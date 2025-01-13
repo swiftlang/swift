@@ -1648,6 +1648,42 @@ extension Set {
   }
 }
 
+/// Extension to add additional mutating methods for `Set`
+///
+/// This extension introduces methods to modify the contents of a `Set` in a way that is not currently
+/// available in the standard library. Specifically, it adds the `remove(where:)` method, which allows
+/// for efficient removal of elements based on a predicate.
+extension Set {
+    
+    /// Removes and returns the first element from the set that satisfies the given predicate.
+    ///
+    /// This method provides a way to efficiently remove an element from the set based on a condition,
+    /// without having to manually collect elements to remove. It ensures that the set remains unique and
+    /// free of duplicates after the removal operation.
+    ///
+    /// - Parameter predicate: A closure that takes an element of the set as its argument and returns
+    ///   a Boolean value indicating whether the element should be removed. The closure should return `true`
+    ///   for the element to be removed, and `false` otherwise.
+    ///
+    /// - Returns: The removed element, or `nil` if no element satisfies the predicate. This allows the caller
+    ///   to check if an element was successfully removed or not.
+    ///
+    /// - Complexity: O(n), where n is the number of elements in the set. This is because the method
+    ///   performs a linear search to find the element to remove.
+    @discardableResult
+    mutating func remove(where predicate: (Element) -> Bool) -> Element? {
+        // Search for the first element that satisfies the predicate condition
+        if let element = self.first(where: predicate) {
+            // Remove the found element from the set
+            self.remove(element)
+            return element
+        }
+        // Return nil if no element satisfies the predicate
+        return nil
+    }
+}
+
+
 public typealias SetIndex<Element: Hashable> = Set<Element>.Index
 public typealias SetIterator<Element: Hashable> = Set<Element>.Iterator
 

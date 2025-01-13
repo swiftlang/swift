@@ -804,6 +804,7 @@ extension Dictionary {
   }
 }
 
+
 extension Dictionary: ExpressibleByDictionaryLiteral {
   /// Creates a dictionary initialized with a dictionary literal.
   ///
@@ -2122,6 +2123,41 @@ extension Dictionary {
     _variant.reserveCapacity(minimumCapacity)
     _internalInvariant(self.capacity >= minimumCapacity)
   }
+}
+
+/// Extension to add additional mutating methods for `Dictionary`
+///
+/// This extension introduces methods to modify the contents of a `Dictionary` in a way that is not currently
+/// available in the standard library. Specifically, it adds the `remove(where:)` method, which allows
+/// for efficient removal of key-value pairs based on a predicate.
+extension Dictionary {
+    
+    /// Removes and returns the first key-value pair from the dictionary that satisfies the given predicate.
+    ///
+    /// This method provides a way to efficiently remove a key-value pair from the dictionary based on a condition,
+    /// without having to manually collect keys to remove. It ensures that the dictionary remains valid and does not
+    /// contain any unwanted entries after the removal operation.
+    ///
+    /// - Parameter predicate: A closure that takes a key-value pair of the dictionary as its argument and returns
+    ///   a Boolean value indicating whether the pair should be removed. The closure should return `true` for the pair
+    ///   to be removed, and `false` otherwise.
+    ///
+    /// - Returns: The removed key-value pair, or `nil` if no pair satisfies the predicate. This allows the caller
+    ///   to check if a pair was successfully removed or not.
+    ///
+    /// - Complexity: O(n), where n is the number of elements in the dictionary. This is because the method
+    ///   performs a linear search to find the key-value pair to remove.
+    @discardableResult
+    mutating func remove(where predicate: (Key, Value) -> Bool) -> (Key, Value)? {
+        // Search for the first key-value pair that satisfies the predicate condition
+        if let pair = self.first(where: { predicate($0.key, $0.value) }) {
+            // Remove the found key-value pair from the dictionary using its key
+            self.removeValue(forKey: pair.key)
+            return pair
+        }
+        // Return nil if no key-value pair satisfies the predicate
+        return nil
+    }
 }
 
 public typealias DictionaryIndex<Key: Hashable, Value> =
