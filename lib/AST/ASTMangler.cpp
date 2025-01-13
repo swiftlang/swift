@@ -2200,6 +2200,19 @@ void ASTMangler::appendImplFunctionType(SILFunctionType *fn,
     OpArgs.push_back('H');
   }
 
+  // Mangle if we have a sending result and we are in a recursive position.
+  //
+  // DISCUSSION: We only want sending results to change ABI if it is using in a
+  // function value passed to a parameter or generic position... but not if it
+  // is just added to a return type.
+  //
+  // E.x.:
+  //
+  //   func foo() -> sending X // No mangling
+  //   func bar(_ x: () -> sending X) {} // Add to mangling for x
+  if (isInRecursion && fn->hasSendingResult())
+    OpArgs.push_back('T');
+
   GenericSignature sig = fn->getSubstGenericSignature();
   
   // Mangle the parameters.
@@ -2211,10 +2224,6 @@ void ASTMangler::appendImplFunctionType(SILFunctionType *fn,
       OpArgs.push_back(*diffKind);
     appendType(param.getInterfaceType(), sig, forDecl);
   }
-
-  // Mangle if we have a sending result.
-  if (isInRecursion && fn->hasSendingResult())
-    OpArgs.push_back('T');
 
   // Mangle the results.
   for (auto result : fn->getResults()) {
