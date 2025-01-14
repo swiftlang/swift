@@ -907,7 +907,7 @@ Decl *ClangTypeConverter::getSwiftDeclForExportedClangDecl(
 clang::QualType ClangTypeConverter::convertTemplateArgument(Type type) {
   auto withCache = [&](auto lookup) {
     auto [it, inserted] = Cache.try_emplace(type, clang::QualType{});
-    if (!inserted)
+    if (inserted)
       it->second = lookup();
     return it->second;
   };
