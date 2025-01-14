@@ -75,6 +75,7 @@ let EI_VERSION    = swift.runtime.EI_VERSION
 let EI_OSABI      = swift.runtime.EI_OSABI
 let EI_ABIVERSION = swift.runtime.EI_ABIVERSION
 let EI_PAD        = swift.runtime.EI_PAD
+let EI_NIDENT     = BacktracingImpl.EI_NIDENT
 
 let ELFMAG0 = swift.runtime.ELFMAG0
 let ELFMAG1 = swift.runtime.ELFMAG1
@@ -180,6 +181,12 @@ let DF_SYMBOLIC = swift.runtime.DF_SYMBOLIC
 let DF_TEXTREL = swift.runtime.DF_TEXTREL
 let DF_BIND_NOW = swift.runtime.DF_BIND_NOW
 let DF_STATIC_TLS = swift.runtime.DF_STATIC_TLS
+
+let NT_GNU_ABI_TAG = swift.runtime.NT_GNU_ABI_TAG
+let NT_GNU_HWCAP = swift.runtime.NT_GNU_HWCAP
+let NT_GNU_BUILD_ID = swift.runtime.NT_GNU_BUILD_ID
+let NT_GNU_GOLD_VERSION = swift.runtime.NT_GNU_GOLD_VERSION
+let NT_GNU_PROPERTY_TYPE_0 = swift.runtime.NT_GNU_PROPERTY_TYPE_0
 
 typealias Elf32_Ehdr = swift.runtime.Elf32_Ehdr
 typealias Elf64_Ehdr = swift.runtime.Elf64_Ehdr
@@ -1365,7 +1372,7 @@ class ElfImage<SomeImageSource: ImageSource,
     }
 
     for note in notes {
-      if note.name == "GNU" && note.type == ImageFormats.NT_GNU_BUILD_ID {
+      if note.name == "GNU" && note.type == NT_GNU_BUILD_ID {
         _uuid = note.desc
         return _uuid
       }

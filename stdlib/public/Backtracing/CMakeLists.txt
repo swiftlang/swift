@@ -53,7 +53,8 @@ set(BACKTRACING_COMPILE_FLAGS
   "-Xfrontend;-experimental-spi-only-imports"
   "-Xcc;-I${SWIFT_SOURCE_DIR}/include"
   "-Xcc;-I${CMAKE_BINARY_DIR}/include"
-  "-Xcc;-I${SWIFT_STDLIB_SOURCE_DIR}/public/Backtracing/modules")
+  "-Xcc;-I${SWIFT_STDLIB_SOURCE_DIR}/public/Backtracing/modules"
+  "-disable-upcoming-feature;MemberImportVisibility")
 
 ###TODO: Add these when we add static linking support
 #
