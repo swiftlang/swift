@@ -745,6 +745,8 @@ static bool ParseEnabledFeatureArgs(LangOptions &Opts, ArgList &Args,
     auto &option = A->getOption();
     StringRef value = A->getValue();
     bool enableUpcoming = option.matches(OPT_enable_upcoming_feature);
+    bool isUpcomingFlag =
+        enableUpcoming || option.matches(OPT_disable_upcoming_feature);
     bool enableFeature =
         enableUpcoming || option.matches(OPT_enable_experimental_feature);
 
@@ -757,20 +759,28 @@ static bool ParseEnabledFeatureArgs(LangOptions &Opts, ArgList &Args,
       continue;
     }
 
-    // If this was specified as an "upcoming feature", it must be recognized
-    // as one.
     auto feature = getUpcomingFeature(value);
-    if (enableUpcoming || option.matches(OPT_disable_upcoming_feature)) {
-      if (!feature)
+    if (feature) {
+      // Diagnose upcoming features enabled with -enable-experimental-feature.
+      if (!isUpcomingFlag)
+        Diags.diagnose(SourceLoc(), diag::feature_not_experimental, value,
+                       enableFeature);
+    } else {
+      // If -enable-upcoming-feature was used and an upcoming feature was not
+      // found, diagnose and continue.
+      if (isUpcomingFlag) {
+        Diags.diagnose(SourceLoc(), diag::unrecognized_feature, value,
+                       /*upcoming=*/true);
         continue;
-    }
+      }
 
-    // If it's not recognized as either an upcoming feature or an experimental
-    // feature, skip it.
-    if (!feature) {
+      // If the feature is also not a recognized experimental feature, skip it.
       feature = getExperimentalFeature(value);
-      if (!feature)
+      if (!feature) {
+        Diags.diagnose(SourceLoc(), diag::unrecognized_feature, value,
+                       /*upcoming=*/false);
         continue;
+      }
     }
 
     // Skip features that are already enabled or disabled.
