@@ -3705,7 +3705,8 @@ void IRGenDebugInfoImpl::emitGlobalVariableDeclaration(
   if (Opts.DebugInfoLevel <= IRGenDebugInfoLevel::LineTables)
     return;
 
-  PrettyStackTraceStringAction trace("emitting global", Var->getName());
+  PrettyStackTraceStringAction trace("emitting global",
+                                     Var ? Var->getName() : Name);
 
   llvm::DIType *DITy = getOrCreateType(DbgTy);
   VarDecl *VD = nullptr;
