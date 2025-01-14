@@ -47,6 +47,7 @@ public:
 
 private:
   friend struct llvm::PointerLikeTypeTraits<AvailabilityDomain>;
+  friend struct llvm::DenseMapInfo<AvailabilityDomain>;
 
   /// For a subset of domain kinds, all the information needed to represent the
   /// domain can be encapsulated inline in this class.
@@ -57,7 +58,8 @@ private:
   public:
     using IntReprType = uint32_t;
     enum : uintptr_t {
-      ReprBits = sizeof(IntReprType) * CHAR_BIT - 8,
+      SpareBits = 8,
+      ReprBits = sizeof(IntReprType) * CHAR_BIT - SpareBits,
       KindShift = ReprBits - sizeof(Kind) * CHAR_BIT,
       PlatformShift = KindShift - sizeof(PlatformKind) * CHAR_BIT,
     };
@@ -83,7 +85,8 @@ private:
   /// defined availability domains.
   using ExternalDomain = void;
 
-  using InlineDomainPtr = llvm::PointerEmbeddedInt<uint32_t, InlineDomain::ReprBits>;
+  using InlineDomainPtr =
+      llvm::PointerEmbeddedInt<uint32_t, InlineDomain::ReprBits>;
   using Storage = llvm::PointerUnion<ExternalDomain *, InlineDomainPtr>;
   Storage storage;
 
@@ -95,8 +98,11 @@ private:
   AvailabilityDomain(PlatformKind platform)
       : storage(InlineDomain(Kind::Platform, platform).asInteger()) {};
 
-  AvailabilityDomain(void *opaque)
-      : storage(Storage::getFromOpaqueValue(opaque)) {};
+  AvailabilityDomain(Storage storage) : storage(storage) {};
+
+  static AvailabilityDomain fromOpaque(void *opaque) {
+    return AvailabilityDomain(Storage::getFromOpaqueValue(opaque));
+  }
 
   void *getOpaqueValue() const { return storage.getOpaqueValue(); }
 
@@ -163,18 +169,7 @@ public:
   llvm::StringRef getNameForAttributePrinting() const;
 
   bool operator==(const AvailabilityDomain &other) const {
-    if (getKind() != other.getKind())
-      return false;
-
-    switch (getKind()) {
-    case Kind::Universal:
-    case Kind::SwiftLanguage:
-    case Kind::PackageDescription:
-      // These availability domains are singletons.
-      return true;
-    case Kind::Platform:
-      return getPlatformKind() == other.getPlatformKind();
-    }
+    return storage.getOpaqueValue() == other.storage.getOpaqueValue();
   }
 
   bool operator!=(const AvailabilityDomain &other) const {
@@ -200,22 +195,38 @@ public:
 } // end namespace swift
 
 namespace llvm {
+using swift::AvailabilityDomain;
+
 // An AvailabilityDomain is "pointer like".
 template <typename T>
 struct PointerLikeTypeTraits;
 template <>
 struct PointerLikeTypeTraits<swift::AvailabilityDomain> {
 public:
-  static inline void *getAsVoidPointer(swift::AvailabilityDomain domain) {
+  static inline void *getAsVoidPointer(AvailabilityDomain domain) {
     return domain.storage.getOpaqueValue();
   }
   static inline swift::AvailabilityDomain getFromVoidPointer(void *P) {
-    return swift::AvailabilityDomain(P);
+    return AvailabilityDomain::fromOpaque(P);
   }
   enum {
-    NumLowBitsAvailable = PointerLikeTypeTraits<
-        swift::AvailabilityDomain::Storage>::NumLowBitsAvailable
+    NumLowBitsAvailable =
+        PointerLikeTypeTraits<AvailabilityDomain::Storage>::NumLowBitsAvailable
   };
+};
+
+template <>
+struct DenseMapInfo<AvailabilityDomain> {
+  static inline AvailabilityDomain getEmptyKey() {
+    return DenseMapInfo<AvailabilityDomain::Storage>::getEmptyKey();
+  }
+  static inline AvailabilityDomain getTombstoneKey() {
+    return DenseMapInfo<AvailabilityDomain::Storage>::getTombstoneKey();
+  }
+  static bool isEqual(const AvailabilityDomain LHS,
+                      const AvailabilityDomain RHS) {
+    return LHS == RHS;
+  }
 };
 
 } // end namespace llvm
