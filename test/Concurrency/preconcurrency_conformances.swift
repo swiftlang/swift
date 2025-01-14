@@ -130,7 +130,7 @@ struct GlobalActor {
 protocol WithIndividuallyIsolatedRequirements {
   @MainActor var a: Int { get set }
   @GlobalActor var b: Int { get set }
-  // expected-note@-1 {{'b' declared here}}
+  // expected-note@-1 {{requirement 'b' declared here}}
 
   @GlobalActor func test()
   // expected-note@-1 {{mark the protocol requirement 'test()' 'async' to allow actor-isolated conformances}}
@@ -158,7 +158,7 @@ do {
 @MainActor
 protocol WithNonIsolated {
   var prop: Int { get set }
-  // expected-note@-1 {{'prop' declared here}}
+  // expected-note@-1 {{requirement 'prop' declared here}}
   nonisolated func test()
   // expected-note@-1 {{mark the protocol requirement 'test()' 'async' to allow actor-isolated conformances}}
 }

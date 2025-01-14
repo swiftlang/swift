@@ -42,6 +42,8 @@ NOTE(opaque_return_type_declared_here,none,
      "opaque return type declared here", ())
 NOTE(default_value_declared_here,none,
      "default value declared here", ())
+NOTE(protocol_requirement_declared_here,none,
+     "requirement %0 declared here", (const ValueDecl *))
 
 //------------------------------------------------------------------------------
 // MARK: Constraint solver diagnostics

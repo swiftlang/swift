@@ -55,7 +55,7 @@ distributed actor D4 {
 
 protocol P1: DistributedActor {
   distributed func dist() -> String
-  // expected-note@-1{{'dist()' declared here}}
+  // expected-note@-1{{requirement 'dist()' declared here}}
 }
 
 distributed actor D5: P1 {

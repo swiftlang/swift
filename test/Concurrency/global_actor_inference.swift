@@ -120,7 +120,7 @@ func testNotAllInP1(nap1: NotAllInP1) { // expected-note{{add '@SomeGlobalActor'
 // Make sure we don't infer 'nonisolated' for stored properties.
 @MainActor
 protocol Interface {
-  nonisolated var baz: Int { get } // expected-note{{'baz' declared here}}
+  nonisolated var baz: Int { get } // expected-note{{requirement 'baz' declared here}}
 }
 
 @MainActor
