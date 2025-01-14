@@ -3158,13 +3158,30 @@ suppressingFeatureIsolatedDeinit(PrintOptions &options,
   action();
 }
 
+namespace {
+struct ExcludeAttrRAII {
+  std::vector<AnyAttrKind> &ExcludeAttrList;
+  unsigned OriginalExcludeAttrCount;
+  
+  ExcludeAttrRAII(std::vector<AnyAttrKind> &ExcludeAttrList,
+                  DeclAttrKind excluded)
+    : ExcludeAttrList(ExcludeAttrList),
+      OriginalExcludeAttrCount(ExcludeAttrList.size())
+  {
+    ExcludeAttrList.push_back(excluded);
+  }
+  
+  ~ExcludeAttrRAII() {
+    ExcludeAttrList.resize(OriginalExcludeAttrCount);
+  }
+};
+}
+
 static void
 suppressingFeatureAllowUnsafeAttribute(PrintOptions &options,
                                        llvm::function_ref<void()> action) {
-  unsigned originalExcludeAttrCount = options.ExcludeAttrList.size();
-  options.ExcludeAttrList.push_back(DeclAttrKind::Unsafe);
+  ExcludeAttrRAII scope(options.ExcludeAttrList, DeclAttrKind::Unsafe);
   action();
-  options.ExcludeAttrList.resize(originalExcludeAttrCount);
 }
 
 static void
@@ -3177,11 +3194,17 @@ suppressingFeatureCoroutineAccessors(PrintOptions &options,
 static void
 suppressingFeatureABIAttribute(PrintOptions &options,
                                llvm::function_ref<void()> action) {
-  llvm::SaveAndRestore<bool> scope(options.PrintSyntheticSILGenName, true);
-  unsigned originalExcludeAttrCount = options.ExcludeAttrList.size();
-  options.ExcludeAttrList.push_back(DeclAttrKind::ABI);
+  llvm::SaveAndRestore<bool> scope1(options.PrintSyntheticSILGenName, true);
+  ExcludeAttrRAII scope2(options.ExcludeAttrList, DeclAttrKind::ABI);
   action();
-  options.ExcludeAttrList.resize(originalExcludeAttrCount);
+}
+
+static void
+suppressingFeatureAddressableTypes(PrintOptions &options,
+                                   llvm::function_ref<void()> action) {
+  ExcludeAttrRAII scope(options.ExcludeAttrList,
+                        DeclAttrKind::AddressableForDependencies);
+  action();
 }
 
 /// Suppress the printing of a particular feature.
