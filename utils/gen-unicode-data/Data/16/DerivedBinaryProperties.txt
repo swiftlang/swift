@@ -1,8 +1,8 @@
-# DerivedBinaryProperties-15.0.0.txt
-# Date: 2022-02-26, 00:38:29 GMT
-# © 2022 Unicode®, Inc.
+# DerivedBinaryProperties-16.0.0.txt
+# Date: 2024-04-30, 21:48:15 GMT
+# © 2024 Unicode®, Inc.
 # Unicode and the Unicode Logo are registered trademarks of Unicode, Inc. in the U.S. and other countries.
-# For terms of use, see https://www.unicode.org/terms_of_use.html
+# For terms of use and license, see https://www.unicode.org/terms_of_use.html
 #
 # Unicode Character Database
 #   For documentation, see https://www.unicode.org/reports/tr44/
@@ -51,7 +51,7 @@
 225F..2260    ; Bidi_Mirrored # Sm   [2] QUESTIONED EQUAL TO..NOT EQUAL TO
 2262          ; Bidi_Mirrored # Sm       NOT IDENTICAL TO
 2264..226B    ; Bidi_Mirrored # Sm   [8] LESS-THAN OR EQUAL TO..MUCH GREATER-THAN
-226E..228C    ; Bidi_Mirrored # Sm  [31] NOT LESS-THAN..MULTISET
+226D..228C    ; Bidi_Mirrored # Sm  [32] NOT EQUIVALENT TO..MULTISET
 228F..2292    ; Bidi_Mirrored # Sm   [4] SQUARE IMAGE OF..SQUARE ORIGINAL OF OR EQUAL TO
 2298          ; Bidi_Mirrored # Sm       CIRCLED DIVISION SLASH
 22A2..22A3    ; Bidi_Mirrored # Sm   [2] RIGHT TACK..LEFT TACK
@@ -236,6 +236,6 @@ FF63          ; Bidi_Mirrored # Pe       HALFWIDTH RIGHT CORNER BRACKET
 1D789         ; Bidi_Mirrored # Sm       MATHEMATICAL SANS-SERIF BOLD PARTIAL DIFFERENTIAL
 1D7C3         ; Bidi_Mirrored # Sm       MATHEMATICAL SANS-SERIF BOLD ITALIC PARTIAL DIFFERENTIAL
 
-# Total code points: 553
+# Total code points: 554
 
 # EOF
