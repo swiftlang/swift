@@ -31,6 +31,7 @@ To cross-compile swift-inspect for Android on Windows, some additional parameter
 ~~~cmd
 set ANDROID_ARCH=aarch64
 set ANDROID_API_LEVEL=29
+set ANDROID_CLANG_VERSION=17.0.2
 set ANDROID_NDK_ROOT=C:\Android\android-sdk\ndk\26.3.11579264
 set SDKROOT_ANDROID=%LocalAppData%\Programs\Swift\Platforms\0.0.0\Android.platform\Developer\SDKs\Android.sdk
 swift build --triple %ANDROID_ARCH%-unknown-linux-android%ANDROID_API_LEVEL% ^
@@ -38,7 +39,8 @@ swift build --triple %ANDROID_ARCH%-unknown-linux-android%ANDROID_API_LEVEL% ^
     -Xswiftc -sdk -Xswiftc %SDKROOT_ANDROID% ^
     -Xswiftc -sysroot -Xswiftc %ANDROID_NDK_ROOT%\toolchains\llvm\prebuilt\windows-x86_64\sysroot ^
     -Xswiftc -I -Xswiftc %SDKROOT_ANDROID%\usr\include ^
-    -Xlinker -L%ANDROID_NDK_ROOT%\toolchains\llvm\prebuilt\windows-x86_64\lib\clang\17.0.2\lib\linux\%ANDROID_ARCH% ^
+    -Xswiftc -Xclang-linker -Xswiftc -resource-dir -Xswiftc -Xclang-linker -Xswiftc %ANDROID_NDK_ROOT%\toolchains\llvm\prebuilt\windows-x86_64\lib\clang\%ANDROID_CLANG_VERSION% ^
+    -Xlinker -L%ANDROID_NDK_ROOT%\toolchains\llvm\prebuilt\windows-x86_64\lib\clang\%ANDROID_CLANG_VERSION%\lib\linux\%ANDROID_ARCH% ^
     -Xcc -I%SDKROOT_ANDROID%\usr\include\swift\SwiftRemoteMirror ^
     -Xlinker %SDKROOT_ANDROID%\usr\lib\swift\android\%ANDROID_ARCH%\libswiftRemoteMirror.so
 ~~~
@@ -62,6 +64,7 @@ In order to build for Android with CMake on Windows, some additiona parameters m
 ~~~cmd
 set ANDROID_ARCH=aarch64
 set ANDROID_API_LEVEL=29
+set ANDROID_CLANG_VERSION=17.0.2
 set ANDROID_NDK_ROOT=C:\Android\android-sdk\ndk\26.3.11579264
 set ANDROID_ARCH_ABI=arm64-v8a
 set SDKROOT_ANDROID=%LocalAppData%\Programs\Swift\Platforms\0.0.0\Android.platform\Developer\SDKs\Android.sdk
@@ -71,7 +74,7 @@ cmake -B build -S . -G Ninja ^
     -D CMAKE_ANDROID_ARCH_ABI=%ANDROID_ARCH_ABI% ^
     -D CMAKE_SYSTEM_VERSION=%ANDROID_API_LEVEL% ^
     -D CMAKE_Swift_COMPILER_TARGET=%ANDROID_ARCH%-unknown-linux-android%ANDROID_API_LEVEL% ^
-    -D CMAKE_Swift_FLAGS="-sdk %SDKROOT_ANDROID% -L%ANDROID_NDK_ROOT%\toolchains\llvm\prebuilt\windows-x86_64\lib\clang\17.0.2\lib\linux\%ANDROID_ARCH% -Xcc -I%SDKROOT_ANDROID%\usr\include -I%SDKROOT_ANDROID%\usr\include\swift\SwiftRemoteMirror" ^
+    -D CMAKE_Swift_FLAGS="-sdk %SDKROOT_ANDROID% -L%ANDROID_NDK_ROOT%\toolchains\llvm\prebuilt\windows-x86_64\lib\clang\%ANDROID_CLANG_VERSION%\lib\linux\%ANDROID_ARCH% -Xclang-linker -resource-dir -Xclang-linker %ANDROID_NDK_ROOT%\toolchains\llvm\prebuilt\windows-x86_64\lib\clang\%ANDROID_CLANG_VERSION% -Xcc -I%SDKROOT_ANDROID%\usr\include -I%SDKROOT_ANDROID%\usr\include\swift\SwiftRemoteMirror" ^
     -D ArgumentParser_DIR=...
 cmake --build build
 ~~~
