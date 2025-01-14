@@ -1904,6 +1904,22 @@ PartialApplyInst::visitOnStackLifetimeEnds(
   return !noUsers;
 }
 
+namespace swift::test {
+FunctionTest PartialApplyPrintOnStackLifetimeEnds(
+    "partial_apply_print_on_stack_lifetime_ends",
+    [](auto &function, auto &arguments, auto &test) {
+      auto *inst = arguments.takeInstruction();
+      auto *pai = cast<PartialApplyInst>(inst);
+      function.print(llvm::outs());
+      auto result = pai->visitOnStackLifetimeEnds([](auto *operand) {
+        operand->print(llvm::outs());
+        return true;
+      });
+      const char *resultString = result ? "true" : "false";
+      llvm::outs() << "returned: " << resultString << "\n";
+    });
+} // end namespace swift::test
+
 // FIXME: Rather than recursing through all results, this should only recurse
 // through ForwardingInstruction and OwnershipTransitionInstruction and the
 // client should prove that any other uses cannot be upstream from a consume of
