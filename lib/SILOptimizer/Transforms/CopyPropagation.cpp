@@ -443,37 +443,25 @@ public:
   /// The entry point to this function transformation.
   void run() override;
 
+  void propagateCopies(CanonicalDefWorklist &defWorklist, bool &changed,
+                       NonLocalAccessBlockAnalysis *accessBlockAnalysis,
+                       InstructionDeleter &deleter);
+
   void verifyOwnership();
 };
 
 } // end anonymous namespace
 
-/// Top-level pass driver.
-void CopyPropagation::run() {
+void CopyPropagation::propagateCopies(
+    CanonicalDefWorklist &defWorklist, bool &changed,
+    NonLocalAccessBlockAnalysis *accessBlockAnalysis,
+    InstructionDeleter &deleter) {
   auto *f = getFunction();
   auto *postOrderAnalysis = getAnalysis<PostOrderAnalysis>();
-  auto *accessBlockAnalysis = getAnalysis<NonLocalAccessBlockAnalysis>();
   auto *deadEndBlocksAnalysis = getAnalysis<DeadEndBlocksAnalysis>();
   auto *dominanceAnalysis = getAnalysis<DominanceAnalysis>();
   auto *calleeAnalysis = getAnalysis<BasicCalleeAnalysis>();
   DominanceInfo *domTree = dominanceAnalysis->get(f);
-
-  // Label for unit testing with debug output.
-  LLVM_DEBUG(llvm::dbgs() << "*** CopyPropagation: " << f->getName() << "\n");
-
-  // This algorithm fundamentally assumes ownership.
-  if (!f->hasOwnership())
-    return;
-
-  CanonicalDefWorklist defWorklist(canonicalizeBorrows);
-  auto callbacks =
-      InstModCallbacks().onDelete([&](SILInstruction *instToDelete) {
-        defWorklist.erase(instToDelete);
-        instToDelete->eraseFromParent();
-      });
-
-  InstructionDeleter deleter(std::move(callbacks));
-  bool changed = false;
 
   StackList<BeginBorrowInst *> beginBorrowsToShrink(f);
   StackList<MoveValueInst *> moveValues(f);
@@ -630,6 +618,32 @@ void CopyPropagation::run() {
     if (auto *inst = def->getDefiningInstruction())
       deleter.trackIfDead(inst);
   }
+}
+
+/// Top-level pass driver.
+void CopyPropagation::run() {
+  auto *f = getFunction();
+  // This algorithm fundamentally assumes ownership.
+  if (!f->hasOwnership())
+    return;
+
+  // Label for unit testing with debug output.
+  LLVM_DEBUG(llvm::dbgs() << "*** CopyPropagation: " << f->getName() << "\n");
+
+  auto *accessBlockAnalysis = getAnalysis<NonLocalAccessBlockAnalysis>();
+
+  CanonicalDefWorklist defWorklist(canonicalizeBorrows);
+
+  auto callbacks =
+      InstModCallbacks().onDelete([&](SILInstruction *instToDelete) {
+        defWorklist.erase(instToDelete);
+        instToDelete->eraseFromParent();
+      });
+  InstructionDeleter deleter(std::move(callbacks));
+
+  bool changed = false;
+  propagateCopies(defWorklist, changed, accessBlockAnalysis, deleter);
+
   // Recursively cleanup dead defs after removing uses.
   deleter.cleanupDeadInstructions();
 
