@@ -905,11 +905,17 @@ Decl *ClangTypeConverter::getSwiftDeclForExportedClangDecl(
 }
 
 clang::QualType ClangTypeConverter::convertTemplateArgument(Type type) {
-  auto withCache = [&](auto lookup) {
-    auto [it, inserted] = Cache.try_emplace(type, clang::QualType{});
-    if (inserted)
-      it->second = lookup();
-    return it->second;
+  auto withCache = [&](auto conversion) {
+    auto cached = Cache.find(type);
+    if (cached != Cache.end())
+      return cached->second;
+
+    // Cache miss; perform the conversion and cache successful results
+    auto result = conversion();
+
+    if (!result.isNull())
+      Cache.insert({type, result});
+    return result;
   };
 
   // This type was imported from Clang, so we can convert it back by retrieving
