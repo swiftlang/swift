@@ -2178,9 +2178,10 @@ ERROR(access_control_extension_open,none,
 ERROR(access_control_open_bad_decl,none,
       "only classes and overridable class members can be declared 'open';"
       " use 'public'", ())
-WARNING(access_control_non_objc_open_member,none,
-      "non-'@objc' %0 in extensions cannot be overridden; use 'public' instead",
-      (DescriptiveDeclKind))
+ERROR(access_control_non_objc_open_member,none,
+      "non-'@objc' %kindonly0 declared in extension cannot be overridden; use "
+      "'public' instead",
+      (const ValueDecl *))
 ERROR(access_control_requires_package_name, none,
       "the package access level %select{|used on %1 }0"
       "requires a package name; set it with the compiler flag -package-name",
