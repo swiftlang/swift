@@ -1850,16 +1850,7 @@ visitRecursivelyLifetimeEndingUses(
       continue;
     }
     // FIXME: Handle store to indirect result
-    
-    // There shouldn't be any dead-end consumptions of a nonescaping
-    // partial_apply that don't forward it along, aside from destroy_value.
-    //
-    // On-stack partial_apply cannot be cloned, so it should never be used by a
-    // BranchInst.
-    //
-    // This is a fatal error because it performs SIL verification that is not
-    // separately checked in the verifier. It is the only check that verifies
-    // the structural requirements of on-stack partial_apply uses.
+
     auto *user = use->getUser();
     if (user->getNumResults() == 0) {
       return visitUnknownUse(use);
@@ -1882,7 +1873,16 @@ PartialApplyInst::visitOnStackLifetimeEnds(
          && "only meaningful for OSSA stack closures");
   bool noUsers = true;
 
-  auto visitUnknownUse = [](Operand *unknownUse){
+  auto visitUnknownUse = [](Operand *unknownUse) {
+    // There shouldn't be any dead-end consumptions of a nonescaping
+    // partial_apply that don't forward it along, aside from destroy_value.
+    //
+    // On-stack partial_apply cannot be cloned, so it should never be used by a
+    // BranchInst.
+    //
+    // This is a fatal error because it performs SIL verification that is not
+    // separately checked in the verifier. It is the only check that verifies
+    // the structural requirements of on-stack partial_apply uses.
     llvm::errs() << "partial_apply [on_stack] use:\n";
     auto *user = unknownUse->getUser();
     user->printInContext(llvm::errs());
