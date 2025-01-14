@@ -565,7 +565,8 @@ ClangTypeConverter::visitBoundGenericType(BoundGenericType *type) {
   }
 
   if (auto kind = classifyPointer(type))
-    return convertPointerType(argType, kind.value(), /*templateArgument=*/false);
+    return convertPointerType(argType, kind.value(),
+                              /*templateArgument=*/false);
 
   if (auto width = classifySIMD(type))
     return convertSIMDType(argType, width.value(), /*templateArgument=*/false);
@@ -576,8 +577,9 @@ ClangTypeConverter::visitBoundGenericType(BoundGenericType *type) {
 clang::QualType ClangTypeConverter::convertSIMDType(CanType scalarType,
                                                     unsigned width,
                                                     bool templateArgument) {
-  clang::QualType scalarTy = templateArgument ? convertTemplateArgument(scalarType)
-                                              : convert(scalarType);
+  clang::QualType scalarTy = templateArgument
+                                 ? convertTemplateArgument(scalarType)
+                                 : convert(scalarType);
   if (scalarTy.isNull())
     return clang::QualType();
 
@@ -599,13 +601,15 @@ clang::QualType ClangTypeConverter::convertPointerType(CanType pointeeType,
     LLVM_FALLTHROUGH;
 
   case PointerKind::UnsafeMutablePointer: {
-    auto clangTy = templateArgument ? convertTemplateArgument(pointeeType) : convert(pointeeType);
+    auto clangTy = templateArgument ? convertTemplateArgument(pointeeType)
+                                    : convert(pointeeType);
     if (clangTy.isNull())
       return clang::QualType();
     return ClangASTContext.getPointerType(clangTy);
   }
   case PointerKind::UnsafePointer: {
-    auto clangTy = templateArgument ? convertTemplateArgument(pointeeType) : convert(pointeeType);
+    auto clangTy = templateArgument ? convertTemplateArgument(pointeeType)
+                                    : convert(pointeeType);
     if (clangTy.isNull())
       return clang::QualType();
     return ClangASTContext.getPointerType(clangTy.withConst());
@@ -958,8 +962,11 @@ clang::QualType ClangTypeConverter::convertTemplateArgument(Type type) {
     if (boundGenericType->getDecl()->isOptionalDecl()) {
       if (auto kind = classifyPointer(argType))
         return withCache([&]() {
-          auto pointeeType = argType->getAs<BoundGenericType>()->getGenericArgs()[0]->getCanonicalType();
-          return convertPointerType(pointeeType, kind.value(), /*templateArgument=*/true);
+          auto pointeeType = argType->getAs<BoundGenericType>()
+                                 ->getGenericArgs()[0]
+                                 ->getCanonicalType();
+          return convertPointerType(pointeeType, kind.value(),
+                                    /*templateArgument=*/true);
         });
 
       // Arbitrary optional types are not (yet) supported
@@ -968,12 +975,14 @@ clang::QualType ClangTypeConverter::convertTemplateArgument(Type type) {
 
     if (auto kind = classifyPointer(boundGenericType))
       return withCache([&]() {
-        return convertPointerType(argType, kind.value(), /*templateArgument=*/true);
+        return convertPointerType(argType, kind.value(),
+                                  /*templateArgument=*/true);
       });
 
     if (auto width = classifySIMD(boundGenericType))
       return withCache([&]() {
-        return convertSIMDType(argType, width.value(), /*templateArgument=*/true);
+        return convertSIMDType(argType, width.value(),
+                               /*templateArgument=*/true);
       });
 
     return clang::QualType();
@@ -1025,20 +1034,22 @@ ClangTypeConverter::getClangTemplateArguments(
   return errorInfo;
 }
 
-std::optional<ClangTypeConverter::PointerKind> ClangTypeConverter::classifyPointer(Type type) {
+std::optional<ClangTypeConverter::PointerKind>
+ClangTypeConverter::classifyPointer(Type type) {
   auto generic = type->getAs<BoundGenericType>();
   if (!generic || generic->getGenericArgs().size() != 1)
     // Must have got something other than a *Pointer<T>
     return std::nullopt;
 
-  return llvm::StringSwitch<std::optional<PointerKind>>(generic->getDecl()->getName().str())
-               .Case("UnsafeMutablePointer", PointerKind::UnsafeMutablePointer)
-               .Case("UnsafePointer", PointerKind::UnsafePointer)
-               .Case("AutoreleasingUnsafeMutablePointer",
-                     PointerKind::AutoreleasingUnsafeMutablePointer)
-               .Case("Unmanaged", PointerKind::Unmanaged)
-               .Case("CFunctionPointer", PointerKind::CFunctionPointer)
-               .Default(std::nullopt);
+  return llvm::StringSwitch<std::optional<PointerKind>>(
+             generic->getDecl()->getName().str())
+      .Case("UnsafeMutablePointer", PointerKind::UnsafeMutablePointer)
+      .Case("UnsafePointer", PointerKind::UnsafePointer)
+      .Case("AutoreleasingUnsafeMutablePointer",
+            PointerKind::AutoreleasingUnsafeMutablePointer)
+      .Case("Unmanaged", PointerKind::Unmanaged)
+      .Case("CFunctionPointer", PointerKind::CFunctionPointer)
+      .Default(std::nullopt);
 }
 
 std::optional<unsigned> ClangTypeConverter::classifySIMD(Type type) {
@@ -1051,7 +1062,7 @@ std::optional<unsigned> ClangTypeConverter::classifySIMD(Type type) {
   if (!name.starts_with("SIMD"))
     return std::nullopt;
   name.consume_front("SIMD");
-  
+
   unsigned width;
   if (/*failed to*/ name.getAsInteger<unsigned>(10, width))
     return std::nullopt;

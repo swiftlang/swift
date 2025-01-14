@@ -120,9 +120,11 @@ private:
 
   clang::QualType convertClangDecl(Type type, const clang::Decl *decl);
 
-  clang::QualType convertSIMDType(CanType scalarType, unsigned width, bool templateArgument);
+  clang::QualType convertSIMDType(CanType scalarType, unsigned width,
+                                  bool templateArgument);
 
-  clang::QualType convertPointerType(CanType pointeeType, PointerKind kind, bool templateArgument);
+  clang::QualType convertPointerType(CanType pointeeType, PointerKind kind,
+                                     bool templateArgument);
 
   void registerExportedClangDecl(Decl *swiftDecl,
                                  const clang::Decl *clangDecl);

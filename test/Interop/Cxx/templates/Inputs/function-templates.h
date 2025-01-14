@@ -61,11 +61,9 @@ struct CxxClass {
   void method() {}
 };
 
-struct
-    __attribute__((swift_attr("import_reference")))
-    __attribute__((swift_attr("retain:immortal")))
-    __attribute__((swift_attr("release:immortal")))
-FRT {
+struct __attribute__((swift_attr("import_reference")))
+__attribute__((swift_attr("retain:immortal")))
+__attribute__((swift_attr("release:immortal"))) FRT {
   int x;
 };
 
