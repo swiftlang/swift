@@ -905,9 +905,6 @@ Decl *ClangTypeConverter::getSwiftDeclForExportedClangDecl(
 }
 
 clang::QualType ClangTypeConverter::convertTemplateArgument(Type type) {
-  // C++ function templates can only be instantiated with Clang types and
-  // a handful of Swift builtin types. These are enumerated here rather than
-  // delegated to ClangTypeConverter::convert() (which is more general).
   auto withCache = [&](auto lookup) {
     auto [it, inserted] = Cache.try_emplace(type, clang::QualType{});
     if (!inserted)

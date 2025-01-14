@@ -116,6 +116,11 @@ private:
   clang::QualType convertMemberType(NominalTypeDecl *DC,
                                     StringRef memberName);
 
+  /// Convert Swift types that are used as C++ function template arguments.
+  ///
+  /// C++ function templates can only be instantiated with types originally
+  /// imported from Clang, and a handful of builtin Swift types (e.g., integers
+  /// and floats).
   clang::QualType convertTemplateArgument(Type type);
 
   clang::QualType convertClangDecl(Type type, const clang::Decl *decl);
