@@ -1195,7 +1195,7 @@ void IterableDeclContext::checkDeserializeMemberErrorInPackage(ModuleDecl *acces
     // This needs to be set to force load all members if not done already.
     setHasLazyMembers(true);
     // Calling getMembers actually loads the members.
-    auto members = getMembers();
+    (void)getMembers();
     assert(!hasLazyMembers());
     assert(didDeserializeMembers());
   }
