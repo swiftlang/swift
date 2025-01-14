@@ -1614,7 +1614,7 @@ class OverridesNonsiolatedInit: SuperWithNonisolatedInit {
 class NonSendable {}
 
 protocol NonisolatedProtocol {
-  var ns: NonSendable { get } // expected-note {{'ns' declared here}}
+  var ns: NonSendable { get } // expected-note {{requirement 'ns' declared here}}
 }
 
 actor ActorWithNonSendableLet: NonisolatedProtocol {

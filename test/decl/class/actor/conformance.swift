@@ -15,8 +15,8 @@ extension MyActor: AsyncProtocol {
 }
 
 protocol SyncProtocol {
-  var propertyA: Int { get } // expected-note{{'propertyA' declared here}}
-  var propertyB: Int { get set } // expected-note{{'propertyB' declared here}}
+  var propertyA: Int { get } // expected-note{{requirement 'propertyA' declared here}}
+  var propertyB: Int { get set } // expected-note{{requirement 'propertyB' declared here}}
 
   func syncMethodA() // expected-note{{mark the protocol requirement 'syncMethodA()' 'async' to allow actor-isolated conformances}}{{21-21= async}}
 
@@ -28,7 +28,7 @@ protocol SyncProtocol {
 
   func syncMethodG() throws -> Void // expected-note{{mark the protocol requirement 'syncMethodG()' 'async' to allow actor-isolated conformances}}{{22-22=async }}
 
-  subscript (index: Int) -> String { get } // expected-note{{'subscript(_:)' declared here}}
+  subscript (index: Int) -> String { get } // expected-note{{requirement 'subscript(_:)' declared here}}
 
   static func staticMethod()
   static var staticProperty: Int { get }
