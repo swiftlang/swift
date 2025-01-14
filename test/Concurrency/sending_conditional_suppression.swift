@@ -207,10 +207,7 @@ public struct TestInStruct {
 // to make sure we do not fail if we fail to parse sending in the if block.
 
 // CHECK: #if compiler(>=5.3) && $NonescapableTypes // Suppression Count: 24
-// CHECK-NEXT: @inlinable public func withCheckedContinuation<T>(isolation: isolated (any _Concurrency.Actor)? = #isolation, function: Swift.String = #function, _ body: (_Concurrency.CheckedContinuation<T, Swift.Never>) -> Swift.Void) async -> sending T {
-// CHECK-NEXT:  fatalError()
-// CHECK-NEXT: }
-// CHECK-NEXT: #elseif compiler(>=5.3) && $SendingArgsAndResults // Suppression Count: 25
+// CHECK-NEXT: #if compiler(>=5.3) && $SendingArgsAndResults // Suppression Count: 25
 // CHECK-NEXT: @inlinable public func withCheckedContinuation<T>(isolation: isolated (any _Concurrency.Actor)? = #isolation, function: Swift.String = #function, _ body: (_Concurrency.CheckedContinuation<T, Swift.Never>) -> Swift.Void) async -> sending T {
 // CHECK-NEXT:  fatalError()
 // CHECK-NEXT: }
@@ -218,6 +215,7 @@ public struct TestInStruct {
 // CHECK-NEXT: @inlinable public func withCheckedContinuation<T>(isolation: isolated (any _Concurrency.Actor)? = #isolation, function: Swift.String = #function, _ body: (_Concurrency.CheckedContinuation<T, Swift.Never>) -> Swift.Void) async -> T {
 // CHECK-NEXT:  fatalError()
 // CHECK-NEXT: }
+// CHECK-NEXT: #endif
 // CHECK-NEXT: #endif
 @inlinable public func withCheckedContinuation<T>(
   isolation: isolated (any _Concurrency.Actor)? = #isolation,
