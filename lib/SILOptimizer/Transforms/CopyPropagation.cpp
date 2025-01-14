@@ -502,6 +502,8 @@ void CopyPropagation::propagateCopies(
     // at least once and then until each stops making changes.
     while (true) {
       SmallVector<CopyValueInst *, 4> modifiedCopyValueInsts;
+      if (!continueWithNextSubpassRun(bbi))
+        return;
       auto shrunk = shrinkBorrowScope(*bbi, deleter, calleeAnalysis,
                                       modifiedCopyValueInsts);
       for (auto *cvi : modifiedCopyValueInsts)
@@ -516,25 +518,35 @@ void CopyPropagation::propagateCopies(
       if (borrowee->getOwnershipKind() != OwnershipKind::Owned)
         break;
 
+      if (!continueWithNextSubpassRun(borrowee))
+        return;
       auto canonicalized = canonicalizer.canonicalizeValueLifetime(borrowee);
       if (!canonicalized && !firstRun)
         break;
 
+      if (!continueWithNextSubpassRun(bbi))
+        return;
       auto folded = foldDestroysOfCopiedLexicalBorrow(bbi, *domTree, deleter);
       if (!folded)
         break;
       auto hoisted = canonicalizer.canonicalizeValueLifetime(folded);
       // Keep running even if the new move's destroys can't be hoisted.
       (void)hoisted;
+      if (!continueWithNextSubpassRun(folded))
+        return;
       eliminateRedundantMove(folded, deleter, defWorklist);
       firstRun = false;
     }
   }
   for (auto *mvi : moveValues) {
+    if (!continueWithNextSubpassRun(mvi))
+      return;
     eliminateRedundantMove(mvi, deleter, defWorklist);
   }
   for (auto *argument : f->getArguments()) {
     if (argument->getOwnershipKind() == OwnershipKind::Owned) {
+      if (!continueWithNextSubpassRun(argument))
+        return;
       canonicalizer.canonicalizeValueLifetime(argument);
     }
   }
@@ -572,8 +584,12 @@ void CopyPropagation::propagateCopies(
       // they may be chained, and CanonicalizeBorrowScopes pushes them
       // top-down.
       for (auto result : ownedForward->getResults()) {
+        if (!continueWithNextSubpassRun(result))
+          return;
         canonicalizer.canonicalizeValueLifetime(result);
       }
+      if (!continueWithNextSubpassRun(ownedForward))
+        return;
       if (sinkOwnedForward(ownedForward, postOrderAnalysis, domTree)) {
         changed = true;
         // Sinking 'ownedForward' may create an opportunity to sink its
@@ -595,6 +611,8 @@ void CopyPropagation::propagateCopies(
     BorrowedValue borrow(defWorklist.borrowedValues.pop_back_val());
     assert(canonicalizeBorrows || !borrow.isLocalScope());
 
+    if (!continueWithNextSubpassRun(borrow.value))
+      return;
     borrowCanonicalizer.canonicalizeBorrowScope(borrow);
     for (CopyValueInst *copy : borrowCanonicalizer.getUpdatedCopies()) {
       defWorklist.updateForCopy(copy);
@@ -611,6 +629,8 @@ void CopyPropagation::propagateCopies(
   // Canonicalize all owned defs.
   while (!defWorklist.ownedValues.empty()) {
     SILValue def = defWorklist.ownedValues.pop_back_val();
+    if (!continueWithNextSubpassRun(def))
+      return;
     auto canonicalized = canonicalizer.canonicalizeValueLifetime(def);
     if (!canonicalized)
       continue;
