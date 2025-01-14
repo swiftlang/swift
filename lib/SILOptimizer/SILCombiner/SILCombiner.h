@@ -47,6 +47,10 @@
 namespace swift {
 
 class AliasAnalysis;
+class SILCombineCanonicalize;
+namespace test {
+struct SILCombinerProcessInstruction;
+}
 
 /// This is a class which maintains the state of the combiner and simplifies
 /// many operations such as removing/adding instructions and syncing them with
@@ -420,6 +424,8 @@ private:
   void processInstruction(SILInstruction *instruction,
                           SILCombineCanonicalize &scCanonicalize,
                           bool &MadeChange);
+  friend test::SILCombinerProcessInstruction;
+
   /// Add reachable code to the worklist. Meant to be used when starting to
   /// process a new function.
   void addReachableCodeToWorklist(SILBasicBlock *BB);
