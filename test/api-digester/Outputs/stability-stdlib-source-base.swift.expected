@@ -379,3 +379,7 @@ Struct UnsafePointer is now with @unsafe
 Struct UnsafeRawBufferPointer is now with @unsafe
 Struct UnsafeRawPointer is now with @unsafe
 Var Optional.unsafelyUnwrapped is now with @unsafe
+
+Accessor Optional.unsafelyUnwrapped.Get() has generic signature change from <Wrapped> to <Wrapped where Wrapped : ~Escapable>
+Accessor UnsafeBufferPointer.indices.Get() has generic signature change from <Element> to <Element where Element : ~Copyable>
+Accessor UnsafeMutableBufferPointer.indices.Get() has generic signature change from <Element> to <Element where Element : ~Copyable>
