@@ -225,16 +225,6 @@ extension LifetimeDependence {
     self.dependentValue = value
   }
 
-  var isUnsafeApplyResult: Bool {
-    if case let .owned(value) = scope {
-      if let apply = value.definingInstruction as? FullApplySite {
-        assert(!apply.hasResultDependence)
-        return true
-      }
-    }
-    return false
-  }
-
   /// Construct LifetimeDependence from mark_dependence [unresolved] or mark_dependence [nonescaping].
   ///
   /// For any LifetimeDependence constructed from a mark_dependence, its `dependentValue` will be the result of the
