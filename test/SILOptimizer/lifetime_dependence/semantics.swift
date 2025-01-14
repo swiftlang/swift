@@ -74,7 +74,17 @@ extension Array {
   }
 }
 
-struct Inner {
+struct InnerTrivial {
+  var p: UnsafePointer<Int>
+
+  @lifetime(borrow self)
+  borrowing func span() -> Span<Int> {
+    Span(base: p, count: 1)
+  }
+}
+
+struct InnerObject {
+  let object: AnyObject
   var p: UnsafePointer<Int>
 
   @lifetime(borrow self)
@@ -84,14 +94,31 @@ struct Inner {
 }
 
 struct Outer {
-  let inner: Inner
-  let fakePointer: UnsafePointer<Inner>
+  var _innerTrivial: InnerTrivial
+  var _innerObject: InnerObject
+  let trivialPointer: UnsafePointer<InnerTrivial>
+  let objectPointer: UnsafePointer<InnerObject>
 
-  var innerAddress: Inner {
+  var innerTrivialAddress: InnerTrivial {
     unsafeAddress {
-      fakePointer
+      trivialPointer
     }
   }
+
+  var innerObjectAddress: InnerObject {
+    unsafeAddress {
+      objectPointer
+    }
+  }
+
+  var innerTrivialTemp: InnerTrivial {
+    get { _innerTrivial }
+  }
+
+  var innerObjectTemp: InnerObject {
+    get { _innerObject }
+  }
+
   /* TODO: rdar://137608270 Add Builtin.addressof() support for @addressable arguments
   @addressableSelf
   var innerAddress: Inner {
@@ -206,11 +233,63 @@ func testTrivialScope<T>(a: Array<T>) -> Span<T> {
 // =============================================================================
 
 @lifetime(borrow outer)
-func testBorrowComponent(outer: Outer) -> Span<Int> {
-  outer.inner.span()
+func testBorrowStoredTrivial(outer: Outer) -> Span<Int> {
+  outer._innerTrivial.span()
 }
 
 @lifetime(borrow outer)
-func testBorrowAddressComponent(outer: Outer) -> Span<Int> {
-  outer.innerAddress.span()
+func testBorrowStoredObject(outer: Outer) -> Span<Int> {
+  outer._innerObject.span()
 }
+
+@lifetime(borrow outer)
+func testBorrowTrivialAddressProjection(outer: Outer) -> Span<Int> {
+  outer.innerTrivialAddress.span()
+}
+
+@lifetime(borrow outer)
+func testBorrowObjectAddressProjection(outer: Outer) -> Span<Int> {
+  outer.innerObjectAddress.span()
+}
+
+func testExprExtendTrivialTemp(outer: Outer) {
+  parse(outer.innerTrivialTemp.span())
+  // expected-error @-1{{lifetime-dependent value escapes its scope}}
+  // expected-note  @-2{{it depends on the lifetime of this parent value}}
+  // expected-note  @-3{{this use of the lifetime-dependent value is out of scope}}
+}
+
+func testExprExtendObjectTemp(outer: Outer) {
+  parse(outer.innerObjectTemp.span())
+  // expected-error @-1{{lifetime-dependent value escapes its scope}}
+  // expected-note  @-2{{it depends on the lifetime of this parent value}}
+  // expected-note  @-3{{this use of the lifetime-dependent value is out of scope}}
+}
+
+func testLocalExtendTrivialTemp(outer: Outer) {
+  let span = outer.innerTrivialTemp.span()
+  // expected-error @-1{{lifetime-dependent variable 'span' escapes its scope}}
+  // expected-note  @-2{{it depends on the lifetime of this parent value}}
+  parse(span) // expected-note {{this use of the lifetime-dependent value is out of scope}}
+}
+
+func testLocalExtendObjectTemp(outer: Outer) {
+  let span = outer.innerObjectTemp.span()
+  // expected-error @-1{{lifetime-dependent variable 'span' escapes its scope}}
+  // expected-note  @-2{{it depends on the lifetime of this parent value}}
+  parse(span) // expected-note {{this use of the lifetime-dependent value is out of scope}}
+}
+
+@lifetime(borrow outer)
+func testReturnTrivialTemp(outer: Outer) -> Span<Int> {
+  outer.innerTrivialTemp.span()
+  // expected-error @-1{{lifetime-dependent value escapes its scope}}
+  // expected-note  @-2{{it depends on the lifetime of this parent value}}
+} // expected-note {{this use causes the lifetime-dependent value to escape}}
+
+@lifetime(borrow outer)
+func testReturnObjectTemp(outer: Outer) -> Span<Int> {
+  outer.innerObjectTemp.span()
+  // expected-error @-1{{lifetime-dependent value escapes its scope}}
+  // expected-note  @-2{{it depends on the lifetime of this parent value}}
+} // expected-note  {{this use causes the lifetime-dependent value to escape}}
