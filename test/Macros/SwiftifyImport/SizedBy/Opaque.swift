@@ -21,8 +21,6 @@ func impNullableUnsafeRawBufferPointer(_ ptr: OpaquePointer!, _ size: CInt) {
 func nonnullSpan(_ ptr: OpaquePointer, _ size: CInt) {
 }
 
-// expected-note@+2{{in expansion of macro '_SwiftifyImport' on global function 'nullableSpan' here}}
-// Cannot refer to source location for the error: "type 'RawSpan' does not conform to protocol 'Escapable'" (which is currently necessary for Optional)
 @_SwiftifyImport(.sizedBy(pointer: .param(1), size: "size"), .nonescaping(pointer: .param(1)))
 func nullableSpan(_ ptr: OpaquePointer?, _ size: CInt) {
 }
