@@ -26,8 +26,13 @@ import Darwin
 @preconcurrency import Dispatch
 import StdlibUnittest
 
+func TESTTEST_taskAddCancellationHandler(handler: () -> Void) {
+  handler()
+}
+func TESTTEST_taskAddEscalationHandler(handler: (TaskPriority) -> Void, t: TaskPriority) { handler(t) }
+
 func loopUntil(priority: TaskPriority) async {
-  var loops = 100
+  var loops = 10
   var currentPriority = Task.currentPriority
   while (currentPriority != priority) {
     print("Current priority = \(currentPriority) != \(priority)")
@@ -97,6 +102,43 @@ func testNestedTaskPriority(basePri: TaskPriority, curPri: TaskPriority) async {
           // Wait till child runs and asks to be escalated
           sem1.wait()
           Task.escalatePriority(task, to: .default)
+          sem2.wait()
+        }
+
+        tests.test("Trigger task escalation handler") {
+          let sem1 = DispatchSemaphore(value: 0)
+          let sem2 = DispatchSemaphore(value: 0)
+          let semEscalated = DispatchSemaphore(value: 0)
+
+          let task = Task(priority: .background) {
+            let _ = expectedBasePri(priority: .background)
+
+            await withTaskPriorityEscalationHandler {
+              print("in withTaskPriorityEscalationHandler, Task.currentPriority = \(Task.currentPriority)")
+
+              // Wait until task is running before asking to be escalated
+              sem1.signal()
+              sleep(1)
+
+              await loopUntil(priority: .default)
+              print("in withTaskPriorityEscalationHandler, after loop, Task.currentPriority = \(Task.currentPriority)")
+            } onEscalate: { newPriority in
+              print("in onEscalate Task.currentPriority = \(Task.currentPriority)")
+              print("in onEscalate newPriority = \(newPriority)")
+              precondition(newPriority == .default)
+              semEscalated.signal()
+            }
+
+            print("Current priority = \(Task.currentPriority)")
+            print("after withTaskPriorityEscalationHandler")
+            sem2.signal()
+          }
+
+          // Wait till child runs and asks to be escalated
+          sem1.wait()
+          task.cancel() // just checking the records don't stomp onto each other somehow
+          Task.escalatePriority(task, to: .default)
+          semEscalated.wait()
           sem2.wait()
         }
       }
