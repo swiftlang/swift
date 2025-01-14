@@ -511,6 +511,36 @@ void SILCombiner::processInstruction(SILInstruction *I,
 }
 
 namespace swift::test {
+struct SILCombinerProcessInstruction {
+  void operator()(SILCombiner &combiner, SILInstruction *inst,
+                  SILCombineCanonicalize &canonicalizer, bool &madeChange) {
+    combiner.processInstruction(inst, canonicalizer, madeChange);
+  }
+};
+// Arguments:
+// - instruction: the instruction to be processed
+// - bool: remove cond_fails
+// - bool: enable lifetime canonicalization
+// Dumps:
+// - the function after the processing is attempted
+static FunctionTest SILCombineProcessInstruction(
+    "sil_combine_process_instruction",
+    [](auto &function, auto &arguments, auto &test) {
+      auto inst = arguments.takeInstruction();
+      auto removeCondFails = arguments.takeBool();
+      auto enableCopyPropagation = arguments.takeBool();
+      SILCombiner combiner(test.getPass(), removeCondFails,
+                           enableCopyPropagation);
+      SILCombineCanonicalize canonicalizer(combiner.Worklist,
+                                           *test.getDeadEndBlocks());
+      bool madeChange = false;
+      SILCombinerProcessInstruction()(combiner, inst, canonicalizer,
+                                      madeChange);
+      function.dump();
+    });
+} // end namespace swift::test
+
+namespace swift::test {
 // Arguments:
 // - instruction: the instruction to be visited
 // Dumps:
