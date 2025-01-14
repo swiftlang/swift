@@ -251,7 +251,7 @@ func emitLargestNameCount(_ names: [(UInt32, String)], into result: inout String
 }
 
 func generateNameProp(into result: inout String) {
-  let derivedName = readFile("Data/DerivedName.txt")
+  let derivedName = readFile("Data/16/DerivedName.txt")
   
   var names: [(UInt32, String)] = []
   var words: [String] = []
