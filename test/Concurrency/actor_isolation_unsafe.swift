@@ -40,12 +40,12 @@ struct S3_P1: P1 {
 
 struct S4_P1_not_quietly: P1 {
   @SomeGlobalActor func onMainActor() { }
-  // expected-warning @-1 {{global actor 'SomeGlobalActor'-isolated instance method 'onMainActor()' cannot be used to satisfy main actor-isolated protocol requirement}}
+  // expected-warning @-1 {{global actor 'SomeGlobalActor'-isolated instance method 'onMainActor()' cannot be used to satisfy main actor-isolated requirement from protocol 'P1'}}
 }
 
 @SomeGlobalActor
 struct S4_P1: P1 {
-  @SomeGlobalActor func onMainActor() { } // expected-warning{{global actor 'SomeGlobalActor'-isolated instance method 'onMainActor()' cannot be used to satisfy main actor-isolated protocol requirement}}
+  @SomeGlobalActor func onMainActor() { } // expected-warning{{global actor 'SomeGlobalActor'-isolated instance method 'onMainActor()' cannot be used to satisfy main actor-isolated requirement from protocol 'P1'}}
 }
 
 // expected-warning@+1 {{'(unsafe)' global actors are deprecated; use '@preconcurrency' instead}}
