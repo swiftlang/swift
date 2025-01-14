@@ -324,6 +324,17 @@ void SILLinkerVisitor::visitProtocolConformance(
     return;
   }
 
+  if (Mod.getASTContext().LangOpts.hasFeature(Feature::Embedded) &&
+      isAvailableExternally(WT->getLinkage()) &&
+      WT->getProtocol()->requiresClass()) {
+    // In embedded swift all the code is generated in the top-level module.
+    // De-serialized tables (= public_external) must be code-gen'd and
+    // therefore made non-external.
+    // Note: for functions we do that at the end of the pipeline in the
+    // IRGenPrepare pass to be able to eliminate dead functions.
+    WT->setLinkage(SILLinkage::Hidden);
+  }
+
   auto maybeVisitRelatedConformance = [&](ProtocolConformanceRef c) {
     // Formally all conformances referenced by a used conformance are used.
     // However, eagerly visiting them all at this point leads to a large blowup
