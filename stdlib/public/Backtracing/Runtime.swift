@@ -19,11 +19,6 @@ import Swift
 
 internal import BacktracingImpl.Runtime
 
-let swift_reportWarning = swift.runtime.swift_reportWarning
-let _swift_backtrace_isThunkFunction
-  = swift.runtime._swift_backtrace_isThunkFunction
-let _swift_backtrace_demangle = swift.runtime._swift_backtrace_demangle
-
 typealias CrashInfo = swift.runtime.backtrace.CrashInfo
 typealias memserver_req = swift.runtime.backtrace.memserver_req
 typealias memserver_resp = swift.runtime.backtrace.memserver_resp
