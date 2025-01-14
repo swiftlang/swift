@@ -242,7 +242,9 @@ public:
       : TaskStatusRecord(TaskStatusRecordKind::CancellationNotification),
         Function(fn), Argument(arg) {}
 
-  void run() { Function(Argument); }
+  void run() {
+    Function(Argument);
+  }
 
   static bool classof(const TaskStatusRecord *record) {
     return record->getKind() == TaskStatusRecordKind::CancellationNotification;
@@ -259,7 +261,7 @@ public:
 /// subsequently used.
 class EscalationNotificationStatusRecord : public TaskStatusRecord {
 public:
-  using FunctionType = void(void *, JobPriority);
+  using FunctionType = SWIFT_CC(swift) void(JobPriority, SWIFT_CONTEXT void *);
 
 private:
   FunctionType *__ptrauth_swift_escalation_notification_function Function;
@@ -268,9 +270,12 @@ private:
 public:
   EscalationNotificationStatusRecord(FunctionType *fn, void *arg)
       : TaskStatusRecord(TaskStatusRecordKind::EscalationNotification),
-        Function(fn), Argument(arg) {}
+        Function(fn), Argument(arg) {
+  }
 
-  void run(JobPriority newPriority) { Function(Argument, newPriority); }
+  void run(JobPriority newPriority) {
+    Function(newPriority, Argument);
+  }
 
   static bool classof(const TaskStatusRecord *record) {
     return record->getKind() == TaskStatusRecordKind::EscalationNotification;

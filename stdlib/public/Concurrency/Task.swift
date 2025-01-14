@@ -929,7 +929,7 @@ extension Task {
   ///   - task: the task which to escalate the priority of
   ///   - newPriority: the new priority the task should continue executing on
   @available(SwiftStdlib 9999, *)
-  public static func escalatePriority(_ task: UnsafeCurrentTask, to newPriority: TaskPriority) {
+  public static func escalatePriority(_ task: Task, to newPriority: TaskPriority) {
     _taskEscalate(task._task, newPriority: newPriority.rawValue)
   }
 
@@ -963,6 +963,56 @@ extension Task {
     _taskEscalate(task._task, newPriority: newPriority.rawValue)
   }
 }
+
+/// Runs the passed `operation` while registering a task priority escalation handler.
+/// The handler will be triggered concurrently to the current task if the current
+/// is subject to priority escalation.
+///
+/// The handler may perform additional actions upon priority escalation,
+/// but cannot influence how the escalation influences the task, i.e. the task's
+/// priority will be escalated regardless of actions performed in the handler.
+///
+/// If multiple task escalation handlers are nester they will all be triggered.
+///
+/// Task escalation propagates through structured concurrency child-tasks.
+///
+/// - Parameters:
+///   - operation: the operation during which to listen for priority escalation
+///   - handler: handler to invoke, concurrently to `operation`,
+///              when priority escalation happens
+/// - Returns: the value returned by `operation`
+/// - Throws: when the `operation` throws an error
+@available(SwiftStdlib 9999, *)
+public func withTaskPriorityEscalationHandler<T, E>(
+  operation: () async throws(E) -> T,
+  onEscalate handler: @Sendable (TaskPriority) -> Void,
+  isolation: isolated (any Actor)? = #isolation
+) async throws(E) -> T {
+  // NOTE: We have to create the closure beforehand as otherwise it seems
+  // the task-local allocator may be used and we end up violating stack-discipline
+  // when releasing the handler closure vs. the record.
+  let handler0: (UInt8) -> Void = {
+    handler(TaskPriority(rawValue: $0))
+  }
+  let record = _taskAddEscalationHandler(handler: handler0)
+  defer { _taskRemoveEscalationHandler(record: record) }
+
+  return try await operation()
+}
+
+@usableFromInline
+@available(SwiftStdlib 9999, *)
+@_silgen_name("swift_task_addEscalationHandler")
+func _taskAddEscalationHandler(
+  handler: (UInt8) -> Void
+) -> UnsafeRawPointer /*EscalationNotificationStatusRecord*/
+
+@usableFromInline
+@available(SwiftStdlib 9999, *)
+@_silgen_name("swift_task_removeEscalationHandler")
+func _taskRemoveEscalationHandler(
+  record: UnsafeRawPointer /*EscalationNotificationStatusRecord*/
+)
 
 // ==== UnsafeCurrentTask ------------------------------------------------------
 
