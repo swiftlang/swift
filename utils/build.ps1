@@ -1451,6 +1451,7 @@ function Build-Compilers() {
     }
     $BuildTools = Join-Path -Path (Get-BuildProjectBinaryCache BuildTools) -ChildPath bin
 
+    $RuntimesOverrides = @{}
     if ($TestClang -or $TestLLD -or $TestLLDB -or $TestLLVM -or $TestSwift) {
       $env:Path = "$(Get-CMarkBinaryCache $Arch)\src;$CompilersBinaryCache\tools\swift\libdispatch-windows-$($Arch.LLVMName)-prefix\bin;$CompilersBinaryCache\bin;$env:Path;$VSInstallRoot\DIA SDK\bin\$($HostArch.VSName);$UnixToolsBinDir"
       $Targets = @()
@@ -1473,6 +1474,20 @@ function Build-Compilers() {
         SWIFT_BUILD_DYNAMIC_STDLIB = "NO";
         SWIFT_BUILD_REMOTE_MIRROR = "NO";
         SWIFT_NATIVE_SWIFT_TOOLS_PATH = $BuildTools;
+      }
+      if ($IsCrossCompiling -and -not $Build) {
+        $RuntimesCompilerPath = "$(Get-BuildProjectBinaryCache Compilers)/bin/clang-cl.exe"
+        $RuntimesTargets = @(
+          "x86_64-unknown-windows-msvc"
+          "aarch64-unknown-windows-msvc"
+          "i686-unknown-windows-msvc"
+        )
+        foreach ($target in $RuntimesTargets) {
+          foreach ($lang in @("C", "CXX", "ASM")) {
+            $RuntimesOverrides["BUILTINS_$($target)_CMAKE_$($lang)_COMPILER"] = $RuntimesCompilerPath
+            $RuntimesOverrides["RUNTIMES_$($target)_CMAKE_$($lang)_COMPILER"] = $RuntimesCompilerPath
+          }
+        }
       }
     }
 
@@ -1497,7 +1512,7 @@ function Build-Compilers() {
       -UsePinnedCompilers Swift `
       -BuildTargets $Targets `
       -CacheScript $SourceCache\swift\cmake\caches\Windows-$($Arch.LLVMName).cmake `
-      -Defines ($TestingDefines + @{
+      -Defines ($TestingDefines + $RuntimesOverrides + @{
         CLANG_TABLEGEN = (Join-Path -Path $BuildTools -ChildPath "clang-tblgen.exe");
         CLANG_TIDY_CONFUSABLE_CHARS_GEN = (Join-Path -Path $BuildTools -ChildPath "clang-tidy-confusable-chars-gen.exe");
         CMAKE_FIND_PACKAGE_PREFER_CONFIG = "YES";
@@ -1804,7 +1819,8 @@ function Build-Sanitizers([Platform]$Platform, $Arch, $InstallTo) {
       -Arch $Arch `
       -Platform $Platform `
       -Defines (@{
-        COMPILER_RT_BUILD_SANITIZERS = "YES"
+        COMPILER_RT_BUILD_PROFILE = "YES";
+        COMPILER_RT_BUILD_SANITIZERS = "YES";
       })
   }
 }

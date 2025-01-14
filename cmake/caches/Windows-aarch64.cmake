@@ -51,11 +51,11 @@ foreach(target ${LLVM_RUNTIME_TARGETS})
   set(RUNTIMES_${target}_CMAKE_MT mt CACHE STRING "")
   set(RUNTIMES_${target}_CMAKE_SYSTEM_NAME Windows CACHE STRING "")
   set(RUNTIMES_${target}_CMAKE_BUILD_TYPE Release CACHE STRING "")
-  set(RUNTIMES_${target}_COMPILER_RT_BUILD_BUILTINS YES CACHE BOOL "")
+  set(RUNTIMES_${target}_COMPILER_RT_BUILD_BUILTINS NO CACHE BOOL "")
   set(RUNTIMES_${target}_COMPILER_RT_BUILD_CRT NO CACHE BOOL "")
   set(RUNTIMES_${target}_COMPILER_RT_BUILD_LIBFUZZER NO CACHE BOOL "")
   set(RUNTIMES_${target}_COMPILER_RT_BUILD_ORC NO CACHE BOOL "")
-  set(RUNTIMES_${target}_COMPILER_RT_BUILD_PROFILE YES CACHE BOOL "")
+  set(RUNTIMES_${target}_COMPILER_RT_BUILD_PROFILE NO CACHE BOOL "")
   set(RUNTIMES_${target}_COMPILER_RT_BUILD_XRAY NO CACHE BOOL "")
   # Sanitizers will be configured, but not built. We have separate build
   # steps for that, because we need a different shell for each target.
