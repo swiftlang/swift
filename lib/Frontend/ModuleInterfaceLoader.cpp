@@ -2202,7 +2202,9 @@ InterfaceSubContextDelegateImpl::runInSubCompilerInstance(StringRef moduleName,
 
   // FIXME: Hack for Darwin.swiftmodule, which cannot be rebuilt with C++
   // interop enabled by the Swift CI because it uses an old host SDK.
-  if (moduleName == "Darwin") {
+  // FIXME: Hack for CoreGraphics.swiftmodule, which cannot be rebuilt because
+  // of a CF_OPTIONS bug (rdar://142762174).
+  if (moduleName == "Darwin" || moduleName == "CoreGraphics") {
     subInvocation.getLangOptions().EnableCXXInterop = false;
     subInvocation.getLangOptions().cxxInteropCompatVersion = {};
     BuildArgs.erase(llvm::remove_if(BuildArgs,
