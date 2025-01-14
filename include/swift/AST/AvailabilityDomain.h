@@ -20,6 +20,8 @@
 
 #include "swift/AST/PlatformKind.h"
 #include "swift/Basic/LLVM.h"
+#include "llvm/ADT/PointerEmbeddedInt.h"
+#include "llvm/ADT/PointerUnion.h"
 
 namespace swift {
 class ASTContext;
@@ -44,17 +46,66 @@ public:
   };
 
 private:
-  Kind kind;
-  PlatformKind platform;
+  friend struct llvm::PointerLikeTypeTraits<AvailabilityDomain>;
 
-  AvailabilityDomain(Kind kind) : kind(kind), platform(PlatformKind::none) {
+  /// For a subset of domain kinds, all the information needed to represent the
+  /// domain can be encapsulated inline in this class.
+  class InlineDomain {
+    Kind kind;
+    PlatformKind platform;
+
+  public:
+    using IntReprType = uint32_t;
+    enum : uintptr_t {
+      ReprBits = sizeof(IntReprType) * CHAR_BIT - 8,
+      KindShift = ReprBits - sizeof(Kind) * CHAR_BIT,
+      PlatformShift = KindShift - sizeof(PlatformKind) * CHAR_BIT,
+    };
+
+    InlineDomain(Kind kind, PlatformKind platform)
+        : kind(kind), platform(platform) {};
+    InlineDomain(IntReprType value)
+        : kind(static_cast<Kind>(value >> KindShift)),
+          platform(static_cast<PlatformKind>(value >> PlatformShift)) {}
+
+    /// Serializes the domain into an integer value that must be smaller than a
+    /// a pointer.
+    IntReprType asInteger() const {
+      return static_cast<IntReprType>(kind) << KindShift |
+             static_cast<IntReprType>(platform) << PlatformShift;
+    }
+
+    Kind getKind() const { return kind; }
+    PlatformKind getPlatform() { return platform; }
+  };
+
+  /// This will eventually be a class storing information about externally
+  /// defined availability domains.
+  using ExternalDomain = void;
+
+  using InlineDomainPtr = llvm::PointerEmbeddedInt<uint32_t, InlineDomain::ReprBits>;
+  using Storage = llvm::PointerUnion<ExternalDomain *, InlineDomainPtr>;
+  Storage storage;
+
+  AvailabilityDomain(Kind kind)
+      : storage(InlineDomain(kind, PlatformKind::none).asInteger()) {
     assert(kind != Kind::Platform);
   };
 
   AvailabilityDomain(PlatformKind platform)
-      : kind(Kind::Platform), platform(platform) {
-    assert(platform != PlatformKind::none);
-  };
+      : storage(InlineDomain(Kind::Platform, platform).asInteger()) {};
+
+  AvailabilityDomain(void *opaque)
+      : storage(Storage::getFromOpaqueValue(opaque)) {};
+
+  void *getOpaqueValue() const { return storage.getOpaqueValue(); }
+
+  std::optional<InlineDomain> getInlineDomain() const {
+    return storage.is<InlineDomainPtr>()
+               ? static_cast<std::optional<InlineDomain>>(
+                     storage.get<InlineDomainPtr>())
+               : std::nullopt;
+  }
 
 public:
   AvailabilityDomain() {}
@@ -75,18 +126,30 @@ public:
     return AvailabilityDomain(Kind::PackageDescription);
   }
 
-  Kind getKind() const { return kind; }
+  Kind getKind() const {
+    if (auto inlineDomain = getInlineDomain())
+      return inlineDomain->getKind();
 
-  bool isUniversal() const { return kind == Kind::Universal; }
+    llvm_unreachable("unimplemented");
+  }
 
-  bool isPlatform() const { return kind == Kind::Platform; }
+  bool isUniversal() const { return getKind() == Kind::Universal; }
 
-  bool isSwiftLanguage() const { return kind == Kind::SwiftLanguage; }
+  bool isPlatform() const { return getKind() == Kind::Platform; }
 
-  bool isPackageDescription() const { return kind == Kind::PackageDescription; }
+  bool isSwiftLanguage() const { return getKind() == Kind::SwiftLanguage; }
+
+  bool isPackageDescription() const {
+    return getKind() == Kind::PackageDescription;
+  }
 
   /// Returns the platform kind for this domain if applicable.
-  PlatformKind getPlatformKind() const { return platform; }
+  PlatformKind getPlatformKind() const {
+    if (auto inlineDomain = getInlineDomain())
+      return inlineDomain->getPlatform();
+
+    return PlatformKind::none;
+  }
 
   /// Returns true if this domain is considered active in the current
   /// compilation context.
@@ -135,5 +198,26 @@ public:
 };
 
 } // end namespace swift
+
+namespace llvm {
+// An AvailabilityDomain is "pointer like".
+template <typename T>
+struct PointerLikeTypeTraits;
+template <>
+struct PointerLikeTypeTraits<swift::AvailabilityDomain> {
+public:
+  static inline void *getAsVoidPointer(swift::AvailabilityDomain domain) {
+    return domain.storage.getOpaqueValue();
+  }
+  static inline swift::AvailabilityDomain getFromVoidPointer(void *P) {
+    return swift::AvailabilityDomain(P);
+  }
+  enum {
+    NumLowBitsAvailable = PointerLikeTypeTraits<
+        swift::AvailabilityDomain::Storage>::NumLowBitsAvailable
+  };
+};
+
+} // end namespace llvm
 
 #endif
