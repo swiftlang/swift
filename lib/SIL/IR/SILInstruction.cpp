@@ -1833,32 +1833,35 @@ visitRecursivelyLifetimeEndingUses(
   llvm::function_ref<bool(Operand *)> visitScopeEnd,
   llvm::function_ref<bool(Operand *)> visitUnknownUse) {
 
-  for (Operand *use : i->getConsumingUses()) {
-    noUsers = false;
-    if (isa<DestroyValueInst>(use->getUser())) {
-      if (!visitScopeEnd(use)) {
-        return false;
-      }
-      continue;
-    }
-    if (auto *ret = dyn_cast<ReturnInst>(use->getUser())) {
-      auto fnTy = ret->getFunction()->getLoweredFunctionType();
-      assert(!fnTy->getLifetimeDependencies().empty());
-      if (!visitScopeEnd(use)) {
-        return false;
-      }
-      continue;
-    }
-    // FIXME: Handle store to indirect result
+  StackList<SILValue> values(i->getFunction());
+  values.push_back(i);
 
-    auto *user = use->getUser();
-    if (user->getNumResults() == 0) {
-      return visitUnknownUse(use);
-    }
-    for (auto res : use->getUser()->getResults()) {
-      if (!visitRecursivelyLifetimeEndingUses(res, noUsers, visitScopeEnd,
-                                              visitUnknownUse)) {
-        return false;
+  while (!values.empty()) {
+    auto value = values.pop_back_val();
+    for (Operand *use : value->getConsumingUses()) {
+      noUsers = false;
+      if (isa<DestroyValueInst>(use->getUser())) {
+        if (!visitScopeEnd(use)) {
+          return false;
+        }
+        continue;
+      }
+      if (auto *ret = dyn_cast<ReturnInst>(use->getUser())) {
+        auto fnTy = ret->getFunction()->getLoweredFunctionType();
+        assert(!fnTy->getLifetimeDependencies().empty());
+        if (!visitScopeEnd(use)) {
+          return false;
+        }
+        continue;
+      }
+      // FIXME: Handle store to indirect result
+
+      auto *user = use->getUser();
+      if (user->getNumResults() == 0) {
+        return visitUnknownUse(use);
+      }
+      for (auto res : use->getUser()->getResults()) {
+        values.push_back(res);
       }
     }
   }
