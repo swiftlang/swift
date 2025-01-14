@@ -905,14 +905,10 @@ clang::QualType ClangTypeConverter::convertTemplateArgument(Type type) {
   // a handful of Swift builtin types. These are enumerated here rather than
   // delegated to ClangTypeConverter::convert() (which is more general).
   auto withCache = [&](auto lookup) {
-    auto cached = Cache.find(type);
-    if (cached != Cache.end())
-      return cached->second;
-
-    auto result = lookup();
-    if (!result.isNull())
-      Cache.insert({type, result});
-    return result;
+    auto [it, inserted] = Cache.try_emplace(type, clang::QualType{});
+    if (!inserted)
+      it->second = lookup();
+    return it->second;
   };
 
   // This type was imported from Clang, so we can convert it back by retrieving
