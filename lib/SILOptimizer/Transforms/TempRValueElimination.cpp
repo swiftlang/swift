@@ -958,15 +958,18 @@ void TempRValueOptPass::run() {
       simplifyAndReplaceAllSimplifiedUsesAndErase(srcInst, callbacks, &deBlocks);
     }
   }
-  if (!deadCopies.empty()) {
-    invalidateAnalysis(SILAnalysis::InvalidationKind::Instructions);
-  }
 
   // Call the utlity to complete ossa lifetime.
+  bool completedAny = false;
   OSSALifetimeCompletion completion(function, da->get(function), deBlocks);
   for (auto it : valuesToComplete) {
-    completion.completeOSSALifetime(it,
-                                    OSSALifetimeCompletion::Boundary::Liveness);
+    auto completed = completion.completeOSSALifetime(
+        it, OSSALifetimeCompletion::Boundary::Liveness);
+    completedAny = (completed == LifetimeCompletion::WasCompleted);
+  }
+
+  if (!deadCopies.empty() || completedAny) {
+    invalidateAnalysis(SILAnalysis::InvalidationKind::Instructions);
   }
 }
 
