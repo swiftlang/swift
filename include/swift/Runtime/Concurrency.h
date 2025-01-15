@@ -609,16 +609,16 @@ SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 void swift_task_removeCancellationHandler(
     CancellationNotificationStatusRecord *record);
 
-/// Create and add an escalation record to the task.
+/// Create and add an priority escalation record to the task.
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 EscalationNotificationStatusRecord*
-swift_task_addEscalationHandler(
+swift_task_addPriorityEscalationHandler(
     EscalationNotificationStatusRecord::FunctionType handler,
     void *handlerContext);
 
-/// Remove the passed cancellation record from the task.
+/// Remove the passed priority escalation record from the task.
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
-void swift_task_removeEscalationHandler(
+void swift_task_removePriorityEscalationHandler(
     EscalationNotificationStatusRecord *record);
 
 /// Create a NullaryContinuationJob from a continuation.
