@@ -945,6 +945,8 @@ void DestroyAddrHoisting::hoistDestroys(
   // blocks and pushing begin_access as we see them and then popping them off
   // the end will result in hoisting inner begin_access' destroy_addrs first.
   for (auto *bai : llvm::reverse(bais)) {
+    if (!continueWithNextSubpassRun(bai))
+      return;
     // [exclusive_modify_scope_hoisting] Hoisting within modify access scopes
     // doesn't respect deinit barriers because
     //
@@ -961,6 +963,8 @@ void DestroyAddrHoisting::hoistDestroys(
   }
   // Alloc stacks always enclose their accesses.
   for (auto *asi : asis) {
+    if (!continueWithNextSubpassRun(asi))
+      return;
     changed |= ::hoistDestroys(asi,
                                /*ignoreDeinitBarriers=*/!asi->isLexical(),
                                remainingDestroyAddrs, deleter, calleeAnalysis);
@@ -969,6 +973,8 @@ void DestroyAddrHoisting::hoistDestroys(
   for (auto *uncastArg : getFunction()->getArguments()) {
     auto *arg = cast<SILFunctionArgument>(uncastArg);
     if (arg->getType().isAddress()) {
+      if (!continueWithNextSubpassRun(arg))
+        return;
       auto convention = arg->getArgumentConvention();
       // This is equivalent to writing
       //
