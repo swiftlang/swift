@@ -26,9 +26,16 @@ bool Mangle::isNonAscii(StringRef str) {
 }
 
 bool Mangle::needsPunycodeEncoding(StringRef str) {
-  for (unsigned char c : str) {
-    if (!isValidSymbolChar(c))
+  if (str.empty()) {
+    return false;
+  }
+  if (!isValidSymbolStart(str.front())) {
+    return true;
+  }
+  for (unsigned char c : str.substr(1)) {
+    if (!isValidSymbolChar(c)) {
       return true;
+    }
   }
   return false;
 }
