@@ -447,9 +447,7 @@ Decl::getSemanticAvailableAttrs(bool includeInactive) const {
 
 std::optional<SemanticAvailableAttr>
 Decl::getSemanticAvailableAttr(const AvailableAttr *attr) const {
-  if (auto domain = attr->getCachedDomain())
-    return SemanticAvailableAttr(attr, *domain);
-  return std::nullopt;
+  return SemanticAvailableAttr(attr);
 }
 
 std::optional<SemanticAvailableAttr>
@@ -790,7 +788,7 @@ bool AvailabilityInference::isAvailableAsSPI(const Decl *D) {
 
 AvailabilityRange
 SemanticAvailableAttr::getIntroducedRange(const ASTContext &Ctx) const {
-  assert(domain.isActive(Ctx));
+  assert(getDomain().isActive(Ctx));
 
   auto *attr = getParsedAttr();
   if (!attr->Introduced.has_value())
