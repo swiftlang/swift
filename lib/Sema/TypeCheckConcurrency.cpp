@@ -5950,10 +5950,19 @@ InferredActorIsolation ActorIsolationRequest::evaluate(
     if (auto selfTypeDecl = value->getDeclContext()->getSelfNominalTypeDecl()) {
       auto selfTypeIsolation = getInferredActorIsolation(selfTypeDecl);
       if (selfTypeIsolation.isolation) {
-        return {
-          inferredIsolation(selfTypeIsolation.isolation, onlyGlobal),
-          selfTypeIsolation.source
-        };
+        auto isolation = selfTypeIsolation.isolation;
+
+        if (auto *func = dyn_cast<AbstractFunctionDecl>(value);
+            ctx.LangOpts.hasFeature(
+                Feature::NonIsolatedAsyncInheritsIsolationFromContext) &&
+            func && func->hasAsync() &&
+            func->getModuleContext() == ctx.MainModule &&
+            isolation.isNonisolated()) {
+          isolation = ActorIsolation::forCallerIsolationInheriting();
+        }
+
+        return {inferredIsolation(isolation, onlyGlobal),
+                selfTypeIsolation.source};
       }
     }
   }
