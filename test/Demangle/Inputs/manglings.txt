@@ -485,3 +485,5 @@ $s4main4SlabVy$1_SiG ---> main.Slab<2, Swift.Int>
 $s$n3_SSBV ---> Builtin.FixedArray<-4, Swift.String>
 $s3red7MyActorC3runyxxyYaKACYcYTXEYaKlFZ ---> static red.MyActor.run<A>(@red.MyActor () async throws -> sending A) async throws -> A
 $s3red7MyActorC3runyxxyYaKYAYTXEYaKlFZ ---> static red.MyActor.run<A>(@isolated(any) () async throws -> sending A) async throws -> A
+$s7ToolKit10TypedValueOACs5Error_pIgHTnTrzo_A2CsAD_pIegHiTrzr_TR ---> {T:} reabstraction thunk helper from @callee_guaranteed @async (@in_guaranteed sending ToolKit.TypedValue) -> sending (@out ToolKit.TypedValue, @error @owned Swift.Error) to @escaping @callee_guaranteed @async (@in sending ToolKit.TypedValue) -> (@out ToolKit.TypedValue, @error @out Swift.Error)
+$s16sending_mangling16NonSendableKlassCACIegTiTr_A2CIegTxTo_TR ---> {T:} reabstraction thunk helper from @escaping @callee_guaranteed (@in sending sending_mangling.NonSendableKlass) -> sending (@out sending_mangling.NonSendableKlass) to @escaping @callee_guaranteed (@owned sending sending_mangling.NonSendableKlass) -> sending (@owned sending_mangling.NonSendableKlass)

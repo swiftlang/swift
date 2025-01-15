@@ -2120,9 +2120,10 @@ ManglingError Remangler::mangleImplFunctionType(Node *node, unsigned depth) {
       }
       case Node::Kind::ImplFunctionAttribute: {
         char FuncAttr = llvm::StringSwitch<char>(Child->getText())
-                        .Case("@Sendable", 'h')
-                        .Case("@async", 'H')
-                        .Default(0);
+                            .Case("@Sendable", 'h')
+                            .Case("@async", 'H')
+                            .Case("sending-result", 'T')
+                            .Default(0);
         if (!FuncAttr) {
           return MANGLING_ERROR(ManglingError::InvalidImplFunctionAttribute,
                                Child);

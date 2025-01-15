@@ -2418,6 +2418,10 @@ NodePointer Demangler::demangleImplFunctionType() {
                    *this);
   }
 
+  if (nextIf('T')) {
+    type->addChild(createNode(Node::Kind::ImplSendingResult), *this);
+  }
+
   addChild(type, GenSig);
 
   int NumTypesToAdd = 0;
@@ -2429,10 +2433,6 @@ NodePointer Demangler::demangleImplFunctionType() {
     if (auto Sending = demangleImplParameterSending())
       Param = addChild(Param, Sending);
     ++NumTypesToAdd;
-  }
-
-  if (nextIf('T')) {
-    type->addChild(createNode(Node::Kind::ImplSendingResult), *this);
   }
 
   while (NodePointer Result = demangleImplResultConvention(
@@ -2467,7 +2467,7 @@ NodePointer Demangler::demangleImplFunctionType() {
       return nullptr;
     type->getChild(type->getNumChildren() - Idx - 1)->addChild(ConvTy, *this);
   }
-  
+
   return createType(type);
 }
 
