@@ -455,6 +455,21 @@ InFlightDiagnostic::warnUntilSwiftVersion(unsigned majorVersion) {
                                         majorVersion);
 }
 
+InFlightDiagnostic &InFlightDiagnostic::warnUntilFutureSwiftCompiler() {
+  // Calling this method on something that is not an error by definition is
+  // not a good practice.
+  {
+    auto diagID = Engine->getActiveDiagnostic().getID();
+    auto diagInfo = storedDiagnosticInfos[(unsigned)diagID];
+
+    ASSERT(diagInfo.kind == DiagnosticKind::Error);
+  }
+
+  wrapIn(diag::error_in_a_future_swift_compiler);
+
+  return limitBehavior(DiagnosticBehavior::Warning);
+}
+
 InFlightDiagnostic &
 InFlightDiagnostic::warnInSwiftInterface(const DeclContext *context) {
   auto sourceFile = context->getParentSourceFile();

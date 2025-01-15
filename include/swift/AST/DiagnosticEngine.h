@@ -731,6 +731,15 @@ namespace swift {
     /// until the next major language version.
     InFlightDiagnostic &warnUntilSwiftVersion(unsigned majorVersion);
 
+    /// Limit the behavior of this diagnostic to a warning and append a fragment
+    /// to the message stating that it will become an error in a future Swift
+    /// compiler.
+    /// The diagnostic represented by the receiver must be defined as an error.
+    ///
+    /// This helps to stage in source-breaking fixes for potentially harmful
+    /// miscompilations.
+    InFlightDiagnostic &warnUntilFutureSwiftCompiler();
+
     /// Limit the diagnostic behavior to warning if the context is a
     /// swiftinterface.
     ///

@@ -59,6 +59,12 @@ WARNING(error_in_a_future_swift_lang_mode,none,
         "%0; this will be an error in a future Swift language mode",
         (DiagnosticInfo *))
 
+// This does not have a group because warnings of this kind inherit the group
+// from the wrapped error.
+WARNING(error_in_a_future_swift_compiler,none,
+        "%0; this will be an error in a future Swift compiler",
+        (DiagnosticInfo *))
+
 // Generic disambiguation
 NOTE(while_parsing_as_left_angle_bracket,none,
      "while parsing this '<' as a type parameter bracket", ())
