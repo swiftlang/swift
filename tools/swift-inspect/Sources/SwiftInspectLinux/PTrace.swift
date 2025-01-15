@@ -32,7 +32,7 @@ public struct PTrace: ~Copyable {
   // it to stop, and leaves it in a stopped state. The caller may resume the
   // process by calling cont().
   // NOTE: clients must use withPTracedProcess instead of direct initialization.
-  init(_ pid: pid_t) throws {
+  fileprivate init(_ pid: pid_t) throws {
     guard ptrace_attach(pid) != -1 else {
       throw PTraceError.operationFailure(PTRACE_ATTACH, pid: pid)
     }
