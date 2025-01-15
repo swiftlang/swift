@@ -766,6 +766,10 @@ def create_argument_parser():
     option('--test-sourcekit-lsp-sanitize-all',
            toggle_true('test_sourcekitlsp_sanitize_all'),
            help='run sourcekit-lsp tests under all sanitizers')
+    option('--sourcekit-lsp-verify-generated-files',
+           toggle_true('sourcekitlsp_verify_generated_files'),
+           help='set to verify that the generated files in the source tree ' +
+                'match the ones that would be generated from current main')
     option('--sourcekit-lsp-lint',
            toggle_true('sourcekitlsp_lint'),
            help='verify that sourcekit-lsp Source code is formatted correctly')
