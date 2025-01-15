@@ -586,9 +586,8 @@ extension _ArrayBuffer {
       _storage.objCInstance,
       _ArrayBuffer.associationKey
     ) {
-      let buffer = assocPtr.load(
-        as: _ContiguousArrayStorage<Element>.self
-      )
+      let buffer: _ContiguousArrayStorage<Element>
+      buffer = Unmanaged.fromOpaque(assocPtr).takeUnretainedValue()
       return _ContiguousArrayBuffer(buffer)
     }
     return nil
