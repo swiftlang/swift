@@ -290,7 +290,6 @@ public struct PublicDiffAttrConformance: ProtocolRequirements {
   var x: Float
   var y: Float
 
-  // FIXME(TF-284): Fix unexpected diagnostic.
   // expected-note @+2 {{candidate is missing explicit '@differentiable(reverse)' attribute to satisfy requirement}} {{10-10=@differentiable(reverse) }}
   // expected-note @+1 {{candidate has non-matching type '(x: Float, y: Float)'}}
   public init(x: Float, y: Float) {
@@ -298,7 +297,6 @@ public struct PublicDiffAttrConformance: ProtocolRequirements {
     self.y = y
   }
 
-  // FIXME(TF-284): Fix unexpected diagnostic.
   // expected-note @+2 {{candidate is missing explicit '@differentiable(reverse)' attribute to satisfy requirement}} {{10-10=@differentiable(reverse) }}
   // expected-note @+1 {{candidate has non-matching type '(x: Float, y: Int)'}}
   public init(x: Float, y: Int) {
