@@ -329,7 +329,11 @@ extension LifetimeDependence.Scope {
       self = Self(guaranteed: refElt.operand.value, context)
     case let .argument(arg):
       if arg.convention.isIndirectIn {
-        self = .initialized(initialAddress: arg, initializingStore: nil)
+        if arg.convention.isGuaranteed {
+          self = .caller(arg)
+        } else {
+          self = .initialized(initialAddress: arg, initializingStore: nil)
+        }
       } else if arg.convention.isIndirectOut || arg.convention.isInout {
         // TODO: verify that @out values are never reassigned.
         self = .caller(arg)
