@@ -20,7 +20,7 @@ extension Unicode {
   /// but is defined by https://www.unicode.org/Public/UCD/latest/ucd/PropertyValueAliases.txt.
   /// We may want to split it out, as it's the only case that is a union of
   /// other script types.
-  public enum Script: String, Hashable {
+  public enum Script: String, Hashable, CaseIterable {
     case adlam = "Adlam"
     case ahom = "Ahom"
     case anatolianHieroglyphs = "Anatolian_Hieroglyphs"
@@ -591,9 +591,7 @@ func emitScriptExtensionData(
   
   // Insert our quick look size at the beginning.
   var size = BitArray(size: 64)
-  // We - 1 here because we only support indexing the bit arrays from
-  // 0 ..< count
-  size.words = [UInt64(bitArrays.count) - 1]
+  size.words = [UInt64(bitArrays.count)]
   bitArrays.insert(size, at: 0)
   
   var dataIndices: [UInt16] = []
