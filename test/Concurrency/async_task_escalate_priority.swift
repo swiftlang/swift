@@ -26,11 +26,6 @@ import Darwin
 @preconcurrency import Dispatch
 import StdlibUnittest
 
-func TESTTEST_taskAddCancellationHandler(handler: () -> Void) {
-  handler()
-}
-func TESTTEST_taskAddEscalationHandler(handler: (TaskPriority) -> Void, t: TaskPriority) { handler(t) }
-
 func loopUntil(priority: TaskPriority) async {
   var loops = 10
   var currentPriority = Task.currentPriority

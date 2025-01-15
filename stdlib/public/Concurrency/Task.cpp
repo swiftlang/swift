@@ -1768,7 +1768,7 @@ static void swift_task_removeCancellationHandlerImpl(
 
 SWIFT_CC(swift)
 static EscalationNotificationStatusRecord*
-swift_task_addEscalationHandlerImpl(
+swift_task_addPriorityEscalationHandlerImpl(
     EscalationNotificationStatusRecord::FunctionType handler,
     void *context) {
   void *allocation =
@@ -1785,7 +1785,7 @@ swift_task_addEscalationHandlerImpl(
 }
 
 SWIFT_CC(swift)
-static void swift_task_removeEscalationHandlerImpl(
+static void swift_task_removePriorityEscalationHandlerImpl(
     EscalationNotificationStatusRecord *record) {
   removeStatusRecordFromSelf(record);
   swift_task_dealloc(record);

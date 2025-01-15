@@ -994,23 +994,23 @@ public func withTaskPriorityEscalationHandler<T, E>(
   let handler0: (UInt8) -> Void = {
     handler(TaskPriority(rawValue: $0))
   }
-  let record = _taskAddEscalationHandler(handler: handler0)
-  defer { _taskRemoveEscalationHandler(record: record) }
+  let record = _taskaddPriorityEscalationHandler(handler: handler0)
+  defer { _taskremovePriorityEscalationHandler(record: record) }
 
   return try await operation()
 }
 
 @usableFromInline
 @available(SwiftStdlib 9999, *)
-@_silgen_name("swift_task_addEscalationHandler")
-func _taskAddEscalationHandler(
+@_silgen_name("swift_task_addPriorityEscalationHandler")
+func _taskaddPriorityEscalationHandler(
   handler: (UInt8) -> Void
 ) -> UnsafeRawPointer /*EscalationNotificationStatusRecord*/
 
 @usableFromInline
 @available(SwiftStdlib 9999, *)
-@_silgen_name("swift_task_removeEscalationHandler")
-func _taskRemoveEscalationHandler(
+@_silgen_name("swift_task_removePriorityEscalationHandler")
+func _taskremovePriorityEscalationHandler(
   record: UnsafeRawPointer /*EscalationNotificationStatusRecord*/
 )
 
