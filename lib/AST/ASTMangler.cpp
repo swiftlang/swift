@@ -2303,9 +2303,9 @@ void ASTMangler::appendImplFunctionType(SILFunctionType *fn,
 
   // Mangle if we have a sending result and we are in a recursive position.
   //
-  // DISCUSSION: We only want sending results to change ABI if it is using in a
-  // function value passed to a parameter or generic position... but not if it
-  // is just added to a return type.
+  // DISCUSSION: We only want sending results to be in the mangling if it is
+  // being used in a function value passed to a parameter or generic
+  // position... but not if it is just added to a return type.
   //
   // E.x.:
   //
