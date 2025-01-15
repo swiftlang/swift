@@ -927,8 +927,69 @@ bool hoistDestroys(SILValue root, bool ignoreDeinitBarriers,
 namespace {
 class DestroyAddrHoisting : public swift::SILFunctionTransform {
   void run() override;
+  void hoistDestroys(bool &changed, ArrayRef<BeginAccessInst *> bais,
+                     ArrayRef<AllocStackInst *> asis,
+                     SmallPtrSetImpl<SILInstruction *> &remainingDestroyAddrs,
+                     InstructionDeleter &deleter);
 };
 } // end anonymous namespace
+
+void DestroyAddrHoisting::hoistDestroys(
+    bool &changed, ArrayRef<BeginAccessInst *> bais,
+    ArrayRef<AllocStackInst *> asis,
+    SmallPtrSetImpl<SILInstruction *> &remainingDestroyAddrs,
+    InstructionDeleter &deleter) {
+  auto *calleeAnalysis = getAnalysis<BasicCalleeAnalysis>();
+
+  // We assume that the function is in reverse post order so visiting the
+  // blocks and pushing begin_access as we see them and then popping them off
+  // the end will result in hoisting inner begin_access' destroy_addrs first.
+  for (auto *bai : llvm::reverse(bais)) {
+    // [exclusive_modify_scope_hoisting] Hoisting within modify access scopes
+    // doesn't respect deinit barriers because
+    //
+    //   Mutable variable lifetimes that are formally modified in the middle of
+    //   a lexical scope are anchored to the beginning of the lexical scope
+    //   rather than to the end.
+    //
+    // TODO: If the performance issues associated with failing to hoist
+    //       destroys within an exclusive modify scope are otherwise addressed,
+    //       it may be less confusing not to make use of the above rule and
+    //       respect deinit barriers here also ( rdar://116335154 ).
+    changed |= ::hoistDestroys(bai, /*ignoreDeinitBarriers=*/true,
+                               remainingDestroyAddrs, deleter, calleeAnalysis);
+  }
+  // Alloc stacks always enclose their accesses.
+  for (auto *asi : asis) {
+    changed |= ::hoistDestroys(asi,
+                               /*ignoreDeinitBarriers=*/!asi->isLexical(),
+                               remainingDestroyAddrs, deleter, calleeAnalysis);
+  }
+  // Arguments enclose everything.
+  for (auto *uncastArg : getFunction()->getArguments()) {
+    auto *arg = cast<SILFunctionArgument>(uncastArg);
+    if (arg->getType().isAddress()) {
+      auto convention = arg->getArgumentConvention();
+      // This is equivalent to writing
+      //
+      //     convention == SILArgumentConvention::Indirect_Inout
+      //
+      // but communicates the rationale: in order to ignore deinit barriers, the
+      // address must be exclusively accessed and be a modification.
+      //
+      // The situation with inout parameters is analogous to that with
+      // mutable exclusive access scopes [exclusive_modify_scope_hoisting], so
+      // deinit barriers are not respected.
+      bool ignoredByConvention = convention.isInoutConvention() &&
+                                 convention.isExclusiveIndirectParameter();
+      auto lifetime = arg->getLifetime();
+      bool ignoreDeinitBarriers = ignoredByConvention || lifetime.isEagerMove();
+      changed |=
+          ::hoistDestroys(arg, ignoreDeinitBarriers, remainingDestroyAddrs,
+                          deleter, calleeAnalysis);
+    }
+  }
+}
 
 // TODO: Handle alloc_box the same way, as long as the box doesn't escape.
 //
@@ -1025,55 +1086,7 @@ void DestroyAddrHoisting::run() {
     ++splitDestroys;
   }
 
-  auto *calleeAnalysis = getAnalysis<BasicCalleeAnalysis>();
-
-  // We assume that the function is in reverse post order so visiting the
-  // blocks and pushing begin_access as we see them and then popping them off
-  // the end will result in hoisting inner begin_access' destroy_addrs first.
-  for (auto *bai : llvm::reverse(bais)) {
-    // [exclusive_modify_scope_hoisting] Hoisting within modify access scopes
-    // doesn't respect deinit barriers because
-    //
-    //   Mutable variable lifetimes that are formally modified in the middle of
-    //   a lexical scope are anchored to the beginning of the lexical scope
-    //   rather than to the end.
-    //
-    // TODO: If the performance issues associated with failing to hoist
-    //       destroys within an exclusive modify scope are otherwise addressed,
-    //       it may be less confusing not to make use of the above rule and
-    //       respect deinit barriers here also ( rdar://116335154 ).
-    changed |= hoistDestroys(bai, /*ignoreDeinitBarriers=*/true,
-                             remainingDestroyAddrs, deleter, calleeAnalysis);
-  }
-  // Alloc stacks always enclose their accesses.
-  for (auto *asi : asis) {
-    changed |= hoistDestroys(asi,
-                             /*ignoreDeinitBarriers=*/!asi->isLexical(),
-                             remainingDestroyAddrs, deleter, calleeAnalysis);
-  }
-  // Arguments enclose everything.
-  for (auto *uncastArg : getFunction()->getArguments()) {
-    auto *arg = cast<SILFunctionArgument>(uncastArg);
-    if (arg->getType().isAddress()) {
-      auto convention = arg->getArgumentConvention();
-      // This is equivalent to writing
-      //
-      //     convention == SILArgumentConvention::Indirect_Inout
-      //
-      // but communicates the rationale: in order to ignore deinit barriers, the
-      // address must be exclusively accessed and be a modification.
-      //
-      // The situation with inout parameters is analogous to that with
-      // mutable exclusive access scopes [exclusive_modify_scope_hoisting], so
-      // deinit barriers are not respected.
-      bool ignoredByConvention = convention.isInoutConvention() &&
-                                 convention.isExclusiveIndirectParameter();
-      auto lifetime = arg->getLifetime();
-      bool ignoreDeinitBarriers = ignoredByConvention || lifetime.isEagerMove();
-      changed |= hoistDestroys(arg, ignoreDeinitBarriers, remainingDestroyAddrs,
-                               deleter, calleeAnalysis);
-    }
-  }
+  hoistDestroys(changed, bais, asis, remainingDestroyAddrs, deleter);
 
   for (auto pair : splitDestroysAndStores) {
     auto *dai = pair.first;
