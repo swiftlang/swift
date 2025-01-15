@@ -994,25 +994,11 @@ public func withTaskPriorityEscalationHandler<T, E>(
   let handler0: (UInt8) -> Void = {
     handler(TaskPriority(rawValue: $0))
   }
-  let record = _taskaddPriorityEscalationHandler(handler: handler0)
-  defer { _taskremovePriorityEscalationHandler(record: record) }
+  let record = _taskAddPriorityEscalationHandler(handler: handler0)
+  defer { _taskRemovePriorityEscalationHandler(record: record) }
 
   return try await operation()
 }
-
-@usableFromInline
-@available(SwiftStdlib 9999, *)
-@_silgen_name("swift_task_addPriorityEscalationHandler")
-func _taskaddPriorityEscalationHandler(
-  handler: (UInt8) -> Void
-) -> UnsafeRawPointer /*EscalationNotificationStatusRecord*/
-
-@usableFromInline
-@available(SwiftStdlib 9999, *)
-@_silgen_name("swift_task_removePriorityEscalationHandler")
-func _taskremovePriorityEscalationHandler(
-  record: UnsafeRawPointer /*EscalationNotificationStatusRecord*/
-)
 
 // ==== UnsafeCurrentTask ------------------------------------------------------
 
@@ -1184,6 +1170,20 @@ func _enqueueJobGlobalWithDelay(_ delay: UInt64, _ task: Builtin.Job)
 func _enqueueJobGlobalWithDeadline(_ seconds: Int64, _ nanoseconds: Int64,
                                    _ toleranceSec: Int64, _ toleranceNSec: Int64,
                                    _ clock: Int32, _ task: Builtin.Job)
+
+@usableFromInline
+@available(SwiftStdlib 9999, *)
+@_silgen_name("swift_task_addPriorityEscalationHandler")
+func _taskAddPriorityEscalationHandler(
+  handler: (UInt8) -> Void
+) -> UnsafeRawPointer /*EscalationNotificationStatusRecord*/
+
+@usableFromInline
+@available(SwiftStdlib 9999, *)
+@_silgen_name("swift_task_removePriorityEscalationHandler")
+func _taskRemovePriorityEscalationHandler(
+  record: UnsafeRawPointer /*EscalationNotificationStatusRecord*/
+)
 
 @available(SwiftStdlib 5.1, *)
 @usableFromInline

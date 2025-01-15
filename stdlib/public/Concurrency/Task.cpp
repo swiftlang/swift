@@ -1773,7 +1773,7 @@ swift_task_addPriorityEscalationHandlerImpl(
     void *context) {
   void *allocation =
       swift_task_alloc(sizeof(EscalationNotificationStatusRecord));
-  auto unsigned_handler = swift_auth_code(handler, 3848); // FIXME: fix this number for ptrauth
+  auto unsigned_handler = swift_auth_code(handler, 62877);
   auto *record = ::new (allocation)
       EscalationNotificationStatusRecord(handler, context);
 
