@@ -1814,8 +1814,9 @@ void InterfaceSubContextDelegateImpl::inheritOptionsForBuildingInterface(
 }
 
 bool InterfaceSubContextDelegateImpl::extractSwiftInterfaceVersionAndArgs(
-    CompilerInvocation &subInvocation, SwiftInterfaceInfo &interfaceInfo,
-    StringRef interfacePath, SourceLoc diagnosticLoc) {
+    CompilerInvocation &subInvocation, DiagnosticEngine &subInstanceDiags,
+    SwiftInterfaceInfo &interfaceInfo, StringRef interfacePath,
+    SourceLoc diagnosticLoc) {
   if (readSwiftInterfaceVersionAndArgs(SM, *Diags, ArgSaver, interfaceInfo,
                                        interfacePath, diagnosticLoc,
                                        subInvocation.getLangOptions().Target))
@@ -1833,7 +1834,7 @@ bool InterfaceSubContextDelegateImpl::extractSwiftInterfaceVersionAndArgs(
   }
 
   SmallString<32> ExpectedModuleName = subInvocation.getModuleName();
-  if (subInvocation.parseArgs(interfaceInfo.Arguments, *Diags)) {
+  if (subInvocation.parseArgs(interfaceInfo.Arguments, subInstanceDiags)) {
     return true;
   }
 
@@ -2236,11 +2237,25 @@ InterfaceSubContextDelegateImpl::runInSubCompilerInstance(StringRef moduleName,
   subInvocation.getFrontendOptions().InputsAndOutputs
     .setMainAndSupplementaryOutputs(outputFiles, ModuleOutputPaths);
 
+  CompilerInstance subInstance;
+  ForwardingDiagnosticConsumer FDC(*Diags);
+  NullDiagnosticConsumer noopConsumer;
+  if (!silenceErrors) {
+    subInstance.addDiagnosticConsumer(&FDC);
+  } else {
+    subInstance.addDiagnosticConsumer(&noopConsumer);
+  }
+
+  // Eagerly suppress warnings if necessary, before parsing arguments.
+  if (subInvocation.getDiagnosticOptions().SuppressWarnings)
+    subInstance.getDiags().setSuppressWarnings(true);
+
   SwiftInterfaceInfo interfaceInfo;
   // Extract compiler arguments from the interface file and use them to configure
   // the compiler invocation.
-  if (extractSwiftInterfaceVersionAndArgs(subInvocation, interfaceInfo,
-                                          interfacePath, diagLoc)) {
+  if (extractSwiftInterfaceVersionAndArgs(subInvocation, subInstance.getDiags(),
+                                          interfaceInfo, interfacePath,
+                                          diagLoc)) {
     return std::make_error_code(std::errc::not_supported);
   }
 
@@ -2252,20 +2267,11 @@ InterfaceSubContextDelegateImpl::runInSubCompilerInstance(StringRef moduleName,
   subInvocation.getFrontendOptions().StrictImplicitModuleContext =
       StrictImplicitModuleContext;
 
-  CompilerInstance subInstance;
   SubCompilerInstanceInfo info;
   info.Instance = &subInstance;
   info.CompilerVersion = interfaceInfo.CompilerVersion;
 
   subInstance.getSourceMgr().setFileSystem(SM.getFileSystem());
-
-  ForwardingDiagnosticConsumer FDC(*Diags);
-  NullDiagnosticConsumer noopConsumer;
-  if (!silenceErrors) {
-    subInstance.addDiagnosticConsumer(&FDC);
-  } else {
-    subInstance.addDiagnosticConsumer(&noopConsumer);
-  }
 
   std::string InstanceSetupError;
   if (subInstance.setup(subInvocation, InstanceSetupError)) {
