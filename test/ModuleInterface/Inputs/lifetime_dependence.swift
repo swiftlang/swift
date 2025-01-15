@@ -54,3 +54,24 @@ public func deriveThisOrThat(_ this: consuming BufferView, _ that: consuming Buf
   return BufferView(that._ptr, that._count)
 }
 
+@_unsafeNonescapableResult
+@_transparent
+@lifetime(borrow source)
+internal func _overrideLifetime<T: ~Copyable & ~Escapable, U: ~Copyable & ~Escapable>(
+  _ dependent: consuming T, borrowing source: borrowing U) -> T {
+  dependent
+}
+
+public struct Container {
+  var buffer: UnsafeRawBufferPointer
+  var object: AnyObject
+}
+
+extension Container {
+  public var storage: BufferView {
+    get {
+      let view = BufferView(buffer, 1)
+      return _overrideLifetime(view, borrowing: self)
+    }
+  }
+}

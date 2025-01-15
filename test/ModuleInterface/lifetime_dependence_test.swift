@@ -35,3 +35,9 @@ import lifetime_dependence
 
 // CHECK: @lifetime(this, that)
 // CHECK-NEXT: @inlinable public func deriveThisOrThat(_ this: consuming lifetime_dependence.BufferView, _ that: consuming lifetime_dependence.BufferView) -> lifetime_dependence.BufferView {
+
+// Check that an implicitly dependent variable accessor is guarded by LifetimeDependence.
+//
+// CHECK: extension lifetime_dependence.Container {
+// CHECK-NEXT: #if compiler(>=5.3) && $NonescapableTypes && $LifetimeDependence
+// CHECK-NEXT:   public var storage: lifetime_dependence.BufferView {
