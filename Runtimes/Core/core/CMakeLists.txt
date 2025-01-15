@@ -283,9 +283,14 @@ target_compile_options(swiftCore PRIVATE
   "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xfrontend -disable-autolinking-runtime-compatibility-concurrency>"
   "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xfrontend -disable-objc-attr-requires-foundation-module>"
   "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xfrontend -require-explicit-availability=ignore>"
-  "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xfrontend -prespecialize-generic-metadata>"
-  "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xllvm -sil-inline-generics>"
-  "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xllvm -sil-partial-specialization>")
+  "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xfrontend -prespecialize-generic-metadata>")
+
+if(NOT "${CMAKE_BUILD_TYPE}" STREQUAL "MinSizeRel")
+  # Using these in MinSizeRel would result in a 15% increase in the binary size
+  target_compile_options(swiftCore PRIVATE
+    "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xllvm -sil-inline-generics>"
+    "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xllvm -sil-partial-specialization>")
+endif()
 
 target_compile_definitions(swiftCore PRIVATE
   $<$<BOOL:${SwiftCore_ENABLE_REFLECTION}>:-DSWIFT_ENABLE_REFLECTION>
