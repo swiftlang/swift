@@ -6202,9 +6202,7 @@ void swift::checkGlobalIsolation(VarDecl *var) {
       var->getASTContext().LangOpts.hasFeature(Feature::GlobalConcurrency) &&
       !isolation.isGlobalActor() &&
       (isolation != ActorIsolation::NonisolatedUnsafe)) {
-    auto *classDecl = var->getDeclContext()->getSelfClassDecl();
-    const bool isActorType = classDecl && classDecl->isAnyActor();
-    if (var->isGlobalStorage() && !isActorType) {
+    if (var->isGlobalStorage()) {
       auto *diagVar = var;
       if (auto *originalVar = var->getOriginalWrappedProperty()) {
         diagVar = originalVar;
