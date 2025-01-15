@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-// RUN: %target-run-stdlib-swift(-enable-experimental-feature Span) -enable-experimental-feature Span
+// RUN: %target-run-stdlib-swift -enable-experimental-feature LifetimeDependence -enable-experimental-feature Span
 
 // REQUIRES: executable_test
 // REQUIRES: objc_interop
