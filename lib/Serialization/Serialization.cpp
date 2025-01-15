@@ -3058,9 +3058,8 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
       ENCODE_VER_TUPLE(Obsoleted, theAttr->Obsoleted)
 
       assert(theAttr->Rename.empty() || !theAttr->hasCachedRenamedDecl());
-
+      assert(theAttr->hasCachedDomain());
       auto domain = theAttr->getCachedDomain();
-      assert(domain);
 
       // FIXME: [availability] Serialize domain and kind directly.
       llvm::SmallString<32> blob;

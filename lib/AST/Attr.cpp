@@ -918,7 +918,7 @@ ParsedDeclAttrFilter::operator()(const DeclAttribute *Attr) const {
 }
 
 bool SemanticAvailableAttr::isActive(ASTContext &ctx) const {
-  return domain.isActive(ctx);
+  return getDomain().isActive(ctx);
 }
 
 std::optional<SemanticAvailableAttr>
