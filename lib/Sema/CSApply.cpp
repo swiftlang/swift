@@ -188,6 +188,15 @@ Solution::resolveConcreteDeclRef(ValueDecl *decl,
   return ConcreteDeclRef(decl, subst);
 }
 
+SelectedOverload
+Solution::getCalleeOverloadChoice(ConstraintLocator *locator) const {
+  return getOverloadChoice(getCalleeLocator(locator));
+}
+
+std::optional<SelectedOverload>
+Solution::getCalleeOverloadChoiceIfAvailable(ConstraintLocator *locator) const {
+  return getOverloadChoiceIfAvailable(getCalleeLocator(locator));
+}
 
 ConstraintLocator *Solution::getCalleeLocator(ConstraintLocator *locator,
                                               bool lookThroughApply) const {

@@ -9364,10 +9364,9 @@ bool DefaultExprTypeMismatch::diagnoseAsError() {
   emitDiagnostic(diag::cannot_convert_default_value_type_to_argument_type,
                  getFromType(), getToType(), paramIdx);
 
-  auto overload = getCalleeOverloadChoiceIfAvailable(locator);
-  assert(overload);
+  auto overload = getSolution().getCalleeOverloadChoice(locator);
 
-  auto *PD = getParameterList(overload->choice.getDecl())->get(paramIdx);
+  auto *PD = getParameterList(overload.choice.getDecl())->get(paramIdx);
 
   auto note = emitDiagnosticAt(PD->getLoc(), diag::default_value_declared_here);
 
