@@ -77,8 +77,8 @@ static void heap_iterate_callback(unsigned long base, unsigned long size, void *
   data[data[NEXT_FREE_IDX]++] = size;
 }
 
-// Both clang and gcc implicitly define __start- and __stop- prefixed symbols
-// that mark the start and end of user defined sections.
+// The linker implicitly defines __start- and __stop- prefixed symbols that mark
+// the start and end of user defined sections.
 extern char __stop_heap_iterator[];
 
 void* heap_iterate_callback_start() {
