@@ -145,6 +145,7 @@ add_library(swiftCore
   SetVariant.swift
   ShadowProtocols.swift
   Shims.swift
+  Slab.swift
   Slice.swift
   SmallString.swift
   Sort.swift
