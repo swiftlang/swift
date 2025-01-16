@@ -27,6 +27,7 @@
 #include "swift/Basic/Version.h"
 #include "swift/Basic/WarningAsErrorRule.h"
 #include "swift/Localization/LocalizationFormat.h"
+#include "swift/AST/DiagnosticsCommon.h"
 #include "llvm/ADT/BitVector.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/ADT/StringSet.h"
@@ -1784,6 +1785,11 @@ namespace swift {
   }
 
   void printClangDeclName(const clang::NamedDecl *ND, llvm::raw_ostream &os);
+
+  void DiagnosticEngine::diagnoseDuplicateDictionaryKey(SourceLoc loc, StringRef type, StringRef key) {
+    diagnose(loc, diag::duplicate_entry_in_dict_literal)
+        << type << key;
+  }
 
   /// Temporary on-stack storage and unescaping for encoded diagnostic
   /// messages.

@@ -198,3 +198,14 @@ f59215(["", "", "", ""]) //expected-error{{dictionary of type '[String : String]
 // expected-note@-1{{did you mean to use a dictionary literal instead?}} {{11-12=:}} {{19-20=:}}
 f59215(["", "", "", ""]) //expected-error{{dictionary of type '[String : String]' cannot be used with array literal}}
 // expected-note@-1{{did you mean to use a dictionary literal instead?}} {{11-12=:}} {{19-20=:}}
+
+let validMap = [1: "one", 2: "two"]
+
+let invalidMap = [1: "one", 1: "also one"]
+
+let invalidStringMap = ["key": "value", "key": "another value"]
+
+#define DUPLICATE_KEY 1
+let macroKey = [DUPLICATE_KEY: "macro", DUPLICATE_KEY: "duplicate"]
+
+let nestedMap = ["outer": [1: "one", 1: "duplicate"]]

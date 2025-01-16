@@ -571,6 +571,19 @@ void TypeChecker::checkForForbiddenPrefix(ASTContext &C, DeclBaseName Name) {
   }
 }
 
+void TypeChecker::checkDictionaryLiteral(DictionaryExpr *dictExpr) {
+  llvm::DenseSet<KeyType> seenKeys;
+
+  for (auto entry : dictExpr->getElements()) {
+    auto key = entry->getKey();
+    if (seenKeys.count(key)) {
+      diagnose(entry->getKey()->getLoc(),diag::duplicate_entry_in_dict_literal, dictExpr->getType(), key->getValue());
+    } else {
+        seenKeys.insert(key);
+    }
+  }
+}
+
 DeclTypeCheckingSemantics
 TypeChecker::getDeclTypeCheckingSemantics(ValueDecl *decl) {
   // Check for a @_semantics attribute.

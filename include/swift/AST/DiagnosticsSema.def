@@ -26,6 +26,12 @@
 DIAG(REMARK,ID,Options,Text,Signature)
 #endif
 
+#define DIAG_DEF(kind, id, text) kind##_##id,
+
+DIAG(diag::duplicate_entry_in_dict_literal, Error,
+     "Dictionary literal of type '%0' has duplicate entries for key '%1'")
+
+
 NOTE(decl_declared_here,none,
      "%0 declared here", (const ValueDecl *))
 NOTE(decl_declared_here_base,none,
