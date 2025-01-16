@@ -484,7 +484,7 @@ class SwiftTestCase(unittest.TestCase):
             ['-DSWIFT_ENABLE_RUNTIME_MODULE:BOOL='
              'TRUE'],
             [x for x in swift.cmake_options
-             if 'DSWIFT_ENABLE_RUNTIME_MODULE in x])
+             if 'DSWIFT_ENABLE_RUNTIME_MODULE' in x])
 
     def test_freestanding_is_darwin_flags(self):
         self.args.swift_freestanding_is_darwin = True

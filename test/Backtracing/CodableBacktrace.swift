@@ -33,7 +33,7 @@ func level5() {
   let backtrace = try! Backtrace.capture()
 
   let encoder = JSONEncoder()
-  encoder.outputFormatting = .prettyPrinted
+  encoder.outputFormatting = [.prettyPrinted,.sortedKeys,.withoutEscapingSlashes]
 
   let data = try! encoder.encode(backtrace)
   let json = String(data: data, encoding: .utf8)!
@@ -41,8 +41,8 @@ func level5() {
   print(json)
 
   // CHECK: {
-  // CHECK-DAG:    "architecture" : "{{.*}}"
-  // CHECK-DAG:    "backtrace" : "{{[A-Za-z0-9+/]*}}"
+  // CHECK:    "architecture" : "{{.*}}",
+  // CHECK:    "backtrace" : "{{[A-Za-z0-9+/]*}}"
   // CHECK: }
 
   let decoder = JSONDecoder()
