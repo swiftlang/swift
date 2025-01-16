@@ -372,3 +372,15 @@ Added: _$ss9TaskLocalC18_enclosingInstance7wrapped7storagexs5NeverO_s24Reference
 
 Added: _swift_taskGroup_initializeWithOptions
 Added: _swift_task_isCurrentExecutorWithFlags
+
+// task priority escalation handlers
+Added: _swift_task_addEscalationHandler
+Added: _swift_task_removeEscalationHandler
+// static Swift.Task.escalatePriority(_: Swift.Task<A, B>, to: Swift.TaskPriority) -> ()
+Added: _$sScT16escalatePriority_2toyScTyxq_G_ScPtFZ
+// static Swift.Task.escalatePriority(_: Swift.UnsafeCurrentTask, to: Swift.TaskPriority) -> ()
+Added: _$sScT16escalatePriority_2toySct_ScPtFZ
+// Swift.withTaskPriorityEscalationHandler<A, B where B: Swift.Error>(operation: () async throws(B) -> A, onEscalate: @Sendable (Swift.TaskPriority) -> (), isolation: isolated Swift.Actor?) async throws(B) -> A
+Added: _$ss33withTaskPriorityEscalationHandler9operation10onEscalate9isolationxxyYaq_YKXE_yScPYbXEScA_pSgYitYaq_YKs5ErrorR_r0_lF
+// async function pointer to Swift.withTaskPriorityEscalationHandler<A, B where B: Swift.Error>(operation: () async throws(B) -> A, onEscalate: @Sendable (Swift.TaskPriority) -> (), isolation: isolated Swift.Actor?) async throws(B) -> A
+Added: _$ss33withTaskPriorityEscalationHandler9operation10onEscalate9isolationxxyYaq_YKXE_yScPYbXEScA_pSgYitYaq_YKs5ErrorR_r0_lFTu

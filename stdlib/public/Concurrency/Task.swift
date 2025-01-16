@@ -928,7 +928,7 @@ extension Task {
   /// - Parameters:
   ///   - task: the task which to escalate the priority of
   ///   - newPriority: the new priority the task should continue executing on
-  @available(SwiftStdlib 9999, *)
+  @available(SwiftStdlib 6.2, *)
   public static func escalatePriority(_ task: Task, to newPriority: TaskPriority) {
     _taskEscalate(task._task, newPriority: newPriority.rawValue)
   }
@@ -958,7 +958,7 @@ extension Task {
   /// - Parameters:
   ///   - task: the task which to escalate the priority of
   ///   - newPriority: the new priority the task should continue executing on
-  @available(SwiftStdlib 9999, *)
+  @available(SwiftStdlib 6.2, *)
   public static func escalatePriority(_ task: UnsafeCurrentTask, to newPriority: TaskPriority) {
     _taskEscalate(task._task, newPriority: newPriority.rawValue)
   }
@@ -982,7 +982,7 @@ extension Task {
 ///              when priority escalation happens
 /// - Returns: the value returned by `operation`
 /// - Throws: when the `operation` throws an error
-@available(SwiftStdlib 9999, *)
+@available(SwiftStdlib 6.2, *)
 public func withTaskPriorityEscalationHandler<T, E>(
   operation: () async throws(E) -> T,
   onEscalate handler: @Sendable (TaskPriority) -> Void,
@@ -1266,7 +1266,7 @@ func _taskIsCancelled(_ task: Builtin.NativeObject) -> Bool
 @_silgen_name("swift_task_currentPriority")
 internal func _taskCurrentPriority(_ task: Builtin.NativeObject) -> UInt8
 
-@available(SwiftStdlib 9999, *) // TODO: determine how far back this can back-deploy because it already was in runtime
+@available(SwiftStdlib 6.2, *)
 @_silgen_name("swift_task_escalate")
 internal func _taskEscalate(_ task: Builtin.NativeObject, newPriority: UInt8)
 
