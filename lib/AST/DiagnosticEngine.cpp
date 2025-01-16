@@ -431,9 +431,9 @@ InFlightDiagnostic::limitBehaviorUntilSwiftVersion(
     // wrapIn will result in the behavior of the wrapping diagnostic.
     if (limit >= DiagnosticBehavior::Warning) {
       if (majorVersion > 6) {
-        wrapIn(diag::error_in_a_future_swift_version);
+        wrapIn(diag::error_in_a_future_swift_lang_mode);
       } else {
-        wrapIn(diag::error_in_future_swift_version, majorVersion);
+        wrapIn(diag::error_in_swift_lang_mode, majorVersion);
       }
     }
 
