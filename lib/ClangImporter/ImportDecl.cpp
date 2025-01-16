@@ -1166,6 +1166,14 @@ namespace {
           decl->getOwningModule() &&
           decl->getOwningModule()->getTopLevelModuleName() == "os")
         return nullptr;
+      // Workaround for simd module declaring `namespace simd` on Darwin,
+      // causing name lookup issues. That namespace declares C++ overlays of
+      // types that are already refined for Swift, so let's not import the
+      // namespace (rdar://143007477).
+      if (decl->getIdentifier() && decl->getName() == "simd" &&
+          decl->getOwningModule() &&
+          decl->getOwningModule()->getTopLevelModuleName() == "simd")
+        return nullptr;
       // If this is a top-level namespace, don't put it in the module we're
       // importing, put it in the "__ObjC" module that is implicitly imported.
       if (!decl->getParent()->isNamespace())
