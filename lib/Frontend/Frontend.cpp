@@ -727,28 +727,11 @@ void CompilerInstance::setUpLLVMArguments() {
 }
 
 void CompilerInstance::setUpDiagnosticOptions() {
-  if (Invocation.getDiagnosticOptions().ShowDiagnosticsAfterFatalError) {
-    Diagnostics.setShowDiagnosticsAfterFatalError();
-  }
-  if (Invocation.getDiagnosticOptions().SuppressWarnings) {
-    Diagnostics.setSuppressWarnings(true);
-  }
-  if (Invocation.getDiagnosticOptions().SuppressRemarks) {
-    Diagnostics.setSuppressRemarks(true);
-  }
-  Diagnostics.setWarningsAsErrorsRules(
-      Invocation.getDiagnosticOptions().WarningsAsErrorsRules);
-  Diagnostics.setPrintDiagnosticNamesMode(
-      Invocation.getDiagnosticOptions().PrintDiagnosticNames);
-  Diagnostics.setDiagnosticDocumentationPath(
-      Invocation.getDiagnosticOptions().DiagnosticDocumentationPath);
-  Diagnostics.setLanguageVersion(
-      Invocation.getLangOptions().EffectiveLanguageVersion);
-  if (!Invocation.getDiagnosticOptions().LocalizationCode.empty()) {
-    Diagnostics.setLocalization(
-        Invocation.getDiagnosticOptions().LocalizationCode,
-        Invocation.getDiagnosticOptions().LocalizationPath);
-  }
+  // As a side-effect, argument parsing will have already partially configured
+  // the diagnostic engine. However, it needs to be reconfigured here in case
+  // there is any new configuration that should effect diagnostics for the rest
+  // of the compile.
+  Invocation.setUpDiagnosticEngine(Diagnostics);
 }
 
 // The ordering of ModuleLoaders is important!

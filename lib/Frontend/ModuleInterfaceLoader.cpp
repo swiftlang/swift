@@ -2248,10 +2248,6 @@ InterfaceSubContextDelegateImpl::runInSubCompilerInstance(StringRef moduleName,
     subInstance.addDiagnosticConsumer(&noopConsumer);
   }
 
-  // Eagerly suppress warnings if necessary, before parsing arguments.
-  if (subInvocation.getDiagnosticOptions().SuppressWarnings)
-    subInstance.getDiags().setSuppressWarnings(true);
-
   SwiftInterfaceInfo interfaceInfo;
   // Extract compiler arguments from the interface file and use them to configure
   // the compiler invocation.
