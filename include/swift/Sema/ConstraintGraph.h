@@ -84,9 +84,24 @@ public:
   /// as this type variable.
   ArrayRef<TypeVariableType *> getEquivalenceClass() const;
 
-  inference::PotentialBindings &getCurrentBindings() {
-    assert(forRepresentativeVar());
-    return Bindings;
+  inference::PotentialBindings &getPotentialBindings() {
+    DEBUG_ASSERT(forRepresentativeVar());
+    return Potential;
+  }
+
+  void initBindingSet();
+
+  inference::BindingSet &getBindingSet() {
+    ASSERT(hasBindingSet());
+    return *Set;
+  }
+
+  bool hasBindingSet() const {
+    return Set.has_value();
+  }
+
+  void resetBindingSet() {
+    Set.reset();
   }
 
 private:
@@ -131,15 +146,6 @@ private:
 
   /// Binding Inference {
 
-  /// Infer bindings from the given constraint and notify referenced variables
-  /// about its arrival (if requested). This happens every time a new constraint
-  /// gets added to a constraint graph node.
-  void introduceToInference(Constraint *constraint);
-
-  /// Forget about the given constraint. This happens every time a constraint
-  /// gets removed for a constraint graph.
-  void retractFromInference(Constraint *constraint);
-
   /// Perform graph updates that must be undone after we bind a fixed type
   /// to a type variable.
   void retractFromInference(Type fixedType);
@@ -182,8 +188,13 @@ private:
   /// The type variable this node represents.
   TypeVariableType *TypeVar;
 
-  /// The set of bindings associated with this type variable.
-  inference::PotentialBindings Bindings;
+  /// The potential bindings for this type variable, updated incrementally by
+  /// the constraint graph.
+  inference::PotentialBindings Potential;
+
+  /// The binding set for this type variable, computed by
+  /// determineBestBindings().
+  std::optional<inference::BindingSet> Set;
 
   /// The vector of constraints that mention this type variable, in a stable
   /// order for iteration.
