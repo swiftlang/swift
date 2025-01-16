@@ -2443,7 +2443,7 @@ static bool canDeclareSymbolName(StringRef symbol, ModuleDecl *fromModule) {
   // promote this to an error after a while.
   
   return llvm::StringSwitch<bool>(symbol)
-#define FUNCTION(_, Name, ...) \
+#define FUNCTION(_, Module, Name, ...) \
     .Case(#Name, false) \
     .Case("_" #Name, false) \
     .Case(#Name "_", false) \
