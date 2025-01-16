@@ -26,6 +26,14 @@ import CRT
 
 import Swift
 
+import BacktracingImpl.Runtime
+
+typealias CrashInfo = swift.runtime.backtrace.CrashInfo
+
+#if os(Linux)
+typealias thread = swift.runtime.backtrace.thread
+#endif
+
 internal func hex<T: FixedWidthInteger>(_ value: T,
                                         withPrefix: Bool = true) -> String {
   let digits = String(value, radix: 16)

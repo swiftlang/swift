@@ -17,7 +17,16 @@
 
 import Swift
 
-@_implementationOnly import OS.Libc
+#if os(macOS) || os(iOS) || os(tvOS) || os(watchOS)
+internal import Darwin
+internal import BacktracingImpl.OS.Darwin
+#elseif os(Windows)
+internal import ucrt
+#elseif canImport(Glibc)
+internal import Glibc
+#elseif canImport(Musl)
+internal import Musl
+#endif
 
 /// A backtrace formatting theme.
 @_spi(Formatting)
