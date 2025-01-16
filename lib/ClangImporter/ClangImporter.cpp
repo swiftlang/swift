@@ -27,6 +27,7 @@
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/DiagnosticsClangImporter.h"
 #include "swift/AST/DiagnosticsSema.h"
+#include "swift/AST/Evaluator.h"
 #include "swift/AST/IRGenOptions.h"
 #include "swift/AST/ImportCache.h"
 #include "swift/AST/LinkLibrary.h"
@@ -41,6 +42,7 @@
 #include "swift/AST/Types.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/Defer.h"
+#include "swift/Basic/LLVM.h"
 #include "swift/Basic/Platform.h"
 #include "swift/Basic/Range.h"
 #include "swift/Basic/SourceLoc.h"
@@ -6161,14 +6163,43 @@ TinyPtrVector<ValueDecl *> ClangRecordMemberLookup::evaluate(
   ClangModuleLoader *clangModuleLoader = ctx.getClangModuleLoader();
   for (auto found : directResults) {
     auto named = found.get<clang::NamedDecl *>();
-    if (dyn_cast<clang::Decl>(named->getDeclContext()) ==
-        recordDecl->getClangDecl()) {
-      // Don't import constructors on foreign reference types.
-      if (isa<clang::CXXConstructorDecl>(named) && isa<ClassDecl>(recordDecl))
+    if (dyn_cast<clang::Decl>(named->getDeclContext()) !=
+        recordDecl->getClangDecl())
+      continue;
+
+    // Don't import constructors on foreign reference types.
+    if (isa<clang::CXXConstructorDecl>(named) && isa<ClassDecl>(recordDecl))
+      continue;
+
+    auto imported = clangModuleLoader->importDeclDirectly(named);
+    if (!imported)
+      continue;
+
+    // If this member is found due to inheritance, clone it from the base class
+    // by synthesizing getters and setters.
+    if (inheritingDecl != recordDecl) {
+      imported = clangModuleLoader->importBaseMemberDecl(
+          cast<ValueDecl>(imported), inheritingDecl);
+      if (!imported)
+        continue;
+    }
+    result.push_back(cast<ValueDecl>(imported));
+  }
+
+  if (inheritingDecl != recordDecl) {
+    // For inheritied members, add members that are synthesized eagerly, such as
+    // subscripts. This is not necessary for non-inherited members because those
+    // should already be in the lookup table.
+    for (auto member :
+         cast<NominalTypeDecl>(recordDecl)->getCurrentMembersWithoutLoading()) {
+      auto namedMember = dyn_cast<ValueDecl>(member);
+      if (!namedMember || !namedMember->hasName() ||
+          namedMember->getName().getBaseName() != name)
         continue;
 
-      if (auto import = clangModuleLoader->importDeclDirectly(named))
-        result.push_back(cast<ValueDecl>(import));
+      if (auto imported = clangModuleLoader->importBaseMemberDecl(
+              namedMember, inheritingDecl))
+        result.push_back(cast<ValueDecl>(imported));
     }
   }
 
@@ -6207,43 +6238,14 @@ TinyPtrVector<ValueDecl *> ClangRecordMemberLookup::evaluate(
             ClangRecordMemberLookup(
                 {cast<NominalTypeDecl>(import), name, inheritingDecl}),
             {});
-        // Add members that are synthesized eagerly, such as subscripts.
-        for (auto member :
-             cast<NominalTypeDecl>(import)->getCurrentMembersWithoutLoading()) {
-          if (auto namedMember = dyn_cast<ValueDecl>(member)) {
-            if (namedMember->hasName() &&
-                namedMember->getName().getBaseName() == name &&
-                // Make sure we don't add duplicate entries, as that would
-                // wrongly imply that lookup is ambiguous.
-                !llvm::is_contained(baseResults, namedMember)) {
-              baseResults.push_back(namedMember);
-            }
-          }
-        }
+
         for (auto foundInBase : baseResults) {
           // Do not add duplicate entry with the same arity,
           // as that would cause an ambiguous lookup.
           if (foundNameArities.count(getArity(foundInBase)))
             continue;
 
-          // Do not importBaseMemberDecl() if this is a recursive lookup into
-          // some class's superclass. importBaseMemberDecl() caches synthesized
-          // members, which does not work if we call it on its result, e.g.:
-          //
-          //    importBaseMemberDecl(importBaseMemberDecl(foundInBase,
-          //    recorDecl), recordDecl)
-          //
-          // Instead, we simply pass on the imported decl (foundInBase) as is,
-          // so that only the top-most request calls importBaseMemberDecl().
-          if (inheritingDecl != recordDecl) {
-            result.push_back(foundInBase);
-            continue;
-          }
-
-          if (auto newDecl = clangModuleLoader->importBaseMemberDecl(
-                  foundInBase, recordDecl)) {
-            result.push_back(newDecl);
-          }
+          result.push_back(foundInBase);
         }
       }
     }
