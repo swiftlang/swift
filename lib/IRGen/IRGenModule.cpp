@@ -1297,8 +1297,8 @@ IRGenModule::createStringConstant(StringRef Str, bool willBeRelativelyAddressed,
     if (NAME)                                                                  \
       return NAME;                                                             \
     NAME = Module.getOrInsertGlobal(SYM, FullExistentialTypeMetadataStructTy); \
-    if (!getSwiftModule()->isStdlibModule() ||                                 \
-        !getSwiftModule()->isStaticLibrary())                                  \
+    if (!getSwiftModule()->isStdlibModule() &&                                 \
+        !Context.getStdlibModule(true)->isStaticLibrary())                     \
       ApplyIRLinkage(IRLinkage::ExternalImport)                                \
           .to(cast<llvm::GlobalVariable>(NAME));                               \
     return NAME;                                                               \
