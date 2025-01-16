@@ -42,6 +42,8 @@ NOTE(opaque_return_type_declared_here,none,
      "opaque return type declared here", ())
 NOTE(default_value_declared_here,none,
      "default value declared here", ())
+NOTE(protocol_requirement_declared_here,none,
+     "requirement %0 declared here", (const ValueDecl *))
 
 //------------------------------------------------------------------------------
 // MARK: Constraint solver diagnostics
@@ -2176,9 +2178,10 @@ ERROR(access_control_extension_open,none,
 ERROR(access_control_open_bad_decl,none,
       "only classes and overridable class members can be declared 'open';"
       " use 'public'", ())
-WARNING(access_control_non_objc_open_member,none,
-      "non-'@objc' %0 in extensions cannot be overridden; use 'public' instead",
-      (DescriptiveDeclKind))
+ERROR(access_control_non_objc_open_member,none,
+      "non-'@objc' %kindonly0 declared in extension cannot be overridden; use "
+      "'public' instead",
+      (const ValueDecl *))
 ERROR(access_control_requires_package_name, none,
       "the package access level %select{|used on %1 }0"
       "requires a package name; set it with the compiler flag -package-name",
@@ -5665,9 +5668,10 @@ NOTE(shared_state_make_immutable,none,
 NOTE(shared_state_nonisolated_unsafe,none,
      "disable concurrency-safety checks if accesses are protected by an external synchronization mechanism", (const ValueDecl *))
 ERROR(actor_isolated_witness,none,
-     "%select{|distributed }0%1 %kind2 cannot be used to satisfy %3 protocol "
-     "requirement",
-     (bool, ActorIsolation, const ValueDecl *, ActorIsolation))
+     "%select{|distributed }0%1 %kind2 cannot be used to satisfy %3 "
+     "requirement from protocol %base4",
+     (bool, ActorIsolation, const ValueDecl *, ActorIsolation,
+      const ValueDecl *))
 ERROR(actor_cannot_conform_to_global_actor_protocol,none,
       "actor %0 cannot conform to global actor isolated protocol %1",
       (Type, Type))

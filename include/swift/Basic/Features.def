@@ -438,7 +438,7 @@ EXPERIMENTAL_FEATURE(CoroutineAccessorsAllocateInCallee, false)
 EXPERIMENTAL_FEATURE(GenerateForceToMainActorThunks, false)
 
 EXPERIMENTAL_FEATURE(AddressableParameters, true)
-EXPERIMENTAL_FEATURE(AddressableTypes, true)
+SUPPRESSIBLE_EXPERIMENTAL_FEATURE(AddressableTypes, true)
 
 /// Allow the @abi attribute.
 SUPPRESSIBLE_EXPERIMENTAL_FEATURE(ABIAttribute, true)

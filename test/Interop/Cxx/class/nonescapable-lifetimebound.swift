@@ -106,17 +106,17 @@ CaptureView getCaptureView(const Owner& owner [[clang::lifetimebound]]) {
 }
 
 // CHECK: sil [clang makeOwner] {{.*}}: $@convention(c) () -> Owner
-// CHECK: sil [clang getView] {{.*}} : $@convention(c) (@in_guaranteed Owner) -> @lifetime(borrow 0) @autoreleased View
-// CHECK: sil [clang getViewFromFirst] {{.*}} : $@convention(c) (@in_guaranteed Owner, @in_guaranteed Owner) -> @lifetime(borrow 0) @autoreleased View
-// CHECK: sil [clang getViewFromEither] {{.*}} : $@convention(c) (@in_guaranteed Owner, @in_guaranteed Owner) -> @lifetime(borrow 0, borrow 1) @autoreleased View
-// CHECK: sil [clang Owner.handOutView] {{.*}} : $@convention(cxx_method) (@in_guaranteed Owner) -> @lifetime(borrow 0) @autoreleased View
-// CHECK: sil [clang Owner.handOutView2] {{.*}} : $@convention(cxx_method) (View, @in_guaranteed Owner) -> @lifetime(borrow 1) @autoreleased View
-// CHECK: sil [clang getViewFromEither] {{.*}} : $@convention(c) (@guaranteed View, @guaranteed View) -> @lifetime(copy 0, copy 1) @autoreleased View
+// CHECK: sil [clang getView] {{.*}} : $@convention(c) (@in_guaranteed Owner) -> @lifetime(borrow 0) @owned View
+// CHECK: sil [clang getViewFromFirst] {{.*}} : $@convention(c) (@in_guaranteed Owner, @in_guaranteed Owner) -> @lifetime(borrow 0) @owned View
+// CHECK: sil [clang getViewFromEither] {{.*}} : $@convention(c) (@in_guaranteed Owner, @in_guaranteed Owner) -> @lifetime(borrow 0, borrow 1) @owned View
+// CHECK: sil [clang Owner.handOutView] {{.*}} : $@convention(cxx_method) (@in_guaranteed Owner) -> @lifetime(borrow 0) @owned View
+// CHECK: sil [clang Owner.handOutView2] {{.*}} : $@convention(cxx_method) (View, @in_guaranteed Owner) -> @lifetime(borrow 1) @owned View
+// CHECK: sil [clang getViewFromEither] {{.*}} : $@convention(c) (@guaranteed View, @guaranteed View) -> @lifetime(copy 0, copy 1) @owned View
 // CHECK: sil [clang View.init] {{.*}} : $@convention(c) () -> @lifetime(immortal) @out View
 // CHECK: sil [clang OtherView.init] {{.*}} : $@convention(c) (@guaranteed View) -> @lifetime(copy 0) @out OtherView
-// CHECK: sil [clang returnsImmortal] {{.*}} : $@convention(c) () -> @lifetime(immortal) @autoreleased View
+// CHECK: sil [clang returnsImmortal] {{.*}} : $@convention(c) () -> @lifetime(immortal) @owned View
 // CHECK: sil [clang copyView] {{.*}} : $@convention(c) (View, @lifetime(copy 0) @inout View) -> ()
-// CHECK: sil [clang getCaptureView] {{.*}} : $@convention(c) (@in_guaranteed Owner) -> @lifetime(borrow 0) @autoreleased CaptureView
+// CHECK: sil [clang getCaptureView] {{.*}} : $@convention(c) (@in_guaranteed Owner) -> @lifetime(borrow 0) @owned CaptureView
 // CHECK: sil [clang CaptureView.captureView] {{.*}} : $@convention(cxx_method) (View, @lifetime(copy 0) @inout CaptureView) -> ()
 // CHECK: sil [clang CaptureView.handOut] {{.*}} : $@convention(cxx_method) (@lifetime(copy 1) @inout View, @in_guaranteed CaptureView) -> ()
 

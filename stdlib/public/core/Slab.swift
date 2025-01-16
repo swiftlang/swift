@@ -11,30 +11,30 @@
 //===----------------------------------------------------------------------===//
 
 /// A fixed-size array.
-@available(SwiftStdlib 6.1, *)
+@available(SwiftStdlib 6.2, *)
 @frozen
 public struct Slab<let count: Int, Element: ~Copyable>: ~Copyable {
   @usableFromInline
   internal let _storage: Builtin.FixedArray<count, Element>
 }
 
-@available(SwiftStdlib 6.1, *)
+@available(SwiftStdlib 6.2, *)
 extension Slab: Copyable where Element: Copyable {}
 
-@available(SwiftStdlib 6.1, *)
+@available(SwiftStdlib 6.2, *)
 extension Slab: BitwiseCopyable where Element: BitwiseCopyable {}
 
-@available(SwiftStdlib 6.1, *)
+@available(SwiftStdlib 6.2, *)
 extension Slab: @unchecked Sendable where Element: Sendable & ~Copyable {}
 
 //===----------------------------------------------------------------------===//
 // Address & Buffer
 //===----------------------------------------------------------------------===//
 
-@available(SwiftStdlib 6.1, *)
+@available(SwiftStdlib 6.2, *)
 extension Slab where Element: ~Copyable {
   /// Returns a read-only pointer to the first element in the vector.
-  @available(SwiftStdlib 6.1, *)
+  @available(SwiftStdlib 6.2, *)
   @_alwaysEmitIntoClient
   @_transparent
   internal var _address: UnsafePointer<Element> {
@@ -42,7 +42,7 @@ extension Slab where Element: ~Copyable {
   }
 
   /// Returns a buffer pointer over the entire vector.
-  @available(SwiftStdlib 6.1, *)
+  @available(SwiftStdlib 6.2, *)
   @_alwaysEmitIntoClient
   @_transparent
   internal var _buffer: UnsafeBufferPointer<Element> {
@@ -50,7 +50,7 @@ extension Slab where Element: ~Copyable {
   }
 
   /// Returns a mutable pointer to the first element in the vector.
-  @available(SwiftStdlib 6.1, *)
+  @available(SwiftStdlib 6.2, *)
   @_alwaysEmitIntoClient
   @_transparent
   internal var _mutableAddress: UnsafeMutablePointer<Element> {
@@ -60,7 +60,7 @@ extension Slab where Element: ~Copyable {
   }
 
   /// Returns a mutable buffer pointer over the entire vector.
-  @available(SwiftStdlib 6.1, *)
+  @available(SwiftStdlib 6.2, *)
   @_alwaysEmitIntoClient
   @_transparent
   internal var _mutableBuffer: UnsafeMutableBufferPointer<Element> {
@@ -71,7 +71,7 @@ extension Slab where Element: ~Copyable {
 
   /// Returns the given raw pointer, which points at an uninitialized vector
   /// instance, to a mutable buffer suitable for initialization.
-  @available(SwiftStdlib 6.1, *)
+  @available(SwiftStdlib 6.2, *)
   @_alwaysEmitIntoClient
   @_transparent
   internal static func _initializationBuffer(
@@ -88,7 +88,7 @@ extension Slab where Element: ~Copyable {
 // Initialization APIs
 //===----------------------------------------------------------------------===//
 
-@available(SwiftStdlib 6.1, *)
+@available(SwiftStdlib 6.2, *)
 extension Slab where Element: ~Copyable {
   /// Initializes every element in this vector running the given closure value
   /// that returns the element to emplace at the given index.
@@ -102,7 +102,7 @@ extension Slab where Element: ~Copyable {
   ///
   /// - Parameter body: A closure that returns an owned `Element` to emplace at
   ///                   the passed in index.
-  @available(SwiftStdlib 6.1, *)
+  @available(SwiftStdlib 6.2, *)
   @_alwaysEmitIntoClient
   public init<E: Error>(_ body: (Int) throws(E) -> Element) throws(E) {
     self = try Builtin.emplace { (rawPtr) throws(E) -> () in
@@ -141,7 +141,7 @@ extension Slab where Element: ~Copyable {
   /// - Parameter next: A closure that passes in an immutable borrow reference
   ///                   of the given first element of the vector which returns
   ///                   an owned `Element` instance to insert into the vector.
-  @available(SwiftStdlib 6.1, *)
+  @available(SwiftStdlib 6.2, *)
   @_alwaysEmitIntoClient
   public init<E: Error>(
     first: consuming Element,
@@ -175,12 +175,12 @@ extension Slab where Element: ~Copyable {
   }
 }
 
-@available(SwiftStdlib 6.1, *)
+@available(SwiftStdlib 6.2, *)
 extension Slab where Element: Copyable {
   /// Initializes every element in this vector to a copy of the given value.
   ///
   /// - Parameter value: The instance to initialize this vector with.
-  @available(SwiftStdlib 6.1, *)
+  @available(SwiftStdlib 6.2, *)
   @_alwaysEmitIntoClient
   public init(repeating value: Element) {
     self = Builtin.emplace {
@@ -195,10 +195,10 @@ extension Slab where Element: Copyable {
 // Collection APIs
 //===----------------------------------------------------------------------===//
 
-@available(SwiftStdlib 6.1, *)
+@available(SwiftStdlib 6.2, *)
 extension Slab where Element: ~Copyable {
   /// The type of the container's elements.
-  @available(SwiftStdlib 6.1, *)
+  @available(SwiftStdlib 6.2, *)
   public typealias Element = Element
 
   /// A type that represents a position in the collection.
@@ -206,11 +206,11 @@ extension Slab where Element: ~Copyable {
   /// Valid indices consist of the position of every element and a
   /// "past the end" position that's not valid for use as a subscript
   /// argument.
-  @available(SwiftStdlib 6.1, *)
+  @available(SwiftStdlib 6.2, *)
   public typealias Index = Int
 
   /// The number of elements in the collection.
-  @available(SwiftStdlib 6.1, *)
+  @available(SwiftStdlib 6.2, *)
   @_alwaysEmitIntoClient
   @_transparent
   public static var count: Int {
@@ -220,7 +220,7 @@ extension Slab where Element: ~Copyable {
   /// The number of elements in the collection.
   ///
   /// - Complexity: O(1)
-  @available(SwiftStdlib 6.1, *)
+  @available(SwiftStdlib 6.2, *)
   @_alwaysEmitIntoClient
   @_transparent
   public var count: Int {
@@ -230,7 +230,7 @@ extension Slab where Element: ~Copyable {
   /// The position of the first element in a nonempty collection.
   ///
   /// If the collection is empty, `startIndex` is equal to `endIndex`.
-  @available(SwiftStdlib 6.1, *)
+  @available(SwiftStdlib 6.2, *)
   @_alwaysEmitIntoClient
   @_transparent
   public var startIndex: Int {
@@ -252,7 +252,7 @@ extension Slab where Element: ~Copyable {
   ///     // Prints "[30, 40, 50]"
   ///
   /// If the collection is empty, `endIndex` is equal to `startIndex`.
-  @available(SwiftStdlib 6.1, *)
+  @available(SwiftStdlib 6.2, *)
   @_alwaysEmitIntoClient
   @_transparent
   public var endIndex: Int {
@@ -276,7 +276,7 @@ extension Slab where Element: ~Copyable {
   ///         i = c.index(after: i)
   ///     }
   ///     // c == MyFancyCollection([2, 4, 6, 8, 10])
-  @available(SwiftStdlib 6.1, *)
+  @available(SwiftStdlib 6.2, *)
   @_alwaysEmitIntoClient
   @_transparent
   public var indices: Range<Int> {
@@ -288,7 +288,7 @@ extension Slab where Element: ~Copyable {
   /// - Parameter i: A valid index of the collection. `i` must be less than
   ///   `endIndex`.
   /// - Returns: The index immediately after `i`.
-  @available(SwiftStdlib 6.1, *)
+  @available(SwiftStdlib 6.2, *)
   @_alwaysEmitIntoClient
   @_transparent
   public borrowing func index(after i: Int) -> Int {
@@ -300,7 +300,7 @@ extension Slab where Element: ~Copyable {
   /// - Parameter i: A valid index of the collection. `i` must be greater than
   ///   `startIndex`.
   /// - Returns: The index value immediately before `i`.
-  @available(SwiftStdlib 6.1, *)
+  @available(SwiftStdlib 6.2, *)
   @_alwaysEmitIntoClient
   @_transparent
   public borrowing func index(before i: Int) -> Int {
@@ -326,7 +326,7 @@ extension Slab where Element: ~Copyable {
   ///   `endIndex` property.
   ///
   /// - Complexity: O(1)
-  @available(SwiftStdlib 6.1, *)
+  @available(SwiftStdlib 6.2, *)
   @_addressableSelf
   @_alwaysEmitIntoClient
   public subscript(_ i: Int) -> Element {
@@ -350,7 +350,7 @@ extension Slab where Element: ~Copyable {
 // Swap
 //===----------------------------------------------------------------------===//
 
-@available(SwiftStdlib 6.1, *)
+@available(SwiftStdlib 6.2, *)
 extension Slab where Element: ~Copyable {
   /// Exchanges the values at the specified indices of the vector.
   ///
@@ -363,7 +363,7 @@ extension Slab where Element: ~Copyable {
   ///   - j: The index of the second value to swap.
   ///
   /// - Complexity: O(1)
-  @available(SwiftStdlib 6.1, *)
+  @available(SwiftStdlib 6.2, *)
   @_alwaysEmitIntoClient
   public mutating func swapAt(
     _ i: Int,
@@ -387,7 +387,7 @@ extension Slab where Element: ~Copyable {
 // Unsafe APIs
 //===----------------------------------------------------------------------===//
 
-@available(SwiftStdlib 6.1, *)
+@available(SwiftStdlib 6.2, *)
 extension Slab where Element: ~Copyable {
   /// Calls a closure with a pointer to the vector's contiguous storage.
   ///
@@ -422,7 +422,7 @@ extension Slab where Element: ~Copyable {
   ///   `withUnsafeBufferPointer(_:)` method. The pointer argument is valid only
   ///   for the duration of the method's execution.
   /// - Returns: The return value, if any, of the `body` closure parameter.
-  @available(SwiftStdlib 6.1, *)
+  @available(SwiftStdlib 6.2, *)
   @_alwaysEmitIntoClient
   @_transparent
   public borrowing func _withUnsafeBufferPointer<Result: ~Copyable, E: Error>(
@@ -471,7 +471,7 @@ extension Slab where Element: ~Copyable {
   ///   for the `withUnsafeMutableBufferPointer(_:)` method. The pointer
   ///   argument is valid only for the duration of the method's execution.
   /// - Returns: The return value, if any, of the `body` closure parameter.
-  @available(SwiftStdlib 6.1, *)
+  @available(SwiftStdlib 6.2, *)
   @_alwaysEmitIntoClient
   @_transparent
   public mutating func _withUnsafeMutableBufferPointer<Result: ~Copyable, E: Error>(

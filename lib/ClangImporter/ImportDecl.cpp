@@ -1158,6 +1158,14 @@ namespace {
       // Do not import namespace declarations marked as 'swift_private'.
       if (decl->hasAttr<clang::SwiftPrivateAttr>())
         return nullptr;
+      // Workaround for os module declaring `namespace os` on Darwin, causing
+      // name lookup issues. That namespace only declares utility functions that
+      // are not supposed to be used from Swift, so let's just not import the
+      // namespace (rdar://119044493).
+      if (decl->getIdentifier() && decl->getName() == "os" &&
+          decl->getOwningModule() &&
+          decl->getOwningModule()->getTopLevelModuleName() == "os")
+        return nullptr;
       // If this is a top-level namespace, don't put it in the module we're
       // importing, put it in the "__ObjC" module that is implicitly imported.
       if (!decl->getParent()->isNamespace())
@@ -8679,7 +8687,7 @@ public:
   ~SwiftifyInfoPrinter() { out << ")"; }
 
   void printCountedBy(const clang::CountAttributedType *CAT,
-                      size_t pointerIndex) {
+                      ssize_t pointerIndex) {
     printSeparator();
     clang::Expr *countExpr = CAT->getCountExpr();
     bool isSizedBy = CAT->isCountInBytes();
@@ -8688,7 +8696,9 @@ public:
       out << "sizedBy";
     else
       out << "countedBy";
-    out << "(pointer: " << pointerIndex + 1 << ", ";
+    out << "(pointer: ";
+    printParamOrReturn(pointerIndex);
+    out << ", ";
     if (isSizedBy)
       out << "size";
     else
@@ -8701,7 +8711,9 @@ public:
 
   void printNonEscaping(int idx) {
     printSeparator();
-    out << ".nonescaping(pointer: " << idx << ")";
+    out << ".nonescaping(pointer: ";
+    printParamOrReturn(idx);
+    out << ")";
   }
 
   void printTypeMapping(const llvm::StringMap<std::string> &mapping) {
@@ -8724,6 +8736,13 @@ private:
     } else {
       firstParam = false;
     }
+  }
+
+  void printParamOrReturn(ssize_t pointerIndex) {
+    if (pointerIndex == -1)
+      out << ".return";
+    else
+      out << ".param(" << pointerIndex + 1 << ")";
   }
 };
 } // namespace
@@ -8751,7 +8770,7 @@ void ClangImporter::Implementation::importSpanAttributes(FuncDecl *MappedDecl) {
       if (decl->getName() != "span")
         continue;
       if (param->hasAttr<clang::NoEscapeAttr>()) {
-        printer.printNonEscaping(index + 1);
+        printer.printNonEscaping(index);
         clang::PrintingPolicy policy(param->getASTContext().getLangOpts());
         policy.SuppressTagKeyword = true;
         auto param = MappedDecl->getParameters()->get(index);
@@ -8787,6 +8806,10 @@ void ClangImporter::Implementation::importBoundsAttributes(
       if (auto CAT = param->getType()->getAs<clang::CountAttributedType>()) {
         printer.printCountedBy(CAT, index);
       }
+    }
+    if (auto CAT =
+            ClangDecl->getReturnType()->getAs<clang::CountAttributedType>()) {
+      printer.printCountedBy(CAT, -1);
     }
   }
 

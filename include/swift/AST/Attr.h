@@ -797,6 +797,13 @@ public:
   /// resolved successfully.
   std::optional<AvailabilityDomain> getCachedDomain() const { return Domain; }
 
+  /// Returns true if the `AvailabilityDomain` associated with the attribute
+  /// has been resolved successfully.
+  bool hasCachedDomain() const {
+    // For now, domains are always set on construction of the attribute.
+    return true;
+  }
+
   /// Returns the kind of availability the attribute specifies.
   Kind getKind() const { return static_cast<Kind>(Bits.AvailableAttr.Kind); }
 
@@ -3189,20 +3196,24 @@ public:
   }
 };
 
-/// A wrapper for `AvailableAttr` that is enriched with additional semantic
-/// informaton, like its corresponding `AvailabilityDomain`.
+/// A wrapper for `AvailableAttr` that enriches it with additional semantic
+/// informaton that can only be determined using the `AvailabilityDomain`
+/// associated with the attribute. A `SemanticAvailableAttr` can only be
+/// constructed with an `AvailableAttr` that has a resolved
+/// `AvailabilityDomain`.
 class SemanticAvailableAttr final {
   const AvailableAttr *attr;
-  AvailabilityDomain domain;
 
 public:
-  SemanticAvailableAttr(const AvailableAttr *attr, AvailabilityDomain domain)
-      : attr(attr), domain(domain) {
+  SemanticAvailableAttr(const AvailableAttr *attr) : attr(attr) {
     assert(attr);
+    assert(attr->hasCachedDomain());
   }
 
   const AvailableAttr *getParsedAttr() const { return attr; }
-  const AvailabilityDomain getDomain() const { return domain; }
+  const AvailabilityDomain getDomain() const {
+    return attr->getCachedDomain().value();
+  }
 
   /// The version tuple written in source for the `introduced:` component.
   std::optional<llvm::VersionTuple> getIntroduced() const {
@@ -3639,6 +3650,32 @@ struct EnumTraits<TypeAttrKind> {
 };
 
 } // end namespace swift
+
+namespace llvm {
+using swift::AvailableAttr;
+using swift::SemanticAvailableAttr;
+
+// A SemanticAvailableAttr just wraps an `AvailableAttr *` and is therefore
+// "pointer like".
+template <typename T>
+struct PointerLikeTypeTraits;
+template <>
+struct PointerLikeTypeTraits<SemanticAvailableAttr> {
+public:
+  static inline void *getAsVoidPointer(SemanticAvailableAttr attr) {
+    return reinterpret_cast<void *>(
+        const_cast<AvailableAttr *>(attr.getParsedAttr()));
+  }
+  static inline SemanticAvailableAttr getFromVoidPointer(void *P) {
+    return SemanticAvailableAttr(static_cast<AvailableAttr *>(P));
+  }
+  enum {
+    NumLowBitsAvailable =
+        PointerLikeTypeTraits<AvailableAttr *>::NumLowBitsAvailable
+  };
+};
+
+} // end namespace llvm
 
 #undef UNIMPLEMENTED_CLONE
 

@@ -19,6 +19,7 @@
 #include "sourcekitd/Service.h"
 #include "sourcekitd/TokenAnnotationsArray.h"
 #include "sourcekitd/VariableTypeArray.h"
+#include "sourcekitd/plugin.h"
 
 #include "SourceKit/Core/Context.h"
 #include "SourceKit/Core/LangSupport.h"
@@ -43,6 +44,7 @@
 #include "llvm/ADT/StringRef.h"
 #include "llvm/ADT/StringSet.h"
 #include "llvm/Support/MemoryBuffer.h"
+#include "llvm/Support/Mutex.h"
 #include "llvm/Support/Path.h"
 #include "llvm/Support/PrettyStackTrace.h"
 #include "llvm/Support/VirtualFileSystem.h"
@@ -51,6 +53,7 @@
 #include <optional>
 
 // FIXME: Portability.
+#include <Block.h>
 #include <dispatch/dispatch.h>
 
 using namespace sourcekitd;
@@ -104,6 +107,53 @@ static void fillDiagnosticInfo(ResponseBuilder::Dictionary ParentElem,
 
 static SourceKit::Context *GlobalCtx = nullptr;
 
+namespace SourceKit {
+class PluginSupport {
+  std::vector<sourcekitd_cancellable_request_handler_t> RequestHandlers;
+  std::vector<sourcekitd_cancellation_handler_t> CancellationHandlers;
+  llvm::sys::Mutex Mtx;
+
+public:
+  ~PluginSupport() {
+    for (auto &Handler : RequestHandlers) {
+      Block_release(Handler);
+    }
+    RequestHandlers.clear();
+  }
+
+  void addRequestHandler(sourcekitd_cancellable_request_handler_t Handler) {
+    RequestHandlers.push_back(Block_copy(Handler));
+  }
+
+  /// Register a cancellation handler that will be called when a request is
+  /// cancelled.
+  void addCancellationHandler(sourcekitd_cancellation_handler_t Handler) {
+    CancellationHandlers.push_back(Block_copy(Handler));
+  }
+
+  bool handleRequest(sourcekitd_object_t Req,
+                     sourcekitd_request_handle_t Handle, ResponseReceiver Rec) {
+    auto ReceiverWrapper = ^void(sourcekitd_response_t Response) {
+      Rec(Response);
+    };
+    for (auto &Handler : RequestHandlers) {
+      if (Handler(Req, Handle, ReceiverWrapper)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  /// Inform all cancellation handlers in the plugins that the request with the
+  /// given handle has been cancelled.
+  void cancelRequest(sourcekitd_request_handle_t Handle) {
+    for (auto &CancellationHandler : CancellationHandlers) {
+      CancellationHandler(Handle);
+    }
+  }
+};
+} // end namespace SourceKit
+
 // NOTE: if we had a connection context, these stats should move into it.
 static Statistic numRequests(UIdentFromSKDUID(KindStatNumRequests),
                              "# of requests (total)");
@@ -117,9 +167,11 @@ void sourcekitd::initializeService(
   INITIALIZE_LLVM();
   initializeSwiftModules();
   llvm::EnablePrettyStackTrace();
-  GlobalCtx = new SourceKit::Context(swiftExecutablePath, runtimeLibPath,
-                                     diagnosticDocumentationPath,
-                                     SourceKit::createSwiftLangSupport);
+  GlobalCtx = new SourceKit::Context(
+      swiftExecutablePath, runtimeLibPath, diagnosticDocumentationPath,
+      SourceKit::createSwiftLangSupport, [](SourceKit::Context &Ctx) {
+        return std::make_shared<PluginSupport>();
+      });
   auto noteCenter = GlobalCtx->getNotificationCenter();
 
   noteCenter->addDocumentUpdateNotificationReceiver([postNotification](StringRef DocumentName) {
@@ -402,6 +454,9 @@ void sourcekitd::handleRequest(sourcekitd_object_t Req,
 }
 
 void sourcekitd::cancelRequest(SourceKitCancellationToken CancellationToken) {
+  // Inform all plugins that the request has been cancelled, even if the request
+  // wasn't handled by a plugin.
+  getGlobalContext().getPlugins()->cancelRequest(CancellationToken);
   getGlobalContext().getRequestTracker()->cancel(CancellationToken);
 }
 
@@ -2064,6 +2119,12 @@ void handleRequestImpl(sourcekitd_object_t ReqObj,
                        SourceKitCancellationToken CancellationToken,
                        ResponseReceiver Rec) {
   ++numRequests;
+
+  if (getGlobalContext().getPlugins()->handleRequest(ReqObj, CancellationToken,
+                                                     Rec)) {
+    // Handled by plugin.
+    return;
+  }
 
   RequestDict Req(ReqObj);
 
@@ -4356,4 +4417,20 @@ static void enableCompileNotifications(bool value) {
   } else {
     trace::unregisterConsumer(&compileConsumer);
   }
+}
+
+void sourcekitd::pluginRegisterRequestHandler(
+    sourcekitd_cancellable_request_handler_t handler) {
+  getGlobalContext().getPlugins()->addRequestHandler(handler);
+}
+
+void sourcekitd::pluginRegisterCancellationHandler(
+    sourcekitd_cancellation_handler_t handler) {
+  getGlobalContext().getPlugins()->addCancellationHandler(handler);
+}
+
+void *sourcekitd::pluginGetOpaqueSwiftIDEInspectionInstance() {
+  return getGlobalContext()
+      .getSwiftLangSupport()
+      .getOpaqueSwiftIDEInspectionInstance();
 }

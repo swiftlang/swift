@@ -2,7 +2,7 @@
 
 // RUN: %target-swift-frontend %s -swift-version 5 -module-name main -disable-availability-checking -typecheck -plugin-path %swift-plugin-dir -dump-macro-expansions 2>&1 | %FileCheck --match-full-lines %s
 
-@_SwiftifyImport(.sizedBy(pointer: 1, size: "len"))
+@_SwiftifyImport(.sizedBy(pointer: .param(1), size: "len"))
 func myFunc(_ ptr: UnsafeRawPointer!, _ len: CInt) {
 }
 

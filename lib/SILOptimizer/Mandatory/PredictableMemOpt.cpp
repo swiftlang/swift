@@ -91,14 +91,14 @@ getFullyReferenceableStruct(SILType Ty) {
   return SD;
 }
 
-static unsigned getNumSubElements(SILType T, SILModule &M,
+static unsigned getNumSubElements(SILType T, SILFunction &F,
                                   TypeExpansionContext context) {
 
   if (auto TT = T.getAs<TupleType>()) {
     unsigned NumElements = 0;
     for (auto index : indices(TT.getElementTypes()))
       NumElements +=
-          getNumSubElements(T.getTupleElementType(index), M, context);
+          getNumSubElements(T.getTupleElementType(index), F, context);
     return NumElements;
   }
   
@@ -106,8 +106,13 @@ static unsigned getNumSubElements(SILType T, SILModule &M,
     unsigned NumElements = 0;
     for (auto *D : SD->getStoredProperties())
       NumElements +=
-          getNumSubElements(T.getFieldType(D, M, context), M, context);
-    return NumElements;
+        getNumSubElements(T.getFieldType(D, F.getModule(), context), F,
+                          context);
+
+    // Returning NumElements == 0 implies that "empty" values can be
+    // materialized without ownership. This is only valid for trivial types.
+    if (NumElements > 0 || T.isTrivial(F))
+      return NumElements;
   }
   
   // If this isn't a tuple or struct, it is a single element.
@@ -152,7 +157,7 @@ static SILValue getAccessPathRoot(SILValue pointer) {
 static unsigned computeSubelement(SILValue Pointer,
                                   SingleValueInstruction *RootInst) {
   unsigned SubElementNumber = 0;
-  SILModule &M = RootInst->getModule();
+  auto &F = *RootInst->getFunction();
   
   while (1) {
     // If we got to the root, we're done.
@@ -175,7 +180,7 @@ static unsigned computeSubelement(SILValue Pointer,
       // Keep track of what subelement is being referenced.
       for (unsigned i = 0, e = TEAI->getFieldIndex(); i != e; ++i) {
         SubElementNumber +=
-            getNumSubElements(TT.getTupleElementType(i), M,
+            getNumSubElements(TT.getTupleElementType(i), F,
                               TypeExpansionContext(*RootInst->getFunction()));
       }
       Pointer = TEAI->getOperand();
@@ -191,7 +196,8 @@ static unsigned computeSubelement(SILValue Pointer,
         if (D == SEAI->getField()) break;
         auto context = TypeExpansionContext(*RootInst->getFunction());
         SubElementNumber +=
-            getNumSubElements(ST.getFieldType(D, M, context), M, context);
+          getNumSubElements(ST.getFieldType(D, F.getModule(), context), F,
+                            context);
       }
       
       Pointer = SEAI->getOperand();
@@ -370,10 +376,9 @@ static bool isFullyAvailable(SILType loadTy, unsigned firstElt,
   if (!firstVal || firstVal.getType() != loadTy)
     return false;
 
-  auto *function = firstVal.getValue()->getFunction();
+  auto &function = *firstVal.getValue()->getFunction();
   return llvm::all_of(
-    range(getNumSubElements(loadTy, function->getModule(),
-                            TypeExpansionContext(*function))),
+    range(getNumSubElements(loadTy, function, TypeExpansionContext(function))),
     [&](unsigned index) -> bool {
       auto &val = AvailableValues[firstElt + index];
       return val.getValue() == firstVal.getValue() &&
@@ -395,7 +400,7 @@ static SILValue nonDestructivelyExtractSubElement(const AvailableValue &Val,
       // Keep track of what subelement is being referenced.
       SILType EltTy = ValTy.getTupleElementType(EltNo);
       unsigned NumSubElt = getNumSubElements(
-          EltTy, B.getModule(), TypeExpansionContext(B.getFunction()));
+          EltTy, B.getFunction(), TypeExpansionContext(B.getFunction()));
       if (SubElementNumber < NumSubElt) {
         auto BorrowedVal = Val.emitBeginBorrow(B, Loc);
         auto NewVal =
@@ -420,7 +425,7 @@ static SILValue nonDestructivelyExtractSubElement(const AvailableValue &Val,
       auto fieldType = ValTy.getFieldType(
           D, B.getModule(), TypeExpansionContext(B.getFunction()));
       unsigned NumSubElt = getNumSubElements(
-          fieldType, B.getModule(), TypeExpansionContext(B.getFunction()));
+          fieldType, B.getFunction(), TypeExpansionContext(B.getFunction()));
 
       if (SubElementNumber < NumSubElt) {
         auto BorrowedVal = Val.emitBeginBorrow(B, Loc);
@@ -1227,7 +1232,8 @@ bool AvailableValueAggregator::canTake(SILType loadTy,
     return llvm::all_of(indices(tt->getElements()), [&](unsigned eltNo) {
       SILType eltTy = loadTy.getTupleElementType(eltNo);
       unsigned numSubElt =
-          getNumSubElements(eltTy, M, TypeExpansionContext(B.getFunction()));
+        getNumSubElements(eltTy, B.getFunction(),
+                          TypeExpansionContext(B.getFunction()));
       bool success = canTake(eltTy, firstElt);
       firstElt += numSubElt;
       return success;
@@ -1238,7 +1244,7 @@ bool AvailableValueAggregator::canTake(SILType loadTy,
     return llvm::all_of(sd->getStoredProperties(), [&](VarDecl *decl) -> bool {
       auto context = TypeExpansionContext(B.getFunction());
       SILType eltTy = loadTy.getFieldType(decl, M, context);
-      unsigned numSubElt = getNumSubElements(eltTy, M, context);
+      unsigned numSubElt = getNumSubElements(eltTy, B.getFunction(), context);
       bool success = canTake(eltTy, firstElt);
       firstElt += numSubElt;
       return success;
@@ -1369,7 +1375,8 @@ SILValue AvailableValueAggregator::aggregateTupleSubElts(TupleType *TT,
   for (unsigned EltNo : indices(TT->getElements())) {
     SILType EltTy = LoadTy.getTupleElementType(EltNo);
     unsigned NumSubElt =
-        getNumSubElements(EltTy, M, TypeExpansionContext(B.getFunction()));
+      getNumSubElements(EltTy, B.getFunction(),
+                        TypeExpansionContext(B.getFunction()));
 
     // If we are missing any of the available values in this struct element,
     // compute an address to load from.
@@ -1406,7 +1413,7 @@ SILValue AvailableValueAggregator::aggregateStructSubElts(StructDecl *sd,
   for (auto *decl : sd->getStoredProperties()) {
     auto context = TypeExpansionContext(B.getFunction());
     SILType eltTy = loadTy.getFieldType(decl, M, context);
-    unsigned numSubElt = getNumSubElements(eltTy, M, context);
+    unsigned numSubElt = getNumSubElements(eltTy, B.getFunction(), context);
 
     // If we are missing any of the available values in this struct element,
     // compute an address to load from.
@@ -1539,6 +1546,8 @@ public:
 
 private:
   SILModule &getModule() const { return TheMemory->getModule(); }
+
+  SILFunction &getFunction() const { return *TheMemory->getFunction(); }
 
   void updateAvailableValues(
     SILInstruction *Inst,
@@ -1673,7 +1682,7 @@ AvailableValueDataflowContext::computeAvailableValues(
     return std::nullopt;
 
   unsigned NumLoadSubElements = getNumSubElements(
-    LoadTy, getModule(), TypeExpansionContext(*TheMemory->getFunction()));
+    LoadTy, getFunction(), TypeExpansionContext(getFunction()));
 
   LoadInfo loadInfo = {LoadTy, FirstElt, NumLoadSubElements};
 
@@ -1712,14 +1721,14 @@ static inline void updateAvailableValuesHelper(
     SmallBitVector &conflictingValues,
     function_ref<std::optional<AvailableValue>(unsigned)> defaultFunc,
     function_ref<bool(AvailableValue &, unsigned)> isSafeFunc) {
-  auto &mod = theMemory->getModule();
   unsigned startSubElt = computeSubelement(address, theMemory);
 
   // TODO: Is this needed now?
   assert(startSubElt != ~0U && "Store within enum projection not handled");
+  auto &f = *theMemory->getFunction();
   for (unsigned i : range(getNumSubElements(
-           address->getType().getObjectType(), mod,
-           TypeExpansionContext(*theMemory->getFunction())))) {
+                            address->getType().getObjectType(), f,
+                            TypeExpansionContext(f)))) {
     // If this element is not required, don't fill it in.
     if (!requiredElts[startSubElt + i])
       continue;
@@ -1849,7 +1858,8 @@ void AvailableValueDataflowContext::updateAvailableValues(
 
     bool AnyRequired = false;
     for (unsigned i : range(getNumSubElements(
-             ValTy, getModule(), TypeExpansionContext(*CAI->getFunction())))) {
+                              ValTy, getFunction(),
+                              TypeExpansionContext(getFunction())))) {
       // If this element is not required, don't fill it in.
       AnyRequired = RequiredElts[StartSubElt+i];
       if (AnyRequired) break;
@@ -1883,7 +1893,7 @@ void AvailableValueDataflowContext::updateAvailableValues(
     // potentially bailing out (because it is address-only).
     bool AnyRequired = false;
     for (unsigned i : range(getNumSubElements(
-             ValTy, getModule(), TypeExpansionContext(*MD->getFunction())))) {
+             ValTy, getFunction(), TypeExpansionContext(getFunction())))) {
       // If this element is not required, don't fill it in.
       AnyRequired = RequiredElts[StartSubElt+i];
       if (AnyRequired) break;
@@ -2171,7 +2181,7 @@ void AvailableValueDataflowContext::updateMarkDependenceValues(
   }
   SILType valueTy = md->getValue()->getType().getObjectType();
   unsigned numMDSubElements = getNumSubElements(
-    valueTy, getModule(), TypeExpansionContext(*TheMemory->getFunction()));
+    valueTy, getFunction(), TypeExpansionContext(getFunction()));
 
   // Update each required subelement of the mark_dependence value.
   for (unsigned subIdx = firstMDElt; subIdx < firstMDElt + numMDSubElements;
@@ -2299,7 +2309,8 @@ public:
       : Module(memory->getModule()), TheMemory(memory),
         MemoryType(getMemoryType(memory)),
         NumMemorySubElements(getNumSubElements(
-            MemoryType, Module, TypeExpansionContext(*memory->getFunction()))),
+            MemoryType, *memory->getFunction(),
+            TypeExpansionContext(*memory->getFunction()))),
         Uses(uses), deleter(deleter), deadEndBlocks(deadEndBlocks),
         DataflowContext(TheMemory, NumMemorySubElements,
                         OptimizationMode::PreserveAlloc, uses,
@@ -2680,7 +2691,8 @@ public:
       : Module(memory->getModule()), TheMemory(memory),
         MemoryType(getMemoryType(memory)),
         NumMemorySubElements(getNumSubElements(
-            MemoryType, Module, TypeExpansionContext(*memory->getFunction()))),
+            MemoryType, *memory->getFunction(),
+            TypeExpansionContext(*memory->getFunction()))),
         Uses(uses), Releases(releases), deadEndBlocks(deadEndBlocks),
         deleter(deleter), domInfo(domInfo),
         DataflowContext(TheMemory, NumMemorySubElements,

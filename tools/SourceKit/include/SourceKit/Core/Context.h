@@ -31,28 +31,30 @@ namespace llvm {
 namespace SourceKit {
   class LangSupport;
   class NotificationCenter;
+  class PluginSupport;
 
-class GlobalConfig {
-public:
-  struct Settings {
-    struct IDEInspectionOptions {
+  class GlobalConfig {
+  public:
+    struct Settings {
+      struct IDEInspectionOptions {
 
-      /// Max count of reusing ASTContext for cached IDE inspection.
-      unsigned MaxASTContextReuseCount = 100;
+        /// Max count of reusing ASTContext for cached IDE inspection.
+        unsigned MaxASTContextReuseCount = 100;
 
-      /// Interval second for checking dependencies in cached IDE inspection.
-      unsigned CheckDependencyInterval = 5;
-    } IDEInspectionOpts;
-  };
+        /// Interval second for checking dependencies in cached IDE inspection.
+        unsigned CheckDependencyInterval = 5;
+      } IDEInspectionOpts;
+    };
 
-private:
-  Settings State;
-  mutable llvm::sys::Mutex Mtx;
+  private:
+    Settings State;
+    mutable llvm::sys::Mutex Mtx;
 
-public:
-  Settings update(std::optional<unsigned> IDEInspectionMaxASTContextReuseCount,
-                  std::optional<unsigned> IDEInspectionCheckDependencyInterval);
-  Settings::IDEInspectionOptions getIDEInspectionOpts() const;
+  public:
+    Settings
+    update(std::optional<unsigned> IDEInspectionMaxASTContextReuseCount,
+           std::optional<unsigned> IDEInspectionCheckDependencyInterval);
+    Settings::IDEInspectionOptions getIDEInspectionOpts() const;
 };
 
 /// Keeps track of all requests that are currently in progress and coordinates
@@ -169,6 +171,7 @@ class Context {
   std::shared_ptr<NotificationCenter> NotificationCtr;
   std::shared_ptr<GlobalConfig> Config;
   std::shared_ptr<RequestTracker> ReqTracker;
+  std::shared_ptr<PluginSupport> Plugins;
   std::shared_ptr<SlowRequestSimulator> SlowRequestSim;
 
 public:
@@ -176,6 +179,8 @@ public:
           StringRef DiagnosticDocumentationPath,
           llvm::function_ref<std::unique_ptr<LangSupport>(Context &)>
               LangSupportFactoryFn,
+          llvm::function_ref<std::shared_ptr<PluginSupport>(Context &)>
+              PluginSupportFactoryFn,
           bool shouldDispatchNotificationsOnMain = true);
   ~Context();
 
@@ -191,6 +196,8 @@ public:
   std::shared_ptr<NotificationCenter> getNotificationCenter() { return NotificationCtr; }
 
   std::shared_ptr<GlobalConfig> getGlobalConfiguration() { return Config; }
+
+  std::shared_ptr<PluginSupport> getPlugins() { return Plugins; }
 
   std::shared_ptr<SlowRequestSimulator> getSlowRequestSimulator() {
     return SlowRequestSim;
