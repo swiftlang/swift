@@ -151,6 +151,7 @@ split_embedded_sources(
   EMBEDDED SetVariant.swift
   EMBEDDED ShadowProtocols.swift
     NORMAL Shims.swift
+  EMBEDDED Slab.swift
   EMBEDDED Slice.swift
   EMBEDDED SmallString.swift
   EMBEDDED Sort.swift
@@ -321,6 +322,9 @@ list(APPEND swift_stdlib_compile_flags "-Xfrontend" "-enable-experimental-concis
 list(APPEND swift_stdlib_compile_flags "-enable-experimental-feature" "Macros")
 list(APPEND swift_stdlib_compile_flags "-enable-experimental-feature" "FreestandingMacros")
 list(APPEND swift_stdlib_compile_flags "-enable-experimental-feature" "Extern")
+list(APPEND swift_stdlib_compile_flags "-enable-experimental-feature" "BitwiseCopyable")
+list(APPEND swift_stdlib_compile_flags "-enable-experimental-feature" "ValueGenerics")
+list(APPEND swift_stdlib_compile_flags "-enable-experimental-feature" "AddressableParameters")
 list(APPEND swift_stdlib_compile_flags "-enable-experimental-feature" "AddressableTypes")
 
 if("${SWIFT_NATIVE_SWIFT_TOOLS_PATH}" STREQUAL "")
@@ -448,7 +452,7 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB)
     list(GET list 0 arch)
     list(GET list 1 mod)
     list(GET list 2 triple)
-    
+
     set(SWIFT_SDK_embedded_ARCH_${arch}_MODULE "${mod}")
     set(SWIFT_SDK_embedded_LIB_SUBDIR "embedded")
     set(SWIFT_SDK_embedded_ARCH_${arch}_TRIPLE "${triple}")
