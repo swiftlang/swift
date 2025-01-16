@@ -23,11 +23,11 @@ extension ASTGenVisitor {
     case .accessorDecl:
       fatalError("Should be generated as a part of another decl")
     case .actorDecl(let node):
-      return self.generate(actorDecl: node)?.asDecl
+      return self.generate(actorDecl: node)
     case .associatedTypeDecl(let node):
       return self.generate(associatedTypeDecl: node)?.asDecl
     case .classDecl(let node):
-      return self.generate(classDecl: node)?.asDecl
+      return self.generate(classDecl: node)
     case .deinitializerDecl(let node):
       return self.generate(deinitializerDecl: node).asDecl
     case .editorPlaceholderDecl:
@@ -35,7 +35,7 @@ extension ASTGenVisitor {
     case .enumCaseDecl(let node):
       return self.generate(enumCaseDecl: node).asDecl
     case .enumDecl(let node):
-      return self.generate(enumDecl: node)?.asDecl
+      return self.generate(enumDecl: node)
     case .extensionDecl(let node):
       return self.generate(extensionDecl: node).asDecl
     case .functionDecl(let node):
@@ -60,9 +60,9 @@ extension ASTGenVisitor {
     case .precedenceGroupDecl(let node):
       return self.generate(precedenceGroupDecl: node)?.asDecl
     case .protocolDecl(let node):
-      return self.generate(protocolDecl: node)?.asDecl
+      return self.generate(protocolDecl: node)
     case .structDecl(let node):
-      return self.generate(structDecl: node)?.asDecl
+      return self.generate(structDecl: node)
     case .subscriptDecl(let node):
       return self.generate(subscriptDecl: node).asDecl
     case .typeAliasDecl(let node):
@@ -109,179 +109,224 @@ extension ASTGenVisitor {
     return decl
   }
 
-  func generate(enumDecl node: EnumDeclSyntax) -> BridgedNominalTypeDecl? {
-    let attrs = self.generateDeclAttributes(node, allowStatic: false)
-    guard let (name, nameLoc) = self.generateIdentifierDeclNameAndLoc(node.name) else {
-      return nil
-    }
+  func generate(enumDecl node: EnumDeclSyntax) -> BridgedDecl? {
+    func createDecl() -> BridgedNominalTypeDecl? {
+      let attrs = self.generateDeclAttributes(node, allowStatic: false)
+      guard let (name, nameLoc) = self.generateIdentifierDeclNameAndLoc(node.name) else {
+        return nil
+      }
 
-    let decl = BridgedEnumDecl.createParsed(
-      self.ctx,
-      declContext: self.declContext,
-      enumKeywordLoc: self.generateSourceLoc(node.enumKeyword),
-      name: name,
-      nameLoc: nameLoc,
-      genericParamList: self.generate(genericParameterClause: node.genericParameterClause),
-      inheritedTypes: self.generate(inheritedTypeList: node.inheritanceClause?.inheritedTypes),
-      genericWhereClause: self.generate(genericWhereClause: node.genericWhereClause),
-      braceRange: self.generateSourceRange(
-        start: node.memberBlock.leftBrace,
-        end: node.memberBlock.rightBrace
+      let decl = BridgedEnumDecl.createParsed(
+        self.ctx,
+        declContext: self.declContext,
+        enumKeywordLoc: self.generateSourceLoc(node.enumKeyword),
+        name: name,
+        nameLoc: nameLoc,
+        genericParamList: self.generate(genericParameterClause: node.genericParameterClause),
+        inheritedTypes: self.generate(inheritedTypeList: node.inheritanceClause?.inheritedTypes),
+        genericWhereClause: self.generate(genericWhereClause: node.genericWhereClause),
+        braceRange: self.generateSourceRange(
+          start: node.memberBlock.leftBrace,
+          end: node.memberBlock.rightBrace
+        )
       )
-    )
-    decl.asDecl.attachParsedAttrs(attrs.attributes)
+      decl.asDecl.attachParsedAttrs(attrs.attributes)
 
-    let members = self.withDeclContext(decl.asDeclContext) {
-      self.generate(memberBlockItemList: node.memberBlock.members)
-    }
-    let fp = self.generateFingerprint(declGroup: node)
-    decl.setParsedMembers(
-      members.lazy.bridgedArray(in: self),
-      fingerprint: fp.bridged
-    )
-
-    return decl
-  }
-
-  func generate(structDecl node: StructDeclSyntax) -> BridgedNominalTypeDecl? {
-    let attrs = self.generateDeclAttributes(node, allowStatic: false)
-    guard let (name, nameLoc) = self.generateIdentifierDeclNameAndLoc(node.name) else {
-      return nil
-    }
-
-    let decl = BridgedStructDecl.createParsed(
-      self.ctx,
-      declContext: self.declContext,
-      structKeywordLoc: self.generateSourceLoc(node.structKeyword),
-      name: name,
-      nameLoc: nameLoc,
-      genericParamList: self.generate(genericParameterClause: node.genericParameterClause),
-      inheritedTypes: self.generate(inheritedTypeList: node.inheritanceClause?.inheritedTypes),
-      genericWhereClause: self.generate(genericWhereClause: node.genericWhereClause),
-      braceRange: self.generateSourceRange(
-        start: node.memberBlock.leftBrace,
-        end: node.memberBlock.rightBrace
+      let members = self.withDeclContext(decl.asDeclContext) {
+        self.generate(memberBlockItemList: node.memberBlock.members)
+      }
+      let fp = self.generateFingerprint(declGroup: node)
+      decl.setParsedMembers(
+        members.lazy.bridgedArray(in: self),
+        fingerprint: fp.bridged
       )
-    )
-    decl.asDecl.attachParsedAttrs(attrs.attributes)
 
-    let members = self.withDeclContext(decl.asDeclContext) {
-      self.generate(memberBlockItemList: node.memberBlock.members)
+      return decl
     }
-    let fp = self.generateFingerprint(declGroup: node)
-    decl.setParsedMembers(
-      members.lazy.bridgedArray(in: self),
-      fingerprint: fp.bridged
-    )
-
-    return decl
+    if let extendedType = node.extendedType {
+      return createImplicitExtension(of: extendedType, node: node) {
+        return createDecl()
+      }?.asDecl
+    } else {
+      return createDecl()?.asDecl
+    }
   }
 
-  func generate(classDecl node: ClassDeclSyntax) -> BridgedNominalTypeDecl? {
-    let attrs = self.generateDeclAttributes(node, allowStatic: false)
-    guard let (name, nameLoc) = self.generateIdentifierDeclNameAndLoc(node.name) else {
-      return nil
-    }
+  func generate(structDecl node: StructDeclSyntax) -> BridgedDecl? {
+    func createDecl() -> BridgedNominalTypeDecl? {
+      let attrs = self.generateDeclAttributes(node, allowStatic: false)
+      guard let (name, nameLoc) = self.generateIdentifierDeclNameAndLoc(node.name) else {
+        return nil
+      }
 
-    let decl = BridgedClassDecl.createParsed(
-      self.ctx,
-      declContext: self.declContext,
-      classKeywordLoc: self.generateSourceLoc(node.classKeyword),
-      name: name,
-      nameLoc: nameLoc,
-      genericParamList: self.generate(genericParameterClause: node.genericParameterClause),
-      inheritedTypes: self.generate(inheritedTypeList: node.inheritanceClause?.inheritedTypes),
-      genericWhereClause: self.generate(genericWhereClause: node.genericWhereClause),
-      braceRange: self.generateSourceRange(
-        start: node.memberBlock.leftBrace,
-        end: node.memberBlock.rightBrace
-      ),
-      isActor: false
-    )
-    decl.asDecl.attachParsedAttrs(attrs.attributes)
-
-    let members = self.withDeclContext(decl.asDeclContext) {
-      self.generate(memberBlockItemList: node.memberBlock.members)
-    }
-    let fp = self.generateFingerprint(declGroup: node)
-    decl.setParsedMembers(
-      members.lazy.bridgedArray(in: self),
-      fingerprint: fp.bridged
-    )
-
-    return decl
-  }
-
-  func generate(actorDecl node: ActorDeclSyntax) -> BridgedNominalTypeDecl? {
-    let attrs = self.generateDeclAttributes(node, allowStatic: false)
-    guard let (name, nameLoc) = self.generateIdentifierDeclNameAndLoc(node.name) else {
-      return nil
-    }
-
-    let decl = BridgedClassDecl.createParsed(
-      self.ctx,
-      declContext: self.declContext,
-      classKeywordLoc: self.generateSourceLoc(node.actorKeyword),
-      name: name,
-      nameLoc: nameLoc,
-      genericParamList: self.generate(genericParameterClause: node.genericParameterClause),
-      inheritedTypes: self.generate(inheritedTypeList: node.inheritanceClause?.inheritedTypes),
-      genericWhereClause: self.generate(genericWhereClause: node.genericWhereClause),
-      braceRange: self.generateSourceRange(
-        start: node.memberBlock.leftBrace,
-        end: node.memberBlock.rightBrace
-      ),
-      isActor: true
-    )
-    decl.asDecl.attachParsedAttrs(attrs.attributes)
-
-    let members = self.withDeclContext(decl.asDeclContext) {
-      self.generate(memberBlockItemList: node.memberBlock.members)
-    }
-    let fp = self.generateFingerprint(declGroup: node)
-    decl.setParsedMembers(
-      members.lazy.bridgedArray(in: self),
-      fingerprint: fp.bridged
-    )
-
-    return decl
-  }
-
-  func generate(protocolDecl node: ProtocolDeclSyntax) -> BridgedNominalTypeDecl? {
-    let attrs = self.generateDeclAttributes(node, allowStatic: false)
-    guard let (name, nameLoc) = self.generateIdentifierDeclNameAndLoc(node.name) else {
-      return nil
-    }
-    let primaryAssociatedTypeNames = node.primaryAssociatedTypeClause?.primaryAssociatedTypes.lazy.map {
-      self.generateLocatedIdentifier($0.name)
-    }
-
-    let decl = BridgedProtocolDecl.createParsed(
-      self.ctx,
-      declContext: self.declContext,
-      protocolKeywordLoc: self.generateSourceLoc(node.protocolKeyword),
-      name: name,
-      nameLoc: nameLoc,
-      primaryAssociatedTypeNames: primaryAssociatedTypeNames.bridgedArray(in: self),
-      inheritedTypes: self.generate(inheritedTypeList: node.inheritanceClause?.inheritedTypes),
-      genericWhereClause: self.generate(genericWhereClause: node.genericWhereClause),
-      braceRange: self.generateSourceRange(
-        start: node.memberBlock.leftBrace,
-        end: node.memberBlock.rightBrace
+      let decl = BridgedStructDecl.createParsed(
+        self.ctx,
+        declContext: self.declContext,
+        structKeywordLoc: self.generateSourceLoc(node.structKeyword),
+        name: name,
+        nameLoc: nameLoc,
+        genericParamList: self.generate(genericParameterClause: node.genericParameterClause),
+        inheritedTypes: self.generate(inheritedTypeList: node.inheritanceClause?.inheritedTypes),
+        genericWhereClause: self.generate(genericWhereClause: node.genericWhereClause),
+        braceRange: self.generateSourceRange(
+          start: node.memberBlock.leftBrace,
+          end: node.memberBlock.rightBrace
+        )
       )
-    )
-    decl.asDecl.attachParsedAttrs(attrs.attributes)
+      decl.asDecl.attachParsedAttrs(attrs.attributes)
 
-    let members = self.withDeclContext(decl.asDeclContext) {
-      self.generate(memberBlockItemList: node.memberBlock.members)
+      let members = self.withDeclContext(decl.asDeclContext) {
+        self.generate(memberBlockItemList: node.memberBlock.members)
+      }
+      let fp = self.generateFingerprint(declGroup: node)
+      decl.setParsedMembers(
+        members.lazy.bridgedArray(in: self),
+        fingerprint: fp.bridged
+      )
+
+      return decl
     }
-    let fp = self.generateFingerprint(declGroup: node)
-    decl.setParsedMembers(
-      members.lazy.bridgedArray(in: self),
-      fingerprint: fp.bridged
-    )
+    if let extendedType = node.extendedType {
+      return createImplicitExtension(of: extendedType, node: node) {
+        return createDecl()
+      }?.asDecl
+    } else {
+      return createDecl()?.asDecl
+    }
+  }
 
-    return decl
+  func generate(classDecl node: ClassDeclSyntax) -> BridgedDecl? {
+    func createDecl() -> BridgedNominalTypeDecl? {
+      let attrs = self.generateDeclAttributes(node, allowStatic: false)
+      guard let (name, nameLoc) = self.generateIdentifierDeclNameAndLoc(node.name) else {
+        return nil
+      }
+
+      let decl = BridgedClassDecl.createParsed(
+        self.ctx,
+        declContext: self.declContext,
+        classKeywordLoc: self.generateSourceLoc(node.classKeyword),
+        name: name,
+        nameLoc: nameLoc,
+        genericParamList: self.generate(genericParameterClause: node.genericParameterClause),
+        inheritedTypes: self.generate(inheritedTypeList: node.inheritanceClause?.inheritedTypes),
+        genericWhereClause: self.generate(genericWhereClause: node.genericWhereClause),
+        braceRange: self.generateSourceRange(
+          start: node.memberBlock.leftBrace,
+          end: node.memberBlock.rightBrace
+        ),
+        isActor: false
+      )
+      decl.asDecl.attachParsedAttrs(attrs.attributes)
+
+      let members = self.withDeclContext(decl.asDeclContext) {
+        self.generate(memberBlockItemList: node.memberBlock.members)
+      }
+      let fp = self.generateFingerprint(declGroup: node)
+      decl.setParsedMembers(
+        members.lazy.bridgedArray(in: self),
+        fingerprint: fp.bridged
+      )
+
+      return decl
+    }
+    if let extendedType = node.extendedType {
+      return createImplicitExtension(of: extendedType, node: node) {
+        return createDecl()
+      }?.asDecl
+    } else {
+      return createDecl()?.asDecl
+    }
+  }
+
+  func generate(actorDecl node: ActorDeclSyntax) -> BridgedDecl? {
+    func createDecl() -> BridgedNominalTypeDecl? {
+      let attrs = self.generateDeclAttributes(node, allowStatic: false)
+      guard let (name, nameLoc) = self.generateIdentifierDeclNameAndLoc(node.name) else {
+        return nil
+      }
+
+      let decl = BridgedClassDecl.createParsed(
+        self.ctx,
+        declContext: self.declContext,
+        classKeywordLoc: self.generateSourceLoc(node.actorKeyword),
+        name: name,
+        nameLoc: nameLoc,
+        genericParamList: self.generate(genericParameterClause: node.genericParameterClause),
+        inheritedTypes: self.generate(inheritedTypeList: node.inheritanceClause?.inheritedTypes),
+        genericWhereClause: self.generate(genericWhereClause: node.genericWhereClause),
+        braceRange: self.generateSourceRange(
+          start: node.memberBlock.leftBrace,
+          end: node.memberBlock.rightBrace
+        ),
+        isActor: true
+      )
+      decl.asDecl.attachParsedAttrs(attrs.attributes)
+
+      let members = self.withDeclContext(decl.asDeclContext) {
+        self.generate(memberBlockItemList: node.memberBlock.members)
+      }
+      let fp = self.generateFingerprint(declGroup: node)
+      decl.setParsedMembers(
+        members.lazy.bridgedArray(in: self),
+        fingerprint: fp.bridged
+      )
+
+      return decl
+    }
+    if let extendedType = node.extendedType {
+      return createImplicitExtension(of: extendedType, node: node) {
+        return createDecl()
+      }?.asDecl
+    } else {
+      return createDecl()?.asDecl
+    }
+  }
+
+  func generate(protocolDecl node: ProtocolDeclSyntax) -> BridgedDecl? {
+    func createDecl() -> BridgedNominalTypeDecl? {
+      let attrs = self.generateDeclAttributes(node, allowStatic: false)
+      guard let (name, nameLoc) = self.generateIdentifierDeclNameAndLoc(node.name) else {
+        return nil
+      }
+      let primaryAssociatedTypeNames = node.primaryAssociatedTypeClause?.primaryAssociatedTypes.lazy.map {
+        self.generateLocatedIdentifier($0.name)
+      }
+
+      let decl = BridgedProtocolDecl.createParsed(
+        self.ctx,
+        declContext: self.declContext,
+        protocolKeywordLoc: self.generateSourceLoc(node.protocolKeyword),
+        name: name,
+        nameLoc: nameLoc,
+        primaryAssociatedTypeNames: primaryAssociatedTypeNames.bridgedArray(in: self),
+        inheritedTypes: self.generate(inheritedTypeList: node.inheritanceClause?.inheritedTypes),
+        genericWhereClause: self.generate(genericWhereClause: node.genericWhereClause),
+        braceRange: self.generateSourceRange(
+          start: node.memberBlock.leftBrace,
+          end: node.memberBlock.rightBrace
+        )
+      )
+      decl.asDecl.attachParsedAttrs(attrs.attributes)
+
+      let members = self.withDeclContext(decl.asDeclContext) {
+        self.generate(memberBlockItemList: node.memberBlock.members)
+      }
+      let fp = self.generateFingerprint(declGroup: node)
+      decl.setParsedMembers(
+        members.lazy.bridgedArray(in: self),
+        fingerprint: fp.bridged
+      )
+
+      return decl
+    }
+    if let extendedType = node.extendedType {
+      return createImplicitExtension(of: extendedType, node: node) {
+        return createDecl()
+      }?.asDecl
+    } else {
+      return createDecl()?.asDecl
+    }
   }
 
   func generate(associatedTypeDecl node: AssociatedTypeDeclSyntax) -> BridgedAssociatedTypeDecl? {
@@ -302,6 +347,28 @@ extension ASTGenVisitor {
     )
     decl.asDecl.attachParsedAttrs(attrs.attributes)
     return decl
+  }
+
+  func createImplicitExtension(
+    of extendedType: TypeSyntax,
+    node: some DeclGroupSyntax,
+    makeNominalType: () -> BridgedNominalTypeDecl?
+  ) -> BridgedExtensionDecl? {
+    let extensionDecl = BridgedExtensionDecl.createImplicit(
+      self.ctx, declContext: self.declContext,
+      extendedType: self.generate(type: extendedType)
+    )
+    let members = self.withDeclContext(extensionDecl.asDeclContext) {
+      guard let decl = makeNominalType() else { return [] }
+      return [decl.asDecl]
+    }
+    let fp = self.generateFingerprint(declGroup: node)
+    extensionDecl.setParsedMembers(
+      members.lazy.bridgedArray(in: self),
+      fingerprint: fp.bridged
+    )
+
+    return extensionDecl
   }
 }
 

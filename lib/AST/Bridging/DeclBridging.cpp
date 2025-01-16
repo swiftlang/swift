@@ -541,6 +541,19 @@ BridgedExtensionDecl BridgedExtensionDecl_createParsed(
   return decl;
 }
 
+BridgedExtensionDecl BridgedExtensionDecl_createImplicit(
+    BridgedASTContext cContext, BridgedDeclContext cDeclContext,
+    BridgedTypeRepr extendedType) {
+  ASTContext &context = cContext.unbridged();
+
+  auto *decl = ExtensionDecl::create(
+      context, /*extensionKeywordLoc*/ SourceLoc(), extendedType.unbridged(),
+      /*inherited*/ {}, cDeclContext.unbridged(),
+      /*genericWhereClause*/ nullptr);
+  decl->setImplicit(true);
+  return decl;
+}
+
 BridgedMacroExpansionDecl BridgedMacroExpansionDecl_createParsed(
     BridgedDeclContext cDeclContext, BridgedSourceLoc cPoundLoc,
     BridgedDeclNameRef cMacroNameRef, BridgedDeclNameLoc cMacroNameLoc,

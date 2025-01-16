@@ -1160,6 +1160,12 @@ BridgedExtensionDecl BridgedExtensionDecl_createParsed(
     BridgedNullableTrailingWhereClause genericWhereClause,
     BridgedSourceRange cBraceRange);
 
+SWIFT_NAME(
+    "BridgedExtensionDecl.createImplicit(_:declContext:extendedType:)")
+BridgedExtensionDecl BridgedExtensionDecl_createImplicit(
+    BridgedASTContext cContext, BridgedDeclContext cDeclContext,
+    BridgedTypeRepr opaqueExtendedType);
+
 enum ENUM_EXTENSIBILITY_ATTR(closed) BridgedOperatorFixity {
   BridgedOperatorFixityInfix,
   BridgedOperatorFixityPrefix,

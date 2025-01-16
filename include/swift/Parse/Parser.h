@@ -1251,14 +1251,14 @@ public:
                 bool &hadError);
   ParserResult<ExtensionDecl> parseDeclExtension(ParseDeclOptions Flags,
                                                  DeclAttributes &Attributes);
-  ParserResult<EnumDecl> parseDeclEnum(ParseDeclOptions Flags,
+  ParserResult<Decl> parseDeclEnum(ParseDeclOptions Flags,
                                        DeclAttributes &Attributes);
   ParserResult<EnumCaseDecl>
   parseDeclEnumCase(ParseDeclOptions Flags, DeclAttributes &Attributes,
                     SmallVectorImpl<Decl *> &decls);
-  ParserResult<StructDecl>
+  ParserResult<Decl>
   parseDeclStruct(ParseDeclOptions Flags, DeclAttributes &Attributes);
-  ParserResult<ClassDecl>
+  ParserResult<Decl>
   parseDeclClass(ParseDeclOptions Flags, DeclAttributes &Attributes);
   ParserResult<PatternBindingDecl>
   parseDeclVar(ParseDeclOptions Flags, DeclAttributes &Attributes,
@@ -1267,6 +1267,9 @@ public:
                StaticSpellingKind StaticSpelling,
                SourceLoc TryLoc,
                bool HasLetOrVarKeyword = true);
+
+  ParserResult<ExtensionDecl> maybeParseImplicitNominalTypeExtension();
+  ParserResult<Decl> maybeFinalizeImplicitNominalTypeExtension(ExtensionDecl *EDOrNull, Decl *D, std::function<ParserResult<Decl>(Decl *)> Callback);
 
   struct ParsedAccessors;
 
@@ -1334,7 +1337,7 @@ public:
       SmallVectorImpl<PrimaryAssociatedTypeName> &AssocTypeNames);
   ParserStatus parsePrimaryAssociatedTypeList(
       SmallVectorImpl<PrimaryAssociatedTypeName> &AssocTypeNames);
-  ParserResult<ProtocolDecl> parseDeclProtocol(ParseDeclOptions Flags,
+  ParserResult<Decl> parseDeclProtocol(ParseDeclOptions Flags,
                                                DeclAttributes &Attributes);
 
   ParserResult<SubscriptDecl>
@@ -1374,8 +1377,12 @@ public:
 
     /// Whether the type is for a closure attribute.
     CustomAttribute,
+
     /// A type in an inheritance clause.
     InheritanceClause,
+
+    /// The type to implicitly extend in a nominal type declaration.
+    NominalTypeDeclExtendedName,
   };
 
   ParserResult<TypeRepr> parseTypeScalar(
@@ -1434,7 +1441,7 @@ public:
   ParserResult<DeclRefTypeRepr> parseTypeIdentifier(TypeRepr *Base);
 
   /// Parse a dotted type, e.g. 'Foo<X>.Y.Z', 'P.Type', '[X].Y'.
-  ParserResult<TypeRepr> parseTypeDotted(ParserResult<TypeRepr> Base);
+  ParserResult<TypeRepr> parseTypeDotted(ParserResult<TypeRepr> Base, ParseTypeReason reason);
 
   struct ParsedTypeAttributeList {
     ParseTypeReason ParseReason;
@@ -1715,7 +1722,9 @@ public:
   /// and the expression will parse with the '<' as an operator.
   bool canParseAsGenericArgumentList();
 
-  bool canParseType();
+  bool canParseType(ParseTypeReason reason = ParseTypeReason::Unspecified);
+
+  bool canContinueParsingExtendedTypeForNominalTypeDecl(ParseTypeReason reason);
 
   /// Returns true if a simple type identifier can be parsed.
   ///

@@ -1440,12 +1440,20 @@ namespace {
           ParseIfNeeded ? SF.getTopLevelItems() : SF.getCachedTopLevelItems();
       if (items) {
         for (auto item : *items) {
+          if (auto decl = item.dyn_cast<Decl *>()) {
+            // Implicit extensions are synthesized when using the `struct A.B {`
+            // syntax, so we don't want to exclude those (and all of their
+            // children) from the AST dump.
+            if (item.isImplicit() && !isa<ExtensionDecl>(decl))
+              continue;
+
+            printRec(decl);
+            continue;
+          }
+
           if (item.isImplicit())
             continue;
-
-          if (auto decl = item.dyn_cast<Decl *>()) {
-            printRec(decl);
-          } else if (auto stmt = item.dyn_cast<Stmt *>()) {
+          if (auto stmt = item.dyn_cast<Stmt *>()) {
             printRec(stmt, &SF.getASTContext());
           } else {
             auto expr = item.get<Expr *>();
