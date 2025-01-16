@@ -1648,6 +1648,32 @@ extension Set {
   }
 }
 
+extension Set {
+    /// Removes all elements from the set that satisfy the given predicate.
+    ///
+    /// This method provides a way to efficiently remove multiple elements from the set based on a condition.
+    /// Instead of performing in-place removals for each match, it creates a new set with elements that don't
+    /// satisfy the predicate, optimizing performance.
+    ///
+    /// - Parameter predicate: A closure that takes an element of the set as its argument and returns
+    ///   a Boolean value indicating whether the element should be removed. The closure should return `true`
+    ///   for the element to be removed, and `false` otherwise.
+    ///
+    /// - Returns: An array containing all the elements that were removed from the set.
+    ///
+    /// - Complexity: O(n), where n is the number of elements in the set.
+    @discardableResult
+    mutating func remove(where predicate: (Element) -> Bool) -> [Element] {
+        // Create a list of elements to remove
+        let removedElements = self.filter(predicate)
+        // Retain only elements that do not satisfy the predicate
+        self = self.filter { !predicate($0) }
+        return removedElements
+    }
+}
+
+
+
 public typealias SetIndex<Element: Hashable> = Set<Element>.Index
 public typealias SetIterator<Element: Hashable> = Set<Element>.Iterator
 
