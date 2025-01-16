@@ -1,6 +1,18 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend %s -dump-parse -disable-availability-checking -enable-experimental-feature SymbolLinkageMarkers -enable-experimental-feature ABIAttribute -enable-experimental-feature Extern -enable-experimental-move-only -enable-experimental-feature ParserASTGen > %t/astgen.ast.raw
-// RUN: %target-swift-frontend %s -dump-parse -disable-availability-checking -enable-experimental-feature SymbolLinkageMarkers -enable-experimental-feature ABIAttribute -enable-experimental-feature Extern -enable-experimental-move-only > %t/cpp-parser.ast.raw
+// RUN: %target-swift-frontend %s -dump-parse -disable-availability-checking \
+// RUN:   -enable-experimental-feature SymbolLinkageMarkers \
+// RUN:   -enable-experimental-feature ABIAttribute \
+// RUN:   -enable-experimental-feature Extern \
+// RUN:   -enable-experimental-feature NonIsolatedAsyncInheritsIsolationFromContext \
+// RUN:   -enable-experimental-move-only \
+// RUN:   -enable-experimental-feature ParserASTGen > %t/astgen.ast.raw
+
+// RUN: %target-swift-frontend %s -dump-parse -disable-availability-checking \
+// RUN:   -enable-experimental-feature SymbolLinkageMarkers \
+// RUN:   -enable-experimental-feature ABIAttribute \
+// RUN:   -enable-experimental-feature Extern \
+// RUN:   -enable-experimental-feature NonIsolatedAsyncInheritsIsolationFromContext \
+// RUN:   -enable-experimental-move-only > %t/cpp-parser.ast.raw
 
 // Filter out any addresses in the dump, since they can differ.
 // RUN: sed -E 's#0x[0-9a-fA-F]+##g' %t/cpp-parser.ast.raw > %t/cpp-parser.ast
@@ -8,7 +20,13 @@
 
 // RUN: %diff -u %t/astgen.ast %t/cpp-parser.ast
 
-// RUN: %target-typecheck-verify-swift -enable-experimental-feature SymbolLinkageMarkers -enable-experimental-feature ABIAttribute -enable-experimental-feature Extern -enable-experimental-move-only -enable-experimental-feature ParserASTGen
+// RUN: %target-typecheck-verify-swift \
+// RUN:   -enable-experimental-feature SymbolLinkageMarkers \
+// RUN:   -enable-experimental-feature ABIAttribute \
+// RUN:   -enable-experimental-feature Extern \
+// RUN:   -enable-experimental-move-only \
+// RUN:   -enable-experimental-feature ParserASTGen \
+// RUN:   -enable-experimental-feature NonIsolatedAsyncInheritsIsolationFromContext
 
 // REQUIRES: executable_test
 // REQUIRES: swift_swift_parser
@@ -16,6 +34,7 @@
 // REQUIRES: swift_feature_Extern
 // REQUIRES: swift_feature_ParserASTGen
 // REQUIRES: swift_feature_ABIAttribute
+// REQUIRES: swift_feature_NonIsolatedAsyncInheritsIsolationFromContext
 
 // rdar://116686158
 // UNSUPPORTED: asan
@@ -26,7 +45,7 @@ struct S1 {
 
 func testStatic() {
   // static.
-  S1.staticMethod() 
+  S1.staticMethod()
   S1().staticMethod() // expected-error {{static member 'staticMethod' cannot be used on instance of type 'S1'}}
 }
 
@@ -160,3 +179,14 @@ struct StorageRestrctionTest {
 
 @_unavailableFromAsync struct UnavailFromAsyncStruct { } // expected-error {{'@_unavailableFromAsync' attribute cannot be applied to this declaration}}
 @_unavailableFromAsync(message: "foo bar") func UnavailFromAsyncFn() {}
+
+@execution(concurrent) func testGlobal() async { // Ok
+}
+
+do {
+  @execution(caller) func testLocal() async {} // Ok
+
+  struct Test {
+    @execution(concurrent) func testMember() async {} // Ok
+  }
+}
