@@ -149,11 +149,11 @@ protected:
     return S.getOverloadChoiceIfAvailable(locator);
   }
 
-  /// Retrieve overload choice resolved for a callee for the anchor
-  /// of a given locator.
+  /// Retrieve the overload choice for the callee associated with the given
+  /// locator, if any.
   std::optional<SelectedOverload>
   getCalleeOverloadChoiceIfAvailable(ConstraintLocator *locator) const {
-    return getOverloadChoiceIfAvailable(S.getCalleeLocator(locator));
+    return S.getCalleeOverloadChoiceIfAvailable(locator);
   }
 
   ConstraintLocator *
