@@ -6151,7 +6151,7 @@ TinyPtrVector<ValueDecl *> ClangRecordMemberLookup::evaluate(
   DeclName name = desc.name;
 
   auto &ctx = recordDecl->getASTContext();
-  auto allResults = evaluateOrDefault(
+  auto directResults = evaluateOrDefault(
       ctx.evaluator,
       ClangDirectLookupRequest({recordDecl, recordDecl->getClangDecl(), name}),
       {});
@@ -6159,7 +6159,7 @@ TinyPtrVector<ValueDecl *> ClangRecordMemberLookup::evaluate(
   // Find the results that are actually a member of "recordDecl".
   TinyPtrVector<ValueDecl *> result;
   ClangModuleLoader *clangModuleLoader = ctx.getClangModuleLoader();
-  for (auto found : allResults) {
+  for (auto found : directResults) {
     auto named = found.get<clang::NamedDecl *>();
     if (dyn_cast<clang::Decl>(named->getDeclContext()) ==
         recordDecl->getClangDecl()) {
