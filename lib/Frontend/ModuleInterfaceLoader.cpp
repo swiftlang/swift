@@ -2205,7 +2205,10 @@ InterfaceSubContextDelegateImpl::runInSubCompilerInstance(StringRef moduleName,
   // interop enabled by the Swift CI because it uses an old host SDK.
   // FIXME: Hack for CoreGraphics.swiftmodule, which cannot be rebuilt because
   // of a CF_OPTIONS bug (rdar://142762174).
-  if (moduleName == "Darwin" || moduleName == "CoreGraphics") {
+  // FIXME: Hack for AppKit.swiftmodule / UIKit.swiftmodule, which cannot be
+  // rebuilt because of an NS_OPTIONS bug (rdar://143033209)
+  if (moduleName == "Darwin" || moduleName == "CoreGraphics"
+      || moduleName == "AppKit" || moduleName == "UIKit") {
     subInvocation.getLangOptions().EnableCXXInterop = false;
     subInvocation.getLangOptions().cxxInteropCompatVersion = {};
     BuildArgs.erase(llvm::remove_if(BuildArgs,
