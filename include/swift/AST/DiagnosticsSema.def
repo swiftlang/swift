@@ -1230,8 +1230,14 @@ REMARK(module_api_import_aliases,none,
        "%select{, which reexports definition from %2|}3",
        (const Decl *, ModuleDecl *, ModuleDecl *, bool))
 
-REMARK(skip_module_invalid,none,"skip invalid swiftmodule: %0", (StringRef))
-WARNING(skip_module_not_testable,none,"ignore swiftmodule built without '-enable-testing': %0", (StringRef))
+REMARK(dependency_scan_skip_module_invalid,none,
+       "module file '%0' skipped by the dependency scan because it is "
+       "incompatible with this Swift compiler: %1", (StringRef, StringRef))
+WARNING(skip_module_not_testable,none,
+        "ignore swiftmodule built without '-enable-testing': %0", (StringRef))
+WARNING(dependency_scan_module_incompatible, none,
+        "module file '%0' is incompatible with this Swift compiler: %1",
+        (StringRef, StringRef))
 
 REMARK(macro_loaded,none,
        "loaded macro implementation module %0 from "
