@@ -163,7 +163,7 @@ extension Duration {
     return Duration(_high: highScaled + Int64(lowScaled.high), low: lowScaled.low)
   }
 
-  /// Construct a `Duration` given a number of seconds milliseconds as a 
+  /// Construct a `Duration` given a number of milliseconds as a 
   /// `Double` by converting the value into the closest attosecond scale value.
   ///
   ///       let d: Duration = .milliseconds(88.3)
@@ -192,7 +192,7 @@ extension Duration {
     return Duration(_high: highScaled + Int64(lowScaled.high), low: lowScaled.low)
   }
 
-  /// Construct a `Duration` given a number of seconds microseconds as a 
+  /// Construct a `Duration` given a number of microseconds as a
   /// `Double` by converting the value into the closest attosecond scale value.
   ///
   ///       let d: Duration = .microseconds(382.9)
@@ -219,6 +219,18 @@ extension Duration {
     let lowScaled = low.multipliedFullWidth(by: 1_000_000_000)
     let highScaled = high * 1_000_000_000
     return Duration(_high: highScaled + Int64(lowScaled.high), low: lowScaled.low)
+  }
+  
+  /// Construct a `Duration` given a number of nanoseconds as a `Double`
+  /// by converting the value into the closest attosecond scale value.
+  ///
+  ///       let d: Duration = .nanoseconds(1929)
+  ///
+  /// - Returns: A `Duration` representing the given number of nanoseconds.
+  @available(SwiftStdlib 5.7, *)
+  @_alwaysEmitIntoClient
+  public static func nanoseconds(_ nanoseconds: Double) -> Duration {
+    Duration(nanoseconds, scale: 1_000_000_000)
   }
 }
 

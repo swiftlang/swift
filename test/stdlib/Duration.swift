@@ -53,6 +53,15 @@ if #available(SwiftStdlib 5.7, *) {
     }
   }
   
+  suite.test("nanoseconds from Double") {
+    for _ in 0 ..< 100 {
+      let integerValue = Double(Int64.random(in: 0 ... 0x7fff_ffff_ffff_fc00))
+      let (sec, attosec) = Duration.nanoseconds(integerValue).components
+      expectEqual(sec, Int64(integerValue) / 1_000_000_000)
+      expectEqual(attosec, Int64(integerValue) % 1_000_000_000 * 1_000_000_000)
+    }
+  }
+  
   suite.test("seconds from Int64") {
     let one = Duration.seconds(1 as Int64)
     expectEqual(one._high, 0)
