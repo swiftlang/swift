@@ -481,7 +481,12 @@ extension LifetimeDependence.Scope {
     }
   }
 
-  // !!! - handle allocations of trivial values: no destroy. Use the dealloc in that case?
+  // Note: an initialized range should always have a destroy_addr. For trivial 'var' variables, we have a alloc_box,
+  // which has a destroy_value. For concrete trivial 'let' variables, we load the trivial value:
+  //   %l = load [trivial] %0
+  //   %m = move_value [var_decl] %2
+  //
+  // For generic trivial (BitwiseCopyable) 'let' variables, we emit a destroy_addr for the alloc_stack.
   private static func computeInitializedRange(initialAddress: Value, initializingStore: Instruction?,
                                               _ context: Context)
     -> InstructionRange {
