@@ -119,6 +119,7 @@ extension Duration {
   
   /// Construct a `Duration` given a duration and scale, taking care so that
   /// exact integer durations are preserved exactly.
+  @usableFromInline
   internal init(_ duration: Double, scale: UInt64) {
     // Split the duration into integral and fractional parts, as we need to
     // handle them slightly differently to ensure that integer values are
@@ -163,7 +164,7 @@ extension Duration {
     return Duration(_high: highScaled + Int64(lowScaled.high), low: lowScaled.low)
   }
 
-  /// Construct a `Duration` given a number of milliseconds as a 
+  /// Construct a `Duration` given a number of milliseconds as a
   /// `Double` by converting the value into the closest attosecond scale value.
   ///
   ///       let d: Duration = .milliseconds(88.3)
