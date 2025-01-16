@@ -900,106 +900,6 @@ extension Task where Success == Never, Failure == Never {
   }
 }
 
-// ==== Manual Priority Escalation ---------------------------------------------
-
-extension Task {
-  /// Escalate the task `priority` of the passed in task to the `newPriority`.
-  ///
-  /// - Warning: This API should rarely be used, and instead you can rely on
-  ///   structured concurrency and implicit priority escalation which happens
-  ///   when a higher priority task awaits on a result of a lower priority task.
-  ///
-  ///   I.e. using `await` on the target task usually is the correct way to
-  ///   escalate the target task to the current priority of the calling task,
-  ///   especially because in such setup if the waiting task gets escalated,
-  ///   the waited on task would be escalated automatically as well.
-  ///
-  /// The concurrency runtime is free to interpret and handle escalation
-  /// depending on platform characteristics.
-  ///
-  /// Priority escalation is propagated to child tasks of the waited-on task,
-  /// and will trigger any priority escalation handlers, if any were registered.
-  ///
-  /// Escalation can only *increase* the priority of a task, and
-  /// de-escalating priority is not supported.
-  ///
-  /// This method can be called from any task or thread.
-  ///
-  /// - Parameters:
-  ///   - task: the task which to escalate the priority of
-  ///   - newPriority: the new priority the task should continue executing on
-  @available(SwiftStdlib 9999, *)
-  public static func escalatePriority(_ task: Task, to newPriority: TaskPriority) {
-    _taskEscalate(task._task, newPriority: newPriority.rawValue)
-  }
-
-  /// Escalate the task `priority` of the passed in task to the `newPriority`.
-  ///
-  /// - Warning: This API should rarely be used, and instead you can rely on
-  ///   structured concurrency and implicit priority escalation which happens
-  ///   when a higher priority task awaits on a result of a lower priority task.
-  ///
-  ///   I.e. using `await` on the target task usually is the correct way to
-  ///   escalate the target task to the current priority of the calling task,
-  ///   especially because in such setup if the waiting task gets escalated,
-  ///   the waited on task would be escalated automatically as well.
-  ///
-  /// The concurrency runtime is free to interpret and handle escalation
-  /// depending on platform characteristics.
-  ///
-  /// Priority escalation is propagated to child tasks of the waited-on task,
-  /// and will trigger any priority escalation handlers, if any were registered.
-  ///
-  /// Escalation can only *increase* the priority of a task, and
-  /// de-escalating priority is not supported.
-  ///
-  /// This method can be called from any task or thread.
-  ///
-  /// - Parameters:
-  ///   - task: the task which to escalate the priority of
-  ///   - newPriority: the new priority the task should continue executing on
-  @available(SwiftStdlib 9999, *)
-  public static func escalatePriority(_ task: UnsafeCurrentTask, to newPriority: TaskPriority) {
-    _taskEscalate(task._task, newPriority: newPriority.rawValue)
-  }
-}
-
-/// Runs the passed `operation` while registering a task priority escalation handler.
-/// The handler will be triggered concurrently to the current task if the current
-/// is subject to priority escalation.
-///
-/// The handler may perform additional actions upon priority escalation,
-/// but cannot influence how the escalation influences the task, i.e. the task's
-/// priority will be escalated regardless of actions performed in the handler.
-///
-/// If multiple task escalation handlers are nester they will all be triggered.
-///
-/// Task escalation propagates through structured concurrency child-tasks.
-///
-/// - Parameters:
-///   - operation: the operation during which to listen for priority escalation
-///   - handler: handler to invoke, concurrently to `operation`,
-///              when priority escalation happens
-/// - Returns: the value returned by `operation`
-/// - Throws: when the `operation` throws an error
-@available(SwiftStdlib 9999, *)
-public func withTaskPriorityEscalationHandler<T, E>(
-  operation: () async throws(E) -> T,
-  onEscalate handler: @Sendable (TaskPriority) -> Void,
-  isolation: isolated (any Actor)? = #isolation
-) async throws(E) -> T {
-  // NOTE: We have to create the closure beforehand as otherwise it seems
-  // the task-local allocator may be used and we end up violating stack-discipline
-  // when releasing the handler closure vs. the record.
-  let handler0: (UInt8) -> Void = {
-    handler(TaskPriority(rawValue: $0))
-  }
-  let record = _taskAddPriorityEscalationHandler(handler: handler0)
-  defer { _taskRemovePriorityEscalationHandler(record: record) }
-
-  return try await operation()
-}
-
 // ==== UnsafeCurrentTask ------------------------------------------------------
 
 /// Calls a closure with an unsafe reference to the current task.
@@ -1266,7 +1166,7 @@ func _taskIsCancelled(_ task: Builtin.NativeObject) -> Bool
 @_silgen_name("swift_task_currentPriority")
 internal func _taskCurrentPriority(_ task: Builtin.NativeObject) -> UInt8
 
-@available(SwiftStdlib 9999, *) // TODO: determine how far back this can back-deploy because it already was in runtime
+@available(SwiftStdlib 6.2, *)
 @_silgen_name("swift_task_escalate")
 internal func _taskEscalate(_ task: Builtin.NativeObject, newPriority: UInt8)
 

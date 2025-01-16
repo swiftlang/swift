@@ -78,64 +78,146 @@ func testNestedTaskPriority(basePri: TaskPriority, curPri: TaskPriority) async {
     let top_level = Task.detached { /* To detach from main actor when running work */
 
       let tests = TestSuite("Task Priority escalation")
-      if #available(SwiftStdlib 5.1, *) {
+      tests.test("Basic task_escalate when task is running") {
+        let sem1 = DispatchSemaphore(value: 0)
+        let sem2 = DispatchSemaphore(value: 0)
+        let task = Task(priority: .background) {
+          let _ = expectedBasePri(priority: .background)
 
-        tests.test("Basic task_escalate when task is running") {
-          let sem1 = DispatchSemaphore(value: 0)
-          let sem2 = DispatchSemaphore(value: 0)
-          let task = Task(priority: .background) {
-            let _ = expectedBasePri(priority: .background)
+          // Wait until task is running before asking to be escalated
+          sem1.signal()
+          sleep(1)
+
+          await loopUntil(priority: .default)
+          sem2.signal()
+        }
+
+        // Wait till child runs and asks to be escalated
+        sem1.wait()
+        Task.escalatePriority(task, to: .default)
+        sem2.wait()
+      }
+
+      tests.test("Trigger task escalation handler") {
+        let sem1 = DispatchSemaphore(value: 0)
+        let sem2 = DispatchSemaphore(value: 0)
+        let semEscalated = DispatchSemaphore(value: 0)
+
+        let task = Task(priority: .background) {
+          let _ = expectedBasePri(priority: .background)
+
+          await withTaskPriorityEscalationHandler {
+            print("in withTaskPriorityEscalationHandler, Task.currentPriority = \(Task.currentPriority)")
 
             // Wait until task is running before asking to be escalated
             sem1.signal()
             sleep(1)
 
             await loopUntil(priority: .default)
-            sem2.signal()
+            print("in withTaskPriorityEscalationHandler, after loop, Task.currentPriority = \(Task.currentPriority)")
+          } onPriorityEscalated: { newPriority in
+            print("in onPriorityEscalated Task.currentPriority = \(Task.currentPriority)")
+            print("in onPriorityEscalated newPriority = \(newPriority)")
+            precondition(newPriority == .default)
+            semEscalated.signal()
           }
 
-          // Wait till child runs and asks to be escalated
-          sem1.wait()
-          Task.escalatePriority(task, to: .default)
-          sem2.wait()
+          print("Current priority = \(Task.currentPriority)")
+          print("after withTaskPriorityEscalationHandler")
+          sem2.signal()
         }
 
-        tests.test("Trigger task escalation handler") {
-          let sem1 = DispatchSemaphore(value: 0)
-          let sem2 = DispatchSemaphore(value: 0)
-          let semEscalated = DispatchSemaphore(value: 0)
+        // Wait till child runs and asks to be escalated
+        sem1.wait()
+        task.cancel() // just checking the records don't stomp onto each other somehow
+        Task.escalatePriority(task, to: .default)
+        semEscalated.wait()
+        sem2.wait()
+      }
 
-          let task = Task(priority: .background) {
-            let _ = expectedBasePri(priority: .background)
+      tests.test("Trigger twice: Escalate to medium, and then again to high") {
+        let sem1 = DispatchSemaphore(value: 0)
+        let semEscalatedMedium = DispatchSemaphore(value: 0)
+        let semEscalatedHigh = DispatchSemaphore(value: 0)
+        let semEscalatedInHandler = DispatchSemaphore(value: 2)
 
-            await withTaskPriorityEscalationHandler {
-              print("in withTaskPriorityEscalationHandler, Task.currentPriority = \(Task.currentPriority)")
+        let task = Task(priority: .background) {
+          let _ = expectedBasePri(priority: .background)
 
-              // Wait until task is running before asking to be escalated
-              sem1.signal()
-              sleep(1)
+          await withTaskPriorityEscalationHandler {
+            print("in withTaskPriorityEscalationHandler, Task.currentPriority = \(Task.currentPriority)")
+            sem1.signal()
 
-              await loopUntil(priority: .default)
-              print("in withTaskPriorityEscalationHandler, after loop, Task.currentPriority = \(Task.currentPriority)")
-            } onEscalate: { newPriority in
-              print("in onEscalate Task.currentPriority = \(Task.currentPriority)")
-              print("in onEscalate newPriority = \(newPriority)")
-              precondition(newPriority == .default)
-              semEscalated.signal()
-            }
+            print("in withTaskPriorityEscalationHandler, wait for escalation -> \(TaskPriority.medium)")
+            await loopUntil(priority: .medium)
+            print("in withTaskPriorityEscalationHandler, after loop, Task.currentPriority = \(Task.currentPriority)")
+            semEscalatedMedium.signal()
 
-            print("Current priority = \(Task.currentPriority)")
-            print("after withTaskPriorityEscalationHandler")
-            sem2.signal()
+            print("in withTaskPriorityEscalationHandler, wait for escalation -> \(TaskPriority.high)")
+            await loopUntil(priority: .high)
+            print("in withTaskPriorityEscalationHandler, after loop, Task.currentPriority = \(Task.currentPriority)")
+            semEscalatedHigh.signal()
+          } onPriorityEscalated: { newPriority in
+            print("in onPriorityEscalated Task.currentPriority = \(Task.currentPriority)") // caller priority
+            print("in onPriorityEscalated newPriority = \(newPriority)")
+            semEscalatedInHandler.signal()
+          }
+          print("after withTaskPriorityEscalationHandler")
+        }
+
+        // Wait till child runs and asks to be escalated
+        sem1.wait()
+        Task.escalatePriority(task, to: .medium)
+        semEscalatedMedium.wait()
+
+        Task.escalatePriority(task, to: .high)
+        semEscalatedHigh.wait()
+
+        // we got escalated twice
+        semEscalatedInHandler.wait()
+      }
+
+      tests.test("Don't trigger in already escalated task") {
+        let sem1 = DispatchSemaphore(value: 0)
+        let sem2 = DispatchSemaphore(value: 0)
+        let semEscalated = DispatchSemaphore(value: 0)
+
+        let task = Task(priority: .background) {
+          let _ = expectedBasePri(priority: .background)
+
+          await withTaskPriorityEscalationHandler {
+            print("in withTaskPriorityEscalationHandler, Task.currentPriority = \(Task.currentPriority)")
+            sem1.signal()
+            await loopUntil(priority: .default)
+            print("in withTaskPriorityEscalationHandler, after loop, Task.currentPriority = \(Task.currentPriority)")
+          } onPriorityEscalated: { newPriority in
+            print("in onPriorityEscalated Task.currentPriority = \(Task.currentPriority)")
+            print("in onPriorityEscalated newPriority = \(newPriority)")
+            precondition(newPriority == .default)
+            semEscalated.signal()
           }
 
-          // Wait till child runs and asks to be escalated
-          sem1.wait()
-          task.cancel() // just checking the records don't stomp onto each other somehow
-          Task.escalatePriority(task, to: .default)
-          semEscalated.wait()
-          sem2.wait()
+          // already escalated
+          await loopUntil(priority: .default)
+
+          await withTaskPriorityEscalationHandler {
+            await loopUntil(priority: .default)
+            print("in withTaskPriorityEscalationHandler, after loop, Task.currentPriority = \(Task.currentPriority)")
+          } onPriorityEscalated: { newPriority in
+            fatalError("Task was already escalated earlier, no escalation triggered here")
+          }
+
+          print("Current priority = \(Task.currentPriority)")
+          print("after withTaskPriorityEscalationHandler")
+          sem2.signal()
         }
+
+        // Wait till child runs and asks to be escalated
+        sem1.wait()
+        task.cancel() // just checking the records don't stomp onto each other somehow
+        Task.escalatePriority(task, to: .default)
+        semEscalated.wait()
+        sem2.wait()
       }
 
       await runAllTestsAsync()
