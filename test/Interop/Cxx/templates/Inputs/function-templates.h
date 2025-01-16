@@ -15,6 +15,9 @@ template <class T> void expectsConstCharPtr(T str) { takesString(str); }
 template <long x> void hasNonTypeTemplateParameter() {}
 template <long x = 0> void hasDefaultedNonTypeTemplateParameter() {}
 
+int *intPtr;
+int (*functionPtr)(void);
+
 // We cannot yet use this in Swift but, make sure we don't crash when parsing
 // it.
 template <class R, class T, class U> R templateParameterReturnType(T a, U b) {
@@ -47,6 +50,21 @@ decltype(auto) testAuto(T arg) {
 template <typename T>
 struct ClassTemplate {
   T t;
+};
+
+struct PlainStruct {
+  int x;
+};
+
+struct CxxClass {
+  int x;
+  void method() {}
+};
+
+struct __attribute__((swift_attr("import_reference")))
+__attribute__((swift_attr("retain:immortal")))
+__attribute__((swift_attr("release:immortal"))) FRT {
+  int x;
 };
 
 template <typename T>
