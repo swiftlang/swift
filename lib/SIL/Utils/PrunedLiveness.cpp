@@ -860,7 +860,7 @@ void PrunedLiveRange<LivenessWithDefs>::computeBoundary(
   // Visit each post-dominating block as the starting point for a
   // backward CFG traversal.
   for (auto *block : postDomBlocks) {
-    blockWorklist.push(block);
+    blockWorklist.pushIfNotVisited(block);
   }
   while (auto *block = blockWorklist.pop()) {
     // Process each block that has not been visited and is not LiveOut.
