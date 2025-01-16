@@ -6147,8 +6147,8 @@ cloneBaseMemberDecl(ValueDecl *decl, DeclContext *newContext) {
 TinyPtrVector<ValueDecl *> ClangRecordMemberLookup::evaluate(
     Evaluator &evaluator, ClangRecordMemberLookupDescriptor desc) const {
   NominalTypeDecl *recordDecl = desc.recordDecl;
+  NominalTypeDecl *inheritingDecl = desc.inheritingDecl;
   DeclName name = desc.name;
-  bool inherited = desc.inherited;
 
   auto &ctx = recordDecl->getASTContext();
   auto allResults = evaluateOrDefault(
@@ -6202,11 +6202,11 @@ TinyPtrVector<ValueDecl *> ClangRecordMemberLookup::evaluate(
           continue;
 
         // Add Clang members that are imported lazily.
-        auto baseResults =
-            evaluateOrDefault(ctx.evaluator,
-                              ClangRecordMemberLookup(
-                                  {cast<NominalTypeDecl>(import), name, true}),
-                              {});
+        auto baseResults = evaluateOrDefault(
+            ctx.evaluator,
+            ClangRecordMemberLookup(
+                {cast<NominalTypeDecl>(import), name, inheritingDecl}),
+            {});
         // Add members that are synthesized eagerly, such as subscripts.
         for (auto member :
              cast<NominalTypeDecl>(import)->getCurrentMembersWithoutLoading()) {
@@ -6235,7 +6235,7 @@ TinyPtrVector<ValueDecl *> ClangRecordMemberLookup::evaluate(
           //
           // Instead, we simply pass on the imported decl (foundInBase) as is,
           // so that only the top-most request calls importBaseMemberDecl().
-          if (inherited) {
+          if (inheritingDecl != recordDecl) {
             result.push_back(foundInBase);
             continue;
           }
