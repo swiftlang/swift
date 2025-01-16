@@ -24,9 +24,11 @@ if(NOT SWIFT_BUILD_STDLIB)
 endif()
 
 set(BACKTRACING_COMPILE_FLAGS
+  "-cxx-interoperability-mode=default"
   "-I${SWIFT_STDLIB_SOURCE_DIR}/public/Backtracing/modules"
   "-Xcc;-I${SWIFT_SOURCE_DIR}/include"
-  "-Xcc;-I${CMAKE_BINARY_DIR}/include")
+  "-Xcc;-I${CMAKE_BINARY_DIR}/include"
+  "-disable-upcoming-feature;MemberImportVisibility")
 
 set(BACKTRACING_SOURCES
   main.swift

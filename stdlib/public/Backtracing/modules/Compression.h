@@ -148,7 +148,7 @@ typedef struct {
 
 #ifdef __cplusplus
 namespace swift {
-extern "C" {
+namespace runtime {
 #endif
 
 // The Swift importer can't cope with complex macros; it will do inline
@@ -161,7 +161,7 @@ static inline z_stream zlib_stream_init() {
 }
 
 #ifdef __cplusplus
-} // extern "C"
+} // namespace runtime
 } // namespace swift
 #endif
 

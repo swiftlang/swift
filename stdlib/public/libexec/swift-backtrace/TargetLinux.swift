@@ -29,8 +29,6 @@ import _Backtracing
 @_spi(MemoryReaders) import _Backtracing
 @_spi(Utils) import _Backtracing
 
-internal import Runtime
-
 enum SomeBacktrace {
   case raw(Backtrace)
   case symbolicated(SymbolicatedBacktrace)
