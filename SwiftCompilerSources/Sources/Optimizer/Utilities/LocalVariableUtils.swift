@@ -197,7 +197,7 @@ class LocalVariableAccessInfo: CustomStringConvertible {
   }
 
   var description: String {
-    return "full-assign: \(_isFullyAssigned == nil ? "unknown" : String(describing: _isFullyAssigned!)) "
+    return "full-assign: \(_isFullyAssigned == nil ? "unknown" : String(describing: _isFullyAssigned!)), "
       + "\(access)"
   }
 
@@ -205,12 +205,10 @@ class LocalVariableAccessInfo: CustomStringConvertible {
   // assignment. This should match any instructions that the LocalVariableAccessMap initializer below recognizes as an
   // allocation.
   static private func isBase(address: Value) -> Bool {
-    switch address {
-    case is AllocBoxInst, is AllocStackInst, is BeginAccessInst:
-      return true
-    default:
-      return false
-    }
+    // TODO: create an API alternative to 'accessPath' that bails out on the first path component and succeeds on the
+    // first begin_access.
+    let path = address.accessPath
+    return path.base.isLocal && path.projectionPath.isEmpty
   }
 }
 
