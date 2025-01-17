@@ -252,6 +252,7 @@ extension ASTGenVisitor {
         .propertyWrapper,
         .requiresStoredPropertyInits,
         .resultBuilder,
+        .safe,
         .sendable,
         .sensitive,
         .spiOnly,

@@ -2895,8 +2895,18 @@ void PrintAST::printInherited(const Decl *decl) {
         Printer << "@retroactive ";
       if (inherited.isPreconcurrency())
         Printer << "@preconcurrency ";
-      if (inherited.isUnsafe())
+      switch (inherited.getExplicitSafety()) {
+      case ExplicitSafety::Unspecified:
+        break;
+
+      case ExplicitSafety::Safe:
+        Printer << "@safe ";
+        break;
+
+      case ExplicitSafety::Unsafe:
         Printer << "@unsafe ";
+        break;
+      }
       if (inherited.isSuppressed())
         Printer << "~";
     });

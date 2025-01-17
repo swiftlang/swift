@@ -3302,8 +3302,8 @@ class DeclDeserializer {
 
       // The next bits are the protocol conformance options.
       // Update the mask below whenever this changes.
-      static_assert(NumProtocolConformanceOptions == 4);
-      ProtocolConformanceOptions options(rawID & 0x0F);
+      static_assert(NumProtocolConformanceOptions == 5);
+      ProtocolConformanceOptions options(rawID & 0x1F);
       rawID = rawID >> NumProtocolConformanceOptions;
 
       TypeID typeID = rawID;

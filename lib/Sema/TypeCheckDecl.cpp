@@ -3201,45 +3201,6 @@ SourceFile::getIfConfigClausesWithin(SourceRange outer) const {
 }
 
 //----------------------------------------------------------------------------//
-// IsUnsafeRequest
-//----------------------------------------------------------------------------//
-
-bool IsUnsafeRequest::evaluate(Evaluator &evaluator, Decl *decl) const {
-  // If it's marked @unsafe, it's unsafe.
-  if (decl->getAttrs().hasAttribute<UnsafeAttr>())
-    return true;
-
-  // Inference: A member of an @unsafe type is also unsafe.
-  if (auto enclosingDC = decl->getDeclContext()) {
-    if (auto enclosingNominal = enclosingDC->getSelfNominalTypeDecl())
-      if (enclosingNominal->isUnsafe())
-        return true;
-
-    if (auto ext = dyn_cast<ExtensionDecl>(enclosingDC)) {
-      if (ext->isUnsafe())
-        return true;
-    }
-  }
-
-  // If an extension extends and unsafe nominal type, it's unsafe.
-  if (auto ext = dyn_cast<ExtensionDecl>(decl)) {
-    if (auto nominal = ext->getExtendedNominal())
-      if (nominal->isUnsafe())
-        return true;
-  }
-
-  // If this is a pattern binding declaration, check whether the first
-  // variable is @unsafe.
-  if (auto patternBinding = dyn_cast<PatternBindingDecl>(decl)) {
-    if (auto var = patternBinding->getSingleVar())
-      if (var->isUnsafe())
-        return true;
-  }
-
-  return false;
-}
-
-//----------------------------------------------------------------------------//
 // PrettyPrintDeclRequest
 //----------------------------------------------------------------------------//
 

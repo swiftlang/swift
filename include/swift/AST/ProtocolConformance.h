@@ -654,9 +654,14 @@ public:
   /// known.
   SourceLoc getPreconcurrencyLoc() const { return PreconcurrencyLoc; }
 
-  /// Whether this is an "unsafe" conformance.
-  bool isUnsafe() const {
-    return getOptions().contains(ProtocolConformanceFlags::Unsafe);
+  /// Query whether this conformance was explicitly declared to be safe or
+  /// unsafe.
+  ExplicitSafety getExplicitSafety() const {
+    if (getOptions().contains(ProtocolConformanceFlags::Unsafe))
+      return ExplicitSafety::Unsafe;
+    if (getOptions().contains(ProtocolConformanceFlags::Safe))
+      return ExplicitSafety::Safe;
+    return ExplicitSafety::Unspecified;
   }
 
   /// Determine whether we've lazily computed the associated conformance array

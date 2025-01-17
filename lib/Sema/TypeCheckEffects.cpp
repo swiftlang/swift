@@ -274,7 +274,7 @@ bool ConformanceHasEffectRequest::evaluate(
     if (kind == EffectKind::Unsafe) {
       auto rootConf = current->getRootConformance();
       if (auto normalConf = dyn_cast<NormalProtocolConformance>(rootConf)) {
-        if (normalConf->isUnsafe())
+        if (normalConf->getExplicitSafety() == ExplicitSafety::Unsafe)
           return true;
       }
     }

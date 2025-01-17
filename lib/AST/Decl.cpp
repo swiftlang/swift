@@ -1087,11 +1087,54 @@ bool Decl::preconcurrency() const {
   return false;
 }
 
-bool Decl::isUnsafe() const {
-  return evaluateOrDefault(
-      getASTContext().evaluator,
-      IsUnsafeRequest{const_cast<Decl *>(this)},
-      false);
+/// Look at the attributes to determine whether they involve an attribute
+/// that explicitly specifies the safety of the declaration.
+static std::optional<ExplicitSafety>
+getExplicitSafetyFromAttrs(const Decl *decl) {
+  // If it's marked @unsafe, it's unsafe.
+  if (decl->getAttrs().hasAttribute<UnsafeAttr>())
+    return ExplicitSafety::Unsafe;
+
+  // If it's marked @safe, it's safe.
+  if (decl->getAttrs().hasAttribute<SafeAttr>())
+    return ExplicitSafety::Safe;
+
+  return std::nullopt;
+}
+
+ExplicitSafety Decl::getExplicitSafety() const {
+  // Check the attributes on the declaration itself.
+  if (auto safety = getExplicitSafetyFromAttrs(this))
+    return *safety;
+
+  // Inference: Check the enclosing context.
+  if (auto enclosingDC = getDeclContext()) {
+    // Is this an extension with @safe or @unsafe on it?
+    if (auto ext = dyn_cast<ExtensionDecl>(enclosingDC)) {
+      if (auto extSafety = getExplicitSafetyFromAttrs(ext))
+        return *extSafety;
+    }
+
+    if (auto enclosingNominal = enclosingDC->getSelfNominalTypeDecl())
+      if (auto nominalSafety = getExplicitSafetyFromAttrs(enclosingNominal))
+        return *nominalSafety;
+  }
+
+  // If an extension extends an unsafe nominal type, it's unsafe.
+  if (auto ext = dyn_cast<ExtensionDecl>(this)) {
+    if (auto nominal = ext->getExtendedNominal())
+      if (nominal->getExplicitSafety() == ExplicitSafety::Unsafe)
+        return ExplicitSafety::Unsafe;
+  }
+
+  // If this is a pattern binding declaration, check whether the first
+  // variable is @unsafe.
+  if (auto patternBinding = dyn_cast<PatternBindingDecl>(this)) {
+    if (auto var = patternBinding->getSingleVar())
+      return var->getExplicitSafety();
+  }
+
+  return ExplicitSafety::Unspecified;
 }
 
 Type AbstractFunctionDecl::getThrownInterfaceType() const {

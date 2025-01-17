@@ -146,3 +146,24 @@ func testAutoclosure() {
 func testUnsafePositionError() -> Int {
   return 3 + unsafe unsafeInt() // expected-error{{'unsafe' cannot appear to the right of a non-assignment operator}}
 }
+
+// @safe suppresses unsafe-type-related diagnostics on an entity
+struct MyArray<Element> {
+  @safe func withUnsafeBufferPointer<R, E>(
+    _ body: (UnsafeBufferPointer<Element>) throws(E) -> R
+  ) throws(E) -> R {
+    return unsafe try body(.init(start: nil, count: 0))
+  }
+}
+
+extension UnsafeBufferPointer {
+  @safe var safeCount: Int { unsafe count }
+}
+
+func testMyArray(ints: MyArray<Int>) {
+  ints.withUnsafeBufferPointer { buffer in
+    // expected-warning@+1{{expression uses unsafe constructs but is not marked with 'unsafe'}}
+    print(buffer.safeCount) // expected-note{{reference to parameter 'buffer' involves unsafe type 'UnsafeBufferPointer<Int>'}}
+    unsafe print(buffer.baseAddress!)
+  }
+}
