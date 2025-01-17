@@ -80,7 +80,7 @@ if(static_target_sdks)
 
     ${BACKTRACING_SOURCES}
 
-    SWIFT_MODULE_DEPENDS         ${backtracing}
+    SWIFT_MODULE_DEPENDS         ${runtime}
 
     SWIFT_MODULE_DEPENDS_OSX          ${darwin}
     SWIFT_MODULE_DEPENDS_WINDOWS      ${wincrt_sdk}
