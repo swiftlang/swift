@@ -8912,6 +8912,9 @@ void ClangImporter::Implementation::importBoundsAttributes(
     for (auto [index, param] : llvm::enumerate(ClangDecl->parameters())) {
       if (auto CAT = param->getType()->getAs<clang::CountAttributedType>()) {
         printer.printCountedBy(CAT, index);
+        if (param->hasAttr<clang::NoEscapeAttr>()) {
+          printer.printNonEscaping(index);
+        }
       }
     }
     if (auto CAT =
