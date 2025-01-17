@@ -4147,6 +4147,8 @@ diagnoseDeclAsyncAvailability(const ValueDecl *D, SourceRange R,
     auto diag = ctx.Diags.diagnose(diagLoc, diag::async_unavailable_decl, D,
                                    attr->getMessage());
     diag.warnUntilSwiftVersion(6);
+    diag.limitBehaviorWithPreconcurrency(DiagnosticBehavior::Warning,
+                                         D->preconcurrency());
 
     if (!attr->getRename().empty()) {
       fixItAvailableAttrRename(diag, R, D, attr->getRename(), call);
