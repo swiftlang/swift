@@ -19,6 +19,8 @@
 #define NOMINMAX
 #include <windows.h>
 
+#pragma comment(lib, "User32.Lib")
+
 #include <mutex>
 #endif
 
