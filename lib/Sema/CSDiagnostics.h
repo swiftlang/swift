@@ -1707,8 +1707,9 @@ public:
   KeyPathSubscriptIndexHashableFailure(const Solution &solution, Type type,
                                        ConstraintLocator *locator)
       : FailureDiagnostic(solution, locator), NonConformingType(type) {
-    assert(locator->isResultOfKeyPathDynamicMemberLookup() ||
-           locator->isKeyPathSubscriptComponent());
+    assert((locator->isResultOfKeyPathDynamicMemberLookup() ||
+            locator->isKeyPathSubscriptComponent()) ||
+           locator->isKeyPathMemberComponent());
   }
 
   SourceLoc getLoc() const override;
