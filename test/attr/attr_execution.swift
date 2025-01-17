@@ -55,3 +55,19 @@ struct TestAttributeCollisions {
 
   @execution(concurrent) @Sendable func test(_: @Sendable () -> Void, _: sending Int) async {} // Ok
 }
+
+@MainActor
+protocol P {
+  func test() async
+}
+
+struct InfersMainActor : P {
+  @execution(concurrent) func test() async {}
+  // expected-error@-1 {{cannot use '@execution(concurrent)' on instance method 'test()' isolated to global actor 'MainActor'}}
+}
+
+@MainActor
+struct IsolatedType {
+  @execution(concurrent) func test() async {}
+  // expected-error@-1 {{cannot use '@execution(concurrent)' on instance method 'test()' isolated to global actor 'MainActor'}}
+}

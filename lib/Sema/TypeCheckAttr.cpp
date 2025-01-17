@@ -264,9 +264,6 @@ public:
       return;
     }
 
-    // Checks based on explicit attributes, inferred ones would
-    // have to be handled during actor isolation inference.
-
     switch (attr->getBehavior()) {
     case ExecutionKind::Concurrent: {
       // 'concurrent' doesn't work with explicit `nonisolated`
@@ -275,14 +272,6 @@ public:
           diagnoseAndRemoveAttr(
               attr,
               diag::attr_execution_concurrent_incompatible_with_nonisolated, F);
-          return;
-        }
-
-        if (auto globalActor = F->getGlobalActorAttr()) {
-          diagnoseAndRemoveAttr(
-              attr,
-              diag::attr_execution_concurrent_incompatible_with_global_actor, F,
-              globalActor->second);
           return;
         }
       }
@@ -315,6 +304,18 @@ public:
             return;
           }
         }
+      }
+
+      // We need isolation check here because global actor isolation
+      // could be inferred.
+
+      auto isolation = getActorIsolation(F);
+      if (isolation.isGlobalActor()) {
+        diagnoseAndRemoveAttr(
+            attr,
+            diag::attr_execution_concurrent_incompatible_with_global_actor, F,
+            isolation.getGlobalActor());
+        return;
       }
 
       break;
