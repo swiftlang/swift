@@ -516,7 +516,7 @@ swift::handleSILGenericParams(GenericParamList *genericParams,
       /*parentSig=*/nullptr,
       nestedList.back(), WhereClauseOwner(),
       {}, {}, genericParams->getLAngleLoc(),
-      /*isExtension=*/false,
+      /*forExtension=*/nullptr,
       allowInverses};
   return evaluateOrDefault(DC->getASTContext().evaluator, request,
                            GenericSignatureWithError()).getPointer();

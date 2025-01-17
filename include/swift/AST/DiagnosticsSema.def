@@ -7850,6 +7850,16 @@ ERROR(extension_conforms_to_invertible_and_others, none,
 ERROR(invertible_conformance_other_source_file,none,
       "conformance to '%0' must occur in the same source file as %kind1",
       (StringRef, const ValueDecl *))
+ERROR(inverse_conditional_must_be_fully_explicit,none,
+        "conditional conformance to %0 must explicitly "
+        "state whether %1 is required to conform to %2 or not",
+        (const ProtocolDecl *, Type, const ProtocolDecl *))
+NOTE(make_inverse_conditional_non_requirement_explicit,none,
+     "specify that the conformance does not require %0 to conform to %1",
+     (Type, const ProtocolDecl *))
+NOTE(make_inverse_conditional_requirement_explicit,none,
+     "specify that the conformance requires %0 to conform to %1",
+     (Type, const ProtocolDecl *))
 
 // -- older ones below --
 ERROR(noncopyable_parameter_requires_ownership, none,
