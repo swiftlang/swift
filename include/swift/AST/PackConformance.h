@@ -74,7 +74,8 @@ public:
 
   PackConformance *getCanonicalConformance() const;
 
-  PackType *getAssociatedType(Type assocType) const;
+  PackType *getTypeWitness(AssociatedTypeDecl *assocType,
+                           SubstOptions options=std::nullopt) const;
 
   PackConformance *
   getAssociatedConformance(Type assocType, ProtocolDecl *protocol) const;

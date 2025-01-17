@@ -69,6 +69,11 @@ public:
     /// The actor isolation iss statically erased, as for a call to
     /// an isolated(any) function.  This is not possible for declarations.
     Erased,
+    /// Inherits isolation from the caller of the given function.
+    ///
+    /// DISCUSSION: This is used for nonisolated asynchronous functions that we
+    /// want to inherit from their context the context's actor isolation.
+    CallerIsolationInheriting,
   };
 
 private:
@@ -91,9 +96,7 @@ private:
 
   ActorIsolation(Kind kind, Expr *actor, unsigned parameterIndex);
 
-  ActorIsolation(Kind kind, Type globalActor)
-      : globalActor(globalActor), kind(kind), isolatedByPreconcurrency(false),
-        silParsed(false), parameterIndex(0) {}
+  ActorIsolation(Kind kind, Type globalActor);
 
 public:
   // No-argument constructor needed for DenseMap use in PostfixCompletion.cpp
@@ -102,11 +105,17 @@ public:
         silParsed(isSILParsed), parameterIndex(0) {}
 
   static ActorIsolation forUnspecified() {
-    return ActorIsolation(Unspecified, nullptr);
+    return ActorIsolation(Unspecified);
   }
 
   static ActorIsolation forNonisolated(bool unsafe) {
-    return ActorIsolation(unsafe ? NonisolatedUnsafe : Nonisolated, nullptr);
+    return ActorIsolation(unsafe ? NonisolatedUnsafe : Nonisolated);
+  }
+
+  static ActorIsolation forCallerIsolationInheriting() {
+    // NOTE: We do not use parameter indices since the parameter is implicit
+    // from the perspective of the AST.
+    return ActorIsolation(CallerIsolationInheriting);
   }
 
   static ActorIsolation forActorInstanceSelf(ValueDecl *decl);
@@ -135,6 +144,8 @@ public:
     return ActorIsolation(GlobalActor, globalActor);
   }
 
+  static ActorIsolation forMainActor(ASTContext &ctx);
+
   static ActorIsolation forErased() {
     return ActorIsolation(Erased);
   }
@@ -152,8 +163,11 @@ public:
                                             ActorIsolation::NonisolatedUnsafe))
             .Case("global_actor",
                   std::optional<ActorIsolation>(ActorIsolation::GlobalActor))
-            .Case("global_actor_unsafe", std::optional<ActorIsolation>(
-                                             ActorIsolation::GlobalActor))
+            .Case("global_actor_unsafe",
+                  std::optional<ActorIsolation>(ActorIsolation::GlobalActor))
+            .Case("caller_isolation_inheriting",
+                  std::optional<ActorIsolation>(
+                      ActorIsolation::CallerIsolationInheriting))
             .Default(std::nullopt);
     if (kind == std::nullopt)
       return std::nullopt;
@@ -170,12 +184,20 @@ public:
     return (kind == Nonisolated) || (kind == NonisolatedUnsafe);
   }
 
+  bool isNonisolatedUnsafe() const { return kind == NonisolatedUnsafe; }
+
   /// Retrieve the parameter to which actor-instance isolation applies.
   ///
   /// Parameter 0 is `self`.
   unsigned getActorInstanceParameter() const {
     assert(getKind() == ActorInstance);
     return parameterIndex;
+  }
+
+  /// Returns true if this is an actor-instance isolation that additionally
+  /// applies to the self parameter of a method.
+  bool isActorInstanceForSelfParameter() const {
+    return getActorInstanceParameter() == 0;
   }
 
   bool isSILParsed() const { return silParsed; }
@@ -190,12 +212,12 @@ public:
     case Unspecified:
     case Nonisolated:
     case NonisolatedUnsafe:
+    case CallerIsolationInheriting:
       return false;
     }
   }
 
   NominalTypeDecl *getActor() const;
-  NominalTypeDecl *getActorOrNullPtr() const;
 
   VarDecl *getActorInstance() const;
 
@@ -204,6 +226,8 @@ public:
   bool isGlobalActor() const {
     return getKind() == GlobalActor;
   }
+
+  bool isActorInstanceIsolated() const { return getKind() == ActorInstance; }
 
   bool isMainActor() const;
 
@@ -262,37 +286,18 @@ public:
                               state.parameterIndex);
   }
 
-  void print(llvm::raw_ostream &os) const {
-    switch (getKind()) {
-    case Unspecified:
-      os << "unspecified";
-      return;
-    case ActorInstance:
-      os << "actor_instance";
-      return;
-    case Nonisolated:
-      os << "nonisolated";
-      return;
-    case NonisolatedUnsafe:
-      os << "nonisolated_unsafe";
-      return;
-    case GlobalActor:
-      os << "global_actor";
-      return;
-    case Erased:
-      os << "erased";
-      return;
-    }
-    llvm_unreachable("Covered switch isn't covered?!");
-  }
+  void print(llvm::raw_ostream &os) const;
 
+  void printForSIL(llvm::raw_ostream &os) const;
+  
+  /// Print the given isolation for diagnostics. If \c asNoun is \c false,
+  /// the participle adjective form is printed, e.g. "main actor-isolated".
+  /// Otherwise, the noun form is printed, e.g. "main actor isolation".
   void printForDiagnostics(llvm::raw_ostream &os,
-                           StringRef openingQuotationMark = "'") const;
+                           StringRef openingQuotationMark = "'",
+                           bool asNoun = false) const;
 
-  SWIFT_DEBUG_DUMP {
-    print(llvm::dbgs());
-    llvm::dbgs() << '\n';
-  }
+  SWIFT_DEBUG_DUMPER(dump());
 
   // Defined out of line to prevent linker errors since libswiftBasic would
   // include this header exascerbating a layering violation where libswiftBasic
@@ -300,8 +305,67 @@ public:
   SWIFT_DEBUG_DUMPER(dumpForDiagnostics());
 };
 
+struct IsolationSource {
+  enum Kind : uint8_t {
+    /// Isolation is written in an explicit attribute.
+    Explicit,
+    /// Isolation is inferred from the enclosing lexical context.
+    LexicalContext,
+    /// Isolation is inferred from conformance to a protocol.
+    Conformance,
+    /// Isolation is inherited from a superclass.
+    Superclass,
+    /// Isolation is inferred from an overridden superclass method.
+    Override,
+    /// Isolation is inferred from \c @main.
+    MainFunction,
+    /// Isolation is inferred in top-level code.
+    TopLevelCode,
+    /// Unspecified isolation, which defaults to \c nonisolated.
+    None,
+  };
+
+  using InferenceSource =
+      llvm::PointerUnion<Decl *, AbstractClosureExpr *>;
+
+  /// The declaration with the original isolation attribute.
+  InferenceSource inferenceSource;
+  Kind kind;
+
+  IsolationSource(InferenceSource inferenceSource = nullptr,
+                  Kind kind = Kind::None)
+      : inferenceSource(inferenceSource), kind(kind) {}
+
+  bool isInferred() const {
+    return (kind != None) && (kind != Explicit);
+  }
+
+  void printForDiagnostics(llvm::raw_ostream &os,
+                           StringRef openingQuotationMark = "'") const;
+};
+
+struct InferredActorIsolation {
+  ActorIsolation isolation;
+  IsolationSource source;
+
+  static InferredActorIsolation forUnspecified() {
+    return {
+      ActorIsolation::forUnspecified(),
+      IsolationSource()
+    };
+  }
+
+  bool preconcurrency() const {
+    return isolation.preconcurrency();
+  }
+};
+
 /// Determine how the given value declaration is isolated.
 ActorIsolation getActorIsolation(ValueDecl *value);
+
+/// Infer the actor isolation of the given declaration, including
+/// the source of isolation inference.
+InferredActorIsolation getInferredActorIsolation(ValueDecl *value);
 
 /// Trampoline for AbstractClosureExpr::getActorIsolation.
 ActorIsolation

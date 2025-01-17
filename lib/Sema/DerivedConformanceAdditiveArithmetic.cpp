@@ -23,15 +23,16 @@
 
 #include "CodeSynthesis.h"
 #include "TypeChecker.h"
+#include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/GenericSignature.h"
-#include "swift/AST/Module.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/Pattern.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/Stmt.h"
 #include "swift/AST/Types.h"
+#include "swift/Basic/Assertions.h"
 #include "DerivedConformances.h"
 
 using namespace swift;
@@ -77,7 +78,7 @@ bool DerivedConformance::canDeriveAdditiveArithmetic(NominalTypeDecl *nominal,
     if (v->getInterfaceType()->hasError())
       return false;
     auto varType = DC->mapTypeIntoContext(v->getValueInterfaceType());
-    return (bool) DC->getParentModule()->checkConformance(varType, proto);
+    return (bool) checkConformance(varType, proto);
   });
 }
 
@@ -93,7 +94,7 @@ deriveBodyMathOperator(AbstractFunctionDecl *funcDecl, MathOperator op) {
   assert(memberwiseInitDecl && "Memberwise initializer must exist");
   auto *initDRE =
       new (C) DeclRefExpr(memberwiseInitDecl, DeclNameLoc(), /*Implicit*/ true);
-  initDRE->setFunctionRefKind(FunctionRefKind::SingleApply);
+  initDRE->setFunctionRefInfo(FunctionRefInfo::singleBaseNameApply());
   auto *nominalTypeExpr = TypeExpr::createImplicitForDecl(
       DeclNameLoc(), nominal, funcDecl,
       funcDecl->mapTypeIntoContext(nominal->getInterfaceType()));
@@ -109,10 +110,9 @@ deriveBodyMathOperator(AbstractFunctionDecl *funcDecl, MathOperator op) {
 
   // Create expression combining lhs and rhs members using member operator.
   auto createMemberOpExpr = [&](VarDecl *member) -> Expr * {
-    auto module = nominal->getModuleContext();
     auto memberType =
         parentDC->mapTypeIntoContext(member->getValueInterfaceType());
-    auto confRef = module->lookupConformance(memberType, proto);
+    auto confRef = lookupConformance(memberType, proto);
     assert(confRef && "Member does not conform to math protocol");
 
     // Get member type's math operator, e.g. `Member.+`.
@@ -223,7 +223,7 @@ deriveBodyPropertyGetter(AbstractFunctionDecl *funcDecl, ProtocolDecl *proto,
   assert(memberwiseInitDecl && "Memberwise initializer must exist");
   auto *initDRE =
       new (C) DeclRefExpr(memberwiseInitDecl, DeclNameLoc(), /*Implicit*/ true);
-  initDRE->setFunctionRefKind(FunctionRefKind::SingleApply);
+  initDRE->setFunctionRefInfo(FunctionRefInfo::singleBaseNameApply());
 
   auto *nominalTypeExpr = TypeExpr::createImplicitForDecl(
       DeclNameLoc(), nominal, funcDecl,
@@ -248,8 +248,7 @@ deriveBodyPropertyGetter(AbstractFunctionDecl *funcDecl, ProtocolDecl *proto,
           new (C) MemberRefExpr(selfDRE, SourceLoc(), member, DeclNameLoc(),
                                 /*Implicit*/ true);
     }
-    auto *module = nominal->getModuleContext();
-    auto confRef = module->lookupConformance(memberType, proto);
+    auto confRef = lookupConformance(memberType, proto);
     assert(confRef && "Member does not conform to `AdditiveArithmetic`");
     // If conformance reference is not concrete, then concrete witness
     // declaration for property cannot be resolved. Return reference to
@@ -293,22 +292,19 @@ deriveBodyAdditiveArithmetic_zero(AbstractFunctionDecl *funcDecl, void *) {
 static ValueDecl *deriveAdditiveArithmetic_zero(DerivedConformance &derived) {
   auto &C = derived.Context;
   auto *nominal = derived.Nominal;
-  auto *parentDC = derived.getConformanceContext();
 
   auto returnInterfaceTy = nominal->getDeclaredInterfaceType();
-  auto returnTy = parentDC->mapTypeIntoContext(returnInterfaceTy);
 
   // Create property declaration.
   VarDecl *propDecl;
   PatternBindingDecl *pbDecl;
   std::tie(propDecl, pbDecl) = derived.declareDerivedProperty(
       DerivedConformance::SynthesizedIntroducer::Var, C.Id_zero,
-      returnInterfaceTy, returnTy, /*isStatic*/ true,
-      /*isFinal*/ true);
+      returnInterfaceTy,
+      /*isStatic*/ true, /*isFinal*/ true);
 
   // Create property getter.
-  auto *getterDecl =
-      derived.addGetterToReadOnlyDerivedProperty(propDecl, returnTy);
+  auto *getterDecl = derived.addGetterToReadOnlyDerivedProperty(propDecl);
   getterDecl->setBodySynthesizer(deriveBodyAdditiveArithmetic_zero, nullptr);
 
   derived.addMembersToConformanceContext({propDecl, pbDecl});

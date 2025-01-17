@@ -30,6 +30,7 @@
 #include "MoveOnlyObjectCheckerUtils.h"
 #include "MoveOnlyTypeUtils.h"
 
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/BlotSetVector.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/FrozenMultiMap.h"
@@ -1539,6 +1540,12 @@ static bool gatherBorrows(SILValue rootValue,
     // escape. Is it legal to canonicalize ForwardingUnowned?
     case OperandOwnership::ForwardingUnowned:
     case OperandOwnership::PointerEscape:
+      if (auto *md = dyn_cast<MarkDependenceInst>(use->getUser())) {
+        // mark_depenence uses only keep its base value alive; they do not use
+        // the base value itself and are irrelevant for destructuring.
+        if (use == &md->getOperandRef(MarkDependenceInst::Base))
+          continue;
+      }
       return false;
 
     case OperandOwnership::InstantaneousUse:

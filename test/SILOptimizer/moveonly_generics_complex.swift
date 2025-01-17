@@ -2,15 +2,12 @@
 // RUN:     -emit-sil -verify                                       \
 // RUN:     %s                                                      \
 // RUN:     -enable-experimental-feature BuiltinModule              \
-// RUN:     -enable-experimental-feature NoncopyableGenerics        \
-// RUN:     -enable-upcoming-feature MoveOnlyPartialConsumption \
 // RUN:     -sil-verify-all
 
-// REQUIRES: asserts
+// REQUIRES: swift_feature_BuiltinModule
 
 import Builtin
 
-@frozen
 enum MyLittleLayout<T : ~Copyable> {
   @_transparent
   static var size: Int {
@@ -22,7 +19,6 @@ enum MyLittleLayout<T : ~Copyable> {
   }
 }
 
-@frozen
 enum MyLittleResult<Success : ~Copyable, Failure : Error> : ~Copyable {
   case success(Success)
   case failure(Failure)

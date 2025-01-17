@@ -62,7 +62,7 @@ SWIFT_RUNTIME_STDLIB_API
 
 @implementation __SwiftNativeNS${Class}Base
 
-- (id)initWithCoder: (NSCoder *)coder {
+- (instancetype)initWithCoder: (NSCoder *)coder {
   return [super init];
 }
 
@@ -102,6 +102,19 @@ swift_stdlib_connectNSBaseClasses() {
 % end
   return true;
 }
+
+@interface __SwiftNativeNSArrayBase (Compatibility)
++ (id) new;
+@end
+
+@implementation __SwiftNativeNSArrayBase (Compatibility)
+
++ (id) new {
+  // Some apps accidentally do [[[aSwiftArray class] new] mutableCopy]
+  return [objc_lookUpClass("NSArray") new];
+}
+
+@end
 
 #endif
 

@@ -278,12 +278,13 @@ def default_stdlib_deployment_targets(args):
     if host_target is None:
         return None
 
+    targets = [host_target]
+
     # OS X build machines configure all Darwin platforms by default.
     # Put iOS native targets last so that we test them last
     # (it takes a long time).
     if host_target == StdlibDeploymentTarget.OSX.x86_64 or \
             host_target == StdlibDeploymentTarget.OSX.arm64:
-        targets = [host_target]
         if args.build_ios and args.build_ios_simulator:
             targets.extend(StdlibDeploymentTarget.iOSSimulator.targets)
         if args.build_ios and args.build_ios_device:
@@ -304,9 +305,12 @@ def default_stdlib_deployment_targets(args):
            args.build_xros and args.build_xros_device:
             targets.extend(StdlibDeploymentTarget.XROS.targets)
         return targets
-    else:
-        # All other machines only configure their host stdlib by default.
-        return [host_target]
+    elif host_target.platform.name == 'linux':
+        if args.build_linux_static:
+            targets.append(getattr(StdlibDeploymentTarget.Musl,
+                                   host_target.arch))
+
+    return targets
 
 
 def apply_default_arguments(toolchain, args):
@@ -420,7 +424,7 @@ def apply_default_arguments(toolchain, args):
         for target in targets
         if (not target.platform.is_darwin or
             target.platform.sdk_supports_architecture(
-                target.arch, args.darwin_xcrun_toolchain))
+                target.arch, args.darwin_xcrun_toolchain, args))
     ]
 
     # Include the Darwin module-only architectures in the CMake options.
@@ -491,6 +495,13 @@ def parse_preset_args():
         help="list all presets and exit",
         action=argparse.actions.StoreTrueAction,
         nargs=argparse.Nargs.OPTIONAL)
+    parser.add_argument(
+        "--preset-vars-file",
+        help="load preset vars from the specified file",
+        metavar="PATH",
+        action="append",
+        dest="preset_vars_file_names",
+        default=[])
     parser.add_argument(
         "--distcc",
         help="use distcc",
@@ -585,6 +596,13 @@ def main_preset():
         fatal_error("missing --preset option")
 
     args.preset_substitutions = {}
+    for file in args.preset_vars_file_names:
+        if os.path.isfile(file):
+            with open(file, 'r') as f:
+                for _, line in enumerate(f):
+                    name, value = line.split("=", 1)
+                    args.preset_substitutions[name] = value.strip()
+
     for arg in args.preset_substitutions_raw:
         name, value = arg.split("=", 1)
         args.preset_substitutions[name] = value
@@ -774,7 +792,7 @@ def main_normal():
             "navigation or editing purposes, but are not a recommended means "
             "to building, running or debugging. For a full-fledged Xcode "
             "workflow using these generated projects, see "
-            "https://github.com/apple/swift/blob/main/docs/HowToGuides/"
+            "https://github.com/swiftlang/swift/blob/main/docs/HowToGuides/"
             "GettingStarted.md#using-ninja-with-xcode"
         )
         print()

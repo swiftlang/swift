@@ -8,8 +8,7 @@ extension Int: P {}
 
 class C {}
 
-@_moveOnly
-struct M {
+struct M: ~Copyable {
 #if ADDRESS_ONLY
     private var x: P = 0
 #elseif NONTRIVIAL

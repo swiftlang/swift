@@ -38,10 +38,32 @@ class SILLoopInfo;
 /// Compute the set of reachable blocks.
 class ReachableBlocks {
   BasicBlockSet visited;
+  bool isComputed;
 
 public:
-  ReachableBlocks(SILFunction *function) : visited(function) {}
+  ReachableBlocks(SILFunction *function)
+      : visited(function), isComputed(false) {}
 
+  /// Populate `visited` with the blocks reachable in the function.
+  void compute();
+
+  /// Whether `block` is reachable from the entry block.
+  bool isReachable(SILBasicBlock *block) const {
+    assert(isComputed);
+    return visited.contains(block);
+  }
+
+  bool hasUnreachableBlocks() const {
+    assert(isComputed);
+    for (auto &block : *visited.getFunction()) {
+      if (!isReachable(&block)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+private:
   /// Invoke \p visitor for each reachable block in \p f in worklist order (at
   /// least one predecessor has been visited--defs are always visited before
   /// uses except for phi-type block args). The \p visitor takes a block
@@ -50,9 +72,6 @@ public:
   ///
   /// Returns true if all reachable blocks were visited.
   bool visit(function_ref<bool(SILBasicBlock *)> visitor);
-
-  /// Return true if \p bb has been visited.
-  bool isVisited(SILBasicBlock *bb) const { return visited.contains(bb); }
 };
 
 /// Computes the set of blocks from which a path to the return-block exists.
@@ -68,27 +87,6 @@ public:
     return worklist.isVisited(block);
   }
 };
-
-/// Computes the set of blocks which are not used for error handling, i.e. not
-/// (exclusively) reachable from the error-block of a try_apply.
-class NonErrorHandlingBlocks {
-    BasicBlockWorklist worklist;
-
-public:
-  NonErrorHandlingBlocks(SILFunction *function);
-
-  /// Returns true if there exists a path from \p block to the return-block.
-  bool isNonErrorHandling(SILBasicBlock *block) const {
-    return worklist.isVisited(block);
-  }
-};
-
-/// Remove all instructions in the body of \p bb in safe manner by using
-/// undef.
-void clearBlockBody(SILBasicBlock *bb);
-
-/// Handle the mechanical aspects of removing an unreachable block.
-void removeDeadBlock(SILBasicBlock *bb);
 
 /// Remove all unreachable blocks in a function.
 bool removeUnreachableBlocks(SILFunction &f);
@@ -211,6 +209,10 @@ public:
   // Clone blocks starting at `origBB`, within the same function.
   BasicBlockCloner(SILBasicBlock *origBB, SILPassManager *pm, DeadEndBlocks *deBlocks = nullptr)
       : SILCloner(*origBB->getParent()), origBB(origBB), deBlocks(deBlocks), pm(pm) {}
+
+  void registerBlockWithNewPhiArg(SILBasicBlock *b) {
+    blocksWithNewPhiArgs.push_back(b);
+  }
 
   bool canCloneBlock() {
     for (auto &inst : *origBB) {

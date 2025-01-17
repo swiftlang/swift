@@ -14,6 +14,7 @@
 
 #include "SILCombiner.h"
 #include "swift/AST/SemanticAttrs.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/STLExtras.h"
 #include "swift/SIL/BasicBlockBits.h"
 #include "swift/SIL/DebugUtils.h"
@@ -572,8 +573,15 @@ bool SILCombiner::optimizeStackAllocatedEnum(AllocStackInst *AS) {
   }
 
   // Second step: replace the enum alloc_stack with a payload alloc_stack.
+  Builder.setCurrentDebugScope(AS->getDebugScope());
   auto *newAlloc = Builder.createAllocStack(
-      AS->getLoc(), payloadType, AS->getVarInfo(), AS->hasDynamicLifetime());
+      AS->getLoc(), payloadType, {}, AS->hasDynamicLifetime(), IsNotLexical,
+      IsNotFromVarDecl, DoesNotUseMoveableValueDebugInfo, true);
+  if (auto varInfo = AS->getVarInfo()) {
+    // TODO: Add support for op_enum_fragment
+    // For now, we can't represent this variable correctly, so we drop it.
+    Builder.createDebugValue(AS->getLoc(), SILUndef::get(AS), *varInfo);
+  }
 
   while (!AS->use_empty()) {
     Operand *use = *AS->use_begin();
@@ -610,11 +618,9 @@ bool SILCombiner::optimizeStackAllocatedEnum(AllocStackInst *AS) {
         break;
       }
       case SILInstructionKind::DebugValueInst:
-        if (DebugValueInst::hasAddrVal(user)) {
-          eraseInstFromFunction(*user);
-          break;
-        }
-        LLVM_FALLTHROUGH;
+        // TODO: Add support for op_enum_fragment
+        use->set(SILUndef::get(AS));
+        break;
       default:
         llvm_unreachable("unexpected alloc_stack user");
     }
@@ -623,9 +629,6 @@ bool SILCombiner::optimizeStackAllocatedEnum(AllocStackInst *AS) {
 }
 
 SILInstruction *SILCombiner::visitAllocStackInst(AllocStackInst *AS) {
-  if (AS->getFunction()->hasOwnership())
-    return nullptr;
-
   if (optimizeStackAllocatedEnum(AS))
     return nullptr;
 
@@ -653,8 +656,20 @@ SILInstruction *SILCombiner::visitAllocStackInst(AllocStackInst *AS) {
   if (IEI && !OEI &&
       !IEI->getLoweredConcreteType().hasOpenedExistential()) {
     assert(!IEI->getLoweredConcreteType().isOpenedExistential());
+    Builder.setCurrentDebugScope(AS->getDebugScope());
+    auto varInfo = AS->getVarInfo();
+    if (varInfo) {
+      if (varInfo->Type == AS->getElementType()) {
+        varInfo->Type = {}; // Lower the variable's type too.
+      } else {
+        // Cannot salvage the variable, its type has changed and its expression
+        // cannot be rewritten.
+        Builder.createDebugValue(AS->getLoc(), SILUndef::get(AS), *varInfo);
+        varInfo = {};
+      }
+    }
     auto *ConcAlloc = Builder.createAllocStack(
-        AS->getLoc(), IEI->getLoweredConcreteType(), AS->getVarInfo());
+        AS->getLoc(), IEI->getLoweredConcreteType(), varInfo);
     IEI->replaceAllUsesWith(ConcAlloc);
     eraseInstFromFunction(*IEI);
 
@@ -761,19 +776,6 @@ static SILValue isConstIndexAddr(SILValue val, unsigned &index) {
   return IA->getBase();
 }
 
-SILInstruction *SILCombiner::visitLoadBorrowInst(LoadBorrowInst *lbi) {
-  // If we have a load_borrow that only has non_debug end_borrow uses, delete
-  // it.
-  if (llvm::all_of(getNonDebugUses(lbi), [](Operand *use) {
-        return isa<EndBorrowInst>(use->getUser());
-      })) {
-    eraseInstIncludingUsers(lbi);
-    return nullptr;
-  }
-
-  return nullptr;
-}
-
 /// Optimize nested index_addr instructions:
 /// Example in SIL pseudo code:
 ///    %1 = index_addr %ptr, x
@@ -827,6 +829,15 @@ SILInstruction *SILCombiner::visitCondFailInst(CondFailInst *CFI) {
   ValueSet DefinedValues(CFI->getFunction());
   for (auto Iter = std::next(CFI->getIterator());
        Iter != CFI->getParent()->end(); ++Iter) {
+
+    if (isBeginScopeMarker(&*Iter)) {
+      for (auto *scopeUse : cast<SingleValueInstruction>(&*Iter)->getUses()) {
+        auto *scopeEnd = scopeUse->getUser();
+        if (isEndOfScopeMarker(scopeEnd)) {
+          ToRemove.push_back(scopeEnd);
+        }
+      }
+    }
     if (!CFI->getFunction()->hasOwnership()) {
       ToRemove.push_back(&*Iter);
       continue;
@@ -853,6 +864,9 @@ SILInstruction *SILCombiner::visitCondFailInst(CondFailInst *CFI) {
     return nullptr;
 
   for (auto *Inst : ToRemove) {
+    if (Inst->isDeleted())
+      continue;
+
     // Replace any still-remaining uses with undef and erase.
     Inst->replaceAllUsesOfAllResultsWithUndef();
     eraseInstFromFunction(*Inst);
@@ -1102,6 +1116,8 @@ SILCombiner::visitInjectEnumAddrInst(InjectEnumAddrInst *IEAI) {
                           IEAI->getOperand()->getType().getObjectType());
     auto storeQual = !func->hasOwnership()
                          ? StoreOwnershipQualifier::Unqualified
+                     : IEAI->getOperand()->getType().isMoveOnly()
+                         ? StoreOwnershipQualifier::Init
                          : StoreOwnershipQualifier::Trivial;
     Builder.createStore(IEAI->getLoc(), E, IEAI->getOperand(), storeQual);
     return eraseInstFromFunction(*IEAI);
@@ -1741,22 +1757,6 @@ SILInstruction *SILCombiner::visitTupleExtractInst(TupleExtractInst *TEI) {
   return nullptr;
 }
 
-SILInstruction *SILCombiner::visitFixLifetimeInst(FixLifetimeInst *fli) {
-  // fix_lifetime(alloc_stack) -> fix_lifetime(load(alloc_stack))
-  Builder.setCurrentDebugScope(fli->getDebugScope());
-  if (auto *ai = dyn_cast<AllocStackInst>(fli->getOperand())) {
-    if (fli->getOperand()->getType().isLoadable(*fli->getFunction())) {
-      // load when ossa is disabled
-      auto load = Builder.emitLoadBorrowOperation(fli->getLoc(), ai);
-      Builder.createFixLifetime(fli->getLoc(), load);
-      // no-op when ossa is disabled
-      Builder.emitEndBorrowOperation(fli->getLoc(), load);
-      return eraseInstFromFunction(*fli);
-    }
-  }
-  return nullptr;
-}
-
 static std::optional<SILType>
 shouldReplaceCallByContiguousArrayStorageAnyObject(SILFunction &F,
                                                    CanType storageMetaTy) {
@@ -1774,7 +1774,7 @@ shouldReplaceCallByContiguousArrayStorageAnyObject(SILFunction &F,
 
   // On SwiftStdlib 5.7 we can replace the call.
   auto &ctxt = storageMetaTy->getASTContext();
-  auto deployment = AvailabilityContext::forDeploymentTarget(ctxt);
+  auto deployment = AvailabilityRange::forDeploymentTarget(ctxt);
   if (!deployment.isContainedIn(ctxt.getSwift57Availability()))
     return std::nullopt;
 
@@ -1784,6 +1784,10 @@ shouldReplaceCallByContiguousArrayStorageAnyObject(SILFunction &F,
 
   auto ty = genericArgs[0]->getCanonicalType();
   if (!ty->getClassOrBoundGenericClass() && !ty->isObjCExistentialType())
+    return std::nullopt;
+  // C++ foreign reference types have custom release/retain operations and are
+  // not AnyObjects.
+  if (ty->isForeignReferenceType())
     return std::nullopt;
 
   auto anyObjectTy = ctxt.getAnyObjectType();
@@ -1954,7 +1958,7 @@ SILInstruction *SILCombiner::visitMarkDependenceInst(MarkDependenceInst *mdi) {
   // does not have a meaning, so just eliminate it.
   {
     SILType baseType = mdi->getBase()->getType();
-    if (baseType.isObject() && baseType.isTrivial(*mdi->getFunction())) {
+    if (baseType.getObjectType().isTrivial(*mdi->getFunction())) {
       SILValue value = mdi->getValue();
       mdi->replaceAllUsesWith(value);
       return eraseInstFromFunction(*mdi);
@@ -1967,24 +1971,6 @@ SILInstruction *SILCombiner::visitMarkDependenceInst(MarkDependenceInst *mdi) {
     // a literal is replace by the string_literal itself.
     replaceInstUsesWith(*mdi, mdi->getValue());
     return eraseInstFromFunction(*mdi);
-  }
-
-  return nullptr;
-}
-
-SILInstruction *
-SILCombiner::visitClassifyBridgeObjectInst(ClassifyBridgeObjectInst *cboi) {
-  auto *urc = dyn_cast<UncheckedRefCastInst>(cboi->getOperand());
-  if (!urc)
-    return nullptr;
-
-  auto type = urc->getOperand()->getType().getASTType();
-  if (ClassDecl *cd = type->getClassOrBoundGenericClass()) {
-    if (!cd->isObjC()) {
-      auto int1Ty = SILType::getBuiltinIntegerType(1, Builder.getASTContext());
-      SILValue zero = Builder.createIntegerLiteral(cboi->getLoc(), int1Ty, 0);
-      return Builder.createTuple(cboi->getLoc(), {zero, zero});
-    }
   }
 
   return nullptr;

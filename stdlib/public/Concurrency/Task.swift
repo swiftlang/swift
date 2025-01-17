@@ -11,7 +11,6 @@
 //===----------------------------------------------------------------------===//
 
 import Swift
-@_implementationOnly import _SwiftConcurrencyShims
 @_implementationOnly import SwiftConcurrencyInternalShims
 
 // ==== Task -------------------------------------------------------------------
@@ -101,7 +100,6 @@ import Swift
 ///     var result: Work?
 ///
 ///     deinit {
-///         assert(work != nil)
 ///         // even though the task is still retained,
 ///         // once it completes it no longer causes a reference cycle with the actor
 ///
@@ -124,16 +122,18 @@ import Swift
 /// And using it like this:
 ///
 /// ```
-/// await Actor().start()
+/// await Worker().start()
 /// ```
 ///
-/// Note that there is nothing, other than the Task's use of `self` retaining the actor,
-/// And that the start method immediately returns, without waiting for the unstructured `Task` to finish.
-/// So once the task is completed and its closure is destroyed, the strong reference to the "self" of the actor is also released allowing the actor to deinitialize as expected.
+/// Note that the actor is only retained by the start() method's use of `self`,
+/// and that the start method immediately returns, without waiting for the
+/// unstructured `Task` to finish. Once the task is completed and its closure is
+/// destroyed, the strong reference to the actor is also released allowing the
+/// actor to deinitialize as expected.
 ///
 /// Therefore, the above call will consistently result in the following output:
 ///
-/// ```
+/// ```other
 /// start task work
 /// completed task work
 /// deinit actor
@@ -194,19 +194,44 @@ extension Task {
     }
   }
 
-  /// Indicates that the task should stop running.
+  /// Cancels this task.
   ///
-  /// Task cancellation is cooperative:
-  /// a task that supports cancellation
-  /// checks whether it has been canceled at various points during its work.
+  /// Cancelling a task has three primary effects:
   ///
-  /// Calling this method on a task that doesn't support cancellation
-  /// has no effect.
-  /// Likewise, if the task has already run
-  /// past the last point where it would stop early,
-  /// calling this method has no effect.
+  /// - It flags the task as canceled.
+  /// - It causes any active cancellation handlers on the task to run, once.
+  /// - It cancels any child tasks and task groups of the task, including
+  ///   those created in the future. If those tasks have cancellation handlers,
+  ///   they also are triggered.
+  ///
+  /// Task cancellation is cooperative and idempotent.
+  ///
+  /// Cancelling a task does not automatically cause arbitrary functions on the task
+  /// to stop running or throw errors. A function _may_ choose to react
+  /// to cancellation by ending its work early, and it is conventional to
+  /// signal that to callers by throwing `CancellationError`. However,
+  /// a function that doesn't specifically check for cancellation will
+  /// run to completion normally, even if the task it is running on is
+  /// canceled. However, that function might still end early if it calls
+  /// other code that handles cancellation by throwing and that function doesn't
+  /// handle the error.
+  ///
+  /// It's safe to cancel a task from any task or thread. It's safe for
+  /// multiple tasks or threads to cancel the same task at the same
+  /// time. Cancelling a task that has already been canceled has no
+  /// additional effect.
+  ///
+  /// `cancel` may need to acquire locks and synchronously run
+  /// arbitrary cancellation-handler code associated with the
+  /// canceled task. To reduce the risk of deadlock, it is
+  /// recommended that callers release any locks they might be
+  /// holding before they call cancel.
+  ///
+  /// If the task has already run past the last point where it could have 
+  /// performed a cancellation check, cancelling it may have no observable effects.
   ///
   /// - SeeAlso: `Task.checkCancellation()`
+  /// - SeeAlso: `withTaskCancellationHandler(operation:onCancel:isolation:)`
   public func cancel() {
     Builtin.cancelAsyncTask(_task)
   }
@@ -603,36 +628,12 @@ extension Task where Failure == Never {
 #if SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
   @discardableResult
   @_alwaysEmitIntoClient
-  @_allowFeatureSuppression(IsolatedAny)
   @available(*, unavailable, message: "Unavailable in task-to-thread concurrency model")
   public init(
     priority: TaskPriority? = nil,
-    @_inheritActorContext @_implicitSelfCapture operation: __owned @Sendable @escaping @isolated(any) () async -> Success
+    @_inheritActorContext @_implicitSelfCapture operation: sending @escaping @isolated(any) () async -> Success
   ) {
     fatalError("Unavailable in task-to-thread concurrency model.")
-  }
-#elseif $Embedded
-  @discardableResult
-  @_alwaysEmitIntoClient
-  public init(
-    priority: TaskPriority? = nil,
-    @_inheritActorContext @_implicitSelfCapture operation: __owned @Sendable @escaping () async -> Success
-  ) {
-#if compiler(>=5.5) && $BuiltinCreateAsyncTaskInGroup
-    // Set up the job flags for a new task.
-    let flags = taskCreateFlags(
-      priority: priority, isChildTask: false, copyTaskLocals: true,
-      inheritContext: true, enqueueJob: true,
-      addPendingGroupTaskUnconditionally: false,
-      isDiscardingTask: false)
-
-    // Create the asynchronous task.
-    let (task, _) = Builtin.createAsyncTask(flags, operation)
-
-    self._task = task
-#else
-    fatalError("Unsupported Swift compiler")
-#endif
   }
 #else
   /// Runs the given nonthrowing operation asynchronously
@@ -660,12 +661,10 @@ extension Task where Failure == Never {
   ///   - operation: The operation to perform.
   @discardableResult
   @_alwaysEmitIntoClient
-  @_allowFeatureSuppression(IsolatedAny)
   public init(
     priority: TaskPriority? = nil,
-    @_inheritActorContext @_implicitSelfCapture operation: __owned @Sendable @escaping @isolated(any) () async -> Success
+    @_inheritActorContext @_implicitSelfCapture operation: sending @escaping @isolated(any) () async -> Success
   ) {
-#if compiler(>=5.5) && $BuiltinCreateAsyncTaskInGroup
     // Set up the job flags for a new task.
     let flags = taskCreateFlags(
       priority: priority, isChildTask: false, copyTaskLocals: true,
@@ -674,7 +673,6 @@ extension Task where Failure == Never {
       isDiscardingTask: false)
 
     // Create the asynchronous task.
-#if $BuiltinCreateTask
     let builtinSerialExecutor =
       Builtin.extractFunctionIsolation(operation)?.unownedExecutor.executor
 
@@ -682,14 +680,8 @@ extension Task where Failure == Never {
                                        initialSerialExecutor:
                                          builtinSerialExecutor,
                                        operation: operation)
-#else
-    let (task, _) = Builtin.createAsyncTask(flags, operation)
-#endif
 
     self._task = task
-#else
-    fatalError("Unsupported Swift compiler")
-#endif
   }
 #endif
 }
@@ -699,36 +691,12 @@ extension Task where Failure == Error {
 #if SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
   @discardableResult
   @_alwaysEmitIntoClient
-  @_allowFeatureSuppression(IsolatedAny)
   @available(*, unavailable, message: "Unavailable in task-to-thread concurrency model")
   public init(
     priority: TaskPriority? = nil,
-    @_inheritActorContext @_implicitSelfCapture operation: __owned @Sendable @escaping @isolated(any) () async throws -> Success
+    @_inheritActorContext @_implicitSelfCapture operation: sending @escaping @isolated(any) () async throws -> Success
   ) {
     fatalError("Unavailable in task-to-thread concurrency model")
-  }
-#elseif $Embedded
-  @discardableResult
-  @_alwaysEmitIntoClient
-  public init(
-    priority: TaskPriority? = nil,
-    @_inheritActorContext @_implicitSelfCapture operation: __owned @Sendable @escaping () async throws -> Success
-  ) {
-#if compiler(>=5.5) && $BuiltinCreateAsyncTaskInGroup
-    // Set up the task flags for a new task.
-    let flags = taskCreateFlags(
-      priority: priority, isChildTask: false, copyTaskLocals: true,
-      inheritContext: true, enqueueJob: true,
-      addPendingGroupTaskUnconditionally: false,
-      isDiscardingTask: false)
-
-    // Create the asynchronous task future.
-    let (task, _) = Builtin.createAsyncTask(flags, operation)
-
-    self._task = task
-#else
-    fatalError("Unsupported Swift compiler")
-#endif
   }
 #else
   /// Runs the given throwing operation asynchronously
@@ -756,12 +724,10 @@ extension Task where Failure == Error {
   ///   - operation: The operation to perform.
   @discardableResult
   @_alwaysEmitIntoClient
-  @_allowFeatureSuppression(IsolatedAny)
   public init(
     priority: TaskPriority? = nil,
-    @_inheritActorContext @_implicitSelfCapture operation: __owned @Sendable @escaping @isolated(any) () async throws -> Success
+    @_inheritActorContext @_implicitSelfCapture operation: sending @escaping @isolated(any) () async throws -> Success
   ) {
-#if compiler(>=5.5) && $BuiltinCreateAsyncTaskInGroup
     // Set up the task flags for a new task.
     let flags = taskCreateFlags(
       priority: priority, isChildTask: false, copyTaskLocals: true,
@@ -770,7 +736,6 @@ extension Task where Failure == Error {
       isDiscardingTask: false)
 
     // Create the asynchronous task future.
-#if $BuiltinCreateTask
     let builtinSerialExecutor =
       Builtin.extractFunctionIsolation(operation)?.unownedExecutor.executor
 
@@ -778,14 +743,8 @@ extension Task where Failure == Error {
                                        initialSerialExecutor:
                                          builtinSerialExecutor,
                                        operation: operation)
-#else
-    let (task, _) = Builtin.createAsyncTask(flags, operation)
-#endif
 
     self._task = task
-#else
-    fatalError("Unsupported Swift compiler")
-#endif
   }
 #endif
 }
@@ -797,36 +756,12 @@ extension Task where Failure == Never {
 #if SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
   @discardableResult
   @_alwaysEmitIntoClient
-  @_allowFeatureSuppression(IsolatedAny)
   @available(*, unavailable, message: "Unavailable in task-to-thread concurrency model")
   public static func detached(
     priority: TaskPriority? = nil,
-    operation: __owned @Sendable @escaping @isolated(any) () async -> Success
+    operation: sending @escaping @isolated(any) () async -> Success
   ) -> Task<Success, Failure> {
     fatalError("Unavailable in task-to-thread concurrency model")
-  }
-#elseif $Embedded
-  @discardableResult
-  @_alwaysEmitIntoClient
-  public static func detached(
-    priority: TaskPriority? = nil,
-    operation: __owned @Sendable @escaping () async -> Success
-  ) -> Task<Success, Failure> {
-#if compiler(>=5.5) && $BuiltinCreateAsyncTaskInGroup
-    // Set up the job flags for a new task.
-    let flags = taskCreateFlags(
-      priority: priority, isChildTask: false, copyTaskLocals: false,
-      inheritContext: false, enqueueJob: true,
-      addPendingGroupTaskUnconditionally: false,
-      isDiscardingTask: false)
-
-    // Create the asynchronous task future.
-    let (task, _) = Builtin.createAsyncTask(flags, operation)
-
-    return Task(task)
-#else
-    fatalError("Unsupported Swift compiler")
-#endif
   }
 #else
   /// Runs the given nonthrowing operation asynchronously
@@ -851,12 +786,10 @@ extension Task where Failure == Never {
   /// - Returns: A reference to the task.
   @discardableResult
   @_alwaysEmitIntoClient
-  @_allowFeatureSuppression(IsolatedAny)
   public static func detached(
     priority: TaskPriority? = nil,
-    operation: __owned @Sendable @escaping @isolated(any) () async -> Success
+    operation: sending @escaping @isolated(any) () async -> Success
   ) -> Task<Success, Failure> {
-#if compiler(>=5.5) && $BuiltinCreateAsyncTaskInGroup
     // Set up the job flags for a new task.
     let flags = taskCreateFlags(
       priority: priority, isChildTask: false, copyTaskLocals: false,
@@ -865,7 +798,6 @@ extension Task where Failure == Never {
       isDiscardingTask: false)
 
     // Create the asynchronous task future.
-#if $BuiltinCreateTask
     let builtinSerialExecutor =
       Builtin.extractFunctionIsolation(operation)?.unownedExecutor.executor
 
@@ -873,14 +805,8 @@ extension Task where Failure == Never {
                                        initialSerialExecutor:
                                          builtinSerialExecutor,
                                        operation: operation)
-#else
-    let (task, _) = Builtin.createAsyncTask(flags, operation)
-#endif
 
     return Task(task)
-#else
-    fatalError("Unsupported Swift compiler")
-#endif
   }
 #endif
 }
@@ -890,36 +816,12 @@ extension Task where Failure == Error {
 #if SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
   @discardableResult
   @_alwaysEmitIntoClient
-  @_allowFeatureSuppression(IsolatedAny)
   @available(*, unavailable, message: "Unavailable in task-to-thread concurrency model")
   public static func detached(
     priority: TaskPriority? = nil,
-    operation: __owned @Sendable @escaping @isolated(any) () async throws -> Success
+    operation: sending @escaping @isolated(any) () async throws -> Success
   ) -> Task<Success, Failure> {
     fatalError("Unavailable in task-to-thread concurrency model")
-  }
-#elseif $Embedded
-  @discardableResult
-  @_alwaysEmitIntoClient
-  public static func detached(
-    priority: TaskPriority? = nil,
-    operation: __owned @Sendable @escaping () async throws -> Success
-  ) -> Task<Success, Failure> {
-#if compiler(>=5.5) && $BuiltinCreateAsyncTaskInGroup
-    // Set up the job flags for a new task.
-    let flags = taskCreateFlags(
-      priority: priority, isChildTask: false, copyTaskLocals: false,
-      inheritContext: false, enqueueJob: true,
-      addPendingGroupTaskUnconditionally: false,
-      isDiscardingTask: false)
-
-    // Create the asynchronous task future.
-    let (task, _) = Builtin.createAsyncTask(flags, operation)
-
-    return Task(task)
-#else
-    fatalError("Unsupported Swift compiler")
-#endif
   }
 #else
   /// Runs the given throwing operation asynchronously
@@ -946,12 +848,10 @@ extension Task where Failure == Error {
   /// - Returns: A reference to the task.
   @discardableResult
   @_alwaysEmitIntoClient
-  @_allowFeatureSuppression(IsolatedAny)
   public static func detached(
     priority: TaskPriority? = nil,
-    operation: __owned @Sendable @escaping @isolated(any) () async throws -> Success
+    operation: sending @escaping @isolated(any) () async throws -> Success
   ) -> Task<Success, Failure> {
-#if compiler(>=5.5) && $BuiltinCreateAsyncTaskInGroup
     // Set up the job flags for a new task.
     let flags = taskCreateFlags(
       priority: priority, isChildTask: false, copyTaskLocals: false,
@@ -960,7 +860,6 @@ extension Task where Failure == Error {
       isDiscardingTask: false)
 
     // Create the asynchronous task future.
-#if $BuiltinCreateTask
     let builtinSerialExecutor =
       Builtin.extractFunctionIsolation(operation)?.unownedExecutor.executor
 
@@ -968,14 +867,8 @@ extension Task where Failure == Error {
                                        initialSerialExecutor:
                                          builtinSerialExecutor,
                                        operation: operation)
-#else
-    let (task, _) = Builtin.createAsyncTask(flags, operation)
-#endif
 
     return Task(task)
-#else
-    fatalError("Unsupported Swift compiler")
-#endif
   }
 #endif
 }
@@ -1088,6 +981,7 @@ public func withUnsafeCurrentTask<T>(body: (UnsafeCurrentTask?) async throws -> 
 /// [concurrency]: https://docs.swift.org/swift-book/LanguageGuide/Concurrency.html
 /// [tspl]: https://docs.swift.org/swift-book/
 @available(SwiftStdlib 5.1, *)
+@unsafe
 public struct UnsafeCurrentTask {
   internal let _task: Builtin.NativeObject
 
@@ -1270,6 +1164,16 @@ func _taskCreateNullaryContinuationJob(priority: Int, continuation: Builtin.RawU
 @_silgen_name("swift_task_isCurrentExecutor")
 func _taskIsCurrentExecutor(_ executor: Builtin.Executor) -> Bool
 
+#if !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY && !SWIFT_CONCURRENCY_EMBEDDED
+
+@available(SwiftStdlib 9999, *)
+@_silgen_name("swift_task_isCurrentExecutorWithFlags")
+@usableFromInline
+internal func _taskIsCurrentExecutor(
+  executor: Builtin.Executor, flags: UInt64) -> Bool
+
+#endif
+
 @available(SwiftStdlib 5.1, *)
 @usableFromInline
 @_silgen_name("swift_task_reportUnexpectedExecutor")
@@ -1363,5 +1267,49 @@ internal func _runTaskForBridgedAsyncMethod(@_inheritActorContext _ body: __owne
 #endif
 }
 #endif
+
+#endif
+
+#if !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY && !SWIFT_CONCURRENCY_EMBEDDED
+
+@available(SwiftStdlib 9999, *)
+@_alwaysEmitIntoClient
+@usableFromInline
+internal func _taskIsOnMainActor() -> Bool {
+  // 0 for check mode means do not assert.
+  return _taskIsCurrentExecutor(executor: _getMainExecutor(),
+                                flags: 0)
+}
+
+/// SPI that is used by the compiler to implement the hop to main actor if
+/// needed thunk. This thunk is used when passing preconcurrency code a main
+/// actor isolated callback. If when invoked, we are dynamically on the main
+/// actor, we just invoke the function without creating a task. Otherwise, we
+/// create a Task and run operation within it.
+///
+/// NOTE: For this to be safe, we need our function to not have any return value
+/// and that includes an error return value. So we cannot accept throwing
+/// functions here.
+@_alwaysEmitIntoClient
+@available(SwiftStdlib 9999, *)
+public func _taskRunOnMainActor(operation: @escaping @MainActor () -> ()) {
+  typealias YesActor = @MainActor () -> ()
+  typealias NoActor = () -> ()
+
+  // First check if we are on the main actor. If so, just call the synchronous
+  // function directly.
+  if _taskIsOnMainActor() {
+    return withoutActuallyEscaping(operation) {
+      (_ fn: @escaping YesActor) -> () in
+      let rawFn = unsafeBitCast(fn, to: NoActor.self)
+      return rawFn()
+    }
+  }
+
+  // Otherwise, create a new task on the main actor and run operation there.
+  Task { @MainActor in
+    operation()
+  }
+}
 
 #endif

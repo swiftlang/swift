@@ -1,10 +1,10 @@
-@available(macOS 10.50, *)
+@available(macOS 50, *)
 public func conditionallyAvailableFunction() {}
 
 @available(macOS, unavailable)
 public func unavailableFunction() {}
 
-@available(macOS 10.50, *)
+@available(macOS 50, *)
 public var conditionallyAvailableGlobal: Int {
   get {return 0}
   set {}
@@ -16,7 +16,7 @@ public var unavailableGlobal: Int {
   set {}
 }
 
-@available(macOS 10.50, *)
+@available(macOS 50, *)
 public struct ConditionallyAvailableStruct {
   public func conditionallyAvailableMethod() {}
 }
@@ -26,7 +26,7 @@ extension ConditionallyAvailableStruct {
 }
 
 @available(macOS, unavailable)
-public struct UnvailableStruct {
+public struct UnavailableStruct {
   public func unavailableMethod() {}
 }
 
@@ -34,7 +34,7 @@ public protocol AlwaysAvailableProtocol {}
 
 public struct AlwaysAvailableStruct {}
 
-@available(macOS 10.50, *)
+@available(macOS 50, *)
 extension AlwaysAvailableStruct : AlwaysAvailableProtocol {}
 
 @available(macOS, unavailable)
@@ -46,6 +46,6 @@ extension AlwaysAvailableStruct : UnavailableProtocol {}
 public enum AlwaysAvailableEnum {
   case alwaysAvailableCase
 
-  @available(macOS 10.50, *)
+  @available(macOS 50, *)
   case conditionallyAvailableCase
 }

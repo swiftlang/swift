@@ -12,6 +12,7 @@
 
 #include "swift/Parse/ParseVersion.h"
 #include "swift/AST/DiagnosticsParse.h"
+#include "swift/Basic/Assertions.h"
 #include "llvm/Support/FormatVariadic.h"
 
 using namespace swift;
@@ -93,7 +94,7 @@ std::optional<Version> VersionParser::parseCompilerVersionString(
 
     // The second version component isn't used for comparison.
     if (i == 1) {
-      if (!SplitComponent.equals("*")) {
+      if (SplitComponent != "*") {
         if (Diags) {
           // Majors 600-1300 were used for Swift 1.0-5.5 (based on clang
           // versions), but then we reset the numbering based on Swift versions,

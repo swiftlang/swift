@@ -1,7 +1,7 @@
 # Dynamic Casting Behavior
 
 * Author: [Tim Kientzle](https://github.com/tbkka)
-* Implementation: [apple/swift#29658](https://github.com/apple/swift/pull/29658)
+* Implementation: [swiftlang/swift#29658](https://github.com/swiftlang/swift/pull/29658)
 
 ## Introduction
 
@@ -665,7 +665,7 @@ let a = NSNumber()
 print(a is Any)
 ```
 
-* [#44896](https://github.com/apple/swift/issues/44896): CF types cannot be cast to protocol existentials
+* [#44896](https://github.com/swiftlang/swift/issues/44896): CF types cannot be cast to protocol existentials
 
 ```swift
 import Foundation
@@ -680,7 +680,7 @@ extension CFBitVector : P {
 print(CFBitVector.makeImmutable(from: [10,20]) is P)
 ```
 
-* [#47129](https://github.com/apple/swift/issues/47129): Cannot cast `Optional<T> as Any` to protocol type.  Note that this is a particular problem for reflection with weak fields, since `Mirror` reflects those as `Any` containing an `Optional` value.
+* [#47129](https://github.com/swiftlang/swift/issues/47129): Cannot cast `Optional<T> as Any` to protocol type.  Note that this is a particular problem for reflection with weak fields, since `Mirror` reflects those as `Any` containing an `Optional` value.
 
 ```swift
 protocol P {}
@@ -692,7 +692,7 @@ let a = c as? Any
 print(a is P)
 ```
 
-* [#51469](https://github.com/apple/swift/issues/51469): `Any` containing `Optional<Any>` cannot cast to `Error`
+* [#51469](https://github.com/swiftlang/swift/issues/51469): `Any` containing `Optional<Any>` cannot cast to `Error`
 
 ```swift
 struct MyError: Error { }
@@ -703,7 +703,7 @@ let b: Any = a
 print(b is Error)
 ```
 
-* [#48681](https://github.com/apple/swift/issues/48681): Inconsistent results for nested optionals
+* [#48681](https://github.com/swiftlang/swift/issues/48681): Inconsistent results for nested optionals
 
 ```swift
 // Note: This issue includes many cases similar to the following
@@ -730,7 +730,7 @@ let a = NSObjectProtocol.self
 print(a is NSObjectProtocol.Type)
 ```
 
-* [#44608](https://github.com/apple/swift/issues/44608): Cannot cast `Any` contents to a protocol type
+* [#44608](https://github.com/swiftlang/swift/issues/44608): Cannot cast `Any` contents to a protocol type
 
 ```swift
 protocol P {}

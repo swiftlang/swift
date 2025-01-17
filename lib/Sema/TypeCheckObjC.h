@@ -71,7 +71,7 @@ public:
     ExplicitlyGKInspectable,
     /// Is it a member of an @objc extension of a class.
     MemberOfObjCExtension,
-    /// Is it a member of an \@\_objcImplementation extension.
+    /// Is it a member of an \@objc \@implementation extension.
     MemberOfObjCImplementationExtension,
     /// Has an explicit '@objc' attribute added by an access note, rather than
     /// written in source code.
@@ -212,9 +212,8 @@ bool fixDeclarationName(InFlightDiagnostic &diag, const ValueDecl *decl,
 ///
 /// For properties, the selector should be a zero-parameter selector of the
 /// given property's name.
-bool fixDeclarationObjCName(InFlightDiagnostic &diag, const ValueDecl *decl,
-                            std::optional<ObjCSelector> nameOpt,
-                            std::optional<ObjCSelector> targetNameOpt,
+bool fixDeclarationObjCName(InFlightDiagnostic &diag, const Decl *decl,
+                            ObjCSelector name, ObjCSelector targetName,
                             bool ignoreImpliedName = false);
 
 } // end namespace swift

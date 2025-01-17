@@ -25,7 +25,7 @@ private func log(_ message: @autoclosure () -> String) {
 ///
 /// TODO: Integrate this with SIL verification to ensure completeness.
 ///
-/// TODO: Convert AddressDefUseWalker to conform to AddressUtils after
+/// TODO: Convert AddressDefUseWalker to use AddressUseVisitor after
 /// checking that the additional instructions are handled correctly by
 /// escape analysis.
 ///
@@ -63,6 +63,10 @@ protocol AddressUseVisitor {
   /// destination address operand.
   mutating func loadedAddressUse(of operand: Operand, into address: Operand)
     -> WalkResult
+
+  /// Yielding an address may modify the value at the yield, but not past the yield. The yielded value may escape, but
+  /// only if its type is escapable.
+  mutating func yieldedAddressUse(of operand: Operand) -> WalkResult
 
   /// A non-address owned `value` whose ownership depends on the in-memory
   /// value at `address`, such as `mark_dependence %value on %address`.
@@ -119,7 +123,7 @@ extension AddressUseVisitor {
     case let pai as PartialApplyInst where pai.mayEscape:
       return escapingAddressUse(of: operand)
 
-    case is ReturnInst, is ThrowInst, is YieldInst, is AddressToPointerInst:
+    case is ThrowInst, is AddressToPointerInst:
       return escapingAddressUse(of: operand)
 
     case is StructElementAddrInst, is TupleElementAddrInst,
@@ -149,11 +153,13 @@ extension AddressUseVisitor {
          is PackElementSetInst:
       return leafAddressUse(of: operand)
 
-    case is LoadInst, is LoadUnownedInst,  is LoadWeakInst, 
-         is ValueMetatypeInst, is ExistentialMetatypeInst,
+    case is LoadInst, is LoadUnownedInst,  is LoadWeakInst, is ValueMetatypeInst, is ExistentialMetatypeInst,
          is PackElementGetInst:
       let svi = operand.instruction as! SingleValueInstruction
       return loadedAddressUse(of: operand, into: svi)
+
+    case is YieldInst:
+      return yieldedAddressUse(of: operand)
 
     case let sdai as SourceDestAddrInstruction
            where sdai.sourceOperand == operand:
@@ -165,12 +171,6 @@ extension AddressUseVisitor {
 
     case let builtin as BuiltinInst:
       switch builtin.id {
-      case .Copy where builtin.operands[1] == operand: // source
-        return loadedAddressUse(of: operand, into: builtin.operands[0])
-
-      case .Copy where builtin.operands[0] == operand: // dest
-        return leafAddressUse(of: operand)
-
       // Builtins that cannot load a nontrivial value.
       case .TSanInoutAccess, .ResumeThrowingContinuationReturning,
            .ResumeNonThrowingContinuationReturning, .GenericAdd,
@@ -194,7 +194,7 @@ extension AddressUseVisitor {
       if operand.instruction.isIncidentalUse {
         return leafAddressUse(of: operand)
       }
-      // Unkown instruction.
+      // Unknown instruction.
       return unknownAddressUse(of: operand)
     }
   }
@@ -215,6 +215,11 @@ extension AccessBase {
         return nil
       }
       baseAddr = arg
+    case let .storeBorrow(sbi):
+      guard case let .stack(allocStack) = sbi.destinationOperand.value.accessBase else {
+        return nil
+      }
+      return (initialAddress: allocStack, initializingStore: sbi)
     default:
       return nil
     }
@@ -289,7 +294,7 @@ extension AddressInitializationWalker {
   }
 }
 
-// Implement AddresUseVisitor
+// Implement AddressUseVisitor
 extension AddressInitializationWalker {
   /// An address projection produces a single address result and does not
   /// escape its address operand in any other way.
@@ -340,6 +345,12 @@ extension AddressInitializationWalker {
     return .continueWalk
   }
 
+  mutating func yieldedAddressUse(of operand: Operand) -> WalkResult {
+    // An inout yield is a partial write. Initialization via coroutine is not supported, so we assume a prior
+    // initialization must dominate the yield.
+    return .continueWalk
+  }
+
   mutating func dependentAddressUse(of operand: Operand, into value: Value)
     -> WalkResult {
     return .continueWalk
@@ -354,7 +365,7 @@ extension AddressInitializationWalker {
   }
 }
 
-/// A live range representing the ownership of addressible memory.
+/// A live range representing the ownership of addressable memory.
 ///
 /// This live range represents the minimal guaranteed lifetime of the object being addressed. Uses of derived addresses
 /// may be extended up to the ends of this scope without violating ownership.
@@ -459,7 +470,7 @@ enum AddressOwnershipLiveRange : CustomStringConvertible {
       }
     case .storeBorrow(let sb):
       return computeValueLiveRange(of: sb.source, context)
-    case .pointer, .unidentified:
+    case .pointer, .index, .unidentified:
       return nil
     }
   }
@@ -558,4 +569,23 @@ extension AddressOwnershipLiveRange {
     }
     return .local(allocation, range)
   }
+}
+
+let addressOwnershipLiveRangeTest = FunctionTest("address_ownership_live_range") {
+  function, arguments, context in
+  let address = arguments.takeValue()
+  print("Address: \(address)")
+  print("Base: \(address.accessBase)")
+  let begin = address.definingInstructionOrTerminator ?? {
+    assert(address is FunctionArgument)
+    return function.instructions.first!
+  }()
+  let localReachabilityCache = LocalVariableReachabilityCache()
+  guard var ownershipRange = AddressOwnershipLiveRange.compute(for: address, at: begin,
+                                                               localReachabilityCache, context) else {
+    print("Error: indeterminate live range")
+    return
+  }
+  defer { ownershipRange.deinitialize() }
+  print(ownershipRange)
 }

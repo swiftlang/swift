@@ -1,5 +1,18 @@
-// RUN: %target-swift-emit-sil -sil-verify-all -verify -enable-upcoming-feature MoveOnlyPartialConsumption -enable-experimental-feature NoImplicitCopy -enable-experimental-feature MoveOnlyClasses %s -Xllvm -sil-print-final-ossa-module | %FileCheck %s
-// RUN: %target-swift-emit-sil -O -sil-verify-all -verify -enable-upcoming-feature MoveOnlyPartialConsumption -enable-experimental-feature NoImplicitCopy -enable-experimental-feature MoveOnlyClasses %s
+// RUN: %target-swift-emit-sil -sil-verify-all -verify \
+// RUN: -enable-experimental-feature NoImplicitCopy \
+// RUN: -enable-experimental-feature MoveOnlyClasses \
+// RUN: -enable-experimental-feature LifetimeDependence \
+// RUN: -Xllvm -sil-print-final-ossa-module %s | %FileCheck %s
+
+// RUN: %target-swift-emit-sil -O -sil-verify-all -verify \
+// RUN: -enable-experimental-feature NoImplicitCopy \
+// RUN: -enable-experimental-feature MoveOnlyClasses \
+// RUN: -enable-experimental-feature LifetimeDependence \
+// RUN: %s
+
+// REQUIRES: swift_feature_MoveOnlyClasses
+// REQUIRES: swift_feature_NoImplicitCopy
+// REQUIRES: swift_feature_LifetimeDependence
 
 // This file contains tests that used to crash due to verifier errors. It must
 // be separate from moveonly_addresschecker_diagnostics since when we fail on
@@ -34,4 +47,30 @@ func testAssertLikeUseDifferentBits() {
             currentPosition = index
         }
     }
+}
+
+// issue #75312
+struct S
+{
+    @usableFromInline
+    init(utf8:consuming [UInt8])
+    {
+        utf8.withUnsafeBufferPointer { _ in }
+        fatalError()
+    }
+}
+
+struct TestCoroAccessorOfCoroAccessor<T : ~Escapable> : ~Copyable & ~Escapable {
+  var t: T
+
+  var inner: TestCoroAccessorOfCoroAccessor<T> {
+    _read {
+      fatalError()
+    }
+  }
+  var outer: TestCoroAccessorOfCoroAccessor<T> {
+    _read {
+      yield inner
+    }
+  }
 }

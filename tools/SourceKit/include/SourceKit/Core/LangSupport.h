@@ -391,6 +391,9 @@ public:
   virtual void handleSemanticAnnotation(unsigned Offset, unsigned Length,
                                         UIdent Kind, bool isSystem) = 0;
 
+  virtual void handleDeclaration(unsigned Offset, unsigned Length, UIdent Kind,
+                                 StringRef USR) = 0;
+
   virtual void beginDocumentSubStructure(unsigned Offset, unsigned Length,
                                          UIdent Kind, UIdent AccessLevel,
                                          UIdent SetterAccessLevel,
@@ -1021,6 +1024,8 @@ public:
 
   virtual ~LangSupport() { }
 
+  virtual void *getOpaqueSwiftIDEInspectionInstance() { return nullptr; }
+
   virtual void globalConfigurationUpdated(std::shared_ptr<GlobalConfig> Config) {};
 
   virtual void dependencyUpdated() {}
@@ -1105,7 +1110,8 @@ public:
                                  SourceKitCancellationToken CancellationToken,
                                  std::shared_ptr<EditorConsumer> Consumer) = 0;
 
-  virtual void editorClose(StringRef Name, bool RemoveCache) = 0;
+  virtual void editorClose(StringRef Name, bool CancelBuilds,
+                           bool RemoveCache) = 0;
 
   virtual void editorReplaceText(StringRef Name, llvm::MemoryBuffer *Buf,
                                  unsigned Offset, unsigned Length,

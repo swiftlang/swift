@@ -32,7 +32,7 @@ public enum PublicEnum {
 }
 
 public struct PublicStruct {}
-@_spi(S) public struct SPIStruct {} // expected-note {{type declared here}}
+@_spi(S) public struct SPIStruct {} // expected-note {{struct declared here}}
 
 public enum PublicEnumWithPayloads {
   case publicCasePublicPayload(_ s: PublicStruct)

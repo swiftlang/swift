@@ -25,6 +25,7 @@
 
 #define DEBUG_TYPE "access-enforcement-release"
 
+#include "swift/Basic/Assertions.h"
 #include "swift/SIL/ApplySite.h"
 #include "swift/SIL/DebugUtils.h"
 #include "swift/SIL/InstructionUtils.h"
@@ -141,6 +142,8 @@ static bool isBarrier(SILInstruction *inst) {
     case BuiltinValueKind::PoundAssert:
     case BuiltinValueKind::TypePtrAuthDiscriminator:
     case BuiltinValueKind::TargetOSVersionAtLeast:
+    case BuiltinValueKind::TargetVariantOSVersionAtLeast:
+    case BuiltinValueKind::TargetOSVersionOrVariantOSVersionAtLeast:
     case BuiltinValueKind::GlobalStringTablePointer:
     case BuiltinValueKind::COWBufferForReading:
     case BuiltinValueKind::GetCurrentAsyncTask:
@@ -159,6 +162,8 @@ static bool isBarrier(SILInstruction *inst) {
     case BuiltinValueKind::GetEnumTag:
     case BuiltinValueKind::InjectEnumTag:
     case BuiltinValueKind::ExtractFunctionIsolation:
+    case BuiltinValueKind::FlowSensitiveSelfIsolation:
+    case BuiltinValueKind::FlowSensitiveDistributedSelfIsolation:
     case BuiltinValueKind::AddressOfRawLayout:
       return false;
 
@@ -183,7 +188,6 @@ static bool isBarrier(SILInstruction *inst) {
     case BuiltinValueKind::AssignCopyArrayFrontToBack:
     case BuiltinValueKind::AssignCopyArrayBackToFront:
     case BuiltinValueKind::AssignTakeArray:
-    case BuiltinValueKind::Copy:
     case BuiltinValueKind::CancelAsyncTask:
     case BuiltinValueKind::StartAsyncLet:
     case BuiltinValueKind::CreateAsyncTask:

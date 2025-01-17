@@ -1,5 +1,5 @@
 // RUN: %empty-directory(%t) 
-// RUN: %target-swift-frontend -primary-file %s -O -sil-verify-all -emit-sil >%t/output.sil
+// RUN: %target-swift-frontend -primary-file %s -O -sil-verify-all -Xllvm -sil-print-types -emit-sil >%t/output.sil
 // RUN: %FileCheck %s < %t/output.sil
 // RUN: %FileCheck -check-prefix=CHECK-ALL %s < %t/output.sil
 
@@ -183,11 +183,10 @@ func testDerivedClass2Read(_ c: DerivedClass2) -> Int {
 }
 
 // CHECK-LABEL: sil {{.*}}testGenClassWrite
-// CHECK: [[S:%[0-9]+]] = alloc_stack $T
 // CHECK: [[E:%[0-9]+]] = ref_element_addr %0
 // CHECK: [[A:%[0-9]+]] = begin_access [modify] [dynamic] [[E]]
 // CHECK: destroy_addr [[A]]
-// CHECK: copy_addr [take] [[S]] to [init] [[A]]
+// CHECK: copy_addr %1 to [init] [[A]]
 // CHECK: end_access [[A]]
 // CHECK: return
 @inline(never)

@@ -13,7 +13,7 @@
 import SwiftShims
 
 // Macros are disabled when Swift is built without swift-syntax.
-#if $Macros && $DebugDescriptionMacro && hasAttribute(attached)
+#if $Macros && hasAttribute(attached)
 
 /// Converts description definitions to a debugger Type Summary.
 ///
@@ -44,12 +44,12 @@ import SwiftShims
 ///     }
 ///
 /// The `DebugDescription` macro supports both `debugDescription`, `description`,
-/// as well as a third option: a property named `_debugDescription`. The first
+/// as well as a third option: a property named `lldbDescription`. The first
 /// two are implemented when conforming to the `CustomDebugStringConvertible`
-/// and `CustomStringConvertible` protocols. The additional `_debugDescription`
+/// and `CustomStringConvertible` protocols. The additional `lldbDescription`
 /// property is useful when both `debugDescription` and `description` are
 /// implemented, but don't meet the requirements of the `DebugDescription`
-/// macro. If `_debugDescription` is implemented, `DebugDescription` choose it
+/// macro. If `lldbDescription` is implemented, `DebugDescription` choose it
 /// over `debugDescription` and `description`. Likewise, `debugDescription` is
 /// preferred over `description`.
 ///
@@ -64,6 +64,7 @@ import SwiftShims
 ///   and other arbitrary computation are not supported. Of note, conditional
 ///   logic and computed properties are not supported.
 /// * Overloaded string interpolation cannot be used.
+@attached(member)
 @attached(memberAttribute)
 public macro DebugDescription() =
   #externalMacro(module: "SwiftMacros", type: "DebugDescriptionMacro")
@@ -238,7 +239,13 @@ public enum _DebuggerSupport {
       print("\(name) : ", terminator: "", to: &target)
     }
 
-    if let str = asStringRepresentation(value: value, mirror: mirror, count: count) {
+    if isRoot, let value = value as? String {
+      // We don't want to use string's debug desciprtion for 'po' because it
+      // escapes the string and prints it raw (e.g. prints "\n" instead of
+      // actually printing a newline), but only if its the root value. Otherwise,
+      // continue using the debug description.
+      print(value, terminator: "", to: &target)
+    } else if let str = asStringRepresentation(value: value, mirror: mirror, count: count) {
       print(str, terminator: "", to: &target)
     }
   

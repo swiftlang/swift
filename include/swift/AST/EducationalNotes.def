@@ -29,7 +29,6 @@ EDUCATIONAL_NOTES(cannot_use_inout_non_ephemeral,
                   "temporary-pointers.md")
 EDUCATIONAL_NOTES(cannot_construct_dangling_pointer, "temporary-pointers.md")
 
-EDUCATIONAL_NOTES(non_nominal_no_initializers, "nominal-types.md")
 EDUCATIONAL_NOTES(non_nominal_extension, "nominal-types.md")
 EDUCATIONAL_NOTES(associated_type_witness_conform_impossible,
                   "nominal-types.md")
@@ -87,7 +86,7 @@ EDUCATIONAL_NOTES(result_builder_missing_build_array,
 EDUCATIONAL_NOTES(multiple_inheritance,
                   "multiple-inheritance.md")
 
-EDUCATIONAL_NOTES(error_in_future_swift_version,
+EDUCATIONAL_NOTES(error_in_swift_lang_mode,
                   "error-in-future-swift-version.md")
 
 #undef EDUCATIONAL_NOTES

@@ -12,6 +12,7 @@
 
 #include "swift/Frontend/CASOutputBackends.h"
 
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/FileTypes.h"
 #include "swift/Frontend/CachingUtils.h"
 #include "swift/Frontend/CompileJobCacheKey.h"
@@ -56,9 +57,10 @@ class SwiftCASOutputBackend::Implementation {
 public:
   Implementation(ObjectStore &CAS, ActionCache &Cache, ObjectRef BaseKey,
                  const FrontendInputsAndOutputs &InputsAndOutputs,
+                 const FrontendOptions &Opts,
                  FrontendOptions::ActionType Action)
       : CAS(CAS), Cache(Cache), BaseKey(BaseKey),
-        InputsAndOutputs(InputsAndOutputs), Action(Action) {
+        InputsAndOutputs(InputsAndOutputs), Opts(Opts), Action(Action) {
     initBackend(InputsAndOutputs);
   }
 
@@ -66,13 +68,35 @@ public:
   createFileImpl(llvm::StringRef ResolvedPath,
                  std::optional<llvm::vfs::OutputConfig> Config) {
     auto ProducingInput = OutputToInputMap.find(ResolvedPath);
+    if (ProducingInput == OutputToInputMap.end() &&
+        ResolvedPath.starts_with(Opts.SymbolGraphOutputDir)) {
+      return std::make_unique<SwiftCASOutputFile>(
+          ResolvedPath, [this](StringRef Path, StringRef Bytes) -> Error {
+            bool Shortened = Path.consume_front(Opts.SymbolGraphOutputDir);
+            assert(Shortened && "symbol graph path outside output dir");
+            (void)Shortened;
+            std::optional<ObjectRef> PathRef;
+            if (Error E =
+                    CAS.storeFromString(std::nullopt, Path).moveInto(PathRef))
+              return E;
+            std::optional<ObjectRef> BytesRef;
+            if (Error E =
+                    CAS.storeFromString(std::nullopt, Bytes).moveInto(BytesRef))
+              return E;
+            auto Ref = CAS.store({*PathRef, *BytesRef}, {});
+            if (!Ref)
+              return Ref.takeError();
+            SymbolGraphOutputRefs.push_back(*Ref);
+            return Error::success();
+          });
+    }
     assert(ProducingInput != OutputToInputMap.end() && "Unknown output file");
 
     unsigned InputIndex = ProducingInput->second.first;
     auto OutputType = ProducingInput->second.second;
 
     // Uncached output kind.
-    if (file_types::isProducedFromDiagnostics(OutputType))
+    if (!isStoredDirectly(OutputType))
       return std::make_unique<llvm::vfs::NullOutputFileImpl>();
 
     return std::make_unique<SwiftCASOutputFile>(
@@ -96,6 +120,7 @@ private:
   ActionCache &Cache;
   ObjectRef BaseKey;
   const FrontendInputsAndOutputs &InputsAndOutputs;
+  const FrontendOptions &Opts;
   FrontendOptions::ActionType Action;
 
   // Map from output path to the input index and output kind.
@@ -103,20 +128,28 @@ private:
 
   // A vector of output refs where the index is the input index.
   SmallVector<DenseMap<file_types::ID, ObjectRef>> OutputRefs;
+
+  SmallVector<ObjectRef> SymbolGraphOutputRefs;
 };
 
 SwiftCASOutputBackend::SwiftCASOutputBackend(
     ObjectStore &CAS, ActionCache &Cache, ObjectRef BaseKey,
     const FrontendInputsAndOutputs &InputsAndOutputs,
-    FrontendOptions::ActionType Action)
+    const FrontendOptions &Opts, FrontendOptions::ActionType Action)
     : Impl(*new SwiftCASOutputBackend::Implementation(
-          CAS, Cache, BaseKey, InputsAndOutputs, Action)) {}
+          CAS, Cache, BaseKey, InputsAndOutputs, Opts, Action)) {}
 
 SwiftCASOutputBackend::~SwiftCASOutputBackend() { delete &Impl; }
 
+bool SwiftCASOutputBackend::isStoredDirectly(file_types::ID Kind) {
+  return !file_types::isProducedFromDiagnostics(Kind) &&
+         Kind != file_types::TY_Dependencies;
+}
+
 IntrusiveRefCntPtr<OutputBackend> SwiftCASOutputBackend::cloneImpl() const {
   return makeIntrusiveRefCnt<SwiftCASOutputBackend>(
-      Impl.CAS, Impl.Cache, Impl.BaseKey, Impl.InputsAndOutputs, Impl.Action);
+      Impl.CAS, Impl.Cache, Impl.BaseKey, Impl.InputsAndOutputs, Impl.Opts,
+      Impl.Action);
 }
 
 Expected<std::unique_ptr<OutputFileImpl>>
@@ -141,6 +174,33 @@ Error SwiftCASOutputBackend::storeCachedDiagnostics(unsigned InputIndex,
                    file_types::ID::TY_CachedDiagnostics);
 }
 
+Error SwiftCASOutputBackend::storeMakeDependenciesFile(StringRef OutputFilename,
+                                                       llvm::StringRef Bytes) {
+  auto Input = Impl.OutputToInputMap.find(OutputFilename);
+  if (Input == Impl.OutputToInputMap.end())
+    return llvm::createStringError("InputIndex for output file not found!");
+  auto InputIndex = Input->second.first;
+  assert(Input->second.second == file_types::TY_Dependencies &&
+         "wrong output type");
+  return storeImpl(OutputFilename, Bytes, InputIndex,
+                   file_types::TY_Dependencies);
+}
+
+Error SwiftCASOutputBackend::storeMCCASObjectID(StringRef OutputFilename,
+                                                llvm::cas::CASID ID) {
+  auto Input = Impl.OutputToInputMap.find(OutputFilename);
+  if (Input == Impl.OutputToInputMap.end())
+    return llvm::createStringError("InputIndex for output file not found!");
+  auto InputIndex = Input->second.first;
+  auto MCRef = Impl.CAS.getReference(ID);
+  if (!MCRef)
+    return createStringError("Invalid CASID: " + ID.toString() +
+                             ". No associated ObjectRef found!");
+
+  Impl.OutputRefs[InputIndex].insert({file_types::TY_Object, *MCRef});
+  return Impl.finalizeCacheKeysFor(InputIndex);
+}
+
 void SwiftCASOutputBackend::Implementation::initBackend(
     const FrontendInputsAndOutputs &InputsAndOutputs) {
   // FIXME: The output to input map might not be enough for example all the
@@ -149,7 +209,10 @@ void SwiftCASOutputBackend::Implementation::initBackend(
   // any commands write output to `-`.
   file_types::ID mainOutputType = InputsAndOutputs.getPrincipalOutputType();
   auto addInput = [&](const InputFile &Input, unsigned Index) {
-    if (!Input.outputFilename().empty())
+    // Ignore the outputFilename for typecheck action since it is not producing
+    // an output file for that.
+    if (!Input.outputFilename().empty() &&
+        Action != FrontendOptions::ActionType::Typecheck)
       OutputToInputMap.insert(
           {Input.outputFilename(), {Index, mainOutputType}});
     Input.getPrimarySpecificPaths()
@@ -207,6 +270,13 @@ Error SwiftCASOutputBackend::Implementation::finalizeCacheKeysFor(
   llvm::for_each(ProducedOutputs, [&OutputsForInput](auto E) {
     OutputsForInput.emplace_back(E.first, E.second);
   });
+  if (InputIndex == InputsAndOutputs.getIndexOfFirstOutputProducingInput() &&
+      !SymbolGraphOutputRefs.empty()) {
+    auto SGRef = CAS.store(SymbolGraphOutputRefs, {});
+    if (!SGRef)
+      return SGRef.takeError();
+    OutputsForInput.emplace_back(file_types::ID::TY_SymbolGraphFile, *SGRef);
+  }
   // Sort to a stable ordering for deterministic output cache object.
   llvm::sort(OutputsForInput,
              [](auto &LHS, auto &RHS) { return LHS.first < RHS.first; });

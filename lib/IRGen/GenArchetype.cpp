@@ -17,11 +17,13 @@
 #include "GenArchetype.h"
 
 #include "swift/AST/ASTContext.h"
+#include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/IRGenOptions.h"
 #include "swift/AST/KnownProtocols.h"
 #include "swift/AST/Types.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/IRGen/Linking.h"
 #include "swift/SIL/SILValue.h"
 #include "swift/SIL/TypeLowering.h"
@@ -77,7 +79,7 @@ irgen::emitArchetypeTypeMetadataRef(IRGenFunction &IGF,
   }
 
 #ifndef NDEBUG
-  if (!archetype->getParent()) {
+  if (archetype->isRoot()) {
     llvm::errs() << "Metadata for archetype not bound in function.\n"
                  << "  The metadata could be missing entirely because it needs "
                     "to be passed to the function.\n"
@@ -96,12 +98,12 @@ irgen::emitArchetypeTypeMetadataRef(IRGenFunction &IGF,
   }
 #endif
   // If there's no local or opaque metadata, it must be a nested type.
-  assert(archetype->getParent() && "Not a nested archetype");
+  auto *member = archetype->getInterfaceType()->castTo<DependentMemberType>();
 
-  CanArchetypeType parent(archetype->getParent());
-  AssociatedType association(
-      archetype->getInterfaceType()->castTo<DependentMemberType>()
-        ->getAssocType());
+  auto parent = cast<ArchetypeType>(
+    archetype->getGenericEnvironment()->mapTypeIntoContext(
+      member->getBase())->getCanonicalType());
+  AssociatedType association(member->getAssocType());
 
   MetadataResponse response =
     emitAssociatedTypeMetadataRef(IGF, parent, association, request);
@@ -304,8 +306,10 @@ llvm::Value *irgen::emitArchetypeWitnessTableRef(IRGenFunction &IGF,
     assert(rootWTable && "root witness table not bound in local context!");
   }
 
+  auto conformance = ProtocolConformanceRef::forAbstract(
+      rootArchetype, rootProtocol);
   wtable = path.followFromWitnessTable(IGF, rootArchetype,
-                                       ProtocolConformanceRef(rootProtocol),
+                                       conformance,
                                        MetadataResponse::forComplete(rootWTable),
                                        /*request*/ MetadataState::Complete,
                                        nullptr).getMetadata();
@@ -414,7 +418,7 @@ const TypeInfo *TypeConverter::convertArchetypeType(ArchetypeType *archetype) {
       IGM.getSwiftModule()->getASTContext().getProtocol(
           KnownProtocolKind::BitwiseCopyable);
   // The protocol won't be present in swiftinterfaces from older SDKs.
-  if (bitwiseCopyableProtocol && IGM.getSwiftModule()->lookupConformance(
+  if (bitwiseCopyableProtocol && checkConformance(
                                      archetype, bitwiseCopyableProtocol)) {
     return BitwiseCopyableTypeInfo::create(storageType, abiAccessible);
   }
@@ -451,12 +455,16 @@ withOpaqueTypeGenericArgs(IRGenFunction &IGF,
     SmallVector<llvm::Value *, 4> args;
     SmallVector<llvm::Type *, 4> types;
 
+    // We need to pass onHeapPacks=true because the runtime demangler
+    // expects to differentiate on-heap packs from non-pack types by
+    // checking the least significant bit of the metadata pointer.
     enumerateGenericSignatureRequirements(
         opaqueDecl->getGenericSignature().getCanonicalSignature(),
         [&](GenericRequirement reqt) {
           auto arg = emitGenericRequirementFromSubstitutions(
               IGF, reqt, MetadataState::Abstract,
-              archetype->getSubstitutions());
+              archetype->getSubstitutions(),
+              /*onHeapPacks=*/true);
           args.push_back(arg);
           types.push_back(args.back()->getType());
         });
@@ -519,8 +527,8 @@ getAddressOfOpaqueTypeDescriptor(IRGenFunction &IGF,
 MetadataResponse irgen::emitOpaqueTypeMetadataRef(IRGenFunction &IGF,
                                           CanOpaqueTypeArchetypeType archetype,
                                           DynamicMetadataRequest request) {
-  bool signedDescriptor = IGF.IGM.getAvailabilityContext().isContainedIn(
-    IGF.IGM.Context.getSignedDescriptorAvailability());
+  bool signedDescriptor = IGF.IGM.getAvailabilityRange().isContainedIn(
+      IGF.IGM.Context.getSignedDescriptorAvailability());
 
   auto accessorFn = signedDescriptor ?
     IGF.IGM.getGetOpaqueTypeMetadata2FunctionPointer() :
@@ -562,8 +570,8 @@ MetadataResponse irgen::emitOpaqueTypeMetadataRef(IRGenFunction &IGF,
 llvm::Value *irgen::emitOpaqueTypeWitnessTableRef(IRGenFunction &IGF,
                                           CanOpaqueTypeArchetypeType archetype,
                                           ProtocolDecl *protocol) {
-  bool signedDescriptor = IGF.IGM.getAvailabilityContext().isContainedIn(
-    IGF.IGM.Context.getSignedDescriptorAvailability());
+  bool signedDescriptor = IGF.IGM.getAvailabilityRange().isContainedIn(
+      IGF.IGM.Context.getSignedDescriptorAvailability());
 
   auto accessorFn = signedDescriptor ?
     IGF.IGM.getGetOpaqueTypeConformance2FunctionPointer() :

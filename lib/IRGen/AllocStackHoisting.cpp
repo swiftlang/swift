@@ -12,9 +12,9 @@
 
 #define DEBUG_TYPE "alloc-stack-hoisting"
 
-#include "swift/AST/Availability.h"
 #include "swift/AST/IRGenOptions.h"
 #include "swift/AST/SemanticAttrs.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/IRGen/IRGenSILPasses.h"
 #include "swift/SIL/DebugUtils.h"
 #include "swift/SIL/Dominance.h"
@@ -157,9 +157,8 @@ void moveAllocStackToBeginningOfBlock(
   // of the debug_value to the original position.
   if (haveMovedElt) {
     if (auto varInfo = AS->getVarInfo()) {
-      SILBuilderWithScope Builder(AS);
       // SILBuilderWithScope skips over meta instructions when picking a scope.
-      Builder.setCurrentDebugScope(AS->getDebugScope());
+      SILBuilder Builder(AS, AS->getDebugScope());
       auto *DVI = Builder.createDebugValue(AS->getLoc(), AS, *varInfo);
       DVI->setUsesMoveableValueDebugInfo();
       DebugValueToBreakBlocksAt.push_back(DVI);
@@ -198,14 +197,14 @@ void Partition::assignStackLocation(
     if (AssignedLoc == AllocStack) continue;
     eraseDeallocStacks(AllocStack);
     AllocStack->replaceAllUsesWith(AssignedLoc);
-    if (hasAtLeastOneMovedElt) {
-      if (auto VarInfo = AllocStack->getVarInfo()) {
-        SILBuilderWithScope Builder(AllocStack);
-        auto *DVI = Builder.createDebugValue(AllocStack->getLoc(), AssignedLoc,
-                                             *VarInfo);
+    if (auto VarInfo = AllocStack->getVarInfo()) {
+      SILBuilder Builder(AllocStack, AllocStack->getDebugScope());
+      auto *DVI = Builder.createDebugValueAddr(AllocStack->getLoc(),
+                                               AssignedLoc, *VarInfo);
+      if (hasAtLeastOneMovedElt) {
         DVI->setUsesMoveableValueDebugInfo();
-        DebugValueToBreakBlocksAt.push_back(DVI);
       }
+      DebugValueToBreakBlocksAt.push_back(DVI);
     }
     AllocStack->eraseFromParent();
   }
@@ -442,7 +441,9 @@ bool inhibitsAllocStackHoisting(SILInstruction *I) {
     return Apply->hasSemantics(semantics::AVAILABILITY_OSVERSION);
   }
   if (auto *bi = dyn_cast<BuiltinInst>(I)) {
-    return bi->getBuiltinInfo().ID == BuiltinValueKind::TargetOSVersionAtLeast;
+    return bi->getBuiltinInfo().ID == BuiltinValueKind::TargetOSVersionAtLeast
+        || bi->getBuiltinInfo().ID == BuiltinValueKind::TargetVariantOSVersionAtLeast
+        || bi->getBuiltinInfo().ID == BuiltinValueKind::TargetOSVersionOrVariantOSVersionAtLeast;
   }
   if (isa<HasSymbolInst>(I)) {
     return true;

@@ -1,7 +1,6 @@
-// RUN: %target-swift-frontend  -disable-availability-checking %s -emit-sil -o /dev/null -verify-additional-prefix minimal-and-targeted- -verify -disable-region-based-isolation-with-strict-concurrency
-// RUN: %target-swift-frontend  -disable-availability-checking %s -emit-sil -o /dev/null -verify-additional-prefix minimal-and-targeted- -verify -strict-concurrency=targeted -disable-region-based-isolation-with-strict-concurrency
-// RUN: %target-swift-frontend  -disable-availability-checking %s -emit-sil -o /dev/null -verify-additional-prefix complete-and-tns- -verify -strict-concurrency=complete -disable-region-based-isolation-with-strict-concurrency
-// RUN: %target-swift-frontend  -disable-availability-checking %s -emit-sil -o /dev/null -verify-additional-prefix complete-and-tns- -verify -strict-concurrency=complete
+// RUN: %target-swift-frontend -target %target-swift-5.1-abi-triple %s -emit-sil -o /dev/null -verify-additional-prefix minimal-and-targeted- -verify
+// RUN: %target-swift-frontend -target %target-swift-5.1-abi-triple %s -emit-sil -o /dev/null -verify-additional-prefix minimal-and-targeted- -verify -strict-concurrency=targeted
+// RUN: %target-swift-frontend -target %target-swift-5.1-abi-triple %s -emit-sil -o /dev/null -verify-additional-prefix complete-and-tns- -verify -strict-concurrency=complete
 
 // REQUIRES: concurrency
 // REQUIRES: asserts
@@ -42,7 +41,7 @@ func referenceGlobalActor() async {
 
   // expected-error@+1{{expression is 'async' but is not marked with 'await'}}{{7-7=await }}
   _ = a[1]  // expected-note{{subscript access is 'async'}}
-  a[0] = 1  // expected-error{{global actor 'SomeGlobalActor'-isolated subscript 'subscript(_:)' can not be mutated from a non-isolated context}}
+  a[0] = 1  // expected-error{{global actor 'SomeGlobalActor'-isolated subscript 'subscript(_:)' can not be mutated from a nonisolated context}}
 
   // expected-error@+1{{expression is 'async' but is not marked with 'await'}}{{7-7=await }}
   _ = 32 + a[1] // expected-note@:12{{subscript access is 'async'}}
@@ -129,7 +128,7 @@ func fromAsync() async {
   // expected-error@+1{{expression is 'async' but is not marked with 'await'}}{{7-7=await }}
   _ = a[1]  // expected-note{{subscript access is 'async'}}
   _ = await a[1]
-  a[0] = 1  // expected-error{{global actor 'SomeGlobalActor'-isolated subscript 'subscript(_:)' can not be mutated from a non-isolated context}}
+  a[0] = 1  // expected-error{{global actor 'SomeGlobalActor'-isolated subscript 'subscript(_:)' can not be mutated from a nonisolated context}}
 }
 
 // expected-minimal-and-targeted-note @+2 {{mutation of this var is only permitted within the actor}}
@@ -137,7 +136,7 @@ func fromAsync() async {
 @SomeGlobalActor var value: Int = 42
 
 func topLevelSyncFunction(_ number: inout Int) { }
-// expected-minimal-and-targeted-error @+1 {{global actor 'SomeGlobalActor'-isolated var 'value' can not be used 'inout' from a non-isolated context}}
+// expected-minimal-and-targeted-error @+1 {{global actor 'SomeGlobalActor'-isolated var 'value' can not be used 'inout' from a nonisolated context}}
 topLevelSyncFunction(&value)
 
 // Strict checking based on inferred Sendable/async/etc.
@@ -145,6 +144,7 @@ topLevelSyncFunction(&value)
 
 class Sub: Super {
   func f() { }
+  // expected-note@-1 {{global actor 'SomeGlobalActor' isolation inferred from inheritance from class 'Super'}}
 
   func g() {
     Task.detached {

@@ -7,7 +7,7 @@ public protocol rdar28048391 {
 extension rdar28048391 {
   public static func oops() -> Self? {
     return self
-    // expected-error@-1 {{cannot convert return expression of type 'Self.Type' to return type 'Self?'}}
+    // expected-error@-1 {{cannot convert return expression of type 'Self.Type' to return type 'Self'}}
   }
 }
 

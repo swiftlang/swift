@@ -9,8 +9,8 @@ extension TestLayout {
     return f()
   }
 }
-struct EqualWitdthHStack : TestLayout {}
-extension EqualWitdthHStack: View {
+struct EqualWidthHStack : TestLayout {}
+extension EqualWidthHStack: View {
   var body : some View {
     Spacer()
   }
@@ -24,7 +24,7 @@ struct EmptyView: View {
 
 struct MyView: View {
   var body : some View {
-    EqualWitdthHStack {
+    EqualWidthHStack {
       EmptyView()
     }
   }

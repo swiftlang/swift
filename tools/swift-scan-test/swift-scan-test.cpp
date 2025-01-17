@@ -17,6 +17,8 @@
 #include "swift-c/DependencyScan/DependencyScan.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/FileTypes.h"
+#include "swift/DependencyScan/DependencyScanJSON.h"
+#include "swift/DependencyScan/StringUtils.h"
 #include "llvm/ADT/StringExtras.h"
 #include "llvm/Support/Allocator.h"
 #include "llvm/Support/CommandLine.h"
@@ -31,6 +33,7 @@ enum Actions {
   compute_cache_key_from_index,
   cache_query,
   replay_result,
+  scan_dependency,
 };
 
 llvm::cl::OptionCategory Category("swift-scan-test Options");
@@ -43,13 +46,16 @@ llvm::cl::opt<std::string> Input("input", llvm::cl::desc("<file|index>"),
 llvm::cl::opt<unsigned> Threads("threads",
                                 llvm::cl::desc("<number of threads>"),
                                 llvm::cl::cat(Category), cl::init(1));
+llvm::cl::opt<std::string> WorkingDirectory("cwd", llvm::cl::desc("<path>"),
+                                            llvm::cl::cat(Category));
 llvm::cl::opt<Actions>
     Action("action", llvm::cl::desc("<action>"),
            llvm::cl::values(clEnumVal(compute_cache_key, "compute cache key"),
                             clEnumVal(compute_cache_key_from_index,
                                       "compute cache key from index"),
                             clEnumVal(cache_query, "cache query"),
-                            clEnumVal(replay_result, "replay result")),
+                            clEnumVal(replay_result, "replay result"),
+                            clEnumVal(scan_dependency, "scan dependency")),
            llvm::cl::cat(Category));
 llvm::cl::list<std::string>
     SwiftCommands(llvm::cl::Positional, llvm::cl::desc("<swift-frontend args>"),
@@ -145,8 +151,13 @@ static int action_replay_result(swiftscan_cas_t cas, const char *key,
                                 std::vector<const char *> &Args) {
   swiftscan_string_ref_t err_msg;
   auto comp = swiftscan_cache_query(cas, key, /*globally=*/false, &err_msg);
-  if (!comp)
-    return printError(err_msg);
+  if (!comp) {
+    if (err_msg.length != 0)
+      return printError(err_msg);
+
+    llvm::errs() << "key " << key << " not found for replay\n";
+    return EXIT_FAILURE;
+  }
 
   SWIFT_DEFER { swiftscan_cached_compilation_dispose(comp); };
   auto numOutput = swiftscan_cached_compilation_get_num_outputs(comp);
@@ -185,13 +196,65 @@ static int action_replay_result(swiftscan_cas_t cas, const char *key,
   return EXIT_SUCCESS;
 }
 
-static std::vector<const char *> createArgs(ArrayRef<std::string> Cmd,
-                                            StringSaver &Saver) {
+static int action_scan_dependency(std::vector<const char *> &Args,
+                                  StringRef WorkingDirectory) {
+  auto scanner = swiftscan_scanner_create();
+  auto invocation = swiftscan_scan_invocation_create();
+  auto error = [&](StringRef msg) {
+    llvm::errs() << msg << "\n";
+    swiftscan_scan_invocation_dispose(invocation);
+    swiftscan_scanner_dispose(scanner);
+    return EXIT_FAILURE;
+  };
+
+  swiftscan_scan_invocation_set_working_directory(
+      invocation, WorkingDirectory.str().c_str());
+  swiftscan_scan_invocation_set_argv(invocation, Args.size(), Args.data());
+
+  auto graph = swiftscan_dependency_graph_create(scanner, invocation);
+  if (!graph)
+    return error("dependency scanning failed");
+
+  auto diags = swiftscan_dependency_graph_get_diagnostics(graph);
+  for (unsigned i = 0; i < diags->count; ++i) {
+    auto msg = swiftscan_diagnostic_get_message(diags->diagnostics[i]);
+    switch (swiftscan_diagnostic_get_severity(diags->diagnostics[i])) {
+    case SWIFTSCAN_DIAGNOSTIC_SEVERITY_ERROR:
+      llvm::errs() << "error: ";
+      break;
+    case SWIFTSCAN_DIAGNOSTIC_SEVERITY_WARNING:
+      llvm::errs() << "warning: ";
+      break;
+    case SWIFTSCAN_DIAGNOSTIC_SEVERITY_NOTE:
+      llvm::errs() << "note: ";
+      break;
+    case SWIFTSCAN_DIAGNOSTIC_SEVERITY_REMARK:
+      llvm::errs() << "remark: ";
+      break;
+    }
+    llvm::errs() << swift::c_string_utils::get_C_string(msg) << "\n";
+  }
+
+  swift::dependencies::writeJSON(llvm::outs(), graph);
+
+  swiftscan_scan_invocation_dispose(invocation);
+  swiftscan_scanner_dispose(scanner);
+  return EXIT_SUCCESS;
+}
+
+static std::vector<const char *>
+createArgs(ArrayRef<std::string> Cmd, StringSaver &Saver, Actions Action) {
   if (!Cmd.empty() && StringRef(Cmd.front()).ends_with("swift-frontend"))
     Cmd = Cmd.drop_front();
 
+  // Quote all the arguments before passing to scanner. The scanner is currently
+  // tokenize the command-line again before parsing.
+  bool Quoted = Action == Actions::scan_dependency;
+
   std::vector<const char *> Args;
   for (auto A : Cmd) {
+    if (Quoted)
+      A = std::string("\"") + A + "\"";
     StringRef Arg = Saver.save(A);
     Args.push_back(Arg.data());
   }
@@ -218,10 +281,10 @@ int main(int argc, char *argv[]) {
   // Convert commands.
   llvm::BumpPtrAllocator Alloc;
   llvm::StringSaver Saver(Alloc);
-  auto Args = createArgs(SwiftCommands, Saver);
+  auto Args = createArgs(SwiftCommands, Saver, Action);
 
   std::atomic<int> Ret = 0;
-  llvm::ThreadPool Pool(llvm::hardware_concurrency(Threads));
+  llvm::StdThreadPool Pool(llvm::hardware_concurrency(Threads));
   for (unsigned i = 0; i < Threads; ++i) {
     Pool.async([&]() {
       switch (Action) {
@@ -237,6 +300,8 @@ int main(int argc, char *argv[]) {
       case replay_result:
         Ret += action_replay_result(cas, CASID.c_str(), Args);
         break;
+      case scan_dependency:
+        Ret += action_scan_dependency(Args, WorkingDirectory);
       }
     });
   }

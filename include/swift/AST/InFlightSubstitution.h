@@ -31,6 +31,7 @@ class InFlightSubstitution {
   SubstOptions Options;
   TypeSubstitutionFn BaselineSubstType;
   LookupConformanceFn BaselineLookupConformance;
+  RecursiveTypeProperties Props;
 
   struct ActivePackExpansion {
     bool isSubstExpansion = false;
@@ -41,10 +42,7 @@ class InFlightSubstitution {
 public:
   InFlightSubstitution(TypeSubstitutionFn substType,
                        LookupConformanceFn lookupConformance,
-                       SubstOptions options)
-    : Options(options),
-      BaselineSubstType(substType),
-      BaselineLookupConformance(lookupConformance) {}
+                       SubstOptions options);
 
   InFlightSubstitution(const InFlightSubstitution &) = delete;
   InFlightSubstitution &operator=(const InFlightSubstitution &) = delete;
@@ -134,8 +132,16 @@ public:
     return Options;
   }
 
+  bool shouldSubstitutePrimaryArchetypes() const {
+    return Options.contains(SubstFlags::SubstitutePrimaryArchetypes);
+  }
+
   bool shouldSubstituteOpaqueArchetypes() const {
     return Options.contains(SubstFlags::SubstituteOpaqueArchetypes);
+  }
+
+  bool shouldSubstituteLocalArchetypes() const {
+    return Options.contains(SubstFlags::SubstituteLocalArchetypes);
   }
 
   /// Is the given type invariant to substitution?

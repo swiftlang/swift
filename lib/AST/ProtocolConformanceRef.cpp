@@ -17,29 +17,25 @@
 
 #include "swift/AST/ProtocolConformanceRef.h"
 #include "swift/AST/ASTContext.h"
-#include "swift/AST/Availability.h"
+#include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/Decl.h"
+#include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/InFlightSubstitution.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/PackConformance.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/Types.h"
+#include "swift/Basic/Assertions.h"
 
 #define DEBUG_TYPE "AST"
 
 using namespace swift;
 
-ProtocolConformanceRef::ProtocolConformanceRef(ProtocolDecl *protocol,
-                                               ProtocolConformance *conf) {
-  assert(protocol != nullptr &&
-         "cannot construct ProtocolConformanceRef with null protocol");
-  if (conf) {
-    assert(protocol == conf->getProtocol() && "protocol conformance mismatch");
-    Union = conf;
-  } else {
-    Union = protocol;
-  }
+ProtocolConformanceRef ProtocolConformanceRef::forAbstract(
+    Type subjectType, ProtocolDecl *proto) {
+  // Temporary implementation:
+  return ProtocolConformanceRef(proto);
 }
 
 bool ProtocolConformanceRef::isInvalid() const {
@@ -110,8 +106,7 @@ ProtocolConformanceRef::subst(Type origType, InFlightSubstitution &IFS) const {
   // If the type is an existential, it must be self-conforming.
   if (substType->isExistentialType()) {
     auto optConformance =
-        proto->getModuleContext()->lookupExistentialConformance(substType,
-                                                                proto);
+        lookupConformance(substType, proto, /*allowMissing=*/true);
     if (optConformance)
       return optConformance;
 
@@ -133,7 +128,8 @@ ProtocolConformanceRef ProtocolConformanceRef::mapConformanceOutOfContext() cons
           return type;
         },
         MakeAbstractConformanceForGenericType(),
-        SubstFlags::PreservePackExpansionLevel);
+        SubstFlags::PreservePackExpansionLevel |
+        SubstFlags::SubstitutePrimaryArchetypes);
   } else if (isPack()) {
     return getPack()->subst(
         [](SubstitutableType *type) -> Type {
@@ -142,7 +138,8 @@ ProtocolConformanceRef ProtocolConformanceRef::mapConformanceOutOfContext() cons
           return type;
         },
         MakeAbstractConformanceForGenericType(),
-        SubstFlags::PreservePackExpansionLevel);
+        SubstFlags::PreservePackExpansionLevel |
+        SubstFlags::SubstitutePrimaryArchetypes);
   }
 
   return *this;
@@ -160,8 +157,7 @@ ProtocolConformanceRef::getTypeWitnessByName(Type type, Identifier name) const {
   if (!assocType)
     return ErrorType::get(proto->getASTContext());
 
-  return assocType->getDeclaredInterfaceType().subst(
-    SubstitutionMap::getProtocolSubstitutions(proto, type, *this));
+  return getTypeWitness(type, assocType);
 }
 
 ConcreteDeclRef
@@ -191,44 +187,65 @@ ProtocolConformanceRef::getConditionalRequirements() const {
     return {};
 }
 
-Type ProtocolConformanceRef::getAssociatedType(Type conformingType,
-                                               Type assocType) const {
+Type ProtocolConformanceRef::getTypeWitness(Type conformingType,
+                                            AssociatedTypeDecl *assocType,
+                                            SubstOptions options) const {
   if (isPack()) {
     auto *pack = getPack();
-    assert(conformingType->isEqual(pack->getType()));
-    return pack->getAssociatedType(assocType);
+    ASSERT(conformingType->isEqual(pack->getType()));
+    return pack->getTypeWitness(assocType);
   }
 
-  assert(!isConcrete() || getConcrete()->getType()->isEqual(conformingType));
+  auto failed = [&]() {
+    return DependentMemberType::get(ErrorType::get(conformingType),
+                                    assocType);
+  };
 
-  auto type = assocType->getCanonicalType();
+  if (isInvalid())
+    return failed();
+
+  auto proto = getRequirement();
+  ASSERT(assocType->getProtocol() == proto);
+
+  if (isConcrete()) {
+    auto witnessType = getConcrete()->getTypeWitness(assocType, options);
+    if (!witnessType || witnessType->is<ErrorType>())
+      return failed();
+    return witnessType;
+  }
+
+  ASSERT(isAbstract());
+
+  if (auto *archetypeType = conformingType->getAs<ArchetypeType>()) {
+    return archetypeType->getNestedType(assocType);
+  }
+
+  CONDITIONAL_ASSERT(conformingType->isTypeParameter() ||
+                     conformingType->isTypeVariableOrMember() ||
+                     conformingType->is<UnresolvedType>() ||
+                     conformingType->is<PlaceholderType>());
+
+  return DependentMemberType::get(conformingType, assocType);
+}
+
+Type ProtocolConformanceRef::getAssociatedType(Type conformingType,
+                                               Type assocType) const {
+  if (isInvalid())
+    return ErrorType::get(assocType->getASTContext());
+
   auto proto = getRequirement();
 
-  // Fast path for generic parameters.
-  if (isa<GenericTypeParamType>(type)) {
-    assert(type->isEqual(proto->getSelfInterfaceType()) &&
-           "type parameter in protocol was not Self");
-    return conformingType;
-  }
-
-  // Fast path for dependent member types on 'Self' of our associated types.
-  auto memberType = cast<DependentMemberType>(type);
-  if (memberType.getBase()->isEqual(proto->getSelfInterfaceType()) &&
-      memberType->getAssocType()->getProtocol() == proto &&
-      isConcrete())
-    return getConcrete()->getTypeWitness(memberType->getAssocType());
-
-  // General case: consult the substitution map.
   auto substMap =
     SubstitutionMap::getProtocolSubstitutions(proto, conformingType, *this);
-  return type.subst(substMap);
+  return assocType.subst(substMap);
 }
 
 ProtocolConformanceRef
 ProtocolConformanceRef::getAssociatedConformance(Type conformingType,
                                                  Type assocType,
                                                  ProtocolDecl *protocol) const {
-  // If this is a pack conformance, project the associated conformances.
+  // If this is a pack conformance, project the associated conformances from
+  // each pack element.
   if (isPack()) {
     auto *pack = getPack();
     assert(conformingType->isEqual(pack->getType()));
@@ -236,21 +253,49 @@ ProtocolConformanceRef::getAssociatedConformance(Type conformingType,
         pack->getAssociatedConformance(assocType, protocol));
   }
 
-  // If this is a concrete conformance, look up the associated conformance.
+  // If this is a concrete conformance, project the associated conformance.
   if (isConcrete()) {
     auto conformance = getConcrete();
     assert(conformance->getType()->isEqual(conformingType));
     return conformance->getAssociatedConformance(assocType, protocol);
   }
 
-  // Otherwise, apply the substitution {self -> conformingType}
-  // to the abstract conformance requirement laid upon the dependent type
-  // by the protocol.
-  auto subMap =
-    SubstitutionMap::getProtocolSubstitutions(getRequirement(),
-                                              conformingType, *this);
-  auto abstractConf = ProtocolConformanceRef(protocol);
-  return abstractConf.subst(assocType, subMap);
+  // An associated conformance of an archetype might be known to be
+  // a concrete conformance, if the subject type is fixed to a concrete
+  // type in the archetype's generic signature. We don't actually have
+  // any way to recover the conformance in this case, except via global
+  // conformance lookup.
+  //
+  // However, if we move to a first-class representation of abstract
+  // conformances where they store their subject types, we can also
+  // cache the lookups inside the abstract conformance instance too.
+  if (auto archetypeType = conformingType->getAs<ArchetypeType>()) {
+    conformingType = archetypeType->getInterfaceType();
+    auto *genericEnv = archetypeType->getGenericEnvironment();
+
+    auto subjectType = assocType.transformRec(
+      [&](TypeBase *t) -> std::optional<Type> {
+        if (isa<GenericTypeParamType>(t))
+          return conformingType;
+        return std::nullopt;
+      });
+
+    return lookupConformance(
+        genericEnv->mapTypeIntoContext(subjectType),
+        protocol);
+  }
+
+  // Associated conformances of type parameters and type variables
+  // are always abstract, because we don't know the output generic
+  // signature of the substitution (or in the case of type variables,
+  // we have no visibility into constraints). See the parallel hack
+  // to handle this in SubstitutionMap::lookupConformance().
+  CONDITIONAL_ASSERT(conformingType->isTypeParameter() ||
+                     conformingType->isTypeVariableOrMember() ||
+                     conformingType->is<UnresolvedType>() ||
+                     conformingType->is<PlaceholderType>());
+
+  return ProtocolConformanceRef(protocol);
 }
 
 /// Check of all types used by the conformance are canonical.
@@ -287,8 +332,9 @@ bool ProtocolConformanceRef::hasUnavailableConformance() const {
 
   // Check whether this conformance is on an unavailable extension.
   auto concrete = getConcrete();
-  auto ext = dyn_cast<ExtensionDecl>(concrete->getDeclContext());
-  if (ext && AvailableAttr::isUnavailable(ext))
+  auto *dc = concrete->getRootConformance()->getDeclContext();
+  auto ext = dyn_cast<ExtensionDecl>(dc);
+  if (ext && ext->isUnavailable())
     return true;
 
   // Check the conformances in the substitution map.

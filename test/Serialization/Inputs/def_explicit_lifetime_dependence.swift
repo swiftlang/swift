@@ -1,6 +1,6 @@
 public struct AnotherView : ~Escapable {
   let ptr: UnsafeRawBufferPointer
-  @_unsafeNonescapableResult
+  @lifetime(borrow ptr)
   public init(_ ptr: UnsafeRawBufferPointer) {
     self.ptr = ptr
   }
@@ -8,49 +8,53 @@ public struct AnotherView : ~Escapable {
 
 public struct BufferView : ~Escapable {
   public let ptr: UnsafeRawBufferPointer
-  @_unsafeNonescapableResult
   @inlinable
+  @lifetime(borrow ptr)
   public init(_ ptr: UnsafeRawBufferPointer) {
     self.ptr = ptr
   }
-  public init(_ ptr: UnsafeRawBufferPointer, _ a: borrowing Array<Int>) -> dependsOn(a) Self {
+  @lifetime(borrow a)
+  public init(_ ptr: UnsafeRawBufferPointer, _ a: borrowing Array<Int>) {
     self.ptr = ptr
-    return self
   }
-  public init(_ ptr: UnsafeRawBufferPointer, _ a: consuming AnotherView) -> dependsOn(a) Self {
+  @lifetime(a)
+  public init(_ ptr: UnsafeRawBufferPointer, _ a: consuming AnotherView) {
     self.ptr = ptr
-    return self
   }
-  public init(_ ptr: UnsafeRawBufferPointer, _ a: consuming AnotherView, _ b: borrowing Array<Int>) -> dependsOn(a) dependsOn(b) Self {
+  @lifetime(a, borrow b)
+  public init(_ ptr: UnsafeRawBufferPointer, _ a: consuming AnotherView, _ b: borrowing Array<Int>) {
     self.ptr = ptr
-    return self
   }
 }
 
 public struct MutableBufferView : ~Escapable, ~Copyable {
   let ptr: UnsafeMutableRawBufferPointer
-  @_unsafeNonescapableResult
+  @lifetime(borrow ptr)
   public init(_ ptr: UnsafeMutableRawBufferPointer) {
     self.ptr = ptr
   }
 }
 
 @inlinable
-public func derive(_ x: borrowing BufferView) -> dependsOn(scoped x) BufferView {
+@lifetime(borrow x)
+public func derive(_ x: borrowing BufferView) -> BufferView {
   return BufferView(x.ptr)
 }
 
 public func use(_ x: borrowing BufferView) {}
 
-public func borrowAndCreate(_ view: borrowing BufferView) -> dependsOn(scoped view) BufferView {
+@lifetime(borrow view)
+public func borrowAndCreate(_ view: borrowing BufferView) -> BufferView {
   return BufferView(view.ptr)
 }
 
-public func consumeAndCreate(_ view: consuming BufferView) -> dependsOn(view) BufferView {
+@lifetime(view)
+public func consumeAndCreate(_ view: consuming BufferView) -> BufferView {
   return BufferView(view.ptr)
 }
 
-public func deriveThisOrThat(_ this: borrowing BufferView, _ that: borrowing BufferView) -> dependsOn(scoped this, that) BufferView {
+@lifetime(borrow this, that)
+public func deriveThisOrThat(_ this: borrowing BufferView, _ that: borrowing BufferView) -> BufferView {
   if (Int.random(in: 1..<100) == 0) {
     return BufferView(this.ptr)
   }
@@ -71,3 +75,17 @@ public struct Wrapper : ~Escapable {
     }
   }
 }
+
+public enum FakeOptional<Wrapped: ~Escapable>: ~Escapable {
+  case none, some(Wrapped)
+}
+
+extension FakeOptional: Escapable where Wrapped: Escapable {}
+
+extension FakeOptional where Wrapped: ~Escapable {
+  @lifetime(immortal)
+  public init(_ nilLiteral: ()) {
+    self = .none
+  }
+}
+

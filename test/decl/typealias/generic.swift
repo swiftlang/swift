@@ -333,12 +333,14 @@ protocol ErrorQ {
   associatedtype Y
 }
 protocol ErrorP {
-  associatedtype X: ErrorQ // expected-note {{protocol requires nested type 'X'; add nested type 'X' for conformance}}
+  associatedtype X: ErrorQ // expected-note {{protocol requires nested type 'X'}}
 }
 
 typealias ErrorA<T: ErrorP> = T.X.Y
 
-struct ErrorB : ErrorP { // expected-error {{type 'ErrorB' does not conform to protocol 'ErrorP'}}
+struct ErrorB : ErrorP { 
+  // expected-error@-1 {{type 'ErrorB' does not conform to protocol 'ErrorP'}}
+  // expected-note@-2 {{add stubs for conformance}}
   typealias X = ErrorC // expected-note {{possibly intended match 'ErrorB.X' (aka 'ErrorC') does not conform to 'ErrorQ'}}
 }
 

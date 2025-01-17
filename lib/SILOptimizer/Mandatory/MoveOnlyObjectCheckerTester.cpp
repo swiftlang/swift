@@ -14,6 +14,7 @@
 
 #include "swift/AST/DiagnosticsSIL.h"
 #include "swift/AST/TypeCheckRequests.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/FrozenMultiMap.h"
 #include "swift/Basic/STLExtras.h"
@@ -88,6 +89,7 @@ class MoveOnlyObjectCheckerTesterPass : public SILFunctionTransform {
     auto *dominanceAnalysis = getAnalysis<DominanceAnalysis>();
     DominanceInfo *domTree = dominanceAnalysis->get(fn);
     auto *poa = getAnalysis<PostOrderAnalysis>();
+    auto *deba = getAnalysis<DeadEndBlocksAnalysis>();
 
     DiagnosticEmitter diagnosticEmitter(fn);
     borrowtodestructure::IntervalMapAllocator allocator;
@@ -110,7 +112,8 @@ class MoveOnlyObjectCheckerTesterPass : public SILFunctionTransform {
                  << "No move introducers found?! Returning early?!\n");
     } else {
       diagCount = diagnosticEmitter.getDiagnosticCount();
-      MoveOnlyObjectChecker checker{diagnosticEmitter, domTree, poa, allocator};
+      MoveOnlyObjectChecker checker{diagnosticEmitter, domTree, deba, poa,
+                                    allocator};
       madeChange |= checker.check(moveIntroducersToProcess);
     }
 

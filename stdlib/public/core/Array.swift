@@ -329,7 +329,7 @@ extension Array {
   @_effects(notEscaping self.**)
   public // @testable
   func _hoistableIsNativeTypeChecked() -> Bool {
-   return _buffer.arrayPropertyIsNativeTypeChecked
+    return _buffer.arrayPropertyIsNativeTypeChecked
   }
 
   @inlinable
@@ -1565,6 +1565,16 @@ extension Array {
       initializingWith: initializer)
   }
 
+  // Superseded by the typed-throws version of this function, but retained
+  // for ABI reasons.
+  @usableFromInline
+  @_disfavoredOverload
+  func withUnsafeBufferPointer<R>(
+    _ body: (UnsafeBufferPointer<Element>) throws -> R
+  ) rethrows -> R {
+    return try _buffer.withUnsafeBufferPointer(body)
+  }
+
   /// Calls a closure with a pointer to the array's contiguous storage.
   ///
   /// Often, the optimizer can eliminate bounds checks within an array
@@ -1594,11 +1604,42 @@ extension Array {
   ///   for the `withUnsafeBufferPointer(_:)` method. The pointer argument is
   ///   valid only for the duration of the method's execution.
   /// - Returns: The return value, if any, of the `body` closure parameter.
-  @inlinable
-  public func withUnsafeBufferPointer<R>(
-    _ body: (UnsafeBufferPointer<Element>) throws -> R
-  ) rethrows -> R {
+  @_alwaysEmitIntoClient
+  public func withUnsafeBufferPointer<R, E>(
+    _ body: (UnsafeBufferPointer<Element>) throws(E) -> R
+  ) throws(E) -> R {
     return try _buffer.withUnsafeBufferPointer(body)
+  }
+
+  // Superseded by the typed-throws version of this function, but retained
+  // for ABI reasons.
+  @_semantics("array.withUnsafeMutableBufferPointer")
+  @_effects(notEscaping self.value**)
+  @usableFromInline
+  @inline(__always)
+  @_silgen_name("$sSa30withUnsafeMutableBufferPointeryqd__qd__SryxGzKXEKlF")
+  mutating func __abi_withUnsafeMutableBufferPointer<R>(
+    _ body: (inout UnsafeMutableBufferPointer<Element>) throws -> R
+  ) rethrows -> R {
+    _makeMutableAndUnique()
+    let count = _buffer.mutableCount
+
+    // Create an UnsafeBufferPointer that we can pass to body
+    let pointer = _buffer.mutableFirstElementAddress
+    var inoutBufferPointer = UnsafeMutableBufferPointer(
+      start: pointer, count: count)
+
+    defer {
+      _precondition(
+        inoutBufferPointer.baseAddress == pointer &&
+        inoutBufferPointer.count == count,
+        "Array withUnsafeMutableBufferPointer: replacing the buffer is not allowed")
+      _endMutation()
+      _fixLifetime(self)
+    }
+
+    // Invoke the body.
+    return try body(&inoutBufferPointer)
   }
 
   /// Calls the given closure with a pointer to the array's mutable contiguous
@@ -1639,14 +1680,14 @@ extension Array {
   /// - Returns: The return value, if any, of the `body` closure parameter.
   @_semantics("array.withUnsafeMutableBufferPointer")
   @_effects(notEscaping self.value**)
-  @inlinable // FIXME(inline-always)
+  @_alwaysEmitIntoClient
   @inline(__always) // Performance: This method should get inlined into the
   // caller such that we can combine the partial apply with the apply in this
   // function saving on allocating a closure context. This becomes unnecessary
   // once we allocate noescape closures on the stack.
-  public mutating func withUnsafeMutableBufferPointer<R>(
-    _ body: (inout UnsafeMutableBufferPointer<Element>) throws -> R
-  ) rethrows -> R {
+  public mutating func withUnsafeMutableBufferPointer<R, E>(
+    _ body: (inout UnsafeMutableBufferPointer<Element>) throws(E) -> R
+  ) throws(E) -> R {
     _makeMutableAndUnique()
     let count = _buffer.mutableCount
 

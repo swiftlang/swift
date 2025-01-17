@@ -1,5 +1,7 @@
 // RUN: %target-typecheck-verify-swift -enable-experimental-feature FullTypedThrows
 
+// REQUIRES: swift_feature_FullTypedThrows
+
 enum MyError: Error {
 case failed
 case epicFailed
@@ -134,9 +136,8 @@ func testTryIncompatibleTyped(cond: Bool) throws(HomeworkError) {
     }
   } catch let error as Never {
     // expected-warning@-1{{'catch' block is unreachable because no errors are thrown in 'do' block}}
-    // expected-warning@-2{{'as' test is always true}}
     throw .forgot
-  }
+  } // expected-error {{thrown expression type 'any Error' cannot be converted to error type 'HomeworkError'}}
 }
 
 func doSomethingWithoutThrowing() { }
@@ -145,7 +146,6 @@ func testDoCatchWithoutThrowing() {
   do {
     try doSomethingWithoutThrowing() // expected-warning{{no calls to throwing functions occur within 'try' expression}}
   } catch HomeworkError.forgot { // expected-warning{{'catch' block is unreachable because no errors are thrown in 'do' block}}
-    // expected-error@-1{{pattern of type 'HomeworkError' cannot match 'Never'}}
   } catch {
   }
 }
@@ -310,4 +310,30 @@ func testDoCatchInClosure(cond: Bool, x: ThrowingMembers) {
       let _: MyError = error
     }
   }
+}
+
+func takesThrowingAutoclosure(_: @autoclosure () throws(MyError) -> Int) {}
+func takesNonThrowingAutoclosure(_: @autoclosure () throws(Never) -> Int) {}
+
+func getInt() throws -> Int { 0 }
+
+func throwingAutoclosures() {
+  takesThrowingAutoclosure(try getInt())
+  // expected-error@-1 {{thrown expression type 'any Error' cannot be converted to error type 'MyError'}}
+
+  takesNonThrowingAutoclosure(try getInt())
+  // expected-error@-1 {{thrown expression type 'any Error' cannot be converted to error type 'Never'}}
+}
+
+func noThrow() throws(Never) {
+  throw MyError.epicFailed
+  // expected-error@-1 {{thrown expression type 'MyError' cannot be converted to error type 'Never'}}
+
+  try doSomething()
+  // expected-error@-1 {{thrown expression type 'MyError' cannot be converted to error type 'Never'}}
+
+  do throws(Never) {
+    throw MyError.epicFailed
+    // expected-error@-1 {{thrown expression type 'MyError' cannot be converted to error type 'Never'}}
+  } catch {}
 }

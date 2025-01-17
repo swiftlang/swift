@@ -139,19 +139,11 @@ func _stdlib_atomicInitializeARCRef(
   let desiredPtr = unmanaged.toOpaque()
   let rawTarget = UnsafeMutableRawPointer(target).assumingMemoryBound(
     to: Optional<UnsafeRawPointer>.self)
-#if $TypedThrows
   let wonRace = withUnsafeMutablePointer(to: &expected) {
     _stdlib_atomicCompareExchangeStrongPtr(
       object: rawTarget, expected: $0, desired: desiredPtr
     )
   }
-#else
-  let wonRace = __abi_se0413_withUnsafeMutablePointer(to: &expected) {
-    _stdlib_atomicCompareExchangeStrongPtr(
-      object: rawTarget, expected: $0, desired: desiredPtr
-    )
-  }
-#endif
   if !wonRace {
     // Some other thread initialized the value.  Balance the retain that we
     // performed on 'desired'.
@@ -176,7 +168,6 @@ func _stdlib_atomicLoadARCRef(
 @_transparent
 @_alwaysEmitIntoClient
 @discardableResult
-@_unavailableInEmbedded
 public func _stdlib_atomicAcquiringInitializeARCRef<T: AnyObject>(
   object target: UnsafeMutablePointer<T?>,
   desired: __owned T
@@ -203,7 +194,6 @@ public func _stdlib_atomicAcquiringInitializeARCRef<T: AnyObject>(
 
 @_alwaysEmitIntoClient
 @_transparent
-@_unavailableInEmbedded
 public func _stdlib_atomicAcquiringLoadARCRef<T: AnyObject>(
   object target: UnsafeMutablePointer<T?>
 ) -> Unmanaged<T>? {
@@ -370,7 +360,6 @@ internal func _float16ToStringImpl(
 ) -> Int
 
 @available(SwiftStdlib 5.3, *)
-@_unavailableInEmbedded
 internal func _float16ToString(
   _ value: Float16,
   debug: Bool
@@ -396,7 +385,6 @@ internal func _float32ToStringImpl(
   _ debug: Bool
 ) -> UInt64
 
-@_unavailableInEmbedded
 internal func _float32ToString(
   _ value: Float32,
   debug: Bool
@@ -421,7 +409,6 @@ internal func _float64ToStringImpl(
   _ debug: Bool
 ) -> UInt64
 
-@_unavailableInEmbedded
 internal func _float64ToString(
   _ value: Float64,
   debug: Bool
@@ -449,7 +436,6 @@ internal func _float80ToStringImpl(
   _ debug: Bool
 ) -> UInt64
 
-@_unavailableInEmbedded
 internal func _float80ToString(
   _ value: Float80,
   debug: Bool
@@ -463,6 +449,7 @@ internal func _float80ToString(
 }
 #endif
 
+#if !$Embedded
 // Returns a UInt64, but that value is the length of the string, so it's
 // guaranteed to fit into an Int. This is part of the ABI, so we can't
 // trivially change it to Int. Callers can safely convert the result
@@ -475,8 +462,18 @@ internal func _int64ToStringImpl(
   _ radix: Int64,
   _ uppercase: Bool
 ) -> UInt64
+#else
+internal func _int64ToStringImpl(
+  _ buffer: UnsafeMutablePointer<UTF8.CodeUnit>,
+  _ bufferLength: UInt,
+  _ value: Int64,
+  _ radix: Int64,
+  _ uppercase: Bool
+) -> UInt64 {
+  return UInt64(value._toStringImpl(buffer, bufferLength, Int(radix), uppercase))
+}
+#endif
 
-@_unavailableInEmbedded
 internal func _int64ToString(
   _ value: Int64,
   radix: Int64 = 10,
@@ -501,6 +498,7 @@ internal func _int64ToString(
   }
 }
 
+#if !$Embedded
 // Returns a UInt64, but that value is the length of the string, so it's
 // guaranteed to fit into an Int. This is part of the ABI, so we can't
 // trivially change it to Int. Callers can safely convert the result
@@ -513,8 +511,18 @@ internal func _uint64ToStringImpl(
   _ radix: Int64,
   _ uppercase: Bool
 ) -> UInt64
+#else
+internal func _uint64ToStringImpl(
+  _ buffer: UnsafeMutablePointer<UTF8.CodeUnit>,
+  _ bufferLength: UInt,
+  _ value: UInt64,
+  _ radix: Int64,
+  _ uppercase: Bool
+) -> UInt64 {
+  return UInt64(value._toStringImpl(buffer, bufferLength, Int(radix), uppercase))
+}
+#endif
 
-@_unavailableInEmbedded
 public // @testable
 func _uint64ToString(
     _ value: UInt64,
@@ -541,7 +549,6 @@ func _uint64ToString(
 }
 
 @inlinable
-@_unavailableInEmbedded
 internal func _rawPointerToString(_ value: Builtin.RawPointer) -> String {
   var result = _uint64ToString(
     UInt64(

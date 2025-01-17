@@ -10,9 +10,10 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "swift/Basic/SourceLoc.h"
 #include "swift/AST/SourceFile.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/Range.h"
+#include "swift/Basic/SourceLoc.h"
 #include "swift/Basic/SourceManager.h"
 #include "llvm/Support/FileSystem.h"
 #include "llvm/Support/MemoryBuffer.h"
@@ -214,6 +215,19 @@ SourceManager::getIDForBufferIdentifier(StringRef BufIdentifier) const {
   return It->second;
 }
 
+void SourceManager::recordSourceFile(unsigned bufferID, SourceFile *sourceFile){
+  bufferIDToSourceFiles[bufferID].push_back(sourceFile);
+}
+
+llvm::TinyPtrVector<SourceFile *>
+SourceManager::getSourceFilesForBufferID(unsigned bufferID) const {
+  auto found = bufferIDToSourceFiles.find(bufferID);
+  if (found == bufferIDToSourceFiles.end())
+    return { };
+
+  return found->second;
+}
+
 SourceManager::~SourceManager() {
   for (auto &generated : GeneratedSourceInfos) {
     free((void*)generated.second.onDiskBufferCopyFileName.data());
@@ -287,11 +301,13 @@ StringRef SourceManager::getIdentifierForBuffer(
   // If this is generated source code, and we're supposed to force it to disk
   // so external clients can see it, do so now.
   if (ForceGeneratedSourceToDisk) {
-    if (auto generatedInfo = getGeneratedSourceInfo(bufferID)) {
-      // We only care about macros, so skip everything else.
+    if (const GeneratedSourceInfo *generatedInfo =
+            getGeneratedSourceInfo(bufferID)) {
+      // We only care about macro expansion buffers, so skip everything else.
       if (generatedInfo->kind == GeneratedSourceInfo::ReplacedFunctionBody ||
           generatedInfo->kind == GeneratedSourceInfo::PrettyPrinted ||
-          generatedInfo->kind == GeneratedSourceInfo::DefaultArgument)
+          generatedInfo->kind == GeneratedSourceInfo::DefaultArgument ||
+          generatedInfo->kind == GeneratedSourceInfo::AttributeFromClang)
         return buffer->getBufferIdentifier();
 
       if (generatedInfo->onDiskBufferCopyFileName.empty()) {
@@ -385,6 +401,7 @@ void SourceManager::setGeneratedSourceInfo(
 #include "swift/Basic/MacroRoles.def"
   case GeneratedSourceInfo::PrettyPrinted:
   case GeneratedSourceInfo::DefaultArgument:
+  case GeneratedSourceInfo::AttributeFromClang:
     break;
 
   case GeneratedSourceInfo::ReplacedFunctionBody:
@@ -402,12 +419,12 @@ bool SourceManager::hasGeneratedSourceInfo(unsigned bufferID) {
   return GeneratedSourceInfos.count(bufferID);
 }
 
-std::optional<GeneratedSourceInfo>
+const GeneratedSourceInfo *
 SourceManager::getGeneratedSourceInfo(unsigned bufferID) const {
   auto known = GeneratedSourceInfos.find(bufferID);
   if (known == GeneratedSourceInfos.end())
-    return std::nullopt;
-  return known->second;
+    return nullptr;
+  return &known->second;
 }
 
 namespace {
@@ -694,7 +711,11 @@ unsigned SourceManager::getExternalSourceBufferID(StringRef Path) {
     return It->getSecond();
   }
   unsigned Id = 0u;
-  auto InputFileOrErr = swift::vfs::getFileOrSTDIN(*getFileSystem(), Path);
+  auto InputFileOrErr =
+      swift::vfs::getFileOrSTDIN(*getFileSystem(), Path,
+                                 /* FileSize */ -1,
+                                 /* RequiresNullTerminator */ true,
+                                 /* isVolatile */ this->OpenSourcesAsVolatile);
   if (InputFileOrErr) {
     // This assertion ensures we can look up from the map in the future when
     // using the same Path.

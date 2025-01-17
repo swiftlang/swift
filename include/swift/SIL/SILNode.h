@@ -127,7 +127,9 @@ public:
   enum { NumMarkDependenceKindBits = 2 };
 
   enum { numCustomBits = 20 };
-  enum { maxBitfieldID = std::numeric_limits<uint64_t>::max() >> numCustomBits };
+
+  constexpr static const size_t maxBitfieldID =
+      std::numeric_limits<uint64_t>::max() >> numCustomBits;
 
 protected:
   friend class SILInstruction;
@@ -205,7 +207,9 @@ protected:
     SHARED_FIELD(AddressToPointerInst, bool needsStackProtection);
     SHARED_FIELD(IndexAddrInst, bool needsStackProtection);
     SHARED_FIELD(HopToExecutorInst, bool mandatory);
-    SHARED_FIELD(DestroyValueInst, bool poisonRefs);
+    SHARED_FIELD(DestroyValueInst, uint8_t
+        poisonRefs : 1,
+        deadEnd : 1);
     SHARED_FIELD(EndCOWMutationInst, bool keepUnique);
     SHARED_FIELD(ConvertFunctionInst, bool withoutActuallyEscaping);
     SHARED_FIELD(BeginCOWMutationInst, bool native);
@@ -245,6 +249,9 @@ protected:
                  pointerEscape : 1,
                  fromVarDecl : 1,
                  fixed : 1);
+
+    SHARED_FIELD(DeallocBoxInst, uint8_t
+                 deadEnd : 1);
 
     SHARED_FIELD(CopyAddrInst, uint8_t
       isTakeOfSrc : 1,
@@ -311,7 +318,8 @@ protected:
     SHARED_FIELD(PointerToAddressInst, uint32_t alignment);
     SHARED_FIELD(SILFunctionArgument, uint32_t noImplicitCopy : 1,
                  lifetimeAnnotation : 2, closureCapture : 1,
-                 parameterPack : 1, hasResultDependsOn : 1);
+                 parameterPack : 1);
+    SHARED_FIELD(MergeRegionIsolationInst, uint32_t numOperands);
 
     // Do not use `_sharedUInt32_private` outside of SILNode.
   } _sharedUInt32_private;

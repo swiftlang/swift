@@ -3,6 +3,28 @@
 
 #include <memory>
 
+struct NonCopyable {
+    NonCopyable(int x) : x(x) {}
+    NonCopyable(const NonCopyable &) = delete;
+    NonCopyable(NonCopyable &&other) : x(other.x) { other.x = -123; }
+
+    int method(int y) const { return x * y; }
+    int mutMethod(int y) {
+      x = y;
+      return y;
+    }
+
+    int x;
+};
+
+struct NonCopyableDerived: public NonCopyable {
+    NonCopyableDerived(int x) : NonCopyable(x) {}
+};
+
+
+inline std::shared_ptr<NonCopyable> getNonCopyableSharedPtr() { return std::make_shared<NonCopyableDerived>(42); }
+inline std::unique_ptr<NonCopyable> getNonCopyableUniquePtr() { return std::make_unique<NonCopyableDerived>(42); }
+
 std::unique_ptr<int> makeInt() {
   return std::make_unique<int>(42);
 }

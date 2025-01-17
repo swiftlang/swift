@@ -134,7 +134,7 @@ template<> void ProtocolConformanceDescriptor::dump() const {
     return "<unknown addr>";
   };
 
-  switch (auto kind = getTypeKind()) {
+  switch (getTypeKind()) {
   case TypeReferenceKind::DirectObjCClassName:
     printf("direct Objective-C class name %s", getDirectObjCClassName());
     break;
@@ -340,8 +340,8 @@ ProtocolConformanceDescriptor::getWitnessTable(const Metadata *type) const {
         [&substitutions](unsigned depth, unsigned index) {
           return substitutions.getMetadata(depth, index).Ptr;
         },
-        [&substitutions](unsigned ordinal) {
-          return substitutions.getMetadataOrdinal(ordinal).Ptr;
+        [&substitutions](unsigned fullOrdinal, unsigned keyOrdinal) {
+          return substitutions.getMetadataKeyArgOrdinal(keyOrdinal).Ptr;
         },
         [&substitutions](const Metadata *type, unsigned index) {
           return substitutions.getWitnessTable(type, index);
@@ -1649,6 +1649,59 @@ checkGenericPackRequirement(
 }
 
 static std::optional<TypeLookupError>
+checkGenericValueRequirement(const GenericRequirementDescriptor &req,
+                             llvm::SmallVectorImpl<const void *> &extraArguments,
+                             SubstGenericParameterFn substGenericParam,
+                             SubstDependentWitnessTableFn substWitnessTable,
+                     llvm::SmallVectorImpl<InvertibleProtocolSet> &suppressed) {
+  assert(req.getFlags().isValueRequirement());
+
+  // Make sure we understand the requirement we're dealing with.
+  if (!req.hasKnownKind())
+    return TypeLookupError("unknown kind");
+
+  // Resolve the subject generic value.
+  auto result = swift::getTypeValueByMangledName(
+      req.getParam(), extraArguments.data(),
+      substGenericParam, substWitnessTable);
+
+  if (result.getError())
+    return *result.getError();
+
+  auto subjectValue = result.getType();
+
+  // Check the requirement.
+  switch (req.getKind()) {
+  case GenericRequirementKind::SameType: {
+    // Resolve the constraint generic value.
+    auto result = swift::getTypeValueByMangledName(
+        req.getMangledTypeName(), extraArguments.data(),
+        substGenericParam, substWitnessTable);
+
+    if (result.getError())
+      return *result.getError();
+
+    auto constraintValue = result.getType();
+
+    if (subjectValue != constraintValue) {
+      return TYPE_LOOKUP_ERROR_FMT(
+            "subject value %" PRIiPTR " does not match constraint value %" PRIiPTR,
+            subjectValue,
+            constraintValue);
+    }
+
+    return std::nullopt;
+  }
+
+  default: {
+    // Value requirements can only be same type'd at the moment.
+    return TYPE_LOOKUP_ERROR_FMT("unknown value generic requirement kind %u",
+                                 (unsigned)req.getKind());
+  }
+  }
+}
+
+static std::optional<TypeLookupError>
 checkInvertibleRequirementsStructural(const Metadata *type,
                                         InvertibleProtocolSet ignored) {
   switch (type->getKind()) {
@@ -1758,6 +1811,10 @@ checkInvertibleRequirementsStructural(const Metadata *type,
     // The existential representation has no room for specifying any
     // suppressed requirements, so it always succeeds.
     return std::nullopt;
+    
+  case MetadataKind::FixedArray:
+    // Builtin.FixedArray has no conformances of its own.
+    return std::nullopt;
 
   case MetadataKind::LastEnumerated:
     break;
@@ -1843,8 +1900,8 @@ checkInvertibleRequirements(const Metadata *type,
         [&substFn](unsigned depth, unsigned index) {
           return substFn.getMetadata(depth, index).Ptr;
         },
-        [&substFn](unsigned ordinal) {
-          return substFn.getMetadataOrdinal(ordinal).Ptr;
+        [&substFn](unsigned fullOrdinal, unsigned keyOrdinal) {
+          return substFn.getMetadataKeyArgOrdinal(keyOrdinal).Ptr;
         },
         [&substFn](const Metadata *type, unsigned index) {
           return substFn.getWitnessTable(type, index);
@@ -1874,6 +1931,13 @@ std::optional<TypeLookupError> swift::_checkGenericRequirements(
                                                allSuppressed);
       if (error)
         return error;
+    } else if (req.getFlags().isValueRequirement()) {
+      auto error = checkGenericValueRequirement(req, extraArguments,
+                                                substGenericParam,
+                                                substWitnessTable,
+                                                allSuppressed);
+      if (error)
+        return error;
     } else {
       auto error = checkGenericRequirement(req, extraArguments,
                                            substGenericParam,
@@ -1886,6 +1950,7 @@ std::optional<TypeLookupError> swift::_checkGenericRequirements(
 
   // Now, check all of the generic arguments for invertible protocols.
   unsigned numGenericParams = genericParams.size();
+  unsigned keyIndex = 0;
   for (unsigned index = 0; index != numGenericParams; ++index) {
     // Non-key arguments don't need to be checked, because they are
     // aliased to another type.
@@ -1896,15 +1961,15 @@ std::optional<TypeLookupError> swift::_checkGenericRequirements(
     if (index < allSuppressed.size())
       suppressed = allSuppressed[index];
 
-    MetadataOrPack metadataOrPack(substGenericParamOrdinal(index));
+    MetadataPackOrValue MetadataPackOrValue(substGenericParamOrdinal(index, keyIndex));
     switch (genericParams[index].getKind()) {
     case GenericParamKind::Type: {
-      if (!metadataOrPack || metadataOrPack.isMetadataPack()) {
+      if (!MetadataPackOrValue || MetadataPackOrValue.isMetadataPack()) {
         return TYPE_LOOKUP_ERROR_FMT(
             "unexpected pack for generic parameter %u", index);
       }
 
-      auto metadata = metadataOrPack.getMetadata();
+      auto metadata = MetadataPackOrValue.getMetadata();
       if (auto error = checkInvertibleRequirements(metadata, suppressed))
         return error;
 
@@ -1913,15 +1978,15 @@ std::optional<TypeLookupError> swift::_checkGenericRequirements(
 
     case GenericParamKind::TypePack: {
       // NULL can be used to indicate an empty pack.
-      if (!metadataOrPack)
+      if (!MetadataPackOrValue)
         break;
 
-      if (metadataOrPack.isMetadata()) {
+      if (MetadataPackOrValue.isMetadata()) {
         return TYPE_LOOKUP_ERROR_FMT(
             "unexpected metadata for generic pack parameter %u", index);
       }
 
-      auto pack = metadataOrPack.getMetadataPack();
+      auto pack = MetadataPackOrValue.getMetadataPack();
       if (pack.getElements() != 0) {
         llvm::ArrayRef<const Metadata *> elements(
             pack.getElements(), pack.getNumElements());
@@ -1933,10 +1998,16 @@ std::optional<TypeLookupError> swift::_checkGenericRequirements(
       break;
     }
 
+    case GenericParamKind::Value: {
+      // Value parameter can never conform to protocols or the inverse thereof.
+      break;
+    }
+
     default:
       return TYPE_LOOKUP_ERROR_FMT("unknown generic parameter kind %u",
                                    index);
     }
+    keyIndex++;
   }
 
   // Success!
@@ -1956,4 +2027,4 @@ const Metadata *swift::findConformingSuperclass(
 }
 
 #define OVERRIDE_PROTOCOLCONFORMANCE COMPATIBILITY_OVERRIDE
-#include COMPATIBILITY_OVERRIDE_INCLUDE_PATH
+#include "../CompatibilityOverride/CompatibilityOverrideIncludePath.h"

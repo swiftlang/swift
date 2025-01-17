@@ -14,7 +14,7 @@ import Basic
 import SILBridging
 
 private func register<T: AnyObject>(_ cl: T.Type) {
-  String(describing: cl)._withBridgedStringRef { nameStr in
+  "\(cl)"._withBridgedStringRef { nameStr in
     let metatype = unsafeBitCast(cl, to: SwiftMetatype.self)
     registerBridgedClass(nameStr, metatype)
   }
@@ -78,6 +78,7 @@ public func registerSILClasses() {
   register(DestroyValueInst.self)
   register(DestroyAddrInst.self)
   register(EndLifetimeInst.self)
+  register(ExtendLifetimeInst.self)
   register(StrongCopyUnownedValueInst.self)
   register(StrongCopyUnmanagedValueInst.self)
   register(StrongCopyWeakValueInst.self)
@@ -149,6 +150,7 @@ public func registerSILClasses() {
   register(MetatypeInst.self)
   register(ValueMetatypeInst.self)
   register(ExistentialMetatypeInst.self)
+  register(TypeValueInst.self)
   register(OpenPackElementInst.self)
   register(PackLengthInst.self)
   register(DynamicPackIndexInst.self)
@@ -254,4 +256,6 @@ public func registerSILClasses() {
   register(AwaitAsyncContinuationInst.self)
   register(CheckedCastBranchInst.self)
   register(CheckedCastAddrBranchInst.self)
+  register(ThunkInst.self)
+  register(MergeIsolationRegionInst.self)
 }

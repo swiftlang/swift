@@ -15,6 +15,10 @@
 // RUN: %empty-directory(%t/subtest-2)
 // RUN: %target-swift-frontend -typecheck -parse-stdlib -module-cache-path %t/mcp -emit-module-interface-path %t/subtest-2/module_shadowing.swiftinterface %s -enable-library-evolution -module-name module_shadowing -I %t/lib -module-interface-preserve-types-as-written -swift-version 5 -verify
 
+// alias-module-names-in-module-interface also disables this warning.
+// RUN: %empty-directory(%t/subtest-2)
+// RUN: %target-swift-frontend -typecheck -parse-stdlib -module-cache-path %t/mcp -emit-module-interface-path %t/subtest-2/module_shadowing.swiftinterface %s -enable-library-evolution -module-name module_shadowing -I %t/lib -alias-module-names-in-module-interface -swift-version 5 -verify
+
 // Build this module in a different configuration where it will shadow itself.
 // RUN: %empty-directory(%t/subtest-3)
 // RUN: %target-swift-frontend -typecheck -parse-stdlib -module-cache-path %t/mcp -emit-module-interface-path %t/subtest-3/ShadowyHorror.swiftinterface %s -enable-library-evolution -module-name ShadowyHorror -DSELF_SHADOW -swift-version 5 2>&1 | %FileCheck --check-prefix SELF --implicit-check-not TestModule %s
@@ -29,7 +33,7 @@
 import ShadowyHorror
 // OTHER-DAG: ShadowyHorror.module_shadowing:{{[0-9]+:[0-9]+}}: warning: public class 'ShadowyHorror.module_shadowing' shadows module 'module_shadowing', which may cause failures when importing 'module_shadowing' or its clients in some configurations; please rename either the class 'ShadowyHorror.module_shadowing' or the module 'module_shadowing', or see https://github.com/apple/swift/issues/56573 for workarounds{{$}}
 
-@_implementationOnly import TestModule
+internal import TestModule
 #endif
 
 public struct ShadowyHorror {

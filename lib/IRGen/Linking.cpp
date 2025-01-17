@@ -19,6 +19,7 @@
 #include "IRGenModule.h"
 #include "swift/AST/ASTMangler.h"
 #include "swift/AST/IRGenOptions.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/ClangImporter/ClangModule.h"
 #include "swift/SIL/SILGlobalVariable.h"
 #include "swift/SIL/FormalLinkage.h"
@@ -105,20 +106,20 @@ LinkEntity LinkEntity::forSILGlobalVariable(SILGlobalVariable *G,
 
 
 /// Mangle this entity into the given buffer.
-void LinkEntity::mangle(SmallVectorImpl<char> &buffer) const {
+void LinkEntity::mangle(ASTContext &Ctx, SmallVectorImpl<char> &buffer) const {
   llvm::raw_svector_ostream stream(buffer);
-  mangle(stream);
+  mangle(Ctx, stream);
 }
 
 /// Mangle this entity into the given stream.
-void LinkEntity::mangle(raw_ostream &buffer) const {
-  std::string Result = mangleAsString();
+void LinkEntity::mangle(ASTContext &Ctx, raw_ostream &buffer) const {
+  std::string Result = mangleAsString(Ctx);
   buffer.write(Result.data(), Result.size());
 }
 
 /// Mangle this entity as a std::string.
-std::string LinkEntity::mangleAsString() const {
-  IRGenMangler mangler;
+std::string LinkEntity::mangleAsString(ASTContext &Ctx) const {
+  IRGenMangler mangler(Ctx);
   switch (getKind()) {
   case Kind::DispatchThunk: {
     auto *func = cast<FuncDecl>(getDecl());
@@ -346,7 +347,7 @@ std::string LinkEntity::mangleAsString() const {
     return mangler.mangleFieldOffset(getDecl());
 
   case Kind::ProtocolWitnessTable:
-    return mangler.mangleWitnessTable(getRootProtocolConformance());
+    return mangler.mangleWitnessTable(getProtocolConformance());
 
   case Kind::GenericProtocolWitnessTableInstantiationFunction:
     return mangler.mangleGenericProtocolWitnessTableInstantiationFunction(
@@ -490,7 +491,7 @@ std::string LinkEntity::mangleAsString() const {
   case Kind::PartialApplyForwarderAsyncFunctionPointer:
   case Kind::DistributedAccessorAsyncPointer: {
     std::string Result(getUnderlyingEntityForAsyncFunctionPointer()
-        .mangleAsString());
+        .mangleAsString(Ctx));
     Result.append("Tu");
     return Result;
   }
@@ -528,7 +529,7 @@ std::string LinkEntity::mangleAsString() const {
 
     auto thunk = dyn_cast<AbstractFunctionDecl>(DC);
     if (thunk && thunk->isDistributedThunk()) {
-      IRGenMangler mangler;
+      IRGenMangler mangler(Ctx);
       return mangler.mangleDistributedThunkRecord(thunk);
     }
 
@@ -642,6 +643,9 @@ SILLinkage LinkEntity::getLinkage(ForDefinition_t forDefinition) const {
     return SILLinkage::Shared;
 
   case Kind::TypeMetadata: {
+    if (isForcedShared())
+      return SILLinkage::Shared;
+
     auto *nominal = getType().getAnyNominal();
     switch (getMetadataAddress()) {
     case TypeMetadataAddress::FullMetadata:
@@ -1300,6 +1304,18 @@ bool LinkEntity::isText() const {
   }
 }
 
+bool LinkEntity::isDistributedThunk() const {
+  if (!hasDecl())
+    return false;
+
+  auto value = getDecl();
+  if (auto afd = dyn_cast<AbstractFunctionDecl>(value)) {
+    return afd->isDistributedThunk();
+  }
+
+  return false;
+}
+
 bool LinkEntity::isWeakImported(ModuleDecl *module) const {
   switch (getKind()) {
   case Kind::SILGlobalVariable:
@@ -1355,7 +1371,6 @@ bool LinkEntity::isWeakImported(ModuleDecl *module) const {
   case Kind::ObjCMetaclass:
   case Kind::SwiftMetaclassStub:
   case Kind::ClassMetadataBaseOffset:
-  case Kind::PropertyDescriptor:
   case Kind::NominalTypeDescriptor:
   case Kind::NominalTypeDescriptorRecord:
   case Kind::ModuleDescriptor:
@@ -1374,6 +1389,11 @@ bool LinkEntity::isWeakImported(ModuleDecl *module) const {
   case Kind::OpaqueTypeDescriptorAccessorVar:
   case Kind::DistributedAccessor:
     return getDecl()->isWeakImported(module);
+      
+  case Kind::PropertyDescriptor:
+    // Static properties may have nil property descriptors if declared in
+    // modules compiled with older compilers and should be weak linked.
+    return (getDecl()->isWeakImported(module) || getDecl()->isStatic());
 
   case Kind::CanonicalSpecializedGenericSwiftMetaclassStub:
     return getType()->getClassOrBoundGenericClass()->isWeakImported(module);
@@ -1430,7 +1450,7 @@ bool LinkEntity::isWeakImported(ModuleDecl *module) const {
   case Kind::KnownAsyncFunctionPointer:
     auto &context = module->getASTContext();
     auto deploymentAvailability =
-        AvailabilityContext::forDeploymentTarget(context);
+        AvailabilityRange::forDeploymentTarget(context);
     return !deploymentAvailability.isContainedIn(
         context.getConcurrencyAvailability());
   }

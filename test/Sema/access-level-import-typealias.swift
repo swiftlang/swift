@@ -13,6 +13,8 @@
 // RUN:   -swift-version 5 -enable-library-evolution \
 // RUN:   -enable-upcoming-feature InternalImportsByDefault
 
+// REQUIRES: swift_feature_InternalImportsByDefault
+
 //--- Original.swift
 open class Clazz {}
 
@@ -24,11 +26,10 @@ public typealias ClazzAlias = Clazz
 public import Aliases
 internal import Original // expected-note 2 {{class 'Clazz' imported as 'internal' from 'Original' here}}
 
-// expected-error@+1 {{'ClazzAlias' aliases 'Original.Clazz' and cannot be used here because 'Original' was not imported publicly}}
+// expected-error@+1 {{'ClazzAlias' aliases 'Original.Clazz' and cannot be used in a public or '@usableFromInline' conformance because 'Original' was not imported publicly}}
 public class InheritsFromClazzAlias: ClazzAlias {}
 
 @inlinable public func inlinableFunc() {
   // expected-error@+1 {{'ClazzAlias' aliases 'Original.Clazz' and cannot be used in an '@inlinable' function because 'Original' was not imported publicly}}
   _ = ClazzAlias.self
 }
-

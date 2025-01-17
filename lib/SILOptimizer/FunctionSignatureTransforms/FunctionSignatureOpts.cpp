@@ -31,6 +31,7 @@
 
 #define DEBUG_TYPE "sil-function-signature-opt"
 #include "FunctionSignatureOpts.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/SIL/DebugUtils.h"
 #include "swift/SIL/SILCloner.h"
 #include "swift/SIL/SILFunction.h"
@@ -185,8 +186,8 @@ FunctionSignatureTransformDescriptor::createOptimizedSILFunctionName() {
   SILFunction *F = OriginalFunction;
 
   auto P = Demangle::SpecializationPass::FunctionSignatureOpts;
-  Mangle::FunctionSignatureSpecializationMangler Mangler(P, F->isSerialized(),
-                                                         F);
+  Mangle::FunctionSignatureSpecializationMangler Mangler(F->getASTContext(),
+      P, F->getSerializedKind(), F);
 
   // Handle arguments' changes.
   for (unsigned i : indices(ArgumentDescList)) {
@@ -287,6 +288,11 @@ static bool usesGenerics(SILFunction *F,
         for (auto Ty : Subs.getReplacementTypes()) {
           Ty.visit(FindArchetypesAndGenericTypes);
         }
+      }
+
+      // Scan the parameter type of a 'type_value'.
+      if (auto tvi = dyn_cast<TypeValueInst>(&I)) {
+        tvi->getParamType().visit(FindArchetypesAndGenericTypes);
       }
 
       // Scan the result type of the instruction.
@@ -542,8 +548,9 @@ void FunctionSignatureTransform::createFunctionSignatureOptimizedFunction() {
   // classSubclassScope.
   TransformDescriptor.OptimizedFunction = FunctionBuilder.createFunction(
       linkage, Name, NewFTy, NewFGenericEnv, F->getLocation(), F->isBare(),
-      F->isTransparent(), F->isSerialized(), IsNotDynamic, IsNotDistributed,
-      IsNotRuntimeAccessible, F->getEntryCount(), F->isThunk(),
+      F->isTransparent(), F->getSerializedKind(), IsNotDynamic,
+      IsNotDistributed, IsNotRuntimeAccessible, F->getEntryCount(),
+      F->isThunk(),
       /*classSubclassScope=*/SubclassScope::NotApplicable,
       F->getInlineStrategy(), F->getEffectsKind(), nullptr, F->getDebugScope());
   SILFunction *NewF = TransformDescriptor.OptimizedFunction.get();
@@ -856,8 +863,8 @@ public:
     // going to change, make sure the mangler is aware of all the changes done
     // to the function.
     auto P = Demangle::SpecializationPass::FunctionSignatureOpts;
-    Mangle::FunctionSignatureSpecializationMangler Mangler(P,
-                                                           F->isSerialized(), F);
+    Mangle::FunctionSignatureSpecializationMangler Mangler(F->getASTContext(),
+        P, F->getSerializedKind(), F);
 
     /// Keep a map between the exploded argument index and the original argument
     /// index.

@@ -16,25 +16,39 @@
 
 // RUN: %target-build-swift -Xfrontend -enable-upcoming-feature -Xfrontend DynamicActorIsolation -I %t -L %t -l Types %t/src/Crash1.swift -o %t/crash1.out
 // RUN: %target-codesign %t/crash1.out
-// RUN: not --crash env SWIFT_UNEXPECTED_EXECUTOR_LOG_LEVEL=2 %target-run %t/crash1.out 2>&1 | %FileCheck %t/src/Crash1.swift
+// RUN: not --crash env SWIFT_IS_CURRENT_EXECUTOR_LEGACY_MODE_OVERRIDE=legacy SWIFT_UNEXPECTED_EXECUTOR_LOG_LEVEL=2 %target-run %t/crash1.out 2>&1 | %FileCheck %t/src/Crash1.swift --check-prefix=LEGACY_CHECK
+// RUN: not --crash env SWIFT_IS_CURRENT_EXECUTOR_LEGACY_MODE_OVERRIDE=swift6 SWIFT_UNEXPECTED_EXECUTOR_LOG_LEVEL=2 %target-run %t/crash1.out 2>&1 | %FileCheck %t/src/Crash1.swift --check-prefix=SWIFT6_CHECK --dump-input=always
 
 // RUN: %target-build-swift -Xfrontend -enable-upcoming-feature -Xfrontend DynamicActorIsolation -I %t -L %t -l Types %t/src/Crash2.swift -o %t/crash2.out
 // RUN: %target-codesign %t/crash2.out
-// RUN: not --crash env SWIFT_UNEXPECTED_EXECUTOR_LOG_LEVEL=2 %target-run %t/crash2.out 2>&1 | %FileCheck %t/src/Crash2.swift
+// RUN: not --crash env SWIFT_IS_CURRENT_EXECUTOR_LEGACY_MODE_OVERRIDE=legacy SWIFT_UNEXPECTED_EXECUTOR_LOG_LEVEL=2 %target-run %t/crash2.out 2>&1 | %FileCheck %t/src/Crash2.swift --check-prefix=LEGACY_CHECK
+// RUN: not --crash env SWIFT_IS_CURRENT_EXECUTOR_LEGACY_MODE_OVERRIDE=swift6 SWIFT_UNEXPECTED_EXECUTOR_LOG_LEVEL=2 %target-run %t/crash2.out 2>&1 | %FileCheck %t/src/Crash2.swift --check-prefix=SWIFT6_CHECK --dump-input=always
 
 // RUN: %target-build-swift -Xfrontend -enable-upcoming-feature -Xfrontend DynamicActorIsolation -I %t -L %t -l Types %t/src/Crash3.swift -o %t/crash3.out
 // RUN: %target-codesign %t/crash3.out
-// RUN: not --crash env SWIFT_UNEXPECTED_EXECUTOR_LOG_LEVEL=2 %target-run %t/crash3.out 2>&1 | %FileCheck %t/src/Crash3.swift
+// RUN: not --crash env SWIFT_IS_CURRENT_EXECUTOR_LEGACY_MODE_OVERRIDE=legacy SWIFT_UNEXPECTED_EXECUTOR_LOG_LEVEL=2 %target-run %t/crash3.out 2>&1 | %FileCheck %t/src/Crash3.swift --check-prefix=LEGACY_CHECK
+// RUN: not --crash env SWIFT_IS_CURRENT_EXECUTOR_LEGACY_MODE_OVERRIDE=swift6 SWIFT_UNEXPECTED_EXECUTOR_LOG_LEVEL=2 %target-run %t/crash3.out 2>&1 | %FileCheck %t/src/Crash3.swift --check-prefix=SWIFT6_CHECK --dump-input=always
 
 // RUN: %target-build-swift -Xfrontend -enable-upcoming-feature -Xfrontend DynamicActorIsolation -I %t -L %t -l Types %t/src/Crash4.swift -o %t/crash4.out
 // RUN: %target-codesign %t/crash4.out
-// RUN: not --crash env SWIFT_UNEXPECTED_EXECUTOR_LOG_LEVEL=2 %target-run %t/crash4.out 2>&1 | %FileCheck %t/src/Crash4.swift
+// RUN: not --crash env SWIFT_IS_CURRENT_EXECUTOR_LEGACY_MODE_OVERRIDE=legacy SWIFT_UNEXPECTED_EXECUTOR_LOG_LEVEL=2 %target-run %t/crash4.out 2>&1 | %FileCheck %t/src/Crash4.swift --check-prefix=LEGACY_CHECK
+// RUN: not --crash env SWIFT_IS_CURRENT_EXECUTOR_LEGACY_MODE_OVERRIDE=swift6 SWIFT_UNEXPECTED_EXECUTOR_LOG_LEVEL=2 %target-run %t/crash4.out 2>&1 | %FileCheck %t/src/Crash4.swift --check-prefix=SWIFT6_CHECK --dump-input=always
 
-// REQUIRES: asserts
+// RUN: %target-build-swift -Xfrontend -enable-upcoming-feature -Xfrontend DynamicActorIsolation -I %t -L %t -l Types %t/src/Crash5.swift -o %t/crash5.out
+// RUN: %target-codesign %t/crash5.out
+// RUN: not --crash env SWIFT_IS_CURRENT_EXECUTOR_LEGACY_MODE_OVERRIDE=legacy SWIFT_UNEXPECTED_EXECUTOR_LOG_LEVEL=2 %target-run %t/crash5.out 2>&1 | %FileCheck %t/src/Crash5.swift --check-prefix=LEGACY_CHECK
+// RUN: not --crash env SWIFT_IS_CURRENT_EXECUTOR_LEGACY_MODE_OVERRIDE=swift6 SWIFT_UNEXPECTED_EXECUTOR_LOG_LEVEL=2 %target-run %t/crash5.out 2>&1 | %FileCheck %t/src/Crash5.swift --check-prefix=SWIFT6_CHECK --dump-input=always
+
+// RUN: %target-build-swift -Xfrontend -enable-upcoming-feature -Xfrontend DynamicActorIsolation -I %t -L %t -l Types %t/src/Crash6.swift -o %t/crash6.out
+// RUN: %target-codesign %t/crash6.out
+// RUN: not --crash env SWIFT_IS_CURRENT_EXECUTOR_LEGACY_MODE_OVERRIDE=legacy SWIFT_UNEXPECTED_EXECUTOR_LOG_LEVEL=2 %target-run %t/crash6.out 2>&1 | %FileCheck %t/src/Crash6.swift --check-prefix=LEGACY_CHECK
+// RUN: not --crash env SWIFT_IS_CURRENT_EXECUTOR_LEGACY_MODE_OVERRIDE=swift6 SWIFT_UNEXPECTED_EXECUTOR_LOG_LEVEL=2 %target-run %t/crash6.out 2>&1 | %FileCheck %t/src/Crash6.swift --check-prefix=SWIFT6_CHECK --dump-input=always
+
 // REQUIRES: concurrency
 // REQUIRES: concurrency_runtime
 // REQUIRES: executable_test
 // REQUIRES: OS=macosx
+// REQUIRES: swift_feature_DynamicActorIsolation
 
 // rdar://123810657
 // UNSUPPORTED: back_deployment_runtime
@@ -45,6 +59,10 @@ public protocol P {
 
   var prop: [String] { get set }
   func test() -> Int
+}
+
+public protocol Q : P {
+  func childTest()
 }
 
 //--- Types.swift
@@ -83,22 +101,71 @@ extension ActorTest : @preconcurrency P {
   public func test() -> Int { x }
 }
 
+@MainActor
+public struct TestWithParent : @preconcurrency Q {
+  public var prop: [String] = []
+
+  public init() {}
+
+  public func test() -> Int { 42 }
+  public func childTest() {}
+}
+
+public func runChildTest<T: Q>(_ type: T.Type) async {
+  let v = type.init()
+  return v.childTest()
+}
+
 //--- Crash1.swift
 import Types
 print(await runTest(Test.self))
-// CHECK: Incorrect actor executor assumption; Expected MainActor executor
+print("OK")
+// LEGACY_CHECK: @MainActor function at Types/Types.swift:16 was not called on the main thread
+
+// Crash without good message, since via 'dispatch_assert_queue'
+// SWIFT6_CHECK-NOT: OK
 
 //--- Crash2.swift
 import Types
 print(await runAccessors(Test.self))
-// CHECK: Incorrect actor executor assumption; Expected MainActor executor
+print("OK")
+// LEGACY_CHECK: data race detected: @MainActor function at Types/Types.swift:15 was not called on the main thread
+
+// Crash without good message, since via 'dispatch_assert_queue'
+// SWIFT6_CHECK-NOT: OK
 
 //--- Crash3.swift
 import Types
 print(await runTest(ActorTest.self))
-// CHECK: Incorrect actor executor assumption
+print("OK")
+// LEGACY_CHECK: data race detected: actor-isolated function at Types/Types.swift:33 was not called on the same actor
+
+// SWIFT6_CHECK: Incorrect actor executor assumption
+// SWIFT6_CHECK-NOT: OK
 
 //--- Crash4.swift
 import Types
 print(await runAccessors(ActorTest.self))
-// CHECK: Incorrect actor executor assumption
+print("OK")
+// LEGACY_CHECK: data race detected: actor-isolated function at Types/Types.swift:30 was not called on the same actor
+
+// SWIFT6_CHECK: Incorrect actor executor assumption
+// SWIFT6_CHECK-NOT: OK
+
+//--- Crash5.swift
+import Types
+print(await runTest(TestWithParent.self))
+print("OK")
+// LEGACY_CHECK: data race detected: @MainActor function at Types/Types.swift:40 was not called on the main thread
+
+// Crash without good message, since via 'dispatch_assert_queue'
+// SWIFT6_CHECK-NOT: OK
+
+//--- Crash6.swift
+import Types
+print(await runChildTest(TestWithParent.self))
+print("OK")
+// LEGACY_CHECK: data race detected: @MainActor function at Types/Types.swift:40 was not called on the main thread
+
+// Crash without good message, since via 'dispatch_assert_queue'
+// SWIFT6_CHECK-NOT: OK

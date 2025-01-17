@@ -329,3 +329,17 @@ public class HasDefaultDeinit {
   // CHECK: [[OBJC]]deinit{{$}}
   // CHECK-NEXT: }
 }
+
+// CHECK: public func testInlinableTextRemovesPostfix()
+@inlinable public func testInlinableTextRemovesPostfix() {
+  // FROMSOURCE: "foobar"
+  // FROMSOURCE-NOT: .debugDescription
+  // FROMSOURCE: .description
+  // FROMSOURCE-NEXT: }
+  _ = "foobar"
+  #if DEBUG
+    .debugDescription
+  #else
+    .description
+  #endif
+}

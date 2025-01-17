@@ -1,8 +1,8 @@
-// RUN: %target-swift-frontend -O -enforce-exclusivity=checked -emit-sil -Xllvm -debug-only=sil-licm -primary-file %s 2>&1 | %FileCheck %s --check-prefix=TESTLICM
-// RUN: %target-swift-frontend -O -enforce-exclusivity=checked -emit-sil -Xllvm -debug-only=sil-licm -primary-file %s 2>&1 | %FileCheck %s --check-prefix=TESTLICM2
-// RUN: %target-swift-frontend -O -enforce-exclusivity=checked -emit-sil  -primary-file %s | %FileCheck %s --check-prefix=TESTSIL
-// RUN: %target-swift-frontend -O -enforce-exclusivity=checked -emit-sil -Xllvm -debug-only=sil-licm -whole-module-optimization %s 2>&1 | %FileCheck %s --check-prefix=TESTLICMWMO
-// RUN: %target-swift-frontend -O -enforce-exclusivity=checked -emit-sil  -whole-module-optimization %s | %FileCheck %s --check-prefix=TESTSILWMO
+// RUN: %target-swift-frontend -O -enforce-exclusivity=checked -Xllvm -sil-print-types -emit-sil -Xllvm -debug-only=sil-licm -primary-file %s 2>&1 | %FileCheck %s --check-prefix=TESTLICM
+// RUN: %target-swift-frontend -O -enforce-exclusivity=checked -Xllvm -sil-print-types -emit-sil -Xllvm -debug-only=sil-licm -primary-file %s 2>&1 | %FileCheck %s --check-prefix=TESTLICM2
+// RUN: %target-swift-frontend -O -enforce-exclusivity=checked -Xllvm -sil-print-types -emit-sil  -primary-file %s | %FileCheck %s --check-prefix=TESTSIL
+// RUN: %target-swift-frontend -O -enforce-exclusivity=checked -Xllvm -sil-print-types -emit-sil -Xllvm -debug-only=sil-licm -whole-module-optimization %s 2>&1 | %FileCheck %s --check-prefix=TESTLICMWMO
+// RUN: %target-swift-frontend -O -enforce-exclusivity=checked -Xllvm -sil-print-types -emit-sil  -whole-module-optimization %s | %FileCheck %s --check-prefix=TESTSILWMO
 
 // REQUIRES: optimized_stdlib,asserts,swift_stdlib_no_asserts
 // REQUIRES: PTRSIZE=64

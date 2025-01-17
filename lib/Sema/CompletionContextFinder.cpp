@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/Sema/CompletionContextFinder.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Parse/Lexer.h"
 #include "swift/Sema/SyntacticElementTarget.h"
 
@@ -83,6 +84,17 @@ CompletionContextFinder::walkToExprPost(Expr *E) {
     Contexts.pop_back();
   }
   return Action::Continue(E);
+}
+
+ASTWalker::PreWalkAction CompletionContextFinder::walkToDeclPre(Decl *D) {
+  // Look through any decl if we're looking for any viable fallback expression.
+  if (ForFallback)
+    return Action::Continue();
+
+  // Otherwise, follow the same rule as the ConstraintSystem, where only
+  // nested PatternBindingDecls are solved as part of the system. Local decls
+  // are handled by TypeCheckASTNodeAtLocRequest.
+  return Action::VisitNodeIf(isa<PatternBindingDecl>(D));
 }
 
 size_t CompletionContextFinder::getKeyPathCompletionComponentIndex() const {

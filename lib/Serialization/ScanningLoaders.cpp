@@ -19,6 +19,7 @@
 #include "swift/AST/ModuleLoader.h"
 #include "swift/AST/SourceFile.h"
 #include "swift/AST/TypeCheckRequests.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/FileTypes.h"
 #include "swift/Basic/PrettyStackTrace.h"
 #include "swift/Frontend/ModuleInterfaceLoader.h"
@@ -148,18 +149,19 @@ SwiftModuleScanner::scanInterfaceFile(Twine moduleInterfacePath,
   StringRef sdkPath = Ctx.SearchPathOpts.getSDKPath();
   llvm::SmallString<32> modulePath = realModuleName.str();
   llvm::sys::path::replace_extension(modulePath, newExt);
+  auto ScannerPackageName = Ctx.LangOpts.PackageName;
   std::optional<ModuleDependencyInfo> Result;
   std::error_code code = astDelegate.runInSubContext(
       realModuleName.str(), moduleInterfacePath.str(), sdkPath,
       StringRef(), SourceLoc(),
       [&](ASTContext &Ctx, ModuleDecl *mainMod, ArrayRef<StringRef> BaseArgs,
-          ArrayRef<StringRef> PCMArgs, StringRef Hash) {
+          ArrayRef<StringRef> PCMArgs, StringRef Hash, StringRef UserModVer) {
         assert(mainMod);
         std::string InPath = moduleInterfacePath.str();
         auto compiledCandidates =
             getCompiledCandidates(Ctx, realModuleName.str(), InPath);
         if (!compiledCandidates.empty() &&
-            !Ctx.SearchPathOpts.NoScannerModuleValidation) {
+            Ctx.SearchPathOpts.ScannerModuleValidation) {
           assert(compiledCandidates.size() == 1 &&
                  "Should only have 1 candidate module");
           auto BinaryDep = scanModuleFile(compiledCandidates[0], isFramework,
@@ -219,17 +221,33 @@ SwiftModuleScanner::scanInterfaceFile(Twine moduleInterfacePath,
         // Create a source file.
         unsigned bufferID =
             Ctx.SourceMgr.addNewSourceBuffer(std::move(interfaceBuf.get()));
-        auto moduleDecl = ModuleDecl::create(realModuleName, Ctx);
+        auto moduleDecl = ModuleDecl::createEmpty(realModuleName, Ctx);
 
         SourceFile::ParsingOptions parsingOpts;
         auto sourceFile = new (Ctx) SourceFile(
             *moduleDecl, SourceFileKind::Interface, bufferID, parsingOpts);
-        moduleDecl->addAuxiliaryFile(*sourceFile);
-
         std::vector<StringRef> ArgsRefs(Args.begin(), Args.end());
+        std::vector<StringRef> compiledCandidatesRefs(compiledCandidates.begin(),
+                                                      compiledCandidates.end());
+
+        // If this interface specified '-autolink-force-load', add it to the
+        // set of linked libraries for this module.
+        std::vector<LinkLibrary> linkLibraries;
+        if (llvm::find(ArgsRefs, "-autolink-force-load") != ArgsRefs.end()) {
+          std::string linkName = realModuleName.str().str();
+          auto linkNameArgIt = llvm::find(ArgsRefs, "-module-link-name");
+          if (linkNameArgIt != ArgsRefs.end())
+            linkName = *(linkNameArgIt+1);
+          linkLibraries.push_back({linkName,
+                                   isFramework ? LibraryKind::Framework : LibraryKind::Library,
+                                   true});
+        }
+        bool isStatic = llvm::find(ArgsRefs, "-static") != ArgsRefs.end();
+
         Result = ModuleDependencyInfo::forSwiftInterfaceModule(
-            outputPathBase.str().str(), InPath, compiledCandidates, ArgsRefs,
-            PCMArgs, Hash, isFramework, {}, /*module-cache-key*/ "");
+            outputPathBase.str().str(), InPath, compiledCandidatesRefs,
+            ArgsRefs, {}, {}, linkLibraries, PCMArgs, Hash, isFramework,
+            isStatic, {}, /*module-cache-key*/ "", UserModVer);
 
         if (Ctx.CASOpts.EnableCaching) {
           std::vector<std::string> clangDependencyFiles;
@@ -243,15 +261,44 @@ SwiftModuleScanner::scanInterfaceFile(Twine moduleInterfacePath,
 
         // Walk the source file to find the import declarations.
         llvm::StringSet<> alreadyAddedModules;
-        Result->addModuleImport(*sourceFile, alreadyAddedModules);
+        Result->addModuleImports(*sourceFile, alreadyAddedModules,
+                                 &Ctx.SourceMgr);
 
         // Collect implicitly imported modules in case they are not explicitly
         // printed in the interface file, e.g. SwiftOnoneSupport.
         auto &imInfo = mainMod->getImplicitImportInfo();
         for (auto import : imInfo.AdditionalUnloadedImports) {
           Result->addModuleImport(import.module.getModulePath(),
-                                  &alreadyAddedModules);
+                                  &alreadyAddedModules, &Ctx.SourceMgr);
         }
+
+        // If this is a dependency that belongs to the same package, and we have not yet enabled Package Textual interfaces,
+        // scan the adjacent binary module for package dependencies.
+        if (!ScannerPackageName.empty() &&
+            !Ctx.LangOpts.EnablePackageInterfaceLoad) {
+           auto adjacentBinaryModule = std::find_if(
+               compiledCandidates.begin(), compiledCandidates.end(),
+               [moduleInterfacePath](const std::string &candidate) {
+                 return llvm::sys::path::parent_path(candidate) ==
+                        llvm::sys::path::parent_path(moduleInterfacePath.str());
+               });
+
+           if (adjacentBinaryModule != compiledCandidates.end()) {
+             auto adjacentBinaryModulePackageOnlyImports = getMatchingPackageOnlyImportsOfModule(
+                  *adjacentBinaryModule, isFramework,
+                  isRequiredOSSAModules(), Ctx.LangOpts.SDKName,
+                  ScannerPackageName, Ctx.SourceMgr.getFileSystem().get(),
+                  Ctx.SearchPathOpts.DeserializedPathRecoverer);
+
+             if (!adjacentBinaryModulePackageOnlyImports)
+               return adjacentBinaryModulePackageOnlyImports.getError();
+
+             for (const auto &requiredImport : *adjacentBinaryModulePackageOnlyImports)
+               if (!alreadyAddedModules.contains(requiredImport.getKey()))
+                 Result->addModuleImport(requiredImport.getKey(),
+                                         &alreadyAddedModules);
+           }
+         }
 
         return std::error_code();
       });
@@ -264,11 +311,10 @@ SwiftModuleScanner::scanInterfaceFile(Twine moduleInterfacePath,
 
 ModuleDependencyVector SerializedModuleLoaderBase::getModuleDependencies(
     Identifier moduleName, StringRef moduleOutputPath,
-    llvm::IntrusiveRefCntPtr<llvm::cas::CachingOnDiskFileSystem> CacheFS,
     const llvm::DenseSet<clang::tooling::dependencies::ModuleID>
         &alreadySeenClangModules,
     clang::tooling::dependencies::DependencyScanningTool &clangScanningTool,
-    InterfaceSubContextDelegate &delegate, llvm::TreePathPrefixMapper *mapper,
+    InterfaceSubContextDelegate &delegate, llvm::PrefixMapper *mapper,
     bool isTestableDependencyLookup) {
   ImportPath::Module::Builder builder(moduleName);
   auto modulePath = builder.get();
@@ -293,7 +339,7 @@ ModuleDependencyVector SerializedModuleLoaderBase::getModuleDependencies(
          "Expected PlaceholderSwiftModuleScanner as the first dependency "
          "scanner loader.");
   for (auto &scanner : scanners) {
-    if (scanner->canImportModule(modulePath, nullptr,
+    if (scanner->canImportModule(modulePath, SourceLoc(), nullptr,
                                  isTestableDependencyLookup)) {
 
       ModuleDependencyVector moduleDependnecies;

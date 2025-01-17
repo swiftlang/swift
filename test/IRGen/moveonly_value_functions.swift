@@ -1,5 +1,5 @@
 // RUN: %target-swift-emit-irgen -O                          \
-// RUN:     -enable-experimental-feature NoncopyableGenerics \
+// RUN:     -Xllvm -sil-disable-pass=deinit-devirtualizer    \
 // RUN:     -disable-type-layout                             \
 // RUN:     %s                                               \
 // RUN: |                                                    \

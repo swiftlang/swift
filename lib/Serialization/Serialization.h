@@ -385,9 +385,9 @@ private:
   /// Writes a pack conformance.
   void writeASTBlockEntity(PackConformance *conformance);
 
-  /// Writes lifetime dependence info
-  void
-  writeLifetimeDependenceInfo(LifetimeDependenceInfo lifetimeDependenceInfo);
+  /// Writes lifetime dependencies
+  void writeLifetimeDependencies(
+      ArrayRef<LifetimeDependenceInfo> lifetimeDependenceInfo);
 
   /// Registers the abbreviation for the given decl or type layout.
   template <typename Layout>
@@ -424,7 +424,8 @@ private:
                     const SpecificASTBlockRecordKeeper &entities);
 
   /// Serializes all transparent SIL functions in the SILModule.
-  void writeSIL(const SILModule *M, bool serializeAllSIL);
+  void writeSIL(const SILModule *M, bool serializeAllSIL,
+                bool serializeDebugInfo);
 
   /// Top-level entry point for serializing a module.
   void writeAST(ModuleOrSourceFile DC);

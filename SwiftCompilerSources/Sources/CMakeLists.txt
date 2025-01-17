@@ -9,5 +9,6 @@
 # NOTE: Subdirectories must be added in dependency order.
 
 add_subdirectory(Basic)
+add_subdirectory(AST)
 add_subdirectory(SIL)
 add_subdirectory(Optimizer)

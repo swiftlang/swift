@@ -17,6 +17,7 @@
 // RUN: %target-swift-frontend -emit-module %t/ExtendedDefinitionNonPublic.swift -o %t -I %t
 // RUN: %target-swift-frontend -emit-module %t/UnusedImport.swift -o %t -I %t
 // RUN: %target-swift-frontend -emit-module %t/UnusedPackageImport.swift -o %t -I %t
+// RUN: %target-swift-frontend -emit-module %t/ExtendedPackageTypeImport.swift -o %t -I %t
 // RUN: %target-swift-frontend -emit-module %t/ImportNotUseFromAPI.swift -o %t -I %t
 // RUN: %target-swift-frontend -emit-module %t/ImportUsedInPackage.swift -o %t -I %t
 // RUN: %target-swift-frontend -emit-module %t/ExportedUnused.swift -o %t -I %t
@@ -31,8 +32,13 @@
 // RUN: %target-swift-frontend -typecheck %t/ClientOfClangModules.swift -I %t \
 // RUN:   -package-name pkg -Rmodule-api-import \
 // RUN:   -enable-upcoming-feature InternalImportsByDefault -verify
+// RUN: %target-swift-frontend -typecheck %t/ClientOfClangReexportedSubmodules.swift -I %t \
+// RUN:   -package-name pkg -Rmodule-api-import \
+// RUN:   -enable-upcoming-feature InternalImportsByDefault -verify
 // RUN: %target-swift-frontend -typecheck %t/Client_Swift5.swift -I %t \
 // RUN:   -swift-version 5 -verify
+
+// REQUIRES: swift_feature_InternalImportsByDefault
 
 //--- DepUsedFromInlinableCode.swift
 public struct TypeUsedFromInlinableCode {}
@@ -98,6 +104,9 @@ public struct NonPublicExtendedType {}
 //--- UnusedImport.swift
 
 //--- UnusedPackageImport.swift
+//--- ExtendedPackageTypeImport.swift
+
+public struct ExtendedPackageType {}
 
 //--- ImportNotUseFromAPI.swift
 public struct NotAnAPIType {}
@@ -119,9 +128,8 @@ public struct Extended {
 
 //--- Client_Swift5.swift
 /// No diagnostics should be raised on the implicit access level.
-import UnusedImport // expected-error {{ambiguous implicit access level for import of 'UnusedImport'; it is imported as 'public' elsewhere}}
+import UnusedImport
 public import UnusedImport // expected-warning {{public import of 'UnusedImport' was not used in public declarations or inlinable code}} {{1-7=internal}}
-// expected-note @-1 {{imported 'public' here}}
 
 //--- Client.swift
 public import DepUsedFromInlinableCode
@@ -145,6 +153,7 @@ package import UnusedImport // expected-warning {{package import of 'UnusedImpor
 // expected-warning @-1 {{module 'UnusedImport' is imported as 'public' from the same file; this 'package' access level will be ignored}}
 
 package import UnusedPackageImport // expected-warning {{package import of 'UnusedPackageImport' was not used in package declarations}} {{1-9=}}
+package import ExtendedPackageTypeImport
 public import ImportNotUseFromAPI // expected-warning {{public import of 'ImportNotUseFromAPI' was not used in public declarations or inlinable code}} {{1-8=}}
 public import ImportUsedInPackage // expected-warning {{public import of 'ImportUsedInPackage' was not used in public declarations or inlinable code}} {{1-7=package}}
 
@@ -243,6 +252,10 @@ public protocol Countable {
 extension Extended: Countable { // expected-remark {{struct 'Extended' is imported via 'RetroactiveConformance'}}
 }
 
+extension ExtendedPackageType { // expected-remark {{struct 'ExtendedPackageType' is imported via 'ExtendedPackageTypeImport'}}
+  package func useExtendedPackageType() { }
+}
+
 /// Tests for imports of clang modules.
 //--- module.modulemap
 module ClangSimpleUnused {
@@ -275,6 +288,21 @@ module ClangTopModule {
   }
 }
 
+module ClangReexportedSubmodulePublic {
+  header "ClangReexportedSubmodulePublic.h"
+  module ClangReexportedSubmodulePublicSub {
+    header "ClangReexportedSubmodulePublicSub.h"
+    export *
+  }
+}
+
+module ClangReexportedSubmoduleTop {
+  header "ClangReexportedSubmoduleTop.h"
+  module ClangReexportedSubmoduleSub {
+    header "ClangReexportedSubmoduleSub.h"
+  }
+}
+
 //--- ClangSimpleUnused.h
 //--- ClangSimple.h
 struct ClangSimpleType {};
@@ -290,6 +318,15 @@ struct ClangSubmoduleSubmoduleType {};
 struct ClangTopModuleType {};
 //--- ClangTopModuleSubmodule.h
 
+//--- ClangReexportedSubmodulePublic.h
+//--- ClangReexportedSubmodulePublicSub.h
+#include <ClangReexportedSubmoduleSub.h>
+
+//--- ClangReexportedSubmoduleTop.h
+//--- ClangReexportedSubmoduleSub.h
+typedef struct _TypedefTypeUnderlying {
+} TypedefType;
+
 //--- ClientOfClangModules.swift
 public import ClangSimple
 public import ClangSimpleUnused // expected-warning {{public import of 'ClangSimpleUnused' was not used in public declarations or inlinable code}}
@@ -302,3 +339,9 @@ public import ClangTopModule.ClangTopModuleSubmodule
 public func clangUser(a: ClangSimpleType) {} // expected-remark {{struct 'ClangSimpleType' is imported via 'ClangSimple'}}
 public func clangUser(a: ClangSubmoduleSubmoduleType) {} // expected-remark {{struct 'ClangSubmoduleSubmoduleType' is imported via 'ClangSubmodule'}}
 public func clangUser(a: ClangTopModuleType) {} // expected-remark {{struct 'ClangTopModuleType' is imported via 'ClangTopModule'}}
+
+//--- ClientOfClangReexportedSubmodules.swift
+public import ClangReexportedSubmodulePublic.ClangReexportedSubmodulePublicSub
+
+public func useTypedefed(a: TypedefType) {} // expected-remark 2 {{typealias underlying type struct '_TypedefTypeUnderlying' is imported via 'ClangReexportedSubmodulePublicSub', which reexports definition from 'ClangReexportedSubmoduleTop'}}
+// expected-remark @-1 {{type alias 'TypedefType' is imported via 'ClangReexportedSubmodulePublicSub', which reexports definition from 'ClangReexportedSubmoduleTop'}}

@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/SILOptimizer/Utils/InstructionDeleter.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/Test.h"
 #include "swift/SILOptimizer/Utils/ConstExpr.h"
@@ -228,6 +229,7 @@ void InstructionDeleter::deleteWithUses(SILInstruction *inst, bool fixLifetimes,
   // Recursively visit all uses while growing toDeleteInsts in def-use order and
   // dropping dead operands.
   SmallVector<SILInstruction *, 4> toDeleteInsts;
+  SmallVector<Operand *, 4> toDropUses;
 
   toDeleteInsts.push_back(inst);
   swift::salvageDebugInfo(inst);
@@ -242,11 +244,14 @@ void InstructionDeleter::deleteWithUses(SILInstruction *inst, bool fixLifetimes,
         assert(!isa<BranchInst>(user) && "can't delete phis");
 
         toDeleteInsts.push_back(user);
+        toDropUses.push_back(use);
         swift::salvageDebugInfo(user);
-        use->drop();
       }
     }
   }
+  // Drop all after salvage debug info has been run.
+  for (auto *use : toDropUses)
+    use->drop();
   // Process the remaining operands. Insert destroys for consuming
   // operands. Track newly dead operand values. Instructions with multiple dead
   // operands may occur in toDeleteInsts multiple times.
@@ -330,7 +335,7 @@ namespace swift::test {
 // Dumps:
 // - the function
 static FunctionTest DeleterDeleteIfDeadTest(
-    "deleter-delete-if-dead", [](auto &function, auto &arguments, auto &test) {
+    "deleter_delete_if_dead", [](auto &function, auto &arguments, auto &test) {
       auto *inst = arguments.takeInstruction();
       InstructionDeleter deleter;
       llvm::outs() << "Deleting-if-dead " << *inst;

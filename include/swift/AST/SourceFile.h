@@ -15,6 +15,7 @@
 
 #include "swift/AST/ASTNode.h"
 #include "swift/AST/FileUnit.h"
+#include "swift/AST/IfConfigClauseRangeInfo.h"
 #include "swift/AST/Import.h"
 #include "swift/AST/SynthesizedFileUnit.h"
 #include "swift/Basic/Debug.h"
@@ -26,6 +27,7 @@
 namespace swift {
 
 class PersistentParserState;
+struct SourceFileExtras;
 
 /// Kind of import affecting how a decl can be reexported.
 ///
@@ -47,44 +49,6 @@ enum class RestrictedImportKind {
 
 /// Import that limits the access level of imported entities.
 using ImportAccessLevel = std::optional<AttributedImport<ImportedModule>>;
-
-/// Stores range information for a \c #if block in a SourceFile.
-class IfConfigClauseRangeInfo final {
-public:
-  enum ClauseKind {
-    // Active '#if', '#elseif', or '#else' clause.
-    ActiveClause,
-    // Inactive '#if', '#elseif', or '#else' clause.
-    InactiveClause,
-    // '#endif' directive.
-    EndDirective,
-  };
-
-private:
-  /// Source location of '#if', '#elseif', etc.
-  SourceLoc DirectiveLoc;
-  /// Character source location of body starts.
-  SourceLoc BodyLoc;
-  /// Location of the end of the body.
-  SourceLoc EndLoc;
-
-  ClauseKind Kind;
-
-public:
-  IfConfigClauseRangeInfo(SourceLoc DirectiveLoc, SourceLoc BodyLoc,
-                          SourceLoc EndLoc, ClauseKind Kind)
-      : DirectiveLoc(DirectiveLoc), BodyLoc(BodyLoc), EndLoc(EndLoc),
-        Kind(Kind) {
-    assert(DirectiveLoc.isValid() && BodyLoc.isValid() && EndLoc.isValid());
-  }
-
-  SourceLoc getStartLoc() const { return DirectiveLoc; }
-  CharSourceRange getDirectiveRange(const SourceManager &SM) const;
-  CharSourceRange getWholeRange(const SourceManager &SM) const;
-  CharSourceRange getBodyRange(const SourceManager &SM) const;
-
-  ClauseKind getKind() const { return Kind; }
-};
 
 /// A file containing Swift source code.
 ///
@@ -159,15 +123,25 @@ private:
   /// The highest access level of declarations referencing each import.
   llvm::DenseMap<const ModuleDecl *, AccessLevel> ImportsUseAccessLevel;
 
+  /// Imports that should be printed in the module interface even though they
+  /// were not written in the source file.
+  llvm::SmallDenseSet<ImportedModule> ImplicitImportsForModuleInterface;
+
+  /// Associates a list of source locations to the member declarations that must
+  /// be diagnosed as being out of scope due to a missing import.
+  using DelayedMissingImportForMemberDiags =
+      llvm::SmallDenseMap<const ValueDecl *, std::vector<SourceLoc>>;
+  DelayedMissingImportForMemberDiags MissingImportForMemberDiagnostics;
+
   /// A unique identifier representing this file; used to mark private decls
   /// within the file to keep them from conflicting with other files in the
   /// same module.
   mutable Identifier PrivateDiscriminator;
 
-  /// The root TypeRefinementContext for this SourceFile.
+  /// The root AvailabilityScope for this SourceFile.
   ///
   /// This is set during type checking.
-  TypeRefinementContext *TRC = nullptr;
+  AvailabilityScope *RootAvailabilityScope = nullptr;
 
   /// Either the class marked \@NS/UIApplicationMain or the synthesized FuncDecl
   /// that calls main on the type marked @main.
@@ -180,12 +154,10 @@ private:
   /// this source file.
   ///
   /// We only collect interface hash for primary input files.
-  std::optional<StableHasher> InterfaceHasher;
+  std::optional<Fingerprint> InterfaceHash;
 
   /// The ID for the memory buffer containing this file's source.
-  ///
-  /// May be -1, to indicate no association with a buffer.
-  int BufferID;
+  unsigned BufferID;
 
   /// The parsing options for the file.
   ParsingOptions ParsingOpts;
@@ -271,6 +243,9 @@ private:
   /// The cached computation of which import flags are present in the file.
   /// Storage for \c HasImportsMatchingFlagRequest.
   ImportOptions cachedImportOptions;
+
+  /// Extra information for the source file, allocated as needed.
+  SourceFileExtras *extras = nullptr;
 
   friend ASTContext;
 
@@ -359,6 +334,10 @@ public:
   /// List of Objective-C member conflicts we have found during type checking.
   llvm::SetVector<ObjCMethodConflict> ObjCMethodConflicts;
 
+  /// Categories (extensions with explicit @objc names) declared in this
+  /// source file. They need to be checked for conflicts after type checking.
+  llvm::TinyPtrVector<ExtensionDecl *> ObjCCategories;
+
   /// List of attributes added by access notes, used to emit remarks for valid
   /// ones.
   llvm::DenseMap<ValueDecl *, std::vector<DeclAttribute *>>
@@ -393,7 +372,12 @@ public:
   /// \c #sourceLocation(file:) declarations.
   llvm::StringMap<SourceFilePathInfo> getInfoForUsedFilePaths() const;
 
-  SourceFile(ModuleDecl &M, SourceFileKind K, std::optional<unsigned> bufferID,
+  /// Retrieve "extra" information associated with this source file, which is
+  /// lazily and separately constructed. Use this for scratch information
+  /// that isn't needed for all source files.
+  SourceFileExtras &getExtras() const;
+
+  SourceFile(ModuleDecl &M, SourceFileKind K, unsigned bufferID,
              ParsingOptions parsingOpts = {}, bool isPrimary = false);
 
   ~SourceFile();
@@ -436,9 +420,11 @@ public:
   AccessLevel
   getMaxAccessLevelUsingImport(const ModuleDecl *import) const;
 
-  /// Register the use of \p import from an API with \p accessLevel.
-  void registerAccessLevelUsingImport(AttributedImport<ImportedModule> import,
-                                      AccessLevel accessLevel);
+  /// Register the requirement that \p mod be imported with an access level
+  /// that is at least as permissive as \p accessLevel in order to satisfy
+  /// access or exportability checking constraints.
+  void registerRequiredAccessLevelForModule(ModuleDecl *mod,
+                                            AccessLevel accessLevel);
 
   enum ImportQueryKind {
     /// Return the results for testable or private imports.
@@ -457,8 +443,11 @@ public:
   /// If not, we can fast-path module checks.
   bool hasImportsWithFlag(ImportFlags flag) const;
 
-  /// Returns the import flags that are active on imports of \p module.
-  ImportFlags getImportFlags(const ModuleDecl *module) const;
+  /// Enumerates each of the direct imports of \p module in the file.
+  using AttributedImportCallback =
+      llvm::function_ref<void(AttributedImport<ImportedModule> &)>;
+  void forEachImportOfModule(const ModuleDecl *module,
+                             AttributedImportCallback callback);
 
   /// Get the most permissive restriction applied to the imports of \p module.
   RestrictedImportKind getRestrictedImportKind(const ModuleDecl *module) const;
@@ -473,9 +462,6 @@ public:
   lookupImportedSPIGroups(
                 const ModuleDecl *importedModule,
                 llvm::SmallSetVector<Identifier, 4> &spiGroups) const override;
-
-  /// Is \p module imported as \c @_weakLinked by this file?
-  bool importsModuleAsWeakLinked(const ModuleDecl *module) const override;
 
   // Is \p targetDecl accessible as an explicitly imported SPI from this file?
   bool isImportedAsSPI(const ValueDecl *targetDecl) const;
@@ -507,10 +493,32 @@ public:
 
   SWIFT_DEBUG_DUMPER(dumpSeparatelyImportedOverlays());
 
-  llvm::SmallDenseSet<ImportedModule> MissingImportedModules;
+  /// Record an import that should be printed in the module interface even
+  /// though it was not written in the source file. These imports are needed in
+  /// Swift 5 mode to preserve the integrity of swiftinterface files when code
+  /// publicly use declarations from modules that were \c `@_implementationOnly`
+  /// imported in other source files.
+  void addImplicitImportForModuleInterface(ImportedModule module) {
+    ImplicitImportsForModuleInterface.insert(module);
+  }
 
-  void addMissingImportedModule(ImportedModule module) const {
-     const_cast<SourceFile *>(this)->MissingImportedModules.insert(module);
+  /// Gather implicit imports that should printed in swiftinterfaces for
+  /// compatibility with code in some Swift 5 modules.
+  void getImplicitImportsForModuleInterface(
+      SmallVectorImpl<ImportedModule> &imports) const override;
+
+  /// Add a source location for which a delayed missing import for member
+  /// diagnostic should be emited.
+  void addDelayedMissingImportForMemberDiagnostic(const ValueDecl *decl,
+                                                  SourceLoc loc) {
+    MissingImportForMemberDiagnostics[decl].push_back(loc);
+  }
+
+  DelayedMissingImportForMemberDiags
+  takeDelayedMissingImportForMemberDiagnostics() {
+    DelayedMissingImportForMemberDiags diags;
+    std::swap(diags, MissingImportForMemberDiagnostics);
+    return diags;
   }
 
   /// Record the source range info for a parsed \c #if clause.
@@ -524,10 +532,10 @@ public:
   ArrayRef<IfConfigClauseRangeInfo>
   getIfConfigClausesWithin(SourceRange outer) const;
 
-  void getMissingImportedModules(
-         SmallVectorImpl<ImportedModule> &imports) const override;
-
+  /// Record visible declarations for use in code completion and refactoring.
   void cacheVisibleDecls(SmallVectorImpl<ValueDecl *> &&globals) const;
+
+  /// Retrieve visible declarations for use in code completion and refactoring.
   const SmallVectorImpl<ValueDecl *> &getCachedVisibleDecls() const;
 
   virtual void lookupValue(DeclName name, NLKind lookupKind,
@@ -577,6 +585,9 @@ public:
   getImportedModules(SmallVectorImpl<ImportedModule> &imports,
                      ModuleDecl::ImportFilter filter) const override;
 
+  virtual void getExternalMacros(
+      SmallVectorImpl<ExternalMacroPlugin> &macros) const override;
+
   virtual void
   collectLinkLibraries(ModuleDecl::LinkLibraryCallback callback) const override;
 
@@ -589,11 +600,11 @@ public:
 
   /// The buffer ID for the file that was imported, or None if there
   /// is no associated buffer.
-  std::optional<unsigned> getBufferID() const {
-    if (BufferID == -1)
-      return std::nullopt;
+  unsigned getBufferID() const {
     return BufferID;
   }
+
+  const GeneratedSourceInfo *getGeneratedSourceFileInfo() const;
 
   /// For source files created to hold the source code created by expanding
   /// a macro, this is the AST node that describes the macro expansion.
@@ -640,6 +651,9 @@ public:
   /// If this buffer corresponds to a file on disk, returns the path.
   /// Otherwise, return an empty string.
   StringRef getFilename() const;
+
+  /// Retrieve the source text buffer.
+  StringRef getBuffer() const;
 
   /// Retrieve the scope that describes this source file.
   ASTScope &getScope();
@@ -737,33 +751,28 @@ public:
     return ImportedUnderlyingModule->findUnderlyingClangModule();
   }
 
-  /// Get the root refinement context for the file. The root context may be
-  /// null if the context hierarchy has not been built yet. Use
-  /// TypeChecker::getOrBuildTypeRefinementContext() to get a built
-  /// root of the hierarchy.
-  TypeRefinementContext *getTypeRefinementContext() const;
+  /// Get the root availability scope for the file. The root scope may be
+  /// null if the scope tree has not been built yet. Use
+  /// TypeChecker::getOrBuildAvailabilityScope() to get a built
+  /// root of the tree.
+  AvailabilityScope *getAvailabilityScope() const;
 
-  /// Set the root refinement context for the file.
-  void setTypeRefinementContext(TypeRefinementContext *TRC);
+  /// Set the root availability scope for the file.
+  void setAvailabilityScope(AvailabilityScope *scope);
 
   /// Whether this file can compute an interface hash.
   bool hasInterfaceHash() const {
     return ParsingOpts.contains(ParsingFlags::EnableInterfaceHash);
   }
 
-  /// Retrieve a fingerprint value that summarizes the declarations in this
-  /// source file.
+  /// Retrieve a fingerprint value that summarizes the top-level declarations in
+  /// this source file.
   ///
   /// Note that the interface hash merely summarizes the top-level declarations
   /// in this file. Type body fingerprints are currently implemented such that
   /// they divert tokens away from the hasher used for fingerprints. That is,
   /// changes to the bodies of types and extensions will not result in a change
-  /// to the interface hash.
-  ///
-  /// In order for the interface hash to be enabled, this source file must be a
-  /// primary and the compiler must be set in incremental mode. If this is not
-  /// the case, this function will try to signal with an assert. It is useful
-  /// to guard requests for the interface hash with \c hasInterfaceHash().
+  /// to the source file interface hash.
   Fingerprint getInterfaceHash() const;
 
   void dumpInterfaceHash(llvm::raw_ostream &out) {
@@ -818,8 +827,8 @@ inline SourceFile::ParsingOptions operator|(SourceFile::ParsingFlags lhs,
 }
 
 inline SourceFile &ModuleDecl::getMainSourceFile() const {
-  assert(!Files.empty() && "No files added yet");
-  return *cast<SourceFile>(Files.front());
+  assert(!getFiles().empty() && "No files in module");
+  return *cast<SourceFile>(getFiles().front());
 }
 
 inline FileUnit *ModuleDecl::EntryPointInfoTy::getEntryPointFile() const {

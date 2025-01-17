@@ -42,3 +42,6 @@ SWIFT_REQUEST(ClangImporter, IsSafeUseOfCxxDecl,
 SWIFT_REQUEST(ClangImporter, CustomRefCountingOperation,
               CustomRefCountingOperationResult(CustomRefCountingOperationDescriptor), Cached,
               NoLocationInfo)
+SWIFT_REQUEST(ClangImporter, ClangTypeEscapability,
+              CxxEscapability(EscapabilityLookupDescriptor), Cached,
+              NoLocationInfo)

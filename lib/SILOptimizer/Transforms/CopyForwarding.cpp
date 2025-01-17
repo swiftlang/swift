@@ -58,6 +58,7 @@
 //===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "copy-forwarding"
+#include "swift/Basic/Assertions.h"
 #include "swift/SIL/DebugUtils.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILBuilder.h"
@@ -69,6 +70,7 @@
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
 #include "swift/SILOptimizer/Utils/CFGOptUtils.h"
+#include "swift/SILOptimizer/Utils/DebugOptUtils.h"
 #include "swift/SILOptimizer/Utils/ValueLifetime.h"
 #include "llvm/ADT/SetVector.h"
 #include "llvm/ADT/Statistic.h"
@@ -698,6 +700,8 @@ propagateCopy(CopyAddrInst *CopyInst) {
       SILBuilderWithScope(CurrentCopy)
           .createDestroyAddr(CurrentCopy->getLoc(), CurrentCopy->getDest());
     }
+    swift::salvageStoreDebugInfo(CurrentCopy, CurrentCopy->getSrc(),
+                                 CurrentCopy->getDest());
     CurrentCopy->eraseFromParent();
     HasChanged = true;
     ++NumCopyForward;
@@ -706,6 +710,8 @@ propagateCopy(CopyAddrInst *CopyInst) {
   // Forward propagation failed. Attempt to backward propagate.
   if (CurrentCopy->isInitializationOfDest() && backwardPropagateCopy()) {
     LLVM_DEBUG(llvm::dbgs() << "  Reversing Copy:" << *CurrentCopy);
+    swift::salvageStoreDebugInfo(CurrentCopy, CurrentCopy->getDest(),
+                                 CurrentCopy->getSrc());
     CurrentCopy->eraseFromParent();
     HasChanged = true;
     ++NumCopyBackward;
@@ -816,6 +822,9 @@ forwardDeadTempCopy(CopyAddrInst *destCopy) {
     SILBuilderWithScope(srcCopy)
       .createDestroyAddr(srcCopy->getLoc(), srcCopy->getDest());
   }
+
+  // Salvage debug values before deleting them.
+  swift::salvageStoreDebugInfo(srcCopy, srcCopy->getSrc(), srcCopy->getDest());
 
   // Delete all dead debug_value instructions
   for (auto *deadDebugUser : debugInstsToDelete) {
@@ -1190,9 +1199,13 @@ bool CopyForwarding::backwardPropagateCopy() {
   // Now that an init was found, it is safe to substitute all recorded uses
   // with the copy's dest.
   for (auto *Oper : ValueUses) {
-    Oper->set(CurrentCopy->getDest());
-    if (isa<CopyAddrInst>(Oper->getUser()))
+    if (auto *SI = dyn_cast<CopyAddrInst>(Oper->getUser())) {
       HasForwardedToCopy = true;
+      // This instruction gets "replaced", so we need to salvage its previous
+      // debug info.
+      swift::salvageStoreDebugInfo(SI, SI->getSrc(), SI->getDest());
+    }
+    Oper->set(CurrentCopy->getDest());
   }
   return true;
 }

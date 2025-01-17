@@ -791,3 +791,17 @@ do {
     }
   }
 }
+
+func testMatchingNonErrorConformingTypeInClosure(_ x: any Error) {
+  enum E {
+    case e
+  }
+  _ = {
+    switch x {
+    case E.e: // expected-error {{pattern of type 'E' does not conform to expected match type 'Error'}}
+      break
+    default:
+      break
+    }
+  }
+}

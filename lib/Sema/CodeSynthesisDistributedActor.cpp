@@ -14,11 +14,10 @@
 
 #include "CodeSynthesis.h"
 #include "DerivedConformances.h"
-#include "TypeCheckType.h"
 #include "TypeChecker.h"
 #include "swift/AST/ASTMangler.h"
 #include "swift/AST/ASTPrinter.h"
-#include "swift/AST/Availability.h"
+#include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/DistributedDecl.h"
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/Expr.h"
@@ -27,6 +26,7 @@
 #include "swift/AST/NameLookupRequests.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/TypeCheckRequests.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/Defer.h"
 #include "swift/ClangImporter/ClangModule.h"
 #include "swift/Sema/ConstraintSystem.h"
@@ -82,15 +82,15 @@ static VarDecl*
 // what already has a witness.
 static VarDecl *addImplicitDistributedActorIDProperty(
     ClassDecl *nominal) {
-  if (!nominal)
-    return nullptr;
-  if (!nominal->isDistributedActor())
+  if (!nominal || !nominal->isDistributedActor())
     return nullptr;
 
   auto &C = nominal->getASTContext();
 
   // ==== Synthesize and add 'id' property to the actor decl
   Type propertyType = getDistributedActorIDType(nominal);
+  if (!propertyType || propertyType->hasError())
+    return nullptr;
 
   auto *propDecl = new (C)
       VarDecl(/*IsStatic*/false, VarDecl::Introducer::Let,
@@ -100,9 +100,10 @@ static VarDecl *addImplicitDistributedActorIDProperty(
   propDecl->copyFormalAccessFrom(nominal, /*sourceIsParentContext*/ true);
   propDecl->setInterfaceType(propertyType);
 
-  Pattern *propPat = NamedPattern::createImplicit(C, propDecl, propertyType);
-  propPat = TypedPattern::createImplicit(C, propPat, propertyType);
-  propPat->setType(propertyType);
+  auto propContextTy = nominal->mapTypeIntoContext(propertyType);
+
+  Pattern *propPat = NamedPattern::createImplicit(C, propDecl, propContextTy);
+  propPat = TypedPattern::createImplicit(C, propPat, propContextTy);
 
   PatternBindingDecl *pbDecl = PatternBindingDecl::createImplicit(
       C, StaticSpellingKind::None, propPat, /*InitExpr*/ nullptr,
@@ -150,9 +151,10 @@ static VarDecl *addImplicitDistributedActorActorSystemProperty(
   propDecl->copyFormalAccessFrom(nominal, /*sourceIsParentContext*/ true);
   propDecl->setInterfaceType(propertyType);
 
-  Pattern *propPat = NamedPattern::createImplicit(C, propDecl, propertyType);
-  propPat = TypedPattern::createImplicit(C, propPat, propertyType);
-  propPat->setType(propertyType);
+  auto propContextTy = nominal->mapTypeIntoContext(propertyType);
+
+  Pattern *propPat = NamedPattern::createImplicit(C, propDecl, propContextTy);
+  propPat = TypedPattern::createImplicit(C, propPat, propContextTy);
 
   PatternBindingDecl *pbDecl = PatternBindingDecl::createImplicit(
       C, StaticSpellingKind::None, propPat, /*InitExpr*/ nullptr,
@@ -199,7 +201,7 @@ static void forwardParameters(AbstractFunctionDecl *afd,
 static llvm::StringRef
 mangleDistributedThunkForAccessorRecordName(
     ASTContext &C, AbstractFunctionDecl *thunk) {
-  Mangle::ASTMangler mangler;
+  Mangle::ASTMangler mangler(C);
 
   // default mangling
   auto mangled =
@@ -693,7 +695,8 @@ static FuncDecl *createSameSignatureDistributedThunkDecl(DeclContext *DC,
                   /*argumentNameLoc=*/SourceLoc(), funcParam->getArgumentName(),
                   /*parameterNameLoc=*/SourceLoc(), paramName, DC);
 
-    paramDecl->setImplicit(true);
+    paramDecl->setImplicit();
+    paramDecl->setSending();
     paramDecl->setSpecifier(funcParam->getSpecifier());
     paramDecl->setInterfaceType(funcParam->getInterfaceType());
 
@@ -766,7 +769,6 @@ addDistributedActorCodableConformance(
   assert(proto->isSpecificProtocol(swift::KnownProtocolKind::Decodable) ||
          proto->isSpecificProtocol(swift::KnownProtocolKind::Encodable));
   auto &C = actor->getASTContext();
-  auto module = actor->getParentModule();
 
   // === Only Distributed actors can gain this implicit conformance
   if (!actor->isDistributedActor()) {
@@ -775,7 +777,7 @@ addDistributedActorCodableConformance(
 
   // === Does the actor explicitly conform to the protocol already?
   auto explicitConformance =
-      module->lookupConformance(actor->getInterfaceType(), proto);
+      lookupConformance(actor->getInterfaceType(), proto);
   if (!explicitConformance.isInvalid()) {
     // ok, it was conformed explicitly -- let's not synthesize;
     return nullptr;
@@ -820,8 +822,7 @@ addDistributedActorCodableConformance(
       actor->getDeclaredInterfaceType(), proto,
       actor->getLoc(), /*dc=*/actor,
       ProtocolConformanceState::Incomplete,
-      /*isUnchecked=*/false,
-      /*isPreconcurrency=*/false);
+      ProtocolConformanceOptions());
   conformance->setSourceKindAndImplyingConformance(
       ConformanceEntryKind::Synthesized, nullptr);
   actor->registerProtocolConformance(conformance, /*synthesized=*/true);
@@ -971,7 +972,6 @@ VarDecl *GetDistributedActorIDPropertyRequest::evaluate(
 VarDecl *GetDistributedActorSystemPropertyRequest::evaluate(
     Evaluator &evaluator, NominalTypeDecl *nominal) const {
   auto &C = nominal->getASTContext();
-  auto module = nominal->getParentModule();
 
   auto DAS = C.getDistributedActorSystemDecl();
 
@@ -987,7 +987,7 @@ VarDecl *GetDistributedActorSystemPropertyRequest::evaluate(
     auto DistributedActorProto = C.getDistributedActorDecl();
     for (auto system : DistributedActorProto->lookupDirect(C.Id_actorSystem)) {
       if (auto var = dyn_cast<VarDecl>(system)) {
-        auto conformance = module->checkConformance(
+        auto conformance = checkConformance(
             proto->mapTypeIntoContext(var->getInterfaceType()),
             DAS);
 
@@ -1062,7 +1062,31 @@ bool CanSynthesizeDistributedActorCodableConformanceRequest::evaluate(
     return false;
 
   return TypeChecker::conformsToKnownProtocol(
-             idTy, KnownProtocolKind::Decodable, actor->getParentModule()) &&
+             idTy, KnownProtocolKind::Decodable) &&
          TypeChecker::conformsToKnownProtocol(
-             idTy, KnownProtocolKind::Encodable, actor->getParentModule());
+             idTy, KnownProtocolKind::Encodable);
+}
+
+NormalProtocolConformance *
+GetDistributedActorAsActorConformanceRequest::evaluate(
+    Evaluator &evaluator, ProtocolDecl *distributedActorProto) const {
+  auto &ctx = distributedActorProto->getASTContext();
+  auto actorProto = ctx.getProtocol(KnownProtocolKind::Actor);
+
+  auto ext = findDistributedActorAsActorExtension(
+      distributedActorProto);
+  if (!ext)
+    return nullptr;
+
+  auto genericParam = GenericTypeParamType::getType(/*depth=*/0, /*index=*/0,
+                                                    ctx);
+
+  auto distributedActorAsActorConformance = ctx.getNormalConformance(
+      Type(genericParam), actorProto, SourceLoc(), ext,
+      ProtocolConformanceState::Incomplete, ProtocolConformanceOptions());
+  // NOTE: Normally we "register" a conformance, but here we don't
+  // because we cannot (currently) register them in a protocol,
+  // since they do not have conformance tables.
+
+  return distributedActorAsActorConformance;
 }

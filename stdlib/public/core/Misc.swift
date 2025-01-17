@@ -97,14 +97,16 @@ func _typeName(_ type: Any.Type, qualified: Bool = true) -> String {
 
 @available(SwiftStdlib 5.3, *)
 @_silgen_name("swift_getMangledTypeName")
-public func _getMangledTypeName(_ type: Any.Type)
+@_preInverseGenerics
+public func _getMangledTypeName(_ type: any ~Copyable.Type)
   -> (UnsafePointer<UInt8>, Int)
 
 /// Returns the mangled name for a given type.
 @available(SwiftStdlib 5.3, *)
 @_unavailableInEmbedded
+@_preInverseGenerics
 public // SPI
-func _mangledTypeName(_ type: Any.Type) -> String? {
+func _mangledTypeName(_ type: any ~Copyable.Type) -> String? {
   let (stringPtr, count) = _getMangledTypeName(type)
   guard count > 0 else {
     return nil
@@ -155,6 +157,7 @@ public func _getTypeByMangledNameInContext(
 /// Prevents performance diagnostics in the passed closure.
 @_alwaysEmitIntoClient
 @_semantics("no_performance_analysis")
+@unsafe
 public func _unsafePerformance<T>(_ c: () -> T) -> T {
   return c()
 }
@@ -169,12 +172,73 @@ func _rethrowsViaClosure(_ fn: () throws -> ()) rethrows {
   try fn()
 }
 
+/// A type whose values can be implicitly or explicitly copied.
+///
+/// Conforming to this protocol indicates that a type's value can be copied;
+/// this protocol doesn’t have any required methods or properties.
+/// You don't generally need to write an explicit conformance to `Copyable`.
+/// The following places implicitly include `Copyable` conformance:
+///
+/// * Structure declarations,
+///   unless it has a noncopyable stored property
+/// * Enumeration declarations,
+///   unless it has a case whose associated value isn't copyable
+/// * Class declarations
+/// * Actor declarations
+/// * Protocol declarations
+/// * Associated type declarations
+/// * The `Self` type in a protocol extension
+/// * In an extension, the generic parameters of the type being extended
+///
+/// A class or actor can contain noncopyable stored properties,
+/// while still being copyable itself ---
+/// classes and actors are copied by retaining and releasing references.
+///
+/// In a declaration that includes generic type parameters,
+/// each generic type parameter implicitly includes `Copyable`
+/// in its list of requirements.
+/// Metatypes and tuples of copyable types are also implicitly copyable,
+/// as are boxed protocol types.
+/// For example,
+/// all of the following pairs of declarations are equivalent:
+///
+///     struct MyStructure { }
+///     struct MyStructure: Copyable { }
+///
+///     protocol MyProtocol { }
+///     protocol MyProtocol: Copyable { }
+///
+///     protocol AnotherProtocol {
+///         associatedtype MyType
+///         associatedtype MyType: Copyable
+///     }
+///
+///     func genericFunction<T>(t: T) { }
+///     func genericFunction<T>(t: T) where T: Copyable { }
+///
+///     let x: any MyProtocol
+///     let x: any MyProtocol & Copyable
+///
+/// To suppress an implicit conformance to `Copyable` you write `~Copyable`.
+/// For example,
+/// only copyable types can conform to `MyProtocol` in the example above,
+/// but both copyable and noncopyable types
+/// can conform `NoRequirements` in the example below:
+///
+///     protocol NoRequirements: ~Copyable { }
+///
+/// Extensions to the `Copyable` protocol are not allowed.
 @_marker public protocol Copyable {}
 
+@_documentation(visibility: internal)
 @_marker public protocol Escapable {}
 
-#if $NoncopyableGenerics && $NonescapableTypes
-@_marker public protocol _BitwiseCopyable: ~Escapable { }
+#if $BitwiseCopyable2
+@_marker public protocol BitwiseCopyable: ~Escapable { }
+
+@available(*, deprecated, message: "Use BitwiseCopyable")
+public typealias _BitwiseCopyable = BitwiseCopyable
 #else
-@_marker public protocol _BitwiseCopyable { }
+@_marker public protocol _BitwiseCopyable: ~Escapable { }
+public typealias BitwiseCopyable = _BitwiseCopyable
 #endif

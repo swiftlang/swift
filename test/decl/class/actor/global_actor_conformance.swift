@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift  -disable-availability-checking
+// RUN: %target-typecheck-verify-swift  -target %target-swift-5.1-abi-triple
 
 // REQUIRES: concurrency
 
@@ -30,13 +30,15 @@ protocol P2 {
 }
 
 class C1 : P1, P2 {
+  // expected-note@-1{{add '@preconcurrency' to the 'P1' conformance to defer isolation checking to run time}}
+
   typealias Assoc = String
 
   func method1() { }
 
-  @GenericGlobalActor<String> func method2() { } // expected-warning{{global actor 'GenericGlobalActor<String>'-isolated instance method 'method2()' cannot be used to satisfy global actor 'GenericGlobalActor<Int>'-isolated protocol requirement}}
+  @GenericGlobalActor<String> func method2() { } // expected-warning{{global actor 'GenericGlobalActor<String>'-isolated instance method 'method2()' cannot be used to satisfy global actor 'GenericGlobalActor<Int>'-isolated requirement from protocol 'P1'}}
   @GenericGlobalActor<String >func method3() { }
-  @GlobalActor func method4() { } // expected-warning{{global actor 'GlobalActor'-isolated instance method 'method4()' cannot be used to satisfy nonisolated protocol requirement}}
+  @GlobalActor func method4() { } // expected-warning{{global actor 'GlobalActor'-isolated instance method 'method4()' cannot be used to satisfy nonisolated requirement from protocol 'P1'}}
 
   // Okay: we can ignore the mismatch in global actor types for 'async' methods.
   func asyncMethod1() async { }
@@ -52,7 +54,9 @@ protocol NonIsolatedRequirement {
 @MainActor class OnMain {}
 
 extension OnMain: NonIsolatedRequirement {
-  // expected-warning@+2 {{main actor-isolated instance method 'requirement()' cannot be used to satisfy nonisolated protocol requirement}}
+  // expected-note@-1{{add '@preconcurrency' to the 'NonIsolatedRequirement' conformance to defer isolation checking to run time}}
+
+  // expected-warning@+2 {{main actor-isolated instance method 'requirement()' cannot be used to satisfy nonisolated requirement from protocol 'NonIsolatedRequirement'}}
   // expected-note@+1 {{add 'nonisolated' to 'requirement()' to make this instance method not isolated to the actor}}
   func requirement() {}
 }

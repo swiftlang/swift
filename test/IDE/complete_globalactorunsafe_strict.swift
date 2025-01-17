@@ -1,13 +1,13 @@
-// RUN: %target-swift-ide-test -batch-code-completion -source-filename %s -filecheck %raw-FileCheck -completion-output-dir %t  -warn-concurrency
+// RUN: %batch-code-completion -warn-concurrency
 // REQUIRES: concurrency
 
 // SAFE_NOTREC: Begin completions, 2 items
 // SAFE_NOTREC-DAG: Keyword[self]/CurrNominal:          self[#SafelyIsolatedCls#];
-// SAFE_NOTREC-DAG: Decl[InstanceMethod]/CurrNominal/NotRecommended: method()[' async'][#Void#];
+// SAFE_NOTREC-DAG: Decl[InstanceMethod]/CurrNominal: method()[' async'][#Void#];
 
 // UNSAFE_NOTREC: Begin completions, 2 items
 // UNSAFE_NOTREC-DAG: Keyword[self]/CurrNominal:          self[#UnsafelyIsolatedCls#];
-// UNSAFE_NOTREC-DAG: Decl[InstanceMethod]/CurrNominal/NotRecommended: method()[' async'][#Void#];
+// UNSAFE_NOTREC-DAG: Decl[InstanceMethod]/CurrNominal: method()[' async'][#Void#];
 
 // SAFE_OK: Begin completions, 2 items
 // SAFE_OK-DAG: Keyword[self]/CurrNominal:          self[#SafelyIsolatedCls#];

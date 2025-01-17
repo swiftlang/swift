@@ -24,10 +24,10 @@
 #include "swift/AST/SourceFile.h"
 #include "swift/AST/SubstitutionMap.h"
 #include "swift/AST/TypeCheckRequests.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/Statistic.h"
 #include "swift/ClangImporter/ClangModule.h"
-#include "swift/Parse/Parser.h"
 #include "swift/Subsystems.h"
 #include "swift/SymbolGraphGen/DocumentationCategory.h"
 #include "clang/Basic/Module.h"
@@ -35,9 +35,9 @@
 #include "llvm/ADT/TinyPtrVector.h"
 #include "llvm/ADT/Twine.h"
 #include "llvm/Support/Debug.h"
-#include "llvm/TargetParser/Host.h"
 #include "llvm/Support/Path.h"
 #include "llvm/Support/SaveAndRestore.h"
+#include "llvm/TargetParser/Host.h"
 #include <algorithm>
 #include <system_error>
 using namespace swift;
@@ -192,6 +192,11 @@ public:
 
   void addImplicitImports();
 
+  void addImplicitImport(ModuleDecl *module) {
+    boundImports.push_back(ImportedModule(module));
+    bindPendingImports();
+  }
+
   /// Retrieve the finalized imports.
   ArrayRef<AttributedImport<ImportedModule>> getFinishedImports() const {
     return boundImports;
@@ -261,6 +266,19 @@ private:
 // MARK: performImportResolution
 //===----------------------------------------------------------------------===//
 
+void swift::performImportResolution(ModuleDecl *M) {
+  for (auto *file : M->getFiles()) {
+    auto *SF = dyn_cast<SourceFile>(file);
+    if (!SF)
+      continue;
+
+    performImportResolution(*SF);
+    assert(SF->ASTStage >= SourceFile::ImportsResolved &&
+           "file has not had its imports resolved");
+  }
+  M->setHasResolvedImports();
+}
+
 /// performImportResolution - This walks the AST to resolve imports.
 ///
 /// Before we can type-check a source file, we need to make declarations
@@ -299,6 +317,22 @@ void swift::performImportResolution(SourceFile &SF) {
 
   SF.ASTStage = SourceFile::ImportsResolved;
   verify(SF);
+}
+
+void swift::performImportResolutionForClangMacroBuffer(
+    SourceFile &SF, ModuleDecl *clangModule
+) {
+  // If we've already performed import resolution, bail.
+  if (SF.ASTStage == SourceFile::ImportsResolved)
+    return;
+
+  ImportResolver resolver(SF);
+  resolver.addImplicitImport(clangModule);
+
+  SF.setImports(resolver.getFinishedImports());
+  SF.setImportedUnderlyingModule(resolver.getUnderlyingClangModule());
+
+  SF.ASTStage = SourceFile::ImportsResolved;
 }
 
 //===----------------------------------------------------------------------===//
@@ -574,6 +608,10 @@ UnboundImport::UnboundImport(AttributedImport<UnloadedImportedModule> implicit)
 // MARK: Import validation (except for scoped imports)
 //===----------------------------------------------------------------------===//
 
+ImportOptions getImportOptions(ImportDecl *ID) {
+  return ImportOptions();
+}
+
 /// Create an UnboundImport for a user-written import declaration.
 UnboundImport::UnboundImport(ImportDecl *ID)
   : import(UnloadedImportedModule(ID->getImportPath(), ID->getImportKind()),
@@ -586,8 +624,10 @@ UnboundImport::UnboundImport(ImportDecl *ID)
   if (ID->getAttrs().hasAttribute<TestableAttr>())
     import.options |= ImportFlags::Testable;
 
-  if (ID->getAttrs().hasAttribute<ImplementationOnlyAttr>())
+  if (auto attr = ID->getAttrs().getAttribute<ImplementationOnlyAttr>()) {
     import.options |= ImportFlags::ImplementationOnly;
+    import.implementationOnlyRange = attr->Range;
+  }
 
   import.accessLevel = ID->getAccessLevel();
   if (auto attr = ID->getAttrs().getAttribute<AccessControlAttr>()) {
@@ -783,13 +823,29 @@ void UnboundImport::validateInterfaceWithPackageName(ModuleDecl *topLevelModule,
   }
 }
 
+/// Returns true if the importer and importee tuple are on an allow list for
+/// use of `@_implementationOnly import`, which is deprecated. Some existing
+/// uses of `@_implementationOnly import` cannot be safely replaced by
+/// `internal import` because the existence of the imported module must always
+/// be hidden from clients.
+static bool shouldSuppressNonResilientImplementationOnlyImportDiagnostic(
+    StringRef targetName, StringRef importerName) {
+  if (targetName == "SwiftConcurrencyInternalShims")
+    return importerName == "_Concurrency";
+
+  if (targetName == "CCryptoBoringSSL" || targetName == "CCryptoBoringSSLShims")
+    return importerName == "Crypto" || importerName == "_CryptoExtras" ||
+           importerName == "CryptoBoringWrapper";
+
+  if (targetName == "CNIOBoringSSL" || targetName == "CNIOBoringSSLShims")
+    return importerName != "NIOSSL";
+
+  return false;
+}
+
 void UnboundImport::validateResilience(NullablePtr<ModuleDecl> topLevelModule,
                                        SourceFile &SF) {
-  ASTContext &ctx = SF.getASTContext();
-
-  // Per getTopLevelModule(), we'll only get nullptr here for non-Swift modules,
-  // so these two really mean the same thing.
-  if (!topLevelModule || topLevelModule.get()->isNonSwiftModule())
+  if (!topLevelModule)
     return;
 
   // If the module we're validating is the builtin one, then just return because
@@ -797,6 +853,7 @@ void UnboundImport::validateResilience(NullablePtr<ModuleDecl> topLevelModule,
   // itself with resiliency. This can occur when one has passed
   // '-enable-builtin-module' and is explicitly importing the Builtin module in
   // their sources.
+  ASTContext &ctx = SF.getASTContext();
   if (topLevelModule.get() == ctx.TheBuiltinModule)
     return;
 
@@ -811,21 +868,27 @@ void UnboundImport::validateResilience(NullablePtr<ModuleDecl> topLevelModule,
   // We exempt some imports using @_implementationOnly in a safe way from
   // packages that cannot be resilient.
   if (import.options.contains(ImportFlags::ImplementationOnly) &&
-      !SF.getParentModule()->isResilient() && topLevelModule &&
-      !(((targetName.str() == "CCryptoBoringSSL" ||
-          targetName.str() == "CCryptoBoringSSLShims") &&
-         (importerName.str() == "Crypto" ||
-          importerName.str() == "_CryptoExtras" ||
-          importerName.str() == "CryptoBoringWrapper")) ||
-        ((targetName.str() == "CNIOBoringSSL" ||
-          targetName.str() == "CNIOBoringSSLShims") &&
-         importerName.str() == "NIOSSL"))) {
-    ctx.Diags.diagnose(import.importLoc,
-                       diag::implementation_only_requires_library_evolution,
-                       importerName);
+      import.implementationOnlyRange.isValid()) {
+    if (SF.getParentModule()->isResilient()) {
+      // Encourage replacing `@_implementationOnly` with `internal import`.
+      if (!topLevelModule.get()->isNonSwiftModule()) {
+        auto inFlight =
+          ctx.Diags.diagnose(import.importLoc,
+                             diag::implementation_only_deprecated);
+        inFlight.fixItReplace(import.implementationOnlyRange, "internal");
+      }
+    } else if ( // Non-resilient client
+        !shouldSuppressNonResilientImplementationOnlyImportDiagnostic(
+            targetName.str(), importerName.str())) {
+      ctx.Diags.diagnose(import.importLoc,
+                         diag::implementation_only_requires_library_evolution,
+                         importerName);
+    }
   }
 
-  if (import.options.contains(ImportFlags::ImplementationOnly) ||
+  // Report public imports of non-resilient modules from a resilient module.
+  if (topLevelModule.get()->isNonSwiftModule() ||
+      import.options.contains(ImportFlags::ImplementationOnly) ||
       import.accessLevel < AccessLevel::Public)
     return;
 
@@ -1072,14 +1135,26 @@ CheckInconsistentAccessLevelOnImport::evaluate(
       return;
 
     auto otherAccessLevel = otherImport->getAccessLevel();
+
+    // Only report ambiguities with non-public imports as bare imports are
+    // public when this diagnostic is active. Do not report ambiguities
+    // between implicitly vs explicitly public.
+    if (otherAccessLevel == AccessLevel::Public)
+      return;
+
     auto &diags = mod->getDiags();
     {
       InFlightDiagnostic error =
-        diags.diagnose(implicitImport, diag::inconsistent_implicit_access_level_on_import,
-                       implicitImport->getModule()->getName(), otherAccessLevel);
+        diags.diagnose(implicitImport,
+                       diag::inconsistent_implicit_access_level_on_import,
+                       implicitImport->getModule()->getName(),
+                       otherAccessLevel);
       error.fixItInsert(implicitImport->getStartLoc(),
                         diag::inconsistent_implicit_access_level_on_import_fixit,
                         otherAccessLevel);
+      error.flush();
+      diags.diagnose(implicitImport,
+                     diag::inconsistent_implicit_access_level_on_import_silence);
     }
 
     SourceLoc accessLevelLoc = otherImport->getStartLoc();
@@ -1338,6 +1413,13 @@ UnboundImport::UnboundImport(
   if (declaringOptions.contains(ImportFlags::ImplementationOnly) ||
       bystandingOptions.contains(ImportFlags::ImplementationOnly))
     import.options |= ImportFlags::ImplementationOnly;
+  if (declaringOptions.contains(ImportFlags::SPIOnly) ||
+      bystandingOptions.contains(ImportFlags::SPIOnly))
+    import.options |= ImportFlags::SPIOnly;
+
+  // Pick the most restrictive access level.
+  import.accessLevel = std::min(declaringImport.accessLevel,
+                                bystandingImport.accessLevel);
 
   // If either have a `@_documentation(visibility: <access>)` attribute, the
   // cross-import has the more restrictive of the two.
@@ -1358,12 +1440,6 @@ void ImportResolver::crossImport(ModuleDecl *M, UnboundImport &I) {
   // first bind all exported imports in all files, then bind all other imports
   // in each file. This may become simpler if we bind all ImportDecls before we
   // start computing cross-imports, but I haven't figured that part out yet.
-  //
-  // Fixing this is tracked within Apple by rdar://problem/59527118. I haven't
-  // filed an SR because I plan to address it myself, but if this comment is
-  // still here in April 2020 without an SR number, please file a Swift bug and
-  // harass @brentdax to fill in the details.
-
   if (!SF.shouldCrossImport())
     return;
 

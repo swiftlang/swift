@@ -23,6 +23,7 @@
 #include "swift/AST/GenericParamList.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/Types.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/Statistic.h"
 #include "llvm/ADT/SmallString.h"
@@ -109,14 +110,18 @@ bool TypeRepr::hasOpaque() {
     findIf([](TypeRepr *ty) { return isa<OpaqueReturnTypeRepr>(ty); });
 }
 
+bool TypeRepr::isParenType() const {
+  auto *tuple = dyn_cast<TupleTypeRepr>(this);
+  return tuple && tuple->isParenType();
+}
+
 TypeRepr *TypeRepr::getWithoutParens() const {
-  auto *repr = const_cast<TypeRepr *>(this);
-  while (auto *tupleRepr = dyn_cast<TupleTypeRepr>(repr)) {
-    if (!tupleRepr->isParenType())
-      break;
-    repr = tupleRepr->getElementType(0);
+  auto *result = this;
+  while (result->isParenType()) {
+    result = cast<TupleTypeRepr>(result)->getElementType(0);
   }
-  return repr;
+
+  return const_cast<TypeRepr *>(result);
 }
 
 bool TypeRepr::isSimpleUnqualifiedIdentifier(Identifier identifier) const {
@@ -147,7 +152,7 @@ SourceLoc TypeRepr::findAttrLoc(TypeAttrKind kind) const {
     for (auto attr : attrTypeRepr->getAttrs()) {
       if (auto typeAttr = attr.dyn_cast<TypeAttribute*>())
         if (typeAttr->getKind() == kind)
-          return typeAttr->getAttrLoc();
+          return typeAttr->getStartLoc();
     }
 
     typeRepr = attrTypeRepr->getTypeRepr();
@@ -430,7 +435,21 @@ void FunctionTypeRepr::printImpl(ASTPrinter &Printer,
   }
   Printer << " -> ";
   Printer.callPrintStructurePre(PrintStructureKind::FunctionReturnType);
-  printTypeRepr(RetTy, Printer, Opts);
+
+  // Check if we are supposed to suppress sending results. If so, look through
+  // the ret ty if it is a Sending TypeRepr.
+  //
+  // DISCUSSION: The reason why we do this is that Sending TypeRepr is used for
+  // arguments and results... and we need the arguments case when we suppress to
+  // print __owned. So this lets us handle both cases.
+  auto ActualRetTy = RetTy;
+  if (Opts.SuppressSendingArgsAndResults) {
+    if (auto *x = dyn_cast<SendingTypeRepr>(RetTy)) {
+      ActualRetTy = x->getBase();
+    }
+  }
+  printTypeRepr(ActualRetTy, Printer, Opts);
+
   Printer.printStructurePost(PrintStructureKind::FunctionReturnType);
   Printer.printStructurePost(PrintStructureKind::FunctionType);
 }
@@ -670,33 +689,28 @@ SourceLoc SILBoxTypeRepr::getLocImpl() const {
   return LBraceLoc;
 }
 
-LifetimeDependentReturnTypeRepr *LifetimeDependentReturnTypeRepr::create(
-    ASTContext &C, TypeRepr *base,
-    ArrayRef<LifetimeDependenceSpecifier> specifiers) {
-  auto size = totalSizeToAlloc<LifetimeDependenceSpecifier>(specifiers.size());
-  auto mem = C.Allocate(size, alignof(LifetimeDependenceSpecifier));
-  return new (mem) LifetimeDependentReturnTypeRepr(base, specifiers);
+LifetimeDependentTypeRepr *
+LifetimeDependentTypeRepr::create(ASTContext &C, TypeRepr *base,
+                                  LifetimeEntry *entry) {
+  return new (C) LifetimeDependentTypeRepr(base, entry);
 }
 
-SourceLoc LifetimeDependentReturnTypeRepr::getStartLocImpl() const {
-  return getLifetimeDependencies().front().getLoc();
+SourceLoc LifetimeDependentTypeRepr::getStartLocImpl() const {
+  return getLifetimeEntry()->getStartLoc();
 }
 
-SourceLoc LifetimeDependentReturnTypeRepr::getEndLocImpl() const {
-  return getLifetimeDependencies().back().getLoc();
+SourceLoc LifetimeDependentTypeRepr::getEndLocImpl() const {
+  return getLifetimeEntry()->getEndLoc();
 }
 
-SourceLoc LifetimeDependentReturnTypeRepr::getLocImpl() const {
+SourceLoc LifetimeDependentTypeRepr::getLocImpl() const {
   return getBase()->getLoc();
 }
 
-void LifetimeDependentReturnTypeRepr::printImpl(
-    ASTPrinter &Printer, const PrintOptions &Opts) const {
+void LifetimeDependentTypeRepr::printImpl(ASTPrinter &Printer,
+                                          const PrintOptions &Opts) const {
   Printer << " ";
-  for (auto &dep : getLifetimeDependencies()) {
-    Printer << dep.getLifetimeDependenceSpecifierString() << " ";
-  }
-
+  Printer << getLifetimeEntry()->getString();
   printTypeRepr(getBase(), Printer, Opts);
 }
 
@@ -847,14 +861,17 @@ void SpecifierTypeRepr::printImpl(ASTPrinter &Printer,
   case TypeReprKind::Isolated:
     Printer.printKeyword("isolated", Opts, " ");
     break;
-  case TypeReprKind::Transferring:
-    Printer.printKeyword("transferring", Opts, " ");
+  case TypeReprKind::Sending:
+    // This handles the argument case. The result case is handled in
+    // FunctionTypeRepr.
+    if (!Opts.SuppressSendingArgsAndResults) {
+      Printer.printKeyword("sending", Opts, " ");
+    } else {
+      Printer.printKeyword("__owned", Opts, " ");
+    }
     break;
   case TypeReprKind::CompileTimeConst:
     Printer.printKeyword("_const", Opts, " ");
-    break;
-  case TypeReprKind::ResultDependsOn:
-    Printer.printKeyword("_resultDependsOn", Opts, " ");
     break;
   }
   printTypeRepr(Base, Printer, Opts);
@@ -887,6 +904,11 @@ void SILBoxTypeRepr::printImpl(ASTPrinter &Printer,
                                const PrintOptions &Opts) const {
   // TODO
   Printer.printKeyword("sil_box", Opts);
+}
+
+void IntegerTypeRepr::printImpl(ASTPrinter &Printer,
+                                const PrintOptions &Opts) const {
+  Printer.printText(getValue());
 }
 
 void ErrorTypeRepr::dischargeDiagnostic(swift::ASTContext &Context) {

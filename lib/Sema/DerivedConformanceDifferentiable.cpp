@@ -20,6 +20,7 @@
 #include "TypeCheckType.h"
 #include "llvm/ADT/SmallPtrSet.h"
 #include "swift/AST/AutoDiff.h"
+#include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/Module.h"
@@ -30,6 +31,7 @@
 #include "swift/AST/Stmt.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/Types.h"
+#include "swift/Basic/Assertions.h"
 #include "DerivedConformances.h"
 
 using namespace swift;
@@ -83,8 +85,7 @@ getStoredPropertiesForDifferentiation(
     if (vd->getInterfaceType()->hasError())
       continue;
     auto varType = DC->mapTypeIntoContext(vd->getValueInterfaceType());
-    auto conformance = DC->getParentModule()->checkConformance(
-        varType, diffableProto);
+    auto conformance = checkConformance(varType, diffableProto);
     if (!conformance)
       continue;
     // Skip `let` stored properties with a mutating `move(by:)` if requested.
@@ -116,8 +117,7 @@ static Type getTangentVectorInterfaceType(Type contextualType,
   auto &C = DC->getASTContext();
   auto *diffableProto = C.getProtocol(KnownProtocolKind::Differentiable);
   assert(diffableProto && "`Differentiable` protocol not found");
-  auto conf =
-      DC->getParentModule()->checkConformance(contextualType, diffableProto);
+  auto conf = checkConformance(contextualType, diffableProto);
   assert(conf && "Contextual type must conform to `Differentiable`");
   if (!conf)
     return nullptr;
@@ -139,7 +139,7 @@ static bool canDeriveTangentVectorAsSelf(NominalTypeDecl *nominal,
   auto *diffableProto = C.getProtocol(KnownProtocolKind::Differentiable);
   auto *addArithProto = C.getProtocol(KnownProtocolKind::AdditiveArithmetic);
   // `Self` must conform to `AdditiveArithmetic`.
-  if (!DC->getParentModule()->checkConformance(nominalTypeInContext, addArithProto))
+  if (!checkConformance(nominalTypeInContext, addArithProto))
     return false;
   for (auto *field : nominal->getStoredProperties()) {
     // `Self` must not have any `@noDerivative` stored properties.
@@ -147,7 +147,7 @@ static bool canDeriveTangentVectorAsSelf(NominalTypeDecl *nominal,
       return false;
     // `Self` must have all stored properties satisfy `Self == TangentVector`.
     auto fieldType = DC->mapTypeIntoContext(field->getValueInterfaceType());
-    auto conf = DC->getParentModule()->checkConformance(fieldType, diffableProto);
+    auto conf = checkConformance(fieldType, diffableProto);
     if (!conf)
       return false;
     auto tangentType = conf.getTypeWitnessByName(fieldType, C.Id_TangentVector);
@@ -210,7 +210,7 @@ bool DerivedConformance::canDeriveDifferentiable(NominalTypeDecl *nominal,
     if (v->getInterfaceType()->hasError())
       return false;
     auto varType = DC->mapTypeIntoContext(v->getValueInterfaceType());
-    return (bool) DC->getParentModule()->checkConformance(varType, diffableProto);
+    return (bool) checkConformance(varType, diffableProto);
   });
 }
 
@@ -239,10 +239,9 @@ deriveBodyDifferentiable_move(AbstractFunctionDecl *funcDecl, void *) {
   // Create call expression applying a member `move(by:)` method to a
   // parameter member: `self.<member>.move(by: offset.<member>)`.
   auto createMemberMethodCallExpr = [&](VarDecl *member) -> Expr * {
-    auto *module = nominal->getModuleContext();
     auto memberType =
         parentDC->mapTypeIntoContext(member->getValueInterfaceType());
-    auto confRef = module->lookupConformance(memberType, diffProto);
+    auto confRef = lookupConformance(memberType, diffProto);
     assert(confRef && "Member does not conform to `Differentiable`");
 
     // Get member type's requirement witness: `<Member>.move(by:)`.
@@ -413,14 +412,16 @@ getOrSynthesizeTangentVectorStruct(DerivedConformance &derived, Identifier id) {
     // causes the type checker to not guarantee the order of these members.
     auto memberContextualType =
         parentDC->mapTypeIntoContext(member->getValueInterfaceType());
-    auto memberTanType =
+    auto memberTanInterfaceType =
         getTangentVectorInterfaceType(memberContextualType, parentDC);
-    tangentProperty->setInterfaceType(memberTanType);
+    tangentProperty->setInterfaceType(memberTanInterfaceType);
+    auto memberTanContextType =
+        parentDC->mapTypeIntoContext(memberTanInterfaceType);
     Pattern *memberPattern =
-        NamedPattern::createImplicit(C, tangentProperty, memberTanType);
+        NamedPattern::createImplicit(C, tangentProperty, memberTanContextType);
     memberPattern =
-        TypedPattern::createImplicit(C, memberPattern, memberTanType);
-    memberPattern->setType(memberTanType);
+        TypedPattern::createImplicit(C, memberPattern, memberTanContextType);
+
     auto *memberBinding = PatternBindingDecl::createImplicit(
         C, StaticSpellingKind::None, memberPattern, /*initExpr*/ nullptr,
         structDecl);
@@ -551,8 +552,7 @@ static void checkAndDiagnoseImplicitNoDerivative(ASTContext &Context,
       continue;
     // Check whether to diagnose stored property.
     auto varType = DC->mapTypeIntoContext(vd->getValueInterfaceType());
-    auto diffableConformance =
-        DC->getParentModule()->checkConformance(varType, diffableProto);
+    auto diffableConformance = checkConformance(varType, diffableProto);
     // If stored property should not be diagnosed, continue.
     if (diffableConformance && 
         canInvokeMoveByOnProperty(vd, diffableConformance))
@@ -636,8 +636,8 @@ ValueDecl *DerivedConformance::deriveDifferentiable(ValueDecl *requirement) {
   ConformanceDecl->diagnose(diag::type_does_not_conform,
                             Nominal->getDeclaredType(), getProtocolType());
   requirement->diagnose(diag::no_witnesses,
-                        getProtocolRequirementKind(requirement),
-                        requirement, getProtocolType(), /*AddFixIt=*/false);
+                        getProtocolRequirementKind(requirement), requirement,
+                        getProtocolType());
 
   // If derivation is possible, cancel the diagnostic and perform derivation.
   if (canDeriveDifferentiable(Nominal, getConformanceContext(), requirement)) {

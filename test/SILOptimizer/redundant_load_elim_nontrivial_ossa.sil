@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -enable-sil-verify-all %s -redundant-load-elimination | %FileCheck %s
+// RUN: %target-sil-opt -sil-print-types -enable-sil-verify-all %s -redundant-load-elimination | %FileCheck %s
 // TODO : Add a version with semantic-arc-opts when #34971 is landed or DCE is enabled on OSSA
 
 // REQUIRES: swift_in_compiler
@@ -353,11 +353,11 @@ bb0(%0 : @owned $AB):
   return %6 : $()
 }
 
-// CHECK-LABEL: no_rle_liferange_with_exit :
+// CHECK-LABEL: no_rle_liverange_with_exit :
 // CHECK:       bb3:
 // CHECK-NEXT:    load
-// CHECK-LABEL: } // end sil function 'no_rle_liferange_with_exit'
-sil [ossa] @no_rle_liferange_with_exit : $@convention(thin) (@owned Klass) -> () {
+// CHECK-LABEL: } // end sil function 'no_rle_liverange_with_exit'
+sil [ossa] @no_rle_liverange_with_exit : $@convention(thin) (@owned Klass) -> () {
 bb0(%0 : @owned $Klass):
   %copy0 = copy_value %0 : $Klass
   %g = global_addr @total_klass : $*Klass

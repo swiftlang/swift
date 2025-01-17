@@ -10,16 +10,13 @@
 //
 //===----------------------------------------------------------------------===//
 
+module _complex [system] {
+  header "complex.h"
+  export *
+}
+
 module ucrt [system] {
   module C {
-    module complex {
-      /* disallow the header in C++ mode as it forwards to `ccomplex`.  */
-      requires !cplusplus
-
-      header "complex.h"
-      export *
-    }
-
     module ctype {
       header "ctype.h"
       export *

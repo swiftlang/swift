@@ -11,7 +11,6 @@
 //===----------------------------------------------------------------------===//
 
 @_exported import BasicBridging
-import CxxStdlib
 
 /// The assert function to be used in the compiler.
 ///
@@ -22,26 +21,50 @@ import CxxStdlib
 ///   case for `precondition`.
 @_transparent
 public func assert(_ condition: Bool, _ message: @autoclosure () -> String,
-                   file: StaticString = #fileID, line: UInt = #line) {
-  if !condition {
-    fatalError(message(), file: file, line: line)
-  }
+                   file: StaticString = #fileID, line: UInt = #line, function: StaticString = #function) {
+  precondition(condition, message(), file: file, line: line, function: function)
 }
 
 /// The assert function (without a message) to be used in the compiler.
 ///
 /// Unforuntately it's not possible to just add a default argument to `message` in the
 /// other `assert` function. We need to defined this overload.
+/// TODO: For some reason the compiler is not happy when adding a `function` argument.
 @_transparent
 public func assert(_ condition: Bool, file: StaticString = #fileID, line: UInt = #line) {
-  if !condition {
-    fatalError("", file: file, line: line)
+  precondition(condition, "", file: file, line: line, function: "")
+}
+
+/// The assert function to be used in the compiler.
+///
+/// This overrides the standard Swift precondition and forwards an assertion failure
+/// to the assertion-handling in the C++ code base.
+@_transparent
+public func precondition(_ condition: Bool, _ message: @autoclosure () -> String,
+                         file: StaticString = #fileID, line: UInt = #line, function: StaticString = #function) {
+  if !_fastPath(condition) {
+    let msg = message()
+    msg.withCString { msgStr in
+      file.withUTF8Buffer { fileBytes in
+        function.withUTF8Buffer { functionBytes in
+          assertFail(msgStr, fileBytes.baseAddress!, line, functionBytes.baseAddress!)
+        }
+      }
+    }
   }
 }
 
 //===----------------------------------------------------------------------===//
 //                            Debugging Utilities
 //===----------------------------------------------------------------------===//
+
+public func debugLog(prefix: Bool = true, _ message: @autoclosure () -> String) {
+  let formatted = (prefix ? "### " : "") + message()
+  formatted._withBridgedStringRef { ref in
+    Bridged_dbgs().write(ref)
+  }
+  Bridged_dbgs().newLine()
+}
 
 /// Let's lldb's `po` command not print any "internal" properties of the conforming type.
 ///
@@ -52,32 +75,12 @@ public extension NoReflectionChildren {
   var customMirror: Mirror { Mirror(self, children: []) }
 }
 
-public var standardError = CFileStream(fp: stderr)
-
-#if os(Android) || canImport(Musl)
-  public typealias FILEPointer = OpaquePointer
-#else
-  public typealias FILEPointer = UnsafeMutablePointer<FILE>
-#endif
-
-public struct CFileStream: TextOutputStream {
-  var fp: FILEPointer
-
-  public func write(_ string: String) {
-    fputs(string, fp)
-  }
-
-  public func flush() {
-    fflush(fp)
-  }
-}
-
 //===----------------------------------------------------------------------===//
 //                              StringRef
 //===----------------------------------------------------------------------===//
 
 public struct StringRef : CustomStringConvertible, NoReflectionChildren {
-  let _bridged: BridgedStringRef
+  public let _bridged: BridgedStringRef
 
   public init(bridged: BridgedStringRef) { self._bridged = bridged }
 
@@ -173,5 +176,23 @@ extension BridgedArrayRef {
     let start = data?.bindMemory(to: ty, capacity: count)
     let buffer = UnsafeBufferPointer(start: start, count: count)
     return c(buffer)
+  }
+}
+
+//===----------------------------------------------------------------------===//
+//                            Sequence Utilities
+//===----------------------------------------------------------------------===//
+
+/// RandomAccessCollection which bridges to some C++ array.
+///
+/// It fixes the default reflection for bridged random access collections, which usually have a
+/// `bridged` stored property.
+/// Conforming to this protocol displays the "real" children  not just `bridged`.
+public protocol BridgedRandomAccessCollection : RandomAccessCollection, CustomReflectable {
+}
+
+extension BridgedRandomAccessCollection {
+  public var customMirror: Mirror {
+    Mirror(self, children: self.map { (label: nil, value: $0 as Any) })
   }
 }

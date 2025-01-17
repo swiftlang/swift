@@ -23,6 +23,7 @@
 #include "swift/AST/Pattern.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/ProtocolConformance.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/ClangImporter/ClangModule.h"
 #include "clang/AST/Attr.h"
 #include "clang/AST/Decl.h"
@@ -79,10 +80,10 @@ SILLinkage swift::getSILLinkage(FormalLinkage linkage,
 }
 
 SILLinkage
-swift::getLinkageForProtocolConformance(const RootProtocolConformance *C,
+swift::getLinkageForProtocolConformance(const ProtocolConformance *C,
                                         ForDefinition_t definition) {
   // If the conformance was synthesized, give it shared linkage.
-  if (C->isSynthesized())
+  if (C->getRootConformance()->isSynthesized())
     return SILLinkage::Shared;
 
   auto typeDecl = C->getDeclContext()->getSelfNominalTypeDecl();
@@ -360,16 +361,21 @@ bool AbstractStorageDecl::exportsPropertyDescriptor() const {
       }
     }
   }
-  
-  // TODO: Global and static properties ought to eventually be referenceable
-  // as key paths from () or T.Type too.
-  if (!getDeclContext()->isTypeContext() || isStatic())
+
+  // TODO: Global properties ought to eventually be referenceable
+  // as key paths from ().
+  if (!getDeclContext()->isTypeContext())
     return false;
   
   // Protocol requirements do not need property descriptors.
   if (isa<ProtocolDecl>(getDeclContext()))
     return false;
-  
+
+  // Static properties in protocol extensions do not need
+  // descriptors as existential Any.Type will not resolve to a value.
+  if (isStatic() && getDeclContext()->getSelfProtocolDecl())
+    return false;
+
   // FIXME: We should support properties and subscripts with '_read' accessors;
   // 'get' is not part of the opaque accessor set there.
   auto *getter = getOpaqueAccessor(AccessorKind::Get);

@@ -69,8 +69,7 @@ namespace irgen {
   OwnedAddress emitBoxedExistentialContainerAllocation(IRGenFunction &IGF,
                                   SILType destType,
                                   CanType formalSrcType,
-                                  ArrayRef<ProtocolConformanceRef> conformances,
-                                  GenericSignature sig);
+                                  ArrayRef<ProtocolConformanceRef> conformances);
   
   /// Deallocate a boxed existential container with uninitialized space to hold
   /// a value of a given type.
@@ -108,8 +107,7 @@ namespace irgen {
 
   Address emitOpaqueBoxedExistentialProjection(
       IRGenFunction &IGF, OpenedExistentialAccess accessKind, Address base,
-      SILType existentialType, CanArchetypeType openedArchetype,
-      GenericSignature fnSig);
+      SILType existentialType, CanArchetypeType openedArchetype);
 
   /// Return the address of the reference values within a class existential.
   Address emitClassExistentialValueAddress(IRGenFunction &IGF,
@@ -123,8 +121,7 @@ namespace irgen {
   llvm::Value *emitClassExistentialProjection(IRGenFunction &IGF,
                                               Explosion &base,
                                               SILType baseTy,
-                                              CanArchetypeType openedArchetype,
-                                              GenericSignature sigFn);
+                                              CanArchetypeType openedArchetype);
 
   /// Extract the metatype pointer from an existential metatype value.
   ///
@@ -156,7 +153,6 @@ namespace irgen {
   void emitMetatypeOfClassExistential(IRGenFunction &IGF,
                                       Explosion &value, SILType metatypeType,
                                       SILType existentialType,
-                                      GenericSignature fnSig,
                                       Explosion &out);
 
   /// Emit the existential metatype of a boxed existential value.

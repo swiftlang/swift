@@ -21,6 +21,12 @@
 #include "DefineDiagnosticMacros.h"
 
 // SILGen issues.
+WARNING(return_borrowing_switch_binding,none,
+        "returning the non-'Copyable' value of a pattern binding from a "
+        "switch that borrows by default; the switch will be performed as a "
+        "consume for compatibility for now, but this will require an explicit "
+        "'switch consume' in the future", ())
+
 ERROR(bridging_module_missing,none,
       "unable to find module '%0' for implicit conversion function '%0.%1'",
       (StringRef, StringRef))
@@ -104,6 +110,9 @@ ERROR(exclusivity_access_required_unknown_decl_moveonly,none,
 
 NOTE(exclusivity_conflicting_access,none,
      "conflicting access is here", ())
+
+ERROR(unsupported_sil_builtin,none,
+      "builtin '%0' is not supported by SIL generation", (StringRef))
 
 ERROR(unsupported_c_function_pointer_conversion,none,
       "C function pointer signature %0 is not compatible with expected type %1",
@@ -231,6 +240,9 @@ ERROR(use_of_self_before_fully_init,none,
 
 NOTE(stored_property_not_initialized,none,
      "'%0' not initialized", (StringRef))
+NOTE(isolated_property_initializer,none,
+     "%1 default value of '%0' cannot be used in a %2 initalizer",
+     (StringRef, ActorIsolation, ActorIsolation))
 
 ERROR(selfinit_multiple_times,none,
       "'%select{super|self}0.init' called multiple times in initializer",
@@ -367,7 +379,11 @@ ERROR(bad_attr_on_non_const_global,none,
 ERROR(global_must_be_compile_time_const,none,
       "global variable must be a compile-time constant", ())
 ERROR(non_final_generic_class_function,none,
-      "classes cannot have non-final generic fuctions in embedded Swift", ())
+      "classes cannot have non-final generic functions in embedded Swift", ())
+ERROR(cannot_specialize_witness_method,none,
+      "an existential type cannot contain a generic method %0 in embedded Swift", (DeclName))
+ERROR(cannot_specialize_class,none,
+      "cannot specialize %0 because class definition is not available (make sure to build with -wmo)", (Type))
 ERROR(embedded_swift_existential_type,none,
       "cannot use a value of protocol type %0 in embedded Swift", (Type))
 ERROR(embedded_swift_existential,none,
@@ -384,10 +400,16 @@ ERROR(embedded_swift_metatype,none,
       "cannot use metatype in embedded Swift", ())
 ERROR(embedded_swift_keypath,none,
       "cannot use key path in embedded Swift", ())
+ERROR(embedded_swift_dynamic_cast,none,
+      "cannot do dynamic casting in embedded Swift", ())
 ERROR(embedded_swift_allocating_type,none,
       "cannot use allocating type %0 in -no-allocations mode", (Type))
 ERROR(embedded_swift_allocating,none,
       "cannot use allocating operation in -no-allocations mode", ())
+ERROR(embedded_capture_of_generic_value_with_deinit,none,
+      "capturing generic non-copyable type with deinit in escaping closure not supported in embedded Swift", ())
+ERROR(wrong_linkage_for_serialized_function,none,
+      "function has wrong linkage to be called from %0", (StringRef))
 NOTE(performance_called_from,none,
       "called from here", ())
 
@@ -603,10 +625,6 @@ NOTE(autodiff_member_subset_indices_not_differentiable,none,
 NOTE(autodiff_cannot_param_subset_thunk_partially_applied_orig_fn,none,
      "cannot convert a direct method reference to a '@differentiable' "
      "function; use an explicit closure instead", ())
-NOTE(autodiff_cannot_differentiate_through_multiple_results,none,
-     "cannot differentiate through multiple results", ())
-NOTE(autodiff_cannot_differentiate_through_inout_arguments,none,
-     "cannot differentiate through 'inout' arguments", ())
 NOTE(autodiff_cannot_differentiate_through_direct_yield,none,
      "cannot differentiate through a '_read' accessor", ())
 NOTE(autodiff_enums_unsupported,none,
@@ -683,17 +701,14 @@ WARNING(warning_int_to_fp_inexact, none,
 
 // Flow-isolation diagnostics
 ERROR(isolated_after_nonisolated, none,
-      "cannot access %1 %2 here in %select{non-isolated initializer|deinitializer}0",
+      "cannot access %1 %2 here in %select{nonisolated initializer|deinitializer}0",
       (bool, DescriptiveDeclKind, DeclName))
 NOTE(nonisolated_blame, none, "after %1%2 %3, "
-     "only non-isolated properties of 'self' can be accessed from "
+     "only nonisolated properties of 'self' can be accessed from "
      "%select{this init|a deinit}0", (bool, StringRef, StringRef, DeclName))
-ERROR(non_sendable_from_deinit,none,
-        "cannot access %1 %2 with a non-sendable type %0 from non-isolated deinit",
-        (Type, DescriptiveDeclKind, DeclName))
 ERROR(isolated_property_mutation_in_nonisolated_context,none,
       "actor-isolated %kind0 can not be %select{referenced|mutated}1 "
-      "from a non-isolated context",
+      "from a nonisolated context",
       (const ValueDecl *, bool))
 
 // Yield usage errors
@@ -777,6 +792,11 @@ NOTE(box_to_stack_cannot_promote_box_to_stack_due_to_escape_location, none,
 
 WARNING(semantic_function_improper_nesting, none, "'@_semantics' function calls non-'@_semantics' function with nested '@_semantics' calls", ())
 
+// SDK mismatch diagnostics
+ERROR(missing_deinit_on_executor_function, none,
+      "Missing 'swift_task_deinitOnExecutor' function! "
+      "This is likely due to an outdated/incompatible SDK.", ())
+
 // Capture promotion diagnostics
 WARNING(capturepromotion_concurrentcapture_mutation, none,
         "'%0' mutated after capture by sendable closure", (StringRef))
@@ -786,14 +806,6 @@ NOTE(capturepromotion_concurrentcapture_capturinguse_here, none,
      "capturing use", ())
 NOTE(capturepromotion_variable_defined_here,none,
      "variable defined here", ())
-
-// move operator used on generic or evalue
-ERROR(move_operator_used_on_generic_or_existential_value, none,
-      "move() used on a generic or existential value", ())
-
-// copy operator used on generic or evalue
-ERROR(copy_operator_used_on_generic_or_existential_value, none,
-      "copy() used on a generic or existential value", ())
 
 // noimplicitcopy on generic or existential binding
 ERROR(noimplicitcopy_used_on_generic_or_existential, none,
@@ -873,6 +885,8 @@ ERROR(sil_movechecking_discard_missing_consume_self, none,
       "must consume 'self' before exiting method that discards self", ())
 ERROR(sil_movechecking_reinit_after_discard, none,
       "cannot reinitialize 'self' after 'discard self'", ())
+ERROR(sil_movechecking_consume_during_deinit, none,
+      "'self' cannot be consumed during 'deinit'", ())
 
 NOTE(sil_movechecking_discard_self_here, none,
      "discarded self here", ())
@@ -936,68 +950,186 @@ NOTE(sil_referencebinding_inout_binding_here, none,
 //                  MARK: Region Based Isolation Diagnostics
 //===----------------------------------------------------------------------===//
 
-NOTE(regionbasedisolation_maybe_race, none,
-     "use here could race", ())
+// READ THIS: Please when adding diagnostics for region based isolation, keep
+// them ordered in sections depending on which emitter uses it. It makes it
+// easier for people unfamiliar with the code to quickly see which diagnostics
+// are used by which of the SendNonSendable emitters use.
+
+//===
+// Misc
+
 ERROR(regionbasedisolation_unknown_pattern, none,
       "pattern that the region based isolation checker does not understand how to check. Please file a bug",
       ())
-
-//===---
-// Old Transfer Non Sendable Diagnostics
-//
-
-ERROR(regionbasedisolation_transfer_yields_race_no_isolation, none,
-      "transferring value of non-Sendable type %0; later accesses could race",
+NOTE(regionbasedisolation_maybe_race, none,
+     "access can happen concurrently", ())
+NOTE(regionbasedisolation_type_is_non_sendable, none,
+      "%0 is a non-Sendable type",
       (Type))
-ERROR(regionbasedisolation_transfer_yields_race_with_isolation, none,
-      "transferring value of non-Sendable type %0 from %1 context to %2 context; later accesses could race",
-      (Type, ActorIsolation, ActorIsolation))
-ERROR(regionbasedisolation_isolated_capture_yields_race, none,
-      "%1 closure captures value of non-Sendable type %0 from %2 context; later accesses to value could race",
-      (Type, ActorIsolation, ActorIsolation))
-ERROR(regionbasedisolation_transfer_yields_race_stronglytransferred_binding, none,
-      "value of non-Sendable type %0 accessed after being transferred; later accesses could race",
+
+//===
+// Use After Send Emitter
+
+ERROR(regionbasedisolation_named_send_yields_race, none,
+      "sending %0 risks causing data races",
+      (Identifier))
+ERROR(regionbasedisolation_type_send_yields_race, none,
+      "sending value of non-Sendable type %0 risks causing data races",
       (Type))
-ERROR(regionbasedisolation_arg_transferred, none,
-      "%0 value of type %1 transferred to %2 context; later accesses to value could race",
-      (StringRef, Type, ActorIsolation))
-ERROR(regionbasedisolation_arg_passed_to_strongly_transferred_param, none,
-      "%0 value of type %1 passed as a strongly transferred parameter; later accesses could race",
-      (StringRef, Type))
-NOTE(regionbasedisolation_isolated_since_in_same_region_basename, none,
-     "value is %0 since it is in the same region as %1",
-     (StringRef, DeclBaseName))
+NOTE(regionbasedisolation_type_use_after_send, none,
+      "sending value of non-Sendable type %0 to %1 callee risks causing data races between %1 and local %2 uses",
+      (Type, ActorIsolation, ActorIsolation))
+NOTE(regionbasedisolation_type_use_after_send_callee, none,
+     "sending value of non-Sendable type %0 to %1 %2 %3 risks causing data "
+     "races between %1 and local %4 uses",
+     (Type, ActorIsolation, DescriptiveDeclKind, DeclName, ActorIsolation))
 
-//===---
-// New Transfer Non Sendable Diagnostics
-//
+NOTE(regionbasedisolation_named_info_send_yields_race, none,
+     "sending %1%0 to %2 callee risks causing data races between %2 and local %3 uses",
+     (Identifier, StringRef, ActorIsolation, ActorIsolation))
+NOTE(regionbasedisolation_named_info_send_yields_race_callee, none,
+     "sending %1%0 to %2 %3 %4 risks causing data races between %2 and local %5 uses",
+     (Identifier, StringRef, ActorIsolation, DescriptiveDeclKind, DeclName, ActorIsolation))
 
-ERROR(regionbasedisolation_named_transfer_yields_race, none,
-      "transferring %0 may cause a data race",
+// Use after send closure.
+NOTE(regionbasedisolation_type_isolated_capture_yields_race, none,
+      "sending value of non-Sendable type %0 to %1 closure due to closure capture risks causing races in between %1 and %2 uses",
+      (Type, ActorIsolation, ActorIsolation))
+
+// Value captured in async let and reused.
+NOTE(regionbasedisolation_named_nonisolated_asynclet_name, none,
+      "sending %0 into async let risks causing data races between async let uses and local uses",
       (Identifier))
 
-NOTE(regionbasedisolation_named_info_transfer_yields_race, none,
-     "transferring %1 %0 to %2 callee could cause races in between callee %2 and local %3 uses",
-     (Identifier, StringRef, ActorIsolation, ActorIsolation))
-NOTE(regionbasedisolation_named_transfer_non_transferrable, none,
-      "transferring %1 %0 to %2 callee could cause races between %2 and %1 uses",
-      (Identifier, StringRef, ActorIsolation))
-NOTE(regionbasedisolation_named_transfer_into_transferring_param, none,
-     "%0 %1 is passed as a transferring parameter; Uses in callee may race with later %0 uses",
-     (StringRef, Identifier))
-NOTE(regionbasedisolation_named_notransfer_transfer_into_result, none,
-     "%0 %1 cannot be a transferring result. %0 uses may race with caller uses",
-     (StringRef, Identifier))
-NOTE(regionbasedisolation_named_stronglytransferred_binding, none,
-      "%0 used after being passed as a transferring parameter; Later uses could race",
+NOTE(regionbasedisolation_named_value_used_after_explicit_sending, none,
+      "%0 used after being passed as a 'sending' parameter; Later uses could race",
       (Identifier))
 NOTE(regionbasedisolation_named_isolated_closure_yields_race, none,
-      "%0 %1 is captured by a %2 closure. %2 uses in closure may race against later %3 uses",
+      "%0%1 is captured by a %2 closure. %2 uses in closure may race against later %3 uses",
       (StringRef, Identifier, ActorIsolation, ActorIsolation))
 
-// Misc Error.
-ERROR(regionbasedisolation_task_or_actor_isolated_transferred, none,
-      "task or actor isolated value cannot be transferred", ())
+NOTE(regionbasedisolation_typed_use_after_sending, none,
+      "Passing value of non-Sendable type %0 as a 'sending' argument risks causing races in between local and caller code",
+      (Type))
+NOTE(regionbasedisolation_typed_use_after_sending_callee, none,
+      "Passing value of non-Sendable type %0 as a 'sending' argument to %1 %2 risks causing races in between local and caller code",
+      (Type, DescriptiveDeclKind, DeclName))
+
+//===
+// Sending Never Sendable Emitter
+
+NOTE(regionbasedisolation_named_send_never_sendable, none,
+      "sending %1%0 to %2 callee risks causing data races between %2 and %3 uses",
+      (Identifier, StringRef, ActorIsolation, StringRef))
+NOTE(regionbasedisolation_named_send_never_sendable_callee, none,
+      "sending %1%0 to %2 %3 %4 risks causing data races between %2 and %5 uses",
+      (Identifier, StringRef, ActorIsolation, DescriptiveDeclKind, DeclName, StringRef))
+
+NOTE(regionbasedisolation_named_send_into_sending_param, none,
+     "%0%1 is passed as a 'sending' parameter; Uses in callee may race with "
+     "later %0uses",
+     (StringRef, Identifier))
+NOTE(regionbasedisolation_named_nosend_send_into_result, none,
+     "%0%1 cannot be a 'sending' result. %2 uses may race with caller uses",
+     (StringRef, Identifier, StringRef))
+NOTE(regionbasedisolation_typed_tns_passed_to_sending, none,
+     "Passing %0 value of non-Sendable type %1 as a 'sending' parameter risks "
+     "causing races inbetween %0 uses and uses reachable from the callee",
+     (StringRef, Type))
+
+ERROR(regionbasedisolation_typed_tns_passed_sending_closure, none,
+     "passing closure as a 'sending' parameter risks causing data races between %0 and concurrent execution of the closure",
+     (StringRef))
+NOTE(regionbasedisolation_typed_tns_passed_to_sending_closure_helper_have_value, none,
+     "closure captures %0 %1",
+     (StringRef, DeclName))
+NOTE(regionbasedisolation_typed_tns_passed_to_sending_closure_helper_have_value_task_isolated, none,
+     "closure captures %0 which is accessible to code in the current task",
+     (DeclName))
+NOTE(regionbasedisolation_typed_tns_passed_to_sending_closure_helper_have_boxed_value_task_isolated, none,
+     "closure captures reference to mutable %1 %0 which is accessible to code in the current task",
+     (DeclName, DescriptiveDeclKind))
+NOTE(regionbasedisolation_typed_tns_passed_to_sending_closure_helper_have_value_region, none,
+     "closure captures %1 which is accessible to %0 code",
+     (StringRef, DeclName))
+
+NOTE(regionbasedisolation_typed_tns_passed_to_sending_closure_helper_multiple_value, none,
+     "closure captures non-Sendable %0",
+     (DeclName))
+
+NOTE(regionbasedisolation_typed_tns_passed_to_sending_callee, none,
+     "Passing %0 value of non-Sendable type %1 as a 'sending' parameter to %2 %3 risks causing races inbetween %0 uses and uses reachable from %3",
+     (StringRef, Type, DescriptiveDeclKind, DeclName))
+
+NOTE(regionbasedisolation_named_send_nt_asynclet_capture, none,
+      "sending %1 %0 into async let risks causing data races between nonisolated and %1 uses",
+      (Identifier, StringRef))
+NOTE(regionbasedisolation_typed_sendneversendable_via_arg, none,
+      "sending %0 value of non-Sendable type %1 to %2 callee risks causing races in between %0 and %2 uses",
+      (StringRef, Type, ActorIsolation))
+NOTE(regionbasedisolation_typed_sendneversendable_via_arg_callee, none,
+      "sending %0 value of non-Sendable type %1 to %2 %3 %4 risks causing races in between %0 and %2 uses",
+      (StringRef, Type, ActorIsolation, DescriptiveDeclKind, DeclName))
+
+// Error that is only used when the send non sendable emitter cannot discover any
+// information to give a better diagnostic.
+ERROR(regionbasedisolation_task_or_actor_isolated_sent, none,
+      "task or actor isolated value cannot be sent", ())
+
+//===
+// InOut Sending Emitter
+
+NOTE(regionbasedisolation_inout_sending_must_be_reinitialized, none,
+     "'inout sending' parameter must be reinitialized before function exit with a non-actor isolated value",
+     ())
+ERROR(regionbasedisolation_inout_sending_cannot_be_actor_isolated, none,
+      "'inout sending' parameter %0 cannot be %1at end of function",
+      (Identifier, StringRef))
+NOTE(regionbasedisolation_inout_sending_cannot_be_actor_isolated_note, none,
+      "%1%0 risks causing races in between %1uses and caller uses since caller assumes value is not actor isolated",
+      (Identifier, StringRef))
+
+//===
+// Out Sending
+
+ERROR(regionbasedisolation_out_sending_cannot_be_actor_isolated_type, none,
+      "returning a %1 %0 value as a 'sending' result risks causing data races",
+      (Type, StringRef))
+NOTE(regionbasedisolation_out_sending_cannot_be_actor_isolated_note_type, none,
+      "returning a %1 %0 value risks causing races since the caller assumes the value can be safely sent to other isolation domains",
+      (Type, StringRef))
+ERROR(regionbasedisolation_out_sending_cannot_be_actor_isolated_named, none,
+      "returning %1 %0 as a 'sending' result risks causing data races",
+      (Identifier, StringRef))
+NOTE(regionbasedisolation_out_sending_cannot_be_actor_isolated_note_named, none,
+      "returning %1 %0 risks causing data races since the caller assumes that %0 can be safely sent to other isolation domains",
+      (Identifier, StringRef))
+
+//===
+// non-Sendable Results
+
+// Example: returning main-actor isolated result to a custom-actor isolated context risks causing data races
+ERROR(rbi_isolation_crossing_result, none,
+      "non-Sendable %0-typed result can not be returned from %1 %kind2 to %3 context",
+      (Type, ActorIsolation, const ValueDecl *, ActorIsolation))
+ERROR(rbi_isolation_crossing_result_no_decl, none,
+      "non-Sendable %0-typed result can not be returned from %1 function to %2 context",
+      (Type, ActorIsolation, ActorIsolation))
+NOTE(rbi_non_sendable_nominal,none,
+     "%kind0 does not conform to the 'Sendable' protocol",
+      (const ValueDecl *))
+NOTE(rbi_nonsendable_function_type,none,
+     "a function type must be marked '@Sendable' to conform to 'Sendable'", ())
+NOTE(rbi_add_nominal_sendable_conformance,none,
+     "consider making %kind0 conform to the 'Sendable' protocol",
+     (const ValueDecl *))
+NOTE(rbi_add_generic_parameter_sendable_conformance,none,
+     "consider making generic parameter %0 conform to the 'Sendable' protocol",
+     (Type))
+
+//===----------------------------------------------------------------------===//
+//                           MARK: Misc Diagnostics
+//===----------------------------------------------------------------------===//
 
 // TODO: print the name of the nominal type
 ERROR(deinit_not_visible, none,
@@ -1025,6 +1157,9 @@ NOTE(lifetime_outside_scope_use, none,
      "this use of the lifetime-dependent value is out of scope", ())
 NOTE(lifetime_outside_scope_escape, none,
      "this use causes the lifetime-dependent value to escape", ())
+
+ERROR(noncopyable_shared_case_block_unimplemented, none,
+      "matching a non-'Copyable' value using a case label that has multiple patterns is not implemented", ())
 
 #define UNDEFINE_DIAGNOSTIC_MACROS
 #include "DefineDiagnosticMacros.h"

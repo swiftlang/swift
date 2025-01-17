@@ -32,6 +32,9 @@ ERROR(error_opening_output,none,
 ERROR(error_closing_output,none,
       "error closing '%0' for output: %1", (StringRef, StringRef))
 
+ERROR(error_mccas,none,
+      "error trying to materialize MCCAS object file: %0", (StringRef))
+
 ERROR(cannot_find_group_info_file,none,
       "cannot find group info file at path: '%0'", (StringRef))
 
@@ -44,9 +47,17 @@ ERROR(error_no_group_info,none,
 NOTE(brace_stmt_suggest_do,none,
      "did you mean to use a 'do' statement?", ())
 
-WARNING(error_in_future_swift_version,none,
+// This does not have a group because warnings of this kind inherit the group
+// from the wrapped error.
+WARNING(error_in_swift_lang_mode,none,
         "%0; this is an error in the Swift %1 language mode",
         (DiagnosticInfo *, unsigned))
+
+// This does not have a group because warnings of this kind inherit the group
+// from the wrapped error.
+WARNING(error_in_a_future_swift_lang_mode,none,
+        "%0; this will be an error in a future Swift language mode",
+        (DiagnosticInfo *))
 
 // Generic disambiguation
 NOTE(while_parsing_as_left_angle_bracket,none,
@@ -109,10 +120,6 @@ ERROR(generic_signature_not_valid,none,
 ERROR(generic_signature_not_equal,none,
       "generic signature %0 is not equal to new signature %1",
       (StringRef, StringRef))
-
-// Used in diagnostics that are split across requests implemented in several places.
-ERROR(concurrency_default_actor_not_found,none,
-      "broken standard library: cannot find default actor type '%0'", (StringRef))
 
 // FIXME: Used by swift-api-digester. Don't want to set up a separate diagnostics
 // file just for a few errors.
@@ -211,6 +218,9 @@ WARNING(warn_scanner_deserialize_failed, none,
 REMARK(remark_reuse_cache, none,
        "Re-using serialized module scanning dependency cache from: '%0'.", (StringRef))
 
+REMARK(remark_scanner_uncached_lookups, none,
+       "Module Dependency Scanner queries executed: '%0'.", (unsigned))
+
 REMARK(remark_save_cache, none,
        "Serializing module scanning dependency cache to: '%0'.", (StringRef))
 
@@ -229,8 +239,13 @@ NOTE(in_macro_expansion,none,
 ERROR(macro_experimental,none,
       "%0 macros are an experimental feature that is not enabled %select{|(%1)}1",
       (StringRef, StringRef))
-ERROR(ambiguous_macro_reference,none,
-      "ambiguous reference to macro %0", (DeclName))
+      
+//------------------------------------------------------------------------------
+// MARK: lexical lookup diagnostics
+//------------------------------------------------------------------------------
+      
+ERROR(lookup_outputs_dont_match,none,
+"Unqualified lookup output from ASTScope and SwiftLexicalLookup don't match", ())
 
 //------------------------------------------------------------------------------
 // MARK: bridged diagnostics

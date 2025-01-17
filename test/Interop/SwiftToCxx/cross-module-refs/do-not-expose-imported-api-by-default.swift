@@ -3,7 +3,7 @@
 
 // RUN: %target-swift-frontend %s -typecheck -module-name UsesStructs -I %t -clang-header-expose-decls=all-public -emit-clang-header-path %t/uses-structs.h
 
-// RUN: %check-interop-cxx-header-in-clang(%t/uses-structs.h)
+// RUN: %check-interop-cxx-header-in-clang(%t/uses-structs.h -DSWIFT_CXX_INTEROP_HIDE_STL_OVERLAY)
 // RUN: %FileCheck %s < %t/uses-structs.h
 
 import Structs

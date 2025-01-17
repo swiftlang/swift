@@ -1,4 +1,4 @@
-// RUN: %target-swift-emit-sil %s -I %S/Inputs -enable-experimental-cxx-interop | %FileCheck %s
+// RUN: %target-swift-emit-sil -Xllvm -sil-print-types %s -I %S/Inputs -enable-experimental-cxx-interop | %FileCheck %s
 
 import MemberInline
 
@@ -170,6 +170,15 @@ public func index(_ arr: inout ConstPtrByVal, _ arg: Int32, _ val: Int32) -> Int
 // CHECK:   [[PTR:%.*]] = apply [[OP]]([[NEWVALUE]], [[SELFACCESS]]) : $@convention(cxx_method) (Int32, @inout ConstPtrByVal) -> Optional<UnsafePointer<Int32>>
 // CHECK:   end_access [[SELFACCESS]] : $*ConstPtrByVal
 // CHECK: } // end sil function '$sSo13ConstPtrByValVySPys5Int32VGSgADcig
+
+public func subscriptUnnamed(_ unnamed: SubscriptUnnamedParameter, _ arg: Int32) -> Int32 { unnamed[arg] }
+// CHECK: sil shared [transparent] @$sSo25SubscriptUnnamedParameterVys5Int32VADcig : $@convention(method) (Int32, SubscriptUnnamedParameter) -> Int32 {
+// CHECK: bb0([[INDEX:%.*]] : $Int32, [[SELF:%.*]] : $SubscriptUnnamedParameter):
+// CHECK:   [[SELFACCESS:%.*]] = alloc_stack $SubscriptUnnamedParameter
+// CHECK:   [[OP:%.*]] = function_ref [[OPERATORNAME:@(_ZNK25SubscriptUnnamedParameterixEi|\?\?ASubscriptUnnamedParameter@@QEBAHH@Z)]] : $@convention(cxx_method) (Int32, @in_guaranteed SubscriptUnnamedParameter) -> Int32
+// CHECK:   [[PTR:%.*]] = apply [[OP]]([[INDEX]], [[SELFACCESS]]) : $@convention(cxx_method) (Int32, @in_guaranteed SubscriptUnnamedParameter) -> Int32
+// CHECK:   dealloc_stack [[SELFACCESS]]
+// CHECK: } // end sil function '$sSo25SubscriptUnnamedParameterVys5Int32VADcig'
 
 // CHECK: sil [clang ReadOnlyIntArray.__operatorSubscriptConst] [[READCLASSNAME]] : $@convention(cxx_method) (Int32, @in_guaranteed ReadOnlyIntArray) -> UnsafePointer<Int32>
 // CHECK: sil [clang ReadWriteIntArray.__operatorSubscript] [[READWRITECLASSNAME]] : $@convention(cxx_method) (Int32, @inout ReadWriteIntArray) -> UnsafeMutablePointer<Int32>

@@ -77,6 +77,11 @@ extension ManagedBuffer where Element: ~Copyable {
   /// an initial `Header`.
   @_preInverseGenerics
   @inlinable
+  #if $Embedded
+  // Transparent in Embedded Swift to avoid needing "self" as a metatype. By
+  // inlining into the caller, we'll know the concrete type instead.
+  @_transparent
+  #endif
   public final class func create(
     minimumCapacity: Int,
     makingHeaderWith factory: (ManagedBuffer<Header, Element>) throws -> Header
@@ -170,7 +175,7 @@ extension ManagedBuffer where Element: ~Copyable {
 
 extension ManagedBuffer {
   @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
-  @_silgen_name("$ss13ManagedBufferC25withUnsafeMutablePointersyqd__qd__SpyxG_Spyq_GtKXEKlF")
+  @_silgen_name("$ss13ManagedBufferC32withUnsafeMutablePointerToHeaderyqd__qd__SpyxGKXEKlF")
   @usableFromInline
   internal final func __legacy_withUnsafeMutablePointerToHeader<R>(
     _ body: (UnsafeMutablePointer<Header>) throws -> R
@@ -179,7 +184,7 @@ extension ManagedBuffer {
   }
 
   @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
-  @_silgen_name("$ss13ManagedBufferC32withUnsafeMutablePointerToHeaderyqd__qd__SpyxGKXEKlF")
+  @_silgen_name("$ss13ManagedBufferC34withUnsafeMutablePointerToElementsyqd__qd__Spyq_GKXEKlF")
   @usableFromInline
   internal final func __legacy_withUnsafeMutablePointerToElements<R>(
     _ body: (UnsafeMutablePointer<Element>) throws -> R
@@ -188,7 +193,7 @@ extension ManagedBuffer {
   }
 
   @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
-  @_silgen_name("$ss13ManagedBufferC34withUnsafeMutablePointerToElementsyqd__qd__Spyq_GKXEKlF")
+  @_silgen_name("$ss13ManagedBufferC25withUnsafeMutablePointersyqd__qd__SpyxG_Spyq_GtKXEKlF")
   @usableFromInline
   internal final func __legacy_withUnsafeMutablePointers<R>(
     _ body: (
@@ -290,7 +295,9 @@ public struct ManagedBufferPointer<
   @_preInverseGenerics
   @inlinable
   public init(unsafeBufferObject buffer: AnyObject) {
+    #if !$Embedded
     ManagedBufferPointer._checkValidBufferClass(type(of: buffer))
+    #endif
 
     self._nativeBuffer = Builtin.unsafeCastToNativeObject(buffer)
   }
@@ -308,7 +315,10 @@ public struct ManagedBufferPointer<
   @_preInverseGenerics
   @inlinable
   internal init(_uncheckedUnsafeBufferObject buffer: AnyObject) {
+    #if !$Embedded
     ManagedBufferPointer._internalInvariantValidBufferClass(type(of: buffer))
+    #endif
+
     self._nativeBuffer = Builtin.unsafeCastToNativeObject(buffer)
   }
 
@@ -373,6 +383,9 @@ public struct ManagedBufferPointer<
     _nativeBuffer = Builtin.unsafeCastToNativeObject(buffer)
   }
 }
+
+@available(*, unavailable)
+extension ManagedBufferPointer: Sendable where Element: ~Copyable {}
 
 extension ManagedBufferPointer where Element: ~Copyable {
   /// The stored `Header` instance.

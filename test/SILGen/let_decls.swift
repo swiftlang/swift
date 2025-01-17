@@ -1,5 +1,5 @@
 
-// RUN: %target-swift-emit-silgen -module-name let_decls -Xllvm -sil-full-demangle %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -Xllvm -sil-print-types -module-name let_decls -Xllvm -sil-full-demangle %s | %FileCheck %s
 
 func takeClosure(_ a : () -> Int) {}
 
@@ -326,7 +326,8 @@ func testLetArchetypeBases<T : SimpleProtocol>(_ p : T) {
 // CHECK-NEXT: debug_value %1 : $*any SimpleProtocol, let, name "b", {{.*}} expr op_deref
 func testDebugValue(_ a : Int, b : SimpleProtocol) -> Int {
 
-  // CHECK-NEXT: debug_value %0 : $Int, let, name "x"
+  // CHECK-NEXT: [[MV:%.*]] = move_value [var_decl] %0 : $Int
+  // CHECK-NEXT: debug_value [[MV]] : $Int, let, name "x"
   let x = a
 
   // CHECK: apply
@@ -334,7 +335,7 @@ func testDebugValue(_ a : Int, b : SimpleProtocol) -> Int {
   
   // CHECK-NOT: destroy_addr
 
-  // CHECK: return %0
+  // CHECK: return [[MV]]
   return x
 }
 

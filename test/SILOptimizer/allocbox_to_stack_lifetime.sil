@@ -50,3 +50,24 @@ bb0(%0 : $Int):
   return %3 : $Int
 }
 
+// CHECK-LABEL: sil [ossa] @keep_dead_end : {{.*}} {
+// CHECK:         [[STACK:%[^,]+]] = alloc_stack
+// CHECK:         cond_br undef, [[DIE:bb[0-9]+]]
+// CHECK:       [[DIE]]:
+// CHECK-NEXT:    unreachable
+// CHECK-LABEL: } // end sil function 'keep_dead_end'
+sil [ossa] @keep_dead_end : $@convention(thin) () -> () {
+bb0:
+  %b = alloc_box ${ var Int }
+  cond_br undef, die, exit
+
+die:
+  dealloc_box [dead_end] %b : ${ var Int }
+  unreachable
+
+exit:
+  dealloc_box %b : ${ var Int }
+  %retval = tuple ()
+  return %retval : $()
+
+}

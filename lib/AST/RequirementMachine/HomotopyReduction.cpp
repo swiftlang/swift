@@ -54,6 +54,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/AST/Type.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/Range.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/DenseSet.h"
@@ -211,7 +212,7 @@ RewriteSystem::findRuleToDelete(EliminationPredicate isRedundantRuleFn) {
     // We should not find a rule that has already been marked redundant
     // here; it should have already been replaced with a rewrite path
     // in all homotopy generators.
-    assert(!rule.isRedundant());
+    ASSERT(!rule.isRedundant());
 
     // Associated type introduction rules are 'permanent'. They're
     // not worth eliminating since they are re-added every time; it
@@ -435,9 +436,9 @@ void RewriteSystem::minimizeRewriteSystem(const PropertyMap &map) {
     llvm::dbgs() << "-----------------------------\n";
   }
 
-  assert(Complete);
-  assert(!Minimized);
-  assert(!Frozen);
+  ASSERT(Complete);
+  ASSERT(!Minimized);
+  ASSERT(!Frozen);
   Minimized = 1;
 
   propagateExplicitBits();
@@ -500,7 +501,7 @@ void RewriteSystem::minimizeRewriteSystem(const PropertyMap &map) {
   performHomotopyReduction([&](unsigned loopID, unsigned ruleID) -> bool {
     const auto &rule = getRule(ruleID);
 
-    if (rule.containsUnresolvedSymbols())
+    if (rule.containsNameSymbols())
       return true;
 
     return false;
@@ -590,8 +591,8 @@ void RewriteSystem::minimizeRewriteSystem(const PropertyMap &map) {
 /// after minimization. Instead, we will rebuild a new rewrite system
 /// from the minimized requirements.
 GenericSignatureErrors RewriteSystem::getErrors() const {
-  assert(Complete);
-  assert(Minimized);
+  ASSERT(Complete);
+  ASSERT(Minimized);
 
   GenericSignatureErrors result;
 
@@ -612,7 +613,7 @@ GenericSignatureErrors RewriteSystem::getErrors() const {
 
     if (!rule.isRedundant() &&
         !rule.isProtocolTypeAliasRule() &&
-        rule.containsUnresolvedSymbols())
+        rule.containsNameSymbols())
       result |= GenericSignatureErrorFlags::HasInvalidRequirements;
 
     if (rule.isRecursive())
@@ -625,7 +626,7 @@ GenericSignatureErrors RewriteSystem::getErrors() const {
 
         if (property->hasSubstitutions()) {
           for (auto t : property->getSubstitutions()) {
-            if (t.containsUnresolvedSymbols())
+            if (t.containsNameSymbols())
               result |= GenericSignatureErrorFlags::HasInvalidRequirements;
           }
         }
@@ -643,8 +644,8 @@ GenericSignatureErrors RewriteSystem::getErrors() const {
 /// These rules form the requirement signatures of these protocols.
 llvm::DenseMap<const ProtocolDecl *, RewriteSystem::MinimizedProtocolRules>
 RewriteSystem::getMinimizedProtocolRules() const {
-  assert(Minimized);
-  assert(!Protos.empty());
+  ASSERT(Minimized);
+  ASSERT(!Protos.empty());
 
   llvm::DenseMap<const ProtocolDecl *, MinimizedProtocolRules> rules;
   for (unsigned ruleID = FirstLocalRule, e = Rules.size();
@@ -662,7 +663,7 @@ RewriteSystem::getMinimizedProtocolRules() const {
 
     if (rule.isProtocolTypeAliasRule())
       rules[proto].TypeAliases.push_back(ruleID);
-    else if (!rule.containsUnresolvedSymbols())
+    else if (!rule.containsNameSymbols())
       rules[proto].Requirements.push_back(ruleID);
   }
 
@@ -675,8 +676,8 @@ RewriteSystem::getMinimizedProtocolRules() const {
 /// These rules form the top-level generic signature for this rewrite system.
 std::vector<unsigned>
 RewriteSystem::getMinimizedGenericSignatureRules() const {
-  assert(Minimized);
-  assert(Protos.empty());
+  ASSERT(Minimized);
+  ASSERT(Protos.empty());
 
   std::vector<unsigned> rules;
   for (unsigned ruleID = FirstLocalRule, e = Rules.size();
@@ -686,11 +687,12 @@ RewriteSystem::getMinimizedGenericSignatureRules() const {
     if (rule.isPermanent() ||
         rule.isRedundant() ||
         rule.isConflicting() ||
-        rule.containsUnresolvedSymbols()) {
+        rule.containsNameSymbols()) {
       continue;
     }
 
-    if (rule.getLHS()[0].getKind() != Symbol::Kind::GenericParam)
+    if (rule.getLHS()[0].getKind() != Symbol::Kind::PackElement &&
+        rule.getLHS()[0].getKind() != Symbol::Kind::GenericParam)
       continue;
 
     rules.push_back(ruleID);
@@ -712,11 +714,11 @@ void RewriteSystem::verifyRedundantConformances(
     const llvm::DenseSet<unsigned> &redundantConformances) const {
   for (unsigned ruleID : redundantConformances) {
     const auto &rule = getRule(ruleID);
-    assert(!rule.isPermanent() &&
+    ASSERT(!rule.isPermanent() &&
            "Permanent rule cannot be redundant");
-    assert(!rule.isIdentityConformanceRule() &&
+    ASSERT(!rule.isIdentityConformanceRule() &&
            "Identity conformance cannot be redundant");
-    assert(rule.isAnyConformanceRule() &&
+    ASSERT(rule.isAnyConformanceRule() &&
            "Redundant conformance is not a conformance rule?");
 
     if (!rule.isRedundant()) {
@@ -791,7 +793,7 @@ void RewriteSystem::verifyMinimizedRules(
         rule.isAnyConformanceRule() &&
         !rule.isRHSSimplified() &&
         !rule.isSubstitutionSimplified() &&
-        !rule.containsUnresolvedSymbols() &&
+        !rule.containsNameSymbols() &&
         !redundantConformances.count(ruleID)) {
       llvm::errs() << "Minimal conformance is redundant: " << rule << "\n\n";
       dump(llvm::errs());

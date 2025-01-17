@@ -15,7 +15,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "swift/Basic/STLExtras.h"
 #define DEBUG_TYPE "differentiation"
 
 #include "swift/SILOptimizer/Differentiation/PullbackCloner.h"
@@ -27,9 +26,12 @@
 #include "swift/SILOptimizer/Differentiation/Thunk.h"
 #include "swift/SILOptimizer/Differentiation/VJPCloner.h"
 
+#include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/PropertyWrappers.h"
 #include "swift/AST/TypeCheckRequests.h"
+#include "swift/Basic/Assertions.h"
+#include "swift/Basic/STLExtras.h"
 #include "swift/SIL/ApplySite.h"
 #include "swift/SIL/InstructionUtils.h"
 #include "swift/SIL/Projection.h"
@@ -130,6 +132,10 @@ private:
   /// Stack buffers allocated for storing local adjoint values.
   SmallVector<AllocStackInst *, 64> functionLocalAllocations;
 
+  /// Copies created to deal with destructive enum operations
+  /// (unchecked_take_enum_addr)
+  llvm::SmallDenseMap<InitEnumDataAddrInst*, SILValue> enumDataAdjCopies;
+
   /// A set used to remember local allocations that were destroyed.
   llvm::SmallDenseSet<SILValue> destroyedLocalAllocations;
 
@@ -209,12 +215,17 @@ private:
   //--------------------------------------------------------------------------//
 
   /// Get the type lowering for the given AST type.
+  ///
+  /// Explicitly use minimal type expansion context: in general, differentiation
+  /// happens on function types, so it cannot know if the original function is
+  /// resilient or not.
   const Lowering::TypeLowering &getTypeLowering(Type type) {
     auto pbGenSig =
         getPullback().getLoweredFunctionType()->getSubstGenericSignature();
     Lowering::AbstractionPattern pattern(pbGenSig,
                                          type->getReducedType(pbGenSig));
-    return getPullback().getTypeLowering(pattern, type);
+    return getContext().getTypeConverter().getTypeLowering(
+      pattern, type, TypeExpansionContext::minimal());
   }
 
   /// Remap any archetypes into the current function's context.
@@ -225,7 +236,11 @@ private:
         getPullback().getLoweredFunctionType()->getSubstGenericSignature());
     auto remappedSILType =
         SILType::getPrimitiveType(remappedType, ty.getCategory());
-    return getPullback().mapTypeIntoContext(remappedSILType);
+    // FIXME: Sometimes getPullback() doesn't have a generic environment, in which
+    // case callers are apparently happy to receive an interface type.
+    if (getPullback().getGenericEnvironment())
+      return getPullback().mapTypeIntoContext(remappedSILType);
+    return remappedSILType;
   }
 
   std::optional<TangentSpace> getTangentSpace(CanType type) {
@@ -234,7 +249,7 @@ private:
         getWitness()->getDerivativeGenericSignature().getReducedType(
             type);
     return type->getAutoDiffTangentSpace(
-        LookUpConformanceInModule(getModule().getSwiftModule()));
+        LookUpConformanceInModule());
   }
 
   /// Returns the tangent value category of the given value.
@@ -665,6 +680,11 @@ private:
             }
             adjNameStream << " (scope #" << origBB->getDebugID() << ")";
             dv.Name = adjName;
+            // We have no meaningful debug location, and the type is different.
+            dv.Scope = nullptr;
+            dv.Loc = {};
+            dv.Type = {};
+            dv.DIExpr = {};
             return dv;
           }));
     return (insertion.first->getSecond() = newBuf);
@@ -755,14 +775,15 @@ private:
                                         SILValue wrappedAdjoint,
                                         SILType optionalTy);
 
-  /// Accumulate optional buffer from `wrappedAdjoint`.
+  /// Accumulate adjoint of `wrappedAdjoint` into optionalBuffer.
   void accumulateAdjointForOptionalBuffer(SILBasicBlock *bb,
                                           SILValue optionalBuffer,
                                           SILValue wrappedAdjoint);
 
-  /// Set optional value from `wrappedAdjoint`.
-  void setAdjointValueForOptional(SILBasicBlock *bb, SILValue optionalValue,
-                                  SILValue wrappedAdjoint);
+  /// Accumulate adjoint of `wrappedAdjoint` into optionalValue.
+  void accumulateAdjointValueForOptional(SILBasicBlock *bb,
+                                         SILValue optionalValue,
+                                         SILValue wrappedAdjoint);
 
   //--------------------------------------------------------------------------//
   // Array literal initialization differentiation
@@ -1418,7 +1439,7 @@ public:
           recordTemporary(adjElt);
         } else {
           auto substMap = tangentVectorTy->getMemberSubstitutionMap(
-              field->getModuleContext(), field);
+              field);
           auto fieldTy = field->getInterfaceType().subst(substMap);
           auto fieldSILTy = getTypeLowering(fieldTy).getLoweredType();
           assert(fieldSILTy.isObject());
@@ -1715,13 +1736,21 @@ public:
   /// move_value, begin_borrow.
   ///   Original: y = copy_value x
   ///    Adjoint: adj[x] += adj[y]
-  void visitValueOwnershipInst(SingleValueInstruction *svi) {
+  void visitValueOwnershipInst(SingleValueInstruction *svi,
+                               bool needZeroResAdj = false) {
     assert(svi->getNumOperands() == 1);
     auto *bb = svi->getParent();
     switch (getTangentValueCategory(svi)) {
     case SILValueCategory::Object: {
       auto adj = getAdjointValue(bb, svi);
       addAdjointValue(bb, svi->getOperand(0), adj, svi->getLoc());
+      if (needZeroResAdj) {
+        assert(svi->getNumResults() == 1);
+        SILValue val = svi->getResult(0);
+        setAdjointValue(
+            bb, val,
+            makeZeroAdjointValue(getRemappedTangentType(val->getType())));
+      }
       break;
     }
     case SILValueCategory::Address: {
@@ -1747,8 +1776,16 @@ public:
 
   /// Handle `move_value` instruction.
   ///   Original: y = move_value x
-  ///    Adjoint: adj[x] += adj[y]
-  void visitMoveValueInst(MoveValueInst *mvi) { visitValueOwnershipInst(mvi); }
+  ///    Adjoint: adj[x] += adj[y]; adj[y] = 0
+  void visitMoveValueInst(MoveValueInst *mvi) {
+    switch (getTangentValueCategory(mvi)) {
+    case SILValueCategory::Address:
+      llvm::report_fatal_error("AutoDiff does not support move_value with "
+                               "SILValueCategory::Address");
+    case SILValueCategory::Object:
+      visitValueOwnershipInst(mvi, /*needZeroResAdj=*/true);
+    }
+  }
 
   void visitEndInitLetRefInst(EndInitLetRefInst *eir) { visitValueOwnershipInst(eir); }
 
@@ -1793,10 +1830,61 @@ public:
     builder.emitZeroIntoBuffer(uccai->getLoc(), adjDest, IsInitialization);
   }
 
+  /// Handle `enum` instruction.
+  ///   Original: y = enum $Enum, #Enum.some!enumelt, x
+  ///    Adjoint: adj[x] += adj[y]
+  void visitEnumInst(EnumInst *ei) {
+    SILBasicBlock *bb = ei->getParent();
+    SILLocation loc = ei->getLoc();
+    auto *optionalEnumDecl = getASTContext().getOptionalDecl();
+
+    // Only `Optional`-typed operands are supported for now. Diagnose all other
+    // enum operand types.
+    if (ei->getType().getEnumOrBoundGenericEnum() != optionalEnumDecl) {
+      LLVM_DEBUG(getADDebugStream()
+                 << "Unsupported enum type in PullbackCloner: " << *ei);
+      getContext().emitNondifferentiabilityError(
+          ei, getInvoker(),
+          diag::autodiff_expression_not_differentiable_note);
+      errorOccurred = true;
+      return;
+    }
+
+    auto adjOpt = getAdjointValue(bb, ei);
+    auto adjStruct = materializeAdjointDirect(adjOpt, loc);
+    StructDecl *adjStructDecl =
+        adjStruct->getType().getStructOrBoundGenericStruct();
+
+    VarDecl *adjOptVar = nullptr;
+    if (adjStructDecl) {
+      ArrayRef<VarDecl *> properties = adjStructDecl->getStoredProperties();
+      adjOptVar = properties.size() == 1 ? properties[0] : nullptr;
+    }
+
+    EnumDecl *adjOptDecl =
+        adjOptVar ? adjOptVar->getTypeInContext()->getEnumOrBoundGenericEnum()
+                  : nullptr;
+
+    // Optional<T>.TangentVector should be a struct with a single
+    // Optional<T.TangentVector> property. This is an implementation detail of
+    // OptionalDifferentiation.swift
+    // TODO: Maybe it would be better to have getters / setters here that we
+    // can call and hide this implementation detail?
+    if (!adjOptDecl || adjOptDecl != optionalEnumDecl)
+      llvm_unreachable("Unexpected type of Optional.TangentVector");
+
+    auto *adjVal = builder.createStructExtract(loc, adjStruct, adjOptVar);
+
+    EnumElementDecl *someElemDecl = getASTContext().getOptionalSomeDecl();
+    auto *adjData = builder.createUncheckedEnumData(loc, adjVal, someElemDecl);
+
+    addAdjointValue(bb, ei->getOperand(), makeConcreteAdjointValue(adjData), loc);
+  }
+
   /// Handle a sequence of `init_enum_data_addr` and `inject_enum_addr`
   /// instructions.
   ///
-  /// Original: y = init_enum_data_addr x
+  /// Original: x = init_enum_data_addr y : $*Enum, #Enum.Case
   ///           inject_enum_addr y
   ///
   ///  Adjoint: adj[x] += unchecked_take_enum_data_addr adj[y]
@@ -1816,6 +1904,10 @@ public:
       errorOccurred = true;
       return;
     }
+
+    // No associated value => no adjoint to propagate
+    if (!inject->getElement()->hasAssociatedValues())
+      return;
 
     InitEnumDataAddrInst *origData = nullptr;
     for (auto use : origEnum->getUses()) {
@@ -1838,9 +1930,9 @@ public:
       }
     }
 
-    SILValue adjStruct = getAdjointBuffer(bb, origEnum);
+    SILValue adjDest = getAdjointBuffer(bb, origEnum);
     StructDecl *adjStructDecl =
-        adjStruct->getType().getStructOrBoundGenericStruct();
+        adjDest->getType().getStructOrBoundGenericStruct();
 
     VarDecl *adjOptVar = nullptr;
     if (adjStructDecl) {
@@ -1860,7 +1952,7 @@ public:
 
     SILLocation loc = origData->getLoc();
     StructElementAddrInst *adjOpt =
-        builder.createStructElementAddr(loc, adjStruct, adjOptVar);
+        builder.createStructElementAddr(loc, adjDest, adjOptVar);
 
     // unchecked_take_enum_data_addr is destructive, so copy
     // Optional<T.TangentVector> to a new alloca.
@@ -1868,27 +1960,27 @@ public:
         createFunctionLocalAllocation(adjOpt->getType(), loc);
     builder.createCopyAddr(loc, adjOpt, adjOptCopy, IsNotTake,
                            IsInitialization);
+    // The Optional copy is invalidated, do not attempt to destroy it at the end
+    // of the pullback. The value returned from unchecked_take_enum_data_addr is
+    // destroyed in visitInitEnumDataAddrInst.
+    auto [_, inserted] = enumDataAdjCopies.try_emplace(origData, adjOptCopy);
+    assert(inserted && "expected single buffer");
 
     EnumElementDecl *someElemDecl = getASTContext().getOptionalSomeDecl();
     UncheckedTakeEnumDataAddrInst *adjData =
         builder.createUncheckedTakeEnumDataAddr(loc, adjOptCopy, someElemDecl);
 
-    setAdjointBuffer(bb, origData, adjData);
-
-    // The Optional copy is invalidated, do not attempt to destroy it at the end
-    // of the pullback. The value returned from unchecked_take_enum_data_addr is
-    // destroyed in visitInitEnumDataAddrInst.
-    destroyedLocalAllocations.insert(adjOptCopy);
+    addToAdjointBuffer(bb, origData, adjData, loc);
   }
 
   /// Handle `init_enum_data_addr` instruction.
   /// Destroy the value returned from `unchecked_take_enum_data_addr`.
   void visitInitEnumDataAddrInst(InitEnumDataAddrInst *init) {
-    auto bufIt = bufferMap.find({init->getParent(), SILValue(init)});
-    if (bufIt == bufferMap.end())
-      return;
-    SILValue adjData = bufIt->second;
-    builder.emitDestroyAddr(init->getLoc(), adjData);
+    SILValue adjOptCopy = enumDataAdjCopies.at(init);
+
+    builder.emitDestroyAddr(init->getLoc(), adjOptCopy);
+    destroyedLocalAllocations.insert(adjOptCopy);
+    enumDataAdjCopies.erase(init);
   }
 
   /// Handle `unchecked_ref_cast` instruction.
@@ -2505,6 +2597,12 @@ bool PullbackCloner::Implementation::run() {
       }
     }
   }
+  // Ensure all enum adjoint copeis have been cleaned up
+  for (const auto &enumData : enumDataAdjCopies) {
+    leakFound = true;
+    getADDebugStream() << "Found leaked temporary:\n" << enumData.second;
+  }
+
   // Ensure all local allocations have been cleaned up.
   for (auto localAlloc : functionLocalAllocations) {
     if (!destroyedLocalAllocations.count(localAlloc)) {
@@ -2607,7 +2705,7 @@ AllocStackInst *PullbackCloner::Implementation::createOptionalAdjoint(
   // Initialize an `Optional<T.TangentVector>` buffer from `wrappedAdjoint` as
   // the input for `Optional<T>.TangentVector.init`.
   auto *optArgBuf = builder.createAllocStack(pbLoc, optionalOfWrappedTanType);
-  if (optionalOfWrappedTanType.isLoadableOrOpaque(builder.getFunction())) {
+  if (optionalOfWrappedTanType.isObject()) {
     // %enum = enum $Optional<T.TangentVector>, #Optional.some!enumelt,
     //         %wrappedAdjoint : $T
     auto *enumInst = builder.createEnum(pbLoc, wrappedAdjoint, someEltDecl,
@@ -2636,9 +2734,8 @@ AllocStackInst *PullbackCloner::Implementation::createOptionalAdjoint(
   auto *initFnRef = builder.createFunctionRef(pbLoc, initFn);
   auto *diffProto =
       builder.getASTContext().getProtocol(KnownProtocolKind::Differentiable);
-  auto *swiftModule = getModule().getSwiftModule();
   auto diffConf =
-      swiftModule->lookupConformance(wrappedType.getASTType(), diffProto);
+      lookupConformance(wrappedType.getASTType(), diffProto);
   assert(!diffConf.isInvalid() && "Missing conformance to `Differentiable`");
   auto subMap = SubstitutionMap::get(
       initFn->getLoweredFunctionType()->getSubstGenericSignature(),
@@ -2672,8 +2769,8 @@ void PullbackCloner::Implementation::accumulateAdjointForOptionalBuffer(
   builder.createDeallocStack(pbLoc, optTanAdjBuf);
 }
 
-// Set the adjoint value for the incoming `Optional` value.
-void PullbackCloner::Implementation::setAdjointValueForOptional(
+// Accumulate adjoint for the incoming `Optional` value.
+void PullbackCloner::Implementation::accumulateAdjointValueForOptional(
     SILBasicBlock *bb, SILValue optionalValue, SILValue wrappedAdjoint) {
   assert(getTangentValueCategory(optionalValue) == SILValueCategory::Object);
   auto pbLoc = getPullback().getLocation();
@@ -2685,10 +2782,11 @@ void PullbackCloner::Implementation::setAdjointValueForOptional(
 
   auto optTanAdjVal = builder.emitLoadValueOperation(
       pbLoc, optTanAdjBuf, LoadOwnershipQualifier::Take);
+
   recordTemporary(optTanAdjVal);
   builder.createDeallocStack(pbLoc, optTanAdjBuf);
 
-  setAdjointValue(bb, optionalValue, makeConcreteAdjointValue(optTanAdjVal));
+  addAdjointValue(bb, optionalValue, makeConcreteAdjointValue(optTanAdjVal), pbLoc);
 }
 
 SILBasicBlock *PullbackCloner::Implementation::buildPullbackSuccessor(
@@ -2899,12 +2997,12 @@ void PullbackCloner::Implementation::visitSILBasicBlock(SILBasicBlock *bb) {
           // Handle `switch_enum` on `Optional`.
           auto termInst = bbArg->getSingleTerminator();
           if (isSwitchEnumInstOnOptional(termInst)) {
-            setAdjointValueForOptional(bb, incomingValue, concreteBBArgAdjCopy);
+            accumulateAdjointValueForOptional(bb, incomingValue, concreteBBArgAdjCopy);
           } else {
             blockTemporaries[getPullbackBlock(predBB)].insert(
               concreteBBArgAdjCopy);
-            setAdjointValue(predBB, incomingValue,
-                            makeConcreteAdjointValue(concreteBBArgAdjCopy));
+            addAdjointValue(predBB, incomingValue,
+                            makeConcreteAdjointValue(concreteBBArgAdjCopy), pbLoc);
           }
         }
         break;
@@ -3061,8 +3159,7 @@ bool PullbackCloner::Implementation::runForSemanticMemberGetter() {
         if (field == tanField) {
           eltVals.push_back(adjResult);
         } else {
-          auto substMap = tangentVectorTy->getMemberSubstitutionMap(
-              field->getModuleContext(), field);
+          auto substMap = tangentVectorTy->getMemberSubstitutionMap(field);
           auto fieldTy = field->getInterfaceType().subst(substMap);
           auto fieldSILTy = getTypeLowering(fieldTy).getLoweredType();
           assert(fieldSILTy.isObject());
@@ -3203,7 +3300,7 @@ SILValue PullbackCloner::Implementation::getAdjointProjection(
     auto adjSource = getAdjointBuffer(origBB, source);
     if (!adjSource->getType().is<TupleType>())
       return adjSource;
-    auto origTupleTy = source->getType().castTo<TupleType>();
+    auto origTupleTy = remapType(source->getType()).castTo<TupleType>();
     unsigned adjIndex = 0;
     for (unsigned i : range(teai->getFieldIndex())) {
       if (getTangentSpace(
@@ -3545,12 +3642,11 @@ AllocStackInst *PullbackCloner::Implementation::getArrayAdjointElementBuffer(
       ctx.getIntType()->getCanonicalType());
   // %index_int = struct $Int (%index_literal)
   auto *eltIndexInt = builder.createStruct(loc, intType, {eltIndexLiteral});
-  auto *swiftModule = getModule().getSwiftModule();
   auto *diffProto = ctx.getProtocol(KnownProtocolKind::Differentiable);
-  auto diffConf = swiftModule->lookupConformance(eltTanType, diffProto);
+  auto diffConf = lookupConformance(eltTanType, diffProto);
   assert(!diffConf.isInvalid() && "Missing conformance to `Differentiable`");
   auto *addArithProto = ctx.getProtocol(KnownProtocolKind::AdditiveArithmetic);
-  auto addArithConf = swiftModule->lookupConformance(eltTanType, addArithProto);
+  auto addArithConf = lookupConformance(eltTanType, addArithProto);
   assert(!addArithConf.isInvalid() &&
          "Missing conformance to `AdditiveArithmetic`");
   auto subMap = SubstitutionMap::get(subscriptFnGenSig, {eltTanType},

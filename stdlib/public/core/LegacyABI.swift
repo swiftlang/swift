@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2019 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2024 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -86,4 +86,30 @@ extension String.UTF16View {
   // compatibility (even though it shouldn't matter), but is unused.
   @inlinable @inline(__always)
   internal var _shortHeuristic: Int { return 32 }
+}
+
+@usableFromInline
+internal func unimplemented_utf8_32bit(
+  _ message: String = "",
+  file: StaticString = #file, line: UInt = #line
+) -> Never {
+  fatalError("32-bit: Unimplemented for UTF-8 support", file: file, line: line)
+}
+
+@usableFromInline
+internal func _unsafePlus(_ lhs: Int, _ rhs: Int) -> Int {
+#if INTERNAL_CHECKS_ENABLED
+  return lhs + rhs
+#else
+  return lhs &+ rhs
+#endif
+}
+
+@usableFromInline
+internal func _unsafeMinus(_ lhs: Int, _ rhs: Int) -> Int {
+#if INTERNAL_CHECKS_ENABLED
+  return lhs - rhs
+#else
+  return lhs &- rhs
+#endif
 }

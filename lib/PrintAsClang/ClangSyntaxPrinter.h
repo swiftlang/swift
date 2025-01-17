@@ -13,6 +13,7 @@
 #ifndef SWIFT_PRINTASCLANG_CLANGSYNTAXPRINTER_H
 #define SWIFT_PRINTASCLANG_CLANGSYNTAXPRINTER_H
 
+#include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTMangler.h"
 #include "swift/AST/Type.h"
 #include "swift/Basic/LLVM.h"
@@ -49,7 +50,7 @@ class ClangSyntaxPrinter {
 public:
   enum class LeadingTrivia { None, Comma };
 
-  ClangSyntaxPrinter(raw_ostream &os) : os(os) {}
+  ClangSyntaxPrinter(const ASTContext &Ctx, raw_ostream &os) : os(os), mangler(Ctx) {}
 
   /// Print a given identifier. If the identifer conflicts with a keyword, add a
   /// trailing underscore.
@@ -94,6 +95,9 @@ public:
   bool printNominalTypeOutsideMemberDeclInnerStaticAssert(
       const NominalTypeDecl *typeDecl);
 
+  // Returns true when no qualifiers were printed.
+  bool printNestedTypeNamespaceQualifiers(const ValueDecl *D) const;
+
   /// Print out the C++ class access qualifier for the given Swift  type
   /// declaration.
   ///
@@ -134,6 +138,13 @@ public:
   void printNamespace(StringRef name,
                       llvm::function_ref<void(raw_ostream &OS)> bodyPrinter,
                       NamespaceTrivia trivia = NamespaceTrivia::None) const;
+
+  /// Prints the C++ namespaces of the outer types for a nested type.
+  /// E.g., for struct Foo { struct Bar {...} } it will print
+  /// namespace __FooNested { ..body.. } // namespace __FooNested
+  void printParentNamespaceForNestedTypes(
+      const ValueDecl *D, llvm::function_ref<void(raw_ostream &OS)> bodyPrinter,
+      NamespaceTrivia trivia = NamespaceTrivia::None) const;
 
   /// Print an extern C block with given body.
   void

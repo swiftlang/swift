@@ -27,10 +27,11 @@
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/TypeRepr.h"
 #include "swift/AST/Types.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/STLExtras.h"
 #include "swift/Basic/StringExtras.h"
 #include "swift/ClangImporter/ClangImporterRequests.h"
-#include "swift/Parse/Parser.h"
+#include "swift/Parse/ParseDeclName.h"
 #include "swift/Strings.h"
 #include "swift/Subsystems.h"
 #include "clang/AST/ASTContext.h"
@@ -548,7 +549,7 @@ struct AnySwiftNameAttr {
   }
 };
 
-/// Aggregate struct for the common members of clang::SwiftVersionedAttr and
+/// Aggregate struct for the common members of clang::SwiftVersionedAdditionAttr and
 /// clang::SwiftVersionedRemovalAttr.
 ///
 /// For a SwiftVersionedRemovalAttr, the Attr member will be null.
@@ -671,8 +672,8 @@ findSwiftNameAttr(const clang::Decl *decl, ImportNameVersion version) {
     for (auto *attr : decl->attrs()) {
       VersionedSwiftNameInfo info;
 
-      if (auto *versionedAttr = dyn_cast<clang::SwiftVersionedAttr>(attr)) {
-        auto added = decodeAttr(versionedAttr->getAttrToAdd());
+      if (auto *versionedAttr = dyn_cast<clang::SwiftVersionedAdditionAttr>(attr)) {
+        auto added = decodeAttr(versionedAttr->getAdditionalAttr());
         if (!added)
           continue;
 
@@ -1430,7 +1431,7 @@ bool NameImporter::hasErrorMethodNameCollision(
   unsigned numArgs = selector.getNumArgs();
   assert(numArgs > 0);
 
-  SmallVector<clang::IdentifierInfo *, 4> chunks;
+  SmallVector<const clang::IdentifierInfo *, 4> chunks;
   for (unsigned i = 0, e = selector.getNumArgs(); i != e; ++i) {
     chunks.push_back(selector.getIdentifierInfoForSlot(i));
   }
@@ -1477,10 +1478,14 @@ static bool suppressFactoryMethodAsInit(const clang::ObjCMethodDecl *method,
 }
 
 static void
-addEmptyArgNamesForClangFunction(const clang::FunctionDecl *funcDecl,
-                                 SmallVectorImpl<StringRef> &argumentNames) {
-  for (size_t i = 0; i < funcDecl->param_size(); ++i)
-    argumentNames.push_back(StringRef());
+addDefaultArgNamesForClangFunction(const clang::FunctionDecl *funcDecl,
+                                   SmallVectorImpl<StringRef> &argumentNames) {
+  for (size_t i = 0; i < funcDecl->param_size(); ++i) {
+    if (funcDecl->getParamDecl(i)->getType()->isRValueReferenceType())
+      argumentNames.push_back("consuming");
+    else
+      argumentNames.push_back(StringRef());
+  }
   if (funcDecl->isVariadic())
     argumentNames.push_back(StringRef());
 }
@@ -1862,7 +1867,7 @@ ImportedName NameImporter::importNameImpl(const clang::NamedDecl *D,
     // If we couldn't find a constructor decl, bail.
     if (!ctor)
       return ImportedName();
-    addEmptyArgNamesForClangFunction(ctor, argumentNames);
+    addDefaultArgNamesForClangFunction(ctor, argumentNames);
     break;
   }
 
@@ -1875,7 +1880,7 @@ ImportedName NameImporter::importNameImpl(const clang::NamedDecl *D,
     if (toType->isBooleanType()) {
       isFunction = true;
       baseName = "__convertToBool";
-      addEmptyArgNamesForClangFunction(conversionDecl, argumentNames);
+      addDefaultArgNamesForClangFunction(conversionDecl, argumentNames);
       break;
     }
     return ImportedName();
@@ -1927,7 +1932,7 @@ ImportedName NameImporter::importNameImpl(const clang::NamedDecl *D,
                               : clang::getOperatorSpelling(op);
       baseName = swiftCtx.getIdentifier(operatorName).str();
       isFunction = true;
-      addEmptyArgNamesForClangFunction(functionDecl, argumentNames);
+      addDefaultArgNamesForClangFunction(functionDecl, argumentNames);
       if (auto cxxMethod = dyn_cast<clang::CXXMethodDecl>(functionDecl)) {
         if (op == clang::OverloadedOperatorKind::OO_Star &&
             cxxMethod->param_empty()) {
@@ -1946,7 +1951,7 @@ ImportedName NameImporter::importNameImpl(const clang::NamedDecl *D,
     case clang::OverloadedOperatorKind::OO_Call:
       baseName = "callAsFunction";
       isFunction = true;
-      addEmptyArgNamesForClangFunction(functionDecl, argumentNames);
+      addDefaultArgNamesForClangFunction(functionDecl, argumentNames);
       break;
     case clang::OverloadedOperatorKind::OO_Subscript: {
       auto returnType = functionDecl->getReturnType();
@@ -1964,7 +1969,7 @@ ImportedName NameImporter::importNameImpl(const clang::NamedDecl *D,
         result.info.accessorKind = ImportedAccessorKind::SubscriptSetter;
       }
       isFunction = true;
-      addEmptyArgNamesForClangFunction(functionDecl, argumentNames);
+      addDefaultArgNamesForClangFunction(functionDecl, argumentNames);
       break;
     }
     default:
@@ -1995,7 +2000,7 @@ ImportedName NameImporter::importNameImpl(const clang::NamedDecl *D,
 
     if (auto function = dyn_cast<clang::FunctionDecl>(D)) {
       isFunction = true;
-      addEmptyArgNamesForClangFunction(function, argumentNames);
+      addDefaultArgNamesForClangFunction(function, argumentNames);
     }
     break;
 
@@ -2235,7 +2240,7 @@ ImportedName NameImporter::importNameImpl(const clang::NamedDecl *D,
   SmallString<16> newName;
   // Check if we need to rename the C++ method to disambiguate it.
   if (auto method = dyn_cast<clang::CXXMethodDecl>(D)) {
-    if (!method->isConst() && !method->isOverloadedOperator()) {
+    if (!method->isConst() && !method->isOverloadedOperator() && !method->isStatic()) {
       // See if any other methods within the same struct have the same name, but
       // differ in constness.
       auto otherDecls = dc->lookup(method->getDeclName());
@@ -2377,7 +2382,7 @@ static bool shouldIgnoreMacro(StringRef name, const clang::MacroInfo *macro,
   if (macro->isUsedForHeaderGuard() && macro->getNumTokens() == 1) {
     auto tok = macro->tokens()[0];
     if (tok.is(clang::tok::numeric_constant) && tok.getLength() == 1 &&
-        PP.getSpellingOfSingleCharacterNumericConstant(tok) == '1')
+        PP.getSpellingOfSingleCharacterNumericConstant(tok) == 1)
       return true;
   }
 

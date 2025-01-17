@@ -42,6 +42,16 @@
                    DECL_ATTR_ALIAS(SPELLING, CLASS)
 #endif
 
+// Diagnose any use of the attribute CLASS without FEATURE_NAME enabled,
+// and also enable other special behavior. If you use this for an experimental
+// feature, please add test cases to:
+// 
+// * test/attr/feature_requirement.swift
+// * test/IDE/complete_decl_attribute_feature_requirement.swift
+#ifndef DECL_ATTR_FEATURE_REQUIREMENT
+#define DECL_ATTR_FEATURE_REQUIREMENT(CLASS, FEATURE_NAME)
+#endif
+
 #ifndef LAST_DECL_ATTR
 #define LAST_DECL_ATTR(CLASS)
 #endif
@@ -59,7 +69,7 @@ DECL_ATTR(objc, ObjC,
 SIMPLE_DECL_ATTR(dynamicCallable, DynamicCallable,
   OnNominalType | ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove,
   6)
-DECL_ATTR(main, MainType,
+SIMPLE_DECL_ATTR(main, MainType,
   OnClass | OnStruct | OnEnum | OnExtension | ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove,
   7)
 SIMPLE_DECL_ATTR(_exported, Exported,
@@ -102,7 +112,7 @@ DECL_ATTR(_semantics, Semantics,
   OnAbstractFunction | OnSubscript | OnNominalType | OnVar | AllowMultipleAttributes | UserInaccessible | ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove,
   21)
 SIMPLE_DECL_ATTR(_transparent, Transparent,
-  OnFunc | OnAccessor | OnConstructor | OnVar | UserInaccessible | ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove,
+  OnFunc | OnAccessor | OnConstructor | OnVar | OnDestructor | UserInaccessible | ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove,
   26)
 SIMPLE_DECL_ATTR(requires_stored_property_inits, RequiresStoredPropertyInits,
   OnClass | ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove,
@@ -429,11 +439,14 @@ CONTEXTUAL_DECL_ATTR(weak, ReferenceOwnership,
   49)
 CONTEXTUAL_DECL_ATTR_ALIAS(unowned, ReferenceOwnership)
 SIMPLE_DECL_ATTR(rethrows, Rethrows,
-  OnFunc | OnConstructor | RejectByParser | ABIBreakingToAdd | ABIBreakingToRemove | APIBreakingToAdd | APIBreakingToRemove,
+  OnFunc | OnConstructor | DeclModifier | RejectByParser | ABIBreakingToAdd | ABIBreakingToRemove | APIBreakingToAdd | APIBreakingToRemove,
   57)
 CONTEXTUAL_SIMPLE_DECL_ATTR(indirect, Indirect,
   DeclModifier | OnEnum | OnEnumElement | ABIBreakingToAdd | ABIBreakingToRemove | APIStableToAdd | APIStableToRemove,
   60)
+CONTEXTUAL_SIMPLE_DECL_ATTR(isolated, Isolated,
+  DeclModifier | OnDestructor | ABIBreakingToAdd | ABIBreakingToRemove | APIBreakingToAdd | APIBreakingToRemove,
+  103)
 CONTEXTUAL_SIMPLE_DECL_ATTR(async, Async,
   DeclModifier | OnVar | OnFunc | ABIBreakingToAdd | ABIBreakingToRemove | APIBreakingToAdd | APIBreakingToRemove,
   106)
@@ -441,7 +454,7 @@ SIMPLE_DECL_ATTR(reasync, Reasync,
   OnFunc | OnConstructor | RejectByParser | ABIBreakingToAdd | ABIBreakingToRemove | APIBreakingToAdd | APIBreakingToRemove,
   109)
 CONTEXTUAL_DECL_ATTR(nonisolated, Nonisolated,
-  DeclModifier | OnFunc | OnConstructor | OnVar | OnSubscript | ABIStableToAdd | ABIStableToRemove | APIBreakingToAdd | APIStableToRemove,
+  DeclModifier | OnFunc | OnConstructor | OnDestructor | OnVar | OnSubscript | OnProtocol | OnExtension | OnClass | OnStruct | OnEnum | ABIStableToAdd | ABIStableToRemove | APIBreakingToAdd | APIStableToRemove,
   112)
 CONTEXTUAL_SIMPLE_DECL_ATTR(distributed, DistributedActor,
   DeclModifier | OnClass | OnFunc | OnAccessor | OnVar | ABIBreakingToAdd | ABIBreakingToRemove | APIBreakingToAdd | APIBreakingToRemove,
@@ -453,10 +466,10 @@ CONTEXTUAL_SIMPLE_DECL_ATTR(_local, KnownToBeLocal,
   DeclModifier | OnFunc | OnParam | OnVar | UserInaccessible | ABIBreakingToAdd | ABIBreakingToRemove | APIBreakingToAdd | APIBreakingToRemove,
   130)
 CONTEXTUAL_SIMPLE_DECL_ATTR(consuming, Consuming,
-  OnFunc | OnAccessor | DeclModifier | UserInaccessible | NotSerialized | ABIBreakingToAdd | ABIBreakingToRemove | APIStableToAdd | APIStableToRemove,
+  OnFunc | OnAccessor | DeclModifier | NotSerialized | ABIBreakingToAdd | ABIBreakingToRemove | APIStableToAdd | APIStableToRemove,
   140)
 CONTEXTUAL_SIMPLE_DECL_ATTR(borrowing, Borrowing,
-  OnFunc | OnAccessor | DeclModifier | UserInaccessible | NotSerialized | ABIBreakingToAdd | ABIBreakingToRemove | APIStableToAdd | APIStableToRemove,
+  OnFunc | OnAccessor | DeclModifier | NotSerialized | ABIBreakingToAdd | ABIBreakingToRemove | APIStableToAdd | APIStableToRemove,
   141)
 DECL_ATTR(attached, MacroRole,
   OnMacro | AllowMultipleAttributes | ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIBreakingToRemove,
@@ -468,9 +481,6 @@ DECL_ATTR(storageRestrictions, StorageRestrictions,
 CONTEXTUAL_SIMPLE_DECL_ATTR(actor, Actor,
   DeclModifier | OnClass | ConcurrencyOnly | ABIBreakingToAdd | ABIBreakingToRemove | APIBreakingToAdd | APIBreakingToRemove,
   102)
-CONTEXTUAL_SIMPLE_DECL_ATTR(_resultDependsOnSelf, ResultDependsOnSelf,
-  OnFunc | DeclModifier | UserInaccessible | ABIBreakingToAdd | ABIStableToRemove | APIBreakingToAdd | APIStableToRemove,
-  150)
 SIMPLE_DECL_ATTR(_staticExclusiveOnly, StaticExclusiveOnly,
   OnStruct | UserInaccessible | ABIStableToAdd | ABIStableToRemove | APIBreakingToAdd | APIStableToRemove,
   151)
@@ -503,7 +513,32 @@ SIMPLE_DECL_ATTR(sensitive, Sensitive,
   OnStruct | UserInaccessible | ABIStableToAdd | ABIStableToRemove | APIBreakingToAdd | APIStableToRemove,
   159)
 
-LAST_DECL_ATTR(PreInverseGenerics)
+SIMPLE_DECL_ATTR(unsafe, Unsafe,
+  OnAbstractFunction | OnSubscript | OnVar | OnMacro | OnNominalType |
+  OnExtension | OnTypeAlias | OnEnumElement | UserInaccessible |
+  ABIStableToAdd | ABIStableToRemove | APIBreakingToAdd | APIStableToRemove,
+  160)
+
+DECL_ATTR(lifetime, Lifetime,
+  OnAccessor | OnConstructor | OnFunc | OnSubscript | LongAttribute | ABIBreakingToAdd | ABIStableToRemove | APIBreakingToAdd | APIStableToRemove | AllowMultipleAttributes,
+  161)
+
+SIMPLE_DECL_ATTR(_addressableSelf, AddressableSelf,
+  OnAccessor | OnConstructor | OnFunc | OnSubscript | ABIBreakingToAdd | ABIBreakingToRemove | APIBreakingToAdd | APIBreakingToRemove | UserInaccessible,
+  162)
+
+SIMPLE_DECL_ATTR(_addressableForDependencies, AddressableForDependencies,
+  OnNominalType | ABIBreakingToAdd | ABIBreakingToRemove | APIBreakingToAdd | APIBreakingToRemove | UserInaccessible,
+  163)
+
+// 164 was the never-shipped @safe attribute and can be reused
+
+DECL_ATTR(abi, ABI,
+  OnAbstractFunction | OnVar /* will eventually add types */ | LongAttribute | ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove,
+  165)
+DECL_ATTR_FEATURE_REQUIREMENT(ABI, ABIAttribute)
+
+LAST_DECL_ATTR(ABI)
 
 #undef DECL_ATTR_ALIAS
 #undef CONTEXTUAL_DECL_ATTR_ALIAS
@@ -511,4 +546,5 @@ LAST_DECL_ATTR(PreInverseGenerics)
 #undef CONTEXTUAL_SIMPLE_DECL_ATTR
 #undef DECL_ATTR
 #undef CONTEXTUAL_DECL_ATTR
+#undef DECL_ATTR_FEATURE_REQUIREMENT
 #undef LAST_DECL_ATTR

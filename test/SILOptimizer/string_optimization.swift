@@ -1,4 +1,5 @@
 // RUN: %target-build-swift -O %s -module-name=test -Xfrontend -sil-verify-all -emit-sil | %FileCheck %s
+// RUN: %target-build-swift -O %s -module-name=test -Xfrontend -sil-verify-all -emit-sil -Xfrontend -enable-ossa-modules | %FileCheck %s
 
 // RUN: %empty-directory(%t) 
 // RUN: %target-build-swift -O -module-name=test %s -o %t/a.out
@@ -67,6 +68,15 @@ public func testFoldStaticLet() -> String {
 @inline(never)
 public func testFoldConcat() -> String {
   return "a" + "b" + "c"
+}
+
+// CHECK-LABEL: sil hidden [noinline] @$s4test0A25InterpolationInLongStringSSyF :
+// CHECK-NOT: apply
+// CHECK-NOT: bb1
+// CHECK: } // end sil function '$s4test0A25InterpolationInLongStringSSyF'
+@inline(never)
+func testInterpolationInLongString() -> String {
+  return "\(#function) used in a veeeeeeeeeeeeeeeeeeeery long string"
 }
 
 // CHECK-LABEL: sil [noinline] @$s4test0A19UnqualifiedTypeNameSSyF 
@@ -140,6 +150,9 @@ printEmbedded(testFoldStaticLet())
 
 // CHECK-OUTPUT: <abc>
 printEmbedded(testFoldConcat())
+
+// CHECK-OUTPUT: <testInterpolationInLongString() used in a veeeeeeeeeeeeeeeeeeeery long string>
+printEmbedded(testInterpolationInLongString())
 
 // CHECK-OUTPUT: <Inner>
 printEmbedded(testUnqualifiedTypeName())

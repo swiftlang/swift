@@ -17,10 +17,56 @@ import SwiftShims
 ///
 /// This is a magic entry point known to the compiler. It is called in
 /// generated code for API availability checking.
+///
+/// This is marked @_transparent on iOS to work around broken availability
+/// checking for iOS apps running on macOS (rdar://83378814). libswiftCore uses
+/// the macOS platform identifier for its version check in that scenario,
+/// causing all queries to return true. When this function is inlined into the
+/// caller, the compiler embeds the correct platform identifier in the client
+/// code, and we get the right answer.
+///
+/// @_transparent breaks the optimizer's ability to remove availability checks
+/// that are unnecessary due to the current deployment target. We call through
+/// to the _stdlib_isOSVersionAtLeast_AEIC function below to work around this,
+/// as the optimizer is able to perform this optimization for a
+/// @_alwaysEmitIntoClient function. We can't use @_alwaysEmitIntoClient
+/// directly on this call because it would break ABI for existing apps.
+///
+/// `@_transparent` breaks the interpreter mode on macOS, as it creates a direct
+/// reference to ___isPlatformVersionAtLeast from compiler-rt, and the
+/// interpreter doesn't currently know how to load symbols from compiler-rt.
+/// Since `@_transparent` is only necessary for iOS apps, we only apply it on
+/// iOS, not any other which would inherit/remap iOS availability.
+#if os(iOS) && !os(visionOS)
+@_effects(readnone)
+@_transparent
+@_noLocks
+public func _stdlib_isOSVersionAtLeast(
+  _ major: Builtin.Word,
+  _ minor: Builtin.Word,
+  _ patch: Builtin.Word
+) -> Builtin.Int1 {
+  return _stdlib_isOSVersionAtLeast_AEIC(major, minor, patch)
+}
+#else
 @_semantics("availability.osversion")
 @_effects(readnone)
 @_unavailableInEmbedded
+@_noLocks
 public func _stdlib_isOSVersionAtLeast(
+  _ major: Builtin.Word,
+  _ minor: Builtin.Word,
+  _ patch: Builtin.Word
+) -> Builtin.Int1 {
+  return _stdlib_isOSVersionAtLeast_AEIC(major, minor, patch)
+}
+#endif
+
+@_semantics("availability.osversion")
+@_effects(readnone)
+@_alwaysEmitIntoClient
+@_noLocks
+public func _stdlib_isOSVersionAtLeast_AEIC(
   _ major: Builtin.Word,
   _ minor: Builtin.Word,
   _ patch: Builtin.Word
@@ -29,13 +75,18 @@ public func _stdlib_isOSVersionAtLeast(
   if Int(major) == 9999 {
     return true._value
   }
-  let runningVersion = _swift_stdlib_operatingSystemVersion()
-  
-  let result =
-    (runningVersion.majorVersion,runningVersion.minorVersion,runningVersion.patchVersion)
-    >= (Int(major),Int(minor),Int(patch))
 
-  return result._value
+  let queryVersion = (Int(major), Int(minor), Int(patch))
+  let major32 = Int32(truncatingIfNeeded:Int(queryVersion.0))
+  let minor32 = Int32(truncatingIfNeeded:Int(queryVersion.1))
+  let patch32 = Int32(truncatingIfNeeded:Int(queryVersion.2))
+
+  // Defer to a builtin that calls clang's version checking builtin from
+  // compiler-rt.
+  let result32 = Int32(Builtin.targetOSVersionAtLeast(major32._value,
+                                                      minor32._value,
+                                                      patch32._value))
+  return (result32 != (0 as Int32))._value
 #else
   // FIXME: As yet, there is no obvious versioning standard for platforms other
   // than Darwin-based OSes, so we just assume false for now. 
@@ -44,12 +95,65 @@ public func _stdlib_isOSVersionAtLeast(
 #endif
 }
 
-#if os(macOS) && SWIFT_RUNTIME_OS_VERSIONING
+// Performs an availability check in macCatalyst code to support back
+// deployment. This entry point takes in a variant OS version
+// (i.e, an iOS version).
+//
+// This is not inlinable because we
+// don't want to inline the messy implementation details of the
+// compiler-rt support into apps and expose those as ABI surface.
+//
 // This is a magic entry point known to the compiler. It is called in
 // generated code for API availability checking.
+
+#if (os(macOS) || os(iOS) && targetEnvironment(macCatalyst)) && SWIFT_RUNTIME_OS_VERSIONING
+@_semantics("availability.osversion")
+@_effects(readnone)
+@available(macOS 10.15, iOS 13.0, *)
+@_noLocks
+public func _stdlib_isVariantOSVersionAtLeast(
+  _ major: Builtin.Word,
+  _ minor: Builtin.Word,
+  _ patch: Builtin.Word
+  ) -> Builtin.Int1 {
+  if Int(major) == 9999 {
+    return true._value
+  }
+  let queryVersion = (Int(major), Int(minor), Int(patch))
+  let major32 = Int32(truncatingIfNeeded:Int(queryVersion.0))
+  let minor32 = Int32(truncatingIfNeeded:Int(queryVersion.1))
+  let patch32 = Int32(truncatingIfNeeded:Int(queryVersion.2))
+
+  // Defer to a builtin that calls clang's version checking builtin from
+  // compiler-rt.
+  let result32 = Int32(Builtin.targetVariantOSVersionAtLeast(major32._value,
+                                                             minor32._value,
+                                                             patch32._value))
+  return (result32 != (0 as Int32))._value
+}
+#endif
+
+// Performs an availability check in zippered code to support back
+// deployment. This entry point takes in both a primary OS version
+// (i.e., a macOS version) and a variant OS version  (i.e, an iOS version).
+//
+// In a normal macOS process it will return 1 if the running OS version is
+// greater than or equal to major.minor.patchVersion and 0 otherwise. For an
+// macCatalyst process it will return 1 if the running macCatalyst version is greater
+// than or equal to the passed-in variant version.
+//
+// Unlike _stdlib_isOSVersionAtLeast, this is not inlinable because we
+// don't want to inline the messy implementation details of the
+// compiler-rt support into apps and expose those as ABI surface.
+//
+// This is a magic entry point known to the compiler. It is called in
+// generated code for API availability checking.
+
+#if (os(macOS) || os(iOS) && targetEnvironment(macCatalyst)) && SWIFT_RUNTIME_OS_VERSIONING
 @_semantics("availability.osversion")
 @_effects(readnone)
 @_unavailableInEmbedded
+@_noLocks
 public func _stdlib_isOSVersionAtLeastOrVariantVersionAtLeast(
   _ major: Builtin.Word,
   _ minor: Builtin.Word,
@@ -58,7 +162,28 @@ public func _stdlib_isOSVersionAtLeastOrVariantVersionAtLeast(
   _ variantMinor: Builtin.Word,
   _ variantPatch: Builtin.Word
   ) -> Builtin.Int1 {
-  return _stdlib_isOSVersionAtLeast(major, minor, patch)
+  if Int(major) == 9999 {
+    return true._value
+  }
+  let queryVersion = (Int(major), Int(minor), Int(patch))
+  let queryVariantVersion =
+    (Int(variantMajor), Int(variantMinor), Int(variantPatch))
+
+  let major32 = UInt32(truncatingIfNeeded:Int(queryVersion.0))
+  let minor32 = UInt32(truncatingIfNeeded:Int(queryVersion.1))
+  let patch32 = UInt32(truncatingIfNeeded:Int(queryVersion.2))
+
+  let variantMajor32 = UInt32(truncatingIfNeeded:Int(queryVariantVersion.0))
+  let variantMinor32 = UInt32(truncatingIfNeeded:Int(queryVariantVersion.1))
+  let variantPatch32 = UInt32(truncatingIfNeeded:Int(queryVariantVersion.2))
+
+  // Defer to a builtin that calls clang's version checking builtin from
+  // compiler-rt.
+  let result32 = Int32(Builtin.targetOSVersionOrVariantOSVersionAtLeast(
+          major32._value, minor32._value, patch32._value,
+          variantMajor32._value, variantMinor32._value, variantPatch32._value))
+
+  return (result32 != (0 as UInt32))._value
 }
 #endif
 
@@ -103,9 +228,13 @@ extension _SwiftStdlibVersion {
   public static var v5_10_0: Self { Self(_value: 0x050A00) }
   @_alwaysEmitIntoClient
   public static var v6_0_0: Self { Self(_value: 0x060000) }
+  @_alwaysEmitIntoClient
+  public static var v6_1_0: Self { Self(_value: 0x060100) }
+  @_alwaysEmitIntoClient
+  public static var v6_2_0: Self { Self(_value: 0x060200) }
 
   @available(SwiftStdlib 5.7, *)
-  public static var current: Self { .v6_0_0 }
+  public static var current: Self { .v6_2_0 }
 }
 
 @available(SwiftStdlib 5.7, *)

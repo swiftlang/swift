@@ -106,6 +106,7 @@ function(add_swift_compiler_modules_library name)
       "-Xcc" "-std=c++17"
       "-Xcc" "-DCOMPILED_WITH_SWIFT" "-Xcc" "-DSWIFT_TARGET"
       "-Xcc" "-UIBOutlet" "-Xcc" "-UIBAction" "-Xcc" "-UIBInspectable")
+
   # Prior to 5.9, we have to use the experimental flag for C++ interop.
   if (CMAKE_Swift_COMPILER_VERSION VERSION_LESS 5.9)
     list(APPEND swift_compile_options "-Xfrontend" "-enable-experimental-cxx-interop")
@@ -120,6 +121,11 @@ function(add_swift_compiler_modules_library name)
         "-Xfrontend" "${SWIFT_MIN_RUNTIME_VERSION}")
     endif()
     list(APPEND swift_compile_options "-Xfrontend" "-disable-implicit-string-processing-module-import")
+
+    # We cannot use Unsafe*Pointer when importing C++ move-only types until the
+    # host libraries are updated to Swift 6.0, because that importing strategy
+    # requires _Pointer have its Pointee: ~Copyable. (rdar://128013193)
+    list(APPEND swift_compile_options "-Xfrontend" "-cxx-interop-use-opaque-pointer-for-moveonly")
   endif()
 
   if(CMAKE_BUILD_TYPE STREQUAL "Debug")
@@ -167,7 +173,32 @@ function(add_swift_compiler_modules_library name)
   # under `include/swift`. These are either located next to the compiler (in case of open source toolchains) or
   # in the SDK (in case a Swift compiler from Xcode)
   get_filename_component(swift_exec_bin_dir ${ALS_SWIFT_EXEC} DIRECTORY)
-  list(APPEND sdk_option "-I" "${swift_exec_bin_dir}/../lib" "-I" "${sdk_path}/usr/lib")
+
+  if(CMAKE_SYSTEM_NAME STREQUAL "Windows")
+    list(APPEND swift_compile_options "-static")
+    list(APPEND sdk_option "-sdk" "${SWIFT_PATH_TO_SWIFT_SDK}")
+    # For "swift/shims/*.h".
+    list(APPEND sdk_option "-I" "${SWIFT_PATH_TO_SWIFT_SDK}/usr/lib")
+
+    # Workaround a crash in the LoadableByAddress pass
+    # https://github.com/apple/swift/issues/73254
+    list(APPEND swift_compile_options "-Xllvm" "-sil-disable-pass=loadable-address")
+
+    # The STL in VS 17.10 requires Clang 17 or higher, but bootstrapping generally uses toolchains with older versions
+    # versions of Clang. Swift 6 toolchains are the first to include Clang 17, so if we are on Windows and using an
+    # earlier toolchain, we need to relax to relax this requirement with ALLOW_COMPILER_AND_STL_VERSION_MISMATCH.
+    if (CMAKE_Swift_COMPILER_VERSION VERSION_LESS 6.0)
+      list(APPEND swift_compile_options "-Xcc" "-D_ALLOW_COMPILER_AND_STL_VERSION_MISMATCH")
+    endif()
+
+    # Make 'offsetof()' a const value.
+    list(APPEND swift_compile_options "-Xcc" "-D_CRT_USE_BUILTIN_OFFSETOF")
+
+    # Workaround for https://github.com/swiftlang/llvm-project/issues/7172
+    list(APPEND swift_compile_options "-Xcc" "-Xclang" "-Xcc" "-fmodule-format=raw")
+  else()
+    list(APPEND sdk_option "-I" "${swift_exec_bin_dir}/../lib" "-I" "${sdk_path}/usr/lib")
+  endif()
 
   set(all_obj_files)
   set(all_module_targets)
@@ -193,11 +224,20 @@ function(add_swift_compiler_modules_library name)
       endforeach()
     endif()
 
-    set(module_obj_file "${build_dir}/${module}.o")
+    if(CMAKE_BUILD_TYPE STREQUAL "Debug" AND NOT SWIFT_HOST_VARIANT_SDK IN_LIST SWIFT_DARWIN_PLATFORMS)
+      # swift-driver when non-optimizing in not Mach-O  platforms adds an extra
+      # job wrapmodule that uses the {module-name}.o as output, which clashes
+      # with the name chosen here. Use a different name in those cases.
+      set(module_obj_file "${build_dir}/${module}.object.o")
+      set(output_obj_files "${module_obj_file}" "${build_dir}/${module}.o")
+    else()
+      set(module_obj_file "${build_dir}/${module}.o")
+      set(output_obj_files "${module_obj_file}")
+    endif()
     set(module_file "${build_dir}/${module}.swiftmodule")
     list(APPEND all_module_files ${module_file})
 
-    set(all_obj_files ${all_obj_files} ${module_obj_file})
+    list(APPEND all_obj_files ${output_obj_files})
     set(c_include_paths
       # LLVM modules and headers.
       "${LLVM_MAIN_INCLUDE_DIR}"
@@ -226,7 +266,7 @@ function(add_swift_compiler_modules_library name)
         ${c_include_paths_args}
         # Generated swift modules.
         "-I" "${build_dir}"
-      OUTPUT ${module_obj_file}
+      OUTPUT ${output_obj_files}
       WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}
       DEPENDS ${sources} ${deps} ${ALS_DEPENDS}
         importedHeaderDependencies
@@ -249,6 +289,9 @@ function(add_swift_compiler_modules_library name)
   add_library(${name} STATIC ${all_obj_files})
   add_dependencies(${name} ${all_module_targets})
   set_target_properties(${name} PROPERTIES LINKER_LANGUAGE CXX)
+  if(CMAKE_BUILD_TYPE STREQUAL "Debug")
+    target_link_libraries(${name} PUBLIC swiftSwiftOnoneSupport)
+  endif()
 
   # Downstream linking should include the swiftmodule in debug builds to allow lldb to
   # work correctly. Only do this on Darwin since neither gold (currently used by default

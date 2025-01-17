@@ -751,6 +751,18 @@ public:
   }
 };
 
+class LocatorPathElt::ProtocolCompositionMemberType final : public StoredIntegerElement<1> {
+public:
+  ProtocolCompositionMemberType(unsigned index)
+      : StoredIntegerElement(ConstraintLocator::GenericArgument, index) {}
+
+  unsigned getIndex() const { return getValue(); }
+
+  static bool classof(const LocatorPathElt *elt) {
+    return elt->getKind() == ConstraintLocator::ProtocolCompositionMemberType;
+  }
+};
+
 class LocatorPathElt::GenericArgument final : public StoredIntegerElement<1> {
 public:
   GenericArgument(unsigned index)
@@ -985,13 +997,13 @@ public:
 };
 
 class LocatorPathElt::PlaceholderType final
-    : public StoredPointerElement<PlaceholderTypeRepr> {
+    : public StoredPointerElement<TypeRepr> {
 public:
-  PlaceholderType(PlaceholderTypeRepr *placeholderRepr)
+  PlaceholderType(TypeRepr *placeholderRepr)
       : StoredPointerElement(PathElementKind::PlaceholderType,
                              placeholderRepr) {}
 
-  PlaceholderTypeRepr *getPlaceholderRepr() const { return getStoredPointer(); }
+  TypeRepr *getPlaceholderRepr() const { return getStoredPointer(); }
 
   static bool classof(const LocatorPathElt *elt) {
     return elt->getKind() == ConstraintLocator::PlaceholderType;
@@ -1277,6 +1289,21 @@ public:
     if (auto lastElt = last()) {
       auto requirement = lastElt->getAs<LocatorPathElt::AnyRequirement>();
       return requirement && kind == requirement->getRequirementKind();
+    }
+    return false;
+  }
+
+  bool isForExistentialMemberAccessConversion() const {
+    for (auto prev = this; prev;
+         prev = prev->previous.dyn_cast<ConstraintLocatorBuilder *>()) {
+      if (auto elt = prev->element) {
+        if (elt->is<LocatorPathElt::ExistentialMemberAccessConversion>())
+          return true;
+      }
+
+      if (auto locator = prev->previous.dyn_cast<ConstraintLocator *>())
+        return bool(locator->findLast<
+                    LocatorPathElt::ExistentialMemberAccessConversion>());
     }
     return false;
   }

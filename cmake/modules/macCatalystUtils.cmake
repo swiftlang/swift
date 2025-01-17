@@ -78,7 +78,7 @@ function(get_target_triple target_out_var target_variant_out_var sdk arch)
   elseif(maccatalyst_build_flavor STREQUAL "macos-like")
     # Use the default macOS triple.
   elseif(maccatalyst_build_flavor STREQUAL "zippered")
-    set(target "${arch}-apple-macosx${SWIFT_DARWIN_DEPLOYMENT_VERSION_OSX}")
+    set(target "${arch}-apple-macosx${deployment_version}")
     set(target_variant "${arch}-apple-ios${SWIFT_DARWIN_DEPLOYMENT_VERSION_MACCATALYST}-macabi")
   elseif(maccatalyst_build_flavor STREQUAL "unzippered-twin")
     # Use the default triple for now

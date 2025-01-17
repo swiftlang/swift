@@ -1,28 +1,58 @@
 // RUN: %target-swift-frontend %s \
-// RUN: -emit-sil  -disable-availability-checking \
-// RUN: -enable-experimental-feature NonescapableTypes \
-// RUN: -enable-experimental-feature NoncopyableGenerics | %FileCheck %s
-// REQUIRES: asserts
+// RUN: -emit-sil  -target %target-swift-5.1-abi-triple \
+// RUN: -enable-experimental-feature LifetimeDependence \
+// RUN: | %FileCheck %s
+
+// REQUIRES: swift_feature_LifetimeDependence
+
+@_unsafeNonescapableResult
+@lifetime(borrow source)
+internal func _overrideLifetime<
+  T: ~Copyable & ~Escapable, U: ~Copyable & ~Escapable
+>(
+  _ dependent: consuming T, borrowing source: borrowing U
+) -> T {
+  // TODO: Remove @_unsafeNonescapableResult. Instead, the unsafe dependence
+  // should be expressed by a builtin that is hidden within the function body.
+  dependent
+}
+
+@_unsafeNonescapableResult
+@lifetime(source)
+internal func _overrideLifetime<
+  T: ~Copyable & ~Escapable, U: ~Copyable & ~Escapable
+>(
+  _ dependent: consuming T, copying source: borrowing U
+) -> T {
+  // TODO: Remove @_unsafeNonescapableResult. Instead, the unsafe dependence
+  // should be expressed by a builtin that is hidden within the function body.
+  dependent
+}
 
 struct BufferView : ~Escapable {
   let ptr: UnsafeRawBufferPointer
   let c: Int
-  @_unsafeNonescapableResult
+  @lifetime(borrow ptr)
   init(_ ptr: UnsafeRawBufferPointer, _ c: Int) {
     self.ptr = ptr
     self.c = c
   }
-// CHECK: sil hidden @$s28implicit_lifetime_dependence10BufferViewVyA2ChYlicfC : $@convention(method) (@guaranteed BufferView, @thin BufferView.Type) -> _inherit(0) @owned BufferView {
+  @lifetime(borrow ptr)
+  init(independent ptr: UnsafeRawBufferPointer, _ c: Int) {
+    self.ptr = ptr
+    self.c = c
+  }
+// CHECK-LABEL: sil hidden @$s28implicit_lifetime_dependence10BufferViewVyA2ChcfC : $@convention(method) (@guaranteed BufferView, @thin BufferView.Type) -> @lifetime(copy 0) @owned BufferView {
   init(_ otherBV: borrowing BufferView) {
     self.ptr = otherBV.ptr
     self.c = otherBV.c
   }
-// CHECK: sil hidden @$s28implicit_lifetime_dependence10BufferViewVyA2CYlicfC : $@convention(method) (@owned BufferView, @thin BufferView.Type) -> _inherit(0) @owned BufferView {
+// CHECK-LABEL: sil hidden @$s28implicit_lifetime_dependence10BufferViewVyA2CcfC : $@convention(method) (@owned BufferView, @thin BufferView.Type) -> @lifetime(copy 0) @owned BufferView {
   init(_ otherBV: consuming BufferView) {
     self.ptr = otherBV.ptr
     self.c = otherBV.c
   }
-// CHECK: sil hidden @$s28implicit_lifetime_dependence10BufferViewVyACSW_SaySiGhYlstcfC : $@convention(method) (UnsafeRawBufferPointer, @guaranteed Array<Int>, @thin BufferView.Type) -> _scope(1) @owned BufferView {
+// CHECK-LABEL: sil hidden @$s28implicit_lifetime_dependence10BufferViewVyACSW_SaySiGhtcfC : $@convention(method) (UnsafeRawBufferPointer, @guaranteed Array<Int>, @thin BufferView.Type) -> @lifetime(borrow 1) @owned BufferView {
   init(_ ptr: UnsafeRawBufferPointer, _ a: borrowing Array<Int>) {
     self.ptr = ptr
     self.c = a.count
@@ -32,7 +62,7 @@ struct BufferView : ~Escapable {
 struct MutableBufferView : ~Escapable, ~Copyable {
   let ptr: UnsafeMutableRawBufferPointer
   let c: Int
-  @_unsafeNonescapableResult
+  @lifetime(borrow ptr)
   init(_ ptr: UnsafeMutableRawBufferPointer, _ c: Int) {
     self.ptr = ptr
     self.c = c
@@ -45,22 +75,23 @@ func testBasic() {
     let view = BufferView($0, a.count)
     let derivedView = derive(view)
     let newView = consumeAndCreate(derivedView)
-    use(newView)    
+    use(newView)
   }
 }
 
-// CHECK: sil hidden @$s28implicit_lifetime_dependence6deriveyAA10BufferViewVADYliF : $@convention(thin) (@guaranteed BufferView) -> _inherit(0) @owned BufferView {
+// CHECK-LABEL: sil hidden @$s28implicit_lifetime_dependence6deriveyAA10BufferViewVADF : $@convention(thin) (@guaranteed BufferView) -> @lifetime(copy 0)  @owned BufferView {
 func derive(_ x: borrowing BufferView) -> BufferView {
   return BufferView(x.ptr, x.c)
 }
 
 func derive(_ unused: Int, _ x: borrowing BufferView) -> BufferView {
-  return BufferView(x.ptr, x.c)
+  return BufferView(independent: x.ptr, x.c)
 }
 
-// CHECK: sil hidden @$s28implicit_lifetime_dependence16consumeAndCreateyAA10BufferViewVADnYliF : $@convention(thin) (@owned BufferView) -> _inherit(0) @owned BufferView {
+// CHECK-LABEL: sil hidden @$s28implicit_lifetime_dependence16consumeAndCreateyAA10BufferViewVADnF : $@convention(thin) (@owned BufferView) -> @lifetime(copy 0)  @owned BufferView {
 func consumeAndCreate(_ x: consuming BufferView) -> BufferView {
-  return BufferView(x.ptr, x.c)
+  let bv = BufferView(independent: x.ptr, x.c)
+  return _overrideLifetime(bv, copying: x)
 }
 
 func use(_ x: borrowing BufferView) {}
@@ -68,26 +99,25 @@ func use(_ x: borrowing BufferView) {}
 struct Wrapper : ~Escapable {
   var _view: BufferView
   var view: BufferView {
-// CHECK: sil hidden @$s28implicit_lifetime_dependence7WrapperV4viewAA10BufferViewVvr : $@yield_once @convention(method) (@guaranteed Wrapper) -> _inherit(0) @yields @guaranteed BufferView {
+// CHECK: sil hidden @$s28implicit_lifetime_dependence7WrapperV4viewAA10BufferViewVvr : $@yield_once @convention(method) (@guaranteed Wrapper) -> @lifetime(copy 0) @yields @guaranteed BufferView {
     _read {
       yield _view
     }
-// CHECK: sil hidden @$s28implicit_lifetime_dependence7WrapperV4viewAA10BufferViewVvM : $@yield_once @convention(method) (@inout Wrapper) -> _inherit(0) @yields @inout BufferView {
+// CHECK: sil hidden @$s28implicit_lifetime_dependence7WrapperV4viewAA10BufferViewVvM : $@yield_once @convention(method) (@inout Wrapper) -> @lifetime(copy 0) @yields @inout BufferView {
     _modify {
       yield &_view
     }
   }
-// CHECK: sil hidden @$s28implicit_lifetime_dependence7WrapperVyAcA10BufferViewVYlicfC : $@convention(method) (@owned BufferView, @thin Wrapper.Type) -> _inherit(0) @owned Wrapper {
+// CHECK-LABEL: sil hidden @$s28implicit_lifetime_dependence7WrapperVyAcA10BufferViewVcfC : $@convention(method) (@owned BufferView, @thin Wrapper.Type) -> @lifetime(copy 0) @owned Wrapper {
   init(_ view: consuming BufferView) {
     self._view = view
   }
-// TODO: Investigate why it was mangled as Yli and not YLi before
-// CHECK: sil hidden @$s28implicit_lifetime_dependence7WrapperV8getView1AA10BufferViewVyKYLiF : $@convention(method) (@guaranteed Wrapper) -> _inherit(0)  (@owned BufferView, @error any Error) {
+// CHECK-LABEL: sil hidden @$s28implicit_lifetime_dependence7WrapperV8getView1AA10BufferViewVyKF : $@convention(method) (@guaranteed Wrapper) -> @lifetime(copy 0)  (@owned BufferView, @error any Error) {
   borrowing func getView1() throws -> BufferView {
     return _view
   }
 
-// CHECK: sil hidden @$s28implicit_lifetime_dependence7WrapperV8getView2AA10BufferViewVyYaKYLiF : $@convention(method) @async (@owned Wrapper) -> _inherit(0)  (@owned BufferView, @error any Error) {
+// CHECK-LABEL: sil hidden @$s28implicit_lifetime_dependence7WrapperV8getView2AA10BufferViewVyYaKF : $@convention(method) @async (@owned Wrapper) -> @lifetime(copy 0)  (@owned BufferView, @error any Error) {
   consuming func getView2() async throws -> BufferView {
     return _view
   }
@@ -96,7 +126,7 @@ struct Wrapper : ~Escapable {
 struct Container1 : ~Copyable {
   let ptr: UnsafeRawBufferPointer
   let c: Int
-// CHECK: sil hidden @$s28implicit_lifetime_dependence10Container1V4viewAA10BufferViewVvg : $@convention(method) (@guaranteed Container1) -> _scope(0) @owned BufferView {
+// CHECK: sil hidden @$s28implicit_lifetime_dependence10Container1V4viewAA10BufferViewVvg : $@convention(method) (@guaranteed Container1) -> @lifetime(borrow 0) @owned BufferView {
   var view: BufferView {
     get {
       return BufferView(ptr, c)
@@ -107,7 +137,7 @@ struct Container1 : ~Copyable {
 struct Container2 : ~Copyable {
   let ptr: UnsafeMutableRawBufferPointer
   let c: Int
-// CHECK: sil hidden @$s28implicit_lifetime_dependence10Container2V11mutableViewAA013MutableBufferF0Vvr : $@yield_once @convention(method) (@guaranteed Container2) -> _scope(0) @yields @guaranteed MutableBufferView {
+// CHECK: sil hidden @$s28implicit_lifetime_dependence10Container2V11mutableViewAA013MutableBufferF0Vvr : $@yield_once @convention(method) (@guaranteed Container2) -> @lifetime(borrow 0) @yields @guaranteed MutableBufferView {
   var mutableView: MutableBufferView {
     _read {
       yield MutableBufferView(ptr, c)
@@ -128,7 +158,8 @@ struct GenericBufferView<Element> : ~Escapable {
   let baseAddress: Pointer
   let count: Int
 
-// CHECK: sil hidden @$s28implicit_lifetime_dependence17GenericBufferViewV11baseAddress5count9dependsOnACyxGSV_Siqd__hYlstclufC : $@convention(method) <Element><Storage> (UnsafeRawPointer, Int, @in_guaranteed Storage, @thin GenericBufferView<Element>.Type) -> _scope(2) @owned GenericBufferView<Element> {
+// CHECK-LABEL: sil hidden @$s28implicit_lifetime_dependence17GenericBufferViewV11baseAddress5countACyxGSV_SitcfC : $@convention(method) <Element> (UnsafeRawPointer, Int, @thin GenericBufferView<Element>.Type) -> @lifetime(borrow 0) @owned GenericBufferView<Element> {
+  @lifetime(borrow baseAddress)
   init<Storage>(baseAddress: Pointer,
                 count: Int,
                 dependsOn: borrowing Storage) {
@@ -136,12 +167,12 @@ struct GenericBufferView<Element> : ~Escapable {
                                       count: count)
   }
   // unsafe private API
-  @_unsafeNonescapableResult
+  @lifetime(borrow baseAddress)
   init(baseAddress: Pointer, count: Int) {
     precondition(count >= 0, "Count must not be negative")
     self.baseAddress = baseAddress
     self.count = count
-  } 
+  }
   subscript(position: Pointer) -> Element {
     get {
       if _isPOD(Element.self) {
@@ -152,19 +183,51 @@ struct GenericBufferView<Element> : ~Escapable {
       }
     }
   }
-// CHECK: sil hidden @$s28implicit_lifetime_dependence17GenericBufferViewVyACyxGAA9FakeRangeVySVGcig : $@convention(method) <Element> (FakeRange<UnsafeRawPointer>, @guaranteed GenericBufferView<Element>) -> _inherit(1) @owned GenericBufferView<Element> {
+// CHECK: sil hidden @$s28implicit_lifetime_dependence17GenericBufferViewVyACyxGAA9FakeRangeVySVGcig : $@convention(method) <Element> (FakeRange<UnsafeRawPointer>, @guaranteed GenericBufferView<Element>) -> @lifetime(copy 1) @owned GenericBufferView<Element> {
   subscript(bounds: FakeRange<Pointer>) -> Self {
     get {
-      GenericBufferView(
-        baseAddress: UnsafeRawPointer(bounds.lowerBound),
+      let pointer = UnsafeRawPointer(bounds.lowerBound)
+      let result = GenericBufferView(
+        baseAddress: pointer,
         count: bounds.upperBound.distance(to:bounds.lowerBound) / MemoryLayout<Element>.stride
       )
+      // assuming that bounds is within self
+      return _overrideLifetime(result, copying: self)
     }
   }
 }
 
-// CHECK: sil hidden @$s28implicit_lifetime_dependence23tupleLifetimeDependenceyAA10BufferViewV_ADtADYliF : $@convention(thin) (@guaranteed BufferView) -> _inherit(0) (@owned BufferView, @owned BufferView) {
+// CHECK-LABEL: sil hidden @$s28implicit_lifetime_dependence23tupleLifetimeDependenceyAA10BufferViewV_ADtADF : $@convention(thin) (@guaranteed BufferView) -> @lifetime(copy 0)  (@owned BufferView, @owned BufferView) {
 func tupleLifetimeDependence(_ x: borrowing BufferView) -> (BufferView, BufferView) {
   return (BufferView(x.ptr, x.c), BufferView(x.ptr, x.c))
 }
 
+public struct OuterNE: ~Escapable {
+  // A public property generates an implicit setter with an infered dependence on 'newValue'.
+  //
+  // [inner1.setter]
+  // CHECK-LABEL: sil [transparent] @$s28implicit_lifetime_dependence7OuterNEV6inner1AC05InnerE0Vvs : $@convention(method) (@owned OuterNE.InnerNE, @lifetime(copy 0) @inout OuterNE) -> () {
+  public var inner1: InnerNE
+
+  // Explicit setter with an infered dependence on 'newValue'.
+  public var inner2: InnerNE {
+    get { inner1 }
+    set { inner1 = newValue }
+  }
+
+  public struct InnerNE: ~Escapable {
+    init<Owner: ~Escapable & ~Copyable>(
+      owner: borrowing Owner
+    ) {}
+  }
+
+  init<Owner: ~Copyable & ~Escapable>(owner: borrowing Owner) {
+    self.inner1 = InnerNE(owner: owner)
+  }
+
+  // CHECK-LABEL: sil hidden @$s28implicit_lifetime_dependence7OuterNEV8setInner5valueyAC0gE0V_tF : $@convention(method) (@guaranteed OuterNE.InnerNE, @lifetime(copy 0) @inout OuterNE) -> () {
+  @lifetime(self: value)
+  mutating func setInner(value: InnerNE) {
+    self.inner1 = value
+  }
+}

@@ -18,6 +18,7 @@
 #include "swift/AST/DiagnosticsParse.h"
 #include "swift/AST/GenericParamList.h"
 #include "swift/AST/TypeRepr.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Parse/IDEInspectionCallbacks.h"
 #include "swift/Parse/Lexer.h"
 
@@ -46,7 +47,8 @@ ParserStatus
 Parser::parseGenericParametersBeforeWhere(SourceLoc LAngleLoc,
                         SmallVectorImpl<GenericTypeParamDecl *> &GenericParams) {
   ParserStatus Result;
-  bool HasNextParam{};
+  bool HasComma{};
+  bool IsEndOfList;
   do {
     // Note that we're parsing a declaration.
     StructureMarkerRAII ParsingDecl(*this, Tok.getLoc(),
@@ -58,12 +60,20 @@ Parser::parseGenericParametersBeforeWhere(SourceLoc LAngleLoc,
       attributes.add(new (Context) RawDocCommentAttr(Tok.getCommentRange()));
     parseDeclAttributeList(attributes);
 
-    // Parse the 'each' keyword for a type parameter pack 'each T'.
     SourceLoc EachLoc;
+    SourceLoc LetLoc;
+
+    // Parse the 'each' keyword for a type parameter pack 'each T'.
     if (Tok.isContextualKeyword("each")) {
       TokReceiver->registerTokenKindChange(Tok.getLoc(),
                                            tok::contextual_keyword);
       EachLoc = consumeToken();
+
+    // Parse the 'let' keyword for a variable type parameter 'let N'.
+    } else if (Tok.is(tok::kw_let)) {
+      TokReceiver->registerTokenKindChange(Tok.getLoc(),
+                                           tok::kw_let);
+      LetLoc = consumeToken();
     }
 
     // Parse the name of the parameter.
@@ -119,20 +129,31 @@ Parser::parseGenericParametersBeforeWhere(SourceLoc LAngleLoc,
         Inherited.push_back({Ty.get()});
     }
 
-    const bool isParameterPack = EachLoc.isValid();
+    auto ParamKind = GenericTypeParamKind::Type;
+    SourceLoc SpecifierLoc;
+
+    if (EachLoc.isValid()) {
+      ParamKind = GenericTypeParamKind::Pack;
+      SpecifierLoc = EachLoc;
+    } else if (LetLoc.isValid()) {
+      ParamKind = GenericTypeParamKind::Value;
+      SpecifierLoc = LetLoc;
+    }
+
     auto *Param = GenericTypeParamDecl::createParsed(
-        CurDeclContext, Name, NameLoc, EachLoc,
-        /*index*/ GenericParams.size(), isParameterPack);
+        CurDeclContext, Name, NameLoc, SpecifierLoc,
+        /*index*/ GenericParams.size(), ParamKind);
     if (!Inherited.empty())
       Param->setInherited(Context.AllocateCopy(Inherited));
     GenericParams.push_back(Param);
 
     // Attach attributes.
-    Param->getAttrs() = attributes;
+    Param->attachParsedAttrs(attributes);
 
     // Parse the comma, if the list continues.
-    HasNextParam = consumeIf(tok::comma);
-  } while (HasNextParam);
+    HasComma = consumeIf(tok::comma);
+    IsEndOfList = startsWithGreater(Tok);
+  } while (HasComma && !IsEndOfList);
 
   return Result;
 }
@@ -275,7 +296,8 @@ ParserStatus Parser::parseGenericWhereClause(
   ParserStatus Status;
   // Parse the 'where'.
   WhereLoc = consumeToken(tok::kw_where);
-  bool HasNextReq;
+  bool HasComma;
+  bool IsEndOfList;
   do {
     if (Tok.is(tok::code_complete)) {
       if (CodeCompletionCallbacks) {
@@ -295,7 +317,9 @@ ParserStatus Parser::parseGenericWhereClause(
 
     // Parse the leading type. It doesn't necessarily have to be just a type
     // identifier if we're dealing with a same-type constraint.
-    ParserResult<TypeRepr> FirstType = parseType();
+    //
+    // Note: This can be a value type, e.g. '123 == N' or 'N == 123'.
+    ParserResult<TypeRepr> FirstType = parseTypeOrValue();
 
     if (FirstType.hasCodeCompletion()) {
       Status.setHasCodeCompletionAndIsError();
@@ -355,7 +379,9 @@ ParserStatus Parser::parseGenericWhereClause(
       SourceLoc EqualLoc = consumeToken();
 
       // Parse the second type.
-      ParserResult<TypeRepr> SecondType = parseType();
+      //
+      // Note: This can be a value type, e.g. '123 == N' or 'N == 123'.
+      ParserResult<TypeRepr> SecondType = parseTypeOrValue();
       Status |= SecondType;
       if (SecondType.isNull())
         SecondType = makeParserResult(ErrorTypeRepr::create(Context, PreviousLoc));
@@ -400,16 +426,18 @@ ParserStatus Parser::parseGenericWhereClause(
       Status.setIsParseError();
       break;
     }
-    HasNextReq = consumeIf(tok::comma);
+    HasComma = consumeIf(tok::comma);
+    IsEndOfList = (Context.LangOpts.hasFeature(Feature::TrailingComma) &&
+                   Tok.is(tok::l_brace));
     // If there's a comma, keep parsing the list.
     // If there's a "&&", diagnose replace with a comma and keep parsing
-    if (Tok.isBinaryOperator() && Tok.getText() == "&&" && !HasNextReq) {
+    if (Tok.isBinaryOperator() && Tok.getText() == "&&" && !HasComma) {
       diagnose(Tok, diag::requires_comma)
         .fixItReplace(SourceRange(Tok.getLoc()), ",");
       consumeToken();
-      HasNextReq = true;
+      HasComma = true;
     }
-  } while (HasNextReq);
+  } while (HasComma && !IsEndOfList);
 
   if (!Requirements.empty())
     EndLoc = Requirements.back().getSourceRange().End;

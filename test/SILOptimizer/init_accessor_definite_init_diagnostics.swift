@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -enable-copy-propagation=requested-passes-only -emit-sil -primary-file %s -o /dev/null -verify
+// RUN: %target-swift-frontend -sil-verify-all -enable-copy-propagation=requested-passes-only -emit-sil -primary-file %s -o /dev/null -verify
 
 struct Test1 {
   var x: Int // expected-note {{variable defined here}}

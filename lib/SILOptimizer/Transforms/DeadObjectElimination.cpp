@@ -24,6 +24,7 @@
 //===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "dead-object-elim"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/IndexTrie.h"
 #include "swift/AST/ResilienceExpansion.h"
 #include "swift/SIL/BasicBlockUtils.h"
@@ -200,6 +201,10 @@ static DestructorEffects doesDestructorHaveSideEffects(AllocRefInstBase *ARI) {
       if (isa<DeallocStackInst>(I)) {
         LLVM_DEBUG(llvm::dbgs() << "            SAFE! dealloc_stack can be "
                    "ignored.\n");
+        continue;
+      }
+
+      if (isa<BeginBorrowInst>(I) || isa<EndBorrowInst>(I) || isa<EndLifetimeInst>(I)) {
         continue;
       }
 
@@ -603,7 +608,8 @@ recursivelyCollectInteriorUses(ValueBase *DefInst,
 
     // Lifetime endpoints that don't allow the address to escape.
     if (isa<RefCountingInst>(User) || isa<DebugValueInst>(User) ||
-        isa<FixLifetimeInst>(User) || isa<DestroyValueInst>(User)) {
+        isa<FixLifetimeInst>(User) || isa<DestroyValueInst>(User) ||
+        isa<EndBorrowInst>(User)) {
       AllUsers.insert(User);
       continue;
     }
@@ -626,6 +632,13 @@ recursivelyCollectInteriorUses(ValueBase *DefInst,
     }
     if (auto *MDI = dyn_cast<MarkDependenceInst>(User)) {
       if (!recursivelyCollectInteriorUses(MDI, AddressNode,
+                                          IsInteriorAddress)) {
+        return false;
+      }
+      continue;
+    }
+    if (auto *bb = dyn_cast<BeginBorrowInst>(User)) {
+      if (!recursivelyCollectInteriorUses(bb, AddressNode,
                                           IsInteriorAddress)) {
         return false;
       }
@@ -854,7 +867,10 @@ void DeadObjectElimination::salvageDebugInfo(SILInstruction *toBeRemoved) {
   if (!varInfo)
     return;
 
-  SILBuilderWithScope Builder(SI);
+  // Note: The instruction should logically be in SI's scope.
+  // However, LLVM does not support variables and stores in different scopes,
+  // so we use the variable's scope.
+  SILBuilder Builder(SI, varInfo->Scope);
   Builder.createDebugValue(SI->getLoc(), SI->getSrc(), *varInfo);
 }
 
@@ -866,7 +882,8 @@ DeadObjectElimination::buildDIExpression(SILInstruction *current) {
     auto var = dvci->getVarInfo();
     if (!var)
       return {};
-    var->Type = dvci->getType();
+    if (!var->Type)
+      var->Type = dvci->getElementType();
     return var;
   }
   if (auto *tupleAddr = dyn_cast<TupleElementAddrInst>(current)) {
@@ -990,6 +1007,9 @@ bool DeadObjectElimination::processAllocStack(AllocStackInst *ASI) {
     return false;
   }
 
+  for (auto *I : UsersToRemove)
+    salvageDebugInfo(I);
+
   if (ASI->getFunction()->hasOwnership()) {
     for (auto *user : UsersToRemove) {
       auto *store = dyn_cast<StoreInst>(user);
@@ -1014,8 +1034,6 @@ bool DeadObjectElimination::processAllocStack(AllocStackInst *ASI) {
     }
   }
 
-  for (auto *I : UsersToRemove)
-    salvageDebugInfo(I);
   // Remove the AllocRef and all of its users.
   removeInstructions(
     ArrayRef<SILInstruction*>(UsersToRemove.begin(), UsersToRemove.end()));

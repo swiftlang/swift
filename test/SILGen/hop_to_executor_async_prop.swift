@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-silgen %s -module-name test -swift-version 5  -disable-availability-checking | %FileCheck --enable-var-scope %s --implicit-check-not 'hop_to_executor {{%[0-9]+}}'
+// RUN: %target-swift-frontend -Xllvm -sil-print-types -emit-silgen %s -module-name test -swift-version 5  -target %target-swift-5.1-abi-triple | %FileCheck --enable-var-scope %s --implicit-check-not 'hop_to_executor {{%[0-9]+}}'
 // REQUIRES: concurrency
 
 @propertyWrapper
@@ -588,9 +588,7 @@ struct Container {
     // CHECK: [[SOME_BB]]:
     // CHECK:       [[DATA_ADDR:%[0-9]+]] = unchecked_take_enum_data_addr [[ACCESS]] : $*Optional<Container>, #Optional.some!enumelt
     // CHECK:       [[ELEM_ADDR:%[0-9]+]] = struct_element_addr [[DATA_ADDR]] : $*Container, #Container.iso
-    // CHECK:       hop_to_executor {{%[0-9]+}} : $Cat
     // CHECK:       {{%[0-9]+}} = load [trivial] [[ELEM_ADDR]] : $*Float
-    // CHECK:       hop_to_executor [[GENERIC_EXEC]] :
     // CHECK:       hop_to_executor [[GENERIC_EXEC]] :
     // CHECK: } // end sil function '$s4test9ContainerV10getOrCrashSfyYaFZ'
     static func getOrCrash() async -> Float {
@@ -628,7 +626,7 @@ struct Container {
 
 @propertyWrapper
 struct StateObject<ObjectType> {
-    @MainActor(unsafe)
+    @preconcurrency @MainActor
     var wrappedValue: ObjectType {
         fatalError()
     }
@@ -643,7 +641,7 @@ struct Blah {
     @StateObject private var coordinator = Coordinator()
 
     // closure #1 in Blah.test()
-    // CHECK-LABEL: sil private [ossa] @$s4test4BlahVAAyyFyyYaYbcfU_ :
+    // CHECK-LABEL: sil private [ossa] @$s4test4BlahVAAyyFyyYacfU_ : $@convention(thin) @async @substituted <τ_0_0> (@guaranteed Optional<any Actor>, Blah) -> @out τ_0_0 for <()> {
     // CHECK:       [[GENERIC_EXEC:%.*]] = enum $Optional<Builtin.Executor>, #Optional.none
     // CHECK:       hop_to_executor [[GENERIC_EXEC]] :
     // CHECK:       hop_to_executor {{%[0-9]+}} : $MainActor
@@ -656,7 +654,7 @@ struct Blah {
     // CHECK:       {{%[0-9]+}} = load [trivial] [[VAL_ACCESS]] : $*Optional<Int>
     // CHECK:       end_access [[VAL_ACCESS]] : $*Optional<Int>
     // CHECK:       hop_to_executor [[GENERIC_EXEC]] : $Optional<Builtin.Executor>
-    // CHECK: } // end sil function '$s4test4BlahVAAyyFyyYaYbcfU_'
+    // CHECK: } // end sil function '$s4test4BlahVAAyyFyyYacfU_'
     @available(SwiftStdlib 5.1, *)
     func test() {
         Task.detached {

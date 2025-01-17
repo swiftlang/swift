@@ -9,11 +9,12 @@
 // See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 //
 //===----------------------------------------------------------------------===//
+
 import Swift
-@_implementationOnly import _SwiftConcurrencyShims
 
 #if !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
 @available(SwiftStdlib 5.7, *)
+@_unavailableInEmbedded
 extension Task where Success == Never, Failure == Never {
   @available(SwiftStdlib 5.7, *)
   internal static func _sleep(

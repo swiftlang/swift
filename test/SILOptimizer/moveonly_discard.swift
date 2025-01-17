@@ -1,5 +1,7 @@
-// RUN: %target-swift-frontend -sil-verify-all -verify -emit-sil -enable-experimental-feature MoveOnlyEnumDeinits %s
-// RUN: %target-swift-frontend  -enable-experimental-feature NoncopyableGenerics -sil-verify-all -verify -emit-sil -enable-experimental-feature MoveOnlyEnumDeinits %s
+// RUN: %target-swift-frontend -sil-verify-all -verify -emit-sil -enable-experimental-feature MoveOnlyEnumDeinits -enable-experimental-feature ConsumeSelfInDeinit %s
+
+// REQUIRES: swift_feature_ConsumeSelfInDeinit
+// REQUIRES: swift_feature_MoveOnlyEnumDeinits
 
 
 func posix_close(_ t: Int) {}
@@ -20,10 +22,9 @@ struct GoodFileDescriptor: ~Copyable {
     discard self
   }
 
-  deinit { // expected-error {{'self' consumed more than once}}
-    // FIXME: this is suppose to be valid. rdar://106044273
-    close() // expected-note {{consumed here}}
-  } // expected-note {{consumed again here}}
+  deinit {
+    close()
+  }
 }
 
 struct BadFileDescriptor: ~Copyable {

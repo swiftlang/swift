@@ -4,8 +4,8 @@
 // RUN: %empty-directory(%t/mods)
 // RUN: split-file %s %t
 
-// RUN: %target-swift-frontend -emit-module -o %t/mods %t/ObjcImpl.swift -import-objc-header %t/objc_impl.h -disable-objc-attr-requires-foundation-module
-// RUN: %target-swift-ide-test -print-indexed-symbols -module-to-print ObjcImpl -source-filename none -I %t/mods | %FileCheck %s
+// RUN: %target-swift-frontend -emit-module -o %t/mods %t/ObjcImpl.swift -import-objc-header %t/objc_impl.h -disable-objc-attr-requires-foundation-module -target %target-stable-abi-triple
+// RUN: %target-swift-ide-test -print-indexed-symbols -module-to-print ObjcImpl -source-filename none -I %t/mods -target %target-stable-abi-triple | %FileCheck %s
 
 //--- objc_impl.h
 @interface NSObject

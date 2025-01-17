@@ -132,11 +132,11 @@ public enum Optional<Wrapped: ~Copyable>: ~Copyable {
   case some(Wrapped)
 }
 
-extension Optional: Copyable /* where Wrapped: Copyable */ {}
+extension Optional: Copyable where Wrapped: Copyable {}
 
 extension Optional: Sendable where Wrapped: ~Copyable & Sendable { }
 
-extension Optional: _BitwiseCopyable where Wrapped: _BitwiseCopyable { }
+extension Optional: BitwiseCopyable where Wrapped: BitwiseCopyable { }
 
 @_preInverseGenerics
 extension Optional: ExpressibleByNilLiteral where Wrapped: ~Copyable {
@@ -186,9 +186,6 @@ extension Optional {
   /// - Returns: The result of the given closure. If this instance is `nil`,
   ///   returns `nil`.
   @_alwaysEmitIntoClient
-  @_disfavoredOverload // FIXME: Workaround for source compat issue with
-                       // functions that used to shadow the original map
-                       // (rdar://125016028)
   public func map<E: Error, U: ~Copyable>(
     _ transform: (Wrapped) throws(E) -> U
   ) throws(E) -> U? {
@@ -233,16 +230,12 @@ extension Optional where Wrapped: ~Copyable {
   public borrowing func _borrowingMap<U: ~Copyable, E: Error>(
     _ transform: (borrowing Wrapped) throws(E) -> U
   ) throws(E) -> U? {
-    #if $NoncopyableGenerics
     switch self {
-    case .some(borrowing y):
+    case .some(let y):
       return .some(try transform(y))
     case .none:
       return .none
     }
-    #else
-    fatalError("unsupported compiler")
-    #endif
   }
 }
 
@@ -267,9 +260,6 @@ extension Optional {
   /// - Returns: The result of the given closure. If this instance is `nil`,
   ///   returns `nil`.
   @_alwaysEmitIntoClient
-  @_disfavoredOverload // FIXME: Workaround for source compat issue with
-                       // functions that used to shadow the original flatMap
-                       // (rdar://125016028)
   public func flatMap<E: Error, U: ~Copyable>(
     _ transform: (Wrapped) throws(E) -> U?
   ) throws(E) -> U? {
@@ -295,7 +285,6 @@ extension Optional {
   }
 }
 
-@_disallowFeatureSuppression(NoncopyableGenerics)
 extension Optional where Wrapped: ~Copyable {
   // FIXME(NCG): Make this public.
   @_alwaysEmitIntoClient
@@ -316,7 +305,7 @@ extension Optional where Wrapped: ~Copyable {
     _ transform: (borrowing Wrapped) throws(E) -> U?
   ) throws(E) -> U? {
     switch self {
-    case .some(borrowing y):
+    case .some(let y):
       return try transform(y)
     case .none:
       return .none
@@ -349,6 +338,7 @@ extension Optional {
   ///   will never be equal to `nil` and only after you've tried using the
   ///   postfix `!` operator.
   @inlinable
+  @unsafe
   public var unsafelyUnwrapped: Wrapped {
     @inline(__always)
     get {
@@ -421,8 +411,8 @@ extension Optional where Wrapped: ~Copyable {
   ///
   /// - Returns: The wrapped value being stored in this instance. If this
   ///   instance is `nil`, returns `nil`.
-  @_alwaysEmitIntoClient // FIXME(NCG): Make this public.
-  public mutating func _take() -> Self {
+  @_alwaysEmitIntoClient
+  public mutating func take() -> Self {
     let result = consume self
     self = nil
     return result
@@ -437,7 +427,12 @@ extension Optional: CustomDebugStringConvertible {
     case .some(let value):
 #if !SWIFT_STDLIB_STATIC_PRINT
       var result = "Optional("
+      #if !$Embedded
       debugPrint(value, terminator: "", to: &result)
+      #else
+      _ = value
+      "(cannot print value in embedded Swift)".write(to: &result)
+      #endif
       result += ")"
       return result
 #else

@@ -2,7 +2,7 @@
 // RUN: %target-swift-frontend %s -typecheck -module-name Properties -clang-header-expose-decls=all-public -emit-clang-header-path %t/properties.h
 // RUN: %FileCheck %s < %t/properties.h
 
-// RUN: %check-interop-cxx-header-in-clang(%t/properties.h)
+// RUN: %check-interop-cxx-header-in-clang(%t/properties.h -DSWIFT_CXX_INTEROP_HIDE_STL_OVERLAY)
 
 public struct FirstSmallStruct {
     public let x: UInt32
@@ -135,71 +135,71 @@ public func createStructWithRefCountStoredProp() -> StructWithRefCountStoredProp
 }
 
 // CHECK: SWIFT_INLINE_THUNK uint32_t FirstSmallStruct::getX() const {
-// CHECK-NEXT: return _impl::$s10Properties16FirstSmallStructV1xs6UInt32Vvg(_impl::swift_interop_passDirect_Properties_uint32_t_0_4(_getOpaquePointer()));
+// CHECK-NEXT: return Properties::_impl::$s10Properties16FirstSmallStructV1xs6UInt32Vvg(Properties::_impl::swift_interop_passDirect_Properties_uint32_t_0_4(_getOpaquePointer()));
 // CHECK-NEXT: }
 
 // CHECK:      SWIFT_INLINE_THUNK swift::Int LargeStruct::getX1() const {
-// CHECK-NEXT: return _impl::$s10Properties11LargeStructV2x1Sivg(_getOpaquePointer());
+// CHECK-NEXT: return Properties::_impl::$s10Properties11LargeStructV2x1Sivg(_getOpaquePointer());
 // CHECK-NEXT: }
 // CHECK-NEXT: SWIFT_INLINE_THUNK swift::Int LargeStruct::getX2() const {
-// CHECK-NEXT: return _impl::$s10Properties11LargeStructV2x2Sivg(_getOpaquePointer());
+// CHECK-NEXT: return Properties::_impl::$s10Properties11LargeStructV2x2Sivg(_getOpaquePointer());
 // CHECK-NEXT: }
 // CHECK-NEXT: SWIFT_INLINE_THUNK swift::Int LargeStruct::getX3() const {
-// CHECK-NEXT: return _impl::$s10Properties11LargeStructV2x3Sivg(_getOpaquePointer());
+// CHECK-NEXT: return Properties::_impl::$s10Properties11LargeStructV2x3Sivg(_getOpaquePointer());
 // CHECK-NEXT: }
 // CHECK-NEXT: SWIFT_INLINE_THUNK swift::Int LargeStruct::getX4() const {
-// CHECK-NEXT: return _impl::$s10Properties11LargeStructV2x4Sivg(_getOpaquePointer());
+// CHECK-NEXT: return Properties::_impl::$s10Properties11LargeStructV2x4Sivg(_getOpaquePointer());
 // CHECK-NEXT: }
 // CHECK-NEXT: SWIFT_INLINE_THUNK swift::Int LargeStruct::getX5() const {
-// CHECK-NEXT: return _impl::$s10Properties11LargeStructV2x5Sivg(_getOpaquePointer());
+// CHECK-NEXT: return Properties::_impl::$s10Properties11LargeStructV2x5Sivg(_getOpaquePointer());
 // CHECK-NEXT: }
 // CHECK-NEXT: SWIFT_INLINE_THUNK swift::Int LargeStruct::getX6() const {
-// CHECK-NEXT: return _impl::$s10Properties11LargeStructV2x6Sivg(_getOpaquePointer());
+// CHECK-NEXT: return Properties::_impl::$s10Properties11LargeStructV2x6Sivg(_getOpaquePointer());
 // CHECK-NEXT: }
 // CHECK-NEXT: SWIFT_INLINE_THUNK LargeStruct LargeStruct::getAnotherLargeStruct() const {
-// CHECK-NEXT: return _impl::_impl_LargeStruct::returnNewValue([&](char * _Nonnull result) SWIFT_INLINE_THUNK_ATTRIBUTES {
-// CHECK-NEXT:   _impl::$s10Properties11LargeStructV07anotherbC0ACvg(result, _getOpaquePointer());
+// CHECK-NEXT: return Properties::_impl::_impl_LargeStruct::returnNewValue([&](char * _Nonnull result) SWIFT_INLINE_THUNK_ATTRIBUTES {
+// CHECK-NEXT:   Properties::_impl::$s10Properties11LargeStructV07anotherbC0ACvg(result, _getOpaquePointer());
 // CHECK-NEXT: });
 // CHECK-NEXT: }
 // CHECK-NEXT: SWIFT_INLINE_THUNK FirstSmallStruct LargeStruct::getFirstSmallStruct() const {
-// CHECK-NEXT: return _impl::_impl_FirstSmallStruct::returnNewValue([&](char * _Nonnull result) SWIFT_INLINE_THUNK_ATTRIBUTES {
-// CHECK-NEXT:   _impl::swift_interop_returnDirect_Properties_uint32_t_0_4(result, _impl::$s10Properties11LargeStructV010firstSmallC0AA05FirsteC0Vvg(_getOpaquePointer()));
+// CHECK-NEXT: return Properties::_impl::_impl_FirstSmallStruct::returnNewValue([&](char * _Nonnull result) SWIFT_INLINE_THUNK_ATTRIBUTES {
+// CHECK-NEXT:   Properties::_impl::swift_interop_returnDirect_Properties_uint32_t_0_4(result, Properties::_impl::$s10Properties11LargeStructV010firstSmallC0AA05FirsteC0Vvg(_getOpaquePointer()));
 // CHECK-NEXT: });
 // CHECK-NEXT: }
 // CHECK-NEXT: SWIFT_INLINE_THUNK swift::Int LargeStruct::getStaticX() {
-// CHECK-NEXT: return _impl::$s10Properties11LargeStructV7staticXSivgZ();
+// CHECK-NEXT: return Properties::_impl::$s10Properties11LargeStructV7staticXSivgZ();
 // CHECK-NEXT: }
 // CHECK-NEXT: SWIFT_INLINE_THUNK FirstSmallStruct LargeStruct::getStaticSmallStruct() {
-// CHECK-NEXT: return _impl::_impl_FirstSmallStruct::returnNewValue([&](char * _Nonnull result) SWIFT_INLINE_THUNK_ATTRIBUTES {
-// CHECK-NEXT:   _impl::swift_interop_returnDirect_Properties_uint32_t_0_4(result, _impl::$s10Properties11LargeStructV011staticSmallC0AA05FirsteC0VvgZ());
+// CHECK-NEXT: return Properties::_impl::_impl_FirstSmallStruct::returnNewValue([&](char * _Nonnull result) SWIFT_INLINE_THUNK_ATTRIBUTES {
+// CHECK-NEXT:   Properties::_impl::swift_interop_returnDirect_Properties_uint32_t_0_4(result, Properties::_impl::$s10Properties11LargeStructV011staticSmallC0AA05FirsteC0VvgZ());
 // CHECK-NEXT: });
 // CHECK-NEXT: }
 
 // CHECK: SWIFT_INLINE_THUNK int32_t PropertiesInClass::getStoredInt() {
-// CHECK-NEXT: return _impl::$s10Properties0A7InClassC9storedInts5Int32Vvg(::swift::_impl::_impl_RefCountedClass::getOpaquePointer(*this));
+// CHECK-NEXT: return Properties::_impl::$s10Properties0A7InClassC9storedInts5Int32Vvg(::swift::_impl::_impl_RefCountedClass::getOpaquePointer(*this));
 // CHECK-NEXT: }
 // CHECK-NEXT: SWIFT_INLINE_THUNK swift::Int PropertiesInClass::getComputedInt() {
-// CHECK-NEXT: return _impl::$s10Properties0A7InClassC11computedIntSivg(::swift::_impl::_impl_RefCountedClass::getOpaquePointer(*this));
+// CHECK-NEXT: return Properties::_impl::$s10Properties0A7InClassC11computedIntSivg(::swift::_impl::_impl_RefCountedClass::getOpaquePointer(*this));
 // CHECK-NEXT: }
 // CHECK-NEXT: SWIFT_INLINE_THUNK FirstSmallStruct PropertiesInClass::getSmallStruct() {
-// CHECK-NEXT: return _impl::_impl_FirstSmallStruct::returnNewValue([&](char * _Nonnull result) SWIFT_INLINE_THUNK_ATTRIBUTES {
-// CHECK-NEXT:   _impl::swift_interop_returnDirect_Properties_uint32_t_0_4(result, _impl::$s10Properties0A7InClassC11smallStructAA010FirstSmallE0Vvg(::swift::_impl::_impl_RefCountedClass::getOpaquePointer(*this)));
+// CHECK-NEXT: return Properties::_impl::_impl_FirstSmallStruct::returnNewValue([&](char * _Nonnull result) SWIFT_INLINE_THUNK_ATTRIBUTES {
+// CHECK-NEXT:   Properties::_impl::swift_interop_returnDirect_Properties_uint32_t_0_4(result, Properties::_impl::$s10Properties0A7InClassC11smallStructAA010FirstSmallE0Vvg(::swift::_impl::_impl_RefCountedClass::getOpaquePointer(*this)));
 // CHECK-NEXT: });
 // CHECK-NEXT: }
 
 // CHECK:      SWIFT_INLINE_THUNK uint32_t SmallStructWithGetters::getStoredInt() const {
-// CHECK-NEXT: return _impl::$s10Properties22SmallStructWithGettersV9storedInts6UInt32Vvg(_impl::swift_interop_passDirect_Properties_uint32_t_0_4(_getOpaquePointer()));
+// CHECK-NEXT: return Properties::_impl::$s10Properties22SmallStructWithGettersV9storedInts6UInt32Vvg(Properties::_impl::swift_interop_passDirect_Properties_uint32_t_0_4(_getOpaquePointer()));
 // CHECK-NEXT: }
 // CHECK-NEXT: SWIFT_INLINE_THUNK swift::Int SmallStructWithGetters::getComputedInt() const {
-// CHECK-NEXT: return _impl::$s10Properties22SmallStructWithGettersV11computedIntSivg(_impl::swift_interop_passDirect_Properties_uint32_t_0_4(_getOpaquePointer()));
+// CHECK-NEXT: return Properties::_impl::$s10Properties22SmallStructWithGettersV11computedIntSivg(Properties::_impl::swift_interop_passDirect_Properties_uint32_t_0_4(_getOpaquePointer()));
 // CHECK-NEXT: }
 // CHECK-NEXT: SWIFT_INLINE_THUNK LargeStruct SmallStructWithGetters::getLargeStruct() const {
-// CHECK-NEXT: return _impl::_impl_LargeStruct::returnNewValue([&](char * _Nonnull result) SWIFT_INLINE_THUNK_ATTRIBUTES {
-// CHECK-NEXT:   _impl::$s10Properties22SmallStructWithGettersV05largeC0AA05LargeC0Vvg(result, _impl::swift_interop_passDirect_Properties_uint32_t_0_4(_getOpaquePointer()));
+// CHECK-NEXT: return Properties::_impl::_impl_LargeStruct::returnNewValue([&](char * _Nonnull result) SWIFT_INLINE_THUNK_ATTRIBUTES {
+// CHECK-NEXT:   Properties::_impl::$s10Properties22SmallStructWithGettersV05largeC0AA05LargeC0Vvg(result, Properties::_impl::swift_interop_passDirect_Properties_uint32_t_0_4(_getOpaquePointer()));
 // CHECK-NEXT: });
 // CHECK-NEXT: }
 // CHECK-NEXT: SWIFT_INLINE_THUNK SmallStructWithGetters SmallStructWithGetters::getSmallStruct() const {
-// CHECK-NEXT: return _impl::_impl_SmallStructWithGetters::returnNewValue([&](char * _Nonnull result) SWIFT_INLINE_THUNK_ATTRIBUTES {
-// CHECK-NEXT:   _impl::swift_interop_returnDirect_Properties_uint32_t_0_4(result, _impl::$s10Properties22SmallStructWithGettersV05smallC0ACvg(_impl::swift_interop_passDirect_Properties_uint32_t_0_4(_getOpaquePointer())));
+// CHECK-NEXT: return Properties::_impl::_impl_SmallStructWithGetters::returnNewValue([&](char * _Nonnull result) SWIFT_INLINE_THUNK_ATTRIBUTES {
+// CHECK-NEXT:   Properties::_impl::swift_interop_returnDirect_Properties_uint32_t_0_4(result, Properties::_impl::$s10Properties22SmallStructWithGettersV05smallC0ACvg(Properties::_impl::swift_interop_passDirect_Properties_uint32_t_0_4(_getOpaquePointer())));
 // CHECK-NEXT: });
 // CHECK-NEXT: }

@@ -28,6 +28,7 @@
 #include "swift/AST/SourceFile.h"
 #include "swift/AST/Stmt.h"
 #include "swift/AST/TypeRepr.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/STLExtras.h"
 #include "swift/Parse/Lexer.h"
 #include "llvm/Support/Compiler.h"
@@ -202,17 +203,9 @@ SourceRange GenericParamScope::getSourceRangeOfThisASTNode(
 
 SourceRange ASTSourceFileScope::getSourceRangeOfThisASTNode(
     const bool omitAssertions) const {
-  if (auto bufferID = SF->getBufferID()) {
-    auto charRange = getSourceManager().getRangeForBuffer(*bufferID);
-    return SourceRange(charRange.getStart(), charRange.getEnd());
-  }
-
-  if (SF->getTopLevelItems().empty())
-    return SourceRange();
-
-  // Use the source ranges of the declarations in the file.
-  return SourceRange(SF->getTopLevelItems().front().getStartLoc(),
-                     SF->getTopLevelItems().back().getEndLoc());
+  auto bufferID = SF->getBufferID();
+  auto charRange = getSourceManager().getRangeForBuffer(bufferID);
+  return SourceRange(charRange.getStart(), charRange.getEnd());
 }
 
 SourceRange GenericTypeOrExtensionScope::getSourceRangeOfThisASTNode(
@@ -356,6 +349,11 @@ SourceRange ClosureParametersScope::getSourceRangeOfThisASTNode(
 }
 
 SourceRange CustomAttributeScope::getSourceRangeOfThisASTNode(
+    const bool omitAssertions) const {
+  return attr->getRange();
+}
+
+SourceRange ABIAttributeScope::getSourceRangeOfThisASTNode(
     const bool omitAssertions) const {
   return attr->getRange();
 }

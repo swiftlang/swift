@@ -10,14 +10,16 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "sourcekitd/Service.h"
 #include "sourcekitd/CodeCompletionResultsArray.h"
+#include "sourcekitd/DeclarationsArray.h"
 #include "sourcekitd/DictionaryKeys.h"
 #include "sourcekitd/DocStructureArray.h"
 #include "sourcekitd/DocSupportAnnotationArray.h"
-#include "sourcekitd/TokenAnnotationsArray.h"
 #include "sourcekitd/ExpressionTypeArray.h"
+#include "sourcekitd/Service.h"
+#include "sourcekitd/TokenAnnotationsArray.h"
 #include "sourcekitd/VariableTypeArray.h"
+#include "sourcekitd/plugin.h"
 
 #include "SourceKit/Core/Context.h"
 #include "SourceKit/Core/LangSupport.h"
@@ -42,6 +44,7 @@
 #include "llvm/ADT/StringRef.h"
 #include "llvm/ADT/StringSet.h"
 #include "llvm/Support/MemoryBuffer.h"
+#include "llvm/Support/Mutex.h"
 #include "llvm/Support/Path.h"
 #include "llvm/Support/PrettyStackTrace.h"
 #include "llvm/Support/VirtualFileSystem.h"
@@ -50,6 +53,7 @@
 #include <optional>
 
 // FIXME: Portability.
+#include <Block.h>
 #include <dispatch/dispatch.h>
 
 using namespace sourcekitd;
@@ -82,6 +86,7 @@ struct SKEditorConsumerOptions {
   bool EnableSyntaxMap = false;
   bool EnableStructure = false;
   bool EnableDiagnostics = false;
+  bool EnableDeclarations = false;
   bool SyntacticOnly = false;
 };
 
@@ -102,6 +107,53 @@ static void fillDiagnosticInfo(ResponseBuilder::Dictionary ParentElem,
 
 static SourceKit::Context *GlobalCtx = nullptr;
 
+namespace SourceKit {
+class PluginSupport {
+  std::vector<sourcekitd_cancellable_request_handler_t> RequestHandlers;
+  std::vector<sourcekitd_cancellation_handler_t> CancellationHandlers;
+  llvm::sys::Mutex Mtx;
+
+public:
+  ~PluginSupport() {
+    for (auto &Handler : RequestHandlers) {
+      Block_release(Handler);
+    }
+    RequestHandlers.clear();
+  }
+
+  void addRequestHandler(sourcekitd_cancellable_request_handler_t Handler) {
+    RequestHandlers.push_back(Block_copy(Handler));
+  }
+
+  /// Register a cancellation handler that will be called when a request is
+  /// cancelled.
+  void addCancellationHandler(sourcekitd_cancellation_handler_t Handler) {
+    CancellationHandlers.push_back(Block_copy(Handler));
+  }
+
+  bool handleRequest(sourcekitd_object_t Req,
+                     sourcekitd_request_handle_t Handle, ResponseReceiver Rec) {
+    auto ReceiverWrapper = ^void(sourcekitd_response_t Response) {
+      Rec(Response);
+    };
+    for (auto &Handler : RequestHandlers) {
+      if (Handler(Req, Handle, ReceiverWrapper)) {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  /// Inform all cancellation handlers in the plugins that the request with the
+  /// given handle has been cancelled.
+  void cancelRequest(sourcekitd_request_handle_t Handle) {
+    for (auto &CancellationHandler : CancellationHandlers) {
+      CancellationHandler(Handle);
+    }
+  }
+};
+} // end namespace SourceKit
+
 // NOTE: if we had a connection context, these stats should move into it.
 static Statistic numRequests(UIdentFromSKDUID(KindStatNumRequests),
                              "# of requests (total)");
@@ -115,9 +167,11 @@ void sourcekitd::initializeService(
   INITIALIZE_LLVM();
   initializeSwiftModules();
   llvm::EnablePrettyStackTrace();
-  GlobalCtx = new SourceKit::Context(swiftExecutablePath, runtimeLibPath,
-                                     diagnosticDocumentationPath,
-                                     SourceKit::createSwiftLangSupport);
+  GlobalCtx = new SourceKit::Context(
+      swiftExecutablePath, runtimeLibPath, diagnosticDocumentationPath,
+      SourceKit::createSwiftLangSupport, [](SourceKit::Context &Ctx) {
+        return std::make_shared<PluginSupport>();
+      });
   auto noteCenter = GlobalCtx->getNotificationCenter();
 
   noteCenter->addDocumentUpdateNotificationReceiver([postNotification](StringRef DocumentName) {
@@ -263,22 +317,22 @@ static sourcekitd_response_t editorOpen(StringRef Name, llvm::MemoryBuffer *Buf,
                                         ArrayRef<const char *> Args,
                                         std::optional<VFSOptions> vfsOptions);
 
-static sourcekitd_response_t
-editorOpenInterface(StringRef Name, StringRef ModuleName,
-                    std::optional<StringRef> Group, ArrayRef<const char *> Args,
-                    bool SynthesizedExtensions,
-                    std::optional<StringRef> InterestedUSR);
+static sourcekitd_response_t editorOpenInterface(
+    StringRef Name, StringRef ModuleName, std::optional<StringRef> Group,
+    ArrayRef<const char *> Args, bool SynthesizedExtensions,
+    std::optional<StringRef> InterestedUSR, bool EnableDeclarations);
 
 static sourcekitd_response_t
 editorOpenHeaderInterface(StringRef Name, StringRef HeaderName,
-                          ArrayRef<const char *> Args,
-                          bool UsingSwiftArgs,
-                          bool SynthesizedExtensions,
-                          StringRef swiftVersion);
+                          ArrayRef<const char *> Args, bool UsingSwiftArgs,
+                          bool SynthesizedExtensions, StringRef swiftVersion,
+                          bool EnableDeclarations);
 
-static void editorOpenSwiftSourceInterface(
-    StringRef Name, StringRef SourceName, ArrayRef<const char *> Args,
-    SourceKitCancellationToken CancellationToken, ResponseReceiver Rec);
+static void
+editorOpenSwiftSourceInterface(StringRef Name, StringRef SourceName,
+                               ArrayRef<const char *> Args,
+                               SourceKitCancellationToken CancellationToken,
+                               ResponseReceiver Rec, bool EnableDeclarations);
 
 static void
 editorOpenSwiftTypeInterface(StringRef TypeUsr, ArrayRef<const char *> Args,
@@ -288,8 +342,8 @@ static sourcekitd_response_t editorExtractTextFromComment(StringRef Source);
 
 static sourcekitd_response_t editorConvertMarkupToXML(StringRef Source);
 
-static sourcekitd_response_t
-editorClose(StringRef Name, bool RemoveCache);
+static sourcekitd_response_t editorClose(StringRef Name, bool CancelBuilds,
+                                         bool RemoveCache);
 
 static sourcekitd_response_t
 editorReplaceText(StringRef Name, llvm::MemoryBuffer *Buf, unsigned Offset,
@@ -400,6 +454,9 @@ void sourcekitd::handleRequest(sourcekitd_object_t Req,
 }
 
 void sourcekitd::cancelRequest(SourceKitCancellationToken CancellationToken) {
+  // Inform all plugins that the request has been cancelled, even if the request
+  // wasn't handled by a plugin.
+  getGlobalContext().getPlugins()->cancelRequest(CancellationToken);
   getGlobalContext().getRequestTracker()->cancel(CancellationToken);
 }
 
@@ -831,10 +888,19 @@ handleRequestEditorClose(const RequestDict &Req,
     if (!Name.has_value())
       return Rec(createErrorRequestInvalid("missing 'key.name'"));
 
-    // Whether we remove the cached AST from libcache, by default, false.
-    int64_t RemoveCache = false;
+    // Whether to cancel in-flight builds, default true.
+    int64_t CancelBuilds = true;
+    Req.getInt64(KeyCancelBuilds, CancelBuilds, /*isOptional=*/true);
+
+    // Whether to remove the cached AST from libcache. This is currently true by
+    // default since future requests will never match matchesSourceState or
+    // cursor info's canUseASTWithSnapshots since the newly opened document
+    // will always have a mismatching stamp. Once we fix that
+    // (rdar://127353608), we ought to be able to switch this back to false by
+    // default.
+    int64_t RemoveCache = true;
     Req.getInt64(KeyRemoveCache, RemoveCache, /*isOptional=*/true);
-    return Rec(editorClose(*Name, RemoveCache));
+    return Rec(editorClose(*Name, CancelBuilds, RemoveCache));
   }
 }
 
@@ -912,7 +978,7 @@ static void
 handleRequestEditorOpenInterface(const RequestDict &Req,
                                  SourceKitCancellationToken CancellationToken,
                                  ResponseReceiver Rec) {
-  {
+  handleSemanticRequest(Req, Rec, [Req, Rec]() {
     SmallVector<const char *, 8> Args;
     if (getCompilerArgumentsForRequestOrEmitError(Req, Args, Rec))
       return;
@@ -927,9 +993,12 @@ handleRequestEditorOpenInterface(const RequestDict &Req,
     Req.getInt64(KeySynthesizedExtension, SynthesizedExtension,
                  /*isOptional=*/true);
     std::optional<StringRef> InterestedUSR = Req.getString(KeyInterestedUSR);
+    bool EnableDeclarations =
+        Req.getOptionalInt64(KeyEnableDeclarations).value_or(false);
     return Rec(editorOpenInterface(*Name, *ModuleName, GroupName, Args,
-                                   SynthesizedExtension, InterestedUSR));
-  }
+                                   SynthesizedExtension, InterestedUSR,
+                                   EnableDeclarations));
+  });
 }
 
 static void handleRequestEditorOpenHeaderInterface(
@@ -960,9 +1029,11 @@ static void handleRequestEditorOpenHeaderInterface(
       if (swiftVerVal.has_value())
         swiftVer = std::to_string(*swiftVerVal);
     }
-    return Rec(editorOpenHeaderInterface(*Name, *HeaderName, Args,
-                                         UsingSwiftArgs.value_or(false),
-                                         SynthesizedExtension, swiftVer));
+    bool EnableDeclarations =
+        Req.getOptionalInt64(KeyEnableDeclarations).value_or(false);
+    return Rec(editorOpenHeaderInterface(
+        *Name, *HeaderName, Args, UsingSwiftArgs.value_or(false),
+        SynthesizedExtension, swiftVer, EnableDeclarations));
   }
 }
 
@@ -979,8 +1050,11 @@ static void handleRequestEditorOpenSwiftSourceInterface(
     std::optional<StringRef> FileName = Req.getString(KeySourceFile);
     if (!FileName.has_value())
       return Rec(createErrorRequestInvalid("missing 'key.sourcefile'"));
-    return editorOpenSwiftSourceInterface(*Name, *FileName, Args,
-                                          CancellationToken, Rec);
+    // Reporting the declarations array is off by default
+    bool EnableDeclarations =
+        Req.getOptionalInt64(KeyEnableDeclarations).value_or(false);
+    return editorOpenSwiftSourceInterface(
+        *Name, *FileName, Args, CancellationToken, Rec, EnableDeclarations);
   }
 }
 
@@ -2045,6 +2119,12 @@ void handleRequestImpl(sourcekitd_object_t ReqObj,
                        SourceKitCancellationToken CancellationToken,
                        ResponseReceiver Rec) {
   ++numRequests;
+
+  if (getGlobalContext().getPlugins()->handleRequest(ReqObj, CancellationToken,
+                                                     Rec)) {
+    // Handled by plugin.
+    return;
+  }
 
   RequestDict Req(ReqObj);
 
@@ -3498,6 +3578,7 @@ public:
   DocStructureArrayBuilder DocStructure;
   TokenAnnotationsArrayBuilder SyntaxMap;
   TokenAnnotationsArrayBuilder SemanticAnnotations;
+  DeclarationsArrayBuilder Declarations;
 
   sourcekitd_response_t Error = nullptr;
 
@@ -3527,6 +3608,9 @@ public:
 
   void handleSemanticAnnotation(unsigned Offset, unsigned Length, UIdent Kind,
                                 bool isSystem) override;
+
+  void handleDeclaration(unsigned Offset, unsigned Length, UIdent Kind,
+                         StringRef USR) override;
 
   bool documentStructureEnabled() override { return Opts.EnableStructure; }
 
@@ -3582,14 +3666,14 @@ static sourcekitd_response_t editorOpen(StringRef Name, llvm::MemoryBuffer *Buf,
   return EditC.createResponse();
 }
 
-static sourcekitd_response_t
-editorOpenInterface(StringRef Name, StringRef ModuleName,
-                    std::optional<StringRef> Group, ArrayRef<const char *> Args,
-                    bool SynthesizedExtensions,
-                    std::optional<StringRef> InterestedUSR) {
+static sourcekitd_response_t editorOpenInterface(
+    StringRef Name, StringRef ModuleName, std::optional<StringRef> Group,
+    ArrayRef<const char *> Args, bool SynthesizedExtensions,
+    std::optional<StringRef> InterestedUSR, bool EnableDeclarations) {
   SKEditorConsumerOptions Opts;
   Opts.EnableSyntaxMap = true;
   Opts.EnableStructure = true;
+  Opts.EnableDeclarations = EnableDeclarations;
   SKEditorConsumer EditC(Opts);
   LangSupport &Lang = getGlobalContext().getSwiftLangSupport();
   Lang.editorOpenInterface(EditC, Name, ModuleName, Group, Args,
@@ -3599,12 +3683,15 @@ editorOpenInterface(StringRef Name, StringRef ModuleName,
 
 /// Getting the interface from a swift source file differs from getting interfaces
 /// from headers or modules for its performing asynchronously.
-static void editorOpenSwiftSourceInterface(
-    StringRef Name, StringRef HeaderName, ArrayRef<const char *> Args,
-    SourceKitCancellationToken CancellationToken, ResponseReceiver Rec) {
+static void
+editorOpenSwiftSourceInterface(StringRef Name, StringRef HeaderName,
+                               ArrayRef<const char *> Args,
+                               SourceKitCancellationToken CancellationToken,
+                               ResponseReceiver Rec, bool EnableDeclarations) {
   SKEditorConsumerOptions Opts;
   Opts.EnableSyntaxMap = true;
   Opts.EnableStructure = true;
+  Opts.EnableDeclarations = EnableDeclarations;
   auto EditC = std::make_shared<SKEditorConsumer>(Rec, Opts);
   LangSupport &Lang = getGlobalContext().getSwiftLangSupport();
   Lang.editorOpenSwiftSourceInterface(Name, HeaderName, Args, CancellationToken,
@@ -3642,13 +3729,13 @@ static sourcekitd_response_t editorConvertMarkupToXML(StringRef Source) {
 
 static sourcekitd_response_t
 editorOpenHeaderInterface(StringRef Name, StringRef HeaderName,
-                          ArrayRef<const char *> Args,
-                          bool UsingSwiftArgs,
-                          bool SynthesizedExtensions,
-                          StringRef swiftVersion) {
+                          ArrayRef<const char *> Args, bool UsingSwiftArgs,
+                          bool SynthesizedExtensions, StringRef swiftVersion,
+                          bool EnableDeclarations) {
   SKEditorConsumerOptions Opts;
   Opts.EnableSyntaxMap = true;
   Opts.EnableStructure = true;
+  Opts.EnableDeclarations = EnableDeclarations;
   SKEditorConsumer EditC(Opts);
   LangSupport &Lang = getGlobalContext().getSwiftLangSupport();
   Lang.editorOpenHeaderInterface(EditC, Name, HeaderName, Args, UsingSwiftArgs,
@@ -3656,11 +3743,11 @@ editorOpenHeaderInterface(StringRef Name, StringRef HeaderName,
   return EditC.createResponse();
 }
 
-static sourcekitd_response_t
-editorClose(StringRef Name, bool RemoveCache) {
+static sourcekitd_response_t editorClose(StringRef Name, bool CancelBuilds,
+                                         bool RemoveCache) {
   ResponseBuilder RespBuilder;
   LangSupport &Lang = getGlobalContext().getSwiftLangSupport();
-  Lang.editorClose(Name, RemoveCache);
+  Lang.editorClose(Name, CancelBuilds, RemoveCache);
   return RespBuilder.createResponse();
 }
 
@@ -3713,7 +3800,9 @@ sourcekitd_response_t SKEditorConsumer::createResponse() {
   if (Opts.EnableStructure) {
     Dict.setCustomBuffer(KeySubStructure, DocStructure.createBuffer());
   }
-
+  if (Opts.EnableDeclarations) {
+    Dict.setCustomBuffer(KeyDeclarations, Declarations.createBuffer());
+  }
 
   return RespBuilder.createResponse();
 }
@@ -3741,6 +3830,13 @@ void SKEditorConsumer::handleSemanticAnnotation(unsigned Offset,
                                                 bool isSystem) {
   assert(Kind.isValid());
   SemanticAnnotations.add(Kind, Offset, Length, isSystem);
+}
+
+void SKEditorConsumer::handleDeclaration(unsigned Offset, unsigned Length,
+                                         UIdent Kind, StringRef USR) {
+  assert(Kind.isValid());
+  if(this->Opts.EnableDeclarations)
+      Declarations.add(Kind, Offset, Length, USR);
 }
 
 void
@@ -4321,4 +4417,20 @@ static void enableCompileNotifications(bool value) {
   } else {
     trace::unregisterConsumer(&compileConsumer);
   }
+}
+
+void sourcekitd::pluginRegisterRequestHandler(
+    sourcekitd_cancellable_request_handler_t handler) {
+  getGlobalContext().getPlugins()->addRequestHandler(handler);
+}
+
+void sourcekitd::pluginRegisterCancellationHandler(
+    sourcekitd_cancellation_handler_t handler) {
+  getGlobalContext().getPlugins()->addCancellationHandler(handler);
+}
+
+void *sourcekitd::pluginGetOpaqueSwiftIDEInspectionInstance() {
+  return getGlobalContext()
+      .getSwiftLangSupport()
+      .getOpaqueSwiftIDEInspectionInstance();
 }

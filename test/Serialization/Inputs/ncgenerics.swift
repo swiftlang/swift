@@ -19,13 +19,12 @@ public func advance<T: Generator>(by n: Int, _ t: inout T) {
     }
 }
 
-#if $NoncopyableGenerics
 public enum Maybe<Wrapped: ~Copyable>: ~Copyable {
     case just(Wrapped)
     case none
 }
 
-extension Maybe: Copyable {}
+extension Maybe: Copyable where Wrapped: Copyable {}
 
 public func ncIdentity<T: ~Copyable>(_ t: consuming T) -> T { return t }
 
@@ -33,5 +32,3 @@ public protocol Either<Left, Right>: ~Copyable {
     associatedtype Left: ~Copyable
     associatedtype Right: ~Copyable
 }
-#endif
-

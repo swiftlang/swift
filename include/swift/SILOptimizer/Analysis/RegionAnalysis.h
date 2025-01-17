@@ -24,33 +24,21 @@
 namespace swift {
 
 class RegionAnalysisFunctionInfo;
+class RegionAnalysisValueMap;
 
 namespace regionanalysisimpl {
 
-using TransferringOperandSetFactory = Partition::TransferringOperandSetFactory;
+/// Global bool set only when asserts are enabled to ease debugging by causing
+/// unknown pattern errors to cause an assert so we drop into the debugger.
+extern bool AbortOnUnknownPatternMatchError;
+
+static inline bool shouldAbortOnUnknownPatternMatchError() {
+  return AbortOnUnknownPatternMatchError;
+}
+
+using SendingOperandSetFactory = Partition::SendingOperandSetFactory;
 using Element = PartitionPrimitives::Element;
 using Region = PartitionPrimitives::Region;
-
-/// Check if the passed in type is NonSendable.
-///
-/// NOTE: We special case RawPointer and NativeObject to ensure they are
-/// treated as non-Sendable and strict checking is applied to it.
-inline bool isNonSendableType(SILType type, SILFunction *fn) {
-  // Treat Builtin.NativeObject and Builtin.RawPointer as non-Sendable.
-  if (type.getASTType()->is<BuiltinNativeObjectType>() ||
-      type.getASTType()->is<BuiltinRawPointerType>()) {
-    return true;
-  }
-
-  // Treat Builtin.SILToken as Sendable. It cannot escape from the current
-  // function. We should change isSendable to hardwire this.
-  if (type.getASTType()->is<SILTokenType>()) {
-    return false;
-  }
-
-  // Otherwise, delegate to seeing if type conforms to the Sendable protocol.
-  return !type.isSendable(fn);
-}
 
 /// Return the ApplyIsolationCrossing for a specific \p inst if it
 /// exists. Returns std::nullopt otherwise.
@@ -86,15 +74,15 @@ class BlockPartitionState {
   /// block.
   std::vector<PartitionOp> blockPartitionOps = {};
 
-  TransferringOperandSetFactory &ptrSetFactory;
+  SendingOperandSetFactory &ptrSetFactory;
 
-  TransferringOperandToStateMap &transferringOpToStateMap;
+  SendingOperandToStateMap &sendingOpToStateMap;
 
   BlockPartitionState(SILBasicBlock *basicBlock,
                       PartitionOpTranslator &translator,
-                      TransferringOperandSetFactory &ptrSetFactory,
+                      SendingOperandSetFactory &ptrSetFactory,
                       IsolationHistory::Factory &isolationHistoryFactory,
-                      TransferringOperandToStateMap &transferringOpToStateMap);
+                      SendingOperandToStateMap &sendingOpToStateMap);
 
 public:
   bool getLiveness() const { return isLive; }
@@ -120,7 +108,6 @@ private:
 
 class TrackableValue;
 class TrackableValueState;
-class RepresentativeValue;
 
 enum class TrackableValueFlag {
   /// Base value that says a value is uniquely represented and is
@@ -142,9 +129,11 @@ using TrackedValueFlagSet = OptionSet<TrackableValueFlag>;
 } // namespace regionanalysisimpl
 
 class regionanalysisimpl::TrackableValueState {
+  friend RegionAnalysisValueMap;
+
   unsigned id;
   TrackedValueFlagSet flagSet = {TrackableValueFlag::isMayAlias};
-  SILIsolationInfo regionInfo = SILIsolationInfo::getDisconnected();
+  std::optional<SILIsolationInfo> regionInfo = {};
 
 public:
   TrackableValueState(unsigned newID) : id(newID) {}
@@ -161,19 +150,27 @@ public:
 
   bool isNonSendable() const { return !isSendable(); }
 
+  SILIsolationInfo getIsolationRegionInfo() const {
+    if (!regionInfo) {
+      return SILIsolationInfo::getDisconnected(false);
+    }
+
+    return *regionInfo;
+  }
+
   SILIsolationInfo::Kind getIsolationRegionInfoKind() const {
-    return regionInfo.getKind();
+    return getIsolationRegionInfo().getKind();
   }
 
   ActorIsolation getActorIsolation() const {
-    return regionInfo.getActorIsolation();
+    return getIsolationRegionInfo().getActorIsolation();
   }
 
-  void mergeIsolationRegionInfo(SILIsolationInfo newRegionInfo) {
-    regionInfo = regionInfo.merge(newRegionInfo);
+  void setDisconnectedNonisolatedUnsafe() {
+    auto oldRegionInfo = getIsolationRegionInfo();
+    assert(oldRegionInfo.isDisconnected());
+    regionInfo = oldRegionInfo.withUnsafeNonIsolated();
   }
-
-  SILIsolationInfo getIsolationRegionInfo() const { return regionInfo; }
 
   Element getID() const { return Element(id); }
 
@@ -186,58 +183,22 @@ public:
        << "][is_no_alias: " << (isNoAlias() ? "yes" : "no")
        << "][is_sendable: " << (isSendable() ? "yes" : "no")
        << "][region_value_kind: ";
-    getIsolationRegionInfo().printForDiagnostics(os);
+    getIsolationRegionInfo().printForOneLineLogging(os);
     os << "].";
-  }
-
-  SWIFT_DEBUG_DUMP { print(llvm::dbgs()); }
-};
-
-/// The representative value of the equivalence class that makes up a tracked
-/// value.
-///
-/// We use a wrapper struct here so that we can inject "fake" actor isolated
-/// values into the regions of values that become merged into an actor by
-/// calling a function without a non-sendable result.
-class regionanalysisimpl::RepresentativeValue {
-  friend llvm::DenseMapInfo<RepresentativeValue>;
-
-  using InnerType = PointerUnion<SILValue, SILInstruction *>;
-
-  /// If this is set to a SILValue then it is the actual represented value. If
-  /// it is set to a SILInstruction, then this is a "fake" representative value
-  /// used to inject actor isolatedness. The instruction stored is the
-  /// instruction that introduced the actor isolated-ness.
-  InnerType value;
-
-public:
-  RepresentativeValue() : value() {}
-  RepresentativeValue(SILValue value) : value(value) {}
-  RepresentativeValue(SILInstruction *actorRegionInst)
-      : value(actorRegionInst) {}
-
-  operator bool() const { return bool(value); }
-
-  void print(llvm::raw_ostream &os) const {
-    if (auto *inst = value.dyn_cast<SILInstruction *>()) {
-      os << "ActorRegionIntroducingInst: " << *inst;
-      return;
-    }
-
-    os << *value.get<SILValue>();
-  }
-
-  SILValue getValue() const { return value.get<SILValue>(); }
-  SILValue maybeGetValue() const { return value.dyn_cast<SILValue>(); }
-  bool hasRegionIntroducingInst() const { return value.is<SILInstruction *>(); }
-  SILInstruction *getActorRegionIntroducingInst() const {
-    return value.get<SILInstruction *>();
   }
 
   SWIFT_DEBUG_DUMP { print(llvm::dbgs()); }
 
 private:
-  RepresentativeValue(InnerType value) : value(value) {}
+  bool hasIsolationRegionInfo() const { return bool(regionInfo); }
+
+  /// Set the isolation region info for this TrackableValueState. Private so it
+  /// can only be used by RegionAnalysisValueMap::getTrackableValue.
+  void setIsolationRegionInfo(SILIsolationInfo newRegionInfo) {
+    assert(!regionInfo.has_value() &&
+           "Can only call setIsolationRegionInfo once!\n");
+    regionInfo = newRegionInfo;
+  }
 };
 
 /// A tuple consisting of a base value and its value state.
@@ -283,9 +244,9 @@ public:
 
   TrackableValueState getValueState() const { return valueState; }
 
-  /// Returns true if this TrackableValue is an alloc_stack from a transferring
+  /// Returns true if this TrackableValue is an alloc_stack from a sending
   /// parameter.
-  bool isTransferringParameter() const;
+  bool isSendingParameter() const;
 
   void printIsolationInfo(SmallString<64> &outString) const {
     llvm::raw_svector_ostream os(outString);
@@ -305,7 +266,10 @@ public:
     os << "\n    Rep Value: " << getRepresentative();
   }
 
-  SWIFT_DEBUG_DUMP { print(llvm::dbgs()); }
+  SWIFT_DEBUG_DUMP {
+    print(llvm::dbgs());
+    llvm::dbgs() << '\n';
+  }
 };
 
 class RegionAnalysis;
@@ -318,7 +282,6 @@ public:
   using Region = PartitionPrimitives::Region;
   using TrackableValue = regionanalysisimpl::TrackableValue;
   using TrackableValueState = regionanalysisimpl::TrackableValueState;
-  using RepresentativeValue = regionanalysisimpl::RepresentativeValue;
 
 private:
   /// A map from the representative of an equivalence class of values to their
@@ -332,12 +295,51 @@ private:
   /// into this map
   llvm::DenseMap<RepresentativeValue, TrackableValueState>
       equivalenceClassValuesToState;
+
+  /// The inverse map of equivalenceClassValuesToState.
   llvm::DenseMap<unsigned, RepresentativeValue> stateIndexToEquivalenceClass;
+
+  /// State that the value -> representative computation yields to us.
+  struct UnderlyingTrackedValueInfo {
+    SILValue value;
+
+    /// Only used for addresses.
+    std::optional<ActorIsolation> actorIsolation;
+
+    explicit UnderlyingTrackedValueInfo(SILValue value) : value(value) {}
+
+    UnderlyingTrackedValueInfo() : value(), actorIsolation() {}
+
+    UnderlyingTrackedValueInfo(const UnderlyingTrackedValueInfo &newVal)
+        : value(newVal.value), actorIsolation(newVal.actorIsolation) {}
+
+    UnderlyingTrackedValueInfo &
+    operator=(const UnderlyingTrackedValueInfo &newVal) {
+      value = newVal.value;
+      actorIsolation = newVal.actorIsolation;
+      return *this;
+    }
+
+    UnderlyingTrackedValueInfo(SILValue value,
+                               std::optional<ActorIsolation> actorIsolation)
+        : value(value), actorIsolation(actorIsolation) {}
+
+    operator bool() const { return value; }
+  };
+
+  /// A map from a SILValue to its equivalence class representative.
+  llvm::DenseMap<SILValue, UnderlyingTrackedValueInfo> valueToEquivalenceClass;
 
   SILFunction *fn;
 
 public:
   RegionAnalysisValueMap(SILFunction *fn) : fn(fn) { }
+
+  /// Maps a value to its representative value if one exists. Return an empty
+  /// representative value if we do not find one.
+  SILValue getRepresentative(SILValue value) const {
+    return getUnderlyingTrackedValue(value).value;
+  }
 
   /// Returns the value for this instruction if it isn't a fake "represenative
   /// value" to inject actor isolatedness. Asserts in such a case.
@@ -346,6 +348,10 @@ public:
   /// Returns the value for this instruction. If it is a fake "representative
   /// value" returns an empty SILValue.
   SILValue maybeGetRepresentative(Element trackableValueID) const;
+
+  /// Returns the value for this instruction if it isn't a fake "represenative
+  /// value" to inject actor isolatedness. Asserts in such a case.
+  RepresentativeValue getRepresentativeValue(Element trackableValueID) const;
 
   /// Returns the fake "representative value" for this element if it
   /// exists. Returns nullptr otherwise.
@@ -376,16 +382,47 @@ private:
   TrackableValue
   getActorIntroducingRepresentative(SILInstruction *introducingInst,
                                     SILIsolationInfo isolation) const;
-  bool mergeIsolationRegionInfo(SILValue value, SILIsolationInfo isolation);
   bool valueHasID(SILValue value, bool dumpIfHasNoID = false);
   Element lookupValueID(SILValue value);
+
+  /// Initialize a TrackableValue with a SILIsolationInfo that we already know
+  /// instead of inferring.
+  ///
+  /// If we successfully initialize \p value with \p info, returns
+  /// {TrackableValue(), true}. If we already had a TrackableValue, we return
+  /// {TrackableValue(), false}.
+  std::pair<TrackableValue, bool>
+  initializeTrackableValue(SILValue value, SILIsolationInfo info) const;
+
+  /// A helper function that performs the actual getUnderlyingTrackedValue
+  /// computation that is cached in getUnderlyingTrackedValue(). Please never
+  /// call this directly! Only call it from getUnderlyingTrackedValue.
+  UnderlyingTrackedValueInfo
+  getUnderlyingTrackedValueHelper(SILValue value) const;
+
+  UnderlyingTrackedValueInfo getUnderlyingTrackedValue(SILValue value) const {
+    // Use try_emplace so we only construct underlying tracked value info on
+    // success and only lookup once in the hash table.
+    auto *self = const_cast<RegionAnalysisValueMap *>(this);
+    auto iter = self->valueToEquivalenceClass.try_emplace(
+        value, UnderlyingTrackedValueInfo());
+
+    // Didn't insert... we have a value!
+    if (!iter.second)
+      return iter.first->getSecond();
+
+    // Otherwise, update with the actual tracked value info.
+    iter.first->getSecond() = getUnderlyingTrackedValueHelper(value);
+
+    // And return the value.
+    return iter.first->getSecond();
+  }
 };
 
 class RegionAnalysisFunctionInfo {
   using BlockPartitionState = regionanalysisimpl::BlockPartitionState;
   using PartitionOpTranslator = regionanalysisimpl::PartitionOpTranslator;
-  using TransferringOperandSetFactory =
-      regionanalysisimpl::TransferringOperandSetFactory;
+  using SendingOperandSetFactory = regionanalysisimpl::SendingOperandSetFactory;
   using BasicBlockData = BasicBlockData<BlockPartitionState>;
 
   llvm::BumpPtrAllocator allocator;
@@ -398,11 +435,11 @@ class RegionAnalysisFunctionInfo {
   // allocator when we allocate everything.
   PartitionOpTranslator *translator;
 
-  TransferringOperandSetFactory ptrSetFactory;
+  SendingOperandSetFactory ptrSetFactory;
 
   IsolationHistory::Factory isolationHistoryFactory;
 
-  TransferringOperandToStateMap transferringOpToStateMap;
+  SendingOperandToStateMap sendingOperandToStateMap;
 
   // We make this optional to prevent an issue that we have seen on windows when
   // capturing a field in a closure that is used to initialize a different
@@ -489,7 +526,7 @@ public:
   reverse_range getReverseRange() { return {rbegin(), rend()}; }
   const_reverse_range getReverseRange() const { return {rbegin(), rend()}; }
 
-  TransferringOperandSetFactory &getOperandSetFactory() {
+  SendingOperandSetFactory &getOperandSetFactory() {
     assert(supportedFunction && "Unsupported Function?!");
     return ptrSetFactory;
   }
@@ -504,14 +541,16 @@ public:
     return isolationHistoryFactory;
   }
 
-  TransferringOperandToStateMap &getTransferringOpToStateMap() {
+  SendingOperandToStateMap &getSendingOperandToStateMap() {
     assert(supportedFunction && "Unsupported Function?!");
-    return transferringOpToStateMap;
+    return sendingOperandToStateMap;
   }
 
   bool isClosureCaptured(SILValue value, Operand *op);
 
-  static SILValue getUnderlyingTrackedValue(SILValue value);
+  SILValue getUnderlyingTrackedValue(SILValue value) {
+    return getValueMap().getRepresentative(value);
+  }
 
 private:
   void runDataflow();
@@ -549,38 +588,5 @@ public:
 };
 
 } // namespace swift
-
-namespace llvm {
-
-inline llvm::raw_ostream &
-operator<<(llvm::raw_ostream &os,
-           const swift::regionanalysisimpl::RepresentativeValue &value) {
-  value.print(os);
-  return os;
-}
-
-template <>
-struct DenseMapInfo<swift::regionanalysisimpl::RepresentativeValue> {
-  using RepresentativeValue = swift::regionanalysisimpl::RepresentativeValue;
-  using InnerType = RepresentativeValue::InnerType;
-  using InnerDenseMapInfo = DenseMapInfo<InnerType>;
-
-  static RepresentativeValue getEmptyKey() {
-    return RepresentativeValue(InnerDenseMapInfo::getEmptyKey());
-  }
-  static RepresentativeValue getTombstoneKey() {
-    return RepresentativeValue(InnerDenseMapInfo::getTombstoneKey());
-  }
-
-  static unsigned getHashValue(RepresentativeValue value) {
-    return InnerDenseMapInfo::getHashValue(value.value);
-  }
-
-  static bool isEqual(RepresentativeValue LHS, RepresentativeValue RHS) {
-    return InnerDenseMapInfo::isEqual(LHS.value, RHS.value);
-  }
-};
-
-} // namespace llvm
 
 #endif

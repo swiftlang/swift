@@ -14,6 +14,7 @@
 
 #include "swift/AST/DiagnosticsSIL.h"
 #include "swift/AST/SemanticAttrs.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/BlotMapVector.h"
 #include "swift/Basic/GraphNodeWorklist.h"
 #include "swift/SIL/ApplySite.h"
@@ -708,6 +709,11 @@ static bool rewriteAllocBoxAsAllocStack(AllocBoxInst *ABI) {
       // instruction we found that isn't an explicit dealloc_box.
       Builder.emitDestroyAddrAndFold(Loc, valueToDestroy);
     }
+    auto *dbi = dyn_cast<DeallocBoxInst>(LastRelease);
+    if (dbi && dbi->isDeadEnd()) {
+      // Don't bother to create dealloc_stack instructions in dead-ends.
+      continue;
+    }
     Builder.createDeallocStack(Loc, ASI);
   }
 
@@ -761,7 +767,7 @@ class PromotedParamCloner : public SILClonerWithScopes<PromotedParamCloner> {
 
 public:
   PromotedParamCloner(SILOptFunctionBuilder &FuncBuilder, SILFunction *Orig,
-                      IsSerialized_t Serialized,
+                      SerializedKind_t Serialized,
                       ArgIndexList &PromotedArgIndices, StringRef ClonedName);
 
   void populateCloned();
@@ -770,7 +776,7 @@ public:
 
 private:
   static SILFunction *initCloned(SILOptFunctionBuilder &FuncBuilder,
-                                 SILFunction *Orig, IsSerialized_t Serialized,
+                                 SILFunction *Orig, SerializedKind_t Serialized,
                                  ArgIndexList &PromotedArgIndices,
                                  StringRef ClonedName);
 
@@ -789,7 +795,7 @@ private:
 
 PromotedParamCloner::PromotedParamCloner(SILOptFunctionBuilder &FuncBuilder,
                                          SILFunction *Orig,
-                                         IsSerialized_t Serialized,
+                                         SerializedKind_t Serialized,
                                          ArgIndexList &PromotedArgIndices,
                                          StringRef ClonedName)
     : SILClonerWithScopes<PromotedParamCloner>(*initCloned(
@@ -800,10 +806,10 @@ PromotedParamCloner::PromotedParamCloner(SILOptFunctionBuilder &FuncBuilder,
          getCloned()->getDebugScope()->getParentFunction());
 }
 
-static std::string getClonedName(SILFunction *F, IsSerialized_t Serialized,
+static std::string getClonedName(SILFunction *F, SerializedKind_t Serialized,
                                  ArgIndexList &PromotedArgIndices) {
   auto P = Demangle::SpecializationPass::AllocBoxToStack;
-  Mangle::FunctionSignatureSpecializationMangler Mangler(P, Serialized, F);
+  Mangle::FunctionSignatureSpecializationMangler Mangler(F->getASTContext(), P, Serialized, F);
   for (unsigned i : PromotedArgIndices) {
     Mangler.setArgumentBoxToStack(i);
   }
@@ -815,7 +821,7 @@ static std::string getClonedName(SILFunction *F, IsSerialized_t Serialized,
 /// parameters (which are specified by PromotedArgIndices).
 SILFunction *PromotedParamCloner::initCloned(SILOptFunctionBuilder &FuncBuilder,
                                              SILFunction *Orig,
-                                             IsSerialized_t Serialized,
+                                             SerializedKind_t Serialized,
                                              ArgIndexList &PromotedArgIndices,
                                              StringRef ClonedName) {
   SILModule &M = Orig->getModule();
@@ -1041,22 +1047,19 @@ specializeApplySite(SILOptFunctionBuilder &FuncBuilder, ApplySite Apply,
   auto *F = FRI->getReferencedFunction();
   assert(F && "Expected a referenced function!");
 
-  IsSerialized_t Serialized = IsNotSerialized;
-  if (Apply.getFunction()->isSerialized())
-    Serialized = IsSerialized;
-
+  SerializedKind_t serializedKind = Apply.getFunction()->getSerializedKind();
   std::string ClonedName =
-    getClonedName(F, Serialized, PromotedCalleeArgIndices);
+    getClonedName(F, serializedKind, PromotedCalleeArgIndices);
 
   auto &M = Apply.getModule();
 
   SILFunction *ClonedFn;
   if (auto *PrevFn = M.lookUpFunction(ClonedName)) {
-    assert(PrevFn->isSerialized() == Serialized);
+    assert(PrevFn->getSerializedKind() == serializedKind);
     ClonedFn = PrevFn;
   } else {
     // Clone the function the existing ApplySite references.
-    PromotedParamCloner Cloner(FuncBuilder, F, Serialized,
+    PromotedParamCloner Cloner(FuncBuilder, F, serializedKind,
                                PromotedCalleeArgIndices,
                                ClonedName);
     Cloner.populateCloned();

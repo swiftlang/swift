@@ -175,8 +175,8 @@ public:
     if (F->getExtFlags().isIsolatedAny()) {
       printField("isolated", "any");
     }
-    if (F->getExtFlags().hasTransferringResult()) {
-      printField("", "transferring-result");
+    if (F->getExtFlags().hasSendingResult()) {
+      printField("", "sending-result");
     }
 
     stream << "\n";
@@ -213,8 +213,8 @@ public:
       if (flags.isVariadic())
         printHeader("variadic");
 
-      if (flags.isTransferring())
-        printHeader("transferring");
+      if (flags.isSending())
+        printHeader("sending");
 
       printRec(param.getType());
 
@@ -395,6 +395,19 @@ public:
     printHeader("opaque");
     stream << ")";
   }
+
+  void visitIntegerTypeRef(const IntegerTypeRef *I) {
+    printHeader("integer");
+    printField("value", std::to_string(I->getValue()));
+    stream << ")";
+  }
+
+  void visitBuiltinFixedArrayTypeRef(const BuiltinFixedArrayTypeRef *BA) {
+    printHeader("builtin_fixed_array");
+    printRec(BA->getSizeType());
+    printRec(BA->getElementType());
+    stream << ")";
+  }
 };
 
 struct TypeRefIsConcrete
@@ -505,6 +518,14 @@ struct TypeRefIsConcrete
 
   bool visitSILBoxTypeWithLayoutTypeRef(const SILBoxTypeWithLayoutTypeRef *SB) {
     return true;
+  }
+
+  bool visitIntegerTypeRef(const IntegerTypeRef *I) {
+    return true;
+  }
+
+  bool visitBuiltinFixedArrayTypeRef(const BuiltinFixedArrayTypeRef *BA) {
+    return visit(BA->getElementType());
   }
 };
 
@@ -698,8 +719,8 @@ public:
       if (flags.isIsolated()) {
         wrapInput(Node::Kind::Isolated);
       }
-      if (flags.isTransferring()) {
-        wrapInput(Node::Kind::Transferring);
+      if (flags.isSending()) {
+        wrapInput(Node::Kind::Sending);
       }
 
       inputs.push_back({input, flags.isVariadic()});
@@ -766,6 +787,15 @@ public:
 
     auto funcNode = Dem.createNode(kind);
 
+    // This needs to use the same order as the demangler.
+
+    // TODO: the C function type would go here
+
+    if (F->getExtFlags().hasSendingResult()) {
+      auto node = Dem.createNode(Node::Kind::SendingResultFunctionType);
+      funcNode->addChild(node, Dem);
+    }
+
     if (auto globalActor = F->getGlobalActor()) {
       auto node = Dem.createNode(Node::Kind::GlobalActorFunctionType);
       auto globalActorNode = visit(globalActor);
@@ -773,9 +803,6 @@ public:
       funcNode->addChild(node, Dem);
     } else if (F->getExtFlags().isIsolatedAny()) {
       auto node = Dem.createNode(Node::Kind::IsolatedAnyFunctionType);
-      funcNode->addChild(node, Dem);
-    } else if (F->getExtFlags().hasTransferringResult()) {
-      auto node = Dem.createNode(Node::Kind::TransferringResultFunctionType);
       funcNode->addChild(node, Dem);
     }
 
@@ -895,7 +922,7 @@ public:
       node->addChild(MemberId, Dem);
     } else {
       // Otherwise, build up a DependentAssociatedTR node with
-      // the member Identifer and protocol
+      // the member Identifier and protocol
       auto AssocTy = Dem.createNode(Node::Kind::DependentAssociatedTypeRef);
       AssocTy->addChild(MemberId, Dem);
       auto Proto = Dem.demangleType(MangledProtocol);
@@ -1049,6 +1076,27 @@ public:
     
     return node;
   }
+
+  Demangle::NodePointer createInteger(intptr_t value) {
+    if (value >= 0) {
+      return Dem.createNode(Node::Kind::Integer, value);
+    } else {
+      return Dem.createNode(Node::Kind::NegativeInteger, value);
+    }
+  }
+
+  Demangle::NodePointer visitIntegerTypeRef(const IntegerTypeRef *I) {
+    return createInteger(I->getValue());
+  }
+
+  Demangle::NodePointer visitBuiltinFixedArrayTypeRef(const BuiltinFixedArrayTypeRef *BA) {
+    auto ba = Dem.createNode(Node::Kind::BuiltinFixedArray);
+
+    ba->addChild(visit(BA->getSizeType()), Dem);
+    ba->addChild(visit(BA->getElementType()), Dem);
+
+    return ba;
+  }
 };
 
 Demangle::NodePointer TypeRef::getDemangling(Demangle::Demangler &Dem) const {
@@ -1067,7 +1115,7 @@ std::optional<std::string> TypeRef::mangle(Demangle::Demangler &Dem) const {
   auto global = Dem.createNode(Node::Kind::Global);
   global->addChild(node, Dem);
 
-  auto mangling = mangleNode(global);
+  auto mangling = mangleNode(global, Mangle::ManglingFlavor::Default);
   if (!mangling.isSuccess())
     return {};
   return mangling.result();
@@ -1087,7 +1135,7 @@ unsigned NominalTypeTrait::getDepth() const {
   if (auto P = Parent) {
     switch (P->getKind()) {
     case TypeRefKind::Nominal:
-      return 1 + cast<NominalTypeRef>(P)->getDepth();
+      return cast<NominalTypeRef>(P)->getDepth();
     case TypeRefKind::BoundGeneric:
       return 1 + cast<BoundGenericTypeRef>(P)->getDepth();
     default:
@@ -1277,6 +1325,14 @@ public:
     return O;
   }
 
+  const TypeRef *visitIntegerTypeRef(const IntegerTypeRef *I) {
+    return I;
+  }
+
+  const TypeRef *visitBuiltinFixedArrayTypeRef(const BuiltinFixedArrayTypeRef *BA) {
+    return BuiltinFixedArrayTypeRef::create(Builder, visit(BA->getSizeType()),
+                                            visit(BA->getElementType()));
+  }
 };
 
 static const TypeRef *
@@ -1530,6 +1586,15 @@ public:
     return OpaqueArchetypeTypeRef::create(Builder, O->getID(), O->getDescription(),
                                           O->getOrdinal(),
                                           newArgLists);
+  }
+
+  const TypeRef *visitIntegerTypeRef(const IntegerTypeRef *I) {
+    return I;
+  }
+
+  const TypeRef *visitBuiltinFixedArrayTypeRef(const BuiltinFixedArrayTypeRef *BA) {
+    return BuiltinFixedArrayTypeRef::create(Builder, visit(BA->getSizeType()),
+                                            visit(BA->getElementType()));
   }
 };
 

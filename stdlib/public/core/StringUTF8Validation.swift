@@ -51,11 +51,11 @@ internal func validateUTF8(_ buf: UnsafeBufferPointer<UInt8>) -> UTF8ValidationR
   var iter = buf.makeIterator()
   var lastValidIndex = buf.startIndex
 
-  @inline(__always) func guaranteeIn(_ f: (UInt8) -> Bool) throws {
+  @inline(__always) func guaranteeIn(_ f: (UInt8) -> Bool) throws(UTF8ValidationError) {
     guard let cu = iter.next() else { throw UTF8ValidationError() }
     guard f(cu) else { throw UTF8ValidationError() }
   }
-  @inline(__always) func guaranteeContinuation() throws {
+  @inline(__always) func guaranteeContinuation() throws(UTF8ValidationError) {
     try guaranteeIn(UTF8.isContinuation)
   }
 
@@ -104,6 +104,11 @@ internal func validateUTF8(_ buf: UnsafeBufferPointer<UInt8>) -> UTF8ValidationR
     _ = iter.next()
     while let cu = iter.next(), UTF8.isContinuation(cu) {
       endIndex += 1
+      // Unicode's Maximal subpart of an ill-formed subsequence will yield
+      // at most 3 bytes of error.
+      if buf.distance(from: buf.startIndex, to: endIndex) >= 3 {
+        break
+      }
     }
     let illegalRange = Range(buf.startIndex...endIndex)
     _internalInvariant(illegalRange.clamped(to: (buf.startIndex..<buf.endIndex)) == illegalRange,
@@ -118,7 +123,8 @@ internal func validateUTF8(_ buf: UnsafeBufferPointer<UInt8>) -> UTF8ValidationR
       if UTF8.isASCII(cu) { lastValidIndex &+= 1; continue }
       isASCII = false
       if _slowPath(!_isUTF8MultiByteLeading(cu)) {
-        throw UTF8ValidationError()
+        func fail() throws(UTF8ValidationError) { throw UTF8ValidationError() }
+        try fail()
       }
       switch cu {
       case 0xC2...0xDF:

@@ -2,7 +2,7 @@
 // RUN: %target-swift-frontend %s -typecheck -module-name CdeclFunctions -clang-header-expose-decls=all-public -emit-clang-header-path %t/cdecl.h
 // RUN: %FileCheck %s < %t/cdecl.h
 
-// RUN: %check-interop-cxx-header-in-clang(%t/cdecl.h)
+// RUN: %check-interop-cxx-header-in-clang(%t/cdecl.h -DSWIFT_CXX_INTEROP_HIDE_STL_OVERLAY)
 
 // CHECK-LABEL: namespace CdeclFunctions SWIFT_PRIVATE_ATTR SWIFT_SYMBOL_MODULE("CdeclFunctions") {
 
@@ -14,5 +14,5 @@
 public func differentCDeclName(x: CInt, y: CInt) -> CInt { return x + y }
 
 // CHECK: SWIFT_INLINE_THUNK int differentCDeclName(int x, int y) noexcept SWIFT_SYMBOL("{{.*}}") SWIFT_WARN_UNUSED_RESULT {
-// CHECK: return _impl::cfuncPassTwo(x, y);
+// CHECK: return CdeclFunctions::_impl::cfuncPassTwo(x, y);
 // CHECK: }

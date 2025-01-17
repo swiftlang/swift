@@ -1,0 +1,32 @@
+// RUN: %target-sil-opt -sil-print-types %s -phi-expansion | %FileCheck %s
+
+sil_stage canonical
+
+import Swift
+
+struct Mystruct {
+  var i: Int
+  var j: Int
+}
+
+// CHECK-LABEL: sil @test_simple
+// CHECK:   br bb3(%{{[0-9]*}} : $Int)
+// CHECK: bb3(%[[PHI:[0-9]*]] : $Int):
+// CHECK:   debug_value %[[PHI]] : $Int, let, name "pos", type $Mystruct, expr op_fragment:#Mystruct.i
+// CHECK: } // end sil function 'test_simple'
+
+sil @test_simple : $@convention(thin) (Mystruct, Mystruct) -> Int {
+bb0(%0 : $Mystruct, %1 : $Mystruct):
+  cond_br undef, bb1, bb2
+
+bb1:
+  br bb3(%0 : $Mystruct)
+
+bb2:
+  br bb3(%1 : $Mystruct)
+
+bb3(%5 : $Mystruct):
+  debug_value %5 : $Mystruct, let, name "pos"
+  %6 = struct_extract %5 : $Mystruct, #Mystruct.i
+  return %6 : $Int
+}

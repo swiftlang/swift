@@ -16,6 +16,7 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Requirement.h"
 #include "swift/AST/Type.h"
+#include "swift/Basic/Assertions.h"
 
 namespace swift {
 
@@ -52,6 +53,18 @@ struct RequirementError {
     RecursiveRequirement,
     /// A not-yet-supported same-element requirement, e.g. each T == Int.
     UnsupportedSameElement,
+    /// An unexpected value type used in a value generic,
+    /// e.g. 'let N: String'.
+    InvalidValueGenericType,
+    /// A value generic type was used to conform to a protocol,
+    /// e.g. 'where N: P' where N == 'let N: Int' and P is some protocol.
+    InvalidValueGenericConformance,
+    /// A value generic type was used to same-type to an unrelated type,
+    /// e.g. 'where N == Int' where N == 'let N: Int'.
+    InvalidValueGenericSameType,
+    /// A value type, either an integer '123' or a value generic parameter 'N',
+    /// was used to same type a regular type parameter, e.g. 'T == 123'.
+    InvalidValueForTypeSameType,
   } kind;
 
 private:
@@ -84,14 +97,14 @@ private:
 
 public:
   Requirement getRequirement() const {
-    assert(kind != Kind::InvalidInverseOuterSubject &&
+    ASSERT(kind != Kind::InvalidInverseOuterSubject &&
            kind != Kind::InvalidInverseSubject &&
            kind != Kind::ConflictingInverseRequirement);
     return requirement;
   }
 
   InverseRequirement getInverse() const {
-    assert(kind == Kind::InvalidInverseOuterSubject ||
+    ASSERT(kind == Kind::InvalidInverseOuterSubject ||
            kind == Kind::InvalidInverseSubject ||
            kind == Kind::ConflictingInverseRequirement);
     return inverse;
@@ -147,6 +160,32 @@ public:
 
   static RequirementError forSameElement(Requirement req, SourceLoc loc) {
     return {Kind::UnsupportedSameElement, req, loc};
+  }
+
+  static RequirementError forInvalidValueGenericType(Type subjectType,
+                                                     Type constraint,
+                                                     SourceLoc loc) {
+    Requirement requirement(RequirementKind::Conformance, subjectType, constraint);
+    return {Kind::InvalidValueGenericType, requirement, loc};
+  }
+
+  static RequirementError forInvalidValueGenericConformance(Requirement req,
+                                                            SourceLoc loc) {
+    return {Kind::InvalidValueGenericConformance, req, loc};
+  }
+
+  static RequirementError forInvalidValueGenericSameType(Type subjectType,
+                                                         Type constraint,
+                                                         SourceLoc loc) {
+    Requirement requirement(RequirementKind::Conformance, subjectType, constraint);
+    return {Kind::InvalidValueGenericSameType, requirement, loc};
+  }
+
+  static RequirementError forInvalidValueForTypeSameType(Type subjectType,
+                                                         Type constraint,
+                                                         SourceLoc loc) {
+    Requirement requirement(RequirementKind::Conformance, subjectType, constraint);
+    return {Kind::InvalidValueForTypeSameType, requirement, loc};
   }
 };
 

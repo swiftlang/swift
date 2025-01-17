@@ -18,12 +18,13 @@
 #ifndef SWIFT_BACKTRACING_FIXED_LAYOUT_H
 #define SWIFT_BACKTRACING_FIXED_LAYOUT_H
 
+#include <stdint.h>
+
 #ifdef __cplusplus
 namespace swift {
-extern "C" {
+namespace runtime {
+namespace backtrace {
 #endif
-
-#include <stdint.h>
 
 struct x86_64_gprs {
   uint64_t _r[16];
@@ -52,8 +53,9 @@ struct arm_gprs {
   uint32_t valid;
 };
 
-#ifdef __cpluspus
-} // extern "C"
+#ifdef __cplusplus
+} // namespace backtrace
+} // namespace runtime
 } // namespace swift
 #endif
 

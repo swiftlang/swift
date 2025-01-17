@@ -1,7 +1,7 @@
-// RUN: %target-sil-opt -enable-sil-verify-all %s -onone-simplification -simplify-instruction=builtin | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-EARLY
-// RUN: %target-sil-opt -enable-sil-verify-all %s -late-onone-simplification -simplify-instruction=builtin | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-LATE
-// RUN: %target-sil-opt -enable-sil-verify-all %s -assert-conf-id=1 -onone-simplification -simplify-instruction=builtin | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-NOASSERTS
-// RUN: %target-sil-opt -enable-sil-verify-all %s -assert-conf-id=2 -onone-simplification -simplify-instruction=builtin | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-NOASSERTS
+// RUN: %target-sil-opt -sil-print-types -enable-sil-verify-all %s -onone-simplification -simplify-instruction=builtin | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-EARLY
+// RUN: %target-sil-opt -sil-print-types -enable-sil-verify-all %s -late-onone-simplification -simplify-instruction=builtin | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-LATE
+// RUN: %target-sil-opt -sil-print-types -enable-sil-verify-all %s -assert-conf-id=1 -onone-simplification -simplify-instruction=builtin | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-NOASSERTS1
+// RUN: %target-sil-opt -sil-print-types -enable-sil-verify-all %s -assert-conf-id=2 -onone-simplification -simplify-instruction=builtin | %FileCheck %s --check-prefix=CHECK --check-prefix=CHECK-NOASSERTS2
 
 // REQUIRES: swift_in_compiler
 
@@ -258,16 +258,30 @@ bb0:
   return %4 : $Builtin.Int1
 }
 
-// CHECK-LABEL: sil @different_function_metatype
+// CHECK-LABEL: sil @different_function_metatype1
 // CHECK:         [[R:%.*]] = integer_literal $Builtin.Int1, 0
 // CHECK-NEXT:    return [[R]]
-// CHECK:       } // end sil function 'different_function_metatype'
-sil @different_function_metatype : $@convention(thin) () -> Builtin.Int1 {
+// CHECK:       } // end sil function 'different_function_metatype1'
+sil @different_function_metatype1 : $@convention(thin) () -> Builtin.Int1 {
 bb0:
   %0 = metatype $@thick ((Int) -> Bool).Type
   %1 = metatype $@thick ((Float) -> Bool).Type
   %2 = init_existential_metatype %0 : $@thick ((Int) -> Bool).Type, $@thick Any.Type
   %3 = init_existential_metatype %1 : $@thick ((Float) -> Bool).Type, $@thick Any.Type
+  %4 = builtin "is_same_metatype"(%2 : $@thick Any.Type, %3 : $@thick Any.Type) : $Builtin.Int1
+  return %4 : $Builtin.Int1
+}
+
+// CHECK-LABEL: sil @different_function_metatype2
+// CHECK:         [[R:%.*]] = builtin "is_same_metatype"
+// CHECK:         return [[R]]
+// CHECK:       } // end sil function 'different_function_metatype2'
+sil @different_function_metatype2 : $@convention(thin) () -> Builtin.Int1 {
+bb0:
+  %0 = metatype $@thick ((Int, Int) -> ()).Type
+  %1 = metatype $@thick (((Int, Int)) -> ()).Type
+  %2 = init_existential_metatype %0 : $@thick ((Int, Int) -> ()).Type, $@thick Any.Type
+  %3 = init_existential_metatype %1 : $@thick (((Int, Int)) -> ()).Type, $@thick Any.Type
   %4 = builtin "is_same_metatype"(%2 : $@thick Any.Type, %3 : $@thick Any.Type) : $Builtin.Int1
   return %4 : $Builtin.Int1
 }
@@ -403,8 +417,9 @@ bb0:
 
 // CHECK-LABEL: sil @remove_assert_configuration
 // CHECK-NOT:     builtin "assert_configuration"
-// CHECK-EARLY:     [[L:%.*]] = integer_literal $Builtin.Int8, 1
-// CHECK-NOASSERTS: [[L:%.*]] = integer_literal $Builtin.Int8, 0
+// CHECK-EARLY:     [[L:%.*]] = integer_literal $Builtin.Int8, 0
+// CHECK-NOASSERTS1: [[L:%.*]] = integer_literal $Builtin.Int8, 1
+// CHECK-NOASSERTS2: [[L:%.*]] = integer_literal $Builtin.Int8, 2
 // CHECK:         [[R:%.*]] = struct $Int8 ([[L]] : $Builtin.Int8)
 // CHECK:         return [[R]]
 // CHECK:       } // end sil function 'remove_assert_configuration'
@@ -589,5 +604,65 @@ bb0(%0 : $Builtin.RawPointer, %1 : $Builtin.Word):
   %2 = metatype $@thick C1<Int>.Type
   %3 = builtin "destroyArray"<C1<Int>>(%2 : $@thick C1<Int>.Type, %0 : $Builtin.RawPointer, %1 : $Builtin.Word) : $()
   return %0 : $Builtin.RawPointer
+}
+
+// CHECK-LABEL: sil @remove_trivial_destroy_array
+// CHECK-NOT:     builtin
+// CHECK:       } // end sil function 'remove_trivial_destroy_array'
+sil @remove_trivial_destroy_array : $@convention(thin) (Builtin.RawPointer, Builtin.Word) -> Builtin.RawPointer {
+bb0(%0 : $Builtin.RawPointer, %1 : $Builtin.Word):
+  %2 = metatype $@thin Int.Type
+  %3 = builtin "destroyArray"<Int>(%2 : $@thin Int.Type, %0 : $Builtin.RawPointer, %1 : $Builtin.Word) : $()
+  return %0 : $Builtin.RawPointer
+}
+
+// CHECK-LABEL: sil @remove_trivial_destroy_metatype_array :
+// CHECK-NOT:     builtin
+// CHECK:       } // end sil function 'remove_trivial_destroy_metatype_array'
+sil @remove_trivial_destroy_metatype_array : $@convention(thin) (Builtin.RawPointer, Builtin.Word) -> Builtin.RawPointer {
+bb0(%0 : $Builtin.RawPointer, %1 : $Builtin.Word):
+  %2 = metatype $@thin Int.Type.Type
+  %3 = builtin "destroyArray"<Int.Type>(%2 : $@thin Int.Type.Type, %0 : $Builtin.RawPointer, %1 : $Builtin.Word) : $()
+  return %0 : $Builtin.RawPointer
+}
+
+// CHECK-LABEL: sil @sizeof_concrete_type :
+// CHECK:         %0 = integer_literal $Builtin.Word, 4
+// CHECK:         return %0
+// CHECK:       } // end sil function 'sizeof_concrete_type'
+sil @sizeof_concrete_type : $@convention(thin) () -> Builtin.Word {
+bb0:
+  %0 = builtin "sizeof"<Int32>() : $Builtin.Word
+  return %0
+}
+
+// CHECK-LABEL: sil @sizeof_generic_type :
+// CHECK:         %1 = builtin
+// CHECK:         return %1
+// CHECK:       } // end sil function 'sizeof_generic_type'
+sil @sizeof_generic_type : $@convention(thin) <T> (@thick T.Type) -> Builtin.Word {
+bb0(%0 : $@thick T.Type):
+  %1 = builtin "sizeof"<T>() : $Builtin.Word
+  return %1
+}
+
+// CHECK-LABEL: sil @sizeof_metatype :
+// CHECK:         %0 = integer_literal $Builtin.Word, {{(4|8)}}
+// CHECK:         return %0
+// CHECK:       } // end sil function 'sizeof_metatype'
+sil @sizeof_metatype : $@convention(thin) () -> Builtin.Word {
+bb0:
+  %0 = builtin "sizeof"<Bool.Type>() : $Builtin.Word
+  return %0
+}
+
+// CHECK-LABEL: sil @sizeof_function_type :
+// CHECK:         %0 = integer_literal $Builtin.Word, {{(8|16)}}
+// CHECK:         return %0
+// CHECK:       } // end sil function 'sizeof_function_type'
+sil @sizeof_function_type : $@convention(thin) () -> Builtin.Word {
+bb0:
+  %0 = builtin "sizeof"<()->()>() : $Builtin.Word
+  return %0
 }
 

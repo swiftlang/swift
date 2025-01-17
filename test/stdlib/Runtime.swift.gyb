@@ -6,6 +6,7 @@
 // RUN: %target-run %t.out
 // REQUIRES: executable_test
 // REQUIRES: reflection
+// REQUIRES: swift_feature_Extern
 
 import Swift
 import StdlibUnittest
@@ -17,6 +18,8 @@ import SwiftShims
   import Glibc
 #elseif os(WASI)
   import WASILibc
+#elseif canImport(Android)
+  import Android
 #elseif os(Windows)
   import CRT
   import WinSDK
@@ -745,6 +748,16 @@ AvailabilityVersionsTestSuite.test("_stdlib_isOSVersionAtLeast") {
                                           patch._builtinWordValue))
   }
 
+  // For calling the alternate entrypoint for macCatalyst versioning.
+#if os(iOS) && targetEnvironment(macCatalyst)
+  func isVariantAtLeastOS(_ major: Int, _ minor: Int, _ patch: Int) -> Bool {
+    return Bool(_builtinBooleanLiteral: _stdlib_isVariantOSVersionAtLeast(
+                                          major._builtinWordValue,
+                                          minor._builtinWordValue,
+                                          patch._builtinWordValue))
+  }
+#endif
+
 // _stdlib_isOSVersionAtLeast is broken for
 // watchOS. rdar://problem/20234735
 #if canImport(Darwin) && _runtime(_ObjC)
@@ -765,6 +778,11 @@ AvailabilityVersionsTestSuite.test("_stdlib_isOSVersionAtLeast") {
   let _swift_classIsSwiftMaskPtr = dlsym(RTLD_DEFAULT, "_swift_classIsSwiftMask")
   if _swift_classIsSwiftMaskPtr != nil {
     expectTrue(isAtLeastOS(9999, 0, 0))
+#if os(iOS) && targetEnvironment(macCatalyst)
+    // On macCatalyst we need to check the variant (iOS) version rather than
+    // the macOS version.
+    expectTrue(isVariantAtLeastOS(9999, 0, 0))
+#endif
   }
 #endif
 }

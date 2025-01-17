@@ -15,12 +15,14 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/AST/ASTContext.h"
+#include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/Requirement.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/GenericParamList.h"
 #include "swift/AST/GenericSignature.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/Types.h"
+#include "swift/Basic/Assertions.h"
 
 using namespace swift;
 
@@ -111,8 +113,11 @@ CheckRequirementResult Requirement::checkRequirement(
     }
 
     auto *proto = getProtocolDecl();
-    auto *module = proto->getParentModule();
-    auto conformance = module->lookupConformance(
+
+    if (firstType->isTypeParameter())
+      return CheckRequirementResult::RequirementFailure;
+
+    auto conformance = lookupConformance(
         firstType, proto, allowMissing);
     if (!conformance)
       return CheckRequirementResult::RequirementFailure;
@@ -203,6 +208,12 @@ bool Requirement::canBeSatisfied() const {
   }
 
   llvm_unreachable("Bad requirement kind");
+}
+
+bool Requirement::isInvertibleProtocolRequirement() const {
+  return getKind() == RequirementKind::Conformance
+      && getFirstType()->is<GenericTypeParamType>()
+      && getProtocolDecl()->getInvertibleProtocolKind();
 }
 
 /// Determine the canonical ordering of requirements.
@@ -320,12 +331,12 @@ swift::checkRequirementsWithoutContext(ArrayRef<Requirement> requirements) {
 }
 
 CheckRequirementsResult swift::checkRequirements(
-    ModuleDecl *module, ArrayRef<Requirement> requirements,
+    ArrayRef<Requirement> requirements,
     TypeSubstitutionFn substitutions, SubstOptions options) {
   SmallVector<Requirement, 4> substReqs;
   for (auto req : requirements) {
     substReqs.push_back(req.subst(substitutions,
-                              LookUpConformanceInModule(module), options));
+                                  LookUpConformanceInModule(), options));
   }
 
   return checkRequirements(substReqs);
@@ -350,6 +361,13 @@ void InverseRequirement::expandDefaults(
     ArrayRef<Type> gps,
     SmallVectorImpl<StructuralRequirement> &result) {
   for (auto gp : gps) {
+    // Value generics never have inverses (or the positive thereof).
+    if (auto gpTy = gp->getAs<GenericTypeParamType>()) {
+      if (gpTy->isValue()) {
+        continue;
+      }
+    }
+
     for (auto ip : InvertibleProtocolSet::allKnown()) {
       auto proto = ctx.getProtocol(getKnownProtocolKind(ip));
       result.push_back({{RequirementKind::Conformance, gp,

@@ -23,6 +23,7 @@
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/PropertyWrappers.h"
 #include "swift/AST/TypeCheckRequests.h"
+#include "swift/Basic/Assertions.h"
 using namespace swift;
 
 static bool isDeclNotAsAccessibleAsParent(ValueDecl *decl,
@@ -100,6 +101,7 @@ static VarDecl *findValueProperty(ASTContext &ctx, NominalTypeDecl *nominal,
 
   case ActorIsolation::GlobalActor:
   case ActorIsolation::Nonisolated:
+  case ActorIsolation::CallerIsolationInheriting:
   case ActorIsolation::NonisolatedUnsafe:
   case ActorIsolation::Unspecified:
     break;
@@ -107,7 +109,7 @@ static VarDecl *findValueProperty(ASTContext &ctx, NominalTypeDecl *nominal,
 
   // The property may not have any effects right now.
   if (auto getter = var->getEffectfulGetAccessor()) {
-    getter->diagnose(diag::property_wrapper_effectful);
+    getter->diagnose(diag::property_wrapper_effectful, getter->getDescriptiveKind());
     return nullptr;
   }
 
@@ -663,7 +665,6 @@ Type swift::computeWrappedValueType(const VarDecl *var, Type backingStorageType,
                                     
   // Follow the chain of wrapped value properties.
   Type wrappedValueType = backingStorageType;
-  DeclContext *dc = var->getDeclContext();
   while (realLimit--) {
     auto *nominal = wrappedValueType->getDesugaredType()->getAnyNominal();
     if (!nominal)
@@ -674,7 +675,6 @@ Type swift::computeWrappedValueType(const VarDecl *var, Type backingStorageType,
       return wrappedValueType;
 
     wrappedValueType = wrappedValueType->getTypeOfMember(
-        dc->getParentModule(),
         wrappedInfo.valueVar,
         wrappedInfo.valueVar->getValueInterfaceType());
     if (wrappedValueType->hasError())
@@ -691,10 +691,8 @@ Type swift::computeProjectedValueType(const VarDecl *var, Type backingStorageTyp
   if (var->hasImplicitPropertyWrapper())
     return backingStorageType;
 
-  DeclContext *dc = var->getDeclContext();
   auto wrapperInfo = var->getAttachedPropertyWrapperTypeInfo(0);
-  return backingStorageType->getTypeOfMember(dc->getParentModule(),
-                                             wrapperInfo.projectedValueVar);
+  return backingStorageType->getTypeOfMember(wrapperInfo.projectedValueVar);
 }
 
 Expr *swift::buildPropertyWrapperInitCall(

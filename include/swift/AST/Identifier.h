@@ -96,7 +96,7 @@ public:
   bool nonempty() const { return !empty(); }
 
   LLVM_ATTRIBUTE_USED bool is(StringRef string) const {
-    return str().equals(string);
+    return str() == string;
   }
   
   /// isOperator - Return true if this identifier is an operator, false if it is
@@ -116,6 +116,14 @@ public:
 
   bool isArithmeticOperator() const {
     return is("+") || is("-") || is("*") || is("/") || is("%");
+  }
+
+  bool isBitwiseOperator() const {
+    return is("~") || is("&") || is("|") || is("^");
+  }
+
+  bool isShiftOperator() const {
+    return is("<<") || is(">>");
   }
 
   // Returns whether this is a standard comparison operator,

@@ -1,4 +1,5 @@
 // REQUIRES: swift_swift_parser
+// REQUIRES: swift_feature_Macros
 
 // RUN: %empty-directory(%t)
 // RUN: %empty-directory(%t/plugins)
@@ -30,6 +31,26 @@
 // RUN:   2>&1 | tee %t/macro-expansions.txt
 
 // RUN: %FileCheck -strict-whitespace %s < %t/macro-expansions.txt
+
+/// Create file with matching name in alt directories and test
+/// `-load-resolved-plugin` takes the priority over other options.
+// RUN: %empty-directory(%t/alt)
+// RUN: touch %t/alt/%target-library-name(MacroDefinition)
+
+// RUN: env SWIFT_DUMP_PLUGIN_MESSAGING=1 %target-swift-frontend \
+// RUN:   -typecheck -verify \
+// RUN:   -swift-version 5 -enable-experimental-feature Macros \
+// RUN:   -external-plugin-path %t/alt#%swift-plugin-server \
+// RUN:   -load-resolved-plugin lib-do-not-exist.dylib##MacroDefinition \
+// RUN:   -load-resolved-plugin %t/plugins/%target-library-name(MacroDefinition)#%swift-plugin-server#MacroDefinition \
+// RUN:   -load-resolved-plugin %t/plugins/%target-library-name(EvilMacros)#%swift-plugin-server#EvilMacros \
+// RUN:   -external-plugin-path %t/alt#%swift-plugin-server \
+// RUN:   -Rmacro-loading -verify-ignore-unknown \
+// RUN:   -module-name MyApp \
+// RUN:   %s \
+// RUN:   2>&1 | tee %t/macro-expansions-2.txt
+
+// RUN: %FileCheck -strict-whitespace %s < %t/macro-expansions-2.txt
 
 // RUN: not %target-swift-frontend \
 // RUN:   -typecheck \
@@ -87,7 +108,7 @@ func testStringify(a: Int, b: Int) {
   let s3: String = #stringify(b + a).1
   print(s3)
 
-  // expected-error @+1 {{macro implementation type 'MacroDefinition.TypeDoesNotExist' could not be found in library plugin '}}
+  // expected-error @+1 {{type 'MacroDefinition.TypeDoesNotExist' could not be found in library plugin '}}
   _ = #missing()
 
   // expected-error @+1 {{type 'MacroDefinition.NotMacroStruct' is not a valid macro implementation type in library plugin '}}

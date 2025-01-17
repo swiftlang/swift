@@ -163,7 +163,7 @@ class ExplicitSwiftModuleLoader: public SerializedModuleLoaderBase {
       bool SkipBuildingInterface, bool IsFramework,
       bool IsTestableDependencyLookup = false) override;
 
-  bool canImportModule(ImportPath::Module named,
+  bool canImportModule(ImportPath::Module named, SourceLoc loc,
                        ModuleVersionInfo *versionInfo,
                        bool isTestableDependencyLookup = false) override;
 
@@ -212,7 +212,7 @@ class ExplicitCASModuleLoader : public SerializedModuleLoaderBase {
       bool SkipBuildingInterface, bool IsFramework,
       bool IsTestableDependencyLookup = false) override;
 
-  bool canImportModule(ImportPath::Module named,
+  bool canImportModule(ImportPath::Module named, SourceLoc loc,
                        ModuleVersionInfo *versionInfo,
                        bool isTestableDependencyLookup = false) override;
 
@@ -414,6 +414,7 @@ private:
     if (moduleName.empty())
       return true;
 
+    bool didInsert;
     if (swiftModulePath.has_value()) {
       assert((clangModuleMapPath.empty() &&
               clangModulePath.empty()) &&
@@ -425,7 +426,7 @@ private:
                                          isFramework,
                                          isSystem,
                                          swiftModuleCacheKey);
-      swiftModuleMap.try_emplace(moduleName, std::move(entry));
+      didInsert = swiftModuleMap.try_emplace(moduleName, std::move(entry)).second;
     } else {
       assert((!clangModuleMapPath.empty() ||
               !clangModulePath.empty()) &&
@@ -436,10 +437,10 @@ private:
                                          isSystem,
                                          isBridgingHeaderDependency,
                                          clangModuleCacheKey);
-      clangModuleMap.try_emplace(moduleName, std::move(entry));
+      didInsert = clangModuleMap.try_emplace(moduleName, std::move(entry)).second;
     }
-
-    return false;
+    // Prevent duplicate module names.
+    return !didInsert;
   }
 
   llvm::StringSaver Saver;
@@ -653,9 +654,11 @@ private:
                                      bool suppressRemarks,
                                      RequireOSSAModules_t requireOSSAModules);
   bool extractSwiftInterfaceVersionAndArgs(CompilerInvocation &subInvocation,
+                                           DiagnosticEngine &subInstanceDiags,
                                            SwiftInterfaceInfo &interfaceInfo,
                                            StringRef interfacePath,
                                            SourceLoc diagnosticLoc);
+
 public:
   InterfaceSubContextDelegateImpl(
       SourceManager &SM, DiagnosticEngine *Diags,
@@ -688,7 +691,7 @@ public:
                                   SourceLoc diagLoc,
     llvm::function_ref<std::error_code(ASTContext&, ModuleDecl*,
                                        ArrayRef<StringRef>, ArrayRef<StringRef>,
-                                       StringRef)> action) override;
+                                       StringRef, StringRef)> action) override;
   std::error_code runInSubCompilerInstance(StringRef moduleName,
                                            StringRef interfacePath,
                                            StringRef sdkPath,

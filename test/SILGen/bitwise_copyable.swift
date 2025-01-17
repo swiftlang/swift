@@ -1,10 +1,13 @@
-// RUN: %target-swift-frontend                                  \
-// RUN:     %s                                                  \
-// RUN:     -emit-silgen                                        \
-// RUN:     -disable-availability-checking                      \
-// RUN:     -enable-experimental-feature ConformanceSuppression \
-// RUN:     -enable-experimental-feature BitwiseCopyable        \
+// RUN: %target-swift-frontend                         \
+// RUN:     %s                                         \
+// RUN:     -emit-silgen                               \
+// RUN:     -target %target-swift-5.1-abi-triple       \
+// RUN:     -enable-experimental-feature Sensitive     \
+// RUN:     -enable-experimental-feature ValueGenerics \
 // RUN:     -enable-builtin-module
+
+// REQUIRES: swift_feature_Sensitive
+// REQUIRES: swift_feature_ValueGenerics
 
 // REQUIRES: asserts
 
@@ -12,7 +15,7 @@
 
 import Builtin
 
-struct S : _BitwiseCopyable {
+struct S : BitwiseCopyable {
   unowned(unsafe) let c: Builtin.AnyObject
 }
 
@@ -27,7 +30,7 @@ func doit() -> B<Int> {
 struct Conditional<T> {
   var t: T
 }
-extension Conditional : _BitwiseCopyable where T : _BitwiseCopyable {}
+extension Conditional : BitwiseCopyable where T : BitwiseCopyable {}
 
 func doit() -> B<Conditional<Int>> { 
   .init(t: .init(t: 0)) 
@@ -41,15 +44,15 @@ enum Context<T> {
 
 func doit() -> Context<Int>.Here { .init(t: 0) }
 
-public enum E : _BitwiseCopyable {
+public enum E : BitwiseCopyable {
   case a
 }
 
-func take<T : _BitwiseCopyable>(_ t: T) {}
+func take<T : BitwiseCopyable>(_ t: T) {}
 
 func pass(_ e: E) { take(e) }
 
-func opacify() -> some _BitwiseCopyable {
+func opacify() -> some BitwiseCopyable {
     return Int()
 }
 
@@ -58,7 +61,21 @@ struct NeverGoingToBeBitwiseCopyable {
 }
 
 @available(*, unavailable)
-extension NeverGoingToBeBitwiseCopyable : _BitwiseCopyable {
+extension NeverGoingToBeBitwiseCopyable : BitwiseCopyable {
 }
 
-struct AlsoNotBitwiseCopyable : ~_BitwiseCopyable {}
+struct AlsoNotBitwiseCopyable : ~BitwiseCopyable {}
+
+@sensitive
+struct S_Explicit_Sensitive {
+}
+
+func takeS_Explicit_Sensitive(_ s: S_Explicit_Sensitive) {
+}
+
+import Builtin
+
+func foo() {
+  let bricks: Builtin.FixedArray<1, Conditional<Int>>
+  let bricks2: Builtin.FixedArray<1, Conditional<String>>
+}

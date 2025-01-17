@@ -14,7 +14,6 @@
 //===----------------------------------------------------------------------===//
 
 import Swift
-@_implementationOnly import _SwiftConcurrencyShims
 
 @available(SwiftStdlib 5.1, *)
 extension Task where Success == Never, Failure == Never {
@@ -56,6 +55,20 @@ extension TaskPriority {
 @_alwaysEmitIntoClient
 @available(*, deprecated, renamed: "withTaskCancellationHandler(operation:onCancel:)")
 public func withTaskCancellationHandler<T>(
+  handler: @Sendable () -> Void,
+  operation: () async throws -> T
+) async rethrows -> T {
+  try await withTaskCancellationHandler(operation: operation, onCancel: handler)
+}
+
+// Note: hack to stage out @_unsafeInheritExecutor forms of various functions
+// in favor of #isolation. The _unsafeInheritExecutor_ prefix is meaningful
+// to the type checker.
+@available(SwiftStdlib 5.1, *)
+@_alwaysEmitIntoClient
+@_unsafeInheritExecutor
+@available(*, deprecated, renamed: "withTaskCancellationHandler(operation:onCancel:)")
+public func _unsafeInheritExecutor_withTaskCancellationHandler<T>(
   handler: @Sendable () -> Void,
   operation: () async throws -> T
 ) async rethrows -> T {

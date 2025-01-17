@@ -1,5 +1,17 @@
+module StdNumeric {
+  header "std-numeric.h"
+  requires cplusplus
+  export *
+}
+
 module StdVector {
   header "std-vector.h"
+  requires cplusplus
+  export *
+}
+
+module StdSpan {
+  header "std-span.h"
   requires cplusplus
   export *
 }
@@ -28,6 +40,18 @@ module StdString {
   export *
 }
 
+module StdStringAndVector {
+  header "std-string-and-vector.h"
+  requires cplusplus
+  export *
+}
+
+module StdStringView {
+  header "std-string-view.h"
+  requires cplusplus
+  export *
+}
+
 module StdPair {
   header "std-pair.h"
   requires cplusplus
@@ -48,6 +72,12 @@ module StdUniquePtr {
 
 module StdFunction {
   header "std-function.h"
+  requires cplusplus
+  export *
+}
+
+module NoCXXStdlib {
+  header "no-cxx-stdlib.h"
   requires cplusplus
   export *
 }

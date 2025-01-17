@@ -101,7 +101,7 @@ option(SWIFT_STDLIB_EMIT_API_DESCRIPTORS
 
 option(SWIFT_STDLIB_BUILD_ONLY_CORE_MODULES
        "Build only the core subset of the standard library,
-       ignoring additional libraries such as Concurrency, Distributed and StringProcessing.
+       ignoring additional libraries such as Distributed, Observation and Synchronization.
        This is an option meant for internal configurations inside Apple
        that need to build the standard libraries in chunks when constructing an SDK"
        FALSE)
@@ -208,6 +208,10 @@ option(SWIFT_STDLIB_HAS_ENVIRON
 
 option(SWIFT_STDLIB_SINGLE_THREADED_CONCURRENCY
        "Build the standard libraries assuming that they will be used in an environment with only a single thread."
+       FALSE)
+
+option(SWIFT_USE_OS_TRACE_LAZY_INIT
+       "Use the os_trace call to check if lazy init has been completed before making os_signpost calls."
        FALSE)
 
 # Use dispatch as the system scheduler by default.

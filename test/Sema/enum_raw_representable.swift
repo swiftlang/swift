@@ -71,7 +71,7 @@ var colorRaw: Color.RawValue = 7.5
 
 // Mismatched case types
 
-enum BadPlain : UInt { // expected-error {{'BadPlain' declares raw type 'UInt', but does not conform to RawRepresentable and conformance could not be synthesized}}
+enum BadPlain : UInt { // expected-error {{'BadPlain' declares raw type 'UInt', but does not conform to RawRepresentable and conformance could not be synthesized}} expected-note {{add stubs for conformance}}
     case a = "hello"   // expected-error {{cannot convert value of type 'String' to raw type 'UInt'}}
 }
 
@@ -87,6 +87,7 @@ class Outer {
   enum E : Array<Int> {
   // expected-error@-1 {{raw type 'Array<Int>' is not expressible by a string, integer, or floating-point literal}}
   // expected-error@-2 {{'Outer.E' declares raw type 'Array<Int>', but does not conform to RawRepresentable and conformance could not be synthesized}}
+  // expected-note@-3 {{add stubs for conformance}}
     case a
   }
 }
@@ -231,6 +232,7 @@ enum ArrayOfNewEquatable : Array<NotEquatable> { }
 // expected-error@-2{{'ArrayOfNewEquatable' declares raw type 'Array<NotEquatable>', but does not conform to RawRepresentable and conformance could not be synthesized}}
 // expected-error@-3{{RawRepresentable conformance cannot be synthesized because raw type 'Array<NotEquatable>' is not Equatable}}
 // expected-error@-4{{an enum with no cases cannot declare a raw type}}
+// expected-note@-5 {{add stubs for conformance}}
 
 // rdar://58127114
 struct NotEquatableInteger : ExpressibleByIntegerLiteral {
@@ -242,6 +244,7 @@ struct NotEquatableInteger : ExpressibleByIntegerLiteral {
 enum NotEquatableRawType1 : NotEquatableInteger {
 // expected-error@-1 {{'NotEquatableRawType1' declares raw type 'NotEquatableInteger', but does not conform to RawRepresentable and conformance could not be synthesized}}
 // expected-error@-2 {{RawRepresentable conformance cannot be synthesized because raw type 'NotEquatableInteger' is not Equatable}}
+// expected-note@-3 {{add stubs for conformance}}
   case a = 123
 }
 
@@ -249,6 +252,7 @@ enum NotEquatableRawType1 : NotEquatableInteger {
 enum NotEquatableRawType2 : NotEquatableInteger {
 // expected-error@-1 {{'NotEquatableRawType2' declares raw type 'NotEquatableInteger', but does not conform to RawRepresentable and conformance could not be synthesized}}
 // expected-error@-2 {{RawRepresentable conformance cannot be synthesized because raw type 'NotEquatableInteger' is not Equatable}}
+// expected-note@-3 {{add stubs for conformance}}
   typealias RawValue = NotEquatableInteger
 
   case a = 123
@@ -262,6 +266,7 @@ struct NotEquatableString : ExpressibleByStringLiteral {
 enum NotEquatableRawType3: NotEquatableString {
 // expected-error@-1 {{RawRepresentable conformance cannot be synthesized because raw type 'NotEquatableString' is not Equatable}}
 // expected-error@-2 {{'NotEquatableRawType3' declares raw type 'NotEquatableString', but does not conform to RawRepresentable and conformance could not be synthesized}}
+// expected-note@-3 {{add stubs for conformance}}
   case a
   typealias RawValue = NotEquatableString
   init?(rawValue: Int) { self = .a }
@@ -275,12 +280,14 @@ enum MismatchedRawValues {
     // expected-error@-1 {{raw type 'Any?' is not expressible}}
     // expected-error@-2 {{'MismatchedRawValues.ExistentialBound' declares raw type 'Any?'}}
     // expected-error@-3 {{RawRepresentable conformance cannot be synthesized }}
+    // expected-note@-4 {{add stubs for conformance}}
     case test = nil
   }
 
   public enum StringViaStaticString: StaticString {
     // expected-error@-1 {{'MismatchedRawValues.StringViaStaticString' declares raw type 'StaticString', but does not conform to RawRepresentable}}
     // expected-error@-2 {{RawRepresentable conformance cannot be synthesized because}}
+    // expected-note@-3 {{add stubs for conformance}}
     public typealias RawValue = String
 
     case TRUE = "TRUE"
@@ -289,6 +296,7 @@ enum MismatchedRawValues {
 
   public enum IntViaString: String {
     // expected-error@-1 {{'MismatchedRawValues.IntViaString' declares raw type 'String', but does not conform to RawRepresentable}}
+    // expected-note@-2 {{add stubs for conformance}}
     public typealias RawValue = Int
 
     case TRUE = "TRUE"
@@ -297,6 +305,7 @@ enum MismatchedRawValues {
 
   public enum ViaNested: String {
     // expected-error@-1 {{'MismatchedRawValues.ViaNested' declares raw type 'String', but does not conform to RawRepresentable}}
+    // expected-note@-2 {{add stubs for conformance}}
     struct RawValue: Equatable {
       let x: String
     }
@@ -306,7 +315,8 @@ enum MismatchedRawValues {
   }
 
   public enum ViaGenericBound<RawValue: Equatable>: String {
-    // expected-error@-1 {{'MismatchedRawValues.ViaGenericBound<RawValue>' declares raw type 'String'}}
+    // expected-error@-1 {{'MismatchedRawValues.ViaGenericBound<RawValue>' declares raw type 'String', but does not conform to RawRepresentable}}
+    // expected-note@-2 {{add stubs for conformance}}
     typealias RawValue = RawValue
     case TRUE = "TRUE"
     case FALSE = "FALSE"

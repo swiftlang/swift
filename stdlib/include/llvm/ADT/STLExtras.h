@@ -529,8 +529,8 @@ make_filter_range(RangeT &&Range, PredicateT Pred) {
 /// somewhere between them. The constraints of these iterators are:
 ///
 /// - On construction or after being incremented, it is comparable and
-///   dereferencable. It is *not* incrementable.
-/// - After being dereferenced, it is neither comparable nor dereferencable, it
+///   dereferenceable. It is *not* incrementable.
+/// - After being dereferenced, it is neither comparable nor dereferenceable, it
 ///   is only incrementable.
 ///
 /// This means you can only dereference the iterator once, and you can only

@@ -1,5 +1,5 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-build-swift -parse-as-library  -Xfrontend -disable-availability-checking -g %s -module-name main -o %t/main
+// RUN: %target-build-swift -parse-as-library  -target %target-swift-5.1-abi-triple -g %s -module-name main -o %t/main
 // RUN: %target-codesign %t/main
 // RUN: %target-run %t/main | %FileCheck %s
 

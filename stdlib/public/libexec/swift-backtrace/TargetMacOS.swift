@@ -25,8 +25,7 @@ import _Backtracing
 @_spi(Contexts) import _Backtracing
 @_spi(MemoryReaders) import _Backtracing
 
-@_implementationOnly import Runtime
-@_implementationOnly import OS.Darwin
+internal import BacktracingImpl.OS.Darwin
 
 #if arch(x86_64)
 typealias MContext = darwin_x86_64_mcontext
@@ -129,21 +128,28 @@ class Target {
     }
   }
 
-  static func isPlatformBinary(pid: pid_t) -> Bool {
+  static func isPrivileged(pid: pid_t) -> Bool {
     var flags = UInt32(0)
 
-    return csops(pid,
-                 UInt32(CS_OPS_STATUS),
-                 &flags,
-                 MemoryLayout<UInt32>.size) != 0 ||
-      (flags & UInt32(CS_PLATFORM_BINARY | CS_PLATFORM_PATH)) != 0
+    guard csops(pid,
+                UInt32(CS_OPS_STATUS),
+                &flags,
+                MemoryLayout<UInt32>.size) == 0 else {
+      return true
+    }
+
+    if (flags & UInt32(CS_PLATFORM_BINARY | CS_PLATFORM_PATH | CS_RUNTIME)) != 0 {
+      return true
+    }
+
+    return (flags & UInt32(CS_GET_TASK_ALLOW)) == 0
   }
 
   init(crashInfoAddr: UInt64, limit: Int?, top: Int, cache: Bool,
        symbolicate: SwiftBacktrace.Symbolication) {
     pid = getppid()
 
-    if Self.isPlatformBinary(pid: pid) {
+    if Self.isPrivileged(pid: pid) {
       /* Exit silently in this case; either
 
          1. We can't call csops(), because we're sandboxed, or
@@ -249,11 +255,12 @@ class Target {
 
       if info.thread_id == crashingThread {
         ctx = HostContext.fromHostMContext(mcontext)
-        crashingThreadNdx = Int(ndx)
+        crashingThreadNdx = threads.count
       } else {
         guard let threadCtx = HostContext.fromHostThread(ports[Int(ndx)]) else {
           // This can happen legitimately, e.g. when looking at a Rosetta 2
           // process, where there are ARM64 threads AS WELL AS the x86_64 ones.
+          mach_port_deallocate(mach_task_self_, ports[Int(ndx)])
           continue
         }
         ctx = threadCtx

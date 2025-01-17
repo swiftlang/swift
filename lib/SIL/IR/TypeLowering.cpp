@@ -16,20 +16,25 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/AnyFunctionRef.h"
 #include "swift/AST/CanTypeVisitor.h"
+#include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/DiagnosticsSIL.h"
 #include "swift/AST/Expr.h"
+#include "swift/AST/FileUnit.h"
 #include "swift/AST/GenericEnvironment.h"
-#include "swift/AST/LazyResolver.h"
+#include "swift/AST/LocalArchetypeRequirementCollector.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/Pattern.h"
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/PropertyWrappers.h"
+#include "swift/AST/SourceFile.h"
 #include "swift/AST/TypeDifferenceVisitor.h"
 #include "swift/AST/Types.h"
+#include "swift/Basic/Assertions.h"
+#include "swift/Basic/LLVMExtras.h"
 #include "swift/ClangImporter/ClangModule.h"
 #include "swift/SIL/AbstractionPatternGenerators.h"
 #include "swift/SIL/PrettyStackTrace.h"
@@ -39,6 +44,7 @@
 #include "swift/SIL/SILModule.h"
 #include "swift/SIL/Test.h"
 #include "clang/AST/Type.h"
+#include "clang/AST/Decl.h"
 #include "llvm/Support/Compiler.h"
 #include "llvm/Support/Debug.h"
 
@@ -116,6 +122,19 @@ static bool hasSingletonMetatype(CanType instanceType) {
 
 CaptureKind TypeConverter::getDeclCaptureKind(CapturedValue capture,
                                               TypeExpansionContext expansion) {
+  if (auto *expr = capture.getPackElement()) {
+    auto contextTy = expr->getType();
+    auto &lowering = getTypeLowering(
+        contextTy, TypeExpansionContext::noOpaqueTypeArchetypesSubstitution(
+                            expansion.getResilienceExpansion()));
+
+    assert(!contextTy->isNoncopyable() && "Not implemented");
+    if (!lowering.isAddressOnly())
+      return CaptureKind::Constant;
+
+    return CaptureKind::Immutable;
+  }
+
   auto decl = capture.getDecl();
   auto *var = cast<VarDecl>(decl);
   assert(var->hasStorage() &&
@@ -295,6 +314,12 @@ namespace {
     }
 
     RecursiveProperties
+    getTrivialOpaqueRecursiveProperties(IsTypeExpansionSensitive_t isSensitive) {
+      return mergeIsTypeExpansionSensitive(isSensitive,
+                                           RecursiveProperties::forTrivial());
+    }
+
+    RecursiveProperties
     getReferenceRecursiveProperties(IsTypeExpansionSensitive_t isSensitive) {
       return mergeIsTypeExpansionSensitive(isSensitive,
                                            RecursiveProperties::forReference());
@@ -335,8 +360,59 @@ namespace {
     IMPL(SILToken, Trivial)
     IMPL(AnyMetatype, Trivial)
     IMPL(Module, Trivial)
+    IMPL(Integer, Trivial)
 
 #undef IMPL
+
+    RetTy visitBuiltinUnboundGenericType(CanBuiltinUnboundGenericType type,
+                                         AbstractionPattern origType,
+                                         IsTypeExpansionSensitive_t isSensitive){
+      llvm_unreachable("not a real type");
+    }
+    
+    RecursiveProperties getBuiltinFixedArrayProperties(
+                                      CanBuiltinFixedArrayType type,
+                                      AbstractionPattern origType,
+                                      IsTypeExpansionSensitive_t isSensitive) {
+      RecursiveProperties props;
+      
+      // We get most of the type properties from the element type.
+      AbstractionPattern origElementType = AbstractionPattern::getOpaque();
+      if (auto bfaOrigTy = origType.getAs<BuiltinFixedArrayType>()) {
+        origElementType = AbstractionPattern(
+          origType.getGenericSignatureOrNull(),
+          bfaOrigTy->getElementType());
+      }
+      
+      props.addSubobject(classifyType(origElementType, type->getElementType(),
+                                      TC, Expansion));
+      
+      props = mergeIsTypeExpansionSensitive(isSensitive, props);
+      
+      // Fixed array regions are implied to be addressable-for-dependencies,
+      // since the developer probably wants to be able to form Spans etc.
+      // over them.
+      props.setAddressableForDependencies();
+      
+      // If the size isn't a known literal, then the layout is also dependent,
+      // so make it address-only. If the size is massive, also treat it as
+      // address-only since there's little practical benefit to passing around
+      // huge amounts of data "directly".
+      auto fixedSize = type->getFixedInhabitedSize();
+      if (!type->isFixedNegativeSize()
+          && (!fixedSize.has_value()
+              || *fixedSize > BuiltinFixedArrayType::MaximumLoadableSize)) {
+        props.setAddressOnly();
+      }
+      return props;
+    }
+    
+    RetTy visitBuiltinFixedArrayType(CanBuiltinFixedArrayType type,
+                                     AbstractionPattern origType,
+                                     IsTypeExpansionSensitive_t isSensitive) {
+      return asImpl().handleAggregateByProperties(type,
+                  getBuiltinFixedArrayProperties(type, origType, isSensitive));
+    }
 
     RetTy visitPackType(CanPackType type,
                         AbstractionPattern origType,
@@ -473,7 +549,6 @@ namespace {
     RecursiveProperties
     getNormalDifferentiableSILFunctionTypeRecursiveProperties(
         CanSILFunctionType type, AbstractionPattern origType) {
-      auto &M = TC.M;
       auto origTy = type->getWithoutDifferentiability();
       // Pass the original type of abstraction pattern to
       // `SILFunctionType:getAutoDiffDerivativeFunctionType` to get the
@@ -484,13 +559,13 @@ namespace {
           type->getDifferentiabilityParameterIndices(),
           type->getDifferentiabilityResultIndices(),
           AutoDiffDerivativeFunctionKind::JVP, TC,
-          LookUpConformanceInModule(&M), CanGenericSignature(),
+          LookUpConformanceInModule(), CanGenericSignature(),
           false, origTypeOfAbstraction);
       auto vjpTy = origTy->getAutoDiffDerivativeFunctionType(
           type->getDifferentiabilityParameterIndices(),
           type->getDifferentiabilityResultIndices(),
           AutoDiffDerivativeFunctionKind::VJP, TC,
-          LookUpConformanceInModule(&M), CanGenericSignature(),
+          LookUpConformanceInModule(), CanGenericSignature(),
           false, origTypeOfAbstraction);
       RecursiveProperties props;
       props.addSubobject(classifyType(origType, origTy, TC, Expansion));
@@ -502,11 +577,10 @@ namespace {
     RecursiveProperties
     getLinearDifferentiableSILFunctionTypeRecursiveProperties(
         CanSILFunctionType type, AbstractionPattern origType) {
-      auto &M = TC.M;
       auto origTy = type->getWithoutDifferentiability();
       auto transposeTy = origTy->getAutoDiffTransposeFunctionType(
           type->getDifferentiabilityParameterIndices(), TC,
-          LookUpConformanceInModule(&M), origType.getGenericSignatureOrNull());
+          LookUpConformanceInModule(), origType.getGenericSignatureOrNull());
       RecursiveProperties props;
       props.addSubobject(classifyType(origType, origTy, TC, Expansion));
       props.addSubobject(classifyType(origType, transposeTy, TC, Expansion));
@@ -677,11 +751,11 @@ namespace {
       if (LayoutInfo) {
         if (LayoutInfo->isFixedSizeTrivial()) {
           return asImpl().handleTrivial(
-              type, getTrivialRecursiveProperties(isSensitive));
+              type, getTrivialOpaqueRecursiveProperties(isSensitive));
         }
 
         if (LayoutInfo->isAddressOnlyTrivial()) {
-          auto properties = getTrivialRecursiveProperties(isSensitive);
+          auto properties = getTrivialOpaqueRecursiveProperties(isSensitive);
           properties.setAddressOnly();
           return asImpl().handleAddressOnly(type, properties);
         }
@@ -1046,6 +1120,15 @@ namespace {
 
     void emitDestroyValue(SILBuilder &B, SILLocation loc,
                           SILValue value) const override {
+      if (B.getFunction().hasOwnership()
+          && B.getModule().getStage() == SILStage::Raw
+          && value->isFromVarDecl()) {
+        // Do not use destroy_value for trivial values. The lifetime introducer
+        // may be implicitly copied and used outside of its original scope,
+        // which violates the invariants of destroy_value.
+        B.createExtendLifetime(loc, value);
+        return;
+      }
       // Trivial
     }
   };
@@ -1333,7 +1416,7 @@ namespace {
       forEachNonTrivialChild(B, loc, aggValue, Fn);
     }
   };
-
+  
   /// A lowering for loadable but non-trivial tuple types.
   class LoadableTupleTypeLowering final
       : public LoadableAggTypeLowering<LoadableTupleTypeLowering, unsigned> {
@@ -1543,7 +1626,7 @@ namespace {
                 AutoDiffDerivativeFunctionKind::VJP}) {
         auto derivativeFnTy = origFnTy->getAutoDiffDerivativeFunctionType(
             paramIndices, resultIndices, kind, TC,
-            LookUpConformanceInModule(&TC.M));
+            LookUpConformanceInModule());
         auto silTy = SILType::getPrimitiveObjectType(derivativeFnTy);
         NormalDifferentiableFunctionTypeComponent extractee(kind);
         // Assert that we have the right extractee. A terrible bug in the past
@@ -1709,7 +1792,7 @@ namespace {
         TC.getTypeLowering(origFnTy, getExpansionContext())
       });
       auto transposeFnTy = origFnTy->getAutoDiffTransposeFunctionType(
-          paramIndices, TC, LookUpConformanceInModule(&TC.M));
+          paramIndices, TC, LookUpConformanceInModule());
       auto transposeSILFnTy = SILType::getPrimitiveObjectType(transposeFnTy);
       children.push_back(Child{
         LinearDifferentiableFunctionTypeComponent::Transpose,
@@ -1736,6 +1819,44 @@ namespace {
     void emitLoweredDestroyValue(SILBuilder &B, SILLocation loc, SILValue value,
                                  TypeExpansionKind style) const override {
       emitDestroyValue(B, loc, value);
+    }
+  };
+
+  /// A class for nonspecific loadable nontrivial types.
+  class MiscNontrivialTypeLowering : public LeafLoadableTypeLowering {
+  public:
+    MiscNontrivialTypeLowering(SILType type, RecursiveProperties properties,
+                          TypeExpansionContext forExpansion)
+        : LeafLoadableTypeLowering(type, properties, IsNotReferenceCounted,
+                                   forExpansion) {}
+
+    MiscNontrivialTypeLowering(CanType type, RecursiveProperties properties,
+                            TypeExpansionContext forExpansion)
+      : MiscNontrivialTypeLowering(SILType::getPrimitiveObjectType(type),
+                                   properties, forExpansion)
+    {}
+
+
+    SILValue emitCopyValue(SILBuilder &B, SILLocation loc,
+                           SILValue value) const override {
+      if (isa<FunctionRefInst>(value) || isa<DynamicFunctionRefInst>(value) ||
+          isa<PreviousDynamicFunctionRefInst>(value))
+        return value;
+
+      if (B.getFunction().hasOwnership())
+        return B.createCopyValue(loc, value);
+
+      B.createRetainValue(loc, value, B.getDefaultAtomicity());
+      return value;
+    }
+
+    void emitDestroyValue(SILBuilder &B, SILLocation loc,
+                          SILValue value) const override {
+      if (B.getFunction().hasOwnership()) {
+        B.createDestroyValue(loc, value);
+        return;
+      }
+      B.createReleaseValue(loc, value, B.getDefaultAtomicity());
     }
   };
 
@@ -2316,29 +2437,43 @@ namespace {
       return handleAggregateByProperties<LoadableTupleTypeLowering>(tupleType,
                                                                     properties);
     }
+    
+    TypeLowering *visitBuiltinFixedArrayType(CanBuiltinFixedArrayType faType,
+                                       AbstractionPattern origType,
+                                       IsTypeExpansionSensitive_t isSensitive) {
+      
+      return handleAggregateByProperties<MiscNontrivialTypeLowering>(faType,
+                 getBuiltinFixedArrayProperties(faType, origType, isSensitive));
+    }
 
     bool handleResilience(CanType type, NominalTypeDecl *D,
                           RecursiveProperties &properties) {
       if (D->isResilient()) {
         // If the type is resilient and defined in our module, make a note of
         // that, since our lowering now depends on the resilience expansion.
-        bool sameModule = (D->getModuleContext() == &TC.M);
-        if (sameModule)
+        // The same should happen if the type was resilient and serialized in
+        // another module in the same package with package-cmo enabled, which
+        // treats those modules to be in the same resilience domain.
+        auto inSameResilienceDomain = D->getModuleContext() == &TC.M ||
+                                      D->bypassResilienceInPackage(&TC.M);
+        if (inSameResilienceDomain)
           properties.addSubobject(RecursiveProperties::forResilient());
 
-        // If the type is in a different module, or if we're using a minimal
+        // If the type is in a different module and not in the same package
+        // resilience domain (with package-cmo), or if we're using a minimal
         // expansion, the type is address only and completely opaque to us.
         //
-        // Note: if the type is in a different module, the lowering does
-        // not depend on the resilience expansion, so we do not need to set
-        // the isResilient() flag above.
-        if (!sameModule || Expansion.getResilienceExpansion() ==
+        // Note: if the type is in a different module and not in the same
+        // package resilience domain, the lowering does not depend on the
+        // resilience expansion, so we do not need to set the isResilient()
+        // flag above.
+        if (!inSameResilienceDomain ||
+            Expansion.getResilienceExpansion() ==
                                ResilienceExpansion::Minimal) {
           properties.addSubobject(RecursiveProperties::forOpaque());
           return true;
         }
       }
-
       return false;
     }
 
@@ -2375,9 +2510,19 @@ namespace {
       }
 
       if (D->isCxxNonTrivial()) {
+        properties.setAddressableForDependencies();
         properties.setAddressOnly();
         properties.setNonTrivial();
         properties.setLexical(IsLexical);
+      }
+
+      if (auto *clangDecl = D->getClangDecl()) {
+        if (auto *recordDecl = dyn_cast<clang::RecordDecl>(clangDecl)) {
+          // C unions are imported as opaque types. Therefore we have to assume
+          // that a union contains a pointer.
+          if (recordDecl->isOrContainsUnion())
+            properties.setIsOrContainsRawPointer();
+        }
       }
 
       // [is_or_contains_pack_unsubstituted] Visit the fields of the
@@ -2395,6 +2540,7 @@ namespace {
       // If the type has raw storage, it is move-only and address-only.
       if (D->getAttrs().hasAttribute<RawLayoutAttr>()) {
         properties.setAddressOnly();
+        properties.setAddressableForDependencies();
         properties.setNonTrivial();
         properties.setLexical(IsLexical);
         return handleMoveOnlyAddressOnly(structType, properties);
@@ -2406,8 +2552,12 @@ namespace {
         properties.setLexical(IsLexical);
         return handleAddressOnly(structType, properties);
       }
+      
+      if (D->getAttrs().hasAttribute<AddressableForDependenciesAttr>()) {
+        properties.setAddressableForDependencies();
+      }
 
-      auto subMap = structType->getContextSubstitutionMap(&TC.M, D);
+      auto subMap = structType->getContextSubstitutionMap();
 
       // Classify the type according to its stored properties.
       for (auto field : D->getStoredProperties()) {
@@ -2476,6 +2626,10 @@ namespace {
       if (handleResilience(enumType, D, properties))
         return handleAddressOnly(enumType, properties);
 
+      if (D->getAttrs().hasAttribute<AddressableForDependenciesAttr>()) {
+        properties.setAddressableForDependencies();
+      }
+
       // [is_or_contains_pack_unsubstituted] Visit the elements of the
       // unsubstituted type to find pack types which would be substituted away.
       for (auto elt : D->getAllElements()) {
@@ -2504,7 +2658,7 @@ namespace {
                                                  Expansion);
       }
 
-      auto subMap = enumType->getContextSubstitutionMap(&TC.M, D);
+      auto subMap = enumType->getContextSubstitutionMap();
 
       // Accumulate the properties of all direct payloads.
       for (auto elt : D->getAllElements()) {
@@ -2522,11 +2676,11 @@ namespace {
         }
         
         auto substEltType =
-          elt->getArgumentInterfaceType().subst(subMap)
+          elt->getPayloadInterfaceType().subst(subMap)
              ->getCanonicalType();
         
         auto origEltType = origType.unsafeGetSubstFieldType(elt,
-                              elt->getArgumentInterfaceType()
+                              elt->getPayloadInterfaceType()
                                  ->getReducedType(D->getGenericSignature()),
                               subMap);
         properties.addSubobject(classifyType(origEltType, substEltType,
@@ -2872,6 +3026,7 @@ bool TypeConverter::visitAggregateLeaves(
     return isa<SILPackType>(ty) ||
            isa<TupleType>(ty) ||
            isa<PackExpansionType>(ty) ||
+           isa<BuiltinFixedArrayType>(ty) ||
            ty.getEnumOrBoundGenericEnum() ||
            ty.getStructOrBoundGenericStruct();
   };
@@ -2883,6 +3038,9 @@ bool TypeConverter::visitAggregateLeaves(
     std::optional<unsigned> index;
     std::tie(ty, origTy, field, index) = popFromWorklist();
     assert(!field || !index && "both field and index!?");
+    if (auto origEltTy = origTy.getVanishingTupleElementPatternType()) {
+      origTy = *origEltTy;
+    }
     if (isAggregate(ty) && !isLeafAggregate(ty, origTy, field, index)) {
       if (auto packTy = dyn_cast<SILPackType>(ty)) {
         for (auto packIndex : indices(packTy->getElementTypes())) {
@@ -2908,9 +3066,16 @@ bool TypeConverter::visitAggregateLeaves(
         insertIntoWorklist(expansion.getPatternType(),
                            origTy.getPackExpansionPatternType(),
                            field, index);
+      } else if (auto array = dyn_cast<BuiltinFixedArrayType>(ty)) {
+        auto origBFA = origTy.getAs<BuiltinFixedArrayType>();
+        insertIntoWorklist(
+            array->getElementType(),
+            AbstractionPattern(origTy.getGenericSignatureOrNull(),
+                               origBFA->getElementType()),
+            field, index);
       } else if (auto *decl = ty.getStructOrBoundGenericStruct()) {
         for (auto *structField : decl->getStoredProperties()) {
-          auto subMap = ty->getContextSubstitutionMap(&M, decl);
+          auto subMap = ty->getContextSubstitutionMap();
           auto substFieldTy =
               structField->getInterfaceType().subst(subMap)->getCanonicalType();
           auto sig =
@@ -2924,18 +3089,18 @@ bool TypeConverter::visitAggregateLeaves(
                              std::nullopt);
         }
       } else if (auto *decl = ty.getEnumOrBoundGenericEnum()) {
-        auto subMap = ty->getContextSubstitutionMap(&M, decl);
+        auto subMap = ty->getContextSubstitutionMap();
         for (auto *element : decl->getAllElements()) {
           if (!element->hasAssociatedValues())
             continue;
           // TODO: Callback for indirect elements.
           if (element->isIndirect())
             continue;
-          auto substElementType = element->getArgumentInterfaceType()
+          auto substElementType = element->getPayloadInterfaceType()
                                       .subst(subMap)
                                       ->getCanonicalType();
           auto origElementTy = origTy.unsafeGetSubstFieldType(
-              element, element->getArgumentInterfaceType()->getReducedType(
+              element, element->getPayloadInterfaceType()->getReducedType(
                            decl->getGenericSignature()), subMap);
 
           insertIntoWorklist(substElementType, origElementTy, element,
@@ -3041,8 +3206,6 @@ void TypeConverter::verifyTrivialLowering(const TypeLowering &lowering,
                                           AbstractionPattern origType,
                                           CanType substType,
                                           TypeExpansionContext forExpansion) {
-  if (!Context.LangOpts.hasFeature(Feature::BitwiseCopyable))
-    return;
   auto *bitwiseCopyableProtocol =
       Context.getProtocol(KnownProtocolKind::BitwiseCopyable);
   if (!bitwiseCopyableProtocol)
@@ -3053,14 +3216,24 @@ void TypeConverter::verifyTrivialLowering(const TypeLowering &lowering,
   if (substType->hasTypeParameter())
     return;
 
-  auto conformance = M.checkConformance(substType, bitwiseCopyableProtocol);
+  auto conformance = checkConformance(substType, bitwiseCopyableProtocol);
 
   if (auto *nominal = substType.getAnyNominal()) {
     auto *module = nominal->getModuleContext();
-    if (module && module->isBuiltFromInterface()) {
-      // Don't verify for types in modules built from interfaces; the feature
-      // may not have been enabled in them.
-      return;
+    if (module) {
+      if (module->isBuiltFromInterface()) {
+        // Don't verify for types in modules built from interfaces; the feature
+        // may not have been enabled in them.
+        return;
+      }
+      auto *file = dyn_cast_or_null<FileUnit>(module->getModuleScopeContext());
+      if (file && file->getKind() == FileUnitKind::Source) {
+        auto sourceFile = nominal->getParentSourceFile();
+        if (sourceFile && sourceFile->Kind == SourceFileKind::SIL) {
+          // Don't verify for types in SIL files.
+          return;
+        }
+      }
     }
   }
 
@@ -3072,6 +3245,7 @@ void TypeConverter::verifyTrivialLowering(const TypeLowering &lowering,
     // (3) being a special type that's not worth forming a conformance for
     //     - ModuleType
     //     - SILTokenType
+    //     - IntegerType
     // (4) being an unowned(unsafe) reference to a class/class-bound existential
     //     NOTE: ReferenceStorageType(C) does not conform HOWEVER the presence
     //           of an unowned(unsafe) field within an aggregate DOES NOT allow
@@ -3086,6 +3260,7 @@ void TypeConverter::verifyTrivialLowering(const TypeLowering &lowering,
     //     unconditionally but does in this case
     // (8) being or containing the error type
     // (9) explicitly suppressing conformance
+    // (10) a layout constrained archetype
     bool hasNoNonconformingNode = visitAggregateLeaves(
         origType, substType, forExpansion,
         /*isLeafAggregate=*/
@@ -3150,12 +3325,14 @@ void TypeConverter::verifyTrivialLowering(const TypeLowering &lowering,
 
           // A BitwiseCopyable conformer appearing within its layout doesn't
           // explain why substType doesn't itself conform.
-          if (M.checkConformance(ty, bitwiseCopyableProtocol))
+          if (checkConformance(ty, bitwiseCopyableProtocol))
             return true;
 
           // ModuleTypes are trivial but don't warrant being given a
           // conformance to BitwiseCopyable (case (3)).
-          if (isa<ModuleType, SILTokenType>(ty)) {
+          if (isa<ModuleType>(ty) ||
+              isa<SILTokenType>(ty) ||
+              isa<IntegerType>(ty)) {
             // These types should never appear within aggregates.
             assert(isTopLevel && "aggregate containing marker type!?");
             // If they did, though, they would not justify the aggregate's
@@ -3174,13 +3351,21 @@ void TypeConverter::verifyTrivialLowering(const TypeLowering &lowering,
             return !isTopLevel;
           }
 
+          // Case (10): a layout-constrained archetype.
+          if (auto archetype = dyn_cast<ArchetypeType>(ty)) {
+            auto constraint = archetype->getLayoutConstraint();
+            if (constraint && constraint->isTrivial()) {
+              return false;
+            }
+          }
+
           auto *nominal = ty.getAnyNominal();
 
           // Non-nominal types (besides case (3) handled above) are trivial iff
           // conforming.
           if (!nominal) {
             llvm::errs()
-                << "Non-nominal type without conformance to _BitwiseCopyable:\n"
+                << "Non-nominal type without conformance to BitwiseCopyable:\n"
                 << ty << "\n"
                 << "within " << substType << "\n"
                 << "of " << origType << "\n";
@@ -3259,7 +3444,7 @@ void TypeConverter::verifyTrivialLowering(const TypeLowering &lowering,
         /*visit=*/
         [&](auto ty, auto origTy, auto *field, auto index) -> bool {
           // Return false to indicate visiting a type parameter.
-          assert(M.checkConformance(ty, bitwiseCopyableProtocol) &&
+          assert(checkConformance(ty, bitwiseCopyableProtocol) &&
                  "leaf of non-trivial BitwiseCopyable type that doesn't "
                  "conform to BitwiseCopyable!?");
 
@@ -3291,7 +3476,7 @@ void TypeConverter::verifyTrivialLowering(const TypeLowering &lowering,
           return true;
         });
     if (hasNoConformingArchetypeNode) {
-      llvm::errs() << "Non-trivial type with _BitwiseCopyable conformance!?:\n"
+      llvm::errs() << "Non-trivial type with BitwiseCopyable conformance!?:\n"
                    << substType << "\n";
       conformance.print(llvm::errs());
       llvm::errs() << "\n"
@@ -3499,8 +3684,7 @@ TypeConverter::computeLoweredRValueType(TypeExpansionContext forExpansion,
 
       // The Swift type directly corresponds to the lowered type.
       auto underlyingTy =
-          substOpaqueTypesWithUnderlyingTypes(substType, forExpansion,
-                                              /*allowLoweredTypes*/ true);
+          substOpaqueTypesWithUnderlyingTypes(substType, forExpansion);
       if (underlyingTy != substType) {
         underlyingTy =
             TC.computeLoweredRValueType(forExpansion, origType, underlyingTy);
@@ -3622,20 +3806,37 @@ const TypeLowering *TypeConverter::getTypeLoweringForExpansion(
   return nullptr;
 }
 
-static GenericSignature 
-getEffectiveGenericSignature(DeclContext *dc,
-                             CaptureInfo captureInfo) {
-  if (dc->getParent()->isLocalContext() &&
-      !captureInfo.hasGenericParamCaptures())
-    return nullptr;
+static GenericSignatureWithCapturedEnvironments
+getGenericSignatureWithCapturedEnvironments(DeclContext *dc,
+                                            CaptureInfo captureInfo) {
+  auto capturedEnvs = captureInfo.getGenericEnvironments();
 
-  return dc->getGenericSignatureOfContext();
+  // A closure or local function does not need a generic signature if it
+  // doesn't capture the primary generic environment or any pack element
+  // environments from the outer scope.
+  if (dc->getParent()->isLocalContext() &&
+      capturedEnvs.empty() &&
+      !captureInfo.hasGenericParamCaptures())
+    return GenericSignatureWithCapturedEnvironments();
+
+  auto genericSig = dc->getGenericSignatureOfContext();
+  if (capturedEnvs.empty())
+    return GenericSignatureWithCapturedEnvironments(genericSig);
+
+  // Build a new generic signature where all captured element archetypes
+  // are represented by new generic parameters.
+  auto newSig = buildGenericSignatureWithCapturedEnvironments(
+      dc->getASTContext(), genericSig, capturedEnvs);
+
+  LLVM_DEBUG(llvm::dbgs() << "-- effective generic signature: " << newSig << "\n");
+  return GenericSignatureWithCapturedEnvironments(genericSig, newSig, capturedEnvs);
 }
 
-static GenericSignature 
-getEffectiveGenericSignature(AnyFunctionRef fn,
-                             CaptureInfo captureInfo) {
-  return getEffectiveGenericSignature(fn.getAsDeclContext(), captureInfo);
+static GenericSignatureWithCapturedEnvironments
+getGenericSignatureWithCapturedEnvironments(AnyFunctionRef fn,
+                                            CaptureInfo captureInfo) {
+  return getGenericSignatureWithCapturedEnvironments(
+      fn.getAsDeclContext(), captureInfo);
 }
 
 static CanGenericSignature
@@ -3692,7 +3893,7 @@ static CanAnyFunctionType getDefaultArgGeneratorInterfaceType(
   canResultTy = removeNoEscape(canResultTy);
 
   // Get the generic signature from the surrounding context.
-  auto sig = TC.getConstantGenericSignature(c);
+  auto sig = TC.getGenericSignatureWithCapturedEnvironments(c).genericSig;
 
   // FIXME: Verify ExtInfo state is correct, not working by accident.
   CanAnyFunctionType::ExtInfo info;
@@ -3745,7 +3946,8 @@ static CanAnyFunctionType getPropertyWrapperBackingInitializerInterfaceType(
     inputType = interfaceType->getCanonicalType();
   }
 
-  GenericSignature sig = TC.getConstantGenericSignature(c);
+  GenericSignature sig = TC.getGenericSignatureWithCapturedEnvironments(c)
+      .genericSig;
 
   AnyFunctionType::Param param(
       inputType, Identifier(),
@@ -3818,16 +4020,27 @@ static CanAnyFunctionType getIVarInitDestroyerInterfaceType(ClassDecl *cd,
 }
 
 static CanAnyFunctionType
-getFunctionInterfaceTypeWithCaptures(TypeConverter &TC,
-                                     CanAnyFunctionType funcType,
-                                     SILDeclRef constant) {
+getAnyFunctionRefInterfaceType(TypeConverter &TC,
+                               CanAnyFunctionType funcType,
+                               SILDeclRef constant) {
   // Get transitive closure of value captured by this function, and any
   // captured functions.
   auto captureInfo = TC.getLoweredLocalCaptures(constant);
 
+  LLVM_DEBUG(llvm::dbgs() << "-- capture info: ";
+             captureInfo.print(llvm::dbgs());
+             llvm::dbgs() << "\n");
+
   // Capture generic parameters from the enclosing context if necessary.
   auto closure = *constant.getAnyFunctionRef();
-  auto genericSig = getEffectiveGenericSignature(closure, captureInfo);
+  auto sig = getGenericSignatureWithCapturedEnvironments(closure, captureInfo);
+
+  if (funcType->hasArchetype()) {
+    assert(isa<FunctionType>(funcType));
+    auto substType = mapLocalArchetypesOutOfContext(
+        funcType, sig.baseGenericSig, sig.capturedEnvs);
+    funcType = cast<FunctionType>(substType->getCanonicalType());
+  }
 
   auto innerExtInfo =
       AnyFunctionType::ExtInfoBuilder(FunctionType::Representation::Thin,
@@ -3836,12 +4049,12 @@ getFunctionInterfaceTypeWithCaptures(TypeConverter &TC,
           .withSendable(funcType->isSendable())
           .withAsync(funcType->isAsync())
           .withIsolation(funcType->getIsolation())
-          .withLifetimeDependenceInfo(funcType->getLifetimeDependenceInfo())
-          .withTransferringResult(funcType->hasTransferringResult())
+          .withLifetimeDependencies(funcType->getLifetimeDependencies())
+          .withSendingResult(funcType->hasSendingResult())
           .build();
 
   return CanAnyFunctionType::get(
-      getCanonicalSignatureOrNull(genericSig),
+      getCanonicalSignatureOrNull(sig.genericSig),
       funcType.getParams(), funcType.getResult(),
       innerExtInfo);
 }
@@ -3917,7 +4130,7 @@ CanAnyFunctionType TypeConverter::makeConstantInterfaceType(SILDeclRef c) {
         makeConstantInterfaceType(c.asAutoDiffOriginalFunction());
     auto *derivativeFnTy = originalFnTy->getAutoDiffDerivativeFunctionType(
         derivativeId->getParameterIndices(), derivativeId->getKind(),
-        LookUpConformanceInModule(&M),
+        LookUpConformanceInModule(),
         derivativeId->getDerivativeGenericSignature());
     return cast<AnyFunctionType>(derivativeFnTy->getCanonicalType());
   }
@@ -3927,14 +4140,21 @@ CanAnyFunctionType TypeConverter::makeConstantInterfaceType(SILDeclRef c) {
   case SILDeclRef::Kind::Func: {
     CanAnyFunctionType funcTy;
     if (auto *ACE = c.loc.dyn_cast<AbstractClosureExpr *>()) {
-      // FIXME: Closures could have an interface type computed by Sema.
-      funcTy = cast<AnyFunctionType>(
-        ACE->getType()->mapTypeOutOfContext()->getCanonicalType());
+      funcTy = cast<AnyFunctionType>(ACE->getType()->getCanonicalType());
+
+      // If we have a closure expr, see if we need to add Sendable to work
+      // issues with inheritActorContext and global actor isolation.
+      if (auto *CE = dyn_cast<ClosureExpr>(ACE)) {
+        if (CE->inheritsActorContext() && CE->isBodyAsync() &&
+            CE->getActorIsolation().isActorIsolated() && !CE->isSendable()) {
+          auto newExtInfo = funcTy->getExtInfo().withSendable();
+          funcTy = funcTy.withExtInfo(newExtInfo);
+        }
+      }
     } else {
-      funcTy = cast<AnyFunctionType>(
-        vd->getInterfaceType()->getCanonicalType());
+      funcTy = cast<AnyFunctionType>(vd->getInterfaceType()->getCanonicalType());
     }
-    return getFunctionInterfaceTypeWithCaptures(*this, funcTy, c);
+    return getAnyFunctionRefInterfaceType(*this, funcTy, c);
   }
 
   case SILDeclRef::Kind::EnumElement: {
@@ -3951,22 +4171,23 @@ CanAnyFunctionType TypeConverter::makeConstantInterfaceType(SILDeclRef c) {
     auto *cd = cast<ConstructorDecl>(vd);
     auto funcTy = cast<AnyFunctionType>(
                                    cd->getInterfaceType()->getCanonicalType());
-    return getFunctionInterfaceTypeWithCaptures(*this, funcTy, c);
+    return getAnyFunctionRefInterfaceType(*this, funcTy, c);
   }
 
   case SILDeclRef::Kind::Initializer: {
     auto *cd = cast<ConstructorDecl>(vd);
     auto funcTy = cast<AnyFunctionType>(
                          cd->getInitializerInterfaceType()->getCanonicalType());
-    return getFunctionInterfaceTypeWithCaptures(*this, funcTy, c);
+    return getAnyFunctionRefInterfaceType(*this, funcTy, c);
   }
 
   case SILDeclRef::Kind::Destroyer:
   case SILDeclRef::Kind::Deallocator:
+  case SILDeclRef::Kind::IsolatedDeallocator:
     return getDestructorInterfaceType(cast<DestructorDecl>(vd),
-                                      c.kind == SILDeclRef::Kind::Deallocator,
+                                      c.kind != SILDeclRef::Kind::Destroyer,
                                       c.isForeign);
-  
+
   case SILDeclRef::Kind::GlobalAccessor: {
     VarDecl *var = cast<VarDecl>(vd);
     assert(var->hasStorage() &&
@@ -3995,28 +4216,30 @@ CanAnyFunctionType TypeConverter::makeConstantInterfaceType(SILDeclRef c) {
   llvm_unreachable("Unhandled SILDeclRefKind in switch.");
 }
 
-GenericSignature 
-TypeConverter::getConstantGenericSignature(SILDeclRef c) {
+GenericSignatureWithCapturedEnvironments
+TypeConverter::getGenericSignatureWithCapturedEnvironments(SILDeclRef c) {
   auto *vd = c.loc.dyn_cast<ValueDecl *>();
-  
+
   /// Get the function generic params, including outer params.
   switch (c.kind) {
   case SILDeclRef::Kind::Func:
   case SILDeclRef::Kind::Allocator:
   case SILDeclRef::Kind::Initializer:
   case SILDeclRef::Kind::Destroyer:
-  case SILDeclRef::Kind::Deallocator: {
+  case SILDeclRef::Kind::Deallocator:
+  case SILDeclRef::Kind::IsolatedDeallocator: {
     auto captureInfo = getLoweredLocalCaptures(c);
-    return getEffectiveGenericSignature(
+    return ::getGenericSignatureWithCapturedEnvironments(
       *c.getAnyFunctionRef(), captureInfo);
   }
   case SILDeclRef::Kind::IVarInitializer:
   case SILDeclRef::Kind::IVarDestroyer:
-    return cast<ClassDecl>(vd)->getGenericSignature();
+    return GenericSignatureWithCapturedEnvironments(
+        cast<ClassDecl>(vd)->getGenericSignature());
   case SILDeclRef::Kind::DefaultArgGenerator: {
     // Use the generic environment of the original function.
     auto captureInfo = getLoweredLocalCaptures(c);
-    return getEffectiveGenericSignature(
+    return ::getGenericSignatureWithCapturedEnvironments(
       vd->getInnermostDeclContext(), captureInfo);
   }
   case SILDeclRef::Kind::PropertyWrapperBackingInitializer:
@@ -4033,25 +4256,63 @@ TypeConverter::getConstantGenericSignature(SILDeclRef c) {
       } else {
         enclosingDecl = SILDeclRef(cast<AbstractFunctionDecl>(dc));
       }
-      return getConstantGenericSignature(enclosingDecl);
+      return getGenericSignatureWithCapturedEnvironments(enclosingDecl);
     }
-    return dc->getGenericSignatureOfContext();
+    return GenericSignatureWithCapturedEnvironments(
+        dc->getGenericSignatureOfContext());
   }
   case SILDeclRef::Kind::EnumElement:
   case SILDeclRef::Kind::GlobalAccessor:
   case SILDeclRef::Kind::StoredPropertyInitializer:
-    return vd->getDeclContext()->getGenericSignatureOfContext();
+    return GenericSignatureWithCapturedEnvironments(
+        vd->getDeclContext()->getGenericSignatureOfContext());
   case SILDeclRef::Kind::EntryPoint:
   case SILDeclRef::Kind::AsyncEntryPoint:
-    llvm_unreachable("Doesn't have generic signature");
+    return GenericSignatureWithCapturedEnvironments();
   }
 
   llvm_unreachable("Unhandled SILDeclRefKind in switch.");
 }
 
+SubstitutionMap
+TypeConverter::getSubstitutionMapWithCapturedEnvironments(
+    SILDeclRef constant, const CaptureInfo &captureInfo,
+    SubstitutionMap subs) {
+  auto sig = getGenericSignatureWithCapturedEnvironments(constant);
+  if (!sig.genericSig) {
+    assert(!sig.baseGenericSig);
+    assert(sig.capturedEnvs.empty());
+    return SubstitutionMap();
+  }
+
+  return buildSubstitutionMapWithCapturedEnvironments(
+      subs, sig.genericSig, sig.capturedEnvs);
+}
+
 GenericEnvironment *
 TypeConverter::getConstantGenericEnvironment(SILDeclRef c) {
-  return getConstantGenericSignature(c).getGenericEnvironment();
+  return getGenericSignatureWithCapturedEnvironments(c)
+      .genericSig.getGenericEnvironment();
+}
+
+std::tuple<GenericEnvironment *, ArrayRef<GenericEnvironment *>, SubstitutionMap>
+TypeConverter::getForwardingSubstitutionsForLowering(SILDeclRef constant) {
+  auto sig = getGenericSignatureWithCapturedEnvironments(constant);
+
+  auto *genericEnv = sig.baseGenericSig.getGenericEnvironment();
+  SubstitutionMap forwardingSubs;
+
+  if (sig.baseGenericSig)
+    forwardingSubs = genericEnv->getForwardingSubstitutionMap();
+
+  if (!sig.capturedEnvs.empty()) {
+    assert(sig.genericSig && !sig.genericSig->isEqual(sig.baseGenericSig));
+
+    forwardingSubs = buildSubstitutionMapWithCapturedEnvironments(
+        forwardingSubs, sig.genericSig, sig.capturedEnvs);
+  }
+
+  return std::make_tuple(genericEnv, sig.capturedEnvs, forwardingSubs);
 }
 
 SILType TypeConverter::getSubstitutedStorageType(TypeExpansionContext context,
@@ -4144,11 +4405,17 @@ TypeConverter::getLoweredLocalCaptures(SILDeclRef fn) {
   
   // Recursively collect transitive captures from captured local functions.
   llvm::DenseSet<AnyFunctionRef> visitedFunctions;
-  llvm::MapVector<ValueDecl*,CapturedValue> captures;
+
+  // FIXME: CapturedValue should just be a hash key
+  llvm::MapVector<VarDecl *, CapturedValue> varCaptures;
+  llvm::MapVector<PackElementExpr *, CapturedValue> packElementCaptures;
 
   // If there is a capture of 'self' with dynamic 'Self' type, it goes last so
   // that IRGen can pass dynamic 'Self' metadata.
   std::optional<CapturedValue> selfCapture;
+
+  // Captured pack element environments.
+  llvm::SetVector<GenericEnvironment *> genericEnv;
 
   bool capturesGenericParams = false;
   DynamicSelfType *capturesDynamicSelf = nullptr;
@@ -4159,18 +4426,27 @@ TypeConverter::getLoweredLocalCaptures(SILDeclRef fn) {
   std::function<void (SILDeclRef)> collectConstantCaptures;
 
   auto recordCapture = [&](CapturedValue capture) {
-    ValueDecl *value = capture.getDecl();
-    auto existing = captures.find(value);
-    if (existing != captures.end()) {
-      existing->second = existing->second.mergeFlags(capture);
+    if (auto *expr = capture.getPackElement()) {
+      auto existing = packElementCaptures.find(expr);
+      if (existing != packElementCaptures.end()) {
+        existing->second = existing->second.mergeFlags(capture.getFlags());
+      } else {
+        packElementCaptures.insert(std::pair<PackElementExpr *, CapturedValue>(
+          expr, capture));
+      }
     } else {
-      captures.insert(std::pair<ValueDecl *, CapturedValue>(value, capture));
+      VarDecl *value = cast<VarDecl>(capture.getDecl());
+      auto existing = varCaptures.find(value);
+      if (existing != varCaptures.end()) {
+        existing->second = existing->second.mergeFlags(capture.getFlags());
+      } else {
+        varCaptures.insert(std::pair<VarDecl *, CapturedValue>(
+          value, capture));
+      }
     }
   };
 
   collectCaptures = [&](CaptureInfo captureInfo) {
-    assert(captureInfo.hasBeenComputed());
-
     if (captureInfo.hasGenericParamCaptures())
       capturesGenericParams = true;
     if (captureInfo.hasDynamicSelfCapture())
@@ -4178,7 +4454,19 @@ TypeConverter::getLoweredLocalCaptures(SILDeclRef fn) {
     if (captureInfo.hasOpaqueValueCapture())
       capturesOpaqueValue = captureInfo.getOpaqueValue();
 
+    // Any set of mutually-recursive local functions will capture the same
+    // element environments, because we can't "cross" a pack expansion
+    // expression.
+    for (auto *env : captureInfo.getGenericEnvironments()) {
+      genericEnv.insert(env);
+    }
+
     for (auto capture : captureInfo.getCaptures()) {
+      if (capture.isPackElement()) {
+        recordCapture(capture);
+        continue;
+      }
+
       if (!capture.isLocalCapture())
         continue;
 
@@ -4228,6 +4516,9 @@ TypeConverter::getLoweredLocalCaptures(SILDeclRef fn) {
           case ReadImplKind::Read:
             collectAccessorCaptures(AccessorKind::Read);
             break;
+          case ReadImplKind::Read2:
+            collectAccessorCaptures(AccessorKind::Read2);
+            break;
           case ReadImplKind::Inherited:
             llvm_unreachable("inherited local variable?");
           }
@@ -4249,6 +4540,9 @@ TypeConverter::getLoweredLocalCaptures(SILDeclRef fn) {
           case WriteImplKind::Modify:
             collectAccessorCaptures(AccessorKind::Modify);
             break;
+          case WriteImplKind::Modify2:
+            collectAccessorCaptures(AccessorKind::Modify2);
+            break;
           case WriteImplKind::InheritedWithObservers:
             llvm_unreachable("inherited local variable");
           }
@@ -4265,6 +4559,9 @@ TypeConverter::getLoweredLocalCaptures(SILDeclRef fn) {
             break;
           case ReadWriteImplKind::Modify:
             collectAccessorCaptures(AccessorKind::Modify);
+            break;
+          case ReadWriteImplKind::Modify2:
+            collectAccessorCaptures(AccessorKind::Modify2);
             break;
           case ReadWriteImplKind::StoredWithDidSet:
             // We've already processed the didSet operation.
@@ -4293,7 +4590,7 @@ TypeConverter::getLoweredLocalCaptures(SILDeclRef fn) {
             // If we've already captured the same value already, just merge
             // flags.
             if (selfCapture && selfCapture->getDecl() == capture.getDecl()) {
-              selfCapture = selfCapture->mergeFlags(capture);
+              selfCapture = selfCapture->mergeFlags(capture.getFlags());
               continue;
 
             // Otherwise, record the canonical self capture. It will appear
@@ -4326,20 +4623,6 @@ TypeConverter::getLoweredLocalCaptures(SILDeclRef fn) {
 
     PrettyStackTraceAnyFunctionRef("lowering local captures", curFn);
     collectCaptures(curFn.getCaptureInfo());
-
-    if (auto *afd = curFn.getAbstractFunctionDecl()) {
-      // If a local function inherits isolation from the enclosing context,
-      // make sure we capture the isolated parameter, if we haven't already.
-      if (afd->isLocalCapture()) {
-        auto actorIsolation = getActorIsolation(afd);
-        if (actorIsolation.getKind() == ActorIsolation::ActorInstance) {
-          if (auto *var = actorIsolation.getActorInstance()) {
-            assert(isa<ParamDecl>(var));
-            recordCapture(CapturedValue(var, 0, afd->getLoc()));
-          }
-        }
-      }
-    }
 
     // A function's captures also include its default arguments, because
     // when we reference a function we don't track which default arguments
@@ -4381,7 +4664,10 @@ TypeConverter::getLoweredLocalCaptures(SILDeclRef fn) {
   collectConstantCaptures(fn);
 
   SmallVector<CapturedValue, 4> resultingCaptures;
-  for (auto capturePair : captures) {
+  for (auto capturePair : varCaptures) {
+    resultingCaptures.push_back(capturePair.second);
+  }
+  for (auto capturePair : packElementCaptures) {
     resultingCaptures.push_back(capturePair.second);
   }
 
@@ -4400,9 +4686,10 @@ TypeConverter::getLoweredLocalCaptures(SILDeclRef fn) {
     resultingCaptures.push_back(*selfCapture);
   }
 
-  // Cache the uniqued set of transitive captures.
-  CaptureInfo info{Context, resultingCaptures, capturesDynamicSelf,
-                   capturesOpaqueValue, capturesGenericParams};
+  // Cache the result.
+  CaptureInfo info(Context, resultingCaptures,
+                   capturesDynamicSelf, capturesOpaqueValue,
+                   capturesGenericParams, genericEnv.getArrayRef());
   auto inserted = LoweredCaptures.insert({fn, info});
   assert(inserted.second && "already in map?!");
   (void)inserted;
@@ -4687,6 +4974,12 @@ TypeConverter::checkFunctionForABIDifferences(SILModule &M,
       return ABIDifference::NeedsThunk;
   }
 
+  // Non-throwing functions and functions with indirect error result need thunk
+  // because of the trailing error result storage parameter.
+  if (fnTy1->hasIndirectErrorResult() != fnTy2->hasIndirectErrorResult()) {
+    return ABIDifference::NeedsThunk;
+  }
+
   // Asynchronous functions require a thunk if they differ in whether they
   // have an error result.
   if (fnTy1->hasErrorResult() != fnTy2->hasErrorResult() &&
@@ -4733,14 +5026,87 @@ TypeConverter::checkFunctionForABIDifferences(SILModule &M,
     return ABIDifference::CompatibleRepresentation;
 }
 
+static void findCapturedEnvironments(
+              Type type,
+              SmallSetVector<GenericEnvironment *, 2> &boxCapturedEnvs) {
+  type.visit([&](Type t) {
+    if (auto *archetypeTy = t->getAs<LocalArchetypeType>()) {
+      boxCapturedEnvs.insert(archetypeTy->getGenericEnvironment());
+    }
+  });
+}
+
 CanSILBoxType
 TypeConverter::getInterfaceBoxTypeForCapture(ValueDecl *captured,
-                                             CanType loweredInterfaceType,
+                                             CanType loweredContextType,
+                                             GenericSignature genericSig,
+                                             ArrayRef<GenericEnvironment *> capturedEnvs,
                                              bool isMutable) {
+  auto boxType = getInterfaceBoxTypeForCapture(captured,
+                                               loweredContextType,
+                                               isMutable);
+
+  LLVM_DEBUG(llvm::dbgs() << "Generic signature of closure: "
+                          << genericSig << "\n";);
+  LLVM_DEBUG(llvm::dbgs() << "Box type: "
+                          << boxType << "\n";);
+
   auto &C = M.getASTContext();
-  auto signature = getCanonicalSignatureOrNull(
+  auto baseGenericSig = getCanonicalSignatureOrNull(
       captured->getDeclContext()->getGenericSignatureOfContext());
   
+  SmallSetVector<GenericEnvironment *, 2> boxCapturedEnvs;
+  findCapturedEnvironments(loweredContextType, boxCapturedEnvs);
+
+  return cast<SILBoxType>(Type(boxType).subst(
+    [&](SubstitutableType *t) -> Type {
+      auto *paramTy = cast<GenericTypeParamType>(t);
+
+      // Depth of first captured local archetype in box generic signature.
+      unsigned depth = baseGenericSig.getNextDepth();
+
+      // Is this a captured local archetype?
+      if (paramTy->getDepth() >= depth) {
+        // Get the environment.
+        auto *genericEnv = boxCapturedEnvs[paramTy->getDepth() - depth];
+
+        // Find this environment in the captured environments of our
+        // closure.
+        auto found = std::find(capturedEnvs.begin(), capturedEnvs.end(),
+                               genericEnv);
+        assert(found != capturedEnvs.end());
+        unsigned capturedEnvIndex = found - capturedEnvs.begin();
+
+        // Remap the depth. This is necessary because the 'var' box might
+        // capture a subset of the captured environments of the closure.
+        return GenericTypeParamType::getType(
+            genericSig.getNextDepth() - capturedEnvs.size() + capturedEnvIndex,
+            paramTy->getIndex(),
+            C);
+      }
+
+      return paramTy;
+    },
+    MakeAbstractConformanceForGenericType(),
+    SubstFlags::PreservePackExpansionLevel)->getCanonicalType());
+}
+
+CanSILBoxType
+TypeConverter::getInterfaceBoxTypeForCapture(ValueDecl *captured,
+                                             CanType loweredContextType,
+                                             bool isMutable) {
+  auto &C = M.getASTContext();
+  auto baseGenericSig = getCanonicalSignatureOrNull(
+      captured->getDeclContext()->getGenericSignatureOfContext());
+
+  SmallSetVector<GenericEnvironment *, 2> boxCapturedEnvs;
+  findCapturedEnvironments(loweredContextType, boxCapturedEnvs);
+
+  auto loweredInterfaceType =
+      mapLocalArchetypesOutOfContext(loweredContextType, baseGenericSig,
+                                     boxCapturedEnvs.getArrayRef())
+      ->getCanonicalType();
+
   // If the type is not dependent at all, we can form a concrete box layout.
   // We don't need to capture the generic environment.
   if (!loweredInterfaceType->hasTypeParameter()) {
@@ -4749,39 +5115,23 @@ TypeConverter::getInterfaceBoxTypeForCapture(ValueDecl *captured,
                                  /*captures generics*/ false);
     return SILBoxType::get(C, layout, {});
   }
+
+  auto boxGenericSig = buildGenericSignatureWithCapturedEnvironments(
+      M.getASTContext(), baseGenericSig,
+      boxCapturedEnvs.getArrayRef()).getCanonicalSignature();
   
   // Otherwise, the layout needs to capture the generic environment of its
   // originating scope.
   // TODO: We could conceivably minimize the captured generic environment to
   // only the parts used by the captured variable.
-  
-  auto layout = SILLayout::get(C, signature,
+  auto layout = SILLayout::get(C, boxGenericSig,
                                SILField(loweredInterfaceType, isMutable),
                                /*captures generics*/ false);
-  
+
   // Instantiate the layout with identity substitutions.
-  auto subMap = signature->getIdentitySubstitutionMap();
+  auto subMap = boxGenericSig->getIdentitySubstitutionMap();
 
-  auto boxTy = SILBoxType::get(C, layout, subMap);
-#ifndef NDEBUG
-  auto loweredContextType = loweredInterfaceType;
-  auto contextBoxTy = boxTy;
-  if (signature) {
-    auto env = signature.getGenericEnvironment();
-    loweredContextType = env->mapTypeIntoContext(loweredContextType)
-                            ->getCanonicalType();
-    contextBoxTy = cast<SILBoxType>(
-      env->mapTypeIntoContext(contextBoxTy)
-         ->getCanonicalType());
-  }
-
-  auto ty = getSILBoxFieldType(TypeExpansionContext::minimal(), contextBoxTy,
-                               *this, 0);
-  assert(contextBoxTy->getLayout()->getFields().size() == 1 &&
-         ty.getRawASTType() == loweredContextType &&
-         "box field type doesn't match capture!");
-#endif
-  return boxTy;
+  return SILBoxType::get(C, layout, subMap);
 }
 
 CanSILBoxType
@@ -4789,24 +5139,19 @@ TypeConverter::getContextBoxTypeForCapture(ValueDecl *captured,
                                            CanType loweredContextType,
                                            GenericEnvironment *env,
                                            bool isMutable) {
-  CanType loweredInterfaceType = loweredContextType;
-  if (env) {
-    auto homeSig = captured->getDeclContext()
-        ->getGenericSignatureOfContext();
-    loweredInterfaceType =
-      loweredInterfaceType->mapTypeOutOfContext()
-        ->getReducedType(homeSig);
-  }
-  
+  SmallSetVector<GenericEnvironment *, 2> boxCapturedEnvs;
+  findCapturedEnvironments(loweredContextType, boxCapturedEnvs);
+
   auto boxType = getInterfaceBoxTypeForCapture(captured,
-                                               loweredInterfaceType,
+                                               loweredContextType,
                                                isMutable);
-  if (env)
-    boxType = cast<SILBoxType>(
-      env->mapTypeIntoContext(boxType)
-         ->getCanonicalType());
-  
-  return boxType;
+
+  MapIntoLocalArchetypeContext mapIntoContext(env, boxCapturedEnvs.getArrayRef());
+
+  return cast<SILBoxType>(
+    Type(boxType).subst(mapIntoContext,
+                        LookUpConformanceInModule(),
+                        SubstFlags::PreservePackExpansionLevel)->getCanonicalType());
 }
 
 CanSILBoxType TypeConverter::getBoxTypeForEnumElement(
@@ -4822,7 +5167,7 @@ CanSILBoxType TypeConverter::getBoxTypeForEnumElement(
       enumDecl->getGenericSignature());
 
   if (boxSignature == CanGenericSignature()) {
-    auto eltIntfTy = elt->getArgumentInterfaceType();
+    auto eltIntfTy = elt->getPayloadInterfaceType();
     auto boxVarTy = getLoweredRValueType(context, eltIntfTy);
     auto layout = SILLayout::get(C, nullptr, SILField(boxVarTy, true),
                                  /*captures generics*/ false);
@@ -4833,7 +5178,7 @@ CanSILBoxType TypeConverter::getBoxTypeForEnumElement(
   auto boundEnum = enumType.getRawASTType();
 
   // Lower the enum element's argument in the box's context.
-  auto eltIntfTy = elt->getArgumentInterfaceType();
+  auto eltIntfTy = elt->getPayloadInterfaceType();
 
   auto boxVarTy = getLoweredRValueType(context,
                                        getAbstractionPattern(elt), eltIntfTy);
@@ -4841,8 +5186,7 @@ CanSILBoxType TypeConverter::getBoxTypeForEnumElement(
                                /*captures generics*/ false);
 
   // Instantiate the layout with enum's substitution list.
-  auto subMap = boundEnum->getContextSubstitutionMap(
-      &M, enumDecl, enumDecl->getGenericEnvironment());
+  auto subMap = boundEnum->getContextSubstitutionMap();
 
   auto boxTy = SILBoxType::get(C, layout, subMap);
   return boxTy;
@@ -4957,6 +5301,16 @@ static void countNumberOfInnerFields(unsigned &fieldsCount, TypeConverter &TC,
     }
     return;
   }
+
+  if (auto fixedArrayTy = Ty.getAs<BuiltinFixedArrayType>()) {
+    auto fixedSize = fixedArrayTy->getFixedInhabitedSize();
+    if (fixedSize.has_value() && !fixedArrayTy->isFixedNegativeSize() )
+      fieldsCount += *fixedSize;
+    else
+      fieldsCount += 1;
+    return;
+  }
+
   if (auto *enumDecl = Ty.getEnumOrBoundGenericEnum()) {
     if (enumDecl->isIndirect()) {
       return;

@@ -20,31 +20,32 @@
 
 import PackageDescription
 
+let swiftSourceDirectory = #filePath
+  .split(separator: "/", omittingEmptySubsequences: false)
+  .dropLast(3) // Remove 'lib', 'ASTGen', 'Package.swift'
+  .joined(separator: "/")
+
 let swiftSetttings: [SwiftSetting] = [
   .interoperabilityMode(.Cxx),
   .unsafeFlags([
-    "-Xcc", "-DCOMPILED_WITH_SWIFT",
+    "-Xcc", "-DCOMPILED_WITH_SWIFT", "-Xcc", "-DPURE_BRIDGING_MODE",
     "-Xcc", "-UIBOutlet", "-Xcc", "-UIBAction", "-Xcc", "-UIBInspectable",
-    "-Xcc", "-I../../include",
-    "-Xcc", "-I../../../llvm-project/llvm/include",
-    "-Xcc", "-I../../../llvm-project/clang/include",
-    "-Xcc", "-I../../../build/Default/swift/include",
-    "-Xcc", "-I../../../build/Default/llvm/include",
-    "-Xcc", "-I../../../build/Default/llvm/tools/clang/include",
-
-    // FIXME: Needed to work around an availability issue with CxxStdlib
-    "-Xfrontend", "-disable-target-os-checking",
+    "-Xcc", "-I\(swiftSourceDirectory)/include",
+    "-Xcc", "-I\(swiftSourceDirectory)/../llvm-project/llvm/include",
+    "-Xcc", "-I\(swiftSourceDirectory)/../llvm-project/clang/include",
+    "-Xcc", "-I\(swiftSourceDirectory)/../build/Default/swift/include",
+    "-Xcc", "-I\(swiftSourceDirectory)/../build/Default/llvm/include",
+    "-Xcc", "-I\(swiftSourceDirectory)/../build/Default/llvm/tools/clang/include",
   ]),
 ]
 
 let package = Package(
   name: "swiftSwiftCompiler",
   platforms: [
-    .macOS(.v10_15)
+    .macOS(.v13)
   ],
   products: [
     .library(name: "swiftASTGen", targets: ["swiftASTGen"]),
-    .library(name: "swiftLLVMJSON", targets: ["swiftLLVMJSON"]),
   ],
   dependencies: [
     .package(path: "../../../swift-syntax")
@@ -53,20 +54,32 @@ let package = Package(
     .target(
       name: "swiftASTGen",
       dependencies: [
-        .product(name: "SwiftBasicFormat", package: "swift-syntax"),
-        .product(name: "SwiftCompilerPluginMessageHandling", package: "swift-syntax"),
         .product(name: "SwiftDiagnostics", package: "swift-syntax"),
+        .product(name: "SwiftIfConfig", package: "swift-syntax"),
+        .product(name: "SwiftLexicalLookup", package: "swift-syntax"),
         .product(name: "SwiftOperators", package: "swift-syntax"),
         .product(name: "SwiftParser", package: "swift-syntax"),
         .product(name: "SwiftParserDiagnostics", package: "swift-syntax"),
         .product(name: "SwiftSyntax", package: "swift-syntax"),
         .product(name: "SwiftSyntaxBuilder", package: "swift-syntax"),
-        .product(name: "SwiftSyntaxMacros", package: "swift-syntax"),
         .product(name: "SwiftSyntaxMacroExpansion", package: "swift-syntax"),
-        "swiftLLVMJSON",
         "_CompilerRegexParser",
       ],
       path: "Sources/ASTGen",
+      swiftSettings: swiftSetttings
+    ),
+    .target(
+      name: "swiftMacroEvaluation",
+      dependencies: [
+        "swiftASTGen",
+        .product(name: "_SwiftCompilerPluginMessageHandling", package: "swift-syntax"),
+        .product(name: "SwiftSyntax", package: "swift-syntax"),
+        .product(name: "SwiftDiagnostics", package: "swift-syntax"),
+        .product(name: "SwiftParser", package: "swift-syntax"),
+        .product(name: "SwiftOperators", package: "swift-syntax"),
+        .product(name: "SwiftSyntaxMacroExpansion", package: "swift-syntax"),
+      ],
+      path: "Sources/MacroEvaluation",
       swiftSettings: swiftSetttings
     ),
     .target(
@@ -77,12 +90,6 @@ let package = Package(
         .product(name: "SwiftSyntax", package: "swift-syntax"),
       ],
       path: "Sources/SwiftIDEUtilsBridging",
-      swiftSettings: swiftSetttings
-    ),
-    .target(
-      name: "swiftLLVMJSON",
-      dependencies: [],
-      path: "Sources/LLVMJSON",
       swiftSettings: swiftSetttings
     ),
     .target(

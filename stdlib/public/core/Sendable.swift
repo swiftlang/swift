@@ -132,13 +132,8 @@
 /// ### Sendable Metatypes
 ///
 /// Metatypes such as `Int.Type` implicitly conform to the `Sendable` protocol.
-#if $NoncopyableGenerics && $NonescapableTypes
 @_marker public protocol Sendable: ~Copyable, ~Escapable { }
-#elseif $NoncopyableGenerics
-@_marker public protocol Sendable: ~Copyable { }
-#else
-@_marker public protocol Sendable { }
-#endif
+
 ///
 /// A type whose values can safely be passed across concurrency domains by copying,
 /// but which disables some safety checking at the conformance site.
@@ -147,11 +142,14 @@
 ///
 ///     struct MyStructure: @unchecked Sendable { ... }
 @available(*, deprecated, message: "Use @unchecked Sendable instead")
+@available(swift, obsoleted: 6.0, message: "Use @unchecked Sendable instead")
 @_marker public protocol UnsafeSendable: Sendable { }
 
 // Historical names
 @available(*, deprecated, renamed: "Sendable")
+@available(swift, obsoleted: 6.0, renamed: "Sendable")
 public typealias ConcurrentValue = Sendable
 
 @available(*, deprecated, renamed: "Sendable")
+@available(swift, obsoleted: 6.0, renamed: "Sendable")
 public typealias UnsafeConcurrentValue = UnsafeSendable

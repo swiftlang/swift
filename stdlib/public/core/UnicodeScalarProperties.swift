@@ -1115,7 +1115,7 @@ extension Unicode {
       case 27: self = .surrogate
       case 28: self = .privateUse
       case 29: self = .unassigned
-      default: fatalError("Unknown general category \(rawValue)")
+      default: fatalError("Unknown general category")
       }
     }
   }
@@ -1485,7 +1485,7 @@ extension Unicode {
       case 2:
         self = .decimal
       default:
-        fatalError("Unknown numeric type \(rawValue)")
+        fatalError("Unknown numeric type")
       }
     }
   }

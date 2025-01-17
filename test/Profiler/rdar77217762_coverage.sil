@@ -10,12 +10,10 @@
 // RUN: %target-build-swift %s -profile-generate -profile-coverage-mapping -O -Xfrontend -disable-sil-perf-optzns -Xfrontend -disable-new-llvm-pass-manager -o %t/main1
 // RUN: %target-build-swift %s -profile-generate -profile-coverage-mapping -O -Xfrontend -disable-sil-perf-optzns -Xfrontend -enable-new-llvm-pass-manager -o %t/main2
 
-// This unusual use of 'sh' allows the path of the profraw file to be
-// substituted by %target-run.
 // RUN: %target-codesign %t/main1
 // RUN: %target-codesign %t/main2
-// RUN: %target-run sh -c 'env LLVM_PROFILE_FILE=$1 $2' -- %t/default1.profraw %t/main1
-// RUN: %target-run sh -c 'env LLVM_PROFILE_FILE=$1 $2' -- %t/default2.profraw %t/main2
+// RUN: env %env-LLVM_PROFILE_FILE=%t/default1.profraw %target-run %t/main1
+// RUN: env %env-LLVM_PROFILE_FILE=%t/default2.profraw %target-run %t/main2
 
 // RUN: %llvm-profdata merge %t/default1.profraw -o %t/default1.profdata
 // RUN: %llvm-profdata merge %t/default2.profraw -o %t/default2.profdata
@@ -25,7 +23,6 @@
 
 // REQUIRES: profile_runtime
 // REQUIRES: executable_test
-// REQUIRES: OS=macosx
 
 sil_stage canonical
 

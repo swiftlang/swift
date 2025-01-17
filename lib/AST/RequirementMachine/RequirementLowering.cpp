@@ -150,6 +150,7 @@
 
 #include "RequirementLowering.h"
 #include "swift/AST/ASTContext.h"
+#include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/Requirement.h"
@@ -157,6 +158,7 @@
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/TypeMatcher.h"
 #include "swift/AST/TypeRepr.h"
+#include "swift/Basic/Assertions.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/SetVector.h"
 #include "Diagnostics.h"
@@ -198,7 +200,7 @@ static void desugarSameTypeRequirement(
     }
 
     void popPosition(Position pos) {
-      assert(stack.back() == pos);
+      ASSERT(stack.back() == pos);
       stack.pop_back();
     }
 
@@ -219,11 +221,45 @@ static void desugarSameTypeRequirement(
         break;
       }
 
-      // If one side is a parameter pack, this is a same-element requirement, which
-      // is not yet supported.
-      if (firstType->isParameterPack() != secondType->isParameterPack()) {
-        errors.push_back(RequirementError::forSameElement(
-            {kind, sugaredFirstType, secondType}, loc));
+      auto &ctx = firstType->getASTContext();
+      if (!ctx.LangOpts.hasFeature(Feature::SameElementRequirements)) {
+        // If one side is a parameter pack, this is a same-element requirement, which
+        // is not yet supported.
+        if (firstType->isParameterPack() != secondType->isParameterPack()) {
+          errors.push_back(RequirementError::forSameElement(
+              {kind, sugaredFirstType, secondType}, loc));
+          return true;
+        }
+      }
+
+      if (firstType->isValueParameter() || secondType->isValueParameter()) {
+        // FIXME: If we ever support other value types in the future besides
+        // 'Int', then we'd want to check their underlying value type to ensure
+        // they are the same.
+        if (firstType->isValueParameter() &&
+            !(secondType->isValueParameter() || secondType->is<IntegerType>())) {
+          errors.push_back(RequirementError::forInvalidValueGenericSameType(
+              sugaredFirstType, secondType, loc));
+          return true;
+        }
+
+        if (secondType->isValueParameter() &&
+            !(firstType->isValueParameter() || firstType->is<IntegerType>())) {
+          errors.push_back(RequirementError::forInvalidValueGenericSameType(
+              secondType, sugaredFirstType, loc));
+          return true;
+        }
+      }
+
+      if (!firstType->isValueParameter() && secondType->is<IntegerType>()) {
+        errors.push_back(RequirementError::forInvalidValueForTypeSameType(
+            sugaredFirstType, secondType, loc));
+        return true;
+      }
+
+      if (!secondType->isValueParameter() && firstType->is<IntegerType>()) {
+        errors.push_back(RequirementError::forInvalidValueForTypeSameType(
+            secondType, sugaredFirstType, loc));
         return true;
       }
 
@@ -332,6 +368,15 @@ static void desugarConformanceRequirement(
 
   // Fast path.
   if (constraintType->is<ProtocolType>()) {
+    // Diagnose attempts to introduce a value generic like 'let N: P' where 'P'
+    // is some protocol in either the defining context or in an extension where
+    // clause.
+    if (req.getFirstType()->isValueParameter()) {
+      errors.push_back(
+        RequirementError::forInvalidValueGenericConformance(req, loc));
+      return;
+    }
+
     if (req.getFirstType()->isTypeParameter()) {
       result.push_back(req);
       return;
@@ -506,6 +551,22 @@ static void realizeTypeRequirement(DeclContext *dc,
     result.push_back({Requirement(RequirementKind::Superclass,
                                   subjectType, constraintType),
                       loc});
+  } else if (subjectType->isValueParameter() && !isa<ExtensionDecl>(dc)) {
+    // This is a correct value generic definition where 'let N: Int'.
+    //
+    // Note: This definition is only valid in non-extension contexts. If we are
+    // in an extension context then the user has written something like:
+    // 'extension T where N: Int' which is weird and not supported.
+    if (constraintType->isLegalValueGenericType()) {
+      return;
+    }
+
+    // Otherwise, we're trying to define a value generic parameter with an
+    // unsupported type right now e.g. 'let N: UInt8'.
+    errors.push_back(
+        RequirementError::forInvalidValueGenericType(subjectType,
+                                                     constraintType,
+                                                     loc));
   } else {
     errors.push_back(
         RequirementError::forInvalidTypeRequirement(subjectType,
@@ -603,9 +664,8 @@ struct InferRequirementsWalker : public TypeWalker {
       if (differentiableProtocol && fnTy->isDifferentiable()) {
         auto addSameTypeConstraint = [&](Type firstType,
                                          AssociatedTypeDecl *assocType) {
-          auto secondType = assocType->getDeclaredInterfaceType()
-              ->castTo<DependentMemberType>()
-              ->substBaseType(module, firstType);
+          auto conformance = lookupConformance(firstType, differentiableProtocol);
+          auto secondType = conformance.getTypeWitness(firstType, assocType);
           reqs.push_back({Requirement(RequirementKind::SameType,
                                       firstType, secondType),
                           SourceLoc()});
@@ -636,7 +696,9 @@ struct InferRequirementsWalker : public TypeWalker {
       }
     }
 
-    if (!ty->isSpecialized())
+    // Both is<ExistentialType>() and isSpecialized() end up being true if we
+    // have invalid code where a protocol is nested inside a generic nominal.
+    if (ty->is<ExistentialType>() || !ty->isSpecialized())
       return Action::Continue;
 
     // Infer from generic nominal types.
@@ -648,7 +710,7 @@ struct InferRequirementsWalker : public TypeWalker {
       return Action::Continue;
 
     /// Retrieve the substitution.
-    auto subMap = ty->getContextSubstitutionMap(module, decl);
+    auto subMap = ty->getContextSubstitutionMap(decl);
 
     // Handle the requirements.
     // FIXME: Inaccurate TypeReprs.
@@ -770,6 +832,11 @@ void swift::rewriting::applyInverses(
       continue;
     }
 
+    // Value generics never have inverse requirements (or the positive thereof).
+    if (canSubject->isValueParameter()) {
+      continue;
+    }
+
     // WARNING: possible quadratic behavior, but should be OK in practice.
     auto notInScope = llvm::none_of(gps, [=](Type t) {
       return t->getCanonicalType() == canSubject;
@@ -878,7 +945,7 @@ void swift::rewriting::realizeInheritedRequirements(
 ArrayRef<StructuralRequirement>
 StructuralRequirementsRequest::evaluate(Evaluator &evaluator,
                                         ProtocolDecl *proto) const {
-  assert(!proto->hasLazyRequirementSignature());
+  ASSERT(!proto->hasLazyRequirementSignature());
 
   SmallVector<StructuralRequirement, 2> result;
   SmallVector<RequirementError, 2> errors;
@@ -1034,7 +1101,7 @@ TypeAliasRequirementsRequest::evaluate(Evaluator &evaluator,
   if (proto->isObjC())
     return ArrayRef<Requirement>();
 
-  assert(!proto->hasLazyRequirementSignature());
+  ASSERT(!proto->hasLazyRequirementSignature());
 
   SmallVector<Requirement, 2> result;
   SmallVector<RequirementError, 2> errors;
@@ -1071,7 +1138,7 @@ TypeAliasRequirementsRequest::evaluate(Evaluator &evaluator,
 
   // Collect all typealiases from inherited protocols recursively.
   llvm::MapVector<Identifier, TinyPtrVector<TypeDecl *>> inheritedTypeDecls;
-  for (auto *inheritedProto : ctx.getRewriteContext().getInheritedProtocols(proto)) {
+  for (auto *inheritedProto : proto->getAllInheritedProtocols()) {
     for (auto req : inheritedProto->getMembers()) {
       if (auto *typeReq = dyn_cast<TypeDecl>(req)) {
         if (!isSuitableType(typeReq))
@@ -1087,8 +1154,8 @@ TypeAliasRequirementsRequest::evaluate(Evaluator &evaluator,
   auto recordInheritedTypeRequirement = [&](TypeDecl *first, TypeDecl *second) {
     auto firstType = getStructuralType(first);
     auto secondType = getStructuralType(second);
-    assert(!firstType->is<UnboundGenericType>());
-    assert(!secondType->is<UnboundGenericType>());
+    ASSERT(!firstType->is<UnboundGenericType>());
+    ASSERT(!secondType->is<UnboundGenericType>());
 
     desugarRequirement(Requirement(RequirementKind::SameType, firstType, secondType),
                        SourceLoc(), result, ignoredInverses, errors);

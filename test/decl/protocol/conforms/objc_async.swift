@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -typecheck -I %S/Inputs/custom-modules  -disable-availability-checking %s -verify -verify-ignore-unknown
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -typecheck -I %S/Inputs/custom-modules  -target %target-swift-5.1-abi-triple %s -verify -verify-ignore-unknown
 
 // REQUIRES: objc_interop
 // REQUIRES: concurrency
@@ -37,7 +37,7 @@ class C3: ConcurrentProtocol {
 
 // Conform but forget to supply either. Also an error.
 // FIXME: Suppress one of the notes?
-class C4: ConcurrentProtocol { // expected-error{{type 'C4' does not conform to protocol 'ConcurrentProtocol'}}
+class C4: ConcurrentProtocol { // expected-error{{type 'C4' does not conform to protocol 'ConcurrentProtocol'}} expected-note {{add stubs for conformance}}
 }
 
 class C5 {

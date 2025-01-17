@@ -62,17 +62,17 @@ public:
 
   const char *readPrintedType(unsigned Offset) { return PrintedTypes + Offset; }
 
-  static bool dictionary_apply(
-      void *Buffer, size_t Index,
-      llvm::function_ref<bool(sourcekitd_uid_t, sourcekitd_variant_t)>
-          Applier) {
+  static bool
+  dictionary_apply(void *Buffer, size_t Index,
+                   sourcekitd_variant_dictionary_applier_f_t Applier,
+                   void *Context) {
     VariableTypeReader Reader((char *)Buffer);
     auto Result = Reader.getVariable(Index);
 #define APPLY(K, Ty, Field)                                                    \
   do {                                                                         \
     sourcekitd_uid_t Key = SKDUIDFromUIdent(K);                                \
     sourcekitd_variant_t Var = make##Ty##Variant(Field);                       \
-    if (!Applier(Key, Var))                                                    \
+    if (!Applier(Key, Var, Context))                                           \
       return false;                                                            \
   } while (0)
 
@@ -157,14 +157,17 @@ VariantFunctions VariableTypeArrayBuilder::Funcs = {
     Implementation::get_type,
     nullptr /*AnnotArray_array_apply*/,
     nullptr /*AnnotArray_array_get_bool*/,
+    nullptr /*AnnotArray_array_get_double*/,
     Implementation::array_get_count,
     nullptr /*AnnotArray_array_get_int64*/,
     nullptr /*AnnotArray_array_get_string*/,
     nullptr /*AnnotArray_array_get_uid*/,
     Implementation::array_get_value,
     nullptr /*AnnotArray_bool_get_value*/,
+    nullptr /*AnnotArray_double_get_value*/,
     nullptr /*AnnotArray_dictionary_apply*/,
     nullptr /*AnnotArray_dictionary_get_bool*/,
+    nullptr /*AnnotArray_dictionary_get_double*/,
     nullptr /*AnnotArray_dictionary_get_int64*/,
     nullptr /*AnnotArray_dictionary_get_string*/,
     nullptr /*AnnotArray_dictionary_get_value*/,

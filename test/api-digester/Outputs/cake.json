@@ -54,26 +54,23 @@
             "children": [
               {
                 "kind": "TypeNominal",
-                "name": "P1",
-                "printedName": "any cake.P1",
-                "usr": "s:4cake2P1P"
+                "name": "GenericTypeParam",
+                "printedName": "Self"
               },
               {
                 "kind": "TypeNominal",
-                "name": "P1",
-                "printedName": "any cake.P1",
-                "usr": "s:4cake2P1P"
+                "name": "GenericTypeParam",
+                "printedName": "Self"
               },
               {
                 "kind": "TypeNominal",
-                "name": "P1",
-                "printedName": "any cake.P1",
-                "usr": "s:4cake2P1P"
+                "name": "GenericTypeParam",
+                "printedName": "Self"
               }
             ],
             "declKind": "Func",
-            "usr": "s:4cake2P1PAAE1poiyAaB_pAaB_p_AaB_ptFZ",
-            "mangledName": "$s4cake2P1PAAE1poiyAaB_pAaB_p_AaB_ptFZ",
+            "usr": "s:4cake2P1PAAE1poiyxx_xtFZ",
+            "mangledName": "$s4cake2P1PAAE1poiyxx_xtFZ",
             "moduleName": "cake",
             "genericSig": "<Self where Self : cake.P1>",
             "static": true,
@@ -253,6 +250,13 @@
             "printedName": "Sendable",
             "usr": "s:s8SendableP",
             "mangledName": "$ss8SendableP"
+          },
+          {
+            "kind": "Conformance",
+            "name": "BitwiseCopyable",
+            "printedName": "BitwiseCopyable",
+            "usr": "s:s15BitwiseCopyableP",
+            "mangledName": "$ss15BitwiseCopyableP"
           },
           {
             "kind": "Conformance",
@@ -680,21 +684,14 @@
                   },
                   {
                     "kind": "TypeNominal",
-                    "name": "Paren",
-                    "printedName": "(cake.Number.Type)",
+                    "name": "Metatype",
+                    "printedName": "cake.Number.Type",
                     "children": [
                       {
                         "kind": "TypeNominal",
-                        "name": "Metatype",
-                        "printedName": "cake.Number.Type",
-                        "children": [
-                          {
-                            "kind": "TypeNominal",
-                            "name": "Number",
-                            "printedName": "cake.Number",
-                            "usr": "s:4cake6NumberO"
-                          }
-                        ]
+                        "name": "Number",
+                        "printedName": "cake.Number",
+                        "usr": "s:4cake6NumberO"
                       }
                     ]
                   }
@@ -992,6 +989,13 @@
             "printedName": "Sendable",
             "usr": "s:s8SendableP",
             "mangledName": "$ss8SendableP"
+          },
+          {
+            "kind": "Conformance",
+            "name": "BitwiseCopyable",
+            "printedName": "BitwiseCopyable",
+            "usr": "s:s15BitwiseCopyableP",
+            "mangledName": "$ss15BitwiseCopyableP"
           },
           {
             "kind": "Conformance",
@@ -2206,6 +2210,13 @@
             ],
             "usr": "s:s10SIMDScalarP",
             "mangledName": "$ss10SIMDScalarP"
+          },
+          {
+            "kind": "Conformance",
+            "name": "BitwiseCopyable",
+            "printedName": "BitwiseCopyable",
+            "usr": "s:s15BitwiseCopyableP",
+            "mangledName": "$ss15BitwiseCopyableP"
           }
         ]
       }

@@ -17,6 +17,8 @@
 
 #define DEBUG_TYPE "sil-generic-specializer"
 
+#include "swift/AST/AvailabilityInference.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/SIL/OptimizationRemark.h"
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/SILInstruction.h"
@@ -26,8 +28,8 @@
 #include "swift/SILOptimizer/Utils/Devirtualize.h"
 #include "swift/SILOptimizer/Utils/Generics.h"
 #include "swift/SILOptimizer/Utils/InstructionDeleter.h"
-#include "swift/SILOptimizer/Utils/SILOptFunctionBuilder.h"
 #include "swift/SILOptimizer/Utils/SILInliner.h"
+#include "swift/SILOptimizer/Utils/SILOptFunctionBuilder.h"
 #include "swift/SILOptimizer/Utils/StackNesting.h"
 #include "llvm/ADT/SmallVector.h"
 
@@ -50,12 +52,6 @@ static void transferSpecializeAttributeTargets(SILModule &M,
       }
     }
     if (auto *targetFunctionDecl = SA->getTargetFunctionDecl(vd)) {
-      auto target = SILDeclRef(targetFunctionDecl);
-      auto targetSILFunction = builder.getOrCreateFunction(
-          SILLocation(vd), target, NotForDefinition,
-          [&builder](SILLocation loc, SILDeclRef constant) -> SILFunction * {
-            return builder.getOrCreateFunction(loc, constant, NotForDefinition);
-          });
       auto kind = SA->getSpecializationKind() ==
                           SpecializeAttr::SpecializationKind::Full
                       ? SILSpecializeAttr::SpecializationKind::Full
@@ -65,12 +61,20 @@ static void transferSpecializeAttributeTargets(SILModule &M,
         spiGroupIdent = spiGroups[0];
       }
       auto availability = AvailabilityInference::annotatedAvailableRangeForAttr(
-          SA, M.getSwiftModule()->getASTContext());
+          vd, SA, M.getSwiftModule()->getASTContext());
 
-      targetSILFunction->addSpecializeAttr(SILSpecializeAttr::create(
+      auto *attr = SILSpecializeAttr::create(
           M, SA->getSpecializedSignature(vd), SA->getTypeErasedParams(),
           SA->isExported(), kind, nullptr,
-          spiGroupIdent, vd->getModuleContext(), availability));
+          spiGroupIdent, vd->getModuleContext(), availability);
+
+      auto target = SILDeclRef(targetFunctionDecl);
+      std::string targetName = target.mangle();
+      if (SILFunction *targetSILFunction = M.lookUpFunction(targetName)) {
+        targetSILFunction->addSpecializeAttr(attr);
+      } else {
+        M.addPendingSpecializeAttr(targetName, attr);
+      }
     }
   }
 }

@@ -1,6 +1,6 @@
-// RUN: %target-swift-frontend -module-name access_marker_verify -enable-verify-exclusivity -enforce-exclusivity=checked -emit-silgen -swift-version 4 -parse-as-library %s | %FileCheck %s
-// RUN: %target-swift-frontend -module-name access_marker_verify -enable-verify-exclusivity -enforce-exclusivity=checked -Onone -emit-sil -swift-version 4 -parse-as-library %s -o /dev/null
-// RUN: %target-swift-frontend -module-name access_marker_verify -enable-verify-exclusivity -enforce-exclusivity=checked -O -emit-sil -swift-version 4 -parse-as-library %s -o /dev/null
+// RUN: %target-swift-frontend -module-name access_marker_verify -enable-verify-exclusivity -enforce-exclusivity=checked -Xllvm -sil-print-types -emit-silgen -swift-version 4 -parse-as-library %s | %FileCheck %s
+// RUN: %target-swift-frontend -module-name access_marker_verify -enable-verify-exclusivity -enforce-exclusivity=checked -Onone -Xllvm -sil-print-types -emit-sil -swift-version 4 -parse-as-library %s -o /dev/null
+// RUN: %target-swift-frontend -module-name access_marker_verify -enable-verify-exclusivity -enforce-exclusivity=checked -O -Xllvm -sil-print-types -emit-sil -swift-version 4 -parse-as-library %s -o /dev/null
 // REQUIRES: asserts
 
 // Test the combination of SILGen + DiagnoseStaticExclusivity with verification.
@@ -272,19 +272,15 @@ func testInitLValue(p: HasIntGetter) -> Int {
 // CHECK:   alloc_box ${ var Int }, var, name "x"
 // CHECK:   [[PROJ:%.*]] = project_box
 // CHECK:   [[OPENED:%.*]] = open_existential_addr immutable_access %0
-// CHECK:   [[X:%.*]] = alloc_stack $@opened
-// CHECK-NOT: begin_access
-// CHECK:   copy_addr %{{.*}} to [init] [[X]] : $*@opened
 // CHECK:   witness_method $@opened
-// CHECK:   apply %{{.*}}<@opened("{{.*}}", any HasIntGetter) Self>([[X]]) : $@convention(witness_method: HasIntGetter) <τ_0_0 where τ_0_0 : HasIntGetter> (@in_guaranteed τ_0_0) -> Int
+// CHECK:   [[VALUE:%.*]] = apply %{{.*}}<@opened("{{.*}}", any HasIntGetter) Self>([[OPENED]])
 // CHECK:   [[ACCESS:%.*]] = begin_access [modify] [unsafe] [[PROJ]] : $*Int
-// CHECK:   store %{{.*}} to [trivial] [[ACCESS]] : $*Int
-// CHECK:   end_access
-// CHECK:   destroy_addr
-// CHECK:   dealloc_stack
-// CHECK:   begin_access [read] [unknown] [[PROJ]]
-// CHECK:   load [trivial]
-// CHECK:   end_access
+// CHECK:   store [[VALUE]] to [trivial] [[ACCESS]] : $*Int
+// CHECK:   end_access [[ACCESS]]
+// CHECK:   [[ACCESS:%.*]] = begin_access [read] [unknown] [[PROJ]]
+// CHECK:   [[RELOAD:%.*]] = load [trivial] [[ACCESS]]
+// CHECK:   end_access [[ACCESS]]
+// CHECK:   return [[RELOAD]]
 // CHECK-LABEL: } // end sil function '$s20access_marker_verify14testInitLValue1pSiAA12HasIntGetter_p_tF'
 
 // --- initialize let.
@@ -610,7 +606,8 @@ func testAddressor(p: UnsafePointer<Int>) -> Int {
 // CHECK:   apply
 // CHECK:   struct_extract
 // CHECK:   [[ADR:%.*]] = pointer_to_address
-// CHECK:   [[ACCESS:%.*]] = begin_access [read] [unsafe] [[ADR]] : $*Int
+// CHECK:   [[MD:%.*]] = mark_dependence [unresolved] [[ADR]] : $*Int on %0 : $UnsafePointer<Int>
+// CHECK:   [[ACCESS:%.*]] = begin_access [read] [unsafe] [[MD]] : $*Int
 // CHECK:   load [trivial] [[ACCESS]] : $*Int
 // CHECK:   return
 // CHECK-LABEL: } // end sil function '$s20access_marker_verify13testAddressor1pSiSPySiG_tF'
@@ -868,19 +865,11 @@ func testMixedTuple(p: HasClassGetter) -> (BaseClass, Any) {
 // CHECK-LABEL: sil hidden [ossa] @$s20access_marker_verify14testMixedTuple1pAA9BaseClassC_yptAA03HasH6Getter_p_tF : $@convention(thin) (@in_guaranteed any HasClassGetter) -> (@owned BaseClass, @out Any) {
 // CHECK: bb0(%0 : $*Any, %1 : $*any HasClassGetter):
 // CHECK: [[P1:%.*]] = open_existential_addr immutable_access %1 : $*any HasClassGetter to $*@opened
-// CHECK: [[TEMP1:%.*]] = alloc_stack $@opened
-// CHECK-NOT: begin_access
-// CHECK: copy_addr [[P1]] to [init] [[TEMP1]] : $*@opened
-// CHECK-NOT: begin_access
-// CHECK: [[OUTC:%.*]] = apply {{.*}} $@convention(witness_method: HasClassGetter) <τ_0_0 where τ_0_0 : HasClassGetter> (@in_guaranteed τ_0_0) -> @owned BaseClass
+// CHECK: [[OUTC:%.*]] = apply %{{.*}}<@opened("{{.*}}", any HasClassGetter) Self>([[P1]])
 // CHECK: [[P2:%.*]] = open_existential_addr immutable_access %1 : $*any HasClassGetter to $*@opened
-// CHECK: [[TEMP2:%.*]] = alloc_stack $@opened
-// CHECK-NOT: begin_access
-// CHECK: copy_addr [[P2]] to [init] [[TEMP2]] : $*@opened
-// CHECK-NOT: begin_access
-// CHECK: apply {{.*}} $@convention(witness_method: HasClassGetter) <τ_0_0 where τ_0_0 : HasClassGetter> (@in_guaranteed τ_0_0) -> @owned BaseClass
+// CHECK: [[R2:%.*]] = apply %{{.*}}<@opened("{{.*}}", any HasClassGetter) Self>([[P2]])
 // CHECK: [[OUTANY:%.*]] = init_existential_addr %0 : $*Any, $BaseClass
-// CHECK: store %{{.*}} to [init] [[OUTANY]] : $*BaseClass
+// CHECK: store [[R2]] to [init] [[OUTANY]] : $*BaseClass
 // CHECK: return [[OUTC]] : $BaseClass
 // CHECK-LABEL: } // end sil function '$s20access_marker_verify14testMixedTuple1pAA9BaseClassC_yptAA03HasH6Getter_p_tF'
 
@@ -1033,7 +1022,8 @@ func testPointerInit(x: Int, y: UnsafeMutablePointer<Int>) {
 // CHECK: [[POINTEE:%.*]] = apply %{{.*}}<Int>(%1) : $@convention(method) <τ_0_0 where τ_0_0 : ~Copyable> (UnsafeMutablePointer<τ_0_0>) -> UnsafeMutablePointer<τ_0_0>
 // CHECK: [[RAWPTR:%.*]] = struct_extract [[POINTEE]] : $UnsafeMutablePointer<Int>, #UnsafeMutablePointer._rawValue
 // CHECK: [[ADR:%.*]] = pointer_to_address [[RAWPTR]] : $Builtin.RawPointer to [strict] $*Int
-// CHECK: [[ACCESS:%.*]] = begin_access [modify] [unsafe] [[ADR]] : $*Int
+// CHECK: [[MD:%.*]] = mark_dependence [unresolved] [[ADR]] : $*Int on %1 : $UnsafeMutablePointer<Int> // user: %9
+// CHECK: [[ACCESS:%.*]] = begin_access [modify] [unsafe] [[MD]] : $*Int
 // CHECK: assign %0 to [[ACCESS]] : $*Int
 // CHECK-LABEL: } // end sil function '$s20access_marker_verify15testPointerInit1x1yySi_SpySiGtF'
 

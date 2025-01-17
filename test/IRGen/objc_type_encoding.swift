@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
 // RUN: %build-irgen-test-overlays
-// RUN: %target-swift-frontend(mock-sdk: -sdk %S/Inputs -I %t) %s -emit-ir -disable-objc-attr-requires-foundation-module -target %target-swift-abi-5.8-triple | %FileCheck %s -check-prefix=CHECK-%target-os
+// RUN: %target-swift-frontend(mock-sdk: -sdk %S/Inputs -I %t) %s -emit-ir -disable-objc-attr-requires-foundation-module -target %target-swift-5.8-abi-triple | %FileCheck %s -check-prefix=CHECK-%target-os
 
 // REQUIRES: CPU=x86_64
 // REQUIRES: objc_interop
@@ -74,10 +74,10 @@ import gizmo
 // CHECK-watchos: private unnamed_addr constant [23 x i8] c"v44@0:8C16S20I24Q28Q36\00"
 // CHECK-xros: private unnamed_addr constant [23 x i8] c"v44@0:8C16S20I24Q28Q36\00"
 
-  @objc func testCChars(_ basic: CChar, wchar wide: CWideChar, char16: CChar16, char32: CChar32) {}
-// CHECK-macosx: private unnamed_addr constant [20 x i8] c"v32@0:8c16i20S24i28\00"
-// CHECK-ios: private unnamed_addr constant [20 x i8] c"v32@0:8c16i20S24i28\00"
-// CHECK-tvos: private unnamed_addr constant [20 x i8] c"v32@0:8c16i20S24i28\00"
+  @objc func testCChars(_ basic: CChar, wchar wide: CWideChar, char8: CChar8, char16: CChar16, char32: CChar32) {}
+// CHECK-macosx: private unnamed_addr constant [23 x i8] c"v36@0:8c16i20C24S28i32\00"
+// CHECK-ios: private unnamed_addr constant [23 x i8] c"v36@0:8c16i20C24S28i32\00"
+// CHECK-tvos: private unnamed_addr constant [23 x i8] c"v36@0:8c16i20C24S28i32\00"
 // CHECK-watchos: private unnamed_addr constant [20 x i8] c"v32@0:8c16i20S24i28\00"
 // CHECK-xros: private unnamed_addr constant [20 x i8] c"v32@0:8c16i20S24i28\00"
 

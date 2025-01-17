@@ -14,6 +14,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "swift/Basic/Assertions.h"
 #include "swift/SIL/Test.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/Support/raw_ostream.h"
@@ -105,6 +106,7 @@ void FunctionTest::run(SILFunction &function, Arguments &arguments,
     auto *fn = invocation.get<NativeSwiftInvocation>();
     Registry::get().getFunctionTestThunk()(fn, {&function}, {&arguments},
                                            {getSwiftPassInvocation()});
+    fflush(stdout);
   }
   this->pass = nullptr;
   this->function = nullptr;
@@ -113,6 +115,10 @@ void FunctionTest::run(SILFunction &function, Arguments &arguments,
 
 DominanceInfo *FunctionTest::getDominanceInfo() {
   return dependencies->getDominanceInfo();
+}
+
+DeadEndBlocks *FunctionTest::getDeadEndBlocks() {
+  return dependencies->getDeadEndBlocks();
 }
 
 SILPassManager *FunctionTest::getPassManager() {

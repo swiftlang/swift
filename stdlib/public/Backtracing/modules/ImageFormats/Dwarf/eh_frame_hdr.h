@@ -22,6 +22,11 @@
 
 #include <inttypes.h>
 
+#ifdef __cplusplus
+namespace swift {
+namespace runtime {
+#endif
+
 /* .. Useful macros ......................................................... */
 
 #define EH_FRAME_OPTIONS(t,n) \
@@ -57,5 +62,10 @@ typedef EH_FRAME_OPTIONS(uint8_t, EHFrameEncoding) {
   DW_EH_PE_pcrel	= 0x10, // Relative to the current program counter
   DW_EH_PE_datarel	= 0x30, // Relative to the beginning of the .eh_frame_hdr
 };
+
+#ifdef __cplusplus
+} // namespace runtime
+} // namespace swift
+#endif
 
 #endif // SWIFT_EH_FRAME_HDR_H

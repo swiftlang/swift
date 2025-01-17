@@ -57,8 +57,10 @@
 #include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/StringSwitch.h"
 #include "llvm/Support/Debug.h"
+#include "swift/AST/DiagnosticsSIL.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/SubstitutionMap.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/ClangImporter/ClangModule.h"
 #include "swift/SIL/FormalLinkage.h"
 #include "swift/Serialization/SerializedSILLoader.h"
@@ -74,20 +76,20 @@ STATISTIC(NumFuncLinked, "Number of SIL functions linked");
 //===----------------------------------------------------------------------===//
 
 void SILLinkerVisitor::deserializeAndPushToWorklist(SILFunction *F) {
-  assert(F->isExternalDeclaration());
+  ASSERT(F->isExternalDeclaration());
 
   LLVM_DEBUG(llvm::dbgs() << "Imported function: "
                           << F->getName() << "\n");
   SILFunction *NewF =
     Mod.getSILLoader()->lookupSILFunction(F, /*onlyUpdateLinkage*/ false);
-  assert(!NewF || NewF == F);
+  ASSERT(!NewF || NewF == F);
   if (!NewF || F->isExternalDeclaration()) {
-    assert((!hasSharedVisibility(F->getLinkage()) || F->hasForeignBody()) &&
+    ASSERT((!hasSharedVisibility(F->getLinkage()) || F->hasForeignBody()) &&
            "cannot deserialize shared function");
     return;
   }
 
-  assert((bool)F->isSerialized() == !Mod.isSerialized() &&
+  ASSERT(!F->isAnySerialized() == Mod.isSerialized() &&
          "the de-serializer did set the wrong serialized flag");
   
   F->setBare(IsBare);
@@ -98,21 +100,43 @@ void SILLinkerVisitor::deserializeAndPushToWorklist(SILFunction *F) {
 }
 
 /// Deserialize a function and add it to the worklist for processing.
-void SILLinkerVisitor::maybeAddFunctionToWorklist(SILFunction *F,
-                                                  bool setToSerializable) {
+void SILLinkerVisitor::maybeAddFunctionToWorklist(
+    SILFunction *F, SerializedKind_t callerSerializedKind, SILFunction *caller) {
   SILLinkage linkage = F->getLinkage();
-  assert((!setToSerializable || F->hasValidLinkageForFragileRef() ||
-         hasSharedVisibility(linkage) || F->isExternForwardDeclaration()) &&
-         "called function has wrong linkage for serialized function");
-                                         
+
+  // Originally this was an assert. But it can happen if the user "re-defines"
+  // an existing function with a wrong linkage, e.g. using `@_cdecl`.
+  if(!(callerSerializedKind == IsNotSerialized ||
+            F->hasValidLinkageForFragileRef(callerSerializedKind) ||
+            hasSharedVisibility(linkage) || F->isExternForwardDeclaration())) {
+    StringRef name = "a serialized function";
+    llvm::SmallVector<char> scratch;
+
+    if (caller) {
+      name = caller->getName();
+      if (SILDeclRef declRef = caller->getDeclRef()) {
+        if (auto *decl = declRef.getDecl()) {
+          name = decl->getName().getString(scratch);
+        }
+      }
+    }
+    F->getModule().getASTContext().Diags.diagnose(
+      F->getLocation().getSourceLoc(),
+      diag::wrong_linkage_for_serialized_function, name);
+    hasError = true;
+    return;
+  }
+
   if (!F->isExternalDeclaration()) {
     // The function is already in the module, so no need to de-serialized it.
     // But check if we need to set the IsSerialized flag.
     // See the top-level comment for SILLinkerVisitor for details.
-    if (setToSerializable && !Mod.isSerialized() &&
-        hasSharedVisibility(linkage) && !F->isSerialized()) {
-      F->setSerialized(IsSerialized);
-      
+    if (callerSerializedKind == IsSerialized &&
+        hasSharedVisibility(linkage) &&
+        !Mod.isSerialized() &&
+        !F->isAnySerialized()) {
+      F->setSerializedKind(IsSerialized);
+
       // Push the function to the worklist so that all referenced shared functions
       // are also set to IsSerialized.
       Worklist.push_back(F);
@@ -148,7 +172,7 @@ void SILLinkerVisitor::maybeAddFunctionToWorklist(SILFunction *F,
 bool SILLinkerVisitor::processFunction(SILFunction *F) {
   // If F is a declaration, first deserialize it.
   if (F->isExternalDeclaration()) {
-    maybeAddFunctionToWorklist(F, /*setToSerializable*/ false);
+    maybeAddFunctionToWorklist(F, /*serializedKind*/ IsNotSerialized);
   } else {
     Worklist.push_back(F);
   }
@@ -158,7 +182,7 @@ bool SILLinkerVisitor::processFunction(SILFunction *F) {
 }
 
 bool SILLinkerVisitor::processConformance(ProtocolConformanceRef conformanceRef) {
-  visitProtocolConformance(conformanceRef);
+  visitProtocolConformance(conformanceRef, false);
   process();
   return Changed;
 }
@@ -171,7 +195,7 @@ void SILLinkerVisitor::linkInVTable(ClassDecl *D) {
   // vtables that might have shared linkage yet, so this is only needed in
   // the performance pipeline to deserialize more functions early, and expose
   // optimization opportunities.
-  assert(isLinkAll());
+  ASSERT(isLinkAll());
 
   // Attempt to lookup the Vtbl from the SILModule.
   SILVTable *Vtbl = Mod.lookUpVTable(D);
@@ -183,10 +207,12 @@ void SILLinkerVisitor::linkInVTable(ClassDecl *D) {
   // for processing.
   for (auto &entry : Vtbl->getEntries()) {
     SILFunction *impl = entry.getImplementation();
-    if (!Vtbl->isSerialized() || impl->hasValidLinkageForFragileRef()) {
+    if (!Vtbl->isAnySerialized() ||
+        impl->hasValidLinkageForFragileRef(Vtbl->getSerializedKind())) {
       // Deserialize and recursively walk any vtable entries that do not have
       // bodies yet.
-      maybeAddFunctionToWorklist(impl, Vtbl->isSerialized());
+      maybeAddFunctionToWorklist(impl, 
+                                 Vtbl->getSerializedKind());
     }
   }
 
@@ -213,19 +239,22 @@ void SILLinkerVisitor::visitPartialApplyInst(PartialApplyInst *PAI) {
 
 void SILLinkerVisitor::visitFunctionRefInst(FunctionRefInst *FRI) {
   maybeAddFunctionToWorklist(FRI->getReferencedFunction(),
-                             FRI->getFunction()->isSerialized());
+                             FRI->getFunction()->getSerializedKind(),
+                             FRI->getFunction());
 }
 
 void SILLinkerVisitor::visitDynamicFunctionRefInst(
     DynamicFunctionRefInst *FRI) {
   maybeAddFunctionToWorklist(FRI->getInitiallyReferencedFunction(),
-                             FRI->getFunction()->isSerialized());
+                             FRI->getFunction()->getSerializedKind(),
+                             FRI->getFunction());
 }
 
 void SILLinkerVisitor::visitPreviousDynamicFunctionRefInst(
     PreviousDynamicFunctionRefInst *FRI) {
   maybeAddFunctionToWorklist(FRI->getInitiallyReferencedFunction(),
-                             FRI->getFunction()->isSerialized());
+                             FRI->getFunction()->getSerializedKind(),
+                             FRI->getFunction());
 }
 
 // Eagerly visiting all used conformances leads to a large blowup
@@ -242,12 +271,15 @@ static bool mustDeserializeProtocolConformance(SILModule &M,
     && conformance->isSynthesized();
 }
 
-void SILLinkerVisitor::visitProtocolConformance(ProtocolConformanceRef ref) {
+void SILLinkerVisitor::visitProtocolConformance(
+    ProtocolConformanceRef ref, bool referencedFromInitExistential) {
   // If an abstract protocol conformance was passed in, do nothing.
   if (ref.isAbstract())
     return;
   
-  bool mustDeserialize = mustDeserializeProtocolConformance(Mod, ref);
+  bool isEmbedded = Mod.getOptions().EmbeddedSwift;
+  bool mustDeserialize = (isEmbedded && referencedFromInitExistential) ||
+                         mustDeserializeProtocolConformance(Mod, ref);
 
   // Otherwise try and lookup a witness table for C.
   ProtocolConformance *C = ref.getConcrete();
@@ -255,8 +287,9 @@ void SILLinkerVisitor::visitProtocolConformance(ProtocolConformanceRef ref) {
   if (!VisitedConformances.insert(C).second)
     return;
 
-  auto *WT = Mod.lookUpWitnessTable(C);
-  
+  RootProtocolConformance *rootC = C->getRootConformance();
+  auto *WT = Mod.lookUpWitnessTable(rootC);
+
   if ((!WT || WT->isDeclaration()) &&
       (mustDeserialize || Mode == SILModule::LinkingMode::LinkAll)) {
     if (!WT) {
@@ -264,7 +297,6 @@ void SILLinkerVisitor::visitProtocolConformance(ProtocolConformanceRef ref) {
       if (C->getProtocol()->isMarkerProtocol())
         return;
 
-      RootProtocolConformance *rootC = C->getRootConformance();
       SILLinkage linkage = getLinkageForProtocolConformance(rootC, NotForDefinition);
       WT = SILWitnessTable::create(Mod, linkage,
                                    const_cast<RootProtocolConformance *>(rootC));
@@ -292,6 +324,17 @@ void SILLinkerVisitor::visitProtocolConformance(ProtocolConformanceRef ref) {
     return;
   }
 
+  if (Mod.getASTContext().LangOpts.hasFeature(Feature::Embedded) &&
+      isAvailableExternally(WT->getLinkage()) &&
+      WT->getProtocol()->requiresClass()) {
+    // In embedded swift all the code is generated in the top-level module.
+    // De-serialized tables (= public_external) must be code-gen'd and
+    // therefore made non-external.
+    // Note: for functions we do that at the end of the pipeline in the
+    // IRGenPrepare pass to be able to eliminate dead functions.
+    WT->setLinkage(SILLinkage::Hidden);
+  }
+
   auto maybeVisitRelatedConformance = [&](ProtocolConformanceRef c) {
     // Formally all conformances referenced by a used conformance are used.
     // However, eagerly visiting them all at this point leads to a large blowup
@@ -300,7 +343,7 @@ void SILLinkerVisitor::visitProtocolConformance(ProtocolConformanceRef ref) {
     // However, we *must* pull in shared clang-importer-derived conformances
     // we potentially use, since we may not otherwise have a local definition.
     if (mustDeserializeProtocolConformance(Mod, c))
-      visitProtocolConformance(c);
+      visitProtocolConformance(c, referencedFromInitExistential);
   };
   
   // For each entry in the witness table...
@@ -315,7 +358,8 @@ void SILLinkerVisitor::visitProtocolConformance(ProtocolConformanceRef ref) {
       // Otherwise, deserialize the witness if it has shared linkage, or if
       // we were asked to deserialize everything.
       maybeAddFunctionToWorklist(E.getMethodWitness().Witness,
-        WT->isSerialized() || isAvailableExternally(WT->getLinkage()));
+        (WT->isSerialized() || isAvailableExternally(WT->getLinkage()) ?
+         IsSerialized : WT->getSerializedKind()));
       break;
     }
     
@@ -326,8 +370,8 @@ void SILLinkerVisitor::visitProtocolConformance(ProtocolConformanceRef ref) {
       maybeVisitRelatedConformance(ProtocolConformanceRef(baseConformance));
       break;
     }
-    case SILWitnessTable::WitnessKind::AssociatedTypeProtocol: {
-      auto assocConformance = E.getAssociatedTypeProtocolWitness().Witness;
+    case SILWitnessTable::WitnessKind::AssociatedConformance: {
+      auto assocConformance = E.getAssociatedConformanceWitness().Witness;
       maybeVisitRelatedConformance(assocConformance);
       break;
     }
@@ -349,7 +393,7 @@ void SILLinkerVisitor::visitApplySubstitutions(SubstitutionMap subs) {
     // However, we *must* pull in shared clang-importer-derived conformances
     // we potentially use, since we may not otherwise have a local definition.
     if (mustDeserializeProtocolConformance(Mod, conformance)) {
-      visitProtocolConformance(conformance);
+      visitProtocolConformance(conformance, false);
     }
   }
 }
@@ -365,7 +409,7 @@ void SILLinkerVisitor::visitInitExistentialAddrInst(
   // visiting the open_existential_addr/witness_method before the
   // init_existential_inst.
   for (ProtocolConformanceRef C : IEI->getConformances()) {
-    visitProtocolConformance(C);
+    visitProtocolConformance(C, true);
   }
 }
 
@@ -379,9 +423,10 @@ void SILLinkerVisitor::visitInitExistentialRefInst(
   // not going to be smart about this to enable avoiding any issues with
   // visiting the protocol_method before the init_existential_inst.
   for (ProtocolConformanceRef C : IERI->getConformances()) {
-    visitProtocolConformance(C);
+    visitProtocolConformance(C, true);
   }
 }
+
 void SILLinkerVisitor::visitAllocRefDynamicInst(AllocRefDynamicInst *ARI) {
   if (!isLinkAll())
     return;
@@ -445,7 +490,7 @@ void SILLinkerVisitor::process() {
       // If the containing module has been serialized,
       // Remove The Serialized state (if any)
       //  This allows for more optimizations
-      Fn->setSerialized(IsSerialized_t::IsNotSerialized);
+      Fn->setSerializedKind(SerializedKind_t::IsNotSerialized);
     }
 
     if (Fn->getModule().getOptions().EmbeddedSwift &&
@@ -460,6 +505,9 @@ void SILLinkerVisitor::process() {
     for (auto &BB : *Fn) {
       for (auto &I : BB) {
         visit(&I);
+
+        if (hasError)
+          return;
       }
     }
   }

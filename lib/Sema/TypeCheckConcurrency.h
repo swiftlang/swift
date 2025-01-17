@@ -23,6 +23,8 @@
 #include "swift/AST/Expr.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/Type.h"
+#include "swift/Sema/Concurrency.h"
+
 #include <cassert>
 
 namespace swift {
@@ -42,6 +44,7 @@ class EnumElementDecl;
 class Expr;
 class FuncDecl;
 class Initializer;
+class LookupResult;
 class PatternBindingDecl;
 class ProtocolConformance;
 class TopLevelCodeDecl;
@@ -85,6 +88,10 @@ enum class SendableCheckReason {
 /// Check that the actor isolation of an override matches that of its
 /// overridden declaration.
 void checkOverrideActorIsolation(ValueDecl *value);
+
+/// Diagnose global state that is not either immutable plus Sendable or isolated
+/// to a global actor.
+void checkGlobalIsolation(VarDecl *var);
 
 /// Determine whether the given context requires strict concurrency checking,
 /// e.g., because it uses concurrency features directly or because it's in
@@ -317,7 +324,7 @@ bool diagnoseNonSendableTypesInReference(
 
 /// Produce a diagnostic for a missing conformance to Sendable.
 void diagnoseMissingSendableConformance(
-    SourceLoc loc, Type type, const DeclContext *fromDC);
+    SourceLoc loc, Type type, const DeclContext *fromDC, bool preconcurrency);
 
 /// If the given nominal type is public and does not explicitly
 /// state whether it conforms to Sendable, provide a diagnostic.
@@ -371,12 +378,23 @@ static inline bool isImplicitSendableCheck(SendableCheck check) {
 /// Describes the context in which a \c Sendable check occurs.
 struct SendableCheckContext {
   const DeclContext * const fromDC;
+  bool preconcurrencyContext;
   const std::optional<SendableCheck> conformanceCheck;
 
   SendableCheckContext(
       const DeclContext *fromDC,
       std::optional<SendableCheck> conformanceCheck = std::nullopt)
-      : fromDC(fromDC), conformanceCheck(conformanceCheck) {}
+      : fromDC(fromDC),
+        preconcurrencyContext(false),
+        conformanceCheck(conformanceCheck) {}
+
+  SendableCheckContext(
+      const DeclContext *fromDC,
+      bool preconcurrencyContext,
+      std::optional<SendableCheck> conformanceCheck = std::nullopt)
+      : fromDC(fromDC),
+        preconcurrencyContext(preconcurrencyContext),
+        conformanceCheck(conformanceCheck) {}
 
   /// Determine the default diagnostic behavior for a missing/unavailable
   /// Sendable conformance in this context.
@@ -389,10 +407,12 @@ struct SendableCheckContext {
   /// type in this context.
   DiagnosticBehavior diagnosticBehavior(NominalTypeDecl *nominal) const;
 
-  std::optional<DiagnosticBehavior> preconcurrencyBehavior(Decl *decl) const;
+  std::optional<DiagnosticBehavior> preconcurrencyBehavior(
+      Decl *decl,
+      bool ignoreExplicitConformance = false) const;
 
-  /// Whether we are in an explicit conformance to Sendable.
-  bool isExplicitSendableConformance() const;
+  /// Whether to warn about a Sendable violation even in minimal checking.
+  bool warnInMinimalChecking() const;
 };
 
 /// Diagnose any non-Sendable types that occur within the given type, using
@@ -434,20 +454,67 @@ bool diagnoseNonSendableTypes(
     Diag<Type, DiagArgs...> diag,
     typename detail::Identity<DiagArgs>::type ...diagArgs) {
 
-    ASTContext &ctx = fromContext.fromDC->getASTContext();
-    return diagnoseNonSendableTypes(
-        type, fromContext, derivedConformance, typeLoc,
-        [&](Type specificType, DiagnosticBehavior behavior) {
-          auto preconcurrency =
-              fromContext.preconcurrencyBehavior(type->getAnyNominal());
+  ASTContext &ctx = fromContext.fromDC->getASTContext();
+  return diagnoseNonSendableTypes(
+      type, fromContext, derivedConformance, typeLoc,
+      [&](Type specificType, DiagnosticBehavior behavior) {
+        // FIXME: Reconcile preconcurrency declaration vs preconcurrency
+        // import behavior.
+        auto preconcurrency =
+          fromContext.preconcurrencyBehavior(specificType->getAnyNominal());
 
+        ctx.Diags.diagnose(diagnoseLoc, diag, type, diagArgs...)
+            .limitBehaviorWithPreconcurrency(behavior,
+                                             fromContext.preconcurrencyContext)
+            .limitBehaviorIf(preconcurrency);
+
+        return (behavior == DiagnosticBehavior::Ignore ||
+                preconcurrency == DiagnosticBehavior::Ignore);
+      });
+}
+
+/// Emit a diagnostic if there are any non-Sendable types for which
+/// the Sendable diagnostic wasn't suppressed. This diagnostic will
+/// only be emitted once, but there might be additional notes for the
+/// various occurrences of Sendable types.
+///
+/// \param typeLoc is the source location of the type being diagnosed
+///
+/// \param diagnoseLoc is the source location at which the main diagnostic should
+/// be reported, which can differ from typeLoc
+///
+/// \returns \c true if any diagnostics.
+template<typename ...DiagArgs>
+bool diagnoseIfAnyNonSendableTypes(
+    Type type, SendableCheckContext fromContext,
+    Type derivedConformance,
+    SourceLoc typeLoc, SourceLoc diagnoseLoc,
+    Diag<Type, DiagArgs...> diag,
+    typename detail::Identity<DiagArgs>::type ...diagArgs) {
+
+  ASTContext &ctx = fromContext.fromDC->getASTContext();
+  bool diagnosed = false;
+  diagnoseNonSendableTypes(
+      type, fromContext, derivedConformance, typeLoc,
+      [&](Type specificType, DiagnosticBehavior behavior) {
+        auto preconcurrency =
+          fromContext.preconcurrencyBehavior(specificType->getAnyNominal());
+
+        if (behavior == DiagnosticBehavior::Ignore ||
+            preconcurrency == DiagnosticBehavior::Ignore)
+          return true;
+
+        if (!diagnosed) {
           ctx.Diags.diagnose(diagnoseLoc, diag, type, diagArgs...)
               .limitBehaviorUntilSwiftVersion(behavior, 6)
               .limitBehaviorIf(preconcurrency);
+          diagnosed = true;
+        }
 
-          return (behavior == DiagnosticBehavior::Ignore ||
-                  preconcurrency == DiagnosticBehavior::Ignore);
-        });
+        return false;
+      });
+
+  return diagnosed;
 }
 
 /// Diagnose any non-Sendable types that occur within the given type, using
@@ -487,11 +554,6 @@ bool diagnoseSendabilityErrorBasedOn(
     NominalTypeDecl *nominal, SendableCheckContext fromContext,
     llvm::function_ref<bool(DiagnosticBehavior)> diagnose);
 
-/// If any of the imports in this source file was @preconcurrency but
-/// there were no diagnostics downgraded or suppressed due to that
-/// @preconcurrency, suggest that the attribute be removed.
-void diagnoseUnnecessaryPreconcurrencyImports(SourceFile &sf);
-
 /// Given a set of custom attributes, pick out the global actor attributes
 /// and perform any necessary resolution and diagnostics, returning the
 /// global actor attribute and type it refers to (or \c std::nullopt).
@@ -501,6 +563,11 @@ checkGlobalActorAttributes(SourceLoc loc, DeclContext *dc,
 
 /// Get the explicit global actor specified for a closure.
 Type getExplicitGlobalActor(ClosureExpr *closure);
+
+/// Determine the actor isolation used when we are referencing the given
+/// declaration.
+ActorIsolation getActorIsolationForReference(ValueDecl *decl,
+                                             const DeclContext *fromDC);
 
 /// Adjust the type of the variable for concurrency.
 Type adjustVarTypeForConcurrency(
@@ -548,9 +615,7 @@ ProtocolConformance *deriveImplicitSendableConformance(Evaluator &evaluator,
 /// Check whether we are in an actor's initializer or deinitializer.
 /// \returns nullptr iff we are not in such a declaration. Otherwise,
 ///          returns a pointer to the declaration.
-AbstractFunctionDecl const *isActorInitOrDeInitContext(
-    const DeclContext *dc,
-    llvm::function_ref<bool(const AbstractClosureExpr *)> isSendable);
+const AbstractFunctionDecl *isActorInitOrDeInitContext(const DeclContext *dc);
 
 /// Determine whether this declaration is always accessed asynchronously.
 bool isAsyncDecl(ConcreteDeclRef declRef);
@@ -602,10 +667,37 @@ bool isPotentiallyIsolatedActor(
     VarDecl *var, llvm::function_ref<bool(ParamDecl *)> isIsolated =
                       [](ParamDecl *P) { return P->isIsolated(); });
 
-/// Check whether the given ApplyExpr makes an unsatisfied isolation jump
-/// and if so, emit diagnostics for any nonsendable arguments to the apply
-bool diagnoseApplyArgSendability(
-    swift::ApplyExpr *apply, const DeclContext *declContext);
+/// If the enclosing function has @_unsafeInheritExecutorAttr, return it.
+AbstractFunctionDecl *enclosingUnsafeInheritsExecutor(const DeclContext *dc);
+
+/// Add Fix-Its to the given function to replace the @_unsafeInheritExecutor
+/// attribute with a defaulted isolation parameter.
+void replaceUnsafeInheritExecutorWithDefaultedIsolationParam(
+    AbstractFunctionDecl *func, InFlightDiagnostic &diag);
+
+/// Replace any functions in this list that were found in the _Concurrency
+/// module and have _unsafeInheritExecutor_-prefixed versions with those
+/// _unsafeInheritExecutor_-prefixed versions.
+///
+/// This function is an egregious hack that allows us to introduce the
+/// #isolation-based versions of functions into the concurrency library
+/// without breaking clients that use @_unsafeInheritExecutor. Since those
+/// clients can't use #isolation (it doesn't work with @_unsafeInheritExecutor),
+/// we route them to the @_unsafeInheritExecutor versions implicitly.
+void introduceUnsafeInheritExecutorReplacements(
+    const DeclContext *dc, SourceLoc loc, SmallVectorImpl<ValueDecl *> &decls);
+
+/// Replace any functions in this list that were found in the _Concurrency
+/// module as a member on "base" and have _unsafeInheritExecutor_-prefixed
+/// versions with those _unsafeInheritExecutor_-prefixed versions.
+///
+/// This function is an egregious hack that allows us to introduce the
+/// #isolation-based versions of functions into the concurrency library
+/// without breaking clients that use @_unsafeInheritExecutor. Since those
+/// clients can't use #isolation (it doesn't work with @_unsafeInheritExecutor),
+/// we route them to the @_unsafeInheritExecutor versions implicitly.
+void introduceUnsafeInheritExecutorReplacements(
+    const DeclContext *dc, Type base, SourceLoc loc, LookupResult &result);
 
 } // end namespace swift
 

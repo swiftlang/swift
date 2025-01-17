@@ -1,0 +1,49 @@
+// RUN: %target-sil-opt -sil-print-types -loadable-address %s | %FileCheck %s
+
+sil_stage canonical
+
+import Builtin
+import Swift
+
+struct X {
+  var x1 : Int
+  var x2 : Int
+  var x3 : Int
+  var x4: Int
+  var x5: Int
+  var x6: Int
+  var x7: Int
+  var x8: Int
+  var x9: Int
+  var x10: Int
+  var x11: Int
+  var x12: Int
+  var x13: Int
+  var x14: Int
+  var x15: Int
+  var x16: Int
+}
+
+
+// CHECK: sil @test1 : $@convention(thin) () -> () {
+// CHECK: bb0:
+// CHECK:   %0 = alloc_stack $Optional<X>
+// CHECK:   %1 = alloc_stack $X
+// CHECK:   %2 = alloc_stack $X
+// CHECK:   %3 = alloc_stack $Optional<X>
+// CHECK:   debug_value %{{[0-9]+}} : $*X, let, name "temp"
+// CHECK: } // end sil function 'test1'
+
+sil @test1 : $@convention(thin) () -> () {
+bb0:
+  %0 = alloc_stack $X
+  %1 = alloc_stack $Optional<X>
+  %2 = load %0 : $*X
+  debug_value %2 : $X, let, name "temp"
+  %3 = enum $Optional<X>, #Optional.some!enumelt, %2 : $X
+  store %3 to %1 : $*Optional<X>
+  dealloc_stack %1 : $*Optional<X>
+  dealloc_stack %0 : $*X
+  %t = tuple ()
+  return %t : $()
+}

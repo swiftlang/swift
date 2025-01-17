@@ -21,6 +21,7 @@
 #include "swift/AST/AnyFunctionRef.h"
 #include "swift/AST/AutoDiff.h"
 #include "swift/AST/Builtins.h"
+#include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/DeclContext.h"
 #include "swift/AST/DiagnosticsSIL.h"
 #include "swift/AST/Expr.h"
@@ -30,6 +31,7 @@
 #include "swift/AST/SourceFile.h"
 #include "swift/AST/SubstitutionMap.h"
 #include "swift/AST/TypeCheckRequests.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/SIL/FormalLinkage.h"
 #include "swift/SIL/PrettyStackTrace.h"
 #include "swift/SIL/SILBuilder.h"
@@ -110,9 +112,10 @@ public:
   ///
   /// \param serializeFunctions specifies whether generated functions should be
   ///        serialized.
-  bool canonicalizeDifferentiabilityWitness(
-      SILDifferentiabilityWitness *witness, DifferentiationInvoker invoker,
-      IsSerialized_t serializeFunctions);
+  bool
+  canonicalizeDifferentiabilityWitness(SILDifferentiabilityWitness *witness,
+                                       DifferentiationInvoker invoker,
+                                       SerializedKind_t serializeFunctions);
 
   /// Process the given `differentiable_function` instruction, filling in
   /// missing derivative functions if necessary.
@@ -202,7 +205,6 @@ static bool diagnoseUnsatisfiedRequirements(ADContext &context,
   if (requirements.empty())
     return false;
   // Iterate through all requirements and check whether they are satisfied.
-  auto *swiftModule = context.getModule().getSwiftModule();
   SmallVector<Requirement, 2> unsatisfiedRequirements;
   for (auto req : requirements) {
     auto firstType = req.getFirstType();
@@ -211,14 +213,14 @@ static bool diagnoseUnsatisfiedRequirements(ADContext &context,
     // looking up conformances in the current module, if possible.
     if (auto substFirstType =
             firstType.subst(QuerySubstitutionMap{substMap},
-                            LookUpConformanceInModule(swiftModule))) {
+                            LookUpConformanceInModule())) {
       firstType = substFirstType;
     }
     if (req.getKind() != RequirementKind::Layout) {
       secondType = req.getSecondType();
       if (auto substSecondType =
               secondType.subst(QuerySubstitutionMap{substMap},
-                               LookUpConformanceInModule(swiftModule))) {
+                               LookUpConformanceInModule())) {
         secondType = substSecondType;
       }
     }
@@ -265,7 +267,7 @@ static bool diagnoseUnsatisfiedRequirements(ADContext &context,
       assert(protocol && "Expected protocol in generic signature requirement");
       // If the first type does not conform to the second type in the current
       // module, then record the unsatisfied requirement.
-      if (!swiftModule->lookupConformance(firstType, protocol))
+      if (!lookupConformance(firstType, protocol))
         unsatisfiedRequirements.push_back(req);
       continue;
     }
@@ -311,7 +313,7 @@ static void copyParameterArgumentsForApply(
     auto argConv = applySite.getArgumentConvention(argOperand);
     auto collectNewArg = [&](SILValue newArg) {
       copiedArgs.push_back(newArg);
-      if (argConv.isGuaranteedConvention() &&
+      if (argConv.isGuaranteedConventionInCaller() &&
           argConv != SILArgumentConvention::Indirect_InoutAliasable)
         newArgsToDestroy.push_back(newArg);
     };
@@ -442,7 +444,7 @@ static SILValue reapplyFunctionConversion(
       } else {
         substMap = SubstitutionMap::get(
             newFuncGenSig, QuerySubstitutionMap{pai->getSubstitutionMap()},
-            LookUpConformanceInModule(builder.getModule().getSwiftModule()));
+            LookUpConformanceInModule());
       }
     }
     return builder.createPartialApply(loc, innerNewFunc, substMap, newArgs,
@@ -602,7 +604,7 @@ emitDerivativeFunctionReference(
               originalFn->getLoweredFunctionType(),
               desiredParameterIndices, desiredResultIndices,
               contextualDerivativeGenSig,
-              LookUpConformanceInModule(context.getModule().getSwiftModule()));
+              LookUpConformanceInModule());
       minimalWitness = SILDifferentiabilityWitness::createDefinition(
           context.getModule(), SILLinkage::Private, originalFn,
           DifferentiabilityKind::Reverse, desiredParameterIndices,
@@ -701,7 +703,7 @@ emitDerivativeFunctionReference(
     auto assocType = originalType->getAutoDiffDerivativeFunctionType(
         minimalConfig->parameterIndices, minimalConfig->resultIndices, kind,
         context.getTypeConverter(),
-        LookUpConformanceInModule(builder.getModule().getSwiftModule()));
+        LookUpConformanceInModule());
     auto *autoDiffFuncId = AutoDiffDerivativeFunctionIdentifier::get(
         kind, minimalASTParamIndices, minimalConfig->derivativeGenericSignature,
         context.getASTContext());
@@ -746,7 +748,7 @@ emitDerivativeFunctionReference(
     auto assocType = originalType->getAutoDiffDerivativeFunctionType(
         minimalConfig->parameterIndices, minimalConfig->resultIndices, kind,
         context.getTypeConverter(),
-        LookUpConformanceInModule(builder.getModule().getSwiftModule()));
+        LookUpConformanceInModule());
     auto *autoDiffFuncId = AutoDiffDerivativeFunctionIdentifier::get(
         kind, minimalASTParamIndices, minimalConfig->derivativeGenericSignature,
         context.getASTContext());
@@ -772,7 +774,7 @@ emitDerivativeFunctionReference(
 
 static SILFunction *createEmptyVJP(ADContext &context,
                                    SILDifferentiabilityWitness *witness,
-                                   IsSerialized_t isSerialized) {
+                                   SerializedKind_t isSerialized) {
   auto original = witness->getOriginalFunction();
   auto config = witness->getConfig();
   LLVM_DEBUG({
@@ -786,7 +788,7 @@ static SILFunction *createEmptyVJP(ADContext &context,
   auto originalTy = original->getLoweredFunctionType();
 
   // === Create an empty VJP. ===
-  Mangle::DifferentiationMangler mangler;
+  Mangle::DifferentiationMangler mangler(context.getASTContext());
   auto vjpName = mangler.mangleDerivativeFunction(
       original->getName(), AutoDiffDerivativeFunctionKind::VJP, config);
   auto vjpCanGenSig = witness->getDerivativeGenericSignature().getCanonicalSignature();
@@ -796,7 +798,7 @@ static SILFunction *createEmptyVJP(ADContext &context,
   auto vjpType = originalTy->getAutoDiffDerivativeFunctionType(
       config.parameterIndices, config.resultIndices,
       AutoDiffDerivativeFunctionKind::VJP,
-      module.Types, LookUpConformanceInModule(module.getSwiftModule()),
+      module.Types, LookUpConformanceInModule(),
       vjpCanGenSig,
       /*isReabstractionThunk*/ original->isThunk() == IsReabstractionThunk);
 
@@ -817,7 +819,7 @@ static SILFunction *createEmptyVJP(ADContext &context,
 
 static SILFunction *createEmptyJVP(ADContext &context,
                                    SILDifferentiabilityWitness *witness,
-                                   IsSerialized_t isSerialized) {
+                                   SerializedKind_t isSerialized) {
   auto original = witness->getOriginalFunction();
   auto config = witness->getConfig();
   LLVM_DEBUG({
@@ -830,7 +832,7 @@ static SILFunction *createEmptyJVP(ADContext &context,
   auto &module = context.getModule();
   auto originalTy = original->getLoweredFunctionType();
 
-  Mangle::DifferentiationMangler mangler;
+  Mangle::DifferentiationMangler mangler(context.getASTContext());
   auto jvpName = mangler.mangleDerivativeFunction(
       original->getName(), AutoDiffDerivativeFunctionKind::JVP, config);
   auto jvpCanGenSig = witness->getDerivativeGenericSignature().getCanonicalSignature();
@@ -840,7 +842,7 @@ static SILFunction *createEmptyJVP(ADContext &context,
   auto jvpType = originalTy->getAutoDiffDerivativeFunctionType(
       config.parameterIndices, config.resultIndices,
       AutoDiffDerivativeFunctionKind::JVP,
-      module.Types, LookUpConformanceInModule(module.getSwiftModule()),
+      module.Types, LookUpConformanceInModule(),
       jvpCanGenSig,
       /*isReabstractionThunk*/ original->isThunk() == IsReabstractionThunk);
 
@@ -894,7 +896,7 @@ static void emitFatalError(ADContext &context, SILFunction *f,
 /// Returns true on error.
 bool DifferentiationTransformer::canonicalizeDifferentiabilityWitness(
     SILDifferentiabilityWitness *witness, DifferentiationInvoker invoker,
-    IsSerialized_t serializeFunctions) {
+    SerializedKind_t serializeFunctions) {
   std::string traceMessage;
   llvm::raw_string_ostream OS(traceMessage);
   OS << "processing ";
@@ -905,6 +907,15 @@ bool DifferentiationTransformer::canonicalizeDifferentiabilityWitness(
       traceMessage.c_str(), witness->getOriginalFunction());
 
   assert(witness->isDefinition());
+  SILFunction *orig = witness->getOriginalFunction();
+
+  // We can generate empty JVP / VJP for functions available externally. These
+  // functions have the same linkage as the original ones sans `external`
+  // flag. Important exception here hidden_external functions as they are
+  // serializable but corresponding hidden ones would be not and the SIL
+  // verifier will fail. Patch `serializeFunctions` for this case.
+  if (orig->getLinkage() == SILLinkage::HiddenExternal)
+    serializeFunctions = IsNotSerialized;
 
   // If the JVP doesn't exist, need to synthesize it.
   if (!witness->getJVP()) {
@@ -913,9 +924,8 @@ bool DifferentiationTransformer::canonicalizeDifferentiabilityWitness(
     // - Functions with unsupported control flow.
     if (context.getASTContext()
             .LangOpts.hasFeature(Feature::ForwardModeDifferentiation) &&
-        (diagnoseNoReturn(context, witness->getOriginalFunction(), invoker) ||
-         diagnoseUnsupportedControlFlow(
-             context, witness->getOriginalFunction(), invoker)))
+        (diagnoseNoReturn(context, orig, invoker) ||
+         diagnoseUnsupportedControlFlow(context, orig, invoker)))
       return true;
 
     // Create empty JVP.
@@ -932,10 +942,10 @@ bool DifferentiationTransformer::canonicalizeDifferentiabilityWitness(
         !witness->getVJP()) {
       // JVP and differential generation do not currently support functions with
       // multiple basic blocks.
-      if (witness->getOriginalFunction()->size() > 1) {
-        context.emitNondifferentiabilityError(
-            witness->getOriginalFunction()->getLocation().getSourceLoc(),
-            invoker, diag::autodiff_jvp_control_flow_not_supported);
+      if (orig->size() > 1) {
+        context.emitNondifferentiabilityError(orig->getLocation().getSourceLoc(),
+                                              invoker,
+                                              diag::autodiff_jvp_control_flow_not_supported);
         return true;
       }
       // Emit JVP function.
@@ -949,7 +959,7 @@ bool DifferentiationTransformer::canonicalizeDifferentiabilityWitness(
                      "_fatalErrorForwardModeDifferentiationDisabled");
       LLVM_DEBUG(getADDebugStream()
                  << "Generated empty JVP for "
-                 << witness->getOriginalFunction()->getName() << ":\n"
+                 << orig->getName() << ":\n"
                  << *jvp);
     }
   }
@@ -959,9 +969,8 @@ bool DifferentiationTransformer::canonicalizeDifferentiabilityWitness(
     // Diagnose:
     // - Functions with no return.
     // - Functions with unsupported control flow.
-    if (diagnoseNoReturn(context, witness->getOriginalFunction(), invoker) ||
-        diagnoseUnsupportedControlFlow(
-            context, witness->getOriginalFunction(), invoker))
+    if (diagnoseNoReturn(context, orig, invoker) ||
+        diagnoseUnsupportedControlFlow(context, orig, invoker))
       return true;
 
     // Create empty VJP.
@@ -1043,10 +1052,10 @@ static SILValue promoteCurryThunkApplicationToDifferentiableFunction(
   SILOptFunctionBuilder fb(dt.getTransform());
   auto *newThunk = fb.getOrCreateFunction(
       loc, newThunkName, getSpecializedLinkage(thunk, thunk->getLinkage()),
-      thunkType, thunk->isBare(), thunk->isTransparent(), thunk->isSerialized(),
-      thunk->isDynamicallyReplaceable(), thunk->isDistributed(),
-      thunk->isRuntimeAccessible(),
-      ProfileCounter(), thunk->isThunk());
+      thunkType, thunk->isBare(), thunk->isTransparent(),
+      thunk->getSerializedKind(), thunk->isDynamicallyReplaceable(),
+      thunk->isDistributed(), thunk->isRuntimeAccessible(), ProfileCounter(),
+      thunk->isThunk());
   // If new thunk is newly created: clone the old thunk body, wrap the
   // returned function value with an `differentiable_function`
   // instruction, and process the `differentiable_function` instruction.
@@ -1183,7 +1192,7 @@ SILValue DifferentiationTransformer::promoteToDifferentiableFunction(
     auto expectedDerivativeFnTy = origFnTy->getAutoDiffDerivativeFunctionType(
         parameterIndices, resultIndices, derivativeFnKind,
         context.getTypeConverter(),
-        LookUpConformanceInModule(context.getModule().getSwiftModule()));
+        LookUpConformanceInModule());
     // If `derivativeFn` is `@convention(thin)` but is expected to be
     // `@convention(thick)`, emit a `thin_to_thick` instruction.
     if (expectedDerivativeFnTy->getRepresentation() ==
@@ -1242,7 +1251,7 @@ SILValue DifferentiationTransformer::promoteToLinearFunction(
   auto originalType = origFnOperand->getType().castTo<SILFunctionType>();
   auto transposeFnType = originalType->getAutoDiffTransposeFunctionType(
       parameterIndices, context.getTypeConverter(),
-      LookUpConformanceInModule(builder.getModule().getSwiftModule()));
+      LookUpConformanceInModule());
   auto transposeType = SILType::getPrimitiveObjectType(transposeFnType);
   auto transposeFn = SILUndef::get(builder.getFunction(), transposeType);
   auto *newLinearFn = context.createLinearFunction(
@@ -1395,7 +1404,8 @@ void Differentiation::run() {
     auto *witness = invokerPair.first;
     auto invoker = invokerPair.second;
     if (transformer.canonicalizeDifferentiabilityWitness(
-            witness, invoker, witness->getOriginalFunction()->isSerialized()))
+            witness, invoker,
+            witness->getOriginalFunction()->getSerializedKind()))
       errorOccurred = true;
   }
 

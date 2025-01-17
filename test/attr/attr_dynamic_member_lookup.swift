@@ -682,7 +682,7 @@ func invalid_refs_through_dynamic_lookup() {
   }
 
   func test(_ lens: A<S>) {
-    _ = lens.foo           // expected-error {{dynamic key path member lookup cannot refer to static member 'foo'}}
+    _ = lens.foo           // expected-error {{static member 'foo' cannot be used on instance of type 'S'}}
     _ = lens.bar()         // expected-error {{dynamic key path member lookup cannot refer to instance method 'bar()'}}
     _ = lens.bar().faz + 1 // expected-error {{dynamic key path member lookup cannot refer to instance method 'bar()'}}
     _ = lens.baz("hello")  // expected-error {{dynamic key path member lookup cannot refer to static method 'baz'}}
@@ -831,5 +831,12 @@ public struct S3_54864 {}
 public extension S3_54864 {
   subscript<T>(dynamicMember member: KeyPath<S3_54864, T>) -> T {
     get { s2_54864_instance[keyPath: member] } // expected-error {{key path with root type 'S3_54864' cannot be applied to a base of type 'S2_54864'}}
+  }
+}
+
+// https://github.com/swiftlang/swift/issues/75244
+struct WithSendable {
+  subscript(dynamicMember member: KeyPath<String, Int> & Sendable) -> Bool { // Ok
+    get { false }
   }
 }

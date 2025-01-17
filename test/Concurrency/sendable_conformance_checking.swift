@@ -4,7 +4,7 @@
 // RUN: %target-swift-frontend -emit-sil %s -o /dev/null -verify -verify-additional-prefix complete-and-tns- -strict-concurrency=complete -enable-upcoming-feature RegionBasedIsolation
 
 // REQUIRES: concurrency
-// REQUIRES: asserts
+// REQUIRES: swift_feature_RegionBasedIsolation
 
 @available(SwiftStdlib 5.1, *)
 class NotSendable { // expected-note 9{{class 'NotSendable' does not conform to the 'Sendable' protocol}}
@@ -38,7 +38,7 @@ actor A2: IsolatedWithNotSendableRequirements {
   nonisolated var prop: NotSendable { NotSendable() }
 
   nonisolated func fAsync() async -> NotSendable { NotSendable() }
-  // expected-warning@-1{{non-sendable type 'NotSendable' returned by nonisolated instance method 'fAsync()' satisfying protocol requirement cannot cross actor boundary}}
+  // expected-warning@-1{{non-sendable type 'NotSendable' cannot be returned from nonisolated implementation to caller of protocol requirement 'fAsync()'}}
 }
 
 @available(SwiftStdlib 5.1, *)
@@ -51,9 +51,9 @@ protocol AsyncProtocolWithNotSendable {
 // actor's domain.
 @available(SwiftStdlib 5.1, *)
 actor A3: AsyncProtocolWithNotSendable {
-  func f() async -> NotSendable { NotSendable() } // expected-warning{{non-sendable type 'NotSendable' returned by actor-isolated instance method 'f()' satisfying protocol requirement cannot cross actor boundary}}
+  func f() async -> NotSendable { NotSendable() } // expected-warning{{non-sendable type 'NotSendable' cannot be returned from actor-isolated implementation to caller of protocol requirement 'f()'}}
 
-  var prop: NotSendable { // expected-warning{{non-sendable type 'NotSendable' in conformance of actor-isolated property 'prop' to protocol requirement cannot cross actor boundary}}
+  var prop: NotSendable { // expected-warning{{non-sendable type 'NotSendable' cannot be returned from actor-isolated implementation to caller of protocol requirement 'prop'}}
     get async {
       NotSendable()
     }
@@ -64,9 +64,9 @@ actor A3: AsyncProtocolWithNotSendable {
 // actor's domain.
 @available(SwiftStdlib 5.1, *)
 actor A4: AsyncProtocolWithNotSendable {
-  func f() -> NotSendable { NotSendable() } // expected-warning{{non-sendable type 'NotSendable' returned by actor-isolated instance method 'f()' satisfying protocol requirement cannot cross actor boundary}}
+  func f() -> NotSendable { NotSendable() } // expected-warning{{non-sendable type 'NotSendable' cannot be returned from actor-isolated implementation to caller of protocol requirement 'f()'}}
 
-  var prop: NotSendable { // expected-warning{{non-sendable type 'NotSendable' in conformance of actor-isolated property 'prop' to protocol requirement cannot cross actor boundary}}
+  var prop: NotSendable { // expected-warning{{non-sendable type 'NotSendable' cannot be returned from actor-isolated implementation to caller of protocol requirement 'prop'}}
     get {
       NotSendable()
     }
@@ -109,9 +109,9 @@ protocol AsyncThrowingProtocolWithNotSendable {
 // actor's domain.
 @available(SwiftStdlib 5.1, *)
 actor A7: AsyncThrowingProtocolWithNotSendable {
-  func f() async -> NotSendable { NotSendable() } // expected-warning{{non-sendable type 'NotSendable' returned by actor-isolated instance method 'f()' satisfying protocol requirement cannot cross actor boundary}}
+  func f() async -> NotSendable { NotSendable() } // expected-warning{{non-sendable type 'NotSendable' cannot be returned from actor-isolated implementation to caller of protocol requirement 'f()'}}
 
-  var prop: NotSendable { // expected-warning{{non-sendable type 'NotSendable' in conformance of actor-isolated property 'prop' to protocol requirement cannot cross actor boundary}}
+  var prop: NotSendable { // expected-warning{{non-sendable type 'NotSendable' cannot be returned from actor-isolated implementation to caller of protocol requirement 'prop'}}
     get async {
       NotSendable()
     }
@@ -122,9 +122,9 @@ actor A7: AsyncThrowingProtocolWithNotSendable {
 // actor's domain.
 @available(SwiftStdlib 5.1, *)
 actor A8: AsyncThrowingProtocolWithNotSendable {
-  func f() -> NotSendable { NotSendable() } // expected-warning{{non-sendable type 'NotSendable' returned by actor-isolated instance method 'f()' satisfying protocol requirement cannot cross actor boundary}}
+  func f() -> NotSendable { NotSendable() } // expected-warning{{non-sendable type 'NotSendable' cannot be returned from actor-isolated implementation to caller of protocol requirement 'f()'}}
 
-  var prop: NotSendable { // expected-warning{{non-sendable type 'NotSendable' in conformance of actor-isolated property 'prop' to protocol requirement cannot cross actor boundary}}
+  var prop: NotSendable { // expected-warning{{non-sendable type 'NotSendable' cannot be returned from actor-isolated implementation to caller of protocol requirement 'prop'}}
     get {
       NotSendable()
     }
@@ -180,10 +180,41 @@ extension SendableExtSub: @unchecked Sendable {}
 
 // Still want to know about same-class redundancy
 class MultiConformance: @unchecked Sendable {} // expected-note {{'MultiConformance' declares conformance to protocol 'Sendable' here}}
-extension MultiConformance: @unchecked Sendable {} // expected-error {{redundant conformance of 'MultiConformance' to protocol 'Sendable'}}
+extension MultiConformance: @unchecked Sendable {} // expected-warning {{redundant conformance of 'MultiConformance' to protocol 'Sendable'}}
 
 @available(SwiftStdlib 5.1, *)
 actor MyActor {
   // expected-warning@+1 {{non-final class 'Nested' cannot conform to 'Sendable'; use '@unchecked Sendable'; this is an error in the Swift 6 language mode}}
   class Nested: Sendable {}
+}
+
+@Sendable func globalFn() {}
+
+protocol NoSendableReqs {
+  var prop: () -> Void { get }
+  static var staticProp: () -> Void { get }
+}
+
+public struct TestSendableWitnesses1 : NoSendableReqs {
+  var prop: @Sendable () -> Void // Ok (no warnings)
+  static let staticProp: @Sendable () -> Void = { } // Ok (no warnings)
+}
+
+public struct TestSendableWitnesses2 : NoSendableReqs {
+  var prop = globalFn // Ok (no warnings)
+  static let staticProp = globalFn // Ok (no warnings)
+}
+
+// @preconcurrency attributes to make it akin to an imported Obj-C API
+@preconcurrency @MainActor public protocol EscapingSendableProtocol {
+  // expected-complete-and-tns-note @+1 {{protocol requires function 'f(handler:)' with type '(@escaping @MainActor @Sendable (Int) -> Void) -> ()'}}
+  @preconcurrency func f(handler: @escaping @MainActor @Sendable (Int) -> Void)
+}
+
+// TODO: The following error should actually be a warning.
+// expected-complete-and-tns-error @+2 {{type 'TestEscapingOnly' does not conform to protocol 'EscapingSendableProtocol'}}
+// expected-complete-and-tns-note @+1 {{add stubs for conformance}}
+class TestEscapingOnly: EscapingSendableProtocol {
+    // expected-complete-and-tns-note @+1 {{candidate has non-matching type '(@escaping (Int) -> Void) -> ()'}}
+    func f(handler: @escaping (Int) -> Void) {}
 }

@@ -53,6 +53,7 @@
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/Types.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/Statistic.h"
 #include "swift/IRGen/Linking.h"
 
@@ -83,14 +84,12 @@ irgen::bindPolymorphicArgumentsFromComponentIndices(IRGenFunction &IGF,
   // The generic environment is marshaled into the end of the component
   // argument area inside the instance. Bind the generic information out of
   // the buffer.
-  if (hasSubscriptIndices) {
-    auto genericArgsSize = llvm::ConstantInt::get(IGF.IGM.SizeTy,
-      requirements.size() * IGF.IGM.getPointerSize().getValue());
+  auto genericArgsSize = llvm::ConstantInt::get(IGF.IGM.SizeTy,
+    requirements.size() * IGF.IGM.getPointerSize().getValue());
 
-    auto genericArgsOffset = IGF.Builder.CreateSub(size, genericArgsSize);
-    args =
-        IGF.Builder.CreateInBoundsGEP(IGF.IGM.Int8Ty, args, genericArgsOffset);
-  }
+  auto genericArgsOffset = IGF.Builder.CreateSub(size, genericArgsSize);
+  args =
+      IGF.Builder.CreateInBoundsGEP(IGF.IGM.Int8Ty, args, genericArgsOffset);
 
   bindFromGenericRequirementsBuffer(
       IGF, requirements,
@@ -785,8 +784,10 @@ emitKeyPathComponent(IRGenModule &IGM,
               substType = substType
                               .transformRec([](Type t) -> std::optional<Type> {
                                 if (auto *openedExistential =
-                                        t->getAs<OpenedArchetypeType>())
-                                  return openedExistential->getInterfaceType();
+                                        t->getAs<OpenedArchetypeType>()) {
+                                  auto &ctx = openedExistential->getASTContext();
+                                  return GenericTypeParamType::getType(0, 0, ctx);
+                                }
                                 return std::nullopt;
                               })
                               ->getCanonicalType();

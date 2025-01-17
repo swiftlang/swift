@@ -63,9 +63,6 @@ internal final class __EmptyArrayStorage
   }
 }
 
-@available(*, unavailable)
-extension __EmptyArrayStorage: Sendable {}
-
 #if $Embedded
 // In embedded Swift, the stdlib is a .swiftmodule only without any .o/.a files,
 // to allow consuming it by clients with different LLVM codegen setting (-mcpu
@@ -119,9 +116,6 @@ internal final class __StaticArrayStorage
     fatalError("__StaticArrayStorage.staticElementType must not be called")
   }
 }
-
-@available(*, unavailable)
-extension __StaticArrayStorage: Sendable {}
 
 /// The empty array prototype.  We use the same object for all empty
 /// `[Native]Array<Element>`s.
@@ -312,9 +306,6 @@ internal final class _ContiguousArrayStorage<
   }
 }
 
-@available(*, unavailable)
-extension _ContiguousArrayStorage: Sendable {}
-
 @_alwaysEmitIntoClient
 @inline(__always)
 internal func _uncheckedUnsafeBitCast<T, U>(_ x: T, to type: U.Type) -> U {
@@ -453,10 +444,11 @@ internal struct _ContiguousArrayBuffer<Element>: _ArrayBufferProtocol {
     return firstElementAddress
   }
 
-  /// Call `body(p)`, where `p` is an `UnsafeBufferPointer` over the
-  /// underlying contiguous storage.
-  @inlinable
-  internal func withUnsafeBufferPointer<R>(
+  // Superseded by the typed-throws version of this function, but retained
+  // for ABI reasons.
+  @usableFromInline
+  @_silgen_name("$ss22_ContiguousArrayBufferV010withUnsafeC7Pointeryqd__qd__SRyxGKXEKlF")
+  internal func __abi_withUnsafeBufferPointer<R>(
     _ body: (UnsafeBufferPointer<Element>) throws -> R
   ) rethrows -> R {
     defer { _fixLifetime(self) }
@@ -464,12 +456,35 @@ internal struct _ContiguousArrayBuffer<Element>: _ArrayBufferProtocol {
       count: count))
   }
 
-  /// Call `body(p)`, where `p` is an `UnsafeMutableBufferPointer`
-  /// over the underlying contiguous storage.
-  @inlinable
-  internal mutating func withUnsafeMutableBufferPointer<R>(
+  /// Call `body(p)`, where `p` is an `UnsafeBufferPointer` over the
+  /// underlying contiguous storage.
+  @_alwaysEmitIntoClient
+  internal func withUnsafeBufferPointer<R, E>(
+    _ body: (UnsafeBufferPointer<Element>) throws(E) -> R
+  ) throws(E) -> R {
+    defer { _fixLifetime(self) }
+    return try body(UnsafeBufferPointer(start: firstElementAddress,
+      count: count))
+  }
+
+  // Superseded by the typed-throws version of this function, but retained
+  // for ABI reasons.
+  @usableFromInline
+  @_silgen_name("$ss22_ContiguousArrayBufferV017withUnsafeMutableC7Pointeryqd__qd__SryxGKXEKlF")
+  internal mutating func __abi_withUnsafeMutableBufferPointer<R>(
     _ body: (UnsafeMutableBufferPointer<Element>) throws -> R
   ) rethrows -> R {
+    defer { _fixLifetime(self) }
+    return try body(
+      UnsafeMutableBufferPointer(start: firstElementAddress, count: count))
+  }
+
+  /// Call `body(p)`, where `p` is an `UnsafeMutableBufferPointer`
+  /// over the underlying contiguous storage.
+  @_alwaysEmitIntoClient
+  internal mutating func withUnsafeMutableBufferPointer<R, E>(
+    _ body: (UnsafeMutableBufferPointer<Element>) throws(E) -> R
+  ) throws(E) -> R {
     defer { _fixLifetime(self) }
     return try body(
       UnsafeMutableBufferPointer(start: firstElementAddress, count: count))
@@ -976,9 +991,6 @@ internal struct _ContiguousArrayBuffer<Element>: _ArrayBufferProtocol {
     return true
   }
 }
-
-@available(*, unavailable)
-extension _ContiguousArrayBuffer: Sendable {}
 
 /// Append the elements of `rhs` to `lhs`.
 @inlinable

@@ -119,7 +119,7 @@ int swift_symbolgraph_extract_main(ArrayRef<const char *> Args,
     Invocation.getClangImporterOptions().ExtraArgs.push_back(A->getValue());
   }
 
-  std::vector<SearchPathOptions::FrameworkSearchPath> FrameworkSearchPaths;
+  std::vector<SearchPathOptions::SearchPath> FrameworkSearchPaths;
   for (const auto *A : ParsedArgs.filtered(OPT_F)) {
     FrameworkSearchPaths.push_back({A->getValue(), /*isSystem*/ false});
   }
@@ -129,7 +129,14 @@ int swift_symbolgraph_extract_main(ArrayRef<const char *> Args,
   Invocation.setFrameworkSearchPaths(FrameworkSearchPaths);
   Invocation.getSearchPathOptions().LibrarySearchPaths =
       ParsedArgs.getAllArgValues(OPT_L);
-  Invocation.setImportSearchPaths(ParsedArgs.getAllArgValues(OPT_I));
+  std::vector<SearchPathOptions::SearchPath> ImportSearchPaths;
+  for (const auto *A : ParsedArgs.filtered(OPT_I)) {
+    ImportSearchPaths.push_back({A->getValue(), /*isSystem*/ false});
+  }
+  for (const auto *A : ParsedArgs.filtered(OPT_Isystem)) {
+    ImportSearchPaths.push_back({A->getValue(), /*isSystem*/ true});
+  }
+  Invocation.setImportSearchPaths(ImportSearchPaths);
 
   Invocation.getLangOptions().EnableObjCInterop = Target.isOSDarwin();
   Invocation.getLangOptions().DebuggerSupport = true;
@@ -163,6 +170,13 @@ int swift_symbolgraph_extract_main(ArrayRef<const char *> Args,
     }
   }
 
+  SmallVector<StringRef, 4> AllowedRexports;
+  if (auto *A =
+          ParsedArgs.getLastArg(OPT_experimental_allowed_reexported_modules)) {
+    for (const auto *val : A->getValues())
+      AllowedRexports.emplace_back(val);
+  }
+
   symbolgraphgen::SymbolGraphOptions Options;
   Options.OutputDir = OutputDir;
   Options.Target = Target;
@@ -175,6 +189,7 @@ int swift_symbolgraph_extract_main(ArrayRef<const char *> Args,
   Options.EmitExtensionBlockSymbols =
       ParsedArgs.hasFlag(OPT_emit_extension_block_symbols,
                          OPT_omit_extension_block_symbols, /*default=*/false);
+  Options.AllowedReexportedModules = AllowedRexports;
 
   if (auto *A = ParsedArgs.getLastArg(OPT_minimum_access_level)) {
     Options.MinimumAccessLevel =
@@ -187,6 +202,8 @@ int swift_symbolgraph_extract_main(ArrayRef<const char *> Args,
             .Case("private", AccessLevel::Private)
             .Default(AccessLevel::Public);
   }
+
+  Invocation.getLangOptions().setCxxInteropFromArgs(ParsedArgs, Diags);
 
   std::string InstanceSetupError;
   if (CI.setup(Invocation, InstanceSetupError)) {

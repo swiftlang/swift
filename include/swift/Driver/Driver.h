@@ -180,12 +180,11 @@ public:
     SwiftDependencyTool,   // swift-dependency-tool
     SwiftLLVMOpt,    // swift-llvm-opt
     AutolinkExtract, // swift-autolink-extract
-    SwiftIndent,     // swift-indent
     SymbolGraph,     // swift-symbolgraph
-    APIExtract,      // swift-api-extract
     APIDigester,     // swift-api-digester
     CacheTool,       // swift-cache-tool
     ParseTest,       // swift-parse-test
+    SynthesizeInterface,  // swift-synthesize-interface
   };
 
   class InputInfoMap;

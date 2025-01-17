@@ -19,7 +19,7 @@
  
 import Distributed
 
-@_DistributedProtocol
+@Resolvable
 @available(SwiftStdlib 6.0, *)
 protocol WorkerProtocol: DistributedActor where ActorSystem == LocalTestingDistributedActorSystem {
   distributed func distributedMethod() -> String
@@ -64,7 +64,7 @@ func test_distributedVariable<DA: WorkerProtocol>(actor: DA) async throws -> Str
     let v1 = try await test_distributedVariable(actor: actor)
     print("v1 = \(v1)") // CHECK: v1 = implemented variable
 
-    let v = try await actor.distributedVariable
-    print("v = \(v)") // CHECK: v = implemented variable
+    let v2 = try await actor.distributedVariable
+    print("v2 = \(v2)") // CHECK: v2 = implemented variable
   }
 }

@@ -42,7 +42,6 @@ func test() {
 
   S<Int>(t: 42).test() // expected-error {{ambiguous use of 'init(t:)'}}
 
-  // FIXME(diagnostics): This should produce ambiguity diagnostic too
   S<Int>.staticFn()
-  // expected-error@-1 {{generic parameter 'T' could not be inferred}}
+  // expected-error@-1 {{ambiguous use of 'staticFn()'}}
 }

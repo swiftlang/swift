@@ -40,10 +40,7 @@ class SubstitutionMap::Storage final
 
   /// The number of conformance requirements, cached to avoid constantly
   /// recomputing it on conformance-buffer access.
-  const unsigned numConformanceRequirements : 31;
-
-  /// Whether we've populated all replacement types already.
-  unsigned populatedAllReplacements : 1;
+  const unsigned numConformanceRequirements;
 
   Storage() = delete;
 

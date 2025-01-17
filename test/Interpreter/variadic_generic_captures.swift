@@ -5,13 +5,13 @@
 
 import StdlibUnittest
 
-var types = TestSuite("VariadicGenericCaptures")
+var captures = TestSuite("VariadicGenericCaptures")
 
 func hasMetadataPack<each T>(_: repeat each T) -> () -> Any.Type {
   return { return (repeat each T).self }
 }
 
-types.test("Metadata") {
+captures.test("Metadata") {
   expectEqual(Void.self, hasMetadataPack()())
   expectEqual((Int, String, Bool).self, hasMetadataPack(1, "hi", false)())
 }
@@ -20,7 +20,7 @@ func hasWitnessTablePack<each T: Sequence>(_: repeat each T) -> () -> Any.Type {
   return { return (repeat (each T).Element).self }
 }
 
-types.test("WitnessTable") {
+captures.test("WitnessTable") {
   expectEqual(Void.self, hasWitnessTablePack()())
   expectEqual((Int, String, Bool).self, hasWitnessTablePack([1], ["hi"], [false])())
 }
@@ -29,7 +29,7 @@ func hasWitnessTablePack2<each T: Sequence>(_: repeat each T) -> () -> Any.Type 
   return { return (repeat (each T).Element.Element).self }
 }
 
-types.test("WitnessTable2") {
+captures.test("WitnessTable2") {
   expectEqual(Void.self, hasWitnessTablePack2()())
   expectEqual((Int, String, Bool).self, hasWitnessTablePack2([[1]], [["hi"]], [[false]])())
 }
@@ -43,7 +43,7 @@ func lifetimeTest2() -> () -> Any.Type {
   return hasMetadataPack(3, 1.0)
 }
 
-types.test("Lifetime") {
+captures.test("Lifetime") {
   let fn1 = lifetimeTest1()
   let fn2 = lifetimeTest2()
   expectEqual((String, Set<Int>).self, fn1())
@@ -71,7 +71,7 @@ func testNonEscapingCapture<each T: Hashable>(_ t: repeat each T) -> [AnyHashabl
   }
 }
 
-types.test("CapturedValue") {
+captures.test("CapturedValue") {
   let fn1 = testEscapingCapture(1, "hi")
   let fn2 = testEscapingCapture(5.0, false)
 
@@ -80,6 +80,41 @@ types.test("CapturedValue") {
 
   expectEqual(["bye", 3.0], testNonEscapingCapture("bye", 3.0))
   expectEqual([true, 7], testNonEscapingCapture(true, 7))
+}
+
+captures.test("Leaks") {
+  func callee<T>(_: T) {}
+
+  func takesEscapingClosure(_ fn: @escaping () -> ()) {
+    fn()
+    fn()
+    fn()
+  }
+
+  func takesNonEscapingClosure(_ fn: () -> ()) {
+    fn()
+    fn()
+    fn()
+  }
+
+  func formPackCaptures<each V>(_ v: repeat each V) {
+    takesEscapingClosure { repeat callee(each v) }
+    takesNonEscapingClosure { repeat callee(each v) }
+    { repeat callee(each v) }()
+  }
+
+  struct S {
+    init<each V>(_ v: repeat each V) {
+      takesEscapingClosure { repeat callee(each v) }
+      takesNonEscapingClosure { repeat callee(each v) }
+      { repeat callee(each v) }()
+    }
+  }
+
+  for _ in 0..<10 {
+     formPackCaptures(LifetimeTracked(0), LifetimeTracked(0), LifetimeTracked(0))
+     callee(S(LifetimeTracked(1), LifetimeTracked(1), LifetimeTracked(1)))
+  }
 }
 
 runAllTests()

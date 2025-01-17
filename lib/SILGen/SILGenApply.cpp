@@ -24,6 +24,7 @@
 #include "SpecializedEmitter.h"
 #include "Varargs.h"
 #include "swift/AST/ASTContext.h"
+#include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/DiagnosticsSIL.h"
 #include "swift/AST/DistributedDecl.h"
 #include "swift/AST/Effects.h"
@@ -36,6 +37,7 @@
 #include "swift/AST/ModuleLoader.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/SubstitutionMap.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/ExternalUnion.h"
 #include "swift/Basic/Range.h"
 #include "swift/Basic/STLExtras.h"
@@ -55,6 +57,23 @@ using namespace Lowering;
 //===----------------------------------------------------------------------===//
 //                             Utility Functions
 //===----------------------------------------------------------------------===//
+
+FunctionTypeInfo SILGenFunction::getClosureTypeInfo(AbstractClosureExpr *expr) {
+  auto fnType = cast<AnyFunctionType>(expr->getType()->getCanonicalType());
+
+  // If we have a closure expr that has inherits actor context, work around AST
+  // issues that causes us to be able to get non-Sendable actor isolated
+  // closures.
+  if (auto *ce = dyn_cast<ClosureExpr>(expr)) {
+    if (ce->inheritsActorContext() && fnType->isAsync() &&
+        !fnType->isSendable() && expr->getActorIsolation().isActorIsolated()) {
+      auto newExtInfo = fnType->getExtInfo().withSendable();
+      fnType = fnType.withExtInfo(newExtInfo);
+    }
+  }
+
+  return getFunctionTypeInfo(fnType);
+}
 
 FunctionTypeInfo SILGenFunction::getFunctionTypeInfo(CanAnyFunctionType fnType) {
   return { AbstractionPattern(fnType), fnType,
@@ -258,7 +277,7 @@ static ManagedValue convertOwnershipConventionGivenParamInfo(
     }
   }
 
-  if (param.isConsumed() &&
+  if (param.isConsumedInCaller() &&
       value.getOwnershipKind() == OwnershipKind::Guaranteed) {
     return value.copyUnmanaged(SGF, loc);
   }
@@ -1225,9 +1244,8 @@ public:
     auto captureInfo = SGF.SGM.Types.getLoweredLocalCaptures(constant);
     SGF.SGM.Types.setCaptureTypeExpansionContext(constant, SGF.SGM.M);
     
-    if (afd->getDeclContext()->isLocalContext() &&
-        !captureInfo.hasGenericParamCaptures())
-      subs = SubstitutionMap();
+    subs = SGF.SGM.Types.getSubstitutionMapWithCapturedEnvironments(
+        constant, captureInfo, subs);
 
     // Check whether we have to dispatch to the original implementation of a
     // dynamically_replaceable inside of a dynamic_replacement(for:) function.
@@ -1292,8 +1310,7 @@ public:
   void visitAbstractClosureExpr(AbstractClosureExpr *e) {
     SILDeclRef constant(e);
 
-    auto closureType = cast<AnyFunctionType>(e->getType()->getCanonicalType());
-    SGF.SGM.emitClosure(e, SGF.getFunctionTypeInfo(closureType));
+    SGF.SGM.emitClosure(e, SGF.getClosureTypeInfo(e));
 
     // If we're in top-level code, we don't need to physically capture script
     // globals, but we still need to mark them as escaping so that DI can flag
@@ -1304,17 +1321,14 @@ public:
 
     // A directly-called closure can be emitted as a direct call instead of
     // really producing a closure object.
-
-    auto captureInfo = SGF.SGM.M.Types.getLoweredLocalCaptures(constant);
-
     SubstitutionMap subs;
-    if (captureInfo.hasGenericParamCaptures())
-      subs = SGF.getForwardingSubstitutionMap();
+    std::tie(std::ignore, std::ignore, subs)
+        = SGF.SGM.Types.getForwardingSubstitutionsForLowering(constant);
 
     setCallee(Callee::forDirect(SGF, constant, subs, e));
     
     // If the closure requires captures, emit them.
-    if (!captureInfo.getCaptures().empty()) {
+    if (SGF.SGM.Types.hasLoweredLocalCaptures(constant)) {
       SmallVector<ManagedValue, 4> captures;
       SGF.emitCaptures(e, constant, CaptureEmission::ImmediateApplication,
                        captures);
@@ -1890,6 +1904,11 @@ static void emitRawApply(SILGenFunction &SGF,
                          SILValue indirectErrorAddr,
                          SmallVectorImpl<SILValue> &rawResults,
                          ExecutorBreadcrumb prevExecutor) {
+  // We completely drop the generic signature if all generic parameters were
+  // concrete.
+  if (subs && subs.getGenericSignature()->areAllParamsConcrete())
+    subs = SubstitutionMap();
+
   SILFunctionConventions substFnConv(substFnType, SGF.SGM.M);
   // Get the callee value.
   bool isConsumed = substFnType->isCalleeConsumed();
@@ -1925,7 +1944,7 @@ static void emitRawApply(SILGenFunction &SGF,
     auto inputTy =
         substFnConv.getSILType(inputParams[i], SGF.getTypeExpansionContext());
 
-    if (inputParams[i].isConsumed()) {
+    if (inputParams[i].isConsumedInCaller()) {
       argValue = args[i].forward(SGF);
       if (argValue->getType().isMoveOnlyWrapped() &&
           !inputTy.isMoveOnlyWrapped()) {
@@ -2111,8 +2130,8 @@ buildBuiltinLiteralArgs(SILGenFunction &SGF, SGFContext C,
                         RegexLiteralExpr *expr) {
   auto &ctx = SGF.getASTContext();
   // %0 = string_literal <regex text>
-  auto strLiteralArgs = emitStringLiteralArgs(SGF, expr, expr->getRegexText(), C,
-                                          StringLiteralExpr::Encoding::UTF8);
+  auto strLiteralArgs = emitStringLiteralArgs(
+      SGF, expr, expr->getRegexToEmit(), C, StringLiteralExpr::Encoding::UTF8);
   // %1 = function_ref String.init(
   //   _builtinStringLiteral:utf8CodeUnitCount:isASCII:)
   // %2 = apply %1(%0, ..., ...) -> $String
@@ -3085,6 +3104,7 @@ done:
 
       case ActorIsolation::Unspecified:
       case ActorIsolation::Nonisolated:
+      case ActorIsolation::CallerIsolationInheriting:
       case ActorIsolation::NonisolatedUnsafe:
         llvm_unreachable("Not isolated");
       }
@@ -3223,6 +3243,14 @@ static StorageRefResult findStorageReferenceExprForBorrow(Expr *e) {
 
 Expr *SILGenFunction::findStorageReferenceExprForMoveOnly(Expr *argExpr,
                                            StorageReferenceOperationKind kind) {
+  ForceValueExpr *forceUnwrap = nullptr;
+  // Check for a force unwrap. This might show up inside or outside of the
+  // load.
+  if (auto *fu = dyn_cast<ForceValueExpr>(argExpr)) {
+    forceUnwrap = fu;
+    argExpr = fu->getSubExpr();
+  }
+  
   // If there's a load around the outer part of this arg expr, look past it.
   bool sawLoad = false;
   if (auto *li = dyn_cast<LoadExpr>(argExpr)) {
@@ -3230,52 +3258,39 @@ Expr *SILGenFunction::findStorageReferenceExprForMoveOnly(Expr *argExpr,
     sawLoad = true;
   }
 
-  // If we have a subscript, strip it off and make sure that our base is
-  // something that we can process. If we do and we succeed below, we return the
-  // subscript instead.
-  SubscriptExpr *subscriptExpr = nullptr;
-  if ((subscriptExpr = dyn_cast<SubscriptExpr>(argExpr))) {
-    auto *decl = cast<SubscriptDecl>(subscriptExpr->getDecl().getDecl());
-    if (decl->getReadImpl() != ReadImplKind::Read) {
-      subscriptExpr = nullptr;
-    } else {
-      argExpr = subscriptExpr->getBase();
-    }
-
-    // If there's a load on the base of the subscript expr, look past it.
-    if (auto *li = dyn_cast<LoadExpr>(argExpr)) {
-      argExpr = li->getSubExpr();
-    }
+  // Check again for a force unwrap before the load.
+  if (auto *fu = dyn_cast<ForceValueExpr>(argExpr)) {
+    forceUnwrap = fu;
+    argExpr = fu->getSubExpr();
   }
 
   // If we're consuming instead, then the load _must_ have been there.
   if (kind == StorageReferenceOperationKind::Consume && !sawLoad)
     return nullptr;
 
-  // If we did not see a load or a subscript expr and our argExpr is a
-  // declref_expr, return nullptr. We have an object not something that will be
-  // in memory. This can happen with classes or with values captured by a
-  // closure.
-  //
-  // NOTE: If we see a member_ref_expr from a decl_ref_expr, we still process it
-  // since the declref_expr could be from a class.
-  if (!sawLoad && !subscriptExpr) {
+  // TODO: This section should be removed eventually. Decl refs should not be
+  // handled different from other storage. Removing it breaks some things
+  // currently.
+  if (!sawLoad) {
     if (auto *declRef = dyn_cast<DeclRefExpr>(argExpr)) {
       assert(!declRef->getType()->is<LValueType>() &&
              "Shouldn't ever have an lvalue type here!");
-      
-      // Proceed if the storage references a global or static let.
-      // TODO: We should treat any storage reference as a borrow, it seems, but
-      // that currently disrupts what the move checker expects. It would also
-      // be valuable to borrow copyable global lets, but this is a targeted
-      // fix to allow noncopyable globals to work properly.
-      bool isGlobal = false;
-      if (auto vd = dyn_cast<VarDecl>(declRef->getDecl())) {
-        isGlobal = vd->isGlobalStorage();
-      }
-      
-      if (!isGlobal) {
-        return nullptr;
+             
+      // Proceed if the storage reference is a force unwrap.
+      if (!forceUnwrap) {
+        // Proceed if the storage references a global or static let.
+        // TODO: We should treat any storage reference as a borrow, it seems, but
+        // that currently disrupts what the move checker expects. It would also
+        // be valuable to borrow copyable global lets, but this is a targeted
+        // fix to allow noncopyable globals to work properly.
+        bool isGlobal = false;
+        if (auto vd = dyn_cast<VarDecl>(declRef->getDecl())) {
+          isGlobal = vd->isGlobalStorage();
+        }
+        
+        if (!isGlobal) {
+          return nullptr;
+        }
       }
     }
   }
@@ -3288,18 +3303,65 @@ Expr *SILGenFunction::findStorageReferenceExprForMoveOnly(Expr *argExpr,
   // We want to perform a borrow/consume if the first piece of storage being
   // referenced is a move-only type.
 
-  VarDecl *storage = nullptr;
+  AbstractStorageDecl *storage = nullptr;
+  AccessSemantics accessSemantics;
   Type type;
   if (auto dre = dyn_cast<DeclRefExpr>(result.getStorageRef())) {
-    storage = dyn_cast<VarDecl>(dre->getDecl());
+    storage = dyn_cast<AbstractStorageDecl>(dre->getDecl());
     type = dre->getType();
+    accessSemantics = dre->getAccessSemantics();
   } else if (auto mre = dyn_cast<MemberRefExpr>(result.getStorageRef())) {
-    storage = dyn_cast<VarDecl>(mre->getDecl().getDecl());
+    storage = dyn_cast<AbstractStorageDecl>(mre->getDecl().getDecl());
     type = mre->getType();
+    accessSemantics = mre->getAccessSemantics();
+  } else if (auto se = dyn_cast<SubscriptExpr>(result.getStorageRef())) {
+    storage = dyn_cast<AbstractStorageDecl>(se->getDecl().getDecl());
+    type = se->getType();
+    accessSemantics = se->getAccessSemantics();
   }
 
   if (!storage)
     return nullptr;
+  // This should match the strategy computation used in
+  // SILGenLValue::visit{DeclRef,Member}RefExpr.
+  auto strategy = storage->getAccessStrategy(accessSemantics,
+         AccessKind::Read, SGM.M.getSwiftModule(), F.getResilienceExpansion(),
+         /* old abi*/ false);
+  
+  switch (strategy.getKind()) {
+  case AccessStrategy::Storage:
+    // Storage can benefit from direct borrowing/consumption.
+    break;
+  case AccessStrategy::DirectToAccessor:
+  case AccessStrategy::DispatchToAccessor:
+    // If the accessor naturally produces a borrow, then we benefit from
+    // directly borrowing it.
+    switch (strategy.getAccessor()) {
+    case AccessorKind::Address:
+    case AccessorKind::MutableAddress:
+    case AccessorKind::Read:
+    case AccessorKind::Read2:
+    case AccessorKind::Modify:
+    case AccessorKind::Modify2:
+      // Accessors that produce a borrow/inout value can be borrowed.
+      break;
+    
+    case AccessorKind::Get:
+    case AccessorKind::Set:
+    case AccessorKind::DistributedGet:
+    case AccessorKind::Init:
+    case AccessorKind::WillSet:
+    case AccessorKind::DidSet:
+      // Other accessors can't.
+      return nullptr;
+    }
+    break;
+  
+  case AccessStrategy::MaterializeToTemporary:
+  case AccessStrategy::DispatchToDistributedThunk:
+    return nullptr;
+  }
+
   assert(type);
 
   SILType ty =
@@ -3311,12 +3373,10 @@ Expr *SILGenFunction::findStorageReferenceExprForMoveOnly(Expr *argExpr,
   }
   if (!isMoveOnly)
     return nullptr;
-
-  // If we saw a subscript expr and the base of the subscript expr passed our
-  // tests above, we can emit the call to the subscript directly as a borrowed
-  // lvalue. Return the subscript expr here so that we emit it appropriately.
-  if (subscriptExpr)
-    return subscriptExpr;
+    
+  if (forceUnwrap) {
+    return forceUnwrap;
+  }
 
   return result.getTransitiveRoot();
 }
@@ -3388,14 +3448,49 @@ Expr *ArgumentSource::findStorageReferenceExprForBorrow() && {
   return lvExpr;
 }
 
+ManagedValue
+SILGenFunction::tryEmitAddressableParameterAsAddress(ArgumentSource &&arg,
+                                                     ValueOwnership ownership) {
+  // If the function takes an addressable parameter, and its argument is
+  // a reference to an addressable declaration with compatible ownership,
+  // forward the address along in-place.
+  if (arg.isExpr()) {
+    auto origExpr = std::move(arg).asKnownExpr();
+    auto expr = origExpr;
+    
+    if (auto le = dyn_cast<LoadExpr>(expr)) {
+      expr = le->getSubExpr();
+    }
+    if (auto dre = dyn_cast<DeclRefExpr>(expr)) {
+      if (auto param = dyn_cast<ParamDecl>(dre->getDecl())) {
+        if (VarLocs.count(param)
+            && VarLocs[param].addressable
+            && param->getValueOwnership() == ownership) {
+          auto addr = VarLocs[param].value;
+          return ManagedValue::forBorrowedAddressRValue(addr);
+        }
+      }
+    }
+    arg = ArgumentSource(origExpr);
+  }
+  return ManagedValue();
+}
+
 namespace {
 
 class ArgEmitter {
+public:
+  enum Flag {
+    IsYield = 0x1,
+    IsForCoroutine = 0x2,
+  };
+  using OptionSet = OptionSet<Flag>;
+
+private:
   SILGenFunction &SGF;
   SILLocation ApplyLoc;
   SILFunctionTypeRepresentation Rep;
-  bool IsYield;
-  bool IsForCoroutine;
+  OptionSet Options;
   ForeignInfo Foreign;
   ClaimedParamsRef ParamInfos;
   SmallVectorImpl<ManagedValue> &Args;
@@ -3406,19 +3501,18 @@ class ArgEmitter {
 
 public:
   ArgEmitter(SILGenFunction &SGF, SILLocation applyLoc,
-             SILFunctionTypeRepresentation Rep,
-             bool isYield, bool isForCoroutine, ClaimedParamsRef paramInfos,
-             SmallVectorImpl<ManagedValue> &args,
+             SILFunctionTypeRepresentation Rep, OptionSet options,
+             ClaimedParamsRef paramInfos, SmallVectorImpl<ManagedValue> &args,
              SmallVectorImpl<DelayedArgument> &delayedArgs,
              const ForeignInfo &foreign)
-      : SGF(SGF), ApplyLoc(applyLoc),
-        Rep(Rep), IsYield(isYield), IsForCoroutine(isForCoroutine),
+      : SGF(SGF), ApplyLoc(applyLoc), Rep(Rep), Options(options),
         Foreign(foreign), ParamInfos(paramInfos), Args(args),
         DelayedArguments(delayedArgs) {}
 
   // origParamType is a parameter type.
   void
   emitSingleArg(ArgumentSource &&arg, AbstractionPattern origParamType,
+                bool addressable,
                 std::optional<AnyFunctionType::Param> param = std::nullopt) {
     // If this is delayed default argument, prepare to emit the default argument
     // generator later.
@@ -3434,7 +3528,7 @@ public:
       maybeEmitForeignArgument();
       return;
     }
-    emit(std::move(arg), origParamType, param);
+    emit(std::move(arg), origParamType, addressable, param);
     maybeEmitForeignArgument();
   }
 
@@ -3460,7 +3554,9 @@ public:
       // single argument.
       if (!origFormalParamType.isPackExpansion()) {
         emitSingleArg(std::move(argSources[nextArgSourceIndex]),
-                      origFormalParamType, params[nextArgSourceIndex]);
+                    origFormalParamType,
+                    origFormalType.isFunctionParamAddressable(SGF.SGM.Types, i),
+                    params[nextArgSourceIndex]);
         ++nextArgSourceIndex;
         // Otherwise we need to emit a pack argument.
       } else {
@@ -3479,7 +3575,20 @@ public:
 
 private:
   void emit(ArgumentSource &&arg, AbstractionPattern origParamType,
+            bool isAddressable,
             std::optional<AnyFunctionType::Param> origParam = std::nullopt) {
+    if (isAddressable && origParam) {
+      // If the function takes an addressable parameter, and its argument is
+      // a reference to an addressable declaration with compatible ownership,
+      // forward the address along in-place.
+      if (auto addr = SGF.tryEmitAddressableParameterAsAddress(std::move(arg),
+                                             origParam->getValueOwnership())) {
+        claimNextParameters(1);
+        Args.push_back(addr);
+        return;
+      }
+    }
+            
     if (!arg.hasLValueType()) {
       // If the unsubstituted function type has a parameter of tuple type,
       // explode the tuple value.
@@ -3536,9 +3645,9 @@ private:
     }
 
     // If we have a guaranteed +0 parameter...
-    if (param.isGuaranteed() || isShared) {
+    if (param.isGuaranteedInCaller() || isShared) {
       // And this is a yield, emit a borrowed r-value.
-      if (IsYield) {
+      if (Options.contains(Flag::IsYield)) {
         if (tryEmitBorrowed(std::move(arg), loweredSubstArgType,
                             loweredSubstParamType, origParamType, paramSlice))
           return;
@@ -3558,7 +3667,7 @@ private:
         return;
     }
 
-    if (param.isConsumed() || isOwned) {
+    if (param.isConsumedInCaller() || isOwned) {
       if (tryEmitConsumedMoveOnly(std::move(arg), loweredSubstArgType,
                                   loweredSubstParamType, origParamType,
                                   paramSlice))
@@ -3589,7 +3698,7 @@ private:
 
     // Handle yields of storage reference expressions specially so that we
     // don't emit them as +1 r-values and then expand.
-    if (IsYield) {
+    if (Options.contains(Flag::IsYield)) {
       if (auto result = std::move(arg).findStorageReferenceExprForBorrow()) {
         emitExpandedBorrowed(result, origParamType);
         return;
@@ -3605,7 +3714,8 @@ private:
       if (!origElt.isOrigPackExpansion()) {
         expander.withElement(origElt.getSubstIndex(),
                              [&](ArgumentSource &&eltSource) {
-          emit(std::move(eltSource), origElt.getOrigType());
+          emit(std::move(eltSource), origElt.getOrigType(),
+               /*addressable*/ false);
         });
         return;
       }
@@ -3759,7 +3869,7 @@ private:
                     ClaimedParamsRef claimedParams) {
     auto emissionKind = SGFAccessKind::BorrowedObjectRead;
     for (auto param : claimedParams) {
-      assert(!param.isConsumed());
+      assert(!param.isConsumedInCaller());
       if (param.isIndirectInGuaranteed() && SGF.silConv.useLoweredAddresses()) {
         emissionKind = SGFAccessKind::BorrowedAddressRead;
         break;
@@ -3837,7 +3947,8 @@ private:
 
     auto convertOwnershipConvention = [&](ManagedValue value) {
       return convertOwnershipConventionGivenParamInfo(
-          SGF, param, origParam, value, loc, IsForCoroutine);
+          SGF, param, origParam, value, loc,
+          Options.contains(Flag::IsForCoroutine));
     };
 
     auto contexts = getRValueEmissionContexts(loweredSubstArgType, param);
@@ -3883,7 +3994,7 @@ private:
       // happen outside of the formal-evaluation scope we pushed for the
       // expression evaluation, but any copies to be done inside of it.
       // Copies are only done if the parameter is consumed.
-      if (!param.isConsumed())
+      if (!param.isConsumedInCaller())
         S.pop();
 
       Args.push_back(convertOwnershipConvention(value));
@@ -4356,7 +4467,7 @@ private:
     bool requiresReabstraction = loweredArgType.getASTType()
       != param.getInterfaceType();
     // If the parameter is consumed, we have to emit at +1.
-    if (param.isConsumed()) {
+    if (param.isConsumedInCaller()) {
       return {SGFContext(), requiresReabstraction};
     }
 
@@ -4402,13 +4513,13 @@ void DelayedArgument::emitDefaultArgument(SILGenFunction &SGF,
 
   SmallVector<ManagedValue, 4> loweredArgs;
   SmallVector<DelayedArgument, 4> delayedArgs;
-  auto emitter = ArgEmitter(SGF, info.loc, info.functionRepresentation,
-                            /*yield*/ false, /*coroutine*/ false,
-                            info.paramsToEmit, loweredArgs,
-                            delayedArgs, ForeignInfo{});
+  auto emitter =
+      ArgEmitter(SGF, info.loc, info.functionRepresentation, {},
+                 info.paramsToEmit, loweredArgs, delayedArgs, ForeignInfo{});
 
   emitter.emitSingleArg(ArgumentSource(info.loc, std::move(value)),
-                        info.origResultType);
+                        info.origResultType,
+                        /*addressable*/ false);
   assert(delayedArgs.empty());
   
   // Splice the emitted default argument into the argument list.
@@ -4731,6 +4842,8 @@ struct ParamLowering {
     return ClaimedParamsRef(result, (unsigned)-1);
   }
 
+  void claimImplicitParameters() { Params = Params.drop_front(); }
+
   ArrayRef<SILParameterInfo>
   claimCaptureParams(ArrayRef<ManagedValue> captures) {
     auto firstCapture = Params.size() - captures.size();
@@ -4797,9 +4910,11 @@ public:
             const ForeignInfo &foreign) && {
     auto params = lowering.claimParams(origFormalType, getParams(), foreign);
 
-    ArgEmitter emitter(SGF, Loc, lowering.Rep, /*yield*/ false,
-                       /*isForCoroutine*/ substFnType->isCoroutine(), params,
-                       args, delayedArgs, foreign);
+    ArgEmitter::OptionSet options;
+    if (substFnType->isCoroutine())
+      options |= ArgEmitter::IsForCoroutine;
+    ArgEmitter emitter(SGF, Loc, lowering.Rep, options, params, args,
+                       delayedArgs, foreign);
     emitter.emitPreparedArgs(std::move(Args), origFormalType);
   }
 
@@ -4968,7 +5083,14 @@ public:
       SGF.B.createEndBorrow(l, *i);
       SGF.B.createDestroyValue(l, (*i)->getOperand());
     }
-    if (forUnwind) {
+    auto *beginApply =
+        cast<BeginApplyInst>(ApplyToken->getDefiningInstruction());
+    auto isCalleeAllocated = beginApply->isCalleeAllocated();
+    auto unwindOnCallerError =
+        !isCalleeAllocated ||
+        SGF.SGM.getASTContext().LangOpts.hasFeature(
+            Feature::CoroutineAccessorsUnwindOnCallerError);
+    if (forUnwind && unwindOnCallerError) {
       SGF.B.createAbortApply(l, ApplyToken);
     } else {
       SGF.B.createEndApply(l, ApplyToken,
@@ -5028,6 +5150,10 @@ SILGenFunction::emitBeginApply(SILLocation loc, ManagedValue fn,
                /*indirect results*/ {}, /*indirect errors*/ {},
                rawResults, ExecutorBreadcrumb());
 
+  if (substFnType->isCalleeAllocatedCoroutine()) {
+    auto allocation = rawResults.pop_back_val();
+    enterDeallocStackCleanup(allocation);
+  }
   auto token = rawResults.pop_back_val();
   auto yieldValues = llvm::ArrayRef(rawResults);
 
@@ -5050,7 +5176,7 @@ SILGenFunction::emitBeginApply(SILLocation loc, ManagedValue fn,
          MarkUnresolvedNonCopyableValueInst::CheckKind::ConsumableAndAssignable);
       }
       yields.push_back(ManagedValue::forLValue(value));
-    } else if (info.isConsumed()) {
+    } else if (info.isConsumedInCaller()) {
       if (value->getType().isMoveOnly()) {
         value = B.createMarkUnresolvedNonCopyableValueInst(loc, value,
          MarkUnresolvedNonCopyableValueInst::CheckKind::ConsumableAndAssignable);
@@ -5058,7 +5184,7 @@ SILGenFunction::emitBeginApply(SILLocation loc, ManagedValue fn,
       !useLoweredAddresses && value->getType().isTrivial(getFunction())
           ? yields.push_back(ManagedValue::forRValueWithoutOwnership(value))
           : yields.push_back(emitManagedRValueWithCleanup(value));
-    } else if (info.isGuaranteed()) {
+    } else if (info.isGuaranteedInCaller()) {
       if (value->getType().isMoveOnly()) {
         if (!value->getType().isAddress()) {
           // The move checker uses the lifetime of the "copy" for borrow checking.
@@ -5380,6 +5506,18 @@ ApplyOptions CallEmission::emitArgumentsForNormalApply(
       options |= ApplyFlags::DoesNotAwait;
     }
 
+    // Before we do anything, claim the implicit parameters. This prevents us
+    // from attempting to handle the implicit parameters when we emit explicit
+    // parameters.
+    //
+    // NOTE: The actual work needs to be done /after/ we emit the normal
+    // parameters since we are going to reverse the order.
+    if (auto isolated = substFnType->maybeGetIsolatedParameter();
+        isolated && isolated->hasOption(SILParameterInfo::ImplicitLeading)) {
+      assert(SGF.ExpectedExecutor.isNecessary());
+      paramLowering.claimImplicitParameters();
+    }
+
     // Collect the captures, if any.
     if (callee.hasCaptures()) {
       (void)paramLowering.claimCaptureParams(callee.getCaptures());
@@ -5409,6 +5547,18 @@ ApplyOptions CallEmission::emitArgumentsForNormalApply(
     // Claim the method formal params.
     std::move(*callSite).emit(SGF, origFormalType, substFnType, paramLowering,
                               args.back(), delayedArgs, siteForeignError);
+  }
+
+  // Now, actually handle the implicit parameters.
+  if (auto isolated = substFnType->maybeGetIsolatedParameter();
+      isolated && isolated->hasOption(SILParameterInfo::ImplicitLeading)) {
+    auto executor =
+        ManagedValue::forBorrowedObjectRValue(SGF.ExpectedExecutor.getEager());
+    args.push_back({});
+    // NOTE: Even though this calls emitActorInstanceIsolation, this also
+    // handles glboal actor isolated cases.
+    args.back().push_back(SGF.emitActorInstanceIsolation(
+        callSite->Loc, executor, executor.getType().getASTType()));
   }
 
   uncurriedLoc = callSite->Loc;
@@ -5596,6 +5746,7 @@ RValue SILGenFunction::emitApply(
     case ParameterConvention::Indirect_In:
     case ParameterConvention::Indirect_Inout:
     case ParameterConvention::Indirect_InoutAliasable:
+    case ParameterConvention::Indirect_In_CXX:
     case ParameterConvention::Pack_Guaranteed:
     case ParameterConvention::Pack_Owned:
     case ParameterConvention::Pack_Inout:
@@ -5681,14 +5832,17 @@ RValue SILGenFunction::emitApply(
 
     case ActorIsolation::Unspecified:
     case ActorIsolation::Nonisolated:
+    case ActorIsolation::CallerIsolationInheriting:
     case ActorIsolation::NonisolatedUnsafe:
       llvm_unreachable("Not isolated");
       break;
     }
 
     breadcrumb = emitHopToTargetExecutor(loc, executor);
-  } else if (ExpectedExecutor &&
-             (substFnType->isAsync() || calleeTypeInfo.foreign.async)) {
+  } else if ((substFnType->isAsync() || calleeTypeInfo.foreign.async) &&
+             ExpectedExecutor.isNecessary()) {
+    assert(F.isAsync());
+
     // Otherwise, if we're in an actor method ourselves, and we're calling into
     // any sort of async function, we'll want to make sure to hop back to our
     // own executor afterward, since the callee could have made arbitrary hops
@@ -5859,6 +6013,11 @@ SILValue SILGenFunction::emitApplyWithRethrow(SILLocation loc, SILValue fn,
                                               SILType substFnType,
                                               SubstitutionMap subs,
                                               ArrayRef<SILValue> args) {
+  // We completely drop the generic signature if all generic parameters were
+  // concrete.
+  if (subs && subs.getGenericSignature()->areAllParamsConcrete())
+    subs = SubstitutionMap();
+
   CanSILFunctionType silFnType = substFnType.castTo<SILFunctionType>();
   SILFunctionConventions fnConv(silFnType, SGM.M);
   SILType resultType = fnConv.getSILResultType(getTypeExpansionContext());
@@ -5910,9 +6069,8 @@ SILValue SILGenFunction::emitApplyWithRethrow(SILLocation loc, SILValue fn,
         assert(outerErrorType == SILType::getExceptionType(getASTContext()));
 
         ProtocolConformanceRef conformances[1] = {
-          getModule().getSwiftModule()->checkConformance(
-            innerError->getType().getASTType(),
-            getASTContext().getErrorDecl())
+          checkConformance(innerError->getType().getASTType(),
+                           getASTContext().getErrorDecl())
         };
 
         outerError = emitExistentialErasure(
@@ -5961,12 +6119,18 @@ SILValue SILGenFunction::emitApplyWithRethrow(SILLocation loc, SILValue fn,
   return normalBB->createPhiArgument(resultType, OwnershipKind::Owned);
 }
 
-std::pair<MultipleValueInstructionResult *, CleanupHandle>
+std::tuple<MultipleValueInstructionResult *, CleanupHandle, SILValue,
+           CleanupHandle>
 SILGenFunction::emitBeginApplyWithRethrow(SILLocation loc, SILValue fn,
                                           SILType substFnType,
                                           SubstitutionMap subs,
                                           ArrayRef<SILValue> args,
                                           SmallVectorImpl<SILValue> &yields) {
+  // We completely drop the generic signature if all generic parameters were
+  // concrete.
+  if (subs && subs.getGenericSignature()->areAllParamsConcrete())
+    subs = SubstitutionMap();
+
   // TODO: adjust this to create try_begin_apply when appropriate.
   assert(!substFnType.castTo<SILFunctionType>()->hasErrorResult());
 
@@ -5977,19 +6141,29 @@ SILGenFunction::emitBeginApplyWithRethrow(SILLocation loc, SILValue fn,
 
   auto *token = beginApply->getTokenResult();
 
+  CleanupHandle deallocCleanup;
+  auto *allocation = beginApply->getCalleeAllocationResult();
+  if (allocation) {
+    deallocCleanup = enterDeallocStackCleanup(allocation);
+  }
+
   Cleanups.pushCleanup<EndCoroutineApply>(token);
   auto abortCleanup = Cleanups.getTopCleanup();
 
-  return { token, abortCleanup };
+  return {token, abortCleanup, allocation, deallocCleanup};
 }
 
-void SILGenFunction::emitEndApplyWithRethrow(SILLocation loc,
-                                        MultipleValueInstructionResult *token) {
+void SILGenFunction::emitEndApplyWithRethrow(
+    SILLocation loc, MultipleValueInstructionResult *token,
+    SILValue allocation) {
   // TODO: adjust this to handle results of TryBeginApplyInst.
   assert(token->isBeginApplyToken());
 
   B.createEndApply(loc, token,
                    SILType::getEmptyTupleType(getASTContext()));
+  if (allocation) {
+    B.createDeallocStack(loc, allocation);
+  }
 }
 
 void SILGenFunction::emitYield(SILLocation loc,
@@ -6014,12 +6188,13 @@ void SILGenFunction::emitYield(SILLocation loc,
          origYield.getConvention()});
   }
 
-  ArgEmitter emitter(*this, loc, fnType->getRepresentation(), /*yield*/ true,
-                     /*isForCoroutine*/ false, ClaimedParamsRef(substYieldTys),
+  ArgEmitter emitter(*this, loc, fnType->getRepresentation(),
+                     ArgEmitter::IsYield, ClaimedParamsRef(substYieldTys),
                      yieldArgs, delayedArgs, ForeignInfo{});
 
   for (auto i : indices(valueSources)) {
-    emitter.emitSingleArg(std::move(valueSources[i]), origTypes[i]);
+    emitter.emitSingleArg(std::move(valueSources[i]), origTypes[i],
+                          /*addressable*/ false);
   }
 
   if (!delayedArgs.empty())
@@ -6366,7 +6541,7 @@ void SILGenFunction::emitApplyOfUnavailableCodeReached() {
     return;
 
   auto loc = RegularLocation::getAutoGeneratedLocation(F.getLocation());
-  FuncDecl *fd = getASTContext().getDiagnoseUnavailableCodeReachedDecl();
+  FuncDecl *fd = getASTContext().getDiagnoseUnavailableCodeReached();
 
   if (!fd) {
     // Broken stdlib?
@@ -6591,8 +6766,7 @@ SILGenFunction::emitUninitializedArrayAllocation(Type ArrayTy,
   auto allocate = Ctx.getAllocateUninitializedArray();
 
   // Invoke the intrinsic, which returns a tuple.
-  auto subMap = ArrayTy->getContextSubstitutionMap(SGM.M.getSwiftModule(),
-                                                   Ctx.getArrayDecl());
+  auto subMap = ArrayTy->getContextSubstitutionMap();
   auto result = emitApplyOfLibraryIntrinsic(
       Loc, allocate, subMap,
       ManagedValue::forObjectRValueWithoutOwnership(Length), SGFContext());
@@ -6617,8 +6791,7 @@ void SILGenFunction::emitUninitializedArrayDeallocation(SILLocation loc,
   CanType arrayTy = array->getType().getASTType();
 
   // Invoke the intrinsic.
-  auto subMap = arrayTy->getContextSubstitutionMap(SGM.M.getSwiftModule(),
-                                                   Ctx.getArrayDecl());
+  auto subMap = arrayTy->getContextSubstitutionMap();
   emitApplyOfLibraryIntrinsic(loc, deallocate, subMap,
                               ManagedValue::forUnmanagedOwnedValue(array),
                               SGFContext());
@@ -6641,8 +6814,7 @@ ManagedValue SILGenFunction::emitUninitializedArrayFinalization(SILLocation loc,
   CanType arrayTy = arrayVal->getType().getASTType();
 
   // Invoke the intrinsic.
-  auto subMap = arrayTy->getContextSubstitutionMap(SGM.M.getSwiftModule(),
-                                                   Ctx.getArrayDecl());
+  auto subMap = arrayTy->getContextSubstitutionMap();
   RValue result = emitApplyOfLibraryIntrinsic(
       loc, finalize, subMap, ManagedValue::forUnmanagedOwnedValue(arrayVal),
       SGFContext());
@@ -6710,14 +6882,9 @@ static Callee getBaseAccessorFunctionRef(SILGenFunction &SGF,
         subs, loc, true);
   }
 
-  // The accessor might be a local function that does not capture any
-  // generic parameters, in which case we don't want to pass in any
-  // substitutions.
   auto captureInfo = SGF.SGM.Types.getLoweredLocalCaptures(constant);
-  if (decl->getDeclContext()->isLocalContext() &&
-      !captureInfo.hasGenericParamCaptures()) {
-    subs = SubstitutionMap();
-  }
+  subs = SGF.SGM.Types.getSubstitutionMapWithCapturedEnvironments(
+      constant, captureInfo, subs);
 
   // If this is a method in a protocol, generate it as a protocol call.
   if (isa<ProtocolDecl>(decl->getDeclContext())) {
@@ -6846,6 +7013,7 @@ bool AccessorBaseArgPreparer::shouldLoadBaseAddress() const {
   // memory to 'in', and we have pass at +1.
   case ParameterConvention::Indirect_In:
   case ParameterConvention::Indirect_In_Guaranteed:
+  case ParameterConvention::Indirect_In_CXX:
     // TODO: We shouldn't be able to get an lvalue here, but the AST
     // sometimes produces an inout base for non-mutating accessors.
     // rdar://problem/19782170
@@ -6865,22 +7033,21 @@ bool AccessorBaseArgPreparer::shouldLoadBaseAddress() const {
 ArgumentSource AccessorBaseArgPreparer::prepareAccessorAddressBaseArg() {
   // If the base is currently an address, we may have to copy it.
   if (shouldLoadBaseAddress()) {
-    if (selfParam.isConsumed() ||
-        (base.getType().isAddressOnly(SGF.F)
-         // If a move-only base is borrowed, then we have to try our best to
-         // borrow it in-place without copying.
-         // TODO: Can we avoid copying a non-move-only value too in this
-         // circumstance?
-         && !base.getType().isMoveOnly())) {
+    if (selfParam.isConsumedInCaller() || base.getType().isAddressOnly(SGF.F)) {
       // The load can only be a take if the base is a +1 rvalue.
       auto shouldTake = IsTake_t(base.hasCleanup());
 
+      auto isGuaranteed = selfParam.isGuaranteedInCaller();
+
+      auto context =
+          isGuaranteed ? SGFContext::AllowImmediatePlusZero : SGFContext();
+
       base = SGF.emitFormalAccessLoad(loc, base.forward(SGF),
                                       SGF.getTypeLowering(baseLoweredType),
-                                      SGFContext(), shouldTake);
+                                      context, shouldTake, isGuaranteed);
       return ArgumentSource(loc, RValue(SGF, loc, baseFormalType, base));
     }
-    
+
     // If the type is address-only, we can borrow the memory location as is.
     if (base.getType().isAddressOnly(SGF.F)) {
       return ArgumentSource(loc, RValue(SGF, loc, baseFormalType, base));
@@ -6919,7 +7086,7 @@ ArgumentSource AccessorBaseArgPreparer::prepareAccessorObjectBaseArg() {
   assert(!base.isLValue());
 
   // We need to produce the value at +1 if it's going to be consumed.
-  if (selfParam.isConsumed() && !base.hasCleanup()) {
+  if (selfParam.isConsumedInCaller() && !base.hasCleanup()) {
     base = base.copyUnmanaged(SGF, loc);
   }
   // If the parameter is indirect, we'll need to drop the value into
@@ -7030,10 +7197,9 @@ static void emitPseudoFunctionArguments(SILGenFunction &SGF,
   SmallVector<ManagedValue, 4> argValues;
   SmallVector<DelayedArgument, 2> delayedArgs;
 
-  ArgEmitter emitter(SGF, applyLoc, SILFunctionTypeRepresentation::Thin,
-                     /*yield*/ false,
-                     /*isForCoroutine*/ false, ClaimedParamsRef(substParamTys),
-                     argValues, delayedArgs, ForeignInfo{});
+  ArgEmitter emitter(SGF, applyLoc, SILFunctionTypeRepresentation::Thin, {},
+                     ClaimedParamsRef(substParamTys), argValues, delayedArgs,
+                     ForeignInfo{});
 
   emitter.emitPreparedArgs(std::move(args), origFnType);
 
@@ -7226,22 +7392,32 @@ ManagedValue SILGenFunction::emitAddressorAccessor(
   emission.apply().getAll(results);
 
   assert(results.size() == 1);
-  auto pointer = results[0].getUnmanagedValue();
+  auto result = results[0].getUnmanagedValue();
 
   // Drill down to the raw pointer using intrinsic knowledge of those types.
   auto pointerType =
-    pointer->getType().castTo<BoundGenericStructType>()->getDecl();
+    result->getType().castTo<BoundGenericStructType>()->getDecl();
   auto props = pointerType->getStoredProperties();
   assert(props.size() == 1);
   VarDecl *rawPointerField = props[0];
-  pointer = B.createStructExtract(loc, pointer, rawPointerField,
-                                  SILType::getRawPointerType(getASTContext()));
+  auto rawPointer =
+    B.createStructExtract(loc, result, rawPointerField,
+                          SILType::getRawPointerType(getASTContext()));
 
   // Convert to the appropriate address type and return.
-  SILValue address = B.createPointerToAddress(loc, pointer, addressType,
+  SILValue address = B.createPointerToAddress(loc, rawPointer, addressType,
                                               /*isStrict*/ true,
                                               /*isInvariant*/ false);
-
+  // Create a dependency on self: the pointer is only valid as long as self is
+  // alive.
+  auto apply = cast<ApplyInst>(result);
+  // global addressors don't have a source value. Presumably, the addressor
+  // is the only way to get at them.
+  if (apply->hasSelfArgument()) {
+    auto selfSILValue = apply->getSelfArgument();
+    address = B.createMarkDependence(loc, address, selfSILValue,
+                                     MarkDependenceKind::Unresolved);
+  }
   return ManagedValue::forLValue(address);
 }
 
@@ -7718,9 +7894,7 @@ SmallVector<ManagedValue, 4> SILGenFunction::emitKeyPathSubscriptOperands(
 
   SmallVector<ManagedValue, 4> argValues;
   SmallVector<DelayedArgument, 2> delayedArgs;
-  ArgEmitter emitter(*this, loc, fnType->getRepresentation(),
-                     /*yield*/ false,
-                     /*isForCoroutine*/ false,
+  ArgEmitter emitter(*this, loc, fnType->getRepresentation(), {},
                      ClaimedParamsRef(fnType->getParameters()), argValues,
                      delayedArgs, ForeignInfo{});
 

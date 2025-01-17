@@ -1,9 +1,4 @@
-$ld$install_name$os10.10$@rpath/libswiftCore.dylib
-$ld$install_name$os10.11$@rpath/libswiftCore.dylib
-$ld$install_name$os10.12$@rpath/libswiftCore.dylib
-$ld$install_name$os10.13$@rpath/libswiftCore.dylib
-$ld$install_name$os10.14$@rpath/libswiftCore.dylib
-$ld$install_name$os10.9$@rpath/libswiftCore.dylib
+$ld$previous$@rpath/libswiftCore.dylib$$1$10.9$10.14.4$$
 _$s11MaskStorages4SIMDPTl
 _$s11RawExponentSBTl
 _$s11SubSequenceSlTl
@@ -13516,7 +13511,6 @@ __swift_tsan_enabled
 __swift_tsan_release
 __swift_willThrow
 _concurrencyEnableCooperativeQueues
-_concurrencyEnableJobDispatchIntegration
 _concurrencyValidateUncheckedContinuations
 _swift_COWChecksEnabled
 _swift_EnumCaseName

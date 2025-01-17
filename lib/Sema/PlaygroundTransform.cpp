@@ -23,6 +23,7 @@
 #include "swift/AST/Module.h"
 #include "swift/AST/Pattern.h"
 #include "swift/AST/SourceFile.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/PlaygroundOption.h"
 
 #include <random>
@@ -307,10 +308,15 @@ public:
   Decl *transformDecl(Decl *D) {
     if (D->isImplicit())
       return D;
-    if (auto *FD = dyn_cast<FuncDecl>(D)) {
+    if (auto *FD = dyn_cast<AbstractFunctionDecl>(D)) {
       if (BraceStmt *B = FD->getTypecheckedBody()) {
         const ParameterList *PL = FD->getParameters();
         TargetKindSetter TKS(BracePairs, BracePair::TargetKinds::Return);
+
+        // Use FD's DeclContext as TypeCheckDC for transforms in func body
+        // then swap back TypeCheckDC at end of scope.
+        llvm::SaveAndRestore<DeclContext *> localDC(TypeCheckDC, FD);
+
         BraceStmt *NB = transformBraceStmt(B, PL);
         if (NB != B) {
           FD->setBody(NB, AbstractFunctionDecl::BodyKind::TypeChecked);
@@ -321,6 +327,10 @@ public:
       for (Decl *Member : NTD->getMembers()) {
         transformDecl(Member);
       }
+    } else if (auto *VD = dyn_cast<AbstractStorageDecl>(D)) {
+      VD->visitParsedAccessors([&](AccessorDecl * ACC) {
+        transformDecl(ACC);
+      });
     }
 
     return D;
@@ -460,7 +470,14 @@ public:
           }
         } else if (auto *AE = dyn_cast<ApplyExpr>(E)) {
           bool Handled = false;
-          if (auto *DRE = dyn_cast<DeclRefExpr>(AE->getFn())) {
+          DeclRefExpr *DRE = nullptr;
+          // With Swift 6 the print() function decl is a sub expression
+          // of a function conversion expression.
+          if (auto *FCE = dyn_cast<FunctionConversionExpr>(AE->getFn()))
+            DRE = dyn_cast<DeclRefExpr>(FCE->getSubExpr());
+          else
+            DRE = dyn_cast<DeclRefExpr>(AE->getFn());
+          if (DRE) {
             auto *FnD = dyn_cast<AbstractFunctionDecl>(DRE->getDecl());
             if (FnD && FnD->getModuleContext() == Context.TheStdlibModule) {
               DeclBaseName FnName = FnD->getBaseName();
@@ -661,7 +678,7 @@ public:
       return nullptr;
     }
 
-    if (isa<ConstructorDecl>(TypeCheckDC) && VD->getNameStr().equals("self")) {
+    if (isa<ConstructorDecl>(TypeCheckDC) && VD->getNameStr() == "self") {
       // Don't log "self" in a constructor
       return nullptr;
     }
@@ -756,13 +773,15 @@ public:
     std::tie(ArgPattern, ArgVariable) = maybeFixupPrintArgument(AE);
 
     AE->setFn(LoggerRef);
-    Added<ApplyExpr *> AddedApply(AE); // safe because we've fixed up the args
 
-    if (!doTypeCheck(Context, TypeCheckDC, AddedApply)) {
+    Expr *E = AE;
+    if (!doTypeCheckExpr(Context, TypeCheckDC, E)) {
       return nullptr;
     }
 
-    return buildLoggerCallWithApply(AddedApply, AE->getSourceRange());
+    Added<Expr *> AddedExpr(E); // safe because we've fixed up the args
+
+    return buildLoggerCallWithAddedExpr(AddedExpr, E->getSourceRange());
   }
 
   Added<Stmt *> logPostPrint(SourceRange SR) {
@@ -882,25 +901,30 @@ public:
         ArgumentList::forImplicitUnlabeled(Context, ArgsWithSourceRange);
     ApplyExpr *LoggerCall =
         CallExpr::createImplicit(Context, LoggerRef, ArgList);
-    Added<ApplyExpr *> AddedLogger(LoggerCall);
 
-    if (!doTypeCheck(Context, TypeCheckDC, AddedLogger)) {
+    Expr *E = LoggerCall;
+    // Type-check the newly created logger call. Note that the type-checker is
+    // free to change the expression type, so type-checking is performed
+    // before wrapping in Added<>.
+    if (!doTypeCheckExpr(Context, TypeCheckDC, E)) {
       return nullptr;
     }
 
-    return buildLoggerCallWithApply(AddedLogger, SR);
+    Added<Expr *> AddedLogger(E);
+
+    return buildLoggerCallWithAddedExpr(AddedLogger, SR);
   }
 
-  // Assumes Apply has already been type-checked.
-  Added<Stmt *> buildLoggerCallWithApply(Added<ApplyExpr *> Apply,
-                                         SourceRange SR) {
+  // Assumes expr has already been type-checked.
+  Added<Stmt *> buildLoggerCallWithAddedExpr(Added<Expr *> AddedExpr,
+                                             SourceRange SR) {
     std::pair<PatternBindingDecl *, VarDecl *> PV =
-        buildPatternAndVariable(*Apply);
+        buildPatternAndVariable(*AddedExpr);
 
-    DeclRefExpr *DRE =
-        new (Context) DeclRefExpr(ConcreteDeclRef(PV.second), DeclNameLoc(),
-                                  true, // implicit
-                                  AccessSemantics::Ordinary, Apply->getType());
+    DeclRefExpr *DRE = new (Context)
+        DeclRefExpr(ConcreteDeclRef(PV.second), DeclNameLoc(),
+                    true, // implicit
+                    AccessSemantics::Ordinary, AddedExpr->getType());
 
     UnresolvedDeclRefExpr *SendDataRef = new (Context)
         UnresolvedDeclRefExpr(SendDataName, DeclRefKind::Ordinary,
@@ -911,9 +935,8 @@ public:
     auto *ArgList = ArgumentList::forImplicitUnlabeled(Context, {DRE});
     Expr *SendDataCall =
         CallExpr::createImplicit(Context, SendDataRef, ArgList);
-    Added<Expr *> AddedSendData(SendDataCall);
 
-    if (!doTypeCheck(Context, TypeCheckDC, AddedSendData)) {
+    if (!doTypeCheckExpr(Context, TypeCheckDC, SendDataCall)) {
       return nullptr;
     }
 
@@ -949,7 +972,9 @@ void swift::performPlaygroundTransform(SourceFile &SF, PlaygroundOptionSet Opts)
 
     PreWalkAction walkToDeclPre(Decl *D) override {
       if (auto *FD = dyn_cast<AbstractFunctionDecl>(D)) {
-        if (!FD->isImplicit() && !FD->isBodySkipped()) {
+        // Skip any functions that do not have user-written source code.
+        if (!FD->isImplicit() && !FD->isBodySkipped() &&
+            !FD->isInMacroExpansionInContext()) {
           if (BraceStmt *Body = FD->getBody()) {
             const ParameterList *PL = FD->getParameters();
             Instrumenter I(ctx, FD, RNG, Options, TmpNameIndex);

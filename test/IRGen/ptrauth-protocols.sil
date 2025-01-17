@@ -51,7 +51,7 @@ bb0(%0 : $*B, %1 : $@thick B.Type):
 }
 
 sil_witness_table B : Q module test {
-  associated_type_protocol (Assoc: P): A: P module main
+  associated_conformance (Assoc: P): A: P module main
   associated_type Assoc: A
   method #Q.init!allocator: @B_init
 }

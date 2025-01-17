@@ -14,6 +14,7 @@
 
 #include "ToolChains.h"
 
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/Platform.h"
 #include "swift/Basic/Range.h"
@@ -47,31 +48,6 @@ toolchains::GenericUnix::sanitizerRuntimeLibName(StringRef Sanitizer,
           this->getTriple().getArchName() +
           (this->getTriple().isAndroid() ? "-android" : "") + ".a")
       .str();
-}
-
-void
-toolchains::GenericUnix::addPluginArguments(const ArgList &Args,
-                                            ArgStringList &Arguments) const {
-  SmallString<64> pluginPath;
-  auto programPath = getDriver().getSwiftProgramPath();
-  CompilerInvocation::computeRuntimeResourcePathFromExecutablePath(
-      programPath, /*shared=*/true, pluginPath);
-
-  auto defaultPluginPath = pluginPath;
-  llvm::sys::path::append(defaultPluginPath, "host", "plugins");
-
-  // Default plugin path.
-  Arguments.push_back("-plugin-path");
-  Arguments.push_back(Args.MakeArgString(defaultPluginPath));
-
-  // Local plugin path.
-  llvm::sys::path::remove_filename(pluginPath); // Remove "swift"
-  llvm::sys::path::remove_filename(pluginPath); // Remove "lib"
-  llvm::sys::path::append(pluginPath, "local", "lib");
-  llvm::sys::path::append(pluginPath, "swift");
-  llvm::sys::path::append(pluginPath, "host", "plugins");
-  Arguments.push_back("-plugin-path");
-  Arguments.push_back(Args.MakeArgString(pluginPath));
 }
 
 ToolChain::InvocationInfo
@@ -127,7 +103,9 @@ bool isAmazonLinux2023Host() {
     }
 
 std::string toolchains::GenericUnix::getDefaultLinker() const {
-  if (getTriple().isAndroid() || isAmazonLinux2023Host())
+  if (getTriple().isAndroid() || isAmazonLinux2023Host()
+      || (getTriple().isMusl()
+          && getTriple().getVendor() == llvm::Triple::Swift))
     return "lld";
 
   switch (getTriple().getArch()) {
@@ -231,17 +209,6 @@ toolchains::GenericUnix::constructInvocation(const DynamicLinkJobAction &job,
 #else
     Arguments.push_back(context.Args.MakeArgString("-fuse-ld=" + Linker));
 #endif
-    // Starting with lld 13, Swift stopped working with the lld --gc-sections
-    // implementation for ELF, unless -z nostart-stop-gc is also passed to lld:
-    //
-    // https://reviews.llvm.org/D96914
-    if (Linker == "lld" || (Linker.length() > 5 &&
-                            Linker.substr(Linker.length() - 6) == "ld.lld")) {
-      Arguments.push_back("-Xlinker");
-      Arguments.push_back("-z");
-      Arguments.push_back("-Xlinker");
-      Arguments.push_back("nostart-stop-gc");
-    }
   }
 
   // Configure the toolchain.
@@ -296,7 +263,8 @@ toolchains::GenericUnix::constructInvocation(const DynamicLinkJobAction &job,
   }
 
   SmallString<128> SharedResourceDirPath;
-  getResourceDirPath(SharedResourceDirPath, context.Args, /*Shared=*/true);
+  getResourceDirPath(SharedResourceDirPath, context.Args,
+                     /*Shared=*/!(staticExecutable || staticStdlib));
 
   SmallString<128> swiftrtPath = SharedResourceDirPath;
   llvm::sys::path::append(swiftrtPath,
@@ -374,13 +342,6 @@ toolchains::GenericUnix::constructInvocation(const DynamicLinkJobAction &job,
     } else {
       llvm::report_fatal_error(Twine(linkFilePath) + " not found");
     }
-  }
-
-  // Link against the desired C++ standard library.
-  if (const Arg *A =
-          context.Args.getLastArg(options::OPT_experimental_cxx_stdlib)) {
-    Arguments.push_back(
-        context.Args.MakeArgString(Twine("-stdlib=") + A->getValue()));
   }
 
   // Explicitly pass the target to the linker

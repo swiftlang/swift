@@ -386,6 +386,16 @@ struct DerivedFromReadWriteIntArray : ReadWriteIntArray {};
 
 struct DerivedFromNonTrivialArrayByVal : NonTrivialArrayByVal {};
 
+struct SubscriptUnnamedParameter {
+  int operator[](int) const { return 123; }
+};
+
+struct SubscriptUnnamedParameterReadWrite {
+  int value = 0;
+  const int &operator[](int) const { return value; }
+  int &operator[](int) { return value; }
+};
+
 struct Iterator {
 private:
   int value = 123;
@@ -465,6 +475,90 @@ struct DerivedFromLoadableIntWrapperWithUsingDecl : private LoadableIntWrapper {
 struct HasOperatorCallWithDefaultArg {
   int value;
   int operator()(int x = 0) const { return value + x; }
+};
+
+class HasStaticOperatorCallBase {
+public:
+  static int operator()(int x) { return x + 42; }
+};
+
+class HasStaticOperatorCallBaseNonTrivial: public NonTrivial {
+public:
+  HasStaticOperatorCallBaseNonTrivial() {}
+  HasStaticOperatorCallBaseNonTrivial(const HasStaticOperatorCallBaseNonTrivial &self) : NonTrivial(self) {}
+  HasStaticOperatorCallBaseNonTrivial(HasStaticOperatorCallBaseNonTrivial &&self) : NonTrivial(self) {}
+
+  static int operator()(const NonTrivial &arg) { return arg.f + 42; }
+};
+
+class HasStaticOperatorCallDerived : public HasStaticOperatorCallBase {};
+
+class HasStaticOperatorCallWithConstOperator {
+public:
+  inline int operator()(int x, int y) const { return x + y; }
+  static int operator()(int x) {
+        return x - 1;
+   }
+};
+
+
+// This type is intentionally unimportable,
+// to ensure that the function that uses in a parameter
+// cannot import its parameter list.
+struct UnimportableCxxTypeByDefault {
+private:
+  UnimportableCxxTypeByDefault(const UnimportableCxxTypeByDefault &) = delete;
+  UnimportableCxxTypeByDefault(UnimportableCxxTypeByDefault &&) = delete;
+};
+
+struct HasStaticOperatorCallWithUnimportableCxxType {
+  // This operator won't be imported.
+  static int operator()(const UnimportableCxxTypeByDefault &) noexcept {
+      return 0;
+  }
+};
+
+struct ClassWithOperatorStarAvailable {
+  int value;
+
+public:
+  int &operator*() { return value; }
+};
+
+struct DerivedClassWithOperatorStarAvailable : ClassWithOperatorStarAvailable {
+};
+
+struct ClassWithOperatorStarUnavailable {
+  int value;
+
+public:
+  int &operator*() __attribute__((availability(swift, unavailable))) {
+    return value;
+  }
+};
+
+struct DerivedClassWithOperatorStarUnavailable
+    : ClassWithOperatorStarUnavailable {};
+
+struct ClassWithSuccessorAvailable {
+  int value;
+
+public:
+  ClassWithSuccessorAvailable &operator++() {
+    value++;
+    return *this;
+  }
+};
+
+struct ClassWithSuccessorUnavailable {
+  int value;
+
+public:
+  ClassWithSuccessorUnavailable &operator++()
+      __attribute__((availability(swift, unavailable))) {
+    value++;
+    return *this;
+  }
 };
 
 #endif

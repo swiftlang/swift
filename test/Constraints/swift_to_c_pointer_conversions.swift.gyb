@@ -304,12 +304,12 @@ func test_array_to_pointer_conversion() {
   void_ptr_func(&x${Size}) // Ok
   const_void_ptr_func(x${Size}) // Ok
   opt_void_ptr_func(x${Size})
-  // expected-error@-1 {{cannot convert value of type '[Int${Size}]' to expected argument type 'UnsafeMutableRawPointer?'}}
+  // expected-error@-1 {{cannot convert value of type '[Int${Size}]' to expected argument type 'UnsafeMutableRawPointer'}}
 
   char_ptr_func(x${Size})
   // expected-error@-1 {{cannot convert value of type '[Int${Size}]' to expected argument type 'UnsafeMutablePointer<CChar>' (aka 'UnsafeMutablePointer<Int8>')}}
   opt_char_ptr_func(x${Size})
-  // expected-error@-1 {{cannot convert value of type '[Int${Size}]' to expected argument type 'UnsafeMutablePointer<CChar>?' (aka 'Optional<UnsafeMutablePointer<Int8>>')}}
+  // expected-error@-1 {{cannot convert value of type '[Int${Size}]' to expected argument type 'UnsafeMutablePointer<CChar>' (aka 'UnsafeMutablePointer<Int8>')}}
 
   const_char_ptr_func(x${Size}) // Ok
   const_opt_char_ptr_func(x${Size}) // Ok
@@ -320,9 +320,9 @@ func test_array_to_pointer_conversion() {
   // expected-error@-1 {{cannot convert value of type '[Int${Size}]' to expected argument type 'UnsafeMutablePointer<UInt${Size}>'}}
 
   opt_int_${Size}_ptr_func(x${Size})
-  // expected-error@-1 {{cannot convert value of type '[Int${Size}]' to expected argument type 'UnsafeMutablePointer<Int${Size}>?'}}
+  // expected-error@-1 {{cannot convert value of type '[Int${Size}]' to expected argument type 'UnsafeMutablePointer<Int${Size}>'}}
   opt_uint_${Size}_ptr_func(x${Size})
-  // expected-error@-1 {{cannot convert value of type '[Int${Size}]' to expected argument type 'UnsafeMutablePointer<UInt${Size}>?'}}
+  // expected-error@-1 {{cannot convert value of type '[Int${Size}]' to expected argument type 'UnsafeMutablePointer<UInt${Size}>'}}
 
   const_int_${Size}_ptr_func(x${Size}) // OK
   const_uint_${Size}_ptr_func(x${Size}) // OK

@@ -6,7 +6,6 @@
 // RUN:     -emit-module                                 \
 // RUN:     -package-name Package                        \
 // RUN:     -enable-library-evolution                    \
-// RUN:     -enable-experimental-feature BitwiseCopyable \
 // RUN:     -module-name Library                         \
 // RUN:     -emit-module-path %t/Library.swiftmodule     \
 // RUN:     -emit-module-interface-path %t/Library.swiftinterface
@@ -16,7 +15,6 @@
 // RUN:     -typecheck -verify                           \
 // RUN:     -package-name Package                        \
 // RUN:     -debug-diagnostic-names                      \
-// RUN:     -enable-experimental-feature BitwiseCopyable \
 // RUN:     -I %t
 
 //--- Library.swift
@@ -34,7 +32,7 @@ public struct PublicStruct {
 //--- Downstream.swift
 import Library
 
-func take<T : _BitwiseCopyable>(_ t: T) {}
+func take<T : BitwiseCopyable>(_ t: T) {}
 
 func passPackageStruct(_ s: PackageStruct) { take(s) } // expected-error{{type_does_not_conform_decl_owner}}
                                                        // expected-note@-3{{where_requirement_failure_one_subst}}

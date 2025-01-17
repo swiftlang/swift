@@ -68,7 +68,7 @@
 
 // Some of the base classes need to be nullable to allow them to be used as
 // optional parameters.
-AST_BRIDGING_WRAPPER_NONNULL(Decl)
+AST_BRIDGING_WRAPPER_NULLABLE(Decl)
 AST_BRIDGING_WRAPPER_NONNULL(DeclContext)
 AST_BRIDGING_WRAPPER_NONNULL(SourceFile)
 AST_BRIDGING_WRAPPER_NULLABLE(Stmt)
@@ -83,9 +83,10 @@ AST_BRIDGING_WRAPPER_NULLABLE(GenericParamList)
 AST_BRIDGING_WRAPPER_NULLABLE(TrailingWhereClause)
 AST_BRIDGING_WRAPPER_NULLABLE(ParameterList)
 AST_BRIDGING_WRAPPER_NULLABLE(PatternBindingInitializer)
+AST_BRIDGING_WRAPPER_NULLABLE(CustomAttributeInitializer)
 AST_BRIDGING_WRAPPER_NONNULL(TypeAttributes)
 AST_BRIDGING_WRAPPER_NONNULL(CustomAttribute)
-AST_BRIDGING_WRAPPER_NONNULL(ArgumentList)
+AST_BRIDGING_WRAPPER_NULLABLE(ArgumentList)
 
 // Non-AST types to generate wrappers for.
 AST_BRIDGING_WRAPPER_NULLABLE(DiagnosticEngine)

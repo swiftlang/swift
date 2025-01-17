@@ -37,3 +37,14 @@ module VirtualMethods {
   header "virtual-methods.h"
   requires cplusplus
 }
+
+module FunctionsObjC {
+  header "functions-objc.h"
+  requires cplusplus
+  requires objc
+}
+
+module InheritedLookup {
+  header "inherited-lookup.h"
+  requires cplusplus
+}

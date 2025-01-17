@@ -1,8 +1,7 @@
-// RUN: %target-sil-opt -sil-move-only-address-checker -enable-upcoming-feature MoveOnlyPartialConsumption -enable-experimental-feature MoveOnlyClasses -enable-sil-verify-all %s -verify
-// RUN: %target-sil-opt -sil-move-only-address-checker -enable-upcoming-feature MoveOnlyPartialConsumption -enable-experimental-feature MoveOnlyClasses -enable-sil-verify-all -move-only-diagnostics-silently-emit-diagnostics %s | %FileCheck %s
+// RUN: %target-sil-opt -sil-move-only-address-checker -enable-experimental-feature MoveOnlyClasses -enable-sil-verify-all %s -verify
+// RUN: %target-sil-opt -sil-move-only-address-checker -enable-experimental-feature MoveOnlyClasses -enable-sil-verify-all -move-only-diagnostics-silently-emit-diagnostics %s | %FileCheck %s
 
-// RUN: %target-sil-opt -enable-experimental-feature NoncopyableGenerics -sil-move-only-address-checker -enable-upcoming-feature MoveOnlyPartialConsumption -enable-experimental-feature MoveOnlyClasses -enable-sil-verify-all %s -verify
-// RUN: %target-sil-opt -enable-experimental-feature NoncopyableGenerics -sil-move-only-address-checker -enable-upcoming-feature MoveOnlyPartialConsumption -enable-experimental-feature MoveOnlyClasses -enable-sil-verify-all -move-only-diagnostics-silently-emit-diagnostics %s | %FileCheck %s
+// REQUIRES: swift_feature_MoveOnlyClasses
 
 // This file contains specific SIL test cases that we expect to emit
 // diagnostics. These are cases where we want to make it easy to validate
@@ -19,8 +18,7 @@ import Builtin
 
 public class CopyableKlass {}
 
-@_moveOnly
-public final class Klass {
+public final class Klass: ~Copyable {
     var intField: Int
     var k: Klass
     init()
@@ -28,32 +26,27 @@ public final class Klass {
 
 sil @get_klass : $@convention(thin) () -> @owned Klass
 
-@_moveOnly
-public struct NonTrivialStruct {
+public struct NonTrivialStruct: ~Copyable {
     var k = Klass()
     var copyableK = CopyableKlass()
     var nonTrivialStruct2 = NonTrivialStruct2()
 }
 
-@_moveOnly
-public struct NonTrivialStructPair {
+public struct NonTrivialStructPair: ~Copyable {
     var lhs: NonTrivialStruct
     var rhs: NonTrivialStruct
 }
 
-@_moveOnly
-public struct NonTrivialStruct2 {
+public struct NonTrivialStruct2: ~Copyable {
     var copyableKlass = CopyableKlass()
 }
 
-@_moveOnly
-public struct KlassPair {
+public struct KlassPair: ~Copyable {
     var lhs: Klass = Klass()
     var rhs: Klass = Klass()
 }
 
-@_moveOnly
-public struct AggStruct {
+public struct AggStruct: ~Copyable {
     var lhs: Klass
     var center: Int
     var rhs: Klass
@@ -65,8 +58,7 @@ protocol P {
     static var value2: any P { get }
 }
 
-@_moveOnly
-public struct AddressOnlyGeneric<T : P> {
+public struct AddressOnlyGeneric<T : P>: ~Copyable {
     var copyable: T
     var moveOnly: NonTrivialStruct
 

@@ -24,6 +24,7 @@
 #include "swift/AST/Decl.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/SubstitutionMap.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/SIL/SILWitnessTable.h"
 #include "swift/SIL/TypeLowering.h"
 
@@ -117,6 +118,10 @@ static bool isLeafTypeMetadata(CanType type) {
   case TypeKind::Metatype:
   case TypeKind::ExistentialMetatype:
     return false;
+
+  // Integer types are leaves.
+  case TypeKind::Integer:
+    return true;
   }
   llvm_unreachable("bad type kind");
 }
@@ -360,7 +365,7 @@ bool FulfillmentMap::searchNominalTypeMetadata(IRGenModule &IGM,
 
   bool hadFulfillment = false;
 
-  auto subs = type->getContextSubstitutionMap(IGM.getSwiftModule(), nominal);
+  auto subs = type->getContextSubstitutionMap();
 
   GenericTypeRequirements requirements(IGM, nominal);
 
@@ -427,6 +432,17 @@ bool FulfillmentMap::searchNominalTypeMetadata(IRGenModule &IGM,
       hadFulfillment |=
         searchWitnessTable(IGM, arg, requirement.getProtocol(),
                            source, std::move(argPath), keys);
+      break;
+    }
+    case GenericRequirement::Kind::Value: {
+      // Refine the path.
+      MetadataPath argPath = path;
+      argPath.addNominalValueArgumentComponent(reqtIndex);
+
+      hadFulfillment |=
+        addFulfillment(GenericRequirement::forValue(arg), source,
+                       std::move(argPath), MetadataState::Complete);
+
       break;
     }
     }

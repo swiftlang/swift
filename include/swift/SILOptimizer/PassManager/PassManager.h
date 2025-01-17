@@ -69,10 +69,14 @@ class SwiftPassInvocation {
   SILAnalysis::InvalidationKind changeNotifications =
       SILAnalysis::InvalidationKind::Nothing;
 
+  bool functionTablesChanged = false;
+
   /// All slabs, allocated by the pass.
   SILModule::SlabList allocatedSlabs;
 
   SILSSAUpdater *ssaUpdater = nullptr;
+
+  SwiftPassInvocation *nestedSwiftPassInvocation = nullptr;
 
   static constexpr int BlockSetCapacity = SILBasicBlock::numCustomBits;
   char blockSetStorage[sizeof(BasicBlockSet) * BlockSetCapacity];
@@ -139,6 +143,8 @@ public:
   /// Called by the pass when changes are made to the SIL.
   void notifyChanges(SILAnalysis::InvalidationKind invalidationKind);
 
+  void notifyFunctionTablesChanged();
+
   /// Called by the pass manager before the pass starts running.
   void startModulePassRun(SILModuleTransform *transform);
 
@@ -180,6 +186,19 @@ public:
   SILSSAUpdater *getSSAUpdater() const {
     assert(ssaUpdater && "SSAUpdater not initialized");
     return ssaUpdater;
+  }
+
+  SwiftPassInvocation *initializeNestedSwiftPassInvocation(SILFunction *newFunction) {
+    assert(!nestedSwiftPassInvocation && "Nested Swift pass invocation already initialized");
+    nestedSwiftPassInvocation = new SwiftPassInvocation(passManager, transform, newFunction);
+    return nestedSwiftPassInvocation;
+  }
+
+  void deinitializeNestedSwiftPassInvocation() {
+    assert(nestedSwiftPassInvocation && "Nested Swift pass invocation not initialized");
+    nestedSwiftPassInvocation->endTransformFunction();
+    delete nestedSwiftPassInvocation;
+    nestedSwiftPassInvocation = nullptr;
   }
 };
 
@@ -497,6 +516,9 @@ inline void SwiftPassInvocation::
 notifyChanges(SILAnalysis::InvalidationKind invalidationKind) {
     changeNotifications = (SILAnalysis::InvalidationKind)
         (changeNotifications | invalidationKind);
+}
+inline void SwiftPassInvocation::notifyFunctionTablesChanged() {
+  functionTablesChanged = true;
 }
 
 } // end namespace swift

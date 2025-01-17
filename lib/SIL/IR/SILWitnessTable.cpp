@@ -25,13 +25,14 @@
 #include "swift/AST/ASTMangler.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/ProtocolConformance.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/SIL/SILModule.h"
 #include "llvm/ADT/SmallString.h"
 
 using namespace swift;
 
-static std::string mangleConstant(RootProtocolConformance *C) {
-  Mangle::ASTMangler Mangler;
+static std::string mangleConstant(ProtocolConformance *C) {
+  Mangle::ASTMangler Mangler(C->getDeclContext()->getASTContext());
   return Mangler.mangleWitnessTable(C);
 }
 
@@ -57,8 +58,8 @@ void SILWitnessTable::addWitnessTable() {
 }
 
 SILWitnessTable *SILWitnessTable::create(
-    SILModule &M, SILLinkage Linkage, IsSerialized_t Serialized,
-    RootProtocolConformance *Conformance,
+    SILModule &M, SILLinkage Linkage, SerializedKind_t SerializedKind,
+    ProtocolConformance *Conformance,
     ArrayRef<SILWitnessTable::Entry> entries,
     ArrayRef<ConditionalConformance> conditionalConformances) {
   assert(Conformance && "Cannot create a witness table for a null "
@@ -72,7 +73,7 @@ SILWitnessTable *SILWitnessTable::create(
   // Allocate the witness table and initialize it.
   void *buf = M.allocate(sizeof(SILWitnessTable), alignof(SILWitnessTable));
   SILWitnessTable *wt = ::new (buf)
-      SILWitnessTable(M, Linkage, Serialized, Name.str(), Conformance, entries,
+      SILWitnessTable(M, Linkage, SerializedKind, Name.str(), Conformance, entries,
                       conditionalConformances);
 
   wt->addWitnessTable();
@@ -83,7 +84,7 @@ SILWitnessTable *SILWitnessTable::create(
 
 SILWitnessTable *
 SILWitnessTable::create(SILModule &M, SILLinkage Linkage,
-                        RootProtocolConformance *Conformance) {
+                        ProtocolConformance *Conformance) {
   assert(Conformance && "Cannot create a witness table for a null "
          "conformance.");
 
@@ -103,18 +104,20 @@ SILWitnessTable::create(SILModule &M, SILLinkage Linkage,
 }
 
 SILWitnessTable::SILWitnessTable(
-    SILModule &M, SILLinkage Linkage, IsSerialized_t Serialized, StringRef N,
-    RootProtocolConformance *Conformance, ArrayRef<Entry> entries,
+    SILModule &M, SILLinkage Linkage, SerializedKind_t SerializedKind, StringRef N,
+    ProtocolConformance *Conformance, ArrayRef<Entry> entries,
     ArrayRef<ConditionalConformance> conditionalConformances)
     : Mod(M), Name(N), Linkage(Linkage), Conformance(Conformance), Entries(),
-      ConditionalConformances(), IsDeclaration(true), Serialized(false) {
-  convertToDefinition(entries, conditionalConformances, Serialized);
+      ConditionalConformances(), IsDeclaration(true),
+      SerializedKind(SerializedKind) {
+  convertToDefinition(entries, conditionalConformances, SerializedKind);
 }
 
 SILWitnessTable::SILWitnessTable(SILModule &M, SILLinkage Linkage, StringRef N,
-                                 RootProtocolConformance *Conformance)
+                                 ProtocolConformance *Conformance)
     : Mod(M), Name(N), Linkage(Linkage), Conformance(Conformance), Entries(),
-      ConditionalConformances(), IsDeclaration(true), Serialized(false) {}
+      ConditionalConformances(), IsDeclaration(true),
+      SerializedKind(IsNotSerialized) {}
 
 SILWitnessTable::~SILWitnessTable() {
   if (isDeclaration())
@@ -129,7 +132,7 @@ SILWitnessTable::~SILWitnessTable() {
       }
       break;
     case AssociatedType:
-    case AssociatedTypeProtocol:
+    case AssociatedConformance:
     case BaseProtocol:
     case Invalid:
       break;
@@ -140,10 +143,10 @@ SILWitnessTable::~SILWitnessTable() {
 void SILWitnessTable::convertToDefinition(
     ArrayRef<Entry> entries,
     ArrayRef<ConditionalConformance> conditionalConformances,
-    IsSerialized_t isSerialized) {
+    SerializedKind_t serializedKind) {
   assert(isDeclaration() && "Definitions should never call this method.");
   IsDeclaration = false;
-  Serialized = (isSerialized == IsSerialized);
+  SerializedKind = serializedKind;
 
   Entries = Mod.allocateCopy(entries);
   ConditionalConformances = Mod.allocateCopy(conditionalConformances);
@@ -157,7 +160,7 @@ void SILWitnessTable::convertToDefinition(
       }
       break;
     case AssociatedType:
-    case AssociatedTypeProtocol:
+    case AssociatedConformance:
     case BaseProtocol:
     case Invalid:
       break;
@@ -165,25 +168,25 @@ void SILWitnessTable::convertToDefinition(
   }
 }
 
-bool SILWitnessTable::conformanceIsSerialized(
-    const RootProtocolConformance *conformance) {
-  // Allow serializing conformance with package or public access level
-  // if package serialization is enabled.
-  auto optInPackage = conformance->getDeclContext()
-                          ->getASTContext()
-                          .SILOpts.EnableSerializePackage;
+SerializedKind_t SILWitnessTable::conformanceSerializedKind(
+                                                            const RootProtocolConformance *conformance) {
+
+  auto optInPackage = conformance->getDeclContext()->getParentModule()->serializePackageEnabled();
   auto accessLevelToCheck =
-      optInPackage ? AccessLevel::Package : AccessLevel::Public;
+  optInPackage ? AccessLevel::Package : AccessLevel::Public;
 
   auto normalConformance = dyn_cast<NormalProtocolConformance>(conformance);
   if (normalConformance && normalConformance->isResilient() && !optInPackage)
-    return false;
+    return IsNotSerialized;
 
   if (conformance->getProtocol()->getEffectiveAccess() < accessLevelToCheck)
-    return false;
+    return IsNotSerialized;
 
   auto *nominal = conformance->getDeclContext()->getSelfNominalTypeDecl();
-  return nominal->getEffectiveAccess() >= accessLevelToCheck;
+  if (nominal->getEffectiveAccess() >= accessLevelToCheck)
+    return IsSerialized;
+
+  return IsNotSerialized;
 }
 
 bool SILWitnessTable::enumerateWitnessTableConditionalConformances(

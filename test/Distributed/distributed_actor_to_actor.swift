@@ -1,13 +1,10 @@
-// RUN: %target-swift-frontend  -disable-availability-checking %s -parse-as-library -parse-stdlib -emit-sil -o - | %FileCheck %s -check-prefix=CHECK-SIL
+// RUN: %target-swift-frontend  -target %target-swift-5.7-abi-triple %s -parse-as-library -parse-stdlib -Xllvm -sil-print-types -emit-sil -o - | %FileCheck %s -check-prefix=CHECK-SIL
 
-// RUN: %target-swift-frontend  -disable-availability-checking %s -parse-as-library -parse-stdlib -emit-ir -o - | %FileCheck %s -check-prefix=CHECK-IR
+// RUN: %target-swift-frontend  -target %target-swift-5.7-abi-triple %s -parse-as-library -parse-stdlib -emit-ir -o - | %FileCheck %s -check-prefix=CHECK-IR
 
 // UNSUPPORTED: back_deploy_concurrency
 // REQUIRES: concurrency
 // REQUIRES: distributed
-
-// rdar://123970272
-// UNSUPPORTED: CPU=arm64e
 
 import Swift
 import _Concurrency
@@ -38,7 +35,7 @@ func getAnyActor(distributedActor: isolated some DistributedActor) -> any Actor 
 // CHECK-IR: [[CONDITIONAL_REQ_GEP:%[0-9]+]] = getelementptr inbounds [1 x ptr], ptr %conditional.requirement.buffer, i32 0, i32 0
 // CHECK-IR-NEXT: [[SELF_DA_REQ:%.*]] = getelementptr inbounds ptr, ptr [[CONDITIONAL_REQ_GEP]], i32 0
 // CHECK-IR-NEXT: store ptr %"some DistributedActor.DistributedActor", ptr [[SELF_DA_REQ]]
-// CHECK-IR-NEXT: call ptr @swift_getWitnessTable(ptr @"$sxScA11DistributedMc", ptr %"some DistributedActor", ptr [[CONDITIONAL_REQ_GEP]])
+// CHECK-IR-NEXT: call ptr @swift_getWitnessTable(ptr @"$sxScA11DistributedMc{{(.ptrauth)?}}", ptr %"some DistributedActor", ptr [[CONDITIONAL_REQ_GEP]])
 
 distributed actor WorkerPool<Worker, ActorSystem: DistributedActorSystem>: AsyncSequence, AsyncIteratorProtocol {
   var level: Int
@@ -46,7 +43,7 @@ distributed actor WorkerPool<Worker, ActorSystem: DistributedActorSystem>: Async
     self.actorSystem = system
     self.level = 0
 
-    // CHECK-SIL: sil private @$s021distributed_actor_to_B010WorkerPoolC0B6SystemACyxq_Gq__tYaKcfcyyYaYbcfU_ : $@convention(thin) @Sendable @async <Worker, ActorSystem where ActorSystem : DistributedActorSystem> (@guaranteed Optional<any Actor>, @sil_isolated @guaranteed WorkerPool<Worker, ActorSystem>) -> @out
+    // CHECK-SIL: sil private @$s021distributed_actor_to_B010WorkerPoolC0B6SystemACyxq_Gq__tYaKcfcyyYacfU_ : $@convention(thin) @Sendable @async <Worker, ActorSystem where ActorSystem : DistributedActorSystem> (@guaranteed Optional<any Actor>, @sil_isolated @guaranteed WorkerPool<Worker, ActorSystem>) -> @out () {
     // CHECK-SIL: hop_to_executor {{%.*}} : $WorkerPool<Worker, ActorSystem>
     _ = Task {
       for await x in self {
@@ -58,8 +55,3 @@ distributed actor WorkerPool<Worker, ActorSystem: DistributedActorSystem>: Async
   nonisolated func makeAsyncIterator() -> WorkerPool { self }
   nonisolated func next() async -> Int? { nil }
 }
-
-// CHECK-SIL-LABEL: sil_witness_table shared <Self where Self : DistributedActor> T: Actor module Distributed {
-// CHECK-SIL-NEXT: method #Actor.unownedExecutor!getter: <Self where Self : Actor> (Self) -> () -> UnownedSerialExecutor : @$sxScA11DistributedScA15unownedExecutorScevgTW
-// CHECK-SIL-NEXT: conditional_conformance (Self: DistributedActor): dependent
-// CHECK-SIL-NEXT: }

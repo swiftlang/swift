@@ -9,8 +9,8 @@ public extension P {
   public func f() -> Int32 {
     // CHECK-NEXT: entry:
     // CHECK-NEXT: %[[ALLOCA:.*]] = alloca ptr,
-    // CHECK-NEXT: @llvm.dbg.declare(metadata ptr %[[ALLOCA]],
-    // CHECK-SAME:    metadata ![[SELFMETA:.*]], metadata !DIExpression())
+    // CHECK-NEXT: #dbg_declare(ptr %[[ALLOCA]],
+    // CHECK-SAME:    ![[SELFMETA:.*]], !DIExpression()
     return v
   }
 }

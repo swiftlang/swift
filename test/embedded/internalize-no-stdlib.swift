@@ -4,6 +4,7 @@
 // RUN: %target-swift-emit-ir %s -parse-stdlib -enable-experimental-feature Embedded -target arm64e-apple-none-macho -wmo | %FileCheck %s --check-prefix CHECK-MACHO
 
 // REQUIRES: swift_in_compiler
+// REQUIRES: swift_feature_Embedded
 
 struct Bool {}
 
@@ -26,7 +27,7 @@ public func main() {
 }
 
 // CHECK-ELF: @_swift1_autolink_entries =
-// CHECK-ELF: @llvm.compiler.used = appending global [1 x ptr] [ptr @_swift1_autolink_entries], section "llvm.metadata"
+// CHECK-ELF: @llvm.used = appending global [1 x ptr] [ptr @_swift1_autolink_entries], section "llvm.metadata"
 // CHECK-ELF-NOT: @llvm.used
 
 // CHECK-MACHO-NOT: @llvm.compiler.used

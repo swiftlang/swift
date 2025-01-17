@@ -1,5 +1,5 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-build-swift -O -Xfrontend -disable-availability-checking %s -parse-as-library -module-name main -o %t/main
+// RUN: %target-build-swift -O -Xfrontend -disable-availability-checking %s -plugin-path %swift-plugin-dir -parse-as-library -module-name main -o %t/main
 // RUN: %target-codesign %t/main
 // RUN: %target-run %t/main | %FileCheck %s
 

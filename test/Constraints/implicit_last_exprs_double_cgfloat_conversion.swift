@@ -1,9 +1,7 @@
 // RUN: %target-typecheck-verify-swift -enable-experimental-feature ImplicitLastExprResults %clang-importer-sdk
 
 // REQUIRES: objc_interop
-
-// Experimental feature requires asserts
-// REQUIRES: asserts
+// REQUIRES: swift_feature_ImplicitLastExprResults
 
 import Foundation
 

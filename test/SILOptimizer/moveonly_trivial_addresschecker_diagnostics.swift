@@ -1,5 +1,6 @@
-// RUN: %target-swift-emit-sil -enable-experimental-feature BorrowingSwitch -enable-upcoming-feature MoveOnlyPartialConsumption -enable-experimental-feature MoveOnlyPartialReinitialization -sil-verify-all -verify %s
-// RUN: %target-swift-emit-sil -enable-experimental-feature BorrowingSwitch -enable-experimental-feature NoncopyableGenerics -enable-upcoming-feature MoveOnlyPartialConsumption -enable-experimental-feature MoveOnlyPartialReinitialization -sil-verify-all -verify %s
+// RUN: %target-swift-emit-sil -enable-experimental-feature MoveOnlyPartialReinitialization -sil-verify-all -verify %s
+
+// REQUIRES: swift_feature_MoveOnlyPartialReinitialization
 
 //////////////////
 // Declarations //

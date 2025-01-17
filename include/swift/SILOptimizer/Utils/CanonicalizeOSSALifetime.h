@@ -96,10 +96,11 @@
 #ifndef SWIFT_SILOPTIMIZER_UTILS_CANONICALOSSALIFETIME_H
 #define SWIFT_SILOPTIMIZER_UTILS_CANONICALOSSALIFETIME_H
 
-#include "swift/Basic/GraphNodeWorklist.h"
 #include "swift/Basic/SmallPtrSetVector.h"
+#include "swift/Basic/TaggedUnion.h"
 #include "swift/SIL/PrunedLiveness.h"
 #include "swift/SIL/SILInstruction.h"
+#include "swift/SILOptimizer/Analysis/DeadEndBlocksAnalysis.h"
 #include "swift/SILOptimizer/Analysis/DominanceAnalysis.h"
 #include "swift/SILOptimizer/Analysis/NonLocalAccessBlockAnalysis.h"
 #include "swift/SILOptimizer/Utils/InstructionDeleter.h"
@@ -180,6 +181,16 @@ public:
   SWIFT_ASSERT_ONLY_DECL(void dump() const LLVM_ATTRIBUTE_USED);
 };
 
+enum PruneDebugInsts_t : bool {
+  DontPruneDebugInsts = false,
+  PruneDebugInsts = true,
+};
+
+enum MaximizeLifetime_t : bool {
+  DontMaximizeLifetime = false,
+  MaximizeLifetime = true,
+};
+
 /// Canonicalize OSSA lifetimes.
 ///
 /// Allows the allocation of analysis state to be reused across calls to
@@ -221,11 +232,11 @@ public:
 private:
   /// If true, then debug_value instructions outside of non-debug
   /// liveness may be pruned during canonicalization.
-  bool pruneDebugMode;
+  const PruneDebugInsts_t pruneDebugMode;
 
   /// If true, lifetimes will not be shortened except when necessary to avoid
   /// copies.
-  bool maximizeLifetime;
+  const MaximizeLifetime_t maximizeLifetime;
 
   // If present, will be used to ensure that the lifetime is not shortened to
   // end inside an access scope which it previously enclosed.  (Note that ending
@@ -237,6 +248,8 @@ private:
   // extendLivenessThroughOverlappingAccess is invoked.
   NonLocalAccessBlocks *accessBlocks = nullptr;
 
+  DeadEndBlocksAnalysis *deadEndBlocksAnalysis;
+
   DominanceInfo *domTree = nullptr;
 
   BasicCalleeAnalysis *calleeAnalysis;
@@ -245,6 +258,9 @@ private:
 
   /// The SILValue to canonicalize.
   SILValue currentDef;
+
+  /// Instructions beyond which liveness is not extended by destroy uses.
+  ArrayRef<SILInstruction *> currentLexicalLifetimeEnds;
 
   /// Original points in the CFG where the current value's lifetime is consumed
   /// or destroyed.  Each block either contains a consuming instruction (e.g.
@@ -263,8 +279,71 @@ private:
   /// outside the pruned liveness at the time it is discovered.
   llvm::SmallPtrSet<DebugValueInst *, 8> debugValues;
 
-  /// Visited set for general def-use traversal that prevents revisiting values.
-  GraphNodeWorklist<SILValue, 8> defUseWorklist;
+  class Def {
+    struct Root {
+      SILValue value;
+    };
+    struct Copy {
+      CopyValueInst *cvi;
+    };
+    struct BorrowedFrom {
+      BorrowedFromInst *bfi;
+    };
+    struct Reborrow {
+      SILArgument *argument;
+    };
+    using Payload = TaggedUnion<Root, Copy, BorrowedFrom, Reborrow>;
+    Payload payload;
+    Def(Payload payload) : payload(payload) {}
+
+  public:
+    enum class Kind {
+      Root,
+      Copy,
+      BorrowedFrom,
+      Reborrow,
+    };
+    Kind getKind() const {
+      if (payload.isa<Root>()) {
+        return Kind::Root;
+      }
+      if (payload.isa<Copy>()) {
+        return Kind::Copy;
+      }
+      if (payload.isa<BorrowedFrom>()) {
+        return Kind::BorrowedFrom;
+      }
+      assert(payload.isa<Reborrow>());
+      return Kind::Reborrow;
+    }
+    operator Kind() const { return getKind(); }
+    bool operator==(Def rhs) const {
+      return getKind() == rhs.getKind() && getValue() == rhs.getValue();
+    }
+    static Def root(SILValue value) { return {Root{value}}; }
+    static Def copy(CopyValueInst *cvi) { return {Copy{cvi}}; }
+    static Def borrowedFrom(BorrowedFromInst *bfi) {
+      return {BorrowedFrom{bfi}};
+    }
+    static Def reborrow(SILArgument *argument) { return {Reborrow{argument}}; }
+    SILValue getValue() const {
+      switch (*this) {
+      case Kind::Root:
+        return payload.get<Root>().value;
+      case Kind::Copy:
+        return payload.get<Copy>().cvi;
+      case Kind::BorrowedFrom:
+        return payload.get<BorrowedFrom>().bfi;
+      case Kind::Reborrow:
+        return payload.get<Reborrow>().argument;
+      }
+      llvm_unreachable("covered switch");
+    }
+  };
+  friend llvm::DenseMapInfo<Def>;
+
+  /// The defs derived from currentDef whose uses are added to liveness.
+  SmallVector<Def, 8> discoveredDefs;
 
   /// The blocks that were discovered by PrunedLiveness.
   SmallVector<SILBasicBlock *, 32> discoveredBlocks;
@@ -306,33 +385,32 @@ public:
   struct LivenessState {
     BitfieldRef<SSAPrunedLiveness>::StackState state;
 
-    LivenessState(CanonicalizeOSSALifetime &parent, SILValue def)
+    LivenessState(CanonicalizeOSSALifetime &parent, SILValue def,
+                  ArrayRef<SILInstruction *> lexicalLifetimeEnds)
         : state(parent.liveness, def->getFunction()) {
-      parent.initializeLiveness(def);
+      parent.initializeLiveness(def, lexicalLifetimeEnds);
     }
   };
 
-  CanonicalizeOSSALifetime(bool pruneDebugMode, bool maximizeLifetime,
-                           SILFunction *function,
-                           NonLocalAccessBlockAnalysis *accessBlockAnalysis,
-                           DominanceInfo *domTree,
-                           BasicCalleeAnalysis *calleeAnalysis,
-                           InstructionDeleter &deleter)
+  CanonicalizeOSSALifetime(
+      PruneDebugInsts_t pruneDebugMode, MaximizeLifetime_t maximizeLifetime,
+      SILFunction *function, NonLocalAccessBlockAnalysis *accessBlockAnalysis,
+      DeadEndBlocksAnalysis *deadEndBlocksAnalysis, DominanceInfo *domTree,
+      BasicCalleeAnalysis *calleeAnalysis, InstructionDeleter &deleter)
       : pruneDebugMode(pruneDebugMode), maximizeLifetime(maximizeLifetime),
-        accessBlockAnalysis(accessBlockAnalysis), domTree(domTree),
+        accessBlockAnalysis(accessBlockAnalysis),
+        deadEndBlocksAnalysis(deadEndBlocksAnalysis), domTree(domTree),
         calleeAnalysis(calleeAnalysis), deleter(deleter) {}
 
   SILValue getCurrentDef() const { return currentDef; }
 
-  void initializeLiveness(SILValue def) {
+  void initializeLiveness(SILValue def,
+                          ArrayRef<SILInstruction *> lexicalLifetimeEnds) {
     assert(consumingBlocks.empty() && debugValues.empty());
-    // Clear the cached analysis pointer just in case the client invalidates the
-    // analysis, freeing its memory.
-    accessBlocks = nullptr;
-    consumes.clear();
-    destroys.clear();
+    clear();
 
     currentDef = def;
+    currentLexicalLifetimeEnds = lexicalLifetimeEnds;
 
     if (maximizeLifetime || respectsDeinitBarriers()) {
       liveness->initializeDiscoveredBlocks(&discoveredBlocks);
@@ -341,14 +419,33 @@ public:
   }
 
   void clear() {
+    // Clear the access blocks analysis pointer in case the client invalidates
+    // the analysis.  If the client did, the analysis will be recomputed in
+    // extendLivenessThroughOverlappingAccess; if it didn't, the analysis
+    // pointer will just be set back to its old value when the analysis' cache
+    // is consulted in extendLivenessThroughOverlappingAccess.
+    accessBlocks = nullptr;
+
     consumingBlocks.clear();
     debugValues.clear();
     discoveredBlocks.clear();
+    consumes.clear();
+    destroys.clear();
   }
 
   /// Top-Level API: rewrites copies and destroys within \p def's extended
-  /// lifetime. \p lifetime caches transient analysis state across multiple
-  /// calls.
+  /// lifetime.
+  ///
+  /// For lexical values, canonicalization respects deinit barriers, introducing
+  /// copies as needed to maintain lifetimes beyond final consuming uses to the
+  /// original lexical lifetime end.  When a lexical value is explicitly
+  /// consumed (via the `consume` keyword), however, the lifetime does not
+  /// extend to original destroys beyond that consume--the value must be dead
+  /// after the corresponding marker instructions (`move_value`); to support
+  /// this shortening, the marker instructions must be provided as \p
+  /// lexicalLifetimeEnds. When provided, deinit barriers will be respected
+  /// except to the extent doing so would result in the value being live after
+  /// the marker instructions.
   ///
   /// Return true if any change was made to \p def's extended lifetime. \p def
   /// itself will not be deleted and no instructions outside of \p def's
@@ -358,7 +455,8 @@ public:
   /// This only deletes instructions within \p def's extended lifetime. Use
   /// InstructionDeleter::cleanUpDeadInstructions() to recursively delete dead
   /// operands.
-  bool canonicalizeValueLifetime(SILValue def);
+  bool canonicalizeValueLifetime(
+      SILValue def, ArrayRef<SILInstruction *> lexicalLifetimeEnds = {});
 
   /// Compute the liveness information for \p def. But do not do any rewriting
   /// or computation of boundaries.
@@ -444,14 +542,19 @@ private:
   void findExtendedBoundary(PrunedLivenessBoundary const &originalBoundary,
                             PrunedLivenessBoundary &boundary);
 
-  void findDestroysOutsideBoundary(SmallVectorImpl<SILInstruction *> &destroys);
+  void extendLivenessToDeadEnds();
   void extendLivenessToDeinitBarriers();
 
   void extendUnconsumedLiveness(PrunedLivenessBoundary const &boundary);
+  void visitExtendedUnconsumedBoundary(
+      ArrayRef<SILInstruction *> ends,
+      llvm::function_ref<void(SILInstruction *, PrunedLiveness::LifetimeEnding)>
+          visitor);
 
-  void insertDestroysOnBoundary(PrunedLivenessBoundary const &boundary);
+  void insertDestroysOnBoundary(PrunedLivenessBoundary const &boundary,
+                                SmallVectorImpl<DestroyValueInst *> &destroys);
 
-  void rewriteCopies();
+  void rewriteCopies(SmallVectorImpl<DestroyValueInst *> const &destroys);
 };
 
 } // end namespace swift

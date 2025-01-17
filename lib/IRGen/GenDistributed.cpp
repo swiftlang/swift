@@ -40,6 +40,7 @@
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/GenericSignature.h"
 #include "swift/AST/ProtocolConformanceRef.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/IRGen/Linking.h"
 #include "swift/SIL/SILFunction.h"
 #include "llvm/IR/DataLayout.h"
@@ -277,8 +278,7 @@ static CanSILFunctionType getAccessorType(IRGenModule &IGM) {
 
   // A generic parameter that represents instance of invocation decoder.
   auto *decoderType =
-      GenericTypeParamType::get(/*isParameterPack=*/false,
-                                /*depth=*/0, /*index=*/0, Context);
+      GenericTypeParamType::getType(/*depth=*/ 0, /*index=*/ 0, Context);
 
   // decoder
   parameters.push_back(GenericFunctionType::Param(
@@ -376,11 +376,11 @@ void IRGenModule::emitDistributedTargetAccessor(ThunkOrRequirement target) {
 
   auto targetDecl = cast<AbstractFunctionDecl>(accessorRef.getDecl());
 
-  IRGenMangler mangler;
+  IRGenMangler mangler(Context);
 
   addAccessibleFunction(AccessibleFunction::forDistributed(
-      mangler.mangleDistributedThunkRecord(targetDecl),
-      mangler.mangleDistributedThunk(targetDecl),
+      /*recordName=*/mangler.mangleDistributedThunkRecord(targetDecl),
+      /*accessorName=*/mangler.mangleDistributedThunk(targetDecl),
       accessor.getTargetType(),
       getAddrOfAsyncFunctionPointer(accessorRef)));
 }
@@ -526,6 +526,7 @@ void DistributedAccessor::decodeArgument(unsigned argumentIdx,
   }
 
   switch (param.getConvention()) {
+  case ParameterConvention::Indirect_In_CXX:
   case ParameterConvention::Indirect_In: {
     // The only way to load opaque type is to allocate a temporary
     // variable on the stack for it and initialize from the given address

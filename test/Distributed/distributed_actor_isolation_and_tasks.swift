@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend-emit-module -emit-module-path %t/FakeDistributedActorSystems.swiftmodule -module-name FakeDistributedActorSystems -disable-availability-checking %S/Inputs/FakeDistributedActorSystems.swift
-// RUN: %target-swift-frontend -typecheck -verify -disable-availability-checking -I %t 2>&1 %s
+// RUN: %target-swift-frontend-emit-module -emit-module-path %t/FakeDistributedActorSystems.swiftmodule -module-name FakeDistributedActorSystems -target %target-swift-5.7-abi-triple %S/Inputs/FakeDistributedActorSystems.swift
+// RUN: %target-swift-frontend -typecheck -verify -target %target-swift-5.7-abi-triple -I %t 2>&1 %s
 // REQUIRES: concurrency
 // REQUIRES: distributed
 
@@ -63,7 +63,7 @@ distributed actor Philosopher {
 
 func test_outside(system: FakeActorSystem) async throws {
   _ = try await Philosopher(system: system).dist()
-  _ = Philosopher(system: system).log // expected-error{{distributed actor-isolated property 'log' can not be accessed from a non-isolated context}}
+  _ = Philosopher(system: system).log // expected-error{{distributed actor-isolated property 'log' can not be accessed from a nonisolated context}}
 
   _ = Philosopher(system: system).id
   _ = Philosopher(system: system).actorSystem

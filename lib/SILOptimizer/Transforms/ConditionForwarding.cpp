@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "condbranch-forwarding"
+#include "swift/Basic/Assertions.h"
 #include "swift/SIL/BasicBlockBits.h"
 #include "swift/SIL/DebugUtils.h"
 #include "swift/SIL/OwnershipUtils.h"
@@ -116,7 +117,7 @@ private:
       }
     }
     if (Changed) {
-      updateBorrowedFrom(getPassManager(), F);
+      updateAllGuaranteedPhis(getPassManager(), F);
       invalidateAnalysis(SILAnalysis::InvalidationKind::BranchesAndInstructions);
     }
   }
@@ -236,7 +237,7 @@ bool ConditionForwarding::tryOptimize(SwitchEnumInst *SEI) {
   if (getFunction()->hasOwnership()) {
     // TODO: Currently disabled because this case may need lifetime extension
     // Disabling this conservatively for now.
-    assert(Condition->getNumOperands() == 1);
+    assert(Condition->getNumRealOperands() == 1);
     BorrowedValue conditionOp(Condition->getOperand(0));
     if (conditionOp && conditionOp.isLocalScope()) {
       return false;
@@ -296,8 +297,6 @@ bool ConditionForwarding::tryOptimize(SwitchEnumInst *SEI) {
     if (HasEnumArg) {
       // The successor block has a new argument (which we created above) where
       // we have to pass the Enum.
-      assert(!getFunction()->hasOwnership() ||
-             EI->getType().isTrivial(*getFunction()));
       BranchArgs.push_back(EI);
     }
     B.createBranch(BI->getLoc(), SEDest, BranchArgs);

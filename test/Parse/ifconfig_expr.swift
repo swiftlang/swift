@@ -163,39 +163,42 @@ func canImportVersioned() {
   let a = 1
 #endif
 
-#if canImport(A, unknown: 2.2) // expected-error {{2nd parameter of canImport should be labeled as _version or _underlyingVersion}}
-  let a = 1
-#endif
-
-#if canImport(A,) // expected-error {{unexpected ',' separator}}
+#if canImport(A, unknown: 2.2) // expected-error {{second parameter of 'canImport' should be labeled as _version or _underlyingVersion}}
   let a = 1
 #endif
   
-#if canImport(A, 2.2) // expected-error {{2nd parameter of canImport should be labeled as _version or _underlyingVersion}}
-  let a = 1
-#endif
 
-#if canImport(A, 2.2, 1.1) // expected-error {{canImport can take only two parameters}}
+#if canImport(A,)
   let a = 1
 #endif
   
+#if canImport(A, 2.2) // expected-error {{second parameter of 'canImport' should be labeled as _version or _underlyingVersion}}
+  let a = 1
+#endif
+
+#if canImport(A, 2.2, 1.1) // expected-error {{'canImport' can take only two parameters}}
+  let a = 1
+#endif
+  
+// expected-error@+1{{'canImport' version check has invalid version ''}}
 #if canImport(A, _version:) // expected-error {{expected expression in list of expressions}}
   let a = 1
 #endif
 
-#if canImport(A, _version: "") // expected-error {{_version argument cannot be empty}}
+#if canImport(A, _version: "") // expected-error {{'canImport' version check has invalid version '""'}}
   let a = 1
 #endif
   
-#if canImport(A, _version: >=2.2) // expected-error {{cannot parse module version '>=2.2'}}
+#if canImport(A, _version: >=2.2) // expected-error {{'canImport' version check has invalid version '>=2.2'}}
   let a = 1
 #endif
-  
+
+// expected-error@+1{{'canImport' version check has invalid version '20A301'}}
 #if canImport(A, _version: 20A301) // expected-error {{'A' is not a valid digit in integer literal}}
   let a = 1
 #endif
 
-#if canImport(A, _version: "20A301") // expected-error {{cannot parse module version '20A301'}}
+#if canImport(A, _version: "20A301") // expected-error {{'canImport' version check has invalid version '"20A301"'}}
   let a = 1
 #endif
 }

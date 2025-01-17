@@ -17,7 +17,7 @@
 #include "swift/AST/ProtocolConformance.h"
 #include "ConformanceLookupTable.h"
 #include "swift/AST/ASTContext.h"
-#include "swift/AST/Availability.h"
+#include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/DistributedDecl.h"
 #include "swift/AST/FileUnit.h"
@@ -29,6 +29,7 @@
 #include "swift/AST/PackConformance.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/Types.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/Statistic.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/Support/PrettyStackTrace.h"
@@ -145,7 +146,27 @@ ProtocolConformance::getTypeWitnessAndDecl(AssociatedTypeDecl *assocType,
 
 Type ProtocolConformance::getTypeWitness(AssociatedTypeDecl *assocType,
                                          SubstOptions options) const {
-  return getTypeWitnessAndDecl(assocType, options).getWitnessType();
+  auto witness = getTypeWitnessAndDecl(assocType, options);
+  auto witnessTy = witness.getWitnessType();
+  if (!witnessTy)
+    return witnessTy;
+
+  // This is a hacky feature allowing code completion to migrate to
+  // using Type::subst() without changing output.
+  //
+  // FIXME: Remove this hack and do whatever we need to do in the
+  // ASTPrinter instead.
+  if (options & SubstFlags::DesugarMemberTypes) {
+    if (auto *aliasType = dyn_cast<TypeAliasType>(witnessTy.getPointer()))
+      witnessTy = aliasType->getSinglyDesugaredType();
+
+    // Another hack. If the type witness is a opaque result type. They can
+    // only be referred using the name of the associated type.
+    if (witnessTy->is<OpaqueTypeArchetypeType>())
+      witnessTy = witness.getWitnessDecl()->getDeclaredInterfaceType();
+  }
+
+  return witnessTy;
 }
 
 ConcreteDeclRef
@@ -184,7 +205,14 @@ usesDefaultDefinition(AssociatedTypeDecl *requirement) const {
 bool ProtocolConformance::isRetroactive() const {
   auto extensionModule = getDeclContext()->getParentModule();
   auto protocolModule = getProtocol()->getParentModule();
-  if (extensionModule->isSameModuleLookingThroughOverlays(protocolModule)) {
+  
+  auto isSameRetroactiveContext = 
+    [](ModuleDecl *moduleA, ModuleDecl *moduleB) -> bool {
+      return moduleA->isSameModuleLookingThroughOverlays(moduleB) ||
+        moduleA->inSamePackage(moduleB);
+    };
+  
+  if (isSameRetroactiveContext(extensionModule, protocolModule)) {
     return false;
   }
 
@@ -192,8 +220,7 @@ bool ProtocolConformance::isRetroactive() const {
       ConformingType->getNominalOrBoundGenericNominal();
   if (conformingTypeDecl) {
     auto conformingTypeModule = conformingTypeDecl->getParentModule();
-    if (extensionModule->
-        isSameModuleLookingThroughOverlays(conformingTypeModule)) {
+    if (isSameRetroactiveContext(extensionModule, conformingTypeModule)) {
       return false;
     }
   }
@@ -230,6 +257,16 @@ GenericSignature ProtocolConformance::getGenericSignature() const {
   case ProtocolConformanceKind::Self:
     // If we have a normal or inherited protocol conformance, look for its
     // generic signature.
+
+    // In -swift-version 5 mode, a conditional conformance to a protocol can imply
+    // a Sendable conformance. The implied conformance is unconditional so it uses
+    // the generic signature of the nominal type and not the generic signature of
+    // the extension that declared the (implying) conditional conformance.
+    if (getSourceKind() == ConformanceEntryKind::Implied &&
+        getProtocol()->isSpecificProtocol(KnownProtocolKind::Sendable)) {
+      return getDeclContext()->getSelfNominalTypeDecl()->getGenericSignature();
+    }
+
     return getDeclContext()->getGenericSignatureOfContext();
 
   case ProtocolConformanceKind::Builtin:
@@ -405,7 +442,11 @@ ConditionalRequirementsRequest::evaluate(Evaluator &evaluator,
     return {};
   }
 
-  const auto extensionSig = ext->getGenericSignature();
+  // In -swift-version 5 mode, a conditional conformance to a protocol can imply
+  // a Sendable conformance. We ask the conformance for its generic signature,
+  // which will always be the generic signature of `ext` except in this case,
+  // where it's the generic signature of the extended nominal.
+  const auto extensionSig = NPC->getGenericSignature();
 
   // The extension signature should be a superset of the type signature, meaning
   // every thing in the type signature either is included too or is implied by
@@ -671,8 +712,7 @@ RootProtocolConformance::getWitnessDeclRef(ValueDecl *requirement) const {
     // witness's parent. Don't use witness.getSubstitutions(), which
     // are written in terms of the witness thunk signature.
     auto subs =
-      getType()->getContextSubstitutionMap(getDeclContext()->getParentModule(),
-                                           witnessDecl->getDeclContext());
+      getType()->getContextSubstitutionMap(witnessDecl->getDeclContext());
     return ConcreteDeclRef(witness.getDecl(), subs);
   }
 
@@ -690,12 +730,11 @@ void NormalProtocolConformance::setWitness(ValueDecl *requirement,
           //  funcs; there seems to be a problem that we mark completed, but
           //  afterwards will record the thunk witness;
           (dyn_cast<FuncDecl>(requirement)
-            ? (dyn_cast<FuncDecl>(requirement)->isDistributed() ||
-               dyn_cast<FuncDecl>(requirement)->isDistributedThunk())
-            : false) ||
+               ? (dyn_cast<FuncDecl>(requirement)->isDistributed() ||
+                  dyn_cast<FuncDecl>(requirement)->isDistributedThunk())
+               : false) ||
           requirement->getAttrs().hasAttribute<OptionalAttr>() ||
-          requirement->getAttrs().isUnavailable(
-                                        requirement->getASTContext())) &&
+          requirement->isUnavailable()) &&
          "Conformance already complete?");
   Mapping[requirement] = witness;
 }
@@ -735,20 +774,17 @@ void SpecializedProtocolConformance::computeConditionalRequirements() const {
     // Substitute the conditional requirements so that they're phrased in
     // terms of the specialized types, not the conformance-declaring decl's
     // types.
-    ModuleDecl *module;
     SubstitutionMap subMap;
     if (auto nominal = GenericConformance->getType()->getAnyNominal()) {
-      module = nominal->getModuleContext();
-      subMap = getType()->getContextSubstitutionMap(module, nominal);
+      subMap = getType()->getContextSubstitutionMap(nominal);
     } else {
-      module = getProtocol()->getModuleContext();
       subMap = getSubstitutionMap();
     }
 
     SmallVector<Requirement, 4> newReqs;
     for (auto oldReq : *parentCondReqs) {
       auto newReq = oldReq.subst(QuerySubstitutionMap{subMap},
-                                 LookUpConformanceInModule(module));
+                                 LookUpConformanceInModule());
       newReqs.push_back(newReq);
     }
     auto &ctxt = getProtocol()->getASTContext();
@@ -938,8 +974,7 @@ ProtocolConformance::subst(InFlightSubstitution &IFS) const {
   switch (getKind()) {
   case ProtocolConformanceKind::Normal: {
     auto origType = getType();
-    if (!origType->hasTypeParameter() &&
-        !origType->hasArchetype())
+    if (IFS.isInvariant(origType))
       return ProtocolConformanceRef(mutableThis);
 
     auto substType = origType.subst(IFS);
@@ -960,8 +995,7 @@ ProtocolConformance::subst(InFlightSubstitution &IFS) const {
 
   case ProtocolConformanceKind::Builtin: {
     auto origType = getType();
-    if (!origType->hasTypeParameter() &&
-        !origType->hasArchetype())
+    if (IFS.isInvariant(origType))
       return ProtocolConformanceRef(mutableThis);
 
     auto substType = origType.subst(IFS);
@@ -984,18 +1018,14 @@ ProtocolConformance::subst(InFlightSubstitution &IFS) const {
 
   case ProtocolConformanceKind::Inherited: {
     // Substitute the base.
+    auto origType = getType();
+    if (IFS.isInvariant(origType))
+      return ProtocolConformanceRef(mutableThis);
+
     auto inheritedConformance
       = cast<InheritedProtocolConformance>(this)->getInheritedConformance();
 
-    auto origType = getType();
-    if (!origType->hasTypeParameter() &&
-        !origType->hasArchetype()) {
-      return ProtocolConformanceRef(mutableThis);
-    }
-
-    auto origBaseType = inheritedConformance->getType();
-    if (origBaseType->hasTypeParameter() ||
-        origBaseType->hasArchetype()) {
+    if (!IFS.isInvariant(inheritedConformance->getType())) {
       // Substitute into the superclass.
       auto substConformance = inheritedConformance->subst(IFS);
       if (!substConformance.isConcrete())
@@ -1142,12 +1172,43 @@ void NominalTypeDecl::prepareConformanceTable() const {
   }
 }
 
+/// Handle special cased protocol-to-protocol conformances, such as e.g.
+/// DistributedActor-to-Actor.
+///
+/// \returns true when the conformance lookup was handled successfully
+static bool lookupSpecialProtocolToProtocolConformance(
+    const ProtocolDecl *thisProtocol, ProtocolDecl *toProtocol,
+    SmallVectorImpl<ProtocolConformance *> &conformances) {
+  auto &C = toProtocol->getASTContext();
+
+  // DistributedActor-to-Actor
+  if (thisProtocol->isSpecificProtocol(KnownProtocolKind::DistributedActor) &&
+      toProtocol->isSpecificProtocol(KnownProtocolKind::Actor)) {
+    if (auto conformance = getDistributedActorAsActorConformance(C)) {
+      conformances.push_back(conformance);
+      return true;
+    }
+  }
+
+  return false;
+}
+
 bool NominalTypeDecl::lookupConformance(
        ProtocolDecl *protocol,
        SmallVectorImpl<ProtocolConformance *> &conformances) const {
+
+  // In general, protocols cannot conform to other protocols, however there are
+  // exceptions, special handle those.
+  if (auto thisProtocol = dyn_cast<ProtocolDecl>(this)) {
+    if (lookupSpecialProtocolToProtocolConformance(thisProtocol, protocol,
+                                                   conformances)) {
+      return true;
+    }
+  }
+
   assert(!isa<ProtocolDecl>(this) &&
          "Self-conformances are only found by the higher-level "
-         "ModuleDecl::lookupConformance() entry point");
+         "swift::lookupConformance() entry point");
 
   prepareConformanceTable();
   return ConformanceTable->lookupConformance(
@@ -1187,7 +1248,7 @@ void NominalTypeDecl::getImplicitProtocols(
 }
 
 void NominalTypeDecl::registerProtocolConformance(
-       NormalProtocolConformance *conformance, bool synthesized) {
+    NormalProtocolConformance *conformance, bool synthesized) {
   prepareConformanceTable();
   auto *dc = conformance->getDeclContext();
   ConformanceTable->registerProtocolConformance(dc, conformance, synthesized);
@@ -1234,8 +1295,7 @@ findSynthesizedConformance(
   if (!cvProto)
     return nullptr;
 
-  auto module = dc->getParentModule();
-  auto conformance = module->lookupConformance(
+  auto conformance = lookupConformance(
       nominal->getDeclaredInterfaceType(), cvProto);
   if (!conformance || !conformance.isConcrete())
     return nullptr;
@@ -1284,10 +1344,7 @@ static SmallVector<ProtocolConformance *, 2> findSynthesizedConformances(
     for (auto ip : InvertibleProtocolSet::allKnown())
       trySynthesize(getKnownProtocolKind(ip));
 
-    if (nominal->getASTContext().LangOpts.hasFeature(
-            Feature::BitwiseCopyable)) {
-      trySynthesize(KnownProtocolKind::BitwiseCopyable);
-    }
+    trySynthesize(KnownProtocolKind::BitwiseCopyable);
   }
 
   /// Distributed actors can synthesize Encodable/Decodable, so look for those

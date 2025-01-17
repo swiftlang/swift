@@ -79,6 +79,8 @@ static Type deriveCaseIterable_AllCases(DerivedConformance &derived) {
 }
 
 ValueDecl *DerivedConformance::deriveCaseIterable(ValueDecl *requirement) {
+  auto &C = requirement->getASTContext();
+
   // Conformance can't be synthesized in an extension.
   if (checkAndDiagnoseDisallowedContext(requirement))
     return nullptr;
@@ -99,11 +101,14 @@ ValueDecl *DerivedConformance::deriveCaseIterable(ValueDecl *requirement) {
   VarDecl *propDecl;
   PatternBindingDecl *pbDecl;
   std::tie(propDecl, pbDecl) = declareDerivedProperty(
-      SynthesizedIntroducer::Var, Context.Id_allCases, returnTy, returnTy,
+      SynthesizedIntroducer::Var, Context.Id_allCases, returnTy,
       /*isStatic=*/true, /*isFinal=*/true);
 
+  propDecl->getAttrs().add(
+              new (C) NonisolatedAttr(/*unsafe=*/false, /*implicit=*/true));
+
   // Define the getter.
-  auto *getterDecl = addGetterToReadOnlyDerivedProperty(propDecl, returnTy);
+  auto *getterDecl = addGetterToReadOnlyDerivedProperty(propDecl);
 
   getterDecl->setBodySynthesizer(&deriveCaseIterable_enum_getter);
 

@@ -19,6 +19,7 @@
 #include "swift/AST/FileUnit.h"
 #include "swift/AST/ModuleLoader.h"
 #include "swift/AST/ModuleDependencies.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/FileTypes.h"
 #include "swift/Basic/Platform.h"
 #include "swift/Basic/SourceManager.h"
@@ -171,6 +172,25 @@ void ModuleLoader::findOverlayFiles(SourceLoc diagLoc, ModuleDecl *module,
   using namespace llvm::sys;
   using namespace file_types;
 
+  // If an overlay for CxxStdlib was requested, only proceed if compiling with
+  // the platform-default C++ stdlib.
+  if (module->getName() == module->getASTContext().Id_CxxStdlib &&
+      !module->getASTContext().LangOpts.isUsingPlatformDefaultCXXStdlib())
+    return;
+
+  // If cross import information is passed on command-line, prefer use that.
+  auto &crossImports = module->getASTContext().SearchPathOpts.CrossImportInfo;
+  auto overlays = crossImports.find(module->getNameStr());
+  if (overlays != crossImports.end()) {
+    for (auto entry : overlays->second) {
+      module->addCrossImportOverlayFile(entry);
+      if (dependencyTracker)
+        dependencyTracker->addDependency(entry, module->isSystemModule());
+    }
+  }
+  if (module->getASTContext().SearchPathOpts.DisableCrossImportOverlaySearch)
+    return;
+
   if (file->getModuleDefiningPath().empty())
     return;
   findOverlayFilesInternal(module->getASTContext(),
@@ -188,7 +208,7 @@ void ModuleLoader::findOverlayFiles(SourceLoc diagLoc, ModuleDecl *module,
 llvm::StringMap<llvm::SmallSetVector<Identifier, 4>>
 ModuleDependencyInfo::collectCrossImportOverlayNames(
     ASTContext &ctx, StringRef moduleName,
-    std::vector<std::string> &overlayFiles) const {
+    std::vector<std::pair<std::string, std::string>> &overlayFiles) const {
   using namespace llvm::sys;
   using namespace file_types;
   std::optional<std::string> modulePath;
@@ -209,7 +229,7 @@ ModuleDependencyInfo::collectCrossImportOverlayNames(
     }
     case swift::ModuleDependencyKind::SwiftBinary: {
       auto *swiftBinaryDep = getAsSwiftBinaryModule();
-      modulePath = swiftBinaryDep->compiledModulePath;
+      modulePath = swiftBinaryDep->getDefiningModulePath();
       assert(modulePath.has_value());
       StringRef parentDir = llvm::sys::path::parent_path(*modulePath);
       if (llvm::sys::path::extension(parentDir) == ".swiftmodule") {
@@ -240,7 +260,7 @@ ModuleDependencyInfo::collectCrossImportOverlayNames(
       ModuleDecl::collectCrossImportOverlay(ctx, file, moduleName,
                                             bystandingModule);
     result[bystandingModule] = std::move(overlayNames);
-    overlayFiles.push_back(file.str());
+    overlayFiles.push_back({moduleName.str(), file.str()});
   });
   return result;
 }

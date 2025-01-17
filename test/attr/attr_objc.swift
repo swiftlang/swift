@@ -142,10 +142,10 @@ class subject_getterSetter1 {
   }
 
   var observingAccessorsVar1: Int = 0 {
-    @objc // expected-error {{observing accessors are not allowed to be marked @objc}} {{5-11=}}
+    @objc // expected-error {{observers (willSet observer) are not allowed to be marked '@objc'}} {{5-11=}}
     willSet {
     }
-    @objc // expected-error {{observing accessors are not allowed to be marked @objc}} {{5-11=}}
+    @objc // expected-error {{observers (didSet observer) are not allowed to be marked '@objc'}} {{5-11=}}
     didSet {
     }
   }
@@ -383,6 +383,17 @@ protocol subject_containerObjCProtocol2 {
   @objc // FIXME: Access notes can't distinguish between subscript(_:) overloads
   subscript(i: String) -> Int { get set}
 }
+
+@objc(ConflictingName)
+extension subject_class1 {}
+// expected-note@-1 {{'ConflictingName' previously declared here}}
+
+@objc(ConflictingName)
+extension subject_class2 {}
+
+@objc(ConflictingName)
+extension subject_class1 {}
+// expected-warning@-1 {{extension with Objective-C category name 'ConflictingName' conflicts with previous extension with the same category name; this is an error in the Swift 6 language mode}}
 
 protocol nonObjCProtocol {
   @objc // bad-access-note-move{{nonObjCProtocol.objcRequirement()}} expected-error{{@objc can only be used with members of classes, @objc protocols, and concrete extensions of classes}}
@@ -1032,7 +1043,7 @@ class infer_instanceVar1 {
   // expected-note@-2 {{empty tuple type cannot be represented in Objective-C}}
 
   var var_tuple3: (Int)
-// CHECK-LABEL: {{^}} var var_tuple3: (Int)
+// CHECK-LABEL: {{^}} var var_tuple3: Int
 
   @objc // access-note-move{{infer_instanceVar1.var_tuple3_}}
   var var_tuple3_: (Int) // no-error
@@ -1266,10 +1277,10 @@ class infer_instanceVar1 {
   var var_ExistentialMetatype9: (Protocol_ObjC1 & Protocol_ObjC2).Type
 // CHECK-LABEL: {{^}}  var var_ExistentialMetatype0: any Any.Type
 // CHECK-LABEL: {{^}}  var var_ExistentialMetatype1: any PlainProtocol.Type
-// CHECK-LABEL: {{^}}  var var_ExistentialMetatype2: any (PlainProtocol).Type
+// CHECK-LABEL: {{^}}  var var_ExistentialMetatype2: any PlainProtocol.Type
 // CHECK-LABEL: {{^}}  var var_ExistentialMetatype3: any (PlainProtocol & Protocol_Class1).Type
 // CHECK-LABEL: {{^}}  var var_ExistentialMetatype4: any (PlainProtocol & Protocol_ObjC1).Type
-// CHECK-LABEL: {{^}}  var var_ExistentialMetatype5: any (Protocol_Class1).Type
+// CHECK-LABEL: {{^}}  var var_ExistentialMetatype5: any Protocol_Class1.Type
 // CHECK-LABEL: {{^}}  var var_ExistentialMetatype6: any (Protocol_Class1 & Protocol_Class2).Type
 // CHECK-LABEL: {{^}}  var var_ExistentialMetatype7: any (Protocol_Class1 & Protocol_ObjC1).Type
 // CHECK-LABEL: {{^}}  var var_ExistentialMetatype8: any Protocol_ObjC1.Type
@@ -2019,6 +2030,9 @@ class BadClass1 { }
 @objc(Protocol:) // bad-access-note-move{{BadProto1}} expected-error{{'@objc' protocol must have a simple name}}{{15-16=}}
 protocol BadProto1 { }
 
+@objc(Extension:) // expected-error{{'@objc' extension must have a simple name}}{{16-17=}}
+extension PlainClass {}
+
 @objc(Enum:) // bad-access-note-move{{BadEnum1}} expected-error{{'@objc' enum must have a simple name}}{{11-12=}}
 enum BadEnum1: Int { case X }
 
@@ -2077,7 +2091,7 @@ class BadClass2 {
   }
 
   var prop3: Int {
-    @objc(setProperty:) // expected-error{{observing accessors are not allowed to be marked @objc}} {{5-25=}}
+    @objc(setProperty:) // expected-error{{observers (didSet observer) are not allowed to be marked '@objc'}} {{5-25=}}
     didSet { }
   }
 }
@@ -2343,7 +2357,7 @@ class ImplicitClassThrows1 {
   // CHECK: {{^}} func methodReturnsOptionalObjCClass() throws -> Class_ObjC1?
   func methodReturnsOptionalObjCClass() throws -> Class_ObjC1? { return nil }
 
-  // CHECK: {{^}} func methodWithTrailingClosures(_ s: String, fn1: @escaping ((Int) -> Int), fn2: @escaping (Int) -> Int, fn3: @escaping (Int) -> Int)
+  // CHECK: {{^}} func methodWithTrailingClosures(_ s: String, fn1: @escaping (Int) -> Int, fn2: @escaping (Int) -> Int, fn3: @escaping (Int) -> Int)
   // CHECK-DUMP-LABEL: func_decl{{.*}}"methodWithTrailingClosures(_:fn1:fn2:fn3:)"
   // CHECK-DUMP-NOT:  foreign_error_convention
   func methodWithTrailingClosures(_ s: String, fn1: (@escaping (Int) -> Int), fn2: @escaping (Int) -> Int, fn3: @escaping (Int) -> Int) throws { }
@@ -2365,7 +2379,7 @@ class ImplicitClassThrows1 {
   // CHECK: {{^}} func methodReturnsError() throws -> any Error
   func methodReturnsError() throws -> Error { return ErrorEnum.failed }
 
-  // CHECK: {{^}} func methodReturnStaticBridged() throws -> ((Int) -> (Int) -> Int)
+  // CHECK: {{^}} func methodReturnStaticBridged() throws -> (Int) -> (Int) -> Int
   func methodReturnStaticBridged() throws -> ((Int) -> (Int) -> Int) {
     func add(x: Int) -> (Int) -> Int { 
       return { x + $0 }
@@ -2377,7 +2391,7 @@ class ImplicitClassThrows1 {
 // CHECK-DUMP-LABEL: class_decl{{.*}}"SubclassImplicitClassThrows1"
 @objc // access-note-move{{SubclassImplicitClassThrows1}}
 class SubclassImplicitClassThrows1 : ImplicitClassThrows1 {
-  // CHECK: {{^}} override func methodWithTrailingClosures(_ s: String, fn1: @escaping ((Int) -> Int), fn2: @escaping ((Int) -> Int), fn3: @escaping ((Int) -> Int))
+  // CHECK: {{^}} override func methodWithTrailingClosures(_ s: String, fn1: @escaping (Int) -> Int, fn2: @escaping (Int) -> Int, fn3: @escaping (Int) -> Int)
   // CHECK-DUMP-LABEL: func_decl{{.*}}"methodWithTrailingClosures(_:fn1:fn2:fn3:)"
   // CHECK-DUMP: (foreign_error_convention kind=ZeroResult unowned param=1 paramtype="Optional<AutoreleasingUnsafeMutablePointer<Optional<NSError>>>" resulttype="ObjCBool")
   override func methodWithTrailingClosures(_ s: String, fn1: (@escaping (Int) -> Int), fn2: (@escaping (Int) -> Int), fn3: (@escaping (Int) -> Int)) throws { }
@@ -2681,12 +2695,4 @@ class issue55246 {
   @objc // bad-access-note-move{{issue55246.subscript(_:)}}
   subscript<T>(foo : [T]) -> Int { return 0 }
   // access-note-adjust{{@objc}} expected-error@-1 {{subscript cannot be marked @objc because it has generic parameters}}
-}
-
-// @backDeployed
-
-public class BackDeployClass {
-  @backDeployed(before: macOS 12.0) // expected-error {{'@backDeployed' must not be used on an '@objc' instance method}}
-  @objc
-  final public func objcMethod() {}
 }

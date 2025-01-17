@@ -12,6 +12,8 @@
 
 import Swift
 
+#if !$Embedded
+
 #if SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
 @available(SwiftStdlib 5.1, *)
 @available(*, unavailable, message: "Unavailable in task-to-thread concurrency model")
@@ -20,20 +22,12 @@ import Swift
 
   @inlinable
   public nonisolated var unownedExecutor: UnownedSerialExecutor {
-    #if compiler(>=5.5) && $BuiltinBuildMainExecutor
     return UnownedSerialExecutor(Builtin.buildMainActorExecutorRef())
-    #else
-    fatalError("Swift compiler is incompatible with this SDK version")
-    #endif
   }
 
   @inlinable
   public static var sharedUnownedExecutor: UnownedSerialExecutor {
-    #if compiler(>=5.5) && $BuiltinBuildMainExecutor
     return UnownedSerialExecutor(Builtin.buildMainActorExecutorRef())
-    #else
-    fatalError("Swift compiler is incompatible with this SDK version")
-    #endif
   }
 
   @inlinable
@@ -50,20 +44,12 @@ import Swift
 
   @inlinable
   public nonisolated var unownedExecutor: UnownedSerialExecutor {
-    #if compiler(>=5.5) && $BuiltinBuildMainExecutor
     return UnownedSerialExecutor(Builtin.buildMainActorExecutorRef())
-    #else
-    fatalError("Swift compiler is incompatible with this SDK version")
-    #endif
   }
 
   @inlinable
   public static var sharedUnownedExecutor: UnownedSerialExecutor {
-    #if compiler(>=5.5) && $BuiltinBuildMainExecutor
     return UnownedSerialExecutor(Builtin.buildMainActorExecutorRef())
-    #else
-    fatalError("Swift compiler is incompatible with this SDK version")
-    #endif
   }
 
   @inlinable
@@ -154,16 +140,12 @@ extension MainActor {
       fatalError("Incorrect actor executor assumption; Expected same executor as \(self).", file: file, line: line)
     }
 
-    #if $TypedThrows
     // To do the unsafe cast, we have to pretend it's @escaping.
     return try withoutActuallyEscaping(operation) {
       (_ fn: @escaping YesActor) throws -> T in
       let rawFn = unsafeBitCast(fn, to: NoActor.self)
       return try rawFn()
     }
-    #else
-    fatalError("unsupported compiler")
-    #endif
   }
 
   @available(SwiftStdlib 5.9, *)
@@ -176,4 +158,6 @@ extension MainActor {
     try assumeIsolated(operation, file: file, line: line)
   }
 }
+#endif
+
 #endif

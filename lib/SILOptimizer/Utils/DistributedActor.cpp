@@ -12,7 +12,9 @@
 
 #include "swift/SILOptimizer/Utils/DistributedActor.h"
 
+#include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/Decl.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILLocation.h"
 
@@ -33,26 +35,18 @@ void emitDistributedActorSystemWitnessCall(
   ProtocolDecl *DAS = C.getDistributedActorSystemDecl();
   assert(DAS);
   auto systemASTType = base->getType().getASTType();
-  auto *module = M.getSwiftModule();
   ProtocolConformanceRef systemConfRef;
 
   // If the base is an existential open it.
   if (systemASTType->isAnyExistentialType()) {
-    OpenedArchetypeType *opened;
-    systemASTType = systemASTType->openAnyExistentialType(opened,
-                                                          F.getGenericSignature())
-                        ->getCanonicalType();
+    systemASTType = OpenedArchetypeType::getAny(systemASTType)
+        ->getCanonicalType();
     base = B.createOpenExistentialAddr(
         loc, base, F.getLoweredType(systemASTType),
         OpenedExistentialAccess::Immutable);
   }
 
-  if (systemASTType->isTypeParameter() || systemASTType->is<ArchetypeType>()) {
-    systemConfRef = ProtocolConformanceRef(DAS);
-  } else {
-    systemConfRef = module->lookupConformance(systemASTType, DAS);
-  }
-
+  systemConfRef = lookupConformance(systemASTType, DAS);
   assert(!systemConfRef.isInvalid() &&
          "Missing conformance to `DistributedActorSystem`");
 
@@ -80,7 +74,7 @@ void emitDistributedActorSystemWitnessCall(
       assert(actorProto);
 
       ProtocolConformanceRef conformance;
-      auto distributedActorConfRef = module->lookupConformance(
+      auto distributedActorConfRef = lookupConformance(
           actorType.getASTType(), actorProto);
       assert(!distributedActorConfRef.isInvalid() &&
              "Missing conformance to `DistributedActor`");

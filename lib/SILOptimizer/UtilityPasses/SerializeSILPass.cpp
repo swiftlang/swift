@@ -40,41 +40,7 @@ public:
     clonedEntryBlock = fun.createBasicBlock();
   }
 
-  SILType remapType(SILType Ty) {
-    if (!Ty.getASTType()->hasOpaqueArchetype() ||
-        !getBuilder()
-             .getTypeExpansionContext()
-             .shouldLookThroughOpaqueTypeArchetypes())
-      return Ty;
-
-    return getBuilder().getTypeLowering(Ty).getLoweredType().getCategoryType(
-        Ty.getCategory());
-  }
-
-  CanType remapASTType(CanType ty) {
-    if (!ty->hasOpaqueArchetype() ||
-        !getBuilder()
-             .getTypeExpansionContext()
-             .shouldLookThroughOpaqueTypeArchetypes())
-      return ty;
-
-    return substOpaqueTypesWithUnderlyingTypes(
-        ty,
-        TypeExpansionContext(getBuilder().getFunction()),
-        /*allowLoweredTypes=*/false);
-  }
-
-  ProtocolConformanceRef remapConformance(Type ty,
-                                          ProtocolConformanceRef conf) {
-    auto context = getBuilder().getTypeExpansionContext();
-    auto conformance = conf;
-    if (ty->hasOpaqueArchetype() &&
-        context.shouldLookThroughOpaqueTypeArchetypes()) {
-      conformance =
-          substOpaqueTypesWithUnderlyingTypes(conformance, ty, context);
-    }
-    return conformance;
-  }
+  bool shouldSubstOpaqueArchetypes() const { return true; }
 
   void replace();
 };
@@ -201,6 +167,7 @@ static bool hasOpaqueArchetype(TypeExpansionContext context,
   case SILInstructionKind::ClassifyBridgeObjectInst:
   case SILInstructionKind::ValueToBridgeObjectInst:
   case SILInstructionKind::MarkDependenceInst:
+  case SILInstructionKind::MergeIsolationRegionInst:
   case SILInstructionKind::CopyBlockInst:
   case SILInstructionKind::CopyBlockWithoutEscapingInst:
   case SILInstructionKind::CopyValueInst:
@@ -335,6 +302,7 @@ static bool hasOpaqueArchetype(TypeExpansionContext context,
   case SILInstructionKind::MarkUnresolvedMoveAddrInst:
   case SILInstructionKind::DestroyAddrInst:
   case SILInstructionKind::EndLifetimeInst:
+  case SILInstructionKind::ExtendLifetimeInst:
   case SILInstructionKind::InjectEnumAddrInst:
   case SILInstructionKind::DeinitExistentialAddrInst:
   case SILInstructionKind::DeinitExistentialValueInst:
@@ -364,6 +332,7 @@ static bool hasOpaqueArchetype(TypeExpansionContext context,
   case SILInstructionKind::PackElementGetInst:
   case SILInstructionKind::PackElementSetInst:
   case SILInstructionKind::TuplePackElementAddrInst:
+  case SILInstructionKind::TypeValueInst:
     // Handle by operand and result check.
     break;
 
@@ -392,6 +361,15 @@ static bool hasOpaqueArchetype(TypeExpansionContext context,
       }
     });
     return wouldChange;
+  }
+
+  case SILInstructionKind::ThunkInst: {
+    auto subs = cast<ThunkInst>(&inst)->getSubstitutionMap();
+    for (auto ty : subs.getReplacementTypes()) {
+      if (opaqueArchetypeWouldChange(context, ty->getCanonicalType()))
+        return true;
+    }
+    break;
   }
 
   case SILInstructionKind::ApplyInst:
@@ -460,8 +438,8 @@ class SerializeSILPass : public SILModuleTransform {
   /// optimizations and for a better dead function elimination.
   void removeSerializedFlagFromAllFunctions(SILModule &M) {
     for (auto &F : M) {
-      bool wasSerialized = F.isSerialized() != IsNotSerialized;
-      F.setSerialized(IsNotSerialized);
+      bool wasSerialized = F.isAnySerialized();
+      F.setSerializedKind(IsNotSerialized);
 
       // We are removing [serialized] from the function. This will change how
       // opaque archetypes are lowered in SIL - they might lower to their
@@ -493,15 +471,15 @@ class SerializeSILPass : public SILModuleTransform {
     }
 
     for (auto &WT : M.getWitnessTables()) {
-      WT.setSerialized(IsNotSerialized);
+      WT.setSerializedKind(IsNotSerialized);
     }
 
     for (auto &VT : M.getVTables()) {
-      VT->setSerialized(IsNotSerialized);
+      VT->setSerializedKind(IsNotSerialized);
     }
 
     for (auto &Deinit : M.getMoveOnlyDeinits()) {
-      Deinit->setSerialized(IsNotSerialized);
+      Deinit->setSerializedKind(IsNotSerialized);
     }
   }
 

@@ -19,6 +19,7 @@
 #include "SwitchEnumBuilder.h"
 #include "swift/AST/GenericSignature.h"
 #include "swift/AST/SubstitutionMap.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/SIL/DynamicCasts.h"
 #include "swift/SIL/SILInstruction.h"
 
@@ -524,20 +525,17 @@ static ManagedValue createInputFunctionArgument(
     SILGenBuilder &B, SILType type, SILLocation loc, ValueDecl *decl = nullptr,
     bool isNoImplicitCopy = false,
     LifetimeAnnotation lifetimeAnnotation = LifetimeAnnotation::None,
-    bool isClosureCapture = false,
-    bool isFormalParameterPack = false) {
+    bool isClosureCapture = false, bool isFormalParameterPack = false,
+    bool isImplicitParameter = false) {
   auto &SGF = B.getSILGenFunction();
   SILFunction &F = B.getFunction();
-  assert((F.isBare() || isFormalParameterPack || decl) &&
-         "Function arguments of non-bare functions must have a decl");
+  assert((F.isBare() || isFormalParameterPack || decl || isImplicitParameter) &&
+         "explicit function arguments of non-bare functions must have a decl");
   auto *arg = F.begin()->createFunctionArgument(type, decl);
   if (auto *pd = dyn_cast_or_null<ParamDecl>(decl)) {
     if (!arg->getType().isMoveOnly()) {
       isNoImplicitCopy |= pd->getSpecifier() == ParamSpecifier::Borrowing;
       isNoImplicitCopy |= pd->getSpecifier() == ParamSpecifier::Consuming;
-    }
-    if (pd->hasResultDependsOn()) {
-      arg->setHasResultDependsOn();
     }
   }
   if (isNoImplicitCopy)
@@ -566,6 +564,7 @@ static ManagedValue createInputFunctionArgument(
   case SILArgumentConvention::Pack_Owned:
     return SGF.emitManagedPackWithCleanup(arg);
 
+  case SILArgumentConvention::Indirect_In_CXX:
   case SILArgumentConvention::Indirect_In:
     if (SGF.silConv.useLoweredAddresses())
       return SGF.emitManagedBufferWithCleanup(arg);
@@ -586,11 +585,10 @@ static ManagedValue createInputFunctionArgument(
 ManagedValue SILGenBuilder::createInputFunctionArgument(
     SILType type, ValueDecl *decl, bool isNoImplicitCopy,
     LifetimeAnnotation lifetimeAnnotation, bool isClosureCapture,
-    bool isFormalParameterPack) {
-  return ::createInputFunctionArgument(*this, type, SILLocation(decl), decl,
-                                       isNoImplicitCopy, lifetimeAnnotation,
-                                       isClosureCapture,
-                                       isFormalParameterPack);
+    bool isFormalParameterPack, bool isImplicit) {
+  return ::createInputFunctionArgument(
+      *this, type, SILLocation(decl), decl, isNoImplicitCopy,
+      lifetimeAnnotation, isClosureCapture, isFormalParameterPack, isImplicit);
 }
 
 ManagedValue SILGenBuilder::createInputFunctionArgument(
@@ -751,6 +749,31 @@ ManagedValue SILGenBuilder::createUncheckedBitCast(SILLocation loc,
     return SGF.B.copyOwnedObjectRValue(loc, cast,
                                        ManagedValue::ScopeKind::Lexical);
   }
+
+  // Otherwise, we forward the cleanup of the input value and place the cleanup
+  // on the cast value since unchecked_ref_cast is "forwarding".
+  value.forward(SGF);
+  return cloner.clone(cast);
+}
+
+ManagedValue SILGenBuilder::createUncheckedForwardingCast(SILLocation loc,
+                                                          ManagedValue value,
+                                                          SILType type) {
+  CleanupCloner cloner(*this, value);
+  SILValue cast = createUncheckedForwardingCast(loc, value.getValue(), type);
+  
+  // Currently createUncheckedBitCast only produces these
+  // instructions. We assert here to make sure if this changes, this code is
+  // updated.
+  assert((isa<UncheckedTrivialBitCastInst>(cast) ||
+          isa<UncheckedRefCastInst>(cast) ||
+          isa<UncheckedValueCastInst>(cast) ||
+          isa<ConvertFunctionInst>(cast)) &&
+         "SILGenBuilder is out of sync with SILBuilder.");
+
+  // If we have a trivial inst, just return early.
+  if (isa<UncheckedTrivialBitCastInst>(cast))
+    return ManagedValue::forObjectRValueWithoutOwnership(cast);
 
   // Otherwise, we forward the cleanup of the input value and place the cleanup
   // on the cast value since unchecked_ref_cast is "forwarding".
@@ -1204,4 +1227,18 @@ ManagedValue SILGenBuilder::borrowObjectRValue(SILGenFunction &SGF,
     return SGF.emitManagedBeginBorrow(loc, value);
   }
   return SGF.emitFormalEvaluationManagedBeginBorrow(loc, value);
+}
+
+ManagedValue SILGenBuilder::createHopToMainActorIfNeededThunk(
+    SILLocation loc, ManagedValue op, SubstitutionMap substitutionMap) {
+  if (op.getOwnershipKind() == OwnershipKind::None) {
+    auto *thunkedFunc = createHopToMainActorIfNeededThunk(
+        loc, op.forward(getSILGenFunction()), substitutionMap);
+    return SGF.emitManagedRValueWithCleanup(thunkedFunc);
+  }
+
+  CleanupCloner cloner(*this, op);
+  auto *thunkedFunc = createHopToMainActorIfNeededThunk(
+      loc, op.forward(getSILGenFunction()), substitutionMap);
+  return cloner.clone(thunkedFunc);
 }

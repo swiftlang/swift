@@ -124,7 +124,7 @@ entry(%arg : $*any Constrained<Int>):
 }
 
 // Make sure we don't instantiate metadata for constrained existentials. Metadata
-// instatiation is not supported on older runtimes.
+// instantiation is not supported on older runtimes.
 
 // OPT: define{{.*}} void @constrained_protocol(
 // OPT: call {{.*}} @"$s12existentials11Constrained_pSi1TAaBPRts_XPWOc"

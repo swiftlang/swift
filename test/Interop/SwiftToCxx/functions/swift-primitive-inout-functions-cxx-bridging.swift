@@ -2,7 +2,7 @@
 // RUN: %target-swift-frontend %s -typecheck -module-name Functions -clang-header-expose-decls=all-public -emit-clang-header-path %t/functions.h
 // RUN: %FileCheck %s < %t/functions.h
 
-// RUN: %check-interop-cxx-header-in-clang(%t/functions.h)
+// RUN: %check-interop-cxx-header-in-clang(%t/functions.h -DSWIFT_CXX_INTEROP_HIDE_STL_OVERLAY)
 
 // CHECK: SWIFT_EXTERN void $s9Functions8inOutIntyySizF(ptrdiff_t * _Nonnull x) SWIFT_NOEXCEPT SWIFT_CALL; // inOutInt(_:)
 // CHECK: SWIFT_EXTERN void $s9Functions11inOutTwoIntyySiz_SiztF(ptrdiff_t * _Nonnull x, ptrdiff_t * _Nonnull y) SWIFT_NOEXCEPT SWIFT_CALL; // inOutTwoInt(_:_:)

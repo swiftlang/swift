@@ -110,10 +110,10 @@ macro(configure_sdks_darwin)
   set(appletvos_arch "arm64")
   set(watchos_arch "armv7k" "arm64_32")
 
-  set(macosx_ver "10.13")
-  set(iphoneos_ver "11.0")
-  set(appletvos_ver "11.0")
-  set(watchos_ver "4.0")
+  set(macosx_ver "13.0")
+  set(iphoneos_ver "16.0")
+  set(appletvos_ver "16.0")
+  set(watchos_ver "6.0")
 
   set(macosx_vendor "apple")
   set(iphoneos_vendor "apple")
@@ -485,6 +485,7 @@ function (swift_benchmark_compile_archopts)
       set(cxx_options "")
       if ("${module_name_path}" MATCHES ".*cxx-source/.*")
         list(APPEND cxx_options "-Xfrontend" "-enable-experimental-cxx-interop" "-I" "${srcdir}/utils/CxxTests/")
+        list(APPEND cxx_options "-Xcc" "-std=c++20")
         # FIXME: https://github.com/apple/swift/issues/61453
         list(APPEND cxx_options "-Xfrontend" "-validate-tbd-against-ir=none")
       endif()
@@ -596,6 +597,7 @@ function (swift_benchmark_compile_archopts)
       "-emit-module" "-module-name" "${module_name}"
       "-I" "${objdir}"
       "-Xfrontend" "-enable-experimental-cxx-interop"
+      "-Xcc" "-std=c++20"
       "-I" "${srcdir}/utils/CxxTests/"
       "-o" "${objdir}/${module_name}.o"
       "${source}")
@@ -714,7 +716,7 @@ function(swift_benchmark_compile)
 
   if(NOT SWIFT_BENCHMARK_BUILT_STANDALONE)
     set(stdlib_dependencies "swift-frontend" "swiftCore-${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_LIB_SUBDIR}")
-    if(SWIFT_HOST_VARIANT_SDK IN_LIST SWIFT_DARWIN_PLATFORMS)
+    if((SWIFT_HOST_VARIANT_SDK IN_LIST SWIFT_DARWIN_PLATFORMS) AND SWIFT_BUILD_SDK_OVERLAY)
       list(APPEND stdlib_dependencies "swiftDarwin-${SWIFT_SDK_${SWIFT_HOST_VARIANT_SDK}_LIB_SUBDIR}")
     endif()
     foreach(stdlib_dependency ${UNIVERSAL_LIBRARY_NAMES_${SWIFT_BENCHMARK_COMPILE_PLATFORM}})

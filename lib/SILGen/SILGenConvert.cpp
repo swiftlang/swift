@@ -19,10 +19,12 @@
 #include "Scope.h"
 #include "SwitchEnumBuilder.h"
 #include "swift/AST/ASTContext.h"
+#include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/SubstitutionMap.h"
 #include "swift/AST/Types.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Basic/type_traits.h"
 #include "swift/SIL/SILArgument.h"
@@ -199,9 +201,8 @@ SILGenFunction::emitPreconditionOptionalHasValue(SILLocation loc,
   auto someDecl = getASTContext().getOptionalSomeDecl();
   auto noneDecl = getASTContext().getOptionalNoneDecl();
 
-  // If we have an object, make sure the object is at +1. All switch_enum of
-  // objects is done at +1.
   bool isAddress = optional.getType().isAddress();
+  bool isBorrow = !optional.isPlusOneOrTrivial(*this);
   SwitchEnumInst *switchEnum = nullptr;
   if (isAddress) {
     // We forward in the creation routine for
@@ -209,6 +210,12 @@ SILGenFunction::emitPreconditionOptionalHasValue(SILLocation loc,
     B.createSwitchEnumAddr(loc, optional.getValue(),
                            /*defaultDest*/ nullptr,
                            {{someDecl, contBB}, {noneDecl, failBB}});
+  } else if (isBorrow) {
+    hadCleanup = false;
+    hadLValue = false;
+    switchEnum = B.createSwitchEnum(loc, optional.getValue(),
+                                    /*defaultDest*/ nullptr,
+                                    {{someDecl, contBB}, {noneDecl, failBB}});
   } else {
     optional = optional.ensurePlusOne(*this, loc);
     hadCleanup = true;
@@ -524,18 +531,14 @@ SILGenFunction::emitPointerToPointer(SILLocation loc,
     origValue = emitManagedBufferWithCleanup(origBuf);
   }
   // Invoke the conversion intrinsic to convert to the destination type.
-  auto *M = SGM.M.getSwiftModule();
-  auto *proto = getPointerProtocol();
-  auto firstSubMap = inputType->getContextSubstitutionMap(M, proto);
-  auto secondSubMap = outputType->getContextSubstitutionMap(M, proto);
+  SmallVector<Type, 2> replacementTypes;
+  replacementTypes.push_back(inputType);
+  replacementTypes.push_back(outputType);
 
   auto genericSig = converter->getGenericSignature();
   auto subMap =
-    SubstitutionMap::combineSubstitutionMaps(firstSubMap,
-                                             secondSubMap,
-                                             CombineSubstitutionMaps::AtIndex,
-                                             1, 0,
-                                             genericSig);
+    SubstitutionMap::get(genericSig, replacementTypes,
+                         LookUpConformanceInModule());
   
   return emitApplyOfLibraryIntrinsic(loc, converter, subMap, origValue, C);
 }
@@ -864,8 +867,7 @@ ManagedValue SILGenFunction::emitExistentialErasure(
 
         // The original conformances are no good because they have the wrong
         // (pseudogeneric) subject type.
-        auto *M = SGM.M.getSwiftModule();
-        conformances = M->collectExistentialConformances(
+        conformances = collectExistentialConformances(
             concreteFormalType, anyObjectTy);
         F = eraseToAnyObject;
       }

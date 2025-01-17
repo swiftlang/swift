@@ -12,6 +12,7 @@
 
 #define DEBUG_TYPE "capture-prop"
 #include "swift/AST/GenericEnvironment.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Demangling/Demangle.h"
 #include "swift/SIL/SILCloner.h"
 #include "swift/SIL/SILInstruction.h"
@@ -67,6 +68,9 @@ static SILInstruction *getConstant(SILValue V) {
   if (auto *lit = dyn_cast<LiteralInst>(V))
     return lit;
 
+  if (auto *uc = dyn_cast<UpcastInst>(V))
+    V = uc->getOperand();
+
   if (auto *kp = dyn_cast<KeyPathInst>(V)) {
     // We could support operands, if they are constants, to enable propagation
     // of subscript keypaths. This would require to add the operands in the
@@ -84,10 +88,10 @@ static SILInstruction *getConstant(SILValue V) {
   return nullptr;
 }
 
-static std::string getClonedName(PartialApplyInst *PAI, IsSerialized_t Serialized,
-                                 SILFunction *F) {
+static std::string getClonedName(PartialApplyInst *PAI,
+                                 SerializedKind_t Serialized, SILFunction *F) {
   auto P = Demangle::SpecializationPass::CapturePropagation;
-  Mangle::FunctionSignatureSpecializationMangler Mangler(P, Serialized, F);
+  Mangle::FunctionSignatureSpecializationMangler Mangler(F->getASTContext(), P, Serialized, F);
 
   // We know that all arguments are literal insts.
   unsigned argIdx = ApplySite(PAI).getCalleeArgIndexOfFirstAppliedArg();
@@ -255,7 +259,7 @@ CanSILFunctionType getPartialApplyInterfaceResultType(PartialApplyInst *PAI) {
   // return signature.
   auto FTy = PAI->getType().castTo<SILFunctionType>();
   assert(!PAI->hasSubstitutions() ||
-         !PAI->getSubstitutionMap().hasArchetypes());
+         !PAI->getSubstitutionMap().getRecursiveProperties().hasArchetype());
   FTy = cast<SILFunctionType>(
     FTy->mapTypeOutOfContext()->getCanonicalType());
   auto NewFTy = FTy;
@@ -267,16 +271,13 @@ CanSILFunctionType getPartialApplyInterfaceResultType(PartialApplyInst *PAI) {
 /// function body.
 SILFunction *CapturePropagation::specializeConstClosure(PartialApplyInst *PAI,
                                                         SILFunction *OrigF) {
-  IsSerialized_t Serialized = IsNotSerialized;
-  if (PAI->getFunction()->isSerialized())
-    Serialized = IsSerialized;
-
-  std::string Name = getClonedName(PAI, Serialized, OrigF);
+  SerializedKind_t serializedKind = PAI->getFunction()->getSerializedKind();
+  std::string Name = getClonedName(PAI, serializedKind, OrigF);
 
   // See if we already have a version of this function in the module. If so,
   // just return it.
   if (auto *NewF = OrigF->getModule().lookUpFunction(Name)) {
-    assert(NewF->isSerialized() == Serialized);
+    assert(NewF->getSerializedKind() == serializedKind);
     LLVM_DEBUG(llvm::dbgs()
                  << "  Found an already specialized version of the callee: ";
                NewF->printName(llvm::dbgs()); llvm::dbgs() << "\n");
@@ -295,7 +296,7 @@ SILFunction *CapturePropagation::specializeConstClosure(PartialApplyInst *PAI,
   SILOptFunctionBuilder FuncBuilder(*this);
   SILFunction *NewF = FuncBuilder.createFunction(
       SILLinkage::Shared, Name, NewFTy, GenericEnv, OrigF->getLocation(),
-      OrigF->isBare(), OrigF->isTransparent(), Serialized, IsNotDynamic,
+      OrigF->isBare(), OrigF->isTransparent(), serializedKind, IsNotDynamic,
       IsNotDistributed, IsNotRuntimeAccessible, OrigF->getEntryCount(),
       OrigF->isThunk(), OrigF->getClassSubclassScope(),
       OrigF->getInlineStrategy(), OrigF->getEffectsKind(),
@@ -491,8 +492,8 @@ static SILFunction *getSpecializedWithDeadParams(
     ReabstractionInfo ReInfo(
         FuncBuilder.getModule().getSwiftModule(),
         FuncBuilder.getModule().isWholeModule(), ApplySite(), Specialized,
-        PAI->getSubstitutionMap(), Specialized->isSerialized(),
-        /* ConvertIndirectToDirect */ false, /*dropMetatypeArgs=*/ false);
+        PAI->getSubstitutionMap(), Specialized->getSerializedKind(),
+        /* ConvertIndirectToDirect */ false, /*dropMetatypeArgs=*/false);
     GenericFuncSpecializer FuncSpecializer(FuncBuilder,
                                            Specialized,
                                            ReInfo.getClonerParamSubstitutionMap(),
@@ -514,7 +515,8 @@ bool CapturePropagation::optimizePartialApply(PartialApplyInst *PAI) {
   if (SubstF->isExternalDeclaration())
     return false;
 
-  if (PAI->hasSubstitutions() && PAI->getSubstitutionMap().hasArchetypes()) {
+  if (PAI->hasSubstitutions() &&
+      PAI->getSubstitutionMap().getRecursiveProperties().hasArchetype()) {
     LLVM_DEBUG(llvm::dbgs()
                  << "CapturePropagation: cannot handle partial specialization "
                     "of partial_apply:\n";
@@ -555,9 +557,9 @@ bool CapturePropagation::optimizePartialApply(PartialApplyInst *PAI) {
       // refers to the callee function.
       if (argConv != SILArgumentConvention::Direct_Guaranteed)
         return false;
-      
+
       // For escaping closures:
-      // To keep things simple, we don't do a liferange analysis to insert
+      // To keep things simple, we don't do a liverange analysis to insert
       // compensating destroys of the keypath.
       // Instead we require that the PAI is the only use of the keypath (= the
       // common case). This allows us to just delete the now unused keypath
@@ -568,7 +570,11 @@ bool CapturePropagation::optimizePartialApply(PartialApplyInst *PAI) {
       // keypath instruction in this pass, but let dead-object-elimination clean
       // it up later.
       if (!PAI->isOnStack()) {
-        if (getSingleNonDebugUser(kp) != PAI)
+        SILInstruction *user = getSingleNonDebugUser(kp);
+        if (auto *uc = dyn_cast_or_null<UpcastInst>(user))
+          user = getSingleNonDebugUser(uc);
+
+        if (user != PAI)
           return false;
         toDelete.push_back(kp);
       }
@@ -592,6 +598,7 @@ bool CapturePropagation::optimizePartialApply(PartialApplyInst *PAI) {
 
 void CapturePropagation::run() {
   DominanceAnalysis *DA = PM->getAnalysis<DominanceAnalysis>();
+  PostDominanceAnalysis *PDA = PM->getAnalysis<PostDominanceAnalysis>();
   auto *F = getFunction();
   bool HasChanged = false;
 
@@ -600,7 +607,8 @@ void CapturePropagation::run() {
     return;
 
   // Cache cold blocks per function.
-  ColdBlockInfo ColdBlocks(DA);
+  ColdBlockInfo ColdBlocks(DA, PDA);
+  ColdBlocks.analyze(F);
   for (auto &BB : *F) {
     if (ColdBlocks.isCold(&BB))
       continue;

@@ -1,15 +1,5 @@
-option(SWIFT_ENABLE_IOS32
-       "Build 32-bit variants of iOS"
-       TRUE)
-
-if(SWIFT_ENABLE_IOS32)
 set(SUPPORTED_IOS_ARCHS "arm64;arm64e")
 set(SUPPORTED_IOS_SIMULATOR_ARCHS "x86_64;arm64")
-else()
-set(SUPPORTED_IOS_ARCHS "arm64;arm64e")
-set(SUPPORTED_IOS_SIMULATOR_ARCHS "x86_64;arm64")
-endif()
-
 set(SUPPORTED_TVOS_ARCHS "arm64")
 set(SUPPORTED_TVOS_SIMULATOR_ARCHS "x86_64;arm64")
 set(SUPPORTED_WATCHOS_ARCHS "armv7k;arm64_32")
@@ -48,7 +38,11 @@ if(swift_build_freestanding AND (SWIFT_FREESTANDING_FLAVOR STREQUAL "apple"))
   configure_target_variant(FREESTANDING-R  "FREESTANDING Release"         FREESTANDING R  "Release")
   configure_target_variant(FREESTANDING-S  "FREESTANDING MinSizeRelease"  FREESTANDING S  "MinSizeRelease")
 
-  set(SWIFT_FREESTANDING_TEST_DEPENDENCIES "Darwin")
+  if(SWIFT_BUILD_SDK_OVERLAY)
+    set(SWIFT_FREESTANDING_TEST_DEPENDENCIES "Darwin")
+  else()
+    set(SWIFT_FREESTANDING_TEST_DEPENDENCIES "")
+  endif()
 endif()
 
 # Compatible cross-compile SDKS for Darwin OSes: IOS, IOS_SIMULATOR, TVOS,

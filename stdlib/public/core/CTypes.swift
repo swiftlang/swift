@@ -25,10 +25,14 @@ public typealias CUnsignedChar = UInt8
 public typealias CUnsignedShort = UInt16
 
 /// The C 'unsigned int' type.
+#if  _pointerBitWidth(_16)
+public typealias CUnsignedInt = UInt
+#else
 public typealias CUnsignedInt = UInt32
+#endif
 
 /// The C 'unsigned long' type.
-#if os(Windows) && (arch(x86_64) || arch(arm64))
+#if (os(Windows) && (arch(x86_64) || arch(arm64))) || _pointerBitWidth(_16)
 public typealias CUnsignedLong = UInt32
 #else
 public typealias CUnsignedLong = UInt
@@ -44,10 +48,14 @@ public typealias CSignedChar = Int8
 public typealias CShort = Int16
 
 /// The C 'int' type.
+#if  _pointerBitWidth(_16)
+public typealias CInt = Int
+#else
 public typealias CInt = Int32
+#endif
 
 /// The C 'long' type.
-#if os(Windows) && (arch(x86_64) || arch(arm64))
+#if (os(Windows) && (arch(x86_64) || arch(arm64))) || _pointerBitWidth(_16)
 public typealias CLong = Int32
 #else
 public typealias CLong = Int
@@ -100,6 +108,8 @@ public typealias CLongDouble = Double
 #elseif os(OpenBSD)
 #if arch(x86_64)
 public typealias CLongDouble = Float80
+#elseif arch(arm64)
+public typealias CLongDouble = Double
 #else
 #error("CLongDouble needs to be defined for this OpenBSD architecture")
 #endif
@@ -126,6 +136,9 @@ public typealias CWideChar = UInt16
 public typealias CWideChar = Unicode.Scalar
 #endif
 
+/// The C++20 'char8_t' type, which has UTF-8 encoding.
+public typealias CChar8 = UInt8
+
 // FIXME: Swift should probably have a UTF-16 type other than UInt16.
 //
 /// The C++11 'char16_t' type, which has UTF-16 encoding.
@@ -142,6 +155,7 @@ public typealias CBool = Bool
 /// Opaque pointers are used to represent C pointers to types that
 /// cannot be represented in Swift, such as incomplete struct types.
 @frozen
+@unsafe
 public struct OpaquePointer {
   @usableFromInline
   internal var _rawValue: Builtin.RawPointer
@@ -275,6 +289,7 @@ extension UInt {
 /// A wrapper around a C `va_list` pointer.
 #if arch(arm64) && !(os(macOS) || os(iOS) || os(tvOS) || os(watchOS) || os(visionOS) ||  os(Windows))
 @frozen
+@unsafe
 public struct CVaListPointer {
   @usableFromInline // unsafe-performance
   internal var _value: (__stack: UnsafeMutablePointer<Int>?,
@@ -308,6 +323,7 @@ extension CVaListPointer: CustomDebugStringConvertible {
 #else
 
 @frozen
+@unsafe
 public struct CVaListPointer {
   @usableFromInline // unsafe-performance
   internal var _value: UnsafeMutableRawPointer

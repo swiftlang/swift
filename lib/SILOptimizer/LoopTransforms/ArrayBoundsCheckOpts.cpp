@@ -13,6 +13,7 @@
 #define DEBUG_TYPE "sil-abcopts"
 
 #include "swift/AST/Builtins.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/STLExtras.h"
 #include "swift/SIL/Dominance.h"
 #include "swift/SIL/InstructionUtils.h"
@@ -176,6 +177,10 @@ static bool isIdentifiedUnderlyingArrayObject(SILValue V) {
   if (isa<SILFunctionArgument>(V))
     return true;
 
+  auto rootVal = lookThroughAddressAndValueProjections(V);
+  if (rootVal != V) {
+    return isIdentifiedUnderlyingArrayObject(rootVal);
+  }
   return false;
 }
 
@@ -356,6 +361,11 @@ static bool isSignedLessEqual(SILValue Start, SILValue End, SILBasicBlock &BB) {
                                         m_Specific(End)),
                             m_One())))
         return true;
+      // Try to match a cond_fail on "SLT End, Start".
+      if (match(CF->getOperand(),
+                m_ApplyInst(BuiltinValueKind::ICMP_SLT, m_Specific(End),
+                            m_Specific(Start))))
+        return true;
       // Inclusive ranges will have a check on the upper value (before adding
       // one).
       if (PreInclusiveEnd) {
@@ -365,6 +375,11 @@ static bool isSignedLessEqual(SILValue Start, SILValue End, SILBasicBlock &BB) {
                                           m_Specific(Start),
                                           m_Specific(PreInclusiveEnd)),
                               m_One())))
+          IsPreInclusiveEndLEQ = true;
+        if (match(CF->getOperand(),
+                  m_ApplyInst(BuiltinValueKind::ICMP_SLT,
+                              m_Specific(PreInclusiveEnd),
+                              m_Specific(Start))))
           IsPreInclusiveEndLEQ = true;
         if (match(CF->getOperand(),
                   m_ApplyInst(BuiltinValueKind::Xor,
@@ -496,10 +511,7 @@ static bool isRangeChecked(SILValue Start, SILValue End,
   if (!PreheaderPred)
     return false;
   auto *CondBr = dyn_cast<CondBranchInst>(PreheaderPred->getTerminator());
-  if (!CondBr)
-    return false;
-
-  if (isLessThanCheck(Start, End, CondBr, Preheader))
+  if (CondBr && isLessThanCheck(Start, End, CondBr, Preheader))
     return true;
 
   // Walk up the dominator tree looking for a range check ("SLE Start, End").
@@ -1196,7 +1208,6 @@ bool ABCOpt::processLoop(SILLoop *Loop) {
 
   LLVM_DEBUG(llvm::dbgs() << "Attempting to remove redundant checks in "
                           << *Loop);
-  LLVM_DEBUG(Header->getParent()->dump());
 
   // Collect safe arrays. Arrays are safe if there is no function call that
   // could mutate their size in the loop.
@@ -1241,8 +1252,6 @@ bool ABCOpt::processLoop(SILLoop *Loop) {
       LLVM_DEBUG(llvm::dbgs() << "Found a latch ...\n");
     } else return Changed;
   }
-
-  LLVM_DEBUG(Preheader->getParent()->dump());
 
   // Find canonical induction variables.
   InductionAnalysis IndVars(DT, *IVs, Preheader, Header, ExitingBlk, ExitBlk);
@@ -1313,8 +1322,6 @@ bool ABCOpt::processLoop(SILLoop *Loop) {
       }
     }
   }
-
-  LLVM_DEBUG(Preheader->getParent()->dump());
 
   // Hoist bounds checks.
   Changed |= hoistChecksInLoop(DT->getNode(Header), ABC, IndVars, Preheader,
@@ -1428,7 +1435,6 @@ bool ABCOpt::hoistChecksInLoop(DominanceInfoNode *DTNode, ABCAnalysis &ABC,
     Changed = true;
   }
 
-  LLVM_DEBUG(Preheader->getParent()->dump());
   // Traverse the children in the dominator tree.
   for (auto Child : *DTNode)
     Changed |= hoistChecksInLoop(Child, ABC, IndVars, Preheader, Header,

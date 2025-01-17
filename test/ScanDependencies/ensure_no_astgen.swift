@@ -9,7 +9,7 @@
 // This test ensures we don't attempt to do syntax tree parsing for dependency
 // scanning.
 
-// RUN: %target-swift-frontend -scan-dependencies -o %t/deps.json %t/a.swift %t/b.swift -I %t/deps -stats-output-dir %t/stats
+// RUN: %target-swift-frontend -scan-dependencies -o %t/deps.json %t/a.swift %t/b.swift -I %t/deps -stats-output-dir %t/stats -print-zero-stats
 // RUN: %{python} %utils/process-stats-dir.py --evaluate 'ExportedSourceFileRequest == 0' %t/stats
 
 //--- Foo.swiftinterface

@@ -16,6 +16,8 @@
 import Darwin
 #elseif canImport(Glibc)
 import Glibc
+#elseif canImport(Musl)
+import Musl
 #elseif canImport(CRT)
 import CRT
 #endif
@@ -454,7 +456,15 @@ Generate a backtrace for the parent process.
     }
   }
 
+  static func unblockSignals() {
+    var mask = sigset_t()
+
+    sigfillset(&mask)
+    sigprocmask(SIG_UNBLOCK, &mask, nil)
+  }
+
   static func main() {
+    unblockSignals()
     parseArguments()
 
     guard let crashInfoAddr = args.crashInfo else {

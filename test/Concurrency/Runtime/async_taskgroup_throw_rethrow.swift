@@ -159,8 +159,15 @@ func test_discardingTaskGroup_automaticallyRethrows_first_withThrowingBodyFirst(
         _ = await echo(1)
       }
       group.addTask {
-        try? await Task.sleep(until: .now + .seconds(10), clock: .continuous)
-        let error = Boom(id: "task, second, isCancelled:\(Task.isCancelled)")
+        let start: ContinuousClock.Instant = .now
+        do {
+          // Sleep for a long time because we need to account for very slow test runners;
+          // This should rarely actually wait so long as throwing from the group will cancel and wake-up this child task.
+          try await Task.sleep(until: start + .seconds(30), clock: .continuous)
+        } catch {
+          print("Child task cancelled! Slept: \(ContinuousClock.Instant.now - start)")
+        }
+        let error = Boom(id: "task, second, isCancelled:\(Task.isCancelled), slept: \(ContinuousClock.Instant.now - start)")
         print("Throwing: \(error)")
         throw error
       }
@@ -173,6 +180,7 @@ func test_discardingTaskGroup_automaticallyRethrows_first_withThrowingBodyFirst(
     fatalError("Expected error to be thrown")
   } catch {
     // CHECK: Throwing: Boom(id: "body, first, isCancelled:false
+    // CHECK: Child task cancelled!
     // CHECK: Throwing: Boom(id: "task, second, isCancelled:true
     // and only then the re-throw happens:
     // CHECK: rethrown: Boom(id: "body, first

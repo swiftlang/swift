@@ -233,7 +233,7 @@ static bool withStatusRecordLock(AsyncTask *task, ActiveTaskStatus status,
 
       status = newStatus;
 
-      status.traceStatusChanged(task);
+      status.traceStatusChanged(task, false);
       worker.flagQueueIsPublished(lockingRecord);
       installedLockRecord = true;
 
@@ -268,7 +268,7 @@ static bool withStatusRecordLock(AsyncTask *task, ActiveTaskStatus status,
     if (task->_private()._status().compare_exchange_weak(status, newStatus,
             /*success*/ std::memory_order_release,
             /*failure*/ std::memory_order_relaxed)) {
-      newStatus.traceStatusChanged(task);
+      newStatus.traceStatusChanged(task, false);
       break;
     }
   }
@@ -322,7 +322,7 @@ bool swift::addStatusRecord(AsyncTask *task, TaskStatusRecord *newRecord,
       if (task->_private()._status().compare_exchange_weak(oldStatus, newStatus,
               /*success*/ std::memory_order_release,
               /*failure*/ std::memory_order_relaxed)) {
-        newStatus.traceStatusChanged(task);
+        newStatus.traceStatusChanged(task, false);
         return true;
       } else {
         // Retry
@@ -404,7 +404,7 @@ void swift::removeStatusRecord(AsyncTask *task, TaskStatusRecord *record,
         if (task->_private()._status().compare_exchange_weak(oldStatus, newStatus,
                /*success*/ std::memory_order_relaxed,
                /*failure*/ std::memory_order_relaxed)) {
-          newStatus.traceStatusChanged(task);
+          newStatus.traceStatusChanged(task, false);
           return;
         }
       }
@@ -436,7 +436,7 @@ void swift::removeStatusRecord(AsyncTask *task, TaskStatusRecord *record,
       if (task->_private()._status().compare_exchange_weak(oldStatus, newStatus,
              /*success*/ std::memory_order_relaxed,
              /*failure*/ std::memory_order_relaxed)) {
-        newStatus.traceStatusChanged(task);
+        newStatus.traceStatusChanged(task, false);
         return;
       }
       // Restart the loop again - someone else modified status concurrently
@@ -464,8 +464,8 @@ void swift::removeStatusRecordWhere(
      llvm::function_ref<bool(ActiveTaskStatus, TaskStatusRecord*)> condition,
      llvm::function_ref<void(ActiveTaskStatus, ActiveTaskStatus&)> updateStatus) {
   assert(condition && "condition is required");
-  SWIFT_TASK_DEBUG_LOG("remove status record = %p, from task = %p",
-                       record, task);
+  SWIFT_TASK_DEBUG_LOG("remove status record where(), from task = %p",
+                       task);
 
   if (oldStatus.isStatusRecordLocked() &&
         waitForStatusRecordUnlockIfNotSelfLocked(task, oldStatus)) {
@@ -494,7 +494,7 @@ void swift::removeStatusRecordWhere(
         if (task->_private()._status().compare_exchange_weak(oldStatus, newStatus,
                /*success*/ std::memory_order_relaxed,
                /*failure*/ std::memory_order_relaxed)) {
-          newStatus.traceStatusChanged(task);
+          newStatus.traceStatusChanged(task, false);
           return;
         }
       }
@@ -595,7 +595,7 @@ static bool swift_task_hasTaskGroupStatusRecordImpl() {
 ///************************** TASK EXECUTORS ********************************/
 ///**************************************************************************/
 
-TaskExecutorRef AsyncTask::getPreferredTaskExecutor() {
+TaskExecutorRef AsyncTask::getPreferredTaskExecutor(bool assumeHasRecord) {
   // We first check the executor preference status flag, in order to avoid
   // having to scan through the records of the task checking if there was
   // such record.
@@ -644,7 +644,14 @@ swift_task_pushTaskExecutorPreferenceImpl(TaskExecutorRef taskExecutor) {
   void *allocation = _swift_task_alloc_specific(
       task, sizeof(class TaskExecutorPreferenceStatusRecord));
   auto record =
-      ::new (allocation) TaskExecutorPreferenceStatusRecord(taskExecutor);
+      ::new (allocation) TaskExecutorPreferenceStatusRecord(
+          taskExecutor,
+          // we don't retain the executor by the task/record, because the "push"
+          // is implemented as a scope which keeps the executor alive by itself
+          // already, so we save the retain/release pair by the task doing it
+          // as well. In contrast, unstructured task creation always retains
+          // the executor.
+          /*retainedExecutor=*/false);
   SWIFT_TASK_DEBUG_LOG("[TaskExecutorPreference] Create task executor "
                        "preference record %p for task:%p",
                        allocation, task);
@@ -669,7 +676,7 @@ static void swift_task_popTaskExecutorPreferenceImpl(
     TaskExecutorPreferenceStatusRecord *record) {
   SWIFT_TASK_DEBUG_LOG("[TaskExecutorPreference] Remove task executor "
                        "preference record %p from task:%p",
-                       allocation, swift_task_getCurrent());
+                       record, swift_task_getCurrent());
   // We keep count of how many records there are because if there is more than
   // one, it means the task status flag should still be "has task preference".
   int preferenceRecordsCount = 0;
@@ -703,11 +710,12 @@ static void swift_task_popTaskExecutorPreferenceImpl(
 }
 
 void AsyncTask::pushInitialTaskExecutorPreference(
-    TaskExecutorRef preferredExecutor) {
+    TaskExecutorRef preferredExecutor, bool owned) {
   void *allocation = _swift_task_alloc_specific(
       this, sizeof(class TaskExecutorPreferenceStatusRecord));
   auto record =
-      ::new (allocation) TaskExecutorPreferenceStatusRecord(preferredExecutor);
+      ::new (allocation) TaskExecutorPreferenceStatusRecord(
+          preferredExecutor, /*ownsExecutor=*/owned);
   SWIFT_TASK_DEBUG_LOG("[InitialTaskExecutorPreference] Create a task "
                        "preference record %p for task:%p",
                        record, this);
@@ -733,10 +741,20 @@ void AsyncTask::dropInitialTaskExecutorPreferenceRecord() {
                        this);
   assert(this->hasInitialTaskExecutorPreferenceRecord());
 
+  HeapObject *executorIdentityToRelease = nullptr;
   withStatusRecordLock(this, [&](ActiveTaskStatus status) {
     for (auto r : status.records()) {
       if (r->getKind() == TaskStatusRecordKind::TaskExecutorPreference) {
         auto record = cast<TaskExecutorPreferenceStatusRecord>(r);
+
+        if (record->hasRetainedExecutor()) {
+          // Some tasks own their executor (i.e. take it consuming and guarantee
+          // its lifetime dynamically), while strictly structured tasks like
+          // async let do not retain it
+          executorIdentityToRelease =
+              record->getPreferredExecutor().getIdentity();
+        }
+
         removeStatusRecordLocked(status, record);
         _swift_task_dealloc_specific(this, record);
         return;
@@ -748,6 +766,17 @@ void AsyncTask::dropInitialTaskExecutorPreferenceRecord() {
     assert(false && "dropInitialTaskExecutorPreferenceRecord must be "
                     "guaranteed to drop the last preference");
   });
+
+  // Release the "initial" preferred task executor, because it was specifically
+  // set in a Task initializer, which retained it.
+  //
+  // This should not be done for withTaskExecutorPreference executors,
+  // however in that case, we would not enter this function here to clean up.
+  //
+  // NOTE: This MUST NOT assume that the object is a swift object (and use
+  // swift_release), because a dispatch_queue_t conforms to TaskExecutor,
+  // and may be passed in here; in which case swift_releasing it would be incorrect.
+  swift_unknownObjectRelease(executorIdentityToRelease);
 }
 
 /**************************************************************************/
@@ -904,7 +933,7 @@ static void swift_task_cancelImpl(AsyncTask *task) {
     }
   }
 
-  newStatus.traceStatusChanged(task);
+  newStatus.traceStatusChanged(task, false);
   if (newStatus.getInnermostRecord() == NULL) {
      // No records, nothing to propagate
      return;
@@ -1031,22 +1060,22 @@ static swift_task_escalateImpl(AsyncTask *task, JobPriority newPriority) {
     //  Task is not running, it's enqueued somewhere waiting to be run
     //
     // TODO (rokhinip): Add a stealer to escalate the thread request for
-    // the task. Still mark the task has having been escalated so that the
-    // thread will self override when it starts draining the task
+    //  the task. Still mark the task has having been escalated so that the
+    //  thread will self override when it starts draining the task
     //
     // TODO (rokhinip): Add a signpost to flag that this is a potential
-    // priority inversion
+    //  priority inversion
     SWIFT_TASK_DEBUG_LOG("[Override] Escalating %p which is enqueued", task);
 
-  } else {
-    SWIFT_TASK_DEBUG_LOG("[Override] Escalating %p which is suspended to %#x", task, newPriority);
-    // We must have at least one record - the task dependency one.
-    assert(newStatus.getInnermostRecord() != NULL);
   }
 
   if (newStatus.getInnermostRecord() == NULL) {
     return newStatus.getStoredPriority();
   }
+
+  SWIFT_TASK_DEBUG_LOG("[Override] Escalating %p which is suspended to %#x", task, newPriority);
+  // We must have at least one record - the task dependency one.
+  assert(newStatus.getInnermostRecord() != NULL);
 
   withStatusRecordLock(task, newStatus, [&](ActiveTaskStatus status) {
     // We know that none of the escalation actions will recursively
@@ -1089,4 +1118,4 @@ void TaskDependencyStatusRecord::performEscalationAction(JobPriority newPriority
 }
 
 #define OVERRIDE_TASK_STATUS COMPATIBILITY_OVERRIDE
-#include COMPATIBILITY_OVERRIDE_INCLUDE_PATH
+#include "../CompatibilityOverride/CompatibilityOverrideIncludePath.h"

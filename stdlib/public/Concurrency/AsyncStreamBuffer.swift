@@ -212,25 +212,21 @@ extension AsyncStream {
       state.onTermination = nil
       state.terminal = true
 
-      if let continuation = state.continuations.first {
-        if state.pending.count > 0 {
-          state.continuations.removeFirst()
-          let toSend = state.pending.removeFirst()
-          unlock()
-          handler?(.finished)
-          continuation.resume(returning: toSend)
-        } else if state.terminal {
-          state.continuations.removeFirst()
-          unlock()
-          handler?(.finished)
-          continuation.resume(returning: nil)
-        } else {
-          unlock()
-          handler?(.finished)
-        }
-      } else {
+      guard !state.continuations.isEmpty else {
         unlock()
         handler?(.finished)
+        return
+      }
+
+      // Hold on to the continuations to resume outside the lock.
+      let continuations = state.continuations
+      state.continuations.removeAll()
+
+      unlock()
+      handler?(.finished)
+
+      for continuation in continuations {
+        continuation.resume(returning: nil)
       }
     }
 

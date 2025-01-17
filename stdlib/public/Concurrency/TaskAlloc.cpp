@@ -47,7 +47,7 @@ static TaskAllocator &allocator(AsyncTask *task) {
   static GlobalAllocator global;
   return global.allocator;
 #else
-  fprintf(stderr, "global allocator fallback not available\n");
+  puts("global allocator fallback not available\n");
   abort();
 #endif
 }

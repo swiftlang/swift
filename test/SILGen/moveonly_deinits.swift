@@ -1,6 +1,8 @@
-// RUN: %target-swift-emit-silgen -enable-experimental-feature MoveOnlyEnumDeinits %s | %FileCheck -check-prefix=SILGEN %s
-// RUN: %target-swift-emit-sil -enable-experimental-feature MoveOnlyEnumDeinits %s | %FileCheck -check-prefix=SIL %s
-// RUN: %target-swift-emit-sil -O -sil-verify-all -enable-experimental-feature MoveOnlyEnumDeinits %s
+// RUN: %target-swift-emit-silgen -Xllvm -sil-print-types -enable-experimental-feature MoveOnlyEnumDeinits %s | %FileCheck -check-prefix=SILGEN %s
+// RUN: %target-swift-emit-sil -Xllvm -sil-print-types -enable-experimental-feature MoveOnlyEnumDeinits %s | %FileCheck -check-prefix=SIL %s
+// RUN: %target-swift-emit-sil -Xllvm -sil-print-types -O -sil-verify-all -enable-experimental-feature MoveOnlyEnumDeinits %s
+
+// REQUIRES: swift_feature_MoveOnlyEnumDeinits
 
 // Test that makes sure that throughout the pipeline we properly handle
 // conditional releases for trivial and non-trivial move only types.
@@ -20,14 +22,12 @@ func doSomething() {
     print("123")
 }
 
-@_moveOnly
-struct KlassPairWithoutDeinit {
+struct KlassPairWithoutDeinit: ~Copyable {
     var lhs = Klass()
     var rhs = Klass()
 }
 
-@_moveOnly
-struct KlassPairWithDeinit {
+struct KlassPairWithDeinit: ~Copyable {
     var lhs = Klass()
     var rhs = Klass()
 
@@ -36,14 +36,12 @@ struct KlassPairWithDeinit {
     }
 }
 
-@_moveOnly
-struct IntPairWithoutDeinit {
+struct IntPairWithoutDeinit: ~Copyable {
     var k: Int = 5
     var k2: Int = 6
 }
 
-@_moveOnly
-struct IntPairWithDeinit {
+struct IntPairWithDeinit: ~Copyable {
     var k: Int = 5
     var k2: Int = 6
 
@@ -65,16 +63,26 @@ var value: Bool { false }
 
 // SILGEN-LABEL: sil hidden [ossa] @$s16moveonly_deinits19KlassPairWithDeinitVfD : $@convention(method) (@owned KlassPairWithDeinit) -> () {
 // SILGEN: bb0([[ARG:%.*]] :
-// SILGEN:   [[MARK:%.*]] = mark_unresolved_non_copyable_value [consumable_and_assignable] [[ARG]]
+// SILGEN:   [[STACK:%.*]] = alloc_stack
+// SILGEN:   [[MARK:%.*]] = mark_unresolved_non_copyable_value [consumable_and_assignable] [[STACK]]
+// SILGEN:   store [[ARG]] to [init] [[MARK]]
 // SILGEN:   [[DD:%.*]] = drop_deinit [[MARK]]
-// SILGEN:   destroy_value [[DD]]
+// SILGEN:   [[L_ADDR:%[^,]+]] = struct_element_addr [[DD]]
+// SILGEN-SAME: #KlassPairWithDeinit.lhs 
+// SILGEN:   [[L_ACCESS:%[^,]+]] = begin_access [deinit] [static] [[L_ADDR]]
+// SILGEN:   destroy_addr [[L_ACCESS]]
+// SILGEN:   [[R_ADDR:%[^,]+]] = struct_element_addr [[DD]]
+// SILGEN-SAME: #KlassPairWithDeinit.rhs 
+// SILGEN:   [[R_ACCESS:%[^,]+]] = begin_access [deinit] [static] [[R_ADDR]]
+// SILGEN:   destroy_addr [[R_ACCESS]]
 // SILGEN: } // end sil function '$s16moveonly_deinits19KlassPairWithDeinitVfD'
 
 // SILGEN-LABEL: sil hidden [ossa] @$s16moveonly_deinits17IntPairWithDeinitVfD : $@convention(method) (@owned IntPairWithDeinit) -> () {
 // SILGEN: bb0([[ARG:%.*]] :
-// SILGEN:   [[MARKED:%.*]] = mark_unresolved_non_copyable_value [consumable_and_assignable] [[ARG]]
-// SILGEN:   [[DD:%.*]] = drop_deinit [[MARKED]]
-// SILGEN:   destroy_value [[DD]]
+// SILGEN:   [[STACK:%.*]] = alloc_stack
+// SILGEN:   [[MARK:%.*]] = mark_unresolved_non_copyable_value [consumable_and_assignable] [[STACK]]
+// SILGEN:   store [[ARG]] to [init] [[MARK]]
+// SILGEN:   [[DD:%.*]] = drop_deinit [[MARK]]
 // SILGEN: } // end sil function '$s16moveonly_deinits17IntPairWithDeinitVfD'
 
 ////////////////////////
@@ -280,14 +288,12 @@ public func testKlassPairWithDeinit() {
 // MARK: Enum Declarations //
 /////////////////////////////
 
-@_moveOnly
-enum KlassEnumPairWithoutDeinit {
+enum KlassEnumPairWithoutDeinit: ~Copyable {
     case lhs(Klass)
     case rhs(Klass)
 }
 
-@_moveOnly
-enum KlassEnumPairWithDeinit {
+enum KlassEnumPairWithDeinit: ~Copyable {
     case lhs(Klass)
     case rhs(Klass)
 
@@ -296,14 +302,12 @@ enum KlassEnumPairWithDeinit {
     }
 }
 
-@_moveOnly
-enum IntEnumPairWithoutDeinit {
+enum IntEnumPairWithoutDeinit: ~Copyable {
 case lhs(Int)
 case rhs(Int)
 }
 
-@_moveOnly
-enum IntEnumPairWithDeinit {
+enum IntEnumPairWithDeinit: ~Copyable {
     case lhs(Int)
     case rhs(Int)
 
@@ -323,20 +327,40 @@ func consumeKlassEnumPairWithDeinit(_ x: __owned KlassEnumPairWithDeinit) { }
 
 // SILGEN-LABEL: sil hidden [ossa] @$s16moveonly_deinits23KlassEnumPairWithDeinitOfD : $@convention(method) (@owned KlassEnumPairWithDeinit) -> () {
 // SILGEN: bb0([[ARG:%.*]] :
-// SILGEN:   [[MARK:%.*]] = mark_unresolved_non_copyable_value [consumable_and_assignable] [[ARG]]
+// SILGEN:   [[STACK:%.*]] = alloc_stack
+// SILGEN:   [[MARK:%.*]] = mark_unresolved_non_copyable_value [consumable_and_assignable] [[STACK]]
+// SILGEN:   store [[ARG]] to [init] [[MARK]]
 // SILGEN:   [[DD:%.*]] = drop_deinit [[MARK]]
-// SILGEN:   destroy_value [[DD]] : $KlassEnumPairWithDeinit
-// SILGEN-NEXT: tuple ()
-// SILGEN-NEXT: return
+// SILGEN:   switch_enum_addr [[DD]]
+// SILGEN-SAME:  case #KlassEnumPairWithDeinit.lhs!enumelt: [[BASIC_BLOCK1:bb[0-9]+]]
+// SILGEN-SAME:  case #KlassEnumPairWithDeinit.rhs!enumelt: [[BASIC_BLOCK2:bb[0-9]+]]
+// SILGEN: [[BASIC_BLOCK1]]:
+// SILGEN:   [[L_ADDR:%[^,]+]] = unchecked_take_enum_data_addr [[DD]]
+// SILGEN-SAME:  #KlassEnumPairWithDeinit.lhs!enumelt
+// SILGEN:   destroy_addr [[L_ADDR]]
+// SILGEN: [[BASIC_BLOCK2]]:
+// SILGEN:   [[R_ADDR:%[^,]+]] = unchecked_take_enum_data_addr [[DD]]
+// SILGEN-SAME:  #KlassEnumPairWithDeinit.rhs!enumelt
+// SILGEN:   destroy_addr [[R_ADDR]]
 // SILGEN: } // end sil function '$s16moveonly_deinits23KlassEnumPairWithDeinitOfD'
 
 // SILGEN-LABEL: sil hidden [ossa] @$s16moveonly_deinits21IntEnumPairWithDeinitOfD : $@convention(method) (@owned IntEnumPairWithDeinit) -> () {
 // SILGEN: bb0([[ARG:%.*]] :
-// SILGEN:   [[MARK:%.*]] = mark_unresolved_non_copyable_value [consumable_and_assignable] [[ARG]]
+// SILGEN:   [[STACK:%.*]] = alloc_stack
+// SILGEN:   [[MARK:%.*]] = mark_unresolved_non_copyable_value [consumable_and_assignable] [[STACK]]
+// SILGEN:   store [[ARG]] to [init] [[MARK]]
 // SILGEN:   [[DD:%.*]] = drop_deinit [[MARK]]
-// SILGEN:   destroy_value [[DD]] : $IntEnumPairWithDeinit
-// SILGEN-NEXT: tuple ()
-// SILGEN-NEXT: return
+// SILGEN:   switch_enum_addr [[DD]]
+// SILGEN-SAME:  case #IntEnumPairWithDeinit.lhs!enumelt: [[BASIC_BLOCK1:bb[0-9]+]]
+// SILGEN-SAME:  case #IntEnumPairWithDeinit.rhs!enumelt: [[BASIC_BLOCK2:bb[0-9]+]]
+// SILGEN: [[BASIC_BLOCK1]]:
+// SILGEN:   [[L_ADDR:%[^,]+]] = unchecked_take_enum_data_addr [[DD]]
+// SILGEN-SAME:  #IntEnumPairWithDeinit.lhs!enumelt
+// SILGEN:   destroy_addr [[L_ADDR]]
+// SILGEN: [[BASIC_BLOCK2]]:
+// SILGEN:   [[R_ADDR:%[^,]+]] = unchecked_take_enum_data_addr [[DD]]
+// SILGEN-SAME:  #IntEnumPairWithDeinit.rhs!enumelt
+// SILGEN:   destroy_addr [[R_ADDR]]
 // SILGEN: } // end sil function '$s16moveonly_deinits21IntEnumPairWithDeinitOfD'
 
 //////////////////////

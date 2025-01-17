@@ -91,6 +91,12 @@ public let benchmarks = [
   BenchmarkInfo(name: "NSArray.nonbridged.mutableCopy.objectAtIndex",
                   runFunction: run_RealNSArrayMutableCopyObjectAtIndex, tags: t,
                   setUpFunction: setup_bridgedArrays),
+  BenchmarkInfo(name: "NSArray.bridged.bufferAccess",
+                  runFunction: run_BridgedNSArrayBufferAccess, tags: t,
+                  setUpFunction: setup_bridgedArrays),
+  BenchmarkInfo(name: "NSArray.bridged.repeatedBufferAccess",
+                  runFunction: run_BridgedNSArrayRepeatedBufferAccess, tags: t,
+                  setUpFunction: setup_bridgedArrays),
 ]
 
 #if _runtime(_ObjC)
@@ -809,6 +815,36 @@ public func run_BridgedNSArrayObjectAtIndex(_ n: Int) {
   for _ in 0 ..< n * 50 {
     for i in 0..<100 {
       blackHole(bridgedArray[i])
+    }
+  }
+  #endif
+}
+
+@inline(never)
+public func run_BridgedNSArrayBufferAccess(_ n: Int) {
+  #if _runtime(_ObjC)
+  for _ in 0 ..< n {
+    for i in 0..<1000 {
+      let tmp = nsArray as! [NSObject]
+      blackHole(tmp)
+      blackHole(tmp.withContiguousStorageIfAvailable {
+        $0[0]
+      })
+    }
+  }
+  #endif
+}
+
+@inline(never)
+public func run_BridgedNSArrayRepeatedBufferAccess(_ n: Int) {
+  #if _runtime(_ObjC)
+  for _ in 0 ..< n {
+    let tmp = nsArray as! [NSObject]
+    blackHole(tmp)
+    for i in 0..<1000 {
+      blackHole(tmp.withContiguousStorageIfAvailable {
+        $0[0]
+      })
     }
   }
   #endif

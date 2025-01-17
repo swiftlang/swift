@@ -10,12 +10,20 @@
 //
 //===----------------------------------------------------------------------===//
 ///
-/// This file contains an optimizer pass that lowers away move only types from
-/// SIL. It can run on all types or just trivial types. It works by Walking all
-/// values in the IR and unsafely converting their type to be without move
+/// Eliminate SIL constructs required by ownership diagnostics.
+///
+/// 1. Remove ownership operations on nonowned values: move_value, begin_borrow,
+/// extend_lifetime.
+///
+/// 2. Remove instructions that convert to and from MoveOnlyWrapped types.
+///
+/// This pass can run on all types or just trivial types. It works by Walking
+/// all values in the IR and unsafely converting their type to be without move
 /// only. If a change is made, we add the defining instruction to a set list for
 /// post-processing. Once we have updated all types in the function, we revisit
 /// the instructions that we touched and update/delete them as appropriate.
+///
+/// TODO: Rename this pass to OwnershipDiagnosticLowering.
 ///
 //===----------------------------------------------------------------------===//
 
@@ -23,6 +31,7 @@
 
 #include "swift/AST/DiagnosticsSIL.h"
 #include "swift/AST/Types.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/Defer.h"
 #include "swift/SIL/ApplySite.h"
 #include "swift/SIL/BasicBlockBits.h"
@@ -51,12 +60,6 @@ namespace {
 
 struct SILMoveOnlyWrappedTypeEliminatorVisitor
     : SILInstructionVisitor<SILMoveOnlyWrappedTypeEliminatorVisitor, bool> {
-  const llvm::SmallSetVector<SILArgument *, 8> &touchedArgs;
-
-  SILMoveOnlyWrappedTypeEliminatorVisitor(
-      const llvm::SmallSetVector<SILArgument *, 8> &touchedArgs)
-      : touchedArgs(touchedArgs) {}
-
   bool visitSILInstruction(SILInstruction *inst) {
     llvm::errs() << "Unhandled SIL Instruction: " << *inst;
     llvm_unreachable("error");
@@ -144,6 +147,7 @@ struct SILMoveOnlyWrappedTypeEliminatorVisitor
   }
   DELETE_IF_TRIVIAL_OP(DestroyValue)
   DELETE_IF_TRIVIAL_OP(EndBorrow)
+  DELETE_IF_TRIVIAL_OP(ExtendLifetime)
 #undef DELETE_IF_TRIVIAL_OP
 
 #define NEED_TO_CONVERT_FORWARDING_TO_NONE_IF_TRIVIAL_OP(CLS)                  \
@@ -186,6 +190,7 @@ struct SILMoveOnlyWrappedTypeEliminatorVisitor
   NO_UPDATE_NEEDED(MarkDependence)
   NO_UPDATE_NEEDED(DestroyAddr)
   NO_UPDATE_NEEDED(DeallocStack)
+  NO_UPDATE_NEEDED(DeallocBox)
   NO_UPDATE_NEEDED(Branch)
   NO_UPDATE_NEEDED(ExplicitCopyAddr)
   NO_UPDATE_NEEDED(CopyAddr)
@@ -193,6 +198,8 @@ struct SILMoveOnlyWrappedTypeEliminatorVisitor
   NO_UPDATE_NEEDED(CheckedCastBranch)
   NO_UPDATE_NEEDED(Object)
   NO_UPDATE_NEEDED(OpenExistentialRef)
+  NO_UPDATE_NEEDED(OpenExistentialAddr)
+  NO_UPDATE_NEEDED(OpenExistentialBox)
   NO_UPDATE_NEEDED(ConvertFunction)
   NO_UPDATE_NEEDED(RefToBridgeObject)
   NO_UPDATE_NEEDED(BridgeObjectToRef)
@@ -201,6 +208,8 @@ struct SILMoveOnlyWrappedTypeEliminatorVisitor
   NO_UPDATE_NEEDED(ClassMethod)
   NO_UPDATE_NEEDED(FixLifetime)
   NO_UPDATE_NEEDED(AddressToPointer)
+  NO_UPDATE_NEEDED(ExistentialMetatype)
+  NO_UPDATE_NEEDED(Builtin)
 #undef NO_UPDATE_NEEDED
 
   bool eliminateIdentityCast(SingleValueInstruction *svi) {
@@ -293,56 +302,80 @@ static bool isMoveOnlyWrappedTrivial(SILValue value) {
 }
 
 bool SILMoveOnlyWrappedTypeEliminator::process() {
-  bool madeChange = true;
+  bool madeChange = false;
 
-  llvm::SmallSetVector<SILArgument *, 8> touchedArgs;
   llvm::SmallSetVector<SILInstruction *, 8> touchedInsts;
+
+  // For each value whose type is move-only wrapped:
+  // - rewrite the value's type
+  // - record its users for later visitation
+  auto visitValue = [&touchedInsts, fn = fn,
+                     trivialOnly = trivialOnly](SILValue value) -> bool {
+    if (!value->getType().hasAnyMoveOnlyWrapping(fn))
+      return false;
+
+    // If we are looking at trivial only, skip non-trivial function args.
+    if (trivialOnly && !isMoveOnlyWrappedTrivial(value))
+      return false;
+
+    for (auto *use : value->getNonTypeDependentUses())
+      touchedInsts.insert(use->getUser());
+
+    if (isa<SILUndef>(value))
+      value->replaceAllUsesWith(
+          SILUndef::get(fn, value->getType().removingAnyMoveOnlyWrapping(fn)));
+    else
+      value->unsafelyEliminateMoveOnlyWrapper(fn);
+
+    return true;
+  };
 
   for (auto &bb : *fn) {
     for (auto *arg : bb.getArguments()) {
-      if (!arg->getType().isMoveOnlyWrapped() &&
-          !arg->getType().isBoxedMoveOnlyWrappedType(fn))
+      bool relevant = visitValue(arg);
+      if (!relevant)
         continue;
-
-      // If we are looking at trivial only, skip non-trivial function args.
-      if (trivialOnly &&
-          !arg->getType().removingMoveOnlyWrapper().isTrivial(*fn))
-        continue;
-
-      arg->unsafelyEliminateMoveOnlyWrapper(fn);
 
       // If our new type is trivial, convert the arguments ownership to
       // None. Otherwise, preserve the ownership kind of the argument.
       if (arg->getType().isTrivial(*fn))
         arg->setOwnershipKind(OwnershipKind::None);
-      touchedArgs.insert(arg);
-      for (auto *use : arg->getNonTypeDependentUses())
-        touchedInsts.insert(use->getUser());
+
+      madeChange = true;
     }
 
     for (auto &ii : bb) {
-      for (SILValue v : ii.getResults()) {
-        if (!v->getType().isMoveOnlyWrapped() &&
-            !v->getType().isBoxedMoveOnlyWrappedType(fn))
+      bool touched = false;
+      for (SILValue value : ii.getResults()) {
+        bool relevant = visitValue(value);
+        if (!relevant)
           continue;
 
-        if (trivialOnly &&
-            !isMoveOnlyWrappedTrivial(v))
-          continue;
-
-        v->unsafelyEliminateMoveOnlyWrapper(fn);
-        touchedInsts.insert(&ii);
-
-        // Add all users as well. This ensures we visit things like
-        // destroy_value and end_borrow.
-        for (auto *use : v->getNonTypeDependentUses())
-          touchedInsts.insert(use->getUser());
-        madeChange = true;
+        touched = true;
       }
+      // delete trivial move_value and extend_lifetime instructions.
+      if (isa<MoveValueInst>(ii) || isa<ExtendLifetimeInst>(ii)) {
+        touched = true;
+      }
+      if (!touched)
+        continue;
+      touchedInsts.insert(&ii);
+
+      madeChange = true;
     }
   }
+  // SILFunction::undefValues may grow during the loop.
+  SmallVector<std::pair<SILType, SILUndef *>, 4> originalUndefs(
+      fn->getUndefValues());
+  for (auto pair : originalUndefs) {
+    bool relevant = visitValue(pair.second);
+    if (!relevant)
+      continue;
 
-  SILMoveOnlyWrappedTypeEliminatorVisitor visitor(touchedArgs);
+    madeChange = true;
+  }
+
+  SILMoveOnlyWrappedTypeEliminatorVisitor visitor;
   while (!touchedInsts.empty()) {
     visitor.visit(touchedInsts.pop_back_val());
   }

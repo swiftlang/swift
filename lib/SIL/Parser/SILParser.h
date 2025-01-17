@@ -33,7 +33,7 @@ struct ParsedSpecAttr {
   SILFunction *target = nullptr;
   Identifier spiGroupID;
   ModuleDecl *spiModule;
-  AvailabilityContext availability = AvailabilityContext::alwaysAvailable();
+  AvailabilityRange availability = AvailabilityRange::alwaysAvailable();
 };
 
 /// The parser for an individual SIL function.
@@ -234,6 +234,11 @@ public:
     }
     return false;
   }
+
+  bool parseASTTypeOrValue(CanType &result,
+                           GenericSignature genericSig = GenericSignature(),
+                           GenericParamList *genericParams = nullptr,
+                           bool forceContextualType = false);
 
   std::optional<StringRef>
   parseOptionalAttribute(ArrayRef<StringRef> expected) {

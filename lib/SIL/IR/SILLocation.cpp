@@ -17,6 +17,7 @@
 #include "swift/AST/Pattern.h"
 #include "swift/AST/Stmt.h"
 #include "swift/AST/Module.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/SourceManager.h"
 #include "llvm/Support/raw_ostream.h"
 
@@ -136,6 +137,8 @@ SourceLoc SILLocation::getStartSourceLoc() const {
     return SourceLoc();
   if (isSILFile())
     return storage.sourceLoc;
+  if (getStorageKind() == FilenameAndLocationKind)
+    return SourceLoc();
   return getStartSourceLoc(getPrimaryASTNode());
 }
 
@@ -157,6 +160,8 @@ SourceLoc SILLocation::getEndSourceLoc() const {
     return SourceLoc();
   if (isSILFile())
     return storage.sourceLoc;
+  if (getStorageKind() == FilenameAndLocationKind)
+    return SourceLoc();
   return getEndSourceLoc(getPrimaryASTNode());
 }
 

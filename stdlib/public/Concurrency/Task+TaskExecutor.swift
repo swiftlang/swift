@@ -11,7 +11,6 @@
 //===----------------------------------------------------------------------===//
 
 import Swift
-@_implementationOnly import _SwiftConcurrencyShims
 
 // None of TaskExecutor APIs are available in task-to-thread concurrency model.
 #if !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
@@ -159,11 +158,17 @@ public func withTaskExecutorPreference<T, Failure>(
   return try await operation()
 }
 
+// Note: hack to stage out @_unsafeInheritExecutor forms of various functions
+// in favor of #isolation. The _unsafeInheritExecutor_ prefix is meaningful
+// to the type checker.
+//
+// This function also doubles as an ABI-compatibility shim predating the
+// introduction of #isolation.
 @_unavailableInEmbedded
 @available(SwiftStdlib 6.0, *)
-@_unsafeInheritExecutor // calling withTaskExecutor MUST NOT perform the "usual" hop to global
+@_unsafeInheritExecutor // for ABI compatibility
 @_silgen_name("$ss26withTaskExecutorPreference_9operationxSch_pSg_xyYaYbKXEtYaKs8SendableRzlF")
-public func __abi__withTaskExecutorPreference<T: Sendable>(
+public func _unsafeInheritExecutor_withTaskExecutorPreference<T: Sendable>(
   _ taskExecutor: (any TaskExecutor)?,
   operation: @Sendable () async throws -> T
 ) async rethrows -> T {
@@ -185,6 +190,7 @@ public func __abi__withTaskExecutorPreference<T: Sendable>(
 /// Task with specified executor -----------------------------------------------
 
 @available(SwiftStdlib 6.0, *)
+@_unavailableInEmbedded
 extension Task where Failure == Never {
   /// Runs the given nonthrowing operation asynchronously
   /// as part of a new top-level task on behalf of the current actor.
@@ -221,15 +227,14 @@ extension Task where Failure == Never {
   @discardableResult
   @_alwaysEmitIntoClient
   public init(
-    executorPreference taskExecutor: (any TaskExecutor)?,
+    executorPreference taskExecutor: consuming (any TaskExecutor)?,
     priority: TaskPriority? = nil,
-    operation: __owned @Sendable @escaping () async -> Success
+    operation: sending @escaping () async -> Success
   ) {
     guard let taskExecutor else {
       self = Self.init(priority: priority, operation: operation)
       return
     }
-    #if $BuiltinCreateAsyncTaskWithExecutor
     // Set up the job flags for a new task.
     let flags = taskCreateFlags(
       priority: priority, isChildTask: false, copyTaskLocals: true,
@@ -237,20 +242,23 @@ extension Task where Failure == Never {
       addPendingGroupTaskUnconditionally: false,
       isDiscardingTask: false)
 
-    // Create the asynchronous task.
+#if $BuiltinCreateAsyncTaskOwnedTaskExecutor
+    let (task, _) = Builtin.createTask(
+      flags: flags,
+      initialTaskExecutorConsuming: taskExecutor,
+      operation: operation)
+#else
     let executorBuiltin: Builtin.Executor =
       taskExecutor.asUnownedTaskExecutor().executor
-
     let (task, _) = Builtin.createAsyncTaskWithExecutor(
       flags, executorBuiltin, operation)
+#endif
     self._task = task
-    #else
-    fatalError("Unsupported Swift compiler, missing support for BuiltinCreateAsyncTaskWithExecutor")
-    #endif
   }
 }
 
 @available(SwiftStdlib 6.0, *)
+@_unavailableInEmbedded
 extension Task where Failure == Error {
   /// Runs the given throwing operation asynchronously
   /// as part of a new top-level task on behalf of the current actor.
@@ -282,15 +290,14 @@ extension Task where Failure == Error {
   @discardableResult
   @_alwaysEmitIntoClient
   public init(
-    executorPreference taskExecutor: (any TaskExecutor)?,
+    executorPreference taskExecutor: consuming (any TaskExecutor)?,
     priority: TaskPriority? = nil,
-    operation: __owned @Sendable @escaping () async throws -> Success
+    operation: sending @escaping () async throws -> Success
   ) {
     guard let taskExecutor else {
       self = Self.init(priority: priority, operation: operation)
       return
     }
-    #if $BuiltinCreateAsyncTaskWithExecutor
     // Set up the job flags for a new task.
     let flags = taskCreateFlags(
       priority: priority, isChildTask: false, copyTaskLocals: true,
@@ -298,21 +305,25 @@ extension Task where Failure == Error {
       addPendingGroupTaskUnconditionally: false,
       isDiscardingTask: false)
 
-    // Create the asynchronous task.
+#if $BuiltinCreateAsyncTaskOwnedTaskExecutor
+    let (task, _) = Builtin.createTask(
+      flags: flags,
+      initialTaskExecutorConsuming: taskExecutor,
+      operation: operation)
+#else
     let executorBuiltin: Builtin.Executor =
       taskExecutor.asUnownedTaskExecutor().executor
     let (task, _) = Builtin.createAsyncTaskWithExecutor(
       flags, executorBuiltin, operation)
+#endif
     self._task = task
-    #else
-    fatalError("Unsupported Swift compiler, missing support for $BuiltinCreateAsyncTaskWithExecutor")
-    #endif
   }
 }
 
 // ==== Detached tasks ---------------------------------------------------------
 
 @available(SwiftStdlib 6.0, *)
+@_unavailableInEmbedded
 extension Task where Failure == Never {
   /// Runs the given nonthrowing operation asynchronously
   /// as part of a new top-level task.
@@ -343,12 +354,11 @@ extension Task where Failure == Never {
   public static func detached(
     executorPreference taskExecutor: (any TaskExecutor)?,
     priority: TaskPriority? = nil,
-    operation: __owned @Sendable @escaping () async -> Success
+    operation: sending @escaping () async -> Success
   ) -> Task<Success, Failure> {
     guard let taskExecutor else {
       return Self.detached(priority: priority, operation: operation)
     }
-    #if $BuiltinCreateAsyncTaskWithExecutor
     // Set up the job flags for a new task.
     let flags = taskCreateFlags(
       priority: priority, isChildTask: false, copyTaskLocals: false,
@@ -356,20 +366,23 @@ extension Task where Failure == Never {
       addPendingGroupTaskUnconditionally: false,
       isDiscardingTask: false)
 
-    // Create the asynchronous task.
+#if $BuiltinCreateAsyncTaskOwnedTaskExecutor
+    let (task, _) = Builtin.createTask(
+      flags: flags,
+      initialTaskExecutorConsuming: taskExecutor,
+      operation: operation)
+#else
     let executorBuiltin: Builtin.Executor =
-        taskExecutor.asUnownedTaskExecutor().executor
+      taskExecutor.asUnownedTaskExecutor().executor
     let (task, _) = Builtin.createAsyncTaskWithExecutor(
       flags, executorBuiltin, operation)
-
+#endif
     return Task(task)
-    #else
-    fatalError("Unsupported Swift compiler")
-    #endif
   }
 }
 
 @available(SwiftStdlib 6.0, *)
+@_unavailableInEmbedded
 extension Task where Failure == Error {
   /// Runs the given throwing operation asynchronously
   /// as part of a new top-level task.
@@ -402,12 +415,11 @@ extension Task where Failure == Error {
   public static func detached(
     executorPreference taskExecutor: (any TaskExecutor)?,
     priority: TaskPriority? = nil,
-    operation: __owned @Sendable @escaping () async throws -> Success
+    operation: sending @escaping () async throws -> Success
   ) -> Task<Success, Failure> {
     guard let taskExecutor else {
       return Self.detached(priority: priority, operation: operation)
     }
-    #if $BuiltinCreateAsyncTaskWithExecutor
     // Set up the job flags for a new task.
     let flags = taskCreateFlags(
       priority: priority, isChildTask: false, copyTaskLocals: false,
@@ -415,22 +427,25 @@ extension Task where Failure == Error {
       addPendingGroupTaskUnconditionally: false,
       isDiscardingTask: false)
 
-    // Create the asynchronous task.
+#if $BuiltinCreateAsyncTaskOwnedTaskExecutor
+    let (task, _) = Builtin.createTask(
+      flags: flags,
+      initialTaskExecutorConsuming: taskExecutor,
+      operation: operation)
+#else
     let executorBuiltin: Builtin.Executor =
-        taskExecutor.asUnownedTaskExecutor().executor
+      taskExecutor.asUnownedTaskExecutor().executor
     let (task, _) = Builtin.createAsyncTaskWithExecutor(
       flags, executorBuiltin, operation)
-
+#endif
     return Task(task)
-    #else
-    fatalError("Unsupported Swift compiler")
-    #endif
   }
 }
 
 // ==== Unsafe Current Task ----------------------------------------------------
 
 @available(SwiftStdlib 6.0, *)
+@_unavailableInEmbedded
 extension UnsafeCurrentTask {
 
   /// The current ``TaskExecutor`` preference, if this task has one configured.

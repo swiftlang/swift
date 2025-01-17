@@ -22,6 +22,7 @@
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/Types.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Basic/STLExtras.h"
 #include "RequirementMachine/RequirementMachine.h"
@@ -79,7 +80,7 @@ ArrayRef<GenericTypeParamType *>
 GenericSignatureImpl::getInnermostGenericParams() const {
   const auto params = getGenericParams();
 
-  const unsigned maxDepth = params.back()->getDepth();
+  const unsigned maxDepth = getMaxDepth();
   if (params.front()->getDepth() == maxDepth)
     return params;
 
@@ -93,6 +94,16 @@ GenericSignatureImpl::getInnermostGenericParams() const {
   }
 
   return params.slice(sliceCount);
+}
+
+unsigned GenericSignatureImpl::getMaxDepth() const {
+  return getGenericParams().back()->getDepth();
+}
+
+unsigned GenericSignature::getNextDepth() const {
+  if (!getPointer())
+    return 0;
+  return getPointer()->getMaxDepth() + 1;
 }
 
 void GenericSignatureImpl::forEachParam(
@@ -316,8 +327,7 @@ GenericSignature::LocalRequirements
 GenericSignatureImpl::getLocalRequirements(Type depType) const {
   assert(depType->isTypeParameter() && "Expected a type parameter here");
 
-  return getRequirementMachine()->getLocalRequirements(
-      depType, getGenericParams());
+  return getRequirementMachine()->getLocalRequirements(depType);
 }
 
 ASTContext &GenericSignatureImpl::getASTContext() const {
@@ -327,18 +337,6 @@ ASTContext &GenericSignatureImpl::getASTContext() const {
 
   // For everything else, just get it from the generic parameter.
   return GenericSignature::getASTContext(getGenericParams(), getRequirements());
-}
-
-ProtocolConformanceRef
-GenericSignatureImpl::lookupConformance(CanType type,
-                                        ProtocolDecl *proto) const {
-  // FIXME: Actually implement this properly.
-  auto *M = proto->getParentModule();
-
-  if (type->isTypeParameter())
-    return ProtocolConformanceRef(proto);
-
-  return M->lookupConformance(type, proto, /*allowMissing=*/true);
 }
 
 bool GenericSignatureImpl::requiresClass(Type type) const {
@@ -408,18 +406,30 @@ bool GenericSignatureImpl::areReducedTypeParametersEqual(Type type1,
 }
 
 bool GenericSignatureImpl::isRequirementSatisfied(
-    Requirement requirement, bool allowMissing) const {
+    Requirement requirement,
+    bool allowMissing,
+    bool brokenPackBehavior) const {
   if (requirement.getFirstType()->hasTypeParameter()) {
     auto *genericEnv = getGenericEnvironment();
 
-    requirement = requirement.subst(
-        [&](SubstitutableType *type) -> Type {
-          if (auto *paramType = type->getAs<GenericTypeParamType>())
-            return genericEnv->mapTypeIntoContext(paramType);
+    if (brokenPackBehavior) {
+      // Swift 5.9 shipped with a bug here where this method would return
+      // incorrect results. Maintain the old behavior specifically for two
+      // call sites in the ASTMangler.
+      if ((requirement.getKind() == RequirementKind::SameType ||
+           requirement.getKind() == RequirementKind::Superclass) &&
+          !requirement.getSecondType()->isTypeParameter() &&
+          requirement.getSecondType().findIf([&](Type t) -> bool {
+            return t->is<PackExpansionType>();
+          })) {
+        return false;
+      }
+    }
 
-          return type;
-        },
-        LookUpConformanceInSignature(this));
+    requirement = requirement.subst(
+        QueryInterfaceTypeSubstitutions{genericEnv},
+        LookUpConformanceInModule(),
+        SubstFlags::PreservePackExpansionLevel);
   }
 
   SmallVector<Requirement, 2> subReqs;
@@ -508,6 +518,11 @@ CanType GenericSignatureImpl::getReducedType(Type type) const {
     return CanType(type);
 
   return getRequirementMachine()->getReducedType(
+      type, { })->getCanonicalType();
+}
+
+CanType GenericSignatureImpl::getReducedTypeParameter(CanType type) const {
+  return getRequirementMachine()->getReducedTypeParameter(
       type, { })->getCanonicalType();
 }
 
@@ -601,11 +616,11 @@ Type GenericSignatureImpl::getSugaredType(Type type) const {
   if (!type->hasTypeParameter())
     return type;
 
-  return type.transform([this](Type Ty) -> Type {
-    if (auto GP = dyn_cast<GenericTypeParamType>(Ty.getPointer())) {
+  return type.transformRec([this](TypeBase *Ty) -> std::optional<Type> {
+    if (auto GP = dyn_cast<GenericTypeParamType>(Ty)) {
       return Type(getSugaredType(GP));
     }
-    return Ty;
+    return std::nullopt;
   });
 }
 
@@ -937,6 +952,7 @@ void GenericSignature::verify(ArrayRef<Requirement> reqts) const {
           llvm::errs() << "\n";
           dumpAndAbort();
         }
+
         if (compareDependentTypes(firstType, secondType) >= 0) {
           llvm::errs() << "Out-of-order type parameters: ";
           reqt.dump(llvm::errs());
@@ -1082,8 +1098,10 @@ static Requirement stripBoundDependentMemberTypes(Requirement req) {
   case RequirementKind::Superclass:
   case RequirementKind::SameType:
     return Requirement(req.getKind(), subjectType,
-                       req.getSecondType().transform([](Type t) {
-                         return stripBoundDependentMemberTypes(t);
+                       req.getSecondType().transformRec([](Type t) -> std::optional<Type> {
+                         if (t->isTypeParameter())
+                           return stripBoundDependentMemberTypes(t);
+                         return std::nullopt;
                        }));
 
   case RequirementKind::Layout:
@@ -1172,7 +1190,39 @@ void swift::validateGenericSignature(ASTContext &context,
 
     // If the removed requirement is satisfied by the new generic signature,
     // it is redundant. Complain.
-    if (newSig->isRequirementSatisfied(requirements[victimIndex])) {
+    auto satisfied = [&](Requirement victim) {
+      if (!newSig->isValidTypeParameter(victim.getFirstType()))
+        return false;
+
+      switch (victim.getKind()) {
+      case RequirementKind::SameShape:
+        return (newSig->isValidTypeParameter(victim.getSecondType()) &&
+                newSig->haveSameShape(victim.getFirstType(),
+                                      victim.getSecondType()));
+      case RequirementKind::Conformance:
+        return newSig->requiresProtocol(victim.getFirstType(),
+                                        victim.getProtocolDecl());
+      case RequirementKind::Superclass: {
+        auto superclass = newSig->getSuperclassBound(victim.getFirstType());
+        return (superclass && superclass->isEqual(victim.getSecondType()));
+      }
+      case RequirementKind::SameType:
+        if (!victim.getSecondType().findIf([&](Type t) -> bool {
+            return (!t->isTypeParameter() ||
+                    newSig->isValidTypeParameter(t));
+          })) {
+          return false;
+        }
+        return newSig.getReducedType(victim.getFirstType())
+          ->isEqual(newSig.getReducedType(victim.getSecondType()));
+      case RequirementKind::Layout: {
+        auto layout = newSig->getLayoutConstraint(victim.getFirstType());
+        return (layout && layout == victim.getLayoutConstraint());
+      }
+      }
+    };
+
+    if (satisfied(requirements[victimIndex])) {
       SmallString<32> reqString;
       {
         llvm::raw_svector_ostream out(reqString);
@@ -1257,6 +1307,10 @@ void GenericSignatureImpl::getRequirementsWithInverses(
     if (getSuperclassBound(gp) || getConcreteType(gp))
       continue;
 
+    // Variable generics never have inverses (or the positive thereof).
+    if (gp->isValue())
+      continue;
+
     for (auto ip : InvertibleProtocolSet::allKnown()) {
       auto *proto = ctx.getProtocol(getKnownProtocolKind(ip));
 
@@ -1272,9 +1326,7 @@ void GenericSignatureImpl::getRequirementsWithInverses(
 
   // Filter out explicit conformances to invertible protocols.
   for (auto req : getRequirements()) {
-    if (req.getKind() == RequirementKind::Conformance &&
-        req.getFirstType()->is<GenericTypeParamType>() &&
-        req.getProtocolDecl()->getInvertibleProtocolKind()) {
+    if (req.isInvertibleProtocolRequirement()) {
       continue;
     }
 

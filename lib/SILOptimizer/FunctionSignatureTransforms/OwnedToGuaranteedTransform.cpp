@@ -12,6 +12,7 @@
 
 #define DEBUG_TYPE "fso-owned-to-guaranteed-transform"
 #include "FunctionSignatureOpts.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/SIL/DebugUtils.h"
 #include "swift/AST/SemanticAttrs.h"
 #include "llvm/Support/CommandLine.h"
@@ -77,6 +78,13 @@ bool FunctionSignatureTransform::OwnedToGuaranteedAnalyzeParameters() {
   for (unsigned i : indices(Args)) {
     ArgumentDescriptor &A = TransformDescriptor.ArgumentDescList[i];
     if (!A.canOptimizeLiveArg()) {
+      continue;
+    }
+    if (A.Arg->getType().isMoveOnly()) {
+      // We must not do this transformation for non-copyable types, because it's
+      // not safe to insert a compensating release_value at the call site. This
+      // release_value calls the deinit which might have been already de-
+      // virtualized in the callee.
       continue;
     }
 

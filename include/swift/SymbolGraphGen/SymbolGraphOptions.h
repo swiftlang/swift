@@ -11,6 +11,8 @@
 //===----------------------------------------------------------------------===//
 
 #include "llvm/TargetParser/Triple.h"
+#include "llvm/ADT/ArrayRef.h"
+
 #include "swift/AST/AttrKind.h"
 
 #ifndef SWIFT_SYMBOLGRAPHGEN_SYMBOLGRAPHOPTIONS_H
@@ -58,11 +60,15 @@ struct SymbolGraphOptions {
   /// members and conformances with the extended nominal.
   bool EmitExtensionBlockSymbols = false;
 
-  /// Whether to print information for private symbols in the standard library.
+  /// Whether to print information for private symbols in system modules.
   /// This should be left as `false` when printing a full-module symbol graph,
   /// but SourceKit should be able to load the information when pulling symbol
   /// information for individual queries.
-  bool PrintPrivateStdlibSymbols = false;
+  bool PrintPrivateSystemSymbols = false;
+
+  /// If this has a value specifies an explicit allow list of reexported module
+  /// names that should be included symbol graph.
+  std::optional<llvm::ArrayRef<StringRef>> AllowedReexportedModules = {};
 };
 
 } // end namespace symbolgraphgen

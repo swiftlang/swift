@@ -1,28 +1,24 @@
 // RUN: %target-typecheck-verify-swift
 
-@_moveOnly
-enum Foo {
+enum Foo: ~Copyable {
     deinit {} // expected-error {{deinitializers are not yet supported on noncopyable enums}}
 }
 
-@_moveOnly
-enum Foo2 {
+enum Foo2: ~Copyable {
 }
 
-@_moveOnly
-struct Bar {
+struct Bar: ~Copyable {
     var x: Int
 }
 
-@_moveOnly
-enum Foo3 {
+enum Foo3: ~Copyable {
     case foo(Int)
     case bar(String)
     case bas
 }
 
 func test_switch(x: consuming Foo3) {
-    switch x { // expected-error{{noncopyable binding being pattern-matched must have the 'consume' operator applied}} {{12-12=consume }}
+    switch x { 
     default:
         break
     }
@@ -32,7 +28,7 @@ func test_switch(x: consuming Foo3) {
         break
     }
 
-    switch (x) { // expected-error{{noncopyable binding being pattern-matched must have the 'consume' operator applied}} {{13-13=consume }}
+    switch (x) { 
     default:
         break
     }
@@ -43,7 +39,7 @@ func test_switch(x: consuming Foo3) {
     }
 
     let _: () -> () = {
-        switch x { // expected-error{{noncopyable binding being pattern-matched must have the 'consume' operator applied}} {{16-16=consume }}
+        switch x { 
         default:
             break
         }
@@ -57,7 +53,7 @@ func test_switch(x: consuming Foo3) {
     }
 
     let _: () -> () = {
-        switch (x) { // expected-error{{noncopyable binding being pattern-matched must have the 'consume' operator applied}} {{17-17=consume }}
+        switch (x) { 
         default:
             break
         }
@@ -72,9 +68,9 @@ func test_switch(x: consuming Foo3) {
 }
 
 func test_if_case(x: consuming Foo3) {
-    if case .bar(let y) = x { _ = y } // expected-error{{noncopyable binding being pattern-matched must have the 'consume' operator applied}} {{27-27=consume }}
+    if case .bar(let y) = x { _ = y } 
 
-    guard case .bar(let y) = x else { return } // expected-error{{noncopyable binding being pattern-matched must have the 'consume' operator applied}} {{30-30=consume }}
+    guard case .bar(let y) = x else { return } 
     _ = y
 
     if case .bar(let z) = consume x { _ = z }
@@ -82,9 +78,9 @@ func test_if_case(x: consuming Foo3) {
     guard case .bar(let z) = consume x else { return }
     _ = z
 
-    if case .bar(let a) = (x) { _ = a } // expected-error{{noncopyable binding being pattern-matched must have the 'consume' operator applied}} {{28-28=consume }}
+    if case .bar(let a) = (x) { _ = a } 
 
-    guard case .bar(let a) = (x) else { return } // expected-error{{noncopyable binding being pattern-matched must have the 'consume' operator applied}} {{31-31=consume }}
+    guard case .bar(let a) = (x) else { return } 
     _ = a
 
     if case .bar(let b) = (consume x) { _ = b }
@@ -93,11 +89,11 @@ func test_if_case(x: consuming Foo3) {
     _ = b
 
     let _: () -> () = {
-        if case .bar(let y) = x { _ = y } // expected-error{{noncopyable binding being pattern-matched must have the 'consume' operator applied}} {{31-31=consume }}
+        if case .bar(let y) = x { _ = y } 
     }
 
     let _: () -> () = {
-        guard case .bar(let y) = x else { return } // expected-error{{noncopyable binding being pattern-matched must have the 'consume' operator applied}} {{34-34=consume }}
+        guard case .bar(let y) = x else { return } 
         _ = y
     }
 
@@ -111,11 +107,11 @@ func test_if_case(x: consuming Foo3) {
     }
 
     let _: () -> () = {
-        if case .bar(let a) = (x) { _ = a } // expected-error{{noncopyable binding being pattern-matched must have the 'consume' operator applied}} {{32-32=consume }}
+        if case .bar(let a) = (x) { _ = a } 
     }
 
     let _: () -> () = {
-        guard case .bar(let a) = (x) else { return } // expected-error{{noncopyable binding being pattern-matched must have the 'consume' operator applied}} {{35-35=consume }}
+        guard case .bar(let a) = (x) else { return } 
         _ = a
     }
 
@@ -130,7 +126,7 @@ func test_if_case(x: consuming Foo3) {
 }
 
 func test_switch_b(x: __owned Foo3) {
-    switch x { // expected-error{{noncopyable binding being pattern-matched must have the 'consume' operator applied}} {{12-12=consume }}
+    switch x { 
     default:
         break
     }
@@ -140,7 +136,7 @@ func test_switch_b(x: __owned Foo3) {
         break
     }
 
-    switch (x) { // expected-error{{noncopyable binding being pattern-matched must have the 'consume' operator applied}} {{13-13=consume }}
+    switch (x) { 
     default:
         break
     }
@@ -151,7 +147,7 @@ func test_switch_b(x: __owned Foo3) {
     }
 
     let _: () -> () = {
-        switch x { // expected-error{{noncopyable binding being pattern-matched must have the 'consume' operator applied}} {{16-16=consume }}
+        switch x { 
         default:
             break
         }
@@ -165,7 +161,7 @@ func test_switch_b(x: __owned Foo3) {
     }
 
     let _: () -> () = {
-        switch (x) { // expected-error{{noncopyable binding being pattern-matched must have the 'consume' operator applied}} {{17-17=consume }}
+        switch (x) { 
         default:
             break
         }
@@ -180,9 +176,9 @@ func test_switch_b(x: __owned Foo3) {
 }
 
 func test_if_case_b(x: __owned Foo3) {
-    if case .bar(let y) = x { _ = y } // expected-error{{noncopyable binding being pattern-matched must have the 'consume' operator applied}} {{27-27=consume }}
+    if case .bar(let y) = x { _ = y } 
 
-    guard case .bar(let y) = x else { return } // expected-error{{noncopyable binding being pattern-matched must have the 'consume' operator applied}} {{30-30=consume }}
+    guard case .bar(let y) = x else { return } 
     _ = y
 
     if case .bar(let z) = consume x { _ = z }
@@ -190,9 +186,9 @@ func test_if_case_b(x: __owned Foo3) {
     guard case .bar(let z) = consume x else { return }
     _ = z
 
-    if case .bar(let a) = (x) { _ = a } // expected-error{{noncopyable binding being pattern-matched must have the 'consume' operator applied}} {{28-28=consume }}
+    if case .bar(let a) = (x) { _ = a } 
 
-    guard case .bar(let a) = (x) else { return } // expected-error{{noncopyable binding being pattern-matched must have the 'consume' operator applied}} {{31-31=consume }}
+    guard case .bar(let a) = (x) else { return } 
     _ = a
 
     if case .bar(let b) = (consume x) { _ = b }
@@ -201,11 +197,11 @@ func test_if_case_b(x: __owned Foo3) {
     _ = b
 
     let _: () -> () = {
-        if case .bar(let y) = x { _ = y } // expected-error{{noncopyable binding being pattern-matched must have the 'consume' operator applied}} {{31-31=consume }}
+        if case .bar(let y) = x { _ = y } 
     }
 
     let _: () -> () = {
-        guard case .bar(let y) = x else { return } // expected-error{{noncopyable binding being pattern-matched must have the 'consume' operator applied}} {{34-34=consume }}
+        guard case .bar(let y) = x else { return } 
         _ = y
     }
 
@@ -219,11 +215,11 @@ func test_if_case_b(x: __owned Foo3) {
     }
 
     let _: () -> () = {
-        if case .bar(let a) = (x) { _ = a } // expected-error{{noncopyable binding being pattern-matched must have the 'consume' operator applied}} {{32-32=consume }}
+        if case .bar(let a) = (x) { _ = a } 
     }
 
     let _: () -> () = {
-        guard case .bar(let a) = (x) else { return } // expected-error{{noncopyable binding being pattern-matched must have the 'consume' operator applied}} {{35-35=consume }}
+        guard case .bar(let a) = (x) else { return } 
         _ = a
     }
 

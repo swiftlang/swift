@@ -27,10 +27,10 @@ class C {}
 // CHECK:       Class [[BOX]] = argument of bb0
 // CHECK:         Field: var value: T Index: 0
 // CHECK-LABEL: end running test {{.*}} on test_phi_nested_access: compute_access_storage with
-// CHECK-LABEL: begin running test 3 of 3 on test_phi_nested_access: accesspath-base
-// CHECK:       Access path base: %6 = argument of bb1
+// CHECK-LABEL: begin running test 3 of 3 on test_phi_nested_access: accesspath
+// CHECK:       Access path for: %6 = argument of bb1
 // CHECK:       Exact Use:   end_access %2
-// CHECK-LABEL: end running test 3 of 3 on test_phi_nested_access: accesspath-base
+// CHECK-LABEL: end running test 3 of 3 on test_phi_nested_access: accesspath
 sil @test_phi_nested_access : $@convention(method) (@guaranteed Box<C>) -> () {
 bb1(%box : $Box<C>):         
   %value_addr = ref_element_addr %box : $Box<C>, #Box.value 
@@ -42,7 +42,7 @@ bb1(%box : $Box<C>):
 exit(%phi : $Builtin.RawPointer):                   
   specify_test "get_access_base @argument"
   specify_test "compute_access_storage @argument"
-  specify_test "accesspath-base @argument"
+  specify_test "accesspath @argument"
   %retval = tuple ()
   return %retval : $()
 } 
@@ -64,4 +64,25 @@ sil @test_access_global : $@convention(thin) () -> () {
   end_access %16 : $*C
   %retval = tuple ()
   return %retval : $()
+}
+
+// CHECK-LABEL: begin running test {{.*}} on test_mark_uninitialized_inst: get_access_base
+// CHECK: Address:  %{{.*}} = mark_uninitialized [var] [[ALLOC:%.*]] : $*C
+// CHECK: Base:     [[ALLOC]] = alloc_stack [var_decl] $C
+// CHECK-LABEL: end running test {{.*}} on test_mark_uninitialized_inst: get_access_base
+// CHECK-LABEL: begin running test {{.*}} on test_mark_uninitialized_inst: swift_get_access_base
+// CHECK: Address:  %{{.*}} = mark_uninitialized [var] [[ALLOC:%.*]] : $*C
+// CHECK: Base: stack - [[ALLOC]] = alloc_stack [var_decl] $C
+// CHECK-LABEL: end running test {{.*}} on test_mark_uninitialized_inst: swift_get_access_base
+sil [ossa] @test_mark_uninitialized_inst : $@convention(thin) (@owned C) -> () {
+bb0(%0 : @owned $C):
+  %1 = alloc_stack [var_decl] $C, let
+  %2 = mark_uninitialized [var] %1 : $*C
+  specify_test "get_access_base %2"
+  specify_test "swift_get_access_base %2"
+  assign %0 to %2 : $*C
+  destroy_addr %2 : $*C
+  dealloc_stack %1 : $*C
+  %9999 = tuple()
+  return %9999 : $()
 }

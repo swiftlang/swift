@@ -97,7 +97,7 @@ extension SwiftReflectionContextRef {
   }
 
   internal func name(allocation tag: swift_metadata_allocation_tag_t) -> String?  {
-    return swift_reflection_metadataAllocationTagName(self, tag).map(String.init)
+    return swift_reflection_metadataAllocationTagName(self, tag).map(String.init(cString:))
   }
 
   internal func isContiguousArray(_ array: swift_reflection_ptr_t) -> Bool {

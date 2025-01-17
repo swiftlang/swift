@@ -17,7 +17,7 @@ extension EnumWithProtocolWitness: P {}
 // protocol witness for static P.requirement(_:) in conformance EnumWithProtocolWitness
 //
 // CHECK-LABEL: sil{{.*}}@$s4Test23EnumWithProtocolWitnessOAA1PA2aDP11requirementyxAA1SVFZTW
-// CHECK:         [[FNREF:%.*]] = function_ref @$[[DIAGNOSEFN:(ss36_diagnoseUnavailableCodeReached_aeics5NeverOyF|ss31_diagnoseUnavailableCodeReacheds5NeverOyF|ss31_diagnoseUnavailableCodeReacheds5NeverOyFTwb)]] : $@convention(thin) () -> Never
+// CHECK:         [[FNREF:%.*]] = function_ref @$[[DIAGNOSEFN:(ss31_diagnoseUnavailableCodeReacheds5NeverOyF|ss31_diagnoseUnavailableCodeReacheds5NeverOyFTwb)]] : $@convention(thin) () -> Never
 // CHECK-NEXT:    [[APPLY:%.*]] = apply [[FNREF]]()
 // CHECK:         {{%.*}} = function_ref @$s4Test23EnumWithProtocolWitnessO11requirementyAcA1SVcACmF
 // CHECK:       } // end sil function '$s4Test23EnumWithProtocolWitnessOAA1PA2aDP11requirementyxAA1SVFZTW'

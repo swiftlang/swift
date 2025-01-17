@@ -81,7 +81,7 @@ class NSManagedAndNonObjCNotAllowed {
 
 @nonobjc func nonObjCTopLevelFuncNotAllowed() { } // expected-error {{only class members and extensions of classes can be declared @nonobjc}} {{1-10=}}
 
-@objc class NonObjCPropertyObjCProtocolNotAllowed : ObjCProtocol { // expected-error {{does not conform to protocol}}
+@objc class NonObjCPropertyObjCProtocolNotAllowed : ObjCProtocol { // expected-error {{does not conform to protocol}} expected-note {{add stubs for conformance}}
   @nonobjc func protocolMethod() { } // expected-note {{candidate is explicitly '@nonobjc'}}
 
   func nonObjCProtocolMethodNotAllowed() { }

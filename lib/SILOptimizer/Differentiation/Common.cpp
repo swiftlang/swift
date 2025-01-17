@@ -20,6 +20,7 @@
 #include "swift/SIL/ApplySite.h"
 #include "swift/SILOptimizer/Differentiation/Common.h"
 #include "swift/AST/TypeCheckRequests.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/SILOptimizer/Differentiation/ADContext.h"
 
 namespace swift {
@@ -266,12 +267,12 @@ void collectMinimalIndicesForFunctionCall(
 std::optional<std::pair<SILDebugLocation, SILDebugVariable>>
 findDebugLocationAndVariable(SILValue originalValue) {
   if (auto *asi = dyn_cast<AllocStackInst>(originalValue))
-    return swift::transform(asi->getVarInfo(),  [&](SILDebugVariable var) {
+    return swift::transform(asi->getVarInfo(false),  [&](SILDebugVariable var) {
       return std::make_pair(asi->getDebugLocation(), var);
     });
   for (auto *use : originalValue->getUses()) {
     if (auto *dvi = dyn_cast<DebugValueInst>(use->getUser()))
-      return swift::transform(dvi->getVarInfo(), [&](SILDebugVariable var) {
+      return swift::transform(dvi->getVarInfo(false), [&](SILDebugVariable var) {
         // We need to drop `op_deref` here as we're transferring debug info
         // location from debug_value instruction (which describes how to get value)
         // into alloc_stack (which describes the location)
@@ -416,7 +417,7 @@ SILValue emitMemoryLayoutSize(
       loc, id, SILType::getBuiltinWordType(ctx),
       SubstitutionMap::get(
           builtin->getGenericSignature(), ArrayRef<Type>{type},
-          LookUpConformanceInSignature(builtin->getGenericSignature().getPointer())),
+          LookUpConformanceInModule()),
       {metatypeVal});
 }
 

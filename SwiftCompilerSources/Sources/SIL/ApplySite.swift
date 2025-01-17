@@ -10,6 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+import AST
 import SILBridging
 
 /// Argument conventions indexed on an apply's operand.
@@ -71,6 +72,12 @@ public struct ApplyOperandConventions : Collection {
       calleeArgumentIndex(ofOperandIndex: operandIndex)!]
   }
 
+  public subscript(parameterDependencies operandIndex: Int)
+    -> FunctionConvention.LifetimeDependencies? {
+    return calleeArgumentConventions[parameterDependencies:
+      calleeArgumentIndex(ofOperandIndex: operandIndex)!]
+  }
+
   public var firstParameterOperandIndex: Int {
     return ApplyOperandConventions.firstArgumentIndex +
       calleeArgumentConventions.firstParameterIndex
@@ -108,6 +115,10 @@ public protocol ApplySite : Instruction {
 extension ApplySite {
   public var callee: Value { operands[ApplyOperandConventions.calleeIndex].value }
 
+  public var hasSubstitutions: Bool {
+    return substitutionMap.hasAnySubstitutableParams
+  }
+
   public var isAsync: Bool {
     return callee.type.isAsyncFunction
   }
@@ -126,7 +137,15 @@ extension ApplySite {
     return false
   }
 
-  /// Returns the subset of operands that are argument operands.
+  public var isCalleeNoReturn: Bool {
+    bridged.ApplySite_isCalleeNoReturn()  
+  }
+
+  public var isCalleeTrapNoReturn: Bool {
+    referencedFunction?.isTrapNoReturn ?? false
+  }
+
+  /// Returns the subset of operands which are argument operands.
   ///
   /// This does not include the callee function operand.
   public var argumentOperands: OperandArray {
@@ -164,7 +183,7 @@ extension ApplySite {
   }
 
   public var substitutionMap: SubstitutionMap {
-    SubstitutionMap(bridged.ApplySite_getSubstitutionMap())
+    SubstitutionMap(bridged: bridged.ApplySite_getSubstitutionMap())
   }
 
   public var calleeArgumentConventions: ArgumentConventions {
@@ -208,6 +227,16 @@ extension ApplySite {
 
   public var hasResultDependence: Bool {
     functionConvention.resultDependencies != nil
+  }
+
+  public var hasLifetimeDependence: Bool {
+    functionConvention.hasLifetimeDependencies()
+  }
+
+  public func parameterDependencies(target operand: Operand) -> FunctionConvention.LifetimeDependencies? {
+    let idx = operand.index
+    return idx < operandConventions.startIndex ? nil
+      : operandConventions[parameterDependencies: idx]
   }
 
   public var yieldConventions: YieldConventions {
@@ -256,9 +285,12 @@ extension ApplySite {
 }
 
 extension ApplySite {
-  private var functionConvention: FunctionConvention {
-    FunctionConvention(for: bridged.ApplySite_getSubstitutedCalleeType(),
-                       in: parentFunction)
+  public var functionConvention: FunctionConvention {
+    FunctionConvention(for: substitutedCalleeType, in: parentFunction)
+  }
+
+  public var substitutedCalleeType: CanonicalType {
+    CanonicalType(bridged: bridged.ApplySite_getSubstitutedCalleeType())
   }
 }
 
@@ -289,7 +321,7 @@ extension FullApplySite {
       beginApply.yieldedValues.forEach { values.push($0) }
     } else {
       let result = singleDirectResult!
-      if !result.type.isEmpty(in: parentFunction) {
+      if !result.type.isVoid {
         values.push(result)
       }
     }

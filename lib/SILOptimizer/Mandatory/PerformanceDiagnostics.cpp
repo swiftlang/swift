@@ -157,13 +157,53 @@ static bool isEffectFreeArraySemanticCall(SILInstruction *inst) {
   }
 }
 
+static bool hasGenericValueDeinit(SILType ty, SILFunction *f) {
+  if (!ty.isMoveOnly())
+    return false;
+  NominalTypeDecl *nominal = ty.getNominalOrBoundGenericNominal();
+  if (!nominal)
+    return false;
+
+  if (nominal->getGenericSignature() && nominal->getValueTypeDestructor())
+    return true;
+
+  if (isa<StructDecl>(nominal)) {
+    for (unsigned i = 0, n = ty.getNumNominalFields(); i < n; ++i) {
+      if (hasGenericValueDeinit(ty.getFieldType(i, f), f))
+        return true;
+    }
+  } else if (auto *en = dyn_cast<EnumDecl>(nominal)) {
+    for (EnumElementDecl *element : en->getAllElements()) {
+      if (element->hasAssociatedValues()) {
+        if (hasGenericValueDeinit(ty.getEnumElementType(element, f), f))
+          return true;
+      }
+    }
+  }
+
+  return false;
+}
+
+static bool allocsGenericValueTypeWithDeinit(AllocBoxInst *abi) {
+  CanSILBoxType boxTy = abi->getBoxType();
+  SILFunction *f = abi->getFunction();
+  unsigned numFields = boxTy->getLayout()->getFields().size();
+  for (unsigned fieldIdx = 0; fieldIdx < numFields; ++fieldIdx) {
+    SILType fieldTy = getSILBoxFieldType(TypeExpansionContext(*f), boxTy,
+                                         abi->getModule().Types, fieldIdx);
+    if (hasGenericValueDeinit(fieldTy, f))
+      return true;
+  }
+  return false;
+}
+
 /// Prints Embedded Swift specific performance diagnostics (no existentials,
 /// no metatypes, optionally no allocations) for \p function.
 bool PerformanceDiagnostics::visitFunctionEmbeddedSwift(
     SILFunction *function, LocWithParent *parentLoc) {
   // Don't check generic functions in embedded Swift, they're about to be
   // removed anyway.
-  if (function->getLoweredFunctionType()->getSubstGenericSignature())
+  if (function->isGeneric())
     return false;
 
   if (!function->isDefinition())
@@ -172,8 +212,6 @@ bool PerformanceDiagnostics::visitFunctionEmbeddedSwift(
   if (visitedFuncs.contains(function))
     return false;
   visitedFuncs[function] = PerformanceConstraints::None;
-
-  NonErrorHandlingBlocks neBlocks(function);
 
   for (SILBasicBlock &block : *function) {
     for (SILInstruction &inst : block) {
@@ -220,6 +258,16 @@ bool PerformanceDiagnostics::visitFunctionEmbeddedSwift(
         default:
           break;
         }
+      } else if (auto *abi = dyn_cast<AllocBoxInst>(&inst)) {
+        // It needs a bit of work to support alloc_box of generic non-copyable
+        // structs/enums with deinit, because we need to specialize the deinit
+        // functions, though they are not explicitly referenced in SIL.
+        // Until this is supported, give an error in such cases. Otherwise
+        // IRGen would crash.
+        if (allocsGenericValueTypeWithDeinit(abi)) {
+          LocWithParent loc(abi->getLoc().getSourceLoc(), parentLoc);
+          diagnose(loc, diag::embedded_capture_of_generic_value_with_deinit);
+        }
       }
     }
   }
@@ -233,26 +281,9 @@ bool PerformanceDiagnostics::visitFunction(SILFunction *function,
   if (!function->isDefinition())
     return false;
 
-  NonErrorHandlingBlocks neBlocks(function);
-
   for (SILBasicBlock &block : *function) {
     // Exclude fatal-error blocks.
     if (isa<UnreachableInst>(block.getTerminator()))
-      continue;
-
-    // TODO: it's not yet clear how to deal with error existentials.
-    // Ignore them for now. If we have typed throws we could ban error existentials
-    // because typed throws would provide and alternative.
-    if (isa<ThrowInst>(block.getTerminator()))
-      continue;
-
-    // If a function has multiple throws, all throw-path branch to the single throw-block.
-    if (SILBasicBlock *succ = block.getSingleSuccessorBlock()) {
-      if (isa<ThrowInst>(succ->getTerminator()))
-        continue;
-    }
-
-    if (!neBlocks.isNonErrorHandling(&block))
       continue;
 
     for (SILInstruction &inst : block) {
@@ -458,7 +489,7 @@ static bool metatypeUsesAreNotRelevant(MetatypeInst *mt) {
 }
 
 static bool allowedMetadataUseInEmbeddedSwift(SILInstruction *inst) {
-  // Only diagnose metatype and value_metatype instructions, for now.
+  // Only diagnose metatype, value_metatype instructions, ...
   if ((isa<ValueMetatypeInst>(inst) || isa<MetatypeInst>(inst))) {
     auto metaTy = cast<SingleValueInstruction>(inst)->getType().castTo<MetatypeType>();
     if (metaTy->getRepresentation() == MetatypeRepresentation::Thick) {
@@ -468,6 +499,9 @@ static bool allowedMetadataUseInEmbeddedSwift(SILInstruction *inst) {
       // Class metadata are supported in embedded Swift
       return instTy->getClassOrBoundGenericClass() ? true : false;
     }
+  // ... and alloc_ref_dynamic, for now.
+  } else if (isa<AllocRefDynamicInst>(inst)) {
+    return false;
   }
 
   return true;
@@ -481,7 +515,8 @@ bool PerformanceDiagnostics::visitInst(SILInstruction *inst,
   LocWithParent loc(inst->getLoc().getSourceLoc(), parentLoc);
 
   if (perfConstr == PerformanceConstraints::NoExistentials &&
-      (impact & RuntimeEffect::Existential)) {
+      ((impact & RuntimeEffect::Existential) ||
+       (impact & RuntimeEffect::ExistentialClassBound))) {
     PrettyStackTracePerformanceDiagnostics stackTrace("existential", inst);
     if (impactType) {
       diagnose(loc, diag::perf_diag_existential_type, impactType.getASTType());
@@ -503,6 +538,8 @@ bool PerformanceDiagnostics::visitInst(SILInstruction *inst,
   }
 
   if (module.getOptions().EmbeddedSwift) {
+    // Explicitly don't detect RuntimeEffect::ExistentialClassBound - those are
+    // allowed in Embedded Swift.
     if (impact & RuntimeEffect::Existential) {
       PrettyStackTracePerformanceDiagnostics stackTrace("existential", inst);
       if (impactType) {
@@ -521,6 +558,10 @@ bool PerformanceDiagnostics::visitInst(SILInstruction *inst,
       }
       if (isa<KeyPathInst>(inst)) {
         diagnose(loc, diag::embedded_swift_keypath);
+        return true;
+      }
+      if (isa<CheckedCastAddrBranchInst>(inst) || isa<UnconditionalCheckedCastAddrInst>(inst)) {
+        diagnose(loc, diag::embedded_swift_dynamic_cast);
         return true;
       }
       if (!allowedMetadataUseInEmbeddedSwift(inst)) {
@@ -748,6 +789,11 @@ private:
   void run() override {
     SILModule *module = getModule();
 
+    // Skip all performance/embedded diagnostics if asked. This is used from
+    // SourceKit to avoid reporting false positives when WMO is turned off for
+    // indexing purposes.
+    if (!module->getOptions().EnableWMORequiredDiagnostics) return;
+
     PerformanceDiagnostics diagnoser(*module, getAnalysis<BasicCalleeAnalysis>());
 
     // Check that @_section, @_silgen_name is only on constant globals
@@ -849,7 +895,7 @@ private:
       for (SILFunction *function : constructorsAndDestructors) {
         diagnoser.visitFunctionEmbeddedSwift(function);
       }
-    }    
+    }
   }
 };
 

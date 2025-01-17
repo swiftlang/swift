@@ -14,6 +14,7 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/DiagnosticsFrontend.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Parse/Lexer.h"
 #include "llvm/Config/config.h"
@@ -82,18 +83,17 @@ PluginLoader::getPluginMap() {
   // Helper function to try inserting an entry if there's no existing entry
   // associated with the module name.
   auto try_emplace = [&](StringRef moduleName, StringRef libPath,
-                         StringRef execPath) {
+                         StringRef execPath, bool overwrite = false) {
     auto moduleNameIdentifier = Ctx.getIdentifier(moduleName);
-    if (map.find(moduleNameIdentifier) != map.end()) {
-      // Specified module name is already in the map.
+    if (map.find(moduleNameIdentifier) != map.end() && !overwrite) {
+      // Specified module name is already in the map and no need to overwrite
+      // the current value.
       return;
     }
 
     libPath = libPath.empty() ? "" : Ctx.AllocateCopy(libPath);
     execPath = execPath.empty() ? "" : Ctx.AllocateCopy(execPath);
-    auto result = map.insert({moduleNameIdentifier, {libPath, execPath}});
-    assert(result.second);
-    (void)result;
+    map[moduleNameIdentifier] = {libPath, execPath};
   };
 
   auto fs = getPluginLoadingFS(Ctx);
@@ -149,6 +149,18 @@ PluginLoader::getPluginMap() {
       }
       continue;
     }
+
+    // '-load-resolved-plugin <library path>#<server path>#<module name>,...'.
+    case PluginSearchOption::Kind::ResolvedPluginConfig: {
+      auto &val = entry.get<PluginSearchOption::ResolvedPluginConfig>();
+      // Respect resolved plugin config above other search path, and it can
+      // overwrite plugins found by other options or previous resolved
+      // configuration.
+      for (auto &moduleName : val.ModuleNames)
+        try_emplace(moduleName, val.LibraryPath, val.ExecutablePath,
+                    /*overwrite*/ true);
+      continue;
+    }
     }
     llvm_unreachable("unhandled PluginSearchOption::Kind");
   }
@@ -170,31 +182,24 @@ PluginLoader::lookupPluginByModuleName(Identifier moduleName) {
   return found->second;
 }
 
-llvm::Expected<LoadedLibraryPlugin *>
-PluginLoader::loadLibraryPlugin(StringRef path) {
+llvm::Expected<CompilerPlugin *> PluginLoader::getInProcessPlugins() {
+  auto inProcPluginServerPath = Ctx.SearchPathOpts.InProcessPluginServerPath;
+  if (inProcPluginServerPath.empty()) {
+    return llvm::createStringError(
+        llvm::inconvertibleErrorCode(),
+        "library plugins require -in-process-plugin-server-path");
+  }
+
   auto fs = getPluginLoadingFS(Ctx);
   SmallString<128> resolvedPath;
-  if (auto err = fs->getRealPath(path, resolvedPath)) {
+  if (auto err = fs->getRealPath(inProcPluginServerPath, resolvedPath)) {
     return llvm::createStringError(err, err.message());
   }
 
-  // Load the plugin.
-  auto plugin = getRegistry()->loadLibraryPlugin(resolvedPath);
-  if (!plugin) {
-    resolvedPath.push_back(0);
-    return llvm::handleErrors(
-        plugin.takeError(), [&](const llvm::ErrorInfoBase &err) {
-          return llvm::createStringError(
-              err.convertToErrorCode(),
-              "compiler plugin '%s' could not be loaded;  %s",
-              resolvedPath.data(), err.message().data());
-        });
-  }
-
-  return plugin;
+  return getRegistry()->getInProcessPlugins(resolvedPath);
 }
 
-llvm::Expected<LoadedExecutablePlugin *>
+llvm::Expected<CompilerPlugin *>
 PluginLoader::loadExecutablePlugin(StringRef path) {
   auto fs = getPluginLoadingFS(Ctx);
   SmallString<128> resolvedPath;

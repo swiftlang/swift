@@ -443,5 +443,9 @@ class MathClass {
   func invalidDefaultArg(s: Int = Self.intMethod()) {}
   // expected-error@-1 {{covariant 'Self' type cannot be referenced from a default argument expression}}
 
+  // Make sure we check subscripts too.
+  subscript(_: Int = Self.intMethod()) -> Int { return 0 }
+  // expected-error@-1 {{covariant 'Self' type cannot be referenced from a default argument expression}}
+
   static func intMethod() -> Int { return 0 }
 }

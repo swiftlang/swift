@@ -13,6 +13,7 @@
 #define DEBUG_TYPE "mandatory-inlining"
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/DiagnosticsSIL.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/BlotSetVector.h"
 #include "swift/SIL/BasicBlockUtils.h"
 #include "swift/SIL/InstructionUtils.h"
@@ -112,6 +113,7 @@ static  bool fixupReferenceCounts(
     bool hasOwnership = f->hasOwnership();
 
     switch (convention) {
+    case ParameterConvention::Indirect_In_CXX:
     case ParameterConvention::Indirect_In:
       llvm_unreachable("Missing indirect copy");
 
@@ -753,9 +755,9 @@ getCalleeFunction(SILFunction *F, FullApplySite AI, bool &IsThick,
   if (CalleeFunction->empty())
     return nullptr;
 
-  if (F->isSerialized() &&
-      !CalleeFunction->hasValidLinkageForFragileInline()) {
-    if (!CalleeFunction->hasValidLinkageForFragileRef()) {
+  if (!CalleeFunction->canBeInlinedIntoCaller(F->getSerializedKind())) {
+    if (F->isAnySerialized() &&
+        !CalleeFunction->hasValidLinkageForFragileRef(F->getSerializedKind())) {
       llvm::errs() << "caller: " << F->getName() << "\n";
       llvm::errs() << "callee: " << CalleeFunction->getName() << "\n";
       llvm_unreachable("Should never be inlining a resilient function into "
@@ -1028,9 +1030,21 @@ class MandatoryInlining : public SILModuleTransform {
 
     SILOptFunctionBuilder FuncBuilder(*this);
     for (auto &F : *M) {
-      // Don't inline into thunks, even transparent callees.
-      if (F.isThunk())
+      switch (F.isThunk()) {
+      case IsThunk_t::IsThunk:
+      case IsThunk_t::IsReabstractionThunk:
+      case IsThunk_t::IsSignatureOptimizedThunk:
+        // Don't inline into most thunks, even transparent callees.
         continue;
+
+      case IsThunk_t::IsNotThunk:
+      case IsThunk_t::IsBackDeployedThunk:
+        // For correctness, inlining _stdlib_isOSVersionAtLeast() when it is
+        // declared transparent is mandatory in the thunks of @backDeployed
+        // functions. These thunks will not contain calls to other transparent
+        // functions.
+        break;
+      }
 
       // Skip deserialized functions.
       if (F.wasDeserializedCanonical())

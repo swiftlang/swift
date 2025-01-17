@@ -17,10 +17,17 @@ func testSetX(_ x: CInt) {
 
 testSetX(2)
 
-// CHECK: sil shared [transparent] @$sSo024NonCopyableHolderDerivedD0V1xSo0aB0Vvlu : $@convention(method) (@in_guaranteed NonCopyableHolderDerivedDerived) -> UnsafePointer<NonCopyable>
-// CHECK: {{.*}}(%[[SELF_VAL:.*]] : $*NonCopyableHolderDerivedDerived):
-// CHECK: function_ref @{{.*}}__synthesizedBaseCall___synthesizedBaseGetterAccessor{{.*}} : $@convention(cxx_method) (@in_guaranteed NonCopyableHolderDerivedDerived) -> UnsafePointer<NonCopyable>
-// CHECK-NEXT: apply %{{.*}}(%[[SELF_VAL]])
+// Beware: this test exhibits a subtle difference between open source Clang and AppleClang:
+// AppleClang runs in an ABI compatibility mode with Clang <= 4, which uses a
+// different criteria to determine whether a C++ type can be passed in 
+// registers. This causes Swift to assume that NonCopyableHolderDerivedDerived
+// can be both loadable or address-only, depending on the compiler flavor used.
+// (rdar://128424443)
+
+// CHECK: sil shared [transparent] @$sSo024NonCopyableHolderDerivedD0V1xSo0aB0Vvlu : $@convention(method) (@{{(in_)?}}guaranteed NonCopyableHolderDerivedDerived) -> UnsafePointer<NonCopyable>
+// CHECK: {{.*}}(%[[SELF_VAL:.*]] : ${{(\*)?}}NonCopyableHolderDerivedDerived):
+// CHECK: function_ref @{{(.*)(31NonCopyableHolderDerivedDerived33__synthesizedBaseGetterAccessor_x|__synthesizedBaseGetterAccessor_x@NonCopyableHolderDerivedDerived)(.*)}} : $@convention(cxx_method) (@in_guaranteed NonCopyableHolderDerivedDerived) -> UnsafePointer<NonCopyable>
+// CHECK-NEXT: apply %{{.*}}
 
 // CHECK: sil shared [transparent] @$sSo024NonCopyableHolderDerivedD0V1xSo0aB0Vvau : $@convention(method) (@inout NonCopyableHolderDerivedDerived) -> UnsafeMutablePointer<NonCopyable>
-// CHECK: function_ref @{{.*}}__synthesizedBaseCall___synthesizedBaseSetterAccessor{{.*}} : $@convention(cxx_method) (@inout NonCopyableHolderDerivedDerived) -> UnsafeMutablePointer<NonCopyable>
+// CHECK: function_ref @{{(.*)(31NonCopyableHolderDerivedDerived33__synthesizedBaseSetterAccessor_x|__synthesizedBaseSetterAccessor_x@NonCopyableHolderDerivedDerived)(.*)}} : $@convention(cxx_method) (@inout NonCopyableHolderDerivedDerived) -> UnsafeMutablePointer<NonCopyable>

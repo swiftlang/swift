@@ -315,7 +315,7 @@ func ivars(_ hive: Hive) {
   hive.queen.description() // expected-error{{value of type 'Hive' has no member 'queen'}}
 }
 
-class NSObjectable : NSObjectProtocol { // expected-error {{cannot declare conformance to 'NSObjectProtocol' in Swift; 'NSObjectable' should inherit 'NSObject' instead}}
+class NSObjectable : NSObjectProtocol { // expected-error {{cannot declare conformance to 'NSObjectProtocol' in Swift; 'NSObjectable' should inherit 'NSObject' instead}} expected-note {{add stubs for conformance}}
   @objc var description : String { return "" }
   @objc(conformsToProtocol:) func conforms(to _: Protocol) -> Bool { return false }
   @objc(isKindOfClass:) func isKind(of aClass: AnyClass) -> Bool { return false }
@@ -380,13 +380,13 @@ class ProtocolAdopter2 : FooProto {
     set { /* do nothing! */ }
   }
 }
-class ProtocolAdopterBad1 : FooProto { // expected-error {{type 'ProtocolAdopterBad1' does not conform to protocol 'FooProto'}}
+class ProtocolAdopterBad1 : FooProto { // expected-error {{type 'ProtocolAdopterBad1' does not conform to protocol 'FooProto'}} expected-note {{add stubs for conformance}}
   @objc var bar: Int = 0 // expected-note {{candidate has non-matching type 'Int'}}
 }
-class ProtocolAdopterBad2 : FooProto { // expected-error {{type 'ProtocolAdopterBad2' does not conform to protocol 'FooProto'}}
+class ProtocolAdopterBad2 : FooProto { // expected-error {{type 'ProtocolAdopterBad2' does not conform to protocol 'FooProto'}} expected-note {{add stubs for conformance}}
   let bar: CInt = 0 // expected-note {{candidate is not settable, but protocol requires it}}
 }
-class ProtocolAdopterBad3 : FooProto { // expected-error {{type 'ProtocolAdopterBad3' does not conform to protocol 'FooProto'}}
+class ProtocolAdopterBad3 : FooProto { // expected-error {{type 'ProtocolAdopterBad3' does not conform to protocol 'FooProto'}} expected-note {{add stubs for conformance}}
   var bar: CInt { // expected-note {{candidate is not settable, but protocol requires it}}
     return 42
   }

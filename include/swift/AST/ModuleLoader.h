@@ -35,7 +35,7 @@
 
 namespace llvm {
 class FileCollectorBase;
-class TreePathPrefixMapper;
+class PrefixMapper;
 namespace vfs {
 class OutputBackend;
 }
@@ -214,7 +214,8 @@ struct InterfaceSubContextDelegate {
                                           SourceLoc diagLoc,
     llvm::function_ref<std::error_code(ASTContext&, ModuleDecl*,
                                        ArrayRef<StringRef>,
-                                       ArrayRef<StringRef>, StringRef)> action) = 0;
+                                       ArrayRef<StringRef>, StringRef,
+                                       StringRef)> action) = 0;
   virtual std::error_code runInSubCompilerInstance(StringRef moduleName,
                                                    StringRef interfacePath,
                                                    StringRef sdkPath,
@@ -287,7 +288,7 @@ public:
   ///
   /// If a non-null \p versionInfo is provided, the module version will be
   /// parsed and populated.
-  virtual bool canImportModule(ImportPath::Module named,
+  virtual bool canImportModule(ImportPath::Module named, SourceLoc loc,
                                ModuleVersionInfo *versionInfo,
                                bool isTestableImport = false) = 0;
 
@@ -372,11 +373,10 @@ public:
   virtual llvm::SmallVector<std::pair<ModuleDependencyID, ModuleDependencyInfo>, 1>
   getModuleDependencies(Identifier moduleName,
                         StringRef moduleOutputPath,
-                        llvm::IntrusiveRefCntPtr<llvm::cas::CachingOnDiskFileSystem> CacheFS,
                         const llvm::DenseSet<clang::tooling::dependencies::ModuleID> &alreadySeenClangModules,
                         clang::tooling::dependencies::DependencyScanningTool &clangScanningTool,
                         InterfaceSubContextDelegate &delegate,
-                        llvm::TreePathPrefixMapper *mapper = nullptr,
+                        llvm::PrefixMapper *mapper = nullptr,
                         bool isTestableImport = false) = 0;
 };
 

@@ -15,6 +15,7 @@
 // DEP: ___stack_chk_guard
 // DEP: ___divti3
 // DEP: ___modti3
+// DEP: _memmove
 // DEP: _memset
 // DEP: _putchar
 
@@ -26,6 +27,7 @@
 // REQUIRES: executable_test
 // REQUIRES: optimized_stdlib
 // REQUIRES: OS=macosx || OS=linux-gnu
+// REQUIRES: swift_feature_Embedded
 // UNSUPPORTED: OS=linux-gnu && CPU=aarch64
 
 print("Hello Embedded Swift!") // CHECK: Hello Embedded Swift!

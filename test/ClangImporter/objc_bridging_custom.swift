@@ -108,7 +108,7 @@ protocol TestProto {
   var propGeneric: ManufacturerInfo<NSString>? { get } // expected-note {{protocol requires}}
 }
 
-@objcMembers class TestProtoImpl : NSObject, TestProto { // expected-error {{type 'TestProtoImpl' does not conform to protocol 'TestProto'}}
+@objcMembers class TestProtoImpl : NSObject, TestProto { // expected-error {{type 'TestProtoImpl' does not conform to protocol 'TestProto'}} expected-note {{add stubs for conformance}}
   // expected-note@+1 {{candidate has non-matching type '(APPRefrigerator, APPRefrigerator?) -> APPRefrigerator'}} {{16-31=Refrigerator}} {{36-52=Refrigerator?}} {{57-72=Refrigerator}}
   func test(a: APPRefrigerator, b: APPRefrigerator?) -> APPRefrigerator {
     return a

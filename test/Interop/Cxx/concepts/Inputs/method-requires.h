@@ -1,4 +1,6 @@
-inline void calledFromConceptBody(int x) {}
+inline void shouldNotBeCalledOrEmitted(int) {}
+
+inline void calledFromConceptBody(int x) { shouldNotBeCalledOrEmitted(x); }
 inline void calledFromMethodBody(int x) {}
 
 struct MyStruct {

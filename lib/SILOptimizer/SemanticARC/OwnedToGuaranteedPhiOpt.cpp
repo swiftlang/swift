@@ -19,6 +19,7 @@
 #include "Context.h"
 #include "OwnershipPhiOperand.h"
 #include "Transforms.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/STLExtras.h"
 #include "swift/SILOptimizer/Utils/OwnershipOptUtils.h"
@@ -267,7 +268,7 @@ bool swift::semanticarc::tryConvertOwnedPhisToGuaranteedPhis(Context &ctx) {
   }
 
   if (madeChange)
-    updateBorrowedFrom(ctx.pm, &ctx.fn);
+    updateAllGuaranteedPhis(ctx.pm, &ctx.fn);
 
   return madeChange;
 }

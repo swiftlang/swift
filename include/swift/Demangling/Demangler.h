@@ -20,6 +20,7 @@
 #define SWIFT_DEMANGLING_DEMANGLER_H
 
 #include "swift/Demangling/Demangle.h"
+#include "swift/Demangling/ManglingFlavor.h"
 #include "swift/Demangling/NamespaceMacros.h"
 
 //#define NODE_FACTORY_DEBUGGING
@@ -44,14 +45,14 @@ class NodeFactory {
   /// The end of the current slab.
   char *End = nullptr;
 
-  struct Slab {
+  struct AllocatedSlab {
     // The previously allocated slab.
-    Slab *Previous;
+    AllocatedSlab *Previous;
     // Tail allocated memory starts here.
   };
   
   /// The head of the single-linked slab list.
-  Slab *CurrentSlab = nullptr;
+  AllocatedSlab *CurrentSlab = nullptr;
 
   /// The size of the previously allocated slab. This may NOT be the size of
   /// CurrentSlab, in the case where a checkpoint has been popped.
@@ -66,7 +67,7 @@ class NodeFactory {
                      & ~((uintptr_t)Alignment - 1));
   }
 
-  static void freeSlabs(Slab *slab);
+  static void freeSlabs(AllocatedSlab *slab);
 
   /// If not null, the NodeFactory from which this factory borrowed free memory.
   NodeFactory *BorrowedFrom = nullptr;
@@ -149,8 +150,8 @@ public:
       // No. We have to malloc a new slab.
       // We double the slab size for each allocated slab.
       SlabSize = std::max(SlabSize * 2, ObjectSize + alignof(T));
-      size_t AllocSize = sizeof(Slab) + SlabSize;
-      Slab *newSlab = (Slab *)malloc(AllocSize);
+      size_t AllocSize = sizeof(AllocatedSlab) + SlabSize;
+      AllocatedSlab *newSlab = (AllocatedSlab *)malloc(AllocSize);
 
       // Insert the new slab in the single-linked list of slabs.
       newSlab->Previous = CurrentSlab;
@@ -225,7 +226,7 @@ public:
   /// A checkpoint which captures the allocator's state at any given time. A
   /// checkpoint can be popped to free all allocations made since it was made.
   struct Checkpoint {
-    Slab *Slab;
+    AllocatedSlab *Slab;
     char *CurPtr;
     char *End;
   };
@@ -405,6 +406,8 @@ protected:
   /// as part of the name.
   bool IsOldFunctionTypeMangling = false;
 
+  Mangle::ManglingFlavor Flavor = Mangle::ManglingFlavor::Default;
+
   Vector<NodePointer> NodeStack;
   Vector<NodePointer> Substitutions;
 
@@ -566,7 +569,7 @@ protected:
   NodePointer demangleInitializer();
   NodePointer demangleImplParamConvention(Node::Kind ConvKind);
   NodePointer demangleImplResultConvention(Node::Kind ConvKind);
-  NodePointer demangleImplParameterTransferring();
+  NodePointer demangleImplParameterSending();
   NodePointer demangleImplParameterResultDifferentiability();
   NodePointer demangleImplFunctionType();
   NodePointer demangleClangType();
@@ -594,7 +597,9 @@ protected:
   NodePointer popDependentAssociatedConformance();
   NodePointer demangleDependentProtocolConformanceAssociated();
   NodePointer demangleThunkOrSpecialization();
-  NodePointer demangleGenericSpecialization(Node::Kind SpecKind);
+  NodePointer demangleGenericSpecialization(Node::Kind SpecKind,
+                                            NodePointer droppedArguments);
+  NodePointer demangleGenericSpecializationWithDroppedArguments();
   NodePointer demangleFunctionSpecialization();
   NodePointer demangleFuncSpecParam(Node::Kind Kind);
   NodePointer addFuncSpecParamNumber(NodePointer Param,
@@ -635,7 +640,7 @@ protected:
   bool demangleBoundGenerics(Vector<NodePointer> &TypeListList,
                              NodePointer &RetroactiveConformances);
 
-  NodePointer demangleLifetimeDependenceKind(bool isSelfDependence);
+  NodePointer demangleIntegerType();
 
   void dump();
 

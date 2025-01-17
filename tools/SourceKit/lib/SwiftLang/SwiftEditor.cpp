@@ -707,6 +707,13 @@ public:
     }
   }
 
+  void cancelBuildsForCachedAST() {
+    if (!InvokRef)
+      return;
+    if (auto ASTMgr = this->ASTMgr.lock())
+      ASTMgr->cancelBuildsForCachedAST(InvokRef);
+  }
+
 private:
   std::vector<SwiftSemanticToken> takeSemanticTokens(
       ImmutableTextSnapshotRef NewSnapshot);
@@ -738,10 +745,9 @@ public:
 
     BufferID = SM.addNewSourceBuffer(std::move(BufCopy));
 
-    Parser.reset(new ParserUnit(
-        SM, SourceFileKind::Main, BufferID, CompInv.getLangOptions(),
-        CompInv.getTypeCheckerOptions(), CompInv.getSILOptions(),
-        CompInv.getModuleName()));
+    Parser.reset(new ParserUnit(SM, SourceFileKind::Main, BufferID,
+                                CompInv.getLangOptions(),
+                                CompInv.getModuleName()));
 
     registerTypeCheckerRequestFunctions(
         Parser->getParser().Context.evaluator);
@@ -966,6 +972,7 @@ public:
       case GeneratedSourceInfo::DefaultArgument:
       case GeneratedSourceInfo::ReplacedFunctionBody:
       case GeneratedSourceInfo::PrettyPrinted:
+      case GeneratedSourceInfo::AttributeFromClang:
         break;
       }
     }
@@ -993,7 +1000,7 @@ public:
       return true;
 
     // Do not annotate references to unavailable decls.
-    if (AvailableAttr::isUnavailable(D))
+    if (D->isUnavailable())
       return true;
 
     auto &SM = D->getASTContext().SourceMgr;
@@ -1095,11 +1102,7 @@ public:
       return;
     }
 
-    if (!AstUnit->getPrimarySourceFile().getBufferID().has_value()) {
-      LOG_WARN_FUNC("Primary SourceFile is expected to have a BufferID");
-      return;
-    }
-    unsigned BufferID = AstUnit->getPrimarySourceFile().getBufferID().value();
+    unsigned BufferID = AstUnit->getPrimarySourceFile().getBufferID();
 
     SemanticAnnotator Annotator(CompIns.getSourceMgr(), BufferID);
     Annotator.walk(AstUnit->getPrimarySourceFile());
@@ -1596,22 +1599,6 @@ private:
       }
       return Action::Continue(E);
     }
-
-    PreWalkAction walkToDeclPre(Decl *D) override {
-      if (auto *ICD = dyn_cast<IfConfigDecl>(D)) {
-        // The base walker assumes the content of active IfConfigDecl clauses
-        // has been injected into the parent context and will be walked there.
-        // This doesn't hold for pre-typechecked ASTs and we need to find
-        // placeholders in inactive clauses anyway, so walk them here.
-        for (auto Clause: ICD->getClauses()) {
-          for (auto Elem: Clause.Elements) {
-            Elem.walk(*this);
-          }
-        }
-        return Action::SkipNode();
-      }
-      return Action::Continue();
-    }
   };
 
   class ClosureTypeWalker: public ASTWalker {
@@ -1688,7 +1675,7 @@ private:
   std::pair<ArgumentList *, bool> enclosingCallExprArg(SourceFile &SF,
                                                        SourceLoc SL) {
 
-    class CallExprFinder : public SourceEntityWalker {
+    class CallExprFinder : public ASTWalker {
     public:
       const SourceManager &SM;
       SourceLoc TargetLoc;
@@ -1712,26 +1699,30 @@ private:
         return true;
       }
 
-      bool walkToExprPre(Expr *E) override {
+      MacroWalking getMacroWalkingBehavior() const override {
+        return MacroWalking::Arguments;
+      }
+
+      PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
         auto SR = E->getSourceRange();
         if (SR.isValid() && SM.rangeContainsTokenLoc(SR, TargetLoc) &&
             !checkCallExpr(E) && !EnclosingCallAndArg.first) {
-          if (!isa<TryExpr>(E) && !isa<AwaitExpr>(E) &&
+          if (!isa<TryExpr>(E) && !isa<AwaitExpr>(E) && !isa<UnsafeExpr>(E) &&
               !isa<PrefixUnaryExpr>(E)) {
             // We don't want to expand to trailing closures if the call is
             // nested inside another expression that has closing characters,
             // like a `)` for a function call. This is not the case for
-            // `try`, `await` and prefix operator applications.
+            // `try`, `await`, `unsafe` and prefix operator applications.
             OuterExpr = E;
           }
         }
-        return true;
+        return Action::Continue(E);
       }
 
-      bool walkToExprPost(Expr *E) override {
+      PostWalkResult<Expr *> walkToExprPost(Expr *E) override {
         if (E->getStartLoc() == TargetLoc)
-          return false; // found what we needed to find, stop walking.
-        return true;
+          return Action::Stop(); // found what we needed to find, stop walking.
+        return Action::Continue(E);
       }
 
       /// Whether this statement body consists of only an implicit "return",
@@ -1749,7 +1740,7 @@ private:
 
           // Before pre-checking, the implicit return will not have been
           // inserted. Look for a single expression body in a closure.
-          if (auto *ParentE = getWalker().Parent.getAsExpr()) {
+          if (auto *ParentE = Parent.getAsExpr()) {
             if (isa<ClosureExpr>(ParentE)) {
               if (auto *innerE = BS->getSingleActiveExpression())
                 return innerE->getStartLoc() == TargetLoc;
@@ -1760,7 +1751,7 @@ private:
         return false;
       }
 
-      bool walkToStmtPre(Stmt *S) override {
+      PreWalkResult<Stmt *> walkToStmtPre(Stmt *S) override {
         auto SR = S->getSourceRange();
         if (SR.isValid() && SM.rangeContainsTokenLoc(SR, TargetLoc) &&
             !isImplicitReturnBody(S)) {
@@ -1784,17 +1775,15 @@ private:
             break;
           }
         }
-        return true;
+        return Action::Continue(S);
       }
-
-      bool shouldWalkInactiveConfigRegion() override { return true; }
 
       ArgumentList *findEnclosingCallArg(SourceFile &SF, SourceLoc SL) {
         EnclosingCallAndArg = {nullptr, nullptr};
         OuterExpr = nullptr;
         OuterStmt = nullptr;
         TargetLoc = SL;
-        walk(SF);
+        SF.walk(*this);
         return EnclosingCallAndArg.second;
       }
     };
@@ -2174,6 +2163,10 @@ void SwiftEditorDocument::removeCachedAST() {
   Impl.SemanticInfo->removeCachedAST();
 }
 
+void SwiftEditorDocument::cancelBuildsForCachedAST() {
+  Impl.SemanticInfo->cancelBuildsForCachedAST();
+}
+
 void SwiftEditorDocument::applyFormatOptions(OptionsDictionary &FmtOptions) {
   static UIdent KeyUseTabs("key.editor.format.usetabs");
   static UIdent KeyIndentWidth("key.editor.format.indentwidth");
@@ -2373,7 +2366,7 @@ void SwiftEditorDocument::reportDocumentStructure(SourceFile &SrcFile,
                                                   EditorConsumer &Consumer) {
   ide::SyntaxModelContext ModelContext(SrcFile);
   SwiftDocumentStructureWalker Walker(SrcFile.getASTContext().SourceMgr,
-                                      *SrcFile.getBufferID(),
+                                      SrcFile.getBufferID(),
                                       Consumer);
   ModelContext.walk(Walker);
 }
@@ -2436,19 +2429,24 @@ void SwiftLangSupport::editorOpen(StringRef Name, llvm::MemoryBuffer *Buf,
 // EditorClose
 //===----------------------------------------------------------------------===//
 
-void SwiftLangSupport::editorClose(StringRef Name, bool RemoveCache) {
+void SwiftLangSupport::editorClose(StringRef Name, bool CancelBuilds,
+                                   bool RemoveCache) {
   auto Removed = EditorDocuments->remove(Name);
-  if (Removed) {
-    --Stats->numOpenDocs;
-  } else {
+  if (!Removed) {
+    // FIXME: Report error if Name did not apply to anything ?
     IFaceGenContexts.remove(Name);
+    return;
   }
+  --Stats->numOpenDocs;
 
-  if (Removed && RemoveCache)
+  // Cancel any in-flight builds for the given AST if needed.
+  if (CancelBuilds)
+    Removed->cancelBuildsForCachedAST();
+
+  // Then remove the cached AST if we've been asked to do so.
+  if (RemoveCache)
     Removed->removeCachedAST();
-  // FIXME: Report error if Name did not apply to anything ?
 }
-
 
 //===----------------------------------------------------------------------===//
 // EditorReplaceText
@@ -2592,7 +2590,7 @@ void SwiftLangSupport::getSemanticTokens(
             "Unable to find input file"));
         return;
       }
-      SemanticAnnotator Annotator(CompIns.getSourceMgr(), *SF->getBufferID());
+      SemanticAnnotator Annotator(CompIns.getSourceMgr(), SF->getBufferID());
       Annotator.walk(SF);
       Receiver(
           RequestResult<SemanticTokensResult>::fromResult(Annotator.SemaToks));
@@ -2600,6 +2598,11 @@ void SwiftLangSupport::getSemanticTokens(
 
     void cancelled() override {
       Receiver(RequestResult<SemanticTokensResult>::cancelled());
+    }
+
+    void failed(StringRef Error) override {
+      LOG_WARN_FUNC("semantic tokens failed: " << Error);
+      Receiver(RequestResult<SemanticTokensResult>::fromError(Error));
     }
   };
 

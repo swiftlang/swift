@@ -1,17 +1,13 @@
 // RUN: %target-run-simple-swift(-Xfrontend -enable-experimental-move-only)
 // RUN: %target-run-simple-swift(-O -Xfrontend -sil-verify-all -Xfrontend -enable-experimental-move-only)
 
-// RUN: %target-run-simple-swift(-enable-experimental-feature NoncopyableGenerics -Xfrontend -enable-experimental-move-only)
-// RUN: %target-run-simple-swift(-enable-experimental-feature NoncopyableGenerics -O -Xfrontend -sil-verify-all -Xfrontend -enable-experimental-move-only)
-
 // REQUIRES: executable_test
 
 // Verify that iterating through the fields of an object whose class has
 // a move-only field does not trap from trying to reflect and copy those
 // move-only fields.
 
-@_moveOnly
-public struct MO {
+public struct MO: ~Copyable {
     var x: Int8 = 0
     var y: Int8 = 0
     var z: Int8 = 0

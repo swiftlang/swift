@@ -73,6 +73,8 @@ class DeadEndBlocks {
 public:
   DeadEndBlocks(const SILFunction *f) : f(f) {}
 
+  ~DeadEndBlocks();
+
   /// Returns true if \p BB is a dead-end block.
   bool isDeadEnd(const SILBasicBlock *block) {
     if (!didComputeValue) {

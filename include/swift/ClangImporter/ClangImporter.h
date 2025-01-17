@@ -26,6 +26,9 @@ namespace llvm {
   class Triple;
   class FileCollectorBase;
   template<typename Fn> class function_ref;
+  namespace opt {
+    class InputArgList;
+  }
   namespace vfs {
     class FileSystem;
     class OutputBackend;
@@ -51,6 +54,9 @@ namespace clang {
   class DeclarationName;
   class CompilerInvocation;
   class TargetOptions;
+  namespace driver {
+    class Driver;
+  }
 namespace tooling {
 namespace dependencies {
   struct ModuleDeps;
@@ -74,14 +80,19 @@ class EnumDecl;
 class FuncDecl;
 class ImportDecl;
 class IRGenOptions;
+class LangOptions;
 class ModuleDecl;
 struct ModuleDependencyID;
 class NominalTypeDecl;
+class SearchPathOptions;
 class StructDecl;
 class SwiftLookupTable;
 class TypeDecl;
 class ValueDecl;
 class VisibleDeclConsumer;
+using ModuleDependencyIDSetVector =
+    llvm::SetVector<ModuleDependencyID, std::vector<ModuleDependencyID>,
+                    std::set<ModuleDependencyID>>;
 enum class SelectorSplitKind;
 
 /// Kinds of optional types.
@@ -180,7 +191,8 @@ public:
   static std::unique_ptr<ClangImporter>
   create(ASTContext &ctx,
          std::string swiftPCHHash = "", DependencyTracker *tracker = nullptr,
-         DWARFImporterDelegate *dwarfImporterDelegate = nullptr);
+         DWARFImporterDelegate *dwarfImporterDelegate = nullptr,
+         bool ignoreFileMapping = false);
 
   static std::vector<std::string>
   getClangDriverArguments(ASTContext &ctx, bool ignoreClangTarget = false);
@@ -194,7 +206,23 @@ public:
   createClangInvocation(ClangImporter *importer,
                         const ClangImporterOptions &importerOpts,
                         llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> VFS,
-                        std::vector<std::string> &CC1Args);
+                        const std::vector<std::string> &CC1Args);
+
+  /// Creates a Clang Driver based on the Swift compiler options.
+  ///
+  /// \return a pair of the Clang Driver and the diagnostic engine, which needs
+  /// to be alive during the use of the Driver.
+  static std::pair<clang::driver::Driver,
+                   llvm::IntrusiveRefCntPtr<clang::DiagnosticsEngine>>
+  createClangDriver(
+      const LangOptions &LangOpts,
+      const ClangImporterOptions &ClangImporterOpts,
+      llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> vfs = nullptr);
+
+  static llvm::opt::InputArgList
+  createClangArgs(const ClangImporterOptions &ClangImporterOpts,
+                  const SearchPathOptions &SearchPathOpts,
+                  clang::driver::Driver &clangDriver);
 
   ClangImporter(const ClangImporter &) = delete;
   ClangImporter(ClangImporter &&) = delete;
@@ -227,7 +255,7 @@ public:
   ///
   /// If a non-null \p versionInfo is provided, the module version will be
   /// parsed and populated.
-  virtual bool canImportModule(ImportPath::Module named,
+  virtual bool canImportModule(ImportPath::Module named, SourceLoc loc,
                                ModuleVersionInfo *versionInfo,
                                bool isTestableImport = false) override;
 
@@ -457,18 +485,21 @@ public:
 
   llvm::SmallVector<std::pair<ModuleDependencyID, ModuleDependencyInfo>, 1>
   getModuleDependencies(Identifier moduleName, StringRef moduleOutputPath,
-                        llvm::IntrusiveRefCntPtr<llvm::cas::CachingOnDiskFileSystem> CacheFS,
                         const llvm::DenseSet<clang::tooling::dependencies::ModuleID> &alreadySeenClangModules,
                         clang::tooling::dependencies::DependencyScanningTool &clangScanningTool,
                         InterfaceSubContextDelegate &delegate,
-                        llvm::TreePathPrefixMapper *mapper,
+                        llvm::PrefixMapper *mapper,
                         bool isTestableImport = false) override;
 
   void recordBridgingHeaderOptions(
       ModuleDependencyInfo &MDI,
       const clang::tooling::dependencies::TranslationUnitDeps &deps);
 
-  /// Add dependency information for header dependencies
+  void getBridgingHeaderOptions(
+      const clang::tooling::dependencies::TranslationUnitDeps &deps,
+      std::vector<std::string> &swiftArgs);
+
+  /// Query dependency information for header dependencies
   /// of a binary Swift module.
   ///
   /// \param moduleID the name of the Swift module whose dependency
@@ -481,10 +512,14 @@ public:
   /// about new Clang modules discovered along the way.
   ///
   /// \returns \c true if an error occurred, \c false otherwise
-  bool addHeaderDependencies(
+  bool getHeaderDependencies(
       ModuleDependencyID moduleID,
       clang::tooling::dependencies::DependencyScanningTool &clangScanningTool,
-      ModuleDependenciesCache &cache);
+      ModuleDependenciesCache &cache,
+      ModuleDependencyIDSetVector &headerClangModuleDependencies,
+      std::vector<std::string> &headerFileInputs,
+      std::vector<std::string> &bridgingHeaderCommandLine,
+      std::optional<std::string> &includeTreeID);
 
   clang::TargetInfo &getModuleAvailabilityTarget() const override;
   clang::ASTContext &getClangASTContext() const override;
@@ -665,6 +700,11 @@ bool requiresCPlusPlus(const clang::Module *module);
 /// (std_vector, std_iosfwd, etc).
 bool isCxxStdModule(const clang::Module *module);
 
+/// Returns true if the given module is one of the C++ standard library modules.
+/// This could be the top-level std module, or any of the libc++ split modules
+/// (std_vector, std_iosfwd, etc).
+bool isCxxStdModule(StringRef moduleName, bool IsSystem);
+
 /// Returns the pointee type if the given type is a C++ `const`
 /// reference type, `None` otherwise.
 std::optional<clang::QualType>
@@ -673,20 +713,45 @@ getCxxReferencePointeeTypeOrNone(const clang::Type *type);
 /// Returns true if the given type is a C++ `const` reference type.
 bool isCxxConstReferenceType(const clang::Type *type);
 
+/// Determine whether this typedef is a CF type.
+bool isCFTypeDecl(const clang::TypedefNameDecl *Decl);
+
+/// Determine whether type is a c++ foreign reference type.
+bool isForeignReferenceTypeWithoutImmortalAttrs(const clang::QualType type);
+
+/// Determine the imported CF type for the given typedef-name, or the empty
+/// string if this is not an imported CF type name.
+llvm::StringRef getCFTypeName(const clang::TypedefNameDecl *decl);
+
+/// Lookup and return the synthesized conformance operator like '==' '-' or '+='
+/// for the given type.
+ValueDecl *getImportedMemberOperator(const DeclBaseName &name,
+                                     NominalTypeDecl *selfType,
+                                     std::optional<Type> parameterType);
+
 } // namespace importer
 
 struct ClangInvocationFileMapping {
+  /// Mapping from a file name to an existing file path.
   SmallVector<std::pair<std::string, std::string>, 2> redirectedFiles;
+
+  /// Mapping from a file name to a string of characters that represents the
+  /// contents of the file.
   SmallVector<std::pair<std::string, std::string>, 1> overridenFiles;
+
   bool requiresBuiltinHeadersInSystemModules;
 };
 
 /// On Linux, some platform libraries (glibc, libstdc++) are not modularized.
 /// We inject modulemaps for those libraries into their include directories
 /// to allow using them from Swift.
+///
+/// `suppressDiagnostic` prevents us from emitting warning messages when we
+/// are unable to find headers.
 ClangInvocationFileMapping getClangInvocationFileMapping(
     ASTContext &ctx,
-    llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> vfs = nullptr);
+    llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> vfs = nullptr,
+    bool suppressDiagnostic = false);
 
 } // end namespace swift
 

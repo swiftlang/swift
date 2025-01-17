@@ -313,7 +313,7 @@ public:
   void flagAsRunning_slow();
 
   /// Flag that this task is now suspended.  This can update the
-  /// priority stored in the job flags if the priority hsa been
+  /// priority stored in the job flags if the priority has been
   /// escalated.  Generally this should be done immediately after
   /// clearing ActiveTask and immediately before enqueuing the task
   /// somewhere.  TODO: record where the task is enqueued if
@@ -605,9 +605,12 @@ static_assert(sizeof(AsyncTask) == NumWords_AsyncTask * sizeof(void*),
               "AsyncTask size is wrong");
 static_assert(alignof(AsyncTask) == 2 * alignof(void*),
               "AsyncTask alignment is wrong");
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Winvalid-offsetof"
 // Libc hardcodes this offset to extract the TaskID
 static_assert(offsetof(AsyncTask, Id) == 4 * sizeof(void *) + 4,
               "AsyncTask::Id offset is wrong");
+#pragma clang diagnostic pop
 
 SWIFT_CC(swiftasync)
 inline void Job::runInFullyEstablishedContext() {

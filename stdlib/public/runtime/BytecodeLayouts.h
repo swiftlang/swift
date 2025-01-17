@@ -36,7 +36,7 @@ enum class RefCountingKind : uint8_t {
   Bridge = 0x08,
   Block = 0x09,
   ObjC = 0x0a,
-  Custom = 0x0b,
+  NativeSwiftObjC = 0x0b,
 
   Metatype = 0x0c,
   Generic = 0x0d,

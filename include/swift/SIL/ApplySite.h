@@ -338,11 +338,43 @@ public:
   }
 
   /// Return the applied argument index for the given operand.
+  ///
+  /// This corresponds to the index of the operand in the actual
+  /// SILFunctionType.
+  ///
+  /// As a result this does not include indirect parameters, but it does include
+  /// implicit parameters (e.x.: the implicit isolated(any) parameter) that are
+  /// in the SIL type but are not in the AST type. To ignore such implicit
+  /// parameters, use getASTAppliedArgIndex.
   unsigned getAppliedArgIndex(const Operand &oper) const {
     assert(oper.getUser() == Inst);
     assert(isArgumentOperand(oper));
 
     return oper.getOperandNumber() - getOperandIndexOfFirstArgument();
+  }
+
+  /// Returns the applied AST argument index for the given operand.
+  ///
+  /// This is guaranteed to return an index that can be used with AST function
+  /// types. This means it looks past the callee, indirect function types, as
+  /// well as any other implicit parameters like isolated(any).
+  ///
+  /// NOTE: If we add more implicit parameters to SILFunction types that do not
+  /// appear at the AST level, this code needs to be updated.
+  unsigned getASTAppliedArgIndex(const Operand &oper) const {
+    // We rely on the assertions in getAppliedArgIndex to allow for us to assume
+    // that we have an argument operand. We check later that we do not have an
+    // isolated(any) parameter.
+    unsigned appliedArgIndex = getAppliedArgIndex(oper);
+    if (auto *pai = dyn_cast<PartialApplyInst>(Inst)) {
+      if (pai->getFunctionType()->getIsolation() ==
+          SILFunctionTypeIsolation::Erased) {
+        assert(appliedArgIndex != 0 &&
+               "isolation(any) does not correspond to an AST argument");
+        appliedArgIndex -= 1;
+      }
+    }
+    return appliedArgIndex;
   }
 
   /// Return the callee's function argument index corresponding to the first
@@ -412,6 +444,7 @@ public:
                               : SILArgumentConvention::Direct_Owned;
     case SILArgumentConvention::Indirect_In:
     case SILArgumentConvention::Indirect_In_Guaranteed:
+    case SILArgumentConvention::Indirect_In_CXX:
       return pai->isOnStack() ? SILArgumentConvention::Indirect_In_Guaranteed
                               : SILArgumentConvention::Indirect_In;
     case SILArgumentConvention::Pack_Guaranteed:
@@ -470,6 +503,21 @@ public:
     llvm_unreachable("covered switch");
   }
 
+  /// Return the sil_isolated operand if we have one.
+  Operand *getIsolatedArgumentOperandOrNullPtr() {
+    switch (ApplySiteKind(Inst->getKind())) {
+    case ApplySiteKind::ApplyInst:
+      return cast<ApplyInst>(Inst)->getIsolatedArgumentOperandOrNullPtr();
+    case ApplySiteKind::BeginApplyInst:
+      return cast<BeginApplyInst>(Inst)->getIsolatedArgumentOperandOrNullPtr();
+    case ApplySiteKind::TryApplyInst:
+      return cast<TryApplyInst>(Inst)->getIsolatedArgumentOperandOrNullPtr();
+    case ApplySiteKind::PartialApplyInst:
+      llvm_unreachable("Unhandled case");
+    }
+    llvm_unreachable("covered switch");
+  }
+
   /// Return a list of applied arguments without self.
   OperandValueArrayRef getArgumentsWithoutSelf() const {
     switch (ApplySiteKind(Inst->getKind())) {
@@ -517,6 +565,10 @@ public:
   /// Returns true if \p op is an operand that passes an indirect
   /// result argument to the apply site.
   bool isIndirectResultOperand(const Operand &op) const;
+
+  /// Returns true if \p op is an operand that is passed as an indirect error
+  /// result.
+  bool isIndirectErrorResultOperand(const Operand &op) const;
 
   ApplyOptions getApplyOptions() const {
     switch (ApplySiteKind(getInstruction()->getKind())) {
@@ -579,6 +631,14 @@ public:
     // The ParameterInfo is going to be the parameter in the caller.
     unsigned calleeArgIndex = getCalleeArgIndex(oper);
     return getSubstCalleeConv().getParamInfoForSILArg(calleeArgIndex);
+  }
+
+  bool isSending(const Operand &oper) const {
+    if (isIndirectErrorResultOperand(oper))
+      return false;
+    if (isIndirectResultOperand(oper))
+      return getSubstCalleeType()->hasSendingResult();
+    return getArgumentParameterInfo(oper).hasOption(SILParameterInfo::Sending);
   }
 
   static ApplySite getFromOpaqueValue(void *p) { return ApplySite(p); }
@@ -724,6 +784,11 @@ public:
 
   OperandValueArrayRef getIndirectSILResults() const {
     return getArguments().slice(0, getNumIndirectSILResults());
+  }
+
+  OperandValueArrayRef getIndirectSILErrorResults() const {
+    return getArguments().slice(getNumIndirectSILResults(),
+                                getNumIndirectSILErrorResults());
   }
 
   OperandValueArrayRef getArgumentsWithoutIndirectResults() const {
@@ -932,6 +997,13 @@ inline bool ApplySite::isIndirectResultOperand(const Operand &op) const {
   if (!fas)
     return false;
   return fas.isIndirectResultOperand(op);
+}
+
+inline bool ApplySite::isIndirectErrorResultOperand(const Operand &op) const {
+  auto fas = asFullApplySite();
+  if (!fas)
+    return false;
+  return fas.isIndirectErrorResultOperand(op);
 }
 
 } // namespace swift

@@ -21,6 +21,7 @@
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/PrintOptions.h"
 #include "swift/AST/SourceFile.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/PrimitiveParsing.h"
 #include "swift/Basic/Unicode.h"
 #include "swift/ClangImporter/ClangImporter.h"
@@ -750,9 +751,7 @@ static SourceLoc getDeclStartPosition(SourceFile &File) {
 }
 
 static void printUntilFirstDeclStarts(SourceFile &File, ASTPrinter &Printer) {
-  if (!File.getBufferID().has_value())
-    return;
-  auto BufferID = *File.getBufferID();
+  auto BufferID = File.getBufferID();
 
   auto &SM = File.getASTContext().SourceMgr;
   CharSourceRange TextRange = SM.getRangeForBuffer(BufferID);

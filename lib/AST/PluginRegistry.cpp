@@ -12,7 +12,9 @@
 
 #include "swift/AST/PluginRegistry.h"
 
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/Defer.h"
+#include "swift/Basic/LoadDynamicLibrary.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/Program.h"
 #include "swift/Basic/Sandbox.h"
@@ -23,14 +25,6 @@
 #include "llvm/Config/config.h"
 
 #include <signal.h>
-
-#if defined(_WIN32)
-#define WIN32_LEAN_AND_MEAN
-#define NOMINMAX
-#include <windows.h>
-#else
-#include <dlfcn.h>
-#endif
 
 #if HAVE_UNISTD_H
 #include <unistd.h>
@@ -44,46 +38,96 @@ PluginRegistry::PluginRegistry() {
   dumpMessaging = ::getenv("SWIFT_DUMP_PLUGIN_MESSAGING") != nullptr;
 }
 
-llvm::Expected<LoadedLibraryPlugin *>
-PluginRegistry::loadLibraryPlugin(StringRef path) {
+CompilerPlugin::~CompilerPlugin() {
+  // Let ASTGen do cleanup things.
+  if (this->cleanup)
+    this->cleanup();
+}
+
+llvm::Expected<std::unique_ptr<InProcessPlugins>>
+InProcessPlugins::create(const char *serverPath) {
+  std::string err;
+  auto server = loadLibrary(serverPath, &err);
+  if (!server) {
+    return llvm::createStringError(llvm::inconvertibleErrorCode(), err);
+  }
+
+  auto funcPtr =
+      getAddressOfSymbol(server, "swift_inproc_plugins_handle_message");
+  if (!funcPtr) {
+    return llvm::createStringError(llvm::inconvertibleErrorCode(),
+                                   "entry point not found in '%s'", serverPath);
+  }
+  return std::unique_ptr<InProcessPlugins>(new InProcessPlugins(
+      serverPath, reinterpret_cast<HandleMessageFunction>(funcPtr)));
+}
+
+llvm::Error InProcessPlugins::sendMessage(llvm::StringRef message) {
+  assert(receivedResponse.empty() &&
+         "sendMessage() called before consuming previous response?");
+
+  if (shouldDumpMessaging()) {
+    llvm::dbgs() << "->(plugin:0) " << message << '\n';
+  }
+
+  char *responseData = nullptr;
+  size_t responseLength = 0;
+  bool hadError = handleMessageFn(message.data(), message.size(), &responseData,
+                                  &responseLength);
+
+  // 'responseData' now holds a response message or error message depending on
+  // 'hadError'. Either way, it's our responsibility to deallocate it.
+  SWIFT_DEFER { free(responseData); };
+  if (hadError) {
+    return llvm::createStringError(llvm::inconvertibleErrorCode(),
+                                   StringRef(responseData, responseLength));
+  }
+
+  // Store the response and wait for 'waitForNextMessage()' call.
+  receivedResponse = std::string(responseData, responseLength);
+
+  if (shouldDumpMessaging()) {
+    llvm::dbgs() << "<-(plugin:0) " << receivedResponse << "\n";
+  }
+
+  assert(!receivedResponse.empty() && "received empty response");
+  return llvm::Error::success();
+}
+
+llvm::Expected<std::string> InProcessPlugins::waitForNextMessage() {
+  assert(!receivedResponse.empty() &&
+         "waitForNextMessage() called without response data.");
+  SWIFT_DEFER { receivedResponse = ""; };
+  return std::move(receivedResponse);
+}
+
+llvm::Expected<CompilerPlugin *>
+PluginRegistry::getInProcessPlugins(llvm::StringRef serverPath) {
   std::lock_guard<std::mutex> lock(mtx);
-  auto &storage = LoadedPluginLibraries[path];
-  if (storage) {
-    // Already loaded.
-    return storage.get();
+  if (!inProcessPlugins) {
+    auto server = InProcessPlugins::create(serverPath.str().c_str());
+    if (!server) {
+      return llvm::handleErrors(
+          server.takeError(), [&](const llvm::ErrorInfoBase &err) {
+            return llvm::createStringError(
+                err.convertToErrorCode(),
+                "failed to load in-process plugin server: " + serverPath +
+                    "; " + err.message());
+          });
+    }
+    inProcessPlugins = std::move(server.get());
+  } else if (inProcessPlugins->getPath() != serverPath) {
+    return llvm::createStringError(
+        llvm::inconvertibleErrorCode(),
+        "loading multiple in-process servers are not supported: '%s' and '%s'",
+        inProcessPlugins->getPath().data(), serverPath.str().c_str());
   }
+  inProcessPlugins->setDumpMessaging(dumpMessaging);
 
-  void *lib = nullptr;
-#if defined(_WIN32)
-  lib = LoadLibraryA(path.str().c_str());
-  if (!lib) {
-    std::error_code ec(GetLastError(), std::system_category());
-    return llvm::errorCodeToError(ec);
-  }
-#else
-  lib = dlopen(path.str().c_str(), RTLD_LAZY | RTLD_LOCAL);
-  if (!lib) {
-    return llvm::createStringError(llvm::inconvertibleErrorCode(), dlerror());
-  }
-#endif
-
-  storage = std::make_unique<LoadedLibraryPlugin>(lib, path);
-  return storage.get();
+  return inProcessPlugins.get();
 }
 
-void *LoadedLibraryPlugin::getAddressOfSymbol(const char *symbolName) {
-  auto &cached = resolvedSymbols[symbolName];
-  if (cached)
-    return cached;
-#if defined(_WIN32)
-  cached = GetProcAddress(static_cast<HMODULE>(handle), symbolName);
-#else
-  cached = dlsym(handle, symbolName);
-#endif
-  return cached;
-}
-
-llvm::Expected<LoadedExecutablePlugin *>
+llvm::Expected<CompilerPlugin *>
 PluginRegistry::loadExecutablePlugin(StringRef path, bool disableSandbox) {
   llvm::sys::fs::file_status stat;
   if (auto err = llvm::sys::fs::status(path, stat)) {
@@ -130,20 +174,14 @@ PluginRegistry::loadExecutablePlugin(StringRef path, bool disableSandbox) {
 
 llvm::Error LoadedExecutablePlugin::spawnIfNeeded() {
   if (Process) {
-    // See if the loaded one is still usable.
-    if (!Process->isStale)
-      return llvm::Error::success();
-
     // NOTE: We don't check the mtime here because 'stat(2)' call is too heavy.
     // PluginRegistry::loadExecutablePlugin() checks it and replace this object
     // itself if the plugin is updated.
-
-    // The plugin is stale. Discard the previously opened process.
-    Process.reset();
+    return llvm::Error::success();
   }
 
   // Create command line arguments.
-  SmallVector<StringRef, 4> command{ExecutablePath};
+  SmallVector<StringRef, 4> command{getPath()};
 
   // Apply sandboxing.
   llvm::BumpPtrAllocator Allocator;
@@ -161,7 +199,7 @@ llvm::Error LoadedExecutablePlugin::spawnIfNeeded() {
                                             childInfo->Read, childInfo->Write);
 
   // Call "on reconnect" callbacks.
-  for (auto *callback : onReconnect) {
+  for (auto *callback : getOnReconnectCallbacks()) {
     (*callback)();
   }
 
@@ -172,17 +210,11 @@ LoadedExecutablePlugin::PluginProcess::~PluginProcess() {
 #if defined(_WIN32)
   _close(input);
   _close(output);
-  CloseHandle(process.Process);
 #else
   close(input);
   close(output);
 #endif
-}
-
-LoadedExecutablePlugin::~LoadedExecutablePlugin() {
-  // Let ASTGen to cleanup things.
-  if (this->cleanup)
-    this->cleanup();
+  llvm::sys::Wait(process, /*SecondsToWait=*/0);
 }
 
 ssize_t LoadedExecutablePlugin::PluginProcess::read(void *buf,
@@ -260,10 +292,10 @@ ssize_t LoadedExecutablePlugin::PluginProcess::write(const void *buf,
 #endif
 }
 
-llvm::Error LoadedExecutablePlugin::sendMessage(llvm::StringRef message) const {
+llvm::Error LoadedExecutablePlugin::sendMessage(llvm::StringRef message) {
   ssize_t writtenSize = 0;
 
-  if (dumpMessaging) {
+  if (shouldDumpMessaging()) {
     llvm::dbgs() << "->(plugin:" << Process->process.Pid << ") " << message << '\n';
   }
 
@@ -271,8 +303,8 @@ llvm::Error LoadedExecutablePlugin::sendMessage(llvm::StringRef message) const {
   size_t size = message.size();
 
   // Write header (message size).
-  uint64_t header = llvm::support::endian::byte_swap(
-      uint64_t(size), llvm::support::endianness::little);
+  uint64_t header = llvm::support::endian::byte_swap(uint64_t(size),
+                                                     llvm::endianness::little);
   writtenSize = Process->write(&header, sizeof(header));
   if (writtenSize != sizeof(header)) {
     setStale();
@@ -291,7 +323,7 @@ llvm::Error LoadedExecutablePlugin::sendMessage(llvm::StringRef message) const {
   return llvm::Error::success();
 }
 
-llvm::Expected<std::string> LoadedExecutablePlugin::waitForNextMessage() const {
+llvm::Expected<std::string> LoadedExecutablePlugin::waitForNextMessage() {
   ssize_t readSize = 0;
 
   // Read header (message size).
@@ -304,8 +336,8 @@ llvm::Expected<std::string> LoadedExecutablePlugin::waitForNextMessage() const {
                                    "failed to read plugin message header");
   }
 
-  size_t size = llvm::support::endian::read<uint64_t>(
-      &header, llvm::support::endianness::little);
+  size_t size =
+      llvm::support::endian::read<uint64_t>(&header, llvm::endianness::little);
 
   // Read message.
   std::string message;
@@ -323,7 +355,7 @@ llvm::Expected<std::string> LoadedExecutablePlugin::waitForNextMessage() const {
     message.append(buffer, readSize);
   }
 
-  if (dumpMessaging) {
+  if (shouldDumpMessaging()) {
     llvm::dbgs() << "<-(plugin:" << Process->process.Pid << ") " << message << "\n";
   }
 

@@ -70,6 +70,41 @@ StdVectorTestSuite.test("VectorOfInt as ExpressibleByArrayLiteral") {
     expectEqual(v2[2], 3)
 }
 
+#if !os(Windows) // FIXME: rdar://113704853
+StdVectorTestSuite.test("VectorOfInt as MutableCollection") {
+    var v = Vector([2, 3, 1])
+    v.sort() // Swift function
+    expectEqual(v[0], 1)
+    expectEqual(v[1], 2)
+    expectEqual(v[2], 3)
+
+    v.reverse() // Swift function
+    expectEqual(v[0], 3)
+    expectEqual(v[1], 2)
+    expectEqual(v[2], 1)
+}
+
+StdVectorTestSuite.test("VectorOfString as MutableCollection") {
+    var v = VectorOfString([std.string("xyz"),
+                            std.string("abc"),
+                            std.string("ijk")])
+    v.swapAt(0, 2) // Swift function
+    expectEqual(v[0], std.string("ijk"))
+    expectEqual(v[1], std.string("abc"))
+    expectEqual(v[2], std.string("xyz"))
+
+    v.reverse() // Swift function
+    expectEqual(v[0], std.string("xyz"))
+    expectEqual(v[1], std.string("abc"))
+    expectEqual(v[2], std.string("ijk"))
+
+    v.sort() // Swift function
+    expectEqual(v[0], std.string("abc"))
+    expectEqual(v[1], std.string("ijk"))
+    expectEqual(v[2], std.string("xyz"))
+}
+#endif
+
 StdVectorTestSuite.test("VectorOfInt.push_back") {
     var v = Vector()
     let _42: CInt = 42

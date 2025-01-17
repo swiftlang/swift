@@ -14,6 +14,7 @@
 #include "CodeCompletionDiagnostics.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/USRGeneration.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/IDE/CodeCompletionStringPrinter.h"
 #include "swift/IDE/Utils.h"
@@ -34,6 +35,11 @@ static bool shouldCopyAssociatedUSRForDecl(const ValueDecl *VD) {
   if (isa<ModuleDecl>(VD))
     return false;
   if (VD->hasClangNode() && !VD->getClangDecl())
+    return false;
+
+  // Avoid generating USRs for decls in local contexts, we cannot guarantee
+  // any parent closures will be type-checked, which is needed for mangling.
+  if (VD->getDeclContext()->getLocalContext())
     return false;
 
   return true;
@@ -128,7 +134,7 @@ CodeCompletionResult *CodeCompletionResultBuilder::takeResult() {
     }
 
     ContextFreeResult = ContextFreeCodeCompletionResult::createDeclResult(
-        Sink, CCS, AssociatedDecl, IsAsync, HasAsyncAlternative, ModuleName,
+        Sink, CCS, AssociatedDecl, HasAsyncAlternative, ModuleName,
         NullTerminatedStringRef(BriefDocComment, Allocator),
         copyAssociatedUSRs(Allocator, AssociatedDecl), ResultType,
         ContextFreeNotRecReason, ContextFreeDiagnosticSeverity,
@@ -145,7 +151,7 @@ CodeCompletionResult *CodeCompletionResultBuilder::takeResult() {
   case CodeCompletionResultKind::Pattern:
     ContextFreeResult =
         ContextFreeCodeCompletionResult::createPatternOrBuiltInOperatorResult(
-            Sink, Kind, CCS, CodeCompletionOperatorKind::None, IsAsync,
+            Sink, Kind, CCS, CodeCompletionOperatorKind::None,
             NullTerminatedStringRef(BriefDocComment, Allocator), ResultType,
             ContextFreeNotRecReason, ContextFreeDiagnosticSeverity,
             ContextFreeDiagnosticMessage);
@@ -212,9 +218,9 @@ void CodeCompletionResultBuilder::setAssociatedDecl(const Decl *D) {
     CurrentModule = MD;
   }
 
-  if (D->getAttrs().getDeprecated(D->getASTContext()))
+  if (D->isDeprecated())
     setContextFreeNotRecommended(ContextFreeNotRecommendedReason::Deprecated);
-  else if (D->getAttrs().getSoftDeprecated(D->getASTContext()))
+  else if (D->getSoftDeprecatedAttr())
     setContextFreeNotRecommended(
         ContextFreeNotRecommendedReason::SoftDeprecated);
 

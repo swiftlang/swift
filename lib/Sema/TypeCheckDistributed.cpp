@@ -18,6 +18,7 @@
 #include "TypeChecker.h"
 #include "swift/Strings.h"
 #include "swift/AST/ASTWalker.h"
+#include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/Initializer.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/ProtocolConformance.h"
@@ -27,6 +28,7 @@
 #include "swift/AST/TypeVisitor.h"
 #include "swift/AST/ImportCache.h"
 #include "swift/AST/ExistentialLayout.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/Defer.h"
 #include "swift/AST/ASTPrinter.h"
 
@@ -403,7 +405,7 @@ bool swift::checkDistributedActorSystemAdHocProtocolRequirements(
 }
 
 static bool checkDistributedTargetResultType(
-    ModuleDecl *module, ValueDecl *valueDecl,
+    ValueDecl *valueDecl,
     Type serializationRequirement,
     bool diagnose) {
   auto &C = valueDecl->getASTContext();
@@ -419,7 +421,10 @@ static bool checkDistributedTargetResultType(
   if (auto func = dyn_cast<FuncDecl>(valueDecl)) {
     resultType = func->mapTypeIntoContext(func->getResultInterfaceType());
   } else if (auto var = dyn_cast<VarDecl>(valueDecl)) {
-    resultType = var->getInterfaceType();
+    // Distributed computed properties are always getters,
+    // so get the get accessor for mapping the type into context:
+    auto getter = var->getAccessor(swift::AccessorKind::Get);
+    resultType = getter->mapTypeIntoContext(var->getInterfaceType());
   } else {
     llvm_unreachable("Unsupported distributed target");
   }
@@ -440,8 +445,7 @@ static bool checkDistributedTargetResultType(
           C, serializationRequirement);
 
   for (auto serializationReq: serializationRequirements) {
-    auto conformance =
-        module->checkConformance(resultType, serializationReq);
+    auto conformance = checkConformance(resultType, serializationReq);
     if (conformance.isInvalid()) {
       if (diagnose) {
         llvm::StringRef conformanceToSuggest = isCodableRequirement ?
@@ -534,7 +538,6 @@ bool CheckDistributedFunctionRequest::evaluate(
   }
 
   auto &C = func->getASTContext();
-  auto module = func->getParentModule();
 
   /// If no distributed module is available, then no reason to even try checks.
   if (!C.getLoadedModule(C.Id_Distributed)) {
@@ -559,7 +562,7 @@ bool CheckDistributedFunctionRequest::evaluate(
 
       auto srl = serializationReqType->getExistentialLayout();
       for (auto req: srl.getProtocols()) {
-        if (module->checkConformance(paramTy, req).isInvalid()) {
+        if (checkConformance(paramTy, req).isInvalid()) {
           auto diag = func->diagnose(
               diag::distributed_actor_func_param_not_codable,
               param->getArgumentName().str(), param->getInterfaceType(),
@@ -610,7 +613,7 @@ bool CheckDistributedFunctionRequest::evaluate(
   }
 
   // --- Result type must be either void or a serialization requirement conforming type
-  if (checkDistributedTargetResultType(module, func, serializationReqType,
+  if (checkDistributedTargetResultType(func, serializationReqType,
                                        /*diagnose=*/true)) {
     return true;
   }
@@ -656,8 +659,7 @@ bool swift::checkDistributedActorProperty(VarDecl *var, bool diagnose) {
   auto serializationRequirement =
       getDistributedActorSerializationType(var->getDeclContext());
 
-  auto module = var->getModuleContext();
-  if (checkDistributedTargetResultType(module, var, serializationRequirement, diagnose)) {
+  if (checkDistributedTargetResultType(var, serializationRequirement, diagnose)) {
     return true;
   }
 
@@ -727,6 +729,11 @@ void TypeChecker::checkDistributedActor(SourceFile *SF, NominalTypeDecl *nominal
 
     // --- Ensure 'distributed func' all thunks
     if (auto func = dyn_cast<AbstractFunctionDecl>(member)) {
+      if (auto dtor = dyn_cast<DestructorDecl>(func)) {
+        ASTContext &C = dtor->getASTContext();
+        auto selfDecl = dtor->getImplicitSelfDecl();
+        selfDecl->getAttrs().add(new (C) KnownToBeLocalAttr(true));
+      }
       if (!func->isDistributed())
         continue;
 

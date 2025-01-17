@@ -59,7 +59,8 @@ public struct ObjectIdentifier: Sendable {
 
   /// Creates an instance that uniquely identifies the given metatype.
   ///
-  /// - Parameter: A metatype.
+  /// - Parameters:
+  ///   - x: A metatype.
   @inlinable // trivial-implementation
   public init(_ x: Any.Type) {
     self._value = unsafeBitCast(x, to: Builtin.RawPointer.self)

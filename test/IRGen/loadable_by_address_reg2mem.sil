@@ -1,4 +1,10 @@
-// RUN: %target-swift-frontend %s  -Xllvm -sil-print-after=loadable-address -import-objc-header %S/Inputs/large_c.h -c -o %t/t.o 2>&1 | %FileCheck %s
+// RUN: %target-swift-frontend %s  -Xllvm -sil-print-types -Xllvm -sil-print-after=loadable-address -import-objc-header %S/Inputs/large_c.h -c -o %t/t.o 2>&1 | %FileCheck %s
+
+// wasm currently disables aggressive reg2mem
+// UNSUPPORTED: wasm
+// UNSUPPORTED: OS=wasi
+// UNSUPPORTED: CPU=wasm32
+// REQUIRES: PTRSIZE=64
 
 sil_stage canonical
 
@@ -6,6 +12,25 @@ import Builtin
 import Swift
 
 struct X {
+  var x1 : Int
+  var x2 : Int
+  var x3 : Int
+  var x4: Int
+  var x5: Int
+  var x6: Int
+  var x7: Int
+  var x8: Int
+  var x9: Int
+  var x10: Int
+  var x11: Int
+  var x12: Int
+  var x13: Int
+  var x14: Int
+  var x15: Int
+  var x16: Int
+}
+
+struct X2 {
   var x1 : Int
   var x2 : Int
   var x3 : Int
@@ -268,4 +293,135 @@ bb0(%0 : $*C1, %1 : $*Small):
   retain_value %3 : $C1
   %t = tuple ()
   return %t : $()
+}
+
+sil @use : $@convention(thin) (UInt32) -> ()
+
+// We need to make sure we use the bigger alloc_stack for the address of
+// unchecked_trivial_bit_cast. A bitcast can go from bigger to smaller type.
+
+// CHECK: sil @test11 : $@convention(thin) (@in union_t) -> () {
+// CHECK-NOT: unchecked_addr_cast %1 : $*union_t.__Unnamed_struct_in to $*union_t
+// CHECK: unchecked_addr_cast {{.*}} : $*union_t to $*union_t.__Unnamed_struct_in
+// CHECK: } // end sil function 'test11'
+
+sil @test11 : $@convention(thin) (@in union_t) -> () {
+bb0(%0 : $*union_t):
+  %1 = alloc_stack $union_t
+  %2 = alloc_stack $union_t
+  copy_addr [take] %0 to [init] %2 : $*union_t
+  %4 = load %2 : $*union_t
+  %7 = unchecked_trivial_bit_cast %4 : $union_t to $union_t.__Unnamed_struct_in
+  %8 = struct_extract %7 : $union_t.__Unnamed_struct_in, #union_t.__Unnamed_struct_in.slot
+  %10 = struct_extract %8 : $enum_t, #enum_t.rawValue
+  %11 = function_ref @use : $@convention(thin) (UInt32) -> ()
+  %12 = apply %11(%10) : $@convention(thin) (UInt32) -> ()
+  %13 = tuple ()
+  dealloc_stack %2 : $*union_t
+  dealloc_stack %1 : $*union_t
+  return %13 : $()
+}
+
+// This test case used to crash because we did not handle `mark_dependence`.
+sil @test12 : $@convention(thin) () -> () {
+bb0:
+  %0 = alloc_stack $X
+  %1 = alloc_stack $Y
+  %2 = alloc_stack $X
+  %3 = load %0 : $*X
+  %4 = load %2 : $*X
+  %5 = mark_dependence %3 : $X on %4 : $X
+  %6 = struct $Y (%5 : $X , %5 : $X)
+  store %6 to %1 : $*Y
+  dealloc_stack %2 : $*X
+  dealloc_stack %1 : $*Y
+  dealloc_stack %0 : $*X
+  %t = tuple ()
+  return %t : $()
+}
+
+// CHECK: sil @test13
+// CHECK:  [[ADDR:%.*]] = unchecked_addr_cast %1 : $*X to $*Y
+// CHECK:  copy_addr [take] [[ADDR]] to [init] %2 : $*Y
+// CHECK: } // end sil function 'test13'
+sil @test13 : $@convention(thin) (@in X) -> () {
+bb0(%0 : $*X):
+  %1 = alloc_stack $Y
+  %2 = alloc_stack $X
+  copy_addr [take] %0 to [init] %2 : $*X
+  %4 = load %2 : $*X
+  %7 = unchecked_bitwise_cast %4 : $X to $Y
+  store %7 to %1: $*Y
+  %13 = tuple ()
+  dealloc_stack %2 : $*X
+  dealloc_stack %1 : $*Y
+  return %13 : $()
+}
+
+// CHECK: sil @test14
+// CHECK:   [[VAL:%.*]] = load {{.*}} : $*X
+// CHECK:   throw [[VAL]]
+// CHECK: } // end sil function 'test14'
+sil @test14 : $@convention(thin) (@in X) -> @error X {
+bb0(%0 : $*X):
+  %1 = alloc_stack $X
+  copy_addr [take] %0 to [init] %1 : $*X
+  %3 = load %1 : $*X
+  dealloc_stack %1 : $*X
+  throw %3 : $X
+}
+
+// CHECK: sil @test15
+// CHECK:  cond_br %1, bb1, bb2
+
+// CHECK: bb1:
+// CHECK:   copy_addr [take] {{.*}} to [init] [[PHI:%[0-9]+]] : $*X
+// CHECK:   br bb3
+
+// CHECK: bb2:
+// CHECK:   [[UNDEF:%.*]] = alloc_stack $X
+// CHECK:   copy_addr [take] [[UNDEF]] to [init] [[PHI]] : $*X
+// CHECK:   dealloc_stack [[UNDEF]] : $*X
+// CHECK:   br bb3
+// CHECK:} // end sil function 'test15'
+
+sil @test15 : $@convention(thin) (X, Builtin.Int1) -> () {
+bb0(%0: $X, %1: $Builtin.Int1):
+  %2 = alloc_stack $X
+cond_br %1, bb1, bb2
+
+bb1:
+ br bb3(%0 : $X)
+
+bb2:
+ br bb3(undef : $X)
+
+bb3(%4 : $X):
+  store %4 to %2: $*X
+
+  dealloc_stack %2 : $*X
+  %t = tuple ()
+  return %t : $()
+}
+
+sil @usei8 : $@convention(thin) (UInt8) -> ()
+
+// CHECK: sil @test16
+// CHECK: bb0(%0 : $member_id_t):
+// CHECK:   [[T0:%.*]] = alloc_stack $member_id_t
+// CHECK:   store %0 to [[T0]] : $*member_id_t
+// CHECK:   struct_element_addr [[T0]]
+// CHECK:} // end sil function 'test16'
+
+sil @test16 : $@convention(thin) (member_id_t) -> () {
+bb0(%0 : $member_id_t):
+  %2 = alloc_stack $X
+  %44 = struct_extract %0 : $member_id_t, #member_id_t.member_value // user: %45
+  %45 = unchecked_trivial_bit_cast %44 : $member_id_t.__Unnamed_union_member_value to $(UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8)
+  %46 = tuple_extract %45 : $(UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8, UInt8), 0
+  %11 = function_ref @usei8 : $@convention(thin) (UInt8) -> ()
+  %12 = apply %11(%46) : $@convention(thin) (UInt8) -> ()
+  dealloc_stack %2 : $*X
+  %13 = tuple ()
+  return %13 : $()
 }

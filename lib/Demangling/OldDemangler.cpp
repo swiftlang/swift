@@ -1213,6 +1213,9 @@ private:
     if (Mangled.nextIf('D')) {
       entityKind = Node::Kind::Deallocator;
       hasType = false;
+    } else if (Mangled.nextIf('Z')) {
+      entityKind = Node::Kind::IsolatedDeallocator;
+      hasType = false;
     } else if (Mangled.nextIf('d')) {
       entityKind = Node::Kind::Destructor;
       hasType = false;
@@ -2248,6 +2251,9 @@ private:
 
     if (Mangled.nextIf('H'))
       addImplFunctionAttribute(type, "@async");
+
+    if (Mangled.nextIf('T'))
+      addImplFunctionAttribute(type, "sending-result");
 
     // Enter a new generic context if this type is generic.
     // FIXME: replace with std::optional, when we have it.

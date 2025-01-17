@@ -1,7 +1,7 @@
-// RUN: %target-typecheck-verify-swift -strict-concurrency=complete -enable-upcoming-feature RegionBasedIsolation
+// RUN: %target-typecheck-verify-swift -strict-concurrency=complete -enable-upcoming-feature GlobalActorIsolatedTypesUsability
 
 // REQUIRES: concurrency
-// REQUIRES: asserts
+// REQUIRES: swift_feature_GlobalActorIsolatedTypesUsability
 
 /*
  This file tests the experimental TransferNonSendable feature. This feature causes the passing
@@ -14,7 +14,6 @@
  */
 
 class NonSendable {
-// expected-note@-1 3{{class 'NonSendable' does not conform to the 'Sendable' protocol}}
     var x = 0
 }
 
@@ -31,10 +30,8 @@ func callActorFuncsFromNonisolated(a : A, ns : NonSendable) async {
     // Non-sendable value passed from actor isolated to nonisolated
 
     await a.actorTakesNS(ns)
-    //deferred-warning@-1{{passing argument of non-sendable type 'NonSendable' into actor-isolated context may introduce data races}}
 
     _ = await a.actorRetsNS()
-    //expected-warning@-1{{non-sendable type 'NonSendable' returned by implicitly asynchronous call to actor-isolated function cannot cross actor boundary}}
 }
 
 @available(SwiftStdlib 5.1, *)
@@ -52,7 +49,6 @@ actor A {
         //deferred-warning@-1{{passing argument of non-sendable type 'NonSendable' outside of actor-isolated context may introduce data races}}
 
         _ = await retsNS()
-        //expected-warning@-1{{non-sendable type 'NonSendable' returned by implicitly asynchronous call to nonisolated function cannot cross actor boundary}}
     }
 
     func callActorFuncsFromDiffActor(ns : NonSendable, a : A) async {
@@ -62,6 +58,5 @@ actor A {
         //deferred-warning@-1{{passing argument of non-sendable type 'NonSendable' into actor-isolated context may introduce data races}}
 
         _ = await a.actorRetsNS()
-        //expected-warning@-1{{non-sendable type 'NonSendable' returned by implicitly asynchronous call to actor-isolated function cannot cross actor boundary}}
     }
 }

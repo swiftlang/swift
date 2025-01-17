@@ -16,6 +16,7 @@
 //===----------------------------------------------------------------------===//
 #include "swift/ABI/MetadataValues.h"
 #include "swift/AST/IRGenOptions.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/SourceLoc.h"
 #include "swift/IRGen/Linking.h"
 #include "llvm/IR/Instructions.h"
@@ -308,6 +309,39 @@ IRGenFunction::emitTargetOSVersionAtLeastCall(llvm::Value *major,
   return Builder.CreateCall(fn, {platformID, major, minor, patch});
 }
 
+llvm::Value *
+IRGenFunction::emitTargetVariantOSVersionAtLeastCall(llvm::Value *major,
+                                                     llvm::Value *minor,
+                                                     llvm::Value *patch) {
+  auto *fn = cast<llvm::Function>(IGM.getPlatformVersionAtLeastFn());
+
+  llvm::Value *iOSPlatformID =
+    llvm::ConstantInt::get(IGM.Int32Ty, llvm::MachO::PLATFORM_IOS);
+  return Builder.CreateCall(fn->getFunctionType(), fn, {iOSPlatformID, major, minor, patch});
+}
+
+llvm::Value *
+IRGenFunction::emitTargetOSVersionOrVariantOSVersionAtLeastCall(
+    llvm::Value *major, llvm::Value *minor, llvm::Value *patch,
+    llvm::Value *variantMajor, llvm::Value *variantMinor,
+    llvm::Value *variantPatch) {
+  auto *fn = cast<llvm::Function>(
+      IGM.getTargetOSVersionOrVariantOSVersionAtLeastFn());
+
+  llvm::Value *macOSPlatformID =
+      llvm::ConstantInt::get(IGM.Int32Ty, llvm::MachO::PLATFORM_MACOS);
+
+  llvm::Value *iOSPlatformID =
+    llvm::ConstantInt::get(IGM.Int32Ty, llvm::MachO::PLATFORM_IOS);
+
+  return Builder.CreateCall(fn->getFunctionType(),
+                            fn, {macOSPlatformID, major, minor, patch,
+                                 iOSPlatformID, variantMajor, variantMinor,
+                                 variantPatch});
+}
+
+
+
 /// Initialize a relative indirectable pointer to the given value.
 /// This always leaves the value in the direct state; if it's not a
 /// far reference, it's the caller's responsibility to ensure that the
@@ -443,6 +477,14 @@ Address IRGenFunction::emitAddressAtOffset(llvm::Value *base, Offset offset,
   auto offsetValue = offset.getAsValue(*this);
   auto slotPtr = emitByteOffsetGEP(base, offsetValue, objectTy);
   return Address(slotPtr, objectTy, objectAlignment);
+}
+
+llvm::CallInst *IRBuilder::CreateExpectCond(IRGenModule &IGM,
+                                            llvm::Value *value,
+                                            bool expectedValue,
+                                            const Twine &name) {
+  unsigned flag = expectedValue ? 1 : 0;
+  return CreateExpect(value, llvm::ConstantInt::get(IGM.Int1Ty, flag), name);
 }
 
 llvm::CallInst *IRBuilder::CreateNonMergeableTrap(IRGenModule &IGM,
@@ -776,6 +818,12 @@ void IRGenFunction::emitAwaitAsyncContinuation(
     auto nullError = llvm::Constant::getNullValue(errorRes->getType());
     auto hasError = Builder.CreateICmpNE(errorRes, nullError);
     optionalErrorResult->addIncoming(errorRes, Builder.GetInsertBlock());
+
+    // Predict no error.
+    hasError =
+        getSILModule().getOptions().EnableThrowsPrediction ?
+        Builder.CreateExpectCond(IGM, hasError, false) : hasError;
+
     Builder.CreateCondBr(hasError, optionalErrorBB, normalContBB);
     Builder.emitBlock(normalContBB);
   }
@@ -840,7 +888,8 @@ void IRGenFunction::emitResumeAsyncContinuationThrowing(
 void IRGenFunction::emitClearSensitive(Address address, llvm::Value *size) {
   // If our deployment target doesn't contain the new swift_clearSensitive,
   // fall back to memset_s
-  auto deploymentAvailability = AvailabilityContext::forDeploymentTarget(IGM.Context);
+  auto deploymentAvailability =
+      AvailabilityRange::forDeploymentTarget(IGM.Context);
   auto clearSensitiveAvail = IGM.Context.getClearSensitiveAvailability();
   if (!deploymentAvailability.isContainedIn(clearSensitiveAvail)) {
     Builder.CreateCall(IGM.getMemsetSFunctionPointer(),

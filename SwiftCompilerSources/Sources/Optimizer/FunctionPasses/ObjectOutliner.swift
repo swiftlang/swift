@@ -10,6 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+import AST
 import SIL
 
 /// Outlines class objects from functions into statically initialized global variables.
@@ -59,16 +60,25 @@ let objectOutliner = FunctionPass(name: "object-outliner") {
     return
   }
 
-  for inst in function.instructions {
-    if let ari = inst as? AllocRefInstBase {
-      if !context.continueWithNextSubpassRun(for: inst) {
+  var allocRefs = Stack<AllocRefInstBase>(context)
+  defer { allocRefs.deinitialize() }
+
+  allocRefs.append(contentsOf: function.instructions.lazy.compactMap { $0 as? AllocRefInstBase })
+
+  // Try multiple iterations to handle multi-dimensional arrays.
+  var changed: Bool
+  repeat {
+    changed = false
+    for ari in allocRefs where !ari.isDeleted {
+      if !context.continueWithNextSubpassRun(for: ari) {
         return
       }
       if let globalValue = optimizeObjectAllocation(allocRef: ari, context) {
         optimizeFindStringCall(stringArray: globalValue, context)
+        changed = true
       }
     }
-  }
+  } while changed
 }
 
 private func optimizeObjectAllocation(allocRef: AllocRefInstBase, _ context: FunctionPassContext) -> GlobalValueInst? {
@@ -87,13 +97,19 @@ private func optimizeObjectAllocation(allocRef: AllocRefInstBase, _ context: Fun
     return nil
   }
 
-  guard let (storesToClassFields, storesToTailElements) = getInitialization(of: allocRef, ignore: endOfInitInst) else {
+  guard let (storesToClassFields, storesToTailElements) = getInitialization(of: allocRef,
+                                                                            ignore: endOfInitInst,
+                                                                            context) else
+  {
     return nil
   }
 
   let outlinedGlobal = context.createGlobalVariable(
         name: context.mangleOutlinedVariable(from: allocRef.parentFunction),
-        type: allocRef.type, isPrivate: true)
+        type: allocRef.type, linkage: .private,
+        // Only if it's a COW object we can be sure that the object allocated in the global is not mutated.
+        // If someone wants to mutate it, it has to be copied first.
+        isLet: endOfInitInst is EndCOWMutationInst)
 
   constructObject(of: allocRef, inInitializerOf: outlinedGlobal, storesToClassFields, storesToTailElements, context)
   context.erase(instructions: storesToClassFields)
@@ -136,7 +152,8 @@ private func findEndOfInitialization(of object: Value, canStoreToGlobal: Bool) -
   return nil
 }
 
-private func getInitialization(of allocRef: AllocRefInstBase, ignore ignoreInst: Instruction)
+private func getInitialization(of allocRef: AllocRefInstBase, ignore ignoreInst: Instruction,
+                               _ context: FunctionPassContext)
   -> (storesToClassFields: [StoreInst], storesToTailElements: [StoreInst])?
 {
   guard let numTailElements = allocRef.numTailElements else {
@@ -154,7 +171,7 @@ private func getInitialization(of allocRef: AllocRefInstBase, ignore ignoreInst:
   let tailCount = numTailElements != 0 ? numTailElements * allocRef.numStoresPerTailElement : 0
   var tailStores = Array<StoreInst?>(repeating: nil, count: tailCount)
 
-  if !findInitStores(of: allocRef, &fieldStores, &tailStores, ignore: ignoreInst) {
+  if !findInitStores(of: allocRef, &fieldStores, &tailStores, ignore: ignoreInst, context) {
     return nil
   }
 
@@ -168,7 +185,9 @@ private func getInitialization(of allocRef: AllocRefInstBase, ignore ignoreInst:
 private func findInitStores(of object: Value,
                             _ fieldStores: inout [StoreInst?],
                             _ tailStores: inout [StoreInst?],
-                            ignore ignoreInst: Instruction) -> Bool {
+                            ignore ignoreInst: Instruction,
+                            _ context: FunctionPassContext) -> Bool
+{
   for use in object.uses {
     let user = use.instruction
     switch user {
@@ -177,15 +196,15 @@ private func findInitStores(of object: Value,
          is MoveValueInst,
          is EndInitLetRefInst,
          is BeginBorrowInst:
-      if !findInitStores(of: user as! SingleValueInstruction, &fieldStores, &tailStores, ignore: ignoreInst) {
+      if !findInitStores(of: user as! SingleValueInstruction, &fieldStores, &tailStores, ignore: ignoreInst, context) {
         return false
       }
     case let rea as RefElementAddrInst:
-      if !findStores(inUsesOf: rea, index: rea.fieldIndex, stores: &fieldStores) {
+      if !findStores(inUsesOf: rea, index: rea.fieldIndex, stores: &fieldStores, context) {
         return false
       }
     case let rta as RefTailAddrInst:
-      if !findStores(toTailAddress: rta, tailElementIndex: 0, stores: &tailStores) {
+      if !findStores(toTailAddress: rta, tailElementIndex: 0, stores: &tailStores, context) {
         return false
       }
     case ignoreInst,
@@ -200,7 +219,8 @@ private func findInitStores(of object: Value,
   return true
 }
 
-private func findStores(toTailAddress tailAddr: Value, tailElementIndex: Int, stores: inout [StoreInst?]) -> Bool {
+private func findStores(toTailAddress tailAddr: Value, tailElementIndex: Int, stores: inout [StoreInst?],
+                        _ context: FunctionPassContext) -> Bool {
   for use in tailAddr.uses {
     switch use.instruction {
     case let indexAddr as IndexAddrInst:
@@ -209,26 +229,26 @@ private func findStores(toTailAddress tailAddr: Value, tailElementIndex: Int, st
       {
         return false
       }
-      if !findStores(toTailAddress: indexAddr, tailElementIndex: tailElementIndex + tailIdx, stores: &stores) {
+      if !findStores(toTailAddress: indexAddr, tailElementIndex: tailElementIndex + tailIdx, stores: &stores, context) {
         return false
       }
     case let tea as TupleElementAddrInst:
       // The tail elements are tuples. There is a separate store for each tuple element.
       let numTupleElements = tea.tuple.type.tupleElements.count
       let tupleIdx = tea.fieldIndex
-      if !findStores(inUsesOf: tea, index: tailElementIndex * numTupleElements + tupleIdx, stores: &stores) {
+      if !findStores(inUsesOf: tea, index: tailElementIndex * numTupleElements + tupleIdx, stores: &stores, context) {
         return false
       }
     case let atp as AddressToPointerInst:
-      if !findStores(toTailAddress: atp, tailElementIndex: tailElementIndex, stores: &stores) {
+      if !findStores(toTailAddress: atp, tailElementIndex: tailElementIndex, stores: &stores, context) {
         return false
       }
     case let mdi as MarkDependenceInst:
-      if !findStores(toTailAddress: mdi, tailElementIndex: tailElementIndex, stores: &stores) {
+      if !findStores(toTailAddress: mdi, tailElementIndex: tailElementIndex, stores: &stores, context) {
         return false
       }
     case let pta as PointerToAddressInst:
-      if !findStores(toTailAddress: pta, tailElementIndex: tailElementIndex, stores: &stores) {
+      if !findStores(toTailAddress: pta, tailElementIndex: tailElementIndex, stores: &stores, context) {
         return false
       }
     case let store as StoreInst:
@@ -237,7 +257,7 @@ private func findStores(toTailAddress tailAddr: Value, tailElementIndex: Int, st
         // Just to be on the safe side..
         return false
       }
-      if !handleStore(store, index: tailElementIndex, stores: &stores) {
+      if !handleStore(store, index: tailElementIndex, stores: &stores, context) {
         return false
       }
     default:
@@ -249,10 +269,12 @@ private func findStores(toTailAddress tailAddr: Value, tailElementIndex: Int, st
   return true
 }
 
-private func findStores(inUsesOf address: Value, index: Int, stores: inout [StoreInst?]) -> Bool {
+private func findStores(inUsesOf address: Value, index: Int, stores: inout [StoreInst?],
+                        _ context: FunctionPassContext) -> Bool
+{
   for use in address.uses {
     if let store = use.instruction as? StoreInst {
-      if !handleStore(store, index: index, stores: &stores) {
+      if !handleStore(store, index: index, stores: &stores, context) {
         return false
       }
     } else if !isValidUseOfObject(use) {
@@ -262,9 +284,11 @@ private func findStores(inUsesOf address: Value, index: Int, stores: inout [Stor
   return true
 }
 
-private func handleStore(_ store: StoreInst, index: Int, stores: inout [StoreInst?]) -> Bool {
+private func handleStore(_ store: StoreInst, index: Int, stores: inout [StoreInst?],
+                         _ context: FunctionPassContext) -> Bool
+{
   if index >= 0 && index < stores.count,
-     store.source.isValidGlobalInitValue,
+     store.source.isValidGlobalInitValue(context),
      stores[index] == nil {
     stores[index] = store
     return true
@@ -389,8 +413,7 @@ private func replace(object allocRef: AllocRefInstBase,
   }
 
   rewriteUses(of: allocRef, context)
-  allocRef.uses.replaceAll(with: globalValue, context)
-  context.erase(instruction: allocRef)
+  allocRef.replace(with: globalValue, context)
   return globalValue
 }
 
@@ -407,13 +430,11 @@ private func rewriteUses(of startValue: Value, _ context: FunctionPassContext) {
       if !beginDealloc.parentFunction.hasOwnership {
         builder.createStrongRelease(operand: beginDealloc.reference)
       }
-      beginDealloc.uses.replaceAll(with: beginDealloc.reference, context)
-      context.erase(instruction: beginDealloc)
+      beginDealloc.replace(with: beginDealloc.reference, context)
     case is EndCOWMutationInst, is EndInitLetRefInst, is MoveValueInst:
       let svi = inst as! SingleValueInstruction
       worklist.pushIfNotVisited(usersOf: svi)
-      svi.uses.replaceAll(with: svi.operands[0].value, context)
-      context.erase(instruction: svi)
+      svi.replace(with: svi.operands[0].value, context)
     case let upCast as UpcastInst:
       worklist.pushIfNotVisited(usersOf: upCast)
     case let refCast as UncheckedRefCastInst:
@@ -430,7 +451,7 @@ private func rewriteUses(of startValue: Value, _ context: FunctionPassContext) {
 
 private extension InstructionWorklist {
   mutating func pushIfNotVisited(usersOf value: Value) {
-    pushIfNotVisited(contentsOf: value.uses.lazy.map { $0.instruction })
+    pushIfNotVisited(contentsOf: value.users)
   }
 }
 
@@ -479,14 +500,6 @@ private extension AllocRefInstBase {
       return tailType.tupleElements.count
     }
     return 1
-  }
-}
-
-private extension FunctionPassContext {
-  func erase(instructions: [Instruction]) {
-    for inst in instructions {
-      erase(instruction: inst)
-    }
   }
 }
 
@@ -541,7 +554,7 @@ private func replace(findStringCall: ApplyInst,
 
   // Create an "opaque" global variable which is passed as inout to
   // _findStringSwitchCaseWithCache and into which the function stores the "cache".
-  let cacheVar = context.createGlobalVariable(name: name, type: cacheType, isPrivate: true)
+  let cacheVar = context.createGlobalVariable(name: name, type: cacheType, linkage: .private, isLet: false)
 
   let varBuilder = Builder(staticInitializerOf: cacheVar, context)
   let zero = varBuilder.createIntegerLiteral(0, type: wordTy)
@@ -555,8 +568,7 @@ private func replace(findStringCall: ApplyInst,
                                                 findStringCall.arguments[1],
                                                 cacheAddr])
 
-  findStringCall.uses.replaceAll(with: newCall, context)
-  context.erase(instruction: findStringCall)
+  findStringCall.replace(with: newCall, context)
 }
 
 private extension GlobalValueInst {

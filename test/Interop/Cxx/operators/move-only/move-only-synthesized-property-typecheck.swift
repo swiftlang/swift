@@ -1,3 +1,4 @@
+// RUN: %target-typecheck-verify-swift -I %S/Inputs -cxx-interoperability-mode=swift-5.9 -DNO_CONSUME
 // RUN: %target-typecheck-verify-swift -I %S/Inputs -cxx-interoperability-mode=swift-6 -DNO_CONSUME
 // RUN: %target-typecheck-verify-swift -I %S/Inputs -cxx-interoperability-mode=upcoming-swift -DNO_CONSUME
 

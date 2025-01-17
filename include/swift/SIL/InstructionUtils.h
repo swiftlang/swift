@@ -15,7 +15,7 @@
 
 #include "swift/SIL/InstWrappers.h"
 #include "swift/SIL/RuntimeEffect.h"
-#include "swift/SIL/SILInstruction.h"
+#include "swift/SIL/SILModule.h"
 
 namespace swift {
 
@@ -69,6 +69,9 @@ SILValue stripAddressProjections(SILValue V);
 /// Look through any projections that transform an address -> an address.
 SILValue lookThroughAddressToAddressProjections(SILValue v);
 
+/// Look through address and value projections
+SILValue lookThroughAddressAndValueProjections(SILValue V);
+
 /// Return the underlying SILValue after stripping off all aggregate projection
 /// instructions.
 ///
@@ -107,8 +110,16 @@ SILValue stripBorrow(SILValue V);
 /// type may be changed by a cast.
 SingleValueInstruction *getSingleValueCopyOrCast(SILInstruction *I);
 
+// Return true if this instruction begins a SIL-level scope. If so, it must have
+// a single result. That result must have an isEndOfScopeMarker direct use on
+// all reachable paths. This instruction along with its scope-ending
+// instructions are considered a single operation. They must be inserted and
+// deleted together.
+bool isBeginScopeMarker(SILInstruction *user);
+
 /// Return true if this instruction terminates a SIL-level scope. Scope end
-/// instructions do not produce a result.
+/// instructions do not produce a result. Their single operand must be an
+/// isBeginScopeMarker and cannot be 'undef'.
 bool isEndOfScopeMarker(SILInstruction *user);
 
 /// Return true if the given instruction has no effect on it's operand values
@@ -221,6 +232,15 @@ bool visitExplodedTupleType(SILType type,
 /// visited all of the tuple elements without the visitor returing false.
 bool visitExplodedTupleValue(SILValue value,
                              llvm::function_ref<SILValue(SILValue, std::optional<unsigned>)> callback);
+
+std::pair<SILFunction *, SILWitnessTable *>
+lookUpFunctionInWitnessTable(WitnessMethodInst *wmi, SILModule::LinkingMode linkingMode);
+
+/// True if a type can be expanded without a significant increase to code size.
+///
+/// False if expanding a type is invalid. For example, expanding a
+/// struct-with-deinit drops the deinit.
+bool shouldExpand(SILModule &module, SILType ty);
 
 } // end namespace swift
 

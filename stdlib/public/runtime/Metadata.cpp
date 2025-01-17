@@ -25,6 +25,7 @@
 #include "MetadataCache.h"
 #include "BytecodeLayouts.h"
 #include "swift/ABI/TypeIdentity.h"
+#include "swift/Basic/Defer.h"
 #include "swift/Basic/MathUtils.h"
 #include "swift/Basic/Lazy.h"
 #include "swift/Basic/Range.h"
@@ -1709,6 +1710,343 @@ FunctionCacheEntry::FunctionCacheEntry(const Key &key) {
 }
 
 /***************************************************************************/
+/*** Vectors ****************************************************************/
+/***************************************************************************/
+
+namespace {
+
+class FixedArrayCacheEntry
+  : public MetadataCacheEntryBase<FixedArrayCacheEntry, int>
+{
+public:
+  // We have to give MetadataCacheEntryBase a non-empty list of trailing
+  // objects or else it gets annoyed.
+  template<typename...Etc>
+  static size_t numTrailingObjects(OverloadToken<int>, Etc &&...) { return 0; }
+
+  AllocationResult allocate() {
+    swift_unreachable("allocated during construction");
+  }
+
+  ValueWitnessTable Witnesses;
+  FullMetadata<FixedArrayTypeMetadata> Data;
+
+  struct Key {
+    intptr_t Count;
+    const Metadata *Element;
+
+
+    static llvm::hash_code hash_value(intptr_t count, const Metadata *elt) {
+      return llvm::hash_combine(count, elt);
+    }
+
+    friend llvm::hash_code hash_value(const Key &key) {
+      return hash_value(key.Count, key.Element);
+    }
+  };
+  
+  static const char *getName() { return "FixedArrayCache"; }
+  
+  ValueType getValue() {
+    return &Data;
+  }
+  void setValue(ValueType value) {
+    assert(value == &Data);
+  }
+  
+  FixedArrayCacheEntry(const Key &key, MetadataWaitQueue::Worker &worker,
+                   MetadataRequest request);
+
+  MetadataStateWithDependency tryInitialize(Metadata *metadata,
+                                    PrivateMetadataState state,
+                                    PrivateMetadataCompletionContext *context);
+
+  MetadataStateWithDependency checkTransitiveCompleteness() {
+    auto dependency = ::checkTransitiveCompleteness(&Data);
+    return { dependency ? PrivateMetadataState::NonTransitiveComplete
+                        : PrivateMetadataState::Complete,
+             dependency };
+  }
+
+  intptr_t getKeyIntValueForDump() {
+    return 0; // No single meaningful value
+  }
+
+  friend llvm::hash_code hash_value(const FixedArrayCacheEntry &value) {
+    return Key::hash_value(value.Data.Count, value.Data.Element);
+  }
+
+  bool matchesKey(const Key &key) {
+    return Data.Count == key.Count && Data.Element == key.Element;
+  }
+
+};
+
+class FixedArrayCacheStorage :
+  public LockingConcurrentMapStorage<FixedArrayCacheEntry, FixedArrayCacheTag> {
+public:
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Winvalid-offsetof"
+  static FixedArrayCacheEntry *
+  resolveExistingEntry(const FixedArrayTypeMetadata *metadata) {
+    // The correctness of this arithmetic is verified by an assertion in
+    // the TupleCacheEntry constructor.
+    auto bytes = reinterpret_cast<const char*>(asFullMetadata(metadata));
+    bytes -= offsetof(FixedArrayCacheEntry, Data);
+    auto entry = reinterpret_cast<const FixedArrayCacheEntry*>(bytes);
+    return const_cast<FixedArrayCacheEntry*>(entry);
+  }
+#pragma clang diagnostic pop
+};
+
+class FixedArrayCache :
+  public LockingConcurrentMap<FixedArrayCacheEntry, FixedArrayCacheStorage> {
+};
+
+static Lazy<FixedArrayCache> FixedArrayTypes;
+
+} // end anonymous namespace
+
+MetadataResponse
+swift::swift_getFixedArrayTypeMetadata(MetadataRequest request,
+                                   intptr_t count,
+                                   const Metadata *element) {
+  // An empty array is laid out like an empty tuple.
+  // Since Builtin.FixedArray is a builtin type, we don't try to guarantee it a
+  // unique runtime identity.
+  if (count <= 0) {
+    return MetadataResponse{&METADATA_SYM(EMPTY_TUPLE_MANGLING),
+                            MetadataState::Complete};
+  }
+  
+  // If the element type has no tail padding, then its metadata is good enough
+  // to hold space for the vector.
+  if (count == 1
+      && element->getValueWitnesses()->size == element->getValueWitnesses()->stride) {
+    return MetadataResponse{element, MetadataState::Complete};
+  }
+  
+  auto &cache = FixedArrayTypes.get();
+  FixedArrayCacheEntry::Key key{count, element};
+  return cache.getOrInsert(key, request).second;
+}
+
+FixedArrayCacheEntry::FixedArrayCacheEntry(const Key &key,
+                                   MetadataWaitQueue::Worker &worker,
+                                   MetadataRequest request)
+  : MetadataCacheEntryBase(worker, PrivateMetadataState::Abstract) {
+  Data.setKind(MetadataKind::FixedArray);
+  Data.Count = key.Count;
+  Data.Element = key.Element;
+
+  assert(FixedArrayCacheStorage::resolveExistingEntry(&Data) == this);
+}
+
+/// Given a metatype pointer, produce the value-witness table for it.
+static const ValueWitnessTable *generic_getValueWitnesses(const Metadata *metatype) {
+  return asFullMetadata(metatype)->ValueWitnesses;
+}
+
+/// Generic value witness for 'projectBuffer'.
+template <bool IsInline>
+static OpaqueValue *generic_projectBuffer(ValueBuffer *buffer,
+                                          const Metadata *metatype) {
+  assert(IsInline == generic_getValueWitnesses(metatype)->isValueInline());
+
+  if (IsInline)
+    return reinterpret_cast<OpaqueValue*>(buffer);
+
+  auto wtable = generic_getValueWitnesses(metatype);
+  unsigned alignMask = wtable->getAlignmentMask();
+  // Compute the byte offset of the object in the box.
+  unsigned byteOffset = (sizeof(HeapObject) + alignMask) & ~alignMask;
+  auto *bytePtr =
+      reinterpret_cast<char *>(*reinterpret_cast<HeapObject **>(buffer));
+  return reinterpret_cast<OpaqueValue *>(bytePtr + byteOffset);
+}
+
+static void
+vector_destroy(OpaqueValue *dest, const Metadata *metatype) {
+  if (metatype->getValueWitnesses()->isPOD()) {
+    return;
+  }
+  
+  auto vectorType = cast<FixedArrayTypeMetadata>(metatype);
+  auto destBytes = (char*)dest;
+  
+  for (unsigned i = 0, end = vectorType->getRealizedCount(),
+                stride = vectorType->Element->vw_stride();
+       i < end;
+       ++i, destBytes += stride) {
+    vectorType->Element->vw_destroy((OpaqueValue*)destBytes);
+  }
+}
+
+namespace {
+template<typename ElementFn>
+OpaqueValue *
+vector_elementwise_transfer(OpaqueValue *dest, OpaqueValue *src,
+                            const Metadata *metatype,
+                            ElementFn &&elementFn) {
+  if (metatype->getValueWitnesses()->isPOD()) {
+    memcpy(dest, src, metatype->vw_size());
+    return dest;
+  }
+  
+  auto vectorType = cast<FixedArrayTypeMetadata>(metatype);
+  auto destBytes = (char*)dest;
+  auto srcBytes = (char*)src;
+  
+  for (unsigned i = 0, end = vectorType->getRealizedCount(),
+                stride = vectorType->Element->vw_stride();
+       i < end;
+       ++i, destBytes += stride, srcBytes += stride) {
+    elementFn(
+      (OpaqueValue*)destBytes,
+      (OpaqueValue*)srcBytes,
+      vectorType->Element);
+  }
+  return dest;
+}
+}
+static OpaqueValue *
+vector_initializeWithCopy(OpaqueValue *dest, OpaqueValue *src,
+                          const Metadata *metatype) {
+  return vector_elementwise_transfer(dest, src, metatype,
+    [&](OpaqueValue *destElt, OpaqueValue *srcElt, const Metadata *eltType) {
+      eltType->vw_initializeWithCopy(destElt, srcElt);
+    });
+}
+static OpaqueValue *
+vector_assignWithCopy(OpaqueValue *dest, OpaqueValue *src,
+                          const Metadata *metatype) {
+  return vector_elementwise_transfer(dest, src, metatype,
+    [&](OpaqueValue *destElt, OpaqueValue *srcElt, const Metadata *eltType) {
+      eltType->vw_assignWithCopy(destElt, srcElt);
+    });
+}
+static OpaqueValue *
+vector_initializeWithTake(OpaqueValue *dest, OpaqueValue *src,
+                          const Metadata *metatype) {
+  return vector_elementwise_transfer(dest, src, metatype,
+    [&](OpaqueValue *destElt, OpaqueValue *srcElt, const Metadata *eltType) {
+      eltType->vw_initializeWithTake(destElt, srcElt);
+    });
+}
+static OpaqueValue *
+vector_assignWithTake(OpaqueValue *dest, OpaqueValue *src,
+                      const Metadata *metatype) {
+  return vector_elementwise_transfer(dest, src, metatype,
+    [&](OpaqueValue *destElt, OpaqueValue *srcElt, const Metadata *eltType) {
+      eltType->vw_assignWithTake(destElt, srcElt);
+    });
+}
+
+static OpaqueValue *vector_initializeBufferWithCopyOfBuffer(ValueBuffer *dest,
+                                                            ValueBuffer *src,
+                                                            const Metadata *metatype) {
+  if (metatype->getValueWitnesses()->isValueInline()) {
+    return vector_initializeWithCopy(
+      generic_projectBuffer<true>(dest, metatype),
+      generic_projectBuffer<true>(src, metatype),
+      metatype);
+  }
+  
+  auto *srcReference = *reinterpret_cast<HeapObject**>(src);
+  *reinterpret_cast<HeapObject**>(dest) = srcReference;
+  swift_retain(srcReference);
+  return generic_projectBuffer<false>(dest, metatype);
+}
+
+static unsigned
+vector_getEnumTagSinglePayload(const OpaqueValue *theEnum,
+                               unsigned numEmptyCases,
+                               const Metadata *metatype) {
+  auto vectorType = cast<FixedArrayTypeMetadata>(metatype);
+  return vectorType->Element->vw_getEnumTagSinglePayload(theEnum,
+                                                         numEmptyCases);
+}
+
+static void
+vector_storeEnumTagSinglePayload(OpaqueValue *theEnum,
+                                 unsigned whichCase,
+                                 unsigned numEmptyCases,
+                                 const Metadata *metatype) {
+  auto vectorType = cast<FixedArrayTypeMetadata>(metatype);
+  vectorType->Element->vw_storeEnumTagSinglePayload(theEnum,
+                                                    whichCase,
+                                                    numEmptyCases);
+}
+
+MetadataStateWithDependency
+FixedArrayCacheEntry::tryInitialize(Metadata *metadata,
+                                PrivateMetadataState state,
+                                PrivateMetadataCompletionContext *context) {
+  // If we've already reached non-transitive completeness, just check that.
+  if (state == PrivateMetadataState::NonTransitiveComplete) {
+    return checkTransitiveCompleteness();
+  }
+
+  // Otherwise, we must still be abstract, because vectors don't have an
+  // intermediate state between that and non-transitive completeness.
+  assert(state == PrivateMetadataState::Abstract);
+
+  // Require the element type to be layout-complete.
+  const Metadata *element = Data.Element;
+  auto eltRequest = MetadataRequest(MetadataState::LayoutComplete,
+                                    /*nonblocking*/ true);
+  auto eltResponse = swift_checkMetadataState(eltRequest, element);
+  
+  // If the element is not layout-complete, we have to suspend.
+  if (!isAtLeast(eltResponse.State, MetadataState::LayoutComplete)) {
+    return {PrivateMetadataState::Abstract,
+            MetadataDependency(element, MetadataState::LayoutComplete)};
+  }
+  
+  // We can derive the array's layout from the element's.
+  intptr_t count = Data.Count;
+  // We should have checked for empty and uninhabited cases before getting this
+  // far.
+  assert(count > 0);
+  Data.ValueWitnesses = &Witnesses;
+  auto eltWitnesses = element->getValueWitnesses();
+  auto arraySize
+    = Witnesses.size = Witnesses.stride = eltWitnesses->stride * count;
+  // We take on most of the properties of the element type, except that an array
+  // of elements might end up larger than an inline buffer.
+  Witnesses.flags = eltWitnesses->flags
+    .withInlineStorage(
+              ValueWitnessTable::isValueInline(eltWitnesses->isBitwiseTakable(),
+                                               arraySize,
+                                               eltWitnesses->getAlignment()));
+  // We get extra inhabitants from the first element.
+  Witnesses.extraInhabitantCount = eltWitnesses->extraInhabitantCount;
+  
+  // Copy in the value witnesses.
+  // TODO: Specialize witnesses for POD etc.?
+#define WANT_ONLY_REQUIRED_VALUE_WITNESSES
+#define VALUE_WITNESS(LOWER_ID, UPPER_ID) \
+  Witnesses.LOWER_ID = vector_##LOWER_ID;
+#define DATA_VALUE_WITNESS(LOWER_ID, UPPER_ID, TYPE)
+#include "swift/ABI/ValueWitness.def"
+
+  // If the element type is complete, so are we.
+  if (eltResponse.State == MetadataState::Complete) {
+    return {PrivateMetadataState::Complete, MetadataDependency()};
+  }
+  
+  // If it isn't at least non-transitively complete, wait for it to be.
+  if (!isAtLeast(eltResponse.State, MetadataState::NonTransitiveComplete)) {
+    return {PrivateMetadataState::NonTransitiveComplete,
+            MetadataDependency(element,
+                               MetadataState::NonTransitiveComplete) };
+  }
+  
+  // Otherwise, do a full completeness check.
+  return checkTransitiveCompleteness();
+}
+
+/***************************************************************************/
 /*** Tuples ****************************************************************/
 /***************************************************************************/
 
@@ -1720,8 +2058,6 @@ class TupleCacheEntry
 public:
   static const char *getName() { return "TupleCache"; }
 
-  // NOTE: if you change the layout of this type, you'll also need
-  // to update tuple_getValueWitnesses().
   unsigned ExtraInhabitantProvidingElement;
   ValueWitnessTable Witnesses;
   FullMetadata<TupleTypeMetadata> Data;
@@ -1823,7 +2159,6 @@ public:
 class TupleCacheStorage :
   public LockingConcurrentMapStorage<TupleCacheEntry, TupleCacheTag> {
 public:
-// FIXME: https://github.com/apple/swift/issues/43763.
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Winvalid-offsetof"
   static TupleCacheEntry *
@@ -1847,37 +2182,12 @@ class TupleCache :
 /// The uniquing structure for tuple type metadata.
 static Lazy<TupleCache> TupleTypes;
 
-/// Given a metatype pointer, produce the value-witness table for it.
-/// This is equivalent to metatype->ValueWitnesses but more efficient.
-static const ValueWitnessTable *tuple_getValueWitnesses(const Metadata *metatype) {
-  return asFullMetadata(metatype)->ValueWitnesses;
-}
-
-/// Generic tuple value witness for 'projectBuffer'.
-template <bool IsPOD, bool IsInline>
-static OpaqueValue *tuple_projectBuffer(ValueBuffer *buffer,
-                                        const Metadata *metatype) {
-  assert(IsPOD == tuple_getValueWitnesses(metatype)->isPOD());
-  assert(IsInline == tuple_getValueWitnesses(metatype)->isValueInline());
-
-  if (IsInline)
-    return reinterpret_cast<OpaqueValue*>(buffer);
-
-  auto wtable = tuple_getValueWitnesses(metatype);
-  unsigned alignMask = wtable->getAlignmentMask();
-  // Compute the byte offset of the object in the box.
-  unsigned byteOffset = (sizeof(HeapObject) + alignMask) & ~alignMask;
-  auto *bytePtr =
-      reinterpret_cast<char *>(*reinterpret_cast<HeapObject **>(buffer));
-  return reinterpret_cast<OpaqueValue *>(bytePtr + byteOffset);
-}
-
 /// Generic tuple value witness for 'allocateBuffer'
 template <bool IsPOD, bool IsInline>
 static OpaqueValue *tuple_allocateBuffer(ValueBuffer *buffer,
                                          const Metadata *metatype) {
-  assert(IsPOD == tuple_getValueWitnesses(metatype)->isPOD());
-  assert(IsInline == tuple_getValueWitnesses(metatype)->isValueInline());
+  assert(IsPOD == generic_getValueWitnesses(metatype)->isPOD());
+  assert(IsInline == generic_getValueWitnesses(metatype)->isValueInline());
 
   if (IsInline)
     return reinterpret_cast<OpaqueValue*>(buffer);
@@ -1890,8 +2200,8 @@ static OpaqueValue *tuple_allocateBuffer(ValueBuffer *buffer,
 template <bool IsPOD, bool IsInline>
 static void tuple_destroy(OpaqueValue *tuple, const Metadata *_metadata) {
   auto &metadata = *(const TupleTypeMetadata*) _metadata;
-  assert(IsPOD == tuple_getValueWitnesses(&metadata)->isPOD());
-  assert(IsInline == tuple_getValueWitnesses(&metadata)->isValueInline());
+  assert(IsPOD == generic_getValueWitnesses(&metadata)->isPOD());
+  assert(IsInline == generic_getValueWitnesses(&metadata)->isValueInline());
 
   if (IsPOD) return;
 
@@ -1937,8 +2247,8 @@ template <bool IsPOD, bool IsInline>
 static OpaqueValue *tuple_initializeWithCopy(OpaqueValue *dest,
                                              OpaqueValue *src,
                                              const Metadata *metatype) {
-  assert(IsPOD == tuple_getValueWitnesses(metatype)->isPOD());
-  assert(IsInline == tuple_getValueWitnesses(metatype)->isValueInline());
+  assert(IsPOD == generic_getValueWitnesses(metatype)->isPOD());
+  assert(IsInline == generic_getValueWitnesses(metatype)->isValueInline());
 
   if (IsPOD) return tuple_memcpy(dest, src, metatype);
   return tuple_forEachField(dest, src, metatype,
@@ -1952,8 +2262,8 @@ template <bool IsPOD, bool IsInline>
 static OpaqueValue *tuple_initializeWithTake(OpaqueValue *dest,
                                              OpaqueValue *src,
                                              const Metadata *metatype) {
-  assert(IsPOD == tuple_getValueWitnesses(metatype)->isPOD());
-  assert(IsInline == tuple_getValueWitnesses(metatype)->isValueInline());
+  assert(IsPOD == generic_getValueWitnesses(metatype)->isPOD());
+  assert(IsInline == generic_getValueWitnesses(metatype)->isValueInline());
 
   if (IsPOD) return tuple_memcpy(dest, src, metatype);
   return tuple_forEachField(dest, src, metatype,
@@ -1967,8 +2277,8 @@ template <bool IsPOD, bool IsInline>
 static OpaqueValue *tuple_assignWithCopy(OpaqueValue *dest,
                                          OpaqueValue *src,
                                          const Metadata *metatype) {
-  assert(IsPOD == tuple_getValueWitnesses(metatype)->isPOD());
-  assert(IsInline == tuple_getValueWitnesses(metatype)->isValueInline());
+  assert(IsPOD == generic_getValueWitnesses(metatype)->isPOD());
+  assert(IsInline == generic_getValueWitnesses(metatype)->isValueInline());
 
   if (IsPOD) return tuple_memcpy(dest, src, metatype);
   return tuple_forEachField(dest, src, metatype,
@@ -1994,18 +2304,18 @@ template <bool IsPOD, bool IsInline>
 static OpaqueValue *tuple_initializeBufferWithCopyOfBuffer(ValueBuffer *dest,
                                                            ValueBuffer *src,
                                                      const Metadata *metatype) {
-  assert(IsPOD == tuple_getValueWitnesses(metatype)->isPOD());
-  assert(IsInline == tuple_getValueWitnesses(metatype)->isValueInline());
+  assert(IsPOD == generic_getValueWitnesses(metatype)->isPOD());
+  assert(IsInline == generic_getValueWitnesses(metatype)->isValueInline());
   if (IsInline) {
     return tuple_initializeWithCopy<IsPOD, IsInline>(
-        tuple_projectBuffer<IsPOD, IsInline>(dest, metatype),
-        tuple_projectBuffer<IsPOD, IsInline>(src, metatype), metatype);
+        generic_projectBuffer<IsInline>(dest, metatype),
+        generic_projectBuffer<IsInline>(src, metatype), metatype);
   }
 
   auto *srcReference = *reinterpret_cast<HeapObject**>(src);
   *reinterpret_cast<HeapObject**>(dest) = srcReference;
   swift_retain(srcReference);
-  return tuple_projectBuffer<IsPOD, IsInline>(dest, metatype);
+  return generic_projectBuffer<IsInline>(dest, metatype);
 }
 
 SWIFT_CC(swift)
@@ -2046,7 +2356,7 @@ static unsigned tuple_getEnumTagSinglePayload(const OpaqueValue *enumAddr,
                                               unsigned numEmptyCases,
                                               const Metadata *self) {
   
-  auto *witnesses = tuple_getValueWitnesses(self);
+  auto *witnesses = generic_getValueWitnesses(self);
   auto size = witnesses->getSize();
   auto numExtraInhabitants = witnesses->getNumExtraInhabitants();
   auto getExtraInhabitantTag = tuple_getExtraInhabitantTag;
@@ -2060,7 +2370,7 @@ template <bool IsPOD, bool IsInline>
 static void
 tuple_storeEnumTagSinglePayload(OpaqueValue *enumAddr, unsigned whichCase,
                                 unsigned numEmptyCases, const Metadata *self) {
-  auto *witnesses = tuple_getValueWitnesses(self);
+  auto *witnesses = generic_getValueWitnesses(self);
   auto size = witnesses->getSize();
   auto numExtraInhabitants = witnesses->getNumExtraInhabitants();
   auto storeExtraInhabitantTag = tuple_storeExtraInhabitantTag;
@@ -2141,6 +2451,7 @@ static void performBasicLayout(TypeLayout &layout,
   size_t alignMask = layout.flags.getAlignmentMask();
   bool isPOD = layout.flags.isPOD();
   bool isBitwiseTakable = layout.flags.isBitwiseTakable();
+  bool isBitwiseBorrowable = layout.flags.isBitwiseBorrowable();
   for (unsigned i = 0; i != numElements; ++i) {
     auto &elt = elements[i];
 
@@ -2156,6 +2467,7 @@ static void performBasicLayout(TypeLayout &layout,
     alignMask = std::max(alignMask, eltLayout->flags.getAlignmentMask());
     if (!eltLayout->flags.isPOD()) isPOD = false;
     if (!eltLayout->flags.isBitwiseTakable()) isBitwiseTakable = false;
+    if (!eltLayout->flags.isBitwiseBorrowable()) isBitwiseBorrowable = false;
   }
   bool isInline =
       ValueWitnessTable::isValueInline(isBitwiseTakable, size, alignMask + 1);
@@ -2165,6 +2477,7 @@ static void performBasicLayout(TypeLayout &layout,
                      .withAlignmentMask(alignMask)
                      .withPOD(isPOD)
                      .withBitwiseTakable(isBitwiseTakable)
+                     .withBitwiseBorrowable(isBitwiseBorrowable)
                      .withInlineStorage(isInline);
   layout.extraInhabitantCount = 0;
   layout.stride = std::max(size_t(1), roundUpToAlignMask(size, alignMask));
@@ -2842,20 +3155,19 @@ void swift::swift_initStructMetadataWithLayoutString(
       const TypeLayout *fieldType = (const TypeLayout*)fieldTypes[i];
       auto alignmentMask = fieldType->flags.getAlignmentMask();
       fullOffset = roundUpToAlignMask(fullOffset, alignmentMask);
-
+      size_t offset = fullOffset - unalignedOffset + previousFieldOffset;
       if (fieldTag <= 0x4) {
-        size_t offset = fullOffset - unalignedOffset + previousFieldOffset;
-
         auto tag = fieldTag <= 0x2 ? RefCountingKind::UnknownUnowned :
                                      RefCountingKind::UnknownWeak;
 
         auto tagAndOffset = ((uint64_t)tag << 56) | offset;
         writer.writeBytes(tagAndOffset);
+        previousFieldOffset = fieldType->size - sizeof(uintptr_t);
+      } else {
+        previousFieldOffset = offset + fieldType->size;
       }
 
       fullOffset += fieldType->size;
-      previousFieldOffset = fieldType->size - sizeof(uintptr_t);
-
       continue;
     }
 
@@ -3049,8 +3361,63 @@ void swift::swift_initRawStructMetadata(StructMetadata *structType,
   vwtable->stride = stride;
   vwtable->flags = ValueWitnessFlags()
                     .withAlignmentMask(alignMask)
-                    .withCopyable(false);
+                    .withCopyable(false)
+                    .withBitwiseTakable(true)
+                    .withBitwiseBorrowable(false);
   vwtable->extraInhabitantCount = extraInhabitantCount;
+}
+
+/// Initialize the value witness table for a @_rawLayout struct.
+SWIFT_RUNTIME_EXPORT
+void swift::swift_initRawStructMetadata2(StructMetadata *structType,
+                                         StructLayoutFlags structLayoutFlags,
+                                         const TypeLayout *likeTypeLayout,
+                                         intptr_t count,
+                                         RawLayoutFlags rawLayoutFlags) {
+  auto vwtable = getMutableVWTableForInit(structType, structLayoutFlags);
+
+  // The existing vwt function entries are all fine to preserve, the only thing
+  // we need to initialize is the actual type layout.
+  auto size = likeTypeLayout->size;
+  auto stride = likeTypeLayout->stride;
+  auto alignMask = likeTypeLayout->flags.getAlignmentMask();
+  auto extraInhabitantCount = likeTypeLayout->extraInhabitantCount;
+
+  if (isRawLayoutArray(rawLayoutFlags)) {
+    // Our count value may be negative, so use 0 if that's the case.
+    stride *= std::max(count, (intptr_t)0);
+    size = stride;
+  }
+
+  vwtable->size = size;
+  vwtable->stride = stride;
+  vwtable->flags = ValueWitnessFlags()
+                    .withAlignmentMask(alignMask)
+                    .withCopyable(false)
+                    .withBitwiseTakable(true); // All raw layouts are assumed
+                                               // to be bitwise takable unless
+                                               // movesAsLike is present.
+  vwtable->extraInhabitantCount = extraInhabitantCount;
+
+  if (shouldRawLayoutMoveAsLike(rawLayoutFlags)) {
+    vwtable->flags = vwtable->flags
+                .withBitwiseTakable(likeTypeLayout->flags.isBitwiseTakable());
+  }
+  
+  vwtable->flags = vwtable->flags
+    .withBitwiseBorrowable(isRawLayoutBitwiseBorrowable(rawLayoutFlags));
+
+  // If the calculated size of this raw layout type is available to be put in
+  // value buffers, then set the inline storage bit if our like type is also
+  // able to be put into inline storage.
+  if (size <= NumWords_ValueBuffer) {
+    vwtable->flags = vwtable->flags
+                .withInlineStorage(likeTypeLayout->flags.isInlineStorage());
+  } else {
+    // Otherwise, we're too big to fit in inline storage regardless of the like
+    // type's ability to be put in inline storage.
+    vwtable->flags = vwtable->flags.withInlineStorage(false);
+  }
 }
 
 /***************************************************************************/
@@ -3195,6 +3562,13 @@ namespace {
     const uint8_t *WeakIvarLayout;
     const void *PropertyList;
   };
+
+  struct ObjCClass {
+    ObjCClass *Isa;
+    ObjCClass *Superclass;
+    void *CacheData[2];
+    uintptr_t RODataAndFlags;
+  };
 } // end anonymous namespace
 
 #if SWIFT_OBJC_INTEROP
@@ -3212,6 +3586,9 @@ static inline ClassROData *getROData(ClassMetadata *theClass) {
   return (ClassROData*)(theClass->Data & ~uintptr_t(SWIFT_CLASS_IS_SWIFT_MASK));
 }
 
+static inline ClassROData *getROData(ObjCClass *theClass) {
+  return (ClassROData*)(theClass->RODataAndFlags & ~uintptr_t(SWIFT_CLASS_IS_SWIFT_MASK));
+}
 // This gets called if we fail during copyGenericClassObjcName().  Its job is
 // to generate a unique name, even though the name won't be very helpful if
 // we end up looking at it in a debugger.
@@ -3964,6 +4341,98 @@ swift::swift_updateClassMetadata2(ClassMetadata *self,
                                         /*allowDependency*/ true);
 }
 
+Class
+swift::swift_updatePureObjCClassMetadata(Class cls,
+                                         ClassLayoutFlags flags,
+                                         size_t numFields,
+                                         const TypeLayout * const *fieldTypes) {
+  bool hasRealizeClassFromSwift =
+    SWIFT_RUNTIME_WEAK_CHECK(_objc_realizeClassFromSwift);
+  assert(hasRealizeClassFromSwift);
+  (void)hasRealizeClassFromSwift;
+
+  SWIFT_DEFER {
+    // Realize the class. This causes the runtime to slide the field offsets
+    // stored in the field offset globals.
+    SWIFT_RUNTIME_WEAK_USE(_objc_realizeClassFromSwift(cls, cls));
+  };
+
+  // Update the field offset globals using runtime type information; the layout
+  // of resilient types might be different than the statically-emitted layout.
+  ObjCClass *self = (ObjCClass *)cls;
+  ClassROData *rodata = getROData(self);
+  ClassIvarList *ivars = rodata->IvarList;
+
+  if (!ivars) {
+    assert(numFields == 0);
+    return cls;
+  }
+
+  assert(ivars->Count == numFields);
+  assert(ivars->EntrySize == sizeof(ClassIvarEntry));
+
+  bool copiedIvarList = false;
+
+  // Start layout from our static notion of where the superclass starts.
+  // Objective-C expects us to have generated a correct ivar layout, which it
+  // will simply slide if it needs to.
+  assert(self->Superclass && "Swift cannot implement a root class");
+  size_t size = rodata->InstanceStart;
+  size_t alignMask = 0xF; // malloc alignment guarantee
+
+  // Okay, now do layout.
+  for (unsigned i = 0; i != numFields; ++i) {
+    ClassIvarEntry *ivar = &ivars->getIvars()[i];
+
+    size_t offset = 0;
+    if (ivar->Offset) {
+      offset = *ivar->Offset;
+    }
+
+    auto *eltLayout = fieldTypes[i];
+
+    // Skip empty fields.
+    if (offset != 0 || eltLayout->size != 0) {
+      offset = roundUpToAlignMask(size, eltLayout->flags.getAlignmentMask());
+      size = offset + eltLayout->size;
+      alignMask = std::max(alignMask, eltLayout->flags.getAlignmentMask());
+
+      // Fill in the field offset global, if this ivar has one.
+      if (ivar->Offset) {
+        if (*ivar->Offset != offset)
+          *ivar->Offset = offset;
+      }
+    }
+
+    // If the ivar's size doesn't match the field layout we
+    // computed, overwrite it and give it better type information.
+    if (ivar->Size != eltLayout->size) {
+      // If we're going to modify the ivar list, we need to copy it first.
+      if (!copiedIvarList) {
+        auto ivarListSize = sizeof(ClassIvarList) +
+                            numFields * sizeof(ClassIvarEntry);
+        ivars = (ClassIvarList*) getResilientMetadataAllocator()
+          .Allocate(ivarListSize, alignof(ClassIvarList));
+        memcpy(ivars, rodata->IvarList, ivarListSize);
+        rodata->IvarList = ivars;
+        copiedIvarList = true;
+
+        // Update ivar to point to the newly copied list.
+        ivar = &ivars->getIvars()[i];
+      }
+      ivar->Size = eltLayout->size;
+      ivar->Type = nullptr;
+      ivar->Log2Alignment =
+        getLog2AlignmentFromMask(eltLayout->flags.getAlignmentMask());
+    }
+  }
+
+  // Save the size into the Objective-C metadata.
+  if (rodata->InstanceSize != size)
+    rodata->InstanceSize = size;
+
+  return cls;
+}
 #endif
 
 #ifndef NDEBUG
@@ -4301,27 +4770,44 @@ public:
 
 class OpaqueExistentialValueWitnessTableCacheEntry {
 public:
+  struct Key {
+    unsigned numWitnessTables : 31;
+    unsigned copyable : 1;
+    
+    bool operator==(struct Key k) {
+      return k.numWitnessTables == numWitnessTables
+        && k.copyable == copyable;
+    }
+  };
+
   ValueWitnessTable Data;
 
-  OpaqueExistentialValueWitnessTableCacheEntry(unsigned numTables);
+  OpaqueExistentialValueWitnessTableCacheEntry(Key key);
 
   unsigned getNumWitnessTables() const {
     return (Data.size - sizeof(OpaqueExistentialContainer))
               / sizeof(const WitnessTable *);
+  }
+  
+  bool isCopyable() const {
+    return Data.flags.isCopyable();
   }
 
   intptr_t getKeyIntValueForDump() {
     return getNumWitnessTables();
   }
 
-  bool matchesKey(unsigned key) const { return key == getNumWitnessTables(); }
+  bool matchesKey(Key key) const {
+    return key == Key{getNumWitnessTables(), isCopyable()};
+  }
 
   friend llvm::hash_code
   hash_value(const OpaqueExistentialValueWitnessTableCacheEntry &value) {
-    return llvm::hash_value(value.getNumWitnessTables());
+    return llvm::hash_value(
+      std::make_pair(value.getNumWitnessTables(), value.isCopyable()));
   }
 
-  static size_t getExtraAllocationSize(unsigned numTables) {
+  static size_t getExtraAllocationSize(Key key) {
     return 0;
   }
   size_t getExtraAllocationSize() const {
@@ -4409,19 +4895,24 @@ OpaqueExistentialValueWitnessTables;
 /// Instantiate a value witness table for an opaque existential container with
 /// the given number of witness table pointers.
 static const ValueWitnessTable *
-getOpaqueExistentialValueWitnesses(unsigned numWitnessTables) {
+getOpaqueExistentialValueWitnesses(unsigned numWitnessTables,
+                                   bool copyable) {
   // We pre-allocate a couple of important cases.
-  if (numWitnessTables == 0)
-    return &OpaqueExistentialValueWitnesses_0;
-  if (numWitnessTables == 1)
-    return &OpaqueExistentialValueWitnesses_1;
+  if (copyable) {
+    if (numWitnessTables == 0)
+      return &OpaqueExistentialValueWitnesses_0;
+    if (numWitnessTables == 1)
+      return &OpaqueExistentialValueWitnesses_1;
+  }
 
-  return &OpaqueExistentialValueWitnessTables.getOrInsert(numWitnessTables)
-                                             .first->Data;
+  return &OpaqueExistentialValueWitnessTables
+    .getOrInsert(OpaqueExistentialValueWitnessTableCacheEntry::Key{
+                  numWitnessTables, copyable})
+    .first->Data;
 }
 
 OpaqueExistentialValueWitnessTableCacheEntry::
-OpaqueExistentialValueWitnessTableCacheEntry(unsigned numWitnessTables) {
+OpaqueExistentialValueWitnessTableCacheEntry(Key key) {
   using Box = NonFixedOpaqueExistentialBox;
   using Witnesses = NonFixedValueWitnesses<Box, /*known allocated*/ true>;
 
@@ -4431,16 +4922,24 @@ OpaqueExistentialValueWitnessTableCacheEntry(unsigned numWitnessTables) {
 #define DATA_VALUE_WITNESS(LOWER_ID, UPPER_ID, TYPE)
 #include "swift/ABI/ValueWitness.def"
 
-  Data.size = Box::Container::getSize(numWitnessTables);
+  Data.size = Box::Container::getSize(key.numWitnessTables);
   Data.flags = ValueWitnessFlags()
-    .withAlignment(Box::Container::getAlignment(numWitnessTables))
+    .withAlignment(Box::Container::getAlignment(key.numWitnessTables))
     .withPOD(false)
     .withBitwiseTakable(true)
-    .withInlineStorage(false);
+    .withInlineStorage(false)
+    .withCopyable(key.copyable)
+    // Non-bitwise-takable values are always stored out-of-line in existentials,
+    // so the existential representation itself is always bitwise-takable.
+    // Noncopyable values however can be bitwise-takable without being
+    // bitwise-borrowable, so noncopyable existentials are not bitwise-borrowable
+    // in the general case.
+    .withBitwiseBorrowable(key.copyable);
   Data.extraInhabitantCount = Witnesses::numExtraInhabitants;
-  Data.stride = Box::Container::getStride(numWitnessTables);
+  Data.stride = Box::Container::getStride(key.numWitnessTables);
 
-  assert(getNumWitnessTables() == numWitnessTables);
+  assert(getNumWitnessTables() == key.numWitnessTables);
+  assert(isCopyable() == key.copyable);
 }
 
 static const ValueWitnessTable ClassExistentialValueWitnesses_1 =
@@ -4509,7 +5008,8 @@ static const ValueWitnessTable *
 getExistentialValueWitnesses(ProtocolClassConstraint classConstraint,
                              const Metadata *superclassConstraint,
                              unsigned numWitnessTables,
-                             SpecialProtocol special) {
+                             SpecialProtocol special,
+                             bool copyable) {
   // Use special representation for special protocols.
   switch (special) {
   case SpecialProtocol::Error:
@@ -4532,7 +5032,7 @@ getExistentialValueWitnesses(ProtocolClassConstraint classConstraint,
                                              numWitnessTables);
   case ProtocolClassConstraint::Any:
     assert(superclassConstraint == nullptr);
-    return getOpaqueExistentialValueWitnesses(numWitnessTables);
+    return getOpaqueExistentialValueWitnesses(numWitnessTables, copyable);
   }
 
   swift_unreachable("Unhandled ProtocolClassConstraint in switch.");
@@ -4775,7 +5275,8 @@ ExistentialCacheEntry::ExistentialCacheEntry(Key key) {
   Data.ValueWitnesses = getExistentialValueWitnesses(key.ClassConstraint,
                                                      key.SuperclassConstraint,
                                                      numWitnessTables,
-                                                     special);
+                                                     special,
+                                                     /*copyable*/ true);
   Data.Flags = ExistentialTypeFlags()
     .withNumWitnessTables(numWitnessTables)
     .withClassConstraint(key.ClassConstraint)
@@ -5011,6 +5512,7 @@ public:
 const ValueWitnessTable *
 ExtendedExistentialTypeCacheEntry::getOrCreateVWT(Key key) {
   auto shape = key.Shape;
+  bool copyable = shape->isCopyable();
 
   if (auto witnesses = shape->getSuggestedValueWitnesses())
     return witnesses;
@@ -5049,7 +5551,8 @@ ExtendedExistentialTypeCacheEntry::getOrCreateVWT(Key key) {
     return getExistentialValueWitnesses(ProtocolClassConstraint::Any,
                                         /*superclass*/ nullptr,
                                         wtableStorageSizeInWords,
-                                        SpecialProtocol::None);
+                                        SpecialProtocol::None,
+                                        copyable);
 
   case SpecialKind::ExplicitLayout:
     swift_unreachable("shape with explicit layout but no suggested VWT");
@@ -5061,7 +5564,8 @@ ExtendedExistentialTypeCacheEntry::getOrCreateVWT(Key key) {
     return getExistentialValueWitnesses(ProtocolClassConstraint::Class,
                                         /*superclass*/ nullptr,
                                         wtableStorageSizeInWords,
-                                        SpecialProtocol::None);
+                                        SpecialProtocol::None,
+                                        /*copyable*/ true);
 
   case SpecialKind::Metatype:
     // Existential metatypes don't store type metadata.
@@ -5666,9 +6170,9 @@ static const unsigned swift_ptrauth_key_associated_type =
 
 /// Given an unsigned pointer to an associated-type protocol witness,
 /// fill in the appropriate slot in the witness table we're building.
-static void initAssociatedTypeProtocolWitness(const Metadata **slot,
-                                              const Metadata *witness,
-                                              const ProtocolRequirement &reqt) {
+static void initAssociatedConformanceWitness(const Metadata **slot,
+                                             const Metadata *witness,
+                                             const ProtocolRequirement &reqt) {
   assert(reqt.Flags.getKind() ==
            ProtocolRequirementFlags::Kind::AssociatedTypeAccessFunction);
   // FIXME: this should use ptrauth_key_process_independent_data
@@ -5709,7 +6213,9 @@ static void initProtocolWitness(void **slot, void *witness,
   case ProtocolRequirementFlags::Kind::Getter:
   case ProtocolRequirementFlags::Kind::Setter:
   case ProtocolRequirementFlags::Kind::ReadCoroutine:
+  case ProtocolRequirementFlags::Kind::Read2Coroutine:
   case ProtocolRequirementFlags::Kind::ModifyCoroutine:
+  case ProtocolRequirementFlags::Kind::Modify2Coroutine:
     swift_ptrauth_init_code_or_data(slot, witness,
                                     reqt.Flags.getExtraDiscriminator(),
                                     !reqt.Flags.isAsync());
@@ -5720,11 +6226,11 @@ static void initProtocolWitness(void **slot, void *witness,
     return;
 
   case ProtocolRequirementFlags::Kind::AssociatedTypeAccessFunction:
-    initAssociatedTypeProtocolWitness(reinterpret_cast<const Metadata **>(
+    initAssociatedConformanceWitness(reinterpret_cast<const Metadata **>(
                                         const_cast<const void**>(slot)),
-                                      reinterpret_cast<const Metadata *>(
+                                     reinterpret_cast<const Metadata *>(
                                         witness),
-                                      reqt);
+                                     reqt);
     return;
   }
   swift_unreachable("bad witness kind");
@@ -5750,7 +6256,9 @@ static void copyProtocolWitness(void **dest, void * const *src,
   case ProtocolRequirementFlags::Kind::Getter:
   case ProtocolRequirementFlags::Kind::Setter:
   case ProtocolRequirementFlags::Kind::ReadCoroutine:
+  case ProtocolRequirementFlags::Kind::Read2Coroutine:
   case ProtocolRequirementFlags::Kind::ModifyCoroutine:
+  case ProtocolRequirementFlags::Kind::Modify2Coroutine:
     swift_ptrauth_copy_code_or_data(
         dest, src, reqt.Flags.getExtraDiscriminator(), !reqt.Flags.isAsync(),
         /*allowNull*/ true); // NULL allowed for VFE (methods in the vtable
@@ -6098,7 +6606,7 @@ public:
        if (req.Flags.getKind() ==
            ProtocolRequirementFlags::Kind::BaseProtocol) {
          ++result;
-         // We currently assume that base protocol requirements preceed other
+         // We currently assume that base protocol requirements precede other
          // requirements i.e we store the base protocol pointers sequentially in
          // instantiateRelativeWitnessTable starting at index 1.
          assert(currIdx == result &&
@@ -6167,7 +6675,7 @@ using RelativeBaseWitness = RelativeDirectPointer<void, true /*nullable*/>;
 //
 // The layout of a dynamically allocated relative witness table is:
 //             [ conditional conformance n] ... private area
-//             [ conditional conformance 0]     (negatively adressed)
+//             [ conditional conformance 0]     (negatively addressed)
 // pointer ->  [ pointer to relative witness table (pattern) ]
 //             [ base protocol witness table pointer 0 ] ... base protocol
 //             [ base protocol witness table pointer n ]     pointers
@@ -7082,6 +7590,10 @@ static bool findAnyTransitiveMetadata(const Metadata *type, T &&predicate) {
         break;
       }
 
+      case GenericParamKind::Value: {
+        break;
+      }
+
       default:
         llvm_unreachable("Unsupported generic parameter kind");
       }
@@ -7279,7 +7791,13 @@ diagnoseMetadataDependencyCycle(llvm::ArrayRef<MetadataDependency> links) {
       .errorType = "type-metadata-cycle",
       .currentStackDescription = "fetching metadata", // TODO?
       .framesToSkip = 1, // skip out to the check function
-      .memoryAddress = links.front().Value
+      .memoryAddress = links.front().Value,
+      .numExtraThreads = 0,
+      .threads = nullptr,
+      .numFixIts = 0,
+      .fixIts = nullptr,
+      .numNotes = 0,
+      .notes = nullptr,
       // TODO: describe the cycle using notes instead of one huge message?
     };
 #pragma GCC diagnostic pop
@@ -7672,12 +8190,20 @@ void swift::verifyMangledNameRoundtrip(const Metadata *metadata) {
 
   Demangle::StackAllocatedDemangler<1024> Dem;
   auto node = _swift_buildDemanglingForMetadata(metadata, Dem);
+  if (!node) {
+    swift::warning(
+        RuntimeErrorFlagNone,
+        "Failed to build demangling to verify roundtrip for metadata %p\n",
+        metadata);
+    return;
+  }
+
   // If the mangled node involves types in an AnonymousContext, then by design,
   // it cannot be looked up by name.
   if (referencesAnonymousContext(node))
     return;
 
-  auto mangling = Demangle::mangleNode(node);
+  auto mangling = Demangle::mangleNode(node, Mangle::ManglingFlavor::Default);
   if (!mangling.isSuccess()) {
     swift::warning(RuntimeErrorFlagNone,
                    "Metadata mangled name failed to roundtrip: %p couldn't be mangled\n",
@@ -7713,7 +8239,7 @@ const HeapObject *swift_getKeyPathImpl(const void *pattern,
 
 #define OVERRIDE_KEYPATH COMPATIBILITY_OVERRIDE
 #define OVERRIDE_WITNESSTABLE COMPATIBILITY_OVERRIDE
-#include COMPATIBILITY_OVERRIDE_INCLUDE_PATH
+#include "../CompatibilityOverride/CompatibilityOverrideIncludePath.h"
 
 // Autolink with libc++, for cases where libswiftCore is linked statically.
 #if defined(__MACH__)

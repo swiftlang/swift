@@ -20,6 +20,7 @@ func testClosures() {
   let _ = { (x: Int, y: Int) throws(MyError) -> Int in x + y }
 }
 
+@available(SwiftStdlib 6.0, *)
 func testTypes() {
   let _ = [(Int, Int) throws(MyError) -> Int]()
 }

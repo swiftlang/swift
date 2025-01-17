@@ -16,6 +16,7 @@
 #include "swift/AST/DiagnosticsDriver.h"
 #include "swift/AST/FineGrainedDependencies.h"
 #include "swift/AST/FineGrainedDependencyFormat.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/OutputFileMap.h"
 #include "swift/Basic/ParseableOutput.h"
 #include "swift/Basic/Program.h"
@@ -731,7 +732,7 @@ namespace driver {
     /// Create \c NumberOfParallelCommands batches and assign each job to a
     /// batch either filling each partition in order or, if seeded with a
     /// nonzero value, pseudo-randomly (but deterministically and nearly-evenly).
-    void partitionIntoBatches(std::vector<const Job *> Batchable,
+    void partitionIntoBatches(const llvm::SmallVectorImpl<const Job *> &Batchable,
                               BatchPartition &Partition) {
       if (Comp.getShowJobLifecycle()) {
         llvm::outs() << "Found " << Batchable.size() << " batchable jobs\n";

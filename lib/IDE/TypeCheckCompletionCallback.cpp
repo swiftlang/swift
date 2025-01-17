@@ -10,6 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "swift/Basic/Assertions.h"
 #include "swift/IDE/TypeCheckCompletionCallback.h"
 #include "swift/IDE/CompletionLookup.h"
 #include "swift/Sema/CompletionContextFinder.h"
@@ -23,7 +24,7 @@ using namespace swift::constraints;
 void TypeCheckCompletionCallback::fallbackTypeCheck(DeclContext *DC) {
   assert(!GotCallback);
 
-  CompletionContextFinder finder(DC);
+  auto finder = CompletionContextFinder::forFallback(DC);
   if (!finder.hasCompletionExpr())
     return;
 
@@ -133,10 +134,10 @@ Type swift::ide::getPatternMatchType(const constraints::Solution &S, Expr *E) {
   // not part of the solution.
   // TODO: This can be removed once ExprPattern type-checking is fully part
   // of the constraint system.
-  if (auto T = S.getConstraintSystem().getVarType(MatchVar))
-    return T;
-
-  return getTypeForCompletion(S, MatchVar);
+  auto Ty = MatchVar->getTypeInContext();
+  if (Ty->hasError())
+    return Type();
+  return Ty;
 }
 
 void swift::ide::getSolutionSpecificVarTypes(

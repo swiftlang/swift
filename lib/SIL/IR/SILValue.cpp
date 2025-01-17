@@ -10,6 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "swift/Basic/Assertions.h"
 #include "swift/SIL/SILValue.h"
 #include "swift/SIL/OwnershipUtils.h"
 #include "swift/SIL/SILArgument.h"
@@ -161,7 +162,7 @@ namespace swift::test {
 // Dumps:
 // - value
 // - whether it's lexical
-static FunctionTest IsLexicalTest("is-lexical", [](auto &function,
+static FunctionTest IsLexicalTest("is_lexical", [](auto &function,
                                                    auto &arguments,
                                                    auto &test) {
   auto value = arguments.takeValue();
@@ -191,12 +192,29 @@ bool ValueBase::isGuaranteedForwarding() const {
   return phi->isGuaranteedForwarding();
 }
 
+bool ValueBase::isBeginApplyToken() const {
+  auto *result = isaResultOf<BeginApplyInst>(this);
+  if (!result)
+    return false;
+  return result->isBeginApplyToken();
+}
+
 bool ValueBase::hasDebugTrace() const {
   for (auto *op : getUses()) {
     if (auto *debugValue = dyn_cast<DebugValueInst>(op->getUser())) {
       if (debugValue->hasTrace())
         return true;
     }
+  }
+  return false;
+}
+
+bool ValueBase::isFromVarDecl() {
+  if (auto *mvi = dyn_cast<MoveValueInst>(this)) {
+    return mvi->isFromVarDecl();
+  }
+  if (auto *bbi = dyn_cast<BeginBorrowInst>(this)) {
+    return bbi->isFromVarDecl();
   }
   return false;
 }
@@ -299,6 +317,7 @@ ValueOwnershipKind::ValueOwnershipKind(const SILFunction &F, SILType Type,
   }
 
   switch (Convention) {
+  case SILArgumentConvention::Indirect_In_CXX:
   case SILArgumentConvention::Indirect_In_Guaranteed:
     value = moduleConventions.isTypeIndirectForIndirectParamConvention(
                 Type.getASTType())
@@ -421,6 +440,12 @@ llvm::raw_ostream &swift::operator<<(llvm::raw_ostream &os,
 //===----------------------------------------------------------------------===//
 //                                  Operand
 //===----------------------------------------------------------------------===//
+
+void Operand::updateReborrowFlags() {
+  if (isa<EndBorrowInst>(getUser())) {
+    swift::updateReborrowFlags(get());
+  }
+}
 
 void Operand::verify() const {
   if (isa<BorrowedFromInst>(getUser()) && getOperandNumber() == 0) {

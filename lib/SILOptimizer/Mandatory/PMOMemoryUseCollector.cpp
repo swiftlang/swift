@@ -13,6 +13,7 @@
 #define DEBUG_TYPE "definite-init"
 #include "PMOMemoryUseCollector.h"
 #include "swift/AST/Expr.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/SIL/InstructionUtils.h"
 #include "swift/SIL/SILArgument.h"
 #include "swift/SIL/SILBuilder.h"
@@ -135,7 +136,7 @@ class ElementUseCollector {
   SILModule &Module;
   const PMOMemoryObjectInfo &TheMemory;
   SmallVectorImpl<PMOMemoryUse> &Uses;
-  SmallVectorImpl<SILInstruction *> &Releases;
+  SmallVectorImpl<SILInstruction *> *Releases = nullptr;
 
   /// When walking the use list, if we index into a struct element, keep track
   /// of this, so that any indexes into tuple subelements don't affect the
@@ -145,7 +146,7 @@ class ElementUseCollector {
 public:
   ElementUseCollector(const PMOMemoryObjectInfo &TheMemory,
                       SmallVectorImpl<PMOMemoryUse> &Uses,
-                      SmallVectorImpl<SILInstruction *> &Releases)
+                      SmallVectorImpl<SILInstruction *> *Releases)
       : Module(TheMemory.MemoryInst->getModule()), TheMemory(TheMemory),
         Uses(Uses), Releases(Releases) {}
 
@@ -211,7 +212,9 @@ bool ElementUseCollector::collectContainerUses(SILValue boxValue) {
     // eliminated. That should be implemented and fixed.
     if (isa<StrongReleaseInst>(user) || isa<ReleaseValueInst>(user) ||
         isa<DestroyValueInst>(user)) {
-      Releases.push_back(user);
+      if (Releases) {
+        Releases->push_back(user);
+      }
       continue;
     }
 
@@ -220,7 +223,14 @@ bool ElementUseCollector::collectContainerUses(SILValue boxValue) {
         return false;
       continue;
     }
-
+    if (auto *md = dyn_cast<MarkDependenceInst>(user)) {
+      // Another value depends on the current in-memory value. Consider that a
+      // load.
+      if (md->getBase() == ui->get()) {
+        Uses.emplace_back(user, PMOUseKind::DependenceBase);
+        continue;
+      }
+    }
     // Other uses of the container are considered escapes of the underlying
     // value.
     //
@@ -276,9 +286,14 @@ bool ElementUseCollector::collectUses(SILValue Pointer) {
       continue;
     }
 
+    auto &mod = User->getFunction()->getModule();
+    bool shouldScalarizeTuple =
+      !mod.getOptions().UseAggressiveReg2MemForCodeSize ||
+      shouldExpand(mod, PointeeType);
+
     // Loads are a use of the value.
     if (isa<LoadInst>(User) || isa<LoadBorrowInst>(User)) {
-      if (PointeeType.is<TupleType>())
+      if (PointeeType.is<TupleType>() && shouldScalarizeTuple)
         UsesToScalarize.push_back(User);
       else
         Uses.emplace_back(User, PMOUseKind::Load);
@@ -290,7 +305,8 @@ bool ElementUseCollector::collectUses(SILValue Pointer) {
       if (UI->getOperandNumber() == StoreInst::Dest) {
         if (auto tupleType = PointeeType.getAs<TupleType>()) {
           if (!tupleType->isEqual(Module.getASTContext().TheEmptyTupleType) &&
-              !tupleType->containsPackExpansionType()) {
+              !tupleType->containsPackExpansionType() &&
+              shouldScalarizeTuple) {
             UsesToScalarize.push_back(User);
             continue;
           }
@@ -327,7 +343,8 @@ bool ElementUseCollector::collectUses(SILValue Pointer) {
       // have an access that crosses elements.
       if (auto tupleType = PointeeType.getAs<TupleType>()) {
         if (!tupleType->isEqual(Module.getASTContext().TheEmptyTupleType) &&
-            !tupleType->containsPackExpansionType()) {
+            !tupleType->containsPackExpansionType() &&
+            shouldScalarizeTuple) {
           UsesToScalarize.push_back(CAI);
           continue;
         }
@@ -395,6 +412,7 @@ bool ElementUseCollector::collectUses(SILValue Pointer) {
         llvm_unreachable("address value passed to indirect parameter");
 
       // If this is an in-parameter, it is like a load.
+      case ParameterConvention::Indirect_In_CXX:
       case ParameterConvention::Indirect_In:
       case ParameterConvention::Indirect_In_Guaranteed:
         Uses.emplace_back(User, PMOUseKind::IndirectIn);
@@ -434,7 +452,9 @@ bool ElementUseCollector::collectUses(SILValue Pointer) {
 
     // We model destroy_addr as a release of the entire value.
     if (isa<DestroyAddrInst>(User)) {
-      Releases.push_back(User);
+      if (Releases) {
+        Releases->push_back(User);
+      }
       continue;
     }
 
@@ -450,6 +470,23 @@ bool ElementUseCollector::collectUses(SILValue Pointer) {
     // We don't care about debug instructions.
     if (User->isDebugInstruction())
       continue;
+
+    if (auto *md = dyn_cast<MarkDependenceInst>(User)) {
+      if (md->getBase() == UI->get()) {
+        Uses.emplace_back(User, PMOUseKind::DependenceBase);
+        continue;
+      }
+      SILValue value = md->getValue();
+      assert(value == UI->get() && "missing mark_dependence use");
+      // A mark_dependence creates a new dependent value in the same memory
+      // location. Analogous to a load + init.
+      Uses.emplace_back(User, PMOUseKind::Load);
+      Uses.emplace_back(User, PMOUseKind::Initialization);
+      if (!collectUses(md))
+        return false;
+
+      continue;
+    }
 
     // Otherwise, the use is something complicated, it escapes.
     Uses.emplace_back(User, PMOUseKind::Escape);
@@ -537,9 +574,16 @@ bool ElementUseCollector::collectUses(SILValue Pointer) {
 
 /// collectPMOElementUsesFrom - Analyze all uses of the specified allocation
 /// instruction (alloc_box, alloc_stack or mark_uninitialized), classifying them
-/// and storing the information found into the Uses and Releases lists.
+/// and storing the information found into the Uses lists.
 bool swift::collectPMOElementUsesFrom(
+    const PMOMemoryObjectInfo &MemoryInfo, SmallVectorImpl<PMOMemoryUse> &Uses)
+{
+  return
+    ElementUseCollector(MemoryInfo, Uses, /*Releases*/nullptr).collectFrom();
+}
+
+bool swift::collectPMOElementUsesAndDestroysFrom(
     const PMOMemoryObjectInfo &MemoryInfo, SmallVectorImpl<PMOMemoryUse> &Uses,
     SmallVectorImpl<SILInstruction *> &Releases) {
-  return ElementUseCollector(MemoryInfo, Uses, Releases).collectFrom();
+  return ElementUseCollector(MemoryInfo, Uses, &Releases).collectFrom();
 }

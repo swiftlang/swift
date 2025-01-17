@@ -60,7 +60,7 @@ extension SIMD3 where SIMD3.Scalar == Float {
 // Test case with circular overrides
 protocol P {
     associatedtype A
-    // expected-note@-1 {{protocol requires nested type 'A'; add nested type 'A' for conformance}}
+    // expected-note@-1 {{protocol requires nested type 'A'}}
     func run(a: A)
 }
 
@@ -85,11 +85,11 @@ class C3: G1<A>, P {
     // expected-error@-1 {{type 'C3' does not conform to protocol 'P'}}
     // expected-error@-2 {{cannot find type 'A' in scope}}
     // expected-note@-3 2{{through reference here}}
+    // expected-note@-4 {{add stubs for conformance}}
     override func run(a: A) {}
-    // expected-error@-1 {{method does not override any method from its superclass}}
-    // expected-error@-2 {{circular reference}}
-    // expected-note@-3 2 {{through reference here}}
-    // expected-note@-4 {{while resolving type 'A'}}
+    // expected-error@-1 {{circular reference}}
+    // expected-note@-2 2 {{through reference here}}
+    // expected-note@-3 {{while resolving type 'A'}}
 }
 
 // Another case that triggers circular override checking.

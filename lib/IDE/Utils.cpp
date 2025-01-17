@@ -12,6 +12,7 @@
 
 #include "swift/IDE/Utils.h"
 #include "swift/AST/SourceFile.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/Edit.h"
 #include "swift/Basic/Platform.h"
 #include "swift/Basic/SourceManager.h"
@@ -95,10 +96,10 @@ static const char *skipStringInCode(const char *p, const char *End) {
 
 SourceCompleteResult
 ide::isSourceInputComplete(std::unique_ptr<llvm::MemoryBuffer> MemBuf,
-                           SourceFileKind SFKind) {
+                           SourceFileKind SFKind, const LangOptions &LangOpts) {
   SourceManager SM;
   auto BufferID = SM.addNewSourceBuffer(std::move(MemBuf));
-  ParserUnit Parse(SM, SFKind, BufferID);
+  ParserUnit Parse(SM, SFKind, BufferID, LangOpts, "input");
   Parse.parse();
   SourceCompleteResult SCR;
   SCR.IsComplete = !Parse.getParser().isInputIncomplete();
@@ -176,10 +177,11 @@ ide::isSourceInputComplete(std::unique_ptr<llvm::MemoryBuffer> MemBuf,
   return SCR;
 }
 
-SourceCompleteResult
-ide::isSourceInputComplete(StringRef Text,SourceFileKind SFKind) {
+SourceCompleteResult ide::isSourceInputComplete(StringRef Text,
+                                                SourceFileKind SFKind,
+                                                const LangOptions &LangOpts) {
   return ide::isSourceInputComplete(llvm::MemoryBuffer::getMemBufferCopy(Text),
-                                    SFKind);
+                                    SFKind, LangOpts);
 }
 
 template <typename FnTy>
@@ -659,6 +661,7 @@ adjustMacroExpansionWhitespace(GeneratedSourceInfo::Kind kind,
   case GeneratedSourceInfo::ReplacedFunctionBody:
   case GeneratedSourceInfo::PrettyPrinted:
   case GeneratedSourceInfo::DefaultArgument:
+  case GeneratedSourceInfo::AttributeFromClang:
     return expandedCode;
   }
 }
@@ -707,9 +710,8 @@ void swift::ide::SourceEditConsumer::acceptMacroExpansionBuffer(
       containingSF->getParentModule()->getSourceFileContainingLocation(
           originalSourceRange.getStart());
   StringRef originalPath;
-  if (originalFile->getBufferID().has_value() &&
-      containingSF->getBufferID() != originalFile->getBufferID()) {
-    originalPath = SM.getIdentifierForBuffer(*originalFile->getBufferID());
+  if (containingSF->getBufferID() != originalFile->getBufferID()) {
+    originalPath = SM.getIdentifierForBuffer(originalFile->getBufferID());
   }
 
   StringRef bufferName;

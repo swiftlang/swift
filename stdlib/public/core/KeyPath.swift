@@ -237,12 +237,10 @@ extension AnyKeyPath: Hashable {
     if a === b {
       return true
     }
-    /*
     // Short-circuit differently-typed key paths
     if type(of: a) != type(of: b) {
       return false
     }
-    */
     return a.withBuffer {
       var aBuffer = $0
       return b.withBuffer {
@@ -1857,12 +1855,12 @@ internal struct RawKeyPathComponent {
   }
 }
 
-internal func _pop<T : _BitwiseCopyable>(from: inout UnsafeRawBufferPointer,
+internal func _pop<T : BitwiseCopyable>(from: inout UnsafeRawBufferPointer,
                       as type: T.Type) -> T {
   let buffer = _pop(from: &from, as: type, count: 1)
   return buffer.baseAddress.unsafelyUnwrapped.pointee
 }
-internal func _pop<T : _BitwiseCopyable>(from: inout UnsafeRawBufferPointer,
+internal func _pop<T : BitwiseCopyable>(from: inout UnsafeRawBufferPointer,
                       as: T.Type,
                       count: Int) -> UnsafeBufferPointer<T> {
   from = MemoryLayout<T>._roundingUpBaseToAlignment(from)
@@ -2787,7 +2785,6 @@ internal func _getTypeByMangledNameInEnvironmentOrContext(
   genericEnvironmentOrContext: UnsafeRawPointer?,
   genericArguments: UnsafeRawPointer?)
   -> Any.Type? {
-
   let taggedPointer = UInt(bitPattern: genericEnvironmentOrContext)
   if taggedPointer & 1 == 0 {
     return _getTypeByMangledNameInEnvironment(name, nameLength,
@@ -3119,11 +3116,18 @@ internal func _walkKeyPathPattern<W: KeyPathPatternVisitor>(
                                   as: Int32.self)
       let descriptor =
         _resolveRelativeIndirectableAddress(descriptorBase, descriptorOffset)
-      let descriptorHeader =
-        descriptor.load(as: RawKeyPathComponent.Header.self)
-      if descriptorHeader.isTrivialPropertyDescriptor {
-        // If the descriptor is trivial, then use the local candidate.
-        // Skip the external generic parameter accessors to get to it.
+      let descriptorHeader: RawKeyPathComponent.Header
+      if descriptor != UnsafeRawPointer(bitPattern: 0) {
+        descriptorHeader = descriptor.load(as: RawKeyPathComponent.Header.self)
+        if descriptorHeader.isTrivialPropertyDescriptor {
+          // If the descriptor is trivial, then use the local candidate.
+          // Skip the external generic parameter accessors to get to it.
+          _ = _pop(from: &buffer, as: Int32.self, count: genericParamCount)
+          continue
+        }
+      } else {
+        // If the external property descriptor is nil, skip it to access
+        // the local candidate header.
         _ = _pop(from: &buffer, as: Int32.self, count: genericParamCount)
         continue
       }
@@ -3482,7 +3486,7 @@ internal struct InstantiateKeyPathBuffer: KeyPathPatternVisitor {
     }
     return (baseAddress, misalign)
   }
-  mutating func pushDest<T : _BitwiseCopyable>(_ value: T) {
+  mutating func pushDest<T : BitwiseCopyable>(_ value: T) {
     let size = MemoryLayout<T>.size
     let (baseAddress, misalign) = adjustDestForAlignment(of: T.self)
     _withUnprotectedUnsafeBytes(of: value) {

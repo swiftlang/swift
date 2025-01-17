@@ -616,6 +616,11 @@ public:
     return MacroWalking::ArgumentsAndExpansion;
   }
 
+  /// This method determines whether the given declaration should be
+  /// considered to be in a macro expansion context. It can be configured
+  /// by subclasses.
+  virtual bool isDeclInMacroExpansion(Decl *decl) const;
+
   /// Determine whether we should walk macro arguments (as they appear in
   /// source) and the expansion (which is semantically part of the program).
   std::pair<bool, bool> shouldWalkMacroArgumentsAndExpansion() const {
@@ -635,27 +640,12 @@ public:
   }
 
   /// This method configures whether the walker should visit the body of a
-  /// closure that was checked separately from its enclosing expression.
-  ///
-  /// For work that is performed for every top-level expression, this should
-  /// be overridden to return false, to avoid duplicating work or visiting
-  /// bodies of closures that have not yet been type checked.
-  virtual bool shouldWalkIntoSeparatelyCheckedClosure(ClosureExpr *) {
-    return true;
-  }
-
-  /// This method configures whether the walker should visit the body of a
   /// TapExpr.
   virtual bool shouldWalkIntoTapExpression() { return true; }
 
   /// This method configures whether the walker should visit the underlying
   /// value of a property wrapper placeholder.
   virtual bool shouldWalkIntoPropertyWrapperPlaceholderValue() { return true; }
-
-  /// This method configures whether the walker should visit the capture
-  /// initializer expressions within a capture list directly, rather than
-  /// walking the declarations.
-  virtual bool shouldWalkCaptureInitializerExpressions() { return false; }
 
   /// This method configures whether the walker should exhibit the legacy
   /// behavior where accessors appear as peers of their storage, rather

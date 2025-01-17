@@ -21,7 +21,7 @@ public enum Result<Success: ~Copyable, Failure: Error> {
   case failure(Failure)
 }
 
-extension Result: Copyable /* where Success: Copyable */ {}
+extension Result: Copyable where Success: Copyable {}
 
 extension Result: Sendable where Success: Sendable & ~Copyable {}
 
@@ -64,8 +64,9 @@ extension Result {
   }
 
   @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
+  @_silgen_name("$ss6ResultO3mapyAByqd__q_Gqd__xXElF")
   @usableFromInline
-  internal func map<NewSuccess>(
+  internal func __abi_map<NewSuccess>(
     _ transform: (Success) -> NewSuccess
   ) -> Result<NewSuccess, Failure> {
     switch self {
@@ -77,7 +78,6 @@ extension Result {
   }
 }
 
-@_disallowFeatureSuppression(NoncopyableGenerics)
 extension Result where Success: ~Copyable {
   // FIXME(NCG): Make this public.
   @_alwaysEmitIntoClient
@@ -98,7 +98,7 @@ extension Result where Success: ~Copyable {
     _ transform: (borrowing Success) -> NewSuccess
   ) -> Result<NewSuccess, Failure> {
     switch self {
-    case .success(borrowing success):
+    case .success(let success):
       return .success(transform(success))
     case let .failure(failure):
       return .failure(failure)
@@ -146,7 +146,6 @@ extension Result where Success: ~Copyable {
   }
 }
 
-@_disallowFeatureSuppression(NoncopyableGenerics)
 extension Result {
   @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
   @usableFromInline
@@ -170,7 +169,7 @@ extension Result {
   /// produces another `Result` type.
   ///
   /// In this example, note the difference in the result of using `map` and
-  /// `flatMap` with a transformation that returns an result type.
+  /// `flatMap` with a transformation that returns a result type.
   ///
   ///     func getNextInteger() -> Result<Int, Error> {
   ///         .success(4)
@@ -205,8 +204,9 @@ extension Result {
   }
 
   @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
+  @_silgen_name("$ss6ResultO7flatMapyAByqd__q_GADxXElF")
   @usableFromInline
-  internal func flatMap<NewSuccess>(
+  internal func __abi_flatMap<NewSuccess>(
     _ transform: (Success) -> Result<NewSuccess, Failure>
   ) -> Result<NewSuccess, Failure> {
     switch self {
@@ -218,7 +218,6 @@ extension Result {
   }
 }
 
-@_disallowFeatureSuppression(NoncopyableGenerics)
 extension Result where Success: ~Copyable {
   // FIXME(NCG): Make this public.
   @_alwaysEmitIntoClient
@@ -239,7 +238,7 @@ extension Result where Success: ~Copyable {
     _ transform: (borrowing Success) -> Result<NewSuccess, Failure>
   ) -> Result<NewSuccess, Failure> {
     switch self {
-    case .success(borrowing success):
+    case .success(let success):
       return transform(success)
     case let .failure(failure):
       return .failure(failure)
@@ -272,7 +271,7 @@ extension Result {
   @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
   @_silgen_name("$ss6ResultO12flatMapErroryAByxqd__GADq_XEs0D0Rd__lF")
   @usableFromInline
-  internal func flatMapError<NewFailure>(
+  internal func __abi_flatMapError<NewFailure>(
     _ transform: (Failure) -> Result<Success, NewFailure>
   ) -> Result<Success, NewFailure> {
     switch self {

@@ -45,7 +45,7 @@ extension DiscontiguousSlice: Equatable where Base.Element: Equatable {
 @available(SwiftStdlib 6.0, *)
 extension DiscontiguousSlice: Hashable where Base.Element: Hashable {
   public func hash(into hasher: inout Hasher) {
-    hasher.combine(count) // delimeter; do not remove
+    hasher.combine(count) // delimiter; do not remove
     for element in self {
       hasher.combine(element)
     }
@@ -53,6 +53,7 @@ extension DiscontiguousSlice: Hashable where Base.Element: Hashable {
 }
 
 @available(SwiftStdlib 6.0, *)
+@_unavailableInEmbedded
 extension DiscontiguousSlice: CustomStringConvertible {
   public var description: String {
     _makeCollectionDescription()
@@ -98,6 +99,7 @@ extension DiscontiguousSlice.Index: Comparable {
 }
 
 @available(SwiftStdlib 6.0, *)
+@_unavailableInEmbedded
 extension DiscontiguousSlice.Index: CustomStringConvertible {
   public var description: String {
     "<base: \(String(reflecting: base)), rangeOffset: \(_rangeOffset)>"
@@ -391,7 +393,7 @@ extension Collection {
   ///
   ///     let str = "The rain in Spain stays mainly in the plain."
   ///     let vowels: Set<Character> = ["a", "e", "i", "o", "u"]
-  ///     let vowelIndices = str.subranges(where: { vowels.contains($0) })
+  ///     let vowelIndices = str.indices(where: { vowels.contains($0) })
   ///
   ///     let disemvoweled = str.removingSubranges(vowelIndices)
   ///     print(String(disemvoweled))

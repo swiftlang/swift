@@ -6,8 +6,8 @@
 // RUN: %target-swift-frontend %s -enable-library-evolution -D NEW_CASE -typecheck -module-name Enums -clang-header-expose-decls=all-public -emit-clang-header-path %t/enums_new_case.h
 // RUN: %FileCheck --check-prefixes=CHECK,NEW_CASE %s < %t/enums_new_case.h
 
-// RUN: %check-interop-cxx-header-in-clang(%t/enums.h -Wno-unused-private-field -Wno-unused-function)
-// RUN: %check-interop-cxx-header-in-clang(%t/enums_new_case.h -Wno-unused-private-field -Wno-unused-function)
+// RUN: %check-interop-cxx-header-in-clang(%t/enums.h -Wno-unused-private-field -Wno-unused-function -DSWIFT_CXX_INTEROP_HIDE_STL_OVERLAY)
+// RUN: %check-interop-cxx-header-in-clang(%t/enums_new_case.h -Wno-unused-private-field -Wno-unused-function -DSWIFT_CXX_INTEROP_HIDE_STL_OVERLAY)
 
 public enum Foo {
     case a(Double)

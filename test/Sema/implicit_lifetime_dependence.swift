@@ -1,10 +1,11 @@
-// RUN: %target-typecheck-verify-swift -enable-experimental-feature NonescapableTypes -enable-experimental-feature NoncopyableGenerics -enable-experimental-feature BitwiseCopyable
-// REQUIRES: asserts
+// RUN: %target-typecheck-verify-swift -enable-experimental-feature LifetimeDependence
+
+// REQUIRES: swift_feature_LifetimeDependence
 
 struct BufferView : ~Escapable, ~Copyable {
   let ptr: UnsafeRawBufferPointer?
   let c: Int
-  @_unsafeNonescapableResult
+  @lifetime(borrow ptr)
   init(_ ptr: UnsafeRawBufferPointer?, _ c: Int) {
     self.ptr = ptr
     self.c = c
@@ -32,7 +33,7 @@ func foo2(_ i: borrowing Int) -> BufferView { // expected-error{{cannot infer li
   return BufferView(nil, 0)
 }
 
-func foo3<T: _BitwiseCopyable>(arg: borrowing T) -> BufferView { // expected-error{{cannot infer lifetime dependence, no parameters found that are either ~Escapable or Escapable with a borrowing ownership}}
+func foo3<T: BitwiseCopyable>(arg: borrowing T) -> BufferView { // expected-error{{cannot infer lifetime dependence, no parameters found that are either ~Escapable or Escapable with a borrowing ownership}}
   return BufferView(nil, 0)
 }
 

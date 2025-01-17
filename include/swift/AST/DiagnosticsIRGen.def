@@ -50,9 +50,6 @@ ERROR(alignment_more_than_maximum,none,
       "@_alignment cannot increase alignment above maximum alignment of %0",
       (unsigned))
       
-ERROR(raw_layout_dynamic_type_layout_unsupported,none,
-      "@_rawLayout is not yet supported for layouts dependent on generic types", ())
-
 ERROR(temporary_allocation_size_negative,none,
       "allocation capacity must be greater than or equal to zero", ())
 ERROR(temporary_allocation_size_overflow,none,
@@ -68,6 +65,20 @@ ERROR(explosion_size_oveflow,none,
 NOTE(layout_strings_blocked,none,
      "Layout string value witnesses have been disabled for module '%0' "
      "through block list entry", (StringRef))
+
+ERROR(attr_objc_implementation_resilient_property_not_supported, none,
+      "'@implementation' does not support stored properties whose size can "
+      "change due to library evolution; store this value in an object or 'any' "
+      "type",
+      ())
+ERROR(attr_objc_implementation_resilient_property_deployment_target, none,
+      "'@implementation' on %0 %1 does not support stored properties whose "
+      "size can change due to library evolution; raise the minimum deployment "
+      "target to %0 %2 or store this value in an object or 'any' type",
+      (StringRef, const llvm::VersionTuple, const llvm::VersionTuple))
+
+ERROR(unable_to_load_pass_plugin,none,
+      "unable to load plugin '%0': '%1'", (StringRef, StringRef))
 
 #define UNDEFINE_DIAGNOSTIC_MACROS
 #include "DefineDiagnosticMacros.h"

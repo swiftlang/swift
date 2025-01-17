@@ -1,20 +1,37 @@
 // RUN: %target-typecheck-verify-swift \
-// RUN: -enable-experimental-feature NoncopyableGenerics \
-// RUN: -enable-experimental-feature NonescapableTypes \
+// RUN: -enable-experimental-feature LifetimeDependence \
 // RUN: -enable-experimental-feature SuppressedAssociatedTypes
 
+// REQUIRES: swift_feature_LifetimeDependence
+// REQUIRES: swift_feature_SuppressedAssociatedTypes
 
+// expected-note@+1 {{'T' has '~Copyable' constraint preventing implicit 'Copyable' conformance}}
+struct AttemptImplicitConditionalConformance<T: ~Copyable>: ~Copyable {
+  var t: T // expected-error {{stored property 't' of 'Copyable'-conforming generic struct 'AttemptImplicitConditionalConformance' has non-Copyable type 'T'}}
+}
+extension AttemptImplicitConditionalConformance: Copyable {}
+// expected-error@-1 {{generic struct 'AttemptImplicitConditionalConformance' required to be 'Copyable' but is marked with '~Copyable'}}
+
+enum Hello<T: ~Escapable & ~Copyable>: ~Escapable & ~Copyable {}
+extension Hello: Escapable {} // expected-error {{generic enum 'Hello' required to be 'Escapable' but is marked with '~Escapable'}}
+extension Hello: Copyable {} // expected-error {{generic enum 'Hello' required to be 'Copyable' but is marked with '~Copyable'}}
+
+enum HelloExplicitlyFixed<T: ~Escapable & ~Copyable>: Escapable, Copyable {}
+
+struct NoInverseBecauseNoDefault<T: ~Copyable & ~Escapable>: ~Copyable {}
+extension NoInverseBecauseNoDefault: Copyable where T: Copyable, T: ~Escapable {}
+// expected-error@-1 {{cannot suppress '~Escapable' on generic parameter 'T' defined in outer scope}}
 
 // Check support for explicit conditional conformance
 public struct ExplicitCond<T: ~Copyable>: ~Copyable {}
-extension ExplicitCond: Copyable {}
+extension ExplicitCond: Copyable where T: Copyable {}
 // expected-note@-1 {{requirement from conditional conformance}}
 // expected-note@-2 {{requirement from conditional conformance of 'ExplicitCondAlias<NC>' (aka 'ExplicitCond<NC>') to 'Copyable'}}
 
 public typealias ExplicitCondAlias<T> = ExplicitCond<T> where T: ~Copyable
 public typealias AlwaysCopyable<T> = ExplicitCond<T>
 
-func checkCopyable<T>(_ t: T) {} // expected-note {{generic parameter 'T' has an implicit Copyable requirement}}
+func checkCopyable<T>(_ t: T) {} // expected-note {{'where T: Copyable' is implicit here}}
 
 func test<C, NC: ~Copyable>(
   _ a1: ExplicitCond<C>, _ b1: borrowing ExplicitCond<NC>,
@@ -70,7 +87,7 @@ class ClassContainment<T: ~Copyable> {
     var storage: T
     init(_ t: consuming T) {
         storage = t
-        checkCopyable(t) // expected-error {{noncopyable type 'T' cannot be substituted for copyable generic parameter 'T' in 'checkCopyable'}}
+        checkCopyable(t) // expected-error {{global function 'checkCopyable' requires that 'T' conform to 'Copyable'}}
     }
 
     deinit {}
@@ -81,7 +98,7 @@ struct ConditionalContainment<T: ~Copyable>: ~Copyable {
   var y: NC // expected-error {{stored property 'y' of 'Copyable'-conforming generic struct 'ConditionalContainment' has non-Copyable type 'NC'}}
 }
 
-extension ConditionalContainment: Copyable {}
+extension ConditionalContainment: Copyable where T: Copyable {}
 
 func chk(_ T: RequireCopyable<ConditionalContainment<Int>>) {}
 
@@ -127,7 +144,7 @@ enum Maybe<Wrapped: ~Copyable>: ~Copyable {
   deinit {} // expected-error {{deinitializer cannot be declared in generic enum 'Maybe' that conforms to 'Copyable'}}
 }
 
-extension Maybe: Copyable {}
+extension Maybe: Copyable where Wrapped: Copyable {}
 
 // expected-note@+4{{requirement specified as 'NC' : 'Copyable'}}
 // expected-note@+3{{requirement from conditional conformance of 'Maybe<NC>' to 'Copyable'}}
@@ -170,29 +187,26 @@ enum Sally: Copyable, ~Copyable, NeedsCopyable {} // expected-error {{enum 'Sall
 
 class NiceTry: ~Copyable, Copyable {} // expected-error {{classes cannot be '~Copyable'}}
 
-@_moveOnly class NiceTry2: Copyable {} // expected-error {{'@_moveOnly' attribute is only valid on structs or enums}}
-
-
 struct Extendo: ~Copyable {}
-extension Extendo: Copyable, ~Copyable {} // expected-error {{cannot suppress '~Copyable' in extension}}
+extension Extendo: Copyable, ~Copyable {} // expected-error {{cannot suppress 'Copyable' in extension}}
 // expected-error@-1 {{struct 'Extendo' required to be 'Copyable' but is marked with '~Copyable'}}
 
 enum EnumExtendo {}
-extension EnumExtendo: ~Copyable {} // expected-error {{cannot suppress '~Copyable' in extension}}
+extension EnumExtendo: ~Copyable {} // expected-error {{cannot suppress 'Copyable' in extension}}
 
 extension NeedsCopyable where Self: ~Copyable {}
 // expected-error@-1 {{'Self' required to be 'Copyable' but is marked with '~Copyable'}}
 
 protocol NoCopyP: ~Copyable {}
 
-func needsCopyable<T>(_ t: T) {} // expected-note 2{{generic parameter 'T' has an implicit Copyable requirement}}
+func needsCopyable<T>(_ t: T) {} // expected-note 2{{'where T: Copyable' is implicit here}}
 func noCopyable(_ t: borrowing some ~Copyable) {}
 func noCopyableAndP(_ t: borrowing some NoCopyP & ~Copyable) {}
 
 func openingExistentials(_ a: borrowing any NoCopyP & ~Copyable,
                          _ b: any NoCopyP,
                          _ nc: borrowing any ~Copyable) {
-  needsCopyable(a) // expected-error {{noncopyable type 'any NoCopyP & ~Copyable' cannot be substituted for copyable generic parameter 'T' in 'needsCopyable'}}
+  needsCopyable(a) // expected-error {{global function 'needsCopyable' requires that 'T' conform to 'Copyable'}}
   noCopyable(a)
   noCopyableAndP(a)
 
@@ -200,7 +214,7 @@ func openingExistentials(_ a: borrowing any NoCopyP & ~Copyable,
   noCopyable(b)
   noCopyableAndP(b)
 
-  needsCopyable(nc) // expected-error {{noncopyable type 'any ~Copyable' cannot be substituted for copyable generic parameter 'T' in 'needsCopyable'}}
+  needsCopyable(nc) // expected-error {{global function 'needsCopyable' requires that 'T' conform to 'Copyable'}}
   noCopyable(nc)
   noCopyableAndP(nc) // expected-error {{global function 'noCopyableAndP' requires that 'some NoCopyP & ~Copyable' conform to 'NoCopyP'}}
 }
@@ -213,13 +227,10 @@ func testSpecial(_ a: Any) {
 /// MARK: non-Escapable types
 
 func requireEscape<T: ~Copyable>(_ t: borrowing T) {} // expected-note {{generic parameters are always considered '@escaping'}}
-// expected-note@-1 {{where 'T' = 'MutableBuggerView<NC>'}}
-// expected-note@-2 {{where 'T' = 'BuggerView<NC>'}}
-// expected-note@-3 {{where 'T' = 'MutableBuggerView<Int>'}}
-// expected-note@-4 {{where 'T' = 'BuggerView<Int>'}}
+// expected-note@-1 4{{'where T: Escapable' is implicit here}}
 
 func genericNoEscape<T: ~Escapable>(_ t: borrowing T) {} // expected-note {{generic parameters are always considered '@escaping'}}
-// expected-note@-1 2{{generic parameter 'T' has an implicit Copyable requirement}}
+// expected-note@-1 2{{'where T: Copyable' is implicit here}}
 
 func genericNoEscapeOrCopy<T: ~Escapable & ~Copyable>(_ t: borrowing T) {}
 
@@ -239,9 +250,9 @@ func checkNominals(_ mutRef: inout MutableBuggerView<NC>,
                    _ intMutRef: borrowing MutableBuggerView<Int>,
                    _ intRef: BuggerView<Int>) {
 
-  genericNoEscape(mutRef) // expected-error {{noncopyable type 'MutableBuggerView<NC>' cannot be substituted for copyable generic parameter 'T' in 'genericNoEscape'}}
+  genericNoEscape(mutRef) // expected-error {{global function 'genericNoEscape' requires that 'MutableBuggerView<NC>' conform to 'Copyable'}}
   genericNoEscape(ref)
-  genericNoEscape(intMutRef) // expected-error {{noncopyable type 'MutableBuggerView<Int>' cannot be substituted for copyable generic parameter 'T' in 'genericNoEscape'}}
+  genericNoEscape(intMutRef) // expected-error {{global function 'genericNoEscape' requires that 'MutableBuggerView<Int>' conform to 'Copyable'}}
   genericNoEscape(intRef)
 
   genericNoEscapeOrCopy(mutRef)
@@ -269,7 +280,7 @@ enum MaybeEscapes<T: ~Escapable>: ~Escapable { // expected-note {{generic enum '
   case none
 }
 
-extension MaybeEscapes: Escapable {}
+extension MaybeEscapes: Escapable where T: Escapable {}
 
 struct Escapes { // expected-note {{consider adding '~Escapable' to struct 'Escapes'}}
   let t: MaybeEscapes<NonescapingType> // expected-error {{stored property 't' of 'Escapable'-conforming struct 'Escapes' has non-Escapable type 'MaybeEscapes<NonescapingType>'}}
@@ -500,4 +511,27 @@ struct TestResolution3 {
   var arrayNC: [NC] = [] // expected-error {{type 'NC' does not conform to protocol 'Copyable'}}
   var dictNC: [String: NC] = [:] // expected-error {{type 'NC' does not conform to protocol 'Copyable'}}
   var exampleNC: Example<NC> = Example() // expected-error {{type 'NC' does not conform to protocol 'Copyable'}}
+}
+
+public struct Box<Wrapped: ~Copyable>: ~Copyable {}
+// Box is never copyable, so we can't support this conditional conformance.
+public enum List<Element: ~Copyable>: ~Copyable {
+  case cons(Element, Box<List<Element>>)   // expected-error {{associated value 'cons' of 'Copyable'-conforming generic enum 'List' has non-Copyable type '(Element, Box<List<Element>>)'}}
+  case empty
+}
+extension List: Copyable where Element: Copyable {}
+
+
+struct Yapping<T: ~Copyable> {}
+extension Yapping { // expected-note {{'where T: Copyable' is implicit here}}
+  func yap() {}
+}
+func testYap(_ y: Yapping<NC>) {
+  y.yap() // expected-error {{referencing instance method 'yap()' on 'Yapping' requires that 'NC' conform to 'Copyable'}}
+}
+
+protocol Veggie: ~Copyable {}
+func generalized(_ x: Any.Type) {}
+func testMetatypes(_ t: (any Veggie & ~Copyable).Type) {
+  generalized(t) // expected-error {{cannot convert value of type '(any Veggie & ~Copyable).Type' to expected argument type 'any Any.Type'}}
 }

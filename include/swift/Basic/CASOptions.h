@@ -43,11 +43,17 @@ public:
   /// Clang Include Trees.
   std::vector<std::string> ClangIncludeTrees;
 
+  /// Clang Include Tree FileList.
+  std::vector<std::string> ClangIncludeTreeFileList;
+
   /// CacheKey for input file.
   std::string InputFileKey;
 
   /// Cache key for imported bridging header.
   std::string BridgingHeaderPCHCacheKey;
+
+  /// Has immutable file system input.
+  bool HasImmutableFileSystem = false;
 
   /// Get the CAS configuration flags.
   void enumerateCASConfigurationFlags(
@@ -57,7 +63,8 @@ public:
   bool requireCASFS() const {
     return EnableCaching &&
            (!CASFSRootIDs.empty() || !ClangIncludeTrees.empty() ||
-            !InputFileKey.empty() || !BridgingHeaderPCHCacheKey.empty());
+            !ClangIncludeTreeFileList.empty() || !InputFileKey.empty() ||
+            !BridgingHeaderPCHCacheKey.empty());
   }
 
   /// Return a hash code of any components from these options that should

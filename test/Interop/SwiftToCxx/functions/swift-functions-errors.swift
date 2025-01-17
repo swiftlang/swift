@@ -4,8 +4,7 @@
 
 // RUN: %check-interop-cxx-header-in-clang(%t/functions.h -DSWIFT_CXX_INTEROP_HIDE_STL_OVERLAY -DSWIFT_CXX_INTEROP_EXPERIMENTAL_SWIFT_ERROR -Wno-unused-function)
 
-// for experimental feature GenerateBindingsForThrowingFunctionsInCXX:
-// REQUIRES: asserts
+// REQUIRES: swift_feature_GenerateBindingsForThrowingFunctionsInCXX
 
 // CHECK-LABEL: namespace Functions SWIFT_PRIVATE_ATTR SWIFT_SYMBOL_MODULE("Functions") {
 
@@ -121,7 +120,7 @@ public func throwFunctionWithPossibleReturn(_ a: Int) throws -> Int {
 // CHECK: SWIFT_INLINE_THUNK swift::ThrowingResult<swift::Int> throwFunctionWithPossibleReturn(swift::Int a) SWIFT_SYMBOL("s:9Functions31throwFunctionWithPossibleReturnyS2iKF") SWIFT_WARN_UNUSED_RESULT {
 // CHECK: void* opaqueError = nullptr;
 // CHECK: void* _ctx = nullptr;
-// CHECK: auto returnValue = _impl::$s9Functions31throwFunctionWithPossibleReturnyS2iKF(a, _ctx, &opaqueError);
+// CHECK: auto returnValue = Functions::_impl::$s9Functions31throwFunctionWithPossibleReturnyS2iKF(a, _ctx, &opaqueError);
 // CHECK: if (opaqueError != nullptr)
 // CHECK: #ifdef __cpp_exceptions
 // CHECK: throw (swift::Error(opaqueError));
@@ -141,7 +140,7 @@ public func throwFunctionWithReturn() throws -> Int {
 // CHECK: SWIFT_INLINE_THUNK swift::ThrowingResult<swift::Int> throwFunctionWithReturn() SWIFT_SYMBOL("s:9Functions23throwFunctionWithReturnSiyKF") SWIFT_WARN_UNUSED_RESULT {
 // CHECK: void* opaqueError = nullptr;
 // CHECK: void* _ctx = nullptr;
-// CHECK: auto returnValue = _impl::$s9Functions23throwFunctionWithReturnSiyKF(_ctx, &opaqueError);
+// CHECK: auto returnValue = Functions::_impl::$s9Functions23throwFunctionWithReturnSiyKF(_ctx, &opaqueError);
 // CHECK: #ifdef __cpp_exceptions
 // CHECK: throw (swift::Error(opaqueError));
 // CHECK: #else

@@ -591,6 +591,16 @@ tryCastToForeignClass(
   return DynamicCastResult::Failure;
 }
 
+static DynamicCastResult tryCastToForeignReferenceType(
+    OpaqueValue *destLocation, const Metadata *destType, OpaqueValue *srcValue,
+    const Metadata *srcType, const Metadata *&destFailureType,
+    const Metadata *&srcFailureType, bool takeOnSuccess, bool mayDeferChecks) {
+  assert(srcType != destType);
+  assert(destType->getKind() == MetadataKind::ForeignReferenceType);
+
+  return DynamicCastResult::Failure;
+}
+
 /******************************************************************************/
 /***************************** Enum Destination *******************************/
 /******************************************************************************/
@@ -1864,8 +1874,8 @@ static DynamicCastResult tryCastToExtendedExistential(
         [&substitutions](unsigned depth, unsigned index) {
           return substitutions.getMetadata(depth, index).Ptr;
         },
-        [&substitutions](unsigned ordinal) {
-          return substitutions.getMetadataOrdinal(ordinal).Ptr;
+        [&substitutions](unsigned fullOrdinal, unsigned keyOrdinal) {
+          return substitutions.getMetadataKeyArgOrdinal(keyOrdinal).Ptr;
         },
         [](const Metadata *type, unsigned index) -> const WitnessTable * {
           swift_unreachable("Resolution of witness tables is not supported");
@@ -2187,6 +2197,8 @@ static tryCastFunctionType *selectCasterForDest(const Metadata *destType) {
     return tryCastToOptional;
   case MetadataKind::ForeignClass:
     return tryCastToForeignClass;
+  case MetadataKind::ForeignReferenceType:
+    return tryCastToForeignReferenceType;
   case MetadataKind::Opaque:
     return tryCastToOpaque;
   case MetadataKind::Tuple:
@@ -2594,4 +2606,4 @@ swift_dynamicCastImpl(OpaqueValue *destLocation,
 }
 
 #define OVERRIDE_DYNAMICCASTING COMPATIBILITY_OVERRIDE
-#include COMPATIBILITY_OVERRIDE_INCLUDE_PATH
+#include "../CompatibilityOverride/CompatibilityOverrideIncludePath.h"

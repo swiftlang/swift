@@ -16,6 +16,7 @@
 //===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "sil-cse"
+#include "swift/Basic/Assertions.h"
 #include "swift/SIL/DebugUtils.h"
 #include "swift/SIL/Dominance.h"
 #include "swift/SIL/InstructionUtils.h"
@@ -848,7 +849,9 @@ static void updateBasicBlockArgTypes(SILBasicBlock *BB,
                                            return NewOpenedArchetype;
                                          return type;
                                        },
-                                       MakeAbstractConformanceForGenericType());
+                                       MakeAbstractConformanceForGenericType(),
+                                       CanGenericSignature(),
+                                       SubstFlags::SubstituteLocalArchetypes);
     if (NewArgType == Arg->getType())
       continue;
     // Replace the type of this BB argument. The type of a BBArg
@@ -905,7 +908,8 @@ bool CSE::processOpenExistentialRef(OpenExistentialRefInst *Inst,
   // opened archetypes trivial.
   InstructionCloner Cloner(Inst->getFunction());
   Cloner.registerLocalArchetypeRemapping(
-      OldOpenedArchetype->castTo<ArchetypeType>(), NewOpenedArchetype);
+      OldOpenedArchetype->getGenericEnvironment(),
+      NewOpenedArchetype->getGenericEnvironment());
   auto &Builder = Cloner.getBuilder();
 
   // Now clone each candidate and replace the opened archetype
@@ -1147,7 +1151,7 @@ bool CSE::canHandle(SILInstruction *Inst) {
     // Note that the function also may not contain any retains. And there are
     // functions which are read-none and have a retain, e.g. functions which
     // _convert_ a global_addr to a reference and retain it.
-    auto MB = BCA->getMemoryBehavior(ApplySite(AI), /*observeRetains*/false);
+    auto MB = BCA->getMemoryBehavior(FullApplySite(AI), /*observeRetains*/false);
     if (MB == MemoryBehavior::None)
       return true;
     

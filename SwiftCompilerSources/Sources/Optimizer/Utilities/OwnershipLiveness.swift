@@ -56,16 +56,20 @@ func computeLinearLiveness(for definingValue: Value, _ context: Context)
   -> InstructionRange {
 
   assert(definingValue.ownership == .owned
-    || BeginBorrowValue(definingValue) != nil,
-    "value must define an OSSA lifetime")
+           || BeginBorrowValue(definingValue) != nil
+           || VariableScopeInstruction(definingValue.definingInstruction) != nil,
+         "value must define an OSSA lifetime or variable scope")
 
   // InstructionRange cannot directly represent the beginning of the block
   // so we fake it with getRepresentativeInstruction().
   var range = InstructionRange(for: definingValue, context)
 
   // Compute liveness.
-  definingValue.lookThroughBorrowedFromUser.uses.endingLifetime.forEach {
-    range.insert($0.instruction)
+ for use in definingValue.lookThroughBorrowedFromUser.uses {
+    let instruction = use.instruction
+    if use.endsLifetime || instruction is ExtendLifetimeInst {
+      range.insert(instruction)
+    }
   }
   return range
 }
@@ -92,7 +96,7 @@ typealias InnerScopeHandler = (Value) -> WalkResult
 /// - All inner scopes are complete. (Use `innerScopeHandler` to complete them or bail-out).
 func computeInteriorLiveness(for definingValue: Value, _ context: FunctionPassContext,
                              innerScopeHandler: InnerScopeHandler? = nil) -> InstructionRange {
-  let result = InteriorLivenessResult.compute(for: definingValue, ignoreEscape: false, context)
+  let result = InteriorLivenessResult.compute(for: definingValue, ignoreEscape: false, visitInnerUses: false, context)
   switch result.pointerStatus {
   case .nonescaping:
     break
@@ -110,8 +114,9 @@ func computeInteriorLiveness(for definingValue: Value, _ context: FunctionPassCo
 /// Compute known liveness and return a range, which the caller must deinitialize.
 ///
 /// This computes a minimal liveness, ignoring pointer escaping uses.
-func computeKnownLiveness(for definingValue: Value, _ context: FunctionPassContext) -> InstructionRange {
-  return InteriorLivenessResult.compute(for: definingValue, ignoreEscape: true, context).range
+func computeKnownLiveness(for definingValue: Value, visitInnerUses: Bool = false, _ context: FunctionPassContext) -> InstructionRange {
+  return InteriorLivenessResult.compute(for: definingValue, ignoreEscape: true,
+                                        visitInnerUses: visitInnerUses, context).range
 }
 
 /// If any interior pointer may escape, then record the first instance here. If 'ignoseEscape' is true, this
@@ -158,7 +163,7 @@ struct InteriorLivenessResult: CustomDebugStringConvertible {
   let range: InstructionRange
   let pointerStatus: InteriorPointerStatus
 
-  static func compute(for definingValue: Value, ignoreEscape: Bool = false,
+  static func compute(for definingValue: Value, ignoreEscape: Bool = false, visitInnerUses: Bool,
                       _ context: FunctionPassContext,
                       innerScopeHandler: InnerScopeHandler? = nil) -> InteriorLivenessResult {
 
@@ -167,7 +172,8 @@ struct InteriorLivenessResult: CustomDebugStringConvertible {
 
     var range = InstructionRange(for: definingValue, context)
 
-    var visitor = InteriorUseWalker(definingValue: definingValue, ignoreEscape: ignoreEscape, context) {
+    var visitor = InteriorUseWalker(definingValue: definingValue, ignoreEscape: ignoreEscape,
+                                    visitInnerUses: visitInnerUses, context) {
       range.insert($0.instruction)
       return .continueWalk
     }
@@ -272,10 +278,10 @@ protocol OwnershipUseVisitor {
   mutating func pointerEscapingUse(of operand: Operand) -> WalkResult
 
   /// A use that creates an implicit borrow scope over the lifetime of
-  /// an owned dependent value. The operand owership is .borrow, but
+  /// an owned dependent value. The operand ownership is .borrow, but
   /// there are no explicit scope-ending operations. Instead
   /// BorrowingInstruction.scopeEndingOperands will return the final
-  /// consumes in the dependent value's forwaring chain.
+  /// consumes in the dependent value's forwarding chain.
   mutating func dependentUse(of operand: Operand, into value: Value)
     -> WalkResult
 
@@ -487,7 +493,7 @@ extension OwnershipUseVisitor {
 ///
 /// - Does not assume the current lifetime is linear. Transitively
 /// follows guaranteed forwarding and address uses within the current
-/// scope. Phis that are not dominanted by definingValue or an outer
+/// scope. Phis that are not dominated by definingValue or an outer
 /// adjacent phi are marked "unenclosed" to signal an incomplete
 /// lifetime.
 ///
@@ -523,6 +529,11 @@ struct InteriorUseWalker {
 
   let definingValue: Value
   let ignoreEscape: Bool
+
+  // If true, it's not assumed that inner scopes are linear. It forces to visit
+  // all interior uses if inner scopes.
+  let visitInnerUses: Bool
+
   let useVisitor: (Operand) -> WalkResult
 
   var innerScopeHandler: InnerScopeHandler? = nil
@@ -546,12 +557,13 @@ struct InteriorUseWalker {
     visited.deinitialize()
   }
 
-  init(definingValue: Value, ignoreEscape: Bool, _ context: FunctionPassContext,
+  init(definingValue: Value, ignoreEscape: Bool, visitInnerUses: Bool, _ context: FunctionPassContext,
     visitor: @escaping (Operand) -> WalkResult) {
     assert(!definingValue.type.isAddress, "address values have no ownership")
     self.functionContext = context
     self.definingValue = definingValue
     self.ignoreEscape = ignoreEscape
+    self.visitInnerUses = visitInnerUses
     self.useVisitor = visitor
     self.visited = ValueSet(context)
   }
@@ -662,6 +674,9 @@ extension InteriorUseWalker: OwnershipUseVisitor {
       if handleInner(borrowed: beginBorrow.value) == .abortWalk {
         return .abortWalk
       }
+      if visitInnerUses {
+        return visitUsesOfOuter(value: beginBorrow.value)
+      }
     }
     return visitInnerBorrowUses(of: borrowInst)
   }
@@ -739,7 +754,11 @@ extension InteriorUseWalker: AddressUseVisitor {
   mutating func loadedAddressUse(of operand: Operand, into address: Operand)
     -> WalkResult {
     return .continueWalk
-  }    
+  }
+  
+  mutating func yieldedAddressUse(of operand: Operand) -> WalkResult {
+    return .continueWalk
+  }
 
   mutating func dependentAddressUse(of operand: Operand, into value: Value)
     -> WalkResult {
@@ -895,7 +914,7 @@ struct LivenessBoundary : CustomStringConvertible {
 
   // Compute the boundary of a singly-defined range.
   init(value: Value, range: InstructionRange, _ context: Context) {
-    assert(range.isValid)
+    assert(range.blockRange.isValid)
 
     lastUsers = Stack<Instruction>(context)
     boundaryEdges = Stack<BasicBlock>(context)
@@ -943,7 +962,7 @@ let interiorLivenessTest = FunctionTest("interior_liveness_swift") {
   var range = InstructionRange(for: value, context)
   defer { range.deinitialize() }
 
-  var visitor = InteriorUseWalker(definingValue: value, ignoreEscape: true, context) {
+  var visitor = InteriorUseWalker(definingValue: value, ignoreEscape: true, visitInnerUses: false, context) {
     range.insert($0.instruction)
     return .continueWalk
   }

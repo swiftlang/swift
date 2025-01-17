@@ -10,6 +10,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "Diff.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Frontend/Frontend.h"
 #include "swift/Migrator/ASTMigratorPass.h"
 #include "swift/Migrator/EditorAdapter.h"
@@ -217,7 +218,7 @@ bool Migrator::performSyntacticPasses(SyntacticPassOptions Opts) {
   RewriteBufferEditsReceiver Rewriter {
     ClangSourceManager,
     Editor.getClangFileIDForSwiftBufferID(
-      StartInstance->getPrimarySourceFile()->getBufferID().value()),
+      StartInstance->getPrimarySourceFile()->getBufferID()),
     InputState->getOutputText()
   };
 

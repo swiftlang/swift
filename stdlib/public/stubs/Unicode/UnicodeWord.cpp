@@ -16,7 +16,7 @@
 #include "swift/Runtime/Debug.h"
 #endif
 #include "swift/shims/UnicodeData.h"
-#include <limits>
+#include <stdint.h>
 
 SWIFT_RUNTIME_STDLIB_INTERNAL
 __swift_uint8_t _swift_stdlib_getWordBreakProperty(__swift_uint32_t scalar) {
@@ -46,6 +46,6 @@ __swift_uint8_t _swift_stdlib_getWordBreakProperty(__swift_uint32_t scalar) {
   // If we made it out here, then our scalar was not found in the word
   // array (this occurs when a scalar doesn't map to any word break
   // property). Return the max value here to indicate .any.
-  return std::numeric_limits<__swift_uint8_t>::max();
+  return UINT8_MAX;
 #endif
 }

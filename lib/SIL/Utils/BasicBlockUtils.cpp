@@ -11,9 +11,10 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/SIL/BasicBlockUtils.h"
-#include "swift/SIL/BasicBlockDatastructures.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/STLExtras.h"
+#include "swift/SIL/BasicBlockDatastructures.h"
 #include "swift/SIL/Dominance.h"
 #include "swift/SIL/LoopInfo.h"
 #include "swift/SIL/OwnershipUtils.h"
@@ -22,6 +23,7 @@
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILFunction.h"
 #include "swift/SIL/TerminatorUtils.h"
+#include "swift/SIL/Test.h"
 #include "llvm/ADT/STLExtras.h"
 
 using namespace swift;
@@ -367,6 +369,11 @@ void swift::mergeBasicBlockWithSingleSuccessor(SILBasicBlock *BB,
 //                              DeadEndBlocks
 //===----------------------------------------------------------------------===//
 
+// Force the compiler to generate the destructor in this C++ file.
+// Otherwise it can happen that it is generated in a SwiftCompilerSources module
+// and that results in unresolved-symbols linker errors.
+DeadEndBlocks::~DeadEndBlocks() {}
+
 // Propagate the reachability up the control flow graph.
 void DeadEndBlocks::propagateNewlyReachableBlocks(unsigned startIdx) {
   for (unsigned idx = startIdx; idx < reachableBlocks.size(); ++idx) {
@@ -419,6 +426,27 @@ bool DeadEndBlocks::triviallyEndsInUnreachable(SILBasicBlock *block) {
     block = singleSucc;
   return isa<UnreachableInst>(block->getTerminator());
 }
+
+namespace swift::test {
+// Arguments:
+// - none
+// Dumps:
+// - the function
+// - the blocks which are dead-end blocks
+static FunctionTest DeadEndBlocksTest("dead_end_blocks", [](auto &function,
+                                                            auto &arguments,
+                                                            auto &test) {
+  std::unique_ptr<DeadEndBlocks> DeadEnds;
+  DeadEnds.reset(new DeadEndBlocks(&function));
+  function.print(llvm::outs());
+#ifndef NDEBUG
+  for (auto &block : function) {
+    if (DeadEnds->isDeadEnd(&block))
+      block.printID(llvm::outs(), true);
+  }
+#endif
+});
+} // end namespace swift::test
 
 //===----------------------------------------------------------------------===//
 //                  Post Dominance Set Completion Utilities

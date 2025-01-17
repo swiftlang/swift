@@ -1,3 +1,4 @@
+// RUN: %target-typecheck-verify-swift -I %S/Inputs -cxx-interoperability-mode=swift-5.9
 // RUN: %target-typecheck-verify-swift -I %S/Inputs -cxx-interoperability-mode=swift-6
 // RUN: %target-typecheck-verify-swift -I %S/Inputs -cxx-interoperability-mode=upcoming-swift
 
@@ -33,13 +34,13 @@ writeOnlyIntArray[2] = 654
 let writeOnlyValue = writeOnlyIntArray[2]
 
 var readOnlyRvalueParam = ReadOnlyRvalueParam()
-let readOnlyRvalueVal = readOnlyRvalueParam[1] // expected-error {{value of type 'ReadOnlyRvalueParam' has no subscripts}}
+let readOnlyRvalueVal = readOnlyRvalueParam[consuming: 1]
 
 var readWriteRvalueParam = ReadWriteRvalueParam()
-let readWriteRvalueVal = readWriteRvalueParam[1] // expected-error {{value of type 'ReadWriteRvalueParam' has no subscripts}}
+let readWriteRvalueVal = readWriteRvalueParam[consuming: 1]
 
 var readWriteRvalueGetterParam = ReadWriteRvalueGetterParam()
-let readWriteRvalueGetterVal = readWriteRvalueGetterParam[1]
+let readWriteRvalueGetterVal = readWriteRvalueGetterParam[consuming: 1]
 
 var diffTypesArray = DifferentTypesArray()
 let diffTypesResultInt: Int32 = diffTypesArray[0]
@@ -77,3 +78,22 @@ let _ = derivedConstIterWithUD.pointee
 
 var derivedIntWrapper = DerivedFromLoadableIntWrapperWithUsingDecl()
 derivedIntWrapper += LoadableIntWrapper()
+
+let classWithSuccessorAvailable = ClassWithSuccessorAvailable()
+let _ = classWithSuccessorAvailable.successor();
+let classWithSuccessorUnavailable = ClassWithSuccessorUnavailable()
+let _ = classWithSuccessorUnavailable.successor(); // expected-error {{'successor()' is unavailable in Swift}}
+
+var classWithOperatorStarAvailable = ClassWithOperatorStarAvailable()
+let _ = classWithOperatorStarAvailable.pointee
+let derivedClassWithOperatorStarAvailable = DerivedClassWithOperatorStarAvailable()
+let _ = derivedClassWithOperatorStarAvailable.pointee
+
+var classWithOperatorStarUnavailable = ClassWithOperatorStarUnavailable()
+let _ = classWithOperatorStarUnavailable.pointee // expected-error {{'pointee' is unavailable in Swift}}
+
+// FIXME: The below test should also fail with 'pointee' is unavailable in Swift error, 
+// but currently pointee is not hidden in derived classes.
+let derivedClassWithOperatorStarUnavailable = DerivedClassWithOperatorStarUnavailable()
+let _ = derivedClassWithOperatorStarUnavailable.pointee  
+

@@ -20,6 +20,7 @@ import Foundation
 }
 
 // CHECK-LABEL: s13objc_pointers14returnNSObject3objSo0D0CAE_tF
+@_semantics("no.preserve.debugger")
 func returnNSObject(obj: NSObject) -> NSObject {
   // CHECK-NOT: return
   // CHECK: @llvm.objc.retain

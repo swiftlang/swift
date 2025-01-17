@@ -19,7 +19,7 @@ protocol NonObjCProto {
   func good()
 }
 
-class Bar : NonObjCProto { // expected-error {{type 'Bar' does not conform to protocol 'NonObjCProto'}}
+class Bar : NonObjCProto { // expected-error {{type 'Bar' does not conform to protocol 'NonObjCProto'}} expected-note {{add stubs for conformance}}
   func good() {}
 }
 
@@ -90,4 +90,12 @@ struct NonSelfT: Unavail {
 struct SelfT: Unavail { // expected-error {{type 'SelfT' does not conform to protocol 'Unavail'}}
   // expected-error@-1 {{unavailable instance method 'req()' was used to satisfy a requirement of protocol 'Unavail': write it yourself}}
   typealias T = SelfT
+}
+
+protocol UnavailableAssoc {
+  @available(*, unavailable) // expected-error {{associated type cannot be marked unavailable with '@available'}}
+  associatedtype A1
+
+  @available(swift, introduced: 99) // expected-error {{associated type cannot be marked unavailable with '@available'}}
+  associatedtype A2
 }

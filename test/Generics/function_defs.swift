@@ -123,7 +123,7 @@ protocol Subscriptable {
   func getIndex() -> Index
   func getValue() -> Value
 
-  subscript (index : Index) -> Value { get set } // expected-note {{candidate expects value of type 'T.Index' for parameter #1 (got 'T.Value')}}
+  subscript (index : Index) -> Value { get set }
 }
 
 protocol IntSubscriptable {
@@ -131,7 +131,7 @@ protocol IntSubscriptable {
 
   func getElement() -> ElementType
 
-  subscript (index : Int) -> ElementType { get  } // expected-note {{candidate expects value of type 'Int' for parameter #1 (got 'T.Value')}}
+  subscript (index : Int) -> ElementType { get }
 }
 
 func subscripting<T : Subscriptable & IntSubscriptable>(_ t: T) {
@@ -144,7 +144,9 @@ func subscripting<T : Subscriptable & IntSubscriptable>(_ t: T) {
   element = t[17]
   t[42] = element // expected-error{{cannot assign through subscript: subscript is get-only}}
 
-  t[value] = 17 // expected-error{{no exact matches in call to subscript}}
+  // Note that this is not an ambiguity because only one subscript is mutating
+  t[value] = 17 // expected-error{{cannot convert value of type 'T.Value' to expected argument type 'T.Index'}}
+  // expected-error@-1 {{cannot assign value of type 'Int' to subscript of type 'T.Value'}}
 }
 
 //===----------------------------------------------------------------------===//

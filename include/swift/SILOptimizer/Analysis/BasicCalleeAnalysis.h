@@ -37,7 +37,7 @@ public:
   BasicCalleeAnalysis(SILModule *M)
       : SILAnalysis(SILAnalysisKind::BasicCallee), M(*M), Cache(nullptr) {}
 
-  ~BasicCalleeAnalysis();
+  ~BasicCalleeAnalysis() {}
 
   static bool classof(const SILAnalysis *S) {
     return S->getKind() == SILAnalysisKind::BasicCallee;
@@ -96,7 +96,7 @@ public:
     return Cache->getDestructors(type, isExactType);
   }
 
-  MemoryBehavior getMemoryBehavior(ApplySite as, bool observeRetains);
+  MemoryBehavior getMemoryBehavior(FullApplySite as, bool observeRetains);
 
   CalleeCache *getCalleeCache() { return Cache.get(); }
 };

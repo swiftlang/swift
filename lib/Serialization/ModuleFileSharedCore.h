@@ -66,10 +66,16 @@ class ModuleFileSharedCore {
   /// The canonical name of the SDK the module was built with.
   StringRef SDKName;
 
+  /// Version string of the SDK against which the module was built.
+  StringRef SDKVersion;
+
   /// The name of the module interface this module was compiled from.
   ///
   /// Empty if this module didn't come from an interface file.
   StringRef ModuleInterfacePath;
+
+  /// true if this module interface was serialized relative to the SDK path.
+  bool IsModuleInterfaceSDKRelative = false;
 
   /// The module interface path if this module is adjacent to such an interface
   /// or it was itself compiled from an interface. Empty otherwise.
@@ -96,6 +102,14 @@ class ModuleFileSharedCore {
 
   /// Module name to use when referenced in clients module interfaces.
   StringRef ModuleExportAsName;
+
+  /// Name to use in public facing diagnostics and documentation.
+  StringRef PublicModuleName;
+
+  /// The version of the Swift compiler used to produce swiftinterface
+  /// this module is based on. This is the most precise version possible
+  /// - a compiler tag or version if this is a development compiler.
+  version::Version SwiftInterfaceCompilerVersion;
 
   /// \c true if this module has incremental dependency information.
   bool HasIncrementalInfo = false;
@@ -177,6 +191,9 @@ private:
   /// This is not intended for use by frameworks, but may show up in debug
   /// modules.
   std::vector<serialization::SearchPath> SearchPaths;
+
+  /// The external macro plugins from the macro definition inside the module.
+  SmallVector<ExternalMacroPlugin, 4> MacroModuleNames;
 
   /// Info for the (lone) imported header for this module.
   struct {
@@ -388,11 +405,21 @@ private:
     /// Whether this module is built with C++ interoperability enabled.
     unsigned HasCxxInteroperability : 1;
 
-    /// Whether this module is built with -experimental-allow-non-resilient-access.
+    /// Whether this module uses the platform default C++ stdlib, or an
+    /// overridden C++ stdlib.
+    unsigned CXXStdlibKind : 8;
+
+    /// Whether this module is built with -allow-non-resilient-access.
     unsigned AllowNonResilientAccess : 1;
 
+    /// Whether this module is built with -package-cmo.
+    unsigned SerializePackageEnabled : 1;
+
+    /// Whether this module enabled strict memory safety.
+    unsigned StrictMemorySafety : 1;
+
     // Explicitly pad out to the next word boundary.
-    unsigned : 3;
+    unsigned : 2;
   } Bits = {};
   static_assert(sizeof(ModuleBits) <= 8, "The bit set should be small");
 
@@ -602,6 +629,34 @@ public:
     return Dependencies;
   }
 
+  /// Returns the list of modules this module depends on.
+  ArrayRef<LinkLibrary> getLinkLibraries() const {
+    return LinkLibraries;
+  }
+
+  /// Does this module correspond to a framework.
+  bool isFramework() const {
+    return Bits.IsFramework;
+  }
+
+  /// Does this module correspond to a static archive.
+  bool isStaticLibrary() const {
+    return Bits.IsStaticLibrary;
+  }
+
+  llvm::VersionTuple getUserModuleVersion() const {
+    return UserModuleVersion;
+  }
+
+  /// Get external macro names.
+  ArrayRef<ExternalMacroPlugin> getExternalMacros() const {
+    return MacroModuleNames;
+  }
+
+  /// If the module-defining `.swiftinterface` file is an SDK-relative path,
+  /// resolve it to be absolute to the specified SDK.
+  std::string resolveModuleDefiningFilePath(const StringRef SDKPath) const;
+
   /// Returns \c true if this module file contains a section with incremental
   /// information.
   bool hasIncrementalInfo() const { return HasIncrementalInfo; }
@@ -615,10 +670,12 @@ public:
 
   bool isConcurrencyChecked() const { return Bits.IsConcurrencyChecked; }
 
+  bool strictMemorySafety() const { return Bits.StrictMemorySafety; }
+
   /// How should \p dependency be loaded for a transitive import via \c this?
   ///
-  /// If \p debuggerMode, more transitive dependencies should try to be loaded
-  /// as they can be useful in debugging.
+  /// If \p importNonPublicDependencies, more transitive dependencies
+  /// should try to be loaded as they can be useful in debugging.
   ///
   /// If \p isPartialModule, transitive dependencies should be loaded as we're
   /// in merge-module mode.
@@ -630,12 +687,10 @@ public:
   /// import. Reports non-public dependencies as required for a testable
   /// client so it can access internal details, which in turn can reference
   /// those non-public dependencies.
-  ModuleLoadingBehavior
-  getTransitiveLoadingBehavior(const Dependency &dependency,
-                               bool debuggerMode,
-                               bool isPartialModule,
-                               StringRef packageName,
-                               bool forTestable) const;
+  ModuleLoadingBehavior getTransitiveLoadingBehavior(
+      const Dependency &dependency, bool importNonPublicDependencies,
+      bool isPartialModule, StringRef packageName,
+      bool resolveInPackageModuleDependencies, bool forTestable) const;
 };
 
 template <typename T, typename RawData>

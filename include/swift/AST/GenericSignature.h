@@ -170,9 +170,6 @@ public:
   /// Stores a set of requirements on a type parameter. Used by
   /// GenericEnvironment for building archetypes.
   struct LocalRequirements {
-    Type anchor;
-
-    Type concreteType;
     Type superclass;
 
     RequiredProtocols protos;
@@ -196,6 +193,11 @@ public:
   /// Given a generic signature for a nested generic type, produce an
   /// array of the generic parameters for the innermost generic type.
   ArrayRef<GenericTypeParamType *> getInnermostGenericParams() const;
+
+  /// Returns the depth that a generic parameter at the next level of
+  /// nesting would have. This is zero for the empty signature,
+  /// and one plus the depth of the final generic parameter otherwise.
+  unsigned getNextDepth() const;
 
   /// Retrieve the requirements.
   ArrayRef<Requirement> getRequirements() const;
@@ -307,18 +309,15 @@ public:
     return Mem;
   }
 
+  /// Returns the depth of the last generic parameter.
+  unsigned getMaxDepth() const;
+
   /// Transform the requirements into a form where implicit Copyable and
   /// Escapable conformances are omitted, and their absence is explicitly
   /// noted.
   void getRequirementsWithInverses(
       SmallVector<Requirement, 2> &reqs,
       SmallVector<InverseRequirement, 2> &inverses) const;
-
-  /// Look up a stored conformance in the generic signature. These are formed
-  /// from same-type constraints placed on associated types of generic
-  /// parameters which have conformance constraints on them.
-  ProtocolConformanceRef lookupConformance(CanType depTy,
-                                           ProtocolDecl *proto) const;
 
   /// Iterate over all generic parameters, passing a flag to the callback
   /// indicating if the generic parameter is canonical or not.
@@ -401,9 +400,16 @@ public:
   /// checking against global state, if any/all of the types in the requirement
   /// are concrete, not type parameters.
   bool isRequirementSatisfied(
-      Requirement requirement, bool allowMissing = false) const;
+      Requirement requirement,
+      bool allowMissing = false,
+      bool brokenPackBehavior = false) const;
 
   bool isReducedType(Type type) const;
+
+  /// Return the reduced version of the given type parameter under this generic
+  /// signature. To reduce a type that more generally contains type parameters,
+  /// use GenericSignature::getReducedType().
+  CanType getReducedTypeParameter(CanType type) const;
 
   /// Determine whether the given type parameter is defined under this generic
   /// signature.

@@ -105,9 +105,6 @@ internal class __RawSetStorage: __SwiftNativeNSSet {
   }
 }
 
-@available(*, unavailable)
-extension __RawSetStorage: Sendable {}
-
 /// The storage class for the singleton empty set.
 /// The single instance of this class is created by the runtime.
 // NOTE: older runtimes called this class _EmptySetSingleton. The two
@@ -129,9 +126,6 @@ internal class __EmptySetSingleton: __RawSetStorage {
   }
 #endif
 }
-
-@available(*, unavailable)
-extension __EmptySetSingleton: Sendable {}
 
 #if $Embedded
 // In embedded Swift, the stdlib is a .swiftmodule only without any .o/.a files,
@@ -315,9 +309,6 @@ final internal class _SetStorage<Element: Hashable>
   }
 #endif
 }
-
-@available(*, unavailable)
-extension _SetStorage: Sendable {}
 
 extension _SetStorage {
   @usableFromInline

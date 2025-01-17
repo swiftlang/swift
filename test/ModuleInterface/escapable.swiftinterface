@@ -1,0 +1,13 @@
+// swift-interface-format-version: 1.0
+// swift-compiler-version: Swift version 6.0
+// swift-module-flags: -swift-version 5 -enable-library-evolution -module-name Library
+
+// RUN: %target-swift-typecheck-module-from-interface(%s) -module-name Library
+
+import Swift
+import _Concurrency
+import _StringProcessing
+import _SwiftConcurrencyShims
+
+public struct S : Swift.Escapable {
+}

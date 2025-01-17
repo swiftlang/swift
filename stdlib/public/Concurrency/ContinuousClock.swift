@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 import Swift
 
+#if !$Embedded
 /// A clock that measures time that always increments and does not stop 
 /// incrementing while the system is asleep. 
 ///
@@ -33,6 +34,24 @@ public struct ContinuousClock: Sendable {
 
   public init() { }
 }
+#endif
+
+@available(SwiftStdlib 5.7, *)
+extension Duration {
+  internal init(_seconds s: Int64, nanoseconds n: Int64) {
+    let (secHi, secLo) = s.multipliedFullWidth(by: 1_000_000_000_000_000_000)
+    // _nanoseconds is in 0 ..< 1_000_000_000, so the conversion to UInt64
+    // and multiply cannot overflow. If you somehow trap here, it is because
+    // the underlying clock hook that produced the time value is implemented
+    // incorrectly on your platform, but because we trap we can't silently
+    // get bogus data.
+    let (low, carry) = secLo.addingReportingOverflow(UInt64(n) * 1_000_000_000)
+    let high = secHi &+ (carry ? 1 : 0)
+    self.init(_high: high, low: low)
+  }
+}
+
+#if !$Embedded
 
 @available(SwiftStdlib 5.7, *)
 extension Clock where Self == ContinuousClock {
@@ -60,7 +79,7 @@ extension ContinuousClock: Clock {
       seconds: &seconds,
       nanoseconds: &nanoseconds,
       clock: _ClockID.continuous.rawValue)
-    return .seconds(seconds) + .nanoseconds(nanoseconds)
+    return Duration(_seconds: seconds, nanoseconds: nanoseconds)
   }
 
   /// The current continuous instant.
@@ -71,8 +90,9 @@ extension ContinuousClock: Clock {
       seconds: &seconds,
       nanoseconds: &nanoseconds,
       clock: _ClockID.continuous.rawValue)
-    return ContinuousClock.Instant(_value:
-      .seconds(seconds) + .nanoseconds(nanoseconds))
+    return Instant(
+      _value: Duration(_seconds: seconds, nanoseconds: nanoseconds)
+    )
   }
 
 #if !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
@@ -173,3 +193,5 @@ extension ContinuousClock.Instant: InstantProtocol {
     rhs.duration(to: lhs)
   }
 }
+
+#endif

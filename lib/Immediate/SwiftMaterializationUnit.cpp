@@ -38,6 +38,7 @@
 #include "swift/AST/IRGenRequests.h"
 #include "swift/AST/SILGenRequests.h"
 #include "swift/AST/TBDGenRequests.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Frontend/Frontend.h"
 #include "swift/Immediate/SwiftMaterializationUnit.h"
 #include "swift/SIL/SILModule.h"
@@ -157,7 +158,7 @@ SwiftJIT::CreateLLJIT(CompilerInstance &CI) {
                   .setOptions(std::move(TargetOpt))
                   .setCPU(std::move(CPU))
                   .addFeatures(Features)
-                  .setCodeGenOptLevel(llvm::CodeGenOpt::Default);
+                  .setCodeGenOptLevel(llvm::CodeGenOptLevel::Default);
   auto J = llvm::orc::LLJITBuilder()
                .setJITTargetMachineBuilder(std::move(JTMB))
                .create();

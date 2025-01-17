@@ -73,6 +73,10 @@ namespace irgen {
                                          SILDeclRef member,
                                          ProtocolConformanceRef conformance);
 
+  llvm::Value *emitAssociatedConformanceValue(IRGenFunction &IGF,
+                                              llvm::Value *wtable,
+                                              const AssociatedConformance &conf);
+
   /// Compute the index into a witness table for a resilient protocol given
   /// a reference to a descriptor of one of the requirements in that witness
   /// table.
@@ -111,6 +115,7 @@ namespace irgen {
     unsigned numShapes;
     unsigned numTypeMetadataPtrs;
     unsigned numWitnessTablePtrs;
+    unsigned numValues;
   };
 
   /// Add the witness parameters necessary for calling a function with

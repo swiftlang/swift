@@ -19,6 +19,7 @@
 #include "swift/AST/NameLookupRequests.h"
 #include "swift/AST/SourceFile.h"
 #include "swift/AST/Types.h"
+#include "swift/Basic/Assertions.h"
 
 #include "llvm/ADT/bit.h"
 
@@ -55,18 +56,20 @@ AccessLevelRequest::evaluate(Evaluator &evaluator, ValueDecl *D) const {
     case AccessorKind::DistributedGet:
     case AccessorKind::Address:
     case AccessorKind::Read:
+    case AccessorKind::Read2:
       return storage->getFormalAccess();
     case AccessorKind::Set:
     case AccessorKind::MutableAddress:
     case AccessorKind::Modify:
+    case AccessorKind::Modify2:
       return storage->getSetterFormalAccess();
     case AccessorKind::WillSet:
     case AccessorKind::DidSet:
       // These are only needed to synthesize the setter.
       return AccessLevel::Private;
     case AccessorKind::Init:
-      // These are only called from designated initializers.
-      return AccessLevel::Private;
+      // These are only called from within the same module.
+      return AccessLevel::Internal;
     }
   }
 

@@ -90,6 +90,13 @@
 #define SWIFT_IMPORT_UNSAFE
 #endif
 
+/// Same as `SWIFT_SELF_CONTAINED` in <swift/bridging>.
+#if __has_attribute(swift_attr)
+#define SWIFT_SELF_CONTAINED __attribute__((swift_attr("import_owned")))
+#else
+#define SWIFT_SELF_CONTAINED
+#endif
+
 #ifdef __GNUC__
 #define SWIFT_ATTRIBUTE_NORETURN __attribute__((noreturn))
 #elif defined(_MSC_VER)
@@ -116,31 +123,6 @@
 
 #define SWIFT_CRASH_BUG_REPORT_MESSAGE \
   "Please " SWIFT_BUG_REPORT_MESSAGE_BASE " and include the crash backtrace."
-
-// Conditionally exclude declarations or statements that are only needed for
-// assertions from release builds (NDEBUG) without cluttering the surrounding
-// code by #ifdefs.
-//
-// struct DoThings  {
-//   SWIFT_ASSERT_ONLY_DECL(unsigned verifyCount = 0);
-//   DoThings() {
-//     SWIFT_ASSERT_ONLY(verifyCount = getNumberOfThingsToDo());
-//   }
-//   void doThings() {
-//     do {
-//       // ... do each thing
-//       SWIFT_ASSERT_ONLY(--verifyCount);
-//     } while (!done());
-//     assert(verifyCount == 0 && "did not do everything");
-//   }
-// };
-#ifdef NDEBUG
-#define SWIFT_ASSERT_ONLY_DECL(...)
-#define SWIFT_ASSERT_ONLY(...) do { } while (false)
-#else
-#define SWIFT_ASSERT_ONLY_DECL(...) __VA_ARGS__
-#define SWIFT_ASSERT_ONLY(...) do { __VA_ARGS__; } while (false)
-#endif
 
 #if defined(__LP64__) || defined(_WIN64)
 #define SWIFT_POINTER_IS_8_BYTES 1

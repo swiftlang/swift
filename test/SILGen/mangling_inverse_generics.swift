@@ -1,7 +1,5 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-emit-silgen %s -module-name test \
-// RUN:   -enable-experimental-feature NoncopyableGenerics \
-// RUN:   -enable-experimental-feature NonescapableTypes \
 // RUN:   -parse-as-library \
 // RUN:   > %t/test.silgen
 
@@ -146,7 +144,7 @@ public struct A<T: ~Copyable>: ~Copyable {
   // CHECK: sil hidden [ossa] @$s4test1AVAARi_zrlEACyxGycfC : $@convention(method) <T where T : ~Copyable> (@thin A<T>.Type) -> @owned A<T> {
 }
 
-extension A: Copyable {}
+extension A: Copyable where T: Copyable {}
 
 // <T: ~Copyable>
 extension A where T: ~Copyable {
@@ -286,15 +284,27 @@ public struct E<T: ~Copyable>: ~Copyable {
   public func __existential2__(_ t: consuming any ~Copyable) {}
 
   // DEMANGLED: test.E.something<A>() -> A1
-  // CHECK: sil [ossa] @$s4test1EV9somethingqd__ylF : $@convention(method) <T><U where U : ~Copyable> (@guaranteed E<T>) -> @out U {
+  // CHECK: sil [ossa] @$s4test1EV9somethingqd__ylF : $@convention(method) <T where T : ~Copyable><U where U : ~Copyable> (@guaranteed E<T>) -> @out U {
   @_preInverseGenerics
   public func something<U: ~Copyable>() -> U {
     fatalError()
   }
 
   // DEMANGLED: (extension in test):test.E< where A: ~Swift.Copyable>.something<A>() -> A1
-  // CHECK: sil [ossa] @$s4test1EVAARi_zrlE9somethingqd__ylF : $@convention(method) <T><U> (@guaranteed E<T>) -> @out U {
+  // CHECK: sil [ossa] @$s4test1EVAARi_zrlE9somethingqd__ylF : $@convention(method) <T where T : ~Copyable><U> (@guaranteed E<T>) -> @out U {
   public func something<U>() -> U {
+    fatalError()
+  }
+
+  // DEMANGLED: test.E.something2<A>() -> A1
+  // CHECK: sil [ossa] @$s4test1EV10something2qd__ylF : $@convention(method) <T><U> (@guaranteed E<T>) -> @out U {
+  public func something2<U>() -> U where T: Copyable {
+    fatalError()
+  }
+
+  // DEMANGLED: test.E.something2<A where A1: ~Swift.Copyable>() -> A1
+  // CHECK: sil [ossa] @$s4test1EV10something2qd__yRi_d__lF : $@convention(method) <T><U where U : ~Copyable> (@guaranteed E<T>) -> @out U {
+  public func something2<U: ~Copyable>() -> U where T: Copyable {
     fatalError()
   }
 

@@ -55,12 +55,12 @@ public struct _Toys {
 public struct ExplicitHello<T: ~Copyable>: ~Copyable {
   let thing: T
 }
-extension ExplicitHello: Copyable {}
+extension ExplicitHello: Copyable where T: Copyable {}
 
 public struct Hello<T: ~Copyable>: ~Copyable, ~Escapable where T: ~Escapable {}
 
-extension Hello: Escapable where T: ~Copyable {}
-extension Hello: Copyable where T: ~Escapable {}
+extension Hello: Escapable where T: Escapable {}
+extension Hello: Copyable where T: Copyable {}
 
 public protocol TestAssocTypes {
   associatedtype A: ~Copyable, _NoCopyP = Int
@@ -94,11 +94,11 @@ public struct Outer<A: ~Copyable>: ~Copyable {
   public struct InnerVariation2<D: ~Escapable>: ~Copyable, ~Escapable {}
 }
 
-extension Outer: Copyable {}
-extension Outer.InnerStruct: Copyable {}
+extension Outer: Copyable where A: Copyable {}
+extension Outer.InnerStruct: Copyable where C: Copyable, A: Copyable {}
 
-extension Outer.InnerVariation1: Copyable {}
-extension Outer.InnerVariation2: Escapable where A: ~Copyable {}
+extension Outer.InnerVariation1: Copyable where A: Copyable, D: Copyable & Escapable {}
+extension Outer.InnerVariation2: Escapable where A: Escapable, D: Escapable {}
 
 extension Outer.InnerStruct {
     public func hello<T: ~Escapable>(_ t: T) {}
@@ -112,3 +112,42 @@ public func borrowsNoncopyable<T: ~Copyable>(_ t: borrowing T) {}
 
 @_disallowFeatureSuppression(NoncopyableGenerics)
 public func suppressesNoncopyableGenerics<T: ~Copyable>(_ t: borrowing T) {}
+
+// coverage for rdar://127389991
+@_disallowFeatureSuppression(NoncopyableGenerics)
+public struct LoudlyNC<T: ~Copyable> {}
+public func _indexHumongousDonuts<TTT, T>(_ aggregate: UnsafePointer<TTT>, _ index: Int) -> T {
+    return UnsafeRawPointer(aggregate).load(
+    fromByteOffset: index * MemoryLayout<T>.stride, as: T.self)
+}
+public func referToLoud(_ t: LoudlyNC<String>) {}
+@_disallowFeatureSuppression(NoncopyableGenerics) public func referToLoudProperGuarding(_ t: LoudlyNC<String>) {}
+public struct NoCopyPls: ~Copyable {}
+public func substCopyable(_ t: String?) {}
+public func substGenericCopyable<T>(_ t: T?) {}
+public func substNC(_ t: borrowing NoCopyPls?) {}
+public func substGenericNC<T: ~Copyable>(_ t: borrowing T?) {}
+
+// coverage for rdar://126090425
+protocol P : ~Copyable {} // NOTE: it's important that this is NOT public.
+protocol Q: ~Copyable {}  // NOTE: it's important that this is NOT public.
+public protocol Publik: ~Copyable {}
+public struct Concrete : (P & ~Copyable) {}
+public struct Generic<T: Publik & ~Copyable> : (P & ~Copyable) {}
+public struct VeryNested: (P & (Q & ~Copyable & Publik) & (P & ~Copyable)) {}
+public struct Twice: P & ~Copyable, Q & ~Copyable {}
+public struct RegularTwice: ~Copyable, ~Copyable {}
+
+// coverage for rdar://130179698
+public struct Continuation<T: ~Copyable, E: Error> {
+  public func resume(returning value: consuming T) where E == Never {}
+}
+
+// coverage for rdar://132453000 (Can't make a type both conditionally Copyable and conditionally Escapable)
+@frozen
+public enum Moptional<Wrapped: ~Copyable & ~Escapable>: ~Copyable, ~Escapable {
+  case none
+  case some(Wrapped)
+}
+extension Moptional: Copyable where Wrapped: Copyable {}
+extension Moptional: Escapable where Wrapped: Escapable {}

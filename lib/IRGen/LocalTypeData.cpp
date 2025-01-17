@@ -28,6 +28,7 @@
 #include "swift/AST/IRGenOptions.h"
 #include "swift/AST/PackConformance.h"
 #include "swift/AST/ProtocolConformance.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/GraphNodeWorklist.h"
 #include "swift/SIL/SILModule.h"
 
@@ -598,6 +599,17 @@ void IRGenFunction::setScopedLocalTypeData(LocalTypeDataKey key,
 
   getOrCreateLocalTypeData().addConcrete(getActiveDominancePoint(),
                                          isConditional, key, value);
+
+  // We query reified types in places so also put a key mapping in for them.
+  auto reified = IGM.getRuntimeReifiedType(key.Type);
+  if (reified != key.Type) {
+    auto reifiedKey = LocalTypeDataKey(reified, key.Kind);
+    if (isConditional) {
+      registerConditionalLocalTypeDataKey(reifiedKey);
+    }
+    getOrCreateLocalTypeData().addConcrete(getActiveDominancePoint(),
+                                           isConditional, reifiedKey, value);
+  }
 }
 
 void IRGenFunction::setUnscopedLocalTypeMetadata(CanType type,
@@ -626,6 +638,15 @@ void IRGenFunction::setUnscopedLocalTypeData(LocalTypeDataKey key,
 
   getOrCreateLocalTypeData().addConcrete(DominancePoint::universal(),
                                          /*conditional*/ false, key, value);
+
+  // We query reified types in places so also put a key mapping in for them.
+  auto reified = IGM.getRuntimeReifiedType(key.Type);
+  if (reified != key.Type) {
+    auto reifiedKey = LocalTypeDataKey(reified, key.Kind);
+    getOrCreateLocalTypeData().addConcrete(DominancePoint::universal(),
+                                           /*conditional*/ false, reifiedKey,
+                                           value);
+  }
 }
 
 void IRGenFunction::bindLocalTypeDataFromTypeMetadata(CanType type,
@@ -779,6 +800,11 @@ addAbstractForFulfillments(IRGenFunction &IGF, FulfillmentMap &&fulfillments,
 
       break;
     }
+
+    case GenericRequirement::Kind::Value: {
+      localDataKind = LocalTypeDataKind::forValue();
+      break;
+    }
     }
 
     // Find the chain for the key.
@@ -928,6 +954,8 @@ void LocalTypeDataKind::print(llvm::raw_ostream &out) const {
     out << "ValueWitnessTable";
   } else if (Value == Shape) {
     out << "Shape";
+  } else if (Value == GenericValue) {
+    out << "GenericValue";
   } else {
     assert(isSingletonKind());
     if (Value >= ValueWitnessDiscriminatorBase) {

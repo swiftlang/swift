@@ -52,7 +52,6 @@ do {
   _=/0/
   // expected-error@-1 {{'_' can only appear in a pattern or on the left side of an assignment}}
   // expected-error@-2 {{cannot find operator '=/' in scope}}
-  // expected-error@-3 {{'/' is not a postfix unary operator}}
 }
 
 // No closing '/' so a prefix operator.
@@ -262,7 +261,7 @@ default:
 }
 
 do {} catch /x/ {}
-// expected-error@-1 {{expression pattern of type 'Regex<Substring>' cannot match values of type 'Never'}}
+// expected-error@-1 {{expression pattern of type 'Regex<Substring>' cannot match values of type 'any Error'}}
 // expected-warning@-2 {{'catch' block is unreachable because no errors are thrown in 'do' block}}
 
 switch /x/ {
@@ -446,7 +445,6 @@ _ = ^/"/"
 _ = ^/"[/"
 // expected-error@-1 {{'^' is not a prefix unary operator}}
 // expected-error@-2 {{unterminated string literal}}
-// expected-error@-3 {{expected custom character class members}}
 
 _ = (^/)("/")
 

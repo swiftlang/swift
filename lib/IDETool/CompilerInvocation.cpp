@@ -12,6 +12,7 @@
 
 #include "swift/IDETool/CompilerInvocation.h"
 
+#include "swift/Basic/Assertions.h"
 #include "swift/Driver/FrontendUtil.h"
 #include "swift/Frontend/Frontend.h"
 #include "clang/AST/DeclObjC.h"
@@ -222,8 +223,12 @@ bool ide::initCompilerInvocation(
 
   auto &LangOpts = Invocation.getLangOptions();
   LangOpts.AttachCommentsToDecls = true;
-  LangOpts.DiagnosticsEditorMode = true;
   LangOpts.CollectParsedToken = true;
+  #if defined(_WIN32)
+  // Source files that might be open in an editor should not be memory mapped on Windows,
+  // as they will become read-only.
+  LangOpts.OpenSourcesAsVolatile = true;
+  #endif
   if (LangOpts.PlaygroundTransform) {
     // The playground instrumenter changes the AST in ways that disrupt the
     // SourceKit functionality. Since we don't need the instrumenter, and all we
@@ -256,8 +261,6 @@ bool ide::initCompilerInvocation(
                                      std::to_string(sessionTimestamp - 1));
     ImporterOpts.ExtraArgs.push_back(
         "-fmodules-validate-once-per-build-session");
-
-    SearchPathOpts.DisableModulesValidateSystemDependencies = true;
   }
 
   // Disable expensive SIL options to reduce time spent in SILGen.
@@ -324,9 +327,6 @@ bool ide::initInvocationByClangArguments(ArrayRef<const char *> ArgList,
       CCArgs.push_back("-iquote");
       CCArgs.push_back(Entry.Path);
       break;
-    case clang::frontend::IndexHeaderMap:
-      CCArgs.push_back("-index-header-map");
-      LLVM_FALLTHROUGH;
     case clang::frontend::Angled: {
       std::string Flag;
       if (Entry.IsFramework)

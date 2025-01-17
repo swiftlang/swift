@@ -33,6 +33,11 @@ public:
   DeclExportabilityVisitor(){};
 
   bool visit(const Decl *D) {
+    // Declarations nested in fragile functions are exported.
+    if (D->getDeclContext()->getFragileFunctionKind().kind !=
+        FragileFunctionKind::None)
+      return true;
+
     if (auto value = dyn_cast<ValueDecl>(D)) {
       // A decl is exportable if it has a public access level.
       auto accessScope =
@@ -165,7 +170,6 @@ public:
 #define UNINTERESTING(KIND)                                                    \
   bool visit##KIND##Decl(const KIND##Decl *D) { return true; }
   UNINTERESTING(TopLevelCode);
-  UNINTERESTING(IfConfig);
   UNINTERESTING(Import);
   UNINTERESTING(PoundDiagnostic);
   UNINTERESTING(PrecedenceGroup);

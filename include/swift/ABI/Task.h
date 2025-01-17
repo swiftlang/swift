@@ -17,7 +17,6 @@
 #ifndef SWIFT_ABI_TASK_H
 #define SWIFT_ABI_TASK_H
 
-#include "swift/ABI/TaskLocal.h"
 #include "swift/ABI/Executor.h"
 #include "swift/ABI/HeapObject.h"
 #include "swift/ABI/Metadata.h"
@@ -43,7 +42,14 @@ class TaskOptionRecord;
 class TaskGroup;
 class ContinuationAsyncContext;
 
-extern FullMetadata<DispatchClassMetadata> jobHeapMetadata;
+// lldb knows about some of these internals. If you change things that lldb
+// knows about (or might know about in the future, as a future lldb might be
+// inspecting a process running an older Swift runtime), increment
+// _swift_concurrency_debug_internal_layout_version and add a comment describing
+// the new version.
+
+extern const HeapMetadata *jobHeapMetadataPtr;
+extern const HeapMetadata *taskHeapMetadataPtr;
 
 /// A schedulable job.
 class alignas(2 * alignof(void*)) Job :
@@ -101,14 +107,14 @@ public:
   };
 
   Job(JobFlags flags, JobInvokeFunction *invoke,
-      const HeapMetadata *metadata = &jobHeapMetadata)
+      const HeapMetadata *metadata = jobHeapMetadataPtr)
       : HeapObject(metadata), Flags(flags), RunJob(invoke) {
     Voucher = voucher_copy();
     assert(!isAsyncTask() && "wrong constructor for a task");
   }
 
   Job(JobFlags flags, TaskContinuationFunction *invoke,
-      const HeapMetadata *metadata = &jobHeapMetadata,
+      const HeapMetadata *metadata = jobHeapMetadataPtr,
       bool captureCurrentVoucher = true)
       : HeapObject(metadata), Flags(flags), ResumeTask(invoke) {
     if (captureCurrentVoucher)
@@ -352,7 +358,11 @@ public:
   /// failing that will return ResumeTask. The returned function pointer may
   /// have a different signature than ResumeTask, and it's only for identifying
   /// code associated with the task.
-  const void *getResumeFunctionForLogging();
+  ///
+  /// If isStarting is true, look into the resume context when appropriate
+  /// to pull out a wrapped resume function. If isStarting is false, assume the
+  /// resume context may not be valid and just return the wrapper.
+  const void *getResumeFunctionForLogging(bool isStarting);
 
   /// Given that we've already fully established the job context
   /// in the current thread, start running this task.  To establish
@@ -415,12 +425,16 @@ public:
 
   /// Get the preferred task executor reference if there is one set for this
   /// task.
-  TaskExecutorRef getPreferredTaskExecutor();
+  TaskExecutorRef getPreferredTaskExecutor(bool assumeHasRecord = false);
 
   /// WARNING: Only to be used during task creation, in other situations prefer
   /// to use `swift_task_pushTaskExecutorPreference` and
   /// `swift_task_popTaskExecutorPreference`.
-  void pushInitialTaskExecutorPreference(TaskExecutorRef preferred);
+  ///
+  /// The `owned` parameter indicates if the executor is owned by the task,
+  /// and must be released when the task completes.
+  void pushInitialTaskExecutorPreference(
+      TaskExecutorRef preferred, bool owned);
 
   /// WARNING: Only to be used during task completion (destroy).
   ///
@@ -723,9 +737,12 @@ static_assert(sizeof(AsyncTask) == NumWords_AsyncTask * sizeof(void*),
               "AsyncTask size is wrong");
 static_assert(alignof(AsyncTask) == 2 * alignof(void*),
               "AsyncTask alignment is wrong");
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Winvalid-offsetof"
 // Libc hardcodes this offset to extract the TaskID
 static_assert(offsetof(AsyncTask, Id) == 4 * sizeof(void *) + 4,
               "AsyncTask::Id offset is wrong");
+#pragma clang diagnostic pop
 
 SWIFT_CC(swiftasync)
 inline void Job::runInFullyEstablishedContext() {

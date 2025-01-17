@@ -4,7 +4,7 @@
 
 // REQUIRES: concurrency
 
-// CHECK: @rethrows
-// CHECK-NEXT: public protocol AsyncIteratorProtocol
+// CHECK-NOT: @rethrows
+// CHECK: public protocol AsyncIteratorProtocol
 public protocol AsyncIteratorProtocol {
 }

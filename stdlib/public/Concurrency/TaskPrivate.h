@@ -18,6 +18,7 @@
 #define SWIFT_CONCURRENCY_TASKPRIVATE_H
 
 #include "Error.h"
+#include "TaskLocal.h"
 #include "Tracing.h"
 #include "swift/ABI/Metadata.h"
 #include "swift/ABI/Task.h"
@@ -322,8 +323,12 @@ public:
     fillWithError(future->getError());
   }
   void fillWithError(SwiftError *error) {
+    #if SWIFT_CONCURRENCY_EMBEDDED
+    swift_unreachable("untyped error used in embedded Swift");
+    #else
     errorResult = error;
     swift_errorRetain(error);
+    #endif
   }
 };
 
@@ -709,10 +714,10 @@ public:
     return record_iterator::rangeBeginning(getInnermostRecord());
   }
 
-  void traceStatusChanged(AsyncTask *task) {
+  void traceStatusChanged(AsyncTask *task, bool isStarting) {
     concurrency::trace::task_status_changed(
         task, static_cast<uint8_t>(getStoredPriority()), isCancelled(),
-        isStoredPriorityEscalated(), isRunning(), isEnqueued());
+        isStoredPriorityEscalated(), isStarting, isRunning(), isEnqueued());
   }
 };
 
@@ -791,7 +796,7 @@ struct AsyncTask::PrivateStorage {
     // elements are destroyed; in order to respect stack-discipline of
     // the task-local allocator.
     if (task->hasInitialTaskExecutorPreferenceRecord()) {
-    task->dropInitialTaskExecutorPreferenceRecord();
+      task->dropInitialTaskExecutorPreferenceRecord();
     }
 
     // Drain unlock the task and remove any overrides on thread as a
@@ -860,8 +865,11 @@ struct AsyncTask::PrivateStorage {
 
 // It will be aligned to 2 words on all platforms. On arm64_32, we have an
 // additional requirement where it is aligned to 4 words.
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Winvalid-offsetof"
 static_assert(((offsetof(AsyncTask, Private) + offsetof(AsyncTask::PrivateStorage, StatusStorage)) % ACTIVE_TASK_STATUS_SIZE == 0),
    "StatusStorage is not aligned in the AsyncTask");
+#pragma clang diagnostic pop
 static_assert(sizeof(AsyncTask::PrivateStorage) <= sizeof(AsyncTask::OpaquePrivateStorage),
               "Task-private storage doesn't fit in reserved space");
 
@@ -938,7 +946,7 @@ inline void AsyncTask::flagAsRunning() {
       if (_private()._status().compare_exchange_weak(oldStatus, newStatus,
                /* success */ std::memory_order_relaxed,
                /* failure */ std::memory_order_relaxed)) {
-        newStatus.traceStatusChanged(this);
+        newStatus.traceStatusChanged(this, true);
         adoptTaskVoucher(this);
         swift_task_enterThreadLocalContext(
             (char *)&_private().ExclusivityAccessSet[0]);

@@ -11,11 +11,13 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/SILOptimizer/Utils/BasicBlockOptUtils.h"
+#include "swift/Basic/Assertions.h"
+#include "swift/SIL/LoopInfo.h"
+#include "swift/SIL/StackList.h"
 #include "swift/SILOptimizer/Utils/CFGOptUtils.h"
 #include "swift/SILOptimizer/Utils/InstOptUtils.h"
 #include "swift/SILOptimizer/Utils/OwnershipOptUtils.h"
 #include "swift/SILOptimizer/Utils/SILSSAUpdater.h"
-#include "swift/SIL/LoopInfo.h"
 
 using namespace swift;
 
@@ -24,9 +26,11 @@ using namespace swift;
 bool ReachableBlocks::visit(function_ref<bool(SILBasicBlock *)> visitor) {
   // Walk over the CFG, starting at the entry block, until all reachable blocks
   // are visited.
-  SILBasicBlock *entryBB = visited.getFunction()->getEntryBlock();
-  SmallVector<SILBasicBlock *, 8> worklist = {entryBB};
-  visited.insert(entryBB);
+  auto *function = visited.getFunction();
+  auto *entry = function->getEntryBlock();
+  StackList<SILBasicBlock *> worklist(function);
+  worklist.push_back(entry);
+  visited.insert(entry);
   while (!worklist.empty()) {
     SILBasicBlock *bb = worklist.pop_back_val();
     if (!visitor(bb))
@@ -38,6 +42,12 @@ bool ReachableBlocks::visit(function_ref<bool(SILBasicBlock *)> visitor) {
     }
   }
   return true;
+}
+
+void ReachableBlocks::compute() {
+  // Visit all the blocks without doing any extra work.
+  visit([](SILBasicBlock *) { return true; });
+  isComputed = true;
 }
 
 ReachingReturnBlocks::ReachingReturnBlocks(SILFunction *function)
@@ -54,62 +64,17 @@ ReachingReturnBlocks::ReachingReturnBlocks(SILFunction *function)
   }
 }
 
-NonErrorHandlingBlocks::NonErrorHandlingBlocks(SILFunction *function)
-    : worklist(function->getEntryBlock()) {
-  while (SILBasicBlock *block = worklist.pop()) {
-    if (auto ta = dyn_cast<TryApplyInst>(block->getTerminator())) {
-      worklist.pushIfNotVisited(ta->getNormalBB());
-    } else {
-      for (SILBasicBlock *succ : block->getSuccessorBlocks()) {
-        worklist.pushIfNotVisited(succ);
-      }
-    }
-  }
-}
-
-/// Remove all instructions in the body of \p bb in safe manner by using
-/// undef.
-void swift::clearBlockBody(SILBasicBlock *bb) {
-
-  for (SILArgument *arg : bb->getArguments()) {
-    arg->replaceAllUsesWithUndef();
-    // To appease the ownership verifier, just set to None.
-    arg->setOwnershipKind(OwnershipKind::None);
-  }
-
-  // Instructions in the dead block may be used by other dead blocks.  Replace
-  // any uses of them with undef values.
-  while (!bb->empty()) {
-    // Grab the last instruction in the bb.
-    auto *inst = &bb->back();
-
-    // Replace any still-remaining uses with undef values and erase.
-    inst->replaceAllUsesOfAllResultsWithUndef();
-    inst->eraseFromParent();
-  }
-}
-
-// Handle the mechanical aspects of removing an unreachable block.
-void swift::removeDeadBlock(SILBasicBlock *bb) {
-  // Clear the body of bb.
-  clearBlockBody(bb);
-
-  // Now that the bb is empty, eliminate it.
-  bb->eraseFromParent();
-}
-
 bool swift::removeUnreachableBlocks(SILFunction &f) {
   ReachableBlocks reachable(&f);
-  // Visit all the blocks without doing any extra work.
-  reachable.visit([](SILBasicBlock *) { return true; });
+  reachable.compute();
 
   // Remove the blocks we never reached. Assume the entry block is visited.
   // Reachable's visited set contains dangling pointers during this loop.
   bool changed = false;
   for (auto ii = std::next(f.begin()), end = f.end(); ii != end;) {
     auto *bb = &*ii++;
-    if (!reachable.isVisited(bb)) {
-      removeDeadBlock(bb);
+    if (!reachable.isReachable(bb)) {
+      bb->removeDeadBlock();
       changed = true;
     }
   }
@@ -156,44 +121,50 @@ void BasicBlockCloner::updateSSAAfterCloning() {
       break;
     }
   }
-  if (!needsSSAUpdate)
-    return;
-
-  SILSSAUpdater ssaUpdater(&updateSSAPhis);
-  for (auto availValPair : availVals) {
-    auto inst = availValPair.first;
-    if (inst->use_empty())
-      continue;
-
-    SILValue newResult(availValPair.second);
-
-    SmallVector<UseWrapper, 16> useList;
-    // Collect the uses of the value.
-    for (auto *use : inst->getUses())
-      useList.push_back(UseWrapper(use));
-
-    ssaUpdater.initialize(inst->getFunction(), inst->getType(),
-                          inst->getOwnershipKind());
-    ssaUpdater.addAvailableValue(origBB, inst);
-    ssaUpdater.addAvailableValue(getNewBB(), newResult);
-
-    if (useList.empty())
-      continue;
-
-    // Update all the uses.
-    for (auto useWrapper : useList) {
-      Operand *use = useWrapper; // unwrap
-      SILInstruction *user = use->getUser();
-      assert(user && "Missing user");
-
-      // Ignore uses in the same basic block.
-      if (user->getParent() == origBB)
+  if (needsSSAUpdate) {
+    SILSSAUpdater ssaUpdater(&updateSSAPhis);
+    for (auto availValPair : availVals) {
+      auto inst = availValPair.first;
+      if (inst->use_empty())
         continue;
 
-      ssaUpdater.rewriteUse(*use);
+      SILValue newResult(availValPair.second);
+
+      SmallVector<UseWrapper, 16> useList;
+      // Collect the uses of the value.
+      for (auto *use : inst->getUses())
+        useList.push_back(UseWrapper(use));
+
+      ssaUpdater.initialize(inst->getFunction(), inst->getType(),
+                            inst->getOwnershipKind());
+      ssaUpdater.addAvailableValue(origBB, inst);
+      ssaUpdater.addAvailableValue(getNewBB(), newResult);
+
+      if (useList.empty())
+        continue;
+
+      // Update all the uses.
+      for (auto useWrapper : useList) {
+        Operand *use = useWrapper; // unwrap
+        SILInstruction *user = use->getUser();
+        assert(user && "Missing user");
+
+        // Ignore uses in the same basic block.
+        if (user->getParent() == origBB)
+          continue;
+
+        ssaUpdater.rewriteUse(*use);
+      }
     }
   }
-  updateBorrowedFromPhis(pm, updateSSAPhis);
+  for (SILBasicBlock *b : blocksWithNewPhiArgs) {
+    for (SILArgument *arg : b->getArguments()) {
+      if (arg->getOwnershipKind() == OwnershipKind::Guaranteed) {
+        updateSSAPhis.push_back(cast<SILPhiArgument>(arg));
+      }
+    }
+  }
+  updateGuaranteedPhis(pm, updateSSAPhis);
 }
 
 void BasicBlockCloner::sinkAddressProjections() {

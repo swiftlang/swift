@@ -421,9 +421,6 @@ final internal class _SwiftDeferredNSDictionary<Key: Hashable, Value>
   }
 }
 
-@available(*, unavailable)
-extension _SwiftDeferredNSDictionary: Sendable {}
-
 // NOTE: older runtimes called this struct _CocoaDictionary. The two
 // must coexist without conflicting ObjC class names from the nested
 // classes, so it was renamed. The old names must not be used in the new

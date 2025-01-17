@@ -18,6 +18,11 @@ module Nullable {
   requires cplusplus
 }
 
+module Inheritance {
+  header "inheritance.h"
+  requires cplusplus
+}
+
 module WitnessTable {
   header "witness-table.h"
   requires cplusplus
@@ -26,6 +31,12 @@ module WitnessTable {
 module ReferenceCounted {
   header "reference-counted.h"
   requires cplusplus
+}
+
+module ReferenceCountedObjCProperty {
+  header "reference-counted-objc-property.h"
+  requires cplusplus
+  export *
 }
 
 module MemberLayout {
@@ -43,3 +54,7 @@ module DerivedFieldGetterReturnsOwnedFRT {
   requires cplusplus
 }
 
+module FunctionsAndMethodsReturningFRT {
+  header "cxx-functions-and-methods-returning-frt.h"
+  requires cplusplus
+}

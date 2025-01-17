@@ -16,13 +16,16 @@
 
 #include "CodeSynthesis.h"
 #include "DerivedConformances.h"
-#include "TypeChecker.h"
-#include "swift/Strings.h"
 #include "TypeCheckDistributed.h"
+#include "TypeChecker.h"
+#include "swift/AST/AvailabilityInference.h"
+#include "swift/AST/ConformanceLookup.h"
+#include "swift/AST/DistributedDecl.h"
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/NameLookupRequests.h"
 #include "swift/AST/ParameterList.h"
-#include "swift/AST/DistributedDecl.h"
+#include "swift/Basic/Assertions.h"
+#include "swift/Strings.h"
 
 using namespace swift;
 
@@ -229,7 +232,8 @@ static FuncDecl* createLocalFunc_doInvokeOnReturn(
   // We create the generic param at invalid depth, which means it'll be filled
   // by semantic analysis.
   auto *resultGenericParamDecl = GenericTypeParamDecl::createImplicit(
-      parentFunc, C.getIdentifier("R"), /*depth*/ 0, /*index*/ 0);
+      parentFunc, C.getIdentifier("R"), /*depth*/ 0, /*index*/ 0,
+      GenericTypeParamKind::Type);
   GenericParamList *doInvokeGenericParamList =
       GenericParamList::create(C, sloc, {resultGenericParamDecl}, sloc);
 
@@ -455,7 +459,6 @@ static ValueDecl *deriveDistributedActor_id(DerivedConformance &derived) {
   PatternBindingDecl *pbDecl;
   std::tie(propDecl, pbDecl) = derived.declareDerivedProperty(
       DerivedConformance::SynthesizedIntroducer::Let, C.Id_id, propertyType,
-      propertyType,
       /*isStatic=*/false, /*isFinal=*/true);
 
   // mark as nonisolated, allowing access to it from everywhere
@@ -474,6 +477,9 @@ static ValueDecl *deriveDistributedActor_actorSystem(
   auto classDecl = dyn_cast<ClassDecl>(derived.Nominal);
   assert(classDecl && derived.Nominal->isDistributedActor());
 
+  if (!C.getLoadedModule(C.Id_Distributed))
+    return nullptr;
+
   // ```
   // nonisolated let actorSystem: ActorSystem
   // ```
@@ -484,8 +490,7 @@ static ValueDecl *deriveDistributedActor_actorSystem(
   PatternBindingDecl *pbDecl;
   std::tie(propDecl, pbDecl) = derived.declareDerivedProperty(
       DerivedConformance::SynthesizedIntroducer::Let, C.Id_actorSystem,
-      propertyType, propertyType,
-      /*isStatic=*/false, /*isFinal=*/true);
+      propertyType, /*isStatic=*/false, /*isFinal=*/true);
 
   // mark as nonisolated, allowing access to it from everywhere
   propDecl->getAttrs().add(
@@ -650,8 +655,6 @@ deriveBodyDistributedActor_unownedExecutor(AbstractFunctionDecl *getter, void *)
   // }
   ASTContext &ctx = getter->getASTContext();
 
-  auto *module = getter->getParentModule();
-
   // Produce an empty brace statement on failure.
   auto failure = [&]() -> std::pair<BraceStmt *, bool> {
     auto body = BraceStmt::create(
@@ -688,8 +691,8 @@ deriveBodyDistributedActor_unownedExecutor(AbstractFunctionDecl *getter, void *)
   Expr *selfForIsLocalArg = DerivedConformance::createSelfDeclRef(getter);
   selfForIsLocalArg->setType(selfType);
 
-  auto conformances = module->collectExistentialConformances(selfType->getCanonicalType(),
-                                                             ctx.getAnyObjectType());
+  auto conformances = collectExistentialConformances(selfType->getCanonicalType(),
+                                                     ctx.getAnyObjectType());
   auto *argListForIsLocal =
       ArgumentList::forImplicitSingle(ctx, Identifier(),
                                       ErasureExpr::create(ctx, selfForIsLocalArg,
@@ -716,7 +719,7 @@ deriveBodyDistributedActor_unownedExecutor(AbstractFunctionDecl *getter, void *)
 
           return Type();
         },
-        LookUpConformanceInModule(getter->getParentModule())
+        LookUpConformanceInModule()
     );
     DeclRefExpr *buildRemoteExecutorExpr =
         new (ctx) DeclRefExpr(
@@ -787,8 +790,7 @@ static ValueDecl *deriveDistributedActor_unownedExecutor(DerivedConformance &der
 
   auto propertyPair = derived.declareDerivedProperty(
       DerivedConformance::SynthesizedIntroducer::Var, ctx.Id_unownedExecutor,
-      executorType, executorType,
-      /*static*/ false, /*final*/ false);
+      executorType, /*static*/ false, /*final*/ false);
   auto property = propertyPair.first;
   property->setSynthesized(true);
   property->getAttrs().add(new (ctx) SemanticsAttr(SEMANTICS_DEFAULT_ACTOR,
@@ -808,11 +810,9 @@ static ValueDecl *deriveDistributedActor_unownedExecutor(DerivedConformance &der
   if (auto enclosingDecl = property->getInnermostDeclWithAvailability())
     asAvailableAs.push_back(enclosingDecl);
 
-  AvailabilityInference::applyInferredAvailableAttrs(
-      property, asAvailableAs, ctx);
+  AvailabilityInference::applyInferredAvailableAttrs(property, asAvailableAs);
 
-  auto getter =
-      derived.addGetterToReadOnlyDerivedProperty(property, executorType);
+  auto getter = derived.addGetterToReadOnlyDerivedProperty(property);
   getter->setBodySynthesizer(deriveBodyDistributedActor_unownedExecutor);
 
   // IMPORTANT: MUST BE AFTER [id, actorSystem].

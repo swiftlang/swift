@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/SIL/OwnershipUtils.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/GraphNodeWorklist.h"
 #include "swift/Basic/SmallPtrSetVector.h"
@@ -102,7 +103,7 @@ namespace swift::test {
 // - the value
 // - whether it has a pointer escape
 static FunctionTest OwnershipUtilsHasPointerEscape(
-    "has-pointer-escape", [](auto &function, auto &arguments, auto &test) {
+    "has_pointer_escape", [](auto &function, auto &arguments, auto &test) {
       auto value = arguments.takeValue();
       auto has = findPointerEscape(value);
       value->print(llvm::outs());
@@ -143,64 +144,6 @@ bool swift::canOpcodeForwardOwnedValues(Operand *use) {
     return fwdOp.preservesOwnership() &&
            !fwdOp.canForwardGuaranteedCompatibleValuesOnly();
   return false;
-}
-
-bool swift::computeIsReborrow(SILArgument *arg) {
-  if (arg->getOwnershipKind() != OwnershipKind::Guaranteed) {
-    return false;
-  }
-  if (isa<SILFunctionArgument>(arg)) {
-    return false;
-  }
-  return !computeIsGuaranteedForwarding(arg);
-}
-
-bool swift::computeIsScoped(SILArgument *arg) {
-  if (arg->getOwnershipKind() == OwnershipKind::Owned) {
-    return true;
-  }
-  return computeIsReborrow(arg);
-}
-
-// This is the use-def equivalent of use->getOperandOwnership() ==
-// OperandOwnership::GuaranteedForwarding.
-bool swift::computeIsGuaranteedForwarding(SILValue value) {
-  if (value->getOwnershipKind() != OwnershipKind::Guaranteed) {
-    return false;
-  }
-  value = lookThroughBorrowedFromDef(value);
-  // NOTE: canOpcodeForwardInnerGuaranteedValues returns true for transformation
-  // terminator results.
-  if (canOpcodeForwardInnerGuaranteedValues(value) ||
-      isa<SILFunctionArgument>(value)) {
-    return true;
-  }
-  // If not a phi, return false
-  auto *phi = dyn_cast<SILPhiArgument>(value);
-  if (!phi || !phi->isPhi()) {
-    return false;
-  }
-  // For a phi, if we find GuaranteedForwarding phi operand on any incoming
-  // path, we return true. Additional verification is added to ensure
-  // GuaranteedForwarding phi operands are found on zero or all paths in the
-  // OwnershipVerifier.
-  bool isGuaranteedForwardingPhi = false;
-  phi->visitTransitiveIncomingPhiOperands([&](auto *, auto *op) -> bool {
-    assert(op->get()->getOwnershipKind().isCompatibleWith(
-        OwnershipKind::Guaranteed));
-    auto opValue = lookThroughBorrowedFromDef(op->get());
-    if (canOpcodeForwardInnerGuaranteedValues(opValue) ||
-        isa<SILFunctionArgument>(opValue)) {
-      isGuaranteedForwardingPhi = true;
-      return false;
-    }
-    auto *phi = dyn_cast<SILPhiArgument>(opValue);
-    if (!phi || !phi->isPhi()) {
-      return false;
-    }
-    return true;
-  });
-  return isGuaranteedForwardingPhi;
 }
 
 BorrowedFromInst *swift::getBorrowedFromUser(SILValue v) {
@@ -751,8 +694,7 @@ bool BorrowingOperand::visitScopeEndingUses(
   }
   case BorrowingOperandKind::BeginApply: {
     bool deadApply = true;
-    auto *user = cast<BeginApplyInst>(op->getUser());
-    for (auto *use : user->getTokenResult()->getUses()) {
+    for (auto *use : cast<BeginApplyInst>(op->getUser())->getEndApplyUses()) {
       deadApply = false;
       if (!visitScopeEnd(use))
         return false;
@@ -913,6 +855,9 @@ void BorrowedValueKind::print(llvm::raw_ostream &os) const {
   case BorrowedValueKind::Phi:
     os << "Phi";
     return;
+  case BorrowedValueKind::BeginApplyToken:
+    os << "BeginApply";
+    return;
   }
   llvm_unreachable("Covered switch isn't covered?!");
 }
@@ -945,7 +890,12 @@ bool BorrowedValue::visitLocalScopeEndingUses(
   case BorrowedValueKind::LoadBorrow:
   case BorrowedValueKind::BeginBorrow:
   case BorrowedValueKind::Phi:
+  case BorrowedValueKind::BeginApplyToken:
     for (auto *use : lookThroughBorrowedFromUser(value)->getUses()) {
+      if (isa<ExtendLifetimeInst>(use->getUser())) {
+        if (!visitor(use))
+          return false;
+      }
       if (use->isLifetimeEnding()) {
         if (!visitor(use))
           return false;
@@ -1142,7 +1092,7 @@ bool AddressOwnership::areUsesWithinLifetime(
   if (!base.hasLocalOwnershipLifetime())
     return true;
 
-  SILValue root = base.getOwnershipReferenceRoot();
+  SILValue root = base.getOwnershipReferenceAggregate();
   BorrowedValue borrow(root);
   if (borrow)
     return borrow.areUsesWithinExtendedScope(uses, &deadEndBlocks);
@@ -1654,10 +1604,15 @@ void swift::visitExtendedReborrowPhiBaseValuePairs(
     // the reborrow, its phi value will be the new base value.
     for (auto &op : phiOp.getBranch()->getAllOperands()) {
       PhiOperand otherPhiOp(&op);
-      if (otherPhiOp.getSource() != currentBaseValue) {
+      auto *borrowedFromUser = getBorrowedFromUser(currentBaseValue);
+      if (borrowedFromUser && borrowedFromUser == otherPhiOp.getSource()) {
+        newBaseValue = otherPhiOp.getValue();
         continue;
       }
-      newBaseValue = otherPhiOp.getValue();
+      if (otherPhiOp.getSource() == currentBaseValue) {
+        newBaseValue = otherPhiOp.getValue();
+        continue;
+      }
     }
 
     // Call the visitor function
@@ -1819,6 +1774,7 @@ public:
 
       case BorrowedValueKind::LoadBorrow:
       case BorrowedValueKind::SILFunctionArgument:
+      case BorrowedValueKind::BeginApplyToken:
         // There is no enclosing def on this path.
         return true;
       }
@@ -2037,6 +1993,7 @@ protected:
     }
     case BorrowedValueKind::LoadBorrow:
     case BorrowedValueKind::SILFunctionArgument:
+    case BorrowedValueKind::BeginApplyToken:
       // There is no enclosing def on this path.
       break;
     }
@@ -2133,7 +2090,7 @@ namespace swift::test {
 // - function
 // - the enclosing defs
 static FunctionTest FindEnclosingDefsTest(
-    "find-enclosing-defs", [](auto &function, auto &arguments, auto &test) {
+    "find_enclosing_defs", [](auto &function, auto &arguments, auto &test) {
       function.print(llvm::outs());
       llvm::outs() << "Enclosing Defs:\n";
       visitEnclosingDefs(arguments.takeValue(), [](SILValue def) {
@@ -2158,7 +2115,7 @@ namespace swift::test {
 // - function
 // - the borrow introducers
 static FunctionTest FindBorrowIntroducers(
-    "find-borrow-introducers", [](auto &function, auto &arguments, auto &test) {
+    "find_borrow_introducers", [](auto &function, auto &arguments, auto &test) {
       function.print(llvm::outs());
       llvm::outs() << "Introducers:\n";
       visitBorrowIntroducers(arguments.takeValue(), [](SILValue def) {
@@ -2277,7 +2234,7 @@ namespace swift::test {
 // - function
 // - the adjacent phis
 static FunctionTest VisitInnerAdjacentPhisTest(
-    "visit-inner-adjacent-phis",
+    "visit_inner_adjacent_phis",
     [](auto &function, auto &arguments, auto &test) {
       function.print(llvm::outs());
       visitInnerAdjacentPhis(cast<SILPhiArgument>(arguments.takeValue()),
@@ -2410,4 +2367,21 @@ bool swift::isRedundantMoveValue(MoveValueInst *mvi) {
   // (3) Escaping matches?  (Expensive check, saved for last.)
   auto moveHasEscape = findPointerEscape(mvi);
   return moveHasEscape == originalHasEscape;
+}
+
+void swift::updateReborrowFlags(SILValue forEndBorrowValue) {
+  ValueWorklist worklist(forEndBorrowValue);
+  while (SILValue v = worklist.pop()) {
+    if (auto *bfi = dyn_cast<BorrowedFromInst>(v)) {
+      v = bfi->getBorrowedValue();
+    }
+    if (auto *arg = dyn_cast<SILPhiArgument>(v)) {
+      if (arg->isPhi() && !arg->isReborrow()) {
+        arg->setReborrow(true);
+        for (auto *predBlock : arg->getParent()->getPredecessorBlocks()) {
+          worklist.pushIfNotVisited(arg->getIncomingPhiValue(predBlock));
+        }
+      }
+    }
+  }
 }

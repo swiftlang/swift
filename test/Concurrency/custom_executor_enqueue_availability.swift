@@ -1,11 +1,11 @@
-// RUN: %target-swift-frontend -enable-experimental-move-only %s -emit-sil -o /dev/null -verify
-// RUN: %target-swift-frontend -enable-experimental-move-only %s -emit-sil -o /dev/null -verify -strict-concurrency=targeted
-// RUN: %target-swift-frontend -enable-experimental-move-only %s -emit-sil -o /dev/null -verify -strict-concurrency=complete
-// RUN: %target-swift-frontend -enable-experimental-move-only %s -emit-sil -o /dev/null -verify -strict-concurrency=complete -enable-upcoming-feature RegionBasedIsolation
+// RUN: %target-swift-frontend -print-diagnostic-groups -enable-experimental-move-only %s -emit-sil -o /dev/null -verify
+// RUN: %target-swift-frontend -print-diagnostic-groups -enable-experimental-move-only %s -emit-sil -o /dev/null -verify -strict-concurrency=targeted
+// RUN: %target-swift-frontend -print-diagnostic-groups -enable-experimental-move-only %s -emit-sil -o /dev/null -verify -strict-concurrency=complete
+// RUN: %target-swift-frontend -print-diagnostic-groups -enable-experimental-move-only %s -emit-sil -o /dev/null -verify -strict-concurrency=complete -enable-upcoming-feature RegionBasedIsolation
 
 // REQUIRES: concurrency
 // REQUIRES: OS=macosx
-// REQUIRES: asserts
+// REQUIRES: swift_feature_RegionBasedIsolation
 
 // rdar://106849189 move-only types should be supported in freestanding mode
 // UNSUPPORTED: freestanding
@@ -55,7 +55,7 @@ final class TripleExecutor: SerialExecutor {
 
   // expected-warning@+2{{'Job' is deprecated: renamed to 'ExecutorJob'}}
   // expected-note@+1{{use 'ExecutorJob' instead}}
-  func enqueue(_ job: __owned Job) {} // expected-warning{{'Executor.enqueue(Job)' is deprecated as a protocol requirement; conform type 'TripleExecutor' to 'Executor' by implementing 'func enqueue(ExecutorJob)' instead}}
+  func enqueue(_ job: __owned Job) {} // expected-warning{{'Executor.enqueue(Job)' is deprecated as a protocol requirement; conform type 'TripleExecutor' to 'Executor' by implementing 'func enqueue(ExecutorJob)' instead [DeprecatedDeclaration]}}
 
   func enqueue(_ job: consuming ExecutorJob) {}
 

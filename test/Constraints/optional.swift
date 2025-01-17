@@ -478,20 +478,17 @@ func rdar75146811() {
 
   var arr: [Double]! = []
 
-  test(&arr) // expected-error {{cannot convert value of type '[Double]?' to expected argument type 'Double'}}
+  test(&arr) // Ok
   test((&arr)) // expected-error {{'&' may only be used to pass an argument to inout parameter}}
-  // expected-error@-1 {{cannot convert value of type '[Double]?' to expected argument type 'Double'}}
-  test(&(arr)) // expected-error {{cannot convert value of type '[Double]?' to expected argument type 'Double'}}
+  test(&(arr)) // Ok
 
-  test_tuple(&arr, x: 0) // expected-error {{cannot convert value of type '[Double]?' to expected argument type 'Double'}}
+  test_tuple(&arr, x: 0) // Ok
   test_tuple((&arr), x: 0) // expected-error {{'&' may only be used to pass an argument to inout parameter}}
-  // expected-error@-1 {{cannot convert value of type '[Double]?' to expected argument type 'Double'}}
-  test_tuple(&(arr), x: 0) // expected-error {{cannot convert value of type '[Double]?' to expected argument type 'Double'}}
+  test_tuple(&(arr), x: 0) // Ok
 
-  test_named(x: &arr) // expected-error {{cannot convert value of type '[Double]?' to expected argument type 'Double'}}
+  test_named(x: &arr) // Ok
   test_named(x: (&arr)) // expected-error {{'&' may only be used to pass an argument to inout parameter}}
-  // expected-error@-1 {{cannot convert value of type '[Double]?' to expected argument type 'Double'}}
-  test_named(x: &(arr)) // expected-error {{cannot convert value of type '[Double]?' to expected argument type 'Double'}}
+  test_named(x: &(arr)) // Ok
 }
 
 // rdar://75514153 - Unable to produce a diagnostic for ambiguities related to use of `nil`
@@ -597,20 +594,4 @@ do {
   var x: Double = 42
   test(x!) // expected-error {{no exact matches in call to local function 'test'}}
   // expected-error@-1 {{cannot force unwrap value of non-optional type 'Double'}}
-}
-
-// Diagnose cases of invalid chaining when parameter is not optional based on context.
-do {
-  class Test {
-    var value: Int = 42
-  }
-
-  class Container {
-    let test: Test = Test()
-
-    func loop() {
-      [test].forEach { $0?.value = 42 }
-      // expected-error@-1 {{cannot use optional chaining on non-optional value of type 'Test'}}
-    }
-  }
 }

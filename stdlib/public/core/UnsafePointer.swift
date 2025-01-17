@@ -204,6 +204,7 @@
 ///       let numberPointer = UnsafePointer<Int>(&number)
 ///       // Accessing 'numberPointer' is undefined behavior.
 @frozen // unsafe-performance
+@unsafe
 public struct UnsafePointer<Pointee: ~Copyable>: Copyable {
 
   /// The underlying raw (untyped) pointer.
@@ -286,7 +287,6 @@ extension UnsafePointer where Pointee: ~Copyable {
   }
 }
 
-@_disallowFeatureSuppression(NoncopyableGenerics)
 extension UnsafePointer {
   // This preserves the ABI of the original (pre-6.0) `pointee` property that
   // used to export a getter. The current one above would export a read
@@ -316,7 +316,6 @@ extension UnsafePointer where Pointee: ~Copyable {
   }
 }
 
-@_disallowFeatureSuppression(NoncopyableGenerics)
 extension UnsafePointer {
   // This preserves the ABI of the original (pre-6.0) subscript that used to
   // export a getter. The current one above would export a read accessor, if it
@@ -444,16 +443,14 @@ extension UnsafePointer {
   /// - Returns: A pointer to the stored property represented
   ///            by the key path, or `nil`.
   @_alwaysEmitIntoClient
-  #if $Embedded
   @_transparent
-  #endif
   public func pointer<Property>(
     to property: KeyPath<Pointee, Property>
   ) -> UnsafePointer<Property>? {
     guard let o = property._storedInlineOffset else { return nil }
     _internalInvariant(o >= 0)
     _debugPrecondition(
-      o == 0 || UnsafeRawPointer(self) < UnsafeRawPointer(bitPattern: 0 &- o)!,
+      !UInt(bitPattern: self).addingReportingOverflow(UInt(bitPattern: o)).overflow,
       "Overflow in pointer arithmetic"
     )
     return .init(Builtin.gepRaw_Word(_rawValue, o._builtinWordValue))
@@ -657,6 +654,7 @@ extension UnsafePointer where Pointee: ~Copyable {
 ///       let numberPointer = UnsafeMutablePointer<Int>(&number)
 ///       // Accessing 'numberPointer' is undefined behavior.
 @frozen // unsafe-performance
+@unsafe
 public struct UnsafeMutablePointer<Pointee: ~Copyable>: Copyable {
   /// The underlying raw (untyped) pointer.
   @_preInverseGenerics
@@ -845,7 +843,6 @@ extension UnsafeMutablePointer where Pointee: ~Copyable {
   }
 }
 
-@_disallowFeatureSuppression(NoncopyableGenerics)
 extension UnsafeMutablePointer {
   // This preserves the ABI of the original (pre-6.0) `pointee` property that
   // used to export a getter. The current one above would export a read
@@ -1303,7 +1300,6 @@ extension UnsafeMutablePointer where Pointee: ~Copyable {
   }
 }
 
-@_disallowFeatureSuppression(NoncopyableGenerics)
 extension UnsafeMutablePointer {
   // This preserves the ABI of the original (pre-6.0) subscript that used to
   // export a getter. The current one above would export a read accessor, if it
@@ -1332,16 +1328,14 @@ extension UnsafeMutablePointer {
   /// - Returns: A pointer to the stored property represented
   ///            by the key path, or `nil`.
   @_alwaysEmitIntoClient
-  #if $Embedded
   @_transparent
-  #endif
   public func pointer<Property>(
     to property: KeyPath<Pointee, Property>
   ) -> UnsafePointer<Property>? {
     guard let o = property._storedInlineOffset else { return nil }
     _internalInvariant(o >= 0)
     _debugPrecondition(
-      o == 0 || UnsafeRawPointer(self) < UnsafeRawPointer(bitPattern: 0 &- o)!,
+      !UInt(bitPattern: self).addingReportingOverflow(UInt(bitPattern: o)).overflow,
       "Overflow in pointer arithmetic"
     )
     return .init(Builtin.gepRaw_Word(_rawValue, o._builtinWordValue))
@@ -1356,16 +1350,14 @@ extension UnsafeMutablePointer {
   /// - Returns: A mutable pointer to the stored property represented
   ///            by the key path, or `nil`.
   @_alwaysEmitIntoClient
-  #if $Embedded
   @_transparent
-  #endif
   public func pointer<Property>(
     to property: WritableKeyPath<Pointee, Property>
   ) -> UnsafeMutablePointer<Property>? {
     guard let o = property._storedInlineOffset else { return nil }
     _internalInvariant(o >= 0)
     _debugPrecondition(
-      o == 0 || UnsafeRawPointer(self) < UnsafeRawPointer(bitPattern: 0 &- o)!,
+      !UInt(bitPattern: self).addingReportingOverflow(UInt(bitPattern: o)).overflow,
       "Overflow in pointer arithmetic"
     )
     return .init(Builtin.gepRaw_Word(_rawValue, o._builtinWordValue))

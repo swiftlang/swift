@@ -220,12 +220,6 @@ extern uintptr_t __COMPATIBILITY_LIBRARIES_CANNOT_CHECK_THE_IS_SWIFT_BIT_DIRECTL
 #define SWIFT_ASYNC_CONTEXT
 #endif
 
-#if __has_attribute(optnone)
-#define SWIFT_OPTNONE __attribute__((optnone))
-#else
-#define SWIFT_OPTNONE
-#endif
-
 // SWIFT_CC(swiftasync) is the Swift async calling convention.
 // We assume that it supports mandatory tail call elimination.
 #if __has_attribute(swiftasynccall)
@@ -330,6 +324,9 @@ extern uintptr_t __COMPATIBILITY_LIBRARIES_CANNOT_CHECK_THE_IS_SWIFT_BIT_DIRECTL
 #define __ptrauth_swift_type_layout_string                                     \
   __ptrauth(ptrauth_key_process_independent_data, 1,                           \
             SpecialPointerAuthDiscriminators::TypeLayoutString)
+#define __ptrauth_swift_deinit_work_function                                   \
+  __ptrauth(ptrauth_key_function_pointer, 1,                                   \
+            SpecialPointerAuthDiscriminators::DeinitWorkFunction)
 
 #if __has_attribute(ptrauth_struct)
 #define swift_ptrauth_struct(key, discriminator)                               \
@@ -370,6 +367,7 @@ extern uintptr_t __COMPATIBILITY_LIBRARIES_CANNOT_CHECK_THE_IS_SWIFT_BIT_DIRECTL
 #define swift_ptrauth_sign_opaque_read_resume_function(__fn, __buffer) (__fn)
 #define swift_ptrauth_sign_opaque_modify_resume_function(__fn, __buffer) (__fn)
 #define __ptrauth_swift_type_layout_string
+#define __ptrauth_swift_deinit_work_function
 #define swift_ptrauth_struct(key, discriminator)
 #define swift_ptrauth_struct_derived(from)
 #endif
@@ -543,6 +541,17 @@ swift_auth_code(T value, unsigned extra) {
 #if SWIFT_PTRAUTH
   return (T)ptrauth_auth_function((void *)value,
                                   ptrauth_key_process_independent_code, extra);
+#else
+  return value;
+#endif
+}
+
+template <typename T>
+SWIFT_RUNTIME_ATTRIBUTE_ALWAYS_INLINE static inline T
+swift_auth_code_function(T value, unsigned extra) {
+#if SWIFT_PTRAUTH
+  return (T)ptrauth_auth_function((void *)value,
+                                  ptrauth_key_function_pointer, extra);
 #else
   return value;
 #endif

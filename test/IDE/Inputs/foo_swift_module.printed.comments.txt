@@ -39,7 +39,7 @@ enum MyQuickLookObject {
 }
 var globalVar: Int
 func hiddenImport()
-func overlayedFoo()
+func overlaidFoo()
 func visibleImport()
 precedencegroup High {
   associativity: left

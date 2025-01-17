@@ -1,4 +1,6 @@
-// RUN: %target-swift-emit-silgen %s -enable-experimental-feature FullTypedThrows | %FileCheck %s
+// RUN: %target-swift-emit-silgen -Xllvm -sil-print-types %s -enable-experimental-feature FullTypedThrows | %FileCheck %s
+
+// REQUIRES: swift_feature_FullTypedThrows
 
 public func genericThrow<E>(e: E) throws(E) {
   throw e
@@ -375,4 +377,13 @@ struct GSF2<F: Error, T>: P2 {
 // CHECK: bb0(%0 : $*any Error, %1 : $*GSA<τ_0_0>):
 struct GSA<T>: P2 {
   typealias Failure = any Error
+}
+
+struct ReducedError<T: Error> {}
+
+extension ReducedError where T == MyError {
+  // CHECK-LABEL: sil hidden [ossa] @$s20typed_throws_generic12ReducedErrorVA2A02MyE0ORszrlE05throwfE0yyAEYKF : $@convention(method) (ReducedError<MyError>) -> @error MyError {
+  func throwMyError() throws(T) {
+    throw MyError.fail
+  }
 }

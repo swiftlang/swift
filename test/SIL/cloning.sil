@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -enable-sil-verify-all -inline %s | %FileCheck %s
+// RUN: %target-sil-opt -sil-print-types -enable-sil-verify-all -inline %s | %FileCheck %s
 
 // Check cloning of instructions.
 
@@ -205,4 +205,104 @@ sil [ossa] @caller_specify_test : $@convention(thin) () -> () {
   %callee = function_ref @callee_specify_test : $@convention(thin) () -> ()
   %retval = apply %callee() : $@convention(thin) () -> ()
   return %retval : $()
+}
+
+
+// CHECK-LABEL: sil [ossa] @caller_extend_lifetime : {{.*}} {
+// CHECK:       bb0([[O:%[^,]+]] :
+// CHECK:         extend_lifetime [[O]]
+// CHECK-LABEL: } // end sil function 'caller_extend_lifetime'
+sil [always_inline] [ossa] @callee_extend_lifetime : $@convention(thin) (@owned Builtin.NativeObject) -> () {
+entry(%o : @owned $Builtin.NativeObject):
+  br loop
+loop:
+  extend_lifetime %o : $Builtin.NativeObject
+  br loop
+}
+
+sil [ossa] @caller_extend_lifetime : $@convention(thin) (@owned Builtin.NativeObject) -> () {
+entry(%o : @owned $Builtin.NativeObject):
+  %callee = function_ref @callee_extend_lifetime : $@convention(thin) (@owned Builtin.NativeObject) -> ()
+  %retval = apply %callee(%o) : $@convention(thin) (@owned Builtin.NativeObject) -> ()
+  return %retval : $()
+}
+
+sil [ossa] [always_inline] @callee_destroy_value : $@convention(thin) (@owned X) -> () {
+entry(%x : @owned $X):
+  cond_br undef, good, bad
+good:
+  cond_br undef, gleft, gright
+gleft:
+  destroy_value %x : $X
+  br exit
+gright:
+  destroy_value [poison] %x : $X
+  br exit
+exit:
+  %retval = tuple()
+  return %retval : $()
+bad:
+  cond_br undef, bleft, bright
+bleft:
+  destroy_value [dead_end] %x : $X
+  unreachable
+bright:
+  destroy_value [poison] [dead_end] %x : $X
+  unreachable
+}
+
+// CHECK-LABEL: sil [ossa] @caller_destroy_value : {{.*}} {
+// CHECK:         destroy_value
+// CHECK:         destroy_value [poison]
+// CHECK:         destroy_value [dead_end]
+// CHECK:         destroy_value [poison] [dead_end]
+// CHECK-LABEL: } // end sil function 'caller_destroy_value'
+sil [ossa] @caller_destroy_value : $@convention(thin) (@owned X) -> () {
+entry(%x : @owned $X):
+  %callee = function_ref @callee_destroy_value : $@convention(thin) (@owned X) -> ()
+  %res = apply %callee(%x) : $@convention(thin) (@owned X) -> ()
+  return %res : $()
+}
+
+sil [ossa] [always_inline] @callee_dealloc_box : $@convention(thin) () -> () {
+entry:
+  %b = alloc_box ${ var X }
+  cond_br undef, exit, die
+
+exit:
+  dealloc_box %b : ${ var X }
+  %retval = tuple()
+  return %retval : $()
+
+die:
+  dealloc_box [dead_end] %b : ${ var X }
+  unreachable
+}
+
+// CHECK-LABEL: sil [ossa] @caller_dealloc_box : {{.*}} {
+// CHECK:         dealloc_box
+// CHECK:         dealloc_box [dead_end]
+// CHECK-LABEL: } // end sil function 'caller_dealloc_box'
+sil [ossa] @caller_dealloc_box : $@convention(thin) () -> () {
+entry:
+  %callee = function_ref @callee_dealloc_box : $@convention(thin) () -> ()
+  %res = apply %callee() : $@convention(thin) () -> ()
+  return %res : $()
+}
+
+sil [transparent] [ossa] @getSize : $@convention(thin) <Type> (@thick Type.Type) -> Builtin.Word {
+bb0(%ty : $@thick Type.Type):
+  %size = builtin "sizeof"<Type>() : $Builtin.Word
+  return %size : $Builtin.Word
+}
+
+// CHECK-LABEL: sil [ossa] @callee_builtin_type_dep_operand : {{.*}} {
+// CHECK:         open_existential_metatype
+// CHECK-LABEL: } // end sil function 'callee_builtin_type_dep_operand'
+sil [ossa] @callee_builtin_type_dep_operand : $@convention(thin) (@thick any Any.Type) -> Builtin.Word {
+bb0(%0 : $@thick any Any.Type):
+  %ty = open_existential_metatype %0 : $@thick any Any.Type to $@thick (@opened("00000000-0000-0000-0000-000000000000", Any) Self).Type
+  %getSize = function_ref @getSize : $@convention(thin) <τ_0_0> (@thick τ_0_0.Type) -> Builtin.Word
+  %retval = apply %getSize<@opened("00000000-0000-0000-0000-000000000000", Any) Self>(%ty) : $@convention(thin) <τ_0_0> (@thick τ_0_0.Type) -> Builtin.Word
+  return %retval : $Builtin.Word
 }

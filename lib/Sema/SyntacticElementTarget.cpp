@@ -17,6 +17,7 @@
 #include "swift/Sema/SyntacticElementTarget.h"
 #include "swift/AST/PropertyWrappers.h"
 #include "swift/AST/TypeRepr.h"
+#include "swift/Basic/Assertions.h"
 #include "TypeChecker.h"
 
 using namespace swift;
@@ -56,7 +57,6 @@ SyntacticElementTarget::SyntacticElementTarget(
   expression.propertyWrapper.innermostWrappedValueInit = nullptr;
   expression.propertyWrapper.hasInitialWrappedValue = false;
   expression.isDiscarded = isDiscarded;
-  expression.bindPatternVarsOneWay = false;
   expression.initialization.patternBinding = nullptr;
   expression.initialization.patternBindingIndex = 0;
 }
@@ -135,8 +135,7 @@ void SyntacticElementTarget::maybeApplyPropertyWrapper() {
 
 SyntacticElementTarget
 SyntacticElementTarget::forInitialization(Expr *initializer, DeclContext *dc,
-                                          Type patternType, Pattern *pattern,
-                                          bool bindPatternVarsOneWay) {
+                                          Type patternType, Pattern *pattern) {
   // Determine the contextual type for the initialization.
   TypeLoc contextualType;
   if (!(isa<OptionalSomePattern>(pattern) && !pattern->isImplicit()) &&
@@ -160,21 +159,20 @@ SyntacticElementTarget::forInitialization(Expr *initializer, DeclContext *dc,
   SyntacticElementTarget target(initializer, dc, contextInfo,
                                 /*isDiscarded=*/false);
   target.expression.pattern = pattern;
-  target.expression.bindPatternVarsOneWay = bindPatternVarsOneWay;
   target.maybeApplyPropertyWrapper();
   return target;
 }
 
 SyntacticElementTarget SyntacticElementTarget::forInitialization(
     Expr *initializer, Type patternType, PatternBindingDecl *patternBinding,
-    unsigned patternBindingIndex, bool bindPatternVarsOneWay) {
+    unsigned patternBindingIndex) {
   auto *dc = patternBinding->getDeclContext();
   if (auto *initContext = patternBinding->getInitContext(patternBindingIndex))
     dc = initContext;
 
   auto result = forInitialization(
       initializer, dc, patternType,
-      patternBinding->getPattern(patternBindingIndex), bindPatternVarsOneWay);
+      patternBinding->getPattern(patternBindingIndex));
   result.expression.initialization.patternBinding = patternBinding;
   result.expression.initialization.patternBindingIndex = patternBindingIndex;
   return result;
@@ -194,9 +192,8 @@ SyntacticElementTarget::forReturn(ReturnStmt *returnStmt, Type contextTy,
 
 SyntacticElementTarget
 SyntacticElementTarget::forForEachPreamble(ForEachStmt *stmt, DeclContext *dc,
-                                           bool ignoreWhereClause,
                                            GenericEnvironment *packElementEnv) {
-  SyntacticElementTarget target(stmt, dc, ignoreWhereClause, packElementEnv);
+  SyntacticElementTarget target(stmt, dc, packElementEnv);
   return target;
 }
 
@@ -236,8 +233,8 @@ ContextualPattern SyntacticElementTarget::getContextualPattern() const {
   }
 
   if (isForEachPreamble()) {
-    return ContextualPattern::forRawPattern(forEachStmt.pattern,
-                                            forEachStmt.dc);
+    return ContextualPattern::forRawPattern(forEachPreamble.pattern,
+                                            forEachPreamble.dc);
   }
 
   auto ctp = getExprContextualTypePurpose();
@@ -303,9 +300,15 @@ bool SyntacticElementTarget::contextualTypeIsOnlyAHint() const {
 
 void SyntacticElementTarget::markInvalid() const {
   class InvalidationWalker : public ASTWalker {
+    ASTContext &Ctx;
+
+  public:
+    InvalidationWalker(ASTContext &ctx) : Ctx(ctx) {}
+
     PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
-      // TODO: We ought to fill in ErrorTypes for expressions here; ultimately
-      // type-checking should always produce typed AST.
+      if (!E->getType())
+        E->setType(ErrorType::get(Ctx));
+
       return Action::Continue(E);
     }
 
@@ -321,7 +324,7 @@ void SyntacticElementTarget::markInvalid() const {
       return Action::VisitNodeIf(isa<PatternBindingDecl>(D));
     }
   };
-  InvalidationWalker walker;
+  InvalidationWalker walker(getDeclContext()->getASTContext());
   walk(walker);
 }
 
@@ -330,8 +333,8 @@ SyntacticElementTarget::walk(ASTWalker &walker) const {
   SyntacticElementTarget result = *this;
   switch (kind) {
   case Kind::expression: {
-    if (isForInitialization()) {
-      if (auto *newPattern = getInitializationPattern()->walk(walker)) {
+    if (auto *pattern = getPattern()) {
+      if (auto *newPattern = pattern->walk(walker)) {
         result.setPattern(newPattern);
       } else {
         return std::nullopt;
@@ -396,7 +399,7 @@ SyntacticElementTarget::walk(ASTWalker &walker) const {
     break;
   }
   case Kind::forEachPreamble: {
-    // We need to skip the where clause if requested, and we currently do not
+    // We need to skip the where clause, and we currently do not
     // type-check a for loop's BraceStmt as part of the SyntacticElementTarget,
     // so we need to skip it here.
     // TODO: We ought to be able to fold BraceStmt checking into the constraint
@@ -417,8 +420,7 @@ SyntacticElementTarget::walk(ASTWalker &walker) const {
       }
 
       PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
-        // Ignore where clause if needed.
-        if (Target.ignoreForEachWhereClause() && E == ForStmt->getWhere())
+        if (E == ForStmt->getWhere())
           return Action::SkipNode(E);
 
         E = E->walk(Walker);
@@ -454,7 +456,7 @@ SyntacticElementTarget::walk(ASTWalker &walker) const {
     ForEachWalker forEachWalker(walker, *this);
 
     if (auto *newStmt = getAsForEachStmt()->walk(forEachWalker)) {
-      result.forEachStmt.stmt = cast<ForEachStmt>(newStmt);
+      result.forEachPreamble.stmt = cast<ForEachStmt>(newStmt);
     } else {
       return std::nullopt;
     }

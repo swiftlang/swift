@@ -41,12 +41,12 @@ static void postNotification(sourcekitd_response_t Notification) {
     goto done;
 
   {
-    xpc_object_t contents = xpc_array_create(nullptr, 0);
+    xpc_object_t contents = xpc_array_create_empty();
     xpc_array_set_uint64(contents, XPC_ARRAY_APPEND,
                          (uint64_t)xpc::Message::Notification);
     xpc_array_set_value(contents, XPC_ARRAY_APPEND, Notification);
 
-    xpc_object_t msg = xpc_dictionary_create(nullptr, nullptr, 0);
+    xpc_object_t msg = xpc_dictionary_create_empty();
     xpc_dictionary_set_value(msg, xpc::KeyInternalMsg, contents);
     xpc_release(contents);
 
@@ -85,12 +85,12 @@ static sourcekitd_uid_t xpcSKDUIDFromUIdent(UIdent UID) {
   if (!peer)
     return nullptr;
 
-  xpc_object_t contents = xpc_array_create(nullptr, 0);
+  xpc_object_t contents = xpc_array_create_empty();
   xpc_array_set_uint64(contents, XPC_ARRAY_APPEND,
                        (uint64_t)xpc::Message::UIDSynchronization);
   xpc_array_set_string(contents, XPC_ARRAY_APPEND, UID.c_str());
 
-  xpc_object_t msg = xpc_dictionary_create(nullptr, nullptr,  0);
+  xpc_object_t msg = xpc_dictionary_create_empty();
   xpc_dictionary_set_value(msg, xpc::KeyInternalMsg, contents);
   xpc_release(contents);
 
@@ -122,12 +122,12 @@ static UIdent xpcUIdentFromSKDUID(sourcekitd_uid_t SKDUID) {
   if (!Peer)
     return UIdent();
 
-  xpc_object_t contents = xpc_array_create(nullptr, 0);
+  xpc_object_t contents = xpc_array_create_empty();
   xpc_array_set_uint64(contents, XPC_ARRAY_APPEND,
                        (uint64_t)xpc::Message::UIDSynchronization);
   xpc_array_set_uint64(contents, XPC_ARRAY_APPEND, uintptr_t(SKDUID));
 
-  xpc_object_t msg = xpc_dictionary_create(nullptr, nullptr,  0);
+  xpc_object_t msg = xpc_dictionary_create_empty();
   xpc_dictionary_set_value(msg, xpc::KeyInternalMsg, contents);
   xpc_release(contents);
 
@@ -324,11 +324,11 @@ static void sourcekitdServer_peer_event_handler(xpc_connection_t peer,
 }
 
 static void getInitializationInfo(xpc_connection_t peer) {
-  xpc_object_t contents = xpc_array_create(nullptr, 0);
+  xpc_object_t contents = xpc_array_create_empty();
   xpc_array_set_uint64(contents, XPC_ARRAY_APPEND,
                        (uint64_t)xpc::Message::Initialization);
 
-  xpc_object_t msg = xpc_dictionary_create(nullptr, nullptr,  0);
+  xpc_object_t msg = xpc_dictionary_create_empty();
   xpc_dictionary_set_value(msg, xpc::KeyInternalMsg, contents);
   xpc_release(contents);
 
@@ -341,7 +341,6 @@ static void getInitializationInfo(xpc_connection_t peer) {
 
   assert(xpc_get_type(reply) == XPC_TYPE_DICTIONARY);
   uint64_t Delay = xpc_dictionary_get_uint64(reply, xpc::KeySemaEditorDelay);
-  xpc_release(reply);
 
   if (Delay != 0) {
     llvm::SmallString<4> Buf;
@@ -351,6 +350,23 @@ static void getInitializationInfo(xpc_connection_t peer) {
     }
     setenv("SOURCEKIT_DELAY_SEMA_EDITOR", Buf.c_str(), /*overwrite=*/1);
   }
+
+  // Only call once, in case there is a second connection.
+  static std::once_flag flag;
+  std::call_once(flag, [reply] {
+    std::vector<std::string> registeredPlugins;
+    xpc_object_t plugins = xpc_dictionary_get_value(reply, xpc::KeyPlugins);
+    if (plugins && xpc_get_type(plugins) == XPC_TYPE_ARRAY)
+      for (size_t i = 0, e = xpc_array_get_count(plugins); i < e; ++i)
+        registeredPlugins.push_back(xpc_array_get_string(plugins, i));
+    sourcekitd::PluginInitParams pluginParams(
+        /*isClientOnly=*/false, sourcekitd::pluginRegisterRequestHandler,
+        sourcekitd::pluginRegisterCancellationHandler,
+        sourcekitd::pluginGetOpaqueSwiftIDEInspectionInstance());
+    sourcekitd::loadPlugins(registeredPlugins, pluginParams);
+  });
+
+  xpc_release(reply);
 }
 
 static void sourcekitdServer_event_handler(xpc_connection_t peer) {

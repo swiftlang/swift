@@ -20,6 +20,7 @@
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/DiagnosticsDriver.h"
 #include "swift/AST/DiagnosticsFrontend.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/LangOptions.h"
 #include "swift/Basic/OutputFileMap.h"
@@ -107,12 +108,11 @@ void Driver::parseDriverKind(ArrayRef<const char *> Args) {
           .Case("swift-dependency-tool", DriverKind::SwiftDependencyTool)
           .Case("swift-llvm-opt", DriverKind::SwiftLLVMOpt)
           .Case("swift-autolink-extract", DriverKind::AutolinkExtract)
-          .Case("swift-indent", DriverKind::SwiftIndent)
           .Case("swift-symbolgraph-extract", DriverKind::SymbolGraph)
-          .Case("swift-api-extract", DriverKind::APIExtract)
           .Case("swift-api-digester", DriverKind::APIDigester)
           .Case("swift-cache-tool", DriverKind::CacheTool)
           .Case("swift-parse-test", DriverKind::ParseTest)
+          .Case("swift-synthesize-interface", DriverKind::SynthesizeInterface)
           .Default(std::nullopt);
 
   if (Kind.has_value())
@@ -158,11 +158,20 @@ static void validateBridgingHeaderArgs(DiagnosticEngine &diags,
 
 static void validateWarningControlArgs(DiagnosticEngine &diags,
                                        const ArgList &args) {
-  if (args.hasArg(options::OPT_suppress_warnings) &&
-      args.hasFlag(options::OPT_warnings_as_errors,
-                   options::OPT_no_warnings_as_errors, false)) {
-    diags.diagnose(SourceLoc(), diag::error_conflicting_options,
-                   "-warnings-as-errors", "-suppress-warnings");
+  if (args.hasArg(options::OPT_suppress_warnings)) {
+    if (args.hasFlag(options::OPT_warnings_as_errors,
+                     options::OPT_no_warnings_as_errors, false)) {
+      diags.diagnose(SourceLoc(), diag::error_conflicting_options,
+                     "-warnings-as-errors", "-suppress-warnings");
+    }
+    if (args.hasArg(options::OPT_Wwarning)) {
+      diags.diagnose(SourceLoc(), diag::error_conflicting_options, "-Wwarning",
+                     "-suppress-warnings");
+    }
+    if (args.hasArg(options::OPT_Werror)) {
+      diags.diagnose(SourceLoc(), diag::error_conflicting_options, "-Werror",
+                     "-suppress-warnings");
+    }
   }
 }
 
@@ -508,7 +517,14 @@ createStatsReporter(const llvm::opt::InputArgList *ArgList,
                                                  DefaultTargetTriple,
                                                  OutputType,
                                                  OptType,
-                                                 A->getValue());
+                                                 A->getValue(),
+                                                 nullptr,
+                                                 nullptr,
+                                                 false,
+                                                 false,
+                                                 false,
+                                                 false,
+                                                 false);
 }
 
 static bool
@@ -935,7 +951,7 @@ void Driver::buildInputs(const ToolChain &TC,
       file_types::ID Ty = file_types::TY_INVALID;
 
       // stdin must be handled specially.
-      if (Value.equals("-")) {
+      if (Value == "-") {
         // By default, treat stdin as Swift input.
         Ty = file_types::TY_Swift;
       } else {
@@ -1144,6 +1160,10 @@ void Driver::buildOutputInfo(const ToolChain &TC, const DerivedArgList &Args,
       OI.CompilerOutputType = file_types::TY_RawSIL;
       break;
 
+    case options::OPT_emit_lowered_sil:
+      OI.CompilerOutputType = file_types::TY_LoweredSIL;
+      break;
+
     case options::OPT_emit_sib:
       OI.CompilerOutputType = file_types::TY_SIB;
       break;
@@ -1153,6 +1173,9 @@ void Driver::buildOutputInfo(const ToolChain &TC, const DerivedArgList &Args,
       break;
 
     case options::OPT_emit_irgen:
+      OI.CompilerOutputType = file_types::TY_RawLLVM_IR;
+      break;
+
     case options::OPT_emit_ir:
       OI.CompilerOutputType = file_types::TY_LLVM_IR;
       break;
@@ -1207,7 +1230,7 @@ void Driver::buildOutputInfo(const ToolChain &TC, const DerivedArgList &Args,
     case options::OPT_typecheck:
     case options::OPT_dump_parse:
     case options::OPT_print_ast:
-    case options::OPT_dump_type_refinement_contexts:
+    case options::OPT_dump_availability_scopes:
     case options::OPT_dump_scope_maps:
     case options::OPT_dump_interface_hash:
     case options::OPT_dump_type_info:
@@ -1600,6 +1623,7 @@ void Driver::buildActions(SmallVectorImpl<const Action *> &TopLevelActions,
       switch (InputType) {
       case file_types::TY_Swift:
       case file_types::TY_SIL:
+      case file_types::TY_LoweredSIL:
       case file_types::TY_SIB: {
         // Source inputs always need to be compiled.
         assert(file_types::isPartOfSwiftCompilation(InputType));
@@ -1654,6 +1678,7 @@ void Driver::buildActions(SmallVectorImpl<const Action *> &TopLevelActions,
       case file_types::TY_dSYM:
       case file_types::TY_Dependencies:
       case file_types::TY_Assembly:
+      case file_types::TY_RawLLVM_IR:
       case file_types::TY_LLVM_IR:
       case file_types::TY_LLVM_BC:
       case file_types::TY_SerializedDiagnostics:
@@ -1666,6 +1691,7 @@ void Driver::buildActions(SmallVectorImpl<const Action *> &TopLevelActions,
       case file_types::TY_PCH:
       case file_types::TY_ImportedModules:
       case file_types::TY_ModuleTrace:
+      case file_types::TY_FineModuleTrace:
       case file_types::TY_YAMLOptRecord:
       case file_types::TY_BitstreamOptRecord:
       case file_types::TY_SwiftModuleInterfaceFile:
@@ -1682,6 +1708,7 @@ void Driver::buildActions(SmallVectorImpl<const Action *> &TopLevelActions,
       case file_types::TY_SwiftFixIt:
       case file_types::TY_ModuleSemanticInfo:
       case file_types::TY_CachedDiagnostics:
+      case file_types::TY_SymbolGraphFile:
         // We could in theory handle assembly or LLVM input, but let's not.
         // FIXME: What about LTO?
         Diags.diagnose(SourceLoc(), diag::error_unexpected_input_file,
@@ -1940,6 +1967,10 @@ bool Driver::handleImmediateArgs(const ArgList &Args, const ToolChain &TC) {
   if (Args.hasArg(options::OPT_help_hidden)) {
     printHelp(true);
     return false;
+  }
+
+  if (Args.hasArg(options::OPT_compiler_assertions)) {
+    CONDITIONAL_ASSERT_Global_enable_flag = 1;
   }
 
   if (Args.hasArg(options::OPT_version)) {
@@ -3095,12 +3126,11 @@ void Driver::printHelp(bool ShowHidden) const {
   case DriverKind::SwiftDependencyTool:
   case DriverKind::SwiftLLVMOpt:
   case DriverKind::AutolinkExtract:
-  case DriverKind::SwiftIndent:
   case DriverKind::SymbolGraph:
-  case DriverKind::APIExtract:
   case DriverKind::APIDigester:
   case DriverKind::CacheTool:
   case DriverKind::ParseTest:
+  case DriverKind::SynthesizeInterface:
     ExcludedFlagsBitmask |= options::NoBatchOption;
     break;
   }

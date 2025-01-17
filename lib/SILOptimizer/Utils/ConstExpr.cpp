@@ -17,6 +17,7 @@
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/SemanticAttrs.h"
 #include "swift/AST/SubstitutionMap.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/NullablePtr.h"
 #include "swift/Demangling/Demangle.h"
@@ -425,13 +426,14 @@ SymbolicValue ConstExprFunctionState::computeConstantValue(SILValue value) {
   // Try to resolve a witness method against our known conformances.
   if (auto *wmi = dyn_cast<WitnessMethodInst>(value)) {
     auto conf = substitutionMap.lookupConformance(
-        wmi->getLookupType(), wmi->getConformance().getRequirement());
+        wmi->getLookupType()->mapTypeOutOfContext()->getCanonicalType(),
+        wmi->getConformance().getRequirement());
     if (conf.isInvalid())
       return getUnknown(evaluator, value,
                         UnknownReason::UnknownWitnessMethodConformance);
     auto &module = wmi->getModule();
     SILFunction *fn =
-        module.lookUpFunctionInWitnessTable(conf, wmi->getMember(),
+        module.lookUpFunctionInWitnessTable(conf, wmi->getMember(), wmi->isSpecialized(),
             SILModule::LinkingMode::LinkAll).first;
     // If we were able to resolve it, then we can proceed.
     if (fn)
@@ -1009,8 +1011,12 @@ ConstExprFunctionState::computeWellKnownCallResult(ApplyInst *apply,
            conventions.getNumDirectSILResults() == 0 &&
            conventions.getNumIndirectSILResults() == 0 &&
            "unexpected Array.append(_:) signature");
-    // Get the element to be appended which is passed indirectly (@in).
-    SymbolicValue element = getConstAddrAndLoadResult(apply->getOperand(1));
+    // Get the element to be appended which is usually passed indirectly (@in),
+    // or directly (in Embedded Swift where Array.append can be specialized).
+    SymbolicValue element = getConstantValue(apply->getOperand(1));
+    if (element.getKind() == SymbolicValue::Address) {
+      element = getConstAddrAndLoadResult(apply->getOperand(1));
+    }
     if (!element.isConstant())
       return element;
 
@@ -1767,6 +1773,7 @@ ConstExprFunctionState::evaluateFlowSensitive(SILInstruction *inst) {
       isa<ReleaseValueInst>(inst) || isa<StrongRetainInst>(inst) ||
       isa<StrongReleaseInst>(inst) || isa<DestroyValueInst>(inst) ||
       isa<EndBorrowInst>(inst) || isa<DebugStepInst>(inst) ||
+      isa<ExtendLifetimeInst>(inst) ||
       // Skip instrumentation
       isInstrumentation(inst))
     return std::nullopt;

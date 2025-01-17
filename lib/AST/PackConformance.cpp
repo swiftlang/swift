@@ -21,6 +21,7 @@
 #include "swift/AST/InFlightSubstitution.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/Types.h"
+#include "swift/Basic/Assertions.h"
 
 #define DEBUG_TYPE "AST"
 
@@ -96,7 +97,9 @@ PackConformance *PackConformance::getCanonicalConformance() const {
 /// Project the corresponding associated type from each pack element
 /// of the conforming type, collecting the results into a new pack type
 /// that has the same pack expansion structure as the conforming type.
-PackType *PackConformance::getAssociatedType(Type assocType) const {
+PackType *PackConformance::getTypeWitness(
+    AssociatedTypeDecl *assocType,
+    SubstOptions options) const {
   SmallVector<Type, 4> packElements;
 
   auto conformances = getPatternConformances();
@@ -109,8 +112,8 @@ PackType *PackConformance::getAssociatedType(Type assocType) const {
     // conformance.
     if (auto *packExpansion = packElement->getAs<PackExpansionType>()) {
       auto assocTypePattern =
-        conformances[i].getAssociatedType(packExpansion->getPatternType(),
-                                          assocType);
+        conformances[i].getTypeWitness(packExpansion->getPatternType(),
+                                       assocType, options);
 
       packElements.push_back(PackExpansionType::get(
           assocTypePattern, packExpansion->getCountType()));
@@ -119,7 +122,7 @@ PackType *PackConformance::getAssociatedType(Type assocType) const {
     // the associated type witness from the pattern conformance.
     } else {
       auto assocTypeScalar =
-        conformances[i].getAssociatedType(packElement, assocType);
+        conformances[i].getTypeWitness(packElement, assocType, options);
       packElements.push_back(assocTypeScalar);
     }
   }
@@ -172,66 +175,6 @@ ProtocolConformanceRef PackConformance::subst(SubstitutionMap subMap,
   return subst(IFS);
 }
 
-namespace {
-
-struct PackConformanceExpander {
-  InFlightSubstitution &IFS;
-  ArrayRef<ProtocolConformanceRef> origConformances;
-
-public:
-  // Results built up by the expansion.
-  SmallVector<Type, 4> substElementTypes;
-  SmallVector<ProtocolConformanceRef, 4> substConformances;
-
-  PackConformanceExpander(InFlightSubstitution &IFS,
-                          ArrayRef<ProtocolConformanceRef> origConformances)
-    : IFS(IFS), origConformances(origConformances) {}
-
-private:
-  /// Substitute a scalar element of the original pack.
-  void substScalar(Type origElementType,
-                   ProtocolConformanceRef origConformance) {
-    auto substElementType = origElementType.subst(IFS);
-    auto substConformance = origConformance.subst(origElementType, IFS);
-
-    substElementTypes.push_back(substElementType);
-    substConformances.push_back(substConformance);
-  }
-
-  /// Substitute and expand an expansion element of the original pack.
-  void substExpansion(PackExpansionType *origExpansionType,
-                       ProtocolConformanceRef origConformance) {
-    IFS.expandPackExpansionType(origExpansionType,
-                                [&](Type substComponentType) {
-      auto origPatternType = origExpansionType->getPatternType();
-
-      // Just substitute the conformance.  We don't directly represent
-      // pack expansion conformances here; it's sort of implicit in the
-      // corresponding pack element type.
-      auto substConformance = origConformance.subst(origPatternType, IFS);
-
-      substElementTypes.push_back(substComponentType);
-      substConformances.push_back(substConformance);
-    });
-  }
-
-public:
-  void expand(PackType *origPackType) {
-    assert(origPackType->getNumElements() == origConformances.size());
-
-    for (auto i : range(origPackType->getNumElements())) {
-      auto origElementType = origPackType->getElementType(i);
-      if (auto *origExpansion = origElementType->getAs<PackExpansionType>()) {
-        substExpansion(origExpansion, origConformances[i]);
-      } else {
-        substScalar(origElementType, origConformances[i]);
-      }
-    }
-  }
-};
-
-} // end anonymous namespace
-
 ProtocolConformanceRef PackConformance::subst(TypeSubstitutionFn subs,
                                               LookupConformanceFn conformances,
                                               SubstOptions options) const {
@@ -241,14 +184,41 @@ ProtocolConformanceRef PackConformance::subst(TypeSubstitutionFn subs,
 
 ProtocolConformanceRef
 PackConformance::subst(InFlightSubstitution &IFS) const {
-  PackConformanceExpander expander(IFS, getPatternConformances());
-  expander.expand(ConformingType);
+  // Results built up by the expansion.
+  SmallVector<Type, 4> substElementTypes;
+  SmallVector<ProtocolConformanceRef, 4> substConformances;
+
+  auto origConformances = getPatternConformances();
+  assert(ConformingType->getNumElements() == origConformances.size());
+
+  for (auto i : range(ConformingType->getNumElements())) {
+    auto origElementType = ConformingType->getElementType(i);
+    if (auto *origExpansion = origElementType->getAs<PackExpansionType>()) {
+      // Substitute and expand an expansion element of the original pack.
+      IFS.expandPackExpansionType(origExpansion,
+                                  [&](Type substComponentType) {
+        substElementTypes.push_back(substComponentType);
+
+        // Just substitute the conformance.  We don't directly represent
+        // pack expansion conformances here; it's sort of implicit in the
+        // corresponding pack element type.
+        substConformances.push_back(
+            origConformances[i].subst(origExpansion->getPatternType(), IFS));
+      });
+    } else {
+      // Substitute a scalar element of the original pack.
+      substElementTypes.push_back(origElementType.subst(IFS));
+
+      substConformances.push_back(
+          origConformances[i].subst(origElementType, IFS));
+    }
+  }
 
   auto &ctx = Protocol->getASTContext();
-  auto *substConformingType = PackType::get(ctx, expander.substElementTypes);
+  auto *substConformingType = PackType::get(ctx, substElementTypes);
 
   auto substConformance = PackConformance::get(substConformingType, Protocol,
-                                               expander.substConformances);
+                                               substConformances);
   return ProtocolConformanceRef(substConformance);
 }
 

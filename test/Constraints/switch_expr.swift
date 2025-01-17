@@ -191,7 +191,9 @@ func testAssignment() {
 }
 
 struct TestBadReturn {
-  var y = switch Bool.random() { case true: return case false: 0 } // expected-error {{return invalid outside of a func}}
+  var y = switch Bool.random() { case true: return case false: 0 }
+  // expected-error@-1 {{return invalid outside of a func}}
+  // expected-error@-2 {{cannot use 'return' to transfer control out of 'switch' expression}}
 }
 
 func testNil1(_ x: Bool) {
@@ -207,8 +209,7 @@ func testNil3(_ x: Bool) {
   let _: _? = switch x { case true: 42 case false: nil }
 }
 func testNil4(_ x: Bool) {
-  // FIXME: Bad diagnostic (#63130)
-  let _: _? = switch x { case true: nil case false: 42 }  // expected-error {{type of expression is ambiguous without a type annotation}}
+  let _: _? = switch x { case true: nil case false: 42 }  // expected-error {{could not infer type for placeholder}}
 }
 
 enum G<T> {

@@ -122,7 +122,6 @@
         "ContiguousArray.swift",
         "ContiguousArrayBuffer.swift",
         "ContiguouslyStored.swift",
-        "FixedArray.swift",
         "SliceBuffer.swift",
         "SwiftNativeNSArray.swift"],
       "HashedCollections": [
@@ -191,12 +190,17 @@
   ],
   "Pointer": [
     "Pointer.swift",
+    "SwiftifyImport.swift",
     "TemporaryAllocation.swift",
     "UnsafePointer.swift",
     "UnsafeRawPointer.swift",
     "UnsafeBufferPointer.swift",
     "UnsafeBufferPointerSlice.swift",
     "UnsafeRawBufferPointer.swift"
+  ],
+  "Span": [
+    "RawSpan.swift",
+    "Span.swift"
   ],
   "Protocols": [
     "CompilerProtocols.swift",
@@ -252,7 +256,8 @@
     "Instant.swift",
     "EmbeddedRuntime.swift",
     "EmbeddedStubs.swift",
-    "EmbeddedPrint.swift"
+    "EmbeddedPrint.swift",
+    "Slab.swift"
   ],
   "Result": [
     "Result.swift"

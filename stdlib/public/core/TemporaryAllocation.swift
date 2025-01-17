@@ -189,19 +189,11 @@ internal func _withUnprotectedUnsafeTemporaryAllocation<
   // notice and complain.)
   let result: R
 
-#if $BuiltinUnprotectedStackAlloc
   let stackAddress = Builtin.unprotectedStackAlloc(
     capacity._builtinWordValue,
     MemoryLayout<T>.stride._builtinWordValue,
     alignment._builtinWordValue
   )
-#else
-  let stackAddress = Builtin.stackAlloc(
-    capacity._builtinWordValue,
-    MemoryLayout<T>.stride._builtinWordValue,
-    alignment._builtinWordValue
-  )
-#endif
 
   // The multiple calls to Builtin.stackDealloc() are because defer { } produces
   // a child function at the SIL layer and that conflicts with the verifier's

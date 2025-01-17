@@ -11,14 +11,9 @@ public struct SequenceAdapter<Base: AsyncSequence>: AsyncSequence {
   // CHECK: @available{{.*}}macOS 10.15
   // CHECK-NEXT: public typealias Element = Base.Element
 
-  // CHECK: #if compiler(>=5.3) && $AssociatedTypeImplements
   // CHECK: @available(
   // CHECK: @_implements(_Concurrency.AsyncIteratorProtocol, Failure)
   // CHECK-SAME: public typealias __AsyncIteratorProtocol_Failure = Base.Failure
-  // CHECK-NEXT: #else
-  // CHECK-NOT: @_implements
-  // CHECK: public typealias __AsyncIteratorProtocol_Failure = Base.Failure
-  // CHECK-NEXT: #endif
   public typealias Element = Base.Element
 
   public struct AsyncIterator: AsyncIteratorProtocol {

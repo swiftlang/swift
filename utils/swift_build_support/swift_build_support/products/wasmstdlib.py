@@ -17,6 +17,8 @@ from . import llvm
 from . import swift
 from . import wasisysroot
 from . import wasmkit
+from .. import cmake
+from .. import shell
 
 
 class WasmStdlib(cmake_product.CMakeProduct):
@@ -39,10 +41,52 @@ class WasmStdlib(cmake_product.CMakeProduct):
         return self.args.test_wasmstdlib
 
     def build(self, host_target):
-        self._build(host_target, 'wasm32-wasi')
+        self._build(host_target, 'wasm32-wasi', 'wasi-wasm32')
 
-    def _build(self, host_target, target_triple):
+    def _build(self, host_target, target_triple, short_triple):
+        llvm_build_dir = self._configure_llvm(target_triple, short_triple)
+        llvm_cmake_dir = os.path.join(llvm_build_dir, 'lib', 'cmake', 'llvm')
+        self._build_stdlib(host_target, target_triple, llvm_cmake_dir)
+
+    def _configure_llvm(self, target_triple, short_triple):
+        # Configure LLVM for WebAssembly target independently
+        # from the native LLVM build to turn off zlib and libxml2
+        build_root = os.path.dirname(self.build_dir)
+        build_dir = os.path.join(
+            build_root, 'llvm-%s' % short_triple)
+        llvm_source_dir = os.path.join(
+            os.path.dirname(self.source_dir), 'llvm-project', 'llvm')
+        cmake_options = cmake.CMakeOptions()
+        cmake_options.define('CMAKE_BUILD_TYPE:STRING', self._build_variant)
+        # compiler-rt for WebAssembly target is not installed in the host toolchain
+        # so skip compiler health checks here.
+        cmake_options.define('CMAKE_C_COMPILER_WORKS:BOOL', 'TRUE')
+        cmake_options.define('CMAKE_CXX_COMPILER_WORKS:BOOL', 'TRUE')
+        cmake_options.define('LLVM_COMPILER_CHECKED:BOOL', 'TRUE')
+        cmake_options.define('LLVM_ENABLE_ZLIB:BOOL', 'FALSE')
+        cmake_options.define('LLVM_ENABLE_LIBXML2:BOOL', 'FALSE')
+        cmake_options.define('LLVM_ENABLE_LIBEDIT:BOOL', 'FALSE')
+        cmake_options.define('LLVM_ENABLE_TERMINFO:BOOL', 'FALSE')
+
+        llvm_cmake = cmake.CMake(
+            self.args, self.toolchain, prefer_native_toolchain=True)
+        # Only configure LLVM, not build it because we just need
+        # LLVM CMake functionalities
+        shell.call(["env", self.toolchain.cmake, "-B", build_dir]
+                   + list(llvm_cmake.common_options(self))
+                   + list(cmake_options)
+                   + [llvm_source_dir])
+        return build_dir
+
+    def _build_stdlib(self, host_target, target_triple, llvm_cmake_dir):
+        self.cmake_options.define('CMAKE_INSTALL_PREFIX:PATH', '/usr')
         self.cmake_options.define('CMAKE_BUILD_TYPE:STRING', self._build_variant)
+        # Teach about the WebAssembly target. UNIX is explicitly set to TRUE
+        # as CMake still doesn't recognize WASI as a UNIX platform and the
+        # variable is used in LLVM CMake configuration.
+        self.cmake_options.define('CMAKE_SYSTEM_NAME:STRING', 'WASI')
+        self.cmake_options.define('CMAKE_SYSTEM_PROCESSOR:STRING', 'wasm32')
+        self.cmake_options.define('UNIX:BOOL', 'TRUE')
         self.cmake_options.define(
             'SWIFT_STDLIB_BUILD_TYPE:STRING', self._build_variant)
 
@@ -62,13 +106,19 @@ class WasmStdlib(cmake_product.CMakeProduct):
         self.cmake_options.define(
             'SWIFT_NATIVE_LLVM_TOOLS_PATH:STRING', os.path.join(toolchain_path, 'bin'))
         self.cmake_options.define(
+            'BOOTSTRAPPING_MODE:STRING', 'CROSSCOMPILE')
+        self.cmake_options.define(
             'SWIFT_BUILD_RUNTIME_WITH_HOST_COMPILER:BOOL', 'FALSE')
         self.cmake_options.define('SWIFT_WASI_SYSROOT_PATH:STRING',
                                   self._wasi_sysroot_path(target_triple))
 
-        # It's ok to use the host LLVM build dir just for CMake functionalities
-        llvm_cmake_dir = os.path.join(self._host_llvm_build_dir(
-            host_target), 'lib', 'cmake', 'llvm')
+        # compiler-rt for WebAssembly target is not installed in the host toolchain
+        # so skip compiler health checks here.
+        self.cmake_options.define('CMAKE_C_COMPILER_WORKS:BOOL', 'TRUE')
+        self.cmake_options.define('CMAKE_CXX_COMPILER_WORKS:BOOL', 'TRUE')
+        self.cmake_options.define('CMAKE_Swift_COMPILER_WORKS:BOOL', 'TRUE')
+        self.cmake_options.define('LLVM_COMPILER_CHECKED:BOOL', 'TRUE')
+
         self.cmake_options.define('LLVM_DIR:PATH', llvm_cmake_dir)
 
         # Standalone stdlib configuration
@@ -84,9 +134,14 @@ class WasmStdlib(cmake_product.CMakeProduct):
         # Build only static stdlib
         self.cmake_options.define('SWIFT_BUILD_STATIC_STDLIB:BOOL', 'TRUE')
         self.cmake_options.define('SWIFT_BUILD_DYNAMIC_STDLIB:BOOL', 'FALSE')
+        self.cmake_options.define('SWIFT_BUILD_STATIC_SDK_OVERLAY:BOOL', 'TRUE')
+        # TODO: Turn off library evolution once we establish a good way to teach
+        # libraries including swift-testing whether to use the stable ABI.
+        self.cmake_options.define('SWIFT_STDLIB_STABLE_ABI:BOOL', 'TRUE')
         self.cmake_options.define('SWIFT_STDLIB_TRACING:BOOL', 'FALSE')
         self.cmake_options.define('SWIFT_STDLIB_HAS_ASLR:BOOL', 'FALSE')
         self.cmake_options.define('SWIFT_STDLIB_CONCURRENCY_TRACING:BOOL', 'FALSE')
+        self.cmake_options.define('SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB:BOOL', 'FALSE')
         self.cmake_options.define(
             'SWIFT_STDLIB_INSTALL_PARENT_MODULE_FOR_SHIMS:BOOL', 'FALSE')
         self.cmake_options.define('SWIFT_RUNTIME_CRASH_REPORTER_CLIENT:BOOL', 'FALSE')
@@ -99,6 +154,7 @@ class WasmStdlib(cmake_product.CMakeProduct):
         self.cmake_options.define(
             'SWIFT_STDLIB_COMPACT_ABSOLUTE_FUNCTION_POINTER:BOOL', 'TRUE')
         self.cmake_options.define('SWIFT_ENABLE_EXPERIMENTAL_CONCURRENCY:BOOL', 'TRUE')
+        self.cmake_options.define('SWIFT_ENABLE_EXPERIMENTAL_DISTRIBUTED:BOOL', 'TRUE')
         self.cmake_options.define(
             'SWIFT_ENABLE_EXPERIMENTAL_STRING_PROCESSING:BOOL', 'TRUE')
         self.cmake_options.define('SWIFT_PATH_TO_STRING_PROCESSING_SOURCE:PATH',
@@ -106,13 +162,15 @@ class WasmStdlib(cmake_product.CMakeProduct):
                                                'swift-experimental-string-processing'))
         self.cmake_options.define('SWIFT_ENABLE_EXPERIMENTAL_CXX_INTEROP:BOOL', 'TRUE')
         self.cmake_options.define('SWIFT_ENABLE_SYNCHRONIZATION:BOOL', 'TRUE')
+        self.cmake_options.define('SWIFT_ENABLE_VOLATILE:BOOL', 'TRUE')
+        self.cmake_options.define('SWIFT_ENABLE_EXPERIMENTAL_OBSERVATION:BOOL', 'TRUE')
 
         self.add_extra_cmake_options()
 
         # Test configuration
         self.cmake_options.define('SWIFT_INCLUDE_TESTS:BOOL', 'TRUE')
         self.cmake_options.define('SWIFT_ENABLE_SOURCEKIT_TESTS:BOOL', 'FALSE')
-        lit_test_paths = ['IRGen', 'stdlib', 'Concurrency/Runtime', 'embedded']
+        lit_test_paths = ['IRGen', 'stdlib', 'Concurrency/Runtime', 'embedded/wasm']
         lit_test_paths = [os.path.join(
             self.build_dir, 'test-wasi-wasm32', path) for path in lit_test_paths]
         self.cmake_options.define('SWIFT_LIT_TEST_PATHS:STRING',
@@ -190,7 +248,7 @@ class WasmStdlib(cmake_product.CMakeProduct):
 
 class WasmThreadsStdlib(WasmStdlib):
     def build(self, host_target):
-        self._build(host_target, 'wasm32-wasip1-threads')
+        self._build(host_target, 'wasm32-wasip1-threads', 'wasip1-threads-wasm32')
 
     def should_test_executable(self):
         # TODO(katei): Enable tests once WasmKit supports WASI threads

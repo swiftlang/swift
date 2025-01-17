@@ -239,6 +239,10 @@ enum class CheckKind : unsigned {
 
   /// The witness itself is inaccessible.
   WitnessUnavailable,
+
+  /// The witness is a deprecated default implementation provided by the
+  /// protocol.
+  DefaultWitnessDeprecated,
 };
 /// Describes the suitability of the chosen witness for
 /// the requirement.
@@ -251,19 +255,19 @@ struct RequirementCheck {
 
   /// The required availability, if the check failed due to the
   /// witness being less available than the requirement.
-  AvailabilityContext RequiredAvailability;
+  AvailabilityRange RequiredAvailability;
 
   RequirementCheck(CheckKind kind)
-    : Kind(kind), RequiredAccessScope(AccessScope::getPublic()),
-      RequiredAvailability(AvailabilityContext::alwaysAvailable()) { }
+      : Kind(kind), RequiredAccessScope(AccessScope::getPublic()),
+        RequiredAvailability(AvailabilityRange::alwaysAvailable()) {}
 
   RequirementCheck(CheckKind kind, AccessScope requiredAccessScope)
-    : Kind(kind), RequiredAccessScope(requiredAccessScope),
-      RequiredAvailability(AvailabilityContext::alwaysAvailable()) { }
+      : Kind(kind), RequiredAccessScope(requiredAccessScope),
+        RequiredAvailability(AvailabilityRange::alwaysAvailable()) {}
 
-  RequirementCheck(CheckKind kind, AvailabilityContext requiredAvailability)
-    : Kind(kind), RequiredAccessScope(AccessScope::getPublic()),
-      RequiredAvailability(requiredAvailability) { }
+  RequirementCheck(CheckKind kind, AvailabilityRange requiredAvailability)
+      : Kind(kind), RequiredAccessScope(AccessScope::getPublic()),
+        RequiredAvailability(requiredAvailability) {}
 };
 
 

@@ -25,6 +25,7 @@
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/Types.h"
+#include "swift/Basic/Assertions.h"
 #include "llvm/ADT/APInt.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/Support/raw_ostream.h"
@@ -180,23 +181,17 @@ deriveBodyEquatable_enum_hasAssociatedValues_eq(AbstractFunctionDecl *eqDecl,
 
     // .<elt>(let l0, let l1, ...)
     SmallVector<VarDecl*, 3> lhsPayloadVars;
-    auto lhsSubpattern = DerivedConformance::enumElementPayloadSubpattern(elt, 'l', eqDecl,
-                                                      lhsPayloadVars);
-    auto *lhsBaseTE = TypeExpr::createImplicit(enumType, C);
-    auto lhsElemPat = new (C)
-        EnumElementPattern(lhsBaseTE, SourceLoc(), DeclNameLoc(), DeclNameRef(),
-                           elt, lhsSubpattern, /*DC*/ eqDecl);
-    lhsElemPat->setImplicit();
+    auto *lhsSubpattern = DerivedConformance::enumElementPayloadSubpattern(
+        elt, 'l', eqDecl, lhsPayloadVars);
+    auto *lhsElemPat = EnumElementPattern::createImplicit(
+        enumType, elt, lhsSubpattern, /*DC*/ eqDecl);
 
     // .<elt>(let r0, let r1, ...)
     SmallVector<VarDecl*, 3> rhsPayloadVars;
-    auto rhsSubpattern = DerivedConformance::enumElementPayloadSubpattern(elt, 'r', eqDecl,
-                                                      rhsPayloadVars);
-    auto *rhsBaseTE = TypeExpr::createImplicit(enumType, C);
-    auto rhsElemPat = new (C)
-        EnumElementPattern(rhsBaseTE, SourceLoc(), DeclNameLoc(), DeclNameRef(),
-                           elt, rhsSubpattern, /*DC*/ eqDecl);
-    rhsElemPat->setImplicit();
+    auto *rhsSubpattern = DerivedConformance::enumElementPayloadSubpattern(
+        elt, 'r', eqDecl, rhsPayloadVars);
+    auto *rhsElemPat = EnumElementPattern::createImplicit(
+        enumType, elt, rhsSubpattern, /*DC*/ eqDecl);
 
     auto hasBoundDecls = !lhsPayloadVars.empty();
     std::optional<MutableArrayRef<VarDecl *>> caseBodyVarDecls;
@@ -415,6 +410,7 @@ deriveEquatable_eq(
       /*Throws=*/false, /*ThrownType=*/Type(),
       /*GenericParams=*/nullptr, params, boolTy, parentDC);
   eqDecl->setUserAccessible(false);
+  eqDecl->setSynthesized();
 
   // Add the @_implements(Equatable, ==(_:_:)) attribute
   if (generatedIdentifier != C.Id_EqualsOperator) {
@@ -432,7 +428,7 @@ deriveEquatable_eq(
     return nullptr;
   }
 
-  addNonIsolatedToSynthesized(derived.Nominal, eqDecl);
+  addNonIsolatedToSynthesized(derived, eqDecl);
 
   eqDecl->setBodySynthesizer(bodySynthesizer);
 
@@ -551,12 +547,13 @@ deriveHashable_hashInto(
       /*Async=*/false,
       /*Throws=*/false, /*ThrownType=*/Type(),
       /*GenericParams=*/nullptr, params, returnType, parentDC);
+  hashDecl->setSynthesized();
   hashDecl->setBodySynthesizer(bodySynthesizer);
   hashDecl->copyFormalAccessFrom(derived.Nominal,
                                  /*sourceIsParentContext=*/true);
 
   // The derived hash(into:) for an actor must be non-isolated.
-  if (!addNonIsolatedToSynthesized(derived.Nominal, hashDecl) &&
+  if (!addNonIsolatedToSynthesized(derived, hashDecl) &&
       derived.Nominal->isActor())
     hashDecl->getAttrs().add(
         new (C) NonisolatedAttr(/*unsafe*/ false, /*implicit*/ true));
@@ -708,11 +705,8 @@ deriveBodyHashable_enum_hasAssociatedValues_hashInto(
 
     auto payloadPattern = DerivedConformance::enumElementPayloadSubpattern(elt, 'a', hashIntoDecl,
                                                        payloadVars);
-    auto pat = new (C)
-        EnumElementPattern(TypeExpr::createImplicit(enumType, C), SourceLoc(),
-                           DeclNameLoc(), DeclNameRef(elt->getBaseIdentifier()),
-                           elt, payloadPattern, /*DC*/ hashIntoDecl);
-    pat->setImplicit();
+    auto *pat = EnumElementPattern::createImplicit(
+        enumType, elt, payloadPattern, /*DC*/ hashIntoDecl);
 
     auto labelItem = CaseLabelItem(pat);
 
@@ -842,7 +836,7 @@ deriveBodyHashable_hashValue(AbstractFunctionDecl *hashValueDecl, void *) {
 
         return Type(dependentType);
       },
-      LookUpConformanceInModule(hashValueDecl->getModuleContext()));
+      LookUpConformanceInModule());
   ConcreteDeclRef hashFuncRef(hashFunc, substitutions);
 
   Type hashFuncType = hashFunc->getInterfaceType().subst(substitutions);
@@ -877,15 +871,13 @@ static ValueDecl *deriveHashable_hashValue(DerivedConformance &derived) {
   // We can't form a Hashable conformance if Int isn't Hashable or
   // ExpressibleByIntegerLiteral.
   if (!TypeChecker::conformsToKnownProtocol(
-          intType, KnownProtocolKind::Hashable,
-          derived.getParentModule())) {
+          intType, KnownProtocolKind::Hashable)) {
     derived.ConformanceDecl->diagnose(diag::broken_int_hashable_conformance);
     return nullptr;
   }
 
   if (!TypeChecker::conformsToKnownProtocol(
-          intType, KnownProtocolKind::ExpressibleByIntegerLiteral,
-          derived.getParentModule())) {
+          intType, KnownProtocolKind::ExpressibleByIntegerLiteral)) {
     derived.ConformanceDecl->diagnose(
       diag::broken_int_integer_literal_convertible_conformance);
     return nullptr;
@@ -921,7 +913,7 @@ static ValueDecl *deriveHashable_hashValue(DerivedConformance &derived) {
   hashValueDecl->setAccessors(SourceLoc(), {getterDecl}, SourceLoc());
 
   // The derived hashValue of an actor must be nonisolated.
-  if (!addNonIsolatedToSynthesized(derived.Nominal, hashValueDecl) &&
+  if (!addNonIsolatedToSynthesized(derived, hashValueDecl) &&
       derived.Nominal->isActor())
     hashValueDecl->getAttrs().add(
         new (C) NonisolatedAttr(/*unsafe*/ false, /*implicit*/ true));
@@ -929,7 +921,6 @@ static ValueDecl *deriveHashable_hashValue(DerivedConformance &derived) {
   Pattern *hashValuePat =
       NamedPattern::createImplicit(C, hashValueDecl, intType);
   hashValuePat = TypedPattern::createImplicit(C, hashValuePat, intType);
-  hashValuePat->setType(intType);
 
   auto *patDecl = PatternBindingDecl::createImplicit(
       C, StaticSpellingKind::None, hashValuePat, /*InitExpr*/ nullptr,
@@ -947,20 +938,6 @@ getHashValueRequirement(ASTContext &C) {
     if (auto fd = dyn_cast<VarDecl>(member)) {
       if (fd->getBaseName() == C.Id_hashValue)
         return fd;
-    }
-  }
-  return nullptr;
-}
-
-static ProtocolConformance *
-getHashableConformance(const Decl *parentDecl) {
-  ASTContext &C = parentDecl->getASTContext();
-  const auto IDC = cast<IterableDeclContext>(parentDecl);
-  auto hashableProto = C.getProtocol(KnownProtocolKind::Hashable);
-  for (auto conformance: IDC->getLocalConformances(
-           ConformanceLookupKind::NonStructural)) {
-    if (conformance->getProtocol() == hashableProto) {
-      return conformance;
     }
   }
   return nullptr;
@@ -984,21 +961,18 @@ void DerivedConformance::tryDiagnoseFailedHashableDerivation(
 }
 
 ValueDecl *DerivedConformance::deriveHashable(ValueDecl *requirement) {
-  ASTContext &C = ConformanceDecl->getASTContext();
-
   // var hashValue: Int
-  if (requirement->getBaseName() == C.Id_hashValue) {
+  if (requirement->getBaseName() == Context.Id_hashValue) {
     // We always allow hashValue to be synthesized; invalid cases are diagnosed
     // during hash(into:) synthesis.
     return deriveHashable_hashValue(*this);
   }
 
   // Hashable.hash(into:)
-  if (requirement->getBaseName() == C.Id_hash) {
+  if (requirement->getBaseName() == Context.Id_hash) {
     // Start by resolving hashValue conformance.
-    auto hashValueReq = getHashValueRequirement(C);
-    auto conformance = getHashableConformance(ConformanceDecl);
-    auto hashValueDecl = conformance->getWitnessDecl(hashValueReq);
+    auto hashValueReq = getHashValueRequirement(Context);
+    auto hashValueDecl = Conformance->getWitnessDecl(hashValueReq);
     if (!hashValueDecl) {
       // We won't derive hash(into:) if hashValue cannot be resolved.
       // The hashValue failure will produce a diagnostic elsewhere.
@@ -1010,7 +984,7 @@ ValueDecl *DerivedConformance::deriveHashable(ValueDecl *requirement) {
       
       // Refuse to synthesize Hashable if type isn't a struct or enum, or if it
       // has non-Hashable stored properties/associated values.
-      auto hashableProto = C.getProtocol(KnownProtocolKind::Hashable);
+      auto hashableProto = Context.getProtocol(KnownProtocolKind::Hashable);
       if (!canDeriveConformance(getConformanceContext(), Nominal,
                                 hashableProto)) {
         ConformanceDecl->diagnose(diag::type_does_not_conform,

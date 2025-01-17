@@ -111,11 +111,6 @@ protected:
     /// The number of elements contained.
     NumElements : 32
   );
-
-  SWIFT_INLINE_BITFIELD_FULL(LifetimeDependentReturnTypeRepr, TypeRepr, 32,
-      : NumPadBits,
-      NumDependencies : 32
-   );
   } Bits;
   // clang-format on
 
@@ -183,6 +178,10 @@ public:
   /// Check recursively whether this type repr or any of its descendants are
   /// opaque return type reprs.
   bool hasOpaque();
+
+  /// Returns a Boolean value indicating whether this written type is
+  /// parenthesized, that is, matches the following grammar: `'(' type ')'`.
+  bool isParenType() const;
 
   /// Retrieve the type repr without any parentheses around it.
   ///
@@ -1114,9 +1113,8 @@ public:
     return T->getKind() == TypeReprKind::Ownership ||
            T->getKind() == TypeReprKind::Isolated ||
            T->getKind() == TypeReprKind::CompileTimeConst ||
-           T->getKind() == TypeReprKind::ResultDependsOn ||
-           T->getKind() == TypeReprKind::LifetimeDependentReturn ||
-           T->getKind() == TypeReprKind::Transferring;
+           T->getKind() == TypeReprKind::LifetimeDependent ||
+           T->getKind() == TypeReprKind::Sending;
   }
   static bool classof(const SpecifierTypeRepr *T) { return true; }
   
@@ -1187,34 +1185,19 @@ public:
   static bool classof(const CompileTimeConstTypeRepr *T) { return true; }
 };
 
-/// A lifetime dependent type.
+/// A sending type.
 /// \code
-///   x : _resultDependsOn Int
+///   x : sending Int
 /// \endcode
-class ResultDependsOnTypeRepr : public SpecifierTypeRepr {
+class SendingTypeRepr : public SpecifierTypeRepr {
 public:
-  ResultDependsOnTypeRepr(TypeRepr *Base, SourceLoc InOutLoc)
-      : SpecifierTypeRepr(TypeReprKind::ResultDependsOn, Base, InOutLoc) {}
+  SendingTypeRepr(TypeRepr *Base, SourceLoc Loc)
+      : SpecifierTypeRepr(TypeReprKind::Sending, Base, Loc) {}
 
   static bool classof(const TypeRepr *T) {
-    return T->getKind() == TypeReprKind::ResultDependsOn;
+    return T->getKind() == TypeReprKind::Sending;
   }
-  static bool classof(const ResultDependsOnTypeRepr *T) { return true; }
-};
-
-/// A transferring type.
-/// \code
-///   x : transferring Int
-/// \endcode
-class TransferringTypeRepr : public SpecifierTypeRepr {
-public:
-  TransferringTypeRepr(TypeRepr *Base, SourceLoc InOutLoc)
-      : SpecifierTypeRepr(TypeReprKind::Transferring, Base, InOutLoc) {}
-
-  static bool classof(const TypeRepr *T) {
-    return T->getKind() == TypeReprKind::Transferring;
-  }
-  static bool classof(const TransferringTypeRepr *T) { return true; }
+  static bool classof(const SendingTypeRepr *T) { return true; }
 };
 
 /// A TypeRepr for a known, fixed type.
@@ -1543,46 +1526,70 @@ private:
   friend TypeRepr;
 };
 
-class LifetimeDependentReturnTypeRepr final
-    : public SpecifierTypeRepr,
-      private llvm::TrailingObjects<LifetimeDependentReturnTypeRepr,
-                                    LifetimeDependenceSpecifier> {
-  friend TrailingObjects;
-
-  size_t
-  numTrailingObjects(OverloadToken<LifetimeDependentReturnTypeRepr>) const {
-    return Bits.LifetimeDependentReturnTypeRepr.NumDependencies;
-  }
+class LifetimeDependentTypeRepr final : public SpecifierTypeRepr {
+  LifetimeEntry *entry;
 
 public:
-  LifetimeDependentReturnTypeRepr(
-      TypeRepr *base, ArrayRef<LifetimeDependenceSpecifier> specifiers)
-      : SpecifierTypeRepr(TypeReprKind::LifetimeDependentReturn, base,
-                          specifiers.front().getLoc()) {
-    assert(base);
-    Bits.LifetimeDependentReturnTypeRepr.NumDependencies = specifiers.size();
-    std::uninitialized_copy(specifiers.begin(), specifiers.end(),
-                            getTrailingObjects<LifetimeDependenceSpecifier>());
-  }
+  LifetimeDependentTypeRepr(TypeRepr *base, LifetimeEntry *entry)
+      : SpecifierTypeRepr(TypeReprKind::LifetimeDependent, base,
+                          entry->getLoc()),
+        entry(entry) {}
 
-  static LifetimeDependentReturnTypeRepr *
-  create(ASTContext &C, TypeRepr *base,
-         ArrayRef<LifetimeDependenceSpecifier> specifiers);
+  static LifetimeDependentTypeRepr *create(ASTContext &C, TypeRepr *base,
+                                           LifetimeEntry *entry);
 
-  ArrayRef<LifetimeDependenceSpecifier> getLifetimeDependencies() const {
-    return {getTrailingObjects<LifetimeDependenceSpecifier>(),
-            Bits.LifetimeDependentReturnTypeRepr.NumDependencies};
-  }
+  LifetimeEntry *getLifetimeEntry() const { return entry; }
 
   static bool classof(const TypeRepr *T) {
-    return T->getKind() == TypeReprKind::LifetimeDependentReturn;
+    return T->getKind() == TypeReprKind::LifetimeDependent;
   }
-  static bool classof(const LifetimeDependentReturnTypeRepr *T) { return true; }
+  static bool classof(const LifetimeDependentTypeRepr *T) { return true; }
 
 private:
   SourceLoc getStartLocImpl() const;
   SourceLoc getEndLocImpl() const;
   SourceLoc getLocImpl() const;
+  void printImpl(ASTPrinter &Printer, const PrintOptions &Opts) const;
+  friend class TypeRepr;
+};
+
+/// A TypeRepr for an integer appearing in a type position.
+class IntegerTypeRepr final : public TypeRepr {
+  StringRef Value;
+  SourceLoc Loc;
+  SourceLoc MinusLoc;
+
+public:
+  IntegerTypeRepr(StringRef value, SourceLoc loc, SourceLoc minusLoc)
+    : TypeRepr(TypeReprKind::Integer), Value(value), Loc(loc),
+      MinusLoc(minusLoc) {}
+
+  StringRef getValue() const {
+    return Value;
+  }
+
+  SourceLoc getLoc() const {
+    return Loc;
+  }
+
+  SourceLoc getMinusLoc() const {
+    return MinusLoc;
+  }
+
+  static bool classof(const TypeRepr *T) {
+    return T->getKind() == TypeReprKind::Integer;
+  }
+
+private:
+  SourceLoc getStartLocImpl() const {
+    if (MinusLoc)
+      return MinusLoc;
+
+    return Loc;
+  }
+
+  SourceLoc getEndLocImpl() const { return Loc; }
+  SourceLoc getLocImpl() const { return Loc; }
   void printImpl(ASTPrinter &Printer, const PrintOptions &Opts) const;
   friend class TypeRepr;
 };
@@ -1617,11 +1624,11 @@ inline bool TypeRepr::isSimple() const {
   case TypeReprKind::Array:
   case TypeReprKind::SILBox:
   case TypeReprKind::Isolated:
-  case TypeReprKind::Transferring:
+  case TypeReprKind::Sending:
   case TypeReprKind::Placeholder:
   case TypeReprKind::CompileTimeConst:
-  case TypeReprKind::ResultDependsOn:
-  case TypeReprKind::LifetimeDependentReturn:
+  case TypeReprKind::LifetimeDependent:
+  case TypeReprKind::Integer:
     return true;
   }
   llvm_unreachable("bad TypeRepr kind");

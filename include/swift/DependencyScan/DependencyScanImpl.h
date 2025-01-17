@@ -21,7 +21,7 @@
 namespace swift {
 namespace dependencies {
 class DependencyScanningTool;
-}
+} // namespace dependencies
 } // namespace swift
 
 struct swiftscan_dependency_graph_s {
@@ -60,8 +60,23 @@ struct swiftscan_dependency_info_s {
    */
   swiftscan_string_set_t *direct_dependencies;
 
+  /// The list of link libraries for this module.
+  swiftscan_link_library_set_t *link_libraries;
+
   /// Specific details of a particular kind of module.
   swiftscan_module_details_t details;
+};
+
+struct swiftscan_link_library_info_s {
+  swiftscan_string_ref_t name;
+  bool isFramework;
+  bool forceLoad;
+};
+
+struct swiftscan_macro_dependency_s {
+  swiftscan_string_ref_t moduleName;
+  swiftscan_string_ref_t libraryPath;
+  swiftscan_string_ref_t executablePath;
 };
 
 /// Swift modules to be built from a module interface, may have a bridging
@@ -103,6 +118,9 @@ typedef struct {
   /// A flag to indicate whether or not this module is a framework.
   bool is_framework;
 
+  /// A flag that indicates this dependency is associated with a static archive
+  bool is_static;
+
   /// The CASID for CASFileSystemRoot
   swiftscan_string_ref_t cas_fs_root_id;
 
@@ -111,6 +129,12 @@ typedef struct {
 
   /// ModuleCacheKey
   swiftscan_string_ref_t module_cache_key;
+
+  /// Macro dependecies.
+  swiftscan_macro_dependency_set_t *macro_dependencies;
+
+  /// User module version
+  swiftscan_string_ref_t user_module_version;
 } swiftscan_swift_textual_details_t;
 
 /// Swift modules with only a binary module file.
@@ -140,8 +164,17 @@ typedef struct {
   /// A flag to indicate whether or not this module is a framework.
   bool is_framework;
 
+  /// A flag that indicates this dependency is associated with a static archive
+  bool is_static;
+
+  /// Macro dependecies.
+  swiftscan_macro_dependency_set_t *macro_dependencies;
+
   /// ModuleCacheKey
   swiftscan_string_ref_t module_cache_key;
+
+  /// User module version
+  swiftscan_string_ref_t user_module_version;
 } swiftscan_swift_binary_details_t;
 
 /// Swift placeholder modules carry additional details that specify their
@@ -212,7 +245,13 @@ struct swiftscan_scan_invocation_s {
 struct swiftscan_diagnostic_info_s {
   swiftscan_string_ref_t message;
   swiftscan_diagnostic_severity_t severity;
-  // TODO: SourceLoc
+  swiftscan_source_location_t source_location;
+};
+
+struct swiftscan_source_location_s {
+  swiftscan_string_ref_t buffer_identifier;
+  uint32_t line_number;
+  uint32_t column_number;
 };
 
 #endif // SWIFT_C_DEPENDENCY_SCAN_IMPL_H

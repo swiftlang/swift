@@ -78,6 +78,24 @@ extension Gizmo {
 }
 
 /*
+ * Make sure that extensions of an ObjC class with `@objc(CustomName)` get the
+ * indicated category name.
+ */
+// CHECK: @"_CATEGORY_Gizmo_$_WidgetMaker" = internal constant
+// CHECK:   ptr @.str.11.WidgetMaker,
+// CHECK:   ptr @"OBJC_CLASS_$_Gizmo",
+// CHECK:   {{.*}} @"_CATEGORY_INSTANCE_METHODS_Gizmo_$_WidgetMaker",
+// CHECK:   {{.*}} ptr null,
+// CHECK:   ptr null,
+// CHECK:   ptr null
+// CHECK: }, section "__DATA, {{.*}}", align 8
+
+@objc(WidgetMaker) extension Gizmo {
+  func makeWidget() {
+  }
+}
+
+/*
  * Check that extensions of Swift subclasses of ObjC objects get categories.
  */
 

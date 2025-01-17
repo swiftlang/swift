@@ -134,7 +134,7 @@ class LLVM(cmake_product.CMakeProduct):
                       ' into the local clang build directory {}.'.format(
                           host_cxx_builtins_dir, dest_builtins_dir))
 
-                for _os in ['ios', 'watchos', 'tvos']:
+                for _os in ['ios', 'watchos', 'tvos', 'xros']:
                     # Copy over the device .a when necessary
                     lib_name = 'libclang_rt.{}.a'.format(_os)
                     host_lib_path = os.path.join(host_cxx_builtins_dir, lib_name)
@@ -142,10 +142,13 @@ class LLVM(cmake_product.CMakeProduct):
                     if not os.path.isfile(dest_lib_path):
                         if os.path.isfile(host_lib_path):
                             if _os == 'tvos':
+                                print('{} -> {} (stripping i386)'.format(
+                                    host_lib_path, dest_lib_path))
                                 self.copy_lib_stripping_architecture(host_lib_path,
                                                                      dest_lib_path,
                                                                      'i386')
                             else:
+                                print('{} -> {}'.format(host_lib_path, dest_lib_path))
                                 shutil.copy(host_lib_path, dest_lib_path)
                         elif self.args.verbose_build:
                             print('no file exists at {}'.format(host_lib_path))
@@ -161,9 +164,13 @@ class LLVM(cmake_product.CMakeProduct):
                             if _os == 'tvos':
                                 # This is to avoid strip failures when generating
                                 # a toolchain
+                                print('{} -> {} (stripping i386)'.format(
+                                    host_sim_lib_path, dest_sim_lib_path))
                                 self.copy_lib_stripping_architecture(
                                     host_sim_lib_path, dest_sim_lib_path, 'i386')
                             else:
+                                print('{} -> {}'.format(
+                                    host_sim_lib_path, dest_sim_lib_path))
                                 shutil.copy(host_sim_lib_path, dest_sim_lib_path)
 
                         elif os.path.isfile(host_lib_path):
@@ -181,6 +188,8 @@ class LLVM(cmake_product.CMakeProduct):
                                 shell.call(['lipo', '-remove', 'i386', host_lib_path,
                                             '-output', dest_sim_lib_path])
                             else:
+                                print('{} -> {}'.format(host_lib_path,
+                                                        dest_sim_lib_path))
                                 shutil.copy(host_lib_path, dest_sim_lib_path)
                         elif self.args.verbose_build:
                             print('no file exists at {}', host_sim_lib_path)
@@ -195,6 +204,7 @@ class LLVM(cmake_product.CMakeProduct):
                     dest_lib_path = os.path.join(dest_builtins_dir, lib_name)
                     if not os.path.isfile(dest_lib_path):
                         if os.path.isfile(host_lib_path):
+                            print('{} -> {}'.format(host_lib_path, dest_lib_path))
                             shutil.copy(host_lib_path, dest_lib_path)
                         elif self.args.verbose_build:
                             print('no file exists at {}'.format(host_lib_path))
@@ -286,6 +296,12 @@ class LLVM(cmake_product.CMakeProduct):
         llvm_cmake_options.define('LLVM_ENABLE_LTO:STRING', self.args.lto_type)
         llvm_cmake_options.define('COMPILER_RT_INTERCEPT_LIBDISPATCH', 'ON')
 
+        if self.args.build_embedded_stdlib and system() == "Darwin":
+            # Ask for Mach-O cross-compilation builtins (for Embedded Swift)
+            llvm_cmake_options.define(
+                'COMPILER_RT_FORCE_BUILD_BAREMETAL_MACHO_BUILTINS_ARCHS:STRING',
+                'armv6 armv6m armv7 armv7m armv7em')
+
         llvm_enable_projects = ['clang']
 
         if self.args.build_compiler_rt and \
@@ -295,13 +311,14 @@ class LLVM(cmake_product.CMakeProduct):
         if self.args.build_clang_tools_extra:
             llvm_enable_projects.append('clang-tools-extra')
 
-        # Always build lld -- on non-Darwin so we can always have a
+        # Building lld is on by default -- on non-Darwin so we can always have a
         # linker that is compatible with the swift we are using to
         # compile the stdlib, but on Darwin too for Embedded Swift use cases.
         #
         # This makes it easier to build target stdlibs on systems that
         # have old toolchains without more modern linker features.
-        llvm_enable_projects.append('lld')
+        if self.args.build_lld:
+            llvm_enable_projects.append('lld')
 
         llvm_cmake_options.define('LLVM_ENABLE_PROJECTS',
                                   ';'.join(llvm_enable_projects))
@@ -346,6 +363,11 @@ class LLVM(cmake_product.CMakeProduct):
         if not self.args.llvm_include_tests:
             llvm_cmake_options.define('LLVM_INCLUDE_TESTS', 'NO')
             llvm_cmake_options.define('CLANG_INCLUDE_TESTS', 'NO')
+
+        build_root = os.path.dirname(self.build_dir)
+        host_machine_target = targets.StdlibDeploymentTarget.host_target().name
+        host_build_dir = os.path.join(build_root, 'llvm-{}'.format(
+            host_machine_target))
 
         if self.is_cross_compile_target(host_target):
             build_root = os.path.dirname(self.build_dir)
@@ -481,8 +503,9 @@ class LLVM(cmake_product.CMakeProduct):
 
         self.install_with_cmake(install_targets, host_install_destdir)
 
+        clang_dest_dir = '{}{}'.format(host_install_destdir,
+                                       self.args.install_prefix)
+
         if self.args.llvm_install_components and system() == 'Darwin':
-            clang_dest_dir = '{}{}'.format(host_install_destdir,
-                                           self.args.install_prefix)
             self.copy_embedded_compiler_rt_builtins_from_darwin_host_toolchain(
                 clang_dest_dir)

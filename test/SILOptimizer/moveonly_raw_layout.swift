@@ -1,6 +1,7 @@
-// RUN: %target-swift-frontend -enable-experimental-feature BuiltinModule -enable-experimental-feature RawLayout -emit-sil %s | %FileCheck %s
-// RUN: %target-swift-frontend -enable-experimental-feature NoncopyableGenerics -enable-experimental-feature BuiltinModule -enable-experimental-feature RawLayout -emit-sil %s | %FileCheck %s
+// RUN: %target-swift-frontend -enable-experimental-feature BuiltinModule -enable-experimental-feature RawLayout -Xllvm -sil-print-types -emit-sil %s | %FileCheck %s
 
+// REQUIRES: swift_feature_BuiltinModule
+// REQUIRES: swift_feature_RawLayout
 
 import Builtin
 
@@ -15,6 +16,7 @@ struct Lock: ~Copyable {
     var _address: Builtin.RawPointer { return Builtin.addressOfBorrow(self) }
 
     // CHECK-LABEL: // Lock.init()
+    // CHECK-NEXT: Isolation: unspecified
     // CHECK-NEXT: sil{{.*}} @[[INIT:\$.*4LockV.*fC]] :
     init() {
         // CHECK-NOT: destroy_addr
@@ -28,6 +30,7 @@ struct Lock: ~Copyable {
     }
 
     // CHECK-LABEL: // Lock.deinit
+    // CHECK-NEXT: // Isolation: nonisolated
     // CHECK-NEXT: sil{{.*}} @[[DEINIT:\$.*4LockV.*fD]] :
     deinit {
         // CHECK-NOT: destroy_addr

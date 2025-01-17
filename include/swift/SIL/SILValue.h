@@ -590,6 +590,8 @@ public:
 
   bool isGuaranteedForwarding() const;
 
+  bool isBeginApplyToken() const;
+
   /// Unsafely eliminate moveonly from this value's type. Returns true if the
   /// value's underlying type was move only and thus was changed. Returns false
   /// otherwise.
@@ -597,20 +599,18 @@ public:
   /// NOTE: Please do not use this directly! It is only meant to be used by the
   /// optimizer pass: SILMoveOnlyWrappedTypeEliminator.
   bool unsafelyEliminateMoveOnlyWrapper(const SILFunction *fn) {
-    if (!Type.isMoveOnlyWrapped() && !Type.isBoxedMoveOnlyWrappedType(fn))
+    if (!Type.hasAnyMoveOnlyWrapping(fn))
       return false;
-    if (Type.isMoveOnlyWrapped()) {
-      Type = Type.removingMoveOnlyWrapper();
-    } else {
-      assert(Type.isBoxedMoveOnlyWrappedType(fn));
-      Type = Type.removingMoveOnlyWrapperToBoxedType(fn);
-    }
+    Type = Type.removingAnyMoveOnlyWrapping(fn);
     return true;
   }
 
   /// Returns true if this value should be traced for optimization debugging
   /// (it has a debug_value [trace] user).
   bool hasDebugTrace() const;
+
+  /// Does this SILValue begin a VarDecl scope? Only true in OSSA.
+  bool isFromVarDecl();
 
   static bool classof(SILNodePointer node) {
     return node->getKind() >= SILNodeKind::First_ValueBase &&
@@ -1021,7 +1021,9 @@ ValueOwnershipKind::getForwardingOperandOwnership(bool allowUnowned) const {
 class Operand {
 public:
   enum { numCustomBits = 8 };
-  enum { maxBitfieldID = std::numeric_limits<uint64_t>::max() >> numCustomBits };
+
+  constexpr static const size_t maxBitfieldID =
+      std::numeric_limits<uint64_t>::max() >> numCustomBits;
 
 private:
   template <class, class> friend class SILBitfield;
@@ -1073,9 +1075,11 @@ public:
     removeFromCurrent();
     TheValue = newValue;
     insertIntoCurrent();
+    updateReborrowFlags();
     verify();
   }
 
+  void updateReborrowFlags();
   void verify() const;
 
   /// Swap the given operand with the current one.

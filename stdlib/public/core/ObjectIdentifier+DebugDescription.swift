@@ -13,7 +13,7 @@
 #if !$Embedded
 @DebugDescription
 extension ObjectIdentifier {
-  var _debugDescription: String {
+  var lldbDescription: String {
     return "ObjectIdentifier(\(_value))"
   }
 }

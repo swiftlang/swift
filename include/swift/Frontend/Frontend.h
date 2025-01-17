@@ -39,7 +39,6 @@
 #include "swift/IRGen/TBDGen.h"
 #include "swift/Migrator/MigratorOptions.h"
 #include "swift/Parse/IDEInspectionCallbacks.h"
-#include "swift/Parse/Parser.h"
 #include "swift/Sema/SourceLoader.h"
 #include "swift/Serialization/Validation.h"
 #include "swift/Subsystems.h"
@@ -52,9 +51,9 @@
 #include "llvm/Option/ArgList.h"
 #include "llvm/Support/BLAKE3.h"
 #include "llvm/Support/HashingOutputBackend.h"
-#include "llvm/TargetParser/Host.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/VirtualOutputBackend.h"
+#include "llvm/TargetParser/Host.h"
 
 #include <memory>
 
@@ -104,6 +103,7 @@ class CompilerInvocation {
   TBDGenOptions TBDGenOpts;
   ModuleInterfaceOptions ModuleInterfaceOpts;
   CASOptions CASOpts;
+  SerializationOptions SerializationOpts;
   llvm::MemoryBuffer *IDEInspectionTargetBuffer = nullptr;
 
   /// The offset that IDEInspection wants to further examine in offset of bytes
@@ -116,11 +116,16 @@ class CompilerInvocation {
 public:
   CompilerInvocation();
 
-  /// Initializes the compiler invocation for the list of arguments.
+  /// Initializes the compiler invocation and diagnostic engine for the list of
+  /// arguments.
   ///
   /// All parsing should be additive, i.e. options should not be reset to their
   /// default values given the /absence/ of a flag. This is because \c parseArgs
   /// may be used to modify an already partially configured invocation.
+  ///
+  /// As a side-effect of parsing, the diagnostic engine will be configured with
+  /// the options specified by the parsed arguments. This ensures that the
+  /// arguments can effect the behavior of diagnostics emitted during parsing.
   ///
   /// Any configuration files loaded as a result of parsing arguments will be
   /// stored in \p ConfigurationFileBuffers, if non-null. The contents of these
@@ -160,6 +165,9 @@ public:
                               StringRef SDKPath,
                               StringRef ResourceDir);
 
+  /// Configures the diagnostic engine for the invocation's options.
+  void setUpDiagnosticEngine(DiagnosticEngine &diags);
+
   void setTargetTriple(const llvm::Triple &Triple);
   void setTargetTriple(StringRef Triple);
 
@@ -187,7 +195,8 @@ public:
     return ClangImporterOpts.ClangScannerModuleCachePath;
   }
 
-  void setImportSearchPaths(const std::vector<std::string> &Paths) {
+  void setImportSearchPaths(
+      const std::vector<SearchPathOptions::SearchPath> &Paths) {
     SearchPathOpts.setImportSearchPaths(Paths);
   }
 
@@ -196,16 +205,16 @@ public:
     SearchPathOpts.DeserializedPathRecoverer = obfuscator;
   }
 
-  ArrayRef<std::string> getImportSearchPaths() const {
+  ArrayRef<SearchPathOptions::SearchPath> getImportSearchPaths() const {
     return SearchPathOpts.getImportSearchPaths();
   }
 
   void setFrameworkSearchPaths(
-             const std::vector<SearchPathOptions::FrameworkSearchPath> &Paths) {
+      const std::vector<SearchPathOptions::SearchPath> &Paths) {
     SearchPathOpts.setFrameworkSearchPaths(Paths);
   }
 
-  ArrayRef<SearchPathOptions::FrameworkSearchPath> getFrameworkSearchPaths() const {
+  ArrayRef<SearchPathOptions::SearchPath> getFrameworkSearchPaths() const {
     return SearchPathOpts.getFrameworkSearchPaths();
   }
 
@@ -249,6 +258,16 @@ public:
 
   /// If we haven't explicitly passed -blocklist-paths, set it to the default value.
   void setDefaultBlocklistsIfNecessary();
+
+  /// If we haven't explicitly passed '-in-process-plugin-server-path', infer
+  /// it as a default value.
+  ///
+  /// FIXME: Remove this after all the clients start sending it.
+  void setDefaultInProcessPluginServerPathIfNecessary();
+
+  /// Determine which C++ stdlib should be used for this compilation, and which
+  /// C++ stdlib is the default for the specified target.
+  void computeCXXStdlibOptions();
 
   /// Computes the runtime resource path relative to the given Swift
   /// executable.
@@ -316,6 +335,11 @@ public:
 
   IRGenOptions &getIRGenOptions() { return IRGenOpts; }
   const IRGenOptions &getIRGenOptions() const { return IRGenOpts; }
+
+  SerializationOptions &getSerializationOptions() { return SerializationOpts; }
+  const SerializationOptions &getSerializationOptions() const {
+    return SerializationOpts;
+  }
 
   void setParseStdlib() {
     FrontendOpts.ParseStdlib = true;
@@ -404,6 +428,9 @@ public:
   /// Whether the Swift Backtracing support library should be implicitly
   /// imported.
   bool shouldImportSwiftBacktracing() const;
+
+  /// Whether the CXX module should be implicitly imported.
+  bool shouldImportCxx() const;
 
   /// Performs input setup common to these tools:
   /// sil-opt, sil-func-extractor, sil-llvm-gen, and sil-nm.
@@ -660,6 +687,9 @@ public:
   /// i.e. if it can be found.
   bool canImportSwiftBacktracing() const;
 
+  /// Whether the Cxx library can be imported
+  bool canImportCxx() const;
+
   /// Whether the CxxShim library can be imported
   /// i.e. if it can be found.
   bool canImportCxxShim() const;
@@ -690,6 +720,10 @@ public:
   /// Returns true if there was an error during setup.
   bool setup(const CompilerInvocation &Invocation, std::string &Error,
              ArrayRef<const char *> Args = {});
+
+  /// The fast setup function for cache replay.
+  bool setupForReplay(const CompilerInvocation &Invocation, std::string &Error,
+                      ArrayRef<const char *> Args = {});
 
   const CompilerInvocation &getInvocation() const { return Invocation; }
 
@@ -769,7 +803,7 @@ private:
   /// Creates a new source file for the main module.
   SourceFile *createSourceFileForMainModule(ModuleDecl *mod,
                                             SourceFileKind FileKind,
-                                            std::optional<unsigned> BufferID,
+                                            unsigned BufferID,
                                             bool isMainBuffer = false) const;
 
   /// Creates all the files to be added to the main module, appending them to

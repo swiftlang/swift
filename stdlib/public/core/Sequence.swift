@@ -495,6 +495,7 @@ extension DropFirstSequence: Sequence {
   public typealias SubSequence = AnySequence<Element>
   
   @inlinable
+  @inline(__always)
   public __consuming func makeIterator() -> Iterator {
     var it = _base.makeIterator()
     var dropped = 0
@@ -706,6 +707,7 @@ extension Sequence {
   // ABI-only entrypoint for the rethrows version of map, which has been
   // superseded by the typed-throws version. Expressed as "throws", which is
   // ABI-compatible with "rethrows".
+  @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
   @usableFromInline
   @_silgen_name("$sSTsE3mapySayqd__Gqd__7ElementQzKXEKlF")
   func __rethrows_map<T>(
@@ -1272,9 +1274,7 @@ public struct IteratorSequence<Base: IteratorProtocol> {
 
 extension IteratorSequence: IteratorProtocol, Sequence {
 
-  #if $NoncopyableGenerics
-    public typealias Element = Base.Element
-  #endif
+  public typealias Element = Base.Element
 
   /// Advances to the next element and returns it, or `nil` if no next element
   /// exists.

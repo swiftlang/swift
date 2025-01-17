@@ -17,7 +17,9 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "swift/Basic/Assertions.h"
 #include "swift/SIL/Test.h"
+#include "swift/SILOptimizer/Analysis/DeadEndBlocksAnalysis.h"
 #include "swift/SILOptimizer/Analysis/DominanceAnalysis.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
 
@@ -41,6 +43,10 @@ class TestRunner : public SILFunctionTransform {
     DominanceInfo *getDominanceInfo() override {
       auto *dominanceAnalysis = pass->getAnalysis<DominanceAnalysis>();
       return dominanceAnalysis->get(function);
+    }
+    DeadEndBlocks *getDeadEndBlocks() override {
+      auto *deadEndBlocksAnalysis = pass->getAnalysis<DeadEndBlocksAnalysis>();
+      return deadEndBlocksAnalysis->get(function);
     }
     SwiftPassInvocation *getSwiftPassInvocation() override {
       return &swiftPassInvocation;
@@ -108,7 +114,7 @@ void TestRunner::run() {
 // Arguments: NONE
 // Dumps:
 // - the function
-static FunctionTest DumpFunctionTest("dump-function",
+static FunctionTest DumpFunctionTest("dump_function",
                                      [](auto &function, auto &, auto &) {
                                        function.print(llvm::outs());
                                      });

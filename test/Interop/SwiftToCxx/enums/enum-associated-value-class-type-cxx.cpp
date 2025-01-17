@@ -52,6 +52,19 @@ int main() {
         assert(c.getX() == 5678);
     }
 
+    {
+      auto c = C::init(5);
+      auto arr = swift::Array<C>::init(c, 2);
+      auto f = F::b(arr);
+      assert(f.getB().getCount() == 2);
+    }
+
+    {
+      auto arr = swift::Array<swift::Int>::init(42, 2);
+      auto g = G<swift::Int>::b(arr);
+      assert(g.getB().getCount() == 2);
+    }
+
     assert(getRetainCount(c) == 1);
     return 0;
 }

@@ -15,6 +15,7 @@
 #include "SourceKit/Core/NotificationCenter.h"
 #include "SourceKit/Support/Concurrency.h"
 #include "SourceKit/SwiftLang/Factory.h"
+#include "swift/Basic/LLVMInitialize.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/Path.h"
 #include "llvm/Support/TargetSelect.h"
@@ -67,6 +68,9 @@ private:
                                 bool isSystem) override {
     Annotations.push_back({Offset, Length, Kind, isSystem});
   }
+
+  void handleDeclaration(unsigned Offset, unsigned Length, UIdent Kind,
+                         StringRef USR) override {}
 
   bool documentStructureEnabled() override { return false; }
 
@@ -121,6 +125,7 @@ class EditTest : public ::testing::Test {
 
 public:
   EditTest() {
+    INITIALIZE_LLVM();
     // This is avoiding destroying \p SourceKit::Context because another
     // thread may be active trying to use it to post notifications.
     // FIXME: Use shared_ptr ownership to avoid such issues.
@@ -128,6 +133,7 @@ public:
                                  getRuntimeLibPath(),
                                  /*diagnosticDocumentationPath*/ "",
                                  SourceKit::createSwiftLangSupport,
+                                 [](SourceKit::Context &Ctx){ return nullptr; },
                                  /*dispatchOnMain=*/false);
     auto localDocUpdState = std::make_shared<DocUpdateMutexState>();
     Ctx->getNotificationCenter()->addDocumentUpdateNotificationReceiver(
@@ -140,13 +146,6 @@ public:
   }
 
   LangSupport &getLang() { return Ctx->getSwiftLangSupport(); }
-
-  void SetUp() override {
-    llvm::InitializeAllTargets();
-    llvm::InitializeAllTargetMCs();
-    llvm::InitializeAllAsmPrinters();
-    llvm::InitializeAllAsmParsers();
-  }
 
   void addNotificationReceiver(DocumentUpdateNotificationReceiver Receiver) {
     Ctx->getNotificationCenter()->addDocumentUpdateNotificationReceiver(Receiver);
@@ -171,7 +170,8 @@ public:
   }
 
   void close(const char *DocName) {
-    getLang().editorClose(DocName, /*removeCache=*/false);
+    getLang().editorClose(DocName, /*CancelBuilds*/ true,
+                          /*RemoveCache*/ false);
   }
 
   void replaceText(StringRef DocName, unsigned Offset, unsigned Length,

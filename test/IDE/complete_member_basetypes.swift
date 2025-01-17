@@ -1,5 +1,4 @@
-// RUN: %empty-directory(%t)
-// RUN: %target-swift-ide-test -batch-code-completion -source-filename %s -filecheck %raw-FileCheck -completion-output-dir %t -module-name "Mod"
+// RUN: %batch-code-completion -module-name "Mod"
 
 protocol BaseP1 {}
 protocol BaseP2 {}
@@ -87,11 +86,11 @@ extension GenericS: BaseP1 where T == Int {}
 
 func testConditionalConformanceNo(arg: GenericS<String>) {
   arg.#^TestConditionalConformanceNo^#
-// TestConditionalConformanceNo: LookedupTypeNames: ['Mod.GenericS', 'Swift.Sendable']
+// TestConditionalConformanceNo: LookedupTypeNames: ['Mod.GenericS', 'Swift.BitwiseCopyable', 'Swift.Sendable']
 }
 
 func testConditionalConformanceYes(arg: GenericS<Int>) {
   arg.#^TestConditionalConformanceYes^#
-// TestConditionalConformanceYes: LookedupTypeNames: ['Mod.BaseP1', 'Mod.GenericS', 'Swift.Sendable']
+// TestConditionalConformanceYes: LookedupTypeNames: ['Mod.BaseP1', 'Mod.GenericS', 'Swift.BitwiseCopyable', 'Swift.Sendable']
 
 }

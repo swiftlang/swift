@@ -12,30 +12,32 @@
 //
 //  This file implements global conformance lookup.
 //
-//  - ModuleDecl::lookupConformance(type, proto) takes a nominal type or an
+//  - swift::lookupConformance(type, proto) takes a nominal type or an
 //    archetype and returns the appropriate normal, specialized or abstract
 //    conformance. It does not check conditional requirements.
 //
-//  - ModuleDecl::checkConformance(type, proto) is like the above, but checks
+//  - swift::checkConformance(type, proto) is like the above, but checks
 //    conditional requirements. The type must not contain type parameters;
 //    they must either be substituted with concrete types by applying a
 //    substitution map, or mapped to archetypes in a generic environment first.
 //
 //===----------------------------------------------------------------------===//
 
-#include "swift/AST/Module.h"
+#include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Builtins.h"
 #include "swift/AST/DistributedDecl.h"
 #include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/GenericEnvironment.h"
+#include "swift/AST/Module.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/NameLookupRequests.h"
 #include "swift/AST/PackConformance.h"
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/TypeCheckRequests.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/Compiler.h"
 #include "swift/Basic/SourceManager.h"
 #include "llvm/ADT/DenseMap.h"
@@ -46,9 +48,9 @@
 using namespace swift;
 
 ArrayRef<ProtocolConformanceRef>
-ModuleDecl::collectExistentialConformances(CanType fromType,
-                                           CanType existential,
-                                           bool allowMissing) {
+swift::collectExistentialConformances(CanType fromType,
+                                      CanType existential,
+                                      bool allowMissing) {
   assert(existential.isAnyExistentialType());
 
   auto layout = existential.getExistentialLayout();
@@ -61,12 +63,12 @@ ModuleDecl::collectExistentialConformances(CanType fromType,
     conformances.push_back(conformance);
   }
 
-  return getASTContext().AllocateCopy(conformances);
+  return fromType->getASTContext().AllocateCopy(conformances);
 }
 
 ProtocolConformanceRef
-ModuleDecl::lookupExistentialConformance(Type type, ProtocolDecl *protocol) {
-  ASTContext &ctx = getASTContext();
+swift::lookupExistentialConformance(Type type, ProtocolDecl *protocol) {
+  ASTContext &ctx = protocol->getASTContext();
 
   assert(type->isExistentialType());
 
@@ -173,25 +175,27 @@ ProtocolConformanceRef ProtocolConformanceRef::forMissingOrInvalid(
   return ProtocolConformanceRef::forInvalid();
 }
 
-ProtocolConformanceRef ModuleDecl::lookupConformance(Type type,
-                                                     ProtocolDecl *protocol,
-                                                     bool allowMissing) {
+ProtocolConformanceRef swift::lookupConformance(Type type,
+                                                ProtocolDecl *protocol,
+                                                bool allowMissing) {
+  auto &eval = protocol->getASTContext().evaluator;
+
   // If we are recursively checking for implicit conformance of a nominal
   // type to a KnownProtocol, fail without evaluating this request. This
   // squashes cycles.
-  LookupConformanceInModuleRequest request{{this, type, protocol}};
+  LookupConformanceInModuleRequest request{{type, protocol}};
   if (auto kp = protocol->getKnownProtocolKind()) {
     if (auto nominal = type->getAnyNominal()) {
       ImplicitKnownProtocolConformanceRequest icvRequest{nominal, *kp};
-      if (getASTContext().evaluator.hasActiveRequest(icvRequest) ||
-          getASTContext().evaluator.hasActiveRequest(request)) {
+      if (eval.hasActiveRequest(icvRequest) ||
+          eval.hasActiveRequest(request)) {
         return ProtocolConformanceRef::forInvalid();
       }
     }
   }
 
   auto result = evaluateOrDefault(
-      getASTContext().evaluator, request, ProtocolConformanceRef::forInvalid());
+      eval, request, ProtocolConformanceRef::forInvalid());
 
   // If we aren't supposed to allow missing conformances but we have one,
   // replace the result with an "invalid" result.
@@ -206,8 +210,7 @@ ProtocolConformanceRef ModuleDecl::lookupConformance(Type type,
 /// Synthesize a builtin tuple type conformance to the given protocol, if
 /// appropriate.
 static ProtocolConformanceRef getBuiltinTupleTypeConformance(
-    Type type, const TupleType *tupleType, ProtocolDecl *protocol,
-    ModuleDecl *module) {
+    Type type, const TupleType *tupleType, ProtocolDecl *protocol) {
   ASTContext &ctx = protocol->getASTContext();
 
   auto *tupleDecl = ctx.getBuiltinTupleDecl();
@@ -237,8 +240,7 @@ static ProtocolConformanceRef getBuiltinTupleTypeConformance(
     }
 
     auto *conformance = cast<NormalProtocolConformance>(conformances.front());
-    auto subMap = type->getContextSubstitutionMap(module,
-                                                  conformance->getDeclContext());
+    auto subMap = type->getContextSubstitutionMap(conformance->getDeclContext());
 
     // TODO: labels
     auto *specialized = ctx.getSpecializedConformance(type, conformance, subMap);
@@ -404,11 +406,22 @@ getBuiltinBuiltinTypeConformance(Type type, const BuiltinType *builtinType,
                                  ProtocolDecl *protocol) {
   if (auto kp = protocol->getKnownProtocolKind()) {
     switch (*kp) {
-    // All builtin types are Sendable, Copyable, and Escapable.
     case KnownProtocolKind::Sendable:
     case KnownProtocolKind::Copyable:
     case KnownProtocolKind::Escapable: {
       ASTContext &ctx = protocol->getASTContext();
+
+      // FixedArray is Sendable, Copyable, or Escapable if its element type is.
+      if (auto bfa = dyn_cast<BuiltinFixedArrayType>(builtinType)) {
+        if (lookupConformance(bfa->getElementType(), protocol)) {
+          return ProtocolConformanceRef(
+            ctx.getBuiltinConformance(type, protocol,
+                                      BuiltinConformanceKind::Synthesized));
+        }
+        break;
+      }
+    
+      // All other builtin types are Sendable, Copyable, and Escapable.
       return ProtocolConformanceRef(
           ctx.getBuiltinConformance(type, protocol,
                                   BuiltinConformanceKind::Synthesized));
@@ -431,27 +444,21 @@ getBuiltinBuiltinTypeConformance(Type type, const BuiltinType *builtinType,
 }
 
 static ProtocolConformanceRef getPackTypeConformance(
-    PackType *type, ProtocolDecl *protocol, ModuleDecl *mod) {
+    PackType *type, ProtocolDecl *protocol) {
   SmallVector<ProtocolConformanceRef, 2> patternConformances;
 
   for (auto packElement : type->getElementTypes()) {
     if (auto *packExpansion = packElement->getAs<PackExpansionType>()) {
       auto patternType = packExpansion->getPatternType();
 
-      auto patternConformance =
-          (patternType->isTypeParameter()
-           ? ProtocolConformanceRef(protocol)
-           : mod->lookupConformance(patternType, protocol,
-                                    /*allowMissing=*/true));
+      auto patternConformance = lookupConformance(patternType, protocol,
+                                                  /*allowMissing=*/true);
       patternConformances.push_back(patternConformance);
       continue;
     }
 
-    auto patternConformance =
-        (packElement->isTypeParameter()
-         ? ProtocolConformanceRef(protocol)
-         : mod->lookupConformance(packElement, protocol,
-                                  /*allowMissing=*/true));
+    auto patternConformance = lookupConformance(packElement, protocol,
+                                                /*allowMissing=*/true);
     patternConformances.push_back(patternConformance);
   }
 
@@ -462,10 +469,9 @@ static ProtocolConformanceRef getPackTypeConformance(
 ProtocolConformanceRef
 LookupConformanceInModuleRequest::evaluate(
     Evaluator &evaluator, LookupConformanceDescriptor desc) const {
-  auto *mod = desc.Mod;
   auto type = desc.Ty;
   auto *protocol = desc.PD;
-  ASTContext &ctx = mod->getASTContext();
+  ASTContext &ctx = protocol->getASTContext();
 
   // Remove SIL reference ownership wrapper, if present.
   type = type->getReferenceStorageReferent();
@@ -490,7 +496,7 @@ LookupConformanceInModuleRequest::evaluate(
     // able to be resolved by a substitution that makes the archetype
     // concrete.
     if (auto super = archetype->getSuperclass()) {
-      auto inheritedConformance = mod->lookupConformance(
+      auto inheritedConformance = lookupConformance(
           super, protocol, /*allowMissing=*/false);
       if (protocol->isSpecificProtocol(KnownProtocolKind::Sendable) &&
           inheritedConformance.hasUnavailableConformance())
@@ -503,7 +509,7 @@ LookupConformanceInModuleRequest::evaluate(
 
     for (auto ap : archetype->getConformsTo()) {
       if (ap == protocol || ap->inheritsFrom(protocol))
-        return ProtocolConformanceRef(protocol);
+        return ProtocolConformanceRef::forAbstract(archetype, protocol);
     }
 
     return ProtocolConformanceRef::forMissingOrInvalid(type, protocol);
@@ -513,30 +519,34 @@ LookupConformanceInModuleRequest::evaluate(
   // existential's list of conformances and the existential conforms to
   // itself.
   if (type->isExistentialType()) {
-    auto result = mod->lookupExistentialConformance(type, protocol);
+    auto result = lookupExistentialConformance(type, protocol);
     if (result.isInvalid())
       return ProtocolConformanceRef::forMissingOrInvalid(type, protocol);
     return result;
   }
 
+  // Type parameters have trivial conformances.
+  if (type->isTypeParameter())
+    return ProtocolConformanceRef::forAbstract(type, protocol);
+
   // Type variables have trivial conformances.
   if (type->isTypeVariableOrMember())
-    return ProtocolConformanceRef(protocol);
+    return ProtocolConformanceRef::forAbstract(type, protocol);
 
   // UnresolvedType is a placeholder for an unknown type used when generating
   // diagnostics.  We consider it to conform to all protocols, since the
   // intended type might have. Same goes for PlaceholderType.
   if (type->is<UnresolvedType>() || type->is<PlaceholderType>())
-    return ProtocolConformanceRef(protocol);
+    return ProtocolConformanceRef::forAbstract(type, protocol);
 
   // Pack types can conform to protocols.
   if (auto packType = type->getAs<PackType>()) {
-    return getPackTypeConformance(packType, protocol, mod);
+    return getPackTypeConformance(packType, protocol);
   }
 
   // Tuple types can conform to protocols.
   if (auto tupleType = type->getAs<TupleType>()) {
-    return getBuiltinTupleTypeConformance(type, tupleType, protocol, mod);
+    return getBuiltinTupleTypeConformance(type, tupleType, protocol);
   }
 
   // Function types can conform to protocols.
@@ -630,17 +640,6 @@ LookupConformanceInModuleRequest::evaluate(
       } else {
         return ProtocolConformanceRef::forMissingOrInvalid(type, protocol);
       }
-    } else if (protocol->isSpecificProtocol(KnownProtocolKind::Copyable)) {
-      if (!ctx.LangOpts.hasFeature(Feature::NoncopyableGenerics)) {
-        // Return an abstract conformance to maintain legacy compatability.
-        // We only need to do this until we are properly dealing with or
-        // omitting Copyable conformances in modules/interfaces.
-
-        if (nominal->canBeCopyable())
-          return ProtocolConformanceRef(protocol);
-      }
-
-      return ProtocolConformanceRef::forMissingOrInvalid(type, protocol);
     } else if (protocol->isSpecificProtocol(
                    KnownProtocolKind::BitwiseCopyable)) {
       // Try to infer BitwiseCopyable conformance.
@@ -698,7 +697,7 @@ LookupConformanceInModuleRequest::evaluate(
     auto superclassTy = type->getSuperclassForDecl(conformingClass);
 
     // Compute the conformance for the inherited type.
-    auto inheritedConformance = mod->lookupConformance(
+    auto inheritedConformance = lookupConformance(
         superclassTy, protocol, /*allowMissing=*/true);
     assert(inheritedConformance &&
            "We already found the inherited conformance");
@@ -728,7 +727,17 @@ LookupConformanceInModuleRequest::evaluate(
       // specialized type.
       auto *normalConf = cast<NormalProtocolConformance>(conformance);
       auto *conformanceDC = normalConf->getDeclContext();
-      auto subMap = type->getContextSubstitutionMap(mod, conformanceDC);
+
+      // In -swift-version 5 mode, a conditional conformance to a protocol can imply
+      // a Sendable conformance. The implied conformance is unconditional so it uses
+      // the generic signature of the nominal type and not the generic signature of
+      // the extension that declared the (implying) conditional conformance.
+      if (normalConf->getSourceKind() == ConformanceEntryKind::Implied &&
+          normalConf->getProtocol()->isSpecificProtocol(KnownProtocolKind::Sendable)) {
+        conformanceDC = conformanceDC->getSelfNominalTypeDecl();
+      }
+
+      auto subMap = type->getContextSubstitutionMap(conformanceDC);
       return ProtocolConformanceRef(
           ctx.getSpecializedConformance(type, normalConf, subMap));
     }
@@ -739,8 +748,8 @@ LookupConformanceInModuleRequest::evaluate(
 }
 
 ProtocolConformanceRef
-ModuleDecl::checkConformance(Type type, ProtocolDecl *proto,
-                             bool allowMissing) {
+swift::checkConformance(Type type, ProtocolDecl *proto,
+                        bool allowMissing) {
   assert(!type->hasTypeParameter()
          && "must take a contextual type. if you really are ok with an "
             "indefinite answer (and usually YOU ARE NOT), then consider whether "
@@ -753,8 +762,8 @@ ModuleDecl::checkConformance(Type type, ProtocolDecl *proto,
 }
 
 std::optional<ProtocolConformanceRef>
-ModuleDecl::checkConformanceWithoutContext(Type type, ProtocolDecl *proto,
-                                           bool allowMissing) {
+swift::checkConformanceWithoutContext(Type type, ProtocolDecl *proto,
+                                      bool allowMissing) {
   auto lookupResult = lookupConformance(type, proto, allowMissing);
   if (lookupResult.isInvalid()) {
     return ProtocolConformanceRef::forInvalid();
@@ -797,8 +806,7 @@ bool TypeBase::isSendableType() {
   if (auto *fas = getAs<AnyFunctionType>())
     return fas->isSendable();
 
-  auto conformance = proto->getParentModule()->checkConformance(
-      this, proto, false /*allow missing*/);
+  auto conformance = checkConformance(this, proto, false /*allow missing*/);
   return conformance && !conformance.hasUnavailableConformance();
 }
 
@@ -842,6 +850,10 @@ static bool conformsToInvertible(CanType type, InvertibleProtocolKind ip) {
   if (type->is<SILPackType>())
     return true;
 
+  if (type->is<SILTokenType>()) {
+    return true;
+  }
+
   // The SIL types in the AST do not have real conformances, and should have
   // been handled in SILType instead.
   assert(!(type->is<SILBoxType,
@@ -850,9 +862,7 @@ static bool conformsToInvertible(CanType type, InvertibleProtocolKind ip) {
                     SILTokenType>()));
 
   const bool conforms =
-      (bool) proto->getParentModule()->checkConformance(
-          type, proto,
-          /*allowMissing=*/false);
+      (bool) checkConformance(type, proto, /*allowMissing=*/false);
 
   return conforms;
 }

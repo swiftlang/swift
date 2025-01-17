@@ -63,7 +63,23 @@ extension _StringGuts {
   internal init(_ storage: __SharedStringStorage) {
     self.init(_StringObject(storage))
   }
+  
+#if !$Embedded
+internal init(
+  constantCocoa cocoa: AnyObject,
+  providesFastUTF8: Bool,
+  isASCII: Bool,
+  length: Int
+) {
+  self.init(_StringObject(
+    constantCocoa: cocoa,
+    providesFastUTF8: providesFastUTF8,
+    isASCII: isASCII,
+    length: length))
+}
+#endif
 
+  #if !$Embedded
   internal init(
     cocoa: AnyObject, providesFastUTF8: Bool, isASCII: Bool, length: Int
   ) {
@@ -73,6 +89,7 @@ extension _StringGuts {
       isASCII: isASCII,
       length: length))
   }
+  #endif
 }
 
 // Queries
@@ -184,7 +201,7 @@ extension _StringGuts {
     the runtime is depending on this, update Reflection.mm and \
     this if you change it
     """)
-    #elseif _pointerBitWidth(_32)
+    #elseif _pointerBitWidth(_32) || _pointerBitWidth(_16)
     _internalInvariant(MemoryLayout<String>.size == 12, """
     the runtime is depending on this, update Reflection.mm and \
     this if you change it

@@ -50,7 +50,7 @@ set(LLVM_TARGETS_TO_BUILD AArch64 ARM WebAssembly X86 CACHE STRING "")
 set(LLVM_BUILD_LLVM_DYLIB NO CACHE BOOL "")
 set(LLVM_BUILD_LLVM_C_DYLIB NO CACHE BOOL "")
 set(LLVM_ENABLE_LIBEDIT NO CACHE BOOL "")
-set(LLVM_ENABLE_LIBXML2 NO CACHE BOOL "")
+set(LLVM_ENABLE_LIBXML2 YES CACHE BOOL "")
 set(LLVM_ENABLE_OCAMLDOC NO CACHE BOOL "")
 set(LLVM_ENABLE_TERMINFO NO CACHE BOOL "")
 set(LLVM_ENABLE_Z3_SOLVER NO CACHE BOOL "")
@@ -62,12 +62,14 @@ set(LLVM_INCLUDE_GO_TESTS NO CACHE BOOL "")
 set(LLVM_TOOL_GOLD_BUILD NO CACHE BOOL "")
 set(LLVM_TOOL_LLVM_SHLIB_BUILD NO CACHE BOOL "")
 
+set(CLANG_ENABLE_LIBXML2 NO CACHE BOOL "")
+
 # Avoid swig dependency for lldb
 set(LLDB_ALLOW_STATIC_BINDINGS YES CACHE BOOL "")
 set(LLDB_USE_STATIC_BINDINGS YES CACHE BOOL "")
 set(LLDB_ENABLE_PYTHON YES CACHE BOOL "")
 set(LLDB_EMBED_PYTHON_HOME NO CACHE BOOL "")
-set(LLDB_ENABLE_LIBXML2 NO CACHE BOOL "")
+set(LLDB_ENABLE_LIBXML2 YES CACHE BOOL "")
 
 # This requires perl which may not be available on Windows
 set(SWIFT_INCLUDE_DOCS NO CACHE BOOL "")
@@ -96,6 +98,7 @@ set(LLVM_TOOLCHAIN_TOOLS
       llvm-dwp
       llvm-lib
       llvm-lipo
+      llvm-ml
       llvm-mt
       llvm-nm
       llvm-objcopy
@@ -124,6 +127,7 @@ set(CLANG_TOOLS
       clang
       clangd
       clang-deps-launcher
+      clang-features-file
       clang-format
       clang-resource-headers
       clang-scan-deps
@@ -147,6 +151,7 @@ set(LLDB_TOOLS
 set(SWIFT_INSTALL_COMPONENTS
       autolink-driver
       compiler
+      compiler-swift-syntax-lib
       clang-builtin-headers
       editor-integration
       tools

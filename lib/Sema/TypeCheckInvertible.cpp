@@ -18,7 +18,9 @@
 
 #include "TypeCheckInvertible.h"
 #include "swift/AST/ASTContext.h"
+#include "swift/AST/ClangModuleLoader.h"
 #include "swift/AST/GenericEnvironment.h"
+#include "swift/Basic/Assertions.h"
 #include "TypeChecker.h"
 
 using namespace swift;
@@ -142,6 +144,16 @@ static void checkInvertibleConformanceCommon(DeclContext *dc,
     if (auto *normalConf = dyn_cast<NormalProtocolConformance>(concrete)) {
       conformanceLoc = normalConf->getLoc();
       assert(conformanceLoc);
+
+      // Conformance must be defined in the same source file as the nominal.
+      auto conformanceDC = concrete->getDeclContext();
+      if (auto *sourceFile = conformanceDC->getOutermostParentSourceFile()) {
+        if (sourceFile != nominalDecl->getOutermostParentSourceFile()) {
+          ctx.Diags.diagnose(conformanceLoc,
+                             diag::invertible_conformance_other_source_file,
+                             getInvertibleProtocolKindName(ip), nominalDecl);
+        }
+      }
 
       auto condReqs = normalConf->getConditionalRequirements();
       hasUnconditionalConformance = condReqs.empty();
@@ -298,6 +310,23 @@ bool StorageVisitor::visit(NominalTypeDecl *nominal, DeclContext *dc) {
         return true;
     }
 
+    // If this is a C++ struct, walk the members of its base types.
+    if (auto cxxRecordDecl =
+            dyn_cast_or_null<clang::CXXRecordDecl>(nominal->getClangDecl())) {
+      for (auto cxxBase : cxxRecordDecl->bases()) {
+        if (auto cxxBaseDecl = cxxBase.getType()->getAsCXXRecordDecl()) {
+          auto clangModuleLoader = dc->getASTContext().getClangModuleLoader();
+          auto importedDecl =
+              clangModuleLoader->importDeclDirectly(cxxBaseDecl);
+          if (auto nominalBaseDecl =
+                  dyn_cast_or_null<NominalTypeDecl>(importedDecl)) {
+            if (visit(nominalBaseDecl, dc))
+              return true;
+          }
+        }
+      }
+    }
+
     return false;
   }
 
@@ -310,7 +339,7 @@ bool StorageVisitor::visit(NominalTypeDecl *nominal, DeclContext *dc) {
 
         // Check that the associated value type is Sendable.
         auto elementType = dc->mapTypeIntoContext(
-            element->getArgumentInterfaceType());
+            element->getPayloadInterfaceType());
         if ((*this)(element, elementType))
           return true;
       }

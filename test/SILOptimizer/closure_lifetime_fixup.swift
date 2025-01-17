@@ -1,7 +1,7 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend %S/../Inputs/resilient_struct.swift -enable-library-evolution -emit-module -emit-module-path %t/resilient_struct.swiftmodule
 // RUN: %target-swift-frontend %S/../Inputs/resilient_enum.swift -I %t -enable-library-evolution -emit-module -emit-module-path %t/resilient_enum.swiftmodule
-// RUN: %target-swift-frontend %s -sil-verify-all -emit-sil -enable-copy-propagation=false -I %t -o - | %FileCheck %s
+// RUN: %target-swift-frontend %s -sil-verify-all -Xllvm -sil-print-types -emit-sil -enable-copy-propagation=false -I %t -o - | %FileCheck %s
 
 // Using -enable-copy-propagation=false to pattern match against older SIL
 // output. At least until -enable-copy-propagation has been around
@@ -445,4 +445,30 @@ public class F<T> {
 // CHECK: apply
 public func testClosureMethodParam<T>(f: F<T>) throws {
   try f.test { return f.t! }
+}
+
+struct AddressOnlyNoncopyableStruct: ~Copyable {
+  let x: Any = 123
+
+  borrowing func hello() {}
+}
+
+func simpleNonescapingClosure(with body: () -> ()) {
+  body()
+}
+
+// CHECK-LABEL: s22closure_lifetime_fixup27trySimpleNonescapingClosure
+// CHECK: [[FIRST:%.*]] = alloc_stack [var_decl] $AddressOnlyNoncopyableStruct, let, name "foo"
+// CHECK: [[SECOND:%.*]] = alloc_stack [var_decl] $AddressOnlyNoncopyableStruct, let, name "bar"
+// CHECK: [[PA:%.*]] = partial_apply [callee_guaranteed] [on_stack] %{{.*}}([[FIRST]], [[SECOND]])
+// CHECK: [[MD_ONE:%.*]] = mark_dependence [nonescaping] [[PA]] : $@noescape @callee_guaranteed () -> () on [[FIRST]] : $*AddressOnlyNoncopyableStruct
+// CHECK: [[MD_TWO:%.*]] = mark_dependence [nonescaping] [[MD_ONE]] : $@noescape @callee_guaranteed () -> () on [[SECOND]] : $*AddressOnlyNoncopyableStruct
+func trySimpleNonescapingClosure() {
+  let foo = AddressOnlyNoncopyableStruct()
+  let bar = AddressOnlyNoncopyableStruct()
+
+  simpleNonescapingClosure {
+    foo.hello() // OK
+    bar.hello() // OK
+  }
 }

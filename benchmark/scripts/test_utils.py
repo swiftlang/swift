@@ -58,7 +58,7 @@ class Mock(object):
     """
 
     def __init__(self, responses=None):
-        """Optionaly initialized with a list of expected calls. See expect."""
+        """Optionally initialized with a list of expected calls. See expect."""
         self.calls = []
         self.expected = []
         self.respond = dict()

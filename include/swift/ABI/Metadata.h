@@ -297,7 +297,6 @@ public:
     case MetadataKind::Class:
     case MetadataKind::ObjCClassWrapper:
     case MetadataKind::ForeignClass:
-    case MetadataKind::ForeignReferenceType:
       return true;
 
     default:
@@ -1236,7 +1235,7 @@ using ForeignClassMetadata = TargetForeignClassMetadata<InProcess>;
 /// The structure of metadata objects for foreign reference types.
 /// A foreign reference type is a non-Swift, non-Objective-C foreign type with
 /// reference semantics. Foreign reference types are pointers/reference to
-/// value types marked with the "import_as_ref" attribute.
+/// value types marked with the `swift_attr("import_reference")` attribute.
 ///
 /// Foreign reference types may have *custom* reference counting operations, or
 /// they may be immortal (and therefore trivial).
@@ -1665,6 +1664,27 @@ struct TargetMetatypeMetadata : public TargetMetadata<Runtime> {
   }
 };
 using MetatypeMetadata = TargetMetatypeMetadata<InProcess>;
+
+/// The structure of `Builtin.FixedArray` type metadata.
+template <typename Runtime>
+struct TargetFixedArrayTypeMetadata : public TargetMetadata<Runtime> {
+  using StoredPointerDifference = typename Runtime::StoredPointerDifference;
+  
+  StoredPointerDifference Count;
+  ConstTargetMetadataPointer<Runtime, swift::TargetMetadata> Element;
+  
+  // Returns the number of elements for which storage is reserved.
+  // A type that is instantiated with negative size cannot have values
+  // instantiated, so is laid out with zero size like an uninhabited type.
+  StoredPointerDifference getRealizedCount() const {
+    return Count < 0 ? 0 : Count;
+  }
+
+  static bool classof(const TargetMetadata<Runtime> *metadata) {
+    return metadata->getKind() == MetadataKind::FixedArray;
+  }
+};
+using FixedArrayTypeMetadata = TargetFixedArrayTypeMetadata<InProcess>;
 
 /// The structure of tuple type metadata.
 template <typename Runtime>
@@ -2146,7 +2166,7 @@ public:
 
   RuntimeGenericSignature<Runtime> getRequirementSignature() const {
     return {ReqSigHeader, getReqSigParams(), getReqSigRequirements(),
-            {0, 0}, nullptr};
+            {0, 0}, nullptr, {0}, nullptr};
   }
 
   unsigned getNumReqSigParams() const {
@@ -2226,7 +2246,8 @@ public:
   RuntimeGenericSignature<Runtime> getGeneralizationSignature() const {
     if (!hasGeneralizationSignature()) return RuntimeGenericSignature<Runtime>();
     return {*getGenSigHeader(), getGenSigParams(), getGenSigRequirements(),
-            getGenSigPackShapeHeader(), getGenSigPackShapeDescriptors()};
+            getGenSigPackShapeHeader(), getGenSigPackShapeDescriptors(),
+            {0}, nullptr};
   }
 
   unsigned getNumGenSigParams() const {
@@ -2274,6 +2295,24 @@ public:
   unsigned getGenSigArgumentLayoutSizeInWords() const {
     if (!hasGeneralizationSignature()) return 0;
     return getGenSigHeader()->getArgumentLayoutSizeInWords();
+  }
+  
+  bool isCopyable() const {
+    if (!hasGeneralizationSignature()) {
+      return true;
+    }
+    auto *reqts = getGenSigRequirements();
+    for (unsigned i = 0, e = getNumGenSigRequirements(); i < e; ++i) {
+      auto &reqt = reqts[i];
+      if (reqt.getKind() != GenericRequirementKind::InvertedProtocols) {
+        continue;
+      }
+      if (reqt.getInvertedProtocols()
+              .contains(InvertibleProtocolKind::Copyable)) {
+        return false;
+      }
+    }
+    return true;
   }
 };
 using ExtendedExistentialTypeShape

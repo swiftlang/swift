@@ -1,6 +1,8 @@
-// RUN: %target-swift-frontend -parse-as-library -disable-availability-checking -import-objc-header %S/Inputs/perf-annotations.h -emit-sil %s -o /dev/null -verify
-// REQUIRES: swift_stdlib_no_asserts,optimized_stdlib
+// RUN: %target-swift-frontend -parse-as-library -disable-availability-checking -enable-experimental-feature RawLayout -import-objc-header %S/Inputs/perf-annotations.h -emit-sil %s -o /dev/null -verify
+
 // REQUIRES: swift_in_compiler
+// REQUIRES: optimized_stdlib
+// REQUIRES: swift_feature_RawLayout
 
 protocol P {
   func protoMethod(_ a: Int) -> Int
@@ -99,13 +101,22 @@ func errorExistential(_ b: Bool) throws -> Int {
   if b {
     return 28
   }
-  throw MyError()
+  throw MyError() // expected-error{{Using type 'MyError' can cause metadata allocation or locks}}
+}
+
+@_noLocks
+func concreteThrowsExistential(_ b: Bool) throws -> Int {
+  if b {
+    return 28
+  }
+
+  throw ErrorEnum.tryAgain // expected-error{{Using type 'any Error' can cause metadata allocation or locks}}
 }
 
 @_noLocks
 func multipleThrows(_ b1: Bool, _ b2: Bool) throws -> Int {
   if b1 {
-    throw MyError()
+    throw MyError() // expected-error{{Using type 'MyError' can cause metadata allocation or locks}}
   }
   if b2 {
     throw MyError2()
@@ -117,9 +128,40 @@ func multipleThrows(_ b1: Bool, _ b2: Bool) throws -> Int {
 func testCatch(_ b: Bool) throws -> Int? {
   do {
     return try errorExistential(true)
-  } catch let e as MyError {
+  } catch let e as MyError { // expected-error{{this code performs reference counting operations which can cause locking}}
     print(e)
     return nil
+  }
+}
+
+enum ErrorEnum: Error {
+  case failed
+  case tryAgain
+}
+
+@_noLocks
+func concreteError(_ b: Bool) throws(ErrorEnum) -> Int {
+  if b {
+    return 28
+  }
+
+  throw .tryAgain
+}
+
+func concreteErrorOther(_ b: Bool) throws(ErrorEnum) -> Int {
+  if b {
+    return 28
+  }
+
+  throw .tryAgain
+}
+
+@_noLocks
+func testCatchConcrete(_ b: Bool) -> Int {
+  do {
+    return try concreteError(b) + concreteErrorOther(b)
+  } catch {
+    return 17
   }
 }
 
@@ -231,11 +273,6 @@ func closueWhichModifiesLocalVar() -> Int {
   }
   localNonEscapingClosure()
   return x
-}
-
-@_noAllocation
-func createEmptyArray() {
-  _ = [Int]() // expected-error {{ending the lifetime of a value of type}}
 }
 
 struct Buffer {
@@ -505,3 +542,66 @@ func testLargeTuple() {
     _ = GenericStruct<SixInt8s>()
 }
 
+struct Ptr<T> {
+  public var p: UnsafeMutablePointer<T>
+
+  @_noAllocation
+  init(p: UnsafeMutablePointer<T>) {
+    self.p = p
+  }
+}
+
+struct NonCopyableStruct: ~Copyable {
+  func foo() {}
+}
+
+@_noLocks
+func testNonCopyable() {
+  let t = NonCopyableStruct()
+  t.foo()
+}
+
+public struct RawLayoutWrapper: ~Copyable {
+  private let x = RawLayout<Int>()
+
+  @_noLocks func testit() {
+    x.test()
+  }
+}
+
+@_rawLayout(like: T)
+public struct RawLayout<T>: ~Copyable {
+  public func test() {}
+}
+
+func takesClosure(_: () -> ()) {}
+
+@_noLocks
+func testClosureExpression<T>(_ t: T) {
+  takesClosure {
+  // expected-error@-1 {{generic closures or local functions can cause metadata allocation or locks}}
+    _ = T.self
+  }
+}
+
+@_noLocks
+func testLocalFunction<T>(_ t: T) {
+  func localFunc() {
+    _ = T.self
+  }
+
+  takesClosure(localFunc)
+  // expected-error@-1 {{generic closures or local functions can cause metadata allocation or locks}}
+}
+
+func takesGInt(_ x: G<Int>) {}
+
+struct G<T> {}
+
+extension G where T == Int {
+  @_noAllocation func method() {
+    takesClosure {
+      takesGInt(self) // OK
+    }
+  }
+}

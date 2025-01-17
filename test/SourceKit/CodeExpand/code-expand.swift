@@ -147,17 +147,11 @@ braced2(x: {<#T##() -> Void#>}, y: Int)
 // CHECK-NEXT:  }, y: Int)
 
 braced3({
-  #if true
   <#T##() -> Int#>
-  #endif
 })
-// CHECK:      braced3({
-// CHECK-NEXT:   #if true
-// CHECK-NEXT:    {
+// CHECK:      braced3 {
 // CHECK-NEXT:      <#code#>
-// CHECK-NEXT:    }
-// CHECK-NEXT:    #endif
-// CHECK-NEXT:  })
+// CHECK-NEXT:  }
 
 func returnTrailing() -> Int {
   return withtrail(<#T##() -> ()#>)
@@ -260,17 +254,6 @@ func activeWithTrailing() {
   // CHECK: forEach {
   // CHECK-NEXT: <#code#>
 }
-#if false
-func inactive() {
-  foo(<#T##value: Foo##Foo#>)
-  // CHECK: foo(Foo)
-}
-func inactiveWithTrailing() {
-  forEach(<#T##() -> ()#>)
-  // CHECK: forEach {
-  // CHECK-NEXT: <#code#>
-}
-#endif
 
 expandClosureWithInternalParameterNames {
   withtrail(<#T##callback: (Int, Int) -> Bool##(_ a: Int, _ b: Int) -> Bool#>)

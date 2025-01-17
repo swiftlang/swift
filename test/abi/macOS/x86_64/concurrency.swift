@@ -66,6 +66,10 @@ Added: _$sScS8IteratorV4next9isolationxSgScA_pSgYi_tYaF
 // async function pointer to Swift.AsyncStream.Iterator.next(isolation: isolated Swift.Actor?) async -> A?
 Added: _$sScS8IteratorV4next9isolationxSgScA_pSgYi_tYaFTu
 
+// Swift.TaskGroup.Iterator.next(isolation: isolated Swift.Actor?) async -> A?
+Added: _$sScG8IteratorV4next9isolationxSgScA_pSgYi_tYaF
+Added: _$sScG8IteratorV4next9isolationxSgScA_pSgYi_tYaFTu
+
 // Swift.ThrowingTaskGroup.Iterator.next(isolation: isolated Swift.Actor?) async throws(B) -> A?
 Added: _$sScg8IteratorV4next9isolationxSgScA_pSgYi_tYaq_YKF
 
@@ -312,10 +316,59 @@ Added: _$sScf13checkIsolatedyyFTj
 // method descriptor for Swift.SerialExecutor.checkIsolated() -> ()
 Added: _$sScf13checkIsolatedyyFTq
 
-// #isolated adoption in TaskLocal.withValue
+// #isolated adoption in multiple APis
+// withTaskCancellationHandler gains #isolated
+Added: _$ss27withTaskCancellationHandler9operation8onCancel9isolationxxyYaKXE_yyYbXEScA_pSgYitYaKlF
+Added: _$ss27withTaskCancellationHandler9operation8onCancel9isolationxxyYaKXE_yyYbXEScA_pSgYitYaKlFTu
+// TaskGroup.with... APIs gain #isolated
+Added: _$ss23withDiscardingTaskGroup9returning9isolation4bodyxxm_ScA_pSgYixs0bcD0VzYaXEtYalF
+Added: _$ss23withDiscardingTaskGroup9returning9isolation4bodyxxm_ScA_pSgYixs0bcD0VzYaXEtYalFTu
+Added: _$ss13withTaskGroup2of9returning9isolation4bodyq_xm_q_mScA_pSgYiq_ScGyxGzYaXEtYas8SendableRzr0_lF
+Added: _$ss13withTaskGroup2of9returning9isolation4bodyq_xm_q_mScA_pSgYiq_ScGyxGzYaXEtYas8SendableRzr0_lFTu
+Added: _$ss31withThrowingDiscardingTaskGroup9returning9isolation4bodyxxm_ScA_pSgYixs0bcdE0Vys5Error_pGzYaKXEtYaKlF
+Added: _$ss31withThrowingDiscardingTaskGroup9returning9isolation4bodyxxm_ScA_pSgYixs0bcdE0Vys5Error_pGzYaKXEtYaKlFTu
+Added: _$ss21withThrowingTaskGroup2of9returning9isolation4bodyq_xm_q_mScA_pSgYiq_Scgyxs5Error_pGzYaKXEtYaKs8SendableRzr0_lF
+Added: _$ss21withThrowingTaskGroup2of9returning9isolation4bodyq_xm_q_mScA_pSgYiq_Scgyxs5Error_pGzYaKXEtYaKs8SendableRzr0_lFTu
 // Swift.TaskLocal.withValueImpl<A>(_: __owned A, operation: () async throws -> A1, isolation: isolated Swift.Actor?, file: Swift.String, line: Swift.UInt) async throws -> A1
 Added: _$ss9TaskLocalC13withValueImpl_9operation9isolation4file4lineqd__xn_qd__yYaKXEScA_pSgYiSSSutYaKlF
 Added: _$ss9TaskLocalC13withValueImpl_9operation9isolation4file4lineqd__xn_qd__yYaKXEScA_pSgYiSSSutYaKlFTu
 // Swift.TaskLocal.withValue<A>(_: A, operation: () async throws -> A1, isolation: isolated Swift.Actor?, file: Swift.String, line: Swift.UInt) async throws -> A1
 Added: _$ss9TaskLocalC9withValue_9operation9isolation4file4lineqd__x_qd__yYaKXEScA_pSgYiSSSutYaKlF
 Added: _$ss9TaskLocalC9withValue_9operation9isolation4file4lineqd__x_qd__yYaKXEScA_pSgYiSSSutYaKlFTu
+
+// isolated deinit
+Added: _swift_task_deinitOnExecutor
+
+Added: __swift_concurrency_debug_internal_layout_version
+
+Added: _swift_task_getMainExecutor_hook
+Added: _swift_task_invokeSwiftCheckIsolated
+Added: _swift_task_isMainExecutor
+Added: _swift_task_isMainExecutor_hook
+
+Added: _swift_task_donateThreadToGlobalExecutorUntil
+Added: _swift_task_donateThreadToGlobalExecutorUntil_hook
+
+// Add property descriptors for static properties
+Added: _$sScM21sharedUnownedExecutorScevpZMV
+Added: _$sScM6sharedScMvpZMV
+Added: _$sScP10backgroundScPvpZMV
+Added: _$sScP11unspecifiedScPvpZMV
+Added: _$sScP13userInitiatedScPvpZMV
+Added: _$sScP15userInteractiveScPvpZMV
+Added: _$sScP3lowScPvpZMV
+Added: _$sScP4highScPvpZMV
+Added: _$sScP6mediumScPvpZMV
+Added: _$sScP7defaultScPvpZMV
+Added: _$sScP7utilityScPvpZMV
+Added: _$sScTss5NeverORszABRs_rlE11isCancelledSbvpZMV
+Added: _$sScTss5NeverORszABRs_rlE12basePriorityScPSgvpZMV
+Added: _$sScTss5NeverORszABRs_rlE15currentPriorityScPvpZMV
+Added: _$ss15ContinuousClockV3nowAB7InstantVvpZMV
+Added: _$ss15ContinuousClockV7InstantV3nowADvpZMV
+Added: _$ss15SuspendingClockV3nowAB7InstantVvpZMV
+Added: _$ss15SuspendingClockV7InstantV3nowADvpZMV
+Added: _$ss9TaskLocalC18_enclosingInstance7wrapped7storagexs5NeverO_s24ReferenceWritableKeyPathCyAGxGAIyAgByxGGtcipZMV
+
+Added: _swift_taskGroup_initializeWithOptions
+Added: _swift_task_isCurrentExecutorWithFlags

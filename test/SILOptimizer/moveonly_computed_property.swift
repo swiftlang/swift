@@ -1,5 +1,4 @@
 // RUN: %target-swift-frontend -emit-sil -verify %s > /dev/null
-// RUN: %target-swift-frontend -enable-experimental-feature NoncopyableGenerics -emit-sil -verify %s > /dev/null
 
 
 

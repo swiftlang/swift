@@ -36,7 +36,8 @@
 private import _Macro
 
 public func test() {
-  let _ = VERSION
+  // Check the VERSION is from command-line, thus a Int32, not string.
+  let _ : Int32 = VERSION
 }
 
 //--- include/module.modulemap
@@ -49,7 +50,7 @@ module _Macro {
 #if defined(_VERSION)
 #define VERSION _VERSION
 #else
-#define VERSION 0
+#define VERSION "not available"
 #endif
 
 //--- hmap.json

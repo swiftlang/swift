@@ -176,6 +176,17 @@ enum HasPack_t : bool {
   HasPack = true,
 };
 
+/// Is the type addressable-for-dependencies?
+///
+/// Values of an addressable-for-dependency type are passed indirectly into
+/// functions that specify a return value lifetime dependency on the value.
+/// This allows the dependent value to safely contain pointers to the in-memory
+/// representation of the source of the dependency.
+enum IsAddressableForDependencies_t : bool {
+  IsNotAddressableForDependencies = false,
+  IsAddressableForDependencies = true,
+};
+
 /// Extended type information used by SIL.
 class TypeLowering {
 public:
@@ -184,15 +195,16 @@ public:
     //
     // clang-format off
     enum : unsigned {
-      NonTrivialFlag             = 1 << 0,
-      NonFixedABIFlag            = 1 << 1,
-      AddressOnlyFlag            = 1 << 2,
-      ResilientFlag              = 1 << 3,
-      TypeExpansionSensitiveFlag = 1 << 4,
-      InfiniteFlag               = 1 << 5,
-      HasRawPointerFlag          = 1 << 6,
-      LexicalFlag                = 1 << 7,
-      HasPackFlag                = 1 << 8,
+      NonTrivialFlag                 = 1 << 0,
+      NonFixedABIFlag                = 1 << 1,
+      AddressOnlyFlag                = 1 << 2,
+      ResilientFlag                  = 1 << 3,
+      TypeExpansionSensitiveFlag     = 1 << 4,
+      InfiniteFlag                   = 1 << 5,
+      HasRawPointerFlag              = 1 << 6,
+      LexicalFlag                    = 1 << 7,
+      HasPackFlag                    = 1 << 8,
+      AddressableForDependenciesFlag = 1 << 9,
     };
     // clang-format on
 
@@ -209,7 +221,8 @@ public:
         IsTypeExpansionSensitive_t isTypeExpansionSensitive =
             IsNotTypeExpansionSensitive,
         HasRawPointer_t hasRawPointer = DoesNotHaveRawPointer,
-        IsLexical_t isLexical = IsNotLexical, HasPack_t hasPack = HasNoPack)
+        IsLexical_t isLexical = IsNotLexical, HasPack_t hasPack = HasNoPack,
+        IsAddressableForDependencies_t isAFD = IsNotAddressableForDependencies)
         : Flags((isTrivial ? 0U : NonTrivialFlag) |
                 (isFixedABI ? 0U : NonFixedABIFlag) |
                 (isAddressOnly ? AddressOnlyFlag : 0U) |
@@ -217,7 +230,8 @@ public:
                 (isTypeExpansionSensitive ? TypeExpansionSensitiveFlag : 0U) |
                 (hasRawPointer ? HasRawPointerFlag : 0U) |
                 (isLexical ? LexicalFlag : 0U) |
-                (hasPack ? HasPackFlag : 0U)) {}
+                (hasPack ? HasPackFlag : 0U) |
+                (isAFD ? AddressableForDependenciesFlag : 0U)) {}
 
     constexpr bool operator==(RecursiveProperties p) const {
       return Flags == p.Flags;
@@ -225,6 +239,12 @@ public:
 
     static constexpr RecursiveProperties forTrivial() {
       return {IsTrivial, IsFixedABI, IsNotAddressOnly, IsNotResilient};
+    }
+
+    static constexpr RecursiveProperties forTrivialOpaque() {
+      return {IsTrivial, IsFixedABI, IsNotAddressOnly, IsNotResilient,
+              IsNotTypeExpansionSensitive, HasRawPointer, IsNotLexical,
+              HasNoPack, IsAddressableForDependencies};
     }
 
     static constexpr RecursiveProperties forRawPointer() {
@@ -239,11 +259,14 @@ public:
 
     static constexpr RecursiveProperties forOpaque() {
       return {IsNotTrivial, IsNotFixedABI, IsAddressOnly, IsNotResilient,
-              IsNotTypeExpansionSensitive, DoesNotHaveRawPointer, IsLexical, HasNoPack};
+              IsNotTypeExpansionSensitive, HasRawPointer, IsLexical,
+              HasNoPack, IsAddressableForDependencies};
     }
 
     static constexpr RecursiveProperties forResilient() {
-      return {IsTrivial, IsFixedABI, IsNotAddressOnly, IsResilient};
+      return {IsTrivial, IsFixedABI, IsNotAddressOnly, IsResilient,
+              IsNotTypeExpansionSensitive, HasRawPointer, IsNotLexical,
+              HasNoPack, IsAddressableForDependencies};
     }
 
     void addSubobject(RecursiveProperties other) {
@@ -278,8 +301,14 @@ public:
     HasPack_t isOrContainsPack() const {
       return HasPack_t((Flags & HasPackFlag) != 0);
     }
+    IsAddressableForDependencies_t isAddressableForDependencies() const {
+      return IsAddressableForDependencies_t(
+                                (Flags & AddressableForDependenciesFlag) != 0);
+    }
 
     void setNonTrivial() { Flags |= NonTrivialFlag; }
+    void setIsOrContainsRawPointer() { Flags |= HasRawPointerFlag; }
+
     void setNonFixedABI() { Flags |= NonFixedABIFlag; }
     void setAddressOnly() { Flags |= AddressOnlyFlag; }
     void setTypeExpansionSensitive(
@@ -292,6 +321,9 @@ public:
       Flags = (Flags & ~LexicalFlag) | (isLexical ? LexicalFlag : 0);
     }
     void setHasPack() { Flags |= HasPackFlag; }
+    void setAddressableForDependencies() {
+      Flags |= AddressableForDependenciesFlag;
+    }
   };
 
 private:
@@ -704,6 +736,28 @@ struct FunctionTypeInfo {
   CanSILFunctionType ExpectedLoweredType;
 };
 
+/// Return type of getGenericSignatureWithCapturedEnvironments().
+struct GenericSignatureWithCapturedEnvironments {
+  GenericSignature baseGenericSig;
+  GenericSignature genericSig;
+  ArrayRef<GenericEnvironment *> capturedEnvs;
+
+  explicit GenericSignatureWithCapturedEnvironments() {}
+
+  explicit GenericSignatureWithCapturedEnvironments(
+      GenericSignature baseGenericSig)
+    : baseGenericSig(baseGenericSig),
+      genericSig(baseGenericSig) {}
+
+  GenericSignatureWithCapturedEnvironments(
+      GenericSignature baseGenericSig,
+      GenericSignature genericSig,
+      ArrayRef<GenericEnvironment *> capturedEnvs)
+    : baseGenericSig(baseGenericSig),
+      genericSig(genericSig),
+      capturedEnvs(capturedEnvs) {}
+};
+
 /// TypeConverter - helper class for creating and managing TypeLowerings.
 class TypeConverter {
   friend class TypeLowering;
@@ -1047,11 +1101,25 @@ public:
   const SILConstantInfo &getConstantInfo(TypeExpansionContext context,
                                          SILDeclRef constant);
 
-  /// Get the generic environment for a constant.
-  GenericSignature getConstantGenericSignature(SILDeclRef constant);
+  /// Get the generic signature for a constant.
+  GenericSignatureWithCapturedEnvironments
+  getGenericSignatureWithCapturedEnvironments(SILDeclRef constant);
+
+  /// Get the substitution map for calling a constant.
+  SubstitutionMap
+  getSubstitutionMapWithCapturedEnvironments(SILDeclRef constant,
+                                             const CaptureInfo &captureInfo,
+                                             SubstitutionMap subs);
 
   /// Get the generic environment for a constant.
   GenericEnvironment *getConstantGenericEnvironment(SILDeclRef constant);
+
+  /// Get the generic environment for SILGen to use. The substitution map
+  /// sends the generic parameters of the function's interface type into
+  /// archetypes, which will either be primary archetypes from this
+  /// environment, or local archetypes captured by this function.
+  std::tuple<GenericEnvironment *, ArrayRef<GenericEnvironment *>, SubstitutionMap>
+  getForwardingSubstitutionsForLowering(SILDeclRef constant);
 
   /// Returns the SIL type of a constant reference.
   SILType getConstantType(TypeExpansionContext context, SILDeclRef constant) {
@@ -1217,13 +1285,25 @@ public:
                                         SILDeclRef constant,
                                         CanAnyFunctionType origInterfaceType);
 
-  /// Get the boxed interface type to use for a capture of the given decl.
+  /// Get the interface type for a box that holds a mutable local 'var',
+  /// substituted for a closure that captures some superset of the local
+  /// environments captured by the 'var'.
   CanSILBoxType
   getInterfaceBoxTypeForCapture(ValueDecl *captured,
-                                CanType loweredInterfaceType,
+                                CanType loweredContextType,
+                                GenericSignature genericSig,
+                                ArrayRef<GenericEnvironment *> capturedEnvs,
                                 bool isMutable);
-  /// Get the boxed contextual type to use for a capture of the given decl
-  /// in the given generic environment.
+
+  /// Get the interface type for a box that holds a mutable local 'var',
+  /// given that the interface type of the 'var' might capture local
+  /// archetypes.
+  CanSILBoxType
+  getInterfaceBoxTypeForCapture(ValueDecl *captured,
+                                CanType loweredContextType,
+                                bool isMutable);
+
+  /// Get the contextual type for a box that holds a mutable local 'var'.
   CanSILBoxType
   getContextBoxTypeForCapture(ValueDecl *captured,
                               CanType loweredContextType,

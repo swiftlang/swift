@@ -17,10 +17,12 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/SILOptimizer/Utils/CastOptimizer.h"
+#include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/GenericSignature.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/SubstitutionMap.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/SIL/BasicBlockUtils.h"
 #include "swift/SIL/DebugUtils.h"
 #include "swift/SIL/DynamicCasts.h"
@@ -41,7 +43,6 @@
 #include "llvm/IR/Intrinsics.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Compiler.h"
-#include <deque>
 #include <optional>
 
 using namespace swift;
@@ -71,11 +72,10 @@ getObjCToSwiftBridgingFunction(SILOptFunctionBuilder &funcBuilder,
                                          ForDefinition_t::NotForDefinition);
 }
 
-static SubstitutionMap lookupBridgeToObjCProtocolSubs(SILModule &mod,
-                                                      CanType target) {
+static SubstitutionMap lookupBridgeToObjCProtocolSubs(CanType target) {
   auto bridgedProto =
-      mod.getASTContext().getProtocol(KnownProtocolKind::ObjectiveCBridgeable);
-  auto conf = mod.getSwiftModule()->lookupConformance(target, bridgedProto);
+      target->getASTContext().getProtocol(KnownProtocolKind::ObjectiveCBridgeable);
+  auto conf = lookupConformance(target, bridgedProto);
   return SubstitutionMap::getProtocolSubstitutions(conf.getRequirement(),
                                                    target, conf);
 }
@@ -314,7 +314,7 @@ CastOptimizer::optimizeBridgedObjCToSwiftCast(SILDynamicCastInst dynamicCast) {
   // This is done by means of calling _forceBridgeFromObjectiveC or
   // _conditionallyBridgeFromObjectiveC_bridgeable from the Target type.
   auto *funcRef = Builder.createFunctionRefFor(Loc, bridgingFunc);
-  SubstitutionMap subMap = lookupBridgeToObjCProtocolSubs(mod, target);
+  SubstitutionMap subMap = lookupBridgeToObjCProtocolSubs(target);
 
   auto MetaTy = MetatypeType::get(target, MetatypeRepresentation::Thick);
   auto SILMetaTy = F->getTypeLowering(MetaTy).getLoweredType();
@@ -443,7 +443,6 @@ CastOptimizer::optimizeBridgedObjCToSwiftCast(SILDynamicCastInst dynamicCast) {
 //===----------------------------------------------------------------------===//
 
 static bool canOptimizeCast(const swift::Type &BridgedTargetTy,
-                            swift::SILModule &M,
                             swift::SILFunctionConventions &substConv,
                             TypeExpansionContext context) {
   // DestTy is the type which we want to convert to
@@ -464,13 +463,11 @@ static bool canOptimizeCast(const swift::Type &BridgedTargetTy,
   }
   // check if it is a bridgeable CF type
   if (ConvTy.getASTType() ==
-      getNSBridgedClassOfCFClass(M.getSwiftModule(),
-                                 DestTy.getASTType())) {
+      getNSBridgedClassOfCFClass(DestTy.getASTType())) {
     return true;
   }
   if (DestTy.getASTType() ==
-      getNSBridgedClassOfCFClass(M.getSwiftModule(),
-                                 ConvTy.getASTType())) {
+      getNSBridgedClassOfCFClass(ConvTy.getASTType())) {
     return true;
   }
   // All else failed - can't optimize this case
@@ -481,31 +478,33 @@ static std::optional<std::pair<SILFunction *, SubstitutionMap>>
 findBridgeToObjCFunc(SILOptFunctionBuilder &functionBuilder,
                      SILDynamicCastInst dynamicCast) {
   CanType sourceFormalType = dynamicCast.getSourceFormalType();
-  auto loc = dynamicCast.getLocation();
-  auto &mod = dynamicCast.getModule();
-  auto bridgedProto =
-      mod.getASTContext().getProtocol(KnownProtocolKind::ObjectiveCBridgeable);
 
-  auto conf = mod.getSwiftModule()->lookupConformance(
-    sourceFormalType, bridgedProto);
+  auto *mod = dynamicCast.getModule().getSwiftModule();
+  auto &ctx = mod->getASTContext();
+  auto loc = dynamicCast.getLocation();
+  auto bridgedProto =
+      ctx.getProtocol(
+        KnownProtocolKind::ObjectiveCBridgeable);
+
+  auto conf = lookupConformance(sourceFormalType, bridgedProto);
   assert(conf && "_ObjectiveCBridgeable conformance should exist");
   (void)conf;
 
   // Generate code to invoke _bridgeToObjectiveC
   ModuleDecl *modDecl =
-      mod.getASTContext().getLoadedModule(mod.getASTContext().Id_Foundation);
+      ctx.getLoadedModule(ctx.Id_Foundation);
   if (!modDecl)
     return std::nullopt;
   SmallVector<ValueDecl *, 2> results;
   modDecl->lookupMember(results,
                         sourceFormalType.getNominalOrBoundGenericNominal(),
-                        mod.getASTContext().Id_bridgeToObjectiveC,
+                        ctx.Id_bridgeToObjectiveC,
                         Identifier());
   ArrayRef<ValueDecl *> resultsRef(results);
   if (resultsRef.empty()) {
-    mod.getSwiftModule()->lookupMember(
+    mod->lookupMember(
         results, sourceFormalType.getNominalOrBoundGenericNominal(),
-        mod.getASTContext().Id_bridgeToObjectiveC, Identifier());
+        ctx.Id_bridgeToObjectiveC, Identifier());
     resultsRef = results;
   }
   if (resultsRef.size() != 1)
@@ -518,7 +517,7 @@ findBridgeToObjCFunc(SILOptFunctionBuilder &functionBuilder,
 
   // Get substitutions, if source is a bound generic type.
   auto subMap = sourceFormalType->getContextSubstitutionMap(
-      mod.getSwiftModule(), resultDecl->getDeclContext());
+      resultDecl->getDeclContext());
 
   // Implementation of _bridgeToObjectiveC could not be found.
   if (!bridgedFunc)
@@ -530,8 +529,8 @@ findBridgeToObjCFunc(SILOptFunctionBuilder &functionBuilder,
     bridgedFunc->setParentModule(
         resultDecl->getDeclContext()->getParentModule());
 
-  if (dynamicCast.getFunction()->isSerialized() &&
-      !bridgedFunc->hasValidLinkageForFragileRef())
+  if (dynamicCast.getFunction()->isAnySerialized() &&
+      !bridgedFunc->hasValidLinkageForFragileRef(dynamicCast.getFunction()->getSerializedKind()))
     return std::nullopt;
 
   if (bridgedFunc->getLoweredFunctionType()
@@ -553,7 +552,6 @@ static SILValue computeFinalCastedValue(SILBuilderWithScope &builder,
   assert(destLoweredTy == dynamicCast.getLoweredBridgedTargetObjectType() &&
          "Expected Dest Type to be the same as BridgedTargetTy");
 
-  auto &m = dynamicCast.getModule();
   if (convTy == destLoweredTy) {
     return newAI;
   }
@@ -598,9 +596,9 @@ static SILValue computeFinalCastedValue(SILBuilderWithScope &builder,
   }
 
   if (convTy.getASTType() ==
-          getNSBridgedClassOfCFClass(m.getSwiftModule(), destLoweredTy.getASTType()) ||
+          getNSBridgedClassOfCFClass(destLoweredTy.getASTType()) ||
       destLoweredTy.getASTType() ==
-          getNSBridgedClassOfCFClass(m.getSwiftModule(), convTy.getASTType())) {
+          getNSBridgedClassOfCFClass(convTy.getASTType())) {
     // Handle NS <-> CF toll-free bridging here.
     return SILValue(builder.createUncheckedRefCast(loc, newAI, destLoweredTy));
   }
@@ -649,7 +647,7 @@ CastOptimizer::optimizeBridgedSwiftToObjCCast(SILDynamicCastInst dynamicCast) {
 
   // Check that this is a case that the authors of this code thought it could
   // handle.
-  if (!canOptimizeCast(BridgedTargetTy, M, substConv,
+  if (!canOptimizeCast(BridgedTargetTy, substConv,
                        F->getTypeExpansionContext())) {
     return nullptr;
   }
@@ -692,6 +690,7 @@ CastOptimizer::optimizeBridgedSwiftToObjCCast(SILDynamicCastInst dynamicCast) {
   case ParameterConvention::Pack_Inout:
   case ParameterConvention::Direct_Owned:
   case ParameterConvention::Indirect_In:
+  case ParameterConvention::Indirect_In_CXX:
     // Currently this
     // cannot appear, because the _bridgeToObjectiveC protocol witness method
     // always receives the this pointer (= the source) as guaranteed.
@@ -1453,7 +1452,6 @@ static bool optimizeStaticallyKnownProtocolConformance(
   if (TargetType->isAnyExistentialType() &&
       !SourceType->isAnyExistentialType()) {
     auto &Ctx = Mod.getASTContext();
-    auto *SM = Mod.getSwiftModule();
 
     auto *Proto = dyn_cast_or_null<ProtocolDecl>(TargetType->getAnyNominal());
     if (!Proto)
@@ -1462,14 +1460,14 @@ static bool optimizeStaticallyKnownProtocolConformance(
     // SourceType is a non-existential type with a non-conditional
     // conformance to a protocol represented by the TargetType.
     //
-    // ModuleDecl::checkConformance() checks any conditional conformances. If
+    // swift::checkConformance() checks any conditional conformances. If
     // they depend on information not known until runtime, the conformance
     // will not be returned. For instance, if `X: P` where `T == Int` in `func
     // foo<T>(_: T) { ... X<T>() as? P ... }`, the cast will succeed for
     // `foo(0)` but not for `foo("string")`. There are many cases where
     // everything is completely static (`X<Int>() as? P`), in which case a
     // valid conformance will be returned.
-    auto Conformance = SM->checkConformance(SourceType, Proto);
+    auto Conformance = checkConformance(SourceType, Proto);
     if (Conformance.isInvalid())
       return false;
 

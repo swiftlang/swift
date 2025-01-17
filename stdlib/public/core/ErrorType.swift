@@ -181,6 +181,7 @@ public func _bridgeErrorToNSError(_ error: __owned Error) -> AnyObject
 @_silgen_name("swift_willThrowTypedImpl")
 @available(SwiftStdlib 6.0, *)
 @usableFromInline
+@_noLocks
 func _willThrowTypedImpl<E: Error>(_ error: E)
 
 #if !$Embedded
@@ -195,7 +196,7 @@ func _willThrowTypedImpl<E: Error>(_ error: E)
 @_alwaysEmitIntoClient
 @_silgen_name("swift_willThrowTyped")
 public func _willThrowTyped<E: Error>(_ error: E) {
-  if #available(macOS 9999, iOS 9999, watchOS 9999, tvOS 9999, visionOS 9999, *) {
+  if #available(macOS 15.0, iOS 18.0, watchOS 11.0, tvOS 18.0, visionOS 2.0, *) {
     _willThrowTypedImpl(error)
   }
 }
@@ -278,7 +279,7 @@ extension Error {
   }
 
   public var _domain: String {
-    return String(reflecting: type(of: self))
+    return _typeName(type(of: self), qualified: true)
   }
 
   public var _userInfo: AnyObject? {

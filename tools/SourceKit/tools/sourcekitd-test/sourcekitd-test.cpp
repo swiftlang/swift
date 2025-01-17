@@ -1069,6 +1069,9 @@ static int handleTestInvocation(TestOptions Opts, TestOptions &InitOpts) {
                                                Opts.InterestedUSR.c_str());
     if (!Opts.USR.empty())
       sourcekitd_request_dictionary_set_string(Req, KeyUSR, Opts.USR.c_str());
+
+    // add possible EnableDeclarations in particular
+    addRequestOptionsDirect(Req, Opts);
     break;
 
   case SourceKitRequest::FindInterfaceDoc:
@@ -2453,6 +2456,12 @@ static void printInterfaceGen(sourcekitd_variant_t Info, bool CheckASCII) {
   sourcekitd_variant_t structure =
       sourcekitd_variant_dictionary_get_value(Info, KeySubStructure);
   printRawVariant(structure);
+  sourcekitd_variant_t declarations =
+      sourcekitd_variant_dictionary_get_value(Info, KeyDeclarations);
+  // only output declarations if there are any (because this might have been
+  // disabled in the request itself)
+  if (sourcekitd_variant_get_type(declarations) != SOURCEKITD_VARIANT_TYPE_NULL)
+    printRawVariant(declarations);
 }
 
 static void printRelatedIdents(sourcekitd_variant_t Info, StringRef Filename,

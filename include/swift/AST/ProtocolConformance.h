@@ -18,6 +18,7 @@
 
 #include "swift/AST/ConcreteDeclRef.h"
 #include "swift/AST/Decl.h"
+#include "swift/AST/ProtocolConformanceOptions.h"
 #include "swift/AST/Type.h"
 #include "swift/AST/Types.h"
 #include "swift/AST/TypeAlignments.h"
@@ -146,19 +147,20 @@ protected:
     SWIFT_INLINE_BITFIELD_EMPTY(RootProtocolConformance, ProtocolConformance);
 
     SWIFT_INLINE_BITFIELD_FULL(NormalProtocolConformance, RootProtocolConformance,
-                               1+1+1+1+bitmax(NumProtocolConformanceStateBits,8)+
+                               1+1+
+                               bitmax(NumProtocolConformanceOptions,8)+
+                               bitmax(NumProtocolConformanceStateBits,8)+
                                bitmax(NumConformanceEntryKindBits,8),
       /// Indicates whether the conformance is invalid.
       IsInvalid : 1,
-      /// The conformance was labeled with @unchecked.
-      IsUnchecked : 1,
-      /// The conformance was labeled with @preconcurrency.
-      IsPreconcurrency : 1,
       /// We have allocated the AssociatedConformances array (but not necessarily
       /// populated any of its elements).
       HasComputedAssociatedConformances : 1,
 
       : NumPadBits,
+
+      /// Options.
+      Options : bitmax(NumProtocolConformanceOptions, 8),
 
       /// The current state of the conformance.
       State : bitmax(NumProtocolConformanceStateBits, 8),
@@ -530,6 +532,12 @@ class NormalProtocolConformance : public RootProtocolConformance,
   /// The location of this protocol conformance in the source.
   SourceLoc Loc;
 
+  /// The location of the protocol name within the conformance.
+  SourceLoc ProtocolNameLoc;
+
+  /// The location of the `@preconcurrency` attribute, if any.
+  SourceLoc PreconcurrencyLoc;
+
   /// The declaration context containing the ExtensionDecl or
   /// NominalTypeDecl that declared the conformance.
   DeclContext *Context;
@@ -561,17 +569,22 @@ class NormalProtocolConformance : public RootProtocolConformance,
 public:
   NormalProtocolConformance(Type conformingType, ProtocolDecl *protocol,
                             SourceLoc loc, DeclContext *dc,
-                            ProtocolConformanceState state, bool isUnchecked,
-                            bool isPreconcurrency)
+                            ProtocolConformanceState state,
+                            ProtocolConformanceOptions options,
+                            SourceLoc preconcurrencyLoc)
       : RootProtocolConformance(ProtocolConformanceKind::Normal,
                                 conformingType),
-        Protocol(protocol), Loc(loc), Context(dc) {
+        Protocol(protocol), Loc(extractNearestSourceLoc(dc)),
+        ProtocolNameLoc(loc), PreconcurrencyLoc(preconcurrencyLoc),
+        Context(dc) {
     assert(!conformingType->hasArchetype() &&
            "ProtocolConformances should store interface types");
+    assert((preconcurrencyLoc.isInvalid() ||
+            options.contains(ProtocolConformanceFlags::Preconcurrency)) &&
+           "Cannot have a @preconcurrency location without isPreconcurrency");
     setState(state);
     Bits.NormalProtocolConformance.IsInvalid = false;
-    Bits.NormalProtocolConformance.IsUnchecked = isUnchecked;
-    Bits.NormalProtocolConformance.IsPreconcurrency = isPreconcurrency;
+    Bits.NormalProtocolConformance.Options = options.toRaw();
     Bits.NormalProtocolConformance.HasComputedAssociatedConformances = false;
     Bits.NormalProtocolConformance.SourceKind =
         unsigned(ConformanceEntryKind::Explicit);
@@ -580,8 +593,11 @@ public:
   /// Get the protocol being conformed to.
   ProtocolDecl *getProtocol() const { return Protocol; }
 
-  /// Retrieve the location of this
+  /// Retrieve the location of this conformance.
   SourceLoc getLoc() const { return Loc; }
+
+  /// Retrieve the name of the protocol location.
+  SourceLoc getProtocolNameLoc() const { return ProtocolNameLoc; }
 
   /// Get the declaration context that contains the conforming extension or
   /// nominal type declaration.
@@ -612,21 +628,35 @@ public:
   /// Mark this conformance as invalid.
   void setInvalid() { Bits.NormalProtocolConformance.IsInvalid = true; }
 
+  ProtocolConformanceOptions getOptions() const {
+    return ProtocolConformanceOptions(Bits.NormalProtocolConformance.Options);
+  }
+
   /// Whether this is an "unchecked" conformance.
   bool isUnchecked() const {
-    return Bits.NormalProtocolConformance.IsUnchecked;
+    return getOptions().contains(ProtocolConformanceFlags::Unchecked);
   }
 
   /// Mark the conformance as unchecked (equivalent to the @unchecked
   /// conformance attribute).
   void setUnchecked() {
     // OK to mutate because the flags are not part of the folding set node ID.
-    Bits.NormalProtocolConformance.IsUnchecked = true;
+    Bits.NormalProtocolConformance.Options =
+        (getOptions() | ProtocolConformanceFlags::Unchecked).toRaw();
   }
 
   /// Whether this is an preconcurrency conformance.
   bool isPreconcurrency() const {
-    return Bits.NormalProtocolConformance.IsPreconcurrency;
+    return getOptions().contains(ProtocolConformanceFlags::Preconcurrency);
+  }
+
+  /// Retrieve the location of `@preconcurrency`, if there is one and it is
+  /// known.
+  SourceLoc getPreconcurrencyLoc() const { return PreconcurrencyLoc; }
+
+  /// Whether this is an "unsafe" conformance.
+  bool isUnsafe() const {
+    return getOptions().contains(ProtocolConformanceFlags::Unsafe);
   }
 
   /// Determine whether we've lazily computed the associated conformance array
@@ -663,7 +693,12 @@ public:
     assert(sourceKind != ConformanceEntryKind::PreMacroExpansion &&
            "cannot create conformance pre-macro-expansion");
     Bits.NormalProtocolConformance.SourceKind = unsigned(sourceKind);
-    ImplyingConformance = implyingConformance;
+    if (auto implying = implyingConformance) {
+      ImplyingConformance = implying;
+      PreconcurrencyLoc = implying->getPreconcurrencyLoc();
+      Bits.NormalProtocolConformance.Options =
+          implyingConformance->getOptions().toRaw();
+    }
   }
 
   /// Determine whether this conformance is lazily loaded.

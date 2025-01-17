@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -enable-sil-verify-all %s -redundant-load-elimination | %FileCheck %s
+// RUN: %target-sil-opt -sil-print-types -enable-sil-verify-all %s -redundant-load-elimination | %FileCheck %s
 // TODO : Add a version with semantic-arc-opts when #34971 is landed or DCE is enabled on OSSA
 
 // REQUIRES: swift_in_compiler
@@ -139,6 +139,7 @@ sil @use_2_64 : $@convention(thin) (Builtin.Int64, Builtin.Int64) -> ()
 sil @use_a : $@convention(thin) (A) -> ()
 sil @use_twofield : $@convention(thin) (TwoField) -> ()
 sil @init_twofield : $@convention(thin) (@thin TwoField.Type) -> TwoField
+sil @consumeB : $@convention(thin) (@owned B) -> ()
 
 // We have a bug in the old projection code which this test case exposes.
 // Make sure its handled properly in the new projection.
@@ -1288,6 +1289,38 @@ bb0(%0 : $Builtin.RawPointer):
   return %99 : $(Int, Int, Int, Int)
 }
 
+// CHECK-LABEL: sil [ossa] @non_const_index :
+// CHECK:         [[L:%.*]] = load
+// CHECK-NOT:     load
+// CHECK:         tuple ([[L]] : $Int, [[L]] : $Int)
+// CHECK-LABEL: } // end sil function 'non_const_index'
+sil [ossa] @non_const_index : $@convention(thin) (@guaranteed B, Builtin.Word) -> (Int, Int) {
+bb0(%0 : @guaranteed $B, %1 : $Builtin.Word):
+  %2 = ref_tail_addr %0 : $B, $Int
+  %3 = index_addr %2 : $*Int, %1 : $Builtin.Word
+  %4 = load [trivial] %3 : $*Int
+  %5 = load [trivial] %3 : $*Int
+  %6 = tuple (%4 : $Int, %5 : $Int)
+  return %6 : $(Int, Int)
+}
+
+// CHECK-LABEL: sil [ossa] @non_const_index_aliasing :
+// CHECK:         [[L1:%.*]] = load
+// CHECK:         store
+// CHECK:         [[L2:%.*]] = load
+// CHECK:         tuple ([[L1]] : $Int, [[L2]] : $Int)
+// CHECK-LABEL: } // end sil function 'non_const_index_aliasing'
+sil [ossa] @non_const_index_aliasing : $@convention(thin) (@guaranteed B, Builtin.Word, Int) -> (Int, Int) {
+bb0(%0 : @guaranteed $B, %1 : $Builtin.Word, %2 : $Int):
+  %3 = ref_tail_addr %0 : $B, $Int
+  %4 = index_addr %3 : $*Int, %1 : $Builtin.Word
+  %5 = load [trivial] %3 : $*Int
+  store %2 to [trivial] %4: $*Int
+  %7 = load [trivial] %3 : $*Int
+  %8 = tuple (%5 : $Int, %7 : $Int)
+  return %8 : $(Int, Int)
+}
+
 sil [ossa] @overwrite_int : $@convention(thin) (@inout Int, Int) -> ()
 
 // Make sure that the store is forwarded to the load, ie. the load is
@@ -1382,8 +1415,6 @@ bb0(%0 : $B, %1 : $*Agg1):
   return %10 : $()
 }
 
-// TODO: When RLE uses TBAA it should remove the second load.
-//
 // CHECK-LABEL: sil @tbaa_struct
 // CHECK:         [[L:%.*]] = load
 // CHECK:         store
@@ -1462,3 +1493,41 @@ bb0:
   dealloc_stack %1 : $*Optional<B>
   return %3 : $Optional<B>
 }
+
+// CHECK-LABEL: sil [ossa] @dont_take_in_borrow_scope :
+// CHECK:         load [copy]
+// CHECK:         end_borrow
+// CHECK:         load [take]
+// CHECK-LABEL: } // end sil function 'dont_take_in_borrow_scope'
+sil [ossa] @dont_take_in_borrow_scope : $@convention(thin) (@in B) -> () {
+bb0(%0 : $*B):
+  %1 = load_borrow %0 : $*B
+  %2 = load [copy] %0 : $*B
+  %3 = function_ref @consumeB : $@convention(thin) (@owned B) -> ()
+  %4 = apply %3(%2) : $@convention(thin) (@owned B) -> ()
+  end_borrow %1 : $B
+  %6 = load [take] %0 : $*B
+  %7 = apply %3(%6) : $@convention(thin) (@owned B) -> ()
+  %8 = tuple ()
+  return %8 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @copy_in_borrow_scope :
+// CHECK:         load [copy]
+// CHECK:         copy_value
+// CHECK:         end_borrow
+// CHECK-NOT:     load
+// CHECK-LABEL: } // end sil function 'copy_in_borrow_scope'
+sil [ossa] @copy_in_borrow_scope : $@convention(thin) (@inout B) -> () {
+bb0(%0 : $*B):
+  %1 = load_borrow %0 : $*B
+  %2 = load [copy] %0 : $*B
+  %3 = function_ref @consumeB : $@convention(thin) (@owned B) -> ()
+  %4 = apply %3(%2) : $@convention(thin) (@owned B) -> ()
+  end_borrow %1 : $B
+  %6 = load [copy] %0 : $*B
+  %7 = apply %3(%6) : $@convention(thin) (@owned B) -> ()
+  %8 = tuple ()
+  return %8 : $()
+}
+

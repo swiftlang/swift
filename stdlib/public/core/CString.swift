@@ -77,7 +77,7 @@ extension String {
   }
 
   @_alwaysEmitIntoClient
-  private init(_checkingCString bytes: UnsafeBufferPointer<UInt8>) {
+  internal init(_checkingCString bytes: UnsafeBufferPointer<UInt8>) {
     guard let length = bytes.firstIndex(of: 0) else {
       _preconditionFailure(
         "input of String.init(cString:) must be null-terminated"

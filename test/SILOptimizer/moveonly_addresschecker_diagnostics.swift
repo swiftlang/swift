@@ -1,5 +1,8 @@
-// RUN: %target-swift-emit-sil -O -sil-verify-all -verify -enable-experimental-feature BorrowingSwitch -enable-upcoming-feature MoveOnlyPartialConsumption -enable-experimental-feature MoveOnlyPartialReinitialization -enable-experimental-feature NoImplicitCopy -enable-experimental-feature MoveOnlyClasses %s
-// RUN: %target-swift-emit-sil -enable-experimental-feature BorrowingSwitch -enable-experimental-feature NoncopyableGenerics -O -sil-verify-all -verify -enable-upcoming-feature MoveOnlyPartialConsumption -enable-experimental-feature MoveOnlyPartialReinitialization -enable-experimental-feature NoImplicitCopy -enable-experimental-feature MoveOnlyClasses %s
+// RUN: %target-swift-emit-sil %s -O -sil-verify-all -verify -enable-experimental-feature MoveOnlyPartialReinitialization -enable-experimental-feature NoImplicitCopy -enable-experimental-feature MoveOnlyClasses
+
+// REQUIRES: swift_feature_MoveOnlyClasses
+// REQUIRES: swift_feature_MoveOnlyPartialReinitialization
+// REQUIRES: swift_feature_NoImplicitCopy
 
 //////////////////
 // Declarations //
@@ -36,8 +39,7 @@ public func consumeVal<T>(_ x: __owned AddressOnlyGeneric<T>) {}
 public func consumeVal(_ x: __owned AddressOnlyProtocol) {}
 public func consumeVal<T>(_ x: __owned T) {}
 
-@_moveOnly
-public final class Klass {
+public final class Klass: ~Copyable {
     var intField: Int
     var k: Klass
     init() {
@@ -46,8 +48,7 @@ public final class Klass {
     }
 }
 
-@_moveOnly
-public final class FinalKlass {
+public final class FinalKlass: ~Copyable {
     var k: Klass = Klass()
 }
 

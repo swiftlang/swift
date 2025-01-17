@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -target %target-cpu-apple-macosx10.50
+// RUN: %target-typecheck-verify-swift -target %target-cpu-apple-macosx50
 
 // REQUIRES: OS=macosx
 
@@ -32,21 +32,21 @@ class DeinitUnavailableMacOS {
 }
 
 class AvailableAtDeploymentTargetDeinit {
-  @available(macOS 10.50, *)
+  @available(macOS 50, *)
   deinit {}
 }
 
 class PotentiallyUnavailableDeinit {
-  @available(macOS 10.51, *) // expected-error {{deinitializer cannot be marked potentially unavailable with '@available'}}
+  @available(macOS 51, *) // expected-error {{deinitializer cannot be marked potentially unavailable with '@available'}}
   deinit {}
 }
 
-@available(macOS 10.51, *)
-func funcAvailable10_51() {}
+@available(macOS 51, *)
+func funcAvailable51() {}
 
 class AlwaysAvailable { // expected-note {{add @available attribute to enclosing class}}
   deinit {
-    funcAvailable10_51() // expected-error {{'funcAvailable10_51()' is only available in macOS 10.51 or newer}}
+    funcAvailable51() // expected-error {{'funcAvailable51()' is only available in macOS 51 or newer}}
     // expected-note@-1 {{add 'if #available' version check}}
   }
 }

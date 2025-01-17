@@ -30,10 +30,6 @@
 
 using namespace swift;
 
-// TODO: can't be inlined to work around https://github.com/apple/swift/issues/64502
-BasicCalleeAnalysis::~BasicCalleeAnalysis() {
-}
-
 void BasicCalleeAnalysis::dump() const {
   print(llvm::errs());
 }
@@ -67,7 +63,7 @@ void BridgedCalleeAnalysis::registerAnalysis(IsDeinitBarrierFn instructionIsDein
 }
 
 MemoryBehavior BasicCalleeAnalysis::
-getMemoryBehavior(ApplySite as, bool observeRetains) {
+getMemoryBehavior(FullApplySite as, bool observeRetains) {
   if (getMemBehvaiorFunction) {
     auto b = getMemBehvaiorFunction({as.getInstruction()->asSILNode()},
                                     observeRetains,
@@ -94,7 +90,7 @@ namespace swift::test {
 // Dumps:
 // - instruction
 // - whether it's a deinit barrier
-static FunctionTest IsDeinitBarrierTest("is-deinit-barrier", [](auto &function,
+static FunctionTest IsDeinitBarrierTest("is_deinit_barrier", [](auto &function,
                                                                 auto &arguments,
                                                                 auto &test) {
   auto *instruction = arguments.takeInstruction();

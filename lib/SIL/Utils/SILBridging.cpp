@@ -19,6 +19,7 @@
 
 #include "swift/AST/Attr.h"
 #include "swift/AST/SemanticAttrs.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/SIL/MemAccessUtils.h"
 #include "swift/SIL/OwnershipUtils.h"
 #include "swift/SIL/ParseTestSpecification.h"
@@ -169,11 +170,6 @@ static_assert((int)BridgedType::MetatypeRepresentation::Thin == (int)swift::Meta
 static_assert((int)BridgedType::MetatypeRepresentation::Thick == (int)swift::MetatypeRepresentation::Thick);
 static_assert((int)BridgedType::MetatypeRepresentation::ObjC == (int)swift::MetatypeRepresentation::ObjC);
 
-static_assert((int)BridgedType::TraitResult::IsNot == (int)swift::TypeTraitResult::IsNot);
-static_assert((int)BridgedType::TraitResult::CanBe == (int)swift::TypeTraitResult::CanBe);
-static_assert((int)BridgedType::TraitResult::Is == (int)swift::TypeTraitResult::Is);
-
-
 //===----------------------------------------------------------------------===//
 //                                SILFunction
 //===----------------------------------------------------------------------===//
@@ -206,7 +202,19 @@ BridgedOwnedString BridgedFunction::getDebugDescription() const {
   llvm::raw_string_ostream os(str);
   getFunction()->print(os);
   str.pop_back(); // Remove trailing newline.
-  return str;
+  return BridgedOwnedString(str);
+}
+
+BridgedSubstitutionMap BridgedFunction::getMethodSubstitutions(BridgedSubstitutionMap contextSubs) const {
+  swift::SILFunction *f = getFunction();
+  swift::GenericSignature genericSig = f->getLoweredFunctionType()->getInvocationGenericSignature();
+
+  if (!genericSig || genericSig->areAllParamsConcrete())
+    return swift::SubstitutionMap();
+
+  return swift::SubstitutionMap::get(genericSig,
+                                     swift::QuerySubstitutionMap{contextSubs.unbridged()},
+                                     swift::LookUpConformanceInModule());
 }
 
 //===----------------------------------------------------------------------===//
@@ -218,7 +226,7 @@ BridgedOwnedString BridgedBasicBlock::getDebugDescription() const {
   llvm::raw_string_ostream os(str);
   unbridged()->print(os);
   str.pop_back(); // Remove trailing newline.
-  return str;
+  return BridgedOwnedString(str);
 }
 
 //===----------------------------------------------------------------------===//
@@ -230,7 +238,7 @@ BridgedOwnedString BridgedValue::getDebugDescription() const {
   llvm::raw_string_ostream os(str);
   getSILValue()->print(os);
   str.pop_back(); // Remove trailing newline.
-  return str;
+  return BridgedOwnedString(str);
 }
 
 BridgedValue::Kind BridgedValue::getKind() const {
@@ -275,6 +283,30 @@ static_assert((int)BridgedArgumentConvention::Pack_Inout == (int)swift::SILArgum
 static_assert((int)BridgedArgumentConvention::Pack_Guaranteed == (int)swift::SILArgumentConvention::Pack_Guaranteed);
 static_assert((int)BridgedArgumentConvention::Pack_Out == (int)swift::SILArgumentConvention::Pack_Out);
 
+//===----------------------------------------------------------------------===//
+//                                Linkage
+//===----------------------------------------------------------------------===//
+
+static_assert((int)BridgedLinkage::Public == (int)swift::SILLinkage::Public);
+static_assert((int)BridgedLinkage::PublicNonABI == (int)swift::SILLinkage::PublicNonABI);
+static_assert((int)BridgedLinkage::Package == (int)swift::SILLinkage::Package);
+static_assert((int)BridgedLinkage::PackageNonABI == (int)swift::SILLinkage::PackageNonABI);
+static_assert((int)BridgedLinkage::Hidden == (int)swift::SILLinkage::Hidden);
+static_assert((int)BridgedLinkage::Shared == (int)swift::SILLinkage::Shared);
+static_assert((int)BridgedLinkage::Private == (int)swift::SILLinkage::Private);
+static_assert((int)BridgedLinkage::PublicExternal == (int)swift::SILLinkage::PublicExternal);
+static_assert((int)BridgedLinkage::PackageExternal == (int)swift::SILLinkage::PackageExternal);
+static_assert((int)BridgedLinkage::HiddenExternal == (int)swift::SILLinkage::HiddenExternal);
+
+//===----------------------------------------------------------------------===//
+//                                Operand
+//===----------------------------------------------------------------------===//
+
+void BridgedOperand::changeOwnership(BridgedValue::Ownership from, BridgedValue::Ownership to) const {
+  swift::ForwardingOperand forwardingOp(op);
+  assert(forwardingOp);
+  forwardingOp.replaceOwnershipKind(BridgedValue::unbridge(from), BridgedValue::unbridge(to));
+}
 
 //===----------------------------------------------------------------------===//
 //                            SILGlobalVariable
@@ -285,7 +317,7 @@ BridgedOwnedString BridgedGlobalVar::getDebugDescription() const {
   llvm::raw_string_ostream os(str);
   getGlobal()->print(os);
   str.pop_back(); // Remove trailing newline.
-  return str;
+  return BridgedOwnedString(str);
 }
 
 bool BridgedGlobalVar::canBeInitializedStatically() const {
@@ -306,41 +338,62 @@ bool BridgedGlobalVar::mustBeInitializedStatically() const {
 }
 
 //===----------------------------------------------------------------------===//
+//                            SILDeclRef
+//===----------------------------------------------------------------------===//
+
+BridgedOwnedString BridgedDeclRef::getDebugDescription() const {
+  std::string str;
+  llvm::raw_string_ostream os(str);
+  unbridged().print(os);
+  return BridgedOwnedString(str);
+}
+
+//===----------------------------------------------------------------------===//
 //                            SILVTable
 //===----------------------------------------------------------------------===//
+
+static_assert(sizeof(BridgedVTableEntry) >= sizeof(swift::SILVTableEntry),
+              "BridgedVTableEntry has wrong size");
+
+static_assert((int)BridgedVTableEntry::Kind::Normal == (int)swift::SILVTableEntry::Normal);
+static_assert((int)BridgedVTableEntry::Kind::Inherited == (int)swift::SILVTableEntry::Inherited);
+static_assert((int)BridgedVTableEntry::Kind::Override == (int)swift::SILVTableEntry::Override);
 
 BridgedOwnedString BridgedVTable::getDebugDescription() const {
   std::string str;
   llvm::raw_string_ostream os(str);
   vTable->print(os);
   str.pop_back(); // Remove trailing newline.
-  return str;
+  return BridgedOwnedString(str);
 }
 
 BridgedOwnedString BridgedVTableEntry::getDebugDescription() const {
   std::string str;
   llvm::raw_string_ostream os(str);
-  entry->print(os);
+  unbridged().print(os);
   str.pop_back(); // Remove trailing newline.
-  return str;
+  return BridgedOwnedString(str);
 }
 
 //===----------------------------------------------------------------------===//
 //                    SILVWitnessTable, SILDefaultWitnessTable
 //===----------------------------------------------------------------------===//
 
-static_assert((int)BridgedWitnessTableEntry::Kind::Invalid == (int)swift::SILWitnessTable::WitnessKind::Invalid);
-static_assert((int)BridgedWitnessTableEntry::Kind::Method == (int)swift::SILWitnessTable::WitnessKind::Method);
-static_assert((int)BridgedWitnessTableEntry::Kind::AssociatedType == (int)swift::SILWitnessTable::WitnessKind::AssociatedType);
-static_assert((int)BridgedWitnessTableEntry::Kind::AssociatedTypeProtocol == (int)swift::SILWitnessTable::WitnessKind::AssociatedTypeProtocol);
-static_assert((int)BridgedWitnessTableEntry::Kind::BaseProtocol == (int)swift::SILWitnessTable::WitnessKind::BaseProtocol);
+static_assert(sizeof(BridgedWitnessTableEntry) >= sizeof(swift::SILWitnessTable::Entry),
+              "BridgedWitnessTableEntry has wrong size");
+
+static_assert((int)BridgedWitnessTableEntry::Kind::invalid == (int)swift::SILWitnessTable::WitnessKind::Invalid);
+static_assert((int)BridgedWitnessTableEntry::Kind::method == (int)swift::SILWitnessTable::WitnessKind::Method);
+static_assert((int)BridgedWitnessTableEntry::Kind::associatedType == (int)swift::SILWitnessTable::WitnessKind::AssociatedType);
+static_assert((int)BridgedWitnessTableEntry::Kind::associatedConformance == (int)swift::SILWitnessTable::WitnessKind::AssociatedConformance);
+static_assert((int)BridgedWitnessTableEntry::Kind::baseProtocol == (int)swift::SILWitnessTable::WitnessKind::BaseProtocol);
 
 BridgedOwnedString BridgedWitnessTableEntry::getDebugDescription() const {
   std::string str;
   llvm::raw_string_ostream os(str);
-  getEntry()->print(os, /*verbose=*/ false, PrintOptions::printSIL());
+  unbridged().print(os, /*verbose=*/ false, PrintOptions::printSIL());
   str.pop_back(); // Remove trailing newline.
-  return str;
+  return BridgedOwnedString(str);
 }
 
 BridgedOwnedString BridgedWitnessTable::getDebugDescription() const {
@@ -348,7 +401,7 @@ BridgedOwnedString BridgedWitnessTable::getDebugDescription() const {
   llvm::raw_string_ostream os(str);
   table->print(os);
   str.pop_back(); // Remove trailing newline.
-  return str;
+  return BridgedOwnedString(str);
 }
 
 BridgedOwnedString BridgedDefaultWitnessTable::getDebugDescription() const {
@@ -356,16 +409,8 @@ BridgedOwnedString BridgedDefaultWitnessTable::getDebugDescription() const {
   llvm::raw_string_ostream os(str);
   table->print(os);
   str.pop_back(); // Remove trailing newline.
-  return str;
+  return BridgedOwnedString(str);
 }
-
-//===----------------------------------------------------------------------===//
-//                               SubstitutionMap
-//===----------------------------------------------------------------------===//
-
-static_assert(sizeof(BridgedSubstitutionMap) >= sizeof(swift::SubstitutionMap),
-              "BridgedSubstitutionMap has wrong size");
-
 
 //===----------------------------------------------------------------------===//
 //                               SILDebugLocation
@@ -389,7 +434,7 @@ BridgedOwnedString BridgedLocation::getDebugDescription() const {
     }
   }
 #endif
-  return str;
+  return BridgedOwnedString(str);
 }
 
 //===----------------------------------------------------------------------===//
@@ -407,7 +452,7 @@ BridgedOwnedString BridgedInstruction::getDebugDescription() const {
   llvm::raw_string_ostream os(str);
   unbridged()->print(os);
   str.pop_back(); // Remove trailing newline.
-  return str;
+  return BridgedOwnedString(str);
 }
 
 bool BridgedInstruction::mayAccessPointer() const {

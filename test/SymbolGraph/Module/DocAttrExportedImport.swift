@@ -23,8 +23,8 @@
 // INTERNAL-DAG: "precise":"s:1A11SymbolFromAV"
 // INTERNAL-DAG: "precise":"s:1B9StructOneV"
 
-// FIXME: Symbols from `@_exported import` do not get emitted when using swift-symbolgraph-extract
-// This is tracked by https://github.com/apple/swift-docc/issues/179.
+// FIXME: Functionality doesn't currently work swift-symbolgraph-extract as documentation visibility attribute isn't
+// exposed in the module interface
 
 // FILES-NOT: DocAttrExportedImport@A.symbols.json
 

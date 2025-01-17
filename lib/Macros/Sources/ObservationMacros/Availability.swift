@@ -12,7 +12,6 @@
 import SwiftSyntax
 import SwiftSyntaxMacros
 import SwiftDiagnostics
-import SwiftOperators
 import SwiftSyntaxBuilder
 
 
@@ -87,7 +86,7 @@ extension AttributeListSyntax.Element {
       if let availability = ifConfig.availability {
         return .ifConfigDecl(availability)
       }
-    default:
+    @unknown default:
       break
     }
     return nil

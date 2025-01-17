@@ -1,5 +1,5 @@
-// RUN: %target-run-simple-swift(-parse-as-library -Xfrontend -sil-verify-all -enable-upcoming-feature MoveOnlyPartialConsumption) | %FileCheck %s
-// RUN: %target-run-simple-swift(-parse-as-library -O -Xfrontend -sil-verify-all -enable-upcoming-feature MoveOnlyPartialConsumption) | %FileCheck %s
+// RUN: %target-run-simple-swift(-parse-as-library -Xfrontend -sil-verify-all) | %FileCheck %s
+// RUN: %target-run-simple-swift(-parse-as-library -O -Xfrontend -sil-verify-all) | %FileCheck %s
 
 // REQUIRES: executable_test
 

@@ -1,6 +1,7 @@
 // RUN: %target-swift-frontend -enable-experimental-feature SymbolLinkageMarkers -parse-as-library -emit-sil %s -o /dev/null -verify
 
 // REQUIRES: swift_in_compiler
+// REQUIRES: swift_feature_SymbolLinkageMarkers
 
 @_used @_section("__TEXT,__mysection") var g0: Int = 1 // ok
 
@@ -29,6 +30,13 @@ struct MyStruct4<T> {
 
     @_section("__TEXT,__mysection") func foo() {} // expected-error {{attribute '_section' cannot be used in a generic context}}
   }
+}
+
+struct MyStruct5<T> {
+}
+
+extension MyStruct5 where T == Never {
+  @_used @_section("__TEXT,__mysection") static let static3: Int = 1 // ok
 }
 
 @_section("__TEXT,__mysection") // expected-error {{'@_section' attribute cannot be applied to this declaration}}

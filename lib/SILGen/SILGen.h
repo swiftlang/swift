@@ -28,6 +28,7 @@
 namespace swift {
   class SILBasicBlock;
   class ForeignAsyncConvention;
+  class SymbolSource;
 
 namespace Lowering {
   class TypeConverter;
@@ -83,10 +84,6 @@ public:
   /// Set of delayed conformances that have already been forced.
   llvm::DenseSet<NormalProtocolConformance *> forcedConformances;
 
-  /// The conformance for any DistributedActor to the Actor protocol,
-  /// used only by the `distributedActorAsAnyActor` builtin.
-  NormalProtocolConformance *distributedActorAsActorConformance = nullptr;
-
   size_t anonymousSymbolCounter = 0;
 
   std::optional<SILDeclRef> StringToNSStringFn;
@@ -127,6 +124,12 @@ public:
   void operator=(SILGenModule const &) = delete;
 
   ASTContext &getASTContext() { return M.getASTContext(); }
+
+  /// Main entry point.
+  void emitSourceFile(SourceFile *sf);
+
+  /// Lazy entry point for Feature::LazyImmediate.
+  void emitSymbolSource(SymbolSource Source);
 
   llvm::StringMap<std::pair<std::string, /*isWinner=*/bool>> FileIDsByFilePath;
 
@@ -270,7 +273,6 @@ public:
   void visitFuncDecl(FuncDecl *fd);
   void visitPatternBindingDecl(PatternBindingDecl *vd);
   void visitTopLevelCodeDecl(TopLevelCodeDecl *td) {}
-  void visitIfConfigDecl(IfConfigDecl *icd);
   void visitPoundDiagnosticDecl(PoundDiagnosticDecl *PDD);
   void visitNominalTypeDecl(NominalTypeDecl *ntd);
   void visitExtensionDecl(ExtensionDecl *ed);
@@ -381,7 +383,7 @@ public:
   /// Emit a protocol witness entry point.
   SILFunction *
   emitProtocolWitness(ProtocolConformanceRef conformance, SILLinkage linkage,
-                      IsSerialized_t isSerialized, SILDeclRef requirement,
+                      SerializedKind_t serializedKind, SILDeclRef requirement,
                       SILDeclRef witnessRef, IsFreeFunctionWitness_t isFree,
                       Witness witness);
 
@@ -556,6 +558,8 @@ public:
   FuncDecl *getAsyncMainDrainQueue();
   /// Retrieve the _Concurrency._swiftJobRun intrinsic.
   FuncDecl *getSwiftJobRun();
+  /// Retrieve the _Concurrency._deinitOnExecutor intrinsic.
+  FuncDecl *getDeinitOnExecutor();
   // Retrieve the _SwiftConcurrencyShims.exit intrinsic.
   FuncDecl *getExit();
 
@@ -601,15 +605,6 @@ public:
   /// mentioned by the given type.
   void useConformancesFromObjectiveCType(CanType type);
 
-  /// Retrieve a protocol conformance to the `Actor` protocol for a
-  /// distributed actor type that is described via a substitution map for
-  /// the generic signature `<T: DistributedActor>`.
-  ///
-  /// The protocol conformance is a special one that is currently
-  /// only used by the `distributedActorAsAnyActor` builtin.
-  ProtocolConformanceRef
-  getDistributedActorAsActorConformance(SubstitutionMap subs);
-
   /// Make a note of a member reference expression, which allows us
   /// to ensure that the conformance above is emitted wherever it
   /// needs to be.
@@ -625,12 +620,23 @@ public:
   /// Emit a property descriptor for the given storage decl if it needs one.
   void tryEmitPropertyDescriptor(AbstractStorageDecl *decl);
 
+  /// Replace local archetypes captured from outer AST contexts with primary
+  /// archetypes.
+  void recontextualizeCapturedLocalArchetypes(
+      SILFunction *F, GenericSignatureWithCapturedEnvironments sig);
+
 private:
   /// The most recent declaration we considered for emission.
   SILDeclRef lastEmittedFunction;
 
   /// Emit the deallocator for a class that uses the objc allocator.
   void emitObjCAllocatorDestructor(ClassDecl *cd, DestructorDecl *dd);
+
+  /// Emit the actual body of deallocator.
+  /// If deinit is isolated, function should be an isolated deallocator, an
+  /// actual deallocator is just a thunk that switches executors. If deinit is
+  /// isolated, function should be the deallocator itself.
+  void emitDeallocatorImpl(SILDeclRef constant, SILFunction *f);
 };
  
 } // end namespace Lowering

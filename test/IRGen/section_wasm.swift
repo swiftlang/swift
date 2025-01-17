@@ -1,13 +1,14 @@
 // RUN: %target-swift-frontend -enable-experimental-feature SymbolLinkageMarkers -primary-file %S/section.swift -S -parse-as-library | %FileCheck %s --check-prefix=ASM --check-prefix ASM-%target-os
 // REQUIRES: CPU=wasm32
 // REQUIRES: swift_in_compiler
+// REQUIRES: swift_feature_SymbolLinkageMarkers
 
 // Wasm cannot have user defined section name for code sections
 //
 // ASM-NOT: .section{{.*}}__TEXT,__mysection
 // ASM: .section        ".text.$s7section3fooyyF"
 // ASM: $s7section3fooyyF:
-// ASM: .section        ".text.$s7section8MyStructV3fooyyF","",@
+// ASM: .section        ".text.$s7section8MyStructV3fooyyF","R",@
 // ASM: $s7section8MyStructV3fooyyF:
 
 // Wasm places one-time init token on .bss section before each "__TEXT,__mysection"

@@ -8,7 +8,7 @@ import Swift
 sil hidden @couple_of_voids : $@convention(thin) () -> () {
 bb0:
   %3 = tuple ()
-  // CHECK-NOT: call void @llvm.dbg.value
+  // CHECK-NOT: #dbg_value
   debug_value %3 : $(), let, (name "success", loc "void.swift":3:1), type $*((), ()), expr op_tuple_fragment:$((), ()):0
   return %3 : $()
 } // end sil function 'couple_of_voids'
@@ -17,8 +17,8 @@ bb0:
 sil hidden @one_existing : $@convention(thin) () -> Builtin.Int64 {
 bb0:
   %1 = integer_literal $Builtin.Int64, 0
-  // CHECK: call void @llvm.dbg.value
-  // CHECK-SAME: metadata ![[RESULT_VAR:[0-9]+]]
+  // CHECK: #dbg_value
+  // CHECK-SAME: ![[RESULT_VAR:[0-9]+]]
   debug_value %1 : $Builtin.Int64, let, (name "result", loc "void.swift":3:1), type $*(Builtin.Int64, ()), expr op_tuple_fragment:$(Builtin.Int64, ()):0
   return %1 : $Builtin.Int64
 } // end sil function 'one_existing'
@@ -27,7 +27,7 @@ bb0:
 sil hidden @one_empty : $@convention(thin) () -> () {
 bb0:
   %3 = tuple ()
-  // CHECK-NOT: call void @llvm.dbg.value
+  // CHECK-NOT: #dbg_value
   debug_value %3 : $(), let, (name "failure", loc "void.swift":3:1), type $*(Builtin.Int64, ()), expr op_tuple_fragment:$(Builtin.Int64, ()):1
   return %3 : $()
 } // end sil function 'one_empty'

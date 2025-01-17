@@ -1,10 +1,10 @@
 // RUN: %target-run-simple-swift(-I %S/Inputs -Xfrontend -enable-experimental-cxx-interop)
 // RUN: %target-run-simple-swift(-I %S/Inputs -Xfrontend -enable-experimental-cxx-interop -D USE_CUSTOM_STRING_API)
-// RUN: %target-run-simple-swift(-I %S/Inputs -cxx-interoperability-mode=swift-6 -D SUPPORTS_DEFAULT_ARGUMENTS -D USE_CUSTOM_STRING_API)
-// RUN: %target-run-simple-swift(-I %S/Inputs -cxx-interoperability-mode=upcoming-swift -D SUPPORTS_DEFAULT_ARGUMENTS -D USE_CUSTOM_STRING_API)
-// RUN: %target-run-simple-swift(-I %S/Inputs -cxx-interoperability-mode=upcoming-swift -D SUPPORTS_DEFAULT_ARGUMENTS -D USE_CUSTOM_STRING_API -Xcc -std=c++14)
-// RUN: %target-run-simple-swift(-I %S/Inputs -cxx-interoperability-mode=upcoming-swift -D SUPPORTS_DEFAULT_ARGUMENTS -D USE_CUSTOM_STRING_API -Xcc -std=c++17)
-// RUN: %target-run-simple-swift(-I %S/Inputs -cxx-interoperability-mode=upcoming-swift -D SUPPORTS_DEFAULT_ARGUMENTS -D USE_CUSTOM_STRING_API -Xcc -std=c++20)
+// RUN: %target-run-simple-swift(-I %S/Inputs -cxx-interoperability-mode=swift-6 -D USE_CUSTOM_STRING_API)
+// RUN: %target-run-simple-swift(-I %S/Inputs -cxx-interoperability-mode=upcoming-swift -D USE_CUSTOM_STRING_API)
+// RUN: %target-run-simple-swift(-I %S/Inputs -cxx-interoperability-mode=upcoming-swift -D USE_CUSTOM_STRING_API -Xcc -std=c++14)
+// RUN: %target-run-simple-swift(-I %S/Inputs -cxx-interoperability-mode=upcoming-swift -D USE_CUSTOM_STRING_API -Xcc -std=c++17)
+// RUN: %target-run-simple-swift(-I %S/Inputs -cxx-interoperability-mode=upcoming-swift -D USE_CUSTOM_STRING_API -Xcc -std=c++20)
 //
 // REQUIRES: executable_test
 
@@ -146,6 +146,54 @@ StdStringTestSuite.test("std::u32string::append") {
     let s2 = std.u32string("abc")
     s1.append(s2)
     expectEqual(s1, std.u32string("0123abc"))
+}
+
+StdStringTestSuite.test("std::string comparison") {
+    let s1 = std.string("abc")
+    let s2 = std.string("def")
+    let s3 = std.string("abc")
+
+    expectTrue(s1 < s2)
+    expectFalse(s2 < s1)
+    expectTrue(s1 <= s2)
+    expectFalse(s2 <= s1)
+    expectTrue(s2 > s1)
+    expectFalse(s1 > s2)
+    expectTrue(s2 >= s1)
+    expectFalse(s1 >= s2)
+    expectTrue(s1 == s3)
+}
+
+StdStringTestSuite.test("std::u16string comparison") {
+    let s1 = std.u16string("abc")
+    let s2 = std.u16string("def")
+    let s3 = std.u16string("abc")
+
+    expectTrue(s1 < s2)
+    expectFalse(s2 < s1)
+    expectTrue(s1 <= s2)
+    expectFalse(s2 <= s1)
+    expectTrue(s2 > s1)
+    expectFalse(s1 > s2)
+    expectTrue(s2 >= s1)
+    expectFalse(s1 >= s2)
+    expectTrue(s1 == s3)
+}
+
+StdStringTestSuite.test("std::u32string comparison") {
+    let s1 = std.u32string("abc")
+    let s2 = std.u32string("def")
+    let s3 = std.u32string("abc")
+
+    expectTrue(s1 < s2)
+    expectFalse(s2 < s1)
+    expectTrue(s1 <= s2)
+    expectFalse(s2 <= s1)
+    expectTrue(s2 > s1)
+    expectFalse(s1 > s2)
+    expectTrue(s2 >= s1)
+    expectFalse(s1 >= s2)
+    expectTrue(s1 == s3)
 }
 
 StdStringTestSuite.test("std::string as Hashable") {
@@ -415,7 +463,6 @@ StdStringTestSuite.test("pass as an argument") {
     expectEqual(res[0], 97)
 }
 
-#if SUPPORTS_DEFAULT_ARGUMENTS
 StdStringTestSuite.test("pass as a default argument") {
     let res = takesStringWithDefaultArg()
     expectEqual(res.size(), 3)
@@ -423,7 +470,6 @@ StdStringTestSuite.test("pass as a default argument") {
     expectEqual(res[1], 98)
     expectEqual(res[2], 99)
 }
-#endif
 #endif
 
 runAllTests()

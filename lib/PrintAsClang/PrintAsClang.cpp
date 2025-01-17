@@ -19,6 +19,7 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/PrettyStackTrace.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/Version.h"
 #include "swift/ClangImporter/ClangImporter.h"
 #include "swift/Frontend/FrontendOptions.h"
@@ -57,14 +58,14 @@ static void emitObjCConditional(raw_ostream &out,
   out << "#endif\n";
 }
 
-static void writePtrauthPrologue(raw_ostream &os) {
+static void writePtrauthPrologue(raw_ostream &os, ASTContext &ctx) {
   emitCxxConditional(os, [&]() {
-    ClangSyntaxPrinter(os).printIgnoredDiagnosticBlock(
+    ClangSyntaxPrinter(ctx, os).printIgnoredDiagnosticBlock(
         "non-modular-include-in-framework-module", [&] {
           os << "#if defined(__arm64e__) && __has_include(<ptrauth.h>)\n";
           os << "# include <ptrauth.h>\n";
           os << "#else\n";
-          ClangSyntaxPrinter(os).printIgnoredDiagnosticBlock(
+          ClangSyntaxPrinter(ctx, os).printIgnoredDiagnosticBlock(
               "reserved-macro-identifier", [&]() {
                 os << "# ifndef "
                       "__ptrauth_swift_value_witness_function_pointer\n";
@@ -130,13 +131,14 @@ static void writePrologue(raw_ostream &out, ASTContext &ctx,
                "#include <stdbool.h>\n"
                "#include <string.h>\n";
       });
-  writePtrauthPrologue(out);
+  writePtrauthPrologue(out, ctx);
   out << "\n"
          "#if !defined(SWIFT_TYPEDEFS)\n"
          "# define SWIFT_TYPEDEFS 1\n"
          "# if __has_include(<uchar.h>)\n"
          "#  include <uchar.h>\n"
          "# elif !defined(__cplusplus)\n"
+         "typedef unsigned char char8_t;\n"
          "typedef uint_least16_t char16_t;\n"
          "typedef uint_least32_t char32_t;\n"
          "# endif\n"
@@ -359,7 +361,7 @@ static void collectClangModuleHeaderIncludes(
     for (clang::Module::HeaderKind headerKind :
          {clang::Module::HK_Normal, clang::Module::HK_Textual}) {
       for (const clang::Module::Header &header :
-           clangModule->Headers[headerKind]) {
+           clangModule->getHeaders(headerKind)) {
         addHeader(header.Entry.getFileEntry().tryGetRealPathName(),
                   header.PathRelativeToRootModuleDirectory);
       }
@@ -403,9 +405,7 @@ writeImports(raw_ostream &out, llvm::SmallPtrSetImpl<ImportModuleTy> &imports,
     if (bridgingHeader.empty())
       return import != &M && import->getName() == M.getName();
 
-    auto importer = static_cast<ClangImporter *>(
-        import->getASTContext().getClangModuleLoader());
-    return import == importer->getImportedHeaderModule();
+    return import->isClangHeaderImportModule();
   };
 
   clang::FileSystemOptions fileSystemOptions;
@@ -603,7 +603,7 @@ bool swift::printAsClangHeader(raw_ostream &os, ModuleDecl *M,
       exposedModules.insert(mod.moduleName);
 
     // Include the shim header only in the C++ mode.
-    ClangSyntaxPrinter(os).printIncludeForShimHeader(
+    ClangSyntaxPrinter(M->getASTContext(), os).printIncludeForShimHeader(
         "_SwiftCxxInteroperability.h");
 
     // Explicit @expose attribute is required only when the user specifies
@@ -623,7 +623,9 @@ bool swift::printAsClangHeader(raw_ostream &os, ModuleDecl *M,
         !frontendOpts.ClangHeaderExposedDecls.has_value() ||
         *frontendOpts.ClangHeaderExposedDecls ==
             FrontendOptions::ClangHeaderExposeBehavior::
-                HasExposeAttrOrImplicitDeps;
+                HasExposeAttrOrImplicitDeps ||
+        *frontendOpts.ClangHeaderExposedDecls ==
+            FrontendOptions::ClangHeaderExposeBehavior::AllPublic;
 
     std::string moduleContentsBuf;
     llvm::raw_string_ostream moduleContents{moduleContentsBuf};

@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -outliner %s -enable-sil-verify-all | %FileCheck %s
+// RUN: %target-sil-opt -sil-print-types -outliner %s -enable-sil-verify-all | %FileCheck %s
 
 // REQUIRES: OS=macosx
 
@@ -105,3 +105,159 @@ bb7(%64 : $Optional<Data>):
   %102 = tuple ()
   return %102 : $()
 }
+
+sil @$sSS10FoundationE19_bridgeToObjectiveCSo8NSStringCyF : $@convention(method) (@guaranteed String) -> @owned NSString
+sil @$sSS21_builtinStringLiteral17utf8CodeUnitCount7isASCIISSBp_BwBi1_tcfC : $@convention(method) (Builtin.RawPointer, Builtin.Word, Builtin.Int1, @thin String.Type) -> @owned String
+sil @get : $@convention(thin) () -> @owned String
+
+@objc class Ty {
+  @objc static func take2(_: String?, _: String?)
+  @objc static func take3(_: String?, _: String?, _: String?)
+}
+
+// CHECK-LABEL: sil [Osize] [ossa] @reuse_owned_2 : {{.*}} {
+// CHECK:         [[NATIVE:%[^,]+]] = apply {{%[^,]+}}()
+// CHECK:         [[TY:%[^,]+]] = metatype
+// CHECK:         [[OUTLINED:%[^,]+]] = function_ref @$s4main2TyC5take2yySSSg_AEtFZToTembgbgnn_
+// CHECK:         apply [[OUTLINED]]([[NATIVE]], [[NATIVE]], [[TY]])
+// CHECK:         destroy_value [[NATIVE]] : $String
+// CHECK-LABEL: } // end sil function 'reuse_owned_2'
+sil [ossa] [Osize] @reuse_owned_2 : $@convention(thin) () -> () {
+bb0:
+  %get = function_ref @get : $@convention(thin) () -> @owned String
+  %native = apply %get() : $@convention(thin) () -> @owned String
+  %ty = metatype $@objc_metatype Ty.Type
+  %bridge = function_ref @$sSS10FoundationE19_bridgeToObjectiveCSo8NSStringCyF : $@convention(method) (@guaranteed String) -> @owned NSString
+  %bridged1 = apply %bridge(%native) : $@convention(method) (@guaranteed String) -> @owned NSString
+  %optbridged1 = enum $Optional<NSString>, #Optional.some!enumelt, %bridged1 : $NSString
+  %bridge2 = function_ref @$sSS10FoundationE19_bridgeToObjectiveCSo8NSStringCyF : $@convention(method) (@guaranteed String) -> @owned NSString
+  %bridged2 = apply %bridge2(%native) : $@convention(method) (@guaranteed String) -> @owned NSString
+  %optbridged2 = enum $Optional<NSString>, #Optional.some!enumelt, %bridged2 : $NSString
+  destroy_value %native : $String
+  %take2 = objc_method %ty : $@objc_metatype Ty.Type, #Ty.take2!foreign : (Ty.Type) -> (String?, String?) -> (), $@convention(objc_method) (Optional<NSString>, Optional<NSString>, @objc_metatype Ty.Type) -> ()
+  %27 = apply %take2(%optbridged1, %optbridged2, %ty) : $@convention(objc_method) (Optional<NSString>, Optional<NSString>, @objc_metatype Ty.Type) -> ()
+  destroy_value %optbridged2 : $Optional<NSString>
+  destroy_value %optbridged1 : $Optional<NSString>
+  %31 = tuple ()
+  return %31 : $()
+}
+
+// CHECK-LABEL: sil [Osize] [ossa] @reuse_owned_3 : {{.*}} {
+// CHECK:         [[NATIVE:%[^,]+]] = apply {{%[^,]+}}()
+// CHECK:         [[TY:%[^,]+]] = metatype
+// CHECK:         [[OUTLINED:%[^,]+]] = function_ref @$s4main2TyC5take3yySSSg_A2EtFZToTembgbgbgnn_
+// CHECK:         apply [[OUTLINED]]([[NATIVE]], [[NATIVE]], [[NATIVE]], [[TY]])
+// CHECK:         destroy_value [[NATIVE]] : $String
+// CHECK-LABEL: } // end sil function 'reuse_owned_3'
+sil [ossa] [Osize] @reuse_owned_3 : $@convention(thin) () -> () {
+bb0:
+  %get = function_ref @get : $@convention(thin) () -> @owned String
+  %native = apply %get() : $@convention(thin) () -> @owned String
+  %ty = metatype $@objc_metatype Ty.Type
+  %bridge = function_ref @$sSS10FoundationE19_bridgeToObjectiveCSo8NSStringCyF : $@convention(method) (@guaranteed String) -> @owned NSString
+  %bridged1 = apply %bridge(%native) : $@convention(method) (@guaranteed String) -> @owned NSString
+  %optbridged1 = enum $Optional<NSString>, #Optional.some!enumelt, %bridged1 : $NSString
+  %bridge2 = function_ref @$sSS10FoundationE19_bridgeToObjectiveCSo8NSStringCyF : $@convention(method) (@guaranteed String) -> @owned NSString
+  %bridged2 = apply %bridge2(%native) : $@convention(method) (@guaranteed String) -> @owned NSString
+  %optbridged2 = enum $Optional<NSString>, #Optional.some!enumelt, %bridged2 : $NSString
+  %bridge3 = function_ref @$sSS10FoundationE19_bridgeToObjectiveCSo8NSStringCyF : $@convention(method) (@guaranteed String) -> @owned NSString
+  %bridged3 = apply %bridge3(%native) : $@convention(method) (@guaranteed String) -> @owned NSString
+  %optbridged3 = enum $Optional<NSString>, #Optional.some!enumelt, %bridged3 : $NSString
+  destroy_value %native : $String
+  %take2 = objc_method %ty : $@objc_metatype Ty.Type, #Ty.take3!foreign : (Ty.Type) -> (String?, String?, String?) -> (), $@convention(objc_method) (Optional<NSString>, Optional<NSString>, Optional<NSString>, @objc_metatype Ty.Type) -> ()
+  %27 = apply %take2(%optbridged1, %optbridged2, %optbridged3, %ty) : $@convention(objc_method) (Optional<NSString>, Optional<NSString>, Optional<NSString>, @objc_metatype Ty.Type) -> ()
+  destroy_value %optbridged3 : $Optional<NSString>
+  destroy_value %optbridged2 : $Optional<NSString>
+  destroy_value %optbridged1 : $Optional<NSString>
+  %31 = tuple ()
+  return %31 : $()
+}
+
+// CHECK-LABEL: sil [Osize] [ossa] @reuse_guaranteed_2 : {{.*}} {
+// CHECK:       bb0([[NATIVE:%[^,]+]] :
+// CHECK:         [[TY:%[^,]+]] = metatype
+// CHECK:         [[OUTLINED:%[^,]+]] = function_ref @$s4main2TyC5take2yySSSg_AEtFZToTembgbgnn_
+// CHECK:         apply [[OUTLINED]]([[NATIVE]], [[NATIVE]], [[TY]])
+// CHECK-LABEL: } // end sil function 'reuse_guaranteed_2'
+sil [ossa] [Osize] @reuse_guaranteed_2 : $@convention(thin) (@guaranteed String) -> () {
+bb0(%native : @guaranteed $String):
+  %ty = metatype $@objc_metatype Ty.Type
+  %bridge = function_ref @$sSS10FoundationE19_bridgeToObjectiveCSo8NSStringCyF : $@convention(method) (@guaranteed String) -> @owned NSString
+  %bridged1 = apply %bridge(%native) : $@convention(method) (@guaranteed String) -> @owned NSString
+  %optbridged1 = enum $Optional<NSString>, #Optional.some!enumelt, %bridged1 : $NSString
+  %bridge2 = function_ref @$sSS10FoundationE19_bridgeToObjectiveCSo8NSStringCyF : $@convention(method) (@guaranteed String) -> @owned NSString
+  %bridged2 = apply %bridge2(%native) : $@convention(method) (@guaranteed String) -> @owned NSString
+  %optbridged2 = enum $Optional<NSString>, #Optional.some!enumelt, %bridged2 : $NSString
+  %take2 = objc_method %ty : $@objc_metatype Ty.Type, #Ty.take2!foreign : (Ty.Type) -> (String?, String?) -> (), $@convention(objc_method) (Optional<NSString>, Optional<NSString>, @objc_metatype Ty.Type) -> ()
+  %27 = apply %take2(%optbridged1, %optbridged2, %ty) : $@convention(objc_method) (Optional<NSString>, Optional<NSString>, @objc_metatype Ty.Type) -> ()
+  destroy_value %optbridged2 : $Optional<NSString>
+  destroy_value %optbridged1 : $Optional<NSString>
+  %31 = tuple ()
+  return %31 : $()
+}
+
+// CHECK-LABEL: sil [Osize] [ossa] @reuse_guaranteed_3 : {{.*}} {
+// CHECK:       bb0([[NATIVE:%[^,]+]] :
+// CHECK:         [[TY:%[^,]+]] = metatype
+// CHECK:         [[OUTLINED:%[^,]+]] = function_ref @$s4main2TyC5take3yySSSg_A2EtFZToTembgbgbgnn_
+// CHECK:         apply [[OUTLINED]]([[NATIVE]], [[NATIVE]], [[NATIVE]], [[TY]])
+// CHECK-LABEL: } // end sil function 'reuse_guaranteed_3'
+sil [ossa] [Osize] @reuse_guaranteed_3 : $@convention(thin) (@guaranteed String) -> () {
+bb0(%native : @guaranteed $String):
+  %ty = metatype $@objc_metatype Ty.Type
+  %bridge = function_ref @$sSS10FoundationE19_bridgeToObjectiveCSo8NSStringCyF : $@convention(method) (@guaranteed String) -> @owned NSString
+  %bridged1 = apply %bridge(%native) : $@convention(method) (@guaranteed String) -> @owned NSString
+  %optbridged1 = enum $Optional<NSString>, #Optional.some!enumelt, %bridged1 : $NSString
+  %bridge2 = function_ref @$sSS10FoundationE19_bridgeToObjectiveCSo8NSStringCyF : $@convention(method) (@guaranteed String) -> @owned NSString
+  %bridged2 = apply %bridge2(%native) : $@convention(method) (@guaranteed String) -> @owned NSString
+  %optbridged2 = enum $Optional<NSString>, #Optional.some!enumelt, %bridged2 : $NSString
+  %bridge3 = function_ref @$sSS10FoundationE19_bridgeToObjectiveCSo8NSStringCyF : $@convention(method) (@guaranteed String) -> @owned NSString
+  %bridged3 = apply %bridge3(%native) : $@convention(method) (@guaranteed String) -> @owned NSString
+  %optbridged3 = enum $Optional<NSString>, #Optional.some!enumelt, %bridged3 : $NSString
+  %take2 = objc_method %ty : $@objc_metatype Ty.Type, #Ty.take3!foreign : (Ty.Type) -> (String?, String?, String?) -> (), $@convention(objc_method) (Optional<NSString>, Optional<NSString>, Optional<NSString>, @objc_metatype Ty.Type) -> ()
+  %27 = apply %take2(%optbridged1, %optbridged2, %optbridged3, %ty) : $@convention(objc_method) (Optional<NSString>, Optional<NSString>, Optional<NSString>, @objc_metatype Ty.Type) -> ()
+  destroy_value %optbridged3 : $Optional<NSString>
+  destroy_value %optbridged2 : $Optional<NSString>
+  destroy_value %optbridged1 : $Optional<NSString>
+  %31 = tuple ()
+  return %31 : $()
+}
+
+// CHECK-LABEL: sil shared [serialized] [noinline] [ossa] @$s4main2TyC5take2yySSSg_AEtFZToTembgbgnn_ : {{.*}} {
+// CHECK:       bb0([[FIRST:%[^,]+]] : @guaranteed
+// CHECK-SAME:    , [[SECOND:%[^,]+]] : @guaranteed
+// CHECK-SAME:    , [[TY:%[^,]+]] : $@objc_metatype
+// CHECK-SAME:  ):
+// CHECK:         [[CALLEE:%[^,]+]] = objc_method [[TY]]
+// CHECK:         [[BRIDGE_1:%[^,]+]] = function_ref @$sSS10FoundationE19_bridgeToObjectiveCSo8NSStringCyF
+// CHECK:         [[BRIDGED_1:%[^,]+]] = apply [[BRIDGE_1]]([[FIRST]])
+// CHECK:         [[OPT_BRIDGED_1:%[^,]+]] = enum $Optional<NSString>, #Optional.some!enumelt, [[BRIDGED_1]]
+// CHECK:         [[BRIDGE_2:%[^,]+]] = function_ref @$sSS10FoundationE19_bridgeToObjectiveCSo8NSStringCyF
+// CHECK:         [[BRIDGED_2:%[^,]+]] = apply [[BRIDGE_2]]([[SECOND]])
+// CHECK:         [[OPT_BRIDGED_2:%[^,]+]] = enum $Optional<NSString>, #Optional.some!enumelt, [[BRIDGED_2]]
+// CHECK:         apply [[CALLEE]]([[OPT_BRIDGED_1]], [[OPT_BRIDGED_2]], [[TY]])
+// CHECK:         destroy_value [[OPT_BRIDGED_2]]
+// CHECK:         destroy_value [[OPT_BRIDGED_1]]
+// CHECK-LABEL: } // end sil function '$s4main2TyC5take2yySSSg_AEtFZToTembgbgnn_'
+
+// CHECK-LABEL: sil shared [serialized] [noinline] [ossa] @$s4main2TyC5take3yySSSg_A2EtFZToTembgbgbgnn_ : {{.*}} {
+// CHECK:       bb0([[FIRST:%[^,]+]] : @guaranteed
+// CHECK-SAME:    , [[SECOND:%[^,]+]] : @guaranteed
+// CHECK-SAME:    , [[THIRD:%[^,]+]] : @guaranteed
+// CHECK-SAME:    , [[TY:%[^,]+]] : $@objc_metatype
+// CHECK-SAME:  ):
+// CHECK:         [[CALLEE:%[^,]+]] = objc_method [[TY]]
+// CHECK:         [[BRIDGE_1:%[^,]+]] = function_ref @$sSS10FoundationE19_bridgeToObjectiveCSo8NSStringCyF
+// CHECK:         [[BRIDGED_1:%[^,]+]] = apply [[BRIDGE_1]]([[FIRST]])
+// CHECK:         [[OPT_BRIDGED_1:%[^,]+]] = enum $Optional<NSString>, #Optional.some!enumelt, [[BRIDGED_1]]
+// CHECK:         [[BRIDGE_2:%[^,]+]] = function_ref @$sSS10FoundationE19_bridgeToObjectiveCSo8NSStringCyF
+// CHECK:         [[BRIDGED_2:%[^,]+]] = apply [[BRIDGE_2]]([[SECOND]])
+// CHECK:         [[OPT_BRIDGED_2:%[^,]+]] = enum $Optional<NSString>, #Optional.some!enumelt, [[BRIDGED_2]]
+// CHECK:         [[BRIDGE_3:%[^,]+]] = function_ref @$sSS10FoundationE19_bridgeToObjectiveCSo8NSStringCyF
+// CHECK:         [[BRIDGED_3:%[^,]+]] = apply [[BRIDGE_3]]([[THIRD]])
+// CHECK:         [[OPT_BRIDGED_3:%[^,]+]] = enum $Optional<NSString>, #Optional.some!enumelt, [[BRIDGED_3]]
+// CHECK:         apply [[CALLEE]]([[OPT_BRIDGED_1]], [[OPT_BRIDGED_2]], [[OPT_BRIDGED_3]], [[TY]])
+// CHECK:         destroy_value [[OPT_BRIDGED_3]]
+// CHECK:         destroy_value [[OPT_BRIDGED_2]]
+// CHECK:         destroy_value [[OPT_BRIDGED_1]]
+// CHECK-LABEL: } // end sil function '$s4main2TyC5take3yySSSg_A2EtFZToTembgbgbgnn_'

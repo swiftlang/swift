@@ -1,18 +1,29 @@
 #!/uar/bin/env python3
 
+import platform
 import subprocess
 import sys
-import threading
+
+sampleCommand = None
+timeoutSampleTime = 0
+
+if platform.system() == 'Darwin':
+    sampleCommand = '/usr/bin/sample'
+    timeoutSampleTime = 10
 
 
-def watchdog(command, timeout=None):
+def watchdog(command, timeout):
     process = subprocess.Popen(command)
-    timer = threading.Timer(timeout, process.kill)
     try:
-        timer.start()
-        process.communicate()
-    finally:
-        timer.cancel()
+        process.wait(timeout=timeout)
+    except subprocess.TimeoutExpired:
+        if sampleCommand:
+            pidstr = str(process.pid)
+            subprocess.run([sampleCommand, pidstr, str(timeoutSampleTime)])
+        process.kill()
+        sys.exit(
+            'error: command timed out after {} seconds: {}'
+            .format(timeout, ' '.join(sys.argv[2:])))
 
 
 if __name__ == '__main__':

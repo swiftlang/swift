@@ -15,6 +15,7 @@
 #include "swift/AST/DiagnosticsSIL.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/SemanticAttrs.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/SIL/InstructionUtils.h"
 #include "swift/SIL/PatternMatch.h"
 #include "swift/SIL/SILBuilder.h"
@@ -1799,8 +1800,7 @@ static bool isApplyOfKnownAvailability(SILInstruction &I) {
   if (!callee->hasSemanticsAttr("availability.osversion"))
     return false;
   auto &context = I.getFunction()->getASTContext();
-  auto deploymentAvailability =
-      AvailabilityContext::forDeploymentTarget(context);
+  auto deploymentAvailability = AvailabilityRange::forDeploymentTarget(context);
   if (apply.getNumArguments() != 3)
     return false;
   auto arg0 = dyn_cast<IntegerLiteralInst>(apply.getArgument(0));
@@ -1817,7 +1817,7 @@ static bool isApplyOfKnownAvailability(SILInstruction &I) {
       arg0->getValue().getLimitedValue(), arg1->getValue().getLimitedValue(),
       arg2->getValue().getLimitedValue()));
 
-  auto callAvailability = AvailabilityContext(version);
+  auto callAvailability = AvailabilityRange(version);
   return deploymentAvailability.isContainedIn(callAvailability);
 }
 

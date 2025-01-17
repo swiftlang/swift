@@ -2,7 +2,7 @@
 
 // REQUIRES: objc_interop
 // REQUIRES: concurrency
-// REQUIRES: asserts
+// REQUIRES: swift_feature_SendableCompletionHandlers
 
 import Foundation
 import ObjCConcurrency
@@ -298,7 +298,6 @@ class BarFrame: PictureFrame {
 @available(SwiftStdlib 5.5, *)
 @SomeGlobalActor
 class BazFrame: NotIsolatedPictureFrame {
-// expected-warning@-1 {{global actor 'SomeGlobalActor'-isolated class 'BazFrame' has different actor isolation from nonisolated superclass 'NotIsolatedPictureFrame'; this is an error in the Swift 6 language mode}}
   init() {
     super.init(size: 0)
   }

@@ -164,6 +164,8 @@ extension Hasher {
       combine(UInt64(truncatingIfNeeded: value))
 #elseif _pointerBitWidth(_32)
       combine(UInt32(truncatingIfNeeded: value))
+#elseif _pointerBitWidth(_16)
+      combine(UInt16(truncatingIfNeeded: value))
 #else
 #error("Unknown platform")
 #endif
@@ -439,7 +441,7 @@ public struct Hasher {
     _internalInvariant(UInt.bitWidth == UInt64.bitWidth)
     state.compress(UInt64(truncatingIfNeeded: value))
     let tbc = _TailBuffer(tail: 0, byteCount: 8)
-#elseif _pointerBitWidth(_32)
+#elseif _pointerBitWidth(_32) || _pointerBitWidth(_16)
     _internalInvariant(UInt.bitWidth < UInt64.bitWidth)
     let tbc = _TailBuffer(
       tail: UInt64(truncatingIfNeeded: value),

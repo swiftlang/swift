@@ -23,6 +23,7 @@ class SwiftLaundryService : NSLaundry {
 
 class OldSwiftLaundryService : NSLaundry { 
 // expected-error@-1 {{type 'OldSwiftLaundryService' does not conform to protocol 'NSLaundry'}}
+// expected-note@-2 {{add stubs for conformance}}
 
   var g: Coat? = nil
 

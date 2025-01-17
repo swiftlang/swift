@@ -187,6 +187,7 @@ swift::ExecuteWithPipe(llvm::StringRef program,
   close(p2.write);
   llvm::sys::ProcessInfo proc;
   proc.Pid = pid;
+  proc.Process = pid;
   return ChildProcessInfo(proc, p1.write, p2.read);
 }
 
@@ -277,6 +278,7 @@ swift::ExecuteWithPipe(llvm::StringRef program,
   output[PI_READ].release();
 
   llvm::sys::ProcessInfo proc;
+  proc.Pid = pi.dwProcessId;
   proc.Process = pi.hProcess;
   return ChildProcessInfo(proc, ifd, ofd);
 }

@@ -66,7 +66,7 @@ import Aliases
 
 // CHECK-NON-RESILIENT-NOT: was not imported by this file
 
-// expected-warning@+2 {{'ClazzAlias' aliases 'Original.Clazz' and cannot be used here because 'Original' was not imported by this file; this is an error in the Swift 6 language mode}}
+// expected-warning@+2 {{'ClazzAlias' aliases 'Original.Clazz' and cannot be used in a public or '@usableFromInline' conformance because 'Original' was not imported by this file; this is an error in the Swift 6 language mode}}
 // expected-note@+1 {{The missing import of module 'Original' will be added implicitly}}
 public class InheritsFromClazzAlias: ClazzAlias {}
 
@@ -81,6 +81,7 @@ public class InheritsFromClazzAlias: ClazzAlias {}
 public func takesGeneric<T: ProtoAlias>(_ t: T) {}
 
 public struct HasMembers {
+  // expected-warning@+3 {{cannot use property 'wrappedValue' here; 'Original' was not imported by this file}}
   // expected-warning@+2 {{'WrapperAlias' aliases 'Original.Wrapper' and cannot be used as property wrapper here because 'Original' was not imported by this file; this is an error in the Swift 6 language mode}}
  // expected-note@+1 {{The missing import of module 'Original' will be added implicitly}}
   @WrapperAlias public var wrapped: Int
@@ -97,6 +98,7 @@ extension StructAlias {
 
 import Aliases
 @_implementationOnly import Original
+// expected-warning @-1 {{'@_implementationOnly' is deprecated, use 'internal import' instead}}
 
 @inlinable public func inlinableFunc() {
   // expected-warning@+1 {{'StructAlias' aliases 'Original.Struct' and cannot be used in an '@inlinable' function because 'Original' has been imported as implementation-only; this is an error in the Swift 6 language mode}}

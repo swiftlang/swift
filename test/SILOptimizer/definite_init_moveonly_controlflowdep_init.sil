@@ -3,8 +3,9 @@
 
 // Test that we properly handle both escaping and non-escaping variants.
 
-@_moveOnly
-struct S {}
+import Swift
+
+struct S: ~Copyable {}
 
 sil @borrowVal : $@convention(thin) (@guaranteed S) -> ()
 sil @consumeVal : $@convention(thin) (@owned S) -> ()

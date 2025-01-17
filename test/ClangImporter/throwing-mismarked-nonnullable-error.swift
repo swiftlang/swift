@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -enable-objc-interop -import-objc-header %S/Inputs/throwing-mismarked-nonnullable-error.h %s -emit-sil | %FileCheck %s
+// RUN: %target-swift-frontend -enable-objc-interop -import-objc-header %S/Inputs/throwing-mismarked-nonnullable-error.h %s -Xllvm -sil-print-types -emit-sil | %FileCheck %s
 
 // REQUIRES: objc_interop
 

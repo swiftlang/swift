@@ -1145,6 +1145,16 @@ protocol Other1 {
   },
   {
     key.kind: source.lang.swift.decl.extension.struct,
+    key.generic_params: [
+      {
+        key.name: "T"
+      }
+    ],
+    key.generic_requirements: [
+      {
+        key.description: "T == String"
+      }
+    ],
     key.offset: 396,
     key.length: 98,
     key.fully_annotated_decl: "<syntaxtype.keyword>extension</syntaxtype.keyword> <ref.struct usr=\"s:16UnderscoredProto1AV\">A</ref.struct>",

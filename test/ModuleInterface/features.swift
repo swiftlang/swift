@@ -1,7 +1,7 @@
 // RUN: %empty-directory(%t)
 
-// RUN: %target-swift-emit-module-interface(%t/FeatureTest.swiftinterface) %s -module-name FeatureTest -disable-availability-checking
-// RUN: %target-swift-typecheck-module-from-interface(%t/FeatureTest.swiftinterface) -module-name FeatureTest -disable-availability-checking
+// RUN: %target-swift-emit-module-interface(%t/FeatureTest.swiftinterface) %s -module-name FeatureTest -target %target-swift-5.1-abi-triple
+// RUN: %target-swift-typecheck-module-from-interface(%t/FeatureTest.swiftinterface) -module-name FeatureTest -target %target-swift-5.1-abi-triple
 // RUN: %FileCheck %s \
 // RUN:   --implicit-check-not "\$AsyncAwait" \
 // RUN:   --implicit-check-not "\$Actors" \
@@ -22,16 +22,6 @@
 // Some feature gaurds are retired when the first compiler that supports the
 // feature is old enough. The --implicit-check-not arguments to FileCheck above
 // verify that those guards no longer pollute the emitted interface.
-
-// CHECK: #if compiler(>=5.3) && $SpecializeAttributeWithAvailability
-// CHECK: @_specialize(exported: true, kind: full, availability: macOS, introduced: 12; where T == Swift.Int)
-// CHECK: public func specializeWithAvailability<T>(_ t: T)
-// CHECK: #else
-// CHECK: public func specializeWithAvailability<T>(_ t: T)
-// CHECK: #endif
-@_specialize(exported: true, availability: macOS 12, *; where T == Int)
-public func specializeWithAvailability<T>(_ t: T) {
-}
 
 // CHECK:      public actor MyActor
 // CHECK:        @_semantics("defaultActor") nonisolated final public var unownedExecutor: _Concurrency.UnownedSerialExecutor {
@@ -81,34 +71,25 @@ public class OldSchool2: MP {
   public func takeClass() async { }
 }
 
-// CHECK:      #if compiler(>=5.3) && $RethrowsProtocol
-// CHECK-NEXT: @rethrows public protocol RP
+// CHECK: @rethrows public protocol RP
 @rethrows public protocol RP {
   func f() throws -> Bool
 }
 
 // CHECK: public struct UsesRP {
 public struct UsesRP {
-  // CHECK:     #if compiler(>=5.3) && $RethrowsProtocol
-  // CHECK-NEXT:  #if $NoncopyableGenerics
-  // CHECK-NEXT:  public var value: (any FeatureTest.RP)? {
-  // CHECK-NOT: #if compiler(>=5.3) && $RethrowsProtocol
-  // CHECK:         get
-  // CHECK:     #else
-  // CHECK-NEXT: public var value: (any FeatureTest.RP)? {
+  // CHECK:  public var value: (any FeatureTest.RP)? {
   // CHECK-NEXT:  get
   public var value: RP? {
     nil
   }
 }
 
-// CHECK:      #if compiler(>=5.3) && $RethrowsProtocol
-// CHECK-NEXT: public struct IsRP
+// CHECK: public struct IsRP
 public struct IsRP: RP {
   // CHECK-NEXT: public func f()
   public func f() -> Bool { }
 
-  // CHECK-NOT: $RethrowsProtocol
   // CHECK-NEXT: public var isF:
   // CHECK-NEXT:   get
   public var isF: Bool {
@@ -116,8 +97,7 @@ public struct IsRP: RP {
   }
 }
 
-// CHECK: #if compiler(>=5.3) && $RethrowsProtocol
-// CHECK-NEXT: public func acceptsRP
+// CHECK: public func acceptsRP
 public func acceptsRP<T: RP>(_: T) { }
 
 // CHECK:     extension Swift.Array : FeatureTest.MP where Element : FeatureTest.MP {
@@ -145,12 +125,6 @@ public func asyncIsh(@_inheritActorContext operation: @Sendable @escaping () asy
 @_unsafeInheritExecutor
 public func unsafeInheritExecutor() async {}
 
-// CHECK:     #if compiler(>=5.3) && $SpecializeAttributeWithAvailability
-// CHECK:     @_specialize{{.*}}
-// CHECK:     public func unsafeInheritExecutorAndSpecialize<T>(value: T) async
-@_unsafeInheritExecutor
-@_specialize(exported: true, availability: SwiftStdlib 5.1, *; where T == Int)
-public func unsafeInheritExecutorAndSpecialize<T>(value: T) async {}
 
 // CHECK:       @_unavailableFromAsync(message: "Test") public func unavailableFromAsyncFunc()
 @_unavailableFromAsync(message: "Test")

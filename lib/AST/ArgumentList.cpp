@@ -18,6 +18,7 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/ParameterList.h"
+#include "swift/Basic/Assertions.h"
 
 using namespace swift;
 
@@ -238,7 +239,7 @@ Expr *ArgumentList::packIntoImplicitTupleOrParen(
   if (auto *unary = getUnlabeledUnaryExpr()) {
     auto *paren = new (ctx) ParenExpr(getLParenLoc(), unary, getRParenLoc());
     if (auto ty = getType(unary))
-      paren->setType(ParenType::get(ctx, ty));
+      paren->setType(ty);
     paren->setImplicit();
     return paren;
   }

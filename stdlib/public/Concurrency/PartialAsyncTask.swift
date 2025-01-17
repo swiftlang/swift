@@ -11,7 +11,6 @@
 //===----------------------------------------------------------------------===//
 
 import Swift
-@_implementationOnly import _SwiftConcurrencyShims
 
 // TODO(swift): rename the file to ExecutorJob.swift eventually, we don't use PartialTask terminology anymore
 
@@ -145,8 +144,10 @@ public struct UnownedJob: Sendable {
   ///
   /// This operation consumes the job, preventing it accidental use after it has been run.
   ///
-  /// Converting a `ExecutorJob` to an ``UnownedJob`` and invoking ``UnownedJob/runSynchronously(_:)` on it multiple times is undefined behavior,
-  /// as a job can only ever be run once, and must not be accessed after it has been run.
+  /// Converting a `ExecutorJob` to an ``UnownedJob`` and invoking
+  /// ``UnownedJob/runSynchronously(isolatedTo:taskExecutor:)` on it multiple times
+  /// is undefined behavior, as a job can only ever be run once, and must not be
+  /// accessed after it has been run.
   ///
   /// - Parameter serialExecutor: the executor this job will be semantically running on.
   /// - Parameter taskExecutor: the task executor this job will be run on.
@@ -191,8 +192,7 @@ extension UnownedJob: CustomStringConvertible {
 @available(SwiftStdlib 5.9, *)
 @available(*, deprecated, renamed: "ExecutorJob")
 @frozen
-@_moveOnly
-public struct Job: Sendable {
+public struct Job: Sendable, ~Copyable {
   internal var context: Builtin.Job
 
   @usableFromInline
@@ -260,8 +260,7 @@ extension Job {
 /// you don't generally interact with jobs directly.
 @available(SwiftStdlib 5.9, *)
 @frozen
-@_moveOnly
-public struct ExecutorJob: Sendable {
+public struct ExecutorJob: Sendable, ~Copyable {
   internal var context: Builtin.Job
 
   @usableFromInline
@@ -357,9 +356,6 @@ extension ExecutorJob {
   /// and should be the same executor as the one semantically calling the `runSynchronously` method.
   ///
   /// This operation consumes the job, preventing it accidental use after it has been run.
-  ///
-  /// Converting a `ExecutorJob` to an ``UnownedJob`` and invoking ``UnownedJob/runSynchronously(_:)` on it multiple times is undefined behavior,
-  /// as a job can only ever be run once, and must not be accessed after it has been run.
   ///
   /// - Parameter serialExecutor: the executor this job will be semantically running on.
   /// - Parameter taskExecutor: the task executor this job will be run on.
@@ -483,6 +479,7 @@ extension JobPriority: Comparable {
 /// without making other changes.
 @available(SwiftStdlib 5.1, *)
 @frozen
+@unsafe
 public struct UnsafeContinuation<T, E: Error>: Sendable {
   @usableFromInline internal var context: Builtin.RawUnsafeContinuation
 
@@ -505,7 +502,7 @@ public struct UnsafeContinuation<T, E: Error>: Sendable {
   /// The task continues executing
   /// when its executor schedules it.
   @_alwaysEmitIntoClient
-  public func resume(returning value: __owned T) where E == Never {
+  public func resume(returning value: sending T) where E == Never {
     #if compiler(>=5.5) && $BuiltinContinuation
     Builtin.resumeNonThrowingContinuationReturning(context, value)
     #else
@@ -527,7 +524,7 @@ public struct UnsafeContinuation<T, E: Error>: Sendable {
   /// The task continues executing
   /// when its executor schedules it.
   @_alwaysEmitIntoClient
-  public func resume(returning value: __owned T) {
+  public func resume(returning value: sending T) {
     #if compiler(>=5.5) && $BuiltinContinuation
     Builtin.resumeThrowingContinuationReturning(context, value)
     #else
@@ -549,7 +546,7 @@ public struct UnsafeContinuation<T, E: Error>: Sendable {
   /// The task continues executing
   /// when its executor schedules it.
   @_alwaysEmitIntoClient
-  public func resume(throwing error: __owned E) {
+  public func resume(throwing error: consuming E) {
     #if compiler(>=5.5) && $BuiltinContinuation
     Builtin.resumeThrowingContinuationThrowing(context, error)
     #else
@@ -577,7 +574,7 @@ extension UnsafeContinuation {
   /// The task continues executing
   /// when its executor schedules it.
   @_alwaysEmitIntoClient
-  public func resume<Er: Error>(with result: Result<T, Er>) where E == Error {
+  public func resume<Er: Error>(with result: __shared sending Result<T, Er>) where E == Error {
     switch result {
       case .success(let val):
         self.resume(returning: val)
@@ -603,7 +600,7 @@ extension UnsafeContinuation {
   /// The task continues executing
   /// when its executor schedules it.
   @_alwaysEmitIntoClient
-  public func resume(with result: Result<T, E>) {
+  public func resume(with result: __shared sending Result<T, E>) {
     switch result {
       case .success(let val):
         self.resume(returning: val)
@@ -635,7 +632,7 @@ extension UnsafeContinuation {
 @_alwaysEmitIntoClient
 internal func _resumeUnsafeContinuation<T>(
   _ continuation: UnsafeContinuation<T, Never>,
-  _ value: __owned T
+  _ value: sending T
 ) {
   continuation.resume(returning: value)
 }
@@ -644,7 +641,7 @@ internal func _resumeUnsafeContinuation<T>(
 @_alwaysEmitIntoClient
 internal func _resumeUnsafeThrowingContinuation<T>(
   _ continuation: UnsafeContinuation<T, Error>,
-  _ value: __owned T
+  _ value: sending T
 ) {
   continuation.resume(returning: value)
 }
@@ -653,7 +650,7 @@ internal func _resumeUnsafeThrowingContinuation<T>(
 @_alwaysEmitIntoClient
 internal func _resumeUnsafeThrowingContinuationWithError<T>(
   _ continuation: UnsafeContinuation<T, Error>,
-  _ error: __owned Error
+  _ error: consuming Error
 ) {
   continuation.resume(throwing: error)
 }
@@ -686,10 +683,11 @@ internal func _resumeUnsafeThrowingContinuationWithError<T>(
 /// - SeeAlso: `withCheckedThrowingContinuation(function:_:)`
 @available(SwiftStdlib 5.1, *)
 @_alwaysEmitIntoClient
+@unsafe
 public func withUnsafeContinuation<T>(
   isolation: isolated (any Actor)? = #isolation,
   _ fn: (UnsafeContinuation<T, Never>) -> Void
-) async -> T {
+) async -> sending T {
   return await Builtin.withUnsafeContinuation {
     fn(UnsafeContinuation<T, Never>($0))
   }
@@ -722,10 +720,39 @@ public func withUnsafeContinuation<T>(
 /// - SeeAlso: `withCheckedThrowingContinuation(function:_:)`
 @available(SwiftStdlib 5.1, *)
 @_alwaysEmitIntoClient
+@unsafe
 public func withUnsafeThrowingContinuation<T>(
   isolation: isolated (any Actor)? = #isolation,
   _ fn: (UnsafeContinuation<T, Error>) -> Void
-) async throws -> T {
+) async throws -> sending T {
+  return try await Builtin.withUnsafeThrowingContinuation {
+    fn(UnsafeContinuation<T, Error>($0))
+  }
+}
+
+// Note: hack to stage out @_unsafeInheritExecutor forms of various functions
+// in favor of #isolation. The _unsafeInheritExecutor_ prefix is meaningful
+// to the type checker.
+@available(SwiftStdlib 5.1, *)
+@_alwaysEmitIntoClient
+@_unsafeInheritExecutor
+public func _unsafeInheritExecutor_withUnsafeContinuation<T>(
+  _ fn: (UnsafeContinuation<T, Never>) -> Void
+) async -> sending T {
+  return await Builtin.withUnsafeContinuation {
+    fn(UnsafeContinuation<T, Never>($0))
+  }
+}
+
+// Note: hack to stage out @_unsafeInheritExecutor forms of various functions
+// in favor of #isolation. The _unsafeInheritExecutor_ prefix is meaningful
+// to the type checker.
+@available(SwiftStdlib 5.1, *)
+@_alwaysEmitIntoClient
+@_unsafeInheritExecutor
+public func _unsafeInheritExecutor_withUnsafeThrowingContinuation<T>(
+  _ fn: (UnsafeContinuation<T, Error>) -> Void
+) async throws -> sending T {
   return try await Builtin.withUnsafeThrowingContinuation {
     fn(UnsafeContinuation<T, Error>($0))
   }

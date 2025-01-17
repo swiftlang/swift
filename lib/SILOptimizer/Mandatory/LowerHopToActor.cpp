@@ -11,6 +11,8 @@
 //===----------------------------------------------------------------------===//
 
 #define DEBUG_TYPE "insert-hop-to-executor"
+#include "swift/AST/ConformanceLookup.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/FrozenMultiMap.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILFunction.h"
@@ -110,20 +112,18 @@ static bool isOptionalBuiltinExecutor(SILType type) {
 void LowerHopToActor::recordDominatingInstFor(SILInstruction *inst) {
   SILValue actor;
   if (auto *hop = dyn_cast<HopToExecutorInst>(inst)) {
+    // hop_to_executor can take optional and non-optional Builtin.Executor
+    // values directly.  If we see Optional<Builtin.Executor>, there's
+    // nothing to do.
     actor = hop->getTargetExecutor();
-    // If hop_to_executor was emitted with an optional executor operand,
-    // there's nothing to derive.
-    if (isOptionalBuiltinExecutor(actor->getType())) {
+    if (isOptionalBuiltinExecutor(actor->getType()))
       return;
-    }
   } else if (auto *extract = dyn_cast<ExtractExecutorInst>(inst)) {
+    // extract_executor can only take non-optional actor values.
     actor = extract->getExpectedExecutor();
   } else {
     return;
   }
-
-  if (isOptionalBuiltinExecutor(actor->getType()))
-    return;
 
   auto *dominatingInst = ExecutorDerivationForActor.lookup(actor);
   if (dominatingInst) {
@@ -227,7 +227,7 @@ SILValue LowerHopToActor::emitGetExecutor(SILBuilderWithScope &B,
       auto builtinDecl = cast<FuncDecl>(getBuiltinValueDecl(ctx, builtinName));
       auto subs = SubstitutionMap::get(builtinDecl->getGenericSignature(),
                                        {actorType},
-                                       LookUpConformanceInModule(module));
+                                       LookUpConformanceInModule());
       return B.createBuiltin(loc, builtinName, executorType, subs, {actor});
     }
 
@@ -242,13 +242,12 @@ SILValue LowerHopToActor::emitGetExecutor(SILBuilderWithScope &B,
 
     // Open an existential actor type.
     if (actorType->isExistentialType()) {
-      actorType = OpenedArchetypeType::get(
-          actorType, F->getGenericSignature())->getCanonicalType();
+      actorType = OpenedArchetypeType::get(actorType)->getCanonicalType();
       SILType loweredActorType = F->getLoweredType(actorType);
       actor = B.createOpenExistentialRef(loc, actor, loweredActorType);
     }
 
-    auto actorConf = module->lookupConformance(actorType, actorProtocol);
+    auto actorConf = lookupConformance(actorType, actorProtocol);
     assert(actorConf &&
            "hop_to_executor with actor that doesn't conform to Actor or DistributedActor");
 

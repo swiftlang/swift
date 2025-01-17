@@ -227,8 +227,8 @@ func testKeyPathInGenericContext<H: Hashable, X>(hashable: H, anything: X) {
 }
 
 func testDisembodiedStringInterpolation(x: Int) {
-  \(x) // expected-error{{string interpolation can only appear inside a string literal}} 
-  \(x, radix: 16) // expected-error{{string interpolation can only appear inside a string literal}} 
+  \(x) // expected-error{{string interpolation can only appear inside a string literal}}
+  \(x, radix: 16) // expected-error{{string interpolation can only appear inside a string literal}}
 }
 
 func testNoComponents() {
@@ -524,16 +524,39 @@ func testInvalidKeyPathComponents() {
   let _ = \.{return 0} // expected-error* {{}}
 }
 
+struct W {
+  static let h = 50
+}
+
 class X {
   class var a: Int { return 1 }
-  static var b = 2
+  static var b = 20
+  let c = true
+  static subscript(d: Int) -> String { "\(d)" }
+  var e: W.Type? { return W.self }
+}
+
+class Y : X {
+  subscript(f: Int) -> W.Type { W.self }
+  static subscript(g: Int) -> W.Type { W.self }
 }
 
 func testStaticKeyPathComponent() {
-  _ = \X.a // expected-error{{cannot refer to static member}}
-  _ = \X.Type.a // expected-error{{cannot refer to static member}}
-  _ = \X.b // expected-error{{cannot refer to static member}}
-  _ = \X.Type.b // expected-error{{cannot refer to static member}}
+  _ = \X.a // expected-error{{static member 'a' cannot be used on instance of type 'X'}}
+  _ = \X.Type.a
+  _ = \X.b // expected-error{{static member 'b' cannot be used on instance of type 'X'}}
+  _ = \X.Type.b
+  _ = \X.c
+  _ = \X.Type.c // expected-error{{instance member 'c' cannot be used on type 'X'}}
+  _ = \X.[42] // expected-error{{static member 'subscript(_:)' cannot be used on instance of type 'X'}}
+  _ = \X.Type.[42]
+
+  let _: KeyPath<X, Int?> = \.e?.h
+  let _: PartialKeyPath<X> = \.e?.h
+  let _: AnyKeyPath = \X.e?.h
+
+  let _ : KeyPath<Y, W.Type> = \Y.[40]
+  let _ : KeyPath<Y.Type, W.Type> = \Y.Type.[70]
 }
 
 class Bass: Hashable {
@@ -735,13 +758,13 @@ protocol P_With_Static_Members {
 
 func test_keypath_with_static_members(_ p: P_With_Static_Members) {
   let _ = p[keyPath: \.x]
-  // expected-error@-1 {{key path cannot refer to static member 'x'}}
+  // expected-error@-1 {{static member 'x' cannot be used on instance of type 'any P_With_Static_Members'}}
   let _: KeyPath<P_With_Static_Members, Int> = \.x
-  // expected-error@-1 {{key path cannot refer to static member 'x'}}
+  // expected-error@-1 {{static member 'x' cannot be used on instance of type 'any P_With_Static_Members'}}
   let _ = \P_With_Static_Members.arr.count
-  // expected-error@-1 {{key path cannot refer to static member 'arr'}}
+  // expected-error@-1 {{static member 'arr' cannot be used on instance of type 'any P_With_Static_Members'}}
   let _ = p[keyPath: \.arr.count]
-  // expected-error@-1 {{key path cannot refer to static member 'arr'}}
+  // expected-error@-1 {{static member 'arr' cannot be used on instance of type 'any P_With_Static_Members'}}
 
   struct S {
     static var foo: String = "Hello"
@@ -754,17 +777,16 @@ func test_keypath_with_static_members(_ p: P_With_Static_Members) {
 
   func foo(_ s: S) {
     let _ = \S.Type.foo
-    // expected-error@-1 {{key path cannot refer to static member 'foo'}}
     let _ = s[keyPath: \.foo]
-    // expected-error@-1 {{key path cannot refer to static member 'foo'}}
+    // expected-error@-1 {{static member 'foo' cannot be used on instance of type 'S'}}
     let _: KeyPath<S, String> = \.foo
-    // expected-error@-1 {{key path cannot refer to static member 'foo'}}
+    // expected-error@-1 {{static member 'foo' cannot be used on instance of type 'S'}}
     let _ = \S.foo
-    // expected-error@-1 {{key path cannot refer to static member 'foo'}}
+    // expected-error@-1 {{static member 'foo' cannot be used on instance of type 'S'}}
     let _ = \S.bar.baz
-    // expected-error@-1 {{key path cannot refer to static member 'baz'}}
+    // expected-error@-1 {{static member 'baz' cannot be used on instance of type 'Bar'}}
     let _ = s[keyPath: \.bar.baz]
-    // expected-error@-1 {{key path cannot refer to static member 'baz'}}
+    // expected-error@-1 {{static member 'baz' cannot be used on instance of type 'Bar'}}
   }
 }
 
@@ -916,7 +938,7 @@ func testKeyPathHole() {
   _ = \.x // expected-error {{cannot infer key path type from context; consider explicitly specifying a root type}} {{8-8=<#Root#>}}
   _ = \.x.y // expected-error {{cannot infer key path type from context; consider explicitly specifying a root type}} {{8-8=<#Root#>}}
 
-  let _ : AnyKeyPath = \.x 
+  let _ : AnyKeyPath = \.x
   // expected-error@-1 {{'AnyKeyPath' does not provide enough context for root type to be inferred; consider explicitly specifying a root type}} {{25-25=<#Root#>}}
   let _ : AnyKeyPath = \.x.y
   // expected-error@-1 {{'AnyKeyPath' does not provide enough context for root type to be inferred; consider explicitly specifying a root type}} {{25-25=<#Root#>}}
@@ -932,7 +954,7 @@ func provideValueButNotRoot<T>(_ fn: (T) -> String) {} // expected-note 2 {{in c
 // expected-error@-1 {{generic parameter 'T' could not be inferred}}
   provideValueButNotRoot(\String.foo) // expected-error {{value of type 'String' has no member 'foo'}}
 
-  func provideKPValueButNotRoot<T>(_ kp: KeyPath<T, String>) {} 
+  func provideKPValueButNotRoot<T>(_ kp: KeyPath<T, String>) {}
   provideKPValueButNotRoot(\.x) // expected-error {{cannot infer key path type from context; consider explicitly specifying a root type}}
   provideKPValueButNotRoot(\.x.y) // expected-error {{cannot infer key path type from context; consider explicitly specifying a root type}}
 
@@ -1002,11 +1024,11 @@ func testMemberAccessOnOptionalKeyPathComponent() {
     }
   }
 
-  \String?.count 
+  \String?.count
   // expected-error@-1 {{value of optional type 'String?' must be unwrapped to refer to member 'count' of wrapped base type 'String'}}
   // expected-note@-2 {{use unwrapped type 'String' as key path root}} {{4-11=String}}
-  
-  \Optional<String>.count 
+
+  \Optional<String>.count
   // expected-error@-1 {{value of optional type 'Optional<String>' must be unwrapped to refer to member 'count' of wrapped base type 'String'}}
   // expected-note@-2 {{use unwrapped type 'String' as key path root}} {{4-20=String}}
 
@@ -1029,7 +1051,7 @@ func testMemberAccessOnOptionalKeyPathComponent() {
   kp(\.count) // expected-error {{key path root inferred as optional type 'String?' must be unwrapped to refer to member 'count' of unwrapped type 'String'}}
   let _ : KeyPath<String?, Int> = \.count // expected-error {{key path root inferred as optional type 'String?' must be unwrapped to refer to member 'count' of unwrapped type 'String'}}
 
-  let _ : KeyPath<String?, Int> = \.utf8.count 
+  let _ : KeyPath<String?, Int> = \.utf8.count
   // expected-error@-1 {{key path root inferred as optional type 'String?' must be unwrapped to refer to member 'utf8' of unwrapped type 'String'}}
 }
 

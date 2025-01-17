@@ -33,6 +33,7 @@
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/SourceFile.h"
 #include "swift/AST/Types.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/FileSystem.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/ReferenceDependencyKeys.h"
@@ -60,7 +61,7 @@ using namespace fine_grained_dependencies;
 static std::string identifierForContext(const DeclContext *DC) {
   if (!DC) return "";
 
-  Mangle::ASTMangler Mangler;
+  Mangle::ASTMangler Mangler(DC->getASTContext());
   if (const auto *context = dyn_cast<NominalTypeDecl>(DC)) {
     return Mangler.mangleTypeAsContextUSR(context);
   }
@@ -216,7 +217,6 @@ StringRef DependencyKey::Builder::getTopLevelName(const Decl *decl) {
   case DeclKind::PatternBinding:
   case DeclKind::EnumCase:
   case DeclKind::TopLevelCode:
-  case DeclKind::IfConfig:
   case DeclKind::PoundDiagnostic:
   case DeclKind::Missing:
   case DeclKind::MissingMember:

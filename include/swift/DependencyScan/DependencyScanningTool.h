@@ -28,7 +28,7 @@ class DependencyScanDiagnosticCollector;
 
 struct ScanQueryInstance {
   std::unique_ptr<CompilerInstance> ScanInstance;
-  std::unique_ptr<DependencyScanDiagnosticCollector> ScanDiagnostics;
+  std::shared_ptr<DependencyScanDiagnosticCollector> ScanDiagnostics;
 };
 
 /// Diagnostic consumer that simply collects the diagnostics emitted so-far
@@ -37,10 +37,11 @@ private:
   struct ScannerDiagnosticInfo {
     std::string Message;
     llvm::SourceMgr::DiagKind Severity;
+    std::optional<ScannerImportStatementInfo::ImportDiagnosticLocationInfo> ImportLocation;
   };
+  std::vector<ScannerDiagnosticInfo> Diagnostics;
 
   void handleDiagnostic(SourceManager &SM, const DiagnosticInfo &Info) override;
-  std::vector<ScannerDiagnosticInfo> Diagnostics;
 
 protected:
   virtual void addDiagnostic(SourceManager &SM, const DiagnosticInfo &Info);
@@ -86,14 +87,15 @@ public:
   /// occurred, \c swiftscan_dependency_result_t otherwise.
   llvm::ErrorOr<swiftscan_dependency_graph_t>
   getDependencies(ArrayRef<const char *> Command,
-                  const llvm::StringSet<> &PlaceholderModules);
+                  const llvm::StringSet<> &PlaceholderModules,
+                  StringRef WorkingDirectory);
 
   /// Collect the set of imports for the input module
   ///
   /// \returns a \c StringError with the diagnostic output if errors
   /// occurred, \c swiftscan_prescan_result_t otherwise.
   llvm::ErrorOr<swiftscan_import_set_t>
-  getImports(ArrayRef<const char *> Command);
+  getImports(ArrayRef<const char *> Command, StringRef WorkingDirectory);
 
   /// Collect the full module dependency graph for the input collection of
   /// module names (batch inputs) and output them to the
@@ -103,15 +105,9 @@ public:
   std::vector<llvm::ErrorOr<swiftscan_dependency_graph_t>>
   getDependencies(ArrayRef<const char *> Command,
                   const std::vector<BatchScanInput> &BatchInput,
-                  const llvm::StringSet<> &PlaceholderModules);
+                  const llvm::StringSet<> &PlaceholderModules,
+                  StringRef WorkingDirectory);
 
-  /// Writes the current `SharedCache` instance to a specified FileSystem path.
-  void serializeCache(llvm::StringRef path);
-  /// Loads an instance of a `SwiftDependencyScanningService` to serve as the `SharedCache`
-  /// from a specified FileSystem path.
-  bool loadCache(llvm::StringRef path);
-  /// Discard the tool's current `SharedCache` and start anew.
-  void resetCache();
   /// Query diagnostics consumed so far.
   std::vector<DependencyScanDiagnosticCollector::ScannerDiagnosticInfo> getDiagnostics();
   /// Discared the collection of diagnostics encountered so far.
@@ -120,14 +116,11 @@ public:
   /// Using the specified invocation command, instantiate a CompilerInstance
   /// that will be used for this scan.
   llvm::ErrorOr<ScanQueryInstance>
-  initCompilerInstanceForScan(ArrayRef<const char *> Command);
+  initCompilerInstanceForScan(ArrayRef<const char *> Command,
+                              StringRef WorkingDirectory,
+                              std::shared_ptr<DependencyScanDiagnosticCollector> scannerDiagnosticsCollector);
 
 private:
-  /// Using the specified invocation command, initialize the scanner instance
-  /// for this scan. Returns the `CompilerInstance` that will be used.
-  llvm::ErrorOr<ScanQueryInstance>
-  initScannerForAction(ArrayRef<const char *> Command);
-
   /// Shared cache of module dependencies, re-used by individual full-scan queries
   /// during the lifetime of this Tool.
   std::unique_ptr<SwiftDependencyScanningService> ScanningService;
@@ -144,6 +137,8 @@ private:
   llvm::BumpPtrAllocator Alloc;
   llvm::StringSaver Saver;
 };
+
+swiftscan_diagnostic_set_t *mapCollectedDiagnosticsForOutput(const DependencyScanDiagnosticCollector *diagnosticCollector);
 
 } // end namespace dependencies
 } // end namespace swift

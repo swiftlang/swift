@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend  -primary-file %s -module-name=test -Xllvm -sil-print-debuginfo -emit-sil | %FileCheck %s
+// RUN: %target-swift-frontend  -primary-file %s -module-name=test -Xllvm -sil-print-types -Xllvm -sil-print-debuginfo -emit-sil | %FileCheck %s
 
 // REQUIRES: swift_in_compiler
 

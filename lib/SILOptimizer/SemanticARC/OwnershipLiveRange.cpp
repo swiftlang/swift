@@ -13,6 +13,7 @@
 #include "OwnershipLiveRange.h"
 #include "OwnershipPhiOperand.h"
 
+#include "swift/Basic/Assertions.h"
 #include "swift/SIL/BasicBlockUtils.h"
 #include "swift/SIL/OwnershipUtils.h"
 
@@ -280,7 +281,6 @@ static SILValue convertIntroducerToGuaranteed(OwnedValueIntroducer introducer) {
   case OwnedValueIntroducerKind::Phi: {
     auto *phiArg = cast<SILPhiArgument>(introducer.value);
     phiArg->setOwnershipKind(OwnershipKind::Guaranteed);
-    phiArg->setReborrow(computeIsReborrow(phiArg));
     return phiArg;
   }
   case OwnedValueIntroducerKind::Struct: {

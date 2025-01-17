@@ -1445,3 +1445,29 @@ bb0(%0 : $F):
   return %r : $()
 }
 
+// CHECK-LABEL: Escape information for test_unchecked_ref_cast:
+// CHECK: return[]: %0 = alloc_ref $Derived
+// CHECK:  -    :   %1 = alloc_ref $Derived
+// CHECK: End function test_unchecked_ref_cast
+sil @test_unchecked_ref_cast : $@convention(thin) () -> @owned X {
+bb0:
+  %0 = alloc_ref $Derived
+  %1 = alloc_ref $Derived
+  %2 = unchecked_ref_cast %0 : $Derived to $X
+  %3 = unchecked_ref_cast %1 : $Derived to $X
+  return %2 : $X
+}
+
+// CHECK-LABEL: Escape information for test_unchecked_addr_cast:
+// CHECK: global:   %1 = alloc_ref $X
+// CHECK: End function test_unchecked_addr_cast
+sil @test_unchecked_addr_cast : $@convention(thin) () -> @owned Builtin.RawPointer {
+bb0:
+  %0 = alloc_stack $X
+  %1 = alloc_ref $X
+  store %1 to %0 : $*X
+  %3 = unchecked_addr_cast %0 : $*X to $*Builtin.RawPointer
+  %4 = load %3 : $*Builtin.RawPointer
+  dealloc_stack %0 : $*X
+  return %4 : $Builtin.RawPointer
+}

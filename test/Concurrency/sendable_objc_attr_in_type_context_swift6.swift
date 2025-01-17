@@ -9,7 +9,7 @@
 // RUN:   -module-name main -I %t -verify
 
 // REQUIRES: objc_interop
-// REQUIRES: asserts
+// REQUIRES: swift_feature_SendableCompletionHandlers
 
 //--- Test.h
 #define SWIFT_SENDABLE __attribute__((__swift_attr__("@Sendable")))
@@ -44,6 +44,7 @@ typedef void (^CompletionHandler)(void (^ SWIFT_SENDABLE)(void)) SWIFT_SENDABLE;
 -(void) withSendableCustom: (void (^)(MyValue *_Nullable SWIFT_SENDABLE)) handler;
 -(void) withNonSendable:(NSString *)operation completionHandler:(void (^ _Nullable NONSENDABLE)(NSString *_Nullable, NSError * _Nullable)) handler;
 -(void) withAliasCompletionHandler:(CompletionHandler)handler;
+-(void) withMainActorId: (void (MAIN_ACTOR ^)(id)) handler;
 @end
 
 // Placement of SWIFT_SENDABLE matters here
@@ -66,6 +67,17 @@ void doSomethingConcurrently(__attribute__((noescape)) void SWIFT_SENDABLE (^blo
 #pragma clang assume_nonnull end
 
 //--- main.swift
+
+do {
+  class SubTestNoActor : Test {
+    @objc override func withMainActorId(_: @escaping (Any) -> Void) {}
+    // expected-error@-1 {{declaration 'withMainActorId' has a type with different global actor isolation from any potential overrides}}
+  }
+
+  class SubTestWithActor : Test {
+    @objc override func withMainActorId(_: @MainActor @escaping (Any) -> Void) {} // Ok
+  }
+}
 
 func test_sendable_attr_in_type_context(test: Test) {
   let fn: (String?, (any Error)?) -> Void = { _,_ in }
@@ -102,19 +114,20 @@ func test_sendable_attr_in_type_context(test: Test) {
 
   _ = TestWithSendableID<SendableValue>() // Ok
 
-  // TOOD(diagnostics): Duplicate diagnostics
+  // TODO(diagnostics): Duplicate diagnostics
   TestWithSendableID().add(MyValue())
-  // expected-error@-1 3 {{type 'MyValue' does not conform to the 'Sendable' protocol}}
+  // expected-warning@-1 3 {{type 'MyValue' does not conform to the 'Sendable' protocol}}
 
   TestWithSendableSuperclass().add(SendableMyValue()) // Ok
 
-  // TOOD(diagnostics): Duplicate diagnostics
+  // TODO(diagnostics): Duplicate diagnostics
   TestWithSendableSuperclass().add(MyValue())
-  // expected-error@-1 3 {{type 'MyValue' does not conform to the 'Sendable' protocol}}
+  // expected-warning@-1 3 {{type 'MyValue' does not conform to the 'Sendable' protocol}}
 }
 
 class TestConformanceWithStripping : InnerSendableTypes {
   // expected-error@-1 {{type 'TestConformanceWithStripping' does not conform to protocol 'InnerSendableTypes'}}
+  // expected-note@-2 {{add stubs for conformance}}
 
   func testComposition(_: MyValue) {
     // expected-note@-1 {{candidate has non-matching type '(MyValue) -> ()'}}
@@ -125,7 +138,7 @@ class TestConformanceWithStripping : InnerSendableTypes {
   }
 
   func test(withCallback name: String, handler: @escaping @MainActor ([String : Any], (any Error)?) -> Void) {
-    // expected-note@-1 {{candidate has non-matching type '(String, @escaping @MainActor ([String : Any], (any Error)?) -> Void) -> ()'}}
+    // expected-note@-1 {{candidate has non-matching type '(String, @escaping @MainActor @Sendable ([String : Any], (any Error)?) -> Void) -> ()'}}
   }
 }
 

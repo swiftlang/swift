@@ -50,11 +50,9 @@ fileprivate extension IDEBridging.LabelRangeType {
     case .noArguments: self = .None
     case .call: self = .CallArg
     case .parameters: self = .Param
+    case .enumCaseParameters: self = .EnumCaseParam
     case .noncollapsibleParameters: self = .NoncollapsibleParam
     case .selector: self = .CompoundName
-#if RESILIENT_SWIFT_SYNTAX
-    @unknown default: fatalError()
-#endif
     }
   }
 }
@@ -72,11 +70,9 @@ extension BridgedResolvedLoc {
     case .noArguments: arguments = []
     case .call(let arguments2, _): arguments = arguments2
     case .parameters(let arguments2): arguments = arguments2
+    case .enumCaseParameters(let arguments2): arguments = arguments2
     case .noncollapsibleParameters(let arguments2): arguments = arguments2
     case .selector(let arguments2): arguments = arguments2
-#if RESILIENT_SWIFT_SYNTAX
-    @unknown default: fatalError()
-#endif
     }
     self.init(
       range: BridgedCharSourceRange(from: resolvedLoc.baseNameRange, in: sourceFile),
@@ -96,9 +92,6 @@ fileprivate extension IDEBridging.ResolvedLocContext {
     case .selector: self = .Selector
     case .comment: self = .Comment
     case .stringLiteral: self = .StringLiteral
-#if RESILIENT_SWIFT_SYNTAX
-    @unknown default: fatalError()
-#endif
     }
   }
 }

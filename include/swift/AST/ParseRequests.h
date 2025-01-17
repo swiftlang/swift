@@ -88,7 +88,7 @@ public:
 struct SourceFileParsingResult {
   ArrayRef<ASTNode> TopLevelItems;
   std::optional<ArrayRef<Token>> CollectedTokens;
-  std::optional<StableHasher> InterfaceHasher;
+  std::optional<Fingerprint> Fingerprint;
 };
 
 /// Parse the top-level items of a SourceFile.
@@ -173,6 +173,23 @@ private:
 public:
   evaluator::DependencySource
   readDependencySource(const evaluator::DependencyRecorder &) const;
+};
+
+class EvaluateIfConditionRequest
+    : public SimpleRequest<EvaluateIfConditionRequest,
+          std::pair<bool, bool>(SourceFile *, SourceRange conditionRange,
+                                bool shouldEvaluate),
+                           RequestFlags::Uncached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  std::pair<bool, bool> evaluate(
+      Evaluator &evaluator, SourceFile *SF, SourceRange conditionRange,
+      bool shouldEvaluate) const;
 };
 
 /// The zone number for the parser.

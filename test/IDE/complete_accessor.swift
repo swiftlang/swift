@@ -116,7 +116,7 @@ extension UNKNOWN_TYPE {
     get {}
     #^UNKNOWN_EXT_PROPERTY_SECOND?check=NO_GLOBAL;check=NO_SELF;check=WITH_GETSET;check=WITH_OBSERVER^#
   }
-  subscript<T>(_1 index: T) -> T where T: ANOTHER_UNKNWON_TYPE {
+  subscript<T>(_1 index: T) -> T where T: ANOTHER_UNKNOWN_TYPE {
     #^UNKNOWN_EXT_SUBSCRIPT_FIRST?check=WITH_GLOBAL;check=WITH_SELF;check=WITH_GETSET;check=NO_OBSERVER^#
   }
   subscript(_2 index: Int) -> String {

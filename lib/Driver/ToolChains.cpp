@@ -13,6 +13,7 @@
 #include "ToolChains.h"
 
 #include "swift/AST/DiagnosticsDriver.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/Platform.h"
 #include "swift/Basic/Range.h"
@@ -203,12 +204,10 @@ void ToolChain::addCommonFrontendArgs(const OutputInfo &OI,
     arguments.push_back("-disable-objc-interop");
   }
 
-  // Add flags for C++ interop.
-  if (const Arg *arg =
-          inputArgs.getLastArg(options::OPT_experimental_cxx_stdlib)) {
-    arguments.push_back("-Xcc");
+  if (const Arg *arg = inputArgs.getLastArg(
+        options::OPT_experimental_serialize_debug_info)) {
     arguments.push_back(
-        inputArgs.MakeArgString(Twine("-stdlib=") + arg->getValue()));
+        inputArgs.MakeArgString(Twine("-experimental-serialize-debug-info")));
   }
 
   if (inputArgs.hasArg(options::OPT_experimental_hermetic_seal_at_link)) {
@@ -243,13 +242,17 @@ void ToolChain::addCommonFrontendArgs(const OutputInfo &OI,
     arguments.push_back(inputArgs.MakeArgString(A->getValue()));
   }
 
+  if (const Arg *A = inputArgs.getLastArg(options::OPT_sysroot)) {
+    arguments.push_back("-sysroot");
+    arguments.push_back(inputArgs.MakeArgString(A->getValue()));
+  }
 
   if (llvm::sys::Process::StandardErrHasColors()) {
     arguments.push_back("-color-diagnostics");
   }
 
   inputArgs.AddAllArgs(arguments, options::OPT_I);
-  inputArgs.AddAllArgs(arguments, options::OPT_F, options::OPT_Fsystem);
+  inputArgs.addAllArgs(arguments, {options::OPT_F, options::OPT_Fsystem});
   inputArgs.AddAllArgs(arguments, options::OPT_vfsoverlay);
 
   inputArgs.AddLastArg(arguments, options::OPT_AssertConfig);
@@ -267,8 +270,10 @@ void ToolChain::addCommonFrontendArgs(const OutputInfo &OI,
   inputArgs.AddLastArg(arguments, options::OPT_disable_dynamic_actor_isolation);
   inputArgs.AddLastArg(arguments, options::OPT_warn_concurrency);
   inputArgs.AddLastArg(arguments, options::OPT_strict_concurrency);
-  inputArgs.AddAllArgs(arguments, options::OPT_enable_experimental_feature);
-  inputArgs.AddAllArgs(arguments, options::OPT_enable_upcoming_feature);
+  inputArgs.addAllArgs(arguments, {options::OPT_enable_experimental_feature,
+                                   options::OPT_disable_experimental_feature,
+                                   options::OPT_enable_upcoming_feature,
+                                   options::OPT_disable_upcoming_feature});
   inputArgs.AddLastArg(arguments, options::OPT_warn_implicit_overrides);
   inputArgs.AddLastArg(arguments, options::OPT_typo_correction_limit);
   inputArgs.AddLastArg(arguments, options::OPT_enable_app_extension);
@@ -291,6 +296,7 @@ void ToolChain::addCommonFrontendArgs(const OutputInfo &OI,
   inputArgs.AddLastArg(arguments, options::OPT_package_name);
   inputArgs.AddLastArg(arguments, options::OPT_export_as);
   inputArgs.AddLastArg(arguments, options::OPT_nostdimport);
+  inputArgs.AddLastArg(arguments, options::OPT_nostdlibimport);
   inputArgs.AddLastArg(arguments, options::OPT_parse_stdlib);
   inputArgs.AddLastArg(arguments, options::OPT_resource_dir);
   inputArgs.AddLastArg(arguments, options::OPT_solver_memory_threshold);
@@ -302,11 +308,11 @@ void ToolChain::addCommonFrontendArgs(const OutputInfo &OI,
   inputArgs.AddLastArg(arguments, options::OPT_suppress_remarks);
   inputArgs.AddLastArg(arguments, options::OPT_experimental_package_bypass_resilience);
   inputArgs.AddLastArg(arguments, options::OPT_ExperimentalPackageCMO);
+  inputArgs.AddLastArg(arguments, options::OPT_PackageCMO);
   inputArgs.AddLastArg(arguments, options::OPT_profile_generate);
   inputArgs.AddLastArg(arguments, options::OPT_profile_use);
   inputArgs.AddLastArg(arguments, options::OPT_profile_coverage_mapping);
-  inputArgs.AddAllArgs(arguments, options::OPT_warnings_as_errors,
-                       options::OPT_no_warnings_as_errors);
+  inputArgs.AddAllArgs(arguments, options::OPT_warning_treating_Group);
   inputArgs.AddLastArg(arguments, options::OPT_sanitize_EQ);
   inputArgs.AddLastArg(arguments, options::OPT_sanitize_recover_EQ);
   inputArgs.AddLastArg(arguments,
@@ -343,14 +349,17 @@ void ToolChain::addCommonFrontendArgs(const OutputInfo &OI,
   inputArgs.AddLastArg(arguments, options::OPT_enable_experimental_cxx_interop);
   inputArgs.AddLastArg(arguments, options::OPT_cxx_interoperability_mode);
   inputArgs.AddLastArg(arguments, options::OPT_enable_builtin_module);
+  inputArgs.AddLastArg(arguments, options::OPT_compiler_assertions);
+  inputArgs.AddLastArg(arguments, options::OPT_load_pass_plugin_EQ);
+  inputArgs.AddAllArgs(arguments, options::OPT_module_alias);
 
   // Pass on any build config options
   inputArgs.AddAllArgs(arguments, options::OPT_D);
 
   // Pass on file paths that should be remapped in debug info.
-  inputArgs.AddAllArgs(arguments, options::OPT_debug_prefix_map,
-                                  options::OPT_coverage_prefix_map,
-                                  options::OPT_file_prefix_map);
+  inputArgs.addAllArgs(arguments, {options::OPT_debug_prefix_map,
+                                   options::OPT_coverage_prefix_map,
+                                   options::OPT_file_prefix_map});
 
   std::string globalRemapping = getGlobalDebugPathRemapping();
   if (!globalRemapping.empty()) {
@@ -710,10 +719,14 @@ const char *ToolChain::JobContext::computeFrontendModeForCompile() const {
     return "-emit-silgen";
   case file_types::TY_SIL:
     return "-emit-sil";
+  case file_types::TY_LoweredSIL:
+    return "-emit-lowered-sil";
   case file_types::TY_RawSIB:
     return "-emit-sibgen";
   case file_types::TY_SIB:
     return "-emit-sib";
+  case file_types::TY_RawLLVM_IR:
+    return "-emit-irgen";
   case file_types::TY_LLVM_IR:
     return "-emit-ir";
   case file_types::TY_LLVM_BC:
@@ -753,6 +766,7 @@ const char *ToolChain::JobContext::computeFrontendModeForCompile() const {
   case file_types::TY_SwiftDeps:
   case file_types::TY_ExternalSwiftDeps:
   case file_types::TY_ModuleTrace:
+  case file_types::TY_FineModuleTrace:
   case file_types::TY_TBD:
   case file_types::TY_YAMLOptRecord:
   case file_types::TY_BitstreamOptRecord:
@@ -770,6 +784,7 @@ const char *ToolChain::JobContext::computeFrontendModeForCompile() const {
   case file_types::TY_SwiftFixIt:
   case file_types::TY_ModuleSemanticInfo:
   case file_types::TY_CachedDiagnostics:
+  case file_types::TY_SymbolGraphFile:
     llvm_unreachable("Output type can never be primary output.");
   case file_types::TY_INVALID:
     llvm_unreachable("Invalid type ID");
@@ -979,6 +994,9 @@ ToolChain::constructInvocation(const BackendJobAction &job,
     case file_types::TY_Object:
       FrontendModeOption = "-c";
       break;
+    case file_types::TY_RawLLVM_IR:
+      FrontendModeOption = "-emit-irgen";
+      break;
     case file_types::TY_LLVM_IR:
       FrontendModeOption = "-emit-ir";
       break;
@@ -1005,6 +1023,7 @@ ToolChain::constructInvocation(const BackendJobAction &job,
     case file_types::TY_RawSIL:
     case file_types::TY_RawSIB:
     case file_types::TY_SIL:
+    case file_types::TY_LoweredSIL:
     case file_types::TY_SIB:
     case file_types::TY_PCH:
     case file_types::TY_ClangModuleFile:
@@ -1024,6 +1043,7 @@ ToolChain::constructInvocation(const BackendJobAction &job,
     case file_types::TY_ExternalSwiftDeps:
     case file_types::TY_Remapping:
     case file_types::TY_ModuleTrace:
+    case file_types::TY_FineModuleTrace:
     case file_types::TY_YAMLOptRecord:
     case file_types::TY_BitstreamOptRecord:
     case file_types::TY_SwiftModuleInterfaceFile:
@@ -1040,6 +1060,7 @@ ToolChain::constructInvocation(const BackendJobAction &job,
     case file_types::TY_SwiftFixIt:
     case file_types::TY_ModuleSemanticInfo:
     case file_types::TY_CachedDiagnostics:
+    case file_types::TY_SymbolGraphFile:
       llvm_unreachable("Output type can never be primary output.");
     case file_types::TY_INVALID:
       llvm_unreachable("Invalid type ID");
@@ -1311,7 +1332,8 @@ ToolChain::constructInvocation(const REPLJobAction &job,
   addRuntimeLibraryFlags(context.OI, FrontendArgs);
 
   context.Args.AddLastArg(FrontendArgs, options::OPT_import_objc_header);
-  context.Args.AddAllArgs(FrontendArgs, options::OPT_framework, options::OPT_L);
+  context.Args.addAllArgs(FrontendArgs,
+                          {options::OPT_framework, options::OPT_L});
   ToolChain::addLinkedLibArgs(context.Args, FrontendArgs);
 
   if (!useLLDB) {
@@ -1464,6 +1486,68 @@ void ToolChain::addLinkRuntimeLib(const ArgList &Args, ArgStringList &Arguments,
   getClangLibraryPath(Args, P);
   llvm::sys::path::append(P, LibName);
   Arguments.push_back(Args.MakeArgString(P));
+}
+
+static void appendInProcPluginServerPath(StringRef PluginPathRoot,
+                                         llvm::SmallVectorImpl<char> &InProcPluginServerPath) {
+  InProcPluginServerPath.append(PluginPathRoot.begin(), PluginPathRoot.end());
+#if defined(_WIN32)
+  llvm::sys::path::append(InProcPluginServerPath, "bin", "SwiftInProcPluginServer.dll");
+#elif defined(__APPLE__)
+  llvm::sys::path::append(InProcPluginServerPath, "lib", "swift", "host", "libSwiftInProcPluginServer.dylib");
+#elif defined(__unix__)
+  llvm::sys::path::append(InProcPluginServerPath, "lib", "swift", "host", "libSwiftInProcPluginServer.so");
+#else
+#error Unknown compiler host
+#endif
+}
+
+static void appendPluginsPath(StringRef PluginPathRoot,
+                              llvm::SmallVectorImpl<char> &PluginsPath) {
+  PluginsPath.append(PluginPathRoot.begin(), PluginPathRoot.end());
+#if defined(_WIN32)
+  llvm::sys::path::append(PluginsPath, "bin");
+#elif defined(__APPLE__) || defined(__unix__)
+  llvm::sys::path::append(PluginsPath, "lib", "swift", "host", "plugins");
+#else
+#error Unknown compiler host
+#endif
+}
+
+#if defined(__APPLE__) || defined(__unix__)
+static void appendLocalPluginsPath(StringRef PluginPathRoot,
+                                   llvm::SmallVectorImpl<char> &LocalPluginsPath) {
+  SmallString<261> localPluginPathRoot = PluginPathRoot;
+  llvm::sys::path::append(localPluginPathRoot, "local");
+  appendPluginsPath(localPluginPathRoot, LocalPluginsPath);
+}
+#endif
+
+void ToolChain::addPluginArguments(const ArgList &Args,
+                                   ArgStringList &Arguments) const {
+  SmallString<261> pluginPathRoot = StringRef(getDriver().getSwiftProgramPath());
+  llvm::sys::path::remove_filename(pluginPathRoot); // Remove `swift`
+  llvm::sys::path::remove_filename(pluginPathRoot); // Remove `bin`
+
+  // In-process plugin server path.
+  SmallString<261> inProcPluginServerPath;
+  appendInProcPluginServerPath(pluginPathRoot, inProcPluginServerPath);
+  Arguments.push_back("-in-process-plugin-server-path");
+  Arguments.push_back(Args.MakeArgString(inProcPluginServerPath));
+
+  // Default plugin path.
+  SmallString<261> defaultPluginPath;
+  appendPluginsPath(pluginPathRoot, defaultPluginPath);
+  Arguments.push_back("-plugin-path");
+  Arguments.push_back(Args.MakeArgString(defaultPluginPath));
+
+  // Local plugin path.
+#if defined(__APPLE__) || defined(__unix__)
+  SmallString<261> localPluginPath;
+  appendLocalPluginsPath(pluginPathRoot, localPluginPath);
+  Arguments.push_back("-plugin-path");
+  Arguments.push_back(Args.MakeArgString(localPluginPath));
+#endif
 }
 
 void ToolChain::getClangLibraryPath(const ArgList &Args,

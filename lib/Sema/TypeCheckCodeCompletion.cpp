@@ -35,6 +35,7 @@
 #include "swift/AST/SourceFile.h"
 #include "swift/AST/Type.h"
 #include "swift/AST/TypeCheckRequests.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/STLExtras.h"
 #include "swift/Basic/Statistic.h"
@@ -220,10 +221,7 @@ bool TypeChecker::typeCheckForCodeCompletion(
   if (needsPrecheck) {
     // First, pre-check the expression, validating any types that occur in the
     // expression and folding sequence expressions.
-    auto failedPreCheck =
-        ConstraintSystem::preCheckTarget(target,
-                                         /*replaceInvalidRefsWithErrors=*/true);
-
+    auto failedPreCheck = ConstraintSystem::preCheckTarget(target);
     if (failedPreCheck)
       return false;
   }
@@ -302,10 +300,12 @@ static std::optional<Type>
 getTypeOfCompletionContextExpr(DeclContext *DC, CompletionTypeCheckKind kind,
                                Expr *&parsedExpr,
                                ConcreteDeclRef &referencedDecl) {
-  if (constraints::ConstraintSystem::preCheckExpression(
-          parsedExpr, DC,
-          /*replaceInvalidRefsWithErrors=*/true))
+  auto target = SyntacticElementTarget(parsedExpr, DC, CTP_Unused, Type(),
+                                       /*isDiscarded*/ true);
+  if (constraints::ConstraintSystem::preCheckTarget(target))
     return std::nullopt;
+
+  parsedExpr = target.getAsExpr();
 
   switch (kind) {
   case CompletionTypeCheckKind::Normal:

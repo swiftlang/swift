@@ -14,6 +14,7 @@
 #include "llvm/ADT/StringSwitch.h"
 #include "llvm/Support/YAMLParser.h"
 #include "llvm/Support/YAMLTraits.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/BlockList.h"
 #include "swift/Basic/SourceManager.h"
 
@@ -43,9 +44,12 @@ struct swift::BlockListStore::Implementation {
     }
     return std::string();
   }
+
+  Implementation(SourceManager &SM) : SM(SM.getFileSystem()) {}
 };
 
-swift::BlockListStore::BlockListStore(): Impl(*new Implementation()) {}
+swift::BlockListStore::BlockListStore(swift::SourceManager &SM)
+    : Impl(*new Implementation(SM)) {}
 
 swift::BlockListStore::~BlockListStore() { delete &Impl; }
 

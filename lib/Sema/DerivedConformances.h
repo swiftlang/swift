@@ -55,11 +55,12 @@ public:
 
 public:
   ASTContext &Context;
+  const NormalProtocolConformance *Conformance;
   Decl *ConformanceDecl;
   NominalTypeDecl *Nominal;
   ProtocolDecl *Protocol;
 
-  DerivedConformance(ASTContext &ctx, Decl *conformanceDecl,
+  DerivedConformance(const NormalProtocolConformance *conformance,
                      NominalTypeDecl *nominal, ProtocolDecl *protocol);
 
   /// Retrieve the context in which the conformance is declared (either the
@@ -367,18 +368,14 @@ public:
   /// Declare a read-only property.
   std::pair<VarDecl *, PatternBindingDecl *>
   declareDerivedProperty(SynthesizedIntroducer intro, Identifier name,
-                         Type propertyInterfaceType, Type propertyContextType,
-                         bool isStatic, bool isFinal);
+                         Type propertyContextType, bool isStatic, bool isFinal);
 
   /// Add a getter to a derived property.  The property becomes read-only.
-  static AccessorDecl *
-  addGetterToReadOnlyDerivedProperty(VarDecl *property,
-                                     Type propertyContextType);
+  static AccessorDecl *addGetterToReadOnlyDerivedProperty(VarDecl *property);
 
   /// Declare a getter for a derived property.
   /// The getter will not be added to the property yet.
-  static AccessorDecl *declareDerivedPropertyGetter(VarDecl *property,
-                                                    Type propertyContextType);
+  static AccessorDecl *declareDerivedPropertyGetter(VarDecl *property);
 
   /// Build a reference to the 'self' decl of a derived function.
   static DeclRefExpr *createSelfDeclRef(AbstractFunctionDecl *fn);

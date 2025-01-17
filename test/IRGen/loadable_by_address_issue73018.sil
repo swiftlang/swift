@@ -1,0 +1,87 @@
+// RUN: %target-swift-frontend %s  -Xllvm -sil-print-types -Xllvm -sil-print-after=loadable-address -Xllvm -verify-continue-on-failure -c -o %t/t.o 2>&1 | %FileCheck %s
+
+// This used to trigger an assertion due to LoadableByAddress not doing proper mapping of
+// switch_enum arguments during rewriting
+
+import Builtin
+import Swift
+
+typealias X = Int
+typealias LargeX = (() -> X, () -> X, () -> X, () -> X, () -> X, () -> X, () -> X, () -> X, () -> X)
+
+enum enum1 {
+case bb0(LargeX)
+}
+
+enum enum2 {
+case bb0(LargeX)
+}
+
+enum large_enum {
+case bb1((enum1, X))
+case bb2((enum2, X))
+}
+
+sil @test1 : $@convention(thin) (@guaranteed large_enum) -> () {
+// CHECK-LABEL: sil @test1
+bb0(%arg : $large_enum):
+  %loc = alloc_stack $(@callee_guaranteed () -> @owned X, @callee_guaranteed () -> @owned X,
+                       @callee_guaranteed () -> @owned X, @callee_guaranteed () -> @owned X,
+                       @callee_guaranteed () -> @owned X, @callee_guaranteed () -> @owned X,
+                       @callee_guaranteed () -> @owned X, @callee_guaranteed () -> @owned X,                       
+                       @callee_guaranteed () -> @owned X)
+  switch_enum %arg : $large_enum, case #large_enum.bb1!enumelt: bb1, case #large_enum.bb2!enumelt: bb2
+
+bb1(%e1 : $(enum1, X)):
+  // CHECK: %[[ADDR1:.*]] = unchecked_take_enum_data_addr %{{.*}} : $*enum1, #enum1.bb0!enumelt
+  // CHECK: copy_addr [take] %[[ADDR1]] to [init] %1 : $*(@callee_guaranteed () -> @owned Int, @callee_guaranteed () -> @owned Int, @callee_guaranteed () -> @owned Int, @callee_guaranteed () -> @owned Int, @callee_guaranteed () -> @owned Int, @callee_guaranteed () -> @owned Int, @callee_guaranteed () -> @owned Int, @callee_guaranteed () -> @owned Int, @callee_guaranteed () -> @owned Int)
+  %e11 = tuple_extract %e1 : $(enum1, X), 0
+  switch_enum %e11 : $enum1, case #enum1.bb0!enumelt: bb11
+
+bb11(%p1 : $((@callee_guaranteed () -> @owned X, @callee_guaranteed () -> @owned X,
+              @callee_guaranteed () -> @owned X, @callee_guaranteed () -> @owned X,
+              @callee_guaranteed () -> @owned X, @callee_guaranteed () -> @owned X,              
+              @callee_guaranteed () -> @owned X, @callee_guaranteed () -> @owned X,
+              @callee_guaranteed () -> @owned X))):
+  br bb3(%p1 : $((@callee_guaranteed () -> @owned X, @callee_guaranteed () -> @owned X,
+                  @callee_guaranteed () -> @owned X, @callee_guaranteed () -> @owned X,
+                  @callee_guaranteed () -> @owned X, @callee_guaranteed () -> @owned X,
+                  @callee_guaranteed () -> @owned X, @callee_guaranteed () -> @owned X,                  
+                  @callee_guaranteed () -> @owned X)))                      
+
+bb2(%e2 : $(enum2, X)):
+  // CHECK: %[[ADDR2:.*]] = unchecked_take_enum_data_addr %{{.*}} : $*enum2, #enum2.bb0!enumelt
+  // CHECK: copy_addr [take] %[[ADDR2]] to [init] %1 : $*(@callee_guaranteed () -> @owned Int, @callee_guaranteed () -> @owned Int, @callee_guaranteed () -> @owned Int, @callee_guaranteed () -> @owned Int, @callee_guaranteed () -> @owned Int, @callee_guaranteed () -> @owned Int, @callee_guaranteed () -> @owned Int, @callee_guaranteed () -> @owned Int, @callee_guaranteed () -> @owned Int)
+  %e22 = tuple_extract %e2 : $(enum2, X), 0
+  switch_enum %e22 : $enum2, case #enum2.bb0!enumelt: bb22
+
+bb22(%p2 : $((@callee_guaranteed () -> @owned X, @callee_guaranteed () -> @owned X,
+              @callee_guaranteed () -> @owned X, @callee_guaranteed () -> @owned X,
+              @callee_guaranteed () -> @owned X, @callee_guaranteed () -> @owned X,
+              @callee_guaranteed () -> @owned X, @callee_guaranteed () -> @owned X,
+              @callee_guaranteed () -> @owned X))):
+  br bb3(%p2 : $((@callee_guaranteed () -> @owned X, @callee_guaranteed () -> @owned X,
+                  @callee_guaranteed () -> @owned X, @callee_guaranteed () -> @owned X,  
+                  @callee_guaranteed () -> @owned X, @callee_guaranteed () -> @owned X,
+                  @callee_guaranteed () -> @owned X, @callee_guaranteed () -> @owned X,            
+                  @callee_guaranteed () -> @owned X)))                      
+
+bb3(%p3 : $((@callee_guaranteed () -> @owned X, @callee_guaranteed () -> @owned X,
+             @callee_guaranteed () -> @owned X, @callee_guaranteed () -> @owned X,
+             @callee_guaranteed () -> @owned X, @callee_guaranteed () -> @owned X,
+             @callee_guaranteed () -> @owned X, @callee_guaranteed () -> @owned X,              
+             @callee_guaranteed () -> @owned X))):
+  store %p3 to %loc : $*(@callee_guaranteed () -> @owned X, @callee_guaranteed () -> @owned X,
+                         @callee_guaranteed () -> @owned X, @callee_guaranteed () -> @owned X,
+                         @callee_guaranteed () -> @owned X, @callee_guaranteed () -> @owned X,
+                         @callee_guaranteed () -> @owned X, @callee_guaranteed () -> @owned X,              
+                         @callee_guaranteed () -> @owned X)
+            
+  dealloc_stack %loc : $*(@callee_guaranteed () -> @owned X, @callee_guaranteed () -> @owned X,
+                          @callee_guaranteed () -> @owned X, @callee_guaranteed () -> @owned X,
+                          @callee_guaranteed () -> @owned X, @callee_guaranteed () -> @owned X,
+                          @callee_guaranteed () -> @owned X, @callee_guaranteed () -> @owned X,              
+                          @callee_guaranteed () -> @owned X)
+  %t = tuple ()
+  return %t : $()
+}

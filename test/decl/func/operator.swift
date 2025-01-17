@@ -380,13 +380,15 @@ extension P2 {
 }
 
 protocol P3 {
-  // Okay: refers to P3
+  // Not allowed: there's no way to infer 'Self' from this interface type
   static func %%%(lhs: P3, rhs: Unrelated) -> Unrelated
+  // expected-error@-1 {{member operator '%%%' of protocol 'P3' must have at least one argument of type 'Self'}}
 }
 
 extension P3 {
-  // Okay: refers to P3
+  // Not allowed: there's no way to infer 'Self' from this interface type
   static func %%%%(lhs: P3, rhs: Unrelated) -> Unrelated { }
+  // expected-error@-1 {{member operator '%%%%' of protocol 'P3' must have at least one argument of type 'Self'}}
 }
 
 // rdar://problem/27940842 - recovery with a non-static '=='.

@@ -24,6 +24,7 @@
 namespace swift {
 
 class ASTContext;
+class AvailabilityContext;
 class QualifiedIdentTypeRepr;
 class TypeRepr;
 class PackElementTypeRepr;
@@ -106,6 +107,11 @@ enum class TypeResolverContext : uint8_t {
   /// arguments.
   VariadicGenericArgument,
 
+  /// Whether we are checking generic arguments of a bound generic type with
+  /// value parameters. We use the ValueMatchVisitor to ensure that all value
+  /// parameters line up with integer types or other value parameters.
+  ValueGenericArgument,
+
   /// Whether we are checking a tuple element type.
   TupleElement,
 
@@ -118,7 +124,7 @@ enum class TypeResolverContext : uint8_t {
   /// Whether we are checking the parameter list of a subscript.
   SubscriptDecl,
 
-  /// Whether we are checking the parameter list of a closure.
+  /// Whether we are checking the parameter list or result of a closure.
   ClosureExpr,
 
   /// Whether we are in the input type of a function, or under one level of
@@ -205,6 +211,9 @@ enum class TypeResolverContext : uint8_t {
 
   /// Whether this is the argument of an inverted constraint (~).
   Inverted,
+
+  /// Whether this is inside a @_rawLayout attribute.
+  RawLayoutAttr,
 };
 
 /// Options that determine how type resolution should work.
@@ -270,7 +279,6 @@ public:
     case Context::InExpression:
     case Context::ExplicitCastExpr:
     case Context::ForEachStmt:
-    case Context::PatternBindingDecl:
     case Context::EditorPlaceholderExpr:
     case Context::ClosureExpr:
       return true;
@@ -302,6 +310,9 @@ public:
     case Context::AssociatedTypeInherited:
     case Context::CustomAttr:
     case Context::Inverted:
+    case Context::ValueGenericArgument:
+    case Context::PatternBindingDecl:
+    case Context::RawLayoutAttr:
       return false;
     }
     llvm_unreachable("unhandled kind");
@@ -346,6 +357,8 @@ public:
     case Context::ImmediateOptionalTypeArgument:
     case Context::AbstractFunctionDecl:
     case Context::CustomAttr:
+    case Context::ValueGenericArgument:
+    case Context::RawLayoutAttr:
       return true;
     }
   }
@@ -388,6 +401,53 @@ public:
     case Context::ImmediateOptionalTypeArgument:
     case Context::AbstractFunctionDecl:
     case Context::CustomAttr:
+    case Context::ValueGenericArgument:
+    case Context::RawLayoutAttr:
+      return false;
+    }
+  }
+
+  /// Whether we are resolving a type in a generic argument list.
+  bool isGenericArgument() const {
+    switch (context) {
+    case Context::ScalarGenericArgument:
+    case Context::VariadicGenericArgument:
+    case Context::ValueGenericArgument:
+      return true;
+
+    case Context::None:
+    case Context::Inherited:
+    case Context::FunctionInput:
+    case Context::PackElement:
+    case Context::TupleElement:
+    case Context::GenericRequirement:
+    case Context::SameTypeRequirement:
+    case Context::ExtensionBinding:
+    case Context::TypeAliasDecl:
+    case Context::GenericTypeAliasDecl:
+    case Context::ExistentialConstraint:
+    case Context::MetatypeBase:
+    case Context::InExpression:
+    case Context::ExplicitCastExpr:
+    case Context::ForEachStmt:
+    case Context::PatternBindingDecl:
+    case Context::EditorPlaceholderExpr:
+    case Context::ClosureExpr:
+    case Context::VariadicFunctionInput:
+    case Context::InoutFunctionInput:
+    case Context::FunctionResult:
+    case Context::SubscriptDecl:
+    case Context::EnumElementDecl:
+    case Context::MacroDecl:
+    case Context::EnumPatternPayload:
+    case Context::ProtocolMetatypeBase:
+    case Context::ImmediateOptionalTypeArgument:
+    case Context::AbstractFunctionDecl:
+    case Context::CustomAttr:
+    case Context::Inverted:
+    case Context::GenericParameterInherited:
+    case Context::AssociatedTypeInherited:
+    case Context::RawLayoutAttr:
       return false;
     }
   }
@@ -432,6 +492,8 @@ public:
     case Context::AbstractFunctionDecl:
     case Context::CustomAttr:
     case Context::Inverted:
+    case Context::ValueGenericArgument:
+    case Context::RawLayoutAttr:
       return false;
     }
   }

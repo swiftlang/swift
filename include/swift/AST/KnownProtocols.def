@@ -77,7 +77,6 @@
     BUILTIN_EXPRESSIBLE_BY_LITERAL_PROTOCOL_WITH_NAME(name, "_" #name)
 
 PROTOCOL(Actor)
-PROTOCOL(AnyActor)
 PROTOCOL(Sequence)
 PROTOCOL(Identifiable)
 PROTOCOL(IteratorProtocol)
@@ -120,6 +119,7 @@ PROTOCOL(Differentiable)
 
 // Distributed Actors
 PROTOCOL(DistributedActor)
+PROTOCOL_(DistributedActorStub)
 PROTOCOL(DistributedActorSystem)
 PROTOCOL(DistributedTargetInvocationEncoder)
 PROTOCOL(DistributedTargetInvocationDecoder)
@@ -133,13 +133,18 @@ PROTOCOL(CxxOptional)
 PROTOCOL(CxxPair)
 PROTOCOL(CxxSet)
 PROTOCOL(CxxRandomAccessCollection)
+PROTOCOL(CxxMutableRandomAccessCollection)
 PROTOCOL(CxxSequence)
 PROTOCOL(CxxUniqueSet)
 PROTOCOL(CxxVector)
+PROTOCOL(CxxSpan)
+PROTOCOL(CxxMutableSpan)
 PROTOCOL(UnsafeCxxInputIterator)
 PROTOCOL(UnsafeCxxMutableInputIterator)
 PROTOCOL(UnsafeCxxRandomAccessIterator)
 PROTOCOL(UnsafeCxxMutableRandomAccessIterator)
+PROTOCOL(UnsafeCxxContiguousIterator)
+PROTOCOL(UnsafeCxxMutableContiguousIterator)
 
 PROTOCOL(AsyncSequence)
 PROTOCOL(AsyncIteratorProtocol)
@@ -150,7 +155,7 @@ PROTOCOL(FloatingPoint)
     INVERTIBLE_PROTOCOL_WITH_NAME(Name, #Name)
 #include "swift/ABI/InvertibleProtocols.def"
 
-REPRESSIBLE_PROTOCOL_(BitwiseCopyable)
+REPRESSIBLE_PROTOCOL(BitwiseCopyable)
 
 EXPRESSIBLE_BY_LITERAL_PROTOCOL(ExpressibleByArrayLiteral, "Array", false)
 EXPRESSIBLE_BY_LITERAL_PROTOCOL(ExpressibleByBooleanLiteral, "BooleanLiteralType", true)

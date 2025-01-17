@@ -11,16 +11,16 @@
 #===----------------------------------------------------------------------===#
 
 if(SWIFT_BUILD_SDK_OVERLAY)
-set(swift_distributed_darwin_depencencies Darwin)
+set(swift_distributed_darwin_dependencies Darwin)
 else()
-set(swift_distributed_darwin_depencencies)
+set(swift_distributed_darwin_dependencies)
 endif()
 
 set(swift_distributed_link_libraries
   swiftCore)
 
 
-add_swift_target_library(swiftDistributed ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_STDLIB
+add_swift_target_library(swiftDistributed ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_STDLIB IMPORTS_NON_OSSA 
   DistributedActor.cpp
   DistributedActor.swift
   DistributedActorSystem.swift
@@ -30,11 +30,13 @@ add_swift_target_library(swiftDistributed ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS
   DistributedMetadata.swift
   LocalTestingDistributedActorSystem.swift
 
-  SWIFT_MODULE_DEPENDS_IOS ${swift_distributed_darwin_depencencies}
-  SWIFT_MODULE_DEPENDS_OSX ${swift_distributed_darwin_depencencies}
-  SWIFT_MODULE_DEPENDS_TVOS ${swift_distributed_darwin_depencencies}
-  SWIFT_MODULE_DEPENDS_WATCHOS ${swift_distributed_darwin_depencencies}
+  SWIFT_MODULE_DEPENDS_IOS ${swift_distributed_darwin_dependencies}
+  SWIFT_MODULE_DEPENDS_OSX ${swift_distributed_darwin_dependencies}
+  SWIFT_MODULE_DEPENDS_TVOS ${swift_distributed_darwin_dependencies}
+  SWIFT_MODULE_DEPENDS_WATCHOS ${swift_distributed_darwin_dependencies}
+  SWIFT_MODULE_DEPENDS_ANDROID Android
   SWIFT_MODULE_DEPENDS_LINUX Glibc
+  SWIFT_MODULE_DEPENDS_LINUX_STATIC Musl
   SWIFT_MODULE_DEPENDS_FREEBSD Glibc
   SWIFT_MODULE_DEPENDS_OPENBSD Glibc
   SWIFT_MODULE_DEPENDS_CYGWIN Glibc

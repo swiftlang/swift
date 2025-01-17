@@ -16,11 +16,13 @@
 
 #include "GenPack.h"
 #include "GenProto.h"
+#include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/IRGenOptions.h"
 #include "swift/AST/PackConformance.h"
 #include "swift/AST/Types.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/IRGen/GenericRequirement.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/SIL/SILType.h"
@@ -323,6 +325,7 @@ static void bindElementSignatureRequirementsAtIndex(
         case GenericRequirement::Kind::Shape:
         case GenericRequirement::Kind::Metadata:
         case GenericRequirement::Kind::WitnessTable:
+        case GenericRequirement::Kind::Value:
           break;
         case GenericRequirement::Kind::MetadataPack: {
           auto ty = requirement.getTypeParameter();
@@ -351,12 +354,12 @@ static void bindElementSignatureRequirementsAtIndex(
                       patternPackArchetype)
                   ->getCanonicalType();
           llvm::Value *_metadata = nullptr;
-          auto packConformance =
-              context.signature->lookupConformance(ty, proto);
+          auto packConformance = ProtocolConformanceRef::forAbstract(
+              patternPackArchetype, proto);
           auto *wtablePack = emitWitnessTableRef(IGF, patternPackArchetype,
                                                  &_metadata, packConformance);
-          auto elementConformance =
-              context.signature->lookupConformance(ty, proto);
+          auto elementConformance = ProtocolConformanceRef::forAbstract(
+              elementArchetype, proto);
           auto *wtable = bindWitnessTableAtIndex(
               IGF, elementArchetype, elementConformance, wtablePack, index);
           assert(wtable);
@@ -573,8 +576,7 @@ static llvm::Value *emitPackExpansionElementWitnessTable(
   auto instantiatedPatternTy =
       context.environment->mapContextualPackTypeIntoElementContext(patternTy);
   auto instantiatedConformance =
-      context.environment->getGenericSignature()->lookupConformance(
-          instantiatedPatternTy, conformance.getRequirement());
+      lookupConformance(instantiatedPatternTy, conformance.getRequirement());
 
   // Emit the element witness table.
   auto *wtable = emitWitnessTableRef(IGF, instantiatedPatternTy,
@@ -1041,7 +1043,7 @@ void irgen::bindOpenedElementArchetypesAtIndex(IRGenFunction &IGF,
     openablePackParams.insert(genericParam->getCanonicalType());
   });
 
-  auto subs = environment->getPackElementContextSubstitutions();
+  auto subs = environment->getOuterSubstitutions();
 
   // Find the archetypes and conformances which must be bound.
   llvm::SmallSetVector<CanType, 2> types;
@@ -1081,6 +1083,7 @@ void irgen::bindOpenedElementArchetypesAtIndex(IRGenFunction &IGF,
         case GenericRequirement::Kind::Shape:
         case GenericRequirement::Kind::Metadata:
         case GenericRequirement::Kind::WitnessTable:
+        case GenericRequirement::Kind::Value:
           break;
         }
       });

@@ -1,9 +1,9 @@
-// RUN: %target-swift-emit-silgen -swift-version 4 %s -disable-objc-attr-requires-foundation-module -enable-objc-interop | %FileCheck %s
-// RUN: %target-swift-emit-sil -swift-version 4 -O %s -disable-objc-attr-requires-foundation-module -enable-objc-interop
+// RUN: %target-swift-emit-silgen -Xllvm -sil-print-types -swift-version 4 %s -disable-objc-attr-requires-foundation-module -enable-objc-interop | %FileCheck %s
+// RUN: %target-swift-emit-sil -Xllvm -sil-print-types -swift-version 4 -O %s -disable-objc-attr-requires-foundation-module -enable-objc-interop
 // RUN: %target-swift-emit-ir -swift-version 4 %s -disable-objc-attr-requires-foundation-module -enable-objc-interop
 
-// RUN: %target-swift-emit-silgen -swift-version 5 %s -disable-objc-attr-requires-foundation-module -enable-objc-interop | %FileCheck %s
-// RUN: %target-swift-emit-sil -swift-version 5 -O %s -disable-objc-attr-requires-foundation-module -enable-objc-interop
+// RUN: %target-swift-emit-silgen -Xllvm -sil-print-types -swift-version 5 %s -disable-objc-attr-requires-foundation-module -enable-objc-interop | %FileCheck %s
+// RUN: %target-swift-emit-sil -Xllvm -sil-print-types -swift-version 5 -O %s -disable-objc-attr-requires-foundation-module -enable-objc-interop
 // RUN: %target-swift-emit-ir -swift-version 5 %s -disable-objc-attr-requires-foundation-module -enable-objc-interop
 
 protocol P {
@@ -96,27 +96,19 @@ func testExistentialDispatch(p: P) {
 
 // CHECK:   [[PCOPY_ADDR:%[0-9]+]] = open_existential_addr immutable_access [[P]] : $*any P to $*@opened([[N:".*"]], any P) Self
 // CHECK:   [[P_RESULT:%[0-9]+]] = alloc_stack $any P
-// CHECK:   [[PCOPY_ADDR_1:%[0-9]+]] = alloc_stack $@opened([[N]], any P) Self
-// CHECK:   copy_addr [[PCOPY_ADDR]] to [init] [[PCOPY_ADDR_1]] : $*@opened([[N]], any P) Self
 // CHECK:   [[P_P_GETTER:%[0-9]+]] = witness_method $@opened([[N]], any P) Self, #P.p!getter : {{.*}}, [[PCOPY_ADDR]]{{.*}} : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> @out τ_0_0
 // CHECK:   [[P_RESULT_ADDR2:%[0-9]+]] = init_existential_addr [[P_RESULT]] : $*any P, $@opened([[N]], any P) Self
-// CHECK:   apply [[P_P_GETTER]]<@opened([[N]], any P) Self>([[P_RESULT_ADDR2]], [[PCOPY_ADDR_1]]) : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> @out τ_0_0
-// CHECK:   destroy_addr [[PCOPY_ADDR_1]] : $*@opened([[N]], any P) Self
+// CHECK:   apply [[P_P_GETTER]]<@opened([[N]], any P) Self>([[P_RESULT_ADDR2]], [[PCOPY_ADDR]]) : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> @out τ_0_0
 // CHECK:   destroy_addr [[P_RESULT]] : $*any P
-// CHECK:   dealloc_stack [[PCOPY_ADDR_1]] : $*@opened([[N]], any P) Self
 // CHECK:   dealloc_stack [[P_RESULT]] : $*any P
   _ = p.p
 
 // CHECK:   [[PCOPY_ADDR:%[0-9]+]] = open_existential_addr immutable_access [[P]] : $*any P to $*@opened([[N:".*"]], any P) Self
 // CHECK:   [[P_RESULT:%[0-9]+]] = alloc_stack $any P
-// CHECK:   [[PCOPY_ADDR_1:%[0-9]+]] = alloc_stack $@opened([[N]], any P) Self
-// CHECK:   copy_addr [[PCOPY_ADDR]] to [init] [[PCOPY_ADDR_1]] : $*@opened([[N]], any P) Self
 // CHECK:   [[P_SUBSCRIPT_GETTER:%[0-9]+]] = witness_method $@opened([[N]], any P) Self, #P.subscript!getter : {{.*}}, [[PCOPY_ADDR]]{{.*}} : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> @out τ_0_0
 // CHECK:   [[P_RESULT_ADDR:%[0-9]+]] = init_existential_addr [[P_RESULT]] : $*any P, $@opened([[N]], any P) Self
-// CHECK:   apply [[P_SUBSCRIPT_GETTER]]<@opened([[N]], any P) Self>([[P_RESULT_ADDR]], [[PCOPY_ADDR_1]]) : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> @out τ_0_0
-// CHECK:   destroy_addr [[PCOPY_ADDR_1]] : $*@opened([[N]], any P) Self
+// CHECK:   apply [[P_SUBSCRIPT_GETTER]]<@opened([[N]], any P) Self>([[P_RESULT_ADDR]], [[PCOPY_ADDR]]) : $@convention(witness_method: P) <τ_0_0 where τ_0_0 : P> (@in_guaranteed τ_0_0) -> @out τ_0_0
 // CHECK:   destroy_addr [[P_RESULT]] : $*any P
-// CHECK:   dealloc_stack [[PCOPY_ADDR_1]] : $*@opened([[N]], any P) Self
 // CHECK:   dealloc_stack [[P_RESULT]] : $*any P
   _ = p[]
 }
@@ -370,7 +362,7 @@ class Base {
 
 class Derived : Base {
   // CHECK-LABEL: sil hidden [ossa] @$s12dynamic_self7DerivedC9superCallyyF : $@convention(method) (@guaranteed Derived) -> ()
-  // CHECK: convert_function %{{[0-9]+}} : $@callee_guaranteed () -> @owned Base to $@callee_guaranteed () -> @owned Derived
+  // CHECK: function_ref @$s12dynamic_self7DerivedC9superCallyyFACycfu_ : $@convention(thin) (@guaranteed Derived) -> @owned Derived
   // CHECK-COUNT-3: unchecked_ref_cast %{{[0-9]+}} : $Base to $Derived
   // CHECK-NOT: unchecked_ref_cast
   // CHECK: end sil function '$s12dynamic_self7DerivedC9superCallyyF'
@@ -380,9 +372,12 @@ class Derived : Base {
     _ = super.property
     _ = super[]
   }
+  // CHECK-LABEL: sil private [ossa] @$s12dynamic_self7DerivedC9superCallyyFACycfu_ : $@convention(thin) (@guaranteed Derived) -> @owned Derived
+  // CHECK: unchecked_ref_cast %{{[0-9]+}} : $Base to $Derived
+  // CHECK: end sil function '$s12dynamic_self7DerivedC9superCallyyFACycfu_'
 
   // CHECK-LABEL: sil hidden [ossa] @$s12dynamic_self7DerivedC15superCallStaticyyFZ : $@convention(method) (@thick Derived.Type) -> ()
-  // CHECK: convert_function %{{[0-9]+}} : $@callee_guaranteed () -> @owned Base to $@callee_guaranteed () -> @owned Derived
+  // CHECK: function_ref @$s12dynamic_self7DerivedC15superCallStaticyyFZACycfu_ : $@convention(thin) (@thick Derived.Type) -> @owned Derived
   // CHECK-COUNT-3: unchecked_ref_cast %{{[0-9]+}} : $Base to $Derived
   // CHECK-NOT: unchecked_ref_cast
   // CHECK: end sil function '$s12dynamic_self7DerivedC15superCallStaticyyFZ'
@@ -392,9 +387,12 @@ class Derived : Base {
     _ = super.staticProperty
     _ = super[]
   }
+  // CHECK-LABEL: sil private [ossa] @$s12dynamic_self7DerivedC15superCallStaticyyFZACycfu_ : $@convention(thin) (@thick Derived.Type) -> @owned Derived
+  // CHECK: unchecked_ref_cast %{{[0-9]+}} : $Base to $Derived
+  // CHECK: end sil function '$s12dynamic_self7DerivedC15superCallStaticyyFZACycfu_'
 
   // CHECK-LABEL: sil hidden [ossa] @$s12dynamic_self7DerivedC32superCallFromMethodReturningSelfACXDyF : $@convention(method) (@guaranteed Derived) -> @owned Derived
-  // CHECK: convert_function %{{[0-9]+}} : $@callee_guaranteed () -> @owned Base to $@callee_guaranteed () -> @owned Derived
+  // CHECK: function_ref @$s12dynamic_self7DerivedC32superCallFromMethodReturningSelfACXDyFACXDycfu_ : $@convention(thin) (@guaranteed Derived) -> @owned Derived
   // CHECK-COUNT-3: unchecked_ref_cast %{{[0-9]+}} : $Base to $Derived
   // CHECK-NOT: unchecked_ref_cast
   // CHECK: end sil function '$s12dynamic_self7DerivedC32superCallFromMethodReturningSelfACXDyF'
@@ -404,9 +402,12 @@ class Derived : Base {
     _ = super[]
     return super.property
   }
+  // CHECK-LABEL: sil private [ossa] @$s12dynamic_self7DerivedC32superCallFromMethodReturningSelfACXDyFACXDycfu_ : $@convention(thin) (@guaranteed Derived) -> @owned Derived
+  // CHECK: unchecked_ref_cast %{{[0-9]+}} : $Base to $Derived
+  // CHECK: end sil function '$s12dynamic_self7DerivedC32superCallFromMethodReturningSelfACXDyFACXDycfu_'
 
   // CHECK-LABEL: sil hidden [ossa] @$s12dynamic_self7DerivedC38superCallFromMethodReturningSelfStaticACXDyFZ : $@convention(method) (@thick Derived.Type) -> @owned Derived
-  // CHECK: convert_function %{{[0-9]+}} : $@callee_guaranteed () -> @owned Base to $@callee_guaranteed () -> @owned Derived
+  // CHECK: function_ref @$s12dynamic_self7DerivedC38superCallFromMethodReturningSelfStaticACXDyFZACXDycfu_ : $@convention(thin) (@thick @dynamic_self Derived.Type) -> @owned Derived
   // CHECK-COUNT-3: unchecked_ref_cast %{{[0-9]+}} : $Base to $Derived
   // CHECK-NOT: unchecked_ref_cast
   // CHECK: end sil function '$s12dynamic_self7DerivedC38superCallFromMethodReturningSelfStaticACXDyFZ'
@@ -416,6 +417,9 @@ class Derived : Base {
     _ = super[]
     return super.staticProperty
   }
+  // CHECK-LABEL: sil private [ossa] @$s12dynamic_self7DerivedC38superCallFromMethodReturningSelfStaticACXDyFZACXDycfu_ : $@convention(thin) (@thick @dynamic_self Derived.Type) -> @owned Derived
+  // CHECK: unchecked_ref_cast %{{[0-9]+}} : $Base to $Derived
+  // CHECK: end sil function '$s12dynamic_self7DerivedC38superCallFromMethodReturningSelfStaticACXDyFZACXDycfu_'
 }
 
 class Generic<T> {

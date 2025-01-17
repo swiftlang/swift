@@ -42,6 +42,9 @@ public:
   NativeConventionSchema &operator=(const NativeConventionSchema&) = delete;
 
   bool requiresIndirect() const { return RequiresIndirect; }
+  bool shouldReturnTypedErrorIndirectly() const {
+    return requiresIndirect() || Lowering.shouldReturnTypedErrorIndirectly();
+  }
   bool empty() const { return Lowering.empty(); }
 
   llvm::Type *getExpandedType(IRGenModule &IGM) const;
@@ -57,7 +60,7 @@ public:
   /// calling convention's schema.
   Explosion mapIntoNative(IRGenModule &IGM, IRGenFunction &IGF,
                           Explosion &fromNonNative, SILType type,
-                          bool isOutlined) const;
+                          bool isOutlined, bool mayPeepholeLoad = false) const;
 
   /// Map form a native explosion that follows the native calling convention's
   /// schema to a non-native explosion whose schema is described by

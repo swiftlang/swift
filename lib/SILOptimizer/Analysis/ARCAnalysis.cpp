@@ -13,6 +13,7 @@
 #define DEBUG_TYPE "sil-arc-analysis"
 
 #include "swift/SILOptimizer/Analysis/ARCAnalysis.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/SIL/DebugUtils.h"
 #include "swift/SIL/InstructionUtils.h"
 #include "swift/SIL/Projection.h"
@@ -174,7 +175,6 @@ bool swift::canUseObject(SILInstruction *Inst) {
   case SILInstructionKind::UncheckedAddrCastInst:
   case SILInstructionKind::RefToRawPointerInst:
   case SILInstructionKind::RawPointerToRefInst:
-  case SILInstructionKind::UnconditionalCheckedCastInst:
   case SILInstructionKind::UncheckedBitwiseCastInst:
   case SILInstructionKind::EndInitLetRefInst:
   case SILInstructionKind::BeginDeallocRefInst:
@@ -242,7 +242,7 @@ static bool doOperandsAlias(ArrayRef<Operand> Ops, SILValue Ptr,
   // If any are not no alias, we have a use.
   return std::any_of(Ops.begin(), Ops.end(),
                      [&AA, &Ptr](const Operand &Op) -> bool {
-                       return !AA->isNoAlias(Ptr, Op.get());
+                       return AA->mayAlias(Ptr, Op.get());
                      });
 }
 
@@ -323,7 +323,7 @@ bool swift::mustUseValue(SILInstruction *User, SILValue Ptr,
 
   // If any of AI's arguments must alias Ptr, return true.
   for (SILValue Arg : AI->getArguments())
-    if (AA->isMustAlias(Arg, Ptr))
+    if (Arg == Ptr)
       return true;
   return false;
 }
@@ -347,7 +347,7 @@ bool swift::mustGuaranteedUseValue(SILInstruction *User, SILValue Ptr,
     return false;
 
   // Return true if Ptr alias's self.
-  return AA->isMustAlias(AI->getSelfArgument(), Ptr);
+  return AI->getSelfArgument() == Ptr;
 }
 
 //===----------------------------------------------------------------------===//
@@ -480,7 +480,7 @@ mayGuaranteedUseValue(SILInstruction *User, SILValue Ptr, AliasAnalysis *AA) {
   // such a case, if we can not prove no alias, we need to be conservative and
   // return true.
   CanSILFunctionType FType = FAS.getSubstCalleeType();
-  if (FType->isCalleeGuaranteed() && !AA->isNoAlias(FAS.getCallee(), Ptr)) {
+  if (FType->isCalleeGuaranteed() && AA->mayAlias(FAS.getCallee(), Ptr)) {
     return true;
   }
 
@@ -496,10 +496,10 @@ mayGuaranteedUseValue(SILInstruction *User, SILValue Ptr, AliasAnalysis *AA) {
   // Ptr. If we fail, return true.
   auto Params = FType->getParameters();
   for (unsigned i : indices(Params)) {    
-    if (!Params[i].isGuaranteed())
+    if (!Params[i].isGuaranteedInCaller())
       continue;
     SILValue Op = FAS.getArgumentsWithoutIndirectResults()[i];
-    if (!AA->isNoAlias(Op, Ptr))
+    if (AA->mayAlias(Op, Ptr))
       return true;
   }
 

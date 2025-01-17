@@ -15,6 +15,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/Demangling/Demangle.h"
+#include "swift/Demangling/ManglingFlavor.h"
 #include "swift/Demangling/ManglingMacros.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/Support/CommandLine.h"
@@ -44,6 +45,10 @@ CompactMode("compact",
 static llvm::cl::opt<bool>
 TreeOnly("tree-only",
            llvm::cl::desc("Tree-only mode (do not show the demangled string)"));
+
+static llvm::cl::opt<bool>
+DemangleType("type",
+           llvm::cl::desc("Demangle a runtime type string"));
 
 static llvm::cl::opt<bool>
 StripSpecialization("strip-specialization",
@@ -94,6 +99,11 @@ static llvm::cl::opt<std::string> HidingModule(
     "hiding-module",
     llvm::cl::desc("Don't qualify types originating from this module"),
     llvm::cl::Hidden);
+
+static llvm::cl::opt<bool>
+    ShowClosureSignature("show-closure-signature", llvm::cl::init(true),
+                         llvm::cl::desc("Show type signature of closures"),
+                         llvm::cl::Hidden);
 /// \}
 
 
@@ -136,14 +146,31 @@ static void demangle(llvm::raw_ostream &os, llvm::StringRef name,
     hadLeadingUnderscore = true;
     name = name.substr(1);
   }
-  swift::Demangle::NodePointer pointer = DCtx.demangleSymbolAsNode(name);
+  swift::Demangle::NodePointer pointer;
+  if (DemangleType) {
+    pointer = DCtx.demangleTypeAsNode(name);
+    if (!pointer) {
+      os << "<<invalid type>>";
+      return;
+    }
+  } else {
+    pointer = DCtx.demangleSymbolAsNode(name);
+  }
+
   if (ExpandMode || TreeOnly) {
     os << "Demangling for " << name << '\n';
     os << getNodeTreeAsString(pointer);
   }
+
+  swift::Mangle::ManglingFlavor ManglingFlavor = swift::Mangle::ManglingFlavor::Default;
+  if (name.starts_with(MANGLING_PREFIX_EMBEDDED_STR)) {
+    ManglingFlavor = swift::Mangle::ManglingFlavor::Embedded;
+  }
+
   if (RemangleMode) {
     std::string remangled;
     if (!pointer || !(name.starts_with(MANGLING_PREFIX_STR) ||
+                      name.starts_with(MANGLING_PREFIX_EMBEDDED_STR) ||
                       name.starts_with("_S"))) {
       // Just reprint the original mangled name if it didn't demangle or is in
       // the old mangling scheme.
@@ -151,7 +178,7 @@ static void demangle(llvm::raw_ostream &os, llvm::StringRef name,
       // mangling and demangling tests.
       remangled = name.str();
     } else {
-      auto mangling = swift::Demangle::mangleNode(pointer);
+      auto mangling = swift::Demangle::mangleNode(pointer, ManglingFlavor);
       if (!mangling.isSuccess()) {
         llvm::errs() << "Error: (" << mangling.error().code << ":"
                      << mangling.error().line << ") unable to re-mangle "
@@ -199,7 +226,7 @@ static void demangle(llvm::raw_ostream &os, llvm::StringRef name,
         llvm::errs() << "Error: unable to de-mangle " << name << '\n';
         exit(1);
       }
-      auto mangling = swift::Demangle::mangleNode(pointer);
+      auto mangling = swift::Demangle::mangleNode(pointer, ManglingFlavor);
       if (!mangling.isSuccess()) {
         llvm::errs() << "Error: (" << mangling.error().code << ":"
                      << mangling.error().line << ") unable to re-mangle "
@@ -212,7 +239,7 @@ static void demangle(llvm::raw_ostream &os, llvm::StringRef name,
     }
     if (StripSpecialization) {
       stripSpecialization(pointer);
-      auto mangling = swift::Demangle::mangleNode(pointer);
+      auto mangling = swift::Demangle::mangleNode(pointer, ManglingFlavor);
       if (!mangling.isSuccess()) {
         llvm::errs() << "Error: (" << mangling.error().code << ":"
                      << mangling.error().line << ") unable to re-mangle "
@@ -319,7 +346,7 @@ static bool findMaybeMangled(llvm::StringRef input, llvm::StringRef &match) {
       while (ptr < end) {
         char ch = *ptr++;
 
-        if (ch == 'S' || ch == 's') {
+        if (ch == 'S' || ch == 's' || ch == 'e') {
           state = FoundPrefix;
           break;
         } else if (ch == '_') {
@@ -390,9 +417,14 @@ int main(int argc, char **argv) {
   options.DisplayObjCModule = DisplayObjCModule;
   options.HidingCurrentModule = HidingModule;
   options.DisplayLocalNameContexts = DisplayLocalNameContexts;
+  options.ShowClosureSignature = ShowClosureSignature;
 
   if (InputNames.empty()) {
     CompactMode = true;
+    if (DemangleType) {
+      llvm::errs() << "The option -type cannot be used to demangle stdin.\n";
+      return EXIT_FAILURE;
+    }
     return demangleSTDIN(options);
   } else {
     swift::Demangle::Context DCtx;
@@ -409,7 +441,7 @@ int main(int argc, char **argv) {
                         "is quoted or escaped.\n";
         continue;
       }
-      if (name.starts_with("S") || name.starts_with("s") ) {
+      if (!DemangleType && (name.starts_with("S") || name.starts_with("s"))) {
         std::string correctedName = std::string("$") + name.str();
         demangle(llvm::outs(), correctedName, DCtx, options);
       } else {

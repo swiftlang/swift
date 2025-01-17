@@ -1,5 +1,7 @@
-// RUN: %target-swift-emit-sil -enable-upcoming-feature MoveOnlyPartialConsumption -sil-verify-all -verify -enable-experimental-feature MoveOnlyClasses -enable-experimental-feature MoveOnlyTuples %s
-// RUN: %target-swift-emit-sil -enable-experimental-feature NoncopyableGenerics -enable-upcoming-feature MoveOnlyPartialConsumption -sil-verify-all -verify -enable-experimental-feature MoveOnlyClasses -enable-experimental-feature MoveOnlyTuples %s
+// RUN: %target-swift-emit-sil -sil-verify-all -verify -enable-experimental-feature MoveOnlyClasses -enable-experimental-feature MoveOnlyTuples %s
+
+// REQUIRES: swift_feature_MoveOnlyClasses
+// REQUIRES: swift_feature_MoveOnlyTuples
 
 // This test validates that we properly emit errors if we partially invalidate
 // through a type with a deinit.
@@ -10,8 +12,7 @@
 
 class Klass {}
 
-@_moveOnly
-class MoveOnlyKlass {
+class MoveOnlyKlass: ~Copyable {
   var value: Int = 0
 }
 

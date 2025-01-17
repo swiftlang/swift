@@ -1429,106 +1429,6 @@
       ]
     },
     {
-      key.kind: source.lang.swift.decl.extension,
-      key.name: "Result",
-      key.offset: 2496,
-      key.length: 36,
-      key.nameoffset: 2506,
-      key.namelength: 6,
-      key.bodyoffset: 2514,
-      key.bodylength: 17,
-      key.substructure: [
-        {
-          key.kind: source.lang.swift.decl.function.method.instance,
-          key.name: "foo()",
-          key.offset: 2517,
-          key.length: 13,
-          key.nameoffset: 2522,
-          key.namelength: 5,
-          key.bodyoffset: 2529,
-          key.bodylength: 0
-        }
-      ]
-    },
-    {
-      key.kind: source.lang.swift.decl.extension,
-      key.name: "Outer",
-      key.offset: 2534,
-      key.length: 53,
-      key.nameoffset: 2544,
-      key.namelength: 5,
-      key.bodyoffset: 2551,
-      key.bodylength: 35,
-      key.substructure: [
-        {
-          key.kind: source.lang.swift.decl.class,
-          key.name: "Inner",
-          key.offset: 2554,
-          key.length: 31,
-          key.nameoffset: 2560,
-          key.namelength: 5,
-          key.bodyoffset: 2567,
-          key.bodylength: 17,
-          key.substructure: [
-            {
-              key.kind: source.lang.swift.decl.function.method.instance,
-              key.name: "deinit",
-              key.offset: 2572,
-              key.length: 9,
-              key.nameoffset: 2572,
-              key.namelength: 6,
-              key.bodyoffset: 2580,
-              key.bodylength: 0
-            }
-          ]
-        }
-      ]
-    },
-    {
-      key.kind: source.lang.swift.decl.extension,
-      key.accessibility: source.lang.swift.accessibility.public,
-      key.name: "Outer2",
-      key.offset: 2596,
-      key.length: 55,
-      key.nameoffset: 2606,
-      key.namelength: 6,
-      key.bodyoffset: 2614,
-      key.bodylength: 36,
-      key.attributes: [
-        {
-          key.offset: 2589,
-          key.length: 6,
-          key.attribute: source.decl.attribute.public
-        }
-      ],
-      key.substructure: [
-        {
-          key.kind: source.lang.swift.decl.class,
-          key.accessibility: source.lang.swift.accessibility.public,
-          key.name: "Inner2",
-          key.offset: 2617,
-          key.length: 32,
-          key.nameoffset: 2623,
-          key.namelength: 6,
-          key.bodyoffset: 2631,
-          key.bodylength: 17,
-          key.substructure: [
-            {
-              key.kind: source.lang.swift.decl.function.method.instance,
-              key.accessibility: source.lang.swift.accessibility.public,
-              key.name: "deinit",
-              key.offset: 2636,
-              key.length: 9,
-              key.nameoffset: 2636,
-              key.namelength: 6,
-              key.bodyoffset: 2644,
-              key.bodylength: 0
-            }
-          ]
-        }
-      ]
-    },
-    {
       key.kind: source.lang.swift.decl.protocol,
       key.accessibility: source.lang.swift.accessibility.internal,
       key.name: "BarProtocol",
@@ -1579,50 +1479,6 @@
       ]
     },
     {
-      key.kind: source.lang.swift.decl.protocol,
-      key.accessibility: source.lang.swift.accessibility.internal,
-      key.name: "MyProtocol",
-      key.offset: 2780,
-      key.length: 71,
-      key.nameoffset: 2789,
-      key.namelength: 10,
-      key.bodyoffset: 2819,
-      key.bodylength: 31,
-      key.inheritedtypes: [
-        {
-          key.name: "NSObjectProtocol"
-        }
-      ],
-      key.attributes: [
-        {
-          key.offset: 2774,
-          key.length: 5,
-          key.attribute: source.decl.attribute.objc
-        }
-      ],
-      key.elements: [
-        {
-          key.kind: source.lang.swift.structure.elem.typeref,
-          key.offset: 2801,
-          key.length: 16
-        }
-      ],
-      key.substructure: [
-        {
-          key.kind: source.lang.swift.decl.var.instance,
-          key.accessibility: source.lang.swift.accessibility.internal,
-          key.name: "thing",
-          key.offset: 2824,
-          key.length: 25,
-          key.typename: "NSObject",
-          key.nameoffset: 2828,
-          key.namelength: 5,
-          key.bodyoffset: 2845,
-          key.bodylength: 3
-        }
-      ]
-    },
-    {
       key.kind: source.lang.swift.decl.class,
       key.accessibility: source.lang.swift.accessibility.internal,
       key.name: "A",
@@ -1631,44 +1487,7 @@
       key.nameoffset: 2866,
       key.namelength: 1,
       key.bodyoffset: 2869,
-      key.bodylength: 59,
-      key.substructure: [
-        {
-          key.kind: source.lang.swift.decl.function.method.instance,
-          key.accessibility: source.lang.swift.accessibility.internal,
-          key.name: "foo(a:)",
-          key.offset: 2899,
-          key.length: 19,
-          key.selector_name: "fooWithA:",
-          key.nameoffset: 2904,
-          key.namelength: 11,
-          key.bodyoffset: 2917,
-          key.bodylength: 0,
-          key.attributes: [
-            {
-              key.offset: 2893,
-              key.length: 5,
-              key.attribute: source.decl.attribute.objc.name
-            },
-            {
-              key.offset: 2883,
-              key.length: 9,
-              key.attribute: source.decl.attribute.ibaction
-            }
-          ],
-          key.substructure: [
-            {
-              key.kind: source.lang.swift.decl.var.parameter,
-              key.name: "a",
-              key.offset: 2908,
-              key.length: 6,
-              key.typename: "Int",
-              key.nameoffset: 2908,
-              key.namelength: 1
-            }
-          ]
-        }
-      ]
+      key.bodylength: 59
     }
   ],
   key.diagnostics: [
@@ -1687,7 +1506,7 @@
       key.filepath: "-foobar",
       key.severity: source.diagnostic.severity.error,
       key.id: "c_style_for_stmt_removed",
-      key.description: "C-style for statement has been removed in Swift 3",
+      key.description: "C-style for statement was removed in Swift 3",
       key.diagnostic_stage: source.diagnostic.stage.swift.parse,
       key.ranges: [
         {

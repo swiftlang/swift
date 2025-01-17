@@ -1,4 +1,13 @@
-// RUN: %target-run-simple-swift( -Xfrontend -disable-availability-checking %import-libdispatch -parse-as-library)
+// NOT: %target-run-simple-swift( -Xfrontend -disable-availability-checking %import-libdispatch -parse-as-library)
+
+// RUN: %empty-directory(%t)
+// RUN: %target-build-swift -Xfrontend -disable-availability-checking %import-libdispatch -parse-as-library %s -o %t/a.out
+// RUN: %target-codesign %t/a.out
+// RUN: %env-SWIFT_IS_CURRENT_EXECUTOR_LEGACY_MODE_OVERRIDE=legacy %target-run %import-libdispatch %t/a.out
+// RUN: %env-SWIFT_IS_CURRENT_EXECUTOR_LEGACY_MODE_OVERRIDE=swift6 %target-run %import-libdispatch %t/a.out
+
+// TODO: Need to find out how to combine %env- and %target-run and %import-libdispatch reliably.
+// UNSUPPORTED: OS=linux-gnu
 
 // REQUIRES: concurrency
 // REQUIRES: executable_test
@@ -7,7 +16,7 @@
 // rdar://106849189 move-only types should be supported in freestanding mode
 // UNSUPPORTED: freestanding
 
-// rdar://119743909 fails in optimze tests.
+// rdar://119743909 fails in optimized tests.
 // UNSUPPORTED: swift_test_mode_optimize
 // UNSUPPORTED: swift_test_mode_optimize_size
 
@@ -86,9 +95,9 @@ struct Runner {
       await actor.test(expectedExecutor: two)
     }
     tests.test("isSameExclusiveContext=false, causes same executor checks to crash") {
-      expectCrashLater(withMessage: "Precondition failed: Incorrect actor executor assumption; " +
-          "Expected 'NaiveQueueExecutor(unknown)' executor. " +
-          "Expected deep equality to trigger for ")
+      // In Swift6 mode the error message for the crash depends on dispatch, so it is lower
+      // quality than our specialized messages; We cannot assert on the text since we run in both modes.
+      expectCrashLater()
 
       let unknown = NaiveQueueExecutor(name: "unknown", DispatchQueue(label: "unknown"))
       let actor = MyActor(executor: one)

@@ -17,4 +17,4 @@ foo()
 // CHECK: call swiftcc void @"$s4main3fooSo10LargeClassVyF"(ptr noalias nocapture sret(%TSo10LargeClassV) %{{.*}})
 
 // The C++ function:
-// CHECK: define{{( dso_local)?}} void @{{_Z21funcReturnsLargeClassv|"\?funcReturnsLargeClass@@YA\?AULargeClass@@XZ"}}({{%struct.LargeClass\*|ptr}} noalias sret(%struct.LargeClass){{( align .*)?}} %{{.*}})
+// CHECK: define{{( dso_local)?}} void @{{_Z21funcReturnsLargeClassv|"\?funcReturnsLargeClass@@YA\?AULargeClass@@XZ"}}({{%struct.LargeClass\*|ptr}}{{.*}} sret(%struct.LargeClass){{( align .*)?}} %{{.*}})

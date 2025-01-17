@@ -18,7 +18,6 @@
 
 #include "swift/AST/ASTMangler.h"
 #include "swift/AST/ASTVisitor.h"
-#include "swift/AST/Availability.h"
 #include "swift/AST/DiagnosticsFrontend.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/ParameterList.h"
@@ -26,6 +25,7 @@
 #include "swift/AST/SourceFile.h"
 #include "swift/AST/SynthesizedFileUnit.h"
 #include "swift/AST/TBDGenRequests.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/SourceManager.h"
@@ -454,7 +454,7 @@ void TBDGenVisitor::addFunction(StringRef name, SILDeclRef declRef) {
 }
 
 void TBDGenVisitor::addGlobalVar(VarDecl *VD) {
-  Mangle::ASTMangler mangler;
+  Mangle::ASTMangler mangler(VD->getASTContext());
   addSymbol(mangler.mangleEntity(VD), SymbolSource::forGlobal(VD),
             SymbolFlags::Data);
 }
@@ -484,7 +484,7 @@ void TBDGenVisitor::addObjCMethod(AbstractFunctionDecl *AFD) {
 
 void TBDGenVisitor::addProtocolWitnessThunk(RootProtocolConformance *C,
                                             ValueDecl *requirementDecl) {
-  Mangle::ASTMangler Mangler;
+  Mangle::ASTMangler Mangler(requirementDecl->getASTContext());
 
   std::string decorated = Mangler.mangleWitnessThunk(C, requirementDecl);
   // FIXME: We should have a SILDeclRef SymbolSource for this.
@@ -766,22 +766,25 @@ private:
   llvm::DenseMap<CategoryNameKey, unsigned> CategoryCounts;
 
   apigen::APIAvailability getAvailability(const Decl *decl) {
-    bool unavailable = false;
+    std::optional<bool> unavailable;
     std::string introduced, obsoleted;
+    bool hasFallbackUnavailability = false;
     auto platform = targetPlatform(module->getASTContext().LangOpts);
-    for (auto *attr : decl->getAttrs()) {
-      if (auto *ava = dyn_cast<AvailableAttr>(attr)) {
-        if (ava->isUnconditionallyUnavailable())
-          unavailable = true;
-        if (ava->Platform == platform) {
-          if (ava->Introduced)
-            introduced = ava->Introduced->getAsString();
-          if (ava->Obsoleted)
-            obsoleted = ava->Obsoleted->getAsString();
-        }
+    for (auto attr : decl->getSemanticAvailableAttrs()) {
+      if (!attr.isPlatformSpecific()) {
+        hasFallbackUnavailability = attr.isUnconditionallyUnavailable();
+        continue;
       }
+      if (attr.getPlatform() != platform)
+        continue;
+      unavailable = attr.isUnconditionallyUnavailable();
+      if (attr.getIntroduced())
+        introduced = attr.getIntroduced()->getAsString();
+      if (attr.getObsoleted())
+        obsoleted = attr.getObsoleted()->getAsString();
     }
-    return {introduced, obsoleted, unavailable};
+    return {introduced, obsoleted,
+            unavailable.value_or(hasFallbackUnavailability)};
   }
 
   StringRef getSelectorName(SILDeclRef method, SmallString<128> &buffer) {
@@ -824,6 +827,10 @@ private:
   void buildCategoryName(const ExtensionDecl *ext, const ClassDecl *cls,
                          SmallVectorImpl<char> &s) {
     llvm::raw_svector_ostream os(s);
+    if (!ext->getObjCCategoryName().empty()) {
+      os << ext->getObjCCategoryName();
+      return;
+    }
     ModuleDecl *module = ext->getParentModule();
     os << module->getName();
     unsigned categoryCount = CategoryCounts[{cls, module}]++;

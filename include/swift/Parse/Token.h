@@ -159,6 +159,10 @@ public:
     return isAnyOperator() && Text == "~";
   }
 
+  bool isMinus() const {
+    return isAnyOperator() && Text == "-";
+  }
+
   /// Determine whether this token occurred at the start of a line.
   bool isAtStartOfLine() const { return AtStartOfLine; }
 

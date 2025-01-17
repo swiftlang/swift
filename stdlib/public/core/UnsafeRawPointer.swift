@@ -168,6 +168,7 @@
 ///       let numberPointer = UnsafeRawPointer(&number)
 ///       // Accessing 'numberPointer' is undefined behavior.
 @frozen
+@unsafe
 public struct UnsafeRawPointer: _Pointer {
 
   public typealias Pointee = UInt8
@@ -455,7 +456,6 @@ extension UnsafeRawPointer {
 
   // FIXME(NCG): Add a borrow analogue of `load`, like `withBorrow(fromByteOffset:as:_:)`
 
-#if $BitwiseCopyable
   /// Returns a new instance of the given type, constructed from the raw memory
   /// at the specified offset.
   ///
@@ -480,13 +480,12 @@ extension UnsafeRawPointer {
   ///   with the value in the range of memory referenced by this pointer.
   @inlinable
   @_alwaysEmitIntoClient
-  public func loadUnaligned<T: _BitwiseCopyable>(
+  public func loadUnaligned<T: BitwiseCopyable>(
     fromByteOffset offset: Int = 0,
     as type: T.Type
   ) -> T {
     return Builtin.loadRaw((self + offset)._rawValue)
   }
-#endif
 
   /// Returns a new instance of the given type, constructed from the raw memory
   /// at the specified offset.
@@ -516,7 +515,10 @@ extension UnsafeRawPointer {
     fromByteOffset offset: Int = 0,
     as type: T.Type
   ) -> T {
-    _debugPrecondition(_isPOD(T.self))
+    _debugPrecondition(
+      _isPOD(T.self),
+      "loadUnaligned only supports loading BitwiseCopyable types."
+    )
     return _withUnprotectedUnsafeTemporaryAllocation(of: T.self, capacity: 1) {
       let temporary = $0.baseAddress._unsafelyUnwrappedUnchecked
       Builtin.int_memcpy_RawPointer_RawPointer_Int64(
@@ -772,6 +774,7 @@ extension UnsafeRawPointer {
 ///       let numberPointer = UnsafeMutableRawPointer(&number)
 ///       // Accessing 'numberPointer' is undefined behavior.
 @frozen
+@unsafe
 public struct UnsafeMutableRawPointer: _Pointer {
 
   public typealias Pointee = UInt8
@@ -1288,7 +1291,6 @@ extension UnsafeMutableRawPointer {
   // FIXME(NCG): Add a consuming analogue of `load`, like `move(fromByteOffset:as:_:)`
   // FIXME(NCG): Add a borrow analogue of `load`, like `withBorrow(fromByteOffset:as:_:)`
 
-#if $BitwiseCopyable
   /// Returns a new instance of the given type, constructed from the raw memory
   /// at the specified offset.
   ///
@@ -1313,13 +1315,12 @@ extension UnsafeMutableRawPointer {
   ///   with the value in the range of memory referenced by this pointer.
   @inlinable
   @_alwaysEmitIntoClient
-  public func loadUnaligned<T: _BitwiseCopyable>(
+  public func loadUnaligned<T: BitwiseCopyable>(
     fromByteOffset offset: Int = 0,
     as type: T.Type
   ) -> T {
     return Builtin.loadRaw((self + offset)._rawValue)
   }
-#endif
 
   /// Returns a new instance of the given type, constructed from the raw memory
   /// at the specified offset.
@@ -1349,7 +1350,10 @@ extension UnsafeMutableRawPointer {
     fromByteOffset offset: Int = 0,
     as type: T.Type
   ) -> T {
-    _debugPrecondition(_isPOD(T.self))
+    _debugPrecondition(
+      _isPOD(T.self),
+      "loadUnaligned only supports loading BitwiseCopyable types."
+    )
     return _withUnprotectedUnsafeTemporaryAllocation(of: T.self, capacity: 1) {
       let temporary = $0.baseAddress._unsafelyUnwrappedUnchecked
       Builtin.int_memcpy_RawPointer_RawPointer_Int64(
@@ -1362,7 +1366,6 @@ extension UnsafeMutableRawPointer {
     }
   }
 
-#if $BitwiseCopyable
   /// Stores the given value's bytes into raw memory at the specified offset.
   ///
   /// The type `T` to be stored must be a trivial type. The memory
@@ -1400,16 +1403,11 @@ extension UnsafeMutableRawPointer {
   ///   - type: The type of `value`.
   @inlinable
   @_alwaysEmitIntoClient
-  public func storeBytes<T: _BitwiseCopyable>(
+  public func storeBytes<T: BitwiseCopyable>(
     of value: T, toByteOffset offset: Int = 0, as type: T.Type
   ) {
-#if $BuiltinStoreRaw
     Builtin.storeRaw(value, (self + offset)._rawValue)
-#else
-    fatalError("Unsupported swift compiler!")
-#endif
   }
-#endif
 
   /// Stores the given value's bytes into raw memory at the specified offset.
   ///
@@ -1453,9 +1451,11 @@ extension UnsafeMutableRawPointer {
   public func storeBytes<T>(
     of value: T, toByteOffset offset: Int = 0, as type: T.Type
   ) {
-    _debugPrecondition(_isPOD(T.self))
+    _debugPrecondition(
+      _isPOD(T.self),
+      "storeBytes only supports storing the bytes of BitwiseCopyable types."
+    )
 
-#if $TypedThrows
     withUnsafePointer(to: value) { source in
       // FIXME: to be replaced by _memcpy when conversions are implemented.
       Builtin.int_memcpy_RawPointer_RawPointer_Int64(
@@ -1465,17 +1465,6 @@ extension UnsafeMutableRawPointer {
         /*volatile:*/ false._value
       )
     }
-#else
-    try! __abi_withUnsafePointer(to: value) { source in
-      // FIXME: to be replaced by _memcpy when conversions are implemented.
-      Builtin.int_memcpy_RawPointer_RawPointer_Int64(
-        (self + offset)._rawValue,
-        source._rawValue,
-        UInt64(MemoryLayout<T>.size)._value,
-        /*volatile:*/ false._value
-      )
-    }
-#endif
   }
 
   // This obsolete implementation uses the expected mangled name
@@ -1501,7 +1490,6 @@ extension UnsafeMutableRawPointer {
       "storeBytes to misaligned raw pointer")
 
     var temp = value
-#if $TypedThrows
     withUnsafeMutablePointer(to: &temp) { source in
       let rawSrc = UnsafeMutableRawPointer(source)._rawValue
       // FIXME: to be replaced by _memcpy when conversions are implemented.
@@ -1509,15 +1497,6 @@ extension UnsafeMutableRawPointer {
         (self + offset)._rawValue, rawSrc, UInt64(MemoryLayout<T>.size)._value,
         /*volatile:*/ false._value)
     }
-#else
-    __abi_se0413_withUnsafeMutablePointer(to: &temp) { source in
-      let rawSrc = UnsafeMutableRawPointer(source)._rawValue
-      // FIXME: to be replaced by _memcpy when conversions are implemented.
-      Builtin.int_memcpy_RawPointer_RawPointer_Int64(
-        (self + offset)._rawValue, rawSrc, UInt64(MemoryLayout<T>.size)._value,
-        /*volatile:*/ false._value)
-    }
-#endif
   }
 
   /// Copies the specified number of bytes from the given raw pointer's memory

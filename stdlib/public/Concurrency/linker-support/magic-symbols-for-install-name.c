@@ -22,116 +22,61 @@
 
 #if defined(__APPLE__) && defined(__MACH__) && SWIFT_STDLIB_SUPPORT_BACK_DEPLOYMENT
 
-#include <Availability.h>
+#include <mach-o/loader.h>
 #include <TargetConditionals.h>
 #include "swift/shims/Visibility.h"
 
-#define RPATH_INSTALL_NAME_DIRECTIVE_IMPL2(name, major, minor) \
-  SWIFT_RUNTIME_EXPORT const char install_name_ ## major ## _ ## minor \
-  __asm("$ld$install_name$os" #major "." #minor "$@rpath/lib" #name ".dylib"); \
-  const char install_name_ ## major ## _ ## minor = 0;
+// Concurrency was supported as an embedded library in macOS 10.15, iOS 13.0, watchOS 6.0, tvOS 13.0. It
+// became part of the OS in macOS 12.0, iOS 15.0, watchOS 8.0, tvOS 15.0. Projects can continue to embed
+// Concurrency, but the linker will see the OS version and try to link on that by default. In order to
+// support back deployment, add a magic symbol to the OS library so that back deployment will link on the
+// embedded library instead. When running on a newer OS, the OS version of the library will be used due to
+// Xcode inserting a runpath search path of /usr/lib/swift based on the deployment target being less than
+// SupportedTargets[target][SwiftConcurrencyMinimumDeploymentTarget] in SDKSettings.plist.
 
-#define RPATH_INSTALL_NAME_DIRECTIVE_IMPL(name, major, minor) \
-  RPATH_INSTALL_NAME_DIRECTIVE_IMPL2(name, major, minor)
+// Clients can back deploy to OS versions that predate Concurrency as an embedded library, and conditionally
+// use it behind an #availability check. Such clients will still need to link the embedded library instead
+// of the OS version. To support that, set the start version to Swift's first supported versions: macOS (née
+// OS X) 10.9, iOS 7.0, watchOS 2.0, tvOS 9.0 rather than Concurrency's first supported versions listed
+// above.
 
-#define RPATH_INSTALL_NAME_DIRECTIVE(major, minor) \
-  RPATH_INSTALL_NAME_DIRECTIVE_IMPL(SWIFT_TARGET_LIBRARY_NAME, major, minor)
+// The linker uses a specially formatted symbol to do the back deployment:
+// $ld$previous$<install-name>$<compatibility-version>$<platform>$<start-version>$<end-version>$<symbol-name>$
+// compatibility-version and symbol-name are left off to apply to all library versions and symbols.
+// This symbol isn't a legal C identifier, so it needs to be specified with __asm.
+#define RPATH_PREVIOUS_DIRECTIVE_IMPL(name, platform, startVersion, endVersion) \
+  SWIFT_RUNTIME_EXPORT const char ld_previous_ ## platform \
+  __asm("$ld$previous$@rpath/lib" __STRING(name) ".dylib$$" __STRING(platform) "$" __STRING(startVersion) "$" __STRING(endVersion) "$$"); \
+  const char ld_previous_ ## platform = 0;
+// Using the __STRING macro is important so that name and platform get expanded before being
+// stringified. The versions could just be #version, __STRING is only used for consistency.
 
+#define RPATH_PREVIOUS_DIRECTIVE(platform, startVersion, endVersion) \
+  RPATH_PREVIOUS_DIRECTIVE_IMPL(SWIFT_TARGET_LIBRARY_NAME, platform, startVersion, endVersion)
 
-#if TARGET_OS_WATCH
-  // Check watchOS first, because TARGET_OS_IPHONE includes watchOS.
-  RPATH_INSTALL_NAME_DIRECTIVE( 2, 0)
-  RPATH_INSTALL_NAME_DIRECTIVE( 2, 1)
-  RPATH_INSTALL_NAME_DIRECTIVE( 2, 2)
-  RPATH_INSTALL_NAME_DIRECTIVE( 3, 0)
-  RPATH_INSTALL_NAME_DIRECTIVE( 3, 1)
-  RPATH_INSTALL_NAME_DIRECTIVE( 3, 2)
-  RPATH_INSTALL_NAME_DIRECTIVE( 4, 0)
-  RPATH_INSTALL_NAME_DIRECTIVE( 4, 1)
-  RPATH_INSTALL_NAME_DIRECTIVE( 4, 2)
-  RPATH_INSTALL_NAME_DIRECTIVE( 4, 3)
-  RPATH_INSTALL_NAME_DIRECTIVE( 5, 0)
-  RPATH_INSTALL_NAME_DIRECTIVE( 5, 1)
-  RPATH_INSTALL_NAME_DIRECTIVE( 5, 2)
-  RPATH_INSTALL_NAME_DIRECTIVE( 5, 3)
-  RPATH_INSTALL_NAME_DIRECTIVE( 6, 0)
-  RPATH_INSTALL_NAME_DIRECTIVE( 6, 1)
-  RPATH_INSTALL_NAME_DIRECTIVE( 6, 2)
-  RPATH_INSTALL_NAME_DIRECTIVE( 6, 3)
-  RPATH_INSTALL_NAME_DIRECTIVE( 7, 0)
-  RPATH_INSTALL_NAME_DIRECTIVE( 7, 1)
-  RPATH_INSTALL_NAME_DIRECTIVE( 7, 2)
-  RPATH_INSTALL_NAME_DIRECTIVE( 7, 3)
-  RPATH_INSTALL_NAME_DIRECTIVE( 7, 4)
-  RPATH_INSTALL_NAME_DIRECTIVE( 7, 5)
-  RPATH_INSTALL_NAME_DIRECTIVE( 7, 6)
-#elif TARGET_OS_IPHONE
-  RPATH_INSTALL_NAME_DIRECTIVE( 7, 0)
-  RPATH_INSTALL_NAME_DIRECTIVE( 7, 1)
-  RPATH_INSTALL_NAME_DIRECTIVE( 8, 0)
-  RPATH_INSTALL_NAME_DIRECTIVE( 8, 1)
-  RPATH_INSTALL_NAME_DIRECTIVE( 8, 2)
-  RPATH_INSTALL_NAME_DIRECTIVE( 8, 3)
-  RPATH_INSTALL_NAME_DIRECTIVE( 8, 4)
-  RPATH_INSTALL_NAME_DIRECTIVE( 9, 0)
-  RPATH_INSTALL_NAME_DIRECTIVE( 9, 1)
-  RPATH_INSTALL_NAME_DIRECTIVE( 9, 2)
-  RPATH_INSTALL_NAME_DIRECTIVE( 9, 3)
-  RPATH_INSTALL_NAME_DIRECTIVE(10, 0)
-  RPATH_INSTALL_NAME_DIRECTIVE(10, 1)
-  RPATH_INSTALL_NAME_DIRECTIVE(10, 2)
-  RPATH_INSTALL_NAME_DIRECTIVE(10, 3)
-  RPATH_INSTALL_NAME_DIRECTIVE(11, 0)
-  RPATH_INSTALL_NAME_DIRECTIVE(11, 1)
-  RPATH_INSTALL_NAME_DIRECTIVE(11, 2)
-  RPATH_INSTALL_NAME_DIRECTIVE(11, 3)
-  RPATH_INSTALL_NAME_DIRECTIVE(11, 4)
-  RPATH_INSTALL_NAME_DIRECTIVE(12, 0)
-  RPATH_INSTALL_NAME_DIRECTIVE(12, 1)
-  RPATH_INSTALL_NAME_DIRECTIVE(12, 2)
-  RPATH_INSTALL_NAME_DIRECTIVE(12, 3)
-  RPATH_INSTALL_NAME_DIRECTIVE(12, 4)
-  RPATH_INSTALL_NAME_DIRECTIVE(12, 5)
-  RPATH_INSTALL_NAME_DIRECTIVE(13, 0)
-  RPATH_INSTALL_NAME_DIRECTIVE(13, 1)
-  RPATH_INSTALL_NAME_DIRECTIVE(13, 2)
-  RPATH_INSTALL_NAME_DIRECTIVE(13, 3)
-  RPATH_INSTALL_NAME_DIRECTIVE(13, 4)
-  RPATH_INSTALL_NAME_DIRECTIVE(13, 5)
-  RPATH_INSTALL_NAME_DIRECTIVE(13, 6)
-  RPATH_INSTALL_NAME_DIRECTIVE(13, 7)
-  RPATH_INSTALL_NAME_DIRECTIVE(14, 0)
-  RPATH_INSTALL_NAME_DIRECTIVE(14, 1)
-  RPATH_INSTALL_NAME_DIRECTIVE(14, 2)
-  RPATH_INSTALL_NAME_DIRECTIVE(14, 3)
-  RPATH_INSTALL_NAME_DIRECTIVE(14, 4)
-  RPATH_INSTALL_NAME_DIRECTIVE(14, 5)
-  RPATH_INSTALL_NAME_DIRECTIVE(14, 6)
-  RPATH_INSTALL_NAME_DIRECTIVE(14, 7)
-  RPATH_INSTALL_NAME_DIRECTIVE(14, 8)
-#elif TARGET_OS_OSX
-  RPATH_INSTALL_NAME_DIRECTIVE(10,  9)
-  RPATH_INSTALL_NAME_DIRECTIVE(10, 10)
-  RPATH_INSTALL_NAME_DIRECTIVE(10, 11)
-  RPATH_INSTALL_NAME_DIRECTIVE(10, 12)
-  RPATH_INSTALL_NAME_DIRECTIVE(10, 13)
-  RPATH_INSTALL_NAME_DIRECTIVE(10, 15)
-  RPATH_INSTALL_NAME_DIRECTIVE(10, 14)
-  RPATH_INSTALL_NAME_DIRECTIVE(11,  0)
-  RPATH_INSTALL_NAME_DIRECTIVE(11,  1)
-  RPATH_INSTALL_NAME_DIRECTIVE(11,  2)
-  RPATH_INSTALL_NAME_DIRECTIVE(11,  3)
-  RPATH_INSTALL_NAME_DIRECTIVE(11,  4)
-  RPATH_INSTALL_NAME_DIRECTIVE(11,  5)
-  RPATH_INSTALL_NAME_DIRECTIVE(11,  6)
-
- // Link against @rpath/libswift_Concurrency.dylib for macCatalyst < 15.0.
-SWIFT_RUNTIME_EXPORT const char ld_previous_macCatalyst
-__asm("$ld$previous$@rpath/libswift_Concurrency.dylib$$6$1.0$15.0$");
-
-const char ld_previous_macCatalyst = 0;
+#if TARGET_OS_OSX || TARGET_OS_MACCATALYST
+RPATH_PREVIOUS_DIRECTIVE(PLATFORM_MACOS, 10.9, 12.0)
+RPATH_PREVIOUS_DIRECTIVE(PLATFORM_MACCATALYST, 13.1, 15.0)
+#elif TARGET_OS_IOS && !TARGET_OS_VISION
+#if TARGET_OS_SIMULATOR
+RPATH_PREVIOUS_DIRECTIVE(PLATFORM_IOSSIMULATOR, 7.0, 15.0)
 #else
-  #error Unknown target.
+RPATH_PREVIOUS_DIRECTIVE(PLATFORM_IOS, 7.0, 15.0)
 #endif
+#elif TARGET_OS_WATCH
+#if TARGET_OS_SIMULATOR
+RPATH_PREVIOUS_DIRECTIVE(PLATFORM_WATCHOSSIMULATOR, 2.0, 8.0)
+#else
+RPATH_PREVIOUS_DIRECTIVE(PLATFORM_WATCHOS, 2.0, 8.0)
+#endif
+#elif TARGET_OS_TV
+#if TARGET_OS_SIMULATOR
+RPATH_PREVIOUS_DIRECTIVE(PLATFORM_TVOSSIMULATOR, 9.0, 15.0)
+#else
+RPATH_PREVIOUS_DIRECTIVE(PLATFORM_TVOS, 9.0, 15.0)
+#endif
+#endif
+// Concurrency wasn't supported as an embedded library in any other OS, so no need to create back deployment
+// symbols for any of the other ones.
 
 #endif // defined(__APPLE__) && defined(__MACH__) && SWIFT_STDLIB_SUPPORT_BACK_DEPLOYMENT

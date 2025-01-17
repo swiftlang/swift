@@ -243,19 +243,16 @@ public:
 
   /// Retrieve the ClassDecl for a type that maps to a Swift class or
   /// bound generic class type.
-  SWIFT_IMPORT_UNSAFE
   ClassDecl *getClassOrBoundGenericClass() const {
     return getASTType().getClassOrBoundGenericClass();
   }
   /// Retrieve the StructDecl for a type that maps to a Swift struct or
   /// bound generic struct type.
-  SWIFT_IMPORT_UNSAFE
   StructDecl *getStructOrBoundGenericStruct() const {
     return getASTType().getStructOrBoundGenericStruct();
   }
   /// Retrieve the EnumDecl for a type that maps to a Swift enum or
   /// bound generic enum type.
-  SWIFT_IMPORT_UNSAFE
   EnumDecl *getEnumOrBoundGenericEnum() const {
     return getASTType().getEnumOrBoundGenericEnum();
   }
@@ -286,7 +283,6 @@ public:
 
   bool isBuiltinBridgeObject() const { return is<BuiltinBridgeObjectType>(); }
 
-  SWIFT_IMPORT_UNSAFE
   SILType getBuiltinVectorElementType() const {
     auto vector = castTo<BuiltinVectorType>();
     return getPrimitiveObjectType(vector.getElementType());
@@ -294,7 +290,6 @@ public:
 
   /// Retrieve the NominalTypeDecl for a type that maps to a Swift
   /// nominal or bound generic nominal type.
-  SWIFT_IMPORT_UNSAFE
   NominalTypeDecl *getNominalOrBoundGenericNominal() const {
     return getASTType().getNominalOrBoundGenericNominal();
   }
@@ -365,6 +360,9 @@ public:
   /// True if the type, or the referenced type of an address type, is
   /// address-only. This is the opposite of isLoadable.
   bool isAddressOnly(const SILFunction &F) const;
+
+  /// For details see the comment of `IsFixedABI_t`.
+  bool isFixedABI(const SILFunction &F) const;
 
   /// True if the underlying AST type is trivial, meaning it is loadable and can
   /// be trivially copied, moved or destroyed. Returns false for address types
@@ -461,13 +459,19 @@ public:
   }
 
   /// Returns true if the referenced type is expressed in terms of one
-  /// or more opened existential types.
+  /// or more opened existential archetypes.
   bool hasOpenedExistential() const {
     return getASTType()->hasOpenedExistential();
   }
 
   TypeTraitResult canBeClass() const {
     return getASTType()->canBeClass();
+  }
+
+  /// Returns true if the referenced type is expressed in terms of one
+  /// or more element archetypes.
+  bool hasElementArchetype() const {
+    return getASTType()->hasElementArchetype();
   }
 
   /// Returns true if the referenced type is expressed in terms of one
@@ -555,6 +559,13 @@ public:
     // Handle whatever AST types are known to hold functions. Namely tuples.
     return ty->isNoEscape();
   }
+  
+  bool isThickFunction() const {
+    if (auto *fTy = getASTType()->getAs<SILFunctionType>()) {
+      return fTy->getRepresentation() == SILFunctionType::Representation::Thick;
+    }
+    return false;
+  }
 
   bool isAsyncFunction() const {
     if (auto *fTy = getASTType()->getAs<SILFunctionType>()) {
@@ -563,8 +574,13 @@ public:
     return false;
   }
 
-  /// True if the type involves any archetypes.
+  /// True if the type involves any primary or local archetypes.
   bool hasArchetype() const { return getASTType()->hasArchetype(); }
+
+  /// True if the type involves any primary archetypes.
+  bool hasPrimaryArchetype() const {
+    return getASTType()->hasPrimaryArchetype();
+  }
 
   /// True if the type involves any opaque archetypes.
   bool hasOpaqueArchetype() const {
@@ -765,10 +781,6 @@ public:
   /// representation. Class existentials do not always qualify.
   bool isHeapObjectReferenceType() const;
 
-  /// Returns true if this SILType is an aggregate that contains \p Ty
-  bool aggregateContainsRecord(SILType Ty, SILModule &SILMod,
-                               TypeExpansionContext context) const;
-
   /// Returns true if this SILType is an aggregate with unreferenceable storage,
   /// meaning it cannot be fully destructured in SIL.
   bool aggregateHasUnreferenceableStorage() const;
@@ -850,7 +862,15 @@ public:
   ///
   /// DISCUSSION: This is separate from removingMoveOnlyWrapper since this API
   /// requires a SILFunction * and is specialized.
-  SILType removingMoveOnlyWrapperToBoxedType(const SILFunction *fn);
+  SILType removingMoveOnlyWrapperFromBoxedType(const SILFunction *fn);
+
+  /// Whether there's a direct wrapper or a wrapper inside a box.
+  bool hasAnyMoveOnlyWrapping(const SILFunction *fn) {
+    return isMoveOnlyWrapped() || isBoxedMoveOnlyWrappedType(fn);
+  }
+
+  /// Removes a direct wrapper from a type or a wrapper from a type in a box.
+  SILType removingAnyMoveOnlyWrapping(const SILFunction *fn);
 
   /// Returns a SILType with any archetypes mapped out of context.
   SILType mapTypeOutOfContext() const;
@@ -872,6 +892,23 @@ public:
 
   /// Returns true if this SILType is a differentiable type.
   bool isDifferentiable(SILModule &M) const;
+
+  /// Returns the @_rawLayout attribute on this type if it has one.
+  RawLayoutAttr *getRawLayout() const {
+    auto sd = getStructOrBoundGenericStruct();
+
+    if (!sd) {
+      return nullptr;
+    }
+
+    return sd->getAttrs().getAttribute<RawLayoutAttr>();
+  }
+
+  /// If this is a raw layout type, returns the substituted like type.
+  Type getRawLayoutSubstitutedLikeType() const;
+
+  /// If this is a raw layout type, returns the substituted count type.
+  Type getRawLayoutSubstitutedCountType() const;
 
   /// If this is a SILBoxType, return getSILBoxFieldType(). Otherwise, return
   /// SILType().
@@ -904,7 +941,7 @@ public:
     return getSILBoxFieldType(fn).isMoveOnlyWrapped();
   }
 
-  SILType getInstanceTypeOfMetatype(SILFunction *function) const;
+  SILType getLoweredInstanceTypeOfMetatype(SILFunction *function) const;
 
   MetatypeRepresentation getRepresentationOfMetatype(SILFunction *function) const;
 
@@ -928,6 +965,11 @@ public:
   bool isAnyActor() const { return getASTType()->isAnyActorType(); }
 
   /// Returns true if this function conforms to the Sendable protocol.
+  ///
+  /// NOTE: For diagnostics this is not always the correct thing to check since
+  /// non-Sendable types afflicted with preconcurrency can have different
+  /// semantic requirements around diagnostics. \see
+  /// getConcurrencyDiagnosticBehavior.
   bool isSendable(SILFunction *fn) const;
 
   /// False if SILValues of this type cannot be used outside the scope of their
@@ -941,6 +983,16 @@ public:
   bool mayEscape(const SILFunction &function) const {
     return !isNoEscapeFunction() && isEscapable(function);
   }
+
+  /// Return the expected concurrency diagnostic behavior for this SILType.
+  ///
+  /// This allows one to know if the type is marked with preconcurrency and thus
+  /// should have diagnostics ignored or converted to warnings instead of
+  /// errors.
+  ///
+  /// \returns nil if we were unable to find such information for this type.
+  std::optional<DiagnosticBehavior>
+  getConcurrencyDiagnosticBehavior(SILFunction *fn) const;
 
   //
   // Accessors for types used in SIL instructions:

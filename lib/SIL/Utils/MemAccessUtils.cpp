@@ -13,6 +13,7 @@
 #define DEBUG_TYPE "sil-access-utils"
 
 #include "swift/SIL/MemAccessUtils.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/GraphNodeWorklist.h"
 #include "swift/SIL/Consumption.h"
 #include "swift/SIL/DynamicCasts.h"
@@ -2087,13 +2088,14 @@ struct AccessUseTestVisitor : public AccessUseVisitor {
   }
 };
 
-static FunctionTest AccessPathBaseTest("accesspath-base", [](auto &function,
-                                                             auto &arguments,
-                                                             auto &test) {
+static FunctionTest AccessPathBaseTest("accesspath", [](auto &function,
+                                                        auto &arguments,
+                                                        auto &test) {
   auto value = arguments.takeValue();
   function.print(llvm::outs());
-  llvm::outs() << "Access path base: " << value;
+  llvm::outs() << "Access path for: " << value;
   auto accessPathWithBase = AccessPathWithBase::compute(value);
+  llvm::outs() << "  base: " << accessPathWithBase.base;
   AccessUseTestVisitor visitor;
   visitAccessPathBaseUses(visitor, accessPathWithBase, &function);
 });
@@ -2193,6 +2195,7 @@ bool GatherUniqueStorageUses::visitUse(Operand *use, AccessUseType useTy) {
     case SILArgumentConvention::Indirect_Inout:
     case SILArgumentConvention::Indirect_InoutAliasable:
     case SILArgumentConvention::Indirect_Out:
+    case SILArgumentConvention::Indirect_In_CXX:
     case SILArgumentConvention::Pack_Inout:
     case SILArgumentConvention::Pack_Out:
       return visitApplyOperand(use, visitor,
@@ -2590,11 +2593,6 @@ static void visitBuiltinAddress(BuiltinInst *builtin,
     // Writes back to the first operand.
     case BuiltinValueKind::TaskRunInline:
       visitor(&builtin->getAllOperands()[0]);
-      return;
-
-    // These effect both operands.
-    case BuiltinValueKind::Copy:
-      visitor(&builtin->getAllOperands()[1]);
       return;
 
     // These consume values out of their second operand.

@@ -1,4 +1,6 @@
-public struct X { }
+public struct X {
+  public init() {}
+}
 
 public protocol P { }
 
@@ -30,4 +32,19 @@ extension Y {
 
 public enum EnumInA {
   case caseInA
+}
+
+open class BaseClassInA {
+  public init() {}
+  open func methodInA() {}
+}
+
+public protocol ProtocolInA {
+  func defaultedRequirementInA()
+  func defaultedRequirementInB()
+  func defaultedRequirementInC()
+}
+
+extension ProtocolInA {
+  public func defaultedRequirementInA() { }
 }

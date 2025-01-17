@@ -35,9 +35,9 @@ bb0(%0 : $*T):
   return %5 : $@callee_owned () -> @out T       // id: %7
 }
 
-// CHECK-LABEL: sil shared [noinline] @$s17getGenericClosure1A19exportsOpaqueReturnQryFQOyQo__Tg5 : $@convention(thin) (Int) -> @owned @callee_owned () -> @out Int {
+// CHECK-LABEL: sil shared [noinline] @$s17getGenericClosureSi_Tg5 : $@convention(thin) (Int) -> @owned @callee_owned () -> @out Int {
 // CHECK:  alloc_box $<τ_0_0> { var τ_0_0 } <Int>
-// CHECK: } // end sil function '$s17getGenericClosure1A19exportsOpaqueReturnQryFQOyQo__Tg5'
+// CHECK: } // end sil function '$s17getGenericClosureSi_Tg5'
 
 sil [transparent] [serialized] @specializePartialApplies : $@convention(thin) (@in SomeButt) -> () {
 bb0(%0 : $*SomeButt):

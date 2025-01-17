@@ -242,6 +242,24 @@ public:
     return 0;
   }
 
+  std::optional<SILResultInfo> getIndirectErrorResult() const {
+    if (!silConv.loweredAddresses)
+      return std::nullopt;
+    auto info = funcTy->getOptionalErrorResult();
+    if (!info)
+      return std::nullopt;
+    if (info->getConvention() != ResultConvention::Indirect)
+      return std::nullopt;
+    return info;
+  }
+
+  SILType getIndirectErrorResultType(TypeExpansionContext context) const {
+    auto result = getIndirectErrorResult();
+    if (!result)
+      return SILType();
+    return getSILType(*result, context);
+  }
+
   bool isArgumentIndexOfIndirectErrorResult(unsigned idx) {
     unsigned indirectResults = getNumIndirectSILResults();
     return idx >= indirectResults &&
@@ -592,6 +610,7 @@ inline bool SILModuleConventions::isIndirectSILParam(SILParameterInfo param,
 
   case ParameterConvention::Indirect_In:
   case ParameterConvention::Indirect_In_Guaranteed:
+  case ParameterConvention::Indirect_In_CXX:
     return isTypeIndirectForIndirectParamConvention(param.getInterfaceType(),
                                                     loweredAddresses);
   case ParameterConvention::Indirect_Inout:

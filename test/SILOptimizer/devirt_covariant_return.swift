@@ -1,5 +1,5 @@
 
-// RUN: %target-swift-frontend -module-name devirt_covariant_return -Xllvm -sil-full-demangle -enable-spec-devirt -O -Xllvm -disable-sil-cm-rr-cm=0   -Xllvm -sil-inline-generics=false -primary-file %s -emit-sil -sil-inline-threshold 1000 -Xllvm -sil-disable-pass=ObjectOutliner -sil-verify-all | %FileCheck %s
+// RUN: %target-swift-frontend -module-name devirt_covariant_return -Xllvm -sil-full-demangle -enable-spec-devirt -O -Xllvm -disable-sil-cm-rr-cm=0   -Xllvm -sil-inline-generics=false -primary-file %s -Xllvm -sil-print-types -emit-sil -sil-inline-threshold 1000 -Xllvm -sil-disable-pass=ObjectOutliner -sil-verify-all | %FileCheck %s
 
 // REQUIRES: swift_in_compiler
 
@@ -235,7 +235,7 @@ public class D2: D1 {
 // that D2.foo() is inlined thanks to this.
 // CHECK-LABEL: sil hidden [noinline] @$s23devirt_covariant_return7driver2ys5Int32VAA2D2CF
 // CHECK-NOT: class_method
-// CHECK: checked_cast_br [exact] D1 in %{{.*}} : $D1 to D2
+// CHECK: checked_cast_br [exact] D1 in
 // CHECK: bb2
 // CHECK: global_addr
 // CHECK: load

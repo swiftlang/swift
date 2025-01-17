@@ -6,6 +6,7 @@
 
 // REQUIRES: swift_in_compiler
 // REQUIRES: OS=macosx || OS=linux-gnu
+// REQUIRES: swift_feature_Embedded
 
 // BEGIN MyModule.swift
 
@@ -27,10 +28,10 @@ public struct Foo<Element> : ~Copyable {
 
 import MyModule
 
-func test() {
+public func test() {
   createFoo(x: 1)
 }
 
-// CHECK-LABEL: sil @$s8MyModule9createFoo1xyx_ts17FixedWidthIntegerRzlFSi_Tg5 :
+// CHECK-LABEL: sil @$e8MyModule9createFoo1xyx_ts17FixedWidthIntegerRzlFSi_Ttg5 :
 // CHECK-NOT:     release
-// CHECK:       } // end sil function '$s8MyModule9createFoo1xyx_ts17FixedWidthIntegerRzlFSi_Tg5'
+// CHECK:       } // end sil function '$e8MyModule9createFoo1xyx_ts17FixedWidthIntegerRzlFSi_Ttg5'

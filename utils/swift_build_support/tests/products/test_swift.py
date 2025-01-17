@@ -58,17 +58,20 @@ class SwiftTestCase(unittest.TestCase):
             enable_experimental_cxx_interop=False,
             enable_cxx_interop_swift_bridging_header=False,
             enable_experimental_distributed=False,
-            enable_experimental_nonescapable_types=False,
             enable_experimental_observation=False,
             enable_experimental_parser_validation=False,
             swift_enable_backtracing=False,
             enable_synchronization=False,
+            enable_volatile=False,
             build_early_swiftsyntax=False,
             build_swift_stdlib_static_print=False,
             build_swift_stdlib_unicode_data=True,
+            build_embedded_stdlib=True,
+            build_embedded_stdlib_cross_compiling=False,
             swift_freestanding_is_darwin=False,
             build_swift_private_stdlib=True,
-            swift_tools_ld64_lto_codegen_only_for_supporting_targets=False)
+            swift_tools_ld64_lto_codegen_only_for_supporting_targets=False,
+            build_stdlib_docs=False)
 
         # Setup shell
         shell.dry_run = True
@@ -104,16 +107,20 @@ class SwiftTestCase(unittest.TestCase):
             '-DSWIFT_ENABLE_EXPERIMENTAL_CXX_INTEROP:BOOL=FALSE',
             '-DSWIFT_ENABLE_CXX_INTEROP_SWIFT_BRIDGING_HEADER:BOOL=FALSE',
             '-DSWIFT_ENABLE_EXPERIMENTAL_DISTRIBUTED:BOOL=FALSE',
-            '-DSWIFT_ENABLE_EXPERIMENTAL_NONESCAPABLE_TYPES:BOOL=FALSE',
             '-DSWIFT_ENABLE_EXPERIMENTAL_OBSERVATION:BOOL=FALSE',
             '-DSWIFT_ENABLE_EXPERIMENTAL_PARSER_VALIDATION:BOOL=FALSE',
             '-DSWIFT_ENABLE_BACKTRACING:BOOL=FALSE',
             '-DSWIFT_ENABLE_SYNCHRONIZATION:BOOL=FALSE',
+            '-DSWIFT_ENABLE_VOLATILE:BOOL=FALSE',
             '-DSWIFT_STDLIB_STATIC_PRINT=FALSE',
             '-DSWIFT_FREESTANDING_IS_DARWIN:BOOL=FALSE',
             '-DSWIFT_STDLIB_BUILD_PRIVATE:BOOL=TRUE',
             '-DSWIFT_STDLIB_ENABLE_UNICODE_DATA=TRUE',
+            '-DSWIFT_SHOULD_BUILD_EMBEDDED_STDLIB=TRUE',
+            '-DSWIFT_SHOULD_BUILD_EMBEDDED_STDLIB_CROSS_COMPILING=FALSE',
             '-DSWIFT_TOOLS_LD64_LTO_CODEGEN_ONLY_FOR_SUPPORTING_TARGETS:BOOL=FALSE',
+            '-USWIFT_DEBUGINFO_NON_LTO_ARGS',
+            '-DSWIFT_STDLIB_BUILD_SYMBOL_GRAPHS:BOOL=FALSE'
         ]
         self.assertEqual(set(swift.cmake_options), set(expected))
 
@@ -134,16 +141,20 @@ class SwiftTestCase(unittest.TestCase):
             '-DSWIFT_ENABLE_EXPERIMENTAL_CXX_INTEROP:BOOL=FALSE',
             '-DSWIFT_ENABLE_CXX_INTEROP_SWIFT_BRIDGING_HEADER:BOOL=FALSE',
             '-DSWIFT_ENABLE_EXPERIMENTAL_DISTRIBUTED:BOOL=FALSE',
-            '-DSWIFT_ENABLE_EXPERIMENTAL_NONESCAPABLE_TYPES:BOOL=FALSE',
             '-DSWIFT_ENABLE_EXPERIMENTAL_OBSERVATION:BOOL=FALSE',
             '-DSWIFT_ENABLE_EXPERIMENTAL_PARSER_VALIDATION:BOOL=FALSE',
             '-DSWIFT_ENABLE_BACKTRACING:BOOL=FALSE',
             '-DSWIFT_ENABLE_SYNCHRONIZATION:BOOL=FALSE',
+            '-DSWIFT_ENABLE_VOLATILE:BOOL=FALSE',
             '-DSWIFT_STDLIB_STATIC_PRINT=FALSE',
             '-DSWIFT_FREESTANDING_IS_DARWIN:BOOL=FALSE',
             '-DSWIFT_STDLIB_BUILD_PRIVATE:BOOL=TRUE',
             '-DSWIFT_STDLIB_ENABLE_UNICODE_DATA=TRUE',
+            '-DSWIFT_SHOULD_BUILD_EMBEDDED_STDLIB=TRUE',
+            '-DSWIFT_SHOULD_BUILD_EMBEDDED_STDLIB_CROSS_COMPILING=FALSE',
             '-DSWIFT_TOOLS_LD64_LTO_CODEGEN_ONLY_FOR_SUPPORTING_TARGETS:BOOL=FALSE',
+            '-USWIFT_DEBUGINFO_NON_LTO_ARGS',
+            '-DSWIFT_STDLIB_BUILD_SYMBOL_GRAPHS:BOOL=FALSE'
         ]
         self.assertEqual(set(swift.cmake_options), set(flags_set))
 
@@ -407,19 +418,6 @@ class SwiftTestCase(unittest.TestCase):
             [x for x in swift.cmake_options
              if 'DSWIFT_ENABLE_EXPERIMENTAL_DISTRIBUTED' in x])
 
-    def test_experimental_nonescapable_types_flags(self):
-        self.args.enable_experimental_nonescapable_types = True
-        swift = Swift(
-            args=self.args,
-            toolchain=self.toolchain,
-            source_dir='/path/to/src',
-            build_dir='/path/to/build')
-        self.assertEqual(
-            ['-DSWIFT_ENABLE_EXPERIMENTAL_NONESCAPABLE_TYPES:BOOL='
-             'TRUE'],
-            [x for x in swift.cmake_options
-             if 'DSWIFT_ENABLE_EXPERIMENTAL_NONESCAPABLE_TYPES' in x])
-
     def test_experimental_observation_flags(self):
         self.args.enable_experimental_observation = True
         swift = Swift(
@@ -459,6 +457,19 @@ class SwiftTestCase(unittest.TestCase):
             [x for x in swift.cmake_options
              if 'DSWIFT_ENABLE_SYNCHRONIZATION' in x])
 
+    def test_volatile_flags(self):
+        self.args.enable_volatile = True
+        swift = Swift(
+            args=self.args,
+            toolchain=self.toolchain,
+            source_dir='/path/to/src',
+            build_dir='/path/to/build')
+        self.assertEqual(
+            ['-DSWIFT_ENABLE_VOLATILE:BOOL='
+             'TRUE'],
+            [x for x in swift.cmake_options
+             if 'DSWIFT_ENABLE_VOLATILE' in x])
+
     def test_freestanding_is_darwin_flags(self):
         self.args.swift_freestanding_is_darwin = True
         swift = Swift(
@@ -497,3 +508,62 @@ class SwiftTestCase(unittest.TestCase):
              'TRUE'],
             [x for x in swift.cmake_options
                 if 'SWIFT_TOOLS_LD64_LTO_CODEGEN_ONLY_FOR_SUPPORTING_TARGETS' in x])
+
+    def test_swift_debuginfo_non_lto_args(self):
+        self.args.swift_debuginfo_non_lto_args = None
+        swift = Swift(
+            args=self.args,
+            toolchain=self.toolchain,
+            source_dir='/path/to/src',
+            build_dir='/path/to/build')
+        self.assertIn(
+            '-USWIFT_DEBUGINFO_NON_LTO_ARGS',
+            swift.cmake_options)
+
+        self.args.swift_debuginfo_non_lto_args = []
+        swift = Swift(
+            args=self.args,
+            toolchain=self.toolchain,
+            source_dir='/path/to/src',
+            build_dir='/path/to/build')
+        self.assertEqual(
+            ['-DSWIFT_DEBUGINFO_NON_LTO_ARGS:STRING='],
+            [x for x in swift.cmake_options
+                if 'SWIFT_DEBUGINFO_NON_LTO_ARGS' in x])
+
+        self.args.swift_debuginfo_non_lto_args = ['-g']
+        swift = Swift(
+            args=self.args,
+            toolchain=self.toolchain,
+            source_dir='/path/to/src',
+            build_dir='/path/to/build')
+        self.assertEqual(
+            ['-DSWIFT_DEBUGINFO_NON_LTO_ARGS:STRING='
+             '-g'],
+            [x for x in swift.cmake_options
+                if 'SWIFT_DEBUGINFO_NON_LTO_ARGS' in x])
+
+        self.args.swift_debuginfo_non_lto_args = ['-gline-tables-only', '-v']
+        swift = Swift(
+            args=self.args,
+            toolchain=self.toolchain,
+            source_dir='/path/to/src',
+            build_dir='/path/to/build')
+        self.assertEqual(
+            ['-DSWIFT_DEBUGINFO_NON_LTO_ARGS:STRING='
+             '-gline-tables-only;-v'],
+            [x for x in swift.cmake_options
+                if 'SWIFT_DEBUGINFO_NON_LTO_ARGS' in x])
+
+    def test_stdlib_docs_flags(self):
+        self.args.build_stdlib_docs = True
+        swift = Swift(
+            args=self.args,
+            toolchain=self.toolchain,
+            source_dir='/path/to/src',
+            build_dir='/path/to/build')
+        self.assertEqual(
+            ['-DSWIFT_STDLIB_BUILD_SYMBOL_GRAPHS:BOOL='
+             'TRUE'],
+            [x for x in swift.cmake_options
+             if 'DSWIFT_STDLIB_BUILD_SYMBOL_GRAPHS' in x])

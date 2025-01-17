@@ -79,6 +79,7 @@
 
 #define DEBUG_TYPE "access-enforcement-opts"
 
+#include "swift/Basic/Assertions.h"
 #include "swift/SIL/DebugUtils.h"
 #include "swift/SIL/MemAccessUtils.h"
 #include "swift/SIL/SILFunction.h"
@@ -1081,7 +1082,7 @@ mergeAccesses(SILFunction *F, PostDominanceInfo *postDomTree,
       continue;
 
     if (!extendOwnership(parentIns, childIns, deleter, deBlocks))
-      return false;
+      continue;
 
     LLVM_DEBUG(llvm::dbgs()
                << "Merging " << *childIns << " into " << *parentIns << "\n");

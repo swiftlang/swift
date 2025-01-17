@@ -51,6 +51,7 @@ enum class ImplMetatypeRepresentation {
 enum class ImplCoroutineKind {
   None,
   YieldOnce,
+  YieldOnce2,
   YieldMany,
 };
 
@@ -84,7 +85,7 @@ public:
   }
   void setNoDerivative() { Flags = Flags.withNoDerivative(true); }
   void setIsolated() { Flags = Flags.withIsolated(true); }
-  void setTransferring() { Flags = Flags.withTransferring(true); }
+  void setSending() { Flags = Flags.withSending(true); }
   void setFlags(ParameterFlags flags) { Flags = flags; };
 
   FunctionParam withLabel(StringRef label) const {
@@ -116,14 +117,14 @@ enum class ImplParameterConvention {
 
 enum class ImplParameterInfoFlags : uint8_t {
   NotDifferentiable = 0x1,
-  Transferring = 0x2,
+  Sending = 0x2,
 };
 
 using ImplParameterInfoOptions = OptionSet<ImplParameterInfoFlags>;
 
 enum class ImplResultInfoFlags : uint8_t {
   NotDifferentiable = 0x1,
-  IsTransferring = 0x2,
+  IsSending = 0x2,
 };
 
 using ImplResultInfoOptions = OptionSet<ImplResultInfoFlags>;
@@ -181,6 +182,14 @@ public:
     }
 
     return {};
+  }
+
+  static OptionsType getSending() {
+    OptionsType result;
+
+    result |= ImplParameterInfoFlags::Sending;
+
+    return result;
   }
 
   ImplFunctionParam(BuiltType type, ImplParameterConvention convention,
@@ -256,6 +265,12 @@ public:
     return {};
   }
 
+  static OptionsType getSending() {
+    OptionsType result;
+    result |= ImplResultInfoFlags::IsSending;
+    return result;
+  }
+
   ImplFunctionResult(BuiltType type, ImplResultConvention convention,
                      ImplResultInfoOptions options = {})
       : Type(type), Convention(convention), Options(options) {}
@@ -294,30 +309,29 @@ class ImplFunctionTypeFlags {
   unsigned Async : 1;
   unsigned ErasedIsolation : 1;
   unsigned DifferentiabilityKind : 3;
-  unsigned HasTransferringResult : 1;
+  unsigned HasSendingResult : 1;
 
 public:
   ImplFunctionTypeFlags()
       : Rep(0), Pseudogeneric(0), Escaping(0), Concurrent(0), Async(0),
-        ErasedIsolation(0), DifferentiabilityKind(0), HasTransferringResult(0) {
-  }
+        ErasedIsolation(0), DifferentiabilityKind(0), HasSendingResult(0) {}
 
   ImplFunctionTypeFlags(ImplFunctionRepresentation rep, bool pseudogeneric,
                         bool noescape, bool concurrent, bool async,
                         bool erasedIsolation,
                         ImplFunctionDifferentiabilityKind diffKind,
-                        bool hasTransferringResult)
+                        bool hasSendingResult)
       : Rep(unsigned(rep)), Pseudogeneric(pseudogeneric), Escaping(noescape),
         Concurrent(concurrent), Async(async), ErasedIsolation(erasedIsolation),
         DifferentiabilityKind(unsigned(diffKind)),
-        HasTransferringResult(hasTransferringResult) {}
+        HasSendingResult(hasSendingResult) {}
 
   ImplFunctionTypeFlags
   withRepresentation(ImplFunctionRepresentation rep) const {
     return ImplFunctionTypeFlags(
         rep, Pseudogeneric, Escaping, Concurrent, Async, ErasedIsolation,
         ImplFunctionDifferentiabilityKind(DifferentiabilityKind),
-        HasTransferringResult);
+        HasSendingResult);
   }
 
   ImplFunctionTypeFlags
@@ -326,7 +340,7 @@ public:
         ImplFunctionRepresentation(Rep), Pseudogeneric, Escaping, true, Async,
         ErasedIsolation,
         ImplFunctionDifferentiabilityKind(DifferentiabilityKind),
-        HasTransferringResult);
+        HasSendingResult);
   }
 
   ImplFunctionTypeFlags
@@ -335,7 +349,7 @@ public:
         ImplFunctionRepresentation(Rep), Pseudogeneric, Escaping, Concurrent,
         true, ErasedIsolation,
         ImplFunctionDifferentiabilityKind(DifferentiabilityKind),
-        HasTransferringResult);
+        HasSendingResult);
   }
 
   ImplFunctionTypeFlags
@@ -344,7 +358,7 @@ public:
         ImplFunctionRepresentation(Rep), Pseudogeneric, true, Concurrent, Async,
         ErasedIsolation,
         ImplFunctionDifferentiabilityKind(DifferentiabilityKind),
-        HasTransferringResult);
+        HasSendingResult);
   }
 
   ImplFunctionTypeFlags
@@ -352,7 +366,7 @@ public:
     return ImplFunctionTypeFlags(
         ImplFunctionRepresentation(Rep), Pseudogeneric, Escaping, Concurrent,
         Async, true, ImplFunctionDifferentiabilityKind(DifferentiabilityKind),
-        HasTransferringResult);
+        HasSendingResult);
   }
   
   ImplFunctionTypeFlags
@@ -361,17 +375,17 @@ public:
         ImplFunctionRepresentation(Rep), true, Escaping, Concurrent, Async,
         ErasedIsolation,
         ImplFunctionDifferentiabilityKind(DifferentiabilityKind),
-        HasTransferringResult);
+        HasSendingResult);
   }
 
   ImplFunctionTypeFlags
   withDifferentiabilityKind(ImplFunctionDifferentiabilityKind diffKind) const {
     return ImplFunctionTypeFlags(ImplFunctionRepresentation(Rep), Pseudogeneric,
                                  Escaping, Concurrent, Async, ErasedIsolation,
-                                 diffKind, HasTransferringResult);
+                                 diffKind, HasSendingResult);
   }
 
-  ImplFunctionTypeFlags withTransferringResult() const {
+  ImplFunctionTypeFlags withSendingResult() const {
     return ImplFunctionTypeFlags(
         ImplFunctionRepresentation(Rep), Pseudogeneric, Escaping, Concurrent,
         Async, ErasedIsolation,
@@ -392,7 +406,7 @@ public:
 
   bool hasErasedIsolation() const { return ErasedIsolation; }
 
-  bool hasTransferringResult() const { return HasTransferringResult; }
+  bool hasSendingResult() const { return HasSendingResult; }
 
   bool isDifferentiable() const {
     return getDifferentiabilityKind() !=
@@ -441,7 +455,8 @@ void decodeRequirement(
     BuilderType &Builder) {
   for (auto &child : *node) {
     if (child->getKind() == Demangle::Node::Kind::DependentGenericParamCount ||
-        child->getKind() == Demangle::Node::Kind::DependentGenericParamPackMarker)
+        child->getKind() == Demangle::Node::Kind::DependentGenericParamPackMarker ||
+        child->getKind() == Demangle::Node::Kind::DependentGenericParamValueMarker)
       continue;
 
     if (child->getNumChildren() != 2)
@@ -705,7 +720,7 @@ protected:
       return decodeMangledType(genericArgs->getChild(0), depth + 1);
     }
     case NodeKind::BuiltinTypeName: {
-      auto mangling = Demangle::mangleNode(Node);
+      auto mangling = Demangle::mangleNode(Node, Builder.getManglingFlavor());
       if (!mangling.isSuccess()) {
         return MAKE_NODE_TYPE_ERROR(Node,
                                     "failed to mangle node (%d:%u)",
@@ -864,7 +879,9 @@ protected:
     case NodeKind::DependentGenericParamType: {
       auto depth = Node->getChild(0)->getIndex();
       auto index = Node->getChild(1)->getIndex();
-      return Builder.createGenericTypeParameterType(depth, index);
+      return TypeLookupErrorOr<BuiltType>(
+          Builder.createGenericTypeParameterType(depth, index),
+          /*ignoreValueCheck*/ true);
     }
     case NodeKind::EscapingObjCBlock:
     case NodeKind::ObjCBlock:
@@ -898,6 +915,12 @@ protected:
         ++firstChildIdx;
       }
 
+      if (Node->getChild(firstChildIdx)->getKind() ==
+          NodeKind::SendingResultFunctionType) {
+        extFlags = extFlags.withSendingResult();
+        ++firstChildIdx;
+      }
+
       BuiltType globalActorType = BuiltType();
       if (Node->getChild(firstChildIdx)->getKind() ==
           NodeKind::GlobalActorFunctionType) {
@@ -917,12 +940,6 @@ protected:
       } else if (Node->getChild(firstChildIdx)->getKind() ==
                  NodeKind::IsolatedAnyFunctionType) {
         extFlags = extFlags.withIsolatedAny();
-        ++firstChildIdx;
-      }
-      
-      if (Node->getChild(firstChildIdx)->getKind() ==
-                 NodeKind::TransferringResultFunctionType) {
-        extFlags = extFlags.withTransferringResult();
         ++firstChildIdx;
       }
 
@@ -1076,12 +1093,21 @@ protected:
             flags = flags.withSendable();
           } else if (child->getText() == "@async") {
             flags = flags.withAsync();
+          } else if (child->getText() == "sending-result") {
+            flags = flags.withSendingResult();
           }
+        } else if (child->getKind() == NodeKind::ImplSendingResult) {
+          // NOTE: This flag needs to be set both at the function level and on
+          // each of the parameters. The flag on the function just means that
+          // all parameters are sending (which is always true today).
+          flags = flags.withSendingResult();
         } else if (child->getKind() == NodeKind::ImplCoroutineKind) {
           if (!child->hasText())
             return MAKE_NODE_TYPE_ERROR0(child, "expected text");
           if (child->getText() == "yield_once") {
             coroutineKind = ImplCoroutineKind::YieldOnce;
+          } else if (child->getText() == "yield_once_2") {
+            coroutineKind = ImplCoroutineKind::YieldOnce2;
           } else if (child->getText() == "yield_many") {
             coroutineKind = ImplCoroutineKind::YieldMany;
           } else
@@ -1460,7 +1486,9 @@ protected:
       if (base.isError())
         return base;
 
-      return Builder.createParenType(base.getType());
+      // ParenType has been removed, return the base type for backwards
+      // compatibility.
+      return base.getType();
     }
     case NodeKind::OpaqueType: {
       if (Node->getNumChildren() < 3)
@@ -1502,6 +1530,32 @@ protected:
       
       return Builder.resolveOpaqueType(descriptor, genericArgs, ordinal);
     }
+
+    case NodeKind::Integer: {
+      return Builder.createIntegerType((intptr_t)Node->getIndex());
+    }
+
+    case NodeKind::NegativeInteger: {
+      return Builder.createNegativeIntegerType((intptr_t)Node->getIndex());
+    }
+
+    case NodeKind::BuiltinFixedArray: {
+      if (Node->getNumChildren() < 2)
+        return MAKE_NODE_TYPE_ERROR(Node,
+                                    "fewer children (%zu) than required (2)",
+                                    Node->getNumChildren());
+
+      auto size = decodeMangledType(Node->getChild(0), depth + 1);
+      if (size.isError())
+        return size;
+
+      auto element = decodeMangledType(Node->getChild(1), depth + 1);
+      if (element.isError())
+        return element;
+
+      return Builder.createBuiltinFixedArrayType(size.getType(), element.getType());
+    }
+
     // TODO: Handle OpaqueReturnType, when we're in the middle of reconstructing
     // the defining decl
     default:
@@ -1595,8 +1649,9 @@ private:
     if (depth > TypeDecoder::MaxDepth)
       return true;
 
-    // Children: `convention, differentiability?, type`
-    if (node->getNumChildren() != 2 && node->getNumChildren() != 3)
+    // Children: `convention, differentiability?, sending?, type`
+    if (node->getNumChildren() != 2 && node->getNumChildren() != 3 &&
+        node->getNumChildren() != 4)
       return true;
 
     auto *conventionNode = node->getChild(0);
@@ -1614,7 +1669,7 @@ private:
       return true;
 
     typename T::OptionsType options;
-    if (node->getNumChildren() == 3) {
+    if (node->getNumChildren() == 3 || node->getNumChildren() == 4) {
       auto diffKindNode = node->getChild(1);
       if (diffKindNode->getKind() !=
           Node::Kind::ImplParameterResultDifferentiability)
@@ -1624,6 +1679,13 @@ private:
       if (!optDiffOptions)
         return true;
       options |= *optDiffOptions;
+    }
+
+    if (node->getNumChildren() == 4) {
+      auto sendingKindNode = node->getChild(2);
+      if (sendingKindNode->getKind() != Node::Kind::ImplParameterSending)
+        return true;
+      options |= T::getSending();
     }
 
     results.emplace_back(result.getType(), *convention, options);
@@ -1780,8 +1842,8 @@ private:
           hasParamFlags = true;
           break;
 
-        case NodeKind::Transferring:
-          param.setTransferring();
+        case NodeKind::Sending:
+          param.setSending();
           node = node->getFirstChild();
           hasParamFlags = true;
           break;

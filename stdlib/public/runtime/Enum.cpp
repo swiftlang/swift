@@ -305,10 +305,10 @@ void swift::swift_initEnumMetadataSinglePayloadWithLayoutString(
   _swift_addRefCountStringForMetatype(writer, flags, payloadType, fullOffset,
                                       previousFieldOffset);
 
-  writer.writeBytes((uint64_t)previousFieldOffset);
+  writer.writeBytes((uint64_t)previousFieldOffset + extraTagBytes);
 
   writer.offset = skipBytesOffset;
-  writer.writeBytes(size - previousFieldOffset);
+  writer.writeBytes(payloadSize - previousFieldOffset);
 
   // we mask out HasRelativePointers, because at this point they have all been
   // resolved to metadata pointers
@@ -382,7 +382,7 @@ swift::swift_initEnumMetadataMultiPayload(EnumMetadata *enumType,
                                      const TypeLayout * const *payloadLayouts) {
   // Accumulate the layout requirements of the payloads.
   size_t payloadSize = 0, alignMask = 0;
-  bool isPOD = true, isBT = true;
+  bool isPOD = true, isBT = true, isBB = true;
   for (unsigned i = 0; i < numPayloads; ++i) {
     const TypeLayout *payloadLayout = payloadLayouts[i];
     payloadSize
@@ -390,6 +390,7 @@ swift::swift_initEnumMetadataMultiPayload(EnumMetadata *enumType,
     alignMask |= payloadLayout->flags.getAlignmentMask();
     isPOD &= payloadLayout->flags.isPOD();
     isBT &= payloadLayout->flags.isBitwiseTakable();
+    isBB &= payloadLayout->flags.isBitwiseBorrowable();
   }
   
   // Store the max payload size in the metadata.
@@ -418,6 +419,7 @@ swift::swift_initEnumMetadataMultiPayload(EnumMetadata *enumType,
                      .withAlignmentMask(alignMask)
                      .withPOD(isPOD)
                      .withBitwiseTakable(isBT)
+                     .withBitwiseBorrowable(isBB)
                      .withEnumWitnesses(true)
                      .withInlineStorage(ValueWitnessTable::isValueInline(
                          isBT, totalSize, alignMask + 1)),

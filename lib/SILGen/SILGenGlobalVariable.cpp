@@ -16,6 +16,7 @@
 #include "Scope.h"
 #include "swift/AST/ASTMangler.h"
 #include "swift/AST/GenericSignature.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/SIL/FormalLinkage.h"
 
 using namespace swift;
@@ -35,13 +36,14 @@ SILGlobalVariable *SILGenModule::getSILGlobalVariable(VarDecl *gDecl,
         mangledName = "\1" + mangledName;
       }
     } else {
-      Mangle::ASTMangler NewMangler;
+      Mangle::ASTMangler NewMangler(gDecl->getASTContext());
       mangledName = NewMangler.mangleGlobalVariableFull(gDecl);
     }
   }
 
   // Get the linkage for SILGlobalVariable.
   FormalLinkage formalLinkage;
+  // sil_global linkage should be kept private if its decl is resilient.
   if (gDecl->isResilient())
     formalLinkage = FormalLinkage::Private;
   else
@@ -221,7 +223,7 @@ void SILGenModule::emitGlobalInitialization(PatternBindingDecl *pd,
   if (!pd->getCheckedAndContextualizedExecutableInit(pbdEntry))
     return;
 
-  Mangle::ASTMangler TokenMangler;
+  Mangle::ASTMangler TokenMangler(pd->getASTContext());
   std::string onceTokenBuffer = TokenMangler.mangleGlobalInit(pd, pbdEntry,
                                                               false);
   
@@ -237,7 +239,7 @@ void SILGenModule::emitGlobalInitialization(PatternBindingDecl *pd,
   onceToken->setDeclaration(false);
 
   // Emit the initialization code into a function.
-  Mangle::ASTMangler FuncMangler;
+  Mangle::ASTMangler FuncMangler(pd->getASTContext());
   std::string onceFuncBuffer = FuncMangler.mangleGlobalInit(pd, pbdEntry,
                                                             true);
   

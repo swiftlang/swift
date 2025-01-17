@@ -19,6 +19,7 @@
 #include "swift/AST/GenericParamList.h"
 #include "swift/AST/SourceFile.h" // only for isMacroSignatureFile
 #include "swift/AST/TypeRepr.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/Nullability.h"
 #include "swift/Parse/IDEInspectionCallbacks.h"
 #include "swift/Parse/Lexer.h"
@@ -53,17 +54,12 @@ Parser::ParsedTypeAttributeList::applyAttributesToType(Parser &p,
     ty = new (p.Context) CompileTimeConstTypeRepr(ty, ConstLoc);
   }
 
-  if (ResultDependsOnLoc.isValid()) {
-    ty = new (p.Context) ResultDependsOnTypeRepr(ty, ResultDependsOnLoc);
+  if (SendingLoc.isValid()) {
+    ty = new (p.Context) SendingTypeRepr(ty, SendingLoc);
   }
 
-  if (TransferringLoc.isValid()) {
-    ty = new (p.Context) TransferringTypeRepr(ty, TransferringLoc);
-  }
-
-  if (!lifetimeDependenceSpecifiers.empty()) {
-    ty = LifetimeDependentReturnTypeRepr::create(p.Context, ty,
-                                                 lifetimeDependenceSpecifiers);
+  if (lifetimeEntry) {
+    ty = LifetimeDependentTypeRepr::create(p.Context, ty, lifetimeEntry);
   }
   return ty;
 }
@@ -159,6 +155,8 @@ LayoutConstraint Parser::parseLayoutConstraint(Identifier LayoutConstraintID) {
 ///     type-collection
 ///     type-array
 ///     '_'
+///     integer-literal
+///     '-' integer-literal
 ///     'Pack' '{' (type (',' type)*)? '}'    (only in SIL files)a
 ParserResult<TypeRepr> Parser::parseTypeSimple(
     Diag<> MessageID, ParseTypeReason reason) {
@@ -229,7 +227,11 @@ ParserResult<TypeRepr> Parser::parseTypeSimple(
     break;
   case tok::code_complete:
     if (CodeCompletionCallbacks) {
-      CodeCompletionCallbacks->completeTypeSimpleBeginning();
+      if (tildeLoc.isValid()) {
+        CodeCompletionCallbacks->completeTypeSimpleInverted();
+      } else {
+        CodeCompletionCallbacks->completeTypeSimpleBeginning();
+      }
     }
     return makeParserCodeCompletionResult<TypeRepr>(
         ErrorTypeRepr::create(Context, consumeToken(tok::code_complete)));
@@ -311,13 +313,7 @@ ParserResult<TypeRepr> Parser::parseTypeSimple(
 
   // Wrap in an InverseTypeRepr if needed.
   if (tildeLoc) {
-    TypeRepr *repr;
-    if (canSuppressConformancesWithTilde())
-      repr = new (Context) InverseTypeRepr(tildeLoc, ty.get());
-    else
-      repr =
-          ErrorTypeRepr::create(Context, tildeLoc, diag::cannot_suppress_here);
-
+    TypeRepr *repr = new (Context) InverseTypeRepr(tildeLoc, ty.get());
     ty = makeParserResult(ty, repr);
   }
 
@@ -405,8 +401,14 @@ ParserResult<TypeRepr> Parser::parseTypeScalar(
   ParserStatus status;
 
   // Parse attributes.
-  ParsedTypeAttributeList parsedAttributeList;
+  ParsedTypeAttributeList parsedAttributeList(reason);
   status |= parsedAttributeList.parse(*this);
+
+  // If we have a completion, create an ErrorType.
+  if (status.hasCodeCompletion()) {
+    auto *ET = ErrorTypeRepr::create(Context, PreviousLoc);
+    return makeParserCodeCompletionResult<TypeRepr>(ET);
+  }
 
   // Parse generic parameters in SIL mode.
   GenericParamList *generics = nullptr;
@@ -590,23 +592,9 @@ ParserResult<TypeRepr> Parser::parseTypeScalar(
 ///   pack-expansion-type:
 ///     type-scalar '...'
 ///
-/// \param fromASTGen If true , this function in called from ASTGen as the
-/// fallback, so do not attempt a callback to ASTGen.
-ParserResult<TypeRepr>
-Parser::parseType(Diag<> MessageID, ParseTypeReason reason, bool fromASTGen) {
+ParserResult<TypeRepr> Parser::parseType(Diag<> MessageID,
+                                         ParseTypeReason reason) {
   ParserResult<TypeRepr> ty;
-
-#if SWIFT_BUILD_SWIFT_SYNTAX
-  if (IsForASTGen && !fromASTGen) {
-    ty = parseTypeReprFromSyntaxTree();
-    // Note: there is a representational difference between the swift-syntax
-    // tree and the C++ parser tree regarding variadic parameters. In the
-    // swift-syntax tree, the ellipsis is part of the parameter declaration.
-    // In the C++ parser tree, the ellipsis is part of the type. Account for
-    // this difference by consuming the ellipsis here.
-    goto AFTER_TY_PARSE;
-  }
-#endif
 
   // Parse pack expansion 'repeat T'
   if (Tok.is(tok::kw_repeat)) {
@@ -628,7 +616,6 @@ Parser::parseType(Diag<> MessageID, ParseTypeReason reason, bool fromASTGen) {
 
   ty = parseTypeScalar(MessageID, reason);
 
-AFTER_TY_PARSE:
   if (ty.isNull())
     return ty;
 
@@ -729,7 +716,8 @@ ParserStatus Parser::parseGenericArguments(SmallVectorImpl<TypeRepr *> &Args,
   // variadic generic types.
   if (!startsWithGreater(Tok)) {
     while (true) {
-      ParserResult<TypeRepr> Ty = parseType(diag::expected_type);
+      // Note: This can be a value type, e.g. 'Slab<3, Int>'.
+      ParserResult<TypeRepr> Ty = parseTypeOrValue(diag::expected_type);
       if (Ty.isNull() || Ty.hasCodeCompletion()) {
         // Skip until we hit the '>'.
         RAngleLoc = skipUntilGreaterInTypeList();
@@ -1009,7 +997,7 @@ Parser::parseTypeSimpleOrComposition(Diag<> MessageID, ParseTypeReason reason) {
             .fixItInsert(FirstTypeLoc, keyword.str() + " ");
       }
 
-      const bool isAnyKeyword = keyword.equals("any");
+      const bool isAnyKeyword = keyword == "any";
 
       if (isAnyKeyword) {
         if (anyLoc.isInvalid()) {
@@ -1207,6 +1195,11 @@ ParserResult<TypeRepr> Parser::parseTypeTupleBody() {
       ObsoletedInOutLoc = SourceLoc();
     }
     Backtracking.reset();
+
+    // Try complete the start of a parameter type since the user may be writing
+    // this as a function type.
+    if (tryCompleteFunctionParamTypeBeginning())
+      return makeParserCodeCompletionStatus();
 
     // Parse the type annotation.
     auto type = parseType(diag::expected_type);
@@ -1466,6 +1459,30 @@ Parser::parseTypeImplicitlyUnwrappedOptional(ParserResult<TypeRepr> base) {
   return makeParserResult(ParserStatus(base), TyR);
 }
 
+ParserResult<TypeRepr> Parser::parseTypeOrValue() {
+  return parseTypeOrValue(diag::expected_type);
+}
+
+ParserResult<TypeRepr> Parser::parseTypeOrValue(Diag<> MessageID,
+                                                ParseTypeReason reason) {
+  // Eat any '-' preceding integer literals.
+  SourceLoc minusLoc;
+  if (Tok.isMinus() && peekToken().is(tok::integer_literal)) {
+    minusLoc = consumeToken();
+  }
+
+  // Attempt to parse values first. Right now the only value that can be parsed
+  // as a type are integers.
+  if (Tok.is(tok::integer_literal)) {
+    auto text = copyAndStripUnderscores(Tok.getText());
+    auto loc = consumeToken(tok::integer_literal);
+    return makeParserResult(new (Context) IntegerTypeRepr(text, loc, minusLoc));
+  }
+
+  // Otherwise, attempt to parse a regular type.
+  return parseType(MessageID, reason);
+}
+
 //===----------------------------------------------------------------------===//
 // Speculative type list parsing
 //===----------------------------------------------------------------------===//
@@ -1474,7 +1491,9 @@ static bool isGenericTypeDisambiguatingToken(Parser &P) {
   auto &tok = P.Tok;
   switch (tok.getKind()) {
   default:
-    return false;
+    // If this is the end of the expr (wouldn't match parseExprSequenceElement),
+    // prefer generic type list over an illegal unary postfix '>' operator.
+    return P.isStartOfSwiftDecl() || P.isStartOfStmt(/*prefer expr=*/true);
   case tok::r_paren:
   case tok::r_square:
   case tok::l_brace:
@@ -1508,7 +1527,7 @@ static bool isGenericTypeDisambiguatingToken(Parser &P) {
 }
 
 bool Parser::canParseAsGenericArgumentList() {
-  if (!Tok.isAnyOperator() || !Tok.getText().equals("<"))
+  if (!Tok.isAnyOperator() || Tok.getText() != "<")
     return false;
 
   BacktrackingScope backtrack(*this);
@@ -1557,6 +1576,8 @@ bool Parser::canParseType() {
     consumeToken();
   } else if (Tok.isContextualKeyword("each")) {
     consumeToken();
+  } else if (Tok.isContextualKeyword("sending")) {
+    consumeToken();
   }
 
   switch (Tok.getKind()) {
@@ -1568,13 +1589,26 @@ bool Parser::canParseType() {
       return false;
     break;
   case tok::oper_prefix:
-    if (Tok.getText() != "~") {
+    if (!Tok.isTilde() && !Tok.isMinus()) {
       return false;
     }
 
-    consumeToken();
-    if (!canParseTypeIdentifier())
-      return false;
+    // '~' can only appear before type identifiers like '~Copyable'.
+    if (Tok.isTilde()) {
+      consumeToken();
+
+      if (!canParseTypeIdentifier())
+        return false;
+    }
+
+    // '-' can only appear before integers being used as types like '-123'.
+    if (Tok.isMinus()) {
+      consumeToken();
+
+      if (!Tok.is(tok::integer_literal))
+        return false;
+    }
+
     break;
   case tok::kw_protocol:
     return canParseOldStyleProtocolComposition();
@@ -1604,7 +1638,9 @@ bool Parser::canParseType() {
   case tok::kw__:
     consumeToken();
     break;
-
+  case tok::integer_literal:
+    consumeToken();
+    break;
 
   default:
     return false;

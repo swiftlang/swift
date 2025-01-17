@@ -37,6 +37,8 @@ class DeclContext;
 class Type;
 class ModuleDecl;
 enum class DeclAttrKind : unsigned;
+class DeclAttribute;
+class CustomAttr;
 class SynthesizedExtensionAnalyzer;
 struct PrintOptions;
 class SILPrintContext;
@@ -235,6 +237,10 @@ struct PrintOptions {
   /// Use the original module name to qualify a symbol.
   bool UseOriginallyDefinedInModuleNames = false;
 
+  /// Add a `@_silgen_name` attribute to each function that
+  /// is compatible with one that specifies its mangled name.
+  bool PrintSyntheticSILGenName = false;
+
   /// Print Swift.Array and Swift.Optional with sugared syntax
   /// ([] and ?), even if there are no sugar type nodes.
   bool SynthesizeSugarOnTypes = false;
@@ -272,12 +278,12 @@ struct PrintOptions {
 
   bool SkipSwiftPrivateClangDecls = false;
 
-  /// Whether to skip internal stdlib declarations.
-  bool SkipPrivateStdlibDecls = false;
+  /// Whether to skip underscored declarations from system modules.
+  bool SkipPrivateSystemDecls = false;
 
-  /// Whether to skip underscored stdlib protocols.
+  /// Whether to skip underscored protocols from system modules.
   /// Protocols marked with @_show_in_interface are still printed.
-  bool SkipUnderscoredStdlibProtocols = false;
+  bool SkipUnderscoredSystemProtocols = false;
 
   /// Whether to skip unsafe C++ class methods that were renamed
   /// (e.g. __fooUnsafe). See IsSafeUseOfCxxDecl.
@@ -339,8 +345,9 @@ struct PrintOptions {
   /// Whether to print the internal layout name instead of AnyObject, etc.
   bool PrintInternalLayoutName = false;
 
-  /// Suppress emitting @available(*, noasync)
-  bool SuppressNoAsyncAvailabilityAttr = false;
+  /// Suppress emitting isolated or async deinit, and emit open containing class
+  /// as public
+  bool SuppressIsolatedDeinit = false;
 
   /// Whether to print the \c{/*not inherited*/} comment on factory initializers.
   bool PrintFactoryInitializerComment = true;
@@ -360,6 +367,10 @@ struct PrintOptions {
   OpaqueReturnTypePrintingMode OpaqueReturnTypePrinting =
       OpaqueReturnTypePrintingMode::WithOpaqueKeyword;
 
+  /// If non-null, opaque types that have this naming decl should be printed as
+  /// `some P1` instead of as a stable reference.
+  const ValueDecl *OpaqueReturnTypeNamingDecl = nullptr;
+
   /// Whether to print decl attributes that are only used internally,
   /// such as _silgen_name, transparent, etc.
   bool PrintUserInaccessibleAttrs = true;
@@ -372,30 +383,31 @@ struct PrintOptions {
   /// Whether to suppress printing of custom attributes that are expanded macros.
   bool SuppressExpandedMacros = true;
 
-  /// Whether we're supposed to slap a @rethrows on `AsyncSequence` /
-  /// `AsyncIteratorProtocol` for backward-compatibility reasons.
-  bool AsyncSequenceRethrows = false;
-
   /// Suppress the @isolated(any) attribute.
   bool SuppressIsolatedAny = false;
 
   /// Suppress 'isolated' and '#isolation' on isolated parameters with optional type.
   bool SuppressOptionalIsolatedParams = false;
 
-  /// Suppress Noncopyable generics.
-  bool SuppressNoncopyableGenerics = false;
-
-  /// Suppress printing of `borrowing` and `consuming`.
-  bool SuppressNoncopyableOwnershipModifiers = false;
+  /// Suppress 'sending' on arguments and results.
+  bool SuppressSendingArgsAndResults = false;
 
   /// Suppress printing of '~Proto' for suppressible, non-invertible protocols.
   bool SuppressConformanceSuppression = false;
+
+  /// Replace BitwiseCopyable with _BitwiseCopyable.
+  bool SuppressBitwiseCopyable = false;
+
+  /// Suppress modify/read accessors.
+  bool SuppressCoroutineAccessors = false;
 
   /// List of attribute kinds that should not be printed.
   std::vector<AnyAttrKind> ExcludeAttrList = {
       DeclAttrKind::Transparent, DeclAttrKind::Effects,
       DeclAttrKind::FixedLayout, DeclAttrKind::ShowInInterface,
   };
+
+  std::vector<CustomAttr *> ExcludeCustomAttrList = {};
 
   /// List of attribute kinds that should be printed exclusively.
   /// Empty means allow all.
@@ -442,9 +454,6 @@ struct PrintOptions {
 
   /// Print all decls that have at least this level of access.
   AccessLevel AccessFilter = AccessLevel::Private;
-
-  /// Print IfConfigDecls.
-  bool PrintIfConfig = true;
 
   /// Whether we are printing for sil.
   bool PrintForSIL = false;
@@ -579,10 +588,6 @@ struct PrintOptions {
   /// compilers that might parse the result.
   bool PrintCompatibilityFeatureChecks = false;
 
-  /// Whether to print @_specialize attributes that have an availability
-  /// parameter.
-  bool PrintSpecializeAttributeWithAvailability = true;
-
   /// Whether to always desugar array types from `[base_type]` to `Array<base_type>`
   bool AlwaysDesugarArraySliceTypes = false;
 
@@ -612,17 +617,6 @@ struct PrintOptions {
   QualifyNestedDeclarations ShouldQualifyNestedDeclarations =
       QualifyNestedDeclarations::Never;
 
-  /// If true, we print a protocol's primary associated types using the
-  /// primary associated type syntax: `protocol Foo<Type1, ...>`.
-  ///
-  /// If false, we print them as ordinary associated types.
-  bool PrintPrimaryAssociatedTypes = true;
-
-  /// Whether or not to print `@attached(extension)` attributes on
-  /// macro declarations. This is used for feature suppression in
-  /// Swift interface printing.
-  bool PrintExtensionMacroAttributes = true;
-
   /// If this is not \c nullptr then function bodies (including accessors
   /// and constructors) will be printed by this function.
   std::function<void(const ValueDecl *, ASTPrinter &)> FunctionBody;
@@ -641,6 +635,8 @@ struct PrintOptions {
                           [K](AnyAttrKind other) { return other == K; });
     return false;
   }
+
+  bool excludeAttr(const DeclAttribute *DA) const;
 
   /// Retrieve the set of options for verbose printing to users.
   static PrintOptions printVerbose() {
@@ -676,7 +672,6 @@ struct PrintOptions {
     result.ExcludeAttrList.push_back(DeclAttrKind::Rethrows);
     result.PrintOverrideKeyword = false;
     result.AccessFilter = accessFilter;
-    result.PrintIfConfig = false;
     result.ShouldQualifyNestedDeclarations =
         QualifyNestedDeclarations::TypesOnly;
     result.PrintDocumentationComments = false;
@@ -694,10 +689,11 @@ struct PrintOptions {
     result.SkipUnavailable = true;
     result.SkipImplicit = true;
     result.SkipSwiftPrivateClangDecls = true;
-    result.SkipPrivateStdlibDecls = true;
-    result.SkipUnderscoredStdlibProtocols = true;
+    result.SkipPrivateSystemDecls = true;
+    result.SkipUnderscoredSystemProtocols = true;
     result.SkipUnsafeCXXMethods = true;
-    result.SkipDeinit = true;
+    result.SkipDeinit = false; // Deinit may have isolation attributes, which
+                               // are part of the interface
     result.EmptyLineBetweenDecls = true;
     result.CascadeDocComment = true;
     result.ShouldQualifyNestedDeclarations =
@@ -747,13 +743,6 @@ struct PrintOptions {
   }
   bool shouldPrint(const Pattern* P) const {
     return CurrentPrintabilityChecker->shouldPrint(P, *this);
-  }
-
-  /// Retrieve the print options that are suitable to print the testable interface.
-  static PrintOptions printTestableInterface(bool printFullConvention) {
-    PrintOptions result = printInterface(printFullConvention);
-    result.AccessFilter = AccessLevel::Internal;
-    return result;
   }
 
   /// Retrieve the print options that are suitable to print interface for a
@@ -810,7 +799,7 @@ struct PrintOptions {
       PrintOptions::FunctionRepresentationMode::None;
     PO.PrintDocumentationComments = false;
     PO.ExcludeAttrList.push_back(DeclAttrKind::Available);
-    PO.SkipPrivateStdlibDecls = true;
+    PO.SkipPrivateSystemDecls = true;
     PO.SkipUnsafeCXXMethods = true;
     PO.ExplodeEnumCaseDecls = true;
     PO.ShouldQualifyNestedDeclarations = QualifyNestedDeclarations::TypesOnly;

@@ -1,0 +1,43 @@
+// RUN: %target-sil-opt -enable-sil-opaque-values -enable-sil-verify-all -experimental-swift-based-closure-specialization %s | %FileCheck %s
+// XFAIL: *
+
+struct TestView {}
+struct TestRange {}
+struct TestSlice {}
+
+// helper
+sil @closure : $@convention(thin) (@inout TestView, TestRange, @in TestSlice) -> () {
+bb0(%0 : $*TestView, %1 : $TestRange, %2 : $TestSlice):
+  %1284 = tuple ()
+  return %1284 : $()
+}
+
+// helper
+sil @thunk : $@convention(thin) (@inout TestView, @owned @callee_owned (@inout TestView) -> ()) -> @out () {
+bb0(%0 : $*TestView, %1 : $@callee_owned (@inout TestView) ->()):
+  %call = apply %1(%0) : $@callee_owned (@inout TestView) -> ()
+  %1284 = tuple ()
+  return %1284 : $()
+}
+
+// Test that ClosureSpecializer can handle captured @in args, in addition to direct args.
+//
+// CHECK-LABEL: sil @testSpecializeThunk : $@convention(thin) (@inout TestView, TestRange, @in TestSlice) -> () {
+// CHECK: bb0(%0 : $*TestView, %1 : $TestRange, %2 : $TestSlice):
+// CHECK:   [[CLOSURE:%.*]] = function_ref @closure : $@convention(thin) (@inout TestView, TestRange, @in TestSlice) -> ()
+// CHECK:   [[SPECIALIZED:%.*]] = function_ref @$s5thunk7closure4main9TestRangeVAC0D5SliceVTf1nc_n : $@convention(thin) (@inout TestView, TestRange, @in TestSlice) -> @out () // user: %6
+// CHECK:   [[THUNK:%.*]] = function_ref @thunk : $@convention(thin) (@inout TestView, @owned @callee_owned (@inout TestView) -> ()) -> @out ()
+// CHECK:   [[CALL:%.*]] = apply [[SPECIALIZED]](%0, %1, %2) : $@convention(thin) (@inout TestView, TestRange, @in TestSlice) -> @out ()
+// CHECK:   %{{.*}} = tuple ()
+// CHECK:   return %{{.*}} : $()
+// CHECK-LABEL: } // end sil function 'testSpecializeThunk'
+sil @testSpecializeThunk : $@convention(thin) (@inout TestView, TestRange, @in TestSlice) -> () {
+bb0(%0 : $*TestView, %1 : $TestRange, %2 : $TestSlice):
+  %closurefn = function_ref @closure : $@convention(thin) (@inout TestView, TestRange, @in TestSlice) -> ()
+  %pa = partial_apply %closurefn(%1, %2) : $@convention(thin) (@inout TestView, TestRange, @in TestSlice) -> ()
+  %thunk = function_ref @thunk : $@convention(thin) (@inout TestView, @owned @callee_owned (@inout TestView) -> ()) -> @out ()
+  strong_retain %pa : $@callee_owned (@inout TestView) -> ()
+  %call = apply %thunk(%0, %pa) : $@convention(thin) (@inout TestView, @owned @callee_owned (@inout TestView) -> ()) -> @out ()
+  %1284 = tuple ()
+  return %1284 : $()
+}

@@ -20,7 +20,7 @@ import MyModule
 
 func testSync() -> Int{
     #^GLOBAL_IN_SYNC^#
-// GLOBAL_IN_SYNC-DAG: Decl[FreeFunction]/OtherModule[MyModule]/NotRecommended/TypeRelation[Convertible]: globalAsyncFunc()[' async'][#Int#];
+// GLOBAL_IN_SYNC-DAG: Decl[FreeFunction]/OtherModule[MyModule]/TypeRelation[Convertible]: globalAsyncFunc()[' async'][#Int#];
 // GLOBAL_IN_SYNC-DAG: Decl[FreeFunction]/OtherModule[MyModule]/NotRecommended: deprecatedFunc()[#Void#];
 // GLOBAL_IN_SYNC-DAG: Decl[Actor]/OtherModule[MyModule]:  MyActor[#MyActor#];
 }
@@ -34,7 +34,7 @@ func testSyncMember(obj: MyActor) -> Int {
     obj.#^MEMBER_IN_SYNC^#
 // MEMBER_IN_SYNC: Begin completions, 9 items
 // MEMBER_IN_SYNC-DAG: Keyword[self]/CurrNominal:          self[#MyActor#];
-// MEMBER_IN_SYNC-DAG: Decl[InstanceMethod]/CurrNominal/NotRecommended/TypeRelation[Convertible]: actorMethod()[' async'][#Int#];
+// MEMBER_IN_SYNC-DAG: Decl[InstanceMethod]/CurrNominal/TypeRelation[Convertible]: actorMethod()[' async'][#Int#];
 // MEMBER_IN_SYNC-DAG: Decl[InstanceMethod]/CurrNominal/NotRecommended: deprecatedMethod()[' async'][#Void#];
 // MEMBER_IN_SYNC-DAG: Decl[InstanceVar]/CurrNominal:      unownedExecutor[#UnownedSerialExecutor#];
 // MEMBER_IN_SYNC-DAG: Decl[InstanceMethod]/Super/IsSystem: preconditionIsolated()[#Void#]; name=preconditionIsolated()
@@ -62,7 +62,7 @@ func testSyncMember(obj: MyActor) async -> Int {
 // RUN: %{python} %utils/split_file.py -o %t %s
 
 // RUN: %empty-directory(%t/Modules)
-// RUN: %target-swift-frontend -emit-module -module-name MyModule -o %t/Modules %t/MyModule.swift -disable-availability-checking
+// RUN: %target-swift-frontend -emit-module -module-name MyModule -o %t/Modules %t/MyModule.swift -target %target-swift-5.1-abi-triple
 
 // RUN: %empty-directory(%t/output)
 // RUN: %empty-directory(%t/ccp)

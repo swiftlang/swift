@@ -13,9 +13,11 @@
 #include "swift/IDE/ConformingMethodList.h"
 #include "ExprContextAnalysis.h"
 #include "swift/AST/ASTDemangler.h"
+#include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/USRGeneration.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/IDE/TypeCheckCompletionCallback.h"
 #include "swift/Parse/IDEInspectionCallbacks.h"
 #include "swift/Sema/IDETypeChecking.h"
@@ -154,8 +156,6 @@ void ConformingMethodListCallbacks::getMatchingMethods(
   assert(T->mayHaveMembers() && !T->is<ModuleType>());
 
   class LocalConsumer : public VisibleDeclConsumer {
-    ModuleDecl *CurModule;
-
     /// The type of the parsed expression.
     Type T;
 
@@ -185,14 +185,14 @@ void ConformingMethodListCallbacks::getMatchingMethods(
       // we might run into trouble with really complicated cases but the fake
       // archetype setup will mostly work.
       auto substitutions = T->getMemberSubstitutionMap(
-          CurModule, FD, FD->getGenericEnvironment());
+          FD, FD->getGenericEnvironment());
       auto resultTy =  FD->getResultInterfaceType().subst(substitutions);
       if (resultTy->is<ErrorType>())
         return false;
 
       // The return type conforms to any of the requested protocols.
       for (auto Proto : ExpectedTypes) {
-        if (CurModule->checkConformance(resultTy, Proto))
+        if (checkConformance(resultTy, Proto))
           return true;
       }
 
@@ -203,8 +203,7 @@ void ConformingMethodListCallbacks::getMatchingMethods(
     LocalConsumer(DeclContext *DC, Type T,
                   llvm::SmallPtrSetImpl<ProtocolDecl*> &expectedTypes,
                   SmallVectorImpl<ValueDecl *> &result)
-        : CurModule(DC->getParentModule()), T(T), ExpectedTypes(expectedTypes),
-          Result(result) {}
+        : T(T), ExpectedTypes(expectedTypes), Result(result) {}
 
     void foundDecl(ValueDecl *VD, DeclVisibilityKind reason,
                    DynamicLookupInfo) override {

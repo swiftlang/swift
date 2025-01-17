@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -enable-sil-verify-all -dce %s | %FileCheck %s
+// RUN: %target-sil-opt -sil-print-types -enable-sil-verify-all -dce %s | %FileCheck %s
 
 sil_stage canonical
 
@@ -13,14 +13,21 @@ typealias Int1 = Builtin.Int1
 
 class C {}
 
+sil @getC : $@convention(thin) () -> @owned C
+sil @barrier : $@convention(thin) () -> ()
+
 struct CAndBit {
     var c: C
     var bit: Int1
 }
 
-@_moveOnly
-struct MO {
-    deinit
+struct MO: ~Copyable {
+  var x: Int
+  deinit
+}
+
+struct Outer : ~Copyable {
+  var x: MO
 }
 
 sil @dummy : $@convention(thin) () -> ()
@@ -468,3 +475,35 @@ bb3:
   %22 = tuple ()
   return %22 : $()
 }
+
+// CHECK-LABEL: sil [ossa] @dont_delete_move_value_lexical : {{.*}} {
+// CHECK:         [[LEXICAL:%[^,]+]] = move_value [lexical]
+// CHECK:         [[DUMMY:%[^,]+]] = function_ref @dummy
+// CHECK:         apply [[DUMMY]]()
+// CHECK:         destroy_value [[LEXICAL]]
+// CHECK-LABEL: } // end sil function 'dont_delete_move_value_lexical'
+sil [ossa] @dont_delete_move_value_lexical : $@convention(thin) () -> () {
+  %getC = function_ref @getC : $@convention(thin) () -> @owned C
+  %c = apply %getC() : $@convention(thin) () -> @owned C
+  %m = move_value [lexical] %c : $C
+  %dummy = function_ref @dummy : $@convention(thin) () -> ()
+  apply %dummy() : $@convention(thin) () -> ()
+  destroy_value %m : $C
+  %retval = tuple ()
+  return %retval : $()
+}
+
+// CHECK-LABEL: sil [ossa] @dont_remove_addr_end_lifetime :
+// CHECK:         end_lifetime
+// CHECK-LABEL: } // end sil function 'dont_remove_addr_end_lifetime'
+sil [ossa] @dont_remove_addr_end_lifetime : $@convention(thin) (@owned Outer) -> () {
+bb0(%0 : @owned $Outer):
+  %1 = alloc_stack $Outer
+  store %0 to [init] %1 : $*Outer 
+  %3 = struct_element_addr %1 : $*Outer, #Outer.x
+  end_lifetime %3 : $*MO
+  dealloc_stack %1 : $*Outer
+  %6 = tuple ()
+  return %6 : $()
+}
+

@@ -25,6 +25,7 @@
 #include "llvm/IR/DerivedTypes.h"
 #include "swift/AST/IRGenOptions.h"
 #include "swift/ABI/MetadataValues.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/IRGen/ValueWitness.h"
 #include "swift/SIL/TypeLowering.h"
 
@@ -623,8 +624,9 @@ StackAddress IRGenFunction::emitDynamicAlloca(llvm::Type *eltTy,
   // executed more than once).
   bool isInEntryBlock = (Builder.GetInsertBlock() == &*CurFn->begin());
   if (!isInEntryBlock) {
-    stackRestorePoint =
-        Builder.CreateIntrinsicCall(llvm::Intrinsic::stacksave, {}, "spsave");
+    stackRestorePoint = Builder.CreateIntrinsicCall(
+        llvm::Intrinsic::stacksave,
+        {IGM.DataLayout.getAllocaPtrType(IGM.getLLVMContext())}, {}, "spsave");
   }
 
   // Emit the dynamic alloca.
@@ -656,7 +658,14 @@ void IRGenFunction::emitDeallocateDynamicAlloca(StackAddress address,
     // NOTE: llvm does not support dynamic allocas in coroutines.
 
     auto allocToken = address.getExtraInfo();
-    assert(allocToken && "dynamic alloca in coroutine without alloc token?");
+    if (!allocToken) {
+#ifndef NDEBUG
+      auto *alloca = cast<llvm::AllocaInst>(address.getAddress().getAddress());
+      assert(isa<llvm::ConstantInt>(alloca->getArraySize()) &&
+             "Dynamic alloca without a token?!");
+#endif
+      return;
+    }
     Builder.CreateIntrinsicCall(llvm::Intrinsic::coro_alloca_free, allocToken);
     return;
   }
@@ -664,7 +673,8 @@ void IRGenFunction::emitDeallocateDynamicAlloca(StackAddress address,
   auto savedSP = address.getExtraInfo();
   if (savedSP == nullptr)
     return;
-  Builder.CreateIntrinsicCall(llvm::Intrinsic::stackrestore, savedSP);
+  Builder.CreateIntrinsicCall(llvm::Intrinsic::stackrestore,
+                              {savedSP->getType()}, {savedSP});
 }
 
 /// Emit a call to do an 'initializeArrayWithCopy' operation.

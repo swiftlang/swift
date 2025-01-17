@@ -125,32 +125,32 @@
 
 // Convenience factory declaration followed by convenience init
 +(instancetype)havingConvenienceFactoryAndLaterConvenienceInitWithFlim:(NSInteger)flim;
--(instancetype)initWithFlim:(NSInteger)flim __attribute__((availability(macosx,introduced=10.52)));
+-(instancetype)initWithFlim:(NSInteger)flim __attribute__((availability(macosx,introduced=52)));
 
 // Convenience init declaration followed by convenience factory
--(instancetype)initWithFlam:(NSInteger)flam __attribute__((availability(macosx,introduced=10.52)));
+-(instancetype)initWithFlam:(NSInteger)flam __attribute__((availability(macosx,introduced=52)));
 +(instancetype)havingConvenienceFactoryAndLaterConvenienceInitWithFlam:(NSInteger)flam;
 @end
 
 @interface NSHavingConvenienceFactoryAndEarlierConvenienceInit : NSObject
 -(instancetype)init NS_DESIGNATED_INITIALIZER;
 
-+(instancetype)havingConvenienceFactoryAndEarlierConvenienceInitWithFlim:(NSInteger)flim __attribute__((availability(macosx,introduced=10.52)));
++(instancetype)havingConvenienceFactoryAndEarlierConvenienceInitWithFlim:(NSInteger)flim __attribute__((availability(macosx,introduced=52)));
 -(instancetype)initWithFlim:(NSInteger)flim;
 
 -(instancetype)initWithFlam:(NSInteger)flam;
-+(instancetype)havingConvenienceFactoryAndEarlierConvenienceInitWithFlam:(NSInteger)flam __attribute__((availability(macosx,introduced=10.52)));
++(instancetype)havingConvenienceFactoryAndEarlierConvenienceInitWithFlam:(NSInteger)flam __attribute__((availability(macosx,introduced=52)));
 @end
 
 @interface NSHavingConvenienceFactoryAndSameConvenienceInit : NSObject
 -(instancetype)init NS_DESIGNATED_INITIALIZER;
 
 // We distinguish between which of these the importer chose by the deprecation message.
-+(instancetype)havingConvenienceFactoryAndSameConvenienceInitWithFlim:(NSInteger)flim __attribute__((availability(macosx,introduced=10.8, deprecated=10.51, message="ConvenienceFactory")));
--(instancetype)initWithFlim:(NSInteger)flim __attribute__((availability(macosx,introduced=10.8, deprecated=10.51, message="ConvenienceInit")));
++(instancetype)havingConvenienceFactoryAndSameConvenienceInitWithFlim:(NSInteger)flim __attribute__((availability(macosx,introduced=10.8, deprecated=51, message="ConvenienceFactory")));
+-(instancetype)initWithFlim:(NSInteger)flim __attribute__((availability(macosx,introduced=10.8, deprecated=51, message="ConvenienceInit")));
 
--(instancetype)initWithFlam:(NSInteger)flam __attribute__((availability(macosx,introduced=10.8, deprecated=10.51, message="ConvenienceInit")));
-+(instancetype)havingConvenienceFactoryAndSameConvenienceInitWithFlam:(NSInteger)flam __attribute__((availability(macosx,introduced=10.8, deprecated=10.51, message="ConvenienceFactory")));
+-(instancetype)initWithFlam:(NSInteger)flam __attribute__((availability(macosx,introduced=10.8, deprecated=51, message="ConvenienceInit")));
++(instancetype)havingConvenienceFactoryAndSameConvenienceInitWithFlam:(NSInteger)flam __attribute__((availability(macosx,introduced=10.8, deprecated=51, message="ConvenienceFactory")));
 
 +(instancetype)havingConvenienceFactoryAndSameConvenienceInitWithFlotsam:(NSInteger)flotsam __attribute__((deprecated("ConvenienceFactory")));
 -(instancetype)initWithFlotsam:(NSInteger)flotsam __attribute__((deprecated("ConvenienceInit")));
@@ -162,9 +162,9 @@
 
 @interface NSHavingConvenienceFactoryAndLaterDesignatedInit : NSObject
 +(instancetype)havingConvenienceFactoryAndLaterDesignatedInitWithFlim:(NSInteger)flim;
--(instancetype)initWithFlim:(NSInteger)flim NS_DESIGNATED_INITIALIZER __attribute__((availability(macosx,introduced=10.52)));
+-(instancetype)initWithFlim:(NSInteger)flim NS_DESIGNATED_INITIALIZER __attribute__((availability(macosx,introduced=52)));
 
--(instancetype)initWithFlam:(NSInteger)flam NS_DESIGNATED_INITIALIZER __attribute__((availability(macosx,introduced=10.52)));
+-(instancetype)initWithFlam:(NSInteger)flam NS_DESIGNATED_INITIALIZER __attribute__((availability(macosx,introduced=52)));
 +(instancetype)havingConvenienceFactoryAndLaterDesignatedInitWithFlam:(NSInteger)flam;
 @end
 
@@ -172,9 +172,9 @@
 -(instancetype)init NS_DESIGNATED_INITIALIZER;
 
 +(NSHavingFactoryAndLaterConvenienceInit *)havingFactoryAndLaterConvenienceInitWithFlim:(NSInteger)flim;
--(instancetype)initWithFlim:(NSInteger)flim __attribute__((availability(macosx,introduced=10.52)));
+-(instancetype)initWithFlim:(NSInteger)flim __attribute__((availability(macosx,introduced=52)));
 
--(instancetype)initWithFlam:(NSInteger)flam __attribute__((availability(macosx,introduced=10.52)));
+-(instancetype)initWithFlam:(NSInteger)flam __attribute__((availability(macosx,introduced=52)));
 +(NSHavingFactoryAndLaterConvenienceInit *)havingFactoryAndLaterConvenienceInitWithFlam:(NSInteger)flam;
 @end
 
@@ -306,3 +306,12 @@ typedef NSPoint *NSPointPointer;
 @interface NSDocument (URL)
 @property (copy,nonnull) NSURL *URL;
 @end
+
+typedef NS_ENUM(NSUInteger, NSBezierPathElement) {
+    NSBezierPathElementMoveTo,
+    NSBezierPathElementLineTo,
+    NSBezierPathElementCubicCurveTo __attribute__((availability(macosx,introduced=52))),
+    NSBezierPathElementClosePath,
+    NSBezierPathElementQuadraticCurveTo __attribute__((availability(macosx,introduced=52))),
+    NSBezierPathElementCurveTo __attribute__((availability(macosx,introduced=51,deprecated=52,message="Use NSBezierPathElementCubicCurveTo"))) = NSBezierPathElementCubicCurveTo,
+};

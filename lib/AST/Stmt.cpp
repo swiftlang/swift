@@ -21,6 +21,7 @@
 #include "swift/AST/Expr.h"
 #include "swift/AST/Pattern.h"
 #include "swift/AST/TypeCheckRequests.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/Statistic.h"
 #include "llvm/ADT/PointerUnion.h"
 
@@ -301,24 +302,7 @@ ASTNode BraceStmt::findAsyncNode() {
 }
 
 static bool hasSingleActiveElement(ArrayRef<ASTNode> elts) {
-  while (true) {
-    // Single element brace.
-    if (elts.size() == 1)
-      return true;
-
-    // See if we have a #if as the first element of a 2 element brace, if so we
-    // can recuse into its active clause. If so, the second element will be the
-    // active element.
-    if (elts.size() == 2) {
-      if (auto *D = elts.front().dyn_cast<Decl *>()) {
-        if (auto *ICD = dyn_cast<IfConfigDecl>(D)) {
-          elts = ICD->getActiveClauseElements();
-          continue;
-        }
-      }
-    }
-    return false;
-  }
+  return elts.size() == 1;
 }
 
 ASTNode BraceStmt::getSingleActiveElement() const {
@@ -526,19 +510,28 @@ void LabeledConditionalStmt::setCond(StmtCondition e) {
 }
 
 /// Whether or not this conditional stmt rebinds self with a `let self`
-/// or `let self = self` condition. If `requireLoadExpr` is `true`,
-/// additionally requires that the RHS of the self condition is a `LoadExpr`.
+/// or `let self = self` condition.
+///  - If `requiresCaptureListRef` is `true`, additionally requires that the
+///    RHS of the self condition references a var defined in a capture list.
+///  - If `requireLoadExpr` is `true`, additionally requires that the RHS of
+///    the self condition is a `LoadExpr`.
 bool LabeledConditionalStmt::rebindsSelf(ASTContext &Ctx,
+                                         bool requiresCaptureListRef,
                                          bool requireLoadExpr) const {
-  return llvm::any_of(getCond(), [&Ctx, requireLoadExpr](const auto &cond) {
-    return cond.rebindsSelf(Ctx, requireLoadExpr);
+  return llvm::any_of(getCond(), [&Ctx, requiresCaptureListRef,
+                                  requireLoadExpr](const auto &cond) {
+    return cond.rebindsSelf(Ctx, requiresCaptureListRef, requireLoadExpr);
   });
 }
 
 /// Whether or not this conditional stmt rebinds self with a `let self`
-/// or `let self = self` condition. If `requireLoadExpr` is `true`,
-/// additionally requires that the RHS of the self condition is a `LoadExpr`.
+/// or `let self = self` condition.
+///  - If `requiresCaptureListRef` is `true`, additionally requires that the
+///    RHS of the self condition references a var defined in a capture list.
+///  - If `requireLoadExpr` is `true`, additionally requires that the RHS of
+///    the self condition is a `LoadExpr`.
 bool StmtConditionElement::rebindsSelf(ASTContext &Ctx,
+                                       bool requiresCaptureListRef,
                                        bool requireLoadExpr) const {
   auto pattern = getPatternOrNull();
   if (!pattern) {
@@ -578,8 +571,22 @@ bool StmtConditionElement::rebindsSelf(ASTContext &Ctx,
   if (auto *DRE = dyn_cast<DeclRefExpr>(
           exprToCheckForDRE->getSemanticsProvidingExpr())) {
     auto *decl = DRE->getDecl();
-    return decl && decl->hasName() ? decl->getName().isSimpleName(Ctx.Id_self)
-                                   : false;
+
+    bool definedInCaptureList = false;
+    if (auto varDecl = dyn_cast_or_null<VarDecl>(DRE->getDecl())) {
+      definedInCaptureList = varDecl->isCaptureList();
+    }
+
+    if (requiresCaptureListRef && !definedInCaptureList) {
+      return false;
+    }
+
+    bool isVariableNamedSelf = false;
+    if (decl && decl->hasName()) {
+      isVariableNamedSelf = decl->getName().isSimpleName(Ctx.Id_self);
+    }
+
+    return isVariableNamedSelf;
   }
 
   return false;
@@ -936,8 +943,7 @@ SwitchStmt *SwitchStmt::create(LabeledStmtInfo LabelInfo, SourceLoc SwitchLoc,
 #ifndef NDEBUG
   for (auto N : Cases)
     assert((N.is<Stmt*>() && isa<CaseStmt>(N.get<Stmt*>())) ||
-           (N.is<Decl*>() && (isa<IfConfigDecl>(N.get<Decl*>()) ||
-                              isa<PoundDiagnosticDecl>(N.get<Decl*>()))));
+           (N.is<Decl*>() && (isa<PoundDiagnosticDecl>(N.get<Decl*>()))));
 #endif
 
   void *p = C.Allocate(totalSizeToAlloc<ASTNode>(Cases.size()),
@@ -963,6 +969,23 @@ LabeledStmt *BreakStmt::getTarget() const {
 LabeledStmt *ContinueStmt::getTarget() const {
   auto &eval = getDeclContext()->getASTContext().evaluator;
   return evaluateOrDefault(eval, ContinueTargetRequest{this}, nullptr);
+}
+
+FallthroughStmt *FallthroughStmt::createParsed(SourceLoc Loc, DeclContext *DC) {
+  auto &ctx = DC->getASTContext();
+  return new (ctx) FallthroughStmt(Loc, DC);
+}
+
+CaseStmt *FallthroughStmt::getFallthroughSource() const {
+  auto &eval = getDeclContext()->getASTContext().evaluator;
+  return evaluateOrDefault(eval, FallthroughSourceAndDestRequest{this}, {})
+      .Source;
+}
+
+CaseStmt *FallthroughStmt::getFallthroughDest() const {
+  auto &eval = getDeclContext()->getASTContext().evaluator;
+  return evaluateOrDefault(eval, FallthroughSourceAndDestRequest{this}, {})
+      .Dest;
 }
 
 SourceLoc swift::extractNearestSourceLoc(const Stmt *S) {

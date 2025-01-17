@@ -19,6 +19,7 @@
 #include "swift/AST/IRGenOptions.h"
 #include "swift/AST/Pattern.h"
 #include "swift/AST/Types.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/SIL/SILModule.h"
 #include "swift/SIL/SILType.h"
 #include "llvm/IR/DerivedTypes.h"
@@ -79,7 +80,7 @@ public:
     auto kind = *component.getAsDerivativeFunctionKind();
     auto assocTy = origFnTy->getAutoDiffDerivativeFunctionType(
         parameterIndices, resultIndices, kind, IGM.getSILTypes(),
-        LookUpConformanceInModule(IGM.getSwiftModule()));
+        LookUpConformanceInModule());
     return SILType::getPrimitiveObjectType(assocTy);
   }
 };
@@ -95,8 +96,8 @@ public:
                              unsigned explosionSize, llvm::Type *ty, Size size,
                              SpareBitVector &&spareBits, Alignment align,
                              IsTriviallyDestroyable_t isTriviallyDestroyable, IsFixedSize_t alwaysFixedSize)
-      : super(fields, explosionSize, ty, size, std::move(spareBits), align,
-              isTriviallyDestroyable, IsCopyable, alwaysFixedSize) {}
+      : super(fields, explosionSize, FieldsAreABIAccessible, ty, size, std::move(spareBits), align,
+              isTriviallyDestroyable, IsCopyable, alwaysFixedSize, IsABIAccessible) {}
 
   Address projectFieldAddress(IRGenFunction &IGF, Address addr, SILType T,
                               const DifferentiableFuncFieldInfo &field) const {
@@ -173,12 +174,14 @@ public:
   }
 
   TypeInfo *createFixed(ArrayRef<DifferentiableFuncFieldInfo> fields,
+                        FieldsAreABIAccessible_t unused,
                         StructLayout &&layout) {
     llvm_unreachable("@differentiable functions are always loadable");
   }
 
   DifferentiableFuncTypeInfo *
   createLoadable(ArrayRef<DifferentiableFuncFieldInfo> fields,
+                 FieldsAreABIAccessible_t unused,
                  StructLayout &&layout, unsigned explosionSize) {
     return DifferentiableFuncTypeInfo::create(
         fields, explosionSize, layout.getType(), layout.getSize(),
@@ -206,7 +209,7 @@ public:
     auto kind = *component.getAsDerivativeFunctionKind();
     auto assocTy = originalType->getAutoDiffDerivativeFunctionType(
         parameterIndices, resultIndices, kind, IGM.getSILTypes(),
-        LookUpConformanceInModule(IGM.getSwiftModule()));
+        LookUpConformanceInModule());
     return SILType::getPrimitiveObjectType(assocTy);
   }
 
@@ -254,7 +257,7 @@ public:
     case LinearDifferentiableFunctionTypeComponent::Transpose:
       auto transposeTy = origFnTy->getAutoDiffTransposeFunctionType(
           parameterIndices, IGM.getSILTypes(),
-          LookUpConformanceInModule(IGM.getSwiftModule()));
+          LookUpConformanceInModule());
       return SILType::getPrimitiveObjectType(transposeTy);
     }
     llvm_unreachable("invalid component type");
@@ -272,8 +275,8 @@ public:
                      unsigned explosionSize, llvm::Type *ty, Size size,
                      SpareBitVector &&spareBits, Alignment align, IsTriviallyDestroyable_t isTriviallyDestroyable,
                      IsFixedSize_t alwaysFixedSize)
-      : super(fields, explosionSize, ty, size, std::move(spareBits), align,
-              isTriviallyDestroyable, IsCopyable, alwaysFixedSize) {}
+      : super(fields, explosionSize, FieldsAreABIAccessible, ty, size, std::move(spareBits), align,
+              isTriviallyDestroyable, IsCopyable, alwaysFixedSize, IsABIAccessible) {}
 
   Address projectFieldAddress(IRGenFunction &IGF, Address addr, SILType T,
                               const LinearFuncFieldInfo &field) const {
@@ -344,11 +347,13 @@ public:
   }
 
   TypeInfo *createFixed(ArrayRef<LinearFuncFieldInfo> fields,
+                        FieldsAreABIAccessible_t areFieldsABIAccessible,
                         StructLayout &&layout) {
     llvm_unreachable("@differentiable functions are always loadable");
   }
 
   LinearFuncTypeInfo *createLoadable(ArrayRef<LinearFuncFieldInfo> fields,
+                                     FieldsAreABIAccessible_t unused,
                                      StructLayout &&layout,
                                      unsigned explosionSize) {
     return LinearFuncTypeInfo::create(
@@ -376,7 +381,7 @@ public:
     case LinearDifferentiableFunctionTypeComponent::Transpose:
       auto transposeTy = originalType->getAutoDiffTransposeFunctionType(
           parameterIndices, IGM.getSILTypes(),
-          LookUpConformanceInModule(IGM.getSwiftModule()));
+          LookUpConformanceInModule());
       return SILType::getPrimitiveObjectType(transposeTy);
     }
     llvm_unreachable("invalid component type");

@@ -19,11 +19,12 @@ protocol VeryThrowing {
 
   var prop1: Int { get throws }
   var prop2: Int { get throws(MyError) }
-  var prop3: Int { get throws(HomeworkError) } // expected-note{{protocol requires property 'prop3' with type 'Int'; add a stub for conformance}}
+  var prop3: Int { get throws(HomeworkError) } // expected-note{{protocol requires property 'prop3' with type 'Int'}}
                                                // FIXME: poor diagnostic above
   var prop4: Int { get throws(SuperError) }
 }
 
+// expected-note@+2 {{add stubs for conformance}}
 // expected-error@+1{{type 'ConformingToVeryThrowing' does not conform to protocol 'VeryThrowing'}}
 struct ConformingToVeryThrowing: VeryThrowing {
   func f() throws(MyError) { } // okay to make type more specific

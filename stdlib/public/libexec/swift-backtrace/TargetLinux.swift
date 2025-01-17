@@ -17,15 +17,17 @@
 
 #if os(Linux)
 
+#if canImport(Glibc)
 import Glibc
+#elseif canImport(Musl)
+import Musl
+#endif
 
 import _Backtracing
 @_spi(Internal) import _Backtracing
 @_spi(Contexts) import _Backtracing
 @_spi(MemoryReaders) import _Backtracing
 @_spi(Utils) import _Backtracing
-
-@_implementationOnly import Runtime
 
 enum SomeBacktrace {
   case raw(Backtrace)

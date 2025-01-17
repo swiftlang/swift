@@ -1,8 +1,8 @@
-// RUN: %target-typecheck-verify-swift -enable-upcoming-feature InferSendableFromCaptures -disable-availability-checking
-// RUN: %target-swift-emit-silgen %s -verify -enable-upcoming-feature InferSendableFromCaptures -disable-availability-checking -module-name sendable_methods | %FileCheck %s
+// RUN: %target-typecheck-verify-swift -enable-upcoming-feature InferSendableFromCaptures -disable-availability-checking -strict-concurrency=complete
+// RUN: %target-swift-emit-silgen %s -verify -enable-upcoming-feature InferSendableFromCaptures -disable-availability-checking -module-name sendable_methods -strict-concurrency=complete | %FileCheck %s
 
 // REQUIRES: concurrency
-// REQUIRES: asserts
+// REQUIRES: swift_feature_InferSendableFromCaptures
 
 func outer() {
     @Sendable func sendable() {}
@@ -42,6 +42,7 @@ struct InferredSendableS: P {
 
 enum InferredSendableE: P {
   case a, b
+  case c(Int)
   
   func f() { }
 }
@@ -59,6 +60,13 @@ struct GenericS<T> : P {
 
   func g() async { }
 }
+
+enum GenericE<T> {
+  case a
+  case b(T)
+}
+
+extension GenericE: Sendable where T: Sendable { }
 
 class NonSendable {
   func f() {}
@@ -151,10 +159,10 @@ struct World {
 
 let helloworld:  @Sendable () -> Void = World.greet
 
-class NonSendableC {
+class NonSendableC { // expected-note{{class 'NonSendableC' does not conform to the 'Sendable' protocol}}
     var x: Int = 0
 
-    @Sendable func inc() { // expected-warning {{instance methods of non-Sendable types cannot be marked as '@Sendable'; this is an error in the Swift 6 language mode}}
+    @Sendable func inc() { // expected-warning {{instance method of non-Sendable type 'NonSendableC' cannot be marked as '@Sendable'}}
         x += 1
     }
 }
@@ -185,10 +193,6 @@ actor TestActor {}
 struct SomeGlobalActor {
   static var shared: TestActor { TestActor() }
 }
-
-@SomeGlobalActor
-let globalValue: NonSendable = NonSendable()
-
 
 @SomeGlobalActor
 // CHECK-LABEL: sil hidden [ossa] @$s16sendable_methods8generic3yyxYalF : $@convention(thin) @async <T> (@in_guaranteed T) -> ()
@@ -267,5 +271,64 @@ do {
 
   func test(c: C) -> (any Sendable)? {
     true ? nil : c // Ok
+  }
+}
+
+func acceptSendableFunc<T, U>(_: @Sendable (T) -> U) { }
+
+acceptSendableFunc(InferredSendableE.c)
+acceptSendableFunc(GenericE<Int>.b)
+acceptSendableFunc(GenericE<NonSendable>.b)
+
+// Make sure pattern matching isn't affected by @Sendable on cases.
+func testPatternMatch(ge: [GenericE<Int>]) {
+  if case .b(let a) = ge.first {
+    _ = a
+  }
+}
+
+// rdar://131321053 - cannot pass an operator to parameter that expectes a @Sendable type
+do {
+  func test(_: @Sendable (Int, Int) -> Bool) {
+  }
+
+  test(<) // Ok
+}
+
+// Partially applied instance method
+do {
+  struct S {
+    func foo() {}
+  }
+
+  func bar(_ x: @Sendable () -> Void) {}
+
+  let fn = S.foo(S())
+  bar(fn) // Ok
+
+  let _: @Sendable (S) -> @Sendable () -> Void = S.foo // Ok
+
+  let classFn = NonSendable.f(NonSendable())
+  bar(classFn) // expected-warning {{converting non-sendable function value to '@Sendable () -> Void' may introduce data races}}
+
+  let _: @Sendable (NonSendable) -> () -> Void = NonSendable.f // Ok
+
+  class Test {
+    static func staticFn() {}
+  }
+
+  bar(Test.staticFn) // Ok
+}
+
+// Reference to static method
+do {
+  struct Outer {
+    struct Inner: Sendable {
+      var f: @Sendable () -> Void
+    }
+
+    var g = Inner(f: Outer.ff)
+
+    static func ff() {}
   }
 }

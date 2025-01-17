@@ -1,4 +1,4 @@
-// RUN: %target-run-simple-swift( -Xfrontend -disable-availability-checking %import-libdispatch)
+// RUN: %target-run-simple-swift( -target %target-swift-5.1-abi-triple %import-libdispatch)
 
 // REQUIRES: executable_test
 // REQUIRES: concurrency
@@ -16,6 +16,8 @@ import StdlibUnittest
     import Darwin
 #elseif canImport(Glibc)
     import Glibc
+#elseif canImport(Android)
+    import Android
 #endif
 
 var asyncTests = TestSuite("Async")

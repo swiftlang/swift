@@ -32,8 +32,14 @@ extension BuiltinInst : OnoneSimplifyable {
            .Strideof,
            .Alignof:
         optimizeTargetTypeConst(context)
-      case .DestroyArray,
-           .CopyArray,
+      case .DestroyArray:
+        let elementType = substitutionMap.replacementType.loweredType(in: parentFunction, maximallyAbstracted: true)
+        if elementType.isTrivial(in: parentFunction) {
+          context.erase(instruction: self)
+          return
+        }
+        optimizeArgumentToThinMetatype(argument: 0, context)
+      case .CopyArray,
            .TakeArrayNoAlias,
            .TakeArrayFrontToBack,
            .TakeArrayBackToFront,
@@ -122,47 +128,39 @@ private extension BuiltinInst {
   }
 
   func optimizeCanBeClass(_ context: SimplifyContext) {
-    guard let ty = substitutionMap.replacementTypes[0] else {
-      return
-    }
     let literal: IntegerLiteralInst
-    switch ty.canBeClass {
-    case .IsNot:
+    switch substitutionMap.replacementType.canonical.canBeClass {
+    case .isNot:
       let builder = Builder(before: self, context)
       literal = builder.createIntegerLiteral(0,  type: type)
-    case .Is:
+    case .is:
       let builder = Builder(before: self, context)
       literal = builder.createIntegerLiteral(1,  type: type)
-    case .CanBe:
+    case .canBe:
       return
-    default:
-      fatalError()
     }
-    uses.replaceAll(with: literal, context)
-    context.erase(instruction: self)
+    self.replace(with: literal, context)
   }
 
   func optimizeAssertConfig(_ context: SimplifyContext) {
-    let literal: IntegerLiteralInst
-    switch context.options.assertConfiguration {
-    case .enabled:
+    // The values for the assert_configuration call are:
+    // 0: Debug
+    // 1: Release
+    // 2: Fast / Unchecked
+    let config = context.options.assertConfiguration
+    switch config {
+    case .debug, .release, .unchecked:
       let builder = Builder(before: self, context)
-      literal = builder.createIntegerLiteral(1,  type: type)
-    case .disabled:
-      let builder = Builder(before: self, context)
-      literal = builder.createIntegerLiteral(0,  type: type)
-    default:
+      let literal = builder.createIntegerLiteral(config.integerValue, type: type)
+      uses.replaceAll(with: literal, context)
+      context.erase(instruction: self)
+    case .unknown:
       return
     }
-    uses.replaceAll(with: literal, context)
-    context.erase(instruction: self)
   }
   
   func optimizeTargetTypeConst(_ context: SimplifyContext) {
-    guard let ty = substitutionMap.replacementTypes[0] else {
-      return
-    }
-    
+    let ty = substitutionMap.replacementType.loweredType(in: parentFunction, maximallyAbstracted: true)
     let value: Int?
     switch id {
     case .Sizeof:
@@ -200,7 +198,7 @@ private extension BuiltinInst {
       return
     }
     
-    let instanceType = type.instanceTypeOfMetatype(in: parentFunction)
+    let instanceType = type.loweredInstanceTypeOfMetatype(in: parentFunction)
     let builder = Builder(before: self, context)
     let newMetatype = builder.createMetatype(of: instanceType, representation: .Thin)
     operands[argument].set(to: newMetatype, context)
@@ -277,8 +275,8 @@ private func typesOfValuesAreEqual(_ lhs: Value, _ rhs: Value, in function: Func
   if lhsMetatype.isDynamicSelfMetatype != rhsMetatype.isDynamicSelfMetatype {
     return nil
   }
-  let lhsTy = lhsMetatype.instanceTypeOfMetatype(in: function)
-  let rhsTy = rhsMetatype.instanceTypeOfMetatype(in: function)
+  let lhsTy = lhsMetatype.loweredInstanceTypeOfMetatype(in: function)
+  let rhsTy = rhsMetatype.loweredInstanceTypeOfMetatype(in: function)
 
   // Do we know the exact types? This is not the case e.g. if a type is passed as metatype
   // to the function.
@@ -286,7 +284,12 @@ private func typesOfValuesAreEqual(_ lhs: Value, _ rhs: Value, in function: Func
                       rhsExistential.metatype is MetatypeInst
 
   if typesAreExact {
-    if lhsTy == rhsTy {
+    // We need to compare the not lowered types, because function types may differ in their original version
+    // but are equal in the lowered version, e.g.
+    //   ((Int, Int) -> ())
+    //   (((Int, Int)) -> ())
+    //
+    if lhsMetatype == rhsMetatype {
       return true
     }
     // Comparing types of different classes which are in a sub-class relation is not handled by the

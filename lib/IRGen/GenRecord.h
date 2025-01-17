@@ -202,6 +202,13 @@ public:
       return emitAssignWithTakeCall(IGF, T, dest, src);
     }
 
+    if (auto rawLayout = T.getRawLayout()) {
+      return handleRawLayout(IGF, dest, src, T, isOutlined, rawLayout,
+            [&](const TypeInfo &ti, SILType type, Address dest, Address src) {
+        ti.assignWithTake(IGF, dest, src, type, isOutlined);
+      });
+    }
+
     if (isOutlined || T.hasParameterizedExistential()) {
       auto offsets = asImpl().getNonFixedOffsets(IGF, T);
       for (auto &field : getFields()) {
@@ -261,7 +268,11 @@ public:
     } else if (!AreFieldsABIAccessible) {
       // If the fields are not ABI-accessible, use the value witness table.
       return emitInitializeWithTakeCall(IGF, T, dest, src);
-
+    } else if (auto rawLayout = T.getRawLayout()) {
+      return handleRawLayout(IGF, dest, src, T, isOutlined, rawLayout,
+            [&](const TypeInfo &ti, SILType type, Address dest, Address src) {
+        ti.initializeWithTake(IGF, dest, src, type, isOutlined, zeroizeIfSensitive);
+      });
     } else if (isOutlined || T.hasParameterizedExistential()) {
       auto offsets = asImpl().getNonFixedOffsets(IGF, T);
       for (auto &field : getFields()) {
@@ -281,11 +292,54 @@ public:
       fillWithZerosIfSensitive(IGF, src, T);
   }
 
+  void handleRawLayout(IRGenFunction &IGF, Address dest, Address src, SILType T,
+                       bool isOutlined, RawLayoutAttr *rawLayout,
+                       std::function<void
+                          (const TypeInfo &, SILType, Address, Address)> body) const {
+    if (rawLayout->shouldMoveAsLikeType()) {
+      auto likeType = T.getRawLayoutSubstitutedLikeType();
+      auto loweredLikeType = IGF.IGM.getLoweredType(likeType);
+      auto &likeTypeInfo = IGF.IGM.getTypeInfo(loweredLikeType);
+
+      // Fixup src/dest address element types because currently they are in
+      // terms of the raw layout type's [n x i8] where we're at a point to use
+      // the like type's concrete storage type.
+      src = Address(src.getAddress(), likeTypeInfo.getStorageType(),
+                    src.getAlignment());
+      dest = Address(dest.getAddress(), likeTypeInfo.getStorageType(),
+                     dest.getAlignment());
+
+      // If we're a scalar, then we only need to run the body once.
+      if (rawLayout->getScalarLikeType()) {
+        body(likeTypeInfo, loweredLikeType, dest, src);
+      }
+
+      // Otherwise, emit a loop that calls body N times where N is the count
+      // of the array variant. This could be generic in which case we need to
+      // pull the value out of metadata or it could be a constant integer.
+      if (rawLayout->getArrayLikeTypeAndCount()) {
+        auto countType = T.getRawLayoutSubstitutedCountType()->getCanonicalType();
+
+        IGF.emitLoopOverElements(likeTypeInfo, loweredLikeType, countType,
+                                 dest, src, [&](Address dest, Address src) {
+          body(likeTypeInfo, loweredLikeType, dest, src);
+        });
+      }
+    }
+  }
+
   void destroy(IRGenFunction &IGF, Address addr, SILType T,
                bool isOutlined) const override {
     // If the fields are not ABI-accessible, use the value witness table.
     if (!AreFieldsABIAccessible) {
       return emitDestroyCall(IGF, T, addr);
+    }
+
+    if (auto rawLayout = T.getRawLayout()) {
+      return handleRawLayout(IGF, Address(), addr, T, isOutlined, rawLayout,
+            [&](const TypeInfo &ti, SILType type, Address dest, Address src) {
+        ti.destroy(IGF, src, type, isOutlined);
+      });
     }
 
     if (isOutlined || T.hasParameterizedExistential()) {
@@ -501,6 +555,23 @@ public:
       auto fType = field.getType(collector.IGF.IGM, T);
       field.getTypeInfo().collectMetadataForOutlining(collector, fType);
     }
+
+    // If we're a raw layout type, collect metadata from our like type and count
+    // as well.
+    if (auto likeType = T.getRawLayoutSubstitutedLikeType()) {
+      auto loweredLikeType = collector.IGF.IGM.getLoweredType(likeType);
+      collector.IGF.IGM.getTypeInfo(loweredLikeType)
+          .collectMetadataForOutlining(collector, loweredLikeType);
+
+      if (auto countType = T.getRawLayoutSubstitutedCountType()) {
+        if (countType->isValueParameter()) {
+          auto loweredCountType = collector.IGF.IGM.getLoweredType(countType);
+          collector.IGF.IGM.getTypeInfo(loweredCountType)
+            .collectMetadataForOutlining(collector, loweredCountType);
+        }
+      }
+    }
+
     collector.collectTypeMetadata(T);
   }
 };
@@ -591,7 +662,7 @@ class RecordTypeInfo<Impl, Base, FieldImpl,
 protected:
   template <class... As> 
   RecordTypeInfo(ArrayRef<FieldImpl> fields, As &&...args)
-    : super(fields, FieldsAreABIAccessible, std::forward<As>(args)...) {}
+    : super(fields, std::forward<As>(args)...) {}
 
   using super::asImpl;
 
@@ -873,12 +944,12 @@ public:
     fieldTypesForLayout.reserve(astFields.size());
 
     auto fieldsABIAccessible = FieldsAreABIAccessible;
-
     unsigned explosionSize = 0;
     for (unsigned i : indices(astFields)) {
       auto &astField = astFields[i];
       // Compute the field's type info.
-      auto &fieldTI = IGM.getTypeInfo(asImpl()->getType(astField));
+      auto fieldTy = asImpl()->getType(astField);
+      auto &fieldTI = IGM.getTypeInfo(fieldTy);
       fieldTypesForLayout.push_back(&fieldTI);
 
       if (!fieldTI.isABIAccessible())
@@ -911,11 +982,10 @@ public:
     // Create the type info.
     if (layout.isLoadable()) {
       assert(layout.isFixedLayout());
-      assert(fieldsABIAccessible);
-      return asImpl()->createLoadable(fields, std::move(layout), explosionSize);
+      return asImpl()->createLoadable(fields, fieldsABIAccessible, std::move(layout), explosionSize
+                                      );
     } else if (layout.isFixedLayout()) {
-      assert(fieldsABIAccessible);
-      return asImpl()->createFixed(fields, std::move(layout));
+      return asImpl()->createFixed(fields, fieldsABIAccessible, std::move(layout));
     } else {
       return asImpl()->createNonFixed(fields, fieldsABIAccessible,
                                       std::move(layout));
