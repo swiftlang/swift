@@ -1983,7 +1983,7 @@ private:
     std::set<std::pair<const TypeRef *, const MetadataSource *>> Done;
     GenericArgumentMap Subs;
 
-    ArrayRef<const TypeRef *> CaptureTypes = Info.CaptureTypes;
+    llvm::ArrayRef<const TypeRef *> CaptureTypes = Info.CaptureTypes;
 
     // Closure context element layout depends on the layout of the
     // captured types, but captured types might depend on element
