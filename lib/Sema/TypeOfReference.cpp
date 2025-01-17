@@ -2495,18 +2495,19 @@ void ConstraintSystem::resolveOverload(ConstraintLocator *locator,
       }
     }
 
-    if (isa<SubscriptDecl>(decl)) {
-      if (locator->isResultOfKeyPathDynamicMemberLookup() ||
-          locator->isKeyPathSubscriptComponent()) {
-        // Subscript type has a format of (Self[.Type) -> (Arg...) -> Result
-        auto declTy = adjustedOpenedType->castTo<FunctionType>();
-        auto subscriptTy = declTy->getResult()->castTo<FunctionType>();
-        // If we have subscript, each of the arguments has to conform to
-        // Hashable, because it would be used as a component inside key path.
-        for (auto index : indices(subscriptTy->getParams())) {
-          const auto &param = subscriptTy->getParams()[index];
-          verifyThatArgumentIsHashable(index, param.getParameterType(), locator);
-        }
+    if ((isa<SubscriptDecl>(decl) &&
+         (locator->isResultOfKeyPathDynamicMemberLookup() ||
+          locator->isKeyPathSubscriptComponent())) ||
+        (isa<FuncDecl>(decl) && locator->isKeyPathMemberComponent())) {
+      // Subscript/method type has a format of (Self[.Type) -> (Arg...) ->
+      // Result
+      auto declTy = adjustedOpenedType->castTo<FunctionType>();
+      auto ty = declTy->getResult()->castTo<FunctionType>();
+      // If we have subscript or method, each of the arguments has to conform to
+      // Hashable, because it would be used as a component inside key path.
+      for (auto index : indices(ty->getParams())) {
+        const auto &param = ty->getParams()[index];
+        verifyThatArgumentIsHashable(index, param.getParameterType(), locator);
       }
     }
 

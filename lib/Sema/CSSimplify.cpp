@@ -9006,8 +9006,9 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyConformsToConstraint(
     // If this is an implicit Hashable conformance check generated for each
     // index argument of the keypath subscript component, we could just treat
     // it as though it conforms.
-    if (loc->isResultOfKeyPathDynamicMemberLookup() ||
-        loc->isKeyPathSubscriptComponent()) {
+    if ((loc->isResultOfKeyPathDynamicMemberLookup() ||
+         loc->isKeyPathSubscriptComponent()) ||
+        loc->isKeyPathMemberComponent()) {
       if (protocol ==
           getASTContext().getProtocol(KnownProtocolKind::Hashable)) {
         auto *fix =
