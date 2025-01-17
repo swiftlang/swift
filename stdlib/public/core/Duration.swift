@@ -46,6 +46,7 @@ public struct Duration: Sendable {
     self._high = _high
   }
 
+  @_alwaysEmitIntoClient
   internal init(_attoseconds: _Int128) {
     self.init(_high: _attoseconds.high, low: _attoseconds.low)
   }
@@ -119,7 +120,7 @@ extension Duration {
   
   /// Construct a `Duration` given a duration and scale, taking care so that
   /// exact integer durations are preserved exactly.
-  @usableFromInline
+  @_alwaysEmitIntoClient
   internal init(_ duration: Double, scale: UInt64) {
     // Split the duration into integral and fractional parts, as we need to
     // handle them slightly differently to ensure that integer values are
