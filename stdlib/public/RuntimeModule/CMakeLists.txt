@@ -14,7 +14,6 @@
 #  rather, it's a high level Swift interface to things
 set(swift_runtime_link_libraries
   swiftCore
-  swiftCxxStdlib
   swift_Concurrency
 )
 
