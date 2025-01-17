@@ -21,7 +21,7 @@ sil @borrowC : $@convention(thin) (@guaranteed C) -> ()
 // CHECK:         destroy_value [[C]]
 // CHECK-LABEL: } // end sil function 'copied_partial_apply'
 // CHECK:       Operand.
-// CHECK:       Owner:   destroy_value [[PA]]
+// CHECK:       Owner:   destroy_value [[PA2]]
 // CHECK:       returned: true
 // CHECK-LABEL: end running test {{.*}} on copied_partial_apply
 sil [ossa] @copied_partial_apply : $@convention(thin) (@owned C) -> () {
