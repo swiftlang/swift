@@ -6163,6 +6163,9 @@ TinyPtrVector<ValueDecl *> ClangRecordMemberLookup::evaluate(
   ClangModuleLoader *clangModuleLoader = ctx.getClangModuleLoader();
   for (auto foundEntry : directResults) {
     auto found = foundEntry.get<clang::NamedDecl *>();
+    if (dyn_cast<clang::Decl>(found->getDeclContext()) !=
+        recordDecl->getClangDecl())
+      continue;
 
     // Don't import constructors on foreign reference types.
     if (isa<clang::CXXConstructorDecl>(found) && isa<ClassDecl>(recordDecl))
