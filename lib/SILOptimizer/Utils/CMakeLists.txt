@@ -22,6 +22,7 @@ target_sources(swiftSILOptimizer PRIVATE
   LexicalDestroyHoisting.cpp
   LoopUtils.cpp
   OptimizerStatsUtils.cpp
+  RegionIsolation.cpp
   PartialApplyCombiner.cpp
   PartitionUtils.cpp
   PerformanceInlinerUtils.cpp
