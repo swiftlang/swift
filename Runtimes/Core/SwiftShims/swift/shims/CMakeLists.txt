@@ -10,6 +10,7 @@ install(FILES
   LibcOverlayShims.h
   LibcShims.h
   MetadataSections.h
+  ObjCShims.h
   Random.h
   RefCount.h
   Reflection.h
