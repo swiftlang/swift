@@ -719,8 +719,8 @@ ERROR(expr_swift_keypath_empty, none,
       "key path must have at least one component", ())
 ERROR(expr_string_interpolation_outside_string,none,
       "string interpolation can only appear inside a string literal", ())
-ERROR(expr_keypath_subscript_index_not_hashable, none,
-      "subscript index of type %0 in a key path must be Hashable", (Type))
+ERROR(expr_keypath_arg_or_index_not_hashable, none,
+      "%select{method argument|subscript index}0 of type %1 in a key path must be Hashable", (bool, Type))
 ERROR(expr_smart_keypath_application_type_mismatch,none,
       "key path of type %0 cannot be applied to a base of type %1",
       (Type, Type))
