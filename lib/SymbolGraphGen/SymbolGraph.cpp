@@ -268,9 +268,22 @@ void SymbolGraph::recordMemberRelationship(Symbol S) {
         }
       }
 
-      return recordEdge(S,
-                        Symbol(this, DC->getSelfNominalTypeDecl(), nullptr),
-                        RelationshipKind::MemberOf());
+      if (Walker.PublicPrivateTypeAliases.contains(
+              DC->getSelfNominalTypeDecl())) {
+        // If our member target is a private type that has a public type alias,
+        // point the membership to that type alias instead.
+        return recordEdge(
+            S,
+            Symbol(
+                this,
+                Walker.PublicPrivateTypeAliases[DC->getSelfNominalTypeDecl()],
+                nullptr),
+            RelationshipKind::MemberOf());
+      } else {
+        return recordEdge(S,
+                          Symbol(this, DC->getSelfNominalTypeDecl(), nullptr),
+                          RelationshipKind::MemberOf());
+      }
     case swift::DeclContextKind::AbstractClosureExpr:
     case swift::DeclContextKind::SerializedAbstractClosure:
     case swift::DeclContextKind::Initializer:
@@ -375,9 +388,11 @@ void SymbolGraph::recordConformanceSynthesizedMemberRelationships(Symbol S) {
           // that protocol would otherwise be hidden.
           if (auto *Nominal = Info.Ext->getExtendedNominal()) {
             if (dropSynthesizedMembers &&
-                !isImplicitlyPrivate(
-                    Nominal, /*IgnoreContext =*/Nominal->getModuleContext() ==
-                                 StdlibModule))
+                !isImplicitlyPrivate(Nominal, /*IgnoreContext =*/
+                                     [&](const Decl *P) {
+                                       return Nominal->getModuleContext() ==
+                                              StdlibModule;
+                                     }))
               continue;
           } else if (dropSynthesizedMembers) {
             continue;
@@ -392,10 +407,12 @@ void SymbolGraph::recordConformanceSynthesizedMemberRelationships(Symbol S) {
               // There can be synthesized members on effectively private
               // protocols or things that conform to them. We don't want to
               // include those.
-              if (isImplicitlyPrivate(SynthMember,
-                                      /*IgnoreContext =*/
-                                      SynthMember->getModuleContext() ==
-                                          StdlibModule)) {
+              if (isImplicitlyPrivate(
+                      SynthMember,
+                      /*IgnoreContext =*/
+                      [&](const Decl *P) {
+                        return SynthMember->getModuleContext() == StdlibModule;
+                      })) {
                 continue;
               }
 
@@ -412,8 +429,11 @@ void SymbolGraph::recordConformanceSynthesizedMemberRelationships(Symbol S) {
                   if (dropSynthesizedMembers &&
                       !isImplicitlyPrivate(
                           ParentDecl,
-                          /*IgnoreContext =*/ParentDecl->getModuleContext() ==
-                              StdlibModule)) {
+                          /*IgnoreContext =*/
+                          [&](const Decl *P) {
+                            return ParentDecl->getModuleContext() ==
+                                   StdlibModule;
+                          })) {
                     continue;
                   }
                 }
@@ -699,8 +719,8 @@ const ValueDecl *getProtocolRequirement(const ValueDecl *VD) {
 
 }
 
-bool SymbolGraph::isImplicitlyPrivate(const Decl *D,
-                                      bool IgnoreContext) const {
+bool SymbolGraph::isImplicitlyPrivate(
+    const Decl *D, llvm::function_ref<bool(const Decl *)> IgnoreContext) const {
   // Don't record unconditionally private declarations
   if (D->isPrivateSystemDecl(/*treatNonBuiltinProtocolsAsPublic=*/false)) {
     return true;
@@ -808,16 +828,15 @@ bool SymbolGraph::isImplicitlyPrivate(const Decl *D,
     if (IsGlobalSIMDType) {
       return true;
     }
-
-    if (IgnoreContext) {
-      return false;
-    }
   }
 
   // Check up the parent chain. Anything inside a privately named
   // thing is also private. We could be looking at the `B` of `_A.B`.
   if (const auto *DC = D->getDeclContext()) {
     if (const auto *Parent = DC->getAsDecl()) {
+      if (IgnoreContext && IgnoreContext(Parent))
+        return false;
+
       // Exception: Children of underscored protocols should be considered
       // public, even though the protocols themselves aren't. This way,
       // synthesized copies of those symbols are correctly added to the public
@@ -852,7 +871,11 @@ bool SymbolGraph::isUnconditionallyUnavailableOnAllPlatforms(const Decl *D) cons
 }
 
 /// Returns `true` if the symbol should be included as a node in the graph.
-bool SymbolGraph::canIncludeDeclAsNode(const Decl *D) const {
+bool SymbolGraph::canIncludeDeclAsNode(const Decl *D,
+                                       const Decl *PublicAncestorDecl) const {
+  if (PublicAncestorDecl && D == PublicAncestorDecl)
+    return true;
+
   // If this decl isn't in this module or module that this module imported with `@_exported`, don't record it,
   // as it will appear elsewhere in its module's symbol graph.
   if (D->getModuleContext()->getName() != M.getName() && !Walker.isConsideredExportedImported(D)) {
@@ -866,6 +889,8 @@ bool SymbolGraph::canIncludeDeclAsNode(const Decl *D) const {
   } else {
     return false;
   }
-  return !isImplicitlyPrivate(cast<ValueDecl>(D)) 
-    && !isUnconditionallyUnavailableOnAllPlatforms(cast<ValueDecl>(D));
+  return !isImplicitlyPrivate(
+             cast<ValueDecl>(D), /*IgnoreContext=*/
+             [&](const Decl *P) { return P == PublicAncestorDecl; }) &&
+         !isUnconditionallyUnavailableOnAllPlatforms(cast<ValueDecl>(D));
 }
