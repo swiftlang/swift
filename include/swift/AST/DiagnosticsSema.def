@@ -1561,6 +1561,8 @@ ERROR(cannot_pass_inout_arg_to_subscript,none,
       "cannot pass an inout argument to a subscript; use "
       "'withUnsafeMutablePointer' to explicitly convert argument "
       "to a pointer", ())
+ERROR(cannot_pass_inout_arg_to_keypath_method,none,
+      "cannot pass an inout argument to a keypath method", ())
 
 ERROR(incorrect_property_wrapper_reference,none,
       "cannot convert value %0 of type %1 to expected type %2, "
