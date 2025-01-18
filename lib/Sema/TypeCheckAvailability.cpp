@@ -538,6 +538,15 @@ private:
     return MacroWalking::Arguments;
   }
 
+  SequenceWalking getSequenceWalkingBehavior() const override {
+    // Since availability scopes may be built at arbitrary times, the builder
+    // may encounter ASTs where SequenceExprs still exist and have not been
+    // folded, or it may encounter folded SequenceExprs that have not been
+    // removed from the AST. When folded exprs are encountered, its important
+    // to avoid walking into the same AST nodes twice.
+    return SequenceWalking::OnlyWalkFirstOperatorWhenFolded;
+  }
+
   /// Check whether this declaration is within a macro expansion buffer that
   /// will have its own availability scope that will be lazily expanded.
   bool isDeclInMacroExpansion(Decl *decl) const override {
