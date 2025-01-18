@@ -2245,6 +2245,44 @@ void ASTContext::loadObjCMethods(
   }
 }
 
+ConstructorDecl *ASTContext::getOptionalTanInitDecl(CanType optionalTanType) {
+  auto *optionalTanDecl = optionalTanType.getNominalOrBoundGenericNominal();
+  // Look up the `Optional<T>.TangentVector.init` declaration.
+  auto initLookup =
+    optionalTanDecl->lookupDirect(DeclBaseName::createConstructor());
+  ConstructorDecl *constructorDecl = nullptr;
+  for (auto *candidate : initLookup) {
+    auto candidateModule = candidate->getModuleContext();
+    if (candidateModule->getName() == Id_Differentiation ||
+        candidateModule->isStdlibModule()) {
+      assert(!constructorDecl && "Multiple `Optional.TangentVector.init`s");
+      constructorDecl = cast<ConstructorDecl>(candidate);
+#ifdef NDEBUG
+      break;
+#endif
+    }
+  }
+  assert(constructorDecl && "No `Optional.TangentVector.init`");
+
+  return constructorDecl;
+}
+
+VarDecl *ASTContext::getOptionalTanValueDecl(CanType optionalTanType) {
+  // TODO: Maybe it would be better to have getters / setters here that we
+  // can call and hide this implementation detail?
+  StructDecl *optStructDecl = optionalTanType.getStructOrBoundGenericStruct();
+  assert(optStructDecl && "Unexpected type of Optional.TangentVector");
+
+  ArrayRef<VarDecl *> properties = optStructDecl->getStoredProperties();
+  assert(properties.size() == 1 && "Unexpected type of Optional.TangentVector");
+  VarDecl *wrappedValueVar = properties[0];
+
+  assert(wrappedValueVar->getTypeInContext()->getEnumOrBoundGenericEnum() ==
+         getOptionalDecl() && "Unexpected type of Optional.TangentVector");
+
+  return wrappedValueVar;
+}
+
 void ASTContext::loadDerivativeFunctionConfigurations(
     AbstractFunctionDecl *originalAFD, unsigned previousGeneration,
     llvm::SetVector<AutoDiffConfig> &results) {

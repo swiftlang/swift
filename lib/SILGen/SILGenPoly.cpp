@@ -301,24 +301,8 @@ SILGenFunction::emitTransformExistential(SILLocation loc,
 ManagedValue SILGenFunction::emitTangentVectorToOptionalTangentVector(
     SILLocation loc, ManagedValue input, CanType wrappedType, CanType inputType,
     CanType outputType, SGFContext ctxt) {
-  auto *optionalTanDecl = outputType.getNominalOrBoundGenericNominal();
   // Look up the `Optional<T>.TangentVector.init` declaration.
-  auto initLookup =
-    optionalTanDecl->lookupDirect(DeclBaseName::createConstructor());
-  ConstructorDecl *constructorDecl = nullptr;
-  for (auto *candidate : initLookup) {
-    auto candidateModule = candidate->getModuleContext();
-    if (candidateModule->getName() ==
-        getASTContext().Id_Differentiation ||
-        candidateModule->isStdlibModule()) {
-      assert(!constructorDecl && "Multiple `Optional.TangentVector.init`s");
-      constructorDecl = cast<ConstructorDecl>(candidate);
-#ifdef NDEBUG
-      break;
-#endif
-    }
-  }
-  assert(constructorDecl && "No `Optional.TangentVector.init`");
+  auto *constructorDecl = getASTContext().getOptionalTanInitDecl(outputType);
 
   // `Optional<T.TangentVector>`
   CanType optionalOfWrappedTanType = inputType.wrapInOptionalType();
@@ -346,25 +330,15 @@ ManagedValue SILGenFunction::emitOptionalTangentVectorToTangentVector(
     SILLocation loc, ManagedValue input, CanType wrappedType, CanType inputType,
     CanType outputType, SGFContext ctxt) {
   // Optional<T>.TangentVector should be a struct with a single
-  // Optional<T.TangentVector> property. This is an implementation detail of
-  // OptionalDifferentiation.swift
-  // TODO: Maybe it would be better to have getters / setters here that we
-  // can call and hide this implementation detail?
-  StructDecl *optStructDecl = inputType.getStructOrBoundGenericStruct();
-  assert(optStructDecl && "Unexpected type of Optional.TangentVector");
-
-  ArrayRef<VarDecl *> properties = optStructDecl->getStoredProperties();
-  assert(properties.size() == 1 && "Unexpected type of Optional.TangentVector");
-  VarDecl *wrappedValueVar = properties[0];
-
-  assert(wrappedValueVar->getTypeInContext()->getEnumOrBoundGenericEnum() ==
-             getASTContext().getOptionalDecl() &&
-         "Unexpected type of Optional.TangentVector");
-
-  FormalEvaluationScope scope(*this);
-
+  // Optional<T.TangentVector> `value` property. This is an implementation
+  // detail of OptionalDifferentiation.swift
+  // TODO: Maybe it would be better to have explicit getters / setters here that we can
+  // call and hide this implementation detail?
+  VarDecl *wrappedValueVar = getASTContext().getOptionalTanValueDecl(inputType);
   // `Optional<T.TangentVector>`
   CanType optionalOfWrappedTanType = outputType.wrapInOptionalType();
+
+  FormalEvaluationScope scope(*this);
 
   auto sig = wrappedValueVar->getDeclContext()->getGenericSignatureOfContext();
   auto *diffProto =
