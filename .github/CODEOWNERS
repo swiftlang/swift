@@ -172,6 +172,7 @@
 /lib/Sema/Constraint*                               @hborla @xedin
 /lib/Sema/DerivedConformance*                       @slavapestov
 /lib/Sema/DerivedConformanceDistributed*            @ktoso @slavapestov
+/lib/Sema/OpenedExistentials*                       @AnthonyLatsis @slavapestov
 /lib/Sema/TypeCheckDistributed*                     @hborla @ktoso @xedin
 /lib/Sema/TypeCheckProtocol*                        @AnthonyLatsis @hborla @slavapestov
 /lib/Sema/TypeCheckType*                            @AnthonyLatsis @hborla @slavapestov @xedin
