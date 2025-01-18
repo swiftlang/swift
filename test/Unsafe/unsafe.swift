@@ -130,7 +130,9 @@ class UnsafeSub: UnsafeSuper { }
 @unsafe var unsafeVar: Int = 0
 
 
-// expected-warning@+1{{global function 'testMe' has an interface that is not memory-safe; use '@unsafe' to indicate that its use is unsafe}}{{1-1=@unsafe }}
+// expected-warning@+3{{global function 'testMe' has an interface that involves unsafe types}}
+// expected-note@+2{{add '@unsafe' to indicate that this declaration is unsafe to use}}{{1-1=@unsafe }}
+// expected-note@+1{{add '@safe' to indicate that this declaration is memory-safe to use}}{1-1=@safe }}
 func testMe(
   _ pointer: PointerType, // expected-note{{reference to unsafe struct 'PointerType'}}
   _ unsafeSuper: UnsafeSuper // expected-note{{reference to unsafe class 'UnsafeSuper'}}
@@ -151,14 +153,18 @@ func testMe(
 // Various declaration kinds
 // -----------------------------------------------------------------------
 
-// expected-warning@+1{{type alias 'SuperUnsafe' has an interface that is not memory-safe; use '@unsafe' to indicate that its use is unsafe}}
+// expected-warning@+3{{type alias 'SuperUnsafe' has an interface that involves unsafe types}}
+// expected-note@+2{{add '@unsafe' to indicate that this declaration is unsafe to use}}{{1-1=@unsafe }}
+// expected-note@+1{{add '@safe' to indicate that this declaration is memory-safe to use}}{1-1=@safe }}
 typealias SuperUnsafe = UnsafeSuper // expected-note{{reference to unsafe class 'UnsafeSuper'}}
 
 @unsafe typealias SuperUnsafe2 = UnsafeSuper
 
 enum HasUnsafeThings {
 
-// expected-warning@+1{{enum case 'one' has an interface that is not memory-safe; use '@unsafe' to indicate that its use is unsafe }}{{1-1=@unsafe }}
+// expected-warning@+3{{enum case 'one' has an interface that involves unsafe types}}
+// expected-note@+2{{add '@unsafe' to indicate that this declaration is unsafe to use}}{{1-1=@unsafe }}
+// expected-note@+1{{add '@safe' to indicate that this declaration is memory-safe to use}}{1-1=@safe }}
 case one(UnsafeSuper)  // expected-note{{reference to unsafe class 'UnsafeSuper'}}
 
 @unsafe case two(UnsafeSuper)

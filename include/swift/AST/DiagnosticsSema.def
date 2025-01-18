@@ -8126,9 +8126,13 @@ NOTE(note_use_of_unsafe_conformance_is_unsafe,none,
      (Type, const ValueDecl *))
 
 GROUPED_WARNING(decl_signature_involves_unsafe,Unsafe,none,
-      "%kindbase0 has an interface that is not memory-safe; "
-      "use '@unsafe' to indicate that its use is unsafe",
+      "%kindbase0 has an interface that involves unsafe types",
       (const Decl *))
+NOTE(decl_signature_mark_unsafe,none,
+      "add '@unsafe' to indicate that this declaration is unsafe to use",
+      ())
+NOTE(decl_signature_mark_safe,none,
+      "add '@safe' to indicate that this declaration is memory-safe to use", ())
 
 GROUPED_WARNING(conformance_involves_unsafe,Unsafe,none,
      "conformance of %0 to %kind1 involves unsafe code; use '@unsafe' to "
