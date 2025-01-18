@@ -454,6 +454,92 @@ class TestGithubIssue70089 {
         }
       }
     }
+
+    func testClosuresInsideWeakSelfNotUnwrapped() {
+      // https://forums.swift.org/t/nested-weak-capture-and-implicit-self-in-swift-6/77230/1
+      doVoidStuff { [weak self] in
+        doVoidStuff { [weak self] in
+          guard let self else { return }
+          x += 1
+        }
+      }
+
+      doVoidStuff { [weak self] in
+        doVoidStuff { [weak self] in
+          doVoidStuff { [weak self] in
+            guard let self else { return }
+            doVoidStuff { [weak self] in
+              doVoidStuff { [weak self] in
+                guard let self else { return }
+                x += 1
+              }
+            }
+          }
+        }
+      }
+
+      doVoidStuff { [weak self] in
+        doVoidStuff { [weak self] in
+          guard let self else { return }
+          doVoidStuff { [self] in
+            doVoidStuff { [self] in
+              doVoidStuff { [weak self] in
+                guard let self else { return }
+                x += 1
+              }
+            }
+          }
+        }
+      }
+
+      doVoidStuff { [weak self] in
+        guard let self = self ?? TestGithubIssue70089.staticOptional else { return }
+        doVoidStuff { [weak self] in
+          guard let self else { return }
+          x += 1 // expected-error{{reference to property 'x' in closure requires explicit use of 'self' to make capture semantics explicit}}
+        }
+      }
+
+      doVoidStuff { [weak self] in
+        doVoidStuff { [self] in
+          x += 1 // expected-error@-1 {{value of optional type 'TestGithubIssue70089?' must be unwrapped to a value of type 'TestGithubIssue70089'}} expected-note@-1 {{coalesce using '??' to provide a default when the optional value contains 'nil'}} expected-note@-1 {{force-unwrap using '!' to abort execution if the optional value contains 'nil'}}
+        }
+      }
+
+      doVoidStuff { [weak self] in
+        doVoidStuff { [self] in // 
+          self.x += 1 // expected-error@-1 {{value of optional type 'TestGithubIssue70089?' must be unwrapped to a value of type 'TestGithubIssue70089'}} expected-note@-1 {{coalesce using '??' to provide a default when the optional value contains 'nil'}} expected-note@-1 {{force-unwrap using '!' to abort execution if the optional value contains 'nil'}}
+        }
+      }
+
+      doVoidStuff { [weak self] in
+        doVoidStuff { [self] in
+          self?.x += 1
+        }
+      }
+
+      doVoidStuff { [weak self] in
+        doVoidStuff { [self] in
+          guard let self else { return }
+          self.x += 1
+        }
+      }
+
+      doVoidStuff { [weak self] in
+        doVoidStuff { [self] in
+          guard let self else { return }
+          x += 1
+        }
+      }
+
+      doVoidStuff { [weak self] in
+        guard let self = self ?? TestGithubIssue70089.staticOptional else { return }
+        doVoidStuff { [self] in
+          guard let self else { return } // expected-error{{initializer for conditional binding must have Optional type, not 'TestGithubIssue70089'}}
+          x += 1 // expected-error{{reference to property 'x' in closure requires explicit use of 'self' to make capture semantics explicit}}
+        }
+      }
+    }
 }
 
 class TestGithubIssue69911 {
@@ -670,7 +756,7 @@ final class AutoclosureTests {
     doVoidStuff { [weak self] in
       doVoidStuff { [self] in
         guard let self else { return }
-        method() // expected-error {{call to method 'method' in closure requires explicit use of 'self' to make capture semantics explicit}}
+        method()
       }
     }
   
@@ -698,13 +784,6 @@ final class AutoclosureTests {
       }
 
       doVoidStuff { [self] in
-        method() // expected-error {{call to method 'method' in closure requires explicit use of 'self' to make capture semantics explicit}}
-      }
-    }
-
-    doVoidStuff { [weak self] in
-      doVoidStuff { [self] in
-        guard let self else { return }
         method() // expected-error {{call to method 'method' in closure requires explicit use of 'self' to make capture semantics explicit}}
       }
     }
