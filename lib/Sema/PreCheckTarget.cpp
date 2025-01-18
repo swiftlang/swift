@@ -1298,6 +1298,9 @@ public:
                                        diag::extraneous_address_of);
             diag.fixItExchange(expr->getLoc(), lastInnerParenLoc);
           }
+          if (!parents.empty() && isa<KeyPathExpr>(parents[0]))
+            diags.diagnose(expr->getStartLoc(),
+                           diag::cannot_pass_inout_arg_to_keypath_method);
           return finish(true, expr);
         }
 
