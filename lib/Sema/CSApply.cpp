@@ -7540,14 +7540,16 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
                 .withDifferentiabilityKind(toEI.getDifferentiabilityKind())
                 .build();
         SmallVector<AnyFunctionType::Param, 4> params(fromFunc->getParams());
-        assert(params.size() == toFunc->getParams().size() && "unexpected @differentiable conversion");
+        assert(params.size() == toFunc->getParams().size() &&
+               "unexpected @differentiable conversion");
         // Propagate @noDerivate from target function type
         for (auto paramAndIndex : llvm::enumerate(toFunc->getParams())) {
           if (!paramAndIndex.value().isNoDerivative())
             continue;
 
           auto &param = params[paramAndIndex.index()];
-          param = param.withFlags(param.getParameterFlags().withNoDerivative(true));
+          param =
+            param.withFlags(param.getParameterFlags().withNoDerivative(true));
         }
 
         fromFunc = FunctionType::get(params, fromFunc->getResult(), newEI);
