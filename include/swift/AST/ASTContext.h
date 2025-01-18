@@ -1124,6 +1124,16 @@ public:
       AbstractFunctionDecl *originalAFD, unsigned previousGeneration,
       llvm::SetVector<AutoDiffConfig> &results);
 
+  /// Given `Optional<T>.TangentVector` type, retreive the
+  /// `Optional<T>.TangentVector.init` declaration.
+  ConstructorDecl *getOptionalTanInitDecl(CanType optionalTanType);
+
+  /// Optional<T>.TangentVector is a struct with a single
+  /// Optional<T.TangentVector> `value` property. This is an implementation
+  /// detail of OptionalDifferentiation.swift. Retreive `VarDecl` corresponding
+  /// to this property.
+  VarDecl *getOptionalTanValueDecl(CanType optionalTanType);
+
   /// Retrieve the next macro expansion discriminator within the given
   /// name and context.
   unsigned getNextMacroDiscriminator(MacroDiscriminatorContext context,
