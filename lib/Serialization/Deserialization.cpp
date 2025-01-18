@@ -5636,6 +5636,8 @@ DeclDeserializer::readAvailable_DECL_ATTR(SmallVectorImpl<uint64_t> &scratch,
     domain = isPackageDescriptionVersionSpecific
                  ? AvailabilityDomain::forPackageDescription()
                  : AvailabilityDomain::forSwiftLanguage();
+  } else if (isForEmbedded) {
+    domain = AvailabilityDomain::forEmbedded();
   } else {
     domain = AvailabilityDomain::forUniversal();
   }
@@ -5643,7 +5645,7 @@ DeclDeserializer::readAvailable_DECL_ATTR(SmallVectorImpl<uint64_t> &scratch,
   auto attr = new (ctx)
       AvailableAttr(SourceLoc(), SourceRange(), domain, kind, message, rename,
                     Introduced, SourceRange(), Deprecated, SourceRange(),
-                    Obsoleted, SourceRange(), isImplicit, isSPI, isForEmbedded);
+                    Obsoleted, SourceRange(), isImplicit, isSPI);
   return attr;
 }
 
