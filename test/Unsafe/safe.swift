@@ -168,6 +168,9 @@ extension UnsafeBufferPointer {
 
 func testMyArray(ints: MyArray<Int>) {
   ints.withUnsafeBufferPointer { buffer in
+    let bufferCopy = unsafe buffer
+    _ = unsafe bufferCopy
+
     // expected-warning@+1{{expression uses unsafe constructs but is not marked with 'unsafe'}}
     print(buffer.safeCount) // expected-note{{reference to parameter 'buffer' involves unsafe type 'UnsafeBufferPointer<Int>'}}
     unsafe print(buffer.baseAddress!)
