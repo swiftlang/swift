@@ -208,21 +208,27 @@ bool ArgsToFrontendOptionsConverter::convert(
   // Ensure that the compiler was built with zlib support if it was the
   // requested AST format.
   if (const Arg *A = Args.getLastArg(OPT_dump_ast_format)) {
-    Opts.DumpASTFormat =
-        llvm::StringSwitch<FrontendOptions::ASTFormat>(A->getValue())
+    auto format =
+        llvm::StringSwitch<std::optional<FrontendOptions::ASTFormat>>(A->getValue())
             .Case("json", FrontendOptions::ASTFormat::JSON)
             .Case("json-zlib", FrontendOptions::ASTFormat::JSONZlib)
-            .Default(FrontendOptions::ASTFormat::Default);
-    if (Opts.DumpASTFormat != FrontendOptions::ASTFormat::Default &&
+            .Case("default", FrontendOptions::ASTFormat::Default)
+            .Default(std::nullopt);
+    if (!format.has_value()) {
+      Diags.diagnose(SourceLoc(), diag::unknown_dump_ast_format, A->getValue());
+      return true;
+    }
+    if (format != FrontendOptions::ASTFormat::Default &&
         !Args.hasArg(OPT_dump_ast)) {
       Diags.diagnose(SourceLoc(), diag::ast_format_requires_dump_ast);
       return true;
     }
     if (Opts.DumpASTFormat == FrontendOptions::ASTFormat::JSONZlib &&
         !llvm::compression::zlib::isAvailable()) {
-      Diags.diagnose(SourceLoc(), diag::zlib_not_supported);
+      Diags.diagnose(SourceLoc(), diag::json_zlib_not_supported);
       return true;
     }
+    Opts.DumpASTFormat = *format;
   }
 
   std::optional<FrontendInputsAndOutputs> inputsAndOutputs =

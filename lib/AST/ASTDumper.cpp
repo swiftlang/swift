@@ -715,7 +715,7 @@ namespace {
                                    Label label) = 0;
 
     /// Print a range of nodes as a single "array" child node.
-    virtual void printRecRange(std::function<void(Label)> body,
+    virtual void printRecRange(std::function<void()> body,
                                Label label) = 0;
 
     /// Call `body` in a context where the printer is ready for a list of
@@ -751,8 +751,8 @@ namespace {
                                 Label label) = 0;
 
     /// Print a field containing a node's source range.
-    virtual void printSourceRange(const SourceRange R,
-                                  const ASTContext *Ctx) = 0;
+    virtual void printSourceRange(const SourceRange R, const ASTContext *Ctx,
+                                  Label label) = 0;
 
     virtual bool hasNonStandardOutput() const = 0;
 
@@ -779,11 +779,11 @@ namespace {
       Indent -= 2;
     }
 
-    void printRecRange(std::function<void(Label)> body,
+    void printRecRange(std::function<void()> body,
                        Label label) override {
       printRecArbitrary([&](Label label) {
         printHead("array", ASTNodeColor, label);
-        body(label);
+        body();
         printFoot();
       }, label);
     }
@@ -841,12 +841,12 @@ namespace {
       }, label, LocationColor);
     }
 
-    void printSourceRange(const SourceRange R,
-                          const ASTContext *Ctx) override {
+    void printSourceRange(const SourceRange R, const ASTContext *Ctx,
+                          Label label) override {
       printFieldRaw([&](raw_ostream &OS) {
         escaping_ostream escOS(OS);
         R.print(escOS, Ctx->SourceMgr, /*PrintText=*/false);
-      }, Label::always("range"), RangeColor);
+      }, label, RangeColor);
     }
 
     bool hasNonStandardOutput() const override {
@@ -868,17 +868,18 @@ namespace {
                            Label label) override {
       // The label is ignored if we're not printing inside an object (meaning
       // we must be in an array).
+      assert(!InObjectStack.empty() && "printHead or printListArbitrary not called before printRecArbitrary");
       if (InObjectStack.back()) {
         OS.attributeBegin(label.text());
         body(Label::optional(""));
         OS.attributeEnd();
       } else {
-        body(label);
+        body(Label::optional(""));
       }
     }
 
-    void printRecRange(std::function<void(Label)> body, Label label) override {
-      printListArbitrary([&]{ body(label); }, label);
+    void printRecRange(std::function<void()> body, Label label) override {
+      printListArbitrary([&]{ body(); }, label);
     }
 
     void printListArbitrary(std::function<void()> body, Label label) override {
@@ -937,9 +938,9 @@ namespace {
       // provide a superset of this information.
     }
 
-    void printSourceRange(const SourceRange R,
-                          const ASTContext *Ctx) override {
-      OS.attributeBegin("range");
+    void printSourceRange(const SourceRange R, const ASTContext *Ctx,
+                          Label label) override {
+      OS.attributeBegin(label.text());
       OS.objectBegin();
 
       SourceManager &srcMgr = Ctx->SourceMgr;
@@ -1035,7 +1036,7 @@ namespace {
                   Label label) {
       switch (C.getKind()) {
       case StmtConditionElement::CK_Boolean:
-        return printRec(C.getBoolean(), Label::optional("expr"));
+        return printRec(C.getBoolean(), label);
       case StmtConditionElement::CK_PatternBinding:
           printRecArbitrary([&](Label label) {
             printHead("pattern", PatternColor, label);
@@ -1111,7 +1112,7 @@ namespace {
     /// Print a range of nodes as a single "array" child node.
     template <typename NodeRange>
     void printRecRange(const NodeRange &range, Label topLabel) {
-      Writer.printRecRange([&](Label topLabel) {
+      Writer.printRecRange([&]() {
         for (auto node : range) {
           printRec(node, Label::optional(""));
         }
@@ -1122,7 +1123,7 @@ namespace {
     template <typename NodeRange>
     void printRecRange(const NodeRange &range, const ASTContext *Ctx,
                        Label topLabel) {
-      Writer.printRecRange([&](Label topLabel) {
+      Writer.printRecRange([&]() {
         for (auto node : range) {
           printRec(node, Ctx, Label::optional(""));
         }
@@ -1281,22 +1282,22 @@ namespace {
 
     /// Print a requirement node.
     void visitRequirementRepr(const RequirementRepr &requirement, Label label) {
-      printHead("requirement", ASTNodeColor, label);
+      printHead("requirement_repr", ASTNodeColor, label);
 
-      printField(requirement.getKind(), Label::always("kind"));
+      printField(requirement.getKind(), Label::optional("kind"));
       switch (requirement.getKind()) {
       case RequirementReprKind::TypeConstraint:
-        printRec(requirement.getSubjectRepr(), Label::always("first_type"));
-        printRec(requirement.getConstraintRepr(), Label::always("second_type"));
+        printRec(requirement.getSubjectRepr(), Label::optional("first_type"));
+        printRec(requirement.getConstraintRepr(), Label::optional("second_type"));
         break;
       case RequirementReprKind::SameType:
-        printRec(requirement.getFirstTypeRepr(), Label::always("first_type"));
-        printRec(requirement.getSecondTypeRepr(), Label::always("second_type"));
+        printRec(requirement.getFirstTypeRepr(), Label::optional("first_type"));
+        printRec(requirement.getSecondTypeRepr(), Label::optional("second_type"));
         break;
       case RequirementReprKind::LayoutConstraint:
-        printRec(requirement.getSubjectRepr(), Label::always("first_type"));
+        printRec(requirement.getSubjectRepr(), Label::optional("first_type"));
         printFieldQuoted(requirement.getLayoutConstraint(),
-                         Label::always("layout"));
+                         Label::optional("layout"));
         break;
       }
 
@@ -1506,10 +1507,11 @@ namespace {
     }
 
     /// Print a field containing a node's source range.
-    void printSourceRange(const SourceRange R, const ASTContext *Ctx) {
+    void printSourceRange(const SourceRange R, const ASTContext *Ctx,
+                          Label label = Label::always("range")) {
       if (!R.isValid() || !Ctx)
         return;
-      Writer.printSourceRange(R, Ctx);
+      Writer.printSourceRange(R, Ctx, label);
     }
 
     /// Print a field containing a node's name, printing the node's name by
@@ -1578,11 +1580,6 @@ namespace {
         printName(VD->getName(), label);
       } else if (!Writer.isParsable()) {
         // We don't print a name field for anonymous decls in parsable outputs.
-        if (label.empty()) {
-          // If we were given an empty name, make sure we have a suitable default
-          // fallback for parsable output formats.
-          label = Label::optional("name");
-        }
         printFieldRaw([&](raw_ostream &OS) {
           OS << "<anonymous @ " << (const void*)D << '>';
         }, label, IdentifierColor);
@@ -1600,10 +1597,26 @@ namespace {
       }
     }
 
+    /// Prints a field containing the name or the USR (based on parsability of
+    /// the output) of a decl that is being referenced elsewhere.
+    template <typename T>
+    void printReferencedDeclWithContextField(const T *D, Label label,
+                                             TerminalColor Color = DeclColor) {
+      if (Writer.isParsable()) {
+        printFieldQuoted(declUSR(D), label, Color);
+      } else {
+        printFieldQuoted(D->printRef(), label, Color);
+      }
+    }
+
     /// Print a field containing a concrete reference to a declaration.
     void printDeclRefField(ConcreteDeclRef declRef, Label label,
                            TerminalColor Color = DeclColor) {
       if (Writer.isParsable()) {
+        // Just omit the key/value for parsable formats if there's no decl.
+        if (!declRef.getDecl())
+          return;
+
         // For parsable outputs, print much more detailed structured information
         // about the declref instead of just a human-readable string.
         printRecArbitrary([&](Label label) {
@@ -1684,8 +1697,7 @@ namespace {
       printFlag(P->isImplicit(), "implicit", ExprModifierColor);
 
       if (P->hasType()) {
-        printTypeField(P->getType(), Label::always("type"), PrintOptions(),
-                       TypeColor);
+        printTypeField(P->getType(), Label::always("type"));
       }
     }
 
@@ -1721,6 +1733,10 @@ namespace {
       printCommon(P, "pattern_typed", label);
       printRec(P->getSubPattern(), Label::optional("sub_pattern"));
       if (!Writer.isParsable()) {
+        // In general, we don't want the TypeRepr for parsable outputs. They
+        // reflect syntactic rather than semantic information, the same
+        // information can be obtained through a syntax parse, and we print the
+        // type USR instead.
         if (auto *repr = P->getTypeRepr()) {
           printRec(repr, Label::optional("type_repr"));
         }
@@ -1920,8 +1936,7 @@ namespace {
       printCommon(TAD, "typealias", label);
 
       if (auto underlying = TAD->getCachedUnderlyingType()) {
-        printTypeField(underlying, Label::always("type"), PrintOptions(),
-                       TypeColor);
+        printTypeField(underlying, Label::always("type"));
       } else {
         printFlag("unresolved_type", TypeColor);
       }
@@ -2118,12 +2133,16 @@ namespace {
                 "final");
       printFlag(attrs.hasAttribute<ObjCAttr>(), "@objc");
       printFlag(attrs.hasAttribute<DynamicAttr>(), "dynamic");
-      if (auto *attr = attrs.getAttribute<DynamicReplacementAttr>()) {
-        printFlagRaw([&](raw_ostream &OS) {
-          OS << "@_dynamicReplacement(for: \"";
-          OS << attr->getReplacedFunctionName();
-          OS << "\")";
-        });
+      if (!Writer.isParsable()) {
+        // This format isn't suitable for parsable formats, and we already print
+        // the full attribute as its own record so we can omit this.
+        if (auto *attr = attrs.getAttribute<DynamicReplacementAttr>()) {
+          printFlagRaw([&](raw_ostream &OS) {
+            OS << "@_dynamicReplacement(for: \"";
+            OS << attr->getReplacedFunctionName();
+            OS << "\")";
+          });
+        }
       }
       // In some cases, getLifetimeAnnotation() can fail before extension
       // binding. hasResolvedImports() approximates an extension binding check.
@@ -2192,16 +2211,16 @@ namespace {
       auto items =
           ParseIfNeeded ? SF.getTopLevelItems() : SF.getCachedTopLevelItems();
       if (items) {
-        printList(*items, [&](auto item, Label label) {
+        printList(*items, [&](ASTNode item, Label label) {
           if (item.isImplicit())
             return;
 
-          if (auto decl = item.template dyn_cast<Decl *>()) {
+          if (auto decl = item.dyn_cast<Decl *>()) {
             printRec(decl, label);
-          } else if (auto stmt = item.template dyn_cast<Stmt *>()) {
+          } else if (auto stmt = item.dyn_cast<Stmt *>()) {
             printRec(stmt, &SF.getASTContext(), label);
           } else {
-            auto expr = item.template get<Expr *>();
+            auto expr = item.get<Expr *>();
             printRec(expr, label);
           }
         }, Label::optional("items"));
@@ -2957,11 +2976,11 @@ public:
   void visitSwitchStmt(SwitchStmt *S, Label label) {
     printCommon(S, "switch_stmt", label);
     printRec(S->getSubjectExpr(), Label::optional("subject_expr"));
-    printList(S->getRawCases(), [&](auto N, Label label) {
-      if (N.template is<Stmt*>())
-        printRec(N.template get<Stmt*>(), label);
+    printList(S->getRawCases(), [&](ASTNode N, Label label) {
+      if (N.is<Stmt*>())
+        printRec(N.get<Stmt*>(), label);
       else
-        printRec(N.template get<Decl*>(), label);
+        printRec(N.get<Decl*>(), label);
     }, Label::optional("cases"));
     printFoot();
   }
@@ -3086,14 +3105,6 @@ public:
     printFlag(E->TrailingSemiLoc.isValid(), "trailing_semi");
   }
   
-  void printSemanticExpr(Expr *semanticExpr, Label label) {
-    if (semanticExpr == nullptr) {
-      return;
-    }
-    
-    printRec(semanticExpr, label);
-  }
-
   void printFunctionRefInfo(const FunctionRefInfo &info, Label label) {
     if (Writer.isParsable()) {
       printRecArbitrary([&](Label label) {
@@ -3121,10 +3132,6 @@ public:
   }
 
   void printInitializerField(ConcreteDeclRef declRef, Label label) {
-    // Just omit the key/value for parsable formats if there's no decl.
-    if (Writer.isParsable() && !declRef.getDecl())
-      return;
-
     printDeclRefField(declRef, label, ExprModifierColor);
   }
 
@@ -3263,13 +3270,14 @@ public:
   void visitTypeExpr(TypeExpr *E, Label label) {
     printCommon(E, "type_expr", label);
 
-    if (Writer.isParsable())
-      printTypeField(E->getType(), Label::always("type"));
-    else if (E->getTypeRepr())
-      printFieldQuotedRaw([&](raw_ostream &OS) { E->getTypeRepr()->print(OS); },
-                          Label::always("typerepr"), TypeReprColor);
-    else if (!Writer.isParsable())
-      printFlag("null_typerepr");
+    // For parsable outputs, the type is already printed by `printCommon`.
+    if (!Writer.isParsable()) {
+      if (E->getTypeRepr())
+        printFieldQuotedRaw([&](raw_ostream &OS) { E->getTypeRepr()->print(OS); },
+                            Label::always("typerepr"), TypeReprColor);
+      else
+        printFlag("null_typerepr");
+    }
 
     printFoot();
   }
@@ -3813,13 +3821,15 @@ public:
       break;
 
     case ActorIsolation::ActorInstance:
-      printFieldQuoted(isolation.getActorInstance()->printRef(),
-                       Label::always("actor_isolated"), CapturesColor);
+      printReferencedDeclWithContextField(isolation.getActorInstance(),
+                                          Label::always("actor_isolated"),
+                                          CapturesColor);
       break;
 
     case ActorIsolation::GlobalActor:
-      printFieldQuoted(isolation.getGlobalActor().getString(),
-                       Label::always("global_actor_isolated"), CapturesColor);
+      printTypeField(isolation.getGlobalActor(),
+                     Label::always("global_actor_isolated"), PrintOptions(),
+                     CapturesColor);
       break;
     }
 
@@ -4071,7 +4081,9 @@ public:
     if (ExpTyR && ExpTyR != TyR) {
       printRec(ExpTyR, Label::optional("type_repr_for_expansion"));
     }
-    printSemanticExpr(E->getSemanticExpr(), Label::optional("semantic_expr"));
+    if (auto *SE = E->getSemanticExpr()) {
+      printRec(SE, Label::always("semantic_expr"));
+    }
     printFoot();
   }
   void visitLazyInitializerExpr(LazyInitializerExpr *E, Label label) {
@@ -4338,11 +4350,7 @@ public:
 
     printFieldQuoted(T->getNameRef(), Label::always("id"), IdentifierColor);
     if (T->isBound()) {
-      if (Writer.isParsable()) {
-        printFieldQuoted(declUSR(T->getBoundDecl()), Label::always("bind"));
-      } else {
-        printFieldQuoted(T->getBoundDecl()->printRef(), Label::always("bind"));
-      }
+      printReferencedDeclWithContextField(T->getBoundDecl(), Label::always("bind"));
     } else {
       printFlag("unbound");
     }
@@ -5489,7 +5497,7 @@ public:
           printFoot();
         }, Label::optional("replacement"));
       }
-    }, Label::always("generic_params"));
+    }, Label::always("substitutions"));
 
     // A minimal dump doesn't need the details about the conformances, a lot of
     // that info can be inferred from the signature.
