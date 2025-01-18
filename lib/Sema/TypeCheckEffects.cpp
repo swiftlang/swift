@@ -3168,11 +3168,15 @@ class CheckEffectsCoverage : public EffectsHandlingWalker<CheckEffectsCoverage> 
   /// Find the top location where we should put the await
   static Expr *walkToAnchor(Expr *e, llvm::DenseMap<Expr *, Expr *> &parentMap,
                             bool isInterpolatedString) {
+    llvm::SmallPtrSet<Expr *, 4> visited;
     Expr *parent = e;
     Expr *lastParent = e;
     while (parent && !isEffectAnchor(parent)) {
       lastParent = parent;
       parent = parentMap[parent];
+
+      if (!visited.insert(parent).second)
+        break;
     }
 
     if (parent && !isAnchorTooEarly(parent)) {
