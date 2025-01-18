@@ -703,11 +703,18 @@ namespace {
     /// single quotes when printing substitution maps in full.
     char Quote = '\"';
 
+    /// Tracks the source buffer ID of the main source file, which subclasses
+    /// can use to distinguish ranges/locations in that file vs. ranges in other
+    /// buffers, like macro expansions.
+    unsigned MainBufferID;
+
   public:
     virtual ~PrintWriterBase() {}
 
     char quote() const { return Quote; }
     void setQuote(char quote) { Quote = quote; }
+
+    void setMainBufferID(unsigned bufferID) { MainBufferID = bufferID; }
 
     /// Call `body` in a context where the printer is ready for a child to be
     /// printed.
@@ -952,6 +959,12 @@ namespace {
       unsigned endBufferID = srcMgr.findBufferContainingLoc(R.End);
       unsigned endOffset = srcMgr.getLocOffsetInBuffer(R.End, endBufferID);
       OS.attribute("end", endOffset);
+
+      // Only print the buffer ID when it doesn't match the main ID, so that we
+      // distinguish macro expansions but don't bloat the output with the main
+      // file name repeated over and over.
+      if (startBufferID != MainBufferID)
+        OS.attribute("buffer_id", srcMgr.getIdentifierForBuffer(startBufferID));
 
       OS.objectEnd();
       OS.attributeEnd();
@@ -2178,15 +2191,25 @@ namespace {
 
       printAttributes(IDC->getDecl());
 
-      auto members = ParseIfNeeded ? IDC->getMembers()
-                                   : IDC->getCurrentMembersWithoutLoading();
-      printList(members, [&](Decl *D, Label label) {
-        printRec(D, label);
-      }, Label::optional("members"));
+      if (Writer.isParsable()) {
+        // Parsable outputs are meant to be used for semantic analysis, so we
+        // want the full list of members, including macro-generated ones.
+        printList(IDC->getABIMembers(), [&](Decl *D, Label label) {
+          printRec(D, label);
+        }, Label::optional("members"));
+      } else {
+        auto members = ParseIfNeeded ? IDC->getMembers()
+                                    : IDC->getCurrentMembersWithoutLoading();
+        printList(members, [&](Decl *D, Label label) {
+          printRec(D, label);
+        }, Label::optional("members"));
+      }
       printFoot();
     }
 
     void visitSourceFile(const SourceFile &SF) {
+      Writer.setMainBufferID(SF.getBufferID());
+
       printHead("source_file", ASTNodeColor, Label::optional(""));
       printNameRaw([&](raw_ostream &OS) {
         OS << SF.getFilename();
