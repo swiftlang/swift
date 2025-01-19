@@ -827,3 +827,6 @@ Added: _$ss4SlabVsRi__rlE5countSivpZMV
 
 // Slab._storage _read accessor
 Added: _$ss4SlabVsRi__rlE8_storagexq_BVvr
+
+// Shared string creation for Foundation
+Added: _$ss40_SwiftCreateImmortalString_ForFoundation6buffer7isASCIISSSgSRys5UInt8VG_SbtF
