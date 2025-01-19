@@ -157,29 +157,29 @@ AvailabilityContext::get(const AvailabilityRange &platformAvailability,
 }
 
 AvailabilityRange AvailabilityContext::getPlatformRange() const {
-  return Info->Platform.Range;
+  return storage->Platform.Range;
 }
 
 std::optional<PlatformKind>
 AvailabilityContext::getUnavailablePlatformKind() const {
-  if (Info->Platform.IsUnavailable)
-    return Info->Platform.UnavailablePlatform;
+  if (storage->Platform.IsUnavailable)
+    return storage->Platform.UnavailablePlatform;
   return std::nullopt;
 }
 
 bool AvailabilityContext::isUnavailableInEmbedded() const {
-  return Info->Platform.IsUnavailableInEmbedded;
+  return storage->Platform.IsUnavailableInEmbedded;
 }
 
 bool AvailabilityContext::isDeprecated() const {
-  return Info->Platform.IsDeprecated;
+  return storage->Platform.IsDeprecated;
 }
 
 void AvailabilityContext::constrainWithContext(const AvailabilityContext &other,
                                                ASTContext &ctx) {
-  PlatformInfo platformAvailability{Info->Platform};
-  if (platformAvailability.constrainWith(other.Info->Platform)) {
-    Info = Storage::get(platformAvailability, ctx);
+  PlatformInfo platformAvailability{storage->Platform};
+  if (platformAvailability.constrainWith(other.storage->Platform)) {
+    storage = Storage::get(platformAvailability, ctx);
   }
 }
 
@@ -189,16 +189,16 @@ void AvailabilityContext::constrainWithDecl(const Decl *decl) {
 
 void AvailabilityContext::constrainWithPlatformRange(
     const AvailabilityRange &platformRange, ASTContext &ctx) {
-  PlatformInfo platformAvailability{Info->Platform};
+  PlatformInfo platformAvailability{storage->Platform};
   if (!constrainRange(platformAvailability.Range, platformRange))
     return;
 
-  Info = Storage::get(platformAvailability, ctx);
+  storage = Storage::get(platformAvailability, ctx);
 }
 
 void AvailabilityContext::constrainWithDeclAndPlatformRange(
     const Decl *decl, const AvailabilityRange &platformRange) {
-  PlatformInfo platformAvailability{Info->Platform};
+  PlatformInfo platformAvailability{storage->Platform};
   bool isConstrained = false;
   isConstrained |= platformAvailability.constrainWith(decl);
   isConstrained |= constrainRange(platformAvailability.Range, platformRange);
@@ -206,11 +206,11 @@ void AvailabilityContext::constrainWithDeclAndPlatformRange(
   if (!isConstrained)
     return;
 
-  Info = Storage::get(platformAvailability, decl->getASTContext());
+  storage = Storage::get(platformAvailability, decl->getASTContext());
 }
 
 bool AvailabilityContext::isContainedIn(const AvailabilityContext other) const {
-  if (!Info->Platform.isContainedIn(other.Info->Platform))
+  if (!storage->Platform.isContainedIn(other.storage->Platform))
     return false;
 
   return true;

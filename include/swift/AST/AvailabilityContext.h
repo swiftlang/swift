@@ -41,9 +41,11 @@ private:
   struct PlatformInfo;
 
   /// A non-null pointer to uniqued storage for this availability context.
-  const Storage *Info;
+  const Storage *storage;
 
-  AvailabilityContext(const Storage *info) : Info(info) { assert(info); };
+  AvailabilityContext(const Storage *storage) : storage(storage) {
+    assert(storage);
+  };
 
   /// Retrieves an `AvailabilityContext` with the given platform availability
   /// parameters.
@@ -108,12 +110,12 @@ public:
 
   friend bool operator==(const AvailabilityContext &lhs,
                          const AvailabilityContext &rhs) {
-    return lhs.Info == rhs.Info;
+    return lhs.storage == rhs.storage;
   }
 
   friend bool operator!=(const AvailabilityContext &lhs,
                          const AvailabilityContext &rhs) {
-    return lhs.Info != rhs.Info;
+    return lhs.storage != rhs.storage;
   }
 
   void print(llvm::raw_ostream &os) const;

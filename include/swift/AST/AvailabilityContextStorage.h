@@ -69,7 +69,7 @@ struct AvailabilityContext::PlatformInfo {
 /// As an implementation detail, the values that make up an `Availability`
 /// context are uniqued and stored as folding set nodes.
 class AvailabilityContext::Storage final : public llvm::FoldingSetNode {
-  Storage(const PlatformInfo &platformInfo) : Platform(platformInfo){};
+  Storage(const PlatformInfo &platformInfo) : Platform(platformInfo) {};
 
 public:
   PlatformInfo Platform;
