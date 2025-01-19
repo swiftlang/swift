@@ -1183,6 +1183,7 @@ public:
       if (!result)
         return Action::Stop();
       // Already walked.
+      seqExpr->setFolded(true);
       return Action::SkipNode(result);
     }
 
