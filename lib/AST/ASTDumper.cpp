@@ -2064,7 +2064,21 @@ namespace {
       printCommonPost(PD);
     }
 
-    void printGenericParameters(GenericParamList *Params) {
+    void printGenericSignature(const GenericSignature &Sig, Label label) {
+      if (!Sig)
+        return;
+
+      printRecArbitrary([&](Label label) {
+        printHead("generic_signature", ASTNodeColor, label);
+        printList(Sig.getGenericParams(), [&](auto GP, Label label) {
+          printTypeField(GP, label);
+        }, Label::always("generic_params"));
+        printGenericRequirements(Sig.getRequirements());
+        printFoot();
+      }, label);
+    }
+
+    void printParsedGenericParams(GenericParamList *Params) {
       if (!Params)
         return;
 
@@ -2101,20 +2115,13 @@ namespace {
       printCommon((Decl*)VD, Name, label, Color);
 
       printDeclName(VD, Label::optional("name"));
-      if (auto *AFD = dyn_cast<AbstractFunctionDecl>(VD)) {
-        printGenericParameters(AFD->getParsedGenericParams());
-        if (AFD->hasComputedGenericSignature())
-          printGenericRequirements(AFD->getGenericRequirements());
-      }
-      if (auto *GTD = dyn_cast<GenericTypeDecl>(VD)) {
-        printGenericParameters(GTD->getParsedGenericParams());
-        if (GTD->hasComputedGenericSignature())
-          printGenericRequirements(GTD->getGenericRequirements());
-      }
-      if (auto *MD = dyn_cast<MacroDecl>(VD)) {
-        printGenericParameters(MD->getParsedGenericParams());
-        if (MD->hasComputedGenericSignature())
-          printGenericRequirements(MD->getGenericRequirements());
+      if (auto *GC = VD->getAsGenericContext()) {
+        if (Writer.isParsable() && GC->hasComputedGenericSignature()) {
+          printGenericSignature(GC->getGenericSignature(),
+                                Label::optional("generic_signature"));
+        } else {
+          printParsedGenericParams(GC->getParsedGenericParams());
+        }
       }
 
       if (VD->hasInterfaceType()) {
@@ -2277,11 +2284,7 @@ namespace {
     }
 
     void printStorageImpl(AbstractStorageDecl *D) {
-      // Use a different label for the parsable outputs because "type: true" is
-      // confusing, especially when we also have keys elsewhere named "type"
-      // that are type USRs.
-      printFlag(D->isStatic(), Writer.isParsable() ? "static" : "type",
-                DeclModifierColor);
+      printFlag(D->isStatic(), "static", DeclModifierColor);
 
       if (D->hasInterfaceType()) {
         auto impl = D->getImplInfo();
@@ -2519,10 +2522,7 @@ namespace {
 
     void printCommonFD(FuncDecl *FD, const char *type, Label label) {
       printCommonAFD(FD, type, label);
-      // Use a different label for the parsable outputs because "type: true" is
-      // confusing, especially when we also have keys elsewhere named "type"
-      // that are type USRs.
-      printFlag(FD->isStatic(), Writer.isParsable() ? "static" : "type");
+      printFlag(FD->isStatic(), "static", DeclModifierColor);
     }
 
     void visitFuncDecl(FuncDecl *FD, Label label) {
@@ -5316,14 +5316,15 @@ public:
     // parsable (JSON) output because it is far too much information when it is
     // rendered as part of every declref that contains such a conformance.
     auto shouldPrintDetails =
-        visited.insert(conformance).second; // && !Writer.isParsable();
+        visited.insert(conformance).second && !Writer.isParsable();
 
     auto printCommon = [&](StringRef kind) {
       printHead(kind, ASTNodeColor, label);
       printTypeField(conformance->getType(), Label::always("type"));
       printReferencedDeclField(conformance->getProtocol(),
                                Label::always("protocol"));
-      printFlag(!shouldPrintDetails, "<details printed above>");
+      if (!Writer.isParsable())
+        printFlag(!shouldPrintDetails, "<details printed above>");
     };
 
     switch (conformance->getKind()) {

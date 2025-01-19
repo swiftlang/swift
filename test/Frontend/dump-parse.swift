@@ -110,7 +110,7 @@ _ = { (v: MyEnum) in }
 // CHECK-LABEL: (struct_decl range=[{{.+}}] "SelfParam"
 struct SelfParam {
 
-  // CHECK-LABEL: (func_decl range=[{{.+}}] "createOptional()" type
+  // CHECK-LABEL: (func_decl range=[{{.+}}] "createOptional()" static
   // CHECK-NEXT:    (parameter "self")
   // CHECK-NEXT:    (parameter_list range=[{{.+}}])
   // CHECK-NEXT:    (result=type_optional
