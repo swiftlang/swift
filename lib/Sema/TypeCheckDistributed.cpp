@@ -494,10 +494,10 @@ bool swift::checkDistributedActorSystem(const NominalTypeDecl *system) {
 
   if (auto alias = dyn_cast<TypeAliasType>(requirementTy.getPointer())) {
     auto concreteReqTy = alias->getDesugaredType();
-    if (auto comp = dyn_cast<ProtocolCompositionType>(concreteReqTy)) {
+    if (isa<ProtocolCompositionType>(concreteReqTy)) {
       // ok, protocol composition is fine as requirement,
       // since special case of just a single protocol
-    } else if (auto proto = dyn_cast<ProtocolType>(concreteReqTy)) {
+    } else if (isa<ProtocolType>(concreteReqTy)) {
       // ok, protocols is exactly what we want to be used as constraints here
     } else {
       nominal->diagnose(diag::distributed_actor_system_serialization_req_must_be_protocol,

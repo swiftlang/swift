@@ -202,8 +202,7 @@ MacroDefinition MacroDefinitionRequest::evaluate(
 
   // If the expanded macro was one of the the magic literal expressions
   // (like #file), there's nothing to expand.
-  if (auto magicLiteral =
-          dyn_cast<MagicIdentifierLiteralExpr>(definition)) {
+  if (isa<MagicIdentifierLiteralExpr>(definition)) {
     StringRef expansionText = externalMacroName.unbridged();
     return MacroDefinition::forExpanded(ctx, expansionText, { }, { });
   }

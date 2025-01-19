@@ -1978,7 +1978,7 @@ StringRef ModuleDecl::getModuleFilename() const {
       continue;
     }
     // Skip synthesized files.
-    if (auto *SFU = dyn_cast<SynthesizedFileUnit>(F))
+    if (isa<SynthesizedFileUnit>(F))
       continue;
     return StringRef();
   }

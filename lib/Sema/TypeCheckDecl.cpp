@@ -2349,7 +2349,7 @@ static Type validateParameterType(ParamDecl *decl) {
                                    PlaceholderType::get,
                                    /*packElementOpener*/ nullptr);
 
-  if (auto *varargTypeRepr = dyn_cast<VarargTypeRepr>(nestedRepr)) {
+  if (isa<VarargTypeRepr>(nestedRepr)) {
     Ty = resolution.resolveType(nestedRepr);
 
     // Monovariadic types (T...) for <T> resolve to [T].

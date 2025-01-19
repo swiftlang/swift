@@ -2206,7 +2206,7 @@ void IRGenerator::emitEntryPointInfo() {
   enum EntryPointFlags : unsigned {
     HasAtMainTypeFlag = 1 << 0,
   };
-  if (auto *mainTypeDecl = SIL.getSwiftModule()->getMainTypeDecl()) {
+  if (SIL.getSwiftModule()->getMainTypeDecl()) {
     flags |= HasAtMainTypeFlag;
   }
   entrypointInfo.addInt(IGM.Int32Ty, flags);

@@ -883,7 +883,7 @@ private:
     IndexSymbol Info;
 
     // Dig back to the original captured variable
-    if (auto *VD = dyn_cast<VarDecl>(D)) {
+    if (isa<VarDecl>(D)) {
       Info.originalDecl = firstDecl(D);
     }
 

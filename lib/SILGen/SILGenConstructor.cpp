@@ -1395,7 +1395,7 @@ emitMemberInit(SILGenFunction &SGF, VarDecl *selfDecl, Pattern *pattern) {
       selfTy.getFieldType(field, SGF.SGM.M, SGF.getTypeExpansionContext());
     SILValue slot;
 
-    if (auto *structDecl = dyn_cast<StructDecl>(field->getDeclContext())) {
+    if (isa<StructDecl>(field->getDeclContext())) {
       slot = SGF.B.createStructElementAddr(pattern, self.forward(SGF), field,
                                            fieldTy.getAddressType());
     } else {

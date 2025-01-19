@@ -835,10 +835,10 @@ addDistributedActorCodableConformance(
 void swift::assertRequiredSynthesizedPropertyOrder(ASTContext &Context,
                                                    NominalTypeDecl *nominal) {
 #ifndef NDEBUG
-  if (auto id = nominal->getDistributedActorIDProperty()) {
-    if (auto system = nominal->getDistributedActorSystemProperty()) {
+  if (nominal->getDistributedActorIDProperty()) {
+    if (nominal->getDistributedActorSystemProperty()) {
       if (auto classDecl = dyn_cast<ClassDecl>(nominal)) {
-        if (auto unownedExecutor = classDecl->getUnownedExecutorProperty()) {
+        if (classDecl->getUnownedExecutorProperty()) {
           int idIdx, actorSystemIdx, unownedExecutorIdx = 0;
           int idx = 0;
           for (auto member : nominal->getMembers()) {

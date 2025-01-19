@@ -527,7 +527,8 @@ void MoveOnlyObjectCheckerPImpl::check(
           //   (%yield, ..., %handle) = begin_apply
           //   %copy = copy_value %yield
           //   %mark = mark_unresolved_noncopyable_value [no_consume_or_assign] %copy
-          if (auto bai = dyn_cast_or_null<BeginApplyInst>(i->getOperand(0)->getDefiningInstruction())) {
+          if (isa_and_nonnull<BeginApplyInst>(
+                  i->getOperand(0)->getDefiningInstruction())) {
             if (i->getOperand(0)->getOwnershipKind() == OwnershipKind::Guaranteed) {
               for (auto *use : markedInst->getConsumingUses()) {
                 destroys.push_back(cast<DestroyValueInst>(use->getUser()));

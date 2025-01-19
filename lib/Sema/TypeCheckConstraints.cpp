@@ -900,8 +900,7 @@ bool TypeChecker::typeCheckForEachPreamble(DeclContext *dc, ForEachStmt *stmt,
     if (!boolType)
       return failed();
 
-    SyntacticElementTarget whereClause(stmt->getWhere(), dc,
-                                       {boolType, CTP_Condition},
+    SyntacticElementTarget whereClause(where, dc, {boolType, CTP_Condition},
                                        /*isDiscarded=*/false);
     auto result = typeCheckTarget(whereClause);
     if (!result)

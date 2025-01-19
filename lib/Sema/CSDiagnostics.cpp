@@ -2016,7 +2016,7 @@ bool RValueTreatedAsLValueFailure::diagnoseAsError() {
     }
   } else if (isa<SubscriptExpr>(diagExpr)) {
       subElementDiagID = diag::assignment_subscript_has_immutable_base;
-  } else if (auto *UME = dyn_cast<UnresolvedMemberExpr>(diagExpr)) {
+  } else if (isa<UnresolvedMemberExpr>(diagExpr)) {
     subElementDiagID = diag::assignment_lhs_is_immutable_property;
   } else {
     subElementDiagID = diag::assignment_lhs_is_immutable_variable;
@@ -2867,7 +2867,7 @@ bool ContextualFailure::diagnoseAsError() {
 
   case ConstraintLocator::FunctionResult:
   case ConstraintLocator::KeyPathValue: {
-    if (auto *KPE = getAsExpr<KeyPathExpr>(anchor)) {
+    if (isExpr<KeyPathExpr>(anchor)) {
       diagnostic = diag::expr_keypath_value_covert_to_contextual_type;
       break;
     } else {

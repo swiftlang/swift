@@ -656,7 +656,7 @@ UnboundImport::UnboundImport(ImportDecl *ID)
     import.preconcurrencyRange = attr->getRangeWithAt();
   }
 
-  if (auto attr = ID->getAttrs().getAttribute<WeakLinkedAttr>())
+  if (ID->getAttrs().hasAttribute<WeakLinkedAttr>())
     import.options |= ImportFlags::WeakLinked;
 
   import.docVisibility = swift::symbolgraphgen::documentationVisibilityForDecl(ID);

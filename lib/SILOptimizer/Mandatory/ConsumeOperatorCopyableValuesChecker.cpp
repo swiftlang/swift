@@ -559,8 +559,7 @@ static bool tryEmitCannotConsumeNonLocalMemoryError(MoveValueInst *mvi) {
     return false;
 
   auto &astContext = mvi->getModule().getASTContext();
-  if (auto *gai =
-          dyn_cast<GlobalAddrInst>(stripAccessMarkers(li->getOperand()))) {
+  if (isa<GlobalAddrInst>(stripAccessMarkers(li->getOperand()))) {
     auto diag = diag::sil_movekillscopyable_move_applied_to_nonlocal_memory;
     diagnose(astContext, mvi->getLoc().getSourceLoc(), diag, 0);
     mvi->setAllowsDiagnostics(false);

@@ -560,7 +560,7 @@ private:
         // If the context is the same source file, don't treat it as an
         // expansion.
         auto introNode = scope->getIntroductionNode();
-        switch (auto reason = scope->getReason()) {
+        switch (scope->getReason()) {
         case AvailabilityScope::Reason::Root:
           if (auto contextFile = introNode.getAsSourceFile())
             if (declFile == contextFile)
@@ -3804,7 +3804,7 @@ public:
     assert(ExprStack.back() == E);
     ExprStack.pop_back();
 
-    if (auto *apply = dyn_cast<ApplyExpr>(E)) {
+    if (isa<ApplyExpr>(E)) {
       PreconcurrencyCalleeStack.pop_back();
     }
 

@@ -1646,7 +1646,7 @@ SILValue CastOptimizer::optimizeMetatypeConversion(
     return newValue;
   };
 
-  if (auto *mi = dyn_cast<MetatypeInst>(op)) {
+  if (isa<MetatypeInst>(op)) {
     return replaceCast(
         SILBuilderWithScope(*mci, builderContext).createMetatype(loc, ty));
   }

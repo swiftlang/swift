@@ -1790,7 +1790,7 @@ namelookup::isInMacroArgument(SourceFile *sourceFile, SourceLoc loc) {
 
         if (macro.getFreestanding()) {
           inMacroArgument = true;
-        } else if (auto *attr = macro.getAttr()) {
+        } else if (macro.getAttr()) {
           auto *moduleScope = sourceFile->getModuleScopeContext();
           auto results =
               lookupMacros(moduleScope, macro.getModuleName(),
@@ -1930,7 +1930,7 @@ PotentialMacroExpansions PotentialMacroExpansionsInContextRequest::evaluate(
           dc->getModuleScopeContext(), med->getMacroName(),
           MacroRole::Declaration, nameTracker);
     } else if (auto *vd = dyn_cast<ValueDecl>(member)) {
-      nameTracker.attachedTo = dyn_cast<ValueDecl>(member);
+      nameTracker.attachedTo = vd;
       forEachPotentialAttachedMacro(member, MacroRole::Peer, nameTracker);
     }
   }
@@ -2016,7 +2016,7 @@ populateLookupTableEntryFromMacroExpansions(ASTContext &ctx,
             dc->getModuleScopeContext(), med->getMacroName(),
             MacroRole::Declaration, nameTracker);
       } else if (auto *vd = dyn_cast<ValueDecl>(member)) {
-        nameTracker.attachedTo = dyn_cast<ValueDecl>(member);
+        nameTracker.attachedTo = vd;
         forEachPotentialAttachedMacro(member, MacroRole::Peer, nameTracker);
       }
 
@@ -3610,7 +3610,7 @@ CollectedOpaqueReprs swift::collectOpaqueTypeReprs(TypeRepr *r, ASTContext &ctx,
       if (!Ctx.LangOpts.hasFeature(Feature::ImplicitSome))
         return Action::Continue();
       
-      if (auto existential = dyn_cast<ExistentialTypeRepr>(repr)) {
+      if (isa<ExistentialTypeRepr>(repr)) {
         return Action::SkipNode();
       } else if (auto composition = dyn_cast<CompositionTypeRepr>(repr)) {
         if (!composition->isTypeReprAny())

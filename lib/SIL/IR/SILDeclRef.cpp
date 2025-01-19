@@ -477,7 +477,7 @@ static LinkageLimit getLinkageLimit(SILDeclRef constant) {
       return Limit::OnDemand;
   }
   
-  if (auto dd = dyn_cast<DestructorDecl>(d)) {
+  if (isa<DestructorDecl>(d)) {
     // The destructor of a class implemented with @_objcImplementation is only
     // ever called by its ObjC thunk, so it should not be public.
     if (d->getDeclContext()->getSelfNominalTypeDecl()->hasClangNode())
