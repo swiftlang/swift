@@ -1197,6 +1197,9 @@ struct Score {
     for (unsigned int i = 0; i < NumScoreKinds; ++i) {
       if (Data[i] != 0) {
         out << " [component: ";
+        out << "#";
+        out << std::to_string(i);
+        out << " ";
         out << getNameFor(ScoreKind(i));
         out << "(s), value: ";
         out << std::to_string(Data[i]);
