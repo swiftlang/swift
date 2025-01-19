@@ -353,6 +353,59 @@ class NotSendable {}
         expectTrue(expectation.fulfilled)
       }
       
+      tests.test("unfold awaiting next with ignored cancellation throwing") {
+        let task = Task.detached {
+          let series = AsyncThrowingStream(unfolding: {
+            withUnsafeCurrentTask { $0?.cancel() }
+            return "hello"
+          })
+          var iterator = series.makeAsyncIterator()
+          do {
+            expectEqual(try await iterator.next(isolation: #isolation), "hello")
+          } catch {
+            expectUnreachable("unexpected error thrown")
+          }
+        }
+        _ = await task.getResult()
+      }
+
+      tests.test("unfold awaiting next and throw with ignored cancellation") {
+        let thrownError = SomeError()
+        let task = Task.detached {
+          let series = AsyncThrowingStream<String, Error>(unfolding: {
+            withUnsafeCurrentTask { $0?.cancel() }
+            throw thrownError
+          })
+          var iterator = series.makeAsyncIterator()
+          do {
+            _ = try await iterator.next(isolation: #isolation)
+          } catch {
+            if let failure = error as? SomeError {
+              expectEqual(failure, thrownError)
+            } else {
+              expectUnreachable("unexpected error type")
+            }
+          }
+        }
+        _ = await task.getResult()
+      }
+
+      tests.test("unfold with early ignored cancellation throwing") {
+        let task = Task.detached {
+          let series = AsyncThrowingStream(unfolding: {
+            return "hello"
+          })
+          var iterator = series.makeAsyncIterator()
+          withUnsafeCurrentTask { $0?.cancel() }
+          do {
+            _ = try await iterator.next(isolation: #isolation)
+          } catch {
+            expectUnreachable("unexpected error thrown")
+          }
+        }
+        _ = await task.getResult()
+      }
+
       tests.test("unfold awaiting next and cancel before throw") {
         let expectation = Expectation()
         let task = Task.detached {
