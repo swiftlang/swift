@@ -3659,7 +3659,9 @@ bool ContextualFailure::isIntegerToStringIndexConversion() const {
 std::optional<Diag<Type, Type>>
 ContextualFailure::getDiagnosticFor(ContextualTypePurpose context,
                                     Type contextualType) {
-  auto forProtocol = contextualType->isConstraintType();
+  bool forProtocol = false;
+  if (!contextualType.isNull())
+    forProtocol = contextualType->isConstraintType();
   switch (context) {
   case CTP_Initialization: {
     if (contextualType->isAnyObject())
