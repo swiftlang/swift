@@ -6145,14 +6145,12 @@ ERROR(closure_unlabeled_parameter_following_variadic_parameter,none,
 ERROR(parameter_vararg_default,none,
       "variadic parameter cannot have a default value", ())
 
-WARNING(implicitly_unwrapped_optional_in_illegal_position_interpreted_as_optional,none,
-        "using '!' is not allowed here; treating this as '?' instead", ())
-
-WARNING(implicitly_unwrapped_optional_deprecated_in_this_position,Deprecation,
-        "using '!' here is deprecated and will be removed in a future release", ())
-
-ERROR(implicitly_unwrapped_optional_in_illegal_position,none,
-        "using '!' is not allowed here; perhaps '?' was intended?", ())
+ERROR(iuo_invalid_here, none,
+      "using '!' is not allowed here", ())
+ERROR(iuo_deprecated_here,Deprecation,
+      "using '!' here is deprecated", ())
+NOTE(iuo_use_optional_instead,none,
+     "use '?' instead", ())
 
 // Ownership
 ERROR(invalid_ownership_type,none,
