@@ -397,6 +397,7 @@ done:
 ///     'try' expr-sequence-element(Mode)
 ///     'try' '?' expr-sequence-element(Mode)
 ///     'try' '!' expr-sequence-element(Mode)
+///     'unsafe' expr-sequence-element(Mode)
 ///     '_move' expr-sequence-element(Mode)
 ///     'borrow' expr-sequence-element(Mode)
 ///     expr-unary(Mode)
@@ -431,7 +432,20 @@ ParserResult<Expr> Parser::parseExprSequenceElement(Diag<> message,
       sub = makeParserResult(new (Context) AwaitExpr(awaitLoc, sub.get()));
     }
 
-   return sub;
+    return sub;
+  }
+
+  if (Context.LangOpts.hasFeature(Feature::WarnUnsafe) &&
+      Tok.isContextualKeyword("unsafe")) {
+    Tok.setKind(tok::contextual_keyword);
+    SourceLoc unsafeLoc = consumeToken();
+    ParserResult<Expr> sub =
+      parseExprSequenceElement(diag::expected_expr_after_unsafe, isExprBasic);
+    if (!sub.hasCodeCompletion() && !sub.isNull()) {
+      sub = makeParserResult(new (Context) UnsafeExpr(unsafeLoc, sub.get()));
+    }
+
+    return sub;
   }
 
   if (Tok.isContextualKeyword("consume")

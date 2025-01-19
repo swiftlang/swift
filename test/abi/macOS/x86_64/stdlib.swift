@@ -750,6 +750,7 @@ Added: _$ss8SIMDMaskVss6SIMD64Vys5Int16VGRszrlE7allTrueAByAGGvpZMV
 Added: _$ss8SIMDMaskVss6SIMD64Vys5Int32VGRszrlE7allTrueAByAGGvpZMV
 Added: _$ss8SIMDMaskVss6SIMD64Vys5Int64VGRszrlE7allTrueAByAGGvpZMV
 Added: _$sSo19_SwiftStdlibVersionasE6v6_1_0ABvpZMV
+Added: _$sSo19_SwiftStdlibVersionasE6v6_2_0ABvpZMV
 Added: _$ss7Float80V12signalingNaNABvpZMV
 Added: _$ss7Float80V13_exponentBiasSuvpZMV
 Added: _$ss7Float80V13_quietNaNMasks6UInt64VvpZMV
@@ -800,13 +801,30 @@ Added: _$ss7RawSpanVMn
 Added: _$ss7RawSpanVN
 
 // _SwiftifyInfo enum for _SwiftifyImports macro
-Added: _$ss13_SwiftifyInfoO11nonescapingyABSi_tcABmFWC
-Added: _$ss13_SwiftifyInfoO7endedByyABSi_SitcABmFWC
-Added: _$ss13_SwiftifyInfoO7sizedByyABSi_SStcABmFWC
-Added: _$ss13_SwiftifyInfoO9countedByyABSi_SStcABmFWC
+Added: _$ss13_SwiftifyExprO5paramyABSicABmFWC
+Added: _$ss13_SwiftifyExprO6returnyA2BmFWC
+Added: _$ss13_SwiftifyExprOMa
+Added: _$ss13_SwiftifyExprOMn
+Added: _$ss13_SwiftifyExprON
+Added: _$ss13_SwiftifyInfoO11nonescapingyABs01_A4ExprO_tcABmFWC
+Added: _$ss13_SwiftifyInfoO7endedByyABs01_A4ExprO_SitcABmFWC
+Added: _$ss13_SwiftifyInfoO7sizedByyABs01_A4ExprO_SStcABmFWC
+Added: _$ss13_SwiftifyInfoO9countedByyABs01_A4ExprO_SStcABmFWC
 Added: _$ss13_SwiftifyInfoOMa
 Added: _$ss13_SwiftifyInfoOMn
 Added: _$ss13_SwiftifyInfoON
 
 // Eager-lazy Array bridging
 Added: _$ss12_ArrayBufferV14associationKeySVvpZMV
+
+// Slab metadata accessor
+Added: _$ss4SlabVMa
+
+// Slab nominal type descriptor
+Added: _$ss4SlabVMn
+
+// Slab.count property descriptor
+Added: _$ss4SlabVsRi__rlE5countSivpZMV
+
+// Slab._storage _read accessor
+Added: _$ss4SlabVsRi__rlE8_storagexq_BVvr

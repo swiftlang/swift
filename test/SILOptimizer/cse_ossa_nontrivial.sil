@@ -1010,3 +1010,26 @@ bb0:
  return %t : $()
 }
 
+// CHECK-LABEL: sil [ossa] @test_aggreate_tail_addr :
+// CHECK: ref_tail_addr
+// CHECK: ref_tail_addr
+// CHECK-LABEL: } // end sil function 'test_aggreate_tail_addr'
+sil [ossa] @test_aggreate_tail_addr : $@convention(thin) (@owned _NativeDictionary<Int, Klass>) -> () {
+bb0(%0 : @owned $_NativeDictionary<Int, Klass>):
+  %49 = move_value [lexical] %0 : $_NativeDictionary<Int, Klass> 
+  %50 = begin_borrow %49
+  %51 = struct_extract %50, #_NativeDictionary._storage
+  %52 = copy_value %51
+  %53 = ref_tail_addr %51, $_UnsafeBitset.Word
+  %59 = load [trivial] %53
+  end_borrow %50
+  %72 = begin_borrow %52
+  %73 = ref_tail_addr %72, $_UnsafeBitset.Word
+  %74 = struct_element_addr %73, #_UnsafeBitset.Word.value
+  %75 = struct_element_addr %74, #UInt._value
+  %76 = load [trivial] %75
+  end_borrow %72
+  destroy_value %52
+  destroy_value %49
+  unreachable
+}

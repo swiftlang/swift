@@ -958,6 +958,7 @@ void Serializer::writeBlockInfoBlock() {
   BLOCK_RECORD(sil_block, SIL_OPEN_PACK_ELEMENT);
   BLOCK_RECORD(sil_block, SIL_PACK_ELEMENT_GET);
   BLOCK_RECORD(sil_block, SIL_PACK_ELEMENT_SET);
+  BLOCK_RECORD(sil_block, SIL_TYPE_VALUE);
   BLOCK_RECORD(sil_block, SIL_DEBUG_SCOPE);
   BLOCK_RECORD(sil_block, SIL_DEBUG_SCOPE_REF);
   BLOCK_RECORD(sil_block, SIL_SOURCE_LOC);
@@ -3057,11 +3058,10 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
       ENCODE_VER_TUPLE(Obsoleted, theAttr->Obsoleted)
 
       assert(theAttr->Rename.empty() || !theAttr->hasCachedRenamedDecl());
+      assert(theAttr->hasCachedDomain());
+      auto domain = theAttr->getCachedDomain();
 
-      bool isPackageDescriptionVersionSpecific =
-          theAttr->getPlatformAgnosticAvailability() ==
-          PlatformAgnosticAvailabilityKind::PackageDescriptionVersionSpecific;
-
+      // FIXME: [availability] Serialize domain and kind directly.
       llvm::SmallString<32> blob;
       blob.append(theAttr->Message);
       blob.append(theAttr->Rename);
@@ -3072,13 +3072,13 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
           theAttr->isUnconditionallyUnavailable(),
           theAttr->isUnconditionallyDeprecated(),
           theAttr->isNoAsync(),
-          isPackageDescriptionVersionSpecific,
+          domain->isPackageDescription(),
           theAttr->isSPI(),
           theAttr->isForEmbedded(),
           LIST_VER_TUPLE_PIECES(Introduced),
           LIST_VER_TUPLE_PIECES(Deprecated),
           LIST_VER_TUPLE_PIECES(Obsoleted),
-          static_cast<unsigned>(theAttr->getPlatform()),
+          static_cast<unsigned>(domain->getPlatformKind()),
           theAttr->Message.size(),
           theAttr->Rename.size(),
           blob);
@@ -3391,15 +3391,6 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
       NonisolatedDeclAttrLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
                                             theAttr->isUnsafe(),
                                             theAttr->isImplicit());
-      return;
-    }
-
-    case DeclAttrKind::Safe: {
-      auto *theAttr = cast<SafeAttr>(DA);
-      auto abbrCode = S.DeclTypeAbbrCodes[SafeDeclAttrLayout::Code];
-      SafeDeclAttrLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
-                                     theAttr->isImplicit(),
-                                     theAttr->message);
       return;
     }
 

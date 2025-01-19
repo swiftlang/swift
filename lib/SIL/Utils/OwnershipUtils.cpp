@@ -1092,7 +1092,7 @@ bool AddressOwnership::areUsesWithinLifetime(
   if (!base.hasLocalOwnershipLifetime())
     return true;
 
-  SILValue root = base.getOwnershipReferenceRoot();
+  SILValue root = base.getOwnershipReferenceAggregate();
   BorrowedValue borrow(root);
   if (borrow)
     return borrow.areUsesWithinExtendedScope(uses, &deadEndBlocks);

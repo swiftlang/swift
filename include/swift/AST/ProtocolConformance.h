@@ -659,11 +659,6 @@ public:
     return getOptions().contains(ProtocolConformanceFlags::Unsafe);
   }
 
-  /// Whether this is an "safe(unchecked)" conformance.
-  bool isSafe() const {
-    return getOptions().contains(ProtocolConformanceFlags::Safe);
-  }
-
   /// Determine whether we've lazily computed the associated conformance array
   /// already.
   bool hasComputedAssociatedConformances() const {

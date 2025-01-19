@@ -235,7 +235,7 @@ extension MainActorPreconcurrency: NotIsolated {
   // expected-complete-tns-note@-2{{add '@preconcurrency' to the 'NotIsolated' conformance to defer isolation checking to run time}}{{36-36=@preconcurrency }}
 
   func requirement() {}
-  // expected-complete-tns-warning@-1 {{main actor-isolated instance method 'requirement()' cannot be used to satisfy nonisolated protocol requirement}}
+  // expected-complete-tns-warning@-1 {{main actor-isolated instance method 'requirement()' cannot be used to satisfy nonisolated requirement from protocol 'NotIsolated'}}
   // expected-complete-tns-note@-2 {{add 'nonisolated' to 'requirement()' to make this instance method not isolated to the actor}}
   // expected-complete-tns-note@-3 {{calls to instance method 'requirement()' from outside of its actor context are implicitly asynchronous}}
 

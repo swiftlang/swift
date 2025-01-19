@@ -4222,7 +4222,7 @@ ConstraintSystem::matchExistentialTypes(Type type1, Type type2,
 
   // Finally, check parameterized protocol requirements.
   if (!layout.getParameterizedProtocols().empty()) {
-    SmallVector<std::pair<AssociatedTypeDecl *, Type>, 4> fromReqs;
+    SmallVector<std::pair<Identifier, Type>, 4> fromReqs;
 
     if (type1->isExistentialType()) {
       auto fromLayout = type1->getExistentialLayout();
@@ -4233,8 +4233,7 @@ ConstraintSystem::matchExistentialTypes(Type type1, Type type2,
 
         for (unsigned i : indices(argTypes)) {
           auto argType = argTypes[i];
-          auto *assocType = assocTypes[i]->getAssociatedTypeAnchor();
-          fromReqs.push_back(std::make_pair(assocType, argType));
+          fromReqs.push_back(std::make_pair(assocTypes[i]->getName(), argType));
         }
       }
     }
@@ -4249,10 +4248,9 @@ ConstraintSystem::matchExistentialTypes(Type type1, Type type2,
 
         for (unsigned i : indices(argTypes)) {
           auto argType = argTypes[i];
-          auto *assocType = assocTypes[i]->getAssociatedTypeAnchor();
           bool found = false;
           for (auto fromReq : fromReqs) {
-            if (fromReq.first == assocType) {
+            if (fromReq.first == assocTypes[i]->getName()) {
               // FIXME: Extend the locator path to point to the argument
               // inducing the requirement.
               auto result = matchTypes(fromReq.second, argType,
@@ -7781,7 +7779,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
     // Special implicit nominal conversions.
     if (!type1->is<LValueType>() && kind >= ConstraintKind::Subtype) {
       // Array -> Array.
-      if (desugar1->isArrayType() && desugar2->isArrayType()) {
+      if (desugar1->isArray() && desugar2->isArray()) {
         conversionsOrFixes.push_back(ConversionRestrictionKind::ArrayUpcast);
       // Dictionary -> Dictionary.
       } else if (isDictionaryType(desugar1) && isDictionaryType(desugar2)) {
@@ -8699,6 +8697,51 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyConformsToConstraint(
           }
         }
       }
+    }
+
+    auto arrayLiteralProto =
+      getASTContext().getProtocol(KnownProtocolKind::ExpressibleByArrayLiteral);
+    auto anchor = loc->getAnchor();
+    auto arrayLiteral = getAsExpr<ArrayExpr>(anchor);
+
+    // If we're attempting to bind an array literal to a 'Slab' parameter,
+    // then check if the counts are equal and solve.
+    if (kind == ConstraintKind::LiteralConformsTo &&
+        protocol == arrayLiteralProto &&
+        type->isSlab() &&
+        arrayLiteral) {
+      auto slabTy = type->castTo<BoundGenericStructType>();
+
+      // <let count: Int, Element>
+      // Attempt to bind the number of elements in the literal with the
+      // contextual count. This will diagnose if the literal does not enough
+      // or too many elements.
+      auto contextualCount = slabTy->getGenericArgs()[0];
+      auto literalCount = IntegerType::get(
+          std::to_string(arrayLiteral->getNumElements()),
+          /* isNegative */ false,
+          slabTy->getASTContext());
+
+      // If the counts are already equal, '2' == '2', then we're done.
+      if (contextualCount->isEqual(literalCount)) {
+        return SolutionKind::Solved;
+      }
+
+      // If our contextual count is not known, e.g., Slab<_, Int> = [1, 2],
+      // then just eagerly bind the count to what the literal count is.
+      if (contextualCount->isTypeVariableOrMember()) {
+        addConstraint(ConstraintKind::Bind, contextualCount, literalCount,
+                      locator);
+        return SolutionKind::Solved;
+      }
+
+      // Otherwise this is an error and the counts aren't equal to each other.
+      if (!shouldAttemptFixes())
+        return SolutionKind::Error;
+
+      auto fix = AllowSlabLiteralCountMismatch::create(*this, contextualCount,
+                                                       literalCount, loc);
+      return recordFix(fix) ? SolutionKind::Error : SolutionKind::Solved;
     }
   } break;
 
@@ -15612,6 +15655,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
   case FixKind::IgnoreInvalidPlaceholder:
   case FixKind::IgnoreOutOfPlaceThenStmt:
   case FixKind::IgnoreMissingEachKeyword:
+  case FixKind::AllowSlabLiteralCountMismatch:
     llvm_unreachable("handled elsewhere");
   }
 

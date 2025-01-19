@@ -3,29 +3,29 @@
 
 // RUN: %target-swift-frontend %s -swift-version 5 -module-name main -disable-availability-checking -typecheck -plugin-path %swift-plugin-dir -dump-macro-expansions -enable-experimental-feature Span -verify 2>&1 | %FileCheck --match-full-lines %s
 
-@_SwiftifyImport(.sizedBy(pointer: 1, size: "size"))
+@_SwiftifyImport(.sizedBy(pointer: .param(1), size: "size"))
 func nonnullUnsafeRawBufferPointer(_ ptr: OpaquePointer, _ size: CInt) {
 }
 
-@_SwiftifyImport(.sizedBy(pointer: 1, size: "size"))
+@_SwiftifyImport(.sizedBy(pointer: .param(1), size: "size"))
 func nullableUnsafeRawBufferPointer(_ ptr: OpaquePointer?, _ size: CInt) {
 }
 
-@_SwiftifyImport(.sizedBy(pointer: 1, size: "size"))
+@_SwiftifyImport(.sizedBy(pointer: .param(1), size: "size"))
 func impNullableUnsafeRawBufferPointer(_ ptr: OpaquePointer!, _ size: CInt) {
 }
 
-@_SwiftifyImport(.sizedBy(pointer: 1, size: "size"), .nonescaping(pointer: 1))
+@_SwiftifyImport(.sizedBy(pointer: .param(1), size: "size"), .nonescaping(pointer: .param(1)))
 func nonnullSpan(_ ptr: OpaquePointer, _ size: CInt) {
 }
 
 // expected-note@+2{{in expansion of macro '_SwiftifyImport' on global function 'nullableSpan' here}}
 // Cannot refer to source location for the error: "type 'RawSpan' does not conform to protocol 'Escapable'" (which is currently necessary for Optional)
-@_SwiftifyImport(.sizedBy(pointer: 1, size: "size"), .nonescaping(pointer: 1))
+@_SwiftifyImport(.sizedBy(pointer: .param(1), size: "size"), .nonescaping(pointer: .param(1)))
 func nullableSpan(_ ptr: OpaquePointer?, _ size: CInt) {
 }
 
-@_SwiftifyImport(.sizedBy(pointer: 1, size: "size"), .nonescaping(pointer: 1))
+@_SwiftifyImport(.sizedBy(pointer: .param(1), size: "size"), .nonescaping(pointer: .param(1)))
 func impNullableSpan(_ ptr: OpaquePointer!, _ size: CInt) {
 }
 

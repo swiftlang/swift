@@ -22,6 +22,11 @@
 
 #include <inttypes.h>
 
+#ifdef __cplusplus
+namespace swift {
+namespace runtime {
+#endif
+
 #pragma pack(push, 1)
 
 /* .. Useful macros ......................................................... */
@@ -733,5 +738,10 @@ typedef struct {
 } Dwarf32_FDEHdr;
 
 #pragma pack(pop)
+
+#ifdef __cplusplus
+} // namespace runtime
+} // namespace swift
+#endif
 
 #endif // SWIFT_DWARF_H

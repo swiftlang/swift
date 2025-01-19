@@ -117,7 +117,7 @@ struct LifetimeDependence : CustomStringConvertible {
     case yield(Value)
     /// An owned value whose OSSA lifetime encloses nonescapable values, or a trivial variable introduced by move_value.
     case owned(Value)
-    /// An borrowed value whose OSSA lifetime encloses nonescapable values, or a trivial variable introduced by
+    /// A borrowed value whose OSSA lifetime encloses nonescapable values, or a trivial variable introduced by
     /// begin_borrow.
     case borrowed(BeginBorrowValue)
     /// Singly-initialized addressable storage (likely for an
@@ -225,16 +225,6 @@ extension LifetimeDependence {
     self.dependentValue = value
   }
 
-  var isUnsafeApplyResult: Bool {
-    if case let .owned(value) = scope {
-      if let apply = value.definingInstruction as? FullApplySite {
-        assert(!apply.hasResultDependence)
-        return true
-      }
-    }
-    return false
-  }
-
   /// Construct LifetimeDependence from mark_dependence [unresolved] or mark_dependence [nonescaping].
   ///
   /// For any LifetimeDependence constructed from a mark_dependence, its `dependentValue` will be the result of the
@@ -313,10 +303,15 @@ extension LifetimeDependence.Scope {
 
   private init(address: Value, _ context: some Context) {
     switch address.enclosingAccessScope {
-    case let .scope(access):
+    case let .access(access):
       self = .access(access)
     case let .base(accessBase):
       self = Self(accessBase: accessBase, address: address, context)
+    case let .dependence(markDep):
+      // The current dependence only represents the forwarded address. If the mark_dependence instruction encoutered
+      // here is [unresolved], then a separate LifetimeDependence.Scope will be created for it, and if it is [escaping],
+      // then it is ignored for the purpose of lifetime dependence.
+      self.init(address: markDep.value, context)
     }
   }
 
@@ -334,7 +329,11 @@ extension LifetimeDependence.Scope {
       self = Self(guaranteed: refElt.operand.value, context)
     case let .argument(arg):
       if arg.convention.isIndirectIn {
-        self = .initialized(initialAddress: arg, initializingStore: nil)
+        if arg.convention.isGuaranteed {
+          self = .caller(arg)
+        } else {
+          self = .initialized(initialAddress: arg, initializingStore: nil)
+        }
       } else if arg.convention.isIndirectOut || arg.convention.isInout {
         // TODO: verify that @out values are never reassigned.
         self = .caller(arg)
@@ -482,7 +481,12 @@ extension LifetimeDependence.Scope {
     }
   }
 
-  // !!! - handle allocations of trivial values: no destroy. Use the dealloc in that case?
+  // Note: an initialized range should always have a destroy_addr. For trivial 'var' variables, we have a alloc_box,
+  // which has a destroy_value. For concrete trivial 'let' variables, we load the trivial value:
+  //   %l = load [trivial] %0
+  //   %m = move_value [var_decl] %2
+  //
+  // For generic trivial (BitwiseCopyable) 'let' variables, we emit a destroy_addr for the alloc_stack.
   private static func computeInitializedRange(initialAddress: Value, initializingStore: Instruction?,
                                               _ context: Context)
     -> InstructionRange {
@@ -633,9 +637,31 @@ struct VariableIntroducerUseDefWalker : LifetimeDependenceUseDefWalker {
 
   mutating func walkUp(address: Value) -> WalkResult {
     if let beginAccess = address.definingInstruction as? BeginAccessInst {
+      // Treat calls to unsafe[Mutable]Address like a projection of 'self' rather than a separate variable access.
+      if let addressorSelf = beginAccess.unsafeAddressorSelf {
+        return walkUp(valueOrAddress: addressorSelf)
+      }
       return introducer(beginAccess, nil)
     }
     return walkUpDefault(address: address)
+  }
+}
+
+private extension BeginAccessInst {
+  // Recognize an access scope for a unsafe addressor:
+  // %adr = pointer_to_address
+  // %md = mark_dependence %adr
+  // begin_access [unsafe] %md
+  var unsafeAddressorSelf: Value? {
+    guard isUnsafe else {
+      return nil
+    }
+    let accessBaseAndScopes = address.accessBaseWithScopes
+    guard case .pointer = accessBaseAndScopes.base,
+          case let .dependence(markDep) = accessBaseAndScopes.scopes.first else {
+      return nil
+    }
+    return markDep.base
   }
 }
 
@@ -1151,7 +1177,7 @@ extension LifetimeDependenceDefUseWalker {
 
     // Get the local variable access that encloses this store.
     var storeAccess = storedOperand.instruction
-    if case let .scope(beginAccess) = storeAddress.enclosingAccessScope {
+    if case let .access(beginAccess) = storeAddress.enclosingAccessScope {
       storeAccess = beginAccess
     }
     if !localReachability.gatherAllReachableUses(of: storeAccess, in: &accessStack) {

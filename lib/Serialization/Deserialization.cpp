@@ -3302,8 +3302,8 @@ class DeclDeserializer {
 
       // The next bits are the protocol conformance options.
       // Update the mask below whenever this changes.
-      static_assert(NumProtocolConformanceOptions == 5);
-      ProtocolConformanceOptions options(rawID & 0x1F);
+      static_assert(NumProtocolConformanceOptions == 4);
+      ProtocolConformanceOptions options(rawID & 0x0F);
       rawID = rawID >> NumProtocolConformanceOptions;
 
       TypeID typeID = rawID;
@@ -5619,27 +5619,31 @@ DeclDeserializer::readAvailable_DECL_ATTR(SmallVectorImpl<uint64_t> &scratch,
   DECODE_VER_TUPLE(Deprecated)
   DECODE_VER_TUPLE(Obsoleted)
 
-  PlatformAgnosticAvailabilityKind platformAgnostic;
+  AvailableAttr::Kind kind;
   if (isUnavailable)
-    platformAgnostic = PlatformAgnosticAvailabilityKind::Unavailable;
+    kind = AvailableAttr::Kind::Unavailable;
   else if (isDeprecated)
-    platformAgnostic = PlatformAgnosticAvailabilityKind::Deprecated;
+    kind = AvailableAttr::Kind::Deprecated;
   else if (isNoAsync)
-    platformAgnostic = PlatformAgnosticAvailabilityKind::NoAsync;
-  else if (platform == PlatformKind::none &&
-           (!Introduced.empty() || !Deprecated.empty() || !Obsoleted.empty()))
-    platformAgnostic =
-        isPackageDescriptionVersionSpecific
-            ? PlatformAgnosticAvailabilityKind::
-                  PackageDescriptionVersionSpecific
-            : PlatformAgnosticAvailabilityKind::SwiftVersionSpecific;
+    kind = AvailableAttr::Kind::NoAsync;
   else
-    platformAgnostic = PlatformAgnosticAvailabilityKind::None;
+    kind = AvailableAttr::Kind::Default;
 
-  auto attr = new (ctx) AvailableAttr(
-      SourceLoc(), SourceRange(), platform, message, rename, Introduced,
-      SourceRange(), Deprecated, SourceRange(), Obsoleted, SourceRange(),
-      platformAgnostic, isImplicit, isSPI, isForEmbedded);
+  AvailabilityDomain domain;
+  if (platform != PlatformKind::none) {
+    domain = AvailabilityDomain::forPlatform(platform);
+  } else if (!Introduced.empty() || !Deprecated.empty() || !Obsoleted.empty()) {
+    domain = isPackageDescriptionVersionSpecific
+                 ? AvailabilityDomain::forPackageDescription()
+                 : AvailabilityDomain::forSwiftLanguage();
+  } else {
+    domain = AvailabilityDomain::forUniversal();
+  }
+
+  auto attr = new (ctx)
+      AvailableAttr(SourceLoc(), SourceRange(), domain, kind, message, rename,
+                    Introduced, SourceRange(), Deprecated, SourceRange(),
+                    Obsoleted, SourceRange(), isImplicit, isSPI, isForEmbedded);
   return attr;
 }
 
@@ -6306,15 +6310,6 @@ llvm::Error DeclDeserializer::deserializeDeclCommon() {
         serialization::decls_block::NonisolatedDeclAttrLayout::readRecord(
             scratch, isUnsafe, isImplicit);
         Attr = new (ctx) NonisolatedAttr(isUnsafe, isImplicit);
-        break;
-      }
-
-      case decls_block::Safe_DECL_ATTR: {
-        bool isImplicit;
-        serialization::decls_block::SafeDeclAttrLayout::readRecord(
-            scratch, isImplicit);
-        Attr = new (ctx) SafeAttr(SourceLoc(), SourceRange(), blobData,
-                                  isImplicit);
         break;
       }
 
@@ -8368,9 +8363,12 @@ void ModuleFile::loadAllMembers(Decl *container, uint64_t contextData) {
   ArrayRef<uint64_t> rawMemberIDs;
   decls_block::MembersLayout::readRecord(memberIDBuffer, rawMemberIDs);
 
-  if (rawMemberIDs.empty())
+  if (rawMemberIDs.empty()) {
+    // No members; set the state of member deserialization to done.
+    if (!IDC->didDeserializeMembers())
+      IDC->setDeserializedMembers(true);
     return;
-
+  }
   SmallVector<Decl *, 16> members;
   members.reserve(rawMemberIDs.size());
   for (DeclID rawID : rawMemberIDs) {
@@ -8386,8 +8384,16 @@ void ModuleFile::loadAllMembers(Decl *container, uint64_t contextData) {
           getContext(), container, next.takeError());
       if (suppliedMissingMember)
         members.push_back(suppliedMissingMember);
+
+      // Not all members can be discovered as missing
+      // members as checked above, so set the error bit
+      // here.
+      IDC->setHasDeserializeMemberError(true);
     }
   }
+  // Set the status of member deserialization to Done.
+  if (!IDC->didDeserializeMembers())
+    IDC->setDeserializedMembers(true);
 
   for (auto member : members)
     IDC->addMember(member);

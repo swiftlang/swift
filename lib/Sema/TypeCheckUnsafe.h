@@ -15,16 +15,45 @@
 
 #include "swift/AST/UnsafeUse.h"
 
+namespace llvm {
+template <typename Fn> class function_ref;
+}
+
 namespace swift {
 
 class Witness;
 
 /// Diagnose the given unsafe use right now.
-void diagnoseUnsafeUse(const UnsafeUse &use, bool asNote = false);
+void diagnoseUnsafeUse(const UnsafeUse &use);
 
-/// Diagnose any unsafe uses within the signature or definition of the given
-/// declaration, if there are any.
-void diagnoseUnsafeUsesIn(const Decl *decl);
+/// Enumerate all of the unsafe uses that occur within this declaration
+///
+/// The given `fn` will be called with each unsafe use. If it returns `true`
+/// for any use, this function will return `true` immediately. Otherwise,
+/// it will return `false` once all unsafe uses have been emitted.
+bool enumerateUnsafeUses(ConcreteDeclRef declRef,
+                         SourceLoc loc,
+                         bool isCall,
+                         llvm::function_ref<bool(UnsafeUse)> fn);
+
+/// Enumerate all of the unsafe uses that occur within this array of protocol
+/// conformances.
+///
+/// The given `fn` will be called with each unsafe use. If it returns `true`
+/// for any use, this function will return `true` immediately. Otherwise,
+/// it will return `false` once all unsafe uses have been emitted.
+bool enumerateUnsafeUses(ArrayRef<ProtocolConformanceRef> conformances,
+                         SourceLoc loc,
+                         llvm::function_ref<bool(UnsafeUse)> fn);
+
+/// Enumerate all of the unsafe uses that occur within this substitution map.
+///
+/// The given `fn` will be called with each unsafe use. If it returns `true`
+/// for any use, this function will return `true` immediately. Otherwise,
+/// it will return `false` once all unsafe uses have been emitted.
+bool enumerateUnsafeUses(SubstitutionMap subs,
+                         SourceLoc loc,
+                         llvm::function_ref<bool(UnsafeUse)> fn);
 
 /// Determine whether a reference to this declaration is considered unsafe,
 /// either explicitly (@unsafe) or because it references an unsafe type.
@@ -35,6 +64,12 @@ bool isUnsafe(ConcreteDeclRef declRef);
 bool isUnsafeInConformance(const ValueDecl *requirement,
                            const Witness &witness,
                            NormalProtocolConformance *conformance);
+
+/// If the given type involves an unsafe type, diagnose it by calling the
+/// diagnose function with the most specific unsafe type that can be provided.
+void diagnoseUnsafeType(ASTContext &ctx, SourceLoc loc, Type type,
+                        llvm::function_ref<void(Type)> diagnose);
+
 }
 
 #endif // SWIFT_SEMA_TYPE_CHECK_UNSAFE_H

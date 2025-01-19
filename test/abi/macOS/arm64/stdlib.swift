@@ -769,6 +769,7 @@ Added: _$ss7UnicodeO5ASCIIO27encodedReplacementCharacters15CollectionOfOneVys5UI
 Added: _$ss7UnicodeO5UTF16O27encodedReplacementCharacters11_UIntBufferVys6UInt16VGvpZMV
 Added: _$ss7UnicodeO5UTF32O27encodedReplacementCharacters15CollectionOfOneVys6UInt32VGvpZMV
 Added: _$sSo19_SwiftStdlibVersionasE6v6_1_0ABvpZMV
+Added: _$sSo19_SwiftStdlibVersionasE6v6_2_0ABvpZMV
 
 // SE-0445 Improving printed descriptions of String.Index
 Added: _$sSS5IndexV16debugDescriptionSSvpMV
@@ -799,13 +800,30 @@ Added: _$ss7RawSpanVMn
 Added: _$ss7RawSpanVN
 
 // _SwiftifyInfo enum for _SwiftifyImports macro
-Added: _$ss13_SwiftifyInfoO11nonescapingyABSi_tcABmFWC
-Added: _$ss13_SwiftifyInfoO7endedByyABSi_SitcABmFWC
-Added: _$ss13_SwiftifyInfoO7sizedByyABSi_SStcABmFWC
-Added: _$ss13_SwiftifyInfoO9countedByyABSi_SStcABmFWC
+Added: _$ss13_SwiftifyExprO5paramyABSicABmFWC
+Added: _$ss13_SwiftifyExprO6returnyA2BmFWC
+Added: _$ss13_SwiftifyExprOMa
+Added: _$ss13_SwiftifyExprOMn
+Added: _$ss13_SwiftifyExprON
+Added: _$ss13_SwiftifyInfoO11nonescapingyABs01_A4ExprO_tcABmFWC
+Added: _$ss13_SwiftifyInfoO7endedByyABs01_A4ExprO_SitcABmFWC
+Added: _$ss13_SwiftifyInfoO7sizedByyABs01_A4ExprO_SStcABmFWC
+Added: _$ss13_SwiftifyInfoO9countedByyABs01_A4ExprO_SStcABmFWC
 Added: _$ss13_SwiftifyInfoOMa
 Added: _$ss13_SwiftifyInfoOMn
 Added: _$ss13_SwiftifyInfoON
 
 // Eager-lazy Array bridging
 Added: _$ss12_ArrayBufferV14associationKeySVvpZMV
+
+// Slab metadata accessor
+Added: _$ss4SlabVMa
+
+// Slab nominal type descriptor
+Added: _$ss4SlabVMn
+
+// Slab.count property descriptor
+Added: _$ss4SlabVsRi__rlE5countSivpZMV
+
+// Slab._storage _read accessor
+Added: _$ss4SlabVsRi__rlE8_storagexq_BVvr

@@ -1753,8 +1753,12 @@ public:
     return *getOverloadChoiceIfAvailable(locator);
   }
 
-  /// Retrieve the overload choice associated with the given
+  /// Retrieve the overload choice for the callee associated with the given
   /// locator.
+  SelectedOverload getCalleeOverloadChoice(ConstraintLocator *locator) const;
+
+  /// Retrieve the overload choice associated with the given
+  /// locator, if any.
   std::optional<SelectedOverload>
   getOverloadChoiceIfAvailable(ConstraintLocator *locator) const {
     auto known = overloadChoices.find(locator);
@@ -1762,6 +1766,11 @@ public:
       return known->second;
     return std::nullopt;
   }
+
+  /// Retrieve the overload choice for the callee associated with the given
+  /// locator, if any.
+  std::optional<SelectedOverload>
+  getCalleeOverloadChoiceIfAvailable(ConstraintLocator *locator) const;
 
   std::optional<SyntacticElementTarget>
   getTargetFor(SyntacticElementTargetKey key) const;
@@ -5161,7 +5170,9 @@ public:
 
   /// Get bindings for the given type variable based on current
   /// state of the constraint system.
-  BindingSet getBindingsFor(TypeVariableType *typeVar, bool finalize = true);
+  ///
+  /// FIXME: Remove this.
+  BindingSet getBindingsFor(TypeVariableType *typeVar);
 
 private:
   /// Add a constraint to the constraint system.

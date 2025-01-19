@@ -18,6 +18,7 @@
 #include "TypeAccessScopeChecker.h"
 #include "TypeCheckAvailability.h"
 #include "TypeChecker.h"
+#include "TypeCheckUnsafe.h"
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/ClangModuleLoader.h"
@@ -1331,7 +1332,7 @@ public:
       if (macroDecl) {
         diagnoseDeclAvailability(
             macroDecl, customAttr->getTypeRepr()->getSourceRange(), nullptr,
-            ExportContext::forDeclSignature(const_cast<Decl *>(D)),
+            ExportContext::forDeclSignature(const_cast<Decl *>(D), nullptr),
             std::nullopt);
       }
     }
@@ -2110,7 +2111,9 @@ class DeclAvailabilityChecker : public DeclVisitor<DeclAvailabilityChecker> {
           continue;
         assert(inheritedEntries.size() == 1);
         auto inherited = inheritedEntries.front();
-        checkType(inherited.getType(), inherited.getTypeRepr(), ownerDecl);
+        checkType(inherited.getType(), inherited.getTypeRepr(), ownerDecl,
+                  ExportabilityReason::General,
+                  DeclAvailabilityFlag::DisableUnsafeChecking);
       }
     }
 
@@ -2125,7 +2128,9 @@ class DeclAvailabilityChecker : public DeclVisitor<DeclAvailabilityChecker> {
       forAllRequirementTypes(WhereClauseOwner(
                                const_cast<GenericContext *>(ownerCtx)),
                              [&](Type type, TypeRepr *typeRepr) {
-        checkType(type, typeRepr, ownerDecl);
+        checkType(type, typeRepr, ownerDecl,
+                  ExportabilityReason::General,
+                  DeclAvailabilityFlag::DisableUnsafeChecking);
       });
     }
   }
@@ -2272,7 +2277,9 @@ public:
     if (assocType->getTrailingWhereClause()) {
       forAllRequirementTypes(assocType,
                              [&](Type type, TypeRepr *typeRepr) {
-        checkType(type, typeRepr, assocType);
+        checkType(type, typeRepr, assocType,
+                  ExportabilityReason::General,
+                  DeclAvailabilityFlag::DisableUnsafeChecking);
       });
     }
   }
@@ -2298,19 +2305,22 @@ public:
 
     for (TypeLoc inherited : nominal->getInherited().getEntries()) {
       checkType(inherited.getType(), inherited.getTypeRepr(), nominal,
-                ExportabilityReason::Inheritance, flags);
+                ExportabilityReason::Inheritance,
+                flags | DeclAvailabilityFlag::DisableUnsafeChecking);
     }
   }
 
   void visitProtocolDecl(ProtocolDecl *proto) {
     for (TypeLoc requirement : proto->getInherited().getEntries()) {
       checkType(requirement.getType(), requirement.getTypeRepr(), proto,
-                ExportabilityReason::General);
+                ExportabilityReason::General,
+                DeclAvailabilityFlag::DisableUnsafeChecking);
     }
 
     if (proto->getTrailingWhereClause()) {
       forAllRequirementTypes(proto, [&](Type type, TypeRepr *typeRepr) {
-        checkType(type, typeRepr, proto);
+        checkType(type, typeRepr, proto, ExportabilityReason::General,
+                  DeclAvailabilityFlag::DisableUnsafeChecking);
       });
     }
   }
@@ -2384,7 +2394,8 @@ public:
                            : ExportabilityReason::ExtensionWithConditionalConformances;
 
     forAllRequirementTypes(ED, [&](Type type, TypeRepr *typeRepr) {
-      checkType(type, typeRepr, ED, reason);
+      checkType(type, typeRepr, ED, reason,
+                DeclAvailabilityFlag::DisableUnsafeChecking);
     });
   }
 
@@ -2398,10 +2409,11 @@ public:
     //
     // 1) If the extension defines conformances, the conformed-to protocols
     // must be exported.
+    DeclAvailabilityFlags flags = DeclAvailabilityFlag::AllowPotentiallyUnavailableProtocol;
+    flags |= DeclAvailabilityFlag::DisableUnsafeChecking;
     for (TypeLoc inherited : ED->getInherited().getEntries()) {
       checkType(inherited.getType(), inherited.getTypeRepr(), ED,
-                ExportabilityReason::Inheritance,
-                DeclAvailabilityFlag::AllowPotentiallyUnavailableProtocol);
+                ExportabilityReason::Inheritance, flags);
     }
 
     auto wasWhere = Where;
@@ -2664,9 +2676,27 @@ void swift::checkAccessControl(Decl *D) {
   if (isa<AccessorDecl>(D))
     return;
 
-  auto where = ExportContext::forDeclSignature(D);
+  // If we need to gather all unsafe uses from the declaration signature,
+  // do so now.
+  llvm::SmallVector<UnsafeUse, 2> unsafeUsesVec;
+  llvm::SmallVectorImpl<UnsafeUse> *unsafeUses = nullptr;
+  if (D->getASTContext().LangOpts.hasFeature(Feature::WarnUnsafe) &&
+      !D->isImplicit() && !D->isUnsafe()) {
+    unsafeUses = &unsafeUsesVec;
+  }
+
+  auto where = ExportContext::forDeclSignature(D, unsafeUses);
   if (where.isImplicit())
     return;
 
   DeclAvailabilityChecker(where).visit(D);
+
+  // If there were any unsafe uses, this declaration needs "@unsafe".
+  if (!unsafeUsesVec.empty()) {
+    D->diagnose(diag::decl_signature_involves_unsafe, D)
+      .fixItInsert(D->getAttributeInsertionLoc(/*forModifier=*/false),
+                   "@unsafe ");
+    std::for_each(unsafeUsesVec.begin(), unsafeUsesVec.end(),
+                  diagnoseUnsafeUse);
+  }
 }

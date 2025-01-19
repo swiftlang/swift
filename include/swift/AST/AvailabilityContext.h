@@ -87,10 +87,6 @@ public:
   /// Returns true if this context is `@_unavailableInEmbedded`.
   bool isUnavailableInEmbedded() const;
 
-  /// Returns true if this context allows the use of unsafe constructs inside
-  /// it.
-  bool allowsUnsafe() const;
-
   /// Constrain with another `AvailabilityContext`.
   void constrainWithContext(const AvailabilityContext &other, ASTContext &ctx);
 
@@ -106,9 +102,6 @@ public:
   void
   constrainWithDeclAndPlatformRange(const Decl *decl,
                                     const AvailabilityRange &platformRange);
-
-  /// Constrain to allow unsafe code.
-  void constrainWithAllowsUnsafe(ASTContext &ctx);
 
   /// Returns true if `other` is as available or is more available.
   bool isContainedIn(const AvailabilityContext other) const;

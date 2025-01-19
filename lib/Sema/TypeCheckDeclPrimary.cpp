@@ -560,6 +560,7 @@ static void checkGenericParams(GenericContext *ownerCtx) {
     return;
 
   auto *decl = ownerCtx->getAsDecl();
+  auto &ctx = ownerCtx->getASTContext();
   bool hasPack = false;
 
   for (auto gp : *genericParams) {
@@ -567,10 +568,13 @@ static void checkGenericParams(GenericContext *ownerCtx) {
     // is not enabled.
     if (gp->isParameterPack()) {
       // Variadic nominal types require runtime support.
-      if (isa<NominalTypeDecl>(decl)) {
+      //
+      // Embedded doesn't require runtime support for this feature.
+      if (isa<NominalTypeDecl>(decl) &&
+          !ctx.LangOpts.hasFeature(Feature::Embedded)) {
         TypeChecker::checkAvailability(
             gp->getSourceRange(),
-            ownerCtx->getASTContext().getVariadicGenericTypeAvailability(),
+            ctx.getVariadicGenericTypeAvailability(),
             diag::availability_variadic_type_only_version_newer,
             ownerCtx);
       }
@@ -586,10 +590,13 @@ static void checkGenericParams(GenericContext *ownerCtx) {
 
     if (gp->isValue()) {
       // Value generic nominal types require runtime support.
-      if (isa<NominalTypeDecl>(decl)) {
+      //
+      // Embedded doesn't require runtime support for this feature.
+      if (isa<NominalTypeDecl>(decl) &&
+          !ctx.LangOpts.hasFeature(Feature::Embedded)) {
         TypeChecker::checkAvailability(
           gp->getSourceRange(),
-          ownerCtx->getASTContext().getValueGenericTypeAvailability(),
+          ctx.getValueGenericTypeAvailability(),
           diag::availability_value_generic_type_only_version_newer,
           ownerCtx);
       }
@@ -2389,20 +2396,6 @@ public:
             { });
       }
     }
-
-    // Diagnose any uses of unsafe constructs within this declaration.
-    if (!hasUnsafeCheckingOutsideOfPrimary(decl))
-      diagnoseUnsafeUsesIn(decl);
-  }
-
-  /// Determine whether @unsafe checking for this declaration occurs outside
-  /// of "primary" declaration checking, e.g., with the request that
-  /// type-checks a function body.
-  static bool hasUnsafeCheckingOutsideOfPrimary(const Decl *decl) {
-    if (auto func = dyn_cast<AbstractFunctionDecl>(decl))
-      return func->hasBody();
-
-    return false;
   }
 
   //===--------------------------------------------------------------------===//
@@ -2470,8 +2463,7 @@ public:
     // concurrency checking enabled.
     if (ID->preconcurrency() &&
         Ctx.LangOpts.StrictConcurrencyLevel == StrictConcurrency::Complete &&
-        Ctx.LangOpts.hasFeature(Feature::WarnUnsafe) && !
-        ID->getAttrs().hasAttribute<SafeAttr>()) {
+        Ctx.LangOpts.hasFeature(Feature::WarnUnsafe)) {
       diagnoseUnsafeUse(UnsafeUse::forPreconcurrencyImport(ID));
     }
   }

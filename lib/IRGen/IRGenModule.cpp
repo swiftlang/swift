@@ -1072,9 +1072,9 @@ llvm::FunctionType *swift::getRuntimeFnType(llvm::Module &Module,
 }
 
 llvm::Constant *swift::getRuntimeFn(
-    llvm::Module &Module, llvm::Constant *&cache, const char *name,
-    llvm::CallingConv::ID cc, RuntimeAvailability availability,
-    llvm::ArrayRef<llvm::Type *> retTypes,
+    llvm::Module &Module, llvm::Constant *&cache, const char *ModuleName,
+    const char *FunctionName, llvm::CallingConv::ID cc,
+    RuntimeAvailability availability, llvm::ArrayRef<llvm::Type *> retTypes,
     llvm::ArrayRef<llvm::Type *> argTypes, ArrayRef<Attribute::AttrKind> attrs,
     ArrayRef<llvm::MemoryEffects> memEffects, IRGenModule *IGM) {
 
@@ -1082,7 +1082,7 @@ llvm::Constant *swift::getRuntimeFn(
     return cache;
 
   bool isWeakLinked = false;
-  std::string functionName(name);
+  std::string name(FunctionName);
 
   switch (availability) {
   case RuntimeAvailability::AlwaysAvailable:
@@ -1093,7 +1093,7 @@ llvm::Constant *swift::getRuntimeFn(
     break;
   }
   case RuntimeAvailability::AvailableByCompatibilityLibrary: {
-    functionName.append("50");
+    name.append("50");
     break;
   }
   }
@@ -1109,7 +1109,7 @@ llvm::Constant *swift::getRuntimeFn(
                                       {argTypes.begin(), argTypes.end()},
                                       /*isVararg*/ false);
 
-  auto addr = Module.getOrInsertFunction(functionName.c_str(), fnTy).getCallee();
+  auto addr = Module.getOrInsertFunction(name.c_str(), fnTy).getCallee();
   auto fnptr = addr;
   // Strip off any bitcast we might have due to this function being declared of
   // a different type previously.
@@ -1126,12 +1126,20 @@ llvm::Constant *swift::getRuntimeFn(
         (fn->getLinkage() == llvm::GlobalValue::ExternalLinkage &&
          fn->isDeclaration());
 
-    if (!isStandardLibrary(Module) && IsExternal &&
-        ::useDllStorage(llvm::Triple(Module.getTargetTriple())))
-      fn->setDLLStorageClass(llvm::GlobalValue::DLLImportStorageClass);
+    if (IGM && useDllStorage(IGM->Triple) && IsExternal) {
+      bool bIsImported = true;
+      if (IGM->getSwiftModule()->getPublicModuleName(true).str() == ModuleName)
+        bIsImported = false;
+      else if (ModuleDecl *MD = IGM->Context.getModuleByName(ModuleName))
+        bIsImported = !MD->isStaticLibrary();
 
-    if (IsExternal && isWeakLinked
-        && !::useDllStorage(llvm::Triple(Module.getTargetTriple())))
+      if (bIsImported)
+        fn->setDLLStorageClass(llvm::GlobalValue::DLLImportStorageClass);
+    }
+
+    // Windows does not allow multiple definitions of weak symbols.
+    if (IsExternal && isWeakLinked &&
+        !llvm::Triple(Module.getTargetTriple()).isOSWindows())
       fn->setLinkage(llvm::GlobalValue::ExternalWeakLinkage);
 
     llvm::AttrBuilder buildFnAttr(Module.getContext());
@@ -1165,7 +1173,7 @@ llvm::Constant *swift::getRuntimeFn(
     // This mismatch of attributes would be issue when lowering to WebAssembly.
     // While lowering, LLVM counts how many dummy params are necessary to match
     // callee and caller signature. So we need to add them correctly.
-    if (functionName == "swift_willThrow") {
+    if (name == "swift_willThrow") {
       assert(IGM && "IGM is required for swift_willThrow.");
       fn->addParamAttr(0, Attribute::AttrKind::SwiftSelf);
       if (IGM->ShouldUseSwiftError) {
@@ -1201,10 +1209,10 @@ void IRGenModule::registerRuntimeEffect(ArrayRef<RuntimeEffect> effect,
 #define QUOTE(...) __VA_ARGS__
 #define STR(X)     #X
 
-#define FUNCTION(ID, NAME, CC, AVAILABILITY, RETURNS, ARGS, ATTRS, EFFECT,     \
-                 MEMEFFECTS)                                                   \
-  FUNCTION_IMPL(ID, NAME, CC, AVAILABILITY, QUOTE(RETURNS), QUOTE(ARGS),       \
-                QUOTE(ATTRS), QUOTE(EFFECT), QUOTE(MEMEFFECTS))
+#define FUNCTION(ID, MODULE, NAME, CC, AVAILABILITY, RETURNS, ARGS, ATTRS,     \
+                 EFFECT, MEMEFFECTS)                                           \
+  FUNCTION_IMPL(ID, MODULE, NAME, CC, AVAILABILITY, QUOTE(RETURNS),            \
+                QUOTE(ARGS), QUOTE(ATTRS), QUOTE(EFFECT), QUOTE(MEMEFFECTS))
 
 #define RETURNS(...) { __VA_ARGS__ }
 #define ARGS(...) { __VA_ARGS__ }
@@ -1217,12 +1225,12 @@ void IRGenModule::registerRuntimeEffect(ArrayRef<RuntimeEffect> effect,
 #define MEMEFFECTS(...)                                                        \
   { __VA_ARGS__ }
 
-#define FUNCTION_IMPL(ID, NAME, CC, AVAILABILITY, RETURNS, ARGS, ATTRS,        \
+#define FUNCTION_IMPL(ID, MODULE, NAME, CC, AVAILABILITY, RETURNS, ARGS, ATTRS,\
                       EFFECT, MEMEFFECTS)                                      \
   llvm::Constant *IRGenModule::get##ID##Fn() {                                 \
     using namespace RuntimeConstants;                                          \
     registerRuntimeEffect(EFFECT, #NAME);                                      \
-    return getRuntimeFn(Module, ID##Fn, #NAME, CC,                             \
+    return getRuntimeFn(Module, ID##Fn, #MODULE, #NAME, CC,                    \
                         AVAILABILITY(this->Context), RETURNS, ARGS, ATTRS,     \
                         MEMEFFECTS, this);                                     \
   }                                                                            \
@@ -1289,7 +1297,8 @@ IRGenModule::createStringConstant(StringRef Str, bool willBeRelativelyAddressed,
     if (NAME)                                                                  \
       return NAME;                                                             \
     NAME = Module.getOrInsertGlobal(SYM, FullExistentialTypeMetadataStructTy); \
-    if (!getSwiftModule()->isStdlibModule())                                   \
+    if (!getSwiftModule()->isStdlibModule() ||                                 \
+        !getSwiftModule()->isStaticLibrary())                                  \
       ApplyIRLinkage(IRLinkage::ExternalImport)                                \
           .to(cast<llvm::GlobalVariable>(NAME));                               \
     return NAME;                                                               \

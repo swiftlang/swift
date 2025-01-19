@@ -748,6 +748,9 @@ namespace {
         if (secondType->is<IntegerType>())
           return true;
 
+        if (secondType->is<PlaceholderType>())
+          return true;
+
         return false;
       }
 
@@ -3525,8 +3528,7 @@ TypeResolver::resolveAttributedType(TypeRepr *repr, TypeResolutionOptions option
 
   if (handleInheritedOnly(claim<UncheckedTypeAttr>(attrs)) ||
       handleInheritedOnly(claim<PreconcurrencyTypeAttr>(attrs)) ||
-      handleInheritedOnly(claim<UnsafeTypeAttr>(attrs)) ||
-      handleInheritedOnly(claim<SafeTypeAttr>(attrs)))
+      handleInheritedOnly(claim<UnsafeTypeAttr>(attrs)))
     return ty;
 
   if (auto retroactiveAttr = claim<RetroactiveTypeAttr>(attrs)) {
@@ -6672,39 +6674,4 @@ Type ExplicitCaughtTypeRequest::evaluate(
   }
 
   llvm_unreachable("Unhandled catch node");
-}
-
-void swift::diagnoseUnsafeType(ASTContext &ctx, SourceLoc loc, Type type,
-                               AvailabilityContext availability,
-                               llvm::function_ref<void(Type)> diagnose) {
-  if (!ctx.LangOpts.hasFeature(Feature::WarnUnsafe))
-    return;
-
-  if (!type->isUnsafe())
-    return;
-
-  if (availability.allowsUnsafe())
-    return;
-
-  // Look for a specific @unsafe nominal type.
-  Type specificType;
-  type.findIf([&specificType](Type type) {
-    if (auto typeDecl = type->getAnyNominal()) {
-      if (typeDecl->isUnsafe()) {
-        specificType = type;
-        return false;
-      }
-    }
-
-    return false;
-  });
-
-  diagnose(specificType ? specificType : type);
-}
-
-void swift::diagnoseUnsafeType(ASTContext &ctx, SourceLoc loc, Type type,
-                               const DeclContext *dc,
-                               llvm::function_ref<void(Type)> diagnose) {
-  auto availability = TypeChecker::availabilityAtLocation(loc, dc);
-  return diagnoseUnsafeType(ctx, loc, type, availability, diagnose);
 }

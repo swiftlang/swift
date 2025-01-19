@@ -17,7 +17,7 @@
 using namespace swift;
 
 bool AvailabilityDomain::isActive(const ASTContext &ctx) const {
-  switch (kind) {
+  switch (getKind()) {
   case Kind::Universal:
   case Kind::SwiftLanguage:
   case Kind::PackageDescription:
@@ -28,27 +28,27 @@ bool AvailabilityDomain::isActive(const ASTContext &ctx) const {
 }
 
 llvm::StringRef AvailabilityDomain::getNameForDiagnostics() const {
-  switch (kind) {
+  switch (getKind()) {
   case Kind::Universal:
     return "";
-  case Kind::Platform:
-    return swift::prettyPlatformString(getPlatformKind());
   case Kind::SwiftLanguage:
     return "Swift";
   case Kind::PackageDescription:
     return "PackageDescription";
+  case Kind::Platform:
+    return swift::prettyPlatformString(getPlatformKind());
   }
 }
 
 llvm::StringRef AvailabilityDomain::getNameForAttributePrinting() const {
-  switch (kind) {
+  switch (getKind()) {
   case Kind::Universal:
     return "*";
-  case Kind::Platform:
-    return swift::platformString(getPlatformKind());
   case Kind::SwiftLanguage:
     return "swift";
   case Kind::PackageDescription:
     return "_PackageDescription";
+  case Kind::Platform:
+    return swift::platformString(getPlatformKind());
   }
 }

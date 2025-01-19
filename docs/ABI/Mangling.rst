@@ -733,10 +733,12 @@ Types
   FUNCTION-KIND ::= 'A'                      // @auto_closure function type (escaping)
   FUNCTION-KIND ::= 'E'                      // function type (noescape)
 
-  C-TYPE is mangled according to the Itanium ABI, and prefixed with the length.
-  Non-ASCII identifiers are preserved as-is; we do not use Punycode.
+  C-TYPE ::= NATURAL CHAR*                   // raw Itanium mangling
 
-  function-signature ::= params-type params-type async? sendable? throws? differentiable? function-isolation? // results and parameters
+  function-signature ::= result-type params-type async? sendable? throws? differentiable? function-isolation? sending-result? // results and parameters
+
+  result-type ::= type
+  result-type ::= empty-list                 // shortcut for ()
 
   params-type ::= type 'z'? 'h'?             // tuple in case of multiple parameters or a single parameter with a single tuple type
                                              // with optional inout convention, shared convention. parameters don't have labels,
@@ -752,6 +754,7 @@ Types
   #if SWIFT_RUNTIME_VERSION >= 6.0
     throws ::= type 'YK'                     // 'throws(type)' annotation on function types
     function-isolation ::= type 'YA'         // @isolated(any) on function type
+    sending-result ::= 'YT'                  // -> sending T
   #endif
   differentiable ::= 'Yjf'                   // @differentiable(_forward) on function type
   differentiable ::= 'Yjr'                   // @differentiable(reverse) on function type
@@ -762,6 +765,12 @@ Types
 
                                                   // FIXME: Consider replacing 'h' with a two-char code
   list-type ::= type identifier? 'Yk'? 'z'? 'h'? 'n'? 'Yi'? 'd'? 'Yt'?  // type with optional label, '@noDerivative', inout convention, shared convention, owned convention, actor 'isolated', variadic specifier, and compile-time constant
+
+In the mangling of C function types,``C-TYPE`` is mangled according to the Itanium ABI, prefixed with its length. This resembles the mangling of ``identifier``, but it does not honor substitutions or Punycode.
+
+The 6.0 Swift runtime supports demangling ``sending-result``, but has a bug when it's combined with ``function-isolation``.
+
+::
 
   METATYPE-REPR ::= 't'                      // Thin metatype representation
   METATYPE-REPR ::= 'T'                      // Thick metatype representation
@@ -828,7 +837,7 @@ mangled in to disambiguate.
   impl-function-type ::= type* 'I' FUNC-ATTRIBUTES '_'
   impl-function-type ::= type* generic-signature 'I' FUNC-ATTRIBUTES '_'
 
-  FUNC-ATTRIBUTES ::= PATTERN-SUBS? INVOCATION-SUBS? PSEUDO-GENERIC? CALLEE-ESCAPE? ISOLATION? DIFFERENTIABILITY-KIND? CALLEE-CONVENTION FUNC-REPRESENTATION? COROUTINE-KIND? SENDABLE? ASYNC? (PARAM-CONVENTION PARAM-DIFFERENTIABILITY?)* RESULT-CONVENTION* ('Y' PARAM-CONVENTION)* ('z' RESULT-CONVENTION RESULT-DIFFERENTIABILITY?)?
+  FUNC-ATTRIBUTES ::= PATTERN-SUBS? INVOCATION-SUBS? PSEUDO-GENERIC? CALLEE-ESCAPE? ISOLATION? DIFFERENTIABILITY-KIND? CALLEE-CONVENTION FUNC-REPRESENTATION? COROUTINE-KIND? SENDABLE? ASYNC? SENDING-RESULT? (PARAM-CONVENTION PARAM-DIFFERENTIABILITY?)* RESULT-CONVENTION* ('Y' PARAM-CONVENTION)* ('z' RESULT-CONVENTION RESULT-DIFFERENTIABILITY?)?
 
   PATTERN-SUBS ::= 's'                       // has pattern substitutions
   INVOCATION-SUB ::= 'I'                     // has invocation substitutions
@@ -862,8 +871,9 @@ mangled in to disambiguate.
   COROUTINE-KIND ::= 'G'                     // yield-many coroutine
 
   #if SWIFT_RUNTIME_VERSION >= 5.5
-    SENDABLE ::= 'h'                           // @Sendable
-    ASYNC ::= 'H'                              // @async
+    SENDABLE ::= 'h'                         // @Sendable
+    ASYNC ::= 'H'                            // @async
+    SENDING-RESULT ::= 'T'                   // sending result
   #endif
 
   PARAM-CONVENTION ::= 'i'                   // indirect in

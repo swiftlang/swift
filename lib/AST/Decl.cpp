@@ -1094,10 +1094,6 @@ bool Decl::isUnsafe() const {
       false);
 }
 
-bool Decl::allowsUnsafe() const {
-  return isUnsafe();
-}
-
 Type AbstractFunctionDecl::getThrownInterfaceType() const {
   if (!getThrownTypeRepr())
     return ThrownType.getType();
@@ -1680,8 +1676,6 @@ InheritedEntry::InheritedEntry(const TypeLoc &typeLoc)
       setOption(ProtocolConformanceFlags::Retroactive);
     if (typeRepr->findAttrLoc(TypeAttrKind::Unsafe).isValid())
       setOption(ProtocolConformanceFlags::Unsafe);
-    if (typeRepr->findAttrLoc(TypeAttrKind::Safe).isValid())
-      setOption(ProtocolConformanceFlags::Safe);
     if (typeRepr->findAttrLoc(TypeAttrKind::Preconcurrency).isValid())
       setOption(ProtocolConformanceFlags::Preconcurrency);
   }
@@ -4720,14 +4714,51 @@ bool ValueDecl::hasOpenAccess(const DeclContext *useDC) const {
 }
 
 bool ValueDecl::bypassResilienceInPackage(ModuleDecl *accessingModule) const {
-  // If the defining module is built with package-cmo, bypass
-  // resilient access from the use site that belongs to a module
-  // in the same package.
+  // To allow bypassing resilience when accessing this decl from another
+  // module, it should be in the same package as this decl's module.
   auto declModule = getModuleContext();
-  return declModule->inSamePackage(accessingModule) &&
-         declModule->isResilient() &&
-         declModule->allowNonResilientAccess() &&
-         declModule->serializePackageEnabled();
+  if (!declModule->inSamePackage(accessingModule))
+    return false;
+  // Package optimization allows bypassing resilience, but it assumes the
+  // memory layout of the decl being accessed is correct. When this assumption
+  // fails due to a deserialization error of its members, the use site incorrectly
+  // accesses the layout of the decl with a wrong field offset, resulting in UB
+  // or a crash.
+  // The deserialization error is currently not caught at compile time due to
+  // LangOpts.EnableDeserializationRecovery being enabled by default (to allow
+  // for recovery of some of the deserialization errors at a later time). In case
+  // of member deserialization, however, it's not necessarily recovered later on
+  // and is silently dropped, causing UB or a crash at runtime.
+  // The following tracks errors in member deserialization by recursively loading
+  // members of a type (if not done already) and checking whether the type's
+  // members, and their respective types (recursively), encountered deserialization
+  // failures.
+  // If any such type is found, it fails and emits a diagnostic at compile time.
+  // Simply disallowing resilience bypassing for this decl here is insufficient
+  // because it would cause a type requirement mismatch later during SIL
+  // deserialiaztion; e.g. generated SIL in the imported module might contain
+  // an instruction that allows a direct access, while the caller in client module
+  // might require a non-direct access due to a deserialization error.
+  if (declModule->isResilient() &&
+      declModule->allowNonResilientAccess() &&
+      declModule->serializePackageEnabled()) {
+    // Fail and diagnose if there is a member deserialization error,
+    // with an option to skip for temporary/migration purposes.
+    if (!getASTContext().LangOpts.SkipDeserializationChecksForPackageCMO) {
+      // Since we're checking for deserialization errors, make sure the
+      // accessing module is different from this decl's module.
+      if (accessingModule &&
+          accessingModule != declModule) {
+        if (auto IDC = dyn_cast<IterableDeclContext>(this)) {
+          // Recursively check if members and their members have failing
+          // deserialization, and emit a diagnostic.
+          IDC->checkDeserializeMemberErrorInPackage(accessingModule);
+        }
+      }
+    }
+    return true;
+  }
+  return false;
 }
 
 /// Given the formal access level for using \p VD, compute the scope where

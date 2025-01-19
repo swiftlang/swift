@@ -5950,10 +5950,19 @@ InferredActorIsolation ActorIsolationRequest::evaluate(
     if (auto selfTypeDecl = value->getDeclContext()->getSelfNominalTypeDecl()) {
       auto selfTypeIsolation = getInferredActorIsolation(selfTypeDecl);
       if (selfTypeIsolation.isolation) {
-        return {
-          inferredIsolation(selfTypeIsolation.isolation, onlyGlobal),
-          selfTypeIsolation.source
-        };
+        auto isolation = selfTypeIsolation.isolation;
+
+        if (auto *func = dyn_cast<AbstractFunctionDecl>(value);
+            ctx.LangOpts.hasFeature(
+                Feature::NonIsolatedAsyncInheritsIsolationFromContext) &&
+            func && func->hasAsync() &&
+            func->getModuleContext() == ctx.MainModule &&
+            isolation.isNonisolated()) {
+          isolation = ActorIsolation::forCallerIsolationInheriting();
+        }
+
+        return {inferredIsolation(isolation, onlyGlobal),
+                selfTypeIsolation.source};
       }
     }
   }
@@ -6654,12 +6663,13 @@ static void addUnavailableAttrs(ExtensionDecl *ext, NominalTypeDecl *nominal) {
         continue;
 
       auto attr = new (ctx) AvailableAttr(
-          SourceLoc(), SourceRange(), available.getPlatform(),
-          available.getMessage(),
+          SourceLoc(), SourceRange(),
+          AvailabilityDomain::forPlatform(available.getPlatform()),
+          AvailableAttr::Kind::Unavailable, available.getMessage(),
           /*Rename=*/"", available.getIntroduced().value_or(noVersion),
           SourceRange(), available.getDeprecated().value_or(noVersion),
           SourceRange(), available.getObsoleted().value_or(noVersion),
-          SourceRange(), PlatformAgnosticAvailabilityKind::Unavailable,
+          SourceRange(),
           /*Implicit=*/true, available.getParsedAttr()->isSPI());
       ext->getAttrs().add(attr);
       anyPlatformSpecificAttrs = true;

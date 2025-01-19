@@ -527,7 +527,6 @@ public:
   void visitWeakLinkedAttr(WeakLinkedAttr *attr);
   void visitSILGenNameAttr(SILGenNameAttr *attr);
   void visitUnsafeAttr(UnsafeAttr *attr);
-  void visitSafeAttr(SafeAttr *attr);
   void visitLifetimeAttr(LifetimeAttr *attr);
   void visitAddressableSelfAttr(AddressableSelfAttr *attr);
   void visitAddressableForDependenciesAttr(AddressableForDependenciesAttr *attr);
@@ -1327,9 +1326,9 @@ void AttributeChecker::visitAccessControlAttr(AccessControlAttr *attr) {
           // an extension.
           if (!VD->isObjC() && attr->getAccess() == AccessLevel::Open) {
             diagnose(attr->getLocation(),
-                     diag::access_control_non_objc_open_member,
-                     VD->getDescriptiveKind())
-                .fixItReplace(attr->getRange(), "public");
+                     diag::access_control_non_objc_open_member, VD)
+                .fixItReplace(attr->getRange(), "public")
+                .warnUntilSwiftVersion(7);
           }
         }
       }
@@ -2444,7 +2443,7 @@ static bool canDeclareSymbolName(StringRef symbol, ModuleDecl *fromModule) {
   // promote this to an error after a while.
   
   return llvm::StringSwitch<bool>(symbol)
-#define FUNCTION(_, Name, ...) \
+#define FUNCTION(_, Module, Name, ...) \
     .Case(#Name, false) \
     .Case("_" #Name, false) \
     .Case(#Name "_", false) \
@@ -3242,7 +3241,7 @@ SynthesizeMainFunctionRequest::evaluate(Evaluator &evaluator,
     return nullptr;
   }
 
-  auto where = ExportContext::forDeclSignature(D);
+  auto where = ExportContext::forDeclSignature(D, nullptr);
   diagnoseDeclAvailability(mainFunction, attr->getRange(), nullptr, where,
                            std::nullopt);
 
@@ -7917,13 +7916,6 @@ void AttributeChecker::visitWeakLinkedAttr(WeakLinkedAttr *attr) {
 }
 
 void AttributeChecker::visitUnsafeAttr(UnsafeAttr *attr) {
-  if (Ctx.LangOpts.hasFeature(Feature::AllowUnsafeAttribute))
-    return;
-
-  diagnoseAndRemoveAttr(attr, diag::unsafe_attr_disabled);
-}
-
-void AttributeChecker::visitSafeAttr(SafeAttr *attr) {
   if (Ctx.LangOpts.hasFeature(Feature::AllowUnsafeAttribute))
     return;
 

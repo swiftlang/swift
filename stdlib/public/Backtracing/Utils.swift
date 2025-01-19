@@ -16,7 +16,15 @@
 
 import Swift
 
-@_implementationOnly import OS.Libc
+#if os(macOS) || os(iOS) || os(tvOS) || os(watchOS)
+internal import Darwin
+#elseif os(Windows)
+internal import ucrt
+#elseif canImport(Glibc)
+internal import Glibc
+#elseif canImport(Musl)
+internal import Musl
+#endif
 
 internal func hex<T: FixedWidthInteger>(_ value: T,
                                         prefix shouldPrefix: Bool = true,
@@ -53,7 +61,7 @@ func pad<T>(_ value: T, _ width: Int, align: PadAlignment = .left) -> String {
 
 @_spi(Utils)
 public func readString(from file: String) -> String? {
-  let fd = _swift_open(file, O_RDONLY, 0)
+  let fd = open(file, O_RDONLY, 0)
   if fd < 0 {
     return nil
   }

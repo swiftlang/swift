@@ -1158,6 +1158,22 @@ namespace {
       // Do not import namespace declarations marked as 'swift_private'.
       if (decl->hasAttr<clang::SwiftPrivateAttr>())
         return nullptr;
+      // Workaround for os module declaring `namespace os` on Darwin, causing
+      // name lookup issues. That namespace only declares utility functions that
+      // are not supposed to be used from Swift, so let's just not import the
+      // namespace (rdar://119044493).
+      if (decl->getIdentifier() && decl->getName() == "os" &&
+          decl->getOwningModule() &&
+          decl->getOwningModule()->getTopLevelModuleName() == "os")
+        return nullptr;
+      // Workaround for simd module declaring `namespace simd` on Darwin,
+      // causing name lookup issues. That namespace declares C++ overlays of
+      // types that are already refined for Swift, so let's not import the
+      // namespace (rdar://143007477).
+      if (decl->getIdentifier() && decl->getName() == "simd" &&
+          decl->getOwningModule() &&
+          decl->getOwningModule()->getTopLevelModuleName() == "simd")
+        return nullptr;
       // If this is a top-level namespace, don't put it in the module we're
       // importing, put it in the "__ObjC" module that is implicitly imported.
       if (!decl->getParent()->isNamespace())
@@ -7997,13 +8013,14 @@ void addCompletionHandlerAttribute(Decl *asyncImport,
       continue;
 
     llvm::VersionTuple NoVersion;
-    auto *attr = new (SwiftContext)
-        AvailableAttr(SourceLoc(), SourceRange(), PlatformKind::none,
-                      /*Message=*/"", /*Rename=*/"", /*Introduced=*/NoVersion,
-                      SourceRange(), /*Deprecated=*/NoVersion, SourceRange(),
-                      /*Obsoleted=*/NoVersion, SourceRange(),
-                      PlatformAgnosticAvailabilityKind::None, /*Implicit=*/true,
-                      /*SPI=*/false);
+    auto *attr = new (SwiftContext) AvailableAttr(
+        SourceLoc(), SourceRange(), AvailabilityDomain::forUniversal(),
+        AvailableAttr::Kind::Default,
+        /*Message=*/"", /*Rename=*/"", /*Introduced=*/NoVersion, SourceRange(),
+        /*Deprecated=*/NoVersion, SourceRange(),
+        /*Obsoleted=*/NoVersion, SourceRange(),
+        /*Implicit=*/true,
+        /*SPI=*/false);
 
     afd->setRenamedDecl(attr, asyncFunc);
     afd->getAttrs().add(attr);
@@ -8678,7 +8695,7 @@ public:
   ~SwiftifyInfoPrinter() { out << ")"; }
 
   void printCountedBy(const clang::CountAttributedType *CAT,
-                      size_t pointerIndex) {
+                      ssize_t pointerIndex) {
     printSeparator();
     clang::Expr *countExpr = CAT->getCountExpr();
     bool isSizedBy = CAT->isCountInBytes();
@@ -8687,7 +8704,9 @@ public:
       out << "sizedBy";
     else
       out << "countedBy";
-    out << "(pointer: " << pointerIndex + 1 << ", ";
+    out << "(pointer: ";
+    printParamOrReturn(pointerIndex);
+    out << ", ";
     if (isSizedBy)
       out << "size";
     else
@@ -8700,7 +8719,9 @@ public:
 
   void printNonEscaping(int idx) {
     printSeparator();
-    out << ".nonescaping(pointer: " << idx << ")";
+    out << ".nonescaping(pointer: ";
+    printParamOrReturn(idx);
+    out << ")";
   }
 
   void printTypeMapping(const llvm::StringMap<std::string> &mapping) {
@@ -8723,6 +8744,13 @@ private:
     } else {
       firstParam = false;
     }
+  }
+
+  void printParamOrReturn(ssize_t pointerIndex) {
+    if (pointerIndex == -1)
+      out << ".return";
+    else
+      out << ".param(" << pointerIndex + 1 << ")";
   }
 };
 } // namespace
@@ -8750,7 +8778,7 @@ void ClangImporter::Implementation::importSpanAttributes(FuncDecl *MappedDecl) {
       if (decl->getName() != "span")
         continue;
       if (param->hasAttr<clang::NoEscapeAttr>()) {
-        printer.printNonEscaping(index + 1);
+        printer.printNonEscaping(index);
         clang::PrintingPolicy policy(param->getASTContext().getLangOpts());
         policy.SuppressTagKeyword = true;
         auto param = MappedDecl->getParameters()->get(index);
@@ -8786,6 +8814,10 @@ void ClangImporter::Implementation::importBoundsAttributes(
       if (auto CAT = param->getType()->getAs<clang::CountAttributedType>()) {
         printer.printCountedBy(CAT, index);
       }
+    }
+    if (auto CAT =
+            ClangDecl->getReturnType()->getAs<clang::CountAttributedType>()) {
+      printer.printCountedBy(CAT, -1);
     }
   }
 
@@ -8937,9 +8969,9 @@ void ClangImporter::Implementation::importAttributes(
         continue;
 
       // Is this declaration marked platform-agnostically unavailable?
-      auto PlatformAgnostic = PlatformAgnosticAvailabilityKind::None;
+      auto AttrKind = AvailableAttr::Kind::Default;
       if (avail->getUnavailable()) {
-        PlatformAgnostic = PlatformAgnosticAvailabilityKind::Unavailable;
+        AttrKind = AvailableAttr::Kind::Unavailable;
         AnyUnavailable = true;
       }
 
@@ -8949,14 +8981,13 @@ void ClangImporter::Implementation::importAttributes(
                               avail->getLoc(), "__SPI_AVAILABLE");
 
       StringRef message = avail->getMessage();
-
       llvm::VersionTuple deprecated = avail->getDeprecated();
 
       if (!deprecated.empty()) {
         if (platformAvailability.treatDeprecatedAsUnavailable(
                 ClangDecl, deprecated, isAsync)) {
+          AttrKind = AvailableAttr::Kind::Unavailable;
           AnyUnavailable = true;
-          PlatformAgnostic = PlatformAgnosticAvailabilityKind::Unavailable;
           if (message.empty()) {
             if (isAsync) {
               message =
@@ -8977,11 +9008,12 @@ void ClangImporter::Implementation::importAttributes(
       if (!replacement.empty())
         swiftReplacement = getSwiftNameFromClangName(replacement);
 
-      auto AvAttr = new (C) AvailableAttr(
-          SourceLoc(), SourceRange(), platformK.value(), message,
-          swiftReplacement, introduced, SourceRange(), deprecated,
-          SourceRange(), obsoleted, SourceRange(), PlatformAgnostic,
-          /*Implicit=*/false, EnableClangSPI && IsSPI);
+      auto AvAttr = new (C)
+          AvailableAttr(SourceLoc(), SourceRange(),
+                        AvailabilityDomain::forPlatform(*platformK), AttrKind,
+                        message, swiftReplacement, introduced, SourceRange(),
+                        deprecated, SourceRange(), obsoleted, SourceRange(),
+                        /*Implicit=*/false, EnableClangSPI && IsSPI);
 
       MappedDecl->getAttrs().add(AvAttr);
     }
@@ -9889,17 +9921,22 @@ ClangImporter::Implementation::loadAllMembers(Decl *D, uint64_t extra) {
   // Check whether we're importing an Objective-C container of some sort.
   auto objcContainer =
     dyn_cast_or_null<clang::ObjCContainerDecl>(D->getClangDecl());
+  auto *IDC = dyn_cast<IterableDeclContext>(D);
 
   // If not, we're importing globals-as-members into an extension.
   if (objcContainer) {
     loadAllMembersOfSuperclassIfNeeded(dyn_cast<ClassDecl>(D));
     loadAllMembersOfObjcContainer(D, objcContainer);
+    if (IDC) // Set member deserialization status
+      IDC->setDeserializedMembers(true);
     return;
   }
 
   if (isa_and_nonnull<clang::RecordDecl>(D->getClangDecl())) {
     loadAllMembersOfRecordDecl(cast<NominalTypeDecl>(D),
                                cast<clang::RecordDecl>(D->getClangDecl()));
+    if (IDC) // Set member deserialization status
+      IDC->setDeserializedMembers(true);
     return;
   }
 
@@ -9910,6 +9947,8 @@ ClangImporter::Implementation::loadAllMembers(Decl *D, uint64_t extra) {
   }
 
   loadAllMembersIntoExtension(D, extra);
+  if (IDC) // Set member deserialization status
+    IDC->setDeserializedMembers(true);
 }
 
 void ClangImporter::Implementation::loadAllMembersIntoExtension(

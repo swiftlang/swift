@@ -1,8 +1,4 @@
 module OS {
-  module Libc {
-    header "Libc.h"
-  }
-
   module Darwin {
     header "Darwin.h"
   }

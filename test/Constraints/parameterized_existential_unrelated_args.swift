@@ -31,4 +31,25 @@ var q: any Q<String> = p // expected-error {{cannot convert value of type 'any P
 // Previously we accepted the above conversion, and then getB()
 // would return something that was dynamically Array<String>
 // and not String as expected.
-print(q.getB())
+// print(q.getB())
+
+
+// However, this is OK -- the two A's have the same name, so by the
+// semantics of the generics system they must be equivalent as type
+// parameters.
+
+protocol P1<A> {
+  associatedtype A
+}
+
+protocol P2<A> {
+  associatedtype A
+}
+
+protocol P3<A>: P1, P2 {
+  associatedtype A
+}
+
+func f<T>(_ value: any P3<T>) -> (any P1<T>, any P2<T>) {
+  return (value, value)
+}

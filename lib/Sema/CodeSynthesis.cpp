@@ -21,6 +21,7 @@
 #include "TypeCheckObjC.h"
 #include "TypeCheckType.h"
 #include "TypeChecker.h"
+#include "DerivedConformances.h"
 #include "swift/AST/ASTMangler.h"
 #include "swift/AST/ASTPrinter.h"
 #include "swift/AST/AvailabilityInference.h"
@@ -1726,6 +1727,15 @@ bool swift::hasLetStoredPropertyWithInitialValue(NominalTypeDecl *nominal) {
   return llvm::any_of(nominal->getStoredProperties(), [&](VarDecl *v) {
     return v->isLet() && v->hasInitialValue();
   });
+}
+
+bool swift::addNonIsolatedToSynthesized(DerivedConformance &derived,
+                                        ValueDecl *value) {
+  if (auto *conformance = derived.Conformance) {
+    if (conformance && conformance->isPreconcurrency())
+      return false;
+  }
+  return addNonIsolatedToSynthesized(derived.Nominal, value);
 }
 
 bool swift::addNonIsolatedToSynthesized(NominalTypeDecl *nominal,

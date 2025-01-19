@@ -68,12 +68,18 @@ do {
 }
 
 // https://github.com/apple/swift/issues/68160
+// https://github.com/apple/swift/issues/69390
 do {
   struct G<each T, U> {
     let f: (repeat Optional<each T>) -> U
+    var f2: (repeat each T) -> Void
 
     init(f: @escaping (repeat Optional<each T>) -> U) {
       self.f = f
+    }
+
+    func foo() {
+      let _: (repeat each T) -> Void = f2
     }
   }
 }

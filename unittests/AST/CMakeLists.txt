@@ -3,6 +3,7 @@ add_swift_unittest(SwiftASTTests
   ASTDumperTests.cpp
   ASTWalkerTests.cpp
   IndexSubsetTests.cpp
+  DiagnosticBehaviorTests.cpp
   DiagnosticConsumerTests.cpp
   DiagnosticGroupsTests.cpp
   SourceLocTests.cpp

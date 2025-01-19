@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#if os(Linux)
+#if os(Linux) || os(Android)
   import Foundation
   import SwiftInspectLinux
   import SwiftRemoteMirror

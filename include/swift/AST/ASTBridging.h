@@ -1505,6 +1505,11 @@ BridgedUnresolvedSpecializeExpr BridgedUnresolvedSpecializeExpr_createParsed(
     BridgedSourceLoc cLAngleLoc, BridgedArrayRef cArguments,
     BridgedSourceLoc cRAngleLoc);
 
+SWIFT_NAME("BridgedUnsafeExpr.createParsed(_:unsafeLoc:subExpr:)")
+BridgedUnsafeExpr BridgedUnsafeExpr_createParsed(BridgedASTContext cContext,
+                                                 BridgedSourceLoc cUnsafeLoc,
+                                                 BridgedExpr cSubExpr);
+
 SWIFT_NAME("BridgedInOutExpr.createParsed(_:loc:subExpr:)")
 BridgedInOutExpr BridgedInOutExpr_createParsed(BridgedASTContext cContext,
                                                BridgedSourceLoc cLoc,

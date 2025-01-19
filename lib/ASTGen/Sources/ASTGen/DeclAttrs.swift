@@ -166,8 +166,6 @@ extension ASTGenVisitor {
         return handle(self.generateProjectedValuePropertyAttr(attribute: node)?.asDeclAttribute)
       case .rawLayout:
         fatalError("unimplemented")
-      case .safe:
-        fatalError("unimplemented")
       case .section:
         return handle(self.generateSectionAttr(attribute: node)?.asDeclAttribute)
       case .semantics:

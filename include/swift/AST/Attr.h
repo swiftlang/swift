@@ -151,12 +151,9 @@ protected:
       Value : 32
     );
 
-    SWIFT_INLINE_BITFIELD(AvailableAttr, DeclAttribute, 8+8+1+1+1+1,
-      /// A `PlatformKind` value.
-      Platform : 8,
-
-      /// A `PlatformAgnosticAvailabilityKind` value.
-      PlatformAgnostic : 8,
+    SWIFT_INLINE_BITFIELD(AvailableAttr, DeclAttribute, 4+1+1+1+1,
+      /// An `AvailableAttr::Kind` value.
+      Kind : 4,
 
       /// State storage for `RenamedDeclRequest`.
       HasComputedRenamedDecl : 1,
@@ -719,38 +716,31 @@ enum class AvailableVersionComparison {
   Obsoleted,
 };
 
-/// Describes the platform-agnostic availability of a declaration.
-enum class PlatformAgnosticAvailabilityKind : uint8_t {
-  /// The associated availability attribute is not platform-agnostic.
-  None,
-  /// The declaration is deprecated, but can still be used.
-  Deprecated,
-  /// The declaration is unavailable in Swift, specifically
-  UnavailableInSwift,
-  /// The declaration is available in some but not all versions
-  /// of Swift, as specified by the VersionTuple members.
-  SwiftVersionSpecific,
-  /// The declaration is available in some but not all versions
-  /// of SwiftPM's PackageDescription library, as specified by
-  /// the VersionTuple members.
-  PackageDescriptionVersionSpecific,
-  /// The declaration is unavailable for other reasons.
-  Unavailable,
-  /// The declaration is unavailable from asynchronous contexts
-  NoAsync,
-};
-
 /// Defines the @available attribute.
 class AvailableAttr : public DeclAttribute {
+  AvailabilityDomain Domain;
+
 public:
-  AvailableAttr(SourceLoc AtLoc, SourceRange Range, PlatformKind Platform,
-                StringRef Message, StringRef Rename,
-                const llvm::VersionTuple &Introduced,
+  enum class Kind : uint8_t {
+    /// The attribute does not specify `deprecated`, `unavailable`,
+    /// or `noasync`. Instead, it may specify `introduced:`, `deprecated:`, or
+    /// `obsoleted:` versions or it may simply have a `rename:` field.
+    Default,
+    /// The attribute specifies unconditional deprecation.
+    Deprecated,
+    /// The attribute specifies unconditional unavailability.
+    Unavailable,
+    /// The attribute specifies unavailability in asynchronous contexts.
+    NoAsync,
+  };
+
+  AvailableAttr(SourceLoc AtLoc, SourceRange Range,
+                const AvailabilityDomain &Domain, Kind Kind, StringRef Message,
+                StringRef Rename, const llvm::VersionTuple &Introduced,
                 SourceRange IntroducedRange,
                 const llvm::VersionTuple &Deprecated,
                 SourceRange DeprecatedRange,
                 const llvm::VersionTuple &Obsoleted, SourceRange ObsoletedRange,
-                PlatformAgnosticAvailabilityKind PlatformAgnostic,
                 bool Implicit, bool IsSPI, bool IsForEmbedded = false);
 
   /// The optional message.
@@ -802,16 +792,20 @@ public:
   /// Whether this attribute was spelled `@_unavailableInEmbedded`.
   bool isForEmbedded() const { return Bits.AvailableAttr.IsForEmbedded; }
 
-  /// Returns the platform that the attribute applies to (may be `none`).
-  PlatformKind getPlatform() const {
-    return static_cast<PlatformKind>(Bits.AvailableAttr.Platform);
+  /// Returns the `AvailabilityDomain` associated with the attribute, or
+  /// `std::nullopt` if it has either not yet been resolved or could not be
+  /// resolved successfully.
+  std::optional<AvailabilityDomain> getCachedDomain() const { return Domain; }
+
+  /// Returns true if the `AvailabilityDomain` associated with the attribute
+  /// has been resolved successfully.
+  bool hasCachedDomain() const {
+    // For now, domains are always set on construction of the attribute.
+    return true;
   }
 
-  /// Returns the platform-agnostic availability.
-  PlatformAgnosticAvailabilityKind getPlatformAgnosticAvailability() const {
-    return static_cast<PlatformAgnosticAvailabilityKind>(
-        Bits.AvailableAttr.PlatformAgnostic);
-  }
+  /// Returns the kind of availability the attribute specifies.
+  Kind getKind() const { return static_cast<Kind>(Bits.AvailableAttr.Kind); }
 
   /// Create an `AvailableAttr` that specifies universal unavailability, e.g.
   /// `@available(*, unavailable)`.
@@ -2830,26 +2824,6 @@ public:
   UNIMPLEMENTED_CLONE(RawLayoutAttr)
 };
 
-class SafeAttr final : public DeclAttribute {
-public:
-  /// The optional message.
-  const StringRef message;
-
-  SafeAttr(SourceLoc atLoc, SourceRange range, StringRef message,
-           bool isImplicit = false)
-      : DeclAttribute(DeclAttrKind::Safe, atLoc, range, isImplicit),
-        message(message) { }
-
-  static bool classof(const DeclAttribute *DA) {
-    return DA->getKind() == DeclAttrKind::Safe;
-  }
-
-  /// Create a copy of this attribute.
-  SafeAttr *clone(ASTContext &ctx) const {
-    return new (ctx) SafeAttr(AtLoc, Range, message, isImplicit());
-  }
-};
-
 class LifetimeAttr final : public DeclAttribute {
   LifetimeEntry *entry;
 
@@ -3222,20 +3196,24 @@ public:
   }
 };
 
-/// A wrapper for `AvailableAttr` that is enriched with additional semantic
-/// informaton, like its corresponding `AvailabilityDomain`.
+/// A wrapper for `AvailableAttr` that enriches it with additional semantic
+/// informaton that can only be determined using the `AvailabilityDomain`
+/// associated with the attribute. A `SemanticAvailableAttr` can only be
+/// constructed with an `AvailableAttr` that has a resolved
+/// `AvailabilityDomain`.
 class SemanticAvailableAttr final {
   const AvailableAttr *attr;
-  AvailabilityDomain domain;
 
 public:
-  SemanticAvailableAttr(const AvailableAttr *attr, AvailabilityDomain domain)
-      : attr(attr), domain(domain) {
+  SemanticAvailableAttr(const AvailableAttr *attr) : attr(attr) {
     assert(attr);
+    assert(attr->hasCachedDomain());
   }
 
   const AvailableAttr *getParsedAttr() const { return attr; }
-  const AvailabilityDomain getDomain() const { return domain; }
+  const AvailabilityDomain getDomain() const {
+    return attr->getCachedDomain().value();
+  }
 
   /// The version tuple written in source for the `introduced:` component.
   std::optional<llvm::VersionTuple> getIntroduced() const {
@@ -3672,6 +3650,32 @@ struct EnumTraits<TypeAttrKind> {
 };
 
 } // end namespace swift
+
+namespace llvm {
+using swift::AvailableAttr;
+using swift::SemanticAvailableAttr;
+
+// A SemanticAvailableAttr just wraps an `AvailableAttr *` and is therefore
+// "pointer like".
+template <typename T>
+struct PointerLikeTypeTraits;
+template <>
+struct PointerLikeTypeTraits<SemanticAvailableAttr> {
+public:
+  static inline void *getAsVoidPointer(SemanticAvailableAttr attr) {
+    return reinterpret_cast<void *>(
+        const_cast<AvailableAttr *>(attr.getParsedAttr()));
+  }
+  static inline SemanticAvailableAttr getFromVoidPointer(void *P) {
+    return SemanticAvailableAttr(static_cast<AvailableAttr *>(P));
+  }
+  enum {
+    NumLowBitsAvailable =
+        PointerLikeTypeTraits<AvailableAttr *>::NumLowBitsAvailable
+  };
+};
+
+} // end namespace llvm
 
 #undef UNIMPLEMENTED_CLONE
 

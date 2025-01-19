@@ -825,15 +825,17 @@ def downgrade_typecheck_interface_error : Flag<["-"], "downgrade-typecheck-inter
 def enable_volatile_modules : Flag<["-"], "enable-volatile-modules">,
   HelpText<"Load Swift modules in memory">;
 
-def solver_expression_time_threshold_EQ : Joined<["-"], "solver-expression-time-threshold=">;
+def solver_expression_time_threshold_EQ : Joined<["-"], "solver-expression-time-threshold=">,
+  HelpText<"Expression type checking timeout, in seconds">;
 
-def solver_scope_threshold_EQ : Joined<["-"], "solver-scope-threshold=">;
+def solver_scope_threshold_EQ : Joined<["-"], "solver-scope-threshold=">,
+  HelpText<"Expression type checking scope limit">;
 
-def solver_trail_threshold_EQ : Joined<["-"], "solver-trail-threshold=">;
+def solver_trail_threshold_EQ : Joined<["-"], "solver-trail-threshold=">,
+  HelpText<"Expression type checking trail change limit">;
 
-def solver_disable_shrink :
-  Flag<["-"], "solver-disable-shrink">,
-  HelpText<"Disable the shrink phase of expression type checking">;
+def solver_disable_splitter : Flag<["-"], "solver-disable-splitter">,
+  HelpText<"Disable the component splitter phase of expression type checking">;
 
 def disable_constraint_solver_performance_hacks : Flag<["-"], "disable-constraint-solver-performance-hacks">,
   HelpText<"Disable all the hacks in the constraint solver">;

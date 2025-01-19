@@ -936,8 +936,17 @@ class ModuleInterfaceLoaderImpl {
         } else if (isInResourceDir(adjacentMod) &&
                    loadMode == ModuleLoadingMode::PreferSerialized &&
                    !version::isCurrentCompilerTagged() &&
-                   rebuildInfo.getOrInsertCandidateModule(adjacentMod).serializationStatus !=
-                     serialization::Status::SDKMismatch) {
+                   rebuildInfo.getOrInsertCandidateModule(adjacentMod)
+                           .serializationStatus !=
+                       serialization::Status::SDKMismatch &&
+                   // FIXME (meg-gupta): We need to support recompilation of
+                   // modules in the resource directory if the mismatch is due
+                   // to importing a non-ossa module to an ossa module. This is
+                   // needed during ossa bringup, once -enable-ossa-modules is
+                   // on by default, this can be deleted.
+                   rebuildInfo.getOrInsertCandidateModule(adjacentMod)
+                           .serializationStatus !=
+                       serialization::Status::NotInOSSA) {
           // Special-case here: If we're loading a .swiftmodule from the resource
           // dir adjacent to the compiler, defer to the serialized loader instead
           // of falling back. This is to support local development of Swift,
@@ -1805,8 +1814,9 @@ void InterfaceSubContextDelegateImpl::inheritOptionsForBuildingInterface(
 }
 
 bool InterfaceSubContextDelegateImpl::extractSwiftInterfaceVersionAndArgs(
-    CompilerInvocation &subInvocation, SwiftInterfaceInfo &interfaceInfo,
-    StringRef interfacePath, SourceLoc diagnosticLoc) {
+    CompilerInvocation &subInvocation, DiagnosticEngine &subInstanceDiags,
+    SwiftInterfaceInfo &interfaceInfo, StringRef interfacePath,
+    SourceLoc diagnosticLoc) {
   if (readSwiftInterfaceVersionAndArgs(SM, *Diags, ArgSaver, interfaceInfo,
                                        interfacePath, diagnosticLoc,
                                        subInvocation.getLangOptions().Target))
@@ -1824,7 +1834,7 @@ bool InterfaceSubContextDelegateImpl::extractSwiftInterfaceVersionAndArgs(
   }
 
   SmallString<32> ExpectedModuleName = subInvocation.getModuleName();
-  if (subInvocation.parseArgs(interfaceInfo.Arguments, *Diags)) {
+  if (subInvocation.parseArgs(interfaceInfo.Arguments, subInstanceDiags)) {
     return true;
   }
 
@@ -2193,7 +2203,9 @@ InterfaceSubContextDelegateImpl::runInSubCompilerInstance(StringRef moduleName,
 
   // FIXME: Hack for Darwin.swiftmodule, which cannot be rebuilt with C++
   // interop enabled by the Swift CI because it uses an old host SDK.
-  if (moduleName == "Darwin") {
+  // FIXME: Hack for CoreGraphics.swiftmodule, which cannot be rebuilt because
+  // of a CF_OPTIONS bug (rdar://142762174).
+  if (moduleName == "Darwin" || moduleName == "CoreGraphics") {
     subInvocation.getLangOptions().EnableCXXInterop = false;
     subInvocation.getLangOptions().cxxInteropCompatVersion = {};
     BuildArgs.erase(llvm::remove_if(BuildArgs,
@@ -2227,11 +2239,21 @@ InterfaceSubContextDelegateImpl::runInSubCompilerInstance(StringRef moduleName,
   subInvocation.getFrontendOptions().InputsAndOutputs
     .setMainAndSupplementaryOutputs(outputFiles, ModuleOutputPaths);
 
+  CompilerInstance subInstance;
+  ForwardingDiagnosticConsumer FDC(*Diags);
+  NullDiagnosticConsumer noopConsumer;
+  if (!silenceErrors) {
+    subInstance.addDiagnosticConsumer(&FDC);
+  } else {
+    subInstance.addDiagnosticConsumer(&noopConsumer);
+  }
+
   SwiftInterfaceInfo interfaceInfo;
   // Extract compiler arguments from the interface file and use them to configure
   // the compiler invocation.
-  if (extractSwiftInterfaceVersionAndArgs(subInvocation, interfaceInfo,
-                                          interfacePath, diagLoc)) {
+  if (extractSwiftInterfaceVersionAndArgs(subInvocation, subInstance.getDiags(),
+                                          interfaceInfo, interfacePath,
+                                          diagLoc)) {
     return std::make_error_code(std::errc::not_supported);
   }
 
@@ -2243,20 +2265,11 @@ InterfaceSubContextDelegateImpl::runInSubCompilerInstance(StringRef moduleName,
   subInvocation.getFrontendOptions().StrictImplicitModuleContext =
       StrictImplicitModuleContext;
 
-  CompilerInstance subInstance;
   SubCompilerInstanceInfo info;
   info.Instance = &subInstance;
   info.CompilerVersion = interfaceInfo.CompilerVersion;
 
   subInstance.getSourceMgr().setFileSystem(SM.getFileSystem());
-
-  ForwardingDiagnosticConsumer FDC(*Diags);
-  NullDiagnosticConsumer noopConsumer;
-  if (!silenceErrors) {
-    subInstance.addDiagnosticConsumer(&FDC);
-  } else {
-    subInstance.addDiagnosticConsumer(&noopConsumer);
-  }
 
   std::string InstanceSetupError;
   if (subInstance.setup(subInvocation, InstanceSetupError)) {

@@ -22,17 +22,15 @@
 #define SWIFT_BACKTRACING_DARWIN_H
 #ifdef __APPLE__
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
 #include <mach/mach.h>
 #include <mach/mach_vm.h>
 
 #include <libproc.h>
 #include <stdint.h>
 
-#include <CoreFoundation/CoreFoundation.h>
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 // .. Mach fixes ...............................................................
 
@@ -140,6 +138,56 @@ extern void _dyld_process_info_for_each_segment(dyld_process_info info, uint64_t
 #define CS_PLATFORM_BINARY 0x04000000
 #define CS_PLATFORM_PATH   0x08000000
 extern int csops(int, unsigned int, void *, size_t);
+
+// .. CoreFoundation ...........................................................
+
+// We can't include <CoreFoundation/CoreFoundation.h> because that will create
+// a circular dependency.  So declare some types directly.
+
+typedef struct CFUUIDBytes {
+  uint8_t byte0;
+  uint8_t byte1;
+  uint8_t byte2;
+  uint8_t byte3;
+  uint8_t byte4;
+  uint8_t byte5;
+  uint8_t byte6;
+  uint8_t byte7;
+  uint8_t byte8;
+  uint8_t byte9;
+  uint8_t byte10;
+  uint8_t byte11;
+  uint8_t byte12;
+  uint8_t byte13;
+  uint8_t byte14;
+  uint8_t byte15;
+} CFUUIDBytes;
+
+#define CF_BRIDGED_TYPE(T) __attribute__((objc_bridge(T)))
+
+typedef const struct CF_BRIDGED_TYPE(NSString) __CFString *CFStringRef;
+typedef const struct CF_BRIDGED_TYPE(id) __CFAllocator *CFAllocatorRef;
+
+#ifdef __LLP64__
+typedef signed long long CFIndex;
+#else
+typedef signed long CFIndex;
+#endif
+
+typedef struct {
+  CFIndex location;
+  CFIndex length;
+} CFRange;
+
+typedef uint32_t CFStringEncoding;
+
+typedef enum __attribute__((enum_extensibility(open)))
+  CFStringBuiltInEncodings : CFStringEncoding CFStringBuiltInEncodings;
+
+enum CFStringBuiltInEncodings: CFStringEncoding {
+  kCFStringEncodingASCII = 0x0600,
+  kCFStringEncodingUTF8 = 0x08000100,
+};
 
 // .. CoreSymbolication SPI ....................................................
 

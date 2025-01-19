@@ -456,6 +456,30 @@ bool swift::areUsesWithinLexicalValueLifetime(SILValue value,
   return false;
 }
 
+bool swift::areUsesWithinValueLifetime(SILValue value, ArrayRef<Operand *> uses,
+                                       DeadEndBlocks *deBlocks) {
+  assert(value->getFunction()->hasOwnership());
+
+  if (value->getOwnershipKind() == OwnershipKind::None) {
+    return true;
+  }
+  if (value->getOwnershipKind() != OwnershipKind::Guaranteed &&
+      value->getOwnershipKind() != OwnershipKind::Owned) {
+    return false;
+  }
+  if (value->getOwnershipKind() == OwnershipKind::Guaranteed) {
+    value = findOwnershipReferenceAggregate(value);
+    BorrowedValue borrowedValue(value);
+    if (!borrowedValue.isLocalScope()) {
+      return true;
+    }
+  }
+  SSAPrunedLiveness liveness(value->getFunction());
+  liveness.initializeDef(value);
+  liveness.computeSimple();
+  return liveness.areUsesWithinBoundary(uses, deBlocks);
+}
+
 //===----------------------------------------------------------------------===//
 //                          BorrowedLifetimeExtender
 //===----------------------------------------------------------------------===//

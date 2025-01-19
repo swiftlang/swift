@@ -3274,7 +3274,7 @@ static bool isBorrowableSubject(SILGenFunction &SGF,
       continue;
     }
 
-    // Look through `try` and `await`.
+    // Look through `try`, `await`, and `unsafe`.
     if (auto tryExpr = dyn_cast<TryExpr>(subjectExpr)) {
       subjectExpr = tryExpr->getSubExpr();
       continue;
@@ -3283,7 +3283,11 @@ static bool isBorrowableSubject(SILGenFunction &SGF,
       subjectExpr = awaitExpr->getSubExpr();
       continue;
     }
-    
+    if (auto unsafeExpr = dyn_cast<UnsafeExpr>(subjectExpr)) {
+      subjectExpr = unsafeExpr->getSubExpr();
+      continue;
+    }
+
     break;
   }
   
