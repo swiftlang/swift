@@ -6620,7 +6620,7 @@ llvm::FunctionType *FunctionPointer::getFunctionType() const {
   }
 
   // Read the function type off the global or else from the Signature.
-  if (auto *constant = dyn_cast<llvm::Constant>(Value)) {
+  if (isa<llvm::Constant>(Value)) {
     auto *gv = dyn_cast<llvm::GlobalValue>(Value);
     if (!gv) {
       return Sig.getType();

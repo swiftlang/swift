@@ -5792,7 +5792,7 @@ synthesizeBaseClassFieldGetterOrAddressGetterBody(AbstractFunctionDecl *afd,
   baseMemberDotCallExpr->setThrows(nullptr);
 
   ArgumentList *argumentList;
-  if (auto subscript = dyn_cast<SubscriptDecl>(baseClassVar)) {
+  if (isa<SubscriptDecl>(baseClassVar)) {
     auto paramDecl = getterDecl->getParameters()->get(0);
     auto paramRefExpr = new (ctx) DeclRefExpr(paramDecl, DeclNameLoc(),
                                               /*Implicit=*/true);

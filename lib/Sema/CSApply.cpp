@@ -6622,7 +6622,7 @@ maybeDiagnoseUnsupportedFunctionConversion(ConstraintSystem &cs, Expr *expr,
       semanticExpr = capture->getClosureBody();
     
     // Can convert a literal closure that doesn't capture context.
-    if (auto closure = dyn_cast<ClosureExpr>(semanticExpr))
+    if (isa<ClosureExpr>(semanticExpr))
       return;
 
     // Diagnose cases like:
@@ -9639,7 +9639,7 @@ ExprWalker::rewriteTarget(SyntacticElementTarget target) {
         wrappedVar, backingType->mapTypeOutOfContext());
 
     return target;
-  } else if (auto *pattern = target.getAsUninitializedVar()) {
+  } else if (target.getAsUninitializedVar()) {
     TypeResolutionOptions options(TypeResolverContext::PatternBindingDecl);
 
     auto contextualPattern = target.getContextualPattern();
@@ -9665,7 +9665,7 @@ ExprWalker::rewriteTarget(SyntacticElementTarget target) {
     }
 
     return std::nullopt;
-  } else if (auto *forEach = target.getAsForEachStmt()) {
+  } else if (target.getAsForEachStmt()) {
     auto forEachPreambleResultTarget =
         applySolutionToForEachStmtPreamble(target, *this);
     if (!forEachPreambleResultTarget)

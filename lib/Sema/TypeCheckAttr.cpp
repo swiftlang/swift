@@ -1282,7 +1282,7 @@ bool AttributeChecker::visitAbstractAccessControlAttr(
   }
 
   SourceFile *File = D->getDeclContext()->getParentSourceFile();
-  if (auto importDecl = dyn_cast<ImportDecl>(D)) {
+  if (isa<ImportDecl>(D)) {
     if (attr->getAccess() == AccessLevel::Open) {
       diagnoseAndRemoveAttr(attr, diag::access_level_on_import_unsupported,
                             attr);
@@ -1508,7 +1508,7 @@ void AttributeChecker::visitSPIAccessControlAttr(SPIAccessControlAttr *attr) {
     }
 
     // Forbid enum elements marked SPI in frozen types.
-    if (auto elt = dyn_cast<EnumElementDecl>(VD)) {
+    if (isa<EnumElementDecl>(VD)) {
       if (auto ED = dyn_cast<EnumDecl>(D->getDeclContext())) {
         if (ED->getAttrs().hasAttribute<FrozenAttr>(/*allowInvalid*/ true) &&
             !ED->isSPI()) {
@@ -5232,7 +5232,7 @@ TypeChecker::diagnosticIfDeclCannotBePotentiallyUnavailable(const Decl *D) {
   auto *DC = D->getDeclContext();
 
   // A destructor is always called if declared.
-  if (auto *DD = dyn_cast<DestructorDecl>(D))
+  if (isa<DestructorDecl>(D))
     return Diagnostic(diag::availability_decl_no_potential, D);
 
   // Observing accessors are always called implicitly.
@@ -5282,7 +5282,7 @@ TypeChecker::diagnosticIfDeclCannotBeUnavailable(const Decl *D) {
   };
 
   // A destructor is always called if declared.
-  if (auto *DD = dyn_cast<DestructorDecl>(D)) {
+  if (isa<DestructorDecl>(D)) {
     if (parentIsUnavailable(D))
       return std::nullopt;
 
@@ -5291,7 +5291,7 @@ TypeChecker::diagnosticIfDeclCannotBeUnavailable(const Decl *D) {
 
   // The conformance checker does not know what to do with unavailable
   // associated types.
-  if (auto *AT = dyn_cast<AssociatedTypeDecl>(D))
+  if (isa<AssociatedTypeDecl>(D))
     return Diagnostic(diag::availability_decl_no_unavailable, D);
 
   // Observing accessors are always called implicitly.
@@ -6321,7 +6321,7 @@ typecheckDifferentiableAttrforDecl(AbstractFunctionDecl *original,
   auto &diags = ctx.Diags;
 
   // Diagnose if original function has opaque result types.
-  if (auto *opaqueResultTypeDecl = original->getOpaqueResultTypeDecl()) {
+  if (original->getOpaqueResultTypeDecl()) {
     diags.diagnose(
         attr->getLocation(),
         diag::autodiff_attr_opaque_result_type_unsupported);
@@ -6708,7 +6708,7 @@ static bool typeCheckDerivativeAttr(DerivativeAttr *attr) {
   }
 
   // Diagnose if original function has opaque result types.
-  if (auto *opaqueResultTypeDecl = originalAFD->getOpaqueResultTypeDecl()) {
+  if (originalAFD->getOpaqueResultTypeDecl()) {
     diags.diagnose(
         attr->getLocation(),
         diag::autodiff_attr_opaque_result_type_unsupported);
@@ -7262,7 +7262,7 @@ void AttributeChecker::visitTransposeAttr(TransposeAttr *attr) {
   attr->setOriginalFunction(originalAFD);
 
   // Diagnose if original function has opaque result types.
-  if (auto *opaqueResultTypeDecl = originalAFD->getOpaqueResultTypeDecl()) {
+  if (originalAFD->getOpaqueResultTypeDecl()) {
     diagnose(attr->getLocation(),
              diag::autodiff_attr_opaque_result_type_unsupported);
     attr->setInvalid();
