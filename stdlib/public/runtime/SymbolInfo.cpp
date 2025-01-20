@@ -18,6 +18,9 @@
 #include <Windows.h>
 #include <DbgHelp.h>
 #include <psapi.h>
+
+#pragma comment(lib, "DbgHelp.Lib")
+
 #elif SWIFT_STDLIB_HAS_DLADDR
 #include <dlfcn.h>
 #endif
