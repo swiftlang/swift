@@ -322,7 +322,7 @@ ManagedValue SILGenFunction::emitTangentVectorToOptionalTangentVector(
   args.add(loc, RValue(*this, {optVal}, optionalOfWrappedTanType));
 
   auto result = emitApplyAllocatingInitializer(loc, initDecl, std::move(args),
-                                               Type(), SGFContext());
+                                               Type(), ctxt);
   return std::move(result).getScalarValue();
 }
 
@@ -353,7 +353,7 @@ ManagedValue SILGenFunction::emitOptionalTangentVectorToTangentVector(
 
   return emitCheckedGetOptionalValueFrom(
       loc, std::move(wrappedVal).getScalarValue(),
-      /*isImplicitUnwrap*/ true, getTypeLowering(wrappedType), ctxt);
+      /*isImplicitUnwrap*/ true, getTypeLowering(optionalOfWrappedTanType), ctxt);
 }
 
 /// Apply this transformation to an arbitrary value.
