@@ -1,5 +1,6 @@
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -typecheck -verify %s
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -enable-experimental-feature KeyPathWithMethodMembers -typecheck -verify %s
 // REQUIRES: objc_interop
+// REQUIRES: swift_feature_KeyPathWithMethodMembers
 
 import Foundation
 

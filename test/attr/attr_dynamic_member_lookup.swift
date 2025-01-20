@@ -1,4 +1,5 @@
-// RUN: %target-typecheck-verify-swift
+// RUN: %target-typecheck-verify-swift -enable-experimental-feature KeyPathWithMethodMembers
+// REQUIRES: swift_feature_KeyPathWithMethodMembers
 
 var global = 42
 
