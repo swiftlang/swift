@@ -723,7 +723,7 @@ function Fetch-Dependencies {
   DownloadAndVerify $WixURL "$BinaryCache\WiX-$WiXVersion.zip" $WiXHash
   Extract-ZipFile WiX-$WiXVersion.zip $BinaryCache WiX-$WiXVersion
 
-  if ($SkipBuild) { return }
+  if ($SkipBuild -and -not $Test) { return }
 
   DownloadAndVerify $PinnedBuild "$BinaryCache\$PinnedToolchain.exe" $PinnedSHA256
 
@@ -823,6 +823,30 @@ function Fetch-Dependencies {
     DownloadAndVerify $NDKURL "$BinaryCache\android-ndk-$AndroidNDKVersion-windows.zip" $NDKHash
 
     Extract-ZipFile -ZipFileName "android-ndk-$AndroidNDKVersion-windows.zip" -BinaryCache $BinaryCache -ExtractPath "android-ndk-$AndroidNDKVersion" -CreateExtractPath $false
+
+    if ($Test -and -not(Test-Path "$NDKDir\licenses")) {
+      $NDKDir = "$BinaryCache\android-ndk-r26b"
+      $CLToolsURL = "https://dl.google.com/android/repository/commandlinetools-win-11076708_latest.zip"
+      $CLToolsHash = "4d6931209eebb1bfb7c7e8b240a6a3cb3ab24479ea294f3539429574b1eec862"
+      DownloadAndVerify $CLToolsURL "$BinaryCache\android-cmdline-tools.zip" $CLToolsHash
+
+      # Install cmdline-tools
+      New-Item -Type Directory -Path "$NDKDir\licenses" -ErrorAction Ignore | Out-Null
+      Set-Content -Path "$NDKDir\licenses\android-sdk-license" -Value "24333f8a63b6825ea9c5514f83c2829b004d1fee"
+      Set-Content -Path "$NDKDir\licenses\android-sdk-preview-license" -Value "84831b9409646a918e30573bab4c9c91346d8abd"
+      Extract-ZipFile -ZipFileName "android-cmdline-tools.zip" -BinaryCache $BinaryCache -ExtractPath "android-ndk-r26b\.temp"
+      Invoke-Program "$NDKDir\.temp\cmdline-tools\bin\sdkmanager.bat" --sdk_root="$NDKDir" "cmdline-tools;latest" "--channel=3"
+
+      # Install packages
+      $AndroidSdkMgr = "$NDKDir\cmdline-tools\latest\bin\sdkmanager.bat"
+      foreach ($Package in @("emulator", "platforms;android-29", "system-images;android-29;default;x86_64", "platform-tools")) {
+        Invoke-Program $AndroidSdkMgr $Package
+      }
+
+      # Create test device
+      $AndroidAvdMgr = "$NDKDir\cmdline-tools\latest\bin\avdmanager.bat"
+      Invoke-Program $AndroidAvdMgr create avd --name "swift-test-device" --package "system-images;android-29;default;x86_64"
+    }
   }
 
   if ($IncludeDS2) {
@@ -2033,6 +2057,33 @@ function Build-Dispatch([Platform]$Platform, $Arch, [switch]$Test = $false) {
     }
 }
 
+function Test-Dispatch([Platform]$Platform) {
+  # TODO: Make it global
+  $NDKDir = "$BinaryCache\android-ndk-r26b"
+
+  # TODO: Start once for all tests and make it shuts down
+  $emulator = "$NDKDir\emulator\emulator.exe"
+  Start-Process -FilePath $emulator -ArgumentList "@swift-test-device" `
+                -RedirectStandardOutput "$NDKDir\.temp\emulator.out" `
+                -RedirectStandardError "$NDKDir\.temp\emulator.err"
+
+  # TODO: Find a better indicator than a upper-bound delay
+  Start-Sleep -Seconds 5
+
+  # This is just a hack for now
+  $LocalBin = (Get-TargetProjectBinaryCache $AndroidX64 Dispatch)
+  $CacheName = Split-Path $LocalBin -Leaf
+  $RemoteBin = "/data/local/tmp/$CacheName"
+
+  # TODO: On my local machine I have to grant network access once. How to do that in CI?
+  $adb = "$NDKDir\platform-tools\adb.exe"
+  Invoke-Program $adb "shell" "rm -rf $RemoteBin"
+  Invoke-Program $adb "shell" "mkdir $RemoteBin"
+  Invoke-Program $adb "push" "$LocalBin/." $RemoteBin
+  Invoke-Program $adb "push" "S:/ctest_mock.sh" "/data/local/tmp"
+  Invoke-Program $adb "shell" "sh /data/local/tmp/ctest_mock.sh $RemoteBin"
+}
+
 function Build-Foundation([Platform]$Platform, $Arch, [switch]$Test = $false) {
   if ($Test) {
     # Foundation tests build via swiftpm rather than CMake
@@ -3073,6 +3124,10 @@ if (-not $IsCrossCompiling) {
 
   if ($Test -contains "dispatch") {
     Build-Dispatch Windows $HostArch -Test
+    # TODO: This is a hack. We need different devices for different arches.
+    if (AndroidSDKs -contains "x86_64") {
+      Test-Dispatch Android
+    }
   }
   if ($Test -contains "foundation") {
     Build-Foundation Windows $HostArch -Test
