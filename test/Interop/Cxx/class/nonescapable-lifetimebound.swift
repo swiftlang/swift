@@ -1,8 +1,11 @@
 // RUN: rm -rf %t
 // RUN: split-file %s %t
 // RUN: %target-swift-frontend -I %swift_src_root/lib/ClangImporter/SwiftBridging  -I %t/Inputs -emit-sil %t/test.swift -enable-experimental-feature LifetimeDependence -cxx-interoperability-mode=default -diagnostic-style llvm 2>&1 | %FileCheck %s
+// RUN: %target-swift-frontend -I %swift_src_root/lib/ClangImporter/SwiftBridging  -I %t/Inputs -emit-sil %t/test.swift  -enable-experimental-feature AddressableParameters -enable-experimental-feature LifetimeDependence -cxx-interoperability-mode=default -diagnostic-style llvm 2>&1 | %FileCheck %s -check-prefix=CHECK-ADDRESSABLE
 // RUN: not %target-swift-frontend -I %swift_src_root/lib/ClangImporter/SwiftBridging  -I %t/Inputs -emit-sil %t/test.swift -cxx-interoperability-mode=default -diagnostic-style llvm 2>&1 | %FileCheck %s -check-prefix=CHECK-NO-LIFETIMES
 
+// REQUIRES: swift_feature_AddressableParameters
+// REQUIRES: swift_feature_LifetimeDependence
 
 //--- Inputs/module.modulemap
 module Test {
@@ -119,6 +122,21 @@ CaptureView getCaptureView(const Owner& owner [[clang::lifetimebound]]) {
 // CHECK: sil [clang getCaptureView] {{.*}} : $@convention(c) (@in_guaranteed Owner) -> @lifetime(borrow 0) @owned CaptureView
 // CHECK: sil [clang CaptureView.captureView] {{.*}} : $@convention(cxx_method) (View, @lifetime(copy 0) @inout CaptureView) -> ()
 // CHECK: sil [clang CaptureView.handOut] {{.*}} : $@convention(cxx_method) (@lifetime(copy 1) @inout View, @in_guaranteed CaptureView) -> ()
+
+// CHECK-ADDRESSABLE: sil [clang makeOwner] {{.*}}: $@convention(c) () -> Owner
+// CHECK-ADDRESSABLE: sil [clang getView] {{.*}} : $@convention(c) (@in_guaranteed Owner) -> @lifetime(borrow 0) @owned View
+// CHECK-ADDRESSABLE: sil [clang getViewFromFirst] {{.*}} : $@convention(c) (@in_guaranteed Owner, @in_guaranteed Owner) -> @lifetime(borrow 0) @owned View
+// CHECK-ADDRESSABLE: sil [clang getViewFromEither] {{.*}} : $@convention(c) (@in_guaranteed Owner, @in_guaranteed Owner) -> @lifetime(borrow 0, borrow 1) @owned View
+// CHECK-ADDRESSABLE: sil [clang Owner.handOutView] {{.*}} : $@convention(cxx_method) (@in_guaranteed Owner) -> @lifetime(borrow 0) @owned View
+// CHECK-ADDRESSABLE: sil [clang Owner.handOutView2] {{.*}} : $@convention(cxx_method) (View, @in_guaranteed Owner) -> @lifetime(borrow 1) @owned View
+// CHECK-ADDRESSABLE: sil [clang getViewFromEither] {{.*}} : $@convention(c) (@guaranteed View, @guaranteed View) -> @lifetime(copy 0, copy 1) @owned View
+// CHECK-ADDRESSABLE: sil [clang View.init] {{.*}} : $@convention(c) () -> @lifetime(immortal) @out View
+// CHECK-ADDRESSABLE: sil [clang OtherView.init] {{.*}} : $@convention(c) (@guaranteed View) -> @lifetime(copy 0) @out OtherView
+// CHECK-ADDRESSABLE: sil [clang returnsImmortal] {{.*}} : $@convention(c) () -> @lifetime(immortal) @owned View
+// CHECK-ADDRESSABLE: sil [clang copyView] {{.*}} : $@convention(c) (View, @lifetime(copy 0) @inout View) -> ()
+// CHECK-ADDRESSABLE: sil [clang getCaptureView] {{.*}} : $@convention(c) (@in_guaranteed Owner) -> @lifetime(borrow 0) @owned CaptureView
+// CHECK-ADDRESSABLE: sil [clang CaptureView.captureView] {{.*}} : $@convention(cxx_method) (View, @lifetime(copy 0) @inout CaptureView) -> ()
+// CHECK-ADDRESSABLE: sil [clang CaptureView.handOut] {{.*}} : $@convention(cxx_method) (@lifetime(copy 1) @inout View, @in_guaranteed CaptureView) -> ()
 
 // CHECK-NO-LIFETIMES: nonescapable.h:36:6: error: returning ~Escapable type requires '-enable-experimental-feature LifetimeDependence'
 // CHECK-NO-LIFETIMES: nonescapable.h:40:6: error: returning ~Escapable type requires '-enable-experimental-feature LifetimeDependence'
