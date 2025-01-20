@@ -43,6 +43,10 @@ func f_54961(fleep: [Blatz]) {
 
 // https://github.com/apple/swift/issues/56996
 func f_56996() {
-  _ = \Int.byteSwapped.signum() // expected-error {{invalid component of Swift key path}}
-  _ = \Int.byteSwapped.init() // expected-error {{invalid component of Swift key path}}
+  _ = \Int.byteSwapped.signum()
+  // expected-error@-1 {{key path cannot refer to instance method 'signum()'}}
+  // expected-error@-2 {{consecutive statements on a line must be separated by newline or ';'}}
+  // expected-note@-3 {{insert newline}}
+  // expected-note@-4 {{insert ';'}}
+  
 }
