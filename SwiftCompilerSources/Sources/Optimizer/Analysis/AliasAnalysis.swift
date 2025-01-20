@@ -615,6 +615,12 @@ private enum ImmutableScope {
           return nil
         }
         object = tailAddr.instance
+      case .global(let global):
+        if global.isLet && !basedAddress.parentFunction.canInitializeGlobal {
+          self = .wholeFunction
+          return
+        }
+        return nil
       default:
         return nil
       }
@@ -891,6 +897,14 @@ private extension Type {
       return true
     }
     return false
+  }
+}
+
+private extension Function {
+  var canInitializeGlobal: Bool {
+    return isGlobalInitOnceFunction ||
+           // In non -parse-as-library mode globals are initialized in the `main` function.
+           name == "main"
   }
 }
 

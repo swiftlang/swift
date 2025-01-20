@@ -257,6 +257,29 @@ bb0(%x : @guaranteed $SubclassLet):
   return undef : $()
 }
 
+// CHECK-LABEL: sil [ossa] @dont_copy_let_global :
+// CHECK:         global_addr
+// CHECK-NEXT:    load_borrow
+// CHECK-NEXT:    begin_borrow
+// CHECK-NEXT:    apply
+// CHECK-NEXT:    end_borrow
+// CHECK-NEXT:    end_borrow
+// CHECK-NEXT:    return
+// CHECK-NEXT: } // end sil function 'dont_copy_let_global'
+sil [ossa] @dont_copy_let_global : $@convention(thin) () -> () {
+bb0:
+  %f = function_ref @black_hole : $@convention(thin) (@guaranteed Klass) -> ()
+
+  %p = global_addr @a_let_global : $*Klass
+  %v = load [copy] %p : $*Klass
+  %b = begin_borrow %v : $Klass
+  apply %f(%b) : $@convention(thin) (@guaranteed Klass) -> ()
+  end_borrow %b : $Klass
+  destroy_value %v : $Klass
+
+  return undef : $()
+}
+
 // CHECK-LABEL: sil [ossa] @dont_copy_let_properties_with_guaranteed_base_structural
 // CHECK:         ref_element_addr
 // CHECK-NEXT:    tuple_element_addr

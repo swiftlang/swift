@@ -841,12 +841,44 @@ bb0(%0 : $*C, %1 : $*C):
 sil_global hidden [let] @globalC : $C
 sil_global hidden @globalCVar : $C
 
+// CHECK-LABEL: @testGlobalLet
+// CHECK:      PAIR #1.
+// CHECK-NEXT:     %3 = apply %2() : $@convention(thin) () -> ()
+// CHECK-NEXT:     %0 = global_addr @globalC : $*C
+// CHECK-NEXT:   r=1,w=0
+sil hidden @testGlobalLet : $@convention(thin) () -> () {
+bb0:
+  %0 = global_addr @globalC : $*C
+  %1 = load %0 : $*C
+  %2 = function_ref @nouser_func : $@convention(thin) () -> ()
+  %3 = apply %2() : $@convention(thin) () -> ()
+  %4 = function_ref @read_C : $@convention(thin) (@in_guaranteed C) -> ()
+  %5 = apply %4(%0) : $@convention(thin) (@in_guaranteed C) -> ()
+  %8 = tuple ()
+  return %8 : $()
+}
+
 // CHECK-LABEL: @testInitGlobalLet
 // CHECK:      PAIR #0.
 // CHECK-NEXT:     %2 = apply %1(%0) : $@convention(thin) () -> @out C
 // CHECK-NEXT:     %0 = global_addr @globalC : $*C
 // CHECK-NEXT:   r=1,w=1
-sil hidden @testInitGlobalLet : $@convention(thin) () -> () {
+sil hidden [global_init_once_fn] @testInitGlobalLet : $@convention(thin) () -> () {
+bb0:
+  %0 = global_addr @globalC : $*C
+  %1 = function_ref @init_C : $@convention(thin) () -> @out C
+  %2 = apply %1(%0) : $@convention(thin) () -> @out C
+  %3 = load %0 : $*C
+  %8 = tuple ()
+  return %8 : $()
+}
+
+// CHECK-LABEL: @main
+// CHECK:      PAIR #0.
+// CHECK-NEXT:     %2 = apply %1(%0) : $@convention(thin) () -> @out C
+// CHECK-NEXT:     %0 = global_addr @globalC : $*C
+// CHECK-NEXT:   r=1,w=1
+sil [global_init_once_fn] @main : $@convention(thin) () -> () {
 bb0:
   %0 = global_addr @globalC : $*C
   %1 = function_ref @init_C : $@convention(thin) () -> @out C
@@ -883,6 +915,25 @@ bb0:
   %0 = global_addr @globalCVar : $*C
   %1 = address_to_pointer %0 : $*C to $Builtin.RawPointer
   return %1 : $Builtin.RawPointer
+}
+
+// CHECK-LABEL: @testGlobalViaAddressorLet
+// CHECK:      PAIR #2.
+// CHECK-NEXT:     %5 = apply %4() : $@convention(thin) () -> ()
+// CHECK-NEXT:     %2 = pointer_to_address %1 : $Builtin.RawPointer to [strict] $*C
+// CHECK-NEXT:   r=1,w=0
+sil @testGlobalViaAddressorLet : $@convention(thin) () -> () {
+bb0:
+  %0 = function_ref @addressor_of_globalC : $@convention(thin) () -> Builtin.RawPointer
+  %1 = apply %0() : $@convention(thin) () -> Builtin.RawPointer
+  %2 = pointer_to_address %1 : $Builtin.RawPointer to [strict] $*C
+  %3 = load %2 : $*C
+  %4 = function_ref @nouser_func : $@convention(thin) () -> ()
+  %5 = apply %4() : $@convention(thin) () -> ()
+  %6 = function_ref @read_C : $@convention(thin) (@in_guaranteed C) -> ()
+  %7 = apply %6(%2) : $@convention(thin) (@in_guaranteed C) -> ()
+  %8 = tuple ()
+  return %8 : $()
 }
 
 // CHECK-LABEL: @testGlobalViaAddressorVar
