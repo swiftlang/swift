@@ -284,4 +284,27 @@ public struct Baz: PrimaryAssociatedTypeInference {
   public func identity() -> some PrimaryAssociatedTypeInference<Assoc> {
     return self
   }
+
+  // CHECK-LABEL: public typealias Assoc = @_opaqueReturnTypeOf("$s17OpaqueResultTypes3BazV3fooyQrSiF", 0) __
+}
+
+// CHECK-LABEL: public struct BazGeneric<T> : OpaqueResultTypes.PrimaryAssociatedTypeInference
+
+public struct BazGeneric<T>: PrimaryAssociatedTypeInference {
+  // CHECK-LABEL: public func foo(_: Swift.Int) -> some OpaqueResultTypes.Foo
+  public func foo(_: Int) -> some Foo {
+    return 123
+  }
+
+  // CHECK-LABEL: public func callsFoo() -> @_opaqueReturnTypeOf("$s17OpaqueResultTypes3BazV3fooyQrSiF", 0)  __<τ_0_0>
+  public func callsFoo() -> Assoc {
+    return foo(123)
+  }
+
+  // CHECK-LABEL: public func identity() -> some OpaqueResultTypes.PrimaryAssociatedTypeInference<@_opaqueReturnTypeOf("$s17OpaqueResultTypes3BazV3fooyQrSiF", 0)  __<τ_0_0>>
+  public func identity() -> some PrimaryAssociatedTypeInference<Assoc> {
+    return self
+  }
+
+  // CHECK-LABEL: public typealias Assoc = @_opaqueReturnTypeOf("$s17OpaqueResultTypes10BazGenericV3fooyQrSiF", 0) __<T>
 }
