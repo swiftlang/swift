@@ -1187,7 +1187,7 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
       Printer << ", unavailable)";
       break;
     }
-    if (Attr->getParsedAttr()->isForEmbedded()) {
+    if (Attr->isEmbeddedSpecific()) {
       std::string atUnavailableInEmbedded =
           (llvm::Twine("@") + UNAVAILABLE_IN_EMBEDDED_ATTRNAME).str();
       Printer.printAttrName(atUnavailableInEmbedded);
@@ -2094,7 +2094,7 @@ AvailableAttr::AvailableAttr(
     const llvm::VersionTuple &Introduced, SourceRange IntroducedRange,
     const llvm::VersionTuple &Deprecated, SourceRange DeprecatedRange,
     const llvm::VersionTuple &Obsoleted, SourceRange ObsoletedRange,
-    bool Implicit, bool IsSPI, bool IsForEmbedded)
+    bool Implicit, bool IsSPI)
     : DeclAttribute(DeclAttrKind::Available, AtLoc, Range, Implicit),
       Domain(Domain), Message(Message), Rename(Rename),
       INIT_VER_TUPLE(Introduced), IntroducedRange(IntroducedRange),
@@ -2104,13 +2104,6 @@ AvailableAttr::AvailableAttr(
   Bits.AvailableAttr.HasComputedRenamedDecl = false;
   Bits.AvailableAttr.HasRenamedDecl = false;
   Bits.AvailableAttr.IsSPI = IsSPI;
-
-  if (IsForEmbedded) {
-    // FIXME: [availability] The IsForEmbedded bit should be removed when
-    // it can be represented with AvailabilityDomain (rdar://138802876)
-    Bits.AvailableAttr.IsForEmbedded = true;
-    assert(Domain.isUniversal());
-  }
 }
 
 #undef INIT_VER_TUPLE
@@ -2180,16 +2173,15 @@ bool BackDeployedAttr::isActivePlatform(const ASTContext &ctx,
 }
 
 AvailableAttr *AvailableAttr::clone(ASTContext &C, bool implicit) const {
-  return new (C) AvailableAttr(implicit ? SourceLoc() : AtLoc,
-                               implicit ? SourceRange() : getRange(), Domain,
-                               getKind(), Message, Rename,
-                               Introduced ? *Introduced : llvm::VersionTuple(),
-                               implicit ? SourceRange() : IntroducedRange,
-                               Deprecated ? *Deprecated : llvm::VersionTuple(),
-                               implicit ? SourceRange() : DeprecatedRange,
-                               Obsoleted ? *Obsoleted : llvm::VersionTuple(),
-                               implicit ? SourceRange() : ObsoletedRange,
-                               implicit, isSPI(), isForEmbedded());
+  return new (C) AvailableAttr(
+      implicit ? SourceLoc() : AtLoc, implicit ? SourceRange() : getRange(),
+      Domain, getKind(), Message, Rename,
+      Introduced ? *Introduced : llvm::VersionTuple(),
+      implicit ? SourceRange() : IntroducedRange,
+      Deprecated ? *Deprecated : llvm::VersionTuple(),
+      implicit ? SourceRange() : DeprecatedRange,
+      Obsoleted ? *Obsoleted : llvm::VersionTuple(),
+      implicit ? SourceRange() : ObsoletedRange, implicit, isSPI());
 }
 
 std::optional<OriginallyDefinedInAttr::ActiveVersion>

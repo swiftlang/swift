@@ -3028,6 +3028,7 @@ public:
   bool shouldHideDomainNameInUnversionedDiagnostics() const {
     switch (getDomain().getKind()) {
     case AvailabilityDomain::Kind::Universal:
+    case AvailabilityDomain::Kind::Embedded:
       return true;
     case AvailabilityDomain::Kind::Platform:
       return false;
