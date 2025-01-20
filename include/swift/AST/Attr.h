@@ -151,7 +151,7 @@ protected:
       Value : 32
     );
 
-    SWIFT_INLINE_BITFIELD(AvailableAttr, DeclAttribute, 4+1+1+1+1,
+    SWIFT_INLINE_BITFIELD(AvailableAttr, DeclAttribute, 4+1+1+1,
       /// An `AvailableAttr::Kind` value.
       Kind : 4,
 
@@ -160,10 +160,7 @@ protected:
       HasRenamedDecl : 1,
 
       /// Whether this attribute was spelled `@_spi_available`.
-      IsSPI : 1,
-
-      /// Whether this attribute was spelled `@_unavailableInEmbedded`.
-      IsForEmbedded : 1
+      IsSPI : 1
     );
 
     SWIFT_INLINE_BITFIELD(ClangImporterSynthesizedTypeAttr, DeclAttribute, 1,
@@ -741,7 +738,7 @@ public:
                 const llvm::VersionTuple &Deprecated,
                 SourceRange DeprecatedRange,
                 const llvm::VersionTuple &Obsoleted, SourceRange ObsoletedRange,
-                bool Implicit, bool IsSPI, bool IsForEmbedded = false);
+                bool Implicit, bool IsSPI);
 
   /// The optional message.
   const StringRef Message;
@@ -788,9 +785,6 @@ public:
 
   /// Whether this attribute was spelled `@_spi_available`.
   bool isSPI() const { return Bits.AvailableAttr.IsSPI; }
-
-  /// Whether this attribute was spelled `@_unavailableInEmbedded`.
-  bool isForEmbedded() const { return Bits.AvailableAttr.IsForEmbedded; }
 
   /// Returns the `AvailabilityDomain` associated with the attribute, or
   /// `std::nullopt` if it has either not yet been resolved or could not be
@@ -3277,8 +3271,8 @@ public:
     return getDomain().isPackageDescription() && isVersionSpecific();
   }
 
-  /// Whether this attribute was spelled `@_unavailableInEmbedded`.
-  bool isEmbeddedSpecific() const { return attr->isForEmbedded(); }
+  /// Whether this attribute an attribute that is specific to Embedded Swift.
+  bool isEmbeddedSpecific() const { return getDomain().isEmbedded(); }
 
   /// Returns the active version from the AST context corresponding to
   /// the available kind. For example, this will return the effective language

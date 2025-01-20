@@ -21,6 +21,7 @@ bool AvailabilityDomain::isActive(const ASTContext &ctx) const {
   case Kind::Universal:
   case Kind::SwiftLanguage:
   case Kind::PackageDescription:
+  case Kind::Embedded:
     return true;
   case Kind::Platform:
     return isPlatformActive(getPlatformKind(), ctx.LangOpts);
@@ -35,6 +36,8 @@ llvm::StringRef AvailabilityDomain::getNameForDiagnostics() const {
     return "Swift";
   case Kind::PackageDescription:
     return "PackageDescription";
+  case Kind::Embedded:
+    return "Embedded Swift";
   case Kind::Platform:
     return swift::prettyPlatformString(getPlatformKind());
   }
@@ -48,6 +51,8 @@ llvm::StringRef AvailabilityDomain::getNameForAttributePrinting() const {
     return "swift";
   case Kind::PackageDescription:
     return "_PackageDescription";
+  case Kind::Embedded:
+    return "Embedded";
   case Kind::Platform:
     return swift::platformString(getPlatformKind());
   }

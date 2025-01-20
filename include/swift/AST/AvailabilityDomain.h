@@ -41,6 +41,9 @@ public:
     /// Represents PackageDescription availability.
     PackageDescription,
 
+    /// Represents Embedded Swift availability.
+    Embedded,
+
     /// Represents availability for a specific operating system platform.
     Platform,
   };
@@ -132,6 +135,10 @@ public:
     return AvailabilityDomain(Kind::PackageDescription);
   }
 
+  static AvailabilityDomain forEmbedded() {
+    return AvailabilityDomain(Kind::Embedded);
+  }
+
   Kind getKind() const {
     if (auto inlineDomain = getInlineDomain())
       return inlineDomain->getKind();
@@ -148,6 +155,8 @@ public:
   bool isPackageDescription() const {
     return getKind() == Kind::PackageDescription;
   }
+
+  bool isEmbedded() const { return getKind() == Kind::Embedded; }
 
   /// Returns the platform kind for this domain if applicable.
   PlatformKind getPlatformKind() const {
@@ -184,6 +193,7 @@ public:
     case Kind::Universal:
     case Kind::SwiftLanguage:
     case Kind::PackageDescription:
+    case Kind::Embedded:
       // These availability domains are singletons.
       return false;
     case Kind::Platform:

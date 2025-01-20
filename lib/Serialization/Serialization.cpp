@@ -3074,7 +3074,7 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
           theAttr->isNoAsync(),
           domain->isPackageDescription(),
           theAttr->isSPI(),
-          theAttr->isForEmbedded(),
+          domain->isEmbedded(),
           LIST_VER_TUPLE_PIECES(Introduced),
           LIST_VER_TUPLE_PIECES(Deprecated),
           LIST_VER_TUPLE_PIECES(Obsoleted),
