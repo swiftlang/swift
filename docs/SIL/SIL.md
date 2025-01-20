@@ -446,7 +446,7 @@ Lifetimes have following properties:
 
 - Lifetimes of guaranteed values are called _borrow scopes_. A borrow scope
   starts with a single definition - the borrow-introducer. There are only a few
-  different kind of borrow-introducers:
+  different kinds of borrow-introducers:
     - guaranteed function argument: the lifetime spans over the whole function
       and doesn't need a scope-ending use.
     - `borrowed-from` instruction: it produces a borrow scope from a [reborrow
@@ -481,7 +481,7 @@ Lifetimes have following properties:
 ```
       %1 = load [copy] %0   // producer
       %2 = copy_value %1    // interior use of %1
-      %3 = move_value %1    // consuming use of %2
+      %3 = move_value %1    // consuming use of %1
       %4 = copy_value %1    // ERROR: use of %1 outside %1's lifetime
 ```
 
