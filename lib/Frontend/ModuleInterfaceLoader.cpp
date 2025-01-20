@@ -2032,6 +2032,15 @@ InterfaceSubContextDelegateImpl::InterfaceSubContextDelegateImpl(
 
     GenericArgs.push_back(
         ArgSaver.save("-cxx-interoperability-mode=" + compatVersion));
+
+    if (!langOpts.isUsingPlatformDefaultCXXStdlib() &&
+        langOpts.CXXStdlib == CXXStdlibKind::Libcxx) {
+      genericSubInvocation.getLangOptions().CXXStdlib = CXXStdlibKind::Libcxx;
+      genericSubInvocation.getClangImporterOptions().ExtraArgs.push_back(
+          "-stdlib=libc++");
+      GenericArgs.push_back("-Xcc");
+      GenericArgs.push_back("-stdlib=libc++");
+    }
   }
 }
 

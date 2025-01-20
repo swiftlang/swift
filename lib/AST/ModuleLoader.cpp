@@ -172,12 +172,6 @@ void ModuleLoader::findOverlayFiles(SourceLoc diagLoc, ModuleDecl *module,
   using namespace llvm::sys;
   using namespace file_types;
 
-  // If an overlay for CxxStdlib was requested, only proceed if compiling with
-  // the platform-default C++ stdlib.
-  if (module->getName() == module->getASTContext().Id_CxxStdlib &&
-      !module->getASTContext().LangOpts.isUsingPlatformDefaultCXXStdlib())
-    return;
-
   // If cross import information is passed on command-line, prefer use that.
   auto &crossImports = module->getASTContext().SearchPathOpts.CrossImportInfo;
   auto overlays = crossImports.find(module->getNameStr());
