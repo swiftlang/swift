@@ -2767,6 +2767,7 @@ namespace {
           decl->getDeclContext()->getParent()->isStdNamespace() &&
           decl->getIdentifier() &&
           (decl->getName() == "tzdb" || decl->getName() == "time_zone_link" ||
+           decl->getName() == "__compressed_pair" ||
            decl->getName() == "time_zone"))
         return nullptr;
 
