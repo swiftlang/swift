@@ -161,7 +161,7 @@
                 "swift-docc-render-artifact": "main",
                 "swift-docc-symbolkit": "main",
                 "swift-markdown": "main",
-                "swift-nio": "2.65.0",
+                "swift-nio": "2.78.0",
                 "swift-experimental-string-processing": "swift/main",
                 "swift-sdk-generator": "main",
                 "wasi-libc": "wasi-sdk-24",
