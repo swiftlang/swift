@@ -1251,6 +1251,11 @@ bool AllowInvalidRefInKeyPath::diagnose(const Solution &solution,
                                                      getLocator());
     return failure.diagnose(asNote);
   }
+  case RefKind::Method:
+  case RefKind::Initializer: {
+    UnsupportedMethodRefInKeyPath failure(solution, Member, getLocator());
+    return failure.diagnose(asNote);
+  }
   case RefKind::MutatingMethod: {
     InvalidMutatingMethodRefInKeyPath failure(solution, Member, getLocator());
     return failure.diagnose(asNote);
@@ -1323,21 +1328,40 @@ AllowInvalidRefInKeyPath::forRef(ConstraintSystem &cs, Type baseType,
           cs, baseType, RefKind::MutatingGetter, member, locator);
   }
 
-  // Referencing mutating, throws or async method members is not currently
-  // allowed.
-  if (auto method = dyn_cast<FuncDecl>(member)) {
-    if (method->isAsyncContext())
-      return AllowInvalidRefInKeyPath::create(
-          cs, baseType, RefKind::AsyncOrThrowsMethod, member, locator);
-    if (auto methodType = method->getInterfaceType()->getAs<AnyFunctionType>()) {
-      if (methodType->getResult()->getAs<AnyFunctionType>()->isThrowing())
+  if (cs.getASTContext().LangOpts.hasFeature(
+          Feature::KeyPathWithMethodMembers)) {
+    // Referencing mutating, throws or async method members is not currently
+    // allowed.
+    if (auto method = dyn_cast<FuncDecl>(member)) {
+      if (method->isAsyncContext())
         return AllowInvalidRefInKeyPath::create(
             cs, baseType, RefKind::AsyncOrThrowsMethod, member, locator);
+      if (auto methodType =
+              method->getInterfaceType()->getAs<AnyFunctionType>()) {
+        if (methodType->getResult()->getAs<AnyFunctionType>()->isThrowing())
+          return AllowInvalidRefInKeyPath::create(
+              cs, baseType, RefKind::AsyncOrThrowsMethod, member, locator);
+      }
+      if (method->isMutating())
+        return AllowInvalidRefInKeyPath::create(
+            cs, baseType, RefKind::MutatingMethod, member, locator);
+      return nullptr;
     }
-    if (method->isMutating())
-      return AllowInvalidRefInKeyPath::create(
-          cs, baseType, RefKind::MutatingMethod, member, locator);
+
+    if (isa<ConstructorDecl>(member))
+      return nullptr;
   }
+
+  // Referencing (instance or static) methods in key path is
+  // not currently allowed.
+  if (isa<FuncDecl>(member))
+    return AllowInvalidRefInKeyPath::create(cs, baseType, RefKind::Method,
+                                            member, locator);
+
+  // Referencing initializers in key path is not currently allowed.
+  if (isa<ConstructorDecl>(member))
+    return AllowInvalidRefInKeyPath::create(cs, baseType, RefKind::Initializer,
+                                            member, locator);
 
   return nullptr;
 }
