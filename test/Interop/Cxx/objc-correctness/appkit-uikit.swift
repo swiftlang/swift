@@ -2,6 +2,7 @@
 
 // REQUIRES: objc_interop
 // REQUIRES: VENDOR=apple
+// REQUIRES: OS=macosx || OS=ios
 
 #if canImport(AppKit)
 import AppKit
@@ -11,6 +12,6 @@ var _: AttributeScopes.AppKitAttributes.UnderlineStyleAttribute! = nil
 #elseif canImport(UIKit)
 import UIKit
 
-var _: AttributeScopes.AppKitAttributes.UnderlineStyleAttribute! = nil
+var _: AttributeScopes.UIKitAttributes.UnderlineStyleAttribute! = nil
 
 #endif
