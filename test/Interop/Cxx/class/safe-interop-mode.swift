@@ -18,6 +18,8 @@ module Test {
 //--- Inputs/nonescapable.h
 #include "swift/bridging"
 #include <span>
+#include <vector>
+#include <tuple>
 
 struct SWIFT_NONESCAPABLE View {
     __attribute__((swift_attr("@lifetime(immortal)")))
@@ -54,6 +56,10 @@ struct MyContainer {
 
 using SpanOfInt = std::span<int>;
 using SpanOfIntAlias = SpanOfInt;
+using VecOfPtr = std::vector<int*>;
+using VecOfInt = std::vector<int>;
+using SafeTuple = std::tuple<int, int, int>;
+using UnsafeTuple = std::tuple<int, int*, int>;
 
 //--- test.swift
 
@@ -85,7 +91,21 @@ func useCfType(x: CFArray) {
 func useString(x: std.string) {
 }
 
-// expected-warning@+1{{global function 'useCppSpan' has an interface that is not memory-safe}}
+// expected-warning@+1{{global function 'useVecOfPtr' has an interface that is not memory-safe; use '@unsafe' to indicate that its use is unsafe}}
+func useVecOfPtr(x: VecOfPtr) { // expected-note{{reference to unsafe type alias 'VecOfPtr'}}
+}
+
+func useVecOfInt(x: VecOfInt) {
+}
+
+func useSafeTuple(x: SafeTuple) {
+}
+
+// expected-warning@+1{{global function 'useUnsafeTuple' has an interface that is not memory-safe; use '@unsafe' to indicate that its use is unsafe}}
+func useUnsafeTuple(x: UnsafeTuple) { // expected-note{{reference to unsafe type alias 'UnsafeTuple'}}
+}
+
+// expected-warning@+1{{global function 'useCppSpan' has an interface that is not memory-safe; use '@unsafe' to indicate that its use is unsafe}}
 func useCppSpan(x: SpanOfInt) { // expected-note{{reference to unsafe type alias 'SpanOfInt'}}
 }
 
