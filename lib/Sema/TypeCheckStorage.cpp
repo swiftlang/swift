@@ -1223,10 +1223,13 @@ static Expr *buildStorageReference(AccessorDecl *accessor,
         // Check for availability of wrappedValue.
         if (accessor->getAccessorKind() == AccessorKind::Get ||
             isYieldingImmutableAccessor(accessor->getAccessorKind())) {
-          diagnoseDeclAvailability(
-              wrappedValue,
-              var->getAttachedPropertyWrappers()[i]->getRangeWithAt(), nullptr,
-              ExportContext::forDeclSignature(accessor));
+          if (wrappedValue->getAttrs().getUnavailable(ctx)) {
+            ExportContext where = ExportContext::forDeclSignature(var);
+            diagnoseExplicitUnavailability(
+                wrappedValue,
+                var->getAttachedPropertyWrappers()[i]->getRangeWithAt(),
+                where, nullptr);
+          }
         }
 
         underlyingVars.push_back({ wrappedValue, isWrapperRefLValue });
