@@ -1,4 +1,5 @@
-// RUN: %target-swift-frontend -typecheck -verify %S/Inputs/keypath.swift -primary-file %s
+// RUN: %target-swift-frontend -enable-experimental-feature KeyPathWithMethodMembers -typecheck -verify %S/Inputs/keypath.swift -primary-file %s
+// REQUIRES: swift_feature_KeyPathWithMethodMembers
 
 struct S {
   let i: Int
