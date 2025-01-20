@@ -3659,9 +3659,8 @@ bool ContextualFailure::isIntegerToStringIndexConversion() const {
 std::optional<Diag<Type, Type>>
 ContextualFailure::getDiagnosticFor(ContextualTypePurpose context,
                                     Type contextualType) {
-  bool forProtocol = false;
-  if (!contextualType.isNull())
-    forProtocol = contextualType->isConstraintType();
+  assert(!contextualType.isNull() && "contextual type should not be null");
+  auto forProtocol = contextualType->isConstraintType();
   switch (context) {
   case CTP_Initialization: {
     if (contextualType->isAnyObject())
@@ -7294,6 +7293,8 @@ bool InOutConversionFailure::diagnoseAsError() {
       assert(locator->findLast<LocatorPathElt::ContextualType>());
       auto anchor = getAnchor();
       auto contextualType = getContextualType(anchor);
+      if (contextualType.isNull())
+        return false;
       auto purpose = getContextualTypePurpose();
       auto diagnostic = getDiagnosticFor(purpose, contextualType);
 
