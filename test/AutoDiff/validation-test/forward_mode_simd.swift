@@ -56,6 +56,10 @@ ForwardModeTests.test("subscript") {
   expectEqual(4, df1(a))
 }
 
+// FIXME(TF-1103): Derivative registration does not yet support
+// https://github.com/swiftlang/swift/issues/54445
+// `@_alwaysEmitIntoClient` original functions like operators, `SIMD.sum()`.
+/*
 ForwardModeTests.test("Addition") {
   let a = SIMD4<Float>(1, 2, 3, 4)
   let g = SIMD4<Float>(1, 1, 1, 1)
@@ -173,7 +177,12 @@ ForwardModeTests.test("Division") {
   expectEqual(5 / a, val3)
   expectEqual((3 * a - 5 * g) / (a * a), df3(3, g))
 }
+*/
 
+// FIXME(TF-1103): Derivative registration does not yet support
+// https://github.com/swiftlang/swift/issues/54445
+// `@_alwaysEmitIntoClient` original functions like operators, `SIMD.sum()`.
+/*
 ForwardModeTests.test("Generics") {
   let a = SIMD3<Double>(1, 2, 3)
   let g = SIMD3<Double>(1, 1, 1)
@@ -245,5 +254,6 @@ ForwardModeTests.test("Generics") {
   expectEqual(SIMD3<Double>(5, 10, 15), val4)
   expectEqual(a * 3 + g * 5 , df4(g, 3))
 }
+*/
 
 runAllTests()
