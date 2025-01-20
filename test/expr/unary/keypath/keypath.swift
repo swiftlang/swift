@@ -1,4 +1,5 @@
-// RUN: %target-swift-frontend -typecheck -parse-as-library %s -verify
+// RUN: %target-swift-frontend -enable-experimental-feature KeyPathWithMethodMembers -typecheck -parse-as-library %s -verify
+// REQUIRES: swift_feature_KeyPathWithMethodMembers
 
 struct Sub: Hashable {
   static func ==(_: Sub, _: Sub) -> Bool { return true }
