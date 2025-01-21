@@ -492,10 +492,12 @@ static bool emitReferenceDependencies(CompilerInstance &Instance,
                                    .getLangOptions()
                                    .EmitFineGrainedDependencySourcefileDotFiles;
 
+#ifndef NDEBUG
   // Before writing to the dependencies file path, preserve any previous file
   // that may have been there. No error handling -- this is just a nicety, it
   // doesn't matter if it fails.
   llvm::sys::fs::rename(outputPath, outputPath + "~");
+#endif
 
   using SourceFileDepGraph = fine_grained_dependencies::SourceFileDepGraph;
   return fine_grained_dependencies::withReferenceDependencies(
@@ -507,7 +509,7 @@ static bool emitReferenceDependencies(CompilerInstance &Instance,
                 g);
 
         // If path is stdout, cannot read it back, so check for "-"
-        assert(outputPath == "-" || g.verifyReadsWhatIsWritten(outputPath));
+        DEBUG_ASSERT(outputPath == "-" || g.verifyReadsWhatIsWritten(outputPath));
 
         if (alsoEmitDotFile)
           g.emitDotFile(Instance.getOutputBackend(), outputPath,
