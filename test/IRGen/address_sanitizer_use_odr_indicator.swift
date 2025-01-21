@@ -1,4 +1,4 @@
-// UNSUPPORTED: OS=windows-msvc
+// XFAIL: OS=windows-msvc
 // REQUIRES: asan_runtime
 
 // Default instrumentation that does not use ODR indicators

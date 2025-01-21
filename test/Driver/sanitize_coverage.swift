@@ -1,4 +1,4 @@
-// UNSUPPORTED: OS=windows-msvc
+// XFAIL: OS=windows-msvc
 
 // Different sanitizer coverage types
 // RUN: %swiftc_driver -driver-print-jobs -sanitize-coverage=func -sanitize=address %s | %FileCheck -check-prefix=SANCOV_FUNC %s

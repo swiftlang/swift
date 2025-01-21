@@ -1,5 +1,5 @@
 // UNSUPPORTED: OS=linux-gnu && CPU=aarch64
-// UNSUPPORTED: OS=windows-msvc
+// XFAIL: OS=windows-msvc
 
 // rdar://100805115
 // UNSUPPORTED: CPU=arm64e

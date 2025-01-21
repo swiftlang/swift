@@ -1,4 +1,4 @@
-// UNSUPPORTED: OS=windows-msvc
+// XFAIL: OS=windows-msvc
 
 // RUN: %target-swiftc_driver %s -g -sanitize=address -o %t_asan-binary
 // RUN: %target-codesign %t_asan-binary
