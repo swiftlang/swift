@@ -15,13 +15,13 @@ public func foo() {
   callback3?(true, true)
 }
 
-// CHECK-LABEL: define swiftcc void @"$e4main3fooyyF"()
+// CHECK-LABEL: define swiftcc void @"$s4main3fooyyF"()
 
-// CHECK:       [[P1:%.*]] = load ptr, ptr @"$e4main8callbackyycSgvp"
+// CHECK:       [[P1:%.*]] = load ptr, ptr @"$s4main8callbackyycSgvp"
 // CHECK:       call swiftcc void [[P1:%.*]](ptr swiftself {{.*}}) [ "ptrauth"(i32 0, i64 3848) ]
 
-// CHECK:       [[P2:%.*]] = load ptr, ptr @"$e4main9callback2ySbcSgvp"
+// CHECK:       [[P2:%.*]] = load ptr, ptr @"$s4main9callback2ySbcSgvp"
 // CHECK:       call swiftcc void [[P2:%.*]](i1 true, ptr swiftself {{.*}}) [ "ptrauth"(i32 0, i64 25457) ]
 
-// CHECK:       [[P3:%.*]] = load ptr, ptr @"$e4main9callback3ySb_SbtcSgvp"
+// CHECK:       [[P3:%.*]] = load ptr, ptr @"$s4main9callback3ySb_SbtcSgvp"
 // CHECK:       call swiftcc void [[P3:%.*]](i1 true, i1 true, ptr swiftself {{.*}}) [ "ptrauth"(i32 0, i64 25424) ]
