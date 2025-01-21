@@ -415,8 +415,6 @@ extension Backtrace {
                                memoryReader: memoryReader)
 
         if let limit = limit {
-          print("limit = \(limit), offset = \(offset), top = \(top)")
-
           let limited = LimitSequence(unwinder,
                                       limit: limit,
                                       offset: offset,
