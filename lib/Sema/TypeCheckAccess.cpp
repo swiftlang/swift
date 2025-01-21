@@ -1887,6 +1887,8 @@ bool isFragileClangDecl(const clang::Decl *decl) {
     return isFragileClangType(pd->getType());
   if (auto *typedefDecl = dyn_cast<clang::TypedefNameDecl>(decl))
     return isFragileClangType(typedefDecl->getUnderlyingType());
+  if (auto *enumDecl = dyn_cast<clang::EnumDecl>(decl))
+    return enumDecl->isScoped();
   if (auto *rd = dyn_cast<clang::RecordDecl>(decl)) {
     auto cxxRecordDecl = dyn_cast<clang::CXXRecordDecl>(rd);
     if (!cxxRecordDecl)
