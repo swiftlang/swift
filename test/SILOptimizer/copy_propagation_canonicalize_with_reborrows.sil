@@ -37,8 +37,8 @@ exit:
 
 // CHECK-LABEL: sil [ossa] @hoist_destroy_over_unrelated_endborrow : {{.*}} {
 // CHECK:       {{bb[0-9]+}}([[UNRELATED:%[^,]+]] : @reborrow $X, [[VALUE:%[^,]+]] : @owned $X):
-// CHECK:         destroy_value [[VALUE]]
 // CHECK:         [[BF:%.*]] = borrowed [[UNRELATED]] : $X from (%0 : $X)
+// CHECK:         destroy_value [[VALUE]]
 // CHECK:         end_borrow [[BF]]
 // CHECK-LABEL: } // end sil function 'hoist_destroy_over_unrelated_endborrow'
 sil [ossa] @hoist_destroy_over_unrelated_endborrow : $@convention(thin) (@guaranteed X) -> () {
@@ -90,8 +90,8 @@ exit:
 // CHECK-LABEL: sil [ossa] @hoist_destroy_over_unrelated_reborrow_reborrow_endborrow : {{.*}} {
 // CHECK:       {{bb[0-9]+}}({{%[^,]+}} : @reborrow $X, {{%[^,]+}} : @owned $X):
 // CHECK:       {{bb[0-9]+}}([[REBORROW:%[^,]+]] : @reborrow $X, [[VALUE:%[^,]+]] : @owned $X):
-// CHECK:         destroy_value [[VALUE]]
 // CHECK:         [[BF:%.*]] = borrowed [[REBORROW]] : $X from (%0 : $X)
+// CHECK:         destroy_value [[VALUE]]
 // CHECK:         end_borrow [[BF]]
 // CHECK-LABEL: } // end sil function 'hoist_destroy_over_unrelated_reborrow_reborrow_endborrow'
 sil [ossa] @hoist_destroy_over_unrelated_reborrow_reborrow_endborrow : $@convention(thin) (@guaranteed X) -> () {

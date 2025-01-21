@@ -1209,7 +1209,7 @@ bb0(%0 : @guaranteed $C):
 }
 
 // CHECK-LABEL: sil [ossa] @test_updating_borrowed_from :
-// CHECK:         borrowed {{.*}} from {{.*}} %0 : $HasObject
+// CHECK:         borrowed {{.*}} from (%0 : $HasObject)
 // CHECK-LABEL: } // end sil function 'test_updating_borrowed_from'
 sil [ossa] @test_updating_borrowed_from : $@convention(thin) (@guaranteed HasObject) -> () {
 bb0(%0 : @guaranteed $HasObject):
