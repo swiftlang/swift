@@ -4802,16 +4802,15 @@ void IRGenSILFunction::visitEndApply(BeginApplyInst *i, EndApplyInst *ei) {
 
   if (!isAbort) {
     auto resultType = call->getType();
+    Explosion e;
     if (!resultType->isVoidTy()) {
-      Explosion e;
       // FIXME: Do we need to handle ABI-related conversions here?
       // It seems we cannot have C function convention for coroutines, etc.
       extractScalarResults(*this, resultType, call, e);
-      
-      // NOTE: This inserts a new entry into the LoweredValues DenseMap,
-      // invalidating the reference held by `coroutine`.
-      setLoweredExplosion(ei, e);
     }
+    // NOTE: This inserts a new entry into the LoweredValues DenseMap,
+    // invalidating the reference held by `coroutine`.    
+    setLoweredExplosion(ei, e);
   }
 }
 

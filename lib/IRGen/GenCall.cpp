@@ -4982,7 +4982,9 @@ static void emitRetconCoroutineEntry(
     ArrayRef<llvm::Value *> extraArguments, llvm::Constant *allocFn,
     llvm::Constant *deallocFn, ArrayRef<llvm::Value *> finalArguments) {
   auto prototype =
-      IGF.IGM.getOpaquePtr(IGF.IGM.getAddrOfContinuationPrototype(fnType));
+    IGF.IGM.getOpaquePtr(
+      IGF.IGM.getAddrOfContinuationPrototype(fnType,
+                                             fnType->getInvocationGenericSignature()));
   // Call the right 'llvm.coro.id.retcon' variant.
   SmallVector<llvm::Value *, 8> arguments;
   arguments.push_back(
