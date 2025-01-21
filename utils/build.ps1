@@ -433,7 +433,6 @@ enum HostComponent {
   Compilers = 5
   FoundationMacros = 10
   TestingMacros
-  System
   ToolsSupportCore
   LLBuild
   Yams
@@ -443,6 +442,7 @@ enum HostComponent {
   Collections
   ASN1
   Certificates
+  System
   PackageManager
   Markdown
   Format
@@ -2209,7 +2209,6 @@ function Build-ToolsSupportCore($Arch) {
     -SwiftSDK (Get-HostSwiftSDK) `
     -Defines @{
       BUILD_SHARED_LIBS = "YES";
-      SwiftSystem_DIR = (Get-HostProjectCMakeModules System);
     }
 }
 
@@ -2297,7 +2296,6 @@ function Build-Driver($Arch) {
     -SwiftSDK (Get-HostSwiftSDK) `
     -Defines @{
       BUILD_SHARED_LIBS = "YES";
-      SwiftSystem_DIR = (Get-HostProjectCMakeModules System);
       TSC_DIR = (Get-HostProjectCMakeModules ToolsSupportCore);
       LLBuild_DIR = (Get-HostProjectCMakeModules LLBuild);
       Yams_DIR = (Get-HostProjectCMakeModules Yams);
@@ -2513,7 +2511,6 @@ function Build-SourceKitLSP($Arch) {
     -SwiftSDK (Get-HostSwiftSDK) `
     -Defines @{
       SwiftSyntax_DIR = (Get-HostProjectCMakeModules Compilers);
-      SwiftSystem_DIR = (Get-HostProjectCMakeModules System);
       TSC_DIR = (Get-HostProjectCMakeModules ToolsSupportCore);
       LLBuild_DIR = (Get-HostProjectCMakeModules LLBuild);
       ArgumentParser_DIR = (Get-HostProjectCMakeModules ArgumentParser);
@@ -2881,7 +2878,6 @@ if (-not $ToBatch) {
 
 if (-not $SkipBuild) {
   Invoke-BuildStep Build-SQLite $HostArch
-  Invoke-BuildStep Build-System $HostArch
   Invoke-BuildStep Build-ToolsSupportCore $HostArch
   Invoke-BuildStep Build-LLBuild $HostArch
   Invoke-BuildStep Build-Yams $HostArch
@@ -2891,6 +2887,7 @@ if (-not $SkipBuild) {
   Invoke-BuildStep Build-Collections $HostArch
   Invoke-BuildStep Build-ASN1 $HostArch
   Invoke-BuildStep Build-Certificates $HostArch
+  Invoke-BuildStep Build-System $HostArch
   Invoke-BuildStep Build-PackageManager $HostArch
   Invoke-BuildStep Build-Markdown $HostArch
   Invoke-BuildStep Build-Format $HostArch
