@@ -65,7 +65,8 @@ static bool diagnoseExplicitUnavailability(
 static bool diagnoseExplicitUnavailability(
     const ValueDecl *D, SourceRange R, const ExportContext &Where,
     DeclAvailabilityFlags Flags,
-    llvm::function_ref<void(InFlightDiagnostic &)> attachRenameFixIts);
+    llvm::function_ref<void(InFlightDiagnostic &, StringRef)>
+        attachRenameFixIts);
 
 static bool diagnoseSubstitutionMapAvailability(
     SourceLoc loc, SubstitutionMap subs, const ExportContext &where,
@@ -2953,8 +2954,9 @@ void swift::diagnoseOverrideOfUnavailableDecl(ValueDecl *override,
   ExportContext where = ExportContext::forDeclSignature(override, nullptr);
   diagnoseExplicitUnavailability(
       base, override->getLoc(), where,
-      /*Flags*/ std::nullopt, [&](InFlightDiagnostic &diag) {
-        ParsedDeclName parsedName = parseDeclName(attr.getRename());
+      /*Flags*/ std::nullopt,
+      [&override, &ctx](InFlightDiagnostic &diag, StringRef rename) {
+        ParsedDeclName parsedName = parseDeclName(rename);
         if (!parsedName || parsedName.isPropertyAccessor() ||
             parsedName.isMember() || parsedName.isOperator()) {
           return;
@@ -2986,10 +2988,8 @@ static bool diagnoseExplicitUnavailability(const ValueDecl *D, SourceRange R,
                                            const Expr *call,
                                            DeclAvailabilityFlags Flags) {
   return diagnoseExplicitUnavailability(
-      D, R, Where, Flags, [=](InFlightDiagnostic &diag) {
-        auto attr = D->getUnavailableAttr();
-        assert(attr);
-        fixItAvailableAttrRename(diag, R, D, attr->getRename(), call);
+      D, R, Where, Flags, [=](InFlightDiagnostic &diag, StringRef rename) {
+        fixItAvailableAttrRename(diag, R, D, rename, call);
       });
 }
 
@@ -3512,7 +3512,8 @@ static void checkFunctionConversionAvailability(Type srcType, Type destType,
 bool diagnoseExplicitUnavailability(
     const ValueDecl *D, SourceRange R, const ExportContext &Where,
     DeclAvailabilityFlags Flags,
-    llvm::function_ref<void(InFlightDiagnostic &)> attachRenameFixIts) {
+    llvm::function_ref<void(InFlightDiagnostic &, StringRef)>
+        attachRenameFixIts) {
   auto diagnosticInfo = getExplicitUnavailabilityDiagnosticInfo(D, Where);
   if (!diagnosticInfo)
     return false;
@@ -3556,7 +3557,7 @@ bool diagnoseExplicitUnavailability(
                                D, replaceKind.has_value(), rawReplaceKind,
                                newName, EncodedMessage.Message);
     diag.limitBehavior(limit);
-    attachRenameFixIts(diag);
+    attachRenameFixIts(diag, rename);
   } else if (isSubscriptReturningString(D, ctx)) {
     diags.diagnose(Loc, diag::availability_string_subscript_migration)
       .highlight(R)
