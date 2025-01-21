@@ -8211,5 +8211,32 @@ ERROR(attr_abi_incompatible_with_silgen_name,none,
       "the same purpose",
       (DescriptiveDeclKind))
 
+//===----------------------------------------------------------------------===//
+// MARK: @execution Attribute
+//===----------------------------------------------------------------------===//
+ERROR(attr_execution_concurrent_only_on_async,none,
+      "cannot use '@execution(concurrent)' on non-async %kind0",
+      (ValueDecl *))
+
+ERROR(attr_execution_concurrent_incompatible_with_global_actor,none,
+      "cannot use '@execution(concurrent)' on %kind0 isolated to global actor %1",
+      (ValueDecl *, Type))
+
+ERROR(attr_execution_concurrent_incompatible_isolated_parameter,none,
+      "cannot use '@execution(concurrent)' on %kind0 because it has "
+      "an isolated parameter: %1",
+      (ValueDecl *, ValueDecl *))
+
+ERROR(attr_execution_concurrent_incompatible_dynamically_isolated_parameter,none,
+      "cannot use '@execution(concurrent)' on %kind0 because it has "
+      "a dynamically isolated parameter: %1",
+      (ValueDecl *, ValueDecl *))
+
+ERROR(attr_execution_concurrent_incompatible_with_nonisolated,none,
+      "cannot use '@execution(concurrent)' and 'nonisolated' on the same %0 "
+      "because they serve the same purpose",
+      (ValueDecl *))
+
+
 #define UNDEFINE_DIAGNOSTIC_MACROS
 #include "DefineDiagnosticMacros.h"

@@ -1650,6 +1650,19 @@ bool DeclAttribute::printImpl(ASTPrinter &Printer, const PrintOptions &Options,
     break;
   }
 
+  case DeclAttrKind::Execution: {
+    auto *attr = cast<ExecutionAttr>(this);
+    switch (attr->getBehavior()) {
+    case ExecutionKind::Concurrent:
+      Printer << "@execution(concurrent)";
+      break;
+    case ExecutionKind::Caller:
+      Printer << "@execution(caller)";
+      break;
+    }
+    break;
+  }
+
 #define SIMPLE_DECL_ATTR(X, CLASS, ...) case DeclAttrKind::CLASS:
 #include "swift/AST/DeclAttr.def"
     llvm_unreachable("handled above");
@@ -1861,6 +1874,15 @@ StringRef DeclAttribute::getAttrName() const {
     }
   case DeclAttrKind::Lifetime:
     return "lifetime";
+  case DeclAttrKind::Execution: {
+    switch (cast<ExecutionAttr>(this)->getBehavior()) {
+    case ExecutionKind::Concurrent:
+      return "execution(concurrent)";
+    case ExecutionKind::Caller:
+      return "execution(caller)";
+    }
+    llvm_unreachable("Invalid execution kind");
+  }
   }
   llvm_unreachable("bad DeclAttrKind");
 }

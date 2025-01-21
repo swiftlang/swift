@@ -111,6 +111,8 @@ extension ASTGenVisitor {
       let attrName = identTy.name.rawText
       let attrKind = BridgedDeclAttrKind(from: attrName.bridged)
       switch attrKind {
+      case .execution:
+        return handle(self.generateExecutionAttr(attribute: node)?.asDeclAttribute)
       case .ABI:
         return handle(self.generateABIAttr(attribute: node)?.asDeclAttribute)
       case .alignment:
@@ -327,6 +329,33 @@ extension ASTGenVisitor {
     }
 
     return handle(self.generateCustomAttr(attribute: node)?.asDeclAttribute)
+  }
+
+  /// E.g.:
+  ///   ```
+  ///   @execution(concurrent)
+  ///   @execution(caller)
+  ///   ```
+  func generateExecutionAttr(attribute node: AttributeSyntax) -> BridgedExecutionAttr? {
+    let behavior: BridgedExecutionKind? = self.generateSingleAttrOption(
+      attribute: node,
+      {
+        switch $0.rawText {
+        case "concurrent": return .concurrent
+        case "caller": return .caller
+        default: return nil
+        }
+      }
+    )
+    guard let behavior else {
+      return nil
+    }
+    return .createParsed(
+      self.ctx,
+      atLoc: self.generateSourceLoc(node.atSign),
+      range: self.generateAttrSourceRange(node),
+      behavior: behavior
+    )
   }
 
   /// E.g.:

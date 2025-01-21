@@ -526,6 +526,14 @@ static StringRef getDumpString(NonSendableKind kind) {
     return "Specific";
   }
 }
+static StringRef getDumpString(ExecutionKind kind) {
+  switch (kind) {
+  case ExecutionKind::Concurrent:
+    return "concurrent";
+  case ExecutionKind::Caller:
+    return "caller";
+  }
+}
 static StringRef getDumpString(StringRef s) {
   return s;
 }
@@ -3871,6 +3879,11 @@ public:
 
 #undef TRIVIAL_ATTR_PRINTER
 
+  void visitExecutionAttr(ExecutionAttr *Attr, StringRef label) {
+    printCommon(Attr, "execution_attr", label);
+    printField(Attr->getBehavior(), "behavior");
+    printFoot();
+  }
   void visitABIAttr(ABIAttr *Attr, StringRef label) {
     printCommon(Attr, "abi_attr", label);
     printRec(Attr->abiDecl, "decl");

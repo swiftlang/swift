@@ -217,6 +217,10 @@ protected:
 
       NumFeatures : 31
     );
+
+    SWIFT_INLINE_BITFIELD(ExecutionAttr, DeclAttribute, NumExecutionKindBits,
+      Behavior : NumExecutionKindBits
+    );
   } Bits;
   // clang-format on
 
@@ -2914,6 +2918,30 @@ public:
   }
 
   UNIMPLEMENTED_CLONE(ABIAttr)
+};
+
+class ExecutionAttr : public DeclAttribute {
+public:
+  ExecutionAttr(SourceLoc AtLoc, SourceRange Range,
+                ExecutionKind behavior,
+                bool Implicit)
+      : DeclAttribute(DeclAttrKind::Execution, AtLoc, Range, Implicit) {
+    Bits.ExecutionAttr.Behavior = static_cast<uint8_t>(behavior);
+  }
+
+  ExecutionAttr(ExecutionKind behavior, bool Implicit)
+      : ExecutionAttr(/*AtLoc=*/SourceLoc(), /*Range=*/SourceRange(), behavior,
+                      Implicit) {}
+
+  ExecutionKind getBehavior() const {
+    return static_cast<ExecutionKind>(Bits.ExecutionAttr.Behavior);
+  }
+
+  static bool classof(const DeclAttribute *DA) {
+    return DA->getKind() == DeclAttrKind::Execution;
+  }
+
+  UNIMPLEMENTED_CLONE(ExecutionAttr)
 };
 
 /// Attributes that may be applied to declarations.
