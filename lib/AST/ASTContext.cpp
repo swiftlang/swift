@@ -5651,10 +5651,9 @@ SubstitutionMap::Storage *SubstitutionMap::Storage::get(
 }
 
 const AvailabilityContext::Storage *
-AvailabilityContext::Storage::get(const PlatformInfo &platformInfo,
-                                  ASTContext &ctx) {
+AvailabilityContext::Storage::get(const Info &info, ASTContext &ctx) {
   llvm::FoldingSetNodeID id;
-  platformInfo.Profile(id);
+  info.Profile(id);
 
   auto &foldingSet =
       ctx.getImpl().getArena(AllocationArena::Permanent).AvailabilityContexts;
@@ -5665,7 +5664,7 @@ AvailabilityContext::Storage::get(const PlatformInfo &platformInfo,
 
   void *mem = ctx.Allocate(sizeof(AvailabilityContext::Storage),
                            alignof(AvailabilityContext::Storage));
-  auto *newNode = ::new (mem) AvailabilityContext::Storage(platformInfo);
+  auto *newNode = ::new (mem) AvailabilityContext::Storage(info);
   foldingSet.InsertNode(newNode, insertPos);
 
   return newNode;

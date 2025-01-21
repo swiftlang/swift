@@ -38,7 +38,7 @@ public:
   class Storage;
 
 private:
-  struct PlatformInfo;
+  class Info;
 
   /// A non-null pointer to uniqued storage for this availability context.
   const Storage *storage;
