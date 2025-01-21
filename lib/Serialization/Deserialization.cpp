@@ -5736,6 +5736,14 @@ llvm::Error DeclDeserializer::deserializeDeclCommon() {
       DeclAttribute *Attr = nullptr;
       bool skipAttr = false;
       switch (recordID) {
+      case decls_block::Execution_DECL_ATTR: {
+        unsigned behavior;
+        serialization::decls_block::ExecutionDeclAttrLayout::readRecord(
+            scratch, behavior);
+        Attr = new (ctx) ExecutionAttr(static_cast<ExecutionKind>(behavior),
+                                       /*Implicit=*/false);
+        break;
+      }
       case decls_block::ABI_DECL_ATTR: {
         bool isImplicit;
         DeclID abiDeclID;

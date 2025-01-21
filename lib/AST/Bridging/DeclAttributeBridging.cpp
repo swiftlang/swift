@@ -585,3 +585,21 @@ BridgedUnavailableFromAsyncAttr BridgedUnavailableFromAsyncAttr_createParsed(
       UnavailableFromAsyncAttr(cMessage.unbridged(), cAtLoc.unbridged(),
                                cRange.unbridged(), /*implicit=*/false);
 }
+
+static ExecutionKind unbridged(BridgedExecutionKind kind) {
+  switch (kind) {
+  case BridgedExecutionKindConcurrent:
+    return ExecutionKind::Concurrent;
+  case BridgedExecutionKindCaller:
+    return ExecutionKind::Caller;
+  }
+  llvm_unreachable("unhandled enum value");
+}
+
+BridgedExecutionAttr BridgedExecutionAttr_createParsed(
+    BridgedASTContext cContext, BridgedSourceLoc atLoc,
+    BridgedSourceRange range, BridgedExecutionKind behavior) {
+  return new (cContext.unbridged())
+      ExecutionAttr(atLoc.unbridged(), range.unbridged(),
+                    unbridged(behavior), /*implicit=*/false);
+}

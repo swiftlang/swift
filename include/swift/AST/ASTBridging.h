@@ -601,6 +601,16 @@ BridgedABIAttr BridgedABIAttr_createParsed(
     BridgedASTContext cContext, BridgedSourceLoc atLoc,
     BridgedSourceRange range, BridgedNullableDecl abiDecl);
 
+enum ENUM_EXTENSIBILITY_ATTR(closed) BridgedExecutionKind {
+  BridgedExecutionKindConcurrent,
+  BridgedExecutionKindCaller,
+};
+
+SWIFT_NAME("BridgedExecutionAttr.createParsed(_:atLoc:range:behavior:)")
+BridgedExecutionAttr BridgedExecutionAttr_createParsed(
+    BridgedASTContext cContext, BridgedSourceLoc atLoc,
+    BridgedSourceRange range, BridgedExecutionKind behavior);
+
 enum ENUM_EXTENSIBILITY_ATTR(closed) BridgedAccessLevel {
   BridgedAccessLevelPrivate,
   BridgedAccessLevelFilePrivate,
