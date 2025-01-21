@@ -68,7 +68,7 @@ extension String {
   }
 }
 
-if #available(SwiftStdlib 5.9, *) {
+if #available(SwiftStdlib 6.1, *) {
   StringWordBreaking.test("word breaking") {
     for wordBreakTest in wordBreakTests {
       expectEqual(
@@ -168,7 +168,7 @@ func getUTF16Array(from string: String) -> [UInt16] {
   return result
 }
 
-if #available(SwiftStdlib 5.9, *) {
+if #available(SwiftStdlib 6.1, *) {
   StringWordBreaking.test("word breaking foreign") {
     for wordBreakTest in wordBreakTests {
       let foreignTest = NonContiguousNSString(
