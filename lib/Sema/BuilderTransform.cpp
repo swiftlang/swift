@@ -511,7 +511,8 @@ protected:
 
       auto *ifBraceStmt = cast<BraceStmt>(ifStmt->getThenStmt());
 
-      std::tie(thenVarRef, unsupported) = transform(ifBraceStmt, thenBody);
+      std::tie(thenVarRef, unsupported) =
+          transform(ifBraceStmt, thenBody, /*isolateBuildBlock=*/true);
       if (unsupported) {
         recordUnsupported(*unsupported);
         return nullptr;
@@ -546,7 +547,8 @@ protected:
         auto *elseBraceStmt = cast<BraceStmt>(elseStmt);
         SmallVector<ASTNode> elseBody;
 
-        std::tie(elseVarRef, unsupported) = transform(elseBraceStmt, elseBody);
+        std::tie(elseVarRef, unsupported) = transform(
+            elseBraceStmt, elseBody, /*isolateBuildBlock=*/true);
         if (unsupported) {
           recordUnsupported(*unsupported);
           return nullptr;
