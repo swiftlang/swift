@@ -478,6 +478,11 @@ function Get-BuildProjectCMakeModules([BuildComponent]$Project) {
   return "$BinaryCache\$($Project.value__)\cmake\modules"
 }
 
+function Get-PlainLLVMTarget($Arch) {
+  # Remove trailing Android API number from the LLVMTarget (if present)
+  return $Arch.LLVMTarget.Replace("$AndroidAPILevel","")
+}
+
 function Copy-File($Src, $Dst) {
   # Create the directory tree first so Copy-Item succeeds
   # If $Dst is the target directory, make sure it ends with "\"
@@ -1091,7 +1096,7 @@ function Build-CMakeProject {
       if (-not ($Platform -eq "Windows")) {
         TryAdd-KeyValue $Defines CMAKE_Swift_COMPILER_WORKS = "YES"
       }
-      TryAdd-KeyValue $Defines CMAKE_Swift_COMPILER_TARGET $Arch.LLVMTarget.Replace("$AndroidAPILevel", "")
+      TryAdd-KeyValue $Defines CMAKE_Swift_COMPILER_TARGET (Get-PlainLLVMTarget $Arch)
       if ($UseBuiltCompilers.Contains("Swift")) {
         $RuntimeBinaryCache = Get-TargetProjectBinaryCache $Arch Runtime
         $SwiftResourceDir = "${RuntimeBinaryCache}\lib\swift"
@@ -1671,12 +1676,10 @@ function Build-RegsGen2($Arch) {
 }
 
 function Build-DS2([Platform]$Platform, $Arch) {
-  $ArchName = $Arch.LLVMTarget.Replace("$AndroidAPILevel","")
-
   Build-CMakeProject `
     -Src "$SourceCache\ds2" `
     -Bin "$($Arch.BinaryCache)\$Platform\ds2" `
-    -InstallTo "$($Arch.PlatformInstallRoot)\Developer\Library\$ArchName" `
+    -InstallTo "$($Arch.PlatformInstallRoot)\Developer\Library\$(Get-PlainLLVMTarget $Arch)" `
     -Arch $Arch `
     -Platform $Platform `
     -BuildTargets default `
@@ -1828,7 +1831,7 @@ function Build-Runtime([Platform]$Platform, $Arch) {
       -CacheScript $SourceCache\swift\cmake\caches\Runtime-$Platform-$($Arch.LLVMName).cmake `
       -UseBuiltCompilers C,CXX,Swift `
       -Defines ($PlatformDefines + @{
-        CMAKE_Swift_COMPILER_TARGET = $Arch.LLVMTarget.Replace("$AndroidAPILevel", "");
+        CMAKE_Swift_COMPILER_TARGET = (Get-PlainLLVMTarget $Arch);
         CMAKE_Swift_COMPILER_WORKS = "YES";
         CMAKE_SYSTEM_NAME = $Platform.ToString();
         LLVM_DIR = "$(Get-TargetProjectBinaryCache $Arch LLVM)\lib\cmake\llvm";
@@ -2124,7 +2127,7 @@ function Install-Platform([Platform]$Platform, $Arch) {
   Get-ChildItem -Recurse "$PlatformLibSrc\$($Arch.LLVMName)" | ForEach-Object {
     if (".swiftmodule", ".swiftdoc", ".swiftinterface" -contains $_.Extension) {
       $DstDir = "$PlatformLibDst\$($_.BaseName).swiftmodule"
-      Copy-File $_.FullName "$DstDir\$($Arch.LLVMTarget)$($_.Extension)"
+      Copy-File $_.FullName "$DstDir\$(Get-PlainLLVMTarget $Arch)$($_.Extension)"
     } else {
       Copy-File $_.FullName "$PlatformLibDst\$($Arch.LLVMName)\"
     }
