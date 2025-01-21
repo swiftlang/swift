@@ -1,4 +1,4 @@
-#include "swift/AST/AvailabilityScope.h"
+#include "swift/AST/AvailabilityRange.h"
 #include "gtest/gtest.h"
 
 using namespace swift;
