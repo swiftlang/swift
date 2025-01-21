@@ -701,16 +701,17 @@ void importer::getNormalInvocationArguments(
         invocationArgStrs.push_back("-isysroot");
         invocationArgStrs.push_back(searchPathOpts.getSDKPath().str());
       } else {
-        llvm::SmallString<256> path;
-        path = searchPathOpts.getSDKPath();
-        llvm::sys::path::append(path, "usr", "include");
-
-        invocationArgStrs.push_back("-isystem");
-        invocationArgStrs.push_back(path.str().str());
-
         if (auto sysroot = searchPathOpts.getSysRoot()) {
+          // Both the sdk path and sysroot are provided. Pass along the sysroot
+          // to Clang but also ensure the SDK include path is provided.
           invocationArgStrs.push_back("--sysroot");
           invocationArgStrs.push_back(sysroot->str());
+
+          llvm::SmallString<256> path;
+          path = searchPathOpts.getSDKPath();
+          llvm::sys::path::append(path, "usr", "include");
+          invocationArgStrs.push_back("-isystem");
+          invocationArgStrs.push_back(path.str().str());
         } else {
           invocationArgStrs.push_back("--sysroot");
           invocationArgStrs.push_back(searchPathOpts.getSDKPath().str());
