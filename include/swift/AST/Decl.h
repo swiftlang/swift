@@ -8171,6 +8171,18 @@ public:
   /// The async function marked as the alternative to this function, if any.
   AbstractFunctionDecl *getAsyncAlternative() const;
 
+  /// True if the storage can be referenced by a keypath directly.
+  /// Otherwise, its override must be referenced.
+  bool isValidKeyPathComponent() const;
+
+  /// Do we need to use resilient access patterns outside of this
+  /// method's resilience domain?
+  bool isResilient() const;
+
+  /// Do we need to use resilient access patterns when accessing this
+  /// method from the given module?
+  bool isResilient(ModuleDecl *M, ResilienceExpansion expansion) const;
+
   /// If \p asyncAlternative is set, then compare its parameters to this
   /// (presumed synchronous) function's parameters to find the index of the
   /// completion handler parameter. This should be the only missing

@@ -1961,6 +1961,12 @@ public:
                        ArgumentSource &&value,
                        bool isOnSelfParameter);
 
+  RValue emitRValueForKeyPathMethod(SILLocation loc, ManagedValue base,
+                                    CanType baseFormalType,
+                                    AbstractFunctionDecl *method, Type methodTy,
+                                    PreparedArguments &&methodArgs,
+                                    SubstitutionMap subs, SGFContext C);
+
   ManagedValue emitAsyncLetStart(SILLocation loc,
                                  SILValue taskOptions,
                                  AbstractClosureExpr *asyncLetEntryPoint,
@@ -3007,7 +3013,7 @@ public:
 
   /// Returns the SILDeclRef to use for references to the given accessor.
   SILDeclRef getAccessorDeclRef(AccessorDecl *accessor) {
-    return SGM.getAccessorDeclRef(accessor, F.getResilienceExpansion());
+    return SGM.getFuncDeclRef(accessor, F.getResilienceExpansion());
   }
 
   /// Given a lowered pack expansion type, produce a generic environment

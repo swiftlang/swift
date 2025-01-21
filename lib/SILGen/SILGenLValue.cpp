@@ -3877,7 +3877,7 @@ static SGFAccessKind getBaseAccessKindForAccessor(SILGenModule &SGM,
   if (accessor->isMutating())
     return SGFAccessKind::ReadWrite;
 
-  auto declRef = SGM.getAccessorDeclRef(accessor, ResilienceExpansion::Minimal);
+  auto declRef = SGM.getFuncDeclRef(accessor, ResilienceExpansion::Minimal);
   if (shouldEmitSelfAsRValue(accessor, baseFormalType, forBorrowExpr)) {
     return SGM.isNonMutatingSelfIndirect(declRef)
                ? SGFAccessKind::OwnedAddressRead
