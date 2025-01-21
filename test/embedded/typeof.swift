@@ -2,7 +2,6 @@
 
 // REQUIRES: swift_in_compiler
 // REQUIRES: optimized_stdlib
-// REQUIRES: OS=macosx || OS=linux-gnu
 // REQUIRES: swift_feature_Embedded
 
 public func unsafeWriteArray<T, R>(_ elementType: R.Type, array: inout T, index n: Int, value: R) {
