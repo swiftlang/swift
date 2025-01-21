@@ -3,6 +3,7 @@
 
 // REQUIRES: swift_in_compiler
 // REQUIRES: OS=macosx
+// REQUIRES: embedded_stdlib_cross_compiling
 // REQUIRES: swift_feature_Embedded
 
 var callback: (()->())? = nil
