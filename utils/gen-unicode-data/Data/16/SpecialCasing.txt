@@ -1,28 +1,28 @@
-# SpecialCasing-15.0.0.txt
-# Date: 2022-02-02, 23:35:52 GMT
-# © 2022 Unicode®, Inc.
+# SpecialCasing-16.0.0.txt
+# Date: 2024-05-10, 22:49:00 GMT
+# © 2024 Unicode®, Inc.
 # Unicode and the Unicode Logo are registered trademarks of Unicode, Inc. in the U.S. and other countries.
-# For terms of use, see https://www.unicode.org/terms_of_use.html
+# For terms of use and license, see https://www.unicode.org/terms_of_use.html
 #
 # Unicode Character Database
 #   For documentation, see https://www.unicode.org/reports/tr44/
 #
 # Special Casing
 #
-# This file is a supplement to the UnicodeData.txt file. It does not define any
-# properties, but rather provides additional information about the casing of
-# Unicode characters, for situations when casing incurs a change in string length
-# or is dependent on context or locale. For compatibility, the UnicodeData.txt
-# file only contains simple case mappings for characters where they are one-to-one
-# and independent of context and language. The data in this file, combined with
+# This file is a supplement to the UnicodeData.txt file. The data in this file, combined with
 # the simple case mappings in UnicodeData.txt, defines the full case mappings
 # Lowercase_Mapping (lc), Titlecase_Mapping (tc), and Uppercase_Mapping (uc).
+# For compatibility, the UnicodeData.txt file only contains simple case mappings
+# for characters where they are one-to-one (and independent of context and language).
+#
+# For historical reasons, this file also provides additional information about the casing
+# of Unicode characters for selected situations when casing is dependent on context or locale.
 #
 # Note that the preferred mechanism for defining tailored casing operations is
 # the Unicode Common Locale Data Repository (CLDR). For more information, see the
 # discussion of case mappings and case algorithms in the Unicode Standard.
 #
-# All code points not listed in this file that do not have a simple case mappings
+# All code points not listed in this file that do not have simple case mappings
 # in UnicodeData.txt map to themselves.
 # ================================================================================
 # Format
@@ -278,4 +278,3 @@ FB17; FB17; 0544 056D; 0544 053D; # ARMENIAN SMALL LIGATURE MEN XEH
 # 0131; 0131; 0049; 0049; tr; # LATIN SMALL LETTER DOTLESS I
 
 # EOF
-
