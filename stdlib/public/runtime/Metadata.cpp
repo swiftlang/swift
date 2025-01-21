@@ -439,6 +439,8 @@ namespace {
 } // end anonymous namespace
 
 namespace swift {
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Winvalid-offsetof"
   struct StaticAssertGenericMetadataCacheEntryValueOffset {
     static_assert(
       offsetof(GenericCacheEntry, Value) ==
@@ -446,6 +448,7 @@ namespace swift {
                Value),
       "The generic metadata cache entry layout mismatch");
   };
+#pragma clang diagnostic pop
 }
 
 namespace {

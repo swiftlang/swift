@@ -1035,28 +1035,6 @@ static llvm::MemoryEffects mergeMemoryEffects(ArrayRef<llvm::MemoryEffects> effe
     return mergedEffects;
 }
 
-
-namespace {
-bool isStandardLibrary(const llvm::Module &M) {
-  if (auto *Flags = M.getNamedMetadata("swift.module.flags")) {
-    for (const auto *F : Flags->operands()) {
-      const auto *Key = dyn_cast_or_null<llvm::MDString>(F->getOperand(0));
-      if (!Key)
-        continue;
-
-      const auto *Value =
-          dyn_cast_or_null<llvm::ConstantAsMetadata>(F->getOperand(1));
-      if (!Value)
-        continue;
-
-      if (Key->getString() == "standard-library")
-        return cast<llvm::ConstantInt>(Value->getValue())->isOne();
-    }
-  }
-  return false;
-}
-}
-
 llvm::FunctionType *swift::getRuntimeFnType(llvm::Module &Module,
                                            llvm::ArrayRef<llvm::Type*> retTypes,
                                            llvm::ArrayRef<llvm::Type*> argTypes) {
