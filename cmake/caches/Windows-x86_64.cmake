@@ -51,7 +51,6 @@ foreach(target ${LLVM_RUNTIME_TARGETS})
   # We configure all runtimes, but don't build them yet. build.ps1 has a
   # separate step for it, because we need a different shell for each target.
   set(RUNTIMES_${target}_CMAKE_MT mt CACHE STRING "")
-  set(RUNTIMES_${target}_CMAKE_SYSTEM_NAME Windows CACHE STRING "")
   set(RUNTIMES_${target}_CMAKE_BUILD_TYPE Release CACHE STRING "")
   set(RUNTIMES_${target}_COMPILER_RT_BUILD_CRT NO CACHE BOOL "")
   set(RUNTIMES_${target}_COMPILER_RT_BUILD_LIBFUZZER NO CACHE BOOL "")
@@ -59,6 +58,11 @@ foreach(target ${LLVM_RUNTIME_TARGETS})
   set(RUNTIMES_${target}_COMPILER_RT_BUILD_XRAY NO CACHE BOOL "")
   set(RUNTIMES_${target}_COMPILER_RT_BUILD_PROFILE NO CACHE BOOL "")
   set(RUNTIMES_${target}_COMPILER_RT_BUILD_SANITIZERS NO CACHE BOOL "")
+  if(${target} MATCHES windows-msvc)
+    set(RUNTIMES_${target}_CMAKE_SYSTEM_NAME Windows CACHE STRING "")
+  elseif(${target} MATCHES linux-android)
+    set(RUNTIMES_${target}_CMAKE_SYSTEM_NAME Android CACHE STRING "")
+  endif()
 
   # Configure and build builtins for all targets
   set(BUILTINS_${target}_CMAKE_MT mt CACHE STRING "")
