@@ -61,6 +61,10 @@ using VecOfInt = std::vector<int>;
 using SafeTuple = std::tuple<int, int, int>;
 using UnsafeTuple = std::tuple<int, int*, int>;
 
+View safeFunc(View v1 [[clang::noescape]], View v2 [[clang::lifetimebound]]);
+// Second non-escapable type is not annotated in any way.
+void unsafeFunc(View v1 [[clang::noescape]], View v2);
+
 //--- test.swift
 
 import Test
@@ -111,4 +115,13 @@ func useCppSpan(x: SpanOfInt) { // expected-note{{reference to unsafe type alias
 
 // expected-warning@+1{{global function 'useCppSpan2' has an interface that is not memory-safe}}
 func useCppSpan2(x: SpanOfIntAlias) { // expected-note{{reference to unsafe type alias 'SpanOfIntAlias'}}
+}
+
+func useSafeLifetimeAnnotated(v: View) {
+    let _ = safeFunc(v, v)
+}
+
+func useUnsafeLifetimeAnnotated(v: View) {
+    // expected-warning@+1{{expression uses unsafe constructs but is not marked with 'unsafe'}}
+    unsafeFunc(v, v) // expected-note{{reference to unsafe global function 'unsafeFunc'}}
 }

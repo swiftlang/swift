@@ -3980,8 +3980,8 @@ namespace {
       if (decl->getTemplatedKind() == clang::FunctionDecl::TK_FunctionTemplate)
         return;
 
-      if (!result->getASTContext().LangOpts.hasFeature(
-              Feature::LifetimeDependence))
+      auto &ASTContext = result->getASTContext();
+      if (!ASTContext.LangOpts.hasFeature(Feature::LifetimeDependence))
         return;
 
       SmallVector<LifetimeDependenceInfo, 1> lifetimeDependencies;
@@ -4013,9 +4013,11 @@ namespace {
       const auto dependencyVecSize = swiftParams->size() + hasSelf;
       SmallBitVector inheritLifetimeParamIndicesForReturn(dependencyVecSize);
       SmallBitVector scopedLifetimeParamIndicesForReturn(dependencyVecSize);
+      SmallBitVector paramHasAnnotation(dependencyVecSize);
       std::map<unsigned, SmallBitVector> inheritedArgDependences;
       auto processLifetimeBound = [&](unsigned idx, Type ty) {
         warnForEscapableReturnType();
+        paramHasAnnotation[idx] = true;
         if (ty->isEscapable())
           scopedLifetimeParamIndicesForReturn[idx] = true;
         else
@@ -4039,6 +4041,7 @@ namespace {
                   param == clang::LifetimeCaptureByAttr::INVALID)
                 continue;
 
+              paramHasAnnotation[idx] = true;
               if (isa<clang::CXXMethodDecl>(decl) &&
                   param == clang::LifetimeCaptureByAttr::THIS) {
                 auto [it, inserted] = inheritedArgDependences.try_emplace(
@@ -4109,6 +4112,19 @@ namespace {
         Impl.SwiftContext.evaluator.cacheOutput(
             LifetimeDependenceInfoRequest{result},
             Impl.SwiftContext.AllocateCopy(lifetimeDependencies));
+      }
+      if (ASTContext.LangOpts.hasFeature(Feature::AllowUnsafeAttribute) &&
+          ASTContext.LangOpts.hasFeature(Feature::SafeInterop)) {
+        for (auto [idx, param] : llvm::enumerate(decl->parameters())) {
+          if (swiftParams->get(idx)->getInterfaceType()->isEscapable())
+            continue;
+          if (param->hasAttr<clang::NoEscapeAttr>() || paramHasAnnotation[idx])
+            continue;
+          // We have a nonescapabe parameter that does not have its lifetime
+          // annotated nor is it marked noescape.
+          auto attr = new (ASTContext) UnsafeAttr(/*implicit=*/true);
+          result->getAttrs().add(attr);
+        }
       }
       Impl.diagnoseTargetDirectly(decl);
     }
