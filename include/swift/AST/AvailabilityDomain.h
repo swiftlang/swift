@@ -20,6 +20,7 @@
 
 #include "swift/AST/PlatformKind.h"
 #include "swift/Basic/LLVM.h"
+#include "llvm/ADT/FoldingSet.h"
 #include "llvm/ADT/PointerEmbeddedInt.h"
 #include "llvm/ADT/PointerUnion.h"
 
@@ -205,6 +206,10 @@ public:
     case Kind::Platform:
       return getPlatformKind() < other.getPlatformKind();
     }
+  }
+
+  void Profile(llvm::FoldingSetNodeID &ID) const {
+    ID.AddPointer(getOpaqueValue());
   }
 };
 

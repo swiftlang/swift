@@ -349,8 +349,8 @@ static bool computeContainedByDeploymentTarget(AvailabilityScope *scope,
 static bool isInsideCompatibleUnavailableDeclaration(
     const Decl *D, AvailabilityContext availabilityContext,
     const SemanticAvailableAttr &attr) {
-  auto contextPlatform = availabilityContext.getUnavailablePlatformKind();
-  if (!contextPlatform)
+  auto contextDomain = availabilityContext.getUnavailableDomain();
+  if (!contextDomain)
     return false;
 
   if (!attr.isUnconditionallyUnavailable())
@@ -358,19 +358,13 @@ static bool isInsideCompatibleUnavailableDeclaration(
 
   // Refuse calling universally unavailable functions from unavailable code,
   // but allow the use of types.
-  PlatformKind declPlatform = attr.getPlatform();
-  if (declPlatform == PlatformKind::none && !attr.isEmbeddedSpecific() &&
-      !isa<TypeDecl>(D) && !isa<ExtensionDecl>(D))
-    return false;
+  auto declDomain = attr.getDomain();
+  if (!isa<TypeDecl>(D) && !isa<ExtensionDecl>(D)) {
+    if (declDomain.isUniversal() || declDomain.isSwiftLanguage())
+      return false;
+  }
 
-  // @_unavailableInEmbedded declarations may be used in contexts that are
-  // also @_unavailableInEmbedded.
-  if (attr.isEmbeddedSpecific())
-    return availabilityContext.isUnavailableInEmbedded();
-
-  return (*contextPlatform == PlatformKind::none ||
-          *contextPlatform == declPlatform ||
-          inheritsAvailabilityFromPlatform(declPlatform, *contextPlatform));
+  return contextDomain->contains(declDomain);
 }
 
 std::optional<SemanticAvailableAttr>
