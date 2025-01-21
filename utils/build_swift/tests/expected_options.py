@@ -630,6 +630,7 @@ EXPECTED_OPTIONS = [
     EnableOption('--enable-experimental-observation'),
     EnableOption('--enable-experimental-parser-validation'),
     EnableOption('--enable-lsan'),
+    EnableOption('--enable-runtime-module'),
     EnableOption('--enable-sanitize-coverage'),
     EnableOption('--enable-tsan'),
     EnableOption('--enable-tsan-runtime'),
