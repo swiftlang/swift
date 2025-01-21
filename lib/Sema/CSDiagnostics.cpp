@@ -1037,7 +1037,8 @@ bool GenericArgumentsMismatchFailure::diagnoseAsError() {
       break;
     }
 
-    case ConstraintLocator::Member: {
+    case ConstraintLocator::Member:
+    case ConstraintLocator::UnresolvedMember: {
       auto *memberLoc = getConstraintLocator(anchor, path);
       auto selectedOverload = getOverloadChoiceIfAvailable(memberLoc);
       if (!selectedOverload)
