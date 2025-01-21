@@ -1,7 +1,8 @@
-# NameAliases-15.0.0.txt
-# Date: 2022-07-26, 20:13:00 GMT [KW]
-# © 2022 Unicode®, Inc.
-# For terms of use, see https://www.unicode.org/terms_of_use.html
+# NameAliases-16.0.0.txt
+# Date: 2024-04-24
+# © 2024 Unicode®, Inc.
+# Unicode and the Unicode Logo are registered trademarks of Unicode, Inc. in the U.S. and other countries.
+# For terms of use and license, see https://www.unicode.org/terms_of_use.html
 #
 # Unicode Character Database
 # For documentation, see https://www.unicode.org/reports/tr44/
@@ -320,12 +321,16 @@ FEFF;BOM;abbreviation
 FEFF;ZWNBSP;abbreviation
 122D4;CUNEIFORM SIGN NU11 TENU;correction
 122D5;CUNEIFORM SIGN NU11 OVER NU11 BUR OVER BUR;correction
+12327;CUNEIFORM SIGN KALAM;correction
+1680B;BAMUM LETTER PHASE-A MAEMGBIEE;correction
 16E56;MEDEFAIDRIN CAPITAL LETTER H;correction
 16E57;MEDEFAIDRIN CAPITAL LETTER NG;correction
 16E76;MEDEFAIDRIN SMALL LETTER H;correction
 16E77;MEDEFAIDRIN SMALL LETTER NG;correction
 1B001;HENTAIGANA LETTER E-1;correction
 1D0C5;BYZANTINE MUSICAL SYMBOL FTHORA SKLIRON CHROMA VASIS;correction
+1E899;MENDE KIKAKUI SYLLABLE M172 MBO;correction
+1E89A;MENDE KIKAKUI SYLLABLE M174 MBOO;correction
 E0100;VS17;abbreviation
 E0101;VS18;abbreviation
 E0102;VS19;abbreviation

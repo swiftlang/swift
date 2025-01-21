@@ -1207,6 +1207,7 @@ extension Unicode.Scalar.Properties {
          (0x2B740 ... 0x2B81D),
          (0x2B820 ... 0x2CEA1),
          (0x2CEB0 ... 0x2EBE0),
+         (0x2EBF0 ... 0x2EE5D),
          (0x30000 ... 0x3134A),
          (0x31350 ... 0x323AF):
       return "CJK UNIFIED IDEOGRAPH-\(scalarName)"
@@ -1225,6 +1226,9 @@ extension Unicode.Scalar.Properties {
 
     case (0x1B170 ... 0x1B2FB):
       return "NUSHU CHARACTER-\(scalarName)"
+
+    case (0x13460 ... 0x143FA):
+      return "EGYPTIAN HIEROGLYPH-\(scalarName)"
 
     // Otherwise, go look it up.
     default:

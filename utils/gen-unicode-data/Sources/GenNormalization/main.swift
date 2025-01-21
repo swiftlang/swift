@@ -16,15 +16,15 @@ import GenUtils
 func generateNormalization(for platform: String) {
   var result = readFile("Input/NormalizationData.h")
   
-  let derivedNormalizationProps = readFile("Data/DerivedNormalizationProps.txt")
+  let derivedNormalizationProps = readFile("Data/16/DerivedNormalizationProps.txt")
   
   let unicodeData: String
   
   switch platform {
   case "Apple":
-    unicodeData = readFile("Data/Apple/UnicodeData.txt")
+    unicodeData = readFile("Data/16/Apple/UnicodeData.txt")
   default:
-    unicodeData = readFile("Data/UnicodeData.txt")
+    unicodeData = readFile("Data/16/UnicodeData.txt")
   }
   
   // Get all NFX_QC information and put it together with CCC info.

@@ -64,7 +64,13 @@ func emitAge(
   let ages = uniqueAges.map {
     UInt16($0[0]) | (UInt16($0[1]) << 8)
   }
-  
+
+  result += """
+  #define AGE_COUNT \(data.count)
+
+
+  """
+
   emitCollection(ages, name: "_swift_stdlib_ages_data", into: &result)
   
   emitCollection(
@@ -87,7 +93,7 @@ func emitAge(
 }
 
 func generateAgeProp(into result: inout String) {
-  let derivedAge = readFile("Data/DerivedAge.txt")
+  let derivedAge = readFile("Data/16/DerivedAge.txt")
   
   var ageData: [(ClosedRange<UInt32>, [UInt8])] = []
   
