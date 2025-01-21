@@ -9,7 +9,7 @@ add_swift_unittest(SwiftASTTests
   SourceLocTests.cpp
   TestContext.cpp
   TypeMatchTests.cpp
-  VersionRangeLattice.cpp
+  VersionRangeTests.cpp
   ImportTests.cpp
 )
 
