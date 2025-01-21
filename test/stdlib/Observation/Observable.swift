@@ -186,6 +186,11 @@ class RecursiveInner {
 }
 
 @Observable
+class GenericClass<T> {
+  var value = 3
+}
+
+@Observable
 class RecursiveOuter {
   var inner = RecursiveInner()
   var value = "prefix"
