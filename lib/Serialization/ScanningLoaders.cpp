@@ -243,7 +243,7 @@ SwiftModuleScanner::scanInterfaceFile(Twine moduleInterfacePath,
             linkName = *(linkNameArgIt+1);
           linkLibraries.push_back({linkName,
                                    isFramework ? LibraryKind::Framework : LibraryKind::Library,
-                                   true});
+                                   /*static=*/false, /*force_load=*/true});
         }
         bool isStatic = llvm::find(ArgsRefs, "-static") != ArgsRefs.end();
 

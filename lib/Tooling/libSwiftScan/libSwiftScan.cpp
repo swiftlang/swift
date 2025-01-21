@@ -249,10 +249,17 @@ swiftscan_string_ref_t
 swiftscan_link_library_info_get_link_name(swiftscan_link_library_info_t info) {
   return info->name;
 }
+
+bool swiftscan_link_library_info_get_is_static(
+    swiftscan_link_library_info_t info) {
+  return info->isStatic;
+}
+
 bool
 swiftscan_link_library_info_get_is_framework(swiftscan_link_library_info_t info) {
   return info->isFramework;
 }
+
 bool
 swiftscan_link_library_info_get_should_force_load(swiftscan_link_library_info_t info) {
   return info->forceLoad;

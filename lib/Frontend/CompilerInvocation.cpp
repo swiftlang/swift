@@ -3211,7 +3211,8 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
       llvm_unreachable("Unknown LinkLibrary option kind");
     }
 
-    Opts.LinkLibraries.push_back(LinkLibrary(A->getValue(), Kind));
+    Opts.LinkLibraries.emplace_back(
+        A->getValue(), Kind, /*static=*/false);
   }
 
   if (auto valueNames = Args.getLastArg(OPT_disable_llvm_value_names,
@@ -3441,11 +3442,11 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
   }
 
   for (const auto &Lib : Args.getAllArgValues(options::OPT_autolink_library))
-    Opts.LinkLibraries.push_back(LinkLibrary(Lib, LibraryKind::Library));
+    Opts.LinkLibraries.emplace_back(
+        Lib, LibraryKind::Library, /*static=*/false);
 
-  for (const auto &Lib : Args.getAllArgValues(options::OPT_public_autolink_library)) {
-    Opts.PublicLinkLibraries.push_back(Lib);
-  }
+  for (const auto &Lib : Args.getAllArgValues(options::OPT_public_autolink_library))
+    Opts.PublicLinkLibraries.push_back(std::make_tuple(Lib, /*static=*/false));
 
   if (const Arg *A = Args.getLastArg(OPT_type_info_dump_filter_EQ)) {
     StringRef mode(A->getValue());
