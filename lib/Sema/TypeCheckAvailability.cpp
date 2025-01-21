@@ -55,16 +55,17 @@ concreteSyntaxDeclForAvailableAttribute(const Decl *AbstractSyntaxDecl);
 /// Emit a diagnostic for references to declarations that have been
 /// marked as unavailable, either through "unavailable" or "obsoleted:".
 static bool diagnoseExplicitUnavailability(
-    SourceLoc loc, const RootProtocolConformance *rootConf,
-    const ExtensionDecl *ext, const ExportContext &where,
+    SourceLoc loc, const AvailabilityConstraint &constraint,
+    const RootProtocolConformance *rootConf, const ExtensionDecl *ext,
+    const ExportContext &where,
     bool warnIfConformanceUnavailablePreSwift6 = false,
     bool preconcurrency = false);
 
 /// Emit a diagnostic for references to declarations that have been
 /// marked as unavailable, either through "unavailable" or "obsoleted:".
 static bool diagnoseExplicitUnavailability(
-    const ValueDecl *D, SourceRange R, const ExportContext &Where,
-    DeclAvailabilityFlags Flags,
+    const ValueDecl *D, SourceRange R, const AvailabilityConstraint &constraint,
+    const ExportContext &Where, DeclAvailabilityFlags Flags,
     llvm::function_ref<void(InFlightDiagnostic &, StringRef)>
         attachRenameFixIts);
 
@@ -2951,9 +2952,16 @@ void swift::diagnoseOverrideOfUnavailableDecl(ValueDecl *override,
     return;
   }
 
+  // FIXME: [availability] Take an unsatisfied constraint as input instead of
+  // recomputing it.
   ExportContext where = ExportContext::forDeclSignature(override, nullptr);
+  auto constraint =
+      getUnsatisfiedAvailabilityConstraint(base, where.getAvailability());
+  if (!constraint)
+    return;
+
   diagnoseExplicitUnavailability(
-      base, override->getLoc(), where,
+      base, override->getLoc(), *constraint, where,
       /*Flags*/ std::nullopt,
       [&override, &ctx](InFlightDiagnostic &diag, StringRef rename) {
         ParsedDeclName parsedName = parseDeclName(rename);
@@ -2983,112 +2991,50 @@ void swift::diagnoseOverrideOfUnavailableDecl(ValueDecl *override,
 
 /// Emit a diagnostic for references to declarations that have been
 /// marked as unavailable, either through "unavailable" or "obsoleted:".
-static bool diagnoseExplicitUnavailability(const ValueDecl *D, SourceRange R,
-                                           const ExportContext &Where,
-                                           const Expr *call,
-                                           DeclAvailabilityFlags Flags) {
+static bool diagnoseExplicitUnavailability(
+    const ValueDecl *D, SourceRange R, const AvailabilityConstraint &constraint,
+    const ExportContext &Where, const Expr *call, DeclAvailabilityFlags Flags) {
   return diagnoseExplicitUnavailability(
-      D, R, Where, Flags, [=](InFlightDiagnostic &diag, StringRef rename) {
+      D, R, constraint, Where, Flags,
+      [=](InFlightDiagnostic &diag, StringRef rename) {
         fixItAvailableAttrRename(diag, R, D, rename, call);
       });
 }
 
-/// Represents common information needed to emit diagnostics about explicitly
-/// unavailable declarations.
-class UnavailabilityDiagnosticInfo {
-public:
-  enum class Status {
-    /// The declaration is marked `unavailable`, potentially on a specific
-    /// platform.
-    AlwaysUnavailable,
+bool shouldHideDomainNameForConstraintDiagnostic(
+    const AvailabilityConstraint &constraint) {
+  switch (constraint.getDomain().getKind()) {
+  case AvailabilityDomain::Kind::Universal:
+  case AvailabilityDomain::Kind::Embedded:
+    return true;
+  case AvailabilityDomain::Kind::Platform:
+    return false;
 
-    /// The declaration is not available until, for example, a later Swift
-    /// language mode.
-    IntroducedInVersion,
-
-    /// The declaration was obsoleted in a previous version.
-    Obsoleted,
-  };
-
-private:
-  Status DiagnosticStatus;
-  SemanticAvailableAttr Attr;
-
-public:
-  UnavailabilityDiagnosticInfo(Status status, const SemanticAvailableAttr &attr)
-      : DiagnosticStatus(status), Attr(attr) {};
-
-  Status getStatus() const { return DiagnosticStatus; }
-  SemanticAvailableAttr getAttr() const { return Attr; }
-  AvailabilityDomain getDomain() const { return Attr.getDomain(); }
-  StringRef getDomainName() const {
-    return getDomain().getNameForDiagnostics();
-  }
-
-  bool shouldHideDomainNameInUnversionedDiagnostics() const {
-    switch (getDomain().getKind()) {
-    case AvailabilityDomain::Kind::Universal:
-    case AvailabilityDomain::Kind::Embedded:
-      return true;
-    case AvailabilityDomain::Kind::Platform:
+  case AvailabilityDomain::Kind::PackageDescription:
+  case AvailabilityDomain::Kind::SwiftLanguage:
+    switch (constraint.getKind()) {
+    case AvailabilityConstraint::Kind::AlwaysUnavailable:
+    case AvailabilityConstraint::Kind::IntroducedInNewerVersion:
       return false;
-
-    case AvailabilityDomain::Kind::PackageDescription:
-    case AvailabilityDomain::Kind::SwiftLanguage:
-      switch (DiagnosticStatus) {
-      case Status::AlwaysUnavailable:
-        return false;
-      case Status::IntroducedInVersion:
-      case Status::Obsoleted:
-        return true;
-      }
+    case AvailabilityConstraint::Kind::RequiresVersion:
+    case AvailabilityConstraint::Kind::Obsoleted:
+      return true;
     }
-  }
-};
-
-static std::optional<UnavailabilityDiagnosticInfo>
-getExplicitUnavailabilityDiagnosticInfo(const Decl *decl,
-                                        const ExportContext &where) {
-  auto attr = where.shouldDiagnoseDeclAsUnavailable(decl);
-  if (!attr)
-    return std::nullopt;
-
-  ASTContext &ctx = decl->getASTContext();
-
-  switch (attr->getVersionAvailability(ctx)) {
-  case AvailableVersionComparison::Available:
-  case AvailableVersionComparison::PotentiallyUnavailable:
-    llvm_unreachable("These aren't considered unavailable");
-
-  case AvailableVersionComparison::Unavailable:
-    if ((attr->isSwiftLanguageModeSpecific() ||
-         attr->isPackageDescriptionVersionSpecific()) &&
-        attr->getIntroduced()) {
-      return UnavailabilityDiagnosticInfo(
-          UnavailabilityDiagnosticInfo::Status::IntroducedInVersion, *attr);
-    } else {
-      return UnavailabilityDiagnosticInfo(
-          UnavailabilityDiagnosticInfo::Status::AlwaysUnavailable, *attr);
-    }
-    break;
-
-  case AvailableVersionComparison::Obsoleted:
-    return UnavailabilityDiagnosticInfo(
-        UnavailabilityDiagnosticInfo::Status::Obsoleted, *attr);
   }
 }
 
-bool diagnoseExplicitUnavailability(
-    SourceLoc loc, const RootProtocolConformance *rootConf,
-    const ExtensionDecl *ext, const ExportContext &where,
-    bool warnIfConformanceUnavailablePreSwift6,
-    bool preconcurrency) {
-  // Invertible protocols are never unavailable.
-  if (rootConf->getProtocol()->getInvertibleProtocolKind())
+bool diagnoseExplicitUnavailability(SourceLoc loc,
+                                    const AvailabilityConstraint &constraint,
+                                    const RootProtocolConformance *rootConf,
+                                    const ExtensionDecl *ext,
+                                    const ExportContext &where,
+                                    bool warnIfConformanceUnavailablePreSwift6,
+                                    bool preconcurrency) {
+  if (constraint.isConditionallySatisfiable())
     return false;
 
-  auto diagnosticInfo = getExplicitUnavailabilityDiagnosticInfo(ext, where);
-  if (!diagnosticInfo)
+  // Invertible protocols are never unavailable.
+  if (rootConf->getProtocol()->getInvertibleProtocolKind())
     return false;
 
   ASTContext &ctx = ext->getASTContext();
@@ -3096,12 +3042,12 @@ bool diagnoseExplicitUnavailability(
 
   auto type = rootConf->getType();
   auto proto = rootConf->getProtocol()->getDeclaredInterfaceType();
-  StringRef versionedPlatform = diagnosticInfo->getDomainName();
-  StringRef platform =
-      diagnosticInfo->shouldHideDomainNameInUnversionedDiagnostics()
-          ? ""
-          : versionedPlatform;
-  auto attr = diagnosticInfo->getAttr();
+  auto domain = constraint.getDomain();
+  StringRef versionedPlatform = domain.getNameForDiagnostics();
+  StringRef platform = shouldHideDomainNameForConstraintDiagnostic(constraint)
+                           ? ""
+                           : versionedPlatform;
+  auto attr = constraint.getAttr();
 
   // Downgrade unavailable Sendable conformance diagnostics where
   // appropriate.
@@ -3115,23 +3061,25 @@ bool diagnoseExplicitUnavailability(
       .limitBehaviorWithPreconcurrency(behavior, preconcurrency)
       .warnUntilSwiftVersionIf(warnIfConformanceUnavailablePreSwift6, 6);
 
-  switch (diagnosticInfo->getStatus()) {
-  case UnavailabilityDiagnosticInfo::Status::AlwaysUnavailable:
+  switch (constraint.getKind()) {
+  case AvailabilityConstraint::Kind::AlwaysUnavailable:
     diags
         .diagnose(ext, diag::conformance_availability_marked_unavailable, type,
                   proto)
         .highlight(attr.getParsedAttr()->getRange());
     break;
-  case UnavailabilityDiagnosticInfo::Status::IntroducedInVersion:
+  case AvailabilityConstraint::Kind::RequiresVersion:
     diags.diagnose(ext, diag::conformance_availability_introduced_in_version,
                    type, proto, versionedPlatform, *attr.getIntroduced());
     break;
-  case UnavailabilityDiagnosticInfo::Status::Obsoleted:
+  case AvailabilityConstraint::Kind::Obsoleted:
     diags
         .diagnose(ext, diag::conformance_availability_obsoleted, type, proto,
                   versionedPlatform, *attr.getObsoleted())
         .highlight(attr.getParsedAttr()->getRange());
     break;
+  case AvailabilityConstraint::Kind::IntroducedInNewerVersion:
+    llvm_unreachable("unexpected constraint");
   }
   return true;
 }
@@ -3510,15 +3458,14 @@ static void checkFunctionConversionAvailability(Type srcType, Type destType,
 }
 
 bool diagnoseExplicitUnavailability(
-    const ValueDecl *D, SourceRange R, const ExportContext &Where,
-    DeclAvailabilityFlags Flags,
+    const ValueDecl *D, SourceRange R, const AvailabilityConstraint &constraint,
+    const ExportContext &Where, DeclAvailabilityFlags Flags,
     llvm::function_ref<void(InFlightDiagnostic &, StringRef)>
         attachRenameFixIts) {
-  auto diagnosticInfo = getExplicitUnavailabilityDiagnosticInfo(D, Where);
-  if (!diagnosticInfo)
+  if (constraint.isConditionallySatisfiable())
     return false;
 
-  auto Attr = diagnosticInfo->getAttr();
+  auto Attr = constraint.getAttr();
   if (Attr.getDomain().isSwiftLanguage() && !Attr.isVersionSpecific()) {
     if (shouldAllowReferenceToUnavailableInSwiftDeclaration(D, Where))
       return false;
@@ -3527,11 +3474,11 @@ bool diagnoseExplicitUnavailability(
   SourceLoc Loc = R.Start;
   ASTContext &ctx = D->getASTContext();
   auto &diags = ctx.Diags;
-  StringRef versionedPlatform = diagnosticInfo->getDomainName();
-  StringRef platform =
-      diagnosticInfo->shouldHideDomainNameInUnversionedDiagnostics()
-          ? ""
-          : versionedPlatform;
+  auto domain = constraint.getDomain();
+  StringRef versionedPlatform = domain.getNameForDiagnostics();
+  StringRef platform = shouldHideDomainNameForConstraintDiagnostic(constraint)
+                           ? ""
+                           : versionedPlatform;
 
   // TODO: Consider removing this.
   // ObjC keypaths components weren't checked previously, so errors are demoted
@@ -3579,22 +3526,25 @@ bool diagnoseExplicitUnavailability(
   }
 
   auto sourceRange = Attr.getParsedAttr()->getRange();
-  switch (diagnosticInfo->getStatus()) {
-  case UnavailabilityDiagnosticInfo::Status::AlwaysUnavailable:
+  switch (constraint.getKind()) {
+  case AvailabilityConstraint::Kind::AlwaysUnavailable:
     diags.diagnose(D, diag::availability_marked_unavailable, D)
         .highlight(sourceRange);
     break;
-  case UnavailabilityDiagnosticInfo::Status::IntroducedInVersion:
+  case AvailabilityConstraint::Kind::RequiresVersion:
     diags
         .diagnose(D, diag::availability_introduced_in_version, D,
                   versionedPlatform, *Attr.getIntroduced())
         .highlight(sourceRange);
     break;
-  case UnavailabilityDiagnosticInfo::Status::Obsoleted:
+  case AvailabilityConstraint::Kind::Obsoleted:
     diags
         .diagnose(D, diag::availability_obsoleted, D, versionedPlatform,
                   *Attr.getObsoleted())
         .highlight(sourceRange);
+    break;
+  case AvailabilityConstraint::Kind::IntroducedInNewerVersion:
+    llvm_unreachable("unexpected constraint");
     break;
   }
   return true;
@@ -4217,9 +4167,8 @@ bool swift::diagnoseDeclAvailability(const ValueDecl *D, SourceRange R,
   auto constraint =
       getUnsatisfiedAvailabilityConstraint(D, Where.getAvailability());
 
-  if (constraint && !constraint->isConditionallySatisfiable()) {
-    // FIXME: diagnoseExplicitUnavailability should take an unmet requirement
-    if (diagnoseExplicitUnavailability(D, R, Where, call, Flags))
+  if (constraint) {
+    if (diagnoseExplicitUnavailability(D, R, *constraint, Where, call, Flags))
       return true;
   }
 
@@ -4739,11 +4688,9 @@ swift::diagnoseConformanceAvailability(SourceLoc loc,
     auto constraint =
         getUnsatisfiedAvailabilityConstraint(ext, where.getAvailability());
     if (constraint) {
-      // FIXME: diagnoseExplicitUnavailability() should take unmet requirement
-      if (diagnoseExplicitUnavailability(
-              loc, rootConf, ext, where,
-              warnIfConformanceUnavailablePreSwift6,
-              preconcurrency)) {
+      if (diagnoseExplicitUnavailability(loc, *constraint, rootConf, ext, where,
+                                         warnIfConformanceUnavailablePreSwift6,
+                                         preconcurrency)) {
         maybeEmitAssociatedTypeNote();
         return true;
       }

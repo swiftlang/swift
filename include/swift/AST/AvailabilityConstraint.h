@@ -17,6 +17,7 @@
 #ifndef SWIFT_AST_AVAILABILITY_CONSTRAINT_H
 #define SWIFT_AST_AVAILABILITY_CONSTRAINT_H
 
+#include "swift/AST/AvailabilityDomain.h"
 #include "swift/AST/AvailabilityRange.h"
 #include "swift/AST/PlatformKind.h"
 #include "swift/Basic/LLVM.h"
@@ -87,6 +88,9 @@ public:
   SemanticAvailableAttr getAttr() const {
     return static_cast<SemanticAvailableAttr>(attrAndKind.getPointer());
   }
+
+  /// Returns the domain that the constraint applies to.
+  AvailabilityDomain getDomain() const { return getAttr().getDomain(); }
 
   /// Returns the platform that this constraint applies to, or
   /// `PlatformKind::none` if it is not platform specific.
