@@ -610,6 +610,13 @@ namespace swift {
     /// from source.
     bool AllowNonResilientAccess = false;
 
+    /// When Package CMO is enabled, deserialization checks are done to
+    /// ensure that the members of a decl are correctly deserialized to maintain
+    /// proper layout. This ensures that bypassing resilience is safe. Accessing
+    /// an incorrectly laid-out decl directly can lead to runtime crashes. This flag
+    /// should only be used temporarily during migration to enable Package CMO.
+    bool SkipDeserializationChecksForPackageCMO = false;
+
     /// Enables dumping type witness systems from associated type inference.
     bool DumpTypeWitnessSystems = false;
 

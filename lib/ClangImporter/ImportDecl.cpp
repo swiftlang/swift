@@ -9680,17 +9680,22 @@ ClangImporter::Implementation::loadAllMembers(Decl *D, uint64_t extra) {
   // Check whether we're importing an Objective-C container of some sort.
   auto objcContainer =
     dyn_cast_or_null<clang::ObjCContainerDecl>(D->getClangDecl());
+  auto *IDC = dyn_cast<IterableDeclContext>(D);
 
   // If not, we're importing globals-as-members into an extension.
   if (objcContainer) {
     loadAllMembersOfSuperclassIfNeeded(dyn_cast<ClassDecl>(D));
     loadAllMembersOfObjcContainer(D, objcContainer);
+    if (IDC) // Set member deserialization status
+      IDC->setDeserializedMembers(true);
     return;
   }
 
   if (isa_and_nonnull<clang::RecordDecl>(D->getClangDecl())) {
     loadAllMembersOfRecordDecl(cast<NominalTypeDecl>(D),
                                cast<clang::RecordDecl>(D->getClangDecl()));
+    if (IDC) // Set member deserialization status
+      IDC->setDeserializedMembers(true);
     return;
   }
 
@@ -9701,6 +9706,8 @@ ClangImporter::Implementation::loadAllMembers(Decl *D, uint64_t extra) {
   }
 
   loadAllMembersIntoExtension(D, extra);
+  if (IDC) // Set member deserialization status
+    IDC->setDeserializedMembers(true);
 }
 
 void ClangImporter::Implementation::loadAllMembersIntoExtension(
