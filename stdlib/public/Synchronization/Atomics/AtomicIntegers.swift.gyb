@@ -163,6 +163,11 @@ extension Atomic where Value == ${intType} {
   ///   overflow does occur. In `-Ounchecked` builds, overflow checking is not
   ///   performed.
   ///
+  ///   The need to check for overflow means that this operation is typically
+  ///   compiled into a compare-exchange loop. For use cases that require a
+  ///   direct atomic addition, see the `wrappingAdd` operation: it avoids the
+  ///   loop, but in exchange it allows silent wraps on overflow.
+  ///
   /// - Parameter operand: An integer value.
   /// - Parameter ordering: The memory ordering to apply on this operation.
   /// - Returns: A tuple containing the original value before the operation and
@@ -201,6 +206,11 @@ extension Atomic where Value == ${intType} {
   /// - Note: This operation checks for overflow at runtime and will trap if an
   ///   overflow does occur. In `-Ounchecked` builds, overflow checking is not
   ///   performed.
+  ///
+  ///   The need to check for overflow means that this operation is typically
+  ///   compiled into a compare-exchange loop. For use cases that require a
+  ///   direct atomic subtraction, see the `wrappingSubtract` operation: it
+  ///   avoids the loop, but in exchange it allows silent wraps on overflow.
   ///
   /// - Parameter operand: An integer value.
   /// - Parameter ordering: The memory ordering to apply on this operation.
