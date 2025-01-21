@@ -1722,6 +1722,7 @@ public:
                                 DeclName MemberName);
 
   ProtocolDecl *getProtocol(DeclContext *dc) const;
+  std::optional<ProtocolDecl *> getCachedProtocol(DeclContext *dc) const;
   TypeRepr *getProtocolTypeRepr() const { return TyR; }
 
   DeclName getMemberName() const { return MemberName; }

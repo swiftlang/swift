@@ -1671,6 +1671,17 @@ namespace {
       }
     }
 
+    /// Prints a `Type` if it is present, falling back to the `TypeRepr`
+    /// otherwise (and lastly, doing nothing if the `TypeRepr` was also null).
+    void printTypeOrTypeRepr(std::optional<Type> Ty, TypeRepr *Repr,
+                             Label label) {
+      if (Ty.has_value()) {
+        printTypeField(*Ty, label);
+      } else if (Repr) {
+        printRec(Repr, label);
+      }
+    }
+
     void printThrowDest(ThrownErrorDestination throws, bool wantNothrow) {
       if (!throws) {
         if (wantNothrow)
@@ -1681,11 +1692,26 @@ namespace {
 
       auto thrownError = throws.getThrownErrorType();
       auto contextError = throws.getContextErrorType();
+      if (Writer.isParsable()) {
+        // For parsable outputs, just print the full thrown and contextual error
+        // information as a nice structured object, even if they're the same.
+        printRecArbitrary(
+            [&](Label label) {
+              printHead("thrown_error_destination", IdentifierColor, label);
+              printTypeField(thrownError, Label::always("thrown_type"));
+              printTypeField(contextError, Label::always("context_type"));
+              printFoot();
+            },
+            Label::always("throws"));
+        return;
+      }
+
       if (thrownError->isEqual(contextError)) {
-        // No translation of the thrown error type is required, so ony print
+        // No translation of the thrown error type is required, so only print
         // the thrown error type.
         Type errorExistentialType =
             contextError->getASTContext().getErrorExistentialType();
+
         if (errorExistentialType && thrownError->isEqual(errorExistentialType))
           printFlag("throws", ExprModifierColor);
         else {
@@ -2456,29 +2482,20 @@ namespace {
       if (auto *P = D->getImplicitSelfDecl()) {
         printRec(P, Label::optional("implicit_self_decl"));
       }
-      printRec(D->getParameters(), Label::optional("params"),
-               &D->getASTContext());
-
       if (auto FD = dyn_cast<FuncDecl>(D)) {
-        if (Writer.isParsable() && FD->hasInterfaceType()) {
-          printTypeField(FD->getResultInterfaceType(), Label::always("result"));
-          if (auto opaque = FD->getOpaqueResultTypeDecl()) {
-            printRec(opaque, Label::always("opaque_result_decl"));
-          }
-        } else if (FD->getResultTypeRepr()) {
-          printRec(FD->getResultTypeRepr(), Label::always("result"));
-          if (auto opaque = FD->getOpaqueResultTypeDecl()) {
-            printRec(opaque, Label::always("opaque_result_decl"));
-          }
+        printTypeOrTypeRepr(FD->getCachedResultInterfaceType(),
+                            FD->getResultTypeRepr(), Label::always("result"));
+        if (auto opaque = FD->getCachedOpaqueResultTypeDecl();
+            opaque && *opaque != nullptr) {
+          printRec(*opaque, Label::always("opaque_result_decl"));
         }
       }
 
-      if (Writer.isParsable() && D->hasInterfaceType()) {
-        printTypeField(D->getThrownInterfaceType(),
-                       Label::always("thrown_type"));
-      } else if (auto thrownTypeRepr = D->getThrownTypeRepr()) {
-        printRec(thrownTypeRepr,Label::always("thrown_type"));
-      }
+      printTypeOrTypeRepr(D->getCachedThrownInterfaceType(),
+                          D->getThrownTypeRepr(), Label::always("thrown_type"));
+
+      printRec(D->getParameters(), Label::optional("params"),
+               &D->getASTContext());
 
       if (auto fac = D->getForeignAsyncConvention()) {
         printRecArbitrary([&](Label label) {
@@ -2653,10 +2670,8 @@ namespace {
       printAttributes(MD);
       printRec(MD->getParameterList(), Label::optional("params"),
                &MD->getASTContext());
-      if (Writer.isParsable() && MD->getResultInterfaceType())
-        printTypeField(MD->getResultInterfaceType(), Label::always("result"));
-      else if (MD->resultType.getTypeRepr())
-        printRec(MD->resultType.getTypeRepr(), Label::always("result"));
+      printTypeOrTypeRepr(MD->getCachedResultInterfaceType(),
+                          MD->getResultTypeRepr(), Label::always("result"));
       printRec(MD->definition, Label::always("definition"));
       printFoot();
     }
@@ -4861,10 +4876,12 @@ public:
   }
   void visitCustomAttr(CustomAttr *Attr, Label label) {
     printCommon(Attr, "custom_attr", label);
-    if (Writer.isParsable())
-      printTypeField(Attr->getType(), Label::always("type"));
-    else
+    printTypeField(Attr->getType(), Label::always("type"));
+    if (!Writer.isParsable()) {
+      // The type has the semantic information we want for parsable outputs, so
+      // omit the `TypeRepr` there.
       printRec(Attr->getTypeRepr(), Label::optional("type_repr"));
+    }
     if (Attr->getArgs())
       printRec(Attr->getArgs(), Label::optional("args"));
     printFoot();
@@ -4925,8 +4942,11 @@ public:
   void visitImplementsAttr(ImplementsAttr *Attr, Label label) {
     printCommon(Attr, "implements_attr", label);
     if (Writer.isParsable()) {
-      printFieldQuoted(declUSR(Attr->getProtocol(DC)),
-                       Label::always("protocol"));
+      // Print the resolved protocol's USR in parsable outputs, not the
+      // TypeRepr.
+      if (auto PD = Attr->getCachedProtocol(DC); PD && *PD != nullptr) {
+        printFieldQuoted(declUSR(*PD), Label::always("protocol"));
+      }
     } else {
       printRec(Attr->getProtocolTypeRepr(), Label::always("protocol"));
     }
