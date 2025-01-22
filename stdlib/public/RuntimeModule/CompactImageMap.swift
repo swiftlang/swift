@@ -160,7 +160,7 @@ public enum CompactImageMapFormat {
             guard let char = iterator.next() else {
               return nil
             }
-            if n > 0 && char == 0x2f {
+            if base + n > stringBase! && (char == 0x2f || char == 0x5c) {
               let prefix = String(decoding: resultBytes[stringBase!..<base+n],
                                   as: UTF8.self)
               #if DEBUG_COMPACT_IMAGE_MAP
@@ -297,6 +297,10 @@ public enum CompactImageMapFormat {
         let acount = Int(((header >> 3) & 0x7) + 1)
         let ecount = Int((header & 0x7) + 1)
 
+        #if DEBUG_COMPACT_IMAGE_MAP
+        print("r = \(relative), acount = \(acount), ecount = \(ecount)")
+        #endif
+
         // Now the base and end of text addresses
         guard let address = decodeAddress(acount) else {
           return nil
@@ -315,10 +319,19 @@ public enum CompactImageMapFormat {
         }
         let endOfText = baseAddress &+ eotOffset
 
+        #if DEBUG_COMPACT_IMAGE_MAP
+        print("address = \(hex(address)), eotOffset = \(hex(eotOffset))")
+        print("baseAddress = \(hex(baseAddress)), endOfText = \(hex(endOfText))")
+        #endif
+
         // Next, get the build ID byte count
         guard let buildIdBytes = decodeCount() else {
           return nil
         }
+
+        #if DEBUG_COMPACT_IMAGE_MAP
+        print("buildIdBytes = \(buildIdBytes)")
+        #endif
 
         // Read the build ID
         var buildId: [UInt8]? = nil
@@ -334,6 +347,10 @@ public enum CompactImageMapFormat {
             buildId!.append(byte)
           }
         }
+
+        #if DEBUG_COMPACT_IMAGE_MAP
+        print("buildId = \(buildId)")
+        #endif
 
         // Decode the path
         let path = decodePath()
@@ -674,6 +691,9 @@ public enum CompactImageMapFormat {
 
             // Add any new prefixes
             forEachPrefix(of: remainingPath) { prefix in
+              #if DEBUG_COMPACT_IMAGE_MAP
+              print("defining \(nextCode) as \"\(prefix)\"")
+              #endif
               pathPrefixes.append((nextCode, prefix))
               nextCode += 1
             }

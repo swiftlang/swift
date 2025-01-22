@@ -33,7 +33,7 @@ public struct ImageMap: Collection, Sendable, Hashable {
 
   /// Tells us what size of machine words were used when capturing the
   /// image map.
-  enum WordSize {
+  enum WordSize: Sendable {
     case sixteenBit
     case thirtyTwoBit
     case sixtyFourBit
