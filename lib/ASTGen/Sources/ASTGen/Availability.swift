@@ -21,6 +21,7 @@ import SwiftIfConfig
 extension ASTGenVisitor {
   /// Implementation detail for `generateAvailableAttr(attribute:)` and `generateSpecializeAttr(attribute:)`.
   func generateAvailableAttr(
+    attribute attrNode: AttributeSyntax,
     atLoc: BridgedSourceLoc,
     range: BridgedSourceRange,
     attrName: SyntaxText,
@@ -43,14 +44,15 @@ extension ASTGenVisitor {
         isShorthand = false
       }
       if isShorthand {
-        return self.generateAvailableAttrShorthand(atLoc: atLoc, range: range, args: args, isSPI: isSPI)
+        return self.generateAvailableAttrShorthand(attribute: attrNode, atLoc: atLoc, range: range, args: args, isSPI: isSPI)
       }
     }
 
     // E.g.
     //   @available(macOS, introduced: 10.12, deprecated: 11.2)
     //   @available(*, unavailable, message: "out of service")
-    let attr = self.generateAvailableAttrExtended(atLoc: atLoc, range: range, args: args, isSPI: isSPI)
+    let attr = self.generateAvailableAttrExtended(attribute: attrNode, atLoc: atLoc, range: range, args: args, isSPI: isSPI)
+
     if let attr {
       return [attr]
     } else {
@@ -66,6 +68,7 @@ extension ASTGenVisitor {
   }
 
   func generateAvailableAttrShorthand(
+    attribute attrNode: AttributeSyntax,
     atLoc: BridgedSourceLoc,
     range: BridgedSourceRange,
     args: AvailabilityArgumentListSyntax,
@@ -121,6 +124,7 @@ extension ASTGenVisitor {
   }
 
   func generateAvailableAttrExtended(
+    attribute attrNode: AttributeSyntax,
     atLoc: BridgedSourceLoc,
     range: BridgedSourceRange,
     args: AvailabilityArgumentListSyntax,
@@ -165,16 +169,17 @@ extension ASTGenVisitor {
     var renamed: BridgedStringRef? = nil
 
     func generateVersion(arg: AvailabilityLabeledArgumentSyntax, into target: inout VersionAndRange?) {
-      guard let versionSytnax = arg.value.as(VersionTupleSyntax.self) else {
-        // TODO: Diagnose
-        fatalError("expected version after introduced, deprecated, or obsoleted")
-      }
-      guard let version = VersionTuple(parsing: versionSytnax.trimmedDescription) else {
-        // TODO: Diagnose
-        fatalError("invalid version string")
-      }
       if target != nil {
-        // TODO: Diagnose duplicated.
+        diagnose(.duplicatedLabeledArgumentInAttribute(attrNode, argument: arg, name: arg.label.text))
+        return
+      }
+      guard
+        let versionSytnax = arg.value.as(VersionTupleSyntax.self),
+        let version = VersionTuple(parsing: versionSytnax.trimmedDescription)
+      else {
+        // FIXME: This is already diagnosed in ParserDiagnostics.
+        // diagnose(.expectedVersionNumberInAvailableAttr(arg))
+        return
       }
 
       target = .init(version: version, range: self.generateSourceRange(versionSytnax))
@@ -195,7 +200,7 @@ extension ASTGenVisitor {
         case "noasync":
           attrKind = .noAsync
         default:
-          // TODO: Diagnose
+          diagnose(.unexpectedArgumentInAttribute(attrNode, arg))
           continue
         }
 
@@ -224,31 +229,35 @@ extension ASTGenVisitor {
           generateVersion(arg: arg, into: &obsoleted)
         case .message:
           guard let literal = arg.value.as(SimpleStringLiteralExprSyntax.self) else {
-            // TODO: Diagnose.
-            fatalError("invalid argument type for 'message:'")
+            diagnose(.expectedArgumentValueInAttribute(attrNode, label: "message", value: "string literal", at: arg.value))
+            continue
           }
           guard let _message = self.generateStringLiteralTextIfNotInterpolated(expr: literal) else {
-            fatalError("invalid literal value")
+            diagnose(.stringInterpolationNotAllowedInAttribute(attrNode, at: literal))
+            continue
           }
           guard message == nil else {
-            fatalError("duplicated 'message' argument")
+            diagnose(.duplicatedLabeledArgumentInAttribute(attrNode, argument: arg, name: "message"))
+            continue
           }
           message = _message
         case .renamed:
           guard let literal = arg.value.as(SimpleStringLiteralExprSyntax.self) else {
-            // TODO: Diagnose.
-            fatalError("invalid argument type for 'renamed:'")
+            diagnose(.expectedArgumentValueInAttribute(attrNode, label: "renamed", value: "string literal", at: arg.value))
+            continue
           }
           guard let _renamed = self.generateStringLiteralTextIfNotInterpolated(expr: literal) else {
-            fatalError("invalid literal value")
+            diagnose(.stringInterpolationNotAllowedInAttribute(attrNode, at: literal))
+            continue
           }
           guard renamed == nil else {
-            fatalError("duplicated 'message' argument")
+            diagnose(.duplicatedLabeledArgumentInAttribute(attrNode, argument: arg, name: "renamed"))
+            continue
           }
           renamed = _renamed
         case .invalid:
-          // TODO: Diagnose
-          fatalError("invalid labeled argument")
+          diagnose(.unexpectedArgumentInAttribute(attrNode, arg))
+          continue
         }
       }
     }
@@ -333,8 +342,8 @@ extension ASTGenVisitor {
       // Was not a macro, it should be a valid platform name.
       let platform = self.generateIdentifierAndSourceLoc(domainNode)
       guard let version = version else {
-        // TODO: Diagnostics.
-        fatalError("expected version")
+        diagnose(.expectedVersionNumberAfterPlatform(domainNode))
+        return
       }
       // FIXME: Wasting ASTContext memory.
       // 'AvailabilitySpec' is 'ASTAllocated' but created spec is ephemeral in context of `@available` attributes.
@@ -361,8 +370,9 @@ extension ASTGenVisitor {
       case .availabilityVersionRestriction(let platformVersion):
         handle(domainNode: platformVersion.platform, versionNode: platformVersion.version)
       default:
-        // TODO: Diagnostics.
-        fatalError("invalid argument kind for availability spec")
+        // FIXME: This is unreachable? ParserDiagnostics emits 'expected platform name'.
+        let token = parsed.argument.firstToken(viewMode: .sourceAccurate)!
+        diagnose(.unexpectedArgumentInAvailabilitySpecList(token))
       }
     }
 
