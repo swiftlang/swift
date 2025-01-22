@@ -557,13 +557,14 @@ std::optional<SemanticAvailableAttr> Decl::getNoAsyncAttr() const {
 
 bool Decl::isUnavailableInCurrentSwiftVersion() const {
   llvm::VersionTuple vers = getASTContext().LangOpts.EffectiveLanguageVersion;
-  for (auto semanticAttr :
-       getSemanticAvailableAttrs(/*includingInactive=*/false)) {
-    if (semanticAttr.isSwiftLanguageModeSpecific()) {
-      auto attr = semanticAttr.getParsedAttr();
-      if (attr->Introduced.has_value() && attr->Introduced.value() > vers)
+  for (auto attr : getSemanticAvailableAttrs(/*includingInactive=*/false)) {
+    if (attr.isSwiftLanguageModeSpecific()) {
+      auto introduced = attr.getIntroduced();
+      if (introduced && *introduced > vers)
         return true;
-      if (attr->Obsoleted.has_value() && attr->Obsoleted.value() <= vers)
+
+      auto obsoleted = attr.getObsoleted();
+      if (obsoleted && *obsoleted <= vers)
         return true;
     }
   }

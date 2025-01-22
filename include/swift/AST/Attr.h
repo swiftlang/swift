@@ -719,8 +719,6 @@ enum class AvailableVersionComparison {
 
 /// Defines the @available attribute.
 class AvailableAttr : public DeclAttribute {
-  AvailabilityDomain Domain;
-
 public:
   enum class Kind : uint8_t {
     /// The attribute does not specify `deprecated`, `unavailable`,
@@ -744,11 +742,44 @@ public:
                 const llvm::VersionTuple &Obsoleted, SourceRange ObsoletedRange,
                 bool Implicit, bool IsSPI);
 
-  /// The optional message.
-  const StringRef Message;
+private:
+  friend class SemanticAvailableAttr;
 
-  /// An optional replacement string to emit in a fixit.  This allows simple
-  /// declaration renames to be applied by Xcode.
+  AvailabilityDomain Domain;
+
+  const StringRef Message;
+  const StringRef Rename;
+
+  const std::optional<llvm::VersionTuple> Introduced;
+  const SourceRange IntroducedRange;
+  const std::optional<llvm::VersionTuple> Deprecated;
+  const SourceRange DeprecatedRange;
+  const std::optional<llvm::VersionTuple> Obsoleted;
+  const SourceRange ObsoletedRange;
+
+public:
+  /// Returns the parsed version for `introduced:`.
+  std::optional<llvm::VersionTuple> getRawIntroduced() const {
+    return Introduced;
+  }
+
+  /// Returns the parsed version for `deprecated:`.
+  std::optional<llvm::VersionTuple> getRawDeprecated() const {
+    return Deprecated;
+  }
+
+  /// Returns the parsed version for `obsoleted:`.
+  std::optional<llvm::VersionTuple> getRawObsoleted() const {
+    return Obsoleted;
+  }
+
+  /// Returns the parsed string for `message:`, which will be presented with
+  /// diagnostics about the availability of the decl.
+  StringRef getMessage() const { return Message; }
+
+  /// Returns the parsed string for `rename:`, which is an optional replacement
+  /// string to emit in a fixit.  This allows simple declaration renames to be
+  /// applied by Xcode.
   ///
   /// This should take the form of an operator, identifier, or full function
   /// name, optionally with a prefixed type, similar to the syntax used for
@@ -758,25 +789,7 @@ public:
   /// referred to by this string. Note that this attribute can have a rename
   /// target that was provided directly when synthesized and therefore can have
   /// a rename decl even when this string is empty.
-  const StringRef Rename;
-
-  /// Indicates when the symbol was introduced.
-  const std::optional<llvm::VersionTuple> Introduced;
-
-  /// Indicates where the Introduced version was specified.
-  const SourceRange IntroducedRange;
-
-  /// Indicates when the symbol was deprecated.
-  const std::optional<llvm::VersionTuple> Deprecated;
-
-  /// Indicates where the Deprecated version was specified.
-  const SourceRange DeprecatedRange;
-
-  /// Indicates when the symbol was obsoleted.
-  const std::optional<llvm::VersionTuple> Obsoleted;
-
-  /// Indicates where the Obsoleted version was specified.
-  const SourceRange ObsoletedRange;
+  StringRef getRename() const { return Rename; }
 
   /// Whether this is an unconditionally unavailable entity.
   bool isUnconditionallyUnavailable() const;
@@ -3241,6 +3254,9 @@ public:
   std::optional<llvm::VersionTuple> getIntroduced() const {
     return attr->Introduced;
   }
+
+  /// The source range of the `introduced:` component.
+  SourceRange getIntroducedSourceRange() const { return attr->IntroducedRange; }
 
   /// Returns the effective range in which the declaration with this attribute
   /// was introduced.

@@ -963,11 +963,11 @@ CheckRedeclarationRequest::evaluate(Evaluator &eval, ValueDecl *current,
         public:
           static AvailabilityRange from(const ValueDecl *VD) {
             AvailabilityRange result;
-            for (auto semanticAttr : VD->getSemanticAvailableAttrs()) {
-              if (semanticAttr.isSwiftLanguageModeSpecific()) {
-                if (auto introduced = semanticAttr.getParsedAttr()->Introduced)
+            for (auto attr : VD->getSemanticAvailableAttrs()) {
+              if (attr.isSwiftLanguageModeSpecific()) {
+                if (auto introduced = attr.getIntroduced())
                   result.introduced = introduced;
-                if (auto obsoleted = semanticAttr.getParsedAttr()->Obsoleted)
+                if (auto obsoleted = attr.getObsoleted())
                   result.obsoleted = obsoleted;
               }
             }
