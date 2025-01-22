@@ -8158,6 +8158,41 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
   if (conversionsOrFixes.empty())
     return getTypeMatchFailure(locator);
 
+  auto favoredRestriction = ConversionRestrictionKind::DeepEquality;
+  if (!(shouldAttemptFixes() ||
+        getASTContext().TypeCheckerOpts.DisableOptimizedRestrictions)) {
+    std::optional<ConversionRestrictionKind> redundantDeepEquality;
+    bool sawDeepEquality = false;
+
+    for (auto potential : conversionsOrFixes) {
+      if (auto restriction = potential.getRestriction()) {
+        switch (*restriction) {
+        case ConversionRestrictionKind::DeepEquality:
+          sawDeepEquality = true;
+          break;
+        case ConversionRestrictionKind::OptionalToOptional:
+          redundantDeepEquality = *restriction;
+          break;
+        default:
+          break;
+        }
+      }
+    }
+
+    if (sawDeepEquality && redundantDeepEquality) {
+      favoredRestriction = *redundantDeepEquality;
+
+      conversionsOrFixes.erase(
+          llvm::remove_if(conversionsOrFixes,
+                          [&](RestrictionOrFix &potential) {
+                            if (auto restriction = potential.getRestriction())
+                              return *restriction == ConversionRestrictionKind::DeepEquality;
+                            return false;
+                          }),
+          conversionsOrFixes.end());
+    }
+  }
+
   // Where there is more than one potential conversion, create a disjunction
   // so that we'll explore all of the options.
   if (conversionsOrFixes.size() > 1) {
@@ -8177,7 +8212,7 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
           Constraint::createRestricted(*this, constraintKind, *restriction,
                                        type1, type2, fixedLocator));
 
-        if (constraints.back()->getKind() == ConstraintKind::Bind)
+        if (*restriction == favoredRestriction)
           constraints.back()->setFavored();
 
         continue;
@@ -14627,7 +14662,9 @@ ConstraintSystem::simplifyRestrictedConstraintImpl(
   // also:
   //   T <c U ===> T? <c U!
   case ConversionRestrictionKind::OptionalToOptional: {
-    addContextualScore();
+    if (shouldAttemptFixes() ||
+        getASTContext().TypeCheckerOpts.DisableOptimizedRestrictions)
+      addContextualScore();
 
     assert(matchKind >= ConstraintKind::Subtype);
     if (auto generic1 = type1->getAs<BoundGenericType>()) {
