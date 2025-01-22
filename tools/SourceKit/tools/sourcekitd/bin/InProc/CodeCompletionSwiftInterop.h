@@ -43,12 +43,15 @@
 #define SWIFTIDE_END_DECLS
 #endif
 
-#ifndef SWIFTIDE_PUBLIC
-#if defined(_MSC_VER)
-#define SWIFTIDE_PUBLIC __declspec(dllimport)
+#if defined(_WIN32)
+// NOTE: static builds are currently unsupported.
+# if defined(sourcekitd_EXPORTS)
+#   define SWIFTIDE_PUBLIC __declspec(dllexport)
+# else
+#   define SWIFTIDE_PUBLIC __declspec(dllimport)
+# endif
 #else
-#define SWIFTIDE_PUBLIC
-#endif
+# define SWIFTIDE_PUBLIC /**/
 #endif
 
 #ifndef __has_feature
