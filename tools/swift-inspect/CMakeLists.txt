@@ -20,8 +20,8 @@ FetchContent_Declare(ArgumentParser
   GIT_SHALLOW     TRUE
   EXCLUDE_FROM_ALL
   FIND_PACKAGE_ARGS CONFIG)
-set(BUILD_TESTING OFF CACHE INTERNAL "skip building tests")
-set(BUILD_EXAMPLES OFF CACHE INTERNAL "skip building examples")
+set(BUILD_TESTING OFF CACHE INTERNAL "Skip building ArgumentParser tests")
+set(BUILD_EXAMPLES OFF CACHE INTERNAL "Skip building ArgumentParser examples")
 FetchContent_MakeAvailable(ArgumentParser)
 
 add_library(SymbolicationShims INTERFACE)
