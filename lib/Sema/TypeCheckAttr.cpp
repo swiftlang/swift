@@ -5050,13 +5050,13 @@ void AttributeChecker::checkBackDeployedAttrs(
     if (Ctx.LangOpts.DisableAvailabilityChecking)
       continue;
 
-    auto availability =
-        TypeChecker::availabilityAtLocation(D->getLoc(), D->getDeclContext());
+    auto availability = TypeChecker::availabilityAtLocation(
+        D->getLoc(), D->getInnermostDeclContext());
 
     // Unavailable decls cannot be back deployed.
-    if (auto unavailablePlatform = availability.getUnavailablePlatformKind()) {
-      if (!inheritsAvailabilityFromPlatform(*unavailablePlatform,
-                                            Attr->Platform)) {
+    if (auto unavailableDomain = availability.getUnavailableDomain()) {
+      auto backDeployedDomain = AvailabilityDomain::forPlatform(Attr->Platform);
+      if (unavailableDomain->contains(backDeployedDomain)) {
         auto platformString = prettyPlatformString(Attr->Platform);
         llvm::VersionTuple ignoredVersion;
 
