@@ -809,11 +809,15 @@ extension Optional where Wrapped: ~Copyable & ~Escapable {
 ///     type as the `Wrapped` type of `optional`.
 @_transparent
 @_alwaysEmitIntoClient
-@lifetime(optional)
-public func ?? <T: ~Copyable & ~Escapable>(
+public func ?? <T: ~Copyable>(
   optional: consuming T?,
-  defaultValue: @autoclosure () throws -> T // FIXME: typed throw
+  defaultValue: @autoclosure () throws -> T // FIXME: typed throws
 ) rethrows -> T {
+  // FIXME: We want this to support nonescapable `T` types.
+  // To implement that, we need to be able to express that the result's lifetime
+  // is limited to the intersection of `optional` and the result of
+  // `defaultValue`:
+  //    @lifetime(optional, defaultValue.result)
   switch consume optional {
   case .some(let value):
     return value
@@ -881,12 +885,15 @@ internal func _legacy_abi_optionalNilCoalescingOperator <T>(
 ///     `optional` have the same type.
 @_transparent
 @_alwaysEmitIntoClient
-@lifetime(optional)
-// FIXME: This needs to support typed throws.
-public func ?? <T: ~Copyable & ~Escapable>(
+public func ?? <T: ~Copyable>(
   optional: consuming T?,
-  defaultValue: @autoclosure () throws -> T?
+  defaultValue: @autoclosure () throws -> T? // FIXME: typed throws
 ) rethrows -> T? {
+  // FIXME: We want this to support nonescapable `T` types.
+  // To implement that, we need to be able to express that the result's lifetime
+  // is limited to the intersection of `optional` and the result of
+  // `defaultValue`:
+  //    @lifetime(optional, defaultValue.result)
   switch consume optional {
   case .some(let value):
     return value
