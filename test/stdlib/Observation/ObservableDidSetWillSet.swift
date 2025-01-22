@@ -1,6 +1,6 @@
 // REQUIRES: swift_swift_parser, executable_test
 
-// RUN: %target-run-simple-swift( -Xfrontend -disable-availability-checking -enable-experimental-feature Macros -Xfrontend -plugin-path -Xfrontend %swift-plugin-dir) | %FileCheck %s
+// RUN: %target-run-simple-swift( -Xfrontend -disable-availability-checking -parse-as-library -enable-experimental-feature Macros -Xfrontend -plugin-path -Xfrontend %swift-plugin-dir) | %FileCheck %s
 
 // REQUIRES: observation
 // REQUIRES: concurrency
@@ -32,11 +32,17 @@ public class Model {
 }
 
 
-let m = Model()
-
-// CHECK: new state=running
-// CHECK: old state=initializing
-m.state = .running
-// CHECK: new state=complete
-// CHECK: old state=running
-m.state = .complete
+@main
+struct Validator {
+  @MainActor
+  static func main() {
+    let m = Model()
+    
+    // CHECK: new state=running
+    // CHECK: old state=initializing
+    m.state = .running
+    // CHECK: new state=complete
+    // CHECK: old state=running
+    m.state = .complete
+  }
+}
