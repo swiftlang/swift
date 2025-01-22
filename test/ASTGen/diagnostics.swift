@@ -23,12 +23,6 @@ _ = [(Int) -> async throws Int]()
 // expected-error@-1{{'async throws' must precede '->'}}
 // expected-note@-2{{move 'async throws' in front of '->'}}{{15-21=}} {{21-28=}} {{12-12=async }} {{12-12=throws }}
 
-@freestanding // expected-error {{expected arguments for 'freestanding' attribute}}
-func dummy() {}
-
-@_silgen_name("whatever", extra)  // expected-error@:27 {{unexpected arguments in '_silgen_name' attribute}}
-func _whatever()
-
 struct S {
     subscript(x: Int) { _ = 1 } // expected-error@:23 {{expected '->' and return type in subscript}}
                                 // expected-note@-1:23 {{insert '->' and return type}}

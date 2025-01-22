@@ -300,16 +300,15 @@ extension ASTGenVisitor {
   }
 
   func generate(classRestrictionType node: ClassRestrictionTypeSyntax) -> BridgedUnqualifiedIdentTypeRepr {
-    // TODO: diagnostics.
-    // warning: using 'class' keyword to define a class-constrained protocol is deprecated; use 'AnyObject' instead
+    // Diagnose to replace 'class' with 'AnyObject'
+    self.diagnose(.classKeywordInheritanceDeprecated(node))
+
     return .createParsed(
       self.ctx,
       loc: self.generateSourceLoc(node.classKeyword),
       name: self.ctx.getIdentifier("AnyObject")
     )
   }
-
-  // NOTE: When implementing new `generate(type:)`, please update  `isTypeMigrated(_:)`.
 }
 
 // MARK: - SpecifierTypeRepr/AttributedTypeRepr

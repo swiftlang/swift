@@ -145,17 +145,26 @@ extension ASTGenVisitor {
   func generatePoundAssertStmt(freestandingMacroExpansion node: some FreestandingMacroExpansionSyntax) -> BridgedPoundAssertStmt? {
     assert(self.ctx.langOptsHasFeature(.StaticAssert))
     var args = node.arguments[...]
-    let conditionExpr = self.generateConsumingAttrOption(args: &args, label: nil) { conditionNode in
-      self.generate(expr: conditionNode)
+    guard let arg = args.popFirst(), arg.label == nil else {
+      // TODO: Diagnose.
+      fatalError("expected condition expression in #assert")
     }
-    guard let conditionExpr else {
-      return nil
-    }
+    let conditionExpr = self.generate(expr: arg.expression)
+
     let message: BridgedStringRef?
-    if !args.isEmpty {
-      message = self.generateConsumingSimpleStringLiteralAttrOption(args: &args)
+    if let arg = args.popFirst() {
+      guard arg.label == nil else {
+        // TODO: Diagnose.
+        fatalError("unexpected label")
+      }
+      message = self.generateStringLiteralTextIfNotInterpolated(expr: arg.expression)
+      // TODO: Diagnose if nil.
     } else {
       message = nil
+    }
+    guard args.isEmpty else {
+      // TODO: Diagnose.
+      fatalError("unexpected label")
     }
 
     return .createParsed(
