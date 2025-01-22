@@ -18,6 +18,7 @@ import Dispatch
   static func main() async {
     await testSleepDuration()
     await testSleepDoesNotBlock()
+    await testSleepHuge()
   }
 
   static func testSleepDuration() async {
@@ -44,5 +45,32 @@ import Dispatch
     // CHECK: Run first
     // CHECK: Run second
     await task.get()
+  }
+
+  static func testSleepHuge() async {
+    // Make sure nanoseconds values about Int64.max don't get interpreted as
+    // negative and fail to sleep.
+    let task1 = detach {
+      try await Task.sleep(nanoseconds: UInt64(Int64.max) + 1)
+    }
+    let task2 = detach {
+      try await Task.sleep(nanoseconds: UInt64.max)
+    }
+
+    try! await Task.sleep(nanoseconds: UInt64(pause))
+
+    task1.cancel()
+    task2.cancel()
+
+    // These should throw due to being canceled. If the sleeps completed then
+    // the cancellation will do nothing and we won't throw, which is a failure.
+    do {
+      _ = try await task1.value
+      fatalError("Sleep 1 completed early.")
+    } catch {}
+    do {
+      _ = try await task2.value
+      fatalError("Sleep 2 completed early.")
+    } catch {}
   }
 }
