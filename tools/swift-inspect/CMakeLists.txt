@@ -22,6 +22,7 @@ FetchContent_Declare(ArgumentParser
   FIND_PACKAGE_ARGS CONFIG)
 
 block(SCOPE_FOR VARIABLES)
+  set(BUILD_SHARED_LIBS OFF CACHE INTERNAL "Build as a shared library")
   set(BUILD_TESTING OFF CACHE INTERNAL "Skip building ArgumentParser tests")
   set(BUILD_EXAMPLES OFF CACHE INTERNAL "Skip building ArgumentParser examples")
   FetchContent_MakeAvailable(ArgumentParser)
