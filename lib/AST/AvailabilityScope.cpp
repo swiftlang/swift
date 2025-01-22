@@ -307,7 +307,7 @@ getAvailabilityConditionVersionSourceRange(const Decl *D, PlatformKind Platform,
       if (Range.isValid())
         return SourceRange();
       else
-        Range = Attr.getParsedAttr()->IntroducedRange;
+        Range = Attr.getIntroducedSourceRange();
     }
   }
   return Range;
