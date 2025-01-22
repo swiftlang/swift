@@ -23,8 +23,9 @@
 
 namespace swift {
 
-/// Summarizes platform specific availability constraints.
-struct AvailabilityContext::PlatformInfo {
+/// Summarizes availability the constraints contained by an AvailabilityContext.
+class AvailabilityContext::Info {
+public:
   /// The introduction version.
   AvailabilityRange Range;
 
@@ -46,7 +47,7 @@ struct AvailabilityContext::PlatformInfo {
   /// Sets each field to the value of the corresponding field in `other` if the
   /// other is more restrictive. Returns true if any field changed as a result
   /// of adding this constraint.
-  bool constrainWith(const PlatformInfo &other);
+  bool constrainWith(const Info &other);
 
   /// Updates each field to reflect the availability of `decl`, if that
   /// availability is more restrictive. Returns true if any field was updated.
@@ -55,7 +56,7 @@ struct AvailabilityContext::PlatformInfo {
   bool constrainUnavailability(std::optional<PlatformKind> unavailablePlatform);
 
   /// Returns true if `other` is as available or is more available.
-  bool isContainedIn(const PlatformInfo &other) const;
+  bool isContainedIn(const Info &other) const;
 
   void Profile(llvm::FoldingSetNodeID &ID) const {
     Range.getRawVersionRange().Profile(ID);
@@ -69,12 +70,12 @@ struct AvailabilityContext::PlatformInfo {
 /// As an implementation detail, the values that make up an `Availability`
 /// context are uniqued and stored as folding set nodes.
 class AvailabilityContext::Storage final : public llvm::FoldingSetNode {
-  Storage(const PlatformInfo &platformInfo) : Platform(platformInfo){};
+  Storage(const Info &info) : info(info){};
 
 public:
-  PlatformInfo Platform;
+  Info info;
 
-  static const Storage *get(const PlatformInfo &platformInfo, ASTContext &ctx);
+  static const Storage *get(const Info &info, ASTContext &ctx);
 
   void Profile(llvm::FoldingSetNodeID &ID) const;
 };

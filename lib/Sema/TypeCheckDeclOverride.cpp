@@ -2223,7 +2223,7 @@ static bool checkSingleOverride(ValueDecl *override, ValueDecl *base) {
     return true;
   }
 
-  // FIXME: Possibly should extend to more availability checking.
+  // FIXME: [availability] Possibly should extend to more availability checking.
   auto unavailabilityStatusAndAttr =
       checkOverrideUnavailability(override, base);
   auto unavailableAttr = unavailabilityStatusAndAttr.second;

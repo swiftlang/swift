@@ -37,8 +37,7 @@ static bool constrainRange(AvailabilityRange &existing,
   return true;
 }
 
-bool AvailabilityContext::PlatformInfo::constrainWith(
-    const PlatformInfo &other) {
+bool AvailabilityContext::Info::constrainWith(const Info &other) {
   bool isConstrained = false;
   isConstrained |= constrainRange(Range, other.Range);
   if (other.IsUnavailable) {
@@ -51,7 +50,7 @@ bool AvailabilityContext::PlatformInfo::constrainWith(
   return isConstrained;
 }
 
-bool AvailabilityContext::PlatformInfo::constrainWith(const Decl *decl) {
+bool AvailabilityContext::Info::constrainWith(const Decl *decl) {
   bool isConstrained = false;
 
   if (auto range = AvailabilityInference::annotatedAvailableRange(decl))
@@ -68,7 +67,7 @@ bool AvailabilityContext::PlatformInfo::constrainWith(const Decl *decl) {
   return isConstrained;
 }
 
-bool AvailabilityContext::PlatformInfo::constrainUnavailability(
+bool AvailabilityContext::Info::constrainUnavailability(
     std::optional<PlatformKind> unavailablePlatform) {
   if (!unavailablePlatform)
     return false;
@@ -94,8 +93,7 @@ bool AvailabilityContext::PlatformInfo::constrainUnavailability(
   return true;
 }
 
-bool AvailabilityContext::PlatformInfo::isContainedIn(
-    const PlatformInfo &other) const {
+bool AvailabilityContext::Info::isContainedIn(const Info &other) const {
   if (!Range.isContainedIn(other.Range))
     return false;
 
@@ -120,17 +118,17 @@ bool AvailabilityContext::PlatformInfo::isContainedIn(
 }
 
 void AvailabilityContext::Storage::Profile(llvm::FoldingSetNodeID &id) const {
-  Platform.Profile(id);
+  info.Profile(id);
 }
 
 AvailabilityContext
 AvailabilityContext::forPlatformRange(const AvailabilityRange &range,
                                       ASTContext &ctx) {
-  PlatformInfo platformInfo{range, PlatformKind::none,
-                            /*IsUnavailable*/ false,
-                            /*IsUnavailableInEmbedded*/ false,
-                            /*IsDeprecated*/ false};
-  return AvailabilityContext(Storage::get(platformInfo, ctx));
+  Info info{range, PlatformKind::none,
+            /*IsUnavailable*/ false,
+            /*IsUnavailableInEmbedded*/ false,
+            /*IsDeprecated*/ false};
+  return AvailabilityContext(Storage::get(info, ctx));
 }
 
 AvailabilityContext AvailabilityContext::forInliningTarget(ASTContext &ctx) {
@@ -147,40 +145,44 @@ AvailabilityContext
 AvailabilityContext::get(const AvailabilityRange &platformAvailability,
                          std::optional<PlatformKind> unavailablePlatform,
                          bool deprecated, ASTContext &ctx) {
-  PlatformInfo platformInfo{platformAvailability,
-                            unavailablePlatform.has_value()
-                                ? *unavailablePlatform
-                                : PlatformKind::none,
-                            unavailablePlatform.has_value(),
-                            /*IsUnavailableInEmbedded*/ false, deprecated};
-  return AvailabilityContext(Storage::get(platformInfo, ctx));
+  Info info{platformAvailability,
+            unavailablePlatform.has_value() ? *unavailablePlatform
+                                            : PlatformKind::none,
+            unavailablePlatform.has_value(),
+            /*IsUnavailableInEmbedded*/ false, deprecated};
+  return AvailabilityContext(Storage::get(info, ctx));
 }
 
 AvailabilityRange AvailabilityContext::getPlatformRange() const {
-  return Info->Platform.Range;
+  return storage->info.Range;
 }
 
 std::optional<PlatformKind>
 AvailabilityContext::getUnavailablePlatformKind() const {
-  if (Info->Platform.IsUnavailable)
-    return Info->Platform.UnavailablePlatform;
+  if (storage->info.IsUnavailable)
+    return storage->info.UnavailablePlatform;
   return std::nullopt;
 }
 
 bool AvailabilityContext::isUnavailableInEmbedded() const {
-  return Info->Platform.IsUnavailableInEmbedded;
+  return storage->info.IsUnavailableInEmbedded;
 }
 
 bool AvailabilityContext::isDeprecated() const {
-  return Info->Platform.IsDeprecated;
+  return storage->info.IsDeprecated;
 }
 
 void AvailabilityContext::constrainWithContext(const AvailabilityContext &other,
                                                ASTContext &ctx) {
-  PlatformInfo platformAvailability{Info->Platform};
-  if (platformAvailability.constrainWith(other.Info->Platform)) {
-    Info = Storage::get(platformAvailability, ctx);
-  }
+  bool isConstrained = false;
+
+  Info info{storage->info};
+  isConstrained |= info.constrainWith(other.storage->info);
+
+  if (!isConstrained)
+    return;
+
+  storage = Storage::get(info, ctx);
 }
 
 void AvailabilityContext::constrainWithDecl(const Decl *decl) {
@@ -189,28 +191,30 @@ void AvailabilityContext::constrainWithDecl(const Decl *decl) {
 
 void AvailabilityContext::constrainWithPlatformRange(
     const AvailabilityRange &platformRange, ASTContext &ctx) {
-  PlatformInfo platformAvailability{Info->Platform};
-  if (!constrainRange(platformAvailability.Range, platformRange))
+
+  Info info{storage->info};
+  if (!constrainRange(info.Range, platformRange))
     return;
 
-  Info = Storage::get(platformAvailability, ctx);
+  storage = Storage::get(info, ctx);
 }
 
 void AvailabilityContext::constrainWithDeclAndPlatformRange(
     const Decl *decl, const AvailabilityRange &platformRange) {
-  PlatformInfo platformAvailability{Info->Platform};
   bool isConstrained = false;
-  isConstrained |= platformAvailability.constrainWith(decl);
-  isConstrained |= constrainRange(platformAvailability.Range, platformRange);
+
+  Info info{storage->info};
+  isConstrained |= info.constrainWith(decl);
+  isConstrained |= constrainRange(info.Range, platformRange);
 
   if (!isConstrained)
     return;
 
-  Info = Storage::get(platformAvailability, decl->getASTContext());
+  storage = Storage::get(info, decl->getASTContext());
 }
 
 bool AvailabilityContext::isContainedIn(const AvailabilityContext other) const {
-  if (!Info->Platform.isContainedIn(other.Info->Platform))
+  if (!storage->info.isContainedIn(other.storage->info))
     return false;
 
   return true;
