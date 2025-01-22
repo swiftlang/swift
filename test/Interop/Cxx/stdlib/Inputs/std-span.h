@@ -2,13 +2,15 @@
 #define TEST_INTEROP_CXX_STDLIB_INPUTS_STD_SPAN_H
 
 #include <cstddef>
-#include <string>
 #include <span>
+#include <string>
+#include <vector>
 
 using ConstSpanOfInt = std::span<const int>;
 using SpanOfInt = std::span<int>;
 using ConstSpanOfString = std::span<const std::string>;
 using SpanOfString = std::span<std::string>;
+using VecOfInt = std::vector<int>;
 
 static int iarray[]{1, 2, 3};
 static std::string sarray[]{"", "ab", "abc"};
@@ -54,6 +56,15 @@ inline SpanOfInt initSpan(int arr[], size_t size) {
 
 inline struct SpanBox getStructSpanBox() { return {iarray, iarray, sarray, sarray}; }
 
-void funcWithSafeWrapper(SpanOfInt s [[clang::noescape]]) {}
+inline void funcWithSafeWrapper(ConstSpanOfInt s [[clang::noescape]]) {}
+
+inline ConstSpanOfInt funcWithSafeWrapper2(ConstSpanOfInt s
+                                           [[clang::lifetimebound]]) {
+  return s;
+}
+inline ConstSpanOfInt funcWithSafeWrapper3(const VecOfInt &v
+                                           [[clang::lifetimebound]]) {
+  return ConstSpanOfInt(v.data(), v.size());
+}
 
 #endif // TEST_INTEROP_CXX_STDLIB_INPUTS_STD_SPAN_H
