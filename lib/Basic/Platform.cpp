@@ -434,8 +434,6 @@ llvm::Triple swift::getUnversionedTriple(const llvm::Triple &triple) {
 std::optional<llvm::VersionTuple>
 swift::getSwiftRuntimeCompatibilityVersionForTarget(
     const llvm::Triple &Triple) {
-#define MAX(a, b) ((a) > (b) ? (a) : (b))
-
   if (Triple.isMacOSX()) {
     llvm::VersionTuple OSVersion;
     Triple.getMacOSXVersion(OSVersion);
@@ -445,7 +443,7 @@ swift::getSwiftRuntimeCompatibilityVersionForTarget(
     auto floorFor64 = [&Triple](llvm::VersionTuple v) {
       if (!Triple.isAArch64()) return v;
       // macOS got first arm64(e) support in 11.0, i.e. VersionTuple(5, 3)
-      return MAX(v, llvm::VersionTuple(5, 3));
+      return std::max(v, llvm::VersionTuple(5, 3));
     };
 
     if (Major == 10) {
@@ -489,13 +487,13 @@ swift::getSwiftRuntimeCompatibilityVersionForTarget(
       if (Triple.isAArch64() && Major <= 14 &&
           (Triple.isSimulatorEnvironment() ||
            Triple.isMacCatalystEnvironment()))
-        return MAX(v, llvm::VersionTuple(5, 3));
+        return std::max(v, llvm::VersionTuple(5, 3));
 
       if (Triple.getArchName() != "arm64e") return v;
 
       // iOS got first arm64e support in 12.0, which has a Swift runtime version
       // older than 5.0, so let's floor at VersionTuple(5, 0) instead.
-      return MAX(v, llvm::VersionTuple(5, 0));
+      return std::max(v, llvm::VersionTuple(5, 0));
     };
 
     if (Major <= 12) {
@@ -532,7 +530,7 @@ swift::getSwiftRuntimeCompatibilityVersionForTarget(
     auto floorFor64bits = [&Triple](llvm::VersionTuple v) {
       if (!Triple.isArch64Bit()) return v;
       // 64-bit watchOS was introduced with Swift 5.3
-      return MAX(v, llvm::VersionTuple(5, 3));
+      return std::max(v, llvm::VersionTuple(5, 3));
     };
 
     if (Major <= 5) {
