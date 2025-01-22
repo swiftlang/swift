@@ -85,7 +85,7 @@ bb2:
 sil @pointeeAddressor : $@convention(method) <τ_0_0 where τ_0_0 : ~Copyable> (UnsafePointer<τ_0_0>) -> UnsafePointer<τ_0_0>
 
 // Test dependence on a loaded trivial value. The dependence scope should not be on the access scope, which is narrower
-// than the scoped of the loaded value.
+// than the scope of the loaded value.
 //
 // CHECK-LABEL: sil hidden [ossa] @testTrivialAccess : $@convention(thin) (UnsafePointer<Int64>) -> () {
 // CHECK: bb0(%0 : $UnsafePointer<Int64>):
