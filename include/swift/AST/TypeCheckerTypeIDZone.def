@@ -206,7 +206,7 @@ SWIFT_REQUEST(TypeChecker, InferredGenericSignatureRequest,
                                          WhereClauseOwner,
                                          SmallVector<Requirement, 2>,
                                          SmallVector<TypeBase *, 2>,
-                                         SourceLoc, bool, bool),
+                                         SourceLoc, ExtensionDecl *, bool),
               Uncached, NoLocationInfo)
 SWIFT_REQUEST(TypeChecker, DistributedModuleIsAvailableRequest,
               bool(const ValueDecl *), Cached, NoLocationInfo)

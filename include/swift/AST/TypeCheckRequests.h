@@ -2118,7 +2118,8 @@ class InferredGenericSignatureRequest :
                                                     WhereClauseOwner,
                                                     SmallVector<Requirement, 2>,
                                                     SmallVector<TypeBase *, 2>,
-                                                    SourceLoc, bool, bool),
+                                                    SourceLoc, ExtensionDecl *,
+                                                    bool),
                          RequestFlags::Uncached> {
 public:
   using SimpleRequest::SimpleRequest;
@@ -2134,7 +2135,8 @@ private:
            WhereClauseOwner whereClause,
            SmallVector<Requirement, 2> addedRequirements,
            SmallVector<TypeBase *, 2> inferenceSources,
-           SourceLoc loc, bool isExtension, bool allowInverses) const;
+           SourceLoc loc, ExtensionDecl *forExtension,
+           bool allowInverses) const;
 
 public:
   /// Inferred generic signature requests don't have source-location info.

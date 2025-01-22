@@ -1987,7 +1987,8 @@ Type ExtensionDecl::getExtendedType() const {
   return ErrorType::get(ctx);
 }
 
-bool ExtensionDecl::isAddingConformanceToInvertible() const {
+std::optional<InvertibleProtocolKind>
+ExtensionDecl::isAddingConformanceToInvertible() const {
   const unsigned numEntries = getInherited().size();
   for (unsigned i = 0; i < numEntries; ++i) {
     InheritedTypeRequest request{this, i, TypeResolutionStage::Structural};
@@ -2005,10 +2006,10 @@ bool ExtensionDecl::isAddingConformanceToInvertible() const {
 
     if (inheritedTy)
       if (auto kp = inheritedTy->getKnownProtocol())
-        if (getInvertibleProtocolKind(*kp))
-          return true;
+        if (auto kind = getInvertibleProtocolKind(*kp))
+          return kind;
   }
-  return false;
+  return std::nullopt;
 }
 
 bool Decl::isObjCImplementation() const {
