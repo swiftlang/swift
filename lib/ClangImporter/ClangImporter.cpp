@@ -6152,6 +6152,8 @@ TinyPtrVector<ValueDecl *> ClangRecordMemberLookup::evaluate(
   NominalTypeDecl *inheritingDecl = desc.inheritingDecl;
   DeclName name = desc.name;
 
+  bool inheritedLookup = recordDecl != inheritingDecl;
+
   auto &ctx = recordDecl->getASTContext();
   auto directResults = evaluateOrDefault(
       ctx.evaluator,
@@ -6177,7 +6179,7 @@ TinyPtrVector<ValueDecl *> ClangRecordMemberLookup::evaluate(
 
     // If this member is found due to inheritance, clone it from the base class
     // by synthesizing getters and setters.
-    if (inheritingDecl != recordDecl) {
+    if (inheritedLookup) {
       imported = clangModuleLoader->importBaseMemberDecl(
           cast<ValueDecl>(imported), inheritingDecl);
       if (!imported)
@@ -6186,8 +6188,8 @@ TinyPtrVector<ValueDecl *> ClangRecordMemberLookup::evaluate(
     result.push_back(cast<ValueDecl>(imported));
   }
 
-  if (inheritingDecl != recordDecl) {
-    // For inheritied members, add members that are synthesized eagerly, such as
+  if (inheritedLookup) {
+    // For inherited members, add members that are synthesized eagerly, such as
     // subscripts. This is not necessary for non-inherited members because those
     // should already be in the lookup table.
     for (auto member :
