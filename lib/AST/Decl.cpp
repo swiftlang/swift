@@ -4660,7 +4660,11 @@ getAccessScopeForFormalAccess(const ValueDecl *VD,
   if (localImportRestriction.has_value()) {
     AccessLevel importAccessLevel =
       localImportRestriction.value().accessLevel;
-    if (access > importAccessLevel) {
+    auto isVisible = access >= AccessLevel::Public ||
+      (access == AccessLevel::Package &&
+       useDC->getParentModule()->inSamePackage(resultDC->getParentModule()));
+
+    if (access > importAccessLevel && isVisible) {
       access = std::min(access, importAccessLevel);
       resultDC = useDC->getParentSourceFile();
     }
