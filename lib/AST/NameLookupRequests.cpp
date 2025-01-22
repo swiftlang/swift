@@ -539,6 +539,9 @@ void swift::simple_display(llvm::raw_ostream &out,
   simple_display(out, desc.name);
   out << " in ";
   simple_display(out, desc.recordDecl);
+  if (desc.recordDecl != desc.inheritingDecl)
+    out << " inherited by ";
+  simple_display(out, desc.inheritingDecl);
 }
 
 SourceLoc
