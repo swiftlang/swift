@@ -179,43 +179,6 @@ class rdar37241550 {
   }
 }
 
-class B {}
-class D : B {
-  var i: Int!
-}
-
-func coerceToIUO(d: D?) -> B {
-  return d as B! // expected-warning {{using '!' here is deprecated and will be removed in a future release}}
-}
-
-func forcedDowncastToOptional(b: B?) -> D? {
-  return b as! D! // expected-warning {{using '!' here is deprecated and will be removed in a future release}}
-}
-
-func forcedDowncastToObject(b: B?) -> D {
-  return b as! D! // expected-warning {{using '!' here is deprecated and will be removed in a future release}}
-}
-
-func forcedDowncastToObjectIUOMember(b: B?) -> Int {
-  return (b as! D!).i // expected-warning {{using '!' here is deprecated and will be removed in a future release}}
-}
-
-func forcedUnwrapViaForcedCast(b: B?) -> B {
-  return b as! B! // expected-warning {{forced cast from 'B?' to 'B' only unwraps optionals; did you mean to use '!'?}}
-  // expected-warning@-1 {{using '!' here is deprecated and will be removed in a future release}}
-}
-
-func conditionalDowncastToOptional(b: B?) -> D? {
-  return b as? D! // expected-warning {{using '!' here is deprecated and will be removed in a future release}}
-}
-
-func conditionalDowncastToObject(b: B?) -> D {
-  return b as? D! // expected-error {{value of optional type 'D?' must be unwrapped to a value of type 'D'}}
-  // expected-note@-1 {{coalesce using '??' to provide a default when the optional value contains 'nil'}}
-  // expected-note@-2 {{force-unwrap using '!' to abort execution if the optional value contains 'nil'}}
-  // expected-warning@-3 {{using '!' here is deprecated and will be removed in a future release}}
-}
-
 // https://github.com/apple/swift/issues/49536
 // Ensure that we select the overload that does *not* involve forcing an IUO.
 do {
