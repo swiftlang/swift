@@ -4883,6 +4883,7 @@ namespace {
       printCommon(#Name, label);                           \
                                                            \
       printFieldQuoted(T->getDecl()->printRef(), "decl");  \
+      printFlag(T->getDecl()->hasClangNode(), "foreign");  \
                                                            \
       if (T->getParent())                                  \
         printRec(T->getParent(), "parent");                \
@@ -4890,11 +4891,26 @@ namespace {
       printFoot();                                         \
     }
 
-    VISIT_NOMINAL_TYPE(EnumType, enum_type)
-    VISIT_NOMINAL_TYPE(StructType, struct_type)
-    VISIT_NOMINAL_TYPE(ClassType, class_type)
+#define VISIT_BINDABLE_NOMINAL_TYPE(TypeClass, Name)       \
+    VISIT_NOMINAL_TYPE(TypeClass, Name)                    \
+    void visitBoundGeneric##TypeClass(                     \
+        BoundGeneric##TypeClass *T, StringRef label) {     \
+      printCommon("bound_generic_" #Name, label);          \
+      printFieldQuoted(T->getDecl()->printRef(), "decl");  \
+      printFlag(T->getDecl()->hasClangNode(), "foreign");  \
+      if (T->getParent())                                  \
+        printRec(T->getParent(), "parent");                \
+      for (auto arg : T->getGenericArgs())                 \
+        printRec(arg);                                     \
+      printFoot();                                         \
+    }
+
+    VISIT_BINDABLE_NOMINAL_TYPE(EnumType, enum_type)
+    VISIT_BINDABLE_NOMINAL_TYPE(StructType, struct_type)
+    VISIT_BINDABLE_NOMINAL_TYPE(ClassType, class_type)
     VISIT_NOMINAL_TYPE(ProtocolType, protocol_type)
 
+#undef VISIT_BINDABLE_NOMINAL_TYPE
 #undef VISIT_NOMINAL_TYPE
 
     void visitBuiltinTupleType(BuiltinTupleType *T, StringRef label) {
@@ -4929,6 +4945,7 @@ namespace {
     void visitModuleType(ModuleType *T, StringRef label) {
       printCommon("module_type", label);
       printDeclNameField(T->getModule(), "module");
+      printFlag(T->getModule()->isNonSwiftModule(), "foreign");
       printFoot();
     }
 
@@ -5046,7 +5063,7 @@ namespace {
     void printAnyFunctionParamsRec(ArrayRef<AnyFunctionType::Param> params,
                                    StringRef label) {
       printRecArbitrary([&](StringRef label) {
-        printCommon("function_params", label);
+        printHead("function_params", FieldLabelColor, label);
 
         printField(params.size(), "num_params");
         for (const auto &param : params) {
@@ -5254,37 +5271,6 @@ namespace {
       printFieldQuoted(T->getDecl()->printRef(), "decl");
       if (T->getParent())
         printRec(T->getParent(), "parent");
-      printFoot();
-    }
-
-    void visitBoundGenericClassType(BoundGenericClassType *T, StringRef label) {
-      printCommon("bound_generic_class_type", label);
-      printFieldQuoted(T->getDecl()->printRef(), "decl");
-      if (T->getParent())
-        printRec(T->getParent(), "parent");
-      for (auto arg : T->getGenericArgs())
-        printRec(arg);
-      printFoot();
-    }
-
-    void visitBoundGenericStructType(BoundGenericStructType *T,
-                                     StringRef label) {
-      printCommon("bound_generic_struct_type", label);
-      printFieldQuoted(T->getDecl()->printRef(), "decl");
-      if (T->getParent())
-        printRec(T->getParent(), "parent");
-      for (auto arg : T->getGenericArgs())
-        printRec(arg);
-      printFoot();
-    }
-
-    void visitBoundGenericEnumType(BoundGenericEnumType *T, StringRef label) {
-      printCommon("bound_generic_enum_type", label);
-      printFieldQuoted(T->getDecl()->printRef(), "decl");
-      if (T->getParent())
-        printRec(T->getParent(), "parent");
-      for (auto arg : T->getGenericArgs())
-        printRec(arg);
       printFoot();
     }
 
