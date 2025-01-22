@@ -471,7 +471,7 @@ isShortFormAvailabilityImpliedByOther(SemanticAvailableAttr Attr,
     if (!inheritsAvailabilityFromPlatform(platform, otherPlatform))
       continue;
 
-    if (Attr.getParsedAttr()->Introduced == other.getParsedAttr()->Introduced)
+    if (Attr.getIntroduced() == other.getIntroduced())
       return true;
   }
   return false;
@@ -495,14 +495,14 @@ static void printShortFormAvailable(const Decl *D,
 
   bool isFirst = true;
   bool isPlatformAvailability = false;
-  for (auto semanticAttr : Attrs) {
-    auto *availAttr = semanticAttr.getParsedAttr();
-    auto domain = semanticAttr.getDomain();
-    assert(availAttr->Introduced.has_value());
+  for (auto attr : Attrs) {
+    auto domain = attr.getDomain();
+    auto introduced = attr.getIntroduced();
+    assert(introduced);
 
     // Avoid omitting available attribute when we are printing module interface.
     if (!Options.IsForSwiftInterface &&
-        isShortFormAvailabilityImpliedByOther(semanticAttr, Attrs))
+        isShortFormAvailabilityImpliedByOther(attr, Attrs))
       continue;
 
     Printer << (isFirst ? "" : ", ");
@@ -512,7 +512,7 @@ static void printShortFormAvailable(const Decl *D,
       isPlatformAvailability = true;
 
     Printer << domain.getNameForAttributePrinting() << " "
-            << availAttr->Introduced.value().getAsString();
+            << introduced.value().getAsString();
   }
 
   if (isPlatformAvailability)

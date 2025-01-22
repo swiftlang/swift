@@ -3928,22 +3928,19 @@ public:
       printFlag("noasync");
       break;
     }
-    if (Attr->Introduced.has_value())
-      printFieldRaw(
-          [&](auto &out) { out << Attr->Introduced.value().getAsString(); },
-          "introduced");
-    if (Attr->Deprecated.has_value())
-      printFieldRaw(
-          [&](auto &out) { out << Attr->Deprecated.value().getAsString(); },
-          "deprecated");
-    if (Attr->Obsoleted.has_value())
-      printFieldRaw(
-          [&](auto &out) { out << Attr->Obsoleted.value().getAsString(); },
-          "obsoleted");
-    if (!Attr->Message.empty())
-      printFieldQuoted(Attr->Message, "message");
-    if (!Attr->Rename.empty())
-      printFieldQuoted(Attr->Rename, "rename");
+    if (auto introduced = Attr->getRawIntroduced())
+      printFieldRaw([&](auto &out) { out << introduced.value().getAsString(); },
+                    "introduced");
+    if (auto deprecated = Attr->getRawDeprecated())
+      printFieldRaw([&](auto &out) { out << deprecated.value().getAsString(); },
+                    "deprecated");
+    if (auto obsoleted = Attr->getRawObsoleted())
+      printFieldRaw([&](auto &out) { out << obsoleted.value().getAsString(); },
+                    "obsoleted");
+    if (!Attr->getMessage().empty())
+      printFieldQuoted(Attr->getMessage(), "message");
+    if (!Attr->getRename().empty())
+      printFieldQuoted(Attr->getRename(), "rename");
     printFoot();
   }
   void visitBackDeployedAttr(BackDeployedAttr *Attr, StringRef label) {
