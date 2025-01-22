@@ -2123,6 +2123,8 @@ AvailableAttr::AvailableAttr(
       INIT_VER_TUPLE(Deprecated), DeprecatedRange(DeprecatedRange),
       INIT_VER_TUPLE(Obsoleted), ObsoletedRange(ObsoletedRange) {
   Bits.AvailableAttr.Kind = static_cast<uint8_t>(Kind);
+  Bits.AvailableAttr.HasComputedSemanticAttr = false;
+  Bits.AvailableAttr.HasDomain = true;
   Bits.AvailableAttr.HasComputedRenamedDecl = false;
   Bits.AvailableAttr.HasRenamedDecl = false;
   Bits.AvailableAttr.IsSPI = IsSPI;

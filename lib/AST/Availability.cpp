@@ -447,7 +447,9 @@ Decl::getSemanticAvailableAttrs(bool includeInactive) const {
 
 std::optional<SemanticAvailableAttr>
 Decl::getSemanticAvailableAttr(const AvailableAttr *attr) const {
-  return SemanticAvailableAttr(attr);
+  return evaluateOrDefault(getASTContext().evaluator,
+                           SemanticAvailableAttrRequest{attr, this},
+                           std::nullopt);
 }
 
 std::optional<SemanticAvailableAttr>

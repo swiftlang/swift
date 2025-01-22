@@ -151,9 +151,13 @@ protected:
       Value : 32
     );
 
-    SWIFT_INLINE_BITFIELD(AvailableAttr, DeclAttribute, 4+1+1+1,
+    SWIFT_INLINE_BITFIELD(AvailableAttr, DeclAttribute, 4+1+1+1+1+1,
       /// An `AvailableAttr::Kind` value.
       Kind : 4,
+
+      /// State storage for `SemanticAvailableAttrRequest`.
+      HasComputedSemanticAttr : 1,
+      HasDomain : 1,
 
       /// State storage for `RenamedDeclRequest`.
       HasComputedRenamedDecl : 1,
@@ -806,14 +810,15 @@ public:
   /// Returns the `AvailabilityDomain` associated with the attribute, or
   /// `std::nullopt` if it has either not yet been resolved or could not be
   /// resolved successfully.
-  std::optional<AvailabilityDomain> getCachedDomain() const { return Domain; }
+  std::optional<AvailabilityDomain> getCachedDomain() const {
+    if (hasCachedDomain())
+      return Domain;
+    return std::nullopt;
+  }
 
   /// Returns true if the `AvailabilityDomain` associated with the attribute
   /// has been resolved successfully.
-  bool hasCachedDomain() const {
-    // For now, domains are always set on construction of the attribute.
-    return true;
-  }
+  bool hasCachedDomain() const { return Bits.AvailableAttr.HasDomain; }
 
   /// Returns the kind of availability the attribute specifies.
   Kind getKind() const { return static_cast<Kind>(Bits.AvailableAttr.Kind); }
@@ -872,6 +877,17 @@ private:
   void setComputedRenamedDecl(bool hasRenamedDecl) {
     Bits.AvailableAttr.HasComputedRenamedDecl = true;
     Bits.AvailableAttr.HasRenamedDecl = hasRenamedDecl;
+  }
+
+private:
+  friend class SemanticAvailableAttrRequest;
+
+  bool hasComputedSemanticAttr() const {
+    return Bits.AvailableAttr.HasComputedSemanticAttr;
+  }
+
+  void setComputedSemanticAttr() {
+    Bits.AvailableAttr.HasComputedSemanticAttr = true;
   }
 };
 
