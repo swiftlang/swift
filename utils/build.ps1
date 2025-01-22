@@ -824,8 +824,8 @@ function Fetch-Dependencies {
 
     Extract-ZipFile -ZipFileName "android-ndk-$AndroidNDKVersion-windows.zip" -BinaryCache $BinaryCache -ExtractPath "android-ndk-$AndroidNDKVersion" -CreateExtractPath $false
 
+    $NDKDir = "$BinaryCache\android-ndk-r26b"
     if ($Test -and -not(Test-Path "$NDKDir\licenses")) {
-      $NDKDir = "$BinaryCache\android-ndk-r26b"
       $CLToolsURL = "https://dl.google.com/android/repository/commandlinetools-win-11076708_latest.zip"
       $CLToolsHash = "4d6931209eebb1bfb7c7e8b240a6a3cb3ab24479ea294f3539429574b1eec862"
       DownloadAndVerify $CLToolsURL "$BinaryCache\android-cmdline-tools.zip" $CLToolsHash
@@ -2077,11 +2077,18 @@ function Test-Dispatch([Platform]$Platform) {
 
   # TODO: On my local machine I have to grant network access once. How to do that in CI?
   $adb = "$NDKDir\platform-tools\adb.exe"
-  Invoke-Program $adb "shell" "rm -rf $RemoteBin"
-  Invoke-Program $adb "shell" "mkdir $RemoteBin"
-  Invoke-Program $adb "push" "$LocalBin/." $RemoteBin
-  Invoke-Program $adb "push" "S:/ctest_mock.sh" "/data/local/tmp"
-  Invoke-Program $adb "shell" "sh /data/local/tmp/ctest_mock.sh $RemoteBin"
+  Write-Host    "$adb shell rm -rf $RemoteBin"
+  Invoke-Program $adb shell "rm -rf $RemoteBin"
+  Write-Host    "$adb shell mkdir $RemoteBin"
+  Invoke-Program $adb shell "mkdir $RemoteBin"
+  Write-Host    "$adb push $LocalBin/. $RemoteBin"
+  Invoke-Program $adb push "$LocalBin/." $RemoteBin
+  Write-Host    "$adb push $SourceCache/swift/utils/android/utils/ctest_mock.sh /data/local/tmp"
+  Invoke-Program $adb push "$SourceCache/swift/utils/android/utils/ctest_mock.sh" "/data/local/tmp"
+  Write-Host    "$adb shell chmod +x /data/local/tmp/ctest_mock.sh"
+  Invoke-Program $adb shell "chmod +x /data/local/tmp/ctest_mock.sh"
+  Write-Host    "$adb shell sh /data/local/tmp/ctest_mock.sh $RemoteBin"
+  Invoke-Program $adb shell "sh /data/local/tmp/ctest_mock.sh $RemoteBin"
 }
 
 function Build-Foundation([Platform]$Platform, $Arch, [switch]$Test = $false) {
@@ -3125,7 +3132,7 @@ if (-not $IsCrossCompiling) {
   if ($Test -contains "dispatch") {
     Build-Dispatch Windows $HostArch -Test
     # TODO: This is a hack. We need different devices for different arches.
-    if (AndroidSDKs -contains "x86_64") {
+    if ($AndroidSDKs -contains "x86_64") {
       Test-Dispatch Android
     }
   }
