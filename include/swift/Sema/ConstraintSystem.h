@@ -1196,12 +1196,11 @@ struct Score {
     bool hasNonDefault = false;
     for (unsigned int i = 0; i < NumScoreKinds; ++i) {
       if (Data[i] != 0) {
-        out << " [component: ";
-        out << "#";
-        out << std::to_string(NumScoreKinds - i);
-        out << " ";
+        out << " [";
         out << getNameFor(ScoreKind(i));
-        out << "(s), impact: ";
+        out << "(s), weight: ";
+        out << std::to_string(NumScoreKinds - i);
+        out << ", impact: ";
         out << std::to_string(Data[i]);
         out << "]";
         hasNonDefault = true;
