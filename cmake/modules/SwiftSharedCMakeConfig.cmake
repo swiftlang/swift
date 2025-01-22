@@ -295,7 +295,9 @@ macro(swift_common_cxx_warnings)
 
     if(MSVC)
       check_cxx_compiler_flag("/we4062" CXX_SUPPORTS_WE4062)
-      add_compile_options($<$<COMPILE_LANGUAGE:CXX>:/we4062>)
+      if(CXX_SUPPORTS_WE4062)
+        add_compile_options($<$<COMPILE_LANGUAGE:CXX>:/we4062>)
+      endif()
     endif()
   endif()
 
