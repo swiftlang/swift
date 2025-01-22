@@ -30,9 +30,9 @@ if(NOT SwiftCore_PLATFORM_SUBDIR)
 endif()
 
 if(NOT SwiftCore_ARCH_SUBDIR)
-  string(JSON platform GET "${target_info_json}" "target" "arch")
-  set(SwiftCore_PLATFORM_SUBDIR "${platform}" CACHE STRING "Architecture name used for installed swift{doc,module,interface} files")
-  mark_as_advanced(SwiftCore_PLATFORM_SUBDIR)
+  string(JSON arch GET "${target_info_json}" "target" "arch")
+  set(SwiftCore_ARCH_SUBDIR "${arch}" CACHE STRING "Architecture used for setting the architecture subdirectory")
+  mark_as_advanced(SwiftCore_ARCH_SUBDIR)
 
-  message(CONFIGURE_LOG "Swift platform: ${platform}")
+  message(CONFIGURE_LOG "Swift Arch: ${arch}")
 endif()
