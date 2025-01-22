@@ -3663,12 +3663,10 @@ static SILFunction *getOrCreateKeyPathSetter(
   return thunk;
 }
 
-static SILFunction *getOrCreateKeyPathAppliedMethod(
-    SILGenModule &SGM, AbstractFunctionDecl *method, SubstitutionMap subs,
-    GenericEnvironment *genericEnv, ResilienceExpansion expansion,
-    ArrayRef<IndexTypePair> args, CanType baseType, CanType methodType) {
-
-  // Handle protocol method overrides for key paths
+/// For keypaths to methods defined in protocols, use the decl defined in the
+/// conforming type's implementation.
+static void lookupMethodViaProtocol(AbstractFunctionDecl *&method,
+                                    SubstitutionMap &subs) {
   if (isa<ProtocolDecl>(method->getDeclContext())) {
     if (!method->requiresNewWitnessTableEntry()) {
       // Find the method that has a witness table entry
@@ -3681,6 +3679,13 @@ static SILFunction *getOrCreateKeyPathAppliedMethod(
       method = wtableMethod;
     }
   }
+}
+
+static SILFunction *getOrCreateKeyPathAppliedMethod(
+    SILGenModule &SGM, AbstractFunctionDecl *method, SubstitutionMap subs,
+    GenericEnvironment *genericEnv, ResilienceExpansion expansion,
+    ArrayRef<IndexTypePair> args, CanType baseType, CanType methodType) {
+  lookupMethodViaProtocol(method, subs);
 
   auto genericSig =
       genericEnv ? genericEnv->getGenericSignature().getCanonicalSignature()
