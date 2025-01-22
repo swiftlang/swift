@@ -60,7 +60,7 @@ set TMPDIR=%BuildRoot%\tmp
 set NINJA_STATUS=[%%f/%%t][%%p][%%es] 
 
 :: Build the -Test argument, if any, by subtracting skipped tests
-set TestArg=-Test lld,lldb,swift,dispatch,foundation,xctest,swift-format,sourcekit-lsp,
+set TestArg=-Test dispatch,
 for %%I in (%SKIP_TESTS%) do (call set TestArg=%%TestArg:%%I,=%%)
 if "%TestArg:~-1%"=="," (set TestArg=%TestArg:~0,-1%) else (set TestArg= )
 
@@ -77,6 +77,8 @@ powershell.exe -ExecutionPolicy RemoteSigned -File %~dp0build.ps1 ^
   -ImageRoot %BuildRoot% ^
   %SkipPackagingArg% ^
   %TestArg% ^
+  -AndroidSDKs x86_64 ^
+  -WindowsSDKs X64 ^
   -Stage %PackageRoot% ^
   -Summary || (exit /b 1)
 
