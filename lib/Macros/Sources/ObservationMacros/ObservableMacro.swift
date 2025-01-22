@@ -101,8 +101,8 @@ public struct ObservableMacro {
       """
   }
 
-  static func canCacheKeyPaths(_ container: ClassDeclSyntax) -> Bool {
-    container.genericParameterClause == nil
+  static func canCacheKeyPaths(_ lexicalContext: [Syntax]) -> Bool {
+    lexicalContext.allSatisfy { $0.isNonGeneric }
   }
 
   static var ignoredAttribute: AttributeSyntax {
@@ -357,7 +357,7 @@ public struct ObservationTrackedMacro: AccessorMacro {
         _\(identifier) = initialValue
       }
       """
-    if ObservableMacro.canCacheKeyPaths(container) {
+    if ObservableMacro.canCacheKeyPaths(context.lexicalContext) {
       let getAccessor: AccessorDeclSyntax =
         """
         get {
@@ -467,7 +467,7 @@ extension ObservationTrackedMacro: PeerMacro {
     }
     
     let storage = DeclSyntax(property.privatePrefixed("_", addingAttribute: ObservableMacro.ignoredAttribute))
-    if ObservableMacro.canCacheKeyPaths(container) {
+    if ObservableMacro.canCacheKeyPaths(context.lexicalContext) {
       let cachedKeypath: DeclSyntax =
         """
         private static let _cachedKeypath_\(identifier) = \\\(container.name).\(identifier)
