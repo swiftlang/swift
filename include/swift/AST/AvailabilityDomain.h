@@ -20,6 +20,7 @@
 
 #include "swift/AST/PlatformKind.h"
 #include "swift/Basic/LLVM.h"
+#include "llvm/ADT/FoldingSet.h"
 #include "llvm/ADT/PointerEmbeddedInt.h"
 #include "llvm/ADT/PointerUnion.h"
 
@@ -177,6 +178,11 @@ public:
   /// Returns the string to use when printing an `@available` attribute.
   llvm::StringRef getNameForAttributePrinting() const;
 
+  /// Returns true if availability in `other` is a subset of availability in
+  /// this domain. The set of all availability domains form a lattice where the
+  /// universal domain (`*`) is the bottom element.
+  bool contains(const AvailabilityDomain &other) const;
+
   bool operator==(const AvailabilityDomain &other) const {
     return storage.getOpaqueValue() == other.storage.getOpaqueValue();
   }
@@ -185,6 +191,7 @@ public:
     return !(*this == other);
   }
 
+  /// A total, stable ordering on domains.
   bool operator<(const AvailabilityDomain &other) const {
     if (getKind() != other.getKind())
       return getKind() < other.getKind();
@@ -199,6 +206,10 @@ public:
     case Kind::Platform:
       return getPlatformKind() < other.getPlatformKind();
     }
+  }
+
+  void Profile(llvm::FoldingSetNodeID &ID) const {
+    ID.AddPointer(getOpaqueValue());
   }
 };
 

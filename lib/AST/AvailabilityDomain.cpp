@@ -57,3 +57,25 @@ llvm::StringRef AvailabilityDomain::getNameForAttributePrinting() const {
     return swift::platformString(getPlatformKind());
   }
 }
+
+bool AvailabilityDomain::contains(const AvailabilityDomain &other) const {
+  // FIXME: [availability] This currently implements something closer to a
+  // total ordering instead of the more flexible partial ordering that it
+  // would ideally represent. Until AvailabilityContext supports tracking
+  // multiple unavailable domains simultaneously, a stricter ordering is
+  // necessary to support source compatibility.
+  switch (getKind()) {
+  case Kind::Universal:
+    return true;
+  case Kind::SwiftLanguage:
+    return !other.isUniversal();
+  case Kind::PackageDescription:
+  case Kind::Embedded:
+    return !other.isUniversal() && !other.isSwiftLanguage();
+  case Kind::Platform:
+    if (getPlatformKind() == other.getPlatformKind())
+      return true;
+    return inheritsAvailabilityFromPlatform(other.getPlatformKind(),
+                                            getPlatformKind());
+  }
+}

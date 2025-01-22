@@ -29,16 +29,8 @@ public:
   /// The introduction version.
   AvailabilityRange Range;
 
-  /// When `IsUnavailable` is true, this value stores the broadest platform
-  /// kind for which the context is unavailable.
-  PlatformKind UnavailablePlatform;
-
-  /// Whether or not the context is considered unavailable on the current
-  /// platform.
-  unsigned IsUnavailable : 1;
-
-  /// Whether or not the context is `@_unavailableInEmbedded`.
-  unsigned IsUnavailableInEmbedded : 1;
+  /// The broadest unavailable domain.
+  std::optional<AvailabilityDomain> UnavailableDomain;
 
   /// Whether or not the context is considered deprecated on the current
   /// platform.
@@ -53,16 +45,18 @@ public:
   /// availability is more restrictive. Returns true if any field was updated.
   bool constrainWith(const Decl *decl);
 
-  bool constrainUnavailability(std::optional<PlatformKind> unavailablePlatform);
+  bool constrainUnavailability(std::optional<AvailabilityDomain> domain);
 
   /// Returns true if `other` is as available or is more available.
   bool isContainedIn(const Info &other) const;
 
   void Profile(llvm::FoldingSetNodeID &ID) const {
     Range.getRawVersionRange().Profile(ID);
-    ID.AddBoolean(IsUnavailable);
-    ID.AddBoolean(IsUnavailableInEmbedded);
-    ID.AddInteger(static_cast<uint8_t>(UnavailablePlatform));
+    if (UnavailableDomain) {
+      UnavailableDomain->Profile(ID);
+    } else {
+      ID.AddPointer(nullptr);
+    }
     ID.AddBoolean(IsDeprecated);
   }
 };
@@ -77,7 +71,7 @@ public:
 
   static const Storage *get(const Info &info, ASTContext &ctx);
 
-  void Profile(llvm::FoldingSetNodeID &ID) const;
+  void Profile(llvm::FoldingSetNodeID &ID) const { info.Profile(ID); }
 };
 
 } // end namespace swift
