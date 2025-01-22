@@ -22,6 +22,7 @@
 #include "swift/SwiftRemoteMirror/MemoryReaderInterface.h"
 #include <optional>
 
+#include <cstdlib>
 #include <cstring>
 #include <functional>
 #include <memory>
