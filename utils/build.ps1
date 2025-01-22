@@ -2067,9 +2067,6 @@ function Test-Dispatch([Platform]$Platform) {
                 -RedirectStandardOutput "$NDKDir\.temp\emulator.out" `
                 -RedirectStandardError "$NDKDir\.temp\emulator.err"
 
-  # TODO: Find a better indicator than a upper-bound delay
-  Start-Sleep -Seconds 5
-
   # This is just a hack for now
   $LocalBin = (Get-TargetProjectBinaryCache $AndroidX64 Dispatch)
   $CacheName = Split-Path $LocalBin -Leaf
@@ -2077,6 +2074,7 @@ function Test-Dispatch([Platform]$Platform) {
 
   # TODO: On my local machine I have to grant network access once. How to do that in CI?
   $adb = "$NDKDir\platform-tools\adb.exe"
+  Invoke-Program $adb "wait-for-device"
   Write-Host    "$adb shell rm -rf $RemoteBin"
   Invoke-Program $adb shell "rm -rf $RemoteBin"
   Write-Host    "$adb shell mkdir $RemoteBin"
@@ -2089,6 +2087,8 @@ function Test-Dispatch([Platform]$Platform) {
   Invoke-Program $adb shell "chmod +x /data/local/tmp/ctest_mock.sh"
   Write-Host    "$adb shell sh /data/local/tmp/ctest_mock.sh $RemoteBin"
   Invoke-Program $adb shell "sh /data/local/tmp/ctest_mock.sh $RemoteBin"
+  Invoke-Program $adb emu kill
+  Invoke-Program $adb kill-server
 }
 
 function Build-Foundation([Platform]$Platform, $Arch, [switch]$Test = $false) {
