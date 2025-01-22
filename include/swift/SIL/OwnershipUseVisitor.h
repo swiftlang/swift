@@ -165,6 +165,8 @@ public:
 protected:
   bool visitConsumes(SILValue ssaDef);
 
+  bool visitExtends(SILValue ssaDef);
+
   bool visitOuterBorrow(SILValue borrowBegin);
 
   bool visitOuterBorrowScopeEnd(Operand *borrowEnd);
@@ -202,8 +204,12 @@ bool OwnershipUseVisitor<Impl>::visitLifetimeEndingUses(SILValue ssaDef) {
   case OwnershipKind::Guaranteed:
     return visitOuterBorrow(ssaDef);
 
-  case OwnershipKind::Any:
   case OwnershipKind::None:
+    if (ssaDef->isFromVarDecl()) {
+      return visitExtends(ssaDef);
+    }
+    LLVM_FALLTHROUGH;
+  case OwnershipKind::Any:
   case OwnershipKind::Unowned:
     llvm_unreachable("requires an owned or guaranteed orignalDef");
   }
@@ -226,6 +232,18 @@ bool OwnershipUseVisitor<Impl>::visitConsumes(SILValue ssaDef) {
         
       if (!handleUsePoint(use, UseLifetimeConstraint::LifetimeEnding))
         return false;
+    }
+  }
+  return true;
+}
+
+template <typename Impl>
+bool OwnershipUseVisitor<Impl>::visitExtends(SILValue ssaDef) {
+  for (Operand *use : ssaDef->getUses()) {
+    if (isa<ExtendLifetimeInst>(use->getUser())) {
+      if (!handleUsePoint(use, UseLifetimeConstraint::NonLifetimeEnding))
+        return false;
+      continue;
     }
   }
   return true;
