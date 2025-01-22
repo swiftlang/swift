@@ -407,6 +407,12 @@ static bool usesFeatureCoroutineAccessors(Decl *decl) {
   }
 }
 
+static bool usesFeatureCustomAvailability(Decl *decl) {
+  // FIXME: [availability] Check whether @available attributes for custom
+  // domains are attached to the decl.
+  return false;
+}
+
 // ----------------------------------------------------------------------------
 // MARK: - FeatureSet
 // ----------------------------------------------------------------------------

@@ -3239,6 +3239,14 @@ suppressingFeatureAddressableTypes(PrintOptions &options,
   action();
 }
 
+static void
+suppressingFeatureCustomAvailability(PrintOptions &options,
+                                     llvm::function_ref<void()> action) {
+  // FIXME: [availability] Save and restore a bit controlling whether
+  // @available attributes for custom domains are printed.
+  action();
+}
+
 /// Suppress the printing of a particular feature.
 static void suppressingFeature(PrintOptions &options, Feature feature,
                                llvm::function_ref<void()> action) {
