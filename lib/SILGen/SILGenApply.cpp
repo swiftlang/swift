@@ -7237,28 +7237,31 @@ static void emitPseudoFunctionArguments(SILGenFunction &SGF,
   outVals.swap(argValues);
 }
 
+CanFunctionType SILGenFunction::prepareStorageType(ValueDecl *decl,
+                                                   SubstitutionMap subs) {
+  auto computeSubstitutedType = [&](Type interfaceType) -> CanFunctionType {
+    if (subs) {
+      if (auto genericFnType = interfaceType->getAs<GenericFunctionType>()) {
+        return cast<FunctionType>(
+            genericFnType->substGenericArgs(subs)->getCanonicalType());
+      }
+    }
+    return cast<FunctionType>(interfaceType->getCanonicalType());
+  };
+  Type interfaceType;
+  if (auto *subscript = dyn_cast<SubscriptDecl>(decl)) {
+    // TODO: Use the real abstraction pattern from the accessor(s) in the
+    // strategy. Currently, the substituted type is used to reconstitute these
+    // as RValues.
+    interfaceType = subscript->getInterfaceType();
+  }
+  return computeSubstitutedType(interfaceType);
+}
+
 PreparedArguments SILGenFunction::prepareIndices(SILLocation loc,
-                                                 ValueDecl *decl,
-                                                 SubstitutionMap subs,
+                                                 CanFunctionType substFnType,
                                                  AccessStrategy strategy,
                                                  ArgumentList *argList) {
-  // TODO: use the real abstraction pattern from the accessor(s) in the
-  // strategy.
-  // Currently we use the substituted type so that we can reconstitute these
-  // as RValues.
-  Type interfaceType = decl->getInterfaceType();
-
-  CanFunctionType substFnType;
-  if (subs)
-    substFnType = cast<FunctionType>(interfaceType
-                                       ->castTo<GenericFunctionType>()
-                                       ->substGenericArgs(subs)
-                                       ->getCanonicalType());
-  else
-    substFnType = cast<FunctionType>(interfaceType
-                                       ->getCanonicalType());
-
-
   AbstractionPattern origFnType(substFnType);
 
   // Prepare the unevaluated index expression.
@@ -7908,12 +7911,7 @@ SmallVector<ManagedValue, 4>
 SILGenFunction::emitKeyPathOperands(SILLocation loc, ValueDecl *decl,
                                     SubstitutionMap subs,
                                     ArgumentList *argList) {
-  Type interfaceType = decl->getInterfaceType();
-  CanFunctionType substFnType =
-      subs ? cast<FunctionType>(interfaceType->castTo<GenericFunctionType>()
-                                    ->substGenericArgs(subs)
-                                    ->getCanonicalType())
-           : cast<FunctionType>(interfaceType->getCanonicalType());
+  auto substFnType = prepareStorageType(decl, subs);
   AbstractionPattern origFnType(substFnType);
   auto fnType =
       getLoweredType(origFnType, substFnType).castTo<SILFunctionType>()
@@ -7925,7 +7923,7 @@ SILGenFunction::emitKeyPathOperands(SILLocation loc, ValueDecl *decl,
                      ClaimedParamsRef(fnType->getParameters()), argValues,
                      delayedArgs, ForeignInfo{});
 
-  auto prepared = prepareIndices(loc, decl, subs,
+  auto prepared = prepareIndices(loc, substFnType,
                                  // Strategy doesn't matter
                                  AccessStrategy::getStorage(), argList);
   emitter.emitPreparedArgs(std::move(prepared), origFnType);

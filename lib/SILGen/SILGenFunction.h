@@ -1933,8 +1933,12 @@ public:
                                 const FunctionTypeInfo &typeContext,
                                 SubstitutionMap subs);
 
-  PreparedArguments prepareIndices(SILLocation loc, ValueDecl *decl,
-                                   SubstitutionMap subs,
+  /// Get substituted type for a given interface type, optionally apply a
+  /// substitution map if provided.
+  CanFunctionType prepareStorageType(ValueDecl *decl, SubstitutionMap subs);
+
+  /// Evaluate and associate arguments with their expressions.
+  PreparedArguments prepareIndices(SILLocation loc, CanFunctionType substFnType,
                                    AccessStrategy strategy,
                                    ArgumentList *argList);
 
