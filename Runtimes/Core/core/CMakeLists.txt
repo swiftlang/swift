@@ -223,6 +223,7 @@ add_library(swiftCore
   Int128.swift
   Mirror.swift
   PlaygroundDisplay.swift
+  SwiftifyImport.swift
   CommandLine.swift
   SliceBuffer.swift
   StaticBigInt.swift
