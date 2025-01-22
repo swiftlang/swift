@@ -233,7 +233,7 @@ Constructor UnsafeRawPointer.init(_:) has generic signature change from <T> to <
 Enum MemoryLayout has generic signature change from <T> to <T where T : ~Copyable, T : ~Escapable>
 Enum Optional has generic signature change from <Wrapped> to <Wrapped where Wrapped : ~Copyable, Wrapped : ~Escapable>
 Enum Result has generic signature change from <Success, Failure where Failure : Swift.Error> to <Success, Failure where Failure : Swift.Error, Success : ~Copyable, Success : ~Escapable>
-Func ??(_:_:) has generic signature change from <T> to <T where T : ~Copyable, T : ~Escapable>
+Func ??(_:_:) has generic signature change from <T> to <T where T : ~Copyable>
 Func ??(_:_:) has parameter 0 changing from Default to Owned
 Func ManagedBuffer.create(minimumCapacity:makingHeaderWith:) has generic signature change from <Header, Element> to <Header, Element where Element : ~Copyable>
 Func ManagedBufferPointer.isUniqueReference() has generic signature change from <Header, Element> to <Header, Element where Element : ~Copyable>
