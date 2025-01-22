@@ -794,10 +794,10 @@ SemanticAvailableAttr::getIntroducedRange(const ASTContext &Ctx) const {
   assert(getDomain().isActive(Ctx));
 
   auto *attr = getParsedAttr();
-  if (!attr->Introduced.has_value())
+  if (!attr->getRawIntroduced().has_value())
     return AvailabilityRange::alwaysAvailable();
 
-  llvm::VersionTuple IntroducedVersion = attr->Introduced.value();
+  llvm::VersionTuple IntroducedVersion = attr->getRawIntroduced().value();
   StringRef Platform;
   llvm::VersionTuple RemappedIntroducedVersion;
   if (AvailabilityInference::updateIntroducedPlatformForFallback(

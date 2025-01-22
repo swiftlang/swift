@@ -754,26 +754,32 @@ private:
   const StringRef Message;
   const StringRef Rename;
 
-  const std::optional<llvm::VersionTuple> Introduced;
+  const llvm::VersionTuple Introduced;
   const SourceRange IntroducedRange;
-  const std::optional<llvm::VersionTuple> Deprecated;
+  const llvm::VersionTuple Deprecated;
   const SourceRange DeprecatedRange;
-  const std::optional<llvm::VersionTuple> Obsoleted;
+  const llvm::VersionTuple Obsoleted;
   const SourceRange ObsoletedRange;
 
 public:
   /// Returns the parsed version for `introduced:`.
   std::optional<llvm::VersionTuple> getRawIntroduced() const {
+    if (Introduced.empty())
+      return std::nullopt;
     return Introduced;
   }
 
   /// Returns the parsed version for `deprecated:`.
   std::optional<llvm::VersionTuple> getRawDeprecated() const {
+    if (Deprecated.empty())
+      return std::nullopt;
     return Deprecated;
   }
 
   /// Returns the parsed version for `obsoleted:`.
   std::optional<llvm::VersionTuple> getRawObsoleted() const {
+    if (Obsoleted.empty())
+      return std::nullopt;
     return Obsoleted;
   }
 
@@ -3268,7 +3274,7 @@ public:
 
   /// The version tuple written in source for the `introduced:` component.
   std::optional<llvm::VersionTuple> getIntroduced() const {
-    return attr->Introduced;
+    return attr->getRawIntroduced();
   }
 
   /// The source range of the `introduced:` component.
@@ -3280,12 +3286,12 @@ public:
 
   /// The version tuple written in source for the `deprecated:` component.
   std::optional<llvm::VersionTuple> getDeprecated() const {
-    return attr->Deprecated;
+    return attr->getRawDeprecated();
   }
 
   /// The version tuple written in source for the `obsoleted:` component.
   std::optional<llvm::VersionTuple> getObsoleted() const {
-    return attr->Obsoleted;
+    return attr->getRawObsoleted();
   }
 
   /// Returns the `message:` field of the attribute, or an empty string.
@@ -3318,7 +3324,8 @@ public:
   /// Whether this attribute has an introduced, deprecated, or obsoleted
   /// version.
   bool isVersionSpecific() const {
-    return attr->Introduced || attr->Deprecated || attr->Obsoleted;
+    return getIntroduced().has_value() || getDeprecated().has_value() ||
+           getObsoleted().has_value();
   }
 
   /// Whether this is a language mode specific attribute.
