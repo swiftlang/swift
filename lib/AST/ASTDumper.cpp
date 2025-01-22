@@ -2227,12 +2227,12 @@ namespace {
       if (Writer.isParsable()) {
         // Parsable outputs are meant to be used for semantic analysis, so we
         // want the full list of members, including macro-generated ones.
-        printList(IDC->getABIMembers(), [&](Decl *D, Label label) {
+        printList(IDC->getAllMembers(), [&](Decl *D, Label label) {
           printRec(D, label);
         }, Label::optional("members"));
       } else {
         auto members = ParseIfNeeded ? IDC->getMembers()
-                                    : IDC->getCurrentMembersWithoutLoading();
+                                     : IDC->getCurrentMembersWithoutLoading();
         printList(members, [&](Decl *D, Label label) {
           printRec(D, label);
         }, Label::optional("members"));
@@ -4794,7 +4794,7 @@ public:
 
   void visitExecutionAttr(ExecutionAttr *Attr, Label label) {
     printCommon(Attr, "execution_attr", label);
-    printField(Attr->getBehavior(), "behavior");
+    printField(Attr->getBehavior(), Label::always("behavior"));
     printFoot();
   }
   void visitABIAttr(ABIAttr *Attr, Label label) {
@@ -5869,14 +5869,15 @@ namespace {
 #define VISIT_BINDABLE_NOMINAL_TYPE(TypeClass, Name)       \
     VISIT_NOMINAL_TYPE(TypeClass, Name)                    \
     void visitBoundGeneric##TypeClass(                     \
-        BoundGeneric##TypeClass *T, StringRef label) {     \
+        BoundGeneric##TypeClass *T, Label label) {         \
       printCommon("bound_generic_" #Name, label);          \
-      printFieldQuoted(T->getDecl()->printRef(), "decl");  \
+      printFieldQuoted(T->getDecl()->printRef(), Label::always("decl"));  \
       printFlag(T->getDecl()->hasClangNode(), "foreign");  \
       if (T->getParent())                                  \
-        printRec(T->getParent(), "parent");                \
-      for (auto arg : T->getGenericArgs())                 \
-        printRec(arg);                                     \
+        printRec(T->getParent(), Label::always("parent")); \
+      printList(T->getGenericArgs(), [&](auto arg, Label label) {  \
+        printRec(arg, label);                              \
+      }, Label::optional("generic_args"));                 \
       printFoot();                                         \
     }
 
@@ -5919,7 +5920,7 @@ namespace {
 
     void visitModuleType(ModuleType *T, Label label) {
       printCommon("module_type", label);
-      printDeclNameField(T->getModule(), Label::always("module"));
+      printDeclName(T->getModule(), Label::always("module"));
       printFlag(T->getModule()->isNonSwiftModule(), "foreign");
       printFoot();
     }
@@ -6042,7 +6043,7 @@ namespace {
     void printAnyFunctionParamsRec(ArrayRef<AnyFunctionType::Param> params,
                                    Label label) {
       printRecArbitrary([&](Label label) {
-        printCommon("function_params", FieldLabelColor, label);
+        printHead("function_params", FieldLabelColor, label);
 
         printField(params.size(), Label::always("num_params"));
         printList(params, [&](const auto &param, Label label) {
