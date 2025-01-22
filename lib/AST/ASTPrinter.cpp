@@ -1004,6 +1004,7 @@ public:
     SwapSelfAndDependentMemberType = 8,
     PrintInherited = 16,
     PrintInverseRequirements = 32,
+    PrintExplicitInvertibleRequirements = 64,
   };
 
   /// The default generic signature flags for printing requirements.
@@ -1773,7 +1774,18 @@ void PrintAST::printGenericSignature(
   SmallVector<Requirement, 2> requirements;
   SmallVector<InverseRequirement, 2> inverses;
 
-  if (flags & PrintInverseRequirements) {
+  if (flags & PrintExplicitInvertibleRequirements) {
+    // Collect the inverted requirements…
+    SmallVector<Requirement, 2> filteredRequirements;
+    genericSig->getRequirementsWithInverses(filteredRequirements, inverses);
+    llvm::erase_if(inverses, [&](InverseRequirement inverse) -> bool {
+      return !inverseFilter(inverse);
+    });
+    // …and also all of the unfiltered requirements, including the ones for
+    // invertible protocols.
+    requirements.append(genericSig.getRequirements().begin(),
+                        genericSig.getRequirements().end());
+  } else if (flags & PrintInverseRequirements) {
     genericSig->getRequirementsWithInverses(requirements, inverses);
     llvm::erase_if(inverses, [&](InverseRequirement inverse) -> bool {
       return !inverseFilter(inverse);
@@ -3123,7 +3135,7 @@ void PrintAST::printExtension(ExtensionDecl *decl) {
       // in such an extension. We need to print the whole signature:
       //     extension S: Copyable where T: Copyable
       if (decl->isAddingConformanceToInvertible())
-        genSigFlags &= ~PrintInverseRequirements;
+        genSigFlags |= PrintExplicitInvertibleRequirements;
 
       printGenericSignature(genericSig,
                             genSigFlags,
