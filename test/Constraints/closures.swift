@@ -1305,3 +1305,13 @@ do {
         })
   }
 }
+
+func rdar143338891() {
+  func takesAny(_: Any?) {}
+
+  class Test {
+    func test() {
+      _ = { [weak self] in takesAny(self) }
+    }
+  }
+}
