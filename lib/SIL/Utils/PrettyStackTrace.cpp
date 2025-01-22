@@ -104,3 +104,9 @@ void PrettyStackTraceSILNode::print(llvm::raw_ostream &out) const {
   if (Node)
     out << *Node;
 }
+
+void PrettyStackTraceSILDeclRef::print(llvm::raw_ostream &out) const {
+  out << "While " << action << " SIL decl '";
+  declRef.print(out);
+  out << "'\n";
+}
