@@ -8794,6 +8794,14 @@ public:
     out << ")";
   }
 
+  void printLifetimeboundReturn(int idx, bool borrow) {
+    printSeparator();
+    out << ".lifetimeDependence(dependsOn: " << (idx + 1);
+    out << ", pointer: .return, type: ";
+    out << (borrow ? ".borrow" : ".copy");
+    out << ")";
+  }
+
   void printTypeMapping(const llvm::StringMap<std::string> &mapping) {
     printSeparator();
     out << "typeMappings: [";
@@ -8839,23 +8847,44 @@ void ClangImporter::Implementation::importSpanAttributes(FuncDecl *MappedDecl) {
     llvm::raw_svector_ostream out(MacroString);
     llvm::StringMap<std::string> typeMapping;
 
+    auto registerSwiftifyMacro =
+        [&typeMapping, &attachMacro](ParamDecl *swiftParam,
+                                     const clang::ParmVarDecl *param) {
+          typeMapping.insert(std::make_pair(
+              swiftParam->getInterfaceType()->getString(),
+              swiftParam->getInterfaceType()->getDesugaredType()->getString()));
+          attachMacro = true;
+        };
     SwiftifyInfoPrinter printer(getClangASTContext(), out);
+    auto retDecl = ClangDecl->getReturnType()->getAsTagDecl();
+    bool returnIsSpan =
+        retDecl && retDecl->isInStdNamespace() && retDecl->getName() == "span";
+    if (returnIsSpan) {
+      typeMapping.insert(
+          std::make_pair(MappedDecl->getResultInterfaceType()->getString(),
+                         MappedDecl->getResultInterfaceType()
+                             ->getDesugaredType()
+                             ->getString()));
+    }
     for (auto [index, param] : llvm::enumerate(ClangDecl->parameters())) {
       auto paramTy = param->getType();
       const auto *decl = paramTy->getAsTagDecl();
-      if (!decl || !decl->isInStdNamespace())
-        continue;
-      if (decl->getName() != "span")
+      auto swiftParam = MappedDecl->getParameters()->get(index);
+      bool isSpan =
+          decl && decl->isInStdNamespace() && decl->getName() == "span";
+      if (param->hasAttr<clang::LifetimeBoundAttr>() &&
+          MappedDecl->getASTContext().LangOpts.hasFeature(
+              Feature::LifetimeDependence) &&
+          (isSpan || returnIsSpan)) {
+        printer.printLifetimeboundReturn(
+            index, !isSpan && swiftParam->getInterfaceType()->isEscapable());
+        registerSwiftifyMacro(swiftParam, param);
+      }
+      if (!isSpan)
         continue;
       if (param->hasAttr<clang::NoEscapeAttr>()) {
         printer.printNonEscaping(index);
-        clang::PrintingPolicy policy(param->getASTContext().getLangOpts());
-        policy.SuppressTagKeyword = true;
-        auto param = MappedDecl->getParameters()->get(index);
-        typeMapping.insert(std::make_pair(
-            paramTy.getAsString(policy),
-            param->getInterfaceType()->getDesugaredType()->getString()));
-        attachMacro = true;
+        registerSwiftifyMacro(swiftParam, param);
       }
     }
     printer.printTypeMapping(typeMapping);

@@ -189,6 +189,15 @@ func replaceBaseType(_ type: TypeSyntax, _ base: TypeSyntax) -> TypeSyntax {
   return base
 }
 
+// The generated type names for template instantiations sometimes contain
+// a `_const` suffix for diambiguation purposes. We need to remove that.
+func dropConstSuffix(_ typeName: String) -> String {
+  if typeName.hasSuffix("_const") {
+    return String(typeName.dropLast("_const".count))
+  }
+  return typeName
+}
+
 func getPointerMutability(text: String) -> Mutability? {
   switch text {
   case "UnsafePointer": return .Immutable
@@ -372,7 +381,8 @@ struct CxxSpanThunkBuilder: ParamPointerBoundsThunkBuilder {
     let parsedDesugaredType = TypeSyntax("\(raw: getUnqualifiedStdName(desugaredType)!)")
     let genericArg = TypeSyntax(parsedDesugaredType.as(IdentifierTypeSyntax.self)!
       .genericArgumentClause!.arguments.first!.argument)!
-    types[index] = replaceBaseType(param.type, TypeSyntax("Span<\(raw: try getTypeName(genericArg).text)>"))
+    types[index] = replaceBaseType(param.type,
+      TypeSyntax("Span<\(raw: dropConstSuffix(try getTypeName(genericArg).text))>"))
     return try base.buildFunctionSignature(types, returnType)
   }
 
@@ -407,7 +417,7 @@ struct CxxSpanReturnThunkBuilder: BoundsCheckedThunkBuilder {
     let genericArg = TypeSyntax(parsedDesugaredType.as(IdentifierTypeSyntax.self)!
       .genericArgumentClause!.arguments.first!.argument)!
     let newType = replaceBaseType(signature.returnClause!.type,
-      TypeSyntax("Span<\(raw: try getTypeName(genericArg).text)>"))
+      TypeSyntax("Span<\(raw: dropConstSuffix(try getTypeName(genericArg).text))>"))
     return try base.buildFunctionSignature(argTypes, newType)
   }
 
