@@ -1,7 +1,8 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-build-swift %s -parse-as-library -Onone -o %t/ImageMap
 // RUN: %target-codesign %t/ImageMap
-// RUN: %target-run %t/ImageMap | %FileCheck %s
+// RUN: %target-run %t/ImageMap | tee %t/ImageMap.out
+// RUN: cat %t/ImageMap.out | %FileCheck %s
 
 // UNSUPPORTED: use_os_stdlib
 // UNSUPPORTED: back_deployment_runtime
