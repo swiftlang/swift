@@ -4203,7 +4203,8 @@ LValue SILGenLValue::visitSubscriptExpr(SubscriptExpr *e,
     actorIso = getActorIsolation(decl);
 
   auto *argList = e->getArgs();
-  auto indices = SGF.prepareIndices(e, decl, subs, strategy, argList);
+  auto storageCanType = SGF.prepareStorageType(decl, subs);
+  auto indices = SGF.prepareIndices(e, storageCanType, strategy, argList);
 
   CanType formalRValueType = getSubstFormalRValueType(e);
   lv.addMemberSubscriptComponent(SGF, e, decl, subs,
