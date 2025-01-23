@@ -1577,6 +1577,7 @@ endif()
 # New standard library build
 option(SWIFT_ENABLE_NEW_RUNTIME_BUILD "Build Swift runtimes with new build system" OFF)
 if(SWIFT_ENABLE_NEW_RUNTIME_BUILD)
+  message(STATUS "New runtime build enabled")
 
   add_custom_target(PopulateRuntimeSourceDir
     COMMAND "${CMAKE_COMMAND}" -P "${CMAKE_CURRENT_SOURCE_DIR}/Runtimes/Resync.cmake"
@@ -1593,6 +1594,12 @@ if(SWIFT_ENABLE_NEW_RUNTIME_BUILD)
       if(${SWIFT_SDK_${sdk}_${arch}_CACHE})
         set(stdlib_cache_file_flag -C ${SWIFT_SDK_${sdk}_${arch}_CACHE})
       endif()
+
+      set(stdlib_target_triple ${SWIFT_SDK_${sdk}_ARCH_${arch}_TRIPLE})
+      if(SWIFT_SDK_${sdk}_DEPLOYMENT_VERSION)
+        string(APPEND stdlib_target_triple ${SWIFT_SDK_${sdk}_DEPLOYMENT_VERSION})
+      endif()
+
       ExternalProject_Add("${stdlib_target}-core"
         SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/Runtimes/Core"
         # TODO: Add this once we're ready to start swapping out the libraries
@@ -1611,8 +1618,13 @@ if(SWIFT_ENABLE_NEW_RUNTIME_BUILD)
           -DCMAKE_Swift_COMPILER:FILEPATH=$<IF:$<BOOL:${CMAKE_CROSSCOMPILING}>,${CMAKE_Swift_COMPILER},$<PATH:REPLACE_FILENAME,$<TARGET_FILE:swift-frontend>,swiftc>>
           -DCMAKE_C_COMPILER:FILEPATH=${CMAKE_C_COMPILER}
           -DCMAKE_CXX_COMPILER:FILEPATH=${CMAKE_CXX_COMPILER}
+          -DCMAKE_Swift_COMPILER_TARGET:STRING=${stdlib_target_triple}
+          -DCMAKE_C_COMPILER_TARGET:STRING=${stdlib_target_triple}
+          -DCMAKE_CXX_COMPILER_TARGET:STRING=${stdlib_target_triple}
           -DCMAKE_COLOR_DIAGNOSTICS:BOOLEAN=${CMAKE_COLOR_DIAGNOSTICS}
-          -DCMAKE_MAKE_PROGRAM=${CMAKE_MAKE_PROGRAM})
+          -DCMAKE_MAKE_PROGRAM=${CMAKE_MAKE_PROGRAM}
+          -DSwiftCore_PLATFORM_SUBDIR=${SWIFT_SDK_${sdk}_LIB_SUBDIR}
+          -DSwiftCore_ARCH_SUBDIR=${arch})
       if(NOT ${CMAKE_CROSSCOMPILING})
         add_dependencies("${stdlib_target}" swift-frontend)
       endif()
