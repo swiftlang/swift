@@ -218,6 +218,40 @@ class GenericClassParent<T> {
   }
 }
 
+protocol MemberProtocol {}
+struct MemberType: MemberProtocol {}
+
+@Observable
+class HasUniversalMember {
+  var member: any MemberProtocol = MemberType()
+}
+
+@Observable
+class HasExistentialMember {
+  var member: some MemberProtocol = MemberType()
+}
+
+protocol HasAssociatedType {
+  associatedtype Associated
+  static var associatedMember: Associated { get }
+}
+
+@Observable
+class HasHiddenExistential: HasAssociatedType {
+  var member: Associated = HasHiddenExistential.associatedMember
+  static var associatedMember: some MemberProtocol { MemberType() }
+}
+
+/*
+// FIXME: This case is not handled yet. Properties that have no type annotation
+// that are inferred as containing a `some` type fail to compile.
+@Observable
+class HasMoreHiddenExistential: HasAssociatedType {
+  var member = HasMoreHiddenExistential.associatedMember
+  static var associatedMember: some MemberProtocol { MemberType() }
+}
+*/
+
 @Observable
 class RecursiveOuter {
   var inner = RecursiveInner()
