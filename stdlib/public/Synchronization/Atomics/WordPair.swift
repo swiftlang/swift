@@ -187,15 +187,11 @@ extension WordPair: Hashable {
 extension WordPair: Comparable {
   // Note: This function can have a lower availability than the conformance
   // itself because it's always emit into client.
-  @available(SwiftStdlib 6.0, *)
+  @available(SwiftStdlib 6.2, *)
   @_alwaysEmitIntoClient
   @_transparent
   public static func <(lhs: WordPair, rhs: WordPair) -> Bool {
-    if lhs.first != rhs.first {
-      return lhs.first < rhs.first
-    } else {
-      return lhs.second < rhs.second
-    }
+    (lhs.first, lhs.second) < (rhs.first, rhs.second)
   }
 }
 
