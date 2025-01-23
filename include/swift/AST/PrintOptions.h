@@ -194,7 +194,7 @@ struct PrintOptions {
     Package // prints package, SPI, and public/inlinable decls
   };
 
-  InterfaceMode InterfaceContentKind;
+  InterfaceMode InterfaceContentKind = InterfaceMode::Private;
 
   bool printPublicInterface() const {
     return InterfaceContentKind == InterfaceMode::Public;
