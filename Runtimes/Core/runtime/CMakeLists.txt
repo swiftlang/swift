@@ -149,13 +149,17 @@ if("${SwiftCore_OBJECT_FORMAT}" STREQUAL "elfx")
     "${SwiftCore_SWIFTC_SOURCE_DIR}/include"
     "${PROJECT_BINARY_DIR}/include")
   target_link_libraries(swiftrt PRIVATE swiftShims)
-  install(TARGETS swiftrt DESTINATION "${CMAKE_INSTALL_LIBDIR}/swift")
+  install(FILES $<TARGET_OBJECTS:swiftrt>
+    DESTINATION "${CMAKE_INSTALL_LIBDIR}/swift/${SwiftCore_PLATFORM_SUBDIR}/${SwiftCore_ARCH_SUBDIR}"
+    RENAME swiftrt.o)
 elseif("${SwiftCore_OBJECT_FORMAT}" STREQUAL "coffx")
   add_library(swiftrt OBJECT SwiftRT-COFF.cpp)
   target_compile_definitions(swiftrt PRIVATE
     $<$<NOT:$<BOOL:${BUILD_SHARED_LIBS}>>:SWIFT_STATIC_STDLIB>)
   target_link_libraries(swiftrt PRIVATE swiftShims)
-  install(TARGETS swiftrt DESTINATION "${CMAKE_INSTALL_LIBDIR}/swift")
+  install(FILES $<TARGET_OBJECTS:swiftrt>
+    DESTINATION "${CMAKE_INSTALL_LIBDIR}/swift/${SwiftCore_PLATFORM_SUBDIR}/${SwiftCore_ARCH_SUBDIR}"
+    RENAME swiftrt.obj)
 elseif(NOT "${SwiftCore_OBJECT_FORMAT}" STREQUAL "x")
   message(SEND_ERROR "Unknown object format '${SwiftCore_OBJECT_FORMAT}'")
 endif()
