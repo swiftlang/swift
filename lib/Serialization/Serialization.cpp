@@ -2891,6 +2891,14 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
   }
 #include "swift/AST/DeclAttr.def"
 
+    case DeclAttrKind::Execution: {
+      auto *theAttr = cast<ExecutionAttr>(DA);
+      auto abbrCode = S.DeclTypeAbbrCodes[ExecutionDeclAttrLayout::Code];
+      ExecutionDeclAttrLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
+                                          (unsigned)theAttr->getKind());
+      return;
+    }
+
     case DeclAttrKind::ABI: {
       auto *theAttr = cast<ABIAttr>(DA);
       auto abbrCode = S.DeclTypeAbbrCodes[ABIDeclAttrLayout::Code];
@@ -3052,35 +3060,37 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
     }
 
     case DeclAttrKind::Available: {
-      auto *theAttr = cast<AvailableAttr>(DA);
-      ENCODE_VER_TUPLE(Introduced, theAttr->Introduced)
-      ENCODE_VER_TUPLE(Deprecated, theAttr->Deprecated)
-      ENCODE_VER_TUPLE(Obsoleted, theAttr->Obsoleted)
+      auto theAttr = D->getSemanticAvailableAttr(cast<AvailableAttr>(DA));
+      assert(theAttr);
 
-      assert(theAttr->Rename.empty() || !theAttr->hasCachedRenamedDecl());
-      assert(theAttr->hasCachedDomain());
-      auto domain = theAttr->getCachedDomain();
+      ENCODE_VER_TUPLE(Introduced, theAttr->getIntroduced())
+      ENCODE_VER_TUPLE(Deprecated, theAttr->getDeprecated())
+      ENCODE_VER_TUPLE(Obsoleted, theAttr->getObsoleted())
+
+      assert(theAttr->getRename().empty() ||
+             !theAttr->getParsedAttr()->hasCachedRenamedDecl());
+      auto domain = theAttr->getDomain();
 
       // FIXME: [availability] Serialize domain and kind directly.
       llvm::SmallString<32> blob;
-      blob.append(theAttr->Message);
-      blob.append(theAttr->Rename);
+      blob.append(theAttr->getMessage());
+      blob.append(theAttr->getRename());
       auto abbrCode = S.DeclTypeAbbrCodes[AvailableDeclAttrLayout::Code];
       AvailableDeclAttrLayout::emitRecord(
           S.Out, S.ScratchRecord, abbrCode,
-          theAttr->isImplicit(),
+          theAttr->getParsedAttr()->isImplicit(),
           theAttr->isUnconditionallyUnavailable(),
           theAttr->isUnconditionallyDeprecated(),
           theAttr->isNoAsync(),
-          domain->isPackageDescription(),
+          domain.isPackageDescription(),
           theAttr->isSPI(),
-          theAttr->isForEmbedded(),
+          domain.isEmbedded(),
           LIST_VER_TUPLE_PIECES(Introduced),
           LIST_VER_TUPLE_PIECES(Deprecated),
           LIST_VER_TUPLE_PIECES(Obsoleted),
-          static_cast<unsigned>(domain->getPlatformKind()),
-          theAttr->Message.size(),
-          theAttr->Rename.size(),
+          static_cast<unsigned>(domain.getPlatformKind()),
+          theAttr->getMessage().size(),
+          theAttr->getRename().size(),
           blob);
       return;
     }

@@ -68,24 +68,24 @@ AvailabilityRange AvailabilityRange::forRuntimeTarget(const ASTContext &Ctx) {
 }
 
 PlatformKind AvailabilityConstraint::getPlatform() const {
-  return attr.getPlatform();
+  return getAttr().getPlatform();
 }
 
 std::optional<AvailabilityRange>
 AvailabilityConstraint::getRequiredNewerAvailabilityRange(
     ASTContext &ctx) const {
-  switch (kind) {
+  switch (getKind()) {
   case Kind::AlwaysUnavailable:
   case Kind::RequiresVersion:
   case Kind::Obsoleted:
     return std::nullopt;
   case Kind::IntroducedInNewerVersion:
-    return attr.getIntroducedRange(ctx);
+    return getAttr().getIntroducedRange(ctx);
   }
 }
 
 bool AvailabilityConstraint::isConditionallySatisfiable() const {
-  switch (kind) {
+  switch (getKind()) {
   case Kind::AlwaysUnavailable:
   case Kind::RequiresVersion:
   case Kind::Obsoleted:
@@ -96,10 +96,10 @@ bool AvailabilityConstraint::isConditionallySatisfiable() const {
 }
 
 bool AvailabilityConstraint::isActiveForRuntimeQueries(ASTContext &ctx) const {
-  if (attr.getPlatform() == PlatformKind::none)
+  if (getAttr().getPlatform() == PlatformKind::none)
     return true;
 
-  return swift::isPlatformActive(attr.getPlatform(), ctx.LangOpts,
+  return swift::isPlatformActive(getAttr().getPlatform(), ctx.LangOpts,
                                  /*forTargetVariant=*/false,
                                  /*forRuntimeQuery=*/true);
 }
@@ -447,7 +447,9 @@ Decl::getSemanticAvailableAttrs(bool includeInactive) const {
 
 std::optional<SemanticAvailableAttr>
 Decl::getSemanticAvailableAttr(const AvailableAttr *attr) const {
-  return SemanticAvailableAttr(attr);
+  return evaluateOrDefault(getASTContext().evaluator,
+                           SemanticAvailableAttrRequest{attr, this},
+                           std::nullopt);
 }
 
 std::optional<SemanticAvailableAttr>
@@ -557,13 +559,14 @@ std::optional<SemanticAvailableAttr> Decl::getNoAsyncAttr() const {
 
 bool Decl::isUnavailableInCurrentSwiftVersion() const {
   llvm::VersionTuple vers = getASTContext().LangOpts.EffectiveLanguageVersion;
-  for (auto semanticAttr :
-       getSemanticAvailableAttrs(/*includingInactive=*/false)) {
-    if (semanticAttr.isSwiftLanguageModeSpecific()) {
-      auto attr = semanticAttr.getParsedAttr();
-      if (attr->Introduced.has_value() && attr->Introduced.value() > vers)
+  for (auto attr : getSemanticAvailableAttrs(/*includingInactive=*/false)) {
+    if (attr.isSwiftLanguageModeSpecific()) {
+      auto introduced = attr.getIntroduced();
+      if (introduced && *introduced > vers)
         return true;
-      if (attr->Obsoleted.has_value() && attr->Obsoleted.value() <= vers)
+
+      auto obsoleted = attr.getObsoleted();
+      if (obsoleted && *obsoleted <= vers)
         return true;
     }
   }
@@ -791,10 +794,10 @@ SemanticAvailableAttr::getIntroducedRange(const ASTContext &Ctx) const {
   assert(getDomain().isActive(Ctx));
 
   auto *attr = getParsedAttr();
-  if (!attr->Introduced.has_value())
+  if (!attr->getRawIntroduced().has_value())
     return AvailabilityRange::alwaysAvailable();
 
-  llvm::VersionTuple IntroducedVersion = attr->Introduced.value();
+  llvm::VersionTuple IntroducedVersion = attr->getRawIntroduced().value();
   StringRef Platform;
   llvm::VersionTuple RemappedIntroducedVersion;
   if (AvailabilityInference::updateIntroducedPlatformForFallback(

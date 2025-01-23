@@ -880,6 +880,17 @@ extension LifetimeDependenceDefUseWalker {
 extension LifetimeDependenceDefUseWalker {
   mutating func walkDown(root: Value) -> WalkResult {
     if root.type.isAddress {
+      if let md = root as? MarkDependenceInst, !root.isEscapable {
+        // LifetimeDependence.dependentValue is typically a mark_dependence. If its 'value' address is a non-Escapable
+        // local variable, then consider all other reachable uses of that local variable to be dependent uses. Remember
+        // the operand to the mark_dependence as if it was a store. Diagnostics will consider this the point of variable
+        // initialization.
+        if visitStoredUses(of: md.valueOperand, into: md.value) == .abortWalk {
+          return .abortWalk
+        }
+      }
+      // The root address may also be an escapable mark_dependence that guards its address uses (unsafeAddress), or an
+      // allocation or incoming argument. In all these cases, it is sufficient to walk down the address uses.
       return walkDownAddressUses(of: root)
     }
     return walkDownUses(of: root, using: nil)
@@ -1127,11 +1138,13 @@ extension LifetimeDependenceDefUseWalker {
     }
   }
 
-  // Visit stores to a local variable (alloc_box), temporary storage
-  // (alloc_stack). This handles stores of the entire value and stores
-  // to a tuple element. Stores to a field within another nominal
-  // value are considered lifetime dependence leaf uses; the type
-  // system enforces non-escapability on the aggregate value.
+  // Visit stores to a local variable (alloc_box), temporary storage (alloc_stack). This handles stores of the entire
+  // value and stores to a tuple element. Stores to a field within another nominal value are considered lifetime
+  // dependence leaf uses; the type system enforces non-escapability on the aggregate value.
+  //
+  // If 'operand' is an address, then the "store" corresponds to initialization via an @out argument. The initial
+  // call to visitStoredUses will have 'operand == address' where the "stored value" is the temporary stack
+  // allocation for the @out parameter.
   private mutating func visitStoredUses(of operand: Operand,
                                         into address: Value) -> WalkResult {
     assert(address.type.isAddress)
@@ -1207,6 +1220,11 @@ extension LifetimeDependenceDefUseWalker {
       default:
         return .abortWalk
       }
+    case .dependence:
+       // An address-forwarding mark_dependence is simply a marker that indicates the start of an in-memory
+       // dependent value. Typically, it has no uses. If it does have uses, then they are visited earlier by
+       // LocalVariableAccessWalker to record any other local accesses.
+       return .continueWalk
     case .store:
       let si = localAccess.operand!.instruction as! StoringInstruction
       assert(si.sourceOperand == initialValue, "the only reachable store should be the current assignment")

@@ -25,9 +25,15 @@ struct Str {
   var _value: Builtin.Int64
 }
 
+class C {
+  @_hasStorage let x: String
+}
+
+
 sil @unknown : $@convention(thin) () -> ()
 sil @load_string : $@convention(thin) (@in_guaranteed String) -> String
 sil @guaranteed_user : $@convention(thin) (@guaranteed Klass) -> ()
+sil @consume : $@convention(thin) (@owned C) -> ()
 
 sil @inguaranteed_user_without_result : $@convention(thin) (@in_guaranteed Klass) -> () {
 bb0(%0 : $*Klass):
@@ -760,4 +766,39 @@ bb0(%0 : $Klass, %1 : $Klass):
   destroy_addr %3 : $*String
   dealloc_stack %3 : $*String
   return %323 : $String
+}
+
+// CHECK-LABEL: sil @dont_remove_copy_from_released_object
+// CHECK:         copy_addr
+// CHECK-NEXT:    strong_release %0
+// CHECK:       } // end sil function 'dont_remove_copy_from_released_object'
+sil @dont_remove_copy_from_released_object : $@convention(thin) (@owned C) -> @owned String {
+bb0(%0 : $C):
+  %1 = ref_element_addr [immutable] %0, #C.x
+  %2 = alloc_stack $String
+  copy_addr %1 to [init] %2
+  strong_release %0
+  %5 = load %2
+  retain_value %5
+  destroy_addr %2
+  dealloc_stack %2
+  return %5
+}
+
+// CHECK-LABEL: sil @dont_remove_copy_from_consumed_object
+// CHECK:         copy_addr
+// CHECK:         apply
+// CHECK:       } // end sil function 'dont_remove_copy_from_consumed_object'
+sil @dont_remove_copy_from_consumed_object : $@convention(thin) (@owned C) -> @owned String {
+bb0(%0 : $C):
+  %1 = ref_element_addr [immutable] %0, #C.x
+  %2 = alloc_stack $String
+  copy_addr %1 to [init] %2
+  %4 = function_ref @consume : $@convention(thin) (@owned C) -> ()
+  apply %4(%0) : $@convention(thin) (@owned C) -> ()
+  %5 = load %2
+  retain_value %5
+  destroy_addr %2
+  dealloc_stack %2
+  return %5
 }

@@ -290,9 +290,13 @@ bool ConditionForwarding::tryOptimize(SwitchEnumInst *SEI) {
     llvm::SmallVector<SILValue, 2> BranchArgs;
     unsigned HasEnumArg = NeedEnumArg.contains(SEDest);
     if (SEDest->getNumArguments() == 1 + HasEnumArg) {
-      // The successor block has an original argument, which is the Enum's
-      // payload.
-      BranchArgs.push_back(EI->getOperand());
+      if (SEI->hasDefault() && SEDest == SEI->getDefaultBB()) {
+        BranchArgs.push_back(EI);
+      } else {
+        // The successor block has an original argument, which is the Enum's
+        // payload.
+        BranchArgs.push_back(EI->getOperand());
+      }
     }
     if (HasEnumArg) {
       // The successor block has a new argument (which we created above) where

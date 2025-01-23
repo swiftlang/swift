@@ -368,9 +368,10 @@ protected:
     IsObjC : 1
   );
 
-  SWIFT_INLINE_BITFIELD_FULL(SequenceExpr, Expr, 32,
+  SWIFT_INLINE_BITFIELD_FULL(SequenceExpr, Expr, 32+1,
     : NumPadBits,
-    NumElements : 32
+    NumElements : 32,
+    IsFolded: 1
   );
 
   SWIFT_INLINE_BITFIELD(OpaqueValueExpr, Expr, 1,
@@ -4000,6 +4001,13 @@ public:
   }
   void setElement(unsigned i, Expr *e) {
     getElements()[i] = e;
+  }
+
+  bool isFolded() const {
+    return static_cast<bool>(Bits.SequenceExpr.IsFolded);
+  }
+  void setFolded(bool folded) {
+    Bits.SequenceExpr.IsFolded = static_cast<unsigned>(folded);
   }
 
   // Implement isa/cast/dyncast/etc.

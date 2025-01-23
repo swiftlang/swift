@@ -809,9 +809,24 @@ Added: _$ss13_SwiftifyInfoO11nonescapingyABs01_A4ExprO_tcABmFWC
 Added: _$ss13_SwiftifyInfoO7endedByyABs01_A4ExprO_SitcABmFWC
 Added: _$ss13_SwiftifyInfoO7sizedByyABs01_A4ExprO_SStcABmFWC
 Added: _$ss13_SwiftifyInfoO9countedByyABs01_A4ExprO_SStcABmFWC
+Added: _$ss13_SwiftifyInfoO18lifetimeDependenceyABSi_s01_A4ExprOs01_D4TypeOtcABmFWC
 Added: _$ss13_SwiftifyInfoOMa
 Added: _$ss13_SwiftifyInfoOMn
 Added: _$ss13_SwiftifyInfoON
+// _DependenceType for _SwiftifyImports macro
+Added: _$ss15_DependenceTypeO2eeoiySbAB_ABtFZ
+Added: _$ss15_DependenceTypeO4copyyA2BmFWC
+Added: _$ss15_DependenceTypeO4hash4intoys6HasherVz_tF
+Added: _$ss15_DependenceTypeO6borrowyA2BmFWC
+Added: _$ss15_DependenceTypeO9hashValueSivg
+Added: _$ss15_DependenceTypeO9hashValueSivpMV
+Added: _$ss15_DependenceTypeOMa
+Added: _$ss15_DependenceTypeOMn
+Added: _$ss15_DependenceTypeON
+Added: _$ss15_DependenceTypeOSHsMc
+Added: _$ss15_DependenceTypeOSHsWP
+Added: _$ss15_DependenceTypeOSQsMc
+Added: _$ss15_DependenceTypeOSQsWP
 
 // Eager-lazy Array bridging
 Added: _$ss12_ArrayBufferV14associationKeySVvpZMV
@@ -827,3 +842,6 @@ Added: _$ss4SlabVsRi__rlE5countSivpZMV
 
 // Slab._storage _read accessor
 Added: _$ss4SlabVsRi__rlE8_storagexq_BVvr
+
+// Shared string creation for Foundation
+Added: _$ss40_SwiftCreateImmortalString_ForFoundation6buffer7isASCIISSSgSRys5UInt8VG_SbtF

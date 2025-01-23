@@ -15,8 +15,8 @@ extension Blah: Escapable where T: Copyable, T: Escapable {}
 // expected-error@-1 {{conditional conformance to suppressible protocol 'Escapable' cannot depend on 'T: Copyable'}}
 
 struct Fixed<T: ~Copyable & ~Escapable>: ~Copyable, ~Escapable {}
-extension Fixed: Copyable where T: Copyable {}
-extension Fixed: Escapable where T: Escapable {}
+extension Fixed: Copyable where T: Copyable, T: ~Escapable {}
+extension Fixed: Escapable where T: Escapable, T: ~Copyable {}
 
 struct TryConformance<Whatever: ~Copyable>: ~Copyable {}
 extension TryConformance: Copyable

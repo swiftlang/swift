@@ -2090,7 +2090,12 @@ public:
 
   /// Does this extension add conformance to an invertible protocol for the
   /// extended type?
-  bool isAddingConformanceToInvertible() const;
+  ///
+  /// Returns \c nullopt if the extension does not add conformance to any
+  /// invertible protocol. Returns one of the invertible protocols being
+  /// conformed to otherwise.
+  std::optional<InvertibleProtocolKind>
+  isAddingConformanceToInvertible() const;
 
   /// If this extension represents an imported Objective-C category, returns the
   /// category's name. Otherwise returns the empty identifier.

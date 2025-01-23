@@ -2194,6 +2194,39 @@ namespace {
             dc);
       Impl.ImportedDecls[{decl->getCanonicalDecl(), getVersion()}] = result;
 
+      // We have to do this after populating ImportedDecls to avoid importing
+      // the same multiple times.
+      if (Impl.SwiftContext.LangOpts.hasFeature(Feature::SafeInterop) &&
+          Impl.SwiftContext.LangOpts.hasFeature(
+              Feature::AllowUnsafeAttribute)) {
+        if (const auto *ctsd =
+                dyn_cast<clang::ClassTemplateSpecializationDecl>(decl)) {
+          for (auto arg : ctsd->getTemplateArgs().asArray()) {
+            llvm::SmallVector<clang::TemplateArgument, 1> nonPackArgs;
+            if (arg.getKind() == clang::TemplateArgument::Pack) {
+              auto pack = arg.getPackAsArray();
+              nonPackArgs.assign(pack.begin(), pack.end());
+            } else {
+              nonPackArgs.push_back(arg);
+            }
+            for (auto realArg : nonPackArgs) {
+              if (realArg.getKind() != clang::TemplateArgument::Type)
+                continue;
+              auto SwiftType = Impl.importTypeIgnoreIUO(
+                  realArg.getAsType(), ImportTypeKind::Abstract,
+                  [](Diagnostic &&diag) {}, false, Bridgeability::None,
+                  ImportTypeAttrs());
+              if (SwiftType && SwiftType->isUnsafe()) {
+                auto attr =
+                    new (Impl.SwiftContext) UnsafeAttr(/*implicit=*/true);
+                result->getAttrs().add(attr);
+                break;
+              }
+            }
+          }
+        }
+      }
+
       if (recordHasMoveOnlySemantics(decl)) {
         if (decl->isInStdNamespace() && decl->getName() == "promise") {
           // Do not import std::promise.
@@ -2767,6 +2800,7 @@ namespace {
           decl->getDeclContext()->getParent()->isStdNamespace() &&
           decl->getIdentifier() &&
           (decl->getName() == "tzdb" || decl->getName() == "time_zone_link" ||
+           decl->getName() == "__compressed_pair" ||
            decl->getName() == "time_zone"))
         return nullptr;
 
@@ -3946,8 +3980,8 @@ namespace {
       if (decl->getTemplatedKind() == clang::FunctionDecl::TK_FunctionTemplate)
         return;
 
-      if (!result->getASTContext().LangOpts.hasFeature(
-              Feature::LifetimeDependence))
+      auto &ASTContext = result->getASTContext();
+      if (!ASTContext.LangOpts.hasFeature(Feature::LifetimeDependence))
         return;
 
       SmallVector<LifetimeDependenceInfo, 1> lifetimeDependencies;
@@ -3979,9 +4013,11 @@ namespace {
       const auto dependencyVecSize = swiftParams->size() + hasSelf;
       SmallBitVector inheritLifetimeParamIndicesForReturn(dependencyVecSize);
       SmallBitVector scopedLifetimeParamIndicesForReturn(dependencyVecSize);
+      SmallBitVector paramHasAnnotation(dependencyVecSize);
       std::map<unsigned, SmallBitVector> inheritedArgDependences;
       auto processLifetimeBound = [&](unsigned idx, Type ty) {
         warnForEscapableReturnType();
+        paramHasAnnotation[idx] = true;
         if (ty->isEscapable())
           scopedLifetimeParamIndicesForReturn[idx] = true;
         else
@@ -4005,6 +4041,7 @@ namespace {
                   param == clang::LifetimeCaptureByAttr::INVALID)
                 continue;
 
+              paramHasAnnotation[idx] = true;
               if (isa<clang::CXXMethodDecl>(decl) &&
                   param == clang::LifetimeCaptureByAttr::THIS) {
                 auto [it, inserted] = inheritedArgDependences.try_emplace(
@@ -4075,6 +4112,19 @@ namespace {
         Impl.SwiftContext.evaluator.cacheOutput(
             LifetimeDependenceInfoRequest{result},
             Impl.SwiftContext.AllocateCopy(lifetimeDependencies));
+      }
+      if (ASTContext.LangOpts.hasFeature(Feature::AllowUnsafeAttribute) &&
+          ASTContext.LangOpts.hasFeature(Feature::SafeInterop)) {
+        for (auto [idx, param] : llvm::enumerate(decl->parameters())) {
+          if (swiftParams->get(idx)->getInterfaceType()->isEscapable())
+            continue;
+          if (param->hasAttr<clang::NoEscapeAttr>() || paramHasAnnotation[idx])
+            continue;
+          // We have a nonescapabe parameter that does not have its lifetime
+          // annotated nor is it marked noescape.
+          auto attr = new (ASTContext) UnsafeAttr(/*implicit=*/true);
+          result->getAttrs().add(attr);
+        }
       }
       Impl.diagnoseTargetDirectly(decl);
     }
@@ -6335,6 +6385,19 @@ SwiftDeclConverter::importSwiftNewtype(const clang::TypedefNameDecl *decl,
       synthesizedProtocols.push_back(kind);
       return true;
     }
+    // HACK: This method may be called before all extensions have been bound.
+    // This is a problem for newtypes in Foundation, which is what provides the
+    // `String: _ObjectiveCBridgeable` conformance; it can cause us to create
+    // `String`-backed newtypes which aren't bridgeable, causing typecheck
+    // failures and crashes down the line (rdar://142693093). Hardcode knowledge
+    // that this conformance will exist.
+    // FIXME: Defer adding conformances to newtypes instead of this. (#78731)
+    if (structDecl->getModuleContext()->isFoundationModule()
+          && kind == KnownProtocolKind::ObjectiveCBridgeable
+          && computedNominal == ctx.getStringDecl()) {
+      synthesizedProtocols.push_back(kind);
+      return true;
+    }
 
     return false;
   };
@@ -8404,6 +8467,13 @@ static bool importAsUnsafe(ClangImporter::Implementation &impl,
   if (isa<ClassDecl>(MappedDecl))
     return false;
 
+  // Most STL containers have std::allocator as their default allocator. We need
+  // to consider std::allocator safe for the STL containers to be ever
+  // considered safe.
+  if (decl->isInStdNamespace() && decl->getIdentifier() &&
+      decl->getName() == "allocator")
+    return false;
+
   if (const auto *record = dyn_cast<clang::RecordDecl>(decl))
     return evaluateOrDefault(
                context.evaluator,
@@ -8724,6 +8794,14 @@ public:
     out << ")";
   }
 
+  void printLifetimeboundReturn(int idx, bool borrow) {
+    printSeparator();
+    out << ".lifetimeDependence(dependsOn: " << (idx + 1);
+    out << ", pointer: .return, type: ";
+    out << (borrow ? ".borrow" : ".copy");
+    out << ")";
+  }
+
   void printTypeMapping(const llvm::StringMap<std::string> &mapping) {
     printSeparator();
     out << "typeMappings: [";
@@ -8769,23 +8847,44 @@ void ClangImporter::Implementation::importSpanAttributes(FuncDecl *MappedDecl) {
     llvm::raw_svector_ostream out(MacroString);
     llvm::StringMap<std::string> typeMapping;
 
+    auto registerSwiftifyMacro =
+        [&typeMapping, &attachMacro](ParamDecl *swiftParam,
+                                     const clang::ParmVarDecl *param) {
+          typeMapping.insert(std::make_pair(
+              swiftParam->getInterfaceType()->getString(),
+              swiftParam->getInterfaceType()->getDesugaredType()->getString()));
+          attachMacro = true;
+        };
     SwiftifyInfoPrinter printer(getClangASTContext(), out);
+    auto retDecl = ClangDecl->getReturnType()->getAsTagDecl();
+    bool returnIsSpan =
+        retDecl && retDecl->isInStdNamespace() && retDecl->getName() == "span";
+    if (returnIsSpan) {
+      typeMapping.insert(
+          std::make_pair(MappedDecl->getResultInterfaceType()->getString(),
+                         MappedDecl->getResultInterfaceType()
+                             ->getDesugaredType()
+                             ->getString()));
+    }
     for (auto [index, param] : llvm::enumerate(ClangDecl->parameters())) {
       auto paramTy = param->getType();
       const auto *decl = paramTy->getAsTagDecl();
-      if (!decl || !decl->isInStdNamespace())
-        continue;
-      if (decl->getName() != "span")
+      auto swiftParam = MappedDecl->getParameters()->get(index);
+      bool isSpan =
+          decl && decl->isInStdNamespace() && decl->getName() == "span";
+      if (param->hasAttr<clang::LifetimeBoundAttr>() &&
+          MappedDecl->getASTContext().LangOpts.hasFeature(
+              Feature::LifetimeDependence) &&
+          (isSpan || returnIsSpan)) {
+        printer.printLifetimeboundReturn(
+            index, !isSpan && swiftParam->getInterfaceType()->isEscapable());
+        registerSwiftifyMacro(swiftParam, param);
+      }
+      if (!isSpan)
         continue;
       if (param->hasAttr<clang::NoEscapeAttr>()) {
         printer.printNonEscaping(index);
-        clang::PrintingPolicy policy(param->getASTContext().getLangOpts());
-        policy.SuppressTagKeyword = true;
-        auto param = MappedDecl->getParameters()->get(index);
-        typeMapping.insert(std::make_pair(
-            paramTy.getAsString(policy),
-            param->getInterfaceType()->getDesugaredType()->getString()));
-        attachMacro = true;
+        registerSwiftifyMacro(swiftParam, param);
       }
     }
     printer.printTypeMapping(typeMapping);

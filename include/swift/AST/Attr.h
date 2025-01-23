@@ -151,19 +151,20 @@ protected:
       Value : 32
     );
 
-    SWIFT_INLINE_BITFIELD(AvailableAttr, DeclAttribute, 4+1+1+1+1,
+    SWIFT_INLINE_BITFIELD(AvailableAttr, DeclAttribute, 4+1+1+1+1+1,
       /// An `AvailableAttr::Kind` value.
       Kind : 4,
+
+      /// State storage for `SemanticAvailableAttrRequest`.
+      HasComputedSemanticAttr : 1,
+      HasDomain : 1,
 
       /// State storage for `RenamedDeclRequest`.
       HasComputedRenamedDecl : 1,
       HasRenamedDecl : 1,
 
       /// Whether this attribute was spelled `@_spi_available`.
-      IsSPI : 1,
-
-      /// Whether this attribute was spelled `@_unavailableInEmbedded`.
-      IsForEmbedded : 1
+      IsSPI : 1
     );
 
     SWIFT_INLINE_BITFIELD(ClangImporterSynthesizedTypeAttr, DeclAttribute, 1,
@@ -219,6 +220,10 @@ protected:
       Inverted : 1,
 
       NumFeatures : 31
+    );
+
+    SWIFT_INLINE_BITFIELD(ExecutionAttr, DeclAttribute, NumExecutionKindBits,
+      Behavior : NumExecutionKindBits
     );
   } Bits;
   // clang-format on
@@ -718,8 +723,6 @@ enum class AvailableVersionComparison {
 
 /// Defines the @available attribute.
 class AvailableAttr : public DeclAttribute {
-  AvailabilityDomain Domain;
-
 public:
   enum class Kind : uint8_t {
     /// The attribute does not specify `deprecated`, `unavailable`,
@@ -741,13 +744,52 @@ public:
                 const llvm::VersionTuple &Deprecated,
                 SourceRange DeprecatedRange,
                 const llvm::VersionTuple &Obsoleted, SourceRange ObsoletedRange,
-                bool Implicit, bool IsSPI, bool IsForEmbedded = false);
+                bool Implicit, bool IsSPI);
 
-  /// The optional message.
+private:
+  friend class SemanticAvailableAttr;
+
+  AvailabilityDomain Domain;
+
   const StringRef Message;
+  const StringRef Rename;
 
-  /// An optional replacement string to emit in a fixit.  This allows simple
-  /// declaration renames to be applied by Xcode.
+  const llvm::VersionTuple Introduced;
+  const SourceRange IntroducedRange;
+  const llvm::VersionTuple Deprecated;
+  const SourceRange DeprecatedRange;
+  const llvm::VersionTuple Obsoleted;
+  const SourceRange ObsoletedRange;
+
+public:
+  /// Returns the parsed version for `introduced:`.
+  std::optional<llvm::VersionTuple> getRawIntroduced() const {
+    if (Introduced.empty())
+      return std::nullopt;
+    return Introduced;
+  }
+
+  /// Returns the parsed version for `deprecated:`.
+  std::optional<llvm::VersionTuple> getRawDeprecated() const {
+    if (Deprecated.empty())
+      return std::nullopt;
+    return Deprecated;
+  }
+
+  /// Returns the parsed version for `obsoleted:`.
+  std::optional<llvm::VersionTuple> getRawObsoleted() const {
+    if (Obsoleted.empty())
+      return std::nullopt;
+    return Obsoleted;
+  }
+
+  /// Returns the parsed string for `message:`, which will be presented with
+  /// diagnostics about the availability of the decl.
+  StringRef getMessage() const { return Message; }
+
+  /// Returns the parsed string for `rename:`, which is an optional replacement
+  /// string to emit in a fixit.  This allows simple declaration renames to be
+  /// applied by Xcode.
   ///
   /// This should take the form of an operator, identifier, or full function
   /// name, optionally with a prefixed type, similar to the syntax used for
@@ -757,25 +799,7 @@ public:
   /// referred to by this string. Note that this attribute can have a rename
   /// target that was provided directly when synthesized and therefore can have
   /// a rename decl even when this string is empty.
-  const StringRef Rename;
-
-  /// Indicates when the symbol was introduced.
-  const std::optional<llvm::VersionTuple> Introduced;
-
-  /// Indicates where the Introduced version was specified.
-  const SourceRange IntroducedRange;
-
-  /// Indicates when the symbol was deprecated.
-  const std::optional<llvm::VersionTuple> Deprecated;
-
-  /// Indicates where the Deprecated version was specified.
-  const SourceRange DeprecatedRange;
-
-  /// Indicates when the symbol was obsoleted.
-  const std::optional<llvm::VersionTuple> Obsoleted;
-
-  /// Indicates where the Obsoleted version was specified.
-  const SourceRange ObsoletedRange;
+  StringRef getRename() const { return Rename; }
 
   /// Whether this is an unconditionally unavailable entity.
   bool isUnconditionallyUnavailable() const;
@@ -789,20 +813,18 @@ public:
   /// Whether this attribute was spelled `@_spi_available`.
   bool isSPI() const { return Bits.AvailableAttr.IsSPI; }
 
-  /// Whether this attribute was spelled `@_unavailableInEmbedded`.
-  bool isForEmbedded() const { return Bits.AvailableAttr.IsForEmbedded; }
-
   /// Returns the `AvailabilityDomain` associated with the attribute, or
   /// `std::nullopt` if it has either not yet been resolved or could not be
   /// resolved successfully.
-  std::optional<AvailabilityDomain> getCachedDomain() const { return Domain; }
+  std::optional<AvailabilityDomain> getCachedDomain() const {
+    if (hasCachedDomain())
+      return Domain;
+    return std::nullopt;
+  }
 
   /// Returns true if the `AvailabilityDomain` associated with the attribute
   /// has been resolved successfully.
-  bool hasCachedDomain() const {
-    // For now, domains are always set on construction of the attribute.
-    return true;
-  }
+  bool hasCachedDomain() const { return Bits.AvailableAttr.HasDomain; }
 
   /// Returns the kind of availability the attribute specifies.
   Kind getKind() const { return static_cast<Kind>(Bits.AvailableAttr.Kind); }
@@ -861,6 +883,17 @@ private:
   void setComputedRenamedDecl(bool hasRenamedDecl) {
     Bits.AvailableAttr.HasComputedRenamedDecl = true;
     Bits.AvailableAttr.HasRenamedDecl = hasRenamedDecl;
+  }
+
+private:
+  friend class SemanticAvailableAttrRequest;
+
+  bool hasComputedSemanticAttr() const {
+    return Bits.AvailableAttr.HasComputedSemanticAttr;
+  }
+
+  void setComputedSemanticAttr() {
+    Bits.AvailableAttr.HasComputedSemanticAttr = true;
   }
 };
 
@@ -2922,6 +2955,30 @@ public:
   UNIMPLEMENTED_CLONE(ABIAttr)
 };
 
+class ExecutionAttr : public DeclAttribute {
+public:
+  ExecutionAttr(SourceLoc AtLoc, SourceRange Range,
+                ExecutionKind behavior,
+                bool Implicit)
+      : DeclAttribute(DeclAttrKind::Execution, AtLoc, Range, Implicit) {
+    Bits.ExecutionAttr.Behavior = static_cast<uint8_t>(behavior);
+  }
+
+  ExecutionAttr(ExecutionKind behavior, bool Implicit)
+      : ExecutionAttr(/*AtLoc=*/SourceLoc(), /*Range=*/SourceRange(), behavior,
+                      Implicit) {}
+
+  ExecutionKind getBehavior() const {
+    return static_cast<ExecutionKind>(Bits.ExecutionAttr.Behavior);
+  }
+
+  static bool classof(const DeclAttribute *DA) {
+    return DA->getKind() == DeclAttrKind::Execution;
+  }
+
+  UNIMPLEMENTED_CLONE(ExecutionAttr)
+};
+
 /// Attributes that may be applied to declarations.
 class DeclAttributes {
   /// Linked list of declaration attributes.
@@ -3217,8 +3274,11 @@ public:
 
   /// The version tuple written in source for the `introduced:` component.
   std::optional<llvm::VersionTuple> getIntroduced() const {
-    return attr->Introduced;
+    return attr->getRawIntroduced();
   }
+
+  /// The source range of the `introduced:` component.
+  SourceRange getIntroducedSourceRange() const { return attr->IntroducedRange; }
 
   /// Returns the effective range in which the declaration with this attribute
   /// was introduced.
@@ -3226,12 +3286,12 @@ public:
 
   /// The version tuple written in source for the `deprecated:` component.
   std::optional<llvm::VersionTuple> getDeprecated() const {
-    return attr->Deprecated;
+    return attr->getRawDeprecated();
   }
 
   /// The version tuple written in source for the `obsoleted:` component.
   std::optional<llvm::VersionTuple> getObsoleted() const {
-    return attr->Obsoleted;
+    return attr->getRawObsoleted();
   }
 
   /// Returns the `message:` field of the attribute, or an empty string.
@@ -3264,7 +3324,8 @@ public:
   /// Whether this attribute has an introduced, deprecated, or obsoleted
   /// version.
   bool isVersionSpecific() const {
-    return attr->Introduced || attr->Deprecated || attr->Obsoleted;
+    return getIntroduced().has_value() || getDeprecated().has_value() ||
+           getObsoleted().has_value();
   }
 
   /// Whether this is a language mode specific attribute.
@@ -3277,8 +3338,8 @@ public:
     return getDomain().isPackageDescription() && isVersionSpecific();
   }
 
-  /// Whether this attribute was spelled `@_unavailableInEmbedded`.
-  bool isEmbeddedSpecific() const { return attr->isForEmbedded(); }
+  /// Whether this attribute an attribute that is specific to Embedded Swift.
+  bool isEmbeddedSpecific() const { return getDomain().isEmbedded(); }
 
   /// Returns the active version from the AST context corresponding to
   /// the available kind. For example, this will return the effective language

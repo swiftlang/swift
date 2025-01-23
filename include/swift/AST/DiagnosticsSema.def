@@ -1232,8 +1232,14 @@ REMARK(module_api_import_aliases,none,
        "%select{, which reexports definition from %2|}3",
        (const Decl *, ModuleDecl *, ModuleDecl *, bool))
 
-REMARK(skip_module_invalid,none,"skip invalid swiftmodule: %0", (StringRef))
-WARNING(skip_module_not_testable,none,"ignore swiftmodule built without '-enable-testing': %0", (StringRef))
+REMARK(dependency_scan_skip_module_invalid,none,
+       "module file '%0' skipped by the dependency scan because it is "
+       "incompatible with this Swift compiler: %1", (StringRef, StringRef))
+WARNING(skip_module_not_testable,none,
+        "ignore swiftmodule built without '-enable-testing': %0", (StringRef))
+WARNING(dependency_scan_module_incompatible, none,
+        "module file '%0' is incompatible with this Swift compiler: %1",
+        (StringRef, StringRef))
 
 REMARK(macro_loaded,none,
        "loaded macro implementation module %0 from "
@@ -6145,14 +6151,12 @@ ERROR(closure_unlabeled_parameter_following_variadic_parameter,none,
 ERROR(parameter_vararg_default,none,
       "variadic parameter cannot have a default value", ())
 
-WARNING(implicitly_unwrapped_optional_in_illegal_position_interpreted_as_optional,none,
-        "using '!' is not allowed here; treating this as '?' instead", ())
-
-WARNING(implicitly_unwrapped_optional_deprecated_in_this_position,Deprecation,
-        "using '!' here is deprecated and will be removed in a future release", ())
-
-ERROR(implicitly_unwrapped_optional_in_illegal_position,none,
-        "using '!' is not allowed here; perhaps '?' was intended?", ())
+ERROR(iuo_invalid_here, none,
+      "using '!' is not allowed here", ())
+ERROR(iuo_deprecated_here,Deprecation,
+      "using '!' here is deprecated", ())
+NOTE(iuo_use_optional_instead,none,
+     "use '?' instead", ())
 
 // Ownership
 ERROR(invalid_ownership_type,none,
@@ -7864,6 +7868,16 @@ ERROR(extension_conforms_to_invertible_and_others, none,
 ERROR(invertible_conformance_other_source_file,none,
       "conformance to '%0' must occur in the same source file as %kind1",
       (StringRef, const ValueDecl *))
+ERROR(inverse_conditional_must_be_fully_explicit,none,
+        "conditional conformance to %0 must explicitly "
+        "state whether %1 is required to conform to %2 or not",
+        (const ProtocolDecl *, Type, const ProtocolDecl *))
+NOTE(make_inverse_conditional_non_requirement_explicit,none,
+     "specify that the conformance does not require %0 to conform to %1",
+     (Type, const ProtocolDecl *))
+NOTE(make_inverse_conditional_requirement_explicit,none,
+     "specify that the conformance requires %0 to conform to %1",
+     (Type, const ProtocolDecl *))
 
 // -- older ones below --
 ERROR(noncopyable_parameter_requires_ownership, none,
@@ -8210,6 +8224,33 @@ ERROR(attr_abi_incompatible_with_silgen_name,none,
       "cannot use '@_silgen_name' and '@abi' on the same %0 because they serve "
       "the same purpose",
       (DescriptiveDeclKind))
+
+//===----------------------------------------------------------------------===//
+// MARK: @execution Attribute
+//===----------------------------------------------------------------------===//
+ERROR(attr_execution_concurrent_only_on_async,none,
+      "cannot use '@execution(concurrent)' on non-async %kind0",
+      (ValueDecl *))
+
+ERROR(attr_execution_concurrent_incompatible_with_global_actor,none,
+      "cannot use '@execution(concurrent)' on %kind0 isolated to global actor %1",
+      (ValueDecl *, Type))
+
+ERROR(attr_execution_concurrent_incompatible_isolated_parameter,none,
+      "cannot use '@execution(concurrent)' on %kind0 because it has "
+      "an isolated parameter: %1",
+      (ValueDecl *, ValueDecl *))
+
+ERROR(attr_execution_concurrent_incompatible_dynamically_isolated_parameter,none,
+      "cannot use '@execution(concurrent)' on %kind0 because it has "
+      "a dynamically isolated parameter: %1",
+      (ValueDecl *, ValueDecl *))
+
+ERROR(attr_execution_concurrent_incompatible_with_nonisolated,none,
+      "cannot use '@execution(concurrent)' and 'nonisolated' on the same %0 "
+      "because they serve the same purpose",
+      (ValueDecl *))
+
 
 #define UNDEFINE_DIAGNOSTIC_MACROS
 #include "DefineDiagnosticMacros.h"

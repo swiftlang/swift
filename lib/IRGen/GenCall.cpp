@@ -20,6 +20,7 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ClangModuleLoader.h"
 #include "swift/AST/GenericEnvironment.h"
+#include "swift/AST/PrettyStackTrace.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/IRGen/Linking.h"
 #include "swift/Runtime/Config.h"
@@ -1473,6 +1474,8 @@ static bool doesClangExpansionMatchSchema(IRGenModule &IGM,
 /// Expand the result and parameter types to the appropriate LLVM IR
 /// types for C, C++ and Objective-C signatures.
 void SignatureExpansion::expandExternalSignatureTypes() {
+  PrettyStackTraceType entry(IGM.Context, "using clang to expand signature for",
+                             FnType);
   assert(FnType->getLanguage() == SILFunctionLanguage::C);
 
   auto SILResultTy = [&]() {
@@ -3027,11 +3030,7 @@ public:
 
         if (nativeSchema.requiresIndirect() ||
             errorSchema.shouldReturnTypedErrorIndirectly() ||
-            (errorSchema.empty() &&
-             fnConv.hasIndirectSILResults())) { // direct empty typed errors are
-                                                // passed
-          // indirectly for compatibility with generic
-          // functions.
+            fnConv.hasIndirectSILResults()) {
           // Return the error indirectly.
           auto buf = IGF.getCalleeTypedErrorResultSlot(silErrorTy);
           Args[--LastArgWritten] = buf.getAddress();

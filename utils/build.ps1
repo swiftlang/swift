@@ -433,16 +433,15 @@ enum HostComponent {
   Compilers = 5
   FoundationMacros = 10
   TestingMacros
-  System
   ToolsSupportCore
   LLBuild
-  Yams
   ArgumentParser
   Driver
   Crypto
   Collections
   ASN1
   Certificates
+  System
   PackageManager
   Markdown
   Format
@@ -2209,7 +2208,6 @@ function Build-ToolsSupportCore($Arch) {
     -SwiftSDK (Get-HostSwiftSDK) `
     -Defines @{
       BUILD_SHARED_LIBS = "YES";
-      SwiftSystem_DIR = (Get-HostProjectCMakeModules System);
     }
 }
 
@@ -2256,21 +2254,6 @@ function Build-LLBuild($Arch, [switch]$Test = $false) {
   }
 }
 
-function Build-Yams($Arch) {
-  Build-CMakeProject `
-    -Src $SourceCache\Yams `
-    -Bin (Get-HostProjectBinaryCache Yams) `
-    -Arch $Arch `
-    -Platform Windows `
-    -UseBuiltCompilers C,Swift `
-    -SwiftSDK (Get-HostSwiftSDK) `
-    -BuildTargets default `
-    -Defines @{
-      BUILD_SHARED_LIBS = "NO";
-      BUILD_TESTING = "NO";
-    }
-}
-
 function Build-ArgumentParser($Arch) {
   Build-CMakeProject `
     -Src $SourceCache\swift-argument-parser `
@@ -2297,10 +2280,8 @@ function Build-Driver($Arch) {
     -SwiftSDK (Get-HostSwiftSDK) `
     -Defines @{
       BUILD_SHARED_LIBS = "YES";
-      SwiftSystem_DIR = (Get-HostProjectCMakeModules System);
       TSC_DIR = (Get-HostProjectCMakeModules ToolsSupportCore);
       LLBuild_DIR = (Get-HostProjectCMakeModules LLBuild);
-      Yams_DIR = (Get-HostProjectCMakeModules Yams);
       ArgumentParser_DIR = (Get-HostProjectCMakeModules ArgumentParser);
       SQLite3_INCLUDE_DIR = "$LibraryRoot\sqlite-3.46.0\usr\include";
       SQLite3_LIBRARY = "$LibraryRoot\sqlite-3.46.0\usr\lib\SQLite3.lib";
@@ -2513,7 +2494,6 @@ function Build-SourceKitLSP($Arch) {
     -SwiftSDK (Get-HostSwiftSDK) `
     -Defines @{
       SwiftSyntax_DIR = (Get-HostProjectCMakeModules Compilers);
-      SwiftSystem_DIR = (Get-HostProjectCMakeModules System);
       TSC_DIR = (Get-HostProjectCMakeModules ToolsSupportCore);
       LLBuild_DIR = (Get-HostProjectCMakeModules LLBuild);
       ArgumentParser_DIR = (Get-HostProjectCMakeModules ArgumentParser);
@@ -2881,16 +2861,15 @@ if (-not $ToBatch) {
 
 if (-not $SkipBuild) {
   Invoke-BuildStep Build-SQLite $HostArch
-  Invoke-BuildStep Build-System $HostArch
   Invoke-BuildStep Build-ToolsSupportCore $HostArch
   Invoke-BuildStep Build-LLBuild $HostArch
-  Invoke-BuildStep Build-Yams $HostArch
   Invoke-BuildStep Build-ArgumentParser $HostArch
   Invoke-BuildStep Build-Driver $HostArch
   Invoke-BuildStep Build-Crypto $HostArch
   Invoke-BuildStep Build-Collections $HostArch
   Invoke-BuildStep Build-ASN1 $HostArch
   Invoke-BuildStep Build-Certificates $HostArch
+  Invoke-BuildStep Build-System $HostArch
   Invoke-BuildStep Build-PackageManager $HostArch
   Invoke-BuildStep Build-Markdown $HostArch
   Invoke-BuildStep Build-Format $HostArch

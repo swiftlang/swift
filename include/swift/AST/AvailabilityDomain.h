@@ -20,6 +20,7 @@
 
 #include "swift/AST/PlatformKind.h"
 #include "swift/Basic/LLVM.h"
+#include "llvm/ADT/FoldingSet.h"
 #include "llvm/ADT/PointerEmbeddedInt.h"
 #include "llvm/ADT/PointerUnion.h"
 
@@ -40,6 +41,9 @@ public:
 
     /// Represents PackageDescription availability.
     PackageDescription,
+
+    /// Represents Embedded Swift availability.
+    Embedded,
 
     /// Represents availability for a specific operating system platform.
     Platform,
@@ -132,6 +136,10 @@ public:
     return AvailabilityDomain(Kind::PackageDescription);
   }
 
+  static AvailabilityDomain forEmbedded() {
+    return AvailabilityDomain(Kind::Embedded);
+  }
+
   Kind getKind() const {
     if (auto inlineDomain = getInlineDomain())
       return inlineDomain->getKind();
@@ -148,6 +156,8 @@ public:
   bool isPackageDescription() const {
     return getKind() == Kind::PackageDescription;
   }
+
+  bool isEmbedded() const { return getKind() == Kind::Embedded; }
 
   /// Returns the platform kind for this domain if applicable.
   PlatformKind getPlatformKind() const {
@@ -168,6 +178,11 @@ public:
   /// Returns the string to use when printing an `@available` attribute.
   llvm::StringRef getNameForAttributePrinting() const;
 
+  /// Returns true if availability in `other` is a subset of availability in
+  /// this domain. The set of all availability domains form a lattice where the
+  /// universal domain (`*`) is the bottom element.
+  bool contains(const AvailabilityDomain &other) const;
+
   bool operator==(const AvailabilityDomain &other) const {
     return storage.getOpaqueValue() == other.storage.getOpaqueValue();
   }
@@ -176,6 +191,7 @@ public:
     return !(*this == other);
   }
 
+  /// A total, stable ordering on domains.
   bool operator<(const AvailabilityDomain &other) const {
     if (getKind() != other.getKind())
       return getKind() < other.getKind();
@@ -184,11 +200,16 @@ public:
     case Kind::Universal:
     case Kind::SwiftLanguage:
     case Kind::PackageDescription:
+    case Kind::Embedded:
       // These availability domains are singletons.
       return false;
     case Kind::Platform:
       return getPlatformKind() < other.getPlatformKind();
     }
+  }
+
+  void Profile(llvm::FoldingSetNodeID &ID) const {
+    ID.AddPointer(getOpaqueValue());
   }
 };
 

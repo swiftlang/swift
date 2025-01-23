@@ -253,6 +253,81 @@ private:
   }
 
 public:
+  void visitExecutionAttr(ExecutionAttr *attr) {
+    auto *F = dyn_cast<FuncDecl>(D);
+    if (!F)
+      return;
+
+    if (!F->hasAsync()) {
+      diagnoseAndRemoveAttr(attr, diag::attr_execution_concurrent_only_on_async,
+                            F);
+      return;
+    }
+
+    switch (attr->getBehavior()) {
+    case ExecutionKind::Concurrent: {
+      // 'concurrent' doesn't work with explicit `nonisolated`
+      if (F->hasExplicitIsolationAttribute()) {
+        if (F->getAttrs().hasAttribute<NonisolatedAttr>()) {
+          diagnoseAndRemoveAttr(
+              attr,
+              diag::attr_execution_concurrent_incompatible_with_nonisolated, F);
+          return;
+        }
+      }
+
+      auto parameters = F->getParameters();
+      if (!parameters)
+        return;
+
+      for (auto *P : *parameters) {
+        auto *repr = P->getTypeRepr();
+        if (!repr)
+          continue;
+
+        // isolated parameters affect isolation of the function itself
+        if (isa<IsolatedTypeRepr>(repr)) {
+          diagnoseAndRemoveAttr(
+              attr,
+              diag::attr_execution_concurrent_incompatible_isolated_parameter,
+              F, P);
+          return;
+        }
+
+        if (auto *attrType = dyn_cast<AttributedTypeRepr>(repr)) {
+          if (attrType->has(TypeAttrKind::Isolated)) {
+            diagnoseAndRemoveAttr(
+                attr,
+                diag::
+                    attr_execution_concurrent_incompatible_dynamically_isolated_parameter,
+                F, P);
+            return;
+          }
+        }
+      }
+
+      // We need isolation check here because global actor isolation
+      // could be inferred.
+
+      auto isolation = getActorIsolation(F);
+      if (isolation.isGlobalActor()) {
+        diagnoseAndRemoveAttr(
+            attr,
+            diag::attr_execution_concurrent_incompatible_with_global_actor, F,
+            isolation.getGlobalActor());
+        return;
+      }
+
+      break;
+    }
+
+    case ExecutionKind::Caller: {
+      // no restrictions for now.
+      break;
+    }
+    }
+  }
+
   void visitABIAttr(ABIAttr *attr) {
     Decl *AD = attr->abiDecl;
     if (isa<VarDecl>(D) && isa<PatternBindingDecl>(AD)) {
@@ -2395,6 +2470,12 @@ void AttributeChecker::visitAvailableAttr(AvailableAttr *parsedAttr) {
           // not diagnosed previously, so only emit a warning in that case.
           if (isa<ExtensionDecl>(DC->getTopmostDeclarationDeclContext()))
             limit = DiagnosticBehavior::Warning;
+        } else if (enclosingAttr.getPlatform() != attr->getPlatform()) {
+          // Downgrade to a warning when the limiting attribute is for a more
+          // specific platform.
+          if (inheritsAvailabilityFromPlatform(enclosingAttr.getPlatform(),
+                                               attr->getPlatform()))
+            limit = DiagnosticBehavior::Warning;
         }
         diagnose(D->isImplicit() ? enclosingDecl->getLoc()
                                  : parsedAttr->getLocation(),
@@ -3489,7 +3570,7 @@ SerializeAttrGenericSignatureRequest::evaluate(Evaluator &evaluator,
       /*addedRequirements=*/{},
       /*inferenceSources=*/{},
       attr->getLocation(),
-      /*isExtension=*/false,
+      /*forExtension=*/nullptr,
       /*allowInverses=*/true};
 
   auto specializedSig = evaluateOrDefault(Ctx.evaluator, request,
@@ -4975,13 +5056,13 @@ void AttributeChecker::checkBackDeployedAttrs(
     if (Ctx.LangOpts.DisableAvailabilityChecking)
       continue;
 
-    auto availability =
-        TypeChecker::availabilityAtLocation(D->getLoc(), D->getDeclContext());
+    auto availability = TypeChecker::availabilityAtLocation(
+        D->getLoc(), D->getInnermostDeclContext());
 
     // Unavailable decls cannot be back deployed.
-    if (auto unavailablePlatform = availability.getUnavailablePlatformKind()) {
-      if (!inheritsAvailabilityFromPlatform(*unavailablePlatform,
-                                            Attr->Platform)) {
+    if (auto unavailableDomain = availability.getUnavailableDomain()) {
+      auto backDeployedDomain = AvailabilityDomain::forPlatform(Attr->Platform);
+      if (unavailableDomain->contains(backDeployedDomain)) {
         auto platformString = prettyPlatformString(Attr->Platform);
         llvm::VersionTuple ignoredVersion;
 
@@ -6086,7 +6167,7 @@ bool resolveDifferentiableAttrDerivativeGenericSignature(
         /*addedRequirements=*/{},
         /*inferenceSources=*/{},
         attr->getLocation(),
-        /*isExtension=*/false,
+        /*forExtension=*/nullptr,
         /*allowInverses=*/true};
 
     // Compute generic signature for derivative functions.
@@ -8175,6 +8256,13 @@ ValueDecl *RenamedDeclRequest::evaluate(Evaluator &evaluator,
   }
 
   return renamedDecl;
+}
+
+std::optional<SemanticAvailableAttr>
+SemanticAvailableAttrRequest::evaluate(swift::Evaluator &evaluator,
+                                       const AvailableAttr *attr,
+                                       const Decl *decl) const {
+  return SemanticAvailableAttr(attr);
 }
 
 template <typename ATTR>

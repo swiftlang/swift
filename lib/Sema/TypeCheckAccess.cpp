@@ -1906,6 +1906,8 @@ bool isFragileClangDecl(const clang::Decl *decl) {
     return isFragileClangType(pd->getType());
   if (auto *typedefDecl = dyn_cast<clang::TypedefNameDecl>(decl))
     return isFragileClangType(typedefDecl->getUnderlyingType());
+  if (auto *enumDecl = dyn_cast<clang::EnumDecl>(decl))
+    return enumDecl->isScoped();
   if (auto *rd = dyn_cast<clang::RecordDecl>(decl)) {
     auto cxxRecordDecl = dyn_cast<clang::CXXRecordDecl>(rd);
     if (!cxxRecordDecl)
@@ -2017,7 +2019,7 @@ swift::getDisallowedOriginKind(const Decl *decl,
       // Decls with @_spi_available aren't hidden entirely from public interfaces,
       // thus public interfaces may still refer them. Be forgiving here so public
       // interfaces can compile.
-      if (where.getUnavailablePlatformKind().has_value())
+      if (where.getAvailability().isUnavailable())
         return DisallowedOriginKind::None;
       // We should only diagnose SPI_AVAILABLE usage when the library level is API.
       // Using SPI_AVAILABLE symbols in private frameworks or executable targets

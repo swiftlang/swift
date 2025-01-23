@@ -623,6 +623,8 @@ bool CrossModuleOptimization::canSerializeFieldsByInstructionKind(
             canUse = false;
         },
         [&](SILDeclRef method) {
+          if (!canUse) // If already set to false in the above lambda, return
+            return;
           if (method.isForeign)
             canUse = false;
           else if (isPackageCMOEnabled(method.getModuleContext())) {

@@ -2706,6 +2706,8 @@ ParserResult<LifetimeAttr> Parser::parseLifetimeAttribute(SourceLoc atLoc,
       /* implicit */ false, lifetimeEntry.get()));
 }
 
+
+
 /// Parses a (possibly optional) argument for an attribute containing a single, arbitrary identifier.
 ///
 /// \param P The parser object.
@@ -4022,6 +4024,21 @@ ParserStatus Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
       Attributes.add(Attr.get());
     break;
   }
+
+  case DeclAttrKind::Execution: {
+    auto behavior = parseSingleAttrOption<ExecutionKind>(
+        *this, Loc, AttrRange, AttrName, DK,
+        {{Context.Id_concurrent, ExecutionKind::Concurrent},
+         {Context.Id_caller, ExecutionKind::Caller}});
+    if (!behavior)
+      return makeParserSuccess();
+
+    if (!DiscardAttribute)
+      Attributes.add(new (Context) ExecutionAttr(AtLoc, AttrRange, *behavior,
+                                                 /*Implicit*/ false));
+
+    break;
+  }
   }
 
   if (DuplicateAttribute) {
@@ -4392,12 +4409,11 @@ ParserStatus Parser::parseDeclAttribute(DeclAttributes &Attributes,
     if (Context.LangOpts.hasFeature(Feature::Embedded)) {
       StringRef Message = "unavailable in embedded Swift", Renamed;
       auto attr = new (Context) AvailableAttr(
-          AtLoc, SourceRange(AtLoc, attrLoc),
-          AvailabilityDomain::forUniversal(), AvailableAttr::Kind::Unavailable,
-          Message, Renamed, llvm::VersionTuple(), SourceRange(),
+          AtLoc, SourceRange(AtLoc, attrLoc), AvailabilityDomain::forEmbedded(),
+          AvailableAttr::Kind::Unavailable, Message, Renamed,
           llvm::VersionTuple(), SourceRange(), llvm::VersionTuple(),
-          SourceRange(),
-          /*Implicit=*/false, /*IsSPI=*/false, /*IsForEmbedded=*/true);
+          SourceRange(), llvm::VersionTuple(), SourceRange(),
+          /*Implicit=*/false, /*IsSPI=*/false);
       Attributes.add(attr);
     }
     return makeParserSuccess();
@@ -9729,7 +9745,7 @@ Parser::parseDeclSubscript(SourceLoc StaticLoc,
       }
     }
   }
-  
+
   ParserStatus Status;
   SourceLoc SubscriptLoc = consumeToken(tok::kw_subscript);
 

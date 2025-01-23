@@ -5636,6 +5636,8 @@ DeclDeserializer::readAvailable_DECL_ATTR(SmallVectorImpl<uint64_t> &scratch,
     domain = isPackageDescriptionVersionSpecific
                  ? AvailabilityDomain::forPackageDescription()
                  : AvailabilityDomain::forSwiftLanguage();
+  } else if (isForEmbedded) {
+    domain = AvailabilityDomain::forEmbedded();
   } else {
     domain = AvailabilityDomain::forUniversal();
   }
@@ -5643,7 +5645,7 @@ DeclDeserializer::readAvailable_DECL_ATTR(SmallVectorImpl<uint64_t> &scratch,
   auto attr = new (ctx)
       AvailableAttr(SourceLoc(), SourceRange(), domain, kind, message, rename,
                     Introduced, SourceRange(), Deprecated, SourceRange(),
-                    Obsoleted, SourceRange(), isImplicit, isSPI, isForEmbedded);
+                    Obsoleted, SourceRange(), isImplicit, isSPI);
   return attr;
 }
 
@@ -5734,6 +5736,14 @@ llvm::Error DeclDeserializer::deserializeDeclCommon() {
       DeclAttribute *Attr = nullptr;
       bool skipAttr = false;
       switch (recordID) {
+      case decls_block::Execution_DECL_ATTR: {
+        unsigned behavior;
+        serialization::decls_block::ExecutionDeclAttrLayout::readRecord(
+            scratch, behavior);
+        Attr = new (ctx) ExecutionAttr(static_cast<ExecutionKind>(behavior),
+                                       /*Implicit=*/false);
+        break;
+      }
       case decls_block::ABI_DECL_ATTR: {
         bool isImplicit;
         DeclID abiDeclID;
