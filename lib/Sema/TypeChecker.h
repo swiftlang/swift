@@ -65,11 +65,11 @@ namespace constraints {
 enum class DeclTypeCheckingSemantics {
   /// A normal declaration.
   Normal,
-  
+
   /// The type(of:) declaration, which performs a "dynamic type" operation,
   /// with different behavior for existential and non-existential arguments.
   TypeOf,
-  
+
   /// The withoutActuallyEscaping(_:do:) declaration, which makes a nonescaping
   /// closure temporarily escapable.
   WithoutActuallyEscaping,
@@ -360,6 +360,9 @@ Type substMemberTypeWithBase(TypeDecl *member, Type baseTy,
 /// typealias GX3<A, B> = X<B, A>
 /// \endcode
 bool isPassThroughTypealias(TypeAliasDecl *typealias, NominalTypeDecl *nominal);
+
+
+bool isTypeInferredByTypealias(TypeAliasDecl *typealias, NominalTypeDecl *nominal);
 
 /// Determine whether one type is a subtype of another.
 ///
