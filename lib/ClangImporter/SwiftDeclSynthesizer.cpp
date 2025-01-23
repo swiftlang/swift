@@ -12,6 +12,7 @@
 
 #include "SwiftDeclSynthesizer.h"
 #include "swift/AST/ASTMangler.h"
+#include "swift/AST/AttrKind.h"
 #include "swift/AST/Builtins.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/ParameterList.h"
@@ -192,9 +193,12 @@ Type SwiftDeclSynthesizer::getConstantLiteralType(
   }
 }
 
-ValueDecl *SwiftDeclSynthesizer::createConstant(
-    Identifier name, DeclContext *dc, Type type, const clang::APValue &value,
-    ConstantConvertKind convertKind, bool isStatic, ClangNode ClangN) {
+ValueDecl *SwiftDeclSynthesizer::createConstant(Identifier name,
+                                                DeclContext *dc, Type type,
+                                                const clang::APValue &value,
+                                                ConstantConvertKind convertKind,
+                                                bool isStatic, ClangNode ClangN,
+                                                AccessLevel access) {
   auto &context = ImporterImpl.SwiftContext;
 
   // Create the integer literal value.
@@ -289,12 +293,16 @@ ValueDecl *SwiftDeclSynthesizer::createConstant(
   }
 
   assert(expr);
-  return createConstant(name, dc, type, expr, convertKind, isStatic, ClangN);
+  return createConstant(name, dc, type, expr, convertKind, isStatic, ClangN,
+                        access);
 }
 
-ValueDecl *SwiftDeclSynthesizer::createConstant(
-    Identifier name, DeclContext *dc, Type type, StringRef value,
-    ConstantConvertKind convertKind, bool isStatic, ClangNode ClangN) {
+ValueDecl *SwiftDeclSynthesizer::createConstant(Identifier name,
+                                                DeclContext *dc, Type type,
+                                                StringRef value,
+                                                ConstantConvertKind convertKind,
+                                                bool isStatic, ClangNode ClangN,
+                                                AccessLevel access) {
   ASTContext &ctx = ImporterImpl.SwiftContext;
 
   auto expr = new (ctx) StringLiteralExpr(value, SourceRange());
@@ -304,7 +312,8 @@ ValueDecl *SwiftDeclSynthesizer::createConstant(
   expr->setBuiltinInitializer(ctx.getStringBuiltinInitDecl(stringDecl));
   expr->setType(literalType);
 
-  return createConstant(name, dc, type, expr, convertKind, isStatic, ClangN);
+  return createConstant(name, dc, type, expr, convertKind, isStatic, ClangN,
+                        access);
 }
 
 /// Synthesizer callback to synthesize the getter for a constant value.
@@ -381,15 +390,18 @@ synthesizeConstantGetterBody(AbstractFunctionDecl *afd, void *voidContext) {
           /*isTypeChecked=*/true};
 }
 
-ValueDecl *SwiftDeclSynthesizer::createConstant(
-    Identifier name, DeclContext *dc, Type type, Expr *valueExpr,
-    ConstantConvertKind convertKind, bool isStatic, ClangNode ClangN) {
+ValueDecl *SwiftDeclSynthesizer::createConstant(Identifier name,
+                                                DeclContext *dc, Type type,
+                                                Expr *valueExpr,
+                                                ConstantConvertKind convertKind,
+                                                bool isStatic, ClangNode ClangN,
+                                                AccessLevel access) {
   auto &C = ImporterImpl.SwiftContext;
 
   VarDecl *var = nullptr;
   if (ClangN) {
     var = ImporterImpl.createDeclWithClangNode<VarDecl>(
-        ClangN, AccessLevel::Public,
+        ClangN, access,
         /*IsStatic*/ isStatic, VarDecl::Introducer::Var, SourceLoc(), name, dc);
   } else {
     var = new (C) VarDecl(
@@ -794,7 +806,7 @@ void SwiftDeclSynthesizer::makeStructRawValued(
   std::tie(var, patternBinding) = createVarWithPattern(
       structDecl, ctx.Id_rawValue, underlyingType, introducer,
       options.contains(MakeStructRawValuedFlags::IsImplicit),
-      AccessLevel::Public, setterAccess);
+      structDecl->getFormalAccess(), setterAccess);
 
   assert(var->hasStorage());
 
@@ -1276,7 +1288,7 @@ SwiftDeclSynthesizer::makeEnumRawValueConstructor(EnumDecl *enumDecl) {
                               /*GenericParams=*/nullptr, enumDecl,
                               /*LifetimeDependentTypeRepr*/ nullptr);
   ctorDecl->setImplicit();
-  ctorDecl->setAccess(AccessLevel::Public);
+  ctorDecl->copyFormalAccessFrom(enumDecl);
   ctorDecl->setBodySynthesizer(synthesizeEnumRawValueConstructorBody, enumDecl);
   return ctorDecl;
 }
