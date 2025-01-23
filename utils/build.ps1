@@ -422,6 +422,8 @@ enum TargetComponent {
   Foundation
   XCTest
   Testing
+  ClangBuiltins
+  ClangRuntime
 }
 
 function Get-TargetProjectBinaryCache($Arch, [TargetComponent]$Project) {
@@ -1604,6 +1606,52 @@ function Build-LLVM([Platform]$Platform, $Arch) {
       CMAKE_SYSTEM_NAME = $Platform.ToString();
       LLVM_HOST_TRIPLE = $Arch.LLVMTarget;
     }
+}
+
+function Build-Sanitizers([Platform]$Platform, $Arch) {
+  $BareTarget = $Arch.LLVMTarget.Replace("$AndroidAPILevel", "")
+  $LLVMDir = "$(Get-TargetProjectBinaryCache $Arch LLVM)\lib\cmake\llvm"
+  $InstallTo = "$($HostArch.ToolchainInstallRoot)\usr\lib\clang\19"
+
+  Build-CMakeProject `
+    -Src $SourceCache\llvm-project\compiler-rt\lib\builtins `
+    -Bin "$(Get-TargetProjectBinaryCache $Arch ClangBuiltins)" `
+    -InstallTo $InstallTo `
+    -Arch $Arch `
+    -Platform $Platform `
+    -UseBuiltCompilers C,CXX `
+    -BuildTargets "install-compiler-rt" `
+    -Defines (@{
+      CMAKE_MT = "mt";
+      CMAKE_SYSTEM_NAME = $Platform.ToString();
+      LLVM_DIR = $LLVMDir;
+      LLVM_ENABLE_PER_TARGET_RUNTIME_DIR = "YES";
+      COMPILER_RT_DEFAULT_TARGET_ONLY = "YES";
+    })
+  
+  Build-CMakeProject `
+    -Src $SourceCache\llvm-project\compiler-rt `
+    -Bin "$(Get-TargetProjectBinaryCache $Arch ClangRuntime)" `
+    -InstallTo $InstallTo `
+    -Arch $Arch `
+    -Platform $Platform `
+    -UseBuiltCompilers C,CXX `
+    -BuildTargets "install-compiler-rt" `
+    -Defines (@{
+      CMAKE_MT = "mt";
+      CMAKE_SYSTEM_NAME = $Platform.ToString();
+      LLVM_DIR = $LLVMDir;
+      LLVM_ENABLE_PER_TARGET_RUNTIME_DIR = "YES";
+      LLVM_RUNTIMES_TARGET = $BareTarget;
+      COMPILER_RT_DEFAULT_TARGET_ONLY = "YES";
+      COMPILER_RT_BUILD_BUILTINS = "NO";
+      COMPILER_RT_BUILD_CRT = "NO";
+      COMPILER_RT_BUILD_LIBFUZZER = "NO";
+      COMPILER_RT_BUILD_ORC = "NO";
+      COMPILER_RT_BUILD_XRAY = "NO";
+      COMPILER_RT_BUILD_PROFILE = "YES";
+      COMPILER_RT_BUILD_SANITIZERS = "YES";
+    })
 }
 
 function Build-ZLib([Platform]$Platform, $Arch) {
@@ -2822,6 +2870,7 @@ if (-not $SkipBuild) {
     Invoke-BuildStep Build-FoundationMacros -Build Windows $BuildArch
     Invoke-BuildStep Build-TestingMacros -Build Windows $BuildArch
     Invoke-BuildStep Build-Foundation Windows $Arch
+    Invoke-BuildStep Build-Sanitizers Windows $Arch
     Invoke-BuildStep Build-XCTest Windows $Arch
     Invoke-BuildStep Build-Testing Windows $Arch
     Invoke-BuildStep Write-PlatformInfoPlist $Arch
@@ -2840,6 +2889,7 @@ if (-not $SkipBuild) {
     Invoke-BuildStep Build-Runtime Android $Arch
     Invoke-BuildStep Build-Dispatch Android $Arch
     Invoke-BuildStep Build-Foundation Android $Arch
+    Invoke-BuildStep Build-Sanitizers Android $Arch
     Invoke-BuildStep Build-XCTest Android $Arch
     Invoke-BuildStep Build-Testing Android $Arch
     Invoke-BuildStep Write-PlatformInfoPlist $Arch
