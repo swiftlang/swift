@@ -2321,7 +2321,7 @@ function Build-ASN1($Arch) {
     -Src $SourceCache\swift-asn1 `
     -Bin (Get-HostProjectBinaryCache ASN1) `
     -Arch $Arch `
-    -UseBuiltCompilers C,Swift `
+    -UseBuiltCompilers Swift `
     -SwiftSDK (Get-HostSwiftSDK) `
     -BuildTargets default `
     -Defines @{
