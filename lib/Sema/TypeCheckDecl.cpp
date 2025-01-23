@@ -83,7 +83,7 @@ struct RawValueKey {
   enum class Kind : uint8_t {
     String, Float, Int, Bool, Tombstone, Empty
   } kind;
-  
+
   struct IntValueTy {
     uint64_t v0;
     uint64_t v1;
@@ -109,7 +109,7 @@ struct RawValueKey {
     FloatValueTy floatValue;
     bool boolValue;
   };
-  
+
   explicit RawValueKey(LiteralExpr *expr) {
     switch (expr->getKind()) {
     case ExprKind::IntegerLiteral:
@@ -153,13 +153,13 @@ struct RawValueKey {
       llvm_unreachable("not a valid literal expr for raw value");
     }
   }
-  
+
   explicit RawValueKey(Kind k) : kind(k) {
     assert((k == Kind::Tombstone || k == Kind::Empty)
            && "this ctor is only for creating DenseMap special values");
   }
 };
-  
+
 /// Used during enum raw value checking to identify the source of a raw value,
 /// which may have been derived by auto-incrementing, for diagnostic purposes.
 struct RawValueSource {
@@ -229,7 +229,7 @@ public:
     llvm_unreachable("Unhandled RawValueKey in switch.");
   }
 };
-  
+
 } // namespace llvm
 
 static bool canSkipCircularityCheck(NominalTypeDecl *decl) {
@@ -525,7 +525,7 @@ BodyInitKindRequest::evaluate(Evaluator &evaluator,
       // Don't walk into further nominal decls.
       return Action::SkipNodeIf(isa<NominalTypeDecl>(D));
     }
-    
+
     PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
       // Don't walk into closures.
       if (isa<ClosureExpr>(E))
@@ -538,7 +538,7 @@ BodyInitKindRequest::evaluate(Evaluator &evaluator,
 
       auto *argList = apply->getArgs();
       auto Callee = apply->getSemanticFn();
-      
+
       Expr *arg;
 
       if (isa<OtherConstructorDeclRefExpr>(Callee)) {
@@ -580,7 +580,7 @@ BodyInitKindRequest::evaluate(Evaluator &evaluator,
             myKind = BodyInitKind::Delegating;
         }
       }
-      
+
       if (myKind == BodyInitKind::None)
         return Action::Continue(E);
 
@@ -1032,7 +1032,7 @@ NeedsNewVTableEntryRequest::evaluate(Evaluator &evaluator,
   // Destructors always use a fixed vtable entry.
   if (isa<DestructorDecl>(decl))
     return false;
-  
+
   assert(isa<FuncDecl>(decl) || isa<ConstructorDecl>(decl));
 
   // Final members are always be called directly.
@@ -1160,7 +1160,7 @@ std::optional<AutomaticEnumValueKind>
 swift::computeAutomaticEnumValueKind(EnumDecl *ED) {
   Type rawTy = ED->getRawType();
   assert(rawTy && "Cannot compute value kind without raw type!");
-  
+
   if (ED->getGenericEnvironmentOfContext() != nullptr)
     rawTy = ED->mapTypeIntoContext(rawTy);
 
@@ -1175,7 +1175,7 @@ swift::computeAutomaticEnumValueKind(EnumDecl *ED) {
     KnownProtocolKind::ExpressibleByUnicodeScalarLiteral,
     KnownProtocolKind::ExpressibleByExtendedGraphemeClusterLiteral,
   };
-  
+
   if (conformsToProtocol(KnownProtocolKind::ExpressibleByIntegerLiteral)) {
     return AutomaticEnumValueKind::Integer;
   } else if (conformsToProtocol(KnownProtocolKind::ExpressibleByStringLiteral)){
@@ -1196,7 +1196,7 @@ EnumRawValuesRequest::evaluate(Evaluator &eval, EnumDecl *ED,
   if (!rawTy) {
     return std::make_tuple<>();
   }
-  
+
   // Avoid computing raw values for enum cases in swiftinterface files since raw
   // values are intentionally omitted from them (unless the enum is @objc).
   // Without bailing here, incorrect raw values can be automatically generated
@@ -1244,7 +1244,7 @@ EnumRawValuesRequest::evaluate(Evaluator &eval, EnumDecl *ED,
           return std::make_tuple<>();
         }
       }
-      
+
       // If the enum element has no explicit raw value, try to
       // autoincrement from the previous value, or start from zero if this
       // is the first element.
@@ -1268,7 +1268,7 @@ EnumRawValuesRequest::evaluate(Evaluator &eval, EnumDecl *ED,
       break;
     }
 
-    
+
     {
       Expr *exprToCheck = prevValue;
       if (TypeChecker::typeCheckExpression(
@@ -1319,7 +1319,7 @@ EnumRawValuesRequest::evaluate(Evaluator &eval, EnumDecl *ED,
 
     // Diagnose the duplicate value.
     Diags.diagnose(diagLoc, diag::enum_raw_value_not_unique);
-    
+
     if (lastExplicitValueElt != elt &&
         valueKind == AutomaticEnumValueKind::Integer) {
       Diags.diagnose(uncheckedRawValueOf(lastExplicitValueElt)->getLoc(),
@@ -1331,7 +1331,7 @@ EnumRawValuesRequest::evaluate(Evaluator &eval, EnumDecl *ED,
     diagLoc = uncheckedRawValueOf(foundElt)->isImplicit()
         ? foundElt->getLoc() : uncheckedRawValueOf(foundElt)->getLoc();
     Diags.diagnose(diagLoc, diag::enum_raw_value_used_here);
-    
+
     if (foundElt != prevSource.lastExplicitValueElt &&
         valueKind == AutomaticEnumValueKind::Integer) {
       if (prevSource.lastExplicitValueElt)
@@ -1896,7 +1896,7 @@ UnderlyingTypeRequest::evaluate(Evaluator &evaluator,
 /// Bind the given function declaration, which declares an operator, to the
 /// corresponding operator declaration.
 OperatorDecl *
-FunctionOperatorRequest::evaluate(Evaluator &evaluator, FuncDecl *FD) const {  
+FunctionOperatorRequest::evaluate(Evaluator &evaluator, FuncDecl *FD) const {
   auto &C = FD->getASTContext();
   auto &diags = C.Diags;
   const auto operatorName = FD->getBaseIdentifier();
@@ -2276,7 +2276,7 @@ ParamSpecifierRequest::evaluate(Evaluator &evaluator,
     }
     return ownershipRepr->getSpecifier();
   }
-  
+
   return ParamSpecifier::Default;
 }
 
@@ -3034,6 +3034,49 @@ bool TypeChecker::isPassThroughTypealias(TypeAliasDecl *typealias,
   return false;
 }
 
+bool TypeChecker::isTypeInferredByTypealias(TypeAliasDecl *typealias,
+                                         NominalTypeDecl *nominal) {
+  // Pass-through only makes sense when the typealias refers to a nominal
+  // type.
+  if (!nominal) return false;
+
+  // Check that the nominal type and the typealias are either both generic
+  // at this level or neither are.
+  if (nominal->isGeneric() != typealias->isGeneric())
+    return false;
+
+  // Make sure either both have generic signatures or neither do.
+  auto nominalSig = nominal->getGenericSignature();
+  auto typealiasSig = typealias->getGenericSignature();
+  if (static_cast<bool>(nominalSig) != static_cast<bool>(typealiasSig))
+    return false;
+
+  // If neither is generic, we're done: it's a pass-through alias.
+  if (!nominalSig) return true;
+
+  // Check that the type parameters are the same the whole way through.
+//  auto nominalGenericParams = nominalSig.getGenericParams();
+//  auto typealiasGenericParams = typealiasSig.getGenericParams();
+//  if (nominalGenericParams.size() != typealiasGenericParams.size())
+//    return false;
+//  if (!std::equal(nominalGenericParams.begin(), nominalGenericParams.end(),
+//                  typealiasGenericParams.begin(),
+//                  [](GenericTypeParamType *gp1, GenericTypeParamType *gp2) {
+//                    return gp1->isEqual(gp2);
+//                  }))
+//    return false;
+
+  // If neither is generic at this level, we have a pass-through typealias.
+  if (!typealias->isGeneric()) return true;
+
+//  if (typealias->getUnderlyingType()->isEqual(
+//        nominal->getSelfInterfaceType())) {
+//    return true;
+//  }
+
+  return false;
+}
+
 Type
 ExtendedTypeRequest::evaluate(Evaluator &eval, ExtensionDecl *ext) const {
   auto error = [&ext]() {
@@ -3067,11 +3110,13 @@ ExtendedTypeRequest::evaluate(Evaluator &eval, ExtensionDecl *ext) const {
     if (auto *aliasDecl = dyn_cast<TypeAliasDecl>(unboundGeneric->getDecl())) {
       auto underlyingType = aliasDecl->getUnderlyingType();
       if (auto extendedNominal = underlyingType->getAnyNominal()) {
-        return extendedType; /*TypeChecker::isPassThroughTypealias(
-                   aliasDecl, extendedNominal)
-                   ? extendedType
-                   : extendedNominal->getDeclaredType(); */
-      } 
+        if (TypeChecker::isPassThroughTypealias(aliasDecl, extendedNominal) || TypeChecker::isTypeInferredByTypealias(aliasDecl, extendedNominal)){
+          return extendedType;
+        }
+        else{
+          return extendedNominal->getDeclaredType();
+        }
+      }
 
       if (underlyingType->is<TupleType>()) {
         return extendedType;
