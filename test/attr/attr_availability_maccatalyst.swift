@@ -164,3 +164,17 @@ public extension UnavailableOniOS { // ok
 public struct AvailableOnMacCatalyst { }
 
 public extension AvailableOnMacCatalyst { } // ok
+
+@available(iOS, introduced: 14.0)
+@available(macCatalyst, introduced: 14.5)
+public struct AvailableLaterOnMacCatalyst { // expected-note {{enclosing scope requires availability of Mac Catalyst 14.5 or newer}}
+  @available(iOS, introduced: 14.0) // expected-warning {{instance method cannot be more available than enclosing scope}}
+  func iOSOnly() { }
+
+  @available(macCatalyst, introduced: 14.5)
+  func macCatalystOnly() { }
+
+  @available(iOS, introduced: 14.0)
+  @available(macCatalyst, introduced: 14.5)
+  func iOSAndMacCatalyst() { }
+}
