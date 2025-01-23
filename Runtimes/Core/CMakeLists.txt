@@ -74,6 +74,7 @@ include(Plist)
 check_symbol_exists("asl_log" "asl.h" SwiftCore_HAS_ASL)
 check_symbol_exists("dladdr" "dlfcn.h" SwiftCore_HAS_DLADDR)
 check_symbol_exists("dlsym" "dlfcn.h" SwiftCore_HAS_DLSYM)
+check_symbol_exists("os_trace" "os/trace.h" SwiftCore_HAS_OS_TRACE)
 
 check_include_file_cxx("clocale" SwiftCore_HAS_LOCALE)
 
@@ -100,6 +101,7 @@ defaulted_option(SwiftCore_ENABLE_STDLIB_TRACING "Enable tracing in the runtime.
 option(SwiftCore_ENABLE_UNICODE_DATA "Include unicode data in Swift runtimes" ON)
 option(SwiftCore_ENABLE_SHORT_MANGLING_LOOKUPS "Build with fast-path context descriptor lookups based on well-known short manglings." ON)
 option(SwiftCore_ENABLE_FILESYSTEM_SUPPORT "Build for systems that have a filesystem" ON)
+option(SwiftCore_ENABLE_OS_TRACE_LAZY_INIT "Use os_trace call to check if lazy init has been completed before making os_signpost calls." ${SwiftCore_HAS_OS_TRACE})
 
 defaulted_option(SwiftCore_ENABLE_BACKTRACING "Enable backtracing runtime support")
 defaulted_set(SwiftCore_BACKTRACER_PATH STRING "Set a fixed path to the Swift backtracer")
