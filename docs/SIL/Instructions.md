@@ -5551,3 +5551,21 @@ sil-instruction ::= 'has_symbol' sil-decl-ref
 Returns true if each of the underlying symbol addresses associated with
 the given declaration are non-null. This can be used to determine
 whether a weakly-imported declaration is available at runtime.
+
+## Miscellaneous instructions
+
+### ignored_use
+
+```none
+sil-instruction ::= 'ignored_use'
+```
+
+This instruction acts as a synthetic use instruction that suppresses unused
+variable warnings. In Swift the equivalent operation is '_ = x'. This
+importantly also provides a way to find the source location for '_ = x' when
+emitting SIL diagnostics. It is only legal in Raw SIL and is removed as dead
+code when we convert to Canonical SIL.
+
+DISCUSSION: Before the introduction of this instruction, in certain cases,
+SILGen would just not emit anything for '_ = x'... so one could not emit
+diagnostics upon this case.

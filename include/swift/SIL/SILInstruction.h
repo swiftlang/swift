@@ -11725,6 +11725,17 @@ public:
   }
 };
 
+/// An instruction that represents a semantic-less use that is used to
+/// suppresses unused value variable warnings. E.x.: _ = x.
+class IgnoredUseInst final
+    : public UnaryInstructionBase<SILInstructionKind::IgnoredUseInst,
+                                  NonValueInstruction> {
+  friend SILBuilder;
+
+  IgnoredUseInst(SILDebugLocation loc, SILValue operand)
+      : UnaryInstructionBase(loc, operand) {}
+};
+
 inline SILType *AllocRefInstBase::getTypeStorage() {
   // If the size of the subclasses are equal, then all of this compiles away.
   if (auto I = dyn_cast<AllocRefInst>(this))

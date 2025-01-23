@@ -5077,6 +5077,11 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
     }
     break;
   }
+  case SILInstructionKind::IgnoredUseInst:
+    if (parseTypedValueRef(Val, B) || parseSILDebugLocation(InstLoc, B))
+      return true;
+    ResultVal = B.createIgnoredUse(InstLoc, Val);
+    break;
 
   case SILInstructionKind::DeallocStackInst:
     if (parseTypedValueRef(Val, B) || parseSILDebugLocation(InstLoc, B))
