@@ -2470,6 +2470,12 @@ void AttributeChecker::visitAvailableAttr(AvailableAttr *parsedAttr) {
           // not diagnosed previously, so only emit a warning in that case.
           if (isa<ExtensionDecl>(DC->getTopmostDeclarationDeclContext()))
             limit = DiagnosticBehavior::Warning;
+        } else if (enclosingAttr.getPlatform() != attr->getPlatform()) {
+          // Downgrade to a warning when the limiting attribute is for a more
+          // specific platform.
+          if (inheritsAvailabilityFromPlatform(enclosingAttr.getPlatform(),
+                                               attr->getPlatform()))
+            limit = DiagnosticBehavior::Warning;
         }
         diagnose(D->isImplicit() ? enclosingDecl->getLoc()
                                  : parsedAttr->getLocation(),
