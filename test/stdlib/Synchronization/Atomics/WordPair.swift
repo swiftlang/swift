@@ -45,6 +45,16 @@ suite.test("basics") {
   let value1 = WordPair(first: .max, second: 0)
   expectEqual(value1.first, .max)
   expectEqual(value1.second, 0)
+
+  let c0 = WordPair(first: 0, second: 0)
+  let c1 = WordPair(first: 1, second: 0)
+  let c2 = WordPair(first: 2, second: 0)
+  let c3 = WordPair(first: 0, second: 1)
+  expectFalse(c0 < c0)
+  expectTrue(c0 < c1)
+  expectTrue(c0 < c2)
+  expectTrue(c0 < c3)
+  expectFalse(c1 < c0)
 }
 
 } // if #available(SwiftStdlib 6.0, *)
