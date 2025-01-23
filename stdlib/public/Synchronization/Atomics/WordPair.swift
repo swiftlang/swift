@@ -190,7 +190,7 @@ extension WordPair: Comparable {
   @available(SwiftStdlib 6.0, *)
   @_alwaysEmitIntoClient
   @_transparent
-  public func <(lhs: WordPair, rhs: WordPair) -> Bool {
+  public static func <(lhs: WordPair, rhs: WordPair) -> Bool {
     if lhs.first != rhs.first {
       return lhs.first < rhs.first
     } else {
