@@ -2730,3 +2730,26 @@ void IsUnsafeRequest::cacheResult(bool value) const {
   auto *decl = std::get<0>(getStorage());
   decl->setUnsafe(value);
 }
+
+//----------------------------------------------------------------------------//
+// SemanticAvailableAttrRequest computation.
+//----------------------------------------------------------------------------//
+
+std::optional<std::optional<SemanticAvailableAttr>>
+SemanticAvailableAttrRequest::getCachedResult() const {
+  const AvailableAttr *attr = std::get<0>(getStorage());
+  if (!attr->hasComputedSemanticAttr())
+    return std::nullopt;
+
+  if (!attr->hasCachedDomain()) {
+    return std::optional<SemanticAvailableAttr>{};
+  }
+
+  return SemanticAvailableAttr(attr);
+}
+
+void SemanticAvailableAttrRequest::cacheResult(
+    std::optional<SemanticAvailableAttr> value) const {
+  AvailableAttr *attr = const_cast<AvailableAttr *>(std::get<0>(getStorage()));
+  attr->setComputedSemanticAttr();
+}
