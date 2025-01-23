@@ -710,8 +710,8 @@ Expr *swift::buildPropertyWrapperInitCall(
   // user-written code.
   if (initKind == PropertyWrapperInitKind::ProjectedValue) {
     auto typeExpr = TypeExpr::createImplicit(backingStorageType, ctx);
-    auto *argList = ArgumentList::forImplicitSingle(ctx, ctx.Id_projectedValue,
-                                                    initializer);
+    auto *argList = ArgumentList::forImplicitSingle(
+        ctx, initializer->getLoc(), ctx.Id_projectedValue, initializer);
     auto *init = CallExpr::createImplicit(ctx, typeExpr, argList);
     innermostInitCallback(init);
     return init;

@@ -47,7 +47,7 @@ deriveBodyBridgedNSError_enum_nsErrorDomain(AbstractFunctionDecl *domainDecl,
       DeclNameLoc(), C.getStringDecl(), domainDecl,
       C.getStringDecl()->getInterfaceType());
   auto *argList = ArgumentList::forImplicitSingle(
-      C, C.getIdentifier("reflecting"), selfRef);
+      C, SourceLoc(), C.getIdentifier("reflecting"), selfRef);
   auto *initReflectingCall = CallExpr::createImplicit(C, stringType, argList);
   auto *ret = ReturnStmt::createImplicit(C, initReflectingCall);
 

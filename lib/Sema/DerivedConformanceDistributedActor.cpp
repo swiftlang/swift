@@ -692,11 +692,10 @@ deriveBodyDistributedActor_unownedExecutor(AbstractFunctionDecl *getter, void *)
 
   auto conformances = collectExistentialConformances(selfType->getCanonicalType(),
                                                      ctx.getAnyObjectType());
-  auto *argListForIsLocal =
-      ArgumentList::forImplicitSingle(ctx, Identifier(),
-                                      ErasureExpr::create(ctx, selfForIsLocalArg,
-                                                          ctx.getAnyObjectType(),
-                                                          conformances, {}));
+  auto *argListForIsLocal = ArgumentList::forImplicitSingle(
+      ctx, SourceLoc(), Identifier(),
+      ErasureExpr::create(ctx, selfForIsLocalArg, ctx.getAnyObjectType(),
+                          conformances, {}));
   CallExpr *isLocalActorCall = CallExpr::createImplicit(ctx, isLocalActorExpr, argListForIsLocal);
   isLocalActorCall->setType(ctx.getBoolType());
   isLocalActorCall->setThrows(nullptr);

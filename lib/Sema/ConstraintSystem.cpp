@@ -4557,7 +4557,8 @@ Expr *ConstraintSystem::buildTypeErasedExpr(Expr *expr, DeclContext *dc,
   auto typeEraser = attr->getResolvedType(PD);
   assert(typeEraser && "Failed to resolve eraser type!");
   auto &ctx = dc->getASTContext();
-  auto *argList = ArgumentList::forImplicitSingle(ctx, ctx.Id_erasing, expr);
+  auto *argList = ArgumentList::forImplicitSingle(ctx, expr->getLoc(),
+                                                  ctx.Id_erasing, expr);
   return CallExpr::createImplicit(
       ctx, TypeExpr::createImplicit(typeEraser, ctx), argList);
 }
