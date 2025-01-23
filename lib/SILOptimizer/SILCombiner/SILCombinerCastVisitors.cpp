@@ -1020,6 +1020,11 @@ SILCombiner::visitConvertFunctionInst(ConvertFunctionInst *cfi) {
   // %vjp' = convert_function %vjp
   // %y = differentiable_function(%orig', %jvp', %vjp')
   if (auto *DFI = dyn_cast<DifferentiableFunctionInst>(cfi->getOperand())) {
+    // Workaround for a problem with OSSA: https://github.com/swiftlang/swift/issues/78848
+    // TODO: remove this if-statement once the underlying problem is fixed.
+    if (cfi->getFunction()->hasOwnership())
+      return nullptr;
+
     auto createConvertFunctionOfComponent =
       [&](NormalDifferentiableFunctionTypeComponent extractee) {
         if (!DFI->hasExtractee(extractee))
