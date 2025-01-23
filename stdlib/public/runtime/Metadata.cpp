@@ -753,10 +753,8 @@ swift::swift_allocateGenericClassMetadata(const ClassDescriptor *description,
   return metadata;
 }
 
-ClassMetadata *
-swift::swift_allocateGenericClassMetadataWithLayoutString(
-    const ClassDescriptor *description,
-    const void *arguments,
+static ClassMetadata *swift_allocateGenericClassMetadataWithLayoutStringImpl(
+    const ClassDescriptor *description, const void *arguments,
     const GenericClassMetadataPattern *pattern) {
   return swift::swift_allocateGenericClassMetadata(description,
                                                    arguments,
@@ -834,12 +832,9 @@ swift::swift_allocateGenericValueMetadata(const ValueTypeDescriptor *description
   return metadata;
 }
 
-ValueMetadata *
-swift::swift_allocateGenericValueMetadataWithLayoutString(
-    const ValueTypeDescriptor *description,
-    const void *arguments,
-    const GenericValueMetadataPattern *pattern,
-    size_t extraDataSize) {
+static ValueMetadata *swift_allocateGenericValueMetadataWithLayoutStringImpl(
+    const ValueTypeDescriptor *description, const void *arguments,
+    const GenericValueMetadataPattern *pattern, size_t extraDataSize) {
   return swift::swift_allocateGenericValueMetadata(description,
                                                    arguments,
                                                    pattern,
@@ -3078,7 +3073,7 @@ void swift::swift_initStructMetadata(StructMetadata *structType,
   vwtable->publishLayout(layout);
 }
 
-void swift::swift_initStructMetadataWithLayoutString(
+static void swift_initStructMetadataWithLayoutStringImpl(
     StructMetadata *structType, StructLayoutFlags layoutFlags, size_t numFields,
     const uint8_t *const *fieldTypes, const uint8_t *fieldTags,
     uint32_t *fieldOffsets) {
@@ -8239,6 +8234,7 @@ const HeapObject *swift_getKeyPathImpl(const void *pattern,
 
 #define OVERRIDE_KEYPATH COMPATIBILITY_OVERRIDE
 #define OVERRIDE_WITNESSTABLE COMPATIBILITY_OVERRIDE
+#define OVERRIDE_CVW_METADATA COMPATIBILITY_OVERRIDE
 #include "../CompatibilityOverride/CompatibilityOverrideIncludePath.h"
 
 // Autolink with libc++, for cases where libswiftCore is linked statically.

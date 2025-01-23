@@ -24,6 +24,8 @@
 #include <cstring>
 #include <algorithm>
 
+#include "../CompatibilityOverride/CompatibilityOverride.h"
+
 using namespace swift;
 
 // So remote inspection/debugging tools can obtain
@@ -65,7 +67,7 @@ swift::swift_initEnumMetadataSingleCase(EnumMetadata *self,
   vwtable->publishLayout(layout);
 }
 
-void swift::swift_initEnumMetadataSingleCaseWithLayoutString(
+static void swift_initEnumMetadataSingleCaseWithLayoutStringImpl(
     EnumMetadata *self, EnumLayoutFlags layoutFlags,
     const Metadata *payloadType) {
   assert(self->hasLayoutString());
@@ -218,7 +220,7 @@ XIElement findXIElement(const Metadata *type) {
 }
 } // namespace
 
-void swift::swift_initEnumMetadataSinglePayloadWithLayoutString(
+static void swift_initEnumMetadataSinglePayloadWithLayoutStringImpl(
     EnumMetadata *self, EnumLayoutFlags layoutFlags,
     const Metadata *payloadType, unsigned emptyCases) {
   assert(self->hasLayoutString());
@@ -437,11 +439,9 @@ swift::swift_initEnumMetadataMultiPayload(EnumMetadata *enumType,
   vwtable->publishLayout(layout);
 }
 
-void swift::swift_initEnumMetadataMultiPayloadWithLayoutString(
-    EnumMetadata *enumType,
-    EnumLayoutFlags layoutFlags,
-    unsigned numPayloads,
-    const Metadata * const *payloadLayouts) {
+static void swift_initEnumMetadataMultiPayloadWithLayoutStringImpl(
+    EnumMetadata *enumType, EnumLayoutFlags layoutFlags, unsigned numPayloads,
+    const Metadata *const *payloadLayouts) {
   assert(enumType->hasLayoutString());
 
   // Accumulate the layout requirements of the payloads.
@@ -719,3 +719,6 @@ swift::swift_getEnumCaseMultiPayload(const OpaqueValue *value,
     }
   }
 }
+
+#define OVERRIDE_CVW_METADATA_ENUM COMPATIBILITY_OVERRIDE
+#include "../CompatibilityOverride/CompatibilityOverrideIncludePath.h"
