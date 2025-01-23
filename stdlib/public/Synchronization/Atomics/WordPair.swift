@@ -191,7 +191,11 @@ extension WordPair: Comparable {
   @_alwaysEmitIntoClient
   @_transparent
   public func <(lhs: WordPair, rhs: WordPair) -> Bool {
-    lhs.first < rhs.first || lhs.second < rhs.second
+    if lhs.first != rhs.first {
+      return lhs.first < rhs.first
+    } else {
+      return lhs.second < rhs.second
+    }
   }
 }
 
