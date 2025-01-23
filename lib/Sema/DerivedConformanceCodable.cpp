@@ -637,8 +637,8 @@ static CallExpr *createContainerKeyedByCall(ASTContext &C, DeclContext *DC,
                                                      SourceLoc(), SourceLoc());
 
   // Full bound base.container(keyedBy: CodingKeys.self) call
-  auto *argList =
-      ArgumentList::forImplicitSingle(C, C.Id_keyedBy, codingKeysMetaTypeExpr);
+  auto *argList = ArgumentList::forImplicitSingle(C, SourceLoc(), C.Id_keyedBy,
+                                                  codingKeysMetaTypeExpr);
   return CallExpr::createImplicit(C, unboundCall, argList);
 }
 
@@ -911,7 +911,8 @@ deriveBodyEncodable_encode(AbstractFunctionDecl *encodeDecl, void *) {
                                                  Argument::unlabeled(superRef));
 
     // super.encode(to: container.superEncoder())
-    auto *args = ArgumentList::forImplicitSingle(C, C.Id_to, superEncoderRef);
+    auto *args = ArgumentList::forImplicitSingle(C, SourceLoc(), C.Id_to,
+                                                 superEncoderRef);
     auto *callExpr = CallExpr::createImplicit(C, encodeCall, args);
 
     // try super.encode(to: container.superEncoder())
@@ -1487,8 +1488,8 @@ deriveBodyDecodable_init(AbstractFunctionDecl *initDecl, void *) {
             C, superRef, DeclBaseName::createConstructor(), {C.Id_from});
 
         // super.decode(from: container.superDecoder())
-        auto *argList =
-            ArgumentList::forImplicitSingle(C, C.Id_from, superDecoderCall);
+        auto *argList = ArgumentList::forImplicitSingle(
+            C, SourceLoc(), C.Id_from, superDecoderCall);
         auto *callExpr = CallExpr::createImplicit(C, initCall, argList);
 
         // try super.init(from: container.superDecoder())

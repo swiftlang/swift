@@ -3596,8 +3596,8 @@ namespace {
         return nullptr;
 
       // Build an argument list.
-      auto *argList =
-          ArgumentList::forImplicitSingle(ctx, ctx.Id_dynamicMember, argExpr);
+      auto *argList = ArgumentList::forImplicitSingle(
+          ctx, dotLoc, ctx.Id_dynamicMember, argExpr);
       // Build and return a subscript that uses this string as the index.
       return buildSubscript(base, argList, cs.getConstraintLocator(expr),
                             memberLocator, /*isImplicit*/ true,
@@ -5427,8 +5427,8 @@ namespace {
           argExpr = buildDynamicMemberLookupArgExpr(fieldName, componentLoc,
                                                     indexType);
         }
-        args = ArgumentList::forImplicitSingle(ctx, ctx.Id_dynamicMember,
-                                               argExpr);
+        args = ArgumentList::forImplicitSingle(ctx, componentLoc,
+                                               ctx.Id_dynamicMember, argExpr);
         // Record the implicit subscript expr's parameter bindings and matching
         // direction as `coerceCallArguments` requires them.
         solution.recordSingleArgMatchingChoice(locator);
@@ -8192,7 +8192,8 @@ std::pair<Expr *, ArgumentList *> ExprRewriter::buildDynamicCallable(
   }
   argExpr->setImplicit();
 
-  auto *argList = ArgumentList::forImplicitSingle(ctx, argumentLabel, argExpr);
+  auto *argList = ArgumentList::forImplicitSingle(ctx, args->getStartLoc(),
+                                                  argumentLabel, argExpr);
   return std::make_pair(member, argList);
 }
 

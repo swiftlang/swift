@@ -132,9 +132,10 @@ ArgumentList::createImplicit(ASTContext &ctx, ArrayRef<Argument> args,
                         firstTrailingClosureIndex, arena);
 }
 
-ArgumentList *ArgumentList::forImplicitSingle(ASTContext &ctx, Identifier label,
-                                              Expr *arg) {
-  return createImplicit(ctx, {Argument(SourceLoc(), label, arg)});
+ArgumentList *ArgumentList::forImplicitSingle(ASTContext &ctx, SourceLoc loc,
+                                              Identifier label, Expr *arg) {
+  return createImplicit(ctx, /*lParenLoc=*/loc, {Argument(loc, label, arg)},
+                        /*lParenLoc=*/loc);
 }
 
 ArgumentList *ArgumentList::forImplicitUnlabeled(ASTContext &ctx,
