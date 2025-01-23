@@ -1737,5 +1737,5 @@ final public class ThunkInst : Instruction {
 final public class MergeIsolationRegionInst : Instruction {
 }
 
-final public class IgnoredUseInst : Instruction {
+final public class IgnoredUseInst : Instruction, UnaryInstruction {
 }
