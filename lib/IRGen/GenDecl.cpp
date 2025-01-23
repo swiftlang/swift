@@ -6012,6 +6012,14 @@ bool IRGenModule::hasResilientMetadata(ClassDecl *D,
     return false;
   }
 
+  // Because the debugger can extend non public types outside of their module, 
+  // also check that "D" is *not* resilient  from the module that contains 
+  // "asViewedFromRootClass".
+  if (Context.LangOpts.DebuggerSupport && asViewedFromRootClass &&
+      !D->hasResilientMetadata(asViewedFromRootClass->getModuleContext(),
+                               expansion))
+    return false;
+
   return D->hasResilientMetadata(getSwiftModule(), expansion);
 }
 
