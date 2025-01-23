@@ -132,13 +132,9 @@ public enum Optional<Wrapped: ~Copyable & ~Escapable>: ~Copyable, ~Escapable {
   case some(Wrapped)
 }
 
-// FIXME: The ~Escapable clause must be explicit for this to be readable.
-// FIXME: Alas, that's currently an error. (rdar://130781168)
-extension Optional: Copyable where Wrapped: Copyable /*& ~Escapable */ {}
+extension Optional: Copyable where Wrapped: Copyable & ~Escapable {}
 
-// FIXME: The ~Copyable clause must be explicit for this to be readable.
-// FIXME: Alas, that's currently an error. (rdar://130781168)
-extension Optional: Escapable where Wrapped: Escapable /*& ~Copyable */ {}
+extension Optional: Escapable where Wrapped: Escapable & ~Copyable {}
 
 extension Optional: BitwiseCopyable
 where Wrapped: BitwiseCopyable & ~Escapable {}
