@@ -1855,7 +1855,7 @@ function Build-Dispatch([Platform]$Platform, $Arch, [switch]$Test = $false) {
     $Targets = @("default", "ExperimentalTest")
     $InstallPath = ""
   } else {
-    $Targets = @("default")
+    $Targets = @("install")
     $InstallPath = "$($Arch.SDKInstallRoot)\usr"
   }
 
@@ -1865,6 +1865,7 @@ function Build-Dispatch([Platform]$Platform, $Arch, [switch]$Test = $false) {
     -InstallTo $InstallPath `
     -Arch $Arch `
     -Platform $Platform `
+    -BuildTargets $Targets `
     -UseBuiltCompilers C,CXX,Swift `
     -Defines @{
       ENABLE_SWIFT = "YES";
@@ -2182,19 +2183,14 @@ function Build-System($Arch) {
   Build-CMakeProject `
     -Src $SourceCache\swift-system `
     -Bin (Get-HostProjectBinaryCache System) `
-    -InstallTo "$($Arch.ToolchainInstallRoot)\usr" `
     -Arch $Arch `
     -Platform Windows `
     -UseBuiltCompilers C,Swift `
     -SwiftSDK (Get-HostSwiftSDK) `
+    -BuildTargets default `
     -Defines @{
-      BUILD_SHARED_LIBS = "YES";
+      BUILD_SHARED_LIBS = "NO";
     }
-
-  if (-not $ToBatch) {
-    # Remove unnecessary "S:\Program Files\swift\Toolchains\0.0.0+Asserts\usr\include\CSystem"
-    Remove-Item -Force -Recurse "$($Arch.ToolchainInstallRoot)\usr\include\CSystem" -ErrorAction Ignore | Out-Null
-  }
 }
 
 function Build-ToolsSupportCore($Arch) {
