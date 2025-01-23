@@ -431,7 +431,7 @@ struct MappedLoc {
 class IndexSwiftASTWalker : public SourceEntityWalker {
   IndexDataConsumer &IdxConsumer;
   SourceManager &SrcMgr;
-  unsigned BufferID;
+  std::optional<unsigned> BufferID;
   bool enableWarnings;
 
   ModuleDecl *CurrentModule = nullptr;
@@ -592,7 +592,7 @@ public:
   IndexSwiftASTWalker(IndexDataConsumer &IdxConsumer, ASTContext &Ctx,
                       SourceFile *SF = nullptr)
       : IdxConsumer(IdxConsumer), SrcMgr(Ctx.SourceMgr),
-        BufferID(SF ? SF->getBufferID() : -1),
+        BufferID(SF ? std::optional(SF->getBufferID()) : std::nullopt),
         enableWarnings(IdxConsumer.enableWarnings()) {}
 
   ~IndexSwiftASTWalker() override {
@@ -1066,19 +1066,19 @@ private:
   // \c None if \p loc is otherwise invalid or its original location isn't
   // contained within the current buffer.
   std::optional<MappedLoc> getMappedLocation(SourceLoc loc) {
-    if (loc.isInvalid()) {
+    if (loc.isInvalid() || !BufferID.has_value()) {
       if (IsModuleFile)
         return {{0, 0, false}};
       return std::nullopt;
     }
 
+    auto bufferID = BufferID.value();
     bool inGeneratedBuffer =
-        !SrcMgr.rangeContainsTokenLoc(SrcMgr.getRangeForBuffer(BufferID), loc);
+        !SrcMgr.rangeContainsTokenLoc(SrcMgr.getRangeForBuffer(bufferID), loc);
 
-    auto bufferID = BufferID;
     if (inGeneratedBuffer) {
       std::tie(bufferID, loc) = CurrentModule->getOriginalLocation(loc);
-      if (BufferID != bufferID) {
+      if (BufferID.value() != bufferID) {
         assert(false && "Location is not within file being indexed");
         return std::nullopt;
       }
