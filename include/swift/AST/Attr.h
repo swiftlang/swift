@@ -151,9 +151,13 @@ protected:
       Value : 32
     );
 
-    SWIFT_INLINE_BITFIELD(AvailableAttr, DeclAttribute, 4+1+1+1,
+    SWIFT_INLINE_BITFIELD(AvailableAttr, DeclAttribute, 4+1+1+1+1+1,
       /// An `AvailableAttr::Kind` value.
       Kind : 4,
+
+      /// State storage for `SemanticAvailableAttrRequest`.
+      HasComputedSemanticAttr : 1,
+      HasDomain : 1,
 
       /// State storage for `RenamedDeclRequest`.
       HasComputedRenamedDecl : 1,
@@ -750,26 +754,32 @@ private:
   const StringRef Message;
   const StringRef Rename;
 
-  const std::optional<llvm::VersionTuple> Introduced;
+  const llvm::VersionTuple Introduced;
   const SourceRange IntroducedRange;
-  const std::optional<llvm::VersionTuple> Deprecated;
+  const llvm::VersionTuple Deprecated;
   const SourceRange DeprecatedRange;
-  const std::optional<llvm::VersionTuple> Obsoleted;
+  const llvm::VersionTuple Obsoleted;
   const SourceRange ObsoletedRange;
 
 public:
   /// Returns the parsed version for `introduced:`.
   std::optional<llvm::VersionTuple> getRawIntroduced() const {
+    if (Introduced.empty())
+      return std::nullopt;
     return Introduced;
   }
 
   /// Returns the parsed version for `deprecated:`.
   std::optional<llvm::VersionTuple> getRawDeprecated() const {
+    if (Deprecated.empty())
+      return std::nullopt;
     return Deprecated;
   }
 
   /// Returns the parsed version for `obsoleted:`.
   std::optional<llvm::VersionTuple> getRawObsoleted() const {
+    if (Obsoleted.empty())
+      return std::nullopt;
     return Obsoleted;
   }
 
@@ -806,14 +816,15 @@ public:
   /// Returns the `AvailabilityDomain` associated with the attribute, or
   /// `std::nullopt` if it has either not yet been resolved or could not be
   /// resolved successfully.
-  std::optional<AvailabilityDomain> getCachedDomain() const { return Domain; }
+  std::optional<AvailabilityDomain> getCachedDomain() const {
+    if (hasCachedDomain())
+      return Domain;
+    return std::nullopt;
+  }
 
   /// Returns true if the `AvailabilityDomain` associated with the attribute
   /// has been resolved successfully.
-  bool hasCachedDomain() const {
-    // For now, domains are always set on construction of the attribute.
-    return true;
-  }
+  bool hasCachedDomain() const { return Bits.AvailableAttr.HasDomain; }
 
   /// Returns the kind of availability the attribute specifies.
   Kind getKind() const { return static_cast<Kind>(Bits.AvailableAttr.Kind); }
@@ -872,6 +883,17 @@ private:
   void setComputedRenamedDecl(bool hasRenamedDecl) {
     Bits.AvailableAttr.HasComputedRenamedDecl = true;
     Bits.AvailableAttr.HasRenamedDecl = hasRenamedDecl;
+  }
+
+private:
+  friend class SemanticAvailableAttrRequest;
+
+  bool hasComputedSemanticAttr() const {
+    return Bits.AvailableAttr.HasComputedSemanticAttr;
+  }
+
+  void setComputedSemanticAttr() {
+    Bits.AvailableAttr.HasComputedSemanticAttr = true;
   }
 };
 
@@ -3252,7 +3274,7 @@ public:
 
   /// The version tuple written in source for the `introduced:` component.
   std::optional<llvm::VersionTuple> getIntroduced() const {
-    return attr->Introduced;
+    return attr->getRawIntroduced();
   }
 
   /// The source range of the `introduced:` component.
@@ -3264,12 +3286,12 @@ public:
 
   /// The version tuple written in source for the `deprecated:` component.
   std::optional<llvm::VersionTuple> getDeprecated() const {
-    return attr->Deprecated;
+    return attr->getRawDeprecated();
   }
 
   /// The version tuple written in source for the `obsoleted:` component.
   std::optional<llvm::VersionTuple> getObsoleted() const {
-    return attr->Obsoleted;
+    return attr->getRawObsoleted();
   }
 
   /// Returns the `message:` field of the attribute, or an empty string.
@@ -3302,7 +3324,8 @@ public:
   /// Whether this attribute has an introduced, deprecated, or obsoleted
   /// version.
   bool isVersionSpecific() const {
-    return attr->Introduced || attr->Deprecated || attr->Obsoleted;
+    return getIntroduced().has_value() || getDeprecated().has_value() ||
+           getObsoleted().has_value();
   }
 
   /// Whether this is a language mode specific attribute.

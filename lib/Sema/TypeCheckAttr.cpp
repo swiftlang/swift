@@ -8252,6 +8252,13 @@ ValueDecl *RenamedDeclRequest::evaluate(Evaluator &evaluator,
   return renamedDecl;
 }
 
+std::optional<SemanticAvailableAttr>
+SemanticAvailableAttrRequest::evaluate(swift::Evaluator &evaluator,
+                                       const AvailableAttr *attr,
+                                       const Decl *decl) const {
+  return SemanticAvailableAttr(attr);
+}
+
 template <typename ATTR>
 static void forEachCustomAttribute(
     Decl *decl,
