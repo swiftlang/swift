@@ -2306,9 +2306,10 @@ static bool ParseSearchPathArgs(SearchPathOptions &Opts, ArgList &Args,
   Opts.ScannerModuleValidation |= Args.hasFlag(OPT_scanner_module_validation,
                                                OPT_no_scanner_module_validation,
                                                CASOpts.EnableCaching);
+
   bool buildingFromInterface =
-      FrontendOptions::doesActionBuildModuleFromInterface(
-          FrontendOpts.RequestedAction);
+      FrontendOpts.InputMode ==
+      FrontendOptions::ParseInputMode::SwiftModuleInterface;
   auto firstInputPath =
       FrontendOpts.InputsAndOutputs.hasInputs()
           ? FrontendOpts.InputsAndOutputs.getFilenameOfFirstInput()
