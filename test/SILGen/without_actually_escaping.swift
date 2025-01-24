@@ -35,14 +35,16 @@ func letEscape(f: () -> ()) -> () -> () {
 // CHECK:  try_apply [[USER]]([[BORROW]]) : {{.*}}, normal bb1, error bb2
 //
 // CHECK: bb1([[RES:%.*]] : @owned $@callee_guaranteed () -> ()):
-// CHECK:   [[ESCAPED:%.*]] = is_escaping_closure [[BORROW]]
-// CHECK:   cond_fail [[ESCAPED]] : $Builtin.Int1
 // CHECK:   end_borrow [[BORROW]]
+// CHECK:   [[ESCAPED:%.*]] = is_escaping_closure [[MD]]
+// CHECK:   cond_fail [[ESCAPED]] : $Builtin.Int1
 // CHECK:   destroy_value [[MD]]
 // CHECK:   return [[RES]]
 //
 // CHECK: bb2([[ERR:%.*]] : @owned $any Error):
 // CHECK:   end_borrow [[BORROW]]
+// CHECK:   [[ESCAPED:%.*]] = is_escaping_closure [[MD]]
+// CHECK:   cond_fail [[ESCAPED]] : $Builtin.Int1
 // CHECK:   destroy_value [[MD]]
 // CHECK:   throw [[ERR]] : $any Error
 // CHECK: }
