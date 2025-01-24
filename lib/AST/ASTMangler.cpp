@@ -4038,6 +4038,18 @@ CanType ASTMangler::getDeclTypeForMangling(
     ty = ty->stripConcurrency(/*recurse=*/true, /*dropGlobalActor=*/true);
   }
 
+  // Map any local archetypes out of context.
+  if (ty->hasLocalArchetype()) {
+    CaptureInfo captureInfo;
+    auto *innerDC = decl->getInnermostDeclContext();
+    if (auto fn = AnyFunctionRef::fromDeclContext(innerDC))
+      captureInfo = fn->getCaptureInfo();
+
+    ty = mapLocalArchetypesOutOfContext(
+        ty, innerDC->getGenericSignatureOfContext(),
+        captureInfo.getGenericEnvironments());
+  }
+
   auto canTy = ty->getCanonicalType();
 
   if (auto gft = dyn_cast<GenericFunctionType>(canTy)) {
