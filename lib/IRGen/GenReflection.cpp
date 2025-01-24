@@ -1778,7 +1778,7 @@ void IRGenModule::emitFieldDescriptor(const NominalTypeDecl *D) {
   bool needsMPEDescriptor = false;
   bool needsFieldDescriptor = true;
 
-  if (auto *ED = dyn_cast<EnumDecl>(D)) {
+  if (isa<EnumDecl>(D)) {
     auto &strategy = getEnumImplStrategy(*this, T);
 
     // @objc enums never have generic parameters or payloads,

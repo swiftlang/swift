@@ -405,7 +405,7 @@ const TypeInfo *TypeConverter::convertArchetypeType(ArchetypeType *archetype) {
   // Opaque result types can be private and from a different module. In this
   // case we can't access their type metadata from another module.
   IsABIAccessible_t abiAccessible = IsABIAccessible;
-  if (auto opaqueArchetype = dyn_cast<OpaqueTypeArchetypeType>(archetype)) {
+  if (isa<OpaqueTypeArchetypeType>(archetype)) {
     auto &currentSILModule = IGM.getSILModule();
     abiAccessible =
         currentSILModule.isTypeMetadataAccessible(archetype->getCanonicalType())

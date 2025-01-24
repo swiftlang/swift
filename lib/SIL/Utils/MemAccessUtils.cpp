@@ -1384,7 +1384,7 @@ public:
   SILValue visitAccessProjection(SingleValueInstruction *projectedAddr,
                                  Operand *sourceAddr) {
     auto projIdx = ProjectionIndex(projectedAddr);
-    if (auto *indexAddr = dyn_cast<IndexAddrInst>(projectedAddr)) {
+    if (isa<IndexAddrInst>(projectedAddr)) {
       addPathOffset(projIdx.isValid() ? projIdx.Index
                                       : AccessPath::UnknownOffset);
     } else if (isa<TailAddrInst>(projectedAddr)) {

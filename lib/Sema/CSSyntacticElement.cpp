@@ -122,7 +122,7 @@ public:
           // relative to this element's context.
           if (CS.simplifyType(type)->hasTypeVariable()) {
             auto transformedTy = type.transformRec([&](Type type) -> std::optional<Type> {
-              if (auto *typeVar = type->getAs<TypeVariableType>()) {
+              if (type->is<TypeVariableType>()) {
                 return Type(ErrorType::get(CS.getASTContext()));
               }
               return std::nullopt;
@@ -199,7 +199,7 @@ public:
   }
 
   PostWalkResult<Expr *> walkToExprPost(Expr *expr) override {
-    if (auto *closure = dyn_cast<ClosureExpr>(expr)) {
+    if (isa<ClosureExpr>(expr)) {
       ClosureDCs.pop_back();
     }
     return Action::Continue(expr);
@@ -900,7 +900,7 @@ private:
     if (auto *elseStmt = ifStmt->getElseStmt()) {
       auto *elseLoc = cs.getConstraintLocator(
           locator, LocatorPathElt::TernaryBranch(/*then=*/false));
-      elements.push_back(makeElement(ifStmt->getElseStmt(), elseLoc));
+      elements.push_back(makeElement(elseStmt, elseLoc));
     }
 
     createConjunction(elements, locator);

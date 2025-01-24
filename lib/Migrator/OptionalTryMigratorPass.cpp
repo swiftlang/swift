@@ -37,17 +37,15 @@ namespace {
         return true;
       }
       
-      if (const auto *explicitCastExpr = dyn_cast<ExplicitCastExpr>(E)) {
+      if (isa<ExplicitCastExpr>(E)) {
         // If the user has already provided an explicit cast for the
         // 'try?', then we don't need to add one. So let's track whether
         // one is active
         explicitCastActiveForOptionalTry = true;
-      }
-      else if (const auto *optTryExpr = dyn_cast<OptionalTryExpr>(E)) {
+      } else if (const auto *optTryExpr = dyn_cast<OptionalTryExpr>(E)) {
         wrapTryInCastIfNeeded(optTryExpr);
         return false;
-      }
-      else if (explicitCastActiveForOptionalTry) {
+      } else if (explicitCastActiveForOptionalTry) {
         // If an explicit cast is active and we are entering a new
         // expression that is not an OptionalTryExpr, then the cast
         // does not apply to the OptionalTryExpr.

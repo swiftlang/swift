@@ -1345,7 +1345,7 @@ static void diagnoseUnboundGenericType(Type ty, SourceLoc loc) {
                    decl->getName());
   } else {
     ty.findIf([&](Type t) -> bool {
-      if (auto unbound = t->getAs<UnboundGenericType>()) {
+      if (t->is<UnboundGenericType>()) {
         ctx.Diags.diagnose(loc,
             diag::generic_type_requires_arguments, t);
         return true;

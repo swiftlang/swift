@@ -4064,7 +4064,7 @@ public:
       auto *SA = cast<SpecializeAttr>(A);
       if (!SA->isExported())
         continue;
-      if (auto *targetFunctionDecl = SA->getTargetFunctionDecl(afd)) {
+      if (SA->getTargetFunctionDecl(afd)) {
         if (!hasNoted)
           exportedPrespecializationDecls.push_back(S.addDeclRef(afd));
         hasNoted = true;
@@ -5213,7 +5213,7 @@ public:
 static bool canSkipWhenInvalid(const Decl *D) {
   // There's no point writing out the deinit when its context is not a class
   // as nothing would be able to reference it
-  if (auto *deinit = dyn_cast<DestructorDecl>(D)) {
+  if (isa<DestructorDecl>(D)) {
     if (!isa<ClassDecl>(D->getDeclContext()))
       return true;
   }

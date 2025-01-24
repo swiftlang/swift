@@ -2397,7 +2397,7 @@ void SILGenFunction::destroyLocalVariable(SILLocation silLoc, VarDecl *vd) {
       }
 
       // Handle trivial arguments.
-      if (auto *move = dyn_cast<MoveValueInst>(mark->getOperand())) {
+      if (isa<MoveValueInst>(mark->getOperand())) {
         emitDestroy(mark);
         return;
       }

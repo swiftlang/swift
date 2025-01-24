@@ -289,7 +289,7 @@ LookupResult TypeChecker::lookupUnqualified(DeclContext *dc, DeclNameRef name,
     if (auto *typeDC = found.getDeclContext()) {
       if (!typeDC->isTypeContext()) {
         // If we don't have a type context this is an implicit 'self' reference.
-        if (auto *CE = dyn_cast<ClosureExpr>(typeDC)) {
+        if (isa<ClosureExpr>(typeDC)) {
           typeDC = typeDC->getInnermostTypeContext();
         } else {
           // Otherwise, we must have the method context.

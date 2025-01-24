@@ -339,7 +339,7 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
 
           // Check for effects
           if (auto asd = dyn_cast<AbstractStorageDecl>(decl)) {
-            if (auto getter = asd->getEffectfulGetAccessor()) {
+            if (asd->getEffectfulGetAccessor()) {
               Ctx.Diags.diagnose(component.getLoc(),
                                  diag::effectful_keypath_component,
                                  asd->getDescriptiveKind());
@@ -1484,7 +1484,7 @@ DeferredDiags swift::findSyntacticErrorForConsume(
   bool partial = false;
   Expr *current = subExpr;
   while (current) {
-    if (auto *dre = dyn_cast<DeclRefExpr>(current)) {
+    if (isa<DeclRefExpr>(current)) {
       if (partial & !noncopyable)
         result.emplace_back(loc, diag::consume_expression_partial_copyable);
 

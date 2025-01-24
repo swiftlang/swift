@@ -2889,7 +2889,7 @@ public:
           << ", resume " << Ctx.getID(AI->getResumeBB());
     
     if (auto errorBB = AI->getErrorBB()) {
-      *this << ", error " << Ctx.getID(AI->getErrorBB());
+      *this << ", error " << Ctx.getID(errorBB);
     }
   }
 

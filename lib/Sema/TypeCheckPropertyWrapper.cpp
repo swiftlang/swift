@@ -357,7 +357,7 @@ PropertyWrapperTypeInfoRequest::evaluate(
 
   PropertyWrapperTypeInfo result;
   result.valueVar = valueVar;
-  if (auto init = findSuitableWrapperInit(ctx, nominal, valueVar,
+  if (findSuitableWrapperInit(ctx, nominal, valueVar,
                               PropertyWrapperInitKind::WrappedValue, decls)) {
     result.wrappedValueInit = PropertyWrapperTypeInfo::HasWrappedValueInit;
   } else if (auto init = findSuitableWrapperInit(

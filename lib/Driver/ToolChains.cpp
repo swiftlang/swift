@@ -204,8 +204,7 @@ void ToolChain::addCommonFrontendArgs(const OutputInfo &OI,
     arguments.push_back("-disable-objc-interop");
   }
 
-  if (const Arg *arg = inputArgs.getLastArg(
-        options::OPT_experimental_serialize_debug_info)) {
+  if (inputArgs.getLastArg(options::OPT_experimental_serialize_debug_info)) {
     arguments.push_back(
         inputArgs.MakeArgString(Twine("-experimental-serialize-debug-info")));
   }

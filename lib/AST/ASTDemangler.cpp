@@ -155,7 +155,7 @@ Type ASTBuilder::createNominalType(GenericTypeDecl *decl, Type parent) {
     return Type();
 
   // If the declaration is generic, fail.
-  if (auto list = nominalDecl->getGenericParams())
+  if (nominalDecl->isGeneric())
     return Type();
 
   // Imported types can be renamed to be members of other (non-generic)
