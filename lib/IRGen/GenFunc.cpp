@@ -1457,7 +1457,8 @@ public:
     auto prototype = subIGF.IGM.getOpaquePtr(
       subIGF.IGM.getAddrOfContinuationPrototype(
         cast<SILFunctionType>(
-          unsubstType->mapTypeOutOfContext()->getCanonicalType())));
+          unsubstType->mapTypeOutOfContext()->getCanonicalType()),
+        origType->getInvocationGenericSignature()));
 
     // Use malloc and free as our allocator.
     auto allocFn = subIGF.IGM.getOpaquePtr(subIGF.IGM.getMallocFn());

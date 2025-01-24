@@ -4829,7 +4829,9 @@ emitRetconCoroutineEntry(IRGenFunction &IGF, CanSILFunctionType fnType,
                          llvm::Intrinsic::ID idIntrinsic, Size bufferSize,
                          Alignment bufferAlignment) {
   auto prototype =
-    IGF.IGM.getOpaquePtr(IGF.IGM.getAddrOfContinuationPrototype(fnType));
+    IGF.IGM.getOpaquePtr(
+      IGF.IGM.getAddrOfContinuationPrototype(fnType,
+                                             fnType->getInvocationGenericSignature()));
 
   // Use malloc and free as our allocator.
   auto allocFn = IGF.IGM.getOpaquePtr(IGF.IGM.getMallocFn());
