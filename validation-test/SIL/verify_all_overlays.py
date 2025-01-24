@@ -41,10 +41,15 @@ for module_file in os.listdir(sdk_overlay_dir):
     # Backtracing needs its own additional modules in the module path, and
     # also needs C++ interop enabled
     if module_name == "_Backtracing":
-        extra_args = ["-I", os.path.join(source_dir, "stdlib",
-                                         "public", "Backtracing", "modules"),
-                      "-I", os.path.join(source_dir, "include"),
-                      "--enable-experimental-cxx-interop"]
+        # We need to get this to work; right now, it aborts claiming that the
+        # current compilation (the sil-opt invocation) uses an unknown C++
+        # library.
+
+        # extra_args = ["-I", os.path.join(source_dir, "stdlib",
+        #                                  "public", "Backtracing", "modules"),
+        #               "-I", os.path.join(source_dir, "include"),
+        #               "--enable-experimental-cxx-interop"]
+        continue
     # _Concurrency needs its own additional modules in the module path
     if module_name == "_Concurrency":
         extra_args = ["-I", os.path.join(source_dir, "stdlib",
