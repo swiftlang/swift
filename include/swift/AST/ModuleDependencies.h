@@ -1252,6 +1252,9 @@ public:
   /// Update stored dependencies for the given module.
   void updateDependency(ModuleDependencyID moduleID,
                         ModuleDependencyInfo dependencyInfo);
+  
+  /// Remove a given dependency info from the cache.
+  void removeDependency(ModuleDependencyID moduleID);
 
   /// Resolve this module's set of directly-imported Swift module
   /// dependencies

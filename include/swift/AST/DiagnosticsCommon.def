@@ -224,6 +224,14 @@ REMARK(remark_scanner_uncached_lookups, none,
 REMARK(remark_save_cache, none,
        "Serializing module scanning dependency cache to: '%0'.", (StringRef))
 
+REMARK(remark_scanner_stale_result_invalidate, none,
+       "Dependency info for module '%0' invalidated due to a modified input"
+       " since last scan: '%1'.", (StringRef, StringRef))
+
+REMARK(remark_scanner_invalidate_upstream, none,
+       "Dependency info for module '%0' invalidated due to an out-of-date"
+       " dependency.", (StringRef))
+
 //------------------------------------------------------------------------------
 // MARK: custom attribute diagnostics
 //------------------------------------------------------------------------------
