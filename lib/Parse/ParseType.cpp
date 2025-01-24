@@ -267,7 +267,7 @@ ParserResult<TypeRepr> Parser::parseTypeSimple(
 
   // '.X', '.Type', '.Protocol', '?', '!', '[]'.
   while (ty.isNonNull()) {
-    if (Tok.isAny(tok::period, tok::period_prefix)) {
+    if (Tok.isAny(tok::period, tok::period_prefix) && canContinueParsingExtendedTypeForNominalTypeDecl(reason)) {
       if (peekToken().is(tok::code_complete)) {
         consumeToken();
 
@@ -280,7 +280,7 @@ ParserResult<TypeRepr> Parser::parseTypeSimple(
         break;
       }
 
-      ty = parseTypeDotted(ty);
+      ty = parseTypeDotted(ty, reason);
       continue;
     }
 
@@ -862,13 +862,22 @@ ParserResult<DeclRefTypeRepr> Parser::parseTypeIdentifier(TypeRepr *Base) {
   return makeParserResult(Result);
 }
 
-ParserResult<TypeRepr> Parser::parseTypeDotted(ParserResult<TypeRepr> Base) {
+bool Parser::canContinueParsingExtendedTypeForNominalTypeDecl(ParseTypeReason reason) {
+  if (reason != ParseTypeReason::NominalTypeDeclExtendedName)
+    return true;
+
+  BacktrackingScope backtrack(*this);
+  consumeToken();  // consume period
+  return canParseType(reason) && Tok.isAny(tok::period, tok::period_prefix);
+}
+
+ParserResult<TypeRepr> Parser::parseTypeDotted(ParserResult<TypeRepr> Base, ParseTypeReason reason) {
   assert(Base.isNonNull());
   assert(Tok.isAny(tok::period, tok::period_prefix));
 
   TypeRepr *Result = Base.get();
 
-  while (Tok.isAny(tok::period, tok::period_prefix)) {
+  while (Tok.isAny(tok::period, tok::period_prefix) && canContinueParsingExtendedTypeForNominalTypeDecl(reason)) {
     if (peekToken().is(tok::code_complete)) {
       // Code completion for "type-simple '.'" is handled in 'parseTypeSimple'.
       break;
@@ -1563,7 +1572,7 @@ bool Parser::canParseGenericArguments() {
   }
 }
 
-bool Parser::canParseType() {
+bool Parser::canParseType(ParseTypeReason reason) {
   // 'repeat' starts a pack expansion type.
   consumeIf(tok::kw_repeat);
 
@@ -1650,6 +1659,9 @@ bool Parser::canParseType() {
   // type-simple.
   while (true) {
     if (Tok.isAny(tok::period_prefix, tok::period)) {
+      if (reason == ParseTypeReason::NominalTypeDeclExtendedName)
+        return true;
+
       consumeToken();
 
       if (Tok.isContextualKeyword("Type") ||

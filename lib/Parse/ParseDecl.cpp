@@ -9133,13 +9133,20 @@ Parser::parseAbstractFunctionBodyDelayed(AbstractFunctionDecl *AFD) {
 ///   decl-enum-body:
 ///      decl*
 /// \endverbatim
-ParserResult<EnumDecl> Parser::parseDeclEnum(ParseDeclOptions Flags,
+ParserResult<Decl> Parser::parseDeclEnum(ParseDeclOptions Flags,
                                              DeclAttributes &Attributes) {
   SourceLoc EnumLoc = consumeToken(tok::kw_enum);
 
   Identifier EnumName;
   SourceLoc EnumNameLoc;
   ParserStatus Status;
+
+  ParserResult<ExtensionDecl> ImplicitExtensionResult = maybeParseImplicitNominalTypeExtension();
+  if (ImplicitExtensionResult.hasCodeCompletion())
+    return makeParserCodeCompletionStatus();
+
+  ExtensionDecl *ImplicitExtension = ImplicitExtensionResult.getPtrOrNull();
+  ContextChange MaybeExtensionCC(*this, ImplicitExtension ? ImplicitExtension : CurDeclContext);
 
   Status |= parseIdentifierDeclName(
       *this, EnumName, EnumNameLoc, "enum", [&](const Token &next) {
@@ -9197,7 +9204,9 @@ ParserResult<EnumDecl> Parser::parseDeclEnum(ParseDeclOptions Flags,
 
   ED->setBraces({LBLoc, RBLoc});
 
-  return DCC.fixupParserResult(Status, ED);
+  return maybeFinalizeImplicitNominalTypeExtension(ImplicitExtension, ED, [&](Decl *D){
+    return makeParserResult(Status, D);
+  });
 }
 
 /// Parse a 'case' of an enum.
@@ -9392,13 +9401,20 @@ Parser::parseDeclEnumCase(ParseDeclOptions Flags,
 ///   decl-struct-body:
 ///      decl*
 /// \endverbatim
-ParserResult<StructDecl> Parser::parseDeclStruct(ParseDeclOptions Flags,
-                                                 DeclAttributes &Attributes) {
+ParserResult<Decl> Parser::parseDeclStruct(ParseDeclOptions Flags,
+                                           DeclAttributes &Attributes) {
   SourceLoc StructLoc = consumeToken(tok::kw_struct);
   
   Identifier StructName;
   SourceLoc StructNameLoc;
   ParserStatus Status;
+
+  ParserResult<ExtensionDecl> ImplicitExtensionResult = maybeParseImplicitNominalTypeExtension();
+  if (ImplicitExtensionResult.hasCodeCompletion())
+    return makeParserCodeCompletionStatus();
+
+  ExtensionDecl *ImplicitExtension = ImplicitExtensionResult.getPtrOrNull();
+  ContextChange MaybeExtensionCC(*this, ImplicitExtension ? ImplicitExtension : CurDeclContext);
 
   Status |= parseIdentifierDeclName(
       *this, StructName, StructNameLoc, "struct", [&](const Token &next) {
@@ -9461,7 +9477,9 @@ ParserResult<StructDecl> Parser::parseDeclStruct(ParseDeclOptions Flags,
 
   SD->setBraces({LBLoc, RBLoc});
 
-  return DCC.fixupParserResult(Status, SD);
+  return maybeFinalizeImplicitNominalTypeExtension(ImplicitExtension, SD, [&](Decl *D){
+    return makeParserResult(Status, D);
+  });
 }
 
 /// Parse a 'class' declaration, doing no token skipping on error.
@@ -9473,7 +9491,7 @@ ParserResult<StructDecl> Parser::parseDeclStruct(ParseDeclOptions Flags,
 ///   decl-class-body:
 ///      decl*
 /// \endverbatim
-ParserResult<ClassDecl> Parser::parseDeclClass(ParseDeclOptions Flags,
+ParserResult<Decl> Parser::parseDeclClass(ParseDeclOptions Flags,
                                                DeclAttributes &Attributes) {
   bool isExplicitActorDecl = Tok.isContextualKeyword("actor");
 
@@ -9488,6 +9506,13 @@ ParserResult<ClassDecl> Parser::parseDeclClass(ParseDeclOptions Flags,
   Identifier ClassName;
   SourceLoc ClassNameLoc;
   ParserStatus Status;
+
+  ParserResult<ExtensionDecl> ImplicitExtensionResult = maybeParseImplicitNominalTypeExtension();
+  if (ImplicitExtensionResult.hasCodeCompletion())
+    return makeParserCodeCompletionStatus();
+
+  ExtensionDecl *ImplicitExtension = ImplicitExtensionResult.getPtrOrNull();
+  ContextChange MaybeExtensionCC(*this, ImplicitExtension ? ImplicitExtension : CurDeclContext);
 
   Status |= parseIdentifierDeclName(
       *this, ClassName, ClassNameLoc, isExplicitActorDecl ? "actor" : "class",
@@ -9577,7 +9602,9 @@ ParserResult<ClassDecl> Parser::parseDeclClass(ParseDeclOptions Flags,
 
   CD->setBraces({LBLoc, RBLoc});
 
-  return DCC.fixupParserResult(Status, CD);
+  return maybeFinalizeImplicitNominalTypeExtension(ImplicitExtension, CD, [&](Decl *D){
+    return makeParserResult(Status, D);
+  });
 }
 
 ParserStatus Parser::parsePrimaryAssociatedTypes(
@@ -9642,13 +9669,20 @@ ParserStatus Parser::parsePrimaryAssociatedTypeList(
 ///      decl-var-simple
 ///      decl-typealias
 /// \endverbatim
-ParserResult<ProtocolDecl> Parser::
+ParserResult<Decl> Parser::
 parseDeclProtocol(ParseDeclOptions Flags, DeclAttributes &Attributes) {
   SourceLoc ProtocolLoc = consumeToken(tok::kw_protocol);
   
   SourceLoc NameLoc;
   Identifier ProtocolName;
   ParserStatus Status;
+
+  ParserResult<ExtensionDecl> ImplicitExtensionResult = maybeParseImplicitNominalTypeExtension();
+  if (ImplicitExtensionResult.hasCodeCompletion())
+    return makeParserCodeCompletionStatus();
+
+  ExtensionDecl *ImplicitExtension = ImplicitExtensionResult.getPtrOrNull();
+  ContextChange MaybeExtensionCC(*this, ImplicitExtension ? ImplicitExtension : CurDeclContext);
 
   Status |= parseIdentifierDeclName(
       *this, ProtocolName, NameLoc, "protocol",
@@ -9714,7 +9748,43 @@ parseDeclProtocol(ParseDeclOptions Flags, DeclAttributes &Attributes) {
     Proto->setBraces({LBraceLoc, RBraceLoc});
   }
   
-  return DCC.fixupParserResult(Status, Proto);
+  return maybeFinalizeImplicitNominalTypeExtension(ImplicitExtension, Proto, [&](Decl *D){
+    return makeParserResult(Status, D);
+  });
+}
+
+/// Attempt to parse a type preceding another dot and an identifier, used to
+/// implicitly synthesize a nesting extension when declaring a nominal type.
+/// Returns the synthesized extension if successful, or a null result if there
+/// was no such type.
+ParserResult<ExtensionDecl> Parser::maybeParseImplicitNominalTypeExtension() {
+  {
+    BacktrackingScope backtrack(*this);
+    if (!(canParseType(ParseTypeReason::NominalTypeDeclExtendedName) && Tok.isAny(tok::period_prefix, tok::period)))
+      return nullptr;
+  }
+
+  auto ExtendedType = parseType(diag::expected_type, ParseTypeReason::NominalTypeDeclExtendedName);
+  if (ExtendedType.hasCodeCompletion())
+    return makeParserCodeCompletionStatus();
+
+  // Consume the period just before the decl's name.
+  consumeToken();
+
+  auto *ED = ExtensionDecl::create(Context, /*extensionKeywordLoc*/ SourceLoc(), ExtendedType.get(), /*inherited*/ {}, CurDeclContext, /*genericWhereClause*/ nullptr);
+  ED->setImplicit(true);
+  return makeParserResult(ParserStatus(), ED);
+}
+
+ParserResult<Decl> Parser::maybeFinalizeImplicitNominalTypeExtension(ExtensionDecl *EDOrNull, Decl *D, std::function<ParserResult<Decl>(Decl *)> Callback) {
+  if (EDOrNull) {
+    Context.evaluator.cacheOutput(
+        ParseMembersRequest{EDOrNull},
+        FingerprintAndMembers{
+            std::nullopt, Context.AllocateCopy(llvm::ArrayRef({D}))});
+    return Callback(EDOrNull);
+  }
+  return Callback(D);
 }
 
 /// Parse a 'subscript' declaration.
