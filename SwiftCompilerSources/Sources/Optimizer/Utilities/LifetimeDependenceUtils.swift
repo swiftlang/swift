@@ -962,7 +962,7 @@ extension LifetimeDependenceDefUseWalker {
 
     case is ExistentialMetatypeInst, is FixLifetimeInst, is WitnessMethodInst,
          is DynamicMethodBranchInst, is ValueMetatypeInst,
-         is IsEscapingClosureInst, is ClassMethodInst, is SuperMethodInst,
+         is DestroyNotEscapedClosureInst, is ClassMethodInst, is SuperMethodInst,
          is ClassifyBridgeObjectInst, is DebugValueInst,
          is ObjCMethodInst, is ObjCSuperMethodInst, is UnmanagedRetainValueInst,
          is UnmanagedReleaseValueInst, is SelectEnumInst:

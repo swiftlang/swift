@@ -456,7 +456,7 @@ mayGuaranteedUseValue(SILInstruction *User, SILValue Ptr, AliasAnalysis *AA) {
       // mutate the reference itself). In fact it's operand's RC root would be
       // the parent object. This means we can ignore it as a direct RC user.
       return false;
-    case SILInstructionKind::IsEscapingClosureInst:
+    case SILInstructionKind::DestroyNotEscapedClosureInst:
       // FIXME: this is overly conservative. It should return true only of the
       // RC identity of the single operand matches Ptr.
       return true;

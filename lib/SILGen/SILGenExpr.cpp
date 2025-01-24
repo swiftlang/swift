@@ -6052,10 +6052,9 @@ public:
     // Now create the verification of the withoutActuallyEscaping operand.
     // Either we fail the uniqueness check (which means the closure has escaped)
     // and abort or we continue and destroy the ultimate reference.
-    auto isEscaping = SGF.B.createIsEscapingClosure(
-        l, v, IsEscapingClosureInst::WithoutActuallyEscaping);
+    auto isEscaping = SGF.B.createDestroyNotEscapedClosure(
+        l, v, DestroyNotEscapedClosureInst::WithoutActuallyEscaping);
     SGF.B.createCondFail(l, isEscaping, "non-escaping closure has escaped");
-    SGF.B.createDestroyValue(l, v);
   }
 
   void dump(SILGenFunction &) const override {
