@@ -873,6 +873,9 @@ mangled in to disambiguate.
   #if SWIFT_RUNTIME_VERSION >= 5.5
     SENDABLE ::= 'h'                         // @Sendable
     ASYNC ::= 'H'                            // @async
+  #endif
+
+  #if SWIFT_RUNTIME_VERSION >= 6.0
     SENDING-RESULT ::= 'T'                   // sending result
   #endif
 
