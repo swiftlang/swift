@@ -158,6 +158,7 @@ static void reportExclusivityConflict(ExclusivityFlags oldAction, void *oldPC,
   _swift_reportToDebugger(RuntimeErrorFlagFatal, message, &details);
 }
 
+SWIFT_ALWAYS_INLINE
 bool AccessSet::insert(Access *access, void *pc, void *pointer,
                        ExclusivityFlags flags) {
 #ifndef NDEBUG
@@ -207,6 +208,7 @@ bool AccessSet::insert(Access *access, void *pc, void *pointer,
   return true;
 }
 
+SWIFT_ALWAYS_INLINE
 void AccessSet::remove(Access *access) {
   assert(Head && "removal from empty AccessSet");
 #ifndef NDEBUG
