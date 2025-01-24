@@ -108,7 +108,7 @@ invocation looks like the following:
   $ ./swift/utils/build-toolchain $BUNDLE_PREFIX
 ```
 
-where ``$BUNDLE_PREFIX`` is a string that will be prepended to the build 
+Where ``$BUNDLE_PREFIX`` is a string that will be prepended to the build 
 date to give the bundle identifier of the toolchain's ``Info.plist``. For 
 instance, if ``$BUNDLE_PREFIX`` was ``com.example``, the toolchain 
 produced will have the bundle identifier ``com.example.YYYYMMDD``. It 
