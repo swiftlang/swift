@@ -1610,8 +1610,14 @@ function Build-LLVM([Platform]$Platform, $Arch) {
 
 function Build-Sanitizers([Platform]$Platform, $Arch) {
   $BareTarget = $Arch.LLVMTarget.Replace("$AndroidAPILevel", "")
-  $LLVMDir = "$(Get-TargetProjectBinaryCache $Arch LLVM)\lib\cmake\llvm"
-  $InstallTo = "$($HostArch.ToolchainInstallRoot)\usr\lib\clang\19"
+  $LLVMTargetCache = $(Get-TargetProjectBinaryCache $Arch LLVM)
+  $LITVersionStr = $(Invoke-Program $(Get-PythonExecutable) "$LLVMTargetCache\bin\llvm-lit.py" --version)
+  if (-not ($LITVersionStr -match "lit (\d+)\.\d+\.\d+.*")) {
+    throw "Unexpected version string output from llvm-lit.py"
+  }
+  $LLVMVersionMajor = $Matches.1
+  $InstallTo = "$($HostArch.ToolchainInstallRoot)\usr\lib\clang\$LLVMVersionMajor"
+  Write-Host "Sanitizers SDK directory: $InstallTo"
 
   Build-CMakeProject `
     -Src $SourceCache\llvm-project\compiler-rt\lib\builtins `
@@ -1624,7 +1630,7 @@ function Build-Sanitizers([Platform]$Platform, $Arch) {
     -Defines (@{
       CMAKE_MT = "mt";
       CMAKE_SYSTEM_NAME = $Platform.ToString();
-      LLVM_DIR = $LLVMDir;
+      LLVM_DIR = "$LLVMTargetCache\lib\cmake\llvm";
       LLVM_ENABLE_PER_TARGET_RUNTIME_DIR = "YES";
       COMPILER_RT_DEFAULT_TARGET_ONLY = "YES";
     })
@@ -1640,7 +1646,7 @@ function Build-Sanitizers([Platform]$Platform, $Arch) {
     -Defines (@{
       CMAKE_MT = "mt";
       CMAKE_SYSTEM_NAME = $Platform.ToString();
-      LLVM_DIR = $LLVMDir;
+      LLVM_DIR = "$LLVMTargetCache\lib\cmake\llvm";
       LLVM_ENABLE_PER_TARGET_RUNTIME_DIR = "YES";
       LLVM_RUNTIMES_TARGET = $BareTarget;
       COMPILER_RT_DEFAULT_TARGET_ONLY = "YES";
