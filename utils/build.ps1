@@ -1627,7 +1627,6 @@ function Build-Sanitizers([Platform]$Platform, $Arch) {
     -UseBuiltCompilers C,CXX `
     -BuildTargets "install-compiler-rt" `
     -Defines (@{
-      CMAKE_MT = "mt";
       CMAKE_SYSTEM_NAME = $Platform.ToString();
       LLVM_DIR = "$LLVMTargetCache\lib\cmake\llvm";
       LLVM_ENABLE_PER_TARGET_RUNTIME_DIR = "YES";
@@ -1643,7 +1642,6 @@ function Build-Sanitizers([Platform]$Platform, $Arch) {
     -UseBuiltCompilers C,CXX `
     -BuildTargets "install-compiler-rt" `
     -Defines (@{
-      CMAKE_MT = "mt";
       CMAKE_SYSTEM_NAME = $Platform.ToString();
       LLVM_DIR = "$LLVMTargetCache\lib\cmake\llvm";
       LLVM_ENABLE_PER_TARGET_RUNTIME_DIR = "YES";
