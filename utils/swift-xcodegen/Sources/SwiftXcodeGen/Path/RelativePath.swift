@@ -37,6 +37,11 @@ public extension RelativePath {
     .init(FileManager.default.currentDirectoryPath).appending(self)
   }
 
+  func absolute(in base: AbsolutePath) -> AbsolutePath {
+    precondition(base.isDirectory, "Expected '\(base)' to be a directory")
+    return base.appending(self)
+  }
+
   init(_ component: Component) {
     self.init(FilePath(root: nil, components: component))
   }
