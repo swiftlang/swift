@@ -82,7 +82,7 @@ extension RepoBuildDir {
         }
 
         log.debug("[*] Reading '\(fileName)'")
-        let ninjaFile = try NinjaParser.parse(fileName.read())
+        let ninjaFile = try NinjaParser.parse(filePath: fileName)
         _ninjaFile = ninjaFile
         return ninjaFile
       }
