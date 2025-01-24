@@ -46,6 +46,7 @@
 #include <cctype>
 #include <cinttypes>
 #include <condition_variable>
+#include <memory>
 #include <new>
 #include <unordered_set>
 #include <vector>
@@ -326,9 +327,28 @@ static PrivateMetadataState inferStateForMetadata(Metadata *metadata) {
 }
 
 namespace {
+// NOTE: this is not possible to mark as `constexpr` as `reinterpret_cast` is
+// not permitted in `constexpr` statements. Additionally, even if we were able
+// to get away from the `reinterpret_cast`, we cannot de-reference the `nullptr`
+// in a `constexpr` statement. Finally, because we are checking the offsets of
+// members in non-standard layouts, we must delay this check until runtime as
+// the static computation is not well defined by the language standard.
+template <typename Type, typename PMFType>
+inline size_t offset_of(PMFType Type::*member) {
+  return reinterpret_cast<uintptr_t>(std::addressof(static_cast<Type *>(nullptr)->*member));
+}
+#define offset_of(T,d) (::(offset_of)(&T::d))
+}
+
+namespace {
   struct GenericCacheEntry final :
       VariadicMetadataCacheEntryBase<GenericCacheEntry> {
     static const char *getName() { return "GenericCache"; }
+
+    static inline void checkLayout() {
+      assert(offset_of(GenericCacheEntry, Value) == offset_of(swift::GenericMetadataCacheEntry<InProcess::StoredPointer>, Value) &&
+             "GenericMetadataCacheEntry layout mismatch");
+    }
 
     // The constructor/allocate operations that take a `const Metadata *`
     // are used for the insertion of canonical specializations.
@@ -338,9 +358,11 @@ namespace {
                       MetadataWaitQueue::Worker &worker,
                       MetadataRequest request,
                       const Metadata *candidate)
-      : VariadicMetadataCacheEntryBase(key, worker,
-                                       PrivateMetadataState::Complete,
-                                       const_cast<Metadata*>(candidate)) {}
+        : VariadicMetadataCacheEntryBase(key, worker,
+                                         PrivateMetadataState::Complete,
+                                         const_cast<Metadata*>(candidate)) {
+      checkLayout();
+    }
 
     AllocationResult allocate(const Metadata *candidate) {
       swift_unreachable("always short-circuited");
@@ -362,9 +384,11 @@ namespace {
                       MetadataRequest request,
                       const TypeContextDescriptor *description,
                       const void * const *arguments)
-      : VariadicMetadataCacheEntryBase(key, worker,
-                                       PrivateMetadataState::Allocating,
-                                       /*candidate*/ nullptr) {}
+        : VariadicMetadataCacheEntryBase(key, worker,
+                                         PrivateMetadataState::Allocating,
+                                         /*candidate*/ nullptr) {
+      checkLayout();
+    }
 
     AllocationResult allocate(const TypeContextDescriptor *description,
                               const void * const *arguments) {
@@ -437,19 +461,6 @@ namespace {
     }
   };
 } // end anonymous namespace
-
-namespace swift {
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Winvalid-offsetof"
-  struct StaticAssertGenericMetadataCacheEntryValueOffset {
-    static_assert(
-      offsetof(GenericCacheEntry, Value) ==
-      offsetof(swift::GenericMetadataCacheEntry<InProcess::StoredPointer>,
-               Value),
-      "The generic metadata cache entry layout mismatch");
-  };
-#pragma clang diagnostic pop
-}
 
 namespace {
   class GenericMetadataCache :
