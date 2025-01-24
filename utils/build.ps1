@@ -1609,7 +1609,6 @@ function Build-LLVM([Platform]$Platform, $Arch) {
 }
 
 function Build-Sanitizers([Platform]$Platform, $Arch) {
-  $BareTarget = $Arch.LLVMTarget.Replace("$AndroidAPILevel", "")
   $LLVMTargetCache = $(Get-TargetProjectBinaryCache $Arch LLVM)
   $LITVersionStr = $(Invoke-Program $(Get-PythonExecutable) "$LLVMTargetCache\bin\llvm-lit.py" --version)
   if (-not ($LITVersionStr -match "lit (\d+)\.\d+\.\d+.*")) {
@@ -1648,7 +1647,6 @@ function Build-Sanitizers([Platform]$Platform, $Arch) {
       CMAKE_SYSTEM_NAME = $Platform.ToString();
       LLVM_DIR = "$LLVMTargetCache\lib\cmake\llvm";
       LLVM_ENABLE_PER_TARGET_RUNTIME_DIR = "YES";
-      LLVM_RUNTIMES_TARGET = $BareTarget;
       COMPILER_RT_DEFAULT_TARGET_ONLY = "YES";
       COMPILER_RT_BUILD_BUILTINS = "NO";
       COMPILER_RT_BUILD_CRT = "NO";
