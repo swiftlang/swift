@@ -3241,6 +3241,10 @@ public:
   /// Get the decl for this value's opaque result type, if it has one.
   OpaqueTypeDecl *getOpaqueResultTypeDecl() const;
 
+  /// Gets the decl for this value's opaque result type if it has already been
+  /// computed, or `nullopt` otherwise. This should only be used for dumping.
+  std::optional<OpaqueTypeDecl *> getCachedOpaqueResultTypeDecl() const;
+
   /// Get the representative for this value's opaque result type, if it has one.
   /// Returns a `TypeRepr` instead of an `OpaqueReturnTypeRepr` because 'some'
   /// types might appear in one or more structural positions, e.g.  (some P,
@@ -7657,6 +7661,10 @@ public:
   /// Retrieves the thrown interface type.
   Type getThrownInterfaceType() const;
 
+  /// Returns the thrown interface type of this function if it has already been
+  /// computed, otherwise `nullopt`. This should only be used for dumping.
+  std::optional<Type> getCachedThrownInterfaceType() const;
+
   /// Retrieve the "effective" thrown interface type, or std::nullopt if
   /// this function cannot throw.
   ///
@@ -8216,6 +8224,10 @@ public:
 
   /// Retrieve the result interface type of this function.
   Type getResultInterfaceType() const;
+
+  /// Returns the result interface type of this function if it has already been
+  /// computed, otherwise `nullopt`. This should only be used for dumping.
+  std::optional<Type> getCachedResultInterfaceType() const;
 
   /// isUnaryOperator - Determine whether this is a unary operator
   /// implementation.  This check is a syntactic rather than type-based check,
@@ -9416,6 +9428,10 @@ public:
 
   /// Retrieve the interface type produced when expanding this macro.
   Type getResultInterfaceType() const;
+
+  /// Returns the result interface type of this macro if it has already been
+  /// computed, otherwise `nullopt`. This should only be used for dumping.
+  std::optional<Type> getCachedResultInterfaceType() const;
 
   /// Determine the contexts in which this macro can be applied.
   MacroRoles getMacroRoles() const;
