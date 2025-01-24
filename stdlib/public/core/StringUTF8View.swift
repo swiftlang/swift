@@ -89,6 +89,7 @@ extension String {
   ///     print(String(s1.utf8.prefix(15))!)
   ///     // Prints "They call me 'B"
   @frozen
+  @_addressableForDependencies
   public struct UTF8View: Sendable {
     @usableFromInline
     internal var _guts: _StringGuts

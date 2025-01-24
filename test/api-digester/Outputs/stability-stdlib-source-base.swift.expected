@@ -378,3 +378,15 @@ Struct UnsafePointer is now with @unsafe
 Struct UnsafeRawBufferPointer is now with @unsafe
 Struct UnsafeRawPointer is now with @unsafe
 Var Optional.unsafelyUnwrapped is now with @unsafe
+
+// Adoption of @_addressableForDependencies
+Struct CollectionOfOne is now with @_addressableForDependencies
+Struct SIMD2 is now with @_addressableForDependencies
+Struct SIMD3 is now with @_addressableForDependencies
+Struct SIMD4 is now with @_addressableForDependencies
+Struct SIMD8 is now with @_addressableForDependencies
+Struct SIMD16 is now with @_addressableForDependencies
+Struct SIMD32 is now with @_addressableForDependencies
+Struct SIMD64 is now with @_addressableForDependencies
+Struct String.UTF8View is now with @_addressableForDependencies
+Struct Substring.UTF8View is now with @_addressableForDependencies
