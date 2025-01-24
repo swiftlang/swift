@@ -4752,6 +4752,17 @@ getIsolationFromAttributes(const Decl *decl, bool shouldDiagnose = true,
   // If the declaration is explicitly marked 'nonisolated', report it as
   // independent.
   if (nonisolatedAttr) {
+    // If the nonisolated async inherits isolation from context is set, return
+    // caller isolation inheriting.
+    if (decl->getASTContext().LangOpts.hasFeature(
+            Feature::NonIsolatedAsyncInheritsIsolationFromContext)) {
+      if (auto *func = dyn_cast<AbstractFunctionDecl>(decl);
+          func && func->hasAsync() &&
+          func->getModuleContext() == decl->getASTContext().MainModule) {
+        return ActorIsolation::forCallerIsolationInheriting();
+      }
+    }
+
     return ActorIsolation::forNonisolated(nonisolatedAttr->isUnsafe());
   }
 
@@ -5614,15 +5625,6 @@ InferredActorIsolation ActorIsolationRequest::evaluate(
     if (isolationFromAttr->isGlobalActor()) {
       if (auto classDecl = dyn_cast<ClassDecl>(value))
         checkClassGlobalActorIsolation(classDecl, *isolationFromAttr);
-    }
-
-    if (ctx.LangOpts.hasFeature(
-            Feature::NonIsolatedAsyncInheritsIsolationFromContext)) {
-      if (auto *func = dyn_cast<AbstractFunctionDecl>(value);
-          func && func->hasAsync() && isolationFromAttr->isNonisolated() &&
-          func->getModuleContext() == ctx.MainModule) {
-        return {ActorIsolation::forCallerIsolationInheriting(), {}};
-      }
     }
 
     return {*isolationFromAttr,
