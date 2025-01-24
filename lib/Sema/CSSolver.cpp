@@ -1946,6 +1946,17 @@ bool ConjunctionElement::attempt(ConstraintSystem &cs) const {
     llvm::SmallPtrSet<TypeVariableType *, 4> referencedVars;
     findReferencedVariables(cs, referencedVars);
 
+    if (cs.isDebugMode()) {
+      auto indent = cs.solverState->getCurrentIndent();
+      auto &log = llvm::errs().indent(indent);
+      log << "(Element type variables in scope: ";
+      interleave(
+        referencedVars,
+        [&](TypeVariableType *typeVar) { log << "$T" << typeVar->getID(); },
+        [&] { log << ", "; });
+      log << ")\n";
+    }
+
     for (auto *typeVar : referencedVars)
       cs.addTypeVariable(typeVar);
   }

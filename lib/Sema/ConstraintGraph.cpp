@@ -565,6 +565,11 @@ static void depthFirstSearch(
     llvm::function_ref<void(Constraint *)> visitConstraint,
     llvm::SmallPtrSet<TypeVariableType *, 4> &typeVars,
     llvm::SmallPtrSet<Constraint *, 8> &visitedConstraints) {
+  // If we're not looking at this type variable right now because we're
+  // solving a conjunction element, don't consider its adjacencies.
+  if (!cg.getConstraintSystem().isActiveTypeVariable(typeVar))
+    return;
+
   // Visit this node. If we've already seen it, bail out.
   if (!typeVars.insert(typeVar).second)
     return;
