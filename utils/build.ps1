@@ -1601,7 +1601,7 @@ function Build-LLVM([Platform]$Platform, $Arch) {
     -Bin (Get-TargetProjectBinaryCache $Arch LLVM) `
     -Arch $Arch `
     -Platform $Platform `
-    -UseMSVCCompilers C,CXX `
+    -UseBuiltCompilers C,CXX `
     -Defines @{
       CMAKE_SYSTEM_NAME = $Platform.ToString();
       LLVM_HOST_TRIPLE = $Arch.LLVMTarget;
