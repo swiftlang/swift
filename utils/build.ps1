@@ -2788,7 +2788,12 @@ if (-not $SkipBuild) {
 
 if ($Clean) {
   10..[HostComponent].getEnumValues()[-1] | ForEach-Object { Remove-Item -Force -Recurse "$BinaryCache\$_" -ErrorAction Ignore }
+  # In case of a previous test run, clear out the swiftmodules as they are not a stable format.
+  Remove-Item -Force -Recurse "$($HostARch.ToolchainInstallRoot)\usr\lib\swift\windows" -ErrorAction Ignore
   foreach ($Arch in $WindowsSDKArchs) {
+    0..[TargetComponent].getEnumValues()[-1] | ForEach-Object { Remove-Item -Force -Recurse "$BinaryCache\$($Arch.BuildID + $_)" -ErrorAction Ignore }
+  }
+  foreach ($Arch in $AndroidSDKArchs) {
     0..[TargetComponent].getEnumValues()[-1] | ForEach-Object { Remove-Item -Force -Recurse "$BinaryCache\$($Arch.BuildID + $_)" -ErrorAction Ignore }
   }
 }
