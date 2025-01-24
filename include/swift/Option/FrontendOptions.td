@@ -266,7 +266,10 @@ def serialize_dependency_scan_cache : Flag<["-"], "serialize-dependency-scan-cac
    HelpText<"After performing a dependency scan, serialize the scanner's internal state.">;
 
 def reuse_dependency_scan_cache : Flag<["-"], "load-dependency-scan-cache">,
-   HelpText<"After performing a dependency scan, serialize the scanner's internal state.">;
+   HelpText<"For performing a dependency scan, deserialize the scanner's internal state from a prior scan.">;
+   
+def validate_prior_dependency_scan_cache : Flag<["-"], "validate-prior-dependency-scan-cache">,
+   HelpText<"For performing a dependency scan with a prior scanner state, validate module dependencies.">;
 
 def dependency_scan_cache_path : Separate<["-"], "dependency-scan-cache-path">,
   HelpText<"The path to output the dependency scanner's internal state.">;

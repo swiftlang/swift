@@ -728,7 +728,8 @@ ModuleDependenciesCache::ModuleDependenciesCache(
     : globalScanningService(globalScanningService),
       mainScanModuleName(mainScanModuleName),
       scannerContextHash(scannerContextHash),
-      moduleOutputPath(moduleOutputPath) {
+      moduleOutputPath(moduleOutputPath),
+      scanInitializationTime(std::chrono::system_clock::now()) {
   for (auto kind = ModuleDependencyKind::FirstKind;
        kind != ModuleDependencyKind::LastKind; ++kind)
     ModuleDependenciesMap.insert({kind, ModuleNameToDependencyMap()});
@@ -807,6 +808,7 @@ ModuleDependenciesCache::findSwiftDependency(StringRef moduleName) const {
 
 const ModuleDependencyInfo &ModuleDependenciesCache::findKnownDependency(
     const ModuleDependencyID &moduleID) const {
+  
   auto dep = findDependency(moduleID);
   assert(dep && "dependency unknown");
   return **dep;
@@ -858,6 +860,11 @@ void ModuleDependenciesCache::updateDependency(
   auto &map = getDependenciesMap(moduleID.Kind);
   assert(map.find(moduleID.ModuleName) != map.end() && "Not yet added to map");
   map.insert_or_assign(moduleID.ModuleName, std::move(dependencyInfo));
+}
+
+void ModuleDependenciesCache::removeDependency(ModuleDependencyID moduleID) {
+  auto &map = getDependenciesMap(moduleID.Kind);
+  map.erase(moduleID.ModuleName);
 }
 
 void
