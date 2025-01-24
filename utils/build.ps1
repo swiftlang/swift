@@ -716,7 +716,7 @@ function Fetch-Dependencies {
     }
   }
 
-  if ($SkipBuild -and $SkipPackaging) { return }
+  if ($SkipBuild -and $SkipPackaging -and -not $Test) { return }
 
   $WiXURL = "https://www.nuget.org/api/v2/package/wix/$WiXVersion"
   $WiXHash = "DF9BDB347183716F82EFE2CECB8C54BB3554AA907A69F47A41741D6FA4D0A754"
@@ -824,28 +824,51 @@ function Fetch-Dependencies {
 
     Extract-ZipFile -ZipFileName "android-ndk-$AndroidNDKVersion-windows.zip" -BinaryCache $BinaryCache -ExtractPath "android-ndk-$AndroidNDKVersion" -CreateExtractPath $false
 
+    # FIXME: Both Java and Android emulator must be available in the environment.
+    # This is a terrible workaround. It's a waste of time and resources.
     $NDKDir = Get-AndroidNDKPath
     if ($Test -and -not(Test-Path "$NDKDir\licenses")) {
+      # Download Java Runtime
+      switch ($BuildArchName) {
+        "AMD64" {
+          $JavaURL = "https://aka.ms/download-jdk/microsoft-jdk-17.0.14-windows-x64.zip"
+          $JavaHash = "3619082f4a667f52c97cce983364a517993f798ae248c411765becfd9705767f"
+          DownloadAndVerify $JavaURL "$BinaryCache\android-cmdline-tools.zip" $JavaHash
+        }
+        "ARM64" {
+          $JavaURL = "https://aka.ms/download-jdk/microsoft-jdk-17.0.14-windows-aarch64.zip"
+          $JavaHash = "2a12c7b3d46712de9671f5f011a3cae9ee53d5ff3b0604136ee079a906146448"
+        }
+        default { throw "Unsupported processor architecture" }
+      }
+      DownloadAndVerify $JavaURL "$BinaryCache\microsoft-jdk.zip" $JavaHash
+      Extract-ZipFile -ZipFileName "microsoft-jdk.zip" -BinaryCache $BinaryCache -ExtractPath "android-ndk-r26b\.temp"
+
+      # Download cmdline-tools
       $CLToolsURL = "https://dl.google.com/android/repository/commandlinetools-win-11076708_latest.zip"
       $CLToolsHash = "4d6931209eebb1bfb7c7e8b240a6a3cb3ab24479ea294f3539429574b1eec862"
       DownloadAndVerify $CLToolsURL "$BinaryCache\android-cmdline-tools.zip" $CLToolsHash
+      Extract-ZipFile -ZipFileName "android-cmdline-tools.zip" -BinaryCache $BinaryCache -ExtractPath "android-ndk-r26b\.temp"
 
-      # Install cmdline-tools
+      # Accept licenses
       New-Item -Type Directory -Path "$NDKDir\licenses" -ErrorAction Ignore | Out-Null
       Set-Content -Path "$NDKDir\licenses\android-sdk-license" -Value "24333f8a63b6825ea9c5514f83c2829b004d1fee"
       Set-Content -Path "$NDKDir\licenses\android-sdk-preview-license" -Value "84831b9409646a918e30573bab4c9c91346d8abd"
-      Extract-ZipFile -ZipFileName "android-cmdline-tools.zip" -BinaryCache $BinaryCache -ExtractPath "android-ndk-r26b\.temp"
-      Invoke-Program "$NDKDir\.temp\cmdline-tools\bin\sdkmanager.bat" --sdk_root="$NDKDir" "cmdline-tools;latest" "--channel=3"
 
-      # Install packages
-      $AndroidSdkMgr = "$NDKDir\cmdline-tools\latest\bin\sdkmanager.bat"
-      foreach ($Package in @("emulator", "platforms;android-29", "system-images;android-29;default;x86_64", "platform-tools")) {
-        Invoke-Program $AndroidSdkMgr $Package
+      # Install packages and create test device
+      Isolate-EnvVars {
+        $env:JAVA_HOME = "$NDKDir\.temp\jdk-17.0.14+7"
+        $env:Path = "${env:JAVA_HOME}\bin;${env:Path}"
+
+        Invoke-Program "$NDKDir\.temp\cmdline-tools\bin\sdkmanager.bat" --sdk_root="$NDKDir" "cmdline-tools;latest" "--channel=3"
+        $AndroidSdkMgr = "$NDKDir\cmdline-tools\latest\bin\sdkmanager.bat"
+        foreach ($Package in @("emulator", "platforms;android-29", "system-images;android-29;default;x86_64", "platform-tools")) {
+          Invoke-Program $AndroidSdkMgr $Package
+        }
+
+        $AndroidAvdMgr = "$NDKDir\cmdline-tools\latest\bin\avdmanager.bat"
+        Invoke-Program $AndroidAvdMgr create avd --name "swift-test-device" --package "system-images;android-29;default;x86_64"
       }
-
-      # Create test device
-      $AndroidAvdMgr = "$NDKDir\cmdline-tools\latest\bin\avdmanager.bat"
-      Invoke-Program $AndroidAvdMgr create avd --name "swift-test-device" --package "system-images;android-29;default;x86_64"
     }
   }
 
@@ -3191,8 +3214,8 @@ if (-not $IsCrossCompiling) {
     Build-Dispatch Windows $HostArch -Test
     # TODO: This is a hack. We need different devices for different arches.
     if ($AndroidSDKs -contains "x86_64") {
-      Invoke-BuildStep Build-CTest Android AndroidX64
-      Test-Dispatch Android AndroidX64
+      Invoke-BuildStep Build-CTest Android $AndroidX64
+      Test-Dispatch Android $AndroidX64
     }
   }
   if ($Test -contains "foundation") {
