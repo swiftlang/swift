@@ -2729,6 +2729,14 @@ ProtocolDecl *ImplementsAttr::getProtocol(DeclContext *dc) const {
         ImplementsAttrProtocolRequest{this, dc}, nullptr);
 }
 
+std::optional<ProtocolDecl *>
+ImplementsAttr::getCachedProtocol(DeclContext *dc) const {
+  ImplementsAttrProtocolRequest request{this, dc};
+  if (dc->getASTContext().evaluator.hasCachedResult(request))
+    return getProtocol(dc);
+  return std::nullopt;
+}
+
 CustomAttr::CustomAttr(SourceLoc atLoc, SourceRange range, TypeExpr *type,
                        CustomAttributeInitializer *initContext,
                        ArgumentList *argList, bool implicit)
