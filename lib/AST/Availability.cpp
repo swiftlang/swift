@@ -880,7 +880,7 @@ AvailabilityRange ASTContext::getSwiftAvailability(unsigned major,
 #define PLATFORM_TEST_macOS     target.isMacOSX()
 #define PLATFORM_TEST_iOS       target.isiOS()
 #define PLATFORM_TEST_watchOS   target.isWatchOS()
-#define PLATFORM_TEST_xrOS      target.isXROS()
+#define PLATFORM_TEST_visionOS  target.isXROS()
 
 #define _SECOND(A, B) B
 #define SECOND(T) _SECOND T
@@ -895,7 +895,7 @@ AvailabilityRange ASTContext::getSwiftAvailability(unsigned major,
 #undef PLATFORM_TEST_macOS
 #undef PLATFORM_TEST_iOS
 #undef PLATFORM_TEST_watchOS
-#undef PLATFORM_TEST_xrOS
+#undef PLATFORM_TEST_visionOS
 #undef _SECOND
 #undef SECOND
 
