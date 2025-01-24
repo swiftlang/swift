@@ -8093,6 +8093,8 @@ public:
     return cast_or_null<AbstractFunctionDecl>(ValueDecl::getOverriddenDecl());
   }
 
+  std::optional<ExecutionKind> getExecutionBehavior() const;
+
   /// Whether the declaration is later overridden in the module
   ///
   /// Overrides are resolved during type checking; only query this field after

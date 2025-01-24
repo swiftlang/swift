@@ -4688,6 +4688,7 @@ getIsolationFromAttributes(const Decl *decl, bool shouldDiagnose = true,
   auto isolatedAttr = decl->getAttrs().getAttribute<IsolatedAttr>();
   auto nonisolatedAttr = decl->getAttrs().getAttribute<NonisolatedAttr>();
   auto globalActorAttr = decl->getGlobalActorAttr();
+  auto concurrentExecutionAttr = decl->getAttrs().getAttribute<ExecutionAttr>();
 
   // Remove implicit attributes if we only care about explicit ones.
   if (onlyExplicit) {
@@ -4697,11 +4698,13 @@ getIsolationFromAttributes(const Decl *decl, bool shouldDiagnose = true,
       isolatedAttr = nullptr;
     if (globalActorAttr && globalActorAttr->first->isImplicit())
       globalActorAttr = std::nullopt;
+    if (concurrentExecutionAttr && concurrentExecutionAttr->isImplicit())
+      concurrentExecutionAttr = nullptr;
   }
 
-  unsigned numIsolationAttrs = (isolatedAttr ? 1 : 0) +
-                               (nonisolatedAttr ? 1 : 0) +
-                               (globalActorAttr ? 1 : 0);
+  unsigned numIsolationAttrs =
+      (isolatedAttr ? 1 : 0) + (nonisolatedAttr ? 1 : 0) +
+      (globalActorAttr ? 1 : 0) + (concurrentExecutionAttr ? 1 : 0);
   if (numIsolationAttrs == 0) {
     if (isa<DestructorDecl>(decl) && !decl->isImplicit()) {
       return ActorIsolation::forNonisolated(false);
@@ -4813,6 +4816,17 @@ getIsolationFromAttributes(const Decl *decl, bool shouldDiagnose = true,
     return ActorIsolation::forGlobalActor(
         globalActorType->mapTypeOutOfContext())
         .withPreconcurrency(decl->preconcurrency() || isUnsafe);
+  }
+
+  // If the declaration is explicitly marked with 'execution', return the
+  // appropriate isolation.
+  if (concurrentExecutionAttr) {
+    switch (concurrentExecutionAttr->getBehavior()) {
+    case ExecutionKind::Concurrent:
+      return ActorIsolation::forNonisolated(false /*is unsafe*/);
+    case ExecutionKind::Caller:
+      return ActorIsolation::forCallerIsolationInheriting();
+    }
   }
 
   llvm_unreachable("Forgot about an attribute?");

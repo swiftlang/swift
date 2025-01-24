@@ -2532,6 +2532,16 @@ static CanSILFunctionType getSILFunctionType(
     if (constant) {
       if (constant->kind == SILDeclRef::Kind::Deallocator) {
         actorIsolation = ActorIsolation::forNonisolated(false);
+      } else if (auto *decl = constant->getAbstractFunctionDecl();
+                 decl && decl->getExecutionBehavior().has_value()) {
+        switch (*decl->getExecutionBehavior()) {
+        case ExecutionKind::Concurrent:
+          actorIsolation = ActorIsolation::forNonisolated(false /*unsafe*/);
+          break;
+        case ExecutionKind::Caller:
+          actorIsolation = ActorIsolation::forCallerIsolationInheriting();
+          break;
+        }
       } else {
         actorIsolation =
             getActorIsolationOfContext(constant->getInnermostDeclContext());
