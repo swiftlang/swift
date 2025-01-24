@@ -27,10 +27,10 @@ struct MyType2 {
 
 func testA(ns: NS, mt: MyType, mt2: MyType2, sc: StrictClass, nsc: NonStrictClass) async {
   Task { // expected-tns-warning {{passing closure as a 'sending' parameter risks causing data races between code in the current task and concurrent execution of the closure}}
-    print(ns) // expected-tns-note {{closure captures non-Sendable 'ns'}}
-    print(mt) // expected-tns-note {{closure captures non-Sendable 'mt'}}
-    print(mt2) // expected-tns-note {{closure captures non-Sendable 'mt2'}}
-    print(sc) // expected-tns-note {{closure captures non-Sendable 'sc'}}
+    print(ns) // expected-tns-note {{closure captures 'ns' which is accessible to code in the current task}}
+    print(mt)
+    print(mt2)
+    print(sc)
   }
 }
 

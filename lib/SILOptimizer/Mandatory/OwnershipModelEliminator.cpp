@@ -139,6 +139,11 @@ struct OwnershipModelEliminatorVisitor
   bool visitExplicitCopyAddrInst(ExplicitCopyAddrInst *cai);
   bool visitApplyInst(ApplyInst *ai);
 
+  bool visitIgnoredUseInst(IgnoredUseInst *iui) {
+    eraseInstruction(iui);
+    return true;
+  }
+
   void splitDestroy(DestroyValueInst *destroy);
   bool peepholeTupleConstructorUser(DestructureTupleInst *dti);
   bool visitDestroyValueInst(DestroyValueInst *dvi);
