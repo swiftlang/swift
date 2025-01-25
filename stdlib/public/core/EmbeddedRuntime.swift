@@ -272,9 +272,17 @@ public func swift_dynamicCastClass(object: UnsafeMutableRawPointer, targetMetada
 public func swift_dynamicCastClassUnconditional(object: UnsafeMutableRawPointer, targetMetadata: UnsafeRawPointer,
     file: UnsafePointer<CChar>, line: CUnsignedInt, column: CUnsignedInt) -> UnsafeMutableRawPointer {
   guard let result = swift_dynamicCastClass(object: object, targetMetadata: targetMetadata) else {
-    Builtin.int_trap()
+    fatalError("failed cast")
   }
   return result
+}
+
+@_cdecl("swift_isEscapingClosureAtFileLocation")
+public func swift_isEscapingClosureAtFileLocation(object: Builtin.RawPointer, filename: UnsafePointer<CChar>, filenameLength: Int32, line: Int32, column: Int32, verificationType: CUnsignedInt) -> Bool {
+  guard swift_isUniquelyReferenced_native(object: object) else {
+    fatalError("non-escaping closure escaped")
+  }
+  return false
 }
 
 @_cdecl("swift_isUniquelyReferenced_native")
