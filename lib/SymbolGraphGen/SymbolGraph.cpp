@@ -232,6 +232,18 @@ void SymbolGraph::recordEdge(Symbol Source,
 
 void SymbolGraph::recordMemberRelationship(Symbol S) {
   const auto *DC = S.getLocalSymbolDecl()->getDeclContext();
+  const ValueDecl *ParentDecl = DC->getSelfNominalTypeDecl();
+  if (!ParentDecl) {
+    // If we couldn't look up the type the member is declared on (e.g.
+    // because the member is declared in an extension whose extended type
+    // doesn't exist), don't record a memberOf relationship.
+    return;
+  }
+  if (const auto *PublicDecl = Walker.PublicPrivateTypeAliases[ParentDecl]) {
+    // If our member target is a private type that has a public type alias,
+    // point the membership to that type alias instead.
+    ParentDecl = PublicDecl;
+  }
   switch (DC->getContextKind()) {
     case DeclContextKind::GenericTypeDecl:
     case DeclContextKind::ExtensionDecl:
@@ -250,13 +262,6 @@ void SymbolGraph::recordMemberRelationship(Symbol S) {
         return;
       }
 
-      if (DC->getSelfNominalTypeDecl() == nullptr) {
-        // If we couldn't look up the type the member is declared on (e.g.
-        // because the member is declared in an extension whose extended type
-        // doesn't exist), don't record a memberOf relationship.
-        return;
-      }
-
       // If this is an extension to an external type, we use the extension
       // symbol itself as the target.
       if (auto const *Extension =
@@ -268,22 +273,8 @@ void SymbolGraph::recordMemberRelationship(Symbol S) {
         }
       }
 
-      if (Walker.PublicPrivateTypeAliases.contains(
-              DC->getSelfNominalTypeDecl())) {
-        // If our member target is a private type that has a public type alias,
-        // point the membership to that type alias instead.
-        return recordEdge(
-            S,
-            Symbol(
-                this,
-                Walker.PublicPrivateTypeAliases[DC->getSelfNominalTypeDecl()],
-                nullptr),
-            RelationshipKind::MemberOf());
-      } else {
-        return recordEdge(S,
-                          Symbol(this, DC->getSelfNominalTypeDecl(), nullptr),
-                          RelationshipKind::MemberOf());
-      }
+      return recordEdge(S, Symbol(this, ParentDecl, nullptr),
+                        RelationshipKind::MemberOf());
     case swift::DeclContextKind::AbstractClosureExpr:
     case swift::DeclContextKind::SerializedAbstractClosure:
     case swift::DeclContextKind::Initializer:
@@ -335,7 +326,16 @@ void SymbolGraph::recordConformanceSynthesizedMemberRelationships(Symbol S) {
   bool dropSynthesizedMembers = !Walker.Options.EmitSynthesizedMembers ||
                                 Walker.Options.SkipProtocolImplementations;
 
-  const auto D = S.getLocalSymbolDecl();
+  const auto *D = S.getLocalSymbolDecl();
+
+  // If this symbol is a public type alias to a private symbol, collect
+  // synthesized members for the underlying type.
+  if (const auto *TD = dyn_cast<TypeAliasDecl>(D)) {
+    const auto *NTD = TD->getUnderlyingType()->getAnyNominal();
+    if (NTD && Walker.PublicPrivateTypeAliases[NTD] == D)
+        D = NTD;
+  }
+
   const NominalTypeDecl *OwningNominal = nullptr;
   if (const auto *ThisNominal = dyn_cast<NominalTypeDecl>(D)) {
     OwningNominal = ThisNominal;
@@ -421,7 +421,11 @@ void SymbolGraph::recordConformanceSynthesizedMemberRelationships(Symbol S) {
                 continue;
               }
 
-              Symbol Source(this, SynthMember, OwningNominal);
+              const ValueDecl *BaseDecl = OwningNominal;
+              if (Walker.PublicPrivateTypeAliases.contains(BaseDecl))
+                BaseDecl = Walker.PublicPrivateTypeAliases[BaseDecl];
+
+              Symbol Source(this, SynthMember, BaseDecl);
 
               if (auto *InheritedDecl = Source.getInheritedDecl()) {
                 if (auto *ParentDecl =
@@ -439,7 +443,7 @@ void SymbolGraph::recordConformanceSynthesizedMemberRelationships(Symbol S) {
                 }
               }
 
-              auto ExtendedSG = Walker.getModuleSymbolGraph(OwningNominal);
+              auto ExtendedSG = Walker.getModuleSymbolGraph(BaseDecl);
 
               ExtendedSG->Nodes.insert(Source);
 
@@ -452,7 +456,15 @@ void SymbolGraph::recordConformanceSynthesizedMemberRelationships(Symbol S) {
 
 void
 SymbolGraph::recordInheritanceRelationships(Symbol S) {
-  const auto D = S.getLocalSymbolDecl();
+  const auto *D = S.getLocalSymbolDecl();
+
+  // If this is a public type alias for a private symbol, gather inheritance
+  // for the underlying type instead.
+  if (const auto *TD = dyn_cast<TypeAliasDecl>(D)) {
+    const auto *NTD = TD->getUnderlyingType()->getAnyNominal();
+    if (NTD && Walker.PublicPrivateTypeAliases[NTD] == D)
+      D = NTD;
+  }
 
   ClassDecl *Super = nullptr;
   if (auto *CD = dyn_cast<ClassDecl>(D))
@@ -461,8 +473,7 @@ SymbolGraph::recordInheritanceRelationships(Symbol S) {
     Super = PD->getSuperclassDecl();
 
   if (Super) {
-    recordEdge(Symbol(this, cast<ValueDecl>(D), nullptr),
-               Symbol(this, Super, nullptr),
+    recordEdge(S, Symbol(this, Super, nullptr),
                RelationshipKind::InheritsFrom());
   }
 }
@@ -541,7 +552,16 @@ void SymbolGraph::recordOptionalRequirementRelationships(Symbol S) {
 }
 
 void SymbolGraph::recordConformanceRelationships(Symbol S) {
-  const auto D = S.getLocalSymbolDecl();
+  const auto *D = S.getLocalSymbolDecl();
+
+  // If this is a public type alias for a private symbol, gather conformances
+  // for the underlying type instead.
+  if (const auto *TD = dyn_cast<TypeAliasDecl>(D)) {
+    const auto *NTD = TD->getUnderlyingType()->getAnyNominal();
+    if (NTD && Walker.PublicPrivateTypeAliases[NTD] == D)
+      D = NTD;
+  }
+
   if (const auto *NTD = dyn_cast<NominalTypeDecl>(D)) {
     if (auto *PD = dyn_cast<ProtocolDecl>(NTD)) {
       for (auto *inherited : PD->getAllInheritedProtocols()) {

@@ -60,11 +60,11 @@ struct SymbolGraphASTWalker : public SourceEntityWalker {
   llvm::StringMap<SymbolGraph *> ExtendedModuleGraphs;
 
   /// A temporary pointer to a base decl when crawling symbols to synthesize.
-  const ValueDecl *BaseDecl;
+  const ValueDecl *BaseDecl = nullptr;
 
   /// A temporary pointer to the top-level decl being crawled when synthesizing
   /// child symbols.
-  const Decl *SynthesizedChildrenBaseDecl;
+  const Decl *SynthesizedChildrenBaseDecl = nullptr;
 
   /// Maps any internal symbol with a public type alias of that symbol.
   llvm::DenseMap<const ValueDecl *, const ValueDecl *> PublicPrivateTypeAliases;
