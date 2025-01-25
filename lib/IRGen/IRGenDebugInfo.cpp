@@ -1283,16 +1283,12 @@ private:
         DBuilder.createInheritance(UnsubstitutedType, SuperClassDITy, 0, 0,
                                    llvm::DINode::FlagZero);
       }
-
-      auto *OpaqueType = createPointerSizedStruct(
-          Scope, Decl ? Decl->getNameStr() : MangledName, File, 0, Flags,
-          MangledName, UnsubstitutedType);
-      return OpaqueType;
     }
 
-    auto *OpaqueType = createOpaqueStruct(
-        Scope, "", File, Line, SizeInBits, AlignInBits, Flags, MangledName,
-        collectGenericParams(Type), UnsubstitutedType);
+    auto *OpaqueType =
+        createOpaqueStruct(Scope, Decl ? Decl->getNameStr() : "", File, Line,
+                           SizeInBits, AlignInBits, Flags, MangledName,
+                           collectGenericParams(Type), UnsubstitutedType);
     DBuilder.replaceTemporary(std::move(FwdDecl), OpaqueType);
     return OpaqueType;
   }
@@ -1979,18 +1975,9 @@ private:
       auto L = getFileAndLocation(Decl);
       unsigned FwdDeclLine = 0;
 
-      if (Opts.DebugInfoLevel > IRGenDebugInfoLevel::ASTTypes)
-        return createSpecializedStructOrClassType(
-            ClassTy, Decl, Scope, L.File, L.Line, SizeInBits, AlignInBits,
-            Flags, MangledName);
-
-      // TODO: We may want to peek at Decl->isObjC() and set this
-      // attribute accordingly.
-      assert(SizeInBits ==
-             CI.getTargetInfo().getPointerWidth(clang::LangAS::Default));
-      return createPointerSizedStruct(
-          Scope, Decl ? Decl->getNameStr() : MangledName, L.File, FwdDeclLine,
-          Flags, MangledName, SpecificationOf);
+      return createSpecializedStructOrClassType(ClassTy, Decl, Scope, L.File,
+                                                L.Line, SizeInBits, AlignInBits,
+                                                Flags, MangledName);
     }
 
     case TypeKind::Pack:
@@ -2174,8 +2161,14 @@ private:
           AliasedTy, DbgTy.getAlignment(), DbgTy.hasDefaultAlignment(),
           /* IsMetadataType = */ false, DbgTy.isFixedBuffer(),
           DbgTy.getNumExtraInhabitants());
-      return DBuilder.createTypedef(getOrCreateType(AliasedDbgTy), MangledName,
-                                    L.File, 0, Scope);
+      auto *TypeDef = DBuilder.createTypedef(getOrCreateType(AliasedDbgTy),
+                                             MangledName, L.File, 0, Scope);
+      // Bound generic types don't reference their type parameters in ASTTypes
+      // mode, so we need to artificially keep typealiases alive, since they can
+      // appear in reflection metadata.
+      if (Opts.DebugInfoLevel < IRGenDebugInfoLevel::DwarfTypes)
+        DBuilder.retainType(TypeDef);
+      return TypeDef;
     }
 
     case TypeKind::Locatable: {
@@ -2511,6 +2504,7 @@ private:
       // winning over a full definition.
       auto *FwdDecl = DBuilder.createReplaceableCompositeType(
           llvm::dwarf::DW_TAG_structure_type, MangledName, Scope, 0, 0,
+
           llvm::dwarf::DW_LANG_Swift);
       FwdDeclTypes.emplace_back(
           std::piecewise_construct, std::make_tuple(MangledName),
