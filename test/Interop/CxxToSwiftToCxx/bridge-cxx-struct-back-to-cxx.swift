@@ -269,7 +269,6 @@ public struct Strct {
 // CHECK-NEXT: } // namespace swift
 // CHECK-EMPTY:
 // CHECK-NEXT: namespace UseCxxTy SWIFT_PRIVATE_ATTR SWIFT_SYMBOL_MODULE("UseCxxTy") {
-// CHECK-EMPTY:
 // CHECK-NEXT: SWIFT_INLINE_THUNK ns::NonTrivialTemplate<ns::TrivialinNS> retNonTrivial2() noexcept SWIFT_SYMBOL({{.*}}) SWIFT_WARN_UNUSED_RESULT {
 // CHECK-NEXT: alignas(alignof(ns::NonTrivialTemplate<ns::TrivialinNS>)) char storage[sizeof(ns::NonTrivialTemplate<ns::TrivialinNS>)];
 // CHECK-NEXT: auto * _Nonnull storageObjectPtr = reinterpret_cast<ns::NonTrivialTemplate<ns::TrivialinNS> *>(storage);
