@@ -177,7 +177,16 @@ bool swift::enumerateUnsafeUses(ConcreteDeclRef declRef,
                                 llvm::function_ref<bool(UnsafeUse)> fn) {
   // If the declaration is explicitly unsafe, note that.
   auto decl = declRef.getDecl();
-  if (decl->isUnsafe()) {
+  switch (decl->getExplicitSafety()) {
+  case ExplicitSafety::Unspecified:
+    // check based on the type, below
+    break;
+
+  case ExplicitSafety::Safe:
+    // Nothing more to check. It's always safe.
+    return false;
+
+  case ExplicitSafety::Unsafe: {
     (void)fn(
         UnsafeUse::forReferenceToUnsafe(
           decl, isCall && !isa<ParamDecl>(decl), Type(), loc));
@@ -185,6 +194,7 @@ bool swift::enumerateUnsafeUses(ConcreteDeclRef declRef,
     // A declaration being explicitly marked @unsafe always stops enumerating
     // safety issues, because it causes too much noise.
     return true;
+  }
   }
 
   // If the type of this declaration involves unsafe types, diagnose that.
@@ -264,7 +274,8 @@ static bool forEachUnsafeConformance(
   ProtocolConformance *concreteConf = conformance.getConcrete();
   RootProtocolConformance *rootConf = concreteConf->getRootConformance();
   if (auto normalConf = dyn_cast<NormalProtocolConformance>(rootConf)) {
-    if (normalConf->isUnsafe() && body(concreteConf))
+    if (normalConf->getExplicitSafety() == ExplicitSafety::Unsafe &&
+        body(concreteConf))
       return true;
   }
 
@@ -321,7 +332,7 @@ bool swift::isUnsafe(ConcreteDeclRef declRef) {
 bool swift::isUnsafeInConformance(const ValueDecl *requirement,
                                   const Witness &witness,
                                   NormalProtocolConformance *conformance) {
-  if (requirement->isUnsafe())
+  if (requirement->getExplicitSafety() == ExplicitSafety::Unsafe)
     return true;
 
   Type requirementType = requirement->getInterfaceType();
@@ -354,7 +365,7 @@ void swift::diagnoseUnsafeType(ASTContext &ctx, SourceLoc loc, Type type,
   Type specificType;
   type.findIf([&specificType](Type type) {
     if (auto typeDecl = type->getAnyNominal()) {
-      if (typeDecl->isUnsafe()) {
+      if (typeDecl->getExplicitSafety() == ExplicitSafety::Unsafe) {
         specificType = type;
         return false;
       }

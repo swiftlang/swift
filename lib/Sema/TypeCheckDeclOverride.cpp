@@ -1741,6 +1741,7 @@ namespace  {
     UNINTERESTING_ATTR(Lifetime)
     UNINTERESTING_ATTR(AddressableSelf)
     UNINTERESTING_ATTR(Unsafe)
+    UNINTERESTING_ATTR(Safe)
     UNINTERESTING_ATTR(AddressableForDependencies)
 #undef UNINTERESTING_ATTR
 
@@ -2261,7 +2262,7 @@ static bool checkSingleOverride(ValueDecl *override, ValueDecl *base) {
     if (isUnsafe(overrideRef) && !isUnsafe(baseRef)) {
       // Don't diagnose @unsafe overrides if the subclass is @unsafe.
       auto overridingClass = override->getDeclContext()->getSelfClassDecl();
-      bool shouldDiagnose = !overridingClass || !overridingClass->isUnsafe();
+      bool shouldDiagnose = !overridingClass || !isUnsafe(overridingClass);
 
       if (shouldDiagnose) {
         diagnoseUnsafeUse(UnsafeUse::forOverride(override, base));
