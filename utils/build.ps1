@@ -1845,9 +1845,32 @@ function Build-Runtime([Platform]$Platform, $Arch) {
         CMAKE_SHARED_LINKER_FLAGS = if ($Platform -eq "Windows") { @("/INCREMENTAL:NO", "/OPT:REF", "/OPT:ICF") } else { @() };
       })
   }
+}
 
-  Invoke-Program "$(Get-PythonExecutable)" -c "import plistlib; print(str(plistlib.dumps({ 'DefaultProperties': { 'DEFAULT_USE_RUNTIME': 'MD' } }), encoding='utf-8'))" `
-    -OutFile "$($Arch.SDKInstallRoot)\SDKSettings.plist"
+function Write-SDKSettingsPlist([Platform]$Platform, $Arch) {
+  if ($Platform -eq [Platform]::Windows) {
+    Invoke-Program "$(Get-PythonExecutable)" -c "import plistlib; print(str(plistlib.dumps({ 'DefaultProperties': { 'DEFAULT_USE_RUNTIME': 'MD' } }), encoding='utf-8'))" `
+      -OutFile "$($Arch.SDKInstallRoot)\SDKSettings.plist"
+  } else {
+    Invoke-Program "$(Get-PythonExecutable)" -c "import plistlib; print(str(plistlib.dumps({ 'DefaultProperties': { } }), encoding='utf-8'))" `
+      -OutFile "$($Arch.SDKInstallRoot)\SDKSettings.plist"
+  }
+
+  $SDKSettings = @{
+    CanonicalName = "$($Arch.LLVMTarget)"
+    DisplayName = "$($Platform.ToString())"
+    IsBaseSDK = "NO"
+    Version = "${ProductVersion}"
+    VersionMap = @{}
+    DefaultProperties = @{
+      PLATFORM_NAME = "$($Platform.ToString())"
+      DEFAULT_COMPILER = "${ToolchainIdentifier}"
+    }
+  }
+  if ($Platform -eq [Platform]::Windows) {
+    $SDKSettings.DefaultProperties.DEFAULT_USE_RUNTIME = "MD"
+  }
+  $SDKSettings | ConvertTo-JSON | Out-FIle -FilePath "$($Arch.SDKInstallRoot)\SDKSettings.json"
 }
 
 function Build-Dispatch([Platform]$Platform, $Arch, [switch]$Test = $false) {
@@ -2137,6 +2160,7 @@ function Install-Platform([Platform]$Platform, $Arch) {
 
   # Copy plist files (same across architectures)
   Copy-File "$($Arch.PlatformInstallRoot)\Info.plist" ([IO.Path]::Combine((Get-InstallDir $HostArch), "Platforms", "${Platform}.platform"))
+  Copy-File "$($Arch.SDKInstallRoot)\SDKSettings.json" ([IO.Path]::Combine((Get-InstallDir $HostArch), "Platforms", "${Platform}.platform", "Developer", "SDKs", "${Platform}.sdk"))
   Copy-File "$($Arch.SDKInstallRoot)\SDKSettings.plist" ([IO.Path]::Combine((Get-InstallDir $HostArch), "Platforms", "${Platform}.platform", "Developer", "SDKs", "${Platform}.sdk"))
 
   # Copy XCTest
@@ -2814,6 +2838,7 @@ if (-not $SkipBuild) {
     Invoke-BuildStep Build-Foundation Windows $Arch
     Invoke-BuildStep Build-XCTest Windows $Arch
     Invoke-BuildStep Build-Testing Windows $Arch
+    Invoke-BuildStep Write-SDKSettingsPlist Windows $Arch
     Invoke-BuildStep Write-PlatformInfoPlist $Arch
   }
 
@@ -2832,6 +2857,7 @@ if (-not $SkipBuild) {
     Invoke-BuildStep Build-Foundation Android $Arch
     Invoke-BuildStep Build-XCTest Android $Arch
     Invoke-BuildStep Build-Testing Android $Arch
+    Invoke-BuildStep Write-SDKSettingsPlist Android $Arch
     Invoke-BuildStep Write-PlatformInfoPlist $Arch
   }
 }
