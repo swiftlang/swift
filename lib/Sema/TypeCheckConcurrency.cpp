@@ -1160,12 +1160,21 @@ bool swift::diagnoseNonSendableTypesInReference(
       return true;
   }
 
-  // For functions, check the parameter and result types.
+  // For functions or subscripts, check the parameter and result types.
   SubstitutionMap subs = declRef.getSubstitutions();
-  if (auto function = dyn_cast<AbstractFunctionDecl>(declRef.getDecl())) {
+  auto decl = declRef.getDecl();
+  if (isa<AbstractFunctionDecl>(decl) || isa<SubscriptDecl>(decl)) {
     if (funcCheckOptions.contains(FunctionCheckKind::Params)) {
       // only check params if funcCheckKind specifies so
-      for (auto param : *function->getParameters()) {
+      ParameterList *paramList = nullptr;
+      if (auto function = dyn_cast<AbstractFunctionDecl>(decl)) {
+        paramList = function->getParameters();
+      } else if (auto subscript = dyn_cast<SubscriptDecl>(decl)) {
+        paramList = subscript->getIndices();
+      }
+
+      // Check params of this function or subscript override for sendability
+      for (auto param : *paramList) {
         Type paramType = param->getInterfaceType().subst(subs);
         if (param->isSending() && !paramType->hasError()) {
           continue;
@@ -1175,13 +1184,13 @@ bool swift::diagnoseNonSendableTypesInReference(
                 paramType, fromDC, derivedConformanceType,
                 refLoc, diagnoseLoc.isInvalid() ? refLoc : diagnoseLoc,
                 getSendableParamDiag(refKind),
-                function, getActorIsolation()))
+                decl, getActorIsolation()))
           return true;
       }
     }
 
-    // Check the result type of a function.
-    if (auto func = dyn_cast<FuncDecl>(function)) {
+    // Check the result type of a function or subscript.
+    if (auto func = dyn_cast<FuncDecl>(decl)) {
       if (funcCheckOptions.contains(FunctionCheckKind::Results)) {
         // only check results if funcCheckKind specifies so
         Type resultType = func->getResultInterfaceType().subst(subs);
@@ -1211,34 +1220,6 @@ bool swift::diagnoseNonSendableTypesInReference(
             getSendablePropertyDiag(refKind),
             var, getActorIsolation()))
       return true;
-  }
-
-  if (auto subscript = dyn_cast<SubscriptDecl>(declRef.getDecl())) {
-    for (auto param : *subscript->getIndices()) {
-      if (funcCheckOptions.contains(FunctionCheckKind::Params)) {
-        // Check params of this subscript override for sendability
-        Type paramType = param->getInterfaceType().subst(subs);
-        if (diagnoseNonSendableTypes(
-                paramType, fromDC, derivedConformanceType,
-                refLoc, diagnoseLoc.isInvalid() ? refLoc : diagnoseLoc,
-                getSendableParamDiag(refKind),
-                subscript, getActorIsolation()))
-          return true;
-      }
-    }
-
-    if (funcCheckOptions.contains(FunctionCheckKind::Results)) {
-      // Check the element type of a subscript.
-      Type resultType = subscript->getElementInterfaceType().subst(subs);
-      if (diagnoseNonSendableTypes(
-              resultType, fromDC, derivedConformanceType,
-              refLoc, diagnoseLoc.isInvalid() ? refLoc : diagnoseLoc,
-              getSendableResultDiag(refKind),
-              subscript, getActorIsolation()))
-        return true;
-    }
-
-    return false;
   }
 
   return false;
