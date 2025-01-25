@@ -21,6 +21,7 @@
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/SourceLoc.h"
 #include "llvm/ADT/ArrayRef.h"
+#include "llvm/ADT/STLFunctionalExtras.h"
 #include <optional>
 
 namespace swift {
@@ -38,21 +39,9 @@ namespace swift {
   class ValueDecl;
   class ForEachStmt;
 
-/// Diagnose any expressions that appear in an unsupported position. If visiting
-/// an expression directly, its \p contextualPurpose should be provided to
-/// evaluate its position.
-  void diagnoseOutOfPlaceExprs(
-      ASTContext &ctx, ASTNode root,
-      std::optional<ContextualTypePurpose> contextualPurpose);
-
   /// Emit diagnostics for syntactic restrictions on a given expression.
-  ///
-  /// Note: \p contextualPurpose must be non-nil, unless
-  /// \p disableOutOfPlaceExprChecking is set to \c true.
-  void performSyntacticExprDiagnostics(
-      const Expr *E, const DeclContext *DC,
-      std::optional<ContextualTypePurpose> contextualPurpose, bool isExprStmt,
-      bool disableOutOfPlaceExprChecking = false);
+  void performSyntacticExprDiagnostics(const Expr *E, const DeclContext *DC,
+                                       bool isExprStmt);
 
   /// Emit diagnostics for a given statement.
   void performStmtDiagnostics(const Stmt *S, DeclContext *DC);
@@ -145,19 +134,20 @@ namespace swift {
                                              ForEachStmt *forEach);
 
   class BaseDiagnosticWalker : public ASTWalker {
-    PreWalkAction walkToDeclPre(Decl *D) override;
-
-    bool shouldWalkIntoSeparatelyCheckedClosure(ClosureExpr *expr) override {
-      return false;
+  protected:
+    PreWalkAction walkToDeclPre(Decl *D) override {
+      // We don't walk into any nested local decls, except PatternBindingDecls,
+      // which are type-checked along with the parent, and MacroExpansionDecl,
+      // which needs to be visited to visit the macro arguments.
+      return Action::VisitChildrenIf(isa<PatternBindingDecl>(D) ||
+                                     isa<MacroExpansionDecl>(D));
     }
 
-    // Only emit diagnostics in the expansion of macros.
     MacroWalking getMacroWalkingBehavior() const override {
-      return MacroWalking::Expansion;
+      // We only want to walk macro arguments. Expansions will be walked when
+      // they're type-checked, not as part of the surrounding code.
+      return MacroWalking::Arguments;
     }
-
-  private:
-    static bool shouldWalkIntoDeclInClosureContext(Decl *D);
   };
 
   // A simple, deferred diagnostic container.
@@ -179,10 +169,18 @@ namespace swift {
   /// \param loc corresponds to the location of the 'consume' for which
   ///            diagnostics should be collected, if any.
   ///
+  /// \param getType is a function that can correctly determine the type of
+  ///                an expression. This is to support calls from the
+  ///                constraint solver.
+  ///
   /// \returns an empty collection if there are no errors.
-  DeferredDiags findSyntacticErrorForConsume(ModuleDecl *module,
-                                             SourceLoc loc,
-                                             Expr *subExpr);
+  DeferredDiags findSyntacticErrorForConsume(
+                     ModuleDecl *module,
+                     SourceLoc loc,
+                     Expr *subExpr,
+                     llvm::function_ref<Type(Expr *)> getType = [](Expr *E) {
+                       return E->getType();
+                     });
 } // namespace swift
 
 #endif // SWIFT_SEMA_MISC_DIAGNOSTICS_H

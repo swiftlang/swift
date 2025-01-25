@@ -19,6 +19,7 @@
 #include "TypeCheckAvailability.h"
 #include "TypeChecker.h"
 #include "TypoCorrection.h"
+#include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/Initializer.h"
 #include "swift/AST/NameLookup.h"
@@ -30,6 +31,27 @@
 #include <algorithm>
 
 using namespace swift;
+
+void swift::simple_display(llvm::raw_ostream &out, NameLookupOptions options) {
+  using Flag = std::pair<NameLookupFlags, StringRef>;
+  Flag possibleFlags[] = {
+      {NameLookupFlags::IgnoreAccessControl, "IgnoreAccessControl"},
+      {NameLookupFlags::IncludeOuterResults, "IncludeOuterResults"},
+      {NameLookupFlags::IncludeUsableFromInline, "IncludeUsableFromInline"},
+      {NameLookupFlags::ExcludeMacroExpansions, "ExcludeMacroExpansions"},
+      {NameLookupFlags::IgnoreMissingImports, "IgnoreMissingImports"},
+      {NameLookupFlags::ABIProviding, "ABIProviding"},
+  };
+
+  auto flagsToPrint = llvm::make_filter_range(
+      possibleFlags, [&](Flag flag) { return options.contains(flag.first); });
+
+  out << "{ ";
+  interleave(
+      flagsToPrint, [&](Flag flag) { out << flag.second; },
+      [&] { out << ", "; });
+  out << " }";
+}
 
 namespace {
   /// Builder that helps construct a lookup result from the raw lookup
@@ -156,8 +178,7 @@ namespace {
 
       // Dig out the protocol conformance.
       auto *foundProto = cast<ProtocolDecl>(foundDC);
-      auto conformance = ModuleDecl::lookupConformance(
-          conformingType, foundProto);
+      auto conformance = lookupConformance(conformingType, foundProto);
       if (conformance.isInvalid()) {
         if (foundInType->isExistentialType()) {
           // If there's no conformance, we have an existential
@@ -225,6 +246,8 @@ convertToUnqualifiedLookupOptions(NameLookupOptions options) {
     newOptions |= UnqualifiedLookupFlags::ExcludeMacroExpansions;
   if (options.contains(NameLookupFlags::IgnoreMissingImports))
     newOptions |= UnqualifiedLookupFlags::IgnoreMissingImports;
+  if (options.contains(NameLookupFlags::ABIProviding))
+    newOptions |= UnqualifiedLookupFlags::ABIProviding;
 
   return newOptions;
 }
@@ -330,6 +353,8 @@ LookupResult TypeChecker::lookupMember(DeclContext *dc,
     subOptions |= NL_IgnoreAccessControl;
   if (options.contains(NameLookupFlags::IgnoreMissingImports))
     subOptions |= NL_IgnoreMissingImports;
+  if (options.contains(NameLookupFlags::ABIProviding))
+    subOptions |= NL_ABIProviding;
 
   // We handle our own overriding/shadowing filtering.
   subOptions &= ~NL_RemoveOverridden;
@@ -430,6 +455,8 @@ LookupTypeResult TypeChecker::lookupMemberType(DeclContext *dc,
     subOptions |= NL_IgnoreMissingImports;
   if (options.contains(NameLookupFlags::IncludeUsableFromInline))
     subOptions |= NL_IncludeUsableFromInline;
+  if (options.contains(NameLookupFlags::ABIProviding))
+    subOptions |= NL_ABIProviding;
 
   // Make sure we've resolved implicit members, if we need them.
   namelookup::installSemanticMembersIfNeeded(type, name);
@@ -498,7 +525,7 @@ LookupTypeResult TypeChecker::lookupMemberType(DeclContext *dc,
       // member entirely.
       auto *protocol = cast<ProtocolDecl>(assocType->getDeclContext());
 
-      auto conformance = ModuleDecl::lookupConformance(type, protocol);
+      auto conformance = lookupConformance(type, protocol);
       if (!conformance) {
         // FIXME: This is an error path. Should we try to recover?
         continue;
@@ -548,14 +575,15 @@ unsigned TypeChecker::getCallEditDistance(DeclNameRef writtenName,
     return 0;
   }
 
-  StringRef writtenBase = writtenName.getBaseName().userFacingName();
-  StringRef correctedBase = correctedName.getBaseName().userFacingName();
-
   // Don't typo-correct to a name with a leading underscore unless the typed
   // name also begins with an underscore.
-  if (correctedBase.starts_with("_") && !writtenBase.starts_with("_")) {
+  if (correctedName.getBaseIdentifier().hasUnderscoredNaming() &&
+      !writtenName.getBaseIdentifier().hasUnderscoredNaming()) {
     return UnreasonableCallEditDistance;
   }
+
+  StringRef writtenBase = writtenName.getBaseName().userFacingName();
+  StringRef correctedBase = correctedName.getBaseName().userFacingName();
 
   unsigned distance = writtenBase.edit_distance(correctedBase, maxEditDistance);
 
@@ -809,7 +837,7 @@ public:
 static void diagnoseMissingImportForMember(const ValueDecl *decl,
                                            SourceFile *sf, SourceLoc loc) {
   auto &ctx = sf->getASTContext();
-  auto definingModule = decl->getModuleContext();
+  auto definingModule = decl->getModuleContextForNameLookup();
   ctx.Diags.diagnose(loc, diag::candidate_from_missing_import,
                      decl->getDescriptiveKind(), decl->getName(),
                      definingModule);
@@ -823,22 +851,33 @@ diagnoseAndFixMissingImportForMember(const ValueDecl *decl, SourceFile *sf,
   diagnoseMissingImportForMember(decl, sf, loc);
 
   auto &ctx = sf->getASTContext();
-  auto definingModule = decl->getModuleContext();
+  auto definingModule = decl->getModuleContextForNameLookup();
   SourceLoc bestLoc = ctx.Diags.getBestAddImportFixItLoc(decl, sf);
   if (!bestLoc.isValid())
     return;
 
   llvm::SmallString<64> importText;
 
+  // Add flags that must be used consistently on every import in every file.
   auto fixItInfo = fixItCache.getInfo(definingModule);
   if (fixItInfo.flags.contains(ImportFlags::ImplementationOnly))
     importText += "@_implementationOnly ";
   if (fixItInfo.flags.contains(ImportFlags::WeakLinked))
     importText += "@_weakLinked ";
-  if (fixItInfo.flags.contains(ImportFlags::SPIOnly))
-    importText += "@_spiOnly ";
 
-  // @_spi imports.
+  auto explicitAccessLevel = fixItInfo.accessLevel;
+  bool isPublicImport =
+      explicitAccessLevel
+          ? *explicitAccessLevel >= AccessLevel::Public
+          : !ctx.LangOpts.hasFeature(Feature::InternalImportsByDefault);
+
+  // Add flags that are only appropriate on public imports.
+  if (isPublicImport) {
+    if (fixItInfo.flags.contains(ImportFlags::SPIOnly))
+      importText += "@_spiOnly ";
+  }
+
+  // Add @_spi groups if needed for the declaration.
   if (decl->isSPI()) {
     auto spiGroups = decl->getSPIGroups();
     if (!spiGroups.empty()) {
@@ -848,8 +887,8 @@ diagnoseAndFixMissingImportForMember(const ValueDecl *decl, SourceFile *sf,
     }
   }
 
-  if (auto accessLevel = fixItInfo.accessLevel) {
-    importText += getAccessLevelSpelling(*accessLevel);
+  if (explicitAccessLevel) {
+    importText += getAccessLevelSpelling(*explicitAccessLevel);
     importText += " ";
   }
 
@@ -863,8 +902,17 @@ diagnoseAndFixMissingImportForMember(const ValueDecl *decl, SourceFile *sf,
 bool swift::maybeDiagnoseMissingImportForMember(const ValueDecl *decl,
                                                 const DeclContext *dc,
                                                 SourceLoc loc) {
-  if (decl->findImport(dc))
+  if (dc->isDeclImported(decl))
     return false;
+
+  if (dc->getASTContext().LangOpts.EnableCXXInterop) {
+    // With Cxx interop enabled, there are some declarations that always belong
+    // to the Clang header import module which should always be implicitly
+    // visible. However, that module is not implicitly imported in source files
+    // so we need to special case it here and avoid diagnosing.
+    if (decl->getModuleContextForNameLookup()->isClangHeaderImportModule())
+      return false;
+  }
 
   auto sf = dc->getParentSourceFile();
   if (!sf)

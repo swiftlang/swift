@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -typecheck -disable-availability-checking -enable-experimental-async-top-level -swift-version 6 %s -verify
+// RUN: %target-swift-frontend -typecheck -target %target-swift-5.1-abi-triple -enable-experimental-async-top-level -swift-version 6 %s -verify
 
 var a = 10
 // expected-note@-1 2 {{var declared here}}
@@ -24,6 +24,7 @@ func nonIsolatedAsync() async {
     // expected-error@-1:5 {{main actor-isolated var 'a' can not be mutated from a nonisolated context}}
     // expected-error@-2:9 {{expression is 'async' but is not marked with 'await'}}
     // expected-note@-3:9 {{property access is 'async'}}
+    // expected-note@-4 {{consider declaring an isolated method on 'MainActor' to perform the mutation}}
 }
 
 @MainActor

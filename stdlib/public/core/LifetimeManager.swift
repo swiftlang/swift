@@ -239,26 +239,18 @@ public func _withUnprotectedUnsafePointer<
 #endif
 }
 
-extension String {
-  /// Calls the given closure with a pointer to the contents of the string,
-  /// represented as a null-terminated sequence of UTF-8 code units.
-  ///
-  /// The pointer passed as an argument to `body` is valid only during the
-  /// execution of `withCString(_:)`. Do not store or return the pointer for
-  /// later use.
-  ///
-  /// - Parameter body: A closure with a pointer parameter that points to a
-  ///   null-terminated sequence of UTF-8 code units. If `body` has a return
-  ///   value, that value is also used as the return value for the
-  ///   `withCString(_:)` method. The pointer argument is valid only for the
-  ///   duration of the method's execution.
-  /// - Returns: The return value, if any, of the `body` closure parameter.
-  @inlinable // fast-path: already C-string compatible
-  public func withCString<Result>(
-    _ body: (UnsafePointer<Int8>) throws -> Result
-  ) rethrows -> Result {
-    return try _guts.withCString(body)
-  }
+/// Invokes the given closure with a pointer to the given argument.
+///
+/// This function is similar to `withUnsafePointer`, except that it
+/// doesn't trigger stack protection for the pointer.
+@_alwaysEmitIntoClient
+public func _withUnprotectedUnsafePointer<
+  T: ~Copyable, E: Error, Result: ~Copyable
+>(
+  to value: borrowing T,
+  _ body: (UnsafePointer<T>) throws(E) -> Result
+) throws(E) -> Result {
+  return try body(UnsafePointer<T>(Builtin.unprotectedAddressOfBorrow(value)))
 }
 
 @available(*, deprecated, message: "Use the copy operator")
@@ -268,4 +260,40 @@ extension String {
 @_semantics("lifetimemanagement.copy")
 public func _copy<T>(_ value: T) -> T {
   copy value
+}
+
+/// Unsafely discard any lifetime dependency on the `dependent` argument. Return
+/// a value identical to `dependent` with a lifetime dependency on the caller's
+/// borrow scope of the `source` argument.
+@unsafe
+@_unsafeNonescapableResult
+@_alwaysEmitIntoClient
+@_transparent
+@lifetime(borrow source)
+internal func _overrideLifetime<
+  T: ~Copyable & ~Escapable, U: ~Copyable & ~Escapable
+>(
+  _ dependent: consuming T, borrowing source: borrowing U
+) -> T {
+  // TODO: Remove @_unsafeNonescapableResult. Instead, the unsafe dependence
+  // should be expressed by a builtin that is hidden within the function body.
+  dependent
+}
+
+/// Unsafely discard any lifetime dependency on the `dependent` argument. Return
+/// a value identical to `dependent` that inherits all lifetime dependencies from
+/// the `source` argument.
+@unsafe
+@_unsafeNonescapableResult
+@_alwaysEmitIntoClient
+@_transparent
+@lifetime(source)
+internal func _overrideLifetime<
+  T: ~Copyable & ~Escapable, U: ~Copyable & ~Escapable
+>(
+  _ dependent: consuming T, copying source: borrowing U
+) -> T {
+  // TODO: Remove @_unsafeNonescapableResult. Instead, the unsafe dependence
+  // should be expressed by a builtin that is hidden within the function body.
+  dependent
 }

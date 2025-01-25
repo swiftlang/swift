@@ -322,6 +322,6 @@ public protocol ResilientAssocTypes {
 // CHECK-NEXT: }
 
 // CHECK-LABEL: sil_default_witness_table ResilientAssocTypes {
-// CHECK-NEXT:   associated_type_protocol (AssocType: P): ConformsToP: P module protocol_resilience
+// CHECK-NEXT:   associated_conformance (AssocType: P): ConformsToP: P module protocol_resilience
 // CHECK-NEXT:   associated_type AssocType: ConformsToP
 // CHECK-NEXT: }

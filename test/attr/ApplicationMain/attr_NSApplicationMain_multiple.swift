@@ -3,6 +3,7 @@
 
 
 // REQUIRES: objc_interop
+// REQUIRES: swift_feature_DeprecateApplicationMain
 
 import AppKit
 

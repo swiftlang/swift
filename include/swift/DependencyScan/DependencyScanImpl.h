@@ -167,6 +167,9 @@ typedef struct {
   /// A flag that indicates this dependency is associated with a static archive
   bool is_static;
 
+  /// Macro dependecies.
+  swiftscan_macro_dependency_set_t *macro_dependencies;
+
   /// ModuleCacheKey
   swiftscan_string_ref_t module_cache_key;
 

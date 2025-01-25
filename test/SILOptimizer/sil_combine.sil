@@ -1,6 +1,7 @@
-// RUN: %target-sil-opt -enable-objc-interop -enable-sil-verify-all %s -sil-combine | %FileCheck %s
+// RUN: %target-sil-opt -sil-print-types -enable-objc-interop -enable-sil-verify-all %s -sil-combine -enable-experimental-feature ValueGenerics | %FileCheck %s
 
 // REQUIRES: swift_in_compiler
+// REQUIRES: swift_feature_ValueGenerics
 
 // Declare this SIL to be canonical because some tests break raw SIL
 // conventions. e.g. address-type block args. -enforce-exclusivity=none is also
@@ -1419,7 +1420,9 @@ bb0(%0 : $*@callee_owned (@in ()) -> @out AnotherClass, %1 : $*AnotherClass):
 
 sil @convertible_result_with_error : $@convention(thin) () -> (@owned AnotherClass, @error Error)
 
-// TODO
+// CHECK-LABEL: sil @peephole_convert_function_result_change_with_error : {{.*}} {
+// CHECK-NOT:     convert_function
+// CHECK-LABEL: } // end sil function 'peephole_convert_function_result_change_with_error'
 sil @peephole_convert_function_result_change_with_error : $@convention(thin) () -> () {
 entry:
   %f = function_ref @convertible_result_with_error : $@convention(thin) () -> (@owned AnotherClass, @error Error)
@@ -3784,6 +3787,22 @@ bb0(%0 : $B):
   return %2 : $B
 }
 
+// CHECK-LABEL: sil @mark_dependence_trivial_address_base :
+// CHECK: bb0(
+// CHECK-NEXT: strong_retain
+// CHECK-NEXT: alloc_stack $Int
+// CHECK-NEXT: dealloc_stack
+// CHECK-NEXT: return
+// CHECK: } // end sil function 'mark_dependence_trivial_address_base'
+sil @mark_dependence_trivial_address_base : $@convention(thin) (@guaranteed B) -> @owned B {
+bb0(%0 : $B):
+  strong_retain %0 : $B
+  %1 = alloc_stack $Int
+  %2 = mark_dependence %0 : $B on %1 : $*Int
+  dealloc_stack %1 : $*Int
+  return %2 : $B
+}
+
 protocol _NSArrayCore {}
 
 // CHECK-LABEL: sil @mark_dependence_base2
@@ -4331,3 +4350,31 @@ bb0(%0 : $*Optional<String>, %1 : $*Kp1):
   return %r : $()
 }
 
+// CHECK-LABEL: sil @test_type_value_generic : $@convention(thin) <let N : Int> () -> Int {
+// CHECK:         [[TYPE_VALUE:%.*]] = type_value $Int for N
+// CHECK-NEXT:    return [[TYPE_VALUE]] : $Int
+// CHECK-LABEL: } // end sil function 'test_type_value_generic'
+sil @test_type_value_generic : $@convention(thin) <let N : Int> () -> Int {
+  %val = type_value $Int for N
+  return %val : $Int
+}
+
+// CHECK-LABEL: sil @test_type_value_concrete : $@convention(thin) () -> Int {
+// CHECK:         [[INT_LITERAL:%.*]] = integer_literal $Builtin.Int{{64|32}}, 123
+// CHECK-NEXT:    [[STRUCT:%.*]] = struct $Int ([[INT_LITERAL]] : $Builtin.Int{{64|32}})
+// CHECK-NEXT:    return [[STRUCT]] : $Int
+// CHECK-LABEL: } // end sil function 'test_type_value_concrete'
+sil @test_type_value_concrete : $@convention(thin) () -> Int {
+  %val = type_value $Int for 123
+  return %val : $Int
+}
+
+// CHECK-LABEL: sil @test_type_value_concrete_negative : $@convention(thin) () -> Int {
+// CHECK:         [[INT_LITERAL:%.*]] = integer_literal $Builtin.Int{{64|32}}, -128
+// CHECK-NEXT:    [[STRUCT:%.*]] = struct $Int ([[INT_LITERAL]] : $Builtin.Int{{64|32}})
+// CHECK-NEXT:    return [[STRUCT]] : $Int
+// CHECK-LABEL: } // end sil function 'test_type_value_concrete_negative'
+sil @test_type_value_concrete_negative : $@convention(thin) () -> Int {
+  %val = type_value $Int for -128
+  return %val : $Int
+}

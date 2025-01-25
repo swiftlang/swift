@@ -18,6 +18,11 @@ module Nullable {
   requires cplusplus
 }
 
+module Inheritance {
+  header "inheritance.h"
+  requires cplusplus
+}
+
 module WitnessTable {
   header "witness-table.h"
   requires cplusplus
@@ -49,3 +54,7 @@ module DerivedFieldGetterReturnsOwnedFRT {
   requires cplusplus
 }
 
+module FunctionsAndMethodsReturningFRT {
+  header "cxx-functions-and-methods-returning-frt.h"
+  requires cplusplus
+}

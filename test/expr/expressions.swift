@@ -619,8 +619,8 @@ class C {
 }
 
 _ = C(3) // expected-error {{missing argument label 'other:' in call}}
-// expected-error@-1 {{cannot convert value of type 'Int' to expected argument type 'C?'}}
-_ = C(other: 3) // expected-error {{cannot convert value of type 'Int' to expected argument type 'C?'}}
+// expected-error@-1 {{cannot convert value of type 'Int' to expected argument type 'C'}}
+_ = C(other: 3) // expected-error {{cannot convert value of type 'Int' to expected argument type 'C'}}
 
 //===----------------------------------------------------------------------===//
 // Unary Operators
@@ -758,10 +758,10 @@ func invalidDictionaryLiteral() {
 //===----------------------------------------------------------------------===//
 // nil/metatype comparisons
 //===----------------------------------------------------------------------===//
-_ = Int.self == nil  // expected-warning {{comparing non-optional value of type 'any Any.Type' to 'nil' always returns false}}
-_ = nil == Int.self  // expected-warning {{comparing non-optional value of type 'any Any.Type' to 'nil' always returns false}}
-_ = Int.self != nil  // expected-warning {{comparing non-optional value of type 'any Any.Type' to 'nil' always returns true}}
-_ = nil != Int.self  // expected-warning {{comparing non-optional value of type 'any Any.Type' to 'nil' always returns true}}
+_ = Int.self == nil  // expected-warning {{comparing non-optional value of type 'Int.Type' to 'nil' always returns false}}
+_ = nil == Int.self  // expected-warning {{comparing non-optional value of type 'Int.Type' to 'nil' always returns false}}
+_ = Int.self != nil  // expected-warning {{comparing non-optional value of type 'Int.Type' to 'nil' always returns true}}
+_ = nil != Int.self  // expected-warning {{comparing non-optional value of type 'Int.Type' to 'nil' always returns true}}
 
 _ = Int.self == .none  // expected-warning {{comparing non-optional value of type 'any Any.Type' to 'Optional.none' always returns false}}
 _ = .none == Int.self  // expected-warning {{comparing non-optional value of type 'any Any.Type' to 'Optional.none' always returns false}}

@@ -20,7 +20,8 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/AccessScope.h"
 #include "swift/AST/AnyFunctionRef.h"
-#include "swift/AST/Availability.h"
+#include "swift/AST/AvailabilityRange.h"
+#include "swift/AST/AvailabilityScope.h"
 #include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/GenericParamList.h"
 #include "swift/AST/GenericSignature.h"
@@ -28,7 +29,6 @@
 #include "swift/AST/LazyResolver.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/PropertyWrappers.h"
-#include "swift/AST/TypeRefinementContext.h"
 #include "swift/Basic/OptionSet.h"
 #include "swift/Config.h"
 #include "swift/Parse/Lexer.h"
@@ -161,10 +161,17 @@ enum class NameLookupFlags {
   /// Whether to include members that would otherwise be filtered out because
   /// they come from a module that has not been imported.
   IgnoreMissingImports = 1 << 4,
+  /// If @abi attributes are present, return the decls representing the ABI,
+  /// not the API.
+  ABIProviding = 1 << 5,
+
+  // Reminder: If you add a flag, make sure you update simple_display() below
 };
 
 /// A set of options that control name lookup.
 using NameLookupOptions = OptionSet<NameLookupFlags>;
+
+void simple_display(llvm::raw_ostream &out, NameLookupOptions opts);
 
 inline NameLookupOptions operator|(NameLookupFlags flag1,
                                    NameLookupFlags flag2) {
@@ -173,6 +180,14 @@ inline NameLookupOptions operator|(NameLookupFlags flag1,
 
 /// Default options for member name lookup.
 const NameLookupOptions defaultMemberLookupOptions;
+
+/// Default options for member name lookup in the constraint solver.
+/// Overloads which come from modules that have not been imported should be
+/// deprioritized by ranking and diagnosed by MiscDiagnostics, so we allow
+/// them to be found in constraint solver lookups to improve diagnostics
+/// overall.
+const NameLookupOptions defaultConstraintSolverMemberLookupOptions(
+    NameLookupFlags::IgnoreMissingImports);
 
 /// Default options for member type lookup.
 const NameLookupOptions defaultMemberTypeLookupOptions;
@@ -460,11 +475,6 @@ void typeCheckASTNode(ASTNode &node, DeclContext *DC,
 std::optional<BraceStmt *> applyResultBuilderBodyTransform(FuncDecl *func,
                                                            Type builderType);
 
-/// Find the return statements within the body of the given function.
-std::vector<ReturnStmt *> findReturnStatements(AnyFunctionRef fn);
-
-bool typeCheckClosureBody(ClosureExpr *closure);
-
 bool typeCheckTapBody(TapExpr *expr, DeclContext *DC);
 
 Type typeCheckParameterDefault(Expr *&defaultValue, DeclContext *DC,
@@ -486,6 +496,13 @@ void diagnoseDuplicateCaptureVars(CaptureListExpr *expr);
 
 Type checkReferenceOwnershipAttr(VarDecl *D, Type interfaceType,
                                  ReferenceOwnershipAttr *attr);
+
+/// Checks if the given witness can structurally match the requirement, ie.
+/// whether it has a matching kind like static vs. non-static, matching decl,
+/// etc. It does not check if the types of the witness is able to satisfy the
+/// requirement.
+/// If there is a matching failure, returns a `false`, otherwise return `true`.
+bool witnessStructureMatches(ValueDecl *req, const ValueDecl *witness);
 
 /// Infer default value witnesses for all requirements in the given protocol.
 void inferDefaultWitnesses(ProtocolDecl *proto);
@@ -514,14 +531,13 @@ void diagnoseRequirementFailure(
     const CheckGenericArgumentsResult::RequirementFailureInfo &reqFailureInfo,
     SourceLoc errorLoc, SourceLoc noteLoc, Type targetTy,
     ArrayRef<GenericTypeParamType *> genericParams,
-    TypeSubstitutionFn substitutions, ModuleDecl *module);
+    TypeSubstitutionFn substitutions);
 
 /// Check the given generic parameter substitutions against the given
 /// requirements and report on any requirement failures in detail for
 /// diagnostic needs.
 CheckGenericArgumentsResult
-checkGenericArgumentsForDiagnostics(ModuleDecl *module,
-                                    ArrayRef<Requirement> requirements,
+checkGenericArgumentsForDiagnostics(ArrayRef<Requirement> requirements,
                                     TypeSubstitutionFn substitutions);
 
 /// Checks whether the generic requirements imposed on the nested type
@@ -565,8 +581,7 @@ checkGenericArgumentsForDiagnostics(ModuleDecl *module,
 ///
 /// \returns \c true on success.
 bool checkContextualRequirements(GenericTypeDecl *decl, Type parentTy,
-                                 SourceLoc loc, ModuleDecl *module,
-                                 GenericSignature contextSig);
+                                 SourceLoc loc, GenericSignature contextSig);
 
 /// Add any implicitly-defined constructors required for the given
 /// struct, class or actor.
@@ -597,11 +612,13 @@ Type typeCheckExpression(Expr *&expr, DeclContext *dc,
 
 std::optional<constraints::SyntacticElementTarget>
 typeCheckExpression(constraints::SyntacticElementTarget &target,
-                    TypeCheckExprOptions options = TypeCheckExprOptions());
+                    TypeCheckExprOptions options = TypeCheckExprOptions(),
+                    DiagnosticTransaction *diagnosticTransaction);
 
 std::optional<constraints::SyntacticElementTarget>
 typeCheckTarget(constraints::SyntacticElementTarget &target,
-                TypeCheckExprOptions options = TypeCheckExprOptions());
+                TypeCheckExprOptions options = TypeCheckExprOptions(),
+                DiagnosticTransaction *diagnosticTransaction);
 
 /// Remove any solutions from the provided vector that require more fixes than
 /// the best score or don't contain a type for the code completion token.
@@ -756,10 +773,9 @@ void computeCaptures(AbstractClosureExpr *ACE);
 /// Check for invalid captures from stored property initializers.
 void checkPatternBindingCaptures(IterableDeclContext *DC);
 
-/// Change the context of closures in the given initializer
-/// expression to the given context.
-void contextualizeInitializer(Initializer *DC, Expr *init);
-void contextualizeCallSideDefaultArgument(DeclContext *DC, Expr *init);
+/// Update the DeclContexts for AST nodes in a given DeclContext. This is
+/// necessary after type-checking since autoclosures may have been introduced.
+void contextualizeExpr(Expr *E, DeclContext *DC);
 void contextualizeTopLevelCode(TopLevelCodeDecl *TLCD);
 
 /// Retrieve the default type for the given protocol.
@@ -922,7 +938,7 @@ bool isDeclRefinementOf(ValueDecl *declA, ValueDecl *declB);
 /// the given set of declarations.
 Expr *buildRefExpr(ArrayRef<ValueDecl *> Decls, DeclContext *UseDC,
                    DeclNameLoc NameLoc, bool Implicit,
-                   FunctionRefKind functionRefKind);
+                   FunctionRefInfo functionRefInfo);
 /// @}
 
 /// Retrieve a specific, known protocol.
@@ -983,88 +999,65 @@ bool diagnoseConformanceExportability(SourceLoc loc,
 /// is sufficient to safely conform to the requirement in the context
 /// the provided conformance. On return, requiredAvailability holds th
 /// availability levels required for conformance.
-bool
-isAvailabilitySafeForConformance(ProtocolDecl *proto, ValueDecl *requirement,
-                                 ValueDecl *witness, DeclContext *dc,
-                                 AvailabilityContext &requiredAvailability);
+bool isAvailabilitySafeForConformance(
+    const ProtocolDecl *proto, const ValueDecl *requirement,
+    const ValueDecl *witness, const DeclContext *dc,
+    AvailabilityRange &requiredAvailability);
+
+/// Returns the most refined `AvailabilityContext` for the given location.
+/// If `MostRefined` is not `nullptr`, it will be set to the most refined scope
+/// that contains the given location.
+AvailabilityContext
+availabilityAtLocation(SourceLoc loc, const DeclContext *DC,
+                       const AvailabilityScope **MostRefined = nullptr);
 
 /// Returns an over-approximation of the range of operating system versions
 /// that could the passed-in location could be executing upon for
 /// the target platform. If MostRefined != nullptr, set to the most-refined
-/// TRC found while approximating.
-AvailabilityContext overApproximateAvailabilityAtLocation(
+/// scope found while approximating.
+AvailabilityRange overApproximateAvailabilityAtLocation(
     SourceLoc loc, const DeclContext *DC,
-    const TypeRefinementContext **MostRefined = nullptr);
+    const AvailabilityScope **MostRefined = nullptr);
 
-/// Walk the AST to build the hierarchy of TypeRefinementContexts
-void buildTypeRefinementContextHierarchy(SourceFile &SF);
+/// Walk the AST to build the tree of AvailabilityScopes.
+void buildAvailabilityScopes(SourceFile &SF);
 
-/// Build the hierarchy of TypeRefinementContexts for the entire
+/// Build the hierarchy of AvailabilityScopes for the entire
 /// source file, if it has not already been built. Returns the root
-/// TypeRefinementContext for the source file.
-TypeRefinementContext *getOrBuildTypeRefinementContext(SourceFile *SF);
+/// AvailabilityScope for the source file.
+AvailabilityScope *getOrBuildAvailabilityScope(SourceFile *SF);
 
 /// Returns a diagnostic indicating why the declaration cannot be annotated
 /// with an @available() attribute indicating it is potentially unavailable
 /// or None if this is allowed.
-std::optional<Diag<>>
+std::optional<Diagnostic>
 diagnosticIfDeclCannotBePotentiallyUnavailable(const Decl *D);
 
 /// Returns a diagnostic indicating why the declaration cannot be annotated
 /// with an @available() attribute indicating it is unavailable or None if this
 /// is allowed.
-std::optional<Diag<>> diagnosticIfDeclCannotBeUnavailable(const Decl *D);
+std::optional<Diagnostic> diagnosticIfDeclCannotBeUnavailable(const Decl *D);
 
-/// Same as \c checkDeclarationAvailability but doesn't give a reason for
-/// unavailability.
-bool isDeclarationUnavailable(
-    const Decl *D, const DeclContext *referenceDC,
-    llvm::function_ref<AvailabilityContext()> getAvailabilityContext);
+bool checkAvailability(
+    SourceRange ReferenceRange, AvailabilityRange RequiredAvailability,
+    const DeclContext *ReferenceDC,
+    llvm::function_ref<InFlightDiagnostic(StringRef, llvm::VersionTuple)>
+        Diagnose);
 
-/// Checks whether a declaration should be considered unavailable when
-/// referred to at the given location and, if so, returns the reason why the
-/// declaration is unavailable. Returns None is the declaration is
-/// definitely available.
-std::optional<UnavailabilityReason>
-checkDeclarationAvailability(const Decl *D, const ExportContext &Where);
+bool checkAvailability(SourceRange ReferenceRange,
+                       AvailabilityRange RequiredAvailability,
+                       Diag<StringRef, llvm::VersionTuple> Diag,
+                       const DeclContext *ReferenceDC);
 
-/// Checks whether a conformance should be considered unavailable when
-/// referred to at the given location and, if so, returns the reason why the
-/// declaration is unavailable. Returns None is the declaration is
-/// definitely available.
-std::optional<UnavailabilityReason>
-checkConformanceAvailability(const RootProtocolConformance *Conf,
-                             const ExtensionDecl *Ext,
-                             const ExportContext &Where);
+void checkConcurrencyAvailability(SourceRange ReferenceRange,
+                                  const DeclContext *ReferenceDC);
+/// @}
 
 /// Checks an "ignored" expression to see if it's okay for it to be ignored.
 ///
 /// An ignored expression is one that is not nested within a larger
 /// expression or statement.
 void checkIgnoredExpr(Expr *E);
-
-// Emits a diagnostic for a reference to a declaration that is potentially
-// unavailable at the given source location. Returns true if an error diagnostic
-// was emitted.
-bool diagnosePotentialUnavailability(const ValueDecl *D,
-                                     SourceRange ReferenceRange,
-                                     const DeclContext *ReferenceDC,
-                                     const UnavailabilityReason &Reason,
-                                     bool WarnBeforeDeploymentTarget);
-
-// Emits a diagnostic for a protocol conformance that is potentially
-// unavailable at the given source location.
-void diagnosePotentialUnavailability(const RootProtocolConformance *rootConf,
-                                     const ExtensionDecl *ext,
-                                     SourceLoc loc,
-                                     const DeclContext *dc,
-                                     const UnavailabilityReason &reason);
-
-void
-diagnosePotentialUnavailability(SourceRange ReferenceRange,
-                                Diag<StringRef, llvm::VersionTuple> Diag,
-                                const DeclContext *ReferenceDC,
-                                const UnavailabilityReason &Reason);
 
 /// Type check a 'distributed actor' declaration.
 void checkDistributedActor(SourceFile *SF, NominalTypeDecl *decl);
@@ -1073,36 +1066,6 @@ void checkDistributedActor(SourceFile *SF, NominalTypeDecl *decl);
 ///
 /// Returns `true` if there was an error.
 bool checkDistributedFunc(FuncDecl *func);
-
-bool checkAvailability(SourceRange ReferenceRange,
-                       AvailabilityContext Availability,
-                       Diag<StringRef, llvm::VersionTuple> Diag,
-                       const DeclContext *ReferenceDC);
-
-void checkConcurrencyAvailability(SourceRange ReferenceRange,
-                                  const DeclContext *ReferenceDC);
-
-/// Emits a diagnostic for a reference to a storage accessor that is
-/// potentially unavailable.
-void diagnosePotentialAccessorUnavailability(
-    const AccessorDecl *Accessor, SourceRange ReferenceRange,
-    const DeclContext *ReferenceDC, const UnavailabilityReason &Reason,
-    bool ForInout);
-
-/// Returns the availability attribute indicating deprecation if the
-/// declaration is deprecated or null otherwise.
-const AvailableAttr *getDeprecated(const Decl *D);
-
-/// Emits a diagnostic for a reference to a declaration that is deprecated.
-void diagnoseIfDeprecated(SourceRange SourceRange, const ExportContext &Where,
-                          const ValueDecl *DeprecatedDecl, const Expr *Call);
-
-/// Emits a diagnostic for a reference to a conformance that is deprecated.
-bool diagnoseIfDeprecated(SourceLoc loc,
-                          const RootProtocolConformance *rootConf,
-                          const ExtensionDecl *ext,
-                          const ExportContext &where);
-/// @}
 
 /// If `LangOptions::DebugForbidTypecheckPrefixes` is set and the given decl
 /// name starts with any of those prefixes, an llvm fatal error is triggered.
@@ -1167,8 +1130,8 @@ bool diagnoseSelfAssignment(const Expr *E);
 /// some reason it could not.
 bool getDefaultGenericArgumentsString(
     SmallVectorImpl<char> &buf, const GenericTypeDecl *typeDecl,
-    llvm::function_ref<Type(const GenericTypeParamDecl *)> getPreferredType =
-        [](const GenericTypeParamDecl *) { return Type(); });
+    llvm::function_ref<Type(const GenericTypeParamType *)> getPreferredType =
+        [](const GenericTypeParamType *) { return Type(); });
 
 /// Attempt to omit needless words from the name of the given declaration.
 std::optional<DeclName> omitNeedlessWords(AbstractFunctionDecl *afd);
@@ -1314,6 +1277,18 @@ bool isValidDynamicMemberLookupSubscript(SubscriptDecl *decl,
 bool isValidStringDynamicMemberLookup(SubscriptDecl *decl,
                                       bool ignoreLabel = false);
 
+/// Returns the KeyPath parameter type for a valid implementation of
+/// the `subscript(dynamicMember: {Writable}KeyPath<...>)` requirement for
+/// @dynamicMemberLookup.
+/// The method is given to be defined as `subscript(dynamicMember:)` which
+/// takes a single non-variadic parameter of `{Writable}KeyPath<T, U>` type.
+///
+/// Returns null if the given subscript is not a valid dynamic member lookup
+/// implementation.
+BoundGenericType *
+getKeyPathTypeForDynamicMemberLookup(SubscriptDecl *decl,
+                                     bool ignoreLabel = false);
+
 /// Returns true if the given subscript method is an valid implementation of
 /// the `subscript(dynamicMember: {Writable}KeyPath<...>)` requirement for
 /// @dynamicMemberLookup.
@@ -1426,7 +1401,7 @@ LabeledStmt *findBreakOrContinueStmtTarget(ASTContext &ctx,
 /// Check the correctness of a 'fallthrough' statement.
 ///
 /// \returns true if an error occurred.
-bool checkFallthroughStmt(DeclContext *dc, FallthroughStmt *stmt);
+bool checkFallthroughStmt(FallthroughStmt *stmt);
 
 /// Check for restrictions on the use of the @unknown attribute on a
 /// case statement.

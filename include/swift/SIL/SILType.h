@@ -243,19 +243,16 @@ public:
 
   /// Retrieve the ClassDecl for a type that maps to a Swift class or
   /// bound generic class type.
-  SWIFT_IMPORT_UNSAFE
   ClassDecl *getClassOrBoundGenericClass() const {
     return getASTType().getClassOrBoundGenericClass();
   }
   /// Retrieve the StructDecl for a type that maps to a Swift struct or
   /// bound generic struct type.
-  SWIFT_IMPORT_UNSAFE
   StructDecl *getStructOrBoundGenericStruct() const {
     return getASTType().getStructOrBoundGenericStruct();
   }
   /// Retrieve the EnumDecl for a type that maps to a Swift enum or
   /// bound generic enum type.
-  SWIFT_IMPORT_UNSAFE
   EnumDecl *getEnumOrBoundGenericEnum() const {
     return getASTType().getEnumOrBoundGenericEnum();
   }
@@ -286,7 +283,6 @@ public:
 
   bool isBuiltinBridgeObject() const { return is<BuiltinBridgeObjectType>(); }
 
-  SWIFT_IMPORT_UNSAFE
   SILType getBuiltinVectorElementType() const {
     auto vector = castTo<BuiltinVectorType>();
     return getPrimitiveObjectType(vector.getElementType());
@@ -294,7 +290,6 @@ public:
 
   /// Retrieve the NominalTypeDecl for a type that maps to a Swift
   /// nominal or bound generic nominal type.
-  SWIFT_IMPORT_UNSAFE
   NominalTypeDecl *getNominalOrBoundGenericNominal() const {
     return getASTType().getNominalOrBoundGenericNominal();
   }
@@ -909,6 +904,12 @@ public:
     return sd->getAttrs().getAttribute<RawLayoutAttr>();
   }
 
+  /// If this is a raw layout type, returns the substituted like type.
+  Type getRawLayoutSubstitutedLikeType() const;
+
+  /// If this is a raw layout type, returns the substituted count type.
+  Type getRawLayoutSubstitutedCountType() const;
+
   /// If this is a SILBoxType, return getSILBoxFieldType(). Otherwise, return
   /// SILType().
   ///
@@ -964,6 +965,11 @@ public:
   bool isAnyActor() const { return getASTType()->isAnyActorType(); }
 
   /// Returns true if this function conforms to the Sendable protocol.
+  ///
+  /// NOTE: For diagnostics this is not always the correct thing to check since
+  /// non-Sendable types afflicted with preconcurrency can have different
+  /// semantic requirements around diagnostics. \see
+  /// getConcurrencyDiagnosticBehavior.
   bool isSendable(SILFunction *fn) const;
 
   /// False if SILValues of this type cannot be used outside the scope of their
@@ -977,6 +983,16 @@ public:
   bool mayEscape(const SILFunction &function) const {
     return !isNoEscapeFunction() && isEscapable(function);
   }
+
+  /// Return the expected concurrency diagnostic behavior for this SILType.
+  ///
+  /// This allows one to know if the type is marked with preconcurrency and thus
+  /// should have diagnostics ignored or converted to warnings instead of
+  /// errors.
+  ///
+  /// \returns nil if we were unable to find such information for this type.
+  std::optional<DiagnosticBehavior>
+  getConcurrencyDiagnosticBehavior(SILFunction *fn) const;
 
   //
   // Accessors for types used in SIL instructions:

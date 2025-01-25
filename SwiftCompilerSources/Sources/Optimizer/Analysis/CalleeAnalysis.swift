@@ -13,7 +13,7 @@
 import OptimizerBridging
 import SIL
 
-public struct CalleeAnalysis {
+struct CalleeAnalysis {
   let bridged: BridgedCalleeAnalysis
 
   static func register() {
@@ -31,7 +31,7 @@ public struct CalleeAnalysis {
     )
   }
 
-  public func getCallees(callee: Value) -> FunctionArray? {
+  func getCallees(callee: Value) -> FunctionArray? {
     let bridgedFuncs = bridged.getCallees(callee.bridged)
     if bridgedFuncs.isIncomplete() {
       return nil
@@ -39,11 +39,11 @@ public struct CalleeAnalysis {
     return FunctionArray(bridged: bridgedFuncs)
   }
 
-  public func getIncompleteCallees(callee: Value) -> FunctionArray {
+  func getIncompleteCallees(callee: Value) -> FunctionArray {
     return FunctionArray(bridged: bridged.getCallees(callee.bridged))
   }
 
-  public func getDestructor(ofExactType type: Type) -> Function? {
+  func getDestructor(ofExactType type: Type) -> Function? {
     let destructors = FunctionArray(bridged: bridged.getDestructors(type.bridged, /*isExactType*/ true))
     if destructors.count == 1 {
       return destructors[0]
@@ -51,7 +51,7 @@ public struct CalleeAnalysis {
     return nil
   }
 
-  public func getDestructors(of type: Type) -> FunctionArray? {
+  func getDestructors(of type: Type) -> FunctionArray? {
     let bridgedDtors = bridged.getDestructors(type.bridged, /*isExactType*/ false)
     if bridgedDtors.isIncomplete() {
       return nil
@@ -60,11 +60,11 @@ public struct CalleeAnalysis {
   }
 
   /// Returns the global (i.e. not argument specific) side effects of an apply.
-  public func getSideEffects(ofApply apply: FullApplySite) -> SideEffects.GlobalEffects {
+  func getSideEffects(ofApply apply: FullApplySite) -> SideEffects.GlobalEffects {
     return getSideEffects(ofCallee: apply.callee)
   }
 
-  public func getSideEffects(ofCallee callee: Value) -> SideEffects.GlobalEffects {
+  func getSideEffects(ofCallee callee: Value) -> SideEffects.GlobalEffects {
     guard let callees = getCallees(callee: callee) else {
       return .worstEffects
     }
@@ -78,7 +78,7 @@ public struct CalleeAnalysis {
   }
 
   /// Returns the argument specific side effects of an apply.
-  public func getSideEffects(of apply: FullApplySite, operand: Operand, path: SmallProjectionPath) -> SideEffects.GlobalEffects {
+  func getSideEffects(of apply: FullApplySite, operand: Operand, path: SmallProjectionPath) -> SideEffects.GlobalEffects {
     var result = SideEffects.GlobalEffects()
     guard let calleeArgIdx = apply.calleeArgumentIndex(of: operand) else {
       return result
@@ -133,7 +133,7 @@ extension Instruction {
   ///
   /// Deinitialization barriers constrain variable lifetimes. Lexical
   /// end_borrow, destroy_value, and destroy_addr cannot be hoisted above them.
-  public final func isDeinitBarrier(_ analysis: CalleeAnalysis) -> Bool {
+  final func isDeinitBarrier(_ analysis: CalleeAnalysis) -> Bool {
     if let site = self as? FullApplySite {
       return site.isBarrier(analysis)
     }
@@ -147,19 +147,19 @@ extension Instruction {
   }
 }
 
-public struct FunctionArray : RandomAccessCollection, FormattedLikeArray {
+struct FunctionArray : RandomAccessCollection, FormattedLikeArray {
   fileprivate let bridged: BridgedCalleeAnalysis.CalleeList
 
-  public var startIndex: Int { 0 }
-  public var endIndex: Int { bridged.getCount() }
+  var startIndex: Int { 0 }
+  var endIndex: Int { bridged.getCount() }
 
-  public subscript(_ index: Int) -> Function {
+  subscript(_ index: Int) -> Function {
     return bridged.getCallee(index).function
   }
 }
 // Bridging utilities
 
 extension BridgedCalleeAnalysis {
-  public var analysis: CalleeAnalysis { .init(bridged: self) }
+  var analysis: CalleeAnalysis { .init(bridged: self) }
 }
 

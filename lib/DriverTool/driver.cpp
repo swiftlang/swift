@@ -94,13 +94,13 @@ extern int autolink_extract_main(ArrayRef<const char *> Args, const char *Argv0,
 extern int modulewrap_main(ArrayRef<const char *> Args, const char *Argv0,
                            void *MainAddr);
 
-/// Run 'swift-indent'
-extern int swift_indent_main(ArrayRef<const char *> Args, const char *Argv0,
-                             void *MainAddr);
-
 /// Run 'swift-symbolgraph-extract'
 extern int swift_symbolgraph_extract_main(ArrayRef<const char *> Args, const char *Argv0,
 void *MainAddr);
+
+/// Run 'swift-synthesize-interface'
+extern int swift_synthesize_interface_main(ArrayRef<const char *> Args,
+                                           const char *Argv0, void *MainAddr);
 
 /// Run 'swift-api-digester'
 extern int swift_api_digester_main(ArrayRef<const char *> Args,
@@ -389,12 +389,12 @@ static int run_driver(StringRef ExecName,
     return autolink_extract_main(
       TheDriver.getArgsWithoutProgramNameAndDriverMode(argv),
       argv[0], (void *)(intptr_t)getExecutablePath);
-  case Driver::DriverKind::SwiftIndent:
-    return swift_indent_main(
-      TheDriver.getArgsWithoutProgramNameAndDriverMode(argv),
-      argv[0], (void *)(intptr_t)getExecutablePath);
   case Driver::DriverKind::SymbolGraph:
       return swift_symbolgraph_extract_main(TheDriver.getArgsWithoutProgramNameAndDriverMode(argv), argv[0], (void *)(intptr_t)getExecutablePath);
+  case Driver::DriverKind::SynthesizeInterface:
+    return swift_synthesize_interface_main(
+        TheDriver.getArgsWithoutProgramNameAndDriverMode(argv), argv[0],
+        (void *)(intptr_t)getExecutablePath);
   case Driver::DriverKind::APIDigester:
     return swift_api_digester_main(
         TheDriver.getArgsWithoutProgramNameAndDriverMode(argv), argv[0],

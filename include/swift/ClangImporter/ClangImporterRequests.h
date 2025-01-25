@@ -16,13 +16,14 @@
 #ifndef SWIFT_CLANG_IMPORTER_REQUESTS_H
 #define SWIFT_CLANG_IMPORTER_REQUESTS_H
 
-#include "swift/AST/SimpleRequest.h"
 #include "swift/AST/ASTTypeIDs.h"
 #include "swift/AST/EvaluatorDependencies.h"
-#include "swift/AST/FileUnit.h"
 #include "swift/AST/Identifier.h"
 #include "swift/AST/NameLookup.h"
+#include "swift/AST/SimpleRequest.h"
 #include "swift/Basic/Statistic.h"
+#include "swift/ClangImporter/ClangImporter.h"
+#include "clang/AST/Type.h"
 #include "llvm/ADT/Hashing.h"
 #include "llvm/ADT/TinyPtrVector.h"
 
@@ -133,26 +134,42 @@ private:
 /// The input type for a record member lookup request.
 struct ClangRecordMemberLookupDescriptor final {
   NominalTypeDecl *recordDecl;
+  NominalTypeDecl *inheritingDecl;
   DeclName name;
 
   ClangRecordMemberLookupDescriptor(NominalTypeDecl *recordDecl, DeclName name)
-      : recordDecl(recordDecl), name(name) {
+      : recordDecl(recordDecl), inheritingDecl(recordDecl), name(name) {
     assert(isa<clang::RecordDecl>(recordDecl->getClangDecl()));
   }
 
   friend llvm::hash_code
   hash_value(const ClangRecordMemberLookupDescriptor &desc) {
-    return llvm::hash_combine(desc.name, desc.recordDecl);
+    return llvm::hash_combine(desc.name, desc.recordDecl, desc.inheritingDecl);
   }
 
   friend bool operator==(const ClangRecordMemberLookupDescriptor &lhs,
                          const ClangRecordMemberLookupDescriptor &rhs) {
-    return lhs.name == rhs.name && lhs.recordDecl == rhs.recordDecl;
+    return lhs.name == rhs.name && lhs.recordDecl == rhs.recordDecl &&
+           lhs.inheritingDecl == rhs.inheritingDecl;
   }
 
   friend bool operator!=(const ClangRecordMemberLookupDescriptor &lhs,
                          const ClangRecordMemberLookupDescriptor &rhs) {
     return !(lhs == rhs);
+  }
+
+private:
+  friend class ClangRecordMemberLookup;
+
+  // This private constructor should only be used in ClangRecordMemberLookup,
+  // for recursively traversing base classes that inheritingDecl inherites from.
+  ClangRecordMemberLookupDescriptor(NominalTypeDecl *recordDecl, DeclName name,
+                                    NominalTypeDecl *inheritingDecl)
+      : recordDecl(recordDecl), inheritingDecl(inheritingDecl), name(name) {
+    assert(isa<clang::RecordDecl>(recordDecl->getClangDecl()));
+    assert(isa<clang::CXXRecordDecl>(inheritingDecl->getClangDecl()));
+    assert(recordDecl != inheritingDecl &&
+           "recursive calls should lookup elsewhere");
   }
 };
 
@@ -326,9 +343,15 @@ struct CxxRecordSemanticsDescriptor final {
   const clang::RecordDecl *decl;
   ASTContext &ctx;
 
-  CxxRecordSemanticsDescriptor(const clang::RecordDecl *decl,
-                               ASTContext &ctx)
-      : decl(decl), ctx(ctx) {}
+  /// Whether to emit warnings for missing destructor or copy constructor
+  /// whenever the classification of the type assumes that they exist (e.g. for
+  /// a value type).
+  bool shouldDiagnoseLifetimeOperations;
+
+  CxxRecordSemanticsDescriptor(const clang::RecordDecl *decl, ASTContext &ctx,
+                               bool shouldDiagnoseLifetimeOperations = true)
+      : decl(decl), ctx(ctx),
+        shouldDiagnoseLifetimeOperations(shouldDiagnoseLifetimeOperations) {}
 
   friend llvm::hash_code hash_value(const CxxRecordSemanticsDescriptor &desc) {
     return llvm::hash_combine(desc.decl);
@@ -353,7 +376,7 @@ SourceLoc extractNearestSourceLoc(CxxRecordSemanticsDescriptor desc);
 ///
 /// Do not evaluate this request before importing has started. For example, it
 /// is OK to invoke this request when importing a decl, but it is not OK to
-/// import this request when importing names. This is because when importing
+/// evaluate this request when importing names. This is because when importing
 /// names, Clang sema has not yet defined implicit special members, so the
 /// results will be flakey/incorrect.
 class CxxRecordSemantics
@@ -465,6 +488,7 @@ SourceLoc extractNearestSourceLoc(CustomRefCountingOperationDescriptor desc);
 struct CustomRefCountingOperationResult {
   enum CustomRefCountingOperationResultKind {
     noAttribute,
+    tooManyAttributes,
     immortal,
     notFound,
     tooManyFound,
@@ -498,6 +522,47 @@ private:
   evaluate(Evaluator &evaluator,
            CustomRefCountingOperationDescriptor desc) const;
 };
+
+enum class CxxEscapability { Escapable, NonEscapable, Unknown };
+
+struct EscapabilityLookupDescriptor final {
+  const clang::Type *type;
+  ClangImporter::Implementation &impl;
+  bool annotationOnly = true;
+
+  friend llvm::hash_code hash_value(const EscapabilityLookupDescriptor &desc) {
+    return llvm::hash_combine(desc.type);
+  }
+
+  friend bool operator==(const EscapabilityLookupDescriptor &lhs,
+                         const EscapabilityLookupDescriptor &rhs) {
+    return lhs.type == rhs.type && lhs.annotationOnly == rhs.annotationOnly;
+  }
+
+  friend bool operator!=(const EscapabilityLookupDescriptor &lhs,
+                         const EscapabilityLookupDescriptor &rhs) {
+    return !(lhs == rhs);
+  }
+};
+
+class ClangTypeEscapability
+    : public SimpleRequest<ClangTypeEscapability,
+                           CxxEscapability(EscapabilityLookupDescriptor),
+                           RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+  bool isCached() const { return true; }
+
+private:
+  friend SimpleRequest;
+
+  CxxEscapability evaluate(Evaluator &evaluator,
+                           EscapabilityLookupDescriptor desc) const;
+};
+
+void simple_display(llvm::raw_ostream &out, EscapabilityLookupDescriptor desc);
+SourceLoc extractNearestSourceLoc(EscapabilityLookupDescriptor desc);
 
 #define SWIFT_TYPEID_ZONE ClangImporter
 #define SWIFT_TYPEID_HEADER "swift/ClangImporter/ClangImporterTypeIDZone.def"

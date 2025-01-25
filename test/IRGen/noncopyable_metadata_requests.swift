@@ -126,3 +126,17 @@ func testNOTCopyableOptional() {
 }
 testNOTCopyableOptional()
 // CHECK: Optional.bar(2)
+
+
+// NEW: define hidden swiftcc void @"$s4main26check_existential_metatype4withyypRi_s_XPXpSg_tF"
+// NEW: call ptr @__swift_instantiateConcreteTypeFromMangledName(ptr @"$sypRi_s_XPXpSgMD")
+// NEW: }
+
+// OLD: define hidden swiftcc void @"$s4main26check_existential_metatype4withyypRi_s_XPXpSg_tF"
+// OLD: call swiftcc %swift.metadata_response @"$sypRi_s_XPXpSgMa"
+// OLD: }
+func check_existential_metatype(with x: (any ~Copyable.Type)?) {
+  x.map { print("passed type = \($0)") }
+}
+check_existential_metatype(with: NC.self)
+// CHECK: passed type = NC

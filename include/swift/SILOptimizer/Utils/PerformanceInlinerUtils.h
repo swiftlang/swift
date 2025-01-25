@@ -429,6 +429,7 @@ public:
       return;
 
     BlockInfoStorage.resize(numBlocks);
+    CBI.analyze(F);
 
     // First step: compute the length of the blocks.
     unsigned BlockIdx = 0;

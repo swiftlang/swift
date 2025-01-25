@@ -5,7 +5,9 @@
 // RUN: %target-swift-frontend -emit-module -I %t -o %t %S/Inputs/MemberImportVisibility/members_C.swift
 // RUN: %target-swift-frontend -typecheck -primary-file %t/main.swift %t/A.swift %t/B.swift %t/C.swift -I %t -verify -swift-version 5
 // RUN: %target-swift-frontend -typecheck -primary-file %t/main.swift %t/A.swift %t/B.swift %t/C.swift -I %t -verify -swift-version 6
-// RUN: %target-swift-frontend -typecheck -primary-file %t/main.swift %t/A.swift %t/B.swift %t/C.swift -I %t -verify -swift-version 5 -enable-experimental-feature MemberImportVisibility -verify-additional-prefix member-visibility-
+// RUN: %target-swift-frontend -typecheck -primary-file %t/main.swift %t/A.swift %t/B.swift %t/C.swift -I %t -verify -swift-version 5 -enable-upcoming-feature MemberImportVisibility -verify-additional-prefix member-visibility-
+
+// REQUIRES: swift_feature_MemberImportVisibility
 
 //--- main.swift
 

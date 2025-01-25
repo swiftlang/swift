@@ -267,6 +267,7 @@ public:
   void completeTypeSimpleBeginning() override;
   void completeTypeSimpleWithDot(TypeRepr *TR) override;
   void completeTypeSimpleWithoutDot(TypeRepr *TR) override;
+  void completeTypeSimpleInverted() override;
 
   void completeCaseStmtKeyword() override;
   void completeCaseStmtBeginning(CodeCompletionExpr *E) override;
@@ -305,7 +306,6 @@ public:
   void completeTypeAttrBeginning() override;
   void completeTypeAttrInheritanceBeginning() override;
   void completeOptionalBinding() override;
-  void completeWithoutConstraintType() override;
 
   void doneParsing(SourceFile *SrcFile) override;
 
@@ -509,6 +509,11 @@ void CodeCompletionCallbacksImpl::completeTypeSimpleWithoutDot(TypeRepr *TR) {
   CurDeclContext = P.CurDeclContext;
 }
 
+void CodeCompletionCallbacksImpl::completeTypeSimpleInverted() {
+  Kind = CompletionKind::TypeSimpleInverted;
+  CurDeclContext = P.CurDeclContext;
+}
+
 void CodeCompletionCallbacksImpl::completeCaseStmtKeyword() {
   Kind = CompletionKind::CaseStmtKeyword;
   CurDeclContext = P.CurDeclContext;
@@ -646,11 +651,6 @@ void CodeCompletionCallbacksImpl::completeOptionalBinding() {
   Kind = CompletionKind::OptionalBinding;
 }
 
-void CodeCompletionCallbacksImpl::completeWithoutConstraintType() {
-  CurDeclContext = P.CurDeclContext;
-  Kind = CompletionKind::WithoutConstraintType;
-}
-
 void CodeCompletionCallbacksImpl::completeTypeAttrBeginning() {
   CurDeclContext = P.CurDeclContext;
   Kind = CompletionKind::TypeAttrBeginning;
@@ -686,7 +686,7 @@ static void addKeyword(CodeCompletionResultSink &Sink, StringRef Name,
 }
 
 static void addDeclKeywords(CodeCompletionResultSink &Sink, DeclContext *DC,
-                            bool IsConcurrencyEnabled) {
+                            const LangOptions &langOpts) {
   auto isTypeDeclIntroducer = [](CodeCompletionKeywordKind Kind,
                                  std::optional<DeclAttrKind> DAK) -> bool {
     switch (Kind) {
@@ -799,9 +799,15 @@ static void addDeclKeywords(CodeCompletionResultSink &Sink, DeclContext *DC,
       return;
 
     // Remove keywords only available when concurrency is enabled.
-    if (DAK.has_value() && !IsConcurrencyEnabled &&
+    if (DAK.has_value() && !langOpts.EnableExperimentalConcurrency &&
         DeclAttribute::isConcurrencyOnly(*DAK))
       return;
+
+    // Remove experimental keywords.
+    if (DAK.has_value())
+      if (auto feature = DeclAttribute::getRequiredFeature(*DAK))
+        if (!langOpts.hasFeature(*feature))
+          return;
 
     CodeCompletionFlair flair = getFlair(Kind, DAK);
 
@@ -960,7 +966,9 @@ addClosureSignatureKeywordsIfApplicable(CodeCompletionResultSink &Sink,
   if (closure->getInLoc().isValid())
     return;
 
-  addKeyword(Sink, "in", CodeCompletionKeywordKind::kw_in);
+  addKeyword(Sink, "in", CodeCompletionKeywordKind::kw_in,
+             /*TypeAnnotation=*/"",
+             CodeCompletionFlairBit::CommonKeywordAtCurrentPosition);
 }
 
 void CodeCompletionCallbacksImpl::addKeywords(CodeCompletionResultSink &Sink,
@@ -991,7 +999,6 @@ void CodeCompletionCallbacksImpl::addKeywords(CodeCompletionResultSink &Sink,
   case CompletionKind::TypeAttrBeginning:
   case CompletionKind::TypeAttrInheritanceBeginning:
   case CompletionKind::OptionalBinding:
-  case CompletionKind::WithoutConstraintType:
     break;
 
   case CompletionKind::EffectsSpecifier:
@@ -1018,8 +1025,7 @@ void CodeCompletionCallbacksImpl::addKeywords(CodeCompletionResultSink &Sink,
     LLVM_FALLTHROUGH;
   }
   case CompletionKind::StmtOrExpr:
-    addDeclKeywords(Sink, CurDeclContext,
-                    Context.LangOpts.EnableExperimentalConcurrency);
+    addDeclKeywords(Sink, CurDeclContext, Context.LangOpts);
     addStmtKeywords(Sink, CurDeclContext, MaybeFuncBody);
     addClosureSignatureKeywordsIfApplicable(Sink, CurDeclContext);
 
@@ -1064,6 +1070,7 @@ void CodeCompletionCallbacksImpl::addKeywords(CodeCompletionResultSink &Sink,
     break;
   case CompletionKind::CaseStmtBeginning:
   case CompletionKind::TypeSimpleWithDot:
+  case CompletionKind::TypeSimpleInverted:
     break;
 
   case CompletionKind::TypeSimpleWithoutDot:
@@ -1120,8 +1127,7 @@ void CodeCompletionCallbacksImpl::addKeywords(CodeCompletionResultSink &Sink,
         .Default(false);
     }) != ParsedKeywords.end();
     if (!HasDeclIntroducer) {
-      addDeclKeywords(Sink, CurDeclContext,
-                      Context.LangOpts.EnableExperimentalConcurrency);
+      addDeclKeywords(Sink, CurDeclContext, Context.LangOpts);
       addLetVarKeywords(Sink);
     }
     break;
@@ -1294,9 +1300,9 @@ void swift::ide::postProcessCompletionResults(
         Kind != CompletionKind::TypeSimpleBeginning &&
         Kind != CompletionKind::TypeSimpleWithoutDot &&
         Kind != CompletionKind::TypeSimpleWithDot &&
+        Kind != CompletionKind::TypeSimpleInverted &&
         Kind != CompletionKind::TypeDeclResultBeginning &&
-        Kind != CompletionKind::GenericRequirement &&
-        Kind != CompletionKind::WithoutConstraintType) {
+        Kind != CompletionKind::GenericRequirement) {
       flair |= CodeCompletionFlairBit::RareTypeAtCurrentPosition;
       modified = true;
     }
@@ -1805,6 +1811,11 @@ void CodeCompletionCallbacksImpl::doneParsing(SourceFile *SrcFile) {
     break;
   }
 
+  case CompletionKind::TypeSimpleInverted: {
+    Lookup.getInvertedTypeCompletions();
+    break;
+  }
+
   case CompletionKind::NominalMemberBeginning: {
     CompletionOverrideLookup OverrideLookup(CompletionContext.getResultSink(),
                                             P.Context, CurDeclContext,
@@ -1950,11 +1961,6 @@ void CodeCompletionCallbacksImpl::doneParsing(SourceFile *SrcFile) {
   case CompletionKind::OptionalBinding: {
     SourceLoc Loc = P.Context.SourceMgr.getIDEInspectionTargetLoc();
     Lookup.getOptionalBindingCompletions(Loc);
-    break;
-  }
-
-  case CompletionKind::WithoutConstraintType: {
-    Lookup.addWithoutConstraintTypes();
     break;
   }
 

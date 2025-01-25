@@ -175,6 +175,7 @@ extension _MutexHandle {
   @available(SwiftStdlib 6.0, *)
   @_alwaysEmitIntoClient
   @_transparent
+  @unsafe
   public borrowing func unsafeLock() {
     _lock()
   }
@@ -182,6 +183,7 @@ extension _MutexHandle {
   @available(SwiftStdlib 6.0, *)
   @_alwaysEmitIntoClient
   @_transparent
+  @unsafe
   public borrowing func unsafeTryLock() -> Bool {
     _tryLock()
   }
@@ -189,6 +191,7 @@ extension _MutexHandle {
   @available(SwiftStdlib 6.0, *)
   @_alwaysEmitIntoClient
   @_transparent
+  @unsafe
   public borrowing func unsafeUnlock() {
     _unlock()
   }

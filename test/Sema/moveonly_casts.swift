@@ -131,3 +131,12 @@ struct ImplicitInit: ~Copyable {
 func test(_ nc: consuming NC) -> ImplicitInit {
   return .init(x: nc)
 }
+
+
+// rdar://134371893 (optional chaining on ~Copyable type)
+struct NonCopyable: ~Copyable {
+    var shared: Self { .init() }
+}
+func f() {
+    _ = (Optional<NonCopyable>.none)?.shared
+}

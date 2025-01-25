@@ -69,6 +69,9 @@ private:
     Annotations.push_back({Offset, Length, Kind, isSystem});
   }
 
+  void handleDeclaration(unsigned Offset, unsigned Length, UIdent Kind,
+                         StringRef USR) override {}
+
   bool documentStructureEnabled() override { return false; }
 
   void beginDocumentSubStructure(unsigned Offset, unsigned Length,
@@ -130,6 +133,7 @@ public:
                                  getRuntimeLibPath(),
                                  /*diagnosticDocumentationPath*/ "",
                                  SourceKit::createSwiftLangSupport,
+                                 [](SourceKit::Context &Ctx){ return nullptr; },
                                  /*dispatchOnMain=*/false);
     auto localDocUpdState = std::make_shared<DocUpdateMutexState>();
     Ctx->getNotificationCenter()->addDocumentUpdateNotificationReceiver(

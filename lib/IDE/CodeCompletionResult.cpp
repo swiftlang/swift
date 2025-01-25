@@ -310,7 +310,6 @@ ContextFreeCodeCompletionResult::getCodeCompletionDeclKind(const Decl *D) {
   case DeclKind::PatternBinding:
   case DeclKind::EnumCase:
   case DeclKind::TopLevelCode:
-  case DeclKind::IfConfig:
   case DeclKind::PoundDiagnostic:
   case DeclKind::Missing:
   case DeclKind::MissingMember:

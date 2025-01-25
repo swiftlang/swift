@@ -1,4 +1,4 @@
-// RUN: %target-swift-emit-sil %s | %FileCheck %s
+// RUN: %target-swift-emit-sil -Xllvm -sil-print-types %s | %FileCheck %s
 
 import _Differentiation
 

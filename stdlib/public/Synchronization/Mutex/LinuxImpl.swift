@@ -13,6 +13,8 @@
 import _SynchronizationShims
 #if canImport(Android)
 import Android
+#elseif canImport(Musl)
+import Musl
 #else
 import Glibc
 #endif

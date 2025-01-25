@@ -17,7 +17,7 @@
 #include "TypeChecker.h"
 #include "swift/AST/ASTMangler.h"
 #include "swift/AST/ASTPrinter.h"
-#include "swift/AST/Availability.h"
+#include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/DistributedDecl.h"
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/Expr.h"
@@ -201,7 +201,7 @@ static void forwardParameters(AbstractFunctionDecl *afd,
 static llvm::StringRef
 mangleDistributedThunkForAccessorRecordName(
     ASTContext &C, AbstractFunctionDecl *thunk) {
-  Mangle::ASTMangler mangler;
+  Mangle::ASTMangler mangler(C);
 
   // default mangling
   auto mangled =
@@ -777,7 +777,7 @@ addDistributedActorCodableConformance(
 
   // === Does the actor explicitly conform to the protocol already?
   auto explicitConformance =
-      ModuleDecl::lookupConformance(actor->getInterfaceType(), proto);
+      lookupConformance(actor->getInterfaceType(), proto);
   if (!explicitConformance.isInvalid()) {
     // ok, it was conformed explicitly -- let's not synthesize;
     return nullptr;
@@ -822,8 +822,7 @@ addDistributedActorCodableConformance(
       actor->getDeclaredInterfaceType(), proto,
       actor->getLoc(), /*dc=*/actor,
       ProtocolConformanceState::Incomplete,
-      /*isUnchecked=*/false,
-      /*isPreconcurrency=*/false);
+      ProtocolConformanceOptions());
   conformance->setSourceKindAndImplyingConformance(
       ConformanceEntryKind::Synthesized, nullptr);
   actor->registerProtocolConformance(conformance, /*synthesized=*/true);
@@ -988,7 +987,7 @@ VarDecl *GetDistributedActorSystemPropertyRequest::evaluate(
     auto DistributedActorProto = C.getDistributedActorDecl();
     for (auto system : DistributedActorProto->lookupDirect(C.Id_actorSystem)) {
       if (auto var = dyn_cast<VarDecl>(system)) {
-        auto conformance = ModuleDecl::checkConformance(
+        auto conformance = checkConformance(
             proto->mapTypeIntoContext(var->getInterfaceType()),
             DAS);
 
@@ -1079,13 +1078,12 @@ GetDistributedActorAsActorConformanceRequest::evaluate(
   if (!ext)
     return nullptr;
 
-  auto genericParam = GenericTypeParamType::get(/*isParameterPack=*/false,
-                                                /*depth=*/0, /*index=*/0, ctx);
+  auto genericParam = GenericTypeParamType::getType(/*depth=*/0, /*index=*/0,
+                                                    ctx);
 
   auto distributedActorAsActorConformance = ctx.getNormalConformance(
       Type(genericParam), actorProto, SourceLoc(), ext,
-      ProtocolConformanceState::Incomplete, /*isUnchecked=*/false,
-      /*isPreconcurrency=*/false);
+      ProtocolConformanceState::Incomplete, ProtocolConformanceOptions());
   // NOTE: Normally we "register" a conformance, but here we don't
   // because we cannot (currently) register them in a protocol,
   // since they do not have conformance tables.

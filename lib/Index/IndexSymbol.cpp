@@ -242,7 +242,6 @@ SymbolInfo index::getSymbolInfoForDecl(const Decl *D) {
     case DeclKind::PatternBinding:
     case DeclKind::EnumCase:
     case DeclKind::TopLevelCode:
-    case DeclKind::IfConfig:
     case DeclKind::PoundDiagnostic:
     case DeclKind::Missing:
     case DeclKind::MissingMember:
@@ -276,7 +275,9 @@ SymbolSubKind index::getSubKindForAccessor(AccessorKind AK) {
   case AccessorKind::MutableAddress:
     return SymbolSubKind::SwiftAccessorMutableAddressor;
   case AccessorKind::Read:      return SymbolSubKind::SwiftAccessorRead;
+  case AccessorKind::Read2:     return SymbolSubKind::SwiftAccessorRead;
   case AccessorKind::Modify:    return SymbolSubKind::SwiftAccessorModify;
+  case AccessorKind::Modify2:   return SymbolSubKind::SwiftAccessorModify;
   case AccessorKind::Init:      return SymbolSubKind::SwiftAccessorInit;
   }
 

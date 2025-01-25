@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "AsyncRefactoring.h"
+#include "swift/AST/ConformanceLookup.h"
 #include "swift/Basic/Assertions.h"
 
 using namespace swift;
@@ -20,7 +21,7 @@ using namespace swift::refactoring::asyncrefactorings;
 static bool isErrorType(Type Ty) {
   if (!Ty)
     return false;
-  return !ModuleDecl::checkConformance(Ty, Ty->getASTContext().getErrorDecl())
+  return !checkConformance(Ty, Ty->getASTContext().getErrorDecl())
               .isInvalid();
 }
 

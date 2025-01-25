@@ -116,8 +116,7 @@ func test009() {
   } catch Error4.E2(let i) {
     #^INSIDE_CATCH4?check=STMT,EXPLICIT_ERROR_PAYLOAD_I^#
   }
-// FIXME: we're getting parentheses around the type when it's unnamed...
-// EXPLICIT_ERROR_PAYLOAD_I-DAG: Decl[LocalVar]/Local: i[#(Int32)#]; name=i
+// EXPLICIT_ERROR_PAYLOAD_I-DAG: Decl[LocalVar]/Local: i[#Int32#]; name=i
 }
 func test010() {
   do {
@@ -156,7 +155,7 @@ func test014() {
   }
 // NSERROR_DOT-DAG: Decl[InstanceVar]/CurrNominal/IsSystem: domain[#String#]; name=domain
 // NSERROR_DOT-DAG: Decl[InstanceVar]/CurrNominal/IsSystem: code[#Int#]; name=code
-// NSERROR_DOT-DAG: Decl[InstanceVar]/Super:                hashValue[#Int#]; name=hashValue
+// NSERROR_DOT-DAG: Decl[InstanceVar]/Super/IsSystem:       hashValue[#Int#]; name=hashValue
 // NSERROR_DOT-DAG: Decl[InstanceMethod]/Super/IsSystem:    myClass()[#AnyClass!#]; name=myClass()
 // NSERROR_DOT-DAG: Decl[InstanceMethod]/Super/IsSystem:    isEqual({#(other): NSObject!#})[#Bool#]; name=isEqual(:)
 // NSERROR_DOT-DAG: Decl[InstanceVar]/Super/IsSystem:       hash[#Int#]; name=hash
@@ -169,8 +168,8 @@ func test015() {
   }
 }
 // Check that we can complete on the bound value; Not exhaustive..
-// INT_DOT-DAG: Decl[InstanceVar]/Super/IsSystem: bigEndian[#(Int32)#]; name=bigEndian
-// INT_DOT-DAG: Decl[InstanceVar]/Super/IsSystem: littleEndian[#(Int32)#]; name=littleEndian
+// INT_DOT-DAG: Decl[InstanceVar]/Super/IsSystem: bigEndian[#Int32#]; name=bigEndian
+// INT_DOT-DAG: Decl[InstanceVar]/Super/IsSystem: littleEndian[#Int32#]; name=littleEndian
 
 //===--- Inside catch body top-level
 do {

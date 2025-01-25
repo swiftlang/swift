@@ -18,6 +18,7 @@
 
 #include "TypeCheckInvertible.h"
 #include "swift/AST/ASTContext.h"
+#include "swift/AST/ClangModuleLoader.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/Basic/Assertions.h"
 #include "TypeChecker.h"
@@ -309,6 +310,23 @@ bool StorageVisitor::visit(NominalTypeDecl *nominal, DeclContext *dc) {
         return true;
     }
 
+    // If this is a C++ struct, walk the members of its base types.
+    if (auto cxxRecordDecl =
+            dyn_cast_or_null<clang::CXXRecordDecl>(nominal->getClangDecl())) {
+      for (auto cxxBase : cxxRecordDecl->bases()) {
+        if (auto cxxBaseDecl = cxxBase.getType()->getAsCXXRecordDecl()) {
+          auto clangModuleLoader = dc->getASTContext().getClangModuleLoader();
+          auto importedDecl =
+              clangModuleLoader->importDeclDirectly(cxxBaseDecl);
+          if (auto nominalBaseDecl =
+                  dyn_cast_or_null<NominalTypeDecl>(importedDecl)) {
+            if (visit(nominalBaseDecl, dc))
+              return true;
+          }
+        }
+      }
+    }
+
     return false;
   }
 
@@ -321,7 +339,7 @@ bool StorageVisitor::visit(NominalTypeDecl *nominal, DeclContext *dc) {
 
         // Check that the associated value type is Sendable.
         auto elementType = dc->mapTypeIntoContext(
-            element->getArgumentInterfaceType());
+            element->getPayloadInterfaceType());
         if ((*this)(element, elementType))
           return true;
       }

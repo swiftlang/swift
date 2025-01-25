@@ -20,6 +20,7 @@ from . import llbuild
 from . import llvm
 from . import product
 from . import swift
+from . import swift_testing
 from . import xctest
 from .. import shell
 from ..targets import StdlibDeploymentTarget
@@ -141,4 +142,5 @@ class SwiftPM(product.Product):
                 libdispatch.LibDispatch,
                 foundation.Foundation,
                 xctest.XCTest,
-                llbuild.LLBuild]
+                llbuild.LLBuild,
+                swift_testing.SwiftTesting]

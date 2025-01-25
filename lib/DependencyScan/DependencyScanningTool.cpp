@@ -229,7 +229,8 @@ static swiftscan_dependency_graph_t generateHollowDiagnosticOutput(
                                           c_string_utils::create_null(),
                                           c_string_utils::create_null(),
                                           c_string_utils::create_null(),
-                                          nullptr};
+                                          nullptr,
+                                          c_string_utils::create_null()};
   hollowMainModuleInfo->details = hollowDetails;
 
   // Empty Link Library set
@@ -353,36 +354,6 @@ DependencyScanningTool::getDependencies(
       Saver, BatchInput);
 
   return BatchScanResults;
-}
-
-void DependencyScanningTool::serializeCache(llvm::StringRef path) {
-  llvm::sys::SmartScopedLock<true> Lock(DependencyScanningToolStateLock);
-  SourceManager SM;
-  DiagnosticEngine Diags(SM);
-  Diags.addConsumer(CDC);
-  llvm::vfs::OnDiskOutputBackend Backend;
-  module_dependency_cache_serialization::writeInterModuleDependenciesCache(
-      Diags, Backend, path, *ScanningService);
-}
-
-bool DependencyScanningTool::loadCache(llvm::StringRef path) {
-  llvm::sys::SmartScopedLock<true> Lock(DependencyScanningToolStateLock);
-  SourceManager SM;
-  DiagnosticEngine Diags(SM);
-  Diags.addConsumer(CDC);
-  ScanningService = std::make_unique<SwiftDependencyScanningService>();
-  bool readFailed =
-      module_dependency_cache_serialization::readInterModuleDependenciesCache(
-          path, *ScanningService);
-  if (readFailed) {
-    Diags.diagnose(SourceLoc(), diag::warn_scanner_deserialize_failed, path);
-  }
-  return readFailed;
-}
-
-void DependencyScanningTool::resetCache() {
-  llvm::sys::SmartScopedLock<true> Lock(DependencyScanningToolStateLock);
-  ScanningService.reset(new SwiftDependencyScanningService());
 }
 
 std::vector<

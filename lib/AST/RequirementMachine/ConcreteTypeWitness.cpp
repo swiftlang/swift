@@ -20,6 +20,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/ProtocolConformance.h"
@@ -150,9 +151,9 @@ void PropertyMap::concretizeNestedTypesFromConcreteParent(
     // subclasses of 'C' which are 'Sendable'.
     bool allowMissing = (requirementKind == RequirementKind::SameType);
 
-    auto conformance = ModuleDecl::lookupConformance(concreteType,
-                                                     const_cast<ProtocolDecl *>(proto),
-                                                     allowMissing);
+    auto conformance = lookupConformance(concreteType,
+                                         const_cast<ProtocolDecl *>(proto),
+                                         allowMissing);
     if (!allowMissing &&
         proto->isSpecificProtocol(KnownProtocolKind::Sendable) &&
         conformance.hasUnavailableConformance()) {

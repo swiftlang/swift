@@ -1604,6 +1604,11 @@ static bool isSelfOperand(const Operand *Op, const SILInstruction *User) {
   return (operandNum == numOperands - 1);
 }
 
+static bool isFlowSensitiveSelfIsolation(BuiltinValueKind kind) {
+  return (kind == BuiltinValueKind::FlowSensitiveSelfIsolation ||
+          kind == BuiltinValueKind::FlowSensitiveDistributedSelfIsolation);
+}
+
 void ElementUseCollector::collectClassSelfUses(
     SILValue ClassPointer, SILType MemorySILType,
     llvm::SmallDenseMap<VarDecl *, unsigned> &EltNumbering) {
@@ -1716,9 +1721,7 @@ void ElementUseCollector::collectClassSelfUses(
     // they have a fully-formed 'self' to use.
     if (auto builtin = dyn_cast<BuiltinInst>(User)) {
       if (auto builtinKind = builtin->getBuiltinKind()) {
-        if (*builtinKind == BuiltinValueKind::FlowSensitiveSelfIsolation ||
-            *builtinKind ==
-              BuiltinValueKind::FlowSensitiveDistributedSelfIsolation) {
+        if (isFlowSensitiveSelfIsolation(*builtinKind)) {
           Kind = DIUseKind::FlowSensitiveSelfIsolation;
         }
       }
@@ -1836,6 +1839,16 @@ collectDelegatingInitUses(const DIMemoryObjectInfo &TheMemory,
     if (isa<ValueMetatypeInst>(User))
       Kind = DIUseKind::TypeOfSelf;
 
+    if (auto builtinInst = dyn_cast<BuiltinInst>(User)) {
+      if (auto builtinKind = builtinInst->getBuiltinKind()) {
+        // Allow uses of the flow-sensitive self isolation builtins on
+        // projections of the self box in delegating actor initializers.
+        if (isFlowSensitiveSelfIsolation(*builtinKind)) {
+          Kind = DIUseKind::FlowSensitiveSelfIsolation;
+        }
+      }
+    }
+
     // We can safely handle anything else as an escape.  They should all happen
     // after self.init is invoked.
     UseInfo.trackUse(DIMemoryUse(User, Kind, 0, 1));
@@ -1867,8 +1880,9 @@ public:
 
 } // end anonymous namespace
 
-/// collectDelegatingClassInitSelfUses - Collect uses of the self argument in a
-/// delegating-constructor-for-a-class case.
+/// collectClassInitSelfUses - Collect uses of self in a class initializer
+/// that receives a self argument: either a non-delegating initializer
+/// or a non-allocating delegating initializer.
 void ClassInitElementUseCollector::collectClassInitSelfUses() {
   // When we're analyzing a delegating constructor, we aren't field sensitive at
   // all.  Just treat all members of self as uses of the single
@@ -1987,6 +2001,18 @@ void ClassInitElementUseCollector::collectClassInitSelfUses() {
     if (isa<DestroyAddrInst>(User)) {
       UseInfo.trackDestroy(User);
       continue;
+    }
+
+    if (auto builtinInst = dyn_cast<BuiltinInst>(User)) {
+      if (auto builtinKind = builtinInst->getBuiltinKind()) {
+        // Allow uses of the flow-sensitive self isolation builtins on
+        // projections of the self box in delegating initializers.
+        if (isFlowSensitiveSelfIsolation(*builtinKind)) {
+          UseInfo.trackUse(
+            DIMemoryUse(User, DIUseKind::FlowSensitiveSelfIsolation, 0, 1));
+          continue;
+        }
+      }
     }
 
     // We can safely handle anything else as an escape.  They should all happen
@@ -2112,6 +2138,7 @@ static bool shouldPerformClassInitSelf(const DIMemoryObjectInfo &MemoryInfo) {
 void swift::ownership::collectDIElementUsesFrom(
     const DIMemoryObjectInfo &MemoryInfo, DIElementUseInfo &UseInfo) {
 
+  // Handle `self` in class initializers that receive it as an argument.
   if (shouldPerformClassInitSelf(MemoryInfo)) {
     ClassInitElementUseCollector UseCollector(MemoryInfo, UseInfo);
     UseCollector.collectClassInitSelfUses();
@@ -2119,6 +2146,9 @@ void swift::ownership::collectDIElementUsesFrom(
     return;
   }
 
+  // Handle `self` in initializers that delegate the creation of the
+  // value and are therefore tracking a box for self.  This includes both
+  // class and value initializers.
   if (MemoryInfo.isDelegatingInit()) {
     // When we're analyzing a delegating constructor, we aren't field sensitive
     // at all. Just treat all members of self as uses of the single

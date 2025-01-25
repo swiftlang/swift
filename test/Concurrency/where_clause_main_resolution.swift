@@ -1,6 +1,6 @@
-// RUN: %target-swift-frontend -disable-availability-checking -D CONFIG1 -dump-ast -parse-as-library %s | %FileCheck %s --check-prefixes=CHECK,CHECK-CONFIG1
-// RUN: %target-swift-frontend -disable-availability-checking -D CONFIG2 -dump-ast -parse-as-library %s | %FileCheck %s --check-prefixes=CHECK,CHECK-CONFIG2
-// RUN: %target-swift-frontend -disable-availability-checking -D CONFIG3 -dump-ast -parse-as-library %s | %FileCheck %s --check-prefixes=CHECK,CHECK-CONFIG3
+// RUN: %target-swift-frontend -target %target-swift-5.1-abi-triple -D CONFIG1 -dump-ast -parse-as-library %s | %FileCheck %s --check-prefixes=CHECK,CHECK-CONFIG1
+// RUN: %target-swift-frontend -target %target-swift-5.1-abi-triple -D CONFIG2 -dump-ast -parse-as-library %s | %FileCheck %s --check-prefixes=CHECK,CHECK-CONFIG2
+// RUN: %target-swift-frontend -target %target-swift-5.1-abi-triple -D CONFIG3 -dump-ast -parse-as-library %s | %FileCheck %s --check-prefixes=CHECK,CHECK-CONFIG3
 
 // REQUIRES: concurrency
 

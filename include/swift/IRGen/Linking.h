@@ -33,7 +33,7 @@ class Triple;
 }
 
 namespace swift {
-class AvailabilityContext;
+class AvailabilityRange;
 
 namespace irgen {
 class IRGenModule;
@@ -89,9 +89,23 @@ inline bool isEmbedded(CanType t) {
   return t->getASTContext().LangOpts.hasFeature(Feature::Embedded);
 }
 
+// Metadata is not generated and not allowed to be referenced in Embedded Swift,
+// expect for classes (both generic and non-generic), dynamic self, and
+// class-bound existentials.
 inline bool isMetadataAllowedInEmbedded(CanType t) {
-  return isa<ClassType>(t) || isa<BoundGenericClassType>(t) ||
-         isa<DynamicSelfType>(t);
+  if (isa<ClassType>(t) || isa<BoundGenericClassType>(t) ||
+      isa<DynamicSelfType>(t)) {
+    return true;
+  }
+  if (auto existentialTy = dyn_cast<ExistentialType>(t)) {
+    if (existentialTy->requiresClass())
+      return true;
+  }
+  if (auto archeTy = dyn_cast<ArchetypeType>(t)) {
+    if (archeTy->requiresClass())
+      return true;
+  }
+  return false;
 }
 
 inline bool isEmbedded(Decl *d) {
@@ -345,14 +359,14 @@ class LinkEntity {
     BaseConformanceDescriptor,
 
     /// A global function pointer for dynamically replaceable functions.
-    /// The pointer is a AbstractStorageDecl*.
+    /// The pointer is a AbstractFunctionDecl*.
     DynamicallyReplaceableFunctionVariableAST,
 
-    /// The pointer is a AbstractStorageDecl*.
+    /// The pointer is a AbstractFunctionDecl*.
     DynamicallyReplaceableFunctionKeyAST,
 
     /// The original implementation of a dynamically replaceable function.
-    /// The pointer is a AbstractStorageDecl*.
+    /// The pointer is a AbstractFunctionDecl*.
     DynamicallyReplaceableFunctionImpl,
 
     /// The once token used by cacheCanonicalSpecializedMetadata, by way of
@@ -1061,8 +1075,11 @@ public:
     return entity;
   }
 
-  static LinkEntity forProtocolWitnessTable(const RootProtocolConformance *C) {
-    assert(!isEmbedded(C));
+  static LinkEntity forProtocolWitnessTable(const ProtocolConformance *C) {
+    if (isEmbedded(C)) {
+      assert(C->getProtocol()->requiresClass());
+    }
+
     LinkEntity entity;
     entity.setForProtocolConformance(Kind::ProtocolWitnessTable, C);
     return entity;
@@ -1435,9 +1452,9 @@ public:
     return entity;
   }
 
-  void mangle(llvm::raw_ostream &out) const;
-  void mangle(SmallVectorImpl<char> &buffer) const;
-  std::string mangleAsString() const;
+  void mangle(ASTContext &Ctx, llvm::raw_ostream &out) const;
+  void mangle(ASTContext &Ctx, SmallVectorImpl<char> &buffer) const;
+  std::string mangleAsString(ASTContext &Ctx) const;
 
   SILDeclRef getSILDeclRef() const;
   SILLinkage getLinkage(ForDefinition_t isDefinition) const;
@@ -1454,6 +1471,11 @@ public:
   const ExtensionDecl *getExtension() const {
     assert(getKind() == Kind::ExtensionDescriptor);
     return reinterpret_cast<ExtensionDecl*>(Pointer);
+  }
+
+  const AbstractStorageDecl *getAbstractStorageDecl() const {
+    assert(getKind() == Kind::PropertyDescriptor);
+    return reinterpret_cast<AbstractStorageDecl *>(Pointer);
   }
 
   const PointerUnion<DeclContext *, VarDecl *> getAnonymousDeclContext() const {
@@ -1488,8 +1510,8 @@ public:
   }
 
   const RootProtocolConformance *getRootProtocolConformance() const {
-    assert(isRootProtocolConformanceKind(getKind()));
-    return cast<RootProtocolConformance>(getProtocolConformance());
+    assert(isProtocolConformanceKind(getKind()));
+    return getProtocolConformance()->getRootConformance();
   }
   
   const ProtocolConformance *getProtocolConformance() const {
@@ -1615,6 +1637,9 @@ public:
            getKind() == Kind::DispatchThunkAllocator ||
            getKind() == Kind::DispatchThunkDerivative;
   }
+  bool isPropertyDescriptor() const {
+    return getKind() == Kind::PropertyDescriptor;
+  }
   bool isNominalTypeDescriptor() const {
     return getKind() == Kind::NominalTypeDescriptor;
   }
@@ -1638,6 +1663,8 @@ public:
 
   /// Determine whether entity that represents a symbol is in DATA segment.
   bool isData() const { return !isText(); }
+
+  bool isTypeKind() const { return isTypeKind(getKind()); }
 
   bool isAlwaysSharedLinkage() const;
 #undef LINKENTITY_GET_FIELD

@@ -30,13 +30,13 @@ func asyncFunc() async {
     // expected-warning@+1{{global function 'basicNoAsync' is unavailable from asynchronous contexts; this is an error in the Swift 6 language mode}}
     basicNoAsync()
 
-    // expected-warning@+1{{global function 'messageNoAsync' is unavailable from asynchronous contexts; a message from the author}}
+    // expected-warning@+1{{global function 'messageNoAsync' is unavailable from asynchronous contexts; a message from the author; this is an error in the Swift 6 language mode}}
     messageNoAsync()
 
-    // expected-warning@+1{{global function 'renamedNoAsync' is unavailable from asynchronous contexts}}{{5-19=asyncReplacement}}
+    // expected-warning@+1{{global function 'renamedNoAsync' is unavailable from asynchronous contexts; this is an error in the Swift 6 language mode}}{{5-19=asyncReplacement}}
     renamedNoAsync() { _ in }
 
-    // expected-warning@+1{{global function 'readStringFromIO' is unavailable from asynchronous contexts}}{{13-29=IOActor.readString}}
+    // expected-warning@+1{{global function 'readStringFromIO' is unavailable from asynchronous contexts; this is an error in the Swift 6 language mode}}{{13-29=IOActor.readString}}
     let _ = readStringFromIO()
 }
 

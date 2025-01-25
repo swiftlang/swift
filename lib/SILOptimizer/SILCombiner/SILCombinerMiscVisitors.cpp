@@ -629,9 +629,6 @@ bool SILCombiner::optimizeStackAllocatedEnum(AllocStackInst *AS) {
 }
 
 SILInstruction *SILCombiner::visitAllocStackInst(AllocStackInst *AS) {
-  if (AS->getFunction()->hasOwnership())
-    return nullptr;
-
   if (optimizeStackAllocatedEnum(AS))
     return nullptr;
 
@@ -777,19 +774,6 @@ static SILValue isConstIndexAddr(SILValue val, unsigned &index) {
 
   index = Index->getValue().getZExtValue();
   return IA->getBase();
-}
-
-SILInstruction *SILCombiner::visitLoadBorrowInst(LoadBorrowInst *lbi) {
-  // If we have a load_borrow that only has non_debug end_borrow uses, delete
-  // it.
-  if (llvm::all_of(getNonDebugUses(lbi), [](Operand *use) {
-        return isa<EndBorrowInst>(use->getUser());
-      })) {
-    eraseInstIncludingUsers(lbi);
-    return nullptr;
-  }
-
-  return nullptr;
 }
 
 /// Optimize nested index_addr instructions:
@@ -1132,6 +1116,8 @@ SILCombiner::visitInjectEnumAddrInst(InjectEnumAddrInst *IEAI) {
                           IEAI->getOperand()->getType().getObjectType());
     auto storeQual = !func->hasOwnership()
                          ? StoreOwnershipQualifier::Unqualified
+                     : IEAI->getOperand()->getType().isMoveOnly()
+                         ? StoreOwnershipQualifier::Init
                          : StoreOwnershipQualifier::Trivial;
     Builder.createStore(IEAI->getLoc(), E, IEAI->getOperand(), storeQual);
     return eraseInstFromFunction(*IEAI);
@@ -1771,22 +1757,6 @@ SILInstruction *SILCombiner::visitTupleExtractInst(TupleExtractInst *TEI) {
   return nullptr;
 }
 
-SILInstruction *SILCombiner::visitFixLifetimeInst(FixLifetimeInst *fli) {
-  // fix_lifetime(alloc_stack) -> fix_lifetime(load(alloc_stack))
-  Builder.setCurrentDebugScope(fli->getDebugScope());
-  if (auto *ai = dyn_cast<AllocStackInst>(fli->getOperand())) {
-    if (fli->getOperand()->getType().isLoadable(*fli->getFunction())) {
-      // load when ossa is disabled
-      auto load = Builder.emitLoadBorrowOperation(fli->getLoc(), ai);
-      Builder.createFixLifetime(fli->getLoc(), load);
-      // no-op when ossa is disabled
-      Builder.emitEndBorrowOperation(fli->getLoc(), load);
-      return eraseInstFromFunction(*fli);
-    }
-  }
-  return nullptr;
-}
-
 static std::optional<SILType>
 shouldReplaceCallByContiguousArrayStorageAnyObject(SILFunction &F,
                                                    CanType storageMetaTy) {
@@ -1804,7 +1774,7 @@ shouldReplaceCallByContiguousArrayStorageAnyObject(SILFunction &F,
 
   // On SwiftStdlib 5.7 we can replace the call.
   auto &ctxt = storageMetaTy->getASTContext();
-  auto deployment = AvailabilityContext::forDeploymentTarget(ctxt);
+  auto deployment = AvailabilityRange::forDeploymentTarget(ctxt);
   if (!deployment.isContainedIn(ctxt.getSwift57Availability()))
     return std::nullopt;
 
@@ -1988,7 +1958,7 @@ SILInstruction *SILCombiner::visitMarkDependenceInst(MarkDependenceInst *mdi) {
   // does not have a meaning, so just eliminate it.
   {
     SILType baseType = mdi->getBase()->getType();
-    if (baseType.isObject() && baseType.isTrivial(*mdi->getFunction())) {
+    if (baseType.getObjectType().isTrivial(*mdi->getFunction())) {
       SILValue value = mdi->getValue();
       mdi->replaceAllUsesWith(value);
       return eraseInstFromFunction(*mdi);
@@ -2001,24 +1971,6 @@ SILInstruction *SILCombiner::visitMarkDependenceInst(MarkDependenceInst *mdi) {
     // a literal is replace by the string_literal itself.
     replaceInstUsesWith(*mdi, mdi->getValue());
     return eraseInstFromFunction(*mdi);
-  }
-
-  return nullptr;
-}
-
-SILInstruction *
-SILCombiner::visitClassifyBridgeObjectInst(ClassifyBridgeObjectInst *cboi) {
-  auto *urc = dyn_cast<UncheckedRefCastInst>(cboi->getOperand());
-  if (!urc)
-    return nullptr;
-
-  auto type = urc->getOperand()->getType().getASTType();
-  if (ClassDecl *cd = type->getClassOrBoundGenericClass()) {
-    if (!cd->isObjC()) {
-      auto int1Ty = SILType::getBuiltinIntegerType(1, Builder.getASTContext());
-      SILValue zero = Builder.createIntegerLiteral(cboi->getLoc(), int1Ty, 0);
-      return Builder.createTuple(cboi->getLoc(), {zero, zero});
-    }
   }
 
   return nullptr;

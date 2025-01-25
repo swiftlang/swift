@@ -130,6 +130,7 @@ SHOULD_NEVER_VISIT_INST(IncrementProfilerCounter)
 SHOULD_NEVER_VISIT_INST(SpecifyTest)
 SHOULD_NEVER_VISIT_INST(ScalarPackIndex)
 SHOULD_NEVER_VISIT_INST(Vector)
+SHOULD_NEVER_VISIT_INST(TypeValue)
 
 #define ALWAYS_OR_SOMETIMES_LOADABLE_CHECKED_REF_STORAGE(Name, ...)            \
   SHOULD_NEVER_VISIT_INST(StrongRetain##Name)                                  \
@@ -213,6 +214,7 @@ OPERAND_OWNERSHIP(TrivialUse, GlobalAddr)
 // The dealloc_stack_ref operand needs to have NonUse ownership because
 // this use comes after the last consuming use (which is usually a dealloc_ref).
 OPERAND_OWNERSHIP(NonUse, DeallocStackRef)
+OPERAND_OWNERSHIP(InstantaneousUse, IgnoredUse)
 
 // Use an owned or guaranteed value only for the duration of the operation.
 OPERAND_OWNERSHIP(InstantaneousUse, ExistentialMetatype)
@@ -227,6 +229,7 @@ OPERAND_OWNERSHIP(InstantaneousUse, ClassifyBridgeObject)
 OPERAND_OWNERSHIP(InstantaneousUse, UnownedCopyValue)
 OPERAND_OWNERSHIP(InstantaneousUse, WeakCopyValue)
 OPERAND_OWNERSHIP(InstantaneousUse, ExtendLifetime)
+OPERAND_OWNERSHIP(InstantaneousUse, MergeIsolationRegion)
 #define REF_STORAGE(Name, ...)                                                 \
   OPERAND_OWNERSHIP(InstantaneousUse, StrongCopy##Name##Value)
 #include "swift/AST/ReferenceStorage.def"
@@ -308,6 +311,7 @@ OPERAND_OWNERSHIP(ForwardingConsume, InitExistentialValue)
 OPERAND_OWNERSHIP(ForwardingConsume, DeinitExistentialValue)
 OPERAND_OWNERSHIP(ForwardingConsume, MarkUninitialized)
 OPERAND_OWNERSHIP(ForwardingConsume, Throw)
+OPERAND_OWNERSHIP(ForwardingConsume, Thunk)
 
 // Instructions that expose a pointer within a borrow scope.
 OPERAND_OWNERSHIP(InteriorPointer, RefElementAddr)
@@ -669,9 +673,12 @@ OperandOwnershipClassifier::visitMarkDependenceInst(MarkDependenceInst *mdi) {
       /*allowUnowned*/true);
   }
   if (mdi->isNonEscaping()) {
-    // This creates a "dependent value", just like on-stack partial_apply, which
-    // we treat like a borrow.
-    return OperandOwnership::Borrow;
+    if (!mdi->getType().isAddress()) {
+      // This creates a "dependent value", just like on-stack partial_apply,
+      // which we treat like a borrow.
+      return OperandOwnership::Borrow;
+    }
+    return OperandOwnership::InteriorPointer;
   }
   if (mdi->hasUnresolvedEscape()) {
     // This creates a dependent value that may extend beyond the parent's
@@ -912,13 +919,32 @@ BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, EndAsyncLetLifetime)
 BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, CreateTaskGroup)
 BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, CreateTaskGroupWithFlags)
 BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, DestroyTaskGroup)
-BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, FlowSensitiveSelfIsolation)
-BUILTIN_OPERAND_OWNERSHIP(InstantaneousUse, FlowSensitiveDistributedSelfIsolation)
 
 BUILTIN_OPERAND_OWNERSHIP(ForwardingConsume, COWBufferForReading)
 
 // This should actually never be seen in SIL
 BUILTIN_OPERAND_OWNERSHIP(GuaranteedForwarding, ExtractFunctionIsolation)
+
+static OperandOwnership
+visitAnyFlowSensitiveSelfIsolation(BuiltinInst *bi) {
+  // In potentially-delegating initializers, the operand will be the
+  // address of the box instead of the actor instance.
+  auto operand = bi->getOperand(0);
+  if (operand->getType().isAddress())
+    return OperandOwnership::TrivialUse;
+  return OperandOwnership::InstantaneousUse;
+}
+
+OperandOwnership
+OperandOwnershipBuiltinClassifier
+::visitFlowSensitiveSelfIsolation(BuiltinInst *bi, StringRef attr) {
+  return visitAnyFlowSensitiveSelfIsolation(bi);
+}
+OperandOwnership
+OperandOwnershipBuiltinClassifier
+::visitFlowSensitiveDistributedSelfIsolation(BuiltinInst *bi, StringRef attr) {
+  return visitAnyFlowSensitiveSelfIsolation(bi);
+}
 
 OperandOwnership
 OperandOwnershipBuiltinClassifier

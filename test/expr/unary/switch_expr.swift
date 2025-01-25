@@ -163,12 +163,14 @@ takesValue(switch Bool.random() { case true: 1 case false: 2 })
 do {
   takesValue(x: switch Bool.random() { case true: 1 case false: 2 })
   // expected-error@-1 {{extraneous argument label 'x:' in call}}
+  // expected-error@-2 {{'switch' may only be used as expression in return, throw, or as the source of an assignment}}
 
   takesValue(_: x: switch Bool.random() { case true: 1 case false: 2 })
   // expected-error@-1 {{expected argument label before colon}}
   // expected-error@-2 {{expected ',' separator}}
   // expected-error@-3 {{cannot find 'x' in scope}}
   // expected-error@-4 {{extra argument in call}}
+  // expected-error@-5 {{'switch' may only be used as expression in return, throw, or as the source of an assignment}}
 }
 func takesValueWithLabel<T>(x: T) {}
 do {
@@ -180,6 +182,7 @@ do {
   // expected-error@-2 {{expected ',' separator}}
   // expected-error@-3 {{cannot find 'y' in scope}}
   // expected-error@-4 {{extra argument in call}}
+  // expected-error@-5 {{'switch' may only be used as expression in return, throw, or as the source of an assignment}}
 }
 func takesValueAndTrailingClosure<T>(_ x: T, _ fn: () -> Int) {}
 takesValueAndTrailingClosure(switch Bool.random() { case true: 0 case false: 1 }) { 2 }
@@ -188,6 +191,7 @@ takesValueAndTrailingClosure(switch Bool.random() { case true: 0 case false: 1 }
 func takesInOut<T>(_ x: inout T) {}
 takesInOut(&switch Bool.random() { case true: 1 case false: 2 })
 // expected-error@-1 {{cannot pass immutable value of type 'Int' as inout argument}}
+// expected-error@-2 {{'switch' may only be used as expression in return, throw, or as the source of an assignment}}
 
 struct HasSubscript {
   static subscript(x: Int) -> Void { () }
@@ -400,7 +404,7 @@ struct TestFailableInit {
     case true:
       0
     case false:
-      return nil // expected-error {{cannot 'return' in 'switch' when used as expression}}
+      return nil // expected-error {{cannot use 'return' to transfer control out of 'switch' expression}}
     }
     _ = y
   }
@@ -496,9 +500,11 @@ do {
 do {
   _ = (switch fatalError() {}, 1) // expected-error {{expected '{' after 'switch' subject expression}}
   // expected-error@-1 {{extra trailing closure passed in call}}
+  // expected-error@-2 {{'switch' may only be used as expression in return, throw, or as the source of an assignment}}
 
   _ = (switch fatalError() { #if FOO
     // expected-error@-1 {{extra trailing closure passed in call}}
+    // expected-error@-2 {{'switch' may only be used as expression in return, throw, or as the source of an assignment}}
   #endif
   }, 0) // expected-error {{expected '{' after 'switch' subject expression}}
 
@@ -507,6 +513,7 @@ do {
     // expected-error@-2 {{type '() -> ()' cannot conform to 'RandomNumberGenerator'}}
     // expected-note@-3 {{required by static method 'random(using:)' where 'T' = '() -> ()'}}
     // expected-note@-4 {{only concrete types such as structs, enums and classes can conform to protocols}}
+    // expected-error@-5 {{'switch' may only be used as expression in return, throw, or as the source of an assignment}}
   case true: // expected-error {{'case' label can only appear inside a 'switch' statement}}
     1
   case false: // expected-error {{'case' label can only appear inside a 'switch' statement}}
@@ -519,6 +526,7 @@ do {
     // expected-error@-2 {{type '() -> ()' cannot conform to 'RandomNumberGenerator'}}
     // expected-note@-3 {{required by static method 'random(using:)' where 'T' = '() -> ()'}}
     // expected-note@-4 {{only concrete types such as structs, enums and classes can conform to protocols}}
+    // expected-error@-5 {{'switch' may only be used as expression in return, throw, or as the source of an assignment}}
   case true: // expected-error {{'case' label can only appear inside a 'switch' statement}}
     1
   case false: // expected-error {{'case' label can only appear inside a 'switch' statement}}
@@ -550,6 +558,7 @@ _ = (switch Bool.random() {
   // expected-error@-2 {{switch must be exhaustive}}
   // expected-note@-3 {{add missing case: 'true'}}
   // expected-note@-4 {{add missing case: 'false'}}
+  // expected-note@-5 {{add missing cases}}
   #if FOO
 case true:
   0
@@ -564,6 +573,7 @@ _ = (switch Bool.random() {
   // expected-error@-2 {{switch must be exhaustive}}
   // expected-note@-3 {{add missing case: 'true'}}
   // expected-note@-4 {{add missing case: 'false'}}
+  // expected-note@-5 {{add missing cases}}
   #if FOO
 case true:
   0
@@ -616,6 +626,9 @@ let m = !switch Bool.random() { case true: true case false: true }
 let n = switch Bool.random() { case true: 1 case false: 2 } + // expected-error {{ambiguous use of operator '+'}}
         switch Bool.random() { case true: 3 case false: 4 } +
         switch Bool.random() { case true: 5 case false: 6 }
+// expected-error@-3 {{'switch' may only be used as expression in return, throw, or as the source of an assignment}}
+// expected-error@-3 {{'switch' may only be used as expression in return, throw, or as the source of an assignment}}
+// expected-error@-3 {{'switch' may only be used as expression in return, throw, or as the source of an assignment}}
 
 let n1 = switch Bool.random() { case true: 1 case false: 2 } +  5
 // expected-error@-1 {{'switch' may only be used as expression in return, throw, or as the source of an assignment}}
@@ -658,6 +671,7 @@ do {
   // FIXME: The type error is likely due to not solving the conjunction before attempting default type var bindings.
   let _ = (switch Bool.random() { case true: Int?.none case false: 1 })?.bitWidth
   // expected-error@-1 {{type of expression is ambiguous without a type annotation}}
+  // expected-error@-2 {{'switch' may only be used as expression in return, throw, or as the source of an assignment}}
 }
 do {
   let _ = switch Bool.random() { case true: Int?.none case false: 1 }!
@@ -747,15 +761,15 @@ func returnBranches() -> Int {
 func returnBranches1() -> Int {
   return switch Bool.random() { // expected-error {{cannot convert return expression of type 'Void' to return type 'Int'}}
   case true:
-    return 0
+    return 0 // expected-error {{cannot use 'return' to transfer control out of 'switch' expression}}
   case false:
-    return 1
+    return 1 // expected-error {{cannot use 'return' to transfer control out of 'switch' expression}}
   }
 }
 
 func returnBranchVoid() {
   return switch Bool.random() { case true: return case false: return () }
-  // expected-error@-1 2{{cannot 'return' in 'switch' when used as expression}}
+  // expected-error@-1 2{{cannot use 'return' to transfer control out of 'switch' expression}}
 }
 
 func returnBranchBinding() -> Int {
@@ -763,9 +777,9 @@ func returnBranchBinding() -> Int {
     // expected-warning@-1 {{constant 'x' inferred to have type 'Void', which may be unexpected}}
     // expected-note@-2 {{add an explicit type annotation to silence this warning}}
   case true:
-    return 0 // expected-error {{cannot 'return' in 'switch' when used as expression}}
+    return 0 // expected-error {{cannot use 'return' to transfer control out of 'switch' expression}}
   case false:
-    return 1 // expected-error {{cannot 'return' in 'switch' when used as expression}}
+    return 1 // expected-error {{cannot use 'return' to transfer control out of 'switch' expression}}
   }
   return x // expected-error {{cannot convert return expression of type 'Void' to return type 'Int'}}
 }
@@ -805,9 +819,9 @@ func returnBranches5() -> Int {
     // expected-warning@-1 {{constant 'i' inferred to have type 'Void', which may be unexpected}}
     // expected-note@-2 {{add an explicit type annotation to silence this warning}}
   case true:
-    return 0 // expected-error {{cannot 'return' in 'switch' when used as expression}}
+    return 0 // expected-error {{cannot use 'return' to transfer control out of 'switch' expression}}
   case false:
-    return 1 // expected-error {{cannot 'return' in 'switch' when used as expression}}
+    return 1 // expected-error {{cannot use 'return' to transfer control out of 'switch' expression}}
   }
   return i // expected-error {{cannot convert return expression of type 'Void' to return type 'Int'}}
 }
@@ -818,7 +832,7 @@ func returnBranches6() -> Int {
   case true:
     print("hello")
     0 // expected-warning {{integer literal is unused}}
-    // expected-error@-1 {{non-expression branch of 'switch' expression may only end with a 'throw'}}
+    // expected-error@-1 {{non-expression branch of 'switch' expression may only end with a 'throw' or 'fallthrough'}}
   case false:
     1
   }
@@ -833,7 +847,7 @@ func returnBranches6PoundIf() -> Int {
     print("hello")
     0 // expected-warning {{integer literal is unused}}
     #endif
-    // expected-error@-1 {{non-expression branch of 'switch' expression may only end with a 'throw'}}
+    // expected-error@-1 {{non-expression branch of 'switch' expression may only end with a 'throw' or 'fallthrough'}}
   case false:
     1
   }
@@ -841,14 +855,14 @@ func returnBranches6PoundIf() -> Int {
 }
 
 func returnBranches6PoundIf2() -> Int {
-  // We don't allow multiple expressions.
+  // We don't allow multiple expressions, but inactive #ifs don't count.
   let i = switch Bool.random() {
   case true:
     #if false
     print("hello")
     0
     #endif
-    // expected-error@-1 {{non-expression branch of 'switch' expression may only end with a 'throw'}}
+    // expected-error@-1 {{expected expression in branch of 'switch' expression}}
   case false:
     1
   }
@@ -859,7 +873,7 @@ func returnBranches7() -> Int {
   let i = switch Bool.random() {
   case true:
     print("hello")
-    return 0 // expected-error {{cannot 'return' in 'switch' when used as expression}}
+    return 0 // expected-error {{cannot use 'return' to transfer control out of 'switch' expression}}
   case false:
     1
   }
@@ -869,7 +883,7 @@ func returnBranches7() -> Int {
 func returnBranches8() -> Int {
   let i = switch Bool.random() {
   case true:
-    return 1 // expected-error {{cannot 'return' in 'switch' when used as expression}}
+    return 1 // expected-error {{cannot use 'return' to transfer control out of 'switch' expression}}
   case false:
     0
   }
@@ -880,7 +894,7 @@ func returnBranches9() -> Int {
   let i = switch Bool.random() {
   case true:
     print("hello")
-    if .random() {} // expected-error {{non-expression branch of 'switch' expression may only end with a 'throw'}}
+    if .random() {} // expected-error {{non-expression branch of 'switch' expression may only end with a 'throw' or 'fallthrough'}}
   case false:
     1
   }
@@ -896,7 +910,7 @@ func returnBranches10() -> Int {
       0 // expected-warning {{integer literal is unused}}
     case false:
       2 // expected-warning {{integer literal is unused}}
-    } // expected-error {{non-expression branch of 'switch' expression may only end with a 'throw'}}
+    } // expected-error {{non-expression branch of 'switch' expression may only end with a 'throw' or 'fallthrough'}}
   case false:
     1
   }
@@ -912,7 +926,7 @@ func returnBranches11() -> Int {
       "" // expected-warning {{string literal is unused}}
     case false:
       2 // expected-warning {{integer literal is unused}}
-    } // expected-error {{non-expression branch of 'switch' expression may only end with a 'throw'}}
+    } // expected-error {{non-expression branch of 'switch' expression may only end with a 'throw' or 'fallthrough'}}
   case false:
     1
   }
@@ -1057,7 +1071,7 @@ func testPoundIfBranch3() -> Int {
     #if false
     0
     #endif
-  // expected-error@-1 {{non-expression branch of 'switch' expression may only end with a 'throw'}}
+  // expected-error@-1 {{expected expression in branch of 'switch' expression}}
   case false:
     0
   }
@@ -1078,27 +1092,26 @@ func testPoundIfBranch4() -> Int {
 }
 
 func testPoundIfBranch5() -> Int {
-  // Not allowed (matches the behavior of implict expression returns)
+  // Okay, inactive #ifs don't count.
   switch Bool.random() {
   case true:
     #if false
     0
     #endif
-    0 // expected-warning {{integer literal is unused}}
+    0
   case false:
-    1 // expected-warning {{integer literal is unused}}
+    1
   }
 }
 
 func testPoundIfBranch6() -> Int {
-  // Not allowed (matches the behavior of implict expression returns)
+  // Okay, inactive #ifs don't count.
   let x = switch Bool.random() {
   case true:
     #if false
     0
     #endif
-    0 // expected-warning {{integer literal is unused}}
-    // expected-error@-1 {{non-expression branch of 'switch' expression may only end with a 'throw'}}
+    0
   case false:
     1
   }
@@ -1171,9 +1184,51 @@ func fallthrough2() -> Int {
     if .random() {
       fallthrough
     }
-    return 1 // expected-error {{cannot 'return' in 'switch' when used as expression}}
+    return 1 // expected-error {{cannot use 'return' to transfer control out of 'switch' expression}}
   case false:
     0
+  }
+  return x
+}
+
+func fallthrough3() -> Int {
+  let x = switch true {
+  case true:
+    fallthrough
+  case false:
+    0
+  }
+  return x
+}
+
+func fallthrough4() -> Int {
+  let x = switch true {
+  case true:
+    fallthrough
+    return 0 // expected-error {{cannot use 'return' to transfer control out of 'switch' expression}}
+  case false:
+    0
+  }
+  return x
+}
+
+func fallthrough5() -> Int {
+  let x = switch true {
+  case true:
+    fallthrough
+    print(0) // expected-error {{non-expression branch of 'switch' expression may only end with a 'throw' or 'fallthrough'}}
+  case false:
+    0
+  }
+  return x
+}
+
+func fallthrough6() -> Int {
+  let x = switch true {
+  case true:
+    0
+  case false:
+    fallthrough // expected-error {{'fallthrough' without a following 'case' or 'default' block}}
   }
   return x
 }

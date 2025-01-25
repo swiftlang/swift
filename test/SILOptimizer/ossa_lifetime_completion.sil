@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt                     \
+// RUN: %target-sil-opt -sil-print-types                     \
 // RUN:     -test-runner                    \
 // RUN:     -enable-ossa-complete-lifetimes \
 // RUN:     %s                              \
@@ -730,7 +730,7 @@ bb0(%existential : @owned $any P):
 // Verify that no instructions were inserted after backedge2's terminator.  (In
 // fact, if they were, the test would crash.)
 // CHECK-LABEL: sil [ossa] @root_of_reborrow : {{.*}} {
-// CHECK:       bb1([[C0:%[^,]+]] : @owned $C, [[B0:%[^,]+]] : @reborrow @guaranteed $C):
+// CHECK:       bb1([[C0:%[^,]+]] : @owned $C, [[B0:%[^,]+]] : @reborrow $C):
 // CHECK-NEXT:    [[B0F:%[^,]+]] = borrowed [[B0]] : $C from ([[C0]] : $C)
 // CHECK-NEXT:    end_borrow [[B0F]]
 // CHECK-NEXT:    destroy_value [[C0]]
@@ -743,7 +743,7 @@ entry:
   %c = apply %getC() : $@convention(thin) () -> (@owned C)
   %b = begin_borrow %c : $C
   br header(%c : $C, %b : $C)
-header(%c0 : @owned $C, %b0 : @reborrow @guaranteed $C):
+header(%c0 : @owned $C, %b0 : @reborrow $C):
   %b0f = borrowed %b0 : $C from (%c0 : $C)
   end_borrow %b0f : $C
   destroy_value %c0 : $C
@@ -756,10 +756,225 @@ backedge:
   %c1 = apply %getC() : $@convention(thin) () -> (@owned C)
   %b1 = begin_borrow %c1 : $C
   br backedge2(%c1 : $C, %b1 : $C)
-backedge2(%c2 : @owned $C, %b2 : @reborrow @guaranteed $C):
+backedge2(%c2 : @owned $C, %b2 : @reborrow $C):
   %b2f = borrowed %b2 : $C from (%c2 : $C)
   specify_test "ossa_lifetime_completion %c2 availability"
   br header(%c2 : $C, %b2f : $C)
 exit:
+  unreachable
+}
+
+
+// CHECK-LABEL: begin running test {{.*}} on test_borrowed_from: ossa_lifetime_completion
+// CHECK-LABEL: sil [ossa] @test_borrowed_from : {{.*}} {
+// CHECK:       bb1([[A:%.*]] : @reborrow $C):
+// CHECK:         [[BF:%.*]] = borrowed [[A]] : $C from (%0 : $C)
+// CHECK:       bb2:
+// CHECK-NEXT:    end_borrow [[BF]] : $C
+// CHECK-NEXT:    unreachable
+// CHECK-LABEL: } // end sil function 'test_borrowed_from'
+// CHECK-LABEL: end running test {{.*}} on test_borrowed_from: ossa_lifetime_completion
+sil [ossa] @test_borrowed_from : $@convention(thin) (@owned C) -> @owned C {
+bb0(%0 : @owned $C):
+  %1 = begin_borrow %0 : $C
+  br bb1(%1 : $C)
+
+bb1(%3 : @reborrow $C):
+  %4 = borrowed %3 : $C from (%0 : $C)
+  specify_test "ossa_lifetime_completion %3 availability"
+  cond_br undef, bb2, bb3
+
+bb2:
+  unreachable
+
+bb3:
+  end_borrow %4 : $C
+  return %0 : $C
+}
+
+// CHECK-LABEL: begin running test {{.*}} on store_borrow: ossa_lifetime_completion
+// CHECK-LABEL: sil [ossa] @store_borrow : {{.*}} {
+// CHECK:         [[TOKEN:%[^,]+]] = store_borrow
+// CHECK:         cond_br undef, {{bb[0-9]+}}, [[DIE:bb[0-9]+]]
+// CHECK:       [[DIE]]:
+// CHECK-NEXT:    end_borrow [[TOKEN]]
+// CHECK-NEXT:    unreachable
+// CHECK-LABEL: } // end sil function 'store_borrow'
+// CHECK-LABEL: end running test {{.*}} on store_borrow: ossa_lifetime_completion
+sil [ossa] @store_borrow : $@convention(thin) (@guaranteed C) -> () {
+entry(%instance : @guaranteed $C):
+  specify_test "ossa_lifetime_completion %token availability"
+  %addr = alloc_stack $C
+  %token = store_borrow %instance to %addr : $*C
+  cond_br undef, exit, die
+
+exit:
+  end_borrow %token : $*C
+  dealloc_stack %addr : $*C
+  %retval = tuple ()
+  return %retval : $()
+die:
+  unreachable
+}
+
+// CHECK-LABEL: begin running test {{.*}} on load_borrow_of_store_borrow_1: ossa_lifetime_completion
+// CHECK-LABEL: sil [ossa] @load_borrow_of_store_borrow_1 : {{.*}} {
+// CHECK:         [[TOKEN:%[^,]+]] = store_borrow
+// CHECK:         [[LOAD:%[^,]+]] = load_borrow [[TOKEN]]
+// CHECK:         [[BORROW:%[^,]+]] = begin_borrow [[LOAD]]
+// CHECK:         cond_br undef, {{bb[0-9]+}}, [[DIE:bb[0-9]+]]
+// CHECK:       [[DIE]]:
+// CHECK-NEXT:    end_borrow [[BORROW]]
+// CHECK-NEXT:    end_borrow [[LOAD]]
+// CHECK-NEXT:    end_borrow [[TOKEN]]
+// CHECK-NEXT:    unreachable
+// CHECK-LABEL: } // end sil function 'load_borrow_of_store_borrow_1'
+// CHECK-LABEL: end running test {{.*}} on load_borrow_of_store_borrow_1: ossa_lifetime_completion
+sil [ossa] @load_borrow_of_store_borrow_1 : $@convention(thin) (@guaranteed C) -> () {
+entry(%instance : @guaranteed $C):
+  specify_test "ossa_lifetime_completion %token availability"
+  %addr = alloc_stack $C
+  %token = store_borrow %instance to %addr
+  %load = load_borrow %token
+  %borrow = begin_borrow %load
+  cond_br undef, exit, die
+
+exit:
+  end_borrow %borrow
+  end_borrow %load
+  end_borrow %token
+  dealloc_stack %addr
+  %retval = tuple ()
+  return %retval : $()
+die:
+  unreachable
+}
+
+// CHECK-LABEL: begin running test {{.*}} on load_borrow_of_store_borrow_2: ossa_lifetime_completion
+// CHECK-LABEL: sil [ossa] @load_borrow_of_store_borrow_2 : {{.*}} {
+// CHECK:         [[TOKEN:%[^,]+]] = store_borrow
+// CHECK:         [[LOAD:%[^,]+]] = load_borrow [[TOKEN]]
+// CHECK:         [[BORROW:%[^,]+]] = begin_borrow [[LOAD]]
+// CHECK:         cond_br undef, {{bb[0-9]+}}, [[DIE:bb[0-9]+]]
+// CHECK:       [[DIE]]:
+// CHECK-NEXT:    end_borrow [[BORROW]]
+// CHECK-NEXT:    end_borrow [[LOAD]]
+// CHECK-NEXT:    end_borrow [[TOKEN]]
+// CHECK-NEXT:    unreachable
+// CHECK-LABEL: } // end sil function 'load_borrow_of_store_borrow_2'
+// CHECK-LABEL: end running test {{.*}} on load_borrow_of_store_borrow_2: ossa_lifetime_completion
+sil [ossa] @load_borrow_of_store_borrow_2 : $@convention(thin) (@guaranteed C) -> () {
+entry(%instance : @guaranteed $C):
+  specify_test "ossa_lifetime_completion %token availability"
+  %addr = alloc_stack $C
+  %token = store_borrow %instance to %addr
+  %load = load_borrow %token
+  %borrow = begin_borrow %load
+  cond_br undef, exit, die
+
+exit:
+  end_borrow %borrow
+  end_borrow %load
+  end_borrow %token
+  dealloc_stack %addr
+  %retval = tuple ()
+  return %retval : $()
+die:
+  end_borrow %borrow
+  end_borrow %load
+  unreachable
+}
+
+sil [ossa] @load_borrow_1 : $@convention(thin) (@in_guaranteed C) -> () {
+entry(%addr : $*C):
+  specify_test "ossa_lifetime_completion %load availability"
+  %load = load_borrow %addr
+  %borrow = begin_borrow %load
+  cond_br undef, exit, die
+
+exit:
+  end_borrow %borrow
+  end_borrow %load
+  %retval = tuple ()
+  return %retval : $()
+die:
+  unreachable
+}
+
+// CHECK-LABEL: begin running test {{.*}} on begin_access: ossa_lifetime_completion
+// CHECK-LABEL: sil [ossa] @begin_access : {{.*}} {
+// CHECK:         [[TOKEN:%[^,]+]] = begin_access
+// CHECK:         cond_br undef, {{bb[0-9]+}}, [[DIE:bb[0-9]+]]
+// CHECK:       [[DIE]]:
+// CHECK-NEXT:    end_access [[TOKEN]]
+// CHECK-NEXT:    unreachable
+// CHECK-LABEL: } // end sil function 'begin_access'
+// CHECK-LABEL: end running test {{.*}} on begin_access: ossa_lifetime_completion
+sil [ossa] @begin_access : $@convention(thin) (@guaranteed C) -> () {
+entry(%instance : @guaranteed $C):
+  specify_test "ossa_lifetime_completion %access availability"
+  %addr = alloc_stack $C
+  %access = begin_access [static] [read] %addr : $*C
+  cond_br undef, exit, die
+
+exit:
+  end_access %access : $*C
+  dealloc_stack %addr : $*C
+  %retval = tuple ()
+  return %retval : $()
+die:
+  unreachable
+}
+
+// CHECK-LABEL: begin running test {{.*}} on load_borrow_of_begin_access: ossa_lifetime_completion
+// CHECK-LABEL: sil [ossa] @load_borrow_of_begin_access : {{.*}} {
+// CHECK:         [[ACCESS:%[^,]+]] = begin_access
+// CHECK:         [[LOAD:%[^,]+]] = load_borrow [[ACCESS]]
+// CHECK:         [[BORROW:%[^,]+]] = begin_borrow [[LOAD]]
+// CHECK:         cond_br undef, {{bb[0-9]+}}, [[DIE:bb[0-9]+]]
+// CHECK:       [[DIE]]:
+// CHECK-NEXT:    end_borrow [[BORROW]]
+// CHECK-NEXT:    end_borrow [[LOAD]]
+// CHECK-NEXT:    end_access [[ACCESS]]
+// CHECK-NEXT:    unreachable
+// CHECK-LABEL: } // end sil function 'load_borrow_of_begin_access'
+// CHECK-LABEL: end running test {{.*}} on load_borrow_of_begin_access: ossa_lifetime_completion
+sil [ossa] @load_borrow_of_begin_access : $@convention(thin) (@in_guaranteed C) -> () {
+entry(%addr : $*C):
+  specify_test "ossa_lifetime_completion %access availability"
+  %access = begin_access [static] [read] %addr : $*C
+  %load = load_borrow %access
+  %borrow = begin_borrow %load
+  cond_br undef, exit, die
+
+exit:
+  end_borrow %borrow
+  end_borrow %load
+  end_access %access : $*C
+  %retval = tuple ()
+  return %retval : $()
+die:
+  unreachable
+}
+
+class Klass {}
+
+struct Wrapper {
+  var c: Klass
+}
+
+// CHECK-LABEL: begin running test {{.*}} on testInteriorMarkDepNonEscAddressValue: ossa_lifetime_completion
+// CHECK-LABEL: sil [ossa] @testInteriorMarkDepNonEscAddressValue : {{.*}} {
+// CHECK: mark_dependence
+// CHECK: end_borrow
+// CHECK-LABEL: } // end sil function 'testInteriorMarkDepNonEscAddressValue'
+// CHECK-LABEL: end running test {{.*}} on testInteriorMarkDepNonEscAddressValue: ossa_lifetime_completion
+sil [ossa] @testInteriorMarkDepNonEscAddressValue : $@convention(thin) (@owned Wrapper, @inout Klass) -> () {
+bb0(%0 : @owned $Wrapper, %1 : $*Klass):
+  specify_test "ossa_lifetime_completion %2 liveness"
+  %2 = begin_borrow %0 : $Wrapper
+  %3 = struct_extract %2 : $Wrapper, #Wrapper.c
+  %4 = mark_dependence [nonescaping] %1 : $*Klass on %3 : $Klass
+  end_borrow %2 : $Wrapper
   unreachable
 }

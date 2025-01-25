@@ -37,6 +37,8 @@ public protocol Value : AnyObject, CustomStringConvertible {
 
   /// True if the value has a trivial type which is and does not contain a Builtin.RawPointer.
   var hasTrivialNonPointerType: Bool { get }
+
+  var isLexical: Bool { get }
 }
 
 public enum Ownership {
@@ -198,7 +200,7 @@ extension Value {
     ProjectedValue(value: self, path: path)
   }
 
-  /// Returns a projected value, defined by this value and path containig a single field of `kind` and `index`.
+  /// Returns a projected value, defined by this value and path containing a single field of `kind` and `index`.
   public func at(_ kind: SmallProjectionPath.FieldKind, index: Int = 0) -> ProjectedValue {
     ProjectedValue(value: self, path: SmallProjectionPath(kind, index: index))
   }
@@ -269,6 +271,8 @@ public final class Undef : Value {
   /// Undef has not parent function, therefore the default `hasTrivialNonPointerType` does not work.
   /// Return the conservative default in this case.
   public var hasTrivialNonPointerType: Bool { false }
+
+  public var isLexical: Bool { false }
 }
 
 final class PlaceholderValue : Value {
@@ -277,6 +281,8 @@ final class PlaceholderValue : Value {
   public var parentBlock: BasicBlock {
     fatalError("PlaceholderValue has no defining block")
   }
+
+  public var isLexical: Bool { false }
 
   public var parentFunction: Function { bridged.PlaceholderValue_getParentFunction().function }
 }

@@ -6,6 +6,6 @@ let x = if .random() {
   then 0
   // expected-error@-1 {{cannot find 'then' in scope}}
   // expected-error@-2 {{consecutive statements on a line must be separated by ';'}}
-} else {
+} else { // expected-error {{non-expression branch of 'if' expression may only end with a 'throw'}}
   1
 }

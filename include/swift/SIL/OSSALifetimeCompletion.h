@@ -63,9 +63,6 @@ public:
   // Availability: "As late as possible."  Consume the value in the last blocks
   //               beyond the non-consuming uses in which the value has been
   //               consumed on no incoming paths.
-  //
-  //                        This boundary works around bugs where SILGen emits
-  //                        illegal OSSA lifetimes.
   struct Boundary {
     enum Value : uint8_t {
       Liveness,
@@ -93,13 +90,20 @@ public:
   ///
   /// Returns true if any new instructions were created to complete the
   /// lifetime.
-  ///
-  /// TODO: We also need to complete scoped addresses (e.g. store_borrow)!
   LifetimeCompletion completeOSSALifetime(SILValue value, Boundary boundary) {
-    if (value->getOwnershipKind() == OwnershipKind::None)
-      return LifetimeCompletion::NoLifetime;
-
-    if (value->getOwnershipKind() != OwnershipKind::Owned) {
+    switch (value->getOwnershipKind()) {
+    case OwnershipKind::None: {
+      auto scopedAddress = ScopedAddressValue(value);
+      if (!scopedAddress)
+        return LifetimeCompletion::NoLifetime;
+      break;
+    }
+    case OwnershipKind::Owned:
+      break;
+    case OwnershipKind::Any:
+      llvm::report_fatal_error("value with any ownership kind!?");
+    case OwnershipKind::Guaranteed:
+    case OwnershipKind::Unowned: {
       BorrowedValue borrowedValue(value);
       if (!borrowedValue)
         return LifetimeCompletion::NoLifetime;
@@ -107,6 +111,8 @@ public:
       if (!borrowedValue.isLocalScope())
         return LifetimeCompletion::AlreadyComplete;
     }
+    }
+
     if (!completedValues.insert(value))
       return LifetimeCompletion::AlreadyComplete;
 
@@ -128,6 +134,7 @@ public:
 
 protected:
   bool analyzeAndUpdateLifetime(SILValue value, Boundary boundary);
+  bool analyzeAndUpdateLifetime(ScopedAddressValue value, Boundary boundary);
 };
 
 //===----------------------------------------------------------------------===//

@@ -689,7 +689,8 @@ namespace {
                                                 align, IsNotTriviallyDestroyable, \
                                                 IsNotBitwiseTakable, \
                                                 IsCopyable, \
-                                                IsFixedSize), \
+                                                IsFixedSize, \
+                                                IsABIAccessible), \
         IsOptional(isOptional) {} \
     TypeLayoutEntry \
     *buildTypeLayoutEntry(IRGenModule &IGM, \
@@ -747,7 +748,7 @@ namespace {
                                       spareBits, align, \
                                       IsNotTriviallyDestroyable, \
                                       IsCopyable, \
-                                      IsFixedSize), \
+                                      IsFixedSize, IsABIAccessible), \
         Refcounting(refcounting), ValueType(valueTy), IsOptional(isOptional) { \
       assert(refcounting == ReferenceCounting::Native || \
              refcounting == ReferenceCounting::Unknown); \
@@ -816,7 +817,7 @@ namespace {
         bool isOptional) \
       : ScalarExistentialTypeInfoBase(storedProtocols, ty, size, \
                                       spareBits, align, IsTriviallyDestroyable,\
-                                      IsCopyable, IsFixedSize), \
+                                      IsCopyable, IsFixedSize, IsABIAccessible), \
         IsOptional(isOptional) {} \
     TypeLayoutEntry \
     *buildTypeLayoutEntry(IRGenModule &IGM, \
@@ -899,12 +900,17 @@ class OpaqueExistentialTypeInfo final :
 
   OpaqueExistentialTypeInfo(ArrayRef<const ProtocolDecl *> protocols,
                             llvm::Type *ty, Size size,
+                            IsCopyable_t copyable,
                             SpareBitVector &&spareBits,
                             Alignment align)
     : super(protocols, ty, size,
             std::move(spareBits), align,
-            IsNotTriviallyDestroyable, IsBitwiseTakable, IsCopyable,
-            IsFixedSize) {}
+            IsNotTriviallyDestroyable,
+            // Copyable existentials are bitwise-takable and borrowable.
+            // Noncopyable existentials are bitwise-takable only.
+            copyable ? IsBitwiseTakableAndBorrowable : IsBitwiseTakableOnly,
+            copyable,
+            IsFixedSize, IsABIAccessible) {}
 
 public:
   OpaqueExistentialLayout getLayout() const {
@@ -1402,7 +1408,7 @@ class ExistentialMetatypeTypeInfo final
                                     std::move(spareBits), align,
                                     IsTriviallyDestroyable,
                                     IsCopyable,
-                                    IsFixedSize),
+                                    IsFixedSize, IsABIAccessible),
       MetatypeTI(metatypeTI) {}
 
 public:
@@ -1648,14 +1654,19 @@ static const TypeInfo *createExistentialTypeInfo(IRGenModule &IGM, CanType T) {
   OpaqueExistentialLayout opaque(protosWithWitnessTables.size());
   Alignment align = opaque.getAlignment(IGM);
   Size size = opaque.getSize(IGM);
+  IsCopyable_t copyable = T->isNoncopyable() ? IsNotCopyable : IsCopyable;
+  
   // There are spare bits in the metadata pointer and witness table pointers
   // consistent with a native object reference.
-  // TODO: There are spare bits we could theoretically use in the type metadata
-  // and witness table pointers, but opaque existentials are currently address-
+  // NB: There are spare bits we could theoretically use in the type metadata
+  // and witness table pointers, but opaque existentials are address-
   // only, and we can't soundly take advantage of spare bits for in-memory
   // representations.
+  // Maybe an ABI break that made opaque existentials loadable could use those
+  // bits, though.
   auto spareBits = SpareBitVector::getConstant(size.getValueInBits(), false);
   return OpaqueExistentialTypeInfo::create(protosWithWitnessTables, type, size,
+                                           copyable,
                                            std::move(spareBits),
                                            align);
 }
@@ -1790,11 +1801,6 @@ static void forEachProtocolWitnessTable(
   assert(protocols.size() == witnessConformances.size() &&
          "mismatched protocol conformances");
 
-  // Don't emit witness tables in embedded Swift.
-  if (srcType->getASTContext().LangOpts.hasFeature(Feature::Embedded)) {
-    return;
-  }
-
   for (unsigned i = 0, e = protocols.size(); i < e; ++i) {
     assert(protocols[i] == witnessConformances[i].getRequirement());
     auto table = emitWitnessTableRef(IGF, srcType, srcMetadataCache,
@@ -1860,8 +1866,7 @@ Address irgen::emitOpenExistentialBox(IRGenFunction &IGF,
 OwnedAddress irgen::emitBoxedExistentialContainerAllocation(IRGenFunction &IGF,
                                   SILType destType,
                                   CanType formalSrcType,
-                                  ArrayRef<ProtocolConformanceRef> conformances,
-                                  GenericSignature sig) {
+                                  ArrayRef<ProtocolConformanceRef> conformances) {
   // TODO: Non-Error boxed existentials.
   assert(destType.canUseExistentialRepresentation(
            ExistentialRepresentation::Boxed, Type()));
@@ -1890,7 +1895,7 @@ OwnedAddress irgen::emitBoxedExistentialContainerAllocation(IRGenFunction &IGF,
   auto addr = IGF.Builder.CreateExtractValue(result, 1);
 
   auto archetype =
-      OpenedArchetypeType::get(destType.getASTType(), sig);
+      OpenedArchetypeType::get(destType.getASTType());
   auto &srcTI = IGF.getTypeInfoForUnlowered(AbstractionPattern(archetype),
                                             formalSrcType);
   addr = IGF.Builder.CreateBitCast(addr,
@@ -2104,7 +2109,6 @@ void irgen::emitMetatypeOfBoxedExistential(IRGenFunction &IGF, Explosion &value,
 void irgen::emitMetatypeOfClassExistential(IRGenFunction &IGF, Explosion &value,
                                            SILType metatypeTy,
                                            SILType existentialTy,
-                                           GenericSignature fnSig,
                                            Explosion &out) {
   assert(existentialTy.isClassExistentialType());
   auto &baseTI = IGF.getTypeInfo(existentialTy).as<ClassExistentialTypeInfo>();
@@ -2124,7 +2128,6 @@ void irgen::emitMetatypeOfClassExistential(IRGenFunction &IGF, Explosion &value,
 
   auto dynamicType = emitDynamicTypeOfHeapObject(IGF, instance, repr,
                                                  existentialTy,
-                                                 fnSig,
                                                  /*allow artificial*/ false);
   out.add(dynamicType);
 
@@ -2159,8 +2162,7 @@ llvm::Value *
 irgen::emitClassExistentialProjection(IRGenFunction &IGF,
                                       Explosion &base,
                                       SILType baseTy,
-                                      CanArchetypeType openedArchetype,
-                                      GenericSignature sigFn) {
+                                      CanArchetypeType openedArchetype) {
   assert(baseTy.isClassExistentialType());
   auto &baseTI = IGF.getTypeInfo(baseTy).as<ClassExistentialTypeInfo>();
 
@@ -2175,7 +2177,6 @@ irgen::emitClassExistentialProjection(IRGenFunction &IGF,
   auto metadata = emitDynamicTypeOfHeapObject(IGF, value,
                                               MetatypeRepresentation::Thick,
                                               baseTy,
-                                              sigFn,
                                               /*allow artificial*/ false);
   bindArchetype(IGF, openedArchetype, metadata, MetadataState::Complete,
                 wtables);
@@ -2544,8 +2545,7 @@ getProjectBoxedOpaqueExistentialFunction(IRGenFunction &IGF,
 
 Address irgen::emitOpaqueBoxedExistentialProjection(
     IRGenFunction &IGF, OpenedExistentialAccess accessKind, Address base,
-    SILType existentialTy, CanArchetypeType openedArchetype,
-    GenericSignature fnSig) {
+    SILType existentialTy, CanArchetypeType openedArchetype) {
 
   assert(existentialTy.isExistentialType());
   if (existentialTy.isClassExistentialType()) {
@@ -2556,7 +2556,6 @@ Address irgen::emitOpaqueBoxedExistentialProjection(
     auto metadata = emitDynamicTypeOfHeapObject(IGF, value,
                                                 MetatypeRepresentation::Thick,
                                                 existentialTy,
-                                                fnSig,
                                                 /*allow artificial*/ false);
 
     // If we are projecting into an opened archetype, capture the

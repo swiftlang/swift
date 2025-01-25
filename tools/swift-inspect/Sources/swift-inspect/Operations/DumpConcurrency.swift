@@ -14,6 +14,9 @@
 
 import ArgumentParser
 import SwiftRemoteMirror
+#if canImport(string_h)
+import string_h
+#endif
 
 struct DumpConcurrency: ParsableCommand {
   static let configuration = CommandConfiguration(

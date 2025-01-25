@@ -1,7 +1,7 @@
-// RUN: %target-swift-frontend  -disable-availability-checking -strict-concurrency=complete -enable-upcoming-feature InferSendableFromCaptures -parse-as-library %s -emit-sil -o /dev/null -verify
+// RUN: %target-swift-frontend -target %target-swift-5.1-abi-triple -strict-concurrency=complete -enable-upcoming-feature InferSendableFromCaptures -parse-as-library %s -emit-sil -o /dev/null -verify
 
 // REQUIRES: concurrency
-// REQUIRES: asserts
+// REQUIRES: swift_feature_InferSendableFromCaptures
 
 // some utilities
 func thrower() throws {}
@@ -232,7 +232,9 @@ func anotherAsyncFunc() async {
 
   _ = b.balance // expected-error {{actor-isolated instance method 'balance()' can not be partially applied}}
 
-  a.owner = "cat" // expected-error{{actor-isolated property 'owner' can not be mutated from a nonisolated context}}
+  // expected-error@+2{{actor-isolated property 'owner' can not be mutated from a nonisolated context}}
+  // expected-note@+1{{consider declaring an isolated method on 'BankAccount' to perform the mutation}}
+  a.owner = "cat"
   // expected-error@+1{{expression is 'async' but is not marked with 'await'}} {{7-7=await }} expected-note@+1{{property access is 'async'}}
   _ = b.owner
   _ = await b.owner == "cat"
@@ -279,7 +281,9 @@ func blender(_ peeler : () -> Void) {
   var money = await dollarsInBananaStand
   money -= 1200
 
-  dollarsInBananaStand = money // expected-error{{global actor 'BananaActor'-isolated var 'dollarsInBananaStand' can not be mutated from global actor 'OrangeActor'}}
+  // expected-error@+2{{global actor 'BananaActor'-isolated var 'dollarsInBananaStand' can not be mutated from global actor 'OrangeActor'}}
+  // expected-note@+1{{consider declaring an isolated method on 'BananaActor' to perform the mutation}}
+  dollarsInBananaStand = money
 
   // FIXME: these two errors seem a bit redundant.
   // expected-error@+2 {{actor-isolated var 'dollarsInBananaStand' cannot be passed 'inout' to implicitly 'async' function call}}
@@ -352,25 +356,17 @@ actor Calculator {
 }
 
 @OrangeActor func doSomething() async {
+  // We will error on the next line when we get past type checking. But since we
+  // error in the type checker, we do not make further progress.
   let _ = (await bananaAdd(1))(2)
-  // expected-warning@-1{{non-sendable result type '(Int) -> Int' cannot be sent from global actor 'BananaActor'-isolated context in call to global function 'bananaAdd'}}
-  // expected-note@-2{{a function type must be marked '@Sendable' to conform to 'Sendable'}}
   let _ = await (await bananaAdd(1))(2) // expected-warning{{no 'async' operations occur within 'await' expression}}
-  // expected-warning@-1{{non-sendable result type '(Int) -> Int' cannot be sent from global actor 'BananaActor'-isolated context in call to global function 'bananaAdd'}}
-  // expected-note@-2{{a function type must be marked '@Sendable' to conform to 'Sendable'}}
 
   let calc = Calculator()
   
   let _ = (await calc.addCurried(1))(2)
-  // expected-warning@-1{{non-sendable result type '(Int) -> Int' cannot be sent from actor-isolated context in call to instance method 'addCurried'}}
-  // expected-note@-2{{a function type must be marked '@Sendable' to conform to 'Sendable'}}
   let _ = await (await calc.addCurried(1))(2) // expected-warning{{no 'async' operations occur within 'await' expression}}
-  // expected-warning@-1{{non-sendable result type '(Int) -> Int' cannot be sent from actor-isolated context in call to instance method 'addCurried'}}
-  // expected-note@-2{{a function type must be marked '@Sendable' to conform to 'Sendable'}}
 
   let plusOne = await calc.addCurried(await calc.add(0, 1))
-  // expected-warning@-1{{non-sendable result type '(Int) -> Int' cannot be sent from actor-isolated context in call to instance method 'addCurried'}}
-  // expected-note@-2{{a function type must be marked '@Sendable' to conform to 'Sendable'}}
   let _ = plusOne(2)
 }
 
@@ -571,4 +567,24 @@ func tryTheActorSubscripts(a : SubscriptA, t : SubscriptT, at : SubscriptAT) asy
   _ = at[0]
 
   _ = try await at[0]
+}
+
+@MainActor
+final class IsolatedOperator: @preconcurrency Equatable {
+  static func == (lhs: IsolatedOperator, rhs: IsolatedOperator) -> Bool {
+    lhs.num == rhs.num
+  }
+
+  var num = 0
+
+  init(num: Int = 0) {
+    self.num = num
+  }
+
+  nonisolated func callEqual() async -> Bool {
+    let foo = await IsolatedOperator()
+    // expected-error@+2{{expression is 'async' but is not marked with 'await'}}
+    // expected-note@+1{{calls to operator function '==' from outside of its actor context are implicitly asynchronous}}
+    return foo == self
+  }
 }

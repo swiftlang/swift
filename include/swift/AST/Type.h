@@ -117,20 +117,22 @@ public:
   
 /// Flags that can be passed when substituting into a type.
 enum class SubstFlags {
-  /// Allow substitutions to recurse into SILFunctionTypes.
-  /// Normally, SILType::subst() should be used for lowered
-  /// types, however in special cases where the substitution
-  /// is just changing between contextual and interface type
-  /// representations, using Type::subst() is allowed.
-  AllowLoweredTypes = 0x01,
   /// Map member types to their desugared witness type.
-  DesugarMemberTypes = 0x02,
-  /// Substitute types involving opaque type archetypes.
+  DesugarMemberTypes = 0x01,
+  /// Allow primary archetypes to themselves be the subject of substitution.
+  /// Otherwise, we map them out of context first.
+  SubstitutePrimaryArchetypes = 0x02,
+  /// Allow opaque archetypes to themselves be the subject of substitution,
+  /// used when erasing them to their underlying types. Otherwise, we
+  /// recursively substitute their substitutions, instead, preserving the
+  /// opaque archetype.
   SubstituteOpaqueArchetypes = 0x04,
+  /// Allow local archetypes to themselves be the subject of substitution.
+  SubstituteLocalArchetypes = 0x08,
   /// Don't increase pack expansion level for free pack references.
   /// Do not introduce new usages of this flag.
   /// FIXME: Remove this.
-  PreservePackExpansionLevel = 0x08,
+  PreservePackExpansionLevel = 0x10,
 };
 
 /// Options for performing substitutions into a type.
@@ -188,7 +190,13 @@ enum class ForeignRepresentableKind : uint8_t {
 /// therefore, the result type is in covariant position relative to the function
 /// type.
 struct TypePosition final {
-  enum : uint8_t { Covariant, Contravariant, Invariant, Shape };
+  enum : uint8_t {
+    Covariant = 1 << 0,
+    Contravariant = 1 << 1,
+    Invariant = 1 << 2,
+    Shape = 1 << 3,
+    Last_Position = Shape,
+  };
 
 private:
   decltype(Covariant) kind;
@@ -210,6 +218,10 @@ public:
   }
 
   operator decltype(kind)() const { return kind; }
+};
+enum : unsigned {
+  NumTypePositions =
+      countBitsUsed(static_cast<unsigned>(TypePosition::Last_Position))
 };
 
 /// Type - This is a simple value object that contains a pointer to a type
@@ -249,16 +261,6 @@ public:
   /// \returns true if the predicate returns true for the given type or any of
   /// its children.
   bool findIf(llvm::function_ref<bool(Type)> pred) const;
-
-  /// Transform the given type by recursively applying the user-provided
-  /// function to each node.
-  ///
-  /// \param fn A function object with the signature \c Type(Type) , which
-  /// accepts a type and returns either a transformed type or a null type
-  /// (which will propagate out the null type).
-  ///
-  /// \returns the result of transforming the type.
-  Type transform(llvm::function_ref<Type(Type)> fn) const;
 
   /// Transform the given type by recursively applying the user-provided
   /// function to each node.
@@ -338,7 +340,9 @@ public:
   /// subsystem.
   Type subst(InFlightSubstitution &subs) const;
 
-  bool isPrivateStdlibType(bool treatNonBuiltinProtocolsAsPublic = true) const;
+  /// Whether this type is from a system module and should be considered
+  /// implicitly private.
+  bool isPrivateSystemType(bool treatNonBuiltinProtocolsAsPublic = true) const;
 
   SWIFT_DEBUG_DUMP;
   void dump(raw_ostream &os, unsigned indent = 0) const;

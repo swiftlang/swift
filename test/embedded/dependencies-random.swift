@@ -28,10 +28,10 @@
 // REQUIRES: swift_in_compiler
 // REQUIRES: executable_test
 // REQUIRES: optimized_stdlib
-// REQUIRES: OS=macosx || OS=linux-gnu
 // UNSUPPORTED: OS=linux-gnu && CPU=aarch64
 
 // REQUIRES: rdar121923818
+// REQUIRES: swift_feature_Embedded
 
 @_extern(c, "putchar")
 @discardableResult

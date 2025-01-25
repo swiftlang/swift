@@ -194,7 +194,7 @@ extension AddressUseVisitor {
       if operand.instruction.isIncidentalUse {
         return leafAddressUse(of: operand)
       }
-      // Unkown instruction.
+      // Unknown instruction.
       return unknownAddressUse(of: operand)
     }
   }
@@ -215,6 +215,11 @@ extension AccessBase {
         return nil
       }
       baseAddr = arg
+    case let .storeBorrow(sbi):
+      guard case let .stack(allocStack) = sbi.destinationOperand.value.accessBase else {
+        return nil
+      }
+      return (initialAddress: allocStack, initializingStore: sbi)
     default:
       return nil
     }
@@ -289,7 +294,7 @@ extension AddressInitializationWalker {
   }
 }
 
-// Implement AddresUseVisitor
+// Implement AddressUseVisitor
 extension AddressInitializationWalker {
   /// An address projection produces a single address result and does not
   /// escape its address operand in any other way.
@@ -341,8 +346,9 @@ extension AddressInitializationWalker {
   }
 
   mutating func yieldedAddressUse(of operand: Operand) -> WalkResult {
-    // An inout yield is a partial write.
-    return .abortWalk
+    // An inout yield is a partial write. Initialization via coroutine is not supported, so we assume a prior
+    // initialization must dominate the yield.
+    return .continueWalk
   }
 
   mutating func dependentAddressUse(of operand: Operand, into value: Value)
@@ -359,7 +365,7 @@ extension AddressInitializationWalker {
   }
 }
 
-/// A live range representing the ownership of addressible memory.
+/// A live range representing the ownership of addressable memory.
 ///
 /// This live range represents the minimal guaranteed lifetime of the object being addressed. Uses of derived addresses
 /// may be extended up to the ends of this scope without violating ownership.
@@ -464,7 +470,7 @@ enum AddressOwnershipLiveRange : CustomStringConvertible {
       }
     case .storeBorrow(let sb):
       return computeValueLiveRange(of: sb.source, context)
-    case .pointer, .unidentified:
+    case .pointer, .index, .unidentified:
       return nil
     }
   }
@@ -563,4 +569,23 @@ extension AddressOwnershipLiveRange {
     }
     return .local(allocation, range)
   }
+}
+
+let addressOwnershipLiveRangeTest = FunctionTest("address_ownership_live_range") {
+  function, arguments, context in
+  let address = arguments.takeValue()
+  print("Address: \(address)")
+  print("Base: \(address.accessBase)")
+  let begin = address.definingInstructionOrTerminator ?? {
+    assert(address is FunctionArgument)
+    return function.instructions.first!
+  }()
+  let localReachabilityCache = LocalVariableReachabilityCache()
+  guard var ownershipRange = AddressOwnershipLiveRange.compute(for: address, at: begin,
+                                                               localReachabilityCache, context) else {
+    print("Error: indeterminate live range")
+    return
+  }
+  defer { ownershipRange.deinitialize() }
+  print(ownershipRange)
 }

@@ -4,7 +4,7 @@
 
 // RUN: %host-build-swift -swift-version 5 -emit-library -o %t/%target-library-name(MacroDefinition) -module-name=MacroDefinition %S/../Macros/Inputs/syntax_macro_definitions.swift -g -no-toolchain-stdlib-rpath
 
-// RUN: %target-swift-frontend -emit-sil -emit-sorted-sil -Xllvm -sil-full-demangle -profile-generate -profile-coverage-mapping -module-name coverage_macros %s -load-plugin-library %t/%target-library-name(MacroDefinition) | %FileCheck %s --implicit-check-not sil_coverage_map
+// RUN: %target-swift-frontend -Xllvm -sil-print-types -emit-sil -emit-sorted-sil -Xllvm -sil-full-demangle -profile-generate -profile-coverage-mapping -module-name coverage_macros %s -load-plugin-library %t/%target-library-name(MacroDefinition) | %FileCheck %s --implicit-check-not sil_coverage_map
 // RUN: %target-swift-frontend -emit-ir -profile-generate -profile-coverage-mapping -load-plugin-library %t/%target-library-name(MacroDefinition) %s
 
 @attached(accessor)

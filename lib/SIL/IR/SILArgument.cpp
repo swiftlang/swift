@@ -29,7 +29,7 @@ using namespace swift;
 SILArgument::SILArgument(ValueKind subClassKind,
                          SILBasicBlock *inputParentBlock, SILType type,
                          ValueOwnershipKind ownershipKind,
-                         const ValueDecl *inputDecl, bool reborrow,
+                         ValueDecl *inputDecl, bool reborrow,
                          bool pointerEscape)
     : ValueBase(subClassKind, type), parentBlock(inputParentBlock),
       decl(inputDecl) {
@@ -432,4 +432,12 @@ bool SILFunctionArgument::isSelf() const {
   // function has a call signature with self.
   return getFunction()->hasSelfParam() &&
          getParent()->getArguments().back() == this;
+}
+
+bool SILFunctionArgument::isSending() const {
+  if (isIndirectErrorResult())
+    return false;
+  if (isIndirectResult())
+    return getFunction()->getLoweredFunctionType()->hasSendingResult();
+  return getKnownParameterInfo().hasOption(SILParameterInfo::Sending);
 }

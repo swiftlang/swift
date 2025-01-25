@@ -122,32 +122,9 @@ std::string swift::nameForMetadata(const Metadata *type,
   return result;
 }
 
-std::string MetadataOrPack::nameForMetadata() const {
-  if (isNull())
-    return "<<nullptr>>";
-
-  if (isMetadata())
-    return ::nameForMetadata(getMetadata());
-
-  std::string result = "Pack{";
-  MetadataPackPointer pack = getMetadataPack();
-  for (size_t i = 0, e = pack.getNumElements(); i < e; ++i) {
-    if (i != 0)
-      result += ", ";
-    result += ::nameForMetadata(pack.getElements()[i]);
-  }
-  result += "}";
-
-  return result;
-}
-
 #else // SWIFT_STDLIB_HAS_TYPE_PRINTING
 
 std::string swift::nameForMetadata(const Metadata *type, bool qualified) {
-  return "<<< type printer not available >>>";
-}
-
-std::string MetadataOrPack::nameForMetadata() const {
   return "<<< type printer not available >>>";
 }
 
@@ -252,7 +229,7 @@ swift::swift_getMangledTypeName(const Metadata *type) {
     if (demangling == nullptr) {
       return TypeNamePair{NULL, 0};
     }
-    auto mangling = Demangle::mangleNode(demangling);
+    auto mangling = Demangle::mangleNode(demangling, Mangle::ManglingFlavor::Default);
     if (!mangling.isSuccess())
       return TypeNamePair{NULL, 0};
     std::string name = mangling.result();
@@ -1312,9 +1289,8 @@ static id bridgeAnythingNonVerbatimToObjectiveC(OpaqueValue *src,
       swift_unknownObjectRetain(result);
     return result;
   }
-  
   // Dig through existential types.
-  if (auto srcExistentialTy = dyn_cast<ExistentialTypeMetadata>(srcType)) {
+  else if (auto srcExistentialTy = dyn_cast<ExistentialTypeMetadata>(srcType)) {
     OpaqueValue *srcInnerValue;
     const Metadata *srcInnerType;
     bool isOutOfLine;
@@ -1343,10 +1319,9 @@ static id bridgeAnythingNonVerbatimToObjectiveC(OpaqueValue *src,
     }
     return result;
   }
-  
-  // Handle metatypes.
-  if (isa<ExistentialMetatypeMetadata>(srcType)
-      || isa<MetatypeMetadata>(srcType)) {
+  // Handle metatypes and existential metatypes
+  else if (isa<ExistentialMetatypeMetadata>(srcType)
+	   || isa<MetatypeMetadata>(srcType)) {
     const Metadata *srcMetatypeValue;
     memcpy(&srcMetatypeValue, src, sizeof(srcMetatypeValue));
     
@@ -1365,8 +1340,9 @@ static id bridgeAnythingNonVerbatimToObjectiveC(OpaqueValue *src,
         return objc_retain(protocolObj);
       }
     }
+  }
   // Handle bridgeable types.
-  } else if (auto srcBridgeWitness = findBridgeWitness(srcType)) {
+  else if (auto srcBridgeWitness = findBridgeWitness(srcType)) {
     // Bridge the source value to an object.
     auto srcBridgedObject =
       srcBridgeWitness->bridgeToObjectiveC(src, srcType, srcBridgeWitness);
@@ -1376,12 +1352,23 @@ static id bridgeAnythingNonVerbatimToObjectiveC(OpaqueValue *src,
       srcType->vw_destroy(src);
 
     return (id)srcBridgedObject;
+  }
   // Handle Errors.
-  } else if (auto srcErrorWitness = findErrorWitness(srcType)) {
+  else if (auto srcErrorWitness = findErrorWitness(srcType)) {
     // Bridge the source value to an NSError.
     auto flags = consume ? DynamicCastFlags::TakeOnSuccess
                          : DynamicCastFlags::Default;
     return dynamicCastValueToNSError(src, srcType, srcErrorWitness, flags);
+  }
+  // Handle functions:  "Block" types can be bridged literally
+  else if (auto fn = dyn_cast<FunctionTypeMetadata>(srcType)) {
+    if (fn->getConvention() == FunctionMetadataConvention::Block) {
+      id result;
+      memcpy(&result, src, sizeof(id));
+      if (!consume)
+	swift_unknownObjectRetain(result);
+      return result;
+    }
   }
 
   // Fall back to boxing.
@@ -1756,5 +1743,4 @@ HeapObject *_swift_bridgeToObjectiveCUsingProtocolIfPossible(
 #endif
 
 #define OVERRIDE_CASTING COMPATIBILITY_OVERRIDE
-#include COMPATIBILITY_OVERRIDE_INCLUDE_PATH
-
+#include "../CompatibilityOverride/CompatibilityOverrideIncludePath.h"

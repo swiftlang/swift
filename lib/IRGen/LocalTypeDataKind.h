@@ -50,6 +50,7 @@ private:
     RepresentationTypeMetadata,
     ValueWitnessTable,
     Shape,
+    GenericValue,
     // <- add more special cases here
 
     // The first enumerator for an individual value witness.
@@ -100,6 +101,11 @@ public:
   /// A reference to the shape expression of a pack type.
   static LocalTypeDataKind forPackShapeExpression() {
     return LocalTypeDataKind(Shape);
+  }
+
+  /// A reference to the value of a variable generic argument.
+  static LocalTypeDataKind forValue() {
+    return LocalTypeDataKind(GenericValue);
   }
 
   /// A reference to a protocol witness table for an archetype.
@@ -180,7 +186,10 @@ public:
   ProtocolConformanceRef getProtocolConformance() const {
     assert(!isSingletonKind());
     if ((Value & KindMask) == Kind_Decl) {
-      return ProtocolConformanceRef(getAbstractProtocolConformance());
+      // FIXME: Passing an empty Type() here temporarily while staging in
+      // new representation for abstract conformances
+      return ProtocolConformanceRef::forAbstract(
+          Type(), getAbstractProtocolConformance());
     } else if ((Value & KindMask) == Kind_PackConformance) {
       return ProtocolConformanceRef(getPackProtocolConformance());
     } else {

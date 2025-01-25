@@ -81,7 +81,6 @@ public:
 private:
   Type visitProtocolType(CanProtocolType type) {
     // Simple protocol types have no sub-structure.
-    assert(!type.getParent());
     return type;
   }
 
@@ -162,6 +161,7 @@ private:
   NO_PRESERVABLE_STRUCTURE(Pack)
   NO_PRESERVABLE_STRUCTURE(PackExpansion)
   NO_PRESERVABLE_STRUCTURE(PackElement)
+  NO_PRESERVABLE_STRUCTURE(Integer)
 #undef NO_PRESERVABLE_STRUCTURE
 
   // These types simply shouldn't appear in types that we generalize at all.
@@ -195,35 +195,37 @@ private:
       newArgs.push_back(generalizeComponentType(CanType(origArg)));
     }
 
+    auto origSig = origSubs.getGenericSignature();
+
     // Generalize all of the conformances.
     // TODO: for abstract requirements, we might not generalize all
     // arguments, and we may need to leave corresponding conformances
     // concrete.
     SmallVector<ProtocolConformanceRef, 4> newConformances;
-    auto origConformances = origSubs.getConformances();
-    for (auto origConformance: origConformances) {
+    for (const auto &req : origSig.getRequirements()) {
+      if (req.getKind() != RequirementKind::Conformance)
+        continue;
       newConformances.push_back(
-        ProtocolConformanceRef(origConformance.getRequirement()));
+          ProtocolConformanceRef::forAbstract(req.getFirstType(),
+                                              req.getProtocolDecl()));
     }
 
-    auto origSig = origSubs.getGenericSignature();
     auto newSubs = SubstitutionMap::get(origSig, newArgs, newConformances);
 
     // Add any conformance requirements to the generic signature and
     // remember the conformances we generalized.
-    if (!origConformances.empty()) {
-      size_t i = 0;
-      for (auto &origReq: origSig.getRequirements()) {
-        if (origReq.getKind() != RequirementKind::Conformance) continue;
-        auto origConformance = origConformances[i++];
+    auto origConformances = origSubs.getConformances();
+    size_t i = 0;
+    for (auto &origReq: origSig.getRequirements()) {
+      if (origReq.getKind() != RequirementKind::Conformance) continue;
+      auto origConformance = origConformances[i++];
 
-        auto newReq = origReq.subst(newSubs);
-        addedRequirements.push_back(newReq);
+      auto newReq = origReq.subst(newSubs);
+      addedRequirements.push_back(newReq);
 
-        substConformances.insert({{newReq.getFirstType()->getCanonicalType(),
-                                   newReq.getProtocolDecl()},
-                                  origConformance});
-      }
+      substConformances.insert({{newReq.getFirstType()->getCanonicalType(),
+                                 newReq.getProtocolDecl()},
+                                origConformance});
     }
 
     // Build the new type.
@@ -254,10 +256,9 @@ private:
 
     // Create a new generalization type parameter and record the
     // substitution.
-    auto newParam = GenericTypeParamType::get(/*sequence*/ false,
-                                              /*depth*/ 0,
-                                              /*index*/ substTypes.size(),
-                                              ctx);
+    auto newParam = GenericTypeParamType::getType(/*depth*/ 0,
+                                                  /*index*/ substTypes.size(),
+                                                  ctx);
     addedParameters.push_back(newParam);
 
     substTypes.insert({CanType(newParam), origArg});

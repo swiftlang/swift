@@ -1536,7 +1536,7 @@ sil_witness_table [serialized] InheritedConformance: InheritedProtocol1 module w
 
 sil_witness_table [serialized] InheritedConformance: AnyProtocol module witness_tables {
   associated_type AssocType: SomeAssoc
-  associated_type_protocol (AssocWithReqt: AssocReqt): ConformingAssoc: AssocReqt module witness_tables
+  associated_conformance (AssocWithReqt: AssocReqt): ConformingAssoc: AssocReqt module witness_tables
 }
 
 sil [transparent] [serialized] @$s9def_basic13serialize_allyyF : $@convention(thin) () -> () {

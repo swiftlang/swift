@@ -4,6 +4,10 @@
 
 // RUN: %target-swift-frontend -primary-file %s -emit-ir  | %FileCheck %s --check-prefix=CHECK
 
+// RUN: %target-swift-frontend -primary-file %s -emit-ir -enable-library-evolution
+
+// RUN: %target-swift-frontend -primary-file %s -emit-ir -O
+
 // XFAIL: CPU=arm64e
 // REQUIRES: PTRSIZE=64
 
@@ -122,7 +126,7 @@ struct MyError: Error {
 
 // CHECK: define hidden swiftcc { float, i64, float } @"$s12typed_throws8mayThrow1x1ySf_s5Int32VSftSb_yXltAA7MyErrorVYKF"
 // CHECK:   [[CONVERTED:%.*]] = ptrtoint ptr {{%.*}} to i64
-// CEHCK:   insertvalue { float, i64, float } undef, i64 [[CONVERTED]], 1
+// CHECK:   insertvalue { float, i64, float } undef, i64 [[CONVERTED]], 1
 // CHECK: }
 @inline(never)
 func mayThrow(x: Bool, y: AnyObject) throws(MyError) -> (Float, Int32, Float) {
@@ -216,3 +220,93 @@ func mayThrowEmptyErrorAsync(x: Bool) async throws(EmptyError) -> String? {
 
   return ""
 }
+
+
+enum SP: Error {
+    case a
+    case b(Int32)
+}
+
+protocol Proto {
+  // This used to crash.
+  static func f() throws(SP) -> Self
+
+  // This used to crash.
+  static func f2() throws(SP) -> Int64
+}
+
+@inline(never)
+@available(SwiftStdlib 6.0, *)
+public func passthroughAsync<T, E: Error>(f: () async throws(E) -> T) async throws(E) -> T {
+  try await f()
+}
+
+@available(SwiftStdlib 6.0, *)
+public func reabstractAsyncVoidThrowsNever() async {
+  await passthroughAsync {
+    ()
+  }
+}
+
+// Used to crash with null GenericSignature -- https://github.com/swiftlang/swift/issues/77297
+struct LoadableGeneric<E>: Error {}
+
+func throwsLoadableGeneric<E>(_: E) throws(LoadableGeneric<E>) {}
+
+@inline(never)
+func throwError() throws(SmallError) -> Never {
+  throw SmallError(x: 1)
+}
+
+func conditionallyCallsThrowError(b: Bool) throws(SmallError) -> Int {
+  if b {
+    try throwError()
+  } else {
+    return 0
+  }
+}
+
+func passthroughFixedErrorCall<T>(_ body: () throws(TinyError) -> T) throws(TinyError) -> T {
+  try body()
+}
+
+func passthroughFixedErrorAsync<T>(_ body: () async throws(TinyError) -> T) async throws(TinyError) -> T {
+  try await body()
+}
+
+func callClosureSync<T>(t: T) {
+  _ = try! passthroughFixedErrorCall { () throws(TinyError) -> T in
+    return t
+  }
+}
+
+func callClosureAsync<T>(t: T) async {
+  _ = try! await passthroughFixedErrorAsync { () async throws(TinyError) -> T in
+    return t
+  }
+}
+
+enum LargeError: Error {
+  case x
+  case y(Int64, Int64, Int64, Int64, Int64)
+}
+
+// Used to crash the compiler because
+func callClosureAsyncIndirectError(f: () async throws(LargeError) -> Int) async throws(LargeError) -> Int {
+  return try await f()
+}
+
+protocol AsyncGenProto<A> {
+  associatedtype A
+  func fn(arg: Int) async throws(SmallError) -> A
+}
+
+// CHECK: define internal swifttailcc void @"$s12typed_throws23callAsyncIndirectResult1p1xxAA0D8GenProto_px1ARts_XP_SitYaAA10SmallErrorVYKlFTY0_"(ptr swiftasync %0)
+// CHECK:   musttail call swifttailcc void {{%.*}}(ptr noalias {{%.*}}, ptr swiftasync {{%.*}}, i64 {{%.*}}, ptr noalias swiftself {{%.*}}, ptr %swifterror, ptr {{%.*}}, ptr {{%.*}})
+// CHECK:   ret void
+// CHECK: }
+@inline(never)
+func callAsyncIndirectResult<A>(p: any AsyncGenProto<A>, x: Int) async throws(SmallError) -> A {
+  return try await p.fn(arg: x)
+}
+

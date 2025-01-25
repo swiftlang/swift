@@ -178,7 +178,7 @@ void SILBasicBlock::moveArgumentList(SILBasicBlock *from) {
 }
 
 SILFunctionArgument *
-SILBasicBlock::createFunctionArgument(SILType Ty, const ValueDecl *D,
+SILBasicBlock::createFunctionArgument(SILType Ty, ValueDecl *D,
                                       bool disableEntryBlockVerification) {
   assert((disableEntryBlockVerification || isEntry()) &&
          "Function Arguments can only be in the entry block");
@@ -192,7 +192,7 @@ SILBasicBlock::createFunctionArgument(SILType Ty, const ValueDecl *D,
 SILFunctionArgument *SILBasicBlock::insertFunctionArgument(unsigned AtArgPos,
                                                            SILType Ty,
                                                            ValueOwnershipKind OwnershipKind,
-                                                           const ValueDecl *D) {
+                                                           ValueDecl *D) {
   assert(isEntry() && "Function Arguments can only be in the entry block");
   auto *arg = new (getModule()) SILFunctionArgument(Ty, OwnershipKind, D);
   arg->parentBlock = this;
@@ -201,7 +201,7 @@ SILFunctionArgument *SILBasicBlock::insertFunctionArgument(unsigned AtArgPos,
 }
 
 SILFunctionArgument *SILBasicBlock::replaceFunctionArgument(
-    unsigned i, SILType Ty, ValueOwnershipKind Kind, const ValueDecl *D) {
+    unsigned i, SILType Ty, ValueOwnershipKind Kind, ValueDecl *D) {
   assert(isEntry() && "Function Arguments can only be in the entry block");
 
   SILFunction *F = getParent();
@@ -226,7 +226,7 @@ SILFunctionArgument *SILBasicBlock::replaceFunctionArgument(
 /// ValueDecl D).
 SILPhiArgument *SILBasicBlock::replacePhiArgument(unsigned i, SILType Ty,
                                                   ValueOwnershipKind Kind,
-                                                  const ValueDecl *D,
+                                                  ValueDecl *D,
                                                   bool isReborrow,
                                                   bool isEscaping) {
   assert(!isEntry() && "PHI Arguments can not be in the entry block");
@@ -250,7 +250,7 @@ SILPhiArgument *SILBasicBlock::replacePhiArgument(unsigned i, SILType Ty,
 }
 
 SILPhiArgument *SILBasicBlock::replacePhiArgumentAndReplaceAllUses(
-    unsigned i, SILType ty, ValueOwnershipKind kind, const ValueDecl *d,
+    unsigned i, SILType ty, ValueOwnershipKind kind, ValueDecl *d,
     bool isReborrow, bool isEscaping) {
   // Put in an undef placeholder before we do the replacement since
   // replacePhiArgument() expects the replaced argument to not have
@@ -277,7 +277,7 @@ SILPhiArgument *SILBasicBlock::replacePhiArgumentAndReplaceAllUses(
 
 SILPhiArgument *SILBasicBlock::createPhiArgument(SILType Ty,
                                                  ValueOwnershipKind Kind,
-                                                 const ValueDecl *D,
+                                                 ValueDecl *D,
                                                  bool isReborrow,
                                                  bool isEscaping) {
   assert(!isEntry() && "PHI Arguments can not be in the entry block");
@@ -289,7 +289,7 @@ SILPhiArgument *SILBasicBlock::createPhiArgument(SILType Ty,
 
 SILPhiArgument *SILBasicBlock::insertPhiArgument(unsigned AtArgPos, SILType Ty,
                                                  ValueOwnershipKind Kind,
-                                                 const ValueDecl *D,
+                                                 ValueDecl *D,
                                                  bool isReborrow,
                                                  bool isEscaping) {
   assert(!isEntry() && "PHI Arguments can not be in the entry block");

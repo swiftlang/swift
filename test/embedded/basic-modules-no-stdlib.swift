@@ -5,6 +5,7 @@
 // RUN: %target-swift-frontend -swift-version 5 -emit-ir     -I %t                      %t/Main.swift     -parse-stdlib -enable-experimental-feature Embedded -wmo | %FileCheck %s
 
 // REQUIRES: swift_in_compiler
+// REQUIRES: swift_feature_Embedded
 
 // BEGIN MyModule.swift
 
@@ -38,8 +39,8 @@ public func main() {
 }
 
 // CHECK: define {{.*}}@main{{.*}} {
-// CHECK: define {{.*}}void @"$s4Main4mainyyF"{{.*}} {
-// CHECK: define {{.*}}void @"$s8MyModule10moduleMainyyF"{{.*}} {
-// CHECK: define {{.*}}void @"$s8MyModule8ConcreteVACycfC"{{.*}} {
-// CHECK: define {{.*}}void @"$s8MyModule5start1pyx_tAA6PlayerRzlFAA8ConcreteV_Tg5"{{.*}} {
-// CHECK: define {{.*}}void @"$s8MyModule8ConcreteV4playyyF"{{.*}} {
+// CHECK: define {{.*}}void @"$e4Main4mainyyF"{{.*}} {
+// CHECK: define {{.*}}void @"$e8MyModule10moduleMainyyF"{{.*}} {
+// CHECK: define {{.*}}void @"$e8MyModule8ConcreteVACycfC"{{.*}} {
+// CHECK: define {{.*}}void @"$e8MyModule5start1pyx_tAA6PlayerRzlFAA8ConcreteV_Tg5"{{.*}} {
+// CHECK: define {{.*}}void @"$e8MyModule8ConcreteV4playyyF"{{.*}} {

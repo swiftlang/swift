@@ -1790,9 +1790,7 @@ bool SimplifyCFG::simplifySwitchEnumUnreachableBlocks(SwitchEnumInst *SEI) {
     return true;
   }
 
-  if (!Element || !Element->hasAssociatedValues() || Dest->args_empty()) {
-    assert(Dest->args_empty() && "Unexpected argument at destination!");
-
+  if (Dest->args_empty()) {
     SILBuilderWithScope(SEI).createBranch(SEI->getLoc(), Dest);
 
     addToWorklist(SEI->getParent());
@@ -1802,16 +1800,25 @@ bool SimplifyCFG::simplifySwitchEnumUnreachableBlocks(SwitchEnumInst *SEI) {
     return true;
   }
 
-  auto &Mod = SEI->getModule();
-  auto OpndTy = SEI->getOperand()->getType();
-  auto Ty = OpndTy.getEnumElementType(
-      Element, Mod, TypeExpansionContext(*SEI->getFunction()));
-  auto *UED = SILBuilderWithScope(SEI)
-    .createUncheckedEnumData(SEI->getLoc(), SEI->getOperand(), Element, Ty);
-
+  // If the Dest has an argument, it's case should have an associated value or
+  // it is the default case in ossa.
+  assert((Element && Element->hasAssociatedValues()) ||
+         (SEI->getFunction()->hasOwnership() && SEI->hasDefault() &&
+          Dest == SEI->getDefaultBB()));
+  SILValue newValue;
+  if (SEI->getFunction()->hasOwnership() && SEI->hasDefault() &&
+      Dest == SEI->getDefaultBB()) {
+    newValue = SEI->getOperand();
+  } else {
+    auto OpndTy = SEI->getOperand()->getType();
+    auto Ty = OpndTy.getEnumElementType(
+        Element, SEI->getModule(), TypeExpansionContext(*SEI->getFunction()));
+    newValue = SILBuilderWithScope(SEI).createUncheckedEnumData(
+        SEI->getLoc(), SEI->getOperand(), Element, Ty);
+  }
   assert(Dest->args_size() == 1 && "Expected only one argument!");
   auto *DestArg = Dest->getArgument(0);
-  DestArg->replaceAllUsesWith(UED);
+  DestArg->replaceAllUsesWith(newValue);
   Dest->eraseArgument(0);
 
   SILBuilderWithScope(SEI).createBranch(SEI->getLoc(), Dest);
@@ -2189,8 +2196,11 @@ bool SimplifyCFG::simplifySwitchEnumBlock(SwitchEnumInst *SEI) {
     }
     Builder.createBranch(loc, LiveBlock, PayLoad);
     SEI->eraseFromParent();
-    updateBorrowedFromPhis(PM, { cast<SILPhiArgument>(LiveBlock->getArgument(0)) });
+    updateGuaranteedPhis(PM, { cast<SILPhiArgument>(LiveBlock->getArgument(0)) });
   } else {
+    if (SEI->getOperand()->getOwnershipKind() == OwnershipKind::Owned) {
+      Builder.createDestroyValue(loc, SEI->getOperand());
+    }
     Builder.createBranch(loc, LiveBlock);
     SEI->eraseFromParent();
   }
@@ -3720,8 +3730,6 @@ bool SimplifyCFG::simplifyArgument(SILBasicBlock *BB, unsigned i) {
     }
     if (inst->getOwnershipKind() == OwnershipKind::Owned)
       return !inst->getSingleUse();
-    if (BorrowedValue borrow = BorrowedValue(inst->getOperand(0)))
-      return borrow.isLocalScope();
     return false;
   };
 
@@ -3781,7 +3789,7 @@ bool SimplifyCFG::simplifyArgument(SILBasicBlock *BB, unsigned i) {
 
   proj->eraseFromParent();
 
-  updateBorrowedFromPhis(PM, { NewArg });
+  updateGuaranteedPhis(PM, { NewArg });
 
   return true;
 }
@@ -3842,11 +3850,21 @@ static void tryToReplaceArgWithIncomingValue(SILBasicBlock *BB, unsigned i,
   // An argument has one result value. We need to replace this with the *value*
   // of the incoming block(s).
   LLVM_DEBUG(llvm::dbgs() << "replace arg with incoming value:" << *A);
-  if (auto *bfi = getBorrowedFromUser(A)) {
-    bfi->replaceAllUsesWith(A);
-    bfi->eraseFromParent();
+  while (!A->use_empty()) {
+    Operand *op = *A->use_begin();
+    if (auto *bfi = dyn_cast<BorrowedFromInst>(op->getUser())) {
+      if (op->getOperandNumber() == 0) {
+        bfi->replaceAllUsesWith(V);
+        bfi->eraseFromParent();
+        continue;
+      }
+      if (auto *prevBfi = dyn_cast<BorrowedFromInst>(V)) {
+        op->set(prevBfi->getBorrowedValue());
+        continue;
+      }
+    }
+    op->set(V);
   }
-  A->replaceAllUsesWith(V);
 }
 
 bool SimplifyCFG::simplifyArgs(SILBasicBlock *BB) {

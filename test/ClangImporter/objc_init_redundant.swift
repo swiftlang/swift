@@ -1,5 +1,5 @@
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk -I %S/Inputs/custom-modules -F %S/Inputs/frameworks) -import-underlying-module -import-objc-header %S/Inputs/objc_init_redundant_bridging.h -emit-sil %s -verify
-// RUN: not %target-swift-frontend(mock-sdk: %clang-importer-sdk -I %S/Inputs/custom-modules -F %S/Inputs/frameworks) -import-underlying-module -import-objc-header %S/Inputs/objc_init_redundant_bridging.h -emit-sil %s > %t.log 2>&1
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk -I %S/Inputs/custom-modules -F %S/Inputs/frameworks) -import-underlying-module -import-objc-header %S/Inputs/objc_init_redundant_bridging.h -emit-sil %s -verify -swift-version 5 -enable-library-evolution
+// RUN: not %target-swift-frontend(mock-sdk: %clang-importer-sdk -I %S/Inputs/custom-modules -F %S/Inputs/frameworks) -import-underlying-module -import-objc-header %S/Inputs/objc_init_redundant_bridging.h -emit-sil %s -swift-version 5 -enable-library-evolution > %t.log 2>&1
 // RUN: %FileCheck %s < %t.log
 
 // REQUIRES: objc_interop

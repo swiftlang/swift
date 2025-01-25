@@ -77,28 +77,28 @@ Swift.success()
 // over sdk/iOSSupport. (default resource dir + bad-bad-sdk)
 //
 // RUN: %empty-directory(%t.mcp)
-// RUN: not %target-swift-frontend(mock-sdk: -sdk %t/bad-bad-sdk) -target x86_64-apple-ios13.1-macabi -module-cache-path %t.mcp -typecheck %s 2>&1 | %FileCheck %s --check-prefix=RESDIR-MACCATALYST
+// RUN: not %target-swift-frontend(mock-sdk: -sdk %t/bad-bad-sdk) -target %target-cpu-apple-ios13.1-macabi -module-cache-path %t.mcp -typecheck %s 2>&1 | %FileCheck %s --check-prefix=RESDIR-MACCATALYST
 // RESDIR-MACCATALYST: success
 
 // IOSSUP: If resource-dir has no standard library but sdk/iOSSupport does, it
 // will be preferred over sdk. (empty-resdir + good-bad-sdk)
 //
 // RUN: %empty-directory(%t.mcp)
-// RUN: not %target-swift-frontend(mock-sdk: -sdk %t/good-bad-sdk) -target x86_64-apple-ios13.1-macabi -resource-dir %t/empty-resdir/usr/lib/swift -module-cache-path %t.mcp -typecheck %s 2>&1 | %FileCheck %s --check-prefix=IOSSUP-MACCATALYST
+// RUN: not %target-swift-frontend(mock-sdk: -sdk %t/good-bad-sdk) -target %target-cpu-apple-ios13.1-macabi -resource-dir %t/empty-resdir/usr/lib/swift -module-cache-path %t.mcp -typecheck %s 2>&1 | %FileCheck %s --check-prefix=IOSSUP-MACCATALYST
 // IOSSUP-MACCATALYST: success
 
 // IOSBAD: Confirms that we don't use sdk/iOSSupport on non-macCatalyst, even if
 // present. (empty-resdir + bad-good-sdk)
 //
 // RUN: %empty-directory(%t.mcp)
-// RUN: not %target-swift-frontend(mock-sdk: -sdk %t/bad-good-sdk) -target x86_64-apple-ios13.1-macabi -resource-dir %t/empty-resdir/usr/lib/swift -module-cache-path %t.mcp -typecheck %s 2>&1 | %FileCheck %s --check-prefix=IOSBAD-MACCATALYST
+// RUN: not %target-swift-frontend(mock-sdk: -sdk %t/bad-good-sdk) -target %target-cpu-apple-ios13.1-macabi -resource-dir %t/empty-resdir/usr/lib/swift -module-cache-path %t.mcp -typecheck %s 2>&1 | %FileCheck %s --check-prefix=IOSBAD-MACCATALYST
 // IOSBAD-MACCATALYST: failure
 
 // SDKTOP: If resource-dir and sdk/iOSSupport don't have standard libraries but
 // sdk does, it will be used as a last resort. (empty-resdir + empty-good-sdk)
 //
 // RUN: %empty-directory(%t.mcp)
-// RUN: not %target-swift-frontend(mock-sdk: -sdk %t/empty-good-sdk) -target x86_64-apple-ios13.1-macabi -resource-dir %t/empty-resdir/usr/lib/swift -module-cache-path %t.mcp -typecheck %s 2>&1 | %FileCheck %s --check-prefix=SDKTOP-MACCATALYST
+// RUN: not %target-swift-frontend(mock-sdk: -sdk %t/empty-good-sdk) -target %target-cpu-apple-ios13.1-macabi -resource-dir %t/empty-resdir/usr/lib/swift -module-cache-path %t.mcp -typecheck %s 2>&1 | %FileCheck %s --check-prefix=SDKTOP-MACCATALYST
 // SDKTOP-MACCATALYST: success
 
 // NILLIB: If no standard libraries are available, stdlib loading fails.
@@ -106,7 +106,7 @@ Swift.success()
 // the others because there are no failure-failure-failure triples to find.
 //
 // RUN: %empty-directory(%t.mcp)
-// RUN: not %target-swift-frontend(mock-sdk: -sdk %t/empty-empty-sdk) -target x86_64-apple-ios13.1-macabi -resource-dir %t/empty-resdir/usr/lib/swift -module-cache-path %t.mcp -typecheck %s 2>&1 | %FileCheck %s --check-prefix=NILLIB-MACCATALYST
+// RUN: not %target-swift-frontend(mock-sdk: -sdk %t/empty-empty-sdk) -target %target-cpu-apple-ios13.1-macabi -resource-dir %t/empty-resdir/usr/lib/swift -module-cache-path %t.mcp -typecheck %s 2>&1 | %FileCheck %s --check-prefix=NILLIB-MACCATALYST
 // NILLIB-MACCATALYST: unable to load standard library
 
 
@@ -121,28 +121,28 @@ Swift.success()
 // over sdk/iOSSupport. (default resource dir + bad-bad-sdk)
 //
 // RUN: %empty-directory(%t.mcp)
-// RUN: not %target-swift-frontend(mock-sdk: -sdk %t/bad-bad-sdk) -target x86_64-apple-macosx10.15 -module-cache-path %t.mcp -typecheck %s 2>&1 | %FileCheck %s --check-prefix=RESDIR-MACOSX
+// RUN: not %target-swift-frontend(mock-sdk: -sdk %t/bad-bad-sdk) -target %target-cpu-apple-macosx10.15 -module-cache-path %t.mcp -typecheck %s 2>&1 | %FileCheck %s --check-prefix=RESDIR-MACOSX
 // RESDIR-MACOSX: {{success|module 'Swift' was created for incompatible target}}
 
 // IOSSUP: If resource-dir has no standard library but sdk/iOSSupport does, it
 // will be preferred over sdk. (empty-resdir + good-bad-sdk)
 //
 // RUN: %empty-directory(%t.mcp)
-// RUN: not %target-swift-frontend(mock-sdk: -sdk %t/good-bad-sdk) -target x86_64-apple-macosx10.15 -resource-dir %t/empty-resdir/usr/lib/swift -module-cache-path %t.mcp -typecheck %s 2>&1 | %FileCheck %s --check-prefix=IOSSUP-MACOSX
+// RUN: not %target-swift-frontend(mock-sdk: -sdk %t/good-bad-sdk) -target %target-cpu-apple-macosx10.15 -resource-dir %t/empty-resdir/usr/lib/swift -module-cache-path %t.mcp -typecheck %s 2>&1 | %FileCheck %s --check-prefix=IOSSUP-MACOSX
 // IOSSUP-MACOSX: failure
 
 // IOSBAD: Confirms that we don't use sdk/iOSSupport on non-macCatalyst, even if
 // present. (empty-resdir + bad-good-sdk)
 //
 // RUN: %empty-directory(%t.mcp)
-// RUN: not %target-swift-frontend(mock-sdk: -sdk %t/bad-good-sdk) -target x86_64-apple-macosx10.15 -resource-dir %t/empty-resdir/usr/lib/swift -module-cache-path %t.mcp -typecheck %s 2>&1 | %FileCheck %s --check-prefix=IOSBAD-MACOSX
+// RUN: not %target-swift-frontend(mock-sdk: -sdk %t/bad-good-sdk) -target %target-cpu-apple-macosx10.15 -resource-dir %t/empty-resdir/usr/lib/swift -module-cache-path %t.mcp -typecheck %s 2>&1 | %FileCheck %s --check-prefix=IOSBAD-MACOSX
 // IOSBAD-MACOSX: {{success|module 'Swift' was created for incompatible target}}
 
 // SDKTOP: If resource-dir and sdk/iOSSupport don't have standard libraries but
 // sdk does, it will be used as a last resort. (empty-resdir + empty-good-sdk)
 //
 // RUN: %empty-directory(%t.mcp)
-// RUN: not %target-swift-frontend(mock-sdk: -sdk %t/empty-good-sdk) -target x86_64-apple-macosx10.15 -resource-dir %t/empty-resdir/usr/lib/swift -module-cache-path %t.mcp -typecheck %s 2>&1 | %FileCheck %s --check-prefix=SDKTOP-MACOSX
+// RUN: not %target-swift-frontend(mock-sdk: -sdk %t/empty-good-sdk) -target %target-cpu-apple-macosx10.15 -resource-dir %t/empty-resdir/usr/lib/swift -module-cache-path %t.mcp -typecheck %s 2>&1 | %FileCheck %s --check-prefix=SDKTOP-MACOSX
 // SDKTOP-MACOSX: {{success|module 'Swift' was created for incompatible target}}
 
 // NILLIB: If no standard libraries are available, stdlib loading fails.
@@ -150,5 +150,5 @@ Swift.success()
 // the others because there are no failure-failure-failure triples to find.
 //
 // RUN: %empty-directory(%t.mcp)
-// RUN: not %target-swift-frontend(mock-sdk: -sdk %t/empty-empty-sdk) -target x86_64-apple-macosx10.15 -resource-dir %t/empty-resdir/usr/lib/swift -module-cache-path %t.mcp -typecheck %s 2>&1 | %FileCheck %s --check-prefix=NILLIB-MACOSX
+// RUN: not %target-swift-frontend(mock-sdk: -sdk %t/empty-empty-sdk) -target %target-cpu-apple-macosx10.15 -resource-dir %t/empty-resdir/usr/lib/swift -module-cache-path %t.mcp -typecheck %s 2>&1 | %FileCheck %s --check-prefix=NILLIB-MACOSX
 // NILLIB-MACOSX: unable to load standard library

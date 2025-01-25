@@ -186,7 +186,7 @@ FunctionSignatureTransformDescriptor::createOptimizedSILFunctionName() {
   SILFunction *F = OriginalFunction;
 
   auto P = Demangle::SpecializationPass::FunctionSignatureOpts;
-  Mangle::FunctionSignatureSpecializationMangler Mangler(
+  Mangle::FunctionSignatureSpecializationMangler Mangler(F->getASTContext(),
       P, F->getSerializedKind(), F);
 
   // Handle arguments' changes.
@@ -288,6 +288,11 @@ static bool usesGenerics(SILFunction *F,
         for (auto Ty : Subs.getReplacementTypes()) {
           Ty.visit(FindArchetypesAndGenericTypes);
         }
+      }
+
+      // Scan the parameter type of a 'type_value'.
+      if (auto tvi = dyn_cast<TypeValueInst>(&I)) {
+        tvi->getParamType().visit(FindArchetypesAndGenericTypes);
       }
 
       // Scan the result type of the instruction.
@@ -858,7 +863,7 @@ public:
     // going to change, make sure the mangler is aware of all the changes done
     // to the function.
     auto P = Demangle::SpecializationPass::FunctionSignatureOpts;
-    Mangle::FunctionSignatureSpecializationMangler Mangler(
+    Mangle::FunctionSignatureSpecializationMangler Mangler(F->getASTContext(),
         P, F->getSerializedKind(), F);
 
     /// Keep a map between the exploded argument index and the original argument

@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 import Basic
+import AST
 import SILBridging
 
 /// A utility to create new instructions at a given insertion point.
@@ -23,13 +24,25 @@ public struct Builder {
     case staticInitializer(GlobalVariable)
   }
 
-  let insertAt: InsertionPoint
+  public let insertionPoint: InsertionPoint
   let location: Location
   private let notificationHandler: BridgedChangeNotificationHandler
   private let notifyNewInstruction: (Instruction) -> ()
 
+  /// Return 'nil' when inserting at the start of a function or in a global initializer.
+  public var insertionBlock: BasicBlock? {
+    switch insertionPoint {
+    case let .before(inst):
+      return inst.parentBlock
+    case let .atEndOf(block):
+      return block
+    case .atStartOf, .staticInitializer:
+      return nil
+    }
+  }
+
   public var bridged: BridgedBuilder {
-    switch insertAt {
+    switch insertionPoint {
     case .before(let inst):
       return BridgedBuilder(insertAt: .beforeInst, insertionObj: inst.bridged.obj,
                             loc: location.bridged)
@@ -60,10 +73,21 @@ public struct Builder {
   public init(insertAt: InsertionPoint, location: Location,
               _ notifyNewInstruction: @escaping (Instruction) -> (),
               _ notificationHandler: BridgedChangeNotificationHandler) {
-    self.insertAt = insertAt
+    self.insertionPoint = insertAt
     self.location = location;
     self.notifyNewInstruction = notifyNewInstruction
     self.notificationHandler = notificationHandler
+  }
+
+  public func createBuiltin(name: StringRef,
+                            type: Type,
+                            substitutions: SubstitutionMap = SubstitutionMap(),
+                            arguments: [Value]) -> BuiltinInst {
+    return arguments.withBridgedValues { valuesRef in
+      let bi = bridged.createBuiltin(
+        name._bridged, type.bridged, substitutions.bridged, valuesRef)
+      return notifyNew(bi.getAs(BuiltinInst.self))
+    }
   }
 
   public func createBuiltinBinaryFunction(name: String,
@@ -88,6 +112,14 @@ public struct Builder {
   public func createIntegerLiteral(_ value: Int, type: Type) -> IntegerLiteralInst {
     let literal = bridged.createIntegerLiteral(type.bridged, value)
     return notifyNew(literal.getAs(IntegerLiteralInst.self))
+  }
+    
+  public func createAllocRef(_ type: Type, isObjC: Bool = false, canAllocOnStack: Bool = false, isBare: Bool = false,
+                             tailAllocatedTypes: TypeArray, tailAllocatedCounts: [Value]) -> AllocRefInst {
+    return tailAllocatedCounts.withBridgedValues { countsRef in
+      let dr = bridged.createAllocRef(type.bridged, isObjC, canAllocOnStack, isBare, tailAllocatedTypes.bridged, countsRef)
+      return notifyNew(dr.getAs(AllocRefInst.self))
+    }
   }
 
   public func createAllocStack(_ type: Type, hasDynamicLifetime: Bool = false,
@@ -121,9 +153,27 @@ public struct Builder {
     return notifyNew(dr.getAs(AddressToPointerInst.self))
   }
 
+  public func createPointerToAddress(pointer: Value, addressType: Type,
+                                     isStrict: Bool, isInvariant: Bool,
+                                     alignment: Int? = nil) -> PointerToAddressInst {
+    let dr = bridged.createPointerToAddress(pointer.bridged, addressType.bridged, isStrict, isInvariant,
+                                            UInt64(alignment ?? 0))
+    return notifyNew(dr.getAs(PointerToAddressInst.self))
+  }
+
+  public func createIndexAddr(base: Value, index: Value, needStackProtection: Bool) -> IndexAddrInst {
+    let dr = bridged.createIndexAddr(base.bridged, index.bridged, needStackProtection)
+    return notifyNew(dr.getAs(IndexAddrInst.self))
+  }
+
   public func createUncheckedRefCast(from value: Value, to type: Type) -> UncheckedRefCastInst {
     let cast = bridged.createUncheckedRefCast(value.bridged, type.bridged)
     return notifyNew(cast.getAs(UncheckedRefCastInst.self))
+  }
+
+  public func createUncheckedAddrCast(from value: Value, to type: Type) -> UncheckedAddrCastInst {
+    let cast = bridged.createUncheckedAddrCast(value.bridged, type.bridged)
+    return notifyNew(cast.getAs(UncheckedAddrCastInst.self))
   }
 
   public func createUpcast(from value: Value, to type: Type) -> UpcastInst {
@@ -196,8 +246,14 @@ public struct Builder {
     return notifyNew(bridged.createCopyValue(operand.bridged).getAs(CopyValueInst.self))
   }
 
-  public func createBeginBorrow(of value: Value) -> BeginBorrowInst {
-    return notifyNew(bridged.createBeginBorrow(value.bridged).getAs(BeginBorrowInst.self))
+  public func createBeginBorrow(
+    of value: Value,
+    isLexical: Bool = false,
+    hasPointerEscape: Bool = false,
+    isFromVarDecl: Bool = false
+  ) -> BeginBorrowInst {
+    return notifyNew(bridged.createBeginBorrow(value.bridged,
+             isLexical, hasPointerEscape, isFromVarDecl).getAs(BeginBorrowInst.self))
   }
 
   public func createBorrowedFrom(borrowedValue: Value, enclosingValues: [Value]) -> BorrowedFromInst {
@@ -426,20 +482,22 @@ public struct Builder {
 
   public func createInitExistentialRef(instance: Value,
                                        existentialType: Type,
-                                       useConformancesOf: InitExistentialRefInst) -> InitExistentialRefInst {
+                                       formalConcreteType: CanonicalType,
+                                       conformances: ConformanceArray) -> InitExistentialRefInst {
     let initExistential = bridged.createInitExistentialRef(instance.bridged,
                                                            existentialType.bridged,
-                                                           useConformancesOf.bridged)
+                                                           formalConcreteType.bridged,
+                                                           conformances.bridged)
     return notifyNew(initExistential.getAs(InitExistentialRefInst.self))
   }
 
   public func createInitExistentialMetatype(
     metatype: Value,
     existentialType: Type,
-    useConformancesOf: InitExistentialMetatypeInst) -> InitExistentialMetatypeInst {
+    conformances: ConformanceArray) -> InitExistentialMetatypeInst {
     let initExistential = bridged.createInitExistentialMetatype(metatype.bridged,
                                                                 existentialType.bridged,
-                                                                useConformancesOf.bridged)
+                                                                conformances.bridged)
     return notifyNew(initExistential.getAs(InitExistentialMetatypeInst.self))
   }
 
@@ -463,6 +521,18 @@ public struct Builder {
   public func createEndAccess(beginAccess: BeginAccessInst) -> EndAccessInst {
       let endAccess = bridged.createEndAccess(beginAccess.bridged)
       return notifyNew(endAccess.getAs(EndAccessInst.self))
+  }
+
+  @discardableResult
+  public func createEndApply(beginApply: BeginApplyInst) -> EndApplyInst {
+    let endApply = bridged.createEndApply(beginApply.token.bridged)
+    return notifyNew(endApply.getAs(EndApplyInst.self))
+  }
+
+  @discardableResult
+  public func createAbortApply(beginApply: BeginApplyInst) -> AbortApplyInst {
+    let endApply = bridged.createAbortApply(beginApply.token.bridged)
+    return notifyNew(endApply.getAs(AbortApplyInst.self))
   }
 
   public func createConvertFunction(originalFunction: Value, resultType: Type, withoutActuallyEscaping: Bool) -> ConvertFunctionInst {

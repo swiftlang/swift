@@ -21,9 +21,11 @@
 #include "TypeCheckObjC.h"
 #include "TypeCheckType.h"
 #include "TypeChecker.h"
+#include "DerivedConformances.h"
 #include "swift/AST/ASTMangler.h"
 #include "swift/AST/ASTPrinter.h"
-#include "swift/AST/Availability.h"
+#include "swift/AST/AvailabilityInference.h"
+#include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/DistributedDecl.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/GenericEnvironment.h"
@@ -547,7 +549,7 @@ createDesignatedInitOverrideGenericParams(ASTContext &ctx,
   for (auto *param : genericParams->getParams()) {
     auto *newParam = GenericTypeParamDecl::createImplicit(
         classDecl, param->getName(), depth, param->getIndex(),
-        param->isParameterPack(), param->isOpaqueType());
+        param->getParamKind());
     newParams.push_back(newParam);
   }
 
@@ -625,8 +627,7 @@ configureInheritedDesignatedInitAttributes(ClassDecl *classDecl,
     if (auto *parentDecl = classDecl->getInnermostDeclWithAvailability()) {
       asAvailableAs.push_back(parentDecl);
     }
-    AvailabilityInference::applyInferredAvailableAttrs(
-        ctor, asAvailableAs, ctx);
+    AvailabilityInference::applyInferredAvailableAttrs(ctor, asAvailableAs);
   }
 
   // Wire up the overrides.
@@ -767,7 +768,7 @@ createDesignatedInitOverride(ClassDecl *classDecl,
   auto genericSig = ctx.getOverrideGenericSignature(
       superclassDecl, classDecl, superclassCtorSig, genericParams);
 
-  assert(!subMap.hasArchetypes());
+  assert(!subMap.getRecursiveProperties().hasArchetype());
 
   if (superclassCtorSig) {
     auto *genericEnv = genericSig.getGenericEnvironment();
@@ -1177,7 +1178,7 @@ static void collectNonOveriddenSuperclassInits(
       continue;
 
     // Skip unavailable superclass initializers.
-    if (AvailableAttr::isUnavailable(superclassCtor))
+    if (superclassCtor->isUnavailable())
       continue;
 
     if (!overriddenInits.count(superclassCtor))
@@ -1381,8 +1382,7 @@ ResolveImplicitMemberRequest::evaluate(Evaluator &evaluator,
       return false;
 
     auto targetType = target->getDeclaredInterfaceType();
-    auto ref = ModuleDecl::lookupConformance(
-        targetType, protocol);
+    auto ref = lookupConformance(targetType, protocol);
     if (ref.isInvalid()) {
       return false;
     }
@@ -1693,11 +1693,6 @@ SynthesizeDefaultInitRequest::evaluate(Evaluator &evaluator,
                                        NominalTypeDecl *decl) const {
   auto &ctx = decl->getASTContext();
 
-  FrontendStatsTracer StatsTracer(ctx.Stats,
-                                  "define-default-ctor", decl);
-  PrettyStackTraceDecl stackTrace("defining default constructor for",
-                                  decl);
-
   // Create the default constructor.
   auto ctorKind = decl->isDistributedActor() ?
       ImplicitConstructorKind::DefaultDistributedActor :
@@ -1732,6 +1727,15 @@ bool swift::hasLetStoredPropertyWithInitialValue(NominalTypeDecl *nominal) {
   return llvm::any_of(nominal->getStoredProperties(), [&](VarDecl *v) {
     return v->isLet() && v->hasInitialValue();
   });
+}
+
+bool swift::addNonIsolatedToSynthesized(DerivedConformance &derived,
+                                        ValueDecl *value) {
+  if (auto *conformance = derived.Conformance) {
+    if (conformance && conformance->isPreconcurrency())
+      return false;
+  }
+  return addNonIsolatedToSynthesized(derived.Nominal, value);
 }
 
 bool swift::addNonIsolatedToSynthesized(NominalTypeDecl *nominal,

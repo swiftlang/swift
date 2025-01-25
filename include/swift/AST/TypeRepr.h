@@ -111,11 +111,6 @@ protected:
     /// The number of elements contained.
     NumElements : 32
   );
-
-  SWIFT_INLINE_BITFIELD_FULL(LifetimeDependentTypeRepr, TypeRepr, 32,
-      : NumPadBits,
-      NumDependencies : 32
-   );
   } Bits;
   // clang-format on
 
@@ -1531,35 +1526,19 @@ private:
   friend TypeRepr;
 };
 
-class LifetimeDependentTypeRepr final
-    : public SpecifierTypeRepr,
-      private llvm::TrailingObjects<LifetimeDependentTypeRepr,
-                                    LifetimeDependenceSpecifier> {
-  friend TrailingObjects;
-
-  size_t numTrailingObjects(OverloadToken<LifetimeDependentTypeRepr>) const {
-    return Bits.LifetimeDependentTypeRepr.NumDependencies;
-  }
+class LifetimeDependentTypeRepr final : public SpecifierTypeRepr {
+  LifetimeEntry *entry;
 
 public:
-  LifetimeDependentTypeRepr(TypeRepr *base,
-                            ArrayRef<LifetimeDependenceSpecifier> specifiers)
+  LifetimeDependentTypeRepr(TypeRepr *base, LifetimeEntry *entry)
       : SpecifierTypeRepr(TypeReprKind::LifetimeDependent, base,
-                          specifiers.front().getLoc()) {
-    assert(base);
-    Bits.LifetimeDependentTypeRepr.NumDependencies = specifiers.size();
-    std::uninitialized_copy(specifiers.begin(), specifiers.end(),
-                            getTrailingObjects<LifetimeDependenceSpecifier>());
-  }
+                          entry->getLoc()),
+        entry(entry) {}
 
-  static LifetimeDependentTypeRepr *
-  create(ASTContext &C, TypeRepr *base,
-         ArrayRef<LifetimeDependenceSpecifier> specifiers);
+  static LifetimeDependentTypeRepr *create(ASTContext &C, TypeRepr *base,
+                                           LifetimeEntry *entry);
 
-  ArrayRef<LifetimeDependenceSpecifier> getLifetimeDependencies() const {
-    return {getTrailingObjects<LifetimeDependenceSpecifier>(),
-            Bits.LifetimeDependentTypeRepr.NumDependencies};
-  }
+  LifetimeEntry *getLifetimeEntry() const { return entry; }
 
   static bool classof(const TypeRepr *T) {
     return T->getKind() == TypeReprKind::LifetimeDependent;
@@ -1570,6 +1549,47 @@ private:
   SourceLoc getStartLocImpl() const;
   SourceLoc getEndLocImpl() const;
   SourceLoc getLocImpl() const;
+  void printImpl(ASTPrinter &Printer, const PrintOptions &Opts) const;
+  friend class TypeRepr;
+};
+
+/// A TypeRepr for an integer appearing in a type position.
+class IntegerTypeRepr final : public TypeRepr {
+  StringRef Value;
+  SourceLoc Loc;
+  SourceLoc MinusLoc;
+
+public:
+  IntegerTypeRepr(StringRef value, SourceLoc loc, SourceLoc minusLoc)
+    : TypeRepr(TypeReprKind::Integer), Value(value), Loc(loc),
+      MinusLoc(minusLoc) {}
+
+  StringRef getValue() const {
+    return Value;
+  }
+
+  SourceLoc getLoc() const {
+    return Loc;
+  }
+
+  SourceLoc getMinusLoc() const {
+    return MinusLoc;
+  }
+
+  static bool classof(const TypeRepr *T) {
+    return T->getKind() == TypeReprKind::Integer;
+  }
+
+private:
+  SourceLoc getStartLocImpl() const {
+    if (MinusLoc)
+      return MinusLoc;
+
+    return Loc;
+  }
+
+  SourceLoc getEndLocImpl() const { return Loc; }
+  SourceLoc getLocImpl() const { return Loc; }
   void printImpl(ASTPrinter &Printer, const PrintOptions &Opts) const;
   friend class TypeRepr;
 };
@@ -1608,6 +1628,7 @@ inline bool TypeRepr::isSimple() const {
   case TypeReprKind::Placeholder:
   case TypeReprKind::CompileTimeConst:
   case TypeReprKind::LifetimeDependent:
+  case TypeReprKind::Integer:
     return true;
   }
   llvm_unreachable("bad TypeRepr kind");

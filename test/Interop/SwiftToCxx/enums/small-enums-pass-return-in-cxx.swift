@@ -109,41 +109,41 @@ public func inoutSmall(_ en: inout Small, _ x: Int) {
 // CHECK: class SWIFT_SYMBOL("s:5Enums4TinyO") Tiny final {
 
 // CHECK:      SWIFT_INLINE_THUNK void inoutSmall(Small& en, swift::Int x) noexcept SWIFT_SYMBOL("s:5Enums10inoutSmallyyAA0C0Oz_SitF") {
-// CHECK-NEXT:   _impl::$s5Enums10inoutSmallyyAA0C0Oz_SitF(_impl::_impl_Small::getOpaquePointer(en), x);
+// CHECK-NEXT:  Enums::_impl::$s5Enums10inoutSmallyyAA0C0Oz_SitF(Enums::_impl::_impl_Small::getOpaquePointer(en), x);
 // CHECK-NEXT: }
 
 // CHECK:      SWIFT_INLINE_THUNK void inoutTiny(Tiny& en, swift::Int x) noexcept SWIFT_SYMBOL("s:5Enums9inoutTinyyyAA0C0Oz_SitF") {
-// CHECK-NEXT:   _impl::$s5Enums9inoutTinyyyAA0C0Oz_SitF(_impl::_impl_Tiny::getOpaquePointer(en), x);
+// CHECK-NEXT:   Enums::_impl::$s5Enums9inoutTinyyyAA0C0Oz_SitF(Enums::_impl::_impl_Tiny::getOpaquePointer(en), x);
 // CHECK-NEXT: }
 
 // CHECK:      SWIFT_INLINE_THUNK Small makeSmall(swift::Int x) noexcept SWIFT_SYMBOL("s:5Enums9makeSmallyAA0C0OSiF") SWIFT_WARN_UNUSED_RESULT {
-// CHECK-NEXT:   return _impl::_impl_Small::returnNewValue([&](char * _Nonnull result) SWIFT_INLINE_THUNK_ATTRIBUTES {
-// CHECK-NEXT:     _impl::swift_interop_returnDirect_Enums_[[Small]](result, _impl::$s5Enums9makeSmallyAA0C0OSiF(x));
+// CHECK-NEXT:   return Enums::_impl::_impl_Small::returnNewValue([&](char * _Nonnull result) SWIFT_INLINE_THUNK_ATTRIBUTES {
+// CHECK-NEXT:     Enums::_impl::swift_interop_returnDirect_Enums_[[Small]](result, Enums::_impl::$s5Enums9makeSmallyAA0C0OSiF(x));
 // CHECK-NEXT:   });
 // CHECK-NEXT: }
 
 // CHECK:      SWIFT_INLINE_THUNK Tiny makeTiny(swift::Int x) noexcept SWIFT_SYMBOL("s:5Enums8makeTinyyAA0C0OSiF") SWIFT_WARN_UNUSED_RESULT {
-// CHECK-NEXT:   return _impl::_impl_Tiny::returnNewValue([&](char * _Nonnull result) SWIFT_INLINE_THUNK_ATTRIBUTES {
-// CHECK-NEXT:     _impl::swift_interop_returnDirect_Enums_uint8_t_0_1(result, _impl::$s5Enums8makeTinyyAA0C0OSiF(x));
+// CHECK-NEXT:   return Enums::_impl::_impl_Tiny::returnNewValue([&](char * _Nonnull result) SWIFT_INLINE_THUNK_ATTRIBUTES {
+// CHECK-NEXT:     Enums::_impl::swift_interop_returnDirect_Enums_uint8_t_0_1(result, Enums::_impl::$s5Enums8makeTinyyAA0C0OSiF(x));
 // CHECK-NEXT:   });
 // CHECK-NEXT: }
 
 // CHECK:      SWIFT_INLINE_THUNK Small passThroughSmall(const Small& en) noexcept SWIFT_SYMBOL("s:5Enums16passThroughSmallyAA0D0OADF") SWIFT_WARN_UNUSED_RESULT {
-// CHECK-NEXT:   return _impl::_impl_Small::returnNewValue([&](char * _Nonnull result) SWIFT_INLINE_THUNK_ATTRIBUTES {
-// CHECK-NEXT:     _impl::swift_interop_returnDirect_Enums_[[Small]](result, _impl::$s5Enums16passThroughSmallyAA0D0OADF(_impl::swift_interop_passDirect_Enums_[[Small]](_impl::_impl_Small::getOpaquePointer(en))));
+// CHECK-NEXT:   return Enums::_impl::_impl_Small::returnNewValue([&](char * _Nonnull result) SWIFT_INLINE_THUNK_ATTRIBUTES {
+// CHECK-NEXT:     Enums::_impl::swift_interop_returnDirect_Enums_[[Small]](result, Enums::_impl::$s5Enums16passThroughSmallyAA0D0OADF(Enums::_impl::swift_interop_passDirect_Enums_[[Small]](Enums::_impl::_impl_Small::getOpaquePointer(en))));
 // CHECK-NEXT:   });
 // CHECK-NEXT: }
 
 // CHECK:      SWIFT_INLINE_THUNK Tiny passThroughTiny(const Tiny& en) noexcept SWIFT_SYMBOL("s:5Enums15passThroughTinyyAA0D0OADF") SWIFT_WARN_UNUSED_RESULT {
-// CHECK-NEXT:   return _impl::_impl_Tiny::returnNewValue([&](char * _Nonnull result) SWIFT_INLINE_THUNK_ATTRIBUTES {
-// CHECK-NEXT:     _impl::swift_interop_returnDirect_Enums_uint8_t_0_1(result, _impl::$s5Enums15passThroughTinyyAA0D0OADF(_impl::swift_interop_passDirect_Enums_uint8_t_0_1(_impl::_impl_Tiny::getOpaquePointer(en))));
+// CHECK-NEXT:   return Enums::_impl::_impl_Tiny::returnNewValue([&](char * _Nonnull result) SWIFT_INLINE_THUNK_ATTRIBUTES {
+// CHECK-NEXT:     Enums::_impl::swift_interop_returnDirect_Enums_uint8_t_0_1(result, Enums::_impl::$s5Enums15passThroughTinyyAA0D0OADF(Enums::_impl::swift_interop_passDirect_Enums_uint8_t_0_1(Enums::_impl::_impl_Tiny::getOpaquePointer(en))));
 // CHECK-NEXT:   });
 // CHECK-NEXT: }
 
 // CHECK:      SWIFT_INLINE_THUNK void printSmall(const Small& en) noexcept SWIFT_SYMBOL("s:5Enums10printSmallyyAA0C0OF") {
-// CHECK-NEXT:   _impl::$s5Enums10printSmallyyAA0C0OF(_impl::swift_interop_passDirect_Enums_[[Small]](_impl::_impl_Small::getOpaquePointer(en)));
+// CHECK-NEXT:   Enums::_impl::$s5Enums10printSmallyyAA0C0OF(Enums::_impl::swift_interop_passDirect_Enums_[[Small]](Enums::_impl::_impl_Small::getOpaquePointer(en)));
 // CHECK-NEXT: }
 
 // CHECK:      SWIFT_INLINE_THUNK void printTiny(const Tiny& en) noexcept SWIFT_SYMBOL("s:5Enums9printTinyyyAA0C0OF") {
-// CHECK-NEXT:   _impl::$s5Enums9printTinyyyAA0C0OF(_impl::swift_interop_passDirect_Enums_uint8_t_0_1(_impl::_impl_Tiny::getOpaquePointer(en)));
+// CHECK-NEXT:   Enums::_impl::$s5Enums9printTinyyyAA0C0OF(Enums::_impl::swift_interop_passDirect_Enums_uint8_t_0_1(Enums::_impl::_impl_Tiny::getOpaquePointer(en)));
 // CHECK-NEXT: }

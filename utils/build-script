@@ -424,7 +424,7 @@ def apply_default_arguments(toolchain, args):
         for target in targets
         if (not target.platform.is_darwin or
             target.platform.sdk_supports_architecture(
-                target.arch, args.darwin_xcrun_toolchain))
+                target.arch, args.darwin_xcrun_toolchain, args))
     ]
 
     # Include the Darwin module-only architectures in the CMake options.
@@ -495,6 +495,13 @@ def parse_preset_args():
         help="list all presets and exit",
         action=argparse.actions.StoreTrueAction,
         nargs=argparse.Nargs.OPTIONAL)
+    parser.add_argument(
+        "--preset-vars-file",
+        help="load preset vars from the specified file",
+        metavar="PATH",
+        action="append",
+        dest="preset_vars_file_names",
+        default=[])
     parser.add_argument(
         "--distcc",
         help="use distcc",
@@ -589,6 +596,13 @@ def main_preset():
         fatal_error("missing --preset option")
 
     args.preset_substitutions = {}
+    for file in args.preset_vars_file_names:
+        if os.path.isfile(file):
+            with open(file, 'r') as f:
+                for _, line in enumerate(f):
+                    name, value = line.split("=", 1)
+                    args.preset_substitutions[name] = value.strip()
+
     for arg in args.preset_substitutions_raw:
         name, value = arg.split("=", 1)
         args.preset_substitutions[name] = value

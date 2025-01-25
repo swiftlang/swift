@@ -19,6 +19,7 @@
 #include "swift/SILOptimizer/Analysis/BasicCalleeAnalysis.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
+#include "swift/SILOptimizer/Utils/BasicBlockOptUtils.h"
 #include "swift/SILOptimizer/Utils/CFGOptUtils.h"
 #include "swift/SILOptimizer/Utils/Devirtualize.h"
 #include "swift/SILOptimizer/Utils/Generics.h"
@@ -239,10 +240,11 @@ public:
   SILPerformanceInliner(StringRef PassName, SILOptFunctionBuilder &FuncBuilder,
                         InlineSelection WhatToInline,
                         SILPassManager *pm, DominanceAnalysis *DA,
+                        PostDominanceAnalysis *PDA,
                         SILLoopAnalysis *LA, BasicCalleeAnalysis *BCA,
                         OptimizationMode OptMode, OptRemark::Emitter &ORE)
       : PassName(PassName), FuncBuilder(FuncBuilder),
-        WhatToInline(WhatToInline), pm(pm), DA(DA), LA(LA), BCA(BCA), CBI(DA), ORE(ORE),
+        WhatToInline(WhatToInline), pm(pm), DA(DA), LA(LA), BCA(BCA), CBI(DA, PDA), ORE(ORE),
         OptMode(OptMode) {}
 
   bool inlineCallsIntoFunction(SILFunction *F);
@@ -470,6 +472,16 @@ bool SILPerformanceInliner::isProfitableToInline(
   int BaseBenefit = isa<BeginApplyInst>(AI) ? RemovedCoroutineCallBenefit
                                             : RemovedCallBenefit;
 
+  // If function has more than 5 parameters / results, then increase base
+  // benefit for each additional parameter. We assume that for each extra
+  // parameter or result we'd eliminate extra pair of loads and stores used to
+  // pass / return value via stack.
+  unsigned numParameters = AI->getNumRealOperands(), numResults = AI->getNumResults();
+  if (numParameters > 5)
+    BaseBenefit += (RemovedLoadBenefit + RemovedStoreBenefit) * (numParameters - 5);
+  if (numResults > 5)
+    BaseBenefit += (RemovedLoadBenefit + RemovedStoreBenefit) * (numResults - 5);
+
   // Osize heuristic.
   //
   // As a hack, don't apply this at all to coroutine inlining; avoiding
@@ -525,9 +537,15 @@ bool SILPerformanceInliner::isProfitableToInline(
     return false;
   }
 
-  SILLoopInfo *LI = LA->get(Callee);
-  ShortestPathAnalysis *SPA = getSPA(Callee, LI);
-  assert(SPA->isValid());
+  SILLoopInfo *CalleeLI = LA->get(Callee);
+  ShortestPathAnalysis *CalleeSPA = getSPA(Callee, CalleeLI);
+  if (!CalleeSPA->isValid()) {
+    CalleeSPA->analyze(CBI, [](FullApplySite FAS) {
+      // We don't compute SPA for another call-level. Functions called from
+      // the callee are assumed to have DefaultApplyLength.
+      return DefaultApplyLength;
+    });
+  }
 
   ConstantTracker constTracker(Callee, &callerTracker, AI);
   DominanceInfo *DT = DA->get(Callee);
@@ -560,7 +578,7 @@ bool SILPerformanceInliner::isProfitableToInline(
   // benefits.
   while (SILBasicBlock *block = domOrder.getNext()) {
     constTracker.beginBlock();
-    Weight BlockW = SPA->getWeight(block, CallerWeight);
+    Weight BlockW = CalleeSPA->getWeight(block, CallerWeight);
 
     for (SILInstruction &I : *block) {
       constTracker.trackInst(&I);
@@ -773,7 +791,7 @@ bool SILPerformanceInliner::isProfitableToInline(
   LLVM_DEBUG(dumpCaller(AI.getFunction());
              llvm::dbgs() << "    decision {c=" << CalleeCost
                           << ", b=" << Benefit
-                          << ", l=" << SPA->getScopeLength(CalleeEntry, 0)
+                          << ", l=" << CalleeSPA->getScopeLength(CalleeEntry, 0)
                           << ", c-w=" << CallerWeight
                           << ", bb=" << Callee->size()
                           << ", c-bb=" << NumCallerBlocks
@@ -858,7 +876,7 @@ static std::optional<bool> shouldInlineGeneric(FullApplySite AI,
   // If all substitutions are concrete, then there is no need to perform the
   // generic inlining. Let the generic specializer create a specialized
   // function and then decide if it is beneficial to inline it.
-  if (!AI.getSubstitutionMap().hasArchetypes())
+  if (!AI.getSubstitutionMap().getRecursiveProperties().hasArchetype())
     return false;
 
   if (Callee->getLoweredFunctionType()->getCoroutineKind() !=
@@ -1151,7 +1169,7 @@ void SILPerformanceInliner::collectAppliesToInline(
     }
 
     domOrder.pushChildrenIf(block, [&] (SILBasicBlock *child) {
-      if (CBI.isSlowPath(block, child)) {
+      if (CBI.isCold(child)) {
         // Handle cold blocks separately.
         visitColdBlocks(InitialCandidates, child, DT, NumCallerBlocks);
         return false;
@@ -1279,7 +1297,7 @@ bool SILPerformanceInliner::inlineCallsIntoFunction(SILFunction *Caller) {
   if (invalidatedStackNesting) {
     StackNesting::fixNesting(Caller);
   }
-  updateBorrowedFrom(pm, Caller);
+  updateAllGuaranteedPhis(pm, Caller);
 
   // If we were asked to verify our caller after inlining all callees we could
   // find into it, do so now. This makes it easier to catch verification bugs in
@@ -1331,6 +1349,7 @@ public:
 
   void run() override {
     DominanceAnalysis *DA = PM->getAnalysis<DominanceAnalysis>();
+    PostDominanceAnalysis *PDA = PM->getAnalysis<PostDominanceAnalysis>();
     SILLoopAnalysis *LA = PM->getAnalysis<SILLoopAnalysis>();
     BasicCalleeAnalysis *BCA = PM->getAnalysis<BasicCalleeAnalysis>();
     OptRemark::Emitter ORE(DEBUG_TYPE, *getFunction());
@@ -1344,7 +1363,7 @@ public:
     SILOptFunctionBuilder FuncBuilder(*this);
 
     SILPerformanceInliner Inliner(getID(), FuncBuilder, WhatToInline,
-                                  getPassManager(), DA, LA, BCA, OptMode, ORE);
+                              getPassManager(), DA, PDA, LA, BCA, OptMode, ORE);
 
     assert(getFunction()->isDefinition() &&
            "Expected only functions with bodies!");
@@ -1354,6 +1373,7 @@ public:
     // can further optimize this function before attempting to inline
     // in it again.
     if (Inliner.inlineCallsIntoFunction(getFunction())) {
+      removeUnreachableBlocks(*getFunction());
       invalidateAnalysis(SILAnalysis::InvalidationKind::FunctionBody);
       restartPassPipeline();
     }

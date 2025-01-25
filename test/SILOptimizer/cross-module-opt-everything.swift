@@ -29,6 +29,24 @@ public func module_func() {
   }
 }
 
+public protocol P {
+  func f()
+}
+
+public struct S1: P {
+  public init() {}
+  public func f() {}
+}
+
+public struct S2: P {
+  public init() {}
+  public func f() {}
+}
+
+public func open_existential(_ p: P) {
+  p.f()
+}
+
 // BEGIN Main.swift
 
 import Module
@@ -43,4 +61,9 @@ public func client_func() {
   foo {
     return 0
   }
+}
+
+public func client_func_2() {
+  open_existential(S1())
+  open_existential(S2())
 }

@@ -10,6 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+import AST
 import SIL
 
 /// Outlines class objects from functions into statically initialized global variables.
@@ -105,7 +106,10 @@ private func optimizeObjectAllocation(allocRef: AllocRefInstBase, _ context: Fun
 
   let outlinedGlobal = context.createGlobalVariable(
         name: context.mangleOutlinedVariable(from: allocRef.parentFunction),
-        type: allocRef.type, isPrivate: true)
+        type: allocRef.type, linkage: .private,
+        // Only if it's a COW object we can be sure that the object allocated in the global is not mutated.
+        // If someone wants to mutate it, it has to be copied first.
+        isLet: endOfInitInst is EndCOWMutationInst)
 
   constructObject(of: allocRef, inInitializerOf: outlinedGlobal, storesToClassFields, storesToTailElements, context)
   context.erase(instructions: storesToClassFields)
@@ -409,8 +413,7 @@ private func replace(object allocRef: AllocRefInstBase,
   }
 
   rewriteUses(of: allocRef, context)
-  allocRef.uses.replaceAll(with: globalValue, context)
-  context.erase(instruction: allocRef)
+  allocRef.replace(with: globalValue, context)
   return globalValue
 }
 
@@ -427,13 +430,11 @@ private func rewriteUses(of startValue: Value, _ context: FunctionPassContext) {
       if !beginDealloc.parentFunction.hasOwnership {
         builder.createStrongRelease(operand: beginDealloc.reference)
       }
-      beginDealloc.uses.replaceAll(with: beginDealloc.reference, context)
-      context.erase(instruction: beginDealloc)
+      beginDealloc.replace(with: beginDealloc.reference, context)
     case is EndCOWMutationInst, is EndInitLetRefInst, is MoveValueInst:
       let svi = inst as! SingleValueInstruction
       worklist.pushIfNotVisited(usersOf: svi)
-      svi.uses.replaceAll(with: svi.operands[0].value, context)
-      context.erase(instruction: svi)
+      svi.replace(with: svi.operands[0].value, context)
     case let upCast as UpcastInst:
       worklist.pushIfNotVisited(usersOf: upCast)
     case let refCast as UncheckedRefCastInst:
@@ -450,7 +451,7 @@ private func rewriteUses(of startValue: Value, _ context: FunctionPassContext) {
 
 private extension InstructionWorklist {
   mutating func pushIfNotVisited(usersOf value: Value) {
-    pushIfNotVisited(contentsOf: value.uses.lazy.map { $0.instruction })
+    pushIfNotVisited(contentsOf: value.users)
   }
 }
 
@@ -499,14 +500,6 @@ private extension AllocRefInstBase {
       return tailType.tupleElements.count
     }
     return 1
-  }
-}
-
-private extension FunctionPassContext {
-  func erase(instructions: [Instruction]) {
-    for inst in instructions {
-      erase(instruction: inst)
-    }
   }
 }
 
@@ -561,7 +554,7 @@ private func replace(findStringCall: ApplyInst,
 
   // Create an "opaque" global variable which is passed as inout to
   // _findStringSwitchCaseWithCache and into which the function stores the "cache".
-  let cacheVar = context.createGlobalVariable(name: name, type: cacheType, isPrivate: true)
+  let cacheVar = context.createGlobalVariable(name: name, type: cacheType, linkage: .private, isLet: false)
 
   let varBuilder = Builder(staticInitializerOf: cacheVar, context)
   let zero = varBuilder.createIntegerLiteral(0, type: wordTy)
@@ -575,8 +568,7 @@ private func replace(findStringCall: ApplyInst,
                                                 findStringCall.arguments[1],
                                                 cacheAddr])
 
-  findStringCall.uses.replaceAll(with: newCall, context)
-  context.erase(instruction: findStringCall)
+  findStringCall.replace(with: newCall, context)
 }
 
 private extension GlobalValueInst {

@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -emit-module -emit-module-path %t/opaque_conformance.swiftmodule -primary-file %S/Inputs/opaque_conformance.swift
-// RUN: %target-swift-frontend -O -emit-sil -primary-file %s -I %t -Xllvm -sil-disable-pass=late-deadfuncelim | %FileCheck %s
+// RUN: %target-swift-frontend -O -Xllvm -sil-print-types -emit-sil -primary-file %s -I %t -Xllvm -sil-disable-pass=late-deadfuncelim | %FileCheck %s
 
 import opaque_conformance
 

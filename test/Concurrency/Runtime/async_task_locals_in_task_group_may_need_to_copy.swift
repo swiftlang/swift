@@ -1,10 +1,12 @@
-// RUN: %target-run-simple-swift( -plugin-path %swift-plugin-dir -Xfrontend -strict-concurrency=complete -Xfrontend -disable-availability-checking -parse-as-library %import-libdispatch) | %FileCheck %s --dump-input=always
+// RUN: %target-run-simple-swift( -plugin-path %swift-plugin-dir -Xfrontend -strict-concurrency=complete -target %target-swift-5.1-abi-triple -parse-as-library %import-libdispatch) | %FileCheck %s --dump-input=always
 
 // REQUIRES: executable_test
 // REQUIRES: concurrency
 // REQUIRES: libdispatch
 // REQUIRES: concurrency_runtime
 // UNSUPPORTED: back_deployment_runtime
+
+// REQUIRES: rdar139384166
 
 enum TL {
   @TaskLocal

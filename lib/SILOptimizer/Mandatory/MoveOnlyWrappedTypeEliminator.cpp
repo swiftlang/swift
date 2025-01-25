@@ -199,6 +199,7 @@ struct SILMoveOnlyWrappedTypeEliminatorVisitor
   NO_UPDATE_NEEDED(Object)
   NO_UPDATE_NEEDED(OpenExistentialRef)
   NO_UPDATE_NEEDED(OpenExistentialAddr)
+  NO_UPDATE_NEEDED(OpenExistentialBox)
   NO_UPDATE_NEEDED(ConvertFunction)
   NO_UPDATE_NEEDED(RefToBridgeObject)
   NO_UPDATE_NEEDED(BridgeObjectToRef)
@@ -208,6 +209,8 @@ struct SILMoveOnlyWrappedTypeEliminatorVisitor
   NO_UPDATE_NEEDED(FixLifetime)
   NO_UPDATE_NEEDED(AddressToPointer)
   NO_UPDATE_NEEDED(ExistentialMetatype)
+  NO_UPDATE_NEEDED(Builtin)
+  NO_UPDATE_NEEDED(IgnoredUse)
 #undef NO_UPDATE_NEEDED
 
   bool eliminateIdentityCast(SingleValueInstruction *svi) {
@@ -309,19 +312,6 @@ bool SILMoveOnlyWrappedTypeEliminator::process() {
   // - record its users for later visitation
   auto visitValue = [&touchedInsts, fn = fn,
                      trivialOnly = trivialOnly](SILValue value) -> bool {
-    // Trivial move_value instructions are relevant. After they are stripped,
-    // any extend_lifetime uses are also stripped.
-    if (isa<MoveValueInst>(value)
-        && value->getOwnershipKind() == OwnershipKind::None) {
-      for (auto *use : value->getNonTypeDependentUses()) {
-        auto *user = use->getUser();
-        if (isa<ExtendLifetimeInst>(user)) {
-          touchedInsts.insert(user);
-        }
-      }
-      return true;
-    }
-
     if (!value->getType().hasAnyMoveOnlyWrapping(fn))
       return false;
 
@@ -362,6 +352,10 @@ bool SILMoveOnlyWrappedTypeEliminator::process() {
         if (!relevant)
           continue;
 
+        touched = true;
+      }
+      // delete trivial move_value and extend_lifetime instructions.
+      if (isa<MoveValueInst>(ii) || isa<ExtendLifetimeInst>(ii)) {
         touched = true;
       }
       if (!touched)

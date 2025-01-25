@@ -410,6 +410,7 @@ deriveEquatable_eq(
       /*Throws=*/false, /*ThrownType=*/Type(),
       /*GenericParams=*/nullptr, params, boolTy, parentDC);
   eqDecl->setUserAccessible(false);
+  eqDecl->setSynthesized();
 
   // Add the @_implements(Equatable, ==(_:_:)) attribute
   if (generatedIdentifier != C.Id_EqualsOperator) {
@@ -427,7 +428,7 @@ deriveEquatable_eq(
     return nullptr;
   }
 
-  addNonIsolatedToSynthesized(derived.Nominal, eqDecl);
+  addNonIsolatedToSynthesized(derived, eqDecl);
 
   eqDecl->setBodySynthesizer(bodySynthesizer);
 
@@ -546,12 +547,13 @@ deriveHashable_hashInto(
       /*Async=*/false,
       /*Throws=*/false, /*ThrownType=*/Type(),
       /*GenericParams=*/nullptr, params, returnType, parentDC);
+  hashDecl->setSynthesized();
   hashDecl->setBodySynthesizer(bodySynthesizer);
   hashDecl->copyFormalAccessFrom(derived.Nominal,
                                  /*sourceIsParentContext=*/true);
 
   // The derived hash(into:) for an actor must be non-isolated.
-  if (!addNonIsolatedToSynthesized(derived.Nominal, hashDecl) &&
+  if (!addNonIsolatedToSynthesized(derived, hashDecl) &&
       derived.Nominal->isActor())
     hashDecl->getAttrs().add(
         new (C) NonisolatedAttr(/*unsafe*/ false, /*implicit*/ true));
@@ -911,7 +913,7 @@ static ValueDecl *deriveHashable_hashValue(DerivedConformance &derived) {
   hashValueDecl->setAccessors(SourceLoc(), {getterDecl}, SourceLoc());
 
   // The derived hashValue of an actor must be nonisolated.
-  if (!addNonIsolatedToSynthesized(derived.Nominal, hashValueDecl) &&
+  if (!addNonIsolatedToSynthesized(derived, hashValueDecl) &&
       derived.Nominal->isActor())
     hashValueDecl->getAttrs().add(
         new (C) NonisolatedAttr(/*unsafe*/ false, /*implicit*/ true));

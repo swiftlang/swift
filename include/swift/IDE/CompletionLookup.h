@@ -593,11 +593,14 @@ public:
 
   void getTypeCompletions(Type BaseType);
 
+  /// Add completions for types that can appear after a \c ~ prefix.
+  void getInvertedTypeCompletions();
+
   void getGenericRequirementCompletions(DeclContext *DC,
                                         SourceLoc CodeCompletionLoc);
 
   static bool canUseAttributeOnDecl(DeclAttrKind DAK, bool IsInSil,
-                                    bool IsConcurrencyEnabled,
+                                    const LangOptions &langOpts,
                                     std::optional<DeclKind> DK, StringRef Name);
 
   void getAttributeDeclCompletions(bool IsInSil, std::optional<DeclKind> DK);
@@ -631,8 +634,6 @@ public:
   void getStmtLabelCompletions(SourceLoc Loc, bool isContinue);
 
   void getOptionalBindingCompletions(SourceLoc Loc);
-
-  void addWithoutConstraintTypes();
 };
 
 } // end namespace ide

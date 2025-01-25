@@ -107,7 +107,9 @@ public struct InlineTest {
 public struct PreformattedTest {
   public func existingFunc() {}
 }
-// PREFORMATTED: [[@LINE-1]]:1-[[@LINE-1]]:1 (@__swiftmacro_4test16PreformattedTest03AddB4FuncfMm_.swift) "/// My preformatted member macro function!
+// PREFORMATTED: [[@LINE-1]]:1-[[@LINE-1]]:1 (@__swiftmacro_4test16PreformattedTest03AddB4FuncfMm_.swift) "
+// PREFORMATTED-NEXT: {{^}}   /// My preformatted member macro function!
 // PREFORMATTED-NEXT: {{^}}public func preformattedFunc() {
 // PREFORMATTED-NEXT: {{^}}_ = 2
-// PREFORMATTED-NEXT: {{^}}}"
+// PREFORMATTED-NEXT: {{^}}}
+// PREFORMATTED-NEXT: {{^}}"

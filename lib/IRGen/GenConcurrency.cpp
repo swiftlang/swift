@@ -20,6 +20,7 @@
 #include "BitPatternBuilder.h"
 #include "ExtraInhabitants.h"
 #include "GenCall.h"
+#include "GenPointerAuth.h"
 #include "GenProto.h"
 #include "GenType.h"
 #include "IRGenDebugInfo.h"
@@ -31,6 +32,7 @@
 #include "swift/AST/ProtocolConformanceRef.h"
 #include "swift/ABI/MetadataValues.h"
 #include "swift/Basic/Assertions.h"
+#include "llvm/IR/Module.h"
 
 using namespace swift;
 using namespace irgen;
@@ -46,7 +48,7 @@ public:
                    Size size, Alignment align, SpareBitVector &&spareBits)
       : TrivialScalarPairTypeInfo(storageType, size, std::move(spareBits),
                                   align, IsTriviallyDestroyable,
-                                  IsCopyable, IsFixedSize) {}
+                                  IsCopyable, IsFixedSize, IsABIAccessible) {}
 
   static Size getFirstElementSize(IRGenModule &IGM) {
     return IGM.getPointerSize();
@@ -258,8 +260,8 @@ llvm::Value *irgen::emitBuiltinStartAsyncLet(IRGenFunction &IGF,
   // space, so that we don't run into that bug. We leave a note on the
   // declaration so that coroutine splitting can pad out the final context
   // size after splitting.
-  auto deploymentAvailability
-    = AvailabilityContext::forDeploymentTarget(IGF.IGM.Context);
+  auto deploymentAvailability =
+      AvailabilityRange::forDeploymentTarget(IGF.IGM.Context);
   if (!deploymentAvailability.isContainedIn(
                                    IGF.IGM.Context.getSwift57Availability()))
   {
@@ -335,6 +337,21 @@ llvm::Value *irgen::emitCreateTaskGroup(IRGenFunction &IGF,
   assert(subs.getReplacementTypes().size() == 1 &&
          "createTaskGroup should have a type substitution");
   auto resultType = subs.getReplacementTypes()[0]->getCanonicalType();
+
+  if (IGF.IGM.Context.LangOpts.hasFeature(Feature::Embedded)) {
+    // In Embedded Swift, call swift_taskGroup_initializeWithOptions instead, to
+    // avoid needing a Metadata argument.
+    llvm::Value *options = llvm::ConstantPointerNull::get(IGF.IGM.Int8PtrTy);
+    llvm::Value *resultTypeMetadata = llvm::ConstantPointerNull::get(IGF.IGM.Int8PtrTy);
+    options = maybeAddEmbeddedSwiftResultTypeInfo(IGF, options, resultType);
+    if (!groupFlags) groupFlags = llvm::ConstantInt::get(IGF.IGM.SizeTy, 0);
+    llvm::CallInst *call = IGF.Builder.CreateCall(IGF.IGM.getTaskGroupInitializeWithOptionsFunctionPointer(),
+                                  {groupFlags, group, resultTypeMetadata, options});
+    call->setDoesNotThrow();
+    call->setCallingConv(IGF.IGM.SwiftCC);
+    return group;
+  }
+
   auto resultTypeMetadata = IGF.emitAbstractTypeMetadataRef(resultType);
 
   llvm::CallInst *call;
@@ -342,8 +359,9 @@ llvm::Value *irgen::emitCreateTaskGroup(IRGenFunction &IGF,
     call = IGF.Builder.CreateCall(IGF.IGM.getTaskGroupInitializeWithFlagsFunctionPointer(),
                                   {groupFlags, group, resultTypeMetadata});
   } else {
-    call = IGF.Builder.CreateCall(IGF.IGM.getTaskGroupInitializeFunctionPointer(),
-                                  {group, resultTypeMetadata});
+    call =
+        IGF.Builder.CreateCall(IGF.IGM.getTaskGroupInitializeFunctionPointer(),
+                               {group, resultTypeMetadata});
   }
   call->setDoesNotThrow();
   call->setCallingConv(IGF.IGM.SwiftCC);
@@ -567,22 +585,50 @@ struct EmbeddedSwiftResultTypeOptionRecordTraits {
     IGF.Builder.CreateStore(
         TI.getStaticAlignmentMask(IGF.IGM),
         IGF.Builder.CreateStructGEP(optionsRecord, 2, Size()));
+
+    auto schema = IGF.getOptions().PointerAuth.ValueWitnesses;
     // initializeWithCopy witness
-    IGF.Builder.CreateStore(
-        IGF.IGM.getOrCreateValueWitnessFunction(
-            ValueWitness::InitializeWithCopy, packing, canType, lowered, TI),
-        IGF.Builder.CreateStructGEP(optionsRecord, 3, Size()));
+    {
+      auto gep = IGF.Builder.CreateStructGEP(optionsRecord, 3, Size());
+      llvm::Value *witness = IGF.IGM.getOrCreateValueWitnessFunction(
+          ValueWitness::InitializeWithCopy, packing, canType, lowered, TI);
+      auto discriminator = llvm::ConstantInt::get(
+          IGF.IGM.Int64Ty,
+          SpecialPointerAuthDiscriminators::InitializeWithCopy);
+      auto storageAddress = gep.getAddress();
+      auto info =
+          PointerAuthInfo::emit(IGF, schema, storageAddress, discriminator);
+      if (schema) witness = emitPointerAuthSign(IGF, witness, info);
+      IGF.Builder.CreateStore(witness, gep);
+    }
     // storeEnumTagSinglePayload witness
-    IGF.Builder.CreateStore(
-        IGF.IGM.getOrCreateValueWitnessFunction(
-            ValueWitness::StoreEnumTagSinglePayload, packing, canType, lowered,
-            TI),
-        IGF.Builder.CreateStructGEP(optionsRecord, 4, Size()));
+    {
+      auto gep = IGF.Builder.CreateStructGEP(optionsRecord, 4, Size());
+      llvm::Value *witness = IGF.IGM.getOrCreateValueWitnessFunction(
+          ValueWitness::StoreEnumTagSinglePayload, packing, canType, lowered,
+          TI);
+      auto discriminator = llvm::ConstantInt::get(
+          IGF.IGM.Int64Ty,
+          SpecialPointerAuthDiscriminators::StoreEnumTagSinglePayload);
+      auto storageAddress = gep.getAddress();
+      auto info =
+          PointerAuthInfo::emit(IGF, schema, storageAddress, discriminator);
+      if (schema) witness = emitPointerAuthSign(IGF, witness, info);
+      IGF.Builder.CreateStore(witness, gep);
+    }
     // destroy witness
-    IGF.Builder.CreateStore(
-        IGF.IGM.getOrCreateValueWitnessFunction(ValueWitness::Destroy, packing,
-                                                canType, lowered, TI),
-        IGF.Builder.CreateStructGEP(optionsRecord, 5, Size()));
+    {
+      auto gep = IGF.Builder.CreateStructGEP(optionsRecord, 5, Size());
+      llvm::Value *witness = IGF.IGM.getOrCreateValueWitnessFunction(
+          ValueWitness::Destroy, packing, canType, lowered, TI);
+      auto discriminator = llvm::ConstantInt::get(
+          IGF.IGM.Int64Ty, SpecialPointerAuthDiscriminators::Destroy);
+      auto storageAddress = gep.getAddress();
+      auto info =
+          PointerAuthInfo::emit(IGF, schema, storageAddress, discriminator);
+      if (schema) witness = emitPointerAuthSign(IGF, witness, info);
+      IGF.Builder.CreateStore(witness, gep);
+    }
   }
 };
 } // end anonymous namespace

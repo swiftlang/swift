@@ -203,7 +203,7 @@ bool PerformanceDiagnostics::visitFunctionEmbeddedSwift(
     SILFunction *function, LocWithParent *parentLoc) {
   // Don't check generic functions in embedded Swift, they're about to be
   // removed anyway.
-  if (function->getLoweredFunctionType()->getSubstGenericSignature())
+  if (function->isGeneric())
     return false;
 
   if (!function->isDefinition())
@@ -212,8 +212,6 @@ bool PerformanceDiagnostics::visitFunctionEmbeddedSwift(
   if (visitedFuncs.contains(function))
     return false;
   visitedFuncs[function] = PerformanceConstraints::None;
-
-  NonErrorHandlingBlocks neBlocks(function);
 
   for (SILBasicBlock &block : *function) {
     for (SILInstruction &inst : block) {
@@ -283,26 +281,9 @@ bool PerformanceDiagnostics::visitFunction(SILFunction *function,
   if (!function->isDefinition())
     return false;
 
-  NonErrorHandlingBlocks neBlocks(function);
-
   for (SILBasicBlock &block : *function) {
     // Exclude fatal-error blocks.
     if (isa<UnreachableInst>(block.getTerminator()))
-      continue;
-
-    // TODO: it's not yet clear how to deal with error existentials.
-    // Ignore them for now. If we have typed throws we could ban error existentials
-    // because typed throws would provide and alternative.
-    if (isa<ThrowInst>(block.getTerminator()))
-      continue;
-
-    // If a function has multiple throws, all throw-path branch to the single throw-block.
-    if (SILBasicBlock *succ = block.getSingleSuccessorBlock()) {
-      if (isa<ThrowInst>(succ->getTerminator()))
-        continue;
-    }
-
-    if (!neBlocks.isNonErrorHandling(&block))
       continue;
 
     for (SILInstruction &inst : block) {
@@ -534,7 +515,8 @@ bool PerformanceDiagnostics::visitInst(SILInstruction *inst,
   LocWithParent loc(inst->getLoc().getSourceLoc(), parentLoc);
 
   if (perfConstr == PerformanceConstraints::NoExistentials &&
-      (impact & RuntimeEffect::Existential)) {
+      ((impact & RuntimeEffect::Existential) ||
+       (impact & RuntimeEffect::ExistentialClassBound))) {
     PrettyStackTracePerformanceDiagnostics stackTrace("existential", inst);
     if (impactType) {
       diagnose(loc, diag::perf_diag_existential_type, impactType.getASTType());
@@ -556,6 +538,8 @@ bool PerformanceDiagnostics::visitInst(SILInstruction *inst,
   }
 
   if (module.getOptions().EmbeddedSwift) {
+    // Explicitly don't detect RuntimeEffect::ExistentialClassBound - those are
+    // allowed in Embedded Swift.
     if (impact & RuntimeEffect::Existential) {
       PrettyStackTracePerformanceDiagnostics stackTrace("existential", inst);
       if (impactType) {
@@ -805,6 +789,11 @@ private:
   void run() override {
     SILModule *module = getModule();
 
+    // Skip all performance/embedded diagnostics if asked. This is used from
+    // SourceKit to avoid reporting false positives when WMO is turned off for
+    // indexing purposes.
+    if (!module->getOptions().EnableWMORequiredDiagnostics) return;
+
     PerformanceDiagnostics diagnoser(*module, getAnalysis<BasicCalleeAnalysis>());
 
     // Check that @_section, @_silgen_name is only on constant globals
@@ -906,7 +895,7 @@ private:
       for (SILFunction *function : constructorsAndDestructors) {
         diagnoser.visitFunctionEmbeddedSwift(function);
       }
-    }    
+    }
   }
 };
 

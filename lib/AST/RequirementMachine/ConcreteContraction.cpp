@@ -138,6 +138,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/Requirement.h"
@@ -283,11 +284,8 @@ ConcreteContraction::substTypeParameterRec(Type type, Position position) const {
 
       // The 'Sendable' protocol does not declare any associated types, so the
       // 'allowMissing' value here is actually irrelevant.
-      auto conformance = ((*substBaseType)->isTypeParameter()
-                          ? ProtocolConformanceRef(proto)
-                          : ModuleDecl::lookupConformance(
-                              *substBaseType, proto,
-                              /*allowMissing=*/false));
+      auto conformance = lookupConformance(*substBaseType, proto,
+                                           /*allowMissing=*/false);
 
       if (proto->isSpecificProtocol(KnownProtocolKind::Sendable) &&
           conformance.hasUnavailableConformance()) {
@@ -304,9 +302,7 @@ ConcreteContraction::substTypeParameterRec(Type type, Position position) const {
         return std::nullopt;
       }
 
-      return assocType->getDeclaredInterfaceType()
-                      ->castTo<DependentMemberType>()
-                      ->substBaseType(*substBaseType);
+      return conformance.getTypeWitness(*substBaseType, assocType);
     }
 
     // An unresolved DependentMemberType stores an identifier. Handle this
@@ -411,8 +407,8 @@ ConcreteContraction::substRequirement(const Requirement &req) const {
       allowMissing = true;
 
     if (!substFirstType->isTypeParameter()) {
-      auto conformance = ModuleDecl::lookupConformance(substFirstType, proto,
-                                                       allowMissing);
+      auto conformance = lookupConformance(substFirstType, proto,
+                                           allowMissing);
 
       if (!allowMissing &&
           proto->isSpecificProtocol(KnownProtocolKind::Sendable) &&
@@ -623,7 +619,7 @@ bool ConcreteContraction::performConcreteContraction(
     auto superclassTy = *found->second.begin();
 
     for (auto *proto : pair.second) {
-      if (ModuleDecl::lookupConformance(superclassTy, proto)) {
+      if (lookupConformance(superclassTy, proto)) {
         auto genericSig = proto->getGenericSignature();
         // FIXME: If we end up here while building the requirement
         // signature of `proto`, we will hit a request cycle.

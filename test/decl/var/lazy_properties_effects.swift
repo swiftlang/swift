@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -disable-availability-checking
+// RUN: %target-typecheck-verify-swift -target %target-swift-5.1-abi-triple
 
 // We could make this work by having `lazy` synthesize an effectful
 // getter, but for now let's reject it instead of crashing.

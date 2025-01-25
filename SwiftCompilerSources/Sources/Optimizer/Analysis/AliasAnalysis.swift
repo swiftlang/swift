@@ -134,7 +134,7 @@ struct AliasAnalysis {
         if let apply = inst as? FullApplySite {
           // Workaround for quadratic complexity in ARCSequenceOpts.
           // We need to use an ever lower budget to not get into noticeable compile time troubles.
-          let effect = aa.getOwnershipEffect(of: apply, for: obj, path: path)
+          let effect = aa.getOwnershipEffect(of: apply, for: obj, path: path, complexityBudget: budget / 10)
           return effect.destroy
         }
         return obj.at(path).isEscaping(using: EscapesToInstructionVisitor(target: inst, isAddress: false),
@@ -334,7 +334,7 @@ struct AliasAnalysis {
     case .stack, .global, .argument, .storeBorrow:
       // Those access bases cannot be interior pointers of a borrowed value
       return .noEffects
-    case .pointer, .unidentified, .yield:
+    case .pointer, .index, .unidentified, .yield:
       // We don't know anything about this address -> get the conservative effects
       return defaultEffects(of: endBorrow, on: memLoc)
     case .box, .class, .tail:
@@ -378,15 +378,6 @@ struct AliasAnalysis {
       // The address has unknown escapes. So we have to take the global effects of the called function(s).
       memoryEffects = calleeAnalysis.getSideEffects(ofApply: apply).memory
     }
-    // Do some magic for `let` variables. Function calls cannot modify let variables.
-    // The only exception is that the let variable is directly passed to an indirect out of the apply.
-    // TODO: make this a more formal and verified approach.
-    if memoryEffects.write {
-      let accessBase = memLoc.address.accessBase
-      if accessBase.isLet && !accessBase.isIndirectResult(of: apply) {
-        return SideEffects.Memory(read: memoryEffects.read, write: false)
-      }
-    }
     return memoryEffects
   }
 
@@ -421,10 +412,10 @@ struct AliasAnalysis {
   }
 
   private func getOwnershipEffect(of apply: FullApplySite, for value: Value,
-                                  path: SmallProjectionPath) -> SideEffects.Ownership {
+                                  path: SmallProjectionPath,
+                                  complexityBudget: Int) -> SideEffects.Ownership {
     let visitor = FullApplyEffectsVisitor(apply: apply, calleeAnalysis: context.calleeAnalysis, isAddress: false)
-    let budget = getComplexityBudget(for: apply.parentFunction)
-    if let result = value.at(path).visit(using: visitor, complexityBudget: budget, context) {
+    if let result = value.at(path).visit(using: visitor, complexityBudget: complexityBudget, context) {
       // The resulting effects are the argument effects to which `value` escapes to.
       return result.ownership
     } else {
@@ -440,11 +431,7 @@ struct AliasAnalysis {
                                          initialWalkingDirection: memLoc.walkingDirection,
                                          complexityBudget: getComplexityBudget(for: inst.parentFunction), context)
     {
-      var effects = inst.memoryEffects
-      if memLoc.isLetValue {
-        effects.write = false
-      }
-      return effects
+      return inst.memoryEffects
     }
     return .noEffects
   }
@@ -603,7 +590,7 @@ private enum ImmutableScope {
 
   init?(for basedAddress: Value, _ context: FunctionPassContext) {
     switch basedAddress.enclosingAccessScope {
-    case .scope(let beginAccess):
+    case .access(let beginAccess):
       if beginAccess.isUnsafe {
         return nil
       }
@@ -628,6 +615,12 @@ private enum ImmutableScope {
           return nil
         }
         object = tailAddr.instance
+      case .global(let global):
+        if global.isLet && !basedAddress.parentFunction.canInitializeGlobal {
+          self = .wholeFunction
+          return
+        }
+        return nil
       default:
         return nil
       }
@@ -648,10 +641,13 @@ private enum ImmutableScope {
           self = .borrow(singleBorrowIntroducer)
         case .functionArgument:
           self = .wholeFunction
-        case .beginApply:
+        case .beginApply, .uncheckOwnershipConversion:
           return nil
         }
       }
+      case .dependence(let markDep):
+        // ignore mark_dependence for the purpose of alias analysis.
+        self.init(for: markDep.value, context)
     }
   }
 
@@ -692,15 +688,27 @@ private struct FindBeginBorrowWalker : ValueUseDefWalker {
   let beginBorrow: BorrowIntroducingInstruction
   var walkUpCache = WalkerCache<Path>()
 
-  public mutating func walkUp(value: Value, path: SmallProjectionPath) -> WalkResult {
+  mutating func walkUp(value: Value, path: SmallProjectionPath) -> WalkResult {
     if value == beginBorrow {
       return .abortWalk
+    }
+    if value.ownership != .guaranteed {
+      // If value is owned then it cannot be the borrowed value.
+      return .continueWalk
     }
     return walkUpDefault(value: value, path: path)
   }
 
   mutating func rootDef(value: Value, path: SmallProjectionPath) -> WalkResult {
-    return .continueWalk
+    switch value {
+    case is FunctionArgument,
+         // Loading a value from memory cannot be the borrowed value.
+         // Note that we exclude the "regular" `load` by checking for guaranteed ownership in `walkUp`.
+         is LoadBorrowInst:
+      return .continueWalk
+    default:
+      return .abortWalk
+    }
   }
 }
 
@@ -729,6 +737,12 @@ private struct FullApplyEffectsVisitor : EscapeVisitorWithResult {
       return .ignore
     }
     if user == apply {
+      if apply.isCallee(operand: operand) {
+        // If the address "escapes" to the callee of the apply it means that the address was captured
+        // by an inout_aliasable operand of an partial_apply.
+        // Therefore assume that the called function will both, read and write, to the address.
+        return .abort
+      }
       let e = calleeAnalysis.getSideEffects(of: apply, operand: operand, path: path.projectionPath)
       result.merge(with: e)
     }
@@ -883,6 +897,14 @@ private extension Type {
       return true
     }
     return false
+  }
+}
+
+private extension Function {
+  var canInitializeGlobal: Bool {
+    return isGlobalInitOnceFunction ||
+           // In non -parse-as-library mode globals are initialized in the `main` function.
+           name == "main"
   }
 }
 

@@ -26,6 +26,7 @@
 #include "swift/AST/ASTDemangler.h"
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/ASTWalker.h"
+#include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/DiagnosticsParse.h"
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/ForeignErrorConvention.h"
@@ -40,6 +41,7 @@
 #include "swift/AST/SourceFile.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/TypeLoc.h"
+#include "swift/AST/TypeMatcher.h"
 #include "swift/AST/TypeRepr.h"
 #include "swift/AST/TypeResolutionStage.h"
 #include "swift/Basic/Assertions.h"
@@ -173,6 +175,8 @@ static unsigned getGenericRequirementKind(TypeResolutionOptions options) {
   case TypeResolverContext::AbstractFunctionDecl:
   case TypeResolverContext::CustomAttr:
   case TypeResolverContext::Inverted:
+  case TypeResolverContext::ValueGenericArgument:
+  case TypeResolverContext::RawLayoutAttr:
     break;
   }
 
@@ -445,16 +449,17 @@ Type TypeResolution::resolveTypeInContext(TypeDecl *typeDecl,
       for (auto *parentDC = fromDC; !parentDC->isModuleScopeContext();
            parentDC = parentDC->getParentForLookup()) {
         auto *parentNominal = parentDC->getSelfNominalTypeDecl();
+        if (!parentNominal) {
+          continue;
+        }
+
         if (parentNominal == nominalType)
           return parentDC->getDeclaredInterfaceType();
-        if (isa<ExtensionDecl>(parentDC)) {
-          auto *extendedType = parentNominal;
-          while (extendedType != nullptr) {
-            if (extendedType == nominalType)
-              return extendedType->getDeclaredInterfaceType();
-            extendedType = extendedType->getParent()->getSelfNominalTypeDecl();
-          }
-        }
+
+        // `parentDC` is either a nominal or an extension thereof. Either way,
+        // continue climbing up the nominal. Do not to climb up an extension
+        // because they are not allowed to be nested.
+        parentDC = parentNominal;
       }
     }
 
@@ -526,6 +531,14 @@ Type TypeResolution::resolveTypeInContext(TypeDecl *typeDecl,
   }
 
   assert(foundDC);
+
+  // Protocols cannot be nested in generic contexts. Use the declared interface
+  // type, which won't have a parent.
+  if (auto *proto = dyn_cast<ProtocolDecl>(typeDecl)) {
+    if (proto->isUnsupportedNestedProtocol()) {
+      return typeDecl->getDeclaredInterfaceType();
+    }
+  }
 
   // selfType is the self type of the context, unless the
   // context is a protocol type, in which case we might have
@@ -601,7 +614,6 @@ static bool isPointerToVoid(ASTContext &Ctx, Type Ty, bool &IsMutable) {
 
 bool TypeChecker::checkContextualRequirements(GenericTypeDecl *decl,
                                               Type parentTy, SourceLoc loc,
-                                              ModuleDecl *module,
                                               GenericSignature contextSig) {
   assert(parentTy && "expected a parent type");
   if (parentTy->hasUnboundGenericType() || parentTy->hasTypeVariable()) {
@@ -639,9 +651,9 @@ bool TypeChecker::checkContextualRequirements(GenericTypeDecl *decl,
       noteLoc = loc;
   }
 
-  const auto subMap = parentTy->getContextSubstitutions(dc);
+  const auto subMap = parentTy->getContextSubstitutionMap(dc);
   const auto substitutions = [&](SubstitutableType *type) -> Type {
-    auto result = QueryTypeSubstitutionMap{subMap}(type);
+    auto result = QuerySubstitutionMap{subMap}(type);
     if (result->hasTypeParameter()) {
       if (contextSig) {
         // Avoid building this generic environment unless we need it.
@@ -653,14 +665,14 @@ bool TypeChecker::checkContextualRequirements(GenericTypeDecl *decl,
   };
 
   const auto result = TypeChecker::checkGenericArgumentsForDiagnostics(
-      module, genericSig.getRequirements(), substitutions);
+      genericSig.getRequirements(), substitutions);
   switch (result.getKind()) {
   case CheckRequirementsResult::RequirementFailure:
     if (loc.isValid()) {
       TypeChecker::diagnoseRequirementFailure(
           result.getRequirementFailureInfo(), loc, noteLoc,
           decl->getDeclaredInterfaceType(), genericSig.getGenericParams(),
-          substitutions, module);
+          substitutions);
     }
 
     return false;
@@ -715,6 +727,60 @@ void swift::diagnoseInvalidGenericArguments(SourceLoc loc,
 
   decl->diagnose(diag::kind_declname_declared_here,
                  DescriptiveDeclKind::GenericType, decl->getName());
+}
+
+namespace {
+  /// Visits a generic parameter and the type attempting to substitute for it
+  /// to see if it's a valid parameter for integer arguments or other value
+  /// generic parameters.
+  class ValueMatchVisitor : public TypeMatcher<ValueMatchVisitor> {
+  public:
+    ValueMatchVisitor() {}
+
+    bool mismatch(TypeBase *firstType, TypeBase *secondType,
+                  Type sugaredFirstType) {
+      return true;
+    }
+
+    bool mismatch(GenericTypeParamType *paramType, TypeBase *secondType,
+                  Type sugaredFirstType) {
+      if (paramType->isValue()) {
+        if (secondType->is<IntegerType>())
+          return true;
+
+        if (secondType->is<PlaceholderType>())
+          return true;
+
+        return false;
+      }
+
+      return true;
+    }
+
+    bool mismatch(GenericTypeParamType *paramType,
+                  GenericTypeParamType *secondType, Type sugaredFirstType) {
+      // If either of these is a value parameter and the other is not, bail.
+      if (paramType->isValue() != secondType->isValue())
+        return false;
+
+      // If both of these aren't values then we're good.
+      if (!paramType->isValue())
+        return true;
+
+      // Both of these generic type parameters are values, but they may not have
+      // underlying value types associated with them. This can occur when a
+      // parameter doesn't declare a value type and we're going to diagnose it
+      // later.
+      if (!paramType->getValueType() || !secondType->getValueType())
+        return true;
+
+      // Otherwise, these are both value parameters and check that both their
+      // value types are the same.
+      return paramType->getValueType()->isEqual(secondType->getValueType());
+    }
+
+    bool alwaysMismatchTypeParameters() const { return true; }
+  };
 }
 
 /// Apply generic arguments to the given type.
@@ -779,8 +845,7 @@ static Type applyGenericArguments(Type type,
     }
 
     if (TypeChecker::checkContextualRequirements(
-            decl, parentTy, loc, dc->getParentModule(),
-            resolution.getGenericSignature()))
+            decl, parentTy, loc, resolution.getGenericSignature()))
       return type;
 
     return ErrorType::get(resolution.getASTContext());
@@ -852,6 +917,45 @@ static Type applyGenericArguments(Type type,
 
     return parameterized;
   }
+  
+  // Builtins have special handling.
+  if (auto bug = type->getAs<BuiltinUnboundGenericType>()) {
+    // We don't have any variadic builtins yet, but we do have value arguments.
+    auto argOptions = options.withoutContext()
+      .withContext(TypeResolverContext::ValueGenericArgument);
+    auto genericResolution = resolution.withOptions(argOptions);
+
+    // Resolve the types of the generic arguments.
+    SmallVector<Type, 2> args;
+    for (auto tyR : genericArgs) {
+      // Propagate failure.
+      Type substTy = genericResolution.resolveType(tyR, silContext);
+      if (!substTy || substTy->hasError())
+        return ErrorType::get(ctx);
+
+      args.push_back(substTy);
+    }
+    
+    // Try to form a substitution map.
+    auto subs = SubstitutionMap::get(bug->getGenericSignature(),
+                                     args,
+                                     [&](CanType dependentType,
+                                         Type conformingReplacementType,
+                                         ProtocolDecl *conformedProtocol)
+                                     -> ProtocolConformanceRef {
+                                       // no generic builtins have conformance
+                                       // requirements yet.
+                                       llvm_unreachable("not implemented yet");
+                                     });
+                                     
+    auto bound = bug->getBound(subs);
+    
+    if (bound->hasError()) {
+      diags.diagnose(loc, diag::invalid_generic_builtin_type, type);
+      return ErrorType::get(ctx);
+    }
+    return bound;
+  }
 
   // We must either have an unbound generic type, or a generic type alias.
   if (!type->is<UnboundGenericType>()) {
@@ -877,10 +981,12 @@ static Type applyGenericArguments(Type type,
   auto *decl = unboundType->getDecl();
 
   auto genericParams = decl->getGenericParams();
-  auto hasParameterPack = llvm::any_of(
-      *genericParams, [](auto *paramDecl) {
-          return paramDecl->isParameterPack();
-      });
+  auto hasParameterPack = llvm::any_of(*genericParams, [](auto *paramDecl) {
+    return paramDecl->isParameterPack();
+  });
+  auto hasValueParam = llvm::any_of(*genericParams, [](auto *paramDecl) {
+    return paramDecl->isValue();
+  });
 
   // If the type declares at least one parameter pack, allow pack expansions
   // anywhere in the argument list. We'll use the PackMatcher to ensure that
@@ -890,6 +996,8 @@ static Type applyGenericArguments(Type type,
       hasParameterPack
       ? TypeResolverContext::VariadicGenericArgument
       : TypeResolverContext::ScalarGenericArgument);
+  if (hasValueParam)
+    argOptions = argOptions.withContext(TypeResolverContext::ValueGenericArgument);
   auto genericResolution = resolution.withOptions(argOptions);
 
   // In SIL mode, Optional<T> interprets T as a SIL type.
@@ -910,6 +1018,11 @@ static Type applyGenericArguments(Type type,
       return ErrorType::get(ctx);
 
     args.push_back(substTy);
+
+    // The type we're binding to may not have value parameters, but one of the
+    // arguments may be a value parameter so diagnose this situation as well.
+    if (substTy->isValueParameter())
+      hasValueParam = true;
   }
 
   // Make sure we have the right number of generic arguments.
@@ -976,6 +1089,31 @@ static Type applyGenericArguments(Type type,
       }
 
       args.push_back(arg);
+    }
+  }
+
+  if (hasValueParam) {
+    ValueMatchVisitor matcher;
+
+    for (auto i : indices(genericParams->getParams())) {
+      auto param = genericParams->getParams()[i]->getDeclaredInterfaceType();
+      auto arg = args[i];
+
+      if (!matcher.match(param, arg)) {
+        // If the parameter is a value, then we're trying to substitute a
+        // non-value type like 'Int' or 'T' to our value.
+        if (param->isValueParameter()) {
+          diags.diagnose(loc, diag::cannot_pass_type_for_value_generic, arg, param);
+          return ErrorType::get(ctx);
+
+        // Otherwise, we're trying to use a value type (either an integer
+        // directly or another generic value parameter) for a non-value
+        // parameter.
+        } else {
+          diags.diagnose(loc, diag::value_type_used_in_type_parameter, arg, param);
+          return ErrorType::get(ctx);
+        }
+      }
     }
   }
 
@@ -1115,8 +1253,6 @@ Type TypeResolution::applyUnboundGenericArguments(
 
   // Check the generic arguments against the requirements of the declaration's
   // generic signature.
-  auto *module = getDeclContext()->getParentModule();
-
   if (!skipRequirementsCheck && getStage() == TypeResolutionStage::Interface) {
     // Check the generic arguments against the requirements of the declaration's
     // generic signature.
@@ -1131,21 +1267,29 @@ Type TypeResolution::applyUnboundGenericArguments(
       if (result->hasTypeParameter()) {
         if (const auto contextSig = getGenericSignature()) {
           auto *genericEnv = contextSig.getGenericEnvironment();
-          return genericEnv->mapTypeIntoContext(result);
+          // FIXME: This should just use mapTypeIntoContext(), but we can't yet
+          // because we sometimes have type parameters here that are invalid for
+          // our generic signature. This can happen if the type parameter was
+          // found via unqualified lookup, but the current context's
+          // generic signature failed to build because of circularity or
+          // completion failure.
+          return result.subst(QueryInterfaceTypeSubstitutions{genericEnv},
+                              LookUpConformanceInModule(),
+                              SubstFlags::PreservePackExpansionLevel);
         }
       }
       return result;
     };
 
     const auto result = TypeChecker::checkGenericArgumentsForDiagnostics(
-        module, genericSig.getRequirements(), substitutions);
+        genericSig.getRequirements(), substitutions);
     switch (result.getKind()) {
     case CheckRequirementsResult::RequirementFailure:
       if (loc.isValid()) {
         TypeChecker::diagnoseRequirementFailure(
             result.getRequirementFailureInfo(), loc, noteLoc,
             UnboundGenericType::get(decl, parentTy, getASTContext()),
-            genericSig.getGenericParams(), substitutions, module);
+            genericSig.getGenericParams(), substitutions);
       }
 
       LLVM_FALLTHROUGH;
@@ -1169,11 +1313,8 @@ Type TypeResolution::applyUnboundGenericArguments(
 
   // Form a sugared typealias reference.
   if (typealias && (!parentTy || !parentTy->isAnyExistentialType())) {
-    auto genericSig = typealias->getGenericSignature();
-    auto subMap = SubstitutionMap::get(genericSig,
-                                       QueryTypeSubstitutionMap{subs},
-                                       LookUpConformanceInModule());
-    resultType = TypeAliasType::get(typealias, parentTy, subMap, resultType);
+    resultType = TypeAliasType::get(typealias, parentTy, genericArgs,
+                                    resultType);
   }
 
   return resultType;
@@ -1228,7 +1369,7 @@ static void maybeDiagnoseBadConformanceRef(DeclContext *dc,
   // If we weren't given a conformance, go look it up.
   ProtocolConformance *conformance = nullptr;
   if (protocol) {
-    auto conformanceRef = ModuleDecl::lookupConformance(parentTy, protocol);
+    auto conformanceRef = lookupConformance(parentTy, protocol);
     if (conformanceRef.isConcrete())
       conformance = conformanceRef.getConcrete();
   }
@@ -1583,6 +1724,32 @@ static void diagnoseGenericArgumentsOnSelf(const TypeResolution &resolution,
   }
 }
 
+/// Diagnose when this is one of the Span types, which currently requires
+/// an experimental feature to use.
+static void diagnoseSpanType(TypeDecl *typeDecl, SourceLoc loc,
+                             const DeclContext *dc) {
+  if (loc.isInvalid())
+    return;
+
+  if (!typeDecl->isStdlibDecl())
+    return;
+
+  ASTContext &ctx = typeDecl->getASTContext();
+  if (ctx.LangOpts.hasFeature(Feature::Span))
+    return;
+
+  auto nameString = typeDecl->getName().str();
+  if (nameString != "Span" && nameString != "RawSpan")
+    return;
+
+  // Don't require this in the standard library or _Concurrency library.
+  auto module = dc->getParentModule();
+  if (module->isStdlibModule() || module->getName().str() == "_Concurrency")
+    return;
+
+  ctx.Diags.diagnose(loc, diag::span_requires_feature_flag, nameString);
+}
+
 /// Resolve the given identifier type representation as an unqualified type,
 /// returning the type it references.
 /// \param silContext Used to look up generic parameters in SIL mode.
@@ -1718,6 +1885,9 @@ resolveUnqualifiedIdentTypeRepr(const TypeResolution &resolution,
       repr->setInvalid();
       return ErrorType::get(ctx);
     }
+
+    diagnoseSpanType(currentDecl, repr->getLoc(), DC);
+
     repr->setValue(currentDecl, currentDC);
     return current;
   }
@@ -1938,6 +2108,8 @@ static Type resolveQualifiedIdentTypeRepr(const TypeResolution &resolution,
     member = memberTypes.back().Member;
     inferredAssocType = memberTypes.back().InferredAssociatedType;
     repr->setValue(member, nullptr);
+
+    diagnoseSpanType(member, repr->getLoc(), DC);
   }
 
   return maybeDiagnoseBadMemberType(member, memberType, inferredAssocType);
@@ -2182,6 +2354,8 @@ namespace {
     NeverNullType
     resolveLifetimeDependentTypeRepr(LifetimeDependentTypeRepr *repr,
                                      TypeResolutionOptions options);
+    NeverNullType resolveIntegerTypeRepr(IntegerTypeRepr *repr,
+                                         TypeResolutionOptions options);
     NeverNullType resolveArrayType(ArrayTypeRepr *repr,
                                    TypeResolutionOptions options);
     NeverNullType resolveDictionaryType(DictionaryTypeRepr *repr,
@@ -2789,6 +2963,9 @@ NeverNullType TypeResolver::resolveType(TypeRepr *repr,
   case TypeReprKind::LifetimeDependent:
     return resolveLifetimeDependentTypeRepr(
         cast<LifetimeDependentTypeRepr>(repr), options);
+
+  case TypeReprKind::Integer:
+    return resolveIntegerTypeRepr(cast<IntegerTypeRepr>(repr), options);
   }
   llvm_unreachable("all cases should be handled");
 }
@@ -2853,18 +3030,21 @@ TypeResolver::resolveOpenedExistentialArchetype(
 
     archetypeType = ErrorType::get(interfaceType->getASTContext());
   } {
-    // The constraint type is written with respect to the surrounding
-    // generic environment.
-    constraintType = GenericEnvironment::mapTypeIntoContext(
-        resolution.getGenericSignature().getGenericEnvironment(),
-        constraintType);
-
     // The opened existential type is formed by mapping the interface type
     // into a new opened generic environment.
-    archetypeType = OpenedArchetypeType::get(constraintType->getCanonicalType(),
-                                             interfaceType,
-                                             GenericSignature(),
-                                             openedAttr->getUUID());
+    auto *env = GenericEnvironment::forOpenedExistential(
+        constraintType->getCanonicalType(),
+        openedAttr->getUUID());
+
+    // Rewrite the interface type into one with the correct depth.
+    interfaceType = Type(interfaceType).subst(
+        [&](SubstitutableType *type) -> Type {
+          return env->getGenericSignature().getGenericParams().back();
+        },
+        MakeAbstractConformanceForGenericType());
+
+    archetypeType = env->mapTypeIntoContext(interfaceType);
+    ASSERT(archetypeType->is<OpenedArchetypeType>());
   }
 
   return archetypeType;
@@ -2997,6 +3177,7 @@ TypeAttrKind TypeAttrSet::getRepresentative(TypeAttrKind kind) {
 
   case TypeAttrKind::YieldMany:
   case TypeAttrKind::YieldOnce:
+  case TypeAttrKind::YieldOnce2:
     return TAR_SILCoroutine;
 
   case TypeAttrKind::CalleeOwned:
@@ -3143,6 +3324,7 @@ static bool isFunctionAttribute(TypeAttrKind attrKind) {
       TypeAttrKind::Escaping,
       TypeAttrKind::Sendable,
       TypeAttrKind::YieldOnce,
+      TypeAttrKind::YieldOnce2,
       TypeAttrKind::YieldMany,
       TypeAttrKind::Async,
   };
@@ -3209,7 +3391,7 @@ Type TypeResolver::resolveGlobalActor(SourceLoc loc, TypeResolutionOptions optio
   if (!result->hasError() && !attr->isInvalid() &&
       getASTContext().LangOpts.isConcurrencyModelTaskToThread()) {
     if (Decl *decl = getDeclContext()->getAsDecl()) {
-      if (!AvailableAttr::isUnavailable(decl))
+      if (!decl->isUnavailable())
         diagnose(attr->getLocation(),
                  diag::concurrency_task_to_thread_model_global_actor_annotation,
                  attr->getTypeRepr(), "task-to-thread concurrency model");
@@ -3321,40 +3503,33 @@ TypeResolver::resolveAttributedType(TypeRepr *repr, TypeResolutionOptions option
   // using claimAllWhere so that the work doen is proportional to the
   // number of attributes that were actually written.
 
-  if (auto uncheckedAttr = claim<UncheckedTypeAttr>(attrs)) {
-    if (ty->hasError()) return ty;
+  // Handle a type attribute that can only be used in inheritance clauses.
+  // Returns true if we need to exit early, false otherwise.
+  auto handleInheritedOnly = [&](AtTypeAttrBase *attr) {
+    if (!attr) return false;
+
+    if (ty->hasError()) return true;
 
     if (!options.is(TypeResolverContext::Inherited) ||
         getDeclContext()->getSelfProtocolDecl()) {
-      diagnoseInvalid(repr, uncheckedAttr->getAtLoc(),
-                      diag::unchecked_not_inheritance_clause);
+      diagnoseInvalid(repr, attr->getAtLoc(),
+                      diag::typeattr_not_inheritance_clause,
+                      attr->getAttrName());
       ty = ErrorType::get(getASTContext());
     } else if (!ty->isConstraintType()) {
-      diagnoseInvalid(repr, uncheckedAttr->getAtLoc(),
-                      diag::unchecked_not_existential, ty);
+      diagnoseInvalid(repr, attr->getAtLoc(),
+                      diag::typeattr_not_existential, attr->getAttrName(), ty);
       ty = ErrorType::get(getASTContext());
     }
 
     // Nothing to record in the type.
-  }
+    return false;
+  };
 
-  if (auto preconcurrencyAttr = claim<PreconcurrencyTypeAttr>(attrs)) {
-    if (ty->hasError())
-      return ty;
-
-    if (!options.is(TypeResolverContext::Inherited) ||
-        getDeclContext()->getSelfProtocolDecl()) {
-      diagnoseInvalid(repr, preconcurrencyAttr->getAtLoc(),
-                      diag::preconcurrency_not_inheritance_clause);
-      ty = ErrorType::get(getASTContext());
-    } else if (!ty->isConstraintType()) {
-      diagnoseInvalid(repr, preconcurrencyAttr->getAtLoc(),
-                      diag::preconcurrency_not_existential, ty);
-      ty = ErrorType::get(getASTContext());
-    }
-
-    // Nothing to record in the type.
-  }
+  if (handleInheritedOnly(claim<UncheckedTypeAttr>(attrs)) ||
+      handleInheritedOnly(claim<PreconcurrencyTypeAttr>(attrs)) ||
+      handleInheritedOnly(claim<UnsafeTypeAttr>(attrs)))
+    return ty;
 
   if (auto retroactiveAttr = claim<RetroactiveTypeAttr>(attrs)) {
     if (ty->hasError()) return ty;
@@ -3440,6 +3615,19 @@ TypeResolver::resolveAttributedType(TypeRepr *repr, TypeResolutionOptions option
 
     if (didDiagnose) {
       ty = ErrorType::get(getASTContext());
+    }
+  }
+  
+  if (getASTContext().LangOpts.hasFeature(Feature::AddressableParameters)) {
+    if (auto addressableAttr = claim<AddressableTypeAttr>(attrs)) {
+      if (options.is(TypeResolverContext::VariadicFunctionInput) &&
+          !options.hasBase(TypeResolverContext::EnumElementDecl)) {
+        diagnoseInvalid(repr, addressableAttr->getAtLoc(),
+                        diag::attr_not_on_variadic_parameters, "@_addressable");
+      } else if (!options.is(TypeResolverContext::FunctionInput)) {
+        diagnoseInvalid(repr, addressableAttr->getAtLoc(),
+                        diag::attr_only_on_parameters, "@_addressable");
+      }
     }
   }
 
@@ -3680,6 +3868,7 @@ TypeResolver::resolveASTFunctionTypeParams(TupleTypeRepr *inputRepr,
 
     bool autoclosure = false;
     bool noDerivative = false;
+    bool addressable = false;
 
     while (auto *ATR = dyn_cast<AttributedTypeRepr>(nestedRepr)) {
       if (ATR->has(TypeAttrKind::Autoclosure))
@@ -3695,6 +3884,10 @@ TypeResolver::resolveASTFunctionTypeParams(TupleTypeRepr *inputRepr,
               .highlight(nestedRepr->getSourceRange());
         else
           noDerivative = true;
+      }
+      
+      if (ATR->has(TypeAttrKind::Addressable)) {
+        addressable = true;
       }
 
       nestedRepr = ATR->getTypeRepr();
@@ -3773,7 +3966,7 @@ TypeResolver::resolveASTFunctionTypeParams(TupleTypeRepr *inputRepr,
 
     auto paramFlags = ParameterTypeFlags::fromParameterType(
         ty, variadic, autoclosure, /*isNonEphemeral*/ false, ownership,
-        isolated, noDerivative, compileTimeConst, isSending);
+        isolated, noDerivative, compileTimeConst, isSending, addressable);
     elements.emplace_back(ty, argumentLabel, paramFlags, parameterName);
   }
 
@@ -3972,6 +4165,26 @@ NeverNullType TypeResolver::resolveASTFunctionType(
   options |= parentOptions.withoutContext().getFlags();
   auto params =
       resolveASTFunctionTypeParams(repr->getArgsTypeRepr(), options, diffKind);
+  // Ensure that parameter attributes are compatible with the convention
+  // chosen.
+  switch (representation) {
+  case FunctionTypeRepresentation::Swift:
+  case FunctionTypeRepresentation::Thin:
+    // Native conventions.
+    break;
+    
+  case FunctionTypeRepresentation::Block:
+  case FunctionTypeRepresentation::CFunctionPointer:
+    // C conventions. Reject incompatible parameter attributes.
+    for (auto param : params) {
+      if (param.isAddressable()) {
+        diagnose(repr->getLoc(),
+                 diag::attr_not_allowed_in_c_functions,
+                 "_addressable");
+      }
+    }
+    break;
+  }
 
   // Use parameter isolation if we have any.  This overrides all other
   // forms (and should cause conflict diagnostics).
@@ -4023,8 +4236,7 @@ NeverNullType TypeResolver::resolveASTFunctionType(
       thrownTy = Type();
     } else if (!options.contains(TypeResolutionFlags::SilenceErrors) &&
                !thrownTy->hasTypeParameter() &&
-               !ModuleDecl::checkConformance(
-                  thrownTy, ctx.getErrorDecl())) {
+               !checkConformance(thrownTy, ctx.getErrorDecl())) {
       diagnoseInvalid(
           thrownTypeRepr, thrownTypeRepr->getLoc(), diag::thrown_type_not_error,
           thrownTy);
@@ -4147,10 +4359,21 @@ NeverNullType TypeResolver::resolveSILFunctionType(FunctionTypeRepr *repr,
   auto coroutineKind = SILCoroutineKind::None;
   if (auto coroAttr = attrs ? attrs->claim(TAR_SILCoroutine) : nullptr) {
     assert(isa<YieldOnceTypeAttr>(coroAttr) ||
+           isa<YieldOnce2TypeAttr>(coroAttr) ||
            isa<YieldManyTypeAttr>(coroAttr));
-    coroutineKind = (isa<YieldOnceTypeAttr>(coroAttr)
-                       ? SILCoroutineKind::YieldOnce
-                       : SILCoroutineKind::YieldMany);
+    switch (coroAttr->getKind()) {
+    case TypeAttrKind::YieldOnce:
+      coroutineKind = SILCoroutineKind::YieldOnce;
+      break;
+    case TypeAttrKind::YieldOnce2:
+      coroutineKind = SILCoroutineKind::YieldOnce2;
+      break;
+    case TypeAttrKind::YieldMany:
+      coroutineKind = SILCoroutineKind::YieldMany;
+      break;
+    default:
+      llvm_unreachable("bad TypeAttrKind for TAR_SILCoroutine");
+    }
   }
 
   ParameterConvention callee = ParameterConvention::Direct_Unowned;
@@ -4405,7 +4628,7 @@ NeverNullType TypeResolver::resolveSILFunctionType(FunctionTypeRepr *repr,
       selfType = next;
     }
 
-    witnessMethodConformance = ModuleDecl::checkConformance(
+    witnessMethodConformance = checkConformance(
         selfType, protocolType->getDecl());
     assert(witnessMethodConformance &&
            "found witness_method without matching conformance");
@@ -4457,6 +4680,10 @@ SILParameterInfo TypeResolver::resolveSILParameter(
 
   std::optional<TypeAttrSet> attrsBuffer;
   TypeAttrSet *attrs = nullptr;
+
+  if (auto *lifetimeRepr = dyn_cast<LifetimeDependentTypeRepr>(repr)) {
+    repr = lifetimeRepr->getBase();
+  }
   if (yieldAttrs) {
     attrs = yieldAttrs;
     assert(!isa<AttributedTypeRepr>(repr));
@@ -4498,6 +4725,10 @@ SILParameterInfo TypeResolver::resolveSILParameter(
 
       case TypeAttrKind::SILSending:
         parameterOptions |= SILParameterInfo::Sending;
+        return true;
+
+      case TypeAttrKind::SILImplicitLeadingParam:
+        parameterOptions |= SILParameterInfo::ImplicitLeading;
         return true;
 
       default:
@@ -4772,22 +5003,6 @@ TypeResolver::resolveDeclRefTypeRepr(DeclRefTypeRepr *repr,
     auto *dc = getDeclContext();
     auto &ctx = getASTContext();
 
-    // Gate the 'Escapable' type behind a specific flag for now.
-    //
-    // NOTE: we do not return an ErrorType, though! We're just artificially
-    // preventing people from referring to the type without the feature.
-    if (auto proto = result->getAs<ProtocolType>()) {
-      if (auto known = proto->getKnownProtocol()) {
-        if (*known == KnownProtocolKind::Escapable
-            && !isSILSourceFile()
-            && !isInterfaceFile()
-            && !ctx.LangOpts.hasFeature(Feature::NonescapableTypes)) {
-          diagnoseInvalid(repr, repr->getLoc(),
-                          diag::escapable_requires_feature_flag);
-        }
-      }
-    }
-
     if (ctx.LangOpts.hasFeature(Feature::ImplicitSome) &&
         options.isConstraintImplicitExistential()) {
       // Check whether this type is an implicit opaque result type.
@@ -4840,7 +5055,7 @@ TypeResolver::resolveDeclRefTypeRepr(DeclRefTypeRepr *repr,
           typeAlias->getDecl()->getName() == getASTContext().getIdentifier("CFTypeRef")) {
         return TypeAliasType::get(typeAlias->getDecl(),
                                   typeAlias->getParent(),
-                                  typeAlias->getSubstitutionMap(),
+                                  typeAlias->getDirectGenericArgs(),
                                   constraint);
       }
 
@@ -4852,6 +5067,21 @@ TypeResolver::resolveDeclRefTypeRepr(DeclRefTypeRepr *repr,
   // function type.
   if (result->is<FunctionType>())
     result = applyNonEscapingIfNecessary(result, options);
+
+  // Referencing a value generic by name, e.g. 'let N' and referencing 'N', is
+  // only valid as a generic argument, in generic requirements, when being
+  // used as an expression, inside of the @_rawLayout attribute, and in SIL mode.
+  if (result->isValueParameter() &&
+      !(options.isGenericArgument() ||
+        options.isGenericRequirement() ||
+        options.isAnyExpr() ||
+        options.is(TypeResolverContext::RawLayoutAttr) ||
+        options.contains(TypeResolutionFlags::SILMode))) {
+    if (!options.contains(TypeResolutionFlags::SilenceErrors)) {
+      diagnose(repr->getNameLoc(), diag::value_generic_unexpected, result);
+    }
+    return ErrorType::get(getASTContext());
+  }
 
   return result;
 }
@@ -5042,6 +5272,22 @@ TypeResolver::resolveLifetimeDependentTypeRepr(LifetimeDependentTypeRepr *repr,
 }
 
 NeverNullType
+TypeResolver::resolveIntegerTypeRepr(IntegerTypeRepr *repr,
+                                     TypeResolutionOptions options) {
+  if (!options.is(TypeResolverContext::ValueGenericArgument) &&
+      !options.is(TypeResolverContext::SameTypeRequirement) &&
+      !options.is(TypeResolverContext::RawLayoutAttr) &&
+      !options.contains(TypeResolutionFlags::SILMode)) {
+    diagnoseInvalid(repr, repr->getLoc(),
+                    diag::integer_type_not_accepted);
+    return ErrorType::get(getASTContext());
+  }
+
+  return IntegerType::get(repr->getValue(), (bool)repr->getMinusLoc(),
+                          getASTContext());
+}
+
+NeverNullType
 TypeResolver::resolveDictionaryType(DictionaryTypeRepr *repr,
                                     TypeResolutionOptions options) {
   auto argOptions = options.withoutContext().withContext(
@@ -5152,37 +5398,47 @@ NeverNullType TypeResolver::resolveImplicitlyUnwrappedOptionalType(
   case TypeResolverContext::AssociatedTypeInherited:
   case TypeResolverContext::CustomAttr:
   case TypeResolverContext::Inverted:
+  case TypeResolverContext::ValueGenericArgument:
+  case TypeResolverContext::RawLayoutAttr:
     doDiag = true;
     break;
   }
 
   if (doDiag && !options.contains(TypeResolutionFlags::SilenceErrors)) {
-    // Prior to Swift 5, we allow 'as T!' and turn it into a disjunction.
-    if (ctx.isSwiftVersionAtLeast(5)) {
-      // Mark this repr as invalid. This is the only way to indicate that
-      // something went wrong without supressing checking other reprs in
-      // the same type. For example:
-      //
-      // struct S<T, U> { ... }
-      //
-      // _ = S<Int!, String!>(...)
-      //
-      // Compiler should diagnose both `Int!` and `String!` as invalid,
-      // but returning `ErrorType` from here would stop type resolution
-      // after `Int!`.
-      repr->setInvalid();
+    // In language modes up to Swift 5, we allow `T!` in invalid position for
+    // compatibility and downgrade the error to a warning.
+    const unsigned swiftLangModeForError = 5;
 
-      diagnose(repr->getStartLoc(),
-               diag::implicitly_unwrapped_optional_in_illegal_position)
-          .fixItReplace(repr->getExclamationLoc(), "?");
-    } else if (options.is(TypeResolverContext::ExplicitCastExpr)) {
-      diagnose(
-          repr->getStartLoc(),
-          diag::implicitly_unwrapped_optional_deprecated_in_this_position);
-    } else {
-      diagnose(
-          repr->getStartLoc(),
-          diag::implicitly_unwrapped_optional_in_illegal_position_interpreted_as_optional)
+    // If we are about to error, mark this node as invalid.
+    // This is the only way to indicate that something went wrong without
+    // supressing checking of sibling nodes.
+    // For example:
+    //
+    // struct S<T, U> { ... }
+    //
+    // _ = S<Int!, String!>(...)
+    //
+    // Compiler should diagnose both `Int!` and `String!` as invalid,
+    // but returning `ErrorType` from here would stop type resolution
+    // after `Int!`.
+    if (ctx.isSwiftVersionAtLeast(swiftLangModeForError)) {
+      repr->setInvalid();
+    }
+
+    Diag<> diagID = diag::iuo_deprecated_here;
+    if (ctx.isSwiftVersionAtLeast(swiftLangModeForError)) {
+      diagID = diag::iuo_invalid_here;
+    }
+
+    diagnose(repr->getExclamationLoc(), diagID)
+        .warnUntilSwiftVersion(swiftLangModeForError);
+
+    // Suggest a regular optional, but not when `T!` is the right-hand side of
+    // a cast expression.
+    // In this case, the user is likely trying to cast an expression of optional
+    // type, and this fix-it is not generally helpful.
+    if (!options.is(TypeResolverContext::ExplicitCastExpr)) {
+      diagnose(repr->getExclamationLoc(), diag::iuo_use_optional_instead)
           .fixItReplace(repr->getExclamationLoc(), "?");
     }
   }
@@ -5420,6 +5676,7 @@ NeverNullType TypeResolver::resolveTupleType(TupleTypeRepr *repr,
         inStage(TypeResolutionStage::Interface) &&
         !moveOnlyElementIndex.has_value() &&
         !ty->hasUnboundGenericType() &&
+        !ty->hasTypeVariable() &&
         !isa<TupleTypeRepr>(tyR)) {
       auto contextTy = GenericEnvironment::mapTypeIntoContext(
           resolution.getGenericSignature().getGenericEnvironment(), ty);
@@ -5456,7 +5713,7 @@ NeverNullType TypeResolver::resolveTupleType(TupleTypeRepr *repr,
 
   if (options.contains(TypeResolutionFlags::SILType)) {
     if (repr->isParenType())
-      return ParenType::get(ctx, elements[0].getType());
+      return elements[0].getType();
   } else {
     // Single-element labeled tuples are not permitted outside of declarations
     // or SIL, either.
@@ -5472,7 +5729,7 @@ NeverNullType TypeResolver::resolveTupleType(TupleTypeRepr *repr,
 
     if (elements.size() == 1 && !elements[0].hasName() &&
         !elements[0].getType()->is<PackExpansionType>())
-      return ParenType::get(ctx, elements[0].getType());
+      return elements[0].getType();
   }
   
   if (moveOnlyElementIndex.has_value()) {
@@ -5659,6 +5916,10 @@ TypeResolver::resolveExistentialType(ExistentialTypeRepr *repr,
       diagnose(repr->getLoc(), diag::incorrect_optional_any,
                constraintType)
         .fixItReplace(repr->getSourceRange(), fix);
+
+      // Recover by returning the intended type, but mark the type
+      // representation as invalid to prevent it from being diagnosed elsewhere.
+      repr->setInvalid();
       return constraintType;
     }
     
@@ -5744,14 +6005,17 @@ NeverNullType TypeResolver::resolveInverseType(InverseTypeRepr *repr,
                                                TypeResolutionOptions options) {
   auto subOptions = options.withoutContext(true)
       .withContext(TypeResolverContext::Inverted);
-  auto ty = resolveType(repr->getConstraint(), subOptions);
+  auto *constraintRepr = repr->getConstraint();
+  auto ty = resolveType(constraintRepr, subOptions);
   if (ty->hasError())
     return ErrorType::get(getASTContext());
 
   // If the inverted type is an existential metatype, unwrap the existential
   // metatype so we can look at the instance type. We'll re-wrap at the end.
-  ExistentialMetatypeType *existentialTy =
-      dyn_cast<ExistentialMetatypeType>(ty.get().getPointer());
+  // Note we don't look through parens.
+  ExistentialMetatypeType *existentialTy = nullptr;
+  if (!constraintRepr->isParenType())
+    existentialTy = dyn_cast<ExistentialMetatypeType>(ty.get().getPointer());
   if (existentialTy) {
     ty = existentialTy->getInstanceType();
   }
@@ -5768,14 +6032,6 @@ NeverNullType TypeResolver::resolveInverseType(InverseTypeRepr *repr,
 
   if (auto kp = ty->getKnownProtocol()) {
     if (auto kind = getInvertibleProtocolKind(*kp)) {
-
-      // Gate the '~Escapable' type behind a specific flag for now.
-      // Uses of 'Escapable' itself are already diagnosed; return ErrorType.
-      if (*kind == InvertibleProtocolKind::Escapable &&
-          !getASTContext().LangOpts.hasFeature(Feature::NonescapableTypes)) {
-        return wrapInExistential(ErrorType::get(getASTContext()));
-      }
-
       return wrapInExistential(
           ProtocolCompositionType::getInverseOf(getASTContext(), *kind));
     }
@@ -5899,7 +6155,7 @@ Type TypeChecker::substMemberTypeWithBase(TypeDecl *member,
   // If we're referring to a typealias within a generic context, build
   // a sugared alias type.
   if (aliasDecl && (!sugaredBaseTy || !sugaredBaseTy->isAnyExistentialType())) {
-    resultType = TypeAliasType::get(aliasDecl, sugaredBaseTy, subs, resultType);
+    resultType = TypeAliasType::get(aliasDecl, sugaredBaseTy, {}, resultType);
   }
 
   return resultType;
@@ -5916,13 +6172,16 @@ class ExistentialTypeSyntaxChecker : public ASTWalker {
   ASTContext &Ctx;
   bool checkStatements;
   bool hitTopStmt;
+  bool warnUntilSwift7;
 
   unsigned exprCount = 0;
   llvm::SmallVector<TypeRepr *, 4> reprStack;
     
 public:
-  ExistentialTypeSyntaxChecker(ASTContext &ctx, bool checkStatements)
-      : Ctx(ctx), checkStatements(checkStatements), hitTopStmt(false) {}
+  ExistentialTypeSyntaxChecker(ASTContext &ctx, bool checkStatements,
+                               bool warnUntilSwift7 = false)
+      : Ctx(ctx), checkStatements(checkStatements), hitTopStmt(false),
+        warnUntilSwift7(warnUntilSwift7) {}
 
   MacroWalking getMacroWalkingBehavior() const override {
     return MacroWalking::ArgumentsAndExpansion;
@@ -6019,6 +6278,7 @@ private:
     case TypeReprKind::PackExpansion:
     case TypeReprKind::PackElement:
     case TypeReprKind::LifetimeDependent:
+    case TypeReprKind::Integer:
       return false;
     }
   }
@@ -6101,13 +6361,6 @@ private:
         continue;
       }
 
-      // Look through '?' and '!' too; `any P?` et al. is diagnosed in the
-      // type resolver.
-      if (isa<OptionalTypeRepr>(*it) ||
-          isa<ImplicitlyUnwrappedOptionalTypeRepr>(*it)) {
-        continue;
-      }
-
       break;
     }
 
@@ -6135,6 +6388,7 @@ private:
           inverse && isAnyOrSomeMissing()) {
         auto diag = Ctx.Diags.diagnose(inverse->getTildeLoc(),
                                        diag::inverse_requires_any);
+        diag.warnUntilSwiftVersionIf(warnUntilSwift7, 7);
         emitInsertAnyFixit(diag, T);
         return;
       }
@@ -6152,6 +6406,7 @@ private:
                                proto->getDeclaredInterfaceType(),
                                proto->getDeclaredExistentialType(),
                                /*isAlias=*/false);
+        diag.warnUntilSwiftVersionIf(warnUntilSwift7, 7);
         emitInsertAnyFixit(diag, T);
       }
     } else if (auto *alias = dyn_cast<TypeAliasDecl>(decl)) {
@@ -6182,6 +6437,7 @@ private:
               alias->getDeclaredInterfaceType(),
               ExistentialType::get(alias->getDeclaredInterfaceType()),
               /*isAlias=*/true);
+          diag.warnUntilSwiftVersionIf(warnUntilSwift7, 7);
           emitInsertAnyFixit(diag, T);
         }
       }
@@ -6261,7 +6517,14 @@ void TypeChecker::checkExistentialTypes(ASTContext &ctx, Stmt *stmt,
   if (sourceFile && sourceFile->Kind == SourceFileKind::Interface)
     return;
 
-  ExistentialTypeSyntaxChecker checker(ctx, /*checkStatements=*/true);
+  // Previously we missed this diagnostic on 'catch' statements, downgrade
+  // to a warning until Swift 7.
+  auto downgradeUntilSwift7 = false;
+  if (auto *CS = dyn_cast<CaseStmt>(stmt))
+    downgradeUntilSwift7 = CS->getParentKind() == CaseParentKind::DoCatch;
+
+  ExistentialTypeSyntaxChecker checker(ctx, /*checkStatements=*/true,
+                                       downgradeUntilSwift7);
   stmt->walk(checker);
 }
 

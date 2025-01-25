@@ -234,18 +234,16 @@ public:
 
     // Visit the type of the capture, if it isn't a class reference, since
     // we'd need the metadata to do so.
-    if (VD->hasInterfaceType()
-        && (!ObjC
+    if (!ObjC
             || !isa<VarDecl>(VD)
-            || !cast<VarDecl>(VD)->getTypeInContext()->hasRetainablePointerRepresentation()))
+            || !cast<VarDecl>(VD)->getTypeInContext()->hasRetainablePointerRepresentation())
       checkType(VD->getInterfaceType(), VD->getLoc());
   }
 
   LazyInitializerWalking getLazyInitializerWalkingBehavior() override {
-    // We don't want to walk into lazy initializers because they're not
-    // really present at this level.  We'll catch them when processing
-    // the getter.
-    return LazyInitializerWalking::None;
+    // Captures for lazy initializers are computed as part of the parent
+    // accessor.
+    return LazyInitializerWalking::InAccessor;
   }
 
   MacroWalking getMacroWalkingBehavior() const override {
@@ -383,12 +381,12 @@ public:
     // capture of the storage address - not a capture of the getter/setter.
     if (auto var = dyn_cast<VarDecl>(D)) {
       if (var->getAccessStrategy(DRE->getAccessSemantics(),
-                                 var->supportsMutation()
-                                   ? AccessKind::ReadWrite
-                                   : AccessKind::Read,
+                                 var->supportsMutation() ? AccessKind::ReadWrite
+                                                         : AccessKind::Read,
                                  CurDC->getParentModule(),
-                                 CurDC->getResilienceExpansion())
-          .getKind() == AccessStrategy::Storage)
+                                 CurDC->getResilienceExpansion(),
+                                 /*useOldABI=*/false)
+              .getKind() == AccessStrategy::Storage)
         Flags |= CapturedValue::IsDirect;
     }
 
@@ -644,12 +642,6 @@ public:
     if (auto *PEE = dyn_cast<PackElementExpr>(E))
       return walkToPackElementExpr(PEE);
 
-    // Look into lazy initializers.
-    if (auto *LIE = dyn_cast<LazyInitializerExpr>(E)) {
-      LIE->getSubExpr()->walk(*this);
-      return Action::Continue(E);
-    }
-
     // When we see a reference to the 'super' expression, capture 'self' decl.
     if (auto *superE = dyn_cast<SuperRefExpr>(E)) {
       if (auto *selfDecl = superE->getSelf()) {
@@ -682,6 +674,10 @@ public:
         assert(VisitingPackExpansionEnv.count(env) == 0);
         VisitingPackExpansionEnv.insert(env);
       }
+    }
+
+    if (auto typeValue = dyn_cast<TypeValueExpr>(E)) {
+      checkType(typeValue->getParamType(), E->getLoc());
     }
 
     return Action::Continue(E);
@@ -750,6 +746,21 @@ CaptureInfo CaptureInfoRequest::evaluate(Evaluator &evaluator,
 
   if (!AFD->isObjC()) {
     finder.checkType(type, AFD->getLoc());
+  }
+
+  if (AFD->isLocalCapture() && AFD->hasAsync()) {
+    // If a local function inherits isolation from the enclosing context,
+    // make sure we capture the isolated parameter, if we haven't already.
+    auto actorIsolation = getActorIsolation(AFD);
+    if (actorIsolation.getKind() == ActorIsolation::ActorInstance) {
+      if (auto *var = actorIsolation.getActorInstance()) {
+        assert(isa<ParamDecl>(var));
+        // Don't capture anything if the isolation parameter is a parameter
+        // of the local function.
+        if (var->getDeclContext() != AFD)
+          finder.addCapture(CapturedValue(var, 0, AFD->getLoc()));
+      }
+    }
   }
 
   // Extensions of generic ObjC functions can't use generic parameters from

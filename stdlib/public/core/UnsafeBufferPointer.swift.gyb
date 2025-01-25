@@ -30,6 +30,7 @@
 /// collection with an `${Self}` instance copies the instances out of the
 /// referenced memory and into the new collection.
 @frozen // unsafe-performance
+@unsafe
 public struct Unsafe${Mutable}BufferPointer<Element: ~Copyable>: Copyable {
 
   @usableFromInline
@@ -108,6 +109,10 @@ public struct Unsafe${Mutable}BufferPointer<Element: ~Copyable>: Copyable {
   }
 % end
 }
+
+// FIXME: The ASTPrinter should print this synthesized conformance.
+// rdar://140291657
+extension Unsafe${Mutable}BufferPointer: BitwiseCopyable where Element: ~Copyable {}
 
 @available(*, unavailable)
 extension Unsafe${Mutable}BufferPointer: Sendable where Element: ~Copyable {}
@@ -548,7 +553,6 @@ extension Unsafe${Mutable}BufferPointer where Element: ~Copyable {
   }
 }
 
-@_disallowFeatureSuppression(NoncopyableGenerics)
 extension Unsafe${Mutable}BufferPointer {
   /// Accesses the element at the specified position.
   ///
@@ -946,7 +950,9 @@ extension UnsafeMutableBufferPointer {
         $0.count <= self.count,
         "buffer cannot contain every element from source."
       )
-      baseAddress?.initialize(from: sourceAddress, count: $0.count)
+      baseAddress.unsafelyUnwrapped.initialize(
+        from: sourceAddress, count: $0.count
+      )
       return $0.count
     }
     if let count {
@@ -1049,7 +1055,7 @@ extension UnsafeMutableBufferPointer {
         $0.count <= self.count,
         "buffer cannot contain every element from source."
       )
-      baseAddress?.update(from: sourceAddress, count: $0.count)
+      baseAddress.unsafelyUnwrapped.update(from: sourceAddress, count: $0.count)
       return $0.count
     }
     if let count {
@@ -1117,7 +1123,9 @@ extension UnsafeMutableBufferPointer where Element: ~Copyable {
       source.count <= self.count,
       "buffer cannot contain every element from source."
     )
-    baseAddress?.moveInitialize(from: sourceAddress, count: source.count)
+    baseAddress.unsafelyUnwrapped.moveInitialize(
+      from: sourceAddress, count: source.count
+    )
     return startIndex.advanced(by: source.count)
   }
 }
@@ -1191,7 +1199,9 @@ extension UnsafeMutableBufferPointer where Element: ~Copyable {
       source.count <= self.count,
       "buffer cannot contain every element from source."
     )
-    baseAddress?.moveUpdate(from: sourceAddress, count: source.count)
+    baseAddress.unsafelyUnwrapped.moveUpdate(
+      from: sourceAddress, count: source.count
+    )
     return startIndex.advanced(by: source.count)
   }
 }

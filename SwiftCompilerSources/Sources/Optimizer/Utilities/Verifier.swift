@@ -13,7 +13,7 @@
 import SIL
 import OptimizerBridging
 
-private protocol VerifyableInstruction : Instruction {
+private protocol VerifiableInstruction : Instruction {
   func verify(_ context: FunctionPassContext)
 }
 
@@ -35,9 +35,10 @@ extension Function {
       for inst in block.instructions {
 
         inst.checkForwardingConformance()
+        inst.checkGuaranteedResults()
 
-        if let verifyableInst = inst as? VerifyableInstruction {
-          verifyableInst.verify(context)
+        if let verifiableInst = inst as? VerifiableInstruction {
+          verifiableInst.verify(context)
         }
       }
     }
@@ -52,10 +53,54 @@ private extension Instruction {
       require(!(self is ForwardingInstruction), "instruction \(self)\nshould not conform to ForwardingInstruction")
     }
   }
+
+  func checkGuaranteedResults() {
+    for result in results where result.ownership == .guaranteed {
+      require(BeginBorrowValue(result) != nil || self is ForwardingInstruction,
+              "\(result) must either be a BeginBorrowValue or a ForwardingInstruction")
+    }
+  }
 }
 
-extension BorrowedFromInst : VerifyableInstruction {
+private extension Argument {
   func verify(_ context: FunctionPassContext) {
+    if let phi = Phi(self), phi.value.ownership == .guaranteed {
+
+      phi.verifyBorrowedFromUse()
+
+      require(phi.isReborrow == phi.hasBorrowEndingUse ||
+              // In a dead-end block an end_borrow might have been deleted.
+              // TODO: this check is not needed anymore once we have complete OSSA lifetimes.
+              (isReborrow && context.deadEndBlocks.isDeadEnd(parentBlock)),
+              "\(self) has stale reborrow flag");
+    }
+  }
+
+}
+
+private extension Phi {
+  func verifyBorrowedFromUse() {
+    var forwardingBorrowedFromFound = false
+    for use in value.uses {
+      require(use.instruction is BorrowedFromInst,
+              "guaranteed phi: \(self)\n has non borrowed-from use: \(use)")
+      if use.index == 0 {
+        require(!forwardingBorrowedFromFound, "phi \(self) has multiple forwarding borrowed-from uses")
+        forwardingBorrowedFromFound = true
+      }
+    }
+    require(forwardingBorrowedFromFound,
+            "missing forwarding borrowed-from user of guaranteed phi \(self)")
+  }
+}
+
+extension BorrowedFromInst : VerifiableInstruction {
+  func verify(_ context: FunctionPassContext) {
+
+    for ev in enclosingValues {
+      require(ev.isValidEnclosingValueInBorrowedFrom, "invalid enclosing value in borrowed-from: \(ev)")
+    }
+
     var computedEVs = Stack<Value>(context)
     defer { computedEVs.deinitialize() }
 
@@ -74,20 +119,140 @@ extension BorrowedFromInst : VerifyableInstruction {
   }
 }
 
-private extension Argument {
+private extension Value {
+  var isValidEnclosingValueInBorrowedFrom: Bool {
+    switch ownership {
+    case .owned:
+      return true
+    case .guaranteed:
+      return BeginBorrowValue(self) != nil ||
+             self is BorrowedFromInst ||
+             forwardingInstruction != nil
+    case .none, .unowned:
+      return false
+    }
+  }
+}
+
+extension LoadBorrowInst : VerifiableInstruction {
   func verify(_ context: FunctionPassContext) {
-    if let phi = Phi(self), phi.value.ownership == .guaranteed {
-      var forwardingBorrowedFromFound = false
-      for use in phi.value.uses {
-        require(use.instruction is BorrowedFromInst,
-                     "guaranteed phi: \(self)\n has non borrowed-from use: \(use)")
-        if use.index == 0 {
-          require(!forwardingBorrowedFromFound, "phi \(self) has multiple forwarding borrowed-from uses")
-          forwardingBorrowedFromFound = true
+    if isUnchecked {
+      return
+    }
+
+    var mutatingInstructions = MutatingUsesWalker(context)
+    defer { mutatingInstructions.deinitialize() }
+
+    mutatingInstructions.findMutatingUses(of: self.address)
+    mutatingInstructions.verifyNoMutatingUsesInLiverange(of: self)
+  }
+}
+
+// Used to check if any instruction is mutating the memory location within the liverange of a `load_borrow`.
+// Note that it is not checking if an instruction _may_ mutate the memory, but it's checking if any instruction
+// _definitely_ will mutate the memory.
+// Otherwise the risk would be too big for false alarms. It also means that this verification is not perfect and
+// might miss some subtle violations.
+private struct MutatingUsesWalker : AddressDefUseWalker {
+  let context: FunctionPassContext
+  var mutatingInstructions: InstructionSet
+
+  init(_ context: FunctionPassContext) {
+    self.context = context
+    self.mutatingInstructions = InstructionSet(context)
+  }
+
+  mutating func deinitialize() {
+    self.mutatingInstructions.deinitialize()
+  }
+
+  mutating func findMutatingUses(of address: Value) {
+    _ = walkDownUses(ofAddress: address, path: UnusedWalkingPath())
+  }
+
+  mutating func verifyNoMutatingUsesInLiverange(of load: LoadBorrowInst) {
+    // The liverange of a `load_borrow` can end in a branch instruction. In such cases we handle the re-borrow liveranges
+    // (starting at the `borrowed_from` in the successor block) separately.
+    // This worklist contains the starts of the individual linear liveranges,
+    // i.e. `load_borrow` and `borrowed_from` instructions.
+    var linearLiveranges = SpecificInstructionWorklist<SingleValueInstruction>(context)
+    defer { linearLiveranges.deinitialize() }
+
+    linearLiveranges.pushIfNotVisited(load)
+    while let startInst = linearLiveranges.pop() {
+      verifyNoMutatingUsesInLinearLiverange(of: startInst)
+
+      for use in startInst.uses {
+        if let phi = Phi(using: use) {
+          if let bf = phi.borrowedFrom {
+            linearLiveranges.pushIfNotVisited(bf)
+          } else {
+            require(false, "missing borrowed-from for \(phi.value)")
+          }
         }
       }
-      require (forwardingBorrowedFromFound,
-                   "missing forwarding borrowed-from user of guaranteed phi \(phi)")
+    }
+  }
+
+  private mutating func verifyNoMutatingUsesInLinearLiverange(of startInst: SingleValueInstruction) {
+    assert(startInst is LoadBorrowInst || startInst is BorrowedFromInst)
+
+    var instWorklist = InstructionWorklist(context)
+    defer { instWorklist.deinitialize() }
+
+    // It would be good enough to only consider `end_borrow`s (and branches), but adding all users doesn't harm.
+    for use in startInst.uses {
+      instWorklist.pushPredecessors(of: use.instruction, ignoring: startInst)
+    }
+
+    while let inst = instWorklist.pop() {
+      require(!mutatingInstructions.contains(inst),
+              "Load borrow invalidated by a local write", atInstruction: inst)
+      instWorklist.pushPredecessors(of: inst, ignoring: startInst)
+    }
+  }
+
+  mutating func leafUse(address: Operand, path: UnusedWalkingPath) -> WalkResult {
+    if address.isMutatedAddress {
+      mutatingInstructions.insert(address.instruction)
+    }
+    return .continueWalk
+  }
+}
+
+private extension Operand {
+  // Returns true if the operand's instruction is definitely writing to the operand's address value.
+  var isMutatedAddress: Bool {
+    assert(value.type.isAddress)
+    switch instruction {
+    case let store as StoringInstruction:
+      return self == store.destinationOperand
+    case let copy as SourceDestAddrInstruction:
+      if self == copy.destinationOperand {
+        return true
+      } else if self == copy.sourceOperand && copy.isTakeOfSrc {
+        return true
+      }
+      return false
+    case let load as LoadInst:
+      return load.loadOwnership == .take
+    case let partialApply as PartialApplyInst:
+      if !partialApply.isOnStack,
+         let convention = partialApply.convention(of: self)
+      {
+        switch convention {
+        case .indirectIn, .indirectInGuaranteed:
+          // Such operands are consumed by the `partial_apply` and therefore cound as "written".
+          return true
+        default:
+          return false
+        }
+      }
+      return false
+    case is DestroyAddrInst, is IsUniqueInst:
+      return true
+    default:
+      return false
     }
   }
 }

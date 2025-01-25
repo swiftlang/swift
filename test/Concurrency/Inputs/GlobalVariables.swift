@@ -2,7 +2,7 @@ public struct Globals {
   public static let integerConstant = 0
   public static var integerMutable = 0
 
-  public static nonisolated(unsafe) let nonisolatedUnsafeIntegerConstant = 0
+  public static let nonisolatedUnsafeIntegerConstant = 0
   public static nonisolated(unsafe) var nonisolatedUnsafeIntegerMutable = 0
 
   @MainActor public static var actorInteger = 0

@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "ClangDerivedConformances.h"
+#include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/PrettyStackTrace.h"
 #include "swift/AST/ProtocolConformance.h"
@@ -71,21 +72,6 @@ static Decl *lookupDirectSingleWithoutExtensions(NominalTypeDecl *decl,
   return dyn_cast<Decl>(results.front());
 }
 
-/// Similar to ModuleDecl::conformsToProtocol, but doesn't introduce a
-/// dependency on Sema.
-static bool isConcreteAndValid(ProtocolConformanceRef conformanceRef) {
-  if (conformanceRef.isInvalid())
-    return false;
-  if (!conformanceRef.isConcrete())
-    return false;
-  auto conformance = conformanceRef.getConcrete();
-  auto subMap = conformance->getSubstitutionMap();
-  return llvm::all_of(subMap.getConformances(),
-                      [&](ProtocolConformanceRef each) -> bool {
-                        return isConcreteAndValid(each);
-                      });
-}
-
 static FuncDecl *getInsertFunc(NominalTypeDecl *decl,
                                TypeAliasDecl *valueType) {
   ASTContext &ctx = decl->getASTContext();
@@ -139,18 +125,12 @@ lookupNestedClangTypeDecl(const clang::CXXRecordDecl *clangDecl,
 
 static clang::TypeDecl *
 getIteratorCategoryDecl(const clang::CXXRecordDecl *clangDecl) {
-  clang::IdentifierInfo *iteratorCategoryDeclName =
-      &clangDecl->getASTContext().Idents.get("iterator_category");
-  auto iteratorCategories = clangDecl->lookup(iteratorCategoryDeclName);
-  // If this is a templated typedef, Clang might have instantiated several
-  // equivalent typedef decls. If they aren't equivalent, Clang has already
-  // complained about this. Let's assume that they are equivalent. (see
-  // filterNonConflictingPreviousTypedefDecls in clang/Sema/SemaDecl.cpp)
-  if (iteratorCategories.empty())
-    return nullptr;
-  auto iteratorCategory = iteratorCategories.front();
+  return lookupNestedClangTypeDecl(clangDecl, "iterator_category");
+}
 
-  return dyn_cast_or_null<clang::TypeDecl>(iteratorCategory);
+static clang::TypeDecl *
+getIteratorConceptDecl(const clang::CXXRecordDecl *clangDecl) {
+  return lookupNestedClangTypeDecl(clangDecl, "iterator_concept");
 }
 
 static ValueDecl *lookupOperator(NominalTypeDecl *decl, Identifier id,
@@ -225,9 +205,7 @@ static FuncDecl *getMinusOperator(NominalTypeDecl *decl) {
     if (lhsNominal != rhsNominal || lhsNominal != decl)
       return false;
     auto returnTy = minus->getResultInterfaceType();
-    auto conformanceRef =
-        ModuleDecl::lookupConformance(returnTy, binaryIntegerProto);
-    if (!isConcreteAndValid(conformanceRef))
+    if (!checkConformance(returnTy, binaryIntegerProto))
       return false;
     return true;
   };
@@ -279,8 +257,8 @@ instantiateTemplatedOperator(ClangImporter::Implementation &impl,
 
   clang::UnresolvedSet<1> ops;
   auto qualType = clang::QualType(classDecl->getTypeForDecl(), 0);
-  auto arg = new (clangCtx)
-      clang::CXXThisExpr(clang::SourceLocation(), qualType, false);
+  auto arg = clang::CXXThisExpr::Create(clangCtx, clang::SourceLocation(),
+                                        qualType, false);
   arg->setType(clang::QualType(classDecl->getTypeForDecl(), 0));
 
   clang::OverloadedOperatorKind opKind =
@@ -451,32 +429,40 @@ void swift::conformToCxxIteratorIfNeeded(
   if (!iteratorCategory)
     return;
 
+  auto unwrapUnderlyingTypeDecl =
+      [](clang::TypeDecl *typeDecl) -> clang::CXXRecordDecl * {
+    clang::CXXRecordDecl *underlyingDecl = nullptr;
+    if (auto typedefDecl = dyn_cast<clang::TypedefNameDecl>(typeDecl)) {
+      auto type = typedefDecl->getUnderlyingType();
+      underlyingDecl = type->getAsCXXRecordDecl();
+    } else {
+      underlyingDecl = dyn_cast<clang::CXXRecordDecl>(typeDecl);
+    }
+    if (underlyingDecl) {
+      underlyingDecl = underlyingDecl->getDefinition();
+    }
+    return underlyingDecl;
+  };
+
   // If `iterator_category` is a typedef or a using-decl, retrieve the
   // underlying struct decl.
-  clang::CXXRecordDecl *underlyingCategoryDecl = nullptr;
-  if (auto typedefDecl = dyn_cast<clang::TypedefNameDecl>(iteratorCategory)) {
-    auto type = typedefDecl->getUnderlyingType();
-    underlyingCategoryDecl = type->getAsCXXRecordDecl();
-  } else {
-    underlyingCategoryDecl = dyn_cast<clang::CXXRecordDecl>(iteratorCategory);
-  }
-  if (underlyingCategoryDecl) {
-    underlyingCategoryDecl = underlyingCategoryDecl->getDefinition();
-  }
-
+  auto underlyingCategoryDecl = unwrapUnderlyingTypeDecl(iteratorCategory);
   if (!underlyingCategoryDecl)
     return;
 
-  auto isIteratorCategoryDecl = [&](const clang::CXXRecordDecl *base,
-                                    StringRef tag) {
+  auto isIteratorTagDecl = [&](const clang::CXXRecordDecl *base,
+                               StringRef tag) {
     return base->isInStdNamespace() && base->getIdentifier() &&
            base->getName() == tag;
   };
   auto isInputIteratorDecl = [&](const clang::CXXRecordDecl *base) {
-    return isIteratorCategoryDecl(base, "input_iterator_tag");
+    return isIteratorTagDecl(base, "input_iterator_tag");
   };
   auto isRandomAccessIteratorDecl = [&](const clang::CXXRecordDecl *base) {
-    return isIteratorCategoryDecl(base, "random_access_iterator_tag");
+    return isIteratorTagDecl(base, "random_access_iterator_tag");
+  };
+  auto isContiguousIteratorDecl = [&](const clang::CXXRecordDecl *base) {
+    return isIteratorTagDecl(base, "contiguous_iterator_tag"); // C++20
   };
 
   // Traverse all transitive bases of `underlyingDecl` to check if
@@ -498,6 +484,27 @@ void swift::conformToCxxIteratorIfNeeded(
 
   if (!isInputIterator)
     return;
+
+  bool isContiguousIterator = false;
+  // In C++20, `std::contiguous_iterator_tag` is specified as a type called
+  // `iterator_concept`. It is not possible to detect a contiguous iterator
+  // based on its `iterator_category`. The type might not have an
+  // `iterator_concept` defined.
+  if (auto iteratorConcept = getIteratorConceptDecl(clangDecl)) {
+    if (auto underlyingConceptDecl =
+            unwrapUnderlyingTypeDecl(iteratorConcept)) {
+      isContiguousIterator = isContiguousIteratorDecl(underlyingConceptDecl);
+      if (!isContiguousIterator)
+        underlyingConceptDecl->forallBases(
+            [&](const clang::CXXRecordDecl *base) {
+              if (isContiguousIteratorDecl(base)) {
+                isContiguousIterator = true;
+                return false;
+              }
+              return true;
+            });
+    }
+  }
 
   // Check if present: `var pointee: Pointee { get }`
   auto pointeeId = ctx.getIdentifier("pointee");
@@ -610,6 +617,15 @@ void swift::conformToCxxIteratorIfNeeded(
   else
     impl.addSynthesizedProtocolAttrs(
         decl, {KnownProtocolKind::UnsafeCxxRandomAccessIterator});
+
+  if (isContiguousIterator) {
+    if (pointeeSettable)
+      impl.addSynthesizedProtocolAttrs(
+          decl, {KnownProtocolKind::UnsafeCxxMutableContiguousIterator});
+    else
+      impl.addSynthesizedProtocolAttrs(
+          decl, {KnownProtocolKind::UnsafeCxxContiguousIterator});
+  }
 }
 
 void swift::conformToCxxConvertibleToBoolIfNeeded(
@@ -721,8 +737,8 @@ void swift::conformToCxxSequenceIfNeeded(
 
   // Check if RawIterator conforms to UnsafeCxxInputIterator.
   auto rawIteratorConformanceRef =
-      ModuleDecl::lookupConformance(rawIteratorTy, cxxIteratorProto);
-  if (!isConcreteAndValid(rawIteratorConformanceRef))
+      checkConformance(rawIteratorTy, cxxIteratorProto);
+  if (!rawIteratorConformanceRef)
     return;
   auto rawIteratorConformance = rawIteratorConformanceRef.getConcrete();
   auto pointeeDecl =
@@ -767,9 +783,7 @@ void swift::conformToCxxSequenceIfNeeded(
       return false;
 
     // Check if RawIterator conforms to UnsafeCxxRandomAccessIterator.
-    auto rawIteratorRAConformanceRef =
-        ModuleDecl::lookupConformance(rawIteratorTy, cxxRAIteratorProto);
-    if (!isConcreteAndValid(rawIteratorRAConformanceRef))
+    if (!checkConformance(rawIteratorTy, cxxRAIteratorProto))
       return false;
 
     // CxxRandomAccessCollection always uses Int as an Index.
@@ -798,8 +812,44 @@ void swift::conformToCxxSequenceIfNeeded(
     impl.addSynthesizedTypealias(decl, ctx.getIdentifier("Indices"), indicesTy);
     impl.addSynthesizedTypealias(decl, ctx.getIdentifier("SubSequence"),
                                  sliceTy);
-    impl.addSynthesizedProtocolAttrs(
-        decl, {KnownProtocolKind::CxxRandomAccessCollection});
+
+    auto tryToConformToMutatingRACollection = [&]() -> bool {
+      auto rawMutableIteratorProto = ctx.getProtocol(
+          KnownProtocolKind::UnsafeCxxMutableRandomAccessIterator);
+      if (!rawMutableIteratorProto)
+        return false;
+
+      // Check if present: `func __beginMutatingUnsafe() -> RawMutableIterator`
+      auto beginMutatingId = ctx.getIdentifier("__beginMutatingUnsafe");
+      auto beginMutating =
+          lookupDirectSingleWithoutExtensions<FuncDecl>(decl, beginMutatingId);
+      if (!beginMutating)
+        return false;
+      auto rawMutableIteratorTy = beginMutating->getResultInterfaceType();
+
+      // Check if present: `func __endMutatingUnsafe() -> RawMutableIterator`
+      auto endMutatingId = ctx.getIdentifier("__endMutatingUnsafe");
+      auto endMutating =
+          lookupDirectSingleWithoutExtensions<FuncDecl>(decl, endMutatingId);
+      if (!endMutating)
+        return false;
+
+      if (!checkConformance(rawMutableIteratorTy, rawMutableIteratorProto))
+        return false;
+
+      impl.addSynthesizedTypealias(
+          decl, ctx.getIdentifier("RawMutableIterator"), rawMutableIteratorTy);
+      impl.addSynthesizedProtocolAttrs(
+          decl, {KnownProtocolKind::CxxMutableRandomAccessCollection});
+      return true;
+    };
+
+    bool conformedToMutableRAC = tryToConformToMutatingRACollection();
+
+    if (!conformedToMutableRAC)
+      impl.addSynthesizedProtocolAttrs(
+          decl, {KnownProtocolKind::CxxRandomAccessCollection});
+
     return true;
   };
 
@@ -865,6 +915,8 @@ void swift::conformToCxxSetIfNeeded(ClangImporter::Implementation &impl,
 
   impl.addSynthesizedTypealias(decl, ctx.Id_Element,
                                valueType->getUnderlyingType());
+  impl.addSynthesizedTypealias(decl, ctx.Id_ArrayLiteralElement,
+                               valueType->getUnderlyingType());
   impl.addSynthesizedTypealias(decl, ctx.getIdentifier("Size"),
                                sizeType->getUnderlyingType());
   impl.addSynthesizedTypealias(decl, ctx.getIdentifier("InsertionResult"),
@@ -876,24 +928,28 @@ void swift::conformToCxxSetIfNeeded(ClangImporter::Implementation &impl,
   if (!isStdDecl(clangDecl, {"set", "unordered_set"}))
     return;
 
-  ProtocolDecl *cxxIteratorProto =
+  ProtocolDecl *cxxInputIteratorProto =
       ctx.getProtocol(KnownProtocolKind::UnsafeCxxInputIterator);
-  if (!cxxIteratorProto)
+  if (!cxxInputIteratorProto)
     return;
 
+  auto rawIteratorType = lookupDirectSingleWithoutExtensions<TypeAliasDecl>(
+      decl, ctx.getIdentifier("const_iterator"));
   auto rawMutableIteratorType =
       lookupDirectSingleWithoutExtensions<TypeAliasDecl>(
           decl, ctx.getIdentifier("iterator"));
-  if (!rawMutableIteratorType)
+  if (!rawIteratorType || !rawMutableIteratorType)
     return;
 
+  auto rawIteratorTy = rawIteratorType->getUnderlyingType();
   auto rawMutableIteratorTy = rawMutableIteratorType->getUnderlyingType();
-  // Check if RawMutableIterator conforms to UnsafeCxxInputIterator.
-  auto rawIteratorConformanceRef =
-      ModuleDecl::lookupConformance(rawMutableIteratorTy, cxxIteratorProto);
-  if (!isConcreteAndValid(rawIteratorConformanceRef))
+
+  if (!checkConformance(rawIteratorTy, cxxInputIteratorProto) ||
+      !checkConformance(rawMutableIteratorTy, cxxInputIteratorProto))
     return;
 
+  impl.addSynthesizedTypealias(decl, ctx.getIdentifier("RawIterator"),
+                               rawIteratorTy);
   impl.addSynthesizedTypealias(decl, ctx.getIdentifier("RawMutableIterator"),
                                rawMutableIteratorTy);
   impl.addSynthesizedProtocolAttrs(decl, {KnownProtocolKind::CxxUniqueSet});
@@ -972,15 +1028,11 @@ void swift::conformToCxxDictionaryIfNeeded(
   auto rawMutableIteratorTy = mutableIterType->getUnderlyingType();
 
   // Check if RawIterator conforms to UnsafeCxxInputIterator.
-  auto rawIteratorConformanceRef =
-      ModuleDecl::lookupConformance(rawIteratorTy, cxxInputIteratorProto);
-  if (!isConcreteAndValid(rawIteratorConformanceRef))
+  if (!checkConformance(rawIteratorTy, cxxInputIteratorProto))
     return;
 
   // Check if RawMutableIterator conforms to UnsafeCxxMutableInputIterator.
-  auto rawMutableIteratorConformanceRef = ModuleDecl::lookupConformance(
-      rawMutableIteratorTy, cxxMutableInputIteratorProto);
-  if (!isConcreteAndValid(rawMutableIteratorConformanceRef))
+  if (!checkConformance(rawMutableIteratorTy, cxxMutableInputIteratorProto))
     return;
 
   // Make the original subscript that returns a non-optional value unavailable.
@@ -1038,9 +1090,7 @@ void swift::conformToCxxVectorIfNeeded(ClangImporter::Implementation &impl,
   auto rawIteratorTy = iterType->getUnderlyingType();
 
   // Check if RawIterator conforms to UnsafeCxxRandomAccessIterator.
-  auto rawIteratorConformanceRef =
-      ModuleDecl::lookupConformance(rawIteratorTy, cxxRandomAccessIteratorProto);
-  if (!isConcreteAndValid(rawIteratorConformanceRef))
+  if (!checkConformance(rawIteratorTy, cxxRandomAccessIteratorProto))
     return;
 
   impl.addSynthesizedTypealias(decl, ctx.Id_Element,
@@ -1219,7 +1269,8 @@ void swift::conformToCxxSpanIfNeeded(ClangImporter::Implementation &impl,
   if (!importedConstructor)
     return;
 
-  auto attr = AvailableAttr::createPlatformAgnostic(importedConstructor->getASTContext(), "use 'init(_:)' instead.", "", PlatformAgnosticAvailabilityKind::Deprecated);
+  auto attr = AvailableAttr::createUniversallyDeprecated(
+      importedConstructor->getASTContext(), "use 'init(_:)' instead.", "");
   importedConstructor->getAttrs().add(attr);
 
   decl->addMember(importedConstructor);

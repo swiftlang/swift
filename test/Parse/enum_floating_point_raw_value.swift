@@ -3,6 +3,7 @@
 // FIXME: this test only passes on platforms which have Float80.
 // <rdar://problem/19508460> Floating point enum raw values are not portable
 
+// REQUIRES: CPU=i386 || CPU=x86_64
 
 // Windows does not support FP80
 // XFAIL: OS=windows-msvc

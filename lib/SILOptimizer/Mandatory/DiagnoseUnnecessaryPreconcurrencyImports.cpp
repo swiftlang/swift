@@ -54,7 +54,6 @@ class DiagnoseUnnecessaryPreconcurrencyImports : public SILModuleTransform {
       }
 
       data.push_back(sf);
-      assert(sf->getBufferID() != -1 && "Must have a buffer id");
     }
 
     // Sort unique by filename so our diagnostics are deterministic.

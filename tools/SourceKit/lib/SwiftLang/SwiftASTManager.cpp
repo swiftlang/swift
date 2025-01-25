@@ -42,8 +42,6 @@ using namespace SourceKit;
 using namespace swift;
 using namespace swift::sys;
 
-void SwiftASTConsumer::failed(StringRef Error) { }
-
 //===----------------------------------------------------------------------===//
 // SwiftInvocation
 //===----------------------------------------------------------------------===//
@@ -1045,8 +1043,6 @@ static void collectModuleDependencies(ModuleDecl *TopMod,
   if (!TopMod)
     return;
 
-  auto ClangModuleLoader = TopMod->getASTContext().getClangModuleLoader();
-
   ModuleDecl::ImportFilter ImportFilter = {
       ModuleDecl::ImportFilterKind::Exported,
       ModuleDecl::ImportFilterKind::Default};
@@ -1063,8 +1059,7 @@ static void collectModuleDependencies(ModuleDecl *TopMod,
     if (Mod->isSystemModule())
       continue;
     // FIXME: Setup dependencies on the included headers.
-    if (ClangModuleLoader &&
-        Mod == ClangModuleLoader->getImportedHeaderModule())
+    if (Mod->isClangHeaderImportModule())
       continue;
     bool NewVisit = Visited.insert(Mod).second;
     if (!NewVisit)
@@ -1219,6 +1214,10 @@ ASTUnitRef ASTBuildOperation::buildASTUnit(std::string &Error) {
       // flag and might thus fail, which SILGen cannot handle.
       llvm::SaveAndRestore<std::shared_ptr<std::atomic<bool>>> DisableCancellationDuringSILGen(CompIns.getASTContext().CancellationFlag, nullptr);
       SILOptions SILOpts = Invocation.getSILOptions();
+
+      // Disable diagnostics that require WMO (as SourceKit disables it).
+      SILOpts.EnableWMORequiredDiagnostics = false;
+
       auto &TC = CompIns.getSILTypes();
       std::unique_ptr<SILModule> SILMod = performASTLowering(*SF, TC, SILOpts);
       if (CancellationFlag->load(std::memory_order_relaxed)) {

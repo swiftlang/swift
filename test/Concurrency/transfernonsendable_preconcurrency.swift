@@ -1,16 +1,16 @@
 // RUN: %empty-directory(%t)
 
 // A swift 5 module /without/ concurrency checking
-// RUN: %target-swift-frontend -emit-module -emit-module-path %t/PreconcurrencyUnchecked.swiftmodule -module-name PreconcurrencyUnchecked %S/Inputs/transfernonsendable_preconcurrency_unchecked.swift -disable-availability-checking -swift-version 5
+// RUN: %target-swift-frontend -emit-module -emit-module-path %t/PreconcurrencyUnchecked.swiftmodule -module-name PreconcurrencyUnchecked %S/Inputs/transfernonsendable_preconcurrency_unchecked.swift -target %target-swift-5.1-abi-triple -swift-version 5
 
 // A swift 5 module /with/ concurrency checking
-// RUN: %target-swift-frontend -emit-module -emit-module-path %t/PreconcurrencyChecked.swiftmodule -module-name PreconcurrencyChecked %S/Inputs/transfernonsendable_preconcurrency_checked.swift -disable-availability-checking -swift-version 5 -strict-concurrency=complete
+// RUN: %target-swift-frontend -emit-module -emit-module-path %t/PreconcurrencyChecked.swiftmodule -module-name PreconcurrencyChecked %S/Inputs/transfernonsendable_preconcurrency_checked.swift -target %target-swift-5.1-abi-triple -swift-version 5 -strict-concurrency=complete
 
 // Test swift 5 with strict concurrency
-// RUN: %target-swift-frontend -swift-version 5 %s -emit-sil -o /dev/null -verify -verify-additional-prefix swift-5- -parse-as-library -I %t -strict-concurrency=complete -disable-availability-checking
+// RUN: %target-swift-frontend -swift-version 5 %s -emit-sil -o /dev/null -verify -verify-additional-prefix swift-5- -parse-as-library -I %t -strict-concurrency=complete -target %target-swift-5.1-abi-triple
 
 // Test swift 6
-// RUN: %target-swift-frontend -swift-version 6 %s -emit-sil -o /dev/null -verify -verify-additional-prefix swift-6- -parse-as-library -I %t -disable-availability-checking
+// RUN: %target-swift-frontend -swift-version 6 %s -emit-sil -o /dev/null -verify -verify-additional-prefix swift-6- -parse-as-library -I %t -target %target-swift-5.1-abi-triple
 
 // REQUIRES: concurrency
 // REQUIRES: asserts
@@ -80,19 +80,12 @@ func testNormal() async {
   // expected-swift-6-note @-1 {{access can happen concurrently}}
 }
 
-func testOnlyErrorOnExactValue() async {
+func testErrorOnNonExactValue() async {
   let x = PreCUncheckedNonSendableKlass()
   let y = (x, x)
-  // We would squelch this if we transferred it directly. Also we error even
-  // though we use x later.
+
   await transferToMain(y)
-  // expected-swift-5-warning @-1 {{sending 'y' risks causing data races}}
-  // expected-swift-5-note @-2 {{sending 'y' to main actor-isolated global function 'transferToMain' risks causing data races between main actor-isolated and local nonisolated uses}}
-  // expected-swift-6-error @-3 {{sending 'y' risks causing data races}}
-  // expected-swift-6-note @-4 {{sending 'y' to main actor-isolated global function 'transferToMain' risks causing data races between main actor-isolated and local nonisolated uses}}
   useValue(x)
-  // expected-swift-5-note @-1 {{access can happen concurrently}}
-  // expected-swift-6-note @-2 {{access can happen concurrently}}
 }
 
 func testNoErrorIfUseInSameRegionLater() async {
@@ -127,21 +120,15 @@ func testNeverTransferNormal(_ x: PostCUncheckedNonSendableKlass) async {
   // expected-swift-6-note @-4 {{sending task-isolated 'x' to main actor-isolated global function 'transferToMain' risks causing data races between main actor-isolated and task-isolated uses}}
 }
 
-// Inexact match => normal behavior.
 func testNeverTransferInexactMatch(_ x: (PreCUncheckedNonSendableKlass, PreCUncheckedNonSendableKlass)) async {
   await transferToMain(x)
-  // expected-swift-5-warning @-1 {{sending 'x' risks causing data races}}
-  // expected-swift-5-note @-2 {{sending task-isolated 'x' to main actor-isolated global function 'transferToMain' risks causing data races between main actor-isolated and task-isolated uses}}
-  // expected-swift-6-error @-3 {{sending 'x' risks causing data races}}
-  // expected-swift-6-note @-4 {{sending task-isolated 'x' to main actor-isolated global function 'transferToMain' risks causing data races between main actor-isolated and task-isolated uses}}
 }
 
-// Inexact match => normal behavior.
 func testNeverTransferInexactMatchExplicit(_ x: (PreCUncheckedExplicitlyNonSendableKlass, PreCUncheckedExplicitlyNonSendableKlass)) async {
   await transferToMain(x)
   // expected-swift-5-warning @-1 {{sending 'x' risks causing data races}}
   // expected-swift-5-note @-2 {{sending task-isolated 'x' to main actor-isolated global function 'transferToMain' risks causing data races between main actor-isolated and task-isolated uses}}
-  // expected-swift-6-error @-3 {{sending 'x' risks causing data races}}
+  // expected-swift-6-warning @-3 {{sending 'x' risks causing data races}}
   // expected-swift-6-note @-4 {{sending task-isolated 'x' to main actor-isolated global function 'transferToMain' risks causing data races between main actor-isolated and task-isolated uses}}
 }
 

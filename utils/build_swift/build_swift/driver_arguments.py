@@ -8,6 +8,7 @@
 
 import multiprocessing
 import os
+import platform
 
 import android.adb.commands
 
@@ -59,6 +60,10 @@ def _apply_default_arguments(args):
     # Build libc++ if fully static Linux was specified.
     if args.build_linux_static and args.build_libcxx is None:
         args.build_libcxx = True
+
+    # Previewing the stdlib docs requires building them.
+    if args.preview_stdlib_docs:
+        args.build_stdlib_docs = True
 
     # Set the default CMake generator.
     if args.cmake_generator is None:
@@ -761,6 +766,10 @@ def create_argument_parser():
     option('--test-sourcekit-lsp-sanitize-all',
            toggle_true('test_sourcekitlsp_sanitize_all'),
            help='run sourcekit-lsp tests under all sanitizers')
+    option('--sourcekit-lsp-verify-generated-files',
+           toggle_true('sourcekitlsp_verify_generated_files'),
+           help='set to verify that the generated files in the source tree ' +
+                'match the ones that would be generated from current main')
     option('--sourcekit-lsp-lint',
            toggle_true('sourcekitlsp_lint'),
            help='verify that sourcekit-lsp Source code is formatted correctly')
@@ -808,6 +817,16 @@ def create_argument_parser():
                 'separate build directory ')
     option(['--wasmkit'], toggle_true('build_wasmkit'),
            help='build WasmKit')
+
+    option('--swift-testing', toggle_true('build_swift_testing'),
+           help='build Swift Testing')
+    option('--install-swift-testing', toggle_true('install_swift_testing'),
+           help='install Swift Testing')
+    option('--swift-testing-macros', toggle_true('build_swift_testing_macros'),
+           help='build Swift Testing macro plugin')
+    option('--install-swift-testing-macros',
+           toggle_true('install_swift_testing_macros'),
+           help='install Swift Testing macro plugin')
 
     option('--xctest', toggle_true('build_xctest'),
            help='build xctest')
@@ -1126,7 +1145,7 @@ def create_argument_parser():
            help='build static variants of the Swift standard library')
 
     option('--build-swift-dynamic-sdk-overlay', toggle_true,
-           default=True,
+           default=platform.system() != "Darwin",
            help='build dynamic variants of the Swift SDK overlay')
 
     option('--build-swift-static-sdk-overlay', toggle_true,
@@ -1149,6 +1168,15 @@ def create_argument_parser():
            default=True,
            help='Include Unicode data in the standard library.'
                 'Note: required for full String functionality')
+
+    option('--build-stdlib-docs', toggle_true,
+           default=False,
+           help='Build documentation for the standard library.'
+                'Note: this builds Swift-DocC to perform the docs build.')
+    option('--preview-stdlib-docs', toggle_true,
+           default=False,
+           help='Build and preview standard library documentation with Swift-DocC.'
+                'Note: this builds Swift-DocC to perform the docs build.')
 
     option('--build-swift-clang-overlays', toggle_true,
            default=True,
@@ -1449,10 +1477,6 @@ def create_argument_parser():
            default=True,
            help='Enable experimental Swift distributed actors.')
 
-    option('--enable-experimental-nonescapable-types', toggle_true,
-           default=False,
-           help='Enable experimental NonescapableTypes.')
-
     option('--enable-experimental-string-processing', toggle_true,
            default=True,
            help='Enable experimental Swift string processing.')
@@ -1470,7 +1494,7 @@ def create_argument_parser():
            help='Enable Volatile module.')
 
     option('--enable-experimental-parser-validation', toggle_true,
-           default=False,
+           default=True,
            help='Enable experimental Swift Parser validation by default.')
 
     # -------------------------------------------------------------------------

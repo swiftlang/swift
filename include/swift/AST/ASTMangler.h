@@ -13,8 +13,10 @@
 #ifndef SWIFT_AST_ASTMANGLER_H
 #define SWIFT_AST_ASTMANGLER_H
 
+#include "swift/AST/ASTContext.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/FreestandingMacroExpansion.h"
+#include "swift/AST/SILThunkKind.h"
 #include "swift/AST/Types.h"
 #include "swift/Basic/Mangler.h"
 #include "swift/Basic/TaggedUnion.h"
@@ -34,9 +36,16 @@ class RootProtocolConformance;
 
 namespace Mangle {
 
+enum class DestructorKind {
+  NonDeallocating,
+  Deallocating,
+  IsolatedDeallocating
+};
+
 /// The mangler for AST declarations.
 class ASTMangler : public Mangler {
 protected:
+  const ASTContext &Context;
   ModuleDecl *Mod = nullptr;
 
   /// Optimize out protocol names if a type only conforms to one protocol.
@@ -90,9 +99,6 @@ protected:
   /// interpreted as a type and the exact string value does not play
   /// a critical role.
   bool AllowTypedThrows = true;
-
-  /// If enabled, lifetime dependencies can be encoded in the mangled name.
-  bool AllowLifetimeDependencies = true;
 
   /// If enabled, declarations annotated with @_originallyDefinedIn are mangled
   /// as if they're part of their original module. Disabled for debug mangling,
@@ -182,12 +188,17 @@ public:
   };
 
   /// lldb overrides the defaulted argument to 'true'.
-  ASTMangler(bool DWARFMangling = false) {
+  ASTMangler(const ASTContext &Ctx, bool DWARFMangling = false) : Context(Ctx) {
     if (DWARFMangling) {
       DWARFMangling = true;
       RespectOriginallyDefinedIn = false;
     }
+    Flavor = Ctx.LangOpts.hasFeature(Feature::Embedded)
+                 ? ManglingFlavor::Embedded
+                 : ManglingFlavor::Default;
   }
+
+  const ASTContext &getASTContext() { return Context; }
 
   void addTypeSubstitution(Type type, GenericSignature sig) {
     type = dropProtocolsFromAssociatedTypes(type, sig);
@@ -198,6 +209,14 @@ public:
     return tryMangleSubstitution(type.getPointer());
   }
 
+protected:
+  using Mangler::addSubstitution;
+  void addSubstitution(const Decl *decl);
+
+  using Mangler::tryMangleSubstitution;
+  bool tryMangleSubstitution(const Decl *decl);
+
+public:
   std::string mangleClosureEntity(const AbstractClosureExpr *closure,
                                   SymbolKind SKind);
 
@@ -205,7 +224,7 @@ public:
                            SymbolKind SKind = SymbolKind::Default);
 
   std::string mangleDestructorEntity(const DestructorDecl *decl,
-                                     bool isDeallocating,
+                                     DestructorKind kind,
                                      SymbolKind SKind = SymbolKind::Default);
 
   std::string mangleConstructorEntity(const ConstructorDecl *ctor,
@@ -219,9 +238,6 @@ public:
                                    const AbstractStorageDecl *decl,
                                    bool isStatic,
                                    SymbolKind SKind);
-
-  std::string mangleGlobalGetterEntity(const ValueDecl *decl,
-                                       SymbolKind SKind = SymbolKind::Default);
 
   std::string mangleDefaultArgumentEntity(const DeclContext *func,
                                           unsigned index,
@@ -242,7 +258,7 @@ public:
                                            const ConstructorDecl *Derived,
                                            bool isAllocating);
 
-  std::string mangleWitnessTable(const RootProtocolConformance *C);
+  std::string mangleWitnessTable(const ProtocolConformance *C);
 
   std::string mangleWitnessThunk(const ProtocolConformance *Conformance,
                                  const ValueDecl *Requirement);
@@ -313,6 +329,9 @@ public:
   std::string mangleSILDifferentiabilityWitness(StringRef originalName,
                                                 DifferentiabilityKind kind,
                                                 const AutoDiffConfig &config);
+
+  std::string mangleSILThunkKind(StringRef originalName,
+                                 SILThunkKind thunkKind);
 
   /// Mangle the AutoDiff generated declaration for the given:
   /// - Generated declaration kind: linear map struct or branching trace enum.
@@ -390,7 +409,9 @@ public:
   std::string mangleAttachedMacroExpansion(
       const Decl *decl, CustomAttr *attr, MacroRole role);
 
-  void appendMacroExpansionContext(SourceLoc loc, DeclContext *origDC);
+  void appendMacroExpansion(const FreestandingMacroExpansion *expansion);
+  void appendMacroExpansionContext(SourceLoc loc, DeclContext *origDC,
+                                   const FreestandingMacroExpansion *expansion);
   void appendMacroExpansionOperator(
       StringRef macroName, MacroRole role, unsigned discriminator);
 
@@ -680,7 +701,7 @@ protected:
   
   void appendClosureEntity(const AbstractClosureExpr *closure);
 
-  void appendClosureComponents(Type Ty, unsigned discriminator, bool isImplicit,
+  void appendClosureComponents(CanType Ty, unsigned discriminator, bool isImplicit,
                                const DeclContext *parentContext,
                                ArrayRef<GenericEnvironment *> capturedEnvs);
 
@@ -703,8 +724,8 @@ protected:
   bool tryAppendStandardSubstitution(const GenericTypeDecl *type);
 
   void appendConstructorEntity(const ConstructorDecl *ctor, bool isAllocating);
-  
-  void appendDestructorEntity(const DestructorDecl *decl, bool isDeallocating);
+
+  void appendDestructorEntity(const DestructorDecl *decl, DestructorKind kind);
 
   /// \param accessorKindCode The code to describe the accessor and addressor
   /// kind. Usually retrieved using getCodeForAccessorKind.

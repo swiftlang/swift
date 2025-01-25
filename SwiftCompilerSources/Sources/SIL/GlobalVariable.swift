@@ -11,11 +11,12 @@
 //===----------------------------------------------------------------------===//
 
 import Basic
+import AST
 import SILBridging
 
 final public class GlobalVariable : CustomStringConvertible, HasShortDescription, Hashable {
   public var varDecl: VarDecl? {
-    VarDecl(bridged: bridged.getDecl())
+    bridged.getDecl().getAs(VarDecl.self)
   }
 
   public var name: StringRef {
@@ -30,6 +31,8 @@ final public class GlobalVariable : CustomStringConvertible, HasShortDescription
 
   public var isLet: Bool { bridged.isLet() }
 
+  public var linkage: Linkage { bridged.getLinkage().linkage }
+
   /// True, if the linkage of the global variable indicates that it is visible outside the current
   /// compilation unit and therefore not all of its uses are known.
   ///
@@ -42,9 +45,7 @@ final public class GlobalVariable : CustomStringConvertible, HasShortDescription
   /// current compilation unit.
   ///
   /// For example, `public_external` linkage.
-  public var isAvailableExternally: Bool {
-    return bridged.isAvailableExternally()
-  }
+  public var isDefinedExternally: Bool { linkage.isExternal }
 
   public var staticInitializerInstructions: InstructionList? {
     if let firstStaticInitInst = bridged.getFirstStaticInitInst().instruction {

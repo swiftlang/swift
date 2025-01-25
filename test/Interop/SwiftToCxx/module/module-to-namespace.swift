@@ -12,4 +12,5 @@
 // CHECK-LABEL: namespace Test SWIFT_PRIVATE_ATTR SWIFT_SYMBOL_MODULE({{.*}}) {
 // CHECK:       } // namespace Test
 // CHECK-EMPTY:
+// CHECK-NEXT: #pragma clang diagnostic pop
 // CHECK-NEXT: #undef SWIFT_SYMBOL

@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt %s -deinit-devirtualizer -module-name=test | %FileCheck %s
+// RUN: %target-sil-opt -sil-print-types %s -deinit-devirtualizer -module-name=test | %FileCheck %s
 
 // REQUIRES: swift_in_compiler
 
@@ -280,6 +280,16 @@ sil [ossa] @nonCopyable_generic : $@convention(thin) <T where T : ~Copyable> (@i
 bb0(%0 : $*T):
   destroy_addr %0 : $*T
   %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil @test_non_ossa :
+// CHECK:         destroy_addr %0
+// CHECK:       } // end sil function 'test_non_ossa'
+sil @test_non_ossa : $@convention(thin) (@in S1) -> () {
+bb0(%0 : $*S1):
+  destroy_addr %0 : $*S1
+  %r = tuple()
   return %r : $()
 }
 

@@ -19,7 +19,7 @@
 /// It's not named just Glibc so that it doesn't conflict in the event of a
 /// future official glibc modulemap.
 module SwiftGlibc [system] {
-% if CMAKE_SDK in ["LINUX", "ANDROID", "OPENBSD"]:
+% if CMAKE_SDK in ["LINUX", "OPENBSD"]:
       link "m"
 % end
 % if CMAKE_SDK in ["LINUX", "FREEBSD", "OPENBSD", "CYGWIN"]:
@@ -49,10 +49,8 @@ module SwiftGlibc [system] {
   export *
 }
 
-% if CMAKE_SDK != "WASI" and CMAKE_SDK != "ANDROID":
 module CUUID [system] {
   header "uuid/uuid.h"
   link "uuid"
   export *
 }
-% end

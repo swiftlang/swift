@@ -39,6 +39,7 @@ PrintTests.test("CustomStringConvertible") {
 #else
   hasDescription(CWideChar(42)!)
 #endif
+  hasDescription(CChar8(42))
   hasDescription(CChar16(42))
   hasDescription(CChar32(42)!)
 }
@@ -60,6 +61,7 @@ PrintTests.test("Printable") {
 #else
   expectPrinted("*", CWideChar(42)!)
 #endif
+  expectPrinted("42", CChar8(42))
   expectPrinted("42", CChar16(42))
   expectPrinted("*", CChar32(42)!)
 
@@ -155,6 +157,7 @@ PrintTests.test("Printable") {
 #else
   expectPrinted("*", CWideChar(42)!)
 #endif
+  expectPrinted("42", CChar8(42))
   expectPrinted("42", CChar16(42))
   expectPrinted("*", CChar32(42)!)
 }

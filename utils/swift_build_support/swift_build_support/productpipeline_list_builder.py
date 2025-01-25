@@ -101,7 +101,7 @@ class ProductPipelineListBuilder(object):
         self.current_pipeline.append(product_cls, is_enabled)
 
     def add_impl_product(self, product_cls, is_enabled):
-        """Add a non-impl product to the current pipeline begin constructed"""
+        """Add an impl product to the current pipeline begin constructed"""
         assert self.current_pipeline is not None
         assert self.is_current_pipeline_impl
         assert product_cls.is_build_script_impl_product()

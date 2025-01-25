@@ -4,13 +4,13 @@
 
 // RUN: %check-interop-c-header-in-clang(%t/functions.h)
 
-// CHECK: SWIFT_EXTERN float $s9Functions16passThrougCFloatyS2fF(float x) SWIFT_NOEXCEPT SWIFT_CALL;
-// CHECK-NEXT: SWIFT_EXTERN bool $s9Functions15passThroughBoolyS2bF(bool x) SWIFT_NOEXCEPT SWIFT_CALL;
+// CHECK: SWIFT_EXTERN bool $s9Functions15passThroughBoolyS2bF(bool x) SWIFT_NOEXCEPT SWIFT_CALL;
 // CHECK-NEXT: SWIFT_EXTERN bool $s9Functions16passThroughCBoolyS2bF(bool x) SWIFT_NOEXCEPT SWIFT_CALL;
 // CHECK-NEXT: SWIFT_EXTERN char $s9Functions16passThroughCCharys4Int8VADF(char x) SWIFT_NOEXCEPT SWIFT_CALL;
 // CHECK-NEXT: SWIFT_EXTERN char16_t $s9Functions18passThroughCChar16ys6UInt16VADF(char16_t x) SWIFT_NOEXCEPT SWIFT_CALL;
 // CHECK-NEXT: SWIFT_EXTERN char32_t $s9Functions18passThroughCChar32ys7UnicodeO6ScalarVAFF(char32_t x) SWIFT_NOEXCEPT SWIFT_CALL;
 // CHECK-NEXT: SWIFT_EXTERN double $s9Functions18passThroughCDoubleyS2dF(double x) SWIFT_NOEXCEPT SWIFT_CALL;
+// CHECK-NEXT: SWIFT_EXTERN float $s9Functions17passThroughCFloatyS2fF(float x) SWIFT_NOEXCEPT SWIFT_CALL;
 // CHECK-NEXT: SWIFT_EXTERN int $s9Functions15passThroughCIntys5Int32VADF(int x) SWIFT_NOEXCEPT SWIFT_CALL;
 // CHECK-NEXT: SWIFT_EXTERN long long $s9Functions20passThroughCLongLongys5Int64VADF(long long x) SWIFT_NOEXCEPT SWIFT_CALL;
 // CHECK-NEXT: SWIFT_EXTERN short $s9Functions17passThroughCShortys5Int16VADF(short x) SWIFT_NOEXCEPT SWIFT_CALL;
@@ -63,7 +63,7 @@ public func passThroughCUnsignedShort(_ x: CUnsignedShort) -> CUnsignedShort { r
 public func passThroughCUnsignedInt(_ x: CUnsignedInt) -> CUnsignedInt { return x }
 public func passThroughCUnsignedLongLong(_ x: CUnsignedLongLong) -> CUnsignedLongLong { return x }
 
-public func passThrougCFloat(_ x: CFloat) -> CFloat { return x }
+public func passThroughCFloat(_ x: CFloat) -> CFloat { return x }
 public func passThroughCDouble(_ x: CDouble) -> CDouble { return x }
 
 public func passThroughInt8(_ x: Int8) -> Int8 { return x }

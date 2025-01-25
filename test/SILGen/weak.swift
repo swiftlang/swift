@@ -1,5 +1,5 @@
 
-// RUN: %target-swift-emit-silgen -module-name weak -Xllvm -sil-full-demangle %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -Xllvm -sil-print-types -module-name weak -Xllvm -sil-full-demangle %s | %FileCheck %s
 
 class C {
   func f() -> Int { return 42 }

@@ -1,6 +1,6 @@
 import SwiftDiagnostics
 import SwiftOperators
-import SwiftSyntax
+@_spi(ExperimentalLanguageFeatures) import SwiftSyntax
 import SwiftSyntaxBuilder
 @_spi(ExperimentalLanguageFeature) import SwiftSyntaxMacros
 
@@ -161,12 +161,7 @@ public enum AddBlocker: ExpressionMacro {
                   changes: [
                     FixIt.Change.replace(
                       oldNode: Syntax(binOp.operator),
-                      newNode: Syntax(
-                        TokenSyntax(
-                          .binaryOperator("-"),
-                          presence: .present
-                        )
-                      )
+                      newNode: Syntax(binOp.operator.detached.with(\.tokenKind, .binaryOperator("-"))),
                     )
                   ]
                 ),
@@ -758,6 +753,39 @@ public struct AddArbitraryMembers: MemberMacro {
   }
 }
 
+public struct MemberThatCallsCodeMacro: MemberMacro {
+  public static func expansion(
+    of node: AttributeSyntax,
+    providingMembersOf decl: some DeclGroupSyntax,
+    in context: some MacroExpansionContext
+  ) throws -> [DeclSyntax] {
+    guard case let .argumentList(arguments) = node.arguments,
+          let firstElement = arguments.first,
+          let stringLiteral = firstElement.expression.as(StringLiteralExprSyntax.self) else {
+      throw CustomError.message("Macro requires a string literal")
+    }
+
+    let codeString = try stringLiteral.segments.map { segment in
+      switch segment {
+      case .stringSegment(let string):
+        return string.content.text
+
+      case .expressionSegment(_):
+        throw CustomError.message("Macro cannot handle string interpolation")
+      }
+    }.joined(separator: "")
+    return [
+      """
+      static var synthesizedMember: String {
+        \(raw: codeString)
+
+        return "hello"
+      }
+      """,
+    ]
+  }
+}
+
 /// Implementation of the `wrapStoredProperties` macro, which can be
 /// used to apply an attribute to all of the stored properties of a type.
 ///
@@ -884,6 +912,206 @@ public enum LeftHandOperandFinderMacro: ExpressionMacro {
     visitor.walk(node)
 
     return node.arguments.first!.expression
+  }
+}
+
+extension SyntaxCollection {
+  mutating func removeLast() {
+    self.remove(at: self.index(before: self.endIndex))
+  }
+}
+
+public struct AddAsyncMacro: PeerMacro {
+  public static func expansion<
+    Context: MacroExpansionContext,
+    Declaration: DeclSyntaxProtocol
+  >(
+    of node: AttributeSyntax,
+    providingPeersOf declaration: Declaration,
+    in context: Context
+  ) throws -> [DeclSyntax] {
+    // Only on functions at the moment.
+    guard var funcDecl = declaration.as(FunctionDeclSyntax.self) else {
+      throw CustomError.message("@addAsync only works on functions")
+    }
+
+    // This only makes sense for non async functions.
+    if funcDecl.signature.effectSpecifiers?.asyncSpecifier != nil {
+      throw CustomError.message(
+        "@addAsync requires an non async function"
+      )
+    }
+
+    // This only makes sense void functions
+    if let resultType = funcDecl.signature.returnClause?.type,
+       resultType.as(IdentifierTypeSyntax.self)?.name.text != "Void" {
+      throw CustomError.message(
+        "@addAsync requires an function that returns void"
+      )
+    }
+
+    // Requires a completion handler block as last parameter
+    let completionHandlerParameter = funcDecl
+      .signature
+      .parameterClause
+      .parameters.last?
+      .type.as(AttributedTypeSyntax.self)?
+      .baseType.as(FunctionTypeSyntax.self)
+    guard let completionHandlerParameter else {
+      throw CustomError.message(
+        "@AddAsync requires an function that has a completion handler as last parameter"
+      )
+    }
+
+    // Completion handler needs to return Void
+    if completionHandlerParameter.returnClause.type.as(IdentifierTypeSyntax.self)?.name.text != "Void" {
+      throw CustomError.message(
+        "@AddAsync requires an function that has a completion handler that returns Void"
+      )
+    }
+
+    let returnType = completionHandlerParameter.parameters.first?.type
+
+    let isResultReturn = returnType?.children(viewMode: .all).first?.description == "Result"
+
+    let successReturnType: TypeSyntax?
+
+    if isResultReturn {
+      let argument = returnType!.as(IdentifierTypeSyntax.self)!.genericArgumentClause?.arguments.first!.argument
+
+      switch argument {
+      case .some(.type(let type)):
+        successReturnType = type
+
+      case .some(.expr(_)):
+        fatalError("expression not available here")
+
+      case .none:
+        successReturnType = nil
+      }
+    } else {
+      successReturnType = returnType
+    }
+
+    // Remove completionHandler and comma from the previous parameter
+    var newParameterList = funcDecl.signature.parameterClause.parameters
+    newParameterList.removeLast()
+    var newParameterListLastParameter = newParameterList.last!
+    newParameterList.removeLast()
+    newParameterListLastParameter.trailingTrivia = []
+    newParameterListLastParameter.trailingComma = nil
+    newParameterList.append(newParameterListLastParameter)
+
+    // Drop the @AddAsync attribute from the new declaration.
+    let newAttributeList = funcDecl.attributes.filter {
+      guard case let .attribute(attribute) = $0,
+        let attributeType = attribute.attributeName.as(IdentifierTypeSyntax.self),
+        let nodeType = node.attributeName.as(IdentifierTypeSyntax.self)
+      else {
+        return true
+      }
+
+      return attributeType.name.text != nodeType.name.text
+    }
+
+    let callArguments: [String] = newParameterList.map { param in
+      let argName = param.secondName ?? param.firstName
+
+      let paramName = param.firstName
+      if paramName.text != "_" {
+        return "\(paramName.text): \(argName.text)"
+      }
+
+      return "\(argName.text)"
+    }
+
+    let switchBody: ExprSyntax =
+      """
+            switch returnValue {
+            case .success(let value):
+              continuation.resume(returning: value)
+            case .failure(let error):
+              continuation.resume(throwing: error)
+            }
+      """
+
+    let newBody: ExprSyntax =
+      """
+
+        \(raw: isResultReturn ? "try await withCheckedThrowingContinuation { continuation in" : "await withCheckedContinuation { continuation in")
+          \(raw: funcDecl.name)(\(raw: callArguments.joined(separator: ", "))) { \(raw: returnType != nil ? "returnValue in" : "")
+
+      \(raw: isResultReturn ? switchBody : "continuation.resume(returning: \(raw: returnType != nil ? "returnValue" : "()"))")
+          }
+        }
+
+      """
+
+    // add async
+    funcDecl.signature.effectSpecifiers = FunctionEffectSpecifiersSyntax(
+      leadingTrivia: .space,
+      asyncSpecifier: .keyword(.async),
+      throwsClause: isResultReturn ? ThrowsClauseSyntax(throwsSpecifier: .keyword(.throws)) : nil
+    )
+
+    // add result type
+    if let successReturnType {
+      funcDecl.signature.returnClause = ReturnClauseSyntax(
+        leadingTrivia: .space,
+        type: successReturnType.with(\.leadingTrivia, .space)
+      )
+    } else {
+      funcDecl.signature.returnClause = nil
+    }
+
+    // drop completion handler
+    funcDecl.signature.parameterClause.parameters = newParameterList
+    funcDecl.signature.parameterClause.trailingTrivia = []
+
+    funcDecl.body = CodeBlockSyntax(
+      leftBrace: .leftBraceToken(leadingTrivia: .space),
+      statements: CodeBlockItemListSyntax(
+        [CodeBlockItemSyntax(item: .expr(newBody))]
+      ),
+      rightBrace: .rightBraceToken(leadingTrivia: .newline)
+    )
+
+    funcDecl.attributes = newAttributeList
+
+    // If this declaration needs to be final, make it so.
+    let isFinal = node.attributeName.trimmedDescription.contains("AddAsyncFinal")
+    if isFinal {
+      var allModifiers = Array(funcDecl.modifiers)
+      if let openIndex = allModifiers.firstIndex(where: { $0.name.text == "open" }) {
+        allModifiers[openIndex].name = .keyword(.public)
+      } else {
+        allModifiers.append(
+          DeclModifierSyntax(
+            name: .keyword(.public),
+            trailingTrivia: .space
+          )
+        )
+      }
+
+      allModifiers.append(
+        DeclModifierSyntax(
+          name: .keyword(.final),
+          trailingTrivia: .space
+        )
+      )
+
+      funcDecl.modifiers = DeclModifierListSyntax(allModifiers)
+
+      var allAttributes = Array(funcDecl.attributes)
+        allAttributes.append(
+          .attribute("@_alwaysEmitIntoClient ")
+        )
+      funcDecl.attributes = AttributeListSyntax(allAttributes)
+    }
+
+    funcDecl.leadingTrivia = .newlines(2)
+
+    return [DeclSyntax(funcDecl)]
   }
 }
 
@@ -2546,4 +2774,47 @@ public struct AddGetterMacro: AccessorMacro {
   ) throws -> [AccessorDeclSyntax] {
     return ["get { 0 }"]
   }
+}
+
+public struct HangingMacro: PeerMacro {
+  public static func expansion(
+    of node: AttributeSyntax,
+    providingPeersOf declaration: some DeclSyntaxProtocol,
+    in context: some MacroExpansionContext
+  ) throws -> [DeclSyntax] {
+    guard let variableDecl = declaration.as(VariableDeclSyntax.self) else {
+      return []
+    }
+
+    guard let binding: PatternBindingSyntax = variableDecl.bindings.first else {
+      return []
+    }
+
+    guard let typeAnnotation = binding.typeAnnotation else {
+      return []
+    }
+
+    let mockProperty = try VariableDeclSyntax("var BadThing: \(typeAnnotation.type)") {
+    }
+
+    return [
+      DeclSyntax(mockProperty)
+    ]
+  }
+}
+
+public struct BigEndianAccessorMacro: AccessorMacro {
+    public static func expansion(
+        of node: AttributeSyntax,
+        providingAccessorsOf declaration: some DeclSyntaxProtocol,
+        in context: some MacroExpansionContext
+    ) throws -> [AccessorDeclSyntax] {
+        [
+            """
+            get {
+                __value.bigEndian
+            }
+            """
+        ]
+    }
 }

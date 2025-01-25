@@ -68,6 +68,9 @@ static SILInstruction *getConstant(SILValue V) {
   if (auto *lit = dyn_cast<LiteralInst>(V))
     return lit;
 
+  if (auto *uc = dyn_cast<UpcastInst>(V))
+    V = uc->getOperand();
+
   if (auto *kp = dyn_cast<KeyPathInst>(V)) {
     // We could support operands, if they are constants, to enable propagation
     // of subscript keypaths. This would require to add the operands in the
@@ -88,7 +91,7 @@ static SILInstruction *getConstant(SILValue V) {
 static std::string getClonedName(PartialApplyInst *PAI,
                                  SerializedKind_t Serialized, SILFunction *F) {
   auto P = Demangle::SpecializationPass::CapturePropagation;
-  Mangle::FunctionSignatureSpecializationMangler Mangler(P, Serialized, F);
+  Mangle::FunctionSignatureSpecializationMangler Mangler(F->getASTContext(), P, Serialized, F);
 
   // We know that all arguments are literal insts.
   unsigned argIdx = ApplySite(PAI).getCalleeArgIndexOfFirstAppliedArg();
@@ -256,7 +259,7 @@ CanSILFunctionType getPartialApplyInterfaceResultType(PartialApplyInst *PAI) {
   // return signature.
   auto FTy = PAI->getType().castTo<SILFunctionType>();
   assert(!PAI->hasSubstitutions() ||
-         !PAI->getSubstitutionMap().hasArchetypes());
+         !PAI->getSubstitutionMap().getRecursiveProperties().hasArchetype());
   FTy = cast<SILFunctionType>(
     FTy->mapTypeOutOfContext()->getCanonicalType());
   auto NewFTy = FTy;
@@ -512,7 +515,8 @@ bool CapturePropagation::optimizePartialApply(PartialApplyInst *PAI) {
   if (SubstF->isExternalDeclaration())
     return false;
 
-  if (PAI->hasSubstitutions() && PAI->getSubstitutionMap().hasArchetypes()) {
+  if (PAI->hasSubstitutions() &&
+      PAI->getSubstitutionMap().getRecursiveProperties().hasArchetype()) {
     LLVM_DEBUG(llvm::dbgs()
                  << "CapturePropagation: cannot handle partial specialization "
                     "of partial_apply:\n";
@@ -566,7 +570,11 @@ bool CapturePropagation::optimizePartialApply(PartialApplyInst *PAI) {
       // keypath instruction in this pass, but let dead-object-elimination clean
       // it up later.
       if (!PAI->isOnStack()) {
-        if (getSingleNonDebugUser(kp) != PAI)
+        SILInstruction *user = getSingleNonDebugUser(kp);
+        if (auto *uc = dyn_cast_or_null<UpcastInst>(user))
+          user = getSingleNonDebugUser(uc);
+
+        if (user != PAI)
           return false;
         toDelete.push_back(kp);
       }
@@ -590,6 +598,7 @@ bool CapturePropagation::optimizePartialApply(PartialApplyInst *PAI) {
 
 void CapturePropagation::run() {
   DominanceAnalysis *DA = PM->getAnalysis<DominanceAnalysis>();
+  PostDominanceAnalysis *PDA = PM->getAnalysis<PostDominanceAnalysis>();
   auto *F = getFunction();
   bool HasChanged = false;
 
@@ -598,7 +607,8 @@ void CapturePropagation::run() {
     return;
 
   // Cache cold blocks per function.
-  ColdBlockInfo ColdBlocks(DA);
+  ColdBlockInfo ColdBlocks(DA, PDA);
+  ColdBlocks.analyze(F);
   for (auto &BB : *F) {
     if (ColdBlocks.isCold(&BB))
       continue;

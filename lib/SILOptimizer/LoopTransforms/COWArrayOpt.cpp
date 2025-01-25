@@ -55,10 +55,10 @@ bool areArraysEqual(RCIdentityFunctionInfo *RCIA, SILValue A, SILValue B,
     return true;
   // We have stripped off struct_extracts. Remove the load to look at the
   // address we are loading from.
-  if (auto *ALoad = dyn_cast<LoadInst>(A))
-    A = ALoad->getOperand();
-  if (auto *BLoad = dyn_cast<LoadInst>(B))
-    B = BLoad->getOperand();
+  if (isa<LoadInst>(A) || isa<LoadBorrowInst>(A))
+    A = cast<SingleValueInstruction>(A)->getOperand(0);
+  if (isa<LoadInst>(B) || isa<LoadBorrowInst>(B))
+    B = cast<SingleValueInstruction>(B)->getOperand(0);
   // Strip off struct_extract_refs until we hit array address.
   if (ArrayAddress) {
     StructElementAddrInst *SEAI = nullptr;
@@ -154,10 +154,13 @@ class COWArrayOpt {
   // analyzing.
   SILValue CurrentArrayAddr;
 public:
-  COWArrayOpt(RCIdentityFunctionInfo *RCIA, SILLoop *L, DominanceAnalysis *DA)
+  COWArrayOpt(RCIdentityFunctionInfo *RCIA, SILLoop *L, DominanceAnalysis *DA,
+              PostDominanceAnalysis *PDA)
       : RCIA(RCIA), Function(L->getHeader()->getParent()), Loop(L),
         Preheader(L->getLoopPreheader()), DomTree(DA->get(Function)),
-        ColdBlocks(DA), CachedSafeLoop(false, false), ReachingBlocks(Function) {}
+        ColdBlocks(DA, PDA), CachedSafeLoop(false, false), ReachingBlocks(Function) {
+    ColdBlocks.analyze(Function);
+  }
 
   bool run();
 
@@ -460,6 +463,10 @@ bool COWArrayOpt::checkSafeArrayAddressUses(UserList &AddressUsers) {
       return false;
     }
 
+    if (isa<LoadBorrowInst>(UseInst)) {
+      continue;
+    }
+
     if (isa<DeallocStackInst>(UseInst)) {
       // Handle destruction of a local array.
       continue;
@@ -564,6 +571,9 @@ bool COWArrayOpt::checkSafeArrayValueUses(UserList &ArrayValueUsers) {
     }
 
     if (isa<MarkDependenceInst>(UseInst))
+      continue;
+
+    if (isa<EndBorrowInst>(UseInst))
       continue;
 
     if (UseInst->isDebugInstruction())
@@ -1063,6 +1073,7 @@ class COWArrayOptPass : public SILFunctionTransform {
                             << getFunction()->getName() << "\n");
 
     auto *DA = PM->getAnalysis<DominanceAnalysis>();
+    auto *PDA = PM->getAnalysis<PostDominanceAnalysis>();
     auto *LA = PM->getAnalysis<SILLoopAnalysis>();
     auto *RCIA =
       PM->getAnalysis<RCIdentityAnalysis>()->get(getFunction());
@@ -1084,7 +1095,7 @@ class COWArrayOptPass : public SILFunctionTransform {
 
     bool HasChanged = false;
     for (auto *L : Loops)
-      HasChanged |= COWArrayOpt(RCIA, L, DA).run();
+      HasChanged |= COWArrayOpt(RCIA, L, DA, PDA).run();
 
     if (HasChanged)
       invalidateAnalysis(SILAnalysis::InvalidationKind::CallsAndInstructions);

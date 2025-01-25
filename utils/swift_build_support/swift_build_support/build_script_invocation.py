@@ -138,6 +138,7 @@ class BuildScriptInvocation(object):
             '--build-swift-clang-overlays', str(
                 args.build_swift_clang_overlays).lower(),
             '--build-swift-remote-mirror', str(args.build_swift_remote_mirror).lower(),
+            "--swift-source-dirname", products.Swift.product_source_name(),
         ]
 
         # Compute any product specific cmake arguments.
@@ -261,6 +262,20 @@ class BuildScriptInvocation(object):
                 args.extra_cmake_options.append(
                     '-DSWIFTSYNTAX_ENABLE_ASSERTIONS:BOOL=TRUE')
 
+        if args.build_early_swift_driver:
+            configuration = 'release' if str(args.swift_build_variant) in [
+                'Release',
+                'RelWithDebInfo'
+            ] else 'debug'
+            directory = 'earlyswiftdriver-{}'.format(self.args.host_target)
+
+            swift_driver_build = os.path.join(self.workspace.build_root,
+                                              directory,
+                                              configuration,
+                                              'bin')
+            args.extra_cmake_options.append(
+                '-DSWIFT_EARLY_SWIFT_DRIVER_BUILD={}'.format(swift_driver_build))
+
         # Then add subproject install flags that either skip building them /or/
         # if we are going to build them and install_all is set, we also install
         # them.
@@ -275,7 +290,7 @@ class BuildScriptInvocation(object):
             (args.build_libdispatch, "libdispatch"),
             (args.build_libxml2, 'libxml2'),
             (args.build_zlib, 'zlib'),
-            (args.build_curl, 'curl')
+            (args.build_curl, 'curl'),
         ]
         for (should_build, string_name) in conditional_subproject_configs:
             if not should_build and not self.args.infer_dependencies:
@@ -670,6 +685,10 @@ class BuildScriptInvocation(object):
         builder.add_product(products.WasmSwiftSDK,
                             is_enabled=self.args.build_wasmstdlib)
 
+        builder.add_product(products.SwiftTestingMacros,
+                            is_enabled=self.args.build_swift_testing_macros)
+        builder.add_product(products.SwiftTesting,
+                            is_enabled=self.args.build_swift_testing)
         builder.add_product(products.SwiftPM,
                             is_enabled=self.args.build_swiftpm)
         builder.add_product(products.SwiftFoundationTests,
@@ -696,10 +715,18 @@ class BuildScriptInvocation(object):
                             is_enabled=self.args.tsan_libdispatch_test)
         builder.add_product(products.SwiftDocC,
                             is_enabled=self.args.build_swiftdocc)
-        builder.add_product(products.SwiftDocCRender,
-                            is_enabled=self.args.install_swiftdocc)
         builder.add_product(products.MinimalStdlib,
                             is_enabled=self.args.build_minimalstdlib)
+
+        # Swift-DocC-Render should be installed whenever Swift-DocC is installed, which
+        # can be either given directly or via install-all
+        install_doccrender = self.args.install_swiftdocc or (
+            self.args.install_all and self.args.build_swiftdocc
+        )
+        builder.add_product(products.SwiftDocCRender,
+                            is_enabled=install_doccrender)
+        builder.add_product(products.StdlibDocs,
+                            is_enabled=self.args.build_stdlib_docs)
 
         # Keep SwiftDriver at last.
         # swift-driver's integration with the build scripts is not fully
@@ -879,20 +906,20 @@ class BuildScriptInvocation(object):
             build_dir=build_dir)
         if product.should_clean(host_target):
             log_message = "Cleaning %s" % product_name
-            print("--- {} ---".format(log_message))
+            print("--- {} ---".format(log_message), flush=True)
             with log_time_in_scope(log_message):
                 product.clean(host_target)
         if product.should_build(host_target):
             log_message = "Building %s" % product_name
-            print("--- {} ---".format(log_message))
+            print("--- {} ---".format(log_message), flush=True)
             with log_time_in_scope(log_message):
                 product.build(host_target)
         if product.should_test(host_target):
             log_message = "Running tests for %s" % product_name
-            print("--- {} ---".format(log_message))
+            print("--- {} ---".format(log_message), flush=True)
             with log_time_in_scope(log_message):
                 product.test(host_target)
-            print("--- Finished tests for %s ---" % product_name)
+            print("--- Finished tests for %s ---" % product_name, flush=True)
         # Install the product if it should be installed specifically, or
         # if it should be built and `install_all` is set to True.
         # The exception is select before_build_script_impl products
@@ -902,6 +929,6 @@ class BuildScriptInvocation(object):
            (self.install_all and product.should_build(host_target) and
            not product.is_ignore_install_all_product()):
             log_message = "Installing %s" % product_name
-            print("--- {} ---".format(log_message))
+            print("--- {} ---".format(log_message), flush=True)
             with log_time_in_scope(log_message):
                 product.install(host_target)

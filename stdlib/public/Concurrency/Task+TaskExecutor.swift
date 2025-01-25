@@ -11,7 +11,6 @@
 //===----------------------------------------------------------------------===//
 
 import Swift
-@_implementationOnly import _SwiftConcurrencyShims
 
 // None of TaskExecutor APIs are available in task-to-thread concurrency model.
 #if !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
@@ -191,6 +190,7 @@ public func _unsafeInheritExecutor_withTaskExecutorPreference<T: Sendable>(
 /// Task with specified executor -----------------------------------------------
 
 @available(SwiftStdlib 6.0, *)
+@_unavailableInEmbedded
 extension Task where Failure == Never {
   /// Runs the given nonthrowing operation asynchronously
   /// as part of a new top-level task on behalf of the current actor.
@@ -258,6 +258,7 @@ extension Task where Failure == Never {
 }
 
 @available(SwiftStdlib 6.0, *)
+@_unavailableInEmbedded
 extension Task where Failure == Error {
   /// Runs the given throwing operation asynchronously
   /// as part of a new top-level task on behalf of the current actor.
@@ -322,6 +323,7 @@ extension Task where Failure == Error {
 // ==== Detached tasks ---------------------------------------------------------
 
 @available(SwiftStdlib 6.0, *)
+@_unavailableInEmbedded
 extension Task where Failure == Never {
   /// Runs the given nonthrowing operation asynchronously
   /// as part of a new top-level task.
@@ -380,6 +382,7 @@ extension Task where Failure == Never {
 }
 
 @available(SwiftStdlib 6.0, *)
+@_unavailableInEmbedded
 extension Task where Failure == Error {
   /// Runs the given throwing operation asynchronously
   /// as part of a new top-level task.
@@ -442,6 +445,7 @@ extension Task where Failure == Error {
 // ==== Unsafe Current Task ----------------------------------------------------
 
 @available(SwiftStdlib 6.0, *)
+@_unavailableInEmbedded
 extension UnsafeCurrentTask {
 
   /// The current ``TaskExecutor`` preference, if this task has one configured.

@@ -15,6 +15,7 @@
 #include "swift/AST/ASTDemangler.h"
 #include "swift/AST/ASTPrinter.h"
 #include "swift/AST/Attr.h"
+#include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/GenericEnvironment.h"
@@ -66,7 +67,7 @@ void swift::getTopLevelDeclsForDisplay(
 
       auto proto = M->getASTContext().getProtocol(KnownProtocolKind::Sendable);
       if (proto)
-        (void)ModuleDecl::lookupConformance(NTD->getDeclaredInterfaceType(), proto);
+        (void) lookupConformance(NTD->getDeclaredInterfaceType(), proto);
     }
   }
 
@@ -190,22 +191,24 @@ struct SynthesizedExtensionAnalyzer::Implementation {
 
   struct ExtensionMergeInfo {
     struct Requirement {
-      Type First;
-      Type Second;
-      RequirementKind Kind;
-      CanType CanFirst;
-      CanType CanSecond;
+      swift::Requirement Req;
 
-      bool operator< (const Requirement& Rhs) const {
-        if (Kind != Rhs.Kind)
-          return Kind < Rhs.Kind;
-        else if (CanFirst != Rhs.CanFirst)
-          return CanFirst < Rhs.CanFirst;
-        else
-          return CanSecond < Rhs.CanSecond;
+      bool operator<(const Requirement& Rhs) const {
+        if (auto result = unsigned(Req.getKind()) - unsigned(Rhs.Req.getKind())) {
+          return result < 0;
+        } else if (!Req.getFirstType()->isEqual(Rhs.Req.getFirstType())) {
+          return (Req.getFirstType()->getCanonicalType() <
+                  Rhs.Req.getFirstType()->getCanonicalType());
+        } else if (Req.getKind() != RequirementKind::Layout) {
+          return (Req.getSecondType()->getCanonicalType() <
+                  Rhs.Req.getSecondType()->getCanonicalType());
+        }
+
+        return false;
       }
+
       bool operator== (const Requirement& Rhs) const {
-        return (!(*this < Rhs)) && (!(Rhs < *this));
+        return Req.getCanonical() == Rhs.Req.getCanonical();
       }
     };
 
@@ -213,12 +216,7 @@ struct SynthesizedExtensionAnalyzer::Implementation {
     unsigned InheritsCount;
     std::set<Requirement> Requirements;
     void addRequirement(swift::Requirement Req) {
-      auto First = Req.getFirstType();
-      auto CanFirst = First->getCanonicalType();
-      auto Second = Req.getSecondType();
-      auto CanSecond = Second->getCanonicalType();
-
-      Requirements.insert({First, Second, Req.getKind(), CanFirst, CanSecond});
+      Requirements.insert({Req});
     }
     bool operator== (const ExtensionMergeInfo& Another) const {
       // Trivially unmergeable.
@@ -332,10 +330,6 @@ struct SynthesizedExtensionAnalyzer::Implementation {
       ProtocolDecl *BaseProto = OwningExt->getInnermostDeclContext()
         ->getSelfProtocolDecl();
       for (auto Req : Reqs) {
-        // FIXME: Don't skip layout requirements.
-        if (Req.getKind() == RequirementKind::Layout)
-          continue;
-
         // Skip protocol's Self : <Protocol> requirement.
         if (BaseProto &&
             Req.getKind() == RequirementKind::Conformance &&
@@ -356,40 +350,35 @@ struct SynthesizedExtensionAnalyzer::Implementation {
         }
 
         assert(!Req.getFirstType()->hasArchetype());
-        assert(!Req.getSecondType()->hasArchetype());
+        if (Req.getKind() != RequirementKind::Layout)
+          assert(!Req.getSecondType()->hasArchetype());
 
-        auto SubstReq = Req.subst(
-          [&](Type type) -> Type {
-            if (type->isTypeParameter())
-              return Target->mapTypeIntoContext(type);
-
-            return type;
-          },
-          LookUpConformanceInModule());
-
+        auto *env = Target->getGenericEnvironment();
         SmallVector<Requirement, 2> subReqs;
-        switch (SubstReq.checkRequirement(subReqs)) {
-        case CheckRequirementResult::Success:
-          break;
+        subReqs.push_back(
+          Req.subst(
+            QueryInterfaceTypeSubstitutions(env),
+            LookUpConformanceInModule(),
+            SubstFlags::PreservePackExpansionLevel));
 
-        case CheckRequirementResult::ConditionalConformance:
-          // FIXME: Need to handle conditional requirements here!
-          break;
+        while (!subReqs.empty()) {
+          auto req = subReqs.pop_back_val();
+          switch (req.checkRequirement(subReqs)) {
+          case CheckRequirementResult::Success:
+          case CheckRequirementResult::PackRequirement:
+          case CheckRequirementResult::ConditionalConformance:
+            break;
 
-        case CheckRequirementResult::PackRequirement:
-          // FIXME
-          assert(false && "Refactor this");
-          return true;
-
-        case CheckRequirementResult::SubstitutionFailure:
-          return true;
-
-        case CheckRequirementResult::RequirementFailure:
-          if (!SubstReq.canBeSatisfied())
+          case CheckRequirementResult::SubstitutionFailure:
             return true;
 
-          MergeInfo.addRequirement(Req);
-          break;
+          case CheckRequirementResult::RequirementFailure:
+            if (!req.canBeSatisfied())
+              return true;
+
+            MergeInfo.addRequirement(Req);
+            break;
+          }
         }
       }
       return false;
@@ -500,7 +489,7 @@ struct SynthesizedExtensionAnalyzer::Implementation {
         // Members from underscored system protocols should still appear as
         // members of the target type, even if the protocols themselves are not
         // printed.
-        AdjustedOpts.SkipUnderscoredStdlibProtocols = false;
+        AdjustedOpts.SkipUnderscoredSystemProtocols = false;
       }
       if (AdjustedOpts.shouldPrint(E)) {
         auto Pair = isApplicable(E, Synthesized, EnablingE, Conf);
@@ -646,7 +635,6 @@ collectDefaultImplementationForProtocolMembers(ProtocolDecl *PD,
 
 /// This walker will traverse the AST and report types for every expression.
 class ExpressionTypeCollector: public SourceEntityWalker {
-  ModuleDecl &Module;
   SourceManager &SM;
   unsigned int BufferId;
   std::vector<ExpressionTypeInfo> &Results;
@@ -700,7 +688,7 @@ class ExpressionTypeCollector: public SourceEntityWalker {
 
     // Collecting protocols conformed by this expressions that are in the list.
     for (auto Proto: InterestedProtocols) {
-      if (Module.checkConformance(E->getType(), Proto.first)) {
+      if (checkConformance(E->getType(), Proto.first)) {
         Conformances.push_back(Proto.second);
       }
     }
@@ -728,8 +716,8 @@ public:
       llvm::MapVector<ProtocolDecl *, StringRef> &InterestedProtocols,
       std::vector<ExpressionTypeInfo> &Results, bool FullyQualified,
       bool CanonicalType, llvm::raw_ostream &OS)
-      : Module(*SF.getParentModule()), SM(SF.getASTContext().SourceMgr),
-        BufferId(*SF.getBufferID()), Results(Results), OS(OS),
+      : SM(SF.getASTContext().SourceMgr),
+        BufferId(SF.getBufferID()), Results(Results), OS(OS),
         InterestedProtocols(InterestedProtocols),
         FullyQualified(FullyQualified), CanonicalType(CanonicalType) {}
   bool walkToExprPre(Expr *E) override {
@@ -843,7 +831,7 @@ public:
                         bool FullyQualified,
                         std::vector<VariableTypeInfo> &Results,
                         llvm::raw_ostream &OS)
-      : SM(SF.getASTContext().SourceMgr), BufferId(*SF.getBufferID()),
+      : SM(SF.getASTContext().SourceMgr), BufferId(SF.getBufferID()),
         TotalRange(Range), FullyQualified(FullyQualified), Results(Results),
         OS(OS) {}
 

@@ -97,7 +97,9 @@ PackConformance *PackConformance::getCanonicalConformance() const {
 /// Project the corresponding associated type from each pack element
 /// of the conforming type, collecting the results into a new pack type
 /// that has the same pack expansion structure as the conforming type.
-PackType *PackConformance::getAssociatedType(Type assocType) const {
+PackType *PackConformance::getTypeWitness(
+    AssociatedTypeDecl *assocType,
+    SubstOptions options) const {
   SmallVector<Type, 4> packElements;
 
   auto conformances = getPatternConformances();
@@ -110,8 +112,8 @@ PackType *PackConformance::getAssociatedType(Type assocType) const {
     // conformance.
     if (auto *packExpansion = packElement->getAs<PackExpansionType>()) {
       auto assocTypePattern =
-        conformances[i].getAssociatedType(packExpansion->getPatternType(),
-                                          assocType);
+        conformances[i].getTypeWitness(packExpansion->getPatternType(),
+                                       assocType, options);
 
       packElements.push_back(PackExpansionType::get(
           assocTypePattern, packExpansion->getCountType()));
@@ -120,7 +122,7 @@ PackType *PackConformance::getAssociatedType(Type assocType) const {
     // the associated type witness from the pattern conformance.
     } else {
       auto assocTypeScalar =
-        conformances[i].getAssociatedType(packElement, assocType);
+        conformances[i].getTypeWitness(packElement, assocType, options);
       packElements.push_back(assocTypeScalar);
     }
   }

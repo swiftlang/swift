@@ -1,5 +1,5 @@
-// RUN: %target-swift-emit-sil -parse-as-library -module-name back_deploy %s -target x86_64-apple-macosx10.15 -target-variant x86_64-apple-ios13.1-macabi -verify
-// RUN: %target-swift-emit-silgen -parse-as-library -module-name back_deploy %s -target x86_64-apple-macosx10.15 -target-variant x86_64-apple-ios13.1-macabi | %FileCheck %s
+// RUN: %target-swift-emit-sil -Xllvm -sil-print-types -parse-as-library -module-name back_deploy %s -target x86_64-apple-macosx10.15 -target-variant x86_64-apple-ios13.1-macabi -verify
+// RUN: %target-swift-emit-silgen -Xllvm -sil-print-types -parse-as-library -module-name back_deploy %s -target x86_64-apple-macosx10.15 -target-variant x86_64-apple-ios13.1-macabi | %FileCheck %s
 
 // REQUIRES: OS=macosx || OS=maccatalyst
 
@@ -10,7 +10,7 @@
 // CHECK:   return [[RESULT]] : $()
 
 // -- Back deployment thunk for trivialFunc_iOS()
-// CHECK-LABEL: sil non_abi [serialized] [thunk] [ossa] @$s11back_deploy15trivialFunc_iOSyyFTwb : $@convention(thin) () -> ()
+// CHECK-LABEL: sil non_abi [serialized] [back_deployed_thunk] [ossa] @$s11back_deploy15trivialFunc_iOSyyFTwb : $@convention(thin) () -> ()
 // CHECK: bb0:
 // CHECK:   [[IOS_MAJOR:%.*]] = integer_literal $Builtin.Word, 51
 // CHECK:   [[IOS_MINOR:%.*]] = integer_literal $Builtin.Word, 1
@@ -45,7 +45,7 @@ public func trivialFunc_iOS() {}
 // CHECK:   return [[RESULT]] : $()
 
 // -- Back deployment thunk for trivialFunc_macOS()
-// CHECK-LABEL: sil non_abi [serialized] [thunk] [ossa] @$s11back_deploy17trivialFunc_macOSyyFTwb : $@convention(thin) () -> ()
+// CHECK-LABEL: sil non_abi [serialized] [back_deployed_thunk] [ossa] @$s11back_deploy17trivialFunc_macOSyyFTwb : $@convention(thin) () -> ()
 // CHECK: bb0:
 // CHECK:   [[MACOS_MAJOR:%.*]] = integer_literal $Builtin.Word, 10
 // CHECK:   [[MACOS_MINOR:%.*]] = integer_literal $Builtin.Word, 53
@@ -80,7 +80,7 @@ public func trivialFunc_macOS() {}
 // CHECK:   return [[RESULT]] : $()
 
 // -- Back deployment thunk for trivialFunc_iOS_macOS()
-// CHECK-LABEL: sil non_abi [serialized] [thunk] [ossa] @$s11back_deploy019trivialFunc_iOS_macE0yyFTwb : $@convention(thin) () -> ()
+// CHECK-LABEL: sil non_abi [serialized] [back_deployed_thunk] [ossa] @$s11back_deploy019trivialFunc_iOS_macE0yyFTwb : $@convention(thin) () -> ()
 // CHECK: bb0:
 // CHECK:   [[MACOS_MAJOR:%.*]] = integer_literal $Builtin.Word, 10
 // CHECK:   [[MACOS_MINOR:%.*]] = integer_literal $Builtin.Word, 53

@@ -23,10 +23,10 @@
 
 #include "CodeSynthesis.h"
 #include "TypeChecker.h"
+#include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/GenericSignature.h"
-#include "swift/AST/Module.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/Pattern.h"
 #include "swift/AST/ProtocolConformance.h"
@@ -78,7 +78,7 @@ bool DerivedConformance::canDeriveAdditiveArithmetic(NominalTypeDecl *nominal,
     if (v->getInterfaceType()->hasError())
       return false;
     auto varType = DC->mapTypeIntoContext(v->getValueInterfaceType());
-    return (bool) ModuleDecl::checkConformance(varType, proto);
+    return (bool) checkConformance(varType, proto);
   });
 }
 
@@ -94,7 +94,7 @@ deriveBodyMathOperator(AbstractFunctionDecl *funcDecl, MathOperator op) {
   assert(memberwiseInitDecl && "Memberwise initializer must exist");
   auto *initDRE =
       new (C) DeclRefExpr(memberwiseInitDecl, DeclNameLoc(), /*Implicit*/ true);
-  initDRE->setFunctionRefKind(FunctionRefKind::SingleApply);
+  initDRE->setFunctionRefInfo(FunctionRefInfo::singleBaseNameApply());
   auto *nominalTypeExpr = TypeExpr::createImplicitForDecl(
       DeclNameLoc(), nominal, funcDecl,
       funcDecl->mapTypeIntoContext(nominal->getInterfaceType()));
@@ -112,7 +112,7 @@ deriveBodyMathOperator(AbstractFunctionDecl *funcDecl, MathOperator op) {
   auto createMemberOpExpr = [&](VarDecl *member) -> Expr * {
     auto memberType =
         parentDC->mapTypeIntoContext(member->getValueInterfaceType());
-    auto confRef = ModuleDecl::lookupConformance(memberType, proto);
+    auto confRef = lookupConformance(memberType, proto);
     assert(confRef && "Member does not conform to math protocol");
 
     // Get member type's math operator, e.g. `Member.+`.
@@ -223,7 +223,7 @@ deriveBodyPropertyGetter(AbstractFunctionDecl *funcDecl, ProtocolDecl *proto,
   assert(memberwiseInitDecl && "Memberwise initializer must exist");
   auto *initDRE =
       new (C) DeclRefExpr(memberwiseInitDecl, DeclNameLoc(), /*Implicit*/ true);
-  initDRE->setFunctionRefKind(FunctionRefKind::SingleApply);
+  initDRE->setFunctionRefInfo(FunctionRefInfo::singleBaseNameApply());
 
   auto *nominalTypeExpr = TypeExpr::createImplicitForDecl(
       DeclNameLoc(), nominal, funcDecl,
@@ -248,7 +248,7 @@ deriveBodyPropertyGetter(AbstractFunctionDecl *funcDecl, ProtocolDecl *proto,
           new (C) MemberRefExpr(selfDRE, SourceLoc(), member, DeclNameLoc(),
                                 /*Implicit*/ true);
     }
-    auto confRef = ModuleDecl::lookupConformance(memberType, proto);
+    auto confRef = lookupConformance(memberType, proto);
     assert(confRef && "Member does not conform to `AdditiveArithmetic`");
     // If conformance reference is not concrete, then concrete witness
     // declaration for property cannot be resolved. Return reference to

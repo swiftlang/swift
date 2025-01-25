@@ -17,8 +17,6 @@
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/raw_ostream.h"
 #include "swift/Basic/Assertions.h"
-#undef NDEBUG
-#include <cassert>
 #include <iostream>
 
 llvm::cl::opt<bool> AssertContinue(

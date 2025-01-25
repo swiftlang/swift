@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 import Swift
 
+#if !$Embedded
 /// A clock that measures time that always increments and does not stop 
 /// incrementing while the system is asleep. 
 ///
@@ -33,6 +34,7 @@ public struct ContinuousClock: Sendable {
 
   public init() { }
 }
+#endif
 
 @available(SwiftStdlib 5.7, *)
 extension Duration {
@@ -48,6 +50,8 @@ extension Duration {
     self.init(_high: high, low: low)
   }
 }
+
+#if !$Embedded
 
 @available(SwiftStdlib 5.7, *)
 extension Clock where Self == ContinuousClock {
@@ -189,3 +193,5 @@ extension ContinuousClock.Instant: InstantProtocol {
     rhs.duration(to: lhs)
   }
 }
+
+#endif

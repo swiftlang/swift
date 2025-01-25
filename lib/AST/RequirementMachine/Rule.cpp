@@ -177,9 +177,9 @@ std::optional<Identifier> Rule::isProtocolTypeAliasRule() const {
   if (LHS.size() == 2) {
     // This is the case where the underlying type is a type parameter.
     //
-    // We shouldn't have unresolved symbols on the right hand side;
-    // they should have been simplified away.
-    if (RHS.containsUnresolvedSymbols()) {
+    // We shouldn't have name symbols on the right hand side; they
+    // should have been simplified away.
+    if (RHS.containsNameSymbols()) {
       if (RHS.size() != 2 ||
           RHS[0] != LHS[0] ||
           RHS[1].getKind() != Symbol::Kind::Name) {

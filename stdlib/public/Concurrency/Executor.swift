@@ -144,6 +144,7 @@ public protocol SerialExecutor: Executor {
 
   /// Convert this executor value to the optimized form of borrowed
   /// executor references.
+  @unsafe
   func asUnownedSerialExecutor() -> UnownedSerialExecutor
 
   /// If this executor has complex equality semantics, and the runtime needs to
@@ -317,6 +318,7 @@ extension SerialExecutor {
 /// different objects, the executor must be referenced strongly by the
 /// actor.
 @available(SwiftStdlib 5.1, *)
+@unsafe
 @frozen
 public struct UnownedSerialExecutor: Sendable {
   @usableFromInline
@@ -539,3 +541,12 @@ internal final class DispatchQueueShim: @unchecked Sendable, SerialExecutor {
   }
 }
 #endif // SWIFT_CONCURRENCY_USES_DISPATCH
+
+
+@available(SwiftStdlib 6.1, *)
+@_silgen_name("swift_task_deinitOnExecutor")
+@usableFromInline
+internal func _deinitOnExecutor(_ object: __owned AnyObject,
+                                _ work: @convention(thin) (__owned AnyObject) -> Void,
+                                _ executor: Builtin.Executor,
+                                _ flags: Builtin.Word)

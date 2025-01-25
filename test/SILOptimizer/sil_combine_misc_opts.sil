@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -enable-objc-interop -enforce-exclusivity=none -enable-sil-verify-all %s -sil-combine -sil-combine-disable-alloc-stack-opts | %FileCheck %s
+// RUN: %target-sil-opt -sil-print-types -enable-objc-interop -enforce-exclusivity=none -enable-sil-verify-all %s -sil-combine -sil-combine-disable-alloc-stack-opts | %FileCheck %s
 
 // This file tests routines in SILCombinerMiscVisitors.cpp
 
@@ -102,7 +102,7 @@ bb0(%0 : $*Builtin.NativeObject):
 }
 
 // CHECK-LABEL: sil [ossa] @test_updating_borrowed_from :
-// CHECK:         borrowed {{.*}} from {{.*}} %0 : $S
+// CHECK:         borrowed {{.*}} from (%0 : $S)
 // CHECK-LABEL: } // end sil function 'test_updating_borrowed_from'
 sil [ossa] @test_updating_borrowed_from : $@convention(thin) (@guaranteed S) -> () {
 bb0(%0 : @guaranteed $S):
@@ -111,7 +111,7 @@ bb0(%0 : @guaranteed $S):
   %3 = begin_borrow %2 : $Klass
   br bb1(%3 : $Klass)
 
-bb1(%5 : @reborrow @guaranteed $Klass):
+bb1(%5 : @reborrow $Klass):
   %6 = borrowed %5 : $Klass from (%2 : $Klass)
   end_borrow %6 : $Klass
   destroy_value %2 : $Klass

@@ -1,13 +1,15 @@
-// RUN: %target-swift-frontend -emit-sil -parse-as-library -disable-availability-checking -strict-concurrency=complete -verify %s -o /dev/null -enable-upcoming-feature GlobalActorIsolatedTypesUsability
+// RUN: %target-swift-frontend -emit-sil -parse-as-library -target %target-swift-5.1-abi-triple -strict-concurrency=complete -verify %s -o /dev/null -enable-upcoming-feature GlobalActorIsolatedTypesUsability
 
 // REQUIRES: concurrency
-// REQUIRES: asserts
+// REQUIRES: swift_feature_GlobalActorIsolatedTypesUsability
 
 ////////////////////////
 // MARK: Declarations //
 ////////////////////////
 
-class NonSendableKlass {}
+class NonSendableKlass {
+  func use() {}
+}
 
 struct NonSendableStruct {
   var first = NonSendableKlass()
@@ -42,9 +44,9 @@ actor Custom {
 
 @globalActor
 struct CustomActor {
-    static var shared: Custom {
-        return Custom()
-    }
+  static var shared: Custom {
+    return Custom()
+  }
 }
 
 @MainActor func transferToMain<T>(_ t: T) {}
@@ -53,6 +55,9 @@ struct CustomActor {
 func throwingFunction() throws { fatalError() }
 
 func transferArg(_ x: sending NonSendableKlass) {
+}
+
+func transferArgAsync(_ x: sending NonSendableKlass) async {
 }
 
 func transferArgWithOtherParam(_ x: sending NonSendableKlass, _ y: NonSendableKlass) {
@@ -66,6 +71,9 @@ func twoTransferArg(_ x: sending NonSendableKlass, _ y: sending NonSendableKlass
 @MainActor var globalKlass = NonSendableKlass()
 
 struct MyError : Error {}
+
+func takeClosure(_ x: sending () -> ()) {}
+func takeClosureAndParam(_ x: NonSendableKlass, _ y: sending () -> ()) {}
 
 /////////////////
 // MARK: Tests //
@@ -504,3 +512,143 @@ func testWrongIsolationGlobalIsolation(_ x: inout sending NonSendableKlass) {
   x = globalKlass
 } // expected-warning {{'inout sending' parameter 'x' cannot be main actor-isolated at end of function}}
 // expected-note @-1 {{main actor-isolated 'x' risks causing races in between main actor-isolated uses and caller uses since caller assumes value is not actor isolated}}
+
+func taskIsolatedCaptureInSendingClosureLiteral(_ x: NonSendableKlass) {
+  Task { // expected-warning {{passing closure as a 'sending' parameter risks causing data races between code in the current task and concurrent execution of the closure}}
+    print(x) // expected-note {{closure captures 'x' which is accessible to code in the current task}}
+  }
+
+  Task { // expected-warning {{passing closure as a 'sending' parameter risks causing data races between code in the current task and concurrent execution of the closure}}
+    {
+      print(x) // expected-note {{closure captures 'x' which is accessible to code in the current task}}
+    }()
+  }
+
+  takeClosure { // expected-warning {{passing closure as a 'sending' parameter risks causing data races between code in the current task and concurrent execution of the closure}}
+    print(x) // expected-note {{closure captures 'x' which is accessible to code in the current task}}
+  }
+
+  takeClosureAndParam(NonSendableKlass()) { // expected-warning {{passing closure as a 'sending' parameter risks causing data races between code in the current task and concurrent execution of the closure}}
+    print(x) // expected-note {{closure captures 'x' which is accessible to code in the current task}}
+  }
+
+  let y = (x, x)
+  Task { // expected-warning {{passing closure as a 'sending' parameter risks causing data races between code in the current task and concurrent execution of the closure}}
+    print(y) // expected-note {{closure captures 'y' which is accessible to code in the current task}}
+  }
+
+  let z = (x, y)
+  Task { // expected-warning {{passing closure as a 'sending' parameter risks causing data races between code in the current task and concurrent execution of the closure}}
+    print(y, z) // expected-note @:11 {{closure captures non-Sendable 'y'}}
+    // expected-note @-1:14 {{closure captures non-Sendable 'z'}}
+  }
+}
+
+extension MyActor {
+  func actorIsolatedCaptureInSendingClosureLiteral(_ x: NonSendableKlass) {
+    Task { // expected-warning {{passing closure as a 'sending' parameter risks causing data races between 'self'-isolated code and concurrent execution of the closure}}
+      print(x) // expected-note {{closure captures 'self'-isolated 'x'}}
+    }
+
+    takeClosure { // expected-warning {{passing closure as a 'sending' parameter risks causing data races between 'self'-isolated code and concurrent execution of the closure}}
+      print(x) // expected-note {{closure captures 'self'-isolated 'x'}}
+    }
+
+    takeClosureAndParam(NonSendableKlass()) { // expected-warning {{passing closure as a 'sending' parameter risks causing data races between 'self'-isolated code and concurrent execution of the closure}}
+      print(x) // expected-note {{closure captures 'self'-isolated 'x'}}
+    }
+
+    let y = (x, x)
+    Task { // expected-warning {{passing closure as a 'sending' parameter risks causing data races between 'self'-isolated code and concurrent execution of the closure}}
+      print(y) // expected-note {{closure captures 'y' which is accessible to 'self'-isolated code}}
+    }
+
+    let z = (x, y)
+    Task { // expected-warning {{passing closure as a 'sending' parameter risks causing data races between 'self'-isolated code and concurrent execution of the closure}}
+      print(y, z) // expected-note @:13 {{closure captures non-Sendable 'y'}}
+      // expected-note @-1:16 {{closure captures non-Sendable 'z'}}
+    }
+  }
+}
+
+// We would normally not error here since transferArg is nonisolated and c is
+// disconnected. Since c is passed as sending, we shouldn't squelch this.
+func disconnectedPassedSendingToNonIsolatedCallee(
+) async -> Void {
+    let c = NonSendableKlass()
+    transferArg(c) // expected-warning {{sending 'c' risks causing data races}}
+    // expected-note @-1 {{'c' used after being passed as a 'sending' parameter}}
+    c.use() // expected-note {{access can happen concurrently}}
+}
+
+// We would normally not error here since transferArg is nonisolated and c is
+// disconnected. Since c is passed as sending, we shouldn't squelch this.
+func disconnectedPassedSendingToAsyncNonIsolatedCallee(
+) async -> Void {
+    let c = NonSendableKlass()
+    await transferArgAsync(c) // expected-warning {{sending 'c' risks causing data races}}
+    // expected-note @-1 {{'c' used after being passed as a 'sending' parameter}}
+    c.use()  // expected-note {{access can happen concurrently}}
+}
+
+// We would normally not error here since transferArg is nonisolated and c is
+// disconnected. Since c is passed as sending, we shouldn't squelch this.
+func disconnectedPassedSendingToNonIsolatedCalleeIsolatedParam2(
+    isolation: isolated (any Actor)? = nil
+) async -> Void {
+    let c = NonSendableKlass()
+    transferArg(c) // expected-warning {{sending 'c' risks causing data races}}
+    // expected-note @-1 {{'c' used after being passed as a 'sending' parameter}}
+    c.use() // expected-note {{access can happen concurrently}}
+}
+
+// We would normally not error here since transferArg is nonisolated and c is
+// disconnected. Since c is passed as sending, we shouldn't squelch this.
+func disconnectedPassedSendingToAsyncNonIsolatedCalleeIsolatedParam2(
+  isolation: isolated (any Actor)? = nil
+) async -> Void {
+    let c = NonSendableKlass()
+    await transferArgAsync(c) // expected-warning {{sending 'c' risks causing data races}}
+    // expected-note @-1 {{'c' used after being passed as a 'sending' parameter}}
+    c.use() // expected-note {{access can happen concurrently}}
+}
+
+// We would normally not error here since transferArg is nonisolated and c is
+// disconnected. Since c is passed as sending, we shouldn't squelch this.
+func disconnectedPassedSendingToNonIsolatedCalleeIsolatedParam3(
+    isolation: isolated (any Actor)? = nil
+) -> Void {
+    let c = NonSendableKlass()
+    transferArg(c) // expected-warning {{sending 'c' risks causing data races}}
+    // expected-note @-1 {{'c' used after being passed as a 'sending' parameter}}
+    c.use() // expected-note {{access can happen concurrently}}
+}
+
+// In all of the below, we don't know that 'a' is the same isolation as the
+// closure isolation.
+func testNonSendableCaptures(ns: NonSendableKlass, a: isolated MyActor) {
+  Task {
+    _ = a
+    _ = ns
+  }
+
+  Task { [a] in // expected-warning {{passing closure as a 'sending' parameter risks causing data races between 'a'-isolated code and concurrent execution of the closure}}
+    _ = a
+    _ = ns // expected-note {{closure captures 'a'-isolated 'ns'}}
+  }
+
+  Task {
+    let _ = a
+    let _ = ns
+  }
+
+  Task { [a] in // expected-warning {{passing closure as a 'sending' parameter risks causing data races between 'a'-isolated code and concurrent execution of the closure}}
+    let _ = a
+    let _ = ns // expected-note {{closure captures 'a'-isolated 'ns'}}
+  }
+
+  Task { [a] in // expected-warning {{passing closure as a 'sending' parameter risks causing data races between 'a'-isolated code and concurrent execution of the closure}}
+    let (_, _) = (a, ns) // expected-note {{closure captures 'a'-isolated 'ns'}}
+    let _ = ns
+  }
+}

@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -swift-version 6 -Xllvm -sil-regionbasedisolation-force-use-of-typed-errors -emit-sil -o /dev/null %s -verify -disable-availability-checking
+// RUN: %target-swift-frontend -swift-version 6 -Xllvm -sil-regionbasedisolation-force-use-of-typed-errors -emit-sil -o /dev/null %s -verify -target %target-swift-5.1-abi-triple
 
 // REQUIRES: concurrency
 // REQUIRES: asserts
@@ -60,7 +60,7 @@ extension MyActor {
         _ = sc
 
         Task { // expected-error {{sending value of non-Sendable type '() async -> ()' risks causing data races}}
-          // expected-note @-1 {{Passing value of non-Sendable type '() async -> ()' as a 'sending' argument risks causing races in between local and caller code}}
+          // expected-note @-1 {{Passing value of non-Sendable type '() async -> ()' as a 'sending' argument to initializer 'init(priority:operation:)' risks causing races in between local and caller code}}
           _ = sc
         }
 

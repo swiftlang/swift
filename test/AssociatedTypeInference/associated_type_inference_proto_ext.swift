@@ -11,7 +11,8 @@ extension Pair: Codable where A: Codable, B: Codable {}
 
 extension Pair: Collection where A == B {
 // expected-error@-1 {{conditional conformance of type 'Pair<A, B>' to protocol 'Collection' does not imply conformance to inherited protocol 'Sequence'}}
-// expected-note@-2 {{did you mean to explicitly state the conformance like 'extension Pair: Sequence where ...'?}}
+// expected-note@-2 {{did you mean to explicitly state the conformance with the same bounds using 'where A == B'?}}
+// expected-note@-3 {{did you mean to explicitly state the conformance with different bounds?}}
     typealias Element = A
 
     var startIndex: Int { return 0 }

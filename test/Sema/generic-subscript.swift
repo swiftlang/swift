@@ -8,7 +8,7 @@ protocol P {
 
 struct S : P { // expected-error {{type 'S' does not conform to protocol 'P'}} expected-note {{add stubs for conformance}}
   subscript<Value>(x: Int) -> Value { // expected-note {{candidate has non-matching type '<Value> (Int) -> Value'}}
-  }  // expected-error {{missing return in subscript expected to return 'Value'}}
+  } // missing return expectations moved to `SILOptimizer/missing_returns`
 }
 
 struct S2: P {

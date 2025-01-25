@@ -8,6 +8,10 @@ endif()
 
 # Build swift-syntax libraries with FetchContent.
 function(includeSwiftSyntax)
+  set(CMAKE_SYSTEM_PROCESSOR ${SWIFT_HOST_VARIANT_ARCH})
+  set(CMAKE_OSX_ARCHITECTURES ${SWIFT_HOST_VARIANT_ARCH})
+  set(CMAKE_C_COMPILER_TARGET ${SWIFT_HOST_TRIPLE})
+  set(CMAKE_CXX_COMPILER_TARGET ${SWIFT_HOST_TRIPLE})
   set(CMAKE_Swift_COMPILER_TARGET ${SWIFT_HOST_TRIPLE})
   set(BUILD_SHARED_LIBS ON)
   set(CMAKE_LIBRARY_OUTPUT_DIRECTORY "${SWIFT_HOST_LIBRARIES_DEST_DIR}/compiler")
@@ -25,12 +29,17 @@ function(includeSwiftSyntax)
   file(TO_CMAKE_PATH "${SWIFT_PATH_TO_SWIFT_SYNTAX_SOURCE}" swift_syntax_path)
   FetchContent_Declare(CompilerSwiftSyntax SOURCE_DIR "${swift_syntax_path}")
   FetchContent_MakeAvailable(CompilerSwiftSyntax)
+
+  # FIXME: Use FetchContent_Declare's EXCLUDE_FROM_ALL after CMake 3.28
+  FetchContent_GetProperties(CompilerSwiftSyntax BINARY_DIR binary_dir)
+  set_property(DIRECTORY "${binary_dir}" PROPERTY EXCLUDE_FROM_ALL TRUE)
 endfunction()
 includeSwiftSyntax()
 
 set(compiler_swiftsyntax_libs
   _CompilerSwiftSyntax
   _CompilerSwiftIfConfig
+  _CompilerSwiftLexicalLookup
   _CompilerSwiftOperators
   _CompilerSwiftSyntaxBuilder
   _CompilerSwiftParser
@@ -48,6 +57,7 @@ foreach(lib ${compiler_swiftsyntax_libs})
 endforeach()
 
 swift_install_in_component(TARGETS ${compiler_swiftsyntax_libs}
-  ARCHIVE DESTINATION "lib${LLVM_LIBDIR_SUFFIX}/swift/host/compiler" COMPONENT compiler
-  LIBRARY DESTINATION "lib${LLVM_LIBDIR_SUFFIX}/swift/host/compiler" COMPONENT compiler
-  RUNTIME DESTINATION "bin" COMPONENT compiler)
+  ARCHIVE DESTINATION "lib${LLVM_LIBDIR_SUFFIX}/swift/host/compiler" COMPONENT compiler-swift-syntax-lib
+  LIBRARY DESTINATION "lib${LLVM_LIBDIR_SUFFIX}/swift/host/compiler" COMPONENT compiler-swift-syntax-lib
+  RUNTIME DESTINATION "bin" COMPONENT compiler-swift-syntax-lib)
+add_dependencies(compiler-swift-syntax-lib ${compiler_swiftsyntax_libs})

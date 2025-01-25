@@ -19,7 +19,7 @@
 #ifndef SWIFT_SIL_SILDeclRef_H
 #define SWIFT_SIL_SILDeclRef_H
 
-#include "swift/AST/Availability.h"
+#include "swift/AST/AvailabilityRange.h"
 #include "swift/AST/ClangNode.h"
 #include "swift/AST/GenericSignature.h"
 #include "swift/AST/TypeAlignments.h"
@@ -111,11 +111,11 @@ struct SILDeclRef {
     /// Initializer - this constant references the initializing constructor
     /// entry point of the class ConstructorDecl in loc.
     Initializer,
-    
+
     /// EnumElement - this constant references the injection function for
     /// an EnumElementDecl.
     EnumElement,
-    
+
     /// Destroyer - this constant references the destroying destructor for the
     /// DestructorDecl in loc.
     Destroyer,
@@ -123,7 +123,11 @@ struct SILDeclRef {
     /// Deallocator - this constant references the deallocating
     /// destructor for the DestructorDecl in loc.
     Deallocator,
-    
+
+    /// Deallocator - this constant references the isolated deallocating
+    /// destructor for the DestructorDecl in loc.
+    IsolatedDeallocator,
+
     /// GlobalAccessor - this constant references the lazy-initializing
     /// accessor for the global VarDecl in loc.
     GlobalAccessor,
@@ -339,7 +343,8 @@ struct SILDeclRef {
   }
   /// True if the SILDeclRef references a destructor entry point.
   bool isDestructor() const {
-    return kind == Kind::Destroyer || kind == Kind::Deallocator;
+    return kind == Kind::Destroyer || kind == Kind::Deallocator ||
+           kind == Kind::IsolatedDeallocator;
   }
   /// True if the SILDeclRef references an enum entry point.
   bool isEnumElement() const {
@@ -554,7 +559,7 @@ struct SILDeclRef {
                                                     AbstractFunctionDecl *func);
 
   /// Returns the availability of the decl for computing linkage.
-  std::optional<AvailabilityContext> getAvailabilityForLinkage() const;
+  std::optional<AvailabilityRange> getAvailabilityForLinkage() const;
 
   /// True if the referenced entity is some kind of thunk.
   bool isThunk() const;
@@ -575,6 +580,10 @@ struct SILDeclRef {
   /// explicitly written code has been spliced into the body. This is the case
   /// for e.g a lazy variable getter.
   bool hasUserWrittenCode() const;
+
+  /// Returns true if this is a function that should be emitted because it is
+  /// accessible in the debugger.
+  bool shouldBeEmittedForDebugger() const;
 
   /// Return the scope in which the parent class of a method (i.e. class
   /// containing this declaration) can be subclassed, returning NotApplicable if

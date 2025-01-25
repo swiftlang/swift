@@ -208,9 +208,9 @@ void *SILModule::allocateInst(unsigned Size, unsigned Align) const {
 
 void SILModule::willDeleteInstruction(SILInstruction *I) {
   // Update RootLocalArchetypeDefs.
-  I->forEachDefinedLocalArchetype([&](CanLocalArchetypeType archeTy,
-                                      SILValue dependency) {
-    LocalArchetypeKey key = {archeTy, I->getFunction()};
+  I->forEachDefinedLocalEnvironment([&](GenericEnvironment *genericEnv,
+                                        SILValue dependency) {
+    LocalArchetypeKey key = {genericEnv, I->getFunction()};
     // In case `willDeleteInstruction` is called twice for the
     // same instruction, we need to check if the archetype is really
     // still in the map for this instruction.
@@ -236,9 +236,8 @@ SILWitnessTable *
 SILModule::lookUpWitnessTable(const ProtocolConformance *C) {
   assert(C && "null conformance passed to lookUpWitnessTable");
 
-  auto rootC = C->getRootConformance();
   // Attempt to lookup the witness table from the table.
-  auto found = WitnessTableMap.find(rootC);
+  auto found = WitnessTableMap.find(C);
   if (found == WitnessTableMap.end())
     return nullptr;
 
@@ -532,6 +531,7 @@ SerializedSILLoader *SILModule::getSILLoader() {
 std::pair<SILFunction *, SILWitnessTable *>
 SILModule::lookUpFunctionInWitnessTable(ProtocolConformanceRef C,
                                         SILDeclRef Requirement,
+                                        bool lookupInSpecializedWitnessTable,
                                         SILModule::LinkingMode linkingMode) {
   if (!C.isConcrete())
     return {nullptr, nullptr};
@@ -540,7 +540,15 @@ SILModule::lookUpFunctionInWitnessTable(ProtocolConformanceRef C,
     SILLinkerVisitor linker(*this, linkingMode);
     linker.processConformance(C);
   }
-  SILWitnessTable *wt = lookUpWitnessTable(C.getConcrete());
+  ProtocolConformance *conf = C.getConcrete();
+  if (auto *inheritedC = dyn_cast<InheritedProtocolConformance>(conf))
+    conf = inheritedC->getInheritedConformance();
+
+  if (!isa<SpecializedProtocolConformance>(conf) || !lookupInSpecializedWitnessTable) {
+    conf = conf->getRootConformance();
+  }
+
+  SILWitnessTable *wt = lookUpWitnessTable(conf);
 
   if (!wt) {
     LLVM_DEBUG(llvm::dbgs() << "        Failed speculative lookup of "
@@ -649,7 +657,7 @@ SILModule::lookUpDifferentiabilityWitness(StringRef name) {
 
 SILDifferentiabilityWitness *
 SILModule::lookUpDifferentiabilityWitness(SILDifferentiabilityWitnessKey key) {
-  Mangle::ASTMangler mangler;
+  Mangle::ASTMangler mangler(getASTContext());
   return lookUpDifferentiabilityWitness(
       mangler.mangleSILDifferentiabilityWitness(
           key.originalFunctionName, key.kind, key.config));
@@ -674,18 +682,23 @@ void SILModule::registerDeserializationNotificationHandler(
   deserializationNotificationHandlers.add(std::move(handler));
 }
 
-SILValue SILModule::getRootLocalArchetypeDef(CanLocalArchetypeType archetype,
-                                             SILFunction *inFunction) {
-  assert(archetype->isRoot());
-
-  SILValue &def = RootLocalArchetypeDefs[{archetype, inFunction}];
+SILValue SILModule::getLocalGenericEnvironmentDef(GenericEnvironment *genericEnv,
+                                                  SILFunction *inFunction) {
+  SILValue &def = RootLocalArchetypeDefs[{genericEnv, inFunction}];
   if (!def) {
     numUnresolvedLocalArchetypes++;
     def = ::new PlaceholderValue(inFunction,
-                                 SILType::getPrimitiveAddressType(archetype));
+                                 SILType::getPrimitiveAddressType(
+                                    inFunction->getASTContext().TheEmptyTupleType));
   }
 
   return def;
+}
+
+SILValue SILModule::getRootLocalArchetypeDef(CanLocalArchetypeType archetype,
+                                             SILFunction *inFunction) {
+  return getLocalGenericEnvironmentDef(archetype->getGenericEnvironment(),
+                                       inFunction);
 }
 
 void SILModule::reclaimUnresolvedLocalArchetypeDefinitions() {
@@ -757,13 +770,13 @@ unsigned SILModule::getCaseIndex(EnumElementDecl *enumElement) {
 }
 
 void SILModule::notifyAddedInstruction(SILInstruction *inst) {
-  inst->forEachDefinedLocalArchetype([&](CanLocalArchetypeType archeTy,
-                                         SILValue dependency) {
-    SILValue &val = RootLocalArchetypeDefs[{archeTy, inst->getFunction()}];
+  inst->forEachDefinedLocalEnvironment([&](GenericEnvironment *genericEnv,
+                                           SILValue dependency) {
+    SILValue &val = RootLocalArchetypeDefs[{genericEnv, inst->getFunction()}];
     if (val) {
       if (!isa<PlaceholderValue>(val)) {
         // Print a useful error message (and not just abort with an assert).
-        llvm::errs() << "re-definition of root local archetype in function "
+        llvm::errs() << "re-definition of local environment in function "
                      << inst->getFunction()->getName() << ":\n";
         inst->print(llvm::errs());
         llvm::errs() << "previously defined in function "
@@ -771,7 +784,7 @@ void SILModule::notifyAddedInstruction(SILInstruction *inst) {
         val->print(llvm::errs());
         abort();
       }
-      // The local archetype was unresolved so far. Replace the placeholder
+      // The local environment was unresolved so far. Replace the placeholder
       // by inst.
       auto *placeholder = cast<PlaceholderValue>(val);
       placeholder->replaceAllUsesWith(dependency);
@@ -792,13 +805,13 @@ void SILModule::notifyMovedInstruction(SILInstruction *inst,
     }
   }
 
-  inst->forEachDefinedLocalArchetype([&](CanLocalArchetypeType archeTy,
-                                         SILValue dependency) {
-    LocalArchetypeKey key = {archeTy, fromFunction};
+  inst->forEachDefinedLocalEnvironment([&](GenericEnvironment *genericEnv,
+                                           SILValue dependency) {
+    LocalArchetypeKey key = {genericEnv, fromFunction};
     assert(RootLocalArchetypeDefs.lookup(key) == dependency &&
            "archetype def was not registered");
     RootLocalArchetypeDefs.erase(key);
-    RootLocalArchetypeDefs[{archeTy, inst->getFunction()}] = dependency;
+    RootLocalArchetypeDefs[{genericEnv, inst->getFunction()}] = dependency;
   });
 }
 
@@ -907,7 +920,7 @@ void SILModule::performOnceForPrespecializedImportedExtensions(
   SmallVector<ModuleDecl *, 8> importedModules;
   // Add the Swift module.
   if (!isStdlibModule()) {
-    auto *SwiftStdlib = getASTContext().getStdlibModule(true);
+    auto *SwiftStdlib = getASTContext().getStdlibModule();
     if (SwiftStdlib)
       importedModules.push_back(SwiftStdlib);
   }
@@ -934,6 +947,26 @@ void SILModule::performOnceForPrespecializedImportedExtensions(
     }
   }
   prespecializedFunctionDeclsImported = true;
+}
+
+void SILModule::moveBefore(SILModule::iterator moveAfter, SILFunction *fn) {
+  assert(&fn->getModule() == this);
+  assert(&moveAfter->getModule() == this);
+  assert(moveAfter != end() &&
+         "We assume that moveAfter must not be end since nothing is after end");
+
+  getFunctionList().remove(fn->getIterator());
+  getFunctionList().insert(moveAfter, fn);
+}
+
+void SILModule::moveAfter(SILModule::iterator moveAfter, SILFunction *fn) {
+  assert(&fn->getModule() == this);
+  assert(&moveAfter->getModule() == this);
+  assert(moveAfter != end() &&
+         "We assume that moveAfter must not be end since nothing is after end");
+
+  getFunctionList().remove(fn->getIterator());
+  getFunctionList().insertAfter(moveAfter, fn);
 }
 
 SILProperty *
@@ -986,4 +1019,26 @@ bool Lowering::usesObjCAllocator(ClassDecl *theClass) {
   // If the root class was implemented in Objective-C, use Objective-C's
   // allocation methods because they may have been overridden.
   return theClass->getObjectModel() == ReferenceCounting::ObjC;
+}
+
+bool Lowering::needsIsolatingDestructor(DestructorDecl *dd) {
+  auto ai = swift::getActorIsolation(dd);
+  if (!ai.isActorIsolated()) {
+    return false;
+  }
+  DestructorDecl *firstIsolated = dd;
+  while (true) {
+    DestructorDecl *next = firstIsolated->getSuperDeinit();
+    if (!next)
+      break;
+    auto ai = swift::getActorIsolation(next);
+    if (!ai.isActorIsolated())
+      break;
+    firstIsolated = next;
+  }
+
+  // If isolation was introduced in ObjC code, then we assume that ObjC code
+  // also overrides retain/release to make sure that dealloc is called on the
+  // correct executor in the first place.
+  return firstIsolated->getClangNode().isNull();
 }

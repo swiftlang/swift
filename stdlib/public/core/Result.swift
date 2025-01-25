@@ -78,7 +78,6 @@ extension Result {
   }
 }
 
-@_disallowFeatureSuppression(NoncopyableGenerics)
 extension Result where Success: ~Copyable {
   // FIXME(NCG): Make this public.
   @_alwaysEmitIntoClient
@@ -147,7 +146,6 @@ extension Result where Success: ~Copyable {
   }
 }
 
-@_disallowFeatureSuppression(NoncopyableGenerics)
 extension Result {
   @_spi(SwiftStdlibLegacyABI) @available(swift, obsoleted: 1)
   @usableFromInline
@@ -220,7 +218,6 @@ extension Result {
   }
 }
 
-@_disallowFeatureSuppression(NoncopyableGenerics)
 extension Result where Success: ~Copyable {
   // FIXME(NCG): Make this public.
   @_alwaysEmitIntoClient

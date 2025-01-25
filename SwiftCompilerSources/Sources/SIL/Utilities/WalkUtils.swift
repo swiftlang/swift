@@ -570,7 +570,7 @@ extension AddressDefUseWalker {
 ///     to reflect that a further projection is needed to reach the value of interest from the new initial value.
 ///   2. If the instruction of the definition is a value construction such as `struct` and
 ///     the head of the path matches the instruction type then the walk continues
-///     with a call to `walkUp` with initial value the operand defintion denoted by the path
+///     with a call to `walkUp` with initial value the operand definition denoted by the path
 ///     and the suffix path as path since the target value can now be reached with fewer projections.
 ///     If the defining instruction of the value does not match the head of the path as in
 ///     `%t = tuple ...` and `"s0.t1"` then `unmatchedPath(%t, ...)` is called.
@@ -689,7 +689,7 @@ extension ValueUseDefWalker {
       return walkUp(value: oer.existential, path: path.push(.existential, index: 0))
     case is BeginBorrowInst, is CopyValueInst, is MoveValueInst,
          is UpcastInst, is EndCOWMutationInst, is EndInitLetRefInst,
-         is BeginDeallocRefInst,
+         is BeginDeallocRefInst, is MarkDependenceInst,
          is RefToBridgeObjectInst, is BridgeObjectToRefInst, is MarkUnresolvedNonCopyableValueInst:
       return walkUp(value: (def as! Instruction).operands[0].value, path: path)
     case let urc as UncheckedRefCastInst:

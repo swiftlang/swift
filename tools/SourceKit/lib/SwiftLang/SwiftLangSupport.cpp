@@ -371,8 +371,10 @@ UIdent SwiftLangSupport::getUIDForAccessor(const ValueDecl *D,
     return IsRef ? KindRefAccessorMutableAddress
                  : KindDeclAccessorMutableAddress;
   case AccessorKind::Read:
+  case AccessorKind::Read2:
     return IsRef ? KindRefAccessorRead : KindDeclAccessorRead;
   case AccessorKind::Modify:
+  case AccessorKind::Modify2:
     return IsRef ? KindRefAccessorModify : KindDeclAccessorModify;
   case AccessorKind::Init:
     return IsRef ? KindRefAccessorInit : KindDeclAccessorInit;

@@ -1,4 +1,5 @@
 // RUN: %target-swift-emit-irgen -O                          \
+// RUN:     -Xllvm -sil-disable-pass=deinit-devirtualizer    \
 // RUN:     -disable-type-layout                             \
 // RUN:     %s                                               \
 // RUN: |                                                    \

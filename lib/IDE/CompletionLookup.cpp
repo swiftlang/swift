@@ -13,6 +13,7 @@
 #include "swift/IDE/CompletionLookup.h"
 #include "CodeCompletionResultBuilder.h"
 #include "ExprContextAnalysis.h"
+#include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/GenericSignature.h"
 #include "swift/AST/ParameterList.h"
@@ -258,19 +259,13 @@ void CompletionLookup::foundFunction(const AnyFunctionType *AFT) {
 
 bool CompletionLookup::canBeUsedAsRequirementFirstType(Type selfTy,
                                                        TypeAliasDecl *TAD) {
-  auto T = TAD->getDeclaredInterfaceType();
-  auto subMap = selfTy->getMemberSubstitutionMap(TAD);
-  T = T.subst(subMap)->getCanonicalType();
-
-  ArchetypeType *archeTy = T->getAs<ArchetypeType>();
-  if (!archeTy)
+  if (TAD->isGeneric())
     return false;
-  archeTy = archeTy->getRoot();
 
-  // For protocol, the 'archeTy' should match with the 'baseTy' which is the
-  // dynamic 'Self' type of the protocol. For nominal decls, 'archTy' should
-  // be one of the generic params in 'selfTy'. Search 'archeTy' in 'baseTy'.
-  return selfTy.findIf([&](Type T) { return archeTy->isEqual(T); });
+  auto T = TAD->getDeclaredInterfaceType();
+  auto subMap = selfTy->getContextSubstitutionMap(TAD->getDeclContext());
+
+  return T.subst(subMap)->is<ArchetypeType>();
 }
 
 CompletionLookup::CompletionLookup(CodeCompletionResultSink &Sink,
@@ -297,8 +292,7 @@ void CompletionLookup::addSubModuleNames(
   for (auto &Pair : SubModuleNameVisibilityPairs) {
     CodeCompletionResultBuilder Builder = makeResultBuilder(
         CodeCompletionResultKind::Declaration, SemanticContextKind::None);
-    auto MD = ModuleDecl::create(Ctx.getIdentifier(Pair.first), Ctx);
-    MD->setFailedToLoad();
+    auto *MD = ModuleDecl::createEmpty(Ctx.getIdentifier(Pair.first), Ctx);
     Builder.setAssociatedDecl(MD);
     Builder.addBaseName(MD->getNameStr());
     Builder.addTypeAnnotation("Module");
@@ -372,8 +366,7 @@ void CompletionLookup::addImportModuleNames() {
     if (ModuleName == mainModuleName || isHiddenModuleName(ModuleName))
       continue;
 
-    auto MD = ModuleDecl::create(ModuleName, Ctx);
-    MD->setFailedToLoad();
+    auto *MD = ModuleDecl::createEmpty(ModuleName, Ctx);
 
     std::optional<ContextualNotRecommendedReason> Reason = std::nullopt;
 
@@ -573,14 +566,14 @@ Type CompletionLookup::eraseArchetypes(Type type, GenericSignature genericSig) {
         genericFuncType->getExtInfo());
   }
 
-  return type.transform([&](Type t) -> Type {
+  return type.transformRec([&](Type t) -> std::optional<Type> {
     // FIXME: Code completion should only deal with one or the other,
     // and not both.
     if (auto *archetypeType = t->getAs<ArchetypeType>()) {
       // Don't erase opaque archetype.
       if (isa<OpaqueTypeArchetypeType>(archetypeType) &&
           archetypeType->isRoot())
-        return t;
+        return std::nullopt;
 
       auto genericSig = archetypeType->getGenericEnvironment()->getGenericSignature();
       auto upperBound = genericSig->getUpperBound(
@@ -602,7 +595,7 @@ Type CompletionLookup::eraseArchetypes(Type type, GenericSignature genericSig) {
         return upperBound;
     }
 
-    return t;
+    return std::nullopt;
   });
 }
 
@@ -648,8 +641,7 @@ Type CompletionLookup::getTypeOfMember(const ValueDecl *VD,
 
     // If the keyPath result type has type parameters, that might affect the
     // subscript result type.
-    auto keyPathResultTy =
-        getResultTypeOfKeypathDynamicMember(SD)->mapTypeOutOfContext();
+    auto keyPathResultTy = getResultTypeOfKeypathDynamicMember(SD);
     if (keyPathResultTy->hasTypeParameter()) {
       auto keyPathRootTy = getRootTypeOfKeypathDynamicMember(SD).subst(
           QueryTypeSubstitutionMap{subs},
@@ -721,8 +713,8 @@ Type CompletionLookup::getTypeOfMember(const ValueDecl *VD, Type ExprType) {
         return T;
 
       // If we are doing implicit member lookup on a protocol and we have found
-      // a declaration in an extension, use the extension's `Self` type for the
-      // generic substitution.
+      // a declaration in a constrained extension, use the extension's `Self`
+      // type for the generic substitution.
       // Eg in the following, the `Self` type returned by `qux` is
       // `MyGeneric<Int>`, not `MyProto` because of the `Self` type restriction.
       // ```
@@ -738,9 +730,11 @@ Type CompletionLookup::getTypeOfMember(const ValueDecl *VD, Type ExprType) {
       // ```
       if (MaybeNominalType->isExistentialType()) {
         Type SelfType;
-        if (auto ED = dyn_cast<ExtensionDecl>(VD->getDeclContext())) {
-          SelfType = ED->getGenericSignature()->getConcreteType(
-              ED->getSelfInterfaceType());
+        if (auto *ED = dyn_cast<ExtensionDecl>(VD->getDeclContext())) {
+          if (ED->getSelfProtocolDecl() && ED->isConstrainedExtension()) {
+            auto Sig = ED->getGenericSignature();
+            SelfType = Sig->getConcreteType(ED->getSelfInterfaceType());
+          }
         }
         if (SelfType) {
           MaybeNominalType = SelfType;
@@ -778,7 +772,7 @@ Type CompletionLookup::getAssociatedTypeType(const AssociatedTypeDecl *ATD) {
   if (BaseTy) {
     BaseTy = BaseTy->getInOutObjectType()->getMetatypeInstanceType();
     if (auto NTD = BaseTy->getAnyNominal()) {
-      auto Conformance = ModuleDecl::lookupConformance(BaseTy, ATD->getProtocol());
+      auto Conformance = lookupConformance(BaseTy, ATD->getProtocol());
       if (Conformance.isConcrete()) {
         return Conformance.getConcrete()->getTypeWitness(
             const_cast<AssociatedTypeDecl *>(ATD));
@@ -833,6 +827,7 @@ void CompletionLookup::analyzeActorIsolation(
     break;
   case ActorIsolation::Unspecified:
   case ActorIsolation::Nonisolated:
+  case ActorIsolation::CallerIsolationInheriting:
   case ActorIsolation::NonisolatedUnsafe:
     return;
   }
@@ -2061,15 +2056,15 @@ void CompletionLookup::onLookupNominalTypeMembers(NominalTypeDecl *NTD,
 }
 
 Type CompletionLookup::normalizeTypeForDuplicationCheck(Type Ty) {
-  return Ty.transform([](Type T) {
+  return Ty.transformRec([](Type T) -> std::optional<Type> {
     if (auto opaque = T->getAs<OpaqueTypeArchetypeType>()) {
       /// Opaque type has a _invisible_ substitution map. Since IDE can't
       /// differentiate them, replace it with empty substitution map.
-      return OpaqueTypeArchetypeType::get(opaque->getDecl(),
-                                          opaque->getInterfaceType(),
-                                          /*Substitutions=*/{});
+      return Type(OpaqueTypeArchetypeType::get(opaque->getDecl(),
+                                               opaque->getInterfaceType(),
+                                               /*Substitutions=*/{}));
     }
-    return T;
+    return std::nullopt;
   });
 }
 
@@ -2484,8 +2479,7 @@ void CompletionLookup::getValueExprCompletions(Type ExprType, ValueDecl *VD,
 
   if (!ExprType->getMetatypeInstanceType()->isAnyObject()) {
     if (ExprType->isAnyExistentialType()) {
-      ExprType = OpenedArchetypeType::getAny(ExprType->getCanonicalType(),
-                                             CurrDeclContext->getGenericSignatureOfContext());
+      ExprType = OpenedArchetypeType::getAny(ExprType->getCanonicalType());
     }
   }
   if (!IsSelfRefExpr && !IsSuperRefExpr && ExprType->getAnyNominal() &&
@@ -2631,7 +2625,7 @@ void CompletionLookup::addTypeRelationFromProtocol(
 
     // Check for conformance to the literal protocol.
     if (T->getAnyNominal()) {
-      if (ModuleDecl::lookupConformance(T, PD)) {
+      if (lookupConformance(T, PD)) {
         literalType = T;
         break;
       }
@@ -2971,6 +2965,22 @@ void CompletionLookup::getTypeCompletions(Type BaseType) {
   }
 }
 
+void CompletionLookup::getInvertedTypeCompletions() {
+  Kind = LookupKind::Type;
+
+  auto addCompletion = [&](InvertibleProtocolKind invertableKind) {
+    auto *P = Ctx.getProtocol(getKnownProtocolKind(invertableKind));
+    if (!P)
+      return;
+
+    addNominalTypeRef(P, DeclVisibilityKind::VisibleAtTopLevel,
+                      DynamicLookupInfo());
+  };
+#define INVERTIBLE_PROTOCOL(Name, Bit)         \
+  addCompletion(InvertibleProtocolKind::Name);
+#include "swift/ABI/InvertibleProtocols.def"
+}
+
 void CompletionLookup::getGenericRequirementCompletions(
     DeclContext *DC, SourceLoc CodeCompletionLoc) {
   auto genericSig = DC->getGenericSignatureOfContext();
@@ -3014,7 +3024,7 @@ void CompletionLookup::getGenericRequirementCompletions(
 }
 
 bool CompletionLookup::canUseAttributeOnDecl(DeclAttrKind DAK, bool IsInSil,
-                                             bool IsConcurrencyEnabled,
+                                             const LangOptions &langOpts,
                                              std::optional<DeclKind> DK,
                                              StringRef Name) {
   if (DeclAttribute::isUserInaccessible(DAK))
@@ -3025,8 +3035,12 @@ bool CompletionLookup::canUseAttributeOnDecl(DeclAttrKind DAK, bool IsInSil,
     return false;
   if (!IsInSil && DeclAttribute::isSilOnly(DAK))
     return false;
-  if (!IsConcurrencyEnabled && DeclAttribute::isConcurrencyOnly(DAK))
+  if (!langOpts.EnableExperimentalConcurrency
+        && DeclAttribute::isConcurrencyOnly(DAK))
     return false;
+  if (auto feature = DeclAttribute::getRequiredFeature(DAK))
+    if (!langOpts.hasFeature(*feature))
+      return false;
   if (!DK.has_value())
     return true;
   // Hide underscored attributes even if they are not marked as user
@@ -3050,11 +3064,10 @@ void CompletionLookup::getAttributeDeclCompletions(bool IsInSil,
 #include "swift/AST/DeclNodes.def"
     }
   }
-  bool IsConcurrencyEnabled = Ctx.LangOpts.EnableExperimentalConcurrency;
   std::string Description = TargetName.str() + " Attribute";
 #define DECL_ATTR_ALIAS(KEYWORD, NAME) DECL_ATTR(KEYWORD, NAME, 0, 0)
 #define DECL_ATTR(KEYWORD, NAME, ...)                                          \
-  if (canUseAttributeOnDecl(DeclAttrKind::NAME, IsInSil, IsConcurrencyEnabled, \
+  if (canUseAttributeOnDecl(DeclAttrKind::NAME, IsInSil, Ctx.LangOpts,         \
                             DK, #KEYWORD))                                     \
     addDeclAttrKeyword(#KEYWORD, Description);
 #include "swift/AST/DeclAttr.def"
@@ -3168,6 +3181,7 @@ void CompletionLookup::getTypeAttributeKeywordCompletions(
       case TypeAttrKind::Retroactive:
       case TypeAttrKind::Preconcurrency:
       case TypeAttrKind::Unchecked:
+      case TypeAttrKind::Unsafe:
         // These attributes are only available in inheritance clasuses.
         return;
       default:
@@ -3496,10 +3510,4 @@ void CompletionLookup::getOptionalBindingCompletions(SourceLoc Loc) {
 
   lookupVisibleDecls(FilteringConsumer, Loc, CurrDeclContext,
                      /*IncludeTopLevel=*/false);
-}
-
-void CompletionLookup::addWithoutConstraintTypes() {
-  auto *CopyableDecl = Ctx.getProtocol(KnownProtocolKind::Copyable);
-  addNominalTypeRef(CopyableDecl, DeclVisibilityKind::VisibleAtTopLevel,
-                    DynamicLookupInfo());
 }

@@ -97,14 +97,16 @@ func _typeName(_ type: Any.Type, qualified: Bool = true) -> String {
 
 @available(SwiftStdlib 5.3, *)
 @_silgen_name("swift_getMangledTypeName")
-public func _getMangledTypeName(_ type: Any.Type)
+@_preInverseGenerics
+public func _getMangledTypeName(_ type: any ~Copyable.Type)
   -> (UnsafePointer<UInt8>, Int)
 
 /// Returns the mangled name for a given type.
 @available(SwiftStdlib 5.3, *)
 @_unavailableInEmbedded
+@_preInverseGenerics
 public // SPI
-func _mangledTypeName(_ type: Any.Type) -> String? {
+func _mangledTypeName(_ type: any ~Copyable.Type) -> String? {
   let (stringPtr, count) = _getMangledTypeName(type)
   guard count > 0 else {
     return nil
@@ -155,6 +157,7 @@ public func _getTypeByMangledNameInContext(
 /// Prevents performance diagnostics in the passed closure.
 @_alwaysEmitIntoClient
 @_semantics("no_performance_analysis")
+@unsafe
 public func _unsafePerformance<T>(_ c: () -> T) -> T {
   return c()
 }
@@ -231,19 +234,11 @@ func _rethrowsViaClosure(_ fn: () throws -> ()) rethrows {
 @_marker public protocol Escapable {}
 
 #if $BitwiseCopyable2
-#if $NonescapableTypes
 @_marker public protocol BitwiseCopyable: ~Escapable { }
-#else
-@_marker public protocol BitwiseCopyable { }
-#endif
 
 @available(*, deprecated, message: "Use BitwiseCopyable")
 public typealias _BitwiseCopyable = BitwiseCopyable
 #else
-#if $NonescapableTypes
 @_marker public protocol _BitwiseCopyable: ~Escapable { }
-#else
-@_marker public protocol _BitwiseCopyable { }
-#endif
 public typealias BitwiseCopyable = _BitwiseCopyable
 #endif

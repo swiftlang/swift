@@ -294,32 +294,18 @@ namespace {
       if (!cxxRecord)
         return;
 
-      auto &layout = cxxRecord->getASTContext().getASTRecordLayout(cxxRecord);
-
-      for (auto base : cxxRecord->bases()) {
-        if (base.isVirtual())
-          continue;
-
-        auto baseType = base.getType().getCanonicalType();
-
-        auto baseRecord = cast<clang::RecordType>(baseType)->getDecl();
-        auto baseCxxRecord = cast<clang::CXXRecordDecl>(baseRecord);
-
-        if (baseCxxRecord->isEmpty())
-          continue;
-
-        auto offset = Size(layout.getBaseClassOffset(baseCxxRecord).getQuantity());
-        auto size = Size(cxxRecord->getASTContext().getTypeSizeInChars(baseType).getQuantity());
-
-        if (offset != CurSize) {
-          assert(offset > CurSize);
-          auto paddingSize = offset - CurSize;
-          auto &opaqueTI = IGM.getOpaqueStorageTypeInfo(paddingSize, Alignment(1));
+      auto bases = getBasesAndOffsets(cxxRecord);
+      for (auto base : bases) {
+        if (base.offset != CurSize) {
+          assert(base.offset > CurSize);
+          auto paddingSize = base.offset - CurSize;
+          auto &opaqueTI =
+              IGM.getOpaqueStorageTypeInfo(paddingSize, Alignment(1));
           auto element = ElementLayout::getIncomplete(opaqueTI);
           addField(element, LayoutStrategy::Universal);
         }
 
-        auto &opaqueTI = IGM.getOpaqueStorageTypeInfo(size, Alignment(1));
+        auto &opaqueTI = IGM.getOpaqueStorageTypeInfo(base.size, Alignment(1));
         auto element = ElementLayout::getIncomplete(opaqueTI);
         addField(element, LayoutStrategy::Universal);
       }
@@ -651,8 +637,7 @@ OwnedAddress irgen::projectPhysicalClassMemberAddress(IRGenFunction &IGF,
                                                       llvm::Value *base,
                                                       SILType baseType,
                                                       SILType fieldType,
-                                                      VarDecl *field,
-                                                      GenericSignature fnSig) {
+                                                      VarDecl *field) {
   // If the field is empty, its address doesn't matter.
   auto &fieldTI = IGF.getTypeInfo(fieldType);
   if (fieldTI.isKnownEmpty(ResilienceExpansion::Maximal)) {
@@ -686,7 +671,7 @@ OwnedAddress irgen::projectPhysicalClassMemberAddress(IRGenFunction &IGF,
   }
     
   case FieldAccess::ConstantIndirect: {
-    auto metadata = emitHeapMetadataRefForHeapObject(IGF, base, baseType, fnSig);
+    auto metadata = emitHeapMetadataRefForHeapObject(IGF, base, baseType);
     auto offset = emitClassFieldOffset(IGF, baseClass, field, metadata);
     return emitAddressAtOffset(IGF, baseType, base, offset, field);
   }
@@ -712,7 +697,7 @@ irgen::getPhysicalClassMemberAccessStrategy(IRGenModule &IGM,
 
   case FieldAccess::NonConstantDirect: {
     std::string symbol =
-      LinkEntity::forFieldOffset(field).mangleAsString();
+      LinkEntity::forFieldOffset(field).mangleAsString(IGM.Context);
     return MemberAccessStrategy::getDirectGlobal(std::move(symbol),
                                  MemberAccessStrategy::OffsetKind::Bytes_Word);
   }
@@ -728,8 +713,7 @@ irgen::getPhysicalClassMemberAccessStrategy(IRGenModule &IGM,
 
 Address irgen::emitTailProjection(IRGenFunction &IGF, llvm::Value *Base,
                                   SILType ClassType,
-                                  SILType TailType,
-                                  GenericSignature fnSig) {
+                                  SILType TailType) {
   const ClassTypeInfo &classTI = IGF.getTypeInfo(ClassType).as<ClassTypeInfo>();
 
   llvm::Value *Offset = nullptr;
@@ -745,8 +729,7 @@ Address irgen::emitTailProjection(IRGenFunction &IGF, llvm::Value *Base,
     Align = HeapObjAlign.alignmentAtOffset(ClassSize);
   } else {
     llvm::Value *metadata = emitHeapMetadataRefForHeapObject(IGF, Base,
-                                                             ClassType,
-                                                             fnSig);
+                                                             ClassType);
     Offset = emitClassResilientInstanceSizeAndAlignMask(IGF,
                                         ClassType.getClassOrBoundGenericClass(),
                                         metadata).first;
@@ -971,7 +954,6 @@ static void getInstanceSizeAndAlignMask(IRGenFunction &IGF,
                                         SILType selfType,
                                         ClassDecl *selfClass,
                                         llvm::Value *selfValue,
-                                        GenericSignature fnSig,
                                         llvm::Value *&size,
                                         llvm::Value *&alignMask) {
   // Try to determine the size of the object we're deallocating.
@@ -988,7 +970,7 @@ static void getInstanceSizeAndAlignMask(IRGenFunction &IGF,
 
   // Otherwise, get them from the metadata.
   llvm::Value *metadata =
-    emitHeapMetadataRefForHeapObject(IGF, selfValue, selfType, fnSig);
+    emitHeapMetadataRefForHeapObject(IGF, selfValue, selfType);
   std::tie(size, alignMask)
     = emitClassResilientInstanceSizeAndAlignMask(IGF, selfClass, metadata);
 }
@@ -1000,8 +982,7 @@ static llvm::Value *emitCastToHeapObject(IRGenFunction &IGF,
 
 void irgen::emitClassDeallocation(IRGenFunction &IGF,
                                   SILType selfType,
-                                  llvm::Value *selfValue,
-                                  GenericSignature fnSig) {
+                                  llvm::Value *selfValue) {
   auto *theClass = selfType.getClassOrBoundGenericClass();
 
   // We want to deallocate default actors or potential default
@@ -1033,7 +1014,7 @@ void irgen::emitClassDeallocation(IRGenFunction &IGF,
   }
 
   llvm::Value *size, *alignMask;
-  getInstanceSizeAndAlignMask(IGF, selfType, theClass, selfValue, fnSig,
+  getInstanceSizeAndAlignMask(IGF, selfType, theClass, selfValue,
                               size, alignMask);
 
   selfValue = emitCastToHeapObject(IGF, selfValue);
@@ -1043,13 +1024,12 @@ void irgen::emitClassDeallocation(IRGenFunction &IGF,
 void irgen::emitPartialClassDeallocation(IRGenFunction &IGF,
                                          SILType selfType,
                                          llvm::Value *selfValue,
-                                         llvm::Value *metadataValue,
-                                         GenericSignature fnSig) {
+                                         llvm::Value *metadataValue) {
   auto *theClass = selfType.getClassOrBoundGenericClass();
   assert(theClass->getForeignClassKind() == ClassDecl::ForeignKind::Normal);
 
   llvm::Value *size, *alignMask;
-  getInstanceSizeAndAlignMask(IGF, selfType, theClass, selfValue, fnSig,
+  getInstanceSizeAndAlignMask(IGF, selfType, theClass, selfValue,
                               size, alignMask);
 
   selfValue = IGF.Builder.CreateBitCast(selfValue, IGF.IGM.RefCountedPtrTy);
@@ -1615,8 +1595,7 @@ namespace {
       std::optional<CanType> specializedGenericType;
       if ((specializedGenericType = getSpecializedGenericType()) && forMeta) {
         //     ClassMetadata *NonMetaClass;
-        b.addBitCast(IGM.getAddrOfTypeMetadata(*specializedGenericType),
-                     IGM.Int8PtrTy);
+        b.add(IGM.getAddrOfTypeMetadata(*specializedGenericType));
       } else {
         //     const uint8_t *IvarLayout;
         // GC/ARC layout.  TODO.
@@ -2343,7 +2322,7 @@ namespace {
         llvm::raw_svector_ostream os(buffer);
         os << LinkEntity::forTypeMetadata(*prespecialization,
                                           TypeMetadataAddress::FullMetadata)
-                  .mangleAsString();
+                  .mangleAsString(IGM.Context);
         return os.str();
       }
 
@@ -2784,7 +2763,7 @@ llvm::Constant *irgen::emitObjCProtocolData(IRGenModule &IGM,
   // situation when both an objective c object and a swift object define the
   // protocol under the same symbol name.
   auto deploymentAvailability =
-      AvailabilityContext::forDeploymentTarget(IGM.Context);
+      AvailabilityRange::forDeploymentTarget(IGM.Context);
   bool canUseClangEmission = deploymentAvailability.isContainedIn(
     IGM.Context.getSwift58Availability());
 
@@ -2972,7 +2951,7 @@ IRGenModule::getClassMetadataStrategy(const ClassDecl *theClass) {
     // If the Objective-C runtime is new enough, we can just use the update
     // pattern unconditionally.
     auto deploymentAvailability =
-      AvailabilityContext::forDeploymentTarget(Context);
+        AvailabilityRange::forDeploymentTarget(Context);
     if (deploymentAvailability.isContainedIn(
           Context.getObjCMetadataUpdateCallbackAvailability()))
       return ClassMetadataStrategy::Update;
@@ -3059,7 +3038,7 @@ llvm::MDString *irgen::typeIdForMethod(IRGenModule &IGM, SILDeclRef method) {
   assert(!method.getOverridden() && "must always be base method");
 
   auto entity = LinkEntity::forMethodDescriptor(method);
-  auto mangled = entity.mangleAsString();
+  auto mangled = entity.mangleAsString(IGM.Context);
   auto typeId = llvm::MDString::get(*IGM.LLVMContext, mangled);
   return typeId;
 }
@@ -3143,7 +3122,6 @@ irgen::emitVirtualMethodValue(IRGenFunction &IGF,
                               SILType baseType,
                               SILDeclRef method,
                               CanSILFunctionType methodType,
-                              GenericSignature fnSig,
                               bool useSuperVTable) {
   // Find the metadata.
   llvm::Value *metadata;
@@ -3162,7 +3140,7 @@ irgen::emitVirtualMethodValue(IRGenFunction &IGF,
       metadata = base;
     } else {
       // Otherwise, load the class metadata from the 'self' value's isa pointer.
-      metadata = emitHeapMetadataRefForHeapObject(IGF, base, baseType, fnSig,
+      metadata = emitHeapMetadataRefForHeapObject(IGF, base, baseType,
                                                   /*suppress cast*/ true);
     }
   }

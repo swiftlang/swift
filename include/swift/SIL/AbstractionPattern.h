@@ -1516,6 +1516,10 @@ public:
   /// the abstraction pattern for its self type.
   AbstractionPattern getDynamicSelfSelfType() const;
 
+  /// Given that the value being abstracted is a protocol composition
+  /// type, return the abstraction pattern for one of its member types.
+  AbstractionPattern getProtocolCompositionMemberType(unsigned i) const;
+
   /// Given that the value being abstracted is a parameterized protocol
   /// type, return the abstraction pattern for one of its argument types.
   AbstractionPattern getParameterizedProtocolArgType(unsigned i) const;
@@ -1553,6 +1557,16 @@ public:
   /// this is not an opaque abstraction pattern, return the parameter flags
   /// for one of its parameters.
   ParameterTypeFlags getFunctionParamFlags(unsigned index) const;
+
+  /// Given that the value being abstracted is a function type, return whether
+  /// the indicated parameter should be treated as addressable, meaning
+  /// calls should preserve the in-memory address of the argument for as
+  /// long as any dependencies may live.
+  ///
+  /// This may be true either because the type is structurally addressable for
+  /// dependencies, or because it was explicitly marked as `@_addressable`
+  /// in its declaration.
+  bool isFunctionParamAddressable(TypeConverter &TC, unsigned index) const;
 
   /// Given that the value being abstracted is a function type, and that
   /// this is not an opaque abstraction pattern, return the number of

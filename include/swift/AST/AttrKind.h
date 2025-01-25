@@ -130,6 +130,15 @@ enum class ExternKind: uint8_t {
 enum : unsigned { NumExternKindBits =
   countBitsUsed(static_cast<unsigned>(ExternKind::Last_ExternKind)) };
 
+enum class ExecutionKind : uint8_t {
+  Concurrent = 0,
+  Caller,
+  Last_ExecutionKind = Caller
+};
+
+enum : unsigned { NumExecutionKindBits =
+  countBitsUsed(static_cast<unsigned>(ExecutionKind::Last_ExecutionKind)) };
+
 enum class DeclAttrKind : unsigned {
 #define DECL_ATTR(_, CLASS, ...) CLASS,
 #define LAST_DECL_ATTR(CLASS) Last_DeclAttr = CLASS,

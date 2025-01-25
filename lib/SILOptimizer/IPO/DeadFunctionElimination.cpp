@@ -37,14 +37,14 @@ class DeadFunctionAndGlobalElimination {
   /// method.
   struct FuncImpl {
     FuncImpl(SILFunction *F, ClassDecl *Cl) : F(F), Impl(Cl) {}
-    FuncImpl(SILFunction *F, RootProtocolConformance *C) : F(F), Impl(C) {}
+    FuncImpl(SILFunction *F, ProtocolConformance *C) : F(F), Impl(C) {}
 
     /// The implementing function.
     SILFunction *F;
 
     /// This is a class decl if we are tracking a class_method (i.e. a vtable
     /// method) and a protocol conformance if we are tracking a witness_method.
-    PointerUnion<ClassDecl *, RootProtocolConformance*> Impl;
+    PointerUnion<ClassDecl *, ProtocolConformance*> Impl;
   };
 
   /// Stores which functions implement a vtable or witness table method.
@@ -74,7 +74,7 @@ class DeadFunctionAndGlobalElimination {
     /// Adds an implementation of the method in a specific conformance.
     ///
     /// \p Conf is null for default implementations and move-only deinits
-    void addWitnessFunction(SILFunction *F, RootProtocolConformance *Conf) {
+    void addWitnessFunction(SILFunction *F, ProtocolConformance *Conf) {
       assert(isWitnessMethod);
       implementingFunctions.push_back(FuncImpl(F, Conf));
     }
@@ -191,9 +191,9 @@ class DeadFunctionAndGlobalElimination {
           }
         } break;
 
-        case SILWitnessTable::AssociatedTypeProtocol: {
+        case SILWitnessTable::AssociatedConformance: {
           ProtocolConformanceRef CRef =
-             entry.getAssociatedTypeProtocolWitness().Witness;
+             entry.getAssociatedConformanceWitness().Witness;
           if (CRef.isConcrete())
             ensureAliveConformance(CRef.getConcrete());
           break;
@@ -328,7 +328,7 @@ class DeadFunctionAndGlobalElimination {
       return;
     mi->methodIsCalled = true;
     for (FuncImpl &FImpl : mi->implementingFunctions) {
-      if (auto Conf = FImpl.Impl.dyn_cast<RootProtocolConformance *>()) {
+      if (auto Conf = FImpl.Impl.dyn_cast<ProtocolConformance *>()) {
         SILWitnessTable *WT = Module->lookUpWitnessTable(Conf);
         if (!WT || isAlive(WT))
           makeAlive(FImpl.F);

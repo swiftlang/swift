@@ -97,7 +97,8 @@ _$SSC3fooyS2d_SdtFTO ---> {T:_$SSC3fooyS2d_SdtF} @nonobjc __C_Synthesized.foo(Sw
 _$S3foo3barC3bas3zimyAaEC_tFTo ---> {T:_$S3foo3barC3bas3zimyAaEC_tF,C} @objc foo.bar.bas(zim: foo.zim) -> ()
 _$SSC3fooyS2d_SdtFTO ---> {T:_$SSC3fooyS2d_SdtF} @nonobjc __C_Synthesized.foo(Swift.Double, Swift.Double) -> Swift.Double
 _$sTA.123 ---> {T:} partial apply forwarder with unmangled suffix ".123"
-$s4main3fooyySiFyyXEfU_TA.1 ---> {T:} closure #1 () -> () in main.foo(Swift.Int) -> ()partial apply forwarder with unmangled suffix ".1"
+$s4main3fooyySiFyyXEfU_TA.1 ---> {T:} partial apply forwarder for closure #1 () -> () in main.foo(Swift.Int) -> () with unmangled suffix ".1"
+$s4main8MyStructV3fooyyFAA1XV_Tg5.foo ---> generic specialization <main.X> of main.MyStruct.foo() -> () with unmangled suffix ".foo"
 _TTDFC3foo3bar3basfT3zimCS_3zim_T_ ---> dynamic foo.bar.bas(zim: foo.zim) -> ()
 _TFC3foo3bar3basfT3zimCS_3zim_T_ ---> foo.bar.bas(zim: foo.zim) -> ()
 _TF3foooi1pFTCS_3barVS_3bas_OS_3zim ---> foo.+ infix(foo.bar, foo.bas) -> foo.zim
@@ -105,6 +106,7 @@ _TF3foooP1xFTCS_3barVS_3bas_OS_3zim ---> foo.^ postfix(foo.bar, foo.bas) -> foo.
 _TFC3foo3barCfT_S0_ ---> foo.bar.__allocating_init() -> foo.bar
 _TFC3foo3barcfT_S0_ ---> foo.bar.init() -> foo.bar
 _TFC3foo3barD ---> foo.bar.__deallocating_deinit
+_TFC3foo3barZ ---> foo.bar.__isolated_deallocating_deinit
 _TFC3foo3bard ---> foo.bar.deinit
 _TMPC3foo3bar ---> generic type metadata pattern for foo.bar
 _TMnC3foo3bar ---> nominal type descriptor for foo.bar
@@ -362,7 +364,8 @@ $S18resilient_protocol21ResilientBaseProtocolTL ---> protocol requirements base 
 $S1t1PP10AssocType2_AA1QTn ---> associated conformance descriptor for t.P.AssocType2: t.Q
 $S1t1PP10AssocType2_AA1QTN ---> default associated conformance accessor for t.P.AssocType2: t.Q
 $s4Test6testityyxlFAA8MystructV_TB5 ---> generic specialization <Test.Mystruct> of Test.testit<A>(A) -> ()
-$sSUss17FixedWidthIntegerRzrlEyxqd__cSzRd__lufCSu_SiTgm5 ---> generic specialization <Swift.UInt, Swift.Int> of (extension in Swift):Swift.UnsignedInteger< where A: Swift.FixedWidthInteger>.init<A where A1: Swift.BinaryInteger>(A1) -> A
+$sSUss17FixedWidthIntegerRzrlEyxqd__cSzRd__lufCSu_SiTg5 ---> generic specialization <Swift.UInt, Swift.Int> of (extension in Swift):Swift.UnsignedInteger< where A: Swift.FixedWidthInteger>.init<A where A1: Swift.BinaryInteger>(A1) -> A
+$s4test7genFuncyyx_q_tr0_lFSi_SbTtt1g5 ---> generic specialization <Swift.Int, Swift.Bool> of test.genFunc<A, B>(A, B) -> ()
 $sSD5IndexVy__GD ---> $sSD5IndexVy__GD
 $s4test3StrCACycfC ---> {T:$s4test3StrCACycfc} test.Str.__allocating_init() -> test.Str
 $s18keypaths_inlinable13KeypathStructV8computedSSvpACTKq  ---> key path getter for keypaths_inlinable.KeypathStruct.computed : Swift.String : keypaths_inlinable.KeypathStruct, serialized
@@ -462,7 +465,7 @@ $sS3fIedgyywTd_D ---> @escaping @differentiable @callee_guaranteed (@unowned Swi
 $sS3fIedgyyTd_D ---> @escaping @differentiable @callee_guaranteed (@unowned Swift.Float, @unowned sending Swift.Float) -> (@unowned Swift.Float)
 $s4testA2A5KlassCyYTF ---> test.test() -> sending test.Klass
 $s4main5KlassCACYTcMD ---> demangling cache variable for type metadata for (main.Klass) -> sending main.Klass
-$s4null19transferAsyncResultAA16NonSendableKlassCyYaYTF ---> null.transferAsyncResult() -> sending null.NonSendableKlass
+$s4null19transferAsyncResultAA16NonSendableKlassCyYaYTF ---> null.transferAsyncResult() async -> sending null.NonSendableKlass
 $s4null16NonSendableKlassCIegHo_ACs5Error_pIegHTrzo_TR ---> {T:} reabstraction thunk helper from @escaping @callee_guaranteed @async () -> (@owned null.NonSendableKlass) to @escaping @callee_guaranteed @async () -> sending (@out null.NonSendableKlass, @error @owned Swift.Error)
 $sSRyxG15Synchronization19AtomicRepresentableABRi_zrlMc ---> protocol conformance descriptor for < where A: ~Swift.Copyable> Swift.UnsafeBufferPointer<A> : Synchronization.AtomicRepresentable in Synchronization
 $sSRyxG15Synchronization19AtomicRepresentableABRi0_zrlMc ---> protocol conformance descriptor for < where A: ~Swift.Escapable> Swift.UnsafeBufferPointer<A> : Synchronization.AtomicRepresentable in Synchronization
@@ -472,6 +475,15 @@ $s23variadic_generic_opaque2G2VyAA2S1V_AA2S2VQPGAA1PHPAeA1QHPyHC_AgaJHPyHCHX_HC 
 
 $s9MacroUser0023macro_expandswift_elFCffMX436_4_23bitwidthNumberedStructsfMf_ ---> freestanding macro expansion #1 of bitwidthNumberedStructs in module MacroUser file macro_expand.swift line 437 column 5
 $sxq_IyXd_D ---> @callee_unowned (@in_cxx A) -> (@unowned B)
-$s32def_implicit_lifetime_dependence6deriveyAA10BufferViewVYliS_ADF ---> def_implicit_lifetime_dependence.derive(def_implicit_lifetime_dependence.BufferView) -> inherit lifetime dependence: {0} def_implicit_lifetime_dependence.BufferView
-$s32def_explicit_lifetime_dependence16deriveThisOrThatyAA10BufferViewVYlsSS_AD_ADtF ---> def_explicit_lifetime_dependence.deriveThisOrThat(def_explicit_lifetime_dependence.BufferView, def_explicit_lifetime_dependence.BufferView) -> scope lifetime dependence: {0, 1} def_explicit_lifetime_dependence.BufferView
-$s39explicit_lifetime_dependence_specifiers17deriveThisOrThat2yAA10BufferViewVYliUS_YlsSU_AD_ADntF ---> explicit_lifetime_dependence_specifiers.deriveThisOrThat2(explicit_lifetime_dependence_specifiers.BufferView, __owned explicit_lifetime_dependence_specifiers.BufferView) -> scope lifetime dependence: {0} inherit lifetime dependence: {1} explicit_lifetime_dependence_specifiers.BufferView
+$s2hi1SV1iSivx ---> hi.S.i.modify2 : Swift.Int
+$s2hi1SV1iSivy ---> hi.S.i.read2 : Swift.Int
+$s2hi1SVIetMIy_TC  ---> coroutine continuation prototype for @escaping @convention(thin) @convention(method) @yield_once_2 (@unowned hi.S) -> ()
+$s4mainAAyyycAA1CCFTTI ---> identity thunk of main.main(main.C) -> () -> ()
+$s4mainAAyyycAA1CCFTTH ---> hop to main actor thunk of main.main(main.C) -> () -> ()
+
+$s4main4SlabVy$1_SiG ---> main.Slab<2, Swift.Int>
+$s$n3_SSBV ---> Builtin.FixedArray<-4, Swift.String>
+$s3red7MyActorC3runyxxyYaKACYcYTXEYaKlFZ ---> static red.MyActor.run<A>(@red.MyActor () async throws -> sending A) async throws -> A
+$s3red7MyActorC3runyxxyYaKYAYTXEYaKlFZ ---> static red.MyActor.run<A>(@isolated(any) () async throws -> sending A) async throws -> A
+$s7ToolKit10TypedValueOACs5Error_pIgHTnTrzo_A2CsAD_pIegHiTrzr_TR ---> {T:} reabstraction thunk helper from @callee_guaranteed @async (@in_guaranteed sending ToolKit.TypedValue) -> sending (@out ToolKit.TypedValue, @error @owned Swift.Error) to @escaping @callee_guaranteed @async (@in sending ToolKit.TypedValue) -> (@out ToolKit.TypedValue, @error @out Swift.Error)
+$s16sending_mangling16NonSendableKlassCACIegTiTr_A2CIegTxTo_TR ---> {T:} reabstraction thunk helper from @escaping @callee_guaranteed (@in sending sending_mangling.NonSendableKlass) -> sending (@out sending_mangling.NonSendableKlass) to @escaping @callee_guaranteed (@owned sending sending_mangling.NonSendableKlass) -> sending (@owned sending_mangling.NonSendableKlass)

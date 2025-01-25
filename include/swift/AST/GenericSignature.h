@@ -170,9 +170,6 @@ public:
   /// Stores a set of requirements on a type parameter. Used by
   /// GenericEnvironment for building archetypes.
   struct LocalRequirements {
-    Type anchor;
-
-    Type concreteType;
     Type superclass;
 
     RequiredProtocols protos;
@@ -403,9 +400,16 @@ public:
   /// checking against global state, if any/all of the types in the requirement
   /// are concrete, not type parameters.
   bool isRequirementSatisfied(
-      Requirement requirement, bool allowMissing = false) const;
+      Requirement requirement,
+      bool allowMissing = false,
+      bool brokenPackBehavior = false) const;
 
   bool isReducedType(Type type) const;
+
+  /// Return the reduced version of the given type parameter under this generic
+  /// signature. To reduce a type that more generally contains type parameters,
+  /// use GenericSignature::getReducedType().
+  CanType getReducedTypeParameter(CanType type) const;
 
   /// Determine whether the given type parameter is defined under this generic
   /// signature.

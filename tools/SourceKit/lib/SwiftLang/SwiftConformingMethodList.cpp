@@ -77,10 +77,9 @@ deliverResults(SourceKit::ConformingMethodListConsumer &SKConsumer,
       Members.emplace_back();
       auto &memberElem = Members.back();
 
-      auto funcTy = cast<FuncDecl>(member)->getMethodInterfaceType();
-      funcTy = Result->Result->ExprType->getTypeOfMember(
-          member, funcTy);
-      auto resultTy = funcTy->castTo<FunctionType>()->getResult();
+      auto resultTy = cast<FuncDecl>(member)->getResultInterfaceType();
+      resultTy = resultTy.subst(
+        Result->Result->ExprType->getMemberSubstitutionMap(member));
 
       // Name.
       memberElem.DeclNameBegin = SS.size();

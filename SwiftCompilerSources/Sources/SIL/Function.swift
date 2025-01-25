@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 import Basic
+import AST
 import SILBridging
 
 @_semantics("arc.immortal")
@@ -39,6 +40,8 @@ final public class Function : CustomStringConvertible, HasShortDescription, Hash
 
   public var isAutodiffVJP: Bool { bridged.isAutodiffVJP() }
 
+  public var isConvertPointerToPointerArgument: Bool { bridged.isConvertPointerToPointerArgument() }
+
   public var specializationLevel: Int { bridged.specializationLevel() }
   
   public var hasOwnership: Bool { bridged.hasOwnership() }
@@ -54,7 +57,9 @@ final public class Function : CustomStringConvertible, HasShortDescription, Hash
   ///    @substituted <τ_0_0> () -> @out τ_0_0 for <ActualResultType>
   /// and this outside its module
   ///    @substituted <τ_0_0> () -> @out τ_0_0 for <some P>
-  public var loweredFunctionType: BridgedASTType { bridged.getLoweredFunctionTypeInContext() }
+  public var loweredFunctionType: CanonicalType {
+    CanonicalType(bridged: bridged.getLoweredFunctionTypeInContext())
+  }
 
   /// Returns true if the function is a definition and not only an external declaration.
   ///
@@ -113,6 +118,8 @@ final public class Function : CustomStringConvertible, HasShortDescription, Hash
 
   public var isGeneric: Bool { bridged.isGeneric() }
 
+  public var linkage: Linkage { bridged.getLinkage().linkage }
+
   /// True, if the linkage of the function indicates that it is visible outside the current
   /// compilation unit and therefore not all of its uses are known.
   ///
@@ -125,9 +132,7 @@ final public class Function : CustomStringConvertible, HasShortDescription, Hash
   /// current compilation unit.
   ///
   /// For example, `public_external` linkage.
-  public var isAvailableExternally: Bool {
-    return bridged.isAvailableExternally()
-  }
+  public var isDefinedExternally: Bool { linkage.isExternal }
 
   public func hasSemanticsAttribute(_ attr: StaticString) -> Bool {
     attr.withUTF8Buffer { (buffer: UnsafeBufferPointer<UInt8>) in
@@ -159,8 +164,26 @@ final public class Function : CustomStringConvertible, HasShortDescription, Hash
     }
   }
 
-  public func canBeInlinedIntoCaller(_ kind: SerializedKind) -> Bool {
-    bridged.canBeInlinedIntoCaller(serializedKindBridged(kind))
+  public func canBeInlinedIntoCaller(withSerializedKind callerSerializedKind: SerializedKind) -> Bool {
+    switch serializedKind {
+    // If both callee and caller are not_serialized, the callee can be inlined into the caller
+    // during SIL inlining passes even if it (and the caller) might contain private symbols.
+    case .notSerialized:
+      return callerSerializedKind == .notSerialized;
+
+    // If Package-CMO is enabled, we serialize package, public, and @usableFromInline decls as
+    // [serialized_for_package].
+    // Their bodies must not, however, leak into @inlinable functons (that are [serialized])
+    // since they are inlined outside of their defining module.
+    //
+    // If this callee is [serialized_for_package], the caller must be either non-serialized
+    // or [serialized_for_package] for this callee's body to be inlined into the caller.
+    // It can however be referenced by [serialized] caller.
+    case .serializedForPackage:
+      return callerSerializedKind != .serialized;
+    case .serialized:
+      return true;
+    }
   }
 
   public func hasValidLinkageForFragileRef(_ kind: SerializedKind) -> Bool {
@@ -231,6 +254,29 @@ final public class Function : CustomStringConvertible, HasShortDescription, Hash
       case .AlwaysInline: return .always
       default:
         fatalError()
+    }
+  }
+
+  public enum SourceFileKind {
+    case library         /// A normal .swift file.
+    case main            /// A .swift file that can have top-level code.
+    case sil             /// Came from a .sil file.
+    case interface       /// Came from a .swiftinterface file, representing another module.
+    case macroExpansion  /// Came from a macro expansion.
+    case defaultArgument /// Came from default argument at caller side
+  };
+
+  public var sourceFileKind: SourceFileKind? {
+    switch bridged.getSourceFileKind() {
+    case .Library: return .library
+    case .Main: return .main
+    case .SIL: return .sil
+    case .Interface: return .interface
+    case .MacroExpansion: return .macroExpansion
+    case .DefaultArgument: return .defaultArgument
+    case .None: return nil
+    @unknown default:
+      fatalError("unknown enum case")
     }
   }
 }

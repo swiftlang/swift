@@ -1,10 +1,10 @@
-// RUN: %target-swift-frontend -disable-availability-checking %s -emit-sil -o /dev/null -verify -verify-additional-prefix minimal-targeted-
-// RUN: %target-swift-frontend -disable-availability-checking %s -emit-sil -o /dev/null -verify -strict-concurrency=targeted -verify-additional-prefix minimal-targeted-
-// RUN: %target-swift-frontend -disable-availability-checking %s -emit-sil -o /dev/null -verify -strict-concurrency=complete -verify-additional-prefix complete-tns-
-// RUN: %target-swift-frontend -disable-availability-checking %s -emit-sil -o /dev/null -verify -strict-concurrency=complete -enable-upcoming-feature RegionBasedIsolation -verify-additional-prefix complete-tns-
+// RUN: %target-swift-frontend -target %target-swift-5.1-abi-triple %s -emit-sil -o /dev/null -verify -verify-additional-prefix minimal-targeted-
+// RUN: %target-swift-frontend -target %target-swift-5.1-abi-triple %s -emit-sil -o /dev/null -verify -strict-concurrency=targeted -verify-additional-prefix minimal-targeted-
+// RUN: %target-swift-frontend -target %target-swift-5.1-abi-triple %s -emit-sil -o /dev/null -verify -strict-concurrency=complete -verify-additional-prefix complete-tns-
+// RUN: %target-swift-frontend -target %target-swift-5.1-abi-triple %s -emit-sil -o /dev/null -verify -strict-concurrency=complete -enable-upcoming-feature RegionBasedIsolation -verify-additional-prefix complete-tns-
 
 // REQUIRES: concurrency
-// REQUIRES: asserts
+// REQUIRES: swift_feature_RegionBasedIsolation
 
 @preconcurrency func unsafelySendableClosure(_ closure: @Sendable () -> Void) { }
 
@@ -235,7 +235,7 @@ extension MainActorPreconcurrency: NotIsolated {
   // expected-complete-tns-note@-2{{add '@preconcurrency' to the 'NotIsolated' conformance to defer isolation checking to run time}}{{36-36=@preconcurrency }}
 
   func requirement() {}
-  // expected-complete-tns-warning@-1 {{main actor-isolated instance method 'requirement()' cannot be used to satisfy nonisolated protocol requirement}}
+  // expected-complete-tns-warning@-1 {{main actor-isolated instance method 'requirement()' cannot be used to satisfy nonisolated requirement from protocol 'NotIsolated'}}
   // expected-complete-tns-note@-2 {{add 'nonisolated' to 'requirement()' to make this instance method not isolated to the actor}}
   // expected-complete-tns-note@-3 {{calls to instance method 'requirement()' from outside of its actor context are implicitly asynchronous}}
 
@@ -271,6 +271,19 @@ do {
       nil
     }
 
+    @preconcurrency
+    open var test5: (@MainActor () -> Void)? { // expected-note {{overridden declaration is here}}
+      nil
+    }
+
+    open var test6: (@MainActor () -> Void)? { // expected-note {{attempt to override property here}}
+      nil
+    }
+
+    @preconcurrency
+    func test7(_: (@MainActor () -> Void)? = nil) { // expected-note {{overridden declaration is here}}
+    }
+
     init() {
       self.test1 = nil
       self.test2 = [:]
@@ -300,6 +313,20 @@ do {
     override var test4: (((any Sendable)?) -> Void)? {
       // expected-warning@-1 {{declaration 'test4' has a type with different sendability from any potential overrides; this is an error in the Swift 6 language mode}}
       nil
+    }
+
+    override var test5: (() -> Void)? {
+      // expected-warning@-1 {{declaration 'test5' has a type with different global actor isolation from any potential overrides; this is an error in the Swift 6 language mode}}
+      nil
+    }
+
+    override var test6: (() -> Void)? {
+      // expected-error@-1 {{property 'test6' with type '(() -> Void)?' cannot override a property with type '(@MainActor () -> Void)?'}}
+      nil
+    }
+
+    override func test7(_: (() -> Void)?) {
+      // expected-warning@-1 {{declaration 'test7' has a type with different global actor isolation from any potential overrides; this is an error in the Swift 6 language mode}}
     }
   }
 }

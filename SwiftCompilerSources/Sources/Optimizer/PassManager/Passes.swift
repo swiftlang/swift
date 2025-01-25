@@ -17,8 +17,7 @@ struct FunctionPass {
   let name: String
   let runFunction: (Function, FunctionPassContext) -> ()
 
-  public init(name: String,
-              _ runFunction: @escaping (Function, FunctionPassContext) -> ()) {
+  init(name: String, _ runFunction: @escaping (Function, FunctionPassContext) -> ()) {
     self.name = name
     self.runFunction = runFunction
   }
@@ -35,8 +34,7 @@ struct ModulePass {
   let name: String
   let runFunction: (ModulePassContext) -> ()
 
-  public init(name: String,
-              _ runFunction: @escaping (ModulePassContext) -> ()) {
+  init(name: String, _ runFunction: @escaping (ModulePassContext) -> ()) {
     self.name = name
     self.runFunction = runFunction
   }

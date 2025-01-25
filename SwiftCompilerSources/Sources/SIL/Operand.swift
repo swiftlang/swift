@@ -13,7 +13,7 @@
 import SILBridging
 
 /// An operand of an instruction.
-public struct Operand : CustomStringConvertible, NoReflectionChildren {
+public struct Operand : CustomStringConvertible, NoReflectionChildren, Equatable {
   public let bridged: BridgedOperand
 
   public init(bridged: BridgedOperand) {
@@ -87,7 +87,7 @@ public struct OperandArray : RandomAccessCollection, CustomReflectable {
   
   /// Returns a sub-array defined by `bounds`.
   ///
-  /// Note: this does not return a Slice. The first index of the returnd array is always 0.
+  /// Note: this does not return a Slice. The first index of the returned array is always 0.
   public subscript(bounds: Range<Int>) -> OperandArray {
     assert(bounds.lowerBound >= startIndex && bounds.upperBound <= endIndex)
     return OperandArray(
@@ -169,6 +169,20 @@ extension Sequence where Element == Operand {
   public var endingLifetime: LazyFilterSequence<Self> {
     return self.lazy.filter { $0.endsLifetime }
   }
+
+  public var users: LazyMapSequence<Self, Instruction> {
+    return self.lazy.map { $0.instruction }
+  }
+
+  // This intentinally returns a Sequence of `Instruction` and not a Sequence of `I` to be able to use
+  // it as argument to `InstructionSet.insert(contentsOf:)`.
+  public func users<I: Instruction>(ofType: I.Type) -> LazyMapSequence<LazyFilterSequence<Self>, Instruction> {
+    self.lazy.filter{ $0.instruction is I }.users
+  }
+}
+
+extension Value {
+  public var users: LazyMapSequence<UseList, Instruction> { uses.users }
 }
 
 extension Operand {
@@ -186,6 +200,19 @@ extension Operand {
       return true
     case let apply as FullApplySite:
       return apply.isIndirectResult(operand: self)
+    default:
+      return false
+    }
+  }
+}
+
+extension Operand {
+  /// A scope ending use is a consuming use for normal borrow scopes, but it also applies to intructions that end the
+  /// scope of an address (end_access) or a token (end_apply, abort_apply),
+  public var isScopeEndingUse: Bool {
+    switch instruction {
+    case is EndBorrowInst, is EndAccessInst, is EndApplyInst, is AbortApplyInst:
+      return true
     default:
       return false
     }

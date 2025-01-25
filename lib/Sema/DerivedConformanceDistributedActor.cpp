@@ -16,14 +16,16 @@
 
 #include "CodeSynthesis.h"
 #include "DerivedConformances.h"
-#include "TypeChecker.h"
-#include "swift/Strings.h"
 #include "TypeCheckDistributed.h"
+#include "TypeChecker.h"
+#include "swift/AST/AvailabilityInference.h"
+#include "swift/AST/ConformanceLookup.h"
+#include "swift/AST/DistributedDecl.h"
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/NameLookupRequests.h"
 #include "swift/AST/ParameterList.h"
-#include "swift/AST/DistributedDecl.h"
 #include "swift/Basic/Assertions.h"
+#include "swift/Strings.h"
 
 using namespace swift;
 
@@ -230,7 +232,8 @@ static FuncDecl* createLocalFunc_doInvokeOnReturn(
   // We create the generic param at invalid depth, which means it'll be filled
   // by semantic analysis.
   auto *resultGenericParamDecl = GenericTypeParamDecl::createImplicit(
-      parentFunc, C.getIdentifier("R"), /*depth*/ 0, /*index*/ 0);
+      parentFunc, C.getIdentifier("R"), /*depth*/ 0, /*index*/ 0,
+      GenericTypeParamKind::Type);
   GenericParamList *doInvokeGenericParamList =
       GenericParamList::create(C, sloc, {resultGenericParamDecl}, sloc);
 
@@ -652,8 +655,6 @@ deriveBodyDistributedActor_unownedExecutor(AbstractFunctionDecl *getter, void *)
   // }
   ASTContext &ctx = getter->getASTContext();
 
-  auto *module = getter->getParentModule();
-
   // Produce an empty brace statement on failure.
   auto failure = [&]() -> std::pair<BraceStmt *, bool> {
     auto body = BraceStmt::create(
@@ -690,8 +691,8 @@ deriveBodyDistributedActor_unownedExecutor(AbstractFunctionDecl *getter, void *)
   Expr *selfForIsLocalArg = DerivedConformance::createSelfDeclRef(getter);
   selfForIsLocalArg->setType(selfType);
 
-  auto conformances = module->collectExistentialConformances(selfType->getCanonicalType(),
-                                                             ctx.getAnyObjectType());
+  auto conformances = collectExistentialConformances(selfType->getCanonicalType(),
+                                                     ctx.getAnyObjectType());
   auto *argListForIsLocal =
       ArgumentList::forImplicitSingle(ctx, Identifier(),
                                       ErasureExpr::create(ctx, selfForIsLocalArg,
@@ -809,8 +810,7 @@ static ValueDecl *deriveDistributedActor_unownedExecutor(DerivedConformance &der
   if (auto enclosingDecl = property->getInnermostDeclWithAvailability())
     asAvailableAs.push_back(enclosingDecl);
 
-  AvailabilityInference::applyInferredAvailableAttrs(
-      property, asAvailableAs, ctx);
+  AvailabilityInference::applyInferredAvailableAttrs(property, asAvailableAs);
 
   auto getter = derived.addGetterToReadOnlyDerivedProperty(property);
   getter->setBodySynthesizer(deriveBodyDistributedActor_unownedExecutor);

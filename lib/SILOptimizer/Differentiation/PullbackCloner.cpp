@@ -26,6 +26,7 @@
 #include "swift/SILOptimizer/Differentiation/Thunk.h"
 #include "swift/SILOptimizer/Differentiation/VJPCloner.h"
 
+#include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/PropertyWrappers.h"
 #include "swift/AST/TypeCheckRequests.h"
@@ -214,12 +215,17 @@ private:
   //--------------------------------------------------------------------------//
 
   /// Get the type lowering for the given AST type.
+  ///
+  /// Explicitly use minimal type expansion context: in general, differentiation
+  /// happens on function types, so it cannot know if the original function is
+  /// resilient or not.
   const Lowering::TypeLowering &getTypeLowering(Type type) {
     auto pbGenSig =
         getPullback().getLoweredFunctionType()->getSubstGenericSignature();
     Lowering::AbstractionPattern pattern(pbGenSig,
                                          type->getReducedType(pbGenSig));
-    return getPullback().getTypeLowering(pattern, type);
+    return getContext().getTypeConverter().getTypeLowering(
+      pattern, type, TypeExpansionContext::minimal());
   }
 
   /// Remap any archetypes into the current function's context.
@@ -1730,13 +1736,21 @@ public:
   /// move_value, begin_borrow.
   ///   Original: y = copy_value x
   ///    Adjoint: adj[x] += adj[y]
-  void visitValueOwnershipInst(SingleValueInstruction *svi) {
+  void visitValueOwnershipInst(SingleValueInstruction *svi,
+                               bool needZeroResAdj = false) {
     assert(svi->getNumOperands() == 1);
     auto *bb = svi->getParent();
     switch (getTangentValueCategory(svi)) {
     case SILValueCategory::Object: {
       auto adj = getAdjointValue(bb, svi);
       addAdjointValue(bb, svi->getOperand(0), adj, svi->getLoc());
+      if (needZeroResAdj) {
+        assert(svi->getNumResults() == 1);
+        SILValue val = svi->getResult(0);
+        setAdjointValue(
+            bb, val,
+            makeZeroAdjointValue(getRemappedTangentType(val->getType())));
+      }
       break;
     }
     case SILValueCategory::Address: {
@@ -1762,8 +1776,16 @@ public:
 
   /// Handle `move_value` instruction.
   ///   Original: y = move_value x
-  ///    Adjoint: adj[x] += adj[y]
-  void visitMoveValueInst(MoveValueInst *mvi) { visitValueOwnershipInst(mvi); }
+  ///    Adjoint: adj[x] += adj[y]; adj[y] = 0
+  void visitMoveValueInst(MoveValueInst *mvi) {
+    switch (getTangentValueCategory(mvi)) {
+    case SILValueCategory::Address:
+      llvm::report_fatal_error("AutoDiff does not support move_value with "
+                               "SILValueCategory::Address");
+    case SILValueCategory::Object:
+      visitValueOwnershipInst(mvi, /*needZeroResAdj=*/true);
+    }
+  }
 
   void visitEndInitLetRefInst(EndInitLetRefInst *eir) { visitValueOwnershipInst(eir); }
 
@@ -2713,7 +2735,7 @@ AllocStackInst *PullbackCloner::Implementation::createOptionalAdjoint(
   auto *diffProto =
       builder.getASTContext().getProtocol(KnownProtocolKind::Differentiable);
   auto diffConf =
-      ModuleDecl::lookupConformance(wrappedType.getASTType(), diffProto);
+      lookupConformance(wrappedType.getASTType(), diffProto);
   assert(!diffConf.isInvalid() && "Missing conformance to `Differentiable`");
   auto subMap = SubstitutionMap::get(
       initFn->getLoweredFunctionType()->getSubstGenericSignature(),
@@ -3278,7 +3300,7 @@ SILValue PullbackCloner::Implementation::getAdjointProjection(
     auto adjSource = getAdjointBuffer(origBB, source);
     if (!adjSource->getType().is<TupleType>())
       return adjSource;
-    auto origTupleTy = source->getType().castTo<TupleType>();
+    auto origTupleTy = remapType(source->getType()).castTo<TupleType>();
     unsigned adjIndex = 0;
     for (unsigned i : range(teai->getFieldIndex())) {
       if (getTangentSpace(
@@ -3621,10 +3643,10 @@ AllocStackInst *PullbackCloner::Implementation::getArrayAdjointElementBuffer(
   // %index_int = struct $Int (%index_literal)
   auto *eltIndexInt = builder.createStruct(loc, intType, {eltIndexLiteral});
   auto *diffProto = ctx.getProtocol(KnownProtocolKind::Differentiable);
-  auto diffConf = ModuleDecl::lookupConformance(eltTanType, diffProto);
+  auto diffConf = lookupConformance(eltTanType, diffProto);
   assert(!diffConf.isInvalid() && "Missing conformance to `Differentiable`");
   auto *addArithProto = ctx.getProtocol(KnownProtocolKind::AdditiveArithmetic);
-  auto addArithConf = ModuleDecl::lookupConformance(eltTanType, addArithProto);
+  auto addArithConf = lookupConformance(eltTanType, addArithProto);
   assert(!addArithConf.isInvalid() &&
          "Missing conformance to `AdditiveArithmetic`");
   auto subMap = SubstitutionMap::get(subscriptFnGenSig, {eltTanType},

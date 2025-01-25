@@ -30,7 +30,7 @@
 namespace swift {
 
 class AssociatedTypeDecl;
-class AvailabilityContext;
+class AvailabilityRange;
 class DeclContext;
 class FuncDecl;
 class NormalProtocolConformance;
@@ -90,7 +90,7 @@ protected:
 
   bool checkWitnessAvailability(ValueDecl *requirement,
                                 ValueDecl *witness,
-                                AvailabilityContext *requirementInfo);
+                                AvailabilityRange *requirementInfo);
 
   RequirementCheck checkWitness(ValueDecl *requirement,
                                 const RequirementMatch &match);

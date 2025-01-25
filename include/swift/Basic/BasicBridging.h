@@ -23,6 +23,20 @@
 // Pure bridging mode does not permit including any C++/llvm/swift headers.
 // See also the comments for `BRIDGING_MODE` in the top-level CMakeLists.txt file.
 //
+//
+// Note: On Windows ARM64, how a C++ struct/class value type is
+// returned is sensitive to conditions including whether a
+// user-defined constructor exists, etc. See
+// https://learn.microsoft.com/en-us/cpp/build/arm64-windows-abi-conventions?view=msvc-170#return-values
+// So, if a C++ struct/class type is returned as a value between Swift
+// and C++, we need to be careful to match the return convention
+// matches between the non-USED_IN_CPP_SOURCE (Swift) side and the
+// USE_IN_CPP_SOURCE (C++) side.
+//
+// !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+// !! Do not put any constructors inside an `#ifdef USED_IN_CPP_SOURCE` block !!
+// !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
 #include "swift/Basic/BridgedSwiftObject.h"
 #include "swift/Basic/Compiler.h"
 
@@ -63,7 +77,14 @@
 
 namespace llvm {
 class raw_ostream;
+class StringRef;
 } // end namespace llvm
+
+namespace swift {
+class SourceLoc;
+class SourceRange;
+class CharSourceRange;
+}
 
 SWIFT_BEGIN_NULLABILITY_ANNOTATIONS
 
@@ -196,12 +217,8 @@ class BridgedStringRef {
   size_t Length;
 
 public:
-#ifdef USED_IN_CPP_SOURCE
-  BridgedStringRef(llvm::StringRef sref)
-      : Data(sref.data()), Length(sref.size()) {}
-
-  llvm::StringRef unbridged() const { return llvm::StringRef(Data, Length); }
-#endif
+  BRIDGED_INLINE BridgedStringRef(llvm::StringRef sref);
+  BRIDGED_INLINE llvm::StringRef unbridged() const;
 
   BridgedStringRef() : Data(nullptr), Length(0) {}
 
@@ -227,14 +244,12 @@ class BridgedOwnedString {
   size_t Length;
 
 public:
-#ifdef USED_IN_CPP_SOURCE
-  BridgedOwnedString(const std::string &stringToCopy);
+  BridgedOwnedString(llvm::StringRef stringToCopy);
 
-  llvm::StringRef unbridgedRef() const { return llvm::StringRef(Data, Length); }
-#endif
+  BRIDGED_INLINE llvm::StringRef unbridgedRef() const;
 
   void destroy() const;
-};
+} SWIFT_SELF_CONTAINED;
 
 SWIFT_NAME("getter:BridgedOwnedString.data(self:)")
 BRIDGED_INLINE 
@@ -292,14 +307,9 @@ public:
   SWIFT_NAME("init(raw:)")
   BridgedSourceLoc(const void *_Nullable raw) : Raw(raw) {}
 
-#ifdef USED_IN_CPP_SOURCE
-  BridgedSourceLoc(swift::SourceLoc loc) : Raw(loc.getOpaquePointerValue()) {}
+  BRIDGED_INLINE BridgedSourceLoc(swift::SourceLoc loc);
 
-  swift::SourceLoc unbridged() const {
-    return swift::SourceLoc(
-        llvm::SMLoc::getFromPointer(static_cast<const char *>(Raw)));
-  }
-#endif
+  BRIDGED_INLINE swift::SourceLoc unbridged() const;
 
   SWIFT_IMPORT_UNSAFE
   const void *_Nullable getOpaquePointerValue() const { return Raw; }
@@ -330,14 +340,9 @@ public:
   BridgedSourceRange(BridgedSourceLoc start, BridgedSourceLoc end)
       : Start(start), End(end) {}
 
-#ifdef USED_IN_CPP_SOURCE
-  BridgedSourceRange(swift::SourceRange range)
-      : Start(range.Start), End(range.End) {}
+  BRIDGED_INLINE BridgedSourceRange(swift::SourceRange range);
 
-  swift::SourceRange unbridged() const {
-    return swift::SourceRange(Start.unbridged(), End.unbridged());
-  }
-#endif
+  BRIDGED_INLINE swift::SourceRange unbridged() const;
 };
 
 //===----------------------------------------------------------------------===//
@@ -356,14 +361,9 @@ public:
   BridgedCharSourceRange(BridgedSourceLoc start, unsigned byteLength)
       : Start(start), ByteLength(byteLength) {}
 
-#ifdef USED_IN_CPP_SOURCE
-  BridgedCharSourceRange(swift::CharSourceRange range)
-      : Start(range.getStart()), ByteLength(range.getByteLength()) {}
+  BRIDGED_INLINE BridgedCharSourceRange(swift::CharSourceRange range);
 
-  swift::CharSourceRange unbridged() const {
-    return swift::CharSourceRange(Start.unbridged(), ByteLength);
-  }
-#endif
+  BRIDGED_INLINE swift::CharSourceRange unbridged() const;
 };
 
 SWIFT_NAME("getter:BridgedCharSourceRange.start(self:)")
@@ -414,70 +414,53 @@ public:
 };
 
 //===----------------------------------------------------------------------===//
-// MARK: Plugins
+// MARK: BridgedSwiftVersion
 //===----------------------------------------------------------------------===//
 
-SWIFT_BEGIN_ASSUME_NONNULL
+class BridgedSwiftVersion {
+  unsigned Major;
+  unsigned Minor;
 
-/// Create a new root 'null' JSON value. Clients must call \c JSON_value_delete
-/// after using it.
-void *JSON_newValue();
+public:
+  BridgedSwiftVersion() : Major(0), Minor(0) {}
 
-/// Parse \p data as a JSON data and return the top-level value. Clients must
-/// call \c JSON_value_delete after using it.
-void *JSON_deserializedValue(BridgedData data);
+  BRIDGED_INLINE
+  SWIFT_NAME("init(major:minor:)")
+  BridgedSwiftVersion(SwiftInt major, SwiftInt minor);
 
-/// Serialize a value and populate \p result with the result data. Clients
-/// must call \c BridgedData_free after using the \p result.
-void JSON_value_serialize(void *valuePtr, BridgedData *result);
+  unsigned getMajor() const { return Major; }
+  unsigned getMinor() const { return Minor; }
+};
 
-/// Destroy and release the memory for \p valuePtr that is a result from
-/// \c JSON_newValue() or \c JSON_deserializedValue() .
-void JSON_value_delete(void *valuePtr);
+//===----------------------------------------------------------------------===//
+// MARK: GeneratedSourceInfo
+//===----------------------------------------------------------------------===//
 
-bool JSON_value_getAsNull(void *valuePtr);
-bool JSON_value_getAsBoolean(void *valuePtr, bool *result);
-bool JSON_value_getAsString(void *valuePtr, BridgedData *result);
-bool JSON_value_getAsDouble(void *valuePtr, double *result);
-bool JSON_value_getAsInteger(void *valuePtr, int64_t *result);
-bool JSON_value_getAsObject(void *valuePtr, void *_Nullable *_Nonnull result);
-bool JSON_value_getAsArray(void *valuePtr, void *_Nullable *_Nonnull result);
+enum ENUM_EXTENSIBILITY_ATTR(closed) BridgedGeneratedSourceFileKind {
+#define MACRO_ROLE(Name, Description)                                          \
+  BridgedGeneratedSourceFileKind##Name##MacroExpansion,
+#include "swift/Basic/MacroRoles.def"
+#undef MACRO_ROLE
 
-size_t JSON_object_getSize(void *objectPtr);
-BridgedData JSON_object_getKey(void *objectPtr, size_t i);
-bool JSON_object_hasKey(void *objectPtr, const char *key);
-void *JSON_object_getValue(void *objectPtr, const char *key);
+  BridgedGeneratedSourceFileKindReplacedFunctionBody,
+  BridgedGeneratedSourceFileKindPrettyPrinted,
+  BridgedGeneratedSourceFileKindDefaultArgument,
+  BridgedGeneratedSourceFileKindAttribute,
 
-size_t JSON_array_getSize(void *arrayPtr);
-void *JSON_array_getValue(void *arrayPtr, size_t index);
+  BridgedGeneratedSourceFileKindNone,
+};
 
-void JSON_value_emplaceNull(void *valuePtr);
-void JSON_value_emplaceBoolean(void *valuePtr, bool value);
-void JSON_value_emplaceString(void *valuePtr, const char *value);
-void JSON_value_emplaceDouble(void *valuePtr, double value);
-void JSON_value_emplaceInteger(void *valuePtr, int64_t value);
-void *JSON_value_emplaceNewObject(void *valuePtr);
-void *JSON_value_emplaceNewArray(void *valuePtr);
+//===----------------------------------------------------------------------===//
+// MARK: VirtualFile
+//===----------------------------------------------------------------------===//
 
-void JSON_object_setNull(void *objectPtr, const char *key);
-void JSON_object_setBoolean(void *objectPtr, const char *key, bool value);
-void JSON_object_setString(void *objectPtr, const char *key, const char *value);
-void JSON_object_setDouble(void *objectPtr, const char *key, double value);
-void JSON_object_setInteger(void *objectPtr, const char *key, int64_t value);
-void *JSON_object_setNewObject(void *objectPtr, const char *key);
-void *JSON_object_setNewArray(void *objectPtr, const char *key);
-void *JSON_object_setNewValue(void *objectPtr, const char *key);
-
-void JSON_array_pushNull(void *arrayPtr);
-void JSON_array_pushBoolean(void *arrayPtr, bool value);
-void JSON_array_pushString(void *arrayPtr, const char *value);
-void JSON_array_pushDouble(void *arrayPtr, double value);
-void JSON_array_pushInteger(void *arrayPtr, int64_t value);
-void *JSON_array_pushNewObject(void *arrayPtr);
-void *JSON_array_pushNewArray(void *arrayPtr);
-void *JSON_array_pushNewValue(void *arrayPtr);
-
-SWIFT_END_ASSUME_NONNULL
+struct BridgedVirtualFile {
+  size_t StartPosition;
+  size_t EndPosition;
+  BridgedStringRef Name;
+  ptrdiff_t LineOffset;
+  size_t NamePosition;
+};
 
 SWIFT_END_NULLABILITY_ANNOTATIONS
 

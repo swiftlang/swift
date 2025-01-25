@@ -13,6 +13,7 @@
 #include "TypeChecker.h"
 #include "TypeCheckConcurrency.h"
 #include "swift/AST/ASTPrinter.h"
+#include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Stmt.h"
 #include "swift/AST/Expr.h"
@@ -188,8 +189,7 @@ DerivedConformance::storedPropertiesNotConformingToProtocol(
     if (!type)
       nonconformingProperties.push_back(propertyDecl);
 
-    if (!ModuleDecl::checkConformance(DC->mapTypeIntoContext(type),
-                                      protocol)) {
+    if (!checkConformance(DC->mapTypeIntoContext(type), protocol)) {
       nonconformingProperties.push_back(propertyDecl);
     }
   }
@@ -294,7 +294,7 @@ ValueDecl *DerivedConformance::getDerivableRequirement(NominalTypeDecl *nominal,
     auto proto = ctx.getProtocol(kind);
     if (!proto) return nullptr;
 
-    auto conformance = ModuleDecl::lookupConformance(
+    auto conformance = lookupConformance(
         nominal->getDeclaredInterfaceType(), proto);
     if (conformance) {
       auto DC = conformance.getConcrete()->getDeclContext();
@@ -834,8 +834,7 @@ DerivedConformance::associatedValuesNotConformingToProtocol(
 
     for (auto param : *PL) {
       auto type = param->getInterfaceType();
-      if (ModuleDecl::checkConformance(DC->mapTypeIntoContext(type),
-                                       protocol).isInvalid()) {
+      if (checkConformance(DC->mapTypeIntoContext(type), protocol).isInvalid()) {
         nonconformingAssociatedValues.push_back(param);
       }
     }
@@ -872,8 +871,8 @@ Pattern *DerivedConformance::enumElementPayloadSubpattern(
   if (!enumElementDecl->hasAssociatedValues())
     return nullptr;
 
-  auto argumentType = enumElementDecl->getArgumentInterfaceType();
-  if (auto tupleType = argumentType->getAs<TupleType>()) {
+  auto payloadType = enumElementDecl->getPayloadInterfaceType();
+  if (auto tupleType = payloadType->getAs<TupleType>()) {
     // Either multiple (labeled or unlabeled) arguments, or one labeled
     // argument. Return a tuple pattern that matches the enum element in arity,
     // types, and labels. For example:
@@ -910,8 +909,7 @@ Pattern *DerivedConformance::enumElementPayloadSubpattern(
   // Otherwise, a one-argument unlabeled payload. Return a paren pattern whose
   // underlying type is the same as the payload. For example:
   // case a(Int) => (let a0)
-  auto underlyingType = argumentType->getWithoutParens();
-  auto payloadVar = indexedVarDecl(varPrefix, 0, underlyingType, varContext);
+  auto payloadVar = indexedVarDecl(varPrefix, 0, payloadType, varContext);
   boundVars.push_back(payloadVar);
 
   auto namedPattern = new (C) NamedPattern(payloadVar);

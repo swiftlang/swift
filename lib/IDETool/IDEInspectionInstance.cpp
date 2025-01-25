@@ -200,7 +200,6 @@ bool IDEInspectionInstance::performCachedOperationIfPossible(
     return false;
 
   auto *oldSF = CachedCI->getIDEInspectionFile();
-  assert(oldSF->getBufferID());
 
   auto *oldState = oldSF->getDelayedParserState();
   assert(oldState->hasIDEInspectionDelayedDeclState());
@@ -208,7 +207,7 @@ bool IDEInspectionInstance::performCachedOperationIfPossible(
 
   auto &SM = CachedCI->getSourceMgr();
   auto bufferName = ideInspectionTargetBuffer->getBufferIdentifier();
-  if (SM.getIdentifierForBuffer(*oldSF->getBufferID()) != bufferName)
+  if (SM.getIdentifierForBuffer(oldSF->getBufferID()) != bufferName)
     return false;
 
   if (shouldCheckDependencies()) {
@@ -223,7 +222,7 @@ bool IDEInspectionInstance::performCachedOperationIfPossible(
     }
 
     if (areAnyDependentFilesInvalidated(
-            *CachedCI, *FileSystem, *oldSF->getBufferID(),
+            *CachedCI, *FileSystem, oldSF->getBufferID(),
             DependencyCheckedTimestamp, InMemoryDependencyHash))
       return false;
     DependencyCheckedTimestamp = std::chrono::system_clock::now();
@@ -242,9 +241,11 @@ bool IDEInspectionInstance::performCachedOperationIfPossible(
   ClangImporterOptions clangOpts;
   symbolgraphgen::SymbolGraphOptions symbolOpts;
   CASOptions casOpts;
+  SerializationOptions serializationOpts =
+      CachedCI->getASTContext().SerializationOpts;
   std::unique_ptr<ASTContext> tmpCtx(
       ASTContext::get(langOpts, typeckOpts, silOpts, searchPathOpts, clangOpts,
-                      symbolOpts, casOpts, tmpSM, tmpDiags));
+                      symbolOpts, casOpts, serializationOpts, tmpSM, tmpDiags));
   tmpCtx->CancellationFlag = CancellationFlag;
   registerParseRequestFunctions(tmpCtx->evaluator);
   registerIDERequestFunctions(tmpCtx->evaluator);
@@ -252,10 +253,9 @@ bool IDEInspectionInstance::performCachedOperationIfPossible(
   registerClangImporterRequestFunctions(tmpCtx->evaluator);
   registerConstExtractRequestFunctions(tmpCtx->evaluator);
   registerSILGenRequestFunctions(tmpCtx->evaluator);
-  ModuleDecl *tmpM = ModuleDecl::create(Identifier(), *tmpCtx);
+  ModuleDecl *tmpM = ModuleDecl::createEmpty(Identifier(), *tmpCtx);
   SourceFile *tmpSF = new (*tmpCtx)
       SourceFile(*tmpM, oldSF->Kind, tmpBufferID, oldSF->getParsingOptions());
-  tmpM->addAuxiliaryFile(*tmpSF);
 
   // FIXME: Since we don't setup module loaders on the temporary AST context,
   // 'canImport()' conditional compilation directive always fails. That causes
@@ -356,6 +356,7 @@ bool IDEInspectionInstance::performCachedOperationIfPossible(
           nullptr
         }
     );
+    SM.recordSourceFile(newBufferID, AFD->getParentSourceFile());
 
     AFD->setBodyToBeReparsed(newBodyRange);
     oldSF->clearScope();
@@ -388,18 +389,20 @@ bool IDEInspectionInstance::performCachedOperationIfPossible(
 
     // Create a new module and a source file using the current AST context.
     auto &Ctx = oldM->getASTContext();
-    auto *newM = ModuleDecl::createMainModule(Ctx, oldM->getName(),
-                                              oldM->getImplicitImportInfo());
+    auto *newM = ModuleDecl::createMainModule(
+        Ctx, oldM->getName(), oldM->getImplicitImportInfo(),
+        [&](ModuleDecl *newM, auto addFile) {
+      addFile(new (Ctx) SourceFile(*newM, SourceFileKind::Main, newBufferID,
+                                   oldSF->getParsingOptions()));
+    });
     newM->setABIName(oldM->getABIName());
-    auto *newSF = new (Ctx) SourceFile(*newM, SourceFileKind::Main, newBufferID,
-                                       oldSF->getParsingOptions());
-    newM->addFile(*newSF);
 
     // Tell the compiler instance we've replaced the main module.
     CachedCI->setMainModule(newM);
 
     // Re-process the whole file (parsing will be lazily triggered). Still
     // re-use imported modules.
+    auto *newSF = &newM->getMainSourceFile();
     performImportResolution(*newSF);
     bindExtensions(*newM);
 

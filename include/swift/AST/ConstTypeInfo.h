@@ -15,6 +15,7 @@
 
 #include "swift/AST/Attr.h"
 #include "swift/AST/Type.h"
+#include "swift/AST/TypeCheckRequests.h"
 #include <memory>
 #include <string>
 #include <vector>
@@ -39,8 +40,10 @@ public:
     Type,
     KeyPath,
     FunctionCall,
+    StaticFunctionCall,
     MemberReference,
     InterpolatedString,
+    NilLiteral,
     Runtime
   };
 
@@ -68,6 +71,22 @@ public:
 
 private:
   std::string Value;
+};
+
+/// A representation of an Optional<Wrapped> value declared as nil
+/// or left undeclared.
+///
+/// Nil values were previously represented as RawLiteralValue with
+/// value "nil". This caused ambiguous values when extracting values,
+/// such as an Optional<String> of value "nil".
+
+class NilLiteralValue : public CompileTimeValue {
+public:
+  NilLiteralValue() : CompileTimeValue(ValueKind::NilLiteral) {}
+
+  static bool classof(const CompileTimeValue *T) {
+    return T->getKind() == ValueKind::NilLiteral;
+  }
 };
 
 struct FunctionParameter {
@@ -198,6 +217,15 @@ public:
   class ConditionalMember : public BuilderMember {
   public:
     ConditionalMember(MemberKind MemberKind,
+                      std::vector<PlatformVersionConstraintAvailabilitySpec>
+                          AvailabilityAttributes,
+                      std::vector<std::shared_ptr<BuilderMember>> IfElements,
+                      std::vector<std::shared_ptr<BuilderMember>> ElseElements)
+        : BuilderMember(MemberKind),
+          AvailabilityAttributes(AvailabilityAttributes),
+          IfElements(IfElements), ElseElements(ElseElements) {}
+
+    ConditionalMember(MemberKind MemberKind,
                       std::vector<std::shared_ptr<BuilderMember>> IfElements,
                       std::vector<std::shared_ptr<BuilderMember>> ElseElements)
         : BuilderMember(MemberKind), IfElements(IfElements),
@@ -210,6 +238,10 @@ public:
              (Kind == MemberKind::Optional);
     }
 
+    std::optional<std::vector<PlatformVersionConstraintAvailabilitySpec>>
+    getAvailabilityAttributes() const {
+      return AvailabilityAttributes;
+    }
     std::vector<std::shared_ptr<BuilderMember>> getIfElements() const {
       return IfElements;
     }
@@ -218,6 +250,8 @@ public:
     }
 
   private:
+    std::optional<std::vector<PlatformVersionConstraintAvailabilitySpec>>
+        AvailabilityAttributes;
     std::vector<std::shared_ptr<BuilderMember>> IfElements;
     std::vector<std::shared_ptr<BuilderMember>> ElseElements;
   };
@@ -390,6 +424,30 @@ public:
 private:
   std::string Identifier;
   std::optional<std::vector<FunctionParameter>> Parameters;
+};
+
+/// A static function reference representation such as
+/// let foo = MyStruct.bar(item: "")
+/// let foo = MyStruct.bar()
+class StaticFunctionCallValue : public CompileTimeValue {
+public:
+  StaticFunctionCallValue(std::string Label, swift::Type Type,
+                          std::vector<FunctionParameter> Parameters)
+      : CompileTimeValue(ValueKind::StaticFunctionCall), Label(Label),
+        Type(Type), Parameters(Parameters) {}
+
+  static bool classof(const CompileTimeValue *T) {
+    return T->getKind() == ValueKind::StaticFunctionCall;
+  }
+
+  std::string getLabel() const { return Label; }
+  swift::Type getType() const { return Type; }
+  std::vector<FunctionParameter> getParameters() const { return Parameters; }
+
+private:
+  std::string Label;
+  swift::Type Type;
+  std::vector<FunctionParameter> Parameters;
 };
 
 /// A member reference representation such as

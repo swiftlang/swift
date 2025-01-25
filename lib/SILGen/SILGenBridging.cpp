@@ -18,6 +18,7 @@
 #include "SILGenFunction.h"
 #include "SILGenFunctionBuilder.h"
 #include "Scope.h"
+#include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/DiagnosticsSIL.h"
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/ForeignErrorConvention.h"
@@ -84,7 +85,7 @@ static bool shouldBridgeThroughError(SILGenModule &SGM, CanType type,
     }
   }
 
-  return (bool)ModuleDecl::lookupConformance(type, errorProtocol);
+  return (bool) lookupConformance(type, errorProtocol);
 }
 
 /// Bridge the given Swift value to its corresponding Objective-C
@@ -746,8 +747,7 @@ static ManagedValue emitNativeToCBridgedNonoptionalValue(SILGenFunction &SGF,
   // If the input argument is known to be an existential, save the runtime
   // some work by opening it.
   if (nativeType->isExistentialType()) {
-    auto openedType = OpenedArchetypeType::get(nativeType,
-                                               SGF.F.getGenericSignature());
+    auto openedType = OpenedArchetypeType::get(nativeType);
 
     FormalEvaluationScope scope(SGF);
 
@@ -2090,6 +2090,11 @@ void SILGenFunction::emitForeignToNativeThunk(SILDeclRef thunk) {
   if (nativeFnTy->isAsync()) {
     foreignAsync = fd->getForeignAsyncConvention();
     assert(foreignAsync && "couldn't find foreign async convention?!");
+
+    // We might switch to to the callee's actor as part of making the call,
+    // but we don't need to switch back afterwards because we're going to
+    // immediately return.
+    ExpectedExecutor.setUnnecessary();
   }
   std::optional<ForeignErrorConvention> foreignError;
   if (nativeFnTy->hasErrorResult()) {

@@ -15,6 +15,7 @@
 //
 //===----------------------------------------------------------------------===//
 #include "TypeChecker.h"
+#include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/GenericSignature.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/ProtocolConformance.h"
@@ -109,6 +110,14 @@ static bool shouldIgnoreScoreIncreaseForCodeCompletion(
   return false;
 }
 
+void ConstraintSystem::increaseScore(ScoreKind kind, unsigned value) {
+  unsigned index = static_cast<unsigned>(kind);
+  CurrentScore.Data[index] += value;
+
+  if (solverState && value > 0)
+    recordChange(SolverTrail::Change::IncreasedScore(kind, value));
+}
+
 void ConstraintSystem::increaseScore(ScoreKind kind,
                                      ConstraintLocatorBuilder Locator,
                                      unsigned value) {
@@ -134,8 +143,28 @@ void ConstraintSystem::increaseScore(ScoreKind kind,
     llvm::errs() << ")\n";
   }
 
-  unsigned index = static_cast<unsigned>(kind);
-  CurrentScore.Data[index] += value;
+  increaseScore(kind, value);
+}
+
+void ConstraintSystem::replayScore(const Score &score) {
+  if (solverState) {
+    for (unsigned i = 0; i < NumScoreKinds; ++i) {
+      if (unsigned value = score.Data[i])
+        recordChange(
+          SolverTrail::Change::IncreasedScore(ScoreKind(i), value));
+    }
+  }
+  CurrentScore += score;
+}
+
+void ConstraintSystem::clearScore() {
+  for (unsigned i = 0; i < NumScoreKinds; ++i) {
+    if (unsigned value = CurrentScore.Data[i]) {
+      recordChange(
+        SolverTrail::Change::DecreasedScore(ScoreKind(i), value));
+    }
+  }
+  CurrentScore = Score();
 }
 
 bool ConstraintSystem::worseThanBestSolution() const {
@@ -297,7 +326,7 @@ computeSelfTypeRelationship(DeclContext *dc, ValueDecl *decl1,
 
   // If the model type does not conform to the protocol, the bases are
   // unrelated.
-  auto conformance = ModuleDecl::lookupConformance(modelTy, proto);
+  auto conformance = lookupConformance(modelTy, proto);
   if (conformance.isInvalid())
     return {SelfTypeRelationship::Unrelated, conformance};
 
@@ -396,15 +425,18 @@ static bool isProtocolExtensionAsSpecializedAs(DeclContext *dc1,
   // Form a constraint system where we've opened up all of the requirements of
   // the second protocol extension.
   ConstraintSystem cs(dc1, std::nullopt);
-  OpenedTypeMap replacements;
+  SmallVector<OpenedType, 4> replacements;
   cs.openGeneric(dc2, sig2, ConstraintLocatorBuilder(nullptr), replacements);
 
   // Bind the 'Self' type from the first extension to the type parameter from
   // opening 'Self' of the second extension.
   Type selfType1 = sig1.getGenericParams()[0];
   Type selfType2 = sig2.getGenericParams()[0];
+  ASSERT(selfType1->isEqual(selfType2));
+  ASSERT(replacements[0].first->isEqual(selfType2));
+
   cs.addConstraint(ConstraintKind::Bind,
-                   replacements[cast<GenericTypeParamType>(selfType2->getCanonicalType())],
+                   replacements[0].second,
                    dc1->mapTypeIntoContext(selfType1),
                    nullptr);
 
@@ -549,7 +581,7 @@ bool CompareDeclSpecializationRequest::evaluate(
 
   auto openType = [&](ConstraintSystem &cs, DeclContext *innerDC,
                       DeclContext *outerDC, Type type,
-                      OpenedTypeMap &replacements,
+                      SmallVectorImpl<OpenedType> &replacements,
                       ConstraintLocator *locator) -> Type {
     if (auto *funcType = type->getAs<AnyFunctionType>()) {
       return cs.openFunctionType(funcType, locator, replacements, outerDC);
@@ -567,12 +599,11 @@ bool CompareDeclSpecializationRequest::evaluate(
   // FIXME: Locator when anchored on a declaration.
   // Get the type of a reference to the second declaration.
 
-  OpenedTypeMap unused, replacements;
-  auto openedType2 = openType(cs, innerDC1, outerDC2, type2, unused, locator);
-  auto openedType1 =
-      openType(cs, innerDC2, outerDC1, type1, replacements, locator);
+  SmallVector<OpenedType, 4> unused, replacements;
+  auto openedType2 = openType(cs, innerDC2, outerDC2, type2, unused, locator);
+  auto openedType1 = openType(cs, innerDC1, outerDC1, type1, replacements, locator);
 
-  for (const auto &replacement : replacements) {
+  for (auto replacement : replacements) {
     if (auto mapped = innerDC1->mapTypeIntoContext(replacement.first)) {
       cs.addConstraint(ConstraintKind::Bind, replacement.second, mapped,
                        locator);
@@ -811,10 +842,10 @@ Comparison TypeChecker::compareDeclarations(DeclContext *dc,
 }
 
 static Type getUnlabeledType(Type type, ASTContext &ctx) {
-  return type.transform([&](Type type) -> Type {
-    if (auto *tupleType = dyn_cast<TupleType>(type.getPointer())) {
+  return type.transformRec([&](TypeBase *type) -> std::optional<Type> {
+    if (auto *tupleType = dyn_cast<TupleType>(type)) {
       if (tupleType->getNumElements() == 1)
-        return ParenType::get(ctx, tupleType->getElementType(0));
+        return tupleType->getElementType(0);
 
       SmallVector<TupleTypeElt, 8> elts;
       for (auto elt : tupleType->getElements()) {
@@ -824,7 +855,7 @@ static Type getUnlabeledType(Type type, ASTContext &ctx) {
       return TupleType::get(elts, ctx);
     }
 
-    return type;
+    return std::nullopt;
   });
 }
 
@@ -962,7 +993,7 @@ SolutionCompareResult ConstraintSystem::compareSolutions(
              ? SolutionCompareResult::Better
              : SolutionCompareResult::Worse;
   }
-  
+
   // Compute relative score.
   unsigned score1 = 0;
   unsigned score2 = 0;
@@ -1319,6 +1350,9 @@ SolutionCompareResult ConstraintSystem::compareSolutions(
   const auto &bindings2 = solutions[idx2].typeBindings;
 
   for (const auto &binding1 : bindings1) {
+    if (!binding1.second)
+      continue;
+
     auto *typeVar = binding1.first;
     auto *loc = typeVar->getImpl().getLocator();
 
@@ -1342,6 +1376,9 @@ SolutionCompareResult ConstraintSystem::compareSolutions(
     // let's consider it.
     auto binding2 = bindings2.find(typeVar);
     if (binding2 == bindings2.end())
+      continue;
+
+    if (!binding2->second)
       continue;
 
     TypeBindingsToCompare typesToCompare(binding1.second, binding2->second);

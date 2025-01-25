@@ -1,5 +1,5 @@
-// RUN: %target-swift-frontend -module-name A -verify -emit-sil -import-objc-header %S/Inputs/Closure.h -enable-copy-propagation=false -disable-objc-attr-requires-foundation-module %s | %FileCheck %s
-// RUN: %target-swift-frontend -module-name A -verify -emit-sil -import-objc-header %S/Inputs/Closure.h -enable-copy-propagation=false -disable-objc-attr-requires-foundation-module -Xllvm -sil-disable-convert-escape-to-noescape-switch-peephole %s | %FileCheck %s --check-prefix=NOPEEPHOLE
+// RUN: %target-swift-frontend -module-name A -verify -Xllvm -sil-print-types -emit-sil -import-objc-header %S/Inputs/Closure.h -enable-copy-propagation=false -disable-objc-attr-requires-foundation-module %s | %FileCheck %s
+// RUN: %target-swift-frontend -module-name A -verify -Xllvm -sil-print-types -emit-sil -import-objc-header %S/Inputs/Closure.h -enable-copy-propagation=false -disable-objc-attr-requires-foundation-module -Xllvm -sil-disable-convert-escape-to-noescape-switch-peephole %s | %FileCheck %s --check-prefix=NOPEEPHOLE
 //
 // Using -enable-copy-propagation=false to pattern match against older SIL
 // output. At least until -enable-copy-propagation has been around

@@ -12,7 +12,7 @@
 
 import ASTBridging
 import SwiftDiagnostics
-import SwiftIfConfig
+@_spi(Compiler) import SwiftIfConfig
 import SwiftParser
 import SwiftSyntax
 
@@ -20,7 +20,12 @@ import SwiftSyntax
 /// queries.
 struct CompilerBuildConfiguration: BuildConfiguration {
   let ctx: BridgedASTContext
-  let conditionLoc: BridgedSourceLoc
+  let sourceBuffer: UnsafeBufferPointer<UInt8>
+
+  init(ctx: BridgedASTContext, sourceBuffer: UnsafeBufferPointer<UInt8>) {
+    self.ctx = ctx
+    self.sourceBuffer = sourceBuffer
+  }
 
   func isCustomConditionSet(name: String) throws -> Bool {
     var name = name
@@ -43,8 +48,11 @@ struct CompilerBuildConfiguration: BuildConfiguration {
     }
   }
   
-  func canImport(importPath: [String], version: CanImportVersion) throws -> Bool {
-    var importPathStr = importPath.joined(separator: ".")
+  func canImport(
+    importPath: [(TokenSyntax, String)],
+    version: CanImportVersion
+  ) throws -> Bool {
+    var importPathStr = importPath.map { $0.1 }.joined(separator: ".")
 
     var versionComponents: [Int]
     let cVersionKind: BridgedCanImportVersion
@@ -66,7 +74,10 @@ struct CompilerBuildConfiguration: BuildConfiguration {
       versionComponents.withUnsafeBufferPointer { versionComponentsBuf in
         ctx.canImport(
           importPath: bridgedImportPathStr,
-          location: conditionLoc,
+          location: BridgedSourceLoc(
+            at: importPath.first!.0.position,
+            in: sourceBuffer
+          ),
           versionKind: cVersionKind,
           versionComponents: versionComponentsBuf.baseAddress,
           numVersionComponents: versionComponentsBuf.count
@@ -98,6 +109,13 @@ struct CompilerBuildConfiguration: BuildConfiguration {
   
   func isActiveTargetRuntime(name: String) throws -> Bool {
     var name = name
+
+    // Complain if the provided runtime isn't one of the known values.
+    switch name {
+    case "_Native", "_ObjC", "_multithreaded": break
+    default: throw IfConfigError.unexpectedRuntimeCondition
+    }
+
     return name.withBridgedString { nameRef in
       ctx.langOptsIsActiveTargetRuntime(nameRef)
     }
@@ -118,7 +136,7 @@ struct CompilerBuildConfiguration: BuildConfiguration {
     var bitWidthsBuf: UnsafeMutablePointer<SwiftInt>? = nil
     let count = ctx.langOptsGetTargetAtomicBitWidths(&bitWidthsBuf)
     let bitWidths = Array(UnsafeMutableBufferPointer(start: bitWidthsBuf, count: count))
-    bitWidthsBuf?.deallocate()
+    deallocateIntBuffer(bitWidthsBuf);
     return bitWidths
   }
 
@@ -135,7 +153,7 @@ struct CompilerBuildConfiguration: BuildConfiguration {
     let version = VersionTuple(
       components: Array(UnsafeMutableBufferPointer(start: componentsBuf, count: count))
     )
-    componentsBuf?.deallocate()
+    deallocateIntBuffer(componentsBuf);
     return version
   }
 
@@ -145,8 +163,37 @@ struct CompilerBuildConfiguration: BuildConfiguration {
     let version = VersionTuple(
       components: Array(UnsafeMutableBufferPointer(start: componentsBuf, count: count))
     )
-    componentsBuf?.deallocate()
+    deallocateIntBuffer(componentsBuf);
     return version
+  }
+}
+
+enum IfConfigError: Error, CustomStringConvertible {
+  case unexpectedRuntimeCondition
+
+  var description: String {
+    switch self {
+      case .unexpectedRuntimeCondition:
+        return "unexpected argument for the '_runtime' condition; expected '_Native' or '_ObjC'"
+    }
+  }
+}
+
+extension ExportedSourceFile {
+  /// Return the configured regions for this source file.
+  mutating func configuredRegions(astContext: BridgedASTContext) -> ConfiguredRegions {
+    if let _configuredRegions {
+      return _configuredRegions
+    }
+
+    let configuration = CompilerBuildConfiguration(
+      ctx: astContext,
+      sourceBuffer: buffer
+    )
+
+    let regions = syntax.configuredRegions(in: configuration)
+    _configuredRegions = regions
+    return regions
   }
 }
 
@@ -154,15 +201,11 @@ struct CompilerBuildConfiguration: BuildConfiguration {
 @_cdecl("swift_ASTGen_configuredRegions")
 public func configuredRegions(
   astContext: BridgedASTContext,
-  sourceFilePtr: UnsafeRawPointer,
+  sourceFilePtr: UnsafeMutableRawPointer,
   cRegionsOut: UnsafeMutablePointer<UnsafeMutablePointer<BridgedIfConfigClauseRangeInfo>?>
 ) -> Int {
   let sourceFilePtr = sourceFilePtr.bindMemory(to: ExportedSourceFile.self, capacity: 1)
-  let configuration = CompilerBuildConfiguration(
-    ctx: astContext,
-    conditionLoc: sourceFilePtr.pointee.sourceLoc(at: AbsolutePosition(utf8Offset: 0))
-  )
-  let regions = sourceFilePtr.pointee.syntax.configuredRegions(in: configuration)
+  let regions = sourceFilePtr.pointee.configuredRegions(astContext: astContext)
 
   var cRegions: [BridgedIfConfigClauseRangeInfo] = []
 
@@ -289,4 +332,205 @@ public func freeConfiguredRegions(
   numRegions: Int
 ) {
   UnsafeMutableBufferPointer(start: regions, count: numRegions).deallocate()
+}
+
+/// Cache used when checking for inactive code that might contain a reference
+/// to specific names.
+private struct InactiveCodeContainsReferenceCache {
+  let syntax: SourceFileSyntax
+  let configuredRegions: ConfiguredRegions
+}
+
+/// Search in inactive/unparsed code to look for evidence that something that
+/// looks unused is actually used in some configurations.
+private enum InactiveCodeChecker {
+  case name(String)
+  case tryOrThrow
+
+  /// Search for the kind of entity in the given syntax node.
+  func search(syntax: SourceFileSyntax, configuredRegions: ConfiguredRegions) -> Bool {
+    // If there are no regions, everything is active. This is the common case.
+    if configuredRegions.isEmpty {
+      return false
+    }
+
+    for token in syntax.tokens(viewMode: .sourceAccurate) {
+      // Match what we're looking for, and continue iterating if it doesn't
+      // match.
+      switch self {
+      case .name(let name):
+        guard let identifier = token.identifier, identifier.name == name else {
+          continue
+        }
+
+        break
+
+      case .tryOrThrow:
+        guard let keywordKind = token.keywordKind,
+              keywordKind == .try || keywordKind == .throw else {
+          continue
+        }
+
+        break
+      }
+
+      // We matched what we were looking for, now check whether it is in an
+      // inactive or unparsed region.
+      if configuredRegions.isActive(token) != .active {
+        // Found it in a non-active region.
+        return true
+      }
+    }
+
+    return false
+  }
+}
+
+/// Determine whether the inactive code within the given search range
+/// contains a token referring to the given name.
+@_cdecl("swift_ASTGen_inactiveCodeContainsReference")
+public func inactiveCodeContainsReference(
+  astContext: BridgedASTContext,
+  sourceFileBuffer: BridgedStringRef,
+  searchRange: BridgedStringRef,
+  bridgedName: BridgedStringRef,
+  untypedCachePtr: UnsafeMutablePointer<UnsafeMutableRawPointer?>
+) -> Bool {
+  let syntax: SourceFileSyntax
+  let configuredRegions: ConfiguredRegions
+  if let untypedCachePtr = untypedCachePtr.pointee {
+    // Use the cache.
+    let cache = untypedCachePtr.assumingMemoryBound(to: InactiveCodeContainsReferenceCache.self)
+    syntax = cache.pointee.syntax
+    configuredRegions = cache.pointee.configuredRegions
+  } else {
+    // Parse the region.
+
+    // FIXME: Use 'ExportedSourceFile' when C++ parser is replaced.
+    let searchRangeBuffer = UnsafeBufferPointer<UInt8>(start: searchRange.data, count: searchRange.count)
+    syntax = Parser.parse(source: searchRangeBuffer)
+
+    // Compute the configured regions within the search range.
+    let configuration = CompilerBuildConfiguration(
+      ctx: astContext,
+      sourceBuffer: searchRangeBuffer
+    )
+    configuredRegions = syntax.configuredRegions(in: configuration)
+
+    let cache = UnsafeMutablePointer<InactiveCodeContainsReferenceCache>.allocate(capacity: 1)
+    cache.initialize(to: .init(syntax: syntax, configuredRegions: configuredRegions))
+
+    untypedCachePtr.pointee = .init(cache)
+  }
+
+  return InactiveCodeChecker.name(String(bridged: bridgedName))
+    .search(syntax: syntax, configuredRegions: configuredRegions)
+}
+
+@_cdecl("swift_ASTGen_inactiveCodeContainsTryOrThrow")
+public func inactiveCodeContainsTryOrThrow(
+  astContext: BridgedASTContext,
+  sourceFileBuffer: BridgedStringRef,
+  searchRange: BridgedStringRef
+) -> Bool {
+  // Parse the region.
+
+  // FIXME: Use 'ExportedSourceFile' when C++ parser is replaced.
+  let searchRangeBuffer = UnsafeBufferPointer<UInt8>(start: searchRange.data, count: searchRange.count)
+  let syntax = Parser.parse(source: searchRangeBuffer)
+
+  // Compute the configured regions within the search range.
+  let configuration = CompilerBuildConfiguration(
+    ctx: astContext,
+    sourceBuffer: searchRangeBuffer
+  )
+  let configuredRegions = syntax.configuredRegions(in: configuration)
+
+  return InactiveCodeChecker.tryOrThrow
+    .search(syntax: syntax, configuredRegions: configuredRegions)
+}
+
+@_cdecl("swift_ASTGen_freeInactiveCodeContainsReferenceCache")
+public func freeInactiveCodeContainsReferenceCache(pointer: UnsafeMutableRawPointer?) {
+  guard let pointer else {
+    return
+  }
+
+  let cache = pointer.assumingMemoryBound(to: InactiveCodeContainsReferenceCache.self)
+  cache.deinitialize(count: 1)
+  cache.deallocate()
+}
+
+/// Evaluate the #if condition at ifClauseLocationPtr.
+@_cdecl("swift_ASTGen_evaluatePoundIfCondition")
+public func evaluatePoundIfCondition(
+  astContext: BridgedASTContext,
+  diagEnginePtr: UnsafeMutableRawPointer,
+  sourceFileBuffer: BridgedStringRef,
+  ifConditionText: BridgedStringRef,
+  shouldEvaluate: Bool
+) -> Int {
+  // Retrieve the #if condition that we're evaluating here.
+  // FIXME: Use 'ExportedSourceFile' when C++ parser is replaced.
+  let textBuffer = UnsafeBufferPointer<UInt8>(start: ifConditionText.data, count: ifConditionText.count)
+  var parser = Parser(textBuffer)
+  let conditionExpr = ExprSyntax.parse(from: &parser)
+
+  let isActive: Bool
+  let syntaxErrorsAllowed: Bool
+  let diagnostics: [Diagnostic]
+  if shouldEvaluate {
+    // Evaluate the condition against the compiler's build configuration.
+    let configuration = CompilerBuildConfiguration(
+      ctx: astContext,
+      sourceBuffer: textBuffer
+    )
+
+    let state: IfConfigRegionState
+    (state, syntaxErrorsAllowed, diagnostics) = IfConfigRegionState.evaluating(conditionExpr, in: configuration)
+    isActive = (state == .active)
+  } else {
+    // Don't evaluate the condition, because we know it's inactive. Determine
+    // whether syntax errors are permitted within this region according to the
+    // condition.
+    isActive = false
+    (syntaxErrorsAllowed, diagnostics) = IfConfigClauseSyntax.syntaxErrorsAllowed(conditionExpr)
+  }
+
+  // Render the diagnostics.
+  for diagnostic in diagnostics {
+    emitDiagnostic(
+      diagnosticEngine: BridgedDiagnosticEngine(raw: diagEnginePtr),
+      sourceFileBuffer: UnsafeBufferPointer(start: sourceFileBuffer.data, count: sourceFileBuffer.count),
+      sourceFileBufferOffset: ifConditionText.data! - sourceFileBuffer.data!,
+      diagnostic: diagnostic,
+      diagnosticSeverity: diagnostic.diagMessage.severity
+    )
+  }
+
+  return (isActive ? 0x1 : 0) | (syntaxErrorsAllowed ? 0x2 : 0)
+}
+
+@_cdecl("swift_ASTGen_extractInlinableText")
+public func extractInlinableText(
+  astContext: BridgedASTContext,
+  sourceText: BridgedStringRef
+) -> BridgedStringRef {
+  let textBuffer = UnsafeBufferPointer<UInt8>(start: sourceText.data, count: sourceText.count)
+  var parser = Parser(textBuffer)
+  let syntax = SourceFileSyntax.parse(from: &parser)
+
+  let configuration = CompilerBuildConfiguration(
+    ctx: astContext,
+    sourceBuffer: textBuffer
+  )
+
+  // Remove any inactive #if regions.
+  let syntaxWithoutInactive = syntax.removingInactive(
+    in: configuration,
+    retainFeatureCheckIfConfigs: true
+  ).result
+
+  // Remove comments and return the result.
+  return allocateBridgedString(syntaxWithoutInactive.descriptionWithoutCommentsAndSourceLocations)
 }

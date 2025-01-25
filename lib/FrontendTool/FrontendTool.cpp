@@ -24,6 +24,7 @@
 #include "Dependencies.h"
 #include "TBD.h"
 #include "swift/AST/ASTMangler.h"
+#include "swift/AST/AvailabilityScope.h"
 #include "swift/AST/DiagnosticsFrontend.h"
 #include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/FileSystem.h"
@@ -34,7 +35,6 @@
 #include "swift/AST/IRGenRequests.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/TBDGenRequests.h"
-#include "swift/AST/TypeRefinementContext.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/Edit.h"
@@ -54,6 +54,7 @@
 #include "swift/Frontend/CompileJobCacheKey.h"
 #include "swift/Frontend/DiagnosticHelper.h"
 #include "swift/Frontend/Frontend.h"
+#include "swift/Frontend/MakeStyleDependencies.h"
 #include "swift/Frontend/ModuleInterfaceLoader.h"
 #include "swift/Frontend/ModuleInterfaceSupport.h"
 #include "swift/IRGen/TBDGen.h"
@@ -81,6 +82,7 @@
 #include "llvm/IRReader/IRReader.h"
 #include "llvm/Option/OptTable.h"
 #include "llvm/Option/Option.h"
+#include "llvm/Support/Compression.h"
 #include "llvm/Support/Error.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/FileSystem.h"
@@ -107,15 +109,13 @@ static std::string displayName(StringRef MainExecutablePath) {
   return Name;
 }
 
-static void emitMakeDependenciesIfNeeded(DiagnosticEngine &diags,
-                                         DependencyTracker *depTracker,
-                                         const FrontendOptions &opts,
-                                         llvm::vfs::OutputBackend &backend) {
-  opts.InputsAndOutputs.forEachInputProducingSupplementaryOutput(
-      [&](const InputFile &f) -> bool {
-        return swift::emitMakeDependenciesIfNeeded(diags, depTracker, opts, f,
-                                                   backend);
-      });
+static void emitMakeDependenciesIfNeeded(CompilerInstance &instance) {
+  instance.getInvocation()
+      .getFrontendOptions()
+      .InputsAndOutputs.forEachInputProducingSupplementaryOutput(
+          [&](const InputFile &f) -> bool {
+            return swift::emitMakeDependenciesIfNeeded(instance, f);
+          });
 }
 
 static void
@@ -238,11 +238,8 @@ static void countStatsOfSourceFile(UnifiedStatsReporter &Stats,
   SF->getPrecedenceGroups(groups);
   C.NumPrecedenceGroups += groups.size();
 
-  auto bufID = SF->getBufferID();
-  if (bufID.has_value()) {
-    C.NumSourceLines +=
-      SM.getEntireTextForBuffer(bufID.value()).count('\n');
-  }
+  C.NumSourceLines +=
+    SM.getEntireTextForBuffer(SF->getBufferID()).count('\n');
 }
 
 static void countASTStats(UnifiedStatsReporter &Stats,
@@ -467,6 +464,28 @@ getPrimaryOrMainSourceFile(const CompilerInstance &Instance) {
 /// Dumps the AST of all available primary source files. If corresponding output
 /// files were specified, use them; otherwise, dump the AST to stdout.
 static bool dumpAST(CompilerInstance &Instance) {
+  const FrontendOptions &opts = Instance.getInvocation().getFrontendOptions();
+  auto dumpAST = [&](SourceFile *SF, raw_ostream &out) {
+    switch (opts.DumpASTFormat) {
+    case FrontendOptions::ASTFormat::Default:
+      SF->dump(out, /*parseIfNeeded*/ true);
+      break;
+    case FrontendOptions::ASTFormat::JSON:
+      SF->dumpJSON(out);
+      break;
+    case FrontendOptions::ASTFormat::JSONZlib:
+      std::string jsonText;
+      llvm::raw_string_ostream jsonTextStream(jsonText);
+      SF->dumpJSON(jsonTextStream);
+
+      SmallVector<uint8_t, 0> compressed;
+      llvm::compression::zlib::compress(llvm::arrayRefFromStringRef(jsonText),
+                                        compressed);
+      out << llvm::toStringRef(compressed);
+      break;
+    }
+  };
+
   auto primaryFiles = Instance.getPrimarySourceFiles();
   if (!primaryFiles.empty()) {
     for (SourceFile *sourceFile: primaryFiles) {
@@ -475,7 +494,7 @@ static bool dumpAST(CompilerInstance &Instance) {
       if (withOutputPath(Instance.getASTContext().Diags,
                          Instance.getOutputBackend(), OutputFilename,
                          [&](raw_ostream &out) -> bool {
-                           sourceFile->dump(out, /*parseIfNeeded*/ true);
+                           dumpAST(sourceFile, out);
                            return false;
                          }))
         return true;
@@ -484,7 +503,7 @@ static bool dumpAST(CompilerInstance &Instance) {
     // Some invocations don't have primary files. In that case, we default to
     // looking for the main file and dumping it to `stdout`.
     auto &SF = getPrimaryOrMainSourceFile(Instance);
-    SF.dump(llvm::outs(), /*parseIfNeeded*/ true);
+    dumpAST(&SF, llvm::outs());
   }
   return Instance.getASTContext().hadError();
 }
@@ -916,7 +935,7 @@ static void dumpAPIIfNeeded(const CompilerInstance &Instance) {
     PO.PrintOriginalSourceText = true;
     PO.Indent = 2;
     PO.PrintAccess = false;
-    PO.SkipUnderscoredStdlibProtocols = true;
+    PO.SkipUnderscoredSystemProtocols = true;
     SF->print(TempOS, PO);
     if (TempOS.str().trim().empty())
       return false; // nothing to show.
@@ -1005,6 +1024,7 @@ static void performEndOfPipelineActions(CompilerInstance &Instance) {
         Instance.getMainModule(), Instance.getDependencyTracker(), opts);
 
     dumpAPIIfNeeded(Instance);
+    swift::emitFineModuleTraceIfNeeded(Instance, opts);
   }
 
   // Contains the hadError checks internally, we still want to output the
@@ -1059,9 +1079,7 @@ static void performEndOfPipelineActions(CompilerInstance &Instance) {
   emitSwiftdepsForAllPrimaryInputsIfNeeded(Instance);
 
   // Emit Make-style dependencies.
-  emitMakeDependenciesIfNeeded(Instance.getDiags(),
-                               Instance.getDependencyTracker(), opts,
-                               Instance.getOutputBackend());
+  emitMakeDependenciesIfNeeded(Instance);
 
   // Emit extracted constant values for every file in the batch
   emitConstValuesForAllPrimaryInputsIfNeeded(Instance);
@@ -1081,8 +1099,8 @@ static void printSingleFrontendOpt(llvm::opt::OptTable &table, options::ID id,
   if (table.getOption(id).hasFlag(options::FrontendOption) ||
       table.getOption(id).hasFlag(options::AutolinkExtractOption) ||
       table.getOption(id).hasFlag(options::ModuleWrapOption) ||
-      table.getOption(id).hasFlag(options::SwiftIndentOption) ||
       table.getOption(id).hasFlag(options::SwiftSymbolGraphExtractOption) ||
+      table.getOption(id).hasFlag(options::SwiftSynthesizeInterfaceOption) ||
       table.getOption(id).hasFlag(options::SwiftAPIDigesterOption)) {
     auto name = StringRef(table.getOptionName(id));
     if (!name.empty()) {
@@ -1112,9 +1130,9 @@ static bool printSwiftFeature(CompilerInstance &instance) {
     out << "}\n";
   };
   out << "  \"SupportedArguments\": [\n";
-#define OPTION(PREFIX, NAME, ID, KIND, GROUP, ALIAS, ALIASARGS, FLAGS, PARAM,  \
-               HELPTEXT, METAVAR, VALUES)                                      \
-  printSingleFrontendOpt(*table, swift::options::OPT_##ID, out);
+#define OPTION(...)                                                            \
+  printSingleFrontendOpt(*table,                                               \
+                         swift::options::LLVM_MAKE_OPT_ID(__VA_ARGS__), out);
 #include "swift/Option/Options.inc"
 #undef OPTION
   out << "    \"LastOption\"\n";
@@ -1240,10 +1258,10 @@ static bool performAction(CompilerInstance &Instance,
           return dumpAndPrintScopeMap(Instance,
                                       getPrimaryOrMainSourceFile(Instance));
         }, /*runDespiteErrors=*/true);
-  case FrontendOptions::ActionType::DumpTypeRefinementContexts:
+  case FrontendOptions::ActionType::DumpAvailabilityScopes:
     return withSemanticAnalysis(
         Instance, observer, [](CompilerInstance &Instance) {
-          getPrimaryOrMainSourceFile(Instance).getTypeRefinementContext()->dump(
+          getPrimaryOrMainSourceFile(Instance).getAvailabilityScope()->dump(
               llvm::errs(), Instance.getASTContext().SourceMgr);
           return Instance.getASTContext().hadError();
         }, /*runDespiteErrors=*/true);
@@ -1284,6 +1302,7 @@ static bool performAction(CompilerInstance &Instance,
   case FrontendOptions::ActionType::EmitSILGen:
   case FrontendOptions::ActionType::EmitSIBGen:
   case FrontendOptions::ActionType::EmitSIL:
+  case FrontendOptions::ActionType::EmitLoweredSIL:
   case FrontendOptions::ActionType::EmitSIB:
   case FrontendOptions::ActionType::EmitModuleOnly:
   case FrontendOptions::ActionType::MergeModules:
@@ -1326,7 +1345,7 @@ static bool tryReplayCompilerResults(CompilerInstance &Instance) {
   bool replayed = replayCachedCompilerOutputs(
       Instance.getObjectStore(), Instance.getActionCache(),
       *Instance.getCompilerBaseKey(), Instance.getDiags(),
-      Instance.getInvocation().getFrontendOptions().InputsAndOutputs, *CDP,
+      Instance.getInvocation().getFrontendOptions(), *CDP,
       Instance.getInvocation().getCASOptions().EnableCachingRemarks,
       Instance.getInvocation().getIRGenOptions().UseCASBackend);
 
@@ -1511,7 +1530,7 @@ static bool validateTBDIfNeeded(const CompilerInvocation &Invocation,
 #endif
     }
 
-    
+
     return true;
   }();
 
@@ -1643,6 +1662,13 @@ static bool performCompileStepsPostSILGen(CompilerInstance &Instance,
     return writeSIL(*SM, PSPs, Instance, Invocation.getSILOptions());
   }
 
+  // In lazy typechecking mode, SILGen may have triggered requests which
+  // resulted in errors. We don't want to proceed with optimization or
+  // serialization if there were errors since the SIL may be incomplete or
+  // invalid.
+  if (Context.TypeCheckerOpts.EnableLazyTypecheck && Context.hadError())
+    return true;
+
   if (Action == FrontendOptions::ActionType::EmitSIBGen) {
     serializeSIB(SM.get(), PSPs, Context, MSF);
     return Context.hadError();
@@ -1745,6 +1771,10 @@ static bool performCompileStepsPostSILGen(CompilerInstance &Instance,
     return !opts.AllowModuleWithCompilerErrors;
 
   runSILLoweringPasses(*SM);
+
+  // If we are asked to emit lowered SIL, dump it now and return.
+  if (Action == FrontendOptions::ActionType::EmitLoweredSIL)
+    return writeSIL(*SM, PSPs, Instance, Invocation.getSILOptions());
 
   // Cancellation check after SILLowering.
   if (Instance.isCancellationRequested())
@@ -1894,7 +1924,9 @@ int swift::performFrontend(ArrayRef<const char *> Args,
   std::unique_ptr<CompilerInstance> Instance =
     std::make_unique<CompilerInstance>();
 
-  DiagnosticHelper DH = DiagnosticHelper::create(*Instance);
+  CompilerInvocation Invocation;
+
+  DiagnosticHelper DH = DiagnosticHelper::create(*Instance, Invocation, Args);
 
   // Hopefully we won't trigger any LLVM-level fatal errors, but if we do try
   // to route them through our usual textual diagnostics before crashing.
@@ -1939,8 +1971,6 @@ int swift::performFrontend(ArrayRef<const char *> Args,
     return finishDiagProcessing(1, /*verifierEnabled*/ false);
   }
 
-  CompilerInvocation Invocation;
-
   SmallString<128> workingDirectory;
   llvm::sys::fs::current_path(workingDirectory);
 
@@ -1963,7 +1993,7 @@ int swift::performFrontend(ArrayRef<const char *> Args,
       FrontendOptions::ActionType::Immediate) {
     llvm::setBugReportMsg(nullptr);
   }
-  
+
   PrettyStackTraceFrontend frontendTrace(Invocation);
 
   // Make an array of PrettyStackTrace objects to dump the configuration files
@@ -1979,12 +2009,18 @@ int swift::performFrontend(ArrayRef<const char *> Args,
   auto configurationFileStackTraces =
       std::make_unique<std::optional<PrettyStackTraceFileContents>[]>(
           configurationFileBuffers.size());
-  for_each(configurationFileBuffers.begin(), configurationFileBuffers.end(),
-           &configurationFileStackTraces[0],
-           [](const std::unique_ptr<llvm::MemoryBuffer> &buffer,
-              std::optional<PrettyStackTraceFileContents> &trace) {
-             trace.emplace(*buffer);
-           });
+
+  // If the compile is a whole module job, then the contents of the filelist
+  // is every file in the module, which is not very interesting and could be
+  // hundreds or thousands of lines. Skip dumping this output in that case.
+  if (!Invocation.getFrontendOptions().InputsAndOutputs.isWholeModule()) {
+    for_each(configurationFileBuffers.begin(), configurationFileBuffers.end(),
+             configurationFileStackTraces.get(),
+             [](const std::unique_ptr<llvm::MemoryBuffer> &buffer,
+                std::optional<PrettyStackTraceFileContents> &trace) {
+               trace.emplace(*buffer);
+             });
+  }
 
   // The compiler invocation is now fully configured; notify our observer.
   if (observer) {
@@ -2016,13 +2052,11 @@ int swift::performFrontend(ArrayRef<const char *> Args,
     return finishDiagProcessing(1, /*verifierEnabled*/ false);
   }
 
-  DH.initDiagConsumers(Invocation);
-
   if (Invocation.getFrontendOptions().PrintStats) {
     llvm::EnableStatistics();
   }
 
-  DH.beginMessage(Invocation, Args);
+  DH.beginMessage();
 
   const DiagnosticOptions &diagOpts = Invocation.getDiagnosticOptions();
   bool verifierEnabled = diagOpts.VerifyMode != DiagnosticOptions::NoVerify;

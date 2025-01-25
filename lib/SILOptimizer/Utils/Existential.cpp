@@ -11,7 +11,8 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/SILOptimizer/Utils/Existential.h"
-#include "swift/AST/Module.h"
+#include "swift/AST/ConformanceLookup.h"
+#include "swift/AST/LocalArchetypeRequirementCollector.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/SIL/BasicBlockUtils.h"
@@ -118,11 +119,6 @@ static SILInstruction *getStackInitInst(SILValue allocStackAddr,
         if (SingleWrite)
           return nullptr;
         SingleWrite = store;
-        // When we support OSSA here, we need to insert a new copy of the value
-        // before `store` (and make sure that the copy is destroyed when
-        // replacing the apply operand).
-        assert(store->getOwnershipQualifier() ==
-               StoreOwnershipQualifier::Unqualified);
       }
       continue;
     }
@@ -250,15 +246,20 @@ void ConcreteExistentialInfo::initializeSubstitutionMap(
   // Construct a single-generic-parameter substitution map directly to the
   // ConcreteType with this existential's full list of conformances.
   //
-  // NOTE: getOpenedExistentialSignature() generates the signature for passing an
+  // NOTE: LocalArchetypeRequirementCollector generates the signature for passing an
   // opened existential as a generic parameter. No opened archetypes are
   // actually involved here--the API is only used as a convenient way to create
   // a substitution map. Since opened archetypes have different conformances
   // than their corresponding existential, ExistentialConformances needs to be
   // filtered when using it with this (phony) generic signature.
-  CanGenericSignature ExistentialSig =
-      M->getASTContext().getOpenedExistentialSignature(ExistentialType,
-                                                       GenericSignature());
+
+  auto &ctx = M->getASTContext();
+  LocalArchetypeRequirementCollector collector(ctx, CanGenericSignature());
+  collector.addOpenedExistential(ExistentialType);
+  auto ExistentialSig = buildGenericSignature(
+      ctx, collector.OuterSig, collector.Params, collector.Requirements,
+      /*allowInverses=*/true).getCanonicalSignature();
+
   ExistentialSubs = SubstitutionMap::get(
       ExistentialSig, [&](SubstitutableType *type) { return ConcreteType; },
       [&](CanType /*depType*/, Type /*replaceType*/,
@@ -389,8 +390,7 @@ ConcreteExistentialInfo::ConcreteExistentialInfo(SILValue existential,
   SILModule *M = existential->getModule();
 
   // We have the open_existential; we still need the conformance.
-  auto ConformanceRef =
-      ModuleDecl::checkConformance(ConcreteTypeCandidate, Protocol);
+  auto ConformanceRef = checkConformance(ConcreteTypeCandidate, Protocol);
   if (ConformanceRef.isInvalid())
     return;
 

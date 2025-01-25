@@ -1088,7 +1088,8 @@ namespace {
 
       SmallVector<ProtocolConformanceRef, 2> conformances;
       for (auto proto : OpenedArchetype->getConformsTo())
-        conformances.push_back(ProtocolConformanceRef(proto));
+        conformances.push_back(ProtocolConformanceRef::forAbstract(
+          OpenedArchetype, proto));
 
       SILValue ref;
       if (base.getType().is<ExistentialMetatypeType>()) {
@@ -2227,7 +2228,7 @@ namespace {
       auto decl = cast<AccessorDecl>(Accessor.getFuncDecl());
 
       // 'modify' always returns an address of the right type.
-      if (decl->getAccessorKind() == AccessorKind::Modify) {
+      if (isYieldingMutableAccessor(decl->getAccessorKind())) {
         assert(yields.size() == 1);
         return yields[0];
       }
@@ -3070,7 +3071,8 @@ public:
     auto accessSemantics = e->getAccessSemantics();
     AccessStrategy strategy = var->getAccessStrategy(
         accessSemantics, getFormalAccessKind(accessKind),
-        SGF.SGM.M.getSwiftModule(), SGF.F.getResilienceExpansion());
+        SGF.SGM.M.getSwiftModule(), SGF.F.getResilienceExpansion(),
+        /*useOldABI=*/false);
 
     auto baseFormalType = getBaseFormalType(e->getBase());
     LValue lv = visit(
@@ -3252,7 +3254,9 @@ namespace {
       }
 
       case AccessorKind::Read:
-      case AccessorKind::Modify: {
+      case AccessorKind::Read2:
+      case AccessorKind::Modify:
+      case AccessorKind::Modify2: {
         auto typeData =
             getPhysicalStorageTypeData(SGF.getTypeExpansionContext(), SGF.SGM,
                                        AccessKind, Storage, Subs,
@@ -3290,9 +3294,9 @@ static LValue emitLValueForNonMemberVarDecl(
     subs = SGF.F.getForwardingSubstitutionMap();
 
   auto access = getFormalAccessKind(accessKind);
-  auto strategy =
-      var->getAccessStrategy(semantics, access, SGF.SGM.M.getSwiftModule(),
-                             SGF.F.getResilienceExpansion());
+  auto strategy = var->getAccessStrategy(
+      semantics, access, SGF.SGM.M.getSwiftModule(),
+      SGF.F.getResilienceExpansion(), /*useOldABI=*/false);
 
   lv.addNonMemberVarComponent(SGF, loc, var, subs, options, accessKind,
                               strategy, formalRValueType, actorIso);
@@ -3885,6 +3889,25 @@ static bool isCurrentFunctionAccessor(SILGenFunction &SGF,
          contextAccessorDecl->getAccessorKind() == accessorKind;
 }
 
+static bool isSynthesizedDefaultImplementionatThunk(SILGenFunction &SGF) {
+  if (!SGF.FunctionDC)
+    return false;
+
+  auto *decl = SGF.FunctionDC->getAsDecl();
+  if (!decl)
+    return false;
+
+  auto *dc = decl->getDeclContext();
+  if (!dc)
+    return false;
+
+  auto *proto = dyn_cast<ProtocolDecl>(dc);
+  if (!proto)
+    return false;
+
+  return true;
+}
+
 LValue SILGenLValue::visitMemberRefExpr(MemberRefExpr *e,
                                         SGFAccessKind accessKind,
                                         LValueOptions options) {
@@ -3906,11 +3929,10 @@ LValue SILGenLValue::visitMemberRefExpr(MemberRefExpr *e,
   }
 
   auto accessSemantics = e->getAccessSemantics();
-  AccessStrategy strategy =
-    var->getAccessStrategy(accessSemantics,
-                           getFormalAccessKind(accessKind),
-                           SGF.SGM.M.getSwiftModule(),
-                           SGF.F.getResilienceExpansion());
+  AccessStrategy strategy = var->getAccessStrategy(
+      accessSemantics, getFormalAccessKind(accessKind),
+      SGF.SGM.M.getSwiftModule(), SGF.F.getResilienceExpansion(),
+      /*useOldABI=*/isSynthesizedDefaultImplementionatThunk(SGF));
 
   bool isOnSelfParameter = isCallToSelfOfCurrentFunction(SGF, e);
 
@@ -3929,10 +3951,9 @@ LValue SILGenLValue::visitMemberRefExpr(MemberRefExpr *e,
             SGF, readAccessor.getAbstractFunctionDecl(), isObjC)) {
       accessSemantics = AccessSemantics::DirectToImplementation;
       strategy = var->getAccessStrategy(
-          accessSemantics,
-          getFormalAccessKind(accessKind),
-          SGF.SGM.M.getSwiftModule(),
-          SGF.F.getResilienceExpansion());
+          accessSemantics, getFormalAccessKind(accessKind),
+          SGF.SGM.M.getSwiftModule(), SGF.F.getResilienceExpansion(),
+          /*useOldABI=*/false);
     }
   }
   
@@ -4117,11 +4138,10 @@ LValue SILGenLValue::visitSubscriptExpr(SubscriptExpr *e,
 
 
   auto accessSemantics = e->getAccessSemantics();
-  auto strategy =
-    decl->getAccessStrategy(accessSemantics,
-                            getFormalAccessKind(accessKind),
-                            SGF.SGM.M.getSwiftModule(),
-                            SGF.F.getResilienceExpansion());
+  auto strategy = decl->getAccessStrategy(
+      accessSemantics, getFormalAccessKind(accessKind),
+      SGF.SGM.M.getSwiftModule(), SGF.F.getResilienceExpansion(),
+      /*useOldABI=*/isSynthesizedDefaultImplementionatThunk(SGF));
 
   bool isOnSelfParameter = isCallToSelfOfCurrentFunction(SGF, e);
   bool isContextRead = isCurrentFunctionAccessor(SGF, AccessorKind::Read);
@@ -4139,10 +4159,9 @@ LValue SILGenLValue::visitSubscriptExpr(SubscriptExpr *e,
             SGF, readAccessor.getAbstractFunctionDecl(), isObjC)) {
       accessSemantics = AccessSemantics::DirectToImplementation;
       strategy = decl->getAccessStrategy(
-          accessSemantics,
-          getFormalAccessKind(accessKind),
-          SGF.SGM.M.getSwiftModule(),
-          SGF.F.getResilienceExpansion());
+          accessSemantics, getFormalAccessKind(accessKind),
+          SGF.SGM.M.getSwiftModule(), SGF.F.getResilienceExpansion(),
+          /*useOldABI=*/false);
     }
   }
 
@@ -4564,10 +4583,19 @@ LValue SILGenLValue::visitABISafeConversionExpr(ABISafeConversionExpr *e,
                                     LValueOptions options) {
   LValue lval = visitRec(e->getSubExpr(), accessKind, options);
   auto typeData = getValueTypeData(SGF, accessKind, e);
+  auto subExprType = e->getSubExpr()->getType()->getRValueType();
+  auto loweredSubExprType = SGF.getLoweredType(subExprType);
+  
+  // Ensure the lvalue is re-abstracted to the substituted type, since that's
+  // the type with which we have ABI compatibility.
+  if (lval.getTypeOfRValue().getASTType() != loweredSubExprType.getASTType()) {
+    // Logical components always re-abstract back to the substituted
+    // type.
+    ASSERT(lval.isLastComponentPhysical());
+    lval.addOrigToSubstComponent(loweredSubExprType);
+  }
 
-  auto OrigType = e->getSubExpr()->getType();
-
-  lval.add<UncheckedConversionComponent>(typeData, OrigType);
+  lval.add<UncheckedConversionComponent>(typeData, subExprType);
 
   return lval;
 }
@@ -4586,11 +4614,9 @@ LValue SILGenFunction::emitPropertyLValue(SILLocation loc, ManagedValue base,
   auto baseType = base.getType().getASTType();
   auto subMap = baseType->getContextSubstitutionMap(ivar->getDeclContext());
 
-  AccessStrategy strategy =
-    ivar->getAccessStrategy(semantics,
-                            getFormalAccessKind(accessKind),
-                            SGM.M.getSwiftModule(),
-                            F.getResilienceExpansion());
+  AccessStrategy strategy = ivar->getAccessStrategy(
+      semantics, getFormalAccessKind(accessKind), SGM.M.getSwiftModule(),
+      F.getResilienceExpansion(), /*useOldABI=*/false);
 
   auto baseAccessKind =
     getBaseAccessKind(SGM, ivar, accessKind, strategy, baseFormalType,
@@ -4989,23 +5015,22 @@ SILValue SILGenFunction::emitSemanticLoad(SILLocation loc,
   }
 
   // Harder case: the srcTL and the rvalueTL match without move only.
-  if (srcType.removingMoveOnlyWrapper() ==
-      rvalueType.removingMoveOnlyWrapper()) {
+  if (srcType.removingMoveOnlyWrapper()
+                                      == rvalueType.removingMoveOnlyWrapper()) {
     // Ok, we know that one must be move only and the other must not be. Thus we
     // perform one of two things:
     //
     // 1. If our source address is move only and our rvalue type is not move
-    // only, lets perform a load [copy] and a moveonly_to_copyable. We just need
-    // to insert something so that the move only checker knows that this copy of
-    // the move only address must be a last use.
+    // only, let's perform a load [copy] from the unwrapped address.
     //
     // 2. If our dest value type is move only and our rvalue type is not move
     // only, then we perform a load [copy] + copyable_to_moveonly.
-    SILValue newCopy = srcTL.emitLoadOfCopy(B, loc, src, isTake);
-    if (newCopy->getType().isMoveOnlyWrapped()) {
-      return B.createOwnedMoveOnlyWrapperToCopyableValue(loc, newCopy);
+    if (src->getType().isMoveOnlyWrapped()) {
+      auto copyableSrc = B.createMoveOnlyWrapperToCopyableAddr(loc, src);
+      return rvalueTL.emitLoadOfCopy(B, loc, copyableSrc, isTake);
     }
 
+    SILValue newCopy = srcTL.emitLoadOfCopy(B, loc, src, isTake);
     return B.createOwnedCopyableToMoveOnlyWrapperValue(loc, newCopy);
   }
 
@@ -5305,10 +5330,9 @@ RValue SILGenFunction::emitRValueForStorageLoad(
     SubstitutionMap substitutions,
     AccessSemantics semantics, Type propTy, SGFContext C,
     bool isBaseGuaranteed) {
-  AccessStrategy strategy =
-    storage->getAccessStrategy(semantics, AccessKind::Read,
-                               SGM.M.getSwiftModule(),
-                               F.getResilienceExpansion());
+  AccessStrategy strategy = storage->getAccessStrategy(
+      semantics, AccessKind::Read, SGM.M.getSwiftModule(),
+      F.getResilienceExpansion(), /*useOldABI=*/false);
 
   // If we should call an accessor of some kind, do so.
   if (strategy.getKind() != AccessStrategy::Storage) {

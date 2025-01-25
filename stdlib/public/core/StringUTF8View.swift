@@ -354,7 +354,7 @@ extension String.UTF8View.Index {
   ///     // Prints "nil"
   ///
   /// - Parameters:
-  ///   - sourcePosition: A position in a `String` or one of its views.
+  ///   - idx: A position in a `String` or one of its views.
   ///   - target: The `UTF8View` in which to find the new position.
   public init?(_ idx: String.Index, within target: String.UTF8View) {
     // Note: This method used to be inlinable until Swift 5.7.

@@ -79,7 +79,7 @@ func rdar_59703585() {
   var cb: Fn? = nil
 
   cb = swiftCallback
-  // expected-error@-1 {{cannot assign value of type '(UnsafePointer<Int8>, UnsafeMutableRawPointer?) -> ()' to type 'Fn?' (aka 'Optional<@convention(c) (Optional<UnsafePointer<Int8>>, Optional<UnsafeMutableRawPointer>) -> ()>')}}
+  // expected-error@-1 {{cannot assign value of type '(UnsafePointer<Int8>, UnsafeMutableRawPointer?) -> ()' to type 'Fn' (aka '@convention(c) (Optional<UnsafePointer<Int8>>, Optional<UnsafeMutableRawPointer>) -> ()')}}
 }
 
 // https://github.com/apple/swift/issues/57216

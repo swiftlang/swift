@@ -32,7 +32,7 @@ public func passIntReturnVoid(x: CInt) { print("passIntReturnVoid \(x)") }
 public func passTwoIntReturnInt(x: CInt, y: CInt) -> CInt { return x + y }
 
 // CHECK: SWIFT_INLINE_THUNK int passTwoIntReturnInt(int x, int y) noexcept SWIFT_SYMBOL("s:9Functions016passTwoIntReturnD01x1ys5Int32VAF_AFtF") SWIFT_WARN_UNUSED_RESULT {
-// CHECK: return _impl::$s9Functions016passTwoIntReturnD01x1ys5Int32VAF_AFtF(x, y);
+// CHECK: return Functions::_impl::$s9Functions016passTwoIntReturnD01x1ys5Int32VAF_AFtF(x, y);
 // CHECK: }
 
 public func passTwoIntReturnIntNoArgLabel(_: CInt, _: CInt) -> CInt {
@@ -41,13 +41,13 @@ public func passTwoIntReturnIntNoArgLabel(_: CInt, _: CInt) -> CInt {
 }
 
 // CHECK: SWIFT_INLINE_THUNK int passTwoIntReturnIntNoArgLabel(int _1, int _2) noexcept SWIFT_SYMBOL("s:9Functions016passTwoIntReturnD10NoArgLabelys5Int32VAD_ADtF") SWIFT_WARN_UNUSED_RESULT {
-// CHECK: return _impl::$s9Functions016passTwoIntReturnD10NoArgLabelys5Int32VAD_ADtF(_1, _2);
+// CHECK: return Functions::_impl::$s9Functions016passTwoIntReturnD10NoArgLabelys5Int32VAD_ADtF(_1, _2);
 // CHECK: }
 
 public func passTwoIntReturnIntNoArgLabelParamName(_ x2: CInt, _ y2: CInt) -> CInt { return x2 + y2 }
 
 // CHECK: SWIFT_INLINE_THUNK int passTwoIntReturnIntNoArgLabelParamName(int x2, int y2) noexcept SWIFT_SYMBOL("s:9Functions016passTwoIntReturnD19NoArgLabelParamNameys5Int32VAD_ADtF") SWIFT_WARN_UNUSED_RESULT {
-// CHECK:   return _impl::$s9Functions016passTwoIntReturnD19NoArgLabelParamNameys5Int32VAD_ADtF(x2, y2);
+// CHECK:   return Functions::_impl::$s9Functions016passTwoIntReturnD19NoArgLabelParamNameys5Int32VAD_ADtF(x2, y2);
 // CHECK: }
 
 public func passVoidReturnNever() -> Never {

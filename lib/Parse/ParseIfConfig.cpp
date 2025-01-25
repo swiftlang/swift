@@ -16,6 +16,7 @@
 
 #include "swift/Parse/Parser.h"
 
+#include "swift/AST/ASTBridging.h"
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/DiagnosticSuppression.h"
 #include "swift/Basic/Assertions.h"
@@ -183,7 +184,7 @@ class ValidateIfConfigCondition :
     if (!UDE)
       return getDeclRefStr(E, DeclRefKind::Ordinary).has_value();
 
-    return UDE->getFunctionRefKind() == FunctionRefKind::Unapplied &&
+    return UDE->getFunctionRefInfo().isUnappliedBaseName() &&
            isModulePath(UDE->getBase());
   }
 
@@ -766,6 +767,26 @@ static Expr *findAnyLikelySimulatorEnvironmentTest(Expr *Condition) {
 
 } // end anonymous namespace
 
+/// Call into the Swift implementation of #if condition evaluation.
+///
+/// \returns std::nullopt if the Swift implementation is not available, or
+/// a pair (isActive, allowSyntaxErrors) describing whether the evaluated
+/// condition indicates that the region is active and whether, if inactive,
+/// the code in that region is allowed to have syntax errors.
+static std::optional<std::pair<bool, bool>> evaluateWithSwiftIfConfig(
+    Parser &parser,
+    SourceRange conditionRange,
+    bool shouldEvaluate
+) {
+#if SWIFT_BUILD_SWIFT_SYNTAX
+  return evaluateOrDefault(
+      parser.Context.evaluator,
+      EvaluateIfConditionRequest{&parser.SF, conditionRange, shouldEvaluate},
+      std::pair(false, false));
+#else
+  return std::nullopt;
+#endif
+}
 
 /// Parse and populate a #if ... #endif directive.
 /// Delegate callback function to parse elements in the blocks.
@@ -842,7 +863,15 @@ Result Parser::parseIfConfigRaw(
       if (result.isNull())
         return makeParserError();
       Condition = result.get();
-      if (validateIfConfigCondition(Condition, Context, Diags)) {
+      if (std::optional<std::pair<bool, bool>> evalResult =
+              evaluateWithSwiftIfConfig(*this,
+                                        Condition->getSourceRange(),
+                                        shouldEvaluate)) {
+        if (!foundActive) {
+          isActive = evalResult->first;
+          isVersionCondition = evalResult->second;
+        }
+      } else if (validateIfConfigCondition(Condition, Context, Diags)) {
         // Error in the condition;
         isActive = false;
         isVersionCondition = false;
@@ -943,49 +972,37 @@ Result Parser::parseIfConfigRaw(
   return finish(EndLoc, HadMissingEnd);
 }
 
-/// Parse and populate a #if ... #endif directive.
+// Parse and populate a #if ... #endif directive.
 /// Delegate callback function to parse elements in the blocks.
-ParserResult<IfConfigDecl> Parser::parseIfConfig(
+ParserStatus Parser::parseIfConfig(
     IfConfigContext ifConfigContext,
-    llvm::function_ref<void(SmallVectorImpl<ASTNode> &, bool)> parseElements) {
-  SmallVector<IfConfigClause, 4> clauses;
-  return parseIfConfigRaw<ParserResult<IfConfigDecl>>(
+    llvm::function_ref<void(bool)> parseElements) {
+  ParserStatus status = makeParserSuccess();
+  return parseIfConfigRaw<ParserStatus>(
       ifConfigContext,
       [&](SourceLoc clauseLoc, Expr *condition, bool isActive,
           IfConfigElementsRole role) {
-        SmallVector<ASTNode, 16> elements;
         if (role != IfConfigElementsRole::Skipped)
-          parseElements(elements, isActive);
-        if (role == IfConfigElementsRole::SyntaxOnly)
-          elements.clear();
-
-        clauses.emplace_back(
-            clauseLoc, condition, Context.AllocateCopy(elements), isActive);
+          parseElements(isActive);
       },
       [&](SourceLoc endLoc, bool hadMissingEnd) {
-        auto *ICD = new (Context) IfConfigDecl(CurDeclContext,
-                                               Context.AllocateCopy(clauses),
-                                               endLoc, hadMissingEnd);
-        return makeParserResult(ICD);
-      });
+      return status;
+    });
 }
 
-ParserStatus Parser::parseIfConfigDeclAttributes(
-    DeclAttributes &attributes, bool ifConfigsAreDeclAttrs,
-    PatternBindingInitializer *initContext) {
+ParserStatus Parser::parseIfConfigAttributes(
+    DeclAttributes &attributes, bool ifConfigsAreDeclAttrs) {
   ParserStatus status = makeParserSuccess();
   return parseIfConfigRaw<ParserStatus>(
       IfConfigContext::DeclAttrs,
       [&](SourceLoc clauseLoc, Expr *condition, bool isActive,
           IfConfigElementsRole role) {
         if (isActive) {
-          status |= parseDeclAttributeList(
-              attributes, ifConfigsAreDeclAttrs, initContext);
+          status |= parseDeclAttributeList(attributes, ifConfigsAreDeclAttrs);
         } else if (role != IfConfigElementsRole::Skipped) {
           DeclAttributes skippedAttributes;
-          PatternBindingInitializer *skippedInitContext = nullptr;
           status |= parseDeclAttributeList(
-              skippedAttributes, ifConfigsAreDeclAttrs, skippedInitContext);
+              skippedAttributes, ifConfigsAreDeclAttrs);
         }
       },
       [&](SourceLoc endLoc, bool hadMissingEnd) {

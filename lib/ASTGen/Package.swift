@@ -28,7 +28,7 @@ let swiftSourceDirectory = #filePath
 let swiftSetttings: [SwiftSetting] = [
   .interoperabilityMode(.Cxx),
   .unsafeFlags([
-    "-Xcc", "-DCOMPILED_WITH_SWIFT",
+    "-Xcc", "-DCOMPILED_WITH_SWIFT", "-Xcc", "-DPURE_BRIDGING_MODE",
     "-Xcc", "-UIBOutlet", "-Xcc", "-UIBAction", "-Xcc", "-UIBInspectable",
     "-Xcc", "-I\(swiftSourceDirectory)/include",
     "-Xcc", "-I\(swiftSourceDirectory)/../llvm-project/llvm/include",
@@ -36,16 +36,13 @@ let swiftSetttings: [SwiftSetting] = [
     "-Xcc", "-I\(swiftSourceDirectory)/../build/Default/swift/include",
     "-Xcc", "-I\(swiftSourceDirectory)/../build/Default/llvm/include",
     "-Xcc", "-I\(swiftSourceDirectory)/../build/Default/llvm/tools/clang/include",
-
-    // FIXME: Needed to work around an availability issue with CxxStdlib
-    "-Xfrontend", "-disable-target-os-checking",
   ]),
 ]
 
 let package = Package(
   name: "swiftSwiftCompiler",
   platforms: [
-    .macOS(.v10_15)
+    .macOS(.v13)
   ],
   products: [
     .library(name: "swiftASTGen", targets: ["swiftASTGen"]),
@@ -57,9 +54,9 @@ let package = Package(
     .target(
       name: "swiftASTGen",
       dependencies: [
-        .product(name: "_SwiftCompilerPluginMessageHandling", package: "swift-syntax"),
         .product(name: "SwiftDiagnostics", package: "swift-syntax"),
         .product(name: "SwiftIfConfig", package: "swift-syntax"),
+        .product(name: "SwiftLexicalLookup", package: "swift-syntax"),
         .product(name: "SwiftOperators", package: "swift-syntax"),
         .product(name: "SwiftParser", package: "swift-syntax"),
         .product(name: "SwiftParserDiagnostics", package: "swift-syntax"),
@@ -69,6 +66,20 @@ let package = Package(
         "_CompilerRegexParser",
       ],
       path: "Sources/ASTGen",
+      swiftSettings: swiftSetttings
+    ),
+    .target(
+      name: "swiftMacroEvaluation",
+      dependencies: [
+        "swiftASTGen",
+        .product(name: "_SwiftCompilerPluginMessageHandling", package: "swift-syntax"),
+        .product(name: "SwiftSyntax", package: "swift-syntax"),
+        .product(name: "SwiftDiagnostics", package: "swift-syntax"),
+        .product(name: "SwiftParser", package: "swift-syntax"),
+        .product(name: "SwiftOperators", package: "swift-syntax"),
+        .product(name: "SwiftSyntaxMacroExpansion", package: "swift-syntax"),
+      ],
+      path: "Sources/MacroEvaluation",
       swiftSettings: swiftSetttings
     ),
     .target(

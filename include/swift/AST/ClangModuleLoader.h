@@ -147,7 +147,7 @@ public:
   virtual void dumpSwiftLookupTables() const = 0;
 
   /// Returns the module that contains imports and declarations from all loaded
-  /// Objective-C header files.
+  /// header files.
   virtual ModuleDecl *getImportedHeaderModule() const = 0;
 
   /// Retrieves the Swift wrapper for the given Clang module, creating

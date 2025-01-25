@@ -116,12 +116,14 @@ takesValue(if .random() { 0 } else { 1 })
 do {
   takesValue(x: if .random() { 0 } else { 1 })
   // expected-error@-1 {{extraneous argument label 'x:' in call}}
+  // expected-error@-2 {{'if' may only be used as expression in return, throw, or as the source of an assignment}}
 
   takesValue(_: x: if .random() { 0 } else { 1 })
   // expected-error@-1 {{expected argument label before colon}}
   // expected-error@-2 {{expected ',' separator}}
   // expected-error@-3 {{cannot find 'x' in scope}}
   // expected-error@-4 {{extra argument in call}}
+  // expected-error@-5 {{'if' may only be used as expression in return, throw, or as the source of an assignment}}
 }
 func takesValueWithLabel<T>(x: T) {}
 do {
@@ -133,6 +135,7 @@ do {
   // expected-error@-2 {{expected ',' separator}}
   // expected-error@-3 {{cannot find 'y' in scope}}
   // expected-error@-4 {{extra argument in call}}
+  // expected-error@-5 {{'if' may only be used as expression in return, throw, or as the source of an assignment}}
 }
 func takesValueAndTrailingClosure<T>(_ x: T, _ fn: () -> Int) {}
 takesValueAndTrailingClosure(if .random() { 0 } else { 1 }) { 2 }
@@ -141,6 +144,7 @@ takesValueAndTrailingClosure(if .random() { 0 } else { 1 }) { 2 }
 func takesInOut<T>(_ x: inout T) {}
 takesInOut(&if .random() { 1 } else { 2 })
 // expected-error@-1 {{cannot pass immutable value of type 'Int' as inout argument}}
+// expected-error@-2 {{'if' may only be used as expression in return, throw, or as the source of an assignment}}
 
 struct HasSubscript {
   static subscript(x: Int) -> Void { () }
@@ -340,7 +344,7 @@ struct TestFailableInit {
     let y = if x {
       0
     } else {
-      return nil // expected-error {{cannot 'return' in 'if' when used as expression}}
+      return nil // expected-error {{cannot use 'return' to transfer control out of 'if' expression}}
     }
     _ = y
   }
@@ -462,6 +466,9 @@ let o = !if .random() { true } else { false }  // expected-error {{'if' may only
 let p = if .random() { 1 } else { 2 } + // expected-error {{ambiguous use of operator '+'}}
         if .random() { 3 } else { 4 } +
         if .random() { 5 } else { 6 }
+// expected-error@-3 {{'if' may only be used as expression in return, throw, or as the source of an assignment}}
+// expected-error@-3 {{'if' may only be used as expression in return, throw, or as the source of an assignment}}
+// expected-error@-3 {{'if' may only be used as expression in return, throw, or as the source of an assignment}}
 
 let p1 = if .random() { 1 } else { 2 } +  5
 // expected-error@-1 {{'if' may only be used as expression in return, throw, or as the source of an assignment}}
@@ -504,6 +511,7 @@ do {
   // FIXME: The type error is likely due to not solving the conjunction before attempting default type var bindings.
   let _ = (if .random() { Int?.none } else { 1 as Int? })?.bitWidth
   // expected-error@-1 {{type of expression is ambiguous without a type annotation}}
+  // expected-error@-2 {{'if' may only be used as expression in return, throw, or as the source of an assignment}}
 }
 do {
   let _ = if .random() { Int?.none } else { 1 as Int? }!
@@ -557,14 +565,28 @@ func stmts() {
     return
   }
 
-  switch if .random() { true } else { false } { // expected-error {{'if' may only be used as expression in return, throw, or as the source of an assignment}}
-  case _ where if .random() { true } else { false }: // expected-error {{'if' may only be used as expression in return, throw, or as the source of an assignment}}
+  switch if .random() { true } else { false } {
+    // expected-error@-1 {{'if' may only be used as expression in return, throw, or as the source of an assignment}}
+  case _ where if .random() { true } else { false }:
+    // expected-error@-1 {{'if' may only be used as expression in return, throw, or as the source of an assignment}}
+    break
+  case if .random() { true } else { false }:
+    // expected-error@-1 {{'if' may only be used as expression in return, throw, or as the source of an assignment}}
+    break
+  case if .random() { true } else { false } && false:
+    // expected-error@-1 {{'if' may only be used as expression in return, throw, or as the source of an assignment}}
     break
   default:
     break
   }
 
-  for b in [true] where if b { true } else { false } {} // expected-error {{'if' may only be used as expression in return, throw, or as the source of an assignment}}
+  for b in [true] where if b { true } else { false } {}
+  // expected-error@-1 {{'if' may only be used as expression in return, throw, or as the source of an assignment}}
+
+  for _ in if .random() { [true] } else { [false] } {}
+  // expected-error@-1 {{'if' may only be used as expression in return, throw, or as the source of an assignment}}
+
+  for _ in if .random() { [true] } else { [false] } {} // expected-error {{'if' may only be used as expression in return, throw, or as the source of an assignment}}
 
   // Make sure this doesn't parse as an if expr pattern with a label.
   let x = 0
@@ -597,24 +619,24 @@ func returnBranches() -> Int {
 
 func returnBranches1() -> Int {
   return if .random() { // expected-error {{cannot convert return expression of type 'Void' to return type 'Int'}}
-    return 0
+    return 0 // expected-error {{cannot use 'return' to transfer control out of 'if' expression}}
   } else {
-    return 1
+    return 1 // expected-error {{cannot use 'return' to transfer control out of 'if' expression}}
   }
 }
 
 func returnBranchVoid() {
   return if .random() { return } else { return () }
-  // expected-error@-1 2{{cannot 'return' in 'if' when used as expression}}
+  // expected-error@-1 2{{cannot use 'return' to transfer control out of 'if' expression}}
 }
 
 func returnBranchBinding() -> Int {
   let x = if .random() {
     // expected-warning@-1 {{constant 'x' inferred to have type 'Void', which may be unexpected}}
     // expected-note@-2 {{add an explicit type annotation to silence this warning}}
-    return 0 // expected-error {{cannot 'return' in 'if' when used as expression}}
+    return 0 // expected-error {{cannot use 'return' to transfer control out of 'if' expression}}
   } else {
-    return 1 // expected-error {{cannot 'return' in 'if' when used as expression}}
+    return 1 // expected-error {{cannot use 'return' to transfer control out of 'if' expression}}
   }
   return x // expected-error {{cannot convert return expression of type 'Void' to return type 'Int'}}
 }
@@ -648,9 +670,9 @@ func returnBranches5() throws -> Int {
   let i = if .random() {
     // expected-warning@-1 {{constant 'i' inferred to have type 'Void', which may be unexpected}}
     // expected-note@-2 {{add an explicit type annotation to silence this warning}}
-    return 0 // expected-error {{cannot 'return' in 'if' when used as expression}}
+    return 0 // expected-error {{cannot use 'return' to transfer control out of 'if' expression}}
   } else {
-    return 1 // expected-error {{cannot 'return' in 'if' when used as expression}}
+    return 1 // expected-error {{cannot use 'return' to transfer control out of 'if' expression}}
   }
   let j = if .random() {
     // expected-warning@-1 {{constant 'j' inferred to have type 'Void', which may be unexpected}}
@@ -688,12 +710,12 @@ func returnBranches6PoundIf() -> Int {
 
 func returnBranches6PoundIf2() -> Int {
   // We don't allow multiple expressions.
-  let i = if .random() {
+  let i = if .random() { // expected-error{{expected expression in branch of 'if' expression}}
     #if false
     print("hello")
     0
     #endif
-  } else { // expected-error {{non-expression branch of 'if' expression may only end with a 'throw'}}
+  } else {
     1
   }
   return i
@@ -702,7 +724,7 @@ func returnBranches6PoundIf2() -> Int {
 func returnBranches7() -> Int {
   let i = if .random() {
     print("hello")
-    return 0  // expected-error {{cannot 'return' in 'if' when used as expression}}
+    return 0  // expected-error {{cannot use 'return' to transfer control out of 'if' expression}}
   } else {
     1
   }
@@ -710,7 +732,7 @@ func returnBranches7() -> Int {
 }
 
 func returnBranches8() -> Int {
-  let i = if .random() { return 1 } else { 0 }  // expected-error {{cannot 'return' in 'if' when used as expression}}
+  let i = if .random() { return 1 } else { 0 }  // expected-error {{cannot use 'return' to transfer control out of 'if' expression}}
   return i
 }
 
@@ -827,11 +849,11 @@ func testPoundIfBranch2() -> Int {
 }
 
 func testPoundIfBranch3() -> Int {
-  let x = if .random() {
+  let x = if .random() { // expected-error{{expected expression in branch of 'if' expression}}
     #if false
     0
     #endif
-  } else { // expected-error {{non-expression branch of 'if' expression may only end with a 'throw'}}
+  } else {
     0
   }
   return x
@@ -850,25 +872,25 @@ func testPoundIfBranch4() -> Int {
 }
 
 func testPoundIfBranch5() -> Int {
-  // Not allowed (matches the behavior of implict expression returns)
+  // Inactive #if regions don't count
   if .random() {
     #if false
     0
     #endif
-    0 // expected-warning {{integer literal is unused}}
+    0
   } else {
-    1 // expected-warning {{integer literal is unused}}
+    1
   }
 }
 
 func testPoundIfBranch6() -> Int {
-  // Not allowed (matches the behavior of implict expression returns)
+  // Inactive #if regions don't count
   let x = if .random() {
     #if false
     0
     #endif
-    0 // expected-warning {{integer literal is unused}}
-  } else {  // expected-error {{non-expression branch of 'if' expression may only end with a 'throw'}}
+    0
+  } else {
     1
   }
   return x
@@ -914,7 +936,7 @@ func break1() -> Int {
   switch true {
   case true:
     let j = if .random() {
-      break // expected-error {{cannot 'break' in 'if' when used as expression}}
+      break // expected-error {{cannot use 'break' to transfer control out of 'if' expression}}
     } else {
       0
     }
@@ -927,7 +949,7 @@ func break1() -> Int {
 func continue1() -> Int {
   for _ in 0 ... 5 {
     let i = if true { continue } else { 1 }
-    // expected-error@-1 {{cannot 'continue' in 'if' when used as expression}}
+    // expected-error@-1 {{cannot use 'continue' to transfer control out of 'if' expression}}
     return i
   }
 }
@@ -941,7 +963,7 @@ func return1() -> Int {
         while true {
           switch 0 {
           default:
-            return 0 // expected-error {{cannot 'return' in 'if' when used as expression}}
+            return 0 // expected-error {{cannot use 'return' to transfer control out of 'if' expression}}
           }
         }
       }
@@ -985,6 +1007,63 @@ func return4() throws -> Int {
     0
   }
   return i
+}
+
+// https://github.com/swiftlang/swift/issues/75880
+func fallthrough1() throws {
+  switch Bool.random() {
+  case true:
+    let _ = if .random() {
+      if .random () {
+        fallthrough // expected-error {{cannot use 'fallthrough' to transfer control out of 'if' expression}}
+      }
+      throw Err()
+    } else {
+      0
+    }
+  case false:
+    break
+  }
+}
+
+func fallthrough2() throws -> Int {
+  let x = switch Bool.random() {
+  case true:
+    if .random() {
+      if .random () {
+        fallthrough // expected-error {{cannot use 'fallthrough' to transfer control out of 'if' expression}}
+      }
+      throw Err()
+    } else {
+      0
+    }
+  case false:
+    1
+  }
+  return x
+}
+
+func fallthrough3() -> Int {
+  let x = switch Bool.random() {
+  case true:
+    if .random() {
+      fallthrough // expected-error {{cannot use 'fallthrough' to transfer control out of 'if' expression}}
+    } else {
+      0
+    }
+  case false:
+    1
+  }
+  return x
+}
+
+func fallthrough4() -> Int {
+  let x = if .random() {
+    fallthrough // expected-error {{'fallthrough' is only allowed inside a switch}}
+  } else {
+    0
+  }
+  return x
 }
 
 // MARK: Effect specifiers

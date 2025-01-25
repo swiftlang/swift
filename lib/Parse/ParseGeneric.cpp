@@ -60,12 +60,20 @@ Parser::parseGenericParametersBeforeWhere(SourceLoc LAngleLoc,
       attributes.add(new (Context) RawDocCommentAttr(Tok.getCommentRange()));
     parseDeclAttributeList(attributes);
 
-    // Parse the 'each' keyword for a type parameter pack 'each T'.
     SourceLoc EachLoc;
+    SourceLoc LetLoc;
+
+    // Parse the 'each' keyword for a type parameter pack 'each T'.
     if (Tok.isContextualKeyword("each")) {
       TokReceiver->registerTokenKindChange(Tok.getLoc(),
                                            tok::contextual_keyword);
       EachLoc = consumeToken();
+
+    // Parse the 'let' keyword for a variable type parameter 'let N'.
+    } else if (Tok.is(tok::kw_let)) {
+      TokReceiver->registerTokenKindChange(Tok.getLoc(),
+                                           tok::kw_let);
+      LetLoc = consumeToken();
     }
 
     // Parse the name of the parameter.
@@ -121,16 +129,26 @@ Parser::parseGenericParametersBeforeWhere(SourceLoc LAngleLoc,
         Inherited.push_back({Ty.get()});
     }
 
-    const bool isParameterPack = EachLoc.isValid();
+    auto ParamKind = GenericTypeParamKind::Type;
+    SourceLoc SpecifierLoc;
+
+    if (EachLoc.isValid()) {
+      ParamKind = GenericTypeParamKind::Pack;
+      SpecifierLoc = EachLoc;
+    } else if (LetLoc.isValid()) {
+      ParamKind = GenericTypeParamKind::Value;
+      SpecifierLoc = LetLoc;
+    }
+
     auto *Param = GenericTypeParamDecl::createParsed(
-        CurDeclContext, Name, NameLoc, EachLoc,
-        /*index*/ GenericParams.size(), isParameterPack);
+        CurDeclContext, Name, NameLoc, SpecifierLoc,
+        /*index*/ GenericParams.size(), ParamKind);
     if (!Inherited.empty())
       Param->setInherited(Context.AllocateCopy(Inherited));
     GenericParams.push_back(Param);
 
     // Attach attributes.
-    Param->getAttrs() = attributes;
+    Param->attachParsedAttrs(attributes);
 
     // Parse the comma, if the list continues.
     HasComma = consumeIf(tok::comma);
@@ -299,7 +317,9 @@ ParserStatus Parser::parseGenericWhereClause(
 
     // Parse the leading type. It doesn't necessarily have to be just a type
     // identifier if we're dealing with a same-type constraint.
-    ParserResult<TypeRepr> FirstType = parseType();
+    //
+    // Note: This can be a value type, e.g. '123 == N' or 'N == 123'.
+    ParserResult<TypeRepr> FirstType = parseTypeOrValue();
 
     if (FirstType.hasCodeCompletion()) {
       Status.setHasCodeCompletionAndIsError();
@@ -359,7 +379,9 @@ ParserStatus Parser::parseGenericWhereClause(
       SourceLoc EqualLoc = consumeToken();
 
       // Parse the second type.
-      ParserResult<TypeRepr> SecondType = parseType();
+      //
+      // Note: This can be a value type, e.g. '123 == N' or 'N == 123'.
+      ParserResult<TypeRepr> SecondType = parseTypeOrValue();
       Status |= SecondType;
       if (SecondType.isNull())
         SecondType = makeParserResult(ErrorTypeRepr::create(Context, PreviousLoc));

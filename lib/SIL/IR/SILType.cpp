@@ -25,6 +25,7 @@
 #include "swift/SIL/SILModule.h"
 #include "swift/SIL/Test.h"
 #include "swift/SIL/TypeLowering.h"
+#include "swift/Sema/Concurrency.h"
 #include <tuple>
 
 using namespace swift;
@@ -198,7 +199,7 @@ Lifetime SILType::getLifetime(const SILFunction &F) const {
 }
 
 std::string SILType::getMangledName() const {
-  Mangle::ASTMangler mangler;
+  Mangle::ASTMangler mangler(getASTContext());
   return mangler.mangleTypeWithoutPrefix(getRawASTType());
 }
 
@@ -413,7 +414,7 @@ SILType SILType::getEnumElementType(EnumElementDecl *elt, TypeConverter &TC,
   addFieldSubstitutionsIfNeeded(TC, *this, elt, origEltType);
 
   auto substEltTy = getASTType()->getTypeOfMember(
-      elt, elt->getArgumentInterfaceType());
+      elt, elt->getPayloadInterfaceType());
   auto loweredTy = TC.getLoweredRValueType(
       context, TC.getAbstractionPattern(elt), substEltTy);
 
@@ -777,12 +778,11 @@ bool SILType::hasAbstractionDifference(SILFunctionTypeRepresentation rep,
 
 bool SILType::isLoweringOf(TypeExpansionContext context, SILModule &Mod,
                            CanType formalType) {
+  formalType =
+      substOpaqueTypesWithUnderlyingTypes(formalType, context)
+        ->getCanonicalType();
+
   SILType loweredType = *this;
-  if (formalType->hasOpaqueArchetype() &&
-      context.shouldLookThroughOpaqueTypeArchetypes() &&
-      loweredType.getASTType() ==
-          Mod.Types.getLoweredRValueType(context, formalType))
-    return true;
 
   // Optional lowers its contained type.
   SILType loweredObjectType = loweredType.getOptionalObjectType();
@@ -855,7 +855,7 @@ bool SILType::isDifferentiable(SILModule &M) const {
 
 Type
 TypeBase::replaceSubstitutedSILFunctionTypesWithUnsubstituted(SILModule &M) const {
-  return Type(const_cast<TypeBase *>(this)).transform([&](Type t) -> Type {
+  return Type(const_cast<TypeBase *>(this)).transformRec([&](TypeBase *t) -> std::optional<Type> {
     if (auto *f = t->getAs<SILFunctionType>()) {
       auto sft = f->getUnsubstitutedType(M);
       
@@ -907,7 +907,7 @@ TypeBase::replaceSubstitutedSILFunctionTypesWithUnsubstituted(SILModule &M) cons
                                   SubstitutionMap(),
                                   M.getASTContext());
     }
-    return t;
+    return std::nullopt;
   });
 }
 
@@ -1253,6 +1253,47 @@ SILType SILType::removingAnyMoveOnlyWrapping(const SILFunction *fn) {
 
 bool SILType::isSendable(SILFunction *fn) const {
   return getASTType()->isSendableType();
+}
+
+Type SILType::getRawLayoutSubstitutedLikeType() const {
+  auto rawLayout = getRawLayout();
+
+  if (!rawLayout)
+    return Type();
+
+  if (rawLayout->getSizeAndAlignment())
+    return Type();
+
+  auto structDecl = getStructOrBoundGenericStruct();
+  auto likeType = rawLayout->getResolvedLikeType(structDecl);
+  auto astT = getASTType();
+  auto subs = astT->getContextSubstitutionMap();
+  return likeType.subst(subs);
+}
+
+Type SILType::getRawLayoutSubstitutedCountType() const {
+  auto rawLayout = getRawLayout();
+
+  if (!rawLayout)
+    return Type();
+
+  if (rawLayout->getSizeAndAlignment() || rawLayout->getScalarLikeType())
+    return Type();
+
+  auto structDecl = getStructOrBoundGenericStruct();
+  auto countType = rawLayout->getResolvedCountType(structDecl);
+  auto astT = getASTType();
+  auto subs = astT->getContextSubstitutionMap();
+  return countType.subst(subs);
+}
+
+std::optional<DiagnosticBehavior>
+SILType::getConcurrencyDiagnosticBehavior(SILFunction *fn) const {
+  auto declRef = fn->getDeclRef();
+  if (!declRef)
+    return {};
+  auto *fromDC = declRef.getInnermostDeclContext();
+  return getASTType()->getConcurrencyDiagnosticBehaviorLimit(fromDC);
 }
 
 namespace swift::test {

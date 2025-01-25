@@ -108,7 +108,7 @@ public struct MyFooProviderInferred: FooProvider {
             Foo(name: "MyFooProviderInferred.foos.Optional")
         }
 
-        if #available(macOS 99, *) {
+        if #available(iOS 18.0, macOS 15.0, watchOS 11.0, tvOS 18.0, visionOS 2.0, *) {
             Foo(name: "MyFooProviderInferred.foos.limitedAvailability.1")
             Foo(name: "MyFooProviderInferred.foos.limitedAvailability.2")
         } else {
@@ -127,6 +127,12 @@ public struct MyFooProviderInferred: FooProvider {
 // CHECK-NEXT:     "conformances": [
 // CHECK-NEXT:       "ExtractResultBuilders.FooProvider"
 // CHECK-NEXT:     ],
+// CHECK-NEXT:    "allConformances": [
+// CHECK-NEXT:      {
+// CHECK-NEXT:        "protocolName": "ExtractResultBuilders.FooProvider"
+// CHECK-NEXT:        "conformanceDefiningModule": "ExtractResultBuilders"
+// CHECK-NEXT:      }
+// CHECK-NEXT:    ],
 // CHECK-NEXT:     "associatedTypeAliases": [],
 // CHECK-NEXT:     "properties": [
 // CHECK-NEXT:       {
@@ -238,6 +244,12 @@ public struct MyFooProviderInferred: FooProvider {
 // CHECK-NEXT:     "conformances": [
 // CHECK-NEXT:       "ExtractResultBuilders.FooProvider"
 // CHECK-NEXT:     ],
+// CHECK-NEXT:    "allConformances": [
+// CHECK-NEXT:      {
+// CHECK-NEXT:        "protocolName": "ExtractResultBuilders.FooProvider"
+// CHECK-NEXT:        "conformanceDefiningModule": "ExtractResultBuilders"
+// CHECK-NEXT:      }
+// CHECK-NEXT:    ],
 // CHECK-NEXT:     "associatedTypeAliases": [],
 // CHECK-NEXT:     "properties": [
 // CHECK-NEXT:       {
@@ -430,6 +442,28 @@ public struct MyFooProviderInferred: FooProvider {
 // CHECK-NEXT:             },
 // CHECK-NEXT:             {
 // CHECK-NEXT:               "kind": "buildLimitedAvailability",
+// CHECK-NEXT:               "availabilityAttributes": [
+// CHECK-NEXT:                 {
+// CHECK-NEXT:                   "platform": "iOS",
+// CHECK-NEXT:                   "minVersion": "18.0"
+// CHECK-NEXT:                 },
+// CHECK-NEXT:                 {
+// CHECK-NEXT:                   "platform": "macOS",
+// CHECK-NEXT:                   "minVersion": "15.0"
+// CHECK-NEXT:                 },
+// CHECK-NEXT:                 {
+// CHECK-NEXT:                   "platform": "watchOS",
+// CHECK-NEXT:                   "minVersion": "11.0"
+// CHECK-NEXT:                 },
+// CHECK-NEXT:                 {
+// CHECK-NEXT:                   "platform": "tvOS",
+// CHECK-NEXT:                   "minVersion": "18.0"
+// CHECK-NEXT:                 },
+// CHECK-NEXT:                 {
+// CHECK-NEXT:                   "platform": "visionOS",
+// CHECK-NEXT:                   "minVersion": "2.0"
+// CHECK-NEXT:                 }
+// CHECK-NEXT:               ],
 // CHECK-NEXT:               "ifElements": [
 // CHECK-NEXT:                 {
 // CHECK-NEXT:                   "element": {

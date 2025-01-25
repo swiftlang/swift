@@ -1,5 +1,8 @@
 // RUN: %target-swift-emit-sil -O -sil-verify-all -verify -enable-experimental-feature NoImplicitCopy -enable-experimental-feature MoveOnlyClasses %s
 
+// REQUIRES: swift_feature_MoveOnlyClasses
+// REQUIRES: swift_feature_NoImplicitCopy
+
 // Test diagnostics for partial-consumption without partial-reinitialization.
 
 struct Ur : ~Copyable {

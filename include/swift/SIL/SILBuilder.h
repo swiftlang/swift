@@ -215,6 +215,11 @@ public:
 
   SILBuilderContext &getBuilderContext() const { return C; }
   SILModule &getModule() const { return C.Module; }
+  SILInstructionContext getInstructionContext() const {
+    if (!F)
+      return SILInstructionContext::forModule(getModule());
+    return SILInstructionContext::forFunction(*F);
+  }
   ASTContext &getASTContext() const { return getModule().getASTContext(); }
   const Lowering::TypeLowering &getTypeLowering(SILType T) const {
 
@@ -555,10 +560,13 @@ public:
       ArrayRef<SILValue> args, SILBasicBlock *normalBB, SILBasicBlock *errorBB,
       ApplyOptions options = ApplyOptions(),
       const GenericSpecializationInformation *specializationInfo = nullptr,
-      std::optional<ApplyIsolationCrossing> isolationCrossing = std::nullopt) {
+      std::optional<ApplyIsolationCrossing> isolationCrossing = std::nullopt,
+      ProfileCounter normalCount = ProfileCounter(),
+      ProfileCounter errorCount = ProfileCounter()) {
     return insertTerminator(TryApplyInst::create(
         getSILDebugLocation(loc), callee, subs, args, normalBB, errorBB,
-        options, *F, specializationInfo, isolationCrossing));
+        options, *F, specializationInfo, isolationCrossing,
+        normalCount, errorCount));
   }
 
   PartialApplyInst *createPartialApply(
@@ -604,8 +612,8 @@ public:
   BuiltinInst *createBuiltin(SILLocation Loc, Identifier Name, SILType ResultTy,
                              SubstitutionMap Subs,
                              ArrayRef<SILValue> Args) {
-    return insert(BuiltinInst::create(getSILDebugLocation(Loc), Name,
-                                      ResultTy, Subs, Args, getModule()));
+    return insert(BuiltinInst::create(getSILDebugLocation(Loc), Name, ResultTy,
+                                      Subs, Args, getInstructionContext()));
   }
 
   /// Create a binary function with the signature: OpdTy, OpdTy -> ResultTy.
@@ -618,7 +626,7 @@ public:
     appendOperandTypeName(OpdTy, NameStr);
     auto Ident = C.getIdentifier(NameStr);
     return insert(BuiltinInst::create(getSILDebugLocation(Loc), Ident, ResultTy,
-                                      {}, Args, getModule()));
+                                      {}, Args, getInstructionContext()));
   }
 
   // Create a binary function with the signature: OpdTy1, OpdTy2 -> ResultTy.
@@ -631,8 +639,8 @@ public:
     appendOperandTypeName(OpdTy1, NameStr);
     appendOperandTypeName(OpdTy2, NameStr);
     auto Ident = C.getIdentifier(NameStr);
-    return insert(BuiltinInst::create(getSILDebugLocation(Loc), Ident,
-                                      ResultTy, {}, Args, getModule()));
+    return insert(BuiltinInst::create(getSILDebugLocation(Loc), Ident, ResultTy,
+                                      {}, Args, getInstructionContext()));
   }
 
   /// Create a binary function with the signature:
@@ -933,14 +941,7 @@ public:
     return lowering.emitStore(*this, Loc, Src, DestAddr, Qualifier);
   }
 
-  EndBorrowInst *createEndBorrow(SILLocation loc, SILValue borrowedValue) {
-    ASSERT(!SILArgument::isTerminatorResult(borrowedValue) &&
-               "terminator results do not have end_borrow");
-    ASSERT(!isa<SILFunctionArgument>(borrowedValue) &&
-           "Function arguments should never have an end_borrow");
-    return insert(new (getModule())
-                      EndBorrowInst(getSILDebugLocation(loc), borrowedValue));
-  }
+  EndBorrowInst *createEndBorrow(SILLocation loc, SILValue borrowedValue);
 
   BeginAccessInst *createBeginAccess(SILLocation loc, SILValue address,
                                      SILAccessKind accessKind,
@@ -1194,7 +1195,8 @@ public:
   CopyAddrInst *createCopyAddr(SILLocation Loc, SILValue srcAddr,
                                SILValue destAddr, IsTake_t isTake,
                                IsInitialization_t isInitialize) {
-    ASSERT(srcAddr->getType() == destAddr->getType());
+    // See rdar://135156833 for why this is not an ASSERT
+    assert(srcAddr->getType() == destAddr->getType());
     return insert(new (getModule()) CopyAddrInst(
         getSILDebugLocation(Loc), srcAddr, destAddr, isTake, isInitialize));
   }
@@ -1234,6 +1236,24 @@ public:
     return insert(ConvertFunctionInst::create(
         getSILDebugLocation(Loc), Op, Ty, getModule(), F,
         WithoutActuallyEscaping, forwardingOwnershipKind));
+  }
+
+  ThunkInst *createThunk(SILLocation Loc, SILValue Op, ThunkInst::Kind kind,
+                         SubstitutionMap substitutionMap = {}) {
+    return insert(ThunkInst::create(getSILDebugLocation(Loc), Op, getModule(),
+                                    F, kind, substitutionMap));
+  }
+
+  ThunkInst *createIdentityThunk(SILLocation Loc, SILValue Op,
+                                 SubstitutionMap substitutionMap = {}) {
+    return createThunk(Loc, Op, ThunkInst::Kind::Identity, substitutionMap);
+  }
+
+  ThunkInst *
+  createHopToMainActorIfNeededThunk(SILLocation Loc, SILValue Op,
+                                    SubstitutionMap substitutionMap = {}) {
+    return createThunk(Loc, Op, ThunkInst::Kind::HopToMainActorIfNeeded,
+                       substitutionMap);
   }
 
   ConvertEscapeToNoEscapeInst *
@@ -2412,6 +2432,13 @@ public:
         getSILDebugLocation(Loc), valueTy, boxOperand));
   }
 
+  TypeValueInst *createTypeValue(SILLocation loc, SILType valueType,
+                                 CanType paramType) {
+    return insert(TypeValueInst::create(getFunction(),
+                              getSILDebugLocation(loc),
+                              valueType, paramType));
+  }
+
   //===--------------------------------------------------------------------===//
   // Unchecked cast helpers
   //===--------------------------------------------------------------------===//
@@ -2545,6 +2572,12 @@ public:
                     getSILDebugLocation(loc), fnValue, resultType));
   }
 
+  MergeIsolationRegionInst *
+  createMergeIsolationRegion(SILLocation loc, ArrayRef<SILValue> args) {
+    return insert(MergeIsolationRegionInst::create(getSILDebugLocation(loc),
+                                                   args, getModule()));
+  }
+
   //===--------------------------------------------------------------------===//
   // Terminator SILInstruction Creation Methods
   //===--------------------------------------------------------------------===//
@@ -2676,6 +2709,17 @@ public:
         getSILDebugLocation(Loc), Operand, DefaultBB, CaseBBs, getFunction(),
         CaseCounts, DefaultCount, forwardingOwnershipKind));
   }
+
+  /// A convenience function to decompose a scalar optional value with a
+  /// switch_enum.  Returns the object value, which will only be valid
+  /// in `someBB`.  Don't forget to switch insertion blocks after
+  /// calling this.
+  SILPhiArgument *createSwitchOptional(
+      SILLocation loc, SILValue operand,
+      SILBasicBlock *someBB, SILBasicBlock *noneBB,
+      ValueOwnershipKind forwardingOwnershipKind,
+      ProfileCounter someCount = ProfileCounter(),
+      ProfileCounter noneCount = ProfileCounter());
 
   SwitchEnumAddrInst *createSwitchEnumAddr(
       SILLocation Loc, SILValue Operand, SILBasicBlock *DefaultBB,
@@ -3043,6 +3087,15 @@ public:
   HasSymbolInst *createHasSymbol(SILLocation Loc, ValueDecl *Decl) {
     return insert(new (getModule()) HasSymbolInst(
         getModule(), getSILDebugLocation(Loc), Decl));
+  }
+
+  //===--------------------------------------------------------------------===//
+  // Misc Uses
+  //===--------------------------------------------------------------------===//
+
+  IgnoredUseInst *createIgnoredUse(SILLocation loc, SILValue value) {
+    return insert(new (getModule())
+                      IgnoredUseInst(getSILDebugLocation(loc), value));
   }
 
   //===--------------------------------------------------------------------===//

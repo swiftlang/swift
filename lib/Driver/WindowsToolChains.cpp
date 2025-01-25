@@ -174,13 +174,6 @@ toolchains::Windows::constructInvocation(const DynamicLinkJobAction &job,
     Arguments.push_back(context.Args.MakeArgString(context.OI.SDKPath));
   }
 
-  // Link against the desired C++ standard library.
-  if (const Arg *A =
-      context.Args.getLastArg(options::OPT_experimental_cxx_stdlib)) {
-    Arguments.push_back(context.Args.MakeArgString(
-        Twine("-stdlib=") + A->getValue()));
-  }
-
   if (job.getKind() == LinkKind::Executable) {
     if (context.OI.SelectedSanitizers & SanitizerKind::Address)
       addLinkRuntimeLib(context.Args, Arguments,

@@ -16,7 +16,7 @@
 // CHECK-NEXT: #pragma clang diagnostic push
 // CHECK-NEXT: #pragma clang diagnostic ignored "-Wc++17-extensions"
 // CHECK-NEXT: template<>
-// CHECK-NEXT: static inline const constexpr bool isUsableInGenericContext<Structs::StructWithIntField> = true;
+// CHECK-NEXT: inline const constexpr bool isUsableInGenericContext<Structs::StructWithIntField> = true;
 // CHECK-NEXT: #pragma clang diagnostic pop
 // CHECK-NEXT: } // namespace swift
 
@@ -112,7 +112,7 @@
 // CHECK-NEXT: };
 // CHECK-NEXT: namespace _impl{
 // CHECK-NEXT: template<>
-// CHECK-NEXT: static inline const constexpr bool isValueType<Structs::StructWithIntField> = true;
+// CHECK-NEXT: inline const constexpr bool isValueType<Structs::StructWithIntField> = true;
 // CHECK-NEXT: template<>
 // CHECK-NEXT: struct implClassFor<Structs::StructWithIntField> { using type = Structs::_impl::_impl_StructWithIntField; };
 // CHECK-NEXT: } // namespace

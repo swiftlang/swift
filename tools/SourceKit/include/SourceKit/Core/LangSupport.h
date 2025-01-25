@@ -391,6 +391,9 @@ public:
   virtual void handleSemanticAnnotation(unsigned Offset, unsigned Length,
                                         UIdent Kind, bool isSystem) = 0;
 
+  virtual void handleDeclaration(unsigned Offset, unsigned Length, UIdent Kind,
+                                 StringRef USR) = 0;
+
   virtual void beginDocumentSubStructure(unsigned Offset, unsigned Length,
                                          UIdent Kind, UIdent AccessLevel,
                                          UIdent SetterAccessLevel,
@@ -1020,6 +1023,8 @@ public:
   const static std::string SynthesizedUSRSeparator;
 
   virtual ~LangSupport() { }
+
+  virtual void *getOpaqueSwiftIDEInspectionInstance() { return nullptr; }
 
   virtual void globalConfigurationUpdated(std::shared_ptr<GlobalConfig> Config) {};
 

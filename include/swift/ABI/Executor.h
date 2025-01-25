@@ -28,6 +28,7 @@ class AsyncTask;
 class DefaultActor;
 class Job;
 class SerialExecutorWitnessTable;
+struct SwiftError;
 class TaskExecutorWitnessTable;
 
 /// An unmanaged reference to a serial executor.
@@ -295,6 +296,7 @@ using ThrowingTaskFutureWaitContinuationFunction =
   SWIFT_CC(swiftasync)
   void (SWIFT_ASYNC_CONTEXT AsyncContext *, SWIFT_CONTEXT void *);
 
+using DeinitWorkFunction = SWIFT_CC(swift) void(void *);
 
 template <class AsyncSignature>
 class AsyncFunctionPointer;

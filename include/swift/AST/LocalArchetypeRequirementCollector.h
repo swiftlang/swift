@@ -50,8 +50,13 @@ struct MapLocalArchetypesOutOfContext {
                                  ArrayRef<GenericEnvironment *> capturedEnvs)
       : baseGenericSig(baseGenericSig), capturedEnvs(capturedEnvs) {}
 
+  Type getInterfaceType(Type interfaceTy, GenericEnvironment *genericEnv) const;
   Type operator()(SubstitutableType *type) const;
 };
+
+Type mapLocalArchetypesOutOfContext(Type type,
+                                    GenericSignature baseGenericSig,
+                                    ArrayRef<GenericEnvironment *> capturedEnvs);
 
 struct MapIntoLocalArchetypeContext {
   GenericEnvironment *baseGenericEnv;

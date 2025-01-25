@@ -278,6 +278,19 @@ llvm::Value *irgen::emitArgumentPackShapeRef(IRGenFunction &IGF,
                                       IGF.IGM.SizeTy);
 }
 
+/// Given a reference to nominal type metadata of the given type,
+/// derive a reference to the value for the nth argument metadata.
+/// The type must have generic arguments.
+llvm::Value *irgen::emitValueGenericRef(IRGenFunction &IGF,
+                                        NominalTypeDecl *decl,
+                                        const GenericTypeRequirements &reqts,
+                                        unsigned reqtIndex,
+                                        llvm::Value *metadata) {
+  assert(reqts.getRequirements()[reqtIndex].isValue());
+  return emitLoadOfGenericRequirement(IGF, metadata, decl, reqtIndex,
+                                      IGF.IGM.SizeTy);
+}
+
 Address irgen::emitAddressOfFieldOffsetVector(IRGenFunction &IGF,
                                               llvm::Value *metadata,
                                               NominalTypeDecl *decl) {

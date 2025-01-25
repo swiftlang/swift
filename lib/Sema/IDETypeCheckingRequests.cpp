@@ -11,7 +11,9 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/AST/ASTPrinter.h"
+#include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/Decl.h"
+#include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/SourceManager.h"
@@ -131,7 +133,7 @@ static bool isExtensionWithSelfBound(const ExtensionDecl *ED,
   if (selfType->is<ExistentialType>())
     return false;
 
-  return ED->getExtendedNominal() == PD || ModuleDecl::checkConformance(selfType, PD);
+  return ED->getExtendedNominal() == PD || checkConformance(selfType, PD);
 }
 
 static bool isExtensionAppliedInternal(const DeclContext *DC, Type BaseTy,
@@ -202,7 +204,8 @@ static bool isMemberDeclAppliedInternal(const DeclContext *DC, Type BaseTy,
   // The context substitution map for the base type fixes the declaration's
   // outer generic parameters.
   auto substMap = BaseTy->getContextSubstitutionMap(
-      VD->getDeclContext(), genericDecl->getGenericEnvironment());
+      VD->getDeclContext(),
+      VD->getDeclContext()->getGenericEnvironmentOfContext());
 
   // The innermost generic parameters are mapped to error types.
   unsigned innerDepth = genericSig->getMaxDepth();
@@ -255,15 +258,11 @@ TypeRelationCheckRequest::evaluate(Evaluator &evaluator,
 TypePair
 RootAndResultTypeOfKeypathDynamicMemberRequest::evaluate(Evaluator &evaluator,
                                               SubscriptDecl *subscript) const {
-  if (!isValidKeyPathDynamicMemberLookup(subscript))
-    return TypePair();
-
-  const auto *param = subscript->getIndices()->get(0);
-  auto keyPathType = param->getTypeInContext()->getAs<BoundGenericType>();
+  auto keyPathType = getKeyPathTypeForDynamicMemberLookup(subscript);
   if (!keyPathType)
     return TypePair();
+
   auto genericArgs = keyPathType->getGenericArgs();
-  assert(!genericArgs.empty() && genericArgs.size() == 2 &&
-         "invalid keypath dynamic member");
+  assert(genericArgs.size() == 2 && "invalid keypath dynamic member");
   return TypePair(genericArgs[0], genericArgs[1]);
 }

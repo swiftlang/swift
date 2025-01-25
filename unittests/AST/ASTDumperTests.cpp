@@ -26,7 +26,7 @@ TEST(ASTDumper, ArchetypeType) {
   TestContext C;
   auto &ctx = C.Ctx;
 
-  auto *genericParamTy = GenericTypeParamType::get(false, 0, 0, ctx);
+  auto *genericParamTy = GenericTypeParamType::getType(0, 0, ctx);
   auto sig = buildGenericSignature(ctx, nullptr, {genericParamTy}, {},
                                    /*allowInverses=*/true);
 
@@ -52,6 +52,6 @@ TEST(ASTDumper, ArchetypeType) {
   }
 
   EXPECT_EQ(str,
-            " name=\"\\xCF\\x84_0_0\"\n"
-            "  (interface_type=generic_type_param_type depth=0 index=0))\n");
+            " name=\"τ_0_0\"\n"
+            "  (interface_type=generic_type_param_type depth=0 index=0 param_kind=type))\n");
 }

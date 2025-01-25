@@ -527,6 +527,34 @@ if("WASI" IN_LIST SWIFT_SDKS)
                                  DESTINATION "lib/swift_static/${arch_subdir}"
                                  COMPONENT sdk-overlay)
     endif()
+
+    set(wasilibc_apinotes_source "SwiftWASILibc.apinotes")
+    add_custom_command_target(
+      copy_wasilibc_apinotes_resource
+      COMMAND
+        "${CMAKE_COMMAND}" "-E" "make_directory" ${SWIFTLIB_DIR}/apinotes ${SWIFTSTATICLIB_DIR}/apinotes
+      COMMAND
+        "${CMAKE_COMMAND}" "-E" "copy_if_different"
+          "${CMAKE_CURRENT_SOURCE_DIR}/${wasilibc_apinotes_source}" ${SWIFTLIB_DIR}/apinotes
+      COMMAND
+        "${CMAKE_COMMAND}" "-E" "copy_if_different"
+          "${CMAKE_CURRENT_SOURCE_DIR}/${wasilibc_apinotes_source}" ${SWIFTSTATICLIB_DIR}/apinotes
+      OUTPUT
+        ${SWIFTLIB_DIR}/apinotes/${wasilibc_apinotes_source}
+        ${SWIFTSTATICLIB_DIR}/apinotes/${wasilibc_apinotes_source}
+      COMMENT "Copying WASILibc API notes to resource directories")
+
+    list(APPEND wasilibc_modulemap_target_list ${copy_wasilibc_apinotes_resource})
+    add_dependencies(sdk-overlay ${copy_wasilibc_apinotes_resource})
+    swift_install_in_component(FILES "${wasilibc_apinotes_source}"
+                               DESTINATION "lib/swift/apinotes"
+                               COMPONENT sdk-overlay)
+    if(SWIFT_BUILD_STATIC_STDLIB)
+      swift_install_in_component(FILES "${wasilibc_apinotes_source}"
+                                 DESTINATION "lib/swift_static/apinotes"
+                                 COMPONENT sdk-overlay)
+    endif()
+
   endforeach()
 endif()
 add_custom_target(wasilibc_modulemap DEPENDS ${wasilibc_modulemap_target_list})

@@ -471,12 +471,12 @@ func generateMappingProps(for platform: String, into result: inout String) {
   
   switch platform {
   case "Apple":
-    unicodeData = readFile("Data/Apple/UnicodeData.txt")
+    unicodeData = readFile("Data/16/Apple/UnicodeData.txt")
   default:
-    unicodeData = readFile("Data/UnicodeData.txt")
+    unicodeData = readFile("Data/16/UnicodeData.txt")
   }
   
-  let specialCasing = readFile("Data/SpecialCasing.txt")
+  let specialCasing = readFile("Data/16/SpecialCasing.txt")
   
   var data: [UInt32: (Int?, Int?, Int?)] = [:]
   getMappings(from: unicodeData, into: &data)

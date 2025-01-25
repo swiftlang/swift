@@ -152,9 +152,6 @@ y17 = z17
 let tupleTypeWithNames = (age:Int, count:Int)(4, 5)
 let dictWithTuple = [String: (age:Int, count:Int)]()
 
-// <rdar://problem/21684837> typeexpr not being formed for postfix !
-let bb2 = [Int!](repeating: nil, count: 2) // expected-warning {{using '!' is not allowed here; treating this as '?' instead}}{{15-16=?}}
-
 // <rdar://problem/21560309> inout allowed on function return type
 func r21560309<U>(_ body: (_: inout Int) -> inout U) {}  // expected-error {{'inout' may only be used on parameters}}
 r21560309 { x in x }

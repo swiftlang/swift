@@ -1,6 +1,6 @@
 // RUN: %target-swift-frontend -print-ast %s | %FileCheck %s
 // RUN: %target-swift-frontend -application-extension -print-ast %s | %FileCheck %s
-// RUN: %target-swift-frontend -target %target-cpu-apple-macosx10.51 -print-ast %s | %FileCheck %s
+// RUN: %target-swift-frontend -target %target-cpu-apple-macosx51 -print-ast %s | %FileCheck %s
 // RUN: %target-swift-frontend -target %target-cpu-apple-macosx14 -print-ast %s | %FileCheck %s
 // REQUIRES: OS=macosx
 
@@ -16,14 +16,14 @@ enum HasElementsWithAvailability: Hashable {
   // CHECK-NEXT:  case unavailableMacOS
   @available(macOS, unavailable)
   case unavailableMacOS
-  // CHECK:       @available(macOS, obsoleted: 10.50)
-  // CHECK-NEXT:  case obsoleted10_50
-  @available(macOS, obsoleted: 10.50)
-  case obsoleted10_50
-  // CHECK:       @available(macOS 10.50, *)
-  // CHECK-NEXT:  case introduced10_50
-  @available(macOS, introduced: 10.50)
-  case introduced10_50
+  // CHECK:       @available(macOS, obsoleted: 50)
+  // CHECK-NEXT:  case obsoleted50
+  @available(macOS, obsoleted: 50)
+  case obsoleted50
+  // CHECK:       @available(macOS 50, *)
+  // CHECK-NEXT:  case introduced50
+  @available(macOS, introduced: 50)
+  case introduced50
   // CHECK:       @available(macOSApplicationExtension, unavailable)
   // CHECK-NEXT:  case unavailableMacOSAppExtension
   @available(macOSApplicationExtension, unavailable)
@@ -38,9 +38,9 @@ enum HasElementsWithAvailability: Hashable {
   // CHECK-NEXT:      _diagnoseUnavailableCodeReached()
   // CHECK-NEXT:    case .unavailableMacOS:
   // CHECK-NEXT:      _diagnoseUnavailableCodeReached()
-  // CHECK-NEXT:    case .obsoleted10_50:
+  // CHECK-NEXT:    case .obsoleted50:
   // CHECK-NEXT:      index_a = 1
-  // CHECK-NEXT:    case .introduced10_50:
+  // CHECK-NEXT:    case .introduced50:
   // CHECK-NEXT:      index_a = 2
   // CHECK-NEXT:    case .unavailableMacOSAppExtension:
   // CHECK-NEXT:      index_a = 3
@@ -53,9 +53,9 @@ enum HasElementsWithAvailability: Hashable {
   // CHECK-NEXT:      _diagnoseUnavailableCodeReached()
   // CHECK-NEXT:    case .unavailableMacOS:
   // CHECK-NEXT:      _diagnoseUnavailableCodeReached()
-  // CHECK-NEXT:    case .obsoleted10_50:
+  // CHECK-NEXT:    case .obsoleted50:
   // CHECK-NEXT:      index_b = 1
-  // CHECK-NEXT:    case .introduced10_50:
+  // CHECK-NEXT:    case .introduced50:
   // CHECK-NEXT:      index_b = 2
   // CHECK-NEXT:    case .unavailableMacOSAppExtension:
   // CHECK-NEXT:      index_b = 3
@@ -72,9 +72,9 @@ enum HasElementsWithAvailability: Hashable {
   // CHECK-NEXT:      _diagnoseUnavailableCodeReached()
   // CHECK-NEXT:    case .unavailableMacOS:
   // CHECK-NEXT:      _diagnoseUnavailableCodeReached()
-  // CHECK-NEXT:    case .obsoleted10_50:
+  // CHECK-NEXT:    case .obsoleted50:
   // CHECK-NEXT:      discriminator = 1
-  // CHECK-NEXT:    case .introduced10_50:
+  // CHECK-NEXT:    case .introduced50:
   // CHECK-NEXT:      discriminator = 2
   // CHECK-NEXT:    case .unavailableMacOSAppExtension:
   // CHECK-NEXT:      discriminator = 3

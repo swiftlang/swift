@@ -8,6 +8,8 @@
 # REQUIRES: long_test
 # REQUIRES: nonexecutable_test
 
+# rdar://142441042
+# UNSUPPORTED: OS=linux-gnu
 
 import os
 import subprocess

@@ -24,9 +24,11 @@ if(NOT SWIFT_BUILD_STDLIB)
 endif()
 
 set(BACKTRACING_COMPILE_FLAGS
+  "-cxx-interoperability-mode=default"
   "-I${SWIFT_STDLIB_SOURCE_DIR}/public/Backtracing/modules"
   "-Xcc;-I${SWIFT_SOURCE_DIR}/include"
-  "-Xcc;-I${CMAKE_BINARY_DIR}/include")
+  "-Xcc;-I${CMAKE_BINARY_DIR}/include"
+  "-disable-upcoming-feature;MemberImportVisibility")
 
 set(BACKTRACING_SOURCES
   main.swift
@@ -37,6 +39,14 @@ set(BACKTRACING_SOURCES
   Utils.swift
   )
 
+# We have to build with a deployment target of at least 10.14.4, otherwise
+# the tests will all fail because dyld will get confused at the use of
+# @rpath (from magic-symbols-for-install-name.c).
+if(SWIFT_DARWIN_DEPLOYMENT_VERSION_OSX VERSION_LESS "10.14.4")
+  set(osx_deployment_target "10.14.4")
+else()
+  set(osx_deployment_target "${SWIFT_DARWIN_DEPLOYMENT_VERSION_OSX}")
+endif()
 
 add_swift_target_executable(swift-backtrace BUILD_WITH_LIBEXEC
   ${BACKTRACING_SOURCES}
@@ -47,6 +57,8 @@ add_swift_target_executable(swift-backtrace BUILD_WITH_LIBEXEC
   SWIFT_MODULE_DEPENDS_WINDOWS      ${wincrt_sdk}
   SWIFT_MODULE_DEPENDS_LINUX        ${glibc}
   SWIFT_MODULE_DEPENDS_LINUX_STATIC ${musl}
+
+  DEPLOYMENT_VERSION_OSX ${osx_deployment_target}
 
   INSTALL_IN_COMPONENT libexec
   COMPILE_FLAGS
@@ -74,6 +86,8 @@ if(static_target_sdks)
     SWIFT_MODULE_DEPENDS_WINDOWS      ${wincrt_sdk}
     SWIFT_MODULE_DEPENDS_LINUX        ${glibc}
     SWIFT_MODULE_DEPENDS_LINUX_STATIC ${musl}
+
+    DEPLOYMENT_VERSION_OSX ${osx_deployment_target}
 
     INSTALL_IN_COMPONENT libexec
     COMPILE_FLAGS

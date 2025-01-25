@@ -33,9 +33,8 @@ extension BuiltinInst : OnoneSimplifyable {
            .Alignof:
         optimizeTargetTypeConst(context)
       case .DestroyArray:
-        if let elementType = substitutionMap.replacementTypes[0],
-           elementType.isTrivial(in: parentFunction)
-        {
+        let elementType = substitutionMap.replacementType.loweredType(in: parentFunction, maximallyAbstracted: true)
+        if elementType.isTrivial(in: parentFunction) {
           context.erase(instruction: self)
           return
         }
@@ -129,47 +128,39 @@ private extension BuiltinInst {
   }
 
   func optimizeCanBeClass(_ context: SimplifyContext) {
-    guard let ty = substitutionMap.replacementTypes[0] else {
-      return
-    }
     let literal: IntegerLiteralInst
-    switch ty.canBeClass {
-    case .IsNot:
+    switch substitutionMap.replacementType.canonical.canBeClass {
+    case .isNot:
       let builder = Builder(before: self, context)
       literal = builder.createIntegerLiteral(0,  type: type)
-    case .Is:
+    case .is:
       let builder = Builder(before: self, context)
       literal = builder.createIntegerLiteral(1,  type: type)
-    case .CanBe:
+    case .canBe:
       return
-    default:
-      fatalError()
     }
-    uses.replaceAll(with: literal, context)
-    context.erase(instruction: self)
+    self.replace(with: literal, context)
   }
 
   func optimizeAssertConfig(_ context: SimplifyContext) {
-    let literal: IntegerLiteralInst
-    switch context.options.assertConfiguration {
-    case .enabled:
+    // The values for the assert_configuration call are:
+    // 0: Debug
+    // 1: Release
+    // 2: Fast / Unchecked
+    let config = context.options.assertConfiguration
+    switch config {
+    case .debug, .release, .unchecked:
       let builder = Builder(before: self, context)
-      literal = builder.createIntegerLiteral(1,  type: type)
-    case .disabled:
-      let builder = Builder(before: self, context)
-      literal = builder.createIntegerLiteral(0,  type: type)
-    default:
+      let literal = builder.createIntegerLiteral(config.integerValue, type: type)
+      uses.replaceAll(with: literal, context)
+      context.erase(instruction: self)
+    case .unknown:
       return
     }
-    uses.replaceAll(with: literal, context)
-    context.erase(instruction: self)
   }
   
   func optimizeTargetTypeConst(_ context: SimplifyContext) {
-    guard let ty = substitutionMap.replacementTypes[0] else {
-      return
-    }
-    
+    let ty = substitutionMap.replacementType.loweredType(in: parentFunction, maximallyAbstracted: true)
     let value: Int?
     switch id {
     case .Sizeof:

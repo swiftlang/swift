@@ -72,12 +72,21 @@ FEATURE(SwiftExceptionPersonality,                      (6, 0))
 FEATURE(IsolatedAny,                                    (6, 0))
 
 FEATURE(NoncopyableGenerics,                            (6, 0))
+FEATURE(InitRawStructMetadata,                          (6, 0))
+
+FEATURE(LayoutStringValueWitnesses,                     (6, 1))
+FEATURE(CreateTaskWithConsumedFunction,                 (6, 1))
+FEATURE(IsolatedDeinit,                                 (6, 1))
+
+FEATURE(ValueGenericType,                               (6, 2))
+FEATURE(InitRawStructMetadata2,                         (6, 2))
 
 FEATURE(TaskExecutor,                                   FUTURE)
 FEATURE(Differentiation,                                FUTURE)
-FEATURE(InitRawStructMetadata,                          FUTURE)
 FEATURE(ClearSensitive,                                 FUTURE)
 FEATURE(UpdatePureObjCClassMetadata,                    FUTURE)
+// TODO: CoroutineAccessors: Change to correct version number.
+FEATURE(CoroutineAccessors,                             FUTURE)
 
 #undef FEATURE
 #undef FUTURE

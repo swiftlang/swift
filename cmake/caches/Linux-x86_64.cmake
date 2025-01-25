@@ -142,12 +142,14 @@ set(LLDB_TOOLS
 set(SWIFT_INSTALL_COMPONENTS
       autolink-driver
       compiler
+      compiler-swift-syntax-lib
       clang-builtin-headers
       editor-integration
       tools
       sourcekit-inproc
       swift-remote-mirror
       swift-remote-mirror-headers
+      swift-syntax-lib
     CACHE STRING "")
 
 set(LLVM_DISTRIBUTION_COMPONENTS

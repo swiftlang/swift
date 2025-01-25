@@ -1,9 +1,10 @@
-// RUN: %target-sil-opt -enable-sil-verify-all -sil-move-only-type-eliminator  %s | %FileCheck %s
-// RUN: %target-sil-opt -enable-sil-verify-all -sil-trivial-move-only-type-eliminator  %s | %FileCheck --check-prefix=TRIVIAL %s
+// RUN: %target-sil-opt -sil-print-types -enable-sil-verify-all -sil-move-only-type-eliminator  %s | %FileCheck %s
+// RUN: %target-sil-opt -sil-print-types -enable-sil-verify-all -sil-trivial-move-only-type-eliminator  %s | %FileCheck --check-prefix=TRIVIAL %s
 
 sil_stage raw
 
 import Builtin
+import Swift
 
 //////////////////
 // Declarations //
@@ -29,14 +30,14 @@ class Klass {
   func foo()
 }
 
+class C {}
+
 struct KlassPair {
   var lhs: Klass
   var rhs: Klass
 }
 
 sil @use_klass : $@convention(thin) (@guaranteed Klass) -> ()
-
-protocol Error {}
 
 ///////////
 // Tests //
@@ -612,4 +613,64 @@ bb0(%x : @guaranteed $any Error):
   %em = existential_metatype $@thick any Error.Type, %y : $@moveOnly (any Error)
   debug_value %em : $@thick any Error.Type, var, name "s", argno 1, expr op_deref
   return %em : $@thick any Error.Type
+}
+
+// CHECK-LABEL: sil [ossa] @existential_box :
+// CHECK:         %1 = open_existential_box %0 : $any Error
+// CHECK-LABEL: } // end sil function 'existential_box'
+sil [ossa] @existential_box : $@convention(thin) (@guaranteed any Error) -> () {
+bb0(%x : @guaranteed $any Error):
+  %y = copyable_to_moveonlywrapper [guaranteed] %x : $any Error
+  %o = open_existential_box %y : $@moveOnly (any Error) to $*@opened("01234567-89AB-CDEF-0123-000000000000", Error) Self
+  %r = tuple ()
+  return %r : $()
+}
+
+// CHECK-LABEL: sil [ossa] @builtin_tsanInoutAccess : {{.*}} {
+// CHECK:         builtin "tsanInoutAccess"
+// CHECK-LABEL: } // end sil function 'builtin_tsanInoutAccess'
+sil [ossa] @builtin_tsanInoutAccess : $@convention(thin) () -> () {
+bb0:
+  %1 = alloc_stack $@moveOnly C, var, name "b", type $@moveOnly C
+  %6 = builtin "tsanInoutAccess"(%1 : $*@moveOnly C) : $()
+  dealloc_stack %1 : $*@moveOnly C
+  %13 = tuple ()
+  return %13 : $()
+}
+
+// Remove trivial move_value + extend_lifetime
+//
+// CHECK-LABEL: sil [ossa] @move_extend_lifetime : $@convention(thin) (@thin Trivial.Type) -> () {
+// CHECK: bb0(%0 : $@thin Trivial.Type):
+// CHECK-NOT: move_value
+// CHECK-NOT: extend_lifetime
+// CHECK-LABEL: } // end sil function 'move_extend_lifetime'
+sil [ossa] @move_extend_lifetime : $@convention(thin) (@thin Trivial.Type) -> () {
+bb0(%0 : $@thin Trivial.Type):
+  %mv = move_value [var_decl] %0 : $@thin Trivial.Type
+  extend_lifetime %mv : $@thin Trivial.Type
+  %13 = tuple ()
+  return %13 : $()
+}
+
+sil @captureType : $@convention(thin) (@thin Trivial.Type) -> ()
+sil @takeClosure : $@convention(thin) (@guaranteed @noescape @callee_guaranteed () -> ()) -> ()
+
+// SILGen pattern binding can (incorrectly) create a local variable to hold the value a function argument. This results
+// in an extend_lifetime that directly uses the argument value. Ensure that MoveOnlyTypeEliminator erases the
+// extend_lifetime.
+//
+// CHECK-LABEL: sil [ossa] @arg_extend_lifetime : $@convention(thin) (@thin Trivial.Type) -> () {
+// CHECK-NOT: extend_lifetime
+// CHECK-LABEL: } // end sil function 'arg_extend_lifetime'
+sil [ossa] @arg_extend_lifetime : $@convention(thin) (@thin Trivial.Type) -> () {
+bb0(%0 : $@thin Trivial.Type):
+  %cf = function_ref @captureType : $@convention(thin) (@thin Trivial.Type) -> ()
+  %closure = partial_apply [callee_guaranteed] [on_stack] %cf(%0) : $@convention(thin) (@thin Trivial.Type) -> ()
+  %f = function_ref @takeClosure : $@convention(thin) (@guaranteed @noescape @callee_guaranteed () -> ()) -> ()
+  %6 = apply %f(%closure) : $@convention(thin) (@guaranteed @noescape @callee_guaranteed () -> ()) -> ()
+  destroy_value %closure : $@noescape @callee_guaranteed () -> ()
+  extend_lifetime %0 : $@thin Trivial.Type
+  %13 = tuple ()
+  return %13 : $()
 }

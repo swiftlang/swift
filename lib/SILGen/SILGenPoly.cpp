@@ -96,6 +96,7 @@
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/Generators.h"
 #include "swift/AST/ASTMangler.h"
+#include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/DiagnosticsSIL.h"
 #include "swift/AST/ExistentialLayout.h"
@@ -253,8 +254,8 @@ SILGenFunction::emitTransformExistential(SILLocation loc,
   FormalEvaluationScope scope(*this);
 
   if (inputType->isAnyExistentialType()) {
-    CanType openedType = OpenedArchetypeType::getAny(inputType,
-                                                     F.getGenericSignature());
+    CanType openedType = OpenedArchetypeType::getAny(inputType)
+        ->getCanonicalType();
     SILType loweredOpenedType = getLoweredType(openedType);
 
     input = emitOpenExistential(loc, input,
@@ -277,8 +278,7 @@ SILGenFunction::emitTransformExistential(SILLocation loc,
 
   assert(!fromInstanceType.isAnyExistentialType());
   ArrayRef<ProtocolConformanceRef> conformances =
-      SGM.M.getSwiftModule()->collectExistentialConformances(
-                                     fromInstanceType,
+      collectExistentialConformances(fromInstanceType,
                                      toInstanceType,
                                      /*allowMissing=*/true);
 
@@ -642,9 +642,8 @@ ManagedValue Transform::transform(ManagedValue v,
 
     auto layout = instanceType.getExistentialLayout();
     if (layout.getSuperclass()) {
-      CanType openedType =
-          OpenedArchetypeType::getAny(inputSubstType,
-                                      SGF.F.getGenericSignature());
+      CanType openedType = OpenedArchetypeType::getAny(inputSubstType)
+          ->getCanonicalType();
       SILType loweredOpenedType = SGF.getLoweredType(openedType);
 
       FormalEvaluationScope scope(SGF);
@@ -667,8 +666,7 @@ ManagedValue Transform::transform(ManagedValue v,
   if (outputSubstType->isAnyHashable()) {
     auto *protocol = SGF.getASTContext().getProtocol(
         KnownProtocolKind::Hashable);
-    auto conformance = ModuleDecl::lookupConformance(
-        inputSubstType, protocol);
+    auto conformance = lookupConformance(inputSubstType, protocol);
     auto addr = v.getType().isAddress() ? v : v.materialize(SGF, Loc);
     auto result = SGF.emitAnyHashableErasure(Loc, addr, inputSubstType,
                                              conformance, ctxt);
@@ -1803,7 +1801,7 @@ private:
     auto opaque = AbstractionPattern::getOpaque();
     auto &concreteTL = SGF.getTypeLowering(opaque, outerSubstType);
 
-    auto conformances = SGF.SGM.M.getSwiftModule()->collectExistentialConformances(
+    auto conformances = collectExistentialConformances(
         outerSubstType, innerSubstType);
 
     auto innerTupleAddr =
@@ -4369,7 +4367,7 @@ ResultPlanner::expandInnerTupleOuterIndirect(AbstractionPattern innerOrigType,
       return;
     }
 
-    auto conformances = SGF.SGM.M.getSwiftModule()->collectExistentialConformances(
+    auto conformances = collectExistentialConformances(
         innerSubstType, outerSubstType);
 
     // Prepare the value slot in the existential.
@@ -4541,13 +4539,11 @@ void ResultPlanner::planExpandedIntoDirect(AbstractionPattern innerOrigType,
              "optional nor are we under opaque value mode");
       assert(outerSubstType->isAny());
 
-      auto *module = SGF.getModule().getSwiftModule();
-
       auto opaque = AbstractionPattern::getOpaque();
       auto anyType = SGF.getLoweredType(opaque, outerSubstType);
       auto outerResultAddr = SGF.emitTemporaryAllocation(Loc, anyType);
       auto conformances =
-        module->collectExistentialConformances(innerSubstType, outerSubstType);
+        collectExistentialConformances(innerSubstType, outerSubstType);
 
       SILValue outerConcreteResultAddr = SGF.B.createInitExistentialAddr(
           Loc, outerResultAddr, innerSubstType,
@@ -5442,7 +5438,10 @@ CanSILFunctionType SILGenFunction::buildThunkType(
     SubstitutionMap &interfaceSubs,
     CanType &dynamicSelfType,
     bool withoutActuallyEscaping) {
-  return buildSILFunctionThunkType(&F, sourceType, expectedType, inputSubstType, outputSubstType, genericEnv, interfaceSubs, dynamicSelfType, withoutActuallyEscaping);
+  return buildSILFunctionThunkType(
+      &F, sourceType, expectedType, inputSubstType, outputSubstType,
+      genericEnv, interfaceSubs, dynamicSelfType,
+      withoutActuallyEscaping);
 }
 
 static ManagedValue createPartialApplyOfThunk(SILGenFunction &SGF,
@@ -5909,7 +5908,7 @@ ManagedValue SILGenFunction::getThunkedAutoDiffLinearMap(
   // Get the thunk name.
   auto fromInterfaceType = fromType->mapTypeOutOfContext()->getCanonicalType();
   auto toInterfaceType = toType->mapTypeOutOfContext()->getCanonicalType();
-  Mangle::ASTMangler mangler;
+  Mangle::ASTMangler mangler(getASTContext());
   std::string name;
   // If `self` is being reordered, it is an AD-specific self-reordering
   // reabstraction thunk.
@@ -6273,7 +6272,7 @@ SILFunction *SILGenModule::getOrCreateCustomDerivativeThunk(
       LookUpConformanceInModule(), derivativeCanGenSig);
   assert(!thunkFnTy->getExtInfo().hasContext());
 
-  Mangle::ASTMangler mangler;
+  Mangle::ASTMangler mangler(getASTContext());
   auto name = getASTContext()
       .getIdentifier(
           mangler.mangleAutoDiffDerivativeFunction(originalAFD, kind, config))
@@ -6825,12 +6824,16 @@ SILGenFunction::emitVTableThunk(SILDeclRef base,
     break;
   }
 
-  case SILCoroutineKind::YieldOnce: {
+  case SILCoroutineKind::YieldOnce:
+  case SILCoroutineKind::YieldOnce2: {
     SmallVector<SILValue, 4> derivedYields;
-    auto tokenAndCleanup =
-        emitBeginApplyWithRethrow(loc, derivedRef,
-                                  SILType::getPrimitiveObjectType(derivedFTy),
-                                  subs, args, derivedYields);
+    auto tokenAndCleanups = emitBeginApplyWithRethrow(
+        loc, derivedRef, SILType::getPrimitiveObjectType(derivedFTy), subs,
+        args, derivedYields);
+    auto token = std::get<0>(tokenAndCleanups);
+    auto abortCleanup = std::get<1>(tokenAndCleanups);
+    auto allocation = std::get<2>(tokenAndCleanups);
+    auto deallocCleanup = std::get<3>(tokenAndCleanups);
     auto overrideSubs = SubstitutionMap::getOverrideSubstitutions(
         base.getDecl(), derived.getDecl()).subst(subs);
 
@@ -6840,10 +6843,13 @@ SILGenFunction::emitVTableThunk(SILDeclRef base,
     translateYields(*this, loc, derivedYields, derivedYieldInfo, baseYieldInfo);
 
     // Kill the abort cleanup without emitting it.
-    Cleanups.setCleanupState(tokenAndCleanup.second, CleanupState::Dead);
+    Cleanups.setCleanupState(abortCleanup, CleanupState::Dead);
+    if (allocation) {
+      Cleanups.setCleanupState(deallocCleanup, CleanupState::Dead);
+    }
 
     // End the inner coroutine normally.
-    emitEndApplyWithRethrow(loc, tokenAndCleanup.first);
+    emitEndApplyWithRethrow(loc, token, allocation);
 
     result = B.createTuple(loc, {});
     break;
@@ -7213,23 +7219,29 @@ void SILGenFunction::emitProtocolWitness(
     break;
   }
 
-  case SILCoroutineKind::YieldOnce: {
+  case SILCoroutineKind::YieldOnce:
+  case SILCoroutineKind::YieldOnce2: {
     SmallVector<SILValue, 4> witnessYields;
-    auto tokenAndCleanup =
-      emitBeginApplyWithRethrow(loc, witnessFnRef, witnessSILTy, witnessSubs,
-                                args, witnessYields);
+    auto tokenAndCleanups = emitBeginApplyWithRethrow(
+        loc, witnessFnRef, witnessSILTy, witnessSubs, args, witnessYields);
+    auto token = std::get<0>(tokenAndCleanups);
+    auto abortCleanup = std::get<1>(tokenAndCleanups);
+    auto allocation = std::get<2>(tokenAndCleanups);
+    auto deallocCleanup = std::get<3>(tokenAndCleanups);
 
     YieldInfo witnessYieldInfo(SGM, witness, witnessFTy, witnessSubs);
-    YieldInfo reqtYieldInfo(SGM, requirement, thunkTy,
-                            reqtSubs.subst(getForwardingSubstitutionMap()));
+    YieldInfo reqtYieldInfo(SGM, requirement, thunkTy, reqtSubs);
 
     translateYields(*this, loc, witnessYields, witnessYieldInfo, reqtYieldInfo);
 
     // Kill the abort cleanup without emitting it.
-    Cleanups.setCleanupState(tokenAndCleanup.second, CleanupState::Dead);
+    Cleanups.setCleanupState(abortCleanup, CleanupState::Dead);
+    if (allocation) {
+      Cleanups.setCleanupState(deallocCleanup, CleanupState::Dead);
+    }
 
     // End the inner coroutine normally.
-    emitEndApplyWithRethrow(loc, tokenAndCleanup.first);
+    emitEndApplyWithRethrow(loc, token, allocation);
 
     reqtResultValue = B.createTuple(loc, {});
     break;

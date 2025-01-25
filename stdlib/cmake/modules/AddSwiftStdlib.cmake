@@ -55,7 +55,7 @@ function(_add_target_variant_c_compile_link_flags)
   if("${CFLAGS_SDK}" IN_LIST SWIFT_DARWIN_PLATFORMS)
     # Check if there's a specific OS deployment version needed for this invocation
     if("${CFLAGS_SDK}" STREQUAL "OSX")
-      if(DEFINED maccatalyst_build_flavor)
+      if(DEFINED maccatalyst_build_flavor AND DEFINED CFLAGS_DEPLOYMENT_VERSION_MACCATALYST)
         set(DEPLOYMENT_VERSION ${CFLAGS_DEPLOYMENT_VERSION_MACCATALYST})
       else()
         set(DEPLOYMENT_VERSION ${CFLAGS_DEPLOYMENT_VERSION_OSX})
@@ -529,6 +529,7 @@ function(_add_target_variant_link_flags)
     list(APPEND link_libraries "pthread")
   elseif("${LFLAGS_SDK}" STREQUAL "OPENBSD")
     list(APPEND link_libraries "pthread")
+    list(APPEND result "-Wl,-Bsymbolic")
   elseif("${LFLAGS_SDK}" STREQUAL "CYGWIN")
     # No extra libraries required.
   elseif("${LFLAGS_SDK}" STREQUAL "WINDOWS")
@@ -554,15 +555,22 @@ function(_add_target_variant_link_flags)
     list(APPEND link_libraries "dl" "log")
     # We need to add the math library, which is linked implicitly by libc++
     list(APPEND result "-lm")
-    if(NOT CMAKE_HOST_SYSTEM MATCHES Windows)
+    if(NOT CMAKE_HOST_SYSTEM MATCHES Windows AND NOT "${SWIFT_ANDROID_NDK_PATH}" STREQUAL "")
       # The Android resource dir is specified from build.ps1 on windows.
-      if(NOT "${SWIFT_ANDROID_NDK_PATH}" STREQUAL "")
-        if("${SWIFT_ANDROID_NDK_PATH}" MATCHES "r26")
+      if(EXISTS "${SWIFT_ANDROID_NDK_PATH}/source.properties")
+        file(READ "${SWIFT_ANDROID_NDK_PATH}/source.properties" NDK_VERSION)
+        if(NOT NDK_VERSION MATCHES "Pkg\\.Revision = ([0-9\\.]+)")
+          message(FATAL_ERROR "Could not find NDK version in source.properties: ${NDK_VERSION}")
+        endif()
+
+        if("${CMAKE_MATCH_1}" VERSION_GREATER_EQUAL "26")
           file(GLOB RESOURCE_DIR ${SWIFT_SDK_ANDROID_ARCH_${LFLAGS_ARCH}_PATH}/../lib/clang/*)
         else()
           file(GLOB RESOURCE_DIR ${SWIFT_SDK_ANDROID_ARCH_${LFLAGS_ARCH}_PATH}/../lib64/clang/*)
         endif()
         list(APPEND result "-resource-dir=${RESOURCE_DIR}")
+      else()
+        message(FATAL_ERROR "Could not detect NDK version: ${SWIFT_ANDROID_NDK_PATH}/source.properties not found")
       endif()
     endif()
 
@@ -937,6 +945,13 @@ function(add_swift_target_library_single target name)
     set(SWIFTLIB_SINGLE_SOURCES ${SWIFTLIB_SINGLE_SOURCES} ${SWIFTLIB_SINGLE_HEADERS} ${SWIFTLIB_SINGLE_TDS})
   endif()
 
+  # FIXME: swiftDarwin currently trips an assertion in SymbolGraphGen
+  if (SWIFTLIB_IS_STDLIB AND SWIFT_STDLIB_BUILD_SYMBOL_GRAPHS AND NOT ${name} STREQUAL "swiftDarwin")
+    list(APPEND SWIFTLIB_SINGLE_SWIFT_COMPILE_FLAGS "-Xfrontend;-emit-symbol-graph")
+    list(APPEND SWIFTLIB_SINGLE_SWIFT_COMPILE_FLAGS
+         "-Xfrontend;-emit-symbol-graph-dir;-Xfrontend;${out_lib_dir}/symbol-graph/${VARIANT_NAME}")
+  endif()
+
   if(MODULE)
     set(libkind MODULE)
   elseif(SWIFTLIB_SINGLE_OBJECT_LIBRARY)
@@ -977,7 +992,7 @@ function(add_swift_target_library_single target name)
         -Xcc;-Xclang;-Xcc;-ivfsoverlay;-Xcc;-Xclang;-Xcc;${SWIFTLIB_SINGLE_VFS_OVERLAY})
     endif()
     list(APPEND SWIFTLIB_SINGLE_SWIFT_COMPILE_FLAGS
-      -vfsoverlay;"${SWIFT_WINDOWS_VFS_OVERLAY}";-strict-implicit-module-context;-Xcc;-Xclang;-Xcc;-fbuiltin-headers-in-system-modules)
+      -vfsoverlay;"${SWIFT_WINDOWS_VFS_OVERLAY}";-Xfrontend;-strict-implicit-module-context;-Xcc;-Xclang;-Xcc;-fbuiltin-headers-in-system-modules)
     if(NOT CMAKE_HOST_SYSTEM MATCHES Windows)
       swift_windows_include_for_arch(${SWIFTLIB_SINGLE_ARCHITECTURE} SWIFTLIB_INCLUDE)
       foreach(directory ${SWIFTLIB_INCLUDE})
@@ -1433,12 +1448,12 @@ function(add_swift_target_library_single target name)
     ENABLE_ASSERTIONS "${enable_assertions}"
     ANALYZE_CODE_COVERAGE "${analyze_code_coverage}"
     ENABLE_LTO "${lto_type}"
-    DEPLOYMENT_VERSION_OSX "${SWIFTLIB_DEPLOYMENT_VERSION_OSX}"
-    DEPLOYMENT_VERSION_MACCATALYST "${SWIFTLIB_DEPLOYMENT_VERSION_MACCATALYST}"
-    DEPLOYMENT_VERSION_IOS "${SWIFTLIB_DEPLOYMENT_VERSION_IOS}"
-    DEPLOYMENT_VERSION_TVOS "${SWIFTLIB_DEPLOYMENT_VERSION_TVOS}"
-    DEPLOYMENT_VERSION_WATCHOS "${SWIFTLIB_DEPLOYMENT_VERSION_WATCHOS}"
-    DEPLOYMENT_VERSION_XROS "${SWIFTLIB_DEPLOYMENT_VERSION_XROS}"
+    DEPLOYMENT_VERSION_OSX "${SWIFTLIB_SINGLE_DEPLOYMENT_VERSION_OSX}"
+    DEPLOYMENT_VERSION_MACCATALYST "${SWIFTLIB_SINGLE_DEPLOYMENT_VERSION_MACCATALYST}"
+    DEPLOYMENT_VERSION_IOS "${SWIFTLIB_SINGLE_DEPLOYMENT_VERSION_IOS}"
+    DEPLOYMENT_VERSION_TVOS "${SWIFTLIB_SINGLE_DEPLOYMENT_VERSION_TVOS}"
+    DEPLOYMENT_VERSION_WATCHOS "${SWIFTLIB_SINGLE_DEPLOYMENT_VERSION_WATCHOS}"
+    DEPLOYMENT_VERSION_XROS "${SWIFTLIB_SINGLE_DEPLOYMENT_VERSION_XROS}"
     RESULT_VAR_NAME c_compile_flags
     MACCATALYST_BUILD_FLAVOR "${SWIFTLIB_SINGLE_MACCATALYST_BUILD_FLAVOR}"
     )
@@ -1456,12 +1471,12 @@ function(add_swift_target_library_single target name)
     ANALYZE_CODE_COVERAGE "${analyze_code_coverage}"
     ENABLE_LTO "${lto_type}"
     LTO_OBJECT_NAME "${target}-${SWIFTLIB_SINGLE_SDK}-${SWIFTLIB_SINGLE_ARCHITECTURE}"
-    DEPLOYMENT_VERSION_OSX "${SWIFTLIB_DEPLOYMENT_VERSION_OSX}"
-    DEPLOYMENT_VERSION_MACCATALYST "${SWIFTLIB_DEPLOYMENT_VERSION_MACCATALYST}"
-    DEPLOYMENT_VERSION_IOS "${SWIFTLIB_DEPLOYMENT_VERSION_IOS}"
-    DEPLOYMENT_VERSION_TVOS "${SWIFTLIB_DEPLOYMENT_VERSION_TVOS}"
-    DEPLOYMENT_VERSION_WATCHOS "${SWIFTLIB_DEPLOYMENT_VERSION_WATCHOS}"
-    DEPLOYMENT_VERSION_XROS "${SWIFTLIB_DEPLOYMENT_VERSION_XROS}"
+    DEPLOYMENT_VERSION_OSX "${SWIFTLIB_SINGLE_DEPLOYMENT_VERSION_OSX}"
+    DEPLOYMENT_VERSION_MACCATALYST "${SWIFTLIB_SINGLE_DEPLOYMENT_VERSION_MACCATALYST}"
+    DEPLOYMENT_VERSION_IOS "${SWIFTLIB_SINGLE_DEPLOYMENT_VERSION_IOS}"
+    DEPLOYMENT_VERSION_TVOS "${SWIFTLIB_SINGLE_DEPLOYMENT_VERSION_TVOS}"
+    DEPLOYMENT_VERSION_WATCHOS "${SWIFTLIB_SINGLE_DEPLOYMENT_VERSION_WATCHOS}"
+    DEPLOYMENT_VERSION_XROS "${SWIFTLIB_SINGLE_DEPLOYMENT_VERSION_XROS}"
     RESULT_VAR_NAME link_flags
     LINK_LIBRARIES_VAR_NAME link_libraries
     LIBRARY_SEARCH_DIRECTORIES_VAR_NAME library_search_directories
@@ -1829,6 +1844,9 @@ endfunction()
 # INSTALL_WITH_SHARED
 #   Install a static library target alongside shared libraries
 #
+# IMPORTS_NON_OSSA
+#   Imports a non-ossa module
+#
 # MACCATALYST_BUILD_FLAVOR
 #   Possible values are 'ios-like', 'macos-like', 'zippered', 'unzippered-twin'
 #   Presence of a build flavor requires SWIFT_MODULE_DEPENDS_MACCATALYST to be
@@ -1888,7 +1906,8 @@ function(add_swift_target_library name)
         SHARED
         STATIC
         NO_LINK_NAME
-        INSTALL_WITH_SHARED)
+        INSTALL_WITH_SHARED
+        IMPORTS_NON_OSSA)
   set(SWIFTLIB_single_parameter_options
         DEPLOYMENT_VERSION_IOS
         DEPLOYMENT_VERSION_OSX
@@ -1929,6 +1948,7 @@ function(add_swift_target_library name)
         SWIFT_COMPILE_FLAGS_WATCHOS
         SWIFT_COMPILE_FLAGS_XROS
         SWIFT_COMPILE_FLAGS_LINUX
+        SWIFT_COMPILE_FLAGS_LINUX_STATIC
         SWIFT_MODULE_DEPENDS
         SWIFT_MODULE_DEPENDS_ANDROID
         SWIFT_MODULE_DEPENDS_CYGWIN
@@ -1959,6 +1979,7 @@ function(add_swift_target_library name)
         SWIFT_SOURCES_DEPENDS_FREEBSD
         SWIFT_SOURCES_DEPENDS_OPENBSD
         SWIFT_SOURCES_DEPENDS_LINUX
+        SWIFT_SOURCES_DEPENDS_LINUX_STATIC
         SWIFT_SOURCES_DEPENDS_CYGWIN
         SWIFT_SOURCES_DEPENDS_HAIKU
         SWIFT_SOURCES_DEPENDS_WASI
@@ -2048,8 +2069,11 @@ function(add_swift_target_library name)
   # behavior for their requirements.
   if (SWIFTLIB_IS_STDLIB)
     list(APPEND SWIFTLIB_SWIFT_COMPILE_FLAGS "-warn-implicit-overrides")
-    list(APPEND SWIFTLIB_SWIFT_COMPILE_FLAGS "-Xfrontend;-enable-ossa-modules")
     list(APPEND SWIFTLIB_SWIFT_COMPILE_FLAGS "-Xfrontend;-enable-lexical-lifetimes=false")
+  endif()
+
+  if (NOT SWIFTLIB_IMPORTS_NON_OSSA)
+    list(APPEND SWIFTLIB_SWIFT_COMPILE_FLAGS "-Xfrontend;-enable-ossa-modules")
   endif()
 
   if(NOT DEFINED SWIFTLIB_INSTALL_BINARY_SWIFTMODULE)
@@ -2212,6 +2236,9 @@ function(add_swift_target_library name)
     elseif(sdk STREQUAL "LINUX")
       list(APPEND swiftlib_swift_compile_flags_all
            ${SWIFTLIB_SWIFT_COMPILE_FLAGS_LINUX})
+    elseif(sdk STREQUAL "LINUX_STATIC")
+      list(APPEND swiftlib_swift_compile_flags_all
+           ${SWIFTLIB_SWIFT_COMPILE_FLAGS_LINUX_STATIC})
     elseif(sdk STREQUAL "WINDOWS")
       # FIXME: https://github.com/apple/swift/issues/44614
       # static and shared are not mutually exclusive; however since we do a
@@ -2227,7 +2254,6 @@ function(add_swift_target_library name)
         list(APPEND swiftlib_swift_compile_flags_all -D_LIB)
       endif()
     endif()
-
 
     # Collect architecture agnostic SDK linker flags
     set(swiftlib_link_flags_all ${SWIFTLIB_LINK_FLAGS})
@@ -2256,6 +2282,8 @@ function(add_swift_target_library name)
       list(APPEND sources ${SWIFTLIB_SWIFT_SOURCES_DEPENDS_OPENBSD})
     elseif(sdk STREQUAL "LINUX" OR sdk STREQUAL "ANDROID")
       list(APPEND sources ${SWIFTLIB_SWIFT_SOURCES_DEPENDS_LINUX})
+    elseif(sdk STREQUAL "LINUX_STATIC")
+      list(APPEND sources ${SWIFTLIB_SWIFT_SOURCES_DEPENDS_LINUX_STATIC})
     elseif(sdk STREQUAL "CYGWIN")
       list(APPEND sources ${SWIFTLIB_SWIFT_SOURCES_DEPENDS_CYGWIN})
     elseif(sdk STREQUAL "HAIKU")
@@ -2828,7 +2856,13 @@ function(_add_swift_target_executable_single name)
     INSTALL_IN_COMPONENT)
   set(multiple_parameter_options
     COMPILE_FLAGS
-    DEPENDS)
+    DEPENDS
+    DEPLOYMENT_VERSION_IOS
+    DEPLOYMENT_VERSION_OSX
+    DEPLOYMENT_VERSION_MACCATALYST
+    DEPLOYMENT_VERSION_TVOS
+    DEPLOYMENT_VERSION_WATCHOS
+    DEPLOYMENT_VERSION_XROS)
   cmake_parse_arguments(SWIFTEXE_SINGLE
     "${options}"
     "${single_parameter_options}"
@@ -2857,6 +2891,12 @@ function(_add_swift_target_executable_single name)
     ENABLE_ASSERTIONS "${LLVM_ENABLE_ASSERTIONS}"
     ENABLE_LTO "${SWIFT_STDLIB_ENABLE_LTO}"
     ANALYZE_CODE_COVERAGE "${SWIFT_ANALYZE_CODE_COVERAGE}"
+    DEPLOYMENT_VERSION_OSX "${SWIFTEXE_SINGLE_DEPLOYMENT_VERSION_OSX}"
+    DEPLOYMENT_VERSION_MACCATALYST "${SWIFTEXE_SINGLE_DEPLOYMENT_VERSION_MACCATALYST}"
+    DEPLOYMENT_VERSION_IOS "${SWIFTEXE_SINGLE_DEPLOYMENT_VERSION_IOS}"
+    DEPLOYMENT_VERSION_TVOS "${SWIFTEXE_SINGLE_DEPLOYMENT_VERSION_TVOS}"
+    DEPLOYMENT_VERSION_WATCHOS "${SWIFTEXE_SINGLE_DEPLOYMENT_VERSION_WATCHOS}"
+    DEPLOYMENT_VERSION_XROS "${SWIFTEXE_SINGLE_DEPLOYMENT_VERSION_XROS}"
     RESULT_VAR_NAME c_compile_flags)
   _add_target_variant_link_flags(
     SDK "${SWIFTEXE_SINGLE_SDK}"
@@ -2866,6 +2906,12 @@ function(_add_swift_target_executable_single name)
     ENABLE_LTO "${SWIFT_STDLIB_ENABLE_LTO}"
     LTO_OBJECT_NAME "${name}-${SWIFTEXE_SINGLE_SDK}-${SWIFTEXE_SINGLE_ARCHITECTURE}"
     ANALYZE_CODE_COVERAGE "${SWIFT_ANALYZE_CODE_COVERAGE}"
+    DEPLOYMENT_VERSION_OSX "${SWIFTEXE_SINGLE_DEPLOYMENT_VERSION_OSX}"
+    DEPLOYMENT_VERSION_MACCATALYST "${SWIFTEXE_SINGLE_DEPLOYMENT_VERSION_MACCATALYST}"
+    DEPLOYMENT_VERSION_IOS "${SWIFTEXE_SINGLE_DEPLOYMENT_VERSION_IOS}"
+    DEPLOYMENT_VERSION_TVOS "${SWIFTEXE_SINGLE_DEPLOYMENT_VERSION_TVOS}"
+    DEPLOYMENT_VERSION_WATCHOS "${SWIFTEXE_SINGLE_DEPLOYMENT_VERSION_WATCHOS}"
+    DEPLOYMENT_VERSION_XROS "${SWIFTEXE_SINGLE_DEPLOYMENT_VERSION_XROS}"
     RESULT_VAR_NAME link_flags
     LINK_LIBRARIES_VAR_NAME link_libraries
     LIBRARY_SEARCH_DIRECTORIES_VAR_NAME library_search_directories)
@@ -2874,7 +2920,7 @@ function(_add_swift_target_executable_single name)
 
   if(SWIFTEXE_SINGLE_SDK STREQUAL "WINDOWS")
     list(APPEND SWIFTEXE_SINGLE_COMPILE_FLAGS
-      -vfsoverlay;"${SWIFT_WINDOWS_VFS_OVERLAY}";-strict-implicit-module-context;-Xcc;-Xclang;-Xcc;-fbuiltin-headers-in-system-modules)
+      -vfsoverlay;"${SWIFT_WINDOWS_VFS_OVERLAY}";-Xfrontend;-strict-implicit-module-context;-Xcc;-Xclang;-Xcc;-fbuiltin-headers-in-system-modules)
   endif()
 
   if ("${SWIFTEXE_SINGLE_SDK}" STREQUAL "LINUX")
@@ -2896,6 +2942,12 @@ function(_add_swift_target_executable_single name)
       COMPILE_FLAGS ${SWIFTEXE_SINGLE_COMPILE_FLAGS}
       ENABLE_LTO "${SWIFT_STDLIB_ENABLE_LTO}"
       INSTALL_IN_COMPONENT "${install_in_component}"
+      DEPLOYMENT_VERSION_OSX "${SWIFTEXE_SINGLE_DEPLOYMENT_VERSION_OSX}"
+      DEPLOYMENT_VERSION_MACCATALYST "${SWIFTEXE_SINGLE_DEPLOYMENT_VERSION_MACCATALYST}"
+      DEPLOYMENT_VERSION_IOS "${SWIFTEXE_SINGLE_DEPLOYMENT_VERSION_IOS}"
+      DEPLOYMENT_VERSION_TVOS "${SWIFTEXE_SINGLE_DEPLOYMENT_VERSION_TVOS}"
+      DEPLOYMENT_VERSION_WATCHOS "${SWIFTEXE_SINGLE_DEPLOYMENT_VERSION_WATCHOS}"
+      DEPLOYMENT_VERSION_XROS "${SWIFTEXE_SINGLE_DEPLOYMENT_VERSION_XROS}"
       IS_MAIN)
   add_swift_source_group("${SWIFTEXE_SINGLE_EXTERNAL_SOURCES}")
 
@@ -3015,6 +3067,12 @@ function(add_swift_target_executable name)
     PREFER_STATIC
     NOSWIFTRT)
   set(SWIFTEXE_single_parameter_options
+    DEPLOYMENT_VERSION_IOS
+    DEPLOYMENT_VERSION_OSX
+    DEPLOYMENT_VERSION_MACCATALYST
+    DEPLOYMENT_VERSION_TVOS
+    DEPLOYMENT_VERSION_WATCHOS
+    DEPLOYMENT_VERSION_XROS
     INSTALL_IN_COMPONENT)
   set(SWIFTEXE_multiple_parameter_options
     DEPENDS
@@ -3253,6 +3311,13 @@ function(add_swift_target_executable name)
             ${SWIFTEXE_TARGET_DEPENDS_with_suffix}
             ${swiftexe_module_dependency_targets}
             ${swiftexe_link_libraries_targets}
+          DEPLOYMENT_VERSION_OSX "${SWIFTEXE_TARGET_DEPLOYMENT_VERSION_OSX}"
+          DEPLOYMENT_VERSION_MACCATALYST
+            "${SWIFTEXE_TARGET_DEPLOYMENT_VERSION_MACCATALYST}"
+          DEPLOYMENT_VERSION_IOS "${SWIFTEXE_TARGET_DEPLOYMENT_VERSION_IOS}"
+          DEPLOYMENT_VERSION_TVOS "${SWIFTEXE_TARGET_DEPLOYMENT_VERSION_TVOS}"
+          DEPLOYMENT_VERSION_WATCHOS "${SWIFTEXE_TARGET_DEPLOYMENT_VERSION_WATCHOS}"
+          DEPLOYMENT_VERSION_XROS "${SWIFTEXE_TARGET_DEPLOYMENT_VERSION_XROS}"
           SDK "${sdk}"
           ARCHITECTURE "${arch}"
           COMPILE_FLAGS

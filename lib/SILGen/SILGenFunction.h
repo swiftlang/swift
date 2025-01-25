@@ -465,11 +465,17 @@ public:
     /// It may be invalid if no box was made for the value (e.g., because it was
     /// an inout value, or constant emitted to an alloc_stack).
     SILValue box;
+    
+    /// True if the `value` represents the memory location of a value that is
+    /// stable for the lifetimes of any dependencies on that value.
+    bool addressable;
 
-    static VarLoc get(SILValue value, SILValue box = SILValue()) {
+    static VarLoc get(SILValue value, SILValue box = SILValue(),
+                      bool addressable = false) {
       VarLoc Result;
       Result.value = value;
       Result.box = box;
+      Result.addressable = addressable;
       return Result;
     }
   };
@@ -575,11 +581,58 @@ public:
   /// The metatype argument to an allocating constructor, if we're emitting one.
   SILValue AllocatorMetatype;
 
+  class ExpectedExecutorStorage {
+    static ValueBase *invalid() {
+      return reinterpret_cast<ValueBase*>(uintptr_t(0));
+    }
+    static ValueBase *unnecessary() {
+      return reinterpret_cast<ValueBase*>(uintptr_t(1));
+    }
+    static ValueBase *lazy() {
+      return reinterpret_cast<ValueBase*>(uintptr_t(2));
+    }
+
+    ValueBase *Value;
+
+  public:
+    ExpectedExecutorStorage() : Value(invalid()) {}
+
+    bool isValid() const { return Value != invalid(); }
+
+    bool isNecessary() const {
+      assert(isValid());
+      return Value != unnecessary();
+    }
+    void setUnnecessary() {
+      assert(Value == invalid());
+      Value = unnecessary();
+    }
+
+    bool isEager() const {
+      assert(Value != invalid() && Value != unnecessary());
+      return Value != lazy();
+    }
+    SILValue getEager() const {
+      assert(isEager());
+      return Value;
+    }
+    void set(SILValue value) {
+      assert(Value == invalid());
+      assert(value != nullptr);
+      Value = value;
+    }
+
+    void setLazy() {
+      assert(Value == invalid());
+      Value = lazy();
+    }
+  };
+
   /// If set, the current function is an async function which is formally
   /// isolated to the given executor, and hop_to_executor instructions must
   /// be inserted at the begin of the function and after all suspension
   /// points.
-  SILValue ExpectedExecutor;
+  ExpectedExecutorStorage ExpectedExecutor;
 
   struct ActivePackExpansion {
     GenericEnvironment *OpenedElementEnv;
@@ -815,15 +868,19 @@ public:
 
   /// Generates code for class/move only deallocating destructor. This calls the
   /// destroying destructor and then deallocates 'self'.
-  void emitDeallocatingDestructor(DestructorDecl *dd);
+  void emitDeallocatingDestructor(DestructorDecl *dd, bool isIsolated);
 
-  /// Generates code for a class deallocating destructor. This
+  /// Generates code for a class (isolated-)deallocating destructor. This
   /// calls the destroying destructor and then deallocates 'self'.
-  void emitDeallocatingClassDestructor(DestructorDecl *dd);
+  void emitDeallocatingClassDestructor(DestructorDecl *dd, bool isIsolated);
 
   /// Generates code for the deinit of the move only type and destroys all of
   /// the fields.
   void emitDeallocatingMoveOnlyDestructor(DestructorDecl *dd);
+
+  /// Generates code for a class deallocating destructor that switches executor
+  /// and calls isolated deallocating destuctor on the right executor.
+  void emitIsolatingDestructor(DestructorDecl *dd);
 
   /// Whether we are inside a constructor whose hops are injected by
   /// definite initialization.
@@ -902,12 +959,8 @@ public:
   ///
   /// \param selfValue The 'self' value.
   /// \param cd The class declaration whose members are being destroyed.
-  /// \param finishBB If set, used as the basic block after members have been
-  ///                 destroyed, and we're ready to perform final cleanups
-  ///                 before returning.
   void emitClassMemberDestruction(ManagedValue selfValue, ClassDecl *cd,
-                                  CleanupLocation cleanupLoc,
-                                  SILBasicBlock* finishBB);
+                                  CleanupLocation cleanupLoc);
 
   /// Generates code to destroy the instance variables of a move only non-class
   /// nominal type.
@@ -1154,17 +1207,6 @@ public:
   /// that unsafely inherits its executor.
   bool unsafelyInheritsExecutor();
 
-  /// A version of `emitHopToTargetActor` that is specialized to the needs
-  /// of various types of ConstructorDecls, like class or value initializers,
-  /// because their prolog emission is not the same as for regular functions.
-  ///
-  /// This function emits the appropriate hop_to_executor for a constructor's
-  /// prologue.
-  ///
-  /// NOTE: this does not support actor initializers!
-  void emitConstructorPrologActorHop(SILLocation loc,
-                                     std::optional<ActorIsolation> actorIso);
-
   /// Set the given global actor as the isolation for this function
   /// (generally a thunk) and hop to it.
   void emitPrologGlobalActorHop(SILLocation loc, Type globalActor);
@@ -1186,9 +1228,10 @@ public:
   void emitPreconditionCheckExpectedExecutor(
       SILLocation loc, SILValue executor);
 
-  /// Gets a reference to the current executor for the task.
-  /// \returns a value of type Builtin.Executor
-  SILValue emitGetCurrentExecutor(SILLocation loc);
+  /// Emit the expected executor value at the current position.
+  /// Returns a reference of some actor type, possibly optional,
+  /// possibly borrowed.
+  ManagedValue emitExpectedExecutor(SILLocation loc);
 
   /// Emit a "hoppable" reference to the executor value for the generic
   /// (concurrent) executor.
@@ -1246,6 +1289,11 @@ public:
   ManagedValue emitClosureIsolation(SILLocation loc, SILDeclRef constant,
                                     ArrayRef<ManagedValue> captures);
 
+  /// Emit the opaque isolation value for the current point of a function
+  /// with flow-sensitive isolation.
+  ManagedValue emitFlowSensitiveSelfIsolation(SILLocation loc,
+                                              ActorIsolation isolation);
+
   //===--------------------------------------------------------------------===//
   // Memory management
   //===--------------------------------------------------------------------===//
@@ -1268,7 +1316,8 @@ public:
 
   /// Set up the ExpectedExecutor field for the current function and emit
   /// whatever hops or assertions are locally expected.
-  void emitExpectedExecutor();
+  void emitExpectedExecutorProlog();
+  void emitConstructorExpectedExecutorProlog();
 
   /// Create SILArguments in the entry block that bind a single value
   /// of the given parameter suitably for being forwarded.
@@ -1375,6 +1424,16 @@ public:
   ManagedValue manageBufferForExprResult(SILValue buffer,
                                          const TypeLowering &bufferTL,
                                          SGFContext C);
+                                         
+  /// Tries to emit an argument referring to an addressable parameter as the
+  /// stable address of the parameter.
+  ///
+  /// Returns a null ManagedValue if the argument is not a parameter reference,
+  /// the referenced parameter is not addressable, or the requested
+  /// \c ownership is not compatible with the parameter's ownership. \c arg
+  /// is consumed only if the operation succeeds.
+  ManagedValue tryEmitAddressableParameterAsAddress(ArgumentSource &&arg,
+                                                    ValueOwnership ownership);
   
   //===--------------------------------------------------------------------===//
   // Type conversions for expr emission and thunks
@@ -2132,12 +2191,14 @@ public:
                                 SubstitutionMap subs,
                                 ArrayRef<SILValue> args);
 
-  std::pair<MultipleValueInstructionResult *, CleanupHandle>
+  std::tuple<MultipleValueInstructionResult *, CleanupHandle, SILValue,
+             CleanupHandle>
   emitBeginApplyWithRethrow(SILLocation loc, SILValue fn, SILType substFnType,
                             SubstitutionMap subs, ArrayRef<SILValue> args,
                             SmallVectorImpl<SILValue> &yields);
   void emitEndApplyWithRethrow(SILLocation loc,
-                               MultipleValueInstructionResult *token);
+                               MultipleValueInstructionResult *token,
+                               SILValue allocation);
 
   ManagedValue emitExtractFunctionIsolation(SILLocation loc,
                                         ArgumentSource &&fnValue);
@@ -2518,9 +2579,8 @@ public:
   /// corresponding SIL function for it.
   void emitDistributedActorFactory(FuncDecl *fd); // TODO(distributed): this is the "resolve"
 
-  void emitDistributedIfRemoteBranch(SILLocation Loc,
-                                     ManagedValue selfValue, Type selfTy,
-                                     SILBasicBlock *isRemoteBB,
+  void emitDistributedIfRemoteBranch(SILLocation Loc, SILValue selfValue,
+                                     Type selfTy, SILBasicBlock *isRemoteBB,
                                      SILBasicBlock *isLocalBB);
 
   /// Notify transport that actor has initialized successfully,
@@ -2543,22 +2603,14 @@ public:
   /// \param actorSelf the SIL value representing the distributed actor instance
   void emitDistributedActorSystemResignIDCall(SILLocation loc,
                               ClassDecl *actorDecl, ManagedValue actorSelf);
-  
-  /// Emit code that tests whether the distributed actor is local, and if so,
-  /// resigns the distributed actor's identity.
-  /// \param continueBB the target block where execution will continue after
-  ///                   the conditional call, whether actor is local or remote.
-  void emitConditionalResignIdentityCall(SILLocation loc,
-                                         ClassDecl *actorDecl,
-                                         ManagedValue actorSelf,
-                                         SILBasicBlock *continueBB,
-                                         SILBasicBlock *finishBB);
 
-  void emitDistributedActorClassMemberDestruction(
-      SILLocation cleanupLoc, ManagedValue selfValue, ClassDecl *cd,
-      SILBasicBlock *normalMemberDestroyBB,
-      SILBasicBlock *remoteMemberDestroyBB,
-      SILBasicBlock *finishBB);
+  /// Emits check for remote actor and a branch that implements deallocating
+  /// deinit for remote proxy. Calls \p emitLocalDeinit to generate branch for
+  /// local actor.
+  void
+  emitDistributedRemoteActorDeinit(SILValue selfValue, DestructorDecl *dd,
+                                   bool isIsolated,
+                                   llvm::function_ref<void()> emitLocalDeinit);
 
   //===--------------------------------------------------------------------===//
   // Declarations
@@ -2662,6 +2714,9 @@ public:
 
   /// Destroy the class member.
   void destroyClassMember(SILLocation L, ManagedValue selfValue, VarDecl *D);
+
+  /// Destroy the default actor implementation.
+  void emitDestroyDefaultActor(CleanupLocation cleanupLoc, SILValue selfValue);
 
   /// Enter a cleanup to deallocate a stack variable.
   CleanupHandle enterDeallocStackCleanup(SILValue address);

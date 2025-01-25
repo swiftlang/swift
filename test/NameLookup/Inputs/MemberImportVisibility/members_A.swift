@@ -1,4 +1,6 @@
-public struct X { }
+public struct X {
+  public init() {}
+}
 
 public protocol P { }
 
@@ -33,6 +35,7 @@ public enum EnumInA {
 }
 
 open class BaseClassInA {
+  public init() {}
   open func methodInA() {}
 }
 

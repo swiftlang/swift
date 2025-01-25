@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/SIL/GenericSpecializationMangler.h"
+#include "swift/AST/ASTContext.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/GenericSignature.h"
 #include "swift/AST/SubstitutionMap.h"
@@ -64,6 +65,10 @@ std::string SpecializationMangler::finalize() {
     FuncTopLevel = D.demangleSymbol(FuncName);
     assert(FuncTopLevel);
   }
+  else if (FuncName.starts_with(MANGLING_PREFIX_EMBEDDED_STR)) {
+    FuncTopLevel = D.demangleSymbol(FuncName);
+    assert(FuncTopLevel);
+  }
   if (!FuncTopLevel) {
     FuncTopLevel = D.createNode(Node::Kind::Global);
     FuncTopLevel->addChild(D.createNode(Node::Kind::Identifier, FuncName), D);
@@ -71,10 +76,10 @@ std::string SpecializationMangler::finalize() {
   for (NodePointer FuncChild : *FuncTopLevel) {
     TopLevel->addChild(FuncChild, D);
   }
-  auto mangling = Demangle::mangleNode(TopLevel);
+  auto mangling = Demangle::mangleNode(TopLevel, Flavor);
   assert(mangling.isSuccess());
   std::string mangledName = mangling.result();
-  verify(mangledName);
+  verify(mangledName, Flavor);
   return mangledName;
 }
 
@@ -107,31 +112,35 @@ manglePrespecialized(GenericSignature sig, SubstitutionMap subs) {
                                   
 std::string GenericSpecializationMangler::
 mangleNotReabstracted(SubstitutionMap subs,
-                      bool metatyeParamsRemoved) {
+                      const SmallBitVector &paramsRemoved) {
   beginMangling();
   appendSubstitutions(getGenericSignature(), subs);
-  if (metatyeParamsRemoved) {
-    appendSpecializationOperator("TGm");
-  } else {
-    appendSpecializationOperator("TG");
-  }
+  appendOperator("T");
+  appendRemovedParams(paramsRemoved);
+  appendSpecializationOperator("G");
   return finalize();
 }
                                   
 std::string GenericSpecializationMangler::
 mangleReabstracted(SubstitutionMap subs, bool alternativeMangling,
-                   bool metatyeParamsRemoved) {
+                   const SmallBitVector &paramsRemoved) {
   beginMangling();
   appendSubstitutions(getGenericSignature(), subs);
-  
+  appendOperator("T");
+  appendRemovedParams(paramsRemoved);
+
   // See ReabstractionInfo::hasConvertedResilientParams for why and when to use
   // the alternative mangling.
-  if (metatyeParamsRemoved) {
-    appendSpecializationOperator(alternativeMangling ? "TBm" : "Tgm");
-  } else {
-    appendSpecializationOperator(alternativeMangling ? "TB" : "Tg");
-  }
+  appendSpecializationOperator(alternativeMangling ? "B" : "g");
   return finalize();
+}
+
+void GenericSpecializationMangler::appendRemovedParams(const SmallBitVector &paramsRemoved) {
+  for (int paramIdx : paramsRemoved.set_bits()) {
+    appendOperator("t");
+    if (paramIdx != 0)
+      Buffer << (paramIdx - 1);
+  }
 }
 
 std::string GenericSpecializationMangler::
@@ -168,11 +177,11 @@ getSubstitutionMapForPrespecialization(GenericSignature genericSig,
   return subs;
 }
 
-std::string GenericSpecializationMangler::manglePrespecialization(
+std::string GenericSpecializationMangler::manglePrespecialization(ASTContext &Ctx,
     std::string unspecializedName, GenericSignature genericSig,
     GenericSignature specializedSig) {
   auto subs =
       getSubstitutionMapForPrespecialization(genericSig, specializedSig);
-  GenericSpecializationMangler mangler(unspecializedName);
+  GenericSpecializationMangler mangler(Ctx, unspecializedName);
   return mangler.manglePrespecialized(genericSig, subs);
 }

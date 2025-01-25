@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -enable-objc-interop -enable-sil-verify-all %s -simplify-cfg | %FileCheck %s
+// RUN: %target-sil-opt -sil-print-types -enable-objc-interop -enable-sil-verify-all %s -simplify-cfg | %FileCheck %s
 
 // OSSA form of tests from simplify_cfg.sil and simplify_cfg_simple.sil.
 //
@@ -1887,3 +1887,87 @@ bb6(%21 : $Optional<Int>):
   return %22 : $()
 }
 
+
+// CHECK-LABEL: sil [ossa] @simplify_switch_enum3 :
+// CHECK-NOT:     switch_enum
+// CHECK:         destroy_value %{{[0-9]+}} : $Optional<String>
+// CHECK:       } // end sil function 'simplify_switch_enum3'
+sil [ossa] @simplify_switch_enum3 : $@convention(thin) () -> () {
+bb0:
+  cond_br undef, bb1, bb2
+
+bb1:
+  %1 = enum $Optional<String>, #Optional.none!enumelt
+  br bb3(%1 : $Optional<String>)
+
+bb2:
+  %4 = enum $Optional<String>, #Optional.none!enumelt
+  br bb3(%4 : $Optional<String>)
+
+bb3(%10 : @owned $Optional<String>):
+  debug_value %10 : $Optional<String>
+  switch_enum %10 : $Optional<String>, case #Optional.some!enumelt: bb5, case #Optional.none!enumelt: bb4
+
+bb4:
+  br bb6
+
+bb5(%14 : @owned $String):
+  destroy_value %14 : $String
+  br bb6
+
+bb6:
+  %17 = tuple ()
+  return %17 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @simplify_switch_enum_unreachable :
+// CHECK-NOT:     switch_enum
+// CHECK:       } // end sil function 'simplify_switch_enum_unreachable'
+sil [ossa] @simplify_switch_enum_unreachable : $@convention(thin) (A) -> () {
+bb0(%0 : $A):
+  switch_enum %0 : $A, case #A.B!enumelt: bb1, default bb2
+
+bb1:
+  unreachable
+
+bb2(%defaultArg : $A):
+  apply undef(%defaultArg) : $@convention(thin) (A) -> ()
+  br bb3
+
+bb3:
+  %t = tuple ()
+  return %t : $()
+}
+
+// CHECK-LABEL: sil [ossa] @replace_phi_arg_with_borrowed_from_use :
+// CHECK:       bb3([[R:%.*]] : @reborrow $B):
+// CHECK:       bb6([[G:%.*]] : @guaranteed $E):
+// CHECK-NEXT:    [[X:%.*]] = borrowed [[G]] : $E from ([[R]] : $B)
+// CHECK-NEXT:    fix_lifetime [[X]]
+// CHECK:       } // end sil function 'replace_phi_arg_with_borrowed_from_use'
+sil [ossa] @replace_phi_arg_with_borrowed_from_use : $@convention(thin) (@in_guaranteed B) -> () {
+bb0(%0 : $*B):
+  cond_br undef, bb1, bb2
+bb1:
+  %4 = load_borrow %0
+  br bb3(%4)
+bb2:
+  %6 = load_borrow %0
+  br bb3(%6)
+bb3(%8 : @reborrow $B):
+  %9 = borrowed %8 from ()
+  cond_br undef, bb4, bb5
+bb4:
+  %11 = unchecked_ref_cast %9 to $E
+  br bb6(%11, %9)
+bb5:
+  %13 = unchecked_ref_cast %9 to $E
+  br bb6(%13, %9)
+bb6(%15: @guaranteed $E, %16 : @reborrow $B):
+  %17 = borrowed %15 from (%16)
+  %18 = borrowed %16 from ()
+  fix_lifetime %17
+  end_borrow %18
+  %r = tuple()
+  return %r
+}

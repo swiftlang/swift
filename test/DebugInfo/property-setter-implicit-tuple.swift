@@ -12,7 +12,7 @@ struct UInt128 {
     }
     // CHECK-LABEL: define {{.+}} @"$s4main7UInt128V10componentss6UInt64V3low_AF4hightvs"
     set {
-      // CHECK: call void @llvm.dbg.declare(metadata ptr {{.+}}, metadata ![[NEW_VALUE:[0-9]+]]
+      // CHECK: #dbg_declare(ptr {{.+}}, ![[NEW_VALUE:[0-9]+]], !DIExpression
       (self.low, self.high) = (newValue.high, newValue.low)
     }
   }

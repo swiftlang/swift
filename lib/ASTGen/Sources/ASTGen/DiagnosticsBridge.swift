@@ -23,7 +23,7 @@ fileprivate func emitDiagnosticParts(
   position: AbsolutePosition,
   offset: Int,
   highlights: [Syntax] = [],
-  fixItChanges: [FixIt.Change] = []
+  edits: [SourceEdit] = []
 ) {
   // Map severity
   let bridgedSeverity = severity.bridged
@@ -52,45 +52,12 @@ fileprivate func emitDiagnosticParts(
   }
 
   // Emit changes for a Fix-It.
-  for change in fixItChanges {
-    let replaceStartLoc: BridgedSourceLoc
-    let replaceEndLoc: BridgedSourceLoc
-    var newText: String
-
-    switch change {
-    case .replace(let oldNode, let newNode):
-      replaceStartLoc = bridgedSourceLoc(at: oldNode.position)
-      replaceEndLoc = bridgedSourceLoc(at: oldNode.endPosition)
-      newText = newNode.description
-
-    case .replaceLeadingTrivia(let oldToken, let newTrivia):
-      replaceStartLoc = bridgedSourceLoc(at: oldToken.position)
-      replaceEndLoc = bridgedSourceLoc(
-        at: oldToken.positionAfterSkippingLeadingTrivia
-      )
-      newText = newTrivia.description
-
-    case .replaceTrailingTrivia(let oldToken, let newTrivia):
-      replaceStartLoc = bridgedSourceLoc(at: oldToken.endPositionBeforeTrailingTrivia)
-      replaceEndLoc = bridgedSourceLoc(at: oldToken.endPosition)
-      newText = newTrivia.description
-
-    case .replaceChild(let replacingChildData):
-      let replacementRange = replacingChildData.replacementRange
-      replaceStartLoc = bridgedSourceLoc(at: replacementRange.lowerBound)
-      replaceEndLoc = bridgedSourceLoc(at: replacementRange.upperBound)
-      newText = replacingChildData.newChild.description
-      
-#if RESILIENT_SWIFT_SYNTAX
-    @unknown default:
-      fatalError()
-#endif
-    }
-
+  for edit in edits {
+    var newText: String = edit.replacement
     newText.withBridgedString { bridgedMessage in
       diag.fixItReplace(
-        start: replaceStartLoc,
-        end: replaceEndLoc,
+        start: bridgedSourceLoc(at: edit.range.lowerBound),
+        end: bridgedSourceLoc(at: edit.range.upperBound),
         replacement: bridgedMessage
       )
     }
@@ -100,7 +67,7 @@ fileprivate func emitDiagnosticParts(
 }
 
 /// Emit the given diagnostic via the diagnostic engine.
-func emitDiagnostic(
+public func emitDiagnostic(
   diagnosticEngine: BridgedDiagnosticEngine,
   sourceFileBuffer: UnsafeBufferPointer<UInt8>,
   sourceFileBufferOffset: Int = 0,
@@ -120,6 +87,7 @@ func emitDiagnostic(
   )
 
   // Emit Fix-Its.
+  // FIXME: Ths assumes the fixIt is on the same tree/buffer, which is not guaranteed.
   for fixIt in diagnostic.fixIts {
     emitDiagnosticParts(
       diagnosticEngine: diagnosticEngine,
@@ -128,11 +96,12 @@ func emitDiagnostic(
       severity: .note,
       position: diagnostic.position,
       offset: sourceFileBufferOffset,
-      fixItChanges: fixIt.changes
+      edits: fixIt.edits
     )
   }
 
   // Emit any notes as follow-ons.
+  // FIXME: Ths assumes the node is on the same tree/buffer, which is not guaranteed.
   for note in diagnostic.notes {
     emitDiagnosticParts(
       diagnosticEngine: diagnosticEngine,
@@ -146,150 +115,12 @@ func emitDiagnostic(
 }
 
 extension DiagnosticSeverity {
-  var bridged: BridgedDiagnosticSeverity {
+  public var bridged: BridgedDiagnosticSeverity {
     switch self {
     case .error: return .error
     case .note: return .note
     case .warning: return .warning
     case .remark: return .remark
-#if RESILIENT_SWIFT_SYNTAX
-    @unknown default: return .error
-#endif
-    }
-  }
-}
-
-extension SourceManager {
-  private func diagnoseSingle<Node: SyntaxProtocol>(
-    message: String,
-    severity: DiagnosticSeverity,
-    node: Node,
-    position: AbsolutePosition,
-    highlights: [Syntax] = [],
-    fixItChanges: [FixIt.Change] = []
-  ) {
-    // Map severity
-    let bridgedSeverity = severity.bridged
-
-    // Emit the diagnostic
-    var mutableMessage = message
-    let diag = mutableMessage.withBridgedString { bridgedMessage in
-      BridgedDiagnostic(
-        at: bridgedSourceLoc(for: node, at: position),
-        message: bridgedMessage,
-        severity: bridgedSeverity,
-        engine: bridgedDiagEngine
-      )
-    }
-
-    // Emit highlights
-    for highlight in highlights {
-      diag.highlight(
-        start: bridgedSourceLoc(for: highlight, at: highlight.positionAfterSkippingLeadingTrivia),
-        end: bridgedSourceLoc(for: highlight, at: highlight.endPositionBeforeTrailingTrivia)
-      )
-    }
-
-    // Emit changes for a Fix-It.
-    for change in fixItChanges {
-      let replaceStartLoc: BridgedSourceLoc
-      let replaceEndLoc: BridgedSourceLoc
-      var newText: String
-
-      switch change {
-      case .replace(let oldNode, let newNode):
-        replaceStartLoc = bridgedSourceLoc(
-          for: oldNode,
-          at: oldNode.positionAfterSkippingLeadingTrivia
-        )
-        replaceEndLoc = bridgedSourceLoc(
-          for: oldNode,
-          at: oldNode.endPositionBeforeTrailingTrivia
-        )
-        newText = newNode.description
-
-      case .replaceLeadingTrivia(let oldToken, let newTrivia):
-        replaceStartLoc = bridgedSourceLoc(for: oldToken)
-        replaceEndLoc = bridgedSourceLoc(
-          for: oldToken,
-          at: oldToken.positionAfterSkippingLeadingTrivia
-        )
-        newText = newTrivia.description
-
-      case .replaceTrailingTrivia(let oldToken, let newTrivia):
-        replaceStartLoc = bridgedSourceLoc(
-          for: oldToken,
-          at: oldToken.endPositionBeforeTrailingTrivia
-        )
-        replaceEndLoc = bridgedSourceLoc(
-          for: oldToken,
-          at: oldToken.endPosition
-        )
-        newText = newTrivia.description
-
-      case .replaceChild(let replacingChildData):
-        let replacementRange = replacingChildData.replacementRange
-        replaceStartLoc = bridgedSourceLoc(
-          for: replacingChildData.parent,
-          at: replacementRange.lowerBound
-        )
-        replaceEndLoc = bridgedSourceLoc(
-          for: replacingChildData.parent,
-          at: replacementRange.upperBound
-        )
-        newText = replacingChildData.newChild.description
-        
-#if RESILIENT_SWIFT_SYNTAX
-      @unknown default:
-        fatalError()
-#endif
-      }
-
-      newText.withBridgedString { bridgedMessage in
-        diag.fixItReplace(
-          start: replaceStartLoc,
-          end: replaceEndLoc,
-          replacement: bridgedMessage
-        )
-      }
-    }
-
-    diag.finish();
-  }
-
-  /// Emit a diagnostic via the C++ diagnostic engine.
-  func diagnose(
-    diagnostic: Diagnostic,
-    messageSuffix: String? = nil
-  ) {
-    // Emit the main diagnostic.
-    diagnoseSingle(
-      message: diagnostic.diagMessage.message + (messageSuffix ?? ""),
-      severity: diagnostic.diagMessage.severity,
-      node: diagnostic.node,
-      position: diagnostic.position,
-      highlights: diagnostic.highlights
-    )
-
-    // Emit Fix-Its.
-    for fixIt in diagnostic.fixIts {
-      diagnoseSingle(
-        message: fixIt.message.message,
-        severity: .note,
-        node: diagnostic.node,
-        position: diagnostic.position,
-        fixItChanges: fixIt.changes
-      )
-    }
-
-    // Emit any notes as follow-ons.
-    for note in diagnostic.notes {
-      diagnoseSingle(
-        message: note.message,
-        severity: .note,
-        node: note.node,
-        position: note.position
-      )
     }
   }
 }
@@ -405,7 +236,7 @@ public func addQueuedDiagnostic(
   text: UnsafePointer<UInt8>,
   textLength: Int,
   severity: BridgedDiagnosticSeverity,
-  position: BridgedSourceLoc,
+  cLoc: BridgedSourceLoc,
   highlightRangesPtr: UnsafePointer<BridgedSourceLoc>?,
   numHighlightRanges: Int
 ) {
@@ -413,7 +244,7 @@ public func addQueuedDiagnostic(
     to: QueuedDiagnostics.self
   )
 
-  guard let rawPosition = position.getOpaquePointerValue() else {
+  guard let rawPosition = cLoc.getOpaquePointerValue() else {
     return
   }
 
@@ -423,18 +254,33 @@ public func addQueuedDiagnostic(
       return false
     }
 
-    return rawPosition >= baseAddress && rawPosition < baseAddress + sf.buffer.count
+    return rawPosition >= baseAddress && rawPosition <= baseAddress + sf.buffer.count
   }
   guard let sourceFile = sourceFile else {
     // FIXME: Hard to report an error here...
     return
   }
 
-  // Find the token at that offset.
   let sourceFileBaseAddress = UnsafeRawPointer(sourceFile.buffer.baseAddress!)
   let sourceFileEndAddress = sourceFileBaseAddress + sourceFile.buffer.count
   let offset = rawPosition - sourceFileBaseAddress
-  guard let token = sourceFile.syntax.token(at: AbsolutePosition(utf8Offset: offset)) else {
+  let position = AbsolutePosition(utf8Offset: offset)
+
+  // Find the token at that offset.
+  let node: Syntax
+  if let token = sourceFile.syntax.token(at: position) {
+    node = Syntax(token)
+  } else if position == sourceFile.syntax.endPosition {
+    // FIXME: EOF token is not included in '.token(at: position)'
+    // We might want to include it, but want to avoid special handling.
+    // Also 'sourceFile.syntax' is not guaranteed to be 'SourceFileSyntax'.
+    if let token = sourceFile.syntax.lastToken(viewMode: .all) {
+      node = Syntax(token)
+    } else {
+      node = sourceFile.syntax
+    }
+  } else {
+    // position out of range.
     return
   }
 
@@ -489,7 +335,8 @@ public func addQueuedDiagnostic(
 
   let textBuffer = UnsafeBufferPointer(start: text, count: textLength)
   let diagnostic = Diagnostic(
-    node: Syntax(token),
+    node: node,
+    position: position,
     message: SimpleDiagnostic(
       message: String(decoding: textBuffer, as: UTF8.self),
       severity: severity.asSeverity

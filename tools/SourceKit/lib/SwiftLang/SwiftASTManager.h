@@ -223,7 +223,7 @@ public:
 
   /// Creation of the AST failed due to \p Error. The request corresponding to
   /// this consumer should fail.
-  virtual void failed(StringRef Error);
+  virtual void failed(StringRef Error) = 0;
 
   /// The consumer was cancelled by the \c requestCancellation method and the \c
   /// ASTBuildOperation creating the AST for this consumer honored the request.

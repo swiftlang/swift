@@ -1,7 +1,7 @@
-// RUN: %target-swift-frontend -swift-version 5 -disable-availability-checking %s -emit-sil -o /dev/null -verify -enable-upcoming-feature DynamicActorIsolation -strict-concurrency=complete -verify-additional-prefix complete-tns-
+// RUN: %target-swift-frontend -swift-version 5 -target %target-swift-5.1-abi-triple %s -emit-sil -o /dev/null -verify -enable-upcoming-feature DynamicActorIsolation -strict-concurrency=complete -verify-additional-prefix complete-tns-
 
 // REQUIRES: concurrency
-// REQUIRES: asserts
+// REQUIRES: swift_feature_DynamicActorIsolation
 
 protocol Q {
 }
@@ -107,7 +107,7 @@ final class K : @preconcurrency Initializable {
 @MainActor
 final class MainActorK: Initializable {
   // expected-note@-1{{add '@preconcurrency' to the 'Initializable' conformance to defer isolation checking to run time}}{{25-25=@preconcurrency }}
-  init() { } // expected-warning{{main actor-isolated initializer 'init()' cannot be used to satisfy nonisolated protocol requirement}}
+  init() { } // expected-warning{{main actor-isolated initializer 'init()' cannot be used to satisfy nonisolated requirement from protocol 'Initializable'}}
   // expected-note@-1{{add 'nonisolated' to 'init()' to make this initializer not isolated to the actor}}
 }
 
@@ -130,7 +130,7 @@ struct GlobalActor {
 protocol WithIndividuallyIsolatedRequirements {
   @MainActor var a: Int { get set }
   @GlobalActor var b: Int { get set }
-  // expected-note@-1 {{'b' declared here}}
+  // expected-note@-1 {{requirement 'b' declared here}}
 
   @GlobalActor func test()
   // expected-note@-1 {{mark the protocol requirement 'test()' 'async' to allow actor-isolated conformances}}
@@ -144,13 +144,13 @@ do {
     var a: Int = 42
 
     @MainActor var b: Int {
-      // expected-warning@-1 {{main actor-isolated property 'b' cannot be used to satisfy global actor 'GlobalActor'-isolated protocol requirement}}
+      // expected-warning@-1 {{main actor-isolated property 'b' cannot be used to satisfy global actor 'GlobalActor'-isolated requirement from protocol 'WithIndividuallyIsolatedRequirements'}}
       get { 0 }
       set {}
     }
 
     @MainActor func test() {
-      // expected-warning@-1 {{main actor-isolated instance method 'test()' cannot be used to satisfy global actor 'GlobalActor'-isolated protocol requirement}}
+      // expected-warning@-1 {{main actor-isolated instance method 'test()' cannot be used to satisfy global actor 'GlobalActor'-isolated requirement from protocol 'WithIndividuallyIsolatedRequirements'}}
     }
   }
 }
@@ -158,7 +158,7 @@ do {
 @MainActor
 protocol WithNonIsolated {
   var prop: Int { get set }
-  // expected-note@-1 {{'prop' declared here}}
+  // expected-note@-1 {{requirement 'prop' declared here}}
   nonisolated func test()
   // expected-note@-1 {{mark the protocol requirement 'test()' 'async' to allow actor-isolated conformances}}
 }
@@ -168,10 +168,10 @@ do {
     // expected-warning@-1 {{@preconcurrency attribute on conformance to 'WithNonIsolated' has no effect}}{{38-54=}}
 
     @GlobalActor var prop: Int = 42
-    // expected-warning@-1 {{global actor 'GlobalActor'-isolated property 'prop' cannot be used to satisfy main actor-isolated protocol requirement}}
+    // expected-warning@-1 {{global actor 'GlobalActor'-isolated property 'prop' cannot be used to satisfy main actor-isolated requirement from protocol 'WithNonIsolated'}}
 
     @MainActor func test() {}
-    // expected-warning@-1 {{main actor-isolated instance method 'test()' cannot be used to satisfy nonisolated protocol requirement}}
+    // expected-warning@-1 {{main actor-isolated instance method 'test()' cannot be used to satisfy nonisolated requirement from protocol 'WithNonIsolated'}}
   }
 }
 

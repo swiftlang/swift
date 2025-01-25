@@ -51,6 +51,7 @@ enum class ImplMetatypeRepresentation {
 enum class ImplCoroutineKind {
   None,
   YieldOnce,
+  YieldOnce2,
   YieldMany,
 };
 
@@ -454,7 +455,8 @@ void decodeRequirement(
     BuilderType &Builder) {
   for (auto &child : *node) {
     if (child->getKind() == Demangle::Node::Kind::DependentGenericParamCount ||
-        child->getKind() == Demangle::Node::Kind::DependentGenericParamPackMarker)
+        child->getKind() == Demangle::Node::Kind::DependentGenericParamPackMarker ||
+        child->getKind() == Demangle::Node::Kind::DependentGenericParamValueMarker)
       continue;
 
     if (child->getNumChildren() != 2)
@@ -718,7 +720,7 @@ protected:
       return decodeMangledType(genericArgs->getChild(0), depth + 1);
     }
     case NodeKind::BuiltinTypeName: {
-      auto mangling = Demangle::mangleNode(Node);
+      auto mangling = Demangle::mangleNode(Node, Builder.getManglingFlavor());
       if (!mangling.isSuccess()) {
         return MAKE_NODE_TYPE_ERROR(Node,
                                     "failed to mangle node (%d:%u)",
@@ -877,7 +879,9 @@ protected:
     case NodeKind::DependentGenericParamType: {
       auto depth = Node->getChild(0)->getIndex();
       auto index = Node->getChild(1)->getIndex();
-      return Builder.createGenericTypeParameterType(depth, index);
+      return TypeLookupErrorOr<BuiltType>(
+          Builder.createGenericTypeParameterType(depth, index),
+          /*ignoreValueCheck*/ true);
     }
     case NodeKind::EscapingObjCBlock:
     case NodeKind::ObjCBlock:
@@ -911,6 +915,12 @@ protected:
         ++firstChildIdx;
       }
 
+      if (Node->getChild(firstChildIdx)->getKind() ==
+          NodeKind::SendingResultFunctionType) {
+        extFlags = extFlags.withSendingResult();
+        ++firstChildIdx;
+      }
+
       BuiltType globalActorType = BuiltType();
       if (Node->getChild(firstChildIdx)->getKind() ==
           NodeKind::GlobalActorFunctionType) {
@@ -930,12 +940,6 @@ protected:
       } else if (Node->getChild(firstChildIdx)->getKind() ==
                  NodeKind::IsolatedAnyFunctionType) {
         extFlags = extFlags.withIsolatedAny();
-        ++firstChildIdx;
-      }
-
-      if (Node->getChild(firstChildIdx)->getKind() ==
-          NodeKind::SendingResultFunctionType) {
-        extFlags = extFlags.withSendingResult();
         ++firstChildIdx;
       }
 
@@ -1089,12 +1093,21 @@ protected:
             flags = flags.withSendable();
           } else if (child->getText() == "@async") {
             flags = flags.withAsync();
+          } else if (child->getText() == "sending-result") {
+            flags = flags.withSendingResult();
           }
+        } else if (child->getKind() == NodeKind::ImplSendingResult) {
+          // NOTE: This flag needs to be set both at the function level and on
+          // each of the parameters. The flag on the function just means that
+          // all parameters are sending (which is always true today).
+          flags = flags.withSendingResult();
         } else if (child->getKind() == NodeKind::ImplCoroutineKind) {
           if (!child->hasText())
             return MAKE_NODE_TYPE_ERROR0(child, "expected text");
           if (child->getText() == "yield_once") {
             coroutineKind = ImplCoroutineKind::YieldOnce;
+          } else if (child->getText() == "yield_once_2") {
+            coroutineKind = ImplCoroutineKind::YieldOnce2;
           } else if (child->getText() == "yield_many") {
             coroutineKind = ImplCoroutineKind::YieldMany;
           } else
@@ -1473,7 +1486,9 @@ protected:
       if (base.isError())
         return base;
 
-      return Builder.createParenType(base.getType());
+      // ParenType has been removed, return the base type for backwards
+      // compatibility.
+      return base.getType();
     }
     case NodeKind::OpaqueType: {
       if (Node->getNumChildren() < 3)
@@ -1515,6 +1530,32 @@ protected:
       
       return Builder.resolveOpaqueType(descriptor, genericArgs, ordinal);
     }
+
+    case NodeKind::Integer: {
+      return Builder.createIntegerType((intptr_t)Node->getIndex());
+    }
+
+    case NodeKind::NegativeInteger: {
+      return Builder.createNegativeIntegerType((intptr_t)Node->getIndex());
+    }
+
+    case NodeKind::BuiltinFixedArray: {
+      if (Node->getNumChildren() < 2)
+        return MAKE_NODE_TYPE_ERROR(Node,
+                                    "fewer children (%zu) than required (2)",
+                                    Node->getNumChildren());
+
+      auto size = decodeMangledType(Node->getChild(0), depth + 1);
+      if (size.isError())
+        return size;
+
+      auto element = decodeMangledType(Node->getChild(1), depth + 1);
+      if (element.isError())
+        return element;
+
+      return Builder.createBuiltinFixedArrayType(size.getType(), element.getType());
+    }
+
     // TODO: Handle OpaqueReturnType, when we're in the middle of reconstructing
     // the defining decl
     default:

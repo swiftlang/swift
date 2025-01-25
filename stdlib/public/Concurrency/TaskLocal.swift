@@ -11,7 +11,6 @@
 //===----------------------------------------------------------------------===//
 
 import Swift
-@_implementationOnly import _SwiftConcurrencyShims
 
 
 // Macros are disabled when Swift is built without swift-syntax.
@@ -101,6 +100,7 @@ public macro TaskLocal() =
 ///     func enter() {
 ///         Example.$traceID.withValue("1234") {
 ///             read() // always "1234", regardless if enter() was called from inside a task or not:
+///         }    
 ///     }
 ///    
 ///     func read() -> String {
@@ -158,7 +158,7 @@ public macro TaskLocal() =
 ///       }
 ///     }
 ///
-/// - SeeAlso: ``TaskLocal-macro``
+/// - SeeAlso: ``TaskLocal()-macro``
 @available(SwiftStdlib 5.1, *)
 public final class TaskLocal<Value: Sendable>: Sendable, CustomStringConvertible {
   let defaultValue: Value
@@ -312,7 +312,7 @@ public final class TaskLocal<Value: Sendable>: Sendable, CustomStringConvertible
 
     @available(*, unavailable, message: "use '$myTaskLocal.withValue(_:do:)' instead")
     set {
-      fatalError("Illegal attempt to set a \(Self.self) value, use `withValue(...) { ... }` instead.")
+      fatalError("Illegal attempt to set a TaskLocal value, use `withValue(...) { ... }` instead.")
     }
   }
 

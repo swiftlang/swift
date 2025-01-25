@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -typecheck -disable-availability-checking -swift-version 6 %s -verify
+// RUN: %target-swift-frontend -typecheck -target %target-swift-5.1-abi-triple -swift-version 6 %s -verify
 
 // Even though enable-experimental-async-top-level is enabled, there are no
 // 'await's made from the top-level, thus the top-level is not an asynchronous
@@ -26,6 +26,7 @@ func nonIsolatedAsync() async {
   a = a + 10 // expected-error{{main actor-isolated var 'a' can not be mutated from a nonisolated context}}
   // expected-note@-1{{property access is 'async'}}
   // expected-error@-2{{expression is 'async' but is not marked with 'await'}}
+  // expected-note@-3{{consider declaring an isolated method on 'MainActor' to perform the mutation}}
 }
 
 @MainActor

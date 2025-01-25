@@ -162,7 +162,7 @@ BASELINE_LANGUAGE_FEATURE(BuiltinAllocVector, 0, "Builtin.allocVector")
 BASELINE_LANGUAGE_FEATURE(BuiltinTaskRunInline, 0, "Builtin.taskRunInline")
 BASELINE_LANGUAGE_FEATURE(BuiltinUnprotectedAddressOf, 0, "Builtin.unprotectedAddressOf")
 BASELINE_LANGUAGE_FEATURE(NewCxxMethodSafetyHeuristics, 0, "Only import C++ methods that return pointers (projections) on owned types as unsafe")
-SUPPRESSIBLE_LANGUAGE_FEATURE(SpecializeAttributeWithAvailability, 0, "@_specialize attribute with availability")
+BASELINE_LANGUAGE_FEATURE(SpecializeAttributeWithAvailability, 0, "@_specialize attribute with availability")
 BASELINE_LANGUAGE_FEATURE(BuiltinAssumeAlignment, 0, "Builtin.assumeAlignment")
 BASELINE_LANGUAGE_FEATURE(BuiltinCreateTaskGroupWithFlags, 0, "Builtin.createTaskGroupWithFlags")
 BASELINE_LANGUAGE_FEATURE(UnsafeInheritExecutor, 0, "@_unsafeInheritExecutor")
@@ -202,6 +202,7 @@ BASELINE_LANGUAGE_FEATURE(BorrowingSwitch, 432, "Noncopyable type pattern matchi
 CONDITIONALLY_SUPPRESSIBLE_LANGUAGE_FEATURE(IsolatedAny, 431, "@isolated(any) function types")
 LANGUAGE_FEATURE(IsolatedAny2, 431, "@isolated(any) function types")
 LANGUAGE_FEATURE(ObjCImplementation, 436, "@objc @implementation extensions")
+LANGUAGE_FEATURE(NonescapableTypes, 446, "Nonescapable types")
 
 // Swift 6
 UPCOMING_FEATURE(ConciseMagicFile, 274, 6)
@@ -223,15 +224,18 @@ UPCOMING_FEATURE(GlobalActorIsolatedTypesUsability, 0434, 6)
 // Swift 7
 UPCOMING_FEATURE(ExistentialAny, 335, 7)
 UPCOMING_FEATURE(InternalImportsByDefault, 409, 7)
+UPCOMING_FEATURE(MemberImportVisibility, 444, 7)
 
 EXPERIMENTAL_FEATURE(StaticAssert, false)
 EXPERIMENTAL_FEATURE(NamedOpaqueTypes, false)
 EXPERIMENTAL_FEATURE(FlowSensitiveConcurrencyCaptures, false)
 EXPERIMENTAL_FEATURE(CodeItemMacros, false)
 EXPERIMENTAL_FEATURE(PreambleMacros, false)
+EXPERIMENTAL_FEATURE(MacrosOnImports, true)
 EXPERIMENTAL_FEATURE(TupleConformances, false)
 EXPERIMENTAL_FEATURE(FullTypedThrows, false)
 EXPERIMENTAL_FEATURE(SameElementRequirements, false)
+EXPERIMENTAL_FEATURE(Span, true)
 
 // Whether to enable @_used and @_section attributes
 EXPERIMENTAL_FEATURE(SymbolLinkageMarkers, true)
@@ -250,7 +254,6 @@ EXPERIMENTAL_FEATURE(MoveOnlyTuples, true)
 EXPERIMENTAL_FEATURE(MoveOnlyPartialReinitialization, true)
 EXPERIMENTAL_FEATURE(ConsumeSelfInDeinit, true)
 
-EXPERIMENTAL_FEATURE(OneWayClosureParameters, false)
 EXPERIMENTAL_FEATURE(LayoutPrespecialization, true)
 
 EXPERIMENTAL_FEATURE(AccessLevelOnImport, true)
@@ -297,10 +300,9 @@ EXPERIMENTAL_FEATURE(ParserRoundTrip, false)
 /// Swift parser.
 EXPERIMENTAL_FEATURE(ParserValidation, false)
 
-/// Whether to emit diagnostics from the new parser first, and only emit
-/// diagnostics from the existing parser when there are none from the new
-/// parser.
-EXPERIMENTAL_FEATURE(ParserDiagnostics, false)
+/// Whether to perform validation of the unqualified lookup produced by
+/// ASTScope and SwiftLexicalLookup
+EXPERIMENTAL_FEATURE(UnqualifiedLookupValidation, false)
 
 /// Enables implicit some while also enabling existential `any`
 EXPERIMENTAL_FEATURE(ImplicitSome, false)
@@ -356,9 +358,8 @@ EXPERIMENTAL_FEATURE(SuppressedAssociatedTypes, true)
 /// Allow destructuring stored `let` bindings in structs.
 EXPERIMENTAL_FEATURE(StructLetDestructuring, true)
 
-/// Enable non-escapable type attributes and function attributes that support
-/// lifetime-dependent results.
-EXPERIMENTAL_FEATURE(NonescapableTypes, true)
+/// Enable returning non-escapable types from functions.
+EXPERIMENTAL_FEATURE(LifetimeDependence, true)
 
 /// Enable the `@_staticExclusiveOnly` attribute.
 EXPERIMENTAL_FEATURE(StaticExclusiveOnly, true)
@@ -374,9 +375,6 @@ EXPERIMENTAL_FEATURE(GroupActorErrors, true)
 
 // Enable explicit isolation of closures.
 EXPERIMENTAL_FEATURE(ClosureIsolation, true)
-
-// Whether lookup of members respects the enclosing file's imports.
-EXPERIMENTAL_FEATURE_EXCLUDED_FROM_MODULE_INTERFACE(MemberImportVisibility, true)
 
 // Enable @implementation on extensions of ObjC classes with non-fixed layout
 // due to resilient stored properties. Requires OS support; this flag exists for
@@ -396,10 +394,58 @@ EXPERIMENTAL_FEATURE(ReinitializeConsumeInMultiBlockDefer, false)
 
 EXPERIMENTAL_FEATURE(SE427NoInferenceOnExtension, true)
 
+
 EXPERIMENTAL_FEATURE(Extern, true)
 
 // Enable trailing comma for comma-separated lists.
 EXPERIMENTAL_FEATURE(TrailingComma, false)
+
+/// Allow the @unsafe attribute.
+SUPPRESSIBLE_EXPERIMENTAL_FEATURE(AllowUnsafeAttribute, true)
+
+/// Warn on use of unsafe constructs.
+EXPERIMENTAL_FEATURE(WarnUnsafe, true)
+
+/// Import unsafe C and C++ constructs as @unsafe.
+EXPERIMENTAL_FEATURE(SafeInterop, true)
+
+// Import bounds safety and lifetime attributes from interop headers to
+// generate Swift wrappers with safe pointer types.
+EXPERIMENTAL_FEATURE(SafeInteropWrappers, false)
+
+/// Ignore resilience errors due to C++ types.
+EXPERIMENTAL_FEATURE(AssumeResilientCxxTypes, true)
+
+// Isolated deinit
+SUPPRESSIBLE_LANGUAGE_FEATURE(IsolatedDeinit, 371, "isolated deinit")
+
+// Enable values in generic signatures, e.g. <let N: Int>
+EXPERIMENTAL_FEATURE(ValueGenerics, true)
+
+// When a parameter has unspecified isolation, infer it as main actor isolated.
+EXPERIMENTAL_FEATURE(UnspecifiedMeansMainActorIsolated, false)
+
+/// modify/read single-yield coroutines
+SUPPRESSIBLE_EXPERIMENTAL_FEATURE(CoroutineAccessors, true)
+
+/// modify/read single-yield coroutines always execute code post-yield code
+EXPERIMENTAL_FEATURE(CoroutineAccessorsUnwindOnCallerError, false)
+
+/// modify/read coroutines use the callee-allocated ABI
+EXPERIMENTAL_FEATURE(CoroutineAccessorsAllocateInCallee, false)
+
+/// When a parameter has unspecified isolation, infer it as main actor isolated.
+EXPERIMENTAL_FEATURE(GenerateForceToMainActorThunks, false)
+
+EXPERIMENTAL_FEATURE(AddressableParameters, true)
+SUPPRESSIBLE_EXPERIMENTAL_FEATURE(AddressableTypes, true)
+
+/// Allow the @abi attribute.
+SUPPRESSIBLE_EXPERIMENTAL_FEATURE(ABIAttribute, true)
+
+/// Functions with nonisolated isolation inherit their isolation from the
+/// calling context.
+EXPERIMENTAL_FEATURE(NonIsolatedAsyncInheritsIsolationFromContext, false)
 
 #undef EXPERIMENTAL_FEATURE_EXCLUDED_FROM_MODULE_INTERFACE
 #undef EXPERIMENTAL_FEATURE

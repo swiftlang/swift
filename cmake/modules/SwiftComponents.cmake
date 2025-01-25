@@ -48,6 +48,7 @@
 # * autolink-driver -- the Swift driver support tools
 # * back-deployment -- Swift back-deployment libraries
 # * compiler -- the Swift compiler and (on supported platforms) the REPL.
+# * compiler-swift-syntax-lib -- install swift-syntax libraries for the compiler.
 # * clang-builtin-headers -- install a copy of Clang builtin headers under
 #   'lib/swift/clang'.  This is useful when Swift compiler is installed in
 #   isolation.
@@ -70,7 +71,7 @@
 # * llvm-toolchain-dev-tools -- install LLVM development tools useful in a shared toolchain
 # * dev -- headers and libraries required to use Swift compiler as a library.
 set(_SWIFT_DEFINED_COMPONENTS
-  "autolink-driver;back-deployment;compiler;clang-builtin-headers;clang-resource-dir-symlink;clang-builtin-headers-in-clang-resource-dir;libexec;stdlib;stdlib-experimental;sdk-overlay;static-mirror-lib;swift-syntax-lib;editor-integration;tools;testsuite-tools;toolchain-tools;toolchain-dev-tools;llvm-toolchain-dev-tools;dev;license;sourcekit-xpc-service;sourcekit-inproc;swift-remote-mirror;swift-remote-mirror-headers")
+  "autolink-driver;back-deployment;compiler;compiler-swift-syntax-lib;clang-builtin-headers;clang-resource-dir-symlink;clang-builtin-headers-in-clang-resource-dir;libexec;stdlib;stdlib-experimental;sdk-overlay;static-mirror-lib;swift-syntax-lib;editor-integration;tools;testsuite-tools;toolchain-tools;toolchain-dev-tools;llvm-toolchain-dev-tools;dev;license;sourcekit-xpc-service;sourcekit-inproc;swift-remote-mirror;swift-remote-mirror-headers")
 
 # The default install components include all of the defined components, except
 # for the following exceptions.
@@ -97,7 +98,13 @@ macro(swift_configure_components)
   set(SWIFT_INSTALL_COMPONENTS "${_SWIFT_DEFAULT_COMPONENTS}" CACHE STRING
     "A semicolon-separated list of components to install from the set ${_SWIFT_DEFINED_COMPONENTS}")
 
+  # 'compiler' depends on 'compiler-swift-syntax-lib' component.
+  if ("compiler" IN_LIST SWIFT_INSTALL_COMPONENTS AND
+      NOT "compiler-swift-syntax-lib" IN_LIST SWIFT_INSTALL_COMPONENTS)
+    list(APPEND SWIFT_INSTALL_COMPONENTS "compiler-swift-syntax-lib")
+  endif()
   # 'compiler' depends on 'swift-syntax-lib' component.
+  # FIXME: Remove this. Clients should specify the components explicitly.
   if ("compiler" IN_LIST SWIFT_INSTALL_COMPONENTS AND
       NOT "swift-syntax-lib" IN_LIST SWIFT_INSTALL_COMPONENTS)
     list(APPEND SWIFT_INSTALL_COMPONENTS "swift-syntax-lib")

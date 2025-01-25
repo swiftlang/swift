@@ -111,7 +111,7 @@ std::string toMangledTypeNameString(const swift::Type &Type) {
   auto PrintingType = Type;
   if (Type->hasArchetype())
     PrintingType = Type->mapTypeOutOfContext();
-  return Mangle::ASTMangler().mangleTypeWithoutPrefix(PrintingType->getCanonicalType());
+  return Mangle::ASTMangler(Type->getASTContext()).mangleTypeWithoutPrefix(PrintingType->getCanonicalType());
 }
 
 } // namespace
@@ -198,8 +198,7 @@ static std::optional<std::string> extractRawLiteral(Expr *expr) {
     switch (expr->getKind()) {
     case ExprKind::BooleanLiteral:
     case ExprKind::FloatLiteral:
-    case ExprKind::IntegerLiteral:
-    case ExprKind::NilLiteral: {
+    case ExprKind::IntegerLiteral: {
       std::string literalOutput;
       llvm::raw_string_ostream OutputStream(literalOutput);
       expr->printConstExprValue(&OutputStream, nullptr);
@@ -230,7 +229,6 @@ static std::shared_ptr<CompileTimeValue> extractCompileTimeValue(Expr *expr) {
     case ExprKind::BooleanLiteral:
     case ExprKind::FloatLiteral:
     case ExprKind::IntegerLiteral:
-    case ExprKind::NilLiteral:
     case ExprKind::StringLiteral: {
       auto rawLiteral = extractRawLiteral(expr);
       if (rawLiteral.has_value()) {
@@ -238,6 +236,10 @@ static std::shared_ptr<CompileTimeValue> extractCompileTimeValue(Expr *expr) {
       }
 
       break;
+    }
+
+    case ExprKind::NilLiteral: {
+      return std::make_shared<NilLiteralValue>();
     }
 
     case ExprKind::Array: {
@@ -294,12 +296,12 @@ static std::shared_ptr<CompileTimeValue> extractCompileTimeValue(Expr *expr) {
 
       if (functionKind == ExprKind::DeclRef) {
         auto declRefExpr = cast<DeclRefExpr>(callExpr->getFn());
-        auto caseName =
+        auto identifier =
             declRefExpr->getDecl()->getName().getBaseIdentifier().str().str();
 
         std::vector<FunctionParameter> parameters =
             extractFunctionArguments(callExpr->getArgs());
-        return std::make_shared<FunctionCallValue>(caseName, parameters);
+        return std::make_shared<FunctionCallValue>(identifier, parameters);
       }
 
       if (functionKind == ExprKind::ConstructorRefCall) {
@@ -313,12 +315,33 @@ static std::shared_ptr<CompileTimeValue> extractCompileTimeValue(Expr *expr) {
         auto fn = dotSyntaxCallExpr->getFn();
         if (fn->getKind() == ExprKind::DeclRef) {
           auto declRefExpr = cast<DeclRefExpr>(fn);
-          auto caseName =
+          auto baseIdentifierName =
               declRefExpr->getDecl()->getName().getBaseIdentifier().str().str();
 
           std::vector<FunctionParameter> parameters =
               extractFunctionArguments(callExpr->getArgs());
-          return std::make_shared<EnumValue>(caseName, parameters);
+
+          auto declRef = dotSyntaxCallExpr->getFn()->getReferencedDecl();
+          switch (declRef.getDecl()->getKind()) {
+          case DeclKind::EnumElement: {
+            return std::make_shared<EnumValue>(baseIdentifierName, parameters);
+          }
+
+          case DeclKind::Func: {
+            auto identifier = declRefExpr->getDecl()
+                                  ->getName()
+                                  .getBaseIdentifier()
+                                  .str()
+                                  .str();
+
+            return std::make_shared<StaticFunctionCallValue>(
+                identifier, callExpr->getType(), parameters);
+          }
+
+          default: {
+            break;
+          }
+          }
         }
       }
 
@@ -465,6 +488,11 @@ static std::shared_ptr<CompileTimeValue> extractCompileTimeValue(Expr *expr) {
         return std::make_shared<BuilderValue>(resultBuilderMembers);
       }
       break;
+    }
+
+    case ExprKind::DerivedToBase: {
+      auto derivedExpr = cast<DerivedToBaseExpr>(expr);
+      return extractCompileTimeValue(derivedExpr->getSubExpr());
     }
     default: {
       break;
@@ -689,6 +717,11 @@ void writeValue(llvm::json::OStream &JSON,
     break;
   }
 
+  case CompileTimeValue::ValueKind::NilLiteral: {
+    JSON.attribute("valueKind", "NilLiteral");
+    break;
+  }
+
   case CompileTimeValue::ValueKind::InitCall: {
     auto initCallValue = cast<InitCallValue>(value);
 
@@ -836,6 +869,27 @@ void writeValue(llvm::json::OStream &JSON,
     break;
   }
 
+  case CompileTimeValue::ValueKind::StaticFunctionCall: {
+    auto staticFunctionCallValue = cast<StaticFunctionCallValue>(value);
+
+    JSON.attribute("valueKind", "StaticFunctionCall");
+    JSON.attributeObject("value", [&]() {
+      JSON.attribute("type", toFullyQualifiedTypeNameString(
+                                 staticFunctionCallValue->getType()));
+      JSON.attribute("memberLabel", staticFunctionCallValue->getLabel());
+      JSON.attributeArray("arguments", [&] {
+        for (auto FP : staticFunctionCallValue->getParameters()) {
+          JSON.object([&] {
+            JSON.attribute("label", FP.Label);
+            JSON.attribute("type", toFullyQualifiedTypeNameString(FP.Type));
+            writeValue(JSON, FP.Value);
+          });
+        }
+      });
+    });
+    break;
+  }
+
   case CompileTimeValue::ValueKind::MemberReference: {
     auto memberReferenceValue = cast<MemberReferenceValue>(value);
     JSON.attribute("valueKind", "MemberReference");
@@ -846,6 +900,7 @@ void writeValue(llvm::json::OStream &JSON,
     });
     break;
   }
+
   case CompileTimeValue::ValueKind::InterpolatedString: {
     auto interpolatedStringValue = cast<InterpolatedStringLiteralValue>(value);
     JSON.attribute("valueKind", "InterpolatedStringLiteral");
@@ -945,6 +1000,7 @@ getResultBuilderElementFromASTNode(const ASTNode node) {
 
 BuilderValue::ConditionalMember
 getConditionalMemberFromIfStmt(const IfStmt *ifStmt) {
+  std::vector<PlatformVersionConstraintAvailabilitySpec> AvailabilityAttributes;
   std::vector<std::shared_ptr<BuilderValue::BuilderMember>> IfElements;
   std::vector<std::shared_ptr<BuilderValue::BuilderMember>> ElseElements;
   if (auto thenBraceStmt = ifStmt->getThenStmt()) {
@@ -976,12 +1032,24 @@ getConditionalMemberFromIfStmt(const IfStmt *ifStmt) {
   }
   for (auto elt : ifStmt->getCond()) {
     if (elt.getKind() == StmtConditionElement::CK_Availability) {
+      for (auto *Q : elt.getAvailability()->getQueries()) {
+        if (auto *availability =
+                dyn_cast<PlatformVersionConstraintAvailabilitySpec>(Q)) {
+          AvailabilityAttributes.push_back(*availability);
+        }
+      }
       memberKind = BuilderValue::LimitedAvailability;
       break;
     }
   }
 
-  return BuilderValue::ConditionalMember(memberKind, IfElements, ElseElements);
+  if (AvailabilityAttributes.empty()) {
+    return BuilderValue::ConditionalMember(memberKind, IfElements,
+                                           ElseElements);
+  }
+
+  return BuilderValue::ConditionalMember(memberKind, AvailabilityAttributes,
+                                         IfElements, ElseElements);
 }
 
 BuilderValue::ArrayMember
@@ -1049,14 +1117,11 @@ createBuilderCompileTimeValue(CustomAttr *AttachedResultBuilder,
 void writeSingleBuilderMemberElement(
     llvm::json::OStream &JSON, std::shared_ptr<CompileTimeValue> Element) {
   switch (Element.get()->getKind()) {
-  case CompileTimeValue::ValueKind::Enum: {
-    auto enumValue = cast<EnumValue>(Element.get());
-    if (enumValue->getIdentifier() == "buildExpression") {
-      if (enumValue->getParameters().has_value()) {
-        auto params = enumValue->getParameters().value();
-        for (auto FP : params) {
-          writeValue(JSON, FP.Value);
-        }
+  case CompileTimeValue::ValueKind::StaticFunctionCall: {
+    auto staticFunctionCallValue = cast<StaticFunctionCallValue>(Element.get());
+    if (staticFunctionCallValue->getLabel() == "buildExpression") {
+      for (auto FP : staticFunctionCallValue->getParameters()) {
+        writeValue(JSON, FP.Value);
       }
     }
     break;
@@ -1094,6 +1159,17 @@ void writeBuilderMember(
 
   default: {
     auto member = cast<BuilderValue::ConditionalMember>(Member);
+    if (auto availabilityAttributes = member->getAvailabilityAttributes()) {
+      JSON.attributeArray("availabilityAttributes", [&] {
+        for (auto elem : *availabilityAttributes) {
+          JSON.object([&] {
+            JSON.attribute("platform",
+                           platformString(elem.getPlatform()).str());
+            JSON.attribute("minVersion", elem.getVersion().getAsString());
+          });
+        }
+      });
+    }
     JSON.attributeArray("ifElements", [&] {
       for (auto elem : member->getIfElements()) {
         JSON.object([&] { writeBuilderMember(JSON, elem); });
@@ -1178,38 +1254,38 @@ extractBuilderValueIfExists(const swift::NominalTypeDecl *TypeDecl,
   ;
 }
 
-void writeAttrInformation(llvm::json::OStream &JSON,
-                          const DeclAttributes &Attrs) {
-  auto availableAttr = Attrs.getAttributes<AvailableAttr>();
-  if (availableAttr.empty())
+void writeAvailabilityAttributes(llvm::json::OStream &JSON, const Decl &decl) {
+  auto attrs = decl.getSemanticAvailableAttrs();
+  if (attrs.empty())
     return;
 
   JSON.attributeArray("availabilityAttributes", [&] {
-    for (const AvailableAttr *attr : availableAttr) {
+    for (auto attr : attrs) {
       JSON.object([&] {
-        if (!attr->platformString().empty())
-          JSON.attribute("platform", attr->platformString());
+        auto domainName = attr.getDomain().getNameForAttributePrinting();
+        if (!domainName.empty())
+          JSON.attribute("platform", domainName);
 
-        if (!attr->Message.empty())
-          JSON.attribute("message", attr->Message);
+        if (!attr.getMessage().empty())
+          JSON.attribute("message", attr.getMessage());
 
-        if (!attr->Rename.empty())
-          JSON.attribute("rename", attr->Rename);
+        if (!attr.getRename().empty())
+          JSON.attribute("rename", attr.getRename());
 
-        if (attr->Introduced.has_value())
+        if (attr.getIntroduced().has_value())
           JSON.attribute("introducedVersion",
-                         attr->Introduced.value().getAsString());
+                         attr.getIntroduced().value().getAsString());
 
-        if (attr->Deprecated.has_value())
+        if (attr.getDeprecated().has_value())
           JSON.attribute("deprecatedVersion",
-                         attr->Deprecated.value().getAsString());
+                         attr.getDeprecated().value().getAsString());
 
-        if (attr->Obsoleted.has_value())
+        if (attr.getObsoleted().has_value())
           JSON.attribute("obsoletedVersion",
-                         attr->Obsoleted.value().getAsString());
+                         attr.getObsoleted().value().getAsString());
 
-        JSON.attribute("isUnavailable", attr->isUnconditionallyUnavailable());
-        JSON.attribute("isDeprecated", attr->isUnconditionallyDeprecated());
+        JSON.attribute("isUnavailable", attr.isUnconditionallyUnavailable());
+        JSON.attribute("isDeprecated", attr.isUnconditionallyDeprecated());
       });
     }
   });
@@ -1306,7 +1382,7 @@ void writeProperties(llvm::json::OStream &JSON,
         }
         writePropertyWrapperAttributes(JSON, PropertyInfo.PropertyWrappers,
                                        decl->getASTContext());
-        writeAttrInformation(JSON, decl->getAttrs());
+        writeAvailabilityAttributes(JSON, *decl);
       });
     }
   });
@@ -1322,6 +1398,26 @@ void writeConformances(llvm::json::OStream &JSON,
         continue;
 
       JSON.value(toFullyQualifiedProtocolNameString(*Proto));
+    }
+  });
+}
+
+void writeAllConformances(llvm::json::OStream &JSON,
+                          const NominalTypeDecl &NomTypeDecl) {
+  JSON.attributeArray("allConformances", [&] {
+    for (auto *Conformance : NomTypeDecl.getAllConformances()) {
+      auto Proto = Conformance->getProtocol();
+      // FIXME(noncopyable_generics): Should these be included?
+      if (Proto->getInvertibleProtocolKind())
+        continue;
+
+      JSON.object([&] {
+        JSON.attribute("protocolName",
+                       toFullyQualifiedProtocolNameString(*Proto));
+        JSON.attribute(
+            "conformanceDefiningModule",
+            Conformance->getDeclContext()->getParentModule()->getName().str());
+      });
     }
   });
 }
@@ -1359,10 +1455,14 @@ bool writeAsJSONToFile(const std::vector<ConstValueTypeInfo> &ConstValueInfos,
         writeNominalTypeKind(JSON, *NomTypeDecl);
         writeLocationInformation(JSON, SourceLoc, Ctx);
         writeConformances(JSON, *NomTypeDecl);
+
+        // "conformances" will be removed once all clients move to
+        // "allConformances"
+        writeAllConformances(JSON, *NomTypeDecl);
         writeAssociatedTypeAliases(JSON, *NomTypeDecl);
         writeProperties(JSON, TypeInfo, *NomTypeDecl);
         writeEnumCases(JSON, TypeInfo.EnumElements);
-        writeAttrInformation(JSON, NomTypeDecl->getAttrs());
+        writeAvailabilityAttributes(JSON, *NomTypeDecl);
       });
     }
   });

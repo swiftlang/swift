@@ -14,6 +14,18 @@ import ASTBridging
 import SwiftDiagnostics
 @_spi(ExperimentalLanguageFeatures) import SwiftSyntax
 
+protocol DoStmtOrExprSyntax {
+  var doKeyword: TokenSyntax { get }
+  var throwsClause: ThrowsClauseSyntax? { get }
+  var body: CodeBlockSyntax { get }
+  var catchClauses: CatchClauseListSyntax { get }
+}
+extension DoStmtSyntax: DoStmtOrExprSyntax {}
+extension DoExprSyntax: DoStmtOrExprSyntax {
+  // FIXME: DoExprSyntax is missing throwsClause?
+  var throwsClause: ThrowsClauseSyntax? { return nil }
+}
+
 extension ASTGenVisitor {
   func generate(stmt node: StmtSyntax) -> BridgedStmt {
     switch node.as(StmtSyntaxEnum.self) {
@@ -38,7 +50,7 @@ extension ASTGenVisitor {
     case .labeledStmt(let node):
       return self.generate(labeledStmt: node)
     case .missingStmt:
-      break
+      fatalError("unimplemented")
     case .repeatStmt(let node):
       return self.generate(repeatStmt: node).asStmt
     case .returnStmt(let node):
@@ -51,33 +63,48 @@ extension ASTGenVisitor {
       return self.generate(whileStmt: node).asStmt
     case .yieldStmt(let node):
       return self.generate(yieldStmt: node).asStmt
-#if RESILIENT_SWIFT_SYNTAX
-    @unknown default:
-      fatalError()
-#endif
     }
-    return self.generateWithLegacy(node)
   }
 
-  func generate(codeBlockItem node: CodeBlockItemSyntax) -> ASTNode {
+  func generate(codeBlockItem node: CodeBlockItemSyntax) -> ASTNode? {
     // TODO: Set semicolon loc.
     switch node.item {
     case .decl(let node):
-      return .decl(self.generate(decl: node))
+      return self.generate(decl: node).map { .decl($0) }
     case .stmt(let node):
       return .stmt(self.generate(stmt: node))
     case .expr(let node):
       return .expr(self.generate(expr: node))
-#if RESILIENT_SWIFT_SYNTAX
-    @unknown default:
-      fatalError()
-#endif
     }
   }
 
   @inline(__always)
   func generate(codeBlockItemList node: CodeBlockItemListSyntax) -> BridgedArrayRef {
-    node.lazy.map { self.generate(codeBlockItem: $0).bridged }.bridgedArray(in: self)
+    var allItems: [BridgedASTNode] = []
+    visitIfConfigElements(
+      node,
+      of: CodeBlockItemSyntax.self,
+      split: Self.splitCodeBlockItemIfConfig
+    ) { codeBlockItem in
+      guard let item = self.generate(codeBlockItem: codeBlockItem) else {
+        return
+      }
+      allItems.append(item.bridged)
+    }
+
+    return allItems.lazy.bridgedArray(in: self)
+  }
+
+  /// Function that splits a code block item into either an #if or the item.
+  static func splitCodeBlockItemIfConfig(
+    _ element: CodeBlockItemSyntax
+  ) -> IfConfigOrUnderlying<CodeBlockItemSyntax> {
+    if case .decl(let decl) = element.item,
+       let ifConfigDecl = decl.as(IfConfigDeclSyntax.self) {
+      return .ifConfigDecl(ifConfigDecl)
+    }
+
+    return .underlying(element)
   }
 
   func generate(codeBlock node: CodeBlockSyntax) -> BridgedBraceStmt {
@@ -152,10 +179,6 @@ extension ASTGenVisitor {
         pattern: pat,
         initializer: initializer
       )
-#if RESILIENT_SWIFT_SYNTAX
-    @unknown default:
-      fatalError()
-#endif
     }
   }
 
@@ -253,6 +276,13 @@ extension ASTGenVisitor {
   }
 
   func generate(doStmt node: DoStmtSyntax, labelInfo: BridgedLabeledStmtInfo = nil) -> BridgedStmt {
+    return self.generate(doStmtOrExpr: node, labelInfo: labelInfo)
+  }
+
+  func generate(
+    doStmtOrExpr node: some DoStmtOrExprSyntax,
+    labelInfo: BridgedLabeledStmtInfo = nil
+  ) -> BridgedStmt {
     if node.catchClauses.isEmpty {
       // FIXME: Handle
       precondition(node.throwsClause == nil)
@@ -317,10 +347,6 @@ extension ASTGenVisitor {
           return self.generate(codeBlock: node).asStmt
         case .ifExpr(let node):
           return self.generateIfStmt(ifExpr: node).asStmt
-#if RESILIENT_SWIFT_SYNTAX
-        @unknown default:
-          fatalError()
-#endif
         }
       }.asNullable
     )
@@ -339,8 +365,8 @@ extension ASTGenVisitor {
 
   func generate(fallThroughStmt node: FallThroughStmtSyntax) -> BridgedFallthroughStmt {
     return .createParsed(
-      self.ctx,
-      loc: self.generateSourceLoc(node.fallthroughKeyword)
+      loc: self.generateSourceLoc(node.fallthroughKeyword),
+      declContext: self.declContext
     )
   }
 
@@ -438,10 +464,6 @@ extension ASTGenVisitor {
       )
       items = CollectionOfOne(item).bridgedArray(in: self)
       terminatorLoc = self.generateSourceLoc(node.colon)
-#if RESILIENT_SWIFT_SYNTAX
-    @unknown default:
-      fatalError()
-#endif
     }
     let body = BridgedBraceStmt.createParsed(
       self.ctx,
@@ -461,18 +483,21 @@ extension ASTGenVisitor {
   }
 
   func generate(switchCaseList node: SwitchCaseListSyntax) -> BridgedArrayRef {
-    return node.lazy.map({ node -> BridgedASTNode in
-      switch node {
-      case .switchCase(let node):
-        return ASTNode.stmt(self.generate(switchCase: node).asStmt).bridged
-      case .ifConfigDecl(_):
-        fatalError("unimplemented")
-#if RESILIENT_SWIFT_SYNTAX
-      @unknown default:
-        fatalError()
-#endif
+    var allBridgedCases: [BridgedASTNode] = []
+    visitIfConfigElements(node, of: SwitchCaseSyntax.self) { element in
+      switch element {
+      case .ifConfigDecl(let ifConfigDecl):
+        return .ifConfigDecl(ifConfigDecl)
+      case .switchCase(let switchCase):
+        return .underlying(switchCase)
       }
-    }).bridgedArray(in: self)
+    } body: { caseNode in
+      allBridgedCases.append(
+        ASTNode.stmt(self.generate(switchCase: caseNode).asStmt).bridged
+      )
+    }
+
+    return allBridgedCases.lazy.bridgedArray(in: self)
   }
 
   func generateSwitchStmt(switchExpr node: SwitchExprSyntax, labelInfo: BridgedLabeledStmtInfo = nil)
@@ -524,10 +549,6 @@ extension ASTGenVisitor {
       lParenLoc = nil
       rParenLoc = nil
       yields = CollectionOfOne(self.generate(expr: node)).bridgedArray(in: self)
-#if RESILIENT_SWIFT_SYNTAX
-    @unknown default:
-      fatalError()
-#endif
     }
     return .createParsed(
       self.ctx,

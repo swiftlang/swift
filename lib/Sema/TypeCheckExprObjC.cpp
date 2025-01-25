@@ -287,7 +287,7 @@ std::optional<Type> TypeChecker::checkObjCKeyPathExpr(DeclContext *dc,
     if (lookup.size() > 1) {
       lookup.filter([&](LookupResultEntry result, bool isOuter) -> bool {
           // Drop unavailable candidates.
-          if (result.getValueDecl()->getAttrs().isUnavailable(Context))
+          if (result.getValueDecl()->isUnavailable())
             return false;
 
           // Drop non-property, non-type candidates.
@@ -374,8 +374,9 @@ std::optional<Type> TypeChecker::checkObjCKeyPathExpr(DeclContext *dc,
 
       Type newType;
       if (lookupType && !lookupType->isAnyObject()) {
-        newType = lookupType->getTypeOfMember(type,
-                                              type->getDeclaredInterfaceType());
+        newType = type->getDeclaredInterfaceType().subst(
+            lookupType->getContextSubstitutionMap(
+                type->getDeclContext()));
       } else {
         newType = type->getDeclaredInterfaceType();
       }

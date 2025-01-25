@@ -1,9 +1,9 @@
 // RUN: %empty-directory(%t)
 
-// RUN: %target-swift-frontend -I %t  -disable-availability-checking -strict-concurrency=complete -parse-as-library -emit-sil -o /dev/null -verify -enable-upcoming-feature IsolatedDefaultValues -enable-upcoming-feature RegionBasedIsolation -enable-upcoming-feature InferSendableFromCaptures %s
+// RUN: %target-swift-frontend -I %t  -target %target-swift-5.1-abi-triple -strict-concurrency=complete -parse-as-library -emit-sil -o /dev/null -verify -enable-upcoming-feature InferSendableFromCaptures %s
 
 // REQUIRES: concurrency
-// REQUIRES: asserts
+// REQUIRES: swift_feature_InferSendableFromCaptures
 
 @globalActor
 actor SomeGlobalActor {
@@ -214,6 +214,18 @@ class C3 {
   @SomeGlobalActor var y = 2
 }
 
+class C4 {
+  let task1 = Task {
+    // expected-error@+2 {{expression is 'async' but is not marked with 'await'}}
+    // expected-note@+1 {{calls to global function 'requiresMainActor()' from outside of its actor context are implicitly asynchronous}}
+    requiresMainActor()
+  }
+
+  let task2 = Task {
+    await requiresMainActor() // okay
+  }
+}
+
 @MainActor struct NonIsolatedInit {
   var x = 0
   var y = 0
@@ -317,3 +329,10 @@ struct Values {
   @MainActor var value: Int { 0 }
   @SomeGlobalActor var otherValue: Int { 0 }
 }
+
+class PreconcurrencyInit {
+  @preconcurrency @MainActor init() {}
+}
+
+// expected-warning@+1 {{main actor-isolated default value in a nonisolated context; this is an error in the Swift 6 language mode}}
+func downgrade(_: PreconcurrencyInit = .init()) {}

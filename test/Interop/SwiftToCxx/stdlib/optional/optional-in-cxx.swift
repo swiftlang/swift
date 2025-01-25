@@ -48,21 +48,21 @@ public func resetOpt<T>(_ val: inout Optional<T>) {
 
 
 // CHECK: SWIFT_INLINE_THUNK swift::Optional<int> createCIntOpt(int val) noexcept SWIFT_SYMBOL("s:11UseOptional13createCIntOptys5Int32VSgADF") SWIFT_WARN_UNUSED_RESULT {
- // CHECK-NEXT: return swift::_impl::_impl_Optional<int>::returnNewValue([&](char * _Nonnull result) SWIFT_INLINE_THUNK_ATTRIBUTES {
-// CHECK-NEXT:   _impl::swift_interop_returnDirect_UseOptional_[[CINTENC:[a-z0-9_]+]](result, _impl::$s11UseOptional13createCIntOptys5Int32VSgADF(val));
+// CHECK-NEXT: return swift::_impl::_impl_Optional<int>::returnNewValue([&](char * _Nonnull result) SWIFT_INLINE_THUNK_ATTRIBUTES {
+// CHECK-NEXT:   UseOptional::_impl::swift_interop_returnDirect_UseOptional_[[CINTENC:[a-z0-9_]+]](result, UseOptional::_impl::$s11UseOptional13createCIntOptys5Int32VSgADF(val));
 // CHECK-NEXT: });
 // CHECK-NEXT: }
 
 
 // CHECK: SWIFT_INLINE_THUNK swift::Optional<Klass> createKlassOpt(int16_t val) noexcept SWIFT_SYMBOL("s:11UseOptional14createKlassOptyAA0D0CSgs5Int16VF") SWIFT_WARN_UNUSED_RESULT {
 // CHECK-NEXT:   return swift::_impl::_impl_Optional<Klass>::returnNewValue([&](char * _Nonnull result) SWIFT_INLINE_THUNK_ATTRIBUTES {
-// CHECK-NEXT: _impl::swift_interop_returnDirect_UseOptional_[[CLASSENC:[a-z0-9_]+]](result, _impl::$s11UseOptional14createKlassOptyAA0D0CSgs5Int16VF(val));
+// CHECK-NEXT: UseOptional::_impl::swift_interop_returnDirect_UseOptional_[[CLASSENC:[a-z0-9_]+]](result, UseOptional::_impl::$s11UseOptional14createKlassOptyAA0D0CSgs5Int16VF(val));
 // CHECK-NEXT:   });
 // CHECK-NEXT: }
 
 // CHECK: SWIFT_INLINE_THUNK swift::Optional<SmallStruct> createSmallStructOpt(int16_t val) noexcept SWIFT_SYMBOL("s:11UseOptional20createSmallStructOptyAA0dE0VSgs5Int16VF") SWIFT_WARN_UNUSED_RESULT {
 // CHECK-NEXT:   return swift::_impl::_impl_Optional<SmallStruct>::returnNewValue([&](char * _Nonnull result) SWIFT_INLINE_THUNK_ATTRIBUTES {
-// CHECK-NEXT:     _impl::swift_interop_returnDirect_UseOptional_uint32_t_0_4(result, _impl::$s11UseOptional20createSmallStructOptyAA0dE0VSgs5Int16VF(val));
+// CHECK-NEXT:     UseOptional::_impl::swift_interop_returnDirect_UseOptional_uint32_t_0_4(result, UseOptional::_impl::$s11UseOptional20createSmallStructOptyAA0dE0VSgs5Int16VF(val));
 // CHECK-NEXT:   });
 // CHECK-NEXT: }
 
@@ -80,15 +80,15 @@ public func resetOpt<T>(_ val: inout Optional<T>) {
 
 
 // CHECK: SWIFT_INLINE_THUNK void takeCIntOpt(const swift::Optional<int>& val) noexcept SWIFT_SYMBOL("s:11UseOptional11takeCIntOptyys5Int32VSgF") {
-// CHECK-NEXT:  _impl::$s11UseOptional11takeCIntOptyys5Int32VSgF(_impl::swift_interop_passDirect_UseOptional_[[CINTENC]](swift::_impl::_impl_Optional<int>::getOpaquePointer(val)));
+// CHECK-NEXT:  UseOptional::_impl::$s11UseOptional11takeCIntOptyys5Int32VSgF(UseOptional::_impl::swift_interop_passDirect_UseOptional_[[CINTENC]](swift::_impl::_impl_Optional<int>::getOpaquePointer(val)));
 // CHECK-NEXT: }
 
 
 // CHECK: SWIFT_INLINE_THUNK void takeKlassOpt(const swift::Optional<Klass>& val) noexcept SWIFT_SYMBOL("s:11UseOptional12takeKlassOptyyAA0D0CSgF") {
-// CHECK-NEXT:   _impl::$s11UseOptional12takeKlassOptyyAA0D0CSgF(_impl::swift_interop_passDirect_UseOptional_[[CLASSENC]](swift::_impl::_impl_Optional<Klass>::getOpaquePointer(val)));
+// CHECK-NEXT:   UseOptional::_impl::$s11UseOptional12takeKlassOptyyAA0D0CSgF(UseOptional::_impl::swift_interop_passDirect_UseOptional_[[CLASSENC]](swift::_impl::_impl_Optional<Klass>::getOpaquePointer(val)));
 // CHECK-NEXT: }
 
 
 // CHECK: SWIFT_INLINE_THUNK void takeSmallStructOpt(const swift::Optional<SmallStruct>& val) noexcept SWIFT_SYMBOL("s:11UseOptional18takeSmallStructOptyyAA0dE0VSgF") {
-// CHECK-NEXT:  _impl::$s11UseOptional18takeSmallStructOptyyAA0dE0VSgF(_impl::swift_interop_passDirect_UseOptional_uint32_t_0_4(swift::_impl::_impl_Optional<SmallStruct>::getOpaquePointer(val)));
+// CHECK-NEXT:  UseOptional::_impl::$s11UseOptional18takeSmallStructOptyyAA0dE0VSgF(UseOptional::_impl::swift_interop_passDirect_UseOptional_uint32_t_0_4(swift::_impl::_impl_Optional<SmallStruct>::getOpaquePointer(val)));
 // CHECK-NEXT: }

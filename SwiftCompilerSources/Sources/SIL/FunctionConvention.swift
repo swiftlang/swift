@@ -10,6 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+import AST
 import SILBridging
 
 /// SIL function parameter and result conventions based on the AST
@@ -22,24 +23,24 @@ import SILBridging
 /// The underlying FunctionType must be contextual and expanded. SIL
 /// has no use for interface types or unexpanded types.
 public struct FunctionConvention : CustomStringConvertible {
-  let bridgedFunctionType: BridgedASTType
+  let functionType: CanonicalType
   let hasLoweredAddresses: Bool
 
-  init(for bridgedFunctionType: BridgedASTType, in function: Function) {
-    assert(!bridgedFunctionType.hasTypeParameter(), "requires contextual type")
-    self.bridgedFunctionType = bridgedFunctionType
+  init(for functionType: CanonicalType, in function: Function) {
+    assert(!functionType.hasTypeParameter, "requires contextual type")
+    self.functionType = functionType
     self.hasLoweredAddresses = function.hasLoweredAddresses
   }
 
   /// All results including the error.
   public var results: Results {
-    Results(bridged: bridgedFunctionType.SILFunctionType_getResultsWithError(),
+    Results(bridged: SILFunctionType_getResultsWithError(functionType.bridged),
       hasLoweredAddresses: hasLoweredAddresses)
   }
 
   public var errorResult: ResultInfo? {
     return ResultInfo(
-      bridged: bridgedFunctionType.SILFunctionType_getErrorResult(),
+      bridged: SILFunctionType_getErrorResult(functionType.bridged),
       hasLoweredAddresses: hasLoweredAddresses)
   }
 
@@ -48,8 +49,8 @@ public struct FunctionConvention : CustomStringConvertible {
   public var indirectSILResultCount: Int {
     // TODO: Return packs directly in lowered-address mode
     return hasLoweredAddresses
-    ? bridgedFunctionType.SILFunctionType_getNumIndirectFormalResultsWithError()
-    : bridgedFunctionType.SILFunctionType_getNumPackResults()
+    ? SILFunctionType_getNumIndirectFormalResultsWithError(functionType.bridged)
+    : SILFunctionType_getNumPackResults(functionType.bridged)
   }
 
   /// Indirect results including the error.
@@ -60,16 +61,16 @@ public struct FunctionConvention : CustomStringConvertible {
   }
 
   public var parameters: Parameters {
-    Parameters(bridged: bridgedFunctionType.SILFunctionType_getParameters(),
+    Parameters(bridged: SILFunctionType_getParameters(functionType.bridged),
       hasLoweredAddresses: hasLoweredAddresses)
   }
 
   public var hasSelfParameter: Bool {
-    bridgedFunctionType.SILFunctionType_hasSelfParam()
+    SILFunctionType_hasSelfParam(functionType.bridged)
   }
 
   public var yields: Yields {
-    Yields(bridged: bridgedFunctionType.SILFunctionType_getYields(),
+    Yields(bridged: SILFunctionType_getYields(functionType.bridged),
       hasLoweredAddresses: hasLoweredAddresses)
   }
 
@@ -86,11 +87,11 @@ public struct FunctionConvention : CustomStringConvertible {
   }
 
   public func hasLifetimeDependencies() -> Bool {
-    return bridgedFunctionType.SILFunctionType_getLifetimeDependencies().count() != 0
+    return SILFunctionType_getLifetimeDependencies(functionType.bridged).count() != 0
   }
 
   public var description: String {
-    var str = String(taking: bridgedFunctionType.getDebugDescription())
+    var str = functionType.description
     for paramIdx in 0..<parameters.count {
       str += "\nparameter: " + parameters[paramIdx].description
       if let deps = parameterDependencies(for: paramIdx) {
@@ -158,12 +159,12 @@ extension FunctionConvention {
 public struct ParameterInfo : CustomStringConvertible {
   /// The parameter type that describes the abstract calling
   /// convention of the parameter.
-  public let type: BridgedASTType
+  public let type: CanonicalType
   public let convention: ArgumentConvention
   public let options: UInt8
   public let hasLoweredAddresses: Bool
 
-  public init(type: BridgedASTType, convention: ArgumentConvention, options: UInt8, hasLoweredAddresses: Bool) {
+  public init(type: CanonicalType, convention: ArgumentConvention, options: UInt8, hasLoweredAddresses: Bool) {
     self.type = type
     self.convention = convention
     self.options = options
@@ -177,7 +178,7 @@ public struct ParameterInfo : CustomStringConvertible {
   public var isSILIndirect: Bool {
     switch convention {
     case .indirectIn, .indirectInGuaranteed:
-      return hasLoweredAddresses || type.isOpenedExistentialWithError()
+      return hasLoweredAddresses || type.isOpenedExistentialWithError
     case .indirectInout, .indirectInoutAliasable, .indirectInCXX:
       return true
     case .directOwned, .directUnowned, .directGuaranteed:
@@ -190,8 +191,7 @@ public struct ParameterInfo : CustomStringConvertible {
   }
 
   public var description: String {
-    convention.description + ": "
-    + String(taking: type.getDebugDescription())
+    "\(convention): \(type)"
   }
 }
 
@@ -252,7 +252,7 @@ public enum LifetimeDependenceConvention : CustomStringConvertible {
 extension FunctionConvention {
   // 'targetIndex' is either the parameter index or parameters.count for the function result.
   private func lifetimeDependencies(for targetIndex: Int) -> LifetimeDependencies? {
-    let bridgedDependenceInfoArray = bridgedFunctionType.SILFunctionType_getLifetimeDependencies()
+    let bridgedDependenceInfoArray = SILFunctionType_getLifetimeDependencies(functionType.bridged)
     for infoIndex in 0..<bridgedDependenceInfoArray.count() {
       let bridgedDependenceInfo = bridgedDependenceInfoArray.at(infoIndex)
       if bridgedDependenceInfo.targetIndex == targetIndex {
@@ -392,13 +392,13 @@ extension ResultConvention {
 
 extension ParameterInfo {
   init(bridged: BridgedParameterInfo, hasLoweredAddresses: Bool) {
-    self.type = BridgedASTType(type: bridged.type)
+    self.type = CanonicalType(bridged: bridged.type)
     self.convention = bridged.convention.convention
     self.options = bridged.options
     self.hasLoweredAddresses = hasLoweredAddresses
   }
 
   public var _bridged: BridgedParameterInfo {
-    BridgedParameterInfo(type.type!, convention.bridged, options)
+    BridgedParameterInfo(type.bridged, convention.bridged, options)
   }
 }

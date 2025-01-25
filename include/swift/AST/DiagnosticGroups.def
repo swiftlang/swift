@@ -1,0 +1,32 @@
+//===--- DiagnosticGroups.def - Diagnostic Groups ---------------*- C++ -*-===//
+//
+// This source file is part of the Swift.org open source project
+//
+// Copyright (c) 2024 Apple Inc. and the Swift project authors
+// Licensed under Apache License v2.0 with Runtime Library Exception
+//
+// See https://swift.org/LICENSE.txt for license information
+// See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
+//
+//===----------------------------------------------------------------------===//
+//
+//  This file defines diagnostic groups and links between them.
+//
+//===----------------------------------------------------------------------===//
+
+#define DEFINE_DIAGNOSTIC_GROUPS_MACROS
+#include "swift/AST/DefineDiagnosticGroupsMacros.h"
+
+// GROUP(Name, DocsFile)
+// GROUP_LINK(Parent, Child)
+
+GROUP(no_group, "")
+
+GROUP(DeprecatedDeclaration, "DeprecatedDeclaration.md")
+GROUP(Unsafe, "Unsafe.md")
+GROUP(UnknownWarningGroup, "UnknownWarningGroup.md")
+GROUP(PreconcurrencyImport, "PreconcurrencyImport.md")
+GROUP(StrictLanguageFeatures, "StrictLanguageFeatures.md")
+
+#define UNDEFINE_DIAGNOSTIC_GROUPS_MACROS
+#include "swift/AST/DefineDiagnosticGroupsMacros.h"

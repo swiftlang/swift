@@ -5,8 +5,8 @@
 // RUN: %target-swift-frontend -enable-import-ptrauth-field-function-pointers -O -emit-ir %t/Main.swift -enable-experimental-feature Embedded -import-objc-header %t/header.h | %FileCheck %s
 
 // REQUIRES: swift_in_compiler
-// REQUIRES: OS=macosx || OS=linux-gnu
 // REQUIRES: CPU=arm64e
+// REQUIRES: swift_feature_Embedded
 
 // BEGIN header.h
 
@@ -25,7 +25,7 @@ public func test2(x: UnsafePointer<MyStruct>) {
     x.pointee.fptr2()
 }
 
-// CHECK: define {{.*}}@"$s4Main5test11xySPySo8MyStructVG_tF"
+// CHECK: define {{.*}}@"$e4Main5test11xySPySo8MyStructVG_tF"
 // CHECK:   call {{.*}}[ "ptrauth"(i32 0, i64 0) ]
-// CHECK: define {{.*}}@"$s4Main5test21xySPySo8MyStructVG_tF"
+// CHECK: define {{.*}}@"$e4Main5test21xySPySo8MyStructVG_tF"
 // CHECK:   call {{.*}}[ "ptrauth"(i32 0, i64 16962) ]

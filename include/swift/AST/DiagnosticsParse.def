@@ -228,6 +228,9 @@ ERROR(let_cannot_be_addressed_property,none,
 ERROR(disallowed_var_multiple_getset,none,
       "'var' declarations with multiple variables cannot have explicit"
       " getters/setters", ())
+ERROR(stub_decl_cannot_have_body,none,
+      "stub %0 cannot have body",
+      (DescriptiveDeclKind))
 
 ERROR(disallowed_init,none,
       "initial value is not allowed here", ())
@@ -253,13 +256,10 @@ ERROR(enum_case_dot_prefix,none,
 ERROR(static_var_decl_global_scope,none,
       "%select{%error|static properties|class properties}0 may only be declared on a type",
       (StaticSpellingKind))
-ERROR(unexpected_curly_braces_in_decl, none,
-      "unexpected '{' in declaration", ())
-ERROR(missing_accessor_return_decl,none,
-      "missing return in %select{accessor|subscript}0 expected to return %1",
-      (bool, TypeRepr*))
 ERROR(expected_getset_in_protocol,none,
       "expected get or set in a protocol property", ())
+ERROR(expected_getreadset_in_protocol,none,
+      "expected get, read, or set in a protocol property", ())
 ERROR(unexpected_getset_implementation_in_protocol,none,
       "protocol property %0 cannot have a default implementation specified "
       "here; use extension instead", (StringRef))
@@ -310,6 +310,9 @@ ERROR(observing_accessor_in_subscript,none,
       "%select{'willSet'|'didSet'}0 is not allowed in subscripts", (unsigned))
 ERROR(getset_cannot_be_implied,none,
       "variable with implied type cannot have implied getter/setter", ())
+ERROR(accessor_requires_coroutine_accessors,none,
+      "%0 is only valid when experimental feature coroutine accessors is enabled",
+      (StringRef))
 
 // Import
 ERROR(decl_expected_module_name,none,
@@ -552,6 +555,8 @@ ERROR(sil_value_def_type_mismatch,none,
       "value '%0' used with mismatching type %1 (expected %2)", (StringRef, Type, Type))
 ERROR(sil_use_of_undefined_value,none,
       "use of undefined value '%0'", (StringRef))
+ERROR(sil_forward_ref_value_needs_type,none,
+      "forward-referenced value '%0' needs a type annotation", (StringRef))
 NOTE(sil_prior_reference,none,
      "prior reference was here", ())
 
@@ -1366,6 +1371,8 @@ ERROR(expected_expr_after_ternary_colon,none,
       "expected expression after '? ... :' in ternary expression", ())
 ERROR(expected_expr_after_await, none,
       "expected expression after 'await'", ())
+ERROR(expected_expr_after_unsafe, none,
+      "expected expression after 'unsafe'", ())
 ERROR(expected_expr_after_move, none,
       "expected expression after 'consume'", ())
 ERROR(expected_expr_after_copy, none,
@@ -1845,8 +1852,6 @@ ERROR(attr_rawlayout_expected_integer_size,none,
       "expected integer literal size in @_rawLayout attribute", ())
 ERROR(attr_rawlayout_expected_integer_alignment,none,
       "expected integer literal alignment in @_rawLayout attribute", ())
-ERROR(attr_rawlayout_expected_integer_count,none,
-      "expected integer literal count in @_rawLayout attribute", ())
 ERROR(attr_rawlayout_expected_params,none,
       "expected %1 argument after %0 argument in @_rawLayout attribute", (StringRef, StringRef))
 
@@ -2097,6 +2102,8 @@ ERROR(unexpected_attribute_expansion,PointsToFirstBadToken,
 ERROR(unexpected_member_expansion,PointsToFirstBadToken,
       "unexpected token '%0' in expanded member list",
       (StringRef))
+ERROR(extra_tokens_after_expression,PointsToFirstBadToken,
+      "extra tokens after expression in macro expansion", ())
 
 ERROR(parser_round_trip_error,none,
       "source file did not round-trip through the new Swift parser", ())
@@ -2168,6 +2175,12 @@ ERROR(sending_repeated,none,
       "parameter may have at most one 'sending' specifier", ())
 ERROR(sending_cannot_be_used_with_borrowing,none,
       "'%0' cannot be used together with 'borrowing'", (StringRef))
+
+ERROR(sil_thunkinst_failed_to_parse_kind,none,
+      "'%0' is not a valid thunk kind supported by ThunkInst", (StringRef))
+
+ERROR(sil_failed_to_parse_sil_optional,none,
+      "Expected SIL optional value of the form '[' NAME ']'", ())
 
 #define UNDEFINE_DIAGNOSTIC_MACROS
 #include "DefineDiagnosticMacros.h"

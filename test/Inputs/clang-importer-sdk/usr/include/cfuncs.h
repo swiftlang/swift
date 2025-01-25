@@ -60,3 +60,5 @@ void opaque_pointer_param(struct not_importable *);
 
 int unsupported_parameter_type(int param1, _Complex int param2);
 _Complex int unsupported_return_type();
+
+void nullability_note(const char * _Nonnull const * _Nonnull parameter);

@@ -13,12 +13,13 @@
 #define DEBUG_TYPE "sil-function"
 
 #include "swift/SIL/SILFunction.h"
-#include "swift/AST/Availability.h"
+#include "swift/AST/AvailabilityRange.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/LocalArchetypeRequirementCollector.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/Stmt.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/OptimizationMode.h"
 #include "swift/Basic/Statistic.h"
 #include "swift/SIL/CFG.h"
@@ -32,7 +33,6 @@
 #include "swift/SIL/SILModule.h"
 #include "swift/SIL/SILProfiler.h"
 #include "clang/AST/Decl.h"
-#include "swift/Basic/Assertions.h"
 #include "llvm/ADT/Statistic.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/GraphWriter.h"
@@ -102,7 +102,7 @@ SILSpecializeAttr::SILSpecializeAttr(bool exported, SpecializationKind kind,
                                      ArrayRef<Type> typeErasedParams,
                                      SILFunction *target, Identifier spiGroup,
                                      const ModuleDecl *spiModule,
-                                     AvailabilityContext availability)
+                                     AvailabilityRange availability)
     : kind(kind), exported(exported), specializedSignature(specializedSig),
       unerasedSpecializedSignature(unerasedSpecializedSig),
       typeErasedParams(typeErasedParams.begin(), typeErasedParams.end()),
@@ -118,7 +118,7 @@ SILSpecializeAttr::create(SILModule &M, GenericSignature specializedSig,
                           bool exported, SpecializationKind kind,
                           SILFunction *target, Identifier spiGroup,
                           const ModuleDecl *spiModule,
-                          AvailabilityContext availability) {
+                          AvailabilityRange availability) {
   auto erasedSpecializedSig =
       SILSpecializeAttr::buildTypeErasedSignature(specializedSig,
                                                   typeErasedParams);
@@ -194,6 +194,14 @@ SILFunction *SILFunction::create(
   else
     M.functions.push_back(fn);
 
+  auto iter = M.pendingSpecializeAttrs.find(name);
+  if (iter != M.pendingSpecializeAttrs.end()) {
+    for (auto *attr : iter->second) {
+      fn->addSpecializeAttr(attr);
+    }
+    M.pendingSpecializeAttrs.erase(iter);
+  }
+
   return fn;
 }
 
@@ -218,7 +226,7 @@ SILFunction::SILFunction(
     IsRuntimeAccessible_t isRuntimeAccessible)
     : SwiftObjectHeader(functionMetatype), Module(Module),
       index(Module.getNewFunctionIndex()),
-      Availability(AvailabilityContext::alwaysAvailable()) {
+      Availability(AvailabilityRange::alwaysAvailable()) {
   init(Linkage, Name, LoweredType, genericEnv, isBareSILFunction, isTrans,
        serializedKind, entryCount, isThunk, classSubclassScope, inlineStrategy, E,
        DebugScope, isDynamic, isExactSelfClass, isDistributed,
@@ -248,7 +256,7 @@ void SILFunction::init(
   this->LoweredType = LoweredType;
   this->SpecializationInfo = nullptr;
   this->EntryCount = entryCount;
-  this->Availability = AvailabilityContext::alwaysAvailable();
+  this->Availability = AvailabilityRange::alwaysAvailable();
   this->Bare = isBareSILFunction;
   this->Transparent = isTrans;
   this->SerializedKind = serializedKind;
@@ -504,7 +512,6 @@ Type SILFunction::mapTypeIntoContext(Type type) const {
     // environment.
     return type.subst(MapIntoLocalArchetypeContext(GenericEnv, CapturedEnvs),
                       LookUpConformanceInModule(),
-                      SubstFlags::AllowLoweredTypes |
                       SubstFlags::PreservePackExpansionLevel);
   }
 
@@ -625,7 +632,7 @@ bool SILFunction::isWeakImported(ModuleDecl *module) const {
     return false;
 
   auto deploymentTarget =
-      AvailabilityContext::forDeploymentTarget(getASTContext());
+      AvailabilityRange::forDeploymentTarget(getASTContext());
 
   if (getASTContext().LangOpts.WeakLinkAtTarget)
     return !Availability.isSupersetOf(deploymentTarget);

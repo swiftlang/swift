@@ -162,7 +162,7 @@ extension Function {
     }
     if isProgramTerminationPoint {
       // We can ignore any memory writes in a program termination point, because it's not relevant
-      // for the caller. But we need to consider memory reads, otherwise preceeding memory writes
+      // for the caller. But we need to consider memory reads, otherwise preceding memory writes
       // would be eliminated by dead-store-elimination in the caller. E.g. String initialization
       // for error strings which are printed by the program termination point.
       // Regarding ownership: a program termination point must not touch any reference counted objects.
@@ -394,7 +394,7 @@ public struct SideEffects : CustomStringConvertible, NoReflectionChildren {
 
   /// Returns the effects of an argument.
   ///
-  /// In constrast to using `arguments` directly, it's valid to have an `argumentIndex`
+  /// In contrast to using `arguments` directly, it's valid to have an `argumentIndex`
   /// which is larger than the number of elements in `arguments`.
   public func getArgumentEffects(for argumentIndex: Int) -> ArgumentEffects {
     if argumentIndex < arguments.count {
@@ -430,7 +430,7 @@ public struct SideEffects : CustomStringConvertible, NoReflectionChildren {
   
   /// Side-effects of a specific function argument.
   ///
-  /// The paths describe what (projeted) values of an argument are affected.
+  /// The paths describe what (projected) values of an argument are affected.
   /// If a path is nil, than there is no such effect on the argument.
   ///
   /// A path can contain any projection or wildcards, as long as there is no load involved.

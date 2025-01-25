@@ -210,8 +210,8 @@ collectLoads(Operand *addressUse, CopyAddrInst *originalCopy,
       // Register 'end_apply'/'abort_apply' as loads as well
       // 'checkNoSourceModification' should check instructions until
       // 'end_apply'/'abort_apply'.
-      for (auto tokenUse : beginApply->getTokenResult()->getUses()) {
-        SILInstruction *tokenUser = tokenUse->getUser();
+      for (auto *tokenUse : beginApply->getEndApplyUses()) {
+        auto *tokenUser = tokenUse->getUser();
         if (tokenUser->getParent() != block)
           return false;
         loadInsts.insert(tokenUser);

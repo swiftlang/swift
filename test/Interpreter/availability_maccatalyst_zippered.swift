@@ -2,26 +2,26 @@
 // RUN: %empty-directory(%t/macos_module)
 // RUN: %empty-directory(%t/maccatalyst_module)
 
-// REQUIRES: rdar73984718
 
 // Build a zippered library
 
 // Emit a zippered library and a module for use from macOSProcesses
-// RUN: %target-build-swift %S/Inputs/availability_zippered.swift -target x86_64-apple-macosx10.15 -target-variant x86_64-apple-ios13.1-macabi -emit-library -emit-module -emit-module-path %t/macos_module/ -o %t/libavailability_zippered.dylib
+// RUN: %target-build-swift-dylib(%t/%target-library-name(availability_zippered)) %S/Inputs/availability_zippered.swift -target %target-cpu-apple-macosx10.15 -target-variant %target-cpu-apple-ios13.1-macabi -emit-module -emit-module-path %t/macos_module/
+// RUN: %target-codesign %t/%target-library-name(availability_zippered)
 
 // Emit just an macCatalyst module for use from an macCatalyst process
-// RUN: %target-build-swift %S/Inputs/availability_zippered.swift -target x86_64-apple-ios13.1-macabi -emit-module -emit-module-path %t/maccatalyst_module/
+// RUN: %target-build-swift %S/Inputs/availability_zippered.swift -target %target-cpu-apple-ios13.1-macabi -emit-module -emit-module-path %t/maccatalyst_module/
 
 // Build a macOS executable that calls into the library
-// RUN: %target-build-swift -emit-executable -target x86_64-apple-macosx10.15 %s -lavailability_zippered -I %t/macos_module -L %t -o %t/a-macos.out
+// RUN: %target-build-swift -emit-executable -target %target-cpu-apple-macosx10.15 %s -lavailability_zippered -I %t/macos_module -L %t -o %t/a-macos.out
 // RUN: %target-codesign %t/a-macos.out
 
 // Built an macCatalyst executable that calls into the library.
-// RUN: %target-build-swift -target x86_64-apple-ios13.1-macabi %s -lavailability_zippered -I %t/maccatalyst_module -L %t -o %t/a-maccatalyst.out
+// RUN: %target-build-swift -target %target-cpu-apple-ios13.1-macabi %s -lavailability_zippered -I %t/maccatalyst_module -L %t -o %t/a-maccatalyst.out
 // RUN: %target-codesign %t/a-maccatalyst.out
 
-// RUN: %target-run %t/a-macos.out
-// RUN: %target-run %t/a-maccatalyst.out
+// RUN: %target-run %t/a-macos.out %t/%target-library-name(availability_zippered)
+// RUN: %target-run %t/a-maccatalyst.out %t/%target-library-name(availability_zippered)
 
 // REQUIRES: executable_test
 // REQUIRES: maccatalyst_support

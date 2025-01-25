@@ -34,16 +34,12 @@ namespace swift {
 
 class GenericEnvironment;
 class GenericParamList;
+class RecursiveTypeProperties;
 class SubstitutableType;
 typedef CanTypeWrapper<GenericTypeParamType> CanGenericTypeParamType;
 
 template<class Type> class CanTypeWrapper;
 typedef CanTypeWrapper<SubstitutableType> CanSubstitutableType;
-
-enum class CombineSubstitutionMaps {
-  AtDepth,
-  AtIndex
-};
 
 /// SubstitutionMap is a data structure type that describes the mapping of
 /// abstract types to replacement types, together with associated conformances
@@ -114,6 +110,15 @@ public:
   /// This function should generally only be used by the substitution
   /// subsystem.
   static SubstitutionMap get(GenericSignature genericSig,
+                             ArrayRef<Type> replacementTypes,
+                             InFlightSubstitution &IFS);
+
+  /// Build a substitution map from the substitutions represented by
+  /// the given in-flight substitution.
+  ///
+  /// This function should generally only be used by the substitution
+  /// subsystem.
+  static SubstitutionMap get(GenericSignature genericSig,
                              InFlightSubstitution &IFS);
 
   /// Retrieve the generic signature describing the environment in which
@@ -150,19 +155,7 @@ public:
   /// parameters.
   ArrayRef<Type> getInnermostReplacementTypes() const;
 
-  /// Query whether any replacement types in the map contain archetypes.
-  bool hasArchetypes() const;
-
-  /// Query whether any replacement types in the map contain an opened
-  /// existential or opened element.
-  bool hasLocalArchetypes() const;
-
-  /// Query whether any replacement types in the map contain an opaque
-  /// return type.
-  bool hasOpaqueArchetypes() const;
-
-  /// Query whether any replacement types in the map contain dynamic Self.
-  bool hasDynamicSelf() const;
+  RecursiveTypeProperties getRecursiveProperties() const;
 
   /// Whether the replacement types are all canonical.
   bool isCanonical() const;
@@ -216,32 +209,13 @@ public:
                            GenericSignature baseSig,
                            const GenericParamList *derivedParams);
 
-  /// Combine two substitution maps as follows.
-  ///
-  /// The result is written in terms of the generic parameters of 'genericSig'.
-  ///
-  /// Generic parameters with a depth or index less than 'firstDepthOrIndex'
-  /// come from 'firstSubMap'.
-  ///
-  /// Generic parameters with a depth greater than 'firstDepthOrIndex' come
-  /// from 'secondSubMap', but are looked up starting with a depth or index of
-  /// 'secondDepthOrIndex'.
-  ///
-  /// The 'how' parameter determines if we're looking at the depth or index.
-  static SubstitutionMap
-  combineSubstitutionMaps(SubstitutionMap firstSubMap,
-                          SubstitutionMap secondSubMap,
-                          CombineSubstitutionMaps how,
-                          unsigned baseDepthOrIndex,
-                          unsigned origDepthOrIndex,
-                          GenericSignature genericSig);
-
   /// Swap archetypes in the substitution map's replacement types with their
   /// interface types.
   SubstitutionMap mapReplacementTypesOutOfContext() const;
 
-  /// Verify that this substitution map is valid.
-  void verify() const;
+  /// Verify that the conformances stored in this substitution map match the
+  /// replacement types provided.
+  void verify(bool allowInvalid=true) const;
 
   /// Whether to dump the full substitution map, or just a minimal useful subset
   /// (on a single line).
@@ -288,7 +262,7 @@ private:
   /// Note that this only finds replacements for maps that are directly
   /// stored inside the map. In most cases, you should call Type::subst()
   /// instead, since that will resolve member types also.
-  Type lookupSubstitution(CanSubstitutableType type) const;
+  Type lookupSubstitution(GenericTypeParamType *type) const;
 };
 
 inline llvm::raw_ostream &operator<<(llvm::raw_ostream &OS,
@@ -358,6 +332,19 @@ struct LookUpConformanceInOverrideSubs {
   ProtocolConformanceRef operator()(CanType type,
                                     Type substType,
                                     ProtocolDecl *proto) const;
+};
+
+// Substitute the outer generic parameters from a substitution map, ignoring
+/// inner generic parameters with a given depth.
+struct OuterSubstitutions {
+  SubstitutionMap subs;
+  unsigned depth;
+
+  bool isUnsubstitutedTypeParameter(Type type) const;
+  Type operator()(SubstitutableType *type) const;
+  ProtocolConformanceRef operator()(CanType dependentType,
+                                    Type conformingReplacementType,
+                                    ProtocolDecl *conformedProtocol) const;
 };
 
 } // end namespace swift

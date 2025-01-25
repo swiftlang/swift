@@ -126,7 +126,7 @@
 //
 //
 // TODO: These utilities should be integrated with OSSA SIL verification and
-// guaranteed to be compelete (produce known results for all legal SIL
+// guaranteed to be complete (produce known results for all legal SIL
 // patterns).
 // ===----------------------------------------------------------------------===//
 
@@ -211,7 +211,7 @@ enum BorrowingInstruction : CustomStringConvertible, Hashable {
   /// the last in the function (e.g. a store rather than a destroy or return).
   /// The client needs to use LifetimeDependenceDefUseWalker to do better.
   ///
-  /// TODO: to hande reborrow-extended uses, migrate ExtendedLiveness
+  /// TODO: to handle reborrow-extended uses, migrate ExtendedLiveness
   /// to SwiftCompilerSources.
   ///
   /// TODO: Handle .partialApply and .markDependence forwarded uses
@@ -270,7 +270,7 @@ enum BorrowingInstruction : CustomStringConvertible, Hashable {
 }
 
 /// A value that introduces a borrow scope:
-/// begin_borrow, load_borrow, reborrow, guaranteed function argument.
+/// begin_borrow, load_borrow, reborrow, guaranteed function argument, begin_apply, unchecked_ownership_conversion.
 ///
 /// If the value introduces a local scope, then that scope is
 /// terminated by scope ending operands. Function arguments do not
@@ -278,21 +278,24 @@ enum BorrowingInstruction : CustomStringConvertible, Hashable {
 ///
 /// If the value is a begin_apply result, then it may be the token or
 /// one of the yielded values. In any case, the scope ending operands
-/// are on the end_apply or abort_apply intructions that use the
+/// are on the end_apply or abort_apply instructions that use the
 /// token.
-///
-/// Note: equivalent to C++ BorrowedValue, but also handles begin_apply.
 enum BeginBorrowValue {
   case beginBorrow(BeginBorrowInst)
   case loadBorrow(LoadBorrowInst)
   case beginApply(Value)
+  case uncheckOwnershipConversion(UncheckedOwnershipConversionInst)
   case functionArgument(FunctionArgument)
   case reborrow(Phi)
 
   init?(_ value: Value) {
     switch value {
-    case let bbi as BeginBorrowInst: self = .beginBorrow(bbi)
-    case let lbi as LoadBorrowInst: self = .loadBorrow(lbi)
+    case let bbi as BeginBorrowInst:
+      self = .beginBorrow(bbi)
+    case let lbi as LoadBorrowInst:
+      self = .loadBorrow(lbi)
+    case let uoci as UncheckedOwnershipConversionInst where uoci.ownership == .guaranteed:
+      self = .uncheckOwnershipConversion(uoci)
     case let arg as FunctionArgument where arg.ownership == .guaranteed:
       self = .functionArgument(arg)
     case let arg as Argument where arg.isReborrow:
@@ -311,6 +314,7 @@ enum BeginBorrowValue {
     case .beginBorrow(let bbi): return bbi
     case .loadBorrow(let lbi): return lbi
     case .beginApply(let v): return v
+    case .uncheckOwnershipConversion(let uoci): return uoci
     case .functionArgument(let arg): return arg
     case .reborrow(let phi): return phi.value
     }
@@ -347,7 +351,7 @@ enum BeginBorrowValue {
 
   var hasLocalScope: Bool {
     switch self {
-    case .beginBorrow, .loadBorrow, .beginApply, .reborrow:
+    case .beginBorrow, .loadBorrow, .beginApply, .reborrow, .uncheckOwnershipConversion:
       return true
     case .functionArgument:
       return false
@@ -364,7 +368,7 @@ enum BeginBorrowValue {
     return beginBorrow.operand
     case let .loadBorrow(loadBorrow):
       return loadBorrow.operand
-    case .beginApply, .functionArgument, .reborrow:
+    case .beginApply, .functionArgument, .reborrow, .uncheckOwnershipConversion:
       return nil
     }
   }
@@ -452,7 +456,7 @@ final class EnclosingValueIterator : IteratorProtocol {
       case let .beginBorrow(bbi):
         // Gather the outer enclosing borrow scope.
         worklist.pushIfNotVisited(bbi.borrowedValue)
-      case .loadBorrow, .beginApply, .functionArgument:
+      case .loadBorrow, .beginApply, .functionArgument, .uncheckOwnershipConversion:
         // There is no enclosing value on this path.
         break
       case .reborrow(let phi):
@@ -592,7 +596,7 @@ func gatherEnclosingValuesFromPredecessors(
     let incomingOperand = phi.incomingOperand(inPredecessor: predecessor)
 
     for predEV in incomingOperand.value.getEnclosingValues(context) {
-      let ev = predecessor.mapToPhiInSuccessor(incomingEnclosingValue: predEV)
+      let ev = predecessor.getEnclosingValueInSuccessor(ofIncoming: predEV)
       if alreadyAdded.insert(ev) {
         enclosingValues.push(ev)
       }
@@ -601,13 +605,31 @@ func gatherEnclosingValuesFromPredecessors(
 }
 
 extension BasicBlock {
-  func mapToPhiInSuccessor(incomingEnclosingValue: Value) -> Value {
+  // Returns either the `incomingEnclosingValue` or an adjacent phi in the successor block.
+  func getEnclosingValueInSuccessor(ofIncoming incomingEnclosingValue: Value) -> Value {
     let branch = terminator as! BranchInst
-    if let incomingEV = branch.operands.first(where: { $0.value.lookThroughBorrowedFrom == incomingEnclosingValue }) {
+    if let incomingEV = branch.operands.first(where: { branchOp in
+      // Only if the lifetime of `branchOp` ends at the branch (either because it's a reborrow or an owned value),
+      // the corresponding phi argument can be the adjacent phi for the incoming value.
+      //   bb1:
+      //     %incomingEnclosingValue = some_owned_value
+      //     %2 = begin_borrow %incomingEnclosingValue  // %incomingEnclosingValue = the enclosing value of %2 in bb1
+      //     br bb2(%incomingEnclosingValue, %2)        // lifetime of incomingEnclosingValue ends here
+      //   bb2(%4 : @owned, %5 : @guaranteed):          // -> %4 = the enclosing value of %5 in bb2
+      //
+      branchOp.endsLifetime &&
+      branchOp.value.lookThroughBorrowedFrom == incomingEnclosingValue
+    }) {
       return branch.getArgument(for: incomingEV)
     }
-    // No candidates phi are outer-adjacent phis. The incoming
-    // `predDef` must dominate the current guaranteed phi.
+    // No candidates phi are outer-adjacent phis. The incomingEnclosingValue must dominate the successor block.
+    //   bb1: // dominates bb3
+    //     %incomingEnclosingValue = some_owned_value
+    //   bb2:
+    //     %2 = begin_borrow %incomingEnclosingValue
+    //     br bb3(%2)
+    //   bb3(%5 : @guaranteed):          // -> %incomingEnclosingValue = the enclosing value of %5 in bb3
+    //
     return incomingEnclosingValue
   }
 }

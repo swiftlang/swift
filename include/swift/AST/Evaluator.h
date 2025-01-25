@@ -29,8 +29,6 @@
 #include "llvm/ADT/SetVector.h"
 #include "llvm/Support/Error.h"
 #include "llvm/Support/PrettyStackTrace.h"
-#include <string>
-#include <tuple>
 #include <type_traits>
 #include <vector>
 
@@ -452,6 +450,6 @@ evaluateOrFatal(Evaluator &eval, Request req) {
   });
 }
 
-} // end namespace evaluator
+} // end namespace swift
 
 #endif // SWIFT_AST_EVALUATOR_H

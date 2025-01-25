@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend -emit-module -o %t -enable-library-evolution %S/Inputs/property_wrapper_defs.swift
-// RUN: %target-swift-emit-silgen -primary-file %s -I %t | %FileCheck %s
+// RUN: %target-swift-emit-silgen -Xllvm -sil-print-types -primary-file %s -I %t | %FileCheck %s
 import property_wrapper_defs
 
 @propertyWrapper

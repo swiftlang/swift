@@ -33,6 +33,11 @@ public:
   DeclExportabilityVisitor(){};
 
   bool visit(const Decl *D) {
+    // Declarations nested in fragile functions are exported.
+    if (D->getDeclContext()->getFragileFunctionKind().kind !=
+        FragileFunctionKind::None)
+      return true;
+
     if (auto value = dyn_cast<ValueDecl>(D)) {
       // A decl is exportable if it has a public access level.
       auto accessScope =
@@ -49,20 +54,6 @@ public:
   // Force all decl kinds to be handled explicitly.
   bool visitDecl(const Decl *D) = delete;
   bool visitValueDecl(const ValueDecl *valueDecl) = delete;
-
-  bool visitAbstractFunctionDecl(const AbstractFunctionDecl *afd) {
-    // If this function is nested within another function that is exportable to
-    // clients then it is also exportable.
-    auto dc = afd->getDeclContext();
-    do {
-      if (auto parent = dyn_cast<AbstractFunctionDecl>(dc)) {
-        if (DeclExportabilityVisitor().visit(parent))
-          return true;
-      }
-    } while ((dc = dc->getParent()));
-
-    return false;
-  }
 
   bool visitExtensionDecl(const ExtensionDecl *ext) {
     // Extensions must extend exportable types to be exportable.
@@ -149,6 +140,7 @@ public:
   DEFAULT_TO_ACCESS_LEVEL(TypeAlias);
   DEFAULT_TO_ACCESS_LEVEL(AssociatedType);
   DEFAULT_TO_ACCESS_LEVEL(AbstractStorage);
+  DEFAULT_TO_ACCESS_LEVEL(AbstractFunction);
   DEFAULT_TO_ACCESS_LEVEL(Macro);
   DEFAULT_TO_ACCESS_LEVEL(EnumElement);
 
@@ -178,7 +170,6 @@ public:
 #define UNINTERESTING(KIND)                                                    \
   bool visit##KIND##Decl(const KIND##Decl *D) { return true; }
   UNINTERESTING(TopLevelCode);
-  UNINTERESTING(IfConfig);
   UNINTERESTING(Import);
   UNINTERESTING(PoundDiagnostic);
   UNINTERESTING(PrecedenceGroup);

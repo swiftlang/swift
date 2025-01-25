@@ -42,7 +42,7 @@ static GenericParamList *cloneGenericParameters(ASTContext &ctx,
   for (auto paramType : sig.getGenericParams()) {
     auto *clonedParam = GenericTypeParamDecl::createImplicit(
         dc, paramType->getName(), paramType->getDepth(), paramType->getIndex(),
-        paramType->isParameterPack());
+        paramType->getParamKind());
     clonedParam->setDeclContext(dc);
     clonedParams.push_back(clonedParam);
   }
@@ -78,7 +78,7 @@ LinearMapInfo::createBranchingTraceDecl(SILBasicBlock *originalBB,
   auto &astCtx = original->getASTContext();
   auto &file = getSynthesizedFile();
   // Create a branching trace enum.
-  Mangle::ASTMangler mangler;
+  Mangle::ASTMangler mangler(astCtx);
   auto config = this->config.withGenericSignature(genericSig);
   auto enumName = mangler.mangleAutoDiffGeneratedDeclaration(
       AutoDiffGeneratedDeclarationKind::BranchingTraceEnum,

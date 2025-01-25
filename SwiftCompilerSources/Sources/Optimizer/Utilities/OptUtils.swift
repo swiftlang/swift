@@ -10,9 +10,12 @@
 //
 //===----------------------------------------------------------------------===//
 
-import ASTBridging
+import AST
 import SIL
 import OptimizerBridging
+
+// Default to SIL.Type within the Optimizer module.
+typealias Type = SIL.`Type`
 
 extension Value {
   var lookThroughBorrow: Value {
@@ -40,6 +43,40 @@ extension Value {
     default:
       return self
     }
+  }
+
+  func isInLexicalLiverange(_ context: some Context) -> Bool {
+    var worklist = ValueWorklist(context)
+    defer { worklist.deinitialize() }
+
+    worklist.pushIfNotVisited(self)
+    while let v = worklist.pop() {
+      if v.ownership == .none {
+        continue
+      }
+      if v.isLexical {
+        return true
+      }
+      switch v {
+      case let fw as ForwardingInstruction:
+        worklist.pushIfNotVisited(contentsOf: fw.definedOperands.lazy.map { $0.value })
+      case let bf as BorrowedFromInst:
+        worklist.pushIfNotVisited(bf.borrowedValue)
+      case let bb as BeginBorrowInst:
+        worklist.pushIfNotVisited(bb.borrowedValue)
+      case let arg as Argument:
+        if let phi = Phi(arg) {
+          worklist.pushIfNotVisited(contentsOf: phi.incomingValues)
+        } else if let termResult = TerminatorResult(arg),
+               let fw = termResult.terminator as? ForwardingInstruction
+        {
+          worklist.pushIfNotVisited(contentsOf: fw.definedOperands.lazy.map { $0.value })
+        }
+      default:
+        continue
+      }
+    }
+    return false
   }
 
   /// Walks over all fields of an aggregate and checks if a reference count
@@ -199,7 +236,7 @@ extension Value {
   -> Bool {
     var users = InstructionSet(context)
     defer { users.deinitialize() }
-    uses.lazy.map({ $0.instruction }).forEach { users.insert($0) }
+    users.insert(contentsOf: self.users)
 
     var worklist = InstructionWorklist(context)
     defer { worklist.deinitialize() }
@@ -274,6 +311,14 @@ extension Value {
   }
 }
 
+extension SingleValueInstruction {
+  /// Replaces all uses with `replacement` and then erases the instruction.
+  func replace(with replacement: Value, _ context: some MutatingContext) {
+    uses.replaceAll(with: replacement, context)
+    context.erase(instruction: self)
+  }
+}
+
 extension Instruction {
   var isTriviallyDead: Bool {
     if results.contains(where: { !$0.uses.isEmpty }) {
@@ -294,6 +339,9 @@ extension Instruction {
     switch self {
     case is TermInst, is MarkUninitializedInst, is DebugValueInst:
       return false
+    case is BorrowedFromInst:
+      // A dead borrowed-from can only be removed if the argument (= operand) is also removed.
+      return false
     case let bi as BuiltinInst:
       if bi.id == .OnFastPath {
         return false
@@ -302,6 +350,10 @@ extension Instruction {
       // Don't remove UncheckedEnumDataInst in OSSA in case it is responsible
       // for consuming an enum value.
       return !parentFunction.hasOwnership
+    case is ExtendLifetimeInst:
+      // An extend_lifetime can only be removed if the operand is also removed.
+      // If its operand is trivial, it will be removed by MandatorySimplification.
+      return false
     default:
       break
     }
@@ -411,7 +463,7 @@ extension StoreInst {
     let builder = Builder(after: self, context)
     let type = source.type
     if type.isStruct {
-      if type.nominal.isStructWithUnreferenceableStorage {
+      if (type.nominal as! StructDecl).hasUnreferenceableStorage {
         return
       }
       if parentFunction.hasOwnership && source.ownership != .none {
@@ -465,7 +517,7 @@ extension LoadInst {
     var elements = [Value]()
     let builder = Builder(before: self, context)
     if type.isStruct {
-      if type.nominal.isStructWithUnreferenceableStorage {
+      if (type.nominal as! StructDecl).hasUnreferenceableStorage {
         return
       }
       guard let fields = type.getNominalFields(in: parentFunction) else {
@@ -477,7 +529,7 @@ extension LoadInst {
         elements.append(splitLoad)
       }
       let newStruct = builder.createStruct(type: self.type, elements: elements)
-      self.uses.replaceAll(with: newStruct, context)
+      self.replace(with: newStruct, context)
     } else if type.isTuple {
       var elements = [Value]()
       let builder = Builder(before: self, context)
@@ -487,11 +539,8 @@ extension LoadInst {
         elements.append(splitLoad)
       }
       let newTuple = builder.createTuple(type: self.type, elements: elements)
-      self.uses.replaceAll(with: newTuple, context)
-    } else {
-      return
+      self.replace(with: newTuple, context)
     }
-    context.erase(instruction: self)
   }
 
   private func splitOwnership(for fieldValue: Value) -> LoadOwnership {
@@ -554,7 +603,7 @@ extension BasicBlock {
 
 extension SimplifyContext {
 
-  /// Replaces a pair of redudant instructions, like
+  /// Replaces a pair of redundant instructions, like
   /// ```
   ///   %first = enum $E, #E.CaseA!enumelt, %replacement
   ///   %second = unchecked_enum_data %first : $E, #E.CaseA!enumelt
@@ -566,13 +615,21 @@ extension SimplifyContext {
     let singleUse = preserveDebugInfo ? first.uses.singleUse : first.uses.ignoreDebugUses.singleUse
     let canEraseFirst = singleUse?.instruction == second
 
-    if !canEraseFirst && first.parentFunction.hasOwnership && replacement.ownership == .owned {
-      // We cannot add more uses to `replacement` without inserting a copy.
-      return
+    if !canEraseFirst && first.parentFunction.hasOwnership {
+      if replacement.ownership == .owned {
+        // We cannot add more uses to `replacement` without inserting a copy.
+        return
+      }
+      if first.ownership == .owned {
+        // We have to insert a compensating destroy because we are deleting the second instruction but
+        // not the first one. This can happen if the first instruction is an `enum` which constructs a
+        // non-trivial enum from a trivial payload.
+        let builder = Builder(before: second, self)
+        builder.createDestroyValue(operand: first)
+      }
     }
 
-    second.uses.replaceAll(with: replacement, self)
-    erase(instruction: second)
+    second.replace(with: replacement, self)
 
     if canEraseFirst {
       erase(instructionIncludingDebugUses: first)
@@ -647,27 +704,6 @@ extension Function {
 }
 
 extension FullApplySite {
-  var canInline: Bool {
-    // Some checks which are implemented in C++
-    if !FullApplySite_canInline(bridged) {
-      return false
-    }
-    // Cannot inline a non-inlinable function it an inlinable function.
-    if let calleeFunction = referencedFunction,
-       !calleeFunction.canBeInlinedIntoCaller(parentFunction.serializedKind) {
-      return false
-    }
-
-    // Cannot inline a non-ossa function into an ossa function
-    if parentFunction.hasOwnership,
-      let calleeFunction = referencedFunction,
-      !calleeFunction.hasOwnership {
-      return false
-    }
-
-    return true
-  }
-
   var inliningCanInvalidateStackNesting: Bool {
     guard let calleeFunction = referencedFunction else {
       return false
@@ -688,6 +724,10 @@ extension FullApplySite {
   }
 }
 
+extension BeginApplyInst {
+  var canInline: Bool { BeginApply_canInline(bridged) }
+}
+
 extension GlobalVariable {
   /// Removes all `begin_access` and `end_access` instructions from the initializer.
   ///
@@ -705,8 +745,7 @@ extension GlobalVariable {
     for initInst in initInsts {
       switch initInst {
       case let beginAccess as BeginAccessInst:
-        beginAccess.uses.replaceAll(with: beginAccess.address, context)
-        context.erase(instruction: beginAccess)
+        beginAccess.replace(with: beginAccess.address, context)
       case let endAccess as EndAccessInst:
         context.erase(instruction: endAccess)
       default:
@@ -821,5 +860,27 @@ extension CheckedCastAddrBranchInst {
       case .willFail:    return false
       default: fatalError("unknown result from classifyDynamicCastBridged")
     }
+  }
+}
+
+extension Type {
+  /// True if a type can be expanded without a significant increase to code
+  /// size.
+  /// Expanding a type can mean expressing it as a SSA value (which ultimately
+  /// is represented as multiple SSA values in LLVM IR) instead of indirectly
+  /// via memory operations (copy_addr), or exploding an SSA value into its
+  /// constituent projections.
+  /// Once a value is represented as its projections we don't "reconstitute" the
+  /// aggregate value anymore leading to register pressure and code size bloat.
+  /// Therefore, we try to keep "larger" values indirect and not exploated
+  /// throughout the pipeline.
+  ///
+  /// False if expanding a type is invalid. For example, expanding a
+  /// struct-with-deinit drops the deinit.
+  func shouldExpand(_ context: some Context) -> Bool {
+    if !context.options.useAggressiveReg2MemForCodeSize {
+      return true
+    }
+    return context._bridged.shouldExpand(self.bridged)
   }
 }

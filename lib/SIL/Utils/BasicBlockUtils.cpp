@@ -369,6 +369,11 @@ void swift::mergeBasicBlockWithSingleSuccessor(SILBasicBlock *BB,
 //                              DeadEndBlocks
 //===----------------------------------------------------------------------===//
 
+// Force the compiler to generate the destructor in this C++ file.
+// Otherwise it can happen that it is generated in a SwiftCompilerSources module
+// and that results in unresolved-symbols linker errors.
+DeadEndBlocks::~DeadEndBlocks() {}
+
 // Propagate the reachability up the control flow graph.
 void DeadEndBlocks::propagateNewlyReachableBlocks(unsigned startIdx) {
   for (unsigned idx = startIdx; idx < reachableBlocks.size(); ++idx) {

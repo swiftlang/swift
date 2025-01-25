@@ -1,0 +1,6 @@
+// swift-interface-format-version: 1.0
+// swift-module-flags: -target arm64-apple-macosx15.0 -enable-objc-interop -enable-library-evolution -module-link-name swift_StringProcessing -swift-version 5 -O -library-level api -enforce-exclusivity=unchecked -target-min-inlining-version min -module-name _StringProcessing
+
+import Swift
+
+public let x: Swift.Int

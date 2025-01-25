@@ -92,8 +92,7 @@ llvm::Value *irgen::emitCheckedCast(IRGenFunction &IGF,
 FailableCastResult irgen::emitClassIdenticalCast(IRGenFunction &IGF,
                                                  llvm::Value *from,
                                                  SILType fromType,
-                                                 SILType toType,
-                                                 GenericSignature fnSig) {
+                                                 SILType toType) {
   // Check metatype objects directly. Don't try to find their meta-metatype.
   auto isMetatype = false;
   if (auto metaType = toType.getAs<MetatypeType>()) {
@@ -130,7 +129,7 @@ FailableCastResult irgen::emitClassIdenticalCast(IRGenFunction &IGF,
   // =>
   // icmp eq %1, @metadata.Sub
   llvm::Value *objectMetadata = isMetatype ? from :
-    emitHeapMetadataRefForHeapObject(IGF, from, fromType, fnSig);
+    emitHeapMetadataRefForHeapObject(IGF, from, fromType);
 
   objectMetadata = IGF.Builder.CreateBitCast(objectMetadata,
                                              targetMetadata->getType());
@@ -534,7 +533,7 @@ llvm::Value *irgen::emitMetatypeToAnyObjectDowncast(IRGenFunction &IGF,
 void irgen::emitScalarExistentialDowncast(
     IRGenFunction &IGF, llvm::Value *value, SILType srcType, SILType destType,
     CheckedCastMode mode, std::optional<MetatypeRepresentation> metatypeKind,
-    GenericSignature fnSig, Explosion &ex) {
+    Explosion &ex) {
   auto srcInstanceType = srcType.getASTType();
   auto destInstanceType = destType.getASTType();
   while (auto metatypeType = dyn_cast<ExistentialMetatypeType>(
@@ -765,8 +764,7 @@ void irgen::emitScalarExistentialDowncast(
     // Get the type metadata for the instance.
     metadataValue = emitDynamicTypeOfHeapObject(IGF, value,
                                                 MetatypeRepresentation::Thick,
-                                                srcType,
-                                                fnSig);
+                                                srcType);
   }
 
   // Look up witness tables for the protocols that need them.
@@ -849,7 +847,6 @@ void irgen::emitScalarCheckedCast(IRGenFunction &IGF,
                                   SILType targetLoweredType,
                                   CanType targetFormalType,
                                   CheckedCastMode mode,
-                                  GenericSignature fnSig,
                                   Explosion &out) {
   assert(sourceLoweredType.isObject());
   assert(targetLoweredType.isObject());
@@ -938,7 +935,6 @@ void irgen::emitScalarCheckedCast(IRGenFunction &IGF,
       emitScalarExistentialDowncast(IGF, metatypeVal, sourceLoweredType,
                                     targetLoweredType, mode,
                                     existential->getRepresentation(),
-                                    fnSig,
                                     out);
       return;
 
@@ -1007,7 +1003,7 @@ void irgen::emitScalarCheckedCast(IRGenFunction &IGF,
   llvm::Value *instance;
   if (sourceLoweredType.isExistentialType()) {
     instance = emitClassExistentialProjection(IGF, value, sourceLoweredType,
-                                              CanArchetypeType(), fnSig);
+                                              CanArchetypeType());
   } else {
     instance = value.claimNext();
   }
@@ -1016,7 +1012,7 @@ void irgen::emitScalarCheckedCast(IRGenFunction &IGF,
     Explosion outRes;
     emitScalarExistentialDowncast(
         IGF, instance, sourceLoweredType, targetLoweredType, mode,
-        /*not a metatype*/ std::nullopt, fnSig, outRes);
+        /*not a metatype*/ std::nullopt, outRes);
     returnNilCheckedResult(IGF.Builder, outRes);
     return;
   }
@@ -1107,7 +1103,7 @@ llvm::Value *irgen::emitFastClassCastIfPossible(
     
   // Load the isa pointer.
   llvm::Value *objMetadata = emitHeapMetadataRefForHeapObject(IGF, instance,
-      sourceFormalType, GenericSignature(), /*suppress cast*/ true);
+      sourceFormalType, /*suppress cast*/ true);
   llvm::Value *rhs = IGF.Builder.CreateBitCast(objMetadata, IGF.IGM.Int8PtrTy);
   
   // return isa_ptr == metadata_ptr ? instance : nullptr

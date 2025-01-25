@@ -15,6 +15,7 @@ func testGlobalFunctions() {
   let _: Int = publicFunc()
   let _: Int = publicFuncReturnsTypealias()
   let _: Int = publicFuncWithDefaultArg()
+  let _: Int = publicInlinableFunc()
   #if TEST_PACKAGE
   let _: Int = packageFunc()
   #endif

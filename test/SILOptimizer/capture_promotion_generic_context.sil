@@ -1,8 +1,9 @@
-// RUN: %target-swift-frontend -emit-sil -O -Xllvm -sil-fso-enable-generics=false %s | %FileCheck %s
+// RUN: %target-swift-frontend -Xllvm -sil-print-types -emit-sil -O -Xllvm -sil-fso-enable-generics=false %s | %FileCheck %s
 
 sil_stage raw
 
 import Builtin
+import Swift
 
 typealias Int = Builtin.Int32
 

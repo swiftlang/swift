@@ -53,16 +53,18 @@ class ClangDiagnosticConsumer : public clang::TextDiagnosticPrinter {
     ~LoadModuleRAII() {
       if (Consumer) {
         // We must reset Clang's diagnostic engine here since we know that only
-        // the module lookup errors have been emitted. While the ClangDiagnosticConsumer
-        // takes care of filtering out the diagnostics from the output and from
-        // being handled by Swift's DiagnosticEngine, we must ensure to also
-        // reset Clang's DiagnosticEngine because its state is queried in later
-        // stages of compilation and errors emitted on "module_not_found" should not
-        // be counted.
-        // FIXME: We must instead allow for module loading in Clang to fail without
-        // needing to emit a diagnostic.
-        if (Engine && Consumer->CurrentImportNotFound && DiagEngineClearPriorToLookup)
-            Engine->Reset();
+        // the module lookup errors have been emitted. While the
+        // ClangDiagnosticConsumer takes care of filtering out the diagnostics
+        // from the output and from being handled by Swift's DiagnosticEngine,
+        // we must ensure to also reset Clang's DiagnosticEngine because its
+        // state is queried in later stages of compilation and errors emitted on
+        // "module_not_found" should not be counted. Use a soft reset that only
+        // clear the errors but not reset the states.
+        // FIXME: We must instead allow for module loading in Clang to fail
+        // without needing to emit a diagnostic.
+        if (Engine && Consumer->CurrentImportNotFound &&
+            DiagEngineClearPriorToLookup)
+          Engine->Reset(/*soft=*/true);
         Consumer->CurrentImport = nullptr;
         Consumer->CurrentImportNotFound = false;
       }

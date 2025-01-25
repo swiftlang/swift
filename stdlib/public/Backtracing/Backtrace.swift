@@ -16,14 +16,22 @@
 
 import Swift
 
-@_implementationOnly import OS.Libc
+#if os(macOS) || os(iOS) || os(tvOS) || os(watchOS)
+internal import Darwin
+#elseif os(Windows)
+internal import ucrt
+#elseif canImport(Glibc)
+internal import Glibc
+#elseif canImport(Musl)
+internal import Musl
+#endif
 
 #if os(macOS) || os(iOS) || os(watchOS) || os(tvOS)
-@_implementationOnly import OS.Darwin
+internal import BacktracingImpl.OS.Darwin
 #endif
 
 #if os(Linux)
-@_implementationOnly import ImageFormats.Elf
+internal import BacktracingImpl.ImageFormats.Elf
 #endif
 
 /// Holds a backtrace.

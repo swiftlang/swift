@@ -591,6 +591,16 @@ tryCastToForeignClass(
   return DynamicCastResult::Failure;
 }
 
+static DynamicCastResult tryCastToForeignReferenceType(
+    OpaqueValue *destLocation, const Metadata *destType, OpaqueValue *srcValue,
+    const Metadata *srcType, const Metadata *&destFailureType,
+    const Metadata *&srcFailureType, bool takeOnSuccess, bool mayDeferChecks) {
+  assert(srcType != destType);
+  assert(destType->getKind() == MetadataKind::ForeignReferenceType);
+
+  return DynamicCastResult::Failure;
+}
+
 /******************************************************************************/
 /***************************** Enum Destination *******************************/
 /******************************************************************************/
@@ -2187,6 +2197,8 @@ static tryCastFunctionType *selectCasterForDest(const Metadata *destType) {
     return tryCastToOptional;
   case MetadataKind::ForeignClass:
     return tryCastToForeignClass;
+  case MetadataKind::ForeignReferenceType:
+    return tryCastToForeignReferenceType;
   case MetadataKind::Opaque:
     return tryCastToOpaque;
   case MetadataKind::Tuple:
@@ -2594,4 +2606,4 @@ swift_dynamicCastImpl(OpaqueValue *destLocation,
 }
 
 #define OVERRIDE_DYNAMICCASTING COMPATIBILITY_OVERRIDE
-#include COMPATIBILITY_OVERRIDE_INCLUDE_PATH
+#include "../CompatibilityOverride/CompatibilityOverrideIncludePath.h"

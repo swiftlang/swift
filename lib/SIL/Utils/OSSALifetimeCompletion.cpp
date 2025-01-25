@@ -51,6 +51,7 @@
 
 #include "swift/SIL/OSSALifetimeCompletion.h"
 #include "swift/Basic/Assertions.h"
+#include "swift/SIL/AddressWalker.h"
 #include "swift/SIL/BasicBlockUtils.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILFunction.h"
@@ -76,7 +77,10 @@ static SILInstruction *endOSSALifetime(SILValue value,
     }
     return builder.createDestroyValue(loc, value, DontPoisonRefs, isDeadEnd);
   }
-  return builder.createEndBorrow(loc, value);
+  if (auto scopedAddress = ScopedAddressValue(value)) {
+    return scopedAddress.createScopeEnd(builder.getInsertionPoint(), loc);
+  }
+  return builder.createEndBorrow(loc, lookThroughBorrowedFromUser(value));
 }
 
 static bool endLifetimeAtLivenessBoundary(SILValue value,
@@ -262,8 +266,17 @@ void AvailabilityBoundaryVisitor::visit(const SSAPrunedLiveness &liveness,
 void AvailabilityBoundaryVisitor::computeRegion(
     const SSAPrunedLiveness &liveness) {
   // (1) Compute the complete liveness boundary.
-  PrunedLivenessBoundary boundary;
+  PrunedLivenessBlockBoundary boundary;
   liveness.computeBoundary(boundary);
+
+  BasicBlockSet consumingBlocks(value->getFunction());
+
+  liveness.visitUsers(
+      [&consumingBlocks](auto *instruction, auto lifetimeEnding) {
+        if (lifetimeEnding.isEnding()) {
+          consumingBlocks.insert(instruction->getParent());
+        }
+      });
 
   // Used in the forward walk below (3).
   BasicBlockWorklist regionWorklist(value->getFunction());
@@ -284,17 +297,13 @@ void AvailabilityBoundaryVisitor::computeRegion(
     regionWorklist.push(block);
   };
 
-  for (SILInstruction *lastUser : boundary.lastUsers) {
-    if (liveness.isInterestingUser(lastUser)
-        != PrunedLiveness::LifetimeEndingUse) {
-      collect(lastUser->getParent());
+  for (auto *endBlock : boundary.endBlocks) {
+    if (!consumingBlocks.contains(endBlock)) {
+      collect(endBlock);
     }
   }
   for (SILBasicBlock *edge : boundary.boundaryEdges) {
     collect(edge);
-  }
-  for (SILNode *deadDef : boundary.deadDefs) {
-    collect(deadDef->getParentBlock());
   }
 
   // (3) Forward walk to find the region in which `value` might be available.
@@ -414,11 +423,81 @@ static bool endLifetimeAtAvailabilityBoundary(SILValue value,
   return changed;
 }
 
+static bool endLifetimeAtBoundary(SILValue value,
+                                  SSAPrunedLiveness const &liveness,
+                                  OSSALifetimeCompletion::Boundary boundary,
+                                  DeadEndBlocks &deadEndBlocks) {
+  bool changed = false;
+  switch (boundary) {
+  case OSSALifetimeCompletion::Boundary::Liveness:
+    changed |= endLifetimeAtLivenessBoundary(value, liveness, deadEndBlocks);
+    break;
+  case OSSALifetimeCompletion::Boundary::Availability:
+    changed |=
+        endLifetimeAtAvailabilityBoundary(value, liveness, deadEndBlocks);
+    break;
+  }
+  return changed;
+}
+
+bool OSSALifetimeCompletion::analyzeAndUpdateLifetime(
+    ScopedAddressValue scopedAddress, Boundary boundary) {
+  SmallVector<SILBasicBlock *, 8> discoveredBlocks;
+  SSAPrunedLiveness liveness(scopedAddress->getFunction(), &discoveredBlocks);
+  liveness.initializeDef(scopedAddress.value);
+
+  struct Walker : TransitiveAddressWalker<Walker> {
+    OSSALifetimeCompletion &completion;
+    ScopedAddressValue scopedAddress;
+    Boundary boundary;
+    SSAPrunedLiveness &liveness;
+    Walker(OSSALifetimeCompletion &completion, ScopedAddressValue scopedAddress,
+           Boundary boundary, SSAPrunedLiveness &liveness)
+        : completion(completion), scopedAddress(scopedAddress),
+          boundary(boundary), liveness(liveness) {}
+    bool visitUse(Operand *use) {
+      auto *user = use->getUser();
+      if (scopedAddress.isScopeEndingUse(use)) {
+        liveness.updateForUse(user, /*lifetimeEnding=*/true);
+        return true;
+      }
+      liveness.updateForUse(user, /*lifetimeEnding=*/false);
+      for (auto result : user->getResults()) {
+        auto shouldComplete =
+            (bool)BorrowedValue(result) || (bool)ScopedAddressValue(result);
+        if (!shouldComplete)
+          continue;
+        auto completed = completion.completeOSSALifetime(result, boundary);
+        switch (completed) {
+        case LifetimeCompletion::NoLifetime:
+          break;
+        case LifetimeCompletion::AlreadyComplete:
+        case LifetimeCompletion::WasCompleted:
+          for (auto *consume : result->getConsumingUses()) {
+            liveness.updateForUse(consume->getUser(), /*lifetimeEnding=*/false);
+          }
+          break;
+        }
+      }
+      return true;
+    }
+  };
+  Walker walker(*this, scopedAddress, boundary, liveness);
+  std::move(walker).walk(scopedAddress.value);
+
+  return endLifetimeAtBoundary(scopedAddress.value, liveness, boundary,
+                               deadEndBlocks);
+}
+
 /// End the lifetime of \p value at unreachable instructions.
 ///
 /// Returns true if any new instructions were created to complete the lifetime.
 bool OSSALifetimeCompletion::analyzeAndUpdateLifetime(SILValue value,
                                                       Boundary boundary) {
+  if (auto scopedAddress = ScopedAddressValue(value)) {
+    return analyzeAndUpdateLifetime(scopedAddress, boundary);
+  }
+
   // Called for inner borrows, inner adjacent reborrows, inner reborrows, and
   // scoped addresses.
   auto handleInnerScope = [this, boundary](SILValue innerBorrowedValue) {
@@ -426,29 +505,19 @@ bool OSSALifetimeCompletion::analyzeAndUpdateLifetime(SILValue value,
   };
   InteriorLiveness liveness(value);
   liveness.compute(domInfo, handleInnerScope);
-
-  bool changed = false;
-  switch (boundary) {
-  case Boundary::Liveness:
-    changed |= endLifetimeAtLivenessBoundary(value, liveness.getLiveness(),
-                                             deadEndBlocks);
-    break;
-  case Boundary::Availability:
-    changed |= endLifetimeAtAvailabilityBoundary(value, liveness.getLiveness(),
-                                                 deadEndBlocks);
-    break;
-  }
   // TODO: Rebuild outer adjacent phis on demand (SILGen does not currently
   // produce guaranteed phis). See FindEnclosingDefs &
   // findSuccessorDefsFromPredDefs. If no enclosing phi is found, we can create
   // it here and use updateSSA to recursively populate phis.
   assert(liveness.getUnenclosedPhis().empty());
-  return changed;
+  return endLifetimeAtBoundary(value, liveness.getLiveness(), boundary,
+                               deadEndBlocks);
 }
 
 namespace swift::test {
 // Arguments:
 // - SILValue: value
+// - string: either "liveness" or "availability"
 // Dumps:
 // - function
 static FunctionTest OSSALifetimeCompletionTest(

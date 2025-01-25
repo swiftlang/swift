@@ -16,12 +16,12 @@ public struct A<T> {
 
 public class C {}
 
-// CHECK-LABEL: define{{.*}} void @testDestroyValueTrival(
+// CHECK-LABEL: define{{.*}} void @testDestroyValueTrivial(
 // CHECK-NEXT: entry:
 // CHECK-NEXT:  ret void
 // CHECK-NEXT: }
 
-sil @testDestroyValueTrival : $@convention(thin) (@in A<Builtin.Int32>) -> ()  {
+sil @testDestroyValueTrivial : $@convention(thin) (@in A<Builtin.Int32>) -> ()  {
 entry(%arg : $*A<Builtin.Int32>):
   destroy_addr %arg : $*A<Builtin.Int32>
   %ret = tuple ()

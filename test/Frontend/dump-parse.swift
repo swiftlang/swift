@@ -31,7 +31,7 @@ func bar() {
 // CHECK-LABEL: (enum_decl{{.*}}trailing_semi "TrailingSemi"
 enum TrailingSemi {
 
-  // CHECK-LABEL: (enum_case_decl{{.*}}trailing_semi
+  // CHECK-LABEL: (enum_case_decl
   // CHECK-NOT:   (enum_element_decl{{.*}}trailing_semi
   // CHECK:       (enum_element_decl{{.*}}"A")
   // CHECK:       (enum_element_decl{{.*}}"B")
@@ -41,7 +41,7 @@ enum TrailingSemi {
   // CHECK-NOT:   (func_decl{{.*}}trailing_semi <anonymous @ 0x{{[0-9a-f]+}}> get for="subscript(_:)"
   // CHECK:       (accessor_decl{{.*}} <anonymous @ 0x{{[0-9a-f]+}}> get for="subscript(_:)"
   subscript(x: Int) -> Int {
-    // CHECK-LABEL: (pattern_binding_decl{{.*}}trailing_semi
+    // CHECK-LABEL: (pattern_binding_decl{{.*}}
     // CHECK-NOT:   (var_decl{{.*}}trailing_semi "y"
     // CHECK:       (var_decl{{.*}}"y"
     var y = 1;
@@ -110,11 +110,11 @@ _ = { (v: MyEnum) in }
 // CHECK-LABEL: (struct_decl range=[{{.+}}] "SelfParam"
 struct SelfParam {
 
-  // CHECK-LABEL: (func_decl range=[{{.+}}] "createOptional()" type
+  // CHECK-LABEL: (func_decl range=[{{.+}}] "createOptional()" static
   // CHECK-NEXT:    (parameter "self")
-  // CHECK-NEXT:    (parameter_list range=[{{.+}}])
   // CHECK-NEXT:    (result=type_optional
   // CHECK-NEXT:      (type_unqualified_ident id="SelfParam" unbound))
+  // CHECK-NEXT:    (parameter_list range=[{{.+}}])
   static func createOptional() -> SelfParam? {
 
     // CHECK-LABEL: (call_expr type="<null>"
@@ -125,8 +125,8 @@ struct SelfParam {
 }
 
 // CHECK-LABEL: (func_decl range=[{{.+}}] "dumpMemberTypeRepr()"
-// CHECK-NEXT:    (parameter_list range=[{{.+}}])
 // CHECK-NEXT:    (result=type_qualified_ident id="Element" unbound
 // CHECK-NEXT:      (type_unqualified_ident id="Array" unbound
 // CHECK-NEXT:        (type_unqualified_ident id="Bool" unbound))
+// CHECK-NEXT:    (parameter_list range=[{{.+}}])
 func dumpMemberTypeRepr() -> Array<Bool>.Element { true }

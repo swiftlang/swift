@@ -25,12 +25,17 @@
 // Same for ExtraStruct.Inner
 // CHECK-DAG: s:27SkipProtocolImplementations11ExtraStructV5InnerV
 
+// HiddenStruct.T should be present because its source protocol is underscored
+// CHECK-DAG: "precise": "s:27SkipProtocolImplementations12HiddenStructV1TV",
+
 // CHECK-LABEL: "relationships": [
 
 // we want to make sure that the conformance relationship itself stays
 // CHECK-DAG: conformsTo
 
-// SomeStruct.otherFunc() and ExtraStruct.Inner should be the only ones with sourceOrigin information
+// There should only be three symbols with sourceOrigin information:
+// - SomeStruct.otherFunc()
+// - ExtraStruct.Inner
 // (ExtraStruct.Inner will have two sourceOrigins because it has two relationships: a memberOf and a
 // conformsTo)
 // COUNT-COUNT-3: sourceOrigin
@@ -73,3 +78,11 @@ public struct ExtraStruct: OtherProtocol {
 }
 
 extension ExtraStruct.Inner: Sendable {}
+
+public protocol _HiddenProtocol {
+    associatedtype T
+}
+
+public struct HiddenStruct: _HiddenProtocol {
+    public struct T {}
+}

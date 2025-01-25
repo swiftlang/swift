@@ -3,6 +3,8 @@
 // RUN: %target-swift-frontend -enable-experimental-feature MoveOnlyEnumDeinits -Xllvm -sil-disable-pass=simplification -g -I %t %s -emit-silgen
 // RUN: %target-sil-opt -enable-experimental-feature MoveOnlyEnumDeinits %t/OtherModule.swiftmodule | %FileCheck -check-prefix=CHECK-SERIALIZED %s
 
+// REQUIRES: swift_feature_MoveOnlyEnumDeinits
+
 // Make sure we can deserialize deinits of both enums and structs.
 
 import OtherModule

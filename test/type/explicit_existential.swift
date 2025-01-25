@@ -1,6 +1,9 @@
 // RUN: %target-typecheck-verify-swift -verify-additional-prefix default-swift-mode-
 // RUN: %target-typecheck-verify-swift -swift-version 6 -verify-additional-prefix swift-6-
 // RUN: %target-typecheck-verify-swift -enable-upcoming-feature ExistentialAny -verify-additional-prefix explicit-any- -verify-additional-prefix default-swift-mode-
+// RUN: %target-typecheck-verify-swift -enable-experimental-feature ExistentialAny -verify-additional-prefix explicit-any- -verify-additional-prefix default-swift-mode-
+
+// REQUIRES: swift_feature_ExistentialAny
 
 
 protocol HasSelfRequirements {
@@ -457,8 +460,9 @@ func testAnyFixIt() {
   let _: (~Copyable)?
   // expected-error@+1 {{use of protocol 'HasAssoc' as a type must be written 'any HasAssoc'}}{{10-18=(any HasAssoc)}}
   let _: HasAssoc!
-  // expected-default-swift-mode-warning@+3 {{using '!' is not allowed here; treating this as '?' instead}}
-  // expected-swift-6-error@+2 {{using '!' is not allowed here; perhaps '?' was intended?}} {{19-20=?}}
+  // expected-note@+4 {{use '?' instead}}{{19-20=?}}
+  // expected-default-swift-mode-warning@+3 {{using '!' here is deprecated}}
+  // expected-swift-6-error@+2 {{using '!' is not allowed here}}
   // expected-error@+1 {{type '(any Copyable)?' cannot be suppressed}}
   let _: ~Copyable!
   // expected-error@+1 {{constraint that suppresses conformance requires 'any'}}{{11-20=any ~Copyable}}
@@ -549,13 +553,13 @@ func testEnumAssociatedValue() {
 typealias Iterator = any IteratorProtocol
 var example: any Iterator = 5 // expected-error{{redundant 'any' in type 'any Iterator' (aka 'any any IteratorProtocol')}} {{14-18=}}
 // expected-error@-1{{value of type 'Int' does not conform to specified type 'IteratorProtocol'}}
-var example1: any (any IteratorProtocol) = 5 // expected-error{{redundant 'any' in type 'any (any IteratorProtocol)'}} {{15-19=}}
+var example1: any (any IteratorProtocol) = 5 // expected-error{{redundant 'any' in type 'any any IteratorProtocol'}} {{15-19=}}
 // expected-error@-1{{value of type 'Int' does not conform to specified type 'IteratorProtocol'}}
 
 protocol PP {}
 struct A : PP {}
 let _: any PP = A() // Ok
-let _: any (any PP) = A() // expected-error{{redundant 'any' in type 'any (any PP)'}} {{8-12=}}
+let _: any (any PP) = A() // expected-error{{redundant 'any' in type 'any any PP'}} {{8-12=}}
 
 // coverage for rdar://123332844
 let x: Any.Type = AnyObject.self

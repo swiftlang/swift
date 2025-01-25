@@ -16,6 +16,7 @@
 
 #define DEBUG_TYPE "sil-existential-transform"
 #include "ExistentialTransform.h"
+#include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/GenericEnvironment.h"
 #include "swift/AST/TypeCheckRequests.h"
@@ -169,9 +170,8 @@ void ExistentialSpecializerCloner::cloneArguments(
     SILType ExistentialType = ArgDesc.Arg->getType().getObjectType();
     CanType OpenedType = NewArg->getType().getASTType();
     assert(!OpenedType.isAnyExistentialType());
-    auto Conformances = M.getSwiftModule()->collectExistentialConformances(
-        OpenedType,
-        ExistentialType.getASTType());
+    auto Conformances = collectExistentialConformances(
+        OpenedType, ExistentialType.getASTType());
 
     auto ExistentialRepr =
         ArgDesc.Arg->getType().getPreferredExistentialRepresentation();
@@ -221,6 +221,10 @@ void ExistentialSpecializerCloner::cloneArguments(
             NewFBuilder.emitLoadValueOperation(InsertLoc, NewArg, qual);
       }
 
+      if (NewFBuilder.hasOwnership() &&
+          NewArg->getOwnershipKind() == OwnershipKind::Unowned) {
+        NewArgValue = NewFBuilder.emitCopyValueOperation(InsertLoc, NewArg);
+      }
       ///  Simple case: Create an init_existential.
       /// %5 = init_existential_ref %0 : $T : $T, $P
       SILValue InitRef = NewFBuilder.createInitExistentialRef(
@@ -228,6 +232,10 @@ void ExistentialSpecializerCloner::cloneArguments(
           NewArg->getType().getASTType(),
           NewArgValue, Conformances);
 
+      if (NewFBuilder.hasOwnership() &&
+          NewArg->getOwnershipKind() == OwnershipKind::Unowned) {
+        CleanupValues.push_back(InitRef);
+      }
       // If we don't have an object and we are in ossa, the store will consume
       // the InitRef.
       if (!NewArg->getType().isObject()) {
@@ -295,8 +303,7 @@ void ExistentialTransform::convertExistentialArgTypesToGenericArgTypes(
       constraint = existential->getConstraintType()->getCanonicalType();
 
     /// Generate new generic parameter.
-    auto *NewGenericParam =
-        GenericTypeParamType::get(/*isParameterPack*/ false, Depth, GPIdx++, Ctx);
+    auto *NewGenericParam = GenericTypeParamType::getType(Depth, GPIdx++, Ctx);
     genericParams.push_back(NewGenericParam);
     Requirement NewRequirement(RequirementKind::Conformance, NewGenericParam,
                                constraint);
@@ -426,12 +433,9 @@ void ExistentialTransform::populateThunkBody() {
     if (iter != ArgToGenericTypeMap.end() &&
         it != ExistentialArgDescriptor.end()) {
       ExistentialTransformArgumentDescriptor &ETAD = it->second;
-      OpenedArchetypeType *Opened;
       auto OrigOperand = ThunkBody->getArgument(ArgDesc.Index);
       auto SwiftType = ArgDesc.Arg->getType().getASTType();
-      auto OpenedType =
-          SwiftType
-              ->openAnyExistentialType(Opened, F->getGenericSignature())
+      auto OpenedType = OpenedArchetypeType::getAny(SwiftType)
               ->getCanonicalType();
       auto OpenedSILType = NewF->getLoweredType(OpenedType);
       SILValue archetypeValue;

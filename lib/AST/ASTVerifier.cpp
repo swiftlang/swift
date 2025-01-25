@@ -17,6 +17,7 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/AccessScope.h"
+#include "swift/AST/AvailabilityScope.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Effects.h"
 #include "swift/AST/ExistentialLayout.h"
@@ -1108,16 +1109,6 @@ public:
       }
 
       if (S->hasResult()) {
-        if (auto *CD = dyn_cast<ConstructorDecl>(func)) {
-          if (!CD->hasLifetimeDependentReturn()) {
-            Out << "Expected ReturnStmt not to have a result. A constructor "
-                   "should not return a result. Returned expression: ";
-            S->getResult()->dump(Out);
-            Out << "\n";
-            abort();
-          }
-        }
-
         auto result = S->getResult();
         auto returnType = result->getType();
         // Make sure that the return has the same type as the function.
@@ -1228,7 +1219,32 @@ public:
         Out << "\n";
         abort();
       }
+      if (E->getDecl() && !ABIRoleInfo(E->getDecl()).providesAPI()) {
+        PrettyStackTraceExpr debugStack(Ctx, "verifying decl reference", E);
+        Out << "reference to ABI-only decl in user code\n";
+        E->dump(Out);
+        Out << "\n";
+        E->getDecl()->dump(Out);
+        Out << "\n";
+        abort();
+      }
       verifyCheckedBase(E);
+    }
+
+    void verifyParsed(OverloadedDeclRefExpr *E) {
+      for (auto D : E->getDecls()) {
+        if (!ABIRoleInfo(D).providesAPI()) {
+          PrettyStackTraceExpr debugStack(Ctx,
+                                      "verifying overloaded decl reference", E);
+          Out << "reference to ABI-only decl in user code\n";
+          E->dump(Out);
+          Out << "\n";
+          D->dump(Out);
+          Out << "\n";
+          abort();
+        }
+      }
+      verifyParsedBase(E);
     }
 
     void verifyChecked(AssignExpr *S) {
@@ -2143,16 +2159,6 @@ public:
       verifyCheckedBase(E);
     }
 
-    void verifyChecked(ParenExpr *E) {
-      PrettyStackTraceExpr debugStack(Ctx, "verifying ParenExpr", E);
-      auto ty = dyn_cast<ParenType>(E->getType().getPointer());
-      if (!ty) {
-        Out << "ParenExpr not of ParenType\n";
-        abort();
-      }
-      verifyCheckedBase(E);
-    }
-
     void verifyChecked(AnyTryExpr *E) {
       PrettyStackTraceExpr debugStack(Ctx, "verifying AnyTryExpr", E);
 
@@ -2950,7 +2956,7 @@ public:
 
         if (auto req = dyn_cast<ValueDecl>(member)) {
           if (!normal->hasWitness(req)) {
-            if ((req->getAttrs().isUnavailable(Ctx) ||
+            if ((req->isUnavailable() ||
                  req->getAttrs().hasAttribute<OptionalAttr>()) &&
                 proto->isObjC()) {
               continue;
@@ -3410,10 +3416,11 @@ public:
           abort();
         }
         if (FD->isDynamic() != storageDecl->isDynamic() &&
-            // We allow a non dynamic setter if there is a dynamic modify,
-            // observer, or mutable addressor.
+            // We allow a non dynamic setter if there is a dynamic
+            // _modify/modify, observer, or mutable addressor.
             !(FD->isSetter() &&
               (storageDecl->getWriteImpl() == WriteImplKind::Modify ||
+               storageDecl->getWriteImpl() == WriteImplKind::Modify2 ||
                storageDecl->getWriteImpl() ==
                    WriteImplKind::StoredWithObservers ||
                storageDecl->getWriteImpl() == WriteImplKind::MutableAddress) &&
@@ -3421,6 +3428,7 @@ public:
             // We allow a non dynamic getter if there is a dynamic read.
             !(FD->isGetter() &&
               (storageDecl->getReadImpl() == ReadImplKind::Read ||
+               storageDecl->getReadImpl() == ReadImplKind::Read2 ||
                storageDecl->getReadImpl() == ReadImplKind::Address) &&
               storageDecl->shouldUseNativeDynamicDispatch())) {
           Out << "Property and accessor do not match for 'dynamic'\n";
@@ -3692,68 +3700,6 @@ public:
                         [&]{ S->dump(Out); });
     }
 
-    void checkSourceRanges(IfConfigDecl *ICD) {
-      checkSourceRangesBase(ICD);
-
-      SourceLoc Location = ICD->getStartLoc();
-      for (auto &Clause : ICD->getClauses()) {
-        // Clause start, note that the first clause start location is the
-        // same as that of the whole statement
-        if (Location == ICD->getStartLoc()) {
-          if (Location != Clause.Loc) {
-            Out << "bad start location of IfConfigDecl first clause\n";
-            ICD->print(Out);
-            abort();
-          }
-        } else {
-          if (!Ctx.SourceMgr.isBeforeInBuffer(Location, Clause.Loc)) {
-            Out << "bad start location of IfConfigDecl clause\n";
-            ICD->print(Out);
-            abort();
-          }
-        }
-        Location = Clause.Loc;
-
-        // Condition if present
-        Expr *Cond = Clause.Cond;
-        if (Cond) {
-          if (!Ctx.SourceMgr.isBeforeInBuffer(Location, Cond->getStartLoc())) {
-            Out << "invalid IfConfigDecl clause condition start location\n";
-            ICD->print(Out);
-            abort();
-          }
-          Location = Cond->getEndLoc();
-        }
-        
-        // Body elements
-        auto StoredLoc = Location;
-        for (auto &Element : Clause.Elements) {
-          auto StartLocation = Element.getStartLoc();
-          if (StartLocation.isInvalid()) {
-            continue;
-          }
-          
-          if (!Ctx.SourceMgr.isBeforeInBuffer(StoredLoc, StartLocation)) {
-            Out << "invalid IfConfigDecl clause element start location\n";
-            ICD->print(Out);
-            abort();
-          }
-          
-          auto EndLocation = Element.getEndLoc();
-          if (EndLocation.isValid() &&
-              Ctx.SourceMgr.isBeforeInBuffer(Location, EndLocation)) {
-            Location = EndLocation;
-          }
-        }
-      }
-
-      if (Ctx.SourceMgr.isBeforeInBuffer(ICD->getEndLoc(), Location)) {
-        Out << "invalid IfConfigDecl end location\n";
-        ICD->print(Out);
-        abort();
-      }
-    }
-    
     void checkSourceRanges(Pattern *P) {
       PrettyStackTracePattern debugStack(Ctx, "verifying ranges", P);
 
@@ -3941,23 +3887,15 @@ void swift::verify(SourceFile &SF) {
     return;
   Verifier verifier(SF, &SF);
   SF.walk(verifier);
+
+  // Verify the AvailabilityScope hierarchy.
+  if (auto scope = SF.getAvailabilityScope()) {
+    scope->verify(SF.getASTContext());
+  }
 }
 
 bool swift::shouldVerify(const Decl *D, const ASTContext &Context) {
-  if (!shouldVerifyGivenContext(Context))
-    return false;
-
-  if (const auto *ED = dyn_cast<ExtensionDecl>(D)) {
-    return shouldVerify(ED->getExtendedNominal(), Context);
-  }
-
-  const auto *VD = dyn_cast<ValueDecl>(D);
-  if (!VD) {
-    // Verify declarations without names everywhere.
-    return true;
-  }
-
-  return true;
+  return shouldVerifyGivenContext(Context);
 }
 
 void swift::verify(Decl *D) {

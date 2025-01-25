@@ -78,6 +78,11 @@ module ProtocolConformance {
   requires cplusplus
 }
 
+module Sendable {
+  header "sendable.h"
+  requires cplusplus
+}
+
 module StructuredBindingsGetMethod {
   header "structured-bindings-get-method.h"
   requires cplusplus
@@ -145,4 +150,10 @@ module CopyMoveAssignment {
 module Closure {
   header "closure.h"
   requires cplusplus
+}
+
+module PIMPL {
+  header "pimpl.h"
+  requires cplusplus
+  export *
 }

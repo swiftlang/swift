@@ -27,7 +27,7 @@ import SIL
 let computeSideEffects = FunctionPass(name: "compute-side-effects") {
   (function: Function, context: FunctionPassContext) in
 
-  if function.isAvailableExternally {
+  if function.isDefinedExternally {
     // We cannot assume anything about function, which are defined in another module,
     // even if the serialized SIL of its body is available in the current module.
     // If the other module was compiled with library evolution, the implementation
@@ -57,6 +57,7 @@ let computeSideEffects = FunctionPass(name: "compute-side-effects") {
   // instruction the argument might have escaped.
   for argument in function.arguments {
     collectedEffects.addEffectsForEscapingArgument(argument: argument)
+    collectedEffects.addEffectsForConsumingArgument(argument: argument)
   }
 
   // Don't modify the effects if they didn't change. This avoids sending a change notification
@@ -145,7 +146,7 @@ private struct CollectedEffects {
       // In addition to the effects of the apply, also consider the
       // effects of the capture, which reads the captured value in
       // order to move it into the context. This only applies to
-      // addressible values, because capturing does not dereference
+      // addressable values, because capturing does not dereference
       // any class objects.
       //
       // Ignore captures for on-stack partial applies. They only
@@ -236,7 +237,17 @@ private struct CollectedEffects {
       addEffects(.destroy, to: argument)
     }
   }
-  
+
+  mutating func addEffectsForConsumingArgument(argument: FunctionArgument) {
+    if argument.convention == .indirectIn {
+      // Usually there _must_ be a read from a consuming in-argument, because the function has to consume the argument.
+      // But in the special case if all control paths end up in an `unreachable`, the consuming read might have been
+      // dead-code eliminated. Therefore make sure to add the read-effect in any case. Otherwise it can result
+      // in memory lifetime failures at a call site.
+      addEffects(.read, to: argument)
+    }
+  }
+
   private mutating func handleApply(_ apply: ApplySite) {
     let callees = calleeAnalysis.getCallees(callee: apply.callee)
     let args = apply.argumentOperands.lazy.map {
@@ -332,7 +343,7 @@ private struct CollectedEffects {
   /// Adds effects to a specific value.
   ///
   /// If the value comes from an argument (or multiple arguments), then the effects are added
-  /// to the corrseponding `argumentEffects`. Otherwise they are added to the `global` effects.
+  /// to the corresponding `argumentEffects`. Otherwise they are added to the `global` effects.
   private mutating func addEffects(_ effects: SideEffects.GlobalEffects, to value: Value) {
     addEffects(effects, to: value, fromInitialPath: defaultPath(for: value))
   }

@@ -16,12 +16,13 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/AST/AccessNotes.h"
+#include "swift/AST/ASTContext.h"
 #include "swift/AST/Attr.h"
 #include "swift/AST/Decl.h"
-#include "swift/AST/Module.h"     // DeclContext::isModuleScopeContext()
 #include "swift/AST/DiagnosticsFrontend.h"
+#include "swift/AST/Module.h" // DeclContext::isModuleScopeContext()
 #include "swift/Basic/Assertions.h"
-#include "swift/Parse/Parser.h"
+#include "swift/Parse/ParseDeclName.h"
 #include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Support/YAMLTraits.h"

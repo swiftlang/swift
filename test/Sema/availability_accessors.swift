@@ -98,7 +98,6 @@ struct SubscriptHelper {
     @available(*, unavailable)
     set { } // expected-note {{setter for 'subscript(unavailableGetterAndSetter:)' has been explicitly marked unavailable here}}
   }
-
 }
 
 @discardableResult func takesInOut<T>(_ t: inout T) -> T {
@@ -552,4 +551,23 @@ struct TestPatternBindingInitExprs {
   var unavailableGetterAndSetter_a = global.unavailableGetterAndSetter.a // expected-error {{getter for 'unavailableGetterAndSetter' is unavailable}}
   var unavailableGetterAndSetter_0 = global.unavailableGetterAndSetter[0] // expected-error {{getter for 'unavailableGetterAndSetter' is unavailable}}
   var unavailableGetterAndSetter_0_b = global.unavailableGetterAndSetter[0].b // expected-error {{getter for 'unavailableGetterAndSetter' is unavailable}}
+}
+
+struct BadAccessorAvailability<T> {
+  var alwaysUnavailableObservers: T  {
+    @available(*, unavailable) // expected-error {{willSet observer for property cannot be marked unavailable with '@available'}}
+    willSet { }
+
+    @available(*, unavailable) // expected-error {{didSet observer for property cannot be marked unavailable with '@available'}}
+    didSet { }
+  }
+
+  var observersUnavailableBeforeSwift99: T  {
+    @available(swift, introduced: 99) // expected-error {{willSet observer for property cannot be marked unavailable with '@available'}}
+    willSet { }
+
+    @available(swift, introduced: 99) // expected-error {{didSet observer for property cannot be marked unavailable with '@available'}}
+    didSet { }
+  }
+
 }

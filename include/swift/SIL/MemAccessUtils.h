@@ -638,6 +638,13 @@ public:
     return findOwnershipReferenceRoot(getReference());
   }
 
+  /// Return the OSSA root of the reference being accessed
+  /// looking through struct_extract, tuple_extract, etc.
+  /// Precondition: isReference() is true.
+  SILValue getOwnershipReferenceAggregate() const {
+    return findOwnershipReferenceAggregate(getReference());
+  }
+  
   /// Return the storage root of the reference being accessed.
   ///
   /// Precondition: isReference() is true.
@@ -1648,6 +1655,21 @@ inline bool isAccessStorageIdentityCast(SingleValueInstruction *svi) {
   case SILInstructionKind::MoveOnlyWrapperToCopyableBoxInst:
     return true;
   }
+}
+
+// Strip access markers and casts that preserve the address type.
+//
+// Consider using RelativeAccessStorageWithBase::compute().
+inline SILValue stripAccessAndIdentityCasts(SILValue v) {
+  if (auto *bai = dyn_cast<BeginAccessInst>(v)) {
+    return stripAccessAndIdentityCasts(bai->getOperand());
+  }
+  if (auto *svi = dyn_cast<SingleValueInstruction>(v)) {
+    if (isAccessStorageIdentityCast(svi)) {
+      return stripAccessAndIdentityCasts(svi->getAllOperands()[0].get());
+    }
+  }
+  return v;
 }
 
 /// An address, pointer, or box cast that occurs outside of the formal

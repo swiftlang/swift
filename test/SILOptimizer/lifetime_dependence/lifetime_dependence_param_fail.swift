@@ -3,16 +3,17 @@
 // RUN:   -verify \
 // RUN:   -sil-verify-all \
 // RUN:   -module-name test \
-// RUN:   -enable-experimental-feature NonescapableTypes
+// RUN:   -enable-experimental-feature LifetimeDependence
 
-// REQUIRES: asserts
 // REQUIRES: swift_in_compiler
+// REQUIRES: swift_feature_LifetimeDependence
 
 struct BV : ~Escapable {
   let p: UnsafeRawPointer
   let c: Int
 
-  init(_ p: UnsafeRawPointer, _ c: Int) -> dependsOn(p) Self {
+  @lifetime(borrow p)
+  init(_ p: UnsafeRawPointer, _ c: Int) {
     self.p = p
     self.c = c
   }
@@ -32,9 +33,9 @@ struct NC : ~Copyable {
 struct NE {
   var bv: BV
 
-  init(_ bv: consuming BV) -> dependsOn(bv) Self {
+  @lifetime(bv)
+  init(_ bv: consuming BV) {
     self.bv = bv
-    return self
   }
 }
 

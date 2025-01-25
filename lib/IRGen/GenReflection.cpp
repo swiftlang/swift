@@ -182,9 +182,10 @@ getRuntimeVersionThatSupportsDemanglingType(CanType type) {
     Swift_5_2,
     Swift_5_5,
     Swift_6_0,
+    Swift_6_1,
 
     // Short-circuit if we find this requirement.
-    Latest = Swift_6_0
+    Latest = Swift_6_1
   };
 
   VersionRequirement latestRequirement = None;
@@ -198,16 +199,29 @@ getRuntimeVersionThatSupportsDemanglingType(CanType type) {
 
   (void) type.findIf([&](CanType t) -> bool {
     if (auto fn = dyn_cast<AnyFunctionType>(t)) {
+      auto isolation = fn->getIsolation();
+      auto sendingResult = fn->hasSendingResult();
+
+      // The Swift 6.1 runtime fixes a bug preventing successful demangling
+      // when @isolated(any) or global actor isolation is combined with a
+      // sending result.
+      if (sendingResult &&
+          (isolation.isErased() || isolation.isGlobalActor()))
+        return addRequirement(Swift_6_1);
+
       // The Swift 6.0 runtime is the first version able to demangle types
-      // that involve typed throws or @isolated(any), or for that matter
-      // represent them at all at runtime.
-      if (!fn.getThrownError().isNull() || fn->getIsolation().isErased())
+      // that involve typed throws, @isolated(any), or a sending result, or
+      // for that matter to represent them at all at runtime.
+      if (!fn.getThrownError().isNull() ||
+          isolation.isErased() ||
+          sendingResult)
         return addRequirement(Swift_6_0);
 
       // The Swift 5.5 runtime is the first version able to demangle types
       // related to concurrency.
-      if (fn->isAsync() || fn->isSendable() ||
-          !fn->getIsolation().isNonIsolated())
+      if (fn->isAsync() ||
+          fn->isSendable() ||
+          !isolation.isNonIsolated())
         return addRequirement(Swift_5_5);
 
       return false;
@@ -245,10 +259,17 @@ getRuntimeVersionThatSupportsDemanglingType(CanType type) {
       }
     }
 
+    // Any composition with an inverse will need the 6.0 runtime to demangle.
+    if (auto pct = dyn_cast<ProtocolCompositionType>(t)) {
+      if (pct->hasInverse())
+        return addRequirement(Swift_6_0);
+    }
+
     return false;
   });
 
   switch (latestRequirement) {
+  case Swift_6_1: return llvm::VersionTuple(6, 1);
   case Swift_6_0: return llvm::VersionTuple(6, 0);
   case Swift_5_5: return llvm::VersionTuple(5, 5);
   case Swift_5_2: return llvm::VersionTuple(5, 2);
@@ -269,7 +290,7 @@ static std::pair<llvm::Constant *, unsigned>
 getTypeRefByFunction(IRGenModule &IGM,
                      CanGenericSignature sig,
                      CanType t) {
-  IRGenMangler mangler;
+  IRGenMangler mangler(IGM.Context);
   std::string symbolName =
     mangler.mangleSymbolNameForMangledMetadataAccessorString(
                                                    "get_type_metadata", sig, t);
@@ -492,7 +513,7 @@ getTypeRefImpl(IRGenModule &IGM,
     break;
   }
 
-  IRGenMangler Mangler;
+  IRGenMangler Mangler(IGM.Context);
   auto SymbolicName =
     useFlatUnique ? Mangler.mangleTypeForFlatUniqueTypeRef(sig, type)
                   : Mangler.mangleTypeForReflection(IGM, sig, type);
@@ -546,7 +567,7 @@ IRGenModule::emitWitnessTableRefString(CanType type,
               [&](GenericRequirement reqt) { requirements.push_back(reqt); });
   auto *genericEnv = genericSig.getGenericEnvironment();
 
-  IRGenMangler mangler;
+  IRGenMangler mangler(Context);
   std::string symbolName =
     mangler.mangleSymbolNameForMangledConformanceAccessorString(
       "get_witness_table", genericSig, type, conformance);
@@ -605,7 +626,7 @@ llvm::Constant *IRGenModule::getMangledAssociatedConformance(
                                   const NormalProtocolConformance *conformance,
                                   const AssociatedConformance &requirement) {
   // Figure out the name of the symbol to be used for the conformance.
-  IRGenMangler mangler;
+  IRGenMangler mangler(Context);
   auto symbolName =
     mangler.mangleSymbolNameForAssociatedConformanceWitness(
       conformance, requirement.getAssociation(),
@@ -736,7 +757,7 @@ protected:
                      MangledTypeRefRole role =
                       MangledTypeRefRole::Reflection) {
     if (auto proto = dyn_cast<ProtocolDecl>(nominal)) {
-      IRGenMangler mangler;
+      IRGenMangler mangler(nominal->getASTContext());
       SymbolicMangling mangledStr;
       mangledStr.String = mangler.mangleBareProtocol(proto);
       auto mangledName =
@@ -925,6 +946,15 @@ private:
 
     B.addInt32(getNumFields(NTD));
     forEachField(IGM, NTD, [&](Field field) {
+      // Skip private C++ fields that were imported as private Swift fields.
+      // The type of a private field might not have all the type witness
+      // operations that Swift requires, for instance,
+      // `std::unique_ptr<IncompleteType>` would not have a destructor.
+      if (field.getKind() == Field::Kind::Var &&
+          field.getVarDecl()->getClangDecl() &&
+          field.getVarDecl()->getFormalAccess() == AccessLevel::Private)
+        return;
+
       addField(field);
     });
   }
@@ -936,7 +966,7 @@ private:
       flags.setIsIndirectCase();
 
     Type interfaceType = decl->isAvailableDuringLowering()
-                             ? decl->getArgumentInterfaceType()
+                             ? decl->getPayloadInterfaceType()
                              : nullptr;
 
     addField(flags, interfaceType, decl->getBaseIdentifier().str());
@@ -1138,7 +1168,7 @@ public:
 
     auto alignment = ti->getFixedAlignment().getValue();
     unsigned bitwiseTakable =
-      (ti->isBitwiseTakable(ResilienceExpansion::Minimal) == IsBitwiseTakable
+      (ti->getBitwiseTakable(ResilienceExpansion::Minimal) >= IsBitwiseTakableOnly
        ? 1 : 0);
     B.addInt32(alignment | (bitwiseTakable << 16));
 
@@ -1157,6 +1187,11 @@ public:
 };
 
 void IRGenModule::emitBuiltinTypeMetadataRecord(CanType builtinType) {
+  // If this builtin is generic, don't emit anything.
+  if (builtinType->hasTypeParameter()) {
+    return;
+  }
+
   FixedTypeMetadataBuilder builder(*this, builtinType);
   builder.emit();
 }
@@ -1287,7 +1322,8 @@ public:
   struct Entry {
     enum Kind {
       Metadata,
-      Shape
+      Shape,
+      Value
     };
 
     Kind kind;
@@ -1308,6 +1344,9 @@ public:
       SmallString<16> EncodeBuffer;
       llvm::raw_svector_ostream OS(EncodeBuffer);
       switch (Kind) {
+      case Entry::Kind::Value:
+        OS << "v";
+        break;
       case Entry::Kind::Shape:
         OS << "s";
         break;
@@ -1384,10 +1423,18 @@ public:
       switch (Bindings[i].getKind()) {
       case GenericRequirement::Kind::Shape:
       case GenericRequirement::Kind::Metadata:
-      case GenericRequirement::Kind::MetadataPack: {
-        auto Kind = (Bindings[i].getKind() == GenericRequirement::Kind::Shape
-                     ? Entry::Kind::Shape
-                     : Entry::Kind::Metadata);
+      case GenericRequirement::Kind::MetadataPack:
+      case GenericRequirement::Kind::Value: {
+        auto Kind = Entry::Kind::Metadata;
+
+        if (Bindings[i].getKind() == GenericRequirement::Kind::Shape) {
+          Kind = Entry::Kind::Shape;
+        }
+
+        if (Bindings[i].getKind() == GenericRequirement::Kind::Value) {
+          Kind = Entry::Kind::Value;
+        }
+
         auto Source = SourceBuilder.createClosureBinding(i);
         auto BindingType = Bindings[i].getTypeParameter().subst(Subs);
         auto InterfaceType = BindingType->mapTypeOutOfContext();
@@ -1444,6 +1491,10 @@ public:
         Kind = Entry::Kind::Metadata;
         break;
 
+      case GenericRequirement::Kind::Value:
+        Kind = Entry::Kind::Value;
+        break;
+
       case GenericRequirement::Kind::WitnessTable:
       case GenericRequirement::Kind::WitnessTablePack:
         llvm_unreachable("Bad kind");
@@ -1473,12 +1524,12 @@ public:
 
       // Erase pseudogeneric captures down to AnyObject.
       if (OrigCalleeType->isPseudogeneric()) {
-        SwiftType = SwiftType.transform([&](Type t) -> Type {
+        SwiftType = SwiftType.transformRec([&](Type t) -> std::optional<Type> {
           if (auto *archetype = t->getAs<ArchetypeType>()) {
             assert(archetype->requiresClass() && "don't know what to do");
             return IGM.Context.getAnyObjectType();
           }
-          return t;
+          return std::nullopt;
         })->getCanonicalType();
       }
       

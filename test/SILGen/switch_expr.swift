@@ -1,8 +1,7 @@
-// RUN: %target-swift-emit-silgen -enable-experimental-feature ThenStatements %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -Xllvm -sil-print-types -enable-experimental-feature ThenStatements %s | %FileCheck %s
 // RUN: %target-swift-emit-ir -enable-experimental-feature ThenStatements %s
 
-// Needed for experimental features
-// REQUIRES: asserts
+// REQUIRES: swift_feature_ThenStatements
 
 func foo() -> Int {
   switch Bool.random() {
@@ -168,6 +167,52 @@ func testFallthrough() throws -> Int {
 // CHECK:       dealloc_stack [[RESULT]] : $*Int
 // CHECK:       return [[VAL]] : $Int
 
+func testFallthrough2() -> Int {
+  let x = switch Bool.random() {
+  case true:
+    fallthrough
+  case false:
+    1
+  }
+  return x
+}
+
+// CHECK-LABEL: sil hidden [ossa] @$s11switch_expr16testFallthrough2SiyF : $@convention(thin) () -> Int {
+// CHECK:       [[RESULT:%[0-9]+]] = alloc_stack $Int
+// CHECK:       switch_value {{%[0-9]+}} : $Builtin.Int1, case {{%[0-9]+}}: [[TRUEBB:bb[0-9]+]], case {{%[0-9]+}}: [[FALSEBB:bb[0-9]+]]
+//
+// CHECK:       [[TRUEBB]]:
+// CHECK-NEXT:  br [[ENDBB:bb[0-9]+]]
+//
+// CHECK:       [[FALSEBB]]:
+// CHECK-NEXT:  br [[ENDBB]]
+//
+// CHECK:       [[ENDBB]]:
+// CHECK:       [[ONELIT:%[0-9]+]] = integer_literal $Builtin.IntLiteral, 1
+// CHECK:       [[ONE:%[0-9]+]] = apply {{%[0-9]+}}([[ONELIT]], {{%[0-9]+}})
+// CHECK:       store [[ONE]] to [trivial] [[RESULT]] : $*Int
+// CHECK:       [[VAL:%[0-9]+]] = load [trivial] [[RESULT]] : $*Int
+// CHECK:       [[VAL_RESULT:%[0-9]+]] = move_value [var_decl] [[VAL]] : $Int
+// CHECK:       dealloc_stack [[RESULT]] : $*Int
+// CHECK:       return [[VAL_RESULT:[%0-9]+]] : $Int
+
+func testFallthrough3() throws -> Int {
+  switch Bool.random() {
+  case true:
+    switch Bool.random() {
+    case true:
+      if .random() {
+        fallthrough
+      }
+      throw Err()
+    case false:
+      1
+    }
+  case false:
+    0
+  }
+}
+
 func testClosure() throws -> Int {
   let fn = {
     switch Bool.random() {
@@ -255,6 +300,12 @@ struct TestPropertyInit {
     default:
       2
   }
+}
+
+// https://github.com/swiftlang/swift/issues/75294
+func testAsyncLet(_ x: Int?) async {
+  async let _ = switch x { case let i?: i default: 0 }
+  // CHECK-LABEL: sil private [ossa] @$s11switch_expr12testAsyncLetyySiSgYaFSiyYaYbcfu_ : $@convention(thin) @Sendable @async @substituted <τ_0_0> (Optional<Int>) -> (@out τ_0_0, @error any Error) for <Int>
 }
 
 func testNested(_ e: E) throws -> Int {

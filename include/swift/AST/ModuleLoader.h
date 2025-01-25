@@ -35,7 +35,7 @@
 
 namespace llvm {
 class FileCollectorBase;
-class TreePathPrefixMapper;
+class PrefixMapper;
 namespace vfs {
 class OutputBackend;
 }
@@ -373,11 +373,10 @@ public:
   virtual llvm::SmallVector<std::pair<ModuleDependencyID, ModuleDependencyInfo>, 1>
   getModuleDependencies(Identifier moduleName,
                         StringRef moduleOutputPath,
-                        llvm::IntrusiveRefCntPtr<llvm::cas::CachingOnDiskFileSystem> CacheFS,
                         const llvm::DenseSet<clang::tooling::dependencies::ModuleID> &alreadySeenClangModules,
                         clang::tooling::dependencies::DependencyScanningTool &clangScanningTool,
                         InterfaceSubContextDelegate &delegate,
-                        llvm::TreePathPrefixMapper *mapper = nullptr,
+                        llvm::PrefixMapper *mapper = nullptr,
                         bool isTestableImport = false) = 0;
 };
 

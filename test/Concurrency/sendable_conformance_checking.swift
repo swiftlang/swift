@@ -4,7 +4,7 @@
 // RUN: %target-swift-frontend -emit-sil %s -o /dev/null -verify -verify-additional-prefix complete-and-tns- -strict-concurrency=complete -enable-upcoming-feature RegionBasedIsolation
 
 // REQUIRES: concurrency
-// REQUIRES: asserts
+// REQUIRES: swift_feature_RegionBasedIsolation
 
 @available(SwiftStdlib 5.1, *)
 class NotSendable { // expected-note 9{{class 'NotSendable' does not conform to the 'Sendable' protocol}}
@@ -186,4 +186,35 @@ extension MultiConformance: @unchecked Sendable {} // expected-warning {{redunda
 actor MyActor {
   // expected-warning@+1 {{non-final class 'Nested' cannot conform to 'Sendable'; use '@unchecked Sendable'; this is an error in the Swift 6 language mode}}
   class Nested: Sendable {}
+}
+
+@Sendable func globalFn() {}
+
+protocol NoSendableReqs {
+  var prop: () -> Void { get }
+  static var staticProp: () -> Void { get }
+}
+
+public struct TestSendableWitnesses1 : NoSendableReqs {
+  var prop: @Sendable () -> Void // Ok (no warnings)
+  static let staticProp: @Sendable () -> Void = { } // Ok (no warnings)
+}
+
+public struct TestSendableWitnesses2 : NoSendableReqs {
+  var prop = globalFn // Ok (no warnings)
+  static let staticProp = globalFn // Ok (no warnings)
+}
+
+// @preconcurrency attributes to make it akin to an imported Obj-C API
+@preconcurrency @MainActor public protocol EscapingSendableProtocol {
+  // expected-complete-and-tns-note @+1 {{protocol requires function 'f(handler:)' with type '(@escaping @MainActor @Sendable (Int) -> Void) -> ()'}}
+  @preconcurrency func f(handler: @escaping @MainActor @Sendable (Int) -> Void)
+}
+
+// TODO: The following error should actually be a warning.
+// expected-complete-and-tns-error @+2 {{type 'TestEscapingOnly' does not conform to protocol 'EscapingSendableProtocol'}}
+// expected-complete-and-tns-note @+1 {{add stubs for conformance}}
+class TestEscapingOnly: EscapingSendableProtocol {
+    // expected-complete-and-tns-note @+1 {{candidate has non-matching type '(@escaping (Int) -> Void) -> ()'}}
+    func f(handler: @escaping (Int) -> Void) {}
 }

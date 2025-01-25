@@ -15,7 +15,7 @@
 
 #include "swift/SIL/InstWrappers.h"
 #include "swift/SIL/RuntimeEffect.h"
-#include "swift/SIL/SILInstruction.h"
+#include "swift/SIL/SILModule.h"
 
 namespace swift {
 
@@ -129,6 +129,11 @@ bool isEndOfScopeMarker(SILInstruction *user);
 /// only used in recognizable patterns without otherwise "escaping".
 bool isIncidentalUse(SILInstruction *user);
 
+/// Returns true if this is a move only wrapper use.
+///
+/// E.x.: moveonlywrapper_to_copyable_addr, copyable_to_moveonlywrapper_value
+bool isMoveOnlyWrapperUse(SILInstruction *user);
+
 /// Return true if the given `user` instruction modifies the value's refcount
 /// without propagating the value or having any other effect aside from
 /// potentially destroying the value itself (and executing associated cleanups).
@@ -232,6 +237,15 @@ bool visitExplodedTupleType(SILType type,
 /// visited all of the tuple elements without the visitor returing false.
 bool visitExplodedTupleValue(SILValue value,
                              llvm::function_ref<SILValue(SILValue, std::optional<unsigned>)> callback);
+
+std::pair<SILFunction *, SILWitnessTable *>
+lookUpFunctionInWitnessTable(WitnessMethodInst *wmi, SILModule::LinkingMode linkingMode);
+
+/// True if a type can be expanded without a significant increase to code size.
+///
+/// False if expanding a type is invalid. For example, expanding a
+/// struct-with-deinit drops the deinit.
+bool shouldExpand(SILModule &module, SILType ty);
 
 } // end namespace swift
 

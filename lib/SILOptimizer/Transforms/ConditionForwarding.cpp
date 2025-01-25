@@ -117,7 +117,7 @@ private:
       }
     }
     if (Changed) {
-      updateBorrowedFrom(getPassManager(), F);
+      updateAllGuaranteedPhis(getPassManager(), F);
       invalidateAnalysis(SILAnalysis::InvalidationKind::BranchesAndInstructions);
     }
   }
@@ -237,7 +237,7 @@ bool ConditionForwarding::tryOptimize(SwitchEnumInst *SEI) {
   if (getFunction()->hasOwnership()) {
     // TODO: Currently disabled because this case may need lifetime extension
     // Disabling this conservatively for now.
-    assert(Condition->getNumOperands() == 1);
+    assert(Condition->getNumRealOperands() == 1);
     BorrowedValue conditionOp(Condition->getOperand(0));
     if (conditionOp && conditionOp.isLocalScope()) {
       return false;
@@ -290,15 +290,17 @@ bool ConditionForwarding::tryOptimize(SwitchEnumInst *SEI) {
     llvm::SmallVector<SILValue, 2> BranchArgs;
     unsigned HasEnumArg = NeedEnumArg.contains(SEDest);
     if (SEDest->getNumArguments() == 1 + HasEnumArg) {
-      // The successor block has an original argument, which is the Enum's
-      // payload.
-      BranchArgs.push_back(EI->getOperand());
+      if (SEI->hasDefault() && SEDest == SEI->getDefaultBB()) {
+        BranchArgs.push_back(EI);
+      } else {
+        // The successor block has an original argument, which is the Enum's
+        // payload.
+        BranchArgs.push_back(EI->getOperand());
+      }
     }
     if (HasEnumArg) {
       // The successor block has a new argument (which we created above) where
       // we have to pass the Enum.
-      assert(!getFunction()->hasOwnership() ||
-             EI->getType().isTrivial(*getFunction()));
       BranchArgs.push_back(EI);
     }
     B.createBranch(BI->getLoc(), SEDest, BranchArgs);

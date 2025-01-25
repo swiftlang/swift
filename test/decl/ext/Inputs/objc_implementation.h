@@ -13,6 +13,8 @@
 - (void)superclassMethod:(int)param;
 @property (assign) int superclassProperty;
 
++ (void)superclassClassMethod;
+
 @end
 
 @protocol ObjCProto
@@ -127,6 +129,13 @@
 
 @end
 
+@interface ObjCClass (InvalidMembers)
+
+- (void)unimplementedMember;
+- (void)nonObjCMethod:(id)value;
+
+@end
+
 @interface ObjCClass (EmptyCategory)
 @end
 
@@ -161,6 +170,10 @@
 
 - (nullable id)nullableResult;
 - (void)nullableArgument:(nullable id)arg;
+
+@end
+
+@interface ObjCClass (TypeMatchOptionalityInvalid)
 
 - (int)nonPointerResult;
 - (void)nonPointerArgument:(int)arg;
@@ -201,6 +214,10 @@
 @end
 
 @protocol EmptyObjCProto
+@end
+
+@interface ObjCClassWithWeirdSwiftAttributeCombo : ObjCBaseClass
+
 @end
 
 #endif

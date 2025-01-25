@@ -2208,7 +2208,7 @@ void PatternMatchEmission::emitEnumElementObjectDispatch(
       // Reabstract to the substituted type, if needed.
       CanType substEltTy =
           sourceType
-              ->getTypeOfMember(elt, elt->getArgumentInterfaceType())
+              ->getTypeOfMember(elt, elt->getPayloadInterfaceType())
               ->getCanonicalType();
 
       AbstractionPattern origEltTy =
@@ -2470,7 +2470,7 @@ void PatternMatchEmission::emitEnumElementDispatch(
       // Reabstract to the substituted type, if needed.
       CanType substEltTy =
         sourceType->getTypeOfMember(eltDecl,
-                                    eltDecl->getArgumentInterfaceType())
+                                    eltDecl->getPayloadInterfaceType())
                   ->getCanonicalType();
 
       AbstractionPattern origEltTy =
@@ -3274,7 +3274,7 @@ static bool isBorrowableSubject(SILGenFunction &SGF,
       continue;
     }
 
-    // Look through `try` and `await`.
+    // Look through `try`, `await`, and `unsafe`.
     if (auto tryExpr = dyn_cast<TryExpr>(subjectExpr)) {
       subjectExpr = tryExpr->getSubExpr();
       continue;
@@ -3283,7 +3283,11 @@ static bool isBorrowableSubject(SILGenFunction &SGF,
       subjectExpr = awaitExpr->getSubExpr();
       continue;
     }
-    
+    if (auto unsafeExpr = dyn_cast<UnsafeExpr>(subjectExpr)) {
+      subjectExpr = unsafeExpr->getSubExpr();
+      continue;
+    }
+
     break;
   }
   
@@ -3316,11 +3320,11 @@ static bool isBorrowableSubject(SILGenFunction &SGF,
   }
   
   // Check the access strategy used to read the storage.
-  auto strategy = storage->getAccessStrategy(access,
-                                             AccessKind::Read,
-                                             SGF.SGM.SwiftModule,
-                                             SGF.F.getResilienceExpansion());
-                                             
+  auto strategy =
+      storage->getAccessStrategy(access, AccessKind::Read, SGF.SGM.SwiftModule,
+                                 SGF.F.getResilienceExpansion(),
+                                 /*useOldABI=*/false);
+
   switch (strategy.getKind()) {
   case AccessStrategy::Kind::Storage:
     // Accessing storage directly benefits from borrowing.
@@ -3335,7 +3339,9 @@ static bool isBorrowableSubject(SILGenFunction &SGF,
       // Get returns an owned value.
       return false;
     case AccessorKind::Read:
+    case AccessorKind::Read2:
     case AccessorKind::Modify:
+    case AccessorKind::Modify2:
     case AccessorKind::Address:
     case AccessorKind::MutableAddress:
       // Read, modify, and addressors yield a borrowable reference.

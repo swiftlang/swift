@@ -1,6 +1,6 @@
 // RUN: %target-typecheck-verify-swift -disable-availability-checking -enable-experimental-feature ImplicitSome
 
-// REQUIRES: asserts
+// REQUIRES: swift_feature_ImplicitSome
 
 protocol P { }
 

@@ -153,7 +153,8 @@ void IRGenThunk::prepareArguments() {
       auto &resultSchema = resultTI.nativeReturnValueSchema(IGF.IGM);
 
       if (resultSchema.requiresIndirect() ||
-          errorSchema.shouldReturnTypedErrorIndirectly()) {
+          errorSchema.shouldReturnTypedErrorIndirectly() ||
+          conv.hasIndirectSILResults()) {
         auto directTypedErrorAddr = original.takeLast();
         IGF.setCalleeTypedErrorResultSlot(Address(directTypedErrorAddr,
                                                   errorTI.getStorageType(),
@@ -263,11 +264,8 @@ Callee IRGenThunk::lookupMethod() {
   if (selfTy.is<MetatypeType>()) {
     metadata = selfValue;
   } else {
-    auto &Types = IGF.IGM.getSILModule().Types;
-    auto *env = Types.getConstantGenericEnvironment(declRef);
-    auto sig = env ? env->getGenericSignature() : GenericSignature();
     metadata = emitHeapMetadataRefForHeapObject(IGF, selfValue, selfTy,
-                                                sig, /*suppress cast*/ true);
+                                                /*suppress cast*/ true);
   }
 
   // Find the method we're interested in.
@@ -357,6 +355,12 @@ void IRGenThunk::emit() {
     llvm::Value *nil = llvm::ConstantPointerNull::get(
         cast<llvm::PointerType>(errorValue->getType()));
     auto *hasError = IGF.Builder.CreateICmpNE(errorValue, nil);
+
+    // Predict no error is thrown.
+    hasError = IGF.IGM.getSILModule().getOptions().EnableThrowsPrediction
+                   ? IGF.Builder.CreateExpectCond(IGF.IGM, hasError, false)
+                   : hasError;
+
     IGF.Builder.CreateCondBr(hasError, errorBB, successBB);
 
     IGF.Builder.emitBlock(errorBB);
@@ -401,10 +405,67 @@ void IRGenThunk::emit() {
       }
       errorArgValues.add(errorValue);
       emitAsyncReturn(IGF, *asyncLayout, origTy, errorArgValues.claimAll());
+
+      IGF.Builder.emitBlock(successBB);
+
+      Explosion resultArgValues;
+      if (result.empty()) {
+        if (!combined.combinedTy->isVoidTy()) {
+          if (auto *structTy =
+                  dyn_cast<llvm::StructType>(combined.combinedTy)) {
+            IGF.emitAllExtractValues(llvm::UndefValue::get(structTy), structTy,
+                                     resultArgValues);
+          } else {
+            resultArgValues = llvm::UndefValue::get(combined.combinedTy);
+          }
+        }
+      } else {
+        if (auto *structTy = dyn_cast<llvm::StructType>(combined.combinedTy)) {
+          llvm::Value *expandedResult =
+              llvm::UndefValue::get(combined.combinedTy);
+          for (size_t i = 0, count = result.size(); i < count; i++) {
+            llvm::Value *elt = result.claimNext();
+            auto *nativeTy = structTy->getElementType(i);
+            elt = convertForDirectError(IGF, elt, nativeTy,
+                                        /*forExtraction*/ false);
+            expandedResult =
+                IGF.Builder.CreateInsertValue(expandedResult, elt, i);
+          }
+          IGF.emitAllExtractValues(expandedResult, structTy, resultArgValues);
+        } else {
+          resultArgValues = convertForDirectError(IGF, result.claimNext(),
+                                                  combined.combinedTy,
+                                                  /*forExtraction*/ false);
+        }
+      }
+
+      resultArgValues.add(errorValue);
+      emitAsyncReturn(IGF, *asyncLayout, origTy, resultArgValues.claimAll());
+
+      return;
     } else {
-      IGF.emitScalarReturn(IGF.CurFn->getReturnType(), *error);
+      if (!error->empty()) {
+        // Map the direct error explosion from the call back to the native
+        // explosion for the return.
+        SILType silErrorTy = conv.getSILErrorType(expansionContext);
+        auto &errorTI = IGF.IGM.getTypeInfo(silErrorTy);
+        auto &errorSchema = errorTI.nativeReturnValueSchema(IGF.IGM);
+        auto combined =
+            combineResultAndTypedErrorType(IGF.IGM, schema, errorSchema);
+        Explosion nativeAgg;
+        buildDirectError(IGF, combined, errorSchema, silErrorTy, *error,
+                         /*forAsync*/ false, nativeAgg);
+        IGF.emitScalarReturn(IGF.CurFn->getReturnType(), nativeAgg);
+      } else {
+        if (IGF.CurFn->getReturnType()->isVoidTy()) {
+          IGF.Builder.CreateRetVoid();
+        } else {
+          IGF.Builder.CreateRet(
+              llvm::UndefValue::get(IGF.CurFn->getReturnType()));
+        }
+      }
+      IGF.Builder.emitBlock(successBB);
     }
-    IGF.Builder.emitBlock(successBB);
   } else {
     if (isAsync) {
       Explosion error;
@@ -418,7 +479,8 @@ void IRGenThunk::emit() {
 
   // Return the result.
   if (result.empty()) {
-    if (emission->getTypedErrorExplosion()) {
+    if (emission->getTypedErrorExplosion() &&
+        !IGF.CurFn->getReturnType()->isVoidTy()) {
       IGF.Builder.CreateRet(llvm::UndefValue::get(IGF.CurFn->getReturnType()));
     } else {
       IGF.Builder.CreateRetVoid();

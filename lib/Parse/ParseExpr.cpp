@@ -41,10 +41,6 @@ using namespace swift;
 ///
 /// \param isExprBasic Whether we're only parsing an expr-basic.
 ParserResult<Expr> Parser::parseExprImpl(Diag<> Message, bool isExprBasic) {
-#if SWIFT_BUILD_SWIFT_SYNTAX
-  if (IsForASTGen)
-    return parseExprFromSyntaxTree();
-#endif
   // If we are parsing a refutable pattern, check to see if this is the start
   // of a let/var/is pattern.  If so, parse it as an UnresolvedPatternExpr and
   // let pattern type checking determine its final form.
@@ -401,6 +397,7 @@ done:
 ///     'try' expr-sequence-element(Mode)
 ///     'try' '?' expr-sequence-element(Mode)
 ///     'try' '!' expr-sequence-element(Mode)
+///     'unsafe' expr-sequence-element(Mode)
 ///     '_move' expr-sequence-element(Mode)
 ///     'borrow' expr-sequence-element(Mode)
 ///     expr-unary(Mode)
@@ -435,7 +432,20 @@ ParserResult<Expr> Parser::parseExprSequenceElement(Diag<> message,
       sub = makeParserResult(new (Context) AwaitExpr(awaitLoc, sub.get()));
     }
 
-   return sub;
+    return sub;
+  }
+
+  if (Context.LangOpts.hasFeature(Feature::WarnUnsafe) &&
+      Tok.isContextualKeyword("unsafe")) {
+    Tok.setKind(tok::contextual_keyword);
+    SourceLoc unsafeLoc = consumeToken();
+    ParserResult<Expr> sub =
+      parseExprSequenceElement(diag::expected_expr_after_unsafe, isExprBasic);
+    if (!sub.hasCodeCompletion() && !sub.isNull()) {
+      sub = makeParserResult(new (Context) UnsafeExpr(unsafeLoc, sub.get()));
+    }
+
+    return sub;
   }
 
   if (Tok.isContextualKeyword("consume")
@@ -748,13 +758,11 @@ ParserResult<Expr> Parser::parseExprKeyPath() {
     }
 
     auto inner = makeParserResult(new (Context) KeyPathDotExpr(dotLoc));
-    bool unusedHasBindOptional = false;
 
     // Inside a keypath's path, the period always behaves normally: the key path
     // behavior is only the separation between type and path.
     pathResult = parseExprPostfixSuffix(inner, /*isExprBasic=*/true,
-                                        /*periodHasKeyPathBehavior=*/false,
-                                        unusedHasBindOptional);
+                                        /*periodHasKeyPathBehavior=*/false);
     parseStatus |= pathResult;
   }
 
@@ -1229,10 +1237,7 @@ getMagicIdentifierLiteralKind(tok Kind, const LangOptions &Opts) {
 
 ParserResult<Expr>
 Parser::parseExprPostfixSuffix(ParserResult<Expr> Result, bool isExprBasic,
-                               bool periodHasKeyPathBehavior,
-                               bool &hasBindOptional) {
-  hasBindOptional = false;
-
+                               bool periodHasKeyPathBehavior) {
   // Handle suffix expressions.
   while (1) {
     // FIXME: Better recovery.
@@ -1318,9 +1323,8 @@ Parser::parseExprPostfixSuffix(ParserResult<Expr> Result, bool isExprBasic,
         // In this case, we want to consume the trailing closure because
         // otherwise it will get parsed as a get-set clause on a variable
         // declared by `baseExpr.<complete>` which is clearly wrong.
-        bool hasBindOptional = false;
         parseExprPostfixSuffix(makeParserResult(CCExpr), isExprBasic,
-                               periodHasKeyPathBehavior, hasBindOptional);
+                               periodHasKeyPathBehavior);
 
         return makeParserCodeCompletionResult(CCExpr);
       }
@@ -1410,7 +1414,6 @@ Parser::parseExprPostfixSuffix(ParserResult<Expr> Result, bool isExprBasic,
     if (consumeIf(tok::question_postfix)) {
       Result = makeParserResult(Result, new (Context) BindOptionalExpr(
                                             Result.get(), TokLoc, /*depth*/ 0));
-      hasBindOptional = true;
       continue;
     }
 
@@ -1478,26 +1481,23 @@ Parser::parseExprPostfixSuffix(ParserResult<Expr> Result, bool isExprBasic,
           .fixItInsert(getEndOfPreviousLoc(), "\n");
       }
 
-      llvm::SmallPtrSet<Expr *, 4> exprsWithBindOptional;
+      llvm::TinyPtrVector<ASTNode> activeElements;
       auto ICD = parseIfConfig(
           IfConfigContext::PostfixExpr,
-          [&](SmallVectorImpl<ASTNode> &elements, bool isActive) {
+          [&](bool isActive) {
             // Although we know the '#if' body starts with period,
             // '#elseif'/'#else' bodies might start with invalid tokens.
             if (isAtStartOfPostfixExprSuffix() || Tok.is(tok::pound_if)) {
-              bool exprHasBindOptional = false;
               auto expr = parseExprPostfixSuffix(Result, isExprBasic,
-                                                 periodHasKeyPathBehavior,
-                                                 exprHasBindOptional);
-              if (exprHasBindOptional)
-                exprsWithBindOptional.insert(expr.get());
-              elements.push_back(expr.get());
+                                                 periodHasKeyPathBehavior);
+
+              if (isActive)
+                activeElements.push_back(expr.get());
             }
           });
-      if (ICD.isNull())
+      if (ICD.isErrorOrHasCompletion())
         break;
 
-      auto activeElements = ICD.get()->getActiveClauseElements();
       if (activeElements.empty())
         // There's no active clause, or it was empty. Keep the current result.
         continue;
@@ -1511,7 +1511,6 @@ Parser::parseExprPostfixSuffix(ParserResult<Expr> Result, bool isExprBasic,
       if (SourceMgr.rangeContainsIDEInspectionTarget(charRange) &&
           L->isCodeCompletion())
         status.setHasCodeCompletion();
-      hasBindOptional |= exprsWithBindOptional.contains(expr);
       Result = makeParserResult(status, expr);
       continue;
     }
@@ -1607,20 +1606,8 @@ ParserResult<Expr> Parser::parseExprPostfix(Diag<> ID, bool isExprBasic) {
   if (Result.isNull())
     return Result;
 
-  bool hasBindOptional = false;
-  Result = parseExprPostfixSuffix(Result, isExprBasic,
-                                  /*periodHasKeyPathBehavior=*/InSwiftKeyPath,
-                                  hasBindOptional);
-  if (Result.isParseErrorOrHasCompletion() || Result.hasCodeCompletion())
-    return Result;
-
-  // If we had a ? suffix expression, bind the entire postfix chain
-  // within an OptionalEvaluationExpr.
-  if (hasBindOptional) {
-    Result = makeParserResult(new (Context) OptionalEvaluationExpr(Result.get()));
-  }
-
-  return Result;
+  return parseExprPostfixSuffix(Result, isExprBasic,
+                                /*periodHasKeyPathBehavior=*/InSwiftKeyPath);
 }
 
 /// parseExprPrimary
@@ -3484,7 +3471,9 @@ ParserResult<Expr> Parser::parseExprMacroExpansion(bool isExprBasic) {
   return makeParserResult(
       status,
       MacroExpansionExpr::create(
-          CurDeclContext, poundLoc, macroNameRef, macroNameLoc, leftAngleLoc,
+          CurDeclContext, poundLoc,
+          /*module name=*/DeclNameRef(), /*module name loc=*/DeclNameLoc(),
+          macroNameRef, macroNameLoc, leftAngleLoc,
           Context.AllocateCopy(genericArgs), rightAngleLoc, argList,
           CurDeclContext->isTypeContext() ? MacroRole::Declaration
                                           : getFreestandingMacroRoles()));

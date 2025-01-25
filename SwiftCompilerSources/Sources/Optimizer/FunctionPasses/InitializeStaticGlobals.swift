@@ -10,6 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+import AST
 import SIL
 
 /// Converts a lazily initialized global to a statically initialized global variable.
@@ -120,7 +121,7 @@ private func getSequenceOfElementStores(firstStore: StoreInst) -> ([StoreInst], 
   if structType.isMoveOnly {
     return nil
   }
-  if structType.nominal.isStructWithUnreferenceableStorage {
+  if (structType.nominal as! StructDecl).hasUnreferenceableStorage {
     return nil
   }
   guard let fields = structType.getNominalFields(in: firstStore.parentFunction) else {

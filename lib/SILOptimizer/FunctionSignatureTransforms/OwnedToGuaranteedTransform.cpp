@@ -80,6 +80,13 @@ bool FunctionSignatureTransform::OwnedToGuaranteedAnalyzeParameters() {
     if (!A.canOptimizeLiveArg()) {
       continue;
     }
+    if (A.Arg->getType().isMoveOnly()) {
+      // We must not do this transformation for non-copyable types, because it's
+      // not safe to insert a compensating release_value at the call site. This
+      // release_value calls the deinit which might have been already de-
+      // virtualized in the callee.
+      continue;
+    }
 
     // See if we can find a ref count equivalent strong_release or release_value
     // at the end of this function if our argument is an @owned parameter.

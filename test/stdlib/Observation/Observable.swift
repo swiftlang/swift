@@ -8,6 +8,7 @@
 // REQUIRES: observation
 // REQUIRES: concurrency
 // REQUIRES: objc_interop
+// REQUIRES: swift_feature_Macros
 // UNSUPPORTED: use_os_stdlib
 // UNSUPPORTED: back_deployment_runtime
 
@@ -182,6 +183,39 @@ class CapturedState<State>: @unchecked Sendable {
 @Observable
 class RecursiveInner {
   var value = "prefix"
+}
+
+@Observable
+class GenericClass<T> {
+  var value = 3
+}
+
+struct StructParent {
+  @Observable
+  class NestedGenericClass<T> {
+    var value = 3
+  }
+}
+
+struct GenericStructParent<T> {
+  @Observable
+  class NestedClass {
+    var value = 3
+  }
+}
+
+class ClassParent {
+  @Observable
+  class NestedGenericClass<T> {
+    var value = 3
+  }
+}
+
+class GenericClassParent<T> {
+  @Observable
+  class NestedClass {
+    var value = 3
+  }
 }
 
 @Observable

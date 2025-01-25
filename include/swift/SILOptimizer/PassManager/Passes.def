@@ -120,8 +120,6 @@ IRGEN_PASS(AllocStackHoisting, "alloc-stack-hoisting",
            "SIL alloc_stack Hoisting")
 PASS(ArrayCountPropagation, "array-count-propagation",
      "Array Count Propagation")
-PASS(ArrayElementPropagation, "array-element-propagation",
-     "Array Element Propagation")
 SWIFT_FUNCTION_PASS(AssumeSingleThreaded, "sil-assume-single-threaded",
      "Assume Single-Threaded Environment")
 SWIFT_MODULE_PASS(AsyncDemotion, "async-demotion",
@@ -173,6 +171,8 @@ PASS(CopyPropagation, "copy-propagation",
      "Copy propagation to Remove Redundant SSA Copies, pruning debug info")
 PASS(MandatoryCopyPropagation, "mandatory-copy-propagation",
      "Copy propagation to Remove Redundant SSA Copies, preserving debug info")
+SWIFT_FUNCTION_PASS(CopyToBorrowOptimization, "copy-to-borrow-optimization",
+     "Convert load [copy] instructions to load_borrow and remove copies of borrowed values")
 PASS(COWOpts, "cow-opts",
      "Optimize COW operations")
 PASS(Differentiation, "differentiation",
@@ -195,6 +195,8 @@ PASS(DefiniteInitialization, "definite-init",
      "Definite Initialization for Diagnostics")
 PASS(DestroyAddrHoisting, "destroy-addr-hoisting",
      "Hoist destroy_addr for uniquely identified values")
+SWIFT_FUNCTION_PASS(DestroyHoisting, "destroy-hoisting",
+     "Hoist destroy_value instructions")
 PASS(Devirtualizer, "devirtualizer",
      "Indirect Call Devirtualization")
 PASS(DiagnoseInfiniteRecursion, "diagnose-infinite-recursion",
@@ -258,8 +260,6 @@ SWIFT_FUNCTION_PASS(DeadStoreElimination, "dead-store-elimination",
      "Dead Store Elimination")
 PASS(GenericSpecializer, "generic-specializer",
      "Generic Function Specialization on Static Types")
-PASS(VTableSpecializer, "vtable-specializer",
-     "Generic Specialization on VTables")
 PASS(ExistentialSpecializer, "existential-specializer",
      "Existential Specializer")
 PASS(SILSkippingChecker, "check-sil-skipping",
@@ -327,7 +327,7 @@ PASS(MoveCondFailToPreds, "move-cond-fail-to-preds",
 PASS(NoReturnFolding, "noreturn-folding",
      "Prune Control Flow at No-Return Calls Using SIL unreachable")
 SWIFT_FUNCTION_PASS(ObjCBridgingOptimization, "objc-bridging-opt",
-     "Optimize ObjectiveC briging operations")
+     "Optimize ObjectiveC bridging operations")
 SWIFT_FUNCTION_PASS(ObjectOutliner, "object-outliner",
      "Outlining of Global Objects")
 PASS(Outliner, "outliner",
@@ -387,7 +387,7 @@ PASS(TempRValueOpt, "temp-rvalue-opt",
      "Remove short-lived immutable temporary copies")
 PASS(IRGenPrepare, "irgen-prepare",
      "Cleanup SIL in preparation for IRGen")
-PASS(TransferNonSendable, "transfer-non-sendable",
+PASS(SendNonSendable, "send-non-sendable",
      "Checks calls that send non-sendable values between isolation domains")
 PASS(LowerTupleAddrConstructor, "lower-tuple-addr-constructor",
      "Lower tuple addr constructor to tuple_element_addr+copy_addr")
@@ -512,21 +512,30 @@ SWIFT_FUNCTION_PASS(UpdateBorrowedFrom, "update-borrowed-from",
      "Test pass for update borrowed-from instructions")
 PASS(DiagnoseUnnecessaryPreconcurrencyImports, "sil-diagnose-unnecessary-preconcurrency-imports",
      "Diagnose any preconcurrency imports that Sema and TransferNonSendable did not use")
+PASS(ThunkLowering, "sil-thunk-lowering",
+     "Lower thunk instructions to actual thunks")
 PASS(PruneVTables, "prune-vtables",
      "Mark class methods that do not require vtable dispatch")
 PASS_RANGE(AllPasses, AliasInfoDumper, PruneVTables)
 
+SWIFT_SILCOMBINE_PASS(BeginBorrowInst)
 SWIFT_SILCOMBINE_PASS(BeginCOWMutationInst)
+SWIFT_SILCOMBINE_PASS(ClassifyBridgeObjectInst)
+SWIFT_SILCOMBINE_PASS(FixLifetimeInst)
 SWIFT_SILCOMBINE_PASS(GlobalValueInst)
 SWIFT_SILCOMBINE_PASS(StrongRetainInst)
 SWIFT_SILCOMBINE_PASS(StrongReleaseInst)
 SWIFT_SILCOMBINE_PASS(RetainValueInst)
 SWIFT_SILCOMBINE_PASS(ReleaseValueInst)
 SWIFT_SILCOMBINE_PASS(LoadInst)
+SWIFT_SILCOMBINE_PASS(LoadBorrowInst)
 SWIFT_SILCOMBINE_PASS(CopyValueInst)
 SWIFT_SILCOMBINE_PASS(DestroyValueInst)
 SWIFT_SILCOMBINE_PASS(DestructureStructInst)
 SWIFT_SILCOMBINE_PASS(DestructureTupleInst)
+SWIFT_SILCOMBINE_PASS(PointerToAddressInst)
+SWIFT_SILCOMBINE_PASS(TypeValueInst)
+SWIFT_SILCOMBINE_PASS(UncheckedEnumDataInst)
 
 #undef IRGEN_PASS
 #undef SWIFT_MODULE_PASS

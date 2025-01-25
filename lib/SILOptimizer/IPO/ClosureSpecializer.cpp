@@ -96,7 +96,7 @@ STATISTIC(NumPropagatedClosuresNotEliminated,
 llvm::cl::opt<bool> EliminateDeadClosures(
     "closure-specialize-eliminate-dead-closures", llvm::cl::init(true),
     llvm::cl::desc("Do not eliminate dead closures after closure "
-                   "specialization. This is meant ot be used when testing."));
+                   "specialization. This is meant to be used when testing."));
 
 //===----------------------------------------------------------------------===//
 //                                  Utility
@@ -608,7 +608,7 @@ SerializedKind_t CallSiteDescriptor::getSerializedKind() const {
 
 std::string CallSiteDescriptor::createName() const {
   auto P = Demangle::SpecializationPass::ClosureSpecializer;
-  Mangle::FunctionSignatureSpecializationMangler Mangler(P, getSerializedKind(),
+  Mangle::FunctionSignatureSpecializationMangler Mangler(getApplyCallee()->getASTContext(), P, getSerializedKind(),
                                                          getApplyCallee());
 
   if (auto *PAI = dyn_cast<PartialApplyInst>(getClosure())) {

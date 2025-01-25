@@ -18,6 +18,7 @@
 #include "CodeSynthesis.h"
 #include "TypeChecker.h"
 #include "llvm/ADT/STLExtras.h"
+#include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/Module.h"
@@ -42,8 +43,8 @@ static bool superclassConformsTo(ClassDecl *target, KnownProtocolKind kpk) {
   if (!superclass)
     return false;
 
-  return !ModuleDecl::lookupConformance(target->getSuperclass(),
-                                        target->getASTContext().getProtocol(kpk))
+  return !lookupConformance(target->getSuperclass(),
+                            target->getASTContext().getProtocol(kpk))
               .isInvalid();
 }
 
@@ -269,7 +270,7 @@ static EnumDecl *validateCodingKeysType(const DerivedConformance &derived,
 
   // Ensure that the type we found conforms to the CodingKey protocol.
   auto *codingKeyProto = C.getProtocol(KnownProtocolKind::CodingKey);
-  if (!ModuleDecl::lookupConformance(codingKeysType, codingKeyProto)) {
+  if (!lookupConformance(codingKeysType, codingKeyProto)) {
     // If CodingKeys is a typealias which doesn't point to a valid nominal type,
     // codingKeysTypeDecl will be nullptr here. In that case, we need to warn on
     // the location of the usage, since there isn't an underlying type to
@@ -336,8 +337,7 @@ static bool validateCodingKeysEnum(const DerivedConformance &derived,
     // We have a property to map to. Ensure it's {En,De}codable.
     auto target = derived.getConformanceContext()->mapTypeIntoContext(
          it->second->getValueInterfaceType());
-    if (ModuleDecl::checkConformance(target, derived.Protocol)
-            .isInvalid()) {
+    if (checkConformance(target, derived.Protocol).isInvalid()) {
       TypeLoc typeLoc = {
           it->second->getTypeReprOrParentPatternTypeRepr(),
           it->second->getTypeInContext(),
@@ -1110,7 +1110,7 @@ deriveBodyEncodable_enum_encode(AbstractFunctionDecl *encodeDecl, void *) {
           -> std::tuple<EnumElementDecl *, BraceStmt *> {
         SmallVector<ASTNode, 3> caseStatements;
 
-        if (elt->getAttrs().isUnavailable(C)) {
+        if (elt->isUnavailable()) {
           // This case is not encodable because it is unavailable and therefore
           // should not be instantiable at runtime. Skipping this case will
           // result in the SIL pipeline giving the switch a default case for
@@ -1254,7 +1254,7 @@ static FuncDecl *deriveEncodable_encode(DerivedConformance &derived) {
     encodeDecl->getAttrs().add(attr);
   }
 
-  addNonIsolatedToSynthesized(derived.Nominal, encodeDecl);
+  addNonIsolatedToSynthesized(derived, encodeDecl);
 
   encodeDecl->copyFormalAccessFrom(derived.Nominal,
                                    /*sourceIsParentContext*/ true);
@@ -1402,8 +1402,8 @@ deriveBodyDecodable_init(AbstractFunctionDecl *initDecl, void *) {
             });
         auto *encodableProto = C.getProtocol(KnownProtocolKind::Encodable);
         bool conformsToEncodable =
-            ModuleDecl::lookupConformance(
-                targetDecl->getDeclaredInterfaceType(), encodableProto) != nullptr;
+            (bool) lookupConformance(
+                targetDecl->getDeclaredInterfaceType(), encodableProto);
 
         // Strategy to use for CodingKeys enum diagnostic part - this is to
         // make the behaviour more explicit:
@@ -1713,7 +1713,7 @@ deriveBodyDecodable_enum_init(AbstractFunctionDecl *initDecl, void *) {
           if (!codingKeyCase)
             return std::make_tuple(nullptr, nullptr);
 
-          if (elt->getAttrs().isUnavailable(C)) {
+          if (elt->isUnavailable()) {
             // generate:
             //       throw DecodingError.dataCorrupted(
             //         DecodingError.Context(
@@ -1906,7 +1906,7 @@ static ValueDecl *deriveDecodable_init(DerivedConformance &derived) {
     initDecl->getAttrs().add(reqAttr);
   }
 
-  addNonIsolatedToSynthesized(derived.Nominal, initDecl);
+  addNonIsolatedToSynthesized(derived, initDecl);
 
   initDecl->copyFormalAccessFrom(derived.Nominal,
                                  /*sourceIsParentContext*/ true);
@@ -1940,7 +1940,7 @@ static bool canSynthesize(DerivedConformance &derived, ValueDecl *requirement,
     if (auto *superclassDecl = classDecl->getSuperclassDecl()) {
       DeclName memberName;
       auto superType = superclassDecl->getDeclaredInterfaceType();
-      if (ModuleDecl::checkConformance(superType, proto)) {
+      if (checkConformance(superType, proto)) {
         // super.init(from:) must be accessible.
         memberName = cast<ConstructorDecl>(requirement)->getName();
       } else {

@@ -67,7 +67,9 @@ printArtificialName(const swift::AbstractStorageDecl *ASD, AccessorKind AK, llvm
   case AccessorKind::Address:
   case AccessorKind::MutableAddress:
   case AccessorKind::Read:
+  case AccessorKind::Read2:
   case AccessorKind::Modify:
+  case AccessorKind::Modify2:
     return true;
   }
 
@@ -429,7 +431,7 @@ struct MappedLoc {
 class IndexSwiftASTWalker : public SourceEntityWalker {
   IndexDataConsumer &IdxConsumer;
   SourceManager &SrcMgr;
-  unsigned BufferID;
+  std::optional<unsigned> BufferID;
   bool enableWarnings;
 
   ModuleDecl *CurrentModule = nullptr;
@@ -590,7 +592,7 @@ public:
   IndexSwiftASTWalker(IndexDataConsumer &IdxConsumer, ASTContext &Ctx,
                       SourceFile *SF = nullptr)
       : IdxConsumer(IdxConsumer), SrcMgr(Ctx.SourceMgr),
-        BufferID(SF ? SF->getBufferID().value_or(-1) : -1),
+        BufferID(SF ? std::optional(SF->getBufferID()) : std::nullopt),
         enableWarnings(IdxConsumer.enableWarnings()) {}
 
   ~IndexSwiftASTWalker() override {
@@ -615,7 +617,7 @@ private:
 
   bool walkToDeclPre(Decl *D, CharSourceRange Range) override {
     // Do not handle unavailable decls from other modules.
-    if (IsModuleFile && AvailableAttr::isUnavailable(D))
+    if (IsModuleFile && D->isUnavailable())
       return false;
 
     if (!handleCustomAttrInitRefs(D))
@@ -674,6 +676,35 @@ private:
       }
     }
     return true;
+  }
+
+  /// Indexes refs to initializers of collections when initialized from a short
+  /// hand version of the collection's type.
+  ///
+  /// For example, emits refs for `[Int](repeating:count:)`.
+  void handleCollectionShortHandTypeInitRefs(Expr *E) {
+    auto *ctorRef = dyn_cast<ConstructorRefCallExpr>(E);
+    if (!ctorRef)
+      return;
+    auto TE = dyn_cast<TypeExpr>(ctorRef->getBase());
+    if (!TE || TE->isImplicit())
+      return;
+    auto TR = TE->getTypeRepr();
+    if (TR && !isa<ArrayTypeRepr>(TR) && !isa<DictionaryTypeRepr>(TR))
+      return;
+    auto DRE = dyn_cast<DeclRefExpr>(ctorRef->getFn());
+    if (!DRE)
+      return;
+
+    auto decl = DRE->getDecl();
+    if (!shouldIndex(decl, /*IsRef=*/true))
+      return;
+    IndexSymbol Info;
+    if (initIndexSymbol(decl, ctorRef->getSourceRange().Start, /*IsRef=*/true,
+                        Info))
+      return;
+    if (startEntity(decl, Info, /*IsRef=*/true))
+      finishCurrentEntity();
   }
 
   void handleMemberwiseInitRefs(Expr *E) {
@@ -742,6 +773,7 @@ private:
     ExprStack.push_back(E);
     Containers.activateContainersFor(E);
     handleMemberwiseInitRefs(E);
+    handleCollectionShortHandTypeInitRefs(E);
     return true;
   }
 
@@ -848,12 +880,12 @@ private:
     if (Loc.isInvalid() || isSuppressed(Loc))
       return true;
 
+    IndexSymbol Info;
+
     // Dig back to the original captured variable
     if (auto *VD = dyn_cast<VarDecl>(D)) {
-      D = firstDecl(D);
+      Info.originalDecl = firstDecl(D);
     }
-
-    IndexSymbol Info;
 
     if (Data.isImplicit)
       Info.roles |= (unsigned)SymbolRole::Implicit;
@@ -1034,19 +1066,19 @@ private:
   // \c None if \p loc is otherwise invalid or its original location isn't
   // contained within the current buffer.
   std::optional<MappedLoc> getMappedLocation(SourceLoc loc) {
-    if (loc.isInvalid()) {
+    if (loc.isInvalid() || !BufferID.has_value()) {
       if (IsModuleFile)
         return {{0, 0, false}};
       return std::nullopt;
     }
 
+    auto bufferID = BufferID.value();
     bool inGeneratedBuffer =
-        !SrcMgr.rangeContainsTokenLoc(SrcMgr.getRangeForBuffer(BufferID), loc);
+        !SrcMgr.rangeContainsTokenLoc(SrcMgr.getRangeForBuffer(bufferID), loc);
 
-    auto bufferID = BufferID;
     if (inGeneratedBuffer) {
       std::tie(bufferID, loc) = CurrentModule->getOriginalLocation(loc);
-      if (BufferID != bufferID) {
+      if (BufferID.value() != bufferID) {
         assert(false && "Location is not within file being indexed");
         return std::nullopt;
       }
@@ -1083,7 +1115,8 @@ private:
       D = cast<VarDecl>(D)->getCanonicalVarDecl();
     }
 
-    if (D->isImplicit() && !shouldIndexImplicitDecl(D, IsRef))
+    if (!D->isSynthesized() && D->isImplicit() &&
+        !shouldIndexImplicitDecl(D, IsRef))
       return false;
 
     // Do not handle non-public imported decls.
@@ -1094,7 +1127,7 @@ private:
       return isa<ParamDecl>(D) && !IsRef &&
         D->getDeclContext()->getContextKind() != DeclContextKind::AbstractClosureExpr;
 
-    if (D->isPrivateStdlibDecl())
+    if (D->isPrivateSystemDecl())
       return false;
 
     return true;
@@ -1164,7 +1197,7 @@ void IndexSwiftASTWalker::visitModule(ModuleDecl &Mod) {
   for (auto File : Mod.getFiles()) {
     if (auto SF = dyn_cast<SourceFile>(File)) {
       auto BufID = SF->getBufferID();
-      if (BufID.has_value() && *BufID == BufferID) {
+      if (BufID == BufferID) {
         SrcFile = SF;
         break;
       }
@@ -1578,13 +1611,17 @@ bool IndexSwiftASTWalker::report(ValueDecl *D) {
     if (!reportRef(shadowedDecl, loc, info, AccessKind::Read))
       return false;
 
-    // Suppress the reference if there is any (it is implicit and hence
-    // already skipped in the shorthand if let case, but explicit in the
-    // captured case).
-    suppressRefAtLoc(loc);
+    // Keep the refs and definition for the real decl when indexing locals,
+    // so the references to the shadowing variable are distinct.
+    if (!IdxConsumer.indexLocals()) {
+      // Suppress the reference if there is any (it is implicit and hence
+      // already skipped in the shorthand if let case, but explicit in the
+      // captured case).
+      suppressRefAtLoc(loc);
 
-    // Skip the definition of a shadowed decl
-    return true;
+      // Skip the definition of a shadowed decl
+      return true;
+    }
   }
 
   if (startEntityDecl(D)) {
@@ -2089,12 +2126,8 @@ void IndexSwiftASTWalker::collectRecursiveModuleImports(
     return;
   }
 
-  ModuleDecl::ImportFilter ImportFilter;
-  ImportFilter |= ModuleDecl::ImportFilterKind::Exported;
-  ImportFilter |= ModuleDecl::ImportFilterKind::Default;
-  // FIXME: ImportFilterKind::ShadowedByCrossImportOverlay?
   SmallVector<ImportedModule, 8> Imports;
-  TopMod.getImportedModules(Imports);
+  TopMod.getImportedModules(Imports, ModuleDecl::ImportFilterKind::Exported);
 
   for (auto Import : Imports) {
     collectRecursiveModuleImports(*Import.importedModule, Visited);

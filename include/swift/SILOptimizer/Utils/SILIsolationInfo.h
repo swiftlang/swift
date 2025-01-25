@@ -143,14 +143,14 @@ public:
   /// This forms a lattice of semantics. The lattice progresses from left ->
   /// right below:
   ///
-  /// Unknown -> Disconnected -> TransferringParameter -> Task -> Actor.
+  /// Unknown -> Disconnected -> Task -> Actor.
   ///
   enum Kind : uint8_t {
     /// Unknown means no information. We error when merging on it.
     Unknown,
 
-    /// An entity with disconnected isolation can be freely transferred into
-    /// another isolation domain. These are associated with "use after transfer"
+    /// An entity with disconnected isolation can be freely sent into another
+    /// isolation domain. These are associated with "use after send"
     /// diagnostics.
     Disconnected,
 
@@ -291,6 +291,13 @@ public:
     llvm::dbgs() << '\n';
   }
 
+  /// Prints out the message for a diagnostic that states that the value is
+  /// exposed to a specific code.
+  ///
+  /// We do this programatically since task-isolated code needs a very different
+  /// form of diagnostic than other cases.
+  void printForCodeDiagnostic(llvm::raw_ostream &os) const;
+
   void printForDiagnostics(llvm::raw_ostream &os) const;
 
   SWIFT_DEBUG_DUMPER(dumpForDiagnostics()) {
@@ -321,6 +328,12 @@ public:
 
   bool hasIsolatedValue() const {
     return (kind == Task || kind == Actor) && bool(isolatedValue);
+  }
+
+  SILValue maybeGetIsolatedValue() const {
+    if (!hasIsolatedValue())
+      return {};
+    return getIsolatedValue();
   }
 
   static SILIsolationInfo getDisconnected(bool isUnsafeNonIsolated) {
@@ -494,6 +507,7 @@ public:
   operator bool() const { return bool(innerInfo); }
 
   SILIsolationInfo *operator->() { return &innerInfo; }
+  const SILIsolationInfo *operator->() const { return &innerInfo; }
 
   SILIsolationInfo getIsolationInfo() const { return innerInfo; }
 
@@ -517,6 +531,10 @@ public:
 
   SWIFT_DEBUG_DUMPER(dumpForDiagnostics()) {
     innerInfo.dumpForDiagnostics();
+  }
+
+  void printForCodeDiagnostic(llvm::raw_ostream &os) const {
+    innerInfo.printForCodeDiagnostic(os);
   }
 
   void printForOneLineLogging(llvm::raw_ostream &os) const {

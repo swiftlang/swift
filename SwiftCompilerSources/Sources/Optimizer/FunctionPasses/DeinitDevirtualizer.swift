@@ -17,6 +17,10 @@ import SIL
 let deinitDevirtualizer = FunctionPass(name: "deinit-devirtualizer") {
   (function: Function, context: FunctionPassContext) in
 
+  guard function.hasOwnership else {
+    return
+  }
+
   for inst in function.instructions {
     switch inst {
     case let destroyValue as DestroyValueInst:

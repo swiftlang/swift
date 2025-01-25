@@ -28,6 +28,7 @@ internal func internalFunc() {}
 // CHECK-NO-SKIP: sil hidden{{.*}} @$s4Test022internalFuncWithNestedC0yyF : $@convention(thin) () -> () {
 // CHECK-SKIP-NOT: s4Test022internalFuncWithNestedC0yyF
 internal func internalFuncWithNestedFunc() {
+  lazy var x = 1
   defer { internalFunc() }
   func nested() {}
   nested()
@@ -36,6 +37,9 @@ internal func internalFuncWithNestedFunc() {
     internalFunc()
   }()
 }
+// CHECK-NO-SKIP: sil private{{.*}} @$s4Test022internalFuncWithNestedC0yyF1xL_Sivg : $@convention(thin) (@guaranteed { var Optional<Int> }) -> Int
+// CHECK-SKIP-NOT: s4Test022internalFuncWithNestedC0yyF1xL_Sivg
+
 // CHECK-NO-SKIP: sil private{{.*}} @$s4Test022internalFuncWithNestedC0yyF6$deferL_yyF : $@convention(thin) () -> () {
 // CHECK-SKIP-NOT: s4Test022internalFuncWithNestedC0yyF6$deferL_yyF
 
@@ -53,10 +57,12 @@ public func publicFunc() {}
 
 // CHECK: sil{{.*}} @$s4Test25publicFuncWithNestedFuncsyyF : $@convention(thin) () -> () {
 public func publicFuncWithNestedFuncs() {
+  lazy var x = 1
   defer { publicFunc() }
   func nested() {}
   nested()
 }
+// CHECK: sil private{{.*}} @$s4Test25publicFuncWithNestedFuncsyyF1xL_Sivg : $@convention(thin) (@guaranteed { var Optional<Int> }) -> Int
 // CHECK: sil private{{.*}} @$s4Test25publicFuncWithNestedFuncsyyF6$deferL_yyF : $@convention(thin) () -> () {
 // CHECK: sil private{{.*}} @$s4Test25publicFuncWithNestedFuncsyyF6nestedL_yyF : $@convention(thin) () -> () {
 

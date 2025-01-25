@@ -202,6 +202,7 @@ public:
     StoredPointer AllocatorSlabPtr;
     std::vector<StoredPointer> ChildTasks;
     std::vector<StoredPointer> AsyncBacktraceFrames;
+    StoredPointer ResumeAsyncContext;
   };
 
   struct ActorInfo {
@@ -1287,6 +1288,12 @@ public:
       // after the isa and retain fields.
       return isaAndRetainCountSize;
 
+    // `ObjCClassTypeRef` instances represent classes in the ObjC module ("__C").
+    // These will never have Swift type metadata.
+    if (auto *objcSuper = dyn_cast<ObjCClassTypeRef>(superclass))
+      if (auto *superTI = ExternalTypeInfo->getTypeInfo(objcSuper->getName()))
+        return superTI->getSize();
+
     auto superclassStart =
         computeUnalignedFieldStartOffset(superclass, ExternalTypeInfo);
     if (!superclassStart)
@@ -1819,9 +1826,12 @@ private:
       RecordPtr = RecordObj->Parent;
     }
 
+    const auto TaskResumeContext = AsyncTaskObj->ResumeContextAndReserved[0];
+    Info.ResumeAsyncContext = TaskResumeContext;
+
     // Walk the async backtrace.
     if (Info.HasIsRunning && !Info.IsRunning) {
-      auto ResumeContext = AsyncTaskObj->ResumeContextAndReserved[0];
+      auto ResumeContext = TaskResumeContext;
       unsigned AsyncBacktraceLoopCount = 0;
       while (ResumeContext && AsyncBacktraceLoopCount++ < AsyncBacktraceLimit) {
         auto ResumeContextObj = readObj<AsyncContext<Runtime>>(ResumeContext);
@@ -1973,7 +1983,7 @@ private:
     std::set<std::pair<const TypeRef *, const MetadataSource *>> Done;
     GenericArgumentMap Subs;
 
-    ArrayRef<const TypeRef *> CaptureTypes = Info.CaptureTypes;
+    llvm::ArrayRef<const TypeRef *> CaptureTypes = Info.CaptureTypes;
 
     // Closure context element layout depends on the layout of the
     // captured types, but captured types might depend on element

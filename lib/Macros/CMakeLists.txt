@@ -29,18 +29,14 @@ function(add_swift_macro_library name)
   set(ASML_SOURCES ${ARGN})
 
   # Add the library.
-  add_pure_swift_host_library(${name} SHARED ${ASML_SOURCES})
+  add_pure_swift_host_library(${name} SHARED
+    PACKAGE_NAME Toolchain
+    ${ASML_SOURCES})
 
   # If we don't have the Swift swift parser, bail out, because the above
   # add_pure_swift_host_library did nothing.
   if (NOT SWIFT_BUILD_SWIFT_SYNTAX)
     return()
-  endif()
-
-  # FXIME: Importing package-cmo enabled '.swiftmodule' causes compiler crash :(
-  if(Swift_COMPILER_PACKAGE_CMO_SUPPORT)
-    target_compile_options(${name} PRIVATE
-      "SHELL:-Xfrontend -module-load-mode -Xfrontend prefer-interface")
   endif()
 
   # Add rpath to 'lib/{platform}'

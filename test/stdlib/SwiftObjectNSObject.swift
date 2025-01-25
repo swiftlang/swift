@@ -113,7 +113,7 @@ func CheckSwiftObjectNSObjectEquals(_: AnyObject, _: AnyObject) -> Bool
 @_silgen_name("TestSwiftObjectNSObjectEquals")
 func TestSwiftObjectNSObjectEquals(_: AnyObject, _: AnyObject)
 @_silgen_name("TestSwiftObjectNSObjectNotEquals")
-func TestSwiftObjectNSObjectNotEquals(_: AnyObject, _: AnyObject)
+func TestSwiftObjectNSObjectNotEquals(_: AnyObject, _: AnyObject?)
 @_silgen_name("TestSwiftObjectNSObjectHashValue")
 func TestSwiftObjectNSObjectHashValue(_: AnyObject, _: Int)
 @_silgen_name("TestSwiftObjectNSObjectDefaultHashValue")
@@ -263,6 +263,10 @@ if #available(OSX 10.12, iOS 10.0, *) {
   TestHashable(H(i:1))
   TestHashable(H(i:2))
   TestHashable(H(i:18))
+
+  // Verify that we correctly handle a nil argument to isEqual:
+  TestSwiftObjectNSObjectNotEquals(C(), nil)
+  TestSwiftObjectNSObjectNotEquals(E(i: 1), nil)
 
   TestSwiftObjectNSObjectAssertNoErrors()
 } else {

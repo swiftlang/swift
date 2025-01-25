@@ -45,21 +45,21 @@ public func inoutLarge(_ en: inout Large, _ x: Int) {
 // CHECK: class SWIFT_SYMBOL("s:5Enums5LargeO") Large final {
 
 // CHECK:      SWIFT_INLINE_THUNK void inoutLarge(Large& en, swift::Int x) noexcept SWIFT_SYMBOL("s:5Enums10inoutLargeyyAA0C0Oz_SitF") {
-// CHECK-NEXT:   _impl::$s5Enums10inoutLargeyyAA0C0Oz_SitF(_impl::_impl_Large::getOpaquePointer(en), x);
+// CHECK-NEXT:   Enums::_impl::$s5Enums10inoutLargeyyAA0C0Oz_SitF(Enums::_impl::_impl_Large::getOpaquePointer(en), x);
 // CHECK-NEXT: }
 
 // CHECK:      SWIFT_INLINE_THUNK Large makeLarge(swift::Int x) noexcept SWIFT_SYMBOL("s:5Enums9makeLargeyAA0C0OSiF") SWIFT_WARN_UNUSED_RESULT {
-// CHECK-NEXT:   return _impl::_impl_Large::returnNewValue([&](char * _Nonnull result) SWIFT_INLINE_THUNK_ATTRIBUTES {
-// CHECK-NEXT:     _impl::$s5Enums9makeLargeyAA0C0OSiF(result, x);
+// CHECK-NEXT:   return Enums::_impl::_impl_Large::returnNewValue([&](char * _Nonnull result) SWIFT_INLINE_THUNK_ATTRIBUTES {
+// CHECK-NEXT:     Enums::_impl::$s5Enums9makeLargeyAA0C0OSiF(result, x);
 // CHECK-NEXT:   });
 // CHECK-NEXT: }
 
 // CHECK:      SWIFT_INLINE_THUNK Large passThroughLarge(const Large& en) noexcept SWIFT_SYMBOL("s:5Enums16passThroughLargeyAA0D0OADF") SWIFT_WARN_UNUSED_RESULT {
-// CHECK-NEXT:   return _impl::_impl_Large::returnNewValue([&](char * _Nonnull result) SWIFT_INLINE_THUNK_ATTRIBUTES {
-// CHECK-NEXT:     _impl::$s5Enums16passThroughLargeyAA0D0OADF(result, _impl::_impl_Large::getOpaquePointer(en));
+// CHECK-NEXT:   return Enums::_impl::_impl_Large::returnNewValue([&](char * _Nonnull result) SWIFT_INLINE_THUNK_ATTRIBUTES {
+// CHECK-NEXT:     Enums::_impl::$s5Enums16passThroughLargeyAA0D0OADF(result, Enums::_impl::_impl_Large::getOpaquePointer(en));
 // CHECK-NEXT:   });
 // CHECK-NEXT: }
 
 // CHECK:      SWIFT_INLINE_THUNK void printLarge(const Large& en) noexcept SWIFT_SYMBOL("s:5Enums10printLargeyyAA0C0OF") {
-// CHECK-NEXT:   _impl::$s5Enums10printLargeyyAA0C0OF(_impl::_impl_Large::getOpaquePointer(en));
+// CHECK-NEXT:   Enums::_impl::$s5Enums10printLargeyyAA0C0OF(Enums::_impl::_impl_Large::getOpaquePointer(en));
 // CHECK-NEXT: }

@@ -10,6 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+import AST
 import SIL
 
 /// Promotes heap allocated objects to the stack.
@@ -70,8 +71,19 @@ private func tryPromoteAlloc(_ allocRef: AllocRefInstBase,
 
   // Usually resilient classes cannot be promoted anyway, because their initializers are
   // not visible and let the object appear to escape.
-  if allocRef.type.nominal.isResilient(in: allocRef.parentFunction) {
+  if allocRef.type.nominal!.isResilient(in: allocRef.parentFunction) {
     return false
+  }
+
+  if let dtor = (allocRef.type.nominal as? ClassDecl)?.destructor {
+    if dtor.isIsolated {
+      // Classes (including actors) with isolated deinit can escape implicitly.
+      //
+      // We could optimize this further and allow promotion if we can prove that
+      // deinit will take fast path (i.e. it will not schedule a job).
+      // But for now, let's keep things simple and disable promotion conservatively.
+      return false
+    }
   }
 
   // The most important check: does the object escape the current function?
@@ -273,7 +285,7 @@ private struct ComputeOuterBlockrange : EscapeVisitorWithResult {
     // instructions (for which the `visitUse` closure is not called).
     result.insert(operandsDefinitionBlock)
 
-    // We need to explicitly add predecessor blocks of phis becaues they
+    // We need to explicitly add predecessor blocks of phis because they
     // are not necesesarily visited during the down-walk in `isEscaping()`.
     // This is important for the special case where there is a back-edge from the
     // inner range to the inner rage's begin-block:

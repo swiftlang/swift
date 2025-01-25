@@ -91,8 +91,20 @@ private func eliminateRedundantLoads(in function: Function, ignoreArrays: Bool, 
         if !context.continueWithNextSubpassRun(for: load) {
           return
         }
-        if ignoreArrays && load.type.isNominal && load.type.nominal == context.swiftArrayDecl {
+        if ignoreArrays,
+           let nominal = load.type.nominal,
+           nominal == context.swiftArrayDecl
+        {
           continue
+        }
+        // Check if the type can be expanded without a significant increase to
+        // code size.
+        // We block redundant load elimination because it might increase
+        // register pressure for large values. Furthermore, this pass also
+        // splits values into its projections (e.g
+        // shrinkMemoryLifetimeAndSplit).
+        if !load.type.shouldExpand(context) {
+           continue
         }
         tryEliminate(load: load, complexityBudget: &complexityBudget, context)
       }
@@ -136,7 +148,7 @@ private extension LoadInst {
   }
 
   func isRedundant(complexityBudget: inout Int, _ context: FunctionPassContext) -> DataflowResult {
-    return isRedundant(at: address.accessPath, complexityBudget: &complexityBudget, context)
+    return isRedundant(at: address.constantAccessPath, complexityBudget: &complexityBudget, context)
   }
 
   func isRedundant(at accessPath: AccessPath, complexityBudget: inout Int, _ context: FunctionPassContext) -> DataflowResult {
@@ -267,8 +279,7 @@ private func replace(load: LoadInst, with availableValues: [AvailableValue], _ c
     //
     newValue = ssaUpdater.getValue(inMiddleOf: load.parentBlock)
   }
-  load.uses.replaceAll(with: newValue, context)
-  context.erase(instruction: load)
+  load.replace(with: newValue, context)
 }
 
 private func provideValue(
@@ -276,7 +287,7 @@ private func provideValue(
   from availableValue: AvailableValue,
   _ context: FunctionPassContext
 ) -> Value {
-  let projectionPath = availableValue.address.accessPath.getMaterializableProjection(to: load.address.accessPath)!
+  let projectionPath = availableValue.address.constantAccessPath.getMaterializableProjection(to: load.address.constantAccessPath)!
 
   switch load.loadOwnership {
   case .unqualified:
@@ -468,16 +479,21 @@ private struct InstructionScanner {
 
   private mutating func visit(instruction: Instruction) -> ScanResult {
     switch instruction {
-    case is FixLifetimeInst, is EndAccessInst, is BeginBorrowInst, is EndBorrowInst:
-      return .transparent
-
+    case is FixLifetimeInst, is EndAccessInst, is EndBorrowInst:
+      // Those scope-ending instructions are only irrelevant if the preceding load is not changed.
+      // If it is changed from `load [copy]` -> `load [take]` the memory effects of those scope-ending
+      // instructions prevent that the `load [take]` will illegally mutate memory which is protected
+      // from mutation by the scope.
+      if load.loadOwnership != .take {
+        return .transparent
+      }
     case let precedingLoad as LoadInst:
       if precedingLoad == load {
         // We need to stop the data flow analysis when we visit the original load again.
         // This happens if the load is in a loop.
         return .available
       }
-      let precedingLoadPath = precedingLoad.address.accessPath
+      let precedingLoadPath = precedingLoad.address.constantAccessPath
       if precedingLoadPath.getMaterializableProjection(to: accessPath) != nil {
         availableValues.append(.viaLoad(precedingLoad))
         return .available
@@ -494,7 +510,7 @@ private struct InstructionScanner {
       if precedingStore.source is Undef {
         return .overwritten
       }
-      let precedingStorePath = precedingStore.destination.accessPath
+      let precedingStorePath = precedingStore.destination.constantAccessPath
       if precedingStorePath.getMaterializableProjection(to: accessPath) != nil {
         availableValues.append(.viaStore(precedingStore))
         return .available

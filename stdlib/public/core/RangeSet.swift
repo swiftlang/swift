@@ -21,7 +21,7 @@
 /// locations of all the negative values in `numbers`:
 ///
 ///     var numbers = [10, 12, -5, 14, -3, -9, 15]
-///     let negativeSubranges = numbers.subranges(where: { $0 < 0 })
+///     let negativeSubranges = numbers.indices(where: { $0 < 0 })
 ///     // numbers[negativeSubranges].count == 3
 ///
 ///     numbers.moveSubranges(negativeSubranges, to: 0)
@@ -398,6 +398,7 @@ extension RangeSet {
 }
 
 @available(SwiftStdlib 6.0, *)
+@_unavailableInEmbedded
 extension RangeSet: CustomStringConvertible {
   public var description: String {
     return _ranges.description

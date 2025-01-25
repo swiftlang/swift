@@ -10,21 +10,22 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "swift/IDE/IDERequests.h"
+#include "swift/AST/ASTDemangler.h"
 #include "swift/AST/ASTPrinter.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Effects.h"
 #include "swift/AST/NameLookup.h"
-#include "swift/AST/ASTDemangler.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Frontend/Frontend.h"
 #include "swift/Frontend/PrintingDiagnosticConsumer.h"
 #include "swift/IDE/CommentConversion.h"
 #include "swift/IDE/Utils.h"
-#include "swift/Sema/IDETypeChecking.h"
 #include "swift/Markup/XMLUtils.h"
+#include "swift/Parse/Lexer.h"
+#include "swift/Sema/IDETypeChecking.h"
 #include "swift/Subsystems.h"
-#include "swift/IDE/IDERequests.h"
 
 using namespace swift;
 using namespace swift::ide;
@@ -431,7 +432,7 @@ void swift::simple_display(llvm::raw_ostream &out, const CursorInfoOwner &owner)
   if (!owner.isValid())
     return;
   auto &SM = owner.File->getASTContext().SourceMgr;
-  out << SM.getIdentifierForBuffer(*owner.File->getBufferID());
+  out << SM.getIdentifierForBuffer(owner.File->getBufferID());
   auto LC = SM.getLineAndColumnInBuffer(owner.Loc);
   out << ":" << LC.first << ":" << LC.second;
 }
@@ -442,7 +443,7 @@ void swift::ide::simple_display(llvm::raw_ostream &out,
     return;
   out << "Resolved cursor info at ";
   auto &SM = info->getSourceFile()->getASTContext().SourceMgr;
-  out << SM.getIdentifierForBuffer(*info->getSourceFile()->getBufferID());
+  out << SM.getIdentifierForBuffer(info->getSourceFile()->getBufferID());
   auto LC = SM.getLineAndColumnInBuffer(info->getLoc());
   out << ":" << LC.first << ":" << LC.second;
 }
@@ -492,6 +493,8 @@ static PossibleEffects getUnhandledEffects(ArrayRef<ASTNode> Nodes) {
         Effects |= EffectKind::Throws;
       if (isa<AwaitExpr>(E))
         Effects |= EffectKind::Async;
+      if (isa<UnsafeExpr>(E))
+        Effects |= EffectKind::Unsafe;
 
       return true;
     }
@@ -1178,7 +1181,7 @@ void swift::simple_display(llvm::raw_ostream &out,
   if (!owner.isValid())
     return;
   auto &SM = owner.File->getASTContext().SourceMgr;
-  out << SM.getIdentifierForBuffer(*owner.File->getBufferID());
+  out << SM.getIdentifierForBuffer(owner.File->getBufferID());
   auto SLC = SM.getLineAndColumnInBuffer(owner.StartLoc);
   auto ELC = SM.getLineAndColumnInBuffer(owner.EndLoc);
   out << ": (" << SLC.first << ":" << SLC.second << ", "
@@ -1188,7 +1191,7 @@ void swift::simple_display(llvm::raw_ostream &out,
 RangeInfoOwner::RangeInfoOwner(SourceFile *File, unsigned Offset,
                                unsigned Length): File(File) {
   SourceManager &SM = File->getASTContext().SourceMgr;
-  unsigned BufferId = File->getBufferID().value();
+  unsigned BufferId = File->getBufferID();
   StartLoc = SM.getLocForOffset(BufferId, Offset);
   EndLoc = SM.getLocForOffset(BufferId, Offset + Length);
 }

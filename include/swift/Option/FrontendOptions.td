@@ -86,6 +86,11 @@ def primary_file : Separate<["-"], "primary-file">,
   Flags<[FrontendOption, NoDriverOption, ArgumentIsPath]>,
   HelpText<"Produce output for this file, not the whole module">;
 
+def block_list_file
+  : Separate<["-"], "blocklist-file">, MetaVarName<"<path>">,
+    Flags<[FrontendOption, NoDriverOption, ArgumentIsPath]>,
+    HelpText<"The path to a blocklist configuration file">;
+
 let Flags = [FrontendOption, NoDriverOption] in {
 
 def triple : Separate<["-"], "triple">, Alias<target>;
@@ -265,6 +270,8 @@ def dependency_scan_cache_remarks : Flag<["-"], "Rdependency-scan-cache">,
 
 def parallel_scan : Flag<["-"], "parallel-scan">,
    HelpText<"Perform dependency scanning in-parallel.">;
+def no_parallel_scan : Flag<["-"], "no-parallel-scan">,
+   HelpText<"Perform dependency scanning in a single-threaded fashion.">;
 
 def enable_copy_propagation : Flag<["-"], "enable-copy-propagation">,
   HelpText<"Run SIL copy propagation with lexical lifetimes to shorten object "
@@ -285,10 +292,6 @@ def Raccess_note : Separate<["-"], "Raccess-note">,
     HelpText<"Control access note remarks (default: all)">;
 def Raccess_note_EQ : Joined<["-"], "Raccess-note=">,
     Alias<Raccess_note>;
-
-def block_list_file
-  : Separate<["-"], "blocklist-file">, MetaVarName<"<path>">,
-    HelpText<"The path to a blocklist configuration file">;
 } // end let Flags = [FrontendOption, NoDriverOption]
 
 def debug_crash_Group : OptionGroup<"<automatic crashing options>">;
@@ -539,6 +542,16 @@ def enable_spec_devirt : Flag<["-"], "enable-spec-devirt">,
 
 def enable_async_demotion : Flag<["-"], "enable-experimental-async-demotion">,
   HelpText<"Enables an optimization pass to demote async functions.">;
+
+def enable_throws_prediction : Flag<["-"], "enable-throws-prediction">,
+  HelpText<"Enables optimization assumption that functions rarely throw errors.">;
+def disable_throws_prediction : Flag<["-"], "disable-throws-prediction">,
+  HelpText<"Disables optimization assumption that functions rarely throw errors.">;
+
+def enable_noreturn_prediction : Flag<["-"], "enable-noreturn-prediction">,
+  HelpText<"Enables optimization assumption that calls to no-return functions are cold.">;
+def disable_noreturn_prediction : Flag<["-"], "disable-noreturn-prediction">,
+  HelpText<"Disables optimization assumption that calls to no-return functions are cold.">;
 
 def disable_access_control : Flag<["-"], "disable-access-control">,
   HelpText<"Don't respect access control restrictions">;
@@ -812,11 +825,17 @@ def downgrade_typecheck_interface_error : Flag<["-"], "downgrade-typecheck-inter
 def enable_volatile_modules : Flag<["-"], "enable-volatile-modules">,
   HelpText<"Load Swift modules in memory">;
 
-def solver_expression_time_threshold_EQ : Joined<["-"], "solver-expression-time-threshold=">;
+def solver_expression_time_threshold_EQ : Joined<["-"], "solver-expression-time-threshold=">,
+  HelpText<"Expression type checking timeout, in seconds">;
 
-def solver_disable_shrink :
-  Flag<["-"], "solver-disable-shrink">,
-  HelpText<"Disable the shrink phase of expression type checking">;
+def solver_scope_threshold_EQ : Joined<["-"], "solver-scope-threshold=">,
+  HelpText<"Expression type checking scope limit">;
+
+def solver_trail_threshold_EQ : Joined<["-"], "solver-trail-threshold=">,
+  HelpText<"Expression type checking trail change limit">;
+
+def solver_disable_splitter : Flag<["-"], "solver-disable-splitter">,
+  HelpText<"Disable the component splitter phase of expression type checking">;
 
 def disable_constraint_solver_performance_hacks : Flag<["-"], "disable-constraint-solver-performance-hacks">,
   HelpText<"Disable all the hacks in the constraint solver">;
@@ -924,6 +943,9 @@ def sil_verify_all : Flag<["-"], "sil-verify-all">,
   
 def sil_verify_none : Flag<["-"], "sil-verify-none">,
   HelpText<"Completely disable SIL verification">;
+
+def sil_ownership_verify_all : Flag<["-"], "sil-ownership-verify-all">,
+  HelpText<"Verify ownership after each transform">;
   
 def verify_all_substitution_maps : Flag<["-"], "verify-all-substitution-maps">,
   HelpText<"Verify all SubstitutionMaps on construction">;
@@ -1054,10 +1076,6 @@ def experimental_print_full_convention :
  HelpText<"When emitting a module interface or SIL, emit additional @convention"
           " arguments, regardless of whether they were written in the source."
           " Also requires -use-clang-function-types to be enabled.">;
-
-def experimental_one_way_closure_params :
-  Flag<["-"], "experimental-one-way-closure-params">,
-  HelpText<"Enable experimental support for one-way closure parameters">;
 
 def force_public_linkage : Flag<["-"], "force-public-linkage">,
    HelpText<"Force public linkage for private symbols. Used by LLDB.">;
@@ -1210,6 +1228,9 @@ let Flags = [FrontendOption, NoDriverOption, HelpHidden, ModuleInterfaceOptionIg
             "when optimizing ownership will be lowered before serializing SIL">;
 }
 
+def enable_recompilation_to_ossa_module : Flag<["-"], "enable-recompilation-to-ossa-module">,
+  HelpText<"Allow recompilation of a non-OSSA module to an OSSA module when imported from another OSSA module">;
+
 def enable_sil_opaque_values : Flag<["-"], "enable-sil-opaque-values">,
   HelpText<"Enable SIL Opaque Values">;
 
@@ -1224,6 +1245,10 @@ def skip_import_in_public_interface:
   Separate<["-"], "skip-import-in-public-interface">,
   HelpText<"Skip the import statement corresponding to a module name "
            "when printing the public interface.">;
+
+def disable_fine_module_tracing:
+  Flag<["-"], "disable-fine-module-tracing">,
+  HelpText<"Skip the emission of fine grained module tracing file.">;
 
 def clang_header_expose_decls:
   Joined<["-"], "clang-header-expose-decls=">,
@@ -1278,6 +1303,13 @@ def disable_lifetime_dependence_diagnostics :
   Flag<["-"], "disable-lifetime-dependence-diagnostics">,
   HelpText<"Disable lifetime dependence diagnostics for Nonescapable types.">;
 
+def enable_aggressive_reg2mem :
+  Flag<["-"], "enable-aggressive-reg2mem">,
+  HelpText<"Enable a more aggressive reg2mem heuristic">;
+def disable_aggressive_reg2mem :
+  Flag<["-"], "disable-aggressive-reg2mem">,
+  HelpText<"Disable a more aggressive reg2mem heuristic">;
+
 def enable_collocate_metadata_functions :
   Flag<["-"], "enable-collocate-metadata-functions">,
   HelpText<"Enable collocate metadata functions">;
@@ -1305,12 +1337,40 @@ def disable_fragile_resilient_protocol_witnesses :
   Flag<["-"], "disable-fragile-relative-protocol-tables">,
   HelpText<"Disable relative protocol witness tables">;
 
+def enable_async_frame_push_pop_metadata :
+  Flag<["-"], "enable-async-frame-push-pop-metadata">,
+  HelpText<"Enable async frame push pop metadata">;
+def disable_async_frame_push_pop_metadata :
+  Flag<["-"], "disable-async-frame-push-pop-metadata">,
+  HelpText<"Disable async frame push pop metadata">;
+
+def enable_async_frame_pointer_all :
+  Flag<["-"], "enable-async-frame-pointer-all">,
+  HelpText<"Always emit async frame stack frames (frame-pointer=all)">;
+def disable_async_frame_pointer_all:
+  Flag<["-"], "disable-async-frame-pointer-all">,
+  HelpText<"Disable always emit async frame stack frames">;
+
+def enable_split_cold_code :
+  Flag<["-"], "enable-split-cold-code">,
+  HelpText<"Enable splitting of cold code when optimizing">;
+def disable_split_cold_code :
+  Flag<["-"], "disable-split-cold-code">,
+  HelpText<"Disable splitting of cold code when optimizing">;
+
 def enable_new_llvm_pass_manager :
   Flag<["-"], "enable-new-llvm-pass-manager">,
   HelpText<"Enable the new llvm pass manager">;
 def disable_new_llvm_pass_manager :
   Flag<["-"], "disable-new-llvm-pass-manager">,
   HelpText<"Disable the new llvm pass manager">;
+
+def enable_profiling_marker_thunks :
+  Flag<["-"], "enable-profiling-marker-thunks">,
+  HelpText<"Enable profiling marker thunks">;
+def disable_profiling_marker_thunks :
+  Flag<["-"], "disable-profiling-marker-thunks">,
+  HelpText<"Disable profiling marker thunks">;
 
 def enable_objective_c_protocol_symbolic_references :
   Flag<["-"], "enable-objective-c-protocol-symbolic-references">,
@@ -1349,7 +1409,8 @@ def cas_fs: Separate<["-"], "cas-fs">,
 
 def clang_include_tree_root: Separate<["-"], "clang-include-tree-root">,
   HelpText<"Clang Include Tree CASID">, MetaVarName<"<cas-id>">;
-
+def clang_include_tree_filelist: Separate<["-"], "clang-include-tree-filelist">,
+  HelpText<"Clang Include Tree FileList CASID">, MetaVarName<"<cas-id>">;
 
 def experimental_spi_only_imports :
   Flag<["-"], "experimental-spi-only-imports">,
@@ -1377,9 +1438,6 @@ def platform_c_calling_convention_EQ :
     Joined<["-"], "experimental-platform-c-calling-convention=">,
     Alias<platform_c_calling_convention>;
 
-def disable_experimental_parser_round_trip : Flag<["-"],
-  "disable-experimental-parser-round-trip">,
-  HelpText<"Disable round trip through the new swift parser">;
 
 def disable_sending_args_and_results_with_region_isolation : Flag<["-"],
   "disable-sending-args-and-results-with-region-based-isolation">,
@@ -1399,3 +1457,8 @@ def platform_availability_inheritance_map_path
     HelpText<"Path of the platform inheritance platform map">;
 
 } // end let Flags = [FrontendOption, NoDriverOption, HelpHidden]
+
+def disable_experimental_parser_round_trip : Flag<["-"],
+  "disable-experimental-parser-round-trip">,
+  HelpText<"Disable round trip through the new swift parser">,
+  Flags<[FrontendOption, NoDriverOption, HelpHidden, ModuleInterfaceOptionIgnorable]>;

@@ -57,14 +57,6 @@ bool canOpcodeForwardInnerGuaranteedValues(SILValue value);
 /// the operation may be trivially rewritten with Guaranteed ownership.
 bool canOpcodeForwardInnerGuaranteedValues(Operand *use);
 
-bool computeIsScoped(SILArgument *arg);
-
-bool computeIsReborrow(SILArgument *arg);
-
-// This is the use-def equivalent of use->getOperandOwnership() ==
-// OperandOwnership::GuaranteedForwarding.
-bool computeIsGuaranteedForwarding(SILValue value);
-
 /// Is the opcode that produces \p value capable of forwarding owned values?
 ///
 /// This may be true even if the current instance of the instruction is not a
@@ -626,6 +618,12 @@ struct BorrowedValue {
   /// BorrowScopeIntroducingValue::isLocalScope().
   bool visitLocalScopeEndingUses(function_ref<bool(Operand *)> visitor) const;
 
+  /// Returns false if the value has no scope-ending uses because all control flow
+  /// paths end in dead-end blocks.
+  bool hasLocalScopeEndingUses() const {
+    return !visitLocalScopeEndingUses([](Operand *) { return false; });
+  }
+
   bool isLocalScope() const { return kind.isLocalScope(); }
 
   /// Add this scope's live blocks into the PrunedLiveness result. This
@@ -825,6 +823,7 @@ public:
     RefTailAddr,
     OpenExistentialBox,
     ProjectBox,
+    MarkDependenceNonEscaping,
   };
 
 private:
@@ -853,6 +852,12 @@ public:
       return Kind::OpenExistentialBox;
     case SILInstructionKind::ProjectBoxInst:
       return Kind::ProjectBox;
+    case SILInstructionKind::MarkDependenceInst: {
+      auto *mdi = cast<MarkDependenceInst>(use->getUser());
+      return mdi->isNonEscaping() && mdi->getType().isAddress()
+                 ? Kind::MarkDependenceNonEscaping
+                 : Kind::Invalid;
+    }
     }
   }
 
@@ -871,6 +876,12 @@ public:
       return Kind::OpenExistentialBox;
     case ValueKind::ProjectBoxInst:
       return Kind::ProjectBox;
+    case ValueKind::MarkDependenceInst: {
+      auto *mdi = cast<MarkDependenceInst>(value->getDefiningInstruction());
+      return mdi->isNonEscaping() && mdi->getType().isAddress()
+                 ? Kind::MarkDependenceNonEscaping
+                 : Kind::Invalid;
+    }
     }
   }
 
@@ -933,6 +944,13 @@ struct InteriorPointerOperand {
           &cast<SingleValueInstruction>(resultValue)->getAllOperands()[0];
       return InteriorPointerOperand(op, kind);
     }
+    case InteriorPointerOperandKind::MarkDependenceNonEscaping: {
+      auto *mdi =
+          cast<MarkDependenceInst>(resultValue->getDefiningInstruction());
+      assert(mdi->isNonEscaping() && mdi->getType().isAddress());
+      return InteriorPointerOperand(
+          &mdi->getAllOperands()[MarkDependenceInst::Base], kind);
+    }
     }
     llvm_unreachable("covered switch");
   }
@@ -970,6 +988,8 @@ struct InteriorPointerOperand {
       return cast<OpenExistentialBoxInst>(operand->getUser());
     case InteriorPointerOperandKind::ProjectBox:
       return cast<ProjectBoxInst>(operand->getUser());
+    case InteriorPointerOperandKind::MarkDependenceNonEscaping:
+      return cast<MarkDependenceInst>(operand->getUser());
     }
     llvm_unreachable("Covered switch isn't covered?!");
   }
@@ -1403,6 +1423,10 @@ bool isNestedLexicalBeginBorrow(BeginBorrowInst *bbi);
 /// - escaping
 /// then the move_value is redundant.
 bool isRedundantMoveValue(MoveValueInst *mvi);
+
+/// Sets the reborrow flags for all transitively incoming phi-arguments of
+/// `forEndBorrowValue`, which is the operand value of an `end_borrow`.
+void updateReborrowFlags(SILValue forEndBorrowValue);
 
 } // namespace swift
 

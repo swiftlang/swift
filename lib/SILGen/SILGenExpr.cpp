@@ -29,6 +29,7 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTMangler.h"
 #include "swift/AST/CanTypeVisitor.h"
+#include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/DiagnosticsCommon.h"
 #include "swift/AST/DistributedDecl.h"
@@ -496,6 +497,7 @@ namespace {
     RValue visitCovariantReturnConversionExpr(
              CovariantReturnConversionExpr *E,
              SGFContext C);
+    RValue visitUnsafeCastExpr(UnsafeCastExpr *E, SGFContext C);
     RValue visitErasureExpr(ErasureExpr *E, SGFContext C);
     RValue visitAnyHashableErasureExpr(AnyHashableErasureExpr *E, SGFContext C);
     RValue visitForcedCheckedCastExpr(ForcedCheckedCastExpr *E,
@@ -592,6 +594,7 @@ namespace {
     RValue visitCopyExpr(CopyExpr *E, SGFContext C);
     RValue visitMacroExpansionExpr(MacroExpansionExpr *E, SGFContext C);
     RValue visitCurrentContextIsolationExpr(CurrentContextIsolationExpr *E, SGFContext C);
+    RValue visitTypeValueExpr(TypeValueExpr *E, SGFContext C);
   };
 } // end anonymous namespace
 
@@ -1506,24 +1509,20 @@ RValue SILGenFunction::emitCollectionConversion(SILLocation loc,
                                                 CanType toCollection,
                                                 ManagedValue mv,
                                                 SGFContext C) {
-  auto *fromDecl = fromCollection->getAnyNominal();
-  auto *toDecl = toCollection->getAnyNominal();
+  SmallVector<Type, 4> replacementTypes;
 
-  auto fromSubMap = fromCollection->getContextSubstitutionMap(fromDecl);
-  auto toSubMap = toCollection->getContextSubstitutionMap(toDecl);
+  auto fromArgs = cast<BoundGenericType>(fromCollection)->getGenericArgs();
+  auto toArgs = cast<BoundGenericType>(toCollection)->getGenericArgs();
+  replacementTypes.insert(replacementTypes.end(),
+                          fromArgs.begin(), fromArgs.end());
+  replacementTypes.insert(replacementTypes.end(),
+                          toArgs.begin(), toArgs.end());
 
   // Form type parameter substitutions.
   auto genericSig = fn->getGenericSignature();
-  unsigned fromParamCount = fromDecl->getGenericSignature()
-    .getGenericParams().size();
-
   auto subMap =
-    SubstitutionMap::combineSubstitutionMaps(fromSubMap,
-                                             toSubMap,
-                                             CombineSubstitutionMaps::AtIndex,
-                                             fromParamCount,
-                                             0,
-                                             genericSig);
+    SubstitutionMap::get(genericSig, replacementTypes,
+                         LookUpConformanceInModule());
   return emitApplyOfLibraryIntrinsic(loc, fn, subMap, {mv}, C);
 }
 
@@ -1566,9 +1565,8 @@ RValueEmitter::visitConditionalBridgeFromObjCExpr(
   auto conversion = cast<FuncDecl>(conversionRef.getDecl());
   auto subs = conversionRef.getSubstitutions();
 
-  auto nativeType = Type(GenericTypeParamType::get(/*isParameterPack*/ false,
-                                                   /*depth*/ 0, /*index*/ 0,
-                                                   SGF.getASTContext()))
+  auto nativeType = Type(GenericTypeParamType::getType(/*depth*/ 0, /*index*/ 0,
+                                                       SGF.getASTContext()))
                         .subst(subs);
 
   auto metatypeType = SGF.getLoweredType(MetatypeType::get(nativeType));
@@ -2135,6 +2133,24 @@ RValue RValueEmitter::visitExtractFunctionIsolationExpr(
   return RValue(SGF, E, result);
 }
 
+RValue RValueEmitter::visitUnsafeCastExpr(UnsafeCastExpr *E, SGFContext C) {
+  ManagedValue original = SGF.emitRValueAsSingleValue(E->getSubExpr());
+  SILType resultType = SGF.getLoweredType(E->getType());
+
+  if (resultType == original.getType())
+    return RValue(SGF, E, original);
+
+  ManagedValue result;
+  if (original.getType().isAddress()) {
+    ASSERT(resultType.isAddress());
+    result = SGF.B.createUncheckedAddrCast(E, original, resultType);
+  } else {
+    result = SGF.B.createUncheckedForwardingCast(E, original, resultType);
+  }
+
+  return RValue(SGF, E, result);
+}
+
 RValue RValueEmitter::visitErasureExpr(ErasureExpr *E, SGFContext C) {
   if (auto result = tryEmitAsBridgingConversion(SGF, E, false, C)) {
     return RValue(SGF, E, *result);
@@ -2143,8 +2159,7 @@ RValue RValueEmitter::visitErasureExpr(ErasureExpr *E, SGFContext C) {
   auto &existentialTL = SGF.getTypeLowering(E->getType());
   auto concreteFormalType = E->getSubExpr()->getType()->getCanonicalType();
 
-  auto archetype = OpenedArchetypeType::getAny(E->getType()->getCanonicalType(),
-                                               SGF.F.getGenericSignature());
+  auto archetype = OpenedArchetypeType::getAny(E->getType()->getCanonicalType());
   AbstractionPattern abstractionPattern(archetype);
   auto &concreteTL = SGF.getTypeLowering(abstractionPattern,
                                          concreteFormalType);
@@ -3178,6 +3193,11 @@ emitKeyPathRValueBase(SILGenFunction &subSGF,
   auto paramSubstValue = subSGF.emitOrigToSubstValue(loc, paramOrigValue,
                                              AbstractionPattern::getOpaque(),
                                              baseType);
+
+  // If base is a metatype, it cannot be opened as an existential or upcasted
+  // from a class.
+  if (baseType->is<MetatypeType>())
+    return paramSubstValue;
   
   // Pop open an existential container base.
   if (baseType->isAnyExistentialType()) {
@@ -3185,8 +3205,7 @@ emitKeyPathRValueBase(SILGenFunction &subSGF,
     // new one (which we'll upcast immediately below) for a class member.
     ArchetypeType *opened;
     if (storage->getDeclContext()->getSelfClassDecl()) {
-      opened = OpenedArchetypeType::get(baseType,
-                                        subSGF.F.getGenericSignature());
+      opened = OpenedArchetypeType::get(baseType);
     } else {
       opened = subs.getReplacementTypes()[0]->castTo<ArchetypeType>();
     }
@@ -3358,7 +3377,7 @@ static SILFunction *getOrCreateKeyPathGetter(SILGenModule &SGM,
   }();
   
   // Find the function and see if we already created it.
-  auto name = Mangle::ASTMangler()
+  auto name = Mangle::ASTMangler(SGM.getASTContext(), property)
     .mangleKeyPathGetterThunkHelper(property, genericSig, baseType,
                                     subs, expansion);
   auto loc = RegularLocation::getAutoGeneratedLocation();
@@ -3553,7 +3572,7 @@ static SILFunction *getOrCreateKeyPathSetter(SILGenModule &SGM,
   }();
   
   // Mangle the name of the thunk to see if we already created it.
-  auto name = Mangle::ASTMangler()
+  auto name = Mangle::ASTMangler(SGM.getASTContext(), property)
     .mangleKeyPathSetterThunkHelper(property, genericSig, baseType,
                                     subs, expansion);
   auto loc = RegularLocation::getAutoGeneratedLocation();
@@ -3649,8 +3668,8 @@ static SILFunction *getOrCreateKeyPathSetter(SILGenModule &SGM,
 
   auto semantics = AccessSemantics::Ordinary;
   auto strategy = property->getAccessStrategy(semantics, AccessKind::Write,
-                                              SGM.M.getSwiftModule(),
-                                              expansion);
+                                              SGM.M.getSwiftModule(), expansion,
+                                              /*useOldABI=*/false);
 
   LValueOptions lvOptions;
   lv.addMemberComponent(subSGF, loc, property, subs, lvOptions,
@@ -3753,7 +3772,7 @@ getOrCreateKeyPathEqualsAndHash(SILGenModule &SGM,
         SubstitutionMap(), C);
 
     // Mangle the name of the thunk to see if we already created it.
-    auto name = Mangle::ASTMangler()
+    auto name = Mangle::ASTMangler(SGM.getASTContext())
       .mangleKeyPathEqualsHelper(indexTypes, genericSig, expansion);
     SILGenFunctionBuilder builder(SGM);
     equals = builder.getOrCreateSharedFunction(
@@ -3808,8 +3827,7 @@ getOrCreateKeyPathEqualsAndHash(SILGenModule &SGM,
       // Get the Equatable conformance from the Hashable conformance.
       auto equatable = hashable.getAssociatedConformance(
           formalTy,
-          GenericTypeParamType::get(/*isParameterPack*/ false,
-                                    /*depth*/ 0, /*index*/ 0, C),
+          GenericTypeParamType::getType(/*depth*/ 0, /*index*/ 0, C),
           equatableProtocol);
 
       assert(equatable.isAbstract() == hashable.isAbstract());
@@ -3932,7 +3950,7 @@ getOrCreateKeyPathEqualsAndHash(SILGenModule &SGM,
     // Mangle the name of the thunk to see if we already created it.
     SmallString<64> nameBuf;
     
-    auto name = Mangle::ASTMangler()
+    auto name = Mangle::ASTMangler(SGM.getASTContext())
       .mangleKeyPathHashHelper(indexTypes, genericSig, expansion);
     SILGenFunctionBuilder builder(SGM);
     hash = builder.getOrCreateSharedFunction(
@@ -4017,9 +4035,30 @@ getIdForKeyPathComponentComputedProperty(SILGenModule &SGM,
                                          AbstractStorageDecl *storage,
                                          ResilienceExpansion expansion,
                                          AccessStrategy strategy) {
+  auto getAccessorFunction = [&SGM](AbstractStorageDecl *storage,
+                                    bool isForeign) -> SILFunction * {
+    // Identify the property using its (unthunked) getter. For a
+    // computed property, this should be stable ABI; for a resilient public
+    // property, this should also be stable ABI across modules.
+    auto representativeDecl = getRepresentativeAccessorForKeyPath(storage);
+    // If the property came from an import-as-member function defined in C,
+    // use the original C function as the key.
+    auto ref =
+        SILDeclRef(representativeDecl, SILDeclRef::Kind::Func, isForeign);
+    // TODO: If the getter has shared linkage (say it's synthesized for a
+    // Clang-imported thing), we'll need some other sort of
+    // stable identifier.
+    return SGM.getFunction(ref, NotForDefinition);
+  };
+
   switch (strategy.getKind()) {
   case AccessStrategy::Storage:
-    // Identify reabstracted stored properties by the property itself.
+    if (auto decl = cast<VarDecl>(storage); decl->isStatic()) {
+      // For metatype keypaths, identify property via accessors.
+      return getAccessorFunction(storage, /*isForeign=*/false);
+    }
+    // Otherwise, identify reabstracted stored properties by the property
+    // itself.
     return cast<VarDecl>(storage);
   case AccessStrategy::MaterializeToTemporary:
     // Use the read strategy.  But try to avoid turning e.g. an
@@ -4032,19 +4071,9 @@ getIdForKeyPathComponentComputedProperty(SILGenModule &SGM,
     }
     LLVM_FALLTHROUGH;
   case AccessStrategy::DirectToAccessor: {
-    // Identify the property using its (unthunked) getter. For a
-    // computed property, this should be stable ABI; for a resilient public
-    // property, this should also be stable ABI across modules.
-    auto representativeDecl = getRepresentativeAccessorForKeyPath(storage);
-    // If the property came from an import-as-member function defined in C,
-    // use the original C function as the key.
-    bool isForeign = representativeDecl->isImportAsMember();
-    auto getterRef = SILDeclRef(representativeDecl,
-                                SILDeclRef::Kind::Func, isForeign);
-    // TODO: If the getter has shared linkage (say it's synthesized for a
-    // Clang-imported thing), we'll need some other sort of
-    // stable identifier.
-    return SGM.getFunction(getterRef, NotForDefinition);
+    return getAccessorFunction(
+        storage,
+        getRepresentativeAccessorForKeyPath(storage)->isImportAsMember());
   }
   case AccessStrategy::DispatchToAccessor: {
     // Identify the property by its vtable or wtable slot.
@@ -4201,12 +4230,11 @@ SILGenModule::emitKeyPathComponentForDecl(SILLocation loc,
     return true;
   };
 
-  auto strategy = storage->getAccessStrategy(AccessSemantics::Ordinary,
-                                             storage->supportsMutation()
-                                               ? AccessKind::ReadWrite
-                                               : AccessKind::Read,
-                                             M.getSwiftModule(),
-                                             expansion);
+  auto strategy = storage->getAccessStrategy(
+      AccessSemantics::Ordinary,
+      storage->supportsMutation() ? AccessKind::ReadWrite : AccessKind::Read,
+      M.getSwiftModule(), expansion,
+      /*useOldABI=*/false);
 
   AbstractStorageDecl *externalDecl = nullptr;
   SubstitutionMap externalSubs;
@@ -4216,11 +4244,12 @@ SILGenModule::emitKeyPathComponentForDecl(SILLocation loc,
     // Map the substitutions out of context.
     if (!subs.empty()) {
       externalSubs = subs;
-      // If any of the substitutions involve local archetypes, then the
+      // If any of the substitutions involve primary archetypes, then the
       // key path pattern needs to capture the generic context, and we need
       // to map the pattern substitutions out of this context.
-      if (externalSubs.hasArchetypes()) {
+      if (externalSubs.getRecursiveProperties().hasArchetype()) {
         needsGenericContext = true;
+        // FIXME: This doesn't do anything for local archetypes!
         externalSubs = externalSubs.mapReplacementTypesOutOfContext();
       }
     }
@@ -4249,19 +4278,25 @@ SILGenModule::emitKeyPathComponentForDecl(SILLocation loc,
     CanType componentTy;
     if (!var->getDeclContext()->isTypeContext()) {
       componentTy = var->getInterfaceType()->getCanonicalType();
+    } else if (var->getDeclContext()->getSelfProtocolDecl() &&
+               baseTy->isExistentialType()) {
+      componentTy = var->getValueInterfaceType()->getCanonicalType();
+      ASSERT(!componentTy->hasTypeParameter());
     } else {
-      componentTy =
+      // The mapTypeIntoContext() / mapTypeOutOfContext() dance is there
+      // to handle the case where baseTy being a type parameter subject
+      // to a superclass requirement.
+      componentTy = var->getValueInterfaceType().subst(
         GenericEnvironment::mapTypeIntoContext(genericEnv, baseTy)
-          ->getTypeOfMember(var)
-          ->getReferenceStorageReferent()
+          ->getContextSubstitutionMap(var->getDeclContext()))
           ->mapTypeOutOfContext()
           ->getCanonicalType();
+    }
 
-      // The component type for an @objc optional requirement needs to be
-      // wrapped in an optional.
-      if (var->getAttrs().hasAttribute<OptionalAttr>()) {
-        componentTy = OptionalType::get(componentTy)->getCanonicalType();
-      }
+    // The component type for an @objc optional requirement needs to be
+    // wrapped in an optional.
+    if (var->getAttrs().hasAttribute<OptionalAttr>()) {
+      componentTy = OptionalType::get(componentTy)->getCanonicalType();
     }
   
     if (canStorageUseStoredKeyPathComponent(var, expansion)) {
@@ -4563,7 +4598,76 @@ visitMagicIdentifierLiteralExpr(MagicIdentifierLiteralExpr *E, SGFContext C) {
   llvm_unreachable("Unhandled MagicIdentifierLiteralExpr in switch.");
 }
 
+static RValue emitSlabLiteral(SILGenFunction &SGF, CollectionExpr *E,
+                              SGFContext C) {
+  ArgumentScope scope(SGF, E);
+
+  auto slabType = E->getType()->castTo<BoundGenericType>();
+  auto loweredSlabType = SGF.getLoweredType(slabType);
+  auto elementType = slabType->getGenericArgs()[1]->getCanonicalType();
+  auto loweredElementType = SGF.getLoweredType(elementType);
+  auto &eltTL = SGF.getTypeLowering(AbstractionPattern::getOpaque(), elementType);
+
+  SILValue alloc = SGF.emitTemporaryAllocation(E, loweredSlabType);
+  SILValue addr = SGF.B.createUncheckedAddrCast(E, alloc,
+                                            loweredElementType.getAddressType());
+
+  // Cleanups for any elements that have been initialized so far.
+  SmallVector<CleanupHandle, 8> cleanups;
+
+  for (unsigned index : range(E->getNumElements())) {
+    auto destAddr = addr;
+
+    if (index != 0) {
+      SILValue indexValue = SGF.B.createIntegerLiteral(
+          E, SILType::getBuiltinWordType(SGF.getASTContext()), index);
+      destAddr = SGF.B.createIndexAddr(E, addr, indexValue,
+                                   /*needsStackProtection=*/ false);
+    }
+
+    // Create a dormant cleanup for the value in case we exit before the
+    // full vector has been constructed.
+
+    CleanupHandle destCleanup = CleanupHandle::invalid();
+    if (!eltTL.isTrivial()) {
+      destCleanup = SGF.enterDestroyCleanup(destAddr);
+      SGF.Cleanups.setCleanupState(destCleanup, CleanupState::Dormant);
+      cleanups.push_back(destCleanup);
+    }
+
+    TemporaryInitialization init(destAddr, destCleanup);
+
+    ArgumentSource(E->getElements()[index])
+        .forwardInto(SGF, AbstractionPattern::getOpaque(), &init, eltTL);
+  }
+
+  // Kill the per-element cleanups. The slab will take ownership of them.
+  for (auto destCleanup : cleanups)
+    SGF.Cleanups.setCleanupState(destCleanup, CleanupState::Dead);
+
+  SILValue slabVal;
+
+  // If the slab is naturally address-only, then we can adopt the stack slot
+  // as the value directly.
+  if (loweredSlabType.isAddressOnly(SGF.F)) {
+    slabVal = SGF.B.createUncheckedAddrCast(E, alloc, loweredSlabType);
+  } else {
+    // Otherwise, this slab is loadable. Load it.
+    slabVal = SGF.B.createTrivialLoadOr(E, alloc, LoadOwnershipQualifier::Take);
+  }
+
+  auto slabMV = SGF.emitManagedRValueWithCleanup(slabVal);
+  auto slab = RValue(SGF, E, slabMV);
+
+  return scope.popPreservingValue(std::move(slab));
+}
+
 RValue RValueEmitter::visitCollectionExpr(CollectionExpr *E, SGFContext C) {
+  // Handle 'Slab' literals separately.
+  if (E->getType()->isSlab()) {
+    return emitSlabLiteral(SGF, E, C);
+  }
+
   auto loc = SILLocation(E);
   ArgumentScope scope(SGF, loc);
 
@@ -5272,7 +5376,19 @@ static void emitSimpleAssignment(SILGenFunction &SGF, SILLocation loc,
           value = value.ensurePlusOne(SGF, loc);
           if (value.getType().isObject())
             value = SGF.B.createMoveValue(loc, value);
+          SGF.B.createIgnoredUse(loc, value.getValue());
+          return;
         }
+
+        // Emit the ignored use instruction like we would do in emitIgnoredExpr.
+        if (!rv.isNull()) {
+          SmallVector<ManagedValue, 16> values;
+          std::move(rv).getAll(values);
+          for (auto v : values) {
+            SGF.B.createIgnoredUse(loc, v.getValue());
+          }
+        }
+
         return;
       }
 
@@ -6145,12 +6261,12 @@ static void diagnoseImplicitRawConversion(Type sourceTy, Type pointerTy,
   auto &ctx = SGF.getASTContext();
   if (auto *bitwiseCopyableDecl = ctx.getProtocol(
         KnownProtocolKind::BitwiseCopyable)) {
-    if (ModuleDecl::checkConformance(eltTy, bitwiseCopyableDecl))
+    if (checkConformance(eltTy, bitwiseCopyableDecl))
       return;
   }
   if (auto *fixedWidthIntegerDecl = ctx.getProtocol(
           KnownProtocolKind::FixedWidthInteger)) {
-    if (ModuleDecl::checkConformance(eltTy, fixedWidthIntegerDecl))
+    if (checkConformance(eltTy, fixedWidthIntegerDecl))
       return;
   }
 
@@ -6353,19 +6469,18 @@ SILGenFunction::emitArrayToPointer(SILLocation loc, ManagedValue array,
     assert(array.isLValue());
   }
 
-  // Invoke the conversion intrinsic, which will produce an owner-pointer pair.
-  auto firstSubMap =
-      accessInfo.ArrayType->getContextSubstitutionMap();
-  auto secondSubMap = accessInfo.PointerType->getContextSubstitutionMap(
-      getPointerProtocol());
-
-  auto genericSig = converter->getGenericSignature();
-  auto subMap = SubstitutionMap::combineSubstitutionMaps(
-      firstSubMap, secondSubMap, CombineSubstitutionMaps::AtIndex, 1, 0,
-      genericSig);
-
   diagnoseImplicitRawConversion(accessInfo.ArrayType, accessInfo.PointerType,
                                 loc, *this);
+
+  // Invoke the conversion intrinsic, which will produce an owner-pointer pair.
+  SmallVector<Type, 2> replacementTypes;
+  replacementTypes.push_back(
+      accessInfo.ArrayType->castTo<BoundGenericStructType>()->getGenericArgs()[0]);
+  replacementTypes.push_back(accessInfo.PointerType);
+
+  auto genericSig = converter->getGenericSignature();
+  auto subMap = SubstitutionMap::get(genericSig, replacementTypes,
+                                     LookUpConformanceInModule());
 
   SmallVector<ManagedValue, 2> resultScalars;
   emitApplyOfLibraryIntrinsic(loc, converter, subMap, array, SGFContext())
@@ -6720,7 +6835,7 @@ RValue RValueEmitter::visitMacroExpansionExpr(MacroExpansionExpr *E,
     return visit(rewritten, C);
   }
   else if (auto *MED = E->getSubstituteDecl()) {
-    Mangle::ASTMangler mangler;
+    Mangle::ASTMangler mangler(MED->getASTContext());
     MED->forEachExpandedNode([&](ASTNode node) {
       if (auto *expr = node.dyn_cast<Expr *>())
         visit(expr, C);
@@ -6736,57 +6851,29 @@ RValue RValueEmitter::visitMacroExpansionExpr(MacroExpansionExpr *E,
 
 RValue RValueEmitter::visitCurrentContextIsolationExpr(
     CurrentContextIsolationExpr *E, SGFContext C) {
-  // If we are in an actor initializer that is isolated to, the current context
-  // isolation flow-sensitive: before 'self' has been initialized, it will be
-  // nil. After 'self' has been initialized, it will be 'self'. Introduce a
-  // custom builtin that Definite Initialization will rewrite appropriately.
+  // If we are in an actor initializer that is isolated to self, the
+  // current isolation is flow-sensitive; use that instead of the
+  // synthesized expression.
   if (auto ctor = dyn_cast_or_null<ConstructorDecl>(
           SGF.F.getDeclRef().getDecl())) {
     auto isolation = getActorIsolation(ctor);
     if (ctor->isDesignatedInit() &&
         isolation == ActorIsolation::ActorInstance &&
         isolation.getActorInstance() == ctor->getImplicitSelfDecl()) {
-      ASTContext &ctx = SGF.getASTContext();
-      auto builtinName = ctx.getIdentifier(
-          isolation.isDistributedActor()
-              ? getBuiltinName(BuiltinValueKind::FlowSensitiveDistributedSelfIsolation)
-              : getBuiltinName(BuiltinValueKind::FlowSensitiveSelfIsolation));
-      SILType resultTy = SGF.getLoweredType(E->getType());
-
-      auto injection = cast<InjectIntoOptionalExpr>(E->getActor());
-      ProtocolConformanceRef conformance;
-      Expr *origActorExpr;
-      if (isolation.isDistributedActor()) {
-        // Create a reference to the asLocalActor getter.
-        auto asLocalActorDecl = getDistributedActorAsLocalActorComputedProperty(
-            SGF.F.getDeclContext()->getParentModule());
-        auto asLocalActorGetter = asLocalActorDecl->getAccessor(AccessorKind::Get);
-        SILDeclRef asLocalActorRef = SILDeclRef(
-            asLocalActorGetter, SILDeclRef::Kind::Func);
-        SGF.emitGlobalFunctionRef(E, asLocalActorRef);
-
-        // Extract the base ('self') and the DistributedActor conformance.
-        auto memberRef = cast<MemberRefExpr>(injection->getSubExpr());
-        conformance = memberRef->getDecl().getSubstitutions()
-            .getConformances()[0];
-        origActorExpr = memberRef->getBase();
-      } else {
-        auto erasure = cast<ErasureExpr>(injection->getSubExpr());
-        conformance = erasure->getConformances()[0];
-        origActorExpr = erasure->getSubExpr();
-      }
-      SGF.SGM.useConformance(conformance);
-
-      SubstitutionMap subs = SubstitutionMap::getProtocolSubstitutions(
-          conformance.getRequirement(), origActorExpr->getType(), conformance);
-      auto origActor = SGF.maybeEmitValueOfLocalVarDecl(
-          ctor->getImplicitSelfDecl(), AccessKind::Read).getValue();
-      auto call = SGF.B.createBuiltin(E, builtinName, resultTy, subs, origActor);
-      return RValue(SGF, E, ManagedValue::forForwardedRValue(SGF, call));
+      auto isolationValue =
+        SGF.emitFlowSensitiveSelfIsolation(E, isolation);
+      return RValue(SGF, E, isolationValue);
     }
   }
 
   return visit(E->getActor(), C);
+}
+
+RValue RValueEmitter::visitTypeValueExpr(TypeValueExpr *E, SGFContext C) {
+  auto paramType = E->getParamType()->getCanonicalType();
+
+  return RValue(SGF, E, ManagedValue::forObjectRValueWithoutOwnership(
+    SGF.B.createTypeValue(E, SGF.getLoweredType(E->getType()), paramType)));
 }
 
 ManagedValue
@@ -6952,7 +7039,24 @@ void SILGenFunction::emitIgnoredExpr(Expr *E) {
 
   // Otherwise, emit the result (to get any side effects), but produce it at +0
   // if that allows simplification.
-  emitRValue(E, SGFContext::AllowImmediatePlusZero);
+  RValue rv = emitRValue(E, SGFContext::AllowImmediatePlusZero);
+
+  // Return early if we do not have any result.
+  if (rv.isNull())
+    return;
+
+  // Then emit ignored use on all of the rvalue components. We purposely do not
+  // implode the tuple since if we have a tuple formation like:
+  //
+  // let _ = (x, y)
+  //
+  // we want the use to be on x and y and not on the imploded tuple. It also
+  // helps us avoid emitting unnecessary code.
+  SmallVector<ManagedValue, 16> values;
+  std::move(rv).getAll(values);
+  for (auto v : values) {
+    B.createIgnoredUse(E, v.getValue());
+  }
 }
 
 /// Emit the given expression as an r-value, then (if it is a tuple), combine

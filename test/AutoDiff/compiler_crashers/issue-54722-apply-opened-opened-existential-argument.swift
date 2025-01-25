@@ -1,4 +1,4 @@
-// RUN: not --crash %target-swift-frontend -disable-availability-checking -emit-sil -verify %s
+// RUN: %target-swift-frontend -disable-availability-checking -emit-sil -verify %s
 
 // https://github.com/apple/swift/issues/54722
 // Differentiation transform crash for `apply` with opened existential arguments
@@ -9,6 +9,7 @@ public protocol TensorView {
   associatedtype Element
 }
 public protocol DifferentiableTensorView: TensorView & Differentiable where Self == TangentVector {}
+// expected-warning@-1 {{protocol 'DifferentiableTensorView' should be declared to refine 'AdditiveArithmetic' due to a same-type constraint on 'Self'}}
 
 public protocol PlatformAPI {
   func abs<T>(_ x: T) -> T where T: DifferentiableTensorView, T.Element: Numeric
@@ -24,6 +25,8 @@ public final class Platform {
 @differentiable(reverse where T: DifferentiableTensorView)
 public func abs<T: DifferentiableTensorView>(_ x: T) -> T where T.Element: Numeric {
   Platform.service.abs(x)
+  // expected-error@-1 {{expression is not differentiable}}
+  // expected-note@-2 {{member is not differentiable because the corresponding protocol requirement is not '@differentiable'}}
 }
 
 // swift: swift/lib/AST/ASTContext.cpp:3307: swift::SILFunctionType::SILFunctionType(swift::GenericSignature, swift::SILFunctionType::ExtInfo, swift::SILCoroutineKind, swift::ParameterConvention, ArrayRef<swift::SILParameterInfo>, ArrayRef<swift::SIL

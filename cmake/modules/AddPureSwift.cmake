@@ -82,6 +82,39 @@ function(_add_host_swift_compile_options name)
   endif()
 endfunction()
 
+# Set compile options for C/C++ interop
+function(_set_swift_cxx_interop_options name)
+  target_compile_options(${name} PRIVATE
+    "SHELL: -Xcc -std=c++17 -Xcc -DCOMPILED_WITH_SWIFT"
+
+    # FIXME: Needed to work around an availability issue with CxxStdlib
+    "SHELL: -Xfrontend -disable-target-os-checking"
+
+    # Necessary to avoid treating IBOutlet and IBAction as keywords
+    "SHELL:-Xcc -UIBOutlet -Xcc -UIBAction -Xcc -UIBInspectable"
+  )
+
+  if(CMAKE_SYSTEM_NAME STREQUAL "Windows")
+    target_compile_options(${name} PRIVATE
+      # Make 'offsetof()' a const value.
+      "SHELL:-Xcc -D_CRT_USE_BUILTIN_OFFSETOF"
+      # Workaround for https://github.com/swiftlang/llvm-project/issues/7172
+      "SHELL:-Xcc -Xclang -Xcc -fmodule-format=raw"
+    )
+  endif()
+
+  # Prior to 5.9, we have to use the experimental flag for C++ interop.
+  if (CMAKE_Swift_COMPILER_VERSION VERSION_LESS 5.9)
+    target_compile_options(${name} PRIVATE
+      "SHELL:-Xfrontend -enable-experimental-cxx-interop"
+    )
+  else()
+    target_compile_options(${name} PRIVATE
+      "-cxx-interoperability-mode=default"
+    )
+  endif()
+endfunction()
+
 function(_set_pure_swift_link_flags name relpath_to_lib_dir)
   if(SWIFT_HOST_VARIANT_SDK MATCHES "LINUX|ANDROID|OPENBSD|FREEBSD")
     # Don't add builder's stdlib RPATH automatically.
@@ -120,6 +153,31 @@ function(_set_pure_swift_profile_flags target_name)
   endif()
 endfunction()
 
+function(_set_pure_swift_package_options target_name package_name)
+  if(NOT package_name OR NOT Swift_COMPILER_PACKAGE_CMO_SUPPORT)
+    return()
+  endif()
+
+  # Enable package CMO if possible.
+  # NOTE: '-enable-library-evolution' is required for package CMO even when we
+  # don't need '.swiftinterface'. E.g. executables.
+  if(Swift_COMPILER_PACKAGE_CMO_SUPPORT STREQUAL "IMPLEMENTED")
+    target_compile_options("${target_name}" PRIVATE
+      "-enable-library-evolution"
+      "SHELL:-package-name ${package_name}"
+      "SHELL:-Xfrontend -package-cmo"
+      "SHELL:-Xfrontend -allow-non-resilient-access"
+    )
+  elseif(Swift_COMPILER_PACKAGE_CMO_SUPPORT STREQUAL "EXPERIMENTAL")
+    target_compile_options("${target_name}" PRIVATE
+      "-enable-library-evolution"
+      "SHELL:-package-name ${package_name}"
+      "SHELL:-Xfrontend -experimental-package-cmo"
+      "SHELL:-Xfrontend -experimental-allow-non-resilient-access"
+      "SHELL:-Xfrontend -experimental-package-bypass-resilience"
+    )
+  endif()
+endfunction()
 
 # Add a new "pure" Swift host library.
 #
@@ -146,8 +204,14 @@ endfunction()
 # STATIC
 #   Build a static library.
 #
+# CXX_INTEROP
+#   Use C++ interop.
+#
 # EMIT_MODULE
 #   Emit '.swiftmodule' to
+#
+# PACKAGE_NAME
+#   Name of the Swift package this library belongs to.
 #
 # DEPENDENCIES
 #   Target names to pass target_link_library
@@ -168,8 +232,10 @@ function(add_pure_swift_host_library name)
   set(options
         SHARED
         STATIC
+        CXX_INTEROP
         EMIT_MODULE)
-  set(single_parameter_options)
+  set(single_parameter_options
+        PACKAGE_NAME)
   set(multiple_parameter_options
         DEPENDENCIES
         SWIFT_DEPENDENCIES)
@@ -193,6 +259,10 @@ function(add_pure_swift_host_library name)
   # Create the library.
   add_library(${name} ${libkind} ${APSHL_SOURCES})
   _add_host_swift_compile_options(${name})
+  _set_pure_swift_package_options(${name} "${APSHL_PACKAGE_NAME}")
+  if(APSHL_CXX_INTEROP)
+    _set_swift_cxx_interop_options(${name})
+  endif()
 
   set_property(TARGET ${name}
     PROPERTY BUILD_WITH_INSTALL_RPATH YES)
@@ -315,6 +385,9 @@ endfunction()
 # name
 #   Name of the tool (e.g., swift-frontend).
 #
+# PACKAGE_NAME
+#   Name of the Swift package this executable belongs to.
+#
 # DEPENDENCIES
 #   Target names to pass target_link_library
 #
@@ -333,7 +406,8 @@ function(add_pure_swift_host_tool name)
   # Option handling
   set(options)
   set(single_parameter_options
-    SWIFT_COMPONENT)
+    SWIFT_COMPONENT
+    PACKAGE_NAME)
   set(multiple_parameter_options
         DEPENDENCIES
         SWIFT_DEPENDENCIES)
@@ -349,6 +423,7 @@ function(add_pure_swift_host_tool name)
   add_executable(${name} ${APSHT_SOURCES})
   _add_host_swift_compile_options(${name})
   _set_pure_swift_link_flags(${name} "../lib/")
+  _set_pure_swift_package_options(${name} "${APSHT_PACKAGE_NAME}")
 
   if(SWIFT_HOST_VARIANT_SDK IN_LIST SWIFT_DARWIN_PLATFORMS)
     set_property(TARGET ${name}

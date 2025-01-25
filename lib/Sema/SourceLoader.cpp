@@ -48,7 +48,7 @@ static FileOrError findModule(ASTContext &ctx, Identifier moduleID,
   StringRef moduleNameRef = ctx.getRealModuleName(moduleID).str();
 
   for (const auto &Path : ctx.SearchPathOpts.getImportSearchPaths()) {
-    inputFilename = Path;
+    inputFilename = Path.Path;
     llvm::sys::path::append(inputFilename, moduleNameRef);
     inputFilename.append(".swift");
     llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>> FileBufOrErr =
@@ -133,17 +133,17 @@ ModuleDecl *SourceLoader::loadModule(SourceLoc importLoc,
   importInfo.StdlibKind = Ctx.getStdlibModule() ? ImplicitStdlibKind::Stdlib
                                                 : ImplicitStdlibKind::None;
 
-  auto *importMod = ModuleDecl::create(moduleID.Item, Ctx, importInfo);
+  auto *importMod = ModuleDecl::create(
+      moduleID.Item, Ctx, importInfo, [&](ModuleDecl *importMod, auto addFile) {
+    auto opts = SourceFile::getDefaultParsingOptions(Ctx.LangOpts);
+    addFile(new (Ctx) SourceFile(*importMod, SourceFileKind::Library, bufferID,
+                                 opts));
+  });
   if (EnableLibraryEvolution)
     importMod->setResilienceStrategy(ResilienceStrategy::Resilient);
   Ctx.addLoadedModule(importMod);
 
-  auto *importFile =
-      new (Ctx) SourceFile(*importMod, SourceFileKind::Library, bufferID,
-                           SourceFile::getDefaultParsingOptions(Ctx.LangOpts));
-  importMod->addFile(*importFile);
-  performImportResolution(*importFile);
-  importMod->setHasResolvedImports();
+  performImportResolution(importMod);
   bindExtensions(*importMod);
   return importMod;
 }
@@ -157,11 +157,10 @@ void SourceLoader::loadExtensions(NominalTypeDecl *nominal,
 ModuleDependencyVector
 SourceLoader::getModuleDependencies(Identifier moduleName,
                                     StringRef moduleOutputPath,
-                                    llvm::IntrusiveRefCntPtr<llvm::cas::CachingOnDiskFileSystem> CacheFS,
                                     const llvm::DenseSet<clang::tooling::dependencies::ModuleID> &alreadySeenClangModules,
                                     clang::tooling::dependencies::DependencyScanningTool &clangScanningTool,
                                     InterfaceSubContextDelegate &delegate,
-                                    llvm::TreePathPrefixMapper* mapper,
+                                    llvm::PrefixMapper* mapper,
                                     bool isTestableImport) {
   // FIXME: Implement?
   return {};

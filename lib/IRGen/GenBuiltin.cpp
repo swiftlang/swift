@@ -295,20 +295,14 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
 
   if (Builtin.ID == BuiltinValueKind::CreateTaskGroup) {
     llvm::Value *groupFlags = nullptr;
-    // Claim metadata pointer.
-    (void)args.claimAll();
+    assert(args.size() == 0);
     out.add(emitCreateTaskGroup(IGF, substitutions, groupFlags));
     return;
   }
 
   if (Builtin.ID == BuiltinValueKind::CreateTaskGroupWithFlags) {
     auto groupFlags = args.claimNext();
-    // Claim the remaining metadata pointer.
-    if (args.size() == 1) {
-      (void)args.claimNext();
-    } else if (args.size() > 1) {
-      llvm_unreachable("createTaskGroupWithFlags expects 1 or 2 arguments");
-    }
+    assert(args.size() == 0);
     out.add(emitCreateTaskGroup(IGF, substitutions, groupFlags));
     return;
   }

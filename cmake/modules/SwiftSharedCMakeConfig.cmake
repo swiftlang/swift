@@ -268,8 +268,10 @@ endmacro()
 #     cmake variables.
 macro(swift_common_unified_build_config product)
   set(${product}_PATH_TO_CLANG_BUILD "${CMAKE_BINARY_DIR}")
-  set(${product}_NATIVE_LLVM_TOOLS_PATH "${CMAKE_BINARY_DIR}/bin")
-  set(${product}_NATIVE_CLANG_TOOLS_PATH "${CMAKE_BINARY_DIR}/bin")
+  if (NOT CMAKE_CROSSCOMPILING)
+    set(${product}_NATIVE_LLVM_TOOLS_PATH "${CMAKE_BINARY_DIR}/bin")
+    set(${product}_NATIVE_CLANG_TOOLS_PATH "${CMAKE_BINARY_DIR}/bin")
+  endif()
   set(LLVM_PACKAGE_VERSION ${PACKAGE_VERSION})
   set(LLVM_CMAKE_DIR "${CMAKE_SOURCE_DIR}/cmake/modules")
   set(CLANG_INCLUDE_DIRS
@@ -293,7 +295,9 @@ macro(swift_common_cxx_warnings)
 
     if(MSVC)
       check_cxx_compiler_flag("/we4062" CXX_SUPPORTS_WE4062)
-      add_compile_options($<$<COMPILE_LANGUAGE:CXX>:/we4062>)
+      if(CXX_SUPPORTS_WE4062)
+        add_compile_options($<$<COMPILE_LANGUAGE:CXX>:/we4062>)
+      endif()
     endif()
   endif()
 
@@ -323,9 +327,15 @@ macro(swift_common_cxx_warnings)
   # dynamic libraries with this flag.
   check_cxx_compiler_flag("-fapplication-extension" CXX_SUPPORTS_FAPPLICATION_EXTENSION)
 
-  # Disable C4068: unknown pragma. This means that MSVC doesn't report hundreds of warnings across
-  # the repository for IDE features such as #pragma mark "Title".
+  # Disable C4067: expected tokens following preprocessor directive - expected a
+  # newline.
+  #
+  # Disable C4068: unknown pragma.
+  #
+  # This means that MSVC doesn't report hundreds of warnings across the
+  # repository for IDE features such as #pragma mark "Title".
   if("${CMAKE_C_COMPILER_ID}" STREQUAL "MSVC")
+    add_compile_options($<$<COMPILE_LANGUAGE:CXX>:/wd4067>)
     add_compile_options($<$<COMPILE_LANGUAGE:CXX>:/wd4068>)
 
     check_cxx_compiler_flag("/permissive-" CXX_SUPPORTS_PERMISSIVE_FLAG)

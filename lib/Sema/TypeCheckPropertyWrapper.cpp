@@ -101,6 +101,7 @@ static VarDecl *findValueProperty(ASTContext &ctx, NominalTypeDecl *nominal,
 
   case ActorIsolation::GlobalActor:
   case ActorIsolation::Nonisolated:
+  case ActorIsolation::CallerIsolationInheriting:
   case ActorIsolation::NonisolatedUnsafe:
   case ActorIsolation::Unspecified:
     break;
@@ -108,7 +109,7 @@ static VarDecl *findValueProperty(ASTContext &ctx, NominalTypeDecl *nominal,
 
   // The property may not have any effects right now.
   if (auto getter = var->getEffectfulGetAccessor()) {
-    getter->diagnose(diag::property_wrapper_effectful);
+    getter->diagnose(diag::property_wrapper_effectful, getter->getDescriptiveKind());
     return nullptr;
   }
 

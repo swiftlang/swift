@@ -119,8 +119,8 @@ public:
 
   // Handle the data witnesses explicitly so we can use more specific
   // types for the flags enums.
-  typedef size_t size;
-  typedef size_t stride;
+  typedef typename Runtime::StoredSize size;
+  typedef typename Runtime::StoredSize stride;
   typedef TargetValueWitnessFlags<typename Runtime::StoredSize> flags;
   typedef uint32_t extraInhabitantCount;
 };

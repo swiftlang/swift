@@ -118,6 +118,13 @@ public:
   /// Controls whether to run async demotion pass.
   bool EnableAsyncDemotion = false;
 
+  /// Controls whether to always assume that functions rarely throw an Error
+  /// within the optimizer. This influences static branch prediction.
+  bool EnableThrowsPrediction = false;
+
+  /// Controls whether to say that blocks ending in an 'unreachable' are cold.
+  bool EnableNoReturnCold = false;
+
   /// Should we run any SIL performance optimizations
   ///
   /// Useful when you want to enable -O LLVM opts but not -O SIL opts.
@@ -146,8 +153,17 @@ public:
   /// Enables SIL-level diagnostics for NonescapableTypes.
   bool EnableLifetimeDependenceDiagnostics = true;
 
+  /// Enable diagnostics requiring WMO (for @noLocks, @noAllocation
+  /// annotations, Embedded Swift, and class specialization). SourceKit is the
+  /// only consumer that has this disabled today (as it disables WMO
+  /// explicitly).
+  bool EnableWMORequiredDiagnostics = true;
+
   /// Controls whether or not paranoid verification checks are run.
   bool VerifyAll = false;
+
+  /// Verify ownership after every pass.
+  bool VerifyOwnershipAll = false;
 
   /// If true, no SIL verification is done at all.
   bool VerifyNone = false;
@@ -177,13 +193,17 @@ public:
   /// If this is disabled we do not serialize in OSSA form when optimizing.
   bool EnableOSSAModules = false;
 
+  /// Allow recompilation of a non-OSSA module to an OSSA module when imported
+  /// from another OSSA module.
+  bool EnableRecompilationToOSSAModule = false;
+
   /// If set to true, compile with the SIL Opaque Values enabled.
   bool EnableSILOpaqueValues = false;
 
-  /// Require linear OSSA lifetimes after SILGen
-  bool OSSACompleteLifetimes = false;
+  /// Introduce linear OSSA lifetimes after SILGen
+  bool OSSACompleteLifetimes = true;
 
-  /// Verify linear OSSA lifetimes after SILGen
+  /// Verify linear OSSA lifetimes throughout OSSA pipeline.
   bool OSSAVerifyComplete = false;
 
   /// Enable pack metadata stack "promotion".
@@ -306,6 +326,10 @@ public:
   /// Are there any options that indicate that functions should not be preserved
   /// for the debugger?
   bool ShouldFunctionsBePreservedToDebugger = true;
+
+  /// Block expanding and register promotion more aggressively throughout the
+  /// optimizer.
+  bool UseAggressiveReg2MemForCodeSize = true;
 
   SILOptions() {}
 

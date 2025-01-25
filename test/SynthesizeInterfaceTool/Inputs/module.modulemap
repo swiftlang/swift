@@ -1,0 +1,20 @@
+module m1 {
+  header "m1.h"
+}
+
+module mcxx {
+  requires cplusplus
+  header "mcxx.h"
+}
+
+module TopLevelModule {
+  header "TopLevelModule.h"
+
+  module ImplicitSubmodule {
+    header "ImplicitSubmodule.h"
+  }
+
+  explicit module ExplicitSubmodule {
+    header "ExplicitSubmodule.h"
+  }
+}

@@ -147,6 +147,7 @@ namespace irgen {
   class StructLayout;
   class IRGenDebugInfo;
   class IRGenFunction;
+  struct IRLinkage;
   class LinkEntity;
   class LoadableTypeInfo;
   class MetadataLayout;
@@ -664,7 +665,7 @@ public:
   const llvm::Triple VariantTriple;
   std::unique_ptr<llvm::TargetMachine> TargetMachine;
   ModuleDecl *getSwiftModule() const;
-  AvailabilityContext getAvailabilityContext() const;
+  AvailabilityRange getAvailabilityRange() const;
   Lowering::TypeConverter &getSILTypes() const;
   SILModule &getSILModule() const { return IRGen.SIL; }
   const IRGenOptions &getOptions() const { return IRGen.Opts; }
@@ -700,7 +701,7 @@ public:
   bool ShouldUseSwiftError;
 
   llvm::Type *VoidTy;                  /// void (usually {})
-  llvm::Type *PtrTy;                   /// ptr
+  llvm::PointerType *PtrTy;            /// ptr
   llvm::IntegerType *Int1Ty;           /// i1
   llvm::IntegerType *Int8Ty;           /// i8
   llvm::IntegerType *Int16Ty;          /// i16
@@ -967,8 +968,6 @@ public:
   void fatal_unimplemented(SourceLoc, StringRef Message);
   void error(SourceLoc loc, const Twine &message);
 
-  bool useDllStorage();
-
   bool shouldPrespecializeGenericMetadata();
   
   bool canMakeStaticObjectReadOnly(SILType objectType);
@@ -1119,8 +1118,10 @@ public:
 
   TypeExpansionContext getMaximalTypeExpansionContext() const;
 
-  bool isResilientConformance(const NormalProtocolConformance *conformance);
-  bool isResilientConformance(const RootProtocolConformance *root);
+  bool isResilientConformance(const NormalProtocolConformance *conformance,
+                              bool disableOptimizations = false);
+  bool isResilientConformance(const RootProtocolConformance *root,
+                              bool disableOptimizations = false);
   bool isDependentConformance(const RootProtocolConformance *conformance);
 
   Alignment getCappedAlignment(Alignment alignment);
@@ -1135,6 +1136,8 @@ public:
   ForeignClassMetadataLayout &getForeignMetadataLayout(ClassDecl *decl);
 
   ClassMetadataStrategy getClassMetadataStrategy(const ClassDecl *theClass);
+
+  bool IsWellKnownBuiltinOrStructralType(CanType type) const;
 
 private:
   TypeConverter &Types;
@@ -1204,10 +1207,10 @@ public:
 
   llvm::Constant *getConstantSignedCFunctionPointer(llvm::Constant *fn);
 
-  llvm::Constant *getConstantSignedPointer(llvm::Constant *pointer,
-                                           unsigned key,
-                                           llvm::Constant *addrDiscriminator,
-                                           llvm::Constant *otherDiscriminator);
+  llvm::Constant *
+  getConstantSignedPointer(llvm::Constant *pointer, unsigned key,
+                           llvm::Constant *storageAddress,
+                           llvm::ConstantInt *otherDiscriminator);
   llvm::Constant *getConstantSignedPointer(llvm::Constant *pointer,
                                            const clang::PointerAuthSchema &schema,
                                            const PointerAuthEntity &entity,
@@ -1219,7 +1222,8 @@ public:
                         llvm::function_ref<void(IRGenFunction &IGF)> generate,
                         bool setIsNoInline = false,
                         bool forPrologue = false,
-                        bool isPerformanceConstraint = false);
+                        bool isPerformanceConstraint = false,
+                        IRLinkage *optionalLinkage = nullptr);
 
   llvm::Constant *getOrCreateRetainFunction(const TypeInfo &objectTI, SILType t,
                               llvm::Type *llvmType, Atomicity atomicity);
@@ -1368,7 +1372,7 @@ private:
     unsigned numExtraInhabitants;
     unsigned align: 16;
     unsigned pod: 1;
-    unsigned bitwiseTakable: 1;
+    unsigned bitwiseTakable: 2;
   };
   friend struct ::llvm::DenseMapInfo<swift::irgen::IRGenModule::FixedLayoutKey>;
   llvm::DenseMap<FixedLayoutKey, llvm::Constant *> PrivateFixedLayouts;
@@ -1506,7 +1510,6 @@ public:
   llvm::Module *getModule() const;
   llvm::AttributeList getAllocAttrs();
   llvm::Constant *getDeletedAsyncMethodErrorAsyncFunctionPointer();
-  bool isStandardLibrary() const;
 
 private:
   llvm::Constant *EmptyTupleMetadata = nullptr;
@@ -1584,6 +1587,7 @@ public:
       StackProtectorMode stackProtect = StackProtectorMode::NoStackProtector);
   void setHasNoFramePointer(llvm::AttrBuilder &Attrs);
   void setHasNoFramePointer(llvm::Function *F);
+  void setMustHaveFramePointer(llvm::Function *F);
   llvm::AttributeList constructInitialAttributes();
   StackProtectorMode shouldEmitStackProtector(SILFunction *f);
 
@@ -1658,7 +1662,8 @@ public:
   llvm::Constant *getAddrOfMethodDescriptor(SILDeclRef declRef,
                                             ForDefinition_t forDefinition);
   void emitNonoverriddenMethodDescriptor(const SILVTable *VTable,
-                                         SILDeclRef declRef);
+                                         SILDeclRef declRef,
+                                         ClassDecl *classDecl);
 
   Address getAddrOfEnumCase(EnumElementDecl *Case,
                             ForDefinition_t forDefinition);
@@ -1673,9 +1678,6 @@ public:
                                         ForDefinition_t forDefinition);
   llvm::Constant *getAddrOfValueWitnessTable(CanType concreteType,
                                              ConstantInit init = ConstantInit());
-  llvm::Constant *
-  getAddrOfEffectiveValueWitnessTable(CanType concreteType,
-                                      ConstantInit init = ConstantInit());
   std::optional<llvm::Function *>
   getAddrOfIVarInitDestroy(ClassDecl *cd, bool isDestroyer, bool isForeign,
                            ForDefinition_t forDefinition);
@@ -1819,6 +1821,16 @@ public:
                        bool isDynamicallyReplaceableImplementation = false,
                        bool shouldCallPreviousImplementation = false);
 
+  llvm::Function *
+  getAddrOfWitnessTableProfilingThunk(llvm::Function *witness,
+                                      const NormalProtocolConformance &C);
+
+  llvm::Function *
+  getAddrOfVTableProfilingThunk(llvm::Function *f, ClassDecl *decl);
+
+  llvm::Function *getOrCreateProfilingThunk(llvm::Function *f,
+                                            StringRef prefix);
+
   void emitDynamicReplacementOriginalFunctionThunk(SILFunction *f);
 
   llvm::Function *getAddrOfContinuationPrototype(CanSILFunctionType fnType);
@@ -1837,7 +1849,7 @@ public:
                                                const NormalProtocolConformance *C,
                                                CanType conformingType,
                                                ForDefinition_t forDefinition);
-  llvm::Constant *getAddrOfWitnessTable(const RootProtocolConformance *C,
+  llvm::Constant *getAddrOfWitnessTable(const ProtocolConformance *C,
                                       ConstantInit definition = ConstantInit());
   llvm::Constant *getAddrOfWitnessTablePattern(
                                       const NormalProtocolConformance *C,
@@ -2012,6 +2024,17 @@ public:
 
 /// Workaround to disable thumb-mode until debugger support is there.
 bool shouldRemoveTargetFeature(StringRef);
+
+struct CXXBaseRecordLayout {
+  const clang::CXXRecordDecl *decl;
+  Size offset;
+  Size size;
+};
+
+/// Retrieves the base classes of a C++ struct/class ordered by their offset in
+/// the derived type's memory layout.
+SmallVector<CXXBaseRecordLayout, 1>
+getBasesAndOffsets(const clang::CXXRecordDecl *decl);
 
 } // end namespace irgen
 } // end namespace swift

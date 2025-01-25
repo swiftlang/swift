@@ -215,22 +215,22 @@ public func createTestSmallStruct(_ x: UInt32) -> TestSmallStruct {
 // CHECK-NEXT: #pragma clang diagnostic ignored "-Wc++17-extensions"
 // CHECK-NEXT:   if constexpr (std::is_base_of<::swift::_impl::RefCountedClass, T_0_0>::value) {
 // CHECK-NEXT:   void *returnValue;
-// CHECK-NEXT:   _impl::$s9Functions15TestSmallStructV24genericMethodPassThroughyxxlF(reinterpret_cast<void *>(&returnValue), swift::_impl::getOpaquePointer(x), _impl::swift_interop_passDirect_Functions_uint32_t_0_4(_getOpaquePointer()), swift::TypeMetadataTrait<T_0_0>::getTypeMetadata());
+// CHECK-NEXT:   _impl::$s9Functions15TestSmallStructV24genericMethodPassThroughyxxlF(reinterpret_cast<void *>(&returnValue), swift::_impl::getOpaquePointer(x), Functions::_impl::swift_interop_passDirect_Functions_uint32_t_0_4(_getOpaquePointer()), swift::TypeMetadataTrait<T_0_0>::getTypeMetadata());
 // CHECK-NEXT:   return ::swift::_impl::implClassFor<T_0_0>::type::makeRetained(returnValue);
 // CHECK-NEXT:   } else if constexpr (::swift::_impl::isValueType<T_0_0>) {
 // CHECK-NEXT:   return ::swift::_impl::implClassFor<T_0_0>::type::returnNewValue([&](void * _Nonnull returnValue) SWIFT_INLINE_THUNK_ATTRIBUTES {
-// CHECK-NEXT: _impl::$s9Functions15TestSmallStructV24genericMethodPassThroughyxxlF(returnValue, swift::_impl::getOpaquePointer(x), _impl::swift_interop_passDirect_Functions_uint32_t_0_4(_getOpaquePointer()), swift::TypeMetadataTrait<T_0_0>::getTypeMetadata());
+// CHECK-NEXT: _impl::$s9Functions15TestSmallStructV24genericMethodPassThroughyxxlF(returnValue, swift::_impl::getOpaquePointer(x), Functions::_impl::swift_interop_passDirect_Functions_uint32_t_0_4(_getOpaquePointer()), swift::TypeMetadataTrait<T_0_0>::getTypeMetadata());
 // CHECK-NEXT:   });
 // CHECK-NEXT:   } else if constexpr (::swift::_impl::isSwiftBridgedCxxRecord<T_0_0>) {
 // CHECK-NEXT:    alignas(alignof(T_0_0)) char storage[sizeof(T_0_0)];
 // CHECK-NEXT:    auto * _Nonnull storageObjectPtr = reinterpret_cast<T_0_0 *>(storage);
-// CHECK-NEXT:    _impl::$s9Functions15TestSmallStructV24genericMethodPassThroughyxxlF(storage, swift::_impl::getOpaquePointer(x), _impl::swift_interop_passDirect_Functions_uint32_t_0_4(_getOpaquePointer()), swift::TypeMetadataTrait<T_0_0>::getTypeMetadata())
+// CHECK-NEXT:    _impl::$s9Functions15TestSmallStructV24genericMethodPassThroughyxxlF(storage, swift::_impl::getOpaquePointer(x), Functions::_impl::swift_interop_passDirect_Functions_uint32_t_0_4(_getOpaquePointer()), swift::TypeMetadataTrait<T_0_0>::getTypeMetadata())
 // CHECK-NEXT:    T_0_0 result(static_cast<T_0_0 &&>(*storageObjectPtr));
 // CHECK-NEXT:    storageObjectPtr->~T_0_0();
 // CHECK-NEXT:    return result;
 // CHECK-NEXT:   } else {
 // CHECK-NEXT:   T_0_0 returnValue;
-// CHECK-NEXT: _impl::$s9Functions15TestSmallStructV24genericMethodPassThroughyxxlF(reinterpret_cast<void *>(&returnValue), swift::_impl::getOpaquePointer(x), _impl::swift_interop_passDirect_Functions_uint32_t_0_4(_getOpaquePointer()), swift::TypeMetadataTrait<T_0_0>::getTypeMetadata());
+// CHECK-NEXT: _impl::$s9Functions15TestSmallStructV24genericMethodPassThroughyxxlF(reinterpret_cast<void *>(&returnValue), swift::_impl::getOpaquePointer(x), Functions::_impl::swift_interop_passDirect_Functions_uint32_t_0_4(_getOpaquePointer()), swift::TypeMetadataTrait<T_0_0>::getTypeMetadata());
 // CHECK-NEXT:   return returnValue;
 // CHECK-NEXT:   }
 // CHECK-NEXT:   #pragma clang diagnostic pop

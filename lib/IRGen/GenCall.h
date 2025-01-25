@@ -212,10 +212,16 @@ namespace irgen {
 
   Address emitAllocYieldOnceCoroutineBuffer(IRGenFunction &IGF);
   void emitDeallocYieldOnceCoroutineBuffer(IRGenFunction &IGF, Address buffer);
+  void emitDeallocYieldOnce2CoroutineFrame(IRGenFunction &IGF,
+                                           llvm::Value *allocation);
   void
   emitYieldOnceCoroutineEntry(IRGenFunction &IGF,
                               CanSILFunctionType coroutineType,
                               NativeCCEntryPointArgumentEmission &emission);
+  void
+  emitYieldOnce2CoroutineEntry(IRGenFunction &IGF,
+                               CanSILFunctionType coroutineType,
+                               NativeCCEntryPointArgumentEmission &emission);
 
   Address emitAllocYieldManyCoroutineBuffer(IRGenFunction &IGF);
   void emitDeallocYieldManyCoroutineBuffer(IRGenFunction &IGF, Address buffer);
@@ -278,6 +284,11 @@ namespace irgen {
   llvm::Value *convertForDirectError(IRGenFunction &IGF, llvm::Value *value,
                                      llvm::Type *toTy, bool forExtraction);
 
+  void buildDirectError(IRGenFunction &IGF,
+                        const CombinedResultAndErrorType &combined,
+                        const NativeConventionSchema &errorSchema,
+                        SILType silErrorTy, Explosion &errorResult,
+                        bool forAsync, Explosion &out);
 } // end namespace irgen
 } // end namespace swift
 

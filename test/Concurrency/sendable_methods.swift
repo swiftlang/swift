@@ -2,7 +2,7 @@
 // RUN: %target-swift-emit-silgen %s -verify -enable-upcoming-feature InferSendableFromCaptures -disable-availability-checking -module-name sendable_methods -strict-concurrency=complete | %FileCheck %s
 
 // REQUIRES: concurrency
-// REQUIRES: asserts
+// REQUIRES: swift_feature_InferSendableFromCaptures
 
 func outer() {
     @Sendable func sendable() {}
@@ -284,5 +284,51 @@ acceptSendableFunc(GenericE<NonSendable>.b)
 func testPatternMatch(ge: [GenericE<Int>]) {
   if case .b(let a) = ge.first {
     _ = a
+  }
+}
+
+// rdar://131321053 - cannot pass an operator to parameter that expectes a @Sendable type
+do {
+  func test(_: @Sendable (Int, Int) -> Bool) {
+  }
+
+  test(<) // Ok
+}
+
+// Partially applied instance method
+do {
+  struct S {
+    func foo() {}
+  }
+
+  func bar(_ x: @Sendable () -> Void) {}
+
+  let fn = S.foo(S())
+  bar(fn) // Ok
+
+  let _: @Sendable (S) -> @Sendable () -> Void = S.foo // Ok
+
+  let classFn = NonSendable.f(NonSendable())
+  bar(classFn) // expected-warning {{converting non-sendable function value to '@Sendable () -> Void' may introduce data races}}
+
+  let _: @Sendable (NonSendable) -> () -> Void = NonSendable.f // Ok
+
+  class Test {
+    static func staticFn() {}
+  }
+
+  bar(Test.staticFn) // Ok
+}
+
+// Reference to static method
+do {
+  struct Outer {
+    struct Inner: Sendable {
+      var f: @Sendable () -> Void
+    }
+
+    var g = Inner(f: Outer.ff)
+
+    static func ff() {}
   }
 }

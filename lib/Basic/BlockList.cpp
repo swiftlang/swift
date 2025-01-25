@@ -44,9 +44,12 @@ struct swift::BlockListStore::Implementation {
     }
     return std::string();
   }
+
+  Implementation(SourceManager &SM) : SM(SM.getFileSystem()) {}
 };
 
-swift::BlockListStore::BlockListStore(): Impl(*new Implementation()) {}
+swift::BlockListStore::BlockListStore(swift::SourceManager &SM)
+    : Impl(*new Implementation(SM)) {}
 
 swift::BlockListStore::~BlockListStore() { delete &Impl; }
 

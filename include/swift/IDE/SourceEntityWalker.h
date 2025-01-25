@@ -196,9 +196,6 @@ public:
   /// This method is called when a Module is referenced in source.
   virtual bool visitModuleReference(ModuleEntity Mod, CharSourceRange Range);
 
-  /// Whether walk into the inactive region in a #if config statement.
-  virtual bool shouldWalkInactiveConfigRegion() { return false; }
-
   virtual bool shouldWalkIntoGenericParams() { return true; }
 
   /// Only walk the arguments of a macro, to represent the source as written.

@@ -1,5 +1,5 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-build-swift -Xfrontend -disable-availability-checking -parse-stdlib %s -module-name main -o %t/a.out
+// RUN: %target-build-swift -target %target-swift-5.1-abi-triple -parse-stdlib %s -module-name main -o %t/a.out
 // RUN: %target-codesign %t/a.out
 // RUN: %target-run %t/a.out
 // REQUIRES: executable_test
@@ -493,6 +493,8 @@ DemangleToMetadataTests.test("Nested types in same-type-constrained extensions")
   // V !: P3 in InnerTEqualsConformsToP1
 }
 
+struct NonCopyable: ~Copyable {}
+
 if #available(SwiftStdlib 5.3, *) {
   DemangleToMetadataTests.test("Round-trip with _mangledTypeName and _typeByName") {
     func roundTrip<T>(_ type: T.Type) {
@@ -523,6 +525,11 @@ if #available(SwiftStdlib 5.3, *) {
   DemangleToMetadataTests.test("Check _mangledTypeName with Any.Type") {
     let type: Any.Type = Int.self
     expectEqual("Si", _mangledTypeName(type))
+  }
+
+  DemangleToMetadataTests.test("Check _MangledTypeName with any ~Copyable.Type") {
+    let type: any ~Copyable.Type = NonCopyable.self
+    expectEqual("4main11NonCopyableV", _mangledTypeName(type))
   }
 }
 
@@ -556,6 +563,16 @@ if #available(SwiftStdlib 6.0, *) {
 
     // throws(Never) -> non-throwing
     expectEqual(getFnTypeWithThrownError(Never.self), _typeByName("ySic")!)
+  }
+}
+
+if #available(SwiftStdlib 6.1, *) {
+  DemangleToMetadataTests.test("NUL-terminated name, excessive length value") {
+    let t = _typeByName("4main1SV\0random stuff here")
+    expectNotNil(t)
+    if let t {
+      expectEqual(type(of: S()), t)
+    }
   }
 }
 

@@ -1,11 +1,11 @@
-// RUN: %target-swift-emit-silgen %s -target x86_64-apple-macosx10.52 -target-variant x86_64-apple-ios50.0-macabi | %FileCheck %s
-// RUN: %target-swift-emit-silgen %s -target x86_64-apple-ios50.0-macabi -target-variant x86_64-apple-macosx10.52 | %FileCheck %s
+// RUN: %target-swift-emit-silgen %s -target %target-cpu-apple-macosx10.52 -target-variant %target-cpu-apple-ios50.0-macabi | %FileCheck %s
+// RUN: %target-swift-emit-silgen %s -target %target-cpu-apple-ios50.0-macabi -target-variant %target-cpu-apple-macosx10.52 | %FileCheck %s
 
-// RUN: %target-swift-emit-silgen %s -target x86_64-apple-macosx10.14.4 -target-variant x86_64-apple-ios50.0-macabi | %FileCheck %s --check-prefix=CHECK-BACKDEPLOY-MAC
-// RUN: %target-swift-emit-silgen %s -target x86_64-apple-ios50.0-macabi -target-variant x86_64-apple-macosx10.14.4 | %FileCheck %s --check-prefix=CHECK-BACKDEPLOY-MAC
+// RUN: %target-swift-emit-silgen %s -target %target-cpu-apple-macosx10.14.4 -target-variant %target-cpu-apple-ios50.0-macabi | %FileCheck %s --check-prefix=CHECK-BACKDEPLOY-MAC
+// RUN: %target-swift-emit-silgen %s -target %target-cpu-apple-ios50.0-macabi -target-variant %target-cpu-apple-macosx10.14.4 | %FileCheck %s --check-prefix=CHECK-BACKDEPLOY-MAC
 
-// RUN: %target-swift-emit-silgen %s -target x86_64-apple-macosx10.15 -target-variant x86_64-apple-ios50.0-macabi | %FileCheck %s --check-prefix=CHECK-DEPLOY10_15-MAC
-// RUN: %target-swift-emit-silgen %s -target x86_64-apple-ios50.0-macabi -target-variant x86_64-apple-macosx10.15 | %FileCheck %s --check-prefix=CHECK-DEPLOY10_15-MAC
+// RUN: %target-swift-emit-silgen %s -target %target-cpu-apple-macosx10.15 -target-variant %target-cpu-apple-ios50.0-macabi | %FileCheck %s --check-prefix=CHECK-DEPLOY10_15-MAC
+// RUN: %target-swift-emit-silgen %s -target %target-cpu-apple-ios50.0-macabi -target-variant %target-cpu-apple-macosx10.15 | %FileCheck %s --check-prefix=CHECK-DEPLOY10_15-MAC
 
 // REQUIRES: OS=macosx || OS=maccatalyst
 

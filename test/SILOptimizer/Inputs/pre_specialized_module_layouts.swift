@@ -13,7 +13,7 @@ public final class SomeClass: Sendable {
 @_specialize(exported: true, where @_noMetadata T : _BridgeObject)
 @_specialize(exported: true, where @_noMetadata T : _Trivial(64))
 @_specialize(exported: true, where @_noMetadata T : _TrivialStride(96))
-@_specialize(exported: true, availability: macOS 10.50, *; where T == SomeData)
+@_specialize(exported: true, availability: macOS 50, *; where T == SomeData)
 public func publicPrespecialized<T>(_ t: T) {
 }
 
@@ -24,14 +24,14 @@ public func publicPrespecializedWithMarkerProtocol<T: Sendable>(_ t: T) -> T {
 
 @_specialize(exported: true, where T == Int)
 @_specialize(exported: true, where @_noMetadata T : _Class)
-@_specialize(exported: true, availability: macOS 10.50, *; where T == SomeData)
+@_specialize(exported: true, availability: macOS 50, *; where T == SomeData)
 @inlinable
 @inline(never)
 public func publicPrespecialized2<T>(_ t: T) { }
 
 @_specialize(exported: true, where T == Int)
 @_specialize(exported: true, where @_noMetadata T : _Class)
-@_specialize(exported: true, availability: macOS 10.50, *; where T == SomeData)
+@_specialize(exported: true, availability: macOS 50, *; where T == SomeData)
 @inlinable
 @inline(never)
 public func publicPrespecializedThrows<T>(_ t: T) throws -> T { return t }

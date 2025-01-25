@@ -290,7 +290,7 @@ public:
   /// Callback used to provide the substitution of a generic parameter
   /// (described by depth/index) to its metadata.
   ///
-  /// The return type here is a lie; it's actually a MetadataOrPack.
+  /// The return type here is a lie; it's actually a MetadataPackOrValue.
   using SubstGenericParameterFn =
     std::function<const void *(unsigned depth, unsigned index)>;
 
@@ -299,7 +299,7 @@ public:
   /// be "full" or it may be only relative to key arguments. The call is
   /// provided both indexes and may use the one it requires.
   ///
-  /// The return type here is a lie; it's actually a MetadataOrPack.
+  /// The return type here is a lie; it's actually a MetadataPackOrValue.
   using SubstGenericParameterOrdinalFn =
     std::function<const void *(unsigned fullOrdinal, unsigned keyOrdinal)>;
 
@@ -309,16 +309,19 @@ public:
     std::function<const WitnessTable *(const Metadata *type, unsigned index)>;
 
   /// A pointer to type metadata or a heap-allocated metadata pack.
-  struct SWIFT_RUNTIME_LIBRARY_VISIBILITY MetadataOrPack {
+  struct SWIFT_RUNTIME_LIBRARY_VISIBILITY MetadataPackOrValue {
     const void *Ptr;
 
-    MetadataOrPack() : Ptr(nullptr) {}
+    MetadataPackOrValue() : Ptr(nullptr) {}
 
-    explicit MetadataOrPack(const void *ptr) : Ptr(ptr) {}
+    explicit MetadataPackOrValue(const void *ptr) : Ptr(ptr) {}
 
-    explicit MetadataOrPack(MetadataResponse response) : Ptr(response.Value) {}
+    explicit MetadataPackOrValue(intptr_t value)
+        : Ptr(reinterpret_cast<const void *>(value)) {}
 
-    explicit MetadataOrPack(MetadataPackPointer ptr) : Ptr(ptr.getPointer()) {
+    explicit MetadataPackOrValue(MetadataResponse response) : Ptr(response.Value) {}
+
+    explicit MetadataPackOrValue(MetadataPackPointer ptr) : Ptr(ptr.getPointer()) {
       if (ptr.getLifetime() != PackLifetime::OnHeap)
         fatalError(0, "Cannot have an on-stack pack here\n");
     }
@@ -359,7 +362,9 @@ public:
       fatalError(0, "Expected a metadata pack but got metadata\n");
     }
 
-    std::string nameForMetadata() const;
+    intptr_t getValue() const {
+      return reinterpret_cast<intptr_t>(Ptr);
+    }
   };
 
   /// Function object that produces substitutions for the generic parameters
@@ -461,8 +466,8 @@ public:
 
     const void * const *getGenericArgs() const { return genericArgs; }
 
-    MetadataOrPack getMetadata(unsigned depth, unsigned index) const;
-    MetadataOrPack getMetadataKeyArgOrdinal(unsigned ordinal) const;
+    MetadataPackOrValue getMetadata(unsigned depth, unsigned index) const;
+    MetadataPackOrValue getMetadataKeyArgOrdinal(unsigned ordinal) const;
     const WitnessTable *getWitnessTable(const Metadata *type,
                                         unsigned index) const;
   };
@@ -511,6 +516,19 @@ public:
                                SubstGenericParameterFn substGenericParam,
                                SubstDependentWitnessTableFn substWitnessTable);
 
+  /// Retrieve the type value described by the given type name.
+  ///
+  /// \p substGenericParam Function that provides generic argument metadata
+  /// given a particular generic parameter specified by depth/index.
+  /// \p substWitnessTable Function that provides witness tables given a
+  /// particular dependent conformance index.
+  SWIFT_RUNTIME_LIBRARY_VISIBILITY
+  TypeLookupErrorOr<intptr_t> getTypeValueByMangledName(
+                               StringRef typeName,
+                               const void * const *arguments,
+                               SubstGenericParameterFn substGenericParam,
+                               SubstDependentWitnessTableFn substWitnessTable);
+
 #pragma clang diagnostic pop
 
   /// Gather generic parameter counts from a context descriptor.
@@ -533,7 +551,7 @@ public:
   bool _gatherWrittenGenericParameters(
       const TypeContextDescriptor *descriptor,
       llvm::ArrayRef<const void *> keyArgs,
-      llvm::SmallVectorImpl<MetadataOrPack> &genericArgs,
+      llvm::SmallVectorImpl<MetadataPackOrValue> &genericArgs,
       Demangle::Demangler &Dem);
 
   /// Check the given generic requirements using the given set of generic

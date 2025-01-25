@@ -430,10 +430,11 @@ internal struct _SliceBuffer<Element>
   internal typealias Indices = Range<Int>
 
   //===--- misc -----------------------------------------------------------===//
-  /// Call `body(p)`, where `p` is an `UnsafeBufferPointer` over the
-  /// underlying contiguous storage.
-  @inlinable
-  internal func withUnsafeBufferPointer<R>(
+  // Superseded by the typed-throws version of this function, but retained
+  // for ABI reasons.
+  @usableFromInline
+  @_silgen_name("$ss12_SliceBufferV010withUnsafeB7Pointeryqd__qd__SRyxGKXEKlF")
+  internal func __abi_withUnsafeBufferPointer<R>(
     _ body: (UnsafeBufferPointer<Element>) throws -> R
   ) rethrows -> R {
     defer { _fixLifetime(self) }
@@ -441,12 +442,35 @@ internal struct _SliceBuffer<Element>
       count: count))
   }
 
-  /// Call `body(p)`, where `p` is an `UnsafeMutableBufferPointer`
-  /// over the underlying contiguous storage.
-  @inlinable
-  internal mutating func withUnsafeMutableBufferPointer<R>(
+  /// Call `body(p)`, where `p` is an `UnsafeBufferPointer` over the
+  /// underlying contiguous storage.
+  @_alwaysEmitIntoClient
+  internal func withUnsafeBufferPointer<R, E>(
+    _ body: (UnsafeBufferPointer<Element>) throws(E) -> R
+  ) throws(E) -> R {
+    defer { _fixLifetime(self) }
+    return try body(UnsafeBufferPointer(start: firstElementAddress,
+      count: count))
+  }
+
+  // Superseded by the typed-throws version of this function, but retained
+  // for ABI reasons.
+  @usableFromInline
+  @_silgen_name("$ss12_SliceBufferV017withUnsafeMutableB7Pointeryqd__qd__SryxGKXEKlF")
+  internal mutating func __abi_withUnsafeMutableBufferPointer<R>(
     _ body: (UnsafeMutableBufferPointer<Element>) throws -> R
   ) rethrows -> R {
+    defer { _fixLifetime(self) }
+    return try body(
+      UnsafeMutableBufferPointer(start: firstElementAddress, count: count))
+  }
+
+  /// Call `body(p)`, where `p` is an `UnsafeMutableBufferPointer`
+  /// over the underlying contiguous storage.
+  @_alwaysEmitIntoClient
+  internal mutating func withUnsafeMutableBufferPointer<R, E>(
+    _ body: (UnsafeMutableBufferPointer<Element>) throws(E) -> R
+  ) throws(E) -> R {
     defer { _fixLifetime(self) }
     return try body(
       UnsafeMutableBufferPointer(start: firstElementAddress, count: count))

@@ -20,6 +20,13 @@
 // CHECK:   typealias RawIterator = SimpleCollectionReadOnly.iterator
 // CHECK: }
 
+// CHECK: struct SimpleCollectionReadWrite : CxxMutableRandomAccessCollection {
+// CHECK:   typealias Element = ConstRACIterator.Pointee
+// CHECK:   typealias Iterator = CxxIterator<SimpleCollectionReadWrite>
+// CHECK:   typealias RawIterator = SimpleCollectionReadWrite.const_iterator
+// CHECK:   typealias RawMutableIterator = SimpleCollectionReadWrite.iterator
+// CHECK: }
+
 // CHECK: struct HasInheritedTemplatedConstRACIterator<CInt> : CxxRandomAccessCollection {
 // CHECK:   typealias Element = InheritedTemplatedConstRACIterator<CInt>.Pointee
 // CHECK:   typealias Iterator = CxxIterator<HasInheritedTemplatedConstRACIterator<CInt>>

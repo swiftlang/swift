@@ -68,7 +68,7 @@ function(_report_sdk prefix)
 endfunction()
 
 # Remove architectures not supported by the SDK from the given list.
-function(remove_sdk_unsupported_archs name os sdk_path architectures_var)
+function(remove_sdk_unsupported_archs name os sdk_path deployment_version architectures_var)
   execute_process(COMMAND
       /usr/libexec/PlistBuddy -c "Print :SupportedTargets:${os}:Archs" ${sdk_path}/SDKSettings.plist
     OUTPUT_VARIABLE sdk_supported_archs
@@ -229,7 +229,7 @@ macro(configure_sdk_darwin
   endif()
 
   # Remove any architectures not supported by the SDK.
-  remove_sdk_unsupported_archs(${name} ${xcrun_name} ${SWIFT_SDK_${prefix}_PATH} SWIFT_SDK_${prefix}_ARCHITECTURES)
+  remove_sdk_unsupported_archs(${name} ${xcrun_name} ${SWIFT_SDK_${prefix}_PATH} "${SWIFT_SDK_${prefix}_DEPLOYMENT_VERSION}" SWIFT_SDK_${prefix}_ARCHITECTURES)
 
   list_intersect(
     "${SWIFT_DARWIN_MODULE_ARCHS}"            # lhs
@@ -433,14 +433,14 @@ macro(configure_sdk_unix name architectures)
 
         set(SWIFT_SDK_FREEBSD_ARCH_${arch}_TRIPLE "${arch}-unknown-freebsd${freebsd_system_version}")
       elseif("${prefix}" STREQUAL "OPENBSD")
-        if(NOT arch STREQUAL "amd64")
+        if(NOT arch STREQUAL "x86_64" AND NOT arch STREQUAL "aarch64")
           message(FATAL_ERROR "unsupported arch for OpenBSD: ${arch}")
         endif()
 
         set(openbsd_system_version ${CMAKE_SYSTEM_VERSION})
         message(STATUS "OpenBSD Version: ${openbsd_system_version}")
 
-        set(SWIFT_SDK_OPENBSD_ARCH_amd64_TRIPLE "amd64-unknown-openbsd${openbsd_system_version}")
+        set(SWIFT_SDK_OPENBSD_ARCH_${arch}_TRIPLE "${arch}-unknown-openbsd${openbsd_system_version}")
 
         if(CMAKE_SYSROOT)
           set(SWIFT_SDK_OPENBSD_ARCH_${arch}_PATH "${CMAKE_SYSROOT}${SWIFT_SDK_OPENBSD_ARCH_${arch}_PATH}" CACHE INTERNAL "sysroot path" FORCE)

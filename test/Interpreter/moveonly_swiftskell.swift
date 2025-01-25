@@ -7,8 +7,7 @@
 // RUN:    -enable-library-evolution \
 // RUN:    -parse-as-library \
 // RUN:    %S/../Inputs/Swiftskell.swift \
-// RUN:   -enable-experimental-feature SuppressedAssociatedTypes \
-// RUN:   -enable-experimental-feature NonescapableTypes
+// RUN:   -enable-experimental-feature SuppressedAssociatedTypes 
 
 // RUN: %target-build-swift -I%t -L%t -lSwiftskell -parse-as-library %s \
 // RUN:                     -module-name E -o %t/E %target-rpath(%t)
@@ -17,7 +16,13 @@
 // RUN: %target-run %t/E %t/%target-library-name(Swiftskell) \
 // RUN:     | %FileCheck %s --implicit-check-not destroy
 
+// RUN: %target-build-swift -O -I%t -L%t -lSwiftskell -parse-as-library %s \
+// RUN:                     -module-name Opt -o %t/Opt %target-rpath(%t)
+// RUN: %target-codesign %t/Opt
+// RUN: %target-run %t/Opt %t/%target-library-name(Swiftskell) | %FileCheck %s --implicit-check-not destroy
+
 // REQUIRES: executable_test
+// REQUIRES: swift_feature_SuppressedAssociatedTypes
 
 // Temporarily disable for back-deployment (rdar://128544927)
 // UNSUPPORTED: back_deployment_runtime

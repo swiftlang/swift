@@ -18,6 +18,7 @@
 
 #include "CSDiagnostics.h"
 #include "TypeCheckConcurrency.h"
+#include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/Type.h"
@@ -26,6 +27,7 @@
 #include "swift/AST/RequirementSignature.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/SourceManager.h"
+#include "swift/Basic/Version.h"
 #include "swift/Sema/ConstraintLocator.h"
 #include "swift/Sema/ConstraintSystem.h"
 #include "swift/Sema/CSFix.h"
@@ -140,6 +142,29 @@ bool TreatRValueAsLValue::diagnose(const Solution &solution,
   return failure.diagnose(asNote);
 }
 
+unsigned TreatRValueAsLValue::assessImpact(ConstraintSystem &cs,
+                                           ConstraintLocator *atLoc) {
+    // Results of calls can never be l-value.
+    unsigned impact = isExpr<CallExpr>(atLoc->getAnchor()) ? 2 : 1;
+    // An overload choice that isn't settable is least interesting for
+    // diagnosis.
+    auto *calleeLoc = cs.getCalleeLocator(atLoc, /*lookThroughApply=*/false);
+    if (auto overload = cs.findSelectedOverloadFor(calleeLoc)) {
+      if (auto *var = dyn_cast_or_null<AbstractStorageDecl>(
+              overload->choice.getDeclOrNull())) {
+        impact += !var->isSettableInSwift(cs.DC) ? 1 : 0;
+      } else {
+        impact += 1;
+      }
+    }
+
+    // This is extra impactful if location has other issues.
+    if (cs.hasFixFor(atLoc) || cs.hasFixFor(calleeLoc))
+      impact += 2;
+
+    return impact;
+}
+
 TreatRValueAsLValue *TreatRValueAsLValue::create(ConstraintSystem &cs,
                                    ConstraintLocator *locator) {
   if (locator->isLastElement<LocatorPathElt::ApplyArgToParam>())
@@ -217,8 +242,8 @@ TreatArrayLiteralAsDictionary::attempt(ConstraintSystem &cs, Type dictionaryTy,
   auto &ctx = cs.getASTContext();
 
   if (auto *proto = ctx.getProtocol(KnownProtocolKind::ExpressibleByDictionaryLiteral))
-      if (!ModuleDecl::lookupConformance(unwrappedDict, proto))
-        return nullptr;
+    if (!lookupConformance(unwrappedDict, proto))
+      return nullptr;
 
   auto arrayLoc = cs.getConstraintLocator(arrayExpr);
   return new (cs.getAllocator())
@@ -270,10 +295,16 @@ getConcurrencyFixBehavior(ConstraintSystem &cs, ConstraintKind constraintKind,
 
   // For a @preconcurrency callee outside of a strict concurrency
   // context, ignore.
-  if (cs.hasPreconcurrencyCallee(locator) &&
-      !contextRequiresStrictConcurrencyChecking(
-          cs.DC, GetClosureType{cs}, ClosureIsolatedByPreconcurrency{cs}))
+  if (cs.hasPreconcurrencyCallee(locator)) {
+    // Preconcurrency failures are always downgraded to warnings, even in
+    // Swift 6 mode.
+    if (contextRequiresStrictConcurrencyChecking(
+            cs.DC, GetClosureType{cs}, ClosureIsolatedByPreconcurrency{cs})) {
+      return FixBehavior::DowngradeToWarning;
+    }
+
     return FixBehavior::Suppress;
+  }
 
   // Otherwise, warn until Swift 6.
   if (!cs.getASTContext().LangOpts.isSwiftVersionAtLeast(6))
@@ -771,17 +802,6 @@ GenericArgumentsMismatch *GenericArgumentsMismatch::create(
       GenericArgumentsMismatch(cs, actual, required, mismatches, locator);
 }
 
-bool AutoClosureForwarding::diagnose(const Solution &solution,
-                                     bool asNote) const {
-  AutoClosureForwardingFailure failure(solution, getLocator());
-  return failure.diagnose(asNote);
-}
-
-AutoClosureForwarding *AutoClosureForwarding::create(ConstraintSystem &cs,
-                                                     ConstraintLocator *locator) {
-  return new (cs.getAllocator()) AutoClosureForwarding(cs, locator);
-}
-
 bool AllowAutoClosurePointerConversion::diagnose(const Solution &solution,
                                                  bool asNote) const {
   AutoClosurePointerConversionFailure failure(solution, getFromType(),
@@ -1152,16 +1172,16 @@ MoveOutOfOrderArgument *MoveOutOfOrderArgument::create(
 
 bool AllowInaccessibleMember::diagnose(const Solution &solution,
                                        bool asNote) const {
-  InaccessibleMemberFailure failure(solution, getMember(), getLocator(),
-                                    IsMissingImport);
+  InaccessibleMemberFailure failure(solution, getMember(), getLocator());
   return failure.diagnose(asNote);
 }
 
-AllowInaccessibleMember *AllowInaccessibleMember::create(
-    ConstraintSystem &cs, Type baseType, ValueDecl *member, DeclNameRef name,
-    ConstraintLocator *locator, bool isMissingImport) {
-  return new (cs.getAllocator()) AllowInaccessibleMember(
-      cs, baseType, member, name, locator, isMissingImport);
+AllowInaccessibleMember *
+AllowInaccessibleMember::create(ConstraintSystem &cs, Type baseType,
+                                ValueDecl *member, DeclNameRef name,
+                                ConstraintLocator *locator) {
+  return new (cs.getAllocator())
+      AllowInaccessibleMember(cs, baseType, member, name, locator);
 }
 
 bool AllowAnyObjectKeyPathRoot::diagnose(const Solution &solution,
@@ -1207,7 +1227,14 @@ bool AllowInvalidRefInKeyPath::diagnose(const Solution &solution,
                                         bool asNote) const {
   switch (Kind) {
   case RefKind::StaticMember: {
-    InvalidStaticMemberRefInKeyPath failure(solution, Member, getLocator());
+    InvalidStaticMemberRefInKeyPath failure(solution, BaseType, Member,
+                                            getLocator());
+    return failure.diagnose(asNote);
+  }
+
+  case RefKind::UnsupportedStaticMember: {
+    UnsupportedStaticMemberRefInKeyPath failure(solution, BaseType, Member,
+                                                getLocator());
     return failure.diagnose(asNote);
   }
 
@@ -1255,47 +1282,61 @@ bool AllowInvalidRefInKeyPath::isEqual(const ConstraintFix *other) const {
 }
 
 AllowInvalidRefInKeyPath *
-AllowInvalidRefInKeyPath::forRef(ConstraintSystem &cs, ValueDecl *member,
+AllowInvalidRefInKeyPath::forRef(ConstraintSystem &cs, Type baseType,
+                                 ValueDecl *member,
                                  ConstraintLocator *locator) {
+  if (member->isStatic() && !isa<FuncDecl>(member)) {
+    // References to static members are supported only for modules that
+    // are built with 6.1+ compilers, libraries produced by earlier
+    // compilers don't have required symbols.
+    if (auto *module = member->getDeclContext()->getParentModule()) {
+      if (module->isBuiltFromInterface()) {
+        auto compilerVersion = module->getSwiftInterfaceCompilerVersion();
+        if (!compilerVersion.isVersionAtLeast(6, 1))
+          return AllowInvalidRefInKeyPath::create(
+              cs, baseType, RefKind::UnsupportedStaticMember, member, locator);
+      }
+    }
+
+    if (!baseType->getRValueType()->is<AnyMetatypeType>())
+      return AllowInvalidRefInKeyPath::create(
+          cs, baseType, RefKind::StaticMember, member, locator);
+  }
+
   // Referencing (instance or static) methods in key path is
   // not currently allowed.
   if (isa<FuncDecl>(member))
-    return AllowInvalidRefInKeyPath::create(cs, RefKind::Method, member,
-                                            locator);
+    return AllowInvalidRefInKeyPath::create(cs, baseType, RefKind::Method,
+                                            member, locator);
 
   // Referencing enum cases in key path is not currently allowed.
   if (isa<EnumElementDecl>(member)) {
-    return AllowInvalidRefInKeyPath::create(cs, RefKind::EnumCase, member,
-                                            locator);
+    return AllowInvalidRefInKeyPath::create(cs, baseType, RefKind::EnumCase,
+                                            member, locator);
   }
 
   // Referencing initializers in key path is not currently allowed.
   if (isa<ConstructorDecl>(member))
-    return AllowInvalidRefInKeyPath::create(cs, RefKind::Initializer,
+    return AllowInvalidRefInKeyPath::create(cs, baseType, RefKind::Initializer,
                                             member, locator);
-
-  // Referencing static members in key path is not currently allowed.
-  if (member->isStatic())
-    return AllowInvalidRefInKeyPath::create(cs, RefKind::StaticMember, member,
-                                            locator);
 
   if (auto *storage = dyn_cast<AbstractStorageDecl>(member)) {
     // Referencing members with mutating getters in key path is not
     // currently allowed.
     if (storage->isGetterMutating())
-      return AllowInvalidRefInKeyPath::create(cs, RefKind::MutatingGetter,
-                                              member, locator);
+      return AllowInvalidRefInKeyPath::create(
+          cs, baseType, RefKind::MutatingGetter, member, locator);
   }
 
   return nullptr;
 }
 
 AllowInvalidRefInKeyPath *
-AllowInvalidRefInKeyPath::create(ConstraintSystem &cs, RefKind kind,
-                                 ValueDecl *member,
+AllowInvalidRefInKeyPath::create(ConstraintSystem &cs, Type baseType,
+                                 RefKind kind, ValueDecl *member,
                                  ConstraintLocator *locator) {
   return new (cs.getAllocator())
-      AllowInvalidRefInKeyPath(cs, kind, member, locator);
+      AllowInvalidRefInKeyPath(cs, baseType, kind, member, locator);
 }
 
 bool RemoveAddressOf::diagnose(const Solution &solution, bool asNote) const {
@@ -2197,10 +2238,15 @@ bool SpecifyBaseTypeForOptionalUnresolvedMember::diagnose(
 SpecifyBaseTypeForOptionalUnresolvedMember *
 SpecifyBaseTypeForOptionalUnresolvedMember::attempt(
     ConstraintSystem &cs, ConstraintKind kind, Type baseTy,
-    DeclNameRef memberName, FunctionRefKind functionRefKind,
+    DeclNameRef memberName, FunctionRefInfo functionRefInfo,
     MemberLookupResult result, ConstraintLocator *locator) {
 
   if (kind != ConstraintKind::UnresolvedValueMember)
+    return nullptr;
+
+  // Only diagnose for UnresolvedMemberExprs.
+  // TODO: We ought to support diagnosing EnumElementPatterns too.
+  if (!isExpr<UnresolvedMemberExpr>(locator->getAnchor()))
     return nullptr;
 
   // None or only one viable candidate, there is no ambiguity.
@@ -2212,7 +2258,7 @@ SpecifyBaseTypeForOptionalUnresolvedMember::attempt(
     return nullptr;
 
   // Don't diagnose for function members e.g. Foo? = .none(0).
-  if (functionRefKind != FunctionRefKind::Unapplied)
+  if (!functionRefInfo.isUnappliedBaseName())
     return nullptr;
 
   Type underlyingBaseType = baseTy->getMetatypeInstanceType();
@@ -2292,7 +2338,7 @@ SpecifyBaseTypeForOptionalUnresolvedMember::attempt(
 
   MemberLookupResult unwrappedResult =
       cs.performMemberLookup(kind, memberName, MetatypeType::get(unwrappedType),
-                             functionRefKind, locator,
+                             functionRefInfo, locator,
                              /*includeInaccessibleMembers*/ false);
   SmallVector<OverloadChoice, 4> unwrappedViableCandidates;
   filterViableCandidates(unwrappedResult.ViableCandidates,
@@ -2617,16 +2663,21 @@ AllowConcreteTypeSpecialization *AllowConcreteTypeSpecialization::create(
       cs, concreteTy, decl, locator, fixBehavior);
 }
 
-bool AllowGenericFunctionSpecialization::diagnose(const Solution &solution,
-                                                  bool asNote) const {
-  GenericFunctionSpecialization failure(solution, Decl, getLocator());
+bool AllowFunctionSpecialization::diagnose(const Solution &solution,
+                                           bool asNote) const {
+  InvalidFunctionSpecialization failure(solution, Decl, getLocator(),
+                                        fixBehavior);
   return failure.diagnose(asNote);
 }
 
-AllowGenericFunctionSpecialization *AllowGenericFunctionSpecialization::create(
-    ConstraintSystem &cs, ValueDecl *decl, ConstraintLocator *locator) {
+AllowFunctionSpecialization *
+AllowFunctionSpecialization::create(ConstraintSystem &cs, ValueDecl *decl,
+                                    ConstraintLocator *locator) {
+  auto fixBehavior = cs.getASTContext().isSwiftVersionAtLeast(6)
+                         ? FixBehavior::Error
+                         : FixBehavior::DowngradeToWarning;
   return new (cs.getAllocator())
-      AllowGenericFunctionSpecialization(cs, decl, locator);
+      AllowFunctionSpecialization(cs, decl, locator, fixBehavior);
 }
 
 bool IgnoreOutOfPlaceThenStmt::diagnose(const Solution &solution,
@@ -2670,4 +2721,18 @@ IgnoreKeyPathSubscriptIndexMismatch::create(ConstraintSystem &cs, Type argType,
                                             ConstraintLocator *locator) {
   return new (cs.getAllocator())
       IgnoreKeyPathSubscriptIndexMismatch(cs, argType, locator);
+}
+
+AllowSlabLiteralCountMismatch *
+AllowSlabLiteralCountMismatch::create(ConstraintSystem &cs, Type lhsCount,
+                                      Type rhsCount,
+                                      ConstraintLocator *locator) {
+  return new (cs.getAllocator())
+      AllowSlabLiteralCountMismatch(cs, lhsCount, rhsCount, locator);
+}
+
+bool AllowSlabLiteralCountMismatch::diagnose(const Solution &solution,
+                                             bool asNote) const {
+  IncorrectSlabLiteralCount failure(solution, lhsCount, rhsCount, getLocator());
+  return failure.diagnose(asNote);
 }

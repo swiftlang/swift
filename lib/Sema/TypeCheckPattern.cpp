@@ -36,11 +36,15 @@ using namespace swift;
 ///
 /// This requires the getter's body to have a certain syntactic form. It should
 /// be kept in sync with importEnumCaseAlias in the ClangImporter library.
-static EnumElementDecl *
-extractEnumElement(DeclContext *DC, SourceLoc UseLoc,
-                   const VarDecl *constant) {
-  ExportContext where = ExportContext::forFunctionBody(DC, UseLoc);
-  diagnoseExplicitUnavailability(constant, UseLoc, where, nullptr);
+static EnumElementDecl *extractEnumElement(DeclContext *DC, SourceLoc UseLoc,
+                                           const VarDecl *constant) {
+  if (auto constraint =
+          getUnsatisfiedAvailabilityConstraint(constant, DC, UseLoc)) {
+    // Only diagnose explicit unavailability.
+    if (!constraint->isConditionallySatisfiable())
+      diagnoseDeclAvailability(constant, UseLoc, nullptr,
+                               ExportContext::forFunctionBody(DC, UseLoc));
+  }
 
   const FuncDecl *getter = constant->getAccessor(AccessorKind::Get);
   if (!getter)
@@ -397,52 +401,11 @@ public:
                                 E->getRParenLoc());
   }
 
-  Pattern *convertBindingsToOptionalSome(Expr *E) {
-    auto *expr = E->getSemanticsProvidingExpr();
-    auto *bindExpr = dyn_cast<BindOptionalExpr>(expr);
-    if (!bindExpr) {
-      // Let's see if this expression prefixed with any number of '?'
-      // has any other disjoint 'BindOptionalExpr' inside of it, if so,
-      // we need to wrap such sub-expression into `OptionalEvaluationExpr`.
-      bool hasDisjointChaining = false;
-      expr->forEachChildExpr([&](Expr *subExpr) -> Expr * {
-        // If there is `OptionalEvaluationExpr` in the AST
-        // it means that all of possible `BindOptionalExpr`
-        // which follow are covered by it.
-        if (isa<OptionalEvaluationExpr>(subExpr))
-          return nullptr;
-
-        if (isa<BindOptionalExpr>(subExpr)) {
-          hasDisjointChaining = true;
-          return nullptr;
-        }
-
-        return subExpr;
-      });
-
-      if (hasDisjointChaining)
-        E = new (Context) OptionalEvaluationExpr(E);
-
-      return getSubExprPattern(E);
-    }
-
-    auto *subExpr = convertBindingsToOptionalSome(bindExpr->getSubExpr());
-    return OptionalSomePattern::create(Context, subExpr,
-                                       bindExpr->getQuestionLoc());
+  // Convert a x? to OptionalSome pattern.
+  Pattern *visitBindOptionalExpr(BindOptionalExpr *E) {
+    return OptionalSomePattern::create(
+        Context, getSubExprPattern(E->getSubExpr()), E->getQuestionLoc());
   }
-
-  // Convert a x? to OptionalSome pattern.  In the AST form, this will look like
-  // an OptionalEvaluationExpr with an immediate BindOptionalExpr inside of it.
-  Pattern *visitOptionalEvaluationExpr(OptionalEvaluationExpr *E) {
-    auto *subExpr = E->getSubExpr();
-    // We only handle the case where one or more bind expressions are subexprs
-    // of the optional evaluation.  Other cases are not simple postfix ?'s.
-    if (!isa<BindOptionalExpr>(subExpr->getSemanticsProvidingExpr()))
-      return nullptr;
-
-    return convertBindingsToOptionalSome(subExpr);
-  }
-
 
   // Unresolved member syntax '.Element' forms an EnumElement pattern. The
   // element will be resolved when we type-check the pattern.
@@ -839,10 +802,7 @@ Type PatternTypeRequest::evaluate(Evaluator &evaluator,
     if (subType->hasError())
       return ErrorType::get(Context);
 
-    auto type = subType;
-    if (P->getKind() == PatternKind::Paren)
-      type = ParenType::get(Context, type);
-    return type;
+    return subType;
   }
 
   // If we see an explicit type annotation, coerce the sub-pattern to
@@ -983,64 +943,72 @@ void repairTupleOrAssociatedValuePatternIfApplicable(
     Type enumPayloadType,
     const EnumElementDecl *enumCase) {
   auto &DE = Ctx.Diags;
-  bool addDeclNote = false;
-  if (auto *tupleType = dyn_cast<TupleType>(enumPayloadType.getPointer())) {
-    if (tupleType->getNumElements() >= 2
-        && enumElementInnerPat->getKind() == PatternKind::Paren) {
-      auto *semantic = enumElementInnerPat->getSemanticsProvidingPattern();
-      if (auto *tuplePattern = dyn_cast<TuplePattern>(semantic)) {
-        if (tuplePattern->getNumElements() >= 2) {
-          auto diag = DE.diagnose(tuplePattern->getLoc(),
-              diag::converting_tuple_into_several_associated_values,
-              enumCase->getNameStr(), tupleType->getNumElements());
-          auto subPattern =
-            dyn_cast<ParenPattern>(enumElementInnerPat)->getSubPattern();
+  auto addDeclNote = [&]() {
+    DE.diagnose(enumCase->getStartLoc(), diag::decl_declared_here, enumCase);
+  };
+  auto payloadParams = enumCase->getCaseConstructorParams();
 
-          // We might also have code like
-          //
-          // enum Upair { case upair(Int, Int) }
-          // func f(u: Upair) { switch u { case .upair(let (x, y)): () } }
-          //
-          // This needs a more complex rearrangement to fix the code. So only
-          // apply the fix-it if we have a tuple immediately inside.
-          if (subPattern->getKind() == PatternKind::Tuple) {
-            auto leadingParen = SourceRange(enumElementInnerPat->getStartLoc());
-            auto trailingParen = SourceRange(enumElementInnerPat->getEndLoc());
-            diag.fixItRemove(leadingParen)
-                .fixItRemove(trailingParen);
-          }
+  // First check to see whether we need to untuple a pattern.
+  if (payloadParams.size() >= 2) {
+    if (enumElementInnerPat->getKind() != PatternKind::Paren)
+      return;
 
-          addDeclNote = true;
-          enumElementInnerPat = semantic;
-        }
-      } else {
-        DE.diagnose(enumElementInnerPat->getLoc(),
-          diag::found_one_pattern_for_several_associated_values,
-          enumCase->getNameStr(),
-          tupleType->getNumElements());
-        addDeclNote = true;
+    auto *semantic = enumElementInnerPat->getSemanticsProvidingPattern();
+    if (auto *tuplePattern = dyn_cast<TuplePattern>(semantic)) {
+      if (tuplePattern->getNumElements() < 2)
+        return;
+
+      auto diag =
+          DE.diagnose(tuplePattern->getLoc(),
+                      diag::converting_tuple_into_several_associated_values,
+                      enumCase->getNameStr(), payloadParams.size());
+      auto subPattern =
+          dyn_cast<ParenPattern>(enumElementInnerPat)->getSubPattern();
+
+      // We might also have code like
+      //
+      // enum Upair { case upair(Int, Int) }
+      // func f(u: Upair) { switch u { case .upair(let (x, y)): () } }
+      //
+      // This needs a more complex rearrangement to fix the code. So only
+      // apply the fix-it if we have a tuple immediately inside.
+      if (subPattern->getKind() == PatternKind::Tuple) {
+        auto leadingParen = SourceRange(enumElementInnerPat->getStartLoc());
+        auto trailingParen = SourceRange(enumElementInnerPat->getEndLoc());
+        diag.fixItRemove(leadingParen).fixItRemove(trailingParen);
       }
+      diag.flush();
+      addDeclNote();
+      enumElementInnerPat = semantic;
+    } else {
+      DE.diagnose(enumElementInnerPat->getLoc(),
+                  diag::found_one_pattern_for_several_associated_values,
+                  enumCase->getNameStr(), payloadParams.size());
+      addDeclNote();
     }
-  } else if (auto *tupleType = enumPayloadType->getAs<TupleType>()) {
-    if (tupleType->getNumElements() >= 2) {
-      if (auto *tuplePattern = dyn_cast<TuplePattern>(enumElementInnerPat)) {
-        DE.diagnose(enumElementInnerPat->getLoc(),
-                    diag::converting_several_associated_values_into_tuple,
-                    enumCase->getNameStr(),
-                    tupleType->getNumElements())
-          .fixItInsert(enumElementInnerPat->getStartLoc(), "(")
-          .fixItInsertAfter(enumElementInnerPat->getEndLoc(), ")");
-        addDeclNote = true;
-        enumElementInnerPat =
-          new (Ctx) ParenPattern(enumElementInnerPat->getStartLoc(),
-                                 enumElementInnerPat,
-                                 enumElementInnerPat->getEndLoc());
-      }
-    }
+    return;
   }
 
-  if (addDeclNote)
-    DE.diagnose(enumCase->getStartLoc(), diag::decl_declared_here, enumCase);
+  // Then check to see whether we need to tuple a pattern.
+  if (payloadParams.size() == 1 && !payloadParams[0].hasLabel()) {
+    auto *tupleType = enumPayloadType->getAs<TupleType>();
+    if (!tupleType || tupleType->getNumElements() < 2)
+      return;
+
+    auto *tuplePattern = dyn_cast<TuplePattern>(enumElementInnerPat);
+    if (!tuplePattern)
+      return;
+
+    DE.diagnose(enumElementInnerPat->getLoc(),
+                diag::converting_several_associated_values_into_tuple,
+                enumCase->getNameStr(), tupleType->getNumElements())
+        .fixItInsert(enumElementInnerPat->getStartLoc(), "(")
+        .fixItInsertAfter(enumElementInnerPat->getEndLoc(), ")");
+    addDeclNote();
+    enumElementInnerPat = new (Ctx)
+        ParenPattern(enumElementInnerPat->getStartLoc(), enumElementInnerPat,
+                     enumElementInnerPat->getEndLoc());
+  }
 }
 
 NullablePtr<Pattern> TypeChecker::trySimplifyExprPattern(ExprPattern *EP,
@@ -1246,8 +1214,9 @@ Pattern *TypeChecker::coercePatternToType(
         !(options & TypeResolutionFlags::FromNonInferredPattern)) {
       diags.diagnose(NP->getLoc(), diag, NP->getDecl()->getName(), type,
                      NP->getDecl()->isLet());
-      diags.diagnose(NP->getLoc(), diag::add_explicit_type_annotation_to_silence)
-          .fixItInsertAfter(var->getNameLoc(), ": " + type->getWithoutParens()->getString());
+      diags
+          .diagnose(NP->getLoc(), diag::add_explicit_type_annotation_to_silence)
+          .fixItInsertAfter(var->getNameLoc(), ": " + type->getString());
     }
 
     return P;
@@ -1601,7 +1570,7 @@ Pattern *TypeChecker::coercePatternToType(
     }
 
     // If there is a subpattern, push the enum element type down onto it.
-    auto argType = elt->getArgumentInterfaceType();
+    auto payloadType = elt->getPayloadInterfaceType();
     if (EEP->hasSubPattern()) {
       Pattern *sub = EEP->getSubPattern();
       if (!elt->hasAssociatedValues()) {
@@ -1615,8 +1584,8 @@ Pattern *TypeChecker::coercePatternToType(
       }
       
       Type elementType;
-      if (argType)
-        elementType = enumTy->getTypeOfMember(elt, argType);
+      if (payloadType)
+        elementType = enumTy->getTypeOfMember(elt, payloadType);
       else
         elementType = TupleType::getEmpty(Context);
       auto newSubOptions = subOptions;
@@ -1633,26 +1602,14 @@ Pattern *TypeChecker::coercePatternToType(
         return nullptr;
 
       EEP->setSubPattern(sub);
-    } else if (argType) {
-      // Else if the element pattern has no sub-pattern but the element type has
+    } else if (payloadType) {
+      // Else if the element pattern has no sub-pattern but the enum case has
       // associated values, expand it to be semantically equivalent to an
       // element pattern of wildcards.
-      Type elementType = enumTy->getTypeOfMember(elt, argType);
       SmallVector<TuplePatternElt, 8> elements;
-      if (auto *TTy = dyn_cast<TupleType>(elementType.getPointer())) {
-        for (auto &elt : TTy->getElements()) {
-          auto *subPattern = AnyPattern::createImplicit(Context);
-          elements.push_back(TuplePatternElt(elt.getName(), SourceLoc(),
-                                             subPattern));
-        }
-      } else {
-        auto parenTy = dyn_cast<ParenType>(elementType.getPointer());
-        assert(parenTy && "Associated value type is neither paren nor tuple?");
-        (void)parenTy;
-        
+      for (auto &param : elt->getCaseConstructorParams()) {
         auto *subPattern = AnyPattern::createImplicit(Context);
-        elements.push_back(TuplePatternElt(Identifier(), SourceLoc(),
-                                           subPattern));
+        elements.emplace_back(param.getLabel(), SourceLoc(), subPattern);
       }
       Pattern *sub = TuplePattern::createSimple(Context, SourceLoc(),
                                                 elements, SourceLoc());
@@ -1660,6 +1617,7 @@ Pattern *TypeChecker::coercePatternToType(
       auto newSubOptions = subOptions;
       newSubOptions.setContext(TypeResolverContext::EnumPatternPayload);
       newSubOptions |= TypeResolutionFlags::FromNonInferredPattern;
+      Type elementType = enumTy->getTypeOfMember(elt, payloadType);
       sub = coercePatternToType(
           pattern.forSubPattern(sub, /*retainTopLevel=*/false), elementType,
           newSubOptions, tryRewritePattern);

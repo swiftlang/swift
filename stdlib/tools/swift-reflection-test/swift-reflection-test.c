@@ -13,8 +13,6 @@
 // on live swift executables.
 //===----------------------------------------------------------------------===//
 
-#define MIN(a,b) (((a)<(b))?(a):(b))
-#define MAX(a,b) (((a)>(b))?(a):(b))
 #define SECTIONS_PER_INFO 6
 
 #include "swift/SwiftRemoteMirror/SwiftRemoteMirror.h"

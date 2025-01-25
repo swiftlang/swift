@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -target %target-future-triple -parse-as-library %s -O -sil-verify-all -Xllvm -sil-disable-pass=FunctionSignatureOpts -module-name=test -emit-sil | %FileCheck %s
+// RUN: %target-swift-frontend -target %target-future-triple -parse-as-library %s -O -sil-verify-all -Xllvm -sil-disable-pass=FunctionSignatureOpts -module-name=test -Xllvm -sil-print-types -emit-sil | %FileCheck %s
 // RUN: %target-swift-frontend -target %target-future-triple -parse-as-library %s -O -sil-verify-all -Xllvm -sil-disable-pass=FunctionSignatureOpts -module-name=test -emit-ir | %FileCheck %s -check-prefix=CHECK-LLVM
 
 // Also do an end-to-end test to check all components, including IRGen.
@@ -36,7 +36,7 @@ public let c = C(x: 27)
 // CHECK:       } // end sil function '$s4test6testitAA1CCyF'
 
 // CHECK-LLVM-LABEL: define {{.*}} @"$s4test6testitAA1CCyF"
-// CHECK-LLVM:         [[C:%.*]] = tail call ptr @swift_initStaticObject({{.*}} getelementptr {{.*}}, ptr @"$s4test1c_WZTv_", i64 0, i32 1))
+// CHECK-LLVM:         [[C:%.*]] = tail call ptr @swift_initStaticObject({{.*}} getelementptr {{.*}}, ptr @"$s4test1c_WZTv_"
 // CHECK-LLVM-NEXT:    ret ptr [[C]]
 // CHECK-LLVM:       }
 @inline(never)

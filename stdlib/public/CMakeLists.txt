@@ -171,12 +171,16 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB_CROSS_COMPILING)
       "armv6    armv6-apple-none-macho    armv6-apple-none-macho"
       "armv6m   armv6m-apple-none-macho   armv6m-apple-none-macho"
       "armv7    armv7-apple-none-macho    armv7-apple-none-macho"
+      "armv7m   armv7m-apple-none-macho   armv7m-apple-none-macho"
       "armv7em  armv7em-apple-none-macho  armv7em-apple-none-macho"
     )
   endif()
   if("AArch64" IN_LIST LLVM_TARGETS_TO_BUILD)
     list(APPEND EMBEDDED_STDLIB_TARGET_TRIPLES
       "arm64    arm64-apple-none-macho    arm64-apple-none-macho"
+      "arm64e   arm64e-apple-none-macho   arm64e-apple-none-macho"
+      "arm64    arm64-apple-ios           arm64-apple-ios18"
+      "arm64e   arm64e-apple-ios          arm64e-apple-ios18"
     )
   endif()
 
@@ -266,7 +270,7 @@ if(SWIFT_BUILD_STDLIB)
   add_subdirectory(core)
   add_subdirectory(SwiftOnoneSupport)
 
-  if(SWIFT_BUILD_CLANG_OVERLAYS)
+  if(SWIFT_BUILD_CLANG_OVERLAYS OR SWIFT_BUILD_TEST_SUPPORT_MODULES)
     add_subdirectory(ClangOverlays)
   endif()
 
@@ -315,13 +319,12 @@ if(SWIFT_BUILD_REMOTE_MIRROR)
   add_subdirectory(SwiftRemoteMirror)
 endif()
 
-if(SWIFT_BUILD_SDK_OVERLAY OR SWIFT_BUILD_TEST_SUPPORT_MODULES)
+if(SWIFT_BUILD_SDK_OVERLAY OR (SWIFT_BUILD_TEST_SUPPORT_MODULES AND SWIFT_BUILD_DYNAMIC_SDK_OVERLAY_default))
   add_subdirectory(Platform)
 endif()
 
 if(SWIFT_BUILD_SDK_OVERLAY)
-  # On Apple platforms, we aren't building any overlays (other than Darwin in
-  # Platform above). Instead, we're picking them up from the SDK.
+  # On Apple platforms, we aren't building any overlays. Instead, we're picking them up from the SDK.
 
   if(WINDOWS IN_LIST SWIFT_SDKS)
     add_subdirectory(Windows)

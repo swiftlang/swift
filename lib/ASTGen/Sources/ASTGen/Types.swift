@@ -21,49 +21,8 @@ extension EffectSpecifiersSyntax {
   }
 }
 
-/// Check if an `TypeSyntax` can be generated using ASTGen.
-///
-/// If all the type nodes that shares the first token are migrated,
-/// returns true.
-func isTypeMigrated(_ node: TypeSyntax) -> Bool {
-  var current: Syntax = Syntax(node)
-  if let firstToken = node.firstToken(viewMode: .sourceAccurate) {
-    current = firstToken.parent!
-  }
-  while true {
-    switch current.kind {
-    // Known implemented kinds.
-    case .arrayType, .attributedType, .classRestrictionType, .compositionType,
-      .someOrAnyType, .dictionaryType, .functionType, .identifierType,
-      .implicitlyUnwrappedOptionalType, .memberType, .metatypeType,
-      .namedOpaqueReturnType, .optionalType, .packElementType,
-      .packExpansionType, .suppressedType, .tupleType:
-      break
-
-    // Known unimplemented kinds.
-    case .missingType:
-      return false;
-
-    // Unknown type kinds
-    case _ where current.is(TypeSyntax.self):
-      return false
-    default:
-      break
-    }
-    if current.id == node.id {
-      return true
-    }
-    // This is walking up the parents from the first token of `node`. `.parent`
-    // must exist if `current` is not `node`
-    current = current.parent!
-  }
-}
-
 extension ASTGenVisitor {
   func generate(type node: TypeSyntax) -> BridgedTypeRepr {
-    guard isTypeMigrated(node) else {
-      return self.generateWithLegacy(node)
-    }
     switch node.as(TypeSyntaxEnum.self) {
     case .arrayType(let node):
       return self.generate(arrayType: node).asTypeRepr
@@ -86,7 +45,7 @@ extension ASTGenVisitor {
     case .metatypeType(let node):
       return self.generate(metatypeType: node)
     case .missingType:
-      break
+      fatalError("unimplemented")
     case .namedOpaqueReturnType(let node):
       return self.generate(namedOpaqueReturnType: node).asTypeRepr
     case .optionalType(let node):
@@ -101,12 +60,7 @@ extension ASTGenVisitor {
       return self.generate(suppressedType: node).asTypeRepr
     case .tupleType(let node):
       return self.generate(tupleType: node).asTypeRepr
-#if RESILIENT_SWIFT_SYNTAX
-    @unknown default:
-      fatalError()
-#endif
     }
-    preconditionFailure("isTypeMigrated() mismatch")
   }
 
   func generate(identifierType node: IdentifierTypeSyntax) -> BridgedTypeRepr {
@@ -124,7 +78,7 @@ extension ASTGenVisitor {
     }
 
     let genericArguments = generics.arguments.lazy.map {
-      self.generate(type: $0.argument)
+      self.generate(genericArgument: $0.argument)
     }
 
     return BridgedUnqualifiedIdentTypeRepr.createParsed(
@@ -144,7 +98,7 @@ extension ASTGenVisitor {
     let angleRange: BridgedSourceRange
     if let generics = node.genericArgumentClause {
       genericArguments = generics.arguments.lazy.map {
-        self.generate(type: $0.argument)
+        self.generate(genericArgument: $0.argument)
       }.bridgedArray(in: self)
 
       angleRange = self.generateSourceRange(start: generics.leftAngle, end: generics.rightAngle)
@@ -360,7 +314,8 @@ extension ASTGenVisitor {
     var type = generate(type: node.baseType)
 
     // Handle specifiers.
-    if let specifier = node.specifier {
+    if case .simpleTypeSpecifier(let simpleSpecifier) = node.specifiers.first {
+      let specifier = simpleSpecifier.specifier
       if let kind = BridgedAttributedTypeSpecifier(from: specifier.keywordKind) {
         type =
           BridgedSpecifierTypeRepr.createParsed(
@@ -370,7 +325,7 @@ extension ASTGenVisitor {
             specifierLoc: self.generateSourceLoc(specifier)
           ).asTypeRepr
       } else {
-        self.diagnose(Diagnostic(node: specifier, message: UnexpectedTokenKindError(token: specifier)))
+        self.diagnose(.unexpectedTokenKind(token: specifier))
       }
     }
 

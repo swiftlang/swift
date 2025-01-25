@@ -338,6 +338,7 @@ extension Optional {
   ///   will never be equal to `nil` and only after you've tried using the
   ///   postfix `!` operator.
   @inlinable
+  @unsafe
   public var unsafelyUnwrapped: Wrapped {
     @inline(__always)
     get {

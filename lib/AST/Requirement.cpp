@@ -15,6 +15,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/AST/ASTContext.h"
+#include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/Requirement.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/GenericParamList.h"
@@ -112,7 +113,11 @@ CheckRequirementResult Requirement::checkRequirement(
     }
 
     auto *proto = getProtocolDecl();
-    auto conformance = ModuleDecl::lookupConformance(
+
+    if (firstType->isTypeParameter())
+      return CheckRequirementResult::RequirementFailure;
+
+    auto conformance = lookupConformance(
         firstType, proto, allowMissing);
     if (!conformance)
       return CheckRequirementResult::RequirementFailure;
@@ -262,28 +267,24 @@ checkRequirementsImpl(ArrayRef<Requirement> requirements,
   while (!worklist.empty()) {
     auto req = worklist.pop_back_val();
 
-  // Check preconditions.
-#ifndef NDEBUG
-  {
+    // Check preconditions.
     auto firstType = req.getFirstType();
-    assert((allowTypeParameters || !firstType->hasTypeParameter())
+    ASSERT((allowTypeParameters || !firstType->hasTypeParameter())
            && "must take a contextual type. if you really are ok with an "
             "indefinite answer (and usually YOU ARE NOT), then consider whether "
             "you really, definitely are ok with an indefinite answer, and "
             "use `checkRequirementsWithoutContext` instead");
-    assert(!firstType->hasTypeVariable());
+    ASSERT(!firstType->hasTypeVariable());
 
     if (req.getKind() != RequirementKind::Layout) {
       auto secondType = req.getSecondType();
-      assert((allowTypeParameters || !secondType->hasTypeParameter())
+      ASSERT((allowTypeParameters || !secondType->hasTypeParameter())
              && "must take a contextual type. if you really are ok with an "
               "indefinite answer (and usually YOU ARE NOT), then consider whether "
               "you really, definitely are ok with an indefinite answer, and "
               "use `checkRequirementsWithoutContext` instead");
-      assert(!secondType->hasTypeVariable());
+      ASSERT(!secondType->hasTypeVariable());
     }
-  }
-#endif
 
     switch (req.checkRequirement(worklist, /*allowMissing=*/true)) {
     case CheckRequirementResult::Success:
@@ -356,6 +357,13 @@ void InverseRequirement::expandDefaults(
     ArrayRef<Type> gps,
     SmallVectorImpl<StructuralRequirement> &result) {
   for (auto gp : gps) {
+    // Value generics never have inverses (or the positive thereof).
+    if (auto gpTy = gp->getAs<GenericTypeParamType>()) {
+      if (gpTy->isValue()) {
+        continue;
+      }
+    }
+
     for (auto ip : InvertibleProtocolSet::allKnown()) {
       auto proto = ctx.getProtocol(getKnownProtocolKind(ip));
       result.push_back({{RequirementKind::Conformance, gp,

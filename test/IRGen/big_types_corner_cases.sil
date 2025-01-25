@@ -126,12 +126,12 @@ bb0(%0 : $Builtin.Int64, %1 : $() -> @owned BigStruct):
   return undef : $BigStruct
 }
 
-// CHECK-LABEL: define swiftcc void @poninter_to_mod_ret(ptr %0, ptr %1)
+// CHECK-LABEL: define swiftcc void @pointer_to_mod_ret(ptr %0, ptr %1)
 // CHECK: [[CALL:%.*]] = call swiftcc { ptr, ptr } %0(ptr swiftself %1)
 // CHECK: extractvalue { ptr, ptr } [[CALL]], 0
 // CHECK: extractvalue { ptr, ptr } [[CALL]], 1
 // CHECK: ret void
-sil @poninter_to_mod_ret : $@convention(thin) (@owned @callee_owned () -> @owned @callee_owned (@owned Builtin.Int64) -> @owned BigStruct) -> () {
+sil @pointer_to_mod_ret : $@convention(thin) (@owned @callee_owned () -> @owned @callee_owned (@owned Builtin.Int64) -> @owned BigStruct) -> () {
 bb0(%funcpointer : $@callee_owned () -> @owned @callee_owned (@owned Builtin.Int64) -> @owned BigStruct):
   %papply = apply %funcpointer() : $@callee_owned () -> @owned @callee_owned (@owned Builtin.Int64) -> @owned BigStruct
   %ret = tuple ()

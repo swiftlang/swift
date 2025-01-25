@@ -233,7 +233,7 @@ func testHaveComma1() {
   ExplicitConstructors1(#^HAVE_COMMA_1?check=EXPLICIT_CONSTRUCTORS_1P^#,
 }
 
-//===--- Test that we show default constuctors inherited from protocols
+//===--- Test that we show default constructors inherited from protocols
 
 protocol ProtDefaultInit {}
 extension ProtDefaultInit { init(foo: Int) {}}

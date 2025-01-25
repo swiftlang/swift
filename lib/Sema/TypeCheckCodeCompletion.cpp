@@ -300,8 +300,12 @@ static std::optional<Type>
 getTypeOfCompletionContextExpr(DeclContext *DC, CompletionTypeCheckKind kind,
                                Expr *&parsedExpr,
                                ConcreteDeclRef &referencedDecl) {
-  if (constraints::ConstraintSystem::preCheckExpression(parsedExpr, DC))
+  auto target = SyntacticElementTarget(parsedExpr, DC, CTP_Unused, Type(),
+                                       /*isDiscarded*/ true);
+  if (constraints::ConstraintSystem::preCheckTarget(target))
     return std::nullopt;
+
+  parsedExpr = target.getAsExpr();
 
   switch (kind) {
   case CompletionTypeCheckKind::Normal:

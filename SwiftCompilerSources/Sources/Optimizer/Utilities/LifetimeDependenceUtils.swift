@@ -52,6 +52,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+import AST
 import SIL
 
 private let verbose = false
@@ -64,6 +65,8 @@ private func log(prefix: Bool = true, _ message: @autoclosure () -> String) {
 
 /// Walk up the value dependence chain to find the best-effort
 /// variable declaration. Typically called while diagnosing an error.
+///
+/// Returns an array with at least one introducer value.
 ///
 /// The walk stops at:
 /// - an address
@@ -84,13 +87,14 @@ func gatherVariableIntroducers(for value: Value, _ context: Context)
   }
   defer { useDefVisitor.deinitialize() }
   _ = useDefVisitor.walkUp(valueOrAddress: value)
+  assert(!introducers.isEmpty, "missing variable introducer")
   return introducers
 }
 
 /// A lifetime dependence represents a scope in which some parent
 /// value is alive and accessible along with a dependent value. All
 /// values derived from the dependent value must be used within this
-/// scope. This supports diagnostics on non-escapable types.
+/// scope. This supports diagnostics on non-copyable and non-escapable types.
 ///
 /// A lifetime dependence is produced by either 'mark_dependence [nonescaping]':
 ///
@@ -111,9 +115,12 @@ struct LifetimeDependence : CustomStringConvertible {
     case access(BeginAccessInst)
     /// A coroutine.
     case yield(Value)
-    /// An owned value whose OSSA lifetime encloses nonescapable values
+    /// An owned value whose OSSA lifetime encloses nonescapable values, or a trivial variable introduced by move_value.
     case owned(Value)
-    /// Singly-initialized addressible storage (likely for an
+    /// A borrowed value whose OSSA lifetime encloses nonescapable values, or a trivial variable introduced by
+    /// begin_borrow.
+    case borrowed(BeginBorrowValue)
+    /// Singly-initialized addressable storage (likely for an
     /// immutable address-only value). The lifetime extends until the
     /// memory is destroyed. e.g. A value produced by an @in
     /// FunctionArgument or @out apply. @inout has caller scope
@@ -124,7 +131,7 @@ struct LifetimeDependence : CustomStringConvertible {
     /// If `initializingStore` is nil, then the `initialAddress` is
     /// initialized on function entry.
     case initialized(initialAddress: Value, initializingStore: Instruction?)
-    // TODO: make .unknown a SIL Verification error
+    // Unknown includes: escapable values with local var_decl, stack allocations that are not singly initialized.
     case unknown(Value)
 
     var parentValue: Value {
@@ -133,6 +140,7 @@ struct LifetimeDependence : CustomStringConvertible {
       case let .access(beginAccess): return beginAccess
       case let .yield(value): return value
       case let .owned(value): return value
+      case let .borrowed(beginBorrow): return beginBorrow.value
       case let .initialized(initialAddress, _): return initialAddress
       case let .unknown(value): return value
       }
@@ -148,6 +156,8 @@ struct LifetimeDependence : CustomStringConvertible {
         precondition(value.definingInstruction is BeginApplyInst)
       case let .owned(value):
         precondition(value.ownership == .owned)
+      case let .borrowed(beginBorrow):
+        precondition(beginBorrow.value.ownership == .guaranteed)
       case let .initialized(initialAddress, initializingStore):
         precondition(initialAddress.type.isAddress, "expected an address")
         precondition(initialAddress is AllocStackInst
@@ -165,6 +175,7 @@ struct LifetimeDependence : CustomStringConvertible {
         case .access: return "Access: "
         case .yield: return "Yield: "
         case .owned: return "Owned: "
+        case .borrowed: return "Borrowed: "
         case .initialized: return "Initialized: "
         case .unknown: return "Unknown: "
         }
@@ -193,11 +204,7 @@ extension LifetimeDependence {
     if arg.isIndirectResult {
       return nil
     }
-    guard let scope = Scope(base: arg, context) else {
-      // Ignore invalid argument types.
-      return nil
-    }
-    self.scope = scope
+    self.scope = Scope(base: arg, context)
     self.dependentValue = arg
   }
 
@@ -214,34 +221,20 @@ extension LifetimeDependence {
       return nil
     }
     assert(value.ownership == .owned, "unsafe apply result must be owned")
-    self.scope = Scope(base: value, context)!
+    self.scope = Scope(base: value, context)
     self.dependentValue = value
   }
 
-  var isUnsafeApplyResult: Bool {
-    if case let .owned(value) = scope {
-      if let apply = value.definingInstruction as? FullApplySite {
-        assert(!apply.hasResultDependence)
-        return true
-      }
-    }
-    return false
-  }
-
-  /// Construct LifetimeDependence from mark_dependence [unresolved]
+  /// Construct LifetimeDependence from mark_dependence [unresolved] or mark_dependence [nonescaping].
   ///
-  /// For any LifetimeDependence constructed from a mark_dependence,
-  /// its `dependentValue` will be the result of the mark_dependence.
+  /// For any LifetimeDependence constructed from a mark_dependence, its `dependentValue` will be the result of the
+  /// mark_dependence.
   ///
-  /// TODO: Add SIL verification that all mark_depedence [unresolved]
-  /// have a valid LifetimeDependence.
+  /// Returns 'nil' for unknown dependence.
   init?(_ markDep: MarkDependenceInst, _ context: some Context) {
     switch markDep.dependenceKind {
     case .Unresolved, .NonEscaping:
-      guard let scope = Scope(base: markDep.base, context) else {
-        return nil
-      }
-      self.scope = scope
+      self.scope = Scope(base: markDep.base, context)
       self.dependentValue = markDep
     case .Escaping:
       return nil
@@ -283,22 +276,16 @@ private extension Value {
 }
 
 extension LifetimeDependence.Scope {
-  /// Construct a lifetime dependence scope from the base value that
-  /// other values depend on. This derives the kind of dependence
-  /// scope and its parentValue from `base`.
+  /// Construct a lifetime dependence scope from the base value that other values depend on. This derives the kind of
+  /// dependence scope and its parentValue from `base`.
   ///
-  /// `base` represents the OSSA lifetime that the dependent value
-  /// must be used within. If `base` is owned, then it directly
-  /// defines the parent lifetime. If `base` is guaranteed, then it
-  /// must have a single borrow introducer, which defines the parent
-  /// lifetime. `base` must not be derived from a guaranteed phi or
-  /// forwarded (via struct/tuple) from multiple guaranteed values.
-  init?(base: Value, _ context: some Context) {
+  /// `base` represents the OSSA lifetime that the dependent value must be used within. If `base` is owned, then it
+  /// directly defines the parent lifetime. If `base` is guaranteed, then it must have a single borrow introducer, which
+  /// defines the parent lifetime. `base` must not be derived from a guaranteed phi or forwarded (via struct/tuple) from
+  /// multiple guaranteed values.
+  init(base: Value, _ context: some Context) {
     if base.type.isAddress {
-      guard let scope = Self(address: base, context) else {
-        return nil
-      }
-      self = scope
+      self = Self(address: base, context)
       return
     }
     switch base.ownership {
@@ -306,54 +293,47 @@ extension LifetimeDependence.Scope {
       self = .owned(base)
       return
     case .guaranteed:
-      guard let scope = Self(guaranteed: base, context) else {
-        return nil
-      }
-      self = scope
+      self = Self(guaranteed: base, context)
     case .none:
-      // lifetime dependence requires a nontrivial value
-      return nil
+      self = Self(variable: base, context)
     case .unowned:
       self = .unknown(base)
     }
   }
 
-  private init?(address: Value, _ context: some Context) {
+  private init(address: Value, _ context: some Context) {
     switch address.enclosingAccessScope {
-    case let .scope(access):
+    case let .access(access):
       self = .access(access)
     case let .base(accessBase):
-      guard let scope = Self(accessBase: accessBase, address: address, context) else {
-        return nil
-      }
-      self = scope
+      self = Self(accessBase: accessBase, address: address, context)
+    case let .dependence(markDep):
+      // The current dependence only represents the forwarded address. If the mark_dependence instruction encoutered
+      // here is [unresolved], then a separate LifetimeDependence.Scope will be created for it, and if it is [escaping],
+      // then it is ignored for the purpose of lifetime dependence.
+      self.init(address: markDep.value, context)
     }
   }
 
-  init?(accessBase: AccessBase, address: Value, _ context: some Context) {
+  init(accessBase: AccessBase, address: Value, _ context: some Context) {
     switch accessBase {
     case let .box(projectBox):
       // Note: the box may be in a borrow scope.
-      guard let scope = Self(base: projectBox.operand.value, context) else {
-        return nil
-      }
-      self = scope
+      self = Self(base: projectBox.operand.value, context)
     case let .stack(allocStack):
-      guard let scope = Self(allocation: allocStack, context) else {
-        return nil
-      }
-      self = scope
+      self = Self(allocation: allocStack, context)
     case .global:
       self = .unknown(address)
     case .class, .tail:
       let refElt = address as! UnaryInstruction
-      guard let scope = Self(guaranteed: refElt.operand.value, context) else {
-        return nil
-      }
-      self = scope
+      self = Self(guaranteed: refElt.operand.value, context)
     case let .argument(arg):
       if arg.convention.isIndirectIn {
-        self = .initialized(initialAddress: arg, initializingStore: nil)
+        if arg.convention.isGuaranteed {
+          self = .caller(arg)
+        } else {
+          self = .initialized(initialAddress: arg, initializingStore: nil)
+        }
       } else if arg.convention.isIndirectOut || arg.convention.isInout {
         // TODO: verify that @out values are never reassigned.
         self = .caller(arg)
@@ -366,39 +346,57 @@ extension LifetimeDependence.Scope {
     case let .yield(result):
       self = Self(yield: result)
     case .storeBorrow(let sb):
-      guard let scope = Self(base: sb.source, context) else {
-        return nil
-      }
-      self = scope
-    case .pointer, .unidentified:
+      self = Self(base: sb.source, context)
+    case .pointer, .index, .unidentified:
       self = .unknown(address)
     }
   }
 
-  private init?(guaranteed base: Value, _ context: some Context) {
-    // If introducers is empty, then the dependence is on a trivial value, so
-    // there is no dependence scope.
-    //
+  private init(guaranteed base: Value, _ context: some Context) {
     // TODO: Add a SIL verifier check that a mark_dependence [nonescaping]
     // base is never a guaranteed phi.
     var iter = base.getBorrowIntroducers(context).makeIterator()
-    guard let beginBorrow = iter.next() else { return nil }
+    // If no borrow introducer was found, then this is a borrow of a trivial value. Since we can assume a single
+    // introducer here, then this is the only condition under which we have a trivial introducer.
+    guard let beginBorrow = iter.next() else {
+      self = Self(variable: base, context)
+      return
+    }
+    // TODO: will we need to handle tuple/struct with multiple scopes?
     assert(iter.next() == nil,
            "guaranteed phis not allowed when diagnosing lifetime dependence")
     switch beginBorrow {
     case .beginBorrow, .loadBorrow:
-      let borrowOperand = beginBorrow.baseOperand!
-      guard let scope = LifetimeDependence.Scope(base: borrowOperand.value,
-                                                 context) else {
-        return nil
-      }
-      self = scope
+      self = .borrowed(beginBorrow)
     case let .beginApply(value):
       self = .yield(value)
-    case .functionArgument:
-      self = .caller(beginBorrow.value as! FunctionArgument)
+    case let .functionArgument(arg):
+      self = .caller(arg)
+    case .uncheckOwnershipConversion:
+      // TODO: is this correct?
+      self = Self(variable: base, context)
     case .reborrow:
       fatalError("reborrows are not supported in diagnostics")
+    }
+  }
+
+  private init(variable base: Value, _ context: some Context) {
+    guard let introducer = gatherVariableIntroducers(for: base, context).singleElement else {
+      // TODO: do we need to handle multiple introducers in case of a tuple/struct?
+      self = .unknown(base)
+      return
+    }
+    switch introducer {
+    case let arg as FunctionArgument:
+      self = .caller(arg)
+    case let bbi as BeginBorrowInst:
+      self = .borrowed(BeginBorrowValue(bbi)!)
+    case is MoveValueInst:
+      self = .owned(introducer)
+    case let bai as BeginAccessInst:
+      self = .access(bai)
+    default:
+      self = .unknown(introducer)
     }
   }
 
@@ -412,19 +410,40 @@ extension LifetimeDependence.Scope {
     self = .yield(result)
   }
 
-  private init?(allocation: AllocStackInst, _ context: Context) {
+  private init(allocation: AllocStackInst, _ context: Context) {
     if let initializer = allocation.accessBase.findSingleInitializer(context) {
       self = .initialized(initialAddress: initializer.initialAddress,
                           initializingStore: initializer.initializingStore)
+      return
     }
-    return nil
+    self = .unknown(allocation)
+  }
+}
+
+extension LifetimeDependence.Scope {
+  /// Ignore "irrelevent" borrow scopes: load_borrow or begin_borrow without [var_decl]
+  func ignoreBorrowScope(_ context: some Context) -> LifetimeDependence.Scope? {
+    guard case let .borrowed(beginBorrowVal) = self else {
+      return nil
+    }
+    switch beginBorrowVal {
+    case let .beginBorrow(bb):
+      if bb.isFromVarDecl {
+        return nil
+      }
+      return LifetimeDependence.Scope(base: bb.borrowedValue, context).ignoreBorrowScope(context)
+    case let .loadBorrow(lb):
+      return LifetimeDependence.Scope(base: lb.address, context)
+    default:
+      fatalError("Scope.borrowed must begin begin_borrow or load_borrow")
+    }
   }
 }
 
 extension LifetimeDependence.Scope {
   /// Compute the range of the dependence scope. 
   ///
-  /// Returns nil if the dependence scope covers the entire function.
+  /// Returns nil if the dependence scope covers the entire function. Returns an empty range for an unknown scope.
   ///
   /// Note: The caller must deinitialize the returned range.
   func computeRange(_ context: Context) -> InstructionRange? {
@@ -450,6 +469,8 @@ extension LifetimeDependence.Scope {
       // how would we ensure that the borrowed mark_dependence value
       // is within this value's OSSA lifetime?
       return computeLinearLiveness(for: value, context)
+    case let .borrowed(beginBorrow):
+      return computeLinearLiveness(for: beginBorrow.value, context)
     case let .initialized(initialAddress, initializingStore):
       return LifetimeDependence.Scope.computeInitializedRange(
         initialAddress: initialAddress, initializingStore: initializingStore,
@@ -459,11 +480,17 @@ extension LifetimeDependence.Scope {
       return InstructionRange(for: value, context)
     }
   }
-  
-  private static func computeInitializedRange(initialAddress: Value,
-                                              initializingStore: Instruction?,
+
+  // Note: an initialized range should always have a destroy_addr. For trivial 'var' variables, we have a alloc_box,
+  // which has a destroy_value. For concrete trivial 'let' variables, we load the trivial value:
+  //   %l = load [trivial] %0
+  //   %m = move_value [var_decl] %2
+  //
+  // For generic trivial (BitwiseCopyable) 'let' variables, we emit a destroy_addr for the alloc_stack.
+  private static func computeInitializedRange(initialAddress: Value, initializingStore: Instruction?,
                                               _ context: Context)
     -> InstructionRange {
+
     assert(initialAddress.type.isAddress)
 
     var range: InstructionRange
@@ -559,7 +586,7 @@ extension LifetimeDependence {
 /// This uses LifetimeDependenceUseDefWalker to find the introducers
 /// of a dependence chain, which represent the value's "inherited"
 /// dependencies. This stops at an address, unless the address refers
-/// to a singly-initialized temprorary, in which case it continues to
+/// to a singly-initialized temporary, in which case it continues to
 /// walk up the stored value.
 ///
 /// This overrides LifetimeDependenceUseDefWalker to stop at a value
@@ -597,26 +624,44 @@ struct VariableIntroducerUseDefWalker : LifetimeDependenceUseDefWalker {
   }
 
   mutating func walkUp(value: Value, _ owner: Value?) -> WalkResult {
-    switch value.definingInstruction {
-    case let moveInst as MoveValueInst:
-      if moveInst.isFromVarDecl {
-        return introducer(moveInst, owner)
-      }
-    case let borrow as BeginBorrowInst:
-      if borrow.isFromVarDecl {
-        return introducer(borrow, owner)
-      }
-    default:
-      break
+    if let inst = value.definingInstruction, VariableScopeInstruction(inst) != nil {
+      return visitorClosure(value)
+    }
+    // Finding a variable introducer requires following the mark_dependence forwarded value, not the base value like the
+    // default LifetimeDependenceUseDefWalker.
+    if value is MarkDependenceInst {
+      return walkUpDefault(forwarded: value, owner)
     }
     return walkUpDefault(dependent: value, owner: owner)
   }
 
   mutating func walkUp(address: Value) -> WalkResult {
     if let beginAccess = address.definingInstruction as? BeginAccessInst {
+      // Treat calls to unsafe[Mutable]Address like a projection of 'self' rather than a separate variable access.
+      if let addressorSelf = beginAccess.unsafeAddressorSelf {
+        return walkUp(valueOrAddress: addressorSelf)
+      }
       return introducer(beginAccess, nil)
     }
     return walkUpDefault(address: address)
+  }
+}
+
+private extension BeginAccessInst {
+  // Recognize an access scope for a unsafe addressor:
+  // %adr = pointer_to_address
+  // %md = mark_dependence %adr
+  // begin_access [unsafe] %md
+  var unsafeAddressorSelf: Value? {
+    guard isUnsafe else {
+      return nil
+    }
+    let accessBaseAndScopes = address.accessBaseWithScopes
+    guard case .pointer = accessBaseAndScopes.base,
+          case let .dependence(markDep) = accessBaseAndScopes.scopes.first else {
+      return nil
+    }
+    return markDep.base
   }
 }
 
@@ -673,6 +718,9 @@ struct VariableIntroducerUseDefWalker : LifetimeDependenceUseDefWalker {
 protocol LifetimeDependenceUseDefWalker : ForwardingUseDefWalker where PathContext == Value? {
   var context: Context { get }
 
+  /// 'owner' is the most recently visited suitable base. Generally, this is the most recent owned value. When a
+  /// mark_dependence value operand is forwarded from its base operand, however, the owner is not updated because that
+  /// would could lead to introducing an illegal mark_dependence with the same value for both operands.
   mutating func introducer(_ value: Value, _ owner: Value?) -> WalkResult
 
   // Minimally, check a ValueSet. This walker may traverse chains of
@@ -753,6 +801,11 @@ extension LifetimeDependenceUseDefWalker {
         return walkUp(newLifetime: store.source)
       case let srcDestInst as SourceDestAddrInstruction:
         return walkUp(address: srcDestInst.sourceOperand.value)
+      case let apply as FullApplySite:
+        if let f = apply.referencedFunction,
+           f.isConvertPointerToPointerArgument {
+          return walkUp(address: apply.parameterOperands[0].value)
+        }
       default:
         break
       }
@@ -773,7 +826,7 @@ extension LifetimeDependenceUseDefWalker {
 /// follows interior pointers using AddressUseVisitor. Handles stores to and loads from local variables using
 /// LocalVariableReachabilityCache.
 ///
-/// Ignores trivial values (~Escapable types are never trivial. Escapable types may only be lifetime-depenent values if
+/// Ignores trivial values (~Escapable types are never trivial. Escapable types may only be lifetime-dependent values if
 /// they are non-trivial).
 ///
 /// Skips uses within nested borrow scopes.
@@ -827,6 +880,17 @@ extension LifetimeDependenceDefUseWalker {
 extension LifetimeDependenceDefUseWalker {
   mutating func walkDown(root: Value) -> WalkResult {
     if root.type.isAddress {
+      if let md = root as? MarkDependenceInst, !root.isEscapable {
+        // LifetimeDependence.dependentValue is typically a mark_dependence. If its 'value' address is a non-Escapable
+        // local variable, then consider all other reachable uses of that local variable to be dependent uses. Remember
+        // the operand to the mark_dependence as if it was a store. Diagnostics will consider this the point of variable
+        // initialization.
+        if visitStoredUses(of: md.valueOperand, into: md.value) == .abortWalk {
+          return .abortWalk
+        }
+      }
+      // The root address may also be an escapable mark_dependence that guards its address uses (unsafeAddress), or an
+      // allocation or incoming argument. In all these cases, it is sufficient to walk down the address uses.
       return walkDownAddressUses(of: root)
     }
     return walkDownUses(of: root, using: nil)
@@ -1074,11 +1138,13 @@ extension LifetimeDependenceDefUseWalker {
     }
   }
 
-  // Visit stores to a local variable (alloc_box), temporary storage
-  // (alloc_stack). This handles stores of the entire value and stores
-  // to a tuple element. Stores to a field within another nominal
-  // value are considered lifetime dependence leaf uses; the type
-  // system enforces non-escapability on the aggregate value.
+  // Visit stores to a local variable (alloc_box), temporary storage (alloc_stack). This handles stores of the entire
+  // value and stores to a tuple element. Stores to a field within another nominal value are considered lifetime
+  // dependence leaf uses; the type system enforces non-escapability on the aggregate value.
+  //
+  // If 'operand' is an address, then the "store" corresponds to initialization via an @out argument. The initial
+  // call to visitStoredUses will have 'operand == address' where the "stored value" is the temporary stack
+  // allocation for the @out parameter.
   private mutating func visitStoredUses(of operand: Operand,
                                         into address: Value) -> WalkResult {
     assert(address.type.isAddress)
@@ -1098,7 +1164,7 @@ extension LifetimeDependenceDefUseWalker {
       break
     case .yield:
       return storeToYieldDependence(address: address, of: operand)
-    case .global, .class, .tail, .storeBorrow, .pointer, .unidentified:
+    case .global, .class, .tail, .storeBorrow, .pointer, .index, .unidentified:
       // An address produced by .storeBorrow should never be stored into.
       //
       // TODO: allow storing an immortal value into a global.
@@ -1124,7 +1190,7 @@ extension LifetimeDependenceDefUseWalker {
 
     // Get the local variable access that encloses this store.
     var storeAccess = storedOperand.instruction
-    if case let .scope(beginAccess) = storeAddress.enclosingAccessScope {
+    if case let .access(beginAccess) = storeAddress.enclosingAccessScope {
       storeAccess = beginAccess
     }
     if !localReachability.gatherAllReachableUses(of: storeAccess, in: &accessStack) {
@@ -1154,6 +1220,11 @@ extension LifetimeDependenceDefUseWalker {
       default:
         return .abortWalk
       }
+    case .dependence:
+       // An address-forwarding mark_dependence is simply a marker that indicates the start of an in-memory
+       // dependent value. Typically, it has no uses. If it does have uses, then they are visited earlier by
+       // LocalVariableAccessWalker to record any other local accesses.
+       return .continueWalk
     case .store:
       let si = localAccess.operand!.instruction as! StoringInstruction
       assert(si.sourceOperand == initialValue, "the only reachable store should be the current assignment")
@@ -1222,7 +1293,7 @@ let lifetimeDependenceScopeTest = FunctionTest("lifetime_dependence_scope") {
     function, arguments, context in
   let markDep = arguments.takeValue() as! MarkDependenceInst
   guard let dependence = LifetimeDependence(markDep, context) else {
-    print("Trivial Dependence")
+    print("Invalid Dependence")
     return
   }
   print(dependence)

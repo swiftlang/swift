@@ -19,7 +19,6 @@ internal func logFailedCheck(_ message: UnsafeRawPointer)
 /// Implementation class that holds the `UnsafeContinuation` instance for
 /// a `CheckedContinuation`.
 @available(SwiftStdlib 5.1, *)
-@_unavailableInEmbedded
 internal final class CheckedContinuationCanary: @unchecked Sendable {
   // The instance state is stored in tail-allocated raw memory, so that
   // we can atomically check the continuation state.
@@ -27,8 +26,8 @@ internal final class CheckedContinuationCanary: @unchecked Sendable {
   private init() { fatalError("must use create") }
 
   private static func _create(continuation: UnsafeRawPointer, function: String)
-      -> Self {
-    let instance = Builtin.allocWithTailElems_1(self,
+      -> CheckedContinuationCanary {
+    let instance = Builtin.allocWithTailElems_1(CheckedContinuationCanary.self,
       1._builtinWordValue,
       (UnsafeRawPointer?, String).self)
 
@@ -52,7 +51,7 @@ internal final class CheckedContinuationCanary: @unchecked Sendable {
   }
 
   internal static func create<T, E>(continuation: UnsafeContinuation<T, E>,
-                                 function: String) -> Self {
+                                 function: String) -> CheckedContinuationCanary {
     return _create(
         continuation: unsafeBitCast(continuation, to: UnsafeRawPointer.self),
         function: function)
@@ -79,7 +78,11 @@ internal final class CheckedContinuationCanary: @unchecked Sendable {
     // Log if the continuation was never consumed before the instance was
     // destructed.
     if _continuationPtr.pointee != nil {
+      #if !$Embedded
       logFailedCheck("SWIFT TASK CONTINUATION MISUSE: \(function) leaked its continuation without resuming it. This may cause tasks waiting on it to remain suspended forever.\n")
+      #else
+      fatalError("SWIFT TASK CONTINUATION MISUSE")
+      #endif
     }
   }
 }
@@ -120,7 +123,6 @@ internal final class CheckedContinuationCanary: @unchecked Sendable {
 /// you can replace one with the other in most circumstances,
 /// without making other changes.
 @available(SwiftStdlib 5.1, *)
-@_unavailableInEmbedded
 public struct CheckedContinuation<T, E: Error>: Sendable {
   private let canary: CheckedContinuationCanary
   
@@ -163,7 +165,11 @@ public struct CheckedContinuation<T, E: Error>: Sendable {
     if let c: UnsafeContinuation<T, E> = canary.takeContinuation() {
       c.resume(returning: value)
     } else {
+      #if !$Embedded
       fatalError("SWIFT TASK CONTINUATION MISUSE: \(canary.function) tried to resume its continuation more than once, returning \(value)!\n")
+      #else
+      fatalError("SWIFT TASK CONTINUATION MISUSE")
+      #endif
     }
   }
   
@@ -183,13 +189,16 @@ public struct CheckedContinuation<T, E: Error>: Sendable {
     if let c: UnsafeContinuation<T, E> = canary.takeContinuation() {
       c.resume(throwing: error)
     } else {
+      #if !$Embedded
       fatalError("SWIFT TASK CONTINUATION MISUSE: \(canary.function) tried to resume its continuation more than once, throwing \(error)!\n")
+      #else
+      fatalError("SWIFT TASK CONTINUATION MISUSE")
+      #endif
     }
   }
 }
 
 @available(SwiftStdlib 5.1, *)
-@_unavailableInEmbedded
 extension CheckedContinuation {
   /// Resume the task awaiting the continuation by having it either
   /// return normally or throw an error based on the state of the given
@@ -282,7 +291,6 @@ extension CheckedContinuation {
 /// - SeeAlso: `withUnsafeContinuation(function:_:)`
 /// - SeeAlso: `withUnsafeThrowingContinuation(function:_:)`
 @inlinable
-@_unavailableInEmbedded
 @available(SwiftStdlib 5.1, *)
 #if !$Embedded
 @backDeployed(before: SwiftStdlib 6.0)
@@ -307,7 +315,6 @@ public func withCheckedContinuation<T>(
 // introduction of #isolation.
 @available(SwiftStdlib 5.1, *)
 @_unsafeInheritExecutor // ABI compatibility with Swift 5.1
-@_unavailableInEmbedded
 @_silgen_name("$ss23withCheckedContinuation8function_xSS_yScCyxs5NeverOGXEtYalF")
 public func _unsafeInheritExecutor_withCheckedContinuation<T>(
   function: String = #function,
@@ -348,7 +355,6 @@ public func _unsafeInheritExecutor_withCheckedContinuation<T>(
 /// - SeeAlso: `withUnsafeContinuation(function:_:)`
 /// - SeeAlso: `withUnsafeThrowingContinuation(function:_:)`
 @inlinable
-@_unavailableInEmbedded
 @available(SwiftStdlib 5.1, *)
 #if !$Embedded
 @backDeployed(before: SwiftStdlib 6.0)
@@ -373,7 +379,6 @@ public func withCheckedThrowingContinuation<T>(
 // introduction of #isolation.
 @available(SwiftStdlib 5.1, *)
 @_unsafeInheritExecutor // ABI compatibility with Swift 5.1
-@_unavailableInEmbedded
 @_silgen_name("$ss31withCheckedThrowingContinuation8function_xSS_yScCyxs5Error_pGXEtYaKlF")
 public func _unsafeInheritExecutor_withCheckedThrowingContinuation<T>(
   function: String = #function,

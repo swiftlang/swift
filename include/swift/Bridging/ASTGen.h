@@ -10,8 +10,10 @@
 //
 //===----------------------------------------------------------------------===//
 
+#ifndef SWIFT_BRIDGING_ASTGEN_H
+#define SWIFT_BRIDGING_ASTGEN_H
+
 #include "swift/AST/ASTBridging.h"
-#include "swift/Parse/ParseBridging.h"
 
 #ifdef __cplusplus
 extern "C" {
@@ -34,11 +36,11 @@ void swift_ASTGen_renderQueuedDiagnostics(
 
 // FIXME: Hack because we cannot easily get to the already-parsed source
 // file from here. Fix this egregious oversight!
-void *_Nullable swift_ASTGen_parseSourceFile(const char *_Nonnull buffer,
-                                             size_t bufferLength,
-                                             const char *_Nonnull moduleName,
-                                             const char *_Nonnull filename,
-                                             void *_Nullable ctx);
+void *_Nullable swift_ASTGen_parseSourceFile(BridgedStringRef buffer,
+                                             BridgedStringRef moduleName,
+                                             BridgedStringRef filename,
+                                             void *_Nullable declContextPtr,
+                                             BridgedGeneratedSourceFileKind);
 void swift_ASTGen_destroySourceFile(void *_Nonnull sourceFile);
 
 /// Check whether the given source file round-trips correctly. Returns 0 if
@@ -48,6 +50,7 @@ int swift_ASTGen_roundTripCheck(void *_Nonnull sourceFile);
 /// Emit parser diagnostics for given source file.. Returns non-zero if any
 /// diagnostics were emitted.
 int swift_ASTGen_emitParserDiagnostics(
+    BridgedASTContext astContext,
     void *_Nonnull diagEngine, void *_Nonnull sourceFile, int emitOnlyErrors,
     int downgradePlaceholderErrorsToWarnings);
 
@@ -55,87 +58,14 @@ int swift_ASTGen_emitParserDiagnostics(
 void swift_ASTGen_buildTopLevelASTNodes(
     BridgedDiagnosticEngine diagEngine, void *_Nonnull sourceFile,
     BridgedDeclContext declContext, BridgedASTContext astContext,
-    BridgedLegacyParser legacyParser, void *_Nonnull outputContext,
-    void (*_Nonnull)(void *_Nonnull, void *_Nonnull));
+    void *_Nonnull outputContext,
+    void (*_Nonnull)(BridgedASTNode, void *_Nonnull));
+
+BridgedFingerprint
+swift_ASTGen_getSourceFileFingerprint(void *_Nonnull sourceFile,
+                                      BridgedASTContext astContext);
 
 void swift_ASTGen_freeBridgedString(BridgedStringRef);
-
-void *_Nonnull swift_ASTGen_resolveExternalMacro(
-    const char *_Nonnull moduleName, const char *_Nonnull typeName,
-    void *_Nonnull opaquePluginHandle);
-void swift_ASTGen_destroyExternalMacro(void *_Nonnull macro);
-
-bool swift_ASTGen_checkDefaultArgumentMacroExpression(
-    void *_Nonnull diagEngine, void *_Nonnull sourceFile,
-    const void *_Nonnull macroSourceLocation);
-
-ptrdiff_t swift_ASTGen_checkMacroDefinition(
-    void *_Nonnull diagEngine, BridgedStringRef sourceFileBuffer,
-    BridgedStringRef macroDeclText,
-    BridgedStringRef *_Nonnull expansionSourceOutPtr,
-    ptrdiff_t *_Nullable *_Nonnull replacementsPtr,
-    ptrdiff_t *_Nonnull numReplacements,
-    ptrdiff_t *_Nullable *_Nonnull genericReplacementsPtr,
-    ptrdiff_t *_Nonnull numGenericReplacements);
-void swift_ASTGen_freeExpansionReplacements(
-    ptrdiff_t *_Nullable replacementsPtr, ptrdiff_t numReplacements);
-
-ptrdiff_t swift_ASTGen_expandFreestandingMacro(
-    void *_Nonnull diagEngine, const void *_Nonnull macro,
-    const char *_Nonnull discriminator, uint8_t rawMacroRole,
-    void *_Nonnull sourceFile, const void *_Nullable sourceLocation,
-    BridgedStringRef *_Nonnull evaluatedSourceOut);
-
-ptrdiff_t swift_ASTGen_expandAttachedMacro(
-    void *_Nonnull diagEngine, const void *_Nonnull macro,
-    const char *_Nonnull discriminator, const char *_Nonnull qualifiedType,
-    const char *_Nonnull conformances, uint8_t rawMacroRole,
-    void *_Nonnull customAttrSourceFile,
-    const void *_Nullable customAttrSourceLocation,
-    void *_Nonnull declarationSourceFile,
-    const void *_Nullable declarationSourceLocation,
-    void *_Nullable parentDeclSourceFile,
-    const void *_Nullable parentDeclSourceLocation,
-    BridgedStringRef *_Nonnull evaluatedSourceOut);
-
-bool swift_ASTGen_initializePlugin(void *_Nonnull handle,
-                                   void *_Nullable diagEngine);
-void swift_ASTGen_deinitializePlugin(void *_Nonnull handle);
-bool swift_ASTGen_pluginServerLoadLibraryPlugin(
-    void *_Nonnull handle, const char *_Nonnull libraryPath,
-    const char *_Nonnull moduleName, BridgedStringRef *_Nullable errorOut);
-
-/// Build a TypeRepr for AST node for the type at the given source location in
-/// the specified file.
-swift::TypeRepr *_Nullable swift_ASTGen_buildTypeRepr(
-    BridgedDiagnosticEngine diagEngine, void *_Nonnull sourceFile,
-    BridgedSourceLoc sourceLoc, BridgedDeclContext declContext,
-    BridgedASTContext astContext, BridgedLegacyParser legacyParser,
-    BridgedSourceLoc *_Nonnull endSourceLoc);
-
-/// Build a Decl for AST node for the type at the given source location in the
-/// specified file.
-swift::Decl *_Nullable swift_ASTGen_buildDecl(
-    BridgedDiagnosticEngine diagEngine, void *_Nonnull sourceFile,
-    BridgedSourceLoc sourceLoc, BridgedDeclContext declContext,
-    BridgedASTContext astContext, BridgedLegacyParser legacyParser,
-    BridgedSourceLoc *_Nonnull endSourceLoc);
-
-/// Build a Expr for AST node for the type at the given source location in the
-/// specified file.
-swift::Expr *_Nullable swift_ASTGen_buildExpr(
-    BridgedDiagnosticEngine diagEngine, void *_Nonnull sourceFile,
-    BridgedSourceLoc sourceLoc, BridgedDeclContext declContext,
-    BridgedASTContext astContext, BridgedLegacyParser legacyParser,
-    BridgedSourceLoc *_Nonnull endSourceLoc);
-
-/// Build a Stmt for AST node for the type at the given source location in the
-/// specified file.
-swift::Stmt *_Nullable swift_ASTGen_buildStmt(
-    BridgedDiagnosticEngine diagEngine, void *_Nonnull sourceFile,
-    BridgedSourceLoc sourceLoc, BridgedDeclContext declContext,
-    BridgedASTContext astContext, BridgedLegacyParser legacyParser,
-    BridgedSourceLoc *_Nonnull endSourceLoc);
 
 // MARK: - Regex parsing
 
@@ -144,12 +74,22 @@ bool swift_ASTGen_lexRegexLiteral(const char *_Nonnull *_Nonnull curPtrPtr,
                                   bool mustBeRegex,
                                   BridgedNullableDiagnosticEngine diagEngine);
 
-bool swift_ASTGen_parseRegexLiteral(BridgedStringRef inputPtr,
-                                    size_t *_Nonnull versionOut,
-                                    void *_Nonnull UnsafeMutableRawPointer,
-                                    size_t captureStructureSize,
-                                    BridgedSourceLoc diagLoc,
-                                    BridgedDiagnosticEngine diagEngine);
+bool swift_ASTGen_parseRegexLiteral(
+    BridgedStringRef inputPtr, size_t *_Nonnull versionOut,
+    void *_Nonnull UnsafeMutableRawPointer, size_t captureStructureSize,
+    BridgedRegexLiteralPatternFeatures *_Nonnull featuresOut,
+    BridgedSourceLoc diagLoc, BridgedDiagnosticEngine diagEngine);
+
+void swift_ASTGen_freeBridgedRegexLiteralPatternFeatures(
+    BridgedRegexLiteralPatternFeatures features);
+
+void swift_ASTGen_getSwiftVersionForRegexPatternFeature(
+    BridgedRegexLiteralPatternFeatureKind kind,
+    BridgedSwiftVersion *_Nonnull versionOut);
+
+void swift_ASTGen_getDescriptionForRegexPatternFeature(
+    BridgedRegexLiteralPatternFeatureKind kind, BridgedASTContext astContext,
+    BridgedStringRef *_Nonnull descriptionOut);
 
 intptr_t swift_ASTGen_configuredRegions(
     BridgedASTContext astContext,
@@ -158,6 +98,21 @@ intptr_t swift_ASTGen_configuredRegions(
 void swift_ASTGen_freeConfiguredRegions(
     BridgedIfConfigClauseRangeInfo *_Nullable regions, intptr_t numRegions);
 
+bool swift_ASTGen_validateUnqualifiedLookup(
+    void *_Nonnull sourceFile,
+    BridgedASTContext astContext,
+    BridgedSourceLoc sourceLoc,
+    bool finishInSequentialScope,
+    BridgedArrayRef astScopeResultRef);
+
+size_t
+swift_ASTGen_virtualFiles(void *_Nonnull sourceFile,
+                          BridgedVirtualFile *_Nullable *_Nonnull virtualFiles);
+void swift_ASTGen_freeBridgedVirtualFiles(
+    BridgedVirtualFile *_Nullable virtualFiles, size_t numFiles);
+
 #ifdef __cplusplus
 }
 #endif
+
+#endif // SWIFT_BRIDGING_ASTGEN_H

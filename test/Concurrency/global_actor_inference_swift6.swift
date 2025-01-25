@@ -176,7 +176,7 @@ struct S3: InferenceConflict {
 
 extension S3 {
   func f() { }
-  // expected-error@-1{{global actor 'SomeGlobalActor'-isolated instance method 'f()' cannot be used to satisfy main actor-isolated protocol requirement}}
+  // expected-error@-1{{global actor 'SomeGlobalActor'-isolated instance method 'f()' cannot be used to satisfy main actor-isolated requirement from protocol 'InferMainActorInherited'}}
   //expected-note@-2{{add 'nonisolated' to 'f()' to make this instance method not isolated to the actor}}
 }
 
@@ -208,7 +208,7 @@ class C2: MainActorSuperclass, InferenceConflictWithSuperclass {
   func f() {}
 
   func g() {}
-  // expected-error@-1 {{main actor-isolated instance method 'g()' cannot be used to satisfy nonisolated protocol requirement}}
+  // expected-error@-1 {{main actor-isolated instance method 'g()' cannot be used to satisfy nonisolated requirement from protocol 'InferenceConflictWithSuperclass'}}
   // expected-note@-2 {{add 'nonisolated' to 'g()' to make this instance method not isolated to the actor}}
 }
 

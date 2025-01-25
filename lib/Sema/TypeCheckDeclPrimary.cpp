@@ -26,6 +26,7 @@
 #include "TypeCheckMacros.h"
 #include "TypeCheckObjC.h"
 #include "TypeCheckType.h"
+#include "TypeCheckUnsafe.h"
 #include "TypeChecker.h"
 #include "swift/AST/ASTPrinter.h"
 #include "swift/AST/ASTVisitor.h"
@@ -33,8 +34,11 @@
 #include "swift/AST/AccessNotes.h"
 #include "swift/AST/AccessScope.h"
 #include "swift/AST/Attr.h"
+#include "swift/AST/AvailabilityInference.h"
+#include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/DeclContext.h"
+#include "swift/AST/DiagnosticsParse.h"
 #include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/Expr.h"
@@ -52,12 +56,12 @@
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/TypeDifferenceVisitor.h"
 #include "swift/AST/TypeWalker.h"
+#include "swift/AST/UnsafeUse.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/Statistic.h"
-#include "swift/Bridging/ASTGen.h"
+#include "swift/Bridging/MacroEvaluation.h"
 #include "swift/Parse/Lexer.h"
-#include "swift/Parse/Parser.h"
 #include "swift/Serialization/SerializedModuleLoader.h"
 #include "swift/Strings.h"
 #include "clang/Basic/Module.h"
@@ -124,13 +128,6 @@ public:
     }
     auto ipk = getInvertibleProtocolKind(*kp);
     if (ipk) {
-      // Gate the '~Escapable' type behind a specific flag for now.
-      // Uses of 'Escapable' itself are already diagnosed; return ErrorType.
-      if (*ipk == InvertibleProtocolKind::Escapable &&
-          !ctx.LangOpts.hasFeature(Feature::NonescapableTypes)) {
-        return ErrorType::get(ctx);
-      }
-
       return ProtocolCompositionType::getInverseOf(ctx, *ipk);
     }
     auto rpk = getRepressibleProtocolKind(*kp);
@@ -563,6 +560,7 @@ static void checkGenericParams(GenericContext *ownerCtx) {
     return;
 
   auto *decl = ownerCtx->getAsDecl();
+  auto &ctx = ownerCtx->getASTContext();
   bool hasPack = false;
 
   for (auto gp : *genericParams) {
@@ -570,10 +568,13 @@ static void checkGenericParams(GenericContext *ownerCtx) {
     // is not enabled.
     if (gp->isParameterPack()) {
       // Variadic nominal types require runtime support.
-      if (isa<NominalTypeDecl>(decl)) {
+      //
+      // Embedded doesn't require runtime support for this feature.
+      if (isa<NominalTypeDecl>(decl) &&
+          !ctx.LangOpts.hasFeature(Feature::Embedded)) {
         TypeChecker::checkAvailability(
             gp->getSourceRange(),
-            ownerCtx->getASTContext().getVariadicGenericTypeAvailability(),
+            ctx.getVariadicGenericTypeAvailability(),
             diag::availability_variadic_type_only_version_newer,
             ownerCtx);
       }
@@ -587,6 +588,20 @@ static void checkGenericParams(GenericContext *ownerCtx) {
       hasPack = true;
     }
 
+    if (gp->isValue()) {
+      // Value generic nominal types require runtime support.
+      //
+      // Embedded doesn't require runtime support for this feature.
+      if (isa<NominalTypeDecl>(decl) &&
+          !ctx.LangOpts.hasFeature(Feature::Embedded)) {
+        TypeChecker::checkAvailability(
+          gp->getSourceRange(),
+          ctx.getValueGenericTypeAvailability(),
+          diag::availability_value_generic_type_only_version_newer,
+          ownerCtx);
+      }
+    }
+
     TypeChecker::checkDeclAttributes(gp);
     checkInheritanceClause(gp);
   }
@@ -598,6 +613,20 @@ static void checkGenericParams(GenericContext *ownerCtx) {
 
   // Check for duplicate generic parameter names.
   TypeChecker::checkShadowedGenericParams(ownerCtx);
+}
+
+/// Returns \c true if \p current and \p other are in the same source file
+/// \em and \c current appears before \p other in that file.
+static bool isBeforeInSameFile(Decl *current, Decl *other) {
+  if (current->getDeclContext()->getParentSourceFile() !=
+                  other->getDeclContext()->getParentSourceFile())
+    return false;
+
+  if (!current->getLoc().isValid())
+    return false;
+
+  return current->getASTContext().SourceMgr
+                        .isBeforeInBuffer(current->getLoc(), other->getLoc());
 }
 
 template <typename T>
@@ -619,16 +648,8 @@ static void checkOperatorOrPrecedenceGroupRedeclaration(
     if (other == decl || other->isInvalid())
       continue;
 
-    bool shouldDiagnose = false;
-    if (currentFile == other->getDeclContext()->getParentSourceFile()) {
-      // For a same-file redeclaration, make sure we get the diagnostic ordering
-      // to be sensible.
-      if (decl->getLoc().isValid() && other->getLoc().isValid() &&
-          ctx.SourceMgr.isBeforeInBuffer(decl->getLoc(), other->getLoc())) {
-        std::swap(decl, other);
-      }
-      shouldDiagnose = true;
-    } else {
+    bool shouldDiagnose = true;
+    if (currentFile != other->getDeclContext()->getParentSourceFile()) {
       // If the declarations are in different files, only diagnose if we've
       // enabled the new operator lookup behaviour where decls in the current
       // module are now favored over imports.
@@ -636,6 +657,12 @@ static void checkOperatorOrPrecedenceGroupRedeclaration(
     }
 
     if (shouldDiagnose) {
+      // For a same-file redeclaration, make sure we get the diagnostic ordering
+      // to be sensible.
+      if (isBeforeInSameFile(decl, other)) {
+        std::swap(decl, other);
+      }
+
       ctx.Diags.diagnose(decl, diagID);
       ctx.Diags.diagnose(other, noteID);
       decl->setInvalid();
@@ -684,28 +711,49 @@ CheckRedeclarationRequest::evaluate(Evaluator &eval, ValueDecl *current,
   }
 
   auto &ctx = current->getASTContext();
+  bool currentIsABIOnly = !ABIRoleInfo(current).providesAPI();
+
+  // If true, two conflicting decls may not be in scope at the same time, so
+  // we might only detect a redeclaration from one and not the other.
+  bool partialScopes = currentDC->isLocalContext() && isa<VarDecl>(current);
 
   // Find other potential definitions.
   SmallVector<ValueDecl *, 4> otherDefinitions;
   if (currentDC->isTypeContext()) {
     // Look within a type context.
     if (auto nominal = currentDC->getSelfNominalTypeDecl()) {
-      auto found = nominal->lookupDirect(current->getBaseName());
+      OptionSet<NominalTypeDecl::LookupDirectFlags> flags;
+      if (currentIsABIOnly)
+        flags |= NominalTypeDecl::LookupDirectFlags::ABIProviding;
+      auto found = nominal->lookupDirect(current->getBaseName(), SourceLoc(),
+                                         flags);
       otherDefinitions.append(found.begin(), found.end());
     }
   } else if (currentDC->isLocalContext()) {
     if (!current->isImplicit()) {
+      ABIRole roleFilter;
+      if (partialScopes)
+        // We don't know if conflicts will be detected when the other decl is
+        // `current`, so if this decl has `ABIRole::Both`, we need this lookup
+        // to include both ProvidesABI *and* ProvidesAPI decls.
+        roleFilter = ABIRoleInfo(current).getRole();
+      else
+        roleFilter = currentIsABIOnly ? ABIRole::ProvidesABI
+                                      : ABIRole::ProvidesAPI;
       ASTScope::lookupLocalDecls(currentFile, current->getBaseName(),
                                  current->getLoc(),
                                  /*stopAfterInnermostBraceStmt=*/true,
-                                 otherDefinitions);
+                                 roleFilter, otherDefinitions);
     }
   } else {
     assert(currentDC->isModuleScopeContext());
     // Look within a module context.
+    OptionSet<ModuleLookupFlags> flags;
+    if (currentIsABIOnly)
+      flags |= ModuleLookupFlags::ABIProviding;
     currentFile->getParentModule()->lookupValue(current->getBaseName(),
                                                 NLKind::QualifiedLookup,
-                                                otherDefinitions);
+                                                flags, otherDefinitions);
   }
 
   // Compare this signature against the signature of other
@@ -726,12 +774,17 @@ CheckRedeclarationRequest::evaluate(Evaluator &eval, ValueDecl *current,
     if (currentModule != otherDC->getParentModule())
       continue;
 
-    // If both declarations are in the same file, only diagnose the second one.
-    if (currentFile == otherDC->getParentSourceFile())
-      if (current->getLoc().isValid() &&
-          ctx.SourceMgr.isBeforeInBuffer(
-            current->getLoc(), other->getLoc()))
+    bool otherIsABIOnly = !ABIRoleInfo(other).providesAPI();
+
+    if (currentIsABIOnly == otherIsABIOnly || partialScopes) {
+      // If both declarations are in the same file, only diagnose the second one
+      if (isBeforeInSameFile(current, other))
         continue;
+    }
+    else if (!currentIsABIOnly && otherIsABIOnly)
+      // Don't diagnose a non-ABI-only decl as conflicting with an ABI-only
+      // decl. (We'll diagnose it in the other direction instead.)
+      continue;
 
     // Don't compare methods vs. non-methods (which only happens with
     // operators).
@@ -910,13 +963,12 @@ CheckRedeclarationRequest::evaluate(Evaluator &eval, ValueDecl *current,
         public:
           static AvailabilityRange from(const ValueDecl *VD) {
             AvailabilityRange result;
-            for (auto *attr : VD->getAttrs().getAttributes<AvailableAttr>()) {
-              if (attr->PlatformAgnostic ==
-                    PlatformAgnosticAvailabilityKind::SwiftVersionSpecific) {
-                if (attr->Introduced)
-                  result.introduced = attr->Introduced;
-                if (attr->Obsoleted)
-                  result.obsoleted = attr->Obsoleted;
+            for (auto attr : VD->getSemanticAvailableAttrs()) {
+              if (attr.isSwiftLanguageModeSpecific()) {
+                if (auto introduced = attr.getIntroduced())
+                  result.introduced = introduced;
+                if (auto obsoleted = attr.getObsoleted())
+                  result.obsoleted = obsoleted;
               }
             }
             return result;
@@ -1141,7 +1193,7 @@ static bool checkExpressionMacroDefaultValueRestrictions(ParamDecl *param) {
 #if SWIFT_BUILD_SWIFT_SYNTAX
   auto *DC = param->getInnermostDeclContext();
   const SourceFile *SF = DC->getParentSourceFile();
-  return swift_ASTGen_checkDefaultArgumentMacroExpression(
+  return swift_Macros_checkDefaultArgumentMacroExpression(
       &ctx.Diags, SF->getExportedSourceFile(),
       initExpr->getLoc().getOpaquePointerValue());
 #else
@@ -1295,7 +1347,7 @@ Expr *DefaultArgumentExprRequest::evaluate(Evaluator &evaluator,
 
   // Walk the checked initializer and contextualize any closures
   // we saw there.
-  TypeChecker::contextualizeInitializer(dc, initExpr);
+  TypeChecker::contextualizeExpr(initExpr, dc);
   TypeChecker::checkInitializerEffects(dc, initExpr);
 
   return initExpr;
@@ -1544,7 +1596,7 @@ static void diagnoseClassWithoutInitializers(ClassDecl *classDecl) {
   if (auto *superclassDecl = classDecl->getSuperclassDecl()) {
     auto *decodableProto = C.getProtocol(KnownProtocolKind::Decodable);
     auto superclassType = superclassDecl->getDeclaredInterfaceType();
-    auto ref = ModuleDecl::lookupConformance(superclassType, decodableProto);
+    auto ref = lookupConformance(superclassType, decodableProto);
     if (ref) {
       // super conforms to Decodable, so we've failed to inherit init(from:).
       // Let's suggest overriding it here.
@@ -1572,7 +1624,7 @@ static void diagnoseClassWithoutInitializers(ClassDecl *classDecl) {
       // likely that the user forgot to override its encode(to:). In this case,
       // we can produce a slightly different diagnostic to suggest doing so.
       auto *encodableProto = C.getProtocol(KnownProtocolKind::Encodable);
-      auto ref = ModuleDecl::lookupConformance(superclassType, encodableProto);
+      auto ref = lookupConformance(superclassType, encodableProto);
       if (ref) {
         // We only want to produce this version of the diagnostic if the
         // subclass doesn't directly implement encode(to:).
@@ -1797,7 +1849,7 @@ static void diagnoseRetroactiveConformances(
     proto->walkInheritedProtocols([&](ProtocolDecl *decl) {
 
       // Get the original conformance of the extended type to this protocol.
-      auto conformanceRef = ModuleDecl::lookupConformance(extendedType, decl);
+      auto conformanceRef = lookupConformance(extendedType, decl);
       if (!conformanceRef.isConcrete()) {
         return TypeWalker::Action::Continue;
       }
@@ -1818,13 +1870,20 @@ static void diagnoseRetroactiveConformances(
         if (decl == proto && entry.isRetroactive()) {
           auto loc =
               entry.getTypeRepr()->findAttrLoc(TypeAttrKind::Retroactive);
+
+          bool typeInSamePackage = extTypeModule->inSamePackage(module);
           bool typeIsSameModule =
               extTypeModule->isSameModuleLookingThroughOverlays(module);
-          auto incorrectTypeName = typeIsSameModule ? 
-              extendedNominalDecl->getName() : proto->getName();
+
+          auto declForDiag = (typeIsSameModule || typeInSamePackage)
+                                 ? extendedNominalDecl
+                                 : proto;
+          bool isSameModule = declForDiag->getParentModule()
+                                  ->isSameModuleLookingThroughOverlays(module);
+
           diags
-              .diagnose(loc, diag::retroactive_attr_does_not_apply,
-                        incorrectTypeName)
+              .diagnose(loc, diag::retroactive_attr_does_not_apply, declForDiag,
+                        isSameModule)
               .warnUntilSwiftVersion(6)
               .fixItRemove(SourceRange(loc, loc.getAdvancedLoc(1)));
           return TypeWalker::Action::Stop;
@@ -2044,29 +2103,33 @@ static void applyAccessNote(ValueDecl *VD, const AccessNote &note,
   });
 
   if (note.ObjCName) {
+    auto newName = note.ObjCName.value();
+
+    // addOrRemoveAttr above guarantees there's an ObjCAttr on this decl.
     auto attr = VD->getAttrs().getAttribute<ObjCAttr>();
     assert(attr && "ObjCName set, but ObjCAttr not true or did not apply???");
 
     if (!attr->hasName()) {
-      auto oldName = attr->getName();
-      attr->setName(*note.ObjCName, true);
+      // There was already an @objc attribute with no selector. Set it.
+      attr->setName(newName, true);
 
       if (!ctx.LangOpts.shouldRemarkOnAccessNoteSuccess())
         return;
 
       VD->diagnose(diag::attr_objc_name_changed_by_access_note,
-                   notes.Reason, VD->getDescriptiveKind(), *note.ObjCName);
+                   notes.Reason, VD->getDescriptiveKind(), newName);
 
       auto fixIt =
           VD->diagnose(diag::fixit_attr_objc_name_changed_by_access_note);
-      fixDeclarationObjCName(fixIt, VD, oldName, *note.ObjCName);
+      fixDeclarationObjCName(fixIt, VD, ObjCSelector(), newName);
     }
-    else if (attr->getName() != *note.ObjCName) {
+    else if (attr->getName() != newName) {
+      // There was already an @objc
       auto behavior = ctx.LangOpts.getAccessNoteFailureLimit();
 
       VD->diagnose(diag::attr_objc_name_conflicts_with_access_note,
-                   notes.Reason, VD->getDescriptiveKind(), *attr->getName(),
-                   *note.ObjCName)
+                   notes.Reason, VD->getDescriptiveKind(),
+                   attr->getName().value(), newName)
           .highlight(attr->getRangeWithAt())
           .limitBehavior(behavior);
     }
@@ -2296,8 +2359,7 @@ public:
       (void) VD->getFormalAccess();
 
       // Compute overrides.
-      if (!VD->getOverriddenDecls().empty())
-        checkOverrideActorIsolation(VD);
+      checkOverrideActorIsolation(VD);
 
       // Check whether the member is @objc or dynamic.
       (void) VD->isObjC();
@@ -2335,7 +2397,6 @@ public:
       }
     }
   }
-
 
   //===--------------------------------------------------------------------===//
   // Visit Methods.
@@ -2381,25 +2442,29 @@ public:
         InFlightDiagnostic inFlight =
             Ctx.Diags.diagnose(ID, diag::error_public_import_of_private_module,
                                target->getName(), importer->getName());
-        if (ID->getAttrs().isEmpty()) {
-           inFlight.fixItInsert(ID->getStartLoc(),
-                              "@_implementationOnly ");
-        }
-
-#ifndef NDEBUG
-        static bool enableTreatAsError = true;
-#else
-        static bool enableTreatAsError = getenv("ENABLE_PUBLIC_IMPORT_OF_PRIVATE_AS_ERROR");
-#endif
+        if (auto attr = ID->getAttrs().getAttribute<AccessControlAttr>()) {
+          if (Ctx.LangOpts.hasFeature(Feature::InternalImportsByDefault))
+            inFlight.fixItRemove(attr->getLocation());
+          else
+            inFlight.fixItReplace(attr->getLocation(), "internal");
+        } else
+          inFlight.fixItInsert(ID->getStartLoc(), "internal ");
 
         bool isImportOfUnderlying = importer->getName() == target->getName();
         auto *SF = ID->getDeclContext()->getParentSourceFile();
-        bool treatAsError = enableTreatAsError &&
-                            !isImportOfUnderlying &&
+        bool treatAsError = !isImportOfUnderlying &&
                             SF->Kind != SourceFileKind::Interface;
         if (!treatAsError)
           inFlight.limitBehavior(DiagnosticBehavior::Warning);
       }
+    }
+
+    // Preconcurrency imports aren't strictly memory-safe when we have strict
+    // concurrency checking enabled.
+    if (ID->preconcurrency() &&
+        Ctx.LangOpts.StrictConcurrencyLevel == StrictConcurrency::Complete &&
+        Ctx.LangOpts.hasFeature(Feature::WarnUnsafe)) {
+      diagnoseUnsafeUse(UnsafeUse::forPreconcurrencyImport(ID));
     }
   }
 
@@ -2739,7 +2804,8 @@ public:
         if (!var->hasStorage())
           return;
 
-        if (var->getAttrs().hasAttribute<SILGenNameAttr>())
+        if (var->getAttrs().hasAttribute<SILGenNameAttr>()
+              || !ABIRoleInfo(var).providesAPI())
           return;
 
         if (var->isInvalid() || PBD->isInvalid())
@@ -2748,7 +2814,18 @@ public:
         // Properties with an opaque return type need an initializer to
         // determine their underlying type.
         if (var->getOpaqueResultTypeDecl()) {
-          var->diagnose(diag::opaque_type_var_no_init);
+          // ...but don't enforce this for SIL or module interface files.
+          switch (SF->Kind) {
+          case SourceFileKind::Interface:
+          case SourceFileKind::SIL:
+            break;
+          case SourceFileKind::DefaultArgument:
+          case SourceFileKind::Main:
+          case SourceFileKind::Library:
+          case SourceFileKind::MacroExpansion:
+            var->diagnose(diag::opaque_type_var_no_init);
+            break;
+          }
         }
 
         // Non-member observing properties need an initializer.
@@ -2849,15 +2926,6 @@ public:
         // Trigger a request that will complete typechecking for the
         // initializer.
         (void) PBD->getCheckedAndContextualizedInit(i);
-
-        if (auto *var = PBD->getSingleVar()) {
-          if (var->hasAttachedPropertyWrapper())
-            return;
-        }
-
-        if (!PBD->getDeclContext()->isLocalContext()) {
-          (void) PBD->getInitializerIsolation(i);
-        }
       }
     }
 
@@ -3058,8 +3126,8 @@ public:
     auto module = AT->getDeclContext()->getParentModule();
     if (!defaultType &&
         module->getResilienceStrategy() == ResilienceStrategy::Resilient &&
-        AvailabilityInference::availableRange(proto, Ctx)
-          .isSupersetOf(AvailabilityInference::availableRange(AT, Ctx))) {
+        AvailabilityInference::availableRange(proto).isSupersetOf(
+            AvailabilityInference::availableRange(AT))) {
       AT->diagnose(
           diag::resilient_associated_type_less_available_requires_default, AT);
     }
@@ -4019,12 +4087,6 @@ public:
     llvm_unreachable("TopLevelCodeDecls are handled elsewhere");
   }
   
-  void visitIfConfigDecl(IfConfigDecl *ICD) {
-    // The active members of the #if block will be type checked along with
-    // their enclosing declaration.
-    TypeChecker::checkDeclAttributes(ICD);
-  }
-
   void visitPoundDiagnosticDecl(PoundDiagnosticDecl *PDD) {
     if (PDD->hasBeenEmitted()) { return; }
     PDD->markEmitted();
@@ -4266,51 +4328,50 @@ void TypeChecker::checkParameterList(ParameterList *params,
     }
 
     // Opaque types cannot occur in parameter position.
-    Type interfaceType = param->getInterfaceType();
-    if (interfaceType->hasTypeParameter()) {
-      interfaceType.findIf([&](Type type) {
-        if (auto fnType = type->getAs<FunctionType>()) {
-          for (auto innerParam : fnType->getParams()) {
-            auto paramType = innerParam.getPlainType();
-            if (!paramType->hasTypeParameter())
-              continue;
+    if (!isa<ClosureExpr>(owner)) {
+      Type interfaceType = param->getInterfaceType();
+      if (interfaceType->hasTypeParameter()) {
+        interfaceType.findIf([&](Type type) {
+          if (auto fnType = type->getAs<FunctionType>()) {
+            for (auto innerParam : fnType->getParams()) {
+              auto paramType = innerParam.getPlainType();
+              if (!paramType->hasTypeParameter())
+                continue;
 
-            bool hadError = paramType.findIf([&](Type innerType) {
-              auto genericParam = innerType->getAs<GenericTypeParamType>();
-              if (!genericParam)
-                return false;
+              bool hadError = paramType.findIf([&](Type innerType) {
+                auto genericParam = innerType->getAs<GenericTypeParamType>();
+                if (!genericParam)
+                  return false;
 
-              auto genericParamDecl = genericParam->getDecl();
-              if (!genericParamDecl)
-                return false;
+                auto genericParamDecl = genericParam->getOpaqueDecl();
+                if (!genericParamDecl)
+                  return false;
 
-              if (!genericParamDecl->isOpaqueType())
-                return false;
+                param->diagnose(
+                   diag::opaque_type_in_parameter, true, interfaceType);
+                return true;
+              });
 
-              param->diagnose(
-                 diag::opaque_type_in_parameter, true, interfaceType);
-              return true;
-            });
+              if (hadError)
+                return true;
+            }
 
-            if (hadError)
-              return true;
+            return false;
           }
 
           return false;
-        }
-
-        return false;
-      });
+        });
+      }
     }
 
     if (param->hasAttachedPropertyWrapper())
       (void) param->getPropertyWrapperInitializerInfo();
 
-    auto *SF = param->getDeclContext()->getParentSourceFile();
     if (!param->isInvalid()) {
+      auto *SF = owner->getParentSourceFile();
       param->visitAuxiliaryDecls([&](VarDecl *auxiliaryDecl) {
         if (!isa<ParamDecl>(auxiliaryDecl))
-          DeclChecker(param->getASTContext(), SF).visitBoundVariable(auxiliaryDecl);
+          DeclChecker(SF->getASTContext(), SF).visitBoundVariable(auxiliaryDecl);
       });
     }
 

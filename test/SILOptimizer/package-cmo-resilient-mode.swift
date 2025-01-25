@@ -1,16 +1,17 @@
 // RUN: %empty-directory(%t)
 // RUN: split-file %s %t
 
+/// Enable Package CMO; conservative mode on resilient module.
 // RUN: %target-build-swift %t/Lib.swift \
 // RUN: -module-name=Lib -package-name Pkg \
 // RUN: -parse-as-library -emit-module -emit-module-path %t/Lib.swiftmodule -I%t \
 // RUN: -Xfrontend -experimental-package-cmo -Xfrontend -experimental-allow-non-resilient-access \
 // RUN: -O -wmo -enable-library-evolution
 
-// RUN: %target-sil-opt %t/Lib.swiftmodule -sil-verify-all -o %t/Lib-res.sil
+// RUN: %target-sil-opt -sil-print-types %t/Lib.swiftmodule -sil-verify-all -o %t/Lib-res.sil
 // RUN: %FileCheck %s --check-prefixes=CHECK-COMMON,CHECK-RES < %t/Lib-res.sil
 
-// RUN: %target-build-swift -module-name=Main -package-name Pkg -I%t -emit-sil -O %t/main.swift -o %t/Main-res.sil
+// RUN: %target-build-swift -module-name=Main -package-name Pkg -I%t -Xllvm -sil-print-types -emit-sil -O %t/main.swift -o %t/Main-res.sil
 // RUN: %FileCheck %s --check-prefixes=CHECK-MAIN-COMMON,CHECK-MAIN-RES < %t/Main-res.sil
 
 // RUN: llvm-bcanalyzer --dump %t/Lib.swiftmodule | %FileCheck %s --check-prefix=CHECK-BC
@@ -18,16 +19,18 @@
 
 // RUN: rm -rf %t/Lib.swiftmodule
 
+/// Enable non-package CMO; conservative mode on non-resilient module,
+/// and compare results with Package CMO.
 // RUN: %target-build-swift %t/Lib.swift \
 // RUN: -module-name=Lib -package-name Pkg \
 // RUN: -parse-as-library -emit-module -emit-module-path %t/Lib.swiftmodule -I%t \
-// RUN: -Xfrontend -experimental-package-cmo -Xfrontend -experimental-allow-non-resilient-access \
+// RUN: -Xfrontend -enable-default-cmo \
 // RUN: -O -wmo
 
-// RUN: %target-sil-opt %t/Lib.swiftmodule -sil-verify-all -o %t/Lib-non-res.sil
+// RUN: %target-sil-opt -sil-print-types %t/Lib.swiftmodule -sil-verify-all -o %t/Lib-non-res.sil
 // RUN: %FileCheck %s --check-prefixes=CHECK-COMMON,CHECK-NONRES < %t/Lib-non-res.sil
 
-// RUN: %target-build-swift -module-name=Main -package-name Pkg -I%t -emit-sil -O %t/main.swift -o %t/Main-non-res.sil
+// RUN: %target-build-swift -module-name=Main -package-name Pkg -I%t -Xllvm -sil-print-types -emit-sil -O %t/main.swift -o %t/Main-non-res.sil
 // RUN: %FileCheck %s --check-prefixes=CHECK-MAIN-COMMON,CHECK-MAIN-NONRES < %t/Main-non-res.sil
 
 // REQUIRES: swift_in_compiler

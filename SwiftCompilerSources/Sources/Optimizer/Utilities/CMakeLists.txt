@@ -9,7 +9,6 @@
 swift_compiler_sources(Optimizer
   AccessUtilsTest.swift
   AddressUtils.swift
-  BorrowedFromUpdater.swift
   BorrowUtils.swift
   SpecializationCloner.swift
   DiagnosticEngine.swift
@@ -17,10 +16,12 @@ swift_compiler_sources(Optimizer
   EscapeUtils.swift
   ForwardingUtils.swift
   FunctionSignatureTransforms.swift
+  GenericSpecialization.swift
   LifetimeDependenceUtils.swift
   LocalVariableUtils.swift
   OptUtils.swift
   OwnershipLiveness.swift
+  PhiUpdater.swift
   SSAUpdater.swift
   StaticInitCloner.swift
   Test.swift

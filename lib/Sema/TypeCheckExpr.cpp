@@ -50,10 +50,6 @@ static Type getArgListUniqueSugarType(ArgumentList *args, CanType resultTy) {
         return Type();
     }
 
-    // If this type is parenthesized, remove the parens.  We don't want to
-    // propagate parens from arguments to the result type.
-    argTy = argTy->getWithoutParens();
-
     // If this is the first match against the sugar type we found, use it.
     if (!uniqueSugarTy) {
       uniqueSugarTy = argTy;
@@ -200,8 +196,8 @@ static Expr *makeBinOp(ASTContext &Ctx, Expr *Op, Expr *LHS, Expr *RHS,
   if (!LHS || !RHS)
     return nullptr;
 
-  // If the left-hand-side is a 'try' or 'await', hoist it up turning
-  // "(try x) + y" into try (x + y).
+  // If the left-hand-side is a 'try', 'await', or 'unsafe', hoist it up
+  // turning "(try x) + y" into try (x + y).
   if (auto *tryEval = dyn_cast<AnyTryExpr>(LHS)) {
     auto sub = makeBinOp(Ctx, Op, tryEval->getSubExpr(), RHS,
                          opPrecedence, isEndOfSequence);
@@ -215,21 +211,17 @@ static Expr *makeBinOp(ASTContext &Ctx, Expr *Op, Expr *LHS, Expr *RHS,
     await->setSubExpr(sub);
     return await;
   }
-  
-  // If this is an assignment operator, and the left operand is an optional
-  // evaluation, pull the operator into the chain.
-  if (opPrecedence && opPrecedence->isAssignment()) {
-    if (auto optEval = dyn_cast<OptionalEvaluationExpr>(LHS)) {
-      auto sub = makeBinOp(Ctx, Op, optEval->getSubExpr(), RHS,
-                           opPrecedence, isEndOfSequence);
-      optEval->setSubExpr(sub);
-      return optEval;
-    }
+
+  if (auto *unsafe = dyn_cast<UnsafeExpr>(LHS)) {
+    auto sub = makeBinOp(Ctx, Op, unsafe->getSubExpr(), RHS,
+                         opPrecedence, isEndOfSequence);
+    unsafe->setSubExpr(sub);
+    return unsafe;
   }
 
-  // If the right operand is a try or await, it's an error unless the operator
-  // is an assignment or conditional operator and there's nothing to
-  // the right that didn't parse as part of the right operand.
+  // If the right operand is a try, await, or unsafe, it's an error unless
+  // the operator is an assignment or conditional operator and there's
+  // nothing to the right that didn't parse as part of the right operand.
   //
   // Generally, nothing to the right will fail to parse as part of the
   // right operand because there are no standard operators that have
@@ -243,13 +235,14 @@ static Expr *makeBinOp(ASTContext &Ctx, Expr *Op, Expr *LHS, Expr *RHS,
   //   x ? try foo() : try bar() $#! 1
   // assuming $#! is some crazy operator with lower precedence
   // than the conditional operator.
-  if (isa<AnyTryExpr>(RHS) || isa<AwaitExpr>(RHS)) {
+  if (isa<AnyTryExpr>(RHS) || isa<AwaitExpr>(RHS) || isa<UnsafeExpr>(RHS)) {
     // If you change this, also change TRY_KIND_SELECT in diagnostics.
     enum class TryKindForDiagnostics : unsigned {
       Try,
       ForceTry,
       OptionalTry,
-      Await
+      Await,
+      Unsafe,
     };
     TryKindForDiagnostics tryKind;
     switch (RHS->getKind()) {
@@ -264,6 +257,9 @@ static Expr *makeBinOp(ASTContext &Ctx, Expr *Op, Expr *LHS, Expr *RHS,
       break;
     case ExprKind::Await:
       tryKind = TryKindForDiagnostics::Await;
+      break;
+    case ExprKind::Unsafe:
+      tryKind = TryKindForDiagnostics::Unsafe;
       break;
     default:
       llvm_unreachable("unknown try-like expression");
@@ -290,9 +286,9 @@ static Expr *makeBinOp(ASTContext &Ctx, Expr *Op, Expr *LHS, Expr *RHS,
   if (auto *ternary = dyn_cast<TernaryExpr>(Op)) {
     // Resolve the ternary expression.
     if (!Ctx.CompletionCallback) {
-      // In code completion we might call preCheckExpression twice - once for
+      // In code completion we might call preCheckTarget twice - once for
       // the first pass and once for the second pass. This is fine since
-      // preCheckExpression idempotent.
+      // preCheckTarget is idempotent.
       assert(!ternary->isFolded() && "already folded if expr in sequence?!");
     }
     ternary->setCondExpr(LHS);
@@ -303,9 +299,9 @@ static Expr *makeBinOp(ASTContext &Ctx, Expr *Op, Expr *LHS, Expr *RHS,
   if (auto *assign = dyn_cast<AssignExpr>(Op)) {
     // Resolve the assignment expression.
     if (!Ctx.CompletionCallback) {
-      // In code completion we might call preCheckExpression twice - once for
+      // In code completion we might call preCheckTarget twice - once for
       // the first pass and once for the second pass. This is fine since
-      // preCheckExpression idempotent.
+      // preCheckTarget is idempotent.
       assert(!assign->isFolded() && "already folded assign expr in sequence?!");
     }
     assign->setDest(LHS);
@@ -316,9 +312,9 @@ static Expr *makeBinOp(ASTContext &Ctx, Expr *Op, Expr *LHS, Expr *RHS,
   if (auto *as = dyn_cast<ExplicitCastExpr>(Op)) {
     // Resolve the 'as' or 'is' expression.
     if (!Ctx.CompletionCallback) {
-      // In code completion we might call preCheckExpression twice - once for
+      // In code completion we might call preCheckTarget twice - once for
       // the first pass and once for the second pass. This is fine since
-      // preCheckExpression idempotent.
+      // preCheckTarget is idempotent.
       assert(!as->isFolded() && "already folded 'as' expr in sequence?!");
     }
     assert(RHS == as && "'as' with non-type RHS?!");
@@ -329,9 +325,9 @@ static Expr *makeBinOp(ASTContext &Ctx, Expr *Op, Expr *LHS, Expr *RHS,
   if (auto *arrow = dyn_cast<ArrowExpr>(Op)) {
     // Resolve the '->' expression.
     if (!Ctx.CompletionCallback) {
-      // In code completion we might call preCheckExpression twice - once for
+      // In code completion we might call preCheckTarget twice - once for
       // the first pass and once for the second pass. This is fine since
-      // preCheckExpression idempotent.
+      // preCheckTarget is idempotent.
       assert(!arrow->isFolded() && "already folded '->' expr in sequence?!");
     }
     arrow->setArgsExpr(LHS);
@@ -528,8 +524,11 @@ bool TypeChecker::requireArrayLiteralIntrinsics(ASTContext &ctx,
 
 Expr *TypeChecker::buildRefExpr(ArrayRef<ValueDecl *> Decls,
                                 DeclContext *UseDC, DeclNameLoc NameLoc,
-                                bool Implicit, FunctionRefKind functionRefKind) {
+                                bool Implicit, FunctionRefInfo functionRefInfo) {
   assert(!Decls.empty() && "Must have at least one declaration");
+  ASSERT(llvm::any_of(Decls, [](ValueDecl *VD) {
+            return ABIRoleInfo(VD).providesAPI();
+          }) && "DeclRefExpr can't refer to ABI-only decl");
 
   auto &Context = UseDC->getASTContext();
 
@@ -540,7 +539,7 @@ Expr *TypeChecker::buildRefExpr(ArrayRef<ValueDecl *> Decls,
 
   Decls = Context.AllocateCopy(Decls);
   auto result = new (Context) OverloadedDeclRefExpr(Decls, NameLoc, 
-                                                    functionRefKind,
+                                                    functionRefInfo,
                                                     Implicit);
   return result;
 }
@@ -784,7 +783,7 @@ Expr *CallerSideDefaultArgExprRequest::evaluate(
     return new (ctx) ErrorExpr(initExpr->getSourceRange(), paramTy);
   }
   if (param->getDefaultArgumentKind() == DefaultArgumentKind::ExpressionMacro) {
-    TypeChecker::contextualizeCallSideDefaultArgument(dc, initExpr);
+    TypeChecker::contextualizeExpr(initExpr, dc);
     TypeChecker::checkCallerSideDefaultArgumentEffects(dc, initExpr);
   }
   return initExpr;

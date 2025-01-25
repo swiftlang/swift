@@ -22,8 +22,10 @@
 #include "swift/AST/DeclNameLoc.h"
 #include "swift/AST/DiagnosticConsumer.h"
 #include "swift/AST/TypeLoc.h"
+#include "swift/Basic/PrintDiagnosticNamesMode.h"
 #include "swift/Basic/Statistic.h"
 #include "swift/Basic/Version.h"
+#include "swift/Basic/WarningAsErrorRule.h"
 #include "swift/Localization/LocalizationFormat.h"
 #include "llvm/ADT/BitVector.h"
 #include "llvm/ADT/StringRef.h"
@@ -50,7 +52,9 @@ namespace swift {
   class ValueDecl;
   class SourceFile;
 
+  enum class CXXStdlibKind : uint8_t;
   enum class DescriptivePatternKind : uint8_t;
+  enum class DiagGroupID : uint16_t;
   enum class SelfAccessKind : uint8_t;
   enum class ReferenceOwnership : uint8_t;
   enum class StaticSpellingKind : uint8_t;
@@ -63,6 +67,8 @@ namespace swift {
   /// Each of the diagnostics described in Diagnostics.def has an entry in
   /// this enumeration type that uniquely identifies it.
   enum class DiagID : uint32_t;
+
+  enum class DiagGroupID : uint16_t;
 
   /// Describes a diagnostic along with its argument types.
   ///
@@ -427,14 +433,29 @@ namespace swift {
 
   /// Describes the current behavior to take with a diagnostic.
   /// Ordered from most severe to least.
-  enum class DiagnosticBehavior : uint8_t {
-    Unspecified = 0,
-    Fatal,
-    Error,
-    Warning,
-    Remark,
-    Note,
-    Ignore,
+  struct DiagnosticBehavior {
+    enum Kind : uint8_t {
+      Unspecified = 0,
+      Fatal,
+      Error,
+      Warning,
+      Remark,
+      Note,
+      Ignore,
+    };
+
+    Kind kind;
+
+    DiagnosticBehavior() : kind(Unspecified) {}
+    DiagnosticBehavior(Kind kind) : kind(kind) {}
+    operator Kind() const { return kind; }
+
+    /// Move up the lattice returning the max value.
+    DiagnosticBehavior merge(DiagnosticBehavior other) const {
+      auto value = std::max(std::underlying_type<Kind>::type(*this),
+                            std::underlying_type<Kind>::type(other));
+      return Kind(value);
+    }
   };
 
   struct DiagnosticFormatOptions {
@@ -480,6 +501,7 @@ namespace swift {
 
   private:
     DiagID ID;
+    DiagGroupID GroupID;
     SmallVector<DiagnosticArgument, 3> Args;
     SmallVector<CharSourceRange, 2> Ranges;
     SmallVector<FixIt, 2> FixIts;
@@ -492,7 +514,16 @@ namespace swift {
     friend DiagnosticEngine;
     friend class InFlightDiagnostic;
 
-    Diagnostic(DiagID ID) : ID(ID) {}
+    /// Constructs a Diagnostic with DiagGroupID infered from DiagID.
+    Diagnostic(DiagID ID);
+
+  protected:
+    /// Only use this constructor privately in this class or in unit tests by
+    /// subclassing.
+    /// In unit tests, it is used as a means for associating diagnostics with
+    /// groups and, thus, circumventing the need to otherwise define mock
+    /// diagnostics, which is not accounted for in the current design.
+    Diagnostic(DiagID ID, DiagGroupID GroupID) : ID(ID), GroupID(GroupID) {}
 
   public:
     // All constructors are intentionally implicit.
@@ -504,8 +535,9 @@ namespace swift {
       gatherArgs(VArgs...);
     }
 
-    /*implicit*/Diagnostic(DiagID ID, ArrayRef<DiagnosticArgument> Args)
-      : ID(ID), Args(Args.begin(), Args.end()) {}
+    Diagnostic(DiagID ID, ArrayRef<DiagnosticArgument> Args) : Diagnostic(ID) {
+      this->Args.append(Args.begin(), Args.end());
+    }
 
     template <class... ArgTypes>
     static Diagnostic fromTuple(Diag<ArgTypes...> id,
@@ -517,6 +549,7 @@ namespace swift {
     
     // Accessors.
     DiagID getID() const { return ID; }
+    DiagGroupID getGroupID() const { return GroupID; }
     ArrayRef<DiagnosticArgument> getArgs() const { return Args; }
     ArrayRef<CharSourceRange> getRanges() const { return Ranges; }
     ArrayRef<FixIt> getFixIts() const { return FixIts; }
@@ -668,6 +701,30 @@ namespace swift {
     InFlightDiagnostic &limitBehaviorUntilSwiftVersion(
         DiagnosticBehavior limit, unsigned majorVersion);
 
+    /// Limits the diagnostic behavior to \c limit accordingly if
+    /// preconcurrency applies. Otherwise, the behavior limit only applies
+    /// prior to the given language mode.
+    ///
+    /// `@preconcurrency` applied to a nominal declaration or an import
+    /// statement will limit concurrency diagnostic behavior based on the
+    /// strict concurrency checking level. Under minimal checking,
+    /// preconcurrency will suppress the diagnostics. With strict concurrency
+    /// checking, including when building with the Swift 6 language mode,
+    /// preconcurrency errors are downgraded to warnings. This allows libraries
+    /// to stage in concurrency annotations even after their clients have
+    /// migrated to Swift 6 using `@preconcurrency` alongside the newly added
+    /// `@Sendable` or `@MainActor` annotations.
+    InFlightDiagnostic
+    &limitBehaviorWithPreconcurrency(DiagnosticBehavior limit,
+                                     bool preconcurrency,
+                                     unsigned languageMode = 6) {
+      if (preconcurrency) {
+        return limitBehavior(limit);
+      }
+
+      return limitBehaviorUntilSwiftVersion(limit, languageMode);
+    }
+
     /// Limit the diagnostic behavior to warning until the specified version.
     ///
     /// This helps stage in fixes for stricter diagnostics as warnings
@@ -736,6 +793,9 @@ namespace swift {
 
     /// Add a character-based range to the currently-active diagnostic.
     InFlightDiagnostic &highlightChars(SourceLoc Start, SourceLoc End);
+
+    /// Add a character-based range to the currently-active diagnostic.
+    InFlightDiagnostic &highlightChars(CharSourceRange Range);
 
     static const char *fixItStringFor(const FixItID id);
 
@@ -851,8 +911,10 @@ namespace swift {
     /// Don't emit any remarks
     bool suppressRemarks = false;
 
-    /// Emit all warnings as errors
-    bool warningsAsErrors = false;
+    /// A mapping from `DiagGroupID` identifiers to Boolean values indicating
+    /// whether warnings belonging to the respective diagnostic groups should be
+    /// escalated to errors.
+    llvm::BitVector warningsAsErrors;
 
     /// Whether a fatal error has occurred
     bool fatalErrorOccurred = false;
@@ -893,9 +955,29 @@ namespace swift {
     void setSuppressRemarks(bool val) { suppressRemarks = val; }
     bool getSuppressRemarks() const { return suppressRemarks; }
 
-    /// Whether to treat warnings as errors
-    void setWarningsAsErrors(bool val) { warningsAsErrors = val; }
-    bool getWarningsAsErrors() const { return warningsAsErrors; }
+    /// Sets whether warnings belonging to the diagnostic group identified by
+    /// `id` should be escalated to errors.
+    void setWarningsAsErrorsForDiagGroupID(DiagGroupID id, bool value) {
+      warningsAsErrors[(unsigned)id] = value;
+    }
+
+    /// Returns a Boolean value indicating whether warnings belonging to the
+    /// diagnostic group identified by `id` should be escalated to errors.
+    bool getWarningsAsErrorsForDiagGroupID(DiagGroupID id) {
+      return warningsAsErrors[(unsigned)id];
+    }
+
+    /// Whether all warnings should be upgraded to errors or not.
+    void setAllWarningsAsErrors(bool value) {
+      // This works as intended because every diagnostic belongs to either a
+      // custom group or the top-level `DiagGroupID::no_group`, which is also
+      // a group.
+      if (value) {
+        warningsAsErrors.set();
+      } else {
+        warningsAsErrors.reset();
+      }
+    }
 
     void resetHadAnyError() {
       anyErrorOccurred = false;
@@ -1021,10 +1103,6 @@ namespace swift {
     /// been emitted due to an open transaction.
     SmallVector<Diagnostic, 4> TentativeDiagnostics;
 
-    /// The set of declarations for which we have pretty-printed
-    /// results that we can point to on the command line.
-    llvm::DenseMap<const Decl *, SourceLoc> PrettyPrintedDeclarations;
-
     llvm::BumpPtrAllocator TransactionAllocator;
     /// A set of all strings involved in current transactional chain.
     /// This is required because diagnostics are not directly emitted
@@ -1035,6 +1113,13 @@ namespace swift {
     /// diagnostic message.
     std::unique_ptr<diag::LocalizationProducer> localization;
 
+    /// This allocator will retain diagnostic strings containing the
+    /// diagnostic's message and identifier as `message [id]` for the duration
+    /// of compiler invocation. This will be used when the frontend flags
+    /// `-debug-diagnostic-names` or `-print-diagnostic-groups` are used.
+    llvm::BumpPtrAllocator DiagnosticStringsAllocator;
+    llvm::StringSaver DiagnosticStringsSaver;
+
     /// The number of open diagnostic transactions. Diagnostics are only
     /// emitted once all transactions have closed.
     unsigned TransactionCount = 0;
@@ -1044,9 +1129,11 @@ namespace swift {
     /// input being compiled.
     /// May be invalid.
     SourceLoc bufferIndirectlyCausingDiagnostic;
-    
-    /// Print diagnostic names after their messages
-    bool printDiagnosticNames = false;
+
+    /// When printing diagnostics, include either the diagnostic name
+    /// (diag::whatever) at the end or the associated diagnostic group.
+    PrintDiagnosticNamesMode printDiagnosticNamesMode =
+        PrintDiagnosticNamesMode::None;
 
     /// Path to diagnostic documentation directory.
     std::string diagnosticDocumentationPath = "";
@@ -1068,11 +1155,13 @@ namespace swift {
     friend class CompoundDiagnosticTransaction;
     friend class DiagnosticStateRAII;
     friend class DiagnosticQueue;
+    friend class PrettyPrintDeclRequest;
 
   public:
     explicit DiagnosticEngine(SourceManager &SourceMgr)
         : SourceMgr(SourceMgr), ActiveDiagnostic(),
-          TransactionStrings(TransactionAllocator) {}
+          TransactionStrings(TransactionAllocator),
+          DiagnosticStringsSaver(DiagnosticStringsAllocator) {}
 
     /// hadAnyError - return true if any *error* diagnostics have been emitted.
     bool hadAnyError() const { return state.hadAnyError(); }
@@ -1105,18 +1194,20 @@ namespace swift {
       return state.getSuppressRemarks();
     }
 
-    /// Whether to treat warnings as errors
-    void setWarningsAsErrors(bool val) { state.setWarningsAsErrors(val); }
-    bool getWarningsAsErrors() const {
-      return state.getWarningsAsErrors();
-    }
+    /// Apply rules specifing what warnings should or shouldn't be treated as
+    /// errors. For group rules the string is a group name defined by
+    /// DiagnosticGroups.def
+    /// Rules are applied in order they appear in the vector.
+    /// In case the vector contains rules affecting the same diagnostic ID
+    /// the last rule wins.
+    void setWarningsAsErrorsRules(const std::vector<WarningAsErrorRule> &rules);
 
     /// Whether to print diagnostic names after their messages
-    void setPrintDiagnosticNames(bool val) {
-      printDiagnosticNames = val;
+    void setPrintDiagnosticNamesMode(PrintDiagnosticNamesMode val) {
+      printDiagnosticNamesMode = val;
     }
-    bool getPrintDiagnosticNames() const {
-      return printDiagnosticNames;
+    PrintDiagnosticNamesMode getPrintDiagnosticNamesMode() const {
+      return printDiagnosticNamesMode;
     }
 
     void setDiagnosticDocumentationPath(std::string path) {
@@ -1137,8 +1228,7 @@ namespace swift {
     void setLocalization(StringRef locale, StringRef path) {
       assert(!locale.empty());
       assert(!path.empty());
-      localization = diag::LocalizationProducer::producerFor(
-          locale, path, getPrintDiagnosticNames());
+      localization = diag::LocalizationProducer::producerFor(locale, path);
     }
 
     void ignoreDiagnostic(DiagID id) {
@@ -1368,7 +1458,8 @@ namespace swift {
 
     /// Generate DiagnosticInfo for a Diagnostic to be passed to consumers.
     std::optional<DiagnosticInfo>
-    diagnosticInfoForDiagnostic(const Diagnostic &diagnostic);
+    diagnosticInfoForDiagnostic(const Diagnostic &diagnostic,
+                                bool includeDiagnosticName);
 
     /// Send \c diag to all diagnostic consumers.
     void emitDiagnostic(const Diagnostic &diag);
@@ -1394,8 +1485,16 @@ namespace swift {
   public:
     DiagnosticKind declaredDiagnosticKindFor(const DiagID id);
 
-    llvm::StringRef diagnosticStringFor(const DiagID id,
-                                        bool printDiagnosticNames);
+    /// Get a localized format string for a given `DiagID`. If no localization
+    /// available returns the default string for that `DiagID`.
+    llvm::StringRef diagnosticStringFor(DiagID id);
+
+    /// Get a localized format string with an optional diagnostic name appended
+    /// to it. The diagnostic name type is defined by
+    /// `PrintDiagnosticNamesMode`.
+    llvm::StringRef diagnosticStringWithNameFor(
+        DiagID id, DiagGroupID groupID,
+        PrintDiagnosticNamesMode printDiagnosticNamesMode);
 
     static llvm::StringRef diagnosticIDStringFor(const DiagID id);
 

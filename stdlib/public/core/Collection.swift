@@ -214,7 +214,7 @@ extension IndexingIterator: Sendable
 /// takes a range expression.
 ///
 ///     if let firstSpace = text.firstIndex(of: " ") {
-///         print(text[..<firstSpace]
+///         print(text[..<firstSpace])
 ///         // Prints "Buffalo"
 ///     }
 ///

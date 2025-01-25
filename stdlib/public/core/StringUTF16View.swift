@@ -540,7 +540,7 @@ extension String.UTF16View.Index {
   ///     // Prints "Café"
   ///
   /// - Parameters:
-  ///   - sourcePosition: A position in at least one of the views of the string
+  ///   - idx: A position in at least one of the views of the string
   ///     shared by `target`.
   ///   - target: The `UTF16View` in which to find the new position.
   public init?(

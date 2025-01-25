@@ -21,6 +21,7 @@
 #define SWIFT_AST_CONFORMANCE_LOOKUP_TABLE_H
 
 #include "swift/AST/DeclContext.h"
+#include "swift/AST/ProtocolConformanceOptions.h"
 #include "swift/Basic/Debug.h"
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/SourceLoc.h"
@@ -94,7 +95,10 @@ class ConformanceLookupTable : public ASTAllocated<ConformanceLookupTable> {
     /// The location of the "preconcurrency" attribute, if there is one.
     SourceLoc preconcurrencyLoc;
 
-    ConformanceSource(void *ptr, ConformanceEntryKind kind) 
+    /// The location of the "unsafe" attribute, if there is one.
+    SourceLoc unsafeLoc;
+
+    ConformanceSource(void *ptr, ConformanceEntryKind kind)
       : Storage(ptr), Kind(kind) { }
 
   public:
@@ -153,6 +157,25 @@ class ConformanceLookupTable : public ASTAllocated<ConformanceLookupTable> {
       return result;
     }
 
+    /// Return a new conformance source with the given location of "@unsafe".
+    ConformanceSource withUnsafeLoc(SourceLoc unsafeLoc) {
+      ConformanceSource result(*this);
+      if (unsafeLoc.isValid())
+        result.unsafeLoc = unsafeLoc;
+      return result;
+    }
+
+    ProtocolConformanceOptions getOptions() const {
+      ProtocolConformanceOptions options;
+      if (getUncheckedLoc().isValid())
+        options |= ProtocolConformanceFlags::Unchecked;
+      if (getPreconcurrencyLoc().isValid())
+        options |= ProtocolConformanceFlags::Preconcurrency;
+      if (getUnsafeLoc().isValid())
+        options |= ProtocolConformanceFlags::Unsafe;
+      return options;
+    }
+
     /// Retrieve the kind of conformance formed from this source.
     ConformanceEntryKind getKind() const { return Kind; }
 
@@ -198,6 +221,11 @@ class ConformanceLookupTable : public ASTAllocated<ConformanceLookupTable> {
 
     SourceLoc getPreconcurrencyLoc() const {
       return preconcurrencyLoc;
+    }
+
+    /// The location of the @unsafe attribute, if any.
+    SourceLoc getUnsafeLoc() const {
+      return unsafeLoc;
     }
 
     /// For an inherited conformance, retrieve the class declaration
