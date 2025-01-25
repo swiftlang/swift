@@ -27,13 +27,13 @@ extension SomeStruct: undefined {} // expected-error {{cannot find type 'undefin
 extension SomeEnum: undefined {} // expected-error {{cannot find type 'undefined'}}
 
 extension undefined {} // expected-error {{cannot find type 'undefined'}}
-extension undefined: undefined {} // expected-error {{cannot find type 'undefined'}}
+extension undefined: undefined {} // expected-error 2 {{cannot find type 'undefined'}}
 extension undefined: SomeProto {} // expected-error {{cannot find type 'undefined'}}
 
 public extension undefined { // expected-error {{cannot find type 'undefined' in scope}}
   protocol SomeProtoInner: undefined {} // expected-error {{cannot find type 'undefined' in scope}}
-  class SomeClassInner: undefined {}
-  struct SomeStructInner: undefined {}
+  class SomeClassInner: undefined {} // expected-error {{cannot find type 'undefined' in scope}}
+  struct SomeStructInner: undefined {} // expected-error {{cannot find type 'undefined' in scope}}
   enum SomeEnumInner: undefined { // expected-error {{cannot find type 'undefined' in scope}}
     case a
   }
