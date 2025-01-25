@@ -3688,41 +3688,6 @@ namespace {
       return nullptr;
     }
 
-    bool hasVisibleValueWitnessTable(CanType t) const {
-      // Some builtin and structural types have value witnesses exported from
-      // the runtime.
-      auto &C = IGF.IGM.Context;
-      if (t == C.TheEmptyTupleType
-          || t == C.TheNativeObjectType
-          || t == C.TheBridgeObjectType
-          || t == C.TheRawPointerType
-          || t == C.getAnyObjectType())
-        return true;
-      if (auto intTy = dyn_cast<BuiltinIntegerType>(t)) {
-        auto width = intTy->getWidth();
-        if (width.isPointerWidth())
-          return true;
-        if (width.isFixedWidth()) {
-          switch (width.getFixedWidth()) {
-          case 8:
-          case 16:
-          case 32:
-          case 64:
-          case 128:
-          case 256:
-            return true;
-          default:
-            return false;
-          }
-        }
-        return false;
-      }
-
-      // TODO: If a nominal type is in the same source file as we're currently
-      // emitting, we would be able to see its value witness table.
-      return false;
-    }
-
     /// Fallback default implementation.
     llvm::Value *visitType(CanType t, DynamicMetadataRequest request) {
       auto silTy = IGF.IGM.getLoweredType(t);
@@ -3731,7 +3696,10 @@ namespace {
       // If the type is in the same source file, or has a common value
       // witness table exported from the runtime, we can project from the
       // value witness table instead of emitting a new record.
-      if (hasVisibleValueWitnessTable(t))
+      //
+      // TODO: If a nominal type is in the same source file as we're currently
+      // emitting, we would be able to see its value witness table.
+      if (IGF.IGM.IsWellKnownBuiltinOrStructralType(t))
         return emitFromValueWitnessTable(t);
 
       // If the type is a singleton aggregate, the field's layout is equivalent

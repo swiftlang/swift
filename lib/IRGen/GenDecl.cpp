@@ -3909,6 +3909,34 @@ IRGenModule::getAddrOfLLVMVariable(LinkEntity entity,
   auto var = createVariable(*this, link, definitionType,
                             entity.getAlignment(*this), DbgTy);
 
+  // @escaping () -> ()
+  // NOTE: we explicitly desugar the `Void` type for the return as the test
+  // suite makes assumptions that it can emit the value witness table without a
+  // standard library for the target. `Context.getVoidType()` will attempt to
+  // lookup the `Decl` before returning the canonical type. To workaround this
+  // dependency, we simply desugar the `Void` return type to `()`.
+  static CanType kAnyFunctionType =
+      FunctionType::get({}, Context.TheEmptyTupleType,
+                        ASTExtInfo{})->getCanonicalType();
+
+  // Adjust the linkage for the well-known VWTs that are strongly defined
+  // in the runtime.
+  //
+  // We special case the "AnyFunctionType" here as this type is referened
+  // inside the standard library with the definition being in the runtime
+  // preventing the normal detection from identifying that this is module
+  // local.
+  if (getSwiftModule()->isStdlibModule())
+    if (entity.isTypeKind() &&
+        (IsWellKnownBuiltinOrStructralType(entity.getType()) ||
+         entity.getType() == kAnyFunctionType))
+      if (auto *GV = dyn_cast<llvm::GlobalValue>(var))
+          if (GV->hasDLLImportStorageClass())
+            ApplyIRLinkage({llvm::GlobalValue::ExternalLinkage,
+                            llvm::GlobalValue::DefaultVisibility,
+                            llvm::GlobalValue::DefaultStorageClass})
+                .to(GV);
+
   // Install the concrete definition if we have one.
   if (definition && definition.hasInit()) {
     definition.getInit().installInGlobal(var);
