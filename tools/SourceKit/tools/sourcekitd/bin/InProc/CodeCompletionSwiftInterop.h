@@ -77,7 +77,7 @@ typedef void *swiftide_connection_t;
 /// may be more expensive to compute.
 typedef void *swiftide_completion_item_t;
 
-typedef enum {
+typedef enum swiftide_completion_kind_t: uint32_t {
   SWIFTIDE_COMPLETION_KIND_NONE = 0,
   SWIFTIDE_COMPLETION_KIND_IMPORT = 1,
   SWIFTIDE_COMPLETION_KIND_UNRESOLVEDMEMBER = 2,
@@ -125,7 +125,7 @@ typedef enum {
   SWIFTIDE_COMPLETION_KIND_TYPESIMPLEINVERTED = 44,
 } swiftide_completion_kind_t;
 
-typedef enum {
+typedef enum swiftide_completion_item_kind_t: uint32_t {
   SWIFTIDE_COMPLETION_ITEM_KIND_DECLARATION = 0,
   SWIFTIDE_COMPLETION_ITEM_KIND_KEYWORD = 1,
   SWIFTIDE_COMPLETION_ITEM_KIND_PATTERN = 2,
@@ -133,7 +133,7 @@ typedef enum {
   SWIFTIDE_COMPLETION_ITEM_KIND_BUILTINOPERATOR = 4,
 } swiftide_completion_item_kind_t;
 
-typedef enum {
+typedef enum swiftide_completion_item_decl_kind_t: uint32_t {
   SWIFTIDE_COMPLETION_ITEM_DECL_KIND_MODULE = 0,
   SWIFTIDE_COMPLETION_ITEM_DECL_KIND_CLASS = 1,
   SWIFTIDE_COMPLETION_ITEM_DECL_KIND_STRUCT = 2,
@@ -161,7 +161,7 @@ typedef enum {
   SWIFTIDE_COMPLETION_ITEM_DECL_KIND_MACRO = 24,
 } swiftide_completion_item_decl_kind_t;
 
-typedef enum {
+typedef enum swiftide_completion_type_relation_t: uint32_t {
   SWIFTIDE_COMPLETION_TYPE_RELATION_NOTAPPLICABLE = 0,
   SWIFTIDE_COMPLETION_TYPE_RELATION_UNKNOWN = 1,
   SWIFTIDE_COMPLETION_TYPE_RELATION_UNRELATED = 2,
@@ -170,7 +170,7 @@ typedef enum {
   SWIFTIDE_COMPLETION_TYPE_RELATION_IDENTICAL = 5,
 } swiftide_completion_type_relation_t;
 
-typedef enum {
+typedef enum swiftide_completion_semantic_context_t: uint32_t {
   SWIFTIDE_COMPLETION_SEMANTIC_CONTEXT_NONE = 0,
   /* obsoleted */ SWIFTIDE_COMPLETION_SEMANTIC_CONTEXT_EXPRESSIONSPECIFIC = 1,
   SWIFTIDE_COMPLETION_SEMANTIC_CONTEXT_LOCAL = 2,
@@ -181,7 +181,7 @@ typedef enum {
   SWIFTIDE_COMPLETION_SEMANTIC_CONTEXT_OTHERMODULE = 7,
 } swiftide_completion_semantic_context_t;
 
-typedef enum {
+typedef enum swiftide_completion_flair_t: uint32_t {
   SWIFTIDE_COMPLETION_FLAIR_EXPRESSIONSPECIFIC = 1 << 0,
   SWIFTIDE_COMPLETION_FLAIR_SUPERCHAIN = 1 << 1,
   SWIFTIDE_COMPLETION_FLAIR_ARGUMENTLABELS = 1 << 2,
@@ -191,7 +191,7 @@ typedef enum {
   SWIFTIDE_COMPLETION_FLAIR_EXPRESSIONATNONSCRIPTORMAINFILESCOPE = 1 << 6,
 } swiftide_completion_flair_t;
 
-typedef enum {
+typedef enum swiftide_completion_not_recommended_reason_t: uint32_t {
   SWIFTIDE_COMPLETION_NOT_RECOMMENDED_NONE = 0,
   SWIFTIDE_COMPLETION_NOT_RECOMMENDED_REDUNDANT_IMPORT = 1,
   SWIFTIDE_COMPLETION_NOT_RECOMMENDED_DEPRECATED = 2,
@@ -204,7 +204,7 @@ typedef enum {
       8,
 } swiftide_completion_not_recommended_reason_t;
 
-typedef enum {
+typedef enum swiftide_completion_diagnostic_severity_t: uint32_t {
   SWIFTIDE_COMPLETION_DIAGNOSTIC_SEVERITY_NONE = 0,
   SWIFTIDE_COMPLETION_DIAGNOSTIC_SEVERITY_ERROR = 1,
   SWIFTIDE_COMPLETION_DIAGNOSTIC_SEVERITY_WARNING = 2,
