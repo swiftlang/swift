@@ -159,9 +159,29 @@ void SILLinkerVisitor::maybeAddFunctionToWorklist(
   // HiddenExternal linkage when they are declarations, then they
   // become Shared after the body has been deserialized.
   // So try deserializing HiddenExternal functions too.
-  if (linkage == SILLinkage::HiddenExternal)
-    return deserializeAndPushToWorklist(F);
-  
+  if (linkage == SILLinkage::HiddenExternal) {
+    deserializeAndPushToWorklist(F);
+    if (!F->markedAsAlwaysEmitIntoClient())
+      return;
+    for (SILDifferentiabilityWitness &witness :
+         F->getModule().getDifferentiabilityWitnesses()) {
+      if (witness.getOriginalFunction() != F)
+        continue;
+      SILDifferentiabilityWitness *loadedWitness =
+          F->getModule().getSILLoader()->lookupDifferentiabilityWitness(
+              witness.getKey());
+      if (loadedWitness == nullptr)
+        continue;
+      assert(loadedWitness == &witness);
+      SILFunction *jvp = loadedWitness->getJVP();
+      SILFunction *vjp = loadedWitness->getVJP();
+      assert(jvp && vjp);
+      deserializeAndPushToWorklist(jvp);
+      deserializeAndPushToWorklist(vjp);
+    }
+    return;
+  }
+
   // Update the linkage of the function in case it's different in the serialized
   // SIL than derived from the AST. This can be the case with cross-module-
   // optimizations.
