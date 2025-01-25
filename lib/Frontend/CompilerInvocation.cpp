@@ -2931,6 +2931,12 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
       Opts.PrintDebugInfo = true;
   }
 
+  if (const Arg *A = Args.getLastArg(OPT_experimental_serialize_debug_info))
+    Opts.PrintDebugInfo = true;
+  //TODO: Remove this as only adding for SWB
+  if (FEOpts.SerializeDebugInfoSIL)
+    Opts.PrintDebugInfo = true;
+
   if (Args.hasArg(OPT_legacy_gsil))
     llvm::WithColor::warning() << "'-gsil' is deprecated, "
                                << "use '-sil-based-debuginfo' instead\n";

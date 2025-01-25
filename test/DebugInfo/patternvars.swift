@@ -51,4 +51,4 @@ public func mangle(s: [UnicodeScalar]) -> [UnicodeScalar] {
 // CHECK:       {{[0-9]+}}:
 // CHECK-NOT:   #dbg_value
 // CHECK-NOT:   call void asm sideeffect "", "r"
-
+// CHECK:       ret void

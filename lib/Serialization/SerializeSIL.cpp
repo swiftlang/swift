@@ -3668,7 +3668,11 @@ void SILSerializer::writeSILBlock(const SILModule *SILMod) {
     }
   }
 
-  for (auto Fn : FuncsToEmitDebug) {
+  SmallVector<const SILFunction *> FuncsToEmitDebugSorted(FuncsToEmitDebug.begin(), FuncsToEmitDebug.end());
+  llvm::sort(FuncsToEmitDebugSorted, [](const SILFunction *lhs, const SILFunction *rhs) {
+      return lhs->getName() <= rhs->getName();
+      });
+  for (auto Fn : FuncsToEmitDebugSorted) {
     if (FuncsToEmit.count(Fn) == 0) {
       FuncsToEmit[Fn] = true; // emit decl only
       functionWorklist.push_back(Fn);

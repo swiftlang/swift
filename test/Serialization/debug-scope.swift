@@ -37,3 +37,13 @@ func fooId() {
      */
     let _ = id(1)
 }
+
+// Some functions have debug scopes attached before deserialization, with the
+// SILLocation pointing to an AST node. This AST node is used to retrieve the
+// Decl to perform various checks such as whether the function has opaque
+// ResultType with Availability Conditions. For such functions, make sure we
+// don't overwrite the location with a FilenameAndLocation
+public func test() {
+  let p = testInlineWithOpaque()
+}
+
