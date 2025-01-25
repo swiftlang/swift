@@ -766,10 +766,12 @@ Decl::getAvailableAttrForPlatformIntroduction() const {
   // itself. This check relies on the fact that we cannot have nested
   // extensions.
 
-  DeclContext *DC = getDeclContext();
-  if (auto *ED = dyn_cast<ExtensionDecl>(DC)) {
-    if (auto attr = getDeclAvailableAttrForPlatformIntroduction(ED))
-      return attr;
+  if (auto parent =
+          AvailabilityInference::parentDeclForInferredAvailability(this)) {
+    if (auto *ED = dyn_cast<ExtensionDecl>(parent)) {
+      if (auto attr = getDeclAvailableAttrForPlatformIntroduction(ED))
+        return attr;
+    }
   }
 
   return std::nullopt;
