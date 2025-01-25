@@ -1195,8 +1195,12 @@ bool swift::diagnoseNonSendableTypesInReference(
         // only check results if funcCheckKind specifies so
         Type resultType = func->getResultInterfaceType().subst(subs);
 
-        if (func->hasSendingResult() && !resultType->hasError())
-          return true;
+        auto diag = getSendableResultDiag(refKind);
+
+        if (diag.ID == diag::non_sendable_result_in_witness.ID &&
+            func->hasSendingResult() && !resultType->hasError()) {
+          return false;
+        }
 
         if (diagnoseNonSendableTypes(
             resultType, fromDC, derivedConformanceType,
