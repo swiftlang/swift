@@ -83,6 +83,42 @@ ${Scalar}x${n}_TestSuite.test("comparisons") {
   expectEqual(ge, a .>= b)
 }
 
+${Scalar}x${n}_TestSuite.test("comparisons with scalar") {
+  let s = ${Scalar}.random(in: ${Scalar}.min ... .max)
+  let sVector = ${Vector}(repeating: s)
+
+  expectTrue(all(s .== sVector))
+  expectFalse(any(s .!= sVector))
+  expectFalse(any(s .< sVector))
+  expectTrue(all(s .<= sVector))
+  expectFalse(any(s .> sVector))
+  expectTrue(all(s .>= sVector))
+
+  expectTrue(all(sVector .== s))
+  expectFalse(any(sVector .!= s))
+  expectFalse(any(sVector .< s))
+  expectTrue(all(sVector .<= s))
+  expectFalse(any(sVector .> s))
+  expectTrue(all(sVector .>= s))
+
+  let aVector = ${Vector}.random(in: ${Scalar}.min ... .max)
+  let leftScalar = genericComparisons(sVector, aVector)
+  expectEqual(leftScalar.eq, s .== aVector)
+  expectEqual(leftScalar.ne, s .!= aVector)
+  expectEqual(leftScalar.lt, s .<  aVector)
+  expectEqual(leftScalar.le, s .<= aVector)
+  expectEqual(leftScalar.gt, s .>  aVector)
+  expectEqual(leftScalar.ge, s .>= aVector)
+
+  let rightScalar = genericComparisons(aVector, sVector)
+  expectEqual(rightScalar.eq, aVector .== s)
+  expectEqual(rightScalar.ne, aVector .!= s)
+  expectEqual(rightScalar.lt, aVector .<  s)
+  expectEqual(rightScalar.le, aVector .<= s)
+  expectEqual(rightScalar.gt, aVector .>  s)
+  expectEqual(rightScalar.ge, aVector .>= s)
+}
+
 ${Scalar}x${n}_TestSuite.test("arithmetic") {
   let a = ${Vector}.random(in: ${Scalar}.min ... .max)
   let b = ${Vector}.random(in: ${Scalar}.min ... .max)
@@ -90,6 +126,46 @@ ${Scalar}x${n}_TestSuite.test("arithmetic") {
   expectEqual(add, a &+ b)
   expectEqual(sub, a &- b)
   expectEqual(mul, a &* b)
+
+  var addA = a
+  addA &+= b
+  expectEqual(add, addA)
+
+  var subA = a
+  subA &-= b
+  expectEqual(sub, subA)
+
+  var mulA = a
+  mulA &*= b
+  expectEqual(mul, mulA)
+}
+
+${Scalar}x${n}_TestSuite.test("arithmetic with scalar") {
+  let s = ${Scalar}.random(in: ${Scalar}.min ... .max)
+  let sVector = ${Vector}(repeating: s)
+  let aVector = ${Vector}.random(in: ${Scalar}.min ... .max)
+
+  let leftScalar = genericArithmetic(sVector, aVector)
+  expectEqual(leftScalar.add, s &+ aVector)
+  expectEqual(leftScalar.sub, s &- aVector)
+  expectEqual(leftScalar.mul, s &* aVector)
+
+  let rightScalar = genericArithmetic(aVector, sVector)
+  expectEqual(rightScalar.add, aVector &+ s)
+  expectEqual(rightScalar.sub, aVector &- s)
+  expectEqual(rightScalar.mul, aVector &* s)
+
+  var addA = aVector
+  addA &+= s
+  expectEqual(rightScalar.add, addA)
+
+  var subA = aVector
+  subA &-= s
+  expectEqual(rightScalar.sub, subA)
+
+  var mulA = aVector
+  mulA &*= s
+  expectEqual(rightScalar.mul, mulA)
 }
 
 % end
