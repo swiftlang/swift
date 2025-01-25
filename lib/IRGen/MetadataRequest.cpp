@@ -1674,12 +1674,6 @@ static MetadataResponse emitFunctionTypeMetadataRef(IRGenFunction &IGF,
   }
 
   default:
-    assert((!params.empty() || type->isDifferentiable() ||
-            !type->getIsolation().isNonIsolated() ||
-            type->getThrownError()) &&
-           "0 parameter case should be specialized unless it is a "
-           "differentiable function or has a global actor");
-
     llvm::SmallVector<llvm::Value *, 8> arguments;
 
     arguments.push_back(flagsVal);

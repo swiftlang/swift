@@ -17,7 +17,9 @@ func g() {
   unsafe unsafeFunction()
 }
 
-// expected-warning@+1{{global function 'h' has an interface that is not memory-safe; use '@unsafe' to indicate that its use is unsafe}}
+// expected-warning@+3{{global function 'h' has an interface that involves unsafe types}}
+// expected-note@+2{{add '@unsafe' to indicate that this declaration is unsafe to use}}{{1-1=@unsafe }}
+// expected-note@+1{{add '@safe' to indicate that this declaration is memory-safe to use}}{{1-1=@safe }}
 func h(_: UnsafeType) { // expected-note{{reference to unsafe struct 'UnsafeType'}}
 // expected-warning@+1{{expression uses unsafe constructs but is not marked with 'unsafe'}}
   unsafeFunction() // expected-note{{reference to unsafe global function 'unsafeFunction()'}}
@@ -29,11 +31,15 @@ func h(_: UnsafeType) { // expected-note{{reference to unsafe struct 'UnsafeType
   unsafe g()
 }
 
-// expected-warning@+1 {{global function 'rethrowing' has an interface that is not memory-safe; use '@unsafe' to indicate that its use is unsafe}}{{1-1=@unsafe }}
+// expected-warning@+3 {{global function 'rethrowing' has an interface that involves unsafe types}}
+// expected-note@+2{{add '@unsafe' to indicate that this declaration is unsafe to use}}{{1-1=@unsafe }}
+// expected-note@+1{{add '@safe' to indicate that this declaration is memory-safe to use}}{1-1=@safe }}
 func rethrowing(body: (UnsafeType) throws -> Void) rethrows { } // expected-note{{reference to unsafe struct 'UnsafeType'}}
 
 class HasStatics {
-  // expected-warning@+1{{static method 'f' has an interface that is not memory-safe; use '@unsafe' to indicate that its use is unsafe }}{{3-3=@unsafe }}
+  // expected-warning@+3{{static method 'f' has an interface that involves unsafe types}}
+// expected-note@+2{{add '@unsafe' to indicate that this declaration is unsafe to use}}{{3-3=@unsafe }}
+// expected-note@+1{{add '@safe' to indicate that this declaration is memory-safe to use}}{3-3=@safe }}
   static internal func f(_: UnsafeType) { } // expected-note{{reference to unsafe struct 'UnsafeType'}}
 
   
@@ -145,4 +151,28 @@ func testAutoclosure() {
 // Parsing of `unsafe` expressions.
 func testUnsafePositionError() -> Int {
   return 3 + unsafe unsafeInt() // expected-error{{'unsafe' cannot appear to the right of a non-assignment operator}}
+}
+
+// @safe suppresses unsafe-type-related diagnostics on an entity
+struct MyArray<Element> {
+  @safe func withUnsafeBufferPointer<R, E>(
+    _ body: (UnsafeBufferPointer<Element>) throws(E) -> R
+  ) throws(E) -> R {
+    return unsafe try body(.init(start: nil, count: 0))
+  }
+}
+
+extension UnsafeBufferPointer {
+  @safe var safeCount: Int { unsafe count }
+}
+
+func testMyArray(ints: MyArray<Int>) {
+  ints.withUnsafeBufferPointer { buffer in
+    let bufferCopy = unsafe buffer
+    _ = unsafe bufferCopy
+
+    // expected-warning@+1{{expression uses unsafe constructs but is not marked with 'unsafe'}}
+    print(buffer.safeCount) // expected-note{{reference to parameter 'buffer' involves unsafe type 'UnsafeBufferPointer<Int>'}}
+    unsafe print(buffer.baseAddress!)
+  }
 }

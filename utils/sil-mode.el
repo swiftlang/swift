@@ -198,6 +198,11 @@
                     "dynamic_pack_index" "pack_pack_index" "scalar_pack_index"
                     "dealloc_pack" "dealloc_pack_metadata")
                   'words) . font-lock-keyword-face)
+
+   ;; Misc uses
+   `(,(regexp-opt '("ignored_use")
+                  'words) . font-lock-keyword-face)
+
    ;; SIL Value
    '("\\b[%][A-Za-z_0-9]+\\([#][0-9]+\\)?\\b" . font-lock-variable-name-face)
    ;; Variables

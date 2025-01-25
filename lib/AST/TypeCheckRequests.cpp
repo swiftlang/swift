@@ -2715,23 +2715,6 @@ void ParamCaptureInfoRequest::cacheResult(CaptureInfo info) const {
 }
 
 //----------------------------------------------------------------------------//
-// IsUnsafeRequest computation.
-//----------------------------------------------------------------------------//
-
-std::optional<bool> IsUnsafeRequest::getCachedResult() const {
-  auto *decl = std::get<0>(getStorage());
-  if (!decl->isUnsafeComputed())
-    return std::nullopt;
-
-  return decl->isUnsafeRaw();
-}
-
-void IsUnsafeRequest::cacheResult(bool value) const {
-  auto *decl = std::get<0>(getStorage());
-  decl->setUnsafe(value);
-}
-
-//----------------------------------------------------------------------------//
 // SemanticAvailableAttrRequest computation.
 //----------------------------------------------------------------------------//
 

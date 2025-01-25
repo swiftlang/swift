@@ -326,9 +326,12 @@ elseif(NOT APPLE AND NOT LINUX AND NOT ANDROID AND UNIX)
   target_link_libraries(swiftCore PRIVATE "${EXECINFO_LIBRARY}")
 endif()
 
-install(TARGETS swiftCore)
+install(TARGETS swiftCore
+  ARCHIVE DESTINATION "${SwiftCore_INSTALL_LIBDIR}"
+  LIBRARY DESTINATION "${SwiftCore_INSTALL_LIBDIR}"
+  RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}")
 install(FILES "${CMAKE_CURRENT_BINARY_DIR}/Swift.swiftmodule"
-  DESTINATION "${CMAKE_INSTALL_LIBDIR}/swift/Swift.swiftmodule"
+  DESTINATION "${SwiftCore_INSTALL_SWIFTMODULEDIR}/Swift.swiftmodule"
   RENAME "${SwiftCore_MODULE_TRIPLE}.swiftmodule")
 emit_swift_interface(swiftCore)
 install_swift_interface(swiftCore)

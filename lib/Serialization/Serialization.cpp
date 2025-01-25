@@ -2894,8 +2894,9 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
     case DeclAttrKind::Execution: {
       auto *theAttr = cast<ExecutionAttr>(DA);
       auto abbrCode = S.DeclTypeAbbrCodes[ExecutionDeclAttrLayout::Code];
-      ExecutionDeclAttrLayout::emitRecord(S.Out, S.ScratchRecord, abbrCode,
-                                          (unsigned)theAttr->getKind());
+      ExecutionDeclAttrLayout::emitRecord(
+          S.Out, S.ScratchRecord, abbrCode,
+          static_cast<uint8_t>(theAttr->getBehavior()));
       return;
     }
 

@@ -1374,6 +1374,12 @@ public:
       Region sentRegion = p.getRegion(sentElement);
       bool isClosureCapturedElt = false;
       SILDynamicMergedIsolationInfo sentRegionIsolation;
+
+      // TODO: Today we only return the first element in our region that has
+      // some form of isolation. This causes us to in the case of sending
+      // partial_applies to only emit a diagnostic for the first element in the
+      // capture list of the partial_apply. If we returned a list of potential
+      // errors... we could emit the error for each capture individually.
       auto pairOpt = getIsolationRegionInfo(sentRegion, op.getSourceOp());
       if (!pairOpt) {
         return handleError(UnknownCodePatternError(op));

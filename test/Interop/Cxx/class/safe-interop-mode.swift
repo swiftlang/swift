@@ -71,16 +71,22 @@ import Test
 import CoreFoundation
 import CxxStdlib
 
-// expected-warning@+1{{global function 'useUnsafeParam' has an interface that is not memory-safe}}{{1-1=@unsafe }}
+// expected-warning@+3{{global function 'useUnsafeParam' has an interface that involves unsafe types}}
+// expected-note@+2{{add '@unsafe' to indicate that this declaration is unsafe to use}}{{1-1=@unsafe }}
+// expected-note@+1{{add '@safe' to indicate that this declaration is memory-safe to use}}{{1-1=@safe }}
 func useUnsafeParam(x: Unannotated) { // expected-note{{reference to unsafe struct 'Unannotated'}}
 }
 
-// expected-warning@+2{{global function 'useUnsafeParam2' has an interface that is not memory-safe}}{{11:1-1=@unsafe }}
+// expected-warning@+4{{global function 'useUnsafeParam2' has an interface that involves unsafe types}}
+// expected-note@+2{{add '@unsafe' to indicate that this declaration is unsafe to use}}{{1-1=@unsafe }}
+// expected-note@+1{{add '@safe' to indicate that this declaration is memory-safe to use}}{{1-1=@safe }}
 @available(SwiftStdlib 5.8, *)
 func useUnsafeParam2(x: UnsafeReference) { // expected-note{{reference to unsafe class 'UnsafeReference'}}
 }
 
-// expected-warning@+1{{global function 'useUnsafeParam3' has an interface that is not memory-safe}}{{1-1=@unsafe }}
+// expected-warning@+3{{global function 'useUnsafeParam3' has an interface that involves unsafe types}}
+// expected-note@+2{{add '@unsafe' to indicate that this declaration is unsafe to use}}{{1-1=@unsafe }}
+// expected-note@+1{{add '@safe' to indicate that this declaration is memory-safe to use}}{{1-1=@safe }}
 func useUnsafeParam3(x: UnknownEscapabilityAggregate) { // expected-note{{reference to unsafe struct 'UnknownEscapabilityAggregate'}}
 }
 
@@ -95,7 +101,9 @@ func useCfType(x: CFArray) {
 func useString(x: std.string) {
 }
 
-// expected-warning@+1{{global function 'useVecOfPtr' has an interface that is not memory-safe; use '@unsafe' to indicate that its use is unsafe}}
+// expected-warning@+3{{global function 'useVecOfPtr' has an interface}}
+// expected-note@+2{{add '@unsafe' to indicate that this declaration is unsafe to use}}{{1-1=@unsafe }}
+// expected-note@+1{{add '@safe' to indicate that this declaration is memory-safe to use}}{1-1=@safe }}
 func useVecOfPtr(x: VecOfPtr) { // expected-note{{reference to unsafe type alias 'VecOfPtr'}}
 }
 
@@ -105,15 +113,21 @@ func useVecOfInt(x: VecOfInt) {
 func useSafeTuple(x: SafeTuple) {
 }
 
-// expected-warning@+1{{global function 'useUnsafeTuple' has an interface that is not memory-safe; use '@unsafe' to indicate that its use is unsafe}}
+// expected-warning@+3{{global function 'useUnsafeTuple' has an interface that involves unsafe types}}
+// expected-note@+2{{add '@unsafe' to indicate that this declaration is unsafe to use}}{{1-1=@unsafe }}
+// expected-note@+1{{add '@safe' to indicate that this declaration is memory-safe to use}}{1-1=@safe }}
 func useUnsafeTuple(x: UnsafeTuple) { // expected-note{{reference to unsafe type alias 'UnsafeTuple'}}
 }
 
-// expected-warning@+1{{global function 'useCppSpan' has an interface that is not memory-safe; use '@unsafe' to indicate that its use is unsafe}}
+// expected-warning@+3{{global function 'useCppSpan' has an interface that involves unsafe types}}
+// expected-note@+2{{add '@unsafe' to indicate that this declaration is unsafe to use}}{{1-1=@unsafe }}
+// expected-note@+1{{add '@safe' to indicate that this declaration is memory-safe to use}}{1-1=@safe }}
 func useCppSpan(x: SpanOfInt) { // expected-note{{reference to unsafe type alias 'SpanOfInt'}}
 }
 
-// expected-warning@+1{{global function 'useCppSpan2' has an interface that is not memory-safe}}
+// expected-warning@+3{{global function 'useCppSpan2' has an interface that involves unsafe types}}
+// expected-note@+2{{add '@unsafe' to indicate that this declaration is unsafe to use}}{{1-1=@unsafe }}
+// expected-note@+1{{add '@safe' to indicate that this declaration is memory-safe to use}}{1-1=@safe }}
 func useCppSpan2(x: SpanOfIntAlias) { // expected-note{{reference to unsafe type alias 'SpanOfIntAlias'}}
 }
 

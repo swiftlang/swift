@@ -2547,7 +2547,7 @@ checkIndividualConformance(NormalProtocolConformance *conformance) {
 
   // If we're enforcing strict memory safety and this conformance hasn't
   // opted out, look for safe/unsafe witness mismatches.
-  if (!conformance->isUnsafe() &&
+  if (conformance->getExplicitSafety() == ExplicitSafety::Unspecified &&
       Context.LangOpts.hasFeature(Feature::WarnUnsafe)) {
     // Collect all of the unsafe uses for this conformance.
     SmallVector<UnsafeUse, 2> unsafeUses;
@@ -2559,7 +2559,7 @@ checkIndividualConformance(NormalProtocolConformance *conformance) {
           TypeWitnessAndDecl typeWitnessAndDecl =
             conformance->getTypeWitnessAndDecl(assocType);
           Type typeWitness = typeWitnessAndDecl.getWitnessType();
-          if (!assocType->isUnsafe() && typeWitness && typeWitness->isUnsafe()) {
+          if (!isUnsafe(assocType) && typeWitness && typeWitness->isUnsafe()) {
             SourceLoc loc;
             if (auto typeDecl = typeWitnessAndDecl.getWitnessDecl()) {
               loc = typeDecl->getLoc();
