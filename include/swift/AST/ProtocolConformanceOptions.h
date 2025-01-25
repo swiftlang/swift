@@ -34,6 +34,9 @@ enum class ProtocolConformanceFlags {
   /// @retroactive conformance
   Retroactive = 0x08,
 
+  /// @safe conformance
+  Safe = 0x10,
+
   // Note: whenever you add a bit here, update
   // NumProtocolConformanceOptions below.
 };
@@ -49,7 +52,7 @@ inline ProtocolConformanceOptions operator|(
 }
 
 enum : unsigned {
-  NumProtocolConformanceOptions = 4
+  NumProtocolConformanceOptions = 5
 };
 
 } // end namespace swift

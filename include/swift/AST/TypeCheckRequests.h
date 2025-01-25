@@ -5175,24 +5175,6 @@ void simple_display(llvm::raw_ostream &out,
                     RegexLiteralPatternFeatureKind kind);
 SourceLoc extractNearestSourceLoc(RegexLiteralPatternFeatureKind kind);
 
-class IsUnsafeRequest
-    : public SimpleRequest<IsUnsafeRequest,
-                           bool(Decl *decl),
-                           RequestFlags::SeparatelyCached> {
-public:
-  using SimpleRequest::SimpleRequest;
-
-private:
-  friend SimpleRequest;
-
-  bool evaluate(Evaluator &evaluator, Decl *decl) const;
-
-public:
-  bool isCached() const { return true; }
-  std::optional<bool> getCachedResult() const;
-  void cacheResult(bool value) const;
-};
-
 class GenericTypeParamDeclGetValueTypeRequest
     : public SimpleRequest<GenericTypeParamDeclGetValueTypeRequest,
                            Type(GenericTypeParamDecl *decl),
