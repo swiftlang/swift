@@ -2252,9 +2252,6 @@ private:
     if (Mangled.nextIf('H'))
       addImplFunctionAttribute(type, "@async");
 
-    if (Mangled.nextIf('T'))
-      addImplFunctionAttribute(type, "sending-result");
-
     // Enter a new generic context if this type is generic.
     // FIXME: replace with std::optional, when we have it.
     bool isPseudogeneric = false;
