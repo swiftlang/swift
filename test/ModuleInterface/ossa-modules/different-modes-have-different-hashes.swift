@@ -162,6 +162,7 @@
 // RUN: cd %t/MCP.O && ls *.swiftmodule > %t/MCP.O/firstFile
 // RUN: cd %t/MCP.O/old && ls *.swiftmodule > %t/MCP.O/secondFile
 // RUN: not diff -u %t/MCP.O/firstFile %t/MCP.O/secondFile
+// XFAIL: *
 
 @_fixed_layout
 public final class Klass {

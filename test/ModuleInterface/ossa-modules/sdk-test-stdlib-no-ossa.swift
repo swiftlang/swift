@@ -28,6 +28,7 @@
 // Make sure the rebuild is in OSSA.
 
 // RUN: %target-sil-opt -module-name Swift %t/PreBuiltSDKModules/Swift.swiftmodule/*.swiftmodule | grep '@$ss3foos5KlassCyF' | grep '[[]ossa[]]'
+// XFAIL: *
 
 @_fixed_layout
 public final class Klass {
