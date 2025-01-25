@@ -99,14 +99,6 @@ class LowerTupleAddrConstructorTransform : public SILFunctionTransform {
           continue;
         }
 
-        // (tuple_addr_constructor [assign/init] %addr,
-        //                         (destructure_tuple %tuple))
-        // ->
-        // (store [assign/init] %tuple to %addr)
-        if (peepholeTupleDestructorOperand(inst)) {
-          continue;
-        }
-
         SILBuilderWithScope builder(inst);
 
         unsigned count = 0;
