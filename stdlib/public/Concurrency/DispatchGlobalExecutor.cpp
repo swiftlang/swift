@@ -54,6 +54,28 @@
 #include "ExecutorImpl.h"
 #include "TaskPrivate.h"
 
+#if __cplusplus < 202002l || !defined(__cpp_lib_bit_cast)
+namespace std {
+template <typename Destination, typename Source>
+std::enable_if_t<sizeof(Destination) == sizeof(Source) &&
+                 std::is_trivially_copyable_v<Source> &&
+                 std::is_trivially_copyable_v<Destination>, Destination>
+bit_cast(const Source &src) noexcept {
+  static_assert(std::is_trivially_constructible_v<Destination>,
+                "The destination type must be trivially constructible");
+  Destination dst;
+  if constexpr (std::is_pointer_v<Source> || std::is_pointer_v<Destination>)
+    std::memcpy(reinterpret_cast<uintptr_t *>(&dst),
+                reinterpret_cast<const uintptr_t *>(&src), sizeof(Destination));
+  else
+    std::memcpy(&dst, &src, sizeof(Destination));
+  return dst;
+}
+}
+#else
+#include <bit>
+#endif
+
 using namespace swift;
 
 // Ensure that Job's layout is compatible with what Dispatch expects.
@@ -119,11 +141,11 @@ static void initializeDispatchEnqueueFunc(dispatch_queue_t queue, void *obj,
   if (SWIFT_RUNTIME_WEAK_CHECK(dispatch_async_swift_job))
     func = SWIFT_RUNTIME_WEAK_USE(dispatch_async_swift_job);
 #elif defined(_WIN32)
-  func = reinterpret_cast<dispatchEnqueueFuncType>(
+  func = std::bit_cast<dispatchEnqueueFuncType>(
       GetProcAddress(LoadLibraryW(L"dispatch.dll"),
       "dispatch_async_swift_job"));
 #else
-  func = reinterpret_cast<dispatchEnqueueFuncType>(
+  func = std::bit_cast<dispatchEnqueueFuncType>(
       dlsym(RTLD_NEXT, "dispatch_async_swift_job"));
 #endif
 #endif
