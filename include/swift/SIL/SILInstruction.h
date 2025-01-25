@@ -11032,6 +11032,10 @@ public:
   SILType getSourceLoweredType() const { return getOperand()->getType(); }
   CanType getSourceFormalType() const { return SrcFormalTy; }
 
+  void updateSourceFormalTypeFromOperandLoweredType() {
+    SrcFormalTy = getSourceLoweredType().getASTType();
+  }
+
   SILType getTargetLoweredType() const { return DestLoweredTy; }
   CanType getTargetFormalType() const { return DestFormalTy; }
 };

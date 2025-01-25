@@ -12,7 +12,7 @@ class X : B {}
 
 // CHECK-LABEL: sil @test_non_ossa :
 // CHECK:         %0 = alloc_ref
-// CHECK:         checked_cast_br AnyObject in %0 : $X
+// CHECK:         checked_cast_br X in %0 : $X
 // CHECK:       } // end sil function 'test_non_ossa'
 sil @test_non_ossa : $@convention(thin) () -> AnyObject {
 bb0:
@@ -31,7 +31,7 @@ bb2:
 
 // CHECK-LABEL: sil [ossa] @test_ossa :
 // CHECK:         %0 = alloc_ref
-// CHECK-O-NEXT:  checked_cast_br AnyObject in %0 : $X
+// CHECK-O-NEXT:  checked_cast_br X in %0 : $X
 // CHECK-ONONE:   checked_cast_br AnyObject in %2 : $AnyObject
 // CHECK-O:     bb2([[A:%.*]] : @owned $X):
 // CHECK-O-NEXT:  [[U:%.*]] = upcast [[A]] : $X to $B
@@ -75,7 +75,7 @@ bb2(%7 : @owned $B):
 
 // CHECK-LABEL: sil [ossa] @test_borrow :
 // CHECK:         %1 = begin_borrow
-// CHECK-NEXT:    checked_cast_br any P in %1 : $X
+// CHECK-NEXT:    checked_cast_br X in %1 : $X
 // CHECK:       bb2([[A:%.*]] : @guaranteed $X):
 // CHECK-NEXT:    [[U:%.*]] = upcast [[A]] : $X to $B
 // CHECK-NEXT:    [[E:%.*]] = init_existential_ref [[U]] : $B
