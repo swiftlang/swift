@@ -239,7 +239,8 @@ deriveBodyDistributed_thunk(AbstractFunctionDecl *thunk, void *context) {
 
   // === __isRemoteActor(self)
   ArgumentList *isRemoteArgs = ArgumentList::forImplicitSingle(
-      C, /*label=*/Identifier(), new (C) DeclRefExpr(selfDecl, dloc, implicit));
+      C, sloc, /*label=*/Identifier(),
+      new (C) DeclRefExpr(selfDecl, dloc, implicit));
 
   FuncDecl *isRemoteFn = C.getIsRemoteDistributedActor();
   assert(isRemoteFn && "Could not find 'is remote' function, is the "
