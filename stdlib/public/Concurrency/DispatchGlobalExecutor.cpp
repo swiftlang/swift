@@ -151,9 +151,9 @@ static constexpr size_t globalQueueCacheCount =
     static_cast<size_t>(JobPriority::UserInteractive) + 1;
 static std::atomic<dispatch_queue_t> globalQueueCache[globalQueueCacheCount];
 
+#if defined(__APPLE__) && !defined(SWIFT_CONCURRENCY_BACK_DEPLOYMENT)
 static constexpr size_t dispatchQueueCooperativeFlag = 4;
-
-#if defined(SWIFT_CONCURRENCY_BACK_DEPLOYMENT) || !defined(__APPLE__)
+#else
 extern "C" void dispatch_queue_set_width(dispatch_queue_t dq, long width);
 #endif
 
