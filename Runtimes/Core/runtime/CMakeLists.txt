@@ -151,6 +151,8 @@ if("${SwiftCore_OBJECT_FORMAT}" STREQUAL "elfx")
     "${SwiftCore_SWIFTC_SOURCE_DIR}/include"
     "${PROJECT_BINARY_DIR}/include")
   target_link_libraries(swiftrt PRIVATE swiftShims)
+  # The driver requires that swifrt.o is under `usr/lib/swift/<platform>/<arch>`
+  # Regardless of settings
   install(FILES $<TARGET_OBJECTS:swiftrt>
     DESTINATION "${CMAKE_INSTALL_LIBDIR}/swift/${SwiftCore_PLATFORM_SUBDIR}/${SwiftCore_ARCH_SUBDIR}"
     RENAME swiftrt.o)
@@ -160,6 +162,8 @@ elseif("${SwiftCore_OBJECT_FORMAT}" STREQUAL "coffx")
     $<$<NOT:$<BOOL:${BUILD_SHARED_LIBS}>>:SWIFT_STATIC_STDLIB>)
   target_link_libraries(swiftrt PRIVATE swiftShims)
   install(FILES $<TARGET_OBJECTS:swiftrt>
+    # The driver requires that swifrt.obj is under `usr/lib/swift/<platform>/<arch>`
+    # Regardless of settings
     DESTINATION "${CMAKE_INSTALL_LIBDIR}/swift/${SwiftCore_PLATFORM_SUBDIR}/${SwiftCore_ARCH_SUBDIR}"
     RENAME swiftrt.obj)
 elseif(NOT "${SwiftCore_OBJECT_FORMAT}" STREQUAL "x")

@@ -113,6 +113,10 @@ option(SwiftCore_ENABLE_INTERNAL_CHECKS "" OFF)
 defaulted_set(SwiftCore_OBJECT_FORMAT STRING "Object format: ELF COFF")
 defaulted_set(SwiftCore_THREADING_PACKAGE STRING "Threading Package: C11 Linux PThreads Win32")
 
+option(SwiftCore_INSTALL_NESTED_SUBDIR "Install libraries under a platform and architecture subdirectory" ON)
+set(SwiftCore_INSTALL_LIBDIR "${CMAKE_INSTALL_LIBDIR}/swift$<$<NOT:$<BOOL:${BUILD_SHARED_LIBS}>>:_static>$<$<BOOL:${SwiftCore_INSTALL_NESTED_SUBDIR}>:/${SwiftCore_PLATFORM_SUBDIR}/${SwiftCore_ARCH_SUBDIR}>")
+set(SwiftCore_INSTALL_SWIFTMODULEDIR "${CMAKE_INSTALL_LIBDIR}/swift$<$<NOT:$<BOOL:${BUILD_SHARED_LIBS}>>:_static>$<$<BOOL:${SwiftCore_INSTALL_NESTED_SUBDIR}>:/${SwiftCore_PLATFORM_SUBDIR}>")
+
 # TODO: Most of these should be attached to specific targets rather than applied
 #       globally. They can be applied as part of the library interface if they
 #       affect the behavior of libraries that build against a given target.
