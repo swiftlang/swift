@@ -1011,14 +1011,14 @@ SILPassPipelinePlan::getPerformancePassPipeline(const SILOptions &Options) {
   // importing this module.
   P.addSerializeSILPass();
 
+  if (Options.StopOptimizationAfterSerialization)
+    return P;
+
   if (P.getOptions().EnableOSSAModules && SILPrintFinalOSSAModule) {
     addModulePrinterPipeline(P, "SIL Print Final OSSA Module");
   }
   // Strip any transparent functions that still have ownership.
   P.addOwnershipModelEliminator();
-
-  if (Options.StopOptimizationAfterSerialization)
-    return P;
 
   P.addAutodiffClosureSpecialization();
 
@@ -1081,6 +1081,9 @@ SILPassPipelinePlan::getOnonePassPipeline(const SILOptions &Options) {
   // First serialize the SIL if we are asked to.
   P.startPipeline("Serialization");
   P.addSerializeSILPass();
+
+  if (Options.StopOptimizationAfterSerialization)
+    return P;
 
   // Now that we have serialized, propagate debug info.
   P.addMovedAsyncVarDebugInfoPropagator();
