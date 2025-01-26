@@ -8298,18 +8298,25 @@ SemanticAvailableAttrRequest::evaluate(swift::Evaluator &evaluator,
   }
 
   if (domain->isSwiftLanguage() || domain->isPackageDescription()) {
-    if (attrKind == AvailableAttr::Kind::Deprecated) {
+    switch (attrKind) {
+    case AvailableAttr::Kind::Deprecated:
       diags.diagnose(attrLoc,
                      diag::attr_availability_expected_deprecated_version,
                      attrName, *string);
       return std::nullopt;
-    }
-    if (attrKind == AvailableAttr::Kind::Unavailable) {
+
+    case AvailableAttr::Kind::Unavailable:
       diags.diagnose(attrLoc, diag::attr_availability_cannot_be_used_for_domain,
                      "unavailable", attrName, *string);
       return std::nullopt;
+
+    case AvailableAttr::Kind::NoAsync:
+      diags.diagnose(attrLoc, diag::attr_availability_cannot_be_used_for_domain,
+                     "noasync", attrName, *string);
+      break;
+    case AvailableAttr::Kind::Default:
+      break;
     }
-    assert(attrKind == AvailableAttr::Kind::Default);
 
     bool hasVersionSpec = (attr->getRawIntroduced() ||
                            attr->getRawDeprecated() || attr->getRawObsoleted());
