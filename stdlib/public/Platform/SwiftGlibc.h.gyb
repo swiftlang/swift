@@ -57,6 +57,7 @@ headers = [
   'nl_types.h',
   'poll.h',
   'pthread.h',
+  'pthread_np.h',
   'pwd.h',
   'regex.h',
   'sched.h',
