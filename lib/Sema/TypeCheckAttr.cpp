@@ -8278,56 +8278,83 @@ SemanticAvailableAttrRequest::evaluate(swift::Evaluator &evaluator,
   auto attrName = attr->getAttrName();
   auto attrKind = attr->getKind();
   auto domainLoc = attr->getDomainLoc();
-  auto string = attr->getDomainString();
-  ASSERT(string);
+  auto introducedVersion = attr->getRawIntroduced();
+  auto deprecatedVersion = attr->getRawDeprecated();
+  auto obsoletedVersion = attr->getRawObsoleted();
+  auto mutableAttr = const_cast<AvailableAttr *>(attr);
+  auto domain = attr->getCachedDomain();
 
-  // Attempt to resolve the domain specified for the attribute and diagnose
-  // if no domain is found.
-  auto domain = AvailabilityDomain::builtinDomainForString(*string);
   if (!domain) {
-    if (auto suggestion = closestCorrectedPlatformString(*string)) {
-      diags
-          .diagnose(domainLoc, diag::attr_availability_suggest_platform,
-                    *string, attrName, *suggestion)
-          .fixItReplace(SourceRange(domainLoc), *suggestion);
-    } else {
-      diags.diagnose(attrLoc, diag::attr_availability_unknown_platform, *string,
-                     attrName);
+    auto string = attr->getDomainString();
+    ASSERT(string);
+
+    // Attempt to resolve the domain specified for the attribute and diagnose
+    // if no domain is found.
+    domain = AvailabilityDomain::builtinDomainForString(*string);
+    if (!domain) {
+      if (auto suggestion = closestCorrectedPlatformString(*string)) {
+        diags
+            .diagnose(domainLoc, diag::attr_availability_suggest_platform,
+                      *string, attrName, *suggestion)
+            .fixItReplace(SourceRange(domainLoc), *suggestion);
+      } else {
+        diags.diagnose(attrLoc, diag::attr_availability_unknown_platform,
+                       *string, attrName);
+      }
+      return std::nullopt;
     }
-    return std::nullopt;
+
+    mutableAttr->setCachedDomain(*domain);
   }
+
+  auto domainName = domain->getNameForAttributePrinting();
 
   if (domain->isSwiftLanguage() || domain->isPackageDescription()) {
     switch (attrKind) {
     case AvailableAttr::Kind::Deprecated:
       diags.diagnose(attrLoc,
                      diag::attr_availability_expected_deprecated_version,
-                     attrName, *string);
+                     attrName, domainName);
       return std::nullopt;
 
     case AvailableAttr::Kind::Unavailable:
       diags.diagnose(attrLoc, diag::attr_availability_cannot_be_used_for_domain,
-                     "unavailable", attrName, *string);
+                     "unavailable", attrName, domainName);
       return std::nullopt;
 
     case AvailableAttr::Kind::NoAsync:
       diags.diagnose(attrLoc, diag::attr_availability_cannot_be_used_for_domain,
-                     "noasync", attrName, *string);
+                     "noasync", attrName, domainName);
       break;
     case AvailableAttr::Kind::Default:
       break;
     }
 
-    bool hasVersionSpec = (attr->getRawIntroduced() ||
-                           attr->getRawDeprecated() || attr->getRawObsoleted());
+    bool hasVersionSpec =
+        (introducedVersion || deprecatedVersion || obsoletedVersion);
     if (!hasVersionSpec) {
       diags.diagnose(attrLoc, diag::attr_availability_expected_version_spec,
-                     attrName, *string);
+                     attrName, domainName);
       return std::nullopt;
     }
   }
 
-  const_cast<AvailableAttr *>(attr)->setCachedDomain(*domain);
+  // Canonicalize platform versions.
+  // FIXME: [availability] This should be done when remapping versions instead.
+  if (domain->isPlatform()) {
+    auto canonicalizeVersion = [&](llvm::VersionTuple version) {
+      return canonicalizePlatformVersion(domain->getPlatformKind(), version);
+    };
+    if (introducedVersion)
+      mutableAttr->setRawIntroduced(canonicalizeVersion(*introducedVersion));
+
+    if (deprecatedVersion)
+      mutableAttr->setRawDeprecated(canonicalizeVersion(*deprecatedVersion));
+
+    if (obsoletedVersion)
+      mutableAttr->setRawObsoleted(canonicalizeVersion(*obsoletedVersion));
+  }
+
   return SemanticAvailableAttr(attr);
 }
 

@@ -565,20 +565,6 @@ ParserResult<AvailableAttr> Parser::parseExtendedAvailabilitySpecList(
     return nullptr;
   }
 
-  if (auto PlatformKind = platformFromString(Platform)) {
-      if (!Introduced.empty())
-        Introduced.Version =
-            canonicalizePlatformVersion(*PlatformKind, Introduced.Version);
-
-      if (!Deprecated.empty())
-        Deprecated.Version =
-            canonicalizePlatformVersion(*PlatformKind, Deprecated.Version);
-
-      if (!Obsoleted.empty())
-        Obsoleted.Version =
-            canonicalizePlatformVersion(*PlatformKind, Obsoleted.Version);
-  }
-
   auto Attr = new (Context) AvailableAttr(
       AtLoc, SourceRange(AttrLoc, Tok.getLoc()), Platform, PlatformLoc,
       AttrKind, Message, Renamed, Introduced.Version, Introduced.Range,
@@ -845,10 +831,6 @@ bool Parser::parseAvailability(
       } else {
         continue;
       }
-
-      if (Domain.isPlatform())
-        Version =
-            canonicalizePlatformVersion(Domain.getPlatformKind(), Version);
 
       addAttribute(new (Context) AvailableAttr(
           AtLoc, attrRange, Domain, Spec->getSourceRange().Start,

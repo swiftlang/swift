@@ -767,11 +767,11 @@ private:
   const StringRef Message;
   const StringRef Rename;
 
-  const llvm::VersionTuple Introduced;
+  llvm::VersionTuple Introduced;
   const SourceRange IntroducedRange;
-  const llvm::VersionTuple Deprecated;
+  llvm::VersionTuple Deprecated;
   const SourceRange DeprecatedRange;
-  const llvm::VersionTuple Obsoleted;
+  llvm::VersionTuple Obsoleted;
   const SourceRange ObsoletedRange;
 
 public:
@@ -911,6 +911,12 @@ private:
 
 private:
   friend class SemanticAvailableAttrRequest;
+
+  void setRawIntroduced(llvm::VersionTuple version) { Introduced = version; }
+
+  void setRawDeprecated(llvm::VersionTuple version) { Deprecated = version; }
+
+  void setRawObsoleted(llvm::VersionTuple version) { Obsoleted = version; }
 
   void setCachedDomain(AvailabilityDomain domain) {
     assert(!Bits.AvailableAttr.HasDomain);
