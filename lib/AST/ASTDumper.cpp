@@ -2151,7 +2151,7 @@ namespace {
       }
 
       if (VD->hasInterfaceType()) {
-        printTypeField(VD->getInterfaceType(), Label::always("interface type"),
+        printTypeField(VD->getInterfaceType(), Label::always("interface_type"),
                        PrintOptions(), InterfaceTypeColor);
       }
 
@@ -2342,7 +2342,7 @@ namespace {
                          IdentifierColor);
       if (PD->hasInterfaceType()) {
         printTypeField(PD->getInterfaceType(),
-                       Label::always("interface type"), PrintOptions(),
+                       Label::always("interface_type"), PrintOptions(),
                        InterfaceTypeColor);
       }
 
