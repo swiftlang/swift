@@ -8,6 +8,7 @@
 
 // TODO: Need to find out how to combine %env- and %target-run and %import-libdispatch reliably.
 // UNSUPPORTED: OS=linux-gnu
+// UNSUPPORTED: OS=freebsd
 
 // REQUIRES: concurrency
 // REQUIRES: executable_test
