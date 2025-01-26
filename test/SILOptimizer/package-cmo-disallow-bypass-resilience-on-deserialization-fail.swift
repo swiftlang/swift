@@ -31,21 +31,21 @@
 // RUN: 2>&1 | %FileCheck %s --check-prefix=CHECK
 // CHECK-DAG: error: cannot bypass resilience due to member deserialization failure while attempting to access missing member of 'PkgStructA' in module 'MyCore' from module 'MyCore'
 
-/// Build a swift module that depends on Core without `INCLUDE_FOO` but
-/// opt out of deserialization checks; it builds even though deserialization failed.
-// RUN: %target-build-swift-dylib(%t/artifacts/SwiftBuilds/%target-library-name(MyUIA)) %t/src/UIA.swift \
-// RUN: -module-name MyUIA -emit-module -package-name pkg \
-// RUN: -enable-library-evolution -O -wmo \
-// RUN: -Xfrontend -experimental-skip-deserialization-checks-for-package-cmo \
-// RUN: -I %t/artifacts/SwiftBuilds -L %t/artifacts/SwiftBuilds \
-// RUN: -I %t/artifacts/ObjcBuilds -L %t/artifacts/ObjcBuilds \
-// RUN: -lMyCore -lObjCAPI -Rmodule-loading
-
 /// Build another swift module that depends on Core; since FooObjc is not referenced
 /// in the call chain, there's no deserialization failure, and bypassing resilience is allowed.
 // RUN: %target-build-swift-dylib(%t/artifacts/SwiftBuilds/%target-library-name(MyUIB)) %t/src/UIB.swift \
 // RUN: -module-name MyUIB -emit-module -package-name pkg \
-// RUN: -enable-library-evolution -O -wmo \
+// RUN: -enable-library-evolution -O -wmo -Xfrontend -sil-verify-all \
+// RUN: -I %t/artifacts/SwiftBuilds -L %t/artifacts/SwiftBuilds \
+// RUN: -I %t/artifacts/ObjcBuilds -L %t/artifacts/ObjcBuilds \
+// RUN: -lMyCore -lObjCAPI -Rmodule-loading
+
+/// Test -experimental-skip-deserialization-checks-for-package-cmo; build should pass.
+// RUN: rm -rf %t/artifacts/SwiftBuilds/%target-library-name(MyUIB)
+// RUN: %target-build-swift-dylib(%t/artifacts/SwiftBuilds/%target-library-name(MyUIB)) %t/src/UIB.swift \
+// RUN: -module-name MyUIB -emit-module -package-name pkg \
+// RUN: -enable-library-evolution -O -wmo -Xfrontend -sil-verify-all \
+// RUN: -Xfrontend -experimental-skip-deserialization-checks-for-package-cmo \
 // RUN: -I %t/artifacts/SwiftBuilds -L %t/artifacts/SwiftBuilds \
 // RUN: -I %t/artifacts/ObjcBuilds -L %t/artifacts/ObjcBuilds \
 // RUN: -lMyCore -lObjCAPI -Rmodule-loading
@@ -71,8 +71,7 @@ public import MyCore
 public import ObjCAPI
 
 package func testWrapperB(_ arg: WrapperB) {
-  let v = arg.varB
-  print(v)
+  print(arg.varB, arg.varBdict, arg.varBarray)
 }
 
 package func testKlass(_ arg: Klass) {
@@ -90,7 +89,8 @@ package struct WrapperA {
 
 package struct WrapperB {
   package var varB: PkgStructB?
-  package var varBstr: String?
+  package var varBdict: [String: PkgStructB]?
+  package var varBarray: [PkgStructB]?
 }
 
 public protocol PubProto {}
