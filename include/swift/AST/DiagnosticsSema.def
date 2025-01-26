@@ -6715,6 +6715,16 @@ NOTE(type_eraser_init_spi,none,
 // MARK: @available
 //------------------------------------------------------------------------------
 
+WARNING(attr_availability_expected_deprecated_version, none,
+       "expected version number with 'deprecated' in '%0' attribute for "
+       "platform '%1'", (StringRef, StringRef))
+WARNING(attr_availability_cannot_be_used_for_domain, none,
+       "'%0' cannot be used in '%1' attribute for platform '%2'",
+       (StringRef, StringRef, StringRef))
+WARNING(attr_availability_expected_version_spec, none,
+       "expected 'introduced', 'deprecated', or 'obsoleted' in '%0' attribute "
+       "for platform '%1'", (StringRef, StringRef))
+
 ERROR(availability_decl_unavailable, none,
       "%0 is unavailable%select{ in %2|}1%select{|: %3}3",
       (const ValueDecl *, bool, StringRef, StringRef))

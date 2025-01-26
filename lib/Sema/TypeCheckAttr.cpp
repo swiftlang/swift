@@ -8273,12 +8273,52 @@ SemanticAvailableAttrRequest::evaluate(swift::Evaluator &evaluator,
   if (attr->hasCachedDomain())
     return SemanticAvailableAttr(attr);
 
+  auto &diags = decl->getASTContext().Diags;
+  auto attrLoc = attr->getLocation();
+  auto attrName = attr->getAttrName();
+  auto attrKind = attr->getKind();
+  auto domainLoc = attr->getDomainLoc();
   auto string = attr->getDomainString();
   ASSERT(string);
 
+  // Attempt to resolve the domain specified for the attribute and diagnose
+  // if no domain is found.
   auto domain = AvailabilityDomain::builtinDomainForString(*string);
-  if (!domain)
+  if (!domain) {
+    if (auto suggestion = closestCorrectedPlatformString(*string)) {
+      diags
+          .diagnose(domainLoc, diag::attr_availability_suggest_platform,
+                    *string, attrName, *suggestion)
+          .fixItReplace(SourceRange(domainLoc), *suggestion);
+    } else {
+      diags.diagnose(attrLoc, diag::attr_availability_unknown_platform, *string,
+                     attrName);
+    }
     return std::nullopt;
+  }
+
+  if (domain->isSwiftLanguage() || domain->isPackageDescription()) {
+    if (attrKind == AvailableAttr::Kind::Deprecated) {
+      diags.diagnose(attrLoc,
+                     diag::attr_availability_expected_deprecated_version,
+                     attrName, *string);
+      return std::nullopt;
+    }
+    if (attrKind == AvailableAttr::Kind::Unavailable) {
+      diags.diagnose(attrLoc, diag::attr_availability_cannot_be_used_for_domain,
+                     "unavailable", attrName, *string);
+      return std::nullopt;
+    }
+    assert(attrKind == AvailableAttr::Kind::Default);
+
+    bool hasVersionSpec = (attr->getRawIntroduced() ||
+                           attr->getRawDeprecated() || attr->getRawObsoleted());
+    if (!hasVersionSpec) {
+      diags.diagnose(attrLoc, diag::attr_availability_expected_version_spec,
+                     attrName, *string);
+      return std::nullopt;
+    }
+  }
 
   const_cast<AvailableAttr *>(attr)->setCachedDomain(*domain);
   return SemanticAvailableAttr(attr);
