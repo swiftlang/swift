@@ -628,9 +628,9 @@ ParserResult<AvailableAttr> Parser::parseExtendedAvailabilitySpecList(
   }
 
   auto Attr = new (Context) AvailableAttr(
-      AtLoc, SourceRange(AttrLoc, Tok.getLoc()), Domain, AttrKind, Message,
-      Renamed, Introduced.Version, Introduced.Range, Deprecated.Version,
-      Deprecated.Range, Obsoleted.Version, Obsoleted.Range,
+      AtLoc, SourceRange(AttrLoc, Tok.getLoc()), Domain, PlatformLoc, AttrKind,
+      Message, Renamed, Introduced.Version, Introduced.Range,
+      Deprecated.Version, Deprecated.Range, Obsoleted.Version, Obsoleted.Range,
       /*Implicit=*/false, AttrName == SPI_AVAILABLE_ATTRNAME);
   return makeParserResult(Attr);
 
@@ -899,7 +899,8 @@ bool Parser::parseAvailability(
             canonicalizePlatformVersion(Domain.getPlatformKind(), Version);
 
       addAttribute(new (Context) AvailableAttr(
-          AtLoc, attrRange, Domain, AvailableAttr::Kind::Default,
+          AtLoc, attrRange, Domain, Spec->getSourceRange().Start,
+          AvailableAttr::Kind::Default,
           /*Message=*/StringRef(),
           /*Rename=*/StringRef(),
           /*Introduced=*/Version,
@@ -4410,7 +4411,7 @@ ParserStatus Parser::parseDeclAttribute(DeclAttributes &Attributes,
       StringRef Message = "unavailable in embedded Swift", Renamed;
       auto attr = new (Context) AvailableAttr(
           AtLoc, SourceRange(AtLoc, attrLoc), AvailabilityDomain::forEmbedded(),
-          AvailableAttr::Kind::Unavailable, Message, Renamed,
+          SourceLoc(), AvailableAttr::Kind::Unavailable, Message, Renamed,
           llvm::VersionTuple(), SourceRange(), llvm::VersionTuple(),
           SourceRange(), llvm::VersionTuple(), SourceRange(),
           /*Implicit=*/false, /*IsSPI=*/false);
