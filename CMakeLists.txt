@@ -1598,6 +1598,7 @@ if(SWIFT_ENABLE_NEW_RUNTIME_BUILD)
       set(stdlib_target_triple ${SWIFT_SDK_${sdk}_ARCH_${arch}_TRIPLE})
       if(SWIFT_SDK_${sdk}_DEPLOYMENT_VERSION)
         string(APPEND stdlib_target_triple ${SWIFT_SDK_${sdk}_DEPLOYMENT_VERSION})
+        set(stdlib_deployment_version_flag -DCMAKE_OSX_DEPLOYMENT_TARGET=${SWIFT_SDK_${sdk}_DEPLOYMENT_VERSION})
       endif()
 
       ExternalProject_Add("${stdlib_target}-core"
@@ -1613,6 +1614,7 @@ if(SWIFT_ENABLE_NEW_RUNTIME_BUILD)
           -DCMAKE_Swift_COMPILER_WORKS:BOOLEAN=YES
           -DBUILD_SHARED_LIBS:BOOLEAN=YES # TODO: Make this configurable
           ${stdlib_cache_file_flag}
+          ${stdlib_deployment_version_flag}
           -DCMAKE_BUILD_TYPE:STRING=${CMAKE_BUILD_TYPE}
           -DCMAKE_INSTALL_PREFIX:FILEPATH=<INSTALL_DIR>
           -DCMAKE_Swift_COMPILER:FILEPATH=$<IF:$<BOOL:${CMAKE_CROSSCOMPILING}>,${CMAKE_Swift_COMPILER},$<PATH:REPLACE_FILENAME,$<TARGET_FILE:swift-frontend>,swiftc>>
