@@ -140,6 +140,10 @@ public:
     return AvailabilityDomain(Kind::Embedded);
   }
 
+  /// Returns the built-in availability domain identified by the given string.
+  static std::optional<AvailabilityDomain>
+  builtinDomainForString(StringRef string);
+
   Kind getKind() const {
     if (auto inlineDomain = getInlineDomain())
       return inlineDomain->getKind();

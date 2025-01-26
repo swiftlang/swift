@@ -13,8 +13,27 @@
 #include "swift/AST/AvailabilityDomain.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Decl.h"
+#include "llvm/ADT/StringSwitch.h"
 
 using namespace swift;
+
+std::optional<AvailabilityDomain>
+AvailabilityDomain::builtinDomainForString(StringRef string) {
+  auto domain = llvm::StringSwitch<std::optional<AvailabilityDomain>>(string)
+                    .Case("*", AvailabilityDomain::forUniversal())
+                    .Case("swift", AvailabilityDomain::forSwiftLanguage())
+                    .Case("_PackageDescription",
+                          AvailabilityDomain::forPackageDescription())
+                    .Default(std::nullopt);
+
+  if (domain)
+    return domain;
+
+  if (auto platformKind = platformFromString(string))
+    return AvailabilityDomain::forPlatform(*platformKind);
+
+  return std::nullopt;
+}
 
 bool AvailabilityDomain::isActive(const ASTContext &ctx) const {
   switch (getKind()) {

@@ -8270,6 +8270,17 @@ std::optional<SemanticAvailableAttr>
 SemanticAvailableAttrRequest::evaluate(swift::Evaluator &evaluator,
                                        const AvailableAttr *attr,
                                        const Decl *decl) const {
+  if (attr->hasCachedDomain())
+    return SemanticAvailableAttr(attr);
+
+  auto string = attr->getDomainString();
+  ASSERT(string);
+
+  auto domain = AvailabilityDomain::builtinDomainForString(*string);
+  if (!domain)
+    return std::nullopt;
+
+  const_cast<AvailableAttr *>(attr)->setCachedDomain(*domain);
   return SemanticAvailableAttr(attr);
 }
 

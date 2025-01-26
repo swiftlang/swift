@@ -912,6 +912,12 @@ private:
 private:
   friend class SemanticAvailableAttrRequest;
 
+  void setCachedDomain(AvailabilityDomain domain) {
+    assert(!Bits.AvailableAttr.HasDomain);
+    Domain = domain;
+    Bits.AvailableAttr.HasDomain = true;
+  }
+
   bool hasComputedSemanticAttr() const {
     return Bits.AvailableAttr.HasComputedSemanticAttr;
   }
