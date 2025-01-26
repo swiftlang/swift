@@ -61,7 +61,9 @@ std::error_code SwiftModuleScanner::findModuleFilesInDirectory(
     if (fs.exists(ModPath)) {
       // The module file will be loaded directly.
       auto dependencies =
-          scanModuleFile(ModPath, IsFramework, isTestableDependencyLookup);
+          scanModuleFile(ModPath, IsFramework,
+                         isTestableDependencyLookup,
+                         /* isCandidateForTextualModule */ false);
       if (dependencies) {
         this->dependencies = std::move(dependencies.get());
         return std::error_code();
@@ -164,8 +166,9 @@ SwiftModuleScanner::scanInterfaceFile(Twine moduleInterfacePath,
             Ctx.SearchPathOpts.ScannerModuleValidation) {
           assert(compiledCandidates.size() == 1 &&
                  "Should only have 1 candidate module");
-          auto BinaryDep = scanModuleFile(compiledCandidates[0], isFramework,
-                                          isTestableImport);
+          auto BinaryDep = scanModuleFile(compiledCandidates[0],
+                                          isFramework, isTestableImport,
+                                          /* isCandidateForTextualModule */ true);
           if (BinaryDep) {
             Result = *BinaryDep;
             return std::error_code();
@@ -246,8 +249,8 @@ SwiftModuleScanner::scanInterfaceFile(Twine moduleInterfacePath,
 
         Result = ModuleDependencyInfo::forSwiftInterfaceModule(
             outputPathBase.str().str(), InPath, compiledCandidatesRefs,
-            ArgsRefs, linkLibraries, PCMArgs, Hash, isFramework, isStatic, {},
-            /*module-cache-key*/ "", UserModVer);
+            ArgsRefs, {}, {}, linkLibraries, PCMArgs, Hash, isFramework,
+            isStatic, {}, /*module-cache-key*/ "", UserModVer);
 
         if (Ctx.CASOpts.EnableCaching) {
           std::vector<std::string> clangDependencyFiles;

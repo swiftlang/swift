@@ -61,8 +61,8 @@ let lifetimeDependenceDiagnosticsPass = FunctionPass(
     if let markDep = instruction as? MarkDependenceInst, markDep.isUnresolved {
       if let lifetimeDep = LifetimeDependence(markDep, context) {
         if analyze(dependence: lifetimeDep, context) {
-          // Note: This promotes the mark_dependence flag but does not invalidate SIL; preserving analyses is good,
-          // but the change won't appear in -sil-print-function. Ideally, we could notify context of a flag change
+          // Note: This promotes the mark_dependence flag but does not invalidate analyses; preserving analyses is good,
+          // although the change won't appear in -sil-print-function. Ideally, we could notify context of a flag change
           // without invalidating analyses.
           lifetimeDep.resolve(context)
           continue
@@ -101,10 +101,11 @@ let lifetimeDependenceDiagnosticsPass = FunctionPass(
 private func analyze(dependence: LifetimeDependence, _ context: FunctionPassContext) -> Bool {
   log("Dependence scope:\n\(dependence)")
 
-  // Early versions of Span in the standard library violate trivial lifetimes. Contemporary versions of the compiler
-  // simply ignored dependencies on trivial values.
-  if !context.options.hasFeature(.LifetimeDependenceDiagnoseTrivial) {
-    if dependence.parentValue.type.objectType.isTrivial(in: dependence.function) {
+  // Briefly, some versions of Span in the standard library violated trivial lifetimes; versions of the compiler built
+  // at that time simply ignored dependencies on trivial values. For now, disable trivial dependencies to allow newer
+  // compilers to build against those older standard libraries. This check is only relevant for ~6 mo (until July 2025).
+  if dependence.parentValue.type.objectType.isTrivial(in: dependence.function) {
+    if let sourceFileKind = dependence.function.sourceFileKind, sourceFileKind == .interface {
       return true
     }
   }
@@ -196,21 +197,6 @@ private struct DiagnoseDependence {
   func checkFunctionResult(operand: Operand) -> WalkResult {
 
     if function.hasUnsafeNonEscapableResult {
-      return .continueWalk
-    }
-    // FIXME: remove this condition once we have a Builtin.dependence,
-    // which developers should use to model the unsafe
-    // dependence. Builtin.lifetime_dependence will be lowered to
-    // mark_dependence [unresolved], which will be checked
-    // independently. Instead, of this function result check, allow
-    // isUnsafeApplyResult to be used be mark_dependence [unresolved]
-    // without checking its dependents.
-    //
-    // Allow returning an apply result (@_unsafeNonescapableResult) if
-    // the calling function has a dependence. This implicitly makes
-    // the unsafe nonescapable result dependent on the calling
-    // function's lifetime dependence arguments.
-    if dependence.isUnsafeApplyResult, function.hasResultDependence {
       return .continueWalk
     }
     // Check that the parameter dependence for this result is the same

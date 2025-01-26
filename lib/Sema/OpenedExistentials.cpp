@@ -147,7 +147,7 @@ findGenericParameterReferencesRec(CanGenericSignature genericSig,
   }
 
   // Metatypes preserve variance.
-  if (auto metaTy = type->getAs<MetatypeType>()) {
+  if (auto metaTy = type->getAs<AnyMetatypeType>()) {
     return findGenericParameterReferencesRec(genericSig, origParam, openedParam,
                                              metaTy->getInstanceType(),
                                              position, canBeCovariantResult);
@@ -272,10 +272,9 @@ findGenericParameterReferencesRec(CanGenericSignature genericSig,
         TypePosition::Invariant, /*canBeCovariantResult=*/false);
   }
 
-  // Specifically ignore parameterized protocols and existential
-  // metatypes because we can erase them to the upper bound.
-  if (type->is<ParameterizedProtocolType>() ||
-      type->is<ExistentialMetatypeType>()) {
+  // Specifically ignore parameterized protocols because we can erase them to
+  // the upper bound.
+  if (type->is<ParameterizedProtocolType>()) {
     return GenericParameterReferenceInfo();
   }
 
@@ -590,10 +589,9 @@ swift::isMemberAvailableOnExistential(Type baseTy, const ValueDecl *member) {
   return result;
 }
 
-std::optional<std::tuple<GenericTypeParamType *, TypeVariableType *,
-                                Type, OpenedExistentialAdjustments>>
+std::optional<std::pair<TypeVariableType *, Type>>
 swift::canOpenExistentialCallArgument(ValueDecl *callee, unsigned paramIdx,
-	                                  Type paramTy, Type argTy) {
+                                      Type paramTy, Type argTy) {
   if (!callee)
     return std::nullopt;
 
@@ -623,24 +621,6 @@ swift::canOpenExistentialCallArgument(ValueDecl *callee, unsigned paramIdx,
   if (!paramTy->hasTypeVariable())
     return std::nullopt;
 
-  OpenedExistentialAdjustments adjustments;
-
-  // The argument may be a "var" instead of a "let".
-  if (auto lv = argTy->getAs<LValueType>()) {
-    argTy = lv->getObjectType();
-    adjustments |= OpenedExistentialAdjustmentFlags::LValue;
-  }
-
-  // If the argument is inout, strip it off and we can add it back.
-  if (auto inOutArg = argTy->getAs<InOutType>()) {
-    argTy = inOutArg->getObjectType();
-    adjustments |= OpenedExistentialAdjustmentFlags::InOut;
-  }
-
-  // The argument type needs to be an existential type or metatype thereof.
-  if (!argTy->isAnyExistentialType())
-    return std::nullopt;
-
   auto param = getParameterAt(callee, paramIdx);
   if (!param)
     return std::nullopt;
@@ -649,28 +629,40 @@ swift::canOpenExistentialCallArgument(ValueDecl *callee, unsigned paramIdx,
   if (param->isVariadic())
     return std::nullopt;
 
-  // Look through an inout and optional types on the formal type of the
-  // parameter.
-  auto formalParamTy = param->getInterfaceType()->getInOutObjectType()
-      ->lookThroughSingleOptionalType();
-
-  // If the argument is of an existential metatype, look through the
-  // metatype on the parameter.
-  if (argTy->is<AnyMetatypeType>()) {
-    formalParamTy = formalParamTy->getMetatypeInstanceType();
-    paramTy = paramTy->getMetatypeInstanceType();
-  }
-
-  // Look through an inout and optional types on the parameter.
-  paramTy = paramTy->getInOutObjectType()->lookThroughSingleOptionalType();
-
-  // The parameter type must be a type variable.
-  auto paramTypeVar = paramTy->getAs<TypeVariableType>();
-  if (!paramTypeVar)
+  // The rvalue argument type needs to be an existential type or metatype
+  // thereof.
+  const auto rValueArgTy = argTy->getWithoutSpecifierType();
+  if (!rValueArgTy->isAnyExistentialType())
     return std::nullopt;
 
-  auto genericParam = formalParamTy->getAs<GenericTypeParamType>();
-  if (!genericParam)
+  GenericTypeParamType *genericParam;
+  TypeVariableType *typeVar;
+  Type bindingTy;
+
+  std::tie(genericParam, typeVar, bindingTy) = [=] {
+    // Look through an inout and optional type.
+    Type genericParam = param->getInterfaceType()
+                            ->getInOutObjectType()
+                            ->lookThroughSingleOptionalType();
+    Type typeVar =
+        paramTy->getInOutObjectType()->lookThroughSingleOptionalType();
+
+    Type bindingTy = rValueArgTy;
+
+    // Look through a metatype.
+    if (genericParam->is<AnyMetatypeType>()) {
+      genericParam = genericParam->getMetatypeInstanceType();
+      typeVar = typeVar->getMetatypeInstanceType();
+      bindingTy = bindingTy->getMetatypeInstanceType();
+    }
+
+    return std::tuple(genericParam->getAs<GenericTypeParamType>(),
+                      typeVar->getAs<TypeVariableType>(), bindingTy);
+  }();
+
+  // The should have reached a type variable and corresponding generic
+  // parameter.
+  if (!typeVar || !genericParam)
     return std::nullopt;
 
   // Only allow opening the innermost generic parameters.
@@ -683,14 +675,11 @@ swift::canOpenExistentialCallArgument(ValueDecl *callee, unsigned paramIdx,
   if (genericParam->getDepth() < genericSig->getMaxDepth())
     return std::nullopt;
 
-  Type existentialTy;
-  if (auto existentialMetaTy = argTy->getAs<ExistentialMetatypeType>())
-    existentialTy = existentialMetaTy->getInstanceType();
-  else
-    existentialTy = argTy;
-
-  ASSERT(existentialTy->isAnyExistentialType());
-
+  // The binding could be an existential metatype. Get the instance type for
+  // conformance checks and to build an opened existential signature. If the
+  // instance type is not an existential type, i.e., the metatype is nested,
+  // bail out.
+  const Type existentialTy = bindingTy->getMetatypeInstanceType();
   if (!existentialTy->isExistentialType())
     return std::nullopt;
 
@@ -728,7 +717,7 @@ swift::canOpenExistentialCallArgument(ValueDecl *callee, unsigned paramIdx,
   if (referenceInfo.hasNonCovariantRef())
     return std::nullopt;
 
-  return std::make_tuple(genericParam, paramTypeVar, argTy, adjustments);
+  return std::pair(typeVar, bindingTy);
 }
 
 /// For each occurrence of a type **type** in `refTy` that satisfies
@@ -800,20 +789,6 @@ static Type typeEraseExistentialSelfReferences(
               return parameterized->getBaseType();
           }
         }
-        /*
-        if (auto lvalue = dyn_cast<LValueType>(t)) {
-          auto objTy = lvalue->getObjectType();
-          auto erasedTy =
-            typeEraseExistentialSelfReferences(
-              objTy, currPos,
-              containsFn, predicateFn, eraseFn);
-
-          if (erasedTy.getPointer() == objTy.getPointer())
-            return Type(lvalue);
-
-          return erasedTy;
-        }
-        */
 
         if (!predicateFn(t)) {
           // Recurse.

@@ -74,8 +74,6 @@ Constraint::Constraint(ConstraintKind Kind, Type First, Type Second,
   case ConstraintKind::EscapableFunctionOf:
   case ConstraintKind::OpenedExistentialOf:
   case ConstraintKind::OptionalObject:
-  case ConstraintKind::OneWayEqual:
-  case ConstraintKind::OneWayBindParam:
   case ConstraintKind::UnresolvedMemberChainBase:
   case ConstraintKind::PropertyWrapper:
   case ConstraintKind::BindTupleOfFunctionParams:
@@ -163,8 +161,6 @@ Constraint::Constraint(ConstraintKind Kind, Type First, Type Second, Type Third,
   case ConstraintKind::BindOverload:
   case ConstraintKind::Disjunction:
   case ConstraintKind::Conjunction:
-  case ConstraintKind::OneWayEqual:
-  case ConstraintKind::OneWayBindParam:
   case ConstraintKind::FallbackType:
   case ConstraintKind::UnresolvedMemberChainBase:
   case ConstraintKind::PropertyWrapper:
@@ -397,8 +393,6 @@ void Constraint::print(llvm::raw_ostream &Out, SourceManager *sm,
   case ConstraintKind::DynamicTypeOf: Out << " dynamicType type of "; break;
   case ConstraintKind::EscapableFunctionOf: Out << " @escaping type of "; break;
   case ConstraintKind::OpenedExistentialOf: Out << " opened archetype of "; break;
-  case ConstraintKind::OneWayEqual: Out << " one-way bind to "; break;
-  case ConstraintKind::OneWayBindParam: Out << " one-way bind param to "; break;
   case ConstraintKind::FallbackType:
     Out << " can fallback to ";
     break;
@@ -568,13 +562,9 @@ void Constraint::dump(SourceManager *sm) const {
 void Constraint::dump(ConstraintSystem *CS) const {
   // Disable MSVC warning: only for use within the debugger.
 #if SWIFT_COMPILER_IS_MSVC
-#pragma warning(push)
-#pragma warning(disable: 4996)
+#pragma warning(suppress: 4996)
 #endif
   dump(&CS->getASTContext().SourceMgr);
-#if SWIFT_COMPILER_IS_MSVC
-#pragma warning(pop)
-#endif
 }
 
 
@@ -678,8 +668,6 @@ gatherReferencedTypeVars(Constraint *constraint,
   case ConstraintKind::ConformsTo:
   case ConstraintKind::LiteralConformsTo:
   case ConstraintKind::TransitivelyConformsTo:
-  case ConstraintKind::OneWayEqual:
-  case ConstraintKind::OneWayBindParam:
   case ConstraintKind::FallbackType:
   case ConstraintKind::UnresolvedMemberChainBase:
   case ConstraintKind::PropertyWrapper:
@@ -709,17 +697,6 @@ gatherReferencedTypeVars(Constraint *constraint,
                     constraint->getTypeVariables().end());
     break;
   }
-}
-
-unsigned Constraint::countResolvedArgumentTypes(ConstraintSystem &cs) const {
-  auto *argumentFuncType = cs.getAppliedDisjunctionArgumentFunction(this);
-  if (!argumentFuncType)
-    return 0;
-
-  return llvm::count_if(argumentFuncType->getParams(), [&](const AnyFunctionType::Param arg) {
-    auto argType = cs.getFixedTypeRecursive(arg.getPlainType(), /*wantRValue=*/true);
-    return !argType->isTypeVariableOrMember();
-  });
 }
 
 bool Constraint::isExplicitConversion() const {

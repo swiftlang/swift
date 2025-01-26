@@ -99,7 +99,7 @@ std::optional<bool> forEachModuleSearchPath(
         callback) {
   for (const auto &path : Ctx.SearchPathOpts.getImportSearchPaths())
     if (auto result =
-            callback(path, ModuleSearchPathKind::Import, /*isSystem=*/false))
+            callback(path.Path, ModuleSearchPathKind::Import, path.IsSystem))
       return result;
 
   for (const auto &path : Ctx.SearchPathOpts.getFrameworkSearchPaths())
@@ -304,6 +304,45 @@ SerializedModuleLoaderBase::getModuleName(ASTContext &Ctx, StringRef modulePath,
   return ModuleFile::getModuleName(Ctx, modulePath, Name);
 }
 
+std::optional<std::string> SerializedModuleLoaderBase::invalidModuleReason(serialization::Status status) {
+  using namespace serialization;
+  switch (status) {
+  case Status::FormatTooOld:
+    return "compiled with an older version of the compiler";
+  case Status::FormatTooNew:
+    return "compiled with a newer version of the compiler";
+  case Status::RevisionIncompatible:
+    return "compiled with a different version of the compiler";
+  case Status::ChannelIncompatible:
+    return "compiled for a different distribution channel";
+  case Status::NotInOSSA:
+    return "module was not built with OSSA";
+  case Status::MissingDependency:
+    return "missing dependency";
+  case Status::MissingUnderlyingModule:
+    return "missing underlying module";
+  case Status::CircularDependency:
+    return "circular dependency";
+  case Status::FailedToLoadBridgingHeader:
+    return "failed to load bridging header";
+  case Status::Malformed:
+    return "malformed";
+  case Status::MalformedDocumentation:
+    return "malformed documentation";
+  case Status::NameMismatch:
+    return "name mismatch";
+  case Status::TargetIncompatible:
+    return "compiled for a different target platform";
+  case Status::TargetTooNew:
+    return "target platform newer than current platform";
+  case Status::SDKMismatch:
+    return "SDK does not match";
+  case Status::Valid:
+    return std::nullopt;
+  }
+  llvm_unreachable("bad status");
+}
+
 llvm::ErrorOr<llvm::StringSet<>>
 SerializedModuleLoaderBase::getMatchingPackageOnlyImportsOfModule(
     Twine modulePath, bool isFramework, bool isRequiredOSSAModules,
@@ -504,7 +543,8 @@ SerializedModuleLoaderBase::resolveMacroPlugin(const ExternalMacroPlugin &macro,
 
 llvm::ErrorOr<ModuleDependencyInfo>
 SerializedModuleLoaderBase::scanModuleFile(Twine modulePath, bool isFramework,
-                                           bool isTestableImport) {
+                                           bool isTestableImport,
+                                           bool isCandidateForTextualModule) {
   const std::string moduleDocPath;
   const std::string sourceInfoPath;
 
@@ -521,10 +561,19 @@ SerializedModuleLoaderBase::scanModuleFile(Twine modulePath, bool isFramework,
 
   if (Ctx.SearchPathOpts.ScannerModuleValidation) {
     // If failed to load, just ignore and return do not found.
-    if (loadInfo.status != serialization::Status::Valid) {
+    if (auto loadFailureReason = invalidModuleReason(loadInfo.status)) {
+      // If no textual interface was found, then for this dependency
+      // scanning query this was *the* module discovered, which means
+      // it would be helpful to let the user know why the scanner
+      // was not able to use it because the scan will ultimately fail to
+      // resolve this dependency due to this incompatibility.
+      if (!isCandidateForTextualModule)
+        Ctx.Diags.diagnose(SourceLoc(), diag::dependency_scan_module_incompatible,
+                           modulePath.str(), loadFailureReason.value());
+
       if (Ctx.LangOpts.EnableModuleLoadingRemarks)
-        Ctx.Diags.diagnose(SourceLoc(), diag::skip_module_invalid,
-                           modulePath.str());
+        Ctx.Diags.diagnose(SourceLoc(), diag::dependency_scan_skip_module_invalid,
+                           modulePath.str(), loadFailureReason.value());
       return std::make_error_code(std::errc::no_such_file_or_directory);
     }
 
@@ -1030,6 +1079,8 @@ LoadedFile *SerializedModuleLoaderBase::loadAST(
       M.setPublicModuleName(Ctx.getIdentifier(loadedModuleFile->getPublicModuleName()));
     if (loadedModuleFile->isConcurrencyChecked())
       M.setIsConcurrencyChecked();
+    if (loadedModuleFile->strictMemorySafety())
+      M.setStrictMemorySafety();
     if (loadedModuleFile->hasCxxInteroperability()) {
       M.setHasCxxInteroperability();
       M.setCXXStdlibKind(loadedModuleFile->getCXXStdlibKind());
@@ -1193,8 +1244,7 @@ void swift::serialization::diagnoseSerializedASTLoadFailure(
                        moduleBufferID);
     break;
   case serialization::Status::NotInOSSA:
-    if (Ctx.SerializationOpts.ExplicitModuleBuild ||
-        !Ctx.SILOpts.EnableRecompilationToOSSAModule) {
+    if (Ctx.SerializationOpts.ExplicitModuleBuild) {
       Ctx.Diags.diagnose(diagLoc,
                          diag::serialization_non_ossa_module_incompatible,
                          ModuleName);
@@ -1389,14 +1439,6 @@ void swift::serialization::diagnoseSerializedASTLoadFailureTransitive(
   }
 }
 
-static bool tripleNeedsSubarchitectureAdjustment(const llvm::Triple &lhs, const llvm::Triple &rhs) {
-  return (lhs.getSubArch() != rhs.getSubArch() &&
-          lhs.getArch() == rhs.getArch() &&
-          lhs.getVendor() == rhs.getVendor() &&
-          lhs.getOS() == rhs.getOS() &&
-          lhs.getEnvironment() == rhs.getEnvironment());
-}
-
 static std::optional<StringRef> getFlagsFromInterfaceFile(StringRef &file,
                                                           StringRef prefix) {
   StringRef line, buffer = file;
@@ -1418,8 +1460,7 @@ static std::optional<StringRef> getFlagsFromInterfaceFile(StringRef &file,
 bool swift::extractCompilerFlagsFromInterface(
     StringRef interfacePath, StringRef buffer, llvm::StringSaver &ArgSaver,
     SmallVectorImpl<const char *> &SubArgs,
-    std::optional<llvm::Triple> PreferredTarget,
-    std::optional<llvm::Triple> PreferredTargetVariant) {
+    std::optional<llvm::Triple> PreferredTarget) {
   auto FlagMatch = getFlagsFromInterfaceFile(buffer, SWIFT_MODULE_FLAGS_KEY);
   if (!FlagMatch)
     return true;
@@ -1429,19 +1470,19 @@ bool swift::extractCompilerFlagsFromInterface(
   // only in subarchitecture from the compatible target triple, then
   // we have loaded a Swift interface from a different-but-compatible
   // architecture slice. Use the compatible subarchitecture.
-  for (unsigned I = 1; I < SubArgs.size(); ++I) {
-    if (strcmp(SubArgs[I - 1], "-target") == 0) {
-      llvm::Triple target(SubArgs[I]);
-      if (PreferredTarget &&
-          tripleNeedsSubarchitectureAdjustment(target, *PreferredTarget))
-        target.setArch(PreferredTarget->getArch(), PreferredTarget->getSubArch());
-      SubArgs[I] = ArgSaver.save(target.str()).data();
-    } else if (strcmp(SubArgs[I - 1], "-target-variant") == 0) {
-      llvm::Triple targetVariant(SubArgs[I]);
-      if (PreferredTargetVariant &&
-          tripleNeedsSubarchitectureAdjustment(targetVariant, *PreferredTargetVariant))
-        targetVariant.setArch(PreferredTargetVariant->getArch(), PreferredTargetVariant->getSubArch());
-      SubArgs[I] = ArgSaver.save(targetVariant.str()).data();
+  if (PreferredTarget) {
+    for (unsigned I = 1; I < SubArgs.size(); ++I) {
+      if (strcmp(SubArgs[I - 1], "-target") != 0 &&
+          strcmp(SubArgs[I - 1], "-target-variant") != 0)
+        continue;
+
+      llvm::Triple triple(SubArgs[I]);
+      if (triple.getArch() != PreferredTarget->getArch())
+        continue;
+      if (triple.getSubArch() == PreferredTarget->getSubArch())
+        continue;
+      triple.setArch(PreferredTarget->getArch(), PreferredTarget->getSubArch());
+      SubArgs[I] = ArgSaver.save(triple.str()).data();
     }
   }
 
@@ -1852,7 +1893,7 @@ bool SerializedASTFile::isSystemModule() const {
 void SerializedASTFile::lookupValue(DeclName name, NLKind lookupKind,
                                     OptionSet<ModuleLookupFlags> Flags,
                                     SmallVectorImpl<ValueDecl*> &results) const{
-  File.lookupValue(name, results);
+  File.lookupValue(name, Flags, results);
 }
 
 StringRef

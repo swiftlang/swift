@@ -198,8 +198,7 @@ static std::optional<std::string> extractRawLiteral(Expr *expr) {
     switch (expr->getKind()) {
     case ExprKind::BooleanLiteral:
     case ExprKind::FloatLiteral:
-    case ExprKind::IntegerLiteral:
-    case ExprKind::NilLiteral: {
+    case ExprKind::IntegerLiteral: {
       std::string literalOutput;
       llvm::raw_string_ostream OutputStream(literalOutput);
       expr->printConstExprValue(&OutputStream, nullptr);
@@ -230,7 +229,6 @@ static std::shared_ptr<CompileTimeValue> extractCompileTimeValue(Expr *expr) {
     case ExprKind::BooleanLiteral:
     case ExprKind::FloatLiteral:
     case ExprKind::IntegerLiteral:
-    case ExprKind::NilLiteral:
     case ExprKind::StringLiteral: {
       auto rawLiteral = extractRawLiteral(expr);
       if (rawLiteral.has_value()) {
@@ -238,6 +236,10 @@ static std::shared_ptr<CompileTimeValue> extractCompileTimeValue(Expr *expr) {
       }
 
       break;
+    }
+
+    case ExprKind::NilLiteral: {
+      return std::make_shared<NilLiteralValue>();
     }
 
     case ExprKind::Array: {
@@ -487,6 +489,11 @@ static std::shared_ptr<CompileTimeValue> extractCompileTimeValue(Expr *expr) {
       }
       break;
     }
+
+    case ExprKind::DerivedToBase: {
+      auto derivedExpr = cast<DerivedToBaseExpr>(expr);
+      return extractCompileTimeValue(derivedExpr->getSubExpr());
+    }
     default: {
       break;
     }
@@ -707,6 +714,11 @@ void writeValue(llvm::json::OStream &JSON,
   case CompileTimeValue::ValueKind::RawLiteral: {
     JSON.attribute("valueKind", "RawLiteral");
     JSON.attribute("value", cast<RawLiteralValue>(value)->getValue());
+    break;
+  }
+
+  case CompileTimeValue::ValueKind::NilLiteral: {
+    JSON.attribute("valueKind", "NilLiteral");
     break;
   }
 
@@ -1242,38 +1254,38 @@ extractBuilderValueIfExists(const swift::NominalTypeDecl *TypeDecl,
   ;
 }
 
-void writeAttrInformation(llvm::json::OStream &JSON,
-                          const DeclAttributes &Attrs) {
-  auto availableAttr = Attrs.getAttributes<AvailableAttr>();
-  if (availableAttr.empty())
+void writeAvailabilityAttributes(llvm::json::OStream &JSON, const Decl &decl) {
+  auto attrs = decl.getSemanticAvailableAttrs();
+  if (attrs.empty())
     return;
 
   JSON.attributeArray("availabilityAttributes", [&] {
-    for (const AvailableAttr *attr : availableAttr) {
+    for (auto attr : attrs) {
       JSON.object([&] {
-        if (!attr->platformString().empty())
-          JSON.attribute("platform", attr->platformString());
+        auto domainName = attr.getDomain().getNameForAttributePrinting();
+        if (!domainName.empty())
+          JSON.attribute("platform", domainName);
 
-        if (!attr->Message.empty())
-          JSON.attribute("message", attr->Message);
+        if (!attr.getMessage().empty())
+          JSON.attribute("message", attr.getMessage());
 
-        if (!attr->Rename.empty())
-          JSON.attribute("rename", attr->Rename);
+        if (!attr.getRename().empty())
+          JSON.attribute("rename", attr.getRename());
 
-        if (attr->Introduced.has_value())
+        if (attr.getIntroduced().has_value())
           JSON.attribute("introducedVersion",
-                         attr->Introduced.value().getAsString());
+                         attr.getIntroduced().value().getAsString());
 
-        if (attr->Deprecated.has_value())
+        if (attr.getDeprecated().has_value())
           JSON.attribute("deprecatedVersion",
-                         attr->Deprecated.value().getAsString());
+                         attr.getDeprecated().value().getAsString());
 
-        if (attr->Obsoleted.has_value())
+        if (attr.getObsoleted().has_value())
           JSON.attribute("obsoletedVersion",
-                         attr->Obsoleted.value().getAsString());
+                         attr.getObsoleted().value().getAsString());
 
-        JSON.attribute("isUnavailable", attr->isUnconditionallyUnavailable());
-        JSON.attribute("isDeprecated", attr->isUnconditionallyDeprecated());
+        JSON.attribute("isUnavailable", attr.isUnconditionallyUnavailable());
+        JSON.attribute("isDeprecated", attr.isUnconditionallyDeprecated());
       });
     }
   });
@@ -1370,7 +1382,7 @@ void writeProperties(llvm::json::OStream &JSON,
         }
         writePropertyWrapperAttributes(JSON, PropertyInfo.PropertyWrappers,
                                        decl->getASTContext());
-        writeAttrInformation(JSON, decl->getAttrs());
+        writeAvailabilityAttributes(JSON, *decl);
       });
     }
   });
@@ -1450,7 +1462,7 @@ bool writeAsJSONToFile(const std::vector<ConstValueTypeInfo> &ConstValueInfos,
         writeAssociatedTypeAliases(JSON, *NomTypeDecl);
         writeProperties(JSON, TypeInfo, *NomTypeDecl);
         writeEnumCases(JSON, TypeInfo.EnumElements);
-        writeAttrInformation(JSON, NomTypeDecl->getAttrs());
+        writeAvailabilityAttributes(JSON, *NomTypeDecl);
       });
     }
   });

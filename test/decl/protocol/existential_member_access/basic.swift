@@ -510,6 +510,7 @@ do {
     // expected-error@+1 {{non-protocol, non-class type 'Sequence<${type}>' cannot be used within a protocol-constrained type}}
     func invariant13() -> any P & Sequence<${type}>
     func invariant14() -> (any Sequence<${type}>).Type
+    func invariant15() -> any (P & Class<${type}>).Type
 
 
     var invariantProp1: (inout ${type}) -> Void { get }
@@ -523,6 +524,7 @@ do {
     var invariantProp9: (Struct<() -> ${type}>) -> Void { get }
     var invariantProp10: (any P & Class<${type}>) -> Void { get }
     var invariantProp11: Struct<${type}>.InnerGeneric<Void> { get }
+    var invariantProp15: any (P & Class<${type}>).Type { get }
 
     subscript(invariantSubscript1 _: Struct<${type}>) -> Void { get }
     subscript(invariantSubscript2 _: Void) -> Struct<${type}> { get }
@@ -532,6 +534,7 @@ do {
     subscript(invariantSubscript6 _: Struct<() -> ${type}>) -> Void { get }
     subscript(invariantSubscript7 _: any P & Class<${type}>) -> Void { get }
     subscript(invariantSubscript8 _: Void) -> Struct<${type}>.InnerGeneric<Void> { get }
+    subscript(invariantSubscript15 _: Void) -> any (P & Class<${type}>).Type { get }
   }
 
   let exist: any P
@@ -561,6 +564,7 @@ do {
     var types = SwiftTypePair(typeOf: exist.invariant14(), type2: SwiftType<(any Sequence).Type>.self)
     types.assertTypesAreEqual()
   }
+  exist.invariant15() // expected-error {{member 'invariant15' cannot be used on value of type 'any P'; consider using a generic constraint instead}}
 
   exist.invariantProp1 // expected-error {{member 'invariantProp1' cannot be used on value of type 'any P'; consider using a generic constraint instead}}
   exist.invariantProp2 // expected-error {{member 'invariantProp2' cannot be used on value of type 'any P'; consider using a generic constraint instead}}
@@ -573,6 +577,7 @@ do {
   exist.invariantProp9 // expected-error {{member 'invariantProp9' cannot be used on value of type 'any P'; consider using a generic constraint instead}}
   exist.invariantProp10 // expected-error {{member 'invariantProp10' cannot be used on value of type 'any P'; consider using a generic constraint instead}}
   exist.invariantProp11 // expected-error {{member 'invariantProp11' cannot be used on value of type 'any P'; consider using a generic constraint instead}}
+  exist.invariantProp15 // expected-error {{member 'invariantProp15' cannot be used on value of type 'any P'; consider using a generic constraint instead}}
 
   exist[invariantSubscript1: 0] // expected-error {{member 'subscript' cannot be used on value of type 'any P'; consider using a generic constraint instead}}
   exist[invariantSubscript2: ()] // expected-error {{member 'subscript' cannot be used on value of type 'any P'; consider using a generic constraint instead}}
@@ -582,4 +587,5 @@ do {
   exist[invariantSubscript6: 0] // expected-error {{member 'subscript' cannot be used on value of type 'any P'; consider using a generic constraint instead}}
   exist[invariantSubscript7: 0] // expected-error {{member 'subscript' cannot be used on value of type 'any P'; consider using a generic constraint instead}}
   exist[invariantSubscript8: ()] // expected-error {{member 'subscript' cannot be used on value of type 'any P'; consider using a generic constraint instead}}
+  exist[invariantSubscript15: ()] // expected-error {{member 'subscript' cannot be used on value of type 'any P'; consider using a generic constraint instead}}
 }

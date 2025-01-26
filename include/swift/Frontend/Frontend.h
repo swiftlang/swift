@@ -116,11 +116,16 @@ class CompilerInvocation {
 public:
   CompilerInvocation();
 
-  /// Initializes the compiler invocation for the list of arguments.
+  /// Initializes the compiler invocation and diagnostic engine for the list of
+  /// arguments.
   ///
   /// All parsing should be additive, i.e. options should not be reset to their
   /// default values given the /absence/ of a flag. This is because \c parseArgs
   /// may be used to modify an already partially configured invocation.
+  ///
+  /// As a side-effect of parsing, the diagnostic engine will be configured with
+  /// the options specified by the parsed arguments. This ensures that the
+  /// arguments can effect the behavior of diagnostics emitted during parsing.
   ///
   /// Any configuration files loaded as a result of parsing arguments will be
   /// stored in \p ConfigurationFileBuffers, if non-null. The contents of these
@@ -160,6 +165,9 @@ public:
                               StringRef SDKPath,
                               StringRef ResourceDir);
 
+  /// Configures the diagnostic engine for the invocation's options.
+  void setUpDiagnosticEngine(DiagnosticEngine &diags);
+
   void setTargetTriple(const llvm::Triple &Triple);
   void setTargetTriple(StringRef Triple);
 
@@ -187,7 +195,8 @@ public:
     return ClangImporterOpts.ClangScannerModuleCachePath;
   }
 
-  void setImportSearchPaths(const std::vector<std::string> &Paths) {
+  void setImportSearchPaths(
+      const std::vector<SearchPathOptions::SearchPath> &Paths) {
     SearchPathOpts.setImportSearchPaths(Paths);
   }
 
@@ -196,16 +205,16 @@ public:
     SearchPathOpts.DeserializedPathRecoverer = obfuscator;
   }
 
-  ArrayRef<std::string> getImportSearchPaths() const {
+  ArrayRef<SearchPathOptions::SearchPath> getImportSearchPaths() const {
     return SearchPathOpts.getImportSearchPaths();
   }
 
   void setFrameworkSearchPaths(
-             const std::vector<SearchPathOptions::FrameworkSearchPath> &Paths) {
+      const std::vector<SearchPathOptions::SearchPath> &Paths) {
     SearchPathOpts.setFrameworkSearchPaths(Paths);
   }
 
-  ArrayRef<SearchPathOptions::FrameworkSearchPath> getFrameworkSearchPaths() const {
+  ArrayRef<SearchPathOptions::SearchPath> getFrameworkSearchPaths() const {
     return SearchPathOpts.getFrameworkSearchPaths();
   }
 

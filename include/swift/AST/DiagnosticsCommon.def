@@ -47,15 +47,15 @@ ERROR(error_no_group_info,none,
 NOTE(brace_stmt_suggest_do,none,
      "did you mean to use a 'do' statement?", ())
 
-// `error_in_future_swift_version` does not have a group because warnings of this kind
-// inherit the group from the wrapped error.
-WARNING(error_in_future_swift_version,none,
+// This does not have a group because warnings of this kind inherit the group
+// from the wrapped error.
+WARNING(error_in_swift_lang_mode,none,
         "%0; this is an error in the Swift %1 language mode",
         (DiagnosticInfo *, unsigned))
 
-// `error_in_a_future_swift_version` does not have a group because warnings of this kind
-// inherit the group from the wrapped error.
-WARNING(error_in_a_future_swift_version,none,
+// This does not have a group because warnings of this kind inherit the group
+// from the wrapped error.
+WARNING(error_in_a_future_swift_lang_mode,none,
         "%0; this will be an error in a future Swift language mode",
         (DiagnosticInfo *))
 
@@ -218,6 +218,9 @@ WARNING(warn_scanner_deserialize_failed, none,
 REMARK(remark_reuse_cache, none,
        "Re-using serialized module scanning dependency cache from: '%0'.", (StringRef))
 
+REMARK(remark_scanner_uncached_lookups, none,
+       "Module Dependency Scanner queries executed: '%0'.", (unsigned))
+
 REMARK(remark_save_cache, none,
        "Serializing module scanning dependency cache to: '%0'.", (StringRef))
 
@@ -236,6 +239,13 @@ NOTE(in_macro_expansion,none,
 ERROR(macro_experimental,none,
       "%0 macros are an experimental feature that is not enabled %select{|(%1)}1",
       (StringRef, StringRef))
+      
+//------------------------------------------------------------------------------
+// MARK: lexical lookup diagnostics
+//------------------------------------------------------------------------------
+      
+ERROR(lookup_outputs_dont_match,none,
+"Unqualified lookup output from ASTScope and SwiftLexicalLookup don't match", ())
 
 //------------------------------------------------------------------------------
 // MARK: bridged diagnostics

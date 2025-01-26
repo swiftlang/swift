@@ -108,8 +108,6 @@ public:
                   const llvm::StringSet<> &PlaceholderModules,
                   StringRef WorkingDirectory);
 
-  /// Discard the tool's current `SharedCache` and start anew.
-  void resetCache();
   /// Query diagnostics consumed so far.
   std::vector<DependencyScanDiagnosticCollector::ScannerDiagnosticInfo> getDiagnostics();
   /// Discared the collection of diagnostics encountered so far.

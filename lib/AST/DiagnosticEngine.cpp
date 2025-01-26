@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2017 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2025 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -16,13 +16,14 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/AST/DiagnosticEngine.h"
-#include "swift/AST/DiagnosticsFrontend.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTPrinter.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/DiagnosticGroups.h"
+#include "swift/AST/DiagnosticList.h"
 #include "swift/AST/DiagnosticSuppression.h"
 #include "swift/AST/DiagnosticsCommon.h"
+#include "swift/AST/DiagnosticsFrontend.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/Pattern.h"
@@ -73,6 +74,11 @@ enum class DiagnosticOptions {
 
   /// A diagnostic warning about an unused element.
   NoUsage,
+
+  /// The diagnostic should be ignored by default, but will be re-enabled
+  /// by various warning options (-Wwarning, -Werror). This only makes sense
+  /// for warnings.
+  DefaultIgnore,
 };
 struct StoredDiagnosticInfo {
   DiagnosticKind kind : 2;
@@ -81,15 +87,17 @@ struct StoredDiagnosticInfo {
   bool isAPIDigesterBreakage : 1;
   bool isDeprecation : 1;
   bool isNoUsage : 1;
+  bool defaultIgnore : 1;
   DiagGroupID groupID;
 
   constexpr StoredDiagnosticInfo(DiagnosticKind k, bool firstBadToken,
                                  bool fatal, bool isAPIDigesterBreakage,
                                  bool deprecation, bool noUsage,
-                                 DiagGroupID groupID)
+                                 bool defaultIgnore, DiagGroupID groupID)
       : kind(k), pointsToFirstBadToken(firstBadToken), isFatal(fatal),
         isAPIDigesterBreakage(isAPIDigesterBreakage),
-        isDeprecation(deprecation), isNoUsage(noUsage), groupID(groupID) {}
+        isDeprecation(deprecation), isNoUsage(noUsage),
+        defaultIgnore(defaultIgnore), groupID(groupID) {}
   constexpr StoredDiagnosticInfo(DiagnosticKind k, DiagnosticOptions opts,
                                  DiagGroupID groupID)
       : StoredDiagnosticInfo(k,
@@ -97,15 +105,9 @@ struct StoredDiagnosticInfo {
                              opts == DiagnosticOptions::Fatal,
                              opts == DiagnosticOptions::APIDigesterBreakage,
                              opts == DiagnosticOptions::Deprecation,
-                             opts == DiagnosticOptions::NoUsage, groupID) {}
-};
-
-// Reproduce the DiagIDs, as we want both the size and access to the raw ids
-// themselves.
-enum LocalDiagID : uint32_t {
-#define DIAG(KIND, ID, Group, Options, Text, Signature) ID,
-#include "swift/AST/DiagnosticsAll.def"
-  NumDiags
+                             opts == DiagnosticOptions::NoUsage,
+                             opts == DiagnosticOptions::DefaultIgnore,
+                             groupID) {}
 };
 } // end anonymous namespace
 
@@ -126,7 +128,7 @@ static const constexpr StoredDiagnosticInfo storedDiagnosticInfos[] = {
 #include "swift/AST/DiagnosticsAll.def"
 };
 static_assert(sizeof(storedDiagnosticInfos) / sizeof(StoredDiagnosticInfo) ==
-                  LocalDiagID::NumDiags,
+                  NumDiagIDs,
               "array size mismatch");
 
 static constexpr const char * const diagnosticStrings[] = {
@@ -163,20 +165,26 @@ struct EducationalNotes {
   constexpr EducationalNotes() : value() {
     for (auto i = 0; i < N; ++i) value[i] = {};
 #define EDUCATIONAL_NOTES(DIAG, ...)                                           \
-  value[LocalDiagID::DIAG] = DIAG##_educationalNotes;
+  value[static_cast<std::underlying_type_t<DiagID>>(DiagID::DIAG)] =           \
+      DIAG##_educationalNotes;
 #include "swift/AST/EducationalNotes.def"
   }
   const char *const *value[N];
 };
 
-static constexpr EducationalNotes<LocalDiagID::NumDiags> _EducationalNotes = EducationalNotes<LocalDiagID::NumDiags>();
+static constexpr EducationalNotes<NumDiagIDs> _EducationalNotes =
+    EducationalNotes<NumDiagIDs>();
 static constexpr auto educationalNotes = _EducationalNotes.value;
 
 DiagnosticState::DiagnosticState() {
-  // Initialize our ignored diagnostics to default
-  ignoredDiagnostics.resize(LocalDiagID::NumDiags);
+  // Initialize our ignored diagnostics to defaults
+  ignoredDiagnostics.reserve(NumDiagIDs);
+  for (const auto &info : storedDiagnosticInfos) {
+    ignoredDiagnostics.push_back(info.defaultIgnore);
+  }
+
   // Initialize warningsAsErrors to default
-  warningsAsErrors.resize(LocalDiagID::NumDiags);
+  warningsAsErrors.resize(DiagGroupsCount);
 }
 
 Diagnostic::Diagnostic(DiagID ID)
@@ -423,9 +431,9 @@ InFlightDiagnostic::limitBehaviorUntilSwiftVersion(
     // wrapIn will result in the behavior of the wrapping diagnostic.
     if (limit >= DiagnosticBehavior::Warning) {
       if (majorVersion > 6) {
-        wrapIn(diag::error_in_a_future_swift_version);
+        wrapIn(diag::error_in_a_future_swift_lang_mode);
       } else {
-        wrapIn(diag::error_in_future_swift_version, majorVersion);
+        wrapIn(diag::error_in_swift_lang_mode, majorVersion);
       }
     }
 
@@ -551,8 +559,9 @@ void DiagnosticEngine::setWarningsAsErrorsRules(
       if (auto groupID = getDiagGroupIDByName(name);
           groupID && *groupID != DiagGroupID::no_group) {
         getDiagGroupInfoByID(*groupID).traverseDepthFirst([&](auto group) {
+          state.setWarningsAsErrorsForDiagGroupID(*groupID, isEnabled);
           for (DiagID diagID : group.diagnostics) {
-            state.setWarningAsErrorForDiagID(diagID, isEnabled);
+            state.setIgnoredDiagnostic(diagID, false);
           }
         });
       } else {
@@ -1232,7 +1241,7 @@ DiagnosticBehavior DiagnosticState::determineBehavior(const Diagnostic &diag) {
   //   4) If the user substituted a different behavior for this behavior, apply
   //      that change
   if (lvl == DiagnosticBehavior::Warning) {
-    if (getWarningAsErrorForDiagID(diag.getID()))
+    if (getWarningsAsErrorsForDiagGroupID(diag.getGroupID()))
       lvl = DiagnosticBehavior::Error;
     if (suppressWarnings)
       lvl = DiagnosticBehavior::Ignore;

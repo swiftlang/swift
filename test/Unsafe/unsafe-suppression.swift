@@ -1,8 +1,5 @@
 // RUN: %target-typecheck-verify-swift -enable-experimental-feature AllowUnsafeAttribute -enable-experimental-feature WarnUnsafe -print-diagnostic-groups
 
-// Make sure everything compiles without error when unsafe code is allowed.
-// RUN: %target-swift-frontend -typecheck -enable-experimental-feature AllowUnsafeAttribute -warnings-as-errors %s
-
 // REQUIRES: swift_feature_AllowUnsafeAttribute
 // REQUIRES: swift_feature_WarnUnsafe
 
@@ -10,16 +7,18 @@
 func iAmUnsafe() { }
 
 @unsafe
-struct UnsafeType { } // expected-note{{unsafe struct 'UnsafeType' declared here}}
+struct UnsafeType { }
 
-// expected-warning@+1{{reference to unsafe struct 'UnsafeType' [Unsafe]}}
+// expected-note@+3{{reference to unsafe struct 'UnsafeType'}}
+// expected-note@+2{{add '@unsafe' to indicate that this declaration is unsafe to use}}{{1-1=@unsafe }}
+// expected-note@+1{{add '@safe' to indicate that this declaration is memory-safe to use}}{1-1=@safe }}
 func iAmImpliedUnsafe() -> UnsafeType? { nil }
-// expected-note@-1{{make global function 'iAmImpliedUnsafe' @unsafe to indicate that its use is not memory-safe}}{{1-1=@unsafe }}
+// expected-warning@-1{{global function 'iAmImpliedUnsafe' has an interface that involves unsafe types}}
 
 @unsafe
 func labeledUnsafe(_: UnsafeType) {
-  iAmUnsafe()
-  let _ = iAmImpliedUnsafe()
+  unsafe iAmUnsafe()
+  let _ = unsafe iAmImpliedUnsafe()
 }
 
 
@@ -42,31 +41,40 @@ protocol P {
 }
 
 struct S1: P {
-  // expected-note@-1{{make the enclosing struct @unsafe to allow unsafe conformance to protocol 'P'}}{{1-1=@unsafe }}
+  // expected-warning@-1{{conformance of 'S1' to protocol 'P' involves unsafe code; use '@unsafe' to indicate that the conformance is not memory-safe [Unsafe]}}{{12-12=@unsafe }}
   @unsafe
-  func protoMethod() { } // expected-warning{{unsafe instance method 'protoMethod()' cannot satisfy safe requirement}}
+  func protoMethod() { } // expected-note{{unsafe instance method 'protoMethod()' cannot satisfy safe requirement}}
 }
 
 @unsafe
 struct S2: P {
-  @unsafe // okay
+  @unsafe
   func protoMethod() { }
 }
 
 struct S3 { }
 
 extension S3: P {
-  // expected-note@-1{{make the enclosing extension @unsafe to allow unsafe conformance to protocol 'P'}}{{1-1=@unsafe }}
+  // expected-warning@-1{{conformance of 'S3' to protocol 'P' involves unsafe code; use '@unsafe' to indicate that the conformance is not memory-safe [Unsafe]}}{{15-15=@unsafe }}
   @unsafe
-  func protoMethod() { } // expected-warning{{unsafe instance method 'protoMethod()' cannot satisfy safe requirement}}
+  func protoMethod() { } // expected-note{{unsafe instance method 'protoMethod()' cannot satisfy safe requirement}}
 }
 
 struct S4 { }
 
-@unsafe
-extension S4: P {
+extension S4: @unsafe P {
   @unsafe
   func protoMethod() { } // okay
+}
+
+protocol P2 {
+  func proto2Method()
+}
+
+@unsafe
+extension S4: P2 { // expected-warning{{conformance of 'S4' to protocol 'P2' involves unsafe code; use '@unsafe' to indicate that the conformance is not memory-safe}}
+  @unsafe
+  func proto2Method() { } // expected-note{{unsafe instance method}}
 }
 
 
@@ -91,17 +99,16 @@ class NonSendable { }
 
 
 @unsafe
-struct UnsafeOuter { // expected-note{{unsafe struct 'UnsafeOuter' declared here}}
+struct UnsafeOuter {
   func f(_: UnsafeType) { } // okay
 
   @unsafe func g(_ y: UnsafeType) {
-    let x: UnsafeType = y
-    let _ = x
+    @unsafe let x: UnsafeType = unsafe y
+    let _ = unsafe x
   }
 }
 
-// expected-note@+1{{make extension of struct 'UnsafeOuter' @unsafe to indicate that its use is not memory-safe}}{{1-1=@unsafe }}
-extension UnsafeOuter { // expected-warning{{reference to unsafe struct 'UnsafeOuter' [Unsafe]}}
+extension UnsafeOuter {
   func h(_: UnsafeType) { }
 }
 

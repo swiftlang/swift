@@ -59,6 +59,7 @@ extension ASTGenVisitor {
         .sendable,
         .retroactive,
         .unchecked,
+        .unsafe,
         .preconcurrency,
         .local,
         .noMetadata,
@@ -118,6 +119,7 @@ extension ASTGenVisitor {
         .silUnowned,
         .silWeak,
         .silSending,
+        .silImplicitLeadingParam,
         .unownedInnerPointer:
         break;
 

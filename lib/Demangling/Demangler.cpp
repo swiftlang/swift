@@ -1634,24 +1634,51 @@ NodePointer Demangler::demanglePlainFunction() {
 
 NodePointer Demangler::popFunctionType(Node::Kind kind, bool hasClangType) {
   NodePointer FuncType = createNode(kind);
+
+  // Demangle a C function type if the function node kind says that
+  // one follows.
   NodePointer ClangType = nullptr;
   if (hasClangType) {
     ClangType = demangleClangType();
   }
   addChild(FuncType, ClangType);
-  addChild(FuncType, popNode(Node::Kind::GlobalActorFunctionType));
-  addChild(FuncType, popNode(Node::Kind::IsolatedAnyFunctionType));
+
+  // The components of function-signature. Note that these need to be
+  // popped in the reverse of the order they're mangled. If you add a
+  // new component, be sure to add a demangling test case for combinations
+  // of specifiers.
+
+  // sending-result?
   addChild(FuncType, popNode(Node::Kind::SendingResultFunctionType));
+
+  // function-isolation?
+  auto isFunctionIsolation = [](Node::Kind kind) {
+    return kind == Node::Kind::GlobalActorFunctionType ||
+           kind == Node::Kind::IsolatedAnyFunctionType;
+  };
+  addChild(FuncType, popNode(isFunctionIsolation));
+
+  // differentiable?
   addChild(FuncType, popNode(Node::Kind::DifferentiableFunctionType));
+
+  // throws?
   addChild(FuncType, popNode([](Node::Kind kind) {
     return kind == Node::Kind::ThrowsAnnotation ||
       kind == Node::Kind::TypedThrowsAnnotation;
   }));
+
+  // sendable?
   addChild(FuncType, popNode(Node::Kind::ConcurrentFunctionType));
+
+  // async?
   addChild(FuncType, popNode(Node::Kind::AsyncAnnotation));
 
+  // params-type
   FuncType = addChild(FuncType, popFunctionParams(Node::Kind::ArgumentTuple));
+
+  // result-type
   FuncType = addChild(FuncType, popFunctionParams(Node::Kind::ReturnType));
+
   return createType(FuncType);
 }
 
@@ -1681,14 +1708,14 @@ NodePointer Demangler::popFunctionParamLabels(NodePointer Type) {
     return nullptr;
 
   unsigned FirstChildIdx = 0;
+  if (FuncType->getChild(FirstChildIdx)->getKind() ==
+      Node::Kind::SendingResultFunctionType)
+    ++FirstChildIdx;
   if (FuncType->getChild(FirstChildIdx)->getKind()
         == Node::Kind::GlobalActorFunctionType)
     ++FirstChildIdx;
   if (FuncType->getChild(FirstChildIdx)->getKind()
         == Node::Kind::IsolatedAnyFunctionType)
-    ++FirstChildIdx;
-  if (FuncType->getChild(FirstChildIdx)->getKind() ==
-      Node::Kind::SendingResultFunctionType)
     ++FirstChildIdx;
   if (FuncType->getChild(FirstChildIdx)->getKind()
         == Node::Kind::DifferentiableFunctionType)
@@ -2391,6 +2418,10 @@ NodePointer Demangler::demangleImplFunctionType() {
                    *this);
   }
 
+  if (nextIf('T')) {
+    type->addChild(createNode(Node::Kind::ImplSendingResult), *this);
+  }
+
   addChild(type, GenSig);
 
   int NumTypesToAdd = 0;
@@ -2402,10 +2433,6 @@ NodePointer Demangler::demangleImplFunctionType() {
     if (auto Sending = demangleImplParameterSending())
       Param = addChild(Param, Sending);
     ++NumTypesToAdd;
-  }
-
-  if (nextIf('T')) {
-    type->addChild(createNode(Node::Kind::ImplSendingResult), *this);
   }
 
   while (NodePointer Result = demangleImplResultConvention(
@@ -2440,7 +2467,7 @@ NodePointer Demangler::demangleImplFunctionType() {
       return nullptr;
     type->getChild(type->getNumChildren() - Idx - 1)->addChild(ConvTy, *this);
   }
-  
+
   return createType(type);
 }
 

@@ -1,9 +1,0 @@
-// RUN: %scale-test --invert-result --begin 1 --end 5 --step 1 --select NumLeafScopes %s
-// REQUIRES: asserts,no_asan
-
-func t(_ x: Int?) -> Int {
-  return (x ?? 0)
-%for i in range(1, N):
-         + (x ?? 0)
-%end
-}

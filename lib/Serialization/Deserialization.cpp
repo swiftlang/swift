@@ -491,6 +491,7 @@ getActualActorIsolationKind(uint8_t raw) {
   CASE(Unspecified)
   CASE(ActorInstance)
   CASE(Nonisolated)
+  CASE(CallerIsolationInheriting)
   CASE(NonisolatedUnsafe)
   CASE(GlobalActor)
   CASE(Erased)
@@ -976,16 +977,14 @@ ProtocolConformanceDeserializer::readNormalProtocolConformance(
 
   DeclID protoID;
   DeclContextID contextID;
-  unsigned valueCount, typeCount, conformanceCount, isUnchecked,
-      isPreconcurrency;
+  unsigned valueCount, typeCount, conformanceCount;
+  unsigned rawOptions;
   ArrayRef<uint64_t> rawIDs;
 
   NormalProtocolConformanceLayout::readRecord(scratch, protoID,
                                               contextID, typeCount,
                                               valueCount, conformanceCount,
-                                              isUnchecked,
-                                              isPreconcurrency,
-                                              rawIDs);
+                                              rawOptions, rawIDs);
 
   auto doOrError = MF.getDeclContextChecked(contextID);
   if (!doOrError)
@@ -1007,7 +1006,7 @@ ProtocolConformanceDeserializer::readNormalProtocolConformance(
   auto conformance = ctx.getNormalConformance(
       conformingType, proto, SourceLoc(), dc,
       ProtocolConformanceState::Incomplete,
-      isUnchecked, isPreconcurrency);
+      ProtocolConformanceOptions(rawOptions));
 
   if (conformance->isConformanceOfProtocol()) {
     auto &C = dc->getASTContext();
@@ -3247,33 +3246,6 @@ static bool attributeChainContains(DeclAttribute *attr) {
   return tempAttrs.hasAttribute<DERIVED>();
 }
 
-// Set original declaration and parameter indices in `@differentiable`
-// attributes.
-//
-// Serializing/deserializing the original declaration DeclID in
-// `@differentiable` attributes does not work because it causes
-// `@differentiable` attribute deserialization to enter an infinite loop.
-//
-// Instead, call this ad-hoc function after deserializing a declaration to set
-// the original declaration and parameter indices for its `@differentiable`
-// attributes.
-static void setOriginalDeclarationAndParameterIndicesInDifferentiableAttributes(
-    Decl *decl, DeclAttribute *attrs,
-    llvm::DenseMap<DifferentiableAttr *, IndexSubset *>
-        &diffAttrParamIndicesMap) {
-  DeclAttributes tempAttrs;
-  tempAttrs.setRawAttributeChain(attrs);
-  for (auto *attr : tempAttrs.getAttributes<DifferentiableAttr>()) {
-    auto *diffAttr = const_cast<DifferentiableAttr *>(attr);
-    diffAttr->setOriginalDeclaration(decl);
-    diffAttr->setParameterIndices(diffAttrParamIndicesMap[diffAttr]);
-  }
-  for (auto *attr : tempAttrs.getAttributes<DerivativeAttr>()) {
-    auto *derAttr = const_cast<DerivativeAttr *>(attr);
-    derAttr->setOriginalDeclaration(decl);
-  }
-}
-
 Decl *ModuleFile::getDecl(DeclID DID) {
   Expected<Decl *> deserialized = getDeclChecked(DID);
   if (!deserialized) {
@@ -3306,6 +3278,11 @@ class DeclDeserializer {
   // Auxiliary map for deserializing `@differentiable` attributes.
   llvm::DenseMap<DifferentiableAttr *, IndexSubset *> diffAttrParamIndicesMap;
 
+  /// State for resolving the declaration in an ABIAttr.
+  std::optional<std::pair<ABIAttr *, DeclID>> unresolvedABIAttr;
+  /// State for setting up an ABIAttr's counterpart relationship.
+  DeclID ABIDeclCounterpartID = 0;
+
   void AddAttribute(DeclAttribute *Attr) {
     // Advance the linked list.
     // This isn't just using DeclAttributes because that would result in the
@@ -3323,13 +3300,11 @@ class DeclDeserializer {
       bool isSuppressed = rawID & 0x01;
       rawID = rawID >> 1;
 
-      // The second low bit indicates "@preconcurrency".
-      bool isPreconcurrency = rawID & 0x01;
-      rawID = rawID >> 1;
-
-      // The third low bit indicates "@unchecked".
-      bool isUnchecked = rawID & 0x01;
-      rawID = rawID >> 1;
+      // The next bits are the protocol conformance options.
+      // Update the mask below whenever this changes.
+      static_assert(NumProtocolConformanceOptions == 5);
+      ProtocolConformanceOptions options(rawID & 0x1F);
+      rawID = rawID >> NumProtocolConformanceOptions;
 
       TypeID typeID = rawID;
       auto maybeType = MF.getTypeChecked(typeID);
@@ -3338,8 +3313,7 @@ class DeclDeserializer {
         continue;
       }
       inheritedTypes.push_back(InheritedEntry(
-          TypeLoc::withoutLoc(maybeType.get()), isUnchecked,
-          /*isRetroactive=*/false, isPreconcurrency, isSuppressed));
+          TypeLoc::withoutLoc(maybeType.get()), options, isSuppressed));
     }
 
     auto inherited = ctx.AllocateCopy(inheritedTypes);
@@ -3348,6 +3322,8 @@ class DeclDeserializer {
     else
       decl.get<ExtensionDecl *>()->setInherited(inherited);
   }
+
+  llvm::Error finishRecursiveAttrs(Decl *decl, DeclAttribute *attrs);
 
 public:
   DeclDeserializer(ModuleFile &MF, Serialized<Decl *> &declOrOffset)
@@ -4084,6 +4060,10 @@ public:
       case ActorIsolation::Nonisolated:
       case ActorIsolation::NonisolatedUnsafe:
         isolation = ActorIsolation::forUnspecified();
+        break;
+
+      case ActorIsolation::CallerIsolationInheriting:
+        isolation = ActorIsolation::forCallerIsolationInheriting();
         break;
 
       case ActorIsolation::Erased:
@@ -5639,27 +5619,33 @@ DeclDeserializer::readAvailable_DECL_ATTR(SmallVectorImpl<uint64_t> &scratch,
   DECODE_VER_TUPLE(Deprecated)
   DECODE_VER_TUPLE(Obsoleted)
 
-  PlatformAgnosticAvailabilityKind platformAgnostic;
+  AvailableAttr::Kind kind;
   if (isUnavailable)
-    platformAgnostic = PlatformAgnosticAvailabilityKind::Unavailable;
+    kind = AvailableAttr::Kind::Unavailable;
   else if (isDeprecated)
-    platformAgnostic = PlatformAgnosticAvailabilityKind::Deprecated;
+    kind = AvailableAttr::Kind::Deprecated;
   else if (isNoAsync)
-    platformAgnostic = PlatformAgnosticAvailabilityKind::NoAsync;
-  else if (platform == PlatformKind::none &&
-           (!Introduced.empty() || !Deprecated.empty() || !Obsoleted.empty()))
-    platformAgnostic =
-        isPackageDescriptionVersionSpecific
-            ? PlatformAgnosticAvailabilityKind::
-                  PackageDescriptionVersionSpecific
-            : PlatformAgnosticAvailabilityKind::SwiftVersionSpecific;
+    kind = AvailableAttr::Kind::NoAsync;
   else
-    platformAgnostic = PlatformAgnosticAvailabilityKind::None;
+    kind = AvailableAttr::Kind::Default;
 
-  auto attr = new (ctx) AvailableAttr(
-      SourceLoc(), SourceRange(), platform, message, rename, Introduced,
-      SourceRange(), Deprecated, SourceRange(), Obsoleted, SourceRange(),
-      platformAgnostic, isImplicit, isSPI, isForEmbedded);
+  AvailabilityDomain domain;
+  if (platform != PlatformKind::none) {
+    domain = AvailabilityDomain::forPlatform(platform);
+  } else if (!Introduced.empty() || !Deprecated.empty() || !Obsoleted.empty()) {
+    domain = isPackageDescriptionVersionSpecific
+                 ? AvailabilityDomain::forPackageDescription()
+                 : AvailabilityDomain::forSwiftLanguage();
+  } else if (isForEmbedded) {
+    domain = AvailabilityDomain::forEmbedded();
+  } else {
+    domain = AvailabilityDomain::forUniversal();
+  }
+
+  auto attr = new (ctx)
+      AvailableAttr(SourceLoc(), SourceRange(), domain, kind, message, rename,
+                    Introduced, SourceRange(), Deprecated, SourceRange(),
+                    Obsoleted, SourceRange(), isImplicit, isSPI);
   return attr;
 }
 
@@ -5737,10 +5723,39 @@ llvm::Error DeclDeserializer::deserializeDeclCommon() {
     if (recordID == ERROR_FLAG) {
       assert(!IsInvalid && "Error flag written multiple times");
       IsInvalid = true;
+    } else if (recordID == ABI_ONLY_COUNTERPART) {
+      assert(ABIDeclCounterpartID == 0
+                && "ABI-only counterpart written multiple times");
+      DeclID counterpartID;
+      serialization::decls_block::ABIOnlyCounterpartLayout::readRecord(
+          scratch, counterpartID);
+      // Defer resolving `ABIDeclCounterpartID` until `finishRecursiveAttrs()`
+      // because the two decls reference each other.
+      ABIDeclCounterpartID = counterpartID;
     } else if (isDeclAttrRecord(recordID)) {
       DeclAttribute *Attr = nullptr;
       bool skipAttr = false;
       switch (recordID) {
+      case decls_block::Execution_DECL_ATTR: {
+        unsigned behavior;
+        serialization::decls_block::ExecutionDeclAttrLayout::readRecord(
+            scratch, behavior);
+        Attr = new (ctx) ExecutionAttr(static_cast<ExecutionKind>(behavior),
+                                       /*Implicit=*/false);
+        break;
+      }
+      case decls_block::ABI_DECL_ATTR: {
+        bool isImplicit;
+        DeclID abiDeclID;
+        serialization::decls_block::ABIDeclAttrLayout::readRecord(
+            scratch, isImplicit, abiDeclID);
+        Attr = new (ctx) ABIAttr(nullptr, isImplicit);
+        // Defer resolving `abiDeclID` until `finishRecursiveAttrs()` because
+        // the two decls reference each other.
+        unresolvedABIAttr.emplace(cast<ABIAttr>(Attr), abiDeclID);
+        break;
+      }
+
       case decls_block::SILGenName_DECL_ATTR: {
         bool isImplicit;
         serialization::decls_block::SILGenNameDeclAttrLayout::readRecord(
@@ -6308,15 +6323,6 @@ llvm::Error DeclDeserializer::deserializeDeclCommon() {
         break;
       }
 
-      case decls_block::Safe_DECL_ATTR: {
-        bool isImplicit;
-        serialization::decls_block::SafeDeclAttrLayout::readRecord(
-            scratch, isImplicit);
-        Attr = new (ctx) SafeAttr(SourceLoc(), SourceRange(), blobData,
-                                  isImplicit);
-        break;
-      }
-
       case decls_block::MacroRole_DECL_ATTR: {
         bool isImplicit;
         uint8_t rawMacroSyntax;
@@ -6481,6 +6487,51 @@ llvm::Error DeclDeserializer::deserializeDeclCommon() {
   }
 }
 
+/// Complete attributes that contain recursive references to the decl being
+/// deserialized or to other decls. This method is called after \p decl is
+/// created and stored into the \c ModuleFile::Decls table, so any cycles
+/// between mutually-referencing decls will be broken.
+///
+/// Attributes handled here include:
+///
+///  \li \c \@differentiable
+///  \li \c \@derivative
+///  \li \c \@abi
+llvm::Error DeclDeserializer::finishRecursiveAttrs(Decl *decl, DeclAttribute *attrs) {
+  DeclAttributes tempAttrs;
+  tempAttrs.setRawAttributeChain(attrs);
+
+  // @differentiable and @derivative
+  for (auto *attr : tempAttrs.getAttributes<DifferentiableAttr>()) {
+    auto *diffAttr = const_cast<DifferentiableAttr *>(attr);
+    diffAttr->setOriginalDeclaration(decl);
+    diffAttr->setParameterIndices(diffAttrParamIndicesMap[diffAttr]);
+  }
+  for (auto *attr : tempAttrs.getAttributes<DerivativeAttr>()) {
+    auto *derAttr = const_cast<DerivativeAttr *>(attr);
+    derAttr->setOriginalDeclaration(decl);
+  }
+
+  // @abi
+  if (unresolvedABIAttr) {
+    auto abiDeclOrError = MF.getDeclChecked(unresolvedABIAttr->second);
+    if (!abiDeclOrError)
+      return abiDeclOrError.takeError();
+    unresolvedABIAttr->first->abiDecl = abiDeclOrError.get();
+    decl->recordABIAttr(unresolvedABIAttr->first);
+  }
+  if (ABIDeclCounterpartID != 0) {
+    // This decl is the `abiDecl` of an `ABIAttr`. Force the decl that `ABIAttr`
+    // belongs to so that `recordABIAttr()` will be called.
+    auto counterpartOrError = MF.getDeclChecked(ABIDeclCounterpartID);
+    if (!counterpartOrError)
+      return counterpartOrError.takeError();
+    (void)counterpartOrError.get();
+  }
+
+  return llvm::Error::success();
+}
+
 Expected<Decl *>
 DeclDeserializer::getDeclCheckedImpl(
   llvm::function_ref<bool(DeclAttributes)> matchAttributes) {
@@ -6525,17 +6576,11 @@ DeclDeserializer::getDeclCheckedImpl(
 #define CASE(RECORD_NAME) \
   case decls_block::RECORD_NAME##Layout::Code: {\
     auto declOrError = deserialize##RECORD_NAME(scratch, blobData); \
-    if (declOrError) { \
-      /* \
-      // Set original declaration and parameter indices in `@differentiable` \
-      // attributes. \
-      */ \
-      setOriginalDeclarationAndParameterIndicesInDifferentiableAttributes(\
-          declOrError.get(), DAttrs, diffAttrParamIndicesMap); \
-    } \
     if (!declOrError) \
       return declOrError; \
     declOrOffset = declOrError.get(); \
+    if (auto finishError = finishRecursiveAttrs(declOrError.get(), DAttrs)) \
+      return finishError; \
     break; \
   }
 
@@ -6722,6 +6767,11 @@ getActualSILParameterOptions(uint8_t raw) {
   if (options.contains(serialization::SILParameterInfoFlags::Sending)) {
     options -= serialization::SILParameterInfoFlags::Sending;
     result |= SILParameterInfo::Sending;
+  }
+
+  if (options.contains(serialization::SILParameterInfoFlags::ImplicitLeading)) {
+    options -= serialization::SILParameterInfoFlags::ImplicitLeading;
+    result |= SILParameterInfo::ImplicitLeading;
   }
 
   // Check if we have any remaining options and return none if we do. We found
@@ -8323,9 +8373,12 @@ void ModuleFile::loadAllMembers(Decl *container, uint64_t contextData) {
   ArrayRef<uint64_t> rawMemberIDs;
   decls_block::MembersLayout::readRecord(memberIDBuffer, rawMemberIDs);
 
-  if (rawMemberIDs.empty())
+  if (rawMemberIDs.empty()) {
+    // No members; set the state of member deserialization to done.
+    if (!IDC->didDeserializeMembers())
+      IDC->setDeserializedMembers(true);
     return;
-
+  }
   SmallVector<Decl *, 16> members;
   members.reserve(rawMemberIDs.size());
   for (DeclID rawID : rawMemberIDs) {
@@ -8341,8 +8394,16 @@ void ModuleFile::loadAllMembers(Decl *container, uint64_t contextData) {
           getContext(), container, next.takeError());
       if (suppliedMissingMember)
         members.push_back(suppliedMissingMember);
+
+      // Not all members can be discovered as missing
+      // members as checked above, so set the error bit
+      // here.
+      IDC->setHasDeserializeMemberError(true);
     }
   }
+  // Set the status of member deserialization to Done.
+  if (!IDC->didDeserializeMembers())
+    IDC->setDeserializedMembers(true);
 
   for (auto member : members)
     IDC->addMember(member);
@@ -8534,8 +8595,7 @@ void ModuleFile::finishNormalConformance(NormalProtocolConformance *conformance,
 
   DeclID protoID;
   DeclContextID contextID;
-  unsigned valueCount, typeCount, conformanceCount, isUnchecked,
-      isPreconcurrency;
+  unsigned valueCount, typeCount, conformanceCount, rawOptions;
   ArrayRef<uint64_t> rawIDs;
   SmallVector<uint64_t, 16> scratch;
 
@@ -8547,7 +8607,7 @@ void ModuleFile::finishNormalConformance(NormalProtocolConformance *conformance,
 
   NormalProtocolConformanceLayout::readRecord(
       scratch, protoID, contextID, typeCount, valueCount, conformanceCount,
-      isUnchecked, isPreconcurrency, rawIDs);
+      rawOptions, rawIDs);
 
   // Read requirement signature conformances.
   SmallVector<ProtocolConformanceRef, 4> reqConformances;

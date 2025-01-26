@@ -19,8 +19,8 @@
 
 import Swift
 
-@_implementationOnly import OS.Libc
-@_implementationOnly import OS.Darwin
+internal import Darwin
+internal import BacktracingImpl.OS.Darwin
 
 // .. Dynamic binding ..........................................................
 

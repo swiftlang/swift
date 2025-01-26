@@ -194,7 +194,7 @@ struct PrintOptions {
     Package // prints package, SPI, and public/inlinable decls
   };
 
-  InterfaceMode InterfaceContentKind;
+  InterfaceMode InterfaceContentKind = InterfaceMode::Private;
 
   bool printPublicInterface() const {
     return InterfaceContentKind == InterfaceMode::Public;
@@ -236,6 +236,10 @@ struct PrintOptions {
 
   /// Use the original module name to qualify a symbol.
   bool UseOriginallyDefinedInModuleNames = false;
+
+  /// Add a `@_silgen_name` attribute to each function that
+  /// is compatible with one that specifies its mangled name.
+  bool PrintSyntheticSILGenName = false;
 
   /// Print Swift.Array and Swift.Optional with sugared syntax
   /// ([] and ?), even if there are no sugar type nodes.
@@ -341,9 +345,6 @@ struct PrintOptions {
   /// Whether to print the internal layout name instead of AnyObject, etc.
   bool PrintInternalLayoutName = false;
 
-  /// Suppress emitting @available(*, noasync)
-  bool SuppressNoAsyncAvailabilityAttr = false;
-
   /// Suppress emitting isolated or async deinit, and emit open containing class
   /// as public
   bool SuppressIsolatedDeinit = false;
@@ -365,10 +366,6 @@ struct PrintOptions {
 
   OpaqueReturnTypePrintingMode OpaqueReturnTypePrinting =
       OpaqueReturnTypePrintingMode::WithOpaqueKeyword;
-
-  /// If non-null, opaque types that have this naming decl should be printed as
-  /// `some P1` instead of as a stable reference.
-  const ValueDecl *OpaqueReturnTypeNamingDecl = nullptr;
 
   /// Whether to print decl attributes that are only used internally,
   /// such as _silgen_name, transparent, etc.

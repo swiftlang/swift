@@ -223,3 +223,28 @@ func takesWrapperClosure<T>(_: ProjectionWrapper<[S<T>]>, closure: (ProjectionWr
 func testGenericPropertyWrapper<U>(@ProjectionWrapper wrappers: [S<U>]) {
   takesWrapperClosure($wrappers) { $wrapper in }
 }
+
+@propertyWrapper
+struct Binding<Value> {
+  var wrappedValue: Value
+
+  init(wrappedValue: Value) {
+    self.wrappedValue = wrappedValue
+  }
+
+  public var projectedValue: Binding<Value> {
+    return self
+  }
+
+  public init(projectedValue: Binding<Value>) {
+    self = projectedValue
+  }
+}
+
+struct Widget {
+  init(@ProjectionWrapper w: Int) {}
+}
+
+func buildWidget(_ w: ProjectionWrapper<Int>) -> Widget {
+  Widget($w: w)
+}

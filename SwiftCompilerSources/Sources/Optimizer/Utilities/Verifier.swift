@@ -35,6 +35,7 @@ extension Function {
       for inst in block.instructions {
 
         inst.checkForwardingConformance()
+        inst.checkGuaranteedResults()
 
         if let verifiableInst = inst as? VerifiableInstruction {
           verifiableInst.verify(context)
@@ -50,6 +51,13 @@ private extension Instruction {
       require(self is ForwardingInstruction, "instruction \(self)\nshould conform to ForwardingInstruction")
     } else {
       require(!(self is ForwardingInstruction), "instruction \(self)\nshould not conform to ForwardingInstruction")
+    }
+  }
+
+  func checkGuaranteedResults() {
+    for result in results where result.ownership == .guaranteed {
+      require(BeginBorrowValue(result) != nil || self is ForwardingInstruction,
+              "\(result) must either be a BeginBorrowValue or a ForwardingInstruction")
     }
   }
 }
@@ -88,6 +96,11 @@ private extension Phi {
 
 extension BorrowedFromInst : VerifiableInstruction {
   func verify(_ context: FunctionPassContext) {
+
+    for ev in enclosingValues {
+      require(ev.isValidEnclosingValueInBorrowedFrom, "invalid enclosing value in borrowed-from: \(ev)")
+    }
+
     var computedEVs = Stack<Value>(context)
     defer { computedEVs.deinitialize() }
 
@@ -102,6 +115,21 @@ extension BorrowedFromInst : VerifiableInstruction {
     for computedEV in computedEVs {
       require(existingEVs.contains(computedEV),
                    "\(computedEV)\n  missing in enclosing values of \(self)")
+    }
+  }
+}
+
+private extension Value {
+  var isValidEnclosingValueInBorrowedFrom: Bool {
+    switch ownership {
+    case .owned:
+      return true
+    case .guaranteed:
+      return BeginBorrowValue(self) != nil ||
+             self is BorrowedFromInst ||
+             forwardingInstruction != nil
+    case .none, .unowned:
+      return false
     }
   }
 }
@@ -156,7 +184,11 @@ private struct MutatingUsesWalker : AddressDefUseWalker {
 
       for use in startInst.uses {
         if let phi = Phi(using: use) {
-          linearLiveranges.pushIfNotVisited(phi.borrowedFrom!)
+          if let bf = phi.borrowedFrom {
+            linearLiveranges.pushIfNotVisited(bf)
+          } else {
+            require(false, "missing borrowed-from for \(phi.value)")
+          }
         }
       }
     }

@@ -857,3 +857,30 @@ exit:
   %retval = tuple ()
   return %retval : $()
 }
+
+// CHECK-LABEL: begin running test {{.*}} on consume_copy_before_use_in_dead_end
+// CHECK-LABEL: sil [ossa] @consume_copy_before_use_in_dead_end : {{.*}} {
+// CHECK-NOT:     destroy_value [dead_end]
+// CHECK-LABEL: } // end sil function 'consume_copy_before_use_in_dead_end'
+// CHECK-LABEL: end running test {{.*}} on consume_copy_before_use_in_dead_end
+sil [ossa] @consume_copy_before_use_in_dead_end : $@convention(thin) (@owned C) -> () {
+entry(%c : @owned $C):
+  cond_br undef, exit, die
+
+exit:
+  destroy_value %c
+  %retval = tuple ()
+  return %retval
+
+die:
+  %move = move_value [lexical] %c
+  %copy = copy_value %move
+  specify_test "canonicalize_ossa_lifetime true false true %move"
+  apply undef(%move) : $@convention(thin) (@owned C) -> ()
+  %addr = alloc_stack $C
+  %token = store_borrow %copy to %addr
+  apply undef() : $@convention(thin) () -> ()
+  %reload = load_borrow %token
+  apply undef(%reload) : $@convention(thin) (@guaranteed C) -> ()
+  unreachable
+}

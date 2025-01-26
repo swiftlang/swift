@@ -830,6 +830,15 @@ public:
     Bits.ModuleDecl.IsConcurrencyChecked = value;
   }
 
+  /// Whether this module has enable strict memory safety checking.
+  bool strictMemorySafety() const {
+    return Bits.ModuleDecl.StrictMemorySafety;
+  }
+
+  void setStrictMemorySafety(bool value = true) {
+    Bits.ModuleDecl.StrictMemorySafety = value;
+  }
+
   bool isObjCNameLookupCachePopulated() const {
     return Bits.ModuleDecl.ObjCNameLookupCachePopulated;
   }

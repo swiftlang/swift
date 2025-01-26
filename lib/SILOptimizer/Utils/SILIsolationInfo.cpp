@@ -358,6 +358,15 @@ inferIsolationInfoForTempAllocStack(AllocStackInst *asi) {
 
 SILIsolationInfo SILIsolationInfo::get(SILInstruction *inst) {
   if (auto fas = FullApplySite::isa(inst)) {
+    // Before we do anything, see if we have a sending result. In such a case,
+    // our full apply site result must be disconnected.
+    //
+    // NOTE: This handles the direct case of a sending result. The indirect case
+    // is handled above.
+    if (fas.getSubstCalleeType()->hasSendingResult())
+      return SILIsolationInfo::getDisconnected(
+          false /*is unsafe non isolated*/);
+
     // Check if we have SIL based "faked" isolation crossings that we use for
     // testing purposes.
     //
@@ -402,7 +411,7 @@ SILIsolationInfo SILIsolationInfo::get(SILInstruction *inst) {
         // Then see if we have a global actor. This pattern matches the output
         // for doing things like GlobalActor.shared.
         if (nomDecl->isGlobalActor()) {
-          return SILIsolationInfo::getGlobalActorIsolated(SILValue(), nomDecl);
+          return SILIsolationInfo::getGlobalActorIsolated(SILValue(), selfASTType);
         }
 
         // TODO: We really should be doing this based off of an Operand. Then

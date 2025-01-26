@@ -5015,23 +5015,22 @@ SILValue SILGenFunction::emitSemanticLoad(SILLocation loc,
   }
 
   // Harder case: the srcTL and the rvalueTL match without move only.
-  if (srcType.removingMoveOnlyWrapper() ==
-      rvalueType.removingMoveOnlyWrapper()) {
+  if (srcType.removingMoveOnlyWrapper()
+                                      == rvalueType.removingMoveOnlyWrapper()) {
     // Ok, we know that one must be move only and the other must not be. Thus we
     // perform one of two things:
     //
     // 1. If our source address is move only and our rvalue type is not move
-    // only, lets perform a load [copy] and a moveonly_to_copyable. We just need
-    // to insert something so that the move only checker knows that this copy of
-    // the move only address must be a last use.
+    // only, let's perform a load [copy] from the unwrapped address.
     //
     // 2. If our dest value type is move only and our rvalue type is not move
     // only, then we perform a load [copy] + copyable_to_moveonly.
-    SILValue newCopy = srcTL.emitLoadOfCopy(B, loc, src, isTake);
-    if (newCopy->getType().isMoveOnlyWrapped()) {
-      return B.createOwnedMoveOnlyWrapperToCopyableValue(loc, newCopy);
+    if (src->getType().isMoveOnlyWrapped()) {
+      auto copyableSrc = B.createMoveOnlyWrapperToCopyableAddr(loc, src);
+      return rvalueTL.emitLoadOfCopy(B, loc, copyableSrc, isTake);
     }
 
+    SILValue newCopy = srcTL.emitLoadOfCopy(B, loc, src, isTake);
     return B.createOwnedCopyableToMoveOnlyWrapperValue(loc, newCopy);
   }
 

@@ -497,6 +497,7 @@ namespace {
     RValue visitCovariantReturnConversionExpr(
              CovariantReturnConversionExpr *E,
              SGFContext C);
+    RValue visitUnsafeCastExpr(UnsafeCastExpr *E, SGFContext C);
     RValue visitErasureExpr(ErasureExpr *E, SGFContext C);
     RValue visitAnyHashableErasureExpr(AnyHashableErasureExpr *E, SGFContext C);
     RValue visitForcedCheckedCastExpr(ForcedCheckedCastExpr *E,
@@ -2129,6 +2130,24 @@ RValue RValueEmitter::visitExtractFunctionIsolationExpr(
   auto arg = SGF.emitRValue(E->getFunctionExpr());
   auto result = SGF.emitExtractFunctionIsolation(
       E, ArgumentSource(E, std::move(arg)), C);
+  return RValue(SGF, E, result);
+}
+
+RValue RValueEmitter::visitUnsafeCastExpr(UnsafeCastExpr *E, SGFContext C) {
+  ManagedValue original = SGF.emitRValueAsSingleValue(E->getSubExpr());
+  SILType resultType = SGF.getLoweredType(E->getType());
+
+  if (resultType == original.getType())
+    return RValue(SGF, E, original);
+
+  ManagedValue result;
+  if (original.getType().isAddress()) {
+    ASSERT(resultType.isAddress());
+    result = SGF.B.createUncheckedAddrCast(E, original, resultType);
+  } else {
+    result = SGF.B.createUncheckedForwardingCast(E, original, resultType);
+  }
+
   return RValue(SGF, E, result);
 }
 
@@ -4579,7 +4598,76 @@ visitMagicIdentifierLiteralExpr(MagicIdentifierLiteralExpr *E, SGFContext C) {
   llvm_unreachable("Unhandled MagicIdentifierLiteralExpr in switch.");
 }
 
+static RValue emitSlabLiteral(SILGenFunction &SGF, CollectionExpr *E,
+                              SGFContext C) {
+  ArgumentScope scope(SGF, E);
+
+  auto slabType = E->getType()->castTo<BoundGenericType>();
+  auto loweredSlabType = SGF.getLoweredType(slabType);
+  auto elementType = slabType->getGenericArgs()[1]->getCanonicalType();
+  auto loweredElementType = SGF.getLoweredType(elementType);
+  auto &eltTL = SGF.getTypeLowering(AbstractionPattern::getOpaque(), elementType);
+
+  SILValue alloc = SGF.emitTemporaryAllocation(E, loweredSlabType);
+  SILValue addr = SGF.B.createUncheckedAddrCast(E, alloc,
+                                            loweredElementType.getAddressType());
+
+  // Cleanups for any elements that have been initialized so far.
+  SmallVector<CleanupHandle, 8> cleanups;
+
+  for (unsigned index : range(E->getNumElements())) {
+    auto destAddr = addr;
+
+    if (index != 0) {
+      SILValue indexValue = SGF.B.createIntegerLiteral(
+          E, SILType::getBuiltinWordType(SGF.getASTContext()), index);
+      destAddr = SGF.B.createIndexAddr(E, addr, indexValue,
+                                   /*needsStackProtection=*/ false);
+    }
+
+    // Create a dormant cleanup for the value in case we exit before the
+    // full vector has been constructed.
+
+    CleanupHandle destCleanup = CleanupHandle::invalid();
+    if (!eltTL.isTrivial()) {
+      destCleanup = SGF.enterDestroyCleanup(destAddr);
+      SGF.Cleanups.setCleanupState(destCleanup, CleanupState::Dormant);
+      cleanups.push_back(destCleanup);
+    }
+
+    TemporaryInitialization init(destAddr, destCleanup);
+
+    ArgumentSource(E->getElements()[index])
+        .forwardInto(SGF, AbstractionPattern::getOpaque(), &init, eltTL);
+  }
+
+  // Kill the per-element cleanups. The slab will take ownership of them.
+  for (auto destCleanup : cleanups)
+    SGF.Cleanups.setCleanupState(destCleanup, CleanupState::Dead);
+
+  SILValue slabVal;
+
+  // If the slab is naturally address-only, then we can adopt the stack slot
+  // as the value directly.
+  if (loweredSlabType.isAddressOnly(SGF.F)) {
+    slabVal = SGF.B.createUncheckedAddrCast(E, alloc, loweredSlabType);
+  } else {
+    // Otherwise, this slab is loadable. Load it.
+    slabVal = SGF.B.createTrivialLoadOr(E, alloc, LoadOwnershipQualifier::Take);
+  }
+
+  auto slabMV = SGF.emitManagedRValueWithCleanup(slabVal);
+  auto slab = RValue(SGF, E, slabMV);
+
+  return scope.popPreservingValue(std::move(slab));
+}
+
 RValue RValueEmitter::visitCollectionExpr(CollectionExpr *E, SGFContext C) {
+  // Handle 'Slab' literals separately.
+  if (E->getType()->isSlab()) {
+    return emitSlabLiteral(SGF, E, C);
+  }
+
   auto loc = SILLocation(E);
   ArgumentScope scope(SGF, loc);
 
@@ -5288,7 +5376,19 @@ static void emitSimpleAssignment(SILGenFunction &SGF, SILLocation loc,
           value = value.ensurePlusOne(SGF, loc);
           if (value.getType().isObject())
             value = SGF.B.createMoveValue(loc, value);
+          SGF.B.createIgnoredUse(loc, value.getValue());
+          return;
         }
+
+        // Emit the ignored use instruction like we would do in emitIgnoredExpr.
+        if (!rv.isNull()) {
+          SmallVector<ManagedValue, 16> values;
+          std::move(rv).getAll(values);
+          for (auto v : values) {
+            SGF.B.createIgnoredUse(loc, v.getValue());
+          }
+        }
+
         return;
       }
 
@@ -6939,7 +7039,24 @@ void SILGenFunction::emitIgnoredExpr(Expr *E) {
 
   // Otherwise, emit the result (to get any side effects), but produce it at +0
   // if that allows simplification.
-  emitRValue(E, SGFContext::AllowImmediatePlusZero);
+  RValue rv = emitRValue(E, SGFContext::AllowImmediatePlusZero);
+
+  // Return early if we do not have any result.
+  if (rv.isNull())
+    return;
+
+  // Then emit ignored use on all of the rvalue components. We purposely do not
+  // implode the tuple since if we have a tuple formation like:
+  //
+  // let _ = (x, y)
+  //
+  // we want the use to be on x and y and not on the imploded tuple. It also
+  // helps us avoid emitting unnecessary code.
+  SmallVector<ManagedValue, 16> values;
+  std::move(rv).getAll(values);
+  for (auto v : values) {
+    B.createIgnoredUse(E, v.getValue());
+  }
 }
 
 /// Emit the given expression as an r-value, then (if it is a tuple), combine

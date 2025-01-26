@@ -23,7 +23,7 @@ fileprivate func emitDiagnosticParts(
   position: AbsolutePosition,
   offset: Int,
   highlights: [Syntax] = [],
-  fixItChanges: [FixIt.Change] = []
+  edits: [SourceEdit] = []
 ) {
   // Map severity
   let bridgedSeverity = severity.bridged
@@ -52,40 +52,12 @@ fileprivate func emitDiagnosticParts(
   }
 
   // Emit changes for a Fix-It.
-  for change in fixItChanges {
-    let replaceStartLoc: BridgedSourceLoc
-    let replaceEndLoc: BridgedSourceLoc
-    var newText: String
-
-    switch change {
-    case .replace(let oldNode, let newNode):
-      replaceStartLoc = bridgedSourceLoc(at: oldNode.position)
-      replaceEndLoc = bridgedSourceLoc(at: oldNode.endPosition)
-      newText = newNode.description
-
-    case .replaceLeadingTrivia(let oldToken, let newTrivia):
-      replaceStartLoc = bridgedSourceLoc(at: oldToken.position)
-      replaceEndLoc = bridgedSourceLoc(
-        at: oldToken.positionAfterSkippingLeadingTrivia
-      )
-      newText = newTrivia.description
-
-    case .replaceTrailingTrivia(let oldToken, let newTrivia):
-      replaceStartLoc = bridgedSourceLoc(at: oldToken.endPositionBeforeTrailingTrivia)
-      replaceEndLoc = bridgedSourceLoc(at: oldToken.endPosition)
-      newText = newTrivia.description
-
-    case .replaceChild(let replacingChildData):
-      let replacementRange = replacingChildData.replacementRange
-      replaceStartLoc = bridgedSourceLoc(at: replacementRange.lowerBound)
-      replaceEndLoc = bridgedSourceLoc(at: replacementRange.upperBound)
-      newText = replacingChildData.newChild.description
-    }
-
+  for edit in edits {
+    var newText: String = edit.replacement
     newText.withBridgedString { bridgedMessage in
       diag.fixItReplace(
-        start: replaceStartLoc,
-        end: replaceEndLoc,
+        start: bridgedSourceLoc(at: edit.range.lowerBound),
+        end: bridgedSourceLoc(at: edit.range.upperBound),
         replacement: bridgedMessage
       )
     }
@@ -115,6 +87,7 @@ public func emitDiagnostic(
   )
 
   // Emit Fix-Its.
+  // FIXME: Ths assumes the fixIt is on the same tree/buffer, which is not guaranteed.
   for fixIt in diagnostic.fixIts {
     emitDiagnosticParts(
       diagnosticEngine: diagnosticEngine,
@@ -123,11 +96,12 @@ public func emitDiagnostic(
       severity: .note,
       position: diagnostic.position,
       offset: sourceFileBufferOffset,
-      fixItChanges: fixIt.changes
+      edits: fixIt.edits
     )
   }
 
   // Emit any notes as follow-ons.
+  // FIXME: Ths assumes the node is on the same tree/buffer, which is not guaranteed.
   for note in diagnostic.notes {
     emitDiagnosticParts(
       diagnosticEngine: diagnosticEngine,

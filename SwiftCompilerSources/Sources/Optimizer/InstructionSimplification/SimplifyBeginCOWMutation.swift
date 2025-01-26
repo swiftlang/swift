@@ -86,8 +86,7 @@ private extension BeginCOWMutationInst {
 
     for use in buffer.uses.ignoreDebugUses {
       let endCOW = use.instruction as! EndCOWMutationInst
-      endCOW.uses.replaceAll(with: instance, context)
-      context.erase(instruction: endCOW)
+      endCOW.replace(with: instance, context)
     }
     context.erase(instructionIncludingDebugUses: self)
     return true

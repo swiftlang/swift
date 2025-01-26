@@ -1,0 +1,8 @@
+// swift-interface-format-version: 1.0
+// swift-module-flags: -module-name SuppressWarnings -swift-version 6 -enable-upcoming-feature ConciseMagicFile
+
+import Swift
+
+@inlinable public func neverMutated() {
+  var x = 1
+}

@@ -955,6 +955,16 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
   }
 
   Expr *visitSequenceExpr(SequenceExpr *E) {
+    if (Walker.getSequenceWalkingBehavior() ==
+            SequenceWalking::OnlyWalkFirstOperatorWhenFolded &&
+        E->isFolded()) {
+      if (E->getNumElements() > 1) {
+        if (Expr *Elt = doIt(E->getElement(1)))
+          E->setElement(1, Elt);
+      }
+      return E;
+    }
+
     for (unsigned i = 0, e = E->getNumElements(); i != e; ++i)
       if (Expr *Elt = doIt(E->getElement(i)))
         E->setElement(i, Elt);
@@ -1329,18 +1339,6 @@ class Traversal : public ASTVisitor<Traversal, Expr*, Stmt*,
     } else {
       return nullptr;
     }
-    return E;
-  }
-
-  Expr *visitOneWayExpr(OneWayExpr *E) {
-    if (auto oldSubExpr = E->getSubExpr()) {
-      if (auto subExpr = doIt(oldSubExpr)) {
-        E->setSubExpr(subExpr);
-      } else {
-        return nullptr;
-      }
-    }
-
     return E;
   }
 

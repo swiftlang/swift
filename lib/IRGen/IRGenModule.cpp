@@ -15,7 +15,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/AST/ASTContext.h"
-#include "swift/AST/Availability.h"
+#include "swift/AST/AvailabilityRange.h"
 #include "swift/AST/DiagnosticsIRGen.h"
 #include "swift/AST/GenericSignature.h"
 #include "swift/AST/IRGenOptions.h"
@@ -1035,32 +1035,6 @@ static llvm::MemoryEffects mergeMemoryEffects(ArrayRef<llvm::MemoryEffects> effe
     return mergedEffects;
 }
 
-
-namespace {
-bool isStandardLibrary(const llvm::Module &M) {
-  if (auto *Flags = M.getNamedMetadata("swift.module.flags")) {
-    for (const auto *F : Flags->operands()) {
-      const auto *Key = dyn_cast_or_null<llvm::MDString>(F->getOperand(0));
-      if (!Key)
-        continue;
-
-      const auto *Value =
-          dyn_cast_or_null<llvm::ConstantAsMetadata>(F->getOperand(1));
-      if (!Value)
-        continue;
-
-      if (Key->getString() == "standard-library")
-        return cast<llvm::ConstantInt>(Value->getValue())->isOne();
-    }
-  }
-  return false;
-}
-}
-
-bool IRGenModule::isStandardLibrary() const {
-  return ::isStandardLibrary(Module);
-}
-
 llvm::FunctionType *swift::getRuntimeFnType(llvm::Module &Module,
                                            llvm::ArrayRef<llvm::Type*> retTypes,
                                            llvm::ArrayRef<llvm::Type*> argTypes) {
@@ -1076,9 +1050,9 @@ llvm::FunctionType *swift::getRuntimeFnType(llvm::Module &Module,
 }
 
 llvm::Constant *swift::getRuntimeFn(
-    llvm::Module &Module, llvm::Constant *&cache, const char *name,
-    llvm::CallingConv::ID cc, RuntimeAvailability availability,
-    llvm::ArrayRef<llvm::Type *> retTypes,
+    llvm::Module &Module, llvm::Constant *&cache, const char *ModuleName,
+    const char *FunctionName, llvm::CallingConv::ID cc,
+    RuntimeAvailability availability, llvm::ArrayRef<llvm::Type *> retTypes,
     llvm::ArrayRef<llvm::Type *> argTypes, ArrayRef<Attribute::AttrKind> attrs,
     ArrayRef<llvm::MemoryEffects> memEffects, IRGenModule *IGM) {
 
@@ -1086,7 +1060,7 @@ llvm::Constant *swift::getRuntimeFn(
     return cache;
 
   bool isWeakLinked = false;
-  std::string functionName(name);
+  std::string name(FunctionName);
 
   switch (availability) {
   case RuntimeAvailability::AlwaysAvailable:
@@ -1097,7 +1071,7 @@ llvm::Constant *swift::getRuntimeFn(
     break;
   }
   case RuntimeAvailability::AvailableByCompatibilityLibrary: {
-    functionName.append("50");
+    name.append("50");
     break;
   }
   }
@@ -1113,7 +1087,7 @@ llvm::Constant *swift::getRuntimeFn(
                                       {argTypes.begin(), argTypes.end()},
                                       /*isVararg*/ false);
 
-  auto addr = Module.getOrInsertFunction(functionName.c_str(), fnTy).getCallee();
+  auto addr = Module.getOrInsertFunction(name.c_str(), fnTy).getCallee();
   auto fnptr = addr;
   // Strip off any bitcast we might have due to this function being declared of
   // a different type previously.
@@ -1130,12 +1104,20 @@ llvm::Constant *swift::getRuntimeFn(
         (fn->getLinkage() == llvm::GlobalValue::ExternalLinkage &&
          fn->isDeclaration());
 
-    if (!isStandardLibrary(Module) && IsExternal &&
-        ::useDllStorage(llvm::Triple(Module.getTargetTriple())))
-      fn->setDLLStorageClass(llvm::GlobalValue::DLLImportStorageClass);
+    if (IGM && useDllStorage(IGM->Triple) && IsExternal) {
+      bool bIsImported = true;
+      if (IGM->getSwiftModule()->getPublicModuleName(true).str() == ModuleName)
+        bIsImported = false;
+      else if (ModuleDecl *MD = IGM->Context.getModuleByName(ModuleName))
+        bIsImported = !MD->isStaticLibrary();
 
-    if (IsExternal && isWeakLinked
-        && !::useDllStorage(llvm::Triple(Module.getTargetTriple())))
+      if (bIsImported)
+        fn->setDLLStorageClass(llvm::GlobalValue::DLLImportStorageClass);
+    }
+
+    // Windows does not allow multiple definitions of weak symbols.
+    if (IsExternal && isWeakLinked &&
+        !llvm::Triple(Module.getTargetTriple()).isOSWindows())
       fn->setLinkage(llvm::GlobalValue::ExternalWeakLinkage);
 
     llvm::AttrBuilder buildFnAttr(Module.getContext());
@@ -1169,7 +1151,7 @@ llvm::Constant *swift::getRuntimeFn(
     // This mismatch of attributes would be issue when lowering to WebAssembly.
     // While lowering, LLVM counts how many dummy params are necessary to match
     // callee and caller signature. So we need to add them correctly.
-    if (functionName == "swift_willThrow") {
+    if (name == "swift_willThrow") {
       assert(IGM && "IGM is required for swift_willThrow.");
       fn->addParamAttr(0, Attribute::AttrKind::SwiftSelf);
       if (IGM->ShouldUseSwiftError) {
@@ -1205,10 +1187,10 @@ void IRGenModule::registerRuntimeEffect(ArrayRef<RuntimeEffect> effect,
 #define QUOTE(...) __VA_ARGS__
 #define STR(X)     #X
 
-#define FUNCTION(ID, NAME, CC, AVAILABILITY, RETURNS, ARGS, ATTRS, EFFECT,     \
-                 MEMEFFECTS)                                                   \
-  FUNCTION_IMPL(ID, NAME, CC, AVAILABILITY, QUOTE(RETURNS), QUOTE(ARGS),       \
-                QUOTE(ATTRS), QUOTE(EFFECT), QUOTE(MEMEFFECTS))
+#define FUNCTION(ID, MODULE, NAME, CC, AVAILABILITY, RETURNS, ARGS, ATTRS,     \
+                 EFFECT, MEMEFFECTS)                                           \
+  FUNCTION_IMPL(ID, MODULE, NAME, CC, AVAILABILITY, QUOTE(RETURNS),            \
+                QUOTE(ARGS), QUOTE(ATTRS), QUOTE(EFFECT), QUOTE(MEMEFFECTS))
 
 #define RETURNS(...) { __VA_ARGS__ }
 #define ARGS(...) { __VA_ARGS__ }
@@ -1221,12 +1203,12 @@ void IRGenModule::registerRuntimeEffect(ArrayRef<RuntimeEffect> effect,
 #define MEMEFFECTS(...)                                                        \
   { __VA_ARGS__ }
 
-#define FUNCTION_IMPL(ID, NAME, CC, AVAILABILITY, RETURNS, ARGS, ATTRS,        \
+#define FUNCTION_IMPL(ID, MODULE, NAME, CC, AVAILABILITY, RETURNS, ARGS, ATTRS,\
                       EFFECT, MEMEFFECTS)                                      \
   llvm::Constant *IRGenModule::get##ID##Fn() {                                 \
     using namespace RuntimeConstants;                                          \
     registerRuntimeEffect(EFFECT, #NAME);                                      \
-    return getRuntimeFn(Module, ID##Fn, #NAME, CC,                             \
+    return getRuntimeFn(Module, ID##Fn, #MODULE, #NAME, CC,                    \
                         AVAILABILITY(this->Context), RETURNS, ARGS, ATTRS,     \
                         MEMEFFECTS, this);                                     \
   }                                                                            \
@@ -1293,7 +1275,8 @@ IRGenModule::createStringConstant(StringRef Str, bool willBeRelativelyAddressed,
     if (NAME)                                                                  \
       return NAME;                                                             \
     NAME = Module.getOrInsertGlobal(SYM, FullExistentialTypeMetadataStructTy); \
-    if (useDllStorage() && !isStandardLibrary())                               \
+    if (!getSwiftModule()->isStdlibModule() &&                                 \
+        !Context.getStdlibModule(true)->isStaticLibrary())                     \
       ApplyIRLinkage(IRLinkage::ExternalImport)                                \
           .to(cast<llvm::GlobalVariable>(NAME));                               \
     return NAME;                                                               \
@@ -1377,6 +1360,39 @@ clang::CodeGen::CodeGenModule &IRGenModule::getClangCGM() const {
 
 llvm::Module *IRGenModule::getModule() const {
   return ClangCodeGen->GetModule();
+}
+
+bool IRGenModule::IsWellKnownBuiltinOrStructralType(CanType T) const {
+  static const CanType kStructural[] = {
+    Context.TheEmptyTupleType, Context.TheNativeObjectType,
+    Context.TheBridgeObjectType, Context.TheRawPointerType,
+    Context.getAnyObjectType()
+  };
+
+  if (std::any_of(std::begin(kStructural), std::end(kStructural),
+                  [T](const CanType &ST) { return T == ST; }))
+    return true;
+
+  if (auto IntTy = dyn_cast<BuiltinIntegerType>(T)) {
+    auto Width = IntTy->getWidth();
+    if (Width.isPointerWidth())
+      return true;
+    if (!Width.isFixedWidth())
+      return false;
+    switch (Width.getFixedWidth()) {
+    case 8:
+    case 16:
+    case 32:
+    case 64:
+    case 128:
+    case 256:
+      return true;
+    default:
+      break;
+    }
+  }
+
+  return false;
 }
 
 GeneratedModule IRGenModule::intoGeneratedModule() && {
@@ -2127,8 +2143,6 @@ void IRGenModule::error(SourceLoc loc, const Twine &message) {
                          message.toStringRef(buffer));
 }
 
-bool IRGenModule::useDllStorage() { return ::useDllStorage(Triple); }
-
 // In embedded swift features are available independent of deployment and
 // runtime targets because the runtime library is always statically linked
 // to the program.
@@ -2152,9 +2166,9 @@ bool IRGenModule::shouldPrespecializeGenericMetadata() {
   auto canPrespecializeTarget =
       (Triple.isOSDarwin() || Triple.isOSWindows() ||
        (Triple.isOSLinux() && !(Triple.isARM() && Triple.isArch32Bit())));
-  if (canPrespecializeTarget && isStandardLibrary()) {
+  if (canPrespecializeTarget && getSwiftModule()->isStdlibModule())
     return IRGen.Opts.PrespecializeGenericMetadata;
-  }
+
   auto &context = getSwiftModule()->getASTContext();
   auto deploymentAvailability = AvailabilityRange::forDeploymentTarget(context);
   return IRGen.Opts.PrespecializeGenericMetadata &&

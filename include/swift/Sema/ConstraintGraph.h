@@ -84,9 +84,24 @@ public:
   /// as this type variable.
   ArrayRef<TypeVariableType *> getEquivalenceClass() const;
 
-  inference::PotentialBindings &getCurrentBindings() {
-    assert(forRepresentativeVar());
-    return Bindings;
+  inference::PotentialBindings &getPotentialBindings() {
+    DEBUG_ASSERT(forRepresentativeVar());
+    return Potential;
+  }
+
+  void initBindingSet();
+
+  inference::BindingSet &getBindingSet() {
+    ASSERT(hasBindingSet());
+    return *Set;
+  }
+
+  bool hasBindingSet() const {
+    return Set.has_value();
+  }
+
+  void resetBindingSet() {
+    Set.reset();
   }
 
 private:
@@ -131,15 +146,6 @@ private:
 
   /// Binding Inference {
 
-  /// Infer bindings from the given constraint and notify referenced variables
-  /// about its arrival (if requested). This happens every time a new constraint
-  /// gets added to a constraint graph node.
-  void introduceToInference(Constraint *constraint);
-
-  /// Forget about the given constraint. This happens every time a constraint
-  /// gets removed for a constraint graph.
-  void retractFromInference(Constraint *constraint);
-
   /// Perform graph updates that must be undone after we bind a fixed type
   /// to a type variable.
   void retractFromInference(Type fixedType);
@@ -182,8 +188,13 @@ private:
   /// The type variable this node represents.
   TypeVariableType *TypeVar;
 
-  /// The set of bindings associated with this type variable.
-  inference::PotentialBindings Bindings;
+  /// The potential bindings for this type variable, updated incrementally by
+  /// the constraint graph.
+  inference::PotentialBindings Potential;
+
+  /// The binding set for this type variable, computed by
+  /// determineBestBindings().
+  std::optional<inference::BindingSet> Set;
 
   /// The vector of constraints that mention this type variable, in a stable
   /// order for iteration.
@@ -311,14 +322,6 @@ public:
                     llvm::function_ref<bool(Constraint *)> acceptConstraint =
                         [](Constraint *constraint) { return true; });
 
-  /// Retrieve the type variables that correspond to nodes in the graph.
-  ///
-  /// The subscript operator can be used to retrieve the nodes that
-  /// correspond to these type variables.
-  ArrayRef<TypeVariableType *> getTypeVariables() const {
-    return TypeVariables;
-  }
-
   /// Describes a single component, as produced by the connected components
   /// algorithm.
   struct Component {
@@ -340,12 +343,6 @@ public:
     /// The constraints in this component.
     TinyPtrVector<Constraint *> constraints;
 
-    /// The set of components that this component depends on, such that
-    /// the partial solutions of the those components need to be available
-    /// before this component can be solved.
-    ///
-    SmallVector<unsigned, 2> dependencies;
-
   public:
     Component(unsigned solutionIndex) : solutionIndex(solutionIndex) { }
 
@@ -360,11 +357,6 @@ public:
     const TinyPtrVector<Constraint *> &getConstraints() const {
       return constraints;
     }
-
-    /// Records a component which this component depends on.
-    void recordDependency(const Component &component);
-
-    ArrayRef<unsigned> getDependencies() const { return dependencies; }
 
     unsigned getNumDisjunctions() const { return numDisjunctions; }
   };
@@ -461,9 +453,6 @@ private:
 
   /// The constraint system.
   ConstraintSystem &CS;
-
-  /// The type variables in this graph, in stable order.
-  std::vector<TypeVariableType *> TypeVariables;
 
   /// Constraints that are "orphaned" because they contain no type variables.
   SmallVector<Constraint *, 4> OrphanedConstraints;

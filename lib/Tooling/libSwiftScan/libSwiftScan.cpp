@@ -143,13 +143,6 @@ void swiftscan_dependency_set_dispose(swiftscan_dependency_set_t *set) {
   }
 }
 
-//=== Scanner Cache Operations --------------------------------------------===//
-
-void swiftscan_scanner_cache_reset(swiftscan_scanner_t scanner) {
-  DependencyScanningTool *ScanningTool = unwrap(scanner);
-  ScanningTool->resetCache();
-}
-
 //=== Scanner Functions ---------------------------------------------------===//
 
 swiftscan_scanner_t swiftscan_scanner_create(void) {

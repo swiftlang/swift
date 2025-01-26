@@ -915,6 +915,12 @@ protected:
         ++firstChildIdx;
       }
 
+      if (Node->getChild(firstChildIdx)->getKind() ==
+          NodeKind::SendingResultFunctionType) {
+        extFlags = extFlags.withSendingResult();
+        ++firstChildIdx;
+      }
+
       BuiltType globalActorType = BuiltType();
       if (Node->getChild(firstChildIdx)->getKind() ==
           NodeKind::GlobalActorFunctionType) {
@@ -934,12 +940,6 @@ protected:
       } else if (Node->getChild(firstChildIdx)->getKind() ==
                  NodeKind::IsolatedAnyFunctionType) {
         extFlags = extFlags.withIsolatedAny();
-        ++firstChildIdx;
-      }
-
-      if (Node->getChild(firstChildIdx)->getKind() ==
-          NodeKind::SendingResultFunctionType) {
-        extFlags = extFlags.withSendingResult();
         ++firstChildIdx;
       }
 
@@ -1093,7 +1093,14 @@ protected:
             flags = flags.withSendable();
           } else if (child->getText() == "@async") {
             flags = flags.withAsync();
+          } else if (child->getText() == "sending-result") {
+            flags = flags.withSendingResult();
           }
+        } else if (child->getKind() == NodeKind::ImplSendingResult) {
+          // NOTE: This flag needs to be set both at the function level and on
+          // each of the parameters. The flag on the function just means that
+          // all parameters are sending (which is always true today).
+          flags = flags.withSendingResult();
         } else if (child->getKind() == NodeKind::ImplCoroutineKind) {
           if (!child->hasText())
             return MAKE_NODE_TYPE_ERROR0(child, "expected text");

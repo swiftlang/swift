@@ -3,12 +3,10 @@
 // RUN:   -verify \
 // RUN:   -sil-verify-all \
 // RUN:   -module-name test \
-// RUN:   -enable-experimental-feature LifetimeDependence \
-// RUN:   -enable-experimental-feature LifetimeDependenceDiagnoseTrivial
+// RUN:   -enable-experimental-feature LifetimeDependence
 
 // REQUIRES: swift_in_compiler
 // REQUIRES: swift_feature_LifetimeDependence
-// REQUIRES: swift_feature_LifetimeDependenceDiagnoseTrivial
 
 struct BV : ~Escapable {
   let p: UnsafeRawPointer
@@ -33,13 +31,17 @@ struct NC : ~Copyable {
     BV(p, i)
   }
 
+  // @lifetime(borrow self)
   borrowing func getEmpty() -> Empty {
     Empty()
   }
 }
 
 // Test dependencies on an empty struct.
-public struct Empty: ~Escapable {}
+public struct Empty: ~Escapable {
+  @lifetime(immortal)
+  init() {}
+}
 
 func use(e: Empty) {}
 

@@ -824,8 +824,8 @@ ASTContext::ASTContext(
 #include "swift/AST/KnownIdentifiers.def"
 
   // Record the initial set of search paths.
-  for (StringRef path : SearchPathOpts.getImportSearchPaths())
-    getImpl().SearchPathsSet[path] |= SearchPathKind::Import;
+  for (const auto &path : SearchPathOpts.getImportSearchPaths())
+    getImpl().SearchPathsSet[path.Path] |= SearchPathKind::Import;
   for (const auto &framepath : SearchPathOpts.getFrameworkSearchPaths())
     getImpl().SearchPathsSet[framepath.Path] |= SearchPathKind::Framework;
 
@@ -2098,7 +2098,7 @@ void ASTContext::addSearchPath(StringRef searchPath, bool isFramework,
     SearchPathOpts.addFrameworkSearchPath({searchPath, isSystem},
                                           SourceMgr.getFileSystem().get());
   } else {
-    SearchPathOpts.addImportSearchPath(searchPath,
+    SearchPathOpts.addImportSearchPath({searchPath, isSystem},
                                        SourceMgr.getFileSystem().get());
   }
 
@@ -2168,8 +2168,8 @@ Identifier ASTContext::getRealModuleName(Identifier key, ModuleAliasLookupOption
 }
 
 namespace {
-  static StringRef
-  pathStringFromFrameworkSearchPath(const SearchPathOptions::FrameworkSearchPath &next) {
+  static StringRef pathStringFromSearchPath(
+      const SearchPathOptions::SearchPath &next) {
     return next.Path;
   }
 }
@@ -2183,16 +2183,16 @@ const {
 llvm::StringSet<> ASTContext::getAllModuleSearchPathsSet()
 const {
   llvm::StringSet<> result;
-  auto ImportSearchPaths = SearchPathOpts.getImportSearchPaths();
-  result.insert(ImportSearchPaths.begin(), ImportSearchPaths.end());
 
-  // Framework paths are "special", they contain more than path strings,
-  // but path strings are all we care about here.
-  using FrameworkPathView = ArrayRefView<SearchPathOptions::FrameworkSearchPath,
-                                         StringRef,
-                                         pathStringFromFrameworkSearchPath>;
-  FrameworkPathView frameworkPathsOnly{
-      SearchPathOpts.getFrameworkSearchPaths()};
+  // Import and framework paths are "special", they contain more than path
+  // strings, but path strings are all we care about here.
+  using SearchPathView = ArrayRefView<SearchPathOptions::SearchPath, StringRef,
+                                      pathStringFromSearchPath>;
+
+  SearchPathView importPathsOnly{SearchPathOpts.getImportSearchPaths()};
+  result.insert(importPathsOnly.begin(), importPathsOnly.end());
+
+  SearchPathView frameworkPathsOnly{SearchPathOpts.getFrameworkSearchPaths()};
   result.insert(frameworkPathsOnly.begin(), frameworkPathsOnly.end());
 
   if (LangOpts.Target.isOSDarwin()) {
@@ -2846,8 +2846,7 @@ ASTContext::getNormalConformance(Type conformingType,
                                  SourceLoc loc,
                                  DeclContext *dc,
                                  ProtocolConformanceState state,
-                                 bool isUnchecked,
-                                 bool isPreconcurrency,
+                                 ProtocolConformanceOptions options,
                                  SourceLoc preconcurrencyLoc) {
   assert(dc->isTypeContext());
 
@@ -2864,7 +2863,7 @@ ASTContext::getNormalConformance(Type conformingType,
   // Build a new normal protocol conformance.
   auto result = new (*this, AllocationArena::Permanent)
       NormalProtocolConformance(conformingType, protocol, loc, dc, state,
-                                isUnchecked, isPreconcurrency, preconcurrencyLoc);
+                                options, preconcurrencyLoc);
   normalConformances.InsertNode(result, insertPos);
 
   return result;
@@ -4077,7 +4076,8 @@ get(GenericTypeDecl *TheDecl, Type Parent, const ASTContext &C) {
   UnboundGenericType::Profile(ID, TheDecl, Parent);
   void *InsertPos = nullptr;
   RecursiveTypeProperties properties;
-  if (TheDecl->isUnsafe()) properties |= RecursiveTypeProperties::IsUnsafe;
+  if (TheDecl->getExplicitSafety() == ExplicitSafety::Unsafe)
+    properties |= RecursiveTypeProperties::IsUnsafe;
   if (Parent) properties |= Parent->getRecursiveProperties();
 
   auto arena = getArena(properties);
@@ -4130,7 +4130,8 @@ BoundGenericType *BoundGenericType::get(NominalTypeDecl *TheDecl,
   llvm::FoldingSetNodeID ID;
   BoundGenericType::Profile(ID, TheDecl, Parent, GenericArgs);
   RecursiveTypeProperties properties;
-  if (TheDecl->isUnsafe()) properties |= RecursiveTypeProperties::IsUnsafe;
+  if (TheDecl->getExplicitSafety() == ExplicitSafety::Unsafe)
+    properties |= RecursiveTypeProperties::IsUnsafe;
   if (Parent) properties |= Parent->getRecursiveProperties();
   for (Type Arg : GenericArgs) {
     properties |= Arg->getRecursiveProperties();
@@ -4212,7 +4213,8 @@ EnumType::EnumType(EnumDecl *TheDecl, Type Parent, const ASTContext &C,
 
 EnumType *EnumType::get(EnumDecl *D, Type Parent, const ASTContext &C) {
   RecursiveTypeProperties properties;
-  if (D->isUnsafe()) properties |= RecursiveTypeProperties::IsUnsafe;
+  if (D->getExplicitSafety() == ExplicitSafety::Unsafe)
+    properties |= RecursiveTypeProperties::IsUnsafe;
   if (Parent) properties |= Parent->getRecursiveProperties();
   auto arena = getArena(properties);
 
@@ -4229,7 +4231,8 @@ StructType::StructType(StructDecl *TheDecl, Type Parent, const ASTContext &C,
 
 StructType *StructType::get(StructDecl *D, Type Parent, const ASTContext &C) {
   RecursiveTypeProperties properties;
-  if (D->isUnsafe()) properties |= RecursiveTypeProperties::IsUnsafe;
+  if (D->getExplicitSafety() == ExplicitSafety::Unsafe)
+    properties |= RecursiveTypeProperties::IsUnsafe;
   if (Parent) properties |= Parent->getRecursiveProperties();
   auto arena = getArena(properties);
 
@@ -4246,7 +4249,8 @@ ClassType::ClassType(ClassDecl *TheDecl, Type Parent, const ASTContext &C,
 
 ClassType *ClassType::get(ClassDecl *D, Type Parent, const ASTContext &C) {
   RecursiveTypeProperties properties;
-  if (D->isUnsafe()) properties |= RecursiveTypeProperties::IsUnsafe;
+  if (D->getExplicitSafety() == ExplicitSafety::Unsafe)
+    properties |= RecursiveTypeProperties::IsUnsafe;
   if (Parent) properties |= Parent->getRecursiveProperties();
   auto arena = getArena(properties);
 
@@ -5397,7 +5401,8 @@ OptionalType *OptionalType::get(Type base) {
 ProtocolType *ProtocolType::get(ProtocolDecl *D, Type Parent,
                                 const ASTContext &C) {
   RecursiveTypeProperties properties;
-  if (D->isUnsafe()) properties |= RecursiveTypeProperties::IsUnsafe;
+  if (D->getExplicitSafety() == ExplicitSafety::Unsafe)
+    properties |= RecursiveTypeProperties::IsUnsafe;
   if (Parent) properties |= Parent->getRecursiveProperties();
   auto arena = getArena(properties);
 
@@ -5561,19 +5566,13 @@ CanTypeWrapper<OpenedArchetypeType> OpenedArchetypeType::getNew(
       properties));
 }
 
-CanOpenedArchetypeType OpenedArchetypeType::get(CanType existential,
-                                                std::optional<UUID> knownID) {
+CanOpenedArchetypeType OpenedArchetypeType::get(CanType existential) {
   auto &ctx = existential->getASTContext();
   auto existentialSig = ctx.getOpenedExistentialSignature(existential);
 
-  if (!knownID)
-    knownID = UUID::fromTime();
-
   auto *genericEnv = GenericEnvironment::forOpenedExistential(
-      existentialSig.OpenedSig,
-      existentialSig.Shape,
-      existentialSig.Generalization,
-      *knownID);
+      existentialSig.OpenedSig, existentialSig.Shape,
+      existentialSig.Generalization, UUID::fromTime());
 
   return cast<OpenedArchetypeType>(
     genericEnv->mapTypeIntoContext(existentialSig.SelfType)
@@ -5658,10 +5657,9 @@ SubstitutionMap::Storage *SubstitutionMap::Storage::get(
 }
 
 const AvailabilityContext::Storage *
-AvailabilityContext::Storage::get(const PlatformInfo &platformInfo,
-                                  ASTContext &ctx) {
+AvailabilityContext::Storage::get(const Info &info, ASTContext &ctx) {
   llvm::FoldingSetNodeID id;
-  platformInfo.Profile(id);
+  info.Profile(id);
 
   auto &foldingSet =
       ctx.getImpl().getArena(AllocationArena::Permanent).AvailabilityContexts;
@@ -5672,7 +5670,7 @@ AvailabilityContext::Storage::get(const PlatformInfo &platformInfo,
 
   void *mem = ctx.Allocate(sizeof(AvailabilityContext::Storage),
                            alignof(AvailabilityContext::Storage));
-  auto *newNode = ::new (mem) AvailabilityContext::Storage(platformInfo);
+  auto *newNode = ::new (mem) AvailabilityContext::Storage(info);
   foldingSet.InsertNode(newNode, insertPos);
 
   return newNode;

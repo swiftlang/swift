@@ -19,7 +19,7 @@
 
 #include "swift/AST/ArgumentList.h"
 #include "swift/AST/Attr.h"
-#include "swift/AST/Availability.h"
+#include "swift/AST/AvailabilityRange.h"
 #include "swift/AST/CaptureInfo.h"
 #include "swift/AST/ConcreteDeclRef.h"
 #include "swift/AST/Decl.h"
@@ -368,9 +368,10 @@ protected:
     IsObjC : 1
   );
 
-  SWIFT_INLINE_BITFIELD_FULL(SequenceExpr, Expr, 32,
+  SWIFT_INLINE_BITFIELD_FULL(SequenceExpr, Expr, 32+1,
     : NumPadBits,
-    NumElements : 32
+    NumElements : 32,
+    IsFolded: 1
   );
 
   SWIFT_INLINE_BITFIELD(OpaqueValueExpr, Expr, 1,
@@ -2173,6 +2174,36 @@ public:
   }
 };
 
+/// UnsafeExpr - An 'unsafe' surrounding an expression, marking that the
+/// expression contains uses of unsafe declarations.
+///
+/// getSemanticsProvidingExpr() looks through this because it doesn't
+/// provide the value and only very specific clients care where the
+/// 'unsafe' was written.
+class UnsafeExpr final : public IdentityExpr {
+  SourceLoc UnsafeLoc;
+public:
+  UnsafeExpr(SourceLoc unsafeLoc, Expr *sub, Type type = Type(),
+            bool implicit = false)
+    : IdentityExpr(ExprKind::Unsafe, sub, type, implicit),
+      UnsafeLoc(unsafeLoc) {
+  }
+
+  static UnsafeExpr *createImplicit(ASTContext &ctx, SourceLoc unsafeLoc, Expr *sub, Type type = Type()) {
+    return new (ctx) UnsafeExpr(unsafeLoc, sub, type, /*implicit=*/true);
+  }
+
+  SourceLoc getLoc() const { return UnsafeLoc; }
+
+  SourceLoc getUnsafeLoc() const { return UnsafeLoc; }
+  SourceLoc getStartLoc() const { return UnsafeLoc; }
+  SourceLoc getEndLoc() const { return getSubExpr()->getEndLoc(); }
+
+  static bool classof(const Expr *e) {
+    return e->getKind() == ExprKind::Unsafe;
+  }
+};
+
 /// ConsumeExpr - A 'consume' surrounding an lvalue expression marking the
 /// lvalue as needing to be moved.
 class ConsumeExpr final : public Expr {
@@ -3600,6 +3631,24 @@ public:
   }
 };
 
+/// UnsafeCastExpr - A special kind of conversion that performs an unsafe
+/// bitcast from one type to the other.
+///
+/// Note that this is an unsafe operation and type-checker is allowed to
+/// use this only in a limited number of cases like: `any Sendable` -> `Any`
+/// conversions in some positions, covariant conversions of function and
+/// function result types.
+class UnsafeCastExpr : public ImplicitConversionExpr {
+public:
+  UnsafeCastExpr(Expr *subExpr, Type type)
+      : ImplicitConversionExpr(ExprKind::UnsafeCast, subExpr, type) {
+  }
+
+  static bool classof(const Expr *E) {
+    return E->getKind() == ExprKind::UnsafeCast;
+  }
+};
+
 /// Extracts the isolation of a dynamically isolated function value.
 class ExtractFunctionIsolationExpr : public Expr {
   /// The function value expression from which to extract the
@@ -3952,6 +4001,13 @@ public:
   }
   void setElement(unsigned i, Expr *e) {
     getElements()[i] = e;
+  }
+
+  bool isFolded() const {
+    return static_cast<bool>(Bits.SequenceExpr.IsFolded);
+  }
+  void setFolded(bool folded) {
+    Bits.SequenceExpr.IsFolded = static_cast<unsigned>(folded);
   }
 
   // Implement isa/cast/dyncast/etc.
@@ -6392,33 +6448,6 @@ public:
 
   static bool classof(const Expr *E) {
     return E->getKind() == ExprKind::SingleValueStmt;
-  }
-};
-
-/// Expression node that effects a "one-way" constraint in
-/// the constraint system, allowing type information to flow from the
-/// subexpression outward but not the other way.
-///
-/// One-way expressions are generally implicit and synthetic, introduced by
-/// the type checker. However, there is a built-in expression of the
-/// form \c Builtin.one_way(x) that forms a one-way constraint coming out
-/// of expression `x` that can be used for testing purposes.
-class OneWayExpr : public Expr {
-  Expr *SubExpr;
-
-public:
-  /// Construct an implicit one-way expression from the given subexpression.
-  OneWayExpr(Expr *subExpr)
-     : Expr(ExprKind::OneWay, /*isImplicit=*/true), SubExpr(subExpr) { }
-
-  SourceLoc getLoc() const { return SubExpr->getLoc(); }
-  SourceRange getSourceRange() const { return SubExpr->getSourceRange(); }
-
-  Expr *getSubExpr() const { return SubExpr; }
-  void setSubExpr(Expr *subExpr) { SubExpr = subExpr; }
-
-  static bool classof(const Expr *E) {
-    return E->getKind() == ExprKind::OneWay;
   }
 };
 

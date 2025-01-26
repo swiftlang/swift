@@ -170,11 +170,6 @@ static_assert((int)BridgedType::MetatypeRepresentation::Thin == (int)swift::Meta
 static_assert((int)BridgedType::MetatypeRepresentation::Thick == (int)swift::MetatypeRepresentation::Thick);
 static_assert((int)BridgedType::MetatypeRepresentation::ObjC == (int)swift::MetatypeRepresentation::ObjC);
 
-static_assert((int)BridgedType::TraitResult::IsNot == (int)swift::TypeTraitResult::IsNot);
-static_assert((int)BridgedType::TraitResult::CanBe == (int)swift::TypeTraitResult::CanBe);
-static_assert((int)BridgedType::TraitResult::Is == (int)swift::TypeTraitResult::Is);
-
-
 //===----------------------------------------------------------------------===//
 //                                SILFunction
 //===----------------------------------------------------------------------===//

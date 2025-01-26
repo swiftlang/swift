@@ -248,6 +248,7 @@ ModuleDependencyScanningWorker::scanFilesystemForClangModuleDependency(
 template <typename Function, typename... Args>
 auto ModuleDependencyScanner::withDependencyScanningWorker(Function &&F,
                                                            Args &&...ArgList) {
+  NumLookups++;
   auto getWorker = [this]() -> std::unique_ptr<ModuleDependencyScanningWorker> {
     std::lock_guard<std::mutex> guard(WorkersLock);
     // If we have run out of workers, something has gone wrong as we must never
@@ -355,7 +356,7 @@ ModuleDependencyScanner::getMainModuleDependencyInfo(ModuleDecl *mainModule) {
   });
 
   auto mainDependencies = ModuleDependencyInfo::forSwiftSourceModule(
-      {}, buildCommands, {}, ExtraPCMArgs);
+       {}, buildCommands, {}, {}, {}, ExtraPCMArgs);
 
   if (ScanASTContext.CASOpts.EnableCaching) {
     std::vector<std::string> clangDependencyFiles;
@@ -713,9 +714,6 @@ ModuleDependencyScanner::resolveAllClangModuleDependencies(
     } else {
       // We need to query the Clang dependency scanner for this module's
       // unresolved imports
-      auto moduleDependencyInfo = cache.findKnownDependency(moduleID);
-
-      // Figure out which imports have already been resolved to module dependencies
       llvm::StringSet<> resolvedImportIdentifiers;
       for (const auto &resolvedDep : moduleDependencyInfo.getImportedSwiftDependencies())
         resolvedImportIdentifiers.insert(resolvedDep.ModuleName);
@@ -928,16 +926,19 @@ void ModuleDependencyScanner::resolveSwiftImportsForModule(
   for (const auto &dependsOn : moduleDependencyInfo.getModuleImports())
     moduleLookupResult.insert(
         std::make_pair(dependsOn.importIdentifier, std::nullopt));
+  std::mutex lookupResultLock;
 
   // A scanning task to query a module by-name. If the module already exists
   // in the cache, do nothing and return.
   auto scanForSwiftModuleDependency =
-      [this, &cache, &moduleLookupResult](Identifier moduleIdentifier,
-                                          bool isTestable) {
+      [this, &cache, &lookupResultLock, &moduleLookupResult](Identifier moduleIdentifier,
+                                                             bool isTestable) {
         auto moduleName = moduleIdentifier.str().str();
-        // If this is already in the cache, no work to do here
-        if (cache.hasSwiftDependency(moduleName))
-          return;
+        {
+          std::lock_guard<std::mutex> guard(lookupResultLock);
+          if (cache.hasSwiftDependency(moduleName))
+            return;
+        }
 
         auto moduleDependencies = withDependencyScanningWorker(
             [&cache, moduleIdentifier,
@@ -946,7 +947,11 @@ void ModuleDependencyScanner::resolveSwiftImportsForModule(
                   moduleIdentifier, cache.getModuleOutputPath(),
                   cache.getScanService().getPrefixMapper(), isTestable);
             });
-        moduleLookupResult.insert_or_assign(moduleName, moduleDependencies);
+
+        {
+          std::lock_guard<std::mutex> guard(lookupResultLock);
+          moduleLookupResult.insert_or_assign(moduleName, moduleDependencies);
+        }
       };
 
   // Enque asynchronous lookup tasks
@@ -1163,13 +1168,13 @@ void ModuleDependencyScanner::discoverCrossImportOverlayDependencies(
 
   // Construct a dummy main to resolve the newly discovered cross import
   // overlays.
-  StringRef dummyMainName = "DummyMainModuleForResolvingCrossImportOverlays";
+  StringRef dummyMainName = "MainModuleCrossImportOverlays";
   auto dummyMainID = ModuleDependencyID{dummyMainName.str(),
                                         ModuleDependencyKind::SwiftSource};
   auto actualMainID = ModuleDependencyID{mainModuleName.str(),
                                          ModuleDependencyKind::SwiftSource};
   auto dummyMainDependencies =
-      ModuleDependencyInfo::forSwiftSourceModule({}, {}, {}, {});
+     ModuleDependencyInfo::forSwiftSourceModule();
   std::for_each(newOverlays.begin(), newOverlays.end(),
                 [&](Identifier modName) {
                   dummyMainDependencies.addModuleImport(modName.str());

@@ -126,24 +126,25 @@ ProtocolType *SemaTest::createProtocol(llvm::StringRef protocolName,
 
 BindingSet SemaTest::inferBindings(ConstraintSystem &cs,
                                    TypeVariableType *typeVar) {
-  llvm::SmallDenseMap<TypeVariableType *, BindingSet> cache;
-
   for (auto *typeVar : cs.getTypeVariables()) {
+    auto &node = cs.getConstraintGraph()[typeVar];
+    node.resetBindingSet();
+
     if (!typeVar->getImpl().hasRepresentativeOrFixed())
-      cache.insert({typeVar, cs.getBindingsFor(typeVar, /*finalize=*/false)});
+      node.initBindingSet();
   }
 
   for (auto *typeVar : cs.getTypeVariables()) {
-    auto cachedBindings = cache.find(typeVar);
-    if (cachedBindings == cache.end())
+    auto &node = cs.getConstraintGraph()[typeVar];
+    if (!node.hasBindingSet())
       continue;
 
-    auto &bindings = cachedBindings->getSecond();
-    bindings.inferTransitiveProtocolRequirements(cache);
-    bindings.finalize(cache);
+    auto &bindings = node.getBindingSet();
+    bindings.inferTransitiveProtocolRequirements();
+    bindings.finalize(/*transitive=*/true);
   }
 
-  auto result = cache.find(typeVar);
-  assert(result != cache.end());
-  return result->second;
+  auto &node = cs.getConstraintGraph()[typeVar];
+  ASSERT(node.hasBindingSet());
+  return node.getBindingSet();
 }

@@ -17,14 +17,19 @@
 
 import Swift
 
-@_implementationOnly import OS.Libc
-#if os(macOS)
-@_implementationOnly import OS.Darwin
-#elseif os(Linux)
-@_implementationOnly import OS.Linux
+#if os(macOS) || os(iOS) || os(tvOS) || os(watchOS)
+internal import Darwin
+#elseif os(Windows)
+internal import ucrt
+#elseif canImport(Glibc)
+internal import Glibc
+#elseif canImport(Musl)
+internal import Musl
 #endif
 
-@_implementationOnly import Runtime
+#if os(macOS)
+internal import BacktracingImpl.OS.Darwin
+#endif
 
 @_spi(MemoryReaders) public protocol MemoryReader {
   typealias Address = UInt64

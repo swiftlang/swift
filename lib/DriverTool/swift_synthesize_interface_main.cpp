@@ -113,7 +113,7 @@ int swift_synthesize_interface_main(ArrayRef<const char *> Args,
     Invocation.getClangImporterOptions().ExtraArgs.push_back(A->getValue());
   }
 
-  std::vector<SearchPathOptions::FrameworkSearchPath> FrameworkSearchPaths;
+  std::vector<SearchPathOptions::SearchPath> FrameworkSearchPaths;
   for (const auto *A : ParsedArgs.filtered(OPT_F)) {
     FrameworkSearchPaths.push_back({A->getValue(), /*isSystem*/ false});
   }
@@ -123,7 +123,14 @@ int swift_synthesize_interface_main(ArrayRef<const char *> Args,
   Invocation.setFrameworkSearchPaths(FrameworkSearchPaths);
   Invocation.getSearchPathOptions().LibrarySearchPaths =
       ParsedArgs.getAllArgValues(OPT_L);
-  Invocation.setImportSearchPaths(ParsedArgs.getAllArgValues(OPT_I));
+  std::vector<SearchPathOptions::SearchPath> ImportSearchPaths;
+  for (const auto *A : ParsedArgs.filtered(OPT_I)) {
+    ImportSearchPaths.push_back({A->getValue(), /*isSystem*/ false});
+  }
+  for (const auto *A : ParsedArgs.filtered(OPT_Isystem)) {
+    ImportSearchPaths.push_back({A->getValue(), /*isSystem*/ true});
+  }
+  Invocation.setImportSearchPaths(ImportSearchPaths);
 
   Invocation.getLangOptions().EnableObjCInterop = Target.isOSDarwin();
   Invocation.getLangOptions().setCxxInteropFromArgs(ParsedArgs, Diags);

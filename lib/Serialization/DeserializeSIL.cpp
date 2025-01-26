@@ -2241,6 +2241,14 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
                            getSILType(Ty, (SILValueCategory)TyCategory, Fn)));
     break;
   }
+  case SILInstructionKind::IgnoredUseInst: {
+    assert(RecordKind == SIL_ONE_OPERAND && "Should be one operand");
+    auto Ty = MF->getType(TyID);
+    ResultInst = Builder.createIgnoredUse(
+        Loc, getLocalValue(Builder.maybeGetFunction(), ValID,
+                           getSILType(Ty, (SILValueCategory)TyCategory, Fn)));
+    break;
+  }
   case SILInstructionKind::DeallocPackInst: {
     auto Ty = MF->getType(TyID);
     ResultInst = Builder.createDeallocPack(

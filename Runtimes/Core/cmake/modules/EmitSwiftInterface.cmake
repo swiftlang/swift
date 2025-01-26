@@ -21,10 +21,10 @@ function(install_swift_interface target)
   if(SwiftCore_ENABLE_LIBRARY_EVOLUTION)
     install(FILES "${CMAKE_CURRENT_BINARY_DIR}/$<TARGET_PROPERTY:${target},Swift_MODULE_NAME>.swiftinterface"
       RENAME "${SwiftCore_MODULE_TRIPLE}.swiftinterface"
-      DESTINATION "${CMAKE_INSTALL_LIBDIR}/swift/$<TARGET_PROPERTY:${target},Swift_MODULE_NAME>.swiftmodule")
+      DESTINATION "${SwiftCore_INSTALL_SWIFTMODULEDIR}/$<TARGET_PROPERTY:${target},Swift_MODULE_NAME>.swiftmodule")
 
     install(FILES "${CMAKE_CURRENT_BINARY_DIR}/$<TARGET_PROPERTY:${target},Swift_MODULE_NAME>.private.swiftinterface"
       RENAME "${SwiftCore_MODULE_TRIPLE}.private.swiftinterface"
-      DESTINATION "${CMAKE_INSTALL_LIBDIR}/swift/$<TARGET_PROPERTY:${target},Swift_MODULE_NAME>.swiftmodule")
+      DESTINATION "${SwiftCore_INSTALL_SWIFTMODULEDIR}/$<TARGET_PROPERTY:${target},Swift_MODULE_NAME>.swiftmodule")
   endif()
 endfunction()

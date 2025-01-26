@@ -1195,9 +1195,12 @@ public:
 };
 
 struct SILNodeOffsetChecker {
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Winvalid-offsetof"
   static_assert(offsetof(SingleValueInstruction, kind) ==
                 offsetof(NonSingleValueInstruction, kind),
                 "wrong SILNode layout in SILInstruction");
+#pragma clang diagnostic pop
 };
 
 inline SILNodePointer::SILNodePointer(const SingleValueInstruction *svi) :
@@ -6074,10 +6077,7 @@ class PointerToAddressInst
       : UnaryInstructionBase(DebugLoc, Operand, Ty) {
     sharedUInt8().PointerToAddressInst.isStrict = IsStrict;
     sharedUInt8().PointerToAddressInst.isInvariant = IsInvariant;
-    unsigned encodedAlignment = llvm::encode(Alignment);
-    sharedUInt32().PointerToAddressInst.alignment = encodedAlignment;
-    assert(sharedUInt32().PointerToAddressInst.alignment == encodedAlignment
-           && "pointer_to_address alignment overflow");
+    setAlignment(Alignment);
   }
 
 public:
@@ -6099,6 +6099,13 @@ public:
   /// alignment indicates the natural in-memory alignment of the element type.
   llvm::MaybeAlign alignment() const {
     return llvm::decodeMaybeAlign(sharedUInt32().PointerToAddressInst.alignment);
+  }
+  
+  void setAlignment(llvm::MaybeAlign Alignment) {
+    unsigned encodedAlignment = llvm::encode(Alignment);
+    sharedUInt32().PointerToAddressInst.alignment = encodedAlignment;
+    assert(sharedUInt32().PointerToAddressInst.alignment == encodedAlignment
+           && "pointer_to_address alignment overflow");
   }
 };
 
@@ -11716,6 +11723,17 @@ public:
   OperandValueArrayRef getArguments() const {
     return OperandValueArrayRef(getAllOperands());
   }
+};
+
+/// An instruction that represents a semantic-less use that is used to
+/// suppresses unused value variable warnings. E.x.: _ = x.
+class IgnoredUseInst final
+    : public UnaryInstructionBase<SILInstructionKind::IgnoredUseInst,
+                                  NonValueInstruction> {
+  friend SILBuilder;
+
+  IgnoredUseInst(SILDebugLocation loc, SILValue operand)
+      : UnaryInstructionBase(loc, operand) {}
 };
 
 inline SILType *AllocRefInstBase::getTypeStorage() {

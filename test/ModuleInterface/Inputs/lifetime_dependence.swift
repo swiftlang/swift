@@ -1,3 +1,21 @@
+@_unsafeNonescapableResult
+@_alwaysEmitIntoClient
+@_transparent
+@lifetime(borrow source)
+internal func _overrideLifetime<T: ~Copyable & ~Escapable, U: ~Copyable & ~Escapable>(
+  _ dependent: consuming T, borrowing source: borrowing U) -> T {
+  dependent
+}
+
+@_unsafeNonescapableResult
+@_alwaysEmitIntoClient
+@_transparent
+@lifetime(source)
+internal func _overrideLifetime<T: ~Copyable & ~Escapable, U: ~Copyable & ~Escapable>(
+  _ dependent: consuming T, copying source: borrowing U) -> T {
+  dependent
+}
+
 public struct AnotherView : ~Escapable {
   @usableFromInline let _ptr: UnsafeRawBufferPointer
   @usableFromInline let _count: Int
@@ -21,19 +39,23 @@ public struct BufferView : ~Escapable {
   @inlinable
   @lifetime(borrow a)
   internal init(_ ptr: UnsafeRawBufferPointer, _ a: borrowing Array<Int>) {
-    self.init(ptr, a.count)
+    let bv = BufferView(ptr, a.count)
+    self = _overrideLifetime(bv, borrowing: a)
   }
   @inlinable
   @lifetime(a)
   internal init(_ ptr: UnsafeRawBufferPointer, _ a: consuming AnotherView) {
-    self.init(ptr, a._count)
+    let bv = BufferView(ptr, a._count)
+    self = _overrideLifetime(bv, copying: a)
   }
 }
 
 @inlinable
 @lifetime(x)
 public func derive(_ x: consuming BufferView) -> BufferView {
-  return BufferView(x._ptr, x._count)
+  let pointer = x._ptr
+  let bv = BufferView(pointer, x._count)
+  return _overrideLifetime(bv, copying: x)
 }
 
 @inlinable
@@ -42,7 +64,9 @@ public func use(_ x: consuming BufferView) {}
 @inlinable
 @lifetime(view)
 public func consumeAndCreate(_ view: consuming BufferView) -> BufferView {
-  return BufferView(view._ptr, view._count)
+  let pointer = view._ptr
+  let bv = BufferView(pointer, view._count)
+  return _overrideLifetime(bv, copying: view)
 }
 
 @inlinable
@@ -54,3 +78,16 @@ public func deriveThisOrThat(_ this: consuming BufferView, _ that: consuming Buf
   return BufferView(that._ptr, that._count)
 }
 
+public struct Container {
+  var buffer: UnsafeRawBufferPointer
+  var object: AnyObject
+}
+
+extension Container {
+  public var storage: BufferView {
+    get {
+      let view = BufferView(buffer, 1)
+      return _overrideLifetime(view, borrowing: self)
+    }
+  }
+}

@@ -338,6 +338,11 @@ def I : JoinedOrSeparate<["-"], "I">,
 def I_EQ : Joined<["-"], "I=">, Flags<[FrontendOption, ArgumentIsPath]>,
   Alias<I>;
 
+def Isystem : Separate<["-"], "Isystem">,
+  Flags<[FrontendOption, ArgumentIsPath, SwiftSymbolGraphExtractOption,
+         SwiftSynthesizeInterfaceOption]>,
+  HelpText<"Add directory to the system import search path">;
+
 def import_underlying_module : Flag<["-"], "import-underlying-module">,
   Flags<[FrontendOption, NoInteractiveOption]>,
   HelpText<"Implicitly imports the Objective-C half of a module">;
@@ -359,6 +364,8 @@ def incremental : Flag<["-"], "incremental">,
   HelpText<"Perform an incremental build if possible">;
 
 def nostdimport : Flag<["-"], "nostdimport">, Flags<[FrontendOption]>,
+  HelpText<"Don't search the standard library or toolchain import paths for modules">;
+def nostdlibimport : Flag<["-"], "nostdlibimport">, Flags<[FrontendOption]>,
   HelpText<"Don't search the standard library import path for modules">;
 
 def output_file_map : Separate<["-"], "output-file-map">,
@@ -792,11 +799,6 @@ def enable_experimental_concise_pound_file : Flag<["-"],
   Flags<[FrontendOption, ModuleInterfaceOption]>,
   HelpText<"Enable experimental concise '#file' identifier">;
 
-def enable_experimental_bounds_safety_interop :
-  Flag<["-"], "enable-experimental-bounds-safety-interop">,
-  Flags<[NoDriverOption, FrontendOption, HelpHidden, ModuleInterfaceOption]>,
-  HelpText<"Enable experimental C bounds safety interop code generation and config directives">;
-
 def enable_experimental_cxx_interop :
   Flag<["-"], "enable-experimental-cxx-interop">,
   Flags<[NoDriverOption, FrontendOption, HelpHidden]>,
@@ -1079,6 +1081,10 @@ def Oplayground : Flag<["-"], "Oplayground">, Group<O_Group>,
   Flags<[HelpHidden, FrontendOption, ModuleInterfaceOption]>,
   HelpText<"Compile with optimizations appropriate for a playground">;
 
+def ExperimentalSkipDeserializationChecksForPackageCMO : Flag<["-"], "experimental-skip-deserialization-checks-for-package-cmo">,
+  Flags<[FrontendOption]>,
+  HelpText<"Skip deserialization checks for package-cmo; use only for experimental purposes">;
+
 def ExperimentalPackageCMO : Flag<["-"], "experimental-package-cmo">,
   Flags<[FrontendOption]>,
   HelpText<"Deprecated; use -package-cmo instead">;
@@ -1343,6 +1349,12 @@ def emit_parse : Flag<["-"], "emit-parse">, Alias<dump_parse>,
   Flags<[FrontendOption, NoInteractiveOption, DoesNotAffectIncrementalBuild]>;
 def dump_ast : Flag<["-"], "dump-ast">,
   HelpText<"Parse and type-check input file(s) and dump AST(s)">, ModeOpt,
+  Flags<[FrontendOption, NoInteractiveOption, DoesNotAffectIncrementalBuild]>;
+def dump_ast_format : Separate<["-"], "dump-ast-format">,
+  HelpText<"Desired format for -dump-ast output "
+           "('default', 'json', or 'json-zlib'); no format is guaranteed "
+           "stable across different compiler versions">,
+  MetaVarName<"<format>">,
   Flags<[FrontendOption, NoInteractiveOption, DoesNotAffectIncrementalBuild]>;
 def emit_ast : Flag<["-"], "emit-ast">, Alias<dump_ast>,
   Flags<[FrontendOption, NoInteractiveOption, DoesNotAffectIncrementalBuild]>;
@@ -1662,7 +1674,7 @@ def emit_symbol_graph: Flag<["-"], "emit-symbol-graph">,
 
 def emit_symbol_graph_dir : Separate<["-"], "emit-symbol-graph-dir">,
   Flags<[FrontendOption, NoInteractiveOption, ArgumentIsPath,
-         SupplementaryOutput, HelpHidden]>,
+         SupplementaryOutput, HelpHidden, CacheInvariant]>,
   HelpText<"Emit a symbol graph to directory <dir>">,
   MetaVarName<"<dir>">;
 
@@ -1789,6 +1801,10 @@ def input_paths: Separate<["-", "--"], "input-paths">,
 def compiler_style_diags: Flag<["-", "--"], "compiler-style-diags">,
   Flags<[NoDriverOption, SwiftAPIDigesterOption]>,
   HelpText<"Print compiler style diagnostics to stderr.">;
+
+def error_on_abi_breakage: Flag<["-", "--"], "error-on-abi-breakage">,
+  Flags<[NoDriverOption, SwiftAPIDigesterOption]>,
+  HelpText<"Always treat ABI checker issues as errors">;
 
 def json: Flag<["-", "--"], "json">,
   Flags<[NoDriverOption, SwiftAPIDigesterOption]>,

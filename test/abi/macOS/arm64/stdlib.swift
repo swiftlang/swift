@@ -769,6 +769,7 @@ Added: _$ss7UnicodeO5ASCIIO27encodedReplacementCharacters15CollectionOfOneVys5UI
 Added: _$ss7UnicodeO5UTF16O27encodedReplacementCharacters11_UIntBufferVys6UInt16VGvpZMV
 Added: _$ss7UnicodeO5UTF32O27encodedReplacementCharacters15CollectionOfOneVys6UInt32VGvpZMV
 Added: _$sSo19_SwiftStdlibVersionasE6v6_1_0ABvpZMV
+Added: _$sSo19_SwiftStdlibVersionasE6v6_2_0ABvpZMV
 
 // SE-0445 Improving printed descriptions of String.Index
 Added: _$sSS5IndexV16debugDescriptionSSvpMV
@@ -797,3 +798,50 @@ Added: _$ss7RawSpanV9byteCountSivpMV
 Added: _$ss7RawSpanVMa
 Added: _$ss7RawSpanVMn
 Added: _$ss7RawSpanVN
+
+// _SwiftifyInfo enum for _SwiftifyImports macro
+Added: _$ss13_SwiftifyExprO5paramyABSicABmFWC
+Added: _$ss13_SwiftifyExprO6returnyA2BmFWC
+Added: _$ss13_SwiftifyExprOMa
+Added: _$ss13_SwiftifyExprOMn
+Added: _$ss13_SwiftifyExprON
+Added: _$ss13_SwiftifyInfoO11nonescapingyABs01_A4ExprO_tcABmFWC
+Added: _$ss13_SwiftifyInfoO7endedByyABs01_A4ExprO_SitcABmFWC
+Added: _$ss13_SwiftifyInfoO7sizedByyABs01_A4ExprO_SStcABmFWC
+Added: _$ss13_SwiftifyInfoO9countedByyABs01_A4ExprO_SStcABmFWC
+Added: _$ss13_SwiftifyInfoO18lifetimeDependenceyABSi_s01_A4ExprOs01_D4TypeOtcABmFWC
+Added: _$ss13_SwiftifyInfoOMa
+Added: _$ss13_SwiftifyInfoOMn
+Added: _$ss13_SwiftifyInfoON
+// _DependenceType for _SwiftifyImports macro
+Added: _$ss15_DependenceTypeO2eeoiySbAB_ABtFZ
+Added: _$ss15_DependenceTypeO4copyyA2BmFWC
+Added: _$ss15_DependenceTypeO4hash4intoys6HasherVz_tF
+Added: _$ss15_DependenceTypeO6borrowyA2BmFWC
+Added: _$ss15_DependenceTypeO9hashValueSivg
+Added: _$ss15_DependenceTypeO9hashValueSivpMV
+Added: _$ss15_DependenceTypeOMa
+Added: _$ss15_DependenceTypeOMn
+Added: _$ss15_DependenceTypeON
+Added: _$ss15_DependenceTypeOSHsMc
+Added: _$ss15_DependenceTypeOSHsWP
+Added: _$ss15_DependenceTypeOSQsMc
+Added: _$ss15_DependenceTypeOSQsWP
+
+// Eager-lazy Array bridging
+Added: _$ss12_ArrayBufferV14associationKeySVvpZMV
+
+// Slab metadata accessor
+Added: _$ss4SlabVMa
+
+// Slab nominal type descriptor
+Added: _$ss4SlabVMn
+
+// Slab.count property descriptor
+Added: _$ss4SlabVsRi__rlE5countSivpZMV
+
+// Slab._storage _read accessor
+Added: _$ss4SlabVsRi__rlE8_storagexq_BVvr
+
+// Shared string creation for Foundation
+Added: _$ss40_SwiftCreateImmortalString_ForFoundation6buffer7isASCIISSSgSRys5UInt8VG_SbtF

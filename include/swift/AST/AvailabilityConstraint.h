@@ -17,7 +17,8 @@
 #ifndef SWIFT_AST_AVAILABILITY_CONSTRAINT_H
 #define SWIFT_AST_AVAILABILITY_CONSTRAINT_H
 
-#include "swift/AST/Availability.h"
+#include "swift/AST/AvailabilityDomain.h"
+#include "swift/AST/AvailabilityRange.h"
 #include "swift/AST/PlatformKind.h"
 #include "swift/Basic/LLVM.h"
 
@@ -59,33 +60,37 @@ public:
   };
 
 private:
-  Kind kind;
-  const AvailableAttr *attr;
+  llvm::PointerIntPair<SemanticAvailableAttr, 2, Kind> attrAndKind;
 
-  AvailabilityConstraint(Kind kind, const AvailableAttr *attr)
-      : kind(kind), attr(attr) {};
+  AvailabilityConstraint(Kind kind, SemanticAvailableAttr attr)
+      : attrAndKind(attr, kind) {};
 
 public:
   static AvailabilityConstraint
-  forAlwaysUnavailable(const AvailableAttr *attr) {
+  forAlwaysUnavailable(SemanticAvailableAttr attr) {
     return AvailabilityConstraint(Kind::AlwaysUnavailable, attr);
   }
 
-  static AvailabilityConstraint forObsoleted(const AvailableAttr *attr) {
+  static AvailabilityConstraint forObsoleted(SemanticAvailableAttr attr) {
     return AvailabilityConstraint(Kind::Obsoleted, attr);
   }
 
-  static AvailabilityConstraint forRequiresVersion(const AvailableAttr *attr) {
+  static AvailabilityConstraint forRequiresVersion(SemanticAvailableAttr attr) {
     return AvailabilityConstraint(Kind::RequiresVersion, attr);
   }
 
   static AvailabilityConstraint
-  forIntroducedInNewerVersion(const AvailableAttr *attr) {
+  forIntroducedInNewerVersion(SemanticAvailableAttr attr) {
     return AvailabilityConstraint(Kind::IntroducedInNewerVersion, attr);
   }
 
-  Kind getKind() const { return kind; }
-  const AvailableAttr *getAttr() const { return attr; }
+  Kind getKind() const { return attrAndKind.getInt(); }
+  SemanticAvailableAttr getAttr() const {
+    return static_cast<SemanticAvailableAttr>(attrAndKind.getPointer());
+  }
+
+  /// Returns the domain that the constraint applies to.
+  AvailabilityDomain getDomain() const { return getAttr().getDomain(); }
 
   /// Returns the platform that this constraint applies to, or
   /// `PlatformKind::none` if it is not platform specific.

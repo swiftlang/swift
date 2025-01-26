@@ -301,6 +301,11 @@ public:
                Constraint *constraint);
 
   void reset();
+
+  void dump(ConstraintSystem &CS,
+            TypeVariableType *TypeVar,
+            llvm::raw_ostream &out,
+            unsigned indent) const;
 };
 
 
@@ -567,64 +572,27 @@ public:
   ///
   /// \param inferredBindings The set of all bindings inferred for type
   /// variables in the workset.
-  void inferTransitiveBindings(
-      const llvm::SmallDenseMap<TypeVariableType *, BindingSet>
-          &inferredBindings);
+  void inferTransitiveBindings();
 
   /// Detect subtype, conversion or equivalence relationship
   /// between two type variables and attempt to propagate protocol
   /// requirements down the subtype or equivalence chain.
-  void inferTransitiveProtocolRequirements(
-      llvm::SmallDenseMap<TypeVariableType *, BindingSet> &inferredBindings);
+  void inferTransitiveProtocolRequirements();
 
   /// Finalize binding computation for this type variable by
   /// inferring bindings from context e.g. transitive bindings.
   ///
   /// \returns true if finalization successful (which makes binding set viable),
   /// and false otherwise.
-  bool finalize(
-      llvm::SmallDenseMap<TypeVariableType *, BindingSet> &inferredBindings);
+  bool finalize(bool transitive);
 
   static BindingScore formBindingScore(const BindingSet &b);
 
-  /// Compare two sets of bindings, where \c x < y indicates that
-  /// \c x is a better set of bindings that \c y.
-  friend bool operator<(const BindingSet &x, const BindingSet &y) {
-    auto xScore = formBindingScore(x);
-    auto yScore = formBindingScore(y);
+  bool operator==(const BindingSet &other);
 
-    if (xScore < yScore)
-      return true;
-
-    if (yScore < xScore)
-      return false;
-
-    auto xDefaults = x.getNumViableDefaultableBindings();
-    auto yDefaults = y.getNumViableDefaultableBindings();
-
-    // If there is a difference in number of default types,
-    // prioritize bindings with fewer of them.
-    if (xDefaults != yDefaults)
-      return xDefaults < yDefaults;
-
-    // If neither type variable is a "hole" let's check whether
-    // there is a subtype relationship between them and prefer
-    // type variable which represents superclass first in order
-    // for "subtype" type variable to attempt more bindings later.
-    // This is required because algorithm can't currently infer
-    // bindings for subtype transitively through superclass ones.
-    if (!(std::get<0>(xScore) && std::get<0>(yScore))) {
-      if (x.Info.isSubtypeOf(y.getTypeVariable()))
-        return false;
-
-      if (y.Info.isSubtypeOf(x.getTypeVariable()))
-        return true;
-    }
-
-    // As a last resort, let's check if the bindings are
-    // potentially incomplete, and if so, let's de-prioritize them.
-    return x.isPotentiallyIncomplete() < y.isPotentiallyIncomplete();
-  }
+  /// Compare two sets of bindings, where \c this < other indicates that
+  /// \c this is a better set of bindings that \c other.
+  bool operator<(const BindingSet &other);
 
   void dump(llvm::raw_ostream &out, unsigned indent) const;
 

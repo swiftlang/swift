@@ -750,14 +750,15 @@ unwrapPropertyWrapperParameterTypes(ConstraintSystem &cs, AbstractFunctionDecl *
       continue;
     }
 
-    auto *wrappedType = cs.createTypeVariable(cs.getConstraintLocator(locator), 0);
+    auto *loc = cs.getConstraintLocator(locator);
+    auto *wrappedType = cs.createTypeVariable(loc, 0);
     auto paramType = paramTypes[i].getParameterType();
     auto paramLabel = paramTypes[i].getLabel();
     auto paramInternalLabel = paramTypes[i].getInternalLabel();
     adjustedParamTypes.push_back(AnyFunctionType::Param(
         wrappedType, paramLabel, ParameterTypeFlags(), paramInternalLabel));
     cs.applyPropertyWrapperToParameter(paramType, wrappedType, paramDecl, argLabel,
-                                       ConstraintKind::Equal, locator);
+                                       ConstraintKind::Equal, loc, loc);
   }
 
   return FunctionType::get(adjustedParamTypes, functionType->getResult(),
@@ -1833,11 +1834,15 @@ Type ConstraintSystem::getEffectiveOverloadType(ConstraintLocator *locator,
           type, var, useDC, GetClosureType{*this},
           ClosureIsolatedByPreconcurrency{*this});
     } else if (isa<AbstractFunctionDecl>(decl) || isa<EnumElementDecl>(decl)) {
-      if (decl->isInstanceMember() &&
-          (!overload.getBaseType() ||
-           (!overload.getBaseType()->getAnyNominal() &&
-            !overload.getBaseType()->is<ExistentialType>())))
-        return Type();
+      if (decl->isInstanceMember()) {
+        auto baseTy = overload.getBaseType();
+        if (!baseTy)
+          return Type();
+
+        baseTy = baseTy->getRValueType();
+        if (!baseTy->getAnyNominal() && !baseTy->is<ExistentialType>())
+          return Type();
+      }
 
       // Cope with 'Self' returns.
       if (!decl->getDeclContext()->getSelfProtocolDecl()) {

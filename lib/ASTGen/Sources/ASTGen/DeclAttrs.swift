@@ -111,6 +111,10 @@ extension ASTGenVisitor {
       let attrName = identTy.name.rawText
       let attrKind = BridgedDeclAttrKind(from: attrName.bridged)
       switch attrKind {
+      case .execution:
+        return handle(self.generateExecutionAttr(attribute: node)?.asDeclAttribute)
+      case .ABI:
+        return handle(self.generateABIAttr(attribute: node)?.asDeclAttribute)
       case .alignment:
         return handle(self.generateAlignmentAttr(attribute: node)?.asDeclAttribute)
       case .allowFeatureSuppression:
@@ -164,8 +168,6 @@ extension ASTGenVisitor {
         return handle(self.generateProjectedValuePropertyAttr(attribute: node)?.asDeclAttribute)
       case .rawLayout:
         fatalError("unimplemented")
-      case .safe:
-        fatalError("unimplemented")
       case .section:
         return handle(self.generateSectionAttr(attribute: node)?.asDeclAttribute)
       case .semantics:
@@ -189,6 +191,7 @@ extension ASTGenVisitor {
 
       // Simple attributes.
       case .addressableSelf,
+        .addressableForDependencies,
         .alwaysEmitConformanceMetadata,
         .alwaysEmitIntoClient,
         .atReasync,
@@ -249,6 +252,7 @@ extension ASTGenVisitor {
         .propertyWrapper,
         .requiresStoredPropertyInits,
         .resultBuilder,
+        .safe,
         .sendable,
         .sensitive,
         .spiOnly,
@@ -326,6 +330,79 @@ extension ASTGenVisitor {
     }
 
     return handle(self.generateCustomAttr(attribute: node)?.asDeclAttribute)
+  }
+
+  /// E.g.:
+  ///   ```
+  ///   @execution(concurrent)
+  ///   @execution(caller)
+  ///   ```
+  func generateExecutionAttr(attribute node: AttributeSyntax) -> BridgedExecutionAttr? {
+    let behavior: BridgedExecutionKind? = self.generateSingleAttrOption(
+      attribute: node,
+      {
+        switch $0.rawText {
+        case "concurrent": return .concurrent
+        case "caller": return .caller
+        default: return nil
+        }
+      }
+    )
+    guard let behavior else {
+      return nil
+    }
+    return .createParsed(
+      self.ctx,
+      atLoc: self.generateSourceLoc(node.atSign),
+      range: self.generateAttrSourceRange(node),
+      behavior: behavior
+    )
+  }
+
+  /// E.g.:
+  ///   ```
+  ///   @abi(func fn())
+  ///   ```
+  func generateABIAttr(attribute node: AttributeSyntax) -> BridgedABIAttr? {
+    guard
+      let arg = node.arguments?.as(ABIAttributeArgumentsSyntax.self)
+    else {
+      // TODO: diagnose
+      return nil
+    }
+
+    let abiDecl: BridgedDecl?
+    switch arg.provider {
+    case .associatedType(let assocTyDecl):
+      abiDecl = self.generate(associatedTypeDecl: assocTyDecl)?.asDecl
+    case .deinitializer(let deinitDecl):
+      abiDecl = self.generate(deinitializerDecl: deinitDecl).asDecl
+    case .enumCase(let caseDecl):
+      abiDecl = self.generate(enumCaseDecl: caseDecl).asDecl
+    case .function(let funcDecl):
+      abiDecl = self.generate(functionDecl: funcDecl)?.asDecl
+    case .initializer(let initDecl):
+      abiDecl = self.generate(initializerDecl: initDecl).asDecl
+    case .`subscript`(let subscriptDecl):
+      abiDecl = self.generate(subscriptDecl: subscriptDecl).asDecl
+    case .typeAlias(let typealiasDecl):
+      abiDecl = self.generate(typeAliasDecl: typealiasDecl)?.asDecl
+    case .variable(let varDecl):
+      abiDecl = self.generate(variableDecl: varDecl).asDecl
+    case .missing(_):
+      // This error condition will have been diagnosed in SwiftSyntax.
+      abiDecl = nil
+    }
+
+    // TODO: Diagnose if `abiDecl` has a body/initial value/etc.
+    // The C++ parser considers it syntactically invalid but SwiftSyntax does not.
+
+    return .createParsed(
+      self.ctx,
+      atLoc: self.generateSourceLoc(node.atSign),
+      range: self.generateAttrSourceRange(node),
+      abiDecl: abiDecl.asNullable
+    )
   }
 
   /// E.g.:

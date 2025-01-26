@@ -31,6 +31,11 @@
 # TODO: /LICENSE.txt
 # TODO: /README.md
 
+# Runtimes
+/Runtimes/**/CMakeLists.txt                @etcwilde @compnerd @edymtt @justice-adams-apple
+/Runtimes/**/*.cmake                       @etcwilde @compnerd @edymtt @justice-adams-apple
+/Runtimes/Core/cmake/caches/Vendors/Apple/ @etcwilde @shahmishal @edymtt @justice-adams-apple
+
 # SwiftCompilerSources
 /SwiftCompilerSources                     @eeckstein
 
@@ -66,7 +71,16 @@
 /include/swift/AST/*Protocol*                      @hborla @slavapestov
 /include/swift/AST/*Requirement*                   @hborla @slavapestov
 /include/swift/AST/*Substitution*                  @slavapestov
+/include/swift/AST/DiagnosticGroup*                @DougGregor
+/include/swift/AST/DiagnosticsClangImporter.def    @zoecarver @hyp @egorzhdan @beccadax @ian-twilightcoder @Xazax-hun
+/include/swift/AST/DiagnosticsDriver.def           @artemcm
+/include/swift/AST/DiagnosticsFrontend.def         @artemcm @tshortli
+/include/swift/AST/DiagnosticsIDE.def              @ahoppen @bnbarham @hamishknight @rintaro
+/include/swift/AST/DiagnosticsIRGen.def            @rjmccall
+/include/swift/AST/DiagnosticsModuleDiffer.def     @nkcsgexi
 /include/swift/AST/DiagnosticsParse.def            @ahoppen @bnbarham @CodaFi @DougGregor @hamishknight @rintaro
+/include/swift/AST/DiagnosticsRefactoring.def      @ahoppen @bnbarham @hamishknight @rintaro
+/include/swift/AST/DiagnosticsSIL.def              @jckarter
 /include/swift/AST/Evaluator*                      @CodaFi @slavapestov
 /include/swift/Basic/                              @DougGregor
 /include/swift/Basic/Features.def                  @DougGregor @hborla
@@ -158,6 +172,7 @@
 /lib/Sema/Constraint*                               @hborla @xedin
 /lib/Sema/DerivedConformance*                       @slavapestov
 /lib/Sema/DerivedConformanceDistributed*            @ktoso @slavapestov
+/lib/Sema/OpenedExistentials*                       @AnthonyLatsis @slavapestov
 /lib/Sema/TypeCheckDistributed*                     @hborla @ktoso @xedin
 /lib/Sema/TypeCheckProtocol*                        @AnthonyLatsis @hborla @slavapestov
 /lib/Sema/TypeCheckType*                            @AnthonyLatsis @hborla @slavapestov @xedin

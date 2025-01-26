@@ -301,8 +301,7 @@ private func rewriteApplyInstruction(using specializedCallee: Function, callSite
     }
   }
 
-  oldApply.uses.replaceAll(with: newApply, context)
-  context.erase(instruction: oldApply)
+  oldApply.replace(with: newApply, context)
 }
 
 // ===================== Utility functions and extensions ===================== //
@@ -501,6 +500,12 @@ private func handleApplies(for rootClosure: SingleValueInstruction, callSiteMap:
     }
 
     guard let callee = pai.referencedFunction else {
+      continue
+    }
+
+    // Workaround for a problem with OSSA: https://github.com/swiftlang/swift/issues/78847
+    // TODO: remove this if-statement once the underlying problem is fixed.
+    if callee.hasOwnership {
       continue
     }
 

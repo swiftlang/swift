@@ -285,10 +285,35 @@ func checkAsync() async {
     await invoke { try await impl.nonMatching_f1(false) }
 }
 
+enum MyError: Error {
+    case x
+    case y
+}
+
+protocol AsyncGenProto<A> {
+  associatedtype A
+  func fn(arg: Int) async throws(MyError) -> A
+}
+
+@inline(never)
+func callAsyncIndirectResult<A>(p: any AsyncGenProto<A>, x: Int) async throws(MyError) -> A {
+  return try await p.fn(arg: x)
+}
+
+
+struct AsyncGenProtoImpl: AsyncGenProto {
+    func fn(arg: Int) async throws(MyError) -> Int {
+        print("Arg is \(arg)")
+        return arg
+    }
+}
+
 @main
 public struct Main {
     public static func main() async {
         await checkSync()
         await checkAsync()
+        // CHECK: Arg is 10
+        print(try! await callAsyncIndirectResult(p: AsyncGenProtoImpl(), x: 10))
     }
 }

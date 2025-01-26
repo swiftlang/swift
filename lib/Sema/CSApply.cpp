@@ -188,6 +188,15 @@ Solution::resolveConcreteDeclRef(ValueDecl *decl,
   return ConcreteDeclRef(decl, subst);
 }
 
+SelectedOverload
+Solution::getCalleeOverloadChoice(ConstraintLocator *locator) const {
+  return getOverloadChoice(getCalleeLocator(locator));
+}
+
+std::optional<SelectedOverload>
+Solution::getCalleeOverloadChoiceIfAvailable(ConstraintLocator *locator) const {
+  return getOverloadChoiceIfAvailable(getCalleeLocator(locator));
+}
 
 ConstraintLocator *Solution::getCalleeLocator(ConstraintLocator *locator,
                                               bool lookThroughApply) const {
@@ -1005,8 +1014,14 @@ namespace {
       auto *env = record.Archetype->getGenericEnvironment();
 
       if (resultTy->hasLocalArchetypeFromEnvironment(env)) {
-        Type erasedTy = typeEraseOpenedArchetypesFromEnvironment(
-            resultTy, env);
+        Type erasedTy = typeEraseOpenedArchetypesFromEnvironment(resultTy, env);
+        ASSERT(erasedTy.getPointer() != resultTy.getPointer());
+
+        // We currently cannot keep lvalueness if the object type changed.
+        if (auto *lvalueTy = dyn_cast<LValueType>(erasedTy.getPointer())) {
+          erasedTy = lvalueTy->getObjectType();
+        }
+
         auto range = result->getSourceRange();
         result = coerceToType(result, erasedTy, locator);
         // FIXME: Implement missing tuple-to-tuple conversion
@@ -1184,8 +1199,8 @@ namespace {
         calleeFnTy = calleeFnTy->getResult()->castTo<FunctionType>();
       }
 
-      const auto &appliedPropertyWrappers =
-          solution.appliedPropertyWrappers[locator.getAnchor()];
+      auto appliedPropertyWrappers =
+          solution.getAppliedPropertyWrappers(locator.getAnchor());
       const auto calleeDeclRef = resolveConcreteDeclRef(
           dyn_cast<AbstractFunctionDecl>(declOrClosure), locator);
 
@@ -1710,7 +1725,16 @@ namespace {
         // pass it as an inout qualified type.
         auto selfParamTy = isDynamic ? selfTy : containerTy;
 
-        if (selfTy->isEqual(baseTy))
+        // If type equality check fails we need to check whether the types
+        // are the same with deep equality restriction since `any Sendable`
+        // to `Any` conversion is now supported in generic argument positions
+        // of @preconcurrency declarations. i.e. referencing a member on
+        // `[any Sendable]` if member declared in an extension that expects
+        // `Element` to be equal to `Any`.
+        if (selfTy->isEqual(baseTy) ||
+            solution.getConversionRestriction(baseTy->getCanonicalType(),
+                                              selfTy->getCanonicalType()) ==
+                ConversionRestrictionKind::DeepEquality)
           if (cs.getType(base)->is<LValueType>())
             selfParamTy = InOutType::get(selfTy);
 
@@ -2313,8 +2337,8 @@ namespace {
                                   ->castTo<FunctionType>();
       auto fullSubscriptTy = openedFullFnType->getResult()
                                   ->castTo<FunctionType>();
-      auto &appliedWrappers =
-          solution.appliedPropertyWrappers[memberLoc->getAnchor()];
+      auto appliedWrappers =
+          solution.getAppliedPropertyWrappers(memberLoc->getAnchor());
       args = coerceCallArguments(
           args, fullSubscriptTy, subscriptRef, nullptr,
           locator.withPathElement(ConstraintLocator::ApplyArgument),
@@ -3777,23 +3801,29 @@ namespace {
     /// "Finish" an array expression by filling in the semantic expression.
     ArrayExpr *finishArrayExpr(ArrayExpr *expr) {
       Type arrayTy = cs.getType(expr);
+      Type elementType;
 
-      ProtocolDecl *arrayProto = TypeChecker::getProtocol(
-          ctx, expr->getLoc(), KnownProtocolKind::ExpressibleByArrayLiteral);
-      assert(arrayProto && "type-checked array literal w/o protocol?!");
+      if (arrayTy->isSlab()) {
+        // <let count: Int, Element>
+        elementType = arrayTy->castTo<BoundGenericStructType>()->getGenericArgs()[1];
+      } else {
+        ProtocolDecl *arrayProto = TypeChecker::getProtocol(
+            ctx, expr->getLoc(), KnownProtocolKind::ExpressibleByArrayLiteral);
+        assert(arrayProto && "type-checked array literal w/o protocol?!");
 
-      auto conformance = checkConformance(arrayTy, arrayProto);
-      assert(conformance && "Type does not conform to protocol?");
+        auto conformance = checkConformance(arrayTy, arrayProto);
+        assert(conformance && "Type does not conform to protocol?");
 
-      DeclName name(ctx, DeclBaseName::createConstructor(),
-                    {ctx.Id_arrayLiteral});
-      ConcreteDeclRef witness =
-          conformance.getWitnessByName(arrayTy->getRValueType(), name);
-      if (!witness || !isa<AbstractFunctionDecl>(witness.getDecl()))
-        return nullptr;
-      expr->setInitializer(witness);
+        DeclName name(ctx, DeclBaseName::createConstructor(),
+                      {ctx.Id_arrayLiteral});
+        ConcreteDeclRef witness =
+            conformance.getWitnessByName(arrayTy->getRValueType(), name);
+        if (!witness || !isa<AbstractFunctionDecl>(witness.getDecl()))
+          return nullptr;
+        expr->setInitializer(witness);
 
-      auto elementType = expr->getElementType();
+        elementType = expr->getElementType();
+      }
 
       for (unsigned i = 0, n = expr->getNumElements(); i != n; ++i) {
         expr->setElement(
@@ -5463,11 +5493,6 @@ namespace {
       llvm_unreachable("Handled by the walker directly");
     }
 
-    Expr *visitOneWayExpr(OneWayExpr *E) {
-      auto type = simplifyType(cs.getType(E));
-      return coerceToType(E->getSubExpr(), type, cs.getConstraintLocator(E));
-    }
-
     Expr *visitTapExpr(TapExpr *E) {
       auto type = simplifyType(cs.getType(E));
 
@@ -6280,6 +6305,7 @@ ArgumentList *ExprRewriter::coerceCallArguments(
       auto *paramDecl = getParameterAt(callee, paramIdx);
       assert(paramDecl);
 
+      ASSERT(appliedWrapperIndex < appliedPropertyWrappers.size());
       auto appliedWrapper = appliedPropertyWrappers[appliedWrapperIndex++];
       auto wrapperType = solution.simplifyType(appliedWrapper.wrapperType);
       auto initKind = appliedWrapper.initKind;
@@ -6782,7 +6808,7 @@ Expr *ExprRewriter::buildCollectionUpcastExpr(
                                  bridged, locator, 0);
 
   // For single-parameter collections, form the upcast.
-  if (toType->isArrayType() || ConstraintSystem::isSetType(toType)) {
+  if (toType->isArray() || ConstraintSystem::isSetType(toType)) {
     return cs.cacheType(
               new (ctx) CollectionUpcastConversionExpr(expr, toType, {}, conv));
   }
@@ -6807,7 +6833,7 @@ Expr *ExprRewriter::buildObjCBridgeExpr(Expr *expr, Type toType,
 
   // Bridged collection casts always succeed, so we treat them as
   // collection "upcasts".
-  if ((fromType->isArrayType() && toType->isArrayType())
+  if ((fromType->isArray() && toType->isArray())
       || (ConstraintSystem::isDictionaryType(fromType)
           && ConstraintSystem::isDictionaryType(toType))
       || (ConstraintSystem::isSetType(fromType)
@@ -7032,6 +7058,18 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
             }
           }
         }
+      }
+
+      // `any Sendable` -> `Any` conversion is allowed in generic
+      // argument positions.
+      {
+        auto erasedFromType = fromType->stripConcurrency(
+            /*recursive=*/true, /*dropGlobalActor=*/false);
+        auto erasedToType = toType->stripConcurrency(
+            /*recursive=*/true, /*dropGlobalActor=*/false);
+
+        if (erasedFromType->isEqual(erasedToType))
+          return cs.cacheType(new (ctx) UnsafeCastExpr(expr, toType));
       }
 
       auto &err = llvm::errs();
@@ -7362,13 +7400,42 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
   // coercion.
   case TypeKind::LValue: {
     auto fromLValue = cast<LValueType>(desugaredFromType);
+
+    auto injectUnsafeLValueCast = [&](Type fromObjType,
+                                      Type toObjType) -> Expr * {
+      auto restriction = solution.getConversionRestriction(
+          fromObjType->getCanonicalType(), toObjType->getCanonicalType());
+      ASSERT(restriction == ConversionRestrictionKind::DeepEquality);
+      return cs.cacheType(
+          new (ctx) ABISafeConversionExpr(expr, LValueType::get(toObjType)));
+    };
+
+    // @lvalue <A> -> @lvalue <B> is only allowed if there is a
+    // deep equality conversion restriction between the types.
+    // This supports `any Sendable` -> `Any` conversion in generic
+    // argument positions.
+    if (auto *toLValue = toType->getAs<LValueType>()) {
+      return injectUnsafeLValueCast(fromLValue->getObjectType(),
+                                    toLValue->getObjectType());
+    }
+
     auto toIO = toType->getAs<InOutType>();
     if (!toIO)
       return coerceToType(cs.addImplicitLoadExpr(expr), toType, locator);
 
+    // @lvalue <A> -> inout <B> has to use an unsafe cast <A> -> <B>:
+    // @lvalue <A> <cast to> @lvalue B -> inout B.
+    //
+    // This can happen due to any Sendable -> Any conversion in generic
+    // argument positions. We need to inject a cast to get @l-value to
+    // match `inout` type exactly.
+    if (!toIO->getObjectType()->isEqual(fromLValue->getObjectType())) {
+      expr = injectUnsafeLValueCast(fromLValue->getObjectType(),
+                                    toIO->getObjectType());
+    }
+
     // In an 'inout' operator like "i += 1", the operand is converted from
     // an implicit lvalue to an inout argument.
-    assert(toIO->getObjectType()->isEqual(fromLValue->getObjectType()));
     return cs.cacheType(new (ctx) InOutExpr(expr->getStartLoc(), expr,
                                             toIO->getObjectType(),
                                             /*isImplicit*/ true));
@@ -7935,24 +8002,7 @@ ExprRewriter::coerceSelfArgumentToType(Expr *expr,
                                        Type baseTy, ValueDecl *member,
                                        ConstraintLocatorBuilder locator) {
   Type toType = adjustSelfTypeForMember(expr, baseTy, member, dc);
-
-  // If our expression already has the right type, we're done.
-  Type fromType = cs.getType(expr);
-  if (fromType->isEqual(toType))
-    return expr;
-
-  // If we're coercing to an rvalue type, just do it.
-  auto toInOutTy = toType->getAs<InOutType>();
-  if (!toInOutTy)
-    return coerceToType(expr, toType, locator);
-
-  assert(fromType->is<LValueType>() && "Can only convert lvalues to inout");
-
-  // Use InOutExpr to convert it to an explicit inout argument for the
-  // receiver.
-  return cs.cacheType(new (ctx) InOutExpr(expr->getStartLoc(), expr, 
-                                          toInOutTy->getInOutObjectType(),
-                                          /*isImplicit*/ true));
+  return coerceToType(expr, toType, locator);
 }
 
 Expr *ExprRewriter::convertLiteralInPlace(
@@ -8161,7 +8211,8 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
         // Resolve into a DynamicTypeExpr.
         auto args = apply->getArgs();
 
-        auto &appliedWrappers = solution.appliedPropertyWrappers[calleeLocator.getAnchor()];
+        auto appliedWrappers = solution.getAppliedPropertyWrappers(
+            calleeLocator.getAnchor());
         auto fnType = cs.getType(fn)->getAs<FunctionType>();
         args = coerceCallArguments(
             args, fnType, declRef, apply,
@@ -8357,7 +8408,9 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
   // For function application, convert the argument to the input type of
   // the function.
   if (auto fnType = cs.getType(fn)->getAs<FunctionType>()) {
-    auto &appliedWrappers = solution.appliedPropertyWrappers[calleeLocator.getAnchor()];
+    auto appliedWrappers = solution.getAppliedPropertyWrappers(
+        calleeLocator.getAnchor());
+
     args = coerceCallArguments(
         args, fnType, callee, apply,
         locator.withPathElement(ConstraintLocator::ApplyArgument),
@@ -8591,7 +8644,8 @@ static std::pair<Expr *, unsigned> getPrecedenceParentAndIndex(
   // have no effect on precedence; they will associate the same with any parent
   // operator as their sub-expression would.
   while (isa<UnresolvedMemberChainResultExpr>(parent) ||
-         isa<AnyTryExpr>(parent) || isa<AwaitExpr>(parent)) {
+         isa<AnyTryExpr>(parent) || isa<AwaitExpr>(parent) ||
+         isa<UnsafeExpr>(parent)) {
     expr = parent;
     parent = getParent(parent);
     if (!parent)
@@ -9234,9 +9288,9 @@ applySolutionToInitialization(SyntacticElementTarget target, Expr *initializer,
 }
 
 static std::optional<SequenceIterationInfo>
-applySolutionToForEachStmt(ForEachStmt *stmt, SequenceIterationInfo info,
-                           DeclContext *dc,
-                           SyntacticElementTargetRewriter &rewriter) {
+applySolutionToForEachStmtPreamble(ForEachStmt *stmt,
+                                   SequenceIterationInfo info, DeclContext *dc,
+                                   SyntacticElementTargetRewriter &rewriter) {
   auto &solution = rewriter.getSolution();
   auto &cs = solution.getConstraintSystem();
   auto &ctx = cs.getASTContext();
@@ -9361,23 +9415,12 @@ applySolutionToForEachStmt(ForEachStmt *stmt, SequenceIterationInfo info,
          "Couldn't find sequence conformance");
   stmt->setSequenceConformance(type, sequenceConformance);
 
-  // Apply the solution to the filtering condition, if there is one.
-  if (auto *whereExpr = stmt->getWhere()) {
-    auto whereTarget = *cs.getTargetFor(whereExpr);
-
-    auto rewrittenTarget = rewriter.rewriteTarget(whereTarget);
-    if (!rewrittenTarget)
-      return std::nullopt;
-
-    stmt->setWhere(rewrittenTarget->getAsExpr());
-  }
-
   return info;
 }
 
 static std::optional<PackIterationInfo>
-applySolutionToForEachStmt(ForEachStmt *stmt, PackIterationInfo info,
-                           SyntacticElementTargetRewriter &rewriter) {
+applySolutionToForEachStmtPreamble(ForEachStmt *stmt, PackIterationInfo info,
+                                   SyntacticElementTargetRewriter &rewriter) {
   auto &solution = rewriter.getSolution();
   auto &cs = solution.getConstraintSystem();
   auto *sequenceExpr = stmt->getParsedSequence();
@@ -9399,8 +9442,8 @@ applySolutionToForEachStmt(ForEachStmt *stmt, PackIterationInfo info,
 ///
 /// \returns the resulting initialization expression.
 static std::optional<SyntacticElementTarget>
-applySolutionToForEachStmt(SyntacticElementTarget target,
-                           SyntacticElementTargetRewriter &rewriter) {
+applySolutionToForEachStmtPreamble(SyntacticElementTarget target,
+                                   SyntacticElementTargetRewriter &rewriter) {
   auto resultTarget = target;
   auto &forEachStmtInfo = resultTarget.getForEachStmtInfo();
   auto *stmt = target.getAsForEachStmt();
@@ -9408,7 +9451,7 @@ applySolutionToForEachStmt(SyntacticElementTarget target,
   Type rewrittenPatternType;
 
   if (auto *info = forEachStmtInfo.dyn_cast<SequenceIterationInfo>()) {
-    auto resultInfo = applySolutionToForEachStmt(
+    auto resultInfo = applySolutionToForEachStmtPreamble(
         stmt, *info, target.getDeclContext(), rewriter);
     if (!resultInfo) {
       return std::nullopt;
@@ -9417,7 +9460,7 @@ applySolutionToForEachStmt(SyntacticElementTarget target,
     forEachStmtInfo = *resultInfo;
     rewrittenPatternType = resultInfo->initType;
   } else {
-    auto resultInfo = applySolutionToForEachStmt(
+    auto resultInfo = applySolutionToForEachStmtPreamble(
         stmt, forEachStmtInfo.get<PackIterationInfo>(), rewriter);
     if (!resultInfo) {
       return std::nullopt;
@@ -9651,11 +9694,12 @@ ExprWalker::rewriteTarget(SyntacticElementTarget target) {
 
     return std::nullopt;
   } else if (auto *forEach = target.getAsForEachStmt()) {
-    auto forEachResultTarget = applySolutionToForEachStmt(target, *this);
-    if (!forEachResultTarget)
+    auto forEachPreambleResultTarget =
+        applySolutionToForEachStmtPreamble(target, *this);
+    if (!forEachPreambleResultTarget)
       return std::nullopt;
 
-    result = *forEachResultTarget;
+    result = *forEachPreambleResultTarget;
   } else {
     auto fn = *target.getAsFunction();
     if (rewriteFunction(fn))

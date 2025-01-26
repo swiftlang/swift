@@ -27,6 +27,7 @@
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/AST/DiagnosticsClangImporter.h"
 #include "swift/AST/DiagnosticsSema.h"
+#include "swift/AST/Evaluator.h"
 #include "swift/AST/IRGenOptions.h"
 #include "swift/AST/ImportCache.h"
 #include "swift/AST/LinkLibrary.h"
@@ -41,6 +42,7 @@
 #include "swift/AST/Types.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/Defer.h"
+#include "swift/Basic/LLVM.h"
 #include "swift/Basic/Platform.h"
 #include "swift/Basic/Range.h"
 #include "swift/Basic/SourceLoc.h"
@@ -188,38 +190,22 @@ namespace {
   };
 
   class ParsingAction : public clang::ASTFrontendAction {
-    ASTContext &Ctx;
     ClangImporter &Importer;
     ClangImporter::Implementation &Impl;
     const ClangImporterOptions &ImporterOpts;
     std::string SwiftPCHHash;
   public:
-    explicit ParsingAction(ASTContext &ctx,
-                           ClangImporter &importer,
+    explicit ParsingAction(ClangImporter &importer,
                            ClangImporter::Implementation &impl,
                            const ClangImporterOptions &importerOpts,
                            std::string swiftPCHHash)
-      : Ctx(ctx), Importer(importer), Impl(impl), ImporterOpts(importerOpts),
+      : Importer(importer), Impl(impl), ImporterOpts(importerOpts),
         SwiftPCHHash(swiftPCHHash) {}
     std::unique_ptr<clang::ASTConsumer>
     CreateASTConsumer(clang::CompilerInstance &CI, StringRef InFile) override {
       return std::make_unique<HeaderParsingASTConsumer>(Impl);
     }
     bool BeginSourceFileAction(clang::CompilerInstance &CI) override {
-      // Prefer frameworks over plain headers.
-      // We add search paths here instead of when building the initial invocation
-      // so that (a) we use the same code as search paths for imported modules,
-      // and (b) search paths are always added after -Xcc options.
-      SearchPathOptions &searchPathOpts = Ctx.SearchPathOpts;
-      for (const auto &framepath : searchPathOpts.getFrameworkSearchPaths()) {
-        Importer.addSearchPath(framepath.Path, /*isFramework*/true,
-                               framepath.IsSystem);
-      }
-
-      for (const auto &path : searchPathOpts.getImportSearchPaths()) {
-        Importer.addSearchPath(path, /*isFramework*/false, /*isSystem=*/false);
-      }
-
       auto PCH =
           Importer.getOrCreatePCH(ImporterOpts, SwiftPCHHash, /*Cached=*/true);
       if (PCH.has_value()) {
@@ -580,7 +566,8 @@ void importer::getNormalInvocationArguments(
     }
   }
 
-  if (LangOpts.hasFeature(Feature::SafeInteropWrappers))
+  if (LangOpts.hasFeature(Feature::SafeInteropWrappers) &&
+      !LangOpts.EnableCXXInterop)
     invocationArgStrs.push_back("-fexperimental-bounds-safety-attributes");
 
   // Set C language options.
@@ -890,19 +877,19 @@ importer::addCommonInvocationArguments(
     }
   }
 
-  if (std::optional<StringRef> R = ctx.SearchPathOpts.getWinSDKRoot()) {
+  if (std::optional<StringRef> R = searchPathOpts.getWinSDKRoot()) {
     invocationArgStrs.emplace_back("-Xmicrosoft-windows-sdk-root");
     invocationArgStrs.emplace_back(*R);
   }
-  if (std::optional<StringRef> V = ctx.SearchPathOpts.getWinSDKVersion()) {
+  if (std::optional<StringRef> V = searchPathOpts.getWinSDKVersion()) {
     invocationArgStrs.emplace_back("-Xmicrosoft-windows-sdk-version");
     invocationArgStrs.emplace_back(*V);
   }
-  if (std::optional<StringRef> R = ctx.SearchPathOpts.getVCToolsRoot()) {
+  if (std::optional<StringRef> R = searchPathOpts.getVCToolsRoot()) {
     invocationArgStrs.emplace_back("-Xmicrosoft-visualc-tools-root");
     invocationArgStrs.emplace_back(*R);
   }
-  if (std::optional<StringRef> V = ctx.SearchPathOpts.getVCToolsVersion()) {
+  if (std::optional<StringRef> V = searchPathOpts.getVCToolsVersion()) {
     invocationArgStrs.emplace_back("-Xmicrosoft-visualc-tools-version");
     invocationArgStrs.emplace_back(*V);
   }
@@ -947,6 +934,24 @@ importer::addCommonInvocationArguments(
 
   for (auto extraArg : importerOpts.ExtraArgs) {
     invocationArgStrs.push_back(extraArg);
+  }
+
+  for (const auto &framepath : searchPathOpts.getFrameworkSearchPaths()) {
+    if (framepath.IsSystem) {
+      invocationArgStrs.push_back("-iframework");
+      invocationArgStrs.push_back(framepath.Path);
+    } else {
+      invocationArgStrs.push_back("-F" + framepath.Path);
+    }
+  }
+
+  for (const auto &path : searchPathOpts.getImportSearchPaths()) {
+    if (path.IsSystem) {
+      invocationArgStrs.push_back("-isystem");
+      invocationArgStrs.push_back(path.Path);
+    } else {
+      invocationArgStrs.push_back("-I" + path.Path);
+    }
   }
 }
 
@@ -1472,7 +1477,7 @@ ClangImporter::create(ASTContext &ctx,
   }
 
   // Create the associated action.
-  importer->Impl.Action.reset(new ParsingAction(ctx, *importer,
+  importer->Impl.Action.reset(new ParsingAction(*importer,
                                                 importer->Impl,
                                                 importerOpts,
                                                 swiftPCHHash));
@@ -4362,10 +4367,8 @@ ModuleDecl *ClangModuleUnit::getOverlayModule() const {
     }
     // If this Clang module is a part of the C++ stdlib, and we haven't loaded
     // the overlay for it so far, it is a split libc++ module (e.g. std_vector).
-    // Load the CxxStdlib overlay explicitly, if building with the
-    // platform-default C++ stdlib.
-    if (!overlay && importer::isCxxStdModule(clangModule) &&
-        Ctx.LangOpts.isUsingPlatformDefaultCXXStdlib()) {
+    // Load the CxxStdlib overlay explicitly.
+    if (!overlay && importer::isCxxStdModule(clangModule)) {
       ImportPath::Module::Builder builder(Ctx.Id_CxxStdlib);
       overlay = owner.loadModule(SourceLoc(), std::move(builder).get());
     }
@@ -5071,6 +5074,7 @@ TinyPtrVector<ValueDecl *> CXXNamespaceMemberLookup::evaluate(
 }
 
 static const llvm::StringMap<std::vector<int>> STLConditionalEscapableParams{
+    {"basic_string", {0}},
     {"vector", {0}},
     {"array", {0}},
     {"inplace_vector", {0}},
@@ -5097,8 +5101,6 @@ static const llvm::StringMap<std::vector<int>> STLConditionalEscapableParams{
     {"multimap", {0, 1}},
     {"flat_multimap", {0, 1}},
     {"unordered_multimap", {0, 1}},
-    {"span", {0}},   // TODO: remove when span is non-escapable by default
-    {"mdspan", {0}}, // TODO: remove when mdspan is non-escapable by default
 };
 
 static std::set<StringRef>
@@ -6147,11 +6149,11 @@ cloneBaseMemberDecl(ValueDecl *decl, DeclContext *newContext) {
 TinyPtrVector<ValueDecl *> ClangRecordMemberLookup::evaluate(
     Evaluator &evaluator, ClangRecordMemberLookupDescriptor desc) const {
   NominalTypeDecl *recordDecl = desc.recordDecl;
+  NominalTypeDecl *inheritingDecl = desc.inheritingDecl;
   DeclName name = desc.name;
-  bool inherited = desc.inherited;
 
   auto &ctx = recordDecl->getASTContext();
-  auto allResults = evaluateOrDefault(
+  auto directResults = evaluateOrDefault(
       ctx.evaluator,
       ClangDirectLookupRequest({recordDecl, recordDecl->getClangDecl(), name}),
       {});
@@ -6159,16 +6161,45 @@ TinyPtrVector<ValueDecl *> ClangRecordMemberLookup::evaluate(
   // Find the results that are actually a member of "recordDecl".
   TinyPtrVector<ValueDecl *> result;
   ClangModuleLoader *clangModuleLoader = ctx.getClangModuleLoader();
-  for (auto found : allResults) {
-    auto named = found.get<clang::NamedDecl *>();
-    if (dyn_cast<clang::Decl>(named->getDeclContext()) ==
-        recordDecl->getClangDecl()) {
-      // Don't import constructors on foreign reference types.
-      if (isa<clang::CXXConstructorDecl>(named) && isa<ClassDecl>(recordDecl))
+  for (auto foundEntry : directResults) {
+    auto found = foundEntry.get<clang::NamedDecl *>();
+    if (dyn_cast<clang::Decl>(found->getDeclContext()) !=
+        recordDecl->getClangDecl())
+      continue;
+
+    // Don't import constructors on foreign reference types.
+    if (isa<clang::CXXConstructorDecl>(found) && isa<ClassDecl>(recordDecl))
+      continue;
+
+    auto imported = clangModuleLoader->importDeclDirectly(found);
+    if (!imported)
+      continue;
+
+    // If this member is found due to inheritance, clone it from the base class
+    // by synthesizing getters and setters.
+    if (inheritingDecl != recordDecl) {
+      imported = clangModuleLoader->importBaseMemberDecl(
+          cast<ValueDecl>(imported), inheritingDecl);
+      if (!imported)
+        continue;
+    }
+    result.push_back(cast<ValueDecl>(imported));
+  }
+
+  if (inheritingDecl != recordDecl) {
+    // For inheritied members, add members that are synthesized eagerly, such as
+    // subscripts. This is not necessary for non-inherited members because those
+    // should already be in the lookup table.
+    for (auto member :
+         cast<NominalTypeDecl>(recordDecl)->getCurrentMembersWithoutLoading()) {
+      auto namedMember = dyn_cast<ValueDecl>(member);
+      if (!namedMember || !namedMember->hasName() ||
+          namedMember->getName().getBaseName() != name)
         continue;
 
-      if (auto import = clangModuleLoader->importDeclDirectly(named))
-        result.push_back(cast<ValueDecl>(import));
+      if (auto imported = clangModuleLoader->importBaseMemberDecl(
+              namedMember, inheritingDecl))
+        result.push_back(cast<ValueDecl>(imported));
     }
   }
 
@@ -6202,48 +6233,19 @@ TinyPtrVector<ValueDecl *> ClangRecordMemberLookup::evaluate(
           continue;
 
         // Add Clang members that are imported lazily.
-        auto baseResults =
-            evaluateOrDefault(ctx.evaluator,
-                              ClangRecordMemberLookup(
-                                  {cast<NominalTypeDecl>(import), name, true}),
-                              {});
-        // Add members that are synthesized eagerly, such as subscripts.
-        for (auto member :
-             cast<NominalTypeDecl>(import)->getCurrentMembersWithoutLoading()) {
-          if (auto namedMember = dyn_cast<ValueDecl>(member)) {
-            if (namedMember->hasName() &&
-                namedMember->getName().getBaseName() == name &&
-                // Make sure we don't add duplicate entries, as that would
-                // wrongly imply that lookup is ambiguous.
-                !llvm::is_contained(baseResults, namedMember)) {
-              baseResults.push_back(namedMember);
-            }
-          }
-        }
+        auto baseResults = evaluateOrDefault(
+            ctx.evaluator,
+            ClangRecordMemberLookup(
+                {cast<NominalTypeDecl>(import), name, inheritingDecl}),
+            {});
+
         for (auto foundInBase : baseResults) {
           // Do not add duplicate entry with the same arity,
           // as that would cause an ambiguous lookup.
           if (foundNameArities.count(getArity(foundInBase)))
             continue;
 
-          // Do not importBaseMemberDecl() if this is a recursive lookup into
-          // some class's superclass. importBaseMemberDecl() caches synthesized
-          // members, which does not work if we call it on its result, e.g.:
-          //
-          //    importBaseMemberDecl(importBaseMemberDecl(foundInBase,
-          //    recorDecl), recordDecl)
-          //
-          // Instead, we simply pass on the imported decl (foundInBase) as is,
-          // so that only the top-most request calls importBaseMemberDecl().
-          if (inherited) {
-            result.push_back(foundInBase);
-            continue;
-          }
-
-          if (auto newDecl = clangModuleLoader->importBaseMemberDecl(
-                  foundInBase, recordDecl)) {
-            result.push_back(newDecl);
-          }
+          result.push_back(foundInBase);
         }
       }
     }

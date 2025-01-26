@@ -610,6 +610,13 @@ namespace swift {
     /// from source.
     bool AllowNonResilientAccess = false;
 
+    /// When Package CMO is enabled, deserialization checks are done to
+    /// ensure that the members of a decl are correctly deserialized to maintain
+    /// proper layout. This ensures that bypassing resilience is safe. Accessing
+    /// an incorrectly laid-out decl directly can lead to runtime crashes. This flag
+    /// should only be used temporarily during migration to enable Package CMO.
+    bool SkipDeserializationChecksForPackageCMO = false;
+
     /// Enables dumping type witness systems from associated type inference.
     bool DumpTypeWitnessSystems = false;
 
@@ -906,13 +913,6 @@ namespace swift {
     /// is for testing purposes.
     std::vector<std::string> DebugForbidTypecheckPrefixes;
 
-    /// The upper bound to number of sub-expressions unsolved
-    /// before termination of the shrink phrase of the constraint solver.
-    unsigned SolverShrinkUnsolvedThreshold = 10;
-
-    /// Disable the shrink phase of the expression type checker.
-    bool SolverDisableShrink = false;
-
     /// Enable experimental operator designated types feature.
     bool EnableOperatorDesignatedTypes = false;
     
@@ -928,6 +928,9 @@ namespace swift {
     /// Allow request evalutation to perform type checking lazily, instead of
     /// eagerly typechecking source files after parsing.
     bool EnableLazyTypecheck = false;
+
+    /// Disable the component splitter phase of the expression type checker.
+    bool SolverDisableSplitter = false;
   };
 
   /// Options for controlling the behavior of the Clang importer.

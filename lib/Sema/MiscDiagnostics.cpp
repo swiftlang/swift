@@ -1709,6 +1709,846 @@ static bool isImplicitSelf(const Expr *E) {
   return DRE->getDecl()->getName().isSimpleName(Ctx.Id_self);
 }
 
+namespace {
+class ImplicitSelfUsageChecker : public BaseDiagnosticWalker {
+  ASTContext &Ctx;
+  SmallVector<AbstractClosureExpr *, 4> Closures;
+
+  /// A list of "implicit self" exprs from shorthand conditions
+  /// like `if let self` or `guard let self`. These conditions
+  /// have an RHS 'self' decl that is implicit, but this is not
+  /// the sort of "implicit self" decl that should trigger
+  /// these diagnostics.
+  SmallPtrSet<Expr *, 16> UnwrapStmtImplicitSelfExprs;
+
+  /// The number of parent macros.
+  unsigned MacroDepth = 0;
+
+public:
+  explicit ImplicitSelfUsageChecker(ASTContext &Ctx, AbstractClosureExpr *ACE)
+      : Ctx(Ctx), Closures() {
+    if (ACE)
+      Closures.push_back(ACE);
+  }
+
+  bool isInMacro() const { return MacroDepth > 0; }
+
+  static bool
+  implicitWeakSelfReferenceIsValid510(const DeclRefExpr *DRE,
+                                      const AbstractClosureExpr *inClosure) {
+    ASTContext &Ctx = DRE->getDecl()->getASTContext();
+
+    // Check if the implicit self decl refers to a var in a conditional stmt
+    LabeledConditionalStmt *conditionalStmt = nullptr;
+    if (auto var = dyn_cast<VarDecl>(DRE->getDecl())) {
+      if (auto parentStmt = var->getParentPatternStmt()) {
+        conditionalStmt = dyn_cast<LabeledConditionalStmt>(parentStmt);
+      }
+    }
+
+    if (!conditionalStmt) {
+      return false;
+    }
+
+    // Require `LoadExpr`s when validating the self binding.
+    // This lets us reject invalid examples like:
+    //
+    //   let `self` = self ?? .somethingElse
+    //   guard let self = self else { return }
+    //   method() // <- implicit self is not allowed
+    //
+    return conditionalStmt->rebindsSelf(Ctx, /*requiresCaptureListRef*/ false,
+                                        /*requireLoadExpr*/ true);
+  }
+
+  static bool
+  isEnclosingSelfReference510(VarDecl *var,
+                              const AbstractClosureExpr *inClosure) {
+    if (var->isSelfParameter())
+      return true;
+
+    // Capture variables have a DC of the parent function.
+    if (inClosure && var->isSelfParamCapture() &&
+        var->getDeclContext() != inClosure->getParent())
+      return true;
+
+    return false;
+  }
+
+  static bool
+  selfDeclAllowsImplicitSelf510(DeclRefExpr *DRE, Type ty,
+                                const AbstractClosureExpr *inClosure) {
+    // If this is an explicit `weak self` capture, then implicit self is
+    // allowed once the closure's self param is unwrapped. We need to validate
+    // that the unwrapped `self` decl specifically refers to an unwrapped copy
+    // of the closure's `self` param, and not something else like in `guard
+    // let self = .someOptionalVariable else { return }` or `let self =
+    // someUnrelatedVariable`. If self hasn't been unwrapped yet and is still
+    // an optional, we would have already hit an error elsewhere.
+    if (closureHasWeakSelfCapture(inClosure)) {
+      return implicitWeakSelfReferenceIsValid510(DRE, inClosure);
+    }
+
+    // Metatype self captures don't extend the lifetime of an object.
+    if (ty->is<MetatypeType>())
+      return true;
+
+    // If self does not have reference semantics, it is very unlikely that
+    // capturing it will create a reference cycle.
+    if (!ty->hasReferenceSemantics())
+      return true;
+
+    if (auto closureExpr = dyn_cast<ClosureExpr>(inClosure)) {
+      if (auto selfDecl = closureExpr->getCapturedSelfDecl()) {
+        // If this capture is using the name `self` actually referring
+        // to some other variable (e.g. with `[self = "hello"]`)
+        // then implicit self is not allowed.
+        if (!selfDecl->isSelfParamCapture()) {
+          return false;
+        }
+      }
+    }
+
+    if (auto var = dyn_cast<VarDecl>(DRE->getDecl())) {
+      if (!isEnclosingSelfReference510(var, inClosure)) {
+        return true;
+      }
+    }
+
+    return false;
+  }
+
+  /// Whether or not implicit self is allowed for self decl
+  static bool selfDeclAllowsImplicitSelf(Expr *E,
+                                         const AbstractClosureExpr *inClosure) {
+    if (!isImplicitSelf(E)) {
+      return true;
+    }
+
+    auto *DRE = cast<DeclRefExpr>(E);
+
+    // Defensive check for type. If the expression doesn't have type here, it
+    // should have been diagnosed somewhere else.
+    Type ty = DRE->getType();
+    assert(ty && "Implicit self parameter ref without type");
+    if (!ty)
+      return true;
+
+    // Prior to Swift 6, use the old validation logic.
+    auto &ctx = inClosure->getASTContext();
+    if (!ctx.isSwiftVersionAtLeast(6))
+      return selfDeclAllowsImplicitSelf510(DRE, ty, inClosure);
+
+    return selfDeclAllowsImplicitSelf(DRE->getDecl(), ty, inClosure,
+                                      /*validateParentClosures:*/ true,
+                                      /*validateSelfRebindings:*/ true);
+  }
+
+  /// Whether or not implicit self is allowed for this implicit self decl
+  static bool selfDeclAllowsImplicitSelf(const ValueDecl *selfDecl,
+                                         const Type captureType,
+                                         const AbstractClosureExpr *inClosure,
+                                         bool validateParentClosures,
+                                         bool validateSelfRebindings) {
+    ASTContext &ctx = inClosure->getASTContext();
+
+    auto requiresSelfQualification =
+        isClosureRequiringSelfQualification(inClosure);
+
+    // Metatype self captures don't extend the lifetime of an object.
+    if (captureType->is<MetatypeType>()) {
+      requiresSelfQualification = false;
+    }
+
+    // If self does not have reference semantics, it is very unlikely that
+    // capturing it will create a reference cycle.
+    if (!captureType->hasReferenceSemantics()) {
+      requiresSelfQualification = false;
+    }
+
+    if (auto closureExpr = dyn_cast<ClosureExpr>(inClosure)) {
+      auto capturedSelfDecl = closureExpr->getCapturedSelfDecl();
+
+      // If this closure doesn't capture self explicitly, but this closure
+      // requires self qualification, then implicit self is disallowed.
+      if (!capturedSelfDecl && requiresSelfQualification) {
+        return false;
+      }
+
+      // If the closure has an explicit capture using the name `self` that
+      // actually refers to some other variable (e.g. `[self = "hello"]`)
+      // then implicit self is not allowed.
+      if (capturedSelfDecl && !isSimpleSelfCapture(capturedSelfDecl)) {
+        return false;
+      }
+    }
+
+    // If the self decl comes from a conditional statement, validate
+    // that it is an allowed `guard let self` or `if let self` condition.
+    //  - Even if this closure doesn't have a `weak self` capture, it could
+    //    be a closure nested in some parent closure with a `weak self`
+    //    capture, so we should always validate the conditional statement
+    //    that defines self if present.
+    if (validateSelfRebindings) {
+      if (auto conditionalStmt = parentConditionalStmt(selfDecl)) {
+        if (!hasValidSelfRebinding(conditionalStmt, ctx)) {
+          return false;
+        }
+      }
+    }
+
+    // If this closure has a `weak self` capture, require that the
+    // closure unwraps self. If not, implicit self is not allowed
+    // in this closure or in any nested closure.
+    if (closureHasWeakSelfCapture(inClosure) &&
+        !hasValidSelfRebinding(parentConditionalStmt(selfDecl), ctx)) {
+      return false;
+    }
+
+    if (auto autoclosure = dyn_cast<AutoClosureExpr>(inClosure)) {
+      // Implicit self is always allowed in autoclosure thunks generated
+      // during type checking. An example of this is when storing an instance
+      // method as a closure (e.g. `let closure = someInstanceMethodOnSelf`).
+      auto thunkKind = autoclosure->getThunkKind();
+      if (thunkKind == AutoClosureExpr::Kind::SingleCurryThunk ||
+          thunkKind == AutoClosureExpr::Kind::DoubleCurryThunk) {
+        return true;
+      }
+
+      // Explicit self is required in escaping autoclosures
+      if (requiresSelfQualification) {
+        return false;
+      }
+    }
+
+    // Lastly, validate that there aren't any parent closures
+    // with invalid self bindings that should disable implicit
+    // self for all nested closures.
+    //  - We have to do this for all closures, even closures that typically
+    //    don't require self qualificationm since an invalid self capture in
+    //    a parent closure still disallows implicit self in a nested closure.
+    if (validateParentClosures) {
+      return !implicitSelfDisallowedDueToInvalidParent(selfDecl, captureType,
+                                                       inClosure);
+    } else {
+      return true;
+    }
+  }
+
+  static bool implicitSelfDisallowedDueToInvalidParent(
+      const ValueDecl *selfDecl, const Type captureType,
+      const AbstractClosureExpr *inClosure) {
+    return parentClosureDisallowingImplicitSelf(selfDecl, captureType,
+                                                inClosure) != nullptr;
+  }
+
+  static const AbstractClosureExpr *
+  parentClosureDisallowingImplicitSelf(const ValueDecl *selfDecl,
+                                       const Type captureType,
+                                       const AbstractClosureExpr *inClosure) {
+    // Find the outer decl that determines what self refers to in this
+    // closure.
+    //  - If this is an escaping closure that captured self, then `selfDecl`
+    //    refers to the self capture.
+    //  - If this is a nonescaping closure then there is no capture,
+    //    so selfDecl already comes from an outer context.
+    const ValueDecl *outerSelfDecl = selfDecl;
+    if (auto closureExpr = dyn_cast<ClosureExpr>(inClosure)) {
+      if (auto capturedSelfDecl = closureExpr->getCapturedSelfDecl()) {
+        // Retrieve the outer decl that the self capture refers to.
+        outerSelfDecl = getParentInitializerDecl(capturedSelfDecl);
+      }
+    }
+
+    if (!outerSelfDecl) {
+      return nullptr;
+    }
+
+    // Find the closest parent closure that contains the outer self decl,
+    // potentially also validating all intermediate closures.
+    auto outerClosure = inClosure;
+    bool validateIntermediateParents = true;
+    while (true) {
+      // We have to validate all intermediate parent closures
+      // to prevent cases like this from succeeding, which is
+      // invalid because the outer closure doesn't have an
+      // explicit self capture:
+      //
+      //   withEscaping {
+      //     withNonEscaping {
+      //       x += 1 // not allowed
+      //     }
+      //   }
+      //
+      // On the other hand, we need to support cases like this.
+      // As long as the inner closure has an explicit capture,
+      // it is not necessary for outer closures to also have
+      // an explicit self capture:
+      //
+      //   withEscaping {
+      //     withEscaping { [self] in
+      //       x += 1 // ok
+      //     }
+      //   }
+      //
+      // So if we reach a closure with an explicit self capture,
+      // we no longer need to validate each intermediate closure
+      // (but we still have to validate the outer closure that
+      // contains the outer self delf).
+      if (auto closureExpr = dyn_cast<ClosureExpr>(outerClosure)) {
+        if (closureExpr->getCapturedSelfDecl()) {
+          validateIntermediateParents = false;
+        }
+      }
+
+      outerClosure = parentClosure(outerClosure);
+
+      if (!outerClosure) {
+        // Once we reach a parent context that isn't a closure,
+        // the only valid self capture is the self parameter.
+        // This disallows cases like:
+        //
+        //   let `self` = somethingElse
+        //   withEscaping { [self] in
+        //     method()
+        //   }
+        //
+        auto VD = dyn_cast<VarDecl>(outerSelfDecl);
+        if (!VD) {
+          return inClosure;
+        }
+
+        if (!VD->isSelfParameter()) {
+          return inClosure;
+        }
+
+        return nullptr;
+      }
+
+      // Check if this closure contains the self decl.
+      //  - If the self decl is defined in the closure's body, its
+      //    decl context will be the closure itself.
+      //  - If the self decl is defined in the closure's capture list,
+      //    its parent capture list will reference the closure.
+      auto selfDeclInOuterClosureContext =
+          outerSelfDecl->getDeclContext() == outerClosure;
+
+      auto selfDeclInOuterClosureCaptureList = false;
+      if (auto selfVD = dyn_cast<VarDecl>(outerSelfDecl)) {
+        if (auto captureList = selfVD->getParentCaptureList()) {
+          selfDeclInOuterClosureCaptureList =
+              captureList->getClosureBody() == outerClosure;
+        }
+      }
+
+      // We can stop searching because we found the first outer closure
+      // that contains the outer self decl. Otherwise we continue searching
+      // any parent closures in the next loop iteration.
+      if (selfDeclInOuterClosureContext || selfDeclInOuterClosureCaptureList) {
+        // Check whether implicit self is disallowed due to this specific
+        // closure, or if its disallowed due to some parent of this closure,
+        // so we can return the specific closure that is invalid.
+        if (!selfDeclAllowsImplicitSelf(outerSelfDecl, captureType,
+                                        outerClosure,
+                                        /*validateParentClosures:*/ false,
+                                        /*validateSelfRebindings:*/ true)) {
+          return outerClosure;
+        }
+
+        return parentClosureDisallowingImplicitSelf(outerSelfDecl, captureType,
+                                                    outerClosure);
+      }
+
+      // Optionally validate this intermediate closure before continuing
+      // to search upwards. Since we're already validating the chain of
+      // parent closures, we don't need to do that separate for this closure.
+      if (validateIntermediateParents) {
+        if (!selfDeclAllowsImplicitSelf(selfDecl, captureType, outerClosure,
+                                        /*validateParentClosures*/ false,
+                                        /*validateSelfRebindings*/ false)) {
+          return outerClosure;
+        }
+      }
+    }
+  }
+
+  static bool
+  hasValidSelfRebinding(const LabeledConditionalStmt *conditionalStmt,
+                        ASTContext &ctx) {
+    if (!conditionalStmt) {
+      return false;
+    }
+
+    // Require that the RHS of the `let self = self` condition
+    // refers to a variable defined in a capture list.
+    // This lets us reject invalid examples like:
+    //
+    //   var `self` = self ?? .somethingElse
+    //   guard let self = self else { return }
+    //   method() // <- implicit self is not allowed
+    //
+    return conditionalStmt->rebindsSelf(ctx, /*requiresCaptureListRef*/ true);
+  }
+
+  /// The `LabeledConditionalStmt` that contains the given `ValueDecl` if
+  /// present
+  static LabeledConditionalStmt *
+  parentConditionalStmt(const ValueDecl *selfDecl) {
+    if (!selfDecl) {
+      return nullptr;
+    }
+
+    if (auto var = dyn_cast<VarDecl>(selfDecl)) {
+      if (auto parentStmt = var->getParentPatternStmt()) {
+        return dyn_cast<LabeledConditionalStmt>(parentStmt);
+      }
+    }
+
+    return nullptr;
+  }
+
+  /// Determines whether or not this is a simple self capture by retreiving
+  /// the `CaptureListEntry` that contains the `selfDecl`.
+  ///  - Unlike `selfDecl->isSelfParamCapture()`, this will return true
+  ///    for a simple `[weak self]` capture.
+  static bool isSimpleSelfCapture(const VarDecl *selfDecl) {
+    if (!selfDecl) {
+      return false;
+    }
+
+    auto captureList = selfDecl->getParentCaptureList();
+    if (!captureList) {
+      return false;
+    }
+
+    for (auto capture : captureList->getCaptureList()) {
+      if (capture.getVar() == selfDecl) {
+        return capture.isSimpleSelfCapture(/*excludeWeakCaptures:*/ false);
+      }
+    }
+
+    return false;
+  }
+
+  // Given a `self` decl that is a closure's `self` capture,
+  // retrieves and returns the decl that the capture refers to.
+  static ValueDecl *getParentInitializerDecl(const VarDecl *selfDecl) {
+    if (!selfDecl) {
+      return nullptr;
+    }
+
+    auto captureList = selfDecl->getParentCaptureList();
+    if (!captureList) {
+      return nullptr;
+    }
+
+    for (auto capture : captureList->getCaptureList()) {
+      if (capture.getVar() == selfDecl && capture.PBD) {
+        // We've found the `CaptureListEntry` that contains the `self`
+        // capture, now we can retrieve and inspect its parent initializer.
+        auto index = capture.PBD->getPatternEntryIndexForVarDecl(selfDecl);
+        auto parentInitializer = capture.PBD->getInit(index);
+
+        // Look through implicit conversions like `InjectIntoOptionalExpr`
+        if (auto implicitConversion =
+                dyn_cast_or_null<ImplicitConversionExpr>(parentInitializer)) {
+          parentInitializer = implicitConversion->getSubExpr();
+        }
+
+        auto DRE = dyn_cast_or_null<DeclRefExpr>(parentInitializer);
+        if (!DRE) {
+          return nullptr;
+        }
+
+        return DRE->getDecl();
+      }
+    }
+
+    return nullptr;
+  }
+
+  /// Return true if this is a closure expression that will require explicit
+  /// use or capture of "self." for qualification of member references.
+  static bool isClosureRequiringSelfQualification(const AbstractClosureExpr *CE,
+                                                  bool ignoreWeakSelf = false) {
+    if (!ignoreWeakSelf && closureHasWeakSelfCapture(CE)) {
+      return true;
+    }
+
+    // If the closure's type was inferred to be noescape, then it doesn't
+    // need qualification.
+    if (isNonEscaping(CE)) {
+      return false;
+    }
+
+    if (auto autoclosure = dyn_cast<AutoClosureExpr>(CE)) {
+      if (autoclosure->getThunkKind() == AutoClosureExpr::Kind::AsyncLet)
+        return false;
+    }
+
+    // If the closure was used in a context where it's explicitly stated
+    // that it does not need "self." qualification, don't require it.
+    if (auto closure = dyn_cast<ClosureExpr>(CE)) {
+      if (closure->allowsImplicitSelfCapture())
+        return false;
+    }
+
+    return true;
+  }
+
+  static bool isNonEscaping(const AbstractClosureExpr *ACE) {
+    if (auto funcTy = ACE->getType()->getAs<FunctionType>()) {
+      return funcTy->isNoEscape();
+    }
+
+    return false;
+  }
+
+  /// The closure that is a parent of this closure, if present
+  static const ClosureExpr *parentClosure(const AbstractClosureExpr *closure) {
+    auto parentContext = closure->getParent();
+    if (!parentContext) {
+      return nullptr;
+    }
+
+    return parentContext->getInnermostClosureForCaptures();
+  }
+
+  bool shouldRecordClosure(const AbstractClosureExpr *E) {
+    // Record all closures in Swift 6 mode.
+    if (Ctx.isSwiftVersionAtLeast(6))
+      return true;
+
+    // Only record closures requiring self qualification prior to Swift 6
+    // mode.
+    return isClosureRequiringSelfQualification(E);
+  }
+
+  template <typename... ArgTypes>
+  InFlightDiagnostic diagnoseImplicitSelfUse(
+      SourceLoc loc, Expr *base, AbstractClosureExpr *closure,
+      Diag<ArgTypes...> ID,
+      typename detail::PassArgument<ArgTypes>::type... Args) {
+    std::optional<unsigned> warnUntilVersion;
+    // Prior to Swift 6, we may need to downgrade to a warning for compatibility
+    // with the 5.10 diagnostic behavior.
+    if (!Ctx.isSwiftVersionAtLeast(6) &&
+        invalidImplicitSelfShouldOnlyWarn510(base, closure)) {
+      warnUntilVersion.emplace(6);
+    }
+    // Prior to Swift 7, downgrade to a warning if we're in a macro to preserve
+    // compatibility with the Swift 6 diagnostic behavior where we previously
+    // skipped diagnosing.
+    if (!Ctx.isSwiftVersionAtLeast(7) && isInMacro())
+      warnUntilVersion.emplace(7);
+
+    auto diag = Ctx.Diags.diagnose(loc, ID, std::move(Args)...);
+    if (warnUntilVersion)
+      diag.warnUntilSwiftVersion(*warnUntilVersion);
+
+    return diag;
+  }
+
+  PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
+    if (isa<MacroExpansionExpr>(E))
+      MacroDepth += 1;
+
+    if (auto *CE = dyn_cast<AbstractClosureExpr>(E)) {
+      if (shouldRecordClosure(CE))
+        Closures.push_back(CE);
+    }
+
+    // If we aren't in a closure, no diagnostics will be produced.
+    if (Closures.size() == 0)
+      return Action::Continue(E);
+
+    // Diagnostics should correct the innermost closure
+    auto *ACE = Closures[Closures.size() - 1];
+    assert(ACE);
+
+    auto &Diags = Ctx.Diags;
+
+    // If this is an "implicit self" expr from the RHS of a shorthand
+    // condition like `guard let self` or `if let self`, then this is
+    // always allowed and we shouldn't run any diagnostics.
+    if (UnwrapStmtImplicitSelfExprs.count(E)) {
+      return Action::Continue(E);
+    }
+
+    SourceLoc memberLoc = SourceLoc();
+    const DeclRefExpr *selfDRE = nullptr;
+    if (auto *MRE = dyn_cast<MemberRefExpr>(E))
+      if (!selfDeclAllowsImplicitSelf(MRE->getBase(), ACE)) {
+        selfDRE = dyn_cast_or_null<DeclRefExpr>(MRE->getBase());
+        auto baseName = MRE->getMember().getDecl()->getBaseName();
+        memberLoc = MRE->getLoc();
+        diagnoseImplicitSelfUse(
+            memberLoc, MRE->getBase(), ACE,
+            diag::property_use_in_closure_without_explicit_self,
+            baseName.getIdentifier());
+      }
+
+    // Handle method calls with a specific diagnostic + fixit.
+    if (auto *DSCE = dyn_cast<DotSyntaxCallExpr>(E))
+      if (!selfDeclAllowsImplicitSelf(DSCE->getBase(), ACE) &&
+          isa<DeclRefExpr>(DSCE->getFn())) {
+        selfDRE = dyn_cast_or_null<DeclRefExpr>(DSCE->getBase());
+        auto MethodExpr = cast<DeclRefExpr>(DSCE->getFn());
+        memberLoc = DSCE->getLoc();
+        diagnoseImplicitSelfUse(
+            memberLoc, DSCE->getBase(), ACE,
+            diag::method_call_in_closure_without_explicit_self,
+            MethodExpr->getDecl()->getBaseIdentifier());
+      }
+
+    if (memberLoc.isValid()) {
+      const AbstractClosureExpr *parentDisallowingImplicitSelf = nullptr;
+      if (Ctx.isSwiftVersionAtLeast(6) && selfDRE && selfDRE->getDecl()) {
+        parentDisallowingImplicitSelf = parentClosureDisallowingImplicitSelf(
+            selfDRE->getDecl(), selfDRE->getType(), ACE);
+      }
+
+      emitFixIts(Diags, memberLoc, parentDisallowingImplicitSelf, ACE);
+      return Action::SkipNode(E);
+    }
+
+    if (!selfDeclAllowsImplicitSelf(E, ACE)) {
+      diagnoseImplicitSelfUse(E->getLoc(), E, ACE,
+                              diag::implicit_use_of_self_in_closure);
+    }
+    return Action::Continue(E);
+  }
+
+  PostWalkResult<Expr *> walkToExprPost(Expr *E) override {
+    if (isa<MacroExpansionExpr>(E)) {
+      assert(isInMacro());
+      MacroDepth -= 1;
+    }
+
+    auto *ACE = dyn_cast<AbstractClosureExpr>(E);
+    if (!ACE) {
+      return Action::Continue(E);
+    }
+
+    if (shouldRecordClosure(ACE)) {
+      assert(Closures.size() > 0);
+      Closures.pop_back();
+    }
+    return Action::Continue(E);
+  }
+
+  PreWalkAction walkToDeclPre(Decl *D) override {
+    if (isa<MacroExpansionDecl>(D))
+      MacroDepth += 1;
+
+    return BaseDiagnosticWalker::walkToDeclPre(D);
+  }
+
+  PostWalkAction walkToDeclPost(Decl *D) override {
+    if (isa<MacroExpansionDecl>(D)) {
+      assert(isInMacro());
+      MacroDepth -= 1;
+    }
+    return Action::Continue();
+  }
+
+  PreWalkResult<Stmt *> walkToStmtPre(Stmt *S) override {
+    /// Conditions like `if let self` or `guard let self`
+    /// have an RHS 'self' decl that is implicit, but this is not
+    /// the sort of "implicit self" decl that should trigger
+    /// these diagnostics. Track these DREs in a list so we can
+    /// avoid running diagnostics on them when we see them later.
+    auto conditionalStmt = dyn_cast<LabeledConditionalStmt>(S);
+    if (!conditionalStmt) {
+      return Action::Continue(S);
+    }
+
+    for (auto cond : conditionalStmt->getCond()) {
+      if (cond.getKind() != StmtConditionElement::CK_PatternBinding) {
+        continue;
+      }
+
+      if (auto OSP = dyn_cast<OptionalSomePattern>(cond.getPattern())) {
+        if (OSP->getSubPattern()->getBoundName() != Ctx.Id_self) {
+          continue;
+        }
+
+        auto E = cond.getInitializer();
+
+        // Peer through any implicit conversions like a LoadExpr
+        if (auto *ICE = dyn_cast<ImplicitConversionExpr>(E)) {
+          E = ICE->getSubExpr();
+        }
+
+        if (isImplicitSelf(E)) {
+          UnwrapStmtImplicitSelfExprs.insert(E);
+        }
+      }
+    }
+
+    return Action::Continue(S);
+  }
+
+  /// Emit any fix-its for this error.
+  void emitFixIts(DiagnosticEngine &Diags, SourceLoc memberLoc,
+                  const AbstractClosureExpr *parentDisallowingImplicitSelf,
+                  const AbstractClosureExpr *ACE) {
+    // These fix-its have to be diagnosed on the closure that requires,
+    // but is currently missing, self qualification. It's possible that
+    // ACE doesn't require self qualification (e.g. because it's
+    // non-escaping) but is nested inside a closure that does require self
+    // qualification. In that case we have to emit the fixit for the parent
+    // closure.
+    //  - Even if this closure requires self qualification, if there's an
+    //    invalid parent we emit the diagnostic on that parent first.
+    //    To enable implicit self you'd have to fix the parent anyway.
+    //    This lets us avoid bogus diagnostics on this closure when
+    //    it's actually _just_ the parent that's invalid.
+    auto closureForDiagnostics = ACE;
+    if (parentDisallowingImplicitSelf) {
+      // Don't do this for escaping autoclosures, which are never allowed
+      // to use implicit self, even after fixing any invalid parents.
+      auto isEscapingAutoclosure =
+          isa<AutoClosureExpr>(ACE) && isClosureRequiringSelfQualification(ACE);
+      if (!isEscapingAutoclosure) {
+        closureForDiagnostics = parentDisallowingImplicitSelf;
+      }
+    }
+
+    // This error can be fixed by either capturing self explicitly (if in an
+    // explicit closure), or referencing self explicitly.
+    if (auto *CE = dyn_cast<const ClosureExpr>(closureForDiagnostics)) {
+      if (diagnoseAlmostMatchingCaptures(Diags, memberLoc, CE)) {
+        // Bail on the rest of the diagnostics. Offering the option to
+        // capture 'self' explicitly will result in an error, and using
+        // 'self.' explicitly will be accessing something other than the
+        // self param.
+        return;
+      }
+      emitFixItsForExplicitClosure(Diags, memberLoc, CE);
+    } else {
+      // If this wasn't an explicit closure, just offer the fix-it to
+      // reference self explicitly.
+      Diags.diagnose(memberLoc, diag::note_reference_self_explicitly)
+          .fixItInsert(memberLoc, "self.");
+    }
+  }
+
+  /// Diagnose any captures which might have been an attempt to capture
+  /// \c self strongly, but do not actually enable implicit \c self. Returns
+  /// whether there were any such captures to diagnose.
+  bool diagnoseAlmostMatchingCaptures(DiagnosticEngine &Diags,
+                                      SourceLoc memberLoc,
+                                      const ClosureExpr *closureExpr) {
+    // If we've already captured something with the name "self" other than
+    // the actual self param, offer special diagnostics.
+    if (auto *VD = closureExpr->getCapturedSelfDecl()) {
+      if (!VD->getInterfaceType()->is<WeakStorageType>()) {
+        Diags.diagnose(VD->getLoc(), diag::note_other_self_capture);
+      }
+
+      return true;
+    }
+    return false;
+  }
+
+  /// Emit fix-its for invalid use of implicit \c self in an explicit closure.
+  /// The error can be solved by capturing self explicitly,
+  /// or by using \c self. explicitly.
+  void emitFixItsForExplicitClosure(DiagnosticEngine &Diags,
+                                    SourceLoc memberLoc,
+                                    const ClosureExpr *closureExpr) {
+    Diags.diagnose(memberLoc, diag::note_reference_self_explicitly)
+        .fixItInsert(memberLoc, "self.");
+    auto diag = Diags.diagnose(closureExpr->getLoc(),
+                               diag::note_capture_self_explicitly);
+    // There are four different potential fix-its to offer based on the
+    // closure signature:
+    //   1. There is an existing capture list which already has some
+    //      entries. We need to insert 'self' into the capture list along
+    //      with a separating comma.
+    //   2. There is an existing capture list, but it is empty (just '[]').
+    //      We can just insert 'self'.
+    //   3. Arguments or types are already specified in the signature,
+    //      but there is no existing capture list. We will need to insert
+    //      the capture list, but 'in' will already be present.
+    //   4. The signature empty so far. We must insert the full capture
+    //      list as well as 'in'.
+    const auto brackets = closureExpr->getBracketRange();
+    if (brackets.isValid()) {
+      emitInsertSelfIntoCaptureListFixIt(brackets, diag);
+    } else {
+      emitInsertNewCaptureListFixIt(closureExpr, diag);
+    }
+  }
+
+  /// Emit a fix-it for inserting \c self into in existing capture list, along
+  /// with a trailing comma if needed. The fix-it will be attached to the
+  /// provided diagnostic \c diag.
+  void emitInsertSelfIntoCaptureListFixIt(SourceRange brackets,
+                                          InFlightDiagnostic &diag) {
+    // Look for any non-comment token. If there's anything before the
+    // closing bracket, we assume that it is a valid capture list entry and
+    // insert 'self,'. If it wasn't a valid entry, then we will at least not
+    // be introducing any new errors/warnings...
+    const auto locAfterBracket = brackets.Start.getAdvancedLoc(1);
+    const auto nextAfterBracket = Lexer::getTokenAtLocation(
+        Ctx.SourceMgr, locAfterBracket, CommentRetentionMode::None);
+    if (nextAfterBracket.getLoc() != brackets.End)
+      diag.fixItInsertAfter(brackets.Start, "self, ");
+    else
+      diag.fixItInsertAfter(brackets.Start, "self");
+  }
+
+  /// Emit a fix-it for inserting a capture list into a closure that does not
+  /// already have one, along with a trailing \c in if necessary. The fix-it
+  /// will be attached to the provided diagnostic \c diag.
+  void emitInsertNewCaptureListFixIt(const ClosureExpr *closureExpr,
+                                     InFlightDiagnostic &diag) {
+    if (closureExpr->getInLoc().isValid()) {
+      diag.fixItInsertAfter(closureExpr->getLoc(), " [self]");
+      return;
+    }
+
+    // If there's a (non-comment) token immediately following the
+    // opening brace of the closure, we may need to pad the fix-it
+    // with a space.
+    const auto nextLoc = closureExpr->getLoc().getAdvancedLoc(1);
+    const auto next = Lexer::getTokenAtLocation(Ctx.SourceMgr, nextLoc,
+                                                CommentRetentionMode::None);
+    std::string trailing = next.getLoc() == nextLoc ? " " : "";
+
+    diag.fixItInsertAfter(closureExpr->getLoc(), " [self] in" + trailing);
+  }
+
+  /// Whether or not this invalid usage of implicit self should be a warning
+  /// in Swift 5 mode, to preserve source compatibility.
+  bool invalidImplicitSelfShouldOnlyWarn510(Expr *selfRef,
+                                            AbstractClosureExpr *ACE) {
+    auto DRE = dyn_cast_or_null<DeclRefExpr>(selfRef);
+    if (!DRE)
+      return false;
+
+    auto selfDecl = dyn_cast_or_null<VarDecl>(DRE->getDecl());
+    if (!selfDecl)
+      return false;
+
+    // If this implicit self decl is from a closure that captured self
+    // weakly, then we should always emit an error, since implicit self was
+    // only allowed starting in Swift 5.8 and later.
+    if (closureHasWeakSelfCapture(ACE)) {
+      // Implicit self was incorrectly permitted for weak self captures
+      // in non-escaping closures in Swift 5.7, so in that case we can
+      // only warn until Swift 6.
+      return !isClosureRequiringSelfQualification(ACE,
+                                                  /*ignoreWeakSelf*/ true);
+    }
+
+    return !selfDecl->isSelfParameter();
+  }
+};
+} // end anonymous namespace
+
 /// Look for any property references in closures that lack a 'self.' qualifier.
 /// Within a closure, we require that the source code contain 'self.' explicitly
 /// (or that the closure explicitly capture 'self' in the capture list) because
@@ -1716,802 +2556,7 @@ static bool isImplicitSelf(const Expr *E) {
 /// confusion, so we force an explicit self.
 static void diagnoseImplicitSelfUseInClosure(const Expr *E,
                                              const DeclContext *DC) {
-  class DiagnoseWalker : public BaseDiagnosticWalker {
-    ASTContext &Ctx;
-    SmallVector<AbstractClosureExpr *, 4> Closures;
-
-    /// A list of "implicit self" exprs from shorthand conditions
-    /// like `if let self` or `guard let self`. These conditions
-    /// have an RHS 'self' decl that is implicit, but this is not
-    /// the sort of "implicit self" decl that should trigger
-    /// these diagnostics.
-    SmallPtrSet<Expr *, 16> UnwrapStmtImplicitSelfExprs;
-
-  public:
-    explicit DiagnoseWalker(ASTContext &Ctx, AbstractClosureExpr *ACE)
-        : Ctx(Ctx), Closures() {
-      if (ACE)
-        Closures.push_back(ACE);
-    }
-
-    static bool
-    implicitWeakSelfReferenceIsValid510(const DeclRefExpr *DRE,
-                                        const AbstractClosureExpr *inClosure) {
-      ASTContext &Ctx = DRE->getDecl()->getASTContext();
-
-      // Check if the implicit self decl refers to a var in a conditional stmt
-      LabeledConditionalStmt *conditionalStmt = nullptr;
-      if (auto var = dyn_cast<VarDecl>(DRE->getDecl())) {
-        if (auto parentStmt = var->getParentPatternStmt()) {
-          conditionalStmt = dyn_cast<LabeledConditionalStmt>(parentStmt);
-        }
-      }
-
-      if (!conditionalStmt) {
-        return false;
-      }
-
-      // Require `LoadExpr`s when validating the self binding.
-      // This lets us reject invalid examples like:
-      //
-      //   let `self` = self ?? .somethingElse
-      //   guard let self = self else { return }
-      //   method() // <- implicit self is not allowed
-      //
-      return conditionalStmt->rebindsSelf(Ctx, /*requiresCaptureListRef*/ false,
-                                          /*requireLoadExpr*/ true);
-    }
-
-    static bool
-    isEnclosingSelfReference510(VarDecl *var,
-                                const AbstractClosureExpr *inClosure) {
-      if (var->isSelfParameter())
-        return true;
-
-      // Capture variables have a DC of the parent function.
-      if (inClosure && var->isSelfParamCapture() &&
-          var->getDeclContext() != inClosure->getParent())
-        return true;
-
-      return false;
-    }
-
-    static bool
-    selfDeclAllowsImplicitSelf510(DeclRefExpr *DRE, Type ty,
-                                  const AbstractClosureExpr *inClosure) {
-      // If this is an explicit `weak self` capture, then implicit self is
-      // allowed once the closure's self param is unwrapped. We need to validate
-      // that the unwrapped `self` decl specifically refers to an unwrapped copy
-      // of the closure's `self` param, and not something else like in `guard
-      // let self = .someOptionalVariable else { return }` or `let self =
-      // someUnrelatedVariable`. If self hasn't been unwrapped yet and is still
-      // an optional, we would have already hit an error elsewhere.
-      if (closureHasWeakSelfCapture(inClosure)) {
-        return implicitWeakSelfReferenceIsValid510(DRE, inClosure);
-      }
-
-      // Metatype self captures don't extend the lifetime of an object.
-      if (ty->is<MetatypeType>())
-        return true;
-
-      // If self does not have reference semantics, it is very unlikely that
-      // capturing it will create a reference cycle.
-      if (!ty->hasReferenceSemantics())
-        return true;
-
-      if (auto closureExpr = dyn_cast<ClosureExpr>(inClosure)) {
-        if (auto selfDecl = closureExpr->getCapturedSelfDecl()) {
-          // If this capture is using the name `self` actually referring
-          // to some other variable (e.g. with `[self = "hello"]`)
-          // then implicit self is not allowed.
-          if (!selfDecl->isSelfParamCapture()) {
-            return false;
-          }
-        }
-      }
-
-      if (auto var = dyn_cast<VarDecl>(DRE->getDecl())) {
-        if (!isEnclosingSelfReference510(var, inClosure)) {
-          return true;
-        }
-      }
-
-      return false;
-    }
-
-    /// Whether or not implicit self is allowed for self decl
-    static bool
-    selfDeclAllowsImplicitSelf(Expr *E, const AbstractClosureExpr *inClosure) {
-      if (!isImplicitSelf(E)) {
-        return true;
-      }
-
-      auto *DRE = cast<DeclRefExpr>(E);
-
-      // Defensive check for type. If the expression doesn't have type here, it
-      // should have been diagnosed somewhere else.
-      Type ty = DRE->getType();
-      assert(ty && "Implicit self parameter ref without type");
-      if (!ty)
-        return true;
-
-      // Prior to Swift 6, use the old validation logic.
-      auto &ctx = inClosure->getASTContext();
-      if (!ctx.isSwiftVersionAtLeast(6))
-        return selfDeclAllowsImplicitSelf510(DRE, ty, inClosure);
-
-      return selfDeclAllowsImplicitSelf(DRE->getDecl(), ty, inClosure,
-                                        /*validateParentClosures:*/ true,
-                                        /*validateSelfRebindings:*/ true);
-    }
-
-    /// Whether or not implicit self is allowed for this implicit self decl
-    static bool selfDeclAllowsImplicitSelf(const ValueDecl *selfDecl,
-                                           const Type captureType,
-                                           const AbstractClosureExpr *inClosure,
-                                           bool validateParentClosures,
-                                           bool validateSelfRebindings) {
-      ASTContext &ctx = inClosure->getASTContext();
-
-      auto requiresSelfQualification =
-          isClosureRequiringSelfQualification(inClosure);
-
-      // Metatype self captures don't extend the lifetime of an object.
-      if (captureType->is<MetatypeType>()) {
-        requiresSelfQualification = false;
-      }
-
-      // If self does not have reference semantics, it is very unlikely that
-      // capturing it will create a reference cycle.
-      if (!captureType->hasReferenceSemantics()) {
-        requiresSelfQualification = false;
-      }
-
-      if (auto closureExpr = dyn_cast<ClosureExpr>(inClosure)) {
-        auto capturedSelfDecl = closureExpr->getCapturedSelfDecl();
-
-        // If this closure doesn't capture self explicitly, but this closure
-        // requires self qualification, then implicit self is disallowed.
-        if (!capturedSelfDecl && requiresSelfQualification) {
-          return false;
-        }
-
-        // If the closure has an explicit capture using the name `self` that
-        // actually refers to some other variable (e.g. `[self = "hello"]`)
-        // then implicit self is not allowed.
-        if (capturedSelfDecl && !isSimpleSelfCapture(capturedSelfDecl)) {
-          return false;
-        }
-      }
-
-      // If the self decl comes from a conditional statement, validate
-      // that it is an allowed `guard let self` or `if let self` condition.
-      //  - Even if this closure doesn't have a `weak self` capture, it could
-      //    be a closure nested in some parent closure with a `weak self`
-      //    capture, so we should always validate the conditional statement
-      //    that defines self if present.
-      if (validateSelfRebindings) {
-        if (auto conditionalStmt = parentConditionalStmt(selfDecl)) {
-          if (!hasValidSelfRebinding(conditionalStmt, ctx)) {
-            return false;
-          }
-        }
-      }
-
-      // If this closure has a `weak self` capture, require that the
-      // closure unwraps self. If not, implicit self is not allowed
-      // in this closure or in any nested closure.
-      if (closureHasWeakSelfCapture(inClosure) &&
-          !hasValidSelfRebinding(parentConditionalStmt(selfDecl), ctx)) {
-        return false;
-      }
-
-      if (auto autoclosure = dyn_cast<AutoClosureExpr>(inClosure)) {
-        // Implicit self is always allowed in autoclosure thunks generated
-        // during type checking. An example of this is when storing an instance
-        // method as a closure (e.g. `let closure = someInstanceMethodOnSelf`).
-        auto thunkKind = autoclosure->getThunkKind();
-        if (thunkKind == AutoClosureExpr::Kind::SingleCurryThunk ||
-            thunkKind == AutoClosureExpr::Kind::DoubleCurryThunk) {
-          return true;
-        }
-
-        // Explicit self is required in escaping autoclosures
-        if (requiresSelfQualification) {
-          return false;
-        }
-      }
-
-      // Lastly, validate that there aren't any parent closures
-      // with invalid self bindings that should disable implicit
-      // self for all nested closures.
-      //  - We have to do this for all closures, even closures that typically
-      //    don't require self qualificationm since an invalid self capture in
-      //    a parent closure still disallows implicit self in a nested closure.
-      if (validateParentClosures) {
-        return !implicitSelfDisallowedDueToInvalidParent(selfDecl, captureType,
-                                                         inClosure);
-      } else {
-        return true;
-      }
-    }
-
-    static bool implicitSelfDisallowedDueToInvalidParent(
-        const ValueDecl *selfDecl, const Type captureType,
-        const AbstractClosureExpr *inClosure) {
-      return parentClosureDisallowingImplicitSelf(selfDecl, captureType,
-                                                  inClosure) != nullptr;
-    }
-
-    static const AbstractClosureExpr *
-    parentClosureDisallowingImplicitSelf(const ValueDecl *selfDecl,
-                                         const Type captureType,
-                                         const AbstractClosureExpr *inClosure) {
-      // Find the outer decl that determines what self refers to in this
-      // closure.
-      //  - If this is an escaping closure that captured self, then `selfDecl`
-      //    refers to the self capture.
-      //  - If this is a nonescaping closure then there is no capture,
-      //    so selfDecl already comes from an outer context.
-      const ValueDecl *outerSelfDecl = selfDecl;
-      if (auto closureExpr = dyn_cast<ClosureExpr>(inClosure)) {
-        if (auto capturedSelfDecl = closureExpr->getCapturedSelfDecl()) {
-          // Retrieve the outer decl that the self capture refers to.
-          outerSelfDecl = getParentInitializerDecl(capturedSelfDecl);
-        }
-      }
-
-      if (!outerSelfDecl) {
-        return nullptr;
-      }
-
-      // Find the closest parent closure that contains the outer self decl,
-      // potentially also validating all intermediate closures.
-      auto outerClosure = inClosure;
-      bool validateIntermediateParents = true;
-      while (true) {
-        // We have to validate all intermediate parent closures
-        // to prevent cases like this from succeeding, which is
-        // invalid because the outer closure doesn't have an
-        // explicit self capture:
-        //
-        //   withEscaping {
-        //     withNonEscaping {
-        //       x += 1 // not allowed
-        //     }
-        //   }
-        //
-        // On the other hand, we need to support cases like this.
-        // As long as the inner closure has an explicit capture,
-        // it is not necessary for outer closures to also have
-        // an explicit self capture:
-        //
-        //   withEscaping {
-        //     withEscaping { [self] in
-        //       x += 1 // ok
-        //     }
-        //   }
-        //
-        // So if we reach a closure with an explicit self capture,
-        // we no longer need to validate each intermediate closure
-        // (but we still have to validate the outer closure that
-        // contains the outer self delf).
-        if (auto closureExpr = dyn_cast<ClosureExpr>(outerClosure)) {
-          if (closureExpr->getCapturedSelfDecl()) {
-            validateIntermediateParents = false;
-          }
-        }
-
-        outerClosure = parentClosure(outerClosure);
-
-        if (!outerClosure) {
-          // Once we reach a parent context that isn't a closure,
-          // the only valid self capture is the self parameter.
-          // This disallows cases like:
-          //
-          //   let `self` = somethingElse
-          //   withEscaping { [self] in
-          //     method()
-          //   }
-          //
-          auto VD = dyn_cast<VarDecl>(outerSelfDecl);
-          if (!VD) {
-            return inClosure;
-          }
-
-          if (!VD->isSelfParameter()) {
-            return inClosure;
-          }
-
-          return nullptr;
-        }
-
-        // Check if this closure contains the self decl.
-        //  - If the self decl is defined in the closure's body, its
-        //    decl context will be the closure itself.
-        //  - If the self decl is defined in the closure's capture list,
-        //    its parent capture list will reference the closure.
-        auto selfDeclInOuterClosureContext =
-            outerSelfDecl->getDeclContext() == outerClosure;
-
-        auto selfDeclInOuterClosureCaptureList = false;
-        if (auto selfVD = dyn_cast<VarDecl>(outerSelfDecl)) {
-          if (auto captureList = selfVD->getParentCaptureList()) {
-            selfDeclInOuterClosureCaptureList =
-                captureList->getClosureBody() == outerClosure;
-          }
-        }
-
-        // We can stop searching because we found the first outer closure
-        // that contains the outer self decl. Otherwise we continue searching
-        // any parent closures in the next loop iteration.
-        if (selfDeclInOuterClosureContext ||
-            selfDeclInOuterClosureCaptureList) {
-          // Check whether implicit self is disallowed due to this specific
-          // closure, or if its disallowed due to some parent of this closure,
-          // so we can return the specific closure that is invalid.
-          if (!selfDeclAllowsImplicitSelf(outerSelfDecl, captureType,
-                                          outerClosure,
-                                          /*validateParentClosures:*/ false,
-                                          /*validateSelfRebindings:*/ true)) {
-            return outerClosure;
-          }
-
-          return parentClosureDisallowingImplicitSelf(
-              outerSelfDecl, captureType, outerClosure);
-        }
-
-        // Optionally validate this intermediate closure before continuing
-        // to search upwards. Since we're already validating the chain of
-        // parent closures, we don't need to do that separate for this closure.
-        if (validateIntermediateParents) {
-          if (!selfDeclAllowsImplicitSelf(selfDecl, captureType, outerClosure,
-                                          /*validateParentClosures*/ false,
-                                          /*validateSelfRebindings*/ false)) {
-            return outerClosure;
-          }
-        }
-      }
-    }
-
-    static bool
-    hasValidSelfRebinding(const LabeledConditionalStmt *conditionalStmt,
-                          ASTContext &ctx) {
-      if (!conditionalStmt) {
-        return false;
-      }
-
-      // Require that the RHS of the `let self = self` condition
-      // refers to a variable defined in a capture list.
-      // This lets us reject invalid examples like:
-      //
-      //   var `self` = self ?? .somethingElse
-      //   guard let self = self else { return }
-      //   method() // <- implicit self is not allowed
-      //
-      return conditionalStmt->rebindsSelf(ctx, /*requiresCaptureListRef*/ true);
-    }
-
-    /// The `LabeledConditionalStmt` that contains the given `ValueDecl` if
-    /// present
-    static LabeledConditionalStmt *
-    parentConditionalStmt(const ValueDecl *selfDecl) {
-      if (!selfDecl) {
-        return nullptr;
-      }
-
-      if (auto var = dyn_cast<VarDecl>(selfDecl)) {
-        if (auto parentStmt = var->getParentPatternStmt()) {
-          return dyn_cast<LabeledConditionalStmt>(parentStmt);
-        }
-      }
-
-      return nullptr;
-    }
-
-    /// Determines whether or not this is a simple self capture by retreiving
-    /// the `CaptureListEntry` that contains the `selfDecl`.
-    ///  - Unlike `selfDecl->isSelfParamCapture()`, this will return true
-    ///    for a simple `[weak self]` capture.
-    static bool isSimpleSelfCapture(const VarDecl *selfDecl) {
-      if (!selfDecl) {
-        return false;
-      }
-
-      auto captureList = selfDecl->getParentCaptureList();
-      if (!captureList) {
-        return false;
-      }
-
-      for (auto capture : captureList->getCaptureList()) {
-        if (capture.getVar() == selfDecl) {
-          return capture.isSimpleSelfCapture(/*excludeWeakCaptures:*/ false);
-        }
-      }
-
-      return false;
-    }
-
-    // Given a `self` decl that is a closure's `self` capture,
-    // retrieves and returns the decl that the capture refers to.
-    static ValueDecl *getParentInitializerDecl(const VarDecl *selfDecl) {
-      if (!selfDecl) {
-        return nullptr;
-      }
-
-      auto captureList = selfDecl->getParentCaptureList();
-      if (!captureList) {
-        return nullptr;
-      }
-
-      for (auto capture : captureList->getCaptureList()) {
-        if (capture.getVar() == selfDecl && capture.PBD) {
-          // We've found the `CaptureListEntry` that contains the `self`
-          // capture, now we can retrieve and inspect its parent initializer.
-          auto index = capture.PBD->getPatternEntryIndexForVarDecl(selfDecl);
-          auto parentInitializer = capture.PBD->getInit(index);
-
-          // Look through implicit conversions like `InjectIntoOptionalExpr`
-          if (auto implicitConversion =
-                  dyn_cast_or_null<ImplicitConversionExpr>(parentInitializer)) {
-            parentInitializer = implicitConversion->getSubExpr();
-          }
-
-          auto DRE = dyn_cast_or_null<DeclRefExpr>(parentInitializer);
-          if (!DRE) {
-            return nullptr;
-          }
-
-          return DRE->getDecl();
-        }
-      }
-
-      return nullptr;
-    }
-
-    /// Return true if this is a closure expression that will require explicit
-    /// use or capture of "self." for qualification of member references.
-    static bool
-    isClosureRequiringSelfQualification(const AbstractClosureExpr *CE,
-                                        bool ignoreWeakSelf = false) {
-      if (!ignoreWeakSelf && closureHasWeakSelfCapture(CE)) {
-        return true;
-      }
-
-      // If the closure's type was inferred to be noescape, then it doesn't
-      // need qualification.
-      if (isNonEscaping(CE)) {
-        return false;
-      }
-
-      if (auto autoclosure = dyn_cast<AutoClosureExpr>(CE)) {
-        if (autoclosure->getThunkKind() == AutoClosureExpr::Kind::AsyncLet)
-          return false;
-      }
-
-      // If the closure was used in a context where it's explicitly stated
-      // that it does not need "self." qualification, don't require it.
-      if (auto closure = dyn_cast<ClosureExpr>(CE)) {
-        if (closure->allowsImplicitSelfCapture())
-          return false;
-      }
-
-      return true;
-    }
-
-    static bool isNonEscaping(const AbstractClosureExpr *ACE) {
-      if (auto funcTy = ACE->getType()->getAs<FunctionType>()) {
-        return funcTy->isNoEscape();
-      }
-
-      return false;
-    }
-
-    /// The closure that is a parent of this closure, if present
-    static const ClosureExpr *
-    parentClosure(const AbstractClosureExpr *closure) {
-      auto parentContext = closure->getParent();
-      if (!parentContext) {
-        return nullptr;
-      }
-
-      return parentContext->getInnermostClosureForCaptures();
-    }
-
-    bool shouldRecordClosure(const AbstractClosureExpr *E) {
-      // Record all closures in Swift 6 mode.
-      if (Ctx.isSwiftVersionAtLeast(6))
-        return true;
-
-      // Only record closures requiring self qualification prior to Swift 6
-      // mode.
-      return isClosureRequiringSelfQualification(E);
-    }
-
-    PreWalkResult<Expr *> walkToExprPre(Expr *E) override {
-      if (auto *CE = dyn_cast<AbstractClosureExpr>(E)) {
-        if (shouldRecordClosure(CE))
-          Closures.push_back(CE);
-      }
-
-      // If we aren't in a closure, no diagnostics will be produced.
-      if (Closures.size() == 0)
-        return Action::Continue(E);
-
-      // Diagnostics should correct the innermost closure
-      auto *ACE = Closures[Closures.size() - 1];
-      assert(ACE);
-
-      auto &Diags = Ctx.Diags;
-
-      // If this is an "implicit self" expr from the RHS of a shorthand
-      // condition like `guard let self` or `if let self`, then this is
-      // always allowed and we shouldn't run any diagnostics.
-      if (UnwrapStmtImplicitSelfExprs.count(E)) {
-        return Action::Continue(E);
-      }
-
-      SourceLoc memberLoc = SourceLoc();
-      const DeclRefExpr *selfDRE = nullptr;
-      if (auto *MRE = dyn_cast<MemberRefExpr>(E))
-        if (!selfDeclAllowsImplicitSelf(MRE->getBase(), ACE)) {
-          selfDRE = dyn_cast_or_null<DeclRefExpr>(MRE->getBase());
-          auto baseName = MRE->getMember().getDecl()->getBaseName();
-          memberLoc = MRE->getLoc();
-          Diags
-              .diagnose(memberLoc,
-                        diag::property_use_in_closure_without_explicit_self,
-                        baseName.getIdentifier())
-              .warnUntilSwiftVersionIf(
-                  invalidImplicitSelfShouldOnlyWarn510(MRE->getBase(), ACE), 6);
-        }
-
-      // Handle method calls with a specific diagnostic + fixit.
-      if (auto *DSCE = dyn_cast<DotSyntaxCallExpr>(E))
-        if (!selfDeclAllowsImplicitSelf(DSCE->getBase(), ACE) &&
-            isa<DeclRefExpr>(DSCE->getFn())) {
-          selfDRE = dyn_cast_or_null<DeclRefExpr>(DSCE->getBase());
-          auto MethodExpr = cast<DeclRefExpr>(DSCE->getFn());
-          memberLoc = DSCE->getLoc();
-          Diags
-              .diagnose(DSCE->getLoc(),
-                        diag::method_call_in_closure_without_explicit_self,
-                        MethodExpr->getDecl()->getBaseIdentifier())
-              .warnUntilSwiftVersionIf(
-                  invalidImplicitSelfShouldOnlyWarn510(DSCE->getBase(), ACE),
-                  6);
-        }
-
-      if (memberLoc.isValid()) {
-        const AbstractClosureExpr *parentDisallowingImplicitSelf = nullptr;
-        if (Ctx.isSwiftVersionAtLeast(6) && selfDRE && selfDRE->getDecl()) {
-          parentDisallowingImplicitSelf = parentClosureDisallowingImplicitSelf(
-              selfDRE->getDecl(), selfDRE->getType(), ACE);
-        }
-
-        emitFixIts(Diags, memberLoc, parentDisallowingImplicitSelf, ACE);
-        return Action::SkipNode(E);
-      }
-
-      if (!selfDeclAllowsImplicitSelf(E, ACE)) {
-        Diags.diagnose(E->getLoc(), diag::implicit_use_of_self_in_closure)
-            .warnUntilSwiftVersionIf(
-                invalidImplicitSelfShouldOnlyWarn510(E, ACE), 6);
-      }
-      return Action::Continue(E);
-    }
-
-    PostWalkResult<Expr *> walkToExprPost(Expr *E) override {
-      auto *ACE = dyn_cast<AbstractClosureExpr>(E);
-      if (!ACE) {
-        return Action::Continue(E);
-      }
-
-      if (shouldRecordClosure(ACE)) {
-        assert(Closures.size() > 0);
-        Closures.pop_back();
-      }
-      return Action::Continue(E);
-    }
-
-    PreWalkResult<Stmt *> walkToStmtPre(Stmt *S) override {
-      /// Conditions like `if let self` or `guard let self`
-      /// have an RHS 'self' decl that is implicit, but this is not
-      /// the sort of "implicit self" decl that should trigger
-      /// these diagnostics. Track these DREs in a list so we can
-      /// avoid running diagnostics on them when we see them later.
-      auto conditionalStmt = dyn_cast<LabeledConditionalStmt>(S);
-      if (!conditionalStmt) {
-        return Action::Continue(S);
-      }
-
-      for (auto cond : conditionalStmt->getCond()) {
-        if (cond.getKind() != StmtConditionElement::CK_PatternBinding) {
-          continue;
-        }
-
-        if (auto OSP = dyn_cast<OptionalSomePattern>(cond.getPattern())) {
-          if (OSP->getSubPattern()->getBoundName() != Ctx.Id_self) {
-            continue;
-          }
-
-          auto E = cond.getInitializer();
-
-          // Peer through any implicit conversions like a LoadExpr
-          if (auto *ICE = dyn_cast<ImplicitConversionExpr>(E)) {
-            E = ICE->getSubExpr();
-          }
-
-          if (isImplicitSelf(E)) {
-            UnwrapStmtImplicitSelfExprs.insert(E);
-          }
-        }
-      }
-
-      return Action::Continue(S);
-    }
-
-    /// Emit any fix-its for this error.
-    void emitFixIts(DiagnosticEngine &Diags, SourceLoc memberLoc,
-                    const AbstractClosureExpr *parentDisallowingImplicitSelf,
-                    const AbstractClosureExpr *ACE) {
-      // These fix-its have to be diagnosed on the closure that requires,
-      // but is currently missing, self qualification. It's possible that
-      // ACE doesn't require self qualification (e.g. because it's
-      // non-escaping) but is nested inside a closure that does require self
-      // qualification. In that case we have to emit the fixit for the parent
-      // closure.
-      //  - Even if this closure requires self qualification, if there's an
-      //    invalid parent we emit the diagnostic on that parent first.
-      //    To enable implicit self you'd have to fix the parent anyway.
-      //    This lets us avoid bogus diagnostics on this closure when
-      //    it's actually _just_ the parent that's invalid.
-      auto closureForDiagnostics = ACE;
-      if (parentDisallowingImplicitSelf) {
-        // Don't do this for escaping autoclosures, which are never allowed
-        // to use implicit self, even after fixing any invalid parents.
-        auto isEscapingAutoclosure =
-            isa<AutoClosureExpr>(ACE) &&
-            isClosureRequiringSelfQualification(ACE);
-        if (!isEscapingAutoclosure) {
-          closureForDiagnostics = parentDisallowingImplicitSelf;
-        }
-      }
-
-      // This error can be fixed by either capturing self explicitly (if in an
-      // explicit closure), or referencing self explicitly.
-      if (auto *CE = dyn_cast<const ClosureExpr>(closureForDiagnostics)) {
-        if (diagnoseAlmostMatchingCaptures(Diags, memberLoc, CE)) {
-          // Bail on the rest of the diagnostics. Offering the option to
-          // capture 'self' explicitly will result in an error, and using
-          // 'self.' explicitly will be accessing something other than the
-          // self param.
-          return;
-        }
-        emitFixItsForExplicitClosure(Diags, memberLoc, CE);
-      } else {
-        // If this wasn't an explicit closure, just offer the fix-it to
-        // reference self explicitly.
-        Diags.diagnose(memberLoc, diag::note_reference_self_explicitly)
-          .fixItInsert(memberLoc, "self.");
-      }
-    }
-
-    /// Diagnose any captures which might have been an attempt to capture
-    /// \c self strongly, but do not actually enable implicit \c self. Returns
-    /// whether there were any such captures to diagnose.
-    bool diagnoseAlmostMatchingCaptures(DiagnosticEngine &Diags,
-                                        SourceLoc memberLoc,
-                                        const ClosureExpr *closureExpr) {
-      // If we've already captured something with the name "self" other than
-      // the actual self param, offer special diagnostics.
-      if (auto *VD = closureExpr->getCapturedSelfDecl()) {
-        if (!VD->getInterfaceType()->is<WeakStorageType>()) {
-          Diags.diagnose(VD->getLoc(), diag::note_other_self_capture);
-        }
-        
-        return true;
-      }
-      return false;
-    }
-
-    /// Emit fix-its for invalid use of implicit \c self in an explicit closure.
-    /// The error can be solved by capturing self explicitly,
-    /// or by using \c self. explicitly.
-    void emitFixItsForExplicitClosure(DiagnosticEngine &Diags,
-                                      SourceLoc memberLoc,
-                                      const ClosureExpr *closureExpr) {
-      Diags.diagnose(memberLoc, diag::note_reference_self_explicitly)
-        .fixItInsert(memberLoc, "self.");
-      auto diag = Diags.diagnose(closureExpr->getLoc(),
-                                 diag::note_capture_self_explicitly);
-      // There are four different potential fix-its to offer based on the
-      // closure signature:
-      //   1. There is an existing capture list which already has some
-      //      entries. We need to insert 'self' into the capture list along
-      //      with a separating comma.
-      //   2. There is an existing capture list, but it is empty (just '[]').
-      //      We can just insert 'self'.
-      //   3. Arguments or types are already specified in the signature,
-      //      but there is no existing capture list. We will need to insert
-      //      the capture list, but 'in' will already be present.
-      //   4. The signature empty so far. We must insert the full capture
-      //      list as well as 'in'.
-      const auto brackets = closureExpr->getBracketRange();
-      if (brackets.isValid()) {
-        emitInsertSelfIntoCaptureListFixIt(brackets, diag);
-      }
-      else {
-        emitInsertNewCaptureListFixIt(closureExpr, diag);
-      }
-    }
-
-    /// Emit a fix-it for inserting \c self into in existing capture list, along
-    /// with a trailing comma if needed. The fix-it will be attached to the
-    /// provided diagnostic \c diag.
-    void emitInsertSelfIntoCaptureListFixIt(SourceRange brackets,
-                                            InFlightDiagnostic &diag) {
-      // Look for any non-comment token. If there's anything before the
-      // closing bracket, we assume that it is a valid capture list entry and
-      // insert 'self,'. If it wasn't a valid entry, then we will at least not
-      // be introducing any new errors/warnings...
-      const auto locAfterBracket = brackets.Start.getAdvancedLoc(1);
-      const auto nextAfterBracket = Lexer::getTokenAtLocation(
-          Ctx.SourceMgr, locAfterBracket, CommentRetentionMode::None);
-      if (nextAfterBracket.getLoc() != brackets.End)
-        diag.fixItInsertAfter(brackets.Start, "self, ");
-      else
-        diag.fixItInsertAfter(brackets.Start, "self");
-    }
-
-    /// Emit a fix-it for inserting a capture list into a closure that does not
-    /// already have one, along with a trailing \c in if necessary. The fix-it
-    /// will be attached to the provided diagnostic \c diag.
-    void emitInsertNewCaptureListFixIt(const ClosureExpr *closureExpr,
-                                       InFlightDiagnostic &diag) {
-      if (closureExpr->getInLoc().isValid()) {
-        diag.fixItInsertAfter(closureExpr->getLoc(), " [self]");
-        return;
-      }
-
-      // If there's a (non-comment) token immediately following the
-      // opening brace of the closure, we may need to pad the fix-it
-      // with a space.
-      const auto nextLoc = closureExpr->getLoc().getAdvancedLoc(1);
-      const auto next =
-      Lexer::getTokenAtLocation(Ctx.SourceMgr, nextLoc,
-                                CommentRetentionMode::None);
-      std::string trailing = next.getLoc() == nextLoc ? " " : "";
-
-      diag.fixItInsertAfter(closureExpr->getLoc(), " [self] in" + trailing);
-    }
-
-    /// Whether or not this invalid usage of implicit self should be a warning
-    /// in Swift 5 mode, to preserve source compatibility.
-    bool invalidImplicitSelfShouldOnlyWarn510(Expr *selfRef,
-                                              AbstractClosureExpr *ACE) {
-      auto DRE = dyn_cast_or_null<DeclRefExpr>(selfRef);
-      if (!DRE)
-        return false;
-
-      auto selfDecl = dyn_cast_or_null<VarDecl>(DRE->getDecl());
-      if (!selfDecl)
-        return false;
-
-      // If this implicit self decl is from a closure that captured self
-      // weakly, then we should always emit an error, since implicit self was
-      // only allowed starting in Swift 5.8 and later.
-      if (closureHasWeakSelfCapture(ACE)) {
-        // Implicit self was incorrectly permitted for weak self captures
-        // in non-escaping closures in Swift 5.7, so in that case we can
-        // only warn until Swift 6.
-        return !isClosureRequiringSelfQualification(ACE,
-                                                    /*ignoreWeakSelf*/ true);
-      }
-
-      return !selfDecl->isSelfParameter();
-    }
-  };
+  using DiagnoseWalker = ImplicitSelfUsageChecker;
 
   auto &ctx = DC->getASTContext();
   AbstractClosureExpr *ACE = nullptr;

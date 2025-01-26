@@ -20,7 +20,7 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/AccessScope.h"
 #include "swift/AST/AnyFunctionRef.h"
-#include "swift/AST/Availability.h"
+#include "swift/AST/AvailabilityRange.h"
 #include "swift/AST/AvailabilityScope.h"
 #include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/GenericParamList.h"
@@ -161,10 +161,17 @@ enum class NameLookupFlags {
   /// Whether to include members that would otherwise be filtered out because
   /// they come from a module that has not been imported.
   IgnoreMissingImports = 1 << 4,
+  /// If @abi attributes are present, return the decls representing the ABI,
+  /// not the API.
+  ABIProviding = 1 << 5,
+
+  // Reminder: If you add a flag, make sure you update simple_display() below
 };
 
 /// A set of options that control name lookup.
 using NameLookupOptions = OptionSet<NameLookupFlags>;
+
+void simple_display(llvm::raw_ostream &out, NameLookupOptions opts);
 
 inline NameLookupOptions operator|(NameLookupFlags flag1,
                                    NameLookupFlags flag2) {
@@ -766,10 +773,9 @@ void computeCaptures(AbstractClosureExpr *ACE);
 /// Check for invalid captures from stored property initializers.
 void checkPatternBindingCaptures(IterableDeclContext *DC);
 
-/// Change the context of closures in the given initializer
-/// expression to the given context.
-void contextualizeInitializer(Initializer *DC, Expr *init);
-void contextualizeCallSideDefaultArgument(DeclContext *DC, Expr *init);
+/// Update the DeclContexts for AST nodes in a given DeclContext. This is
+/// necessary after type-checking since autoclosures may have been introduced.
+void contextualizeExpr(Expr *E, DeclContext *DC);
 void contextualizeTopLevelCode(TopLevelCodeDecl *TLCD);
 
 /// Retrieve the default type for the given protocol.

@@ -42,6 +42,16 @@
                    DECL_ATTR_ALIAS(SPELLING, CLASS)
 #endif
 
+// Diagnose any use of the attribute CLASS without FEATURE_NAME enabled,
+// and also enable other special behavior. If you use this for an experimental
+// feature, please add test cases to:
+// 
+// * test/attr/feature_requirement.swift
+// * test/IDE/complete_decl_attribute_feature_requirement.swift
+#ifndef DECL_ATTR_FEATURE_REQUIREMENT
+#define DECL_ATTR_FEATURE_REQUIREMENT(CLASS, FEATURE_NAME)
+#endif
+
 #ifndef LAST_DECL_ATTR
 #define LAST_DECL_ATTR(CLASS)
 #endif
@@ -506,7 +516,7 @@ SIMPLE_DECL_ATTR(sensitive, Sensitive,
 SIMPLE_DECL_ATTR(unsafe, Unsafe,
   OnAbstractFunction | OnSubscript | OnVar | OnMacro | OnNominalType |
   OnExtension | OnTypeAlias | OnEnumElement | UserInaccessible |
-  ABIStableToAdd | ABIStableToRemove | APIBreakingToAdd | APIStableToRemove,
+  ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove,
   160)
 
 DECL_ATTR(lifetime, Lifetime,
@@ -514,16 +524,30 @@ DECL_ATTR(lifetime, Lifetime,
   161)
 
 SIMPLE_DECL_ATTR(_addressableSelf, AddressableSelf,
-  OnAccessor | OnConstructor | OnFunc | OnSubscript | ABIBreakingToAdd | ABIStableToRemove | APIBreakingToAdd | APIStableToRemove | UserInaccessible,
+  OnAccessor | OnConstructor | OnFunc | OnSubscript | ABIBreakingToAdd | ABIBreakingToRemove | APIBreakingToAdd | APIBreakingToRemove | UserInaccessible,
   162)
 
-DECL_ATTR(safe, Safe,
-  OnAbstractFunction | OnSubscript | OnVar | OnMacro | OnNominalType |
-  OnExtension | OnTypeAlias | UserInaccessible |
-  ABIStableToAdd | ABIStableToRemove | APIBreakingToAdd | APIStableToRemove,
+SIMPLE_DECL_ATTR(_addressableForDependencies, AddressableForDependencies,
+  OnNominalType | ABIBreakingToAdd | ABIBreakingToRemove | APIBreakingToAdd | APIBreakingToRemove | UserInaccessible,
   163)
 
-LAST_DECL_ATTR(Safe)
+SIMPLE_DECL_ATTR(safe, Safe,
+  OnAbstractFunction | OnSubscript | OnVar | OnMacro | OnNominalType |
+  OnExtension | OnEnumElement | UserInaccessible |
+  ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove,
+  164)
+
+DECL_ATTR(abi, ABI,
+  OnAbstractFunction | OnVar /* will eventually add types */ | LongAttribute | ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove,
+  165)
+DECL_ATTR_FEATURE_REQUIREMENT(ABI, ABIAttribute)
+
+DECL_ATTR(execution, Execution,
+  OnFunc | ABIBreakingToAdd | ABIBreakingToRemove | APIBreakingToAdd | APIBreakingToRemove,
+  166)
+DECL_ATTR_FEATURE_REQUIREMENT(Execution, NonIsolatedAsyncInheritsIsolationFromContext)
+
+LAST_DECL_ATTR(Execution)
 
 #undef DECL_ATTR_ALIAS
 #undef CONTEXTUAL_DECL_ATTR_ALIAS
@@ -531,4 +555,5 @@ LAST_DECL_ATTR(Safe)
 #undef CONTEXTUAL_SIMPLE_DECL_ATTR
 #undef DECL_ATTR
 #undef CONTEXTUAL_DECL_ATTR
+#undef DECL_ATTR_FEATURE_REQUIREMENT
 #undef LAST_DECL_ATTR

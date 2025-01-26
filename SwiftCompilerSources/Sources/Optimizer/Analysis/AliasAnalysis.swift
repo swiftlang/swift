@@ -378,15 +378,6 @@ struct AliasAnalysis {
       // The address has unknown escapes. So we have to take the global effects of the called function(s).
       memoryEffects = calleeAnalysis.getSideEffects(ofApply: apply).memory
     }
-    // Do some magic for `let` variables. Function calls cannot modify let variables.
-    // The only exception is that the let variable is directly passed to an indirect out of the apply.
-    // TODO: make this a more formal and verified approach.
-    if memoryEffects.write {
-      let accessBase = memLoc.address.accessBase
-      if accessBase.isLet && !accessBase.isIndirectResult(of: apply) {
-        return SideEffects.Memory(read: memoryEffects.read, write: false)
-      }
-    }
     return memoryEffects
   }
 
@@ -440,11 +431,7 @@ struct AliasAnalysis {
                                          initialWalkingDirection: memLoc.walkingDirection,
                                          complexityBudget: getComplexityBudget(for: inst.parentFunction), context)
     {
-      var effects = inst.memoryEffects
-      if memLoc.isLetValue {
-        effects.write = false
-      }
-      return effects
+      return inst.memoryEffects
     }
     return .noEffects
   }
@@ -603,7 +590,7 @@ private enum ImmutableScope {
 
   init?(for basedAddress: Value, _ context: FunctionPassContext) {
     switch basedAddress.enclosingAccessScope {
-    case .scope(let beginAccess):
+    case .access(let beginAccess):
       if beginAccess.isUnsafe {
         return nil
       }
@@ -628,6 +615,12 @@ private enum ImmutableScope {
           return nil
         }
         object = tailAddr.instance
+      case .global(let global):
+        if global.isLet && !basedAddress.parentFunction.canInitializeGlobal {
+          self = .wholeFunction
+          return
+        }
+        return nil
       default:
         return nil
       }
@@ -648,10 +641,13 @@ private enum ImmutableScope {
           self = .borrow(singleBorrowIntroducer)
         case .functionArgument:
           self = .wholeFunction
-        case .beginApply:
+        case .beginApply, .uncheckOwnershipConversion:
           return nil
         }
       }
+      case .dependence(let markDep):
+        // ignore mark_dependence for the purpose of alias analysis.
+        self.init(for: markDep.value, context)
     }
   }
 
@@ -901,6 +897,14 @@ private extension Type {
       return true
     }
     return false
+  }
+}
+
+private extension Function {
+  var canInitializeGlobal: Bool {
+    return isGlobalInitOnceFunction ||
+           // In non -parse-as-library mode globals are initialized in the `main` function.
+           name == "main"
   }
 }
 

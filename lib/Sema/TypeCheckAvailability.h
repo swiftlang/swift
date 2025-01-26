@@ -13,7 +13,7 @@
 #ifndef SWIFT_SEMA_TYPE_CHECK_AVAILABILITY_H
 #define SWIFT_SEMA_TYPE_CHECK_AVAILABILITY_H
 
-#include "swift/AST/AttrKind.h"
+#include "swift/AST/Attr.h"
 #include "swift/AST/AvailabilityConstraint.h"
 #include "swift/AST/AvailabilityContext.h"
 #include "swift/AST/DeclContext.h"
@@ -26,7 +26,6 @@
 
 namespace swift {
   class ApplyExpr;
-  class AvailableAttr;
   class Expr;
   class ClosureExpr;
   class InFlightDiagnostic;
@@ -37,6 +36,7 @@ namespace swift {
   class SubstitutionMap;
   class Type;
   class TypeRepr;
+  class UnsafeUse;
   class ValueDecl;
 
 enum class DeclAvailabilityFlag : uint8_t {
@@ -62,6 +62,9 @@ enum class DeclAvailabilityFlag : uint8_t {
   /// Do not diagnose potential decl unavailability if that unavailability
   /// would only occur at or below the deployment target.
   AllowPotentiallyUnavailableAtOrBelowDeploymentTarget = 1 << 4,
+
+  /// Don't perform "unsafe" checking.
+  DisableUnsafeChecking = 1 << 5,
 };
 using DeclAvailabilityFlags = OptionSet<DeclAvailabilityFlag>;
 
@@ -106,14 +109,16 @@ class ExportContext {
   DeclContext *DC;
   AvailabilityContext Availability;
   FragileFunctionKind FragileKind;
+  llvm::SmallVectorImpl<UnsafeUse> *UnsafeUses;
   unsigned SPI : 1;
   unsigned Exported : 1;
   unsigned Implicit : 1;
   unsigned Reason : 3;
 
   ExportContext(DeclContext *DC, AvailabilityContext availability,
-                FragileFunctionKind kind, bool spi, bool exported,
-                bool implicit);
+                FragileFunctionKind kind,
+                llvm::SmallVectorImpl<UnsafeUse> *unsafeUses,
+                bool spi, bool exported, bool implicit);
 
 public:
 
@@ -122,7 +127,8 @@ public:
   ///
   /// If the declaration is exported, the resulting context is restricted to
   /// referencing exported types only. Otherwise it can reference anything.
-  static ExportContext forDeclSignature(Decl *D);
+  static ExportContext forDeclSignature(
+      Decl *D, llvm::SmallVectorImpl<UnsafeUse> *unsafeUses);
 
   /// Create an instance describing the declarations that can be referenced
   /// from the given function's body.
@@ -166,6 +172,12 @@ public:
   /// If not 'None', the context has the inlinable function body restriction.
   FragileFunctionKind getFragileFunctionKind() const { return FragileKind; }
 
+  /// Retrieve a pointer to the vector where any unsafe uses should be stored.
+  /// When NULL, we shouldn't be checking
+  llvm::SmallVectorImpl<UnsafeUse> *getUnsafeUses() const {
+    return UnsafeUses;
+  }
+
   /// If true, the context is part of a synthesized declaration, and
   /// availability checking should be disabled.
   bool isImplicit() const { return Implicit; }
@@ -181,10 +193,6 @@ public:
   /// reference other deprecated declarations without warning.
   bool isDeprecated() const { return Availability.isDeprecated(); }
 
-  std::optional<PlatformKind> getUnavailablePlatformKind() const {
-    return Availability.getUnavailablePlatformKind();
-  }
-
   /// If true, the context can only reference exported declarations, either
   /// because it is the signature context of an exported declaration, or
   /// because it is the function body context of an inlinable function.
@@ -198,7 +206,8 @@ public:
   /// is not also unavailable in the same way, then this returns the specific
   /// `@available` attribute that makes the decl unavailable. Otherwise, returns
   /// nullptr.
-  const AvailableAttr *shouldDiagnoseDeclAsUnavailable(const Decl *decl) const;
+  std::optional<SemanticAvailableAttr>
+  shouldDiagnoseDeclAsUnavailable(const Decl *decl) const;
 };
 
 /// Check if a declaration is exported as part of a module's external interface.
@@ -239,7 +248,7 @@ bool diagnoseDeclAvailability(const ValueDecl *D, SourceRange R,
 /// unavailable declaration.
 void diagnoseOverrideOfUnavailableDecl(ValueDecl *override,
                                        const ValueDecl *base,
-                                       const AvailableAttr *attr);
+                                       SemanticAvailableAttr attr);
 
 /// Checks whether a declaration should be considered unavailable when referred
 /// to in the given declaration context and availability context and, if so,

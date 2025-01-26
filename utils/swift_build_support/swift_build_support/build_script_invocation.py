@@ -138,6 +138,7 @@ class BuildScriptInvocation(object):
             '--build-swift-clang-overlays', str(
                 args.build_swift_clang_overlays).lower(),
             '--build-swift-remote-mirror', str(args.build_swift_remote_mirror).lower(),
+            "--swift-source-dirname", products.Swift.product_source_name(),
         ]
 
         # Compute any product specific cmake arguments.

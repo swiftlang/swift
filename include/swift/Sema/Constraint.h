@@ -150,17 +150,6 @@ enum class ConstraintKind : char {
   /// The key path type is chosen based on the selection of overloads for the
   /// member references along the path.
   KeyPath,
-  /// The first type will be equal to the second type, but only when the
-  /// second type has been fully determined (and mapped down to a concrete
-  /// type). At that point, this constraint will be treated like an `Equal`
-  /// constraint.
-  OneWayEqual,
-  /// The second type is the type of a function parameter, and the first type
-  /// is the type of a reference to that function parameter within the body.
-  /// Once the second type has been fully determined (and mapped down to a
-  /// concrete type), this constraint will be treated like a 'BindParam'
-  /// constraint.
-  OneWayBindParam,
   /// If there is no contextual info e.g. `_ = { 42 }` default first type
   /// to a second type. This is effectively a `Defaultable` constraint
   /// which one significant difference:
@@ -686,8 +675,6 @@ public:
     case ConstraintKind::DynamicCallableApplicableFunction:
     case ConstraintKind::BindOverload:
     case ConstraintKind::OptionalObject:
-    case ConstraintKind::OneWayEqual:
-    case ConstraintKind::OneWayBindParam:
     case ConstraintKind::FallbackType:
     case ConstraintKind::UnresolvedMemberChainBase:
     case ConstraintKind::PackElementOf:
@@ -825,11 +812,6 @@ public:
     });
   }
 
-  /// Returns the number of resolved argument types for an applied disjunction
-  /// constraint. This is always zero for disjunctions that do not represent
-  /// an applied overload.
-  unsigned countResolvedArgumentTypes(ConstraintSystem &cs) const;
-
   /// Determine if this constraint represents explicit conversion,
   /// e.g. coercion constraint "as X" which forms a disjunction.
   bool isExplicitConversion() const;
@@ -837,12 +819,6 @@ public:
   /// Determine whether this constraint should be solved in isolation
   /// from the rest of the constraint system.
   bool isIsolated() const { return IsIsolated; }
-
-  /// Whether this is a one-way constraint.
-  bool isOneWayConstraint() const {
-    return Kind == ConstraintKind::OneWayEqual ||
-        Kind == ConstraintKind::OneWayBindParam;
-  }
 
   /// Retrieve the overload choice for an overload-binding constraint.
   OverloadChoice getOverloadChoice() const {

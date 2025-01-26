@@ -39,3 +39,12 @@ extension S: P {}
 // CHECK: sil shared [serialized]{{.*}} @$s4main1SV11borrowedVarSivr : $@yield_once @convention(method) (S) -> @yields Int {
 // CHECK:   yield
 // CHECK: } // end sil function '$s4main1SV11borrowedVarSivr'
+
+// We type-check this function since it has a nested type, but we don't
+// type-check the implicit lazy getter for 'x'. As such, the nested autoclosure
+// won't have captures computed. Make sure we don't attempt to query the
+// captures.
+func testAutoclosureInLazyVar(_ y: Int?) {
+  struct R {}
+  lazy var x = y ?? 0
+}

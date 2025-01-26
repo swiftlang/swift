@@ -1,7 +1,5 @@
 // RUN: %empty-directory(%t)
 // RUN: mkdir -p %t/clang-module-cache
-// Temporarily disabled while the cache serialization code is being brought back from being stale/disabled for a long time
-// XFAIL: *
 
 // This test ensures that subsequent invocations of the dependency scanner that re-use previous cache state do not re-use cache entries that contain modules found outside of the current scanner invocation's search paths.
 

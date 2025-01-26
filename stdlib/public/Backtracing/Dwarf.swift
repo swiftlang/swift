@@ -19,8 +19,260 @@
 
 import Swift
 
-@_implementationOnly import ImageFormats.Dwarf
-@_implementationOnly import Runtime
+internal import BacktracingImpl.ImageFormats.Dwarf
+
+// .. Use *our* Dwarf definitions ..............................................
+
+// To avoid confusion with other similar sets of definitions, we've put ours
+// into a C++ wrapper, which means we need aliases here.
+
+typealias Dwarf_Byte   = swift.runtime.Dwarf_Byte
+typealias Dwarf_Half   = swift.runtime.Dwarf_Half
+typealias Dwarf_Word   = swift.runtime.Dwarf_Word
+typealias Dwarf_Xword  = swift.runtime.Dwarf_Xword
+typealias Dwarf_Sbyte  = swift.runtime.Dwarf_Sbyte
+typealias Dwarf_Sword  = swift.runtime.Dwarf_Sword
+typealias Dwarf_Sxword = swift.runtime.Dwarf_Sxword
+
+typealias Dwarf32_Offset = swift.runtime.Dwarf32_Offset
+typealias Dwarf32_Size   = swift.runtime.Dwarf32_Size
+typealias Dwarf32_Length = swift.runtime.Dwarf32_Length
+
+typealias Dwarf64_Offset = swift.runtime.Dwarf64_Offset
+typealias Dwarf64_Size   = swift.runtime.Dwarf64_Size
+typealias Dwarf64_Length = swift.runtime.Dwarf64_Length
+
+typealias Dwarf_UnitType           = swift.runtime.Dwarf_UnitType
+typealias Dwarf_Tag                = swift.runtime.Dwarf_Tag
+typealias Dwarf_ChildDetermination = swift.runtime.Dwarf_ChildDetermination
+typealias Dwarf_Attribute          = swift.runtime.Dwarf_Attribute
+typealias Dwarf_Form               = swift.runtime.Dwarf_Form
+
+let DW_OP_addr                = swift.runtime.DW_OP_addr
+let DW_OP_deref               = swift.runtime.DW_OP_deref
+let DW_OP_const1u             = swift.runtime.DW_OP_const1u
+let DW_OP_const1s             = swift.runtime.DW_OP_const1s
+let DW_OP_const2u             = swift.runtime.DW_OP_const2u
+let DW_OP_const2s             = swift.runtime.DW_OP_const2s
+let DW_OP_const4u             = swift.runtime.DW_OP_const4u
+let DW_OP_const4s             = swift.runtime.DW_OP_const4s
+let DW_OP_const8u             = swift.runtime.DW_OP_const8u
+let DW_OP_const8s             = swift.runtime.DW_OP_const8s
+let DW_OP_constu              = swift.runtime.DW_OP_constu
+let DW_OP_consts              = swift.runtime.DW_OP_consts
+let DW_OP_dup                 = swift.runtime.DW_OP_dup
+let DW_OP_drop                = swift.runtime.DW_OP_drop
+let DW_OP_over                = swift.runtime.DW_OP_over
+let DW_OP_pick                = swift.runtime.DW_OP_pick
+let DW_OP_swap                = swift.runtime.DW_OP_swap
+let DW_OP_rot                 = swift.runtime.DW_OP_rot
+let DW_OP_xderef              = swift.runtime.DW_OP_xderef
+let DW_OP_abs                 = swift.runtime.DW_OP_abs
+let DW_OP_and                 = swift.runtime.DW_OP_and
+let DW_OP_div                 = swift.runtime.DW_OP_div
+let DW_OP_minus               = swift.runtime.DW_OP_minus
+let DW_OP_mod                 = swift.runtime.DW_OP_mod
+let DW_OP_mul                 = swift.runtime.DW_OP_mul
+let DW_OP_neg                 = swift.runtime.DW_OP_neg
+let DW_OP_not                 = swift.runtime.DW_OP_not
+let DW_OP_or                  = swift.runtime.DW_OP_or
+let DW_OP_plus                = swift.runtime.DW_OP_plus
+let DW_OP_plus_uconst         = swift.runtime.DW_OP_plus_uconst
+let DW_OP_shl                 = swift.runtime.DW_OP_shl
+let DW_OP_shr                 = swift.runtime.DW_OP_shr
+let DW_OP_shra                = swift.runtime.DW_OP_shra
+let DW_OP_xor                 = swift.runtime.DW_OP_xor
+let DW_OP_bra                 = swift.runtime.DW_OP_bra
+let DW_OP_eq                  = swift.runtime.DW_OP_eq
+let DW_OP_ge                  = swift.runtime.DW_OP_ge
+let DW_OP_gt                  = swift.runtime.DW_OP_gt
+let DW_OP_le                  = swift.runtime.DW_OP_le
+let DW_OP_lt                  = swift.runtime.DW_OP_lt
+let DW_OP_ne                  = swift.runtime.DW_OP_ne
+let DW_OP_skip                = swift.runtime.DW_OP_skip
+let DW_OP_lit0                = swift.runtime.DW_OP_lit0
+let DW_OP_lit1                = swift.runtime.DW_OP_lit1
+let DW_OP_lit2                = swift.runtime.DW_OP_lit2
+let DW_OP_lit3                = swift.runtime.DW_OP_lit3
+let DW_OP_lit4                = swift.runtime.DW_OP_lit4
+let DW_OP_lit5                = swift.runtime.DW_OP_lit5
+let DW_OP_lit6                = swift.runtime.DW_OP_lit6
+let DW_OP_lit7                = swift.runtime.DW_OP_lit7
+let DW_OP_lit8                = swift.runtime.DW_OP_lit8
+let DW_OP_lit9                = swift.runtime.DW_OP_lit9
+let DW_OP_lit10               = swift.runtime.DW_OP_lit10
+let DW_OP_lit11               = swift.runtime.DW_OP_lit11
+let DW_OP_lit12               = swift.runtime.DW_OP_lit12
+let DW_OP_lit13               = swift.runtime.DW_OP_lit13
+let DW_OP_lit14               = swift.runtime.DW_OP_lit14
+let DW_OP_lit15               = swift.runtime.DW_OP_lit15
+let DW_OP_lit16               = swift.runtime.DW_OP_lit16
+let DW_OP_lit17               = swift.runtime.DW_OP_lit17
+let DW_OP_lit18               = swift.runtime.DW_OP_lit18
+let DW_OP_lit19               = swift.runtime.DW_OP_lit19
+let DW_OP_lit20               = swift.runtime.DW_OP_lit20
+let DW_OP_lit21               = swift.runtime.DW_OP_lit21
+let DW_OP_lit22               = swift.runtime.DW_OP_lit22
+let DW_OP_lit23               = swift.runtime.DW_OP_lit23
+let DW_OP_lit24               = swift.runtime.DW_OP_lit24
+let DW_OP_lit25               = swift.runtime.DW_OP_lit25
+let DW_OP_lit26               = swift.runtime.DW_OP_lit26
+let DW_OP_lit27               = swift.runtime.DW_OP_lit27
+let DW_OP_lit28               = swift.runtime.DW_OP_lit28
+let DW_OP_lit29               = swift.runtime.DW_OP_lit29
+let DW_OP_lit30               = swift.runtime.DW_OP_lit30
+let DW_OP_lit31               = swift.runtime.DW_OP_lit31
+
+let DW_OP_reg0                = swift.runtime.DW_OP_reg0
+let DW_OP_reg1                = swift.runtime.DW_OP_reg1
+let DW_OP_reg2                = swift.runtime.DW_OP_reg2
+let DW_OP_reg3                = swift.runtime.DW_OP_reg3
+let DW_OP_reg4                = swift.runtime.DW_OP_reg4
+let DW_OP_reg5                = swift.runtime.DW_OP_reg5
+let DW_OP_reg6                = swift.runtime.DW_OP_reg6
+let DW_OP_reg7                = swift.runtime.DW_OP_reg7
+let DW_OP_reg8                = swift.runtime.DW_OP_reg8
+let DW_OP_reg9                = swift.runtime.DW_OP_reg9
+let DW_OP_reg10               = swift.runtime.DW_OP_reg10
+let DW_OP_reg11               = swift.runtime.DW_OP_reg11
+let DW_OP_reg12               = swift.runtime.DW_OP_reg12
+let DW_OP_reg13               = swift.runtime.DW_OP_reg13
+let DW_OP_reg14               = swift.runtime.DW_OP_reg14
+let DW_OP_reg15               = swift.runtime.DW_OP_reg15
+let DW_OP_reg16               = swift.runtime.DW_OP_reg16
+let DW_OP_reg17               = swift.runtime.DW_OP_reg17
+let DW_OP_reg18               = swift.runtime.DW_OP_reg18
+let DW_OP_reg19               = swift.runtime.DW_OP_reg19
+let DW_OP_reg20               = swift.runtime.DW_OP_reg20
+let DW_OP_reg21               = swift.runtime.DW_OP_reg21
+let DW_OP_reg22               = swift.runtime.DW_OP_reg22
+let DW_OP_reg23               = swift.runtime.DW_OP_reg23
+let DW_OP_reg24               = swift.runtime.DW_OP_reg24
+let DW_OP_reg25               = swift.runtime.DW_OP_reg25
+let DW_OP_reg26               = swift.runtime.DW_OP_reg26
+let DW_OP_reg27               = swift.runtime.DW_OP_reg27
+let DW_OP_reg28               = swift.runtime.DW_OP_reg28
+let DW_OP_reg29               = swift.runtime.DW_OP_reg29
+let DW_OP_reg30               = swift.runtime.DW_OP_reg30
+let DW_OP_reg31               = swift.runtime.DW_OP_reg31
+
+let DW_OP_breg0               = swift.runtime.DW_OP_breg0
+let DW_OP_breg1               = swift.runtime.DW_OP_breg1
+let DW_OP_breg2               = swift.runtime.DW_OP_breg2
+let DW_OP_breg3               = swift.runtime.DW_OP_breg3
+let DW_OP_breg4               = swift.runtime.DW_OP_breg4
+let DW_OP_breg5               = swift.runtime.DW_OP_breg5
+let DW_OP_breg6               = swift.runtime.DW_OP_breg6
+let DW_OP_breg7               = swift.runtime.DW_OP_breg7
+let DW_OP_breg8               = swift.runtime.DW_OP_breg8
+let DW_OP_breg9               = swift.runtime.DW_OP_breg9
+let DW_OP_breg10              = swift.runtime.DW_OP_breg10
+let DW_OP_breg11              = swift.runtime.DW_OP_breg11
+let DW_OP_breg12              = swift.runtime.DW_OP_breg12
+let DW_OP_breg13              = swift.runtime.DW_OP_breg13
+let DW_OP_breg14              = swift.runtime.DW_OP_breg14
+let DW_OP_breg15              = swift.runtime.DW_OP_breg15
+let DW_OP_breg16              = swift.runtime.DW_OP_breg16
+let DW_OP_breg17              = swift.runtime.DW_OP_breg17
+let DW_OP_breg18              = swift.runtime.DW_OP_breg18
+let DW_OP_breg19              = swift.runtime.DW_OP_breg19
+let DW_OP_breg20              = swift.runtime.DW_OP_breg20
+let DW_OP_breg21              = swift.runtime.DW_OP_breg21
+let DW_OP_breg22              = swift.runtime.DW_OP_breg22
+let DW_OP_breg23              = swift.runtime.DW_OP_breg23
+let DW_OP_breg24              = swift.runtime.DW_OP_breg24
+let DW_OP_breg25              = swift.runtime.DW_OP_breg25
+let DW_OP_breg26              = swift.runtime.DW_OP_breg26
+let DW_OP_breg27              = swift.runtime.DW_OP_breg27
+let DW_OP_breg28              = swift.runtime.DW_OP_breg28
+let DW_OP_breg29              = swift.runtime.DW_OP_breg29
+let DW_OP_breg30              = swift.runtime.DW_OP_breg30
+let DW_OP_breg31              = swift.runtime.DW_OP_breg31
+let DW_OP_regx                = swift.runtime.DW_OP_regx
+let DW_OP_fbreg               = swift.runtime.DW_OP_fbreg
+let DW_OP_bregx               = swift.runtime.DW_OP_bregx
+let DW_OP_piece               = swift.runtime.DW_OP_piece
+let DW_OP_deref_size          = swift.runtime.DW_OP_deref_size
+let DW_OP_xderef_size         = swift.runtime.DW_OP_xderef_size
+let DW_OP_nop                 = swift.runtime.DW_OP_nop
+let DW_OP_push_object_address = swift.runtime.DW_OP_push_object_address
+let DW_OP_call2               = swift.runtime.DW_OP_call2
+let DW_OP_call4               = swift.runtime.DW_OP_call4
+let DW_OP_call_ref            = swift.runtime.DW_OP_call_ref
+let DW_OP_form_tls_address    = swift.runtime.DW_OP_form_tls_address
+let DW_OP_call_frame_cfa      = swift.runtime.DW_OP_call_frame_cfa
+let DW_OP_bit_piece           = swift.runtime.DW_OP_bit_piece
+let DW_OP_implicit_value      = swift.runtime.DW_OP_implicit_value
+let DW_OP_stack_value         = swift.runtime.DW_OP_stack_value
+let DW_OP_implicit_pointer    = swift.runtime.DW_OP_implicit_pointer
+let DW_OP_addrx               = swift.runtime.DW_OP_addrx
+let DW_OP_constx              = swift.runtime.DW_OP_constx
+let DW_OP_entry_value         = swift.runtime.DW_OP_entry_value
+let DW_OP_const_type          = swift.runtime.DW_OP_const_type
+let DW_OP_regval_type         = swift.runtime.DW_OP_regval_type
+let DW_OP_deref_type          = swift.runtime.DW_OP_deref_type
+let DW_OP_xderef_type         = swift.runtime.DW_OP_xderef_type
+let DW_OP_convert             = swift.runtime.DW_OP_convert
+let DW_OP_reinterpret         = swift.runtime.DW_OP_reinterpret
+let DW_OP_lo_user             = swift.runtime.DW_OP_lo_user
+let DW_OP_hi_user             = swift.runtime.DW_OP_hi_user
+
+typealias Dwarf_LNS_Opcode = swift.runtime.Dwarf_LNS_Opcode
+typealias Dwarf_LNE_Opcode = swift.runtime.Dwarf_LNE_Opcode
+typealias Dwarf_Lhdr_Format = swift.runtime.Dwarf_Lhdr_Format
+
+typealias DWARF32_Lhdr = swift.runtime.DWARF32_Lhdr
+typealias DWARF64_Lhdr = swift.runtime.DWARF64_Lhdr
+
+let DW_CFA_advance_loc        = swift.runtime.DW_CFA_advance_loc
+let DW_CFA_offset             = swift.runtime.DW_CFA_offset
+let DW_CFA_restore            = swift.runtime.DW_CFA_restore
+let DW_CFA_nop                = swift.runtime.DW_CFA_nop
+let DW_CFA_set_loc            = swift.runtime.DW_CFA_set_loc
+let DW_CFA_advance_loc1       = swift.runtime.DW_CFA_advance_loc1
+let DW_CFA_advance_loc2       = swift.runtime.DW_CFA_advance_loc2
+let DW_CFA_advance_loc4       = swift.runtime.DW_CFA_advance_loc4
+let DW_CFA_offset_extended    = swift.runtime.DW_CFA_offset_extended
+let DW_CFA_restore_extended   = swift.runtime.DW_CFA_restore_extended
+let DW_CFA_undefined          = swift.runtime.DW_CFA_undefined
+let DW_CFA_same_value         = swift.runtime.DW_CFA_same_value
+let DW_CFA_register           = swift.runtime.DW_CFA_register
+let DW_CFA_remember_state     = swift.runtime.DW_CFA_remember_state
+let DW_CFA_restore_state      = swift.runtime.DW_CFA_restore_state
+let DW_CFA_def_cfa            = swift.runtime.DW_CFA_def_cfa
+let DW_CFA_def_cfa_register   = swift.runtime.DW_CFA_def_cfa_register
+let DW_CFA_def_cfa_offset     = swift.runtime.DW_CFA_def_cfa_offset
+let DW_CFA_def_cfa_expression = swift.runtime.DW_CFA_def_cfa_expression
+let DW_CFA_expression         = swift.runtime.DW_CFA_expression
+let DW_CFA_offset_extended_sf = swift.runtime.DW_CFA_offset_extended_sf
+let DW_CFA_def_cfa_sf         = swift.runtime.DW_CFA_def_cfa_sf
+let DW_CFA_def_cfa_offset_sf  = swift.runtime.DW_CFA_def_cfa_offset_sf
+let DW_CFA_val_offset         = swift.runtime.DW_CFA_val_offset
+let DW_CFA_val_offset_sf      = swift.runtime.DW_CFA_val_offset_sf
+let DW_CFA_val_expression     = swift.runtime.DW_CFA_val_expression
+let DW_CFA_lo_user            = swift.runtime.DW_CFA_lo_user
+let DW_CFA_hi_user            = swift.runtime.DW_CFA_hi_user
+
+typealias Dwarf_RLE_Entry = swift.runtime.Dwarf_RLE_Entry
+typealias Dwarf32_CIEHdr  = swift.runtime.Dwarf32_CIEHdr
+typealias Dwarf64_CIEHdr  = swift.runtime.Dwarf64_CIEHdr
+typealias Dwarf32_FDEHdr  = swift.runtime.Dwarf32_FDEHdr
+
+typealias EHFrameHdr      = swift.runtime.EHFrameHdr
+typealias EHFrameEncoding = swift.runtime.EHFrameEncoding
+
+let DW_EH_PE_omit    = swift.runtime.DW_EH_PE_omit
+let DW_EH_PE_uleb128 = swift.runtime.DW_EH_PE_uleb128
+let DW_EH_PE_udata2  = swift.runtime.DW_EH_PE_udata2
+let DW_EH_PE_udata4  = swift.runtime.DW_EH_PE_udata4
+let DW_EH_PE_udata8  = swift.runtime.DW_EH_PE_udata8
+let DW_EH_PE_sleb128 = swift.runtime.DW_EH_PE_sleb128
+let DW_EH_PE_sdata2  = swift.runtime.DW_EH_PE_sdata2
+let DW_EH_PE_sdata4  = swift.runtime.DW_EH_PE_sdata4
+let DW_EH_PE_sdata8  = swift.runtime.DW_EH_PE_sdata8
+let DW_EH_PE_absptr  = swift.runtime.DW_EH_PE_absptr
+let DW_EH_PE_pcrel   = swift.runtime.DW_EH_PE_pcrel
+let DW_EH_PE_datarel = swift.runtime.DW_EH_PE_datarel
 
 // .. Dwarf specific errors ....................................................
 

@@ -72,6 +72,15 @@ if(SwiftCore_ENABLE_RUNTIME_LEAK_CHECKER)
     Leaks.mm)
 endif()
 
+# runtime/Paths.cpp uses `SWIFT_ARCH` and `SWIFT_LIB_SUBDIR` to find the
+# subdirectory under `libexec` in which to find the backtracer.
+# Fail the configuration if it isn't set appropriately.
+# TODO: In the future, we might consider moving the backtracer up to
+# `libexec/swift` and drop the platform/architecture specific subdirectories
+if(SwiftCore_ENABLE_FILESYSTEM_SUPPORT AND (NOT SwiftCore_ARCH_SUBDIR OR NOT SwiftCore_PLATFORM_SUBDIR))
+  message(SEND_ERROR "Filesystem support requires setting `SwiftCore_ARCH_SUBDIR` and `SwiftCore_PLATFORM_SUBDIR`")
+endif()
+
 # TODO: Probably worth considering putting half of these in a RuntimeConfig.h.in
 #       file rather than pushing them through macro flags.
 target_compile_definitions(swiftRuntime
@@ -84,7 +93,17 @@ target_compile_definitions(swiftRuntime
     $<$<BOOL:${SwiftCore_ENABLE_MALLOC_TYPE}>:-DSWIFT_STDLIB_HAS_MALLOC_TYPE>
     $<$<BOOL:${SwiftCore_BACKTRACER_PATH}>:-DSWIFT_RUNTIME_FIXED_BACKTRACER_PATH="${SwiftCore_BACKTRACER_PATH}">
     $<$<BOOL:${SwiftCore_ENABLE_STDLIB_TRACING}>:-DSWIFT_STDLIB_TRACING>
-    $<$<BOOL:${SwiftCore_ENABLE_SHORT_MANGLING_LOOKUPS}>:-DSWIFT_STDLIB_SHORT_MANGLING_LOOKUPS>)
+    $<$<BOOL:${SwiftCore_ENABLE_SHORT_MANGLING_LOOKUPS}>:-DSWIFT_STDLIB_SHORT_MANGLING_LOOKUPS>
+    $<$<BOOL:${SwiftCore_HAS_ASL}>:-DSWIFT_STDLIB_HAS_ASL>
+    $<$<BOOL:${SwiftCore_ENABLE_TYPE_PRINTING}>:-DSWIFT_STDLIB_HAS_TYPE_PRINTING>
+    $<$<BOOL:${SwiftCore_HAS_DLADDR}>:-DSWIFT_STDLIB_HAS_DLADDR>
+    $<$<BOOL:${SwiftCore_HAS_DLSYM}>:-DSWIFT_STDLIB_HAS_DLSYM>
+    $<$<BOOL:${SwiftCore_ENABLE_FILESYSTEM_SUPPORT}>:-DSWIFT_STDLIB_HAS_FILESYSTEM>
+    $<$<BOOL:${SwiftCore_ENABLE_FILESYSTEM_SUPPORT}>:-DSWIFT_ARCH="${SwiftCore_ARCH_SUBDIR}">
+    $<$<BOOL:${SwiftCore_ENABLE_FILESYSTEM_SUPPORT}>:-DSWIFT_LIB_SUBDIR="${SwiftCore_PLATFORM_SUBDIR}">
+    $<$<BOOL:${SwiftCore_ENABLE_FATALERROR_BACKTRACE}>:-DSWIFT_STDLIB_SUPPORTS_BACKTRACE_REPORTING>
+  PUBLIC
+    $<$<BOOL:${SwiftCore_ENABLE_OS_TRACE_LAZY_INIT}>:-DSWIFT_USE_OS_TRACE_LAZY_INIT>)
 
 target_include_directories(swiftRuntime PRIVATE
   "${PROJECT_BINARY_DIR}/include"
@@ -92,7 +111,8 @@ target_include_directories(swiftRuntime PRIVATE
 
 target_link_libraries(swiftRuntime PRIVATE
   $<$<PLATFORM_ID:Windows>:User32>
-  swiftShims)
+  swiftShims
+  swiftDemangling)
 
 # FIXME: Refactor so that we're not pulling sources from the compiler files
 target_sources(swiftRuntime PRIVATE
@@ -132,11 +152,21 @@ if("${SwiftCore_OBJECT_FORMAT}" STREQUAL "elfx")
     "${SwiftCore_SWIFTC_SOURCE_DIR}/include"
     "${PROJECT_BINARY_DIR}/include")
   target_link_libraries(swiftrt PRIVATE swiftShims)
-  install(TARGETS swiftrt DESTINATION "${CMAKE_INSTALL_LIBDIR}/swift")
+  # The driver requires that swifrt.o is under `usr/lib/swift/<platform>/<arch>`
+  # Regardless of settings
+  install(FILES $<TARGET_OBJECTS:swiftrt>
+    DESTINATION "${CMAKE_INSTALL_LIBDIR}/swift/${SwiftCore_PLATFORM_SUBDIR}/${SwiftCore_ARCH_SUBDIR}"
+    RENAME swiftrt.o)
 elseif("${SwiftCore_OBJECT_FORMAT}" STREQUAL "coffx")
   add_library(swiftrt OBJECT SwiftRT-COFF.cpp)
+  target_compile_definitions(swiftrt PRIVATE
+    $<$<NOT:$<BOOL:${BUILD_SHARED_LIBS}>>:SWIFT_STATIC_STDLIB>)
   target_link_libraries(swiftrt PRIVATE swiftShims)
-  install(TARGETS swiftrt DESTINATION "${CMAKE_INSTALL_LIBDIR}/swift")
+  install(FILES $<TARGET_OBJECTS:swiftrt>
+    # The driver requires that swifrt.obj is under `usr/lib/swift/<platform>/<arch>`
+    # Regardless of settings
+    DESTINATION "${CMAKE_INSTALL_LIBDIR}/swift/${SwiftCore_PLATFORM_SUBDIR}/${SwiftCore_ARCH_SUBDIR}"
+    RENAME swiftrt.obj)
 elseif(NOT "${SwiftCore_OBJECT_FORMAT}" STREQUAL "x")
   message(SEND_ERROR "Unknown object format '${SwiftCore_OBJECT_FORMAT}'")
 endif()

@@ -17,7 +17,6 @@
 #include "TypeChecker.h"
 #include "swift/AST/ASTMangler.h"
 #include "swift/AST/ASTPrinter.h"
-#include "swift/AST/Availability.h"
 #include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/DistributedDecl.h"
 #include "swift/AST/ExistentialLayout.h"
@@ -823,8 +822,7 @@ addDistributedActorCodableConformance(
       actor->getDeclaredInterfaceType(), proto,
       actor->getLoc(), /*dc=*/actor,
       ProtocolConformanceState::Incomplete,
-      /*isUnchecked=*/false,
-      /*isPreconcurrency=*/false);
+      ProtocolConformanceOptions());
   conformance->setSourceKindAndImplyingConformance(
       ConformanceEntryKind::Synthesized, nullptr);
   actor->registerProtocolConformance(conformance, /*synthesized=*/true);
@@ -1085,8 +1083,7 @@ GetDistributedActorAsActorConformanceRequest::evaluate(
 
   auto distributedActorAsActorConformance = ctx.getNormalConformance(
       Type(genericParam), actorProto, SourceLoc(), ext,
-      ProtocolConformanceState::Incomplete, /*isUnchecked=*/false,
-      /*isPreconcurrency=*/false);
+      ProtocolConformanceState::Incomplete, ProtocolConformanceOptions());
   // NOTE: Normally we "register" a conformance, but here we don't
   // because we cannot (currently) register them in a protocol,
   // since they do not have conformance tables.

@@ -1273,6 +1273,9 @@ public:
   visitMoveOnlyWrapperToCopyableBoxInst(MoveOnlyWrapperToCopyableBoxInst *i) {
     llvm_unreachable("OSSA instruction");
   }
+
+  void visitIgnoredUseInst(IgnoredUseInst *i) {}
+
   void
   visitMoveOnlyWrapperToCopyableAddrInst(MoveOnlyWrapperToCopyableAddrInst *i) {
     auto e = getLoweredExplosion(i->getOperand());
@@ -2146,12 +2149,11 @@ static void emitEntryPointArgumentsNativeCC(IRGenSILFunction &IGF,
   case SILCoroutineKind::None:
     break;
   case SILCoroutineKind::YieldOnce2:
-    if (IGF.IGM.IRGen.Opts.EmitYieldOnce2AsYieldOnce) {
-      LLVM_FALLTHROUGH;
-    } else {
+    if (!IGF.IGM.IRGen.Opts.EmitYieldOnce2AsYieldOnce) {
       emitYieldOnce2CoroutineEntry(IGF, funcTy, *emission);
       break;
     }
+    LLVM_FALLTHROUGH;
   case SILCoroutineKind::YieldOnce:
     emitYieldOnceCoroutineEntry(IGF, funcTy, *emission);
     break;
@@ -3118,6 +3120,8 @@ static bool mayDirectlyCallAsync(SILFunction *fn) {
 
 void IRGenSILFunction::visitFunctionRefBaseInst(FunctionRefBaseInst *i) {
   auto fn = i->getInitiallyReferencedFunction();
+  PrettyStackTraceSILFunction entry("lowering reference to", fn);
+
   auto fnType = fn->getLoweredFunctionType();
 
   auto fpKind = irgen::classifyFunctionPointerKind(fn);
@@ -3866,12 +3870,10 @@ void IRGenSILFunction::visitFullApplySite(FullApplySite site) {
     break;
 
   case SILCoroutineKind::YieldOnce2:
-    if (IGM.IRGen.Opts.EmitYieldOnce2AsYieldOnce) {
-      LLVM_FALLTHROUGH;
-    } else {
-      // @yield_once_2 coroutines allocate in the callee
+    // @yield_once_2 coroutines allocate in the callee
+    if (!IGM.IRGen.Opts.EmitYieldOnce2AsYieldOnce)
       break;
-    }
+    LLVM_FALLTHROUGH;
 
   case SILCoroutineKind::YieldOnce:
     coroutineBuffer = emitAllocYieldOnceCoroutineBuffer(*this);
@@ -8101,6 +8103,8 @@ void IRGenSILFunction::visitWitnessMethodInst(swift::WitnessMethodInst *i) {
   CanType baseTy = i->getLookupType();
   ProtocolConformanceRef conformance = i->getConformance();
   SILDeclRef member = i->getMember();
+  PrettyStackTraceSILDeclRef entry("lowering use of witness method", member);
+
   auto fnType = IGM.getSILTypes().getConstantFunctionType(
       IGM.getMaximalTypeExpansionContext(), member);
 
@@ -8285,6 +8289,7 @@ void IRGenSILFunction::visitSuperMethodInst(swift::SuperMethodInst *i) {
   llvm::Value *baseValue = base.claimNext();
 
   auto method = i->getMember().getOverriddenVTableEntry();
+  PrettyStackTraceSILDeclRef entry("lowering super call to", method);
   auto methodType = i->getType().castTo<SILFunctionType>();
 
   auto *classDecl = cast<ClassDecl>(method.getDecl()->getDeclContext());
@@ -8381,11 +8386,21 @@ void IRGenSILFunction::visitClassMethodInst(swift::ClassMethodInst *i) {
   llvm::Value *baseValue = base.claimNext();
 
   SILDeclRef method = i->getMember().getOverriddenVTableEntry();
+  PrettyStackTraceSILDeclRef entry("lowering class method call to", method);
+
   auto methodType = i->getType().castTo<SILFunctionType>();
 
+  AccessLevel methodAccess = method.getDecl()->getEffectiveAccess();
   auto *classDecl = cast<ClassDecl>(method.getDecl()->getDeclContext());
   bool shouldUseDispatchThunk = false;
-  if (IGM.hasResilientMetadata(classDecl, ResilienceExpansion::Maximal)) {
+  // Because typechecking for the debugger has more lax rules, check the access
+  // level of the getter to decide whether to use a dispatch thunk for the
+  // debugger.
+  bool shouldUseDispatchThunkIfInDebugger =
+      !classDecl->getASTContext().LangOpts.DebuggerSupport ||
+      methodAccess == AccessLevel::Public;
+  if (IGM.hasResilientMetadata(classDecl, ResilienceExpansion::Maximal) &&
+      shouldUseDispatchThunkIfInDebugger) {
     shouldUseDispatchThunk = true;
   } else if (IGM.getOptions().VirtualFunctionElimination) {
     // For VFE, use a thunk if the target class is in another module. This

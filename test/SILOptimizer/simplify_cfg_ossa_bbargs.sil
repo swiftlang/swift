@@ -266,7 +266,7 @@ bb3:
 }
 
 // CHECK-LABEL: sil [ossa] @test_simplify_enum_arg_guaranteed1 : 
-// CHECK: bb1([[ARG:%.*]] : @guaranteed $FakeOptional<Klass>)
+// CHECK: bb1([[ARG:%.*]] : @guaranteed $Klass)
 // CHECK-LABEL: } // end sil function 'test_simplify_enum_arg_guaranteed1'
 sil [ossa] @test_simplify_enum_arg_guaranteed1 : $@convention(thin) (@owned Klass) -> () {
 bb0(%0 : @owned $Klass):
@@ -290,7 +290,9 @@ bb2:
   return %t : $()
 }
 
-// CHECK: bb1([[ARG:%.*]] : @guaranteed $NonTrivialStruct)
+// CHECK-LABEL: sil [ossa] @test_simplify_enum_arg_guaranteed2 : 
+// CHECK: bb1([[ARG:%.*]] : @guaranteed $Klass)
+// CHECK-LABEL: } // end sil function 'test_simplify_enum_arg_guaranteed2'
 sil [ossa] @test_simplify_enum_arg_guaranteed2 : $@convention(thin) (@owned Klass) -> () {
 bb0(%0 : @owned $Klass):
   specify_test "simplify_cfg_simplify_argument @block[1] 0"

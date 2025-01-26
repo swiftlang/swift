@@ -93,6 +93,16 @@ static std::optional<AccessLevel> unbridge(BridgedAccessLevel level) {
   llvm_unreachable("unhandled BridgedAccessLevel");
 }
 
+BridgedABIAttr BridgedABIAttr_createParsed(BridgedASTContext cContext,
+                                           BridgedSourceLoc atLoc,
+                                           BridgedSourceRange range,
+                                           BridgedNullableDecl abiDecl) {
+  return new (cContext.unbridged()) ABIAttr(abiDecl.unbridged(),
+                                            atLoc.unbridged(),
+                                            range.unbridged(),
+                                            /*isImplicit=*/false);
+}
+
 BridgedAccessControlAttr
 BridgedAccessControlAttr_createParsed(BridgedASTContext cContext,
                                       BridgedSourceRange cRange,
@@ -574,4 +584,22 @@ BridgedUnavailableFromAsyncAttr BridgedUnavailableFromAsyncAttr_createParsed(
   return new (cContext.unbridged())
       UnavailableFromAsyncAttr(cMessage.unbridged(), cAtLoc.unbridged(),
                                cRange.unbridged(), /*implicit=*/false);
+}
+
+static ExecutionKind unbridged(BridgedExecutionKind kind) {
+  switch (kind) {
+  case BridgedExecutionKindConcurrent:
+    return ExecutionKind::Concurrent;
+  case BridgedExecutionKindCaller:
+    return ExecutionKind::Caller;
+  }
+  llvm_unreachable("unhandled enum value");
+}
+
+BridgedExecutionAttr BridgedExecutionAttr_createParsed(
+    BridgedASTContext cContext, BridgedSourceLoc atLoc,
+    BridgedSourceRange range, BridgedExecutionKind behavior) {
+  return new (cContext.unbridged())
+      ExecutionAttr(atLoc.unbridged(), range.unbridged(),
+                    unbridged(behavior), /*implicit=*/false);
 }

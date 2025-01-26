@@ -32,8 +32,10 @@
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/AccessScope.h"
 #include "swift/AST/Attr.h"
+#include "swift/AST/AvailabilityInference.h"
 #include "swift/AST/ClangModuleLoader.h"
 #include "swift/AST/ConformanceLookup.h"
+#include "swift/AST/Decl.h"
 #include "swift/AST/DiagnosticsParse.h"
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/Expr.h"
@@ -47,6 +49,7 @@
 #include "swift/AST/PropertyWrappers.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/SourceFile.h"
+#include "swift/AST/Type.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/TypeWalker.h"
 #include "swift/Basic/Assertions.h"
@@ -2147,8 +2150,8 @@ ResultTypeRequest::evaluate(Evaluator &evaluator, ValueDecl *decl) const {
     // usable from Swift, even though it is imported.
     if (!decl->isUnavailable()) {
       StringRef unavailabilityMsgRef = "return type is unavailable in Swift";
-      auto ua =
-          AvailableAttr::createPlatformAgnostic(ctx, unavailabilityMsgRef);
+      auto ua = AvailableAttr::createUniversallyUnavailable(
+          ctx, unavailabilityMsgRef);
       decl->getAttrs().add(ua);
     }
 
@@ -3195,25 +3198,6 @@ SourceFile::getIfConfigClausesWithin(SourceRange outer) const {
         return SM.isBeforeInBuffer(loc, range.getStartLoc());
       });
   return llvm::ArrayRef(lower, upper - lower);
-}
-
-//----------------------------------------------------------------------------//
-// IsUnsafeRequest
-//----------------------------------------------------------------------------//
-
-bool IsUnsafeRequest::evaluate(Evaluator &evaluator, Decl *decl) const {
-  // If it's marked @unsafe, it's unsafe.
-  if (decl->getAttrs().hasAttribute<UnsafeAttr>())
-    return true;
-
-  // Inference: A member of an @unsafe type is also unsafe.
-  if (auto enclosingDC = decl->getDeclContext()) {
-    if (auto enclosingNominal = enclosingDC->getSelfNominalTypeDecl())
-      if (enclosingNominal->isUnsafe())
-        return true;
-  }
-
-  return false;
 }
 
 //----------------------------------------------------------------------------//

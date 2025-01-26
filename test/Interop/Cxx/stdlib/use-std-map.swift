@@ -100,6 +100,38 @@ StdMapTestSuite.test("UnorderedMap as ExpressibleByDictionaryLiteral") {
   takesUnorderedMap([-1 : 2, 2 : 3, 33 : 44])
 }
 
+StdMapTestSuite.test("Map.init(grouping:by:)") {
+  let m = MapGroup(
+            grouping: [
+                10,
+                20, 21, 22,
+                30, 31, 32, 33, 34
+            ], by: { $0 / 10 })
+
+  expectEqual(m.size(), 3)
+
+  expectNil(m[0])
+  expectEqual(m[1]?.size(), 1)
+  expectEqual(m[2]?.size(), 3)
+  expectEqual(m[3]?.size(), 5)
+}
+
+StdMapTestSuite.test("UnorderedMap.init(grouping:by:)") {
+  let m = UnorderedMapGroup(
+            grouping: [
+                10, 11,
+                20, 21, 22, 23,
+                30, 31, 32, 33, 34, 35,
+            ], by: { $0 / 10 })
+
+  expectEqual(m.size(), 3)
+
+  expectNil(m[0])
+  expectEqual(m[1]?.size(), 2)
+  expectEqual(m[2]?.size(), 4)
+  expectEqual(m[3]?.size(), 6)
+}
+
 StdMapTestSuite.test("Map.subscript") {
   // This relies on the `std::map` conformance to `CxxDictionary` protocol.
   var m = initMap()
@@ -171,6 +203,70 @@ StdMapTestSuite.test("UnorderedMap.subscript") {
   expectNil(m[-1])
 }
 
+StdMapTestSuite.test("Map.subscript(:default:)") {
+  // This relies on the `std::map` conformance to `CxxDictionary` protocol.
+  var m = initMap()
+  let at1 = m[1, default: 0]
+  expectNotNil(at1)
+  expectEqual(at1, 3)
+  expectEqual(m[2, default: 0], 2)
+  expectEqual(m[3, default: 0], 3)
+  expectEqual(m[-1, default: -1], -1)
+  expectEqual(m[5, default: 5], 5)
+
+  m[1] = nil
+  expectEqual(m[-1, default: -1], -1)
+  m[-1, default: -1] += 1
+  expectEqual(m[-1], 0)
+  m[-2, default: -2] += 3
+  expectEqual(m[-2, default: -2], 1)
+
+  m[-1] = nil
+  expectEqual(m[-1, default: -1], -1)
+
+  expectEqual(m[-5, default: 555], 555)
+}
+
+StdMapTestSuite.test("MapStrings.subscript(:default:)") {
+  var m = MapStrings()
+  expectNil(m[std.string()])
+  expectNil(m[std.string()])
+  m[std.string()] = std.string()
+  expectNotNil(m[std.string()])
+
+  m[std.string("abc")] = std.string("qw")
+  expectEqual(m[std.string("abc")], std.string("qw"))
+
+  m[std.string("abc"), default: std.string("qwe1")] = std.string("qwe")
+  expectEqual(m[std.string("abc")], std.string("qwe"))
+  m[std.string("abc"), default: std.string("qwe1")].append(std.string("2"))
+  expectEqual(m[std.string("abc")], std.string("qwe2"))
+
+  m[std.string("abcd"), default: std.string("qwe1")].append(std.string("1"))
+  expectEqual(m[std.string("abcd")], std.string("qwe11"))
+
+  expectEqual(m[std.string("abcdef"), default: std.string("abcdefg")], std.string("abcdefg"))
+}
+
+StdMapTestSuite.test("UnorderedMap.subscript(:default:)") {
+  var m = initUnorderedMap()
+  expectEqual(m[1, default: 0], 3)
+  expectEqual(m[2, default: 0], 2)
+  expectEqual(m[3, default: 0], 3)
+  expectEqual(m[-1, default: -1], -1)
+  expectEqual(m[5, default: 5], 5)
+
+  m[1, default: 1] = 777
+  expectEqual(m[1], 777)
+
+  m[-1, default: -1] += 1
+  expectEqual(m[-1], 0)
+  m[-2, default: -2] += 3
+  expectEqual(m[-2, default: -2], 1)
+
+  expectEqual(m[-5, default: 555], 555)
+}
+
 StdMapTestSuite.test("Map.filter") {
   var m = initMap()
   var n = initEmptyMap()
@@ -220,5 +316,117 @@ StdMapTestSuite.test("UnorderedMap.erase") {
   m.erase(2)
   expectNil(m[2])
 }
+
+StdMapTestSuite.test("Map.remveValue(forKey:)") {
+  var m = initMap()
+  expectNotNil(m[1])
+  expectEqual(m.removeValue(forKey: 1), 3)
+  expectNil(m[1])
+  expectEqual(m.removeValue(forKey: 1), nil)
+  expectNil(m[1])
+}
+
+StdMapTestSuite.test("UnorderedMap.remveValue(forKey:)") {
+  var m = initUnorderedMap()
+  expectNotNil(m[2])
+  expectEqual(m.removeValue(forKey: 2), 2)
+  expectNil(m[2])
+  expectEqual(m.removeValue(forKey: 2), nil)
+  expectNil(m[2])
+}
+
+StdMapTestSuite.test("Map.merge<S: Sequence>(_ :)") {
+  var m = initMap()
+  m.merge([(1, 1), (2, 2), (3, 3)]) { v0, _ in v0 }
+
+  expectEqual(m[1], 3)
+  expectEqual(m[2], 2)
+  expectEqual(m[3], 3)
+
+  m.merge([(1, 1), (2, 2), (3, 3)]) { _, v1 in v1 }
+  expectEqual(m[1], 1)
+  expectEqual(m[2], 2)
+  expectEqual(m[3], 3)
+}
+
+StdMapTestSuite.test("UnorderedMap.merge<S: Sequence>(_ :)") {
+  var m = initUnorderedMap()
+  m.merge([(1, 1), (2, 2), (3, 3)]) { v0, _ in v0 }
+  expectEqual(m[1], 3)
+  expectEqual(m[2], 2)
+  expectEqual(m[3], 3)
+
+  m.merge([(1, 1), (2, 2), (3, 3)]) { _, v1 in v1 }
+  expectEqual(m[1], 1)
+  expectEqual(m[2], 2)
+  expectEqual(m[3], 3)
+}
+
+StdMapTestSuite.test("Map.merge") {
+  var m = initMap()
+  m.merge([1: 1, 2: 2, 3: 3]) { v0, _ in v0 }
+
+  expectEqual(m[1], 3)
+  expectEqual(m[2], 2)
+  expectEqual(m[3], 3)
+
+  m.merge([1: 1, 2: 2, 3: 3]) { _, v1 in v1 }
+  expectEqual(m[1], 1)
+  expectEqual(m[2], 2)
+  expectEqual(m[3], 3)
+}
+
+StdMapTestSuite.test("UnorderedMap.merge") {
+  var m = initUnorderedMap()
+  m.merge([1: 1, 2: 2, 3: 3]) { v0, _ in v0 }
+  expectEqual(m[1], 3)
+  expectEqual(m[2], 2)
+  expectEqual(m[3], 3)
+
+  m.merge([1: 1, 2: 2, 3: 3]) { _, v1 in v1 }
+  expectEqual(m[1], 1)
+  expectEqual(m[2], 2)
+  expectEqual(m[3], 3)
+}
+
+StdMapTestSuite.test("Map.merge(map)") {
+  var m = initMap()
+
+  let tmp = Map([1: 1, 2: 2, 3: 3])
+
+  expectEqual(tmp[1], 1)
+  expectEqual(tmp[2], 2)
+  expectEqual(tmp[3], 3)
+
+  m.merge(tmp) { v0, _ in v0 }
+  expectEqual(m[1], 3)
+  expectEqual(m[2], 2)
+  expectEqual(m[3], 3)
+
+  m.merge(tmp) { _, v1 in v1 }
+  expectEqual(m[1], 1)
+  expectEqual(m[2], 2)
+  expectEqual(m[3], 3)
+}
+
+StdMapTestSuite.test("UnorderedMap.merge(map)") {
+  var m = initUnorderedMap()
+  let tmp = UnorderedMap([1: 1, 2: 2, 3: 3])
+  expectEqual(tmp[1], 1)
+  expectEqual(tmp[2], 2)
+  expectEqual(tmp[3], 3)
+
+  m.merge(tmp) { v0, _ in v0 }
+  expectEqual(m[1], 3)
+  expectEqual(m[2], 2)
+  expectEqual(m[3], 3)
+
+  m.merge(tmp) { _, v1 in v1 }
+  expectEqual(m[1], 1)
+  expectEqual(m[2], 2)
+  expectEqual(m[3], 3)
+}
+
+// `merging` is implemented by calling `merge`, so we can skip this test
 
 runAllTests()
