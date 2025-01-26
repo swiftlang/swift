@@ -287,8 +287,9 @@ namespace {
     /// elements that had 'non-load uses' _before_ the given instruction. This
     /// is pre- computed for instructions expected to be queried for (local)
     /// liveness during initial data structure setup.
-    std::optional<llvm::SmallDenseMap<SILInstruction *, SmallBitVector>>
-        InstToAvailability;
+    using AvailabilityCache = llvm::SmallDenseMap<SILInstruction *, SmallBitVector>;
+    std::optional<AvailabilityCache> InstToAvailability;
+    // TODO: ensure memory mgmt is correct for this ^
 
     LiveOutBlockState() { init(0); }
 
@@ -551,6 +552,14 @@ namespace {
     void diagnoseBadExplicitStore(SILInstruction *Inst);
     
     bool isBlockIsReachableFromEntry(const SILBasicBlock *BB);
+
+    /// Map from blocks to the classified instructions they contain.
+    using BlocksToInstsMap = llvm::SmallDenseMap<SILBasicBlock *, llvm::SmallDenseSet<SILInstruction *>>;
+
+    /// Utility method to pre-compute and cache intra-block memory element
+    /// availability information for lookup by instruction. Used to speed up
+    /// liveness queries for large blocks.
+    void configureLocalLivenessCache(BlocksToInstsMap BlocksToInsts);
   };
 } // end anonymous namespace
 
@@ -560,22 +569,22 @@ LifetimeChecker::LifetimeChecker(const DIMemoryObjectInfo &TheMemory,
     : F(TheMemory.getFunction()), Module(TheMemory.getModule()),
       TheMemory(TheMemory), Uses(UseInfo.Uses),
       StoresToSelf(UseInfo.StoresToSelf), Destroys(UseInfo.Releases),
-      blockStates(blockStates), blockStateInitialized(&F) {
+      blockStates(blockStates), blockStateInitialized(&F)
+{
 
-  // Tracks instructions for which we may choose to pre-compute local liveness
-  // information. These may be from Uses, Releases, SelfStores, or the Memory
-  // object itself.
-  llvm::SmallDenseSet<SILInstruction *> InstsOfNote;
+  // Maps blocks to instructions for which we may choose to pre-compute local
+  // liveness information. These may be from Uses, Releases, SelfStores, or the
+  // Memory object itself.
+  BlocksToInstsMap BlocksToInsts;
 
-  // Tracks blocks containing any of the 'InstsOfNote'
-  llvm::SmallDenseSet<SILBasicBlock *> BlocksOfNote;
+  const bool shouldCacheLiveness = true;
 
   // Records the given instruction and its parent block as a candidate for
   // pre-computing local liveness.
-  auto recordInstForLocalLivenessCheck = [&InstsOfNote,
-                                          &BlocksOfNote](SILInstruction *I) {
-    InstsOfNote.insert(I);
-    BlocksOfNote.insert(I->getParent());
+  auto recordInstForLivenessCache = [&](SILInstruction *I) {
+    if (!shouldCacheLiveness) return;
+    auto BB = I->getParent();
+    BlocksToInsts[BB].insert(I);
   };
 
   // The first step of processing an element is to collect information about the
@@ -585,7 +594,7 @@ LifetimeChecker::LifetimeChecker(const DIMemoryObjectInfo &TheMemory,
     assert(Use.Inst && "No instruction identified?");
 
     // Track Uses as liveness pre-computation candidates.
-    recordInstForLocalLivenessCheck(Use.Inst);
+    recordInstForLivenessCache(Use.Inst);
 
     // Keep track of all the uses that aren't loads or escapes.  These are
     // important uses that we'll visit, but we don't consider them definition
@@ -628,12 +637,12 @@ LifetimeChecker::LifetimeChecker(const DIMemoryObjectInfo &TheMemory,
     getBlockInfo(bb).markStoreToSelf();
 
     // Track StoresToSelf as liveness pre-computation candidates.
-    recordInstForLocalLivenessCheck(I);
+    recordInstForLivenessCache(I);
   }
 
   // Track Destroys as liveness pre-computation candidates.
   for (auto Release : Destroys) {
-    recordInstForLocalLivenessCheck(Release);
+    recordInstForLivenessCache(Release);
   }
 
   // It isn't really a use, but we account for the mark_uninitialized or
@@ -641,57 +650,16 @@ LifetimeChecker::LifetimeChecker(const DIMemoryObjectInfo &TheMemory,
   auto &MemBBInfo = getBlockInfo(TheMemory.getParentBlock());
   MemBBInfo.HasNonLoadUse = true;
 
-  // Track the memory instruction for pre-computation
-  recordInstForLocalLivenessCheck(TheMemory.getUninitializedValue());
+  // Track the memory instruction for liveness pre-computation
+  recordInstForLivenessCache(TheMemory.getUninitializedValue());
   // TODO: ^ is this right? TheMemory doesn't give direct access to its Inst
+  // also, do we ever query the uninit value for liveness?
 
-  // We've collected the instructions & blocks we expect to be queried for
-  // liveness, so now we can pre-compute the intra-block memory availability
-  // at these instructions to speed up the anticipated future queries.
-  for (auto InstBB : BlocksOfNote) {
-    auto &BBInfo = getBlockInfo(InstBB);
-
-    // If there aren't any non-load uses, there's nothing to pre-compute.
-    if (!BBInfo.HasNonLoadUse)
-      continue;
-
-    // Already computed the intra-block cache, so bail.
-    if (BBInfo.InstToAvailability.has_value())
-      continue;
-
-    // This tracks the memory element indices that have had a non-load
-    // instruction operate upon them within the current block.
-    auto CurEltAvail = SmallBitVector(TheMemory.getNumElements());
-
-    // This is the cache from instruction to elements affected by non-loads
-    // _before_ them within this block.
-    llvm::SmallDenseMap<SILInstruction *, SmallBitVector> InstToEltAvail;
-
-    for (auto BBI = InstBB->begin(), E = InstBB->end(); BBI != E; BBI++) {
-      SILInstruction *CurInst = &*BBI;
-
-      // If this instruction wasn't in the earlier aggregation logic, ignore it.
-      if (!InstsOfNote.contains(CurInst))
-        continue;
-
-      // Record the elements that have been operated upon by non-loads _before_
-      // this instruction.
-      InstToEltAvail[CurInst] = CurEltAvail;
-
-      // If we found a non-load use, update our local tracking of used elements
-      // for the next iteration.
-      auto NLUIt = NonLoadUses.find(CurInst);
-      if (NLUIt != NonLoadUses.end()) {
-        for (unsigned TheUse : NLUIt->second) {
-          auto &TheInstUse = Uses[TheUse];
-          CurEltAvail.set(TheInstUse.FirstElement,
-                          TheInstUse.FirstElement + TheInstUse.NumElements);
-        }
-      }
-    }
-
-    BBInfo.InstToAvailability = InstToEltAvail;
-  }
+  // We've collected the instructions we expect to be checked for liveness,
+  // so now we can pre-compute the intra-block memory availability at these
+  // instructions to speed up the anticipated future queries.
+  if (shouldCacheLiveness)
+    configureLocalLivenessCache(BlocksToInsts);
 
   // There is no scanning required (or desired) for the block that defines the
   // memory object itself.  Its live-out properties are whatever are trivially
@@ -703,6 +671,72 @@ LifetimeChecker::LifetimeChecker(const DIMemoryObjectInfo &TheMemory,
   // non-delegating struct initializers.
   if (TheMemory.isCrossModuleStructInitSelf())
     WantsCrossModuleStructInitializerDiagnostic = true;
+}
+
+void LifetimeChecker::configureLocalLivenessCache(llvm::SmallDenseMap<SILBasicBlock *, llvm::SmallDenseSet<SILInstruction *>> BlocksToInsts) {
+  for (auto pair : BlocksToInsts) {
+    auto InstBB = pair.first;
+    auto &BBInfo = getBlockInfo(InstBB);
+
+    // If there aren't any non-load uses, there's nothing to pre-compute since
+    // we will skip intra-block checking for liveness queries.
+    if (!BBInfo.HasNonLoadUse)
+      continue;
+
+    auto InstsOfNote = pair.second;
+
+    // Already computed the intra-block cache, so bail.
+    if (BBInfo.InstToAvailability.has_value())
+      continue;
+
+    // TODO: determine if this is actually possible...
+    if (InstsOfNote.size() == 1)
+      continue;
+
+    // TODO: it seems like there may be cases where this could end up not being
+    // valuable or possibly more costly than not doing it. e.g. there's one
+    // NLU and one Inst in a large block near the end – since we start from
+    // the block's beginning we'd end up considering a lot of instructions
+    // that are irrelevant. maybe pick a heuristic/empirical threshold where
+    // this seems 'worth it' somehow?
+
+    // This tracks the memory element indices that have had a non-load
+    // instruction operate upon them within the current block.
+    auto CurEltAvail = SmallBitVector(TheMemory.getNumElements());
+
+    // This is the cache from instruction to memory elements affected by
+    // non-loads occurring _before_ them within this block.
+    llvm::SmallDenseMap<SILInstruction *, SmallBitVector> InstToEltAvail;
+
+    for (auto BBI = InstBB->begin(), E = InstBB->end(); BBI != E; BBI++) {
+      // We've stored everything we think will be valuable to cache.
+      if (InstToEltAvail.size() == InstsOfNote.size())
+        break;
+
+      SILInstruction *CurInst = &*BBI;
+
+      // If this instruction wasn't in the earlier aggregation logic, ignore it
+      // since we don't anticipate a future liveness query.
+      if (!InstsOfNote.contains(CurInst))
+        continue;
+
+      // Record the elements that have been operated upon by non-loads _before_
+      // this instruction.
+      InstToEltAvail[CurInst] = CurEltAvail;
+
+      // If we found a non-load use, update the current availability.
+      if (auto NLUIt = NonLoadUses.find(CurInst);
+          NLUIt != NonLoadUses.end()) {
+        for (unsigned TheUse : NLUIt->second) {
+          auto &TheInstUse = Uses[TheUse];
+          CurEltAvail.set(TheInstUse.FirstElement,
+                          TheInstUse.FirstElement + TheInstUse.NumElements);
+        }
+      }
+    }
+
+    BBInfo.InstToAvailability = InstToEltAvail;
+  }
 }
 
 /// Determine whether the specified block is reachable from the entry of the
@@ -3792,13 +3826,13 @@ AvailabilitySet LifetimeChecker::getLivenessAtInst(SILInstruction *Inst,
       }
 
       auto InstToAvail = BBInfo.InstToAvailability.value();
-      auto PreComputeIt = InstToAvail.find(Inst);
-      if (PreComputeIt == InstToAvail.end()) {
+      auto CachedAvailIt = InstToAvail.find(Inst);
+      if (CachedAvailIt == InstToAvail.end()) {
         usedCache = false;
         break;
       }
 
-      auto InstAvail = PreComputeIt->second;
+      auto InstAvail = CachedAvailIt->second;
       for (unsigned Elt = FirstElt, E = Elt + NumElts; Elt != E; Elt++) {
         // TODO: can this be more efficient than a loop?
         if (InstAvail[Elt])
