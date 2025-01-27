@@ -1179,7 +1179,6 @@ bool swift::diagnoseNonSendableTypesInReference(
         if (param->isSending() && !paramType->hasError()) {
           continue;
         }
-
         if (diagnoseNonSendableTypes(
                 paramType, fromDC, derivedConformanceType,
                 refLoc, diagnoseLoc.isInvalid() ? refLoc : diagnoseLoc,
@@ -1194,19 +1193,15 @@ bool swift::diagnoseNonSendableTypesInReference(
       if (funcCheckOptions.contains(FunctionCheckKind::Results)) {
         // only check results if funcCheckKind specifies so
         Type resultType = func->getResultInterfaceType().subst(subs);
-
         auto diag = getSendableResultDiag(refKind);
-
         if (diag.ID == diag::non_sendable_result_in_witness.ID &&
             func->hasSendingResult() && !resultType->hasError()) {
           return false;
         }
-
         if (diagnoseNonSendableTypes(
-            resultType, fromDC, derivedConformanceType,
-            refLoc, diagnoseLoc.isInvalid() ? refLoc : diagnoseLoc,
-            getSendableResultDiag(refKind),
-            func, getActorIsolation()))
+                resultType, fromDC, derivedConformanceType, refLoc,
+                diagnoseLoc.isInvalid() ? refLoc : diagnoseLoc, diag, func,
+                getActorIsolation()))
           return true;
       }
     }
