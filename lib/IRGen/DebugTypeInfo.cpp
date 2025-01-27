@@ -193,6 +193,10 @@ TypeDecl *DebugTypeInfo::getDecl() const {
   return nullptr;
 }
 
+bool DebugTypeInfo::isForwardDecl() const {
+  return isNull() || (!FragmentStorageType && !isa<TypeAliasType>(getType()));
+}
+
 #if !defined(NDEBUG) || defined(LLVM_ENABLE_DUMP)
 LLVM_DUMP_METHOD void DebugTypeInfo::dump() const {
   llvm::errs() << "[";
@@ -203,7 +207,8 @@ LLVM_DUMP_METHOD void DebugTypeInfo::dump() const {
   if (FragmentStorageType) {
     llvm::errs() << "FragmentStorageType=";
     FragmentStorageType->dump();
-  } else
+  }
+  if (isForwardDecl())
     llvm::errs() << "forward-declared\n";
 }
 #endif

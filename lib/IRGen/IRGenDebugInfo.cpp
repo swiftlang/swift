@@ -2511,7 +2511,7 @@ private:
 
     // If this is a forward decl, create one for this mangled name and don't
     // cache it.
-    if (DbgTy.isForwardDecl() && !isa<TypeAliasType>(DbgTy.getType())) {
+    if (DbgTy.isForwardDecl()) {
       // In LTO type uniquing is performed based on the UID. Forward
       // declarations may not have a unique ID to avoid a forward declaration
       // winning over a full definition.

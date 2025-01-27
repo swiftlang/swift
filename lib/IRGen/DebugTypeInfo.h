@@ -102,8 +102,8 @@ public:
 
   llvm::Type *getFragmentStorageType() const { return FragmentStorageType; }
   Alignment getAlignment() const { return Align; }
-  bool isNull() const { return Type == nullptr; }
-  bool isForwardDecl() const { return FragmentStorageType == nullptr; }
+  bool isNull() const { return !Type; }
+  bool isForwardDecl() const;
   bool isMetadataType() const { return IsMetadataType; }
   bool hasDefaultAlignment() const { return DefaultAlignment; }
   bool isFixedBuffer() const { return IsFixedBuffer; }
