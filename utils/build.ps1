@@ -830,7 +830,7 @@ function Fetch-Dependencies {
 
     # FIXME: Both Java and Android emulator must be available in the environment.
     # This is a terrible workaround. It's a waste of time and resources.
-    $NDKDir = Get-AndroidNDKPath
+    $NDKDir = "$BinaryCache\android-sdk"
     if ($Test -and -not(Test-Path "$NDKDir\licenses")) {
       # Download Java Runtime
       switch ($BuildArchName) {
@@ -845,13 +845,13 @@ function Fetch-Dependencies {
         default { throw "Unsupported processor architecture" }
       }
       DownloadAndVerify $JavaURL "$BinaryCache\microsoft-jdk.zip" $JavaHash
-      Extract-ZipFile -ZipFileName "microsoft-jdk.zip" -BinaryCache $BinaryCache -ExtractPath "android-ndk-r26b\.temp\jdk"
+      Extract-ZipFile -ZipFileName "microsoft-jdk.zip" -BinaryCache $BinaryCache -ExtractPath "android-sdk-jdk"
 
       # Download cmdline-tools
       $CLToolsURL = "https://dl.google.com/android/repository/commandlinetools-win-11076708_latest.zip"
       $CLToolsHash = "4d6931209eebb1bfb7c7e8b240a6a3cb3ab24479ea294f3539429574b1eec862"
       DownloadAndVerify $CLToolsURL "$BinaryCache\android-cmdline-tools.zip" $CLToolsHash
-      Extract-ZipFile -ZipFileName "android-cmdline-tools.zip" -BinaryCache $BinaryCache -ExtractPath "android-ndk-r26b\.temp\cmdline-tools"
+      Extract-ZipFile -ZipFileName "android-cmdline-tools.zip" -BinaryCache $BinaryCache -ExtractPath "android-sdk-cmdline-tools"
 
       # Accept licenses
       New-Item -Type Directory -Path "$NDKDir\licenses" -ErrorAction Ignore | Out-Null
@@ -860,17 +860,18 @@ function Fetch-Dependencies {
 
       # Install packages and create test device
       Isolate-EnvVars {
-        $env:JAVA_HOME = "$NDKDir\.temp\jdk\jdk-17.0.14+7"
+        $env:JAVA_HOME = "$BinaryCache\android-sdk-jdk\jdk-17.0.14+7"
         $env:Path = "${env:JAVA_HOME}\bin;${env:Path}"
 
-        Invoke-Program "$NDKDir\.temp\cmdline-tools\cmdline-tools\bin\sdkmanager.bat" --sdk_root="$NDKDir" "cmdline-tools;latest" "--channel=3"
+        Invoke-Program "$BinaryCache\android-sdk-cmdline-tools\cmdline-tools\bin\sdkmanager.bat" "--sdk_root=$NDKDir" '"cmdline-tools;latest"' '--channel=3'
         $AndroidSdkMgr = "$NDKDir\cmdline-tools\latest\bin\sdkmanager.bat"
-        foreach ($Package in @("emulator", "platforms;android-29", "system-images;android-29;default;x86_64", "platform-tools")) {
-          Invoke-Program $AndroidSdkMgr $Package
+        foreach ($Package in @('"ndk;26.2.11394342"', '"system-images;android-29;default;x86_64"', '"platforms;android-29"', '"platform-tools"')) {
+          Write-Host "$AndroidSdkMgr $Package"
+          Invoke-Program -OutNull $AndroidSdkMgr $Package
         }
 
         $AndroidAvdMgr = "$NDKDir\cmdline-tools\latest\bin\avdmanager.bat"
-        Invoke-Program $AndroidAvdMgr create avd --name "swift-test-device" --package "system-images;android-29;default;x86_64"
+        Invoke-Program $AndroidAvdMgr create avd --name '"swift-test-device"' --package '"system-images;android-29;default;x86_64"'
       }
     }
   }
@@ -2143,7 +2144,7 @@ function Test-Dispatch([Platform]$Platform, $Arch) {
   $RemoteBin = "/data/local/tmp/$CacheName"
 
   # TODO: On my local machine I have to grant adb.exe network access once. How to do that in CI?
-  $adb = "$NDKDir\platform-tools\adb.exe"
+  $adb = "$BinaryCache\android-sdk\platform-tools\adb.exe"
   Invoke-Program $adb "wait-for-device"
 
   # Add binary directory to emulator
@@ -3268,7 +3269,7 @@ if (-not $IsCrossCompiling) {
 
   exit 1
 } finally {
-  $adb = "$(Get-AndroidNDKPath)\platform-tools\adb.exe"
+  $adb = "$BinaryCache\android-sdk\platform-tools\adb.exe"
   Invoke-Program $adb emu kill
   Invoke-Program $adb kill-server
 
