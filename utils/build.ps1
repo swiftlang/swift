@@ -716,6 +716,11 @@ function Fetch-Dependencies {
 
   if ($SkipBuild -and $SkipPackaging) { return }
 
+  $Stopwatch = [Diagnostics.Stopwatch]::StartNew()
+  if ($ToBatch) {
+    Write-Host -ForegroundColor Cyan "[$([DateTime]::Now.ToString("yyyy-MM-dd HH:mm:ss"))] Fetch-Dependencies..."
+  }
+
   $WiXURL = "https://www.nuget.org/api/v2/package/wix/$WiXVersion"
   $WiXHash = "DF9BDB347183716F82EFE2CECB8C54BB3554AA907A69F47A41741D6FA4D0A754"
   DownloadAndVerify $WixURL "$BinaryCache\WiX-$WiXVersion.zip" $WiXHash
@@ -826,6 +831,11 @@ function Fetch-Dependencies {
         Copy-Directory "$NugetRoot\$Package.$($Arch.ShortName).$WinSDKVersion\c\*" "$CustomWinSDKRoot\lib\$WinSDKVersionRevisionZero"
       }
     }
+  }
+
+  if (-not $ToBatch) {
+    Write-Host -ForegroundColor Cyan "[$([DateTime]::Now.ToString("yyyy-MM-dd HH:mm:ss"))] Fetch-Dependencies took $($Stopwatch.Elapsed)"
+    Write-Host ""
   }
 }
 
