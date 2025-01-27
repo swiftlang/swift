@@ -131,6 +131,9 @@ WARNING(libstdcxx_modulemap_not_found, none,
         "module map for libstdc++ not found for '%0'; C++ stdlib may be unavailable",
         (StringRef))
 
+ERROR(libcxx_custom_prohibits_system_cxxstdlib_module, none,
+      "import of system's C++ stdlib module '%0' prohibited when using libc++", (StringRef))
+
 WARNING(api_pattern_attr_ignored, none,
         "'%0' Swift attribute ignored on type '%1': type is not copyable or destructible",
         (StringRef, StringRef))
