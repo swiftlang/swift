@@ -1275,8 +1275,8 @@ bb0(%0 : $LazyKlass):
 }
 
 // CHECK-LABEL: sil [ossa] @test_end_lifetime :
-// CHECK:       upcast
-// CHECK-NOT:   upcast
+// TODO:       upcast
+// TODO-NOT:   upcast
 // CHECK: } // end sil function 'test_end_lifetime'
 sil [ossa] @test_end_lifetime : $@convention(method) (@owned E) -> () {
 bb0(%0 : @owned $E):

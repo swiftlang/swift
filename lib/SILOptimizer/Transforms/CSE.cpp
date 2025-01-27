@@ -86,26 +86,6 @@ template <> struct DenseMapInfo<SimpleValue> {
 };
 } // end namespace llvm
 
-SILValue tryLookThroughOwnershipInsts(const Operand *op) {
-  auto opValue = op->get();
-  auto opOwnership = op->getOperandOwnership();
-
-  // Escaped values are dependent on the base value lifetime.
-  // OSSA RAUW does not lifetime extend base value for an escaped value.
-  // Don't look through ownership instructions for such values.
-
-  // Theoritically, it should be possible to look through ownership instructions
-  // for a bitwise escape, barring any dependent instructions like
-  // mark_dependence. Not doing it here to be conservative.
-  if (opOwnership == OperandOwnership::PointerEscape ||
-      opOwnership == OperandOwnership::BitwiseEscape ||
-      opOwnership == OperandOwnership::ForwardingUnowned) {
-    return opValue;
-  }
-
-  return lookThroughOwnershipInsts(opValue);
-}
-
 namespace {
 class HashVisitor : public SILInstructionVisitor<HashVisitor, llvm::hash_code> {
   using hash_code = llvm::hash_code;
@@ -118,34 +98,26 @@ public:
   hash_code visitBridgeObjectToRefInst(BridgeObjectToRefInst *X) {
     return llvm::hash_combine(
         X->getKind(), X->getType(),
-        tryLookThroughOwnershipInsts(&X->getOperandRef()));
+        X->getOperand());
   }
 
   hash_code visitBridgeObjectToWordInst(BridgeObjectToWordInst *X) {
     return llvm::hash_combine(
         X->getKind(), X->getType(),
-        tryLookThroughOwnershipInsts(&X->getOperandRef()));
+        X->getOperand());
   }
 
   hash_code visitClassifyBridgeObjectInst(ClassifyBridgeObjectInst *X) {
     return llvm::hash_combine(
-        X->getKind(), tryLookThroughOwnershipInsts(&X->getOperandRef()));
+        X->getKind(), X->getOperand());
   }
 
   hash_code visitValueToBridgeObjectInst(ValueToBridgeObjectInst *X) {
     return llvm::hash_combine(
-        X->getKind(), tryLookThroughOwnershipInsts(&X->getOperandRef()));
+        X->getKind(), X->getOperand());
   }
 
   hash_code visitRefToBridgeObjectInst(RefToBridgeObjectInst *X) {
-    if (X->getFunction()->hasOwnership()) {
-      auto TransformedOpValues =
-          X->getOperandValues(tryLookThroughOwnershipInsts, false);
-      return llvm::hash_combine(
-          X->getKind(), X->getType(),
-          llvm::hash_combine_range(TransformedOpValues.begin(),
-                                   TransformedOpValues.end()));
-    }
     OperandValueArrayRef Operands(X->getAllOperands());
     return llvm::hash_combine(
         X->getKind(), X->getType(),
@@ -155,19 +127,19 @@ public:
   hash_code visitUncheckedTrivialBitCastInst(UncheckedTrivialBitCastInst *X) {
     return llvm::hash_combine(
         X->getKind(), X->getType(),
-        tryLookThroughOwnershipInsts(&X->getOperandRef()));
+        X->getOperand());
   }
 
   hash_code visitUncheckedBitwiseCastInst(UncheckedBitwiseCastInst *X) {
     return llvm::hash_combine(
         X->getKind(), X->getType(),
-        tryLookThroughOwnershipInsts(&X->getOperandRef()));
+        X->getOperand());
   }
 
   hash_code visitUncheckedAddrCastInst(UncheckedAddrCastInst *X) {
     return llvm::hash_combine(
         X->getKind(), X->getType(),
-        tryLookThroughOwnershipInsts(&X->getOperandRef()));
+        X->getOperand());
   }
 
   hash_code visitFunctionRefInst(FunctionRefInst *X) {
@@ -188,45 +160,45 @@ public:
 
   hash_code visitRefElementAddrInst(RefElementAddrInst *X) {
     return llvm::hash_combine(X->getKind(),
-                              tryLookThroughOwnershipInsts(&X->getOperandRef()),
+                              X->getOperand(),
                               X->getField());
   }
 
   hash_code visitRefTailAddrInst(RefTailAddrInst *X) {
     return llvm::hash_combine(
-        X->getKind(), tryLookThroughOwnershipInsts(&X->getOperandRef()));
+        X->getKind(), X->getOperand());
   }
 
   hash_code visitProjectBoxInst(ProjectBoxInst *X) {
     return llvm::hash_combine(
-        X->getKind(), tryLookThroughOwnershipInsts(&X->getOperandRef()));
+        X->getKind(), X->getOperand());
   }
 
   hash_code visitRefToRawPointerInst(RefToRawPointerInst *X) {
     return llvm::hash_combine(
-        X->getKind(), tryLookThroughOwnershipInsts(&X->getOperandRef()));
+        X->getKind(), X->getOperand());
   }
 
   hash_code visitRawPointerToRefInst(RawPointerToRefInst *X) {
     return llvm::hash_combine(
-        X->getKind(), tryLookThroughOwnershipInsts(&X->getOperandRef()));
+        X->getKind(), X->getOperand());
   }
 
 #define LOADABLE_REF_STORAGE(Name, ...)                                        \
   hash_code visit##Name##ToRefInst(Name##ToRefInst *X) {                       \
     return llvm::hash_combine(                                                 \
-        X->getKind(), tryLookThroughOwnershipInsts(&X->getOperandRef()));      \
+        X->getKind(), X->getOperand());      \
   }                                                                            \
   hash_code visitRefTo##Name##Inst(RefTo##Name##Inst *X) {                     \
     return llvm::hash_combine(                                                 \
-        X->getKind(), tryLookThroughOwnershipInsts(&X->getOperandRef()));      \
+        X->getKind(), X->getOperand());      \
   }
 #include "swift/AST/ReferenceStorage.def"
 
   hash_code visitUpcastInst(UpcastInst *X) {
     return llvm::hash_combine(
         X->getKind(), X->getType(),
-        tryLookThroughOwnershipInsts(&X->getOperandRef()));
+        X->getOperand());
   }
 
   hash_code visitStringLiteralInst(StringLiteralInst *X) {
@@ -236,14 +208,6 @@ public:
   hash_code visitStructInst(StructInst *X) {
     // This is safe since we are hashing the operands using the actual pointer
     // values of the values being used by the operand.
-    if (X->getFunction()->hasOwnership()) {
-      auto TransformedOpValues =
-          X->getOperandValues(tryLookThroughOwnershipInsts, false);
-      return llvm::hash_combine(
-          X->getKind(), X->getStructDecl(),
-          llvm::hash_combine_range(TransformedOpValues.begin(),
-                                   TransformedOpValues.end()));
-    }
     OperandValueArrayRef Operands(X->getAllOperands());
     return llvm::hash_combine(
         X->getKind(), X->getStructDecl(),
@@ -253,13 +217,13 @@ public:
   hash_code visitStructExtractInst(StructExtractInst *X) {
     return llvm::hash_combine(
         X->getKind(), X->getStructDecl(), X->getField(),
-        tryLookThroughOwnershipInsts(&X->getOperandRef()));
+        X->getOperand());
   }
 
   hash_code visitStructElementAddrInst(StructElementAddrInst *X) {
     return llvm::hash_combine(
         X->getKind(), X->getStructDecl(), X->getField(),
-        tryLookThroughOwnershipInsts(&X->getOperandRef()));
+        X->getOperand());
   }
 
   hash_code visitCondFailInst(CondFailInst *X) {
@@ -269,24 +233,16 @@ public:
   hash_code visitClassMethodInst(ClassMethodInst *X) {
     return llvm::hash_combine(
         X->getKind(), X->getType(),
-        tryLookThroughOwnershipInsts(&X->getOperandRef()));
+        X->getOperand());
   }
 
   hash_code visitSuperMethodInst(SuperMethodInst *X) {
     return llvm::hash_combine(
         X->getKind(), X->getType(),
-        tryLookThroughOwnershipInsts(&X->getOperandRef()));
+        X->getOperand());
   }
 
   hash_code visitTupleInst(TupleInst *X) {
-    if (X->getFunction()->hasOwnership()) {
-      auto TransformedOpValues =
-          X->getOperandValues(tryLookThroughOwnershipInsts, false);
-      return llvm::hash_combine(
-          X->getKind(), X->getTupleType(),
-          llvm::hash_combine_range(TransformedOpValues.begin(),
-                                   TransformedOpValues.end()));
-    }
     OperandValueArrayRef Operands(X->getAllOperands());
     return llvm::hash_combine(
         X->getKind(), X->getTupleType(),
@@ -296,13 +252,13 @@ public:
   hash_code visitTupleExtractInst(TupleExtractInst *X) {
     return llvm::hash_combine(
         X->getKind(), X->getTupleType(), X->getFieldIndex(),
-        tryLookThroughOwnershipInsts(&X->getOperandRef()));
+        X->getOperand());
   }
 
   hash_code visitTupleElementAddrInst(TupleElementAddrInst *X) {
     return llvm::hash_combine(
         X->getKind(), X->getTupleType(), X->getFieldIndex(),
-        tryLookThroughOwnershipInsts(&X->getOperandRef()));
+        X->getOperand());
   }
 
   hash_code visitMetatypeInst(MetatypeInst *X) {
@@ -312,7 +268,7 @@ public:
   hash_code visitValueMetatypeInst(ValueMetatypeInst *X) {
     return llvm::hash_combine(
         X->getKind(), X->getType(),
-        tryLookThroughOwnershipInsts(&X->getOperandRef()));
+        X->getOperand());
   }
 
   hash_code visitExistentialMetatypeInst(ExistentialMetatypeInst *X) {
@@ -322,7 +278,7 @@ public:
   hash_code visitInitExistentialMetatypeInst(InitExistentialMetatypeInst *X) {
     return llvm::hash_combine(
         X->getKind(), X->getType(),
-        tryLookThroughOwnershipInsts(&X->getOperandRef()),
+        X->getOperand(),
         llvm::hash_combine_range(X->getConformances().begin(),
                                  X->getConformances().end()));
   }
@@ -334,30 +290,22 @@ public:
   hash_code visitIndexRawPointerInst(IndexRawPointerInst *X) {
     return llvm::hash_combine(
         X->getKind(), X->getType(),
-        tryLookThroughOwnershipInsts(&X->getBaseOperandRef()), X->getIndex());
+        X->getBase(), X->getIndex());
   }
 
   hash_code visitPointerToAddressInst(PointerToAddressInst *X) {
     return llvm::hash_combine(X->getKind(), X->getType(),
-                              tryLookThroughOwnershipInsts(&X->getOperandRef()),
+                              X->getOperand(),
                               X->isStrict());
   }
 
   hash_code visitAddressToPointerInst(AddressToPointerInst *X) {
     return llvm::hash_combine(
         X->getKind(), X->getType(),
-        tryLookThroughOwnershipInsts(&X->getOperandRef()));
+        X->getOperand());
   }
 
   hash_code visitApplyInst(ApplyInst *X) {
-    if (X->getFunction()->hasOwnership()) {
-      auto TransformedOpValues =
-          X->getOperandValues(tryLookThroughOwnershipInsts, false);
-      return llvm::hash_combine(
-          X->getKind(), X->getCallee(),
-          llvm::hash_combine_range(TransformedOpValues.begin(),
-                                   TransformedOpValues.end()));
-    }
     OperandValueArrayRef Operands(X->getAllOperands());
     return llvm::hash_combine(
         X->getKind(), X->getCallee(),
@@ -365,15 +313,6 @@ public:
   }
 
   hash_code visitBuiltinInst(BuiltinInst *X) {
-    if (X->getFunction()->hasOwnership()) {
-      auto TransformedOpValues =
-          X->getOperandValues(tryLookThroughOwnershipInsts, false);
-      return llvm::hash_combine(
-          X->getKind(), X->getName().get(),
-          llvm::hash_combine_range(TransformedOpValues.begin(),
-                                   TransformedOpValues.end()),
-          X->hasSubstitutions());
-    }
     OperandValueArrayRef Operands(X->getAllOperands());
     return llvm::hash_combine(
         X->getKind(), X->getName().get(),
@@ -387,56 +326,56 @@ public:
       return llvm::hash_combine(X->getKind(), X->getElement());
     return llvm::hash_combine(
         X->getKind(), X->getElement(),
-        tryLookThroughOwnershipInsts(&X->getOperandRef()));
+        X->getOperand());
   }
 
   hash_code visitUncheckedEnumDataInst(UncheckedEnumDataInst *X) {
     // We hash the enum by hashing its kind, element, and operand.
     return llvm::hash_combine(
         X->getKind(), X->getElement(),
-        tryLookThroughOwnershipInsts(&X->getOperandRef()));
+        X->getOperand());
   }
 
   hash_code visitIndexAddrInst(IndexAddrInst *X) {
     return llvm::hash_combine(
         X->getKind(), X->getType(),
-        tryLookThroughOwnershipInsts(&X->getBaseOperandRef()), X->getIndex());
+        X->getBase(), X->getIndex());
   }
 
   hash_code visitThickToObjCMetatypeInst(ThickToObjCMetatypeInst *X) {
     return llvm::hash_combine(X->getKind(),
-                              tryLookThroughOwnershipInsts(&X->getOperandRef()),
+                              X->getOperand(),
                               X->getType());
   }
 
   hash_code visitObjCToThickMetatypeInst(ObjCToThickMetatypeInst *X) {
     return llvm::hash_combine(X->getKind(),
-                              tryLookThroughOwnershipInsts(&X->getOperandRef()),
+                              X->getOperand(),
                               X->getType());
   }
 
   hash_code visitObjCMetatypeToObjectInst(ObjCMetatypeToObjectInst *X) {
     return llvm::hash_combine(X->getKind(),
-                              tryLookThroughOwnershipInsts(&X->getOperandRef()),
+                              X->getOperand(),
                               X->getType());
   }
 
   hash_code visitObjCExistentialMetatypeToObjectInst(
       ObjCExistentialMetatypeToObjectInst *X) {
     return llvm::hash_combine(X->getKind(),
-                              tryLookThroughOwnershipInsts(&X->getOperandRef()),
+                              X->getOperand(),
                               X->getType());
   }
 
   hash_code visitUncheckedRefCastInst(UncheckedRefCastInst *X) {
     return llvm::hash_combine(X->getKind(),
-                              tryLookThroughOwnershipInsts(&X->getOperandRef()),
+                              X->getOperand(),
                               X->getType());
   }
 
   hash_code visitSelectEnumOperation(SelectEnumOperation X) {
     auto hash = llvm::hash_combine(
-        X->getKind(), tryLookThroughOwnershipInsts(&X.getEnumOperandRef()),
+        X->getKind(), X.getEnumOperand(),
         X->getType(), X.hasDefault());
 
     for (unsigned i = 0, e = X.getNumCases(); i < e; ++i) {
@@ -458,17 +397,6 @@ public:
   }
 
   hash_code visitWitnessMethodInst(WitnessMethodInst *X) {
-    if (X->getFunction()->hasOwnership()) {
-      auto TransformedOpValues =
-          X->getOperandValues(tryLookThroughOwnershipInsts, false);
-      return llvm::hash_combine(
-          X->getKind(), X->getLookupType().getPointer(), X->getMember(),
-          X->getConformance(), X->getType(),
-          !X->getTypeDependentOperands().empty(),
-          llvm::hash_combine_range(TransformedOpValues.begin(),
-                                   TransformedOpValues.end()));
-    }
-
     OperandValueArrayRef Operands(X->getAllOperands());
     return llvm::hash_combine(
         X->getKind(), X->getLookupType().getPointer(), X->getMember(),
@@ -478,14 +406,6 @@ public:
   }
 
   hash_code visitMarkDependenceInst(MarkDependenceInst *X) {
-    if (X->getFunction()->hasOwnership()) {
-      auto TransformedOpValues =
-          X->getOperandValues(tryLookThroughOwnershipInsts, false);
-      return llvm::hash_combine(
-          X->getKind(), X->getType(),
-          llvm::hash_combine_range(TransformedOpValues.begin(),
-                                   TransformedOpValues.end()));
-    }
     OperandValueArrayRef Operands(X->getAllOperands());
     return llvm::hash_combine(
         X->getKind(), X->getType(),
@@ -496,7 +416,7 @@ public:
     auto ArchetypeTy = X->getType().castTo<ArchetypeType>();
     auto ConformsTo = ArchetypeTy->getConformsTo();
     return llvm::hash_combine(
-        X->getKind(), tryLookThroughOwnershipInsts(&X->getOperandRef()),
+        X->getKind(), X->getOperand(),
         llvm::hash_combine_range(ConformsTo.begin(), ConformsTo.end()));
   }
 
@@ -508,7 +428,7 @@ public:
   hash_code visitDynamicPackIndexInst(DynamicPackIndexInst *X) {
     return llvm::hash_combine(
         X->getKind(), X->getIndexedPackType(),
-        tryLookThroughOwnershipInsts(&X->getOperandRef()));
+        X->getOperand());
   }
 
   hash_code visitTuplePackElementAddrInst(TuplePackElementAddrInst *X) {
@@ -535,9 +455,7 @@ bool llvm::DenseMapInfo<SimpleValue>::isEqual(SimpleValue LHS,
   auto ROpen = dyn_cast<OpenExistentialRefInst>(RHSI);
   if (LOpen && ROpen) {
     // Check operands.
-    auto *LOp = &LOpen->getOperandRef();
-    auto *ROp = &ROpen->getOperandRef();
-    if (tryLookThroughOwnershipInsts(LOp) != tryLookThroughOwnershipInsts(ROp))
+    if (LOpen->getOperand() != ROpen->getOperand())
       return false;
 
     // Consider the types of two open_existential_ref instructions to be equal,
@@ -561,15 +479,8 @@ bool llvm::DenseMapInfo<SimpleValue>::isEqual(SimpleValue LHS,
 
     return true;
   }
-  auto opCmp = [&](const Operand *op1, const Operand *op2) -> bool {
-    if (op1 == op2)
-      return true;
-    if (tryLookThroughOwnershipInsts(op1) == tryLookThroughOwnershipInsts(op2))
-      return true;
-    return false;
-  };
   bool isEqual =
-      LHSI->getKind() == RHSI->getKind() && LHSI->isIdenticalTo(RHSI, opCmp);
+      LHSI->getKind() == RHSI->getKind() && LHSI->isIdenticalTo(RHSI);
 #ifndef NDEBUG
   if (isEqual && getHashValue(LHS) != getHashValue(RHS)) {
     llvm::dbgs() << "LHS: ";
