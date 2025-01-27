@@ -11,7 +11,6 @@
 
 import argparse
 import os
-import shutil
 import sys
 import tempfile
 import unittest
@@ -20,13 +19,12 @@ from io import StringIO
 from swift_build_support import shell
 from swift_build_support.products import LLVM
 from swift_build_support.toolchain import host_toolchain
-from swift_build_support.workspace import Workspace
+
 
 class LLVMLinuxCrossCompileTestCase(unittest.TestCase):
     def setUp(self):
         # Setup workspace
         tmpdir1 = os.path.realpath(tempfile.mkdtemp())
-        tmpdir2 = os.path.realpath(tempfile.mkdtemp())
         os.makedirs(os.path.join(tmpdir1, 'llvm'))
 
         # Setup toolchain
