@@ -429,7 +429,6 @@
                 "wasi-libc": "wasi-sdk-24",
                 "wasmkit": "0.1.2",
                 "curl": "curl-8_9_1",
-                "icu": "maint/maint-69",
                 "libxml2": "v2.11.5",
                 "zlib": "v1.3.1",
                 "mimalloc": "v3.0.1"
