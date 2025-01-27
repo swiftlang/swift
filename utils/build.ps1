@@ -211,7 +211,7 @@ if ($AndroidSDKs.Length -gt 0) {
 
 if ($Test -contains "*") {
   # Explicitly don't include llbuild yet since tests are known to fail on Windows
-  $Test = @("swift", "dispatch", "foundation", "xctest")
+  $Test = @("lld", "lldb", "swift", "dispatch", "foundation", "xctest", "swift-format", "sourcekit-lsp")
 }
 
 # Architecture definitions
