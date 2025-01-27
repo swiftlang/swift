@@ -2735,4 +2735,6 @@ void SemanticAvailableAttrRequest::cacheResult(
     std::optional<SemanticAvailableAttr> value) const {
   AvailableAttr *attr = const_cast<AvailableAttr *>(std::get<0>(getStorage()));
   attr->setComputedSemanticAttr();
+  if (!value)
+    attr->setInvalid();
 }

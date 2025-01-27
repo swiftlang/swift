@@ -737,8 +737,17 @@ public:
     NoAsync,
   };
 
-  AvailableAttr(SourceLoc AtLoc, SourceRange Range,
-                const AvailabilityDomain &Domain, Kind Kind, StringRef Message,
+  AvailableAttr(SourceLoc AtLoc, SourceRange Range, AvailabilityDomain Domain,
+                SourceLoc DomainLoc, Kind Kind, StringRef Message,
+                StringRef Rename, const llvm::VersionTuple &Introduced,
+                SourceRange IntroducedRange,
+                const llvm::VersionTuple &Deprecated,
+                SourceRange DeprecatedRange,
+                const llvm::VersionTuple &Obsoleted, SourceRange ObsoletedRange,
+                bool Implicit, bool IsSPI);
+
+  AvailableAttr(SourceLoc AtLoc, SourceRange Range, StringRef DomainString,
+                SourceLoc DomainLoc, Kind Kind, StringRef Message,
                 StringRef Rename, const llvm::VersionTuple &Introduced,
                 SourceRange IntroducedRange,
                 const llvm::VersionTuple &Deprecated,
@@ -749,19 +758,47 @@ public:
 private:
   friend class SemanticAvailableAttr;
 
-  AvailabilityDomain Domain;
+  union {
+    AvailabilityDomain Domain;
+    StringRef DomainString;
+  };
+  const SourceLoc DomainLoc;
 
   const StringRef Message;
   const StringRef Rename;
 
-  const llvm::VersionTuple Introduced;
+  llvm::VersionTuple Introduced;
   const SourceRange IntroducedRange;
-  const llvm::VersionTuple Deprecated;
+  llvm::VersionTuple Deprecated;
   const SourceRange DeprecatedRange;
-  const llvm::VersionTuple Obsoleted;
+  llvm::VersionTuple Obsoleted;
   const SourceRange ObsoletedRange;
 
 public:
+  /// Returns true if the `AvailabilityDomain` associated with the attribute
+  /// has been resolved successfully.
+  bool hasCachedDomain() const { return Bits.AvailableAttr.HasDomain; }
+
+  /// Returns the `AvailabilityDomain` associated with the attribute, or
+  /// `std::nullopt` if it has either not yet been resolved or could not be
+  /// resolved successfully.
+  std::optional<AvailabilityDomain> getCachedDomain() const {
+    if (hasCachedDomain())
+      return Domain;
+    return std::nullopt;
+  }
+
+  /// If the attribute does not already have a cached `AvailabilityDomain`, this
+  /// returns the domain string that was written in source, from which an
+  /// `AvailabilityDomain` can be resolved.
+  std::optional<StringRef> getDomainString() const {
+    if (hasCachedDomain())
+      return std::nullopt;
+    return DomainString;
+  }
+
+  SourceLoc getDomainLoc() const { return DomainLoc; }
+
   /// Returns the parsed version for `introduced:`.
   std::optional<llvm::VersionTuple> getRawIntroduced() const {
     if (Introduced.empty())
@@ -812,19 +849,6 @@ public:
 
   /// Whether this attribute was spelled `@_spi_available`.
   bool isSPI() const { return Bits.AvailableAttr.IsSPI; }
-
-  /// Returns the `AvailabilityDomain` associated with the attribute, or
-  /// `std::nullopt` if it has either not yet been resolved or could not be
-  /// resolved successfully.
-  std::optional<AvailabilityDomain> getCachedDomain() const {
-    if (hasCachedDomain())
-      return Domain;
-    return std::nullopt;
-  }
-
-  /// Returns true if the `AvailabilityDomain` associated with the attribute
-  /// has been resolved successfully.
-  bool hasCachedDomain() const { return Bits.AvailableAttr.HasDomain; }
 
   /// Returns the kind of availability the attribute specifies.
   Kind getKind() const { return static_cast<Kind>(Bits.AvailableAttr.Kind); }
@@ -887,6 +911,18 @@ private:
 
 private:
   friend class SemanticAvailableAttrRequest;
+
+  void setRawIntroduced(llvm::VersionTuple version) { Introduced = version; }
+
+  void setRawDeprecated(llvm::VersionTuple version) { Deprecated = version; }
+
+  void setRawObsoleted(llvm::VersionTuple version) { Obsoleted = version; }
+
+  void setCachedDomain(AvailabilityDomain domain) {
+    assert(!Bits.AvailableAttr.HasDomain);
+    Domain = domain;
+    Bits.AvailableAttr.HasDomain = true;
+  }
 
   bool hasComputedSemanticAttr() const {
     return Bits.AvailableAttr.HasComputedSemanticAttr;
