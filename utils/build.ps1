@@ -833,7 +833,6 @@ function Fetch-Dependencies {
         "AMD64" {
           $JavaURL = "https://aka.ms/download-jdk/microsoft-jdk-17.0.14-windows-x64.zip"
           $JavaHash = "3619082f4a667f52c97cce983364a517993f798ae248c411765becfd9705767f"
-          DownloadAndVerify $JavaURL "$BinaryCache\android-cmdline-tools.zip" $JavaHash
         }
         "ARM64" {
           $JavaURL = "https://aka.ms/download-jdk/microsoft-jdk-17.0.14-windows-aarch64.zip"
@@ -842,13 +841,13 @@ function Fetch-Dependencies {
         default { throw "Unsupported processor architecture" }
       }
       DownloadAndVerify $JavaURL "$BinaryCache\microsoft-jdk.zip" $JavaHash
-      Extract-ZipFile -ZipFileName "microsoft-jdk.zip" -BinaryCache $BinaryCache -ExtractPath "android-ndk-r26b\.temp"
+      Extract-ZipFile -ZipFileName "microsoft-jdk.zip" -BinaryCache $BinaryCache -ExtractPath "android-ndk-r26b\.temp\jdk"
 
       # Download cmdline-tools
       $CLToolsURL = "https://dl.google.com/android/repository/commandlinetools-win-11076708_latest.zip"
       $CLToolsHash = "4d6931209eebb1bfb7c7e8b240a6a3cb3ab24479ea294f3539429574b1eec862"
       DownloadAndVerify $CLToolsURL "$BinaryCache\android-cmdline-tools.zip" $CLToolsHash
-      Extract-ZipFile -ZipFileName "android-cmdline-tools.zip" -BinaryCache $BinaryCache -ExtractPath "android-ndk-r26b\.temp"
+      Extract-ZipFile -ZipFileName "android-cmdline-tools.zip" -BinaryCache $BinaryCache -ExtractPath "android-ndk-r26b\.temp\cmdline-tools"
 
       # Accept licenses
       New-Item -Type Directory -Path "$NDKDir\licenses" -ErrorAction Ignore | Out-Null
@@ -857,10 +856,10 @@ function Fetch-Dependencies {
 
       # Install packages and create test device
       Isolate-EnvVars {
-        $env:JAVA_HOME = "$NDKDir\.temp\jdk-17.0.14+7"
+        $env:JAVA_HOME = "$NDKDir\.temp\jdk\jdk-17.0.14+7"
         $env:Path = "${env:JAVA_HOME}\bin;${env:Path}"
 
-        Invoke-Program "$NDKDir\.temp\cmdline-tools\bin\sdkmanager.bat" --sdk_root="$NDKDir" "cmdline-tools;latest" "--channel=3"
+        Invoke-Program "$NDKDir\.temp\cmdline-tools\cmdline-tools\bin\sdkmanager.bat" --sdk_root="$NDKDir" "cmdline-tools;latest" "--channel=3"
         $AndroidSdkMgr = "$NDKDir\cmdline-tools\latest\bin\sdkmanager.bat"
         foreach ($Package in @("emulator", "platforms;android-29", "system-images;android-29;default;x86_64", "platform-tools")) {
           Invoke-Program $AndroidSdkMgr $Package
