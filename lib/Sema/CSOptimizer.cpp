@@ -125,6 +125,9 @@ static bool isSupportedDisjunction(Constraint *disjunction) {
   // Non-operator disjunctions are supported only if they don't
   // have any generic choices.
   return llvm::all_of(choices, [&](Constraint *choice) {
+    if (choice->isDisabled())
+      return true;
+
     if (choice->getKind() != ConstraintKind::BindOverload)
       return false;
 
