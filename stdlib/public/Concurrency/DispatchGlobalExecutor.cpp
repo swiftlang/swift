@@ -56,6 +56,15 @@
 
 using namespace swift;
 
+/// Indexes in the schedulerPrivate array
+enum {
+  SwiftJobNextWaitingTaskIndex = 0,
+
+  SwiftJobDispatchHasLongObjectHeader = sizeof(void *) == sizeof(int),
+  SwiftJobDispatchLinkageIndex = SwiftJobDispatchHasLongObjectHeader ? 1 : 0,
+  SwiftJobDispatchQueueIndex = SwiftJobDispatchHasLongObjectHeader? 0 : 1
+};
+
 // Ensure that Job's layout is compatible with what Dispatch expects.
 // Note: MinimalDispatchObjectHeader just has the fields we care about, it is
 // not complete and should not be used for anything other than these asserts.
@@ -262,7 +271,7 @@ void swift_task_enqueueGlobalImpl(SwiftJob *job) {
 
 
 SWIFT_CC(swift)
-void swift_task_enqueueGlobalWithDelayImpl(SwiftJobDelay delay,
+void swift_task_enqueueGlobalWithDelayImpl(uint64_t nanoseconds,
                                            SwiftJob *job) {
   assert(job && "no job provided");
 
@@ -276,7 +285,7 @@ void swift_task_enqueueGlobalWithDelayImpl(SwiftJobDelay delay,
   job->schedulerPrivate[SwiftJobDispatchQueueIndex] =
       DISPATCH_QUEUE_GLOBAL_EXECUTOR;
 
-  dispatch_time_t when = dispatch_time(DISPATCH_TIME_NOW, delay);
+  dispatch_time_t when = dispatch_time(DISPATCH_TIME_NOW, nanoseconds);
   dispatch_after_f(when, queue, dispatchContext, dispatchFunction);
 }
 
@@ -349,11 +358,10 @@ clock_and_value_to_time(int clock, long long deadline) {
 }
 
 SWIFT_CC(swift)
-void swift_task_enqueueGlobalWithDeadlineImpl(long long sec,
-                                              long long nsec,
-                                              long long tsec,
-                                              long long tnsec,
-                                              int clock, SwiftJob *job) {
+void swift_task_enqueueGlobalWithDeadlineImpl(SwiftTime deadline,
+                                              SwiftTolerance tolerance,
+                                              SwiftClockId clock,
+                                              SwiftJob *job) {
   assert(job && "no job provided");
 
   SwiftJobPriority priority = swift_job_getPriority(job);
@@ -363,11 +371,11 @@ void swift_task_enqueueGlobalWithDeadlineImpl(long long sec,
   job->schedulerPrivate[SwiftJobDispatchQueueIndex] =
       DISPATCH_QUEUE_GLOBAL_EXECUTOR;
 
-  uint64_t deadline = sec * NSEC_PER_SEC + nsec;
-  dispatch_time_t when = clock_and_value_to_time(clock, deadline);
-  
-  if (tnsec != -1) {
-    uint64_t leeway = tsec * NSEC_PER_SEC + tnsec;
+  int64_t deadlineNsec = swift_time_toNanoseconds(deadline);
+  dispatch_time_t when = clock_and_value_to_time(clock, deadlineNsec);
+
+  if (!swift_tolerance_isUnspecified(tolerance)) {
+    uint64_t leeway = (uint64_t)swift_tolerance_toNanoseconds(tolerance);
 
     dispatch_source_t source = 
       dispatch_source_create(DISPATCH_SOURCE_TYPE_TIMER, 0, 0, queue);

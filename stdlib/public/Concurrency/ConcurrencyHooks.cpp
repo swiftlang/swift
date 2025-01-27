@@ -57,8 +57,7 @@ swift::swift_task_enqueueGlobal(Job *job) {
 
 SWIFT_CC(swift) static void
 swift_task_enqueueGlobalWithDelayOrig(JobDelay delay, Job *job) {
-  swift_task_enqueueGlobalWithDelayImpl(
-      static_cast<SwiftJobDelay>(delay), reinterpret_cast<SwiftJob *>(job));
+  swift_task_enqueueGlobalWithDelayImpl(delay, reinterpret_cast<SwiftJob *>(job));
 }
 
 void
@@ -79,8 +78,12 @@ swift_task_enqueueGlobalWithDeadlineOrig(
     long long tsec,
     long long tnsec,
     int clock, Job *job) {
-  swift_task_enqueueGlobalWithDeadlineImpl(sec, nsec, tsec, tnsec, clock,
-                                           reinterpret_cast<SwiftJob *>(job));
+  SwiftTime deadline = { sec, (uint64_t)nsec };
+  SwiftDuration tolerance = { tsec, (uint64_t)tnsec };
+  swift_task_enqueueGlobalWithDeadlineImpl(
+    deadline, tolerance, SwiftClockId(clock),
+    reinterpret_cast<SwiftJob *>(job)
+  );
 }
 
 void

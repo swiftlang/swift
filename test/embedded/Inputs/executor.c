@@ -174,7 +174,7 @@ static void job_schedule(SwiftJob *job, SwiftClockId clock, uint64_t deadline) {
 
 static uint64_t job_getTime(SwiftClockId clock) {
   SwiftTime now = swift_time_now(clock);
-  return now.seconds * 1000000000ull + now.nanoseconds;
+  return swift_time_toNanoseconds(now);
 }
 
 static void job_runTimers(void) {
@@ -263,34 +263,29 @@ swift_task_enqueueGlobalImpl(SwiftJob *job) {
   job_heap_push(job);
 }
 
-/// Enqueue a job on the global executor, with a specific delay before it
-/// should execute.
+/// Enqueue a job on the global executor after a specified delay.
 SWIFT_CC(swift) void
-swift_task_enqueueGlobalWithDelayImpl(SwiftJobDelay delay,
+swift_task_enqueueGlobalWithDelayImpl(uint64_t delay,
                                       SwiftJob *job) {
-  SwiftTime now = swift_time_now(SwiftContinuousClock);
-  uint64_t deadline = now.seconds * 1000000000ull + now.nanoseconds + delay;
+  uint64_t now = job_getTime(SwiftSuspendingClock);
+  uint64_t deadline = now + delay;
 
-  debug("executor: job %p scheduled with delay %llu ns\n", job, delay);
+  debug("executor: job %p scheduled with delay %"PRId64"\n",
+        job, delay);
 
-  job_schedule(job, SwiftContinuousClock, deadline);
+  job_schedule(job, SwiftSuspendingClock, deadline);
 }
 
-/// Enqueue a job on the global executor, with a specific deadline before
-/// which it must execute.
-SWIFT_CC(swift)
-void swift_task_enqueueGlobalWithDeadlineImpl(long long sec,
-                                              long long nsec,
-                                              long long tsec,
-                                              long long tnsec,
-                                              int clock,
-                                              SwiftJob *job) {
-  uint64_t deadline = sec * 1000000000ull + nsec;
-
+/// Enqueue a job on the global executor at a specified time.
+SWIFT_CC(swift) void
+swift_task_enqueueGlobalWithDeadlineImpl(SwiftTime deadline,
+                                         SwiftTolerance tolerance,
+                                         SwiftClockId clock,
+                                         SwiftJob *job) {
   debug("executor: job %p scheduled with deadline %"PRIu64" on clock %d\n",
-         job, deadline, clock);
+        job, deadline, clock);
 
-  job_schedule(job, clock, deadline);
+  job_schedule(job, clock, swift_time_toNanoseconds(deadline));
 }
 
 /// Enqueue a job on the main executor (which may or may not be the same as
