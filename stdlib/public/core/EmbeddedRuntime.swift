@@ -279,6 +279,9 @@ public func swift_dynamicCastClassUnconditional(object: UnsafeMutableRawPointer,
 
 @_cdecl("swift_isEscapingClosureAtFileLocation")
 public func swift_isEscapingClosureAtFileLocation(object: Builtin.RawPointer, filename: UnsafePointer<CChar>, filenameLength: Int32, line: Int32, column: Int32, verificationType: CUnsignedInt) -> Bool {
+  let objectBits = UInt(Builtin.ptrtoint_Word(object))
+  if objectBits == 0 { return false }
+
   guard swift_isUniquelyReferenced_native(object: object) else {
     fatalError("non-escaping closure escaped")
   }
