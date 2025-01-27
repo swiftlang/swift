@@ -191,9 +191,10 @@ static AvailableAttr *createAvailableAttr(AvailabilityDomain Domain,
       Inferred.Obsoleted.value_or(llvm::VersionTuple());
 
   return new (Context) AvailableAttr(
-      SourceLoc(), SourceRange(), Domain, Inferred.Kind, Inferred.Message,
-      Inferred.Rename, Introduced, SourceRange(), Deprecated, SourceRange(),
-      Obsoleted, SourceRange(), /*Implicit=*/true, Inferred.IsSPI);
+      SourceLoc(), SourceRange(), Domain, SourceLoc(), Inferred.Kind,
+      Inferred.Message, Inferred.Rename, Introduced, SourceRange(), Deprecated,
+      SourceRange(), Obsoleted, SourceRange(), /*Implicit=*/true,
+      Inferred.IsSPI);
 }
 
 void AvailabilityInference::applyInferredAvailableAttrs(

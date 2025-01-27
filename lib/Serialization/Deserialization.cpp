@@ -5643,7 +5643,7 @@ DeclDeserializer::readAvailable_DECL_ATTR(SmallVectorImpl<uint64_t> &scratch,
   }
 
   auto attr = new (ctx)
-      AvailableAttr(SourceLoc(), SourceRange(), domain, kind, message, rename,
+      AvailableAttr(SourceLoc(), SourceRange(), domain, SourceLoc(), kind, message, rename,
                     Introduced, SourceRange(), Deprecated, SourceRange(),
                     Obsoleted, SourceRange(), isImplicit, isSPI);
   return attr;

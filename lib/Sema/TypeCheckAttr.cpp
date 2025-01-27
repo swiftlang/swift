@@ -8270,6 +8270,91 @@ std::optional<SemanticAvailableAttr>
 SemanticAvailableAttrRequest::evaluate(swift::Evaluator &evaluator,
                                        const AvailableAttr *attr,
                                        const Decl *decl) const {
+  if (attr->hasCachedDomain())
+    return SemanticAvailableAttr(attr);
+
+  auto &diags = decl->getASTContext().Diags;
+  auto attrLoc = attr->getLocation();
+  auto attrName = attr->getAttrName();
+  auto attrKind = attr->getKind();
+  auto domainLoc = attr->getDomainLoc();
+  auto introducedVersion = attr->getRawIntroduced();
+  auto deprecatedVersion = attr->getRawDeprecated();
+  auto obsoletedVersion = attr->getRawObsoleted();
+  auto mutableAttr = const_cast<AvailableAttr *>(attr);
+  auto domain = attr->getCachedDomain();
+
+  if (!domain) {
+    auto string = attr->getDomainString();
+    ASSERT(string);
+
+    // Attempt to resolve the domain specified for the attribute and diagnose
+    // if no domain is found.
+    domain = AvailabilityDomain::builtinDomainForString(*string);
+    if (!domain) {
+      if (auto suggestion = closestCorrectedPlatformString(*string)) {
+        diags
+            .diagnose(domainLoc, diag::attr_availability_suggest_platform,
+                      *string, attrName, *suggestion)
+            .fixItReplace(SourceRange(domainLoc), *suggestion);
+      } else {
+        diags.diagnose(attrLoc, diag::attr_availability_unknown_platform,
+                       *string, attrName);
+      }
+      return std::nullopt;
+    }
+
+    mutableAttr->setCachedDomain(*domain);
+  }
+
+  auto domainName = domain->getNameForAttributePrinting();
+
+  if (domain->isSwiftLanguage() || domain->isPackageDescription()) {
+    switch (attrKind) {
+    case AvailableAttr::Kind::Deprecated:
+      diags.diagnose(attrLoc,
+                     diag::attr_availability_expected_deprecated_version,
+                     attrName, domainName);
+      return std::nullopt;
+
+    case AvailableAttr::Kind::Unavailable:
+      diags.diagnose(attrLoc, diag::attr_availability_cannot_be_used_for_domain,
+                     "unavailable", attrName, domainName);
+      return std::nullopt;
+
+    case AvailableAttr::Kind::NoAsync:
+      diags.diagnose(attrLoc, diag::attr_availability_cannot_be_used_for_domain,
+                     "noasync", attrName, domainName);
+      break;
+    case AvailableAttr::Kind::Default:
+      break;
+    }
+
+    bool hasVersionSpec =
+        (introducedVersion || deprecatedVersion || obsoletedVersion);
+    if (!hasVersionSpec) {
+      diags.diagnose(attrLoc, diag::attr_availability_expected_version_spec,
+                     attrName, domainName);
+      return std::nullopt;
+    }
+  }
+
+  // Canonicalize platform versions.
+  // FIXME: [availability] This should be done when remapping versions instead.
+  if (domain->isPlatform()) {
+    auto canonicalizeVersion = [&](llvm::VersionTuple version) {
+      return canonicalizePlatformVersion(domain->getPlatformKind(), version);
+    };
+    if (introducedVersion)
+      mutableAttr->setRawIntroduced(canonicalizeVersion(*introducedVersion));
+
+    if (deprecatedVersion)
+      mutableAttr->setRawDeprecated(canonicalizeVersion(*deprecatedVersion));
+
+    if (obsoletedVersion)
+      mutableAttr->setRawObsoleted(canonicalizeVersion(*obsoletedVersion));
+  }
+
   return SemanticAvailableAttr(attr);
 }
 

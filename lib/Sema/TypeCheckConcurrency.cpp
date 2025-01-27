@@ -6664,7 +6664,7 @@ static void addUnavailableAttrs(ExtensionDecl *ext, NominalTypeDecl *nominal) {
 
       auto attr = new (ctx) AvailableAttr(
           SourceLoc(), SourceRange(),
-          AvailabilityDomain::forPlatform(available.getPlatform()),
+          AvailabilityDomain::forPlatform(available.getPlatform()), SourceLoc(),
           AvailableAttr::Kind::Unavailable, available.getMessage(),
           /*Rename=*/"", available.getIntroduced().value_or(noVersion),
           SourceRange(), available.getDeprecated().value_or(noVersion),
