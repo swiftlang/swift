@@ -2084,18 +2084,19 @@ not replace this reference with a not uniquely reference object.
 
 For details see [Copy-on-Write Representation](SIL.md#Copy-on-Write-Representation).
 
-### is_escaping_closure
+### destroy_not_escaped_closure
 
 ```
-sil-instruction ::= 'is_escaping_closure' sil-operand
+sil-instruction ::= 'destroy_not_escaped_closure' sil-operand
 
-%1 = is_escaping_closure %0 : $@callee_guaranteed () -> ()
+%1 = destroy_not_escaped_closure %0 : $@callee_guaranteed () -> ()
 // %0 must be an escaping swift closure.
 // %1 will be of type Builtin.Int1
 ```
 
-Checks whether the context reference is not nil and bigger than one and
-returns true if it is.
+Checks if the closure context escaped and then destroys the context.
+The escape-check is done by checking if its reference count is exactly 1.
+Returns true if it is.
 
 ### copy_block
 

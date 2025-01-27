@@ -1138,6 +1138,7 @@ bool SILInstruction::mayRelease() const {
   case SILInstructionKind::EndApplyInst:
   case SILInstructionKind::YieldInst:
   case SILInstructionKind::DestroyAddrInst:
+  case SILInstructionKind::DestroyNotEscapedClosureInst:
   case SILInstructionKind::StrongReleaseInst:
 #define UNCHECKED_REF_STORAGE(Name, ...)                                       \
   case SILInstructionKind::Name##ReleaseValueInst:
@@ -1227,7 +1228,7 @@ bool SILInstruction::mayReleaseOrReadRefCount() const {
   switch (getKind()) {
   case SILInstructionKind::IsUniqueInst:
   case SILInstructionKind::BeginCOWMutationInst:
-  case SILInstructionKind::IsEscapingClosureInst:
+  case SILInstructionKind::DestroyNotEscapedClosureInst:
     return true;
   default:
     return mayRelease();

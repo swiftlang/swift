@@ -3185,11 +3185,11 @@ void SILCloner<ImplClass>::visitEndCOWMutationInst(EndCOWMutationInst *Inst) {
                         getOpValue(Inst->getOperand()), Inst->doKeepUnique()));
 }
 template <typename ImplClass>
-void SILCloner<ImplClass>::visitIsEscapingClosureInst(
-    IsEscapingClosureInst *Inst) {
+void SILCloner<ImplClass>::visitDestroyNotEscapedClosureInst(
+    DestroyNotEscapedClosureInst *Inst) {
   getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
   recordClonedInstruction(
-      Inst, getBuilder().createIsEscapingClosure(getOpLocation(Inst->getLoc()),
+      Inst, getBuilder().createDestroyNotEscapedClosure(getOpLocation(Inst->getLoc()),
                                                  getOpValue(Inst->getOperand()),
                                                  Inst->getVerificationType()));
 }

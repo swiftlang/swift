@@ -6041,6 +6041,33 @@ RValue RValueEmitter::visitOpenExistentialExpr(OpenExistentialExpr *E,
                                              });
 }
 
+namespace {
+class DestroyNotEscapedClosureCleanup : public Cleanup {
+  SILValue v;
+public:
+  DestroyNotEscapedClosureCleanup(SILValue v) : v(v) {}
+
+  void emit(SILGenFunction &SGF, CleanupLocation l,
+            ForUnwind_t forUnwind) override {
+    // Now create the verification of the withoutActuallyEscaping operand.
+    // Either we fail the uniqueness check (which means the closure has escaped)
+    // and abort or we continue and destroy the ultimate reference.
+    auto isEscaping = SGF.B.createDestroyNotEscapedClosure(
+        l, v, DestroyNotEscapedClosureInst::WithoutActuallyEscaping);
+    SGF.B.createCondFail(l, isEscaping, "non-escaping closure has escaped");
+  }
+
+  void dump(SILGenFunction &) const override {
+#ifndef NDEBUG
+    llvm::errs() << "DestroyNotEscapedClosureCleanup\n"
+                 << "State:" << getState() << "\n"
+                 << "Value:" << v << "\n";
+#endif
+  }
+};
+} // end anonymous namespace
+
+
 RValue RValueEmitter::visitMakeTemporarilyEscapableExpr(
     MakeTemporarilyEscapableExpr *E, SGFContext C) {
   // Emit the non-escaping function value.
@@ -6075,19 +6102,15 @@ RValue RValueEmitter::visitMakeTemporarilyEscapableExpr(
   }
 
   // Convert it to an escaping function value.
-  auto escapingClosure =
+  auto ec =
       SGF.createWithoutActuallyEscapingClosure(E, functionValue, escapingFnTy);
+  SILValue ecv = ec.forward(SGF);
+  SGF.Cleanups.pushCleanup<DestroyNotEscapedClosureCleanup>(ecv);
+  auto escapingClosure = ManagedValue::forOwnedRValue(ecv, SGF.Cleanups.getTopCleanup());
   auto loc = SILLocation(E);
   auto borrowedClosure = escapingClosure.borrow(SGF, loc);
   RValue rvalue = visitSubExpr(borrowedClosure, false /* isClosureConsumable */);
 
-  // Now create the verification of the withoutActuallyEscaping operand.
-  // Either we fail the uniqueness check (which means the closure has escaped)
-  // and abort or we continue and destroy the ultimate reference.
-  auto isEscaping = SGF.B.createIsEscapingClosure(
-      loc, borrowedClosure.getValue(),
-      IsEscapingClosureInst::WithoutActuallyEscaping);
-  SGF.B.createCondFail(loc, isEscaping, "non-escaping closure has escaped");
   return rvalue;
 }
 
