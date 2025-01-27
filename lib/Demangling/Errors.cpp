@@ -64,7 +64,7 @@ static void reportOnCrash(uint32_t flags, const char *message) {
 
   oldMessage = std::atomic_load_explicit(
     (volatile std::atomic<char *> *)&gCRAnnotations.message,
-    SWIFT_MEMORY_ORDER_CONSUME);
+    std::memory_order_consume);
 
   do {
     if (newMessage) {
@@ -81,7 +81,7 @@ static void reportOnCrash(uint32_t flags, const char *message) {
              (volatile std::atomic<char *> *)&gCRAnnotations.message,
              &oldMessage, newMessage,
              std::memory_order_release,
-             SWIFT_MEMORY_ORDER_CONSUME));
+             std::memory_order_consume));
 
   if (oldMessage && malloc_size(oldMessage))
     free(oldMessage);
