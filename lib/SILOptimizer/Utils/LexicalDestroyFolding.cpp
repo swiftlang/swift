@@ -799,8 +799,6 @@ swift::foldDestroysOfCopiedLexicalBorrow(BeginBorrowInst *bbi,
     return nullptr;
   if (bbi->getOperand()->getOwnershipKind() != OwnershipKind::Owned)
     return nullptr;
-  if (!dominanceTree.isReachableFromEntry(bbi->getParentBlock()))
-    return nullptr;
 
   auto context = LexicalDestroyFolding::Context(bbi, dominanceTree, deleter);
   return LexicalDestroyFolding::run(context);
