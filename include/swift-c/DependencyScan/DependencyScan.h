@@ -155,6 +155,8 @@ swiftscan_module_info_get_details(swiftscan_dependency_info_t info);
 SWIFTSCAN_PUBLIC swiftscan_string_ref_t
 swiftscan_link_library_info_get_link_name(
     swiftscan_link_library_info_t info);
+SWIFTSCAN_PUBLIC bool
+swiftscan_link_library_info_get_is_static(swiftscan_link_library_info_t info);
 SWIFTSCAN_PUBLIC bool swiftscan_link_library_info_get_is_framework(
     swiftscan_link_library_info_t info);
 SWIFTSCAN_PUBLIC bool swiftscan_link_library_info_get_should_force_load(

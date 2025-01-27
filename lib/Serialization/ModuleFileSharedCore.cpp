@@ -1589,7 +1589,9 @@ ModuleFileSharedCore::ModuleFileSharedCore(
           if (Bits.IsStaticLibrary)
             shouldForceLink = false;
           if (auto libKind = getActualLibraryKind(rawKind))
-            LinkLibraries.push_back({blobData, *libKind, shouldForceLink});
+            LinkLibraries.emplace_back(blobData, *libKind,
+                                       static_cast<bool>(Bits.IsStaticLibrary),
+                                       shouldForceLink);
           // else ignore the dependency...it'll show up as a linker error.
           break;
         }
