@@ -62,9 +62,14 @@ inline ConstSpanOfInt funcWithSafeWrapper2(ConstSpanOfInt s
                                            [[clang::lifetimebound]]) {
   return s;
 }
+
 inline ConstSpanOfInt funcWithSafeWrapper3(const VecOfInt &v
                                            [[clang::lifetimebound]]) {
   return ConstSpanOfInt(v.data(), v.size());
 }
+
+struct X {
+  inline void methodWithSafeWrapper(ConstSpanOfInt s [[clang::noescape]]) {}
+};
 
 #endif // TEST_INTEROP_CXX_STDLIB_INPUTS_STD_SPAN_H
