@@ -113,6 +113,9 @@
         },
         "zlib": {
           "remote": { "id": "madler/zlib" }
+        },
+        "mimalloc": {
+          "remote": { "id": "microsoft/mimalloc" }
         }
     },
     "default-branch-scheme": "main",
@@ -167,7 +170,8 @@
                 "wasmkit": "0.1.2",
                 "curl": "curl-8_9_1",
                 "libxml2": "v2.11.5",
-                "zlib": "v1.3.1"
+                "zlib": "v1.3.1",
+                "mimalloc": "v3.0.1"
             }
         },
         "release/6.1": {
@@ -374,7 +378,8 @@
                 "wasmkit": "0.1.2",
                 "curl": "curl-8_9_1",
                 "libxml2": "v2.11.5",
-                "zlib": "v1.3.1"
+                "zlib": "v1.3.1",
+                "mimalloc": "v3.0.1"
             }
         },
         "next" : {
@@ -423,7 +428,8 @@
                 "curl": "curl-8_9_1",
                 "icu": "maint/maint-69",
                 "libxml2": "v2.11.5",
-                "zlib": "v1.3.1"
+                "zlib": "v1.3.1",
+                "mimalloc": "v3.0.1"
             }
         }
     }
