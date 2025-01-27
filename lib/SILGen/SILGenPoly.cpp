@@ -7046,6 +7046,14 @@ void SILGenFunction::emitProtocolWitness(
   FullExpr scope(Cleanups, cleanupLoc);
   FormalEvaluationScope formalEvalScope(*this);
 
+  // The protocol conditional conformance itself might bring some T :
+  // Differentiable conformances. They are already added to the derivative
+  // generic signature. Update witness substitution map generic signature to
+  // have them as well.
+  if (auto *derivativeId = witness.getDerivativeFunctionIdentifier())
+    witnessSubs = SubstitutionMap::get(derivativeId->getDerivativeGenericSignature(),
+                                       witnessSubs);
+
   auto thunkTy = F.getLoweredFunctionType();
 
   SmallVector<ManagedValue, 8> origParams;
