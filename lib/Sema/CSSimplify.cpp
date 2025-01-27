@@ -14263,17 +14263,6 @@ void ConstraintSystem::addRestrictedConstraint(
                                      TMF_GenerateConstraints, locator);
 }
 
-void ConstraintSystem::recordImplicitValueConversion(
-                             ConstraintLocator *locator,
-                             ConversionRestrictionKind restriction) {
-  bool inserted = ImplicitValueConversions.insert(
-        {getConstraintLocator(locator), restriction}).second;
-  ASSERT(inserted);
-
-  if (solverState)
-    recordChange(SolverTrail::Change::RecordedImplicitValueConversion(locator));
-}
-
 /// Given that we have a conversion constraint between two types, and
 /// that the given constraint-reduction rule applies between them at
 /// the top level, apply it and generate any necessary recursive
@@ -14850,45 +14839,6 @@ ConstraintSystem::simplifyRestrictedConstraintImpl(
     if (worseThanBestSolution())
       return SolutionKind::Error;
 
-    auto *conversionLoc =
-        getImplicitValueConversionLocator(locator, restriction);
-
-    auto *applicationLoc =
-        getConstraintLocator(conversionLoc, ConstraintLocator::ApplyFunction);
-
-    auto *memberLoc = getConstraintLocator(
-        applicationLoc, ConstraintLocator::ConstructorMember);
-
-    // Allocate a single argument info to cover all possible
-    // Double <-> CGFloat conversion locations.
-    auto *argumentsLoc =
-        getConstraintLocator(conversionLoc, ConstraintLocator::ApplyArgument);
-
-    if (!ArgumentLists.count(argumentsLoc)) {
-      auto *argList = ArgumentList::createImplicit(
-          getASTContext(), {Argument(SourceLoc(), Identifier(), nullptr)},
-          /*firstTrailingClosureIndex=*/std::nullopt,
-          AllocationArena::ConstraintSolver);
-      recordArgumentList(argumentsLoc, argList);
-    }
-
-    auto *memberTypeLoc = getConstraintLocator(
-        applicationLoc, LocatorPathElt::ConstructorMemberType());
-
-    auto *memberTy = createTypeVariable(memberTypeLoc, TVO_CanBindToNoEscape);
-
-    addValueMemberConstraint(MetatypeType::get(type2, getASTContext()),
-                             DeclNameRef(DeclBaseName::createConstructor()),
-                             memberTy, DC,
-                             FunctionRefInfo::doubleBaseNameApply(),
-                             /*outerAlternatives=*/{}, memberLoc);
-
-    addConstraint(ConstraintKind::ApplicableFunction,
-                  FunctionType::get({FunctionType::Param(type1)}, type2),
-                  memberTy, applicationLoc);
-
-    ImplicitValueConversions.insert(
-        {getConstraintLocator(locator), restriction});
     return SolutionKind::Solved;
   }
   }
