@@ -42,3 +42,42 @@ func empty_custom_product(_ xs: (E, Int)) { // expected-note {{'xs' is of type '
   print() // expected-warning{{will never be executed}}
 }
 
+//===--- Uninhabited self parameters
+
+extension Never {
+  var unreachableComputed: Int { // expected-note{{'self' is of type 'Never' which cannot be constructed because it is an enum with no cases}}
+    42 // expected-warning{{will never be executed}}
+  }
+
+  subscript(_ i: Int) -> Int { // expected-note{{'self' is of type 'Never' which cannot be constructed because it is an enum with no cases}}
+    42 // expected-warning{{will never be executed}}
+  }
+
+  func unreachableMethod() -> Int { // expected-note{{'self' is of type 'Never' which cannot be constructed because it is an enum with no cases}}
+    42 // expected-warning{{will never be executed}}
+  }
+
+  func unreachableMethodWithParam(_ x: Int) -> Int { // expected-note{{'self' is of type 'Never' which cannot be constructed because it is an enum with no cases}}
+    42 // expected-warning{{will never be executed}}
+  }
+
+  func unreachableMethodWithUninhabitedParam(_ p0: Int, _ p1: Self, _ p2: Never) -> Int { // expected-note{{'p1' is of type 'Never' which cannot be constructed because it is an enum with no cases}}
+    42 // expected-warning{{will never be executed}}
+  }
+
+  func unreachableWithNestedDecls() -> Int { // expected-note{{'self' is of type 'Never' which cannot be constructed because it is an enum with no cases}}
+    func g() -> Int { 42 }
+    let c = { g() } // expected-warning{{will never be executed}}
+    return c()
+  }
+}
+
+protocol P {
+  var prop: Int { get }
+  func uncallable(_ n: Never)
+}
+
+extension Never: P {
+  var prop: Int { fatalError() }
+  func uncallable(_ n: Never) {}
+}
