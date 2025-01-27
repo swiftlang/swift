@@ -686,9 +686,10 @@ struct TaskGroupRecordTraits {
 
   void initialize(IRGenFunction &IGF, Address recordAddr,
                   Explosion &taskGroup) const {
+    auto record = IGF.Builder.CreateStructGEP(recordAddr, 1, 2 * IGF.IGM.getPointerSize());
     IGF.Builder.CreateStore(
         taskGroup.claimNext(),
-        IGF.Builder.CreateStructGEP(recordAddr, 1, 2 * IGF.IGM.getPointerSize()));
+        record);
   }
 };
 
@@ -747,6 +748,55 @@ struct InitialTaskExecutorOwnedRecordTraits {
   }
 };
 
+struct InitialTaskNameRecordTraits {
+  static StringRef getLabel() {
+    return "task_name";
+  }
+  static llvm::StructType *getRecordType(IRGenModule &IGM) {
+    return IGM.SwiftInitialTaskNameTaskOptionRecordTy;
+  }
+  static TaskOptionRecordFlags getRecordFlags() {
+    return TaskOptionRecordFlags(TaskOptionRecordKind::InitialTaskName);
+  }
+  static CanType getValueType(ASTContext &ctx) {
+    // FIXME: maybe raw pointer type?
+    return OptionalType::get(ctx.getUnsafeRawBufferPointerType())
+        ->getCanonicalType();
+  }
+
+  // Create 'InitialTaskNameTaskOptionRecord'
+  void initialize(IRGenFunction &IGF, Address recordAddr,
+                  Explosion &taskName) const {
+
+    fprintf(stderr, "[%s:%d](%s) initialize InitialTaskNameTaskOptionRecord\n", __FILE_NAME__, __LINE__, __FUNCTION__);
+    taskName.dump();
+
+    fprintf(stderr, "[%s:%d](%s) taskName.size() = %d\n", __FILE_NAME__, __LINE__, __FUNCTION__,
+            taskName.size());
+
+    // FIXME: why is this wrong?
+    // [GenConcurrency.cpp:725](initialize) initialize InitialTaskNameTaskOptionRecord
+    //  %16 = extractvalue { i64, i64 } %15, 0
+    //  %17 = extractvalue { i64, i64 } %15, 1
+    // [GenConcurrency.cpp:728](initialize) taskName.size() = 2
+    //  Assertion failed: (isa<llvm::StructType>(address.getElementType()) || isa<llvm::ArrayType>(address.getElementType())), function CreateStructGEP, file IRBuilder.h, line 193. Process 27213 stopped
+
+//    auto record =
+//        IGF.Builder.CreateStructGEP(recordAddr, 1, 2 * IGF.IGM.getPointerSize());
+//    IGF.Builder.CreateStore(taskName.claimNext(),
+//                            IGF.Builder.CreateStructGEP(record, 0, Size()));
+//    IGF.Builder.CreateStore(taskName.claimNext(),
+//                            IGF.Builder.CreateStructGEP(record, 1, Size()));
+
+    auto record = IGF.Builder.CreateStructGEP(recordAddr, 1, 2 * IGF.IGM.getPointerSize());
+    fprintf(stderr, "[%s:%d](%s) record = \n", __FILE_NAME__, __LINE__, __FUNCTION__);
+    record->dump();
+    IGF.Builder.CreateStore(
+        taskName.claimNext(),
+        record);
+  }
+};
+
 } // end anonymous namespace
 
 static llvm::Value *
@@ -783,12 +833,20 @@ maybeAddInitialTaskExecutorOwnedOptionRecord(IRGenFunction &IGF,
                               taskExecutorExistential);
 }
 
+static llvm::Value *
+maybeAddTaskNameOptionRecord(IRGenFunction &IGF, llvm::Value *prevOptions,
+                             OptionalExplosion &taskName) {
+  return maybeAddOptionRecord(IGF, prevOptions, InitialTaskNameRecordTraits(),
+                              taskName);
+}
+
 std::pair<llvm::Value *, llvm::Value *>
 irgen::emitTaskCreate(IRGenFunction &IGF, llvm::Value *flags,
                       OptionalExplosion &serialExecutor,
                       OptionalExplosion &taskGroup,
                       OptionalExplosion &taskExecutorUnowned,
                       OptionalExplosion &taskExecutorExistential,
+                      OptionalExplosion &taskName,
                       Explosion &taskFunction,
                       SubstitutionMap subs) {
   llvm::Value *taskOptions =
@@ -824,6 +882,16 @@ irgen::emitTaskCreate(IRGenFunction &IGF, llvm::Value *flags,
     taskOptions = maybeAddInitialTaskExecutorOwnedOptionRecord(
         IGF, taskOptions, taskExecutorExistential);
   }
+
+  // Add an option record for the initial task name, if present.
+  //
+  //    (lldb) e taskName.value.Values[0]
+  //        (llvm::Value *) $11 = 0x000060000220d1a0
+  //    (lldb) e taskName.value.Values[0]->dump()
+  //        %16 = extractvalue { i64, i64 } %15, 0
+  //    (lldb) e taskName.value.Values[1]->dump()
+  //       %17 = extractvalue { i64, i64 } %15, 1
+  taskOptions = maybeAddTaskNameOptionRecord(IGF, taskOptions, taskName);
 
   // In embedded Swift, create and pass result type info.
   taskOptions = maybeAddEmbeddedSwiftResultTypeInfo(IGF, taskOptions, resultType);
