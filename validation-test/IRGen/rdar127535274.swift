@@ -4,8 +4,8 @@
 // REQUIRES: swift_feature_LayoutStringValueWitnessesInstantiation
 
 // CHECK: define internal ptr @"$s13rdar1275352744TestVMi"
-// CHECK:  [[METADATA:%.*]] = call ptr @swift_allocateGenericValueMetadataWithLayoutString
-// CHECK:  call void @swift_generic_instantiateLayoutString(ptr @"type_layout_string l13rdar1275352744TestVyxG", ptr [[METADATA]])
+// CHECK:  [[METADATA:%.*]] = call ptr @swift_cvw_allocateGenericValueMetadataWithLayoutString
+// CHECK:  call void @swift_cvw_instantiateLayoutString(ptr @"type_layout_string l13rdar1275352744TestVyxG", ptr [[METADATA]])
 // CHECK:  ret ptr [[METADATA]]
 // CHECK: }
 public struct Test<T> {

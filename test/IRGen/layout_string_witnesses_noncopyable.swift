@@ -3,31 +3,31 @@
 // REQUIRES: swift_feature_LayoutStringValueWitnesses
 // REQUIRES: swift_feature_LayoutStringValueWitnessesInstantiation
 
-// CHECK-NOT: @"$s3Foo7GenericVWV" = {{.*}}ptr @swift_generic{{.*$}}
+// CHECK-NOT: @"$s3Foo7GenericVWV" = {{.*}}ptr @swift_cvw{{.*$}}
 struct Generic<T: ~Copyable>: ~Copyable {
     let x: T
     let y: Int
 }
 
-// CHECK-NOT: @"$s3Foo13SinglePayloadOWV" = {{.*}}ptr @swift_generic{{.*$}}
+// CHECK-NOT: @"$s3Foo13SinglePayloadOWV" = {{.*}}ptr @swift_cvw{{.*$}}
 enum SinglePayload: ~Copyable {
     case x(AnyObject)
     case y
 }
 
-// CHECK-NOT: @"$s3Foo12MultiPayloadOWV" = {{.*}}ptr @swift_generic{{.*$}}
+// CHECK-NOT: @"$s3Foo12MultiPayloadOWV" = {{.*}}ptr @swift_cvw{{.*$}}
 enum MultiPayload: ~Copyable {
     case x(AnyObject)
     case y(AnyObject)
 }
 
-// CHECK-NOT: @"$s3Foo20SinglePayloadGenericOWV" = {{.*}}ptr @swift_generic{{.*$}}
+// CHECK-NOT: @"$s3Foo20SinglePayloadGenericOWV" = {{.*}}ptr @swift_cvw{{.*$}}
 enum SinglePayloadGeneric<T>: ~Copyable {
     case x(T)
     case y
 }
 
-// CHECK-NOT: @"$s3Foo19MultiPayloadGenericOWV" = {{.*}}ptr @swift_generic{{.*$}}
+// CHECK-NOT: @"$s3Foo19MultiPayloadGenericOWV" = {{.*}}ptr @swift_cvw{{.*$}}
 enum MultiPayloadGeneric<T>: ~Copyable {
     case x(T)
     case y(T)
