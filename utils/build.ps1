@@ -486,7 +486,7 @@ function Get-BuildProjectCMakeModules([BuildComponent]$Project) {
 }
 
 function Get-TargetInfo($Arch) {
-  # Cache the result of "swift -print-target-info" as $Arch.TargetInfo
+  # Cache the result of "swift -print-target-info" as $Arch.Cache.TargetInfo
   $cacheKey = "TargetInfo"
   if (-not $Arch.Cache.ContainsKey($cacheKey)) {
     $swiftExe = Join-Path -Path (Get-PinnedToolchainTool) -ChildPath "swift.exe"
