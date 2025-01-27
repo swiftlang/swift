@@ -756,12 +756,20 @@ swift::swift_allocateGenericClassMetadata(const ClassDescriptor *description,
   return metadata;
 }
 
-static ClassMetadata *swift_allocateGenericClassMetadataWithLayoutStringImpl(
+static ClassMetadata *
+swift_cvw_allocateGenericClassMetadataWithLayoutStringImpl(
     const ClassDescriptor *description, const void *arguments,
     const GenericClassMetadataPattern *pattern) {
   return swift::swift_allocateGenericClassMetadata(description,
                                                    arguments,
                                                    pattern);
+}
+
+ClassMetadata *swift::swift_allocateGenericClassMetadataWithLayoutString(
+    const ClassDescriptor *description, const void *arguments,
+    const GenericClassMetadataPattern *pattern) {
+  return swift_cvw_allocateGenericClassMetadataWithLayoutString(
+      description, arguments, pattern);
 }
 
 static void
@@ -835,13 +843,21 @@ swift::swift_allocateGenericValueMetadata(const ValueTypeDescriptor *description
   return metadata;
 }
 
-static ValueMetadata *swift_allocateGenericValueMetadataWithLayoutStringImpl(
+static ValueMetadata *
+swift_cvw_allocateGenericValueMetadataWithLayoutStringImpl(
     const ValueTypeDescriptor *description, const void *arguments,
     const GenericValueMetadataPattern *pattern, size_t extraDataSize) {
   return swift::swift_allocateGenericValueMetadata(description,
                                                    arguments,
                                                    pattern,
                                                    extraDataSize);
+}
+
+ValueMetadata *swift::swift_allocateGenericValueMetadataWithLayoutString(
+    const ValueTypeDescriptor *description, const void *arguments,
+    const GenericValueMetadataPattern *pattern, size_t extraDataSize) {
+  return swift_cvw_allocateGenericValueMetadataWithLayoutString(
+      description, arguments, pattern, extraDataSize);
 }
 
 // Look into the canonical prespecialized metadata attached to the type
@@ -3076,7 +3092,7 @@ void swift::swift_initStructMetadata(StructMetadata *structType,
   vwtable->publishLayout(layout);
 }
 
-static void swift_initStructMetadataWithLayoutStringImpl(
+static void swift_cvw_initStructMetadataWithLayoutStringImpl(
     StructMetadata *structType, StructLayoutFlags layoutFlags, size_t numFields,
     const uint8_t *const *fieldTypes, const uint8_t *fieldTags,
     uint32_t *fieldOffsets) {
@@ -3186,11 +3202,6 @@ static void swift_initStructMetadataWithLayoutStringImpl(
   structType->setLayoutString(layoutStr);
 
   auto *vwtable = getMutableVWTableForInit(structType, layoutFlags);
-  vwtable->destroy = swift_generic_destroy;
-  vwtable->initializeWithCopy = swift_generic_initWithCopy;
-  vwtable->initializeWithTake = swift_generic_initWithTake;
-  vwtable->assignWithCopy = swift_generic_assignWithCopy;
-  vwtable->assignWithTake = swift_generic_assignWithTake;
 
   layout.extraInhabitantCount = extraInhabitantCount;
 
@@ -3198,6 +3209,14 @@ static void swift_initStructMetadataWithLayoutStringImpl(
   installCommonValueWitnesses(layout, vwtable);
 
   vwtable->publishLayout(layout);
+}
+
+void swift::swift_initStructMetadataWithLayoutString(
+    StructMetadata *structType, StructLayoutFlags layoutFlags, size_t numFields,
+    const uint8_t *const *fieldTypes, const uint8_t *fieldTags,
+    uint32_t *fieldOffsets) {
+  swift_cvw_initStructMetadataWithLayoutString(
+      structType, layoutFlags, numFields, fieldTypes, fieldTags, fieldOffsets);
 }
 
 size_t swift::_swift_refCountBytesForMetatype(const Metadata *type) {
@@ -3297,8 +3316,9 @@ void swift::_swift_addRefCountStringForMetatype(LayoutStringWriter &writer,
              reader.layoutStr + layoutStringHeaderSize, fieldRefCountBytes);
 
       if (fieldFlags & LayoutStringFlags::HasRelativePointers) {
-        swift_resolve_resilientAccessors(writer.layoutStr, writer.offset,
-                                         reader.layoutStr + layoutStringHeaderSize, fieldType);
+        swift_cvw_resolve_resilientAccessors(
+            writer.layoutStr, writer.offset,
+            reader.layoutStr + layoutStringHeaderSize, fieldType);
       }
 
       if (offset) {
