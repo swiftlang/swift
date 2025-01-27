@@ -9474,14 +9474,14 @@ public:
 
 /// Given an escaping closure return true iff it has a non-nil context and the
 /// context has a strong reference count greater than 1.
-class IsEscapingClosureInst
-    : public UnaryInstructionBase<SILInstructionKind::IsEscapingClosureInst,
+class DestroyNotEscapedClosureInst
+    : public UnaryInstructionBase<SILInstructionKind::DestroyNotEscapedClosureInst,
                                   SingleValueInstruction> {
   friend SILBuilder;
 
   unsigned VerificationType;
 
-  IsEscapingClosureInst(SILDebugLocation DebugLoc, SILValue Operand,
+  DestroyNotEscapedClosureInst(SILDebugLocation DebugLoc, SILValue Operand,
                         SILType BoolTy, unsigned VerificationType)
       : UnaryInstructionBase(DebugLoc, Operand, BoolTy),
         VerificationType(VerificationType) {}

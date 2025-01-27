@@ -2728,7 +2728,7 @@ public:
     *this << getIDAndType(I->getReference()) << " of "
           << getIDAndType(I->getOperand(1));
   }
-  void visitIsEscapingClosureInst(IsEscapingClosureInst *CUI) {
+  void visitDestroyNotEscapedClosureInst(DestroyNotEscapedClosureInst *CUI) {
     if (CUI->getVerificationType())
       *this << "[objc] ";
     *this << getIDAndType(CUI->getOperand());

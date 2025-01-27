@@ -1310,10 +1310,9 @@ static bool fixupCopyBlockWithoutEscaping(CopyBlockWithoutEscapingInst *cb,
     if (singleDestroy) {
       SILBuilderWithScope b(std::next(singleDestroy->getIterator()));
       SILValue v = sentinelClosure;
-      SILValue isEscaping = b.createIsEscapingClosure(
-          loc, v, IsEscapingClosureInst::ObjCEscaping);
+      SILValue isEscaping = b.createDestroyNotEscapedClosure(
+          loc, v, DestroyNotEscapedClosureInst::ObjCEscaping);
       b.createCondFail(loc, isEscaping, "non-escaping closure has escaped");
-      b.createDestroyValue(loc, v);
       return true;
     }
 
@@ -1324,10 +1323,9 @@ static bool fixupCopyBlockWithoutEscaping(CopyBlockWithoutEscapingInst *cb,
     for (auto *Block : ExitingBlocks) {
       SILBuilderWithScope B(Block->getTerminator());
       SILValue V = sentinelClosure;
-      SILValue isEscaping = B.createIsEscapingClosure(
-          loc, V, IsEscapingClosureInst::ObjCEscaping);
+      SILValue isEscaping = B.createDestroyNotEscapedClosure(
+          loc, V, DestroyNotEscapedClosureInst::ObjCEscaping);
       B.createCondFail(loc, isEscaping, "non-escaping closure has escaped");
-      B.createDestroyValue(loc, V);
     }
 
     return true;
@@ -1392,15 +1390,14 @@ static bool fixupCopyBlockWithoutEscaping(CopyBlockWithoutEscapingInst *cb,
     SILBuilderWithScope(initialValue).createDestroyValue(autoGenLoc, v);
   }
 
-  // And insert an is_escaping_closure, cond_fail, destroy_value at each of the
+  // And insert an destroy_not_escaped_closure, cond_fail at each of the
   // lifetime end points. This ensures we do not expand our lifetime too much.
   if (singleDestroy) {
     SILBuilderWithScope b(std::next(singleDestroy->getIterator()));
     SILValue v = updater.getValueInMiddleOfBlock(singleDestroy->getParent());
     SILValue isEscaping =
-        b.createIsEscapingClosure(loc, v, IsEscapingClosureInst::ObjCEscaping);
+        b.createDestroyNotEscapedClosure(loc, v, DestroyNotEscapedClosureInst::ObjCEscaping);
     b.createCondFail(loc, isEscaping, "non-escaping closure has escaped");
-    b.createDestroyValue(loc, v);
   }
 
   // Then to be careful with regards to loops, insert at each of the destroy

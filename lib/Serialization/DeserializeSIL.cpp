@@ -2548,10 +2548,10 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
     break;
   }
 
-  case SILInstructionKind::IsEscapingClosureInst: {
+  case SILInstructionKind::DestroyNotEscapedClosureInst: {
     assert(RecordKind == SIL_ONE_OPERAND && "Layout should be OneOperand.");
     unsigned verificationType = Attr;
-    ResultInst = Builder.createIsEscapingClosure(
+    ResultInst = Builder.createDestroyNotEscapedClosure(
         Loc,
         getLocalValue(
             Builder.maybeGetFunction(), ValID,

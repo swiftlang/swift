@@ -1205,7 +1205,7 @@ final public class WitnessMethodInst : SingleValueInstruction {}
 
 final public class IsUniqueInst : SingleValueInstruction, UnaryInstruction {}
 
-final public class IsEscapingClosureInst : SingleValueInstruction, UnaryInstruction {}
+final public class DestroyNotEscapedClosureInst : SingleValueInstruction, UnaryInstruction {}
 
 final public class MarkUnresolvedNonCopyableValueInst: SingleValueInstruction, UnaryInstruction {}
 
