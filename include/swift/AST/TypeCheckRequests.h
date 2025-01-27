@@ -5175,24 +5175,6 @@ void simple_display(llvm::raw_ostream &out,
                     RegexLiteralPatternFeatureKind kind);
 SourceLoc extractNearestSourceLoc(RegexLiteralPatternFeatureKind kind);
 
-class IsUnsafeRequest
-    : public SimpleRequest<IsUnsafeRequest,
-                           bool(Decl *decl),
-                           RequestFlags::SeparatelyCached> {
-public:
-  using SimpleRequest::SimpleRequest;
-
-private:
-  friend SimpleRequest;
-
-  bool evaluate(Evaluator &evaluator, Decl *decl) const;
-
-public:
-  bool isCached() const { return true; }
-  std::optional<bool> getCachedResult() const;
-  void cacheResult(bool value) const;
-};
-
 class GenericTypeParamDeclGetValueTypeRequest
     : public SimpleRequest<GenericTypeParamDeclGetValueTypeRequest,
                            Type(GenericTypeParamDecl *decl),
@@ -5223,6 +5205,27 @@ private:
 
 public:
   bool isCached() const { return true; }
+};
+
+class SemanticAvailableAttrRequest
+    : public SimpleRequest<SemanticAvailableAttrRequest,
+                           std::optional<SemanticAvailableAttr>(
+                               const AvailableAttr *, const Decl *),
+                           RequestFlags::SeparatelyCached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+private:
+  friend SimpleRequest;
+
+  std::optional<SemanticAvailableAttr> evaluate(Evaluator &evaluator,
+                                                const AvailableAttr *attr,
+                                                const Decl *decl) const;
+
+public:
+  bool isCached() const { return true; }
+  std::optional<std::optional<SemanticAvailableAttr>> getCachedResult() const;
+  void cacheResult(std::optional<SemanticAvailableAttr> value) const;
 };
 
 #define SWIFT_TYPEID_ZONE TypeChecker

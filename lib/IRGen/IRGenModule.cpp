@@ -1362,6 +1362,39 @@ llvm::Module *IRGenModule::getModule() const {
   return ClangCodeGen->GetModule();
 }
 
+bool IRGenModule::IsWellKnownBuiltinOrStructralType(CanType T) const {
+  static const CanType kStructural[] = {
+    Context.TheEmptyTupleType, Context.TheNativeObjectType,
+    Context.TheBridgeObjectType, Context.TheRawPointerType,
+    Context.getAnyObjectType()
+  };
+
+  if (std::any_of(std::begin(kStructural), std::end(kStructural),
+                  [T](const CanType &ST) { return T == ST; }))
+    return true;
+
+  if (auto IntTy = dyn_cast<BuiltinIntegerType>(T)) {
+    auto Width = IntTy->getWidth();
+    if (Width.isPointerWidth())
+      return true;
+    if (!Width.isFixedWidth())
+      return false;
+    switch (Width.getFixedWidth()) {
+    case 8:
+    case 16:
+    case 32:
+    case 64:
+    case 128:
+    case 256:
+      return true;
+    default:
+      break;
+    }
+  }
+
+  return false;
+}
+
 GeneratedModule IRGenModule::intoGeneratedModule() && {
   return GeneratedModule{
     std::move(LLVMContext),

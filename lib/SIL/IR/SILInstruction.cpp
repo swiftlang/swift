@@ -1138,6 +1138,7 @@ bool SILInstruction::mayRelease() const {
   case SILInstructionKind::EndApplyInst:
   case SILInstructionKind::YieldInst:
   case SILInstructionKind::DestroyAddrInst:
+  case SILInstructionKind::DestroyNotEscapedClosureInst:
   case SILInstructionKind::StrongReleaseInst:
 #define UNCHECKED_REF_STORAGE(Name, ...)                                       \
   case SILInstructionKind::Name##ReleaseValueInst:
@@ -1227,7 +1228,7 @@ bool SILInstruction::mayReleaseOrReadRefCount() const {
   switch (getKind()) {
   case SILInstructionKind::IsUniqueInst:
   case SILInstructionKind::BeginCOWMutationInst:
-  case SILInstructionKind::IsEscapingClosureInst:
+  case SILInstructionKind::DestroyNotEscapedClosureInst:
     return true;
   default:
     return mayRelease();
@@ -1833,41 +1834,35 @@ visitRecursivelyLifetimeEndingUses(
   llvm::function_ref<bool(Operand *)> visitScopeEnd,
   llvm::function_ref<bool(Operand *)> visitUnknownUse) {
 
-  for (Operand *use : i->getConsumingUses()) {
-    noUsers = false;
-    if (isa<DestroyValueInst>(use->getUser())) {
-      if (!visitScopeEnd(use)) {
-        return false;
+  StackList<SILValue> values(i->getFunction());
+  values.push_back(i);
+
+  while (!values.empty()) {
+    auto value = values.pop_back_val();
+    for (Operand *use : value->getConsumingUses()) {
+      noUsers = false;
+      if (isa<DestroyValueInst>(use->getUser())) {
+        if (!visitScopeEnd(use)) {
+          return false;
+        }
+        continue;
       }
-      continue;
-    }
-    if (auto *ret = dyn_cast<ReturnInst>(use->getUser())) {
-      auto fnTy = ret->getFunction()->getLoweredFunctionType();
-      assert(!fnTy->getLifetimeDependencies().empty());
-      if (!visitScopeEnd(use)) {
-        return false;
+      if (auto *ret = dyn_cast<ReturnInst>(use->getUser())) {
+        auto fnTy = ret->getFunction()->getLoweredFunctionType();
+        assert(!fnTy->getLifetimeDependencies().empty());
+        if (!visitScopeEnd(use)) {
+          return false;
+        }
+        continue;
       }
-      continue;
-    }
-    // FIXME: Handle store to indirect result
-    
-    // There shouldn't be any dead-end consumptions of a nonescaping
-    // partial_apply that don't forward it along, aside from destroy_value.
-    //
-    // On-stack partial_apply cannot be cloned, so it should never be used by a
-    // BranchInst.
-    //
-    // This is a fatal error because it performs SIL verification that is not
-    // separately checked in the verifier. It is the only check that verifies
-    // the structural requirements of on-stack partial_apply uses.
-    auto *user = use->getUser();
-    if (user->getNumResults() == 0) {
-      return visitUnknownUse(use);
-    }
-    for (auto res : use->getUser()->getResults()) {
-      if (!visitRecursivelyLifetimeEndingUses(res, noUsers, visitScopeEnd,
-                                              visitUnknownUse)) {
-        return false;
+      // FIXME: Handle store to indirect result
+
+      auto *user = use->getUser();
+      if (user->getNumResults() == 0) {
+        return visitUnknownUse(use);
+      }
+      for (auto res : use->getUser()->getResults()) {
+        values.push_back(res);
       }
     }
   }
@@ -1882,7 +1877,16 @@ PartialApplyInst::visitOnStackLifetimeEnds(
          && "only meaningful for OSSA stack closures");
   bool noUsers = true;
 
-  auto visitUnknownUse = [](Operand *unknownUse){
+  auto visitUnknownUse = [](Operand *unknownUse) {
+    // There shouldn't be any dead-end consumptions of a nonescaping
+    // partial_apply that don't forward it along, aside from destroy_value.
+    //
+    // On-stack partial_apply cannot be cloned, so it should never be used by a
+    // BranchInst.
+    //
+    // This is a fatal error because it performs SIL verification that is not
+    // separately checked in the verifier. It is the only check that verifies
+    // the structural requirements of on-stack partial_apply uses.
     llvm::errs() << "partial_apply [on_stack] use:\n";
     auto *user = unknownUse->getUser();
     user->printInContext(llvm::errs());

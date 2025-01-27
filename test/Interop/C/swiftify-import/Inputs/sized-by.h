@@ -17,5 +17,7 @@ void nonnull(int len, void * __sized_by(len) _Nonnull p);
 
 void nullable(int len, void * __sized_by(len) _Nullable p);
 
+void * __sized_by(len) returnPointer(int len);
+
 typedef struct foo opaque_t;
 void opaque(int len, opaque_t * __sized_by(len) p);

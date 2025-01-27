@@ -43,7 +43,7 @@ func main() {
   _ = withoutCName()
   // CHECK-DAG: [[F6:%.+]] = function_ref @$s8extern_c10defaultArgyySiFfA_ : $@convention(thin) () -> Int
   // CHECK-DAG: [[DEFAULT_V:%.+]] = apply [[F6]]() : $@convention(thin) () -> Int
-  // CHECK-DAG: [[F7:%.+]] = function_ref @default_arg : $@convention(c) (Int) -> () // user: %20
+  // CHECK-DAG: [[F7:%.+]] = function_ref @default_arg : $@convention(c) (Int) -> ()
   // CHECK-DAG: apply [[F7]]([[DEFAULT_V]]) : $@convention(c) (Int) -> ()
   defaultArg()
 }

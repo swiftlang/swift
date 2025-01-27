@@ -4651,7 +4651,7 @@ swift::diagnoseConformanceAvailability(SourceLoc loc,
   if (auto unsafeUses = where.getUnsafeUses()) {
     if (auto normalConf = dyn_cast<NormalProtocolConformance>(rootConf)) {
       // @unsafe conformances are considered... unsafe.
-      if (normalConf->isUnsafe()) {
+      if (normalConf->getExplicitSafety() == ExplicitSafety::Unsafe) {
         unsafeUses->push_back(
             UnsafeUse::forConformance(
               concreteConf->getType(), conformance, loc));

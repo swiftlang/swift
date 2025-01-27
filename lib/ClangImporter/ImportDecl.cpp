@@ -8073,7 +8073,7 @@ void addCompletionHandlerAttribute(Decl *asyncImport,
     llvm::VersionTuple NoVersion;
     auto *attr = new (SwiftContext) AvailableAttr(
         SourceLoc(), SourceRange(), AvailabilityDomain::forUniversal(),
-        AvailableAttr::Kind::Default,
+        SourceLoc(), AvailableAttr::Kind::Default,
         /*Message=*/"", /*Rename=*/"", /*Introduced=*/NoVersion, SourceRange(),
         /*Deprecated=*/NoVersion, SourceRange(),
         /*Obsoleted=*/NoVersion, SourceRange(),
@@ -8907,6 +8907,9 @@ void ClangImporter::Implementation::importBoundsAttributes(
     for (auto [index, param] : llvm::enumerate(ClangDecl->parameters())) {
       if (auto CAT = param->getType()->getAs<clang::CountAttributedType>()) {
         printer.printCountedBy(CAT, index);
+        if (param->hasAttr<clang::NoEscapeAttr>()) {
+          printer.printNonEscaping(index);
+        }
       }
     }
     if (auto CAT =
@@ -9102,12 +9105,12 @@ void ClangImporter::Implementation::importAttributes(
       if (!replacement.empty())
         swiftReplacement = getSwiftNameFromClangName(replacement);
 
-      auto AvAttr = new (C)
-          AvailableAttr(SourceLoc(), SourceRange(),
-                        AvailabilityDomain::forPlatform(*platformK), AttrKind,
-                        message, swiftReplacement, introduced, SourceRange(),
-                        deprecated, SourceRange(), obsoleted, SourceRange(),
-                        /*Implicit=*/false, EnableClangSPI && IsSPI);
+      auto AvAttr = new (C) AvailableAttr(
+          SourceLoc(), SourceRange(),
+          AvailabilityDomain::forPlatform(*platformK), SourceLoc(), AttrKind,
+          message, swiftReplacement, introduced, SourceRange(), deprecated,
+          SourceRange(), obsoleted, SourceRange(),
+          /*Implicit=*/false, EnableClangSPI && IsSPI);
 
       MappedDecl->getAttrs().add(AvAttr);
     }

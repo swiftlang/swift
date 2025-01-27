@@ -100,7 +100,10 @@ target_compile_definitions(swiftRuntime
     $<$<BOOL:${SwiftCore_HAS_DLSYM}>:-DSWIFT_STDLIB_HAS_DLSYM>
     $<$<BOOL:${SwiftCore_ENABLE_FILESYSTEM_SUPPORT}>:-DSWIFT_STDLIB_HAS_FILESYSTEM>
     $<$<BOOL:${SwiftCore_ENABLE_FILESYSTEM_SUPPORT}>:-DSWIFT_ARCH="${SwiftCore_ARCH_SUBDIR}">
-    $<$<BOOL:${SwiftCore_ENABLE_FILESYSTEM_SUPPORT}>:-DSWIFT_LIB_SUBDIR="${SwiftCore_PLATFORM_SUBDIR}">)
+    $<$<BOOL:${SwiftCore_ENABLE_FILESYSTEM_SUPPORT}>:-DSWIFT_LIB_SUBDIR="${SwiftCore_PLATFORM_SUBDIR}">
+    $<$<BOOL:${SwiftCore_ENABLE_FATALERROR_BACKTRACE}>:-DSWIFT_STDLIB_SUPPORTS_BACKTRACE_REPORTING>
+  PUBLIC
+    $<$<BOOL:${SwiftCore_ENABLE_OS_TRACE_LAZY_INIT}>:-DSWIFT_USE_OS_TRACE_LAZY_INIT>)
 
 target_include_directories(swiftRuntime PRIVATE
   "${PROJECT_BINARY_DIR}/include"
@@ -149,13 +152,21 @@ if("${SwiftCore_OBJECT_FORMAT}" STREQUAL "elfx")
     "${SwiftCore_SWIFTC_SOURCE_DIR}/include"
     "${PROJECT_BINARY_DIR}/include")
   target_link_libraries(swiftrt PRIVATE swiftShims)
-  install(TARGETS swiftrt DESTINATION "${CMAKE_INSTALL_LIBDIR}/swift")
+  # The driver requires that swifrt.o is under `usr/lib/swift/<platform>/<arch>`
+  # Regardless of settings
+  install(FILES $<TARGET_OBJECTS:swiftrt>
+    DESTINATION "${CMAKE_INSTALL_LIBDIR}/swift/${SwiftCore_PLATFORM_SUBDIR}/${SwiftCore_ARCH_SUBDIR}"
+    RENAME swiftrt.o)
 elseif("${SwiftCore_OBJECT_FORMAT}" STREQUAL "coffx")
   add_library(swiftrt OBJECT SwiftRT-COFF.cpp)
   target_compile_definitions(swiftrt PRIVATE
     $<$<NOT:$<BOOL:${BUILD_SHARED_LIBS}>>:SWIFT_STATIC_STDLIB>)
   target_link_libraries(swiftrt PRIVATE swiftShims)
-  install(TARGETS swiftrt DESTINATION "${CMAKE_INSTALL_LIBDIR}/swift")
+  install(FILES $<TARGET_OBJECTS:swiftrt>
+    # The driver requires that swifrt.obj is under `usr/lib/swift/<platform>/<arch>`
+    # Regardless of settings
+    DESTINATION "${CMAKE_INSTALL_LIBDIR}/swift/${SwiftCore_PLATFORM_SUBDIR}/${SwiftCore_ARCH_SUBDIR}"
+    RENAME swiftrt.obj)
 elseif(NOT "${SwiftCore_OBJECT_FORMAT}" STREQUAL "x")
   message(SEND_ERROR "Unknown object format '${SwiftCore_OBJECT_FORMAT}'")
 endif()

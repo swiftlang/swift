@@ -2715,18 +2715,26 @@ void ParamCaptureInfoRequest::cacheResult(CaptureInfo info) const {
 }
 
 //----------------------------------------------------------------------------//
-// IsUnsafeRequest computation.
+// SemanticAvailableAttrRequest computation.
 //----------------------------------------------------------------------------//
 
-std::optional<bool> IsUnsafeRequest::getCachedResult() const {
-  auto *decl = std::get<0>(getStorage());
-  if (!decl->isUnsafeComputed())
+std::optional<std::optional<SemanticAvailableAttr>>
+SemanticAvailableAttrRequest::getCachedResult() const {
+  const AvailableAttr *attr = std::get<0>(getStorage());
+  if (!attr->hasComputedSemanticAttr())
     return std::nullopt;
 
-  return decl->isUnsafeRaw();
+  if (!attr->hasCachedDomain()) {
+    return std::optional<SemanticAvailableAttr>{};
+  }
+
+  return SemanticAvailableAttr(attr);
 }
 
-void IsUnsafeRequest::cacheResult(bool value) const {
-  auto *decl = std::get<0>(getStorage());
-  decl->setUnsafe(value);
+void SemanticAvailableAttrRequest::cacheResult(
+    std::optional<SemanticAvailableAttr> value) const {
+  AvailableAttr *attr = const_cast<AvailableAttr *>(std::get<0>(getStorage()));
+  attr->setComputedSemanticAttr();
+  if (!value)
+    attr->setInvalid();
 }

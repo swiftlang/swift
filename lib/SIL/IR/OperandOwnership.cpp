@@ -214,6 +214,7 @@ OPERAND_OWNERSHIP(TrivialUse, GlobalAddr)
 // The dealloc_stack_ref operand needs to have NonUse ownership because
 // this use comes after the last consuming use (which is usually a dealloc_ref).
 OPERAND_OWNERSHIP(NonUse, DeallocStackRef)
+OPERAND_OWNERSHIP(InstantaneousUse, IgnoredUse)
 
 // Use an owned or guaranteed value only for the duration of the operation.
 OPERAND_OWNERSHIP(InstantaneousUse, ExistentialMetatype)
@@ -221,7 +222,6 @@ OPERAND_OWNERSHIP(InstantaneousUse, FixLifetime)
 OPERAND_OWNERSHIP(InstantaneousUse, WitnessMethod)
 OPERAND_OWNERSHIP(InstantaneousUse, DynamicMethodBranch)
 OPERAND_OWNERSHIP(InstantaneousUse, ValueMetatype)
-OPERAND_OWNERSHIP(InstantaneousUse, IsEscapingClosure)
 OPERAND_OWNERSHIP(InstantaneousUse, ClassMethod)
 OPERAND_OWNERSHIP(InstantaneousUse, SuperMethod)
 OPERAND_OWNERSHIP(InstantaneousUse, ClassifyBridgeObject)
@@ -298,6 +298,7 @@ OPERAND_OWNERSHIP(DestroyingConsume, DeallocBox)
 OPERAND_OWNERSHIP(DestroyingConsume, DeallocExistentialBox)
 OPERAND_OWNERSHIP(DestroyingConsume, DeallocRef)
 OPERAND_OWNERSHIP(DestroyingConsume, DestroyValue)
+OPERAND_OWNERSHIP(DestroyingConsume, DestroyNotEscapedClosure)
 OPERAND_OWNERSHIP(DestroyingConsume, EndLifetime)
 OPERAND_OWNERSHIP(DestroyingConsume, BeginCOWMutation)
 OPERAND_OWNERSHIP(DestroyingConsume, EndCOWMutation)
@@ -672,9 +673,12 @@ OperandOwnershipClassifier::visitMarkDependenceInst(MarkDependenceInst *mdi) {
       /*allowUnowned*/true);
   }
   if (mdi->isNonEscaping()) {
-    // This creates a "dependent value", just like on-stack partial_apply, which
-    // we treat like a borrow.
-    return OperandOwnership::Borrow;
+    if (!mdi->getType().isAddress()) {
+      // This creates a "dependent value", just like on-stack partial_apply,
+      // which we treat like a borrow.
+      return OperandOwnership::Borrow;
+    }
+    return OperandOwnership::InteriorPointer;
   }
   if (mdi->hasUnresolvedEscape()) {
     // This creates a dependent value that may extend beyond the parent's

@@ -2371,11 +2371,11 @@ public:
     return insert(new (getModule()) EndCOWMutationInst(getSILDebugLocation(Loc),
                                                   operand, keepUnique));
   }
-  IsEscapingClosureInst *createIsEscapingClosure(SILLocation Loc,
+  DestroyNotEscapedClosureInst *createDestroyNotEscapedClosure(SILLocation Loc,
                                                  SILValue operand,
                                                  unsigned VerificationType) {
     auto Int1Ty = SILType::getBuiltinIntegerType(1, getASTContext());
-    return insert(new (getModule()) IsEscapingClosureInst(
+    return insert(new (getModule()) DestroyNotEscapedClosureInst(
         getSILDebugLocation(Loc), operand, Int1Ty, VerificationType));
   }
 
@@ -3087,6 +3087,15 @@ public:
   HasSymbolInst *createHasSymbol(SILLocation Loc, ValueDecl *Decl) {
     return insert(new (getModule()) HasSymbolInst(
         getModule(), getSILDebugLocation(Loc), Decl));
+  }
+
+  //===--------------------------------------------------------------------===//
+  // Misc Uses
+  //===--------------------------------------------------------------------===//
+
+  IgnoredUseInst *createIgnoredUse(SILLocation loc, SILValue value) {
+    return insert(new (getModule())
+                      IgnoredUseInst(getSILDebugLocation(loc), value));
   }
 
   //===--------------------------------------------------------------------===//

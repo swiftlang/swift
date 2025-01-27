@@ -435,7 +435,6 @@ enum HostComponent {
   TestingMacros
   ToolsSupportCore
   LLBuild
-  Yams
   ArgumentParser
   Driver
   Crypto
@@ -906,6 +905,7 @@ function Build-CMakeProject {
     [string[]] $UsePinnedCompilers = @(), # ASM,C,CXX,Swift
     [switch] $UseSwiftSwiftDriver = $false,
     [switch] $AddAndroidCMakeEnv = $false,
+    [switch] $UseGNUDriver = $false,
     [string] $SwiftSDK = "",
     [hashtable] $Defines = @{}, # Values are either single strings or arrays of flags
     [string[]] $BuildTargets = @()
@@ -993,7 +993,11 @@ function Build-CMakeProject {
     $CFlags = @()
     switch ($Platform) {
       Windows {
-        $CFlags = @("/GS-", "/Gw", "/Gy", "/Oi", "/Oy", "/Zc:inline")
+        $CFlags = if ($UseGNUDriver) {
+          @("-fno-stack-protector", "-ffunction-sections", "-fdata-sections", "-fomit-frame-pointer")
+        } else {
+          @("/GS-", "/Gw", "/Gy", "/Oi", "/Oy", "/Zc:inline")
+        }
       }
       Android {
         $CFlags = @("--sysroot=$(Get-AndroidNDKPath)\toolchains\llvm\prebuilt\windows-x86_64\sysroot")
@@ -1001,7 +1005,7 @@ function Build-CMakeProject {
     }
 
     $CXXFlags = @()
-    if ($Platform -eq "Windows") {
+    if ($Platform -eq "Windows" -and -not $UseGNUDriver) {
       $CXXFlags += $CFlags.Clone() + @("/Zc:__cplusplus")
     }
 
@@ -1012,8 +1016,13 @@ function Build-CMakeProject {
         Append-FlagsDefine $Defines CMAKE_MSVC_DEBUG_INFORMATION_FORMAT Embedded
         Append-FlagsDefine $Defines CMAKE_POLICY_CMP0141 NEW
         # Add additional linker flags for generating the debug info.
-        Append-FlagsDefine $Defines CMAKE_SHARED_LINKER_FLAGS "/debug"
-        Append-FlagsDefine $Defines CMAKE_EXE_LINKER_FLAGS "/debug"
+        if ($UseGNUDriver) {
+          Append-FlagsDefine $Defines CMAKE_SHARED_LINKER_FLAGS "-Xlinker -debug"
+          Append-FlagsDefine $Defines CMAKE_EXE_LINKER_FLAGS "-Xlinker -debug"
+        } else {
+          Append-FlagsDefine $Defines CMAKE_SHARED_LINKER_FLAGS "/debug"
+          Append-FlagsDefine $Defines CMAKE_EXE_LINKER_FLAGS "/debug"
+        }
       } elseif ($Platform -eq "Android") {
         # Use a built lld linker as the Android's NDK linker might be too
         # old and not support all required relocations needed by the Swift
@@ -1051,7 +1060,7 @@ function Build-CMakeProject {
       }
     }
     if ($UsePinnedCompilers.Contains("C") -Or $UseBuiltCompilers.Contains("C")) {
-      $Driver = if ($Platform -eq "Windows") { "clang-cl.exe" } else { "clang.exe" }
+      $Driver = if ($Platform -eq "Windows" -and -not $UseGNUDriver) { "clang-cl.exe" } else { "clang.exe" }
       if ($UseBuiltCompilers.Contains("C")) {
         TryAdd-KeyValue $Defines CMAKE_C_COMPILER ([IO.Path]::Combine($CompilersBinaryCache, "bin", $Driver))
       } else {
@@ -1065,7 +1074,7 @@ function Build-CMakeProject {
       Append-FlagsDefine $Defines CMAKE_C_FLAGS $CFlags
     }
     if ($UsePinnedCompilers.Contains("CXX") -Or $UseBuiltCompilers.Contains("CXX")) {
-      $Driver = if ($Platform -eq "Windows") { "clang-cl.exe" } else { "clang++.exe" }
+      $Driver = if ($Platform -eq "Windows" -and -not $UseGNUDriver) { "clang-cl.exe" } else { "clang++.exe" }
       if ($UseBuiltCompilers.Contains("CXX")) {
         TryAdd-KeyValue $Defines CMAKE_CXX_COMPILER ([IO.Path]::Combine($CompilersBinaryCache, "bin", $Driver))
       } else {
@@ -1846,9 +1855,32 @@ function Build-Runtime([Platform]$Platform, $Arch) {
         CMAKE_SHARED_LINKER_FLAGS = if ($Platform -eq "Windows") { @("/INCREMENTAL:NO", "/OPT:REF", "/OPT:ICF") } else { @() };
       })
   }
+}
 
-  Invoke-Program "$(Get-PythonExecutable)" -c "import plistlib; print(str(plistlib.dumps({ 'DefaultProperties': { 'DEFAULT_USE_RUNTIME': 'MD' } }), encoding='utf-8'))" `
-    -OutFile "$($Arch.SDKInstallRoot)\SDKSettings.plist"
+function Write-SDKSettingsPlist([Platform]$Platform, $Arch) {
+  if ($Platform -eq [Platform]::Windows) {
+    Invoke-Program "$(Get-PythonExecutable)" -c "import plistlib; print(str(plistlib.dumps({ 'DefaultProperties': { 'DEFAULT_USE_RUNTIME': 'MD' } }), encoding='utf-8'))" `
+      -OutFile "$($Arch.SDKInstallRoot)\SDKSettings.plist"
+  } else {
+    Invoke-Program "$(Get-PythonExecutable)" -c "import plistlib; print(str(plistlib.dumps({ 'DefaultProperties': { } }), encoding='utf-8'))" `
+      -OutFile "$($Arch.SDKInstallRoot)\SDKSettings.plist"
+  }
+
+  $SDKSettings = @{
+    CanonicalName = "$($Arch.LLVMTarget)"
+    DisplayName = "$($Platform.ToString())"
+    IsBaseSDK = "NO"
+    Version = "${ProductVersion}"
+    VersionMap = @{}
+    DefaultProperties = @{
+      PLATFORM_NAME = "$($Platform.ToString())"
+      DEFAULT_COMPILER = "${ToolchainIdentifier}"
+    }
+  }
+  if ($Platform -eq [Platform]::Windows) {
+    $SDKSettings.DefaultProperties.DEFAULT_USE_RUNTIME = "MD"
+  }
+  $SDKSettings | ConvertTo-JSON | Out-FIle -FilePath "$($Arch.SDKInstallRoot)\SDKSettings.json"
 }
 
 function Build-Dispatch([Platform]$Platform, $Arch, [switch]$Test = $false) {
@@ -1856,7 +1888,7 @@ function Build-Dispatch([Platform]$Platform, $Arch, [switch]$Test = $false) {
     $Targets = @("default", "ExperimentalTest")
     $InstallPath = ""
   } else {
-    $Targets = @("default")
+    $Targets = @("install")
     $InstallPath = "$($Arch.SDKInstallRoot)\usr"
   }
 
@@ -1866,6 +1898,7 @@ function Build-Dispatch([Platform]$Platform, $Arch, [switch]$Test = $false) {
     -InstallTo $InstallPath `
     -Arch $Arch `
     -Platform $Platform `
+    -BuildTargets $Targets `
     -UseBuiltCompilers C,CXX,Swift `
     -Defines @{
       ENABLE_SWIFT = "YES";
@@ -1909,12 +1942,6 @@ function Build-Foundation([Platform]$Platform, $Arch, [switch]$Test = $false) {
     $ShortArch = $Arch.LLVMName
 
     Isolate-EnvVars {
-      $SDKRoot = if ($Platform -eq "Windows") {
-        ""
-      } else {
-        (Get-Variable "${Platform}$($Arch.ShortName)" -ValueOnly).SDKInstallRoot
-      }
-
       $SDKRoot = if ($Platform -eq "Windows") {
         ""
       } else {
@@ -2137,6 +2164,7 @@ function Install-Platform([Platform]$Platform, $Arch) {
 
   # Copy plist files (same across architectures)
   Copy-File "$($Arch.PlatformInstallRoot)\Info.plist" ([IO.Path]::Combine((Get-InstallDir $HostArch), "Platforms", "${Platform}.platform"))
+  Copy-File "$($Arch.SDKInstallRoot)\SDKSettings.json" ([IO.Path]::Combine((Get-InstallDir $HostArch), "Platforms", "${Platform}.platform", "Developer", "SDKs", "${Platform}.sdk"))
   Copy-File "$($Arch.SDKInstallRoot)\SDKSettings.plist" ([IO.Path]::Combine((Get-InstallDir $HostArch), "Platforms", "${Platform}.platform", "Developer", "SDKs", "${Platform}.sdk"))
 
   # Copy XCTest
@@ -2183,19 +2211,14 @@ function Build-System($Arch) {
   Build-CMakeProject `
     -Src $SourceCache\swift-system `
     -Bin (Get-HostProjectBinaryCache System) `
-    -InstallTo "$($Arch.ToolchainInstallRoot)\usr" `
     -Arch $Arch `
     -Platform Windows `
     -UseBuiltCompilers C,Swift `
     -SwiftSDK (Get-HostSwiftSDK) `
+    -BuildTargets default `
     -Defines @{
-      BUILD_SHARED_LIBS = "YES";
+      BUILD_SHARED_LIBS = "NO";
     }
-
-  if (-not $ToBatch) {
-    # Remove unnecessary "S:\Program Files\swift\Toolchains\0.0.0+Asserts\usr\include\CSystem"
-    Remove-Item -Force -Recurse "$($Arch.ToolchainInstallRoot)\usr\include\CSystem" -ErrorAction Ignore | Out-Null
-  }
 }
 
 function Build-ToolsSupportCore($Arch) {
@@ -2255,21 +2278,6 @@ function Build-LLBuild($Arch, [switch]$Test = $false) {
   }
 }
 
-function Build-Yams($Arch) {
-  Build-CMakeProject `
-    -Src $SourceCache\Yams `
-    -Bin (Get-HostProjectBinaryCache Yams) `
-    -Arch $Arch `
-    -Platform Windows `
-    -UseBuiltCompilers C,Swift `
-    -SwiftSDK (Get-HostSwiftSDK) `
-    -BuildTargets default `
-    -Defines @{
-      BUILD_SHARED_LIBS = "NO";
-      BUILD_TESTING = "NO";
-    }
-}
-
 function Build-ArgumentParser($Arch) {
   Build-CMakeProject `
     -Src $SourceCache\swift-argument-parser `
@@ -2298,7 +2306,6 @@ function Build-Driver($Arch) {
       BUILD_SHARED_LIBS = "YES";
       TSC_DIR = (Get-HostProjectCMakeModules ToolsSupportCore);
       LLBuild_DIR = (Get-HostProjectCMakeModules LLBuild);
-      Yams_DIR = (Get-HostProjectCMakeModules Yams);
       ArgumentParser_DIR = (Get-HostProjectCMakeModules ArgumentParser);
       SQLite3_INCLUDE_DIR = "$LibraryRoot\sqlite-3.46.0\usr\include";
       SQLite3_LIBRARY = "$LibraryRoot\sqlite-3.46.0\usr\lib\SQLite3.lib";
@@ -2342,7 +2349,7 @@ function Build-ASN1($Arch) {
     -Src $SourceCache\swift-asn1 `
     -Bin (Get-HostProjectBinaryCache ASN1) `
     -Arch $Arch `
-    -UseBuiltCompilers C,Swift `
+    -UseBuiltCompilers Swift `
     -SwiftSDK (Get-HostSwiftSDK) `
     -BuildTargets default `
     -Defines @{
@@ -2787,6 +2794,19 @@ try {
 
 Fetch-Dependencies
 
+if ($Clean) {
+  10..[HostComponent].getEnumValues()[-1] | ForEach-Object { Remove-Item -Force -Recurse "$BinaryCache\$_" -ErrorAction Ignore }
+  # In case of a previous test run, clear out the swiftmodules as they are not a stable format.
+  Remove-Item -Force -Recurse -Path "$($HostARch.ToolchainInstallRoot)\usr\lib\swift\windows\*.swiftmodule" -ErrorAction Ignore
+  foreach ($Arch in $WindowsSDKArchs) {
+    0..[TargetComponent].getEnumValues()[-1] | ForEach-Object { Remove-Item -Force -Recurse "$BinaryCache\$($Arch.BuildID + $_)" -ErrorAction Ignore }
+  }
+  foreach ($Arch in $AndroidSDKArchs) {
+    0..[TargetComponent].getEnumValues()[-1] | ForEach-Object { Remove-Item -Force -Recurse "$BinaryCache\$($Arch.BuildID + $_)" -ErrorAction Ignore }
+  }
+}
+
+
 if (-not $SkipBuild) {
   if ($EnableCaching -And (-Not (Test-SCCacheAtLeast -Major 0 -Minor 7 -Patch 4))) {
     throw "Minimum required sccache version is 0.7.4"
@@ -2807,13 +2827,6 @@ if (-not $SkipBuild) {
   Invoke-BuildStep Build-Compilers $HostArch
 }
 
-if ($Clean) {
-  10..[HostComponent].getEnumValues()[-1] | ForEach-Object { Remove-Item -Force -Recurse "$BinaryCache\$_" -ErrorAction Ignore }
-  foreach ($Arch in $WindowsSDKArchs) {
-    0..[TargetComponent].getEnumValues()[-1] | ForEach-Object { Remove-Item -Force -Recurse "$BinaryCache\$($Arch.BuildID + $_)" -ErrorAction Ignore }
-  }
-}
-
 if (-not $SkipBuild) {
   foreach ($Arch in $WindowsSDKArchs) {
     Invoke-BuildStep Build-ZLib Windows $Arch
@@ -2830,6 +2843,7 @@ if (-not $SkipBuild) {
     Invoke-BuildStep Build-Foundation Windows $Arch
     Invoke-BuildStep Build-XCTest Windows $Arch
     Invoke-BuildStep Build-Testing Windows $Arch
+    Invoke-BuildStep Write-SDKSettingsPlist Windows $Arch
     Invoke-BuildStep Write-PlatformInfoPlist $Arch
   }
 
@@ -2848,6 +2862,7 @@ if (-not $SkipBuild) {
     Invoke-BuildStep Build-Foundation Android $Arch
     Invoke-BuildStep Build-XCTest Android $Arch
     Invoke-BuildStep Build-Testing Android $Arch
+    Invoke-BuildStep Write-SDKSettingsPlist Android $Arch
     Invoke-BuildStep Write-PlatformInfoPlist $Arch
   }
 }
@@ -2880,7 +2895,6 @@ if (-not $SkipBuild) {
   Invoke-BuildStep Build-SQLite $HostArch
   Invoke-BuildStep Build-ToolsSupportCore $HostArch
   Invoke-BuildStep Build-LLBuild $HostArch
-  Invoke-BuildStep Build-Yams $HostArch
   Invoke-BuildStep Build-ArgumentParser $HostArch
   Invoke-BuildStep Build-Driver $HostArch
   Invoke-BuildStep Build-Crypto $HostArch

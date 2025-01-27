@@ -2,8 +2,16 @@ module CountedByClang {
     header "counted-by.h"
     export *
 }
+module CountedByNoEscapeClang {
+    header "counted-by-noescape.h"
+    export *
+}
 module SizedByClang {
     header "sized-by.h"
+    export *
+}
+module SizedByNoEscapeClang {
+    header "sized-by-noescape.h"
     export *
 }
 

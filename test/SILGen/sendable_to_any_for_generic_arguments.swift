@@ -158,8 +158,8 @@ struct TestGeneral {
 
   // CHECK-LABEL: sil hidden [ossa] @$s37sendable_to_any_for_generic_arguments11TestGeneralV023test_function_types_as_E5_argsyyF
   // CHECK: [[FUNCV_REF:%.*]] = struct_extract %0, #TestGeneral.funcV
-  // CHECK-NEXT: %3 = unchecked_trivial_bit_cast [[FUNCV_REF]] to $S<(Array<Any>) -> Optional<Any>>
-  // CHECK: [[DATA_REF:%.*]] = struct_extract %20, #<abstract function>Test.data
+  // CHECK-NEXT: {{%.*}} = unchecked_trivial_bit_cast [[FUNCV_REF]] to $S<(Array<Any>) -> Optional<Any>>
+  // CHECK: [[DATA_REF:%.*]] = struct_extract %{{.*}}, #<abstract function>Test.data
   // CHECK-NEXT: [[DATA_COPY:%.*]] = copy_value [[DATA_REF]]
   // CHECK-NEXT: [[DATA_ANY:%.*]] = unchecked_value_cast [[DATA_COPY]] to $V<(Array<Any>) -> Any>
   // CHECK: [[ACCEPTS_ANY:%.*]] = function_ref @$s37sendable_to_any_for_generic_arguments11TestGeneralV023test_function_types_as_E5_argsyyF08accepts_C0L_yyAcDyyF1VL_VyypSayypGcGF : $@convention(thin) (@guaranteed V<(Array<Any>) -> Any>) -> ()
@@ -215,7 +215,7 @@ func test_subscript_computed_property_and_mutating_access(u: User) {
   // CHECK-NEXT: [[COPIED_ANY_DICT:%.*]] = copy_value [[ANY_LOADED_DICT]]
   // CHECK-NEXT: store [[COPIED_ANY_DICT]] to [init] [[ANY_DICT]]
   // CHECK: [[SUBSCRIPT_SETTER:%.*]] = function_ref @$sSD37sendable_to_any_for_generic_argumentsSSRszypRs_rlE5entryqd__Sgqd___tcluis
-  // CHECK-NEXT: %48 = apply [[SUBSCRIPT_SETTER]]<String, Any, Int>({{.*}}, [[ANY_DICT]])
+  // CHECK-NEXT: %{{.*}} = apply [[SUBSCRIPT_SETTER]]<String, Any, Int>({{.*}}, [[ANY_DICT]])
   // CHECK-NEXT: [[LOADED_ANY_DICT:%.*]] = load [take] [[ANY_DICT]]
   // CHECK-NEXT: [[SENDABLE_DICT:%.*]] = unchecked_bitwise_cast [[LOADED_ANY_DICT]] to $Dictionary<String, any Sendable>
   // CHECK-NEXT: [[COPIED_SENDABLE_DICT:%.*]] = copy_value [[SENDABLE_DICT]]
@@ -254,7 +254,7 @@ func test_subscript_computed_property_and_mutating_access(u: User) {
   // CHECK-NEXT: [[COPIED_DICT:%.*]] = copy_value [[CASTED_DICT]]
   // CHECK-NEXT: store [[COPIED_DICT]] to [init] [[ANY_DICT]]
   // CHECK: [[MUTATING_METHOD:%.*]] = function_ref @$sSD37sendable_to_any_for_generic_argumentsSSRszypRs_rlE12testMutatingyyF : $@convention(method) (@inout Dictionary<String, Any>) -> ()
-  // CHECK-NEXT: %101 = apply [[MUTATING_METHOD]]([[ANY_DICT]]) : $@convention(method) (@inout Dictionary<String, Any>) -> ()
+  // CHECK-NEXT: {{%.*}} = apply [[MUTATING_METHOD]]([[ANY_DICT]]) : $@convention(method) (@inout Dictionary<String, Any>) -> ()
   // CHECK-NEXT: [[LOADED_ANY_DICT:%.*]] = load [take] [[ANY_DICT]]
   // CHECK-NEXT: [[SENDABLE_DICT:%.*]] = unchecked_bitwise_cast [[LOADED_ANY_DICT]] to $Dictionary<String, any Sendable>
   // CHECK-NEXT: [[COPIED_SENDABLE_DICT:%.*]] = copy_value [[SENDABLE_DICT]]

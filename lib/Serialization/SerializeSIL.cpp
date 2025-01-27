@@ -1594,7 +1594,7 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
   case SILInstructionKind::AbortApplyInst:
   case SILInstructionKind::ReturnInst:
   case SILInstructionKind::UncheckedOwnershipConversionInst:
-  case SILInstructionKind::IsEscapingClosureInst:
+  case SILInstructionKind::DestroyNotEscapedClosureInst:
   case SILInstructionKind::ThrowInst: {
     unsigned Attr = 0;
     if (auto *LI = dyn_cast<LoadInst>(&SI))
@@ -1607,7 +1607,7 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
       Attr = RCI->isNonAtomic();
     else if (auto *UOCI = dyn_cast<UncheckedOwnershipConversionInst>(&SI)) {
       Attr = encodeValueOwnership(UOCI->getOwnershipKind());
-    } else if (auto *IEC = dyn_cast<IsEscapingClosureInst>(&SI)) {
+    } else if (auto *IEC = dyn_cast<DestroyNotEscapedClosureInst>(&SI)) {
       Attr = IEC->getVerificationType();
     } else if (auto *HTE = dyn_cast<HopToExecutorInst>(&SI)) {
       Attr = HTE->isMandatory();
@@ -1690,6 +1690,17 @@ void SILSerializer::writeSILInstruction(const SILInstruction &SI) {
         (unsigned)FRI->getType().getCategory(),
         addSILFunctionRef(ReferencedFunction));
 
+    break;
+  }
+  case SILInstructionKind::IgnoredUseInst: {
+    // Use SILOneOperandLayout to specify our operand.
+    auto *iui = cast<IgnoredUseInst>(&SI);
+    unsigned abbrCode = SILAbbrCodes[SILOneOperandLayout::Code];
+    SILOneOperandLayout::emitRecord(
+        Out, ScratchRecord, abbrCode, (unsigned)iui->getKind(), 0,
+        S.addTypeRef(iui->getOperand()->getType().getRawASTType()),
+        (unsigned)iui->getOperand()->getType().getCategory(),
+        addValueRef(iui->getOperand()));
     break;
   }
   case SILInstructionKind::DynamicFunctionRefInst: {

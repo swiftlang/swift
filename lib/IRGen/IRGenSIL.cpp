@@ -1273,6 +1273,9 @@ public:
   visitMoveOnlyWrapperToCopyableBoxInst(MoveOnlyWrapperToCopyableBoxInst *i) {
     llvm_unreachable("OSSA instruction");
   }
+
+  void visitIgnoredUseInst(IgnoredUseInst *i) {}
+
   void
   visitMoveOnlyWrapperToCopyableAddrInst(MoveOnlyWrapperToCopyableAddrInst *i) {
     auto e = getLoweredExplosion(i->getOperand());
@@ -1408,7 +1411,7 @@ public:
   void visitIsUniqueInst(IsUniqueInst *i);
   void visitBeginCOWMutationInst(BeginCOWMutationInst *i);
   void visitEndCOWMutationInst(EndCOWMutationInst *i);
-  void visitIsEscapingClosureInst(IsEscapingClosureInst *i);
+  void visitDestroyNotEscapedClosureInst(DestroyNotEscapedClosureInst *i);
   void visitDeallocStackInst(DeallocStackInst *i);
   void visitDeallocStackRefInst(DeallocStackRefInst *i);
   void visitDeallocPackInst(DeallocPackInst *i);
@@ -6332,8 +6335,8 @@ void IRGenSILFunction::visitEndCOWMutationInst(EndCOWMutationInst *i) {
   setLoweredExplosion(i, v);
 }
 
-void IRGenSILFunction::visitIsEscapingClosureInst(
-    swift::IsEscapingClosureInst *i) {
+void IRGenSILFunction::visitDestroyNotEscapedClosureInst(
+    swift::DestroyNotEscapedClosureInst *i) {
   // The closure operand is allowed to be an optional closure.
   auto operandType = i->getOperand()->getType();
   if (operandType.getOptionalObjectType())
@@ -6345,21 +6348,19 @@ void IRGenSILFunction::visitIsEscapingClosureInst(
 
   // This code relies on that an optional<()->()>'s tag fits in the function
   // pointer.
-  auto &TI = cast<LoadableTypeInfo>(getTypeInfo(operandType));
+  auto &TI = cast<ReferenceTypeInfo>(getTypeInfo(operandType));
   assert(TI.mayHaveExtraInhabitants(IGM) &&
          "Must have extra inhabitants to be able to handle the optional "
          "closure case");
   (void)TI;
 
   Explosion closure = getLoweredExplosion(i->getOperand());
-  auto func = closure.claimNext();
-  (void)func;
-  auto context = closure.claimNext();
-  assert(closure.empty());
+  auto context = closure.getAll()[1];
   if (context->getType()->isIntegerTy())
     context = Builder.CreateIntToPtr(context, IGM.RefCountedPtrTy);
   auto result = emitIsEscapingClosureCall(context, i->getLoc().getSourceLoc(),
                                           i->getVerificationType());
+  TI.strongRelease(*this, closure, irgen::Atomicity::Atomic);
   Explosion out;
   out.add(result);
   setLoweredExplosion(i, out);
@@ -8387,9 +8388,17 @@ void IRGenSILFunction::visitClassMethodInst(swift::ClassMethodInst *i) {
 
   auto methodType = i->getType().castTo<SILFunctionType>();
 
+  AccessLevel methodAccess = method.getDecl()->getEffectiveAccess();
   auto *classDecl = cast<ClassDecl>(method.getDecl()->getDeclContext());
   bool shouldUseDispatchThunk = false;
-  if (IGM.hasResilientMetadata(classDecl, ResilienceExpansion::Maximal)) {
+  // Because typechecking for the debugger has more lax rules, check the access
+  // level of the getter to decide whether to use a dispatch thunk for the
+  // debugger.
+  bool shouldUseDispatchThunkIfInDebugger =
+      !classDecl->getASTContext().LangOpts.DebuggerSupport ||
+      methodAccess == AccessLevel::Public;
+  if (IGM.hasResilientMetadata(classDecl, ResilienceExpansion::Maximal) &&
+      shouldUseDispatchThunkIfInDebugger) {
     shouldUseDispatchThunk = true;
   } else if (IGM.getOptions().VirtualFunctionElimination) {
     // For VFE, use a thunk if the target class is in another module. This

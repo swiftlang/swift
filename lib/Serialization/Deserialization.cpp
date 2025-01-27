@@ -3302,8 +3302,8 @@ class DeclDeserializer {
 
       // The next bits are the protocol conformance options.
       // Update the mask below whenever this changes.
-      static_assert(NumProtocolConformanceOptions == 4);
-      ProtocolConformanceOptions options(rawID & 0x0F);
+      static_assert(NumProtocolConformanceOptions == 5);
+      ProtocolConformanceOptions options(rawID & 0x1F);
       rawID = rawID >> NumProtocolConformanceOptions;
 
       TypeID typeID = rawID;
@@ -5643,7 +5643,7 @@ DeclDeserializer::readAvailable_DECL_ATTR(SmallVectorImpl<uint64_t> &scratch,
   }
 
   auto attr = new (ctx)
-      AvailableAttr(SourceLoc(), SourceRange(), domain, kind, message, rename,
+      AvailableAttr(SourceLoc(), SourceRange(), domain, SourceLoc(), kind, message, rename,
                     Introduced, SourceRange(), Deprecated, SourceRange(),
                     Obsoleted, SourceRange(), isImplicit, isSPI);
   return attr;

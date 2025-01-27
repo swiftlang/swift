@@ -2728,7 +2728,7 @@ public:
     *this << getIDAndType(I->getReference()) << " of "
           << getIDAndType(I->getOperand(1));
   }
-  void visitIsEscapingClosureInst(IsEscapingClosureInst *CUI) {
+  void visitDestroyNotEscapedClosureInst(DestroyNotEscapedClosureInst *CUI) {
     if (CUI->getVerificationType())
       *this << "[objc] ";
     *this << getIDAndType(CUI->getOperand());
@@ -2871,6 +2871,10 @@ public:
     if (GI->throws())
       *this << "[throws] ";
     *this << GI->getFormalResumeType();
+  }
+
+  void visitIgnoredUseInst(IgnoredUseInst *i) {
+    *this << getIDAndType(i->getOperand());
   }
 
   void visitGetAsyncContinuationAddrInst(GetAsyncContinuationAddrInst *GI) {

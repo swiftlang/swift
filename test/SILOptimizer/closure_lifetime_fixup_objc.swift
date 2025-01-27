@@ -50,11 +50,8 @@ public protocol DangerousEscaper {
 
 // Release sentinel closure copy (5).
 // CHECK:   strong_release [[BLOCK_COPY]] : $@convention(block) @noescape () -> ()
-// CHECK:   [[ESCAPED:%.*]] = is_escaping_closure [objc] [[SENTINEL]]
+// CHECK:   [[ESCAPED:%.*]] = destroy_not_escaped_closure [objc] [[SENTINEL]]
 // CHECK:   cond_fail [[ESCAPED]] : $Builtin.Int1
-
-// Release of sentinel copy (4).
-// CHECK:   strong_release [[SENTINEL]]
 
 // Extended lifetime (2).
 // CHECK:   strong_release [[ARG]]
@@ -98,8 +95,7 @@ public func couldActuallyEscapeWithLoop(_ closure: @escaping () -> (), _ villain
 // CHECK:   [[DISPATCH_SYNC_FUNC:%.*]] = function_ref @dispatch_sync :
 // CHECK:   apply [[DISPATCH_SYNC_FUNC]]({{%.*}}, [[BLOCK_COPY]])
 // CHECK:   strong_release [[BLOCK_COPY]]
-// CHECK:   is_escaping_closure [objc] [[SOME]]
-// CHECK:   release_value [[SOME]]
+// CHECK:   destroy_not_escaped_closure [objc] [[SOME]]
 // CHECK:   [[NONE_FOR_BACKEDGE:%.*]] = enum $Optional<{{.*}}>, #Optional.none
 // CHECK:   br [[LOOP_HEADER_BB]]([[NONE_FOR_BACKEDGE]] :
 //

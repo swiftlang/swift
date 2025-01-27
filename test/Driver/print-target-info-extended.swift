@@ -6,10 +6,12 @@
 // CHECK-embedded: "platform": "embedded",
 // CHECK-freebsd: "platform": "freebsd",
 // CHECK-linux: "platform": "linux",
+// CHECK-macosx: "platform": "macosx",
 // CHECK-mingw: "platform": "mingw",
 // CHECK-openbsd: "platform": "openbsd",
 // CHECK-wasi: "platform": "wasi",
 // CHECK-windows: "platform": "windows",
 
 // CHECK-aarch64: "arch": "aarch64"
+// CHECK-arm64: "arch": "arm64"
 // CHECK-x86_64: "arch": "x86_64"

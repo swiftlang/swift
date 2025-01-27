@@ -79,10 +79,21 @@ struct LinearLivenessVisitor :
 LinearLiveness::LinearLiveness(SILValue def,
                                IncludeExtensions_t includeExtensions)
     : OSSALiveness(def), includeExtensions(includeExtensions) {
-  if (def->getOwnershipKind() != OwnershipKind::Owned) {
+  switch (def->getOwnershipKind()) {
+  case OwnershipKind::Owned:
+    break;
+  case OwnershipKind::Guaranteed: {
     BorrowedValue borrowedValue(def);
     assert(borrowedValue && borrowedValue.isLocalScope());
     (void)borrowedValue;
+    break;
+  }
+  case OwnershipKind::None:
+    assert(def->isFromVarDecl());
+    break;
+  case OwnershipKind::Unowned:
+  case OwnershipKind::Any:
+    llvm_unreachable("bad ownership for LinearLiveness");
   }
 }
 

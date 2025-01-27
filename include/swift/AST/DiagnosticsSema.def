@@ -1232,8 +1232,14 @@ REMARK(module_api_import_aliases,none,
        "%select{, which reexports definition from %2|}3",
        (const Decl *, ModuleDecl *, ModuleDecl *, bool))
 
-REMARK(skip_module_invalid,none,"skip invalid swiftmodule: %0", (StringRef))
-WARNING(skip_module_not_testable,none,"ignore swiftmodule built without '-enable-testing': %0", (StringRef))
+REMARK(dependency_scan_skip_module_invalid,none,
+       "module file '%0' skipped by the dependency scan because it is "
+       "incompatible with this Swift compiler: %1", (StringRef, StringRef))
+WARNING(skip_module_not_testable,none,
+        "ignore swiftmodule built without '-enable-testing': %0", (StringRef))
+WARNING(dependency_scan_module_incompatible, none,
+        "module file '%0' is incompatible with this Swift compiler: %1",
+        (StringRef, StringRef))
 
 REMARK(macro_loaded,none,
        "loaded macro implementation module %0 from "
@@ -6709,6 +6715,16 @@ NOTE(type_eraser_init_spi,none,
 // MARK: @available
 //------------------------------------------------------------------------------
 
+WARNING(attr_availability_expected_deprecated_version, none,
+       "expected version number with 'deprecated' in '%0' attribute for "
+       "platform '%1'", (StringRef, StringRef))
+WARNING(attr_availability_cannot_be_used_for_domain, none,
+       "'%0' cannot be used in '%1' attribute for platform '%2'",
+       (StringRef, StringRef, StringRef))
+WARNING(attr_availability_expected_version_spec, none,
+       "expected 'introduced', 'deprecated', or 'obsoleted' in '%0' attribute "
+       "for platform '%1'", (StringRef, StringRef))
+
 ERROR(availability_decl_unavailable, none,
       "%0 is unavailable%select{ in %2|}1%select{|: %3}3",
       (const ValueDecl *, bool, StringRef, StringRef))
@@ -8120,9 +8136,13 @@ NOTE(note_use_of_unsafe_conformance_is_unsafe,none,
      (Type, const ValueDecl *))
 
 GROUPED_WARNING(decl_signature_involves_unsafe,Unsafe,none,
-      "%kindbase0 has an interface that is not memory-safe; "
-      "use '@unsafe' to indicate that its use is unsafe",
+      "%kindbase0 has an interface that involves unsafe types",
       (const Decl *))
+NOTE(decl_signature_mark_unsafe,none,
+      "add '@unsafe' to indicate that this declaration is unsafe to use",
+      ())
+NOTE(decl_signature_mark_safe,none,
+      "add '@safe' to indicate that this declaration is memory-safe to use", ())
 
 GROUPED_WARNING(conformance_involves_unsafe,Unsafe,none,
      "conformance of %0 to %kind1 involves unsafe code; use '@unsafe' to "

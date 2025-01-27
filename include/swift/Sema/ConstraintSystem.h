@@ -23,7 +23,6 @@
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/AnyFunctionRef.h"
-#include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/NameLookup.h"
 #include "swift/AST/PropertyWrappers.h"
 #include "swift/AST/Types.h"
@@ -1196,9 +1195,11 @@ struct Score {
     bool hasNonDefault = false;
     for (unsigned int i = 0; i < NumScoreKinds; ++i) {
       if (Data[i] != 0) {
-        out << " [component: ";
+        out << " [";
         out << getNameFor(ScoreKind(i));
-        out << "(s), value: ";
+        out << "(s), weight: ";
+        out << std::to_string(NumScoreKinds - i);
+        out << ", impact: ";
         out << std::to_string(Data[i]);
         out << "]";
         hasNonDefault = true;

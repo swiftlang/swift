@@ -1092,28 +1092,30 @@ private:
     return DITy;
   }
 
-  llvm::TempDIType createStructForwardDecl(
-      DebugTypeInfo DbgTy, NominalTypeDecl *Decl, llvm::DIScope *Scope,
-      llvm::DIFile *File, unsigned Line, unsigned SizeInBits,
-      llvm::DINode::DIFlags Flags, StringRef UniqueID, StringRef Name) {
-    // Forward declare this first because types may be recursive.
-    llvm::TempDICompositeType FwdDecl(DBuilder.createReplaceableCompositeType(
-        llvm::dwarf::DW_TAG_structure_type, Name, Scope, File, Line,
-        llvm::dwarf::DW_LANG_Swift, SizeInBits, 0, Flags, UniqueID));
-
+  /// Creates a temporary replaceable forward decl to protect against recursion.
+  llvm::TempDIType createTemporaryReplaceableForwardDecl(
+      TypeBase *Type, llvm::DIScope *Scope, llvm::DIFile *File, unsigned Line,
+      unsigned SizeInBits, unsigned AlignInBits, llvm::DINode::DIFlags Flags,
+      StringRef MangledName, StringRef Name) {
 #ifndef NDEBUG
-    if (UniqueID.empty())
+    if (MangledName.empty())
       assert(!Name.empty() &&
              "no mangled name and no human readable name given");
     else
-      assert((UniqueID.starts_with("_T") ||
-              UniqueID.starts_with(MANGLING_PREFIX_STR) ||
-              UniqueID.starts_with(MANGLING_PREFIX_EMBEDDED_STR)) &&
+      assert(swift::Demangle::isMangledName(MangledName) &&
              "UID is not a mangled name");
 #endif
+    auto ReplaceableType = DBuilder.createReplaceableCompositeType(
+        llvm::dwarf::DW_TAG_structure_type, "", Scope, File, Line,
+        llvm::dwarf::DW_LANG_Swift, SizeInBits, AlignInBits, Flags,
+        MangledName);
+    auto FwdDecl = llvm::TempDIType(ReplaceableType);
 
     auto TH = llvm::TrackingMDNodeRef(FwdDecl.get());
-    DITypeCache[DbgTy.getType()] = TH;
+    DITypeCache[Type] = TH;
+    if (auto UID = ReplaceableType->getRawIdentifier())
+      DIRefMap[UID] = llvm::TrackingMDNodeRef(TH);
+
     return FwdDecl;
   }
 
@@ -1124,8 +1126,9 @@ private:
                    llvm::DINode::DIFlags Flags, llvm::DIType *DerivedFrom,
                    unsigned RuntimeLang, StringRef UniqueID) {
     StringRef Name = Decl->getName().str();
-    auto FwdDecl = createStructForwardDecl(DbgTy, Decl, Scope, File, Line,
-                                           SizeInBits, Flags, UniqueID, Name);
+    auto FwdDecl = createTemporaryReplaceableForwardDecl(
+        DbgTy.getType(), Scope, File, Line, SizeInBits, AlignInBits, Flags,
+        UniqueID, Name);
     // Collect the members.
     SmallVector<llvm::Metadata *, 16> Elements;
     unsigned OffsetInBits = 0;
@@ -1171,9 +1174,9 @@ private:
     unsigned SizeInBits = 0;
     unsigned AlignInBits = 0;
     StringRef Name = Decl->getName().str();
-    auto FwdDecl = createStructForwardDecl(DbgTy, Decl, Scope, File, Line,
-                                           SizeInBits, Flags, UniqueID, Name);
-
+    auto FwdDecl = createTemporaryReplaceableForwardDecl(
+        DbgTy.getType(), Scope, File, Line, SizeInBits, AlignInBits, Flags,
+        UniqueID, Name);
     // Collect the members.
     SmallVector<llvm::Metadata *, 16> Elements;
     for (VarDecl *VD : Decl->getStoredProperties()) {
@@ -1215,12 +1218,10 @@ private:
       return createUnsubstitutedVariantType(DbgTy, Decl, MangledName, Scope,
                                             File, 0, Flags);
     }
-    auto FwdDecl = llvm::TempDIType(DBuilder.createReplaceableCompositeType(
-        llvm::dwarf::DW_TAG_structure_type, "", Scope, File, 0,
-        llvm::dwarf::DW_LANG_Swift, 0, 0, llvm::DINode::FlagZero, MangledName));
-
-    auto TH = llvm::TrackingMDNodeRef(FwdDecl.get());
-    DITypeCache[EnumTy] = TH;
+    StringRef Name = Decl->getName().str();
+    auto FwdDecl = createTemporaryReplaceableForwardDecl(
+        EnumTy, Scope, File, Line, SizeInBits, AlignInBits, Flags, MangledName,
+        Name);
     // Force the creation of the unsubstituted type, don't create it
     // directly so it goes through all the caching/verification logic.
     auto unsubstitutedDbgTy = getOrCreateType(DbgTy);
@@ -1231,77 +1232,70 @@ private:
     return DIType;
   }
 
-/// Create a DICompositeType from a specialized struct. A specialized type
-/// is a generic type, or a child type whose parent is generic.
-llvm::DIType *
-createSpecializedStructOrClassType(NominalOrBoundGenericNominalType *Type,
-                                   NominalTypeDecl *Decl, llvm::DIScope *Scope,
-                                   llvm::DIFile *File, unsigned Line,
-                                   unsigned SizeInBits, unsigned AlignInBits,
-                                   llvm::DINode::DIFlags Flags,
-                                   StringRef MangledName,
-                                   bool IsClass = false) {
-  // To emit debug info of the DwarfTypes level for generic types, the strategy
-  // is to emit a description of all the fields for the type with archetypes,
-  // and still the same debug info as the ASTTypes level for the specialized
-  // type. For example, given:
-  // struct Pair<T, U> {
-  //   let t: T
-  //   let u: U
-  // }
-  // When emitting debug information for a type such as Pair<Int, Double>,
-  // emit a description of all the fields for Pair<T, U>, and emit the regular
-  // debug information for Pair<Int, Double>.
+  /// Create a DICompositeType from a specialized struct. A specialized type
+  /// is a generic type, or a child type whose parent is generic.
+  llvm::DIType *createSpecializedStructOrClassType(
+      NominalOrBoundGenericNominalType *Type, NominalTypeDecl *Decl,
+      llvm::DIScope *Scope, llvm::DIFile *File, unsigned Line,
+      unsigned SizeInBits, unsigned AlignInBits, llvm::DINode::DIFlags Flags,
+      StringRef MangledName, bool IsClass = false) {
+    // To emit debug info of the DwarfTypes level for generic types, the
+    // strategy is to emit a description of all the fields for the type with
+    // archetypes, and still the same debug info as the ASTTypes level for the
+    // specialized type. For example, given: struct Pair<T, U> {
+    //   let t: T
+    //   let u: U
+    // }
+    // When emitting debug information for a type such as Pair<Int, Double>,
+    // emit a description of all the fields for Pair<T, U>, and emit the regular
+    // debug information for Pair<Int, Double>.
+    StringRef Name = Decl->getName().str();
+    auto FwdDecl = createTemporaryReplaceableForwardDecl(
+        Type, Scope, File, Line, SizeInBits, AlignInBits, Flags, MangledName,
+        Name);
 
-  auto FwdDecl = llvm::TempDIType(DBuilder.createReplaceableCompositeType(
-      llvm::dwarf::DW_TAG_structure_type, "", Scope, File, Line,
-      llvm::dwarf::DW_LANG_Swift, SizeInBits, 0, Flags, MangledName));
+    // Go from Pair<Int, Double> to Pair<T, U>.
+    auto UnsubstitutedTy = Decl->getDeclaredInterfaceType();
+    UnsubstitutedTy = Decl->mapTypeIntoContext(UnsubstitutedTy);
 
-  auto TH = llvm::TrackingMDNodeRef(FwdDecl.get());
-  DITypeCache[Type] = TH;
+    auto DbgTy = DebugTypeInfo::getFromTypeInfo(
+        UnsubstitutedTy, IGM.getTypeInfoForUnlowered(UnsubstitutedTy), IGM);
+    Mangle::ASTMangler Mangler(IGM.Context);
+    std::string DeclTypeMangledName = Mangler.mangleTypeForDebugger(
+        UnsubstitutedTy->mapTypeOutOfContext(), {});
+    if (DeclTypeMangledName == MangledName) {
+      return createUnsubstitutedGenericStructOrClassType(
+          DbgTy, Decl, UnsubstitutedTy, Scope, File, Line, Flags, nullptr,
+          llvm::dwarf::DW_LANG_Swift, DeclTypeMangledName);
+    }
+    // Force the creation of the unsubstituted type, don't create it
+    // directly so it goes through all the caching/verification logic.
+    auto UnsubstitutedType = getOrCreateType(DbgTy);
 
-  // Go from Pair<Int, Double> to Pair<T, U>.
-  auto UnsubstitutedTy = Decl->getDeclaredInterfaceType();
-  UnsubstitutedTy = Decl->mapTypeIntoContext(UnsubstitutedTy);
+    if (auto *ClassTy = llvm::dyn_cast<BoundGenericClassType>(Type)) {
+      auto SuperClassTy = ClassTy->getSuperclass();
+      if (SuperClassTy) {
+        auto SuperClassDbgTy = DebugTypeInfo::getFromTypeInfo(
+            SuperClassTy, IGM.getTypeInfoForUnlowered(SuperClassTy), IGM);
 
-  auto DbgTy = DebugTypeInfo::getFromTypeInfo(
-      UnsubstitutedTy, IGM.getTypeInfoForUnlowered(UnsubstitutedTy), IGM);
-  Mangle::ASTMangler Mangler(IGM.Context);
-  std::string DeclTypeMangledName =
-      Mangler.mangleTypeForDebugger(UnsubstitutedTy->mapTypeOutOfContext(), {});
-  if (DeclTypeMangledName == MangledName) {
-    return createUnsubstitutedGenericStructOrClassType(
-        DbgTy, Decl, UnsubstitutedTy, Scope, File, Line, Flags, nullptr,
-        llvm::dwarf::DW_LANG_Swift, DeclTypeMangledName);
-  }
-  // Force the creation of the unsubstituted type, don't create it
-  // directly so it goes through all the caching/verification logic.
-  auto UnsubstitutedType = getOrCreateType(DbgTy);
+        llvm::DIType *SuperClassDITy = getOrCreateType(SuperClassDbgTy);
+        assert(SuperClassDITy && "getOrCreateType should never return null!");
+        DBuilder.createInheritance(UnsubstitutedType, SuperClassDITy, 0, 0,
+                                   llvm::DINode::FlagZero);
+      }
 
-  if (auto *ClassTy = llvm::dyn_cast<BoundGenericClassType>(Type)) {
-    auto SuperClassTy = ClassTy->getSuperclass();
-    if (SuperClassTy) {
-      auto SuperClassDbgTy = DebugTypeInfo::getFromTypeInfo(
-          SuperClassTy, IGM.getTypeInfoForUnlowered(SuperClassTy), IGM);
-
-      llvm::DIType *SuperClassDITy = getOrCreateType(SuperClassDbgTy);
-      assert(SuperClassDITy && "getOrCreateType should never return null!");
-      DBuilder.createInheritance(UnsubstitutedType, SuperClassDITy, 0, 0,
-                                 llvm::DINode::FlagZero);
+      auto *OpaqueType = createPointerSizedStruct(
+          Scope, Decl ? Decl->getNameStr() : MangledName, File, 0, Flags,
+          MangledName, UnsubstitutedType);
+      return OpaqueType;
     }
 
-    auto *OpaqueType = createPointerSizedStruct(
-        Scope, Decl ? Decl->getNameStr() : MangledName, File, 0, Flags,
-        MangledName, UnsubstitutedType);
+    auto *OpaqueType = createOpaqueStruct(
+        Scope, "", File, Line, SizeInBits, AlignInBits, Flags, MangledName,
+        collectGenericParams(Type), UnsubstitutedType);
+    DBuilder.replaceTemporary(std::move(FwdDecl), OpaqueType);
     return OpaqueType;
   }
-
-  auto *OpaqueType = createOpaqueStruct(
-      Scope, "", File, Line, SizeInBits, AlignInBits, Flags, MangledName,
-      collectGenericParams(Type), UnsubstitutedType);
-  DBuilder.replaceTemporary(std::move(FwdDecl), OpaqueType);
-  return OpaqueType;
-}
 
   /// Create debug information for an enum with a raw type (enum E : Int {}).
   llvm::DICompositeType *createRawEnumType(CompletedDebugTypeInfo DbgTy,
@@ -1319,13 +1313,9 @@ createSpecializedStructOrClassType(NominalOrBoundGenericNominalType *Type,
     // Default, since Swift doesn't allow specifying a custom alignment.
     unsigned AlignInBits = 0;
 
-    llvm::TempDICompositeType FwdDecl(DBuilder.createReplaceableCompositeType(
-        llvm::dwarf::DW_TAG_enumeration_type, MangledName, Scope, File, Line,
-        llvm::dwarf::DW_LANG_Swift, SizeInBits, AlignInBits, Flags,
-        MangledName));
-
-    auto TH = llvm::TrackingMDNodeRef(FwdDecl.get());
-    DITypeCache[DbgTy.getType()] = TH;
+    auto FwdDecl = createTemporaryReplaceableForwardDecl(
+        DbgTy.getType(), Scope, File, Line, SizeInBits, AlignInBits, Flags,
+        MangledName, Name);
 
     auto RawType = Decl->getRawType();
     auto &TI = IGM.getTypeInfoForUnlowered(RawType);
@@ -1373,14 +1363,10 @@ createSpecializedStructOrClassType(NominalOrBoundGenericNominalType *Type,
 
     // A variant part should actually be a child to a DW_TAG_structure_type
     // according to the DWARF spec.
-    llvm::TempDICompositeType FwdDecl(DBuilder.createReplaceableCompositeType(
-        llvm::dwarf::DW_TAG_structure_type, MangledName, Scope, File, Line,
-        llvm::dwarf::DW_LANG_Swift, SizeInBits, AlignInBits, Flags,
-        MangledName));
 
-    auto TH = llvm::TrackingMDNodeRef(FwdDecl.get());
-    DITypeCache[DbgTy.getType()] = TH;
-
+    auto FwdDecl = createTemporaryReplaceableForwardDecl(
+        DbgTy.getType(), Scope, File, Line, SizeInBits, AlignInBits, Flags,
+        MangledName, Name);
     SmallVector<llvm::Metadata *, 16> Elements;
     for (auto *ElemDecl : Decl->getAllElements()) {
       std::optional<CompletedDebugTypeInfo> ElemDbgTy;
@@ -1437,13 +1423,9 @@ createSpecializedStructOrClassType(NominalOrBoundGenericNominalType *Type,
     unsigned AlignInBits = 0;
     // A variant part should actually be a child to a DW_TAG_structure_type
     // according to the DWARF spec.
-    llvm::TempDICompositeType FwdDecl(DBuilder.createReplaceableCompositeType(
-        llvm::dwarf::DW_TAG_structure_type, MangledName, Scope, File, Line,
-        llvm::dwarf::DW_LANG_Swift, SizeInBits, AlignInBits, Flags,
-        MangledName));
-
-    auto TH = llvm::TrackingMDNodeRef(FwdDecl.get());
-    DITypeCache[DbgTy.getType()] = TH;
+    auto FwdDecl = createTemporaryReplaceableForwardDecl(
+        DbgTy.getType(), Scope, File, Line, SizeInBits, AlignInBits, Flags,
+        MangledName, Name);
 
     SmallVector<llvm::Metadata *, 16> Elements;
     for (auto *ElemDecl : Decl->getAllElements()) {
@@ -1655,13 +1637,9 @@ createSpecializedStructOrClassType(NominalOrBoundGenericNominalType *Type,
                                       unsigned SizeInBits, unsigned AlignInBits,
                                       llvm::DINode::DIFlags Flags,
                                       StringRef MangledName) {
-    llvm::TempDICompositeType FwdDecl(DBuilder.createReplaceableCompositeType(
-        llvm::dwarf::DW_TAG_subroutine_type, MangledName, Scope, MainFile, 0,
-        llvm::dwarf::DW_LANG_Swift, SizeInBits, AlignInBits, Flags,
-        MangledName));
-
-    auto TH = llvm::TrackingMDNodeRef(FwdDecl.get());
-    DITypeCache[DbgTy.getType()] = TH;
+    auto FwdDecl = createTemporaryReplaceableForwardDecl(
+        DbgTy.getType(), Scope, MainFile, 0, SizeInBits, AlignInBits, Flags,
+        MangledName, MangledName);
 
     CanSILFunctionType FunTy;
     TypeBase *BaseTy = DbgTy.getType();
@@ -1720,12 +1698,9 @@ createSpecializedStructOrClassType(NominalOrBoundGenericNominalType *Type,
     }
     // FIXME: assert that SizeInBits == OffsetInBits.
 
-    llvm::TempDICompositeType FwdDecl(DBuilder.createReplaceableCompositeType(
-        llvm::dwarf::DW_TAG_structure_type, MangledName, Scope, MainFile, 0,
-        llvm::dwarf::DW_LANG_Swift, SizeInBits, AlignInBits, Flags,
-        MangledName));
-
-    DITypeCache[DbgTy.getType()] = llvm::TrackingMDNodeRef(FwdDecl.get());
+    auto FwdDecl = createTemporaryReplaceableForwardDecl(
+        DbgTy.getType(), Scope, MainFile, 0, SizeInBits, AlignInBits, Flags,
+        MangledName, MangledName);
 
     auto DITy = DBuilder.createStructType(
         Scope, MangledName, MainFile, 0, SizeInBits, AlignInBits, Flags,

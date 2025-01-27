@@ -5376,7 +5376,19 @@ static void emitSimpleAssignment(SILGenFunction &SGF, SILLocation loc,
           value = value.ensurePlusOne(SGF, loc);
           if (value.getType().isObject())
             value = SGF.B.createMoveValue(loc, value);
+          SGF.B.createIgnoredUse(loc, value.getValue());
+          return;
         }
+
+        // Emit the ignored use instruction like we would do in emitIgnoredExpr.
+        if (!rv.isNull()) {
+          SmallVector<ManagedValue, 16> values;
+          std::move(rv).getAll(values);
+          for (auto v : values) {
+            SGF.B.createIgnoredUse(loc, v.getValue());
+          }
+        }
+
         return;
       }
 
@@ -6029,6 +6041,33 @@ RValue RValueEmitter::visitOpenExistentialExpr(OpenExistentialExpr *E,
                                              });
 }
 
+namespace {
+class DestroyNotEscapedClosureCleanup : public Cleanup {
+  SILValue v;
+public:
+  DestroyNotEscapedClosureCleanup(SILValue v) : v(v) {}
+
+  void emit(SILGenFunction &SGF, CleanupLocation l,
+            ForUnwind_t forUnwind) override {
+    // Now create the verification of the withoutActuallyEscaping operand.
+    // Either we fail the uniqueness check (which means the closure has escaped)
+    // and abort or we continue and destroy the ultimate reference.
+    auto isEscaping = SGF.B.createDestroyNotEscapedClosure(
+        l, v, DestroyNotEscapedClosureInst::WithoutActuallyEscaping);
+    SGF.B.createCondFail(l, isEscaping, "non-escaping closure has escaped");
+  }
+
+  void dump(SILGenFunction &) const override {
+#ifndef NDEBUG
+    llvm::errs() << "DestroyNotEscapedClosureCleanup\n"
+                 << "State:" << getState() << "\n"
+                 << "Value:" << v << "\n";
+#endif
+  }
+};
+} // end anonymous namespace
+
+
 RValue RValueEmitter::visitMakeTemporarilyEscapableExpr(
     MakeTemporarilyEscapableExpr *E, SGFContext C) {
   // Emit the non-escaping function value.
@@ -6063,19 +6102,15 @@ RValue RValueEmitter::visitMakeTemporarilyEscapableExpr(
   }
 
   // Convert it to an escaping function value.
-  auto escapingClosure =
+  auto ec =
       SGF.createWithoutActuallyEscapingClosure(E, functionValue, escapingFnTy);
+  SILValue ecv = ec.forward(SGF);
+  SGF.Cleanups.pushCleanup<DestroyNotEscapedClosureCleanup>(ecv);
+  auto escapingClosure = ManagedValue::forOwnedRValue(ecv, SGF.Cleanups.getTopCleanup());
   auto loc = SILLocation(E);
   auto borrowedClosure = escapingClosure.borrow(SGF, loc);
   RValue rvalue = visitSubExpr(borrowedClosure, false /* isClosureConsumable */);
 
-  // Now create the verification of the withoutActuallyEscaping operand.
-  // Either we fail the uniqueness check (which means the closure has escaped)
-  // and abort or we continue and destroy the ultimate reference.
-  auto isEscaping = SGF.B.createIsEscapingClosure(
-      loc, borrowedClosure.getValue(),
-      IsEscapingClosureInst::WithoutActuallyEscaping);
-  SGF.B.createCondFail(loc, isEscaping, "non-escaping closure has escaped");
   return rvalue;
 }
 
@@ -7027,7 +7062,24 @@ void SILGenFunction::emitIgnoredExpr(Expr *E) {
 
   // Otherwise, emit the result (to get any side effects), but produce it at +0
   // if that allows simplification.
-  emitRValue(E, SGFContext::AllowImmediatePlusZero);
+  RValue rv = emitRValue(E, SGFContext::AllowImmediatePlusZero);
+
+  // Return early if we do not have any result.
+  if (rv.isNull())
+    return;
+
+  // Then emit ignored use on all of the rvalue components. We purposely do not
+  // implode the tuple since if we have a tuple formation like:
+  //
+  // let _ = (x, y)
+  //
+  // we want the use to be on x and y and not on the imploded tuple. It also
+  // helps us avoid emitting unnecessary code.
+  SmallVector<ManagedValue, 16> values;
+  std::move(rv).getAll(values);
+  for (auto v : values) {
+    B.createIgnoredUse(E, v.getValue());
+  }
 }
 
 /// Emit the given expression as an r-value, then (if it is a tuple), combine

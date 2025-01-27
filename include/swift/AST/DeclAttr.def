@@ -516,7 +516,7 @@ SIMPLE_DECL_ATTR(sensitive, Sensitive,
 SIMPLE_DECL_ATTR(unsafe, Unsafe,
   OnAbstractFunction | OnSubscript | OnVar | OnMacro | OnNominalType |
   OnExtension | OnTypeAlias | OnEnumElement | UserInaccessible |
-  ABIStableToAdd | ABIStableToRemove | APIBreakingToAdd | APIStableToRemove,
+  ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove,
   160)
 
 DECL_ATTR(lifetime, Lifetime,
@@ -531,7 +531,11 @@ SIMPLE_DECL_ATTR(_addressableForDependencies, AddressableForDependencies,
   OnNominalType | ABIBreakingToAdd | ABIBreakingToRemove | APIBreakingToAdd | APIBreakingToRemove | UserInaccessible,
   163)
 
-// 164 was the never-shipped @safe attribute and can be reused
+SIMPLE_DECL_ATTR(safe, Safe,
+  OnAbstractFunction | OnSubscript | OnVar | OnMacro | OnNominalType |
+  OnExtension | OnEnumElement | UserInaccessible |
+  ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove,
+  164)
 
 DECL_ATTR(abi, ABI,
   OnAbstractFunction | OnVar /* will eventually add types */ | LongAttribute | ABIStableToAdd | ABIStableToRemove | APIStableToAdd | APIStableToRemove,

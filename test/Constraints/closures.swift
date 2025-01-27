@@ -1283,3 +1283,25 @@ do {
     }
   }
 }
+
+// Make sure that closure gets both Void? and Void attempted
+// otherwise it won't be possible to type-check the second closure.
+do {
+  struct Semaphore {
+    func signal() -> Int {}
+  }
+
+  func compute(_ completion: (Semaphore?) -> Void?) {}
+
+  func test() {
+    compute { $0?.signal() }
+    // expected-warning@-1 {{result of call to 'signal()' is unused}}
+
+    true
+      ? compute({ $0?.signal() }) // expected-warning {{result of call to 'signal()' is unused}}
+      : compute({
+           let sem = $0!
+           sem.signal() // expected-warning {{result of call to 'signal()' is unused}}
+        })
+  }
+}

@@ -2683,7 +2683,8 @@ void swift::checkAccessControl(Decl *D) {
   llvm::SmallVector<UnsafeUse, 2> unsafeUsesVec;
   llvm::SmallVectorImpl<UnsafeUse> *unsafeUses = nullptr;
   if (D->getASTContext().LangOpts.hasFeature(Feature::WarnUnsafe) &&
-      !D->isImplicit() && !D->isUnsafe()) {
+      !D->isImplicit() &&
+      D->getExplicitSafety() == ExplicitSafety::Unspecified) {
     unsafeUses = &unsafeUsesVec;
   }
 
@@ -2695,9 +2696,16 @@ void swift::checkAccessControl(Decl *D) {
 
   // If there were any unsafe uses, this declaration needs "@unsafe".
   if (!unsafeUsesVec.empty()) {
-    D->diagnose(diag::decl_signature_involves_unsafe, D)
-      .fixItInsert(D->getAttributeInsertionLoc(/*forModifier=*/false),
-                   "@unsafe ");
+    D->diagnose(diag::decl_signature_involves_unsafe, D);
+
+    ASTContext &ctx = D->getASTContext();
+    auto insertLoc = D->getAttributeInsertionLoc(/*forModifier=*/false);
+
+    ctx.Diags.diagnose(insertLoc, diag::decl_signature_mark_unsafe)
+      .fixItInsert(insertLoc, "@unsafe ");
+    ctx.Diags.diagnose(insertLoc, diag::decl_signature_mark_safe)
+      .fixItInsert(insertLoc, "@safe ");
+
     std::for_each(unsafeUsesVec.begin(), unsafeUsesVec.end(),
                   diagnoseUnsafeUse);
   }

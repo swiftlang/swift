@@ -235,6 +235,16 @@ enum class AssociatedValueCheck {
   HasAssociatedValues,
 };
 
+/// An explicit declaration of the safety of
+enum class ExplicitSafety {
+  /// There was no explicit declaration of the safety of the given entity.
+  Unspecified,
+  /// The entity was explicitly declared safe with @safe.
+  Safe,
+  /// The entity was explicitly declared unsafe with @unsafe.
+  Unsafe
+};
+
 /// Diagnostic printing of \c StaticSpellingKind.
 llvm::raw_ostream &operator<<(llvm::raw_ostream &OS, StaticSpellingKind SSK);
 
@@ -859,7 +869,6 @@ protected:
   friend class ExpandPeerMacroRequest;
   friend class GlobalActorAttributeRequest;
   friend class SPIGroupsRequest;
-  friend class IsUnsafeRequest;
 
 private:
   llvm::PointerUnion<DeclContext *, ASTContext *> Context;
@@ -1203,9 +1212,9 @@ public:
   /// Whether this declaration predates the introduction of concurrency.
   bool preconcurrency() const;
 
-  /// Whether this declaration is considered "unsafe", i.e., should not be
-  /// used in a "safe" dialect.
-  bool isUnsafe() const;
+  /// Query whether this declaration was explicitly declared to be safe or
+  /// unsafe.
+  ExplicitSafety getExplicitSafety() const;
 
 private:
   bool isUnsafeComputed() const {
@@ -1816,14 +1825,34 @@ public:
   bool isPreconcurrency() const {
     return getOptions().contains(ProtocolConformanceFlags::Preconcurrency);
   }
-  bool isUnsafe() const {
-    return getOptions().contains(ProtocolConformanceFlags::Unsafe);
+
+  ExplicitSafety getExplicitSafety() const {
+    if (getOptions().contains(ProtocolConformanceFlags::Unsafe))
+      return ExplicitSafety::Unsafe;
+    if (getOptions().contains(ProtocolConformanceFlags::Safe))
+      return ExplicitSafety::Safe;
+    return ExplicitSafety::Unspecified;
   }
 
   bool isSuppressed() const { return IsSuppressed; }
 
   void setOption(ProtocolConformanceFlags flag) {
     RawOptions = (getOptions() | flag).toRaw();
+  }
+
+  void setOption(ExplicitSafety safety) {
+    RawOptions = (getOptions() - ProtocolConformanceFlags::Unsafe
+                    - ProtocolConformanceFlags::Safe).toRaw();
+    switch (safety) {
+    case ExplicitSafety::Unspecified:
+      break;
+    case ExplicitSafety::Safe:
+      RawOptions = (getOptions() | ProtocolConformanceFlags::Safe).toRaw();
+      break;
+    case ExplicitSafety::Unsafe:
+      RawOptions = (getOptions() | ProtocolConformanceFlags::Unsafe).toRaw();
+      break;
+    }
   }
 
   void setSuppressed() {
@@ -3325,6 +3354,10 @@ public:
 
   /// Get the decl for this value's opaque result type, if it has one.
   OpaqueTypeDecl *getOpaqueResultTypeDecl() const;
+
+  /// Gets the decl for this value's opaque result type if it has already been
+  /// computed, or `nullopt` otherwise. This should only be used for dumping.
+  std::optional<OpaqueTypeDecl *> getCachedOpaqueResultTypeDecl() const;
 
   /// Get the representative for this value's opaque result type, if it has one.
   /// Returns a `TypeRepr` instead of an `OpaqueReturnTypeRepr` because 'some'
@@ -7769,6 +7802,10 @@ public:
   /// Retrieves the thrown interface type.
   Type getThrownInterfaceType() const;
 
+  /// Returns the thrown interface type of this function if it has already been
+  /// computed, otherwise `nullopt`. This should only be used for dumping.
+  std::optional<Type> getCachedThrownInterfaceType() const;
+
   /// Retrieve the "effective" thrown interface type, or std::nullopt if
   /// this function cannot throw.
   ///
@@ -8328,6 +8365,10 @@ public:
 
   /// Retrieve the result interface type of this function.
   Type getResultInterfaceType() const;
+
+  /// Returns the result interface type of this function if it has already been
+  /// computed, otherwise `nullopt`. This should only be used for dumping.
+  std::optional<Type> getCachedResultInterfaceType() const;
 
   /// isUnaryOperator - Determine whether this is a unary operator
   /// implementation.  This check is a syntactic rather than type-based check,
@@ -9528,6 +9569,10 @@ public:
 
   /// Retrieve the interface type produced when expanding this macro.
   Type getResultInterfaceType() const;
+
+  /// Returns the result interface type of this macro if it has already been
+  /// computed, otherwise `nullopt`. This should only be used for dumping.
+  std::optional<Type> getCachedResultInterfaceType() const;
 
   /// Determine the contexts in which this macro can be applied.
   MacroRoles getMacroRoles() const;

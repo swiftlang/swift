@@ -1087,11 +1087,54 @@ bool Decl::preconcurrency() const {
   return false;
 }
 
-bool Decl::isUnsafe() const {
-  return evaluateOrDefault(
-      getASTContext().evaluator,
-      IsUnsafeRequest{const_cast<Decl *>(this)},
-      false);
+/// Look at the attributes to determine whether they involve an attribute
+/// that explicitly specifies the safety of the declaration.
+static std::optional<ExplicitSafety>
+getExplicitSafetyFromAttrs(const Decl *decl) {
+  // If it's marked @unsafe, it's unsafe.
+  if (decl->getAttrs().hasAttribute<UnsafeAttr>())
+    return ExplicitSafety::Unsafe;
+
+  // If it's marked @safe, it's safe.
+  if (decl->getAttrs().hasAttribute<SafeAttr>())
+    return ExplicitSafety::Safe;
+
+  return std::nullopt;
+}
+
+ExplicitSafety Decl::getExplicitSafety() const {
+  // Check the attributes on the declaration itself.
+  if (auto safety = getExplicitSafetyFromAttrs(this))
+    return *safety;
+
+  // Inference: Check the enclosing context.
+  if (auto enclosingDC = getDeclContext()) {
+    // Is this an extension with @safe or @unsafe on it?
+    if (auto ext = dyn_cast<ExtensionDecl>(enclosingDC)) {
+      if (auto extSafety = getExplicitSafetyFromAttrs(ext))
+        return *extSafety;
+    }
+
+    if (auto enclosingNominal = enclosingDC->getSelfNominalTypeDecl())
+      if (auto nominalSafety = getExplicitSafetyFromAttrs(enclosingNominal))
+        return *nominalSafety;
+  }
+
+  // If an extension extends an unsafe nominal type, it's unsafe.
+  if (auto ext = dyn_cast<ExtensionDecl>(this)) {
+    if (auto nominal = ext->getExtendedNominal())
+      if (nominal->getExplicitSafety() == ExplicitSafety::Unsafe)
+        return ExplicitSafety::Unsafe;
+  }
+
+  // If this is a pattern binding declaration, check whether the first
+  // variable is @unsafe.
+  if (auto patternBinding = dyn_cast<PatternBindingDecl>(this)) {
+    if (auto var = patternBinding->getSingleVar())
+      return var->getExplicitSafety();
+  }
+
+  return ExplicitSafety::Unspecified;
 }
 
 Type AbstractFunctionDecl::getThrownInterfaceType() const {
@@ -1100,6 +1143,14 @@ Type AbstractFunctionDecl::getThrownInterfaceType() const {
 
   auto mutableThis = const_cast<AbstractFunctionDecl *>(this);
   return CatchNode(mutableThis).getExplicitCaughtType(getASTContext());
+}
+
+std::optional<Type> AbstractFunctionDecl::getCachedThrownInterfaceType() const {
+  if (!getThrownTypeRepr())
+    return ThrownType.getType();
+
+  auto mutableThis = const_cast<AbstractFunctionDecl *>(this);
+  return CatchNode(mutableThis).getCachedExplicitCaughtType(getASTContext());
 }
 
 std::optional<Type> AbstractFunctionDecl::getEffectiveThrownErrorType() const {
@@ -3932,6 +3983,12 @@ OpaqueTypeDecl *ValueDecl::getOpaqueResultTypeDecl() const {
   return evaluateOrDefault(getASTContext().evaluator,
     OpaqueResultTypeRequest{const_cast<ValueDecl *>(this)},
     nullptr);
+}
+
+std::optional<OpaqueTypeDecl *>
+ValueDecl::getCachedOpaqueResultTypeDecl() const {
+  return OpaqueResultTypeRequest{const_cast<ValueDecl *>(this)}
+      .getCachedResult();
 }
 
 bool ValueDecl::isObjC() const {
@@ -10768,6 +10825,11 @@ Type FuncDecl::getResultInterfaceType() const {
   return ErrorType::get(ctx);
 }
 
+std::optional<Type> FuncDecl::getCachedResultInterfaceType() const {
+  auto mutableThis = const_cast<FuncDecl *>(this);
+  return ResultTypeRequest{mutableThis}.getCachedResult();
+}
+
 bool FuncDecl::isUnaryOperator() const {
   if (!isOperator())
     return false;
@@ -11925,6 +11987,11 @@ Type MacroDecl::getResultInterfaceType() const {
   return ErrorType::get(ctx);
 }
 
+std::optional<Type> MacroDecl::getCachedResultInterfaceType() const {
+  auto mutableThis = const_cast<MacroDecl *>(this);
+  return ResultTypeRequest{mutableThis}.getCachedResult();
+}
+
 SourceRange MacroDecl::getSourceRange() const {
   SourceLoc endLoc = getNameLoc();
   if (parameterList)
@@ -12353,6 +12420,11 @@ CatchNode::getThrownErrorTypeInContext(ASTContext &ctx) const {
 Type CatchNode::getExplicitCaughtType(ASTContext &ctx) const {
   return evaluateOrDefault(
       ctx.evaluator, ExplicitCaughtTypeRequest{&ctx, *this}, Type());
+}
+
+std::optional<Type>
+CatchNode::getCachedExplicitCaughtType(ASTContext &ctx) const {
+  return ExplicitCaughtTypeRequest{&ctx, *this}.getCachedResult();
 }
 
 void swift::simple_display(llvm::raw_ostream &out, CatchNode catchNode) {

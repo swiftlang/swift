@@ -153,6 +153,13 @@ bool ValueBase::isLexical() const {
     return bbi->isLexical();
   if (auto *mvi = dyn_cast<MoveValueInst>(this))
     return mvi->isLexical();
+
+  // TODO: This is only a workaround. Optimizations should look through such instructions to
+  // get the isLexical state, instead of doing it here.
+  // rdar://143577158
+  if (auto *eilr = dyn_cast<EndInitLetRefInst>(this))
+    return eilr->getOperand()->isLexical();
+
   return false;
 }
 

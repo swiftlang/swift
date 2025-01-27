@@ -2084,18 +2084,19 @@ not replace this reference with a not uniquely reference object.
 
 For details see [Copy-on-Write Representation](SIL.md#Copy-on-Write-Representation).
 
-### is_escaping_closure
+### destroy_not_escaped_closure
 
 ```
-sil-instruction ::= 'is_escaping_closure' sil-operand
+sil-instruction ::= 'destroy_not_escaped_closure' sil-operand
 
-%1 = is_escaping_closure %0 : $@callee_guaranteed () -> ()
+%1 = destroy_not_escaped_closure %0 : $@callee_guaranteed () -> ()
 // %0 must be an escaping swift closure.
 // %1 will be of type Builtin.Int1
 ```
 
-Checks whether the context reference is not nil and bigger than one and
-returns true if it is.
+Checks if the closure context escaped and then destroys the context.
+The escape-check is done by checking if its reference count is exactly 1.
+Returns true if it is.
 
 ### copy_block
 
@@ -5551,3 +5552,21 @@ sil-instruction ::= 'has_symbol' sil-decl-ref
 Returns true if each of the underlying symbol addresses associated with
 the given declaration are non-null. This can be used to determine
 whether a weakly-imported declaration is available at runtime.
+
+## Miscellaneous instructions
+
+### ignored_use
+
+```none
+sil-instruction ::= 'ignored_use'
+```
+
+This instruction acts as a synthetic use instruction that suppresses unused
+variable warnings. In Swift the equivalent operation is '_ = x'. This
+importantly also provides a way to find the source location for '_ = x' when
+emitting SIL diagnostics. It is only legal in Raw SIL and is removed as dead
+code when we convert to Canonical SIL.
+
+DISCUSSION: Before the introduction of this instruction, in certain cases,
+SILGen would just not emit anything for '_ = x'... so one could not emit
+diagnostics upon this case.

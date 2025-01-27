@@ -2108,34 +2108,45 @@ Type RawLayoutAttr::getResolvedCountType(StructDecl *sd) const {
                            ErrorType::get(ctx));
 }
 
-#define INIT_VER_TUPLE(X) X(X.empty() ? std::optional<llvm::VersionTuple>() : X)
-
 AvailableAttr::AvailableAttr(
-    SourceLoc AtLoc, SourceRange Range, const AvailabilityDomain &Domain,
-    Kind Kind, StringRef Message, StringRef Rename,
+    SourceLoc AtLoc, SourceRange Range, AvailabilityDomain Domain,
+    SourceLoc DomainLoc, Kind Kind, StringRef Message, StringRef Rename,
     const llvm::VersionTuple &Introduced, SourceRange IntroducedRange,
     const llvm::VersionTuple &Deprecated, SourceRange DeprecatedRange,
     const llvm::VersionTuple &Obsoleted, SourceRange ObsoletedRange,
     bool Implicit, bool IsSPI)
     : DeclAttribute(DeclAttrKind::Available, AtLoc, Range, Implicit),
-      Domain(Domain), Message(Message), Rename(Rename),
-      INIT_VER_TUPLE(Introduced), IntroducedRange(IntroducedRange),
-      INIT_VER_TUPLE(Deprecated), DeprecatedRange(DeprecatedRange),
-      INIT_VER_TUPLE(Obsoleted), ObsoletedRange(ObsoletedRange) {
+      Domain(Domain), DomainLoc(DomainLoc), Message(Message), Rename(Rename),
+      Introduced(Introduced), IntroducedRange(IntroducedRange),
+      Deprecated(Deprecated), DeprecatedRange(DeprecatedRange),
+      Obsoleted(Obsoleted), ObsoletedRange(ObsoletedRange) {
   Bits.AvailableAttr.Kind = static_cast<uint8_t>(Kind);
-  Bits.AvailableAttr.HasComputedRenamedDecl = false;
-  Bits.AvailableAttr.HasRenamedDecl = false;
+  Bits.AvailableAttr.HasDomain = true;
   Bits.AvailableAttr.IsSPI = IsSPI;
 }
 
-#undef INIT_VER_TUPLE
+AvailableAttr::AvailableAttr(
+    SourceLoc AtLoc, SourceRange Range, StringRef DomainString,
+    SourceLoc DomainLoc, Kind Kind, StringRef Message, StringRef Rename,
+    const llvm::VersionTuple &Introduced, SourceRange IntroducedRange,
+    const llvm::VersionTuple &Deprecated, SourceRange DeprecatedRange,
+    const llvm::VersionTuple &Obsoleted, SourceRange ObsoletedRange,
+    bool Implicit, bool IsSPI)
+    : DeclAttribute(DeclAttrKind::Available, AtLoc, Range, Implicit),
+      DomainString(DomainString), DomainLoc(DomainLoc), Message(Message),
+      Rename(Rename), Introduced(Introduced), IntroducedRange(IntroducedRange),
+      Deprecated(Deprecated), DeprecatedRange(DeprecatedRange),
+      Obsoleted(Obsoleted), ObsoletedRange(ObsoletedRange) {
+  Bits.AvailableAttr.Kind = static_cast<uint8_t>(Kind);
+  Bits.AvailableAttr.IsSPI = IsSPI;
+}
 
 AvailableAttr *AvailableAttr::createUniversallyUnavailable(ASTContext &C,
                                                            StringRef Message,
                                                            StringRef Rename) {
   return new (C) AvailableAttr(
       SourceLoc(), SourceRange(), AvailabilityDomain::forUniversal(),
-      Kind::Unavailable, Message, Rename,
+      SourceLoc(), Kind::Unavailable, Message, Rename,
       /*Introduced=*/{}, SourceRange(), /*Deprecated=*/{}, SourceRange(),
       /*Obsoleted=*/{}, SourceRange(),
       /*Implicit=*/false,
@@ -2147,7 +2158,7 @@ AvailableAttr *AvailableAttr::createUniversallyDeprecated(ASTContext &C,
                                                           StringRef Rename) {
   return new (C) AvailableAttr(
       SourceLoc(), SourceRange(), AvailabilityDomain::forUniversal(),
-      Kind::Deprecated, Message, Rename,
+      SourceLoc(), Kind::Deprecated, Message, Rename,
       /*Introduced=*/{}, SourceRange(), /*Deprecated=*/{}, SourceRange(),
       /*Obsoleted=*/{}, SourceRange(),
       /*Implicit=*/false,
@@ -2159,7 +2170,7 @@ AvailableAttr *AvailableAttr::createUnavailableInSwift(ASTContext &C,
                                                        StringRef Rename) {
   return new (C) AvailableAttr(
       SourceLoc(), SourceRange(), AvailabilityDomain::forSwiftLanguage(),
-      Kind::Unavailable, Message, Rename,
+      SourceLoc(), Kind::Unavailable, Message, Rename,
       /*Introduced=*/{}, SourceRange(), /*Deprecated=*/{}, SourceRange(),
       /*Obsoleted=*/{}, SourceRange(),
       /*Implicit=*/false,
@@ -2171,7 +2182,7 @@ AvailableAttr *AvailableAttr::createSwiftLanguageModeVersioned(
     llvm::VersionTuple Introduced, llvm::VersionTuple Obsoleted) {
   return new (C) AvailableAttr(
       SourceLoc(), SourceRange(), AvailabilityDomain::forSwiftLanguage(),
-      Kind::Default, Message, Rename, Introduced, SourceRange(),
+      SourceLoc(), Kind::Default, Message, Rename, Introduced, SourceRange(),
       /*Deprecated=*/{}, SourceRange(), Obsoleted, SourceRange(),
       /*Implicit=*/false,
       /*SPI=*/false);
@@ -2183,8 +2194,8 @@ AvailableAttr *AvailableAttr::createPlatformVersioned(
     llvm::VersionTuple Obsoleted) {
   return new (C) AvailableAttr(
       SourceLoc(), SourceRange(), AvailabilityDomain::forPlatform(Platform),
-      Kind::Default, Message, Rename, Introduced, SourceRange(), Deprecated,
-      SourceRange(), Obsoleted, SourceRange(),
+      SourceLoc(), Kind::Default, Message, Rename, Introduced, SourceRange(),
+      Deprecated, SourceRange(), Obsoleted, SourceRange(),
       /*Implicit=*/false,
       /*SPI=*/false);
 }
@@ -2197,12 +2208,9 @@ bool BackDeployedAttr::isActivePlatform(const ASTContext &ctx,
 AvailableAttr *AvailableAttr::clone(ASTContext &C, bool implicit) const {
   return new (C) AvailableAttr(
       implicit ? SourceLoc() : AtLoc, implicit ? SourceRange() : getRange(),
-      Domain, getKind(), Message, Rename,
-      Introduced ? *Introduced : llvm::VersionTuple(),
-      implicit ? SourceRange() : IntroducedRange,
-      Deprecated ? *Deprecated : llvm::VersionTuple(),
-      implicit ? SourceRange() : DeprecatedRange,
-      Obsoleted ? *Obsoleted : llvm::VersionTuple(),
+      Domain, implicit ? SourceLoc() : DomainLoc, getKind(), Message, Rename,
+      Introduced, implicit ? SourceRange() : IntroducedRange, Deprecated,
+      implicit ? SourceRange() : DeprecatedRange, Obsoleted,
       implicit ? SourceRange() : ObsoletedRange, implicit, isSPI());
 }
 
@@ -2292,7 +2300,7 @@ SemanticAvailableAttr::getVersionAvailability(const ASTContext &ctx) const {
     return AvailableVersionComparison::Unavailable;
 
   llvm::VersionTuple queryVersion = getActiveVersion(ctx);
-  std::optional<llvm::VersionTuple> ObsoletedVersion = attr->Obsoleted;
+  std::optional<llvm::VersionTuple> ObsoletedVersion = getObsoleted();
 
   StringRef ObsoletedPlatform;
   llvm::VersionTuple RemappedObsoletedVersion;
@@ -2305,7 +2313,7 @@ SemanticAvailableAttr::getVersionAvailability(const ASTContext &ctx) const {
   if (ObsoletedVersion && *ObsoletedVersion <= queryVersion)
     return AvailableVersionComparison::Obsoleted;
 
-  std::optional<llvm::VersionTuple> IntroducedVersion = attr->Introduced;
+  std::optional<llvm::VersionTuple> IntroducedVersion = getIntroduced();
   StringRef IntroducedPlatform;
   llvm::VersionTuple RemappedIntroducedVersion;
   if (AvailabilityInference::updateIntroducedPlatformForFallback(
@@ -2732,6 +2740,14 @@ ImplementsAttr *ImplementsAttr::create(DeclContext *DC,
 ProtocolDecl *ImplementsAttr::getProtocol(DeclContext *dc) const {
   return evaluateOrDefault(dc->getASTContext().evaluator,
         ImplementsAttrProtocolRequest{this, dc}, nullptr);
+}
+
+std::optional<ProtocolDecl *>
+ImplementsAttr::getCachedProtocol(DeclContext *dc) const {
+  ImplementsAttrProtocolRequest request{this, dc};
+  if (dc->getASTContext().evaluator.hasCachedResult(request))
+    return getProtocol(dc);
+  return std::nullopt;
 }
 
 CustomAttr::CustomAttr(SourceLoc atLoc, SourceRange range, TypeExpr *type,

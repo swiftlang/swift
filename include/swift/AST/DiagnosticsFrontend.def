@@ -603,5 +603,15 @@ GROUPED_WARNING(command_line_conflicts_with_strict_safety,Unsafe,none,
       "'%0' is not memory-safe and should not be combined with "
       "strict memory safety checking", (StringRef))
 
+ERROR(json_zlib_not_supported,none,
+      "this compiler was not built with zlib compression support enabled; "
+      "'-dump-ast-format json-zlib' cannot be used", ())
+
+ERROR(ast_format_requires_dump_ast,none,
+      "structured AST formats are only supported when using -dump-ast", ())
+
+ERROR(unknown_dump_ast_format,none,
+      "unknown format '%0' requested with '-dump-ast-format'", (StringRef))
+
 #define UNDEFINE_DIAGNOSTIC_MACROS
 #include "DefineDiagnosticMacros.h"

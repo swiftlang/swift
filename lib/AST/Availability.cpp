@@ -191,9 +191,10 @@ static AvailableAttr *createAvailableAttr(AvailabilityDomain Domain,
       Inferred.Obsoleted.value_or(llvm::VersionTuple());
 
   return new (Context) AvailableAttr(
-      SourceLoc(), SourceRange(), Domain, Inferred.Kind, Inferred.Message,
-      Inferred.Rename, Introduced, SourceRange(), Deprecated, SourceRange(),
-      Obsoleted, SourceRange(), /*Implicit=*/true, Inferred.IsSPI);
+      SourceLoc(), SourceRange(), Domain, SourceLoc(), Inferred.Kind,
+      Inferred.Message, Inferred.Rename, Introduced, SourceRange(), Deprecated,
+      SourceRange(), Obsoleted, SourceRange(), /*Implicit=*/true,
+      Inferred.IsSPI);
 }
 
 void AvailabilityInference::applyInferredAvailableAttrs(
@@ -447,7 +448,9 @@ Decl::getSemanticAvailableAttrs(bool includeInactive) const {
 
 std::optional<SemanticAvailableAttr>
 Decl::getSemanticAvailableAttr(const AvailableAttr *attr) const {
-  return SemanticAvailableAttr(attr);
+  return evaluateOrDefault(getASTContext().evaluator,
+                           SemanticAvailableAttrRequest{attr, this},
+                           std::nullopt);
 }
 
 std::optional<SemanticAvailableAttr>
@@ -764,10 +767,12 @@ Decl::getAvailableAttrForPlatformIntroduction() const {
   // itself. This check relies on the fact that we cannot have nested
   // extensions.
 
-  DeclContext *DC = getDeclContext();
-  if (auto *ED = dyn_cast<ExtensionDecl>(DC)) {
-    if (auto attr = getDeclAvailableAttrForPlatformIntroduction(ED))
-      return attr;
+  if (auto parent =
+          AvailabilityInference::parentDeclForInferredAvailability(this)) {
+    if (auto *ED = dyn_cast<ExtensionDecl>(parent)) {
+      if (auto attr = getDeclAvailableAttrForPlatformIntroduction(ED))
+        return attr;
+    }
   }
 
   return std::nullopt;
@@ -792,10 +797,10 @@ SemanticAvailableAttr::getIntroducedRange(const ASTContext &Ctx) const {
   assert(getDomain().isActive(Ctx));
 
   auto *attr = getParsedAttr();
-  if (!attr->Introduced.has_value())
+  if (!attr->getRawIntroduced().has_value())
     return AvailabilityRange::alwaysAvailable();
 
-  llvm::VersionTuple IntroducedVersion = attr->Introduced.value();
+  llvm::VersionTuple IntroducedVersion = attr->getRawIntroduced().value();
   StringRef Platform;
   llvm::VersionTuple RemappedIntroducedVersion;
   if (AvailabilityInference::updateIntroducedPlatformForFallback(
@@ -878,7 +883,7 @@ AvailabilityRange ASTContext::getSwiftAvailability(unsigned major,
 #define PLATFORM_TEST_macOS     target.isMacOSX()
 #define PLATFORM_TEST_iOS       target.isiOS()
 #define PLATFORM_TEST_watchOS   target.isWatchOS()
-#define PLATFORM_TEST_xrOS      target.isXROS()
+#define PLATFORM_TEST_visionOS  target.isXROS()
 
 #define _SECOND(A, B) B
 #define SECOND(T) _SECOND T
@@ -893,7 +898,7 @@ AvailabilityRange ASTContext::getSwiftAvailability(unsigned major,
 #undef PLATFORM_TEST_macOS
 #undef PLATFORM_TEST_iOS
 #undef PLATFORM_TEST_watchOS
-#undef PLATFORM_TEST_xrOS
+#undef PLATFORM_TEST_visionOS
 #undef _SECOND
 #undef SECOND
 

@@ -304,6 +304,45 @@ SerializedModuleLoaderBase::getModuleName(ASTContext &Ctx, StringRef modulePath,
   return ModuleFile::getModuleName(Ctx, modulePath, Name);
 }
 
+std::optional<std::string> SerializedModuleLoaderBase::invalidModuleReason(serialization::Status status) {
+  using namespace serialization;
+  switch (status) {
+  case Status::FormatTooOld:
+    return "compiled with an older version of the compiler";
+  case Status::FormatTooNew:
+    return "compiled with a newer version of the compiler";
+  case Status::RevisionIncompatible:
+    return "compiled with a different version of the compiler";
+  case Status::ChannelIncompatible:
+    return "compiled for a different distribution channel";
+  case Status::NotInOSSA:
+    return "module was not built with OSSA";
+  case Status::MissingDependency:
+    return "missing dependency";
+  case Status::MissingUnderlyingModule:
+    return "missing underlying module";
+  case Status::CircularDependency:
+    return "circular dependency";
+  case Status::FailedToLoadBridgingHeader:
+    return "failed to load bridging header";
+  case Status::Malformed:
+    return "malformed";
+  case Status::MalformedDocumentation:
+    return "malformed documentation";
+  case Status::NameMismatch:
+    return "name mismatch";
+  case Status::TargetIncompatible:
+    return "compiled for a different target platform";
+  case Status::TargetTooNew:
+    return "target platform newer than current platform";
+  case Status::SDKMismatch:
+    return "SDK does not match";
+  case Status::Valid:
+    return std::nullopt;
+  }
+  llvm_unreachable("bad status");
+}
+
 llvm::ErrorOr<llvm::StringSet<>>
 SerializedModuleLoaderBase::getMatchingPackageOnlyImportsOfModule(
     Twine modulePath, bool isFramework, bool isRequiredOSSAModules,
@@ -504,7 +543,8 @@ SerializedModuleLoaderBase::resolveMacroPlugin(const ExternalMacroPlugin &macro,
 
 llvm::ErrorOr<ModuleDependencyInfo>
 SerializedModuleLoaderBase::scanModuleFile(Twine modulePath, bool isFramework,
-                                           bool isTestableImport) {
+                                           bool isTestableImport,
+                                           bool isCandidateForTextualModule) {
   const std::string moduleDocPath;
   const std::string sourceInfoPath;
 
@@ -521,10 +561,19 @@ SerializedModuleLoaderBase::scanModuleFile(Twine modulePath, bool isFramework,
 
   if (Ctx.SearchPathOpts.ScannerModuleValidation) {
     // If failed to load, just ignore and return do not found.
-    if (loadInfo.status != serialization::Status::Valid) {
+    if (auto loadFailureReason = invalidModuleReason(loadInfo.status)) {
+      // If no textual interface was found, then for this dependency
+      // scanning query this was *the* module discovered, which means
+      // it would be helpful to let the user know why the scanner
+      // was not able to use it because the scan will ultimately fail to
+      // resolve this dependency due to this incompatibility.
+      if (!isCandidateForTextualModule)
+        Ctx.Diags.diagnose(SourceLoc(), diag::dependency_scan_module_incompatible,
+                           modulePath.str(), loadFailureReason.value());
+
       if (Ctx.LangOpts.EnableModuleLoadingRemarks)
-        Ctx.Diags.diagnose(SourceLoc(), diag::skip_module_invalid,
-                           modulePath.str());
+        Ctx.Diags.diagnose(SourceLoc(), diag::dependency_scan_skip_module_invalid,
+                           modulePath.str(), loadFailureReason.value());
       return std::make_error_code(std::errc::no_such_file_or_directory);
     }
 

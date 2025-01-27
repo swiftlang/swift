@@ -158,6 +158,10 @@ BridgedSourceLoc BridgedDeclObj::Value_getNameLoc() const {
   return BridgedSourceLoc(getAs<swift::ValueDecl>()->getNameLoc().getOpaquePointerValue());
 }
 
+bool BridgedDeclObj::hasClangNode() const {
+  return unbridged()->hasClangNode();
+}
+
 bool BridgedDeclObj::Value_isObjC() const {
   return getAs<swift::ValueDecl>()->isObjC();
 }

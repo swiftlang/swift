@@ -3566,7 +3566,7 @@ RecursiveTypeProperties ArchetypeType::archetypeProperties(
   properties |= subs.getRecursiveProperties();
 
   for (auto proto : conformsTo) {
-    if (proto->isUnsafe()) {
+    if (proto->getExplicitSafety() == ExplicitSafety::Unsafe) {
       properties |= RecursiveTypeProperties::IsUnsafe;
       break;
     }
