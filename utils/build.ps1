@@ -229,6 +229,7 @@ $ArchX64 = @{
   XCTestInstallRoot = "$BinaryCache\x64\Windows.platform\Developer\Library\XCTest-development";
   SwiftTestingInstallRoot = "$BinaryCache\x64\Windows.platform\Developer\Library\Testing-development";
   ToolchainInstallRoot = "$BinaryCache\x64\toolchains\$ProductVersion+Asserts";
+  Cache = @{};
 }
 
 $ArchX86 = @{
@@ -244,6 +245,7 @@ $ArchX86 = @{
   SDKInstallRoot = "$BinaryCache\x86\Windows.platform\Developer\SDKs\Windows.sdk";
   XCTestInstallRoot = "$BinaryCache\x86\Windows.platform\Developer\Library\XCTest-development";
   SwiftTestingInstallRoot = "$BinaryCache\x86\Windows.platform\Developer\Library\Testing-development";
+  Cache = @{};
 }
 
 $ArchARM64 = @{
@@ -260,6 +262,7 @@ $ArchARM64 = @{
   XCTestInstallRoot = "$BinaryCache\arm64\Windows.platform\Developer\Library\XCTest-development";
   ToolchainInstallRoot = "$BinaryCache\arm64\toolchains\$ProductVersion+Asserts";
   SwiftTestingInstallRoot = "$BinaryCache\arm64\Windows.platform\Developer\Library\Testing-development";
+  Cache = @{};
 }
 
 $AndroidARM64 = @{
@@ -275,6 +278,7 @@ $AndroidARM64 = @{
   SDKInstallRoot = "$BinaryCache\arm64\Android.platform\Developer\SDKs\Android.sdk";
   XCTestInstallRoot = "$BinaryCache\arm64\Android.platform\Developer\Library\XCTest-development";
   SwiftTestingInstallRoot = "$BinaryCache\arm64\Android.platform\Developer\Library\Testing-development";
+  Cache = @{};
 }
 
 $AndroidARMv7 = @{
@@ -290,6 +294,7 @@ $AndroidARMv7 = @{
   SDKInstallRoot = "$BinaryCache\armv7\Android.platform\Developer\SDKs\Android.sdk";
   XCTestInstallRoot = "$BinaryCache\armv7\Android.platform\Developer\Library\XCTest-development";
   SwiftTestingInstallRoot = "$BinaryCache\armv7\Android.platform\Developer\Library\Testing-development";
+  Cache = @{};
 }
 
 $AndroidX86 = @{
@@ -305,6 +310,7 @@ $AndroidX86 = @{
   SDKInstallRoot = "$BinaryCache\x86\Android.platform\Developer\SDKs\Android.sdk";
   XCTestInstallRoot = "$BinaryCache\x86\Android.platform\Developer\Library\XCTest-development";
   SwiftTestingInstallRoot = "$BinaryCache\x86\Android.platform\Developer\Library\Testing-development";
+  Cache = @{};
 }
 
 $AndroidX64 = @{
@@ -320,6 +326,7 @@ $AndroidX64 = @{
   SDKInstallRoot = "$BinaryCache\x64\Android.platform\Developer\SDKs\Android.sdk";
   XCTestInstallRoot = "$BinaryCache\x64\Android.platform\Developer\Library\XCTest-development";
   SwiftTestingInstallRoot = "$BinaryCache\x64\Android.platform\Developer\Library\Testing-development";
+  Cache = @{};
 }
 
 $HostArch = switch ($HostArchName) {
@@ -479,14 +486,14 @@ function Get-BuildProjectCMakeModules([BuildComponent]$Project) {
 }
 
 function Get-TargetInfo($Arch) {
-  # Cache the result of "swift -print-target-info" as $Arch.targetInfo
-  $key = "targetInfo"
-  if (-not $Arch.ContainsKey($key)) {
+  # Cache the result of "swift -print-target-info" as $Arch.TargetInfo
+  $cacheKey = "TargetInfo"
+  if (-not $Arch.Cache.ContainsKey($cacheKey)) {
     $swiftExe = Join-Path -Path (Get-PinnedToolchainTool) -ChildPath "swift.exe"
     $targetInfoJson = & $swiftExe -target $Arch.LLVMTarget -print-target-info
-    $Arch[$key] = $targetInfoJson | ConvertFrom-Json
+    $Arch.Cache[$cacheKey] = $targetInfoJson | ConvertFrom-Json
   }
-  return $Arch[$key]
+  return $Arch.Cache[$cacheKey]
 }
 
 function Get-ModuleTriple($Arch) {
