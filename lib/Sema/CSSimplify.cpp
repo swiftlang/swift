@@ -7392,28 +7392,18 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
         // Look through all value-to-optional promotions to allow
         // conversions like Double -> CGFloat?? and vice versa.
         // T -> Optional<T>
-        if (location.endsWith<LocatorPathElt::OptionalPayload>()) {
+        if (location.endsWith<LocatorPathElt::OptionalPayload>() ||
+            location.endsWith<LocatorPathElt::GenericArgument>()) {
           SmallVector<LocatorPathElt, 4> path;
           auto anchor = location.getLocatorParts(path);
 
-          // An attempt at Double/CGFloat conversion through
-          // optional chaining. This is not supported at the
-          // moment because solution application doesn't know
-          // how to map Double to/from CGFloat through optionals.
-          if (isExpr<OptionalEvaluationExpr>(anchor)) {
-            if (!shouldAttemptFixes())
-              return getTypeMatchFailure(locator);
-
-            conversionsOrFixes.push_back(ContextualMismatch::create(
-                *this, nominal1, nominal2, getConstraintLocator(locator)));
-            break;
-          }
-
-          // Drop all of the applied `value-to-optional` promotions.
+          // Drop all of the applied `value-to-optional` and
+          // `optional-to-optional` conversions.
           path.erase(llvm::remove_if(
                          path,
                          [](const LocatorPathElt &elt) {
-                           return elt.is<LocatorPathElt::OptionalPayload>();
+                           return elt.is<LocatorPathElt::OptionalPayload>() ||
+                                  elt.is<LocatorPathElt::GenericArgument>();
                          }),
                      path.end());
 
