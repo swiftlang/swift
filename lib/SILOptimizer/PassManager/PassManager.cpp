@@ -488,16 +488,35 @@ bool SILPassManager::continueTransforming() {
   return NumPassesRun < maxNumPassesToRun;
 }
 
-bool SILPassManager::continueWithNextSubpassRun(SILInstruction *forInst,
-                                                SILFunction *function,
-                                                SILTransform *trans) {
+bool SILPassManager::continueWithNextSubpassRun(
+    std::optional<Transformee> origTransformee, SILFunction *function,
+    SILTransform *trans) {
+  // Rewrite .some(nullptr) as .none.
+  std::optional<llvm::PointerUnion<SILValue, SILInstruction *>> forTransformee;
+  if (origTransformee) {
+    auto forValue = dyn_cast<SILValue>(*origTransformee);
+    if (forValue) {
+      forTransformee = forValue;
+    } else if (auto *forInst = cast<SILInstruction *>(*origTransformee)) {
+      forTransformee = forInst;
+    }
+  }
+
   unsigned subPass = numSubpassesRun++;
 
-  if (forInst && isFunctionSelectedForPrinting(function) &&
-      SILPrintEverySubpass) {
+  if (isFunctionSelectedForPrinting(function) && SILPrintEverySubpass) {
     dumpPassInfo("*** SIL function before ", trans, function);
-    if (forInst) {
-      llvm::dbgs() << "  *** sub-pass " << subPass << " for " << *forInst;
+    llvm::dbgs() << "  *** sub-pass " << subPass << " for ";
+    if (forTransformee) {
+      auto forValue = dyn_cast<SILValue>(*forTransformee);
+      if (forValue) {
+        llvm::dbgs() << forValue;
+      } else {
+        auto *forInst = cast<SILInstruction *>(*forTransformee);
+        llvm::dbgs() << *forInst;
+      }
+    } else {
+      llvm::dbgs() << "???\n";
     }
     function->dump(getOptions().EmitVerboseSIL);
   }
@@ -509,8 +528,16 @@ bool SILPassManager::continueWithNextSubpassRun(SILInstruction *forInst,
 
   if (subPass == maxNumSubpassesToRun - 1 && SILPrintLast) {
     dumpPassInfo("*** SIL function before ", trans, function);
-    if (forInst) {
-      llvm::dbgs() << "  *** sub-pass " << subPass << " for " << *forInst;
+    if (forTransformee) {
+      auto forValue = dyn_cast<SILValue>(*forTransformee);
+      if (forValue) {
+        llvm::dbgs() << forValue;
+      } else {
+        auto *forInst = cast<SILInstruction *>(*forTransformee);
+        llvm::dbgs() << *forInst;
+      }
+    } else {
+      llvm::dbgs() << "???\n";
     }
     function->dump(getOptions().EmitVerboseSIL);
   }
