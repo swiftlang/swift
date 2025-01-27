@@ -3925,6 +3925,9 @@ namespace {
           }
           if (selfIdx) {
             func->setSelfIndex(selfIdx.value());
+            if (func->getASTContext().LangOpts.hasFeature(
+                    Feature::AddressableParameters))
+              func->getImplicitSelfDecl()->setAddressable();
           } else {
             func->setStatic();
             func->setImportAsStaticMember();
