@@ -69,3 +69,28 @@ func testPreconcurrencyDowngrade(ns: NotSendable) {
     // expected-complete-warning@-1 {{mutation of captured var 'x' in concurrently-executing code}}
   }
 }
+
+// rdar://136766795
+do {
+  class Class {
+    static func test() -> @Sendable () -> Void {
+      {
+        // OK, an unbound reference is sendable.
+        let _ = Class.method
+      }
+    }
+
+    func method() {}
+  }
+}
+
+do {
+  class Class {}
+  // expected-complete-note@-1 {{class 'Class' does not conform to the 'Sendable' protocol}}
+
+  func test(_: @autoclosure @Sendable () -> Class) {}
+
+  let c: Class
+  test(c)
+  // expected-complete-warning@-1:8 {{implicit capture of 'c' requires that 'Class' conforms to `Sendable`; this is an error in the Swift 6 language mode}}
+}
