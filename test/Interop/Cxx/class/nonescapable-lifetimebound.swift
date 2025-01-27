@@ -23,7 +23,6 @@ private:
 };
 
 struct SWIFT_NONESCAPABLE OtherView {
-    OtherView() : member(nullptr) {}
     OtherView(View v [[clang::lifetimebound]]) : member(v.member) {}
     OtherView(const OtherView&) = default;
 private:
@@ -105,6 +104,10 @@ CaptureView getCaptureView(const Owner& owner [[clang::lifetimebound]]) {
     return CaptureView(View{&owner.data});
 }
 
+struct SWIFT_NONESCAPABLE AggregateView {
+    const int *member;
+};
+
 // CHECK: sil [clang makeOwner] {{.*}}: $@convention(c) () -> Owner
 // CHECK: sil [clang getView] {{.*}} : $@convention(c) (@in_guaranteed Owner) -> @lifetime(borrow 0) @owned View
 // CHECK: sil [clang getViewFromFirst] {{.*}} : $@convention(c) (@in_guaranteed Owner, @in_guaranteed Owner) -> @lifetime(borrow 0) @owned View
@@ -120,18 +123,20 @@ CaptureView getCaptureView(const Owner& owner [[clang::lifetimebound]]) {
 // CHECK: sil [clang CaptureView.captureView] {{.*}} : $@convention(cxx_method) (View, @lifetime(copy 0) @inout CaptureView) -> ()
 // CHECK: sil [clang CaptureView.handOut] {{.*}} : $@convention(cxx_method) (@lifetime(copy 1) @inout View, @in_guaranteed CaptureView) -> ()
 
-// CHECK-NO-LIFETIMES: nonescapable.h:36:6: error: returning ~Escapable type requires '-enable-experimental-feature LifetimeDependence'
-// CHECK-NO-LIFETIMES: nonescapable.h:40:6: error: returning ~Escapable type requires '-enable-experimental-feature LifetimeDependence'
-// CHECK-NO-LIFETIMES: nonescapable.h:46:6: error: returning ~Escapable type requires '-enable-experimental-feature LifetimeDependence'
-// CHECK-NO-LIFETIMES: nonescapable.h:53:6: error: returning ~Escapable type requires '-enable-experimental-feature LifetimeDependence'
-// CHECK-NO-LIFETIMES: nonescapable.h:23:10: error: returning ~Escapable type requires '-enable-experimental-feature LifetimeDependence'
-// CHECK-NO-LIFETIMES: nonescapable.h:27:10: error: returning ~Escapable type requires '-enable-experimental-feature LifetimeDependence'
+// CHECK-NO-LIFETIMES: nonescapable.h:35:6: error: returning ~Escapable type requires '-enable-experimental-feature LifetimeDependence'
+// CHECK-NO-LIFETIMES: nonescapable.h:39:6: error: returning ~Escapable type requires '-enable-experimental-feature LifetimeDependence'
+// CHECK-NO-LIFETIMES: nonescapable.h:45:6: error: returning ~Escapable type requires '-enable-experimental-feature LifetimeDependence'
+// CHECK-NO-LIFETIMES: nonescapable.h:52:6: error: returning ~Escapable type requires '-enable-experimental-feature LifetimeDependence'
+// CHECK-NO-LIFETIMES: nonescapable.h:22:10: error: returning ~Escapable type requires '-enable-experimental-feature LifetimeDependence'
+// CHECK-NO-LIFETIMES: nonescapable.h:26:10: error: returning ~Escapable type requires '-enable-experimental-feature LifetimeDependence'
 // CHECK-NO-LIFETIMES: nonescapable.h:4:5: error: returning ~Escapable type requires '-enable-experimental-feature LifetimeDependence'
 // CHECK-NO-LIFETIMES: nonescapable.h:5:5: error: returning ~Escapable type requires '-enable-experimental-feature LifetimeDependence'
 // CHECK-NO-LIFETIMES: nonescapable.h:13:5: error: returning ~Escapable type requires '-enable-experimental-feature LifetimeDependence'
-// CHECK-NO-LIFETIMES: nonescapable.h:14:5: error: returning ~Escapable type requires '-enable-experimental-feature LifetimeDependence'
-// CHECK-NO-LIFETIMES: nonescapable.h:68:6: error: returning ~Escapable type requires '-enable-experimental-feature LifetimeDependence'
-// CHECK-NO-LIFETIMES: nonescapable.h:91:13: error: returning ~Escapable type requires '-enable-experimental-feature LifetimeDependence'
+// CHECK-NO-LIFETIMES: nonescapable.h:12:27: error: returning ~Escapable type requires '-enable-experimental-feature LifetimeDependence'
+// CHECK-NO-LIFETIMES: nonescapable.h:67:6: error: returning ~Escapable type requires '-enable-experimental-feature LifetimeDependence'
+// CHECK-NO-LIFETIMES: nonescapable.h:90:13: error: returning ~Escapable type requires '-enable-experimental-feature LifetimeDependence'
+// CHECK-NO-LIFETIMES: nonescapable.h:94:27: error: returning ~Escapable type requires '-enable-experimental-feature LifetimeDependence'
+// CHECK-NO-LIFETIMES: nonescapable.h:94:27: error: returning ~Escapable type requires '-enable-experimental-feature LifetimeDependence'
 // CHECK-NO-LIFETIMES-NOT: error
 
 //--- test.swift
@@ -154,4 +159,8 @@ public func test() {
     var cv = getCaptureView(o)
     cv.captureView(v1)
     cv.handOut(&v1)
+}
+
+public func test2(_ x: AggregateView) {
+    let _ = AggregateView(member: x.member)
 }
