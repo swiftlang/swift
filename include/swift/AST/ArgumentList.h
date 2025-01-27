@@ -269,8 +269,11 @@ public:
 
   /// Create a new implicit ArgumentList with a single labeled argument
   /// expression.
-  static ArgumentList *forImplicitSingle(ASTContext &ctx, Identifier label,
-                                         Expr *arg);
+  ///
+  /// \param loc The source location to associate with the implicit argument
+  /// list for diagnostics.
+  static ArgumentList *forImplicitSingle(ASTContext &ctx, SourceLoc loc,
+                                         Identifier label, Expr *arg);
 
   /// Create a new implicit ArgumentList with a set of unlabeled arguments.
   static ArgumentList *forImplicitUnlabeled(ASTContext &ctx,

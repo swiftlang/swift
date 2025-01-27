@@ -4199,6 +4199,10 @@ namespace {
                 isolation, decl)
               .warnUntilSwiftVersionIf(downgrade, 6);
 
+            if (keyPath->isImplicit()) {
+              decl->diagnose(diag::decl_declared_here, decl);
+            }
+
             diagnosed = !downgrade;
             break;
           }
