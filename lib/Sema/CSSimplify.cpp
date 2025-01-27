@@ -15843,8 +15843,8 @@ ConstraintSystem::addKeyPathApplicationRootConstraint(Type root, ConstraintLocat
   if (!typeVar)
     return;
 
-  auto constraints = CG.gatherConstraints(
-      typeVar, ConstraintGraph::GatheringKind::EquivalenceClass,
+  auto constraints = CG.gatherNearbyConstraints(
+      typeVar,
       [&keyPathExpr](Constraint *constraint) -> bool {
         if (constraint->getKind() != ConstraintKind::KeyPath)
           return false;
