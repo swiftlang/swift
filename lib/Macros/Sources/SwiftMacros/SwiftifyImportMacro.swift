@@ -10,6 +10,7 @@ import SwiftSyntaxMacros
 enum SwiftifyExpr: Hashable {
   case param(_ index: Int)
   case `return`
+  case `self`
 }
 
 extension SwiftifyExpr: CustomStringConvertible {
@@ -17,6 +18,7 @@ extension SwiftifyExpr: CustomStringConvertible {
     switch self {
     case .param(let index): return ".param(\(index))"
     case .return: return ".return"
+    case .self: return ".self"
     }
   }
 }
@@ -26,7 +28,7 @@ enum DependenceType {
 }
 
 struct LifetimeDependence {
-  let dependsOn: Int
+  let dependsOn: SwiftifyExpr
   let type: DependenceType
 }
 
@@ -48,6 +50,8 @@ func tryGetParamName(_ funcDecl: FunctionDeclSyntax, _ expr: SwiftifyExpr) -> To
   case .param(let i):
     let funcParam = getParam(funcDecl, i - 1)
     return funcParam.secondName ?? funcParam.firstName
+  case .`self`:
+    return .keyword(.self)
   default: return nil
   }
 }
@@ -59,6 +63,8 @@ func getSwiftifyExprType(_ funcDecl: FunctionDeclSyntax, _ expr: SwiftifyExpr) -
     return funcParam.type
   case .return:
     return funcDecl.signature.returnClause!.type
+  case .self:
+    return TypeSyntax(IdentifierTypeSyntax(name: TokenSyntax("Self")))
   }
 }
 
@@ -84,6 +90,8 @@ struct CxxSpan: ParamInfo {
     case .return:
       return CxxSpanReturnThunkBuilder(base: base, signature: funcDecl.signature,
         typeMappings: typeMappings, node: original)
+    case .self:
+      return base
     }
   }
 }
@@ -118,6 +126,8 @@ struct CountedBy: ParamInfo {
         base: base, countExpr: count,
         signature: funcDecl.signature,
         nonescaping: nonescaping, isSizedBy: sizedBy)
+    case .self:
+      return base
     }
   }
 }
@@ -315,8 +325,9 @@ struct FunctionCallBuilder: BoundsCheckedThunkBuilder {
     }.map { (i: Int, e: FunctionParameterSyntax) in
       e.with(\.type, (argTypes[i] ?? e.type)!)
     }
-    let last = newParams.popLast()!
-    newParams.append(last.with(\.trailingComma, nil))
+    if let last = newParams.popLast() {
+      newParams.append(last.with(\.trailingComma, nil))
+    }
 
     var sig = base.signature.with(\.parameterClause.parameters, FunctionParameterListSyntax(newParams))
     if returnType != nil {
@@ -755,9 +766,10 @@ public struct SwiftifyImportMacro: PeerMacro {
       let pointerParamIndex: Int = try getIntLiteralValue(pointerParamIndexArg.expression)
       return .param(pointerParamIndex)
     case "return": return .return
+    case "self": return .`self`
     default:
       throw DiagnosticError(
-        "expected 'param' or 'return', got '\(enumName)'",
+        "expected 'param', 'return', or 'self', got '\(enumName)'",
         node: expr)
     }
   }
@@ -823,7 +835,11 @@ public struct SwiftifyImportMacro: PeerMacro {
   static func parseLifetimeDependence(_ enumConstructorExpr: FunctionCallExprSyntax) throws -> (SwiftifyExpr, LifetimeDependence) {
     let argumentList = enumConstructorExpr.arguments
     let pointer: SwiftifyExpr = try parseSwiftifyExpr(try getArgumentByName(argumentList, "pointer"))
-    let dependsOn: Int = try getIntLiteralValue(try getArgumentByName(argumentList, "dependsOn"))
+    let dependsOnArg = try getArgumentByName(argumentList, "dependsOn")
+    let dependsOn: SwiftifyExpr = try parseSwiftifyExpr(dependsOnArg)
+    if dependsOn == .`return` {
+        throw DiagnosticError("lifetime cannot depend on the return value", node: dependsOnArg)
+    }
     let type = try getArgumentByName(argumentList, "type") 
     let depType: DependenceType
     switch try parseEnumName(type) {
@@ -917,8 +933,9 @@ public struct SwiftifyImportMacro: PeerMacro {
       let (expr, dependence) = try parseLifetimeDependence(enumConstructorExpr)
       lifetimeDependencies[expr, default: []].append(dependence)
       // We assume pointers annotated with lifetimebound do not escape.
-      if dependence.type == DependenceType.copy {
-        nonescapingPointers.insert(dependence.dependsOn)
+      let fromIdx = paramOrReturnIndex(dependence.dependsOn)
+      if dependence.type == DependenceType.copy && fromIdx != 0 {
+        nonescapingPointers.insert(fromIdx)
       }
       // The escaping is controlled when a parameter is the target of a lifetimebound.
       // So we want to do the transformation to Swift's Span.
@@ -987,6 +1004,8 @@ public struct SwiftifyImportMacro: PeerMacro {
           "multiple _SwiftifyInfos referring to return value: \(pointerInfo) and \(ret!)", node: pointerInfo.original)
       }
       ret = pointerInfo
+      case .self:
+        throw DiagnosticError("do not annotate self", node: pointerInfo.original)
       }
     }
   }
@@ -994,6 +1013,7 @@ public struct SwiftifyImportMacro: PeerMacro {
   static func paramOrReturnIndex(_ expr: SwiftifyExpr) -> Int {
     switch expr {
     case .param(let i): return i
+    case .`self`: return 0
     case .return: return -1
     }
   }
@@ -1029,7 +1049,7 @@ public struct SwiftifyImportMacro: PeerMacro {
           DeclReferenceExprSyntax(baseName: TokenSyntax("borrow"))))
       }
       args.append(LabeledExprSyntax(expression: 
-        DeclReferenceExprSyntax(baseName: TokenSyntax(tryGetParamName(funcDecl, .param(dependence.dependsOn)))!),
+        DeclReferenceExprSyntax(baseName: TokenSyntax(tryGetParamName(funcDecl, dependence.dependsOn))!),
         trailingComma: .commaToken()))
     }
     args[args.count - 1] = args[args.count - 1].with(\.trailingComma, nil)

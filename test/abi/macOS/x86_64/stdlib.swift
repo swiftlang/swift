@@ -803,6 +803,7 @@ Added: _$ss7RawSpanVN
 // _SwiftifyInfo enum for _SwiftifyImports macro
 Added: _$ss13_SwiftifyExprO5paramyABSicABmFWC
 Added: _$ss13_SwiftifyExprO6returnyA2BmFWC
+Added: _$ss13_SwiftifyExprO4selfyA2BmFWC
 Added: _$ss13_SwiftifyExprOMa
 Added: _$ss13_SwiftifyExprOMn
 Added: _$ss13_SwiftifyExprON
@@ -810,7 +811,7 @@ Added: _$ss13_SwiftifyInfoO11nonescapingyABs01_A4ExprO_tcABmFWC
 Added: _$ss13_SwiftifyInfoO7endedByyABs01_A4ExprO_SitcABmFWC
 Added: _$ss13_SwiftifyInfoO7sizedByyABs01_A4ExprO_SStcABmFWC
 Added: _$ss13_SwiftifyInfoO9countedByyABs01_A4ExprO_SStcABmFWC
-Added: _$ss13_SwiftifyInfoO18lifetimeDependenceyABSi_s01_A4ExprOs01_D4TypeOtcABmFWC
+Added: _$ss13_SwiftifyInfoO18lifetimeDependenceyABs01_A4ExprO_AEs01_D4TypeOtcABmFWC
 Added: _$ss13_SwiftifyInfoOMa
 Added: _$ss13_SwiftifyInfoOMn
 Added: _$ss13_SwiftifyInfoON
