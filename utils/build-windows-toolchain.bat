@@ -77,8 +77,6 @@ powershell.exe -ExecutionPolicy RemoteSigned -File %~dp0build.ps1 ^
   -ImageRoot %BuildRoot% ^
   %SkipPackagingArg% ^
   %TestArg% ^
-  -AndroidSDKs x86_64 ^
-  -WindowsSDKs X64 ^
   -Stage %PackageRoot% ^
   -Summary || (exit /b 1)
 
