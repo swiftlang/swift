@@ -598,7 +598,7 @@ function Invoke-VsDevShell($Arch) {
   if ($ToBatch) {
     Write-Output "call `"$VSInstallRoot\Common7\Tools\VsDevCmd.bat`" $DevCmdArguments"
   } else {
-    # This dll path is valid for VS2019 and VS2022, but it was under a vsdevcmd subfolder in VS2017 
+    # This dll path is valid for VS2019 and VS2022, but it was under a vsdevcmd subfolder in VS2017
     Import-Module "$VSInstallRoot\Common7\Tools\Microsoft.VisualStudio.DevShell.dll"
     Enter-VsDevShell -VsInstallPath $VSInstallRoot -SkipAutomaticLocation -DevCmdArguments $DevCmdArguments
 
@@ -679,7 +679,6 @@ function Fetch-Dependencies {
     New-Item -ItemType Directory -ErrorAction Ignore -Path $BinaryCache | Out-Null
     Expand-Archive -Path $source -DestinationPath $destination -Force
   }
-
 
   function Extract-Toolchain {
     param
@@ -1400,7 +1399,7 @@ function Build-WiXProject() {
   $ProductVersionArg = $ProductVersion
   if (-not $Bundle) {
     # WiX v4 will accept a semantic version string for Bundles,
-    # but Packages still require a purely numerical version number, 
+    # but Packages still require a purely numerical version number,
     # so trim any semantic versioning suffixes
     $ProductVersionArg = [regex]::Replace($ProductVersion, "[-+].*", "")
   }
@@ -2603,7 +2602,7 @@ function Test-Format {
     "-Xswiftc", "-I$(Get-HostProjectBinaryCache Format)\swift",
     "-Xlinker", "-L$(Get-HostProjectBinaryCache Format)\lib"
   )
-  
+
   Isolate-EnvVars {
     $env:SWIFTFORMAT_BUILD_ONLY_TESTS=1
     # Testing swift-format is faster in serial mode than in parallel mode, probably because parallel test execution
