@@ -8796,7 +8796,8 @@ public:
 
   void printLifetimeboundReturn(int idx, bool borrow) {
     printSeparator();
-    out << ".lifetimeDependence(dependsOn: " << (idx + 1);
+    out << ".lifetimeDependence(dependsOn: ";
+    printParamOrReturn(idx);
     out << ", pointer: .return, type: ";
     out << (borrow ? ".borrow" : ".copy");
     out << ")";
@@ -8825,7 +8826,9 @@ private:
   }
 
   void printParamOrReturn(ssize_t pointerIndex) {
-    if (pointerIndex == -1)
+    if (pointerIndex == -2)
+      out << ".self";
+    else if (pointerIndex == -1)
       out << ".return";
     else
       out << ".param(" << pointerIndex + 1 << ")";
@@ -8866,15 +8869,21 @@ void ClangImporter::Implementation::importSpanAttributes(FuncDecl *MappedDecl) {
                              ->getDesugaredType()
                              ->getString()));
     }
+    bool lifetimeDependenceOn = MappedDecl->getASTContext().LangOpts.hasFeature(
+        Feature::LifetimeDependence);
+    if (SwiftDeclConverter::getImplicitObjectParamAnnotation<
+            clang::LifetimeBoundAttr>(ClangDecl) &&
+        lifetimeDependenceOn && returnIsSpan) {
+      printer.printLifetimeboundReturn(-2, true);
+      attachMacro = true;
+    }
     for (auto [index, param] : llvm::enumerate(ClangDecl->parameters())) {
       auto paramTy = param->getType();
       const auto *decl = paramTy->getAsTagDecl();
       auto swiftParam = MappedDecl->getParameters()->get(index);
       bool isSpan =
           decl && decl->isInStdNamespace() && decl->getName() == "span";
-      if (param->hasAttr<clang::LifetimeBoundAttr>() &&
-          MappedDecl->getASTContext().LangOpts.hasFeature(
-              Feature::LifetimeDependence) &&
+      if (param->hasAttr<clang::LifetimeBoundAttr>() && lifetimeDependenceOn &&
           (isSpan || returnIsSpan)) {
         printer.printLifetimeboundReturn(
             index, !isSpan && swiftParam->getInterfaceType()->isEscapable());
