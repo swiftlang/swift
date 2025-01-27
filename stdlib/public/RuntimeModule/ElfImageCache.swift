@@ -66,7 +66,7 @@ final class ElfImageCache {
     return nil
   }
 
-  private static var key: pthread_key_t? = {
+  private static var key: pthread_key_t = {
     var theKey = pthread_key_t()
     let err = pthread_key_create(
       &theKey,
@@ -78,15 +78,15 @@ final class ElfImageCache {
       }
     )
     if err != 0 {
-      return nil
+      fatalError("Unable to create TSD key for ElfImageCache")
     }
     return theKey
   }()
 
   static var threadLocal: ElfImageCache {
-    guard let rawPtr = pthread_getspecific(key!) else {
+    guard let rawPtr = pthread_getspecific(key) else {
       let cache = Unmanaged<ElfImageCache>.passRetained(ElfImageCache())
-      pthread_setspecific(key!, cache.toOpaque())
+      pthread_setspecific(key, cache.toOpaque())
       return cache.takeUnretainedValue()
     }
     let cache = Unmanaged<ElfImageCache>.fromOpaque(rawPtr)

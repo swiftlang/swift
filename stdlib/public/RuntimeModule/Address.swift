@@ -148,13 +148,13 @@ extension Backtrace.Address {
         return T(0)
       case let .sixteenBit(addr):
         guard T.bitWidth >= 16 else { return nil }
-        return T(addr)
+        return T(truncatingIfNeeded: addr)
       case let .thirtyTwoBit(addr):
         guard T.bitWidth >= 32 else { return nil }
-        return T(addr)
+        return T(truncatingIfNeeded: addr)
       case let .sixtyFourBit(addr):
         guard T.bitWidth >= 64 else { return nil }
-        return T(addr)
+        return T(truncatingIfNeeded: addr)
     }
   }
 }
@@ -204,11 +204,11 @@ extension Backtrace.Address {
   public init?<T: FixedWidthInteger>(_ value: T) {
     switch T.bitWidth {
       case 16:
-        self.init(UInt16(value))
+        self.init(UInt16(truncatingIfNeeded: value))
       case 32:
-        self.init(UInt32(value))
+        self.init(UInt32(truncatingIfNeeded: value))
       case 64:
-        self.init(UInt64(value))
+        self.init(UInt64(truncatingIfNeeded: value))
       default:
         return nil
     }

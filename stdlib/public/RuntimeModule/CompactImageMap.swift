@@ -16,6 +16,9 @@
 
 import Swift
 
+private let slash = UInt8(ascii: "/")
+private let backslash = UInt8(ascii: "\\")
+
 @_spi(Internal)
 public enum CompactImageMapFormat {
 
@@ -58,7 +61,7 @@ public enum CompactImageMapFormat {
     while pos < end {
       let ch = str[pos]
 
-      if pos > base && (ch == 0x2f || ch == 0x5c) {
+      if pos > base && (ch == slash || ch == backslash) {
         let range = base..<pos
         let prefix = String(str[range])!
         body(prefix)
@@ -179,7 +182,8 @@ public enum CompactImageMapFormat {
             guard let char = iterator.next() else {
               return nil
             }
-            if base + n > stringBase! && (char == 0x2f || char == 0x5c) {
+            if base + n > stringBase! && (char == slash
+                                            || char == backslash) {
               let prefix = String(decoding: resultBytes[stringBase!..<base+n],
                                   as: UTF8.self)
               #if DEBUG_COMPACT_IMAGE_MAP
@@ -226,11 +230,11 @@ public enum CompactImageMapFormat {
           print("framewk version='\(versionChar)' name='\(name)'")
           #endif
 
-          resultBytes.append(0x2f) // '/'
+          resultBytes.append(slash)
           resultBytes.append(contentsOf: nameBytes)
           resultBytes.append(contentsOf: ".framework/Versions/".utf8)
           resultBytes.append(version)
-          resultBytes.append(0x2f)
+          resultBytes.append(slash)
           resultBytes.append(contentsOf: nameBytes)
 
           return String(decoding: resultBytes, as: UTF8.self)
@@ -383,7 +387,7 @@ public enum CompactImageMapFormat {
         // Extract the name from the path
         if let path = path {
           if let lastSlashNdx = path.utf8.lastIndex(
-               where: { $0 == 0x2f || $0 == 0x5c }
+               where: { $0 == slash || $0 == backslash }
              ) {
             let nameNdx = path.index(after: lastSlashNdx)
 
@@ -726,7 +730,7 @@ public enum CompactImageMapFormat {
                   version = remainingPath[verNdx]
 
                   let slashNdx = remainingPath.index(after: verNdx)
-                  if remainingPath[slashNdx] == 0x2f {
+                  if remainingPath[slashNdx] == slash {
                     let nameNdx = remainingPath.index(after: slashNdx)
                     if remainingPath[nameNdx...].elementsEqual(name.utf8) {
                       self.remainingPath = remainingPath[nameNdx...]

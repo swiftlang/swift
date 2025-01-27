@@ -57,6 +57,10 @@ The following instructions are currently defined
 | `1000xxxx` | `rep`    | Repeat the previous frame                 |
 | `1xxxxxxx` | reserved | Reserved for future expansion             |
 
+If the bit labelled `a` is set, it means that the address computation
+is absolute rather than being relative to the previously computed
+address.
+
 ### `end`/`trunc`
 
 #### Encoding
