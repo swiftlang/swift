@@ -932,16 +932,16 @@ private:
     // Filter to select which fields we'll export FieldDescriptors for.
     auto exportable_field =
       [](Field field) {
-	// Don't export private C++ fields that were imported as private Swift fields.
-	// The type of a private field might not have all the type witness
-	// operations that Swift requires, for instance,
-	// `std::unique_ptr<IncompleteType>` would not have a destructor.
-	if (field.getKind() == Field::Kind::Var &&
-	    field.getVarDecl()->getClangDecl() &&
-	    field.getVarDecl()->getFormalAccess() == AccessLevel::Private)
-	  return false;
-	// All other fields are exportable
-	return true;
+        // Don't export private C++ fields that were imported as private Swift fields.
+        // The type of a private field might not have all the type witness
+        // operations that Swift requires, for instance,
+        // `std::unique_ptr<IncompleteType>` would not have a destructor.
+        if (field.getKind() == Field::Kind::Var &&
+            field.getVarDecl()->getClangDecl() &&
+            field.getVarDecl()->getFormalAccess() == AccessLevel::Private)
+          return false;
+        // All other fields are exportable
+        return true;
       };
 
     // Count exportable fields
