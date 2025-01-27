@@ -260,67 +260,7 @@ extension SIMD${n} where Scalar == ${Scalar} {
       Builtin.cmp_${s}ge_${Builtin}(a._storage._value, b._storage._value)
     ))
   }
-
-  @_alwaysEmitIntoClient
-  public static func .==(a: Scalar, b: Self) -> SIMDMask<MaskStorage> {
-    Self(repeating: a) .== b
-  }
-
-  @_alwaysEmitIntoClient
-  public static func .!=(a: Scalar, b: Self) -> SIMDMask<MaskStorage> {
-    Self(repeating: a) .!= b
-  }
-
-  @_alwaysEmitIntoClient
-  public static func .<(a: Scalar, b: Self) -> SIMDMask<MaskStorage> {
-    Self(repeating: a) .< b
-  }
-
-  @_alwaysEmitIntoClient
-  public static func .<=(a: Scalar, b: Self) -> SIMDMask<MaskStorage> {
-    Self(repeating: a) .<= b
-  }
-
-  @_alwaysEmitIntoClient
-  public static func .>(a: Scalar, b: Self) -> SIMDMask<MaskStorage> {
-    Self(repeating: a) .> b
-  }
-
-  @_alwaysEmitIntoClient
-  public static func .>=(a: Scalar, b: Self) -> SIMDMask<MaskStorage> {
-    Self(repeating: a) .>= b
-  }
-
-  @_alwaysEmitIntoClient
-  public static func .==(a: Self, b: Scalar) -> SIMDMask<MaskStorage> {
-    a .== Self(repeating: b)
-  }
-
-  @_alwaysEmitIntoClient
-  public static func .!=(a: Self, b: Scalar) -> SIMDMask<MaskStorage> {
-    a .!= Self(repeating: b)
-  }
-
-  @_alwaysEmitIntoClient
-  public static func .<(a: Self, b: Scalar) -> SIMDMask<MaskStorage> {
-    a .< Self(repeating: b)
-  }
-
-  @_alwaysEmitIntoClient
-  public static func .<=(a: Self, b: Scalar) -> SIMDMask<MaskStorage> {
-    a .<= Self(repeating: b)
-  }
-
-  @_alwaysEmitIntoClient
-  public static func .>(a: Self, b: Scalar) -> SIMDMask<MaskStorage> {
-    a .> Self(repeating: b)
-  }
-
-  @_alwaysEmitIntoClient
-  public static func .>=(a: Self, b: Scalar) -> SIMDMask<MaskStorage> {
-    a .>= Self(repeating: b)
-  }
-
+    
   /// The wrapping sum of two vectors.
   @_alwaysEmitIntoClient
   public static func &+(a: Self, b: Self) -> Self {
@@ -338,37 +278,7 @@ extension SIMD${n} where Scalar == ${Scalar} {
   public static func &*(a: Self, b: Self) -> Self {
     Self(Builtin.mul_${Builtin}(a._storage._value, b._storage._value))
   }
-
-  @_alwaysEmitIntoClient
-  public static func &+(a: Scalar, b: Self) -> Self {
-    Self(repeating: a) &+ b
-  }
-
-  @_alwaysEmitIntoClient
-  public static func &-(a: Scalar, b: Self) -> Self {
-    Self(repeating: a) &- b
-  }
-
-  @_alwaysEmitIntoClient
-  public static func &*(a: Scalar, b: Self) -> Self {
-    Self(repeating: a) &* b
-  }
-
-  @_alwaysEmitIntoClient
-  public static func &+(a: Self, b: Scalar) -> Self {
-    a &+ Self(repeating: b)
-  }
-
-  @_alwaysEmitIntoClient
-  public static func &-(a: Self, b: Scalar) -> Self {
-    a &- Self(repeating: b)
-  }
-
-  @_alwaysEmitIntoClient
-  public static func &*(a: Self, b: Scalar) -> Self {
-    a &* Self(repeating: b)
-  }
-
+        
   /// Updates the left hand side with the wrapping sum of the two
   /// vectors.
   @_alwaysEmitIntoClient
@@ -384,20 +294,36 @@ extension SIMD${n} where Scalar == ${Scalar} {
   @_alwaysEmitIntoClient
   public static func &*=(a: inout Self, b: Self) { a = a &* b }
 
+%   for operator in ['.==', '.!=', '.<', '.<=', '.>', '.>=']:
   @_alwaysEmitIntoClient
-  public static func &+=(a: inout Self, b: Scalar) {
-    a = a &+ Self(repeating: b)
+  public static func ${operator}(a: Scalar, b: Self) -> SIMDMask<MaskStorage> {
+    Self(repeating: a) ${operator} b
   }
 
   @_alwaysEmitIntoClient
-  public static func &-=(a: inout Self, b: Scalar) {
-    a = a &- Self(repeating: b)
+  public static func ${operator}(a: Self, b: Scalar) -> SIMDMask<MaskStorage> {
+    a ${operator} Self(repeating: b)
+  }
+%   end
+
+%   for operator in ['&+', '&-', '&*']:
+  @_alwaysEmitIntoClient
+  public static func ${operator}(a: Scalar, b: Self) -> Self {
+    Self(repeating: a) ${operator} b
   }
 
   @_alwaysEmitIntoClient
-  public static func &*=(a: inout Self, b: Scalar) {
-    a = a &* Self(repeating: b)
+  public static func ${operator}(a: Self, b: Scalar) -> Self {
+    a ${operator} Self(repeating: b)
   }
+%   end
+
+%   for operator in ['&+=', '&-=', '&*=']:
+  @_alwaysEmitIntoClient
+  public static func ${operator}(a: inout Self, b: Scalar) {
+    a ${operator} Self(repeating: b)
+  }
+%   end
 }
 
 % end
@@ -468,65 +394,17 @@ extension SIMD${n} where Scalar == ${Scalar} {
     ))
   }
 
+%   for operator in ['.==', '.!=', '.<', '.<=', '.>', '.>=']:
   @_alwaysEmitIntoClient
-  public static func .==(a: Scalar, b: Self) -> SIMDMask<MaskStorage> {
-    Self(repeating: a) .== b
+  public static func ${operator}(a: Scalar, b: Self) -> SIMDMask<MaskStorage> {
+    Self(repeating: a) ${operator} b
   }
 
   @_alwaysEmitIntoClient
-  public static func .!=(a: Scalar, b: Self) -> SIMDMask<MaskStorage> {
-    Self(repeating: a) .!= b
+  public static func ${operator}(a: Self, b: Scalar) -> SIMDMask<MaskStorage> {
+    a ${operator} Self(repeating: b)
   }
-
-  @_alwaysEmitIntoClient
-  public static func .<(a: Scalar, b: Self) -> SIMDMask<MaskStorage> {
-    Self(repeating: a) .< b
-  }
-
-  @_alwaysEmitIntoClient
-  public static func .<=(a: Scalar, b: Self) -> SIMDMask<MaskStorage> {
-    Self(repeating: a) .<= b
-  }
-
-  @_alwaysEmitIntoClient
-  public static func .>(a: Scalar, b: Self) -> SIMDMask<MaskStorage> {
-    Self(repeating: a) .> b
-  }
-
-  @_alwaysEmitIntoClient
-  public static func .>=(a: Scalar, b: Self) -> SIMDMask<MaskStorage> {
-    Self(repeating: a) .>= b
-  }
-
-  @_alwaysEmitIntoClient
-  public static func .==(a: Self, b: Scalar) -> SIMDMask<MaskStorage> {
-    a .== Self(repeating: b)
-  }
-
-  @_alwaysEmitIntoClient
-  public static func .!=(a: Self, b: Scalar) -> SIMDMask<MaskStorage> {
-    a .!= Self(repeating: b)
-  }
-
-  @_alwaysEmitIntoClient
-  public static func .<(a: Self, b: Scalar) -> SIMDMask<MaskStorage> {
-    a .< Self(repeating: b)
-  }
-
-  @_alwaysEmitIntoClient
-  public static func .<=(a: Self, b: Scalar) -> SIMDMask<MaskStorage> {
-    a .<= Self(repeating: b)
-  }
-
-  @_alwaysEmitIntoClient
-  public static func .>(a: Self, b: Scalar) -> SIMDMask<MaskStorage> {
-    a .> Self(repeating: b)
-  }
-
-  @_alwaysEmitIntoClient
-  public static func .>=(a: Self, b: Scalar) -> SIMDMask<MaskStorage> {
-    a .>= Self(repeating: b)
-  }
+%   end
 }
 %  if bits == 16:
 #endif
