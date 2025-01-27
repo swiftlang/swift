@@ -6,6 +6,7 @@
 
 // REQUIRES: swift_in_compiler
 // REQUIRES: executable_test
+// REQUIRES: swift_test_mode_optimize_none
 // REQUIRES: swift_feature_Embedded
 
 var sink: ()->() = {}
