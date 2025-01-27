@@ -2831,6 +2831,14 @@ namespace {
             ->mapTypeIntoContext(decl->getInterfaceType())
             ->getReferenceStorageReferent();
 
+        if (ctx.LangOpts.hasFeature(
+                Feature::GlobalActorIsolatedTypesUsability)) {
+          // If the local capture is globally-isolated, it is implicitly
+          // Sendable.
+          if (isolation.isGlobalActor())
+            continue;
+        }
+
         if (type->hasError())
           continue;
 
@@ -4121,6 +4129,13 @@ namespace {
       }
 
       if (auto func = dyn_cast<FuncDecl>(value)) {
+        if (ctx.LangOpts.hasFeature(
+                Feature::GlobalActorIsolatedTypesUsability)) {
+          bool globallyIsolated = getActorIsolation(value).isGlobalActor();
+          if (func->isSendable() || globallyIsolated)
+            return false;
+        }
+
         if (func->isSendable())
           return false;
 
