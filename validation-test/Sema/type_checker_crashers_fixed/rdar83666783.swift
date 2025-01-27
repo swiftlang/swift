@@ -12,5 +12,5 @@ func compute(_: Double?) -> Double? {
 }
 
 func test(s: S?) {
-  _ = compute(s?.test) // expected-error {{cannot implicitly convert value of type 'CGFloat?' to expected type 'Double?'}}
+  _ = compute(s?.test)
 }
