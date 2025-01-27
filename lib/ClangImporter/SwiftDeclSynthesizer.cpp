@@ -2477,11 +2477,9 @@ synthesizeDefaultArgumentBody(AbstractFunctionDecl *afd, void *context) {
   return {body, /*isTypeChecked=*/true};
 }
 
-CallExpr *
-SwiftDeclSynthesizer::makeDefaultArgument(DeclContext *dc,
-                                          const clang::ParmVarDecl *param,
-                                          const swift::Type &swiftParamTy,
-                                          SourceLoc paramLoc) {
+CallExpr *SwiftDeclSynthesizer::makeDefaultArgument(
+    DeclContext *dc, const clang::ParmVarDecl *param,
+    const swift::Type &swiftParamTy, SourceLoc paramLoc) {
   assert(param->hasDefaultArg() && "must have a C++ default argument");
   if (!param->getIdentifier())
     // Work around an assertion failure in CXXNameMangler::mangleUnqualifiedName

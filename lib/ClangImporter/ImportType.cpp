@@ -2775,8 +2775,8 @@ ParameterList *ClangImporter::Implementation::importFunctionParameterList(
       name = argNames[index];
 
     auto paramInfo =
-        getParameterInfo(this, dc, param, name, swiftParamTy, isInOut, isConsuming,
-                         isParamTypeImplicitlyUnwrapped);
+        getParameterInfo(this, dc, param, name, swiftParamTy, isInOut,
+                         isConsuming, isParamTypeImplicitlyUnwrapped);
     parameters.push_back(paramInfo);
     ++index;
   }
