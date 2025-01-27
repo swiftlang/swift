@@ -632,6 +632,11 @@ def emit_module_path_EQ : Joined<["-"], "emit-module-path=">,
   Flags<[FrontendOption, NoInteractiveOption, ArgumentIsPath,
          SupplementaryOutput, CacheInvariant]>,
   Alias<emit_module_path>;
+def emit_variant_module_path : Separate<["-"], "emit-variant-module-path">,
+  Flags<[NoInteractiveOption, ArgumentIsPath, SupplementaryOutput,
+         CacheInvariant, NewDriverOnlyOption]>,
+  MetaVarName<"<path>">,
+  HelpText<"Emit an importable module for the target variant at the specified path">;
 
 def emit_module_summary :
   Flag<["-"], "emit-module-summary">,
@@ -652,18 +657,35 @@ def emit_module_interface_path :
   Flags<[FrontendOption, NoInteractiveOption, ArgumentIsPath,
          SupplementaryOutput, CacheInvariant]>,
   MetaVarName<"<path>">, HelpText<"Output module interface file to <path>">;
+def emit_variant_module_interface_path :
+  Separate<["-"], "emit-variant-module-interface-path">,
+  Flags<[FrontendOption, NoInteractiveOption, ArgumentIsPath,
+         SupplementaryOutput, CacheInvariant, NewDriverOnlyOption]>,
+  MetaVarName<"<path>">, HelpText<"Output module interface file for the target variant to <path>">;
 
 def emit_private_module_interface_path :
   Separate<["-"], "emit-private-module-interface-path">,
   Flags<[FrontendOption, NoInteractiveOption, HelpHidden,
          ArgumentIsPath, SupplementaryOutput, CacheInvariant]>,
   MetaVarName<"<path>">, HelpText<"Output private module interface file to <path>">;
+def emit_variant_private_module_interface_path :
+  Separate<["-"], "emit-variant-private-module-interface-path">,
+  Flags<[FrontendOption, NoInteractiveOption, ArgumentIsPath,
+         SupplementaryOutput, CacheInvariant, NewDriverOnlyOption]>,
+  MetaVarName<"<path>">,
+  HelpText<"Output private module interface file for the target variant to <path>">;
 
 def emit_package_module_interface_path :
   Separate<["-"], "emit-package-module-interface-path">,
   Flags<[FrontendOption, NoInteractiveOption, HelpHidden,
          ArgumentIsPath, SupplementaryOutput, CacheInvariant]>,
   MetaVarName<"<path>">, HelpText<"Output package module interface file to <path>">;
+def emit_variant_package_module_interface_path :
+  Separate<["-"], "emit-variant-package-module-interface-path">,
+  Flags<[FrontendOption, NoInteractiveOption, ArgumentIsPath,
+         SupplementaryOutput, CacheInvariant, NewDriverOnlyOption]>,
+  MetaVarName<"<path>">,
+  HelpText<"Output package module interface file for the target variant to <path>">;
 
 def verify_emitted_module_interface :
   Flag<["-"], "verify-emitted-module-interface">,
@@ -685,6 +707,11 @@ def emit_module_source_info_path :
   Flags<[FrontendOption, NoInteractiveOption, ArgumentIsPath,
          SupplementaryOutput]>,
   MetaVarName<"<path>">, HelpText<"Output module source info file to <path>">;
+def emit_variant_module_source_info_path :
+  Separate<["-"], "emit-variant-module-source-info-path">,
+  Flags<[FrontendOption, NoInteractiveOption, ArgumentIsPath,
+         SupplementaryOutput, NewDriverOnlyOption]>,
+  MetaVarName<"<path>">, HelpText<"Output module source info file for the target variant to <path>">;
 
 def emit_parseable_module_interface :
   Flag<["-"], "emit-parseable-module-interface">,
@@ -715,6 +742,12 @@ def emit_api_descriptor_path :
          SupplementaryOutput, CacheInvariant]>,
   MetaVarName<"<path>">,
   HelpText<"Output a JSON file describing the module's API to <path>">;
+def emit_variant_api_descriptor_path :
+  Separate<["-"], "emit-variant-api-descriptor-path">,
+  Flags<[FrontendOption, NoInteractiveOption, ArgumentIsPath,
+         SupplementaryOutput, CacheInvariant, NewDriverOnlyOption]>,
+  MetaVarName<"<path>">,
+  HelpText<"Output a JSON file describing the target variant module's API to <path>">;
 
 def emit_objc_header : Flag<["-"], "emit-objc-header">,
   Flags<[FrontendOption, NoInteractiveOption, SupplementaryOutput]>,

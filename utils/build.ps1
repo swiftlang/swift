@@ -2784,6 +2784,19 @@ try {
 
 Fetch-Dependencies
 
+if ($Clean) {
+  10..[HostComponent].getEnumValues()[-1] | ForEach-Object { Remove-Item -Force -Recurse "$BinaryCache\$_" -ErrorAction Ignore }
+  # In case of a previous test run, clear out the swiftmodules as they are not a stable format.
+  Remove-Item -Force -Recurse -Path "$($HostARch.ToolchainInstallRoot)\usr\lib\swift\windows\*.swiftmodule" -ErrorAction Ignore
+  foreach ($Arch in $WindowsSDKArchs) {
+    0..[TargetComponent].getEnumValues()[-1] | ForEach-Object { Remove-Item -Force -Recurse "$BinaryCache\$($Arch.BuildID + $_)" -ErrorAction Ignore }
+  }
+  foreach ($Arch in $AndroidSDKArchs) {
+    0..[TargetComponent].getEnumValues()[-1] | ForEach-Object { Remove-Item -Force -Recurse "$BinaryCache\$($Arch.BuildID + $_)" -ErrorAction Ignore }
+  }
+}
+
+
 if (-not $SkipBuild) {
   if ($EnableCaching -And (-Not (Test-SCCacheAtLeast -Major 0 -Minor 7 -Patch 4))) {
     throw "Minimum required sccache version is 0.7.4"
@@ -2802,18 +2815,6 @@ if (-not $SkipBuild) {
   Invoke-BuildStep Build-CMark $HostArch
   Invoke-BuildStep Build-XML2 Windows $HostArch
   Invoke-BuildStep Build-Compilers $HostArch
-}
-
-if ($Clean) {
-  10..[HostComponent].getEnumValues()[-1] | ForEach-Object { Remove-Item -Force -Recurse "$BinaryCache\$_" -ErrorAction Ignore }
-  # In case of a previous test run, clear out the swiftmodules as they are not a stable format.
-  Remove-Item -Force -Recurse "$($HostARch.ToolchainInstallRoot)\usr\lib\swift\windows" -ErrorAction Ignore
-  foreach ($Arch in $WindowsSDKArchs) {
-    0..[TargetComponent].getEnumValues()[-1] | ForEach-Object { Remove-Item -Force -Recurse "$BinaryCache\$($Arch.BuildID + $_)" -ErrorAction Ignore }
-  }
-  foreach ($Arch in $AndroidSDKArchs) {
-    0..[TargetComponent].getEnumValues()[-1] | ForEach-Object { Remove-Item -Force -Recurse "$BinaryCache\$($Arch.BuildID + $_)" -ErrorAction Ignore }
-  }
 }
 
 if (-not $SkipBuild) {
