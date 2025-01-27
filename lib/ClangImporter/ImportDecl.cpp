@@ -1619,10 +1619,10 @@ namespace {
         if (!underlyingType)
           return nullptr;
 
+        auto access = importer::convertClangAccess(decl->getAccess());
         auto Loc = Impl.importSourceLoc(decl->getLocation());
         auto structDecl = Impl.createDeclWithClangNode<StructDecl>(
-            decl, importer::convertClangAccess(decl->getAccess()), Loc, name,
-            Loc, std::nullopt, nullptr, dc);
+            decl, access, Loc, name, Loc, std::nullopt, nullptr, dc);
 
         auto options = getDefaultMakeStructRawValuedOptions();
         options |= MakeStructRawValuedFlags::MakeUnlabeledValueInit;
@@ -1633,7 +1633,7 @@ namespace {
             structDecl, underlyingType,
             {KnownProtocolKind::RawRepresentable, KnownProtocolKind::Equatable,
              KnownProtocolKind::Hashable},
-            options, /*setterAccess=*/AccessLevel::Public);
+            options, /*setterAccess=*/access);
 
         result = structDecl;
         break;
@@ -3934,8 +3934,7 @@ namespace {
             func->setImportAsStaticMember();
           }
         }
-        // Someday, maybe this will need to be 'open' for C++ virtual methods.
-        func->setAccess(AccessLevel::Public);
+        func->setAccess(importer::convertClangAccess(decl->getAccess()));
 
         if (!importFuncWithoutSignature) {
           bool success = processSpecialImportedFunc(
