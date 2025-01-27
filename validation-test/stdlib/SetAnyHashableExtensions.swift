@@ -145,7 +145,8 @@ SetTests.test("insert<Hashable>(_:)/CastTrap")
   }
 
   expectCrashLater()
-  _ = s.insert(TestHashableDerivedB(1010, identity: 3))
+  let (_, old) = s.insert(TestHashableDerivedB(1010, identity: 3))
+  _blackHole(old)
 }
 
 SetTests.test("update<Hashable>(with:)") {
