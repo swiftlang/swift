@@ -381,7 +381,7 @@ class Product(object):
             return self.args.cross_compile_sysroot
         if not self.is_cross_compile_target('{}-{}'.format(platform, arch)):
             return None
-        sysroot_arch, abi = self.get_linux_target_components(arch)
+        sysroot_arch, _, abi = self.get_linux_target_components(arch)
         # $ARCH-$PLATFORM-$ABI
         # E.x.: aarch64-linux-gnu
         sysroot_dirname = '{}-{}-{}'.format(sysroot_arch, platform, abi)
