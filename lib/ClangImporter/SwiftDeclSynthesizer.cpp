@@ -2478,7 +2478,8 @@ synthesizeDefaultArgumentBody(AbstractFunctionDecl *afd, void *context) {
 }
 
 CallExpr *
-SwiftDeclSynthesizer::makeDefaultArgument(const clang::ParmVarDecl *param,
+SwiftDeclSynthesizer::makeDefaultArgument(DeclContext *dc,
+                                          const clang::ParmVarDecl *param,
                                           const swift::Type &swiftParamTy,
                                           SourceLoc paramLoc) {
   assert(param->hasDefaultArg() && "must have a C++ default argument");
@@ -2503,15 +2504,18 @@ SwiftDeclSynthesizer::makeDefaultArgument(const clang::ParmVarDecl *param,
   os << "__defaultArg_" << param->getFunctionScopeIndex() << "_";
   ImporterImpl.getMangledName(mangler.get(), clangFunc, os);
 
-  // Synthesize `func __defaultArg_XYZ() -> ParamTy { ... }`.
+  // Synthesize `static private func __defaultArg_XYZ() -> ParamTy { ... }`
+  // in the context of the function where the param is declared.
   DeclName funcName(ctx, DeclBaseName(ctx.getIdentifier(s)),
                     ParameterList::createEmpty(ctx));
   auto funcDecl = FuncDecl::createImplicit(
-      ctx, StaticSpellingKind::None, funcName, paramLoc, false, false, Type(),
-      {}, ParameterList::createEmpty(ctx), swiftParamTy,
-      ImporterImpl.ImportedHeaderUnit);
+      ctx, StaticSpellingKind::KeywordStatic, funcName, paramLoc, false, false,
+      Type(), {}, ParameterList::createEmpty(ctx), swiftParamTy, dc);
   funcDecl->setBodySynthesizer(synthesizeDefaultArgumentBody, (void *)param);
-  funcDecl->setAccess(AccessLevel::Public);
+  funcDecl->setAccess(AccessLevel::Private); // This is necessary in case the
+                                             // default parameter involves any
+                                             // private types, which are
+                                             // forbidden in public functions.
 
   ImporterImpl.defaultArgGenerators[param] = funcDecl;
 

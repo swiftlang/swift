@@ -330,7 +330,8 @@ public:
   VarDecl *makeComputedPropertyFromCXXMethods(FuncDecl *getter,
                                               FuncDecl *setter);
 
-  CallExpr *makeDefaultArgument(const clang::ParmVarDecl *param,
+  CallExpr *makeDefaultArgument(DeclContext *dc,
+                                const clang::ParmVarDecl *param,
                                 const swift::Type &swiftParamTy,
                                 SourceLoc paramLoc);
 
