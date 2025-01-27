@@ -55,7 +55,9 @@
         "swift-integration-tests": {
             "remote": { "id": "swiftlang/swift-integration-tests" } },
         "swift-xcode-playground-support": {
-            "remote": { "id": "apple/swift-xcode-playground-support" } },
+            "remote": { "id": "apple/swift-xcode-playground-support" },
+            "platforms": [ "Darwin" ]
+        },
         "ninja": {
             "remote": { "id": "ninja-build/ninja" } },
         "yams": {
@@ -115,7 +117,8 @@
           "remote": { "id": "madler/zlib" }
         },
         "mimalloc": {
-          "remote": { "id": "microsoft/mimalloc" }
+          "remote": { "id": "microsoft/mimalloc" },
+          "platforms": [ "Windows" ]
         }
     },
     "default-branch-scheme": "main",
