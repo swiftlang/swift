@@ -313,6 +313,7 @@ public:
   getTypeDefForCXXCFOptionsDefinition(const clang::Decl *candidateDecl) = 0;
 
   virtual SourceLoc importSourceLocation(clang::SourceLocation loc) = 0;
+  virtual SourceRange importSourceRange(clang::SourceRange range) = 0;
 };
 
 /// Describes a C++ template instantiation error.
