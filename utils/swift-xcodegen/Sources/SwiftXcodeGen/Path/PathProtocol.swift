@@ -68,6 +68,12 @@ public extension PathProtocol {
     return RelativePath(result)
   }
 
+  func removingLastComponent() -> Self {
+    var result = storage
+    result.removeLastComponent()
+    return .init(result)
+  }
+
   func hasExtension(_ ext: FileExtension) -> Bool {
     storage.extension == ext.rawValue
   }
