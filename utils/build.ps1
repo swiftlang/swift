@@ -1938,12 +1938,6 @@ function Build-Foundation([Platform]$Platform, $Arch, [switch]$Test = $false) {
         (Get-Variable "${Platform}$($Arch.ShortName)" -ValueOnly).SDKInstallRoot
       }
 
-      $SDKRoot = if ($Platform -eq "Windows") {
-        ""
-      } else {
-        (Get-Variable "${Platform}$($Arch.ShortName)" -ValueOnly).SDKInstallRoot
-      }
-
       Build-CMakeProject `
         -Src $SourceCache\swift-corelibs-foundation `
         -Bin $FoundationBinaryCache `
