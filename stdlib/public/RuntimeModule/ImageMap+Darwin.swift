@@ -21,7 +21,43 @@ import Swift
 internal import Darwin
 internal import BacktracingImpl.OS.Darwin
 
+fileprivate func getSysCtlString(_ name: String) -> String? {
+  return withUnsafeTemporaryAllocation(byteCount: 256, alignment: 16) {
+    (buffer: UnsafeMutableRawBufferPointer) -> String? in
+
+    var len = buffer.count
+    let ret = sysctlbyname(name,
+                           buffer.baseAddress, &len,
+                           nil, 0)
+    if ret != 0 {
+      return nil
+    }
+
+    return String(validatingUTF8:
+                    buffer.baseAddress!.assumingMemoryBound(to: CChar.self))
+  }
+}
+
 extension ImageMap {
+
+  private static let platform = {
+    #if os(macOS)
+    var platform = "macOS"
+    #elseif os(iOS)
+    var platform = "iOS"
+    #elseif os(watchOS)
+    var platform = "watchOS"
+    #elseif os(tvOS)
+    var platform = "tvOS"
+    #elseif os(visionOS)
+    var platform = "visionOS"
+    #endif
+
+    let osVersion = getSysCtlString("kern.osversion") ?? "<unknown>"
+    let osProductVersion = getSysCtlString("kern.osproductversion") ?? "<unknown>"
+
+    return "\(platform) \(osProductVersion) (\(osVersion))"
+  }()
 
   private static func withDyldProcessInfo<T>(for task: task_t,
                                              fn: (OpaquePointer?) throws -> T)
@@ -83,7 +119,11 @@ extension ImageMap {
 
     images.sort(by: { $0.baseAddress < $1.baseAddress })
 
-    return ImageMap(images: images, wordSize: .sixtyFourBit)
+    return ImageMap(
+      platform: ImageMap.platform,
+      images: images,
+      wordSize: .sixtyFourBit
+    )
   }
 
 }

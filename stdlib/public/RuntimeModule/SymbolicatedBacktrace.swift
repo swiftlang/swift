@@ -245,11 +245,14 @@ public struct SymbolicatedBacktrace: CustomStringConvertible {
     }
   }
 
+  /// The architecture on which this backtrace was captured.
+  public var architecture: String { return backtrace.architecture }
+
   /// A list of captured frame information.
-  public var frames: [Frame]
+  public private(set) var frames: [Frame]
 
   /// A list of images found in the process.
-  public var images: ImageMap
+  public private(set) var images: ImageMap
 
   /// True if this backtrace is a Swift runtime failure.
   public var isSwiftRuntimeFailure: Bool {

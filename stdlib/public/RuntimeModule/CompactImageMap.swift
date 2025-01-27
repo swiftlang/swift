@@ -101,6 +101,25 @@ public enum CompactImageMapFormat {
       return value
     }
 
+    mutating func decodeString() -> String? {
+      guard let utf8Length = iterator.next() else {
+        return nil
+      }
+
+      var bytes: [UInt8] = []
+      bytes.reserveCapacity(Int(utf8Length))
+
+      for _ in 0..<utf8Length {
+        guard let byte = iterator.next() else {
+          return nil
+        }
+
+        bytes.append(byte)
+      }
+
+      return String(decoding: bytes, as: UTF8.self)
+    }
+
     mutating func decodeAddress(_ count: Int) -> UInt64? {
       var word: UInt64
       guard let firstByte = iterator.next() else {
@@ -250,7 +269,7 @@ public enum CompactImageMapFormat {
       }
     }
 
-    mutating func decode() -> ([ImageMap.Image], ImageMap.WordSize)? {
+    mutating func decode() -> (String, [ImageMap.Image], ImageMap.WordSize)? {
       // Check the version and decode the size
       guard let infoByte = iterator.next() else {
         return nil
@@ -272,6 +291,11 @@ public enum CompactImageMapFormat {
           wordMask = 0xffffff00
         case .sixtyFourBit:
           wordMask = 0xffffffffffffff00
+      }
+
+      // Now decode the platform
+      guard let platform = decodeString() else {
+        return nil
       }
 
       // Next is the image count
@@ -392,7 +416,7 @@ public enum CompactImageMapFormat {
           wsMap = .sixtyFourBit
       }
 
-      return (images, wsMap)
+      return (platform, images, wsMap)
     }
   }
 
@@ -414,6 +438,7 @@ public enum CompactImageMapFormat {
     public struct Iterator: IteratorProtocol {
       enum State {
         case start
+        case platform(Int)
         case count(Int)
         case image
         case baseAddress(Int)
@@ -483,13 +508,38 @@ public enum CompactImageMapFormat {
                 size = .sixtyFourBit
             }
 
-            let count = source.images.count
-            let bits = Int.bitWidth - count.leadingZeroBitCount
-            state = .count(7 * (bits / 7))
+            state = .platform(-1)
 
             let version: UInt8 = 0
             let infoByte = (version << 2) | size.rawValue
             return infoByte
+
+          case let .platform(ndx):
+            let length = UInt8(source.platform.utf8.count)
+            let byte: UInt8
+
+            if ndx == -1 {
+              // The length byte comes first
+              byte = length
+            } else {
+              byte = source.platform.utf8[
+                source.platform.utf8.index(
+                  source.platform.utf8.startIndex,
+                  offsetBy: ndx
+                )
+              ]
+            }
+
+            // If we're done, move to the .count state
+            if ndx + 1 == length {
+              let count = source.images.count
+              let bits = Int.bitWidth - count.leadingZeroBitCount
+              state = .count(7 * (bits / 7))
+            } else {
+              state = .platform(ndx + 1)
+            }
+
+            return byte
 
           case let .count(ndx):
             let count = source.images.count

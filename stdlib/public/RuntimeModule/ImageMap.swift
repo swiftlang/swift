@@ -51,6 +51,9 @@ public struct ImageMap: Collection, Sendable, Hashable {
     var endOfText: Address
   }
 
+  /// The name of the platform that captured this image map.
+  public private(set) var platform: String
+
   /// The actual image storage.
   var images: [Image]
 
@@ -58,7 +61,8 @@ public struct ImageMap: Collection, Sendable, Hashable {
   var wordSize: WordSize
 
   /// Construct an ImageMap.
-  init(images: [Image], wordSize: WordSize) {
+  init(platform: String, images: [Image], wordSize: WordSize) {
+    self.platform = platform
     self.images = images
     self.wordSize = wordSize
   }
@@ -67,10 +71,10 @@ public struct ImageMap: Collection, Sendable, Hashable {
   @_spi(Internal)
   public init?(compactImageMapData: some Sequence<UInt8>) {
     var decoder = CompactImageMapFormat.Decoder(compactImageMapData)
-    guard let (images, wordSize) = decoder.decode() else {
+    guard let (platform, images, wordSize) = decoder.decode() else {
       return nil
     }
-    self.init(images: images, wordSize: wordSize)
+    self.init(platform: platform, images: images, wordSize: wordSize)
   }
 
   /// The position of the first element in a non-empty collection.
@@ -125,7 +129,7 @@ public struct ImageMap: Collection, Sendable, Hashable {
 extension ImageMap: CustomStringConvertible {
   /// Generate a description of an ImageMap
   public var description: String {
-    var lines: [String] = []
+    var lines: [String] = ["Platform: \(platform)", ""]
     let addressWidth: Int
     switch wordSize {
       case .sixteenBit: addressWidth = 4
@@ -187,4 +191,21 @@ extension Backtrace.Image {
               baseAddress: baseAddress,
               endOfText: endOfText)
   }
+}
+
+extension ImageMap: Codable {
+
+  public func encode(to encoder: any Encoder) throws {
+    var container = encoder.singleValueContainer()
+    let cimfEncoder = CompactImageMapFormat.Encoder(self)
+    let base64 = stringFrom(sequence: Base64Encoder(source: cimfEncoder))
+    try container.encode(base64)
+  }
+
+  public init(from decoder: any Decoder) throws {
+    let container = try decoder.singleValueContainer()
+    let base64 = try container.decode(String.self)
+    self.init(compactImageMapData: Base64Decoder(source: base64.utf8))!
+  }
+
 }

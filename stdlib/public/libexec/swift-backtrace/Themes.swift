@@ -38,6 +38,16 @@ extension PromptTheme {
   public func prompt(_ s: String) -> String { return s }
 }
 
+protocol PlatformArchTheme {
+  func platform(_ s: String) -> String
+  func architecture(_ s: String) -> String
+}
+
+extension PlatformArchTheme {
+  public func platform(_ s: String) -> String { return s }
+  public func architecture(_ s: String) -> String { return s }
+}
+
 protocol MemoryDumpTheme {
   func address(_ s: String) -> String
   func data(_ s: String) -> String
@@ -67,7 +77,7 @@ extension RegisterDumpTheme {
 }
 
 typealias Theme = BacktraceFormattingTheme & ErrorAndWarningTheme &
-  PromptTheme & MemoryDumpTheme & RegisterDumpTheme
+  PromptTheme & MemoryDumpTheme & RegisterDumpTheme & PlatformArchTheme
 
 enum Themes {
 
@@ -163,6 +173,13 @@ enum Themes {
     }
     public func info(_ s: String) -> String {
       return "ℹ️ \(s)"
+    }
+
+    public func platform(_ s: String) -> String {
+      return "\(fg: .white)\(s)\(fg: .normal)"
+    }
+    public func architecture(_ s: String) -> String {
+      return "\(fg: .white)\(s)\(fg: .normal)"
     }
   }
 

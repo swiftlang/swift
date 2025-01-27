@@ -164,7 +164,7 @@ extension FixedWidthInteger {
   ///
   /// This initializer will return nil if the address width is larger than the
   /// type you are attempting to convert into.
-  init?(_ address: Backtrace.Address) {
+  public init?(_ address: Backtrace.Address) {
     guard let result = address.toFixedWidth(type: Self.self) else {
       return nil
     }
@@ -174,7 +174,7 @@ extension FixedWidthInteger {
 
 extension Backtrace.Address {
   /// Convert from a UInt16.
-  init(_ value: UInt16) {
+  public init(_ value: UInt16) {
     if value == 0 {
       self.representation = .null
       return
@@ -183,7 +183,7 @@ extension Backtrace.Address {
   }
 
   /// Convert from a UInt32.
-  init(_ value: UInt32) {
+  public init(_ value: UInt32) {
     if value == 0 {
       self.representation = .null
       return
@@ -192,7 +192,7 @@ extension Backtrace.Address {
   }
 
   /// Convert from a UInt64.
-  init(_ value: UInt64) {
+  public init(_ value: UInt64) {
     if value == 0 {
       self.representation = .null
       return
@@ -201,21 +201,16 @@ extension Backtrace.Address {
   }
 
   /// Convert from a FixedWidthInteger
-  init<T: FixedWidthInteger>(_ value: T) {
-    if value == 0 {
-      self.representation = .null
-      return
-    }
-
+  public init?<T: FixedWidthInteger>(_ value: T) {
     switch T.bitWidth {
       case 16:
-        self.representation = .sixteenBit(UInt16(value))
+        self.init(UInt16(value))
       case 32:
-        self.representation = .thirtyTwoBit(UInt32(value))
+        self.init(UInt32(value))
       case 64:
-        self.representation = .sixtyFourBit(UInt64(value))
+        self.init(UInt64(value))
       default:
-        fatalError("Unsupported address width")
+        return nil
     }
   }
 }

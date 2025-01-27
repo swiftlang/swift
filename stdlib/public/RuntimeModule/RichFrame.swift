@@ -132,11 +132,11 @@ extension Backtrace.Frame {
   init<T>(_ frame: RichFrame<T>) {
     switch frame {
       case let .returnAddress(addr):
-        self = .returnAddress(Backtrace.Address(addr))
+        self = .returnAddress(Backtrace.Address(addr)!)
       case let .programCounter(addr):
-        self = .programCounter(Backtrace.Address(addr))
+        self = .programCounter(Backtrace.Address(addr)!)
       case let .asyncResumePoint(addr):
-        self = .asyncResumePoint(Backtrace.Address(addr))
+        self = .asyncResumePoint(Backtrace.Address(addr)!)
       case let .omittedFrames(count):
         self = .omittedFrames(count)
       case .truncated:

@@ -719,6 +719,17 @@ Generate a backtrace for the parent process.
     var mentionedImages = Set<Int>()
     let formatter = backtraceFormatter()
 
+    let platform = target.images.platform
+    let architecture: String
+    switch crashingThread.backtrace {
+      case let .raw(backtrace):
+        architecture = backtrace.architecture
+      case let .symbolicated(backtrace):
+        architecture = backtrace.architecture
+    }
+
+    writeln("\nPlatform: \(theme.architecture(architecture)) \(theme.platform(target.images.platform))")
+
     func dump(ndx: Int, thread: TargetThread) {
       let crashed = thread.id == target.crashingThread ? " crashed" : ""
       let name = !thread.name.isEmpty ? " \"\(thread.name)\"" : ""

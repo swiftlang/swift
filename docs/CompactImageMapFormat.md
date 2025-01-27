@@ -39,10 +39,14 @@ follows:
 |   10   | 64-bit            |
 |   11   | Reserved          |
 
-This is followed immediately by a field encoding the number of images
-in the image map; this field is encoded as a sequence of bytes, each
-holding seven bits of data, with the top bit clear for the final byte.
-The most significant byte is the first.  e.g.
+This is followed immediately by a field containing the name of the platform
+that generated this image map.  This field consists of a single byte length
+followed by a UTF-8 string of that length.
+
+After that is a field encoding the number of images in the image map;
+this field is encoded as a sequence of bytes, each holding seven bits
+of data, with the top bit clear for the final byte.  The most
+significant byte is the first.  e.g.
 
 | `count` | Encoding    |
 | ------: | :---------- |

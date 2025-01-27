@@ -26,7 +26,51 @@ internal import Musl
 
 internal import BacktracingImpl.ImageFormats.Elf
 
+fileprivate func readOSRelease(fd: CInt) -> [String:String]? {
+  let len = lseek(fd, 0, SEEK_END)
+  guard len >= 0 else {
+    return nil
+  }
+  return withUnsafeTemporaryAllocation(byteCount: len, alignment: 16) {
+    (buffer: UnsafeMutableRawBufferPointer) -> [String:String]? in
+
+    _ = lseek(fd, 0, SEEK_SET)
+    let bytesRead = read(fd, buffer.baseAddress, buffer.count)
+    guard bytesRead == buffer.count else {
+      return nil
+    }
+
+    let asString = String(decoding: buffer, as: UTF8.self)
+    return Dictionary(OSReleaseScanner(asString),
+                      uniquingKeysWith: { $1 })
+  }
+}
+
+fileprivate func readOSRelease() -> [String:String]? {
+  var fd = open("/etc/os-release", O_RDONLY)
+  if fd == -1 {
+    fd = open("/usr/lib/os-release", O_RDONLY)
+  }
+  if fd == -1 {
+    return nil
+  }
+  defer {
+    close(fd)
+  }
+
+  return readOSRelease(fd: fd)
+}
+
 extension ImageMap {
+
+  private static var platform = {
+    guard let info = readOSRelease(),
+          let pretty = info["PRETTY_NAME"] else {
+      return "Linux (unknown)"
+    }
+
+    return "Linux (\(pretty))"
+  }()
 
   private struct AddressRange {
     var low: Address = 0
@@ -59,7 +103,7 @@ extension ImageMap {
     }
 
     guard let procMaps = readString(from: path) else {
-      return ImageMap(images: [], wordSize: wordSize)
+      return ImageMap(platform: ImageMap.platform, images: [], wordSize: wordSize)
     }
 
     // Find all the mapped files and get high/low ranges
@@ -113,7 +157,11 @@ extension ImageMap {
 
     images.sort(by: { $0.baseAddress < $1.baseAddress })
 
-    return ImageMap(images: images, wordSize: wordSize)
+    return ImageMap(
+      platform: ImageMap.platform,
+      images: images,
+      wordSize: wordSize
+    )
   }
 
 }

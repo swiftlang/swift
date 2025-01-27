@@ -48,6 +48,7 @@ set(RUNTIME_SOURCES
   Libc.swift
   LimitSequence.swift
   MemoryReader.swift
+  OSReleaseScanner.swift
   ProcMapsScanner.swift
   Registers.swift
   Runtime.swift

@@ -229,7 +229,7 @@ public struct Backtrace: CustomStringConvertible, Sendable {
   }
 
   /// The architecture of the system that captured this backtrace.
-  public var architecture: String
+  public internal(set) var architecture: String
 
   /// The actual backtrace data, stored in Compact Backtrace Format.
   var representation: [UInt8]
@@ -345,7 +345,7 @@ public struct Backtrace: CustomStringConvertible, Sendable {
 
   /// Provide a textual version of the backtrace.
   public var description: String {
-    var lines: [String] = []
+    var lines: [String] = ["Architecture: \(architecture)", ""]
 
     var n = 0
     for frame in frames {
