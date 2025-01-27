@@ -18,4 +18,11 @@
 @property void *z;
 @end
 
+// Direct access to FirstClass for tests that need it.
+
+static inline void *FirstClassPointerRaw(void) {
+  extern char OBJC_CLASS_$_FirstClass;
+  return &OBJC_CLASS_$_FirstClass;
+}
+
 #endif
