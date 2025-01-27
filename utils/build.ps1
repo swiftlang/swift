@@ -1503,7 +1503,7 @@ function Build-Compilers() {
       if ($TestLLD) { $Targets += @("check-lld") }
       if ($TestSwift) { $Targets += @("check-swift", "SwiftCompilerPlugin") }
       if ($TestLLDB) {
-        $Targets += @("check-lldb", "check-lldb", "check-lldb", "check-lldb", "check-lldb", "check-lldb", "check-lldb", "check-lldb", "check-lldb", "check-lldb", "check-lldb", "check-lldb", "check-lldb", "check-lldb", "check-lldb", "check-lldb", "check-lldb", "check-lldb", "check-lldb", "check-lldb")
+        $Targets += @("check-lldb")
 
         function Select-LitTestOverrides {
           param([string] $TestStatus)
