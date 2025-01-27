@@ -225,6 +225,33 @@ extension _StringGuts {
     return _foreignConvertedToSmall()
   }
 
+  private mutating func _shouldBeSmall(afterAppendingCount otherCount: Int) -> Bool {
+    let totalCount = utf8Count + otherCount
+
+    /*
+    Special case: a non-smol String that can fit in a smol String but doesn't
+      meet the above criteria shouldn't throw away its buffer just to be smol.
+      The reasoning here is that it may be bridged or have reserveCapacity'd
+      in preparation for appending more later, in which case we would end up
+      have to allocate anyway to convert back from smol.
+
+      If we would have to re-allocate anyway then that's not a problem and we
+      should just be smol.
+
+      e.g. consider
+      var str = "" // smol
+      str.reserveCapacity(100) // large native unique
+      str += "<html>" // don't convert back to smol here!
+      str += htmlContents // because this would have to anyway!
+     */
+    let hasEnoughUsableSpace = isUniqueNative &&
+      nativeUnusedCapacity! >= otherCount
+    let shouldBeSmol = totalCount <= _SmallString.capacity &&
+      (isSmall || !hasEnoughUsableSpace)
+
+    return shouldBeSmol
+  }
+
   internal mutating func append(_ slicedOther: _StringGutsSlice) {
     defer { self._invariantCheck() }
 
@@ -238,28 +265,8 @@ extension _StringGuts {
      • Not uniquely owned and native: we can't use the capacity to grow into,
         have to become unique + native by allocating
      • Not enough capacity: have to allocate to grow
-
-     Special case: a non-smol String that can fit in a smol String but doesn't
-        meet the above criteria shouldn't throw away its buffer just to be smol.
-        The reasoning here is that it may be bridged or have reserveCapacity'd
-        in preparation for appending more later, in which case we would end up
-        have to allocate anyway to convert back from smol.
-
-        If we would have to re-allocate anyway then that's not a problem and we
-        should just be smol.
-
-        e.g. consider
-        var str = "" // smol
-        str.reserveCapacity(100) // large native unique
-        str += "<html>" // don't convert back to smol here!
-        str += htmlContents // because this would have to anyway!
      */
-    let hasEnoughUsableSpace = isUniqueNative &&
-      nativeUnusedCapacity! >= otherCount
-    let shouldBeSmol = totalCount <= _SmallString.capacity &&
-      (isSmall || !hasEnoughUsableSpace)
-
-    if shouldBeSmol {
+    if _shouldBeSmall(afterAppendingCount: otherCount) {
       let smolSelf = _convertedToSmall()
       let smolOther = String(Substring(slicedOther))._guts._convertedToSmall()
       // TODO: In-register slicing
@@ -278,6 +285,32 @@ extension _StringGuts {
     }
 
     _foreignAppendInPlace(slicedOther)
+  }
+
+  internal mutating func append(_ other: UnsafeBufferPointer<UInt8>, isASCII: Bool) {
+    defer { self._invariantCheck() }
+
+    let otherCount = other.count
+
+    let totalCount = utf8Count + otherCount
+
+    /*
+     Goal: determine if we need to allocate new native capacity
+     Possible scenarios in which we need to allocate:
+     • Not uniquely owned and native: we can't use the capacity to grow into,
+        have to become unique + native by allocating
+     • Not enough capacity: have to allocate to grow
+     */
+    if _shouldBeSmall(afterAppendingCount: otherCount) {
+      let smolSelf = _convertedToSmall()
+      let smolOther = _SmallString(other)!
+      // TODO: In-register slicing
+      self = _StringGuts(_SmallString(smolSelf, appending: smolOther)!)
+      return
+    }
+
+    prepareForAppendInPlace(totalCount: totalCount, otherUTF8Count: otherCount)
+    self.appendInPlace(other, isASCII: isASCII)
   }
 
   internal mutating func appendInPlace(
