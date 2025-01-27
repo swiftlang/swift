@@ -905,6 +905,7 @@ function Build-CMakeProject {
     [string[]] $UsePinnedCompilers = @(), # ASM,C,CXX,Swift
     [switch] $UseSwiftSwiftDriver = $false,
     [switch] $AddAndroidCMakeEnv = $false,
+    [switch] $UseGNUDriver = $false,
     [string] $SwiftSDK = "",
     [hashtable] $Defines = @{}, # Values are either single strings or arrays of flags
     [string[]] $BuildTargets = @()
@@ -992,7 +993,11 @@ function Build-CMakeProject {
     $CFlags = @()
     switch ($Platform) {
       Windows {
-        $CFlags = @("/GS-", "/Gw", "/Gy", "/Oi", "/Oy", "/Zc:inline")
+        $CFlags = if ($UseGNUDriver) {
+          @("-fno-stack-protector", "-ffunction-sections", "-fdata-sections", "-fomit-frame-pointer")
+        } else {
+          @("/GS-", "/Gw", "/Gy", "/Oi", "/Oy", "/Zc:inline")
+        }
       }
       Android {
         $CFlags = @("--sysroot=$(Get-AndroidNDKPath)\toolchains\llvm\prebuilt\windows-x86_64\sysroot")
@@ -1000,7 +1005,7 @@ function Build-CMakeProject {
     }
 
     $CXXFlags = @()
-    if ($Platform -eq "Windows") {
+    if ($Platform -eq "Windows" -and -not $UseGNUDriver) {
       $CXXFlags += $CFlags.Clone() + @("/Zc:__cplusplus")
     }
 
@@ -1011,8 +1016,13 @@ function Build-CMakeProject {
         Append-FlagsDefine $Defines CMAKE_MSVC_DEBUG_INFORMATION_FORMAT Embedded
         Append-FlagsDefine $Defines CMAKE_POLICY_CMP0141 NEW
         # Add additional linker flags for generating the debug info.
-        Append-FlagsDefine $Defines CMAKE_SHARED_LINKER_FLAGS "/debug"
-        Append-FlagsDefine $Defines CMAKE_EXE_LINKER_FLAGS "/debug"
+        if ($UseGNUDriver) {
+          Append-FlagsDefine $Defines CMAKE_SHARED_LINKER_FLAGS "-Xlinker -debug"
+          Append-FlagsDefine $Defines CMAKE_EXE_LINKER_FLAGS "-Xlinker -debug"
+        } else {
+          Append-FlagsDefine $Defines CMAKE_SHARED_LINKER_FLAGS "/debug"
+          Append-FlagsDefine $Defines CMAKE_EXE_LINKER_FLAGS "/debug"
+        }
       } elseif ($Platform -eq "Android") {
         # Use a built lld linker as the Android's NDK linker might be too
         # old and not support all required relocations needed by the Swift
@@ -1050,7 +1060,7 @@ function Build-CMakeProject {
       }
     }
     if ($UsePinnedCompilers.Contains("C") -Or $UseBuiltCompilers.Contains("C")) {
-      $Driver = if ($Platform -eq "Windows") { "clang-cl.exe" } else { "clang.exe" }
+      $Driver = if ($Platform -eq "Windows" -and -not $UseGNUDriver) { "clang-cl.exe" } else { "clang.exe" }
       if ($UseBuiltCompilers.Contains("C")) {
         TryAdd-KeyValue $Defines CMAKE_C_COMPILER ([IO.Path]::Combine($CompilersBinaryCache, "bin", $Driver))
       } else {
@@ -1064,7 +1074,7 @@ function Build-CMakeProject {
       Append-FlagsDefine $Defines CMAKE_C_FLAGS $CFlags
     }
     if ($UsePinnedCompilers.Contains("CXX") -Or $UseBuiltCompilers.Contains("CXX")) {
-      $Driver = if ($Platform -eq "Windows") { "clang-cl.exe" } else { "clang++.exe" }
+      $Driver = if ($Platform -eq "Windows" -and -not $UseGNUDriver) { "clang-cl.exe" } else { "clang++.exe" }
       if ($UseBuiltCompilers.Contains("CXX")) {
         TryAdd-KeyValue $Defines CMAKE_CXX_COMPILER ([IO.Path]::Combine($CompilersBinaryCache, "bin", $Driver))
       } else {
