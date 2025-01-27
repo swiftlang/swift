@@ -1575,6 +1575,12 @@ TypeChecker::availabilityAtLocation(SourceLoc loc, const DeclContext *DC,
   return availability;
 }
 
+AvailabilityContext
+TypeChecker::availabilityForDeclSignature(const Decl *decl) {
+  return TypeChecker::availabilityAtLocation(decl->getLoc(),
+                                             decl->getInnermostDeclContext());
+}
+
 AvailabilityRange TypeChecker::overApproximateAvailabilityAtLocation(
     SourceLoc loc, const DeclContext *DC,
     const AvailabilityScope **MostRefined) {

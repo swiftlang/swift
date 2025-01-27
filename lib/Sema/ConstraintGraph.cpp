@@ -552,19 +552,17 @@ void ConstraintGraph::retractBindings(TypeVariableType *typeVar,
 
 #pragma mark Algorithms
 
-/// Perform a depth-first search.
-///
-/// \param cg The constraint graph.
-/// \param typeVar The type variable we're searching from.
-/// \param visitConstraint Called before considering a constraint.
-/// \param visitedConstraints Set of already-visited constraints, used
-/// internally to avoid duplicated work.
 static void depthFirstSearch(
     ConstraintGraph &cg,
     TypeVariableType *typeVar,
-    llvm::function_ref<void(Constraint *)> visitConstraint,
     llvm::SmallPtrSet<TypeVariableType *, 4> &typeVars,
+    llvm::TinyPtrVector<Constraint *> &constraints,
     llvm::SmallPtrSet<Constraint *, 8> &visitedConstraints) {
+  // If we're not looking at this type variable right now because we're
+  // solving a conjunction element, don't consider its adjacencies.
+  if (!cg.getConstraintSystem().isActiveTypeVariable(typeVar))
+    return;
+
   // Visit this node. If we've already seen it, bail out.
   if (!typeVars.insert(typeVar).second)
     return;
@@ -572,11 +570,8 @@ static void depthFirstSearch(
   // Local function to visit adjacent type variables.
   auto visitAdjacencies = [&](ArrayRef<TypeVariableType *> adjTypeVars) {
     for (auto adj : adjTypeVars) {
-      if (adj == typeVar)
-        continue;
-
-      // Recurse into this node.
-      depthFirstSearch(cg, adj, visitConstraint, typeVars, visitedConstraints);
+      if (adj != typeVar)
+        depthFirstSearch(cg, adj, typeVars, constraints, visitedConstraints);
     }
   };
 
@@ -587,7 +582,7 @@ static void depthFirstSearch(
     if (!visitedConstraints.insert(constraint).second)
       continue;
 
-    visitConstraint(constraint);
+    constraints.push_back(constraint);
   }
 
   // Visit all of the other nodes in the equivalence class.
@@ -606,28 +601,22 @@ static void depthFirstSearch(
   visitAdjacencies(node.getReferencedVars());
 }
 
-llvm::TinyPtrVector<Constraint *> ConstraintGraph::gatherConstraints(
-    TypeVariableType *typeVar, GatheringKind kind,
-    llvm::function_ref<bool(Constraint *)> acceptConstraintFn) {
+llvm::TinyPtrVector<Constraint *> ConstraintGraph::gatherAllConstraints(
+    TypeVariableType *typeVar) {
   llvm::TinyPtrVector<Constraint *> constraints;
   llvm::SmallPtrSet<TypeVariableType *, 4> typeVars;
   llvm::SmallPtrSet<Constraint *, 8> visitedConstraints;
 
-  if (kind == GatheringKind::AllMentions) {
-    // If we've been asked for "all mentions" of a type variable, search for
-    // constraints involving both it and its fixed bindings.
-    depthFirstSearch(
-        *this, typeVar,
-        [&](Constraint *constraint) {
-          if (acceptConstraintFn(constraint))
-            constraints.push_back(constraint);
-        },
-        typeVars, visitedConstraints);
-    return constraints;
-  }
+  depthFirstSearch(*this, typeVar, typeVars, constraints, visitedConstraints);
+  return constraints;
+}
 
-  // Otherwise only search in the type var's equivalence class and immediate
-  // fixed bindings.
+llvm::TinyPtrVector<Constraint *> ConstraintGraph::gatherNearbyConstraints(
+    TypeVariableType *typeVar, 
+    llvm::function_ref<bool(Constraint *)> acceptConstraintFn) {
+  llvm::TinyPtrVector<Constraint *> constraints;
+  llvm::SmallPtrSet<TypeVariableType *, 4> typeVars;
+  llvm::SmallPtrSet<Constraint *, 8> visitedConstraints;
 
   // Local function to add constraints.
   auto addTypeVarConstraints = [&](TypeVariableType *adjTypeVar) {
