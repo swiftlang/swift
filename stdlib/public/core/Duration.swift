@@ -99,6 +99,22 @@ extension Duration {
   }
 }
 
+extension Duration {
+  /// The duration represented in attoseconds.
+  @available(SwiftStdlib 6.0, *)
+  @_alwaysEmitIntoClient
+  public var attoseconds: Int128 {
+    Int128(_low: _low, _high: _high)
+  }
+  
+  /// Initializes a `Duration` from the given number of attoseconds.
+  @available(SwiftStdlib 6.0, *)
+  @_alwaysEmitIntoClient
+  public init(attoseconds: Int128) {
+    self.init(_high: attoseconds._high, low: attoseconds._low)
+  }
+}
+
 @available(SwiftStdlib 5.7, *)
 extension Duration {
   /// Construct a `Duration` given a number of seconds represented as a 
