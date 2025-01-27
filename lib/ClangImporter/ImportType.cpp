@@ -2660,7 +2660,6 @@ bool ClangImporter::Implementation::isDefaultArgSafeToImport(
 }
 
 static ParamDecl *getParameterInfo(ClangImporter::Implementation *impl,
-                                   DeclContext *dc,
                                    const clang::ParmVarDecl *param,
                                    const Identifier &name,
                                    const swift::Type &swiftParamTy,
@@ -2710,7 +2709,7 @@ static ParamDecl *getParameterInfo(ClangImporter::Implementation *impl,
       !param->isTemplated()) {
     SwiftDeclSynthesizer synthesizer(*impl);
     if (CallExpr *defaultArgExpr = synthesizer.makeDefaultArgument(
-            dc, param, swiftParamTy, paramInfo->getParameterNameLoc())) {
+            param, swiftParamTy, paramInfo->getParameterNameLoc())) {
       paramInfo->setDefaultArgumentKind(DefaultArgumentKind::Normal);
       paramInfo->setTypeCheckedDefaultExpr(defaultArgExpr);
       paramInfo->setDefaultValueStringRepresentation("cxxDefaultArg");
@@ -2775,8 +2774,8 @@ ParameterList *ClangImporter::Implementation::importFunctionParameterList(
       name = argNames[index];
 
     auto paramInfo =
-        getParameterInfo(this, dc, param, name, swiftParamTy, isInOut,
-                         isConsuming, isParamTypeImplicitlyUnwrapped);
+        getParameterInfo(this, param, name, swiftParamTy, isInOut, isConsuming,
+                         isParamTypeImplicitlyUnwrapped);
     parameters.push_back(paramInfo);
     ++index;
   }
@@ -3412,8 +3411,8 @@ ImportedType ClangImporter::Implementation::importMethodParamsAndReturnType(
 
     // Set up the parameter info
     auto paramInfo =
-        getParameterInfo(this, origDC, param, name, swiftParamTy, isInOut,
-                         isConsuming, isParamTypeImplicitlyUnwrapped);
+        getParameterInfo(this, param, name, swiftParamTy, isInOut, isConsuming,
+                         isParamTypeImplicitlyUnwrapped);
 
     // Determine whether we have a default argument.
     if (kind == SpecialMethodKind::Regular ||

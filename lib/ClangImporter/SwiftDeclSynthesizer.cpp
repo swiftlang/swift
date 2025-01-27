@@ -2477,9 +2477,10 @@ synthesizeDefaultArgumentBody(AbstractFunctionDecl *afd, void *context) {
   return {body, /*isTypeChecked=*/true};
 }
 
-CallExpr *SwiftDeclSynthesizer::makeDefaultArgument(
-    DeclContext *dc, const clang::ParmVarDecl *param,
-    const swift::Type &swiftParamTy, SourceLoc paramLoc) {
+CallExpr *
+SwiftDeclSynthesizer::makeDefaultArgument(const clang::ParmVarDecl *param,
+                                          const swift::Type &swiftParamTy,
+                                          SourceLoc paramLoc) {
   assert(param->hasDefaultArg() && "must have a C++ default argument");
   if (!param->getIdentifier())
     // Work around an assertion failure in CXXNameMangler::mangleUnqualifiedName
@@ -2502,18 +2503,15 @@ CallExpr *SwiftDeclSynthesizer::makeDefaultArgument(
   os << "__defaultArg_" << param->getFunctionScopeIndex() << "_";
   ImporterImpl.getMangledName(mangler.get(), clangFunc, os);
 
-  // Synthesize `static private func __defaultArg_XYZ() -> ParamTy { ... }`
-  // in the context of the function where the param is declared.
+  // Synthesize `func __defaultArg_XYZ() -> ParamTy { ... }`.
   DeclName funcName(ctx, DeclBaseName(ctx.getIdentifier(s)),
                     ParameterList::createEmpty(ctx));
   auto funcDecl = FuncDecl::createImplicit(
-      ctx, StaticSpellingKind::KeywordStatic, funcName, paramLoc, false, false,
-      Type(), {}, ParameterList::createEmpty(ctx), swiftParamTy, dc);
+      ctx, StaticSpellingKind::None, funcName, paramLoc, false, false, Type(),
+      {}, ParameterList::createEmpty(ctx), swiftParamTy,
+      ImporterImpl.ImportedHeaderUnit);
   funcDecl->setBodySynthesizer(synthesizeDefaultArgumentBody, (void *)param);
-  funcDecl->setAccess(AccessLevel::Private); // This is necessary in case the
-                                             // default parameter involves any
-                                             // private types, which are
-                                             // forbidden in public functions.
+  funcDecl->setAccess(AccessLevel::Public);
 
   ImporterImpl.defaultArgGenerators[param] = funcDecl;
 
