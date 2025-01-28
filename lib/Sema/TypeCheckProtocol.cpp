@@ -1670,16 +1670,14 @@ bool WitnessChecker::findBestWitness(
     // interface can be treated as opaque.
     // FIXME: ...but we should do something better about types.
     if (conformance && !conformance->isInvalid()) {
-      if (auto *SF = DC->getParentSourceFile()) {
-        if (SF->Kind == SourceFileKind::Interface) {
-          auto match = matchWitness(ReqEnvironmentCache, Proto,
-                                    conformance, DC, requirement, requirement);
-          if (match.isViable()) {
-            numViable = 1;
-            bestIdx = matches.size();
-            matches.push_back(std::move(match));
-            return true;
-          }
+      if (DC->isInSwiftinterface()) {
+        auto match = matchWitness(ReqEnvironmentCache, Proto, conformance, DC,
+                                  requirement, requirement);
+        if (match.isViable()) {
+          numViable = 1;
+          bestIdx = matches.size();
+          matches.push_back(std::move(match));
+          return true;
         }
       }
     }
@@ -4651,8 +4649,7 @@ ResolveWitnessResult ConformanceChecker::resolveWitnessViaDerivation(
                        ValueDecl *requirement) {
   assert(!isa<AssociatedTypeDecl>(requirement) && "Use resolveTypeWitnessVia*");
 
-  auto *SF = DC->getParentSourceFile();
-  if (SF != nullptr && SF->Kind == SourceFileKind::Interface)
+  if (DC->isInSwiftinterface())
     return ResolveWitnessResult::Missing;
 
   // Find the declaration that derives the protocol conformance.

@@ -457,8 +457,7 @@ InFlightDiagnostic::warnUntilSwiftVersion(unsigned majorVersion) {
 
 InFlightDiagnostic &
 InFlightDiagnostic::warnInSwiftInterface(const DeclContext *context) {
-  auto sourceFile = context->getParentSourceFile();
-  if (sourceFile && sourceFile->Kind == SourceFileKind::Interface) {
+  if (context->isInSwiftinterface()) {
     return limitBehavior(DiagnosticBehavior::Warning);
   }
 
