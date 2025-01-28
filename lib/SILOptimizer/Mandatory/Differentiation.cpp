@@ -914,7 +914,8 @@ bool DifferentiationTransformer::canonicalizeDifferentiabilityWitness(
   // flag. Important exception here hidden_external functions as they are
   // serializable but corresponding hidden ones would be not and the SIL
   // verifier will fail. Patch `serializeFunctions` for this case.
-  if (orig->getLinkage() == SILLinkage::HiddenExternal)
+  if (orig->getLinkage() == SILLinkage::HiddenExternal &&
+      !orig->markedAsAlwaysEmitIntoClient())
     serializeFunctions = IsNotSerialized;
 
   // If the JVP doesn't exist, need to synthesize it.

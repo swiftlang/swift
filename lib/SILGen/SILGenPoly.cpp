@@ -6282,10 +6282,19 @@ SILFunction *SILGenModule::getOrCreateCustomDerivativeThunk(
   SILGenFunctionBuilder fb(*this);
   // Derivative thunks have the same linkage as the original function, stripping
   // external.
-  auto linkage = stripExternalFromLinkage(originalFn->getLinkage());
+  auto linkage = originalFn->markedAsAlwaysEmitIntoClient()
+                     ? SILLinkage::PublicNonABI
+                     : stripExternalFromLinkage(originalFn->getLinkage());
+
+  auto serializedKind = customDerivativeFn->getSerializedKind();
+  // See comment for an identical if statement in
+  // DifferentiationTransformer::canonicalizeDifferentiabilityWitness.
+  if (originalFn->getLinkage() == SILLinkage::HiddenExternal &&
+      !originalFn->markedAsAlwaysEmitIntoClient())
+    serializedKind = IsNotSerialized;
+
   auto *thunk = fb.getOrCreateFunction(
-      loc, name, linkage, thunkFnTy, IsBare, IsNotTransparent,
-      customDerivativeFn->getSerializedKind(),
+      loc, name, linkage, thunkFnTy, IsBare, IsNotTransparent, serializedKind,
       customDerivativeFn->isDynamicallyReplaceable(),
       customDerivativeFn->isDistributed(),
       customDerivativeFn->isRuntimeAccessible(),

@@ -1,0 +1,25 @@
+// REQUIRES: executable_test
+// RUN: %empty-directory(%t)
+
+// RUN: %target-build-swift-dylib(%t/%target-library-name(SingleFileModule)) %S/Inputs/SingleFileModule/file.swift \
+// RUN:   -emit-module -emit-module-path %t/SingleFileModule.swiftmodule -module-name SingleFileModule
+// RUN: %target-build-swift -I%t -L%t %s -lm -lSingleFileModule -o %t/a.out %target-rpath(%t)
+// RUN: %target-run %t/a.out
+
+// RUN: %target-build-swift -I%t %s -emit-ir | %FileCheck %s
+
+import SingleFileModule
+import StdlibUnittest
+import _Differentiation
+
+var AlwaysEmitIntoClientTests = TestSuite("AlwaysEmitIntoClient")
+
+AlwaysEmitIntoClientTests.test("registration") {
+  expectEqual(42, gradient(at: 0, of: f))
+  expectEqual(42, gradient(at: 1, of: f))
+  expectEqual(42, gradient(at: 2, of: f))
+}
+
+runAllTests()
+
+// CHECK: @"16SingleFileModule1fyS2fFWJrSpSr" = weak_odr hidden global { ptr, ptr } { ptr @"$s16SingleFileModule1fyS2fFTJfSpSr", ptr @"$s16SingleFileModule1fyS2fFTJrSpSr" }, align 8

@@ -538,9 +538,11 @@ SILDifferentiabilityWitness *getOrCreateMinimalASTDifferentiabilityWitness(
          "definitions with explicit differentiable attributes");
 
   return SILDifferentiabilityWitness::createDeclaration(
-      module, SILLinkage::PublicExternal, original, kind,
-      minimalConfig->parameterIndices, minimalConfig->resultIndices,
-      minimalConfig->derivativeGenericSignature);
+      module,
+      original->markedAsAlwaysEmitIntoClient() ? SILLinkage::PublicNonABI
+                                               : SILLinkage::PublicExternal,
+      original, kind, minimalConfig->parameterIndices,
+      minimalConfig->resultIndices, minimalConfig->derivativeGenericSignature);
 }
 
 } // end namespace autodiff
