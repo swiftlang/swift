@@ -1900,9 +1900,21 @@ public:
     // If this closure has a `weak self` capture, require that the
     // closure unwraps self. If not, implicit self is not allowed
     // in this closure or in any nested closure.
-    if (closureHasWeakSelfCapture(inClosure) &&
-        !hasValidSelfRebinding(parentConditionalStmt(selfDecl), ctx)) {
-      return false;
+    if (closureHasWeakSelfCapture(inClosure)) {
+      // If a `guard let self` or `if let self` unbinding condition exists,
+      // then it must not be invalid.
+      if (auto condStmt = parentConditionalStmt(selfDecl)) {
+        if (!hasValidSelfRebinding(condStmt, ctx)) {
+          return false;
+        }
+      }
+
+      // If the self decl hasn't been unwrapped, then this closure is
+      // invalid unless non-unwrapped weak self is explicitly enabled
+      // in this situation.
+      else if (validateSelfRebindings) {
+        return false;
+      }
     }
 
     if (auto autoclosure = dyn_cast<AutoClosureExpr>(inClosure)) {
@@ -2048,10 +2060,15 @@ public:
         // Check whether implicit self is disallowed due to this specific
         // closure, or if its disallowed due to some parent of this closure,
         // so we can return the specific closure that is invalid.
+        //
+        // If this is a `weak self` capture, we don't need to validate that
+        // that capture has been unwrapped in a `let self = self` binding
+        // within the parent closure. A self rebinding in this inner closure
+        // is sufficient to enable implicit self.
         if (!selfDeclAllowsImplicitSelf(outerSelfDecl, captureType,
                                         outerClosure,
                                         /*validateParentClosures:*/ false,
-                                        /*validateSelfRebindings:*/ true)) {
+                                        /*validateSelfRebindings:*/ false)) {
           return outerClosure;
         }
 
