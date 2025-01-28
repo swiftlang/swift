@@ -10,7 +10,7 @@ struct Slab<let N: Int, Element: ~Copyable>: ~Copyable {
 
 extension Slab: Copyable where Element: Copyable {}
 
-// CHECK-DAG: !DICompositeType({{.*}}name: "Builtin.FixedArray", {{.*}}identifier: "$sxq_BVD"
+// CHECK-DAG: !DICompositeType({{.*}}name: "$sxq_BVD"
 func genericBA<let N: Int, Element>(_: Builtin.FixedArray<N, Element>) {}
 
 // CHECK-DAG: !DICompositeType({{.*}}name: "$s4main4SlabVyxq_GD"
@@ -24,5 +24,5 @@ func concreteBA(_: Builtin.FixedArray<4, Int>) {}
 // CHECK-DAG: ![[COUNT_PARAM]] = !DITemplateTypeParameter(type: ![[COUNT_TYPE:.*]])
 // CHECK-DAG: ![[COUNT_TYPE]] = !DICompositeType({{.*}}name: "$s$1_D"
 // CHECK-DAG: ![[ELEMENT_PARAM]] = !DITemplateTypeParameter(type: ![[ELEMENT_TYPE:.*]])
-// CHECK-DAG: ![[ELEMENT_TYPE]] = !DICompositeType({{.*}}name: "$sSiD"
+// CHECK-DAG: ![[ELEMENT_TYPE]] = !DICompositeType({{.*}}identifier: "$sSiD"
 func concreteV(_: Slab<2, Int>) {}

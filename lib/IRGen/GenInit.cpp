@@ -44,7 +44,7 @@ void IRGenModule::emitSILGlobalVariable(SILGlobalVariable *var) {
   // variable directly, don't actually emit it; just return undef.
   if (ti.isKnownEmpty(expansion)) {
     if (DebugInfo && var->getDecl()) {
-      auto DbgTy = DebugTypeInfo::getGlobal(var, Int8Ty, *this);
+      auto DbgTy = DebugTypeInfo::getGlobal(var, *this);
       DebugInfo->emitGlobalVariableDeclaration(nullptr, var->getDecl()->getName().str(),
                                                "", DbgTy,
                                                var->getLinkage() != SILLinkage::Public &&
