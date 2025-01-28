@@ -18,7 +18,11 @@
 using namespace swift;
 
 std::optional<AvailabilityDomain>
-AvailabilityDomain::builtinDomainForString(StringRef string) {
+AvailabilityDomain::builtinDomainForString(StringRef string,
+                                           const DeclContext *declContext) {
+  // This parameter is used in downstream forks, do not remove.
+  (void)declContext;
+
   auto domain = llvm::StringSwitch<std::optional<AvailabilityDomain>>(string)
                     .Case("*", AvailabilityDomain::forUniversal())
                     .Case("swift", AvailabilityDomain::forSwiftLanguage())

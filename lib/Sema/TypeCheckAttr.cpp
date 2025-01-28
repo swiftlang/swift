@@ -8284,7 +8284,8 @@ SemanticAvailableAttrRequest::evaluate(swift::Evaluator &evaluator,
 
     // Attempt to resolve the domain specified for the attribute and diagnose
     // if no domain is found.
-    domain = AvailabilityDomain::builtinDomainForString(*string);
+    auto declContext = decl->getInnermostDeclContext();
+    domain = AvailabilityDomain::builtinDomainForString(*string, declContext);
     if (!domain) {
       if (auto suggestion = closestCorrectedPlatformString(*string)) {
         diags
