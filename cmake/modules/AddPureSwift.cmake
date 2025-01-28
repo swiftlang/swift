@@ -63,7 +63,6 @@ function(_add_host_swift_compile_options name)
       target_compile_options(${name} PRIVATE $<$<COMPILE_LANGUAGE:Swift>:-tools-directory;${tools_path};>)
     endif()
   endif()
-  _add_host_variant_swift_sanitizer_flags(${name})
 
   target_compile_options(${name} PRIVATE
     $<$<COMPILE_LANGUAGE:Swift>:-color-diagnostics>
