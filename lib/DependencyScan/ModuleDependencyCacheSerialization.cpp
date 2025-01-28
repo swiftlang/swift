@@ -19,6 +19,7 @@
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/Support/VirtualOutputBackend.h"
 #include <unordered_map>
+#include <format>
 
 using namespace swift;
 using namespace dependencies;
@@ -58,6 +59,7 @@ class ModuleDependenciesCacheDeserializer {
   bool readSignature();
   bool enterGraphBlock();
   bool readMetadata(StringRef scannerContextHash);
+  bool readSerializationTime(llvm::sys::TimePoint<> &SerializationTimeStamp);
   bool readGraph(ModuleDependenciesCache &cache);
 
   std::optional<std::string> getIdentifier(unsigned n);
@@ -76,7 +78,8 @@ class ModuleDependenciesCacheDeserializer {
 public:
   ModuleDependenciesCacheDeserializer(llvm::MemoryBufferRef Data)
       : Cursor(Data) {}
-  bool readInterModuleDependenciesCache(ModuleDependenciesCache &cache);
+  bool readInterModuleDependenciesCache(ModuleDependenciesCache &cache,
+                                        llvm::sys::TimePoint<> &serializedCacheTimeStamp);
 };
 
 } // namespace swift
@@ -175,6 +178,35 @@ bool ModuleDependenciesCacheDeserializer::readMetadata(StringRef scannerContextH
     return true;
 
   return false;
+}
+
+bool ModuleDependenciesCacheDeserializer::readSerializationTime(llvm::sys::TimePoint<> &SerializationTimeStamp) {
+  using namespace graph_block;
+
+  auto entry = Cursor.advance();
+  if (!entry) {
+    consumeError(entry.takeError());
+    return true;
+  }
+
+  if (entry->Kind != llvm::BitstreamEntry::Record)
+    return true;
+
+  auto recordID = Cursor.readRecord(entry->ID, Scratch, &BlobData);
+  if (!recordID) {
+    consumeError(recordID.takeError());
+    return true;
+  }
+
+  if (*recordID != TIME_NODE)
+    return true;
+  
+  TimeLayout::readRecord(Scratch);
+  std::string serializedTimeStamp = BlobData.str();
+  
+  SerializationTimeStamp =
+    llvm::sys::TimePoint<>(llvm::sys::TimePoint<>::duration(std::stoll(serializedTimeStamp)));
+  return SerializationTimeStamp == llvm::sys::TimePoint<>();
 }
 
 /// Read in the top-level block's graph structure by first reading in
@@ -808,7 +840,8 @@ bool ModuleDependenciesCacheDeserializer::readGraph(
 }
 
 bool ModuleDependenciesCacheDeserializer::readInterModuleDependenciesCache(
-    ModuleDependenciesCache &cache) {
+    ModuleDependenciesCache &cache,
+    llvm::sys::TimePoint<> &serializedCacheTimeStamp) {
   using namespace graph_block;
 
   if (readSignature())
@@ -818,6 +851,9 @@ bool ModuleDependenciesCacheDeserializer::readInterModuleDependenciesCache(
     return true;
 
   if (readMetadata(cache.scannerContextHash))
+    return true;
+  
+  if (readSerializationTime(serializedCacheTimeStamp))
     return true;
 
   if (readGraph(cache))
@@ -992,21 +1028,23 @@ ModuleDependenciesCacheDeserializer::getModuleDependencyIDArray(unsigned n) {
 
 bool swift::dependencies::module_dependency_cache_serialization::
     readInterModuleDependenciesCache(llvm::MemoryBuffer &buffer,
-                                     ModuleDependenciesCache &cache) {
+                                     ModuleDependenciesCache &cache,
+                                     llvm::sys::TimePoint<> &serializedCacheTimeStamp) {
   ModuleDependenciesCacheDeserializer deserializer(buffer.getMemBufferRef());
-  return deserializer.readInterModuleDependenciesCache(cache);
+  return deserializer.readInterModuleDependenciesCache(cache, serializedCacheTimeStamp);
 }
 
 bool swift::dependencies::module_dependency_cache_serialization::
     readInterModuleDependenciesCache(StringRef path,
-                                     ModuleDependenciesCache &cache) {
+                                     ModuleDependenciesCache &cache,
+                                     llvm::sys::TimePoint<> &serializedCacheTimeStamp) {
   PrettyStackTraceStringAction stackTrace(
       "loading inter-module dependency graph", path);
   auto buffer = llvm::MemoryBuffer::getFile(path);
   if (!buffer)
     return true;
 
-  return readInterModuleDependenciesCache(*buffer.get(), cache);
+  return readInterModuleDependenciesCache(*buffer.get(), cache, serializedCacheTimeStamp);
 }
 
 // MARK: Serialization
@@ -1126,6 +1164,7 @@ class ModuleDependenciesCacheSerializer {
   void writeBlockInfoBlock();
 
   void writeMetadata(StringRef scanningContextHash);
+  void writeSerializationTime();
   void writeIdentifiers();
   void writeArraysOfIdentifiers();
 
@@ -1189,6 +1228,7 @@ void ModuleDependenciesCacheSerializer::writeBlockInfoBlock() {
 
   BLOCK(GRAPH_BLOCK);
   BLOCK_RECORD(graph_block, METADATA);
+  BLOCK_RECORD(graph_block, TIME_NODE);
   BLOCK_RECORD(graph_block, IDENTIFIER_NODE);
   BLOCK_RECORD(graph_block, IDENTIFIER_ARRAY_NODE);
 
@@ -1219,6 +1259,16 @@ void ModuleDependenciesCacheSerializer::writeMetadata(StringRef scanningContextH
                              MODULE_DEPENDENCY_CACHE_FORMAT_VERSION_MAJOR,
                              MODULE_DEPENDENCY_CACHE_FORMAT_VERSION_MINOR,
                              scanningContextHash);
+}
+
+void ModuleDependenciesCacheSerializer::writeSerializationTime() {
+  using namespace graph_block;
+  llvm::sys::TimePoint<> now = std::chrono::system_clock::now();
+  auto timeSinceEpoch = now.time_since_epoch().count();
+  std::string serializationData = std::to_string(timeSinceEpoch);
+  TimeLayout::emitRecord(Out, ScratchRecord,
+                         AbbrCodes[TimeLayout::Code],
+                         serializationData);
 }
 
 void ModuleDependenciesCacheSerializer::writeIdentifiers() {
@@ -1877,6 +1927,7 @@ void ModuleDependenciesCacheSerializer::writeInterModuleDependenciesCache(
   using namespace graph_block;
 
   registerRecordAbbr<MetadataLayout>();
+  registerRecordAbbr<TimeLayout>();
   registerRecordAbbr<IdentifierNodeLayout>();
   registerRecordAbbr<IdentifierArrayLayout>();
   registerRecordAbbr<LinkLibraryLayout>();
@@ -1891,13 +1942,16 @@ void ModuleDependenciesCacheSerializer::writeInterModuleDependenciesCache(
   registerRecordAbbr<SwiftBinaryModuleDetailsLayout>();
   registerRecordAbbr<SwiftPlaceholderModuleDetailsLayout>();
   registerRecordAbbr<ClangModuleDetailsLayout>();
-
+  
   // Make a pass to collect all unique strings and arrays
   // of strings
   collectStringsAndArrays(cache);
 
   // Write the version information
   writeMetadata(cache.scannerContextHash);
+
+  // The current time-stamp
+  writeSerializationTime();
 
   // Write the strings
   writeIdentifiers();
