@@ -2741,10 +2741,9 @@ Address IRGenModule::getAddrOfSILGlobalVariable(SILGlobalVariable *var,
       }
 
       DebugTypeInfo DbgTy =
-          inFixedBuffer
-              ? DebugTypeInfo::getGlobalFixedBuffer(
-                    var, globalTy, fixedSize, fixedAlignment)
-              : DebugTypeInfo::getGlobal(var, globalTy, *this);
+          inFixedBuffer ? DebugTypeInfo::getGlobalFixedBuffer(var, fixedSize,
+                                                              fixedAlignment)
+                        : DebugTypeInfo::getGlobal(var, *this);
 
       gvar = createVariable(*this, link, globalTy, fixedAlignment, DbgTy, loc, name);
     }
@@ -4738,8 +4737,8 @@ Address IRGenModule::getAddrOfObjCClassRef(ClassDecl *theClass) {
   assert(ObjCInterop && "getting address of ObjC class ref in no-interop mode");
 
   LinkEntity entity = LinkEntity::forObjCClassRef(theClass);
-  auto DbgTy = DebugTypeInfo::getObjCClass(
-      theClass, ObjCClassPtrTy, getPointerSize(), getPointerAlignment());
+  auto DbgTy = DebugTypeInfo::getObjCClass(theClass, getPointerSize(),
+                                           getPointerAlignment());
   auto addr = getAddrOfLLVMVariable(entity, ConstantInit(), DbgTy);
 
   // Define it lazily.
@@ -4764,8 +4763,8 @@ llvm::Constant *IRGenModule::getAddrOfObjCClass(ClassDecl *theClass,
   assert(ObjCInterop && "getting address of ObjC class in no-interop mode");
   assert(!theClass->isForeign());
   LinkEntity entity = LinkEntity::forObjCClass(theClass);
-  auto DbgTy = DebugTypeInfo::getObjCClass(
-      theClass, ObjCClassPtrTy, getPointerSize(), getPointerAlignment());
+  auto DbgTy = DebugTypeInfo::getObjCClass(theClass, getPointerSize(),
+                                           getPointerAlignment());
   auto addr = getAddrOfLLVMVariable(entity, forDefinition, DbgTy);
   return addr;
 }
@@ -4784,8 +4783,8 @@ IRGenModule::getAddrOfMetaclassObject(ClassDecl *decl,
                     ? LinkEntity::forObjCMetaclass(decl)
                     : LinkEntity::forSwiftMetaclassStub(decl);
 
-  auto DbgTy = DebugTypeInfo::getObjCClass(
-      decl, ObjCClassPtrTy, getPointerSize(), getPointerAlignment());
+  auto DbgTy = DebugTypeInfo::getObjCClass(decl, getPointerSize(),
+                                           getPointerAlignment());
   auto addr = getAddrOfLLVMVariable(entity, forDefinition, DbgTy);
   return addr;
 }
@@ -4800,8 +4799,8 @@ IRGenModule::getAddrOfCanonicalSpecializedGenericMetaclassObject(
   auto entity =
       LinkEntity::forSpecializedGenericSwiftMetaclassStub(concreteType);
 
-  auto DbgTy = DebugTypeInfo::getObjCClass(
-      theClass, ObjCClassPtrTy, getPointerSize(), getPointerAlignment());
+  auto DbgTy = DebugTypeInfo::getObjCClass(theClass, getPointerSize(),
+                                           getPointerAlignment());
   auto addr = getAddrOfLLVMVariable(entity, forDefinition, DbgTy);
   return addr;
 }
@@ -5149,10 +5148,8 @@ llvm::GlobalValue *IRGenModule::defineTypeMetadata(
                                          TypeMetadataAddress::AddressPoint);
   }
 
-  auto DbgTy = DebugTypeInfo::getGlobalMetadata(
-      MetatypeType::get(concreteType),
-      entity.getDefaultDeclarationType(*this)->getPointerTo(), Size(0),
-      Alignment(1));
+  auto DbgTy = DebugTypeInfo::getGlobalMetadata(MetatypeType::get(concreteType),
+                                                Size(0), Alignment(1));
 
   // Define the variable.
   llvm::GlobalVariable *var = cast<llvm::GlobalVariable>(
@@ -5316,7 +5313,6 @@ IRGenModule::getAddrOfTypeMetadata(CanType concreteType,
     break;
   }
   DbgTy = DebugTypeInfo::getGlobalMetadata(MetatypeType::get(concreteType),
-                                           defaultVarTy->getPointerTo(),
                                            Size(0), Alignment(1));
 
   ConstantReference addr;

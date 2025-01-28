@@ -10,7 +10,7 @@ public let s = S<Int>(t: 0)
 // CHECK-SAME:             templateParams: ![[PARAMS:[0-9]+]]
 // CHECK: ![[PARAMS]] = !{![[INTPARAM:[0-9]+]]}
 // CHECK: ![[INTPARAM]] = !DITemplateTypeParameter(type: ![[INT:[0-9]+]])
-// CHECK: ![[INT]] = !DICompositeType(tag: DW_TAG_structure_type, name: "$sSiD",
+// CHECK: ![[INT]] = !DICompositeType(tag: DW_TAG_structure_type, {{.*}}identifier: "$sSiD"
 
 
 // DWARF: !DICompositeType(tag: DW_TAG_structure_type,
@@ -56,4 +56,4 @@ public let inner = S2<Double>.Inner(t:4.2)
 
 // DWARF: ![[ELEMENTS1]] = !{![[ELEMENTS2:[0-9]+]]}
 
-// DWARF: ![[ELEMENTS2]] = !DIDerivedType(tag: DW_TAG_member, name: "t", scope: !27, file: !3, baseType: ![[GENERIC_PARAM_TYPE]])
+// DWARF: ![[ELEMENTS2]] = !DIDerivedType(tag: DW_TAG_member, name: "t", {{.*}}, baseType: ![[GENERIC_PARAM_TYPE]])
