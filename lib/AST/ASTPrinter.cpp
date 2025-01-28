@@ -2702,7 +2702,11 @@ static void addNamespaceMembers(Decl *decl,
   const auto *declOwner = namespaceDecl->getOwningModule();
   if (declOwner)
     declOwner = declOwner->getTopLevelModule();
-  for (auto redecl : namespaceDecl->redecls()) {
+  auto Redecls = llvm::SmallVector<clang::NamespaceDecl *, 2>(namespaceDecl->redecls());
+  std::stable_sort(Redecls.begin(), Redecls.end(), [&](clang::NamespaceDecl *LHS, clang::NamespaceDecl *RHS) {
+    return LHS->getOwningModule()->Name < RHS->getOwningModule()->Name;
+  });
+  for (auto redecl : Redecls) {
     // Skip namespace declarations that come from other top-level modules.
     if (const auto *redeclOwner = redecl->getOwningModule()) {
       if (declOwner && declOwner != redeclOwner->getTopLevelModule())

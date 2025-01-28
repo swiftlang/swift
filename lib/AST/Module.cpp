@@ -957,6 +957,22 @@ ModuleDecl *ModuleDecl::getTopLevelModule(bool overlay) {
   return this;
 }
 
+bool ModuleDecl::isSubmoduleOf(const ModuleDecl *M) const {
+  // Swift modules don't currently support submodules.
+  if (!isNonSwiftModule())
+    return false;
+
+  auto *ClangParent = M->findUnderlyingClangModule();
+  if (!ClangParent)
+    return false;
+
+  auto *ClangModule = findUnderlyingClangModule();
+  if (!ClangModule)
+    return false;
+
+  return ClangModule->isSubModuleOf(ClangParent);
+}
+
 static bool isParsedModule(const ModuleDecl *mod) {
   // FIXME: If we ever get mixed modules that contain both SourceFiles and other
   // kinds of file units, this will break; there all callers of this function should
@@ -1239,14 +1255,6 @@ void SourceFile::lookupObjCMethods(
   results.append(known->second.begin(), known->second.end());
 }
 
-bool ModuleDecl::shouldCollectDisplayDecls() const {
-  for (const FileUnit *file : getFiles()) {
-    if (!file->shouldCollectDisplayDecls())
-      return false;
-  }
-  return true;
-}
-
 void ModuleDecl::getLocalTypeDecls(SmallVectorImpl<TypeDecl*> &Results) const {
   FORWARD(getLocalTypeDecls, (Results));
 }
@@ -1471,9 +1479,6 @@ void ModuleDecl::ImportCollector::collect(
     const ImportedModule &importedModule) {
   auto *module = importedModule.importedModule;
 
-  if (!module->shouldCollectDisplayDecls())
-    return;
-
   if (importFilter && !importFilter(module))
     return;
 
@@ -1494,11 +1499,17 @@ static void
 collectExportedImports(const ModuleDecl *topLevelModule,
                        ModuleDecl::ImportCollector &importCollector) {
   SmallVector<const ModuleDecl *> stack;
+  SmallPtrSet<const ModuleDecl *, 4> visited;
+  visited.insert(topLevelModule);
   stack.push_back(topLevelModule);
   while (!stack.empty()) {
     const ModuleDecl *module = stack.pop_back_val();
-    if (module->isNonSwiftModule())
+    if (module->isNonSwiftModule() && module != topLevelModule &&
+        !module->isSubmoduleOf(topLevelModule)) {
+      // Recurse into submodules of the top-level module so that we can
+      // re-export them if necessary.
       continue;
+    }
 
     for (const FileUnit *file : module->getFiles()) {
       if (const SourceFile *source = dyn_cast<SourceFile>(file)) {
@@ -1518,10 +1529,12 @@ collectExportedImports(const ModuleDecl *topLevelModule,
                                  ModuleDecl::ImportFilterKind::Exported);
         for (const auto &im : exportedImports) {
           // Skip collecting the underlying clang module as we already have the relevant import.
-          if (module->isClangOverlayOf(im.importedModule))
-            continue;
-          importCollector.collect(im);
-          stack.push_back(im.importedModule);
+          if (!module->isClangOverlayOf(im.importedModule))
+            importCollector.collect(im);
+          if (!visited.contains(im.importedModule)) {
+            visited.insert(im.importedModule);
+            stack.push_back(im.importedModule);
+          }
         }
       }
     }
