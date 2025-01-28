@@ -431,6 +431,15 @@ void CrossModuleOptimization::serializeWitnessTablesInModule() {
 }
 
 void CrossModuleOptimization::serializeVTablesInModule() {
+  if (everything) {
+    for (SILVTable *vt : M.getVTables()) {
+      vt->setSerializedKind(IsSerialized);
+      for (auto &entry : vt->getEntries()) {
+        makeFunctionUsableFromInline(entry.getImplementation());
+      }
+    }
+    return;
+  }
   if (!isPackageCMOEnabled(M.getSwiftModule()))
     return;
 
