@@ -1049,7 +1049,9 @@ struct AddressOwnership {
 
   AddressOwnership(AccessBase base) : base(base) {}
 
-  operator bool() const { return bool(base); }
+  operator bool() const {
+    return bool(base) && base.getKind() != AccessRepresentation::Unidentified;
+  }
 
   bool operator==(const AddressOwnership &other) const {
     return base.hasIdenticalAccessInfo(other.base);
