@@ -3427,6 +3427,12 @@ namespace {
         }
       } else {
         if (returnsRetainedAttrIsPresent || returnsUnretainedAttrIsPresent) {
+          if (const auto *functiionDecl = dyn_cast<clang::FunctionDecl>(decl)) {
+            if (functiionDecl->getTemplateSpecializationKind() !=
+                clang::TSK_Undeclared) {
+              return;
+            }
+          }
           Impl.diagnose(
               loc,
               diag::
