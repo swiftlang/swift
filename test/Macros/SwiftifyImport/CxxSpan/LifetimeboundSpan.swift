@@ -13,20 +13,25 @@ import StdSpan
 
 public struct VecOfInt {}
 
-@_SwiftifyImport(.lifetimeDependence(dependsOn: 1, pointer: .return, type: .copy), typeMappings: ["SpanOfInt" : "std.span<CInt>"])
+@_SwiftifyImport(.lifetimeDependence(dependsOn: .param(1), pointer: .return, type: .copy), typeMappings: ["SpanOfInt" : "std.span<CInt>"])
 func myFunc(_ span: SpanOfInt) -> SpanOfInt {
 }
 
-@_SwiftifyImport(.lifetimeDependence(dependsOn: 1, pointer: .return, type: .borrow), typeMappings: ["SpanOfInt" : "std.span<CInt>"])
+@_SwiftifyImport(.lifetimeDependence(dependsOn: .param(1), pointer: .return, type: .borrow), typeMappings: ["SpanOfInt" : "std.span<CInt>"])
 func myFunc2(_ vec: borrowing VecOfInt) -> SpanOfInt {
 }
 
-@_SwiftifyImport(.lifetimeDependence(dependsOn: 1, pointer: .return, type: .copy), .lifetimeDependence(dependsOn: 2, pointer: .return, type: .copy), typeMappings: ["SpanOfInt" : "std.span<CInt>"])
+@_SwiftifyImport(.lifetimeDependence(dependsOn: .param(1), pointer: .return, type: .copy), .lifetimeDependence(dependsOn: .param(2), pointer: .return, type: .copy), typeMappings: ["SpanOfInt" : "std.span<CInt>"])
 func myFunc3(_ span1: SpanOfInt, _ span2: SpanOfInt) -> SpanOfInt {
 }
 
-@_SwiftifyImport(.lifetimeDependence(dependsOn: 1, pointer: .return, type: .borrow), .lifetimeDependence(dependsOn: 2, pointer: .return, type: .copy), typeMappings: ["SpanOfInt" : "std.span<CInt>"])
+@_SwiftifyImport(.lifetimeDependence(dependsOn: .param(1), pointer: .return, type: .borrow), .lifetimeDependence(dependsOn: .param(2), pointer: .return, type: .copy), typeMappings: ["SpanOfInt" : "std.span<CInt>"])
 func myFunc4(_ vec: borrowing VecOfInt, _ span: SpanOfInt) -> SpanOfInt {
+}
+
+struct X {
+  @_SwiftifyImport(.lifetimeDependence(dependsOn: .self, pointer: .return, type: .borrow), typeMappings: ["SpanOfInt" : "std.span<CInt>"])
+  func myFunc5() -> SpanOfInt {}
 }
 
 // CHECK:      @_alwaysEmitIntoClient @lifetime(span)
@@ -47,4 +52,9 @@ func myFunc4(_ vec: borrowing VecOfInt, _ span: SpanOfInt) -> SpanOfInt {
 // CHECK:      @_alwaysEmitIntoClient @lifetime(borrow vec, span)
 // CHECK-NEXT: func myFunc4(_ vec: borrowing VecOfInt, _ span: Span<CInt>) -> Span<CInt> {
 // CHECK-NEXT:     return Span(_unsafeCxxSpan: myFunc4(vec, SpanOfInt(span)))
+// CHECK-NEXT: }
+
+// CHECK:      @_alwaysEmitIntoClient @lifetime(borrow self)
+// CHECK-NEXT: func myFunc5() -> Span<CInt> {
+// CHECK-NEXT:     return Span(_unsafeCxxSpan: myFunc5())
 // CHECK-NEXT: }

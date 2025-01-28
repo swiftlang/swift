@@ -54,6 +54,11 @@ inline SpanOfInt initSpan(int arr[], size_t size) {
   return SpanOfInt(arr, size);
 }
 
+struct DependsOnSelf {
+  std::vector<int> v;
+  ConstSpanOfInt get() [[clang::lifetimebound]] { return ConstSpanOfInt(v.data(), v.size()); }
+};
+
 inline struct SpanBox getStructSpanBox() { return {iarray, iarray, sarray, sarray}; }
 
 inline void funcWithSafeWrapper(ConstSpanOfInt s [[clang::noescape]]) {}
