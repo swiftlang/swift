@@ -2683,7 +2683,7 @@ namespace {
       auto boolDecl = ctx.getBoolDecl();
 
       if (!boolDecl) {
-        ctx.Diags.diagnose(SourceLoc(), diag::broken_bool);
+        ctx.Diags.diagnose(SourceLoc(), diag::broken_stdlib_type, "Bool");
         return Type();
       }
 
