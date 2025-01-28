@@ -421,10 +421,6 @@ namespace swift {
     /// Disable the implicit import of the _StringProcessing module.
     bool DisableImplicitStringProcessingModuleImport = false;
 
-    /// Disable the implicit import of the _Backtracing module.
-    bool DisableImplicitBacktracingModuleImport =
-        !SWIFT_IMPLICIT_BACKTRACING_IMPORT;
-
     /// Disable the implicit import of the Cxx module.
     bool DisableImplicitCxxModuleImport = false;
 

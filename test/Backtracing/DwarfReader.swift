@@ -6,7 +6,7 @@
 // REQUIRES: OS=linux-gnu
 // REQUIRES: backtracing
 
-@_spi(DwarfTest) import _Backtracing
+@_spi(DwarfTest) import Runtime
 #if canImport(Darwin)
 import Darwin
 #elseif canImport(SwiftWASILibc)
