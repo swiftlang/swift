@@ -4031,7 +4031,16 @@ public:
   /// \returns the number of entries added.
   size_t addInherited(InheritedTypes inheritedEntries,
                       SmallVectorImpl<TypeID> &result) {
-    for (const auto &inherited : inheritedEntries.getEntries()) {
+    for (size_t i : inheritedEntries.getIndices()) {
+      // Ensure that we run the `InheritedTypeRequest` before getting the
+      // inherited type. We serialize the inherited type from `getEntry` rather
+      // than `getResolvedType` since the former represents a suppressed
+      // conformance as a separate bit distinct from the type, which is how we
+      // want to serialize it. We thus need to get the type to serialize using a
+      // subsequent call to `getEntry(i).getType()` (see
+      // `InheritedTypeRequest::cacheResult`).
+      (void)inheritedEntries.getResolvedType(i);
+      const InheritedEntry &inherited = inheritedEntries.getEntry(i);
       assert(!inherited.getType() || !inherited.getType()->hasArchetype());
       TypeID typeRef = S.addTypeRef(inherited.getType());
 
