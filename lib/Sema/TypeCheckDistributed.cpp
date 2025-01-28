@@ -618,6 +618,19 @@ bool CheckDistributedFunctionRequest::evaluate(
     return true;
   }
 
+  // TODO: rdar://136467591 Currently typed throws were not implemented for distributed methods
+  if (func->hasThrows()) {
+    if (auto thrownError = func->getEffectiveThrownErrorType()) {
+      // Basically we only support throwing `any Error` out of a distributed
+      // function because then the effective error thrown by thunk calls naturally
+      // is correct and the same `any Error`
+      if (thrownError.has_value() &&
+          !(*thrownError)->isEqual(C.getErrorExistentialType())) {
+        func->diagnose(diag::distributed_actor_func_typed_throws);
+      }
+    }
+  }
+
   return false;
 }
 
