@@ -306,18 +306,6 @@ public:
         }
       }
 
-      // We need isolation check here because global actor isolation
-      // could be inferred.
-
-      auto isolation = getActorIsolation(F);
-      if (isolation.isGlobalActor()) {
-        diagnoseAndRemoveAttr(
-            attr,
-            diag::attr_execution_concurrent_incompatible_with_global_actor, F,
-            isolation.getGlobalActor());
-        return;
-      }
-
       break;
     }
 
