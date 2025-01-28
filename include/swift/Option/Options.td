@@ -561,6 +561,21 @@ def unavailable_decl_optimization_EQ : Joined<["-"], "unavailable-decl-optimizat
            "value may be 'none' (no optimization) or 'complete' (code is not "
            "generated at all unavailable declarations)">;
 
+def define_enabled_availability_domain : Separate<["-"], "define-enabled-availability-domain">,
+    Flags<[HelpHidden, FrontendOption, NoInteractiveOption, ModuleInterfaceOptionIgnorable]>,
+    HelpText<"Defines a custom availability domain that is available at compile time">,
+    MetaVarName<"<domain>">;
+
+def define_disabled_availability_domain : Separate<["-"], "define-disabled-availability-domain">,
+    Flags<[HelpHidden, FrontendOption, NoInteractiveOption, ModuleInterfaceOptionIgnorable]>,
+    HelpText<"Defines a custom availability domain that is unavailable at compile time">,
+    MetaVarName<"<domain>">;
+
+def define_dynamic_availability_domain : Separate<["-"], "define-dynamic-availability-domain">,
+    Flags<[HelpHidden, FrontendOption, NoInteractiveOption, ModuleInterfaceOptionIgnorable]>,
+    HelpText<"Defines a custom availability domain that can be enabled or disabled at runtime">,
+    MetaVarName<"<domain>">;
+
 def experimental_package_bypass_resilience : Flag<["-"], "experimental-package-bypass-resilience">,
   Flags<[FrontendOption]>,
   HelpText<"Deprecated; has no effect">;
