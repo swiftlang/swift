@@ -1246,6 +1246,96 @@ selectDisjunctionInResultBuilderContext(ConstraintSystem &cs,
   return best.first;
 }
 
+/// Given two disjunctions and their scores determine whether the first one
+/// is better than the second one if one of the disjunctions is an operator
+/// and another one is unsupported or un-scored member/subscript/global
+/// function.
+///
+/// This function is intended to determine whether it's beneficial to prefer
+/// an unsupported or un-scored member/subscript/global function over an
+/// operator when the former precedes the operator in source because such
+/// disjunctions usually have fewer choices than operators and due to their
+/// location would establish context for the subsequent operators.
+///
+/// For example: `a.b() + 1` or a more complex `[a.b()].map { $0 + 1 }`.
+///
+/// if `b` has active generic overloads it would be deemed unsupported
+/// but selecting it before `+` (which has a low score due to a literal use)
+/// is preferable because it would either put additional generic requirements
+/// on the argument of `+` or provide a concrete type that would be used
+/// to further filter operator's overload set.
+///
+/// Selecting operator first in these cases could result in the solver
+/// having to attempt every operator overload for every overload of `b`.
+///
+/// @param ctx The current AST context.
+/// @param disjunctionA The disjunction to check preference for.
+/// @param disjunctionB The disjunction to compare against.
+/// @param scoreA The score associated with `disjunctionA`.
+/// @param scoreB The score associated with `disjunctionB`.
+///
+/// @returns `nullopt` if the determination cannot be made,
+/// `true` if disjunctionA is better than disjunctionB, `false`
+/// otherwise.
+static std::optional<bool> isPreferable(ASTContext &ctx,
+                                        Constraint *disjunctionA,
+                                        Constraint *disjunctionB, double scoreA,
+                                        double scoreB) {
+  auto isOperatorA = isOperatorDisjunction(disjunctionA);
+  auto isOperatorB = isOperatorDisjunction(disjunctionB);
+
+  if (isOperatorA == isOperatorB)
+    return std::nullopt;
+
+  auto anchorA = getAsExpr(disjunctionA->getLocator()->getAnchor());
+  auto anchorB = getAsExpr(disjunctionB->getLocator()->getAnchor());
+
+  if (!anchorA || !anchorB)
+    return std::nullopt;
+
+  if (!anchorA->getLoc() || !anchorB->getLoc())
+    return std::nullopt;
+
+  auto isMemberSubscriptOrGlobal = [&](Constraint *disjunction) {
+    auto *loc = disjunction->getLocator();
+    return loc->isLastElement<LocatorPathElt::Member>() ||
+           loc->isLastElement<LocatorPathElt::SubscriptMember>() ||
+           loc->directlyAt<OverloadedDeclRefExpr>();
+  };
+
+  auto isBefore = [&](Expr *a, Expr *b) {
+    return ctx.SourceMgr.isBeforeInBuffer(a->getLoc(), b->getLoc());
+  };
+
+  // Check the operator score first, if the operator is un-scored
+  // or highly scored the decision could be made based on that
+  // information alone.
+  {
+    auto operatorScore = isOperatorA ? scoreA : scoreB;
+    // Always prefer non-operator declarations because
+    // they have smaller overload sets.
+    if (!operatorScore)
+      return isOperatorB;
+
+    // If we know something concrete about the operator
+    // let's not make the determination here.
+    if (operatorScore >= 1)
+      return std::nullopt;
+  }
+
+  auto nonOperatorDisjunction = isOperatorA ? disjunctionB : disjunctionA;
+  auto nonOperatorScore = isOperatorA ? scoreB : scoreA;
+
+  // If non-operator disjunction is a member, subscript or a global function
+  // that is either unsupported or un-scored (due to absence of information),
+  // let's prefer it if it appears before the operator in the source code
+  // otherwise prefer the operator.
+  if (isMemberSubscriptOrGlobal(nonOperatorDisjunction) && !nonOperatorScore)
+    return isBefore(anchorA, anchorB);
+
+  return std::nullopt;
+}
+
 std::optional<std::pair<Constraint *, llvm::TinyPtrVector<Constraint *>>>
 ConstraintSystem::selectDisjunction() {
   SmallVector<Constraint *, 4> disjunctions;
@@ -1275,6 +1365,11 @@ ConstraintSystem::selectDisjunction() {
 
         auto &[firstScore, firstFavoredChoices] = favorings[first];
         auto &[secondScore, secondFavoredChoices] = favorings[second];
+
+        if (auto preference =
+                isPreferable(Context, first, second, firstScore.value_or(0),
+                             secondScore.value_or(0)))
+          return preference.value();
 
         // Rank based on scores only if both disjunctions are supported.
         if (firstScore && secondScore) {

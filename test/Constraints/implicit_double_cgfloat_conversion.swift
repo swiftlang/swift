@@ -381,3 +381,10 @@ func test_explicit_cgfloat_use_avoids_ambiguity(v: Int) {
   var total = 0.0 // This is Double by default
   total += test(CGFloat(v)) + CGFloat(v) // Ok
 }
+
+func test_no_ambiguity_when_int_and_double_literals_are_mixed(v: CGFloat) {
+  func round<T: FloatingPoint>(_: T) -> T {}
+  func round(_: Double) -> Double { 0 }
+
+  let _ = round(abs(v - v) * 1) / 1.0 // Ok
+}
