@@ -198,3 +198,55 @@ do {
       func b() {} // Ok
     }
 }
+
+do {
+  protocol P1 {}
+  protocol P2 {}
+  protocol P3: P1, P2 {}
+
+  // expected-warning@+1 {{@preconcurrency attribute on conformance to 'P3' has no effect}}
+  @MainActor struct S: @preconcurrency P3 {}
+}
+
+// rdar://137794903
+do {
+  @MainActor protocol P1 {}
+  protocol P2 {
+    func foo()
+  }
+  protocol P3: P1, P2 {}
+
+  do {
+    // OK, preconcurrency is effectful on 'P3' through 'P2'.
+    @MainActor struct S: @preconcurrency P3 {
+      func foo() {}
+    }
+  }
+
+  do {
+    // OK, preconcurrency is effectful on 'P3' through 'P2'.
+    struct S: @preconcurrency P3 {
+      func foo() {}
+    }
+  }
+
+  protocol P4 {}
+  protocol P5 {}
+  protocol P6: P4, P5 {}
+
+  do {
+    // OK, preconcurrency is effectful on 'P3' through 'P2'.
+    @MainActor struct S: @preconcurrency P3, P4 {
+      func foo() {}
+    }
+  }
+
+  do {
+    // OK, preconcurrency is effectful on 'P3' through 'P2'.
+    // expected-warning@+1 {{@preconcurrency attribute on conformance to 'P4' has no effect}}
+    @MainActor struct S: @preconcurrency P3 & P4 {
+      func foo() {}
+    }
+  }
+}
+
