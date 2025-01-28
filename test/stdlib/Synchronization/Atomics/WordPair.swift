@@ -45,7 +45,12 @@ suite.test("basics") {
   let value1 = WordPair(first: .max, second: 0)
   expectEqual(value1.first, .max)
   expectEqual(value1.second, 0)
+}
 
+} // if #available(SwiftStdlib 6.0, *)
+
+if #available(SwiftStdlib 6.2, *) {
+suite.test("comparable") {
   let c0 = WordPair(first: 0, second: 0)
   let c1 = WordPair(first: 1, second: 0)
   let c2 = WordPair(first: 2, second: 0)
@@ -60,7 +65,6 @@ suite.test("basics") {
   expectTrue(c4 < c5)
   expectFalse(c5 < c4)
 }
-
-} // if #available(SwiftStdlib 6.0, *)
+} // if #available(SwiftStdlib 6.2, *)
 
 runAllTests()

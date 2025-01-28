@@ -185,8 +185,6 @@ extension WordPair: Hashable {
 
 @available(SwiftStdlib 6.2, *)
 extension WordPair: Comparable {
-  // Note: This function can have a lower availability than the conformance
-  // itself because it's always emit into client.
   @available(SwiftStdlib 6.2, *)
   @_alwaysEmitIntoClient
   @_transparent
