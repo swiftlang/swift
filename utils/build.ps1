@@ -1624,7 +1624,7 @@ function Build-Sanitizers([Platform]$Platform, $Arch) {
     -InstallTo $InstallTo `
     -Arch $Arch `
     -Platform $Platform `
-    -UseBuiltCompilers C,CXX `
+    -UseBuiltCompilers ASM,C,CXX `
     -BuildTargets "install-compiler-rt" `
     -Defines (@{
       CMAKE_SYSTEM_NAME = $Platform.ToString();
@@ -1639,7 +1639,7 @@ function Build-Sanitizers([Platform]$Platform, $Arch) {
     -InstallTo $InstallTo `
     -Arch $Arch `
     -Platform $Platform `
-    -UseBuiltCompilers C,CXX `
+    -UseBuiltCompilers ASM,C,CXX `
     -BuildTargets "install-compiler-rt" `
     -Defines (@{
       CMAKE_SYSTEM_NAME = $Platform.ToString();
