@@ -246,6 +246,7 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
   Int32PtrTy = Int32Ty->getPointerTo();
   Int64Ty = llvm::Type::getInt64Ty(getLLVMContext());
   Int8PtrTy = PtrTy;
+  FunctionPtrTy = llvm::Type::getInt8Ty(getLLVMContext())->getPointerTo(DataLayout.getProgramAddressSpace());
   Int8PtrPtrTy = Int8PtrTy->getPointerTo(0);
   SizeTy = DataLayout.getIntPtrType(getLLVMContext(), /*addrspace*/ 0);
 
