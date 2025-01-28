@@ -33,11 +33,11 @@ public func noInlineNoEffects(_ x: X) -> Int {
   return x.i
 }
 
-// CHECK-FR-MODULE-LABEL: sil [serialized] [noinline] [canonical] @$s6Module15inlineNoEffectsySiAA1XCF : $@convention(thin) (@guaranteed X) -> Int {
+// CHECK-FR-MODULE-LABEL: sil [serialized] [noinline] [canonical] {{.*}}@$s6Module15inlineNoEffectsySiAA1XCF : $@convention(thin) (@guaranteed X) -> Int {
 // CHECK-FR-MODULE-NEXT:  [%0: noescape **, read c0.v**]
 // CHECK-FR-MODULE-NEXT:  [global: ]
 // CHECK-FR-MODULE-NEXT:  {{^[^[]}}
-// CHECK-LE-MODULE-LABEL: sil [serialized] [noinline] [canonical] @$s6Module15inlineNoEffectsySiAA1XCF : $@convention(thin) (@guaranteed X) -> Int {
+// CHECK-LE-MODULE-LABEL: sil [serialized] [noinline] [canonical] {{.*}}@$s6Module15inlineNoEffectsySiAA1XCF : $@convention(thin) (@guaranteed X) -> Int {
 // CHECK-LE-MODULE-NEXT:  {{^[^[]}}
 @inlinable
 @inline(never)
@@ -65,11 +65,11 @@ public func noInlineWithEffects(_ x: X) -> Int {
   return x.i
 }
 
-// CHECK-FR-MODULE-LABEL: sil [serialized] [noinline] [canonical] @$s6Module17inlineWithEffectsySiAA1XCF :
+// CHECK-FR-MODULE-LABEL: sil [serialized] [noinline] [canonical] {{.*}}@$s6Module17inlineWithEffectsySiAA1XCF :
 // CHECK-FR-MODULE-NEXT:  [%0: noescape! **, read c0.v**]
 // CHECK-FR-MODULE-NEXT:  [global: ]
 // CHECK-FR-MODULE-NEXT:  {{^[^[]}}
-// CHECK-LE-MODULE-LABEL: sil [serialized] [noinline] [canonical] @$s6Module17inlineWithEffectsySiAA1XCF :
+// CHECK-LE-MODULE-LABEL: sil [serialized] [noinline] [canonical] {{.*}}@$s6Module17inlineWithEffectsySiAA1XCF :
 // CHECK-LE-MODULE-NEXT:  [%0: noescape! **]
 // CHECK-LE-MODULE-NEXT:  {{^[^[]}}
 @inlinable
@@ -79,15 +79,15 @@ public func inlineWithEffects(_ x: X) -> Int {
   return internalCallee(x)
 }
 
-// CHECK-LE-MODULE-LABEL: sil [serialized] [noinline] [canonical] @loadWeakX_from : {{.*}} {
+// CHECK-LE-MODULE-LABEL: sil [serialized] [noinline] [canonical] [ossa] @loadWeakX_from : {{.*}} {
 // CHECK-LE-MODULE:       {{^[^[]}}
 // CHECK-LE-MODULE-LABEL: } // end sil function 'loadWeakX_from'
 
-// CHECK-FR-MODULE-LABEL: sil [serialized] [noinline] [canonical] @$s6Module12simpleInlineySiAA1XCF : $@convention(thin) (@guaranteed X) -> Int {
+// CHECK-FR-MODULE-LABEL: sil [serialized] [noinline] [canonical] [ossa] @$s6Module12simpleInlineySiAA1XCF : $@convention(thin) (@guaranteed X) -> Int {
 // CHECK-FR-MODULE-NEXT:  [%0: noescape **, read c0.v**]
 // CHECK-FR-MODULE-NEXT:  [global: ]
 // CHECK-FR-MODULE-NEXT:  {{^[^[]}}
-// CHECK-LE-MODULE-LABEL: sil [serialized] [noinline] [canonical] @$s6Module12simpleInlineySiAA1XCF : $@convention(thin) (@guaranteed X) -> Int {
+// CHECK-LE-MODULE-LABEL: sil [serialized] [noinline] [canonical] [ossa] @$s6Module12simpleInlineySiAA1XCF : $@convention(thin) (@guaranteed X) -> Int {
 // CHECK-LE-MODULE-NEXT:  {{^[^[]}}
 @inlinable
 @inline(never)
@@ -100,7 +100,7 @@ public struct S {
   public weak var x: X?
 }
 
-// CHECK-FR-MODULE-LABEL: sil [serialized] [noinline] [canonical] @loadWeakX_from : {{.*}} {
+// CHECK-FR-MODULE-LABEL: sil [serialized] [noinline] [canonical] [ossa] @loadWeakX_from : {{.*}} {
 // CHECK-FR-MODULE:       [global: deinit_barrier]
 // CHECK-FR-MODULE-LABEL: } // end sil function 'loadWeakX_from'
 @inlinable
