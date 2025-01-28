@@ -379,6 +379,11 @@ class Product(object):
     def get_linux_sysroot(self, platform, arch):
         if not self.is_cross_compile_target('{}-{}'.format(platform, arch)):
             return None
+
+        # If the deps path was passed, use it instead
+        if self.args.cross_compile_deps_path:
+            return self.args.cross_compile_deps_path
+
         sysroot_arch, _, abi = self.get_linux_target_components(arch)
         # $ARCH-$PLATFORM-$ABI
         # E.x.: aarch64-linux-gnu
