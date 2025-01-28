@@ -37,13 +37,6 @@ using CompilerArgInstanceCacheMap =
                                std::unique_ptr<SwiftDependencyScanningService>,
                                std::unique_ptr<ModuleDependenciesCache>>>;
 
-struct BatchScanInput {
-  llvm::StringRef moduleName;
-  llvm::StringRef arguments;
-  llvm::StringRef outputPath;
-  bool isSwift;
-};
-
 // MARK: FrontendTool dependency scanner entry points
 /// Scans the dependencies of the main module of \c instance and writes out
 /// the resulting JSON according to the instance's output parameters.
@@ -51,10 +44,6 @@ bool scanDependencies(CompilerInstance &instance);
 
 /// Identify all imports in the translation unit's module.
 bool prescanDependencies(CompilerInstance &instance);
-
-/// Batch scan the dependencies for modules specified in \c batchInputFile.
-bool batchScanDependencies(CompilerInstance &instance,
-                           llvm::StringRef batchInputFile);
 
 // MARK: Dependency scanning execution
 /// Scans the dependencies of the main module of \c instance.
@@ -69,14 +58,6 @@ performModulePrescan(CompilerInstance &instance,
                      DependencyScanDiagnosticCollector *diagnostics,
                      ModuleDependenciesCache &cache);
 
-/// Batch scan the dependencies for modules specified in \c batchInputFile.
-std::vector<llvm::ErrorOr<swiftscan_dependency_graph_t>>
-performBatchModuleScan(CompilerInstance &invocationInstance,
-                       DependencyScanDiagnosticCollector *diagnostics,
-                       ModuleDependenciesCache &invocationCache,
-                       CompilerArgInstanceCacheMap *versionedPCMInstanceCache,
-                       llvm::StringSaver &saver,
-                       const std::vector<BatchScanInput> &BatchInput);
 } // end namespace dependencies
 } // end namespace swift
 

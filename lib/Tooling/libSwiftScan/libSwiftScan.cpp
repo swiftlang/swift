@@ -177,45 +177,6 @@ swiftscan_dependency_graph_create(swiftscan_scanner_t scanner,
   return DependencyGraph;
 }
 
-swiftscan_batch_scan_result_t *
-swiftscan_batch_scan_result_create(swiftscan_scanner_t scanner,
-                                   swiftscan_batch_scan_input_t *batch_input,
-                                   swiftscan_scan_invocation_t invocation) {
-  DependencyScanningTool *ScanningTool = unwrap(scanner);
-  int argc = invocation->argv->count;
-  std::vector<const char *> Compilation;
-  for (int i = 0; i < argc; ++i)
-    Compilation.push_back(swift::c_string_utils::get_C_string(invocation->argv->strings[i]));
-
-  std::vector<BatchScanInput> BatchInput;
-  for (size_t i = 0; i < batch_input->count; ++i) {
-    swiftscan_batch_scan_entry_s *Entry = batch_input->modules[i];
-    BatchInput.push_back({swift::c_string_utils::get_C_string(Entry->module_name),
-        swift::c_string_utils::get_C_string(Entry->arguments),
-                          /*outputPath*/ "", Entry->is_swift});
-  }
-
-  // Execute the scan and bridge the result
-  auto BatchScanResult = ScanningTool->getDependencies(
-      Compilation, BatchInput, {},
-      swift::c_string_utils::get_C_string(invocation->working_directory));
-  swiftscan_batch_scan_result_t *Result = new swiftscan_batch_scan_result_t;
-  auto ResultGraphs = new swiftscan_dependency_graph_t[BatchScanResult.size()];
-  for (size_t i = 0; i < BatchScanResult.size(); ++i) {
-    auto &ResultOrErr = BatchScanResult[i];
-    if (ResultOrErr.getError()) {
-      ResultGraphs[i] = nullptr;
-      continue;
-    }
-
-    ResultGraphs[i] = ResultOrErr.get();
-  }
-
-  Result->results = ResultGraphs;
-  Result->count = BatchScanResult.size();
-  return Result;
-}
-
 swiftscan_import_set_t
 swiftscan_import_set_create(swiftscan_scanner_t scanner,
                             swiftscan_scan_invocation_t invocation) {
@@ -484,55 +445,6 @@ swiftscan_string_ref_t swiftscan_clang_detail_get_module_cache_key(
   return details->clang_details.module_cache_key;
 }
 
-//=== Batch Scan Input Functions ------------------------------------------===//
-
-swiftscan_batch_scan_input_t *swiftscan_batch_scan_input_create() {
-  return new swiftscan_batch_scan_input_t;
-}
-
-void swiftscan_batch_scan_input_set_modules(
-    swiftscan_batch_scan_input_t *input, int count,
-    swiftscan_batch_scan_entry_t *modules) {
-  input->count = count;
-  input->modules = modules;
-}
-
-//=== Batch Scan Entry Functions ------------------------------------------===//
-
-swiftscan_batch_scan_entry_t swiftscan_batch_scan_entry_create() {
-  return new swiftscan_batch_scan_entry_s;
-}
-
-void swiftscan_batch_scan_entry_set_module_name(
-    swiftscan_batch_scan_entry_t entry, const char *name) {
-  entry->module_name = swift::c_string_utils::create_clone(name);
-}
-
-void swiftscan_batch_scan_entry_set_arguments(
-    swiftscan_batch_scan_entry_t entry, const char *arguments) {
-  entry->arguments = swift::c_string_utils::create_clone(arguments);
-}
-
-void swiftscan_batch_scan_entry_set_is_swift(swiftscan_batch_scan_entry_t entry,
-                                             bool is_swift) {
-  entry->is_swift = is_swift;
-}
-
-swiftscan_string_ref_t
-swiftscan_batch_scan_entry_get_module_name(swiftscan_batch_scan_entry_t entry) {
-  return entry->module_name;
-}
-
-swiftscan_string_ref_t
-swiftscan_batch_scan_entry_get_arguments(swiftscan_batch_scan_entry_t entry) {
-  return entry->arguments;
-}
-
-bool swiftscan_batch_scan_entry_get_is_swift(
-    swiftscan_batch_scan_entry_t entry) {
-  return entry->is_swift;
-}
-
 //=== Prescan Result Functions --------------------------------------------===//
 
 swiftscan_string_set_t *
@@ -601,29 +513,6 @@ void swiftscan_dependency_graph_dispose(swiftscan_dependency_graph_t result) {
 void swiftscan_import_set_dispose(swiftscan_import_set_t result) {
   swiftscan_string_set_dispose(result->imports);
   swiftscan_diagnostics_set_dispose(result->diagnostics);
-  delete result;
-}
-
-void swiftscan_batch_scan_entry_dispose(swiftscan_batch_scan_entry_t entry) {
-  swiftscan_string_dispose(entry->module_name);
-  swiftscan_string_dispose(entry->arguments);
-  delete entry;
-}
-
-void swiftscan_batch_scan_input_dispose(swiftscan_batch_scan_input_t *input) {
-  for (size_t i = 0; i < input->count; ++i) {
-    swiftscan_batch_scan_entry_dispose(input->modules[i]);
-  }
-  delete[] input->modules;
-  delete input;
-}
-
-void swiftscan_batch_scan_result_dispose(
-    swiftscan_batch_scan_result_t *result) {
-  for (size_t i = 0; i < result->count; ++i) {
-    swiftscan_dependency_graph_dispose(result->results[i]);
-  }
-  delete[] result->results;
   delete result;
 }
 

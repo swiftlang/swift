@@ -224,12 +224,6 @@ struct swiftscan_module_details_s {
   };
 };
 
-struct swiftscan_batch_scan_entry_s {
-  swiftscan_string_ref_t module_name;
-  swiftscan_string_ref_t arguments;
-  bool is_swift;
-};
-
 struct swiftscan_import_set_s {
   /// The complete list of imports discovered
   swiftscan_string_set_t *imports;

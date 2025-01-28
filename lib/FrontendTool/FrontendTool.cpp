@@ -1179,16 +1179,10 @@ withSemanticAnalysis(CompilerInstance &Instance, FrontendObserver *observer,
 }
 
 static bool performScanDependencies(CompilerInstance &Instance) {
-  auto batchScanInput =
-      Instance.getASTContext().SearchPathOpts.BatchScanInputFilePath;
-  if (batchScanInput.empty()) {
-    if (Instance.getInvocation().getFrontendOptions().ImportPrescan)
-      return dependencies::prescanDependencies(Instance);
-    else
-      return dependencies::scanDependencies(Instance);
-  } else {
-    return dependencies::batchScanDependencies(Instance, batchScanInput);
-  }
+  if (Instance.getInvocation().getFrontendOptions().ImportPrescan)
+    return dependencies::prescanDependencies(Instance);
+  else
+    return dependencies::scanDependencies(Instance);
 }
 
 static bool performParseOnly(ModuleDecl &MainModule) {

@@ -78,7 +78,6 @@ findPathToDependency(ModuleDependencyID dependency,
                      const ModuleDependenciesCache &cache) {
   auto mainModuleDep = cache.findDependency(cache.getMainModuleName(),
                                             ModuleDependencyKind::SwiftSource);
-  // We may be in a batch scan instance which does not have this dependency
   if (!mainModuleDep.has_value())
     return {};
   auto mainModuleID = ModuleDependencyID{cache.getMainModuleName().str(),
