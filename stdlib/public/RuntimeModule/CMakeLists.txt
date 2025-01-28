@@ -1,4 +1,4 @@
-#===--- CMakeLists.txt - Backtracing support library -----------------------===#
+#===--- CMakeLists.txt - Runtime module ------------------------------------===#
 #
 # This source file is part of the Swift.org open source project
 #
@@ -9,8 +9,10 @@
 # See https://swift.org/CONTRIBUTORS.txt for the list of Swift project authors
 #
 #===------------------------------------------------------------------------===#
-
-set(swift_backtracing_link_libraries
+#
+#  The Runtime module isn't the runtime itself; that lives in libswiftCore;
+#  rather, it's a high level Swift interface to things
+set(swift_runtime_link_libraries
   swiftCore
   swift_Concurrency
 )
@@ -20,27 +22,37 @@ if(SWIFT_BUILD_STDLIB AND SWIFT_ENABLE_EXPERIMENTAL_CONCURRENCY)
   set(concurrency _Concurrency)
 endif()
 
-set(BACKTRACING_SOURCES
-  ArrayImageSource.swift
+set(RUNTIME_SOURCES
+  Address.swift
   Backtrace.swift
+  Backtrace+Codable.swift
   BacktraceFormatter.swift
+  Base64.swift
   ByteSwapping.swift
   CachingMemoryReader.swift
-  Context.swift
+  CompactBacktrace.swift
+  CompactImageMap.swift
   Compression.swift
+  Context.swift
   CoreSymbolication.swift
   Dwarf.swift
+  EightByteBuffer.swift
   Elf.swift
-  FileImageSource.swift
+  ElfImageCache.swift
   FramePointerUnwinder.swift
   Image.swift
+  ImageMap.swift
+  ImageMap+Darwin.swift
+  ImageMap+Linux.swift
   ImageSource.swift
-  MemoryImageSource.swift
   Libc.swift
+  LimitSequence.swift
   MemoryReader.swift
+  OSReleaseScanner.swift
   ProcMapsScanner.swift
   Registers.swift
   Runtime.swift
+  RichFrame.swift
   SymbolicatedBacktrace.swift
   Utils.swift
   Win32Extras.cpp
@@ -48,24 +60,24 @@ set(BACKTRACING_SOURCES
   get-cpu-context.${SWIFT_ASM_EXT}
 )
 
-set(BACKTRACING_COMPILE_FLAGS
+set(RUNTIME_COMPILE_FLAGS
   "-cxx-interoperability-mode=default"
   "-Xfrontend;-experimental-spi-only-imports"
   "-Xcc;-I${SWIFT_SOURCE_DIR}/include"
   "-Xcc;-I${CMAKE_BINARY_DIR}/include"
-  "-Xcc;-I${SWIFT_STDLIB_SOURCE_DIR}/public/Backtracing/modules"
+  "-Xcc;-I${SWIFT_STDLIB_SOURCE_DIR}/public/RuntimeModule/modules"
   "-disable-upcoming-feature;MemberImportVisibility")
 
 ###TODO: Add these when we add static linking support
 #
-#list(APPEND BACKTRACING_COMPILE_FLAGS
+#list(APPEND RUNTIME_COMPILE_FLAGS
 #  "-Xcc;-I${SWIFT_PATH_TO_ZLIB_SOURCE}"
 #  "-Xcc;-I${SWIFT_PATH_TO_ZSTD_SOURCE}/lib"
 #  "-Xcc;-I${SWIFT_PATH_TO_LIBLZMA_SOURCE}/src/liblzma/api")
 
 if(SWIFT_ASM_AVAILABLE)
-  list(APPEND BACKTRACING_SOURCES get-cpu-context.${SWIFT_ASM_EXT})
-  list(APPEND BACKTRACING_COMPILE_FLAGS "-DSWIFT_ASM_AVAILABLE")
+  list(APPEND RUNTIME_SOURCES get-cpu-context.${SWIFT_ASM_EXT})
+  list(APPEND RUNTIME_COMPILE_FLAGS "-DSWIFT_ASM_AVAILABLE")
 else()
   message(warning "Assembly language not available on this platform; backtracing will fail.")
 endif()
@@ -75,8 +87,8 @@ set(LLVM_OPTIONAL_SOURCES
   get-cpu-context.asm
 )
 
-add_swift_target_library(swift_Backtracing ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_STDLIB
-  ${BACKTRACING_SOURCES}
+add_swift_target_library(swiftRuntime ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_STDLIB
+  ${RUNTIME_SOURCES}
 
   SWIFT_MODULE_DEPENDS ${concurrency}
 
@@ -89,11 +101,11 @@ add_swift_target_library(swift_Backtracing ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} I
   SWIFT_MODULE_DEPENDS_HAIKU Glibc
   SWIFT_MODULE_DEPENDS_WINDOWS CRT
 
-  PRIVATE_LINK_LIBRARIES ${swift_backtracing_link_libraries}
+  PRIVATE_LINK_LIBRARIES ${swift_runtime_link_libraries}
 
   SWIFT_COMPILE_FLAGS
     ${SWIFT_STANDARD_LIBRARY_SWIFT_FLAGS}
-    ${BACKTRACING_COMPILE_FLAGS}
+    ${RUNTIME_COMPILE_FLAGS}
     -parse-stdlib
 
   LINK_FLAGS

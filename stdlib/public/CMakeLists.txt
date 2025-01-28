@@ -301,8 +301,8 @@ if(SWIFT_BUILD_STDLIB AND NOT SWIFT_STDLIB_BUILD_ONLY_CORE_MODULES)
     add_subdirectory(Observation)
   endif()
 
-  if(SWIFT_ENABLE_BACKTRACING)
-    add_subdirectory(Backtracing)
+  if(SWIFT_ENABLE_RUNTIME_MODULE)
+    add_subdirectory(RuntimeModule)
   endif()
 
   if(SWIFT_ENABLE_SYNCHRONIZATION)

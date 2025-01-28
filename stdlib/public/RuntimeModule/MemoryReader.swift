@@ -57,6 +57,9 @@ internal import BacktracingImpl.OS.Darwin
 
   /// Fetch a NUL terminated string from the specified location in the source
   func fetchString(from addr: Address) throws -> String?
+
+  /// Fetch a fixed-length string from the specified location in the source
+  func fetchString(from addr: Address, length: Int) throws -> String?
 }
 
 extension MemoryReader {
@@ -106,6 +109,10 @@ extension MemoryReader {
     return String(decoding: bytes, as: UTF8.self)
   }
 
+  public func fetchString(from addr: Address, length: Int) throws -> String? {
+    let bytes = try fetch(from: addr, count: length, as: UInt8.self)
+    return String(decoding: bytes, as: UTF8.self)
+  }
 }
 
 @_spi(MemoryReaders) public struct UnsafeLocalMemoryReader: MemoryReader {
@@ -118,6 +125,16 @@ extension MemoryReader {
       byteCount: buffer.count
     )
   }
+
+  public func fetch<T>(from address: Address, as type: T.Type) throws -> T {
+    let ptr = UnsafeRawPointer(bitPattern: UInt(address))!
+    return ptr.loadUnaligned(fromByteOffset: 0, as: type)
+  }
+
+  public func fetchString(from address: Address) throws -> String? {
+    let ptr = UnsafeRawPointer(bitPattern: UInt(address))!
+    return String(validatingUTF8: ptr.assumingMemoryBound(to: CChar.self))
+  }
 }
 
 #if os(macOS)
@@ -125,7 +142,8 @@ extension MemoryReader {
   var result: kern_return_t
 }
 
-@_spi(MemoryReaders) public struct RemoteMemoryReader: MemoryReader {
+@_spi(MemoryReaders)
+public struct UncachedRemoteMemoryReader: MemoryReader {
   private var task: task_t
 
   // Sadly we can't expose the type of this argument
@@ -151,13 +169,14 @@ extension MemoryReader {
   }
 }
 
-@_spi(MemoryReaders) public struct LocalMemoryReader: MemoryReader {
+@_spi(MemoryReaders)
+public struct UncachedLocalMemoryReader: MemoryReader {
   public typealias Address = UInt64
   public typealias Size = UInt64
 
   public func fetch(from address: Address,
                     into buffer: UnsafeMutableRawBufferPointer) throws {
-    let reader = RemoteMemoryReader(task: mach_task_self())
+    let reader = UncachedRemoteMemoryReader(task: mach_task_self())
     return try reader.fetch(from: address, into: buffer)
   }
 }
@@ -172,7 +191,8 @@ extension MemoryReader {
   var message: String
 }
 
-@_spi(MemoryReaders) public struct MemserverMemoryReader: MemoryReader {
+@_spi(MemoryReaders)
+public struct UncachedMemserverMemoryReader: MemoryReader {
   private var fd: CInt
 
   public init(fd: CInt) {
@@ -267,7 +287,8 @@ extension MemoryReader {
   }
 }
 
-@_spi(MemoryReaders) public struct RemoteMemoryReader: MemoryReader {
+@_spi(MemoryReaders)
+public struct UncachedRemoteMemoryReader: MemoryReader {
   private var pid: pid_t
 
   public init(pid: Any) {
@@ -288,7 +309,8 @@ extension MemoryReader {
   }
 }
 
-@_spi(MemoryReaders) public struct LocalMemoryReader: MemoryReader {
+@_spi(MemoryReaders)
+public struct UncachedLocalMemoryReader: MemoryReader {
   private var reader: RemoteMemoryReader
 
   init() {

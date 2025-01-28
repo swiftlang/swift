@@ -23,21 +23,23 @@
 #include "swift/Runtime/CrashInfo.h"
 
 #ifdef __cplusplus
-#define EXTERN_C extern "C"
-#else
-#define EXTERN_C
+extern "C" {
 #endif
 
 // Can't import swift/Runtime/Debug.h because it assumes C++
-EXTERN_C void swift_reportWarning(uint32_t flags, const char *message);
+void swift_reportWarning(uint32_t flags, const char *message);
 
 // Returns true if the given function is a thunk function
-EXTERN_C bool _swift_backtrace_isThunkFunction(const char *rawName);
+bool _swift_backtrace_isThunkFunction(const char *rawName);
 
 // Demangle the given raw name (supports Swift and C++)
-EXTERN_C char *_swift_backtrace_demangle(const char *rawName,
-                                         size_t rawNameLength,
-                                         char *outputBuffer,
-                                         size_t *outputBufferSize);
+char *_swift_backtrace_demangle(const char *rawName,
+                                size_t rawNameLength,
+                                char *outputBuffer,
+                                size_t *outputBufferSize);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif // SWIFT_BACKTRACING_RUNTIME_H

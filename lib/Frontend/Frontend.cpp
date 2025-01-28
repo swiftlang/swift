@@ -1109,20 +1109,6 @@ bool CompilerInvocation::shouldImportSwiftStringProcessing() const {
         FrontendOptions::ParseInputMode::SwiftModuleInterface;
 }
 
-/// Enable Swift backtracing on a per-target basis
-static bool shouldImportSwiftBacktracingByDefault(const llvm::Triple &target) {
-  if (target.isOSDarwin() || target.isOSWindows() || target.isOSLinux())
-    return true;
-  return false;
-}
-
-bool CompilerInvocation::shouldImportSwiftBacktracing() const {
-  return shouldImportSwiftBacktracingByDefault(getLangOptions().Target) &&
-    !getLangOptions().DisableImplicitBacktracingModuleImport &&
-    getFrontendOptions().InputMode !=
-      FrontendOptions::ParseInputMode::SwiftModuleInterface;
-}
-
 bool CompilerInvocation::shouldImportCxx() const {
   // C++ Interop is disabled
   if (!getLangOptions().EnableCXXInterop)
@@ -1205,21 +1191,6 @@ void CompilerInstance::verifyImplicitStringProcessingImport() {
 bool CompilerInstance::canImportSwiftStringProcessing() const {
   ImportPath::Module::Builder builder(
       getASTContext().getIdentifier(SWIFT_STRING_PROCESSING_NAME));
-  auto modulePath = builder.get();
-  return getASTContext().testImportModule(modulePath);
-}
-
-void CompilerInstance::verifyImplicitBacktracingImport() {
-  if (Invocation.shouldImportSwiftBacktracing() &&
-      !canImportSwiftBacktracing()) {
-    Diagnostics.diagnose(SourceLoc(),
-                         diag::warn_implicit_backtracing_import_failed);
-  }
-}
-
-bool CompilerInstance::canImportSwiftBacktracing() const {
-  ImportPath::Module::Builder builder(
-      getASTContext().getIdentifier(SWIFT_BACKTRACING_NAME));
   auto modulePath = builder.get();
   return getASTContext().testImportModule(modulePath);
 }
@@ -1317,19 +1288,6 @@ ImplicitImportInfo CompilerInstance::getImplicitImportInfo() const {
     case ImplicitStdlibKind::Stdlib:
       if (canImportSwiftStringProcessing())
         pushImport(SWIFT_STRING_PROCESSING_NAME);
-      break;
-    }
-  }
-
-  if (Invocation.shouldImportSwiftBacktracing()) {
-    switch (imports.StdlibKind) {
-    case ImplicitStdlibKind::Builtin:
-    case ImplicitStdlibKind::None:
-      break;
-
-    case ImplicitStdlibKind::Stdlib:
-      if (canImportSwiftBacktracing())
-        pushImport(SWIFT_BACKTRACING_NAME);
       break;
     }
   }

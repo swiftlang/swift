@@ -18,18 +18,17 @@ import Swift
 
 // The size of the pages in the page cache (must be a power of 2)
 fileprivate let pageSize = 4096
-
 fileprivate let pageMask = pageSize - 1
 
 // The largest chunk we will try to cache data for
 fileprivate let maxCachedSize = pageSize * 8
 
 @_spi(MemoryReaders)
-public class CachingMemoryReader<T: MemoryReader>: MemoryReader {
-  private var reader: T
+public class CachingMemoryReader<Reader: MemoryReader>: MemoryReader {
+  private var reader: Reader
   private var cache: [Address:UnsafeRawBufferPointer]
 
-  public init(for reader: T) {
+  public init(for reader: Reader) {
     self.reader = reader
     self.cache = [:]
   }
@@ -40,7 +39,7 @@ public class CachingMemoryReader<T: MemoryReader>: MemoryReader {
     }
   }
 
-  private func getPage(at address: Address) throws -> UnsafeRawBufferPointer {
+  func getPage(at address: Address) throws -> UnsafeRawBufferPointer {
     precondition((address & Address(pageMask)) == 0)
 
     if let page = cache[address] {
@@ -82,5 +81,41 @@ public class CachingMemoryReader<T: MemoryReader>: MemoryReader {
       remaining -= chunk
       pageAddress += Address(pageSize)
     }
+  }
+}
+
+#if os(Linux)
+@_spi(MemoryReaders)
+public typealias MemserverMemoryReader
+  = CachingMemoryReader<UncachedMemserverMemoryReader>
+
+extension CachingMemoryReader where Reader == UncachedMemserverMemoryReader {
+  convenience public init(fd: CInt) {
+    self.init(for: UncachedMemserverMemoryReader(fd: fd))
+  }
+}
+#endif
+
+@_spi(MemoryReaders)
+public typealias RemoteMemoryReader = CachingMemoryReader<UncachedRemoteMemoryReader>
+
+extension CachingMemoryReader where Reader == UncachedRemoteMemoryReader {
+  #if os(macOS)
+  convenience public init(task: Any) {
+    self.init(for: UncachedRemoteMemoryReader(task: task))
+  }
+  #elseif os(Linux)
+  convenience public init(pid: Any) {
+    self.init(for: UncachedRemoteMemoryReader(pid: pid))
+  }
+  #endif
+}
+
+@_spi(MemoryReaders)
+public typealias LocalMemoryReader = CachingMemoryReader<UncachedLocalMemoryReader>
+
+extension CachingMemoryReader where Reader == UncachedLocalMemoryReader {
+  convenience public init() {
+    self.init(for: UncachedLocalMemoryReader())
   }
 }

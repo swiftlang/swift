@@ -651,22 +651,6 @@ static void recordShadowedDeclsAfterTypeMatch(
         }
       }
 
-      // Next, prefer any other module over the _Backtracing module.
-      if (auto spModule = ctx.getLoadedModule(ctx.Id_Backtracing)) {
-        if ((firstModule == spModule) != (secondModule == spModule)) {
-          // If second module is _StringProcessing, then it is shadowed by
-          // first.
-          if (secondModule == spModule) {
-            shadowed.insert(secondDecl);
-            continue;
-          }
-
-          // Otherwise, the first declaration is shadowed by the second.
-          shadowed.insert(firstDecl);
-          break;
-        }
-      }
-
       // Next, prefer any other module over the Observation module.
       if (auto obsModule = ctx.getLoadedModule(ctx.Id_Observation)) {
         if ((firstModule == obsModule) != (secondModule == obsModule)) {

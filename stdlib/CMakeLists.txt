@@ -228,12 +228,6 @@ swift_create_stdlib_targets("swift-test-stdlib" "" FALSE)
 swift_create_stdlib_targets("swift-libexec" "" TRUE)
 swift_create_stdlib_targets("swift-test-libexec" "" FALSE)
 
-# Check whether the Swift compiler we're using supports
-# -disable-implicit-backtracing-module-import
-include(SwiftCompilerCapability)
-
-swift_supports_implicit_module("backtracing" SWIFT_COMPILER_SUPPORTS_BACKTRACING)
-
 # FIXME: Include the toolchain directory before the public directory. Otherwise
 # the clang resource directory symlink stops installing correctly.
 add_subdirectory(toolchain)

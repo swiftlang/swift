@@ -46,6 +46,9 @@ private func symbol<T>(_ handle: UnsafeMutableRawPointer, _ name: String) -> T {
   return unsafeBitCast(result, to: T.self)
 }
 
+// Define UniChar
+typealias UniChar = UInt16
+
 private enum Sym {
   // CRCopySanitizedPath
   static let CRCopySanitizedPath: @convention(c) (CFString, CFIndex) -> CFString =
@@ -130,6 +133,9 @@ private enum Sym {
                     UnsafeMutableRawPointer?, CFIndex,
                     UnsafeMutablePointer<CFIndex>?) -> CFIndex =
     symbol(coreFoundationHandle, "CFStringGetBytes")
+  static let CFStringGetCharactersPtr:
+    @convention(c) (CFString) -> UnsafePointer<UniChar>? =
+    symbol(coreFoundationHandle, "CFStringGetCharactersPtr")
 }
 
 // .. Core Foundation miscellany ...............................................
@@ -159,6 +165,11 @@ internal func CFStringGetCStringPtr(_ s: CFString,
                                     _ encoding: CFStringEncoding)
   -> UnsafePointer<CChar>? {
   return Sym.CFStringGetCStringPtr(s, encoding)
+}
+
+internal func CFStringGetCharactersPtr(_ s: CFString)
+  -> UnsafePointer<UniChar>? {
+  return Sym.CFStringGetCharactersPtr(s);
 }
 
 internal func CFStringGetBytes(_ s: CFString,
@@ -199,8 +210,15 @@ private func fromCFString(_ cf: CFString) -> String {
 
   if let ptr = CFStringGetCStringPtr(cf,
                                      CFStringBuiltInEncodings.ASCII.rawValue) {
-    return String(decoding: UnsafeRawBufferPointer(start: ptr, count: length),
-                  as: UTF8.self)
+    let buffer = UnsafeRawBufferPointer(start: ptr, count: length)
+    return String(decoding: buffer, as: UTF8.self)
+  } else if let ptr = CFStringGetCharactersPtr(cf) {
+    let buffer = UnsafeBufferPointer(start: ptr, count: length)
+    return String(decoding: buffer, as: UTF16.self)
+  } else if let ptr = CFStringGetCStringPtr(cf,
+                                            CFStringBuiltInEncodings.UTF8.rawValue) {
+    let buffer = UnsafeRawBufferPointer(start: ptr, count: length)
+    return String(decoding: buffer, as: UTF8.self)
   } else {
     var byteLen = CFIndex(0)
 

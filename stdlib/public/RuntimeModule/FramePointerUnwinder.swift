@@ -20,7 +20,7 @@ import Swift
 public struct FramePointerUnwinder<C: Context, M: MemoryReader>: Sequence, IteratorProtocol {
   public typealias Context = C
   public typealias MemoryReader = M
-  public typealias Address = MemoryReader.Address
+  public typealias Address = Context.Address
 
   var pc: Address
   var fp: Address
@@ -30,15 +30,18 @@ public struct FramePointerUnwinder<C: Context, M: MemoryReader>: Sequence, Itera
   var done: Bool
 
   #if os(Linux)
-  var elf32Cache: [Int:Elf32Image<FileImageSource>] = [:]
-  var elf64Cache: [Int:Elf64Image<FileImageSource>] = [:]
-  var images: [Backtrace.Image]?
+  var images: ImageMap?
   #endif
 
   var reader: MemoryReader
 
+  @_specialize(exported: true, kind: full, where C == HostContext, M == UnsafeLocalMemoryReader)
+  @_specialize(exported: true, kind: full, where C == HostContext, M == RemoteMemoryReader)
+  #if os(Linux)
+  @_specialize(exported: true, kind: full, where C == HostContext, M == MemserverMemoryReader)
+  #endif
   public init(context: Context,
-              images: [Backtrace.Image]?,
+              images: ImageMap?,
               memoryReader: MemoryReader) {
 
     pc = Address(context.programCounter)
@@ -73,35 +76,36 @@ public struct FramePointerUnwinder<C: Context, M: MemoryReader>: Sequence, Itera
     return false
   }
 
+  @_specialize(exported: true, kind: full, where C == HostContext, M == UnsafeLocalMemoryReader)
+  @_specialize(exported: true, kind: full, where C == HostContext, M == RemoteMemoryReader)
+  #if os(Linux)
+  @_specialize(exported: true, kind: full, where C == HostContext, M == MemserverMemoryReader)
+  #endif
   private mutating func isAsyncPC(_ pc: Address) -> Bool {
     // On Linux, we need to examine the PC to see if this is an async frame
     #if os(Linux)
-    let address = FileImageSource.Address(pc)
+    let address = MemoryReader.Address(pc)
 
     if let images = images,
-       let imageNdx = images.firstIndex(
-         where: { address >= $0.baseAddress && address < $0.endOfText }
-       ) {
-      let relativeAddress = address - FileImageSource.Address(images[imageNdx].baseAddress)
-      var elf32Image = elf32Cache[imageNdx]
-      var elf64Image = elf64Cache[imageNdx]
+       let imageNdx = images.indexOfImage(at: Backtrace.Address(address)) {
+      let base = MemoryReader.Address(images[imageNdx].baseAddress)!
+      let relativeAddress = address - base
+      let cache = ElfImageCache.threadLocal
 
-      if elf32Image == nil && elf64Image == nil {
-        if let source = try? FileImageSource(path: images[imageNdx].path) {
-          if let elfImage = try? Elf32Image(source: source) {
-            elf32Image = elfImage
-            elf32Cache[imageNdx] = elfImage
-          } else if let elfImage = try? Elf64Image(source: source) {
-            elf64Image = elfImage
-            elf64Cache[imageNdx] = elfImage
-          }
+      if let hit = cache.lookup(path: images[imageNdx].path) {
+        switch hit {
+          case let .elf32Image(image):
+            if let theSymbol = image.lookupSymbol(
+                 address: Elf32Image.Traits.Address(relativeAddress)
+               ) {
+              return isAsyncSymbol(theSymbol.name)
+            }
+          case let .elf64Image(image):
+            if let theSymbol = image.lookupSymbol(
+                 address: Elf64Image.Traits.Address(relativeAddress)) {
+              return isAsyncSymbol(theSymbol.name)
+            }
         }
-      }
-
-      if let theSymbol = elf32Image?.lookupSymbol(address: relativeAddress) {
-        return isAsyncSymbol(theSymbol.name)
-      } else if let theSymbol = elf64Image?.lookupSymbol(address: relativeAddress) {
-        return isAsyncSymbol(theSymbol.name)
       }
     }
     #endif
@@ -109,6 +113,11 @@ public struct FramePointerUnwinder<C: Context, M: MemoryReader>: Sequence, Itera
     return false
   }
 
+  @_specialize(exported: true, kind: full, where C == HostContext, M == UnsafeLocalMemoryReader)
+  @_specialize(exported: true, kind: full, where C == HostContext, M == RemoteMemoryReader)
+  #if os(Linux)
+  @_specialize(exported: true, kind: full, where C == HostContext, M == MemserverMemoryReader)
+  #endif
   private func isAsyncFrame(_ storedFp: Address) -> Bool {
     #if (os(macOS) || os(iOS) || os(watchOS)) && (arch(arm64) || arch(arm64_32) || arch(x86_64))
     // On Darwin, we borrow a bit of the frame pointer to indicate async
@@ -119,15 +128,25 @@ public struct FramePointerUnwinder<C: Context, M: MemoryReader>: Sequence, Itera
     #endif
   }
 
+  @_specialize(exported: true, kind: full, where C == HostContext, M == UnsafeLocalMemoryReader)
+  @_specialize(exported: true, kind: full, where C == HostContext, M == RemoteMemoryReader)
+  #if os(Linux)
+  @_specialize(exported: true, kind: full, where C == HostContext, M == MemserverMemoryReader)
+  #endif
   private func stripPtrAuth(_ address: Address) -> Address {
-    return Address(Context.stripPtrAuth(address: Context.Address(address)))
+    return Context.stripPtrAuth(address: address)
   }
 
+  @_specialize(exported: true, kind: full, where C == HostContext, M == UnsafeLocalMemoryReader)
+  @_specialize(exported: true, kind: full, where C == HostContext, M == RemoteMemoryReader)
+  #if os(Linux)
+  @_specialize(exported: true, kind: full, where C == HostContext, M == MemserverMemoryReader)
+  #endif
   private mutating func fetchAsyncContext() -> Bool {
     let strippedFp = stripPtrAuth(fp)
 
     do {
-      asyncContext = try reader.fetch(from: Address(strippedFp - 8),
+      asyncContext = try reader.fetch(from: MemoryReader.Address(strippedFp - 8),
                                       as: Address.self)
       return true
     } catch {
@@ -135,7 +154,12 @@ public struct FramePointerUnwinder<C: Context, M: MemoryReader>: Sequence, Itera
     }
   }
 
-  public mutating func next() -> Backtrace.Frame? {
+  @_specialize(exported: true, kind: full, where C == HostContext, M == UnsafeLocalMemoryReader)
+  @_specialize(exported: true, kind: full, where C == HostContext, M == RemoteMemoryReader)
+  #if os(Linux)
+  @_specialize(exported: true, kind: full, where C == HostContext, M == MemserverMemoryReader)
+  #endif
+  public mutating func next() -> RichFrame<Address>? {
     if done {
       return nil
     }
@@ -143,7 +167,7 @@ public struct FramePointerUnwinder<C: Context, M: MemoryReader>: Sequence, Itera
     if first {
       first = false
       pc = stripPtrAuth(pc)
-      return .programCounter(Backtrace.Address(pc))
+      return .programCounter(pc)
     }
 
     if !isAsync {
@@ -153,17 +177,20 @@ public struct FramePointerUnwinder<C: Context, M: MemoryReader>: Sequence, Itera
         let strippedFp = stripPtrAuth(fp)
 
         if strippedFp == 0
-             || !Context.isAlignedForStack(framePointer:
-                                             Context.Address(strippedFp)) {
+             || !Context.isAlignedForStack(framePointer:strippedFp) {
           done = true
           return nil
         }
 
         do {
-          pc = stripPtrAuth(try reader.fetch(from:
-                                               strippedFp + Address(MemoryLayout<Address>.size),
-                                             as: Address.self))
-          next = try reader.fetch(from: Address(strippedFp), as: Address.self)
+          pc = stripPtrAuth(try reader.fetch(
+                              from:MemoryReader.Address(
+                                strippedFp
+                                  + Address(MemoryLayout<Address>.size)
+                              ),
+                              as: Address.self))
+          next = try reader.fetch(from: MemoryReader.Address(strippedFp),
+                                  as: Address.self)
         } catch {
           done = true
           return nil
@@ -176,7 +203,7 @@ public struct FramePointerUnwinder<C: Context, M: MemoryReader>: Sequence, Itera
 
         if !isAsyncFrame(next) {
           fp = next
-          return .returnAddress(Backtrace.Address(pc))
+          return .returnAddress(pc)
         }
       }
 
@@ -202,8 +229,10 @@ public struct FramePointerUnwinder<C: Context, M: MemoryReader>: Sequence, Itera
     // On arm64_32, the two pointers at the start of the context are 32-bit,
     // although the stack layout is identical to vanilla arm64
     do {
-      var next32 = try reader.fetch(from: strippedCtx, as: UInt32.self)
-      var pc32 = try reader.fetch(from: strippedCtx + 4, as: UInt32.self)
+      var next32 = try reader.fetch(from: MemoryReader.Address(strippedCtx),
+                                    as: UInt32.self)
+      var pc32 = try reader.fetch(from: MemoryReader.Address(strippedCtx + 4),
+                                  as: UInt32.self)
 
       next = Address(next32)
       pc = stripPtrAuth(Address(pc32))
@@ -215,8 +244,10 @@ public struct FramePointerUnwinder<C: Context, M: MemoryReader>: Sequence, Itera
 
     // Otherwise it's two 64-bit words
     do {
-      next = try reader.fetch(from: strippedCtx, as: Address.self)
-      pc = stripPtrAuth(try reader.fetch(from: strippedCtx + 8, as: Address.self))
+      next = try reader.fetch(from: MemoryReader.Address(strippedCtx),
+                              as: Address.self)
+      pc = stripPtrAuth(try reader.fetch(from: MemoryReader.Address(strippedCtx + 8),
+                                         as: Address.self))
     } catch {
       done = true
       return nil
@@ -225,7 +256,6 @@ public struct FramePointerUnwinder<C: Context, M: MemoryReader>: Sequence, Itera
     #endif
 
     asyncContext = next
-
-    return .asyncResumePoint(Backtrace.Address(pc))
+    return .asyncResumePoint(pc)
   }
 }
