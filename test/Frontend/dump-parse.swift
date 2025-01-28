@@ -110,11 +110,11 @@ _ = { (v: MyEnum) in }
 // CHECK-LABEL: (struct_decl range=[{{.+}}] "SelfParam"
 struct SelfParam {
 
-  // CHECK-LABEL: (func_decl range=[{{.+}}] "createOptional()" type
+  // CHECK-LABEL: (func_decl range=[{{.+}}] "createOptional()" static
   // CHECK-NEXT:    (parameter "self")
-  // CHECK-NEXT:    (parameter_list range=[{{.+}}])
   // CHECK-NEXT:    (result=type_optional
   // CHECK-NEXT:      (type_unqualified_ident id="SelfParam" unbound))
+  // CHECK-NEXT:    (parameter_list range=[{{.+}}])
   static func createOptional() -> SelfParam? {
 
     // CHECK-LABEL: (call_expr type="<null>"
@@ -125,8 +125,8 @@ struct SelfParam {
 }
 
 // CHECK-LABEL: (func_decl range=[{{.+}}] "dumpMemberTypeRepr()"
-// CHECK-NEXT:    (parameter_list range=[{{.+}}])
 // CHECK-NEXT:    (result=type_qualified_ident id="Element" unbound
 // CHECK-NEXT:      (type_unqualified_ident id="Array" unbound
 // CHECK-NEXT:        (type_unqualified_ident id="Bool" unbound))
+// CHECK-NEXT:    (parameter_list range=[{{.+}}])
 func dumpMemberTypeRepr() -> Array<Bool>.Element { true }

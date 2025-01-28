@@ -1086,6 +1086,14 @@ Type AbstractFunctionDecl::getThrownInterfaceType() const {
   return CatchNode(mutableThis).getExplicitCaughtType(getASTContext());
 }
 
+std::optional<Type> AbstractFunctionDecl::getCachedThrownInterfaceType() const {
+  if (!getThrownTypeRepr())
+    return ThrownType.getType();
+
+  auto mutableThis = const_cast<AbstractFunctionDecl *>(this);
+  return CatchNode(mutableThis).getCachedExplicitCaughtType(getASTContext());
+}
+
 std::optional<Type> AbstractFunctionDecl::getEffectiveThrownErrorType() const {
   // FIXME: Only getters can have thrown error types right now, and DidSet
   // has a cyclic reference if we try to get its interface type here. Find a
@@ -3911,6 +3919,12 @@ OpaqueTypeDecl *ValueDecl::getOpaqueResultTypeDecl() const {
   return evaluateOrDefault(getASTContext().evaluator,
     OpaqueResultTypeRequest{const_cast<ValueDecl *>(this)},
     nullptr);
+}
+
+std::optional<OpaqueTypeDecl *>
+ValueDecl::getCachedOpaqueResultTypeDecl() const {
+  return OpaqueResultTypeRequest{const_cast<ValueDecl *>(this)}
+      .getCachedResult();
 }
 
 bool ValueDecl::isObjC() const {
@@ -10610,6 +10624,11 @@ Type FuncDecl::getResultInterfaceType() const {
   return ErrorType::get(ctx);
 }
 
+std::optional<Type> FuncDecl::getCachedResultInterfaceType() const {
+  auto mutableThis = const_cast<FuncDecl *>(this);
+  return ResultTypeRequest{mutableThis}.getCachedResult();
+}
+
 bool FuncDecl::isUnaryOperator() const {
   if (!isOperator())
     return false;
@@ -11766,6 +11785,11 @@ Type MacroDecl::getResultInterfaceType() const {
   return ErrorType::get(ctx);
 }
 
+std::optional<Type> MacroDecl::getCachedResultInterfaceType() const {
+  auto mutableThis = const_cast<MacroDecl *>(this);
+  return ResultTypeRequest{mutableThis}.getCachedResult();
+}
+
 SourceRange MacroDecl::getSourceRange() const {
   SourceLoc endLoc = getNameLoc();
   if (parameterList)
@@ -12194,6 +12218,11 @@ CatchNode::getThrownErrorTypeInContext(ASTContext &ctx) const {
 Type CatchNode::getExplicitCaughtType(ASTContext &ctx) const {
   return evaluateOrDefault(
       ctx.evaluator, ExplicitCaughtTypeRequest{&ctx, *this}, Type());
+}
+
+std::optional<Type>
+CatchNode::getCachedExplicitCaughtType(ASTContext &ctx) const {
+  return ExplicitCaughtTypeRequest{&ctx, *this}.getCachedResult();
 }
 
 void swift::simple_display(llvm::raw_ostream &out, CatchNode catchNode) {

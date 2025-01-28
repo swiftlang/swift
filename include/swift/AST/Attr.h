@@ -1709,6 +1709,12 @@ public:
                                 DeclName MemberName);
 
   ProtocolDecl *getProtocol(DeclContext *dc) const;
+
+  /// Returns the protocol declaration containing the requirement being
+  /// implemented by the attributed declaration if it has already been computed,
+  /// otherwise `nullopt`. This should only be used for dumping.
+  std::optional<ProtocolDecl *> getCachedProtocol(DeclContext *dc) const;
+
   TypeRepr *getProtocolTypeRepr() const { return TyR; }
 
   DeclName getMemberName() const { return MemberName; }
