@@ -13,6 +13,7 @@
 #include "SwiftDeclSynthesizer.h"
 #include "swift/AST/ASTMangler.h"
 #include "swift/AST/Builtins.h"
+#include "swift/AST/Decl.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/Pattern.h"
@@ -2214,7 +2215,11 @@ SwiftDeclSynthesizer::makeOperator(FuncDecl *operatorMethod,
   newParams.push_back(lhsParam);
 
   for (auto param : *paramList) {
-    newParams.push_back(param);
+    auto clonedParam = ParamDecl::clone(ctx, param);
+    if (clonedParam->getParameterName().empty()) {
+      clonedParam->setName(ctx.getIdentifier("other"));
+    }
+    newParams.push_back(clonedParam);
   }
 
   auto oldArgNames = operatorMethod->getName().getArgumentNames();

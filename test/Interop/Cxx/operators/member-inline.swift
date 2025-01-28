@@ -464,4 +464,10 @@ OperatorsTestSuite.test("HasStaticOperatorCallWithConstOperator.call") {
   expectEqual(8, res2)
 }
 
+OperatorsTestSuite.test("UnnamedParameterInOperator.equal") {
+  let lhs = ClassWithOperatorEqualsParamUnnamed()
+  let rhs = ClassWithOperatorEqualsParamUnnamed()
+  expectFalse(lhs == rhs)
+}
+
 runAllTests()
