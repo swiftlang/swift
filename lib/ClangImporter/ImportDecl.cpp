@@ -4116,6 +4116,7 @@ namespace {
           // annotated nor is it marked noescape.
           auto attr = new (ASTContext) UnsafeAttr(/*implicit=*/true);
           result->getAttrs().add(attr);
+          break;
         }
       }
       Impl.diagnoseTargetDirectly(decl);
