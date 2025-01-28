@@ -4418,6 +4418,56 @@ void AttributeChecker::visitFrozenAttr(FrozenAttr *attr) {
   }
 }
 
+static void checkGlobalActorAttr(
+    const Decl *decl,
+    std::pair<CustomAttr *, NominalTypeDecl *> &globalActorAttr) {
+  auto isolatedAttr = decl->getAttrs().getAttribute<IsolatedAttr>();
+  auto nonisolatedAttr = decl->getAttrs().getAttribute<NonisolatedAttr>();
+  struct NameAndRange {
+    StringRef name;
+    SourceRange range;
+
+    NameAndRange(StringRef _name, SourceRange _range)
+        : name(_name), range(_range) {}
+  };
+
+  llvm::SmallVector<NameAndRange, 3> attributes;
+
+  attributes.push_back(NameAndRange(globalActorAttr.second->getName().str(),
+                                    globalActorAttr.first->getRangeWithAt()));
+
+  if (isolatedAttr) {
+    attributes.push_back(NameAndRange(isolatedAttr->getAttrName(),
+                                      isolatedAttr->getRangeWithAt()));
+  }
+  if (nonisolatedAttr) {
+    attributes.push_back(NameAndRange(nonisolatedAttr->getAttrName(),
+                                      nonisolatedAttr->getRangeWithAt()));
+  }
+  if (attributes.size() == 1)
+    return;
+
+  if (attributes.size() == 2) {
+    decl->diagnose(diag::actor_isolation_multiple_attr_2, decl,
+                   attributes[0].name, attributes[1].name)
+        .highlight(attributes[0].range)
+        .highlight(attributes[1].range)
+        .warnUntilSwiftVersion(6)
+        .fixItRemove(attributes[1].range);
+
+  } else {
+    assert(attributes.size() == 3);
+    decl->diagnose(diag::actor_isolation_multiple_attr_3, decl,
+                   attributes[0].name, attributes[1].name, attributes[2].name)
+        .highlight(attributes[0].range)
+        .highlight(attributes[1].range)
+        .highlight(attributes[2].range)
+        .warnUntilSwiftVersion(6)
+        .fixItRemove(attributes[1].range)
+        .fixItRemove(attributes[2].range);
+  }
+}
+
 void AttributeChecker::visitCustomAttr(CustomAttr *attr) {
   auto dc = D->getDeclContext();
 
@@ -4602,7 +4652,10 @@ void AttributeChecker::visitCustomAttr(CustomAttr *attr) {
   // retrieval request perform checking for us.
   if (nominal->isGlobalActor()) {
     diagnoseIsolatedDeinitInValueTypes(attr);
-    (void)D->getGlobalActorAttr();
+    if (auto g = D->getGlobalActorAttr()) {
+      checkGlobalActorAttr(D, *g);
+    }
+
     if (auto value = dyn_cast<ValueDecl>(D)) {
       (void)getActorIsolation(value);
     } else {
@@ -8062,7 +8115,7 @@ public:
         ctx.evaluator, GlobalActorAttributeRequest{closure}, std::nullopt);
 
     if (globalActorAttr && globalActorAttr->first == attr) {
-      // if there is an `isolated` parameter, then this global-actor attribute
+      // If there is an `isolated` parameter, then this global-actor attribute
       // is invalid.
       for (auto param : *closure->getParameters()) {
         if (param->isIsolated()) {
@@ -8075,6 +8128,8 @@ public:
           break; // don't need to complain about this more than once.
         }
       }
+
+      // Check if we have nonisolated or
 
       return; // it's OK
     }
