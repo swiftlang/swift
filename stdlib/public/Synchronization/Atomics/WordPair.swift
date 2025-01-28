@@ -183,6 +183,18 @@ extension WordPair: Hashable {
   }
 }
 
+@available(SwiftStdlib 6.2, *)
+extension WordPair: Comparable {
+  // Note: This function can have a lower availability than the conformance
+  // itself because it's always emit into client.
+  @available(SwiftStdlib 6.2, *)
+  @_alwaysEmitIntoClient
+  @_transparent
+  public static func <(lhs: WordPair, rhs: WordPair) -> Bool {
+    (lhs.first, lhs.second) < (rhs.first, rhs.second)
+  }
+}
+
 @available(SwiftStdlib 6.0, *)
 @_unavailableInEmbedded
 extension WordPair: CustomStringConvertible {
