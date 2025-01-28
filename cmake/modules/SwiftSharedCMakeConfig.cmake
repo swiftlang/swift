@@ -377,3 +377,35 @@ function(swift_common_llvm_config target)
     llvm_config("${target}" ${ARGN})
   endif()
 endfunction()
+
+# Set sanitizer options to all Swift compiler flags. Similar options are added to C/CXX compiler in 'HandleLLVMOptions'
+macro(swift_common_sanitizer_config)
+  if(LLVM_USE_SANITIZER)
+    if(LLVM_USE_SANITIZER STREQUAL "Address")
+      set(_Swift_SANITIZER_FLAGS "-sanitize=address -Xclang-linker -fsanitize=address")
+    elseif(LLVM_USE_SANITIZER STREQUAL "HWAddress")
+      # Not supported?
+    elseif(LLVM_USE_SANITIZER MATCHES "Memory(WithOrigins)?")
+      # Not supported
+      if(LLVM_USE_SANITIZER STREQUAL "MemoryWithOrigins")
+        # Not supported
+      endif()
+    elseif(LLVM_USE_SANITIZER STREQUAL "Undefined")
+      set(_Swift_SANITIZER_FLAGS "-sanitize=undefined -Xclang-linker -fsanitize=undefined")
+    elseif(LLVM_USE_SANITIZER STREQUAL "Thread")
+      set(_Swift_SANITIZER_FLAGS "-sanitize=thread -Xclang-linker -fsanitize=thread")
+    elseif(LLVM_USE_SANITIZER STREQUAL "DataFlow")
+      # Not supported
+    elseif(LLVM_USE_SANITIZER STREQUAL "Address;Undefined" OR
+           LLVM_USE_SANITIZER STREQUAL "Undefined;Address")
+      set(_Swift_SANITIZER_FLAGS "-sanitize=address -sanitize=undefined -Xclang-linker -fsanitize=address -Xclang-linker -fsanitize=undefined")
+    elseif(LLVM_USE_SANITIZER STREQUAL "Leaks")
+      # Not supported
+    else()
+      message(SEND_ERROR "unsupported value for LLVM_USE_SANITIZER: ${LLVM_USE_SANITIZER}")
+    endif()
+
+    set(CMAKE_Swift_FLAGS "${CMAKE_Swift_FLAGS} ${_Swift_SANITIZER_FLAGS}")
+
+  endif()
+endmacro()
