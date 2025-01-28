@@ -598,7 +598,7 @@ function Invoke-VsDevShell($Arch) {
   if ($ToBatch) {
     Write-Output "call `"$VSInstallRoot\Common7\Tools\VsDevCmd.bat`" $DevCmdArguments"
   } else {
-    # This dll path is valid for VS2019 and VS2022, but it was under a vsdevcmd subfolder in VS2017 
+    # This dll path is valid for VS2019 and VS2022, but it was under a vsdevcmd subfolder in VS2017
     Import-Module "$VSInstallRoot\Common7\Tools\Microsoft.VisualStudio.DevShell.dll"
     Enter-VsDevShell -VsInstallPath $VSInstallRoot -SkipAutomaticLocation -DevCmdArguments $DevCmdArguments
 
@@ -680,7 +680,6 @@ function Fetch-Dependencies {
     Expand-Archive -Path $source -DestinationPath $destination -Force
   }
 
-
   function Extract-Toolchain {
     param
     (
@@ -714,14 +713,19 @@ function Fetch-Dependencies {
     }
   }
 
-  if ($SkipBuild -and $SkipPackaging) { return }
+  if ($SkipBuild -and $SkipPackaging -and -not $Test) { return }
+
+  $Stopwatch = [Diagnostics.Stopwatch]::StartNew()
+  if ($ToBatch) {
+    Write-Host -ForegroundColor Cyan "[$([DateTime]::Now.ToString("yyyy-MM-dd HH:mm:ss"))] Fetch-Dependencies..."
+  }
 
   $WiXURL = "https://www.nuget.org/api/v2/package/wix/$WiXVersion"
   $WiXHash = "DF9BDB347183716F82EFE2CECB8C54BB3554AA907A69F47A41741D6FA4D0A754"
   DownloadAndVerify $WixURL "$BinaryCache\WiX-$WiXVersion.zip" $WiXHash
   Extract-ZipFile WiX-$WiXVersion.zip $BinaryCache WiX-$WiXVersion
 
-  if ($SkipBuild) { return }
+  if ($SkipBuild -and -not $Test) { return }
 
   DownloadAndVerify $PinnedBuild "$BinaryCache\$PinnedToolchain.exe" $PinnedSHA256
 
@@ -821,6 +825,53 @@ function Fetch-Dependencies {
     DownloadAndVerify $NDKURL "$BinaryCache\android-ndk-$AndroidNDKVersion-windows.zip" $NDKHash
 
     Extract-ZipFile -ZipFileName "android-ndk-$AndroidNDKVersion-windows.zip" -BinaryCache $BinaryCache -ExtractPath "android-ndk-$AndroidNDKVersion" -CreateExtractPath $false
+
+    # FIXME: Both Java and Android emulator must be available in the environment.
+    # This is a terrible workaround. It's a waste of time and resources.
+    $NDKDir = "$BinaryCache\android-sdk"
+    if ($Test -and -not(Test-Path "$NDKDir\licenses")) {
+      # Download Java Runtime
+      switch ($BuildArchName) {
+        "AMD64" {
+          $JavaURL = "https://aka.ms/download-jdk/microsoft-jdk-17.0.14-windows-x64.zip"
+          $JavaHash = "3619082f4a667f52c97cce983364a517993f798ae248c411765becfd9705767f"
+        }
+        "ARM64" {
+          $JavaURL = "https://aka.ms/download-jdk/microsoft-jdk-17.0.14-windows-aarch64.zip"
+          $JavaHash = "2a12c7b3d46712de9671f5f011a3cae9ee53d5ff3b0604136ee079a906146448"
+        }
+        default { throw "Unsupported processor architecture" }
+      }
+      DownloadAndVerify $JavaURL "$BinaryCache\microsoft-jdk.zip" $JavaHash
+      Extract-ZipFile -ZipFileName "microsoft-jdk.zip" -BinaryCache $BinaryCache -ExtractPath "android-sdk-jdk"
+
+      # Download cmdline-tools
+      $CLToolsURL = "https://dl.google.com/android/repository/commandlinetools-win-11076708_latest.zip"
+      $CLToolsHash = "4d6931209eebb1bfb7c7e8b240a6a3cb3ab24479ea294f3539429574b1eec862"
+      DownloadAndVerify $CLToolsURL "$BinaryCache\android-cmdline-tools.zip" $CLToolsHash
+      Extract-ZipFile -ZipFileName "android-cmdline-tools.zip" -BinaryCache $BinaryCache -ExtractPath "android-sdk-cmdline-tools"
+
+      # Accept licenses
+      New-Item -Type Directory -Path "$NDKDir\licenses" -ErrorAction Ignore | Out-Null
+      Set-Content -Path "$NDKDir\licenses\android-sdk-license" -Value "24333f8a63b6825ea9c5514f83c2829b004d1fee"
+      Set-Content -Path "$NDKDir\licenses\android-sdk-preview-license" -Value "84831b9409646a918e30573bab4c9c91346d8abd"
+
+      # Install packages and create test device
+      Isolate-EnvVars {
+        $env:JAVA_HOME = "$BinaryCache\android-sdk-jdk\jdk-17.0.14+7"
+        $env:Path = "${env:JAVA_HOME}\bin;${env:Path}"
+
+        Invoke-Program "$BinaryCache\android-sdk-cmdline-tools\cmdline-tools\bin\sdkmanager.bat" "--sdk_root=$NDKDir" '"cmdline-tools;latest"' '--channel=3'
+        $AndroidSdkMgr = "$NDKDir\cmdline-tools\latest\bin\sdkmanager.bat"
+        foreach ($Package in @('"ndk;26.2.11394342"', '"system-images;android-29;default;x86_64"', '"platforms;android-29"', '"platform-tools"')) {
+          Write-Host "$AndroidSdkMgr $Package"
+          Invoke-Program -OutNull $AndroidSdkMgr $Package
+        }
+
+        $AndroidAvdMgr = "$NDKDir\cmdline-tools\latest\bin\avdmanager.bat"
+        Invoke-Program $AndroidAvdMgr create avd --name '"swift-test-device"' --package '"system-images;android-29;default;x86_64"'
+      }
+    }
   }
 
   if ($IncludeDS2) {
@@ -856,6 +907,11 @@ function Fetch-Dependencies {
         Copy-Directory "$NugetRoot\$Package.$($Arch.ShortName).$WinSDKVersion\c\*" "$CustomWinSDKRoot\lib\$WinSDKVersionRevisionZero"
       }
     }
+  }
+
+  if (-not $ToBatch) {
+    Write-Host -ForegroundColor Cyan "[$([DateTime]::Now.ToString("yyyy-MM-dd HH:mm:ss"))] Fetch-Dependencies took $($Stopwatch.Elapsed)"
+    Write-Host ""
   }
 }
 
@@ -1391,7 +1447,7 @@ function Build-WiXProject() {
   $ProductVersionArg = $ProductVersion
   if (-not $Bundle) {
     # WiX v4 will accept a semantic version string for Bundles,
-    # but Packages still require a purely numerical version number, 
+    # but Packages still require a purely numerical version number,
     # so trim any semantic versioning suffixes
     $ProductVersionArg = [regex]::Replace($ProductVersion, "[-+].*", "")
   }
@@ -1983,6 +2039,98 @@ function Build-Dispatch([Platform]$Platform, $Arch, [switch]$Test = $false) {
     }
 }
 
+function Build-CTest([Platform]$Platform, $Arch) {
+  if (-not(Test-Path $SourceCache\libarchive)) {
+    Invoke-Program git clone "https://github.com/libarchive/libarchive" $SourceCache\libarchive
+  }
+  Build-CMakeProject `
+    -Src $SourceCache\libarchive `
+    -Bin "$($Arch.BinaryCache)\$Platform\libarchive" `
+    -InstallTo "$($Arch.SDKInstallRoot)\usr" `
+    -Arch $Arch `
+    -Platform $Platform `
+    -UseBuiltCompilers C,CXX
+
+  if (-not(Test-Path $SourceCache\libuv)) {
+    Invoke-Program git clone "https://github.com/libuv/libuv" $SourceCache\libuv
+  }
+  Build-CMakeProject `
+    -Src $SourceCache\libuv `
+    -Bin "$($Arch.BinaryCache)\$Platform\libuv" `
+    -Arch $Arch `
+    -Platform $Platform `
+    -UseBuiltCompilers C,CXX `
+    -BuildTargets "libuv.a"
+
+  Build-CMakeProject `
+    -Src $SourceCache\cmake `
+    -Bin "$($Arch.BinaryCache)\$Platform\cmake" `
+    -Arch $Arch `
+    -Platform $Platform `
+    -UseBuiltCompilers C,CXX `
+    -BuildTargets ctest `
+    -Defines (@{
+      CMAKE_USE_SYSTEM_LIBUV = "YES";
+      CMAKE_USE_SYSTEM_LIBARCHIVE = "YES";
+      LibArchive_INCLUDE_DIR = "$($Arch.SDKInstallRoot)\usr\include";
+      LibArchive_LIBRARY = "$($Arch.SDKInstallRoot)\usr\lib\libarchive.a";
+      LibUV_INCLUDE_DIR = "$SourceCache\libuv\include";
+      LibUV_LIBRARY = "$($Arch.BinaryCache)\$Platform\libuv\libuv.a";
+    })
+}
+
+function Test-Dispatch([Platform]$Platform, $Arch) {
+  $NDKDir = Get-AndroidNDKPath
+
+  # TODO: One emulator instance for all tests?
+  $emulator = "$NDKDir\emulator\emulator.exe"
+  Start-Process -FilePath $emulator -ArgumentList "@swift-test-device" `
+                -RedirectStandardOutput "$NDKDir\.temp\emulator.out" `
+                -RedirectStandardError "$NDKDir\.temp\emulator.err"
+
+  # This is just a hack for now
+  $LocalBin = (Get-TargetProjectBinaryCache $AndroidX64 Dispatch)
+  $CacheName = Split-Path $LocalBin -Leaf
+  $RemoteBin = "/data/local/tmp/$CacheName"
+
+  # TODO: On my local machine I have to grant adb.exe network access once. How to do that in CI?
+  $adb = "$BinaryCache\android-sdk\platform-tools\adb.exe"
+  Invoke-Program $adb "wait-for-device"
+
+  # Add binary directory to emulator
+  Write-Host    "$adb shell rm -rf $RemoteBin"
+  Invoke-Program $adb shell "rm -rf $RemoteBin"
+  Write-Host    "$adb shell mkdir $RemoteBin"
+  Invoke-Program $adb shell "mkdir $RemoteBin"
+  Write-Host    "$adb push $LocalBin\. $RemoteBin"
+  Invoke-Program $adb push "$LocalBin\." $RemoteBin
+
+  # Replace absolute paths in config file
+  Write-Host    "$adb shell sed -i 's|$($LocalBin.Replace('\', '/'))|$RemoteBin|g' $RemoteBin/tests/CTestTestfile.cmake"
+  Invoke-Program $adb shell "sed -i 's|$($LocalBin.Replace('\', '/'))|$RemoteBin|g' $RemoteBin/tests/CTestTestfile.cmake"
+  Invoke-Program $adb shell "cat $RemoteBin/tests/CTestTestfile.cmake"
+
+  # Set executable flag for all tests (and bsdtestharness utility)
+  $Executables = @("bsdtestharness","dispatch_apply","dispatch_api","dispatch_debug","dispatch_queue_finalizer","dispatch_overcommit","dispatch_context_for_key","dispatch_after","dispatch_timer","dispatch_timer_short","dispatch_timer_timeout","dispatch_sema","dispatch_timer_bit31","dispatch_timer_bit63","dispatch_timer_set_time","dispatch_data","dispatch_io_muxed","dispatch_io_net","dispatch_io_pipe","dispatch_io_pipe_close","dispatch_select","dispatch_c99","dispatch_plusplus")
+  foreach ($Exe in $Executables) {
+    Write-Host    "$adb shell chmod +x $RemoteBin/$Exe"
+    Invoke-Program $adb shell "chmod +x $RemoteBin/$Exe"
+  }
+
+  # Add ctest driver to emulator and make it executable
+  Write-Host    "$adb push $($Arch.BinaryCache)\$Platform\cmake\bin\ctest /data/local/tmp"
+  Invoke-Program $adb push "$($Arch.BinaryCache)\$Platform\cmake\bin\ctest" "/data/local/tmp"
+  Write-Host    "$adb shell chmod +x /data/local/tmp/ctest"
+  Invoke-Program $adb shell "chmod +x /data/local/tmp/ctest"
+
+  # Run tests
+  Write-Host    "$adb shell /data/local/tmp/ctest --test-dir $RemoteBin"
+  Invoke-Program $adb shell "/data/local/tmp/ctest --test-dir $RemoteBin"
+
+  Invoke-Program $adb emu kill
+  Invoke-Program $adb kill-server
+}
+
 function Build-Foundation([Platform]$Platform, $Arch, [switch]$Test = $false) {
   if ($Test) {
     # Foundation tests build via swiftpm rather than CMake
@@ -2542,7 +2690,7 @@ function Test-Format {
     "-Xswiftc", "-I$(Get-HostProjectBinaryCache Format)\swift",
     "-Xlinker", "-L$(Get-HostProjectBinaryCache Format)\lib"
   )
-  
+
   Isolate-EnvVars {
     $env:SWIFTFORMAT_BUILD_ONLY_TESTS=1
     # Testing swift-format is faster in serial mode than in parallel mode, probably because parallel test execution
@@ -3021,6 +3169,11 @@ if (-not $IsCrossCompiling) {
 
   if ($Test -contains "dispatch") {
     Build-Dispatch Windows $HostArch -Test
+    # TODO: This is a hack. We need different devices for different arches.
+    if ($AndroidSDKs -contains "x86_64") {
+      Invoke-BuildStep Build-CTest Android $AndroidX64
+      Test-Dispatch Android $AndroidX64
+    }
   }
   if ($Test -contains "foundation") {
     Build-Foundation Windows $HostArch -Test
@@ -3064,6 +3217,10 @@ if (-not $IsCrossCompiling) {
 
   exit 1
 } finally {
+  $adb = "$BinaryCache\android-sdk\platform-tools\adb.exe"
+  Invoke-Program $adb emu kill
+  Invoke-Program $adb kill-server
+
   if ($Summary) {
     $TimingData | Select-Object Platform,Arch,Checkout,"Elapsed Time" | Sort-Object -Descending -Property "Elapsed Time" | Format-Table -AutoSize
   }
