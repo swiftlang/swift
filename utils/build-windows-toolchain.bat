@@ -105,7 +105,6 @@ set "args=%args% --skip-repository swift"
 set "args=%args% --skip-repository ninja"
 set "args=%args% --skip-repository swift-integration-tests"
 set "args=%args% --skip-repository swift-stress-tester"
-set "args=%args% --skip-repository swift-xcode-playground-support"
 
 call "%SourceRoot%\swift\utils\update-checkout.cmd" %args% --clone --skip-history --reset-to-remote --github-comment "%ghprbCommentBody%"
 
