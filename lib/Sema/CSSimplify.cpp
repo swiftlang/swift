@@ -8956,8 +8956,9 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyConformsToConstraint(
     // If this is an implicit Hashable conformance check generated for each
     // index argument of the keypath subscript component, we could just treat
     // it as though it conforms.
-    if (loc->isResultOfKeyPathDynamicMemberLookup() ||
-        loc->isKeyPathSubscriptComponent()) {
+    if ((loc->isResultOfKeyPathDynamicMemberLookup() ||
+         loc->isKeyPathSubscriptComponent()) ||
+        loc->isKeyPathMemberComponent()) {
       if (protocol ==
           getASTContext().getProtocol(KnownProtocolKind::Hashable)) {
         auto *fix =
@@ -9687,6 +9688,24 @@ static bool mayBeForKeyPathSubscriptWithoutLabel(ConstraintSystem &cs,
   return false;
 }
 
+static bool isForKeyPathConstructor(ConstraintSystem &cs,
+                                    ConstraintLocator *locator) {
+  if (!locator || !locator->getAnchor())
+    return false;
+
+  if (auto *CE = getAsExpr<CallExpr>(locator->getAnchor())) {
+    if (auto *ctorRef = dyn_cast<DeclRefExpr>(CE->getFn())) {
+      if (auto *ctor = dyn_cast<ConstructorDecl>(ctorRef->getDecl())) {
+        if (CE->getArgs()->isUnary() &&
+            CE->getArgs()->getLabel(0) == cs.getASTContext().Id_keyPath) {
+          return true;
+        }
+      }
+    }
+  }
+  return false;
+}
+
 /// Determine whether all of the given candidate overloads
 /// found through conditional conformances of a given base type.
 /// This is useful to figure out whether it makes sense to
@@ -10041,6 +10060,12 @@ performMemberLookup(ConstraintKind constraintKind, DeclNameRef memberName,
       if (memberLocator &&
           UnevaluatedRootExprs.count(getAsExpr(memberLocator->getAnchor()))) {
         hasInstanceMembers = true;
+      }
+
+      // If we have an initializer keypath component, allow as candidate.
+      if (auto *ctor = dyn_cast<ConstructorDecl>(decl)) {
+        if (isForKeyPathConstructor(*this, memberLocator))
+          return result.addViable(candidate);
       }
     } else {
       // Otherwise, we can access all instance members.
