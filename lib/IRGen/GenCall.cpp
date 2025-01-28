@@ -83,12 +83,10 @@ static Size getCoroutineContextSize(IRGenModule &IGM,
   case SILCoroutineKind::None:
     llvm_unreachable("expand a coroutine");
   case SILCoroutineKind::YieldOnce2:
-    if (IGM.IRGen.Opts.EmitYieldOnce2AsYieldOnce) {
-      LLVM_FALLTHROUGH;
-    } else {
+    if (!IGM.IRGen.Opts.EmitYieldOnce2AsYieldOnce)
       llvm::report_fatal_error(
           "callee allocated coroutines do not have fixed-size buffers");
-    }
+    LLVM_FALLTHROUGH;
   case SILCoroutineKind::YieldOnce:
     return getYieldOnceCoroutineBufferSize(IGM);
   case SILCoroutineKind::YieldMany:
@@ -1912,11 +1910,9 @@ void SignatureExpansion::expandParameters(
   case SILCoroutineKind::None:
     break;
   case SILCoroutineKind::YieldOnce2:
-    if (IGM.IRGen.Opts.EmitYieldOnce2AsYieldOnce) {
-      LLVM_FALLTHROUGH;
-    } else {
+    if (!IGM.IRGen.Opts.EmitYieldOnce2AsYieldOnce)
       break;
-    }
+    LLVM_FALLTHROUGH;
 
   case SILCoroutineKind::YieldOnce:
   case SILCoroutineKind::YieldMany:
@@ -2720,12 +2716,9 @@ public:
     // Pass along the coroutine buffer.
     switch (origCalleeType->getCoroutineKind()) {
     case SILCoroutineKind::YieldOnce2:
-      if (IGF.IGM.IRGen.Opts.EmitYieldOnce2AsYieldOnce) {
-        LLVM_FALLTHROUGH;
-      } else {
+      if (!IGF.IGM.IRGen.Opts.EmitYieldOnce2AsYieldOnce)
         llvm::report_fatal_error("unimplemented");
-        break;
-      }
+      LLVM_FALLTHROUGH;
     case SILCoroutineKind::YieldOnce:
     case SILCoroutineKind::YieldMany:
       original.transferInto(adjusted, 1);
@@ -4810,12 +4803,10 @@ irgen::getCoroutineResumeFunctionPointerAuth(IRGenModule &IGM,
     return { IGM.getOptions().PointerAuth.YieldManyResumeFunctions,
              PointerAuthEntity::forYieldTypes(fnType) };
   case SILCoroutineKind::YieldOnce2:
-    if (IGM.IRGen.Opts.EmitYieldOnce2AsYieldOnce) {
-      LLVM_FALLTHROUGH;
-    } else {
+    if (!IGM.IRGen.Opts.EmitYieldOnce2AsYieldOnce)
       return {IGM.getOptions().PointerAuth.YieldOnce2ResumeFunctions,
               PointerAuthEntity::forYieldTypes(fnType)};
-    }
+    LLVM_FALLTHROUGH;
   case SILCoroutineKind::YieldOnce:
     return { IGM.getOptions().PointerAuth.YieldOnceResumeFunctions,
              PointerAuthEntity::forYieldTypes(fnType) };
