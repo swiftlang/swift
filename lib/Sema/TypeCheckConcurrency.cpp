@@ -4821,9 +4821,7 @@ getIsolationFromAttributes(const Decl *decl, bool shouldDiagnose = true,
     bool isUnsafe = attr->isArgUnsafe();
     if (attr->hasArgs()) {
       if (isUnsafe) {
-        SourceFile *file = decl->getDeclContext()->getParentSourceFile();
-        bool inSwiftinterface =
-            file && file->Kind == SourceFileKind::Interface;
+        bool inSwiftinterface = decl->getDeclContext()->isInSwiftinterface();
         ctx.Diags.diagnose(
             attr->getLocation(),
             diag::unsafe_global_actor)

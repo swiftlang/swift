@@ -2396,8 +2396,7 @@ void AttributeChecker::visitAvailableAttr(AvailableAttr *parsedAttr) {
 
   // Skip the remaining diagnostics in swiftinterfaces.
   auto *DC = D->getDeclContext();
-  auto *SF = DC->getParentSourceFile();
-  if (SF && SF->Kind == SourceFileKind::Interface)
+  if (DC->isInSwiftinterface())
     return;
 
   // The remaining diagnostics are only for attributes that are active.
@@ -4549,8 +4548,7 @@ void AttributeChecker::visitCustomAttr(CustomAttr *attr) {
         // Module interfaces don't print bodies for all getters, so allow getters
         // that don't have a body if we're compiling a module interface.
         // Within a protocol definition, there will never be a body.
-        SourceFile *parent = storage->getDeclContext()->getParentSourceFile();
-        bool isInInterface = parent && parent->Kind == SourceFileKind::Interface;
+        bool isInInterface = storage->getDeclContext()->isInSwiftinterface();
         if (!isInInterface && !getter->hasBody() &&
             !isa<ProtocolDecl>(storage->getDeclContext()))
           return true;
@@ -5262,9 +5260,7 @@ TypeChecker::diagnosticIfDeclCannotBePotentiallyUnavailable(const Decl *D) {
     // An enum element with an associated value cannot be potentially
     // unavailable.
     if (EED->hasAssociatedValues()) {
-      auto *SF = DC->getParentSourceFile();
-
-      if (SF->Kind == SourceFileKind::Interface) {
+      if (DC->isInSwiftinterface()) {
         return diag::availability_enum_element_no_potential_warn;
       } else {
         return diag::availability_enum_element_no_potential;
@@ -7885,8 +7881,7 @@ void AttributeChecker::visitMacroRoleAttr(MacroRoleAttr *attr) {
       break;
     case MacroRole::Conformance: {
       // Suppress the conformance macro error in swiftinterfaces.
-      SourceFile *file = D->getDeclContext()->getParentSourceFile();
-      if (file && file->Kind == SourceFileKind::Interface)
+      if (D->getDeclContext()->isInSwiftinterface())
         break;
 
       diagnoseAndRemoveAttr(attr, diag::conformance_macro)

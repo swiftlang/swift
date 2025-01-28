@@ -2266,8 +2266,7 @@ namespace {
     }
 
     bool isInterfaceFile() const {
-      auto SF = getDeclContext()->getParentSourceFile();
-      return (SF && SF->Kind == SourceFileKind::Interface);
+      return getDeclContext()->isInSwiftinterface();
     }
 
     /// Short-hand to query the current stage of type resolution.
@@ -6464,8 +6463,7 @@ void TypeChecker::checkExistentialTypes(Decl *decl) {
     return;
 
   // Skip diagnosing existential `any` requirements in swiftinterfaces.
-  auto sourceFile = decl->getDeclContext()->getParentSourceFile();
-  if (sourceFile && sourceFile->Kind == SourceFileKind::Interface)
+  if (decl->getDeclContext()->isInSwiftinterface())
     return;
 
   auto &ctx = decl->getASTContext();
@@ -6513,8 +6511,7 @@ void TypeChecker::checkExistentialTypes(ASTContext &ctx, Stmt *stmt,
     return;
 
   // Skip diagnosing existential `any` requirements in swiftinterfaces.
-  auto sourceFile = DC->getParentSourceFile();
-  if (sourceFile && sourceFile->Kind == SourceFileKind::Interface)
+  if (DC->isInSwiftinterface())
     return;
 
   // Previously we missed this diagnostic on 'catch' statements, downgrade

@@ -1201,8 +1201,7 @@ EnumRawValuesRequest::evaluate(Evaluator &eval, EnumDecl *ED,
   // values are intentionally omitted from them (unless the enum is @objc).
   // Without bailing here, incorrect raw values can be automatically generated
   // and incorrect diagnostics may be omitted for some decls.
-  SourceFile *Parent = ED->getDeclContext()->getParentSourceFile();
-  if (Parent && Parent->Kind == SourceFileKind::Interface && !ED->isObjC())
+  if (ED->getDeclContext()->isInSwiftinterface() && !ED->isObjC())
     return std::make_tuple<>();
 
   if (!computeAutomaticEnumValueKind(ED)) {

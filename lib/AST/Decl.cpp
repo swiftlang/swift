@@ -8626,7 +8626,7 @@ static DefaultArgumentKind computeDefaultArgumentKind(DeclContext *dc,
     // expected to include them explicitly in subclasses. A default argument of
     // '= super' in a parameter of such initializer indicates that the default
     // argument is inherited.
-    if (dc->getParentSourceFile()->Kind == SourceFileKind::Interface) {
+    if (dc->isInSwiftinterface()) {
       return DefaultArgumentKind::Inherited;
     } else {
       return DefaultArgumentKind::Normal;

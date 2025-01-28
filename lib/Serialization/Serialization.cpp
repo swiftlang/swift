@@ -3599,9 +3599,7 @@ private:
     // Everything should be safe in a swiftinterface. So, don't emit any safety
     // record when building a swiftinterface in release builds. Debug builds
     // instead print inconsistencies.
-    auto parentSF = DC->getParentSourceFile();
-    bool fromModuleInterface = parentSF &&
-                               parentSF->Kind == SourceFileKind::Interface;
+    bool fromModuleInterface = DC->isInSwiftinterface();
 #if NDEBUG
     if (fromModuleInterface)
       return;
