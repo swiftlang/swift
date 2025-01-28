@@ -486,10 +486,13 @@ public struct Dictionary<Key: Hashable, Value> {
     // error instead of calling fatalError() directly because we want the
     // message to include the duplicate key, and the closure only has access to
     // the conflicting values.
-    try! native.merge(
+    native.merge(
       keysAndValues,
       isUnique: true,
-      uniquingKeysWith: { _, _ in throw _MergeError.keyCollision })
+      uniquingKeysWith: { _, _ throws(_MergeError) in
+        throw _MergeError.keyCollision
+      }
+    )
     self.init(_native: native)
   }
 

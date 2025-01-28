@@ -792,6 +792,33 @@ extension _NativeDictionary { // High-level operations
   }
 
   @inlinable
+  internal mutating func merge<S: Sequence>(
+    _ keysAndValues: __owned S,
+    isUnique: Bool,
+    uniquingKeysWith combine: (Value, Value) throws(_MergeError) -> Value
+  ) where S.Element == (Key, Value) {
+    var isUnique = isUnique
+    for (key, value) in keysAndValues {
+      let (bucket, found) = mutatingFind(key, isUnique: isUnique)
+      isUnique = true
+      if found {
+        do throws(_MergeError) {
+          let newValue = try combine(uncheckedValue(at: bucket), value)
+          _values[bucket.offset] = newValue
+        } catch {
+          #if !$Embedded
+          fatalError("Duplicate values for key: '\(key)'")
+          #else
+          fatalError("Duplicate values for a key in a Dictionary")
+          #endif
+        }
+      } else {
+        _insert(at: bucket, key: key, value: value)
+      }
+    }
+  }
+
+  @inlinable
   @inline(__always)
   internal init<S: Sequence>(
     grouping values: __owned S,
