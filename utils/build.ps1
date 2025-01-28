@@ -830,8 +830,8 @@ function Fetch-Dependencies {
 
     # FIXME: Both Java and Android emulator must be available in the environment.
     # This is a terrible workaround. It's a waste of time and resources.
-    $NDKDir = "$BinaryCache\android-sdk"
-    if ($Test -and -not(Test-Path "$NDKDir\licenses")) {
+    $SDKDir = "$BinaryCache\android-sdk"
+    if ($Test -and -not(Test-Path "$SDKDir\licenses")) {
       # Download Java Runtime
       switch ($BuildArchName) {
         "AMD64" {
@@ -854,9 +854,9 @@ function Fetch-Dependencies {
       Extract-ZipFile -ZipFileName "android-cmdline-tools.zip" -BinaryCache $BinaryCache -ExtractPath "android-sdk-cmdline-tools"
 
       # Accept licenses
-      New-Item -Type Directory -Path "$NDKDir\licenses" -ErrorAction Ignore | Out-Null
-      Set-Content -Path "$NDKDir\licenses\android-sdk-license" -Value "24333f8a63b6825ea9c5514f83c2829b004d1fee"
-      Set-Content -Path "$NDKDir\licenses\android-sdk-preview-license" -Value "84831b9409646a918e30573bab4c9c91346d8abd"
+      New-Item -Type Directory -Path "$SDKDir\licenses" -ErrorAction Ignore | Out-Null
+      Set-Content -Path "$SDKDir\licenses\android-sdk-license" -Value "24333f8a63b6825ea9c5514f83c2829b004d1fee"
+      Set-Content -Path "$SDKDir\licenses\android-sdk-preview-license" -Value "84831b9409646a918e30573bab4c9c91346d8abd"
 
       # Install packages and create test device
       Isolate-EnvVars {
@@ -864,15 +864,15 @@ function Fetch-Dependencies {
         $env:Path = "${env:JAVA_HOME}\bin;${env:Path}"
 
         # Let cmdline-tools install itself. This is idiomatic for installing the Android SDK.
-        Invoke-Program "$BinaryCache\android-sdk-cmdline-tools\cmdline-tools\bin\sdkmanager.bat" -OutNull "--sdk_root=$NDKDir" '"cmdline-tools;latest"' '--channel=3'
-        $AndroidSdkMgr = "$NDKDir\cmdline-tools\latest\bin\sdkmanager.bat"
+        Invoke-Program "$BinaryCache\android-sdk-cmdline-tools\cmdline-tools\bin\sdkmanager.bat" -OutNull "--sdk_root=$SDKDir" '"cmdline-tools;latest"' '--channel=3'
+        $AndroidSdkMgr = "$SDKDir\cmdline-tools\latest\bin\sdkmanager.bat"
         foreach ($Package in @('"system-images;android-29;default;x86_64"', '"platforms;android-29"', '"platform-tools"')) {
           Write-Host "$AndroidSdkMgr $Package"
           Invoke-Program -OutNull $AndroidSdkMgr $Package
         }
 
         # There is no way to disable interactive mode in avdmanager
-        "no" | & "$NDKDir\cmdline-tools\latest\bin\avdmanager.bat" create avd --force --name '"swift-test-device"' --package '"system-images;android-29;default;x86_64"'
+        "no" | & "$SDKDir\cmdline-tools\latest\bin\avdmanager.bat" create avd --force --name '"swift-test-device"' --package '"system-images;android-29;default;x86_64"'
       }
     }
   }
