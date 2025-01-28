@@ -15,7 +15,7 @@ extension MyStruct: Equatable {
 // CHECK:      "target"
 // CHECK-NEXT: "globals": [
 // CHECK-NEXT:   {
-// CHECK-NEXT:     "name": "_main",
+// CHECK-NEXT:     "name": "{{(_main)|(main)}}",
 // CHECK-NEXT:     "access": "public",
 // CHECK-NEXT:     "file": "",
 // CHECK-NEXT:     "linkage": "exported"
