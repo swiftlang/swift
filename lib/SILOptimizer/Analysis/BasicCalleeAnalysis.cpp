@@ -75,7 +75,7 @@ getMemoryBehavior(FullApplySite as, bool observeRetains) {
 
 bool swift::isDeinitBarrier(SILInstruction *const instruction,
                             BasicCalleeAnalysis *bca) {
-  if (!instructionIsDeinitBarrierFunction) {
+  if (!instructionIsDeinitBarrierFunction || !bca) {
     return mayBeDeinitBarrierNotConsideringSideEffects(instruction);
   }
   BridgedInstruction inst = {
