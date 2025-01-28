@@ -870,8 +870,8 @@ function Fetch-Dependencies {
           Invoke-Program -OutNull $AndroidSdkMgr $Package
         }
 
-        $AndroidAvdMgr = "$NDKDir\cmdline-tools\latest\bin\avdmanager.bat"
-        Invoke-Program $AndroidAvdMgr create avd --name '"swift-test-device"' --package '"system-images;android-29;default;x86_64"'
+        # There is no way to disable interactive mode in avdmanager
+        "no" | & "$NDKDir\cmdline-tools\latest\bin\avdmanager.bat" create avd --name '"swift-test-device"' --package '"system-images;android-29;default;x86_64"'
       }
     }
   }
