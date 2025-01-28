@@ -423,6 +423,8 @@ enum TargetComponent {
   Foundation
   XCTest
   Testing
+  ClangBuiltins
+  ClangRuntime
 }
 
 function Get-TargetProjectBinaryCache($Arch, [TargetComponent]$Project) {
@@ -1690,11 +1692,59 @@ function Build-LLVM([Platform]$Platform, $Arch) {
     -Bin (Get-TargetProjectBinaryCache $Arch LLVM) `
     -Arch $Arch `
     -Platform $Platform `
-    -UseMSVCCompilers C,CXX `
+    -UseBuiltCompilers C,CXX `
     -Defines @{
       CMAKE_SYSTEM_NAME = $Platform.ToString();
       LLVM_HOST_TRIPLE = $Arch.LLVMTarget;
     }
+}
+
+function Build-Sanitizers([Platform]$Platform, $Arch) {
+  $LLVMTargetCache = $(Get-TargetProjectBinaryCache $Arch LLVM)
+  $LITVersionStr = $(Invoke-Program $(Get-PythonExecutable) "$LLVMTargetCache\bin\llvm-lit.py" --version)
+  if (-not ($LITVersionStr -match "lit (\d+)\.\d+\.\d+.*")) {
+    throw "Unexpected version string output from llvm-lit.py"
+  }
+  $LLVMVersionMajor = $Matches.1
+  $InstallTo = "$($HostArch.ToolchainInstallRoot)\usr\lib\clang\$LLVMVersionMajor"
+  Write-Host "Sanitizers SDK directory: $InstallTo"
+
+  Build-CMakeProject `
+    -Src $SourceCache\llvm-project\compiler-rt\lib\builtins `
+    -Bin "$(Get-TargetProjectBinaryCache $Arch ClangBuiltins)" `
+    -InstallTo $InstallTo `
+    -Arch $Arch `
+    -Platform $Platform `
+    -UseBuiltCompilers ASM,C,CXX `
+    -BuildTargets "install-compiler-rt" `
+    -Defines (@{
+      CMAKE_SYSTEM_NAME = $Platform.ToString();
+      LLVM_DIR = "$LLVMTargetCache\lib\cmake\llvm";
+      LLVM_ENABLE_PER_TARGET_RUNTIME_DIR = "YES";
+      COMPILER_RT_DEFAULT_TARGET_ONLY = "YES";
+    })
+  
+  Build-CMakeProject `
+    -Src $SourceCache\llvm-project\compiler-rt `
+    -Bin "$(Get-TargetProjectBinaryCache $Arch ClangRuntime)" `
+    -InstallTo $InstallTo `
+    -Arch $Arch `
+    -Platform $Platform `
+    -UseBuiltCompilers ASM,C,CXX `
+    -BuildTargets "install-compiler-rt" `
+    -Defines (@{
+      CMAKE_SYSTEM_NAME = $Platform.ToString();
+      LLVM_DIR = "$LLVMTargetCache\lib\cmake\llvm";
+      LLVM_ENABLE_PER_TARGET_RUNTIME_DIR = "YES";
+      COMPILER_RT_DEFAULT_TARGET_ONLY = "YES";
+      COMPILER_RT_BUILD_BUILTINS = "NO";
+      COMPILER_RT_BUILD_CRT = "NO";
+      COMPILER_RT_BUILD_LIBFUZZER = "NO";
+      COMPILER_RT_BUILD_ORC = "NO";
+      COMPILER_RT_BUILD_XRAY = "NO";
+      COMPILER_RT_BUILD_PROFILE = "YES";
+      COMPILER_RT_BUILD_SANITIZERS = "YES";
+    })
 }
 
 function Build-ZLib([Platform]$Platform, $Arch) {
@@ -2919,6 +2969,7 @@ if (-not $SkipBuild) {
     Invoke-BuildStep Build-FoundationMacros -Build Windows $BuildArch
     Invoke-BuildStep Build-TestingMacros -Build Windows $BuildArch
     Invoke-BuildStep Build-Foundation Windows $Arch
+    Invoke-BuildStep Build-Sanitizers Windows $Arch
     Invoke-BuildStep Build-XCTest Windows $Arch
     Invoke-BuildStep Build-Testing Windows $Arch
     Invoke-BuildStep Write-SDKSettingsPlist Windows $Arch
@@ -2938,6 +2989,7 @@ if (-not $SkipBuild) {
     Invoke-BuildStep Build-Runtime Android $Arch
     Invoke-BuildStep Build-Dispatch Android $Arch
     Invoke-BuildStep Build-Foundation Android $Arch
+    Invoke-BuildStep Build-Sanitizers Android $Arch
     Invoke-BuildStep Build-XCTest Android $Arch
     Invoke-BuildStep Build-Testing Android $Arch
     Invoke-BuildStep Write-SDKSettingsPlist Android $Arch
