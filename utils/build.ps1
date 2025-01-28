@@ -837,6 +837,14 @@ function Fetch-Dependencies {
     Write-Host -ForegroundColor Cyan "[$([DateTime]::Now.ToString("yyyy-MM-dd HH:mm:ss"))] Fetch-Dependencies took $($Stopwatch.Elapsed)"
     Write-Host ""
   }
+  if ($Summary) {
+    $TimingData.Add([PSCustomObject]@{
+      Arch = $BuildArch.LLVMName
+      Platform = 'Windows'
+      Checkout = 'Fetch-Dependencies'
+      "Elapsed Time" = $Stopwatch.Elapsed.ToString()
+    })
+  }
 }
 
 function Get-PinnedToolchainTool() {
