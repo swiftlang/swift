@@ -2,12 +2,13 @@
 // RUN: %target-build-swift %s -module-name HiddenTypeAlias -emit-module -emit-module-path %t/
 // RUN: %target-swift-symbolgraph-extract -module-name HiddenTypeAlias -I %t -pretty-print -output-dir %t -v
 // RUN: %FileCheck %s --input-file %t/HiddenTypeAlias.symbols.json
+// RUN: %FileCheck %s --input-file %t/HiddenTypeAlias.symbols.json --check-prefix INNER
 
 // Ensure that public type aliases of effectively-private symbols inherit the child symbols of the
 // inner type.
 
 // _InnerType's type name should only appear in quotes like this once, in the declaration for OuterType
-// CHECK-COUNT-1: "_InnerType"
+// INNER-COUNT-1: "_InnerType"
 
 // _InnerType.someFunc() as synthesized on OuterType
 // CHECK-DAG: "precise": "s:15HiddenTypeAlias06_InnerB0C8someFuncyyF::SYNTHESIZED::s:15HiddenTypeAlias05OuterB0a"
