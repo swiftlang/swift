@@ -4544,7 +4544,8 @@ ERROR(try_assign_rhs_noncovering,none,
       "'" TRY_KIND_SELECT(0) "' following assignment operator does not cover "
       "everything to its right", (unsigned))
 
-ERROR(broken_bool,none, "type 'Bool' is broken", ())
+ERROR(broken_stdlib_type,none,
+      "standard library type '%0' is missing or broken; this is a compiler bug", (StringRef))
 
 WARNING(inject_forced_downcast,none,
         "treating a forced downcast to %0 as optional will never produce 'nil'",

@@ -936,7 +936,7 @@ bool swift::isRepresentableInObjC(
         boolDecl = ctx.getBoolDecl();
 
       if (boolDecl == nullptr) {
-        AFD->diagnose(diag::broken_bool);
+        AFD->diagnose(diag::broken_stdlib_type, "Bool");
         return false;
       }
 
