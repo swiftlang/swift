@@ -40,7 +40,8 @@ class LLVMLinuxCrossCompileTestCase(unittest.TestCase):
             clang_compiler_version=None,
             clang_user_visible_version=None,
             cross_compile_hosts='linux-aarch64',
-            cross_compile_deps_path='sysroot'
+            cross_compile_deps_path=None,
+            build_variant='Release'
         )
 
         # Setup shell
@@ -59,7 +60,7 @@ class LLVMLinuxCrossCompileTestCase(unittest.TestCase):
         self.toolchain = None
         self.args = None
 
-    def test_llvm_get_linux_sysroot(self):
+    def test_llvm_get_linux_sysroot_default(self):
         llvm = LLVM(
             args=self.args,
             toolchain=self.toolchain,
@@ -67,3 +68,30 @@ class LLVMLinuxCrossCompileTestCase(unittest.TestCase):
             build_dir='/path/to/build')
         expected_arg = '/usr/aarch64-linux-gnu'
         self.assertIn(expected_arg, llvm.get_linux_sysroot("linux", "aarch64"))
+
+    def test_llvm_get_linux_sysroot_external(self):
+        self.args = argparse.Namespace(
+            llvm_targets_to_build='X86;ARM;AArch64',
+            llvm_assertions='true',
+            compiler_vendor='none',
+            clang_compiler_version=None,
+            clang_user_visible_version=None,
+            cross_compile_hosts='linux-armv7',
+            cross_compile_deps_path='sysroot'
+        )
+        llvm = LLVM(
+            args=self.args,
+            toolchain=self.toolchain,
+            source_dir='/path/to/src',
+            build_dir='/path/to/build')
+        expected_arg = 'sysroot'
+        self.assertIn(expected_arg, llvm.get_linux_sysroot("linux", "armv7"))
+
+    def test_llvm_c_flags_includes_lld(self):
+        llvm = LLVM(
+            args=self.args,
+            toolchain=self.toolchain,
+            source_dir='/path/to/src',
+            build_dir='/path/to/build')
+        expected_flag = '-w -fuse-ld=lld'
+        self.assertIn(expected_flag, llvm.llvm_c_flags("linux", "aarch64"))
