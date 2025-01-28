@@ -2687,14 +2687,18 @@ static ParamDecl *getParameterInfo(ClangImporter::Implementation *impl,
     }
   }
 
+  // Parameters of type const T& imported as T, make sure we borrow from them
+  // when they have lifetime annotations.
+  bool isBorrowing = (param->getAttr<clang::LifetimeBoundAttr>() ||
+                      param->getAttr<clang::LifetimeCaptureByAttr>()) &&
+                     param->getType()->isReferenceType();
   // Foreign references are already references so they don't need to be passed
   // as inout.
   paramInfo->setSpecifier(
       isConsuming ? ParamSpecifier::Consuming
                   : (isInOut ? ParamSpecifier::InOut
-                             : (param->getAttr<clang::LifetimeBoundAttr>()
-                                    ? ParamSpecifier::Borrowing
-                                    : ParamSpecifier::Default)));
+                             : (isBorrowing ? ParamSpecifier::Borrowing
+                                            : ParamSpecifier::Default)));
   paramInfo->setInterfaceType(swiftParamTy);
   impl->recordImplicitUnwrapForDecl(paramInfo, isParamTypeImplicitlyUnwrapped);
 
