@@ -8,7 +8,6 @@
 
 // REQUIRES: swift_feature_CustomAvailability
 
-// expected-error@+1 {{expected ',' in 'available' attribute}}
 @available(EnabledDomain) // expected-warning {{unknown platform 'EnabledDomain' for attribute 'available'}}
 func availableInEnabledDomain() { }
 
@@ -18,11 +17,9 @@ func availableInDisabledDomain() { }
 @available(RedefinedDomain, deprecated, message: "Use something else") // expected-warning {{unknown platform 'RedefinedDomain' for attribute 'available'}}
 func availableInRedefinedDomain() { }
 
-// expected-error@+1 {{expected ',' in 'available' attribute}}
 @available(DynamicDomain) // expected-warning {{unknown platform 'DynamicDomain' for attribute 'available'}}
 func availableInDynamicDomain() { }
 
-// expected-error@+1 {{expected ',' in 'available' attribute}}
 @available(UnknownDomain) // expected-warning {{unknown platform 'UnknownDomain' for attribute 'available'}}
 func availableInUnknownDomain() { }
 
