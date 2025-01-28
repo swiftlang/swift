@@ -863,15 +863,16 @@ function Fetch-Dependencies {
         $env:JAVA_HOME = "$BinaryCache\android-sdk-jdk\jdk-17.0.14+7"
         $env:Path = "${env:JAVA_HOME}\bin;${env:Path}"
 
-        Invoke-Program "$BinaryCache\android-sdk-cmdline-tools\cmdline-tools\bin\sdkmanager.bat" "--sdk_root=$NDKDir" '"cmdline-tools;latest"' '--channel=3'
+        # Let cmdline-tools install itself. This is idiomatic for installing the Android SDK.
+        Invoke-Program "$BinaryCache\android-sdk-cmdline-tools\cmdline-tools\bin\sdkmanager.bat" -OutNull "--sdk_root=$NDKDir" '"cmdline-tools;latest"' '--channel=3'
         $AndroidSdkMgr = "$NDKDir\cmdline-tools\latest\bin\sdkmanager.bat"
-        foreach ($Package in @('"ndk;26.2.11394342"', '"system-images;android-29;default;x86_64"', '"platforms;android-29"', '"platform-tools"')) {
+        foreach ($Package in @('"system-images;android-29;default;x86_64"', '"platforms;android-29"', '"platform-tools"')) {
           Write-Host "$AndroidSdkMgr $Package"
           Invoke-Program -OutNull $AndroidSdkMgr $Package
         }
 
         # There is no way to disable interactive mode in avdmanager
-        "no" | & "$NDKDir\cmdline-tools\latest\bin\avdmanager.bat" create avd --name '"swift-test-device"' --package '"system-images;android-29;default;x86_64"'
+        "no" | & "$NDKDir\cmdline-tools\latest\bin\avdmanager.bat" create avd --force --name '"swift-test-device"' --package '"system-images;android-29;default;x86_64"'
       }
     }
   }
@@ -2130,13 +2131,11 @@ function Build-CTest([Platform]$Platform, $Arch) {
 }
 
 function Test-Dispatch([Platform]$Platform, $Arch) {
-  $NDKDir = Get-AndroidNDKPath
-
   # TODO: One emulator instance for all tests?
-  $emulator = "$NDKDir\emulator\emulator.exe"
+  $emulator = "$BinaryCache\android-sdk\emulator\emulator.exe"
   Start-Process -FilePath $emulator -ArgumentList "@swift-test-device" `
-                -RedirectStandardOutput "$NDKDir\.temp\emulator.out" `
-                -RedirectStandardError "$NDKDir\.temp\emulator.err"
+                -RedirectStandardOutput "$BinaryCache\android-sdk\.temp\emulator.out" `
+                -RedirectStandardError "$BinaryCache\android-sdk\.temp\emulator.err"
 
   # This is just a hack for now
   $LocalBin = (Get-TargetProjectBinaryCache $AndroidX64 Dispatch)
