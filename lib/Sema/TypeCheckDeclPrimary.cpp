@@ -1152,8 +1152,7 @@ static void checkInheritedDefaultValueRestrictions(ParamDecl *PD) {
   assert(PD->getDefaultArgumentKind() == DefaultArgumentKind::Inherited);
 
   auto *DC = PD->getInnermostDeclContext();
-  const SourceFile *SF = DC->getParentSourceFile();
-  assert((SF && SF->Kind == SourceFileKind::Interface || PD->isImplicit()) &&
+  assert((DC->isInSwiftinterface() || PD->isImplicit()) &&
          "explicit inherited default argument outside of a module interface?");
 
   // The containing decl should be a designated initializer.
@@ -1807,7 +1806,7 @@ static void diagnoseRetroactiveConformances(
   }
 
   // Don't warn for this if we see it in module interfaces.
-  if (ext->getParentSourceFile()->Kind == SourceFileKind::Interface) {
+  if (ext->getDeclContext()->isInSwiftinterface()) {
     return;
   }
 
@@ -2557,9 +2556,8 @@ public:
           // This allows the compiler to process existing .swiftinterface
           // files that contain this issue.
           if (resultType->isVoid()) {
-            if (auto sourceFile = MD->getParentSourceFile())
-              if (sourceFile->Kind == SourceFileKind::Interface)
-                diag.limitBehavior(DiagnosticBehavior::Warning);
+            if (MD->getDeclContext()->isInSwiftinterface())
+              diag.limitBehavior(DiagnosticBehavior::Warning);
           }
         }
 
@@ -3332,8 +3330,7 @@ public:
   void checkRequiredInClassInits(ClassDecl *cd) {
     // Initializers may be omitted from property declarations in module
     // interface files so don't diagnose in them.
-    SourceFile *sourceFile = cd->getDeclContext()->getParentSourceFile();
-    if (sourceFile && sourceFile->Kind == SourceFileKind::Interface)
+    if (cd->getDeclContext()->isInSwiftinterface())
       return;
 
     ClassDecl *source = nullptr;

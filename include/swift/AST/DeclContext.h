@@ -576,6 +576,11 @@ public:
   LLVM_READONLY
   SourceFile *getOutermostParentSourceFile() const;
 
+  /// Returns true if the source file that contains the context is a
+  /// `.swiftinterface` file.
+  LLVM_READONLY
+  bool isInSwiftinterface() const;
+
   /// Determine whether this declaration context is generic, meaning that it or
   /// any of its parents have generic parameters.
   bool isGenericContext() const;
