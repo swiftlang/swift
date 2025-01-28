@@ -847,6 +847,27 @@ swift_distributedActor_remote_initialize(const Metadata *actorType);
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 void swift_defaultActor_enqueue(Job *job, DefaultActor *actor);
 
+/// Synchronously wait for the given closure (function pointer + context) to
+/// execute on the given actor.
+///
+/// The operation is executed at the given priority, and is priority-ordered
+/// in the same way as all other work on the actor. If the calling thread
+/// manages to take the actor lock, it will execute jobs up until this
+/// operation is completed, then return. Otherwise, it will block waiting for
+/// a different thread to execute this operation.
+///
+/// This operation is only available for default actors (ones that do not have
+/// custom executors), and will trap if provided with an actor that has a
+/// custom executor. Note that the blocking nature of this operation makes it
+/// prone to deadlock, so it should be used sparingly.
+SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
+void swift_actor_synchronous_wait(
+    HeapObject *actor,
+    JobPriority priority,
+    SwiftNullaryClosure *closure,
+    void *closureContext
+);
+
 /// Check if the actor is a distributed 'remote' actor instance.
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
 bool swift_distributed_actor_is_remote(HeapObject *actor);
