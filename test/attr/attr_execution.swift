@@ -51,6 +51,7 @@ struct TestAttributeCollisions {
   // expected-error@-1 {{cannot use '@execution(concurrent)' on instance method 'testIsolationAny(arg:)' because it has a dynamically isolated parameter: 'arg'}}
 
   @MainActor @execution(concurrent) func testGlobalActor() async {}
+  // expected-warning @-1 {{instance method 'testGlobalActor()' has multiple actor-isolation attributes ('MainActor' and 'execution(concurrent)')}}
 
   @execution(concurrent) @Sendable func test(_: @Sendable () -> Void, _: sending Int) async {} // Ok
 }

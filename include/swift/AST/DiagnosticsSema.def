@@ -5966,6 +5966,9 @@ ERROR(actor_isolation_multiple_attr_2,none,
 ERROR(actor_isolation_multiple_attr_3,none,
       "%0 %1 has multiple actor-isolation attributes ('%2', '%3' and '%4')",
       (const Decl *, StringRef, StringRef, StringRef))
+ERROR(actor_isolation_multiple_attr_4,none,
+      "%0 %1 has multiple actor-isolation attributes ('%2', '%3', '%4', and '%5')",
+      (const Decl *, StringRef, StringRef, StringRef, StringRef))
 ERROR(actor_isolation_override_mismatch,none,
       "%0 %kind1 has different actor isolation from %2 overridden declaration",
       (ActorIsolation, const ValueDecl *, ActorIsolation))

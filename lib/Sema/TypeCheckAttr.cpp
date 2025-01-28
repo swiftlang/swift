@@ -4411,6 +4411,7 @@ static void checkGlobalActorAttr(
     std::pair<CustomAttr *, NominalTypeDecl *> &globalActorAttr) {
   auto isolatedAttr = decl->getAttrs().getAttribute<IsolatedAttr>();
   auto nonisolatedAttr = decl->getAttrs().getAttribute<NonisolatedAttr>();
+  auto executionAttr = decl->getAttrs().getAttribute<ExecutionAttr>();
   struct NameAndRange {
     StringRef name;
     SourceRange range;
@@ -4419,7 +4420,7 @@ static void checkGlobalActorAttr(
         : name(_name), range(_range) {}
   };
 
-  llvm::SmallVector<NameAndRange, 3> attributes;
+  llvm::SmallVector<NameAndRange, 4> attributes;
 
   attributes.push_back(NameAndRange(globalActorAttr.second->getName().str(),
                                     globalActorAttr.first->getRangeWithAt()));
@@ -4432,6 +4433,11 @@ static void checkGlobalActorAttr(
     attributes.push_back(NameAndRange(nonisolatedAttr->getAttrName(),
                                       nonisolatedAttr->getRangeWithAt()));
   }
+  if (executionAttr) {
+    attributes.push_back(NameAndRange(executionAttr->getAttrName(),
+                                      executionAttr->getRangeWithAt()));
+  }
+
   if (attributes.size() == 1)
     return;
 
@@ -4442,9 +4448,10 @@ static void checkGlobalActorAttr(
         .highlight(attributes[1].range)
         .warnUntilSwiftVersion(6)
         .fixItRemove(attributes[1].range);
+    return;
+  }
 
-  } else {
-    assert(attributes.size() == 3);
+  if (attributes.size() == 3) {
     decl->diagnose(diag::actor_isolation_multiple_attr_3, decl,
                    attributes[0].name, attributes[1].name, attributes[2].name)
         .highlight(attributes[0].range)
@@ -4453,7 +4460,21 @@ static void checkGlobalActorAttr(
         .warnUntilSwiftVersion(6)
         .fixItRemove(attributes[1].range)
         .fixItRemove(attributes[2].range);
+    return;
   }
+
+  assert(attributes.size() == 4);
+  decl->diagnose(diag::actor_isolation_multiple_attr_4, decl,
+                 attributes[0].name, attributes[1].name, attributes[2].name,
+                 attributes[3].name)
+      .highlight(attributes[0].range)
+      .highlight(attributes[1].range)
+      .highlight(attributes[2].range)
+      .highlight(attributes[3].range)
+      .warnUntilSwiftVersion(6)
+      .fixItRemove(attributes[1].range)
+      .fixItRemove(attributes[2].range)
+      .fixItRemove(attributes[3].range);
 }
 
 void AttributeChecker::visitCustomAttr(CustomAttr *attr) {
