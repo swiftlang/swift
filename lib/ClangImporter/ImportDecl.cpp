@@ -162,9 +162,11 @@ void ClangImporter::Implementation::makeComputed(AbstractStorageDecl *storage,
   }
 }
 
-bool ClangImporter::Implementation::recordHasReferenceSemantics(
-    const clang::RecordDecl *decl, ASTContext &ctx) {
-  if (!isa<clang::CXXRecordDecl>(decl) && !ctx.LangOpts.CForeignReferenceTypes)
+bool importer::recordHasReferenceSemantics(
+    const clang::RecordDecl *decl,
+    ClangImporter::Implementation *importerImpl) {
+  if (!isa<clang::CXXRecordDecl>(decl) &&
+      !importerImpl->SwiftContext.LangOpts.CForeignReferenceTypes)
     return false;
 
   // At this point decl might not be fully imported into Swift yet, which
@@ -177,10 +179,11 @@ bool ClangImporter::Implementation::recordHasReferenceSemantics(
   // To avoid emitting spurious diagnostics, let's disable them here. Types with
   // missing lifetime operations would get diagnosed later, once their members
   // are fully instantiated.
+  // FN_NOTE: CxxRecordSemanticsDescriptor constructor used here
   auto semanticsKind = evaluateOrDefault(
-      ctx.evaluator,
-      CxxRecordSemantics(
-          {decl, ctx, /* shouldDiagnoseLifetimeOperations */ false}),
+      importerImpl->SwiftContext.evaluator,
+      CxxRecordSemantics({decl, importerImpl->SwiftContext, importerImpl,
+                          /* shouldDiagnoseLifetimeOperations */ false}),
       {});
   return semanticsKind == CxxRecordSemanticsKind::Reference;
 }
@@ -2030,14 +2033,13 @@ namespace {
     }
 
     bool recordHasReferenceSemantics(const clang::RecordDecl *decl) {
-      return ClangImporter::Implementation::recordHasReferenceSemantics(
-          decl, Impl.SwiftContext);
+      return importer::recordHasReferenceSemantics(decl, &Impl);
     }
 
     bool recordHasMoveOnlySemantics(const clang::RecordDecl *decl) {
       auto semanticsKind = evaluateOrDefault(
           Impl.SwiftContext.evaluator,
-          CxxRecordSemantics({decl, Impl.SwiftContext}), {});
+          CxxRecordSemantics({decl, Impl.SwiftContext, &Impl}), {});
       return semanticsKind == CxxRecordSemanticsKind::MoveOnly;
     }
 
@@ -2903,9 +2905,9 @@ namespace {
 
       // It is import that we bail on an unimportable record *before* we import
       // any of its members or cache the decl.
-      auto semanticsKind =
-          evaluateOrDefault(Impl.SwiftContext.evaluator,
-                            CxxRecordSemantics({decl, Impl.SwiftContext}), {});
+      auto semanticsKind = evaluateOrDefault(
+          Impl.SwiftContext.evaluator,
+          CxxRecordSemantics({decl, Impl.SwiftContext, &Impl}), {});
       if (semanticsKind == CxxRecordSemanticsKind::MissingLifetimeOperation &&
           // Let un-specialized class templates through. We'll sort out their
           // members once they're instranciated.
@@ -3248,7 +3250,7 @@ namespace {
               decl->getAnonField()->getParent())) {
         auto semanticsKind = evaluateOrDefault(
             Impl.SwiftContext.evaluator,
-            CxxRecordSemantics({parent, Impl.SwiftContext}), {});
+            CxxRecordSemantics({parent, Impl.SwiftContext, &Impl}), {});
         if (semanticsKind == CxxRecordSemanticsKind::MissingLifetimeOperation)
           return nullptr;
       }
