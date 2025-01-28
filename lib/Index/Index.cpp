@@ -2155,6 +2155,12 @@ void index::indexSourceFile(SourceFile *SF, IndexDataConsumer &consumer) {
 
 void index::indexModule(ModuleDecl *module, IndexDataConsumer &consumer) {
   assert(module);
+  auto mName = module->getRealName().str().str();
+  if (module->getASTContext().blockListConfig.hasBlockListAction(mName,
+      BlockListKeyKind::ModuleName,
+      BlockListAction::SkipIndexingModule)) {
+    return;
+  }
   IndexSwiftASTWalker walker(consumer, module->getASTContext());
   walker.visitModule(*module);
   consumer.finish();
