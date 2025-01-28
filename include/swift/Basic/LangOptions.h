@@ -487,6 +487,7 @@ namespace swift {
     /// These are shared_ptrs so that this class remains copyable.
     std::shared_ptr<llvm::Regex> OptimizationRemarkPassedPattern;
     std::shared_ptr<llvm::Regex> OptimizationRemarkMissedPattern;
+    std::shared_ptr<llvm::Regex> OptimizationRemarkAnalysisPattern;
 
     /// How should we emit diagnostics about access notes?
     AccessNoteDiagnosticBehavior AccessNoteBehavior =
