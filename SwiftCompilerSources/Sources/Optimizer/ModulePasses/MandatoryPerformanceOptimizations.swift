@@ -80,6 +80,17 @@ fileprivate struct PathFunctionTuple: Hashable {
 
 private func optimize(function: Function, _ context: FunctionPassContext, _ moduleContext: ModulePassContext, _ worklist: inout FunctionWorklist) {
   var alreadyInlinedFunctions: Set<PathFunctionTuple> = Set()
+
+  // ObjectOutliner replaces calls to findStringSwitchCase with _findStringSwitchCaseWithCache, but this happens as a late SIL optimization,
+  // which is a problem for Embedded Swift, because _findStringSwitchCaseWithCache will then reference non-specialized code. Solve this by
+  // eagerly linking and specializing _findStringSwitchCaseWithCache whenever findStringSwitchCase is found in the module.
+  if context.options.enableEmbeddedSwift {
+    if function.hasSemanticsAttribute("findStringSwitchCase"),
+        let f = context.lookupStdlibFunction(name: "_findStringSwitchCaseWithCache"),
+        context.loadFunction(function: f, loadCalleesRecursively: true) {
+      worklist.pushIfNotVisited(f)
+    }
+  }
   
   var changed = true
   while changed {
