@@ -243,11 +243,6 @@ Solution ConstraintSystem::finalize() {
     solution.appliedPropertyWrappers.insert(appliedWrapper);
   }
 
-  // Remember implicit value conversions.
-  for (const auto &valueConversion : ImplicitValueConversions) {
-    solution.ImplicitValueConversions.push_back(valueConversion);
-  }
-
   // Remember argument lists.
   for (const auto &argListMapping : ArgumentLists) {
     solution.argumentLists.insert(argListMapping);
@@ -442,13 +437,6 @@ void ConstraintSystem::replaySolution(const Solution &solution,
         applyPropertyWrapper(getAsExpr(appliedWrapper.first), applied);
     } else {
       ASSERT(found->second.size() == appliedWrapper.second.size());
-    }
-  }
-
-  for (auto &valueConversion : solution.ImplicitValueConversions) {
-    if (ImplicitValueConversions.count(valueConversion.first) == 0) {
-      recordImplicitValueConversion(valueConversion.first,
-                                    valueConversion.second);
     }
   }
 

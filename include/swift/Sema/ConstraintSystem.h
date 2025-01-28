@@ -1580,10 +1580,6 @@ public:
   /// The locators of \c Defaultable constraints whose defaults were used.
   llvm::DenseSet<ConstraintLocator *> DefaultedConstraints;
 
-  /// Implicit value conversions applied for a given locator.
-  std::vector<std::pair<ConstraintLocator *, ConversionRestrictionKind>>
-      ImplicitValueConversions;
-
   /// The node -> type mappings introduced by this solution.
   llvm::DenseMap<ASTNode, Type> nodeTypes;
 
@@ -2367,11 +2363,6 @@ private:
   /// matching rule and parameter bindings that were applied.
   llvm::DenseMap<ConstraintLocator *, MatchCallArgumentResult>
       argumentMatchingChoices;
-
-  /// The set of implicit value conversions performed by the solver on
-  /// a current path to reach a solution.
-  llvm::SmallDenseMap<ConstraintLocator *, ConversionRestrictionKind, 2>
-      ImplicitValueConversions;
 
   /// The worklist of "active" constraints that should be revisited
   /// due to a change.
@@ -4608,16 +4599,15 @@ public:
     inline bool isFailure() const { return Kind == SolutionKind::Error; }
     inline bool isAmbiguous() const { return Kind == SolutionKind::Unsolved; }
 
-    static TypeMatchResult success(ConstraintSystem &cs) {
+    static TypeMatchResult success() {
       return {SolutionKind::Solved};
     }
 
-    static TypeMatchResult failure(ConstraintSystem &cs,
-                                   ConstraintLocatorBuilder location) {
+    static TypeMatchResult failure() {
       return {SolutionKind::Error};
     }
 
-    static TypeMatchResult ambiguous(ConstraintSystem &cs) {
+    static TypeMatchResult ambiguous() {
       return {SolutionKind::Unsolved};
     }
 
@@ -4722,15 +4712,15 @@ public: // FIXME: public due to statics in CSSimplify.cpp
                              ConstraintLocatorBuilder locator);
 
   TypeMatchResult getTypeMatchSuccess() {
-    return TypeMatchResult::success(*this);
+    return TypeMatchResult::success();
   }
 
   TypeMatchResult getTypeMatchFailure(ConstraintLocatorBuilder locator) {
-    return TypeMatchResult::failure(*this, locator);
+    return TypeMatchResult::failure();
   }
 
   TypeMatchResult getTypeMatchAmbiguous() {
-    return TypeMatchResult::ambiguous(*this);
+    return TypeMatchResult::ambiguous();
   }
 
 public:
@@ -5046,10 +5036,6 @@ private:
                  ConstraintKind matchKind,
                  TypeMatchOptions flags,
                  ConstraintLocatorBuilder locator);
-
-  /// Update ImplicitValueConversions and record a change in the trail.
-  void recordImplicitValueConversion(ConstraintLocator *locator,
-                                     ConversionRestrictionKind restriction);
 
   /// Simplify a conversion constraint by applying the given
   /// reduction rule, which is known to apply at the outermost level.
