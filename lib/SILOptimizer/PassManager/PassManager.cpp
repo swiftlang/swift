@@ -1929,11 +1929,7 @@ OptionalBridgedFunction BridgedPassContext::lookupStdlibFunction(BridgedStringRe
 
   SILDeclRef declRef(decl, SILDeclRef::Kind::Func);
   SILOptFunctionBuilder funcBuilder(*invocation->getTransform());
-  SILFunction *function = funcBuilder.getOrCreateFunction(SILLocation(decl), declRef, NotForDefinition);
-  if (mod->getOptions().EmbeddedSwift) {
-    mod->linkFunction(function, SILModule::LinkingMode::LinkAll);
-  }
-  return {function};
+  return {funcBuilder.getOrCreateFunction(SILLocation(decl), declRef, NotForDefinition)};
 }
 
 OptionalBridgedFunction BridgedPassContext::lookUpNominalDeinitFunction(BridgedDeclObj nominal)  const {

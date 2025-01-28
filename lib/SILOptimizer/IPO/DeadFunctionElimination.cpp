@@ -124,6 +124,14 @@ class DeadFunctionAndGlobalElimination {
     if (F->getRepresentation() == SILFunctionTypeRepresentation::ObjCMethod)
       return true;
 
+    // To support ObjectOutliner's replacing of calls to findStringSwitchCase
+    // with _findStringSwitchCaseWithCache. In Embedded Swift, we have to load
+    // the body of this function early and specialize it, so that ObjectOutliner
+    // can reference it later. To make this work we have to avoid DFE'ing it.
+    // Linker's dead-stripping will eventually remove this if actually unused.
+    if (F->hasSemanticsAttr("findStringSwitchCaseWithCache"))
+      return true;
+
     return false;
   }
 

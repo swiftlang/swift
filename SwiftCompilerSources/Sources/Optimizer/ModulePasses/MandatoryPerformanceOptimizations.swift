@@ -86,7 +86,8 @@ private func optimize(function: Function, _ context: FunctionPassContext, _ modu
   // eagerly linking and specializing _findStringSwitchCaseWithCache whenever findStringSwitchCase is found in the module.
   if context.options.enableEmbeddedSwift {
     if function.hasSemanticsAttribute("findStringSwitchCase"),
-        let f = context.lookupStdlibFunction(name: "_findStringSwitchCaseWithCache") {
+        let f = context.lookupStdlibFunction(name: "_findStringSwitchCaseWithCache"),
+        context.loadFunction(function: f, loadCalleesRecursively: true) {
       worklist.pushIfNotVisited(f)
     }
   }
