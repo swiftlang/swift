@@ -23,4 +23,13 @@ StringDescribingTestSuite.test("String(reflecting:) should include extra stuff i
   expectEqual(privateName.suffix(5), ").Foo")
 }
 
+StringDescribingTestSuite.test("String(describing:) for CustomStringConvertible & TextOutputStreamable types") {
+  expectEqual(String(describing: "abc" as String), "abc")
+  expectEqual(String(describing: "xyz" as Substring), "xyz")
+  expectEqual(String(describing: "a" as Character), "a")
+  expectEqual(String(describing: "z" as Unicode.Scalar), "z")
+  expectEqual(String(describing: -0.5 as Double), "-0.5")
+  expectEqual(String(describing: Double.nan), "nan")
+}
+
 runAllTests()
