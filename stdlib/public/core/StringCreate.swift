@@ -203,7 +203,6 @@ extension String {
     return contents.withUnsafeBufferPointer { String._uncheckedFromUTF8($0) }
   }
 
-  @inline(never) // slow path
   private static func _slowFromCodeUnits<
     Input: Collection,
     Encoding: Unicode.Encoding
@@ -213,7 +212,34 @@ extension String {
     repair: Bool
   ) -> (String, repairsMade: Bool)?
   where Input.Element == Encoding.CodeUnit {
-    // TODO(String Performance): Attempt to form smol strings
+    if input.count < _SmallString.capacity {
+      var repaired = false
+      var overflow = false
+      let result = _SmallString(initializingUTF8With: { buffer in
+        var bytesUsed = 0
+        repaired = transcode(
+          input.makeIterator(),
+          from: encoding,
+          to: UTF8.self,
+          stoppingOnError: false,
+          into: {
+            if bytesUsed < buffer.count {
+              buffer[bytesUsed] = $0
+            }
+            bytesUsed &+= 1
+          }
+        )
+        guard bytesUsed <= buffer.count else {
+          overflow = true
+          return 0
+        }
+        return bytesUsed
+      })
+      if !overflow {
+        return repair || !repaired
+          ? (String(_StringGuts(result)), repairsMade: repaired) : nil
+      }
+    }
 
     // TODO(String performance): Skip intermediary array, transcode directly
     // into a StringStorage space.
@@ -236,6 +262,10 @@ extension String {
     where Input == UnsafeBufferPointer<UInt8>, Encoding == Unicode.ASCII)
   @_specialize(
     where Input == Array<UInt8>, Encoding == Unicode.ASCII)
+  @_specialize(
+    where Input == UnsafeBufferPointer<UInt16>, Encoding == UTF16)
+  @_specialize(
+    where Input == Array<UInt16>, Encoding == UTF16)
   internal static func _fromCodeUnits<
     Input: Collection,
     Encoding: Unicode.Encoding
