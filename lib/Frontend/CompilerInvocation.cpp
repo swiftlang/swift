@@ -1039,7 +1039,7 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
     Opts.EnableTargetOSChecking
       = A->getOption().matches(OPT_enable_target_os_checking);
   }
-  
+
   Opts.EnableNewOperatorLookup = Args.hasFlag(OPT_enable_new_operator_lookup,
                                               OPT_disable_new_operator_lookup,
                                               /*default*/ false);
@@ -1446,7 +1446,7 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   if (const Arg *A = Args.getLastArg(OPT_clang_target)) {
     Opts.ClangTarget = llvm::Triple(A->getValue());
   }
-  
+
   Opts.setCxxInteropFromArgs(Args, Diags);
 
   Opts.EnableObjCInterop =
@@ -1496,7 +1496,7 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   auto getDefaultMinimumInliningTargetVersion =
       [&](const llvm::Triple &triple) -> llvm::VersionTuple {
     const auto targetVersion = getVersionTuple(triple);
-    
+
     // In API modules, default to the version when Swift first became available.
     if (Opts.LibraryLevel == LibraryLevel::API) {
       if (auto minVersion = minimumAvailableOSVersionForTriple(triple))
@@ -1983,6 +1983,8 @@ static bool ParseClangImporterArgs(ClangImporterOptions &Opts, ArgList &Args,
 
   if (auto *A = Args.getLastArg(OPT_import_objc_header))
     Opts.BridgingHeader = A->getValue();
+  if (auto *A = Args.getLastArg(OPT_import_pch))
+    Opts.BridgingHeaderPCH = A->getValue();
   Opts.DisableSwiftBridgeAttr |= Args.hasArg(OPT_disable_swift_bridge_attr);
 
   Opts.DisableOverlayModules |= Args.hasArg(OPT_emit_imported_modules);
@@ -2306,7 +2308,9 @@ static bool ParseSearchPathArgs(SearchPathOptions &Opts, ArgList &Args,
   Opts.ScannerModuleValidation |= Args.hasFlag(OPT_scanner_module_validation,
                                                OPT_no_scanner_module_validation,
                                                CASOpts.EnableCaching);
-
+  Opts.BridgingHeaderChaining =
+      Args.hasArg(OPT_experimental_bridging_header_chaining) ||
+      Args.hasArg(OPT_cache_compile_job);
   bool buildingFromInterface =
       FrontendOpts.InputMode ==
       FrontendOptions::ParseInputMode::SwiftModuleInterface;
@@ -3003,7 +3007,7 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
 
   Opts.NoAllocations = Args.hasArg(OPT_no_allocations);
 
-  Opts.EnableExperimentalSwiftBasedClosureSpecialization = 
+  Opts.EnableExperimentalSwiftBasedClosureSpecialization =
       Args.hasArg(OPT_enable_experimental_swift_based_closure_specialization);
 
   // If these optimizations are enabled never preserve functions for the
