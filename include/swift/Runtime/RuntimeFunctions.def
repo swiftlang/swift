@@ -1027,12 +1027,12 @@ FUNCTION(AllocateGenericClassMetadata, Swift, swift_allocateGenericClassMetadata
          EFFECT(MetaData),
          UNKNOWN_MEMEFFECTS)
 
-// Metadata *swift_allocateGenericClassMetadataWithLayoutString(
+// Metadata *swift_cvw_allocateGenericClassMetadataWithLayoutString(
 //     ClassDescriptor *type,
 //     const void * const *arguments,
 //     const void *template);
 FUNCTION(AllocateGenericClassMetadataWithLayoutString,
-         Swift, swift_allocateGenericClassMetadataWithLayoutString,
+         Swift, swift_cvw_allocateGenericClassMetadataWithLayoutString,
          C_CC, AlwaysAvailable,
          RETURNS(TypeMetadataPtrTy),
          ARGS(TypeContextDescriptorPtrTy, Int8PtrPtrTy, Int8PtrTy),
@@ -1052,13 +1052,13 @@ FUNCTION(AllocateGenericValueMetadata, Swift, swift_allocateGenericValueMetadata
          EFFECT(MetaData),
          UNKNOWN_MEMEFFECTS)
 
-// Metadata *swift_allocateGenericValueMetadataWithLayoutString(
+// Metadata *swift_cvw_allocateGenericValueMetadataWithLayoutString(
 //     ValueTypeDescriptor *type,
 //     const void * const *arguments,
 //     const void *template,
 //     size_t extraSize);
 FUNCTION(AllocateGenericValueMetadataWithLayoutString,
-         Swift, swift_allocateGenericValueMetadataWithLayoutString,
+         Swift, swift_cvw_allocateGenericValueMetadataWithLayoutString,
          C_CC, AlwaysAvailable,
          RETURNS(TypeMetadataPtrTy),
          ARGS(TypeContextDescriptorPtrTy, Int8PtrPtrTy, Int8PtrTy, SizeTy),
@@ -1489,14 +1489,14 @@ FUNCTION(InitStructMetadata,
          EFFECT(MetaData),
          UNKNOWN_MEMEFFECTS)
 
-// void swift_initStructMetadataWithLayoutString(Metadata *structType,
+// void swift_cvw_initStructMetadataWithLayoutString(Metadata *structType,
 //                                               StructLayoutFlags flags,
 //                                               size_t numFields,
 //                                               uint8_t * const *fieldTypes,
 //                                               const uint8_t *fieldTags
 //                                               uint32_t *fieldOffsets);
 FUNCTION(InitStructMetadataWithLayoutString,
-         Swift, swift_initStructMetadataWithLayoutString, C_CC, AlwaysAvailable,
+         Swift, swift_cvw_initStructMetadataWithLayoutString, C_CC, AlwaysAvailable,
          RETURNS(VoidTy),
          ARGS(TypeMetadataPtrTy, SizeTy, SizeTy,
               Int8PtrPtrTy->getPointerTo(0),
@@ -1518,11 +1518,11 @@ FUNCTION(InitEnumMetadataSingleCase,
          EFFECT(MetaData),
          UNKNOWN_MEMEFFECTS)
 
-// void swift_initEnumMetadataSingleCaseWithLayoutString(Metadata *enumType,
+// void swift_cvw_initEnumMetadataSingleCaseWithLayoutString(Metadata *enumType,
 //                                                       EnumLayoutFlags flags,
 //                                                       Metadata *payload);
 FUNCTION(InitEnumMetadataSingleCaseWithLayoutString,
-         Swift, swift_initEnumMetadataSingleCaseWithLayoutString,
+         Swift, swift_cvw_initEnumMetadataSingleCaseWithLayoutString,
          C_CC, AlwaysAvailable,
          RETURNS(VoidTy),
          ARGS(TypeMetadataPtrTy, SizeTy, TypeMetadataPtrTy),
@@ -1543,12 +1543,12 @@ FUNCTION(InitEnumMetadataSinglePayload,
          EFFECT(MetaData),
          UNKNOWN_MEMEFFECTS)
 
-// void swift_initEnumMetadataSinglePayloadWithLayoutString(Metadata *enumType,
+// void swift_cvw_initEnumMetadataSinglePayloadWithLayoutString(Metadata *enumType,
 //                                                        EnumLayoutFlags flags,
 //                                                        Metadata *payload,
 //                                                    unsigned num_empty_cases);
 FUNCTION(InitEnumMetadataSinglePayloadWithLayoutString,
-         Swift, swift_initEnumMetadataSinglePayloadWithLayoutString,
+         Swift, swift_cvw_initEnumMetadataSinglePayloadWithLayoutString,
          C_CC, AlwaysAvailable,
          RETURNS(VoidTy),
          ARGS(TypeMetadataPtrTy, SizeTy, TypeMetadataPtrTy, Int32Ty),
@@ -1570,12 +1570,12 @@ FUNCTION(InitEnumMetadataMultiPayload,
          UNKNOWN_MEMEFFECTS)
 
 // void
-// swift_initEnumMetadataMultiPayloadWithLayoutString(Metadata *enumType,
+// swift_cvw_initEnumMetadataMultiPayloadWithLayoutString(Metadata *enumType,
 //                                                  EnumLayoutFlags layoutFlags,
 //                                                    size_t numPayloads,
 //                                              Metadata * const *payloadTypes);
 FUNCTION(InitEnumMetadataMultiPayloadWithLayoutString,
-         Swift, swift_initEnumMetadataMultiPayloadWithLayoutString,
+         Swift, swift_cvw_initEnumMetadataMultiPayloadWithLayoutString,
          C_CC, AlwaysAvailable,
          RETURNS(VoidTy),
          ARGS(TypeMetadataPtrTy, SizeTy, SizeTy, TypeMetadataPtrPtrTy),
@@ -2684,9 +2684,9 @@ FUNCTION(StoreMultiPayloadEnumTagSinglePayload,
          EFFECT(NoEffect),
          UNKNOWN_MEMEFFECTS)
 
-// void swift_generic_destroy(opaque*, const Metadata* type);
+// void swift_cvw_destroy(opaque*, const Metadata* type);
 FUNCTION(GenericDestroy,
-         Swift, swift_generic_destroy,
+         Swift, swift_cvw_destroy,
          C_CC, AlwaysAvailable,
          RETURNS(VoidTy),
          ARGS(Int8PtrTy, TypeMetadataPtrTy),
@@ -2695,9 +2695,9 @@ FUNCTION(GenericDestroy,
          UNKNOWN_MEMEFFECTS)
 
 
-// void *swift_generic_assignWithCopy(opaque* dest, opaque* src, const Metadata* type);
+// void *swift_cvw_assignWithCopy(opaque* dest, opaque* src, const Metadata* type);
 FUNCTION(GenericAssignWithCopy,
-         Swift, swift_generic_assignWithCopy,
+         Swift, swift_cvw_assignWithCopy,
          C_CC, AlwaysAvailable,
          RETURNS(Int8PtrTy),
          ARGS(Int8PtrTy, Int8PtrTy, TypeMetadataPtrTy),
@@ -2705,9 +2705,9 @@ FUNCTION(GenericAssignWithCopy,
          EFFECT(RefCounting, Deallocating),
          UNKNOWN_MEMEFFECTS)
 
-// void *swift_generic_assignWithTake(opaque* dest, opaque* src, const Metadata* type);
+// void *swift_cvw_assignWithTake(opaque* dest, opaque* src, const Metadata* type);
 FUNCTION(GenericAssignWithTake,
-         Swift, swift_generic_assignWithTake,
+         Swift, swift_cvw_assignWithTake,
          C_CC, AlwaysAvailable,
          RETURNS(Int8PtrTy),
          ARGS(Int8PtrTy, Int8PtrTy, TypeMetadataPtrTy),
@@ -2715,9 +2715,9 @@ FUNCTION(GenericAssignWithTake,
          EFFECT(RefCounting, Deallocating),
          UNKNOWN_MEMEFFECTS)
 
-// void *swift_generic_initWithCopy(opaque* dest, opaque* src, const Metadata* type);
+// void *swift_cvw_initWithCopy(opaque* dest, opaque* src, const Metadata* type);
 FUNCTION(GenericInitWithCopy,
-         Swift, swift_generic_initWithCopy,
+         Swift, swift_cvw_initWithCopy,
          C_CC, AlwaysAvailable,
          RETURNS(Int8PtrTy),
          ARGS(Int8PtrTy, Int8PtrTy, TypeMetadataPtrTy),
@@ -2725,9 +2725,9 @@ FUNCTION(GenericInitWithCopy,
          EFFECT(RefCounting),
          UNKNOWN_MEMEFFECTS)
 
-// void *swift_generic_initWithTake(opaque* dest, opaque* src, const Metadata* type);
+// void *swift_cvw_initWithTake(opaque* dest, opaque* src, const Metadata* type);
 FUNCTION(GenericInitWithTake,
-         Swift, swift_generic_initWithTake,
+         Swift, swift_cvw_initWithTake,
          C_CC, AlwaysAvailable,
          RETURNS(Int8PtrTy),
          ARGS(Int8PtrTy, Int8PtrTy, TypeMetadataPtrTy),
@@ -2735,9 +2735,9 @@ FUNCTION(GenericInitWithTake,
          EFFECT(RefCounting),
          UNKNOWN_MEMEFFECTS)
 
-// void *swift_generic_initializeBufferWithCopyOfBuffer(ValueBuffer* dest, ValueBuffer* src, const Metadata* type);
+// void *swift_cvw_initializeBufferWithCopyOfBuffer(ValueBuffer* dest, ValueBuffer* src, const Metadata* type);
 FUNCTION(GenericInitializeBufferWithCopyOfBuffer,
-         Swift, swift_generic_initializeBufferWithCopyOfBuffer,
+         Swift, swift_cvw_initializeBufferWithCopyOfBuffer,
          C_CC, AlwaysAvailable,
          RETURNS(Int8PtrTy),
          ARGS(getFixedBufferTy()->getPointerTo(),
@@ -2747,10 +2747,10 @@ FUNCTION(GenericInitializeBufferWithCopyOfBuffer,
          EFFECT(RefCounting),
          UNKNOWN_MEMEFFECTS)
 
-// unsigned swift_singletonEnum_getEnumTag(swift::OpaqueValue *address,
+// unsigned swift_cvw_singletonEnum_getEnumTag(swift::OpaqueValue *address,
 //                                         const Metadata *metadata);
 FUNCTION(SingletonEnumGetEnumTag,
-         Swift, swift_singletonEnum_getEnumTag,
+         Swift, swift_cvw_singletonEnum_getEnumTag,
          C_CC, AlwaysAvailable,
          RETURNS(Int32Ty),
          ARGS(Int8PtrTy, TypeMetadataPtrTy),
@@ -2758,11 +2758,11 @@ FUNCTION(SingletonEnumGetEnumTag,
          EFFECT(NoEffect),
          UNKNOWN_MEMEFFECTS)
 
-// void swift_singletonEnum_destructiveInjectEnumTag(swift::OpaqueValue *address,
+// void swift_cvw_singletonEnum_destructiveInjectEnumTag(swift::OpaqueValue *address,
 //                                                   unsigned tag,
 //                                                   const Metadata *metadata)
 FUNCTION(SingletonEnumDestructiveInjectEnumTag,
-         Swift, swift_singletonEnum_destructiveInjectEnumTag,
+         Swift, swift_cvw_singletonEnum_destructiveInjectEnumTag,
          C_CC, AlwaysAvailable,
          RETURNS(VoidTy),
          ARGS(Int8PtrTy, Int32Ty, TypeMetadataPtrTy),
@@ -2770,10 +2770,10 @@ FUNCTION(SingletonEnumDestructiveInjectEnumTag,
          EFFECT(NoEffect),
          UNKNOWN_MEMEFFECTS)
 
-// unsigned swift_enumSimple_getEnumTag(swift::OpaqueValue *address,
+// unsigned swift_cvw_enumSimple_getEnumTag(swift::OpaqueValue *address,
 //                                      const Metadata *metadata);
 FUNCTION(EnumSimpleGetEnumTag,
-         Swift, swift_enumSimple_getEnumTag,
+         Swift, swift_cvw_enumSimple_getEnumTag,
          C_CC, AlwaysAvailable,
          RETURNS(Int32Ty),
          ARGS(Int8PtrTy, TypeMetadataPtrTy),
@@ -2781,11 +2781,11 @@ FUNCTION(EnumSimpleGetEnumTag,
          EFFECT(NoEffect),
          UNKNOWN_MEMEFFECTS)
 
-// unsigned swift_enumSimple_destructiveInjectEnumTag(swift::OpaqueValue *address,
+// unsigned swift_cvw_enumSimple_destructiveInjectEnumTag(swift::OpaqueValue *address,
 //                                                    unsigned tag,
 //                                                    const Metadata *metadata)
 FUNCTION(EnumSimpleDestructiveInjectEnumTag,
-         Swift, swift_enumSimple_destructiveInjectEnumTag,
+         Swift, swift_cvw_enumSimple_destructiveInjectEnumTag,
          C_CC, AlwaysAvailable,
          RETURNS(VoidTy),
          ARGS(Int8PtrTy, Int32Ty, TypeMetadataPtrTy),
@@ -2793,10 +2793,10 @@ FUNCTION(EnumSimpleDestructiveInjectEnumTag,
          EFFECT(NoEffect),
          UNKNOWN_MEMEFFECTS)
 
-// unsigned swift_enumFn_getEnumTag(swift::OpaqueValue *address,
+// unsigned swift_cvw_enumFn_getEnumTag(swift::OpaqueValue *address,
 //                                  const Metadata *metadata);
 FUNCTION(EnumFnGetEnumTag,
-         Swift, swift_enumFn_getEnumTag,
+         Swift, swift_cvw_enumFn_getEnumTag,
          C_CC, AlwaysAvailable,
          RETURNS(Int32Ty),
          ARGS(Int8PtrTy, TypeMetadataPtrTy),
@@ -2804,10 +2804,10 @@ FUNCTION(EnumFnGetEnumTag,
          EFFECT(NoEffect),
          UNKNOWN_MEMEFFECTS)
 
-// unsigned swift_multiPayloadEnumGeneric_getEnumTag(opaque* address,
+// unsigned swift_cvw_multiPayloadEnumGeneric_getEnumTag(opaque* address,
 //                                                   const Metadata *type);
 FUNCTION(MultiPayloadEnumGenericGetEnumTag,
-         Swift, swift_multiPayloadEnumGeneric_getEnumTag,
+         Swift, swift_cvw_multiPayloadEnumGeneric_getEnumTag,
          C_CC, AlwaysAvailable,
          RETURNS(Int32Ty),
          ARGS(Int8PtrTy, TypeMetadataPtrTy),
@@ -2815,11 +2815,11 @@ FUNCTION(MultiPayloadEnumGenericGetEnumTag,
          EFFECT(NoEffect),
          UNKNOWN_MEMEFFECTS)
 
-// void swift_multiPayloadEnumGeneric_destructiveInjectEnumTag(swift::OpaqueValue *address,
+// void swift_cvw_multiPayloadEnumGeneric_destructiveInjectEnumTag(swift::OpaqueValue *address,
 //                                                             unsigned tag,
 //                                                             const Metadata *metadata)
 FUNCTION(MultiPayloadEnumGenericDestructiveInjectEnumTag,
-         Swift, swift_multiPayloadEnumGeneric_destructiveInjectEnumTag,
+         Swift, swift_cvw_multiPayloadEnumGeneric_destructiveInjectEnumTag,
          C_CC, AlwaysAvailable,
          RETURNS(VoidTy),
          ARGS(Int8PtrTy, Int32Ty, TypeMetadataPtrTy),
@@ -2827,10 +2827,10 @@ FUNCTION(MultiPayloadEnumGenericDestructiveInjectEnumTag,
          EFFECT(NoEffect),
          UNKNOWN_MEMEFFECTS)
 
-// unsigned swift_singlePayloadEnumGeneric_getEnumTag(swift::OpaqueValue *address,
+// unsigned swift_cvw_singlePayloadEnumGeneric_getEnumTag(swift::OpaqueValue *address,
 //                                                    const Metadata *metadata);
 FUNCTION(SinglePayloadEnumGenericGetEnumTag,
-         Swift, swift_singlePayloadEnumGeneric_getEnumTag,
+         Swift, swift_cvw_singlePayloadEnumGeneric_getEnumTag,
          C_CC, AlwaysAvailable,
          RETURNS(Int32Ty),
          ARGS(Int8PtrTy, TypeMetadataPtrTy),
@@ -2838,11 +2838,11 @@ FUNCTION(SinglePayloadEnumGenericGetEnumTag,
          EFFECT(NoEffect),
          UNKNOWN_MEMEFFECTS)
 
-// void swift_singlePayloadEnumGeneric_destructiveInjectEnumTag(swift::OpaqueValue *address,
+// void swift_cvw_singlePayloadEnumGeneric_destructiveInjectEnumTag(swift::OpaqueValue *address,
 //                                                              unsigned tag,
 //                                                              const Metadata *metadata)
 FUNCTION(SinglePayloadEnumGenericDestructiveInjectEnumTag,
-         Swift, swift_singlePayloadEnumGeneric_destructiveInjectEnumTag,
+         Swift, swift_cvw_singlePayloadEnumGeneric_destructiveInjectEnumTag,
          C_CC, AlwaysAvailable,
          RETURNS(VoidTy),
          ARGS(Int8PtrTy, Int32Ty, TypeMetadataPtrTy),
@@ -2850,10 +2850,10 @@ FUNCTION(SinglePayloadEnumGenericDestructiveInjectEnumTag,
          EFFECT(NoEffect),
          UNKNOWN_MEMEFFECTS)
 
-// void swift_generic_instantiateLayoutString(const uint8_t* layoutStr,
+// void swift_cvw_instantiateLayoutString(const uint8_t* layoutStr,
 //                                            Metadata* type);
 FUNCTION(GenericInstantiateLayoutString,
-         Swift, swift_generic_instantiateLayoutString,
+         Swift, swift_cvw_instantiateLayoutString,
          C_CC, AlwaysAvailable,
          RETURNS(VoidTy),
          ARGS(Int8PtrTy, TypeMetadataPtrTy),

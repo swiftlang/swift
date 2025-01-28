@@ -307,6 +307,12 @@ swift_allocateGenericClassMetadata(const ClassDescriptor *description,
                                    const void *arguments,
                                    const GenericClassMetadataPattern *pattern);
 
+SWIFT_EXTERN_C SWIFT_RETURNS_NONNULL SWIFT_NODISCARD
+    SWIFT_RUNTIME_EXPORT_ATTRIBUTE ClassMetadata *
+    swift_cvw_allocateGenericClassMetadataWithLayoutString(
+        const ClassDescriptor *description, const void *arguments,
+        const GenericClassMetadataPattern *pattern);
+
 SWIFT_EXTERN_C SWIFT_RETURNS_NONNULL SWIFT_NODISCARD SWIFT_RUNTIME_EXPORT_ATTRIBUTE
 ClassMetadata *
 swift_allocateGenericClassMetadataWithLayoutString(
@@ -323,6 +329,12 @@ swift_allocateGenericValueMetadata(const ValueTypeDescriptor *description,
                                    const void *arguments,
                                    const GenericValueMetadataPattern *pattern,
                                    size_t extraDataSize);
+
+SWIFT_EXTERN_C SWIFT_RETURNS_NONNULL SWIFT_NODISCARD
+    SWIFT_RUNTIME_EXPORT_ATTRIBUTE ValueMetadata *
+    swift_cvw_allocateGenericValueMetadataWithLayoutString(
+        const ValueTypeDescriptor *description, const void *arguments,
+        const GenericValueMetadataPattern *pattern, size_t extraDataSize);
 
 SWIFT_EXTERN_C SWIFT_RETURNS_NONNULL SWIFT_NODISCARD SWIFT_RUNTIME_EXPORT_ATTRIBUTE
 ValueMetadata *
@@ -661,6 +673,12 @@ void swift_initStructMetadata(StructMetadata *self,
                               size_t numFields,
                               const TypeLayout * const *fieldTypes,
                               uint32_t *fieldOffsets);
+
+SWIFT_RUNTIME_EXPORT
+void swift_cvw_initStructMetadataWithLayoutString(
+    StructMetadata *self, StructLayoutFlags flags, size_t numFields,
+    const uint8_t *const *fieldTypes, const uint8_t *fieldTags,
+    uint32_t *fieldOffsets);
 
 SWIFT_RUNTIME_EXPORT
 void swift_initStructMetadataWithLayoutString(StructMetadata *self,
