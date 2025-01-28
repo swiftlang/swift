@@ -41,6 +41,7 @@
 #include "swift/Basic/Defer.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/ClangImporter/ClangImporter.h"
+#include "swift/ClangImporter/ClangModule.h"
 #include "swift/Demangling/Demangler.h"
 #include "swift/Demangling/ManglingMacros.h"
 #include "swift/Demangling/ManglingUtils.h"
@@ -53,8 +54,8 @@
 #include "clang/AST/Mangle.h"
 #include "clang/Basic/CharInfo.h"
 #include "llvm/ADT/DenseMap.h"
-#include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/STLExtras.h"
+#include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/ErrorHandling.h"
@@ -1091,6 +1092,11 @@ static StringRef getPrivateDiscriminatorIfNecessary(const Decl *decl) {
   // based on their enclosing file.
   auto topLevelSubcontext = decl->getDeclContext()->getModuleScopeContext();
   auto fileUnit = cast<FileUnit>(topLevelSubcontext);
+
+  // Clang modules do not provide a namespace, so no discriminator is needed
+  // here, even for non-public declarations.
+  if (isa<ClangModuleUnit>(fileUnit))
+    return StringRef();
 
   Identifier discriminator =
       fileUnit->getDiscriminatorForPrivateDecl(decl);

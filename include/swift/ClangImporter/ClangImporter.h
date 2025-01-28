@@ -16,7 +16,9 @@
 #ifndef SWIFT_CLANG_IMPORTER_H
 #define SWIFT_CLANG_IMPORTER_H
 
+#include "swift/AST/AttrKind.h"
 #include "swift/AST/ClangModuleLoader.h"
+#include "clang/Basic/Specifiers.h"
 #include "llvm/Support/VirtualFileSystem.h"
 
 /// The maximum number of SIMD vector elements we currently try to import.
@@ -728,7 +730,11 @@ llvm::StringRef getCFTypeName(const clang::TypedefNameDecl *decl);
 ValueDecl *getImportedMemberOperator(const DeclBaseName &name,
                                      NominalTypeDecl *selfType,
                                      std::optional<Type> parameterType);
-
+/// Map the access specifier of a Clang record member to a Swift access level.
+///
+/// This mapping is conservative: the resulting Swift access should be at _most_
+/// as permissive as the input C++ access.
+AccessLevel convertClangAccess(clang::AccessSpecifier access);
 } // namespace importer
 
 struct ClangInvocationFileMapping {

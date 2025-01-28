@@ -108,7 +108,7 @@ public:
 
   Identifier
   getDiscriminatorForPrivateDecl(const Decl *D) const override {
-    llvm_unreachable("no private decls in Clang modules");
+    llvm_unreachable("Clang modules do not need discriminators");
   }
 
   virtual version::Version getLanguageVersionBuiltWith() const override {
