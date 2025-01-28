@@ -135,11 +135,15 @@ SILDeclRef::SILDeclRef(ValueDecl *vd, SILDeclRef::Kind kind, bool isForeign,
       isAsyncLetClosure(0), pointer(derivativeId) {}
 
 SILDeclRef::SILDeclRef(SILDeclRef::Loc baseLoc, bool asForeign,
-                       bool asDistributed, bool asDistributedKnownToBeLocal)
+                       bool asDistributed, bool asDistributedKnownToBeLocal,
+                       const clang::Type *thunkType)
     : isRuntimeAccessible(false),
       backDeploymentKind(SILDeclRef::BackDeploymentKind::None),
       defaultArgIndex(0), isAsyncLetClosure(0),
-      pointer((AutoDiffDerivativeFunctionIdentifier *)nullptr) {
+      pointer((AutoDiffDerivativeFunctionIdentifier *)nullptr),
+      thunkType(thunkType) {
+  assert((!thunkType || baseLoc.is<AbstractClosureExpr *>()) &&
+         "thunk type is needed only for closures");
   if (auto *vd = baseLoc.dyn_cast<ValueDecl*>()) {
     if (auto *fd = dyn_cast<FuncDecl>(vd)) {
       // Map FuncDecls directly to Func SILDeclRefs.
@@ -169,6 +173,8 @@ SILDeclRef::SILDeclRef(SILDeclRef::Loc baseLoc, bool asForeign,
       llvm_unreachable("invalid loc decl for SILDeclRef!");
     }
   } else if (auto *ACE = baseLoc.dyn_cast<AbstractClosureExpr *>()) {
+    assert((!asForeign || thunkType) &&
+           "thunk type needed for foreign type for closures");
     loc = ACE;
     kind = Kind::Func;
     if (ACE->getASTContext().LangOpts.hasFeature(
