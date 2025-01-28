@@ -794,6 +794,7 @@ int sil_opt_main(ArrayRef<const char *> argv, void *MainAddr) {
   }
 
   Invocation.getLangOptions().EnableCXXInterop = options.EnableCxxInterop;
+  Invocation.computeCXXStdlibOptions();
 
   Invocation.getLangOptions().UnavailableDeclOptimizationMode =
       options.UnavailableDeclOptimization;
