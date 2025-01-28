@@ -35,6 +35,28 @@
 
 #include <new>
 
+#if __cplusplus < 202002l || !defined(__cpp_lib_bit_cast)
+namespace std {
+template <typename Destination, typename Source>
+std::enable_if_t<sizeof(Destination) == sizeof(Source) &&
+                 std::is_trivially_copyable_v<Source> &&
+                 std::is_trivially_copyable_v<Destination>, Destination>
+bit_cast(const Source &src) noexcept {
+  static_assert(std::is_trivially_constructible_v<Destination>,
+                "The destination type must be trivially constructible");
+  Destination dst;
+  if constexpr (std::is_pointer_v<Source> || std::is_pointer_v<Destination>)
+    std::memcpy(reinterpret_cast<uintptr_t *>(&dst),
+                reinterpret_cast<const uintptr_t *>(&src), sizeof(Destination));
+  else
+    std::memcpy(&dst, &src, sizeof(Destination));
+  return dst;
+}
+}
+#else
+#include <bit>
+#endif
+
 using namespace swift;
 
 namespace {
@@ -287,8 +309,8 @@ static void _asyncLet_get_throwing_continuation(
   }
 
   // Continue the caller's execution.
-  auto throwingResume
-    = reinterpret_cast<ThrowingTaskFutureWaitContinuationFunction*>(callContext->ResumeParent);
+  auto throwingResume =
+      std::bit_cast<ThrowingTaskFutureWaitContinuationFunction*>(callContext->ResumeParent);
   return throwingResume(callContext->Parent, error);
 }
 
@@ -305,8 +327,8 @@ static void swift_asyncLet_get_throwingImpl(
   }
 
   auto aletContext = static_cast<AsyncLetContinuationContext*>(callContext);
-  aletContext->ResumeParent
-    = reinterpret_cast<TaskContinuationFunction*>(resumeFunction);
+  aletContext->ResumeParent =
+      std::bit_cast<TaskContinuationFunction*>(resumeFunction);
   aletContext->Parent = callerContext;
   aletContext->alet = alet;
   auto futureContext = asImpl(alet)->getFutureContext();
@@ -376,7 +398,7 @@ static void asyncLet_finish_after_task_completion(SWIFT_ASYNC_CONTEXT AsyncConte
     swift_task_dealloc(task);
   }
 
-  return reinterpret_cast<ThrowingTaskFutureWaitContinuationFunction*>(resumeFunction)
+  return std::bit_cast<ThrowingTaskFutureWaitContinuationFunction*>(resumeFunction)
     (callerContext, error);
 }
 
@@ -528,14 +550,14 @@ static void swift_asyncLet_consume_throwingImpl(
   if (asImpl(alet)->hasResultInBuffer()) {
     return asyncLet_finish_after_task_completion(callerContext,
                    alet,
-                   reinterpret_cast<TaskContinuationFunction*>(resumeFunction),
+                   std::bit_cast<TaskContinuationFunction*>(resumeFunction),
                    callContext,
                    nullptr);
   }
 
   auto aletContext = static_cast<AsyncLetContinuationContext*>(callContext);
-  aletContext->ResumeParent
-    = reinterpret_cast<TaskContinuationFunction*>(resumeFunction);
+  aletContext->ResumeParent =
+      std::bit_cast<TaskContinuationFunction*>(resumeFunction);
   aletContext->Parent = callerContext;
   aletContext->alet = alet;
   auto futureContext = asImpl(alet)->getFutureContext();
