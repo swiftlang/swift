@@ -53,3 +53,7 @@ let w = x - y
 let f = FunctionVoidToFRTStruct()
 let frt = f()
 // CHECK-NOT: warning: 'operator()' should be annotated with either SWIFT_RETURNS_RETAINED or SWIFT_RETURNS_UNRETAINED as it is returning a SWIFT_SHARED_REFERENCE
+
+let nonFrt = NonFRTStruct()
+let nonFrtLocalVar1 = global_function_returning_templated_retrun_frt_owned(nonFrt)
+// CHECK-NOT: error: 'global_function_returning_templated_retrun_frt_owned<NonFRTStruct>' cannot be annotated with either SWIFT_RETURNS_RETAINED or SWIFT_RETURNS_UNRETAINED because it is not returning a SWIFT_SHARED_REFERENCE type
