@@ -485,7 +485,8 @@ class Product(object):
             cross_flags.append('-fno-stack-protector')
 
         # Use lld when cross-compiling to a Linux arch
-        if self.is_cross_compile_target("{}-{}".format(platform, arch)) and platform == 'linux':
+        if (self.is_cross_compile_target("{}-{}".format(platform, arch))
+                and platform == 'linux'):
             cross_flags.append('-w -fuse-ld=lld')
 
         return self.common_c_flags + cross_flags
