@@ -848,7 +848,7 @@ namespace swift {
 
     /// If non-zero, abort the expression type checker if it takes more
     /// than this many seconds.
-    unsigned ExpressionTimeoutThreshold = 600;
+    unsigned ExpressionTimeoutThreshold = 0;
 
     /// The upper bound, in bytes, of temporary data that can be
     /// allocated by the constraint solver.
