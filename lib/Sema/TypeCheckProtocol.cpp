@@ -2012,6 +2012,9 @@ class MultiConformanceChecker {
   /// Determine whether the given requirement was left unsatisfied.
   bool isUnsatisfiedReq(NormalProtocolConformance *conformance, ValueDecl *req);
 
+  /// Diagnose redundant `@preconcurrency` attributes on conformances.
+  void diagnoseRedundantPreconcurrency();
+
 public:
   MultiConformanceChecker(ASTContext &ctx) : Context(ctx) {}
 
@@ -2089,6 +2092,69 @@ static void diagnoseProtocolStubFixit(
     NormalProtocolConformance *conformance,
     ArrayRef<ASTContext::MissingWitness> missingWitnesses);
 
+void MultiConformanceChecker::diagnoseRedundantPreconcurrency() {
+  // Collect explicit preconcurrency conformances for which preconcurrency is
+  // not directly effectful.
+  SmallVector<NormalProtocolConformance *, 2> explicitConformances;
+  for (auto *conformance : AllConformances) {
+    if (conformance->getSourceKind() == ConformanceEntryKind::Explicit &&
+        conformance->isPreconcurrency() &&
+        !conformance->isPreconcurrencyEffectful()) {
+      explicitConformances.push_back(conformance);
+    }
+  }
+
+  if (explicitConformances.empty()) {
+    return;
+  }
+
+  // If preconcurrency is effectful for an implied conformance (a conformance
+  // to an inherited protocol), consider it effectful for the explicit implying
+  // one.
+  for (auto *conformance : AllConformances) {
+    switch (conformance->getSourceKind()) {
+    case ConformanceEntryKind::Inherited:
+    case ConformanceEntryKind::PreMacroExpansion:
+      llvm_unreachable("Invalid normal protocol conformance kind");
+    case ConformanceEntryKind::Explicit:
+    case ConformanceEntryKind::Synthesized:
+      continue;
+    case ConformanceEntryKind::Implied:
+      if (!conformance->isPreconcurrency() ||
+          !conformance->isPreconcurrencyEffectful()) {
+        continue;
+      }
+
+      auto *proto = conformance->getProtocol();
+      for (auto *explicitConformance : explicitConformances) {
+        if (explicitConformance->getProtocol()->inheritsFrom(proto)) {
+          explicitConformance->setPreconcurrencyEffectful();
+        }
+      }
+
+      continue;
+    }
+  }
+
+  // Diagnose all explicit preconcurrency conformances for which preconcurrency
+  // is not effectful (redundant).
+  for (auto *conformance : explicitConformances) {
+    if (conformance->isPreconcurrencyEffectful()) {
+      continue;
+    }
+
+    auto diag = Context.Diags.diagnose(
+        conformance->getLoc(), diag::preconcurrency_conformance_not_used,
+        conformance->getProtocol()->getDeclaredInterfaceType());
+
+    SourceLoc preconcurrencyLoc = conformance->getPreconcurrencyLoc();
+    if (preconcurrencyLoc.isValid()) {
+      SourceLoc endLoc = preconcurrencyLoc.getAdvancedLoc(1);
+      diag.fixItRemove(SourceRange(preconcurrencyLoc, endLoc));
+    }
+  }
+}
+
 void MultiConformanceChecker::checkAllConformances() {
   if (AllConformances.empty()) {
     return;
@@ -2157,6 +2223,9 @@ void MultiConformanceChecker::checkAllConformances() {
       }
     }
   }
+
+  // Diagnose any redundant preconcurrency.
+  this->diagnoseRedundantPreconcurrency();
 
   // Emit diagnostics at the very end.
   for (auto *conformance : AllConformances) {
@@ -5353,16 +5422,8 @@ void ConformanceChecker::resolveValueWitnesses() {
     }
   }
 
-  if (Conformance->isPreconcurrency() && !usesPreconcurrency) {
-    auto diag = DC->getASTContext().Diags.diagnose(
-        Conformance->getLoc(), diag::preconcurrency_conformance_not_used,
-        Proto->getDeclaredInterfaceType());
-
-    SourceLoc preconcurrencyLoc = Conformance->getPreconcurrencyLoc();
-    if (preconcurrencyLoc.isValid()) {
-      SourceLoc endLoc = preconcurrencyLoc.getAdvancedLoc(1);
-      diag.fixItRemove(SourceRange(preconcurrencyLoc, endLoc));
-    }
+  if (Conformance->isPreconcurrency() && usesPreconcurrency) {
+    Conformance->setPreconcurrencyEffectful();
   }
 
   // Finally, check some ad-hoc protocol requirements.

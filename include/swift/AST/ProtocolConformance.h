@@ -147,7 +147,7 @@ protected:
     SWIFT_INLINE_BITFIELD_EMPTY(RootProtocolConformance, ProtocolConformance);
 
     SWIFT_INLINE_BITFIELD_FULL(NormalProtocolConformance, RootProtocolConformance,
-                               1+1+
+                               1+1+1+
                                bitmax(NumProtocolConformanceOptions,8)+
                                bitmax(NumProtocolConformanceStateBits,8)+
                                bitmax(NumConformanceEntryKindBits,8),
@@ -156,6 +156,10 @@ protected:
       /// We have allocated the AssociatedConformances array (but not necessarily
       /// populated any of its elements).
       HasComputedAssociatedConformances : 1,
+
+      /// Whether the preconcurrency attribute is effectful (not redundant) for
+      /// this conformance.
+      IsPreconcurrencyEffectful : 1,
 
       : NumPadBits,
 
@@ -584,6 +588,7 @@ public:
            "Cannot have a @preconcurrency location without isPreconcurrency");
     setState(state);
     Bits.NormalProtocolConformance.IsInvalid = false;
+    Bits.NormalProtocolConformance.IsPreconcurrencyEffectful = false;
     Bits.NormalProtocolConformance.Options = options.toRaw();
     Bits.NormalProtocolConformance.HasComputedAssociatedConformances = false;
     Bits.NormalProtocolConformance.SourceKind =
@@ -643,6 +648,20 @@ public:
     // OK to mutate because the flags are not part of the folding set node ID.
     Bits.NormalProtocolConformance.Options =
         (getOptions() | ProtocolConformanceFlags::Unchecked).toRaw();
+  }
+
+  /// Whether the preconcurrency attribute is effectful (not redundant) for
+  /// this conformance.
+  bool isPreconcurrencyEffectful() const {
+    ASSERT(isPreconcurrency() && isComplete());
+    return Bits.NormalProtocolConformance.IsPreconcurrencyEffectful;
+  }
+
+  /// Record that the preconcurrency attribute is effectful (not redundant)
+  /// for this conformance.
+  void setPreconcurrencyEffectful() {
+    ASSERT(isPreconcurrency());
+    Bits.NormalProtocolConformance.IsPreconcurrencyEffectful = true;
   }
 
   /// Whether this is an preconcurrency conformance.
