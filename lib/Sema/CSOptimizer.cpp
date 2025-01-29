@@ -175,6 +175,18 @@ void forEachDisjunctionChoice(
     if (!decl)
       continue;
 
+    // Ignore declarations that come from implicitly imported modules
+    // when `MemberImportVisibility` feature is enabled otherwise
+    // we might end up favoring an overload that would be diagnosed
+    // as unavailable later.
+    if (cs.getASTContext().LangOpts.hasFeature(
+            Feature::MemberImportVisibility)) {
+      if (auto *useDC = constraint->getOverloadUseDC()) {
+        if (!useDC->isDeclImported(decl))
+          continue;
+      }
+    }
+
     // If disjunction choice is unavailable or disfavored we cannot
     // do anything with it.
     if (decl->getAttrs().hasAttribute<DisfavoredOverloadAttr>() ||
