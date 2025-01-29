@@ -132,3 +132,12 @@ extension String {
     }
   }
 }
+
+/// Pattern match by `is` property. E.g. `case \.isNewline: ...`
+func ~= <T>(keyPath: KeyPath<T, Bool>, subject: T) -> Bool {
+  return subject[keyPath: keyPath]
+}
+
+func ~= <T>(keyPath: KeyPath<T, Bool>, subject: T?) -> Bool {
+  return subject?[keyPath: keyPath] == true
+}

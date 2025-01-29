@@ -29,18 +29,6 @@ extension Byte: Comparable {
   }
 }
 
-extension Byte? {
-  var isSpaceOrTab: Bool {
-    self?.isSpaceOrTab == true
-  }
-  var isNewline: Bool {
-    self?.isNewline == true
-  }
-  var isSpaceTabOrNewline: Bool {
-    self?.isSpaceTabOrNewline == true
-  }
-}
-
 extension Byte {
   var isSpaceOrTab: Bool {
     self == " " || self == "\t"

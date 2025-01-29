@@ -130,7 +130,7 @@ fileprivate extension ByteScanner {
     // Consume the element, stopping at the first space.
     return try consume(using: { consumer in
       switch consumer.peek {
-      case let c where c.isSpaceOrTab:
+      case \.isSpaceOrTab:
         return false
       case "\"":
         try consumer.consumeStringLiteral()
