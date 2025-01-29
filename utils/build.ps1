@@ -487,22 +487,27 @@ function Get-BuildProjectCMakeModules([BuildComponent]$Project) {
 
 function Get-TargetInfo($Arch) {
   # Cache the result of "swift -print-target-info" as $Arch.Cache.TargetInfo
-  $cacheKey = "TargetInfo"
-  if (-not $Arch.Cache.ContainsKey($cacheKey)) {
+  $CacheKey = "TargetInfo"
+  if (-not $Arch.Cache.ContainsKey($CacheKey)) {
+    $CompilersBinaryCache = if ($IsCrossCompiling) {
+      Get-BuildProjectBinaryCache Compilers
+    } else {
+      Get-HostProjectBinaryCache Compilers
+    }
+    $ToolchainBinDir = Join-Path -Path $CompilersBinaryCache -ChildPath "bin"
+    $CMarkDir = Join-Path -Path (Get-CMarkBinaryCache $BuildArch) -ChildPath "src"
+    $SwiftExe = Join-Path -Path $ToolchainBinDir -ChildPath "swift.exe"
     Isolate-EnvVars {
-      $pinnedToolchainToolDir = Get-PinnedToolchainTool
-      $pinnedToolchainRuntimeDir = Get-PinnedToolchainRuntime
-      $env:Path = "${pinnedToolchainTools};${pinnedToolchainRuntime};${env:Path}"
-      $swiftExe = Join-Path -Path $pinnedToolchainTools -ChildPath "swift.exe"
-      $targetInfoJson = & $swiftExe -target $Arch.LLVMTarget -print-target-info
+      $env:Path = "$ToolchainBinDir;$CMarkDir;${env:Path}"
+      $TargetInfoJson = & $SwiftExe -target $Arch.LLVMTarget -print-target-info
       if ($LastExitCode -ne 0) {
-        throw "Unable to print target info for $($Arch.LLVMTarget) $targetInfoJson"
+        throw "Unable to print target info for $($Arch.LLVMTarget) $TargetInfoJson"
       }
-      $targetInfo = $targetInfoJson | ConvertFrom-Json
-      $Arch.Cache[$cacheKey] = $targetInfo.target
+      $TargetInfo = $TargetInfoJson | ConvertFrom-Json
+      $Arch.Cache[$CacheKey] = $TargetInfo.target
     }
   }
-  return $Arch.Cache[$cacheKey]
+  return $Arch.Cache[$CacheKey]
 }
 
 function Get-ModuleTriple($Arch) {
@@ -1123,8 +1128,8 @@ function Build-CMakeProject {
       if (-not ($Platform -eq "Windows")) {
         TryAdd-KeyValue $Defines CMAKE_Swift_COMPILER_WORKS = "YES"
       }
-      TryAdd-KeyValue $Defines CMAKE_Swift_COMPILER_TARGET (Get-ModuleTriple $Arch)
       if ($UseBuiltCompilers.Contains("Swift")) {
+        TryAdd-KeyValue $Defines CMAKE_Swift_COMPILER_TARGET (Get-ModuleTriple $Arch)
         $RuntimeBinaryCache = Get-TargetProjectBinaryCache $Arch Runtime
         $SwiftResourceDir = "${RuntimeBinaryCache}\lib\swift"
 
@@ -1164,6 +1169,7 @@ function Build-CMakeProject {
         }
 
       } else {
+        TryAdd-KeyValue $Defines CMAKE_Swift_COMPILER_TARGET $Arch.LLVMTarget
         $SwiftArgs += @("-sdk", (Get-PinnedToolchainSDK))
       }
 
