@@ -48,4 +48,19 @@ CXXCopyConstructorTestSuite.test("Default copy constructor, member with user-def
   expectTrue(result.0.box.numCopies + result.1.box.numCopies > 0)
 }
 
+CXXCopyConstructorTestSuite.test("Copy constructor with default argument") {
+  @inline(never)
+
+  func createTypeWithCopyConstructorWithDefaultArgument() -> (HasCopyConstructorWithDefaultArgs, HasCopyConstructorWithDefaultArgs) {
+    let obj = HasCopyConstructorWithDefaultArgs(0)
+    print(obj.funcWithDefaultArg())
+    return (obj, obj)
+  }
+
+  let result = createTypeWithCopyConstructorWithDefaultArgument()
+  print(result.1.value)
+  expectTrue(result.0.value == 0) // 2
+  // expectTrue(result.1.value == 2)
+}
+
 runAllTests()

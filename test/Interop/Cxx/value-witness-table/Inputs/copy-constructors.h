@@ -23,8 +23,24 @@ struct HasNonTrivialDefaultCopyConstructor {
       const HasNonTrivialDefaultCopyConstructor &) = default;
 };
 
+struct HasCopyConstructorWithDefaultArgs {
+  int value;
+  HasCopyConstructorWithDefaultArgs(int value) : value(value) {}
+  // HasCopyConstructorWithDefaultArgs(
+  //     const HasCopyConstructorWithDefaultArgs &other)
+  //     : value(other.value + 1) {}
+
+  // rdar://142414553
+  HasCopyConstructorWithDefaultArgs(
+      const HasCopyConstructorWithDefaultArgs &other, int value = 0)
+      : value(other.value + 1) {}
+
+  int funcWithDefaultArg(int arg = 0) const { return arg + 1; }
+};
+
 // Make sure that we don't crash on struct templates with copy-constructors.
-template <typename T> struct S {
+template <typename T>
+struct S {
   S(S const &) {}
 };
 
