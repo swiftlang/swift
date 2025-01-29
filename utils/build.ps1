@@ -2083,11 +2083,11 @@ function Build-Foundation([Platform]$Platform, $Arch, [switch]$Test = $false) {
         -Platform $Platform `
         -UseBuiltCompilers ASM,C,CXX,Swift `
         -SwiftSDK:$SDKRoot `
-        -Defines (@{
+        -Defines @{
+          CMAKE_FIND_PACKAGE_PREFER_CONFIG = "YES";
           CMAKE_NINJA_FORCE_RESPONSE_FILE = "YES";
           ENABLE_TESTING = "NO";
           FOUNDATION_BUILD_TOOLS = if ($Platform -eq "Windows") { "YES" } else { "NO" };
-          CMAKE_FIND_PACKAGE_PREFER_CONFIG = "YES";
           CURL_DIR = "$LibraryRoot\curl-8.9.1\usr\lib\$Platform\$ShortArch\cmake\CURL";
           LibXml2_DIR = "$LibraryRoot\libxml2-2.11.5\usr\lib\$Platform\$ShortArch\cmake\libxml2-2.11.5";
           ZLIB_LIBRARY = if ($Platform -eq "Windows") {
@@ -2102,7 +2102,7 @@ function Build-Foundation([Platform]$Platform, $Arch, [switch]$Test = $false) {
           _SwiftFoundationICU_SourceDIR = "$SourceCache\swift-foundation-icu";
           _SwiftCollections_SourceDIR = "$SourceCache\swift-collections";
           SwiftFoundation_MACRO = "$(Get-BuildProjectBinaryCache FoundationMacros)\bin"
-        })
+        }
     }
   }
 }
