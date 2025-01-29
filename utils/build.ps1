@@ -498,7 +498,7 @@ function Get-TargetInfo($Arch) {
     $CMarkDir = Join-Path -Path (Get-CMarkBinaryCache $BuildArch) -ChildPath "src"
     $SwiftExe = Join-Path -Path $ToolchainBinDir -ChildPath "swift.exe"
     Isolate-EnvVars {
-      $env:Path = "$ToolchainBinDir;$CMarkDir;${env:Path}"
+      $env:Path = "$ToolchainBinDir;$CMarkDir;$(Get-PinnedToolchainRuntime);${env:Path}"
       $TargetInfoJson = & $SwiftExe -target $Arch.LLVMTarget -print-target-info
       if ($LastExitCode -ne 0) {
         throw "Unable to print target info for $($Arch.LLVMTarget) $TargetInfoJson"
