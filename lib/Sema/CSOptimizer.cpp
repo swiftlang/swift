@@ -128,8 +128,14 @@ static bool isSupportedDisjunction(Constraint *disjunction) {
     if (choice->getKind() != ConstraintKind::BindOverload)
       return false;
 
-    if (auto *decl = getOverloadChoiceDecl(choice))
+    if (auto *decl = getOverloadChoiceDecl(choice)) {
+      // Cannot optimize declarations that return IUO because
+      // they form a disjunction over a result type once attempted.
+      if (decl->isImplicitlyUnwrappedOptional())
+        return false;
+
       return decl->getInterfaceType()->is<FunctionType>();
+    }
 
     return false;
   });
