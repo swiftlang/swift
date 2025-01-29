@@ -1666,20 +1666,6 @@ struct TypeSimplifier {
         auto *proto = assocType->getProtocol();
         auto conformance = CS.lookupConformance(lookupBaseType, proto);
         if (!conformance) {
-          // Special case: When building slab literals, we go through the same
-          // array literal machinery, so there will be a conversion constraint
-          // for the element to ExpressibleByArrayLiteral.ArrayLiteralType.
-          if (lookupBaseType->isSlab()) {
-            auto &ctx = CS.getASTContext();
-            auto arrayProto =
-                ctx.getProtocol(KnownProtocolKind::ExpressibleByArrayLiteral);
-            auto elementAssocTy = arrayProto->getAssociatedTypeMembers()[0];
-
-            if (proto == arrayProto && assocType == elementAssocTy) {
-              return lookupBaseType->isArrayType();
-            }
-          }
-
           // If the base type doesn't conform to the associatedtype's protocol,
           // there will be a missing conformance fix applied in diagnostic mode,
           // so the concrete dependent member type is considered a "hole" in
@@ -4466,6 +4452,7 @@ ConstraintSystem::isConversionEphemeral(ConversionRestrictionKind conversion,
   case ConversionRestrictionKind::ObjCTollFreeBridgeToCF:
   case ConversionRestrictionKind::CGFloatToDouble:
   case ConversionRestrictionKind::DoubleToCGFloat:
+  case ConversionRestrictionKind::ArrayLiteralToInlineArray:
     // @_nonEphemeral has no effect on these conversions, so treat them as all
     // being non-ephemeral in order to allow their passing to an @_nonEphemeral
     // parameter.

@@ -7334,6 +7334,13 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
       finishApply(implicitInit, toType, callLocator, callLocator);
       return implicitInit;
     }
+
+    case ConversionRestrictionKind::ArrayLiteralToInlineArray: {
+      cs.setType(expr, toType);
+      if (!finishArrayExpr(cast<ArrayExpr>(expr))) return nullptr;
+
+      return expr;
+    }
     }
   }
 

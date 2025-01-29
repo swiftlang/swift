@@ -295,6 +295,8 @@ enum class ConversionRestrictionKind {
   ///    - Unsafe[Mutable]RawPointer -> Unsafe[Mutable]Pointer<[U]Int>
   ///    - Unsafe[Mutable]Pointer<Int{8, 16, ...}> <-> Unsafe[Mutable]Pointer<UInt{8, 16, ...}>
   PointerToCPointer,
+  /// Conversion from an array literal to an InlineArray
+  ArrayLiteralToInlineArray,
 };
 
 /// Specifies whether a given conversion requires the creation of a temporary

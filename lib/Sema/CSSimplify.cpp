@@ -8097,6 +8097,26 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
     return getTypeMatchSuccess();
   }
 
+  // If we're trying to match an 'Array' to a 'Slab', check to see if the
+  // locator is anchored to an array literal expression. If it is, we can
+  // interpret the array literal as a slab literal instead.
+  if (type1->isArray() && type2->isSlab()) {
+    // If the locator is pointing directly at an array literal, allow the
+    // conversion.
+    if (isExpr<ArrayExpr>(locator.getAnchor())) {
+      conversionsOrFixes.push_back(
+        ConversionRestrictionKind::ArrayLiteralToInlineArray);
+    }
+
+    // Allow array literal call arguments to convert to 'Slab'.
+    if ((kind == ConstraintKind::ArgumentConversion ||
+        kind == ConstraintKind::OperatorArgumentConversion) &&
+        isExpr<ArrayExpr>(locator.trySimplifyToExpr())) {
+      conversionsOrFixes.push_back(
+        ConversionRestrictionKind::ArrayLiteralToInlineArray);
+    }
+  }
+
   // Attempt fixes iff it's allowed, both types are concrete and
   // we are not in the middle of attempting one already.
   if (shouldAttemptFixes() && !flags.contains(TMF_ApplyingFix)) {
@@ -8697,51 +8717,6 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyConformsToConstraint(
           }
         }
       }
-    }
-
-    auto arrayLiteralProto =
-      getASTContext().getProtocol(KnownProtocolKind::ExpressibleByArrayLiteral);
-    auto anchor = loc->getAnchor();
-    auto arrayLiteral = getAsExpr<ArrayExpr>(anchor);
-
-    // If we're attempting to bind an array literal to a 'Slab' parameter,
-    // then check if the counts are equal and solve.
-    if (kind == ConstraintKind::LiteralConformsTo &&
-        protocol == arrayLiteralProto &&
-        type->isSlab() &&
-        arrayLiteral) {
-      auto slabTy = type->castTo<BoundGenericStructType>();
-
-      // <let count: Int, Element>
-      // Attempt to bind the number of elements in the literal with the
-      // contextual count. This will diagnose if the literal does not enough
-      // or too many elements.
-      auto contextualCount = slabTy->getGenericArgs()[0];
-      auto literalCount = IntegerType::get(
-          std::to_string(arrayLiteral->getNumElements()),
-          /* isNegative */ false,
-          slabTy->getASTContext());
-
-      // If the counts are already equal, '2' == '2', then we're done.
-      if (contextualCount->isEqual(literalCount)) {
-        return SolutionKind::Solved;
-      }
-
-      // If our contextual count is not known, e.g., Slab<_, Int> = [1, 2],
-      // then just eagerly bind the count to what the literal count is.
-      if (contextualCount->isTypeVariableOrMember()) {
-        addConstraint(ConstraintKind::Bind, contextualCount, literalCount,
-                      locator);
-        return SolutionKind::Solved;
-      }
-
-      // Otherwise this is an error and the counts aren't equal to each other.
-      if (!shouldAttemptFixes())
-        return SolutionKind::Error;
-
-      auto fix = AllowSlabLiteralCountMismatch::create(*this, contextualCount,
-                                                       literalCount, loc);
-      return recordFix(fix) ? SolutionKind::Error : SolutionKind::Solved;
     }
   } break;
 
@@ -14890,6 +14865,52 @@ ConstraintSystem::simplifyRestrictedConstraintImpl(
     ImplicitValueConversions.insert(
         {getConstraintLocator(locator), restriction});
     return SolutionKind::Solved;
+  }
+
+  // [Element] ===> InlineArray<N, Element>
+  case ConversionRestrictionKind::ArrayLiteralToInlineArray: {
+    auto arrayLiteral = cast<ArrayExpr>(locator.trySimplifyToExpr());
+
+    auto arrayEltTy = type1->isArrayType();
+
+    auto slabTy = type2->castTo<BoundGenericStructType>();
+    auto slabEltTy = slabTy->getGenericArgs()[1];
+
+    addConstraint(ConstraintKind::Bind, arrayEltTy, slabEltTy, locator);
+
+    // <let count: Int, Element>
+    // Attempt to bind the number of elements in the literal with the
+    // contextual count. This will diagnose if the literal does not enough
+    // or too many elements.
+    auto contextualCount = slabTy->getGenericArgs()[0];
+    auto literalCount = IntegerType::get(
+        std::to_string(arrayLiteral->getNumElements()),
+        /* isNegative */ false,
+        slabTy->getASTContext());
+
+    // If the counts are already equal, '2' == '2', then we don't need to bind
+    // them.
+    if (contextualCount->isEqual(literalCount)) {
+      return SolutionKind::Solved;
+    }
+
+    // If our contextual count is not known, e.g., Slab<_, Int> = [1, 2],
+    // then just eagerly bind the count to what the literal count is.
+    if (contextualCount->isTypeVariableOrMember()) {
+      addConstraint(ConstraintKind::Bind, contextualCount, literalCount,
+                    locator);
+
+      return SolutionKind::Solved;
+    }
+
+    // Otherwise this is an error and the counts aren't equal to each other.
+    if (!shouldAttemptFixes())
+      return SolutionKind::Error;
+
+    auto fix = AllowSlabLiteralCountMismatch::create(*this, contextualCount,
+                                                     literalCount,
+                                                  getConstraintLocator(locator));
+    return recordFix(fix) ? SolutionKind::Error : SolutionKind::Solved;
   }
   }
   

@@ -620,6 +620,8 @@ StringRef swift::constraints::getName(ConversionRestrictionKind kind) {
     return "[CGFloat-to-Double]";
   case ConversionRestrictionKind::DoubleToCGFloat:
     return "[Double-to-CGFloat]";
+  case ConversionRestrictionKind::ArrayLiteralToInlineArray:
+    return "[Array-Literal-to-Inline-Array]";
   }
   llvm_unreachable("bad conversion restriction kind");
 }
