@@ -272,6 +272,7 @@ extension SwiftBacktrace {
       }
       write("]")
     } else {
+      write(#", "crashedThread": "#)
       outputJSONThread(ndx: target.crashingThreadNdx,
                        thread: crashingThread)
     }
