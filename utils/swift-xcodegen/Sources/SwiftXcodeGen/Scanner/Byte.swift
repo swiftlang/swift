@@ -17,37 +17,15 @@ struct Byte: Hashable {
   }
 }
 
-// Please forgive me...
-func == (lhs: UnicodeScalar, rhs: Byte?) -> Bool {
-  guard let rhs else { return false }
-  return lhs.value == rhs.rawValue
-}
-func == (lhs: Byte?, rhs: UnicodeScalar) -> Bool {
-  rhs == lhs
-}
-func != (lhs: UnicodeScalar, rhs: Byte?) -> Bool {
-  !(lhs == rhs)
-}
-func != (lhs: Byte?, rhs: UnicodeScalar) -> Bool {
-  rhs != lhs
+extension Byte: ExpressibleByUnicodeScalarLiteral {
+  init(unicodeScalarLiteral value: UnicodeScalar) {
+    self.init(UInt8(ascii: value))
+  }
 }
 
-func ~= (pattern: UnicodeScalar, match: Byte) -> Bool {
-  pattern == match
-}
-func ~= (pattern: UnicodeScalar, match: Byte?) -> Bool {
-  pattern == match
-}
-
-extension Byte? {
-  var isSpaceOrTab: Bool {
-    self?.isSpaceOrTab == true
-  }
-  var isNewline: Bool {
-    self?.isNewline == true
-  }
-  var isSpaceTabOrNewline: Bool {
-    self?.isSpaceTabOrNewline == true
+extension Byte: Comparable {
+  static func < (lhs: Self, rhs: Self) -> Bool {
+    lhs.rawValue < rhs.rawValue
   }
 }
 
@@ -60,15 +38,5 @@ extension Byte {
   }
   var isSpaceTabOrNewline: Bool {
     isSpaceOrTab || isNewline
-  }
-  init(ascii scalar: UnicodeScalar) {
-    assert(scalar.isASCII)
-    self.rawValue = UInt8(scalar.value)
-  }
-  var scalar: UnicodeScalar {
-    UnicodeScalar(UInt32(rawValue))!
-  }
-  var char: Character {
-    .init(scalar)
   }
 }

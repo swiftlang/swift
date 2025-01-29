@@ -46,13 +46,11 @@ fileprivate extension ByteScanner {
       // Ninja uses '$' as the escape character.
       if c == "$" {
         switch consumer.peek(ahead: 1) {
-        case let c? where c.isSpaceOrTab:
-          fallthrough
-        case "$", ":":
+        case "$", ":", \.isSpaceOrTab:
           // Skip the '$' and take the unescaped character.
           consumer.skip()
           return consumer.eat()
-        case let c? where c.isNewline:
+        case \.isNewline:
           // This is a line continuation, skip the newline, and strip any
           // following space.
           consumer.skip(untilAfter: \.isNewline)
@@ -160,7 +158,7 @@ extension NinjaParser.Lexer {
   private mutating func consumeElement() -> String? {
     input.consumeUnescaped(while: { char in
       switch char {
-      case let c where c.isNinjaOperator || c.isSpaceTabOrNewline:
+      case \.isNinjaOperator, \.isSpaceTabOrNewline:
         false
       default:
         true

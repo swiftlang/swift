@@ -154,7 +154,7 @@ extension NinjaBuildFile {
 
 extension Byte {
   fileprivate var isNinjaVarName: Bool {
-    switch self.scalar {
+    switch self {
     case "0"..."9", "a"..."z", "A"..."Z", "_", "-":
       return true
     default:
