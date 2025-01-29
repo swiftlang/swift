@@ -2952,9 +2952,7 @@ if (-not $SkipBuild) {
   Invoke-BuildStep Build-CMark $HostArch
   Invoke-BuildStep Build-XML2 Windows $HostArch
   Invoke-BuildStep Build-Compilers $HostArch
-}
 
-if (-not $SkipBuild) {
   foreach ($Arch in $WindowsSDKArchs) {
     Invoke-BuildStep Build-ZLib Windows $Arch
     Invoke-BuildStep Build-XML2 Windows $Arch
@@ -2994,9 +2992,7 @@ if (-not $SkipBuild) {
     Invoke-BuildStep Write-SDKSettingsPlist Android $Arch
     Invoke-BuildStep Write-PlatformInfoPlist $Arch
   }
-}
 
-if (-not $SkipBuild) {
   # Build Macros for distribution
   Invoke-BuildStep Build-FoundationMacros Windows $HostArch
   Invoke-BuildStep Build-TestingMacros Windows $HostArch
