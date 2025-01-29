@@ -26,6 +26,7 @@
 
 namespace swift {
 class ASTContext;
+class DeclContext;
 
 /// Represents a dimension of availability (e.g. macOS platform or Swift
 /// language mode).
@@ -142,7 +143,7 @@ public:
 
   /// Returns the built-in availability domain identified by the given string.
   static std::optional<AvailabilityDomain>
-  builtinDomainForString(StringRef string);
+  builtinDomainForString(StringRef string, const DeclContext *declContext);
 
   Kind getKind() const {
     if (auto inlineDomain = getInlineDomain())

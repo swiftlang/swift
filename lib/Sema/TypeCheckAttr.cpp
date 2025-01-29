@@ -8271,7 +8271,6 @@ SemanticAvailableAttrRequest::evaluate(swift::Evaluator &evaluator,
   auto &diags = decl->getASTContext().Diags;
   auto attrLoc = attr->getLocation();
   auto attrName = attr->getAttrName();
-  auto attrKind = attr->getKind();
   auto domainLoc = attr->getDomainLoc();
   auto introducedVersion = attr->getRawIntroduced();
   auto deprecatedVersion = attr->getRawDeprecated();
@@ -8285,7 +8284,8 @@ SemanticAvailableAttrRequest::evaluate(swift::Evaluator &evaluator,
 
     // Attempt to resolve the domain specified for the attribute and diagnose
     // if no domain is found.
-    domain = AvailabilityDomain::builtinDomainForString(*string);
+    auto declContext = decl->getInnermostDeclContext();
+    domain = AvailabilityDomain::builtinDomainForString(*string, declContext);
     if (!domain) {
       if (auto suggestion = closestCorrectedPlatformString(*string)) {
         diags
@@ -8305,7 +8305,7 @@ SemanticAvailableAttrRequest::evaluate(swift::Evaluator &evaluator,
   auto domainName = domain->getNameForAttributePrinting();
 
   if (domain->isSwiftLanguage() || domain->isPackageDescription()) {
-    switch (attrKind) {
+    switch (attr->getKind()) {
     case AvailableAttr::Kind::Deprecated:
       diags.diagnose(attrLoc,
                      diag::attr_availability_expected_deprecated_version,
@@ -8320,7 +8320,8 @@ SemanticAvailableAttrRequest::evaluate(swift::Evaluator &evaluator,
     case AvailableAttr::Kind::NoAsync:
       diags.diagnose(attrLoc, diag::attr_availability_cannot_be_used_for_domain,
                      "noasync", attrName, domainName);
-      break;
+      return std::nullopt;
+
     case AvailableAttr::Kind::Default:
       break;
     }
