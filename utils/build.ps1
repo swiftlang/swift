@@ -2111,12 +2111,12 @@ function Test-Dispatch([Platform]$Platform) {
   Invoke-Program $adb shell "mkdir $RemoteBin"
   Write-Host    "$adb push $LocalBin/. $RemoteBin"
   Invoke-Program $adb push "$LocalBin/." $RemoteBin
-  Write-Host    "$adb push $SourceCache/swift/utils/android/utils/ctest_mock.sh /data/local/tmp"
-  Invoke-Program $adb push "$SourceCache/swift/utils/android/utils/ctest_mock.sh" "/data/local/tmp"
-  Write-Host    "$adb shell chmod +x /data/local/tmp/ctest_mock.sh"
-  Invoke-Program $adb shell "chmod +x /data/local/tmp/ctest_mock.sh"
-  Write-Host    "$adb shell sh /data/local/tmp/ctest_mock.sh $RemoteBin"
-  Invoke-Program $adb shell "sh /data/local/tmp/ctest_mock.sh $RemoteBin"
+  Write-Host    "$adb push $SourceCache/swift/utils/android/emulator/ctest-libdispatch.sh /data/local/tmp"
+  Invoke-Program $adb push "$SourceCache/swift/utils/android/emulator/ctest-libdispatch.sh" "/data/local/tmp"
+  Write-Host    "$adb shell chmod +x /data/local/tmp/ctest-libdispatch.sh"
+  Invoke-Program $adb shell "chmod +x /data/local/tmp/ctest-libdispatch.sh"
+  Write-Host    "$adb shell sh /data/local/tmp/ctest-libdispatch.sh $RemoteBin"
+  Invoke-Program $adb shell "sh /data/local/tmp/ctest-libdispatch.sh $RemoteBin"
   Invoke-Program $adb emu kill
   Invoke-Program $adb kill-server
 }
@@ -3209,8 +3209,10 @@ if (-not $IsCrossCompiling) {
   exit 1
 } finally {
   $adb = "$BinaryCache\android-sdk\platform-tools\adb.exe"
-  Invoke-Program $adb emu kill
-  Invoke-Program $adb kill-server
+  if (Test-Path $adb) {
+    & $adb emu kill | Out-Null
+    & $adb kill-server | Out-Null
+  }
 
   if ($Summary) {
     $TimingData | Select-Object Platform,Arch,Checkout,"Elapsed Time" | Sort-Object -Descending -Property "Elapsed Time" | Format-Table -AutoSize
