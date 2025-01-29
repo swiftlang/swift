@@ -210,8 +210,8 @@ func testConcurrency() {
     print(y) // okay
   }
   acceptConcurrent {
-    print(x) // expected-warning{{capture of 'x' with non-sendable type 'NotConcurrent' in a `@Sendable` closure}}
-    print(y) // expected-warning{{capture of 'y' with non-sendable type 'NotConcurrent' in a `@Sendable` closure}}
+    print(x) // expected-warning{{capture of 'x' with non-sendable type 'NotConcurrent' in a '@Sendable' closure}}
+    print(y) // expected-warning{{capture of 'y' with non-sendable type 'NotConcurrent' in a '@Sendable' closure}}
     // expected-warning@-1{{reference to captured var 'y' in concurrently-executing code}}
   }
 }
@@ -308,7 +308,7 @@ func acceptConcurrentUnary<T>(_: @Sendable (T) -> T) { }
 func concurrentClosures<T>(_: T) { // expected-note{{consider making generic parameter 'T' conform to the 'Sendable' protocol}} {{26-26=: Sendable}}
   acceptConcurrentUnary { (x: T) in
     _ = x // ok
-    acceptConcurrentUnary { _ in x } // expected-warning{{capture of 'x' with non-sendable type 'T' in a `@Sendable` closure}}
+    acceptConcurrentUnary { _ in x } // expected-warning{{capture of 'x' with non-sendable type 'T' in a '@Sendable' closure}}
     let y: T? = nil
     return y!
   }
@@ -475,7 +475,7 @@ enum E12<T>: UnsafeSendable { // expected-warning{{'UnsafeSendable' is deprecate
 func testSendableOptionalInference(nc: NotConcurrent) {
   var fn: (@Sendable () -> Void)? = nil
   fn = {
-    print(nc) // expected-warning{{capture of 'nc' with non-sendable type 'NotConcurrent' in a `@Sendable` closure}}
+    print(nc) // expected-warning{{capture of 'nc' with non-sendable type 'NotConcurrent' in a '@Sendable' closure}}
   }
   _ = fn
 }

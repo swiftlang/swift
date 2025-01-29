@@ -5597,7 +5597,7 @@ ERROR(concurrent_access_of_inout_param,none,
       "concurrently-executing code",
       (DeclName))
 ERROR(non_sendable_capture,none,
-      "capture of %1 with non-sendable type %0 in a `@Sendable` "
+      "capture of %1 with non-sendable type %0 in a '@Sendable' "
       "%select{local function|closure}2",
       (Type, DeclName, bool))
 ERROR(non_sendable_isolated_capture,none,
@@ -5608,7 +5608,7 @@ ERROR(self_capture_deinit_task,none,
       "capture of 'self' in a closure that outlives deinit",
       ())
 ERROR(implicit_non_sendable_capture,none,
-      "implicit capture of %1 requires that %0 conforms to `Sendable`",
+      "implicit capture of %1 requires that %0 conforms to 'Sendable'",
       (Type, DeclName))
 
 NOTE(actor_isolated_sync_func,none,

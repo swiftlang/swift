@@ -209,7 +209,7 @@ struct Clock {
     // nonisolated instead of custom actor isolated.
     print(ns) // expected-tns-warning {{sending 'ns' risks causing data races}}
     // expected-tns-note @-1 {{global actor 'CustomActor'-isolated 'ns' is captured by a main actor-isolated closure. main actor-isolated uses in closure may race against later nonisolated uses}}
-    // expected-complete-warning @-2 {{capture of 'ns' with non-sendable type 'NonSendableKlass' in a `@Sendable` closure}}
+    // expected-complete-warning @-2 {{capture of 'ns' with non-sendable type 'NonSendableKlass' in a '@Sendable' closure}}
   }
 
   useValue(ns)
