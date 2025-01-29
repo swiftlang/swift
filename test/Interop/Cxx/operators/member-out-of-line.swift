@@ -72,4 +72,11 @@ OperatorsTestSuite.test("NonTrivialIntArrayByVal.subscript (out-of-line)") {
   expectEqual(42, result5)
 }
 
+OperatorsTestSuite.test("UnnamedParameterInOperator.equal") {
+  let lhs = ClassWithOperatorEqualsParamUnnamed()
+  let rhs = ClassWithOperatorEqualsParamUnnamed()
+  expectFalse(lhs == rhs)
+  expectTrue(lhs != rhs)
+}
+
 runAllTests()
