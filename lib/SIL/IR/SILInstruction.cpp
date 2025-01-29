@@ -15,14 +15,17 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/SIL/SILInstruction.h"
-#include "swift/Basic/Assertions.h"
 #include "swift/Basic/AssertImplements.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/Unicode.h"
 #include "swift/Basic/type_traits.h"
 #include "swift/SIL/ApplySite.h"
 #include "swift/SIL/DynamicCasts.h"
+#include "swift/SIL/InstWrappers.h"
 #include "swift/SIL/InstructionUtils.h"
+#include "swift/SIL/NodeDatastructures.h"
 #include "swift/SIL/OwnershipUtils.h"
+#include "swift/SIL/PrunedLiveness.h"
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILCloner.h"
 #include "swift/SIL/SILDebugScope.h"
@@ -1828,6 +1831,134 @@ bool SILInstruction::maySuspend() const {
   return false;
 }
 
+static SILValue lookThroughOwnershipAndForwardingInsts(SILValue value) {
+  auto current = value;
+  while (true) {
+    if (auto *inst = current->getDefiningInstruction()) {
+      switch (inst->getKind()) {
+      case SILInstructionKind::MoveValueInst:
+      case SILInstructionKind::CopyValueInst:
+      case SILInstructionKind::BeginBorrowInst:
+        current = inst->getOperand(0);
+        continue;
+      default:
+        break;
+      }
+      auto forward = ForwardingOperation(inst);
+      Operand *op = nullptr;
+      if (forward && (op = forward.getSingleForwardingOperand())) {
+        current = op->get();
+        continue;
+      }
+    } else if (auto *result = SILArgument::isTerminatorResult(current)) {
+      auto *op = result->forwardedTerminatorResultOperand();
+      if (!op) {
+        break;
+      }
+      current = op->get();
+      continue;
+    }
+    break;
+  }
+  return current;
+}
+
+bool
+PartialApplyInst::visitOnStackLifetimeEnds(
+                             llvm::function_ref<bool (Operand *)> func) const {
+  assert(getFunction()->hasOwnership()
+         && isOnStack()
+         && "only meaningful for OSSA stack closures");
+  bool noUsers = true;
+
+  auto *function = getFunction();
+
+  SmallVector<SILBasicBlock *, 32> discoveredBlocks;
+  SSAPrunedLiveness liveness(function, &discoveredBlocks);
+  liveness.initializeDef(this);
+
+  StackList<SILValue> values(function);
+  values.push_back(this);
+
+  while (!values.empty()) {
+    auto value = values.pop_back_val();
+    for (auto *use : value->getUses()) {
+      if (!use->isConsuming()) {
+        if (auto *cvi = dyn_cast<CopyValueInst>(use->getUser())) {
+          values.push_back(cvi);
+        }
+        continue;
+      }
+      noUsers = false;
+      if (isa<DestroyValueInst>(use->getUser())) {
+        liveness.updateForUse(use->getUser(), /*lifetimeEnding=*/true);
+        continue;
+      }
+      auto forward = ForwardingOperand(use);
+      if (!forward) {
+        // There shouldn't be any non-forwarding consumptions of a nonescaping
+        // partial_apply that don't forward it along, aside from destroy_value.
+        //
+        // On-stack partial_apply cannot be cloned, so it should never be used
+        // by a BranchInst.
+        //
+        // This is a fatal error because it performs SIL verification that is
+        // not separately checked in the verifier. It is the only check that
+        // verifies the structural requirements of on-stack partial_apply uses.
+        if (lookThroughOwnershipAndForwardingInsts(use->get()) !=
+            SILValue(this)) {
+          // Consumes of values which aren't "essentially" the
+          //   partial_apply [on_stack]
+          // are okay.  For example, a not-on_stack partial_apply that captures
+          // it.
+          continue;
+        }
+        llvm::errs() << "partial_apply [on_stack] use:\n";
+        auto *user = use->getUser();
+        user->printInContext(llvm::errs());
+        if (isa<BranchInst>(user)) {
+          llvm::report_fatal_error("partial_apply [on_stack] cannot be cloned");
+        }
+        llvm::report_fatal_error("partial_apply [on_stack] must be directly "
+                                 "forwarded to a destroy_value");
+      }
+      forward.visitForwardedValues([&values](auto value) {
+        values.push_back(value);
+        return true;
+      });
+    }
+  }
+  PrunedLivenessBoundary boundary;
+  liveness.computeBoundary(boundary);
+
+  for (auto *inst : boundary.lastUsers) {
+    // Only destroy_values were added to liveness, so only destroy_values can be
+    // the last users.
+    auto *dvi = cast<DestroyValueInst>(inst);
+    auto keepGoing = func(&dvi->getOperandRef());
+    if (!keepGoing) {
+      return false;
+    }
+  }
+  return !noUsers;
+}
+
+namespace swift::test {
+FunctionTest PartialApplyPrintOnStackLifetimeEnds(
+    "partial_apply_print_on_stack_lifetime_ends",
+    [](auto &function, auto &arguments, auto &test) {
+      auto *inst = arguments.takeInstruction();
+      auto *pai = cast<PartialApplyInst>(inst);
+      function.print(llvm::outs());
+      auto result = pai->visitOnStackLifetimeEnds([](auto *operand) {
+        operand->print(llvm::outs());
+        return true;
+      });
+      const char *resultString = result ? "true" : "false";
+      llvm::outs() << "returned: " << resultString << "\n";
+    });
+} // end namespace swift::test
+
 static bool
 visitRecursivelyLifetimeEndingUses(
   SILValue i, bool &noUsers,
@@ -1867,41 +1998,6 @@ visitRecursivelyLifetimeEndingUses(
     }
   }
   return true;
-}
-
-bool
-PartialApplyInst::visitOnStackLifetimeEnds(
-                             llvm::function_ref<bool (Operand *)> func) const {
-  assert(getFunction()->hasOwnership()
-         && isOnStack()
-         && "only meaningful for OSSA stack closures");
-  bool noUsers = true;
-
-  auto visitUnknownUse = [](Operand *unknownUse) {
-    // There shouldn't be any dead-end consumptions of a nonescaping
-    // partial_apply that don't forward it along, aside from destroy_value.
-    //
-    // On-stack partial_apply cannot be cloned, so it should never be used by a
-    // BranchInst.
-    //
-    // This is a fatal error because it performs SIL verification that is not
-    // separately checked in the verifier. It is the only check that verifies
-    // the structural requirements of on-stack partial_apply uses.
-    llvm::errs() << "partial_apply [on_stack] use:\n";
-    auto *user = unknownUse->getUser();
-    user->printInContext(llvm::errs());
-    if (isa<BranchInst>(user)) {
-      llvm::report_fatal_error("partial_apply [on_stack] cannot be cloned");
-    }
-    llvm::report_fatal_error("partial_apply [on_stack] must be directly "
-                             "forwarded to a destroy_value");
-    return false;
-  };
-  if (!visitRecursivelyLifetimeEndingUses(this, noUsers, func,
-                                          visitUnknownUse)) {
-    return false;
-  }
-  return !noUsers;
 }
 
 // FIXME: Rather than recursing through all results, this should only recurse
