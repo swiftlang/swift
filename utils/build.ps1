@@ -133,7 +133,6 @@ param(
   [string] $WinSDKVersion = "",
   [switch] $Android = $false,
   [switch] $SkipBuild = $false,
-  [switch] $SkipRedistInstall = $false,
   [switch] $SkipPackaging = $false,
   [switch] $IncludeDS2 = $false,
   [string[]] $Test = @(),
