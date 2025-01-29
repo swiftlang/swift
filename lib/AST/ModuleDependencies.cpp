@@ -962,7 +962,7 @@ ModuleDependenciesCache::getClangDependencies(const ModuleDependencyID &moduleID
   auto clangImportedDepsRef = moduleInfo.getImportedClangDependencies();
   result.insert(clangImportedDepsRef.begin(),
                 clangImportedDepsRef.end());
-  if (moduleInfo.isSwiftSourceModule()) {
+  if (moduleInfo.isSwiftSourceModule() || moduleInfo.isSwiftBinaryModule()) {
     auto headerClangDepsRef = moduleInfo.getHeaderClangDependencies();
     result.insert(headerClangDepsRef.begin(),
                   headerClangDepsRef.end());
