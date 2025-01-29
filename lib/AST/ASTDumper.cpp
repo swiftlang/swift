@@ -5777,6 +5777,7 @@ namespace {
       printCommon(#Name, label);                           \
                                                            \
       printFieldQuoted(T->getDecl()->printRef(), Label::always("decl"));  \
+      printFlag(T->getDecl()->hasClangNode(), "foreign");  \
                                                            \
       if (T->getParent())                                  \
         printRec(T->getParent(), Label::always("parent")); \
@@ -5790,6 +5791,7 @@ namespace {
         BoundGeneric##TypeClass *T, Label label) {         \
       printCommon("bound_generic_" #Name, label);          \
       printFieldQuoted(T->getDecl()->printRef(), Label::always("decl"));  \
+      printFlag(T->getDecl()->hasClangNode(), "foreign");  \
       if (T->getParent())                                  \
         printRec(T->getParent(), Label::always("parent")); \
       printList(T->getGenericArgs(), [&](auto arg, Label label) {  \
@@ -5838,6 +5840,7 @@ namespace {
     void visitModuleType(ModuleType *T, Label label) {
       printCommon("module_type", label);
       printDeclName(T->getModule(), Label::always("module"));
+      printFlag(T->getModule()->isNonSwiftModule(), "foreign");
       printFoot();
     }
 
