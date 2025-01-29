@@ -381,7 +381,7 @@ backtracer settings:
 +-------------------+--------------------------------------------------------+
 | Field             | Value                                                  |
 +===================+========================================================+
-| threads           | An array of thread record, one for each thread (if the |
+| threads           | An array of thread records, one for each thread (if the |
 |                   | backtracer is set to give backtraces for all threads). |
 +-------------------+--------------------------------------------------------+
 | crashedThread     | A single thread record for the crashing thread (if the |
