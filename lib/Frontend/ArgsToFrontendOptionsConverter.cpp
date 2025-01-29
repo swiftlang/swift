@@ -419,6 +419,10 @@ bool ArgsToFrontendOptionsConverter::convert(
   }
 
   Opts.DisableSandbox = Args.hasArg(OPT_disable_sandbox);
+
+  if (computeAvailabilityDomains())
+    return true;
+
   return false;
 }
 
@@ -546,6 +550,39 @@ void ArgsToFrontendOptionsConverter::computeDumpScopeMapLocations() {
 
   if (!invalid && Opts.DumpScopeMapLocations.empty())
     Diags.diagnose(SourceLoc(), diag::error_no_source_location_scope_map);
+}
+
+bool ArgsToFrontendOptionsConverter::computeAvailabilityDomains() {
+  using namespace options;
+
+  bool hadError = false;
+  llvm::SmallSet<std::string, 4> seenDomains;
+
+  for (const Arg *A :
+       Args.filtered_reverse(OPT_define_enabled_availability_domain,
+                             OPT_define_disabled_availability_domain,
+                             OPT_define_dynamic_availability_domain)) {
+    std::string domain = A->getValue();
+    if (!seenDomains.insert(domain).second)
+      continue;
+
+    if (!Lexer::isIdentifier(domain)) {
+      Diags.diagnose(SourceLoc(), diag::error_invalid_arg_value,
+                     A->getAsString(Args), A->getValue());
+      hadError = true;
+      continue;
+    }
+
+    auto &option = A->getOption();
+    if (option.matches(OPT_define_enabled_availability_domain))
+      Opts.AvailabilityDomains.EnabledDomains.emplace_back(domain);
+    else if (option.matches(OPT_define_disabled_availability_domain))
+      Opts.AvailabilityDomains.DisabledDomains.emplace_back(domain);
+    else if (option.matches(OPT_define_dynamic_availability_domain))
+      Opts.AvailabilityDomains.DynamicDomains.emplace_back(domain);
+  }
+
+  return hadError;
 }
 
 FrontendOptions::ActionType
