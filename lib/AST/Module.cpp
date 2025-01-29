@@ -3047,33 +3047,6 @@ bool ModuleDecl::isImportedImplementationOnly(const ModuleDecl *module) const {
   return true;
 }
 
-bool ModuleDecl::
-canBeUsedForCrossModuleOptimization(DeclContext *ctxt) const {
-  ModuleDecl *moduleOfCtxt = ctxt->getParentModule();
-
-  // If the context defined in the same module - or is the same module, it's
-  // fine.
-  if (moduleOfCtxt == this)
-    return true;
-
-  // See if context is imported in a "regular" way, i.e. not with
-  // @_implementationOnly, `package import` or @_spiOnly.
-  ModuleDecl::ImportFilter filter = {
-    ModuleDecl::ImportFilterKind::ImplementationOnly,
-    ModuleDecl::ImportFilterKind::PackageOnly,
-    ModuleDecl::ImportFilterKind::SPIOnly
-  };
-  SmallVector<ImportedModule, 4> results;
-  getImportedModules(results, filter);
-
-  auto &imports = getASTContext().getImportCache();
-  for (auto &desc : results) {
-    if (imports.isImportedBy(moduleOfCtxt, desc.importedModule))
-      return false;
-  }
-  return true;
-}
-
 void SourceFile::lookupImportedSPIGroups(
                         const ModuleDecl *importedModule,
                         llvm::SmallSetVector<Identifier, 4> &spiGroups) const {
