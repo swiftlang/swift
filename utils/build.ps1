@@ -229,6 +229,7 @@ $ArchX64 = @{
   XCTestInstallRoot = "$BinaryCache\x64\Windows.platform\Developer\Library\XCTest-development";
   SwiftTestingInstallRoot = "$BinaryCache\x64\Windows.platform\Developer\Library\Testing-development";
   ToolchainInstallRoot = "$BinaryCache\x64\toolchains\$ProductVersion+Asserts";
+  Cache = @{};
 }
 
 $ArchX86 = @{
@@ -244,6 +245,7 @@ $ArchX86 = @{
   SDKInstallRoot = "$BinaryCache\x86\Windows.platform\Developer\SDKs\Windows.sdk";
   XCTestInstallRoot = "$BinaryCache\x86\Windows.platform\Developer\Library\XCTest-development";
   SwiftTestingInstallRoot = "$BinaryCache\x86\Windows.platform\Developer\Library\Testing-development";
+  Cache = @{};
 }
 
 $ArchARM64 = @{
@@ -260,6 +262,7 @@ $ArchARM64 = @{
   XCTestInstallRoot = "$BinaryCache\arm64\Windows.platform\Developer\Library\XCTest-development";
   ToolchainInstallRoot = "$BinaryCache\arm64\toolchains\$ProductVersion+Asserts";
   SwiftTestingInstallRoot = "$BinaryCache\arm64\Windows.platform\Developer\Library\Testing-development";
+  Cache = @{};
 }
 
 $AndroidARM64 = @{
@@ -275,6 +278,7 @@ $AndroidARM64 = @{
   SDKInstallRoot = "$BinaryCache\arm64\Android.platform\Developer\SDKs\Android.sdk";
   XCTestInstallRoot = "$BinaryCache\arm64\Android.platform\Developer\Library\XCTest-development";
   SwiftTestingInstallRoot = "$BinaryCache\arm64\Android.platform\Developer\Library\Testing-development";
+  Cache = @{};
 }
 
 $AndroidARMv7 = @{
@@ -290,6 +294,7 @@ $AndroidARMv7 = @{
   SDKInstallRoot = "$BinaryCache\armv7\Android.platform\Developer\SDKs\Android.sdk";
   XCTestInstallRoot = "$BinaryCache\armv7\Android.platform\Developer\Library\XCTest-development";
   SwiftTestingInstallRoot = "$BinaryCache\armv7\Android.platform\Developer\Library\Testing-development";
+  Cache = @{};
 }
 
 $AndroidX86 = @{
@@ -305,6 +310,7 @@ $AndroidX86 = @{
   SDKInstallRoot = "$BinaryCache\x86\Android.platform\Developer\SDKs\Android.sdk";
   XCTestInstallRoot = "$BinaryCache\x86\Android.platform\Developer\Library\XCTest-development";
   SwiftTestingInstallRoot = "$BinaryCache\x86\Android.platform\Developer\Library\Testing-development";
+  Cache = @{};
 }
 
 $AndroidX64 = @{
@@ -320,6 +326,7 @@ $AndroidX64 = @{
   SDKInstallRoot = "$BinaryCache\x64\Android.platform\Developer\SDKs\Android.sdk";
   XCTestInstallRoot = "$BinaryCache\x64\Android.platform\Developer\Library\XCTest-development";
   SwiftTestingInstallRoot = "$BinaryCache\x64\Android.platform\Developer\Library\Testing-development";
+  Cache = @{};
 }
 
 $HostArch = switch ($HostArchName) {
@@ -477,6 +484,36 @@ function Get-BuildProjectBinaryCache([BuildComponent]$Project) {
 
 function Get-BuildProjectCMakeModules([BuildComponent]$Project) {
   return "$BinaryCache\$($Project.value__)\cmake\modules"
+}
+
+function Get-TargetInfo($Arch) {
+  # Cache the result of "swift -print-target-info" as $Arch.Cache.TargetInfo
+  $CacheKey = "TargetInfo"
+  if (-not $Arch.Cache.ContainsKey($CacheKey)) {
+    $CompilersBinaryCache = if ($IsCrossCompiling) {
+      Get-BuildProjectBinaryCache Compilers
+    } else {
+      Get-HostProjectBinaryCache Compilers
+    }
+    $ToolchainBinDir = Join-Path -Path $CompilersBinaryCache -ChildPath "bin"
+    $CMarkDir = Join-Path -Path (Get-CMarkBinaryCache $BuildArch) -ChildPath "src"
+    $SwiftExe = Join-Path -Path $ToolchainBinDir -ChildPath "swift.exe"
+    Isolate-EnvVars {
+      $env:Path = "$ToolchainBinDir;$CMarkDir;$(Get-PinnedToolchainRuntime);${env:Path}"
+      $TargetInfoJson = & $SwiftExe -target $Arch.LLVMTarget -print-target-info
+      if ($LastExitCode -ne 0) {
+        throw "Unable to print target info for $($Arch.LLVMTarget) $TargetInfoJson"
+      }
+      $TargetInfo = $TargetInfoJson | ConvertFrom-Json
+      $Arch.Cache[$CacheKey] = $TargetInfo.target
+    }
+  }
+  return $Arch.Cache[$CacheKey]
+}
+
+function Get-ModuleTriple($Arch) {
+  $targetInfo = Get-TargetInfo -Arch $Arch
+  return $targetInfo.moduleTriple
 }
 
 function Copy-File($Src, $Dst) {
@@ -1150,8 +1187,8 @@ function Build-CMakeProject {
       if (-not ($Platform -eq "Windows")) {
         TryAdd-KeyValue $Defines CMAKE_Swift_COMPILER_WORKS = "YES"
       }
-      TryAdd-KeyValue $Defines CMAKE_Swift_COMPILER_TARGET $Arch.LLVMTarget.Replace("$AndroidAPILevel", "")
       if ($UseBuiltCompilers.Contains("Swift")) {
+        TryAdd-KeyValue $Defines CMAKE_Swift_COMPILER_TARGET (Get-ModuleTriple $Arch)
         $RuntimeBinaryCache = Get-TargetProjectBinaryCache $Arch Runtime
         $SwiftResourceDir = "${RuntimeBinaryCache}\lib\swift"
 
@@ -1191,6 +1228,7 @@ function Build-CMakeProject {
         }
 
       } else {
+        TryAdd-KeyValue $Defines CMAKE_Swift_COMPILER_TARGET $Arch.LLVMTarget
         $SwiftArgs += @("-sdk", (Get-PinnedToolchainSDK))
       }
 
@@ -1826,12 +1864,10 @@ function Build-RegsGen2($Arch) {
 }
 
 function Build-DS2([Platform]$Platform, $Arch) {
-  $ArchName = $Arch.LLVMTarget.Replace("$AndroidAPILevel","")
-
   Build-CMakeProject `
     -Src "$SourceCache\ds2" `
     -Bin "$($Arch.BinaryCache)\$Platform\ds2" `
-    -InstallTo "$($Arch.PlatformInstallRoot)\Developer\Library\$ArchName" `
+    -InstallTo "$($Arch.PlatformInstallRoot)\Developer\Library\$(Get-ModuleTriple $Arch)" `
     -Arch $Arch `
     -Platform $Platform `
     -BuildTargets default `
@@ -1983,7 +2019,7 @@ function Build-Runtime([Platform]$Platform, $Arch) {
       -CacheScript $SourceCache\swift\cmake\caches\Runtime-$Platform-$($Arch.LLVMName).cmake `
       -UseBuiltCompilers C,CXX,Swift `
       -Defines ($PlatformDefines + @{
-        CMAKE_Swift_COMPILER_TARGET = $Arch.LLVMTarget.Replace("$AndroidAPILevel", "");
+        CMAKE_Swift_COMPILER_TARGET = (Get-ModuleTriple $Arch);
         CMAKE_Swift_COMPILER_WORKS = "YES";
         CMAKE_SYSTEM_NAME = $Platform.ToString();
         LLVM_DIR = "$(Get-TargetProjectBinaryCache $Arch LLVM)\lib\cmake\llvm";
@@ -2297,7 +2333,7 @@ function Install-Platform([Platform]$Platform, $Arch) {
   Get-ChildItem -Recurse "$PlatformLibSrc\$($Arch.LLVMName)" | ForEach-Object {
     if (".swiftmodule", ".swiftdoc", ".swiftinterface" -contains $_.Extension) {
       $DstDir = "$PlatformLibDst\$($_.BaseName).swiftmodule"
-      Copy-File $_.FullName "$DstDir\$($Arch.LLVMTarget)$($_.Extension)"
+      Copy-File $_.FullName "$DstDir\$(Get-ModuleTriple $Arch)$($_.Extension)"
     } else {
       Copy-File $_.FullName "$PlatformLibDst\$($Arch.LLVMName)\"
     }
