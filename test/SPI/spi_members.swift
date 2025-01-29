@@ -14,7 +14,6 @@ public struct SPIWrapper<T> {
   public init(wrappedValue: T) {}
 
   public var wrappedValue: T { fatalError() }
-  // expected-note@-1 2 {{property declared here}}
 }
 
 @_spi(Foo)
@@ -46,7 +45,6 @@ public struct ResilientStructSPIMembers {
 
   @SPIWrapper public var wrappedProperty4: PublicType
   // expected-error@-1 {{cannot use generic struct 'SPIWrapper' as property wrapper here; it is SPI}}
-  // expected-error@-2 {{cannot use property 'wrappedValue' here; it is SPI}}
 
   @_spi(Foo) public var inlinableGet: Int {
     @inlinable
@@ -131,7 +129,6 @@ public struct ResilientStructSPIMembers {
 
   @SPIWrapper public var wrappedProperty3: PublicType
   // expected-error@-1 {{cannot use generic struct 'SPIWrapper' as property wrapper here; it is SPI}}
-  // expected-error@-2 {{cannot use property 'wrappedValue' here; it is SPI}}
 }
 
 @frozen public struct FrozenStructPrivateMembers {
