@@ -2098,25 +2098,17 @@ function Test-Dispatch([Platform]$Platform) {
                 -RedirectStandardError "$BinaryCache\android-sdk\.temp\emulator.err"
 
   # This is just a hack for now
-  $LocalBin = (Get-TargetProjectBinaryCache $AndroidX64 Dispatch)
-  $CacheName = Split-Path $LocalBin -Leaf
-  $RemoteBin = "/data/local/tmp/$CacheName"
+  $CachePath = (Get-TargetProjectBinaryCache $AndroidX64 Dispatch)
+  $CacheName = Split-Path $CachePath -Leaf
+  $RemoteRoot = "/data/local/tmp"
 
   # TODO: On my local machine I have to grant adb.exe network access once. How to do that in CI?
   $adb = "$BinaryCache\android-sdk\platform-tools\adb.exe"
   Invoke-Program $adb "wait-for-device"
-  Write-Host    "$adb shell rm -rf $RemoteBin"
-  Invoke-Program $adb shell "rm -rf $RemoteBin"
-  Write-Host    "$adb shell mkdir $RemoteBin"
-  Invoke-Program $adb shell "mkdir $RemoteBin"
-  Write-Host    "$adb push $LocalBin/. $RemoteBin"
-  Invoke-Program $adb push "$LocalBin/." $RemoteBin
-  Write-Host    "$adb push $SourceCache/swift/utils/android/emulator/ctest-libdispatch.sh /data/local/tmp"
-  Invoke-Program $adb push "$SourceCache/swift/utils/android/emulator/ctest-libdispatch.sh" "/data/local/tmp"
-  Write-Host    "$adb shell chmod +x /data/local/tmp/ctest-libdispatch.sh"
-  Invoke-Program $adb shell "chmod +x /data/local/tmp/ctest-libdispatch.sh"
-  Write-Host    "$adb shell sh /data/local/tmp/ctest-libdispatch.sh $RemoteBin"
-  Invoke-Program $adb shell "sh /data/local/tmp/ctest-libdispatch.sh $RemoteBin"
+  Write-Host    "$adb push $CachePath $RemoteRoot"
+  Invoke-Program $adb push $CachePath $RemoteRoot
+  Write-Host    "$adb shell sh $RemoteRoot/$CacheName/tests/ctest-android.sh"
+  Invoke-Program $adb shell "sh $RemoteRoot/$CacheName/tests/ctest-android.sh"
   Invoke-Program $adb emu kill
   Invoke-Program $adb kill-server
 }
