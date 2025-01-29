@@ -16,7 +16,7 @@ import CxxStdlib
 
 // CHECK:     struct DependsOnSelf {
 // CHECK:       @lifetime(borrow self)
-// CHECK-NEXT:  @_alwaysEmitIntoClient public mutating func get() -> Span<CInt>
+// CHECK-NEXT:  @_alwaysEmitIntoClient @_disfavoredOverload public mutating func get() -> Span<CInt>
 // CHECK-NEXT:  mutating func get() -> ConstSpanOfInt
 
 // CHECK:      mutating func set(_ x: borrowing std.{{.*}}vector<CInt, std.{{.*}}allocator<CInt>>)
@@ -32,4 +32,4 @@ import CxxStdlib
 // CHECK-NEXT: @lifetime(s)
 // CHECK-NEXT: @_alwaysEmitIntoClient public func funcWithSafeWrapper2(_ s: Span<CInt>) -> Span<CInt>
 // CHECK-NEXT: @lifetime(borrow v)
-// CHECK-NEXT: @_alwaysEmitIntoClient public func funcWithSafeWrapper3(_ v: borrowing VecOfInt) -> Span<CInt>
+// CHECK-NEXT: @_alwaysEmitIntoClient @_disfavoredOverload public func funcWithSafeWrapper3(_ v: borrowing VecOfInt) -> Span<CInt>

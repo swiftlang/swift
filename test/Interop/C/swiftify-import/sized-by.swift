@@ -14,7 +14,7 @@ import SizedByClang
 // CHECK-NEXT: @_alwaysEmitIntoClient public func nullUnspecified(_  p: UnsafeMutableRawBufferPointer)
 // CHECK-NEXT: @_alwaysEmitIntoClient public func nullable(_  p: UnsafeMutableRawBufferPointer?)
 // CHECK-NEXT: @_alwaysEmitIntoClient public func opaque(_  p: UnsafeRawBufferPointer)
-// CHECK-NEXT: @_alwaysEmitIntoClient public func returnPointer(_ len: Int{{.*}}) -> UnsafeMutableRawBufferPointer
+// CHECK-NEXT: @_alwaysEmitIntoClient @_disfavoredOverload public func returnPointer(_ len: Int{{.*}}) -> UnsafeMutableRawBufferPointer
 // CHECK-NEXT: @_alwaysEmitIntoClient public func shared(_ len: Int{{.*}}, _ p1: UnsafeMutableRawBufferPointer, _ p2: UnsafeMutableRawBufferPointer)
 // CHECK-NEXT: @_alwaysEmitIntoClient public func simple(_  p: UnsafeMutableRawBufferPointer)
 // CHECK-NEXT: @_alwaysEmitIntoClient public func swiftAttr(_  p: UnsafeMutableRawBufferPointer)
