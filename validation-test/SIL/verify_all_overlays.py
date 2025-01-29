@@ -5,6 +5,7 @@
 # RUN:       -F %sdk/System/Library/PrivateFrameworks \
 # RUN:       -F "%xcode-extra-frameworks-dir"
 
+# REQUIRES: rdar143050566
 # REQUIRES: long_test
 # REQUIRES: nonexecutable_test
 
