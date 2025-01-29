@@ -2757,6 +2757,7 @@ static bool deferMatchesEnclosingAccess(const FuncDecl *defer) {
         switch (isolation) {
           case ActorIsolation::Unspecified:
           case ActorIsolation::NonisolatedUnsafe:
+          case ActorIsolation::ConcurrentUnsafe:
             break;
 
           case ActorIsolation::GlobalActor:
@@ -2768,6 +2769,7 @@ static bool deferMatchesEnclosingAccess(const FuncDecl *defer) {
           case ActorIsolation::CallerIsolationInheriting:
           case ActorIsolation::ActorInstance:
           case ActorIsolation::Nonisolated:
+          case ActorIsolation::Concurrent:
           case ActorIsolation::Erased: // really can't happen
             return true;
         }
@@ -11458,6 +11460,8 @@ bool VarDecl::isSelfParamCaptureIsolated() const {
       case ActorIsolation::Unspecified:
       case ActorIsolation::Nonisolated:
       case ActorIsolation::NonisolatedUnsafe:
+      case ActorIsolation::Concurrent:
+      case ActorIsolation::ConcurrentUnsafe:
       case ActorIsolation::GlobalActor:
       case ActorIsolation::Erased:
       case ActorIsolation::CallerIsolationInheriting:

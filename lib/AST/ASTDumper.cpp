@@ -3844,10 +3844,15 @@ public:
     switch (auto isolation = E->getActorIsolation()) {
     case ActorIsolation::Unspecified:
     case ActorIsolation::NonisolatedUnsafe:
+    case ActorIsolation::ConcurrentUnsafe:
       break;
 
     case ActorIsolation::Nonisolated:
       printFlag(true, "nonisolated", CapturesColor);
+      break;
+
+    case ActorIsolation::Concurrent:
+      printFlag(true, "concurrent", CapturesColor);
       break;
 
     case ActorIsolation::Erased:

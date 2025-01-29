@@ -39,7 +39,10 @@ ActorIsolation::ActorIsolation(Kind kind, Expr *actor, unsigned parameterIndex)
 
 ActorIsolation::ActorIsolation(Kind kind, Type globalActor)
     : globalActor(globalActor), kind(kind), isolatedByPreconcurrency(false),
-      silParsed(false), parameterIndex(0) {}
+      silParsed(false), parameterIndex(0) {
+  assert((silParsed || globalActor) &&
+         "If we are not sil parsed, global actor must be a real type");
+}
 
 ActorIsolation
 ActorIsolation::forActorInstanceParameter(Expr *actor,
@@ -49,7 +52,7 @@ ActorIsolation::forActorInstanceParameter(Expr *actor,
   // An isolated value of `nil` is statically nonisolated.
   // FIXME: Also allow 'Optional.none'
   if (isa<NilLiteralExpr>(actor))
-    return ActorIsolation::forNonisolated(/*unsafe*/ false);
+    return ActorIsolation::forConcurrent(/*unsafe*/ false);
 
   // An isolated value of `<global actor type>.shared` is statically
   // global actor isolated.
@@ -164,6 +167,8 @@ bool ActorIsolation::isEqual(const ActorIsolation &lhs,
   switch (lhs.getKind()) {
   case Nonisolated:
   case NonisolatedUnsafe:
+  case Concurrent:
+  case ConcurrentUnsafe:
   case Unspecified:
     return true;
 

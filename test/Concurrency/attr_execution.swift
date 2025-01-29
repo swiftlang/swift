@@ -5,7 +5,7 @@
 
 
 // CHECK-LABEL: // concurrentTest()
-// CHECK: // Isolation: nonisolated
+// CHECK: // Isolation: concurrent
 // CHECK: sil hidden [ossa] @$s14attr_execution14concurrentTestyyYaF : $@convention(thin) @async () -> () {
 @execution(concurrent)
 func concurrentTest() async {}

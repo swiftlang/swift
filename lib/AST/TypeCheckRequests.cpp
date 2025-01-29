@@ -1860,6 +1860,8 @@ bool ActorIsolation::requiresSubstitution() const {
   case ActorInstance:
   case Nonisolated:
   case NonisolatedUnsafe:
+  case Concurrent:
+  case ConcurrentUnsafe:
   case Unspecified:
     return false;
 
@@ -1875,6 +1877,8 @@ ActorIsolation ActorIsolation::subst(SubstitutionMap subs) const {
   case CallerIsolationInheriting:
   case Nonisolated:
   case NonisolatedUnsafe:
+  case Concurrent:
+  case ConcurrentUnsafe:
   case Unspecified:
     return *this;
 
@@ -1912,11 +1916,13 @@ void ActorIsolation::printForDiagnostics(llvm::raw_ostream &os,
     os << "@isolated(any)";
     break;
 
+  case ActorIsolation::Concurrent:
+  case ActorIsolation::ConcurrentUnsafe:
   case ActorIsolation::Nonisolated:
   case ActorIsolation::NonisolatedUnsafe:
   case ActorIsolation::Unspecified:
     os << "nonisolated";
-    if (*this == ActorIsolation::NonisolatedUnsafe) {
+    if (isUnsafe()) {
       os << "(unsafe)";
     }
     break;
@@ -1942,6 +1948,12 @@ void ActorIsolation::print(llvm::raw_ostream &os) const {
     return;
   case NonisolatedUnsafe:
     os << "nonisolated_unsafe";
+    return;
+  case Concurrent:
+    os << "concurrent";
+    return;
+  case ConcurrentUnsafe:
+    os << "concurrent_unsafe";
     return;
   case GlobalActor:
     os << "global_actor. type: " << getGlobalActor();
@@ -1969,6 +1981,12 @@ void ActorIsolation::printForSIL(llvm::raw_ostream &os) const {
     return;
   case NonisolatedUnsafe:
     os << "nonisolated_unsafe";
+    return;
+  case Concurrent:
+    os << "concurrent";
+    return;
+  case ConcurrentUnsafe:
+    os << "concurrent_unsafe";
     return;
   case GlobalActor:
     os << "global_actor";
@@ -2015,8 +2033,10 @@ void swift::simple_display(
 
     case ActorIsolation::Nonisolated:
     case ActorIsolation::NonisolatedUnsafe:
+    case ActorIsolation::Concurrent:
+    case ActorIsolation::ConcurrentUnsafe:
       out << "nonisolated";
-      if (state == ActorIsolation::NonisolatedUnsafe) {
+      if (state.isUnsafe()) {
         out << "(unsafe)";
       }
       break;

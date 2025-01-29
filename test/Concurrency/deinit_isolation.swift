@@ -27,7 +27,7 @@ func isolatedFunc() {}  // expected-note 15{{calls to global function 'isolatedF
 // CHECK-SYMB-NOT: BaseWithNonisolatedDeinit.__isolated_deallocating_deinit
 // CHECK-SYMB-NOT: @$s16deinit_isolation25BaseWithNonisolatedDeinitCfZ
 // CHECK-SYMB: // BaseWithNonisolatedDeinit.__deallocating_deinit
-// CHECK-SYMB-NEXT: // Isolation: nonisolated
+// CHECK-SYMB-NEXT: // Isolation: concurrent
 // CHECK-SYMB-NEXT: sil hidden [ossa] @$s16deinit_isolation25BaseWithNonisolatedDeinitCfD : $@convention(method) (@owned BaseWithNonisolatedDeinit) -> () {
 class BaseWithNonisolatedDeinit {}
 
@@ -38,7 +38,7 @@ class BaseWithNonisolatedDeinit {}
 // CHECK-SYMB-NEXT: // Isolation: global_actor. type: FirstActor
 // CHECK-SYMB-NEXT: sil hidden [ossa] @$s16deinit_isolation34BaseWithDeinitIsolatedOnFirstActorCfZ : $@convention(thin) (@owned BaseWithDeinitIsolatedOnFirstActor) -> () {
 // CHECK-SYMB: BaseWithDeinitIsolatedOnFirstActor.__deallocating_deinit
-// CHECK-SYMB-NEXT: // Isolation: nonisolated
+// CHECK-SYMB-NEXT: // Isolation: concurrent
 // CHECK-SYMB-NEXT: sil hidden [ossa] @$s16deinit_isolation34BaseWithDeinitIsolatedOnFirstActorCfD : $@convention(method) (@owned BaseWithDeinitIsolatedOnFirstActor) -> () {
 class BaseWithDeinitIsolatedOnFirstActor {
     @FirstActor deinit {} // expected-note 3{{overridden declaration is here}}
@@ -57,7 +57,7 @@ class BaseIsolatedOnSecondActor {}
 // CHECK-SYMB-NEXT: // Isolation: global_actor. type: SecondActor
 // CHECK-SYMB-NEXT: sil hidden [ossa] @$s16deinit_isolation35BaseWithDeinitIsolatedOnSecondActorCfZ : $@convention(thin) (@owned BaseWithDeinitIsolatedOnSecondActor) -> () {
 // CHECK-SYMB: BaseWithDeinitIsolatedOnSecondActor.__deallocating_deinit
-// CHECK-SYMB-NEXT: // Isolation: nonisolated
+// CHECK-SYMB-NEXT: // Isolation: concurrent
 // CHECK-SYMB-NEXT: sil hidden [ossa] @$s16deinit_isolation35BaseWithDeinitIsolatedOnSecondActorCfD : $@convention(method) (@owned BaseWithDeinitIsolatedOnSecondActor) -> () {
 class BaseWithDeinitIsolatedOnSecondActor {
     @SecondActor deinit {} // expected-note 3{{overridden declaration is here}}
@@ -71,7 +71,7 @@ class BaseWithDeinitIsolatedOnSecondActor {
 // CHECK-SYMB-NOT: ImplicitDeinitActor.__isolated_deallocating_deinit
 // CHECK-SYMB-NOT: @$s16deinit_isolation19ImplicitDeinitActorCfZ
 // CHECK-SYMB: // ImplicitDeinitActor.__deallocating_deinit
-// CHECK-SYMB-NEXT: // Isolation: nonisolated
+// CHECK-SYMB-NEXT: // Isolation: concurrent
 // CHECK-SYMB-NEXT: sil hidden [ossa] @$s16deinit_isolation19ImplicitDeinitActorCfD : $@convention(method) (@owned ImplicitDeinitActor) -> () {
 actor ImplicitDeinitActor {
     // nonisolated deinit
@@ -83,7 +83,7 @@ actor ImplicitDeinitActor {
 // CHECK-SYMB-NOT: DefaultDeinitActor.__isolated_deallocating_deinit
 // CHECK-SYMB-NOT: @$s16deinit_isolation18DefaultDeinitActorCfZ
 // CHECK-SYMB: // DefaultDeinitActor.__deallocating_deinit
-// CHECK-SYMB-NEXT: // Isolation: nonisolated
+// CHECK-SYMB-NEXT: // Isolation: concurrent
 // CHECK-SYMB-NEXT: sil hidden [ossa] @$s16deinit_isolation18DefaultDeinitActorCfD : $@convention(method) (@owned DefaultDeinitActor) -> () {
 actor DefaultDeinitActor {
     // self-isolated deinit
@@ -101,7 +101,7 @@ actor DefaultDeinitActor {
 // CHECK-SYMB-NEXT: // Isolation: actor_instance. name: 'self'
 // CHECK-SYMB-NEXT: sil hidden [ossa] @$s16deinit_isolation21PropagatedDeinitActorCfZ : $@convention(thin) (@owned PropagatedDeinitActor) -> () {
 // CHECK-SYMB: // PropagatedDeinitActor.__deallocating_deinit
-// CHECK-SYMB-NEXT: // Isolation: nonisolated
+// CHECK-SYMB-NEXT: // Isolation: concurrent
 // CHECK-SYMB-NEXT: sil hidden [ossa] @$s16deinit_isolation21PropagatedDeinitActorCfD : $@convention(method) (@owned PropagatedDeinitActor) -> () {
 actor PropagatedDeinitActor {
     // self-isolated deinit
@@ -118,7 +118,7 @@ actor PropagatedDeinitActor {
 // CHECK-SYMB-NOT: NonisolatedDeinitActor.__isolated_deallocating_deinit
 // CHECK-SYMB-NOT: @$s16deinit_isolation22NonisolatedDeinitActorCfZ
 // CHECK-SYMB: // NonisolatedDeinitActor.__deallocating_deinit
-// CHECK-SYMB-NEXT: // Isolation: nonisolated
+// CHECK-SYMB-NEXT: // Isolation: concurrent
 // CHECK-SYMB-NEXT: sil hidden [ossa] @$s16deinit_isolation22NonisolatedDeinitActorCfD : $@convention(method) (@owned NonisolatedDeinitActor) -> () {
 actor NonisolatedDeinitActor {
     // nonisolated deinit
@@ -136,7 +136,7 @@ actor NonisolatedDeinitActor {
 // CHECK-SYMB-NEXT: // Isolation: global_actor. type: FirstActor
 // CHECK-SYMB-NEXT: sil hidden [ossa] @$s16deinit_isolation19IsolatedDeinitActorCfZ : $@convention(thin) (@owned IsolatedDeinitActor) -> () {
 // CHECK-SYMB: // IsolatedDeinitActor.__deallocating_deinit
-// CHECK-SYMB-NEXT: // Isolation: nonisolated
+// CHECK-SYMB-NEXT: // Isolation: concurrent
 // CHECK-SYMB-NEXT: sil hidden [ossa] @$s16deinit_isolation19IsolatedDeinitActorCfD : $@convention(method) (@owned IsolatedDeinitActor) -> () {
 actor IsolatedDeinitActor {
     // FirstActor-isolated deinit
@@ -154,7 +154,7 @@ actor IsolatedDeinitActor {
 // CHECK-SYMB-NOT: ImplicitDeinit.__isolated_deallocating_deinit
 // CHECK-SYMB-NOT: @$s16deinit_isolation14ImplicitDeinitCfZ
 // CHECK-SYMB: // ImplicitDeinit.__deallocating_deinit
-// CHECK-SYMB-NEXT: // Isolation: nonisolated
+// CHECK-SYMB-NEXT: // Isolation: concurrent
 // CHECK-SYMB-NEXT: sil hidden [ossa] @$s16deinit_isolation14ImplicitDeinitCfD : $@convention(method) (@owned ImplicitDeinit) -> () {
 @FirstActor
 class ImplicitDeinit {
@@ -167,7 +167,7 @@ class ImplicitDeinit {
 // CHECK-SYMB-NOT: DefaultDeinit.__isolated_deallocating_deinit
 // CHECK-SYMB-NOT: @$s16deinit_isolation13DefaultDeinitCfZ
 // CHECK-SYMB: // DefaultDeinit.__deallocating_deinit
-// CHECK-SYMB-NEXT: // Isolation: nonisolated
+// CHECK-SYMB-NEXT: // Isolation: concurrent
 // CHECK-SYMB-NEXT: sil hidden [ossa] @$s16deinit_isolation13DefaultDeinitCfD : $@convention(method) (@owned DefaultDeinit) -> () {
 @FirstActor
 class DefaultDeinit {
@@ -185,7 +185,7 @@ class DefaultDeinit {
 // CHECK-SYMB-NEXT: // Isolation: global_actor. type: FirstActor
 // CHECK-SYMB-NEXT: sil hidden [ossa] @$s16deinit_isolation16PropagatedDeinitCfZ : $@convention(thin) (@owned PropagatedDeinit) -> () {
 // CHECK-SYMB: // PropagatedDeinit.__deallocating_deinit
-// CHECK-SYMB-NEXT: // Isolation: nonisolated
+// CHECK-SYMB-NEXT: // Isolation: concurrent
 // CHECK-SYMB-NEXT: sil hidden [ossa] @$s16deinit_isolation16PropagatedDeinitCfD : $@convention(method) (@owned PropagatedDeinit) -> () {
 @FirstActor
 class PropagatedDeinit {
@@ -207,7 +207,7 @@ class BadPropagatedDeinit {
 // CHECK-SYMB-NOT: NonisolatedDeinit.__isolated_deallocating_deinit
 // CHECK-SYMB-NOT: @$s16deinit_isolation17NonisolatedDeinitCfZ
 // CHECK-SYMB: // NonisolatedDeinit.__deallocating_deinit
-// CHECK-SYMB-NEXT: // Isolation: nonisolated
+// CHECK-SYMB-NEXT: // Isolation: concurrent
 // CHECK-SYMB-NEXT: sil hidden [ossa] @$s16deinit_isolation17NonisolatedDeinitCfD : $@convention(method) (@owned NonisolatedDeinit) -> () {
 @FirstActor
 class NonisolatedDeinit {
@@ -226,7 +226,7 @@ class NonisolatedDeinit {
 // CHECK-SYMB-NEXT: // Isolation: global_actor. type: FirstActor
 // CHECK-SYMB-NEXT: sil hidden [ossa] @$s16deinit_isolation14IsolatedDeinitCfZ : $@convention(thin) (@owned IsolatedDeinit) -> () {
 // CHECK-SYMB: // IsolatedDeinit.__deallocating_deinit
-// CHECK-SYMB-NEXT: // Isolation: nonisolated
+// CHECK-SYMB-NEXT: // Isolation: concurrent
 // CHECK-SYMB-NEXT: sil hidden [ossa] @$s16deinit_isolation14IsolatedDeinitCfD : $@convention(method) (@owned IsolatedDeinit) -> () {
 class IsolatedDeinit {
     // FirstActor-isolated deinit
@@ -242,7 +242,7 @@ class IsolatedDeinit {
 // CHECK-SYMB-NEXT: // Isolation: global_actor. type: SecondActor
 // CHECK-SYMB-NEXT: sil hidden [ossa] @$s16deinit_isolation23DifferentIsolatedDeinitCfZ : $@convention(thin) (@owned DifferentIsolatedDeinit) -> () {
 // CHECK-SYMB: // DifferentIsolatedDeinit.__deallocating_deinit
-// CHECK-SYMB-NEXT: // Isolation: nonisolated
+// CHECK-SYMB-NEXT: // Isolation: concurrent
 // CHECK-SYMB-NEXT: sil hidden [ossa] @$s16deinit_isolation23DifferentIsolatedDeinitCfD : $@convention(method) (@owned DifferentIsolatedDeinit) -> () {
 @FirstActor
 class DifferentIsolatedDeinit {
@@ -262,7 +262,7 @@ class DifferentIsolatedDeinit {
 // CHECK-SYMB-NOT: ImplicitDeinitInheritNonisolated.__isolated_deallocating_deinit
 // CHECK-SYMB-NOT: @$s16deinit_isolation32ImplicitDeinitInheritNonisolatedCfZ
 // CHECK-SYMB: // ImplicitDeinitInheritNonisolated.__deallocating_deinit
-// CHECK-SYMB-NEXT: // Isolation: nonisolated
+// CHECK-SYMB-NEXT: // Isolation: concurrent
 // CHECK-SYMB-NEXT: sil hidden [ossa] @$s16deinit_isolation32ImplicitDeinitInheritNonisolatedCfD : $@convention(method) (@owned ImplicitDeinitInheritNonisolated) -> () {
 @FirstActor
 class ImplicitDeinitInheritNonisolated: BaseWithNonisolatedDeinit {
@@ -275,7 +275,7 @@ class ImplicitDeinitInheritNonisolated: BaseWithNonisolatedDeinit {
 // CHECK-SYMB-NOT: // DefaultDeinitInheritNonisolated.__isolated_deallocating_deinit
 // CHECK-SYMB-NOT: sil hidden [ossa] @$s16deinit_isolation31DefaultDeinitInheritNonisolatedCfZ : $@convention(thin) (@owned DefaultDeinitInheritNonisolated) -> () {
 // CHECK-SYMB: // DefaultDeinitInheritNonisolated.__deallocating_deinit
-// CHECK-SYMB-NEXT: // Isolation: nonisolated
+// CHECK-SYMB-NEXT: // Isolation: concurrent
 // CHECK-SYMB-NEXT: sil hidden [ossa] @$s16deinit_isolation31DefaultDeinitInheritNonisolatedCfD : $@convention(method) (@owned DefaultDeinitInheritNonisolated) -> () {
 @FirstActor
 class DefaultDeinitInheritNonisolated: BaseWithNonisolatedDeinit {
@@ -300,7 +300,7 @@ class BadPropagatedDeinitInheritNonisolated: BaseWithNonisolatedDeinit {
 // CHECK-SYMB-NEXT: // Isolation: global_actor. type: FirstActor
 // CHECK-SYMB-NEXT: sil hidden [ossa] @$s16deinit_isolation34PropagatedDeinitInheritNonisolatedCfZ : $@convention(thin) (@owned PropagatedDeinitInheritNonisolated) -> () {
 // CHECK-SYMB: // PropagatedDeinitInheritNonisolated.__deallocating_deinit
-// CHECK-SYMB-NEXT: // Isolation: nonisolated
+// CHECK-SYMB-NEXT: // Isolation: concurrent
 // CHECK-SYMB-NEXT: sil hidden [ossa] @$s16deinit_isolation34PropagatedDeinitInheritNonisolatedCfD : $@convention(method) (@owned PropagatedDeinitInheritNonisolated) -> () {
 @FirstActor
 class PropagatedDeinitInheritNonisolated: BaseWithNonisolatedDeinit {
@@ -316,7 +316,7 @@ class PropagatedDeinitInheritNonisolated: BaseWithNonisolatedDeinit {
 // CHECK-SYMB-NOT: NonisolatedDeinitInheritNonisolated.__isolated_deallocating_deinit
 // CHECK-SYMB-NOT: @$s16deinit_isolation024NonisolatedDeinitInheritC0CfZ
 // CHECK-SYMB: // NonisolatedDeinitInheritNonisolated.__deallocating_deinit
-// CHECK-SYMB-NEXT: // Isolation: nonisolated
+// CHECK-SYMB-NEXT: // Isolation: concurrent
 // CHECK-SYMB-NEXT: sil hidden [ossa] @$s16deinit_isolation024NonisolatedDeinitInheritC0CfD : $@convention(method) (@owned NonisolatedDeinitInheritNonisolated) -> () {
 @FirstActor
 class NonisolatedDeinitInheritNonisolated: BaseWithNonisolatedDeinit {
@@ -335,7 +335,7 @@ class NonisolatedDeinitInheritNonisolated: BaseWithNonisolatedDeinit {
 // CHECK-SYMB-NEXT: // Isolation: global_actor. type: FirstActor
 // CHECK-SYMB-NEXT: sil hidden [ossa] @$s16deinit_isolation32IsolatedDeinitInheritNonisolatedCfZ : $@convention(thin) (@owned IsolatedDeinitInheritNonisolated) -> () {
 // CHECK-SYMB: // IsolatedDeinitInheritNonisolated.__deallocating_deinit
-// CHECK-SYMB-NEXT: // Isolation: nonisolated
+// CHECK-SYMB-NEXT: // Isolation: concurrent
 // CHECK-SYMB-NEXT: sil hidden [ossa] @$s16deinit_isolation32IsolatedDeinitInheritNonisolatedCfD : $@convention(method) (@owned IsolatedDeinitInheritNonisolated) -> () {
 class IsolatedDeinitInheritNonisolated: BaseWithNonisolatedDeinit {
     // FirstActor-isolated deinit
@@ -351,7 +351,7 @@ class IsolatedDeinitInheritNonisolated: BaseWithNonisolatedDeinit {
 // CHECK-SYMB-NEXT: // Isolation: global_actor. type: SecondActor
 // CHECK-SYMB-NEXT: sil hidden [ossa] @$s16deinit_isolation41DifferentIsolatedDeinitInheritNonisolatedCfZ : $@convention(thin) (@owned DifferentIsolatedDeinitInheritNonisolated) -> () {
 // CHECK-SYMB: // DifferentIsolatedDeinitInheritNonisolated.__deallocating_deinit
-// CHECK-SYMB-NEXT: // Isolation: nonisolated
+// CHECK-SYMB-NEXT: // Isolation: concurrent
 // CHECK-SYMB-NEXT: sil hidden [ossa] @$s16deinit_isolation41DifferentIsolatedDeinitInheritNonisolatedCfD : $@convention(method) (@owned DifferentIsolatedDeinitInheritNonisolated) -> () {
 @FirstActor
 class DifferentIsolatedDeinitInheritNonisolated: BaseWithNonisolatedDeinit {
@@ -372,7 +372,7 @@ class DifferentIsolatedDeinitInheritNonisolated: BaseWithNonisolatedDeinit {
 // CHECK-SYMB-NEXT: // Isolation: global_actor. type: FirstActor
 // CHECK-SYMB-NEXT: sil hidden [ossa] @$s16deinit_isolation30ImplicitDeinitInheritIsolated1CfZ : $@convention(thin) (@owned ImplicitDeinitInheritIsolated1) -> () {
 // CHECK-SYMB: // ImplicitDeinitInheritIsolated1.__deallocating_deinit
-// CHECK-SYMB-NEXT: // Isolation: nonisolated
+// CHECK-SYMB-NEXT: // Isolation: concurrent
 // CHECK-SYMB-NEXT: sil hidden [ossa] @$s16deinit_isolation30ImplicitDeinitInheritIsolated1CfD : $@convention(method) (@owned ImplicitDeinitInheritIsolated1) -> () {
 @FirstActor
 class ImplicitDeinitInheritIsolated1: BaseWithDeinitIsolatedOnFirstActor {
@@ -404,7 +404,7 @@ class BadPropagatedDeinitIsolated: BaseWithDeinitIsolatedOnFirstActor {
 // CHECK-SYMB-NEXT: // Isolation: global_actor. type: FirstActor
 // CHECK-SYMB-NEXT: sil hidden [ossa] @$s16deinit_isolation29GoodPropagatedDeinitIsolated1CfZ : $@convention(thin) (@owned GoodPropagatedDeinitIsolated1) -> () {
 // CHECK-SYMB: // GoodPropagatedDeinitIsolated1.__deallocating_deinit
-// CHECK-SYMB-NEXT: // Isolation: nonisolated
+// CHECK-SYMB-NEXT: // Isolation: concurrent
 // CHECK-SYMB-NEXT: sil hidden [ossa] @$s16deinit_isolation29GoodPropagatedDeinitIsolated1CfD : $@convention(method) (@owned GoodPropagatedDeinitIsolated1) -> () {
 class GoodPropagatedDeinitIsolated1: BaseIsolatedOnFirstActor {
     isolated deinit {
@@ -419,7 +419,7 @@ class GoodPropagatedDeinitIsolated1: BaseIsolatedOnFirstActor {
 // CHECK-SYMB-NEXT: // Isolation: global_actor. type: FirstActor
 // CHECK-SYMB-NEXT: sil hidden [ossa] @$s16deinit_isolation25PropagatedDeinitIsolated1CfZ : $@convention(thin) (@owned PropagatedDeinitIsolated1) -> () {
 // CHECK-SYMB: // PropagatedDeinitIsolated1.__deallocating_deinit
-// CHECK-SYMB-NEXT: // Isolation: nonisolated
+// CHECK-SYMB-NEXT: // Isolation: concurrent
 // CHECK-SYMB-NEXT: sil hidden [ossa]  @$s16deinit_isolation25PropagatedDeinitIsolated1CfD : $@convention(method) (@owned PropagatedDeinitIsolated1) -> () {
 @FirstActor
 class PropagatedDeinitIsolated1: BaseWithDeinitIsolatedOnFirstActor {
@@ -446,7 +446,7 @@ class NonisolatedDeinitIsolated1: BaseWithDeinitIsolatedOnFirstActor {
 // CHECK-SYMB-NEXT: // Isolation: global_actor. type: FirstActor
 // CHECK-SYMB-NEXT: sil hidden [ossa] @$s16deinit_isolation23IsolatedDeinitIsolated1CfZ : $@convention(thin) (@owned IsolatedDeinitIsolated1) -> () {
 // CHECK-SYMB: // IsolatedDeinitIsolated1.__deallocating_deinit
-// CHECK-SYMB-NEXT: // Isolation: nonisolated
+// CHECK-SYMB-NEXT: // Isolation: concurrent
 // CHECK-SYMB-NEXT: sil hidden [ossa] @$s16deinit_isolation23IsolatedDeinitIsolated1CfD : $@convention(method) (@owned IsolatedDeinitIsolated1) -> () {
 class IsolatedDeinitIsolated1: BaseWithDeinitIsolatedOnFirstActor {
     // FirstActor-isolated deinit
@@ -474,7 +474,7 @@ class DifferentIsolatedDeinitIsolated1: BaseWithDeinitIsolatedOnFirstActor {
 // CHECK-SYMB-NEXT: // Isolation: global_actor. type: SecondActor
 // CHECK-SYMB-NEXT: sil hidden [ossa] @$s16deinit_isolation30ImplicitDeinitInheritIsolated2CfZ : $@convention(thin) (@owned ImplicitDeinitInheritIsolated2) -> () {
 // CHECK-SYMB: // ImplicitDeinitInheritIsolated2.__deallocating_deinit
-// CHECK-SYMB-NEXT: // Isolation: nonisolated
+// CHECK-SYMB-NEXT: // Isolation: concurrent
 // CHECK-SYMB-NEXT: sil hidden [ossa] @$s16deinit_isolation30ImplicitDeinitInheritIsolated2CfD : $@convention(method) (@owned ImplicitDeinitInheritIsolated2) -> () {
 @FirstActor
 class ImplicitDeinitInheritIsolated2: BaseWithDeinitIsolatedOnSecondActor {
@@ -488,7 +488,7 @@ class ImplicitDeinitInheritIsolated2: BaseWithDeinitIsolatedOnSecondActor {
 // CHECK-SYMB-NEXT: // Isolation: global_actor. type: SecondActor
 // CHECK-SYMB-NEXT: sil hidden [ossa] @$s16deinit_isolation29GoodPropagatedDeinitIsolated2CfZ : $@convention(thin) (@owned GoodPropagatedDeinitIsolated2) -> () {
 // CHECK-SYMB: // GoodPropagatedDeinitIsolated2.__deallocating_deinit
-// CHECK-SYMB-NEXT: // Isolation: nonisolated
+// CHECK-SYMB-NEXT: // Isolation: concurrent
 // CHECK-SYMB-NEXT: sil hidden [ossa] @$s16deinit_isolation29GoodPropagatedDeinitIsolated2CfD : $@convention(method) (@owned GoodPropagatedDeinitIsolated2) -> () {
 class GoodPropagatedDeinitIsolated2: BaseIsolatedOnSecondActor {
     isolated deinit {
@@ -534,7 +534,7 @@ class IsolatedDeinitIsolated2: BaseWithDeinitIsolatedOnSecondActor {
 // CHECK-SYMB-NEXT: // Isolation: global_actor. type: SecondActor
 // CHECK-SYMB-NEXT: sil hidden [ossa] @$s16deinit_isolation32DifferentIsolatedDeinitIsolated2CfZ : $@convention(thin) (@owned DifferentIsolatedDeinitIsolated2) -> () {
 // CHECK-SYMB: // DifferentIsolatedDeinitIsolated2.__deallocating_deinit
-// CHECK-SYMB-NEXT: // Isolation: nonisolated
+// CHECK-SYMB-NEXT: // Isolation: concurrent
 // CHECK-SYMB-NEXT: sil hidden [ossa] @$s16deinit_isolation32DifferentIsolatedDeinitIsolated2CfD : $@convention(method) (@owned DifferentIsolatedDeinitIsolated2) -> () {
 @FirstActor
 class DifferentIsolatedDeinitIsolated2: BaseWithDeinitIsolatedOnSecondActor {
