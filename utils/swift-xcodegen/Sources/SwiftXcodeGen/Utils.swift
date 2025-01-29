@@ -78,7 +78,7 @@ extension String {
       let result = scanner.consumeWhole { consumer in
         switch consumer.peek {
         case "\\", "\"":
-          consumer.append(Byte(ascii: "\\"))
+          consumer.append("\\")
         case " ", "$": // $ is potentially a variable reference
           needsQuotes = true
         default:
