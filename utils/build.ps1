@@ -1868,6 +1868,56 @@ function Build-Dispatch([Platform]$Platform, $Arch, [switch]$Test = $false) {
     }
 }
 
+function Build-CMake([Platform]$Platform, $Arch) {
+  if (-not(Test-Path $SourceCache\libarchive)) {
+    Invoke-Program git clone "https://github.com/libarchive/libarchive" $SourceCache\libarchive
+  }
+  Build-CMakeProject `
+    -Src $SourceCache\libarchive `
+    -Bin "$($Arch.BinaryCache)\$Platform\libarchive" `
+    -Arch $Arch `
+    -Platform $Platform `
+    -UseBuiltCompilers C,CXX `
+    -BuildTargets "archive"
+
+  if (-not(Test-Path $SourceCache\libuv)) {
+    Invoke-Program git clone "https://github.com/libuv/libuv" $SourceCache\libuv
+  }
+  Build-CMakeProject `
+    -Src $SourceCache\libuv `
+    -Bin "$($Arch.BinaryCache)\$Platform\libuv" `
+    -Arch $Arch `
+    -Platform $Platform `
+    -UseBuiltCompilers C,CXX `
+    -BuildTargets "uv"
+
+  $ShortArch = $Arch.LLVMName
+  $LibSuffix = $(if ($Platform -eq "Windows") { "lib" } else { "a" })
+  $EnableCxxExceptions = $(if ($Platform -eq "Windows") { "/EHsc" } else { "-fcxxexceptions" })
+  Build-CMakeProject `
+    -Src $SourceCache\cmake `
+    -Bin "$($Arch.BinaryCache)\$Platform\cmake" `
+    -Arch $Arch `
+    -Platform $Platform `
+    -UseBuiltCompilers C,CXX `
+    -BuildTargets cmake,ctest `
+    -Defines (@{
+      CMAKE_CXX_FLAGS = "$EnableCxxExceptions";
+      CMAKE_USE_SYSTEM_LIBUV = "YES";
+      CMAKE_USE_SYSTEM_LIBARCHIVE = "YES";
+      LibArchive_INCLUDE_DIR = "$SourceCache\libarchive\libarchive";
+      LibArchive_LIBRARY = "$($Arch.BinaryCache)\$Platform\libarchive\libarchive\archive.$LibSuffix";
+      LibUV_INCLUDE_DIR = "$SourceCache\libuv\include";
+      LibUV_LIBRARY = "$($Arch.BinaryCache)\$Platform\libuv\uv.$LibSuffix";
+      ZLIB_INCLUDE_DIR = "$LibraryRoot\zlib-1.3.1\usr\include";
+      ZLIB_LIBRARY = if ($Platform -eq "Windows") {
+        "$LibraryRoot\zlib-1.3.1\usr\lib\$Platform\$ShortArch\zlibstatic.lib"
+      } else {
+        "$LibraryRoot\zlib-1.3.1\usr\lib\$Platform\$ShortArch\libz.a"
+      };
+    })
+}
+
 function Build-Foundation([Platform]$Platform, $Arch, [switch]$Test = $false) {
   if ($Test) {
     # Foundation tests build via swiftpm rather than CMake
@@ -2725,6 +2775,10 @@ function Test-PackageManager() {
   }
 }
 
+function Test-Dispatch([Platform]$Platform, $Arch) {
+  # ...
+}
+
 function Build-Installer($Arch) {
   # TODO(hjyamauchi) Re-enable the swift-inspect and swift-docc builds
   # when cross-compiling https://github.com/apple/swift/issues/71655
@@ -2787,6 +2841,8 @@ if (-not $SkipBuild) {
   }
 
   Invoke-BuildStep Build-CMark $BuildArch
+  Invoke-BuildStep Build-ZLib Windows $BuildArch
+  Invoke-BuildStep Build-CMake Windows $BuildArch
   Invoke-BuildStep Build-BuildTools $BuildArch
   if ($IsCrossCompiling) {
     Invoke-BuildStep Build-XML2 Windows $BuildArch
@@ -2923,6 +2979,9 @@ if (-not $IsCrossCompiling) {
 
   if ($Test -contains "dispatch") {
     Build-Dispatch Windows $HostArch -Test
+    # Example invocation
+    Invoke-BuildStep Build-CMake Android $AndroidX64
+    Test-Dispatch Android $AndroidX64
   }
   if ($Test -contains "foundation") {
     Build-Foundation Windows $HostArch -Test
