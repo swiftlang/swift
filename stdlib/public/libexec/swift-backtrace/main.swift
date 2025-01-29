@@ -563,8 +563,10 @@ Generate a backtrace for the parent process.
 
           var fd = open(filename, O_RDWR|O_CREAT|O_EXCL, 0o644)
           var ndx = 1
-          while fd < 0 && errno == EEXIST {
-            ndx += 1
+          while fd < 0 && (errno == EEXIST || errno == EINTR) {
+            if errno != EINTR {
+              ndx += 1
+            }
             filename = "\(args.outputPath)/\(name)-\(pid)-\(now.tv_sec).\(now.tv_nsec)-\(ndx).log"
             fd = open(filename, O_RDWR|O_CREAT|O_EXCL, 0o644)
           }
