@@ -102,11 +102,6 @@ in batch file format instead of executing them.
 .PARAMETER HostArchName
 The architecture where the toolchain will execute.
 
-.PARAMETER Allocator
-The memory allocator used in the toolchain binaries, if it's
-`mimalloc`, it uses mimalloc. Otherwise, it uses the default
-allocator.
-
 .EXAMPLE
 PS> .\Build.ps1
 
@@ -144,7 +139,6 @@ param(
   [switch] $DebugInfo,
   [switch] $EnableCaching,
   [string] $Cache = "",
-  [string] $Allocator = "",
   [switch] $Summary,
   [switch] $ToBatch
 )
@@ -1685,7 +1679,7 @@ function Build-Compilers() {
 }
 
 # Reference: https://github.com/microsoft/mimalloc/tree/dev/bin#minject
-function Build-Mimalloc() {
+function Build-mimalloc() {
   [CmdletBinding(PositionalBinding = $false)]
   param
   (
@@ -1693,36 +1687,48 @@ function Build-Mimalloc() {
     [hashtable]$Arch
   )
 
-  $MSBuildArgs = @("$SourceCache\mimalloc\ide\vs2022\mimalloc.sln")
+  # TODO: migrate to the CMake build
+  $MSBuildArgs = @()
   $MSBuildArgs += "-noLogo"
   $MSBuildArgs += "-maxCpuCount"
-  $MSBuildArgs += "-p:Configuration=Release"
-  $MSBuildArgs += "-p:Platform=$($Arch.ShortName)"
+
+  $Properties = @{}
+  TryAdd-KeyValue $Properties Configuration Release
+  TryAdd-KeyValue $Properties OutDir "$($Arch.BinaryCache)\mimalloc\bin\"
+  TryAdd-KeyValue $Properties Platform "$($Arch.ShortName)"
 
   Isolate-EnvVars {
     Invoke-VsDevShell $Arch
     # Avoid hard-coding the VC tools version number
     $VCRedistDir = (Get-ChildItem "${env:VCToolsRedistDir}\$($HostArch.ShortName)" -Filter "Microsoft.VC*.CRT").FullName
     if ($VCRedistDir) {
-      $MSBuildArgs += "-p:VCRedistDir=$VCRedistDir\"
+      TryAdd-KeyValue $Properties VCRedistDir "$VCRedistDir\"
     }
   }
 
-  Invoke-Program $msbuild @MSBuildArgs
+  foreach ($Property in $Properties.GetEnumerator()) {
+    if ($Property.Value.Contains(" ")) {
+      $MSBuildArgs += "-p:$($Property.Key)=$($Property.Value.Replace('\', '\\'))"
+    } else {
+      $MSBuildArgs += "-p:$($Property.Key)=$($Property.Value)"
+    }
+  }
+
+  Invoke-Program $msbuild "$SourceCache\mimalloc\ide\vs2022\mimalloc-lib.vcxproj" @MSBuildArgs "-p:IntDir=$($Arch.BinaryCache)\mimalloc\mimalloc\"
+  Invoke-Program $msbuild "$SourceCache\mimalloc\ide\vs2022\mimalloc-override-dll.vcxproj" @MSBuildArgs "-p:IntDir=$($Arch.BinaryCache)\mimalloc\mimalloc-override-dll\"
 
   $HostSuffix = if ($Arch -eq $ArchX64) { "" } else { "-arm64" }
   $BuildSuffix = if ($BuildArch -eq $ArchX64) { "" } else { "-arm64" }
-  $Products = @( "mimalloc.dll" )
-  foreach ($Product in $Products) {
-    Copy-Item -Path "$SourceCache\mimalloc\out\msvc-$($Arch.ShortName)\Release\$Product" -Destination "$($Arch.ToolchainInstallRoot)\usr\bin"
-  }
-  Copy-Item -Path "$SourceCache\mimalloc\out\msvc-$($Arch.ShortName)\Release\mimalloc-redirect$HostSuffix.dll" -Destination "$($Arch.ToolchainInstallRoot)\usr\bin"
+
+  Copy-Item -Path "$($Arch.BinaryCache)\mimalloc\bin\mimalloc.dll" -Destination "$($Arch.ToolchainInstallRoot)\usr\bin\"
+  Copy-Item -Path "$($Arch.BinaryCache)\mimalloc\bin\mimalloc-redirect$HostSuffix.dll" -Destination "$($Arch.ToolchainInstallRoot)\usr\bin"
   # When cross-compiling, bundle the second mimalloc redirect dll as a workaround for
   # https://github.com/microsoft/mimalloc/issues/997
   if ($IsCrossCompiling) {
-    Copy-Item -Path "$SourceCache\mimalloc\out\msvc-$($Arch.ShortName)\Release\mimalloc-redirect$HostSuffix.dll" -Destination "$($Arch.ToolchainInstallRoot)\usr\bin\mimalloc-redirect$BuildSuffix.dll"
+    Copy-Item -Path "$($Arch.BinaryCache)\mimalloc\bin\mimalloc-redirect$HostSuffix.dll" -Destination "$($Arch.ToolchainInstallRoot)\usr\bin\mimalloc-redirect$BuildSuffix.dll"
   }
 
+  # TODO: should we split this out into its own function?
   $Tools = @(
     "swift.exe",
     "swiftc.exe",
@@ -1739,9 +1745,9 @@ function Build-Mimalloc() {
   foreach ($Tool in $Tools) {
     $Binary = [IO.Path]::Combine("$($Arch.ToolchainInstallRoot)\usr\bin", $Tool)
     # Binary-patch in place
-    Invoke-Program "$SourceCache\mimalloc\bin\minject$BuildSuffix" "-f" "-i" "-v" "$Binary"
+    Start-Process -Wait -WindowStyle Hidden -FilePath "$SourceCache\mimalloc\bin\minject$BuildSuffix" -ArgumentList @("-f", "-i", "-v", "$Binary")
     # Log the import table
-    Invoke-Program "$SourceCache\mimalloc\bin\minject$BuildSuffix" "-l" "$Binary"
+    Start-Process -Wait -WindowStyle Hidden -FilePath "$SourceCache\mimalloc\bin\minject$BuildSuffix" -ArgumentList @("-l", "$Binary")
   }
 }
 
@@ -2927,16 +2933,13 @@ function Build-Installer($Arch) {
   # TODO(hjyamauchi) Re-enable the swift-inspect and swift-docc builds
   # when cross-compiling https://github.com/apple/swift/issues/71655
   $INCLUDE_SWIFT_DOCC = if ($IsCrossCompiling) { "false" } else { "true" }
-  $ENABLE_MIMALLOC = if ($Allocator -eq "mimalloc") { "true" } else { "false" }
-  # When cross-compiling, bundle the second mimalloc redirect dll as a workaround for
-  # https://github.com/microsoft/mimalloc/issues/997
-  $WORKAROUND_MIMALLOC_ISSUE_997 = if ($IsCrossCompiling) { "true" } else { "false" }
 
   $Properties = @{
     BundleFlavor = "offline";
     TOOLCHAIN_ROOT = "$($Arch.ToolchainInstallRoot)\";
-    ENABLE_MIMALLOC = $ENABLE_MIMALLOC;
-    WORKAROUND_MIMALLOC_ISSUE_997 = $WORKAROUND_MIMALLOC_ISSUE_997;
+    # When cross-compiling, bundle the second mimalloc redirect dll as a workaround for
+    # https://github.com/microsoft/mimalloc/issues/997
+    WORKAROUND_MIMALLOC_ISSUE_997 = if ($IsCrossCompiling) { "true" } else { "false" };
     INCLUDE_SWIFT_DOCC = $INCLUDE_SWIFT_DOCC;
     SWIFT_DOCC_BUILD = "$($Arch.BinaryCache)\swift-docc\release";
     SWIFT_DOCC_RENDER_ARTIFACT_ROOT = "${SourceCache}\swift-docc-render-artifact";
@@ -3104,8 +3107,8 @@ if (-not $SkipBuild) {
 
 Install-HostToolchain
 
-if (-not $SkipBuild -and $Allocator -eq "mimalloc") {
-  Invoke-BuildStep Build-Mimalloc $HostArch
+if (-not $SkipBuild) {
+  Invoke-BuildStep Build-mimalloc $HostArch
 }
 
 if (-not $SkipBuild -and -not $IsCrossCompiling) {
