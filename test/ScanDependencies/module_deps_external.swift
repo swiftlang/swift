@@ -71,12 +71,6 @@ import SomeExternalModule
 // CHECK-NEXT:    }
 // CHECK-NEXT:  ]
 
-// CHECK:      "extraPcmArgs": [
-// CHECK-NEXT:    "-Xcc",
-// CHECK-NEXT:    "-target",
-// CHECK-NEXT:    "-Xcc",
-// CHECK:         "-fapinotes-swift-version=4"
-
 /// --------Swift external module SomeExternalModule
 // CHECK-LABEL: "modulePath": "{{.*}}{{/|\\}}SomeExternalModule.swiftmodule",
 // CHECK-NEXT: "details": {

@@ -63,8 +63,6 @@ void swiftscan_dependency_info_details_dispose(
         details_impl->swift_textual_details.swift_overlay_module_dependencies);
     swiftscan_string_set_dispose(
         details_impl->swift_textual_details.command_line);
-    swiftscan_string_set_dispose(
-        details_impl->swift_textual_details.extra_pcm_args);
     swiftscan_string_dispose(details_impl->swift_textual_details.context_hash);
     swiftscan_string_dispose(
         details_impl->swift_textual_details.cas_fs_root_id);
@@ -105,7 +103,6 @@ void swiftscan_dependency_info_details_dispose(
     swiftscan_string_dispose(details_impl->clang_details.module_map_path);
     swiftscan_string_dispose(details_impl->clang_details.context_hash);
     swiftscan_string_set_dispose(details_impl->clang_details.command_line);
-    swiftscan_string_set_dispose(details_impl->clang_details.captured_pcm_args);
     swiftscan_string_dispose(details_impl->clang_details.cas_fs_root_id);
     swiftscan_string_dispose(details_impl->clang_details.module_cache_key);
     break;
@@ -307,11 +304,6 @@ swiftscan_swift_textual_detail_get_bridging_pch_command_line(
   return details->swift_textual_details.bridging_pch_command_line;
 }
 
-swiftscan_string_set_t *swiftscan_swift_textual_detail_get_extra_pcm_args(
-    swiftscan_module_details_t details) {
-  return details->swift_textual_details.extra_pcm_args;
-}
-
 swiftscan_string_ref_t swiftscan_swift_textual_detail_get_context_hash(
     swiftscan_module_details_t details) {
   return details->swift_textual_details.context_hash;
@@ -428,11 +420,6 @@ swiftscan_clang_detail_get_context_hash(swiftscan_module_details_t details) {
 swiftscan_string_set_t *
 swiftscan_clang_detail_get_command_line(swiftscan_module_details_t details) {
   return details->clang_details.command_line;
-}
-
-swiftscan_string_set_t *
-swiftscan_clang_detail_get_captured_pcm_args(swiftscan_module_details_t details) {
-  return details->clang_details.captured_pcm_args;
 }
 
 swiftscan_string_ref_t
@@ -674,3 +661,50 @@ swiftscan_source_location_get_column_number(swiftscan_source_location_t source_l
 int invoke_swift_compiler(int argc, const char **argv) {
   return swift::mainEntry(argc, argv);
 }
+
+//=== Deprecated Function Stubs -----------------------------------------===//
+swiftscan_batch_scan_result_t *
+swiftscan_batch_scan_result_create(swiftscan_scanner_t scanner,
+                                   swiftscan_batch_scan_input_t *batch_input,
+                                   swiftscan_scan_invocation_t invocation) {
+  return nullptr;
+}
+swiftscan_string_set_t *swiftscan_swift_textual_detail_get_extra_pcm_args(
+   swiftscan_module_details_t details) {
+  return nullptr;
+}
+swiftscan_string_set_t *
+swiftscan_clang_detail_get_captured_pcm_args(swiftscan_module_details_t details) {
+  return nullptr;
+}
+swiftscan_batch_scan_input_t *swiftscan_batch_scan_input_create() {
+  return nullptr;
+}
+void swiftscan_batch_scan_input_set_modules(
+   swiftscan_batch_scan_input_t *input, int count,
+   swiftscan_batch_scan_entry_t *modules) {}
+
+swiftscan_batch_scan_entry_t swiftscan_batch_scan_entry_create() {
+  return nullptr;
+}
+void swiftscan_batch_scan_entry_set_module_name(
+   swiftscan_batch_scan_entry_t entry, const char *name) {}
+void swiftscan_batch_scan_entry_set_arguments(
+   swiftscan_batch_scan_entry_t entry, const char *arguments) {}
+void swiftscan_batch_scan_entry_set_is_swift(swiftscan_batch_scan_entry_t entry,
+                                            bool is_swift) {}
+swiftscan_string_ref_t
+swiftscan_batch_scan_entry_get_module_name(swiftscan_batch_scan_entry_t entry) {
+  return swift::c_string_utils::create_null();
+}
+swiftscan_string_ref_t
+swiftscan_batch_scan_entry_get_arguments(swiftscan_batch_scan_entry_t entry) {
+  return swift::c_string_utils::create_null();
+}
+bool swiftscan_batch_scan_entry_get_is_swift(
+   swiftscan_batch_scan_entry_t entry) {
+  return false;
+}
+void swiftscan_batch_scan_entry_dispose(swiftscan_batch_scan_entry_t entry) {}
+void swiftscan_batch_scan_input_dispose(swiftscan_batch_scan_input_t *input) {}
+void swiftscan_batch_scan_result_dispose(swiftscan_batch_scan_result_t *result) {}

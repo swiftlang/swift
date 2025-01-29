@@ -330,13 +330,6 @@ ModuleDependencyScanner::getMainModuleDependencyInfo(ModuleDecl *mainModule) {
                                  .asAPINotesVersionString())
                                 .str();
 
-  // Compute the dependencies of the main module.
-  std::vector<StringRef> ExtraPCMArgs = {"-Xcc", apinotesVer};
-  if (!ScanASTContext.LangOpts.ClangTarget.has_value())
-    ExtraPCMArgs.insert(
-        ExtraPCMArgs.begin(),
-        {"-Xcc", "-target", "-Xcc", ScanASTContext.LangOpts.Target.str()});
-
   auto clangImporter =
       static_cast<ClangImporter *>(ScanASTContext.getClangModuleLoader());
   std::vector<std::string> buildArgs;
@@ -355,7 +348,7 @@ ModuleDependencyScanner::getMainModuleDependencyInfo(ModuleDecl *mainModule) {
   });
 
   auto mainDependencies = ModuleDependencyInfo::forSwiftSourceModule(
-       {}, buildCommands, {}, {}, {}, ExtraPCMArgs);
+       {}, buildCommands, {}, {}, {});
 
   if (ScanASTContext.CASOpts.EnableCaching) {
     std::vector<std::string> clangDependencyFiles;

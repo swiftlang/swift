@@ -89,11 +89,6 @@ struct SwiftModuleDetails: Codable {
   /// Options to the compile command
   var commandLine: [String]? = []
 
-  /// To build a PCM to be used by this Swift module, we need to append these
-  /// arguments to the generic PCM build arguments reported from the dependency
-  /// graph.
-  var extraPcmArgs: [String]
-
   /// A flag to indicate whether or not this module is a framework.
   var isFramework: Bool
 
@@ -130,10 +125,6 @@ struct SwiftPrebuiltExternalModuleDetails: Codable {
 struct ClangModuleDetails: Codable {
   /// The path to the module map used to build this module.
   public var moduleMapPath: String
-
-  /// Set of PCM Arguments of depending modules which
-  /// are covered by the directDependencies info of this module
-  public var dependenciesCapturedPCMArgs: Set<[String]>?
 
   /// clang-generated context hash
   var contextHash: String

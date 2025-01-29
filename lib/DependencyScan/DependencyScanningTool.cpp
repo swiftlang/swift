@@ -222,7 +222,6 @@ static swiftscan_dependency_graph_t generateHollowDiagnosticOutput(
                                           c_string_utils::create_empty_set(),
                                           c_string_utils::create_empty_set(),
                                           c_string_utils::create_empty_set(),
-                                          c_string_utils::create_empty_set(),
                                           c_string_utils::create_null(),
                                           false,
                                           false,

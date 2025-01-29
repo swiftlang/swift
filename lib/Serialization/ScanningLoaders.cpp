@@ -157,7 +157,7 @@ SwiftModuleScanner::scanInterfaceFile(Twine moduleInterfacePath,
       realModuleName.str(), moduleInterfacePath.str(), sdkPath,
       StringRef(), SourceLoc(),
       [&](ASTContext &Ctx, ModuleDecl *mainMod, ArrayRef<StringRef> BaseArgs,
-          ArrayRef<StringRef> PCMArgs, StringRef Hash, StringRef UserModVer) {
+          StringRef Hash, StringRef UserModVer) {
         assert(mainMod);
         std::string InPath = moduleInterfacePath.str();
         auto compiledCandidates =
@@ -249,7 +249,7 @@ SwiftModuleScanner::scanInterfaceFile(Twine moduleInterfacePath,
 
         Result = ModuleDependencyInfo::forSwiftInterfaceModule(
             outputPathBase.str().str(), InPath, compiledCandidatesRefs,
-            ArgsRefs, {}, {}, linkLibraries, PCMArgs, Hash, isFramework,
+            ArgsRefs, {}, {}, linkLibraries, Hash, isFramework,
             isStatic, {}, /*module-cache-key*/ "", UserModVer);
 
         if (Ctx.CASOpts.EnableCaching) {
