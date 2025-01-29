@@ -8138,8 +8138,6 @@ public:
         }
       }
 
-      // Check if we have nonisolated or
-
       return; // it's OK
     }
 
