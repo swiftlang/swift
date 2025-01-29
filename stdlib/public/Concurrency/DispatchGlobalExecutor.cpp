@@ -32,6 +32,7 @@
 
 #include "swift/Runtime/Concurrency.h"
 #include "swift/Runtime/EnvironmentVariables.h"
+#include "swift/Runtime/STLCompatibility.h"
 
 #if SWIFT_CONCURRENCY_ENABLE_DISPATCH
 #include "swift/Runtime/HeapObject.h"
@@ -53,28 +54,6 @@
 #include "Error.h"
 #include "ExecutorImpl.h"
 #include "TaskPrivate.h"
-
-#if __cplusplus < 202002l || !defined(__cpp_lib_bit_cast)
-namespace std {
-template <typename Destination, typename Source>
-std::enable_if_t<sizeof(Destination) == sizeof(Source) &&
-                 std::is_trivially_copyable_v<Source> &&
-                 std::is_trivially_copyable_v<Destination>, Destination>
-bit_cast(const Source &src) noexcept {
-  static_assert(std::is_trivially_constructible_v<Destination>,
-                "The destination type must be trivially constructible");
-  Destination dst;
-  if constexpr (std::is_pointer_v<Source> || std::is_pointer_v<Destination>)
-    std::memcpy(reinterpret_cast<uintptr_t *>(&dst),
-                reinterpret_cast<const uintptr_t *>(&src), sizeof(Destination));
-  else
-    std::memcpy(&dst, &src, sizeof(Destination));
-  return dst;
-}
-}
-#else
-#include <bit>
-#endif
 
 using namespace swift;
 
