@@ -46,12 +46,22 @@ extension SwiftBacktrace {
       description = target.signalDescription
     }
 
+    let architecture: String
+    switch crashingThread.backtrace {
+      case let .raw(backtrace):
+        architecture = backtrace.architecture
+      case let .symbolicated(backtrace):
+        architecture = backtrace.architecture
+    }
+
     write("""
             { \
             "timestamp": "\(formatISO8601(now))", \
             "kind": "crashReport", \
             "description": "\(escapeJSON(description))", \
-            "faultAddress": "\(hex(target.faultAddress))"
+            "faultAddress": "\(hex(target.faultAddress))", \
+            "platform": "\(escapeJSON(target.images.platform))", \
+            "architecture": "\(escapeJSON(architecture))",
             """)
 
     var mentionedImages = Set<Int>()
