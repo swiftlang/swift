@@ -24,7 +24,7 @@ struct SwiftTargets {
 
   init(for buildDir: RepoBuildDir) throws {
     log.debug("[*] Reading Swift targets from build.ninja")
-    for rule in try buildDir.ninjaFile.buildRules {
+    for rule in try buildDir.ninjaFile.buildEdges {
       try tryAddTarget(for: rule, buildDir: buildDir)
     }
     targets.sort(by: { $0.name < $1.name })
@@ -65,32 +65,16 @@ struct SwiftTargets {
   }
 
   private mutating func computeBuildArgs(
-    for rule: NinjaBuildFile.BuildRule
+    for edge: NinjaBuildFile.BuildEdge,
+    in ninja: NinjaBuildFile
   ) throws -> BuildArgs? {
-    var buildArgs = BuildArgs(for: .swiftc)
-    if let commandAttr = rule.attributes[.command] {
-      // We have a custom command, parse it looking for a swiftc invocation.
-      let command = try CommandParser.parseKnownCommandOnly(commandAttr.value)
-      guard let command, command.executable.knownCommand == .swiftc else {
-        return nil
-      }
-      buildArgs += command.args
-    } else if rule.attributes[.flags] != nil {
-      // Ninja separates out other arguments we need, splice them back in.
-      for key: NinjaBuildFile.Attribute.Key in [.flags, .includes, .defines] {
-        guard let attr = rule.attributes[key] else { continue }
-        buildArgs.append(attr.value)
-      }
-      // Add a module name argument if one is specified, validating to
-      // ensure it's correct since we currently have some targets with
-      // invalid module names, e.g swift-plugin-server.
-      if let moduleName = rule.attributes[.swiftModuleName]?.value,
-         moduleName.isValidSwiftIdentifier {
-        buildArgs.append("-module-name \(moduleName)")
-      }
-    } else {
+    let commandLine = try ninja.commandLine(for: edge)
+    let command = try CommandParser.parseKnownCommandOnly(commandLine)
+    guard let command, command.executable.knownCommand == .swiftc else {
       return nil
     }
+
+    var buildArgs = BuildArgs(for: .swiftc, args: command.args)
 
     // Only include known flags for now.
     buildArgs = buildArgs.filter { arg in
@@ -125,17 +109,9 @@ struct SwiftTargets {
   }
 
   func getSources(
-    from rule: NinjaBuildFile.BuildRule, buildDir: RepoBuildDir
+    from edge: NinjaBuildFile.BuildEdge, buildDir: RepoBuildDir
   ) throws -> SwiftTarget.Sources {
-    // If we have SWIFT_SOURCES defined, use it, otherwise check the rule
-    // inputs.
-    let files: [AnyPath]
-    if let sourcesStr = rule.attributes[.swiftSources]?.value {
-      files = try CommandParser.parseArguments(sourcesStr, for: .swiftc)
-        .compactMap(\.value).map(AnyPath.init)
-    } else {
-      files = rule.inputs.map(AnyPath.init)
-    }
+    let files: [AnyPath] = edge.inputs.map(AnyPath.init)
 
     // Split the files into repo sources and external sources. Repo sources
     // are those under the repo path, external sources are outside that path,
@@ -166,29 +142,29 @@ struct SwiftTargets {
   }
 
   private mutating func tryAddTarget(
-    for rule: NinjaBuildFile.BuildRule,
+    for edge: NinjaBuildFile.BuildEdge,
     buildDir: RepoBuildDir
   ) throws {
     // Phonies are only used to track aliases.
-    if rule.isPhony {
-      for output in rule.outputs {
-        outputAliases[output, default: []] += rule.inputs
+    if edge.isPhony {
+      for output in edge.outputs {
+        outputAliases[output, default: []] += edge.inputs
       }
       return
     }
 
     // Ignore build rules that don't have object file or swiftmodule outputs.
-    let forBuild = rule.outputs.contains(
+    let forBuild = edge.outputs.contains(
       where: { $0.hasExtension(.o) }
     )
-    let forModule = rule.outputs.contains(
+    let forModule = edge.outputs.contains(
       where: { $0.hasExtension(.swiftmodule) }
     )
     guard forBuild || forModule else {
       return
     }
-    let primaryOutput = rule.outputs.first!
-    let sources = try getSources(from: rule, buildDir: buildDir)
+    let primaryOutput = edge.outputs.first!
+    let sources = try getSources(from: edge, buildDir: buildDir)
     let repoSources = sources.repoSources
     let externalSources = sources.externalSources
 
@@ -198,32 +174,30 @@ struct SwiftTargets {
       return
     }
 
-    guard let buildArgs = try computeBuildArgs(for: rule) else { return }
+    guard let buildArgs = try computeBuildArgs(for: edge, in: buildDir.ninjaFile) else { return }
 
     // Pick up the module name from the arguments, or use an explicitly
     // specified module name if we have one. The latter might be invalid so
     // may not be part of the build args (e.g 'swift-plugin-server'), but is
     // fine for generation.
-    let moduleName = buildArgs.lastValue(for: .moduleName) ??
-                       rule.attributes[.swiftModuleName]?.value
+    let moduleName = buildArgs.lastValue(for: .moduleName) ?? edge.bindings[.swiftModuleName]
     guard let moduleName else {
       log.debug("! Skipping Swift target with output \(primaryOutput); no module name")
       return
     }
-    let moduleLinkName = rule.attributes[.swiftLibraryName]?.value ??
-                           buildArgs.lastValue(for: .moduleLinkName)
+    let moduleLinkName = buildArgs.lastValue(for: .moduleLinkName) ?? edge.bindings[.swiftLibraryName]
     let name = moduleLinkName ?? moduleName
 
     // Add the dependencies. We track dependencies for any input files, along
     // with any recorded swiftmodule dependencies.
     dependenciesByTargetName.withValue(for: name, default: []) { deps in
       deps.formUnion(
-        rule.inputs.filter {
+        edge.inputs.filter {
           $0.hasExtension(.swiftmodule) || $0.hasExtension(.o)
         }
       )
       deps.formUnion(
-        rule.dependencies.filter { $0.hasExtension(.swiftmodule) }
+        edge.dependencies.filter { $0.hasExtension(.swiftmodule) }
       )
     }
 
@@ -258,7 +232,7 @@ struct SwiftTargets {
       targets.append(target)
       return target
     }()
-    for output in rule.outputs {
+    for output in edge.outputs {
       targetsByOutput[output] = target
     }
     if buildRule == nil || target.buildRule == nil {
