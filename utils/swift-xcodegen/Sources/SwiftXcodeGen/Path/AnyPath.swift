@@ -52,6 +52,15 @@ extension AnyPath {
       a
     }
   }
+
+  public func absolute(in base: AbsolutePath) -> AbsolutePath {
+    switch self {
+    case .relative(let r):
+      r.absolute(in: base)
+    case .absolute(let a):
+      a
+    }
+  }
 }
 
 extension AnyPath: Decodable {

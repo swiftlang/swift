@@ -22,7 +22,7 @@ struct RunnableTargets {
   private var targets: [RunnableTarget] = []
 
   init(from buildDir: RepoBuildDir) throws {
-    for rule in try buildDir.ninjaFile.buildRules {
+    for rule in try buildDir.ninjaFile.buildEdges {
       tryAddTarget(rule, buildDir: buildDir)
     }
   }
@@ -59,7 +59,7 @@ extension RunnableTargets {
   }
 
   private mutating func tryAddTarget(
-    _ rule: NinjaBuildFile.BuildRule, buildDir: RepoBuildDir
+    _ rule: NinjaBuildFile.BuildEdge, buildDir: RepoBuildDir
   ) {
     guard let (name, path) = getRunnablePath(for: rule.outputs),
           addedPaths.insert(path).inserted else { return }
