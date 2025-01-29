@@ -39,7 +39,7 @@ struct X {
 // CHECK-NEXT:     return Span(_unsafeCxxSpan: myFunc(SpanOfInt(span)))
 // CHECK-NEXT: }
 
-// CHECK:      @_alwaysEmitIntoClient @lifetime(borrow vec)
+// CHECK:      @_alwaysEmitIntoClient @lifetime(borrow vec) @_disfavoredOverload
 // CHECK-NEXT: func myFunc2(_ vec: borrowing VecOfInt) -> Span<CInt> {
 // CHECK-NEXT:     return Span(_unsafeCxxSpan: myFunc2(vec))
 // CHECK-NEXT: }
@@ -54,7 +54,7 @@ struct X {
 // CHECK-NEXT:     return Span(_unsafeCxxSpan: myFunc4(vec, SpanOfInt(span)))
 // CHECK-NEXT: }
 
-// CHECK:      @_alwaysEmitIntoClient @lifetime(borrow self)
+// CHECK:      @_alwaysEmitIntoClient @lifetime(borrow self) @_disfavoredOverload
 // CHECK-NEXT: func myFunc5() -> Span<CInt> {
 // CHECK-NEXT:     return Span(_unsafeCxxSpan: myFunc5())
 // CHECK-NEXT: }
