@@ -61,7 +61,7 @@ extension SwiftBacktrace {
             "description": "\(escapeJSON(description))", \
             "faultAddress": "\(hex(target.faultAddress))", \
             "platform": "\(escapeJSON(target.images.platform))", \
-            "architecture": "\(escapeJSON(architecture))",
+            "architecture": "\(escapeJSON(architecture))"
             """)
 
     var mentionedImages = Set<Int>()
@@ -233,7 +233,7 @@ extension SwiftBacktrace {
                         "column": \(sourceLocation.column)
                         """)
 
-                write(" } ")
+                write(" }")
               }
             }
             write(" }")
@@ -267,7 +267,13 @@ extension SwiftBacktrace {
 
     if args.threads! {
       write(#", "threads": [ "#)
+      var first = true
       for (ndx, thread) in target.threads.enumerated() {
+        if first {
+          first = false
+        } else {
+          write(", ")
+        }
         outputJSONThread(ndx: ndx, thread: thread)
       }
       write("]")
