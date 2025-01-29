@@ -9,7 +9,7 @@ import Distributed
 typealias DefaultDistributedActorSystem = LocalTestingDistributedActorSystem
 
 distributed actor Foo {
-  distributed func alwaysThrows() throws(FooError) { // expected-error{{cannot declare distributed function function with typed throws}}
+  distributed func alwaysThrows() throws(FooError) { // expected-error{{cannot declare distributed function with typed throws}}
     throw FooError()
   }
 }
