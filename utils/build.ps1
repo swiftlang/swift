@@ -2090,47 +2090,7 @@ function Build-Dispatch([Platform]$Platform, $Arch, [switch]$Test = $false) {
     }
 }
 
-function Build-CTest([Platform]$Platform, $Arch) {
-  if (-not(Test-Path $SourceCache\libarchive)) {
-    Invoke-Program git clone "https://github.com/libarchive/libarchive" $SourceCache\libarchive
-  }
-  Build-CMakeProject `
-    -Src $SourceCache\libarchive `
-    -Bin "$($Arch.BinaryCache)\$Platform\libarchive" `
-    -InstallTo "$($Arch.SDKInstallRoot)\usr" `
-    -Arch $Arch `
-    -Platform $Platform `
-    -UseBuiltCompilers C,CXX
-
-  if (-not(Test-Path $SourceCache\libuv)) {
-    Invoke-Program git clone "https://github.com/libuv/libuv" $SourceCache\libuv
-  }
-  Build-CMakeProject `
-    -Src $SourceCache\libuv `
-    -Bin "$($Arch.BinaryCache)\$Platform\libuv" `
-    -Arch $Arch `
-    -Platform $Platform `
-    -UseBuiltCompilers C,CXX `
-    -BuildTargets "libuv.a"
-
-  Build-CMakeProject `
-    -Src $SourceCache\cmake `
-    -Bin "$($Arch.BinaryCache)\$Platform\cmake" `
-    -Arch $Arch `
-    -Platform $Platform `
-    -UseBuiltCompilers C,CXX `
-    -BuildTargets ctest `
-    -Defines (@{
-      CMAKE_USE_SYSTEM_LIBUV = "YES";
-      CMAKE_USE_SYSTEM_LIBARCHIVE = "YES";
-      LibArchive_INCLUDE_DIR = "$($Arch.SDKInstallRoot)\usr\include";
-      LibArchive_LIBRARY = "$($Arch.SDKInstallRoot)\usr\lib\libarchive.a";
-      LibUV_INCLUDE_DIR = "$SourceCache\libuv\include";
-      LibUV_LIBRARY = "$($Arch.BinaryCache)\$Platform\libuv\libuv.a";
-    })
-}
-
-function Test-Dispatch([Platform]$Platform, $Arch) {
+function Test-Dispatch([Platform]$Platform) {
   # TODO: One emulator instance for all tests?
   $emulator = "$BinaryCache\android-sdk\emulator\emulator.exe"
   Start-Process -FilePath $emulator -ArgumentList "@swift-test-device" `
@@ -2145,37 +2105,18 @@ function Test-Dispatch([Platform]$Platform, $Arch) {
   # TODO: On my local machine I have to grant adb.exe network access once. How to do that in CI?
   $adb = "$BinaryCache\android-sdk\platform-tools\adb.exe"
   Invoke-Program $adb "wait-for-device"
-
-  # Add binary directory to emulator
   Write-Host    "$adb shell rm -rf $RemoteBin"
   Invoke-Program $adb shell "rm -rf $RemoteBin"
   Write-Host    "$adb shell mkdir $RemoteBin"
   Invoke-Program $adb shell "mkdir $RemoteBin"
-  Write-Host    "$adb push $LocalBin\. $RemoteBin"
-  Invoke-Program $adb push "$LocalBin\." $RemoteBin
-
-  # Replace absolute paths in config file
-  Write-Host    "$adb shell sed -i 's|$($LocalBin.Replace('\', '/'))|$RemoteBin|g' $RemoteBin/tests/CTestTestfile.cmake"
-  Invoke-Program $adb shell "sed -i 's|$($LocalBin.Replace('\', '/'))|$RemoteBin|g' $RemoteBin/tests/CTestTestfile.cmake"
-  Invoke-Program $adb shell "cat $RemoteBin/tests/CTestTestfile.cmake"
-
-  # Set executable flag for all tests (and bsdtestharness utility)
-  $Executables = @("bsdtestharness","dispatch_apply","dispatch_api","dispatch_debug","dispatch_queue_finalizer","dispatch_overcommit","dispatch_context_for_key","dispatch_after","dispatch_timer","dispatch_timer_short","dispatch_timer_timeout","dispatch_sema","dispatch_timer_bit31","dispatch_timer_bit63","dispatch_timer_set_time","dispatch_data","dispatch_io_muxed","dispatch_io_net","dispatch_io_pipe","dispatch_io_pipe_close","dispatch_select","dispatch_c99","dispatch_plusplus")
-  foreach ($Exe in $Executables) {
-    Write-Host    "$adb shell chmod +x $RemoteBin/$Exe"
-    Invoke-Program $adb shell "chmod +x $RemoteBin/$Exe"
-  }
-
-  # Add ctest driver to emulator and make it executable
-  Write-Host    "$adb push $($Arch.BinaryCache)\$Platform\cmake\bin\ctest /data/local/tmp"
-  Invoke-Program $adb push "$($Arch.BinaryCache)\$Platform\cmake\bin\ctest" "/data/local/tmp"
-  Write-Host    "$adb shell chmod +x /data/local/tmp/ctest"
-  Invoke-Program $adb shell "chmod +x /data/local/tmp/ctest"
-
-  # Run tests
-  Write-Host    "$adb shell /data/local/tmp/ctest --test-dir $RemoteBin"
-  Invoke-Program $adb shell "/data/local/tmp/ctest --test-dir $RemoteBin"
-
+  Write-Host    "$adb push $LocalBin/. $RemoteBin"
+  Invoke-Program $adb push "$LocalBin/." $RemoteBin
+  Write-Host    "$adb push $SourceCache/swift/utils/android/utils/ctest_mock.sh /data/local/tmp"
+  Invoke-Program $adb push "$SourceCache/swift/utils/android/utils/ctest_mock.sh" "/data/local/tmp"
+  Write-Host    "$adb shell chmod +x /data/local/tmp/ctest_mock.sh"
+  Invoke-Program $adb shell "chmod +x /data/local/tmp/ctest_mock.sh"
+  Write-Host    "$adb shell sh /data/local/tmp/ctest_mock.sh $RemoteBin"
+  Invoke-Program $adb shell "sh /data/local/tmp/ctest_mock.sh $RemoteBin"
   Invoke-Program $adb emu kill
   Invoke-Program $adb kill-server
 }
@@ -3222,7 +3163,6 @@ if (-not $IsCrossCompiling) {
     Build-Dispatch Windows $HostArch -Test
     # TODO: This is a hack. We need different devices for different arches.
     if ($AndroidSDKs -contains "x86_64") {
-      Invoke-BuildStep Build-CTest Android $AndroidX64
       Test-Dispatch Android $AndroidX64
     }
   }
