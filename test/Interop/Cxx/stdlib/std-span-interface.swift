@@ -14,6 +14,11 @@ import StdSpan
 #endif
 import CxxStdlib
 
+// CHECK:     struct DependsOnSelf {
+// CHECK:       @lifetime(borrow self)
+// CHECK-NEXT:  @_alwaysEmitIntoClient public mutating func get() -> Span<CInt>
+// CHECK-NEXT:  mutating func get() -> ConstSpanOfInt
+
 // CHECK:      func funcWithSafeWrapper(_ s: ConstSpanOfInt)
 // CHECK-NEXT: func funcWithSafeWrapper2(_ s: borrowing ConstSpanOfInt) -> ConstSpanOfInt
 // CHECK-NEXT: func funcWithSafeWrapper3(_ v: borrowing VecOfInt) -> ConstSpanOfInt
