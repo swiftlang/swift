@@ -77,10 +77,6 @@ struct ByteScanner {
     tryEat(where: { $0 == byte })
   }
 
-  mutating func tryEat(_ c: UnicodeScalar) -> Bool {
-    tryEat(where: { $0 == c })
-  }
-
   mutating func tryEat<S: Sequence>(_ seq: S) -> Bool where S.Element == UInt8 {
     let start = cursor
     for byte in seq {

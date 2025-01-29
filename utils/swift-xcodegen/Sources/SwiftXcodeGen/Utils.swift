@@ -78,7 +78,7 @@ extension String {
       let result = scanner.consumeWhole { consumer in
         switch consumer.peek {
         case "\\", "\"":
-          consumer.append(Byte(ascii: "\\"))
+          consumer.append("\\")
         case " ", "$": // $ is potentially a variable reference
           needsQuotes = true
         default:
@@ -131,4 +131,13 @@ extension String {
       return bytes.isUnchanged ? self : String(utf8: bytes)
     }
   }
+}
+
+/// Pattern match by `is` property. E.g. `case \.isNewline: ...`
+func ~= <T>(keyPath: KeyPath<T, Bool>, subject: T) -> Bool {
+  return subject[keyPath: keyPath]
+}
+
+func ~= <T>(keyPath: KeyPath<T, Bool>, subject: T?) -> Bool {
+  return subject?[keyPath: keyPath] == true
 }
