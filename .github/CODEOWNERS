@@ -190,7 +190,7 @@
 /stdlib/private/*Runtime*/                @rjmccall
 /stdlib/private/SwiftReflectionTest/      @slavapestov
 /stdlib/public/*Demangl*/                 @rjmccall
-/stdlib/public/Backtracing/               @al45tair
+/stdlib/public/RuntimeModule/             @al45tair @mikeash
 /stdlib/public/Concurrency/               @ktoso
 /stdlib/public/Cxx/                       @zoecarver @hyp @egorzhdan @Xazax-hun
 /stdlib/public/Distributed/               @ktoso
