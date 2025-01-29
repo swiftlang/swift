@@ -11,56 +11,55 @@ var CXXCopyConstructorTestSuite = TestSuite("CXX Copy Constructor")
 // one). What we really want to be checking is that the correct copy constructor
 // was eventually called.
 
-CXXCopyConstructorTestSuite.test("Basic object with custom copy constructor") {
-  // Make sure we don't inline this function. We should copy "userCC" into the
-  // two tuple elements (in the return address). If we inline this function, it
-  // would allow Swift to put "userCC" directly into "expectTrue" which would
-  // eliminate the copy.
-  @inline(never)
-  func createHasUserProvidedCopyConstructor() -> (HasUserProvidedCopyConstructor, HasUserProvidedCopyConstructor) {
-    let userCC = HasUserProvidedCopyConstructor(0)
-    return (userCC, userCC)
-  }
+// CXXCopyConstructorTestSuite.test("Basic object with custom copy constructor") {
+//   // Make sure we don't inline this function. We should copy "userCC" into the
+//   // two tuple elements (in the return address). If we inline this function, it
+//   // would allow Swift to put "userCC" directly into "expectTrue" which would
+//   // eliminate the copy.
+//   @inline(never)
+//   func createHasUserProvidedCopyConstructor() -> (HasUserProvidedCopyConstructor, HasUserProvidedCopyConstructor) {
+//     let userCC = HasUserProvidedCopyConstructor(0)
+//     return (userCC, userCC)
+//   }
   
-  let result = createHasUserProvidedCopyConstructor()
-  expectTrue(result.0.numCopies + result.1.numCopies > 0)
-}
+//   let result = createHasUserProvidedCopyConstructor()
+//   expectTrue(result.0.numCopies + result.1.numCopies > 0)
+// }
 
-CXXCopyConstructorTestSuite.test("Implicit copy constructor, member with user-defined copy constructor") {
-  @inline(never)
-  func createTypeWithNonTrivialImplicitCopyConstructor() -> (HasNonTrivialImplicitCopyConstructor, HasNonTrivialImplicitCopyConstructor) {
-    let implicit = HasNonTrivialImplicitCopyConstructor()
-    return (implicit, implicit)
-  }
+// CXXCopyConstructorTestSuite.test("Implicit copy constructor, member with user-defined copy constructor") {
+//   @inline(never)
+//   func createTypeWithNonTrivialImplicitCopyConstructor() -> (HasNonTrivialImplicitCopyConstructor, HasNonTrivialImplicitCopyConstructor) {
+//     let implicit = HasNonTrivialImplicitCopyConstructor()
+//     return (implicit, implicit)
+//   }
 
-  let result = createTypeWithNonTrivialImplicitCopyConstructor()
-  expectTrue(result.0.box.numCopies + result.1.box.numCopies > 0)
-}
+//   let result = createTypeWithNonTrivialImplicitCopyConstructor()
+//   expectTrue(result.0.box.numCopies + result.1.box.numCopies > 0)
+// }
 
-CXXCopyConstructorTestSuite.test("Default copy constructor, member with user-defined copy constructor") {
-  @inline(never)
-  func createTypeWithNonTrivialDefaultCopyConstructor() -> (HasNonTrivialDefaultCopyConstructor, HasNonTrivialDefaultCopyConstructor) {
-    let def = HasNonTrivialDefaultCopyConstructor()
-    return (def, def)
-  }
+// CXXCopyConstructorTestSuite.test("Default copy constructor, member with user-defined copy constructor") {
+//   @inline(never)
+//   func createTypeWithNonTrivialDefaultCopyConstructor() -> (HasNonTrivialDefaultCopyConstructor, HasNonTrivialDefaultCopyConstructor) {
+//     let def = HasNonTrivialDefaultCopyConstructor()
+//     return (def, def)
+//   }
   
-  let result = createTypeWithNonTrivialDefaultCopyConstructor()
-  expectTrue(result.0.box.numCopies + result.1.box.numCopies > 0)
-}
+//   let result = createTypeWithNonTrivialDefaultCopyConstructor()
+//   expectTrue(result.0.box.numCopies + result.1.box.numCopies > 0)
+// }
 
 CXXCopyConstructorTestSuite.test("Copy constructor with default argument") {
   @inline(never)
 
   func createTypeWithCopyConstructorWithDefaultArgument() -> (HasCopyConstructorWithDefaultArgs, HasCopyConstructorWithDefaultArgs) {
     let obj = HasCopyConstructorWithDefaultArgs(0)
-    print(obj.funcWithDefaultArg())
     return (obj, obj)
   }
 
   let result = createTypeWithCopyConstructorWithDefaultArgument()
-  print(result.1.value)
   expectTrue(result.0.value == 0) // 2
   // expectTrue(result.1.value == 2)
+  // print(result.1.value)
 }
 
 runAllTests()

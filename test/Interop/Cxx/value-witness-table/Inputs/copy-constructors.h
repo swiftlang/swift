@@ -33,9 +33,7 @@ struct HasCopyConstructorWithDefaultArgs {
   // rdar://142414553
   HasCopyConstructorWithDefaultArgs(
       const HasCopyConstructorWithDefaultArgs &other, int value = 0)
-      : value(other.value + 1) {}
-
-  int funcWithDefaultArg(int arg = 0) const { return arg + 1; }
+      : value(other.value + value) {}
 };
 
 // Make sure that we don't crash on struct templates with copy-constructors.
