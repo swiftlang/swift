@@ -791,6 +791,7 @@ extension _NativeDictionary { // High-level operations
     }
   }
 
+  #if $Embedded
   @inlinable
   internal mutating func merge<S: Sequence>(
     _ keysAndValues: __owned S,
@@ -817,6 +818,7 @@ extension _NativeDictionary { // High-level operations
       }
     }
   }
+  #endif
 
   @inlinable
   @inline(__always)
