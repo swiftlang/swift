@@ -22,6 +22,11 @@ import CxxStdlib
 // CHECK:      func funcWithSafeWrapper(_ s: ConstSpanOfInt)
 // CHECK-NEXT: func funcWithSafeWrapper2(_ s: borrowing ConstSpanOfInt) -> ConstSpanOfInt
 // CHECK-NEXT: func funcWithSafeWrapper3(_ v: borrowing VecOfInt) -> ConstSpanOfInt
+// CHECK:      struct X {
+// CHECK-NEXT:   init()
+// CHECK-NEXT:   @_alwaysEmitIntoClient public mutating func methodWithSafeWrapper(_ s: Span<CInt>)
+// CHECK-NEXT:   mutating func methodWithSafeWrapper(_ s: ConstSpanOfInt)
+// CHECK-NEXT: }
 // CHECK-NEXT: @_alwaysEmitIntoClient public func funcWithSafeWrapper(_ s: Span<CInt>)
 // CHECK-NEXT: @lifetime(s)
 // CHECK-NEXT: @_alwaysEmitIntoClient public func funcWithSafeWrapper2(_ s: borrowing Span<CInt>) -> Span<CInt>
