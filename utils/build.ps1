@@ -2093,6 +2093,9 @@ function Build-Dispatch([Platform]$Platform, $Arch, [switch]$Test = $false) {
 function Test-Dispatch([Platform]$Platform) {
   # TODO: One emulator instance for all tests?
   $emulator = "$BinaryCache\android-sdk\emulator\emulator.exe"
+  Write-Host    "$emulator -version"
+  Invoke-Program $emulator "-version"
+
   Start-Process -FilePath $emulator -ArgumentList "@swift-test-device" `
                 -RedirectStandardOutput "$BinaryCache\android-sdk\.temp\emulator.out" `
                 -RedirectStandardError "$BinaryCache\android-sdk\.temp\emulator.err"
@@ -2104,6 +2107,8 @@ function Test-Dispatch([Platform]$Platform) {
 
   # TODO: On my local machine I have to grant adb.exe network access once. How to do that in CI?
   $adb = "$BinaryCache\android-sdk\platform-tools\adb.exe"
+  Write-Host    "$adb version"
+  Invoke-Program $adb "version"
   Invoke-Program $adb "wait-for-device"
   Write-Host    "$adb push $CachePath $RemoteRoot"
   Invoke-Program $adb push $CachePath $RemoteRoot
@@ -3001,6 +3006,9 @@ function Stage-BuildArtifacts($Arch) {
 try {
 
 Fetch-Dependencies
+
+Test-Dispatch Android $AndroidX64
+exit(1)
 
 if ($Clean) {
   10..[HostComponent].getEnumValues()[-1] | ForEach-Object { Remove-Item -Force -Recurse "$BinaryCache\$_" -ErrorAction Ignore }
