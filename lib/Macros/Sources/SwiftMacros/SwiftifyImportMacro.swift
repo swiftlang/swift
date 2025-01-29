@@ -289,8 +289,10 @@ func transformType(_ prev: TypeSyntax, _ generateSpan: Bool, _ isSizedBy: Bool) 
 protocol BoundsCheckedThunkBuilder {
   func buildFunctionCall(_ pointerArgs: [Int: ExprSyntax]) throws -> ExprSyntax
   func buildBoundsChecks() throws -> [CodeBlockItemSyntax.Item]
+  // The second component of the return value is true when only the return type of the
+  // function signature was changed.
   func buildFunctionSignature(_ argTypes: [Int: TypeSyntax?], _ returnType: TypeSyntax?) throws
-    -> FunctionSignatureSyntax
+    -> (FunctionSignatureSyntax, Bool)
 }
 
 func getParam(_ signature: FunctionSignatureSyntax, _ paramIndex: Int) -> FunctionParameterSyntax {
@@ -308,6 +310,7 @@ func getParam(_ funcDecl: FunctionDeclSyntax, _ paramIndex: Int) -> FunctionPara
 
 struct FunctionCallBuilder: BoundsCheckedThunkBuilder {
   let base: FunctionDeclSyntax
+
   init(_ function: FunctionDeclSyntax) {
     base = function
   }
@@ -317,7 +320,7 @@ struct FunctionCallBuilder: BoundsCheckedThunkBuilder {
   }
 
   func buildFunctionSignature(_ argTypes: [Int: TypeSyntax?], _ returnType: TypeSyntax?) throws
-    -> FunctionSignatureSyntax {
+    -> (FunctionSignatureSyntax, Bool) {
     var newParams = base.signature.parameterClause.parameters.enumerated().filter {
       let type = argTypes[$0.offset]
       // filter out deleted parameters, i.e. ones where argTypes[i] _contains_ nil
@@ -333,7 +336,7 @@ struct FunctionCallBuilder: BoundsCheckedThunkBuilder {
     if returnType != nil {
       sig = sig.with(\.returnClause!.type, returnType!)
     }
-    return sig
+    return (sig, (argTypes.count == 0 && returnType != nil))
   }
 
   func buildFunctionCall(_ pointerArgs: [Int: ExprSyntax]) throws -> ExprSyntax {
@@ -381,7 +384,7 @@ struct CxxSpanThunkBuilder: ParamPointerBoundsThunkBuilder {
   }
 
   func buildFunctionSignature(_ argTypes: [Int: TypeSyntax?], _ returnType: TypeSyntax?) throws
-    -> FunctionSignatureSyntax {
+    -> (FunctionSignatureSyntax, Bool) {
     var types = argTypes
     let typeName = try getTypeName(oldType).text
     guard let desugaredType = typeMappings[typeName] else {
@@ -417,7 +420,7 @@ struct CxxSpanReturnThunkBuilder: BoundsCheckedThunkBuilder {
   }
 
   func buildFunctionSignature(_ argTypes: [Int: TypeSyntax?], _ returnType: TypeSyntax?) throws
-    -> FunctionSignatureSyntax {
+    -> (FunctionSignatureSyntax, Bool) {
     assert(returnType == nil)
     let typeName = try getTypeName(signature.returnClause!.type).text
     guard let desugaredType = typeMappings[typeName] else {
@@ -490,7 +493,7 @@ struct CountedOrSizedReturnPointerThunkBuilder: PointerBoundsThunkBuilder {
   }
 
   func buildFunctionSignature(_ argTypes: [Int: TypeSyntax?], _ returnType: TypeSyntax?) throws
-    -> FunctionSignatureSyntax {
+    -> (FunctionSignatureSyntax, Bool) {
     assert(returnType == nil)
     return try base.buildFunctionSignature(argTypes, newType)
   }
@@ -518,7 +521,7 @@ struct CountedOrSizedPointerThunkBuilder: ParamPointerBoundsThunkBuilder {
   public let skipTrivialCount: Bool
 
   func buildFunctionSignature(_ argTypes: [Int: TypeSyntax?], _ returnType: TypeSyntax?) throws
-    -> FunctionSignatureSyntax {
+    -> (FunctionSignatureSyntax, Bool) {
     var types = argTypes
     types[index] = try newType
     if skipTrivialCount {
@@ -1104,7 +1107,7 @@ public struct SwiftifyImportMacro: PeerMacro {
         { (prev, parsedArg) in
           parsedArg.getBoundsCheckedThunkBuilder(prev, funcDecl, skipTrivialCount)
         })
-      let newSignature = try builder.buildFunctionSignature([:], nil)
+      let (newSignature, onlyReturnTypeChanged) = try builder.buildFunctionSignature([:], nil)
       let checks =
         skipTrivialCount
         ? [] as [CodeBlockItemSyntax]
@@ -1118,6 +1121,12 @@ public struct SwiftifyImportMacro: PeerMacro {
             expression: try builder.buildFunctionCall([:]))))
       let body = CodeBlockSyntax(statements: CodeBlockItemListSyntax(checks + [call]))
       let lifetimeAttrs = lifetimeAttributes(funcDecl, lifetimeDependencies)
+      let disfavoredOverload : [AttributeListSyntax.Element] = (onlyReturnTypeChanged ? [
+        .attribute(
+          AttributeSyntax(
+            atSign: .atSignToken(),
+            attributeName: IdentifierTypeSyntax(name: "_disfavoredOverload")))
+      ] : [])
       let newFunc =
         funcDecl
         .with(\.signature, newSignature)
@@ -1138,7 +1147,8 @@ public struct SwiftifyImportMacro: PeerMacro {
                 atSign: .atSignToken(),
                 attributeName: IdentifierTypeSyntax(name: "_alwaysEmitIntoClient")))
           ]
-          + lifetimeAttrs)
+          + lifetimeAttrs
+          + disfavoredOverload)
       return [DeclSyntax(newFunc)]
     } catch let error as DiagnosticError {
       context.diagnose(

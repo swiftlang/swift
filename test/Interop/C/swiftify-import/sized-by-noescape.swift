@@ -14,7 +14,7 @@ import SizedByNoEscapeClang
 // CHECK-NEXT: @_alwaysEmitIntoClient public func nonnull(_ p: RawSpan)
 // CHECK-NEXT: @_alwaysEmitIntoClient public func nullUnspecified(_  p: RawSpan)
 // CHECK-NEXT: @_alwaysEmitIntoClient public func opaque(_  p: RawSpan)
-// CHECK-NEXT: @_alwaysEmitIntoClient public func returnPointer(_ len: Int{{.*}}) -> UnsafeRawBufferPointer
+// CHECK-NEXT: @_alwaysEmitIntoClient @_disfavoredOverload public func returnPointer(_ len: Int{{.*}}) -> UnsafeRawBufferPointer
 // CHECK-NEXT: @_alwaysEmitIntoClient public func shared(_ len: Int{{.*}}, _ p1: RawSpan, _ p2: RawSpan)
 // CHECK-NEXT: @_alwaysEmitIntoClient public func simple(_  p: RawSpan)
 // CHECK-NEXT: @_alwaysEmitIntoClient public func swiftAttr(_  p: RawSpan)

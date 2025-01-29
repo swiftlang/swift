@@ -10,12 +10,12 @@ func myFunc(_ len: CInt) -> UnsafeMutablePointer<CInt> {
 func nonEscaping(_ len: CInt) -> UnsafePointer<CInt> {
 }
 
-// CHECK:      @_alwaysEmitIntoClient
+// CHECK:      @_alwaysEmitIntoClient @_disfavoredOverload
 // CHECK-NEXT: func myFunc(_ len: CInt) -> UnsafeMutableBufferPointer<CInt> {
 // CHECK-NEXT:     return UnsafeMutableBufferPointer<CInt> (start: myFunc(len), count: Int(len))
 // CHECK-NEXT: }
 
-// CHECK:      @_alwaysEmitIntoClient
+// CHECK:      @_alwaysEmitIntoClient @_disfavoredOverload
 // CHECK-NEXT: func nonEscaping(_ len: CInt) -> UnsafeBufferPointer<CInt> {
 // CHECK-NEXT:     return UnsafeBufferPointer<CInt> (start: nonEscaping(len), count: Int(len))
 // CHECK-NEXT: }
