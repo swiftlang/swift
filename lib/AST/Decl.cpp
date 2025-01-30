@@ -10607,6 +10607,9 @@ AccessorDecl *AccessorDecl::createParsed(
       // The cloned parameter is implicit.
       param->setImplicit();
 
+      if (subscriptParam->isSending())
+        param->setSending();
+
       newParams.push_back(param);
     }
   }
