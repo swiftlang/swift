@@ -225,6 +225,15 @@ void AvailabilityInference::applyInferredAvailableAttrs(
         return false;
       case AvailabilityDomain::Kind::Platform:
         return domain.getPlatformKind() < other.domain.getPlatformKind();
+      case AvailabilityDomain::Kind::Custom: {
+        auto mod = domain.getModule();
+        auto otherMod = other.domain.getModule();
+        if (mod != otherMod)
+          return mod->getName() < otherMod->getName();
+
+        return domain.getNameForAttributePrinting() <
+               other.domain.getNameForAttributePrinting();
+      }
       }
     }
   };

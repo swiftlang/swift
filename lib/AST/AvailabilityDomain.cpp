@@ -13,6 +13,7 @@
 #include "swift/AST/AvailabilityDomain.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Decl.h"
+#include "swift/Basic/Assertions.h"
 #include "llvm/ADT/StringSwitch.h"
 
 using namespace swift;
@@ -48,6 +49,10 @@ bool AvailabilityDomain::isActive(const ASTContext &ctx) const {
     return true;
   case Kind::Platform:
     return isPlatformActive(getPlatformKind(), ctx.LangOpts);
+  case Kind::Custom:
+    // For now, custom domains are always active but it's conceivable that in
+    // the future someone might want to define a domain but leave it inactive.
+    return true;
   }
 }
 
@@ -63,6 +68,8 @@ llvm::StringRef AvailabilityDomain::getNameForDiagnostics() const {
     return "Embedded Swift";
   case Kind::Platform:
     return swift::prettyPlatformString(getPlatformKind());
+  case Kind::Custom:
+    return getCustomDomain()->getName().str();
   }
 }
 
@@ -78,7 +85,16 @@ llvm::StringRef AvailabilityDomain::getNameForAttributePrinting() const {
     return "Embedded";
   case Kind::Platform:
     return swift::platformString(getPlatformKind());
+  case Kind::Custom:
+    return getCustomDomain()->getName().str();
   }
+}
+
+ModuleDecl *AvailabilityDomain::getModule() const {
+  if (auto customDomain = getCustomDomain())
+    return customDomain->getModule();
+
+  return nullptr;
 }
 
 bool AvailabilityDomain::contains(const AvailabilityDomain &other) const {
@@ -100,5 +116,20 @@ bool AvailabilityDomain::contains(const AvailabilityDomain &other) const {
       return true;
     return inheritsAvailabilityFromPlatform(other.getPlatformKind(),
                                             getPlatformKind());
+  case Kind::Custom:
+    return getCustomDomain() == other.getCustomDomain();
   }
+}
+
+CustomAvailabilityDomain::CustomAvailabilityDomain(Identifier name,
+                                                   ModuleDecl *mod, Kind kind)
+    : name(name), kind(kind), mod(mod) {
+  ASSERT(!name.empty());
+  ASSERT(mod);
+}
+
+CustomAvailabilityDomain *
+CustomAvailabilityDomain::create(const ASTContext &ctx, StringRef name,
+                                 ModuleDecl *mod, Kind kind) {
+  return new (ctx) CustomAvailabilityDomain(ctx.getIdentifier(name), mod, kind);
 }
