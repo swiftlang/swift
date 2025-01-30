@@ -12,16 +12,16 @@
 // CHECK:   }
 
 // CHECK:   private struct PrivateEnum : Hashable, Equatable, RawRepresentable {
-// CHECK:     private init(_ rawValue: UInt32)
-// CHECK:     private init(rawValue: UInt32)
-// CHECK:     private var rawValue: UInt32
-// CHECK:     private typealias RawValue = UInt32
+// CHECK:     private init(_ rawValue: [[ENUM_RV_T:.*]])
+// CHECK:     private init(rawValue: [[ENUM_RV_T]])
+// CHECK:     private var rawValue: [[ENUM_RV_T]]
+// CHECK:     private typealias RawValue = [[ENUM_RV_T]]
 // CHECK:   }
 
-// CHECK:   private enum PrivateEnumClass : Int32 {
-// CHECK:     private init?(rawValue: Int32)
-// CHECK:     private var rawValue: Int32 { get }
-// CHECK:     private typealias RawValue = Int32
+// CHECK:   private enum PrivateEnumClass : [[ENUM_CLASS_RV_T:.*]] {
+// CHECK:     private init?(rawValue: [[ENUM_CLASS_RV_T]])
+// CHECK:     private var rawValue: [[ENUM_CLASS_RV_T]] { get }
+// CHECK:     private typealias RawValue = [[ENUM_CLASS_RV_T]]
 // CHECK:     case privateEnumClassMember
 // CHECK:   }
 
