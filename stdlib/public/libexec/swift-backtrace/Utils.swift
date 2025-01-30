@@ -264,6 +264,8 @@ func escapeJSON(_ s: String) -> String {
   var pos = chunk
   let end = utf8View.endIndex
 
+  result.reserveCapacity(utf8View.count)
+
   while pos != end {
     let scalar = utf8View[pos]
     switch scalar {
