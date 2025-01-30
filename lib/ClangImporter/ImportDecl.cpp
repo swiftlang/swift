@@ -467,7 +467,7 @@ void ClangImporter::Implementation::addSynthesizedTypealias(
   auto typealias = new (ctx) TypeAliasDecl(SourceLoc(), SourceLoc(), name,
                                            SourceLoc(), nullptr, nominal);
   typealias->setUnderlyingType(underlyingType);
-  typealias->setAccess(AccessLevel::Public);
+  typealias->setAccess(nominal->getFormalAccess());
   typealias->setImplicit();
 
   nominal->addMember(typealias);
@@ -1418,11 +1418,10 @@ namespace {
               // Create a typealias for this CF typedef.
               TypeAliasDecl *typealias = nullptr;
               typealias = Impl.createDeclWithClangNode<TypeAliasDecl>(
-                            Decl, AccessLevel::Public,
-                            Impl.importSourceLoc(Decl->getBeginLoc()),
-                            SourceLoc(), Name,
-                            Impl.importSourceLoc(Decl->getLocation()),
-                            /*genericparams*/nullptr, DC);
+                  Decl, importer::convertClangAccess(Decl->getAccess()),
+                  Impl.importSourceLoc(Decl->getBeginLoc()), SourceLoc(), Name,
+                  Impl.importSourceLoc(Decl->getLocation()),
+                  /*genericparams*/ nullptr, DC);
               typealias->setUnderlyingType(
                   underlying->getDeclaredInterfaceType());
 
@@ -1437,11 +1436,10 @@ namespace {
               // Create a typealias for this CF typedef.
               TypeAliasDecl *typealias = nullptr;
               typealias = Impl.createDeclWithClangNode<TypeAliasDecl>(
-                            Decl, AccessLevel::Public,
-                            Impl.importSourceLoc(Decl->getBeginLoc()),
-                            SourceLoc(), Name,
-                            Impl.importSourceLoc(Decl->getLocation()),
-                            /*genericparams*/nullptr, DC);
+                  Decl, importer::convertClangAccess(Decl->getAccess()),
+                  Impl.importSourceLoc(Decl->getBeginLoc()), SourceLoc(), Name,
+                  Impl.importSourceLoc(Decl->getLocation()),
+                  /*genericparams*/ nullptr, DC);
               typealias->setUnderlyingType(
                 Impl.SwiftContext.getAnyObjectType());
 
@@ -1506,12 +1504,10 @@ namespace {
         return nullptr;
 
       auto Loc = Impl.importSourceLoc(Decl->getLocation());
-      auto Result = Impl.createDeclWithClangNode<TypeAliasDecl>(Decl,
-                                      AccessLevel::Public,
-                                      Impl.importSourceLoc(Decl->getBeginLoc()),
-                                      SourceLoc(), Name,
-                                      Loc,
-                                      /*genericparams*/nullptr, DC);
+      auto Result = Impl.createDeclWithClangNode<TypeAliasDecl>(
+          Decl, importer::convertClangAccess(Decl->getAccess()),
+          Impl.importSourceLoc(Decl->getBeginLoc()), SourceLoc(), Name, Loc,
+          /*genericparams*/ nullptr, DC);
 
       Result->setUnderlyingType(SwiftType);
       if (SwiftType->isUnsafe())
@@ -1615,21 +1611,21 @@ namespace {
         if (!underlyingType)
           return nullptr;
 
+        auto access = importer::convertClangAccess(decl->getAccess());
         auto Loc = Impl.importSourceLoc(decl->getLocation());
         auto structDecl = Impl.createDeclWithClangNode<StructDecl>(
-            decl, AccessLevel::Public, Loc, name, Loc, std::nullopt, nullptr,
-            dc);
+            decl, access, Loc, name, Loc, std::nullopt, nullptr, dc);
 
         auto options = getDefaultMakeStructRawValuedOptions();
         options |= MakeStructRawValuedFlags::MakeUnlabeledValueInit;
         options -= MakeStructRawValuedFlags::IsLet;
         options -= MakeStructRawValuedFlags::IsImplicit;
 
-        synthesizer.makeStructRawValued(
-            structDecl, underlyingType,
-            {KnownProtocolKind::RawRepresentable, KnownProtocolKind::Equatable,
-             KnownProtocolKind::Hashable},
-            options, /*setterAccess=*/AccessLevel::Public);
+        synthesizer.makeStructRawValued(structDecl, underlyingType,
+                                        {KnownProtocolKind::RawRepresentable,
+                                         KnownProtocolKind::Equatable,
+                                         KnownProtocolKind::Hashable},
+                                        options, /*setterAccess=*/access);
 
         result = structDecl;
         break;
@@ -1666,6 +1662,10 @@ namespace {
             (nsErrorDecl = C.getNSErrorDecl()) &&
             (errorCodeProto =
                C.getProtocol(KnownProtocolKind::ErrorCodeProtocol))) {
+          assert(
+              decl->getAccess() != clang::AS_private &&
+              decl->getAccess() != clang::AS_protected &&
+              "NSError enums shouldn't be defined as non-public C++ members");
           // Create the wrapper struct.
           errorWrapper =
               new (C) StructDecl(loc, name, loc, std::nullopt, nullptr, dc);
@@ -1737,9 +1737,9 @@ namespace {
 
         // Create the enumeration.
         auto enumDecl = Impl.createDeclWithClangNode<EnumDecl>(
-            decl, AccessLevel::Public, loc, enumName,
-            Impl.importSourceLoc(decl->getLocation()), std::nullopt, nullptr,
-            enumDC);
+            decl, importer::convertClangAccess(decl->getAccess()), loc,
+            enumName, Impl.importSourceLoc(decl->getLocation()), std::nullopt,
+            nullptr, enumDC);
         enumDecl->setHasFixedRawValues();
 
         // Annotate as 'frozen' if appropriate.
@@ -1781,7 +1781,7 @@ namespace {
                                         SourceLoc(), varName,
                                         enumDecl);
         rawValue->setImplicit();
-        rawValue->setAccess(AccessLevel::Public);
+        rawValue->copyFormalAccessFrom(enumDecl);
         rawValue->setSetterAccess(AccessLevel::Private);
         rawValue->setInterfaceType(underlyingType);
 
@@ -1804,6 +1804,10 @@ namespace {
         // If we have an error wrapper, finish it up now that its
         // nested enum has been constructed.
         if (errorWrapper) {
+          assert(
+              decl->getAccess() != clang::AS_private &&
+              decl->getAccess() != clang::AS_protected &&
+              "NSError enums shouldn't be defined as non-public C++ members");
           // Add the ErrorType alias:
           //   public typealias ErrorType
           auto alias = Impl.createDeclWithClangNode<TypeAliasDecl>(
@@ -2190,12 +2194,12 @@ namespace {
       auto loc = Impl.importSourceLoc(decl->getLocation());
       if (recordHasReferenceSemantics(decl))
         result = Impl.createDeclWithClangNode<ClassDecl>(
-            decl, AccessLevel::Public, loc, name, loc,
-            ArrayRef<InheritedEntry>{}, nullptr, dc, false);
+            decl, importer::convertClangAccess(decl->getAccess()), loc, name,
+            loc, ArrayRef<InheritedEntry>{}, nullptr, dc, false);
       else
         result = Impl.createDeclWithClangNode<StructDecl>(
-            decl, AccessLevel::Public, loc, name, loc, std::nullopt, nullptr,
-            dc);
+            decl, importer::convertClangAccess(decl->getAccess()), loc, name,
+            loc, std::nullopt, nullptr, dc);
       Impl.ImportedDecls[{decl->getCanonicalDecl(), getVersion()}] = result;
 
       // We have to do this after populating ImportedDecls to avoid importing
@@ -3213,7 +3217,8 @@ namespace {
             name, dc, type, clang::APValue(decl->getInitVal()),
             enumKind == EnumKind::Unknown ? ConstantConvertKind::Construction
                                           : ConstantConvertKind::None,
-            isStatic, decl);
+            isStatic, decl,
+            importer::convertClangAccess(clangEnum->getAccess()));
         Impl.ImportedDecls[{decl->getCanonicalDecl(), getVersion()}] = result;
 
         // If this is a compatibility stub, mark it as such.
@@ -3282,12 +3287,10 @@ namespace {
       auto type = importedType.getType();
 
       // Map this indirect field to a Swift variable.
-      auto result = Impl.createDeclWithClangNode<VarDecl>(decl,
-                       AccessLevel::Public,
-                       /*IsStatic*/false,
-                       VarDecl::Introducer::Var,
-                       Impl.importSourceLoc(decl->getBeginLoc()),
-                       name, dc);
+      auto result = Impl.createDeclWithClangNode<VarDecl>(
+          decl, importer::convertClangAccess(decl->getAccess()),
+          /*IsStatic*/ false, VarDecl::Introducer::Var,
+          Impl.importSourceLoc(decl->getBeginLoc()), name, dc);
       result->setInterfaceType(type);
       result->setIsObjC(false);
       result->setIsDynamic(false);
@@ -3915,7 +3918,8 @@ namespace {
         DeclName ctorName(Impl.SwiftContext, DeclBaseName::createConstructor(),
                           bodyParams);
         result = Impl.createDeclWithClangNode<ConstructorDecl>(
-            clangNode, AccessLevel::Public, ctorName, loc,
+            clangNode, importer::convertClangAccess(ctordecl->getAccess()),
+            ctorName, loc,
             /*failable=*/false, /*FailabilityLoc=*/SourceLoc(),
             /*Async=*/false, /*AsyncLoc=*/SourceLoc(),
             /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(),
@@ -3948,8 +3952,7 @@ namespace {
             func->setImportAsStaticMember();
           }
         }
-        // Someday, maybe this will need to be 'open' for C++ virtual methods.
-        func->setAccess(AccessLevel::Public);
+        func->setAccess(importer::convertClangAccess(decl->getAccess()));
 
         if (!importFuncWithoutSignature) {
           bool success = processSpecialImportedFunc(
@@ -4316,21 +4319,10 @@ namespace {
 
       auto type = importedType.getType();
 
-      // Private C++ fields should also be private in Swift. Since Swift does
-      // not have a notion of protected field, map protected C++ fields to
-      // private Swift fields.
-      AccessLevel accessLevel =
-          (decl->getAccess() == clang::AccessSpecifier::AS_private ||
-           decl->getAccess() == clang::AccessSpecifier::AS_protected)
-              ? AccessLevel::Private
-              : AccessLevel::Public;
-
-      auto result =
-        Impl.createDeclWithClangNode<VarDecl>(decl, accessLevel,
-                              /*IsStatic*/ false,
-                              VarDecl::Introducer::Var,
-                              Impl.importSourceLoc(decl->getLocation()),
-                              name, dc);
+      auto result = Impl.createDeclWithClangNode<VarDecl>(
+          decl, importer::convertClangAccess(decl->getAccess()),
+          /*IsStatic*/ false, VarDecl::Introducer::Var,
+          Impl.importSourceLoc(decl->getLocation()), name, dc);
       if (decl->getType().isConstQualified()) {
         // Note that in C++ there are ways to change the values of const
         // members, so we don't use WriteImplKind::Immutable storage.
@@ -4393,11 +4385,10 @@ namespace {
       auto introducer = Impl.shouldImportGlobalAsLet(decl->getType())
                         ? VarDecl::Introducer::Let
                         : VarDecl::Introducer::Var;
-      auto result = Impl.createDeclWithClangNode<VarDecl>(decl,
-                       AccessLevel::Public,
-                       /*IsStatic*/isStatic, introducer,
-                       Impl.importSourceLoc(decl->getLocation()),
-                       name, dc);
+      auto result = Impl.createDeclWithClangNode<VarDecl>(
+          decl, importer::convertClangAccess(decl->getAccess()),
+          /*IsStatic*/ isStatic, introducer,
+          Impl.importSourceLoc(decl->getLocation()), name, dc);
       result->setIsObjC(false);
       result->setIsDynamic(false);
 
@@ -4481,8 +4472,8 @@ namespace {
           Impl.SwiftContext, loc, genericParams, loc);
 
       auto structDecl = Impl.createDeclWithClangNode<StructDecl>(
-          decl, AccessLevel::Public, loc, name, loc, std::nullopt,
-          genericParamList, dc);
+          decl, importer::convertClangAccess(decl->getAccess()), loc, name, loc,
+          std::nullopt, genericParamList, dc);
 
       auto attr = AvailableAttr::createUniversallyUnavailable(
           Impl.SwiftContext, "Un-specialized class templates are not currently "
@@ -4549,12 +4540,9 @@ namespace {
 
         auto Loc = Impl.importSourceLoc(decl->getLocation());
         auto Result = Impl.createDeclWithClangNode<TypeAliasDecl>(
-            decl,
-            AccessLevel::Public,
-            Impl.importSourceLoc(decl->getBeginLoc()),
-            SourceLoc(), Name,
-            Loc,
-            /*genericparams*/nullptr, importedDC);
+            decl, importer::convertClangAccess(decl->getAccess()),
+            Impl.importSourceLoc(decl->getBeginLoc()), SourceLoc(), Name, Loc,
+            /*genericparams*/ nullptr, importedDC);
         Result->setUnderlyingType(SwiftTypeDecl->getDeclaredInterfaceType());
 
         return Result;
@@ -6237,9 +6225,11 @@ Decl *SwiftDeclConverter::importCompatibilityTypeAlias(
 
   // Create the type alias.
   auto alias = Impl.createDeclWithClangNode<TypeAliasDecl>(
-      decl, AccessLevel::Public, Impl.importSourceLoc(decl->getBeginLoc()),
-      SourceLoc(), compatibilityName.getBaseIdentifier(Impl.SwiftContext),
-      Impl.importSourceLoc(decl->getLocation()), /*generic params*/nullptr, dc);
+      decl, importer::convertClangAccess(decl->getAccess()),
+      Impl.importSourceLoc(decl->getBeginLoc()), SourceLoc(),
+      compatibilityName.getBaseIdentifier(Impl.SwiftContext),
+      Impl.importSourceLoc(decl->getLocation()), /*generic params*/ nullptr,
+      dc);
 
   auto *GTD = dyn_cast<GenericTypeDecl>(typeDecl);
   if (GTD && !isa<ProtocolDecl>(GTD)) {
@@ -6334,7 +6324,8 @@ SwiftDeclConverter::importSwiftNewtype(const clang::TypedefNameDecl *decl,
   auto Loc = Impl.importSourceLoc(decl->getLocation());
 
   auto structDecl = Impl.createDeclWithClangNode<StructDecl>(
-      decl, AccessLevel::Public, Loc, name, Loc, std::nullopt, nullptr, dc);
+      decl, importer::convertClangAccess(decl->getAccess()), Loc, name, Loc,
+      std::nullopt, nullptr, dc);
 
   // Import the type of the underlying storage
   ImportDiagnosticAdder addImportDiag(Impl, decl, decl->getLocation());
@@ -6534,8 +6525,8 @@ Decl *SwiftDeclConverter::importEnumCase(const clang::EnumConstantDecl *decl,
     rawValueExpr->setNegative(SourceLoc());
 
   auto element = Impl.createDeclWithClangNode<EnumElementDecl>(
-      decl, AccessLevel::Public, SourceLoc(), name, nullptr,
-      SourceLoc(), rawValueExpr, theEnum);
+      decl, importer::convertClangAccess(clangEnum->getAccess()), SourceLoc(),
+      name, nullptr, SourceLoc(), rawValueExpr, theEnum);
 
   Impl.importAttributes(decl, element);
 
@@ -6559,7 +6550,8 @@ SwiftDeclConverter::importOptionConstant(const clang::EnumConstantDecl *decl,
     convertKind = ConstantConvertKind::ConstructionWithUnwrap;
   Decl *CD = synthesizer.createConstant(
       name, theStruct, theStruct->getDeclaredInterfaceType(),
-      clang::APValue(decl->getInitVal()), convertKind, /*isStatic*/ true, decl);
+      clang::APValue(decl->getInitVal()), convertKind, /*isStatic*/ true, decl,
+      importer::convertClangAccess(clangEnum->getAccess()));
   Impl.importAttributes(decl, CD);
 
   // NS_OPTIONS members that have a value of 0 (typically named "None") do
@@ -6623,9 +6615,10 @@ Decl *SwiftDeclConverter::importEnumCaseAlias(
     result->setType(original->getInterfaceType());
   }
 
-  Decl *CD = synthesizer.createConstant(name, importIntoDC, importedEnumTy,
-                                 result, ConstantConvertKind::None,
-                                 /*isStatic*/ true, alias);
+  Decl *CD = synthesizer.createConstant(
+      name, importIntoDC, importedEnumTy, result, ConstantConvertKind::None,
+      /*isStatic*/ true, alias,
+      importer::convertClangAccess(clangEnum->getAccess()));
   Impl.importAttributes(alias, CD);
   return CD;
 }
@@ -6639,7 +6632,8 @@ SwiftDeclConverter::importAsOptionSetType(DeclContext *dc, Identifier name,
 
   // Create a struct with the underlying type as a field.
   auto structDecl = Impl.createDeclWithClangNode<StructDecl>(
-      decl, AccessLevel::Public, Loc, name, Loc, std::nullopt, nullptr, dc);
+      decl, importer::convertClangAccess(decl->getAccess()), Loc, name, Loc,
+      std::nullopt, nullptr, dc);
   Impl.ImportedDecls[{decl->getCanonicalDecl(), getVersion()}] = structDecl;
 
   // Compute the underlying type.
@@ -6715,7 +6709,7 @@ Decl *SwiftDeclConverter::importGlobalAsInitializer(
   }
 
   auto result = Impl.createDeclWithClangNode<ConstructorDecl>(
-      decl, AccessLevel::Public, name,
+      decl, importer::convertClangAccess(decl->getAccess()), name,
       Impl.importSourceLoc(decl->getLocation()), failable,
       /*FailabilityLoc=*/SourceLoc(),
       /*Async=*/false, /*AsyncLoc=*/SourceLoc(),
@@ -6896,8 +6890,8 @@ SwiftDeclConverter::getImplicitProperty(ImportedName importedName,
   Type swiftPropertyType = importedType.getType();
 
   auto property = Impl.createDeclWithClangNode<VarDecl>(
-      getter, AccessLevel::Public, /*IsStatic*/isStatic,
-      VarDecl::Introducer::Var, SourceLoc(),
+      getter, importer::convertClangAccess(getter->getAccess()),
+      /*IsStatic*/ isStatic, VarDecl::Introducer::Var, SourceLoc(),
       propertyName, dc);
   property->setInterfaceType(swiftPropertyType);
   property->setIsObjC(false);
@@ -9262,17 +9256,6 @@ ClangImporter::Implementation::importDeclImpl(const clang::NamedDecl *ClangDecl,
   if (ClangDecl->isInvalidDecl())
     return nullptr;
 
-  // Private and protected C++ class members should never be used from Swift,
-  // however, parts of the Swift typechecker rely on being able to iterate over
-  // all of the stored fields of a particular struct. This means we still need
-  // to add private fields to the Swift AST.
-  // 
-  // Other kinds of private and protected C++ decls are not relevant for Swift.
-  clang::AccessSpecifier access = ClangDecl->getAccess();
-  if ((access == clang::AS_protected || access == clang::AS_private) &&
-      !isa<clang::FieldDecl>(ClangDecl))
-    return nullptr;
-
   bool SkippedOverTypedef = false;
   Decl *Result = nullptr;
   if (auto *UnderlyingDecl = canSkipOverTypedef(*this, ClangDecl,
@@ -9900,16 +9883,14 @@ markUnavailable(ValueDecl *decl, StringRef unavailabilityMsgRef) {
 
 /// Create a decl with error type and an "unavailable" attribute on it
 /// with the specified message.
-ValueDecl *ClangImporter::Implementation::
-createUnavailableDecl(Identifier name, DeclContext *dc, Type type,
-                      StringRef UnavailableMessage, bool isStatic,
-                      ClangNode ClangN) {
+ValueDecl *ClangImporter::Implementation::createUnavailableDecl(
+    Identifier name, DeclContext *dc, Type type, StringRef UnavailableMessage,
+    bool isStatic, ClangNode ClangN, AccessLevel access) {
 
   // Create a new VarDecl with dummy type.
-  auto var = createDeclWithClangNode<VarDecl>(ClangN, AccessLevel::Public,
-                                              /*IsStatic*/isStatic,
-                                              VarDecl::Introducer::Var,
-                                              SourceLoc(), name, dc);
+  auto var = createDeclWithClangNode<VarDecl>(
+      ClangN, access,
+      /*IsStatic*/ isStatic, VarDecl::Introducer::Var, SourceLoc(), name, dc);
   var->setIsObjC(false);
   var->setIsDynamic(false);
   var->setInterfaceType(type);
