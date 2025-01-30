@@ -17,3 +17,32 @@ struct MemberInjectingMacro: MemberMacro {
     return [member]
   }
 }
+
+struct PeerInjectingMacro: PeerMacro {
+  public static func expansion(
+    of node: AttributeSyntax,
+    providingPeersOf decl: some DeclSyntaxProtocol,
+    in context: some MacroExpansionContext
+  ) throws -> [DeclSyntax] {
+    let peer: DeclSyntax =
+      """
+      struct FixedNamePeer {}
+      """
+
+    return [peer]
+  }
+}
+
+struct FreestandingInjectingMacro: DeclarationMacro {
+  public static func expansion(
+    of node: some FreestandingMacroExpansionSyntax,
+    in context: some MacroExpansionContext
+  ) throws -> [DeclSyntax] {
+    let peer: DeclSyntax =
+      """
+      struct FixedNameFreestander {}
+      """
+
+    return [peer]
+  }
+}

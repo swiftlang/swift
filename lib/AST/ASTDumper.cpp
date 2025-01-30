@@ -1905,6 +1905,21 @@ namespace {
       printSourceRange(D->getSourceRange(), &D->getASTContext());
       printFlag(D->TrailingSemiLoc.isValid(), "trailing_semi",
                 DeclModifierColor);
+
+      if (Writer.isParsable()) {
+        // Print just the USRs of any auxiliary decls associated with this decl,
+        // which lets us relate macro expansions back to their originating decl
+        // if desired.
+        std::vector<std::string> auxiliaryUSRs;
+        D->visitAuxiliaryDecls([&auxiliaryUSRs](Decl *auxDecl) {
+          if (auto usr = declUSR(auxDecl); !usr.empty()) {
+            auxiliaryUSRs.push_back(usr);
+          }
+        });
+        printStringListField(
+            auxiliaryUSRs, [&](auto usr) { return usr; },
+            Label::always("auxiliary_decl_usrs"));
+      }
     }
 
     void printInherited(InheritedTypes Inherited) {
@@ -2274,31 +2289,50 @@ namespace {
         }, Label::always("compiler_version"));
       }
 
-      std::optional<std::vector<ASTNode>> items;
+      std::vector<ASTNode> items;
+      bool shouldPrintImplicit;
+
       switch (MemberLoading) {
       case ASTDumpMemberLoading::None:
-        items = SF.getCachedTopLevelItems();
+        shouldPrintImplicit = false;
+        if (auto cached = SF.getCachedTopLevelItems()) {
+          items = *cached;
+        }
         break;
       case ASTDumpMemberLoading::Parsed:
-      case ASTDumpMemberLoading::TypeChecked:
+        shouldPrintImplicit = false;
         items = SF.getTopLevelItems();
         break;
-      }
-      if (items) {
-        printList(*items, [&](ASTNode item, Label label) {
-          if (item.isImplicit())
-            return;
+      case ASTDumpMemberLoading::TypeChecked:
+        shouldPrintImplicit = true;
+        for (ASTNode item : SF.getTopLevelItems()) {
+          items.push_back(item);
 
+          // If the item is a decl, also collect any auxiliary decls associated
+          // with it so that we get macro expansions.
           if (auto decl = item.dyn_cast<Decl *>()) {
-            printRec(decl, label);
-          } else if (auto stmt = item.dyn_cast<Stmt *>()) {
-            printRec(stmt, &SF.getASTContext(), label);
-          } else {
-            auto expr = item.get<Expr *>();
-            printRec(expr, label);
+            decl->visitAuxiliaryDecls(
+                [&items](Decl *auxDecl) { items.push_back(auxDecl); });
           }
-        }, Label::optional("items"));
+        }
+        break;
       }
+      printList(
+          items,
+          [&](ASTNode item, Label label) {
+            if (!shouldPrintImplicit && item.isImplicit())
+              return;
+
+            if (auto decl = item.dyn_cast<Decl *>()) {
+              printRec(decl, label);
+            } else if (auto stmt = item.dyn_cast<Stmt *>()) {
+              printRec(stmt, &SF.getASTContext(), label);
+            } else {
+              auto expr = item.get<Expr *>();
+              printRec(expr, label);
+            }
+          },
+          Label::optional("items"));
       printFoot();
     }
 
