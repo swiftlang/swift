@@ -21,6 +21,8 @@
 
 #include "SymbolGraph.h"
 
+#include <string>
+
 namespace swift {
 
 class Decl;
@@ -144,7 +146,21 @@ public:
   /// extension block symbol, or if its members should be directly associated
   /// with its extended nominal.
   virtual bool shouldBeRecordedAsExtension(const ExtensionDecl *ED) const;
+
+  /// Returns the owning module of the given decl. Loads the module from Clang if necessary, to
+  /// correctly fetch owning submodules.
+  virtual ModuleDecl *getRealModuleOf(const Decl *D) const;
 };
+
+LLVM_ATTRIBUTE_USED
+static std::string getFullModuleName(const ModuleDecl *M) {
+    if (!M) return "";
+
+    std::string fullName;
+    llvm::raw_string_ostream OS(fullName);
+    M->getReverseFullModuleName().printForward(OS);
+    return fullName;
+}
 
 } // end namespace symbolgraphgen
 } // end namespace swift
