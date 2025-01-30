@@ -22,7 +22,6 @@ AccessInversionTestSuite.test("usePrivateAlias") {
 
 AccessInversionTestSuite.test("usePrivateRec") {
     let p = Leaky.staticReturningPrivateRec()
-    // TODO: should privateRecMethod() be accessible, even if we can't name its type?
     // p.privateRecMethod()
     var r = Leaky.RecWithPrivateRec()
     r.mem = p
@@ -34,16 +33,11 @@ AccessInversionTestSuite.test("usePrivateEnum") {
 }
 
 AccessInversionTestSuite.test("usePrivateEnumClass") {
-    // TODO: should private enum class members be accessible?
-    // let e = Leaky.AliasToPrivateEnumClass.privateEnumClassMember
-
     let e = Leaky.AliasToPrivateEnumClass(rawValue: 0)!
 
     switch e {
-    // TODO: should private enum class members be accessible?
-    // case .privateEnumClassMember:
     default:
-      // There is not much to test since we can't actually access variants
+      // There is not much to test since we can't access private enums' variants
       expectEqual(e.rawValue, 0)
     }
 }

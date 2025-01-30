@@ -19,7 +19,7 @@ var publicClosedEnumVar: PublicPrivate.PublicClosedEnum
 var publicOpenEnumVar: PublicPrivate.PublicOpenEnum
 var publicFlagEnumVar: PublicPrivate.PublicFlagEnum
 
-// TODO: nested enum members aren't being imported correctly yet. rdar://143859248
+// TODO: nested enum members aren't being imported correctly yet (#54905)
 // Once they are, verify that they are accessible.
 // print(PublicPrivate.PublicEnumValue1)
 // print(PublicPrivate.PublicAnonymousEnumValue)
@@ -39,7 +39,7 @@ var privateClosedEnumVar: PublicPrivate.PrivateClosedEnum // expected-error {{'P
 var privateOpenEnumVar: PublicPrivate.PrivateOpenEnum // expected-error {{'PrivateOpenEnum' is inaccessible due to 'private' protection level}}
 var privateFlagEnumVar: PublicPrivate.PrivateFlagEnum // expected-error {{'PrivateFlagEnum' is inaccessible due to 'private' protection level}}
 
-// TODO: nested enum members aren't being imported correctly yet. rdar://143859248
+// TODO: nested enum members aren't being imported correctly yet (#54905)
 // Once they are, verify that this throws an error (similar to above).
 // print(PublicPrivate.PrivateEnumValue1)
 // print(PublicPrivate.PrivateAnonymousEnumValue1)

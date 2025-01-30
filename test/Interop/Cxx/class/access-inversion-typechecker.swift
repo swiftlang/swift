@@ -138,7 +138,8 @@ func usePrivateRec(a: inout Leaky.AliasToPrivateRec) -> Leaky.AliasToPrivateRec 
     // Using PrivateRec
     //
 
-    // TODO: should privateRecMethod() be accessible, even if we can't name its type?
+    // NOTE: privateRecMethod() is not accessible here even though it is
+    // a public method of PrivateRec.
 
     a.privateRecMethod()
     // expected-error@-1 {{'privateRecMethod' is inaccessible due to 'private' protection level}}
@@ -206,7 +207,7 @@ func usePrivateEnum(a: inout Leaky.AliasToPrivateEnum) -> Leaky.AliasToPrivateEn
     // Constructing and reading PrivateEnum
     //
 
-    // TODO: nested enum members are not being imported
+    // TODO: nested enum members are not being imported (#54905)
     // let _ = Leaky.privateEnumMember
     let rv0 = Leaky.AliasToPrivateEnum(rawValue: 0)!
     let _ = Leaky.PrivateEnum(rawValue: 0)!
@@ -274,7 +275,9 @@ func usePrivateEnumClass(a: inout Leaky.AliasToPrivateEnumClass) -> Leaky.AliasT
     // Constructing and reading PrivateEnumClass
     //
 
-    // TODO: should private enum class members be accessible?
+    // NOTE: private enum class members are not accessible even if we can access
+    // instances of the private enum class via
+
     let _ = Leaky.AliasToPrivateEnumClass.privateEnumClassMember
     // expected-error@-1 {{'privateEnumClassMember' is inaccessible due to 'private' protection level}}
     let _ = Leaky.PrivateEnumClass.privateEnumClassMember
@@ -293,7 +296,6 @@ func usePrivateEnumClass(a: inout Leaky.AliasToPrivateEnumClass) -> Leaky.AliasT
     // expected-error@-1 {{'PrivateEnumClass' is inaccessible due to 'private' protection level}}
 
     switch rv0 {
-    // TODO: should private enum class members be accessible?
     case .privateEnumClassMember:
     // expected-error@-1 {{'privateEnumClassMember' is inaccessible due to 'private' protection level}}
       doSomething()
