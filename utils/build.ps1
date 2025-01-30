@@ -2146,41 +2146,47 @@ function Build-Dispatch([Platform]$Platform, $Arch, [switch]$Test = $false) {
 }
 
 function Test-Dispatch([Platform]$Platform) {
-  # TODO: One emulator instance for all tests?
-  $emulator = "$BinaryCache\android-sdk\emulator\emulator.exe"
-  Write-Host    "$emulator -version"
-  Invoke-Program $emulator "-version"
+  # Install packages and create test device
+  Isolate-EnvVars {
+    $env:JAVA_HOME = "$BinaryCache\android-sdk-jdk\jdk-17.0.14+7"
+    $env:Path = "${env:JAVA_HOME}\bin;${env:Path}"
 
-  # Dump virtual devices (again) to confirm that swift-test-device exists
-  Invoke-Program "$BinaryCache\android-sdk\cmdline-tools\latest\bin\avdmanager.bat" list avd
+    # TODO: One emulator instance for all tests?
+    $emulator = "$BinaryCache\android-sdk\emulator\emulator.exe"
+    Write-Host    "$emulator -version"
+    Invoke-Program $emulator "-version"
 
-  Start-Process -FilePath $emulator -ArgumentList "@swift-test-device"
-  Start-Sleep -Seconds 30
+    # Dump virtual devices (again) to confirm that swift-test-device exists
+    Invoke-Program "$BinaryCache\android-sdk\cmdline-tools\latest\bin\avdmanager.bat" list avd
 
-  # This is just a hack for now
-  $CachePath = (Get-TargetProjectBinaryCache $AndroidX64 Dispatch)
-  $CacheName = Split-Path $CachePath -Leaf
-  $RemoteRoot = "/data/local/tmp"
+    Start-Process -FilePath $emulator -ArgumentList "@swift-test-device"
+    Start-Sleep -Seconds 30
 
-  # TODO: On my local machine I have to grant adb.exe network access once. How to do that in CI?
-  $adb = "$BinaryCache\android-sdk\platform-tools\adb.exe"
-  Write-Host    "$adb version"
-  Invoke-Program $adb "version"
-  Write-Host    "$adb get-state @swift-test-device"
-  &              $adb get-state "@swift-test-device"
-  Write-Host    "$adb logcat -d @swift-test-device"
-  &              $adb logcat -d "@swift-test-device"
-  #Write-Host    "$BinaryCache\android-sdk\.temp\emulator.out log:"
-  #Write-Host    (Get-Content -Path "$BinaryCache\android-sdk\.temp\emulator.out")
-  #Write-Host    "$BinaryCache\android-sdk\.temp\emulator.err log:"
-  #Write-Host    (Get-Content -Path "$BinaryCache\android-sdk\.temp\emulator.err")
-  Invoke-Program $adb "wait-for-device"
-  Write-Host    "$adb push $CachePath $RemoteRoot"
-  Invoke-Program $adb push $CachePath $RemoteRoot
-  Write-Host    "$adb shell sh $RemoteRoot/$CacheName/tests/ctest-android.sh"
-  Invoke-Program $adb shell "sh $RemoteRoot/$CacheName/tests/ctest-android.sh"
-  Invoke-Program $adb emu kill
-  Invoke-Program $adb kill-server
+    # This is just a hack for now
+    $CachePath = (Get-TargetProjectBinaryCache $AndroidX64 Dispatch)
+    $CacheName = Split-Path $CachePath -Leaf
+    $RemoteRoot = "/data/local/tmp"
+
+    # TODO: On my local machine I have to grant adb.exe network access once. How to do that in CI?
+    $adb = "$BinaryCache\android-sdk\platform-tools\adb.exe"
+    Write-Host    "$adb version"
+    Invoke-Program $adb "version"
+    Write-Host    "$adb get-state @swift-test-device"
+    &              $adb get-state "@swift-test-device"
+    Write-Host    "$adb logcat -d @swift-test-device"
+    &              $adb logcat -d "@swift-test-device"
+    #Write-Host    "$BinaryCache\android-sdk\.temp\emulator.out log:"
+    #Write-Host    (Get-Content -Path "$BinaryCache\android-sdk\.temp\emulator.out")
+    #Write-Host    "$BinaryCache\android-sdk\.temp\emulator.err log:"
+    #Write-Host    (Get-Content -Path "$BinaryCache\android-sdk\.temp\emulator.err")
+    Invoke-Program $adb "wait-for-device"
+    Write-Host    "$adb push $CachePath $RemoteRoot"
+    Invoke-Program $adb push $CachePath $RemoteRoot
+    Write-Host    "$adb shell sh $RemoteRoot/$CacheName/tests/ctest-android.sh"
+    Invoke-Program $adb shell "sh $RemoteRoot/$CacheName/tests/ctest-android.sh"
+    Invoke-Program $adb emu kill
+    Invoke-Program $adb kill-server
+  }
 }
 
 function Build-Foundation([Platform]$Platform, $Arch, [switch]$Test = $false) {
