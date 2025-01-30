@@ -150,7 +150,7 @@ extension SwiftBacktrace {
       if thread.id == target.crashingThread {
         write(#""crashed": true, "#)
       }
-      if args.registers! == .all {
+      if args.registers! == .all || thread.id == target.crashingThread {
         if let context = thread.context {
           write(#""registers": {"#)
           outputJSONRegisterDump(context)
@@ -241,7 +241,7 @@ extension SwiftBacktrace {
       }
       write(" ] ")
 
-      write("} ")
+      write("}")
 
       if args.showImages! == .mentioned {
         switch thread.backtrace {
@@ -265,8 +265,8 @@ extension SwiftBacktrace {
       }
     }
 
+    write(#", "threads": [ "#)
     if args.threads! {
-      write(#", "threads": [ "#)
       var first = true
       for (ndx, thread) in target.threads.enumerated() {
         if first {
@@ -276,19 +276,14 @@ extension SwiftBacktrace {
         }
         outputJSONThread(ndx: ndx, thread: thread)
       }
-      write("]")
     } else {
-      write(#", "crashedThread": "#)
       outputJSONThread(ndx: target.crashingThreadNdx,
                        thread: crashingThread)
     }
+    write(" ]")
 
-    if args.registers! == .crashedOnly {
-      if let context = target.threads[target.crashingThreadNdx].context {
-        write(#", "registers": { "#)
-        outputJSONRegisterDump(context)
-        write(" }")
-      }
+    if !args.threads! && target.threads.count > 1 {
+      write(", \"omittedThreads\": \(target.threads.count - 1)")
     }
 
     if !capturedBytes.isEmpty && !(args.sanitize ?? false) {

@@ -22,7 +22,6 @@
 // RUN: %validate-json %t/crash7.json
 // RUN: %validate-json %t/crash8.json
 
-
 // UNSUPPORTED: use_os_stdlib
 // UNSUPPORTED: back_deployment_runtime
 // UNSUPPORTED: asan
@@ -87,6 +86,12 @@ struct Crash {
 // CHECK-NEXT: "threads": [
 // CHECK-NEXT:   {
 // CHECK-NEXT:     "crashed": true,
+// CHECK-NEXT:     "registers": {
+// CHECK-NEXT:       "{{.*}}": "0x{{[0-9a-f]+}}",
+
+// More registers here, but the number is system specific
+
+// CHECK:          },
 // CHECK-NEXT:     "frames": [
 // CHECK-NEXT:       {
 // CHECK-NEXT:         "kind": "programCounter",
@@ -97,7 +102,7 @@ struct Crash {
 // CHECK-NEXT:         "image": "Crash",
 // CHECK-NEXT:         "sourceLocation": {
 // CHECK-NEXT:           "file": "{{.*}}/JSON.swift",
-// CHECK-NEXT:           "line": 52,
+// CHECK-NEXT:           "line": 51,
 // CHECK-NEXT:           "column": 15
 // CHECK-NEXT:         }
 // CHECK-NEXT:       },
@@ -110,7 +115,7 @@ struct Crash {
 // CHECK-NEXT:         "image": "Crash",
 // CHECK-NEXT:         "sourceLocation": {
 // CHECK-NEXT:           "file": "{{.*}}/JSON.swift",
-// CHECK-NEXT:           "line": 46,
+// CHECK-NEXT:           "line": 45,
 // CHECK-NEXT:           "column": 3
 // CHECK-NEXT:         }
 // CHECK-NEXT:       },
@@ -123,7 +128,7 @@ struct Crash {
 // CHECK-NEXT:         "image": "Crash",
 // CHECK-NEXT:         "sourceLocation": {
 // CHECK-NEXT:           "file": "{{.*}}/JSON.swift",
-// CHECK-NEXT:           "line": 42,
+// CHECK-NEXT:           "line": 41,
 // CHECK-NEXT:           "column": 3
 // CHECK-NEXT:         }
 // CHECK-NEXT:       },
@@ -136,7 +141,7 @@ struct Crash {
 // CHECK-NEXT:         "image": "Crash",
 // CHECK-NEXT:         "sourceLocation": {
 // CHECK-NEXT:           "file": "{{.*}}/JSON.swift",
-// CHECK-NEXT:           "line": 38,
+// CHECK-NEXT:           "line": 37,
 // CHECK-NEXT:           "column": 3
 // CHECK-NEXT:         }
 // CHECK-NEXT:       },
@@ -149,7 +154,7 @@ struct Crash {
 // CHECK-NEXT:         "image": "Crash",
 // CHECK-NEXT:         "sourceLocation": {
 // CHECK-NEXT:           "file": "{{.*}}/JSON.swift",
-// CHECK-NEXT:           "line": 34,
+// CHECK-NEXT:           "line": 33,
 // CHECK-NEXT:           "column": 3
 // CHECK-NEXT:         }
 // CHECK-NEXT:       },
@@ -162,7 +167,7 @@ struct Crash {
 // CHECK-NEXT:         "image": "Crash",
 // CHECK-NEXT:         "sourceLocation": {
 // CHECK-NEXT:           "file": "{{.*}}/JSON.swift",
-// CHECK-NEXT:           "line": 58,
+// CHECK-NEXT:           "line": 57,
 // CHECK-NEXT:           "column": 5
 // CHECK-NEXT:         }
 // CHECK-NEXT:       },
@@ -200,12 +205,6 @@ struct Crash {
 // CHECK:          ]
 // CHECK:        }
 // CHECK-NEXT: ],
-// CHECK-NEXT: "registers": {
-// CHECK-NEXT:   "{{.*}}": "0x{{[0-9a-f]+}}",
-
-// More registers here, again, system specific
-
-// CHECK:      },
 // CHECK-NEXT: "capturedMemory": {
 // CHECK-NEXT:   "0x{{[[0-9a-f]+}}": "{{([0-9a-f][0-9a-f])+}}",
 

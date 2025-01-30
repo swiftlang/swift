@@ -352,6 +352,14 @@ strings, rather than as numbers, in order to avoid representational issues.
 Additionally, boolean fields that are ``false``, as well as fields whose
 values are unknown or empty, will normally be completely omitted to save space.
 
+Where hexadecimal *values* are output, they will normally be prefixed with
+a ``0x`` prefix.  Hexadecimal *data*, by contrast, such as captured memory or
+build IDs, will not have a prefix and will be formatted as a string with no
+whitespace.
+
+Note that since JSON does not officially support hexadecimal, hexadecimal
+values will always be output as strings.
+
 JSON crash logs will always contain the following top level fields:
 
 +-------------------+--------------------------------------------------------+
@@ -374,6 +382,8 @@ JSON crash logs will always contain the following top level fields:
 +-------------------+--------------------------------------------------------+
 | architecture      | The name of the processor architecture for this crash. |
 +-------------------+--------------------------------------------------------+
+| threads           | An array of thread records, one for each thread.       |
++-------------------+--------------------------------------------------------+
 
 These will be followed by some or all of the following, according to the
 backtracer settings:
@@ -381,27 +391,24 @@ backtracer settings:
 +-------------------+--------------------------------------------------------+
 | Field             | Value                                                  |
 +===================+========================================================+
-| threads           | An array of thread records, one for each thread (if the |
-|                   | backtracer is set to give backtraces for all threads). |
-+-------------------+--------------------------------------------------------+
-| crashedThread     | A single thread record for the crashing thread (if the |
-|                   | backtracer is set to give a backtrace only for the     |
-|                   | crashed thread).                                       |
-+-------------------+--------------------------------------------------------+
-| registers         | A dictionary containing the register contents on the   |
-|                   | crashed thread (if set to give registers for only the  |
-|                   | crashed thread).                                       |
-|                   |                                                        |
-|                   | The dictionary is keyed by architecture specific       |
-|                   | register name; values are given as hexadecimal         |
-|                   | strings.                                               |
+| omittedThreads    | A count of the number of threads that were omitted, if |
+|                   | the backtracer is set to give a backtrace only for the |
+|                   | crashed thread.  Omitted if zero.                      |
 +-------------------+--------------------------------------------------------+
 | capturedMemory    | A dictionary containing captured memory contents, if   |
 |                   | any.  This will not be present if the ``sanitize``     |
 |                   | setting is enabled, or if no data was captured.        |
 |                   |                                                        |
 |                   | The dictionary is keyed by hexadecimal addresses, as   |
-|                   | strings; values are also hexadecimal strings.          |
+|                   | strings (with a ``0x`` prefix); the captured data is   |
+|                   | also given as a hexadecimal string, but with no prefix |
+|                   | and no inter-byte whitespace.                          |
+|                   |                                                        |
+|                   | You should make no assumptions about the number of     |
+|                   | bytes captured at each address; the backtracer will    |
+|                   | currently attempt to grab 16 bytes, but this may       |
+|                   | change if only a shorter range is available or in      |
+|                   | future according to configuration parameters.          |
 +-------------------+--------------------------------------------------------+
 | omittedImages     | If ``images`` is set to ``mentioned``, this is an      |
 |                   | integer giving the number of images whose details were |
@@ -427,8 +434,16 @@ A thread record is a dictionary with the following fields:
 | crashed           | ``true`` if the thread is the one that crashed,        |
 |                   | omitted otherwise.                                     |
 +-------------------+--------------------------------------------------------+
-| registers         | If ``registers`` is set to ``all``, the registers for  |
-|                   | the thread (see above for the format).                 |
+| registers         | A dictionary containing the register contents on the   |
+|                   | crashed thread.                                        |
+|                   |                                                        |
+|                   | The dictionary is keyed by architecture specific       |
+|                   | register name; values are given as hexadecimal         |
+|                   | strings (with a ``0x`` prefix).                        |
+|                   |                                                        |
+|                   | This field may be omitted for threads other than the   |
+|                   | crashed thread, if the ``registers`` setting is set    |
+|                   | to ``crashed``.                                        |
 +-------------------+--------------------------------------------------------+
 | frames            | An array of frames forming the backtrace for the       |
 |                   | thread.                                                |
@@ -514,7 +529,8 @@ An image record is a dictionary with the following fields:
 | name              | The name of the image (omitted if not known).          |
 +-------------------+--------------------------------------------------------+
 | buildId           | The build ID (aka unique ID) of the image (omitted if  |
-|                   | not known).                                            |
+|                   | not known).  Build IDs are formatted as un-prefixed    |
+|                   | hexadecimal strings, with no inter-byte whitespace.    |
 +-------------------+--------------------------------------------------------+
 | path              | The path to the image (omitted if not known).          |
 +-------------------+--------------------------------------------------------+
