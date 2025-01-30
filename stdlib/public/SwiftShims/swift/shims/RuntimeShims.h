@@ -49,7 +49,7 @@ const char *_swift_stdlib_strtof_clocale(const char *nptr, float *outResult);
 SWIFT_RUNTIME_STDLIB_API
 const char *_swift_stdlib_strtof16_clocale(const char *nptr, __fp16 *outResult);
 
-SWIFT_RUNTIME_STDLIB_API
+SWIFT_CC(swift) SWIFT_RUNTIME_STDLIB_API
 void _swift_stdlib_immortalize(void *obj);
   
 SWIFT_RUNTIME_STDLIB_API
