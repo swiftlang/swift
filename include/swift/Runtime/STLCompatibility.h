@@ -1,4 +1,4 @@
-//===---- STLCompatibility.h - Runtime C++ Compatibiltiy Stubs --*- C++ -*-===//
+//===---- STLCompatibility.h - Runtime C++ Compatibility Stubs --*- C++ -*-===//
 //
 // This source file is part of the Swift.org open source project
 //
