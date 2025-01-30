@@ -23,6 +23,7 @@
 #include "swift/FrontendTool/FrontendTool.h"
 #include "Dependencies.h"
 #include "TBD.h"
+#include "swift/AST/ASTDumper.h"
 #include "swift/AST/ASTMangler.h"
 #include "swift/AST/AvailabilityScope.h"
 #include "swift/AST/DiagnosticsFrontend.h"
@@ -468,7 +469,7 @@ static bool dumpAST(CompilerInstance &Instance) {
   auto dumpAST = [&](SourceFile *SF, raw_ostream &out) {
     switch (opts.DumpASTFormat) {
     case FrontendOptions::ASTFormat::Default:
-      SF->dump(out, /*parseIfNeeded*/ true);
+      SF->dump(out, ASTDumpMemberLoading::Parsed);
       break;
     case FrontendOptions::ASTFormat::JSON:
       SF->dumpJSON(out);
