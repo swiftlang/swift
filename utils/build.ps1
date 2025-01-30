@@ -2100,7 +2100,7 @@ function Test-Dispatch([Platform]$Platform) {
                 -RedirectStandardOutput "$BinaryCache\android-sdk\.temp\emulator.out" `
                 -RedirectStandardError "$BinaryCache\android-sdk\.temp\emulator.err"
 
-  Start-Sleep -Seconds 20
+  Start-Sleep -Seconds 30
 
   # This is just a hack for now
   $CachePath = (Get-TargetProjectBinaryCache $AndroidX64 Dispatch)
@@ -2112,9 +2112,13 @@ function Test-Dispatch([Platform]$Platform) {
   Write-Host    "$adb version"
   Invoke-Program $adb "version"
   Write-Host    "$adb get-state @swift-test-device"
-  Invoke-Program $adb get-state "@swift-test-device"
+  &              $adb get-state "@swift-test-device"
   Write-Host    "$adb logcat -d @swift-test-device"
-  Invoke-Program $adb logcat -d "@swift-test-device"
+  &              $adb logcat -d "@swift-test-device"
+  Write-Host    "$BinaryCache\android-sdk\.temp\emulator.out log:"
+  Write-Host    (Get-Content -Path "$BinaryCache\android-sdk\.temp\emulator.out")
+  Write-Host    "$BinaryCache\android-sdk\.temp\emulator.err log:"
+  Write-Host    (Get-Content -Path "$BinaryCache\android-sdk\.temp\emulator.err")
   Invoke-Program $adb "wait-for-device"
   Write-Host    "$adb push $CachePath $RemoteRoot"
   Invoke-Program $adb push $CachePath $RemoteRoot
