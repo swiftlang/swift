@@ -2596,7 +2596,8 @@ bool TypeVarBindingProducer::computeNext() {
         // expression is non-optional), if we allow  both the solver would
         // find two solutions that differ only in location of optional
         // injection.
-        if (!TypeVar->getImpl().isClosureResultType() || objTy->isVoid()) {
+        if (!TypeVar->getImpl().isClosureResultType() || objTy->isVoid() ||
+            objTy->isTypeVariableOrMember()) {
           // If T is a type variable, only attempt this if both the
           // type variable we are trying bindings for, and the type
           // variable we will attempt to bind, both have the same

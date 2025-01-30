@@ -128,8 +128,14 @@ static bool isSupportedDisjunction(Constraint *disjunction) {
     if (choice->getKind() != ConstraintKind::BindOverload)
       return false;
 
-    if (auto *decl = getOverloadChoiceDecl(choice))
+    if (auto *decl = getOverloadChoiceDecl(choice)) {
+      // Cannot optimize declarations that return IUO because
+      // they form a disjunction over a result type once attempted.
+      if (decl->isImplicitlyUnwrappedOptional())
+        return false;
+
       return decl->getInterfaceType()->is<FunctionType>();
+    }
 
     return false;
   });
@@ -174,6 +180,18 @@ void forEachDisjunctionChoice(
     auto *decl = choice.getDeclOrNull();
     if (!decl)
       continue;
+
+    // Ignore declarations that come from implicitly imported modules
+    // when `MemberImportVisibility` feature is enabled otherwise
+    // we might end up favoring an overload that would be diagnosed
+    // as unavailable later.
+    if (cs.getASTContext().LangOpts.hasFeature(
+            Feature::MemberImportVisibility)) {
+      if (auto *useDC = constraint->getOverloadUseDC()) {
+        if (!useDC->isDeclImported(decl))
+          continue;
+      }
+    }
 
     // If disjunction choice is unavailable or disfavored we cannot
     // do anything with it.

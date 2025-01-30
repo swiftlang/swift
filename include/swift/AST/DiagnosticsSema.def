@@ -4745,7 +4745,7 @@ NOTE(ambiguous_because_of_trailing_closure,none,
      (bool, const ValueDecl *))
 
 // In-package resilience bypassing
-ERROR(cannot_bypass_resilience_due_to_missing_member,none,
+WARNING(cannot_bypass_resilience_due_to_missing_member,none,
       "cannot bypass resilience due to member deserialization failure while attempting to access %select{member %0|missing member}1 of %2 in module %3 from module %4",
       (Identifier, bool, Identifier, Identifier, Identifier))
 
@@ -5656,6 +5656,9 @@ ERROR(distributed_actor_func_unsupported_specifier, none,
 ERROR(distributed_actor_func_variadic, none,
       "cannot declare variadic argument %0 in %kind1",
       (DeclName, const ValueDecl *))
+ERROR(distributed_actor_func_typed_throws, none,
+      "cannot declare distributed function with typed throws",
+      ())
 NOTE(actor_mutable_state,none,
      "mutation of this %0 is only permitted within the actor",
      (DescriptiveDeclKind))
@@ -5967,6 +5970,9 @@ ERROR(actor_isolation_multiple_attr_2,none,
 ERROR(actor_isolation_multiple_attr_3,none,
       "%0 %1 has multiple actor-isolation attributes ('%2', '%3' and '%4')",
       (const Decl *, StringRef, StringRef, StringRef))
+ERROR(actor_isolation_multiple_attr_4,none,
+      "%0 %1 has multiple actor-isolation attributes ('%2', '%3', '%4', and '%5')",
+      (const Decl *, StringRef, StringRef, StringRef, StringRef))
 ERROR(actor_isolation_override_mismatch,none,
       "%0 %kind1 has different actor isolation from %2 overridden declaration",
       (ActorIsolation, const ValueDecl *, ActorIsolation))
@@ -8243,13 +8249,10 @@ ERROR(attr_abi_incompatible_with_silgen_name,none,
 //===----------------------------------------------------------------------===//
 // MARK: @execution Attribute
 //===----------------------------------------------------------------------===//
+
 ERROR(attr_execution_concurrent_only_on_async,none,
       "cannot use '@execution(concurrent)' on non-async %kind0",
       (ValueDecl *))
-
-ERROR(attr_execution_concurrent_incompatible_with_global_actor,none,
-      "cannot use '@execution(concurrent)' on %kind0 isolated to global actor %1",
-      (ValueDecl *, Type))
 
 ERROR(attr_execution_concurrent_incompatible_isolated_parameter,none,
       "cannot use '@execution(concurrent)' on %kind0 because it has "

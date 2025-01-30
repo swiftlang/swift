@@ -2409,6 +2409,11 @@ for host in "${ALL_HOSTS[@]}"; do
                     continue
                 fi
 
+                if [[ "${BUILD_SWIFT_TOOLS}" == "0" ]]; then
+                    echo "Skipping building Foundation Macros for ${host}, because the host tools are not being built"
+                    continue
+                fi
+
                 if [[ "${SKIP_CLEAN_FOUNDATION}" == "0" ]]
                 then
                   # The Swift project might have been changed, but CMake might
@@ -2556,11 +2561,6 @@ for host in "${ALL_HOSTS[@]}"; do
                     # https://cmake.org/cmake/help/latest/command/find_package.html
                     cmake_options+=(
                         -DCMAKE_FIND_ROOT_PATH:PATH="${CROSS_COMPILE_DEPS_PATH}"
-                    )
-                fi
-                if [[ "${host}" == "android-"* ]]; then
-                    cmake_options+=(
-                        -DCMAKE_HAVE_LIBC_PTHREAD=True
                     )
                 fi
                 ;;
@@ -3006,6 +3006,11 @@ for host in "${ALL_HOSTS[@]}"; do
                 # FIXME: Foundation doesn't build from the script on OS X
                 if [[ ${host} == "macosx"* ]]; then
                     echo "Skipping Foundation on OS X -- Foundation does not build for this platform"
+                    continue
+                fi
+
+                if [[ "${BUILD_SWIFT_TOOLS}" == "0" && "${product}" == "foundation_macros" ]]; then
+                    echo "Skipping installing Foundation Macros for ${host}, because the host tools are not being built"
                     continue
                 fi
 

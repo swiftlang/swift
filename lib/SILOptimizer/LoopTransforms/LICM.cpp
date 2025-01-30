@@ -890,6 +890,10 @@ void LoopTreeOptimization::analyzeCurrentLoop(
     for (auto &Inst : *BB) {
       if (hasOwnershipOperandsOrResults(&Inst)) {
         checkSideEffects(Inst, sideEffects, sideEffectsInBlock);
+        // Collect fullApplies to be checked in analyzeBeginAccess
+        if (auto fullApply = FullApplySite::isa(&Inst)) {
+          fullApplies.push_back(fullApply);
+        }
         continue;
       }
       switch (Inst.getKind()) {

@@ -1283,16 +1283,12 @@ private:
         DBuilder.createInheritance(UnsubstitutedType, SuperClassDITy, 0, 0,
                                    llvm::DINode::FlagZero);
       }
-
-      auto *OpaqueType = createPointerSizedStruct(
-          Scope, Decl ? Decl->getNameStr() : MangledName, File, 0, Flags,
-          MangledName, UnsubstitutedType);
-      return OpaqueType;
     }
 
-    auto *OpaqueType = createOpaqueStruct(
-        Scope, "", File, Line, SizeInBits, AlignInBits, Flags, MangledName,
-        collectGenericParams(Type), UnsubstitutedType);
+    auto *OpaqueType =
+        createOpaqueStruct(Scope, Decl ? Decl->getNameStr() : "", File, Line,
+                           SizeInBits, AlignInBits, Flags, MangledName,
+                           collectGenericParams(Type), UnsubstitutedType);
     DBuilder.replaceTemporary(std::move(FwdDecl), OpaqueType);
     return OpaqueType;
   }
@@ -1475,24 +1471,14 @@ private:
   }
 
   llvm::DIType *getOrCreateDesugaredType(Type Ty, DebugTypeInfo DbgTy) {
-    DebugTypeInfo BlandDbgTy(Ty, DbgTy.getFragmentStorageType(),
-                             DbgTy.getAlignment(), DbgTy.hasDefaultAlignment(),
+    DebugTypeInfo BlandDbgTy(Ty, DbgTy.getAlignment(),
+                             DbgTy.hasDefaultAlignment(),
                              DbgTy.isMetadataType(), DbgTy.isFixedBuffer());
     return getOrCreateType(BlandDbgTy);
   }
 
   uint64_t getSizeOfBasicType(CompletedDebugTypeInfo DbgTy) {
     uint64_t BitWidth = DbgTy.getSizeInBits();
-    llvm::Type *StorageType = DbgTy.getFragmentStorageType()
-                                  ? DbgTy.getFragmentStorageType()
-                                  : IGM.DataLayout.getSmallestLegalIntType(
-                                        IGM.getLLVMContext(), BitWidth);
-
-    if (StorageType)
-      return IGM.DataLayout.getTypeSizeInBits(StorageType);
-
-    // This type is too large to fit in a register.
-    assert(BitWidth > IGM.DataLayout.getLargestLegalIntTypeSizeInBits());
     return BitWidth;
   }
 
@@ -1732,8 +1718,7 @@ private:
 
   bool shouldCacheDIType(llvm::DIType *DITy, DebugTypeInfo &DbgTy) {
     // Don't cache a type alias to a forward declaration either.
-    if (DbgTy.isForwardDecl() || DbgTy.isFixedBuffer() ||
-        DITy->isForwardDecl())
+    if (DbgTy.isFixedBuffer() || DITy->isForwardDecl())
       return false;
 
     if (auto Ty = DbgTy.getType())
@@ -1744,6 +1729,14 @@ private:
     return true;
   }
 
+  std::optional<CompletedDebugTypeInfo> completeType(DebugTypeInfo DbgTy) {
+    if (!DbgTy.getType() || DbgTy.getType()->hasTypeParameter() ||
+        isa<IntegerType>(DbgTy.getType()))
+      return {};
+    return CompletedDebugTypeInfo::getFromTypeInfo(
+        DbgTy.getType(), IGM.getTypeInfoForUnlowered(DbgTy.getType()), IGM);
+  }
+
   llvm::DIType *createType(DebugTypeInfo DbgTy, StringRef MangledName,
                            llvm::DIScope *Scope, llvm::DIFile *File) {
     // FIXME: For SizeInBits, clang uses the actual size of the type on
@@ -1752,8 +1745,7 @@ private:
     // emitting the storage size of the struct, but it may be necessary
     // to emit the (target!) size of the underlying basic type.
     uint64_t SizeOfByte = CI.getTargetInfo().getCharWidth();
-    auto CompletedDbgTy = CompletedDebugTypeInfo::getFromTypeInfo(
-      DbgTy.getType(), IGM.getTypeInfoForUnlowered(DbgTy.getType()), IGM);
+    std::optional<CompletedDebugTypeInfo> CompletedDbgTy = completeType(DbgTy);
     std::optional<uint64_t> SizeInBitsOrNull;
     if (CompletedDbgTy)
       SizeInBitsOrNull = CompletedDbgTy->getSizeInBits();
@@ -1791,8 +1783,9 @@ private:
     case TypeKind::BuiltinFixedArray: {
       // TODO: provide proper array debug info
       unsigned FwdDeclLine = 0;
-      return createOpaqueStruct(Scope, "Builtin.FixedArray", MainFile, FwdDeclLine,
-                                SizeInBits, AlignInBits, Flags, MangledName);
+      return createOpaqueStruct(Scope, "Builtin.FixedArray", MainFile,
+                                FwdDeclLine, SizeInBits, AlignInBits, Flags,
+                                MangledName);
     }
 
     case TypeKind::BuiltinPackIndex:
@@ -1832,7 +1825,6 @@ private:
             llvm::dwarf::DW_LANG_Swift, nullptr, {}, nullptr,
             NumExtraInhabitants);
         return PTy;
-
       }
       llvm::DIDerivedType *PTy = DBuilder.createPointerType(
           nullptr, PtrSize, 0,
@@ -1862,8 +1854,8 @@ private:
       auto *Decl = StructTy->getDecl();
       auto L = getFileAndLocation(Decl);
       // No line numbers are attached to type forward declarations.  This is
-      // intentional: It interferes with the efficacy of incremental builds. We
-      // don't want a whitespace change to an secondary file trigger a
+      // intentional: It interferes with the efficacy of incremental builds.
+      // We don't want a whitespace change to an secondary file trigger a
       // recompilation of the debug info of a primary source file.
       unsigned FwdDeclLine = 0;
       if (Opts.DebugInfoLevel > IRGenDebugInfoLevel::ASTTypes) {
@@ -1983,30 +1975,18 @@ private:
       auto L = getFileAndLocation(Decl);
       unsigned FwdDeclLine = 0;
 
-      if (Opts.DebugInfoLevel > IRGenDebugInfoLevel::ASTTypes)
-        return createSpecializedStructOrClassType(
-            ClassTy, Decl, Scope, L.File, L.Line, SizeInBits, AlignInBits,
-            Flags, MangledName);
-
-      // TODO: We may want to peek at Decl->isObjC() and set this
-      // attribute accordingly.
-      assert(SizeInBits ==
-             CI.getTargetInfo().getPointerWidth(clang::LangAS::Default));
-      return createPointerSizedStruct(
-          Scope, Decl ? Decl->getNameStr() : MangledName, L.File, FwdDeclLine,
-          Flags, MangledName, SpecificationOf);
+      return createSpecializedStructOrClassType(ClassTy, Decl, Scope, L.File,
+                                                L.Line, SizeInBits, AlignInBits,
+                                                Flags, MangledName);
     }
 
     case TypeKind::Pack:
     case TypeKind::PackElement:
-      llvm_unreachable("Unimplemented!");
-
     case TypeKind::SILPack:
     case TypeKind::PackExpansion:
-      //assert(SizeInBits == CI.getTargetInfo().getPointerWidth(0));
-      return createPointerSizedStruct(Scope,
-                                      MangledName,
-                                      MainFile, 0, Flags, MangledName);
+      // assert(SizeInBits == CI.getTargetInfo().getPointerWidth(0));
+      return createPointerSizedStruct(Scope, MangledName, MainFile, 0, Flags,
+                                      MangledName);
 
     case TypeKind::BuiltinTuple:
       llvm_unreachable("BuiltinTupleType should not show up here");
@@ -2032,8 +2012,8 @@ private:
     case TypeKind::PackArchetype: {
       auto *Archetype = BaseTy->castTo<ArchetypeType>();
       AssociatedTypeDecl *assocType = nullptr;
-      if (auto depMemTy = Archetype->getInterfaceType()
-              ->getAs<DependentMemberType>())
+      if (auto depMemTy =
+              Archetype->getInterfaceType()->getAs<DependentMemberType>())
         assocType = depMemTy->getAssocType();
       auto L = getFileAndLocation(assocType);
       if (!L.File)
@@ -2057,9 +2037,9 @@ private:
 
         auto PTy =
             IGM.getLoweredType(ProtocolDecl->getInterfaceType()).getASTType();
-        auto PDbgTy = DebugTypeInfo::getFromTypeInfo(
-            ProtocolDecl->getInterfaceType(), IGM.getTypeInfoForLowered(PTy),
-            IGM);
+        auto PDbgTy =
+            DebugTypeInfo::getFromTypeInfo(ProtocolDecl->getInterfaceType(),
+                                           IGM.getTypeInfoForLowered(PTy), IGM);
         auto PDITy = getOrCreateType(PDbgTy);
         Protocols.push_back(
             DBuilder.createInheritance(FwdDecl.get(), PDITy, 0, 0, Flags));
@@ -2178,12 +2158,17 @@ private:
       // For TypeAlias types, the DeclContext for the aliased type is
       // in the decl of the alias type.
       DebugTypeInfo AliasedDbgTy(
-          AliasedTy, DbgTy.getFragmentStorageType(),
-          DbgTy.getAlignment(), DbgTy.hasDefaultAlignment(),
+          AliasedTy, DbgTy.getAlignment(), DbgTy.hasDefaultAlignment(),
           /* IsMetadataType = */ false, DbgTy.isFixedBuffer(),
           DbgTy.getNumExtraInhabitants());
-      return DBuilder.createTypedef(getOrCreateType(AliasedDbgTy), MangledName,
-                                    L.File, 0, Scope);
+      auto *TypeDef = DBuilder.createTypedef(getOrCreateType(AliasedDbgTy),
+                                             MangledName, L.File, 0, Scope);
+      // Bound generic types don't reference their type parameters in ASTTypes
+      // mode, so we need to artificially keep typealiases alive, since they can
+      // appear in reflection metadata.
+      if (Opts.DebugInfoLevel < IRGenDebugInfoLevel::DwarfTypes)
+        DBuilder.retainType(TypeDef);
+      return TypeDef;
     }
 
     case TypeKind::Locatable: {
@@ -2277,16 +2262,17 @@ private:
     // so skip the sanity check.
     if (CachedType->isTemporary())
       return true;
-    if (DbgTy.isForwardDecl())
-      return true;
-    auto CompletedDbgTy = CompletedDebugTypeInfo::getFromTypeInfo(
-      DbgTy.getType(), IGM.getTypeInfoForUnlowered(DbgTy.getType()), IGM);
     std::optional<uint64_t> SizeInBits;
+    std::optional<CompletedDebugTypeInfo> CompletedDbgTy = completeType(DbgTy);
     if (CompletedDbgTy)
       SizeInBits = CompletedDbgTy->getSizeInBits();
     unsigned CachedSizeInBits = getSizeInBits(CachedType);
-    if ((SizeInBits && CachedSizeInBits != *SizeInBits) ||
-        (!SizeInBits && CachedSizeInBits)) {
+    if (SizeInBits && CachedSizeInBits != *SizeInBits) {
+      // Note that CachedSizeInBits && !SizeInBits may happen and is benign,
+      // because the cached copy would win. When the sizeless type is generated
+      // it should be emitted as a forward declaration and thus never make it
+      // into the cache.
+
       // In some situation a specialized type is emitted with size 0, even if
       // the real type has a size.
       if (DbgTy.getType()->isSpecialized() && SizeInBits && *SizeInBits > 0 &&
@@ -2511,12 +2497,14 @@ private:
 
     // If this is a forward decl, create one for this mangled name and don't
     // cache it.
-    if (DbgTy.isForwardDecl() && !isa<TypeAliasType>(DbgTy.getType())) {
+    if (!isa<PrimaryArchetypeType>(DbgTy.getType()) &&
+        (DbgTy.isFixedBuffer() || !completeType(DbgTy))) {
       // In LTO type uniquing is performed based on the UID. Forward
       // declarations may not have a unique ID to avoid a forward declaration
       // winning over a full definition.
       auto *FwdDecl = DBuilder.createReplaceableCompositeType(
           llvm::dwarf::DW_TAG_structure_type, MangledName, Scope, 0, 0,
+
           llvm::dwarf::DW_LANG_Swift);
       FwdDeclTypes.emplace_back(
           std::piecewise_construct, std::make_tuple(MangledName),
@@ -2529,7 +2517,7 @@ private:
 
 
     if (!shouldCacheDIType(DITy, DbgTy))
-        return  DITy;
+      return DITy;
 
     // Incrementally build the DIRefMap.
     if (auto *CTy = dyn_cast<llvm::DICompositeType>(DITy)) {
@@ -3731,7 +3719,7 @@ void IRGenDebugInfoImpl::emitTypeMetadata(IRGenFunction &IGF,
   assert(PtrWidthInBits % 8 == 0);
   auto DbgTy = DebugTypeInfo::getTypeMetadata(
       getMetadataType(Name)->getDeclaredInterfaceType().getPointer(),
-      Metadata->getType(), Size(PtrWidthInBits / 8),
+      Size(PtrWidthInBits / 8),
       Alignment(CI.getTargetInfo().getPointerAlign(clang::LangAS::Default)));
   emitVariableDeclaration(IGF.Builder, Metadata, DbgTy, IGF.getDebugScope(),
                           {}, {OS.str().str(), 0, false},

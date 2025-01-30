@@ -4810,6 +4810,7 @@ bool ValueDecl::bypassResilienceInPackage(ModuleDecl *accessingModule) const {
         if (auto IDC = dyn_cast<IterableDeclContext>(this)) {
           // Recursively check if members and their members have failing
           // deserialization, and emit a diagnostic.
+          // FIXME: It throws a warning for now; need to upgrade to an error.
           IDC->checkDeserializeMemberErrorInPackage(accessingModule);
         }
       }
@@ -8526,6 +8527,14 @@ void VarDecl::emitLetToVarNoteIfSimple(DeclContext *UseDC) const {
      .fixItReplace(PBD->getLoc(), "var");
     return;
   }
+}
+
+std::optional<ExecutionKind>
+AbstractFunctionDecl::getExecutionBehavior() const {
+  auto *attr = getAttrs().getAttribute<ExecutionAttr>();
+  if (!attr)
+    return {};
+  return attr->getBehavior();
 }
 
 clang::PointerAuthQualifier VarDecl::getPointerAuthQualifier() const {
