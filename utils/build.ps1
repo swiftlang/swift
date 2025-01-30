@@ -432,6 +432,7 @@ enum TargetComponent {
   Testing
   ClangBuiltins
   ClangRuntime
+  SwiftInspect
 }
 
 function Get-TargetProjectBinaryCache($Arch, [TargetComponent]$Project) {
@@ -459,7 +460,6 @@ enum HostComponent {
   SourceKitLSP
   SymbolKit
   DocC
-  SwiftInspect
 }
 
 function Get-HostProjectBinaryCache([HostComponent]$Project) {
@@ -2874,19 +2874,37 @@ function Install-HostToolchain() {
   Copy-Item -Force $SwiftDriver "$($HostArch.ToolchainInstallRoot)\usr\bin\swiftc.exe"
 }
 
-function Build-Inspect() {
-  $SDKRoot = Get-HostSwiftSDK
+function Build-Inspect([Platform]$Platform, $Arch) {
+  $InstallPath = if ($Arch -eq $HostArch) {
+    # Place the host swift-inspect binary with the other toolchain binaries.
+    "$($HostArch.ToolchainInstallRoot)\usr"
+  } else {
+    "$($Arch.PlatformInstallRoot)\Developer\Library\$(Get-ModuleTriple $Arch)"
+  }
+
+  $ArgumentParserDir = if ($Platform -eq "Android") {
+    # TODO: remove this special-case when the toolchain build moves to a newer version of
+    # swift-argument-parser (>= 1.5.0). For now, let CMake fetch the dependency because
+    # older versions of swift-argument-parser do not build properly for Android.
+    ""
+  } else {
+    Get-HostProjectCMakeModules ArgumentParser
+  }
 
   Build-CMakeProject `
     -Src $SourceCache\swift\tools\swift-inspect `
-    -Bin (Get-HostProjectBinaryCache SwiftInspect) `
-    -InstallTo "$($HostArch.ToolchainInstallRoot)\usr" `
-    -Arch $HostArch `
+    -Bin (Get-TargetProjectBinaryCache $Arch SwiftInspect)`
+    -InstallTo $InstallPath `
+    -Arch $Arch `
+    -Platform $Platform `
     -UseBuiltCompilers C,CXX,Swift `
-    -SwiftSDK $SDKRoot `
+    -SwiftSDK $Arch.SDKInstallRoot `
     -Defines @{
-      CMAKE_Swift_FLAGS = @("-Xcc", "-I$SDKRoot\usr\include\swift\SwiftRemoteMirror");
-      ArgumentParser_DIR = (Get-HostProjectCMakeModules ArgumentParser);
+      CMAKE_Swift_FLAGS = @(
+        "-Xcc", "-I$($Arch.SDKInstallRoot)\usr\lib\swift",
+        "-Xcc", "-I$($Arch.SDKInstallRoot)\usr\include\swift\SwiftRemoteMirror",
+        "-L$($Arch.SDKInstallRoot)\usr\lib\swift\$Platform");
+      ArgumentParser_DIR = $ArgumentParserDir;
     }
 }
 
@@ -3033,6 +3051,13 @@ if (-not $SkipBuild) {
     Invoke-BuildStep Build-Sanitizers Windows $Arch
     Invoke-BuildStep Build-XCTest Windows $Arch
     Invoke-BuildStep Build-Testing Windows $Arch
+
+    # Windows swift-inspect only supports 64-bit platforms.
+    if ($Arch.VSName -eq "amd64" -or
+        $Arch.VSName -eq "arm64") {
+      Invoke-BuildStep Build-Inspect -Platform Windows -Arch $Arch
+    }
+
     Invoke-BuildStep Write-SDKSettingsPlist Windows $Arch
     Invoke-BuildStep Write-PlatformInfoPlist $Arch
   }
@@ -3053,6 +3078,13 @@ if (-not $SkipBuild) {
     Invoke-BuildStep Build-Sanitizers Android $Arch
     Invoke-BuildStep Build-XCTest Android $Arch
     Invoke-BuildStep Build-Testing Android $Arch
+
+    # Android swift-inspect only supports 64-bit platforms.
+    if ($Arch.AndroidArchABI -eq "arm64-v8a" -or
+        $Arch.AndroidArchABI -eq "x86_64") {
+      Invoke-BuildStep Build-Inspect -Platform Android -Arch $Arch
+    }
+
     Invoke-BuildStep Write-SDKSettingsPlist Android $Arch
     Invoke-BuildStep Write-PlatformInfoPlist $Arch
   }
@@ -3099,7 +3131,6 @@ if (-not $SkipBuild) {
   Invoke-BuildStep Build-LMDB $HostArch
   Invoke-BuildStep Build-IndexStoreDB $HostArch
   Invoke-BuildStep Build-SourceKitLSP $HostArch
-  Invoke-BuildStep Build-Inspect $HostArch
 }
 
 Install-HostToolchain
