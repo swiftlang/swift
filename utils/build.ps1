@@ -2096,10 +2096,7 @@ function Test-Dispatch([Platform]$Platform) {
   Write-Host    "$emulator -version"
   Invoke-Program $emulator "-version"
 
-  Start-Process -FilePath $emulator -ArgumentList "@swift-test-device" `
-                -RedirectStandardOutput "$BinaryCache\android-sdk\.temp\emulator.out" `
-                -RedirectStandardError "$BinaryCache\android-sdk\.temp\emulator.err"
-
+  Start-Process -FilePath $emulator -ArgumentList "@swift-test-device"
   Start-Sleep -Seconds 30
 
   # This is just a hack for now
