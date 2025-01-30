@@ -419,6 +419,12 @@ macro(configure_sdk_unix name architectures)
         else()
           message(FATAL_ERROR "unknown arch for ${prefix}: ${arch}")
         endif()
+
+        # If we are using an external sysroot, update path and CXX compile flags to point to it
+        if(CROSS_COMPILE_SYSROOT)
+          set(SWIFT_SDK_${prefix}_ARCH_${arch}_PATH ${CROSS_COMPILE_SYSROOT})
+          set(SWIFT_SDK_${prefix}_CXX_OVERLAY_SWIFT_COMPILE_FLAGS -Xcc --gcc-toolchain=${CROSS_COMPILE_SYSROOT}/usr)
+        endif()
       elseif("${prefix}" STREQUAL "FREEBSD")
         if(NOT arch MATCHES "(arm64|x86_64)")
           message(FATAL_ERROR "unsupported arch for FreeBSD: ${arch}")

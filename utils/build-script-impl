@@ -1751,6 +1751,15 @@ for host in "${ALL_HOSTS[@]}"; do
                     )
                 fi
 
+                # TODO: Add a new option here like --cross-compile-sysroot/CROSS_COMPILE_SYSROOT
+                if [ ! -z "${CROSS_COMPILE_DEPS_PATH}" ]; then
+                    cmake_options=(
+                        "${cmake_options[@]}"
+                        -DCROSS_COMPILE_SYSROOT:STRING="${CROSS_COMPILE_DEPS_PATH}"
+                        -DSWIFT_USE_LINKER:STRING="lld"
+                    )
+                fi
+
                 if [[ "${DARWIN_OVERLAY_TARGET}" != "" ]]; then
                     # Split LOCAL_HOST into a pair ``arch-sdk``
                     # Example LOCAL_HOST: macosx-x86_64
