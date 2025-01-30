@@ -3,7 +3,9 @@
 
 /// A record whose public members expose private members
 struct Leaky {
-public: Leaky() {} // Apparently necessary to ensure constructor is unambiguous in Swift
+public:
+  Leaky() {
+  } // Apparently necessary to ensure constructor is unambiguous in Swift
 
 private:
   typedef bool PrivateAlias;
@@ -49,30 +51,36 @@ public:
   };
 
   static PrivateAlias staticReturningPrivateAlias() { return privateAliasVal; }
-  static PrivateRec staticReturningPrivateRec()     { return privateRecVal; }
-  static PrivateEnum staticReturningPrivateEnum()   { return privateEnumVal; }
-  static PrivateEnumClass staticReturningPrivateEnumClass()   { return privateEnumClassVal; }
+  static PrivateRec staticReturningPrivateRec() { return privateRecVal; }
+  static PrivateEnum staticReturningPrivateEnum() { return privateEnumVal; }
+  static PrivateEnumClass staticReturningPrivateEnumClass() {
+    return privateEnumClassVal;
+  }
 
-  static void staticTakingPrivateAlias(PrivateAlias p){}
-  static void staticTakingPrivateRec(PrivateRec p)    {}
-  static void staticTakingPrivateEnum(PrivateEnum p)  {}
-  static void staticTakingPrivateEnumClass(PrivateEnumClass p)  {}
+  static void staticTakingPrivateAlias(PrivateAlias p) {}
+  static void staticTakingPrivateRec(PrivateRec p) {}
+  static void staticTakingPrivateEnum(PrivateEnum p) {}
+  static void staticTakingPrivateEnumClass(PrivateEnumClass p) {}
 
   PrivateAlias methodReturningPrivateAlias() const { return privateAliasVal; }
   PrivateRec methodReturningPrivateRec() const { return privateRecVal; }
   PrivateEnum methodReturningPrivateEnum() const { return privateEnumVal; }
-  PrivateEnumClass methodReturningPrivateEnumClass() const { return privateEnumClassVal; }
+  PrivateEnumClass methodReturningPrivateEnumClass() const {
+    return privateEnumClassVal;
+  }
 
   void methodTakingPrivateAlias(PrivateAlias p) const {}
   void methodTakingPrivateRec(PrivateRec p) const {}
   void methodTakingPrivateEnum(PrivateEnum p) const {}
   void methodTakingPrivateEnumClass(PrivateEnumClass p) const {}
 
-  void defaultArgOfPrivateRec(PrivateRec a=privateRecVal) const {}
-  void defaultArgOfPrivateEnum(PrivateEnum a=privateEnumMember) const {}
-  void defaultArgOfPrivateEnumClass(PrivateEnumClass a=PrivateEnumClass::privateEnumClassMember) const {}
-  void defaultArgOfPrivateConst(bool a=PRIVATE_CONST) const {}
-  void defaultArgOfPrivateRecConst(bool a=PrivateRec::PRIVATE_REC_CONST) const {}
+  void defaultArgOfPrivateRec(PrivateRec a = privateRecVal) const {}
+  void defaultArgOfPrivateEnum(PrivateEnum a = privateEnumMember) const {}
+  void defaultArgOfPrivateEnumClass(
+      PrivateEnumClass a = PrivateEnumClass::privateEnumClassMember) const {}
+  void defaultArgOfPrivateConst(bool a = PRIVATE_CONST) const {}
+  void
+  defaultArgOfPrivateRecConst(bool a = PrivateRec::PRIVATE_REC_CONST) const {}
 };
 
 #endif
