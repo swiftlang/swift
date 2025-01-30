@@ -2714,7 +2714,7 @@ public func _swift_getKeyPath(pattern: UnsafeMutableRawPointer,
   if let oncePtr = oncePtr {
     // Try to replace a null pointer in the cache variable with the instance
     // pointer.
-    let instancePtr = Unmanaged.passRetained(instance)
+    let instancePtr = Unmanaged.passUnretained(instance)
 
     while true {
       let (oldValue, won) = Builtin.cmpxchg_seqcst_seqcst_Word(
@@ -2725,7 +2725,7 @@ public func _swift_getKeyPath(pattern: UnsafeMutableRawPointer,
       // If the exchange succeeds, then the instance we formed is the canonical
       // one.
       if Bool(won) {
-        _swift_stdlib_immortalize(instance)
+        _swift_stdlib_immortalize(instancePtr.toOpaque())
         break
       }
 
@@ -2733,10 +2733,6 @@ public func _swift_getKeyPath(pattern: UnsafeMutableRawPointer,
       // and won. Their instance should be just as good as ours, so we can take
       // that one and let ours get deallocated.
       if let existingInstance = UnsafeRawPointer(bitPattern: Int(oldValue)) {
-        // Return the instantiated object at +1.
-        let object = Unmanaged<AnyKeyPath>.fromOpaque(existingInstance)
-        // Release the instance we created.
-        instancePtr.release()
         return existingInstance
       } else {
         // Try the cmpxchg again if it spuriously failed.
