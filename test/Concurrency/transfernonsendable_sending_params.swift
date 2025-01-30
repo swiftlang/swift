@@ -524,6 +524,12 @@ func taskIsolatedCaptureInSendingClosureLiteral(_ x: NonSendableKlass) {
     }()
   }
 
+  Task { // expected-warning {{passing closure as a 'sending' parameter risks causing data races between code in the current task and concurrent execution of the closure}}
+    { // expected-note {{closure captures 'x' which is accessible to code in the current task}}
+      print($0)
+    }(x)
+  }
+
   takeClosure { // expected-warning {{passing closure as a 'sending' parameter risks causing data races between code in the current task and concurrent execution of the closure}}
     print(x) // expected-note {{closure captures 'x' which is accessible to code in the current task}}
   }
