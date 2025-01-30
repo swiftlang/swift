@@ -411,9 +411,6 @@ namespace swift {
     /// implementation quirk of previous compilers.
     bool DisableNamedLazyImportAsMemberLoading = false;
 
-    /// Enable inference of Sendable conformances for public types.
-    bool EnableInferPublicSendable = false;
-
     /// Disable the implicit import of the _Concurrency module.
     bool DisableImplicitConcurrencyModuleImport =
         !SWIFT_IMPLICIT_CONCURRENCY_IMPORT;

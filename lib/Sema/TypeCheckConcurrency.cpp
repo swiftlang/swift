@@ -6846,10 +6846,8 @@ ProtocolConformance *swift::deriveImplicitSendableConformance(
 
   SendableCheck check;
 
-  // Okay to infer Sendable conformance for non-public types or when
-  // specifically requested.
-  if (nominal->getASTContext().LangOpts.EnableInferPublicSendable ||
-      !nominal->getFormalAccessScope(
+  // Okay to infer Sendable conformance for non-public types.
+  if (!nominal->getFormalAccessScope(
           /*useDC=*/nullptr, /*treatUsableFromInlineAsPublic=*/true)
             .isPublic()) {
     check = SendableCheck::Implicit;

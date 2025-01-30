@@ -291,9 +291,6 @@ def copy_propagation_state_EQ :
   HelpText<"Whether to enable copy propagation">,
   MetaVarName<"true|requested-passes-only|false">;
 
-def enable_infer_public_concurrent_value : Flag<["-"], "enable-infer-public-sendable">,
-    HelpText<"Enable inference of Sendable conformances for public structs and enums">;
-
 def disable_infer_public_concurrent_value : Flag<["-"], "disable-infer-public-sendable">,
     HelpText<"Disable inference of Sendable conformances for public structs and enums">;
 
