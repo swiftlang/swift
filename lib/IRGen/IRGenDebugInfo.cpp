@@ -1973,7 +1973,6 @@ private:
       auto *ClassTy = BaseTy->castTo<BoundGenericClassType>();
       auto *Decl = ClassTy->getDecl();
       auto L = getFileAndLocation(Decl);
-      unsigned FwdDeclLine = 0;
 
       return createSpecializedStructOrClassType(ClassTy, Decl, Scope, L.File,
                                                 L.Line, SizeInBits, AlignInBits,
