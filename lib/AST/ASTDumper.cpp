@@ -28,6 +28,7 @@
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/SourceFile.h"
+#include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/TypeVisitor.h"
 #include "swift/AST/USRGeneration.h"
 #include "swift/Basic/Assertions.h"
@@ -2731,7 +2732,11 @@ namespace {
 
     void visitMacroExpansionDecl(MacroExpansionDecl *MED, Label label) {
       printCommon(MED, "macro_expansion_decl", label);
-      printName(MED->getMacroName().getFullName(), Label::optional("name"));
+      if (MemberLoading == ASTDumpMemberLoading::TypeChecked) {
+        printDeclRefField(MED->getMacroRef(), Label::always("macro"));
+      } else {
+        printName(MED->getMacroName().getFullName(), Label::optional("name"));
+      }
       printRec(MED->getArgs(), Label::optional("args"));
       printFoot();
     }
@@ -4931,10 +4936,21 @@ public:
   }
   void visitCustomAttr(CustomAttr *Attr, Label label) {
     printCommon(Attr, "custom_attr", label);
-    printTypeField(Attr->getType(), Label::always("type"));
+    if (Attr->getType()) {
+      printTypeField(Attr->getType(), Label::always("type"));
+    } else if (MemberLoading == ASTDumpMemberLoading::TypeChecked) {
+      // If the type is null, it might be a macro reference. Try that if we're
+      // dumping the fully type-checked AST.
+      auto macroRef =
+          evaluateOrDefault(const_cast<ASTContext *>(Ctx)->evaluator,
+                            ResolveMacroRequest{Attr, DC}, ConcreteDeclRef());
+      if (macroRef) {
+        printDeclRefField(macroRef, Label::always("macro"));
+      }
+    }
     if (!Writer.isParsable()) {
       // The type has the semantic information we want for parsable outputs, so
-      // omit the `TypeRepr` there.
+      // omit the `TypeRepr` there. This also works for macro references.
       printRec(Attr->getTypeRepr(), Label::optional("type_repr"));
     }
     if (Attr->getArgs())
