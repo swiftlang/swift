@@ -606,8 +606,8 @@ Generate a backtrace for the parent process.
           while fd < 0 && (errno == EEXIST || errno == EINTR) {
             if errno != EINTR {
               ndx += 1
+              filename = "\(args.outputPath)/\(name)-\(pid)-\(now.tv_sec).\(now.tv_nsec)-\(ndx).\(ext)"
             }
-            filename = "\(args.outputPath)/\(name)-\(pid)-\(now.tv_sec).\(now.tv_nsec)-\(ndx).\(ext)"
             fd = open(filename, O_RDWR|O_CREAT|O_EXCL, 0o644)
           }
 

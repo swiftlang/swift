@@ -166,7 +166,7 @@ struct JSONAsync {
 // CHECK-NEXT:         "offset": [[OFFSET:[0-9]+]],
 // CHECK-NEXT:         "image": "JSONAsync",
 // CHECK-NEXT:         "sourceLocation": {
-// CHECK-NEXT:           "file": "{{/?}}<compiler-generated>",
+// CHECK-NEXT:           "file": "{{/*}}<compiler-generated>",
 // CHECK-NEXT:           "line": 0,
 // CHECK-NEXT:           "column": 0
 // CHECK-NEXT:         }
@@ -179,7 +179,7 @@ struct JSONAsync {
 // CHECK-NEXT:         "offset": [[OFFSET:[0-9]+]],
 // CHECK-NEXT:         "image": "JSONAsync",
 // CHECK-NEXT:         "sourceLocation": {
-// CHECK-NEXT:           "file": "{{/?}}<compiler-generated>",
+// CHECK-NEXT:           "file": "{{/*}}<compiler-generated>",
 // CHECK-NEXT:           "line": 0,
 // CHECK-NEXT:           "column": 0
 // CHECK-NEXT:         }
@@ -206,8 +206,8 @@ struct JSONAsync {
 // Maybe multiple images before this one
 
 // CHECK:          "name": "JSONAsync",
-// CHECK-NEXT:     "buildId": "{{([0-9a-f][0-9a-f])+}}",
-// CHECK-NEXT:     "path": "{{.*}}/JSONAsync",
+//                 "buildId": ... is optional
+// CHECK:          "path": "{{.*}}/JSONAsync",
 // CHECK-NEXT:     "baseAddress": "0x{{[0-9a-f]+}}",
 // CHECK-NEXT:     "endOfText": "0x{{[0-9a-f]+}}"
 // CHECK-NEXT:   }

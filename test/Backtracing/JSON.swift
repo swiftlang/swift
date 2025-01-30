@@ -85,7 +85,10 @@ struct Crash {
 
 // CHECK-NEXT: "threads": [
 // CHECK-NEXT:   {
-// CHECK-NEXT:     "crashed": true,
+
+// On Linux there's a name here
+
+// CHECK:          "crashed": true,
 // CHECK-NEXT:     "registers": {
 // CHECK-NEXT:       "{{.*}}": "0x{{[0-9a-f]+}}",
 
@@ -180,7 +183,7 @@ struct Crash {
 // CHECK-NEXT:         "description": "static Crash.$main() + [[OFFSET]]",
 // CHECK-NEXT:         "image": "Crash",
 // CHECK-NEXT:         "sourceLocation": {
-// CHECK-NEXT:           "file": "{{/?}}<compiler-generated>",
+// CHECK-NEXT:           "file": "{{/*}}<compiler-generated>",
 // CHECK-NEXT:           "line": 0,
 // CHECK-NEXT:           "column": 0
 // CHECK-NEXT:         }
@@ -218,8 +221,8 @@ struct Crash {
 // Maybe multiple images before this one
 
 // CHECK:          "name": "Crash",
-// CHECK-NEXT:     "buildId": "{{([0-9a-f][0-9a-f])+}}",
-// CHECK-NEXT:     "path": "{{.*}}/Crash",
+//                 "buildId": ... is optional
+// CHECK:          "path": "{{.*}}/Crash",
 // CHECK-NEXT:     "baseAddress": "0x{{[0-9a-f]+}}",
 // CHECK-NEXT:     "endOfText": "0x{{[0-9a-f]+}}"
 // CHECK-NEXT:   }
