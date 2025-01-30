@@ -1305,3 +1305,24 @@ do {
         })
   }
 }
+
+// rdar://143474313 - invalid error: member 'init(item:)' in 'Test.Item?' produces result of type 'Test.Item', but context expects 'Test.Item?'
+do {
+  struct List {
+    struct Item {
+    }
+
+    var items: [Item] = []
+  }
+
+  struct Test {
+    struct Item {
+      init(item: List.Item) {
+      }
+    }
+
+    let list: List
+
+    var items: [Test.Item] { .init(list.items.compactMap { .init(item: $0) }) } // Ok
+  }
+}
