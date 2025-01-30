@@ -2280,8 +2280,6 @@ static bool ParseSearchPathArgs(SearchPathOptions &Opts, ArgList &Args,
   }
   if (const Arg *A = Args.getLastArg(OPT_placeholder_dependency_module_map))
     Opts.PlaceholderDependencyModuleMap = A->getValue();
-  if (const Arg *A = Args.getLastArg(OPT_batch_scan_input_file))
-    Opts.BatchScanInputFilePath = A->getValue();
 
   if (const Arg *A = Args.getLastArg(OPT_const_gather_protocols_file))
     Opts.ConstGatherProtocolListFilePath = A->getValue();

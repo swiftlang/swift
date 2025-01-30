@@ -39,7 +39,7 @@ using llvm::BCVBR;
 
 /// Every .moddepcache file begins with these 4 bytes, for easy identification.
 const unsigned char MODULE_DEPENDENCY_CACHE_FORMAT_SIGNATURE[] = {'I', 'M', 'D','C'};
-const unsigned MODULE_DEPENDENCY_CACHE_FORMAT_VERSION_MAJOR = 8;
+const unsigned MODULE_DEPENDENCY_CACHE_FORMAT_VERSION_MAJOR = 9;
 /// Increment this on every change.
 const unsigned MODULE_DEPENDENCY_CACHE_FORMAT_VERSION_MINOR = 0;
 
@@ -203,7 +203,6 @@ using SwiftInterfaceModuleDetailsLayout =
                    FileIDField,                         // swiftInterfaceFile
                    FileIDArrayIDField,                  // compiledModuleCandidates
                    FlagIDArrayIDField,                  // buildCommandLine
-                   FlagIDArrayIDField,                  // extraPCMArgs
                    ContextHashIDField,                  // contextHash
                    IsFrameworkField,                    // isFramework
                    IsStaticField,                       // isStatic
@@ -219,7 +218,6 @@ using SwiftInterfaceModuleDetailsLayout =
 
 using SwiftSourceModuleDetailsLayout =
     BCRecordLayout<SWIFT_SOURCE_MODULE_DETAILS_NODE, // ID
-                   FlagIDArrayIDField,               // extraPCMArgs
                    FileIDField,                      // bridgingHeaderFile
                    FileIDArrayIDField,               // sourceFiles
                    FileIDArrayIDField,               // bridgingSourceFiles
@@ -260,7 +258,6 @@ using ClangModuleDetailsLayout =
                    ContextHashIDField,        // contextHash
                    FlagIDArrayIDField,        // commandLine
                    FileIDArrayIDField,        // fileDependencies
-                   FlagIDArrayIDField,        // capturedPCMArgs
                    IdentifierIDField,         // CASFileSystemRootID
                    IdentifierIDField,         // clangIncludeTreeRoot
                    IdentifierIDField,         // moduleCacheKey

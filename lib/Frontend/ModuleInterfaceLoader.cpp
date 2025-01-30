@@ -2120,7 +2120,7 @@ InterfaceSubContextDelegateImpl::runInSubContext(StringRef moduleName,
                                                  StringRef outputPath,
                                                  SourceLoc diagLoc,
     llvm::function_ref<std::error_code(ASTContext&, ModuleDecl*, ArrayRef<StringRef>,
-                          ArrayRef<StringRef>, StringRef, StringRef)> action) {
+                          StringRef, StringRef)> action) {
   return runInSubCompilerInstance(moduleName, interfacePath, sdkPath, outputPath,
                                   diagLoc, /*silenceErrors=*/false,
                                   [&](SubCompilerInstanceInfo &info){
@@ -2129,7 +2129,6 @@ InterfaceSubContextDelegateImpl::runInSubContext(StringRef moduleName,
     return action(info.Instance->getASTContext(),
                   info.Instance->getMainModule(),
                   info.BuildArguments,
-                  info.ExtraPCMArgs,
                   info.Hash,
                   UserModuleVer);
   });
@@ -2255,17 +2254,6 @@ InterfaceSubContextDelegateImpl::runInSubCompilerInstance(StringRef moduleName,
   auto langVersion = *(std::find(BuildArgs.rbegin(), BuildArgs.rend(),
                                  "-swift-version") - 1);
 
-  std::vector<StringRef> ExtraPCMArgs = {
-    // PCMs should use the effective Swift language version for apinotes.
-    "-Xcc",
-    ArgSaver.save((llvm::Twine("-fapinotes-swift-version=") + langVersion).str())
-  };
-  if (!subInvocation.getLangOptions().ClangTarget.has_value()) {
-    ExtraPCMArgs.insert(ExtraPCMArgs.begin(), {"-Xcc", "-target",
-                                               "-Xcc", target});
-  }
-
-  info.ExtraPCMArgs = ExtraPCMArgs;
   // Run the action under the sub compiler instance.
   return action(info);
 }
