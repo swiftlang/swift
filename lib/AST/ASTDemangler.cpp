@@ -677,6 +677,10 @@ Type ASTBuilder::createImplFunctionType(
     auto type = result.getType()->getCanonicalType();
     auto conv = getResultConvention(result.getConvention());
     auto options = *getResultOptions(result.getOptions());
+    // We currently set sending result at the function level, but we set sending
+    // result on each result.
+    if (flags.hasSendingResult())
+      options |= SILResultInfo::IsSending;
     funcResults.emplace_back(type, conv, options);
   }
 
