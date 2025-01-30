@@ -10357,14 +10357,3 @@ const UnifiedStatsReporter::TraceFormatter*
 FrontendStatsTracer::getTraceFormatter<const clang::Decl *>() {
   return &TF;
 }
-
-/*
- * Omissions SwiftDeclConverter:
- * - VisitNamespaceDecl(): namespaces are always "public"
- * - VisitNamespaceAliasDecl(): namespaces are always "public"
- * - VisitEnumDecl(): where enumKind != EnumKind::Unknown:
- *   + EnumKind::Constants (anonymous enums): these aren't imported at all
- *   + EnumKind::Options: FIXME: do this
- *   + EnumKind::{NonFrozenEnum,FrozenEnum}:
- *     * Obj-C error enums:
- */
