@@ -195,8 +195,6 @@ public:
   virtual Identifier
   getDiscriminatorForPrivateDecl(const Decl *D) const = 0;
 
-  virtual bool shouldCollectDisplayDecls() const { return true; }
-
   /// Finds all top-level decls in this file.
   ///
   /// This does a simple local lookup, not recursively looking through imports.

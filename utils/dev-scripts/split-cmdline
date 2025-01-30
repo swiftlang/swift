@@ -158,7 +158,6 @@ def main():
                 "-autolink-library",
                 "-b",
                 "-backup-module-interface-path",
-                "-batch-scan-input-file",
                 "-blocklist-file",
                 "-build-id",
                 "-cache-replay-prefix-map",

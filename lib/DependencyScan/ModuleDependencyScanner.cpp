@@ -78,7 +78,6 @@ findPathToDependency(ModuleDependencyID dependency,
                      const ModuleDependenciesCache &cache) {
   auto mainModuleDep = cache.findDependency(cache.getMainModuleName(),
                                             ModuleDependencyKind::SwiftSource);
-  // We may be in a batch scan instance which does not have this dependency
   if (!mainModuleDep.has_value())
     return {};
   auto mainModuleID = ModuleDependencyID{cache.getMainModuleName().str(),
@@ -331,13 +330,6 @@ ModuleDependencyScanner::getMainModuleDependencyInfo(ModuleDecl *mainModule) {
                                  .asAPINotesVersionString())
                                 .str();
 
-  // Compute the dependencies of the main module.
-  std::vector<StringRef> ExtraPCMArgs = {"-Xcc", apinotesVer};
-  if (!ScanASTContext.LangOpts.ClangTarget.has_value())
-    ExtraPCMArgs.insert(
-        ExtraPCMArgs.begin(),
-        {"-Xcc", "-target", "-Xcc", ScanASTContext.LangOpts.Target.str()});
-
   auto clangImporter =
       static_cast<ClangImporter *>(ScanASTContext.getClangModuleLoader());
   std::vector<std::string> buildArgs;
@@ -356,7 +348,7 @@ ModuleDependencyScanner::getMainModuleDependencyInfo(ModuleDecl *mainModule) {
   });
 
   auto mainDependencies = ModuleDependencyInfo::forSwiftSourceModule(
-       {}, buildCommands, {}, {}, {}, ExtraPCMArgs);
+       {}, buildCommands, {}, {}, {});
 
   if (ScanASTContext.CASOpts.EnableCaching) {
     std::vector<std::string> clangDependencyFiles;

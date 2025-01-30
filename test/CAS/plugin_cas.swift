@@ -31,9 +31,7 @@
 // RUN:   -cas-plugin-path %llvm_libs_dir/libCASPluginTest%llvm_plugin_ext \
 // RUN:   -cas-plugin-option first-prefix=myfirst- -cas-plugin-option second-prefix=mysecond- \
 // RUN:   -cas-plugin-option upstream-path=%t/cas-upstream
-// Check the contents of the JSON output
-// RUN: %validate-json %t/deps_clang_target.json &>/dev/null
-// RUN: %FileCheck -check-prefix CHECK_CLANG_TARGET %s < %t/deps_clang_target.json
+
 
 import C
 import E
@@ -58,11 +56,6 @@ import SubE
 // CHECK-DAG:     "swift": "_cross_import_E"
 // CHECK: ],
 
-// CHECK:      "extraPcmArgs": [
-// CHECK-NEXT:    "-Xcc",
-// CHECK-NEXT:    "-target",
-// CHECK-NEXT:    "-Xcc",
-// CHECK:         "-fapinotes-swift-version=4"
 // CHECK-NOT: "error: cannot open Swift placeholder dependency module map from"
 // CHECK: "bridgingHeader":
 // CHECK-NEXT: "path":
@@ -159,13 +152,6 @@ import SubE
 // CHECK: "5"
 // CHECK: ],
 // CHECK: "contextHash": "{{.*}}",
-// CHECK_NO_CLANG_TARGET: "extraPcmArgs": [
-// CHECK_NO_CLANG_TARGET-NEXT:   "-Xcc",
-// CHECK_NO_CLANG_TARGET-NEXT:   "-target",
-// CHECK_CLANG_TARGET: "extraPcmArgs": [
-// CHECK_CLANG_TARGET-NEXT:   "-Xcc",
-// CHECK_CLANG_TARGET-NEXT:   "-fapinotes-swift-version={{.*}}"
-// CHECK_CLANG_TARGET-NEXT:   ]
 
 /// --------Swift module E
 // CHECK: "swift": "E"

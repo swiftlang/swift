@@ -77,89 +77,6 @@ using namespace llvm::yaml;
 
 namespace {
 
-static std::string getScalaNodeText(Node *N) {
-  SmallString<32> Buffer;
-  return cast<ScalarNode>(N)->getValue(Buffer).str();
-}
-
-/// Parse an entry like this, where the "platforms" key-value pair is optional:
-///  {
-///     "swiftModuleName": "Foo",
-///     "arguments": "-target 10.15",
-///     "output": "../Foo.json"
-///  },
-static bool parseBatchInputEntries(ASTContext &Ctx, llvm::StringSaver &saver,
-                                   Node *Node,
-                                   std::vector<BatchScanInput> &result) {
-  auto *SN = cast<SequenceNode>(Node);
-  if (!SN)
-    return true;
-  for (auto It = SN->begin(); It != SN->end(); ++It) {
-    auto *MN = cast<MappingNode>(&*It);
-    BatchScanInput entry;
-    std::optional<std::set<int8_t>> Platforms;
-    for (auto &Pair : *MN) {
-      auto Key = getScalaNodeText(Pair.getKey());
-      auto *Value = Pair.getValue();
-      if (Key == "clangModuleName") {
-        entry.moduleName = saver.save(getScalaNodeText(Value));
-        entry.isSwift = false;
-      } else if (Key == "swiftModuleName") {
-        entry.moduleName = saver.save(getScalaNodeText(Value));
-        entry.isSwift = true;
-      } else if (Key == "arguments") {
-        entry.arguments = saver.save(getScalaNodeText(Value));
-      } else if (Key == "output") {
-        entry.outputPath = saver.save(getScalaNodeText(Value));
-      } else {
-        // Future proof.
-        continue;
-      }
-    }
-    if (entry.moduleName.empty())
-      return true;
-    if (entry.outputPath.empty())
-      return true;
-    result.emplace_back(std::move(entry));
-  }
-  return false;
-}
-
-static std::optional<std::vector<BatchScanInput>>
-parseBatchScanInputFile(ASTContext &ctx, StringRef batchInputPath,
-                        llvm::StringSaver &saver) {
-  assert(!batchInputPath.empty());
-  namespace yaml = llvm::yaml;
-  std::vector<BatchScanInput> result;
-
-  // Load the input file.
-  llvm::ErrorOr<std::unique_ptr<llvm::MemoryBuffer>> FileBufOrErr =
-      llvm::MemoryBuffer::getFile(batchInputPath);
-  if (!FileBufOrErr) {
-    ctx.Diags.diagnose(SourceLoc(), diag::batch_scan_input_file_missing,
-                       batchInputPath);
-    return std::nullopt;
-  }
-  StringRef Buffer = FileBufOrErr->get()->getBuffer();
-
-  // Use a new source manager instead of the one from ASTContext because we
-  // don't want the Json file to be persistent.
-  SourceManager SM;
-  yaml::Stream Stream(llvm::MemoryBufferRef(Buffer, batchInputPath),
-                      SM.getLLVMSourceMgr());
-  for (auto DI = Stream.begin(); DI != Stream.end(); ++DI) {
-    assert(DI != Stream.end() && "Failed to read a document");
-    yaml::Node *N = DI->getRoot();
-    assert(N && "Failed to find a root");
-    if (parseBatchInputEntries(ctx, saver, N, result)) {
-      ctx.Diags.diagnose(SourceLoc(), diag::batch_scan_input_file_corrupted,
-                         batchInputPath);
-      return std::nullopt;
-    }
-  }
-  return result;
-}
-
 class ExplicitModuleDependencyResolver {
 public:
   ExplicitModuleDependencyResolver(
@@ -782,7 +699,6 @@ generateFullDependencyGraph(const CompilerInstance &instance,
             create_set(bridgedOverlayDependencyNames),
             create_set(swiftTextualDeps->textualModuleDetails.buildCommandLine),
             /*bridgingHeaderBuildCommand*/ create_set({}),
-            create_set(swiftTextualDeps->textualModuleDetails.extraPCMArgs),
             create_clone(swiftTextualDeps->contextHash.c_str()),
             swiftTextualDeps->isFramework,
             swiftTextualDeps->isStatic,
@@ -815,7 +731,6 @@ generateFullDependencyGraph(const CompilerInstance &instance,
             create_set(bridgedOverlayDependencyNames),
             create_set(swiftSourceDeps->textualModuleDetails.buildCommandLine),
             create_set(swiftSourceDeps->bridgingHeaderBuildCommandLine),
-            create_set(swiftSourceDeps->textualModuleDetails.extraPCMArgs),
             /*contextHash*/
             create_clone(
                 instance.getInvocation().getModuleScanningHash().c_str()),
@@ -863,7 +778,6 @@ generateFullDependencyGraph(const CompilerInstance &instance,
             create_clone(clangDeps->moduleMapFile.c_str()),
             create_clone(clangDeps->contextHash.c_str()),
             create_set(clangDeps->buildCommandLine),
-            create_set(clangDeps->capturedPCMArgs),
             create_clone(clangDeps->CASFileSystemRootID.c_str()),
             create_clone(clangDeps->CASClangIncludeTreeRootID.c_str()),
             create_clone(clangDeps->moduleCacheKey.c_str())};
@@ -1163,116 +1077,6 @@ static bool diagnoseCycle(const CompilerInstance &instance,
   closeSet.clear();
   return false;
 }
-
-static void updateCachedInstanceOpts(CompilerInstance &cachedInstance,
-                                     const CompilerInstance &invocationInstance,
-                                     llvm::StringRef entryArguments) {
-  cachedInstance.getASTContext().SearchPathOpts =
-      invocationInstance.getASTContext().SearchPathOpts;
-
-  // The Clang Importer arguments must consist of a combination of
-  // Clang Importer arguments of the current invocation to inherit its Clang-specific
-  // search path options, followed by the options specific to the given batch-entry,
-  // which may overload some of the invocation's options (e.g. target)
-  cachedInstance.getASTContext().ClangImporterOpts =
-      invocationInstance.getASTContext().ClangImporterOpts;
-  std::istringstream iss(entryArguments.str());
-  std::vector<std::string> splitArguments(
-      std::istream_iterator<std::string>{iss},
-      std::istream_iterator<std::string>());
-  for (auto it = splitArguments.begin(), end = splitArguments.end(); it != end;
-       ++it) {
-    if ((*it) == "-Xcc") {
-      assert((it + 1 != end) && "Expected option following '-Xcc'");
-      cachedInstance.getASTContext().ClangImporterOpts.ExtraArgs.push_back(
-          *(it + 1));
-    }
-  }
-}
-
-static bool
-forEachBatchEntry(CompilerInstance &invocationInstance,
-                  ModuleDependenciesCache &invocationCache,
-                  CompilerArgInstanceCacheMap *versionedPCMInstanceCache,
-                  llvm::StringSaver &saver,
-                  const std::vector<BatchScanInput> &batchInput,
-                  llvm::function_ref<void(BatchScanInput, CompilerInstance &,
-                                          ModuleDependenciesCache &)>
-                      scanningAction) {
-  const CompilerInvocation &invoke = invocationInstance.getInvocation();
-  bool localSubInstanceMap = false;
-  CompilerArgInstanceCacheMap *subInstanceMap;
-  if (versionedPCMInstanceCache)
-    subInstanceMap = versionedPCMInstanceCache;
-  else {
-    subInstanceMap = new CompilerArgInstanceCacheMap;
-    localSubInstanceMap = true;
-  }
-  SWIFT_DEFER {
-    if (localSubInstanceMap)
-      delete subInstanceMap;
-  };
-
-  auto &diags = invocationInstance.getDiags();
-  ForwardingDiagnosticConsumer FDC(invocationInstance.getDiags());
-
-  for (auto &entry : batchInput) {
-    CompilerInstance *pInstance = nullptr;
-    ModuleDependenciesCache *pCache = nullptr;
-    if (entry.arguments.empty()) {
-      // Use the compiler's instance if no arguments are specified.
-      pInstance = &invocationInstance;
-      pCache = &invocationCache;
-    } else if (subInstanceMap->count(entry.arguments)) {
-      // Use the previously created instance if we've seen the arguments
-      // before.
-      pInstance = std::get<0>((*subInstanceMap)[entry.arguments]).get();
-      pCache = std::get<2>((*subInstanceMap)[entry.arguments]).get();
-      // We must update the search paths of this instance to instead reflect
-      // those of the current scanner invocation.
-      updateCachedInstanceOpts(*pInstance, invocationInstance, entry.arguments);
-    } else {
-      // Create a new instance by the arguments and save it in the map.
-      auto newService = std::make_unique<SwiftDependencyScanningService>();
-      auto newInstance = std::make_unique<CompilerInstance>();
-
-      SmallVector<const char *, 4> args;
-      llvm::cl::TokenizeGNUCommandLine(entry.arguments, saver, args);
-      CompilerInvocation subInvoke = invoke;
-      newInstance->addDiagnosticConsumer(&FDC);
-      if (subInvoke.parseArgs(args, diags)) {
-        invocationInstance.getDiags().diagnose(
-            SourceLoc(), diag::scanner_arguments_invalid, entry.arguments);
-        return true;
-      }
-      std::string InstanceSetupError;
-      if (newInstance->setup(subInvoke, InstanceSetupError)) {
-        invocationInstance.getDiags().diagnose(
-            SourceLoc(), diag::scanner_arguments_invalid, entry.arguments);
-        return true;
-      }
-      auto mainModuleName = newInstance->getMainModule()->getNameStr();
-      auto scanContextHash =
-          newInstance->getInvocation().getModuleScanningHash();
-      auto moduleOutputPath = newInstance->getInvocation()
-                                  .getFrontendOptions()
-                                  .ExplicitModulesOutputPath;
-      auto newLocalCache = std::make_unique<ModuleDependenciesCache>(
-          *newService, mainModuleName.str(), moduleOutputPath, scanContextHash);
-      pInstance = newInstance.get();
-      pCache = newLocalCache.get();
-      subInstanceMap->insert(
-          {entry.arguments,
-           std::make_tuple(std::move(newInstance), std::move(newService),
-                           std::move(newLocalCache))});
-    }
-    assert(pInstance);
-    assert(pCache);
-    scanningAction(entry, *pInstance, *pCache);
-  }
-
-  return false;
-}
 } // namespace
 
 bool swift::dependencies::scanDependencies(CompilerInstance &CI) {
@@ -1357,48 +1161,6 @@ bool swift::dependencies::prescanDependencies(CompilerInstance &instance) {
   // logic where we don't create a fresh context when scanning Swift interfaces
   // that includes their own command-line flags.
   Context.Diags.resetHadAnyError();
-  return false;
-}
-
-bool swift::dependencies::batchScanDependencies(
-    CompilerInstance &instance, llvm::StringRef batchInputFile) {
-  // The primary cache used for scans carried out with the compiler instance
-  // we have created
-
-  SwiftDependencyScanningService singleUseService;
-  if (singleUseService.setupCachingDependencyScanningService(instance))
-    return true;
-
-  ModuleDependenciesCache cache(
-      singleUseService, instance.getMainModule()->getNameStr().str(),
-      instance.getInvocation().getFrontendOptions().ExplicitModulesOutputPath,
-      instance.getInvocation().getModuleScanningHash());
-  (void)instance.getMainModule();
-  llvm::BumpPtrAllocator alloc;
-  llvm::StringSaver saver(alloc);
-  auto batchInput =
-      parseBatchScanInputFile(instance.getASTContext(), batchInputFile, saver);
-  if (!batchInput.has_value())
-    return true;
-
-  auto batchScanResults = performBatchModuleScan(
-      instance, /*DependencyScanDiagnosticCollector*/ nullptr,
-      cache, /*versionedPCMInstanceCache*/ nullptr, saver,
-      *batchInput);
-
-  // Write the result JSON to the specified output path, for each entry
-  auto ientries = batchInput->cbegin();
-  auto iresults = batchScanResults.cbegin();
-  for (; ientries != batchInput->end() and iresults != batchScanResults.end();
-       ++ientries, ++iresults) {
-    if ((*iresults).getError())
-      return true;
-
-    if (writeJSONToOutput(instance.getASTContext().Diags,
-                          instance.getOutputBackend(), (*ientries).outputPath,
-                          **iresults))
-      return true;
-  }
   return false;
 }
 
@@ -1589,66 +1351,4 @@ swift::dependencies::performModulePrescan(CompilerInstance &instance,
           ? mapCollectedDiagnosticsForOutput(diagnosticCollector)
           : nullptr;
   return importSet;
-}
-
-std::vector<llvm::ErrorOr<swiftscan_dependency_graph_t>>
-swift::dependencies::performBatchModuleScan(
-    CompilerInstance &invocationInstance,
-    DependencyScanDiagnosticCollector *diagnosticCollector,
-    ModuleDependenciesCache &invocationCache,
-    CompilerArgInstanceCacheMap *versionedPCMInstanceCache,
-    llvm::StringSaver &saver, const std::vector<BatchScanInput> &batchInput) {
-  std::vector<llvm::ErrorOr<swiftscan_dependency_graph_t>> batchScanResult;
-  batchScanResult.reserve(batchInput.size());
-
-  // Perform a full dependency scan for each batch entry module
-  forEachBatchEntry(
-      invocationInstance, invocationCache, versionedPCMInstanceCache, saver,
-      batchInput,
-      [&batchScanResult, &diagnosticCollector](BatchScanInput entry,
-                         CompilerInstance &instance,
-                         ModuleDependenciesCache &cache) {
-        auto scanner = ModuleDependencyScanner(
-            cache.getScanService(), instance.getInvocation(),
-            instance.getSILOptions(), instance.getASTContext(),
-            *instance.getDependencyTracker(), instance.getDiags(),
-            instance.getInvocation().getFrontendOptions().ParallelDependencyScan);
-
-        StringRef moduleName = entry.moduleName;
-        bool isClang = !entry.isSwift;
-        ModuleDependencyID moduleID{
-           moduleName.str(), isClang ? ModuleDependencyKind::Clang
-                                     : ModuleDependencyKind::SwiftInterface};
-        std::optional<const ModuleDependencyInfo *> rootDeps;
-        std::vector<ModuleDependencyID> allDependencies;
-        if (isClang) {
-          // Loading the clang module using Clang importer.
-          // This action will populate the cache with the main module's
-          // dependencies.
-          ModuleDependencyIDSetVector allClangModules;
-          rootDeps = scanner.getNamedClangModuleDependencyInfo(moduleName, cache, allClangModules);
-          if (!rootDeps.has_value()) {
-            batchScanResult.push_back(
-                std::make_error_code(std::errc::invalid_argument));
-            return;
-          }
-          allDependencies = allClangModules.takeVector();
-        } else {
-          rootDeps = scanner.getNamedSwiftModuleDependencyInfo(moduleName, cache);
-          if (!rootDeps.has_value()) {
-            batchScanResult.push_back(
-                std::make_error_code(std::errc::invalid_argument));
-            return;
-          }
-          allDependencies = scanner.performDependencyScan(moduleID, cache);
-        }
-
-        batchScanResult.push_back(
-            generateFullDependencyGraph(instance, diagnosticCollector, cache,
-                                        allDependencies));
-        if (diagnosticCollector)
-          diagnosticCollector->reset();
-      });
-
-  return batchScanResult;
 }
