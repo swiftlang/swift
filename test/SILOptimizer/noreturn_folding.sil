@@ -73,7 +73,7 @@ sil [ossa] @ignore_use_begin_apply : $@convention(thin) () -> () {
 bb0:
   %0 = function_ref @returnNeverCoroutine : $@yield_once @convention(thin) () -> @yields Never
   (%1, %2) = begin_apply %0() : $@yield_once @convention(thin) () -> @yields Never
-  ignored_use %1
+  ignored_use %1 : $Never
   end_apply %2 as $()
   unreachable
 }
