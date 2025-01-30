@@ -915,6 +915,9 @@ function Fetch-Dependencies {
 
         # There is no way to disable interactive mode in avdmanager
         "no" | & "$SDKDir\cmdline-tools\latest\bin\avdmanager.bat" create avd --force --name '"swift-test-device"' --package '"system-images;android-29;default;x86_64"'
+
+        # Dump virtual devices to confirm that swift-test-device exists
+        Invoke-Program "$SDKDir\cmdline-tools\latest\bin\avdmanager.bat" list avd
       }
     }
   }
@@ -2147,6 +2150,9 @@ function Test-Dispatch([Platform]$Platform) {
   $emulator = "$BinaryCache\android-sdk\emulator\emulator.exe"
   Write-Host    "$emulator -version"
   Invoke-Program $emulator "-version"
+
+  # Dump virtual devices (again) to confirm that swift-test-device exists
+  Invoke-Program "$BinaryCache\android-sdk\cmdline-tools\latest\bin\avdmanager.bat" list avd
 
   Start-Process -FilePath $emulator -ArgumentList "@swift-test-device"
   Start-Sleep -Seconds 30
