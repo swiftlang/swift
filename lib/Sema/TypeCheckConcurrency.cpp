@@ -4688,6 +4688,7 @@ getIsolationFromAttributes(const Decl *decl, bool shouldDiagnose = true,
   auto isolatedAttr = decl->getAttrs().getAttribute<IsolatedAttr>();
   auto nonisolatedAttr = decl->getAttrs().getAttribute<NonisolatedAttr>();
   auto globalActorAttr = decl->getGlobalActorAttr();
+  auto concurrentExecutionAttr = decl->getAttrs().getAttribute<ExecutionAttr>();
 
   // Remove implicit attributes if we only care about explicit ones.
   if (onlyExplicit) {
@@ -4697,11 +4698,13 @@ getIsolationFromAttributes(const Decl *decl, bool shouldDiagnose = true,
       isolatedAttr = nullptr;
     if (globalActorAttr && globalActorAttr->first->isImplicit())
       globalActorAttr = std::nullopt;
+    if (concurrentExecutionAttr && concurrentExecutionAttr->isImplicit())
+      concurrentExecutionAttr = nullptr;
   }
 
-  unsigned numIsolationAttrs = (isolatedAttr ? 1 : 0) +
-                               (nonisolatedAttr ? 1 : 0) +
-                               (globalActorAttr ? 1 : 0);
+  unsigned numIsolationAttrs =
+      (isolatedAttr ? 1 : 0) + (nonisolatedAttr ? 1 : 0) +
+      (globalActorAttr ? 1 : 0) + (concurrentExecutionAttr ? 1 : 0);
   if (numIsolationAttrs == 0) {
     if (isa<DestructorDecl>(decl) && !decl->isImplicit()) {
       return ActorIsolation::forNonisolated(false);
@@ -4709,49 +4712,20 @@ getIsolationFromAttributes(const Decl *decl, bool shouldDiagnose = true,
     return std::nullopt;
   }
 
-  // Only one such attribute is valid, but we only actually care of one of
-  // them is a global actor.
-  if (numIsolationAttrs > 1 && globalActorAttr && shouldDiagnose) {
-    struct NameAndRange {
-      StringRef name;
-      SourceRange range;
-
-      NameAndRange(StringRef _name, SourceRange _range)
-          : name(_name), range(_range) {}
-    };
-
-    llvm::SmallVector<NameAndRange, 3> attributes;
-    if (isolatedAttr) {
-      attributes.push_back(NameAndRange(isolatedAttr->getAttrName(),
-                                        isolatedAttr->getRangeWithAt()));
-    }
-    if (nonisolatedAttr) {
-      attributes.push_back(NameAndRange(nonisolatedAttr->getAttrName(),
-                                        nonisolatedAttr->getRangeWithAt()));
-    }
-    if (globalActorAttr) {
-      attributes.push_back(
-          NameAndRange(globalActorAttr->second->getName().str(),
-                       globalActorAttr->first->getRangeWithAt()));
-    }
-    if (attributes.size() == 3) {
-      decl->diagnose(diag::actor_isolation_multiple_attr_3, decl,
-                     attributes[0].name, attributes[1].name, attributes[2].name)
-          .highlight(attributes[0].range)
-          .highlight(attributes[1].range)
-          .highlight(attributes[2].range);
-    } else {
-      assert(attributes.size() == 2);
-      decl->diagnose(diag::actor_isolation_multiple_attr_2, decl,
-                     attributes[0].name, attributes[1].name)
-          .highlight(attributes[0].range)
-          .highlight(attributes[1].range);
-    }
-  }
-
   // If the declaration is explicitly marked 'nonisolated', report it as
   // independent.
   if (nonisolatedAttr) {
+    // If the nonisolated async inherits isolation from context is set, return
+    // caller isolation inheriting.
+    if (decl->getASTContext().LangOpts.hasFeature(
+            Feature::NonIsolatedAsyncInheritsIsolationFromContext)) {
+      if (auto *func = dyn_cast<AbstractFunctionDecl>(decl);
+          func && func->hasAsync() &&
+          func->getModuleContext() == decl->getASTContext().MainModule) {
+        return ActorIsolation::forCallerIsolationInheriting();
+      }
+    }
+
     return ActorIsolation::forNonisolated(nonisolatedAttr->isUnsafe());
   }
 
@@ -4840,6 +4814,17 @@ getIsolationFromAttributes(const Decl *decl, bool shouldDiagnose = true,
     return ActorIsolation::forGlobalActor(
         globalActorType->mapTypeOutOfContext())
         .withPreconcurrency(decl->preconcurrency() || isUnsafe);
+  }
+
+  // If the declaration is explicitly marked with 'execution', return the
+  // appropriate isolation.
+  if (concurrentExecutionAttr) {
+    switch (concurrentExecutionAttr->getBehavior()) {
+    case ExecutionKind::Concurrent:
+      return ActorIsolation::forNonisolated(false /*is unsafe*/);
+    case ExecutionKind::Caller:
+      return ActorIsolation::forCallerIsolationInheriting();
+    }
   }
 
   llvm_unreachable("Forgot about an attribute?");
@@ -5612,15 +5597,6 @@ InferredActorIsolation ActorIsolationRequest::evaluate(
     if (isolationFromAttr->isGlobalActor()) {
       if (auto classDecl = dyn_cast<ClassDecl>(value))
         checkClassGlobalActorIsolation(classDecl, *isolationFromAttr);
-    }
-
-    if (ctx.LangOpts.hasFeature(
-            Feature::NonIsolatedAsyncInheritsIsolationFromContext)) {
-      if (auto *func = dyn_cast<AbstractFunctionDecl>(value);
-          func && func->hasAsync() && isolationFromAttr->isNonisolated() &&
-          func->getModuleContext() == ctx.MainModule) {
-        return {ActorIsolation::forCallerIsolationInheriting(), {}};
-      }
     }
 
     return {*isolationFromAttr,

@@ -154,7 +154,7 @@ class KlassA {
 
 @MainActor
 nonisolated struct Conflict {}
-// expected-error@-1 {{struct 'Conflict' has multiple actor-isolation attributes ('nonisolated' and 'MainActor')}}
+// expected-error@-1 {{struct 'Conflict' has multiple actor-isolation attributes ('MainActor' and 'nonisolated')}}
 
 struct B: Sendable {
   // expected-error@+1 {{'nonisolated' can not be applied to variable with non-'Sendable' type 'NonSendable}}
