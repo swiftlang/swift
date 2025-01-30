@@ -8,6 +8,7 @@
 
 // REQUIRES: reflection_test_support
 // REQUIRES: executable_test
+// UNSUPPORTED: back_deployment_runtime
 // UNSUPPORTED: use_os_stdlib
 // UNSUPPORTED: asan
 
