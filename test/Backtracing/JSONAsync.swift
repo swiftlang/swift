@@ -67,6 +67,12 @@ struct JSONAsync {
 // The crashing thread isn't necessarily the first
 
 // CHECK:          "crashed": true,
+// CHECK-NEXT:     "registers": {
+// CHECK-NEXT:       "{{.*}}": "0x{{[0-9a-f]+}}",
+
+// More registers here, but the number is system specific
+
+// CHECK:          },
 // CHECK-NEXT:     "frames": [
 // CHECK-NEXT:       {
 // CHECK-NEXT:         "kind": "programCounter",
@@ -187,12 +193,6 @@ struct JSONAsync {
 // Potentially more threads here
 
 // CHECK:      ],
-// CHECK-NEXT: "registers": {
-// CHECK-NEXT:   "{{.*}}": "0x{{[0-9a-f]+}}",
-
-// More registers here, again, system specific
-
-// CHECK:      },
 // CHECK-NEXT: "capturedMemory": {
 // CHECK-NEXT:   "0x{{[[0-9a-f]+}}": "{{([0-9a-f][0-9a-f])+}}",
 
