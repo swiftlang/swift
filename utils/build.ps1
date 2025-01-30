@@ -133,7 +133,6 @@ param(
   [string] $WinSDKVersion = "",
   [switch] $Android = $false,
   [switch] $SkipBuild = $false,
-  [switch] $SkipRedistInstall = $false,
   [switch] $SkipPackaging = $false,
   [switch] $IncludeDS2 = $false,
   [string[]] $Test = @(),
@@ -2141,11 +2140,11 @@ function Build-Foundation([Platform]$Platform, $Arch, [switch]$Test = $false) {
         -Platform $Platform `
         -UseBuiltCompilers ASM,C,CXX,Swift `
         -SwiftSDK:$SDKRoot `
-        -Defines (@{
+        -Defines @{
+          CMAKE_FIND_PACKAGE_PREFER_CONFIG = "YES";
           CMAKE_NINJA_FORCE_RESPONSE_FILE = "YES";
           ENABLE_TESTING = "NO";
           FOUNDATION_BUILD_TOOLS = if ($Platform -eq "Windows") { "YES" } else { "NO" };
-          CMAKE_FIND_PACKAGE_PREFER_CONFIG = "YES";
           CURL_DIR = "$LibraryRoot\curl-8.9.1\usr\lib\$Platform\$ShortArch\cmake\CURL";
           LibXml2_DIR = "$LibraryRoot\libxml2-2.11.5\usr\lib\$Platform\$ShortArch\cmake\libxml2-2.11.5";
           ZLIB_LIBRARY = if ($Platform -eq "Windows") {
@@ -2160,7 +2159,7 @@ function Build-Foundation([Platform]$Platform, $Arch, [switch]$Test = $false) {
           _SwiftFoundationICU_SourceDIR = "$SourceCache\swift-foundation-icu";
           _SwiftCollections_SourceDIR = "$SourceCache\swift-collections";
           SwiftFoundation_MACRO = "$(Get-BuildProjectBinaryCache FoundationMacros)\bin"
-        })
+        }
     }
   }
 }
@@ -3014,9 +3013,7 @@ if (-not $SkipBuild) {
   Invoke-BuildStep Build-CMark $HostArch
   Invoke-BuildStep Build-XML2 Windows $HostArch
   Invoke-BuildStep Build-Compilers $HostArch
-}
 
-if (-not $SkipBuild) {
   foreach ($Arch in $WindowsSDKArchs) {
     Invoke-BuildStep Build-ZLib Windows $Arch
     Invoke-BuildStep Build-XML2 Windows $Arch
@@ -3056,9 +3053,7 @@ if (-not $SkipBuild) {
     Invoke-BuildStep Write-SDKSettingsPlist Android $Arch
     Invoke-BuildStep Write-PlatformInfoPlist $Arch
   }
-}
 
-if (-not $SkipBuild) {
   # Build Macros for distribution
   Invoke-BuildStep Build-FoundationMacros Windows $HostArch
   Invoke-BuildStep Build-TestingMacros Windows $HostArch
