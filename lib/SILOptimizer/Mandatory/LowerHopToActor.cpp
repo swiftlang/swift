@@ -268,9 +268,15 @@ SILValue LowerHopToActor::emitGetExecutor(SILBuilderWithScope &B,
     return B.createStructExtract(loc, witnessCall, executorProps[0]);
   };
 
+  bool needEndBorrow = false;
   SILValue unmarkedExecutor;
   if (auto wrappedActor = actorType->getOptionalObjectType()) {
     assert(makeOptional);
+
+    if (B.hasOwnership() && actor->getOwnershipKind() == OwnershipKind::Owned) {
+      actor = B.createBeginBorrow(loc, actor);
+      needEndBorrow = true;
+    }
 
     // Unwrap the optional and call 'unownedExecutor'.
     auto *someDecl = B.getASTContext().getOptionalSomeDecl();
@@ -323,6 +329,9 @@ SILValue LowerHopToActor::emitGetExecutor(SILBuilderWithScope &B,
   // force the actor to stay alive.
   SILValue executor = B.createMarkDependence(loc, unmarkedExecutor, actor,
                                              MarkDependenceKind::Escaping);
+  if (needEndBorrow) {
+    B.createEndBorrow(loc, actor);
+  }
 
   return executor;
 }
