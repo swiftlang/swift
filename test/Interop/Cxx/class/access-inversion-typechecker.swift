@@ -310,3 +310,16 @@ func usePrivateDefaultArgs(leaky: Leaky) {
   leaky.defaultArgOfPrivateRecConst()
 }
 
+let privateAlias = Leaky.staticReturningPrivateAlias()
+// expected-error@-1 {{constant must be declared private or fileprivate because its type 'Leaky.PrivateAlias' (aka 'Bool') uses a private type}}
+let privateRec = Leaky.staticReturningPrivateRec()
+// expected-error@-1 {{constant must be declared private or fileprivate because its type 'Leaky.PrivateRec' uses a private type}}
+let privateEnum = Leaky.staticReturningPrivateEnum()
+// expected-error@-1 {{constant must be declared private or fileprivate because its type 'Leaky.PrivateEnum' uses a private type}}
+let privateEnumClass = Leaky.staticReturningPrivateEnumClass()
+// expected-error@-1 {{constant must be declared private or fileprivate because its type 'Leaky.PrivateEnumClass' uses a private type}}
+
+let aliasedPrivateAlias: Leaky.AliasToPrivateAlias = Leaky.staticReturningPrivateAlias()
+let aliasedPrivateRec: Leaky.AliasToPrivateRec = Leaky.staticReturningPrivateRec()
+let aliasedPrivateEnum: Leaky.AliasToPrivateEnum = Leaky.staticReturningPrivateEnum()
+let aliasedPrivateEnumClass: Leaky.AliasToPrivateEnumClass = Leaky.staticReturningPrivateEnumClass()
