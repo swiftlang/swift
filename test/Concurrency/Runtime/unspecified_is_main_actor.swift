@@ -76,7 +76,9 @@ tests.test("checkIfOnMainQueue crashes off the main queue 2") { @CustomActor () 
 class Klass {}
 
 struct MainActorIsolated {
-  init() {}
+  init() {
+    checkIfOnMainQueue()
+  }
 
   func test() async {
     checkIfOnMainQueue()
@@ -84,7 +86,7 @@ struct MainActorIsolated {
 };
 
 tests.test("callNominalType") { @CustomActor () -> () in
-  let x = MainActorIsolated()
+  let x = await MainActorIsolated()
   // We would crash without hopping here.
   await x.test()
 }
