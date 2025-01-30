@@ -2875,20 +2875,17 @@ function Install-HostToolchain() {
 }
 
 function Build-Inspect([Platform]$Platform, $Arch) {
-  $InstallPath = if ($Arch -eq $HostArch) {
-    # Place the host swift-inspect binary with the other toolchain binaries.
-    "$($HostArch.ToolchainInstallRoot)\usr"
+  if ($Arch -eq $HostArch) {
+    # When building for the host target, use the host version of the swift-argument-parser,
+    # and place the host swift-inspect executable with the other host toolchain binaries.
+    $ArgumentParserDir = Get-HostProjectCMakeModules ArgumentParser
+    $InstallPath = "$($HostArch.ToolchainInstallRoot)\usr"
   } else {
-    "$($Arch.PlatformInstallRoot)\Developer\Library\$(Get-ModuleTriple $Arch)"
-  }
-
-  $ArgumentParserDir = if ($Platform -eq "Android") {
-    # TODO: remove this special-case when the toolchain build moves to a newer version of
-    # swift-argument-parser (>= 1.5.0). For now, let CMake fetch the dependency because
-    # older versions of swift-argument-parser do not build properly for Android.
-    ""
-  } else {
-    Get-HostProjectCMakeModules ArgumentParser
+    # When building for non-host target, let CMake fetch the swift-argument-parser dependency
+    # since it is currently only built for the host and and cannot be built for Android until
+    # the pinned version is >= 1.5.0.
+    $ArgumentParserDir = ""
+    $InstallPath = "$($Arch.PlatformInstallRoot)\Developer\Library\$(Get-ModuleTriple $Arch)"
   }
 
   Build-CMakeProject `
@@ -3051,13 +3048,6 @@ if (-not $SkipBuild) {
     Invoke-BuildStep Build-Sanitizers Windows $Arch
     Invoke-BuildStep Build-XCTest Windows $Arch
     Invoke-BuildStep Build-Testing Windows $Arch
-
-    # Windows swift-inspect only supports 64-bit platforms.
-    if ($Arch.VSName -eq "amd64" -or
-        $Arch.VSName -eq "arm64") {
-      Invoke-BuildStep Build-Inspect -Platform Windows -Arch $Arch
-    }
-
     Invoke-BuildStep Write-SDKSettingsPlist Windows $Arch
     Invoke-BuildStep Write-PlatformInfoPlist $Arch
   }
@@ -3084,7 +3074,6 @@ if (-not $SkipBuild) {
         $Arch.AndroidArchABI -eq "x86_64") {
       Invoke-BuildStep Build-Inspect -Platform Android -Arch $Arch
     }
-
     Invoke-BuildStep Write-SDKSettingsPlist Android $Arch
     Invoke-BuildStep Write-PlatformInfoPlist $Arch
   }
@@ -3131,6 +3120,7 @@ if (-not $SkipBuild) {
   Invoke-BuildStep Build-LMDB $HostArch
   Invoke-BuildStep Build-IndexStoreDB $HostArch
   Invoke-BuildStep Build-SourceKitLSP $HostArch
+  Invoke-BuildStep Build-Inspect Windows $HostArch
 }
 
 Install-HostToolchain
