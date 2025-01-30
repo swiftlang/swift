@@ -290,3 +290,20 @@ bb0(%0 : @guaranteed $Optional<any Actor>):
   %r = tuple ()
   return %r : $()
 }
+
+// CHECK-LABEL: sil [ossa] @optional_owned_actor :
+// CHECK:         %1 = copy_value %0
+// CHECK-NEXT:    %2 = begin_borrow %1
+// CHECK-NEXT:    switch_enum %2
+// CHECK:         mark_dependence
+// CHECK-NEXT:    end_borrow %2
+// CHECKL:      } // end sil function '@optional_owned_actor'
+sil [ossa] @optional_owned_actor : $@convention(thin) @async (@guaranteed Optional<any Actor>) -> () {
+bb0(%0 : @guaranteed $Optional<any Actor>):
+  %1 = copy_value %0
+  hop_to_executor %1
+  destroy_value %1
+  %r = tuple ()
+  return %r
+}
+
