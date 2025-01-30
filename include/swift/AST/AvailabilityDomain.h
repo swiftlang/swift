@@ -196,23 +196,6 @@ public:
     return !(*this == other);
   }
 
-  /// A total, stable ordering on domains.
-  bool operator<(const AvailabilityDomain &other) const {
-    if (getKind() != other.getKind())
-      return getKind() < other.getKind();
-
-    switch (getKind()) {
-    case Kind::Universal:
-    case Kind::SwiftLanguage:
-    case Kind::PackageDescription:
-    case Kind::Embedded:
-      // These availability domains are singletons.
-      return false;
-    case Kind::Platform:
-      return getPlatformKind() < other.getPlatformKind();
-    }
-  }
-
   void Profile(llvm::FoldingSetNodeID &ID) const {
     ID.AddPointer(getOpaqueValue());
   }
@@ -248,6 +231,10 @@ struct DenseMapInfo<AvailabilityDomain> {
   }
   static inline AvailabilityDomain getTombstoneKey() {
     return DenseMapInfo<AvailabilityDomain::Storage>::getTombstoneKey();
+  }
+  static inline unsigned getHashValue(AvailabilityDomain domain) {
+    return DenseMapInfo<AvailabilityDomain::Storage>::getHashValue(
+        domain.storage);
   }
   static bool isEqual(const AvailabilityDomain LHS,
                       const AvailabilityDomain RHS) {
