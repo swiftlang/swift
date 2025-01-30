@@ -300,3 +300,12 @@ func usePrivateEnumClass(a: inout Leaky.AliasToPrivateEnumClass) -> Leaky.AliasT
       doSomething()
     }
 }
+
+func usePrivateDefaultArgs(leaky: Leaky) {
+  leaky.defaultArgOfPrivateRec()
+  leaky.defaultArgOfPrivateEnum()
+  leaky.defaultArgOfPrivateEnumClass()
+  leaky.defaultArgOfPrivateConst()
+  leaky.defaultArgOfPrivateRecConst()
+}
+

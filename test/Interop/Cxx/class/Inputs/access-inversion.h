@@ -8,13 +8,17 @@ public: Leaky() {} // Apparently necessary to ensure constructor is unambiguous 
 private:
   typedef bool PrivateAlias;
 
-  struct PrivateRec { public: void privateRecMethod() const {} };
+  struct PrivateRec {
+  public:
+    void privateRecMethod() const {}
+    static const bool PRIVATE_REC_CONST = true;
+  };
 
   enum PrivateEnum { privateEnumMember };
 
   enum class PrivateEnumClass { privateEnumClassMember };
 
-  static const bool PrivateConst = true;
+  static const bool PRIVATE_CONST = true;
 
   // These are used as return values in functions that return private types
   static PrivateAlias privateAliasVal;
@@ -41,7 +45,7 @@ public:
     PrivateEnumClass mem;
   };
   struct RecWithPrivateConst {
-    const bool mem = PrivateConst;
+    const bool mem = PRIVATE_CONST;
   };
 
   static PrivateAlias staticReturningPrivateAlias() { return privateAliasVal; }
@@ -59,10 +63,16 @@ public:
   PrivateEnum methodReturningPrivateEnum() const { return privateEnumVal; }
   PrivateEnumClass methodReturningPrivateEnumClass() const { return privateEnumClassVal; }
 
-  void methodTakingPrivateAlias(PrivateAlias p) const {};
-  void methodTakingPrivateRec(PrivateRec p) const {} ;
-  void methodTakingPrivateEnum(PrivateEnum p) const {};
-  void methodTakingPrivateEnumClass(PrivateEnumClass p) const {};
+  void methodTakingPrivateAlias(PrivateAlias p) const {}
+  void methodTakingPrivateRec(PrivateRec p) const {}
+  void methodTakingPrivateEnum(PrivateEnum p) const {}
+  void methodTakingPrivateEnumClass(PrivateEnumClass p) const {}
+
+  void defaultArgOfPrivateRec(PrivateRec a=privateRecVal) const {}
+  void defaultArgOfPrivateEnum(PrivateEnum a=privateEnumMember) const {}
+  void defaultArgOfPrivateEnumClass(PrivateEnumClass a=PrivateEnumClass::privateEnumClassMember) const {}
+  void defaultArgOfPrivateConst(bool a=PRIVATE_CONST) const {}
+  void defaultArgOfPrivateRecConst(bool a=PrivateRec::PRIVATE_REC_CONST) const {}
 };
 
 #endif
