@@ -2670,11 +2670,6 @@ public func _swift_getKeyPath(pattern: UnsafeMutableRawPointer,
     let existingInstance = theOncePtr.load(as: UnsafeRawPointer?.self)
     
     if let existingInstance = existingInstance {
-      // Return the instantiated object at +1.
-      let object = Unmanaged<AnyKeyPath>.fromOpaque(existingInstance)
-      // TODO: This retain will be unnecessary once we support global objects
-      // with inert refcounting.
-      _ = object.retain()
       return existingInstance
     }
   } else {
@@ -2730,6 +2725,7 @@ public func _swift_getKeyPath(pattern: UnsafeMutableRawPointer,
       // If the exchange succeeds, then the instance we formed is the canonical
       // one.
       if Bool(won) {
+        _swift_stdlib_immortalize(instance)
         break
       }
 
@@ -2739,9 +2735,6 @@ public func _swift_getKeyPath(pattern: UnsafeMutableRawPointer,
       if let existingInstance = UnsafeRawPointer(bitPattern: Int(oldValue)) {
         // Return the instantiated object at +1.
         let object = Unmanaged<AnyKeyPath>.fromOpaque(existingInstance)
-        // TODO: This retain will be unnecessary once we support global objects
-        // with inert refcounting.
-        _ = object.retain()
         // Release the instance we created.
         instancePtr.release()
         return existingInstance
