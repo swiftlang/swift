@@ -37,21 +37,19 @@ using namespace swift;
 using namespace symbolgraphgen;
 
 Symbol::Symbol(SymbolGraph *Graph, const ExtensionDecl *ED,
-               const ValueDecl *SynthesizedBaseTypeDecl, Type BaseType)
+               const NominalTypeDecl *SynthesizedBaseTypeDecl, Type BaseType)
     : Symbol::Symbol(Graph, nullptr, ED, SynthesizedBaseTypeDecl, BaseType) {}
 
 Symbol::Symbol(SymbolGraph *Graph, const ValueDecl *VD,
-               const ValueDecl *SynthesizedBaseTypeDecl, Type BaseType)
+               const NominalTypeDecl *SynthesizedBaseTypeDecl, Type BaseType)
     : Symbol::Symbol(Graph, VD, nullptr, SynthesizedBaseTypeDecl, BaseType) {}
 
 Symbol::Symbol(SymbolGraph *Graph, const ValueDecl *VD, const ExtensionDecl *ED,
-               const ValueDecl *SynthesizedBaseTypeDecl, Type BaseType)
+               const NominalTypeDecl *SynthesizedBaseTypeDecl, Type BaseType)
     : Graph(Graph), D(VD), BaseType(BaseType),
       SynthesizedBaseTypeDecl(SynthesizedBaseTypeDecl) {
-  if (!BaseType && SynthesizedBaseTypeDecl) {
-    if (const auto *NTD = dyn_cast<NominalTypeDecl>(SynthesizedBaseTypeDecl))
-      BaseType = NTD->getDeclaredInterfaceType();
-  }
+  if (!BaseType && SynthesizedBaseTypeDecl)
+    BaseType = SynthesizedBaseTypeDecl->getDeclaredInterfaceType();
   if (D == nullptr) {
     D = ED;
   }
