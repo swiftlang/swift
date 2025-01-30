@@ -669,6 +669,11 @@ def create_argument_parser():
                 'library dependencies of the corelibs and other Swift repos, '
                 'such as the libcurl dependency of FoundationNetworking')
 
+    option('--cross-compile-sysroot', store_path,
+           help='The path to a directory that contains a sysroot for a different '
+                'platform and/or architecture for cross-compiling Swift to. The sysroot '
+                'must contain libraries that match the architecture that is being built for.')
+
     option('--cross-compile-append-host-target-to-destdir', toggle_true,
            default=True,
            help="Append each cross-compilation host target's name as a subdirectory "

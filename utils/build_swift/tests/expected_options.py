@@ -156,6 +156,7 @@ EXPECTED_DEFAULTS = {
     'coverage_db': None,
     'cross_compile_append_host_target_to_destdir': True,
     'cross_compile_deps_path': None,
+    'cross_compile_sysroot': None,
     'cross_compile_hosts': [],
     'infer_cross_compile_hosts_on_darwin': False,
     'darwin_deployment_version_ios':
@@ -813,6 +814,7 @@ EXPECTED_OPTIONS = [
     PathOption('--cmake'),
     PathOption('--coverage-db'),
     PathOption('--cross-compile-deps-path'),
+    PathOption('--cross-compile-sysroot'),
     PathOption('--host-cc'),
     PathOption('--host-cxx'),
     PathOption('--host-libtool'),
