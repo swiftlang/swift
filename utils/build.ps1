@@ -2164,10 +2164,10 @@ function Test-Dispatch([Platform]$Platform) {
   &              $adb get-state "@swift-test-device"
   Write-Host    "$adb logcat -d @swift-test-device"
   &              $adb logcat -d "@swift-test-device"
-  Write-Host    "$BinaryCache\android-sdk\.temp\emulator.out log:"
-  Write-Host    (Get-Content -Path "$BinaryCache\android-sdk\.temp\emulator.out")
-  Write-Host    "$BinaryCache\android-sdk\.temp\emulator.err log:"
-  Write-Host    (Get-Content -Path "$BinaryCache\android-sdk\.temp\emulator.err")
+  #Write-Host    "$BinaryCache\android-sdk\.temp\emulator.out log:"
+  #Write-Host    (Get-Content -Path "$BinaryCache\android-sdk\.temp\emulator.out")
+  #Write-Host    "$BinaryCache\android-sdk\.temp\emulator.err log:"
+  #Write-Host    (Get-Content -Path "$BinaryCache\android-sdk\.temp\emulator.err")
   Invoke-Program $adb "wait-for-device"
   Write-Host    "$adb push $CachePath $RemoteRoot"
   Invoke-Program $adb push $CachePath $RemoteRoot
