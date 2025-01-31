@@ -377,6 +377,8 @@ class Product(object):
         return sysroot_arch, vendor, abi
 
     def get_linux_sysroot(self, platform, arch):
+        if self.args.cross_compile_sysroot:
+            return self.args.cross_compile_sysroot
         if not self.is_cross_compile_target('{}-{}'.format(platform, arch)):
             return None
         sysroot_arch, abi = self.get_linux_target_components(arch)
