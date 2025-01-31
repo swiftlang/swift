@@ -482,7 +482,7 @@ class Product(object):
             cross_flags.append('-fno-stack-protector')
 
         # Use lld if external sysroot is provided
-        if self.is_cross_compile_target('{}-{}'.format(platform, arch)) and self.args.cross_compile_sysroot:
+        if self.args.cross_compile_sysroot:
             cross_flags.append('-w -fuse-ld=lld')
 
         return self.common_c_flags + cross_flags
