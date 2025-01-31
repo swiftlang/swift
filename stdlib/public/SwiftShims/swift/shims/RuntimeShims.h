@@ -28,6 +28,26 @@
 extern "C" {
 #endif
 
+#ifndef SWIFT_CC
+#define SWIFT_CC(CC) SWIFT_CC_##CC
+
+// SWIFT_CC(c) is the C calling convention.
+#define SWIFT_CC_c
+
+#if __has_extension(swiftcc) || __has_feature(swiftasynccc)
+#define SWIFT_CC_swift __attribute__((swiftcall))
+#define SWIFT_CONTEXT __attribute__((swift_context))
+#define SWIFT_ERROR_RESULT __attribute__((swift_error_result))
+#define SWIFT_INDIRECT_RESULT __attribute__((swift_indirect_result))
+#else
+#define SWIFT_CC_swift
+#define SWIFT_CONTEXT
+#define SWIFT_ERROR_RESULT
+#define SWIFT_INDIRECT_RESULT
+#endif
+
+#endif
+
 /// Return an NSString to be used as the Mirror summary of the object
 SWIFT_RUNTIME_STDLIB_API
 void *_swift_objCMirrorSummary(const void * nsObject);
