@@ -671,11 +671,11 @@ swiftscan_batch_scan_result_create(swiftscan_scanner_t scanner,
 }
 swiftscan_string_set_t *swiftscan_swift_textual_detail_get_extra_pcm_args(
    swiftscan_module_details_t details) {
-  return nullptr;
+  return swift::c_string_utils::create_empty_set();
 }
 swiftscan_string_set_t *
 swiftscan_clang_detail_get_captured_pcm_args(swiftscan_module_details_t details) {
-  return nullptr;
+  return swift::c_string_utils::create_empty_set();
 }
 swiftscan_batch_scan_input_t *swiftscan_batch_scan_input_create() {
   return nullptr;
