@@ -39,7 +39,10 @@ set(SwiftCore_CMAKE_MODULES_DIR "${CMAKE_SOURCE_DIR}/cmake/modules")
 list(APPEND CMAKE_MODULE_PATH ${SwiftCore_CMAKE_MODULES_DIR})
 
 include(CMakeWorkarounds)
-project(SwiftCore LANGUAGES C CXX Swift VERSION 6.1)
+# NOTE: always use the 3-component style as the expansion as
+# `${PROJECT_VERSION}` will not extend this to the complete form and this can
+# change the behaviour for comparison with non-SemVer compliant parsing.
+project(SwiftCore LANGUAGES C CXX Swift VERSION 6.1.0)
 
 # The Swift standard library is not intended for use as a sub-library as part of
 # another project. It is tightly coupled with the compiler version.
