@@ -100,6 +100,7 @@ static const SupportedConditionalValue SupportedConditionalCompilationArches[] =
   "powerpc64le",
   "s390x",
   "wasm32",
+  "riscv32",
   "riscv64",
   "avr"
 };
@@ -539,6 +540,9 @@ std::pair<bool, bool> LangOptions::setTarget(llvm::Triple triple) {
     break;
   case llvm::Triple::ArchType::wasm32:
     addPlatformConditionValue(PlatformConditionKind::Arch, "wasm32");
+    break;
+  case llvm::Triple::ArchType::riscv32:
+    addPlatformConditionValue(PlatformConditionKind::Arch, "riscv32");
     break;
   case llvm::Triple::ArchType::riscv64:
     addPlatformConditionValue(PlatformConditionKind::Arch, "riscv64");
