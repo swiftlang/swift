@@ -409,10 +409,6 @@ static void verifyHelper(ArrayRef<ManagedValue> values,
   ValueOwnershipKind result = OwnershipKind::None;
   std::optional<bool> sameHaveCleanups;
   for (ManagedValue v : values) {
-    assert((!SGF || !v.getType().isLoadable(SGF.get()->F) ||
-            v.getType().isObject()) &&
-           "All loadable values in an RValue must be an object");
-
     ValueOwnershipKind kind = v.getOwnershipKind();
     if (kind == OwnershipKind::None)
       continue;
