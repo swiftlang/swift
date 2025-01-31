@@ -1147,7 +1147,7 @@ static void handleRefCountsInitWithCopy(const Metadata *metadata,
     uintptr_t _addrOffset = addrOffset;
     auto tag = reader.readBytes<uint64_t>();
     auto offset = (tag & ~(0xFFULL << 56));
-    if (SWIFT_UNLIKELY(offset)) {
+    if (offset) {
       memcpy(dest + _addrOffset, src + _addrOffset, offset);
     }
     addrOffset = _addrOffset + offset;
@@ -1305,7 +1305,7 @@ static void handleRefCountsInitWithTake(const Metadata *metadata,
     uintptr_t _addrOffset = addrOffset;
     auto tag = reader.readBytes<uint64_t>();
     auto offset = (tag & ~(0xFFULL << 56));
-    if (SWIFT_UNLIKELY(offset)) {
+    if (offset) {
       memcpy(dest + _addrOffset, src + _addrOffset, offset);
     }
     addrOffset += offset;
@@ -2586,6 +2586,121 @@ void swift::swift_cvw_resolve_resilientAccessors(uint8_t *layoutStr,
     default:
       break;
     }
+  }
+}
+
+static void swift_cvw_destroyMultiPayloadEnumFNImpl(swift::OpaqueValue *address,
+                                                    const Metadata *metadata) {
+  const uint8_t *layoutStr = metadata->getLayoutString();
+  LayoutStringReader1 reader{layoutStr + layoutStringHeaderSize};
+  uintptr_t addrOffset = 0;
+  uint8_t *addr = (uint8_t *)address;
+
+#ifndef NDEBUG
+  assert(reader.readBytes<uint64_t>() ==
+             ((uint64_t)RefCountingKind::MultiPayloadEnumFN) << 56 &&
+         "Invalid tag, expected MultiPayloadEnumFN");
+#else
+  reader.skip(sizeof(uint64_t));
+#endif
+
+  multiPayloadEnumFN<handleRefCountsDestroy>(metadata, reader, addrOffset,
+                                             addr);
+}
+
+static swift::OpaqueValue *
+swift_cvw_assignWithCopyMultiPayloadEnumFNImpl(swift::OpaqueValue *_dest,
+                                               swift::OpaqueValue *_src,
+                                               const Metadata *metadata) {
+  const uint8_t *layoutStr = metadata->getLayoutString();
+  LayoutStringReader1 reader{layoutStr + layoutStringHeaderSize};
+  uintptr_t addrOffset = 0;
+  uint8_t *dest = (uint8_t *)_dest;
+  uint8_t *src = (uint8_t *)_src;
+
+#ifndef NDEBUG
+  assert(reader.readBytes<uint64_t>() ==
+             ((uint64_t)RefCountingKind::MultiPayloadEnumFN) << 56 &&
+         "Invalid tag, expected MultiPayloadEnumFN");
+#else
+  reader.skip(sizeof(uint64_t));
+#endif
+
+  multiPayloadEnumFNAssignWithCopy(metadata, reader, addrOffset, dest, src);
+  return _dest;
+}
+
+static swift::OpaqueValue *
+swift_cvw_assignWithTakeMultiPayloadEnumFNImpl(swift::OpaqueValue *dest,
+                                               swift::OpaqueValue *src,
+                                               const Metadata *metadata) {
+  swift_cvw_destroyMultiPayloadEnumFN(dest, metadata);
+  return swift_cvw_initWithTake(dest, src, metadata);
+}
+
+static swift::OpaqueValue *
+swift_cvw_initWithCopyMultiPayloadEnumFNImpl(swift::OpaqueValue *_dest,
+                                             swift::OpaqueValue *_src,
+                                             const Metadata *metadata) {
+  const uint8_t *layoutStr = metadata->getLayoutString();
+  LayoutStringReader1 reader{layoutStr + layoutStringHeaderSize};
+  uintptr_t addrOffset = 0;
+  uint8_t *dest = (uint8_t *)_dest;
+  uint8_t *src = (uint8_t *)_src;
+
+#ifndef NDEBUG
+  assert(reader.readBytes<uint64_t>() ==
+             ((uint64_t)RefCountingKind::MultiPayloadEnumFN) << 56 &&
+         "Invalid tag, expected MultiPayloadEnumFN");
+#else
+  reader.skip(sizeof(uint64_t));
+#endif
+
+  multiPayloadEnumFN<handleRefCountsInitWithCopy>(metadata, reader, addrOffset,
+                                                  dest, src);
+  return _dest;
+}
+
+static swift::OpaqueValue *
+swift_cvw_initWithTakeMultiPayloadEnumFNImpl(swift::OpaqueValue *_dest,
+                                             swift::OpaqueValue *_src,
+                                             const Metadata *metadata) {
+  if (SWIFT_LIKELY(metadata->getValueWitnesses()->isBitwiseTakable())) {
+    size_t size = metadata->vw_size();
+    memcpy(_dest, _src, size);
+    return _dest;
+  }
+
+  const uint8_t *layoutStr = metadata->getLayoutString();
+  LayoutStringReader1 reader{layoutStr + layoutStringHeaderSize};
+  uintptr_t addrOffset = 0;
+  uint8_t *dest = (uint8_t *)_dest;
+  uint8_t *src = (uint8_t *)_src;
+
+#ifndef NDEBUG
+  assert(reader.readBytes<uint64_t>() ==
+             ((uint64_t)RefCountingKind::MultiPayloadEnumFN) << 56 &&
+         "Invalid tag, expected MultiPayloadEnumFN");
+#else
+  reader.skip(sizeof(uint64_t));
+#endif
+
+  multiPayloadEnumFN<handleRefCountsInitWithTake>(metadata, reader, addrOffset,
+                                                  dest, src);
+  return _dest;
+}
+
+static swift::OpaqueValue *
+swift_cvw_initializeBufferWithCopyOfBufferMultiPayloadEnumFNImpl(
+    swift::ValueBuffer *dest, swift::ValueBuffer *src,
+    const Metadata *metadata) {
+  if (metadata->getValueWitnesses()->isValueInline()) {
+    return swift_cvw_initWithCopyMultiPayloadEnumFN(
+        (swift::OpaqueValue *)dest, (swift::OpaqueValue *)src, metadata);
+  } else {
+    memcpy(dest, src, sizeof(swift::HeapObject *));
+    swift_retain(*(swift::HeapObject **)src);
+    return (swift::OpaqueValue *)&(*(swift::HeapObject **)dest)[1];
   }
 }
 

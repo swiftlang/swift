@@ -2747,6 +2747,68 @@ FUNCTION(GenericInitializeBufferWithCopyOfBuffer,
          EFFECT(RefCounting),
          UNKNOWN_MEMEFFECTS)
 
+// void swift_cvw_destroyMultiPayloadEnumFN(opaque*, const Metadata* type);
+FUNCTION(GenericDestroyMultiPayloadEnumFN,
+         Swift, swift_cvw_destroyMultiPayloadEnumFN,
+         C_CC, AlwaysAvailable,
+         RETURNS(VoidTy),
+         ARGS(Int8PtrTy, TypeMetadataPtrTy),
+         ATTRS(NoUnwind),
+         EFFECT(Deallocating),
+         UNKNOWN_MEMEFFECTS)
+
+// void *swift_cvw_assignWithCopyMultiPayloadEnumFN(opaque* dest, opaque* src, const Metadata* type);
+FUNCTION(GenericAssignWithCopyMultiPayloadEnumFN,
+         Swift, swift_cvw_assignWithCopyMultiPayloadEnumFN,
+         C_CC, AlwaysAvailable,
+         RETURNS(Int8PtrTy),
+         ARGS(Int8PtrTy, Int8PtrTy, TypeMetadataPtrTy),
+         ATTRS(NoUnwind),
+         EFFECT(RefCounting, Deallocating),
+         UNKNOWN_MEMEFFECTS)
+
+// void *swift_cvw_assignWithTakeMultiPayloadEnumFN(opaque* dest, opaque* src, const Metadata* type);
+FUNCTION(GenericAssignWithTakeMultiPayloadEnumFN,
+         Swift, swift_cvw_assignWithTakeMultiPayloadEnumFN,
+         C_CC, AlwaysAvailable,
+         RETURNS(Int8PtrTy),
+         ARGS(Int8PtrTy, Int8PtrTy, TypeMetadataPtrTy),
+         ATTRS(NoUnwind),
+         EFFECT(RefCounting, Deallocating),
+         UNKNOWN_MEMEFFECTS)
+
+// void *swift_cvw_initWithCopyMultiPayloadEnumFN(opaque* dest, opaque* src, const Metadata* type);
+FUNCTION(GenericInitWithCopyMultiPayloadEnumFN,
+         Swift, swift_cvw_initWithCopyMultiPayloadEnumFN,
+         C_CC, AlwaysAvailable,
+         RETURNS(Int8PtrTy),
+         ARGS(Int8PtrTy, Int8PtrTy, TypeMetadataPtrTy),
+         ATTRS(NoUnwind),
+         EFFECT(RefCounting),
+         UNKNOWN_MEMEFFECTS)
+
+// void *swift_cvw_initWithTakeMultiPayloadEnumFN(opaque* dest, opaque* src, const Metadata* type);
+FUNCTION(GenericInitWithTakeMultiPayloadEnumFN,
+         Swift, swift_cvw_initWithTakeMultiPayloadEnumFN,
+         C_CC, AlwaysAvailable,
+         RETURNS(Int8PtrTy),
+         ARGS(Int8PtrTy, Int8PtrTy, TypeMetadataPtrTy),
+         ATTRS(NoUnwind),
+         EFFECT(RefCounting),
+         UNKNOWN_MEMEFFECTS)
+
+// void *swift_cvw_initializeBufferWithCopyOfBufferMultiPayloadEnumFN(ValueBuffer* dest, ValueBuffer* src, const Metadata* type);
+FUNCTION(GenericInitializeBufferWithCopyOfBufferMultiPayloadEnumFN,
+         Swift, swift_cvw_initializeBufferWithCopyOfBufferMultiPayloadEnumFN,
+         C_CC, AlwaysAvailable,
+         RETURNS(Int8PtrTy),
+         ARGS(getFixedBufferTy()->getPointerTo(),
+              getFixedBufferTy()->getPointerTo(),
+              TypeMetadataPtrTy),
+         ATTRS(NoUnwind),
+         EFFECT(RefCounting),
+         UNKNOWN_MEMEFFECTS)
+
 // unsigned swift_cvw_singletonEnum_getEnumTag(swift::OpaqueValue *address,
 //                                         const Metadata *metadata);
 FUNCTION(SingletonEnumGetEnumTag,
