@@ -830,7 +830,6 @@ void CompletionLookup::analyzeActorIsolation(
   case ActorIsolation::NonisolatedUnsafe:
   case ActorIsolation::Concurrent:
   case ActorIsolation::ConcurrentUnsafe:
-  case ActorIsolation::CallerIsolationInheriting:
     return;
   }
 }

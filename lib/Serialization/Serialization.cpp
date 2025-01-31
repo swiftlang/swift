@@ -1554,7 +1554,6 @@ getRawStableActorIsolationKind(swift::ActorIsolation::Kind kind) {
   CASE(NonisolatedUnsafe)
   CASE(Concurrent)
   CASE(ConcurrentUnsafe)
-  CASE(CallerIsolationInheriting)
   CASE(GlobalActor)
   CASE(Erased)
 #undef CASE
