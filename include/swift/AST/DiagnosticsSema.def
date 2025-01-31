@@ -6731,6 +6731,10 @@ WARNING(attr_availability_cannot_be_used_for_domain, none,
 WARNING(attr_availability_expected_version_spec, none,
        "expected 'introduced', 'deprecated', or 'obsoleted' in '%0' attribute "
        "for platform '%1'", (StringRef, StringRef))
+ERROR(attr_availability_requires_custom_availability, none,
+      "specifying '%0' in '%1' attribute requires "
+      "-enable-experimental-feature CustomAvailability",
+      (StringRef, const DeclAttribute))
 
 ERROR(availability_decl_unavailable, none,
       "%0 is unavailable%select{ in %2|}1%select{|: %3}3",

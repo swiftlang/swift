@@ -8386,6 +8386,15 @@ SemanticAvailableAttrRequest::evaluate(swift::Evaluator &evaluator,
       return std::nullopt;
     }
 
+    if (domain->isCustom() &&
+        !ctx.LangOpts.hasFeature(Feature::CustomAvailability) &&
+        !declContext->isInSwiftinterface()) {
+      diags.diagnose(domainLoc,
+                     diag::attr_availability_requires_custom_availability,
+                     *domainName, attr);
+      return std::nullopt;
+    }
+
     mutableAttr->setCachedDomain(*domain);
   }
 
