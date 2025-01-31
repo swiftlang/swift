@@ -22,14 +22,14 @@
 
 /// Build a swift module that depends on the above Core swift module without `INCLUDE_FOO`;
 /// it should fail and diagnose that there was a deserialization failure.
-// RUN: not %target-build-swift-dylib(%t/artifacts/SwiftBuilds/%target-library-name(MyUIA)) %t/src/UIA.swift \
+// RUN: %target-build-swift-dylib(%t/artifacts/SwiftBuilds/%target-library-name(MyUIA)) %t/src/UIA.swift \
 // RUN: -module-name MyUIA -emit-module -package-name pkg \
 // RUN: -enable-library-evolution -O -wmo \
 // RUN: -I %t/artifacts/SwiftBuilds -L %t/artifacts/SwiftBuilds \
 // RUN: -I %t/artifacts/ObjcBuilds -L %t/artifacts/ObjcBuilds \
 // RUN: -lMyCore -lObjCAPI -Rmodule-loading \
 // RUN: 2>&1 | %FileCheck %s --check-prefix=CHECK
-// CHECK-DAG: error: cannot bypass resilience due to member deserialization failure while attempting to access missing member of 'PkgStructA' in module 'MyCore' from module 'MyCore'
+// CHECK-DAG: warning: cannot bypass resilience due to member deserialization failure while attempting to access missing member of 'PkgStructA' in module 'MyCore' from module 'MyCore'
 
 /// Build a swift module that depends on Core without `INCLUDE_FOO` but
 /// opt out of deserialization checks; it builds even though deserialization failed.
