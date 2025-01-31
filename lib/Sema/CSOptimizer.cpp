@@ -299,7 +299,13 @@ static void determineBestChoicesInContext(
     if (applicableFn.isNull()) {
       auto *locator = disjunction->getLocator();
       if (auto expr = getAsExpr(locator->getAnchor())) {
-        if (auto *parentExpr = cs.getParentExpr(expr)) {
+        auto *parentExpr = cs.getParentExpr(expr);
+        // Look through optional evaluation, so
+        // we can cover expressions like `a?.b + 2`.
+        if (isExpr<OptionalEvaluationExpr>(parentExpr))
+          parentExpr = cs.getParentExpr(parentExpr);
+
+        if (parentExpr) {
           // If this is a chained member reference or a direct operator
           // argument it could be prioritized since it helps to establish
           // context for other calls i.e. `(a.)b + 2` if `a` and/or `b`
