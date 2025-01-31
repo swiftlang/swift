@@ -468,10 +468,18 @@ extension ObservationTrackedMacro: PeerMacro {
     
     let storage = DeclSyntax(property.privatePrefixed("_", addingAttribute: ObservableMacro.ignoredAttribute))
     if ObservableMacro.canCacheKeyPaths(context.lexicalContext) {
-      let cachedKeypath: DeclSyntax =
-        """
-        private static let _cachedKeypath_\(identifier) = \\\(container.name).\(identifier)
-        """
+      let cachedKeypath: DeclSyntax
+      if let type = property.type {
+        cachedKeypath =
+          """
+          private static let _cachedKeypath_\(identifier): ReferenceWritableKeyPath<\(container.name), \(type)> = \\\(container.name).\(identifier)
+          """
+      } else {
+        cachedKeypath =
+          """
+          private static let _cachedKeypath_\(identifier) = \\\(container.name).\(identifier)
+          """
+      }
       return [storage, cachedKeypath]
     } else {
       return [storage]
