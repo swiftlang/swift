@@ -741,9 +741,6 @@ public:
     if (canSkipNominal(nominal))
       return;
 
-    if (ED->getASTContext().LangOpts.hasFeature(Feature::Embedded))
-      return;
-
     if (auto CD = dyn_cast_or_null<ClassDecl>(ED->getImplementedObjCDecl())) {
       // @_objcImplementation extensions generate the class metadata symbols.
       (void)addClassMetadata(CD);
