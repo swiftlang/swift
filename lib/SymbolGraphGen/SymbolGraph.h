@@ -220,12 +220,10 @@ struct SymbolGraph {
   /// implicitly internal/private, such as underscore prefixes,
   /// and checking every named parent context as well.
   ///
-  /// \param IgnoreContext A function ref that receives the parent decl
-  /// and returns whether or not the context should be ignored when determining
-  /// privacy.
-  bool isImplicitlyPrivate(
-      const Decl *D,
-      llvm::function_ref<bool(const Decl *)> IgnoreContext = nullptr) const;
+  /// \param IgnoreContext If `true`, don't consider
+  /// the context of the declaration to determine whether it is implicitly private.
+  bool isImplicitlyPrivate(const Decl *D,
+                           bool IgnoreContext = false) const;
 
   /// Returns `true` if the declaration has an availability attribute
   /// that marks it as unconditionally unavailable on all platforms (i.e., where
@@ -234,11 +232,7 @@ struct SymbolGraph {
 
   /// Returns `true` if the declaration should be included as a node
   /// in the graph.
-  ///
-  /// If `PublicAncestorDecl` is set and is an ancestor of `D`, that declaration
-  /// is considered to be public, regardless of its surrounding context.
-  bool canIncludeDeclAsNode(const Decl *D,
-                            const Decl *PublicAncestorDecl = nullptr) const;
+  bool canIncludeDeclAsNode(const Decl *D) const;
 
   /// Returns `true` if the declaration is a requirement of a protocol
   /// or is a default implementation of a protocol
