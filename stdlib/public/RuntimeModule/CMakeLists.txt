@@ -87,6 +87,16 @@ set(LLVM_OPTIONAL_SOURCES
   get-cpu-context.asm
 )
 
+# We have to build with a deployment target of at least 10.15, otherwise
+# the tests will all fail because dyld will get confused at the use of
+# @rpath (from magic-symbols-for-install-name.c) and the `some Sequence<Frame>`
+# in Backtrace won't be accessible.
+if(SWIFT_DARWIN_DEPLOYMENT_VERSION_OSX VERSION_LESS "10.15")
+  set(osx_deployment_target "10.15")
+else()
+  set(osx_deployment_target "${SWIFT_DARWIN_DEPLOYMENT_VERSION_OSX}")
+endif()
+
 add_swift_target_library(swiftRuntime ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_STDLIB
   ${RUNTIME_SOURCES}
 
@@ -102,6 +112,8 @@ add_swift_target_library(swiftRuntime ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_STD
   SWIFT_MODULE_DEPENDS_WINDOWS CRT
 
   PRIVATE_LINK_LIBRARIES ${swift_runtime_link_libraries}
+
+  DEPLOYMENT_VERSION_OSX ${osx_deployment_target}
 
   SWIFT_COMPILE_FLAGS
     ${SWIFT_STANDARD_LIBRARY_SWIFT_FLAGS}
