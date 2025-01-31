@@ -25,9 +25,11 @@
 #include "llvm/ADT/STLExtras.h"
 
 namespace swift {
-
+class ASTScope;
+class AvailabilityScope;
 class PersistentParserState;
 struct SourceFileExtras;
+class Token;
 
 /// Kind of import affecting how a decl can be reexported.
 ///

@@ -8332,6 +8332,21 @@ ValueDecl *RenamedDeclRequest::evaluate(Evaluator &evaluator,
   return renamedDecl;
 }
 
+static std::optional<AvailabilityDomain>
+getAvailabilityDomainForName(StringRef name, const DeclContext *declContext) {
+  if (auto builtinDomain =
+          AvailabilityDomain::builtinDomainForString(name, declContext))
+    return builtinDomain;
+
+  auto &ctx = declContext->getASTContext();
+  auto identifier = ctx.getIdentifier(name);
+  if (auto customDomain =
+          ctx.MainModule->getAvailabilityDomainForIdentifier(identifier))
+    return customDomain;
+
+  return std::nullopt;
+}
+
 std::optional<SemanticAvailableAttr>
 SemanticAvailableAttrRequest::evaluate(swift::Evaluator &evaluator,
                                        const AvailableAttr *attr,
@@ -8339,7 +8354,8 @@ SemanticAvailableAttrRequest::evaluate(swift::Evaluator &evaluator,
   if (attr->hasCachedDomain())
     return SemanticAvailableAttr(attr);
 
-  auto &diags = decl->getASTContext().Diags;
+  auto &ctx = decl->getASTContext();
+  auto &diags = ctx.Diags;
   auto attrLoc = attr->getLocation();
   auto attrName = attr->getAttrName();
   auto domainLoc = attr->getDomainLoc();
@@ -8350,22 +8366,22 @@ SemanticAvailableAttrRequest::evaluate(swift::Evaluator &evaluator,
   auto domain = attr->getCachedDomain();
 
   if (!domain) {
-    auto string = attr->getDomainString();
-    ASSERT(string);
+    auto domainName = attr->getDomainString();
+    ASSERT(domainName);
 
     // Attempt to resolve the domain specified for the attribute and diagnose
     // if no domain is found.
     auto declContext = decl->getInnermostDeclContext();
-    domain = AvailabilityDomain::builtinDomainForString(*string, declContext);
+    domain = getAvailabilityDomainForName(*domainName, declContext);
     if (!domain) {
-      if (auto suggestion = closestCorrectedPlatformString(*string)) {
+      if (auto suggestion = closestCorrectedPlatformString(*domainName)) {
         diags
             .diagnose(domainLoc, diag::attr_availability_suggest_platform,
-                      *string, attrName, *suggestion)
+                      *domainName, attrName, *suggestion)
             .fixItReplace(SourceRange(domainLoc), *suggestion);
       } else {
         diags.diagnose(attrLoc, diag::attr_availability_unknown_platform,
-                       *string, attrName);
+                       *domainName, attrName);
       }
       return std::nullopt;
     }

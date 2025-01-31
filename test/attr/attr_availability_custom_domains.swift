@@ -8,25 +8,25 @@
 
 // REQUIRES: swift_feature_CustomAvailability
 
-@available(EnabledDomain) // expected-warning {{unknown platform 'EnabledDomain' for attribute 'available'}}
+@available(EnabledDomain)
 func availableInEnabledDomain() { }
 
-@available(DisabledDomain, unavailable) // expected-warning {{unknown platform 'DisabledDomain' for attribute 'available'}}
-func availableInDisabledDomain() { }
+@available(DisabledDomain, unavailable)
+func unavailableInDisabledDomain() { } // expected-note {{'unavailableInDisabledDomain()' has been explicitly marked unavailable here}}
 
-@available(RedefinedDomain, deprecated, message: "Use something else") // expected-warning {{unknown platform 'RedefinedDomain' for attribute 'available'}}
-func availableInRedefinedDomain() { }
+@available(RedefinedDomain, deprecated, message: "Use something else")
+func deprecatedInRedefinedDomain() { }
 
-@available(DynamicDomain) // expected-warning {{unknown platform 'DynamicDomain' for attribute 'available'}}
+@available(DynamicDomain)
 func availableInDynamicDomain() { }
 
 @available(UnknownDomain) // expected-warning {{unknown platform 'UnknownDomain' for attribute 'available'}}
 func availableInUnknownDomain() { }
 
 func test() {
-  availableInEnabledDomain()
-  availableInDisabledDomain()
-  availableInRedefinedDomain()
-  availableInDynamicDomain()
-  availableInUnknownDomain()
+  availableInEnabledDomain() // FIXME: [availability] should be diagnosed
+  unavailableInDisabledDomain() // expected-error {{'unavailableInDisabledDomain()' is unavailable}}
+  deprecatedInRedefinedDomain() // expected-warning {{'deprecatedInRedefinedDomain()' is deprecated: Use something else}}
+  availableInDynamicDomain() // FIXME: [availability] should be diagnosed
+  availableInUnknownDomain() // Ok
 }

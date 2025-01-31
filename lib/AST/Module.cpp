@@ -4135,3 +4135,12 @@ version::Version ModuleDecl::getLanguageVersionBuiltWith() const {
 
   return version::Version();
 }
+
+std::optional<AvailabilityDomain>
+ModuleDecl::getAvailabilityDomainForIdentifier(Identifier identifier) const {
+  auto iter = AvailabilityDomains.find(identifier);
+  if (iter == AvailabilityDomains.end())
+    return std::nullopt;
+
+  return AvailabilityDomain::forCustom(iter->getSecond());
+}
