@@ -11,6 +11,15 @@
 @available(EnabledDomain)
 func availableInEnabledDomain() { }
 
+@available(EnabledDomain, introduced: 1.0) // expected-warning {{unexpected version number in '@available' attribute for 'EnabledDomain'}}
+func introducedInEnabledDomain() { }
+
+@available(EnabledDomain, deprecated: 1.0) // expected-warning {{unexpected version number in '@available' attribute for 'EnabledDomain'}}
+func deprecatedInEnabledDomain() { }
+
+@available(EnabledDomain, obsoleted: 1.0) // expected-warning {{unexpected version number in '@available' attribute for 'EnabledDomain'}}
+func obsoletedInEnabledDomain() { }
+
 @available(DisabledDomain, unavailable)
 func unavailableInDisabledDomain() { } // expected-note {{'unavailableInDisabledDomain()' has been explicitly marked unavailable here}}
 

@@ -40,6 +40,21 @@ AvailabilityDomain::builtinDomainForString(StringRef string,
   return std::nullopt;
 }
 
+bool AvailabilityDomain::isVersioned() const {
+  switch (getKind()) {
+  case Kind::Universal:
+  case Kind::Embedded:
+    return false;
+  case Kind::SwiftLanguage:
+  case Kind::PackageDescription:
+  case Kind::Platform:
+    return true;
+  case Kind::Custom:
+    // FIXME: [availability] Support versioned custom availability domains
+    return false;
+  }
+}
+
 bool AvailabilityDomain::isActive(const ASTContext &ctx) const {
   switch (getKind()) {
   case Kind::Universal:

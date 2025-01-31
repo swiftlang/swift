@@ -190,6 +190,10 @@ public:
     return PlatformKind::none;
   }
 
+  /// Returns true if availability for this domain can be specified in terms of
+  /// version ranges.
+  bool isVersioned() const;
+
   /// Returns true if this domain is considered active in the current
   /// compilation context.
   bool isActive(const ASTContext &ctx) const;

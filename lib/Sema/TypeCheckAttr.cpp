@@ -8399,6 +8399,26 @@ SemanticAvailableAttrRequest::evaluate(swift::Evaluator &evaluator,
   }
 
   auto domainName = domain->getNameForAttributePrinting();
+  auto semanticAttr = SemanticAvailableAttr(attr);
+
+  bool hasVersionSpec =
+      (introducedVersion || deprecatedVersion || obsoletedVersion);
+
+  if (!domain->isVersioned() && hasVersionSpec) {
+    SourceRange versionSourceRange;
+    if (introducedVersion)
+      versionSourceRange = semanticAttr.getIntroducedSourceRange();
+    else if (deprecatedVersion)
+      versionSourceRange = semanticAttr.getDeprecatedSourceRange();
+    else if (obsoletedVersion)
+      versionSourceRange = semanticAttr.getObsoletedSourceRange();
+
+    diags
+        .diagnose(attrLoc, diag::attr_availability_unexpected_version, attr,
+                  domainName)
+        .highlight(versionSourceRange);
+    return std::nullopt;
+  }
 
   if (domain->isSwiftLanguage() || domain->isPackageDescription()) {
     switch (attr->getKind()) {
@@ -8422,8 +8442,6 @@ SemanticAvailableAttrRequest::evaluate(swift::Evaluator &evaluator,
       break;
     }
 
-    bool hasVersionSpec =
-        (introducedVersion || deprecatedVersion || obsoletedVersion);
     if (!hasVersionSpec) {
       diags.diagnose(attrLoc, diag::attr_availability_expected_version_spec,
                      attrName, domainName);
@@ -8447,7 +8465,7 @@ SemanticAvailableAttrRequest::evaluate(swift::Evaluator &evaluator,
       mutableAttr->setRawObsoleted(canonicalizeVersion(*obsoletedVersion));
   }
 
-  return SemanticAvailableAttr(attr);
+  return semanticAttr;
 }
 
 template <typename ATTR>
