@@ -6092,7 +6092,7 @@ static void inferStaticInitializeObjCMetadata(ClassDecl *classDecl) {
   // FIXME: This is a workaround. The proper solution is for IRGen to
   // only statically initialize the Objective-C metadata when running on
   // a new-enough OS.
-  if (auto sourceFile = classDecl->getParentSourceFile()) {
+  if (classDecl->getParentSourceFile()) {
     AvailabilityRange safeRangeUnderApprox{
         AvailabilityInference::availableRange(classDecl)};
     AvailabilityRange runningOSOverApprox =

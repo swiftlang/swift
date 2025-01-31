@@ -388,7 +388,7 @@ GlobalActorAttributeRequest::evaluate(
     return std::nullopt;
 
   // Closures can always have a global actor attached.
-  if (auto closure = subject.dyn_cast<ClosureExpr *>()) {
+  if (subject.is<ClosureExpr *>()) {
     return result;
   }
 
@@ -3854,7 +3854,7 @@ namespace {
           if (calleeDecl) {
             auto calleeIsolation = getInferredActorIsolation(calleeDecl);
             calleeDecl->diagnose(diag::actor_isolated_sync_func, calleeDecl);
-            if (auto source = calleeIsolation.source.isInferred()) {
+            if (calleeIsolation.source.isInferred()) {
               calleeDecl->diagnose(diag::actor_isolation_source,
                                    calleeIsolation.isolation,
                                    calleeIsolation.source);
@@ -5554,7 +5554,7 @@ InferredActorIsolation ActorIsolationRequest::evaluate(
     } else {
       actorType = paramType;
     }
-    if (auto actor = actorType->getAnyActor())
+    if (actorType->getAnyActor())
       return {
         ActorIsolation::forActorInstanceParameter(param, *paramIdx),
         IsolationSource()
@@ -6064,7 +6064,7 @@ DefaultInitializerIsolation::evaluate(Evaluator &evaluator,
     // initializer expression.
     if (auto *property = param->getStoredProperty()) {
       // FIXME: Force computation of property wrapper initializers.
-      if (auto *wrapped = property->getOriginalWrappedProperty())
+      if (property->getOriginalWrappedProperty())
         (void)property->getPropertyWrapperInitializerInfo();
 
       return property->getInitializerIsolation();
@@ -6312,7 +6312,7 @@ static bool checkSendableInstanceStorage(
     NominalTypeDecl *nominal, DeclContext *dc, SendableCheck check) {
   // Raw storage is assumed not to be sendable.
   if (auto sd = dyn_cast<StructDecl>(nominal)) {
-    if (auto rawLayout = sd->getAttrs().getAttribute<RawLayoutAttr>()) {
+    if (sd->getAttrs().hasAttribute<RawLayoutAttr>()) {
       auto behavior = SendableCheckContext(
             dc, check).defaultDiagnosticBehavior();
       if (!isImplicitSendableCheck(check)
@@ -7153,7 +7153,7 @@ VarDecl *swift::getReferencedParamOrCapture(
   // as it only transforms the DistributedActor self to an "any Actor" self
   // used for isolation purposes.
   if (auto memberRef = dyn_cast<MemberRefExpr>(expr)) {
-    if (auto refDecl = expr->getReferencedDecl(/*stopAtParenExpr=*/true)) {
+    if (auto refDecl = memberRef->getMember()) {
       if (auto decl = dyn_cast_or_null<VarDecl>(refDecl.getDecl())) {
         if (isDistributedActorAsLocalActorComputedProperty(decl)) {
           return getCurrentIsolatedVar();

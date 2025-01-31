@@ -1695,7 +1695,7 @@ PotentialBindings::inferFromRelational(ConstraintSystem &CS,
     }
   }
 
-  if (auto *locator = TypeVar->getImpl().getLocator()) {
+  if (TypeVar->getImpl().getLocator()) {
     // Don't allow a protocol type to get propagated from the base to the result
     // type of a chain, Result should always be a concrete type which conforms
     // to the protocol inferred for the base.

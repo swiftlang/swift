@@ -409,7 +409,7 @@ unsigned LocalDiscriminatorsRequest::evaluate(
   ASTContext &ctx = dc->getASTContext();
 
   // Autoclosures aren't their own contexts; look to the parent instead.
-  if (auto autoclosure = dyn_cast<AutoClosureExpr>(dc)) {
+  if (isa<AutoClosureExpr>(dc)) {
     return evaluateOrDefault(evaluator,
                              LocalDiscriminatorsRequest{dc->getParent()}, 0);
   }
@@ -1225,7 +1225,7 @@ public:
       if (auto decl = outerDC->getAsDecl()) {
         ctx.Diags.diagnose(DS->getDiscardLoc(), diag::discard_wrong_context_decl,
                            decl->getDescriptiveKind());
-      } else if (auto clos = dyn_cast<AbstractClosureExpr>(outerDC)) {
+      } else if (isa<AbstractClosureExpr>(outerDC)) {
         ctx.Diags.diagnose(DS->getDiscardLoc(),
                            diag::discard_wrong_context_closure);
       } else {
@@ -2396,7 +2396,7 @@ bool TypeCheckASTNodeAtLocRequest::evaluate(
         auto i = patternInit->getBindingIndex();
         PBD->getPattern(i)->forEachVariable(
             [](VarDecl *VD) { (void)VD->getInterfaceType(); });
-        if (auto Init = PBD->getInit(i)) {
+        if (PBD->getInit(i)) {
           if (!PBD->isInitializerChecked(i)) {
             typeCheckPatternBinding(PBD, i);
             // Retrieve the accessor's body to trigger RecontextualizeClosures
@@ -2757,7 +2757,7 @@ PreCheckFunctionBodyRequest::evaluate(Evaluator &evaluator,
   // For constructors, we make sure that the body ends with a "return"
   // stmt, which we either implicitly synthesize, or the user can write.
   // This simplifies SILGen.
-  if (auto *ctor = dyn_cast<ConstructorDecl>(AFD)) {
+  if (isa<ConstructorDecl>(AFD)) {
     if (body->empty() || !isKnownEndOfConstructor(body->getLastElement())) {
       SmallVector<ASTNode, 8> Elts(body->getElements().begin(),
                                    body->getElements().end());

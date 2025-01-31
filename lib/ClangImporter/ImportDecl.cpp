@@ -484,8 +484,7 @@ void ClangImporter::Implementation::addSynthesizedProtocolAttrs(
     // ctx.getProtocol(kind) != nulltpr which would be nice.
     if (auto proto = ctx.getProtocol(kind))
       nominal->getAttrs().add(
-          new (ctx) SynthesizedProtocolAttr(ctx.getProtocol(kind), this,
-                                            isUnchecked));
+          new (ctx) SynthesizedProtocolAttr(proto, this, isUnchecked));
   }
 }
 
@@ -4212,8 +4211,7 @@ namespace {
 
       if (decl->isVirtual()) {
         if (auto funcDecl = dyn_cast_or_null<FuncDecl>(method)) {
-          if (auto structDecl =
-                  dyn_cast_or_null<StructDecl>(method->getDeclContext())) {
+          if (isa_and_nonnull<StructDecl>(method->getDeclContext())) {
             // If this is a method of a Swift struct, any possible override of
             // this method would get sliced away, and an invocation would get
             // dispatched statically. This is fine because it matches the C++
@@ -4225,8 +4223,7 @@ namespace {
                                    "virtual function is not available in Swift "
                                    "because it is pure");
             }
-          } else if (auto classDecl = dyn_cast_or_null<ClassDecl>(
-                         funcDecl->getDeclContext())) {
+          } else if (isa_and_nonnull<ClassDecl>(funcDecl->getDeclContext())) {
             // This is a foreign reference type. Since `class T` on the Swift
             // side is mapped from `T*` on the C++ side, an invocation of a
             // virtual method `t->method()` should get dispatched dynamically.

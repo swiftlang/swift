@@ -5415,7 +5415,7 @@ bool ConstraintSystem::repairFailures(
     // type associated with key path expression, which we need to
     // fix-up here unless last component has already a invalid type or
     // instance fix recorded.
-    if (auto *kpExpr = getAsExpr<KeyPathExpr>(anchor)) {
+    if (isExpr<KeyPathExpr>(anchor)) {
       if (isKnownKeyPathType(lhs) && isKnownKeyPathType(rhs)) {
         // If we have a conversion happening here, we should let fix happen in
         // simplifyRestrictedConstraint.
@@ -5428,7 +5428,7 @@ bool ConstraintSystem::repairFailures(
       return true;
     }
 
-    if (auto *ODRE = getAsExpr<OverloadedDeclRefExpr>(anchor)) {
+    if (isExpr<OverloadedDeclRefExpr>(anchor)) {
       if (lhs->is<LValueType>()) {
         conversionsOrFixes.push_back(
             TreatRValueAsLValue::create(*this, getConstraintLocator(locator)));
@@ -10653,7 +10653,7 @@ static ConstraintFix *validateInitializerRef(ConstraintSystem &cs,
     // which means MetatypeType has to be added after finding a type variable.
     if (baseLocator->isLastElement<LocatorPathElt::MemberRefBase>())
       baseType = MetatypeType::get(baseType);
-  } else if (auto *keyPathExpr = getAsExpr<KeyPathExpr>(anchor)) {
+  } else if (isExpr<KeyPathExpr>(anchor)) {
     // Key path can't refer to initializers e.g. `\Type.init`
     return AllowInvalidRefInKeyPath::forRef(cs, baseType, init, locator);
   }
@@ -15540,7 +15540,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
       // specific fix for. Let's assume that such types
       // are completely disjoint and adjust impact of
       // the fix accordingly.
-      if (auto *fnType2 = type2->getAs<FunctionType>()) {
+      if (type2->is<FunctionType>()) {
         increaseScore(SK_Fix, locator, 10);
       } else {
         // If type produced by expression is a function type

@@ -959,14 +959,14 @@ public:
   CLONE_AND_EMIT_TANGENT(BeginAccess, bai) {
     // Check for non-differentiable writes.
     if (bai->getAccessKind() == SILAccessKind::Modify) {
-      if (auto *gai = dyn_cast<GlobalAddrInst>(bai->getSource())) {
+      if (isa<GlobalAddrInst>(bai->getSource())) {
         context.emitNondifferentiabilityError(
             bai, invoker,
             diag::autodiff_cannot_differentiate_writes_to_global_variables);
         errorOccurred = true;
         return;
       }
-      if (auto *pbi = dyn_cast<ProjectBoxInst>(bai->getSource())) {
+      if (isa<ProjectBoxInst>(bai->getSource())) {
         context.emitNondifferentiabilityError(
             bai, invoker,
             diag::autodiff_cannot_differentiate_writes_to_mutable_captures);

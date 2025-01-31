@@ -2624,7 +2624,7 @@ void NonSendableIsolationCrossingResultDiagnosticEmitter::emit() {
     return emitUnknownPatternError();
 
   auto type = getType();
-  if (auto *decl = getCalledDecl()) {
+  if (getCalledDecl()) {
     diagnoseError(error.op->getSourceInst(), diag::rbi_isolation_crossing_result,
                   type, isolationCrossing->getCalleeIsolation(), getCalledDecl(),
                   isolationCrossing->getCallerIsolation())

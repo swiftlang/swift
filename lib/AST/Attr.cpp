@@ -267,7 +267,7 @@ void OpenedTypeAttr::printImpl(ASTPrinter &printer,
   printer << "(\"" << getUUID() << "\"";
   if (auto constraintType = getConstraintType()) {
     printer << ", ";
-    getConstraintType()->print(printer, options);
+    constraintType->print(printer, options);
   }
   printer << ")";
   printer.printStructurePost(PrintStructureKind::BuiltinAttribute);
