@@ -2155,7 +2155,7 @@ void index::indexSourceFile(SourceFile *SF, IndexDataConsumer &consumer) {
 
 void index::indexModule(ModuleDecl *module, IndexDataConsumer &consumer) {
   assert(module);
-  auto mName = module->getRealName().str().str();
+  auto mName = module->getRealName().str();
   if (module->getASTContext().blockListConfig.hasBlockListAction(mName,
       BlockListKeyKind::ModuleName,
       BlockListAction::SkipIndexingModule)) {
