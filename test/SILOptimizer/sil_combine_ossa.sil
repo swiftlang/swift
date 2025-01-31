@@ -1388,19 +1388,16 @@ bb0(%0 : $*Builtin.Int1):
 // CHECK: bb0([[B_PTR:%[0-9]+]]
 // CHECK-NEXT: [[ALLOCA:%[0-9]+]] = alloc_stack $FakeOptional<B>
 // CHECK-NEXT: [[B_PTR_COPY_FOR_ENUM:%.*]] = copy_value [[B_PTR]]
-// This copy is the copy that was between the init_enum_data_addr/inject_enum_addr
-// CHECK-NEXT: [[B_PTR_COPY_NOT_OBSTRUCTING:%.*]] = copy_value [[B_PTR]]
 // CHECK-NEXT: [[ENUM:%[0-9]+]] = enum $FakeOptional<B>, #FakeOptional.some!enumelt, [[B_PTR_COPY_FOR_ENUM]] : $B
 // CHECK-NEXT: store [[ENUM]] to [init] [[ALLOCA]]
 // CHECK-NEXT: [[RESULT:%[0-9]+]] = load [take] [[ALLOCA]]
 // CHECK-NEXT: dealloc_stack
-// CHECK-NEXT: destroy_value [[B_PTR]]
 // CHECK-NEXT: br bb1
 // CHECK: bb1:
 // CHECK-NEXT: // function_ref
 // CHECK-NEXT: function_ref
 // CHECK-NEXT: apply
-// CHECK-NEXT: destroy_value [[B_PTR_COPY_NOT_OBSTRUCTING]]
+// CHECK-NEXT: destroy_value [[B_PTR]]
 // CHECK-NEXT: return [[RESULT]]
 // CHECK: } // end sil function 'enum_promotion_case2'
 sil [ossa] @enum_promotion_case2 : $@convention(thin) (@owned B) -> @owned FakeOptional<B> {
@@ -1824,8 +1821,6 @@ bb0(%0 : $*E, %1 : @owned $E, %2 : $*B):
 
 // CHECK-LABEL: sil [ossa] @dont_form_upcast_when_casts_are_identity : $@convention(thin) (@inout E, @owned E, @inout E) -> @owned E {
 // CHECK: bb0
-// CHECK-NEXT: copy_value
-// CHECK-NEXT: destroy_value
 // CHECK-NEXT: load
 // CHECK-NEXT: store
 // CHECK-NEXT: return
@@ -2416,15 +2411,12 @@ bb0(%0 : @owned $B):
 // CHECK-NEXT:   cond_br
 //
 // CHECK:      bb1:
-// CHECK-NEXT:   copy_value
 // CHECK-NEXT:   br bb3(
 //
 // CHECK:      bb2:
-// CHECK-NEXT:   copy_value
 // CHECK-NEXT:   br bb3(
 //
 // CHECK:      bb3(
-// CHECK-NEXT:   destroy_value
 // CHECK-NEXT:   return
 // CHECK: } // end sil function 'delete_readonly_insert_release_after_arc_uses_multibb'
 sil [ossa] @delete_readonly_insert_release_after_arc_uses_multibb : $@convention(thin) (@owned B) -> @owned B {
@@ -2653,7 +2645,7 @@ bb4:
 }
 
 // CHECK-LABEL: sil [ossa] @test_dont_delete_readonly_try_apply4 :
-// CHECK: try_apply %{{[0-9]+}}(%0)
+// CHECK: try_apply
 // CHECK: } // end sil function 'test_dont_delete_readonly_try_apply4'
 sil [ossa] @test_dont_delete_readonly_try_apply4 : $@convention(thin) (@owned ZZZ, @owned ZZZ) -> @owned ZZZ {
 bb0(%0 : @owned $ZZZ, %1 : @owned $ZZZ):
@@ -3881,9 +3873,7 @@ bb0(%0 : $Builtin.RawPointer, %1 : $Builtin.Word):
 // CHECK-LABEL: sil [ossa] @enum_promotion_case3 :
 // CHECK: bb0([[B_PTR:%[0-9]+]]
 // CHECK-NEXT: [[ALLOCA:%[0-9]+]] = alloc_stack $FakeOptional<B>
-// CHECK-NEXT: [[LIFETIME_EXTEND_B_PTR:%.*]] = copy_value [[B_PTR]]
-// CHECK-NEXT: destroy_value [[B_PTR]]
-// CHECK-NEXT: [[ENUM:%[0-9]+]] = enum $FakeOptional<B>, #FakeOptional.some!enumelt, [[LIFETIME_EXTEND_B_PTR]] : $B
+// CHECK-NEXT: [[ENUM:%[0-9]+]] = enum $FakeOptional<B>, #FakeOptional.some!enumelt, [[B_PTR]] : $B
 // CHECK-NEXT: store [[ENUM]] to [init] [[ALLOCA]]
 // CHECK-NEXT: [[RESULT:%[0-9]+]] = load [take] [[ALLOCA]]
 // CHECK-NEXT: dealloc_stack
@@ -4994,9 +4984,7 @@ bb2(%6c : @guaranteed $__ContiguousArrayStorageBase):
 //
 // CHECK-LABEL: sil [ossa] @unchecked_trivial_bit_cast_hoist_up_def_use_chain : $@convention(thin) (@guaranteed AnyObject) -> UInt {
 // CHECK: bb0([[ARG:%.*]] :
-// CHECK:   [[ARG_COPY:%.*]] = copy_value [[ARG]]
-// CHECK:   [[RESULT:%.*]] = unchecked_trivial_bit_cast [[ARG_COPY]]
-// CHECK:   destroy_value [[ARG_COPY]]
+// CHECK:   [[RESULT:%.*]] = unchecked_trivial_bit_cast [[ARG]]
 // CHECK:   cond_br undef, [[BB_UNREACHABLE:bb[0-9]*]], [[BB_RESULT:bb[0-9]*]]
 //
 // CHECK: [[BB_UNREACHABLE]]:
