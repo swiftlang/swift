@@ -31,13 +31,13 @@ package import CoreA
 @_spiOnly public import CoreB
 
 /// PkgStruct is imported with `package import` and should be serialized.
-// CHECK-DAG: sil package [serialized_for_package] [canonical] @$s3Lib7libFuncyy5CoreA9PkgStructVF : $@convention(thin) (@in_guaranteed PkgStruct) -> () {
+// CHECK-DAG: sil package [serialized_for_package] [canonical] [ossa] @$s3Lib7libFuncyy5CoreA9PkgStructVF : $@convention(thin) (@in_guaranteed PkgStruct) -> () {
 package func libFunc(_ arg: PkgStruct) {
   print(arg.pkgVar)
 }
 
 /// PubStruct is imported with `@_spiOnly public import` and should be serialized.
-// CHECK-DAG: sil [serialized_for_package] [canonical] @$s3Lib7spiFuncyy5CoreB15PubStructForSPIVF : $@convention(thin) (@in_guaranteed PubStructForSPI) -> () {
+// CHECK-DAG: sil [serialized_for_package] [canonical] [ossa] @$s3Lib7spiFuncyy5CoreB15PubStructForSPIVF : $@convention(thin) (@in_guaranteed PubStructForSPI) -> () {
 @_spi(InCoreB)
 public func spiFunc(_ arg: PubStructForSPI) {
   print(arg.pubVarForSPI)

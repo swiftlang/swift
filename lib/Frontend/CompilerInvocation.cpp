@@ -2615,7 +2615,9 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
   // If we're only emitting a module, stop optimizations once we've serialized
   // the SIL for the module.
   if (FEOpts.RequestedAction == FrontendOptions::ActionType::EmitModuleOnly ||
-      FEOpts.RequestedAction == FrontendOptions::ActionType::CompileModuleFromInterface)
+      FEOpts.RequestedAction ==
+          FrontendOptions::ActionType::CompileModuleFromInterface ||
+      FEOpts.RequestedAction == FrontendOptions::ActionType::EmitSIB)
     Opts.StopOptimizationAfterSerialization = true;
 
   if (Args.getLastArg(OPT_emit_empty_object_file)) {
