@@ -18,6 +18,7 @@
 import argparse
 import glob
 import os
+import sys
 
 import adb.commands
 
@@ -46,7 +47,7 @@ def argument_parser():
         '-a', '--destination-arch',
         help='The architecture of the host device. Used to determine the '
              'right library versions to send to the device.',
-        choices=['armv7', 'aarch64'],
+        choices=['armv7', 'aarch64', 'x86_64'],
         default='armv7')
     return parser
 
@@ -54,6 +55,29 @@ def argument_parser():
 def _push(sources, destination):
     print('Pushing "{}" to device path "{}".'.format(sources, destination))
     print(adb.commands.push(sources, destination))
+
+
+def _find_libcpp(ndk_path, target_arch):
+    ndk_version = 26
+    # TODO: Add argument and keep support?
+    if ndk_version < 22:
+        return os.path.join(ndk_path,
+                                'sources',
+                                'cxx-stl',
+                                'llvm-libc++',
+                                'libs',
+                                {
+                                    'armv7': 'armeabi-v7a',
+                                    'aarch64': 'arm64-v8a',
+                                    'x86_64': 'x86_64'
+                                }[target_arch],
+                                'libc++_shared.so')
+    # TODO: Detect host arch
+    host_triple = 'windows-x86_64' if sys.platform == 'win32' else 'linux-x86_64'
+    target_triple = target_arch + '-linux-android'
+
+    # TODO: Support just-built libc++?
+    return os.path.join(ndk_path, 'toolchains', 'llvm', 'prebuilt', host_triple, 'sysroot', 'usr', 'lib', target_triple, 'libc++_shared.so')
 
 
 def main():
@@ -67,6 +91,7 @@ def main():
     args = parser.parse_args()
 
     for path in args.paths:
+        adb.commands.shell(['mkdir', '-p', args.destination])
         if os.path.isdir(path):
             full_paths = [
                 os.path.join(path, basename)
@@ -76,16 +101,7 @@ def main():
             _push(path, args.destination)
 
     if args.ndk:
-        libcpp = os.path.join(args.ndk,
-                              'sources',
-                              'cxx-stl',
-                              'llvm-libc++',
-                              'libs',
-                              {
-                                  'armv7': 'armeabi-v7a',
-                                  'aarch64': 'arm64-v8a',
-                              }[args.destination_arch],
-                              'libc++_shared.so')
+        libcpp = _find_libcpp(args.ndk, args.destination_arch)
         _push(libcpp, args.destination)
 
     return 0
