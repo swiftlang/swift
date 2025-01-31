@@ -977,7 +977,7 @@ emitRValueForDecl(SILLocation loc, ConcreteDeclRef declRef, Type ncRefType,
   }
 
   // If this is a reference to a var, emit it as an l-value and then load.
-  if (auto *var = dyn_cast<VarDecl>(decl))
+  if (isa<VarDecl>(decl))
     return emitRValueForNonMemberVarDecl(loc, declRef, refType, semantics, C);
 
   assert(!isa<TypeDecl>(decl));

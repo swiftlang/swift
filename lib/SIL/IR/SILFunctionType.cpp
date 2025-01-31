@@ -1673,8 +1673,7 @@ private:
     SmallBitVector paramsWithScopedDependencies(params.size(), false);
     for (auto &depInfo : Dependencies) {
       if (auto scopeIndices = depInfo.getScopeIndices()) {
-        paramsWithScopedDependencies
-          |= depInfo.getScopeIndices()->getBitVector();
+        paramsWithScopedDependencies |= scopeIndices->getBitVector();
       }
     }
     
@@ -4602,7 +4601,7 @@ getAbstractionPatternForConstant(ASTContext &ctx, SILDeclRef constant,
       return AbstractionPattern(fnType, value->getType().getTypePtr());
     } else {
       assert(numParameterLists == 2);
-      if (auto method = dyn_cast<clang::CXXMethodDecl>(clangDecl)) {
+      if (isa<clang::CXXMethodDecl>(clangDecl)) {
         // C++ method.
         return AbstractionPattern::getCurriedCXXMethod(fnType, bridgedFn);
       } else {

@@ -145,7 +145,7 @@ getAddrOfLLVMVariableForClangDecl(IRGenModule &IGM, ValueDecl *decl,
     return silFn ? IGM.getAddrOfSILFunction(silFn, NotForDefinition) : nullptr;
   }
 
-  if (auto var = dyn_cast<clang::ObjCInterfaceDecl>(clangDecl))
+  if (isa<clang::ObjCInterfaceDecl>(clangDecl))
     return IGM.getAddrOfObjCClass(cast<ClassDecl>(decl), NotForDefinition);
 
   llvm::report_fatal_error("Unexpected clang decl kind");

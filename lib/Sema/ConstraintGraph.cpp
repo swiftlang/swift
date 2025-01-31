@@ -813,7 +813,7 @@ namespace {
 
       for (auto typeVar : typeVars) {
         auto &impl = typeVar->getImpl();
-        if (auto fixedType = impl.getRepresentativeOrFixed().dyn_cast<TypeBase *>()) {
+        if (impl.getRepresentativeOrFixed().is<TypeBase *>()) {
           auto &node = cg[typeVar];
           for (auto otherTypeVar : node.getReferencedVars()) {
             unionSets(typeVar, otherTypeVar);

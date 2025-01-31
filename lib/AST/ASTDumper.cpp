@@ -5692,7 +5692,7 @@ namespace {
       } else if (auto *VD = originator.dyn_cast<VarDecl *>()) {
         printFieldQuotedRaw([&](raw_ostream &OS) { VD->dumpRef(OS); },
                             Label::optional("originating_var"), DeclColor);
-      } else if (auto *EE = originator.dyn_cast<ErrorExpr *>()) {
+      } else if (originator.is<ErrorExpr *>()) {
         printFlag("error_expr");
       } else if (auto *DMT = originator.dyn_cast<DependentMemberType *>()) {
         printRec(DMT, Label::always("dependent_member_type"));

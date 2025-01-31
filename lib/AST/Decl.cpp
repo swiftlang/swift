@@ -1701,7 +1701,7 @@ AccessLevel ImportDecl::getAccessLevel() const {
 }
 
 bool ImportDecl::isAccessLevelImplicit() const {
-  if (auto attr = getAttrs().getAttribute<AccessControlAttr>()) {
+  if (getAttrs().hasAttribute<AccessControlAttr>()) {
     return false;
   }
   return true;
@@ -4688,7 +4688,7 @@ static AccessLevel getAdjustedFormalAccess(const ValueDecl *VD,
   if (useDC) {
     // If the use site decl context is PackageUnit, just return
     // the access level that's passed in
-    if (auto usePkg = useDC->getPackageContext())
+    if (useDC->getPackageContext())
       return access;
     // Check whether we need to modify the access level based on
     // @testable/@_private import attributes.
@@ -8024,7 +8024,7 @@ bool VarDecl::isMemberwiseInitialized(bool preferDeclaredProperties) const {
   // memberwise initializable when it could be used to initialize
   // other stored properties.
   if (hasInitAccessor()) {
-    if (auto *init = getAccessor(AccessorKind::Init))
+    if (getAccessor(AccessorKind::Init))
       return true;
   }
 
@@ -11528,7 +11528,7 @@ ActorIsolation swift::getActorIsolationOfContext(
     return getClosureActorIsolation(closure);
   }
 
-  if (auto *tld = dyn_cast<TopLevelCodeDecl>(dcToUse)) {
+  if (isa<TopLevelCodeDecl>(dcToUse)) {
     if (dcToUse->isAsyncContext() ||
         dcToUse->getASTContext().LangOpts.StrictConcurrencyLevel >=
             StrictConcurrency::Complete) {

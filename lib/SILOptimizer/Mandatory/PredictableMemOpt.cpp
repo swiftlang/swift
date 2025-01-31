@@ -2854,7 +2854,7 @@ SILInstruction *OptimizeDeadAlloc::collectUsesForPromotion() {
           continue;
         }
       }
-      if (auto *md = dyn_cast<MarkDependenceInst>(u.Inst)) {
+      if (isa<MarkDependenceInst>(u.Inst)) {
         // A mark_dependence source use does not prevent removal. The use
         // collector already looks through them to find other uses.
         continue;
