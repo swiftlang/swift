@@ -201,9 +201,9 @@ class C { // expected-complete-tns-note {{'C' does not conform to the 'Sendable'
     func doNext() { // expected-complete-tns-warning {{concurrently-executed local function 'doNext()' must be marked as '@Sendable'}}
       doPreconcurrency {
         self.ev?.scheduleTask(deadline: i, doNext)
-        // expected-complete-tns-warning @-1 {{capture of 'self' with non-sendable type 'C' in a `@Sendable` closure}}
+        // expected-complete-tns-warning @-1 {{capture of 'self' with non-sendable type 'C' in a '@Sendable' closure}}
         // expected-complete-tns-warning @-2 {{converting non-sendable function value to '@Sendable () throws -> ()' may introduce data races}}
-        // expected-complete-tns-warning @-3 {{capture of 'doNext()' with non-sendable type '() -> ()' in a `@Sendable` closure}}
+        // expected-complete-tns-warning @-3 {{capture of 'doNext()' with non-sendable type '() -> ()' in a '@Sendable' closure}}
         // expected-complete-tns-note @-4 {{a function type must be marked '@Sendable' to conform to 'Sendable'}}
         return
       }
