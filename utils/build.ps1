@@ -420,7 +420,7 @@ enum TargetComponent {
   LLVM
   Runtime
   Dispatch
-  Foundation
+  DynamicFoundation
   XCTest
   Testing
   ClangBuiltins
@@ -2128,7 +2128,7 @@ function Build-Foundation([Platform]$Platform, $Arch, [switch]$Test = $false) {
     }
   } else {
     $DispatchBinaryCache = Get-TargetProjectBinaryCache $Arch Dispatch
-    $FoundationBinaryCache = Get-TargetProjectBinaryCache $Arch Foundation
+    $FoundationBinaryCache = Get-TargetProjectBinaryCache $Arch DynamicFoundation
     $ShortArch = $Arch.LLVMName
 
     Isolate-EnvVars {
@@ -2221,7 +2221,7 @@ function Build-FoundationMacros() {
 
 function Build-XCTest([Platform]$Platform, $Arch, [switch]$Test = $false) {
   $DispatchBinaryCache = Get-TargetProjectBinaryCache $Arch Dispatch
-  $FoundationBinaryCache = Get-TargetProjectBinaryCache $Arch Foundation
+  $FoundationBinaryCache = Get-TargetProjectBinaryCache $Arch DynamicFoundation
   $XCTestBinaryCache = Get-TargetProjectBinaryCache $Arch XCTest
 
   Isolate-EnvVars {
@@ -2260,7 +2260,7 @@ function Build-XCTest([Platform]$Platform, $Arch, [switch]$Test = $false) {
 
 function Build-Testing([Platform]$Platform, $Arch, [switch]$Test = $false) {
   $DispatchBinaryCache = Get-TargetProjectBinaryCache $Arch Dispatch
-  $FoundationBinaryCache = Get-TargetProjectBinaryCache $Arch Foundation
+  $FoundationBinaryCache = Get-TargetProjectBinaryCache $Arch DynamicFoundation
   $SwiftTestingBinaryCache = Get-TargetProjectBinaryCache $Arch Testing
 
   Isolate-EnvVars {
