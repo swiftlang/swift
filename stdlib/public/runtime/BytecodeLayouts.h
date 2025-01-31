@@ -195,6 +195,36 @@ swift::OpaqueValue *
 swift_cvw_initializeBufferWithCopyOfBuffer(swift::ValueBuffer *dest,
                                            swift::ValueBuffer *src,
                                            const Metadata *metadata);
+
+SWIFT_RUNTIME_EXPORT
+void swift_cvw_destroyMultiPayloadEnumFN(swift::OpaqueValue *address,
+                                         const Metadata *metadata);
+SWIFT_RUNTIME_EXPORT
+swift::OpaqueValue *
+swift_cvw_assignWithCopyMultiPayloadEnumFN(swift::OpaqueValue *dest,
+                                           swift::OpaqueValue *src,
+                                           const Metadata *metadata);
+SWIFT_RUNTIME_EXPORT
+swift::OpaqueValue *
+swift_cvw_assignWithTakeMultiPayloadEnumFN(swift::OpaqueValue *dest,
+                                           swift::OpaqueValue *src,
+                                           const Metadata *metadata);
+SWIFT_RUNTIME_EXPORT
+swift::OpaqueValue *
+swift_cvw_initWithCopyMultiPayloadEnumFN(swift::OpaqueValue *dest,
+                                         swift::OpaqueValue *src,
+                                         const Metadata *metadata);
+SWIFT_RUNTIME_EXPORT
+swift::OpaqueValue *
+swift_cvw_initWithTakeMultiPayloadEnumFN(swift::OpaqueValue *dest,
+                                         swift::OpaqueValue *src,
+                                         const Metadata *metadata);
+SWIFT_RUNTIME_EXPORT
+swift::OpaqueValue *
+swift_cvw_initializeBufferWithCopyOfBufferMultiPayloadEnumFN(
+    swift::ValueBuffer *dest, swift::ValueBuffer *src,
+    const Metadata *metadata);
+
 SWIFT_RUNTIME_EXPORT
 unsigned swift_cvw_singletonEnum_getEnumTag(swift::OpaqueValue *address,
                                             const Metadata *metadata);
@@ -271,6 +301,7 @@ swift::OpaqueValue *
 swift_generic_initializeBufferWithCopyOfBuffer(swift::ValueBuffer *dest,
                                                swift::ValueBuffer *src,
                                                const Metadata *metadata);
+
 SWIFT_RUNTIME_EXPORT
 unsigned swift_singletonEnum_getEnumTag(swift::OpaqueValue *address,
                                         const Metadata *metadata);

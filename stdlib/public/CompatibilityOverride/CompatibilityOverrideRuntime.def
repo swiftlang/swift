@@ -310,6 +310,42 @@ OVERRIDE_CVW(cvw_initializeBufferWithCopyOfBuffer, swift::OpaqueValue *,
                           const Metadata *metadata),
               (dest, src, metadata))
 
+OVERRIDE_CVW(cvw_destroyMultiPayloadEnumFN, void, SWIFT_RUNTIME_EXPORT,
+              , swift::, (swift::OpaqueValue *address,
+                          const Metadata *metadata),
+              (address, metadata))
+
+OVERRIDE_CVW(cvw_assignWithCopyMultiPayloadEnumFN, swift::OpaqueValue *, SWIFT_RUNTIME_EXPORT,
+              , swift::, (swift::OpaqueValue *dest,
+                          swift::OpaqueValue *src,
+                          const Metadata *metadata),
+              (dest, src, metadata))
+
+OVERRIDE_CVW(cvw_assignWithTakeMultiPayloadEnumFN, swift::OpaqueValue *, SWIFT_RUNTIME_EXPORT,
+              , swift::, (swift::OpaqueValue *dest,
+                          swift::OpaqueValue *src,
+                          const Metadata *metadata),
+              (dest, src, metadata))
+
+OVERRIDE_CVW(cvw_initWithCopyMultiPayloadEnumFN, swift::OpaqueValue *, SWIFT_RUNTIME_EXPORT,
+              , swift::, (swift::OpaqueValue *dest,
+                          swift::OpaqueValue *src,
+                          const Metadata *metadata),
+              (dest, src, metadata))
+
+OVERRIDE_CVW(cvw_initWithTakeMultiPayloadEnumFN, swift::OpaqueValue *, SWIFT_RUNTIME_EXPORT,
+              , swift::, (swift::OpaqueValue *dest,
+                          swift::OpaqueValue *src,
+                          const Metadata *metadata),
+              (dest, src, metadata))
+
+OVERRIDE_CVW(cvw_initializeBufferWithCopyOfBufferMultiPayloadEnumFN, swift::OpaqueValue *,
+             SWIFT_RUNTIME_EXPORT,
+              , swift::, (swift::ValueBuffer *dest,
+                          swift::ValueBuffer *src,
+                          const Metadata *metadata),
+              (dest, src, metadata))
+
 OVERRIDE_CVW(cvw_enumSimple_getEnumTag, unsigned, SWIFT_RUNTIME_EXPORT,
               , swift::, (swift::OpaqueValue *address,
                           const Metadata *metadata),
