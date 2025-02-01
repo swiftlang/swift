@@ -363,7 +363,7 @@ public:
                                 int *extraInhabitantIndex) const override;
 
   BitMask getSpareBits(TypeConverter &TC, bool &hasAddrOnly) const override;
-
+  const TypeInfo *getElementTypeInfo() const { return ElementTI; }
   static bool classof(const TypeInfo *TI) {
     return TI->getKind() == TypeInfoKind::Array;
   }
