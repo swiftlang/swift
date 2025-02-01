@@ -1,0 +1,50 @@
+// RUN: %empty-directory(%t)
+// RUN: %gyb -D CMAKE_SIZEOF_VOID_P=$((%target-ptrsize/8)) %s -o %t/simd_builtin_fp_operations.swift
+// RUN: %target-swift-emit-sil -Xllvm -sil-print-types %t/simd_builtin_fp_operations.swift | %FileCheck %t/simd_builtin_fp_operations.swift
+
+%{
+storagescalarCounts = [2,4,8,16,32,64]
+vectorscalarCounts = storagescalarCounts + [3]
+}%
+
+%for (Scalar, bits) in [('Float16',16), ('Float',32), ('Double',64)]:
+% for n in vectorscalarCounts:
+%  Vector = "SIMD" + str(n) + "<" + Scalar + ">"
+%  storageN = 4 if n == 3 else n
+%  Builtin = "Vec" + str(storageN) + "xFPIEEE" + str(bits)
+
+%  SIMDMask = "SIMDMask<SIMD" + str(n) + "<Int" + str(bits) + ">>"
+%  for (opSymbol, opName) in [(".==", "oeq"), (".!=", "une"), (".<", "olt"), (".<=", "ole"), (".>", "ogt"), (".>=", "oge")]:
+%   for (LType, RType) in [(Vector, Vector), (Scalar, Vector), (Vector, Scalar)]:
+%    labelSuffix = opName + (Builtin if LType == Vector else Scalar) + (Builtin if RType == Vector else Scalar)
+%    if bits == 16:
+#if !((os(macOS) || targetEnvironment(macCatalyst)) && arch(x86_64))
+@available(SwiftStdlib 5.3, *)
+// CHECK: sil hidden [available 11.0] @[[FUNC_${labelSuffix}:\$.*]] : $@convention(thin) (${LType}, ${RType}) -> ${SIMDMask} {
+%    else:
+// CHECK: sil hidden @[[FUNC_${labelSuffix}:\$.*]] : $@convention(thin) (${LType}, ${RType}) -> ${SIMDMask} {
+%    end
+func f_${Builtin}_${opName}(a: ${LType}, b: ${RType}) -> ${SIMDMask} {
+  // CHECK: bb0([[LHS:%.*]] : $$${LType}, [[RHS:%.*]] : $$${RType}):
+  // CHECK: [[META:%.*]] = metatype $@thin ${Vector}.Type
+  // CHECK: [[FUNC:%.*]] = function_ref @[[FUNC_OPERATOR_${labelSuffix}:\$.*]] : $@convention(method) (${LType}, ${RType}, @thin ${Vector}.Type) -> ${SIMDMask}
+  // CHECK: [[RET:%.*]] = apply [[FUNC]]([[LHS]], [[RHS]], [[META]]) : $@convention(method) (${LType}, ${RType}, @thin ${Vector}.Type) -> ${SIMDMask}
+  // CHECK: return [[RET]]
+  // CHECK: } // end sil function '[[FUNC_${labelSuffix}]]'
+  a ${opSymbol} b
+}
+
+%    if bits == 16:
+// CHECK: sil shared [available 11.0] @[[FUNC_OPERATOR_${labelSuffix}]] : $@convention(method) (${LType}, ${RType}, @thin ${Vector}.Type) -> ${SIMDMask} {
+%    else:
+// CHECK: sil shared @[[FUNC_OPERATOR_${labelSuffix}]] : $@convention(method) (${LType}, ${RType}, @thin ${Vector}.Type) -> ${SIMDMask} {
+%    end
+// CHECK: builtin "fcmp_${opName}_${Builtin}"
+// CHECK: } // end sil function '[[FUNC_OPERATOR_${labelSuffix}]]'
+%    if bits == 16:
+#endif
+%    end
+%   end
+%  end
+% end
+%end

@@ -1,0 +1,81 @@
+// RUN: %empty-directory(%t)
+// RUN: %gyb -D CMAKE_SIZEOF_VOID_P=$((%target-ptrsize/8)) %s -o %t/simd_builtin_integer_operations.swift
+// RUN: %target-swift-emit-sil -Xllvm -sil-print-types %t/simd_builtin_integer_operations.swift | %FileCheck %t/simd_builtin_integer_operations.swift
+
+%{
+from SwiftIntTypes import all_integer_types
+word_bits = int(CMAKE_SIZEOF_VOID_P) * 8
+storagescalarCounts = [2,4,8,16,32,64]
+vectorscalarCounts = storagescalarCounts + [3]
+}%
+
+%for int in all_integer_types(word_bits):
+% Scalar = int.stdlib_name
+% for n in vectorscalarCounts:
+%  Vector = "SIMD" + str(n) + "<" + Scalar + ">"
+%  storageN = 4 if n == 3 else n
+%  s = "s" if int.is_signed else "u"
+%  Builtin = "Vec" + str(storageN) + "xInt" + str(int.bits)
+
+%  SignedScalar = "Int" if int.is_word else ("Int" + str(int.bits))
+%  SIMDMask = "SIMDMask<SIMD" + str(n) + "<" + SignedScalar + ">>"
+%  for (opSymbol, opName) in [(".==", "eq"), (".!=", "ne"), (".<", s + "lt"), (".<=", s + "le"), (".>", s + "gt"), (".>=", s + "ge")]:
+%   for (LType, RType) in [(Vector, Vector), (Scalar, Vector), (Vector, Scalar)]:
+%    labelSuffix = opName + (Builtin if LType == Vector else Scalar) + (Builtin if RType == Vector else Scalar)
+// CHECK: sil hidden @[[FUNC_${labelSuffix}:\$.*]] : $@convention(thin) (${LType}, ${RType}) -> ${SIMDMask} {
+func f_${Builtin}_${opName}(a: ${LType}, b: ${RType}) -> ${SIMDMask} {
+  // CHECK: bb0([[LHS:%.*]] : $$${LType}, [[RHS:%.*]] : $$${RType}):
+  // CHECK: [[META:%.*]] = metatype $@thin ${Vector}.Type
+  // CHECK: [[FUNC:%.*]] = function_ref @[[FUNC_OPERATOR_${labelSuffix}:\$.*]] : $@convention(method) (${LType}, ${RType}, @thin ${Vector}.Type) -> ${SIMDMask}
+  // CHECK: [[RET:%.*]] = apply [[FUNC]]([[LHS]], [[RHS]], [[META]]) : $@convention(method) (${LType}, ${RType}, @thin ${Vector}.Type) -> ${SIMDMask}
+  // CHECK: return [[RET]]
+  // CHECK: } // end sil function '[[FUNC_${labelSuffix}]]'
+  a ${opSymbol} b
+}
+
+// CHECK: sil shared @[[FUNC_OPERATOR_${labelSuffix}]] : $@convention(method) (${LType}, ${RType}, @thin ${Vector}.Type) -> ${SIMDMask} {
+// CHECK: builtin "cmp_${opName}_${Builtin}"
+// CHECK: } // end sil function '[[FUNC_OPERATOR_${labelSuffix}]]'
+%   end
+%  end
+
+%  for (opSymbol, opName) in [("&+", "add"), ("&-", "sub"), ("&*", "mul")]:
+%   for (LType, RType) in [(Vector, Vector), (Scalar, Vector), (Vector, Scalar)]:
+%    labelSuffix = opName + (Builtin if LType == Vector else Scalar) + (Builtin if RType == Vector else Scalar)
+// CHECK: sil hidden @[[FUNC_${labelSuffix}:\$.*]] : $@convention(thin) (${LType}, ${RType}) -> ${Vector} {
+func f_${Builtin}_${opName}(a: ${LType}, b: ${RType}) -> ${Vector} {
+  // CHECK: bb0([[LHS:%.*]] : $$${LType}, [[RHS:%.*]] : $$${RType}):
+  // CHECK: [[META:%.*]] = metatype $@thin ${Vector}.Type
+  // CHECK: [[FUNC:%.*]] = function_ref @[[FUNC_OPERATOR_${labelSuffix}:\$.*]] : $@convention(method) (${LType}, ${RType}, @thin ${Vector}.Type) -> ${Vector}
+  // CHECK: [[RET:%.*]] = apply [[FUNC]]([[LHS]], [[RHS]], [[META]]) : $@convention(method) (${LType}, ${RType}, @thin ${Vector}.Type) -> ${Vector}
+  // CHECK: return [[RET]]
+  // CHECK: } // end sil function '[[FUNC_${labelSuffix}]]'
+  a ${opSymbol} b
+}
+
+// CHECK: sil shared @[[FUNC_OPERATOR_${labelSuffix}]] : $@convention(method) (${LType}, ${RType}, @thin ${Vector}.Type) -> ${Vector} {
+// CHECK: builtin "${opName}_${Builtin}"
+// CHECK: } // end sil function '[[FUNC_OPERATOR_${labelSuffix}]]'
+
+%    if LType == Vector:
+// CHECK: sil hidden @[[FUNC_MUTATING_${labelSuffix}:\$.*]] : $@convention(thin) (@inout ${LType}, ${RType}) -> () {
+func f_${Builtin}_${opName}_mutating(a: inout ${LType}, b: ${RType}) {
+  // CHECK: bb0([[LHS:%.*]] : $$*${LType}, [[RHS:%.*]] : $$${RType}):
+  // CHECK: [[META:%.*]] = metatype $@thin ${Vector}.Type
+  // CHECK: [[MLHS:%.*]] = begin_access [modify] [static] [[LHS]]
+  // CHECK: [[FUNC:%.*]] = function_ref @[[FUNC_MUTATING_OPERATOR_${labelSuffix}:\$.*]] : $@convention(method) (@inout ${LType}, ${RType}, @thin ${Vector}.Type) -> ()
+  // CHECK: [[RET:%.*]] = apply [[FUNC]]([[MLHS]], [[RHS]], [[META]]) : $@convention(method) (@inout ${LType}, ${RType}, @thin ${Vector}.Type) -> ()
+  // CHECK: end_access [[MLHS]]
+  // CHECK: } // end sil function '[[FUNC_MUTATING_${labelSuffix}]]'
+  a ${opSymbol}= b
+}
+
+// CHECK: sil shared @[[FUNC_MUTATING_OPERATOR_${labelSuffix}]] : $@convention(method) (@inout ${LType}, ${RType}, @thin ${Vector}.Type) -> () {
+// CHECK: builtin "${opName}_${Builtin}"
+// CHECK: } // end sil function '[[FUNC_MUTATING_OPERATOR_${labelSuffix}]]'
+%    end
+%   end
+%  end
+
+% end
+%end
