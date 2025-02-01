@@ -36,6 +36,12 @@
 // CHECK-MOVED: note: could not deserialize type for 'foo()'
 // CHECK-MOVED: error: cannot find 'foo' in scope
 
+// CHECK-MOVED: remark: reference to type 'BrokenType' broken by a context change; 'BrokenType' was expected to be in 'A'
+// CHECK-MOVED: note: could not deserialize type for 'init(t:)'
+
+// CHECK-MOVED: remark: reference to type 'BrokenType' broken by a context change; 'BrokenType' was expected to be in 'A'
+// CHECK-MOVED: note: could not deserialize type for 'member()'
+
 /// Move A to the SDK, triggering a different note about layering.
 // RUN: mv %t/A.swiftmodule %t/sdk/A.swiftmodule
 // RUN: not %target-swift-frontend -c -O %t/Client.swift -I %t -I %t/sdk -Rmodule-recovery -sdk %t/sdk 2>&1 \
@@ -80,7 +86,18 @@ public func foo() -> BrokenType {
     fatalError()
 }
 
+public class StableType {
+    public init() {}
+    public convenience init(t: BrokenType) { self.init() }
+    public func member() -> BrokenType { fatalError() }
+}
+
 //--- Client.swift
 import LibWithXRef
 
 foo()
+
+let s = StableType()
+s.member()
+
+let s2 = StableType(42)
