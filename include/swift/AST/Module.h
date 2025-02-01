@@ -19,6 +19,7 @@
 
 #include "swift/AST/AccessNotes.h"
 #include "swift/AST/AttrKind.h"
+#include "swift/AST/AvailabilityDomain.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/DeclContext.h"
 #include "swift/AST/Identifier.h"
@@ -41,8 +42,8 @@
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/MD5.h"
 #include <optional>
-#include <unordered_map>
 #include <set>
+#include <unordered_map>
 
 namespace clang {
   class Module;
@@ -51,20 +52,16 @@ namespace clang {
 namespace swift {
   enum class ArtificialMainKind : uint8_t;
   class ASTContext;
-  class ASTScope;
   class ASTWalker;
-  class AvailabilityScope;
-  class BraceStmt;
+  class CustomAvailabilityDomain;
   class Decl;
   class DeclAttribute;
   class TypeDecl;
   enum class DeclKind : uint8_t;
-  class ExtensionDecl;
   class DebuggerClient;
   class DeclName;
   class FileUnit;
   class FuncDecl;
-  class InfixOperatorDecl;
   enum class LibraryLevel : uint8_t;
   class LinkLibrary;
   class ModuleLoader;
@@ -74,19 +71,11 @@ namespace swift {
   class PostfixOperatorDecl;
   class PrefixOperatorDecl;
   class ProtocolConformance;
-  class ProtocolDecl;
   struct PrintOptions;
   class SourceLookupCache;
-  class Token;
-  class TupleType;
   class Type;
   class ValueDecl;
-  class VarDecl;
   class VisibleDeclConsumer;
-
-namespace ast_scope {
-class ASTSourceFileScope;
-}
 
 /// Discriminator for file-units.
 enum class FileUnitKind {
@@ -360,6 +349,10 @@ private:
 
   /// Used by the debugger to bypass resilient access to fields.
   bool BypassResilience = false;
+
+  using AvailabilityDomainMap =
+      llvm::SmallDenseMap<Identifier, CustomAvailabilityDomain *>;
+  AvailabilityDomainMap AvailabilityDomains;
 
 public:
   using PopulateFilesFn = llvm::function_ref<void(
@@ -1232,6 +1225,15 @@ public:
   /// Returns the language version that was used to compile this module.
   /// An empty `Version` is returned if the information is not available.
   version::Version getLanguageVersionBuiltWith() const;
+
+  /// Returns the custom availability domain defined by this module with the
+  /// given identifier, if one exists.
+  std::optional<AvailabilityDomain>
+  getAvailabilityDomainForIdentifier(Identifier identifier) const;
+
+  void setAvailabilityDomains(const AvailabilityDomainMap &&map) {
+    AvailabilityDomains = std::move(map);
+  }
 
   static bool classof(const DeclContext *DC) {
     if (auto D = DC->getAsDecl())
