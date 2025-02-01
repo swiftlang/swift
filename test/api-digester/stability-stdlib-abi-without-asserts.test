@@ -691,9 +691,6 @@ Func _fixLifetime(_:) is now with @_preInverseGenerics
 Func swap(_:_:) has generic signature change from <T> to <T where T : ~Copyable>
 Func swap(_:_:) has mangled name changing from 'Swift.swap<A>(inout A, inout A) -> ()' to 'Swift.swap<A where A: ~Swift.Copyable>(inout A, inout A) -> ()'
 Func swap(_:_:) is now with @_preInverseGenerics
-Func unsafeBitCast(_:to:) has generic signature change from <T, U> to <T, U where T : ~Escapable>
-Func unsafeBitCast(_:to:) has mangled name changing from 'Swift.unsafeBitCast<A, B>(_: A, to: B.Type) -> B' to 'Swift.unsafeBitCast<A, B where A: ~Swift.Escapable>(_: A, to: B.Type) -> B'
-Func unsafeBitCast(_:to:) is now with @_preInverseGenerics
 Func withUnsafeBytes(of:_:) has been removed
 Func withUnsafeMutableBytes(of:_:) has been removed
 Func withUnsafeMutablePointer(to:_:) has been removed
