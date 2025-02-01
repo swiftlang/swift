@@ -201,9 +201,46 @@ void AvailabilityInference::applyInferredAvailableAttrs(
     Decl *ToDecl, ArrayRef<const Decl *> InferredFromDecls) {
   auto &Context = ToDecl->getASTContext();
 
+  /// A wrapper for AvailabilityDomain that implements a stable, total ordering for
+  /// domains. This is needed to ensure that the inferred attributes are added to
+  /// the declaration in a consistent order, preserving interface printing output
+  /// stability across compilations.
+  class OrderedAvailabilityDomain {
+  public:
+    AvailabilityDomain domain;
+
+    OrderedAvailabilityDomain(AvailabilityDomain domain) : domain(domain) {}
+
+    bool operator<(const OrderedAvailabilityDomain &other) const {
+      auto kind = domain.getKind();
+      auto otherKind = other.domain.getKind();
+      if (kind != otherKind)
+        return kind < otherKind;
+
+      switch (kind) {
+      case AvailabilityDomain::Kind::Universal:
+      case AvailabilityDomain::Kind::SwiftLanguage:
+      case AvailabilityDomain::Kind::PackageDescription:
+      case AvailabilityDomain::Kind::Embedded:
+        return false;
+      case AvailabilityDomain::Kind::Platform:
+        return domain.getPlatformKind() < other.domain.getPlatformKind();
+      case AvailabilityDomain::Kind::Custom: {
+        auto mod = domain.getModule();
+        auto otherMod = other.domain.getModule();
+        if (mod != otherMod)
+          return mod->getName() < otherMod->getName();
+
+        return domain.getNameForAttributePrinting() <
+               other.domain.getNameForAttributePrinting();
+      }
+      }
+    }
+  };
+
   // Iterate over the declarations and infer required availability on
   // a per-platform basis.
-  std::map<AvailabilityDomain, InferredAvailability> Inferred;
+  std::map<OrderedAvailabilityDomain, InferredAvailability> Inferred;
   for (const Decl *D : InferredFromDecls) {
     llvm::SmallVector<SemanticAvailableAttr, 8> MergedAttrs;
 
@@ -238,7 +275,8 @@ void AvailabilityInference::applyInferredAvailableAttrs(
   // Create an availability attribute for each observed platform and add
   // to ToDecl.
   for (auto &Pair : Inferred) {
-    if (auto Attr = createAvailableAttr(Pair.first, Pair.second, Context))
+    if (auto Attr =
+            createAvailableAttr(Pair.first.domain, Pair.second, Context))
       Attrs.add(Attr);
   }
 }

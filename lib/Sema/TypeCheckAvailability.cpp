@@ -3006,6 +3006,7 @@ bool shouldHideDomainNameForConstraintDiagnostic(
   switch (constraint.getDomain().getKind()) {
   case AvailabilityDomain::Kind::Universal:
   case AvailabilityDomain::Kind::Embedded:
+  case AvailabilityDomain::Kind::Custom:
     return true;
   case AvailabilityDomain::Kind::Platform:
     return false;
