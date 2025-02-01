@@ -8404,7 +8404,9 @@ SemanticAvailableAttrRequest::evaluate(swift::Evaluator &evaluator,
   bool hasVersionSpec =
       (introducedVersion || deprecatedVersion || obsoletedVersion);
 
-  if (!domain->isVersioned() && hasVersionSpec) {
+  // FIXME: [availability] For the universal domain, this is currently
+  // diagnosed during parsing. That diagnostic should be subsumed by this one.
+  if (!domain->isVersioned() && hasVersionSpec && !domain->isUniversal()) {
     SourceRange versionSourceRange;
     if (introducedVersion)
       versionSourceRange = semanticAttr.getIntroducedSourceRange();
