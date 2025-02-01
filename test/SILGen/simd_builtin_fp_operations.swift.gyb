@@ -1,5 +1,5 @@
 // RUN: %empty-directory(%t)
-// RUN: %gyb -D CMAKE_SIZEOF_VOID_P=$((%target-ptrsize/8)) %s -o %t/simd_builtin_fp_operations.swift
+// RUN: %gyb %s -o %t/simd_builtin_fp_operations.swift
 // RUN: %target-swift-emit-sil -Xllvm -sil-print-types %t/simd_builtin_fp_operations.swift | %FileCheck %t/simd_builtin_fp_operations.swift
 
 %{

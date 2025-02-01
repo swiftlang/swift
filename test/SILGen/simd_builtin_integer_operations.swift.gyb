@@ -1,10 +1,10 @@
 // RUN: %empty-directory(%t)
-// RUN: %gyb -D CMAKE_SIZEOF_VOID_P=$((%target-ptrsize/8)) %s -o %t/simd_builtin_integer_operations.swift
+// RUN: %gyb -DWORD_BITS=%target-ptrsize %s -o %t/simd_builtin_integer_operations.swift
 // RUN: %target-swift-emit-sil -Xllvm -sil-print-types %t/simd_builtin_integer_operations.swift | %FileCheck %t/simd_builtin_integer_operations.swift
 
 %{
 from SwiftIntTypes import all_integer_types
-word_bits = int(CMAKE_SIZEOF_VOID_P) * 8
+word_bits = int(WORD_BITS)
 storagescalarCounts = [2,4,8,16,32,64]
 vectorscalarCounts = storagescalarCounts + [3]
 }%
