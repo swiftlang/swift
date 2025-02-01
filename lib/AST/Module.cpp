@@ -3649,6 +3649,33 @@ ASTScope &SourceFile::getScope() {
   return *Scope.get();
 }
 
+bool SourceFile::matchesFileID(StringRef fileID) const {
+  // Never match with SourceFiles that do not correpond to a file on disk
+  if (getFilename().empty())
+    return false;
+
+  auto parsed = parseFileID(fileID);
+  if (!parsed)
+    return false;
+
+  auto moduleName = parsed->first;
+  auto fileName = parsed->second;
+  return moduleName == getParentModule()->getNameStr() &&
+         fileName == llvm::sys::path::filename(getFilename());
+}
+
+std::optional<std::pair<StringRef, StringRef>>
+SourceFile::parseFileID(StringRef fileID) {
+  auto names = fileID.split('/');
+  auto moduleName = names.first;
+  auto fileName = names.second;
+
+  if (moduleName.empty() || fileName.empty() || !fileName.ends_with(".swift"))
+    return {};
+
+  return {{moduleName, fileName}};
+}
+
 Identifier SourceFile::getPrivateDiscriminator(bool createIfMissing) const {
   if (!PrivateDiscriminator.empty() || !createIfMissing)
     return PrivateDiscriminator;
