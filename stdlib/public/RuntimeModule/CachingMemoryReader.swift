@@ -96,6 +96,7 @@ extension CachingMemoryReader where Reader == UncachedMemserverMemoryReader {
 }
 #endif
 
+#if os(Linux) || os(macOS)
 @_spi(MemoryReaders)
 public typealias RemoteMemoryReader = CachingMemoryReader<UncachedRemoteMemoryReader>
 
@@ -119,3 +120,4 @@ extension CachingMemoryReader where Reader == UncachedLocalMemoryReader {
     self.init(for: UncachedLocalMemoryReader())
   }
 }
+#endif // os(Linux) || os(macOS)
