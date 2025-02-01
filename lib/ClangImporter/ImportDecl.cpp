@@ -4561,18 +4561,40 @@ namespace {
         if (!dc->isDerivedFrom(targetRecord))
           return nullptr;
 
+        // Using Base::targetMethod() is only valid if targetMethod is protected
+        // or public, because otherwise it would not be inherited.
+        if (targetMethod->getAccess() == clang::AS_private)
+          return nullptr;
+
+        // NOTE: it is possible that targetMethod is not actually accessible
+        // from the inheriting class, importedDC, because of private inheritance
+        // occuring somewhere along the class hierarchy. We rely on Clang to
+        // flag that as an error and assume targetMethod is accessible here.
+        //
+        // BUG: If the derived class already has a member with the same name,
+        // parameter list, and qualifications, the derived class member should
+        // hide or override (rather than conflict with) the member that is
+        // introduced from the base class.
+
         auto importedBaseMethod = dyn_cast_or_null<FuncDecl>(
             Impl.importDecl(targetMethod, getActiveSwiftVersion()));
-        // This will be nullptr for a protected method of base class that is
-        // made public with a using declaration in a derived class. This is
-        // valid in C++ but we do not import such using declarations now.
-        // TODO: make this work for protected base methods.
         if (!importedBaseMethod)
           return nullptr;
+
+        // It does not matter what access level we inherit targetMethod with
+        // because we will overwrite it according to the access specifier of
+        // the using decl.
         auto clonedMethod = dyn_cast_or_null<FuncDecl>(
-            Impl.importBaseMemberDecl(importedBaseMethod, importedDC));
+            Impl.importBaseMemberDecl(importedBaseMethod, importedDC,
+                                      /*inheritance=*/clang::AS_public));
         if (!clonedMethod)
           return nullptr;
+
+        // The clonedMethod's access level needs to be overwritten because it is
+        // possible for a using decl to promote a protected method into a public
+        // method, which importBaseMemberDecl() does not account for.
+        clonedMethod->overwriteAccess(
+            importer::convertClangAccess(decl->getAccess()));
 
         bool success = processSpecialImportedFunc(
             clonedMethod, importedName, targetMethod->getOverloadedOperator());
@@ -9918,7 +9940,8 @@ static void loadAllMembersOfSuperclassIfNeeded(ClassDecl *CD) {
 }
 
 void ClangImporter::Implementation::loadAllMembersOfRecordDecl(
-    NominalTypeDecl *swiftDecl, const clang::RecordDecl *clangRecord) {
+    NominalTypeDecl *swiftDecl, const clang::RecordDecl *clangRecord,
+    clang::AccessSpecifier inheritance) {
   // Import all of the members.
   llvm::SmallVector<Decl *, 16> members;
   for (const clang::Decl *m : clangRecord->decls()) {
@@ -9945,21 +9968,29 @@ void ClangImporter::Implementation::loadAllMembersOfRecordDecl(
   }
 
   // Add the members here.
-  for (auto member: members) {
-    // This means we found a member in a C++ record's base class.
-    if (swiftDecl->getClangDecl() != clangRecord) {
-      auto namedMember = cast<ValueDecl>(member);
-      if (namedMember->getFormalAccess() < AccessLevel::Public)
+  for (auto member : members) {
+    if (inheritance != clang::AS_none) {
+      // This means we found a member in a C++ record's base class.
+      assert(swiftDecl->getClangDecl() != clangRecord);
+      auto baseMember = cast<ValueDecl>(member);
+
+      // Skip this member if this is a case of nested private inheritance.
+      //
+      // BUG: private base class members should be inherited but inaccessible.
+      // Skipping them here may affect accurate overload resolution in cases of
+      // multiple inheritance (which is currently buggy anyway).
+      if (baseMember->getClangDecl()->getAccess() == clang::AS_private)
         continue;
+
       // Do not clone the base member into the derived class
       // when the derived class already has a member of such
       // name and arity.
       auto memberArity =
-          getImportedBaseMemberDeclArity(namedMember);
+          getImportedBaseMemberDeclArity(baseMember);
       bool shouldAddBaseMember = true;
       for (const auto *currentMember : swiftDecl->getMembers()) {
         auto vd = dyn_cast<ValueDecl>(currentMember);
-        if (vd->getName() == namedMember->getName()) {
+        if (vd->getName() == baseMember->getName()) {
           if (memberArity == getImportedBaseMemberDeclArity(vd)) {
             shouldAddBaseMember = false;
             break;
@@ -9968,10 +9999,11 @@ void ClangImporter::Implementation::loadAllMembersOfRecordDecl(
       }
       if (!shouldAddBaseMember)
         continue;
+
       // So we need to clone the member into the derived class.
-      if (auto newDecl = importBaseMemberDecl(namedMember, swiftDecl)) {
-        swiftDecl->addMember(newDecl);
-      }
+      if (auto cloned = importBaseMemberDecl(baseMember, swiftDecl, inheritance))
+        swiftDecl->addMember(cloned);
+
       continue;
     }
 
@@ -9992,8 +10024,23 @@ void ClangImporter::Implementation::loadAllMembersOfRecordDecl(
   // If this is a C++ record, look through the base classes too.
   if (auto cxxRecord = dyn_cast<clang::CXXRecordDecl>(clangRecord)) {
     for (auto base : cxxRecord->bases()) {
-      if (base.getAccessSpecifier() != clang::AccessSpecifier::AS_public)
+      clang::AccessSpecifier baseInheritance = base.getAccessSpecifier();
+      // Skip this base class if this is a case of nested private inheritance.
+      //
+      // BUG: members of private base classes should actually be imported but
+      // inaccessible. Skipping them here may affect accurate overload
+      // resolution in cases of multiple inheritance (which is currently buggy
+      // anyway).
+      if (inheritance != clang::AS_none && baseInheritance == clang::AS_private)
         continue;
+
+      if (inheritance != clang::AS_none)
+        // For nested inheritance, clamp inheritance to least permissive level
+        // which is the largest numerical value for clang::AccessSpecifier
+        baseInheritance = std::max(inheritance, baseInheritance);
+      static_assert(clang::AS_private > clang::AS_protected &&
+                    clang::AS_protected > clang::AS_public &&
+                    "using std::max() relies on this ordering");
 
       clang::QualType baseType = base.getType();
       if (auto spectType = dyn_cast<clang::TemplateSpecializationType>(baseType))
@@ -10004,7 +10051,7 @@ void ClangImporter::Implementation::loadAllMembersOfRecordDecl(
         continue;
 
       auto *baseRecord = cast<clang::RecordType>(baseType)->getDecl();
-      loadAllMembersOfRecordDecl(swiftDecl, baseRecord);
+      loadAllMembersOfRecordDecl(swiftDecl, baseRecord, baseInheritance);
     }
   }
 }
@@ -10045,7 +10092,8 @@ ClangImporter::Implementation::loadAllMembers(Decl *D, uint64_t extra) {
 
   if (isa_and_nonnull<clang::RecordDecl>(D->getClangDecl())) {
     loadAllMembersOfRecordDecl(cast<NominalTypeDecl>(D),
-                               cast<clang::RecordDecl>(D->getClangDecl()));
+                               cast<clang::RecordDecl>(D->getClangDecl()),
+                               /*inheritance=*/clang::AS_none);
     if (IDC) // Set member deserialization status
       IDC->setDeserializedMembers(true);
     return;
