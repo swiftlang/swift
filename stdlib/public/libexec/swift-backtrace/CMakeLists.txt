@@ -39,11 +39,12 @@ set(BACKTRACING_SOURCES
   Utils.swift
   )
 
-# We have to build with a deployment target of at least 10.14.4, otherwise
+# We have to build with a deployment target of at least 10.15, otherwise
 # the tests will all fail because dyld will get confused at the use of
-# @rpath (from magic-symbols-for-install-name.c).
-if(SWIFT_DARWIN_DEPLOYMENT_VERSION_OSX VERSION_LESS "10.14.4")
-  set(osx_deployment_target "10.14.4")
+# @rpath (from magic-symbols-for-install-name.c) and the `some Sequence<Frame>`
+# in Backtrace won't be accessible.
+if(SWIFT_DARWIN_DEPLOYMENT_VERSION_OSX VERSION_LESS "10.15")
+  set(osx_deployment_target "10.15")
 else()
   set(osx_deployment_target "${SWIFT_DARWIN_DEPLOYMENT_VERSION_OSX}")
 endif()
