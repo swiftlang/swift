@@ -411,19 +411,32 @@ macro(configure_sdk_unix name architectures)
 
       if("${prefix}" STREQUAL "LINUX")
         if(arch MATCHES "(armv5)")
-          set(SWIFT_SDK_LINUX_ARCH_${arch}_TRIPLE "${arch}-unknown-linux-gnueabi")
+          set(SWIFT_SDK_LINUX_ARCH_${arch}_SUFFIX linux-gnueabi)
         elseif(arch MATCHES "(armv6|armv7)")
-          set(SWIFT_SDK_LINUX_ARCH_${arch}_TRIPLE "${arch}-unknown-linux-gnueabihf")
+          set(SWIFT_SDK_LINUX_ARCH_${arch}_SUFFIX linux-gnueabihf)
         elseif(arch MATCHES "(aarch64|i686|powerpc|powerpc64|powerpc64le|s390x|x86_64|riscv64)")
-          set(SWIFT_SDK_LINUX_ARCH_${arch}_TRIPLE "${arch}-unknown-linux-gnu")
+          set(SWIFT_SDK_LINUX_ARCH_${arch}_SUFFIX linux-gnu)
         else()
           message(FATAL_ERROR "unknown arch for ${prefix}: ${arch}")
         endif()
 
+        set(SWIFT_SDK_LINUX_ARCH_${arch}_TRIPLE "${arch}-unknown-${SWIFT_SDK_LINUX_ARCH_${arch}_SUFFIX}")
+
         # If we are using an external sysroot, update path and CXX compile flags to point to it
         if(CROSS_COMPILE_SYSROOT)
           set(SWIFT_SDK_${prefix}_ARCH_${arch}_PATH ${CROSS_COMPILE_SYSROOT})
-          set(SWIFT_SDK_${prefix}_CXX_OVERLAY_SWIFT_COMPILE_FLAGS -Xcc --gcc-toolchain=${CROSS_COMPILE_SYSROOT}/usr)
+
+          # Find toolchain install dir
+          execute_process(
+            COMMAND dirname $(find . -name crtbegin.o | grep ${SWIFT_SDK_LINUX_ARCH_${arch}_SUFFIX})
+            WORKING_DIRECTORY ${CROSS_COMPILE_SYSROOT}
+            OUTPUT_VARIABLE GCC_INSTALL_DIR
+            RESULT_VARIABLE FOUND_GCC_INSTALL_DIR)
+          if(FOUND_GCC_INSTALL_DIR)
+            set(SWIFT_SDK_${prefix}_CXX_OVERLAY_SWIFT_COMPILE_FLAGS -Xcc --gcc-install-dir=${GCC_INSTALL_DIR})
+          else()
+            set(SWIFT_SDK_${prefix}_CXX_OVERLAY_SWIFT_COMPILE_FLAGS -Xcc --gcc-toolchain=${CROSS_COMPILE_SYSROOT})
+          endif()
         endif()
       elseif("${prefix}" STREQUAL "FREEBSD")
         if(NOT arch MATCHES "(arm64|x86_64)")
