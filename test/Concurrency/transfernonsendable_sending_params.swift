@@ -518,6 +518,18 @@ func taskIsolatedCaptureInSendingClosureLiteral(_ x: NonSendableKlass) {
     print(x) // expected-note {{closure captures 'x' which is accessible to code in the current task}}
   }
 
+  Task { // expected-warning {{passing closure as a 'sending' parameter risks causing data races between code in the current task and concurrent execution of the closure}}
+    {
+      print(x) // expected-note {{closure captures 'x' which is accessible to code in the current task}}
+    }()
+  }
+
+  Task { // expected-warning {{passing closure as a 'sending' parameter risks causing data races between code in the current task and concurrent execution of the closure}}
+    { // expected-note {{closure captures 'x' which is accessible to code in the current task}}
+      print($0)
+    }(x)
+  }
+
   takeClosure { // expected-warning {{passing closure as a 'sending' parameter risks causing data races between code in the current task and concurrent execution of the closure}}
     print(x) // expected-note {{closure captures 'x' which is accessible to code in the current task}}
   }
@@ -616,4 +628,33 @@ func disconnectedPassedSendingToNonIsolatedCalleeIsolatedParam3(
     transferArg(c) // expected-warning {{sending 'c' risks causing data races}}
     // expected-note @-1 {{'c' used after being passed as a 'sending' parameter}}
     c.use() // expected-note {{access can happen concurrently}}
+}
+
+// In all of the below, we don't know that 'a' is the same isolation as the
+// closure isolation.
+func testNonSendableCaptures(ns: NonSendableKlass, a: isolated MyActor) {
+  Task {
+    _ = a
+    _ = ns
+  }
+
+  Task { [a] in // expected-warning {{passing closure as a 'sending' parameter risks causing data races between 'a'-isolated code and concurrent execution of the closure}}
+    _ = a
+    _ = ns // expected-note {{closure captures 'a'-isolated 'ns'}}
+  }
+
+  Task {
+    let _ = a
+    let _ = ns
+  }
+
+  Task { [a] in // expected-warning {{passing closure as a 'sending' parameter risks causing data races between 'a'-isolated code and concurrent execution of the closure}}
+    let _ = a
+    let _ = ns // expected-note {{closure captures 'a'-isolated 'ns'}}
+  }
+
+  Task { [a] in // expected-warning {{passing closure as a 'sending' parameter risks causing data races between 'a'-isolated code and concurrent execution of the closure}}
+    let (_, _) = (a, ns) // expected-note {{closure captures 'a'-isolated 'ns'}}
+    let _ = ns
+  }
 }

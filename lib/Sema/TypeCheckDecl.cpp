@@ -1201,8 +1201,7 @@ EnumRawValuesRequest::evaluate(Evaluator &eval, EnumDecl *ED,
   // values are intentionally omitted from them (unless the enum is @objc).
   // Without bailing here, incorrect raw values can be automatically generated
   // and incorrect diagnostics may be omitted for some decls.
-  SourceFile *Parent = ED->getDeclContext()->getParentSourceFile();
-  if (Parent && Parent->Kind == SourceFileKind::Interface && !ED->isObjC())
+  if (ED->getDeclContext()->isInSwiftinterface() && !ED->isObjC())
     return std::make_tuple<>();
 
   if (!computeAutomaticEnumValueKind(ED)) {
@@ -2349,7 +2348,7 @@ static Type validateParameterType(ParamDecl *decl) {
                                    PlaceholderType::get,
                                    /*packElementOpener*/ nullptr);
 
-  if (auto *varargTypeRepr = dyn_cast<VarargTypeRepr>(nestedRepr)) {
+  if (isa<VarargTypeRepr>(nestedRepr)) {
     Ty = resolution.resolveType(nestedRepr);
 
     // Monovariadic types (T...) for <T> resolve to [T].
@@ -3198,45 +3197,6 @@ SourceFile::getIfConfigClausesWithin(SourceRange outer) const {
         return SM.isBeforeInBuffer(loc, range.getStartLoc());
       });
   return llvm::ArrayRef(lower, upper - lower);
-}
-
-//----------------------------------------------------------------------------//
-// IsUnsafeRequest
-//----------------------------------------------------------------------------//
-
-bool IsUnsafeRequest::evaluate(Evaluator &evaluator, Decl *decl) const {
-  // If it's marked @unsafe, it's unsafe.
-  if (decl->getAttrs().hasAttribute<UnsafeAttr>())
-    return true;
-
-  // Inference: A member of an @unsafe type is also unsafe.
-  if (auto enclosingDC = decl->getDeclContext()) {
-    if (auto enclosingNominal = enclosingDC->getSelfNominalTypeDecl())
-      if (enclosingNominal->isUnsafe())
-        return true;
-
-    if (auto ext = dyn_cast<ExtensionDecl>(enclosingDC)) {
-      if (ext->isUnsafe())
-        return true;
-    }
-  }
-
-  // If an extension extends and unsafe nominal type, it's unsafe.
-  if (auto ext = dyn_cast<ExtensionDecl>(decl)) {
-    if (auto nominal = ext->getExtendedNominal())
-      if (nominal->isUnsafe())
-        return true;
-  }
-
-  // If this is a pattern binding declaration, check whether the first
-  // variable is @unsafe.
-  if (auto patternBinding = dyn_cast<PatternBindingDecl>(decl)) {
-    if (auto var = patternBinding->getSingleVar())
-      if (var->isUnsafe())
-        return true;
-  }
-
-  return false;
 }
 
 //----------------------------------------------------------------------------//

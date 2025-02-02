@@ -101,6 +101,10 @@ public struct ObservableMacro {
       """
   }
 
+  static func canCacheKeyPaths(_ lexicalContext: [Syntax]) -> Bool {
+    lexicalContext.allSatisfy { $0.isNonGeneric }
+  }
+
   static var ignoredAttribute: AttributeSyntax {
     AttributeSyntax(
       leadingTrivia: .space,
@@ -353,47 +357,88 @@ public struct ObservationTrackedMacro: AccessorMacro {
         _\(identifier) = initialValue
       }
       """
-
-    let getAccessor: AccessorDeclSyntax =
-      """
-      get {
-        access(keyPath: \(container.trimmed.name)._cachedKeypath_\(identifier))
-        return _\(identifier)
-      }
-      """
-
-    let setAccessor: AccessorDeclSyntax =
-      """
-      set {
-        guard shouldNotifyObservers(_\(identifier), newValue) else {
-          return
+    if ObservableMacro.canCacheKeyPaths(context.lexicalContext) {
+      let getAccessor: AccessorDeclSyntax =
+        """
+        get {
+          access(keyPath: \(container.trimmed.name)._cachedKeypath_\(identifier))
+          return _\(identifier)
         }
-        withMutation(keyPath: \(container.trimmed.name)._cachedKeypath_\(identifier)) {
-          _\(identifier) = newValue
-        }
-      }
-      """
-      
-    // Note: this accessor cannot test the equality since it would incur
-    // additional CoW's on structural types. Most mutations in-place do
-    // not leave the value equal so this is "fine"-ish.
-    // Warning to future maintence: adding equality checks here can make
-    // container mutation O(N) instead of O(1).
-    // e.g. observable.array.append(element) should just emit a change
-    // to the new array, and NOT cause a copy of each element of the
-    // array to an entirely new array.
-    let modifyAccessor: AccessorDeclSyntax =
-      """
-      _modify {
-        let keyPath = \(container.trimmed.name)._cachedKeypath_\(identifier)
-        access(keyPath: keyPath)
-        \(raw: ObservableMacro.registrarVariableName).willSet(self, keyPath: keyPath)
-        defer { \(raw: ObservableMacro.registrarVariableName).didSet(self, keyPath: keyPath) }
-        yield &_\(identifier)
-      }
-      """
+        """
 
-    return [initAccessor, getAccessor, setAccessor, modifyAccessor]
+      let setAccessor: AccessorDeclSyntax =
+        """
+        set {
+          guard shouldNotifyObservers(_\(identifier), newValue) else {
+            return
+          }
+          withMutation(keyPath: \(container.trimmed.name)._cachedKeypath_\(identifier)) {
+            _\(identifier) = newValue
+          }
+        }
+        """
+        
+      // Note: this accessor cannot test the equality since it would incur
+      // additional CoW's on structural types. Most mutations in-place do
+      // not leave the value equal so this is "fine"-ish.
+      // Warning to future maintence: adding equality checks here can make
+      // container mutation O(N) instead of O(1).
+      // e.g. observable.array.append(element) should just emit a change
+      // to the new array, and NOT cause a copy of each element of the
+      // array to an entirely new array.
+      let modifyAccessor: AccessorDeclSyntax =
+        """
+        _modify {
+          let keyPath = \(container.trimmed.name)._cachedKeypath_\(identifier)
+          access(keyPath: keyPath)
+          \(raw: ObservableMacro.registrarVariableName).willSet(self, keyPath: keyPath)
+          defer { \(raw: ObservableMacro.registrarVariableName).didSet(self, keyPath: keyPath) }
+          yield &_\(identifier)
+        }
+        """
+
+      return [initAccessor, getAccessor, setAccessor, modifyAccessor]
+    } else {
+      let getAccessor: AccessorDeclSyntax =
+        """
+        get {
+          access(keyPath: \\.\(identifier))
+          return _\(identifier)
+        }
+        """
+
+      let setAccessor: AccessorDeclSyntax =
+        """
+        set {
+          guard shouldNotifyObservers(_\(identifier), newValue) else {
+            return
+          }
+          withMutation(keyPath: \\.\(identifier)) {
+            _\(identifier) = newValue
+          }
+        }
+        """
+        
+      // Note: this accessor cannot test the equality since it would incur
+      // additional CoW's on structural types. Most mutations in-place do
+      // not leave the value equal so this is "fine"-ish.
+      // Warning to future maintence: adding equality checks here can make
+      // container mutation O(N) instead of O(1).
+      // e.g. observable.array.append(element) should just emit a change
+      // to the new array, and NOT cause a copy of each element of the
+      // array to an entirely new array.
+      let modifyAccessor: AccessorDeclSyntax =
+        """
+        _modify {
+          access(keyPath: \\.\(identifier))
+          \(raw: ObservableMacro.registrarVariableName).willSet(self, keyPath: \\.\(identifier))
+          defer { \(raw: ObservableMacro.registrarVariableName).didSet(self, keyPath: \\.\(identifier)) }
+          yield &_\(identifier)
+        }
+        """
+
+      return [initAccessor, getAccessor, setAccessor, modifyAccessor]
+    }
   }
 }
 
@@ -422,11 +467,15 @@ extension ObservationTrackedMacro: PeerMacro {
     }
     
     let storage = DeclSyntax(property.privatePrefixed("_", addingAttribute: ObservableMacro.ignoredAttribute))
-    let cachedKeypath: DeclSyntax =
-      """
-      private static let _cachedKeypath_\(identifier) = \\\(container.name).\(identifier)
-      """
-    return [storage, cachedKeypath]
+    if ObservableMacro.canCacheKeyPaths(context.lexicalContext) {
+      let cachedKeypath: DeclSyntax =
+        """
+        private static let _cachedKeypath_\(identifier) = \\\(container.name).\(identifier)
+        """
+      return [storage, cachedKeypath]
+    } else {
+      return [storage]
+    }
   }
 }
 

@@ -300,25 +300,18 @@ public:
   /// to a type variable.
   void introduceToInference(TypeVariableType *typeVar, Type fixedType);
 
-  /// Describes which constraints \c gatherConstraints should gather.
-  enum class GatheringKind {
-    /// Gather constraints associated with all of the variables within the
-    /// same equivalence class as the given type variable, as well as its
-    /// immediate fixed bindings.
-    EquivalenceClass,
-    /// Gather all constraints that mention this type variable or type variables
-    /// that it is a fixed binding of. Unlike EquivalenceClass, this looks
-    /// through transitive fixed bindings. This can be used to find all the
-    /// constraints that may be affected when binding a type variable.
-    AllMentions,
-  };
-
-  /// Gather the set of constraints that involve the given type variable,
-  /// i.e., those constraints that will be affected when the type variable
-  /// gets merged or bound to a fixed type.
+  /// Gather constraints associated with all of the variables within the
+  /// same equivalence class as the given type variable, as well as its
+  /// immediate fixed bindings.
   llvm::TinyPtrVector<Constraint *>
-  gatherConstraints(TypeVariableType *typeVar,
-                    GatheringKind kind,
+  gatherAllConstraints(TypeVariableType *typeVar);
+
+  /// Gather all constraints that mention this type variable or type variables
+  /// that it is a fixed binding of. Unlike EquivalenceClass, this looks
+  /// through transitive fixed bindings. This can be used to find all the
+  /// constraints that may be affected when binding a type variable.
+  llvm::TinyPtrVector<Constraint *>
+  gatherNearbyConstraints(TypeVariableType *typeVar,
                     llvm::function_ref<bool(Constraint *)> acceptConstraint =
                         [](Constraint *constraint) { return true; });
 

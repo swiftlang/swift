@@ -147,13 +147,6 @@ ModuleDependencyVector ClangImporter::bridgeClangModuleDependencies(
     return path.str();
   };
 
-  // This scanner invocation's already-captured APINotes version
-  std::vector<std::string>
-      capturedPCMArgs = {
-          "-Xcc",
-          ("-fapinotes-swift-version=" +
-           ctx.LangOpts.EffectiveLanguageVersion.asAPINotesVersionString())};
-
   for (auto &clangModuleDep : clangDependencies) {
     // File dependencies for this module.
     std::vector<std::string> fileDeps;
@@ -281,7 +274,7 @@ ModuleDependencyVector ClangImporter::bridgeClangModuleDependencies(
     llvm::StringSet<> alreadyAddedModules;
     auto dependencies = ModuleDependencyInfo::forClangModule(
         pcmPath, mappedPCMPath, clangModuleDep.ClangModuleMapFile,
-        clangModuleDep.ID.ContextHash, swiftArgs, fileDeps, capturedPCMArgs,
+        clangModuleDep.ID.ContextHash, swiftArgs, fileDeps,
         LinkLibraries, RootID, IncludeTree, /*module-cache-key*/ "",
         clangModuleDep.IsSystem);
 

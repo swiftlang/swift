@@ -78,7 +78,6 @@ findPathToDependency(ModuleDependencyID dependency,
                      const ModuleDependenciesCache &cache) {
   auto mainModuleDep = cache.findDependency(cache.getMainModuleName(),
                                             ModuleDependencyKind::SwiftSource);
-  // We may be in a batch scan instance which does not have this dependency
   if (!mainModuleDep.has_value())
     return {};
   auto mainModuleID = ModuleDependencyID{cache.getMainModuleName().str(),
@@ -331,13 +330,6 @@ ModuleDependencyScanner::getMainModuleDependencyInfo(ModuleDecl *mainModule) {
                                  .asAPINotesVersionString())
                                 .str();
 
-  // Compute the dependencies of the main module.
-  std::vector<StringRef> ExtraPCMArgs = {"-Xcc", apinotesVer};
-  if (!ScanASTContext.LangOpts.ClangTarget.has_value())
-    ExtraPCMArgs.insert(
-        ExtraPCMArgs.begin(),
-        {"-Xcc", "-target", "-Xcc", ScanASTContext.LangOpts.Target.str()});
-
   auto clangImporter =
       static_cast<ClangImporter *>(ScanASTContext.getClangModuleLoader());
   std::vector<std::string> buildArgs;
@@ -356,7 +348,7 @@ ModuleDependencyScanner::getMainModuleDependencyInfo(ModuleDecl *mainModule) {
   });
 
   auto mainDependencies = ModuleDependencyInfo::forSwiftSourceModule(
-       {}, buildCommands, {}, {}, {}, ExtraPCMArgs);
+       {}, buildCommands, {}, {}, {});
 
   if (ScanASTContext.CASOpts.EnableCaching) {
     std::vector<std::string> clangDependencyFiles;
@@ -926,16 +918,19 @@ void ModuleDependencyScanner::resolveSwiftImportsForModule(
   for (const auto &dependsOn : moduleDependencyInfo.getModuleImports())
     moduleLookupResult.insert(
         std::make_pair(dependsOn.importIdentifier, std::nullopt));
+  std::mutex lookupResultLock;
 
   // A scanning task to query a module by-name. If the module already exists
   // in the cache, do nothing and return.
   auto scanForSwiftModuleDependency =
-      [this, &cache, &moduleLookupResult](Identifier moduleIdentifier,
-                                          bool isTestable) {
+      [this, &cache, &lookupResultLock, &moduleLookupResult](Identifier moduleIdentifier,
+                                                             bool isTestable) {
         auto moduleName = moduleIdentifier.str().str();
-        // If this is already in the cache, no work to do here
-        if (cache.hasSwiftDependency(moduleName))
-          return;
+        {
+          std::lock_guard<std::mutex> guard(lookupResultLock);
+          if (cache.hasSwiftDependency(moduleName))
+            return;
+        }
 
         auto moduleDependencies = withDependencyScanningWorker(
             [&cache, moduleIdentifier,
@@ -944,7 +939,11 @@ void ModuleDependencyScanner::resolveSwiftImportsForModule(
                   moduleIdentifier, cache.getModuleOutputPath(),
                   cache.getScanService().getPrefixMapper(), isTestable);
             });
-        moduleLookupResult.insert_or_assign(moduleName, moduleDependencies);
+
+        {
+          std::lock_guard<std::mutex> guard(lookupResultLock);
+          moduleLookupResult.insert_or_assign(moduleName, moduleDependencies);
+        }
       };
 
   // Enque asynchronous lookup tasks

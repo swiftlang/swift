@@ -956,3 +956,25 @@ exit:
 die:
   unreachable
 }
+
+class Klass {}
+
+struct Wrapper {
+  var c: Klass
+}
+
+// CHECK-LABEL: begin running test {{.*}} on testInteriorMarkDepNonEscAddressValue: ossa_lifetime_completion
+// CHECK-LABEL: sil [ossa] @testInteriorMarkDepNonEscAddressValue : {{.*}} {
+// CHECK: mark_dependence
+// CHECK: end_borrow
+// CHECK-LABEL: } // end sil function 'testInteriorMarkDepNonEscAddressValue'
+// CHECK-LABEL: end running test {{.*}} on testInteriorMarkDepNonEscAddressValue: ossa_lifetime_completion
+sil [ossa] @testInteriorMarkDepNonEscAddressValue : $@convention(thin) (@owned Wrapper, @inout Klass) -> () {
+bb0(%0 : @owned $Wrapper, %1 : $*Klass):
+  specify_test "ossa_lifetime_completion %2 liveness"
+  %2 = begin_borrow %0 : $Wrapper
+  %3 = struct_extract %2 : $Wrapper, #Wrapper.c
+  %4 = mark_dependence [nonescaping] %1 : $*Klass on %3 : $Klass
+  end_borrow %2 : $Wrapper
+  unreachable
+}

@@ -1695,7 +1695,7 @@ PotentialBindings::inferFromRelational(ConstraintSystem &CS,
     }
   }
 
-  if (auto *locator = TypeVar->getImpl().getLocator()) {
+  if (TypeVar->getImpl().getLocator()) {
     // Don't allow a protocol type to get propagated from the base to the result
     // type of a chain, Result should always be a concrete type which conforms
     // to the protocol inferred for the base.
@@ -2584,7 +2584,8 @@ bool TypeVarBindingProducer::computeNext() {
         //
         // Let's not perform $T? -> $T for closure result types to avoid having
         // to re-discover solutions that differ only in location of optional
-        // injection.
+        // injection. `Void` is a special case because in $T_result position
+        // it has special semantics and enables T? -> Void conversions.
         //
         // The pattern with such type variables is:
         //
@@ -2595,7 +2596,8 @@ bool TypeVarBindingProducer::computeNext() {
         // expression is non-optional), if we allow  both the solver would
         // find two solutions that differ only in location of optional
         // injection.
-        if (!TypeVar->getImpl().isClosureResultType()) {
+        if (!TypeVar->getImpl().isClosureResultType() || objTy->isVoid() ||
+            objTy->isTypeVariableOrMember()) {
           // If T is a type variable, only attempt this if both the
           // type variable we are trying bindings for, and the type
           // variable we will attempt to bind, both have the same

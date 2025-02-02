@@ -267,8 +267,7 @@ void ConstraintSystem::assignFixedType(TypeVariableType *typeVar, Type type,
 void ConstraintSystem::addTypeVariableConstraintsToWorkList(
        TypeVariableType *typeVar) {
   // Activate the constraints affected by a change to this type variable.
-  auto gatheringKind = ConstraintGraph::GatheringKind::AllMentions;
-  for (auto *constraint : CG.gatherConstraints(typeVar, gatheringKind))
+  for (auto *constraint : CG.gatherAllConstraints(typeVar))
     if (!constraint->isActive())
       activateConstraint(constraint);
 }
@@ -488,7 +487,7 @@ void ConstraintSystem::recordPotentialThrowSite(
 
   // do..catch statements without an explicit `throws` clause do infer
   // thrown types.
-  if (auto doCatch = catchNode.dyn_cast<DoCatchStmt *>()) {
+  if (catchNode.is<DoCatchStmt *>()) {
     PotentialThrowSite site{kind, type, getConstraintLocator(locator)};
     recordPotentialThrowSite(catchNode, site);
     return;
@@ -1074,7 +1073,7 @@ Type ConstraintSystem::getFixedTypeRecursive(Type type, TypeMatchOptions &flags,
 
   // Tuple types can lose their tuple structure under substitution
   // when a parameter pack is substituted with one element.
-  if (auto tuple = type->getAs<TupleType>()) {
+  if (type->is<TupleType>()) {
     auto simplified = simplifyType(type);
     if (simplified.getPointer() == type.getPointer())
       return type;
@@ -1082,7 +1081,7 @@ Type ConstraintSystem::getFixedTypeRecursive(Type type, TypeMatchOptions &flags,
     return getFixedTypeRecursive(simplified, flags, wantRValue);
   }
 
-  if (auto metatype = type->getAs<AnyMetatypeType>()) {
+  if (type->is<AnyMetatypeType>()) {
     auto simplified = simplifyType(type);
     if (simplified.getPointer() == type.getPointer())
       return type;
@@ -3476,7 +3475,7 @@ void constraints::simplifyLocator(ASTNode &anchor,
       LLVM_FALLTHROUGH;
 
     case ConstraintLocator::Member:
-      if (auto UDE = getAsExpr<UnresolvedDotExpr>(anchor)) {
+      if (isExpr<UnresolvedDotExpr>(anchor)) {
         path = path.slice(1);
         continue;
       }
@@ -4668,7 +4667,7 @@ void ConstraintSystem::diagnoseFailureFor(SyntacticElementTarget target) {
       nominal->diagnose(diag::property_wrapper_declared_here,
                         nominal->getName());
     }
-  } else if (auto *var = target.getAsUninitializedVar()) {
+  } else if (target.getAsUninitializedVar()) {
     DE.diagnose(target.getLoc(), diag::failed_to_produce_diagnostic);
   } else if (target.isForEachPreamble()) {
     DE.diagnose(target.getLoc(), diag::failed_to_produce_diagnostic);

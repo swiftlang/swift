@@ -17,6 +17,7 @@
 #ifndef SWIFT_AST_AVAILABILITY_CONSTRAINT_H
 #define SWIFT_AST_AVAILABILITY_CONSTRAINT_H
 
+#include "swift/AST/AvailabilityDomain.h"
 #include "swift/AST/AvailabilityRange.h"
 #include "swift/AST/PlatformKind.h"
 #include "swift/Basic/LLVM.h"
@@ -59,11 +60,10 @@ public:
   };
 
 private:
-  Kind kind;
-  SemanticAvailableAttr attr;
+  llvm::PointerIntPair<SemanticAvailableAttr, 2, Kind> attrAndKind;
 
   AvailabilityConstraint(Kind kind, SemanticAvailableAttr attr)
-      : kind(kind), attr(attr) {};
+      : attrAndKind(attr, kind) {};
 
 public:
   static AvailabilityConstraint
@@ -84,8 +84,13 @@ public:
     return AvailabilityConstraint(Kind::IntroducedInNewerVersion, attr);
   }
 
-  Kind getKind() const { return kind; }
-  SemanticAvailableAttr getAttr() const { return attr; }
+  Kind getKind() const { return attrAndKind.getInt(); }
+  SemanticAvailableAttr getAttr() const {
+    return static_cast<SemanticAvailableAttr>(attrAndKind.getPointer());
+  }
+
+  /// Returns the domain that the constraint applies to.
+  AvailabilityDomain getDomain() const { return getAttr().getDomain(); }
 
   /// Returns the platform that this constraint applies to, or
   /// `PlatformKind::none` if it is not platform specific.

@@ -2207,7 +2207,7 @@ bool PullbackCloner::Implementation::run() {
       //
       // Do not diagnose `Optional`-typed values, which will have special-case
       // differentiation support.
-      if (auto *enumDecl = type.getEnumOrBoundGenericEnum()) {
+      if (type.getEnumOrBoundGenericEnum()) {
         if (!type.getASTType()->isOptional()) {
           getContext().emitNondifferentiabilityError(
               v, getInvoker(), diag::autodiff_enums_unsupported);

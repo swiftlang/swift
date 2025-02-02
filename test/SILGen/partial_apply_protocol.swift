@@ -62,7 +62,7 @@ func testClonableInGenericContext<T>(c: Clonable, t: T) {
   // CHECK: [[THUNK:%.*]] = apply [[THUNK_FN]]({{.*}})
   let _: () -> Clonable = c.clone
 
-  // CHECK: [[THUNK_FN:%.*]] = function_ref @$s22partial_apply_protocol28testClonableInGenericContext1c1tyAA0E0_p_xtlFAaE_pSgycAaE_pcfu1_ : $@convention(thin) (@in_guaranteed any Clonable) -> @owned @callee_guaranteed () -> @out Optional<any Clonable> // user: %8
+  // CHECK: [[THUNK_FN:%.*]] = function_ref @$s22partial_apply_protocol28testClonableInGenericContext1c1tyAA0E0_p_xtlFAaE_pSgycAaE_pcfu1_ : $@convention(thin) (@in_guaranteed any Clonable) -> @owned @callee_guaranteed () -> @out Optional<any Clonable>
   // CHECK: [[THUNK:%.*]] = apply [[THUNK_FN]]({{.*}})
   let _: () -> Clonable? = c.maybeClone
 

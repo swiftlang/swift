@@ -37,11 +37,6 @@ std::string quote(StringRef unquoted) {
 }
 } // namespace
 
-/// Write a single JSON field.
-template <typename T>
-void writeJSONSingleField(llvm::raw_ostream &out, StringRef fieldName,
-                          const T &value, unsigned indentLevel,
-                          bool trailingComma, bool nested = false);
 
 /// Write a string value as JSON.
 void writeJSONValue(llvm::raw_ostream &out, StringRef value,
@@ -75,38 +70,6 @@ void writeJSONValue(llvm::raw_ostream &out, swiftscan_string_set_t *value_set,
 
   out.indent(indentLevel * 2);
   out << "]";
-}
-
-void writeEncodedModuleIdJSONValue(llvm::raw_ostream &out,
-                                   swiftscan_string_ref_t value,
-                                   unsigned indentLevel) {
-  out << "{\n";
-  static const std::string textualPrefix("swiftTextual");
-  static const std::string binaryPrefix("swiftBinary");
-  static const std::string placeholderPrefix("swiftPlaceholder");
-  static const std::string clangPrefix("clang");
-  std::string valueStr = get_C_string(value);
-  std::string moduleKind;
-  std::string moduleName;
-  if (!valueStr.compare(0, textualPrefix.size(), textualPrefix)) {
-    moduleKind = "swift";
-    moduleName = valueStr.substr(textualPrefix.size() + 1);
-  } else if (!valueStr.compare(0, binaryPrefix.size(), binaryPrefix)) {
-    // FIXME: rename to be consistent in the clients (swift-driver)
-    moduleKind = "swiftPrebuiltExternal";
-    moduleName = valueStr.substr(binaryPrefix.size() + 1);
-  } else if (!valueStr.compare(0, placeholderPrefix.size(),
-                               placeholderPrefix)) {
-    moduleKind = "swiftPlaceholder";
-    moduleName = valueStr.substr(placeholderPrefix.size() + 1);
-  } else {
-    moduleKind = "clang";
-    moduleName = valueStr.substr(clangPrefix.size() + 1);
-  }
-  writeJSONSingleField(out, moduleKind, moduleName, indentLevel + 1,
-                       /*trailingComma=*/false);
-  out.indent(indentLevel * 2);
-  out << "}";
 }
 
 /// Write a boolean value as JSON.
@@ -147,35 +110,51 @@ void writeJSONValue(llvm::raw_ostream &out, const std::vector<T> &values,
 template <typename T>
 void writeJSONSingleField(llvm::raw_ostream &out, StringRef fieldName,
                           const T &value, unsigned indentLevel,
-                          bool trailingComma, bool nested) {
+                          bool trailingComma) {
   out.indent(indentLevel * 2);
   writeJSONValue(out, fieldName, indentLevel);
   out << ": ";
   auto updatedIndentLevel = indentLevel;
-  
-  if (nested) {
-    // This is a hack to "fix" a format for a value that should be a nested
-    // set of strings. Currently only capturedPCMArgs (clang) is expected to
-    // in the nested format, which supposedly only contains one set of strings.
-    // Adjust the indentation to account for the nested brackets.
-    updatedIndentLevel += 1;
-    out << "[\n";
-    out.indent(updatedIndentLevel * 2);
-  }
 
   writeJSONValue(out, value, updatedIndentLevel);
-
-  if (nested) {
-    // If nested, add an extra closing brack with a correct indentation.
-    out << "\n";
-    out.indent(indentLevel * 2);
-    out << "]";
-  }
 
   if (trailingComma)
     out << ",";
   out << "\n";
 }
+
+void writeEncodedModuleIdJSONValue(llvm::raw_ostream &out,
+                                   swiftscan_string_ref_t value,
+                                   unsigned indentLevel) {
+  out << "{\n";
+  static const std::string textualPrefix("swiftTextual");
+  static const std::string binaryPrefix("swiftBinary");
+  static const std::string placeholderPrefix("swiftPlaceholder");
+  static const std::string clangPrefix("clang");
+  std::string valueStr = get_C_string(value);
+  std::string moduleKind;
+  std::string moduleName;
+  if (!valueStr.compare(0, textualPrefix.size(), textualPrefix)) {
+    moduleKind = "swift";
+    moduleName = valueStr.substr(textualPrefix.size() + 1);
+  } else if (!valueStr.compare(0, binaryPrefix.size(), binaryPrefix)) {
+    // FIXME: rename to be consistent in the clients (swift-driver)
+    moduleKind = "swiftPrebuiltExternal";
+    moduleName = valueStr.substr(binaryPrefix.size() + 1);
+  } else if (!valueStr.compare(0, placeholderPrefix.size(),
+                               placeholderPrefix)) {
+    moduleKind = "swiftPlaceholder";
+    moduleName = valueStr.substr(placeholderPrefix.size() + 1);
+  } else {
+    moduleKind = "clang";
+    moduleName = valueStr.substr(clangPrefix.size() + 1);
+  }
+  writeJSONSingleField(out, moduleKind, moduleName, indentLevel + 1,
+                       /*trailingComma=*/false);
+  out.indent(indentLevel * 2);
+  out << "}";
+}
+
 
 static void writeDependencies(llvm::raw_ostream &out,
                               const swiftscan_string_set_t *dependencies,
@@ -441,10 +420,8 @@ void writeJSON(llvm::raw_ostream &out,
           swiftTextualDeps->swift_overlay_module_dependencies &&
           swiftTextualDeps->swift_overlay_module_dependencies->count > 0;
       bool commaAfterBridgingHeaderPath = hasOverlayDependencies;
-      bool commaAfterExtraPcmArgs =
-          hasBridgingHeaderPath || commaAfterBridgingHeaderPath;
       bool commaAfterFramework =
-          swiftTextualDeps->extra_pcm_args->count != 0 || commaAfterExtraPcmArgs;
+          hasBridgingHeaderPath || commaAfterBridgingHeaderPath;
 
       if (swiftTextualDeps->cas_fs_root_id.length != 0) {
         writeJSONSingleField(out, "casFSRootID",
@@ -463,22 +440,6 @@ void writeJSON(llvm::raw_ostream &out,
                              /*trailingComma=*/true);
       writeJSONSingleField(out, "isFramework", swiftTextualDeps->is_framework,
                            5, commaAfterFramework);
-      if (swiftTextualDeps->extra_pcm_args->count != 0) {
-        out.indent(5 * 2);
-        out << "\"extraPcmArgs\": [\n";
-        for (int i = 0, count = swiftTextualDeps->extra_pcm_args->count;
-             i < count; ++i) {
-          const auto &arg =
-              get_C_string(swiftTextualDeps->extra_pcm_args->strings[i]);
-          out.indent(6 * 2);
-          out << "\"" << quote(arg) << "\"";
-          if (i != count - 1)
-            out << ",";
-          out << "\n";
-        }
-        out.indent(5 * 2);
-        out << (commaAfterExtraPcmArgs ? "],\n" : "]\n");
-      }
       /// Bridging header and its source file dependencies, if any.
       if (hasBridgingHeaderPath) {
         out.indent(5 * 2);
@@ -618,24 +579,22 @@ void writeJSON(llvm::raw_ostream &out,
 
       // Command line.
       writeJSONSingleField(out, "commandLine", clangDeps->command_line, 5,
-                           /*trailingComma=*/true);
+                           clangDeps->cas_fs_root_id.length != 0 ||
+                           clangDeps->clang_include_tree.length != 0 ||
+                           clangDeps->module_cache_key.length != 0);
 
       if (clangDeps->cas_fs_root_id.length != 0)
         writeJSONSingleField(out, "casFSRootID", clangDeps->cas_fs_root_id, 5,
-                             /*trailingComma=*/true);
+                             clangDeps->clang_include_tree.length != 0 ||
+                             clangDeps->module_cache_key.length != 0);
       if (clangDeps->clang_include_tree.length != 0)
         writeJSONSingleField(out, "clangIncludeTree",
                              clangDeps->clang_include_tree, 5,
-                             /*trailingComma=*/true);
+                             clangDeps->module_cache_key.length != 0);
       if (clangDeps->module_cache_key.length != 0)
         writeJSONSingleField(out, "moduleCacheKey", clangDeps->module_cache_key,
                              5,
-                             /*trailingComma=*/true);
-
-      // Captured PCM arguments.
-      writeJSONSingleField(out, "capturedPCMArgs", clangDeps->captured_pcm_args, 5,
-                           /*trailingComma=*/false, /*nested=*/true);
-
+                             /*trailingComma=*/false);
     }
 
     out.indent(4 * 2);

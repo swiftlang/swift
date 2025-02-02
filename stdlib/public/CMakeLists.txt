@@ -152,6 +152,9 @@ option(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB_CROSS_COMPILING
       "Enable build of the embedded Swift standard library and runtime for cross-compiling targets"
       FALSE)
 
+set(SWIFT_EMBEDDED_STDLIB_EXTRA_TARGET_TRIPLES "" CACHE STRING
+    "List of extra target triples to build the embedded Swift standard library for")
+
 if((NOT SWIFT_HOST_VARIANT STREQUAL "macosx") AND (NOT SWIFT_HOST_VARIANT STREQUAL "linux") AND (NOT SWIFT_HOST_VARIANT STREQUAL "windows"))
   set(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB FALSE)
 elseif(BOOTSTRAPPING_MODE STREQUAL "OFF")
@@ -250,6 +253,24 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB)
   endif()
 endif()
 
+foreach(triple ${SWIFT_EMBEDDED_STDLIB_EXTRA_TARGET_TRIPLES})
+  if(triple STREQUAL "")
+    continue()
+  endif()
+
+  string(REGEX REPLACE "-" ";" list "${triple}")
+  list(GET list 0 arch)
+  list(GET list 1 vendor)
+  list(GET list 2 os)
+  string(REGEX REPLACE "[0-9]+(\\.[0-9]+)+" " " mod "${triple}")
+
+  list(FILTER EMBEDDED_STDLIB_TARGET_TRIPLES EXCLUDE REGEX " ${mod} ")
+
+  list(APPEND EMBEDDED_STDLIB_TARGET_TRIPLES
+    "${arch} ${mod} ${triple}"
+  )
+endforeach()
+
 if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB)
   set(triples)
   foreach(entry ${EMBEDDED_STDLIB_TARGET_TRIPLES})
@@ -301,8 +322,8 @@ if(SWIFT_BUILD_STDLIB AND NOT SWIFT_STDLIB_BUILD_ONLY_CORE_MODULES)
     add_subdirectory(Observation)
   endif()
 
-  if(SWIFT_ENABLE_BACKTRACING)
-    add_subdirectory(Backtracing)
+  if(SWIFT_ENABLE_RUNTIME_MODULE)
+    add_subdirectory(RuntimeModule)
   endif()
 
   if(SWIFT_ENABLE_SYNCHRONIZATION)

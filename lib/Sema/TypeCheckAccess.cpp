@@ -1906,6 +1906,8 @@ bool isFragileClangDecl(const clang::Decl *decl) {
     return isFragileClangType(pd->getType());
   if (auto *typedefDecl = dyn_cast<clang::TypedefNameDecl>(decl))
     return isFragileClangType(typedefDecl->getUnderlyingType());
+  if (auto *enumDecl = dyn_cast<clang::EnumDecl>(decl))
+    return enumDecl->isScoped();
   if (auto *rd = dyn_cast<clang::RecordDecl>(decl)) {
     auto cxxRecordDecl = dyn_cast<clang::CXXRecordDecl>(rd);
     if (!cxxRecordDecl)
@@ -2017,7 +2019,7 @@ swift::getDisallowedOriginKind(const Decl *decl,
       // Decls with @_spi_available aren't hidden entirely from public interfaces,
       // thus public interfaces may still refer them. Be forgiving here so public
       // interfaces can compile.
-      if (where.getUnavailablePlatformKind().has_value())
+      if (where.getAvailability().isUnavailable())
         return DisallowedOriginKind::None;
       // We should only diagnose SPI_AVAILABLE usage when the library level is API.
       // Using SPI_AVAILABLE symbols in private frameworks or executable targets
@@ -2681,7 +2683,8 @@ void swift::checkAccessControl(Decl *D) {
   llvm::SmallVector<UnsafeUse, 2> unsafeUsesVec;
   llvm::SmallVectorImpl<UnsafeUse> *unsafeUses = nullptr;
   if (D->getASTContext().LangOpts.hasFeature(Feature::WarnUnsafe) &&
-      !D->isImplicit() && !D->isUnsafe()) {
+      !D->isImplicit() &&
+      D->getExplicitSafety() == ExplicitSafety::Unspecified) {
     unsafeUses = &unsafeUsesVec;
   }
 
@@ -2693,9 +2696,16 @@ void swift::checkAccessControl(Decl *D) {
 
   // If there were any unsafe uses, this declaration needs "@unsafe".
   if (!unsafeUsesVec.empty()) {
-    D->diagnose(diag::decl_signature_involves_unsafe, D)
-      .fixItInsert(D->getAttributeInsertionLoc(/*forModifier=*/false),
-                   "@unsafe ");
+    D->diagnose(diag::decl_signature_involves_unsafe, D);
+
+    ASTContext &ctx = D->getASTContext();
+    auto insertLoc = D->getAttributeInsertionLoc(/*forModifier=*/false);
+
+    ctx.Diags.diagnose(insertLoc, diag::decl_signature_mark_unsafe)
+      .fixItInsert(insertLoc, "@unsafe ");
+    ctx.Diags.diagnose(insertLoc, diag::decl_signature_mark_safe)
+      .fixItInsert(insertLoc, "@safe ");
+
     std::for_each(unsafeUsesVec.begin(), unsafeUsesVec.end(),
                   diagnoseUnsafeUse);
   }

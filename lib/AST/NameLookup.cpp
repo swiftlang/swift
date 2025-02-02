@@ -651,22 +651,6 @@ static void recordShadowedDeclsAfterTypeMatch(
         }
       }
 
-      // Next, prefer any other module over the _Backtracing module.
-      if (auto spModule = ctx.getLoadedModule(ctx.Id_Backtracing)) {
-        if ((firstModule == spModule) != (secondModule == spModule)) {
-          // If second module is _StringProcessing, then it is shadowed by
-          // first.
-          if (secondModule == spModule) {
-            shadowed.insert(secondDecl);
-            continue;
-          }
-
-          // Otherwise, the first declaration is shadowed by the second.
-          shadowed.insert(firstDecl);
-          break;
-        }
-      }
-
       // Next, prefer any other module over the Observation module.
       if (auto obsModule = ctx.getLoadedModule(ctx.Id_Observation)) {
         if ((firstModule == obsModule) != (secondModule == obsModule)) {
@@ -1790,7 +1774,7 @@ namelookup::isInMacroArgument(SourceFile *sourceFile, SourceLoc loc) {
 
         if (macro.getFreestanding()) {
           inMacroArgument = true;
-        } else if (auto *attr = macro.getAttr()) {
+        } else if (macro.getAttr()) {
           auto *moduleScope = sourceFile->getModuleScopeContext();
           auto results =
               lookupMacros(moduleScope, macro.getModuleName(),
@@ -1930,7 +1914,7 @@ PotentialMacroExpansions PotentialMacroExpansionsInContextRequest::evaluate(
           dc->getModuleScopeContext(), med->getMacroName(),
           MacroRole::Declaration, nameTracker);
     } else if (auto *vd = dyn_cast<ValueDecl>(member)) {
-      nameTracker.attachedTo = dyn_cast<ValueDecl>(member);
+      nameTracker.attachedTo = vd;
       forEachPotentialAttachedMacro(member, MacroRole::Peer, nameTracker);
     }
   }
@@ -2016,7 +2000,7 @@ populateLookupTableEntryFromMacroExpansions(ASTContext &ctx,
             dc->getModuleScopeContext(), med->getMacroName(),
             MacroRole::Declaration, nameTracker);
       } else if (auto *vd = dyn_cast<ValueDecl>(member)) {
-        nameTracker.attachedTo = dyn_cast<ValueDecl>(member);
+        nameTracker.attachedTo = vd;
         forEachPotentialAttachedMacro(member, MacroRole::Peer, nameTracker);
       }
 
@@ -2340,22 +2324,27 @@ ObjCCategoryNameMap ClassDecl::getObjCCategoryNameMap() {
                            ObjCCategoryNameMap());
 }
 
-static bool missingImportForMemberDecl(const DeclContext *dc, ValueDecl *decl) {
-  // Only require explicit imports for members when MemberImportVisibility is
-  // enabled.
-  auto &ctx = dc->getASTContext();
+/// Determines whether MemberImportVisiblity should be enforced for lookups in
+/// the given context.
+static bool shouldRequireImportsInContext(const DeclContext *lookupContext) {
+  auto &ctx = lookupContext->getASTContext();
   if (!ctx.LangOpts.hasFeature(Feature::MemberImportVisibility))
     return false;
 
-  return !dc->isDeclImported(decl);
+  // Code outside of the main module (which is often synthesized) isn't subject
+  // to MemberImportVisibility rules.
+  if (lookupContext->getParentModule() != ctx.MainModule)
+    return false;
+
+  return true;
 }
 
 /// Determine whether the given declaration is an acceptable lookup
 /// result when searching from the given DeclContext.
-static bool isAcceptableLookupResult(const DeclContext *dc,
-                                     NLOptions options,
+static bool isAcceptableLookupResult(const DeclContext *dc, NLOptions options,
                                      ValueDecl *decl,
-                                     bool onlyCompleteObjectInits) {
+                                     bool onlyCompleteObjectInits,
+                                     bool requireImport) {
   // Filter out designated initializers, if requested.
   if (onlyCompleteObjectInits) {
     if (auto ctor = dyn_cast<ConstructorDecl>(decl)) {
@@ -2383,10 +2372,9 @@ static bool isAcceptableLookupResult(const DeclContext *dc,
 
   // Check that there is some import in the originating context that makes this
   // decl visible.
-  if (!(options & NL_IgnoreMissingImports)) {
-    if (missingImportForMemberDecl(dc, decl))
+  if (requireImport && !(options & NL_IgnoreMissingImports))
+    if (!dc->isDeclImported(decl))
       return false;
-  }
 
   // Check that it has the appropriate ABI role.
   if (!ABIRoleInfo(decl).matchesOptions(options))
@@ -2620,6 +2608,9 @@ QualifiedLookupRequest::evaluate(Evaluator &eval, const DeclContext *DC,
   // Whether we only want to return complete object initializers.
   bool onlyCompleteObjectInits = false;
 
+  // Whether to enforce MemberImportVisibility import restrictions.
+  bool requireImport = shouldRequireImportsInContext(DC);
+
   // Visit all of the nominal types we know about, discovering any others
   // we need along the way.
   bool wantProtocolMembers = (options & NL_ProtocolMembers);
@@ -2654,7 +2645,8 @@ QualifiedLookupRequest::evaluate(Evaluator &eval, const DeclContext *DC,
       if ((options & NL_OnlyMacros) && !isa<MacroDecl>(decl))
         continue;
 
-      if (isAcceptableLookupResult(DC, options, decl, onlyCompleteObjectInits))
+      if (isAcceptableLookupResult(DC, options, decl, onlyCompleteObjectInits,
+                                   requireImport))
         decls.push_back(decl);
     }
 
@@ -2792,6 +2784,9 @@ AnyObjectLookupRequest::evaluate(Evaluator &evaluator, const DeclContext *dc,
                                              member.getFullName(), allDecls);
   }
 
+  /// Whether to enforce MemberImportVisibility import restrictions.
+  bool requireImport = shouldRequireImportsInContext(dc);
+
   // For each declaration whose context is not something we've
   // already visited above, add it to the list of declarations.
   llvm::SmallPtrSet<ValueDecl *, 4> knownDecls;
@@ -2824,7 +2819,8 @@ AnyObjectLookupRequest::evaluate(Evaluator &evaluator, const DeclContext *dc,
     // result, add it to the list.
     if (knownDecls.insert(decl).second &&
         isAcceptableLookupResult(dc, options, decl,
-                                 /*onlyCompleteObjectInits=*/false))
+                                 /*onlyCompleteObjectInits=*/false,
+                                 requireImport))
       decls.push_back(decl);
   }
 
@@ -3610,7 +3606,7 @@ CollectedOpaqueReprs swift::collectOpaqueTypeReprs(TypeRepr *r, ASTContext &ctx,
       if (!Ctx.LangOpts.hasFeature(Feature::ImplicitSome))
         return Action::Continue();
       
-      if (auto existential = dyn_cast<ExistentialTypeRepr>(repr)) {
+      if (isa<ExistentialTypeRepr>(repr)) {
         return Action::SkipNode();
       } else if (auto composition = dyn_cast<CompositionTypeRepr>(repr)) {
         if (!composition->isTypeReprAny())

@@ -151,7 +151,7 @@ static bool isPrespecilizationDeclWithTarget(const ValueDecl *vd) {
   for (auto *attr : vd->getAttrs().getAttributes<SpecializeAttr>()) {
     if (!attr->isExported())
       continue;
-    if (auto *targetFun = attr->getTargetFunctionDecl(vd))
+    if (attr->getTargetFunctionDecl(vd))
       return true;
   }
   return false;
@@ -193,6 +193,24 @@ bool PrintOptions::excludeAttr(const DeclAttribute *DA) const {
   }
   return false;
 }
+
+/// Forces printing types with the `some` keyword, instead of the full stable
+/// reference.
+struct PrintWithOpaqueResultTypeKeywordRAII {
+  PrintWithOpaqueResultTypeKeywordRAII(PrintOptions &Options)
+      : Options(Options) {
+    SavedMode = Options.OpaqueReturnTypePrinting;
+    Options.OpaqueReturnTypePrinting =
+        PrintOptions::OpaqueReturnTypePrintingMode::WithOpaqueKeyword;
+  }
+  ~PrintWithOpaqueResultTypeKeywordRAII() {
+    Options.OpaqueReturnTypePrinting = SavedMode;
+  }
+
+private:
+  PrintOptions &Options;
+  PrintOptions::OpaqueReturnTypePrintingMode SavedMode;
+};
 
 PrintOptions PrintOptions::printSwiftInterfaceFile(ModuleDecl *ModuleToPrint,
                                                    bool preferTypeRepr,
@@ -941,19 +959,10 @@ class PrintAST : public ASTVisitor<PrintAST> {
     printTypeLocWithOptions(TL, Options, printBeforeType);
   }
 
-  void printTypeLocForImplicitlyUnwrappedOptional(
-      TypeLoc TL, bool IUO, const ValueDecl *opaqueTypeNamingDecl) {
-    auto savedIOU = Options.PrintOptionalAsImplicitlyUnwrapped;
-    Options.PrintOptionalAsImplicitlyUnwrapped = IUO;
-
-    auto savedOpaqueTypeNamingDecl = Options.OpaqueReturnTypeNamingDecl;
-    if (opaqueTypeNamingDecl)
-      Options.OpaqueReturnTypeNamingDecl = opaqueTypeNamingDecl;
-
-    printTypeLocWithOptions(TL, Options);
-
-    Options.PrintOptionalAsImplicitlyUnwrapped = savedIOU;
-    Options.OpaqueReturnTypeNamingDecl = savedOpaqueTypeNamingDecl;
+  void printTypeLocForImplicitlyUnwrappedOptional(TypeLoc TL, bool IUO) {
+    PrintOptions options = Options;
+    options.PrintOptionalAsImplicitlyUnwrapped = IUO;
+    printTypeLocWithOptions(TL, options);
   }
 
   void printContextIfNeeded(const Decl *decl) {
@@ -995,6 +1004,7 @@ public:
     SwapSelfAndDependentMemberType = 8,
     PrintInherited = 16,
     PrintInverseRequirements = 32,
+    PrintExplicitInvertibleRequirements = 64,
   };
 
   /// The default generic signature flags for printing requirements.
@@ -1390,17 +1400,18 @@ void PrintAST::printTypedPattern(const TypedPattern *TP) {
   printPattern(TP->getSubPattern());
   Printer << ": ";
 
-  VarDecl *varDecl = nullptr;
+  PrintWithOpaqueResultTypeKeywordRAII x(Options);
+
+  // Make sure to check if the underlying var decl is an implicitly unwrapped
+  // optional.
+  bool isIUO = false;
   if (auto *named = dyn_cast<NamedPattern>(TP->getSubPattern()))
     if (auto decl = named->getDecl())
-      varDecl = decl;
+      isIUO = decl->isImplicitlyUnwrappedOptional();
 
   const auto TyLoc = TypeLoc(TP->getTypeRepr(),
                              TP->hasType() ? TP->getType() : Type());
-
-  printTypeLocForImplicitlyUnwrappedOptional(
-      TyLoc, varDecl ? varDecl->isImplicitlyUnwrappedOptional() : false,
-      varDecl);
+  printTypeLocForImplicitlyUnwrappedOptional(TyLoc, isIUO);
 }
 
 /// Determines if we are required to print the name of a property declaration,
@@ -1763,7 +1774,18 @@ void PrintAST::printGenericSignature(
   SmallVector<Requirement, 2> requirements;
   SmallVector<InverseRequirement, 2> inverses;
 
-  if (flags & PrintInverseRequirements) {
+  if (flags & PrintExplicitInvertibleRequirements) {
+    // Collect the inverted requirements…
+    SmallVector<Requirement, 2> filteredRequirements;
+    genericSig->getRequirementsWithInverses(filteredRequirements, inverses);
+    llvm::erase_if(inverses, [&](InverseRequirement inverse) -> bool {
+      return !inverseFilter(inverse);
+    });
+    // …and also all of the unfiltered requirements, including the ones for
+    // invertible protocols.
+    requirements.append(genericSig.getRequirements().begin(),
+                        genericSig.getRequirements().end());
+  } else if (flags & PrintInverseRequirements) {
     genericSig->getRequirementsWithInverses(requirements, inverses);
     llvm::erase_if(inverses, [&](InverseRequirement inverse) -> bool {
       return !inverseFilter(inverse);
@@ -2680,7 +2702,11 @@ static void addNamespaceMembers(Decl *decl,
   const auto *declOwner = namespaceDecl->getOwningModule();
   if (declOwner)
     declOwner = declOwner->getTopLevelModule();
-  for (auto redecl : namespaceDecl->redecls()) {
+  auto Redecls = llvm::SmallVector<clang::NamespaceDecl *, 2>(namespaceDecl->redecls());
+  std::stable_sort(Redecls.begin(), Redecls.end(), [&](clang::NamespaceDecl *LHS, clang::NamespaceDecl *RHS) {
+    return LHS->getOwningModule()->Name < RHS->getOwningModule()->Name;
+  });
+  for (auto redecl : Redecls) {
     // Skip namespace declarations that come from other top-level modules.
     if (const auto *redeclOwner = redecl->getOwningModule()) {
       if (declOwner && declOwner != redeclOwner->getTopLevelModule())
@@ -2873,8 +2899,18 @@ void PrintAST::printInherited(const Decl *decl) {
         Printer << "@retroactive ";
       if (inherited.isPreconcurrency())
         Printer << "@preconcurrency ";
-      if (inherited.isUnsafe())
+      switch (inherited.getExplicitSafety()) {
+      case ExplicitSafety::Unspecified:
+        break;
+
+      case ExplicitSafety::Safe:
+        Printer << "@safe ";
+        break;
+
+      case ExplicitSafety::Unsafe:
         Printer << "@unsafe ";
+        break;
+      }
       if (inherited.isSuppressed())
         Printer << "~";
     });
@@ -3113,7 +3149,7 @@ void PrintAST::printExtension(ExtensionDecl *decl) {
       // in such an extension. We need to print the whole signature:
       //     extension S: Copyable where T: Copyable
       if (decl->isAddingConformanceToInvertible())
-        genSigFlags &= ~PrintInverseRequirements;
+        genSigFlags |= PrintExplicitInvertibleRequirements;
 
       printGenericSignature(genericSig,
                             genSigFlags,
@@ -3204,6 +3240,14 @@ suppressingFeatureAddressableTypes(PrintOptions &options,
                                    llvm::function_ref<void()> action) {
   ExcludeAttrRAII scope(options.ExcludeAttrList,
                         DeclAttrKind::AddressableForDependencies);
+  action();
+}
+
+static void
+suppressingFeatureCustomAvailability(PrintOptions &options,
+                                     llvm::function_ref<void()> action) {
+  // FIXME: [availability] Save and restore a bit controlling whether
+  // @available attributes for custom domains are printed.
   action();
 }
 
@@ -3854,8 +3898,9 @@ void PrintAST::visitVarDecl(VarDecl *decl) {
     }
     Printer.printDeclResultTypePre(decl, tyLoc);
 
+    PrintWithOpaqueResultTypeKeywordRAII x(Options);
     printTypeLocForImplicitlyUnwrappedOptional(
-        tyLoc, decl->isImplicitlyUnwrappedOptional(), decl);
+      tyLoc, decl->isImplicitlyUnwrappedOptional());
   }
 
   printAccessors(decl);
@@ -3937,7 +3982,7 @@ void PrintAST::printOneParameter(const ParamDecl *param,
     }
 
     printTypeLocForImplicitlyUnwrappedOptional(
-        TheTypeLoc, param->isImplicitlyUnwrappedOptional(), nullptr);
+      TheTypeLoc, param->isImplicitlyUnwrappedOptional());
   }
 
   if (param->isDefaultArgument() && Options.PrintDefaultArgumentValue) {
@@ -4091,7 +4136,7 @@ void PrintAST::visitAccessorDecl(AccessorDecl *decl) {
   // Explicitly print 'mutating' and 'nonmutating' if needed.
   printSelfAccessKindModifiersIfNeeded(decl);
 
-  switch (auto kind = decl->getAccessorKind()) {
+  switch (decl->getAccessorKind()) {
   case AccessorKind::Get:
   case AccessorKind::DistributedGet:
   case AccessorKind::Address:
@@ -4229,6 +4274,8 @@ void PrintAST::visitFuncDecl(FuncDecl *decl) {
         }
       }
 
+      PrintWithOpaqueResultTypeKeywordRAII x(Options);
+
       // Check if we would go down the type repr path... in such a case, see if
       // we can find a type repr and if that type has a sending type repr. In
       // such a case, look through the sending type repr since we handle it here
@@ -4255,7 +4302,7 @@ void PrintAST::visitFuncDecl(FuncDecl *decl) {
       // If we printed using type repr printing, do not print again.
       if (!usedTypeReprPrinting) {
         printTypeLocForImplicitlyUnwrappedOptional(
-            ResultTyLoc, decl->isImplicitlyUnwrappedOptional(), decl);
+            ResultTyLoc, decl->isImplicitlyUnwrappedOptional());
       }
       Printer.printStructurePost(PrintStructureKind::FunctionReturnType);
     }
@@ -4404,8 +4451,9 @@ void PrintAST::visitSubscriptDecl(SubscriptDecl *decl) {
     Printer.printDeclResultTypePre(decl, elementTy);
     Printer.callPrintStructurePre(PrintStructureKind::FunctionReturnType);
 
+    PrintWithOpaqueResultTypeKeywordRAII x(Options);
     printTypeLocForImplicitlyUnwrappedOptional(
-        elementTy, decl->isImplicitlyUnwrappedOptional(), decl);
+      elementTy, decl->isImplicitlyUnwrappedOptional());
     Printer.printStructurePost(PrintStructureKind::FunctionReturnType);
   }
 
@@ -4725,13 +4773,13 @@ void PrintAST::visitErrorExpr(ErrorExpr *expr) {
 
 void PrintAST::visitTernaryExpr(TernaryExpr *expr) {
   if (auto condExpr = expr->getCondExpr()) {
-    visit(expr->getCondExpr());
+    visit(condExpr);
   }
   Printer << " ? ";
   visit(expr->getThenExpr());
   Printer << " : ";
   if (auto elseExpr = expr->getElseExpr()) {
-    visit(expr->getElseExpr());
+    visit(elseExpr);
   }
 }
 
@@ -6012,7 +6060,7 @@ public:
       } else if (auto *VD = originator.dyn_cast<VarDecl *>()) {
         Printer << "decl = ";
         Printer << VD->getName();
-      } else if (auto *EE = originator.dyn_cast<ErrorExpr *>()) {
+      } else if (originator.is<ErrorExpr *>()) {
         Printer << "error_expr";
       } else if (auto *DMT = originator.dyn_cast<DependentMemberType *>()) {
         visit(DMT);
@@ -7223,11 +7271,7 @@ public:
     auto genericSig = namingDecl->getInnermostDeclContext()
           ->getGenericSignatureOfContext();
 
-    auto mode = Options.OpaqueReturnTypePrinting;
-    if (Options.OpaqueReturnTypeNamingDecl == T->getDecl()->getNamingDecl())
-      mode = PrintOptions::OpaqueReturnTypePrintingMode::WithOpaqueKeyword;
-
-    switch (mode) {
+    switch (Options.OpaqueReturnTypePrinting) {
     case PrintOptions::OpaqueReturnTypePrintingMode::WithOpaqueKeyword:
       if (printNamedOpaque())
         return;

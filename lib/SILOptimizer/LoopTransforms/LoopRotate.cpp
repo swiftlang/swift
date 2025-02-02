@@ -18,6 +18,7 @@
 #include "swift/SIL/SILBuilder.h"
 #include "swift/SIL/SILInstruction.h"
 #include "swift/SILOptimizer/Analysis/Analysis.h"
+#include "swift/SILOptimizer/Analysis/DeadEndBlocksAnalysis.h"
 #include "swift/SILOptimizer/Analysis/DominanceAnalysis.h"
 #include "swift/SILOptimizer/Analysis/LoopAnalysis.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
@@ -371,6 +372,15 @@ static bool rotateLoop(SILLoop *loop, DominanceInfo *domInfo,
   // It does not make sense to rotate the loop if the new header is loop
   // exiting as well.
   if (loop->isLoopExiting(newHeader)) {
+    return false;
+  }
+
+  // Incomplete liveranges in the dead-end exit block can cause a missing adjacent
+  // phi-argument for a re-borrow if there is a borrow-scope is in the loop.
+  // But even when we have complete lifetimes, it's probably not worth rotating
+  // a loop where the header block branches to a dead-end block.
+  auto *deBlocks = pm->getAnalysis<DeadEndBlocksAnalysis>()->get(exit->getParent());
+  if (deBlocks->isDeadEnd(exit)) {
     return false;
   }
 

@@ -139,7 +139,8 @@ typealias E = protocol<Any> // expected-error {{'protocol<...>' composition synt
 typealias F = protocol<Any, Any> // expected-error {{'protocol<...>' composition syntax has been removed; join the type constraints using '&'}} {{15-33=Any & Any}}
 typealias G = protocol<P1>.Type // expected-error {{'protocol<...>' composition syntax has been removed and is not needed here}} {{15-27=P1}}
 typealias H = protocol<P1>! // expected-error {{'protocol<...>' composition syntax has been removed and is not needed here}} {{15-28=P1!}}
-// expected-warning@-1 {{using '!' is not allowed here; treating this as '?' instead}}
+// expected-warning@-1 {{using '!' here is deprecated}}
+// expected-note@-2:27 {{use '?' instead}}{{27-28=?}}
 typealias J = protocol<P1, P2>.Protocol // expected-error {{'protocol<...>' composition syntax has been removed; join the type constraints using '&'}} {{15-31=(P1 & P2)}}
 typealias K = protocol<P1, P2>? // expected-error {{'protocol<...>' composition syntax has been removed; join the type constraints using '&'}} {{15-32=(P1 & P2)?}}
 typealias L = protocol<(P1), P2> // expected-error {{'protocol<...>' composition syntax has been removed; join the type constraints using '&'}} {{15-33=(P1) & P2}}
@@ -161,8 +162,10 @@ do {
 typealias T01 = P1.Protocol & P2 // expected-error {{non-protocol, non-class type '(any P1).Type' cannot be used within a protocol-constrained type}}
 typealias T02 = P1.Type & P2 // expected-error {{non-protocol, non-class type 'any P1.Type' cannot be used within a protocol-constrained type}}
 typealias T03 = P1? & P2 // expected-error {{non-protocol, non-class type '(any P1)?' cannot be used within a protocol-constrained type}}
+// FIXME: '!' diagnostic is superfluous here.
 typealias T04 = P1 & P2! // expected-error {{non-protocol, non-class type '(any P2)?' cannot be used within a protocol-constrained type}}
-// expected-warning@-1 {{using '!' is not allowed here; treating this as '?' instead}}
+// expected-warning@-1 {{using '!' here is deprecated}}
+// expected-note@-2:24 {{use '?' instead}}
 typealias T05 = P1 & P2 -> P3 // expected-error {{single argument function types require parentheses}} {{17-17=(}} {{24-24=)}}
 typealias T06 = P1 -> P2 & P3 // expected-error {{single argument function types require parentheses}} {{17-17=(}} {{19-19=)}}
 typealias T07 = P1 & protocol<P2, P3> // expected-error {{protocol<...>' composition syntax has been removed; join the type constraints using '&'}} {{22-38=P2 & P3}}

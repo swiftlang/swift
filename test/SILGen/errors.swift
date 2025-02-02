@@ -530,6 +530,8 @@ func testForceTryMultiple() {
 // CHECK: [[FN_2:%.+]] = function_ref @$s6errors10make_a_catAA3CatCyKF
 // CHECK-NEXT: try_apply [[FN_2]]() : $@convention(thin) () -> (@owned Cat, @error any Error), normal [[SUCCESS_2:[^ ]+]], error [[CLEANUPS_2:[^ ]+]],
 // CHECK: [[SUCCESS_2]]([[VALUE_2:%.+]] : @owned $Cat)
+// CHECK-NEXT: ignored_use [[VALUE_1]]
+// CHECK-NEXT: ignored_use [[VALUE_2]]
 // CHECK-NEXT: destroy_value [[VALUE_2]] : $Cat
 // CHECK-NEXT: destroy_value [[VALUE_1]] : $Cat
 // CHECK-NEXT: [[VOID:%.+]] = tuple ()
@@ -841,6 +843,7 @@ func testForcePeephole(_ f: () throws -> Int?) -> Int {
 // CHECK-NEXT: [[WRAPPED:%.+]] = enum $Optional<Cat>, #Optional.some!enumelt, [[VALUE]]
 // CHECK-NEXT: br [[DONE:[^ ]+]]([[WRAPPED]] : $Optional<Cat>)
 // CHECK: [[DONE]]([[RESULT:%.+]] : @owned $Optional<Cat>):
+// CHECK-NEXT: ignored_use [[RESULT]]
 // CHECK-NEXT: destroy_value [[RESULT]] : $Optional<Cat>
 // CHECK-NEXT: [[VOID:%.+]] = tuple ()
 // CHECK-NEXT: return [[VOID]] : $()
@@ -897,6 +900,7 @@ func testOptionalTryVar() {
 // CHECK-NEXT: inject_enum_addr [[BOX]] : $*Optional<T>, #Optional.some!enumelt
 // CHECK-NEXT: br [[DONE:[^ ]+]],
 // CHECK: [[DONE]]:
+// CHECK-NEXT: ignored_use [[BOX]]
 // CHECK-NEXT: destroy_addr [[BOX]] : $*Optional<T>
 // CHECK-NEXT: dealloc_stack [[BOX]] : $*Optional<T>
 // CHECK-NOT: destroy_addr %0 : $*T
@@ -949,6 +953,7 @@ func testOptionalTryAddressOnlyVar<T>(_ obj: T) {
 // CHECK-NEXT: [[WRAPPED:%.+]] = enum $Optional<(Cat, Cat)>, #Optional.some!enumelt, [[TUPLE]]
 // CHECK-NEXT: br [[DONE:[^ ]+]]([[WRAPPED]] : $Optional<(Cat, Cat)>)
 // CHECK: [[DONE]]([[RESULT:%.+]] : @owned $Optional<(Cat, Cat)>):
+// CHECK-NEXT: ignored_use [[RESULT]]
 // CHECK-NEXT: destroy_value [[RESULT]] : $Optional<(Cat, Cat)>
 // CHECK-NEXT: [[VOID:%.+]] = tuple ()
 // CHECK-NEXT: return [[VOID]] : $()
@@ -970,6 +975,7 @@ func testOptionalTryMultiple() {
 // CHECK: bb0:
 // CHECK-NEXT:   [[VALUE:%.+]] = tuple ()
 // CHECK-NEXT:   = enum $Optional<()>, #Optional.some!enumelt, [[VALUE]]
+// CHECK-NEXT:   ignored_use
 // CHECK-NEXT:   [[VOID:%.+]] = tuple ()
 // CHECK-NEXT:   return [[VOID]] : $()
 // CHECK: } // end sil function '$s6errors25testOptionalTryNeverFailsyyF'
@@ -1000,6 +1006,7 @@ func testOptionalTryNeverFailsVar() {
 // CHECK-NEXT:   [[BOX_DATA:%.+]] = init_enum_data_addr [[BOX]] : $*Optional<T>, #Optional.some!enumelt
 // CHECK-NEXT:   copy_addr %0 to [init] [[BOX_DATA]] : $*T
 // CHECK-NEXT:   inject_enum_addr [[BOX]] : $*Optional<T>, #Optional.some!enumelt
+// CHECK-NEXT:   ignored_use [[BOX]]
 // CHECK-NEXT:   destroy_addr [[BOX]] : $*Optional<T>
 // CHECK-NEXT:   dealloc_stack [[BOX]] : $*Optional<T>
 // CHECK-NOT:   destroy_addr %0 : $*T

@@ -541,6 +541,7 @@ func dontEmitIgnoredLoadExpr(_ a: NonTrivialStruct) -> NonTrivialStruct.Type {
 // CHECK-LABEL: dontEmitIgnoredLoadExpr
 // CHECK: bb0(%0 : @guaranteed $NonTrivialStruct):
 // CHECK-NEXT: debug_value
+// CHECK-NEXT: ignored_use
 // CHECK-NEXT: [[RESULT:%.*]] = metatype $@thin NonTrivialStruct.Type
 // CHECK-NEXT: return [[RESULT]] : $@thin NonTrivialStruct.Type
 

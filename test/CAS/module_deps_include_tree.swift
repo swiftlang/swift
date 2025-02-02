@@ -5,9 +5,6 @@
 // RUN: mkdir -p %t/cas
 
 // RUN: %target-swift-frontend -scan-dependencies -module-load-mode prefer-interface -module-cache-path %t/clang-module-cache %s -o %t/deps.json -I %S/../ScanDependencies/Inputs/CHeaders -I %S/../ScanDependencies/Inputs/Swift -emit-dependencies -emit-dependencies-path %t/deps.d -import-objc-header %S/../ScanDependencies/Inputs/CHeaders/Bridging.h -swift-version 4 -enable-cross-import-overlays -cache-compile-job -cas-path %t/cas
-// Check the contents of the JSON output
-// RUN: %validate-json %t/deps.json &>/dev/null
-// RUN: %FileCheck -check-prefix CHECK -check-prefix CHECK_NO_CLANG_TARGET %s < %t/deps.json
 
 // Check the contents of the JSON output
 // RUN: %FileCheck %s -check-prefix CHECK -check-prefix CHECK-NO-SEARCH-PATHS < %t/deps.json
@@ -16,14 +13,9 @@
 // RUN: %FileCheck %s -check-prefix CHECK-MAKE-DEPS < %t/deps.d
 
 // RUN: %target-swift-frontend -scan-dependencies -module-load-mode prefer-interface -test-dependency-scan-cache-serialization -module-cache-path %t/clang-module-cache %s -o %t/deps.json -I %S/../ScanDependencies/Inputs/CHeaders -I %S/../ScanDependencies/Inputs/Swift -import-objc-header %S/../ScanDependencies/Inputs/CHeaders/Bridging.h -swift-version 4 -enable-cross-import-overlays -cache-compile-job -cas-path %t/cas
-// RUN: %validate-json %t/deps.json &>/dev/null
-// RUN: %FileCheck -check-prefix CHECK -check-prefix CHECK_NO_CLANG_TARGET %s < %t/deps.json
 
 // Ensure that scanning with `-clang-target` makes sure that Swift modules' respective PCM-dependency-build-argument sets do not contain target triples.
 // RUN: %target-swift-frontend -scan-dependencies -module-load-mode prefer-interface -module-cache-path %t/clang-module-cache %s -o %t/deps_clang_target.json -I %S/../ScanDependencies/Inputs/CHeaders -I %S/../ScanDependencies/Inputs/Swift -import-objc-header %S/../ScanDependencies/Inputs/CHeaders/Bridging.h -swift-version 4 -enable-cross-import-overlays -clang-target %target-cpu-apple-macosx10.14 -cache-compile-job -cas-path %t/cas
-// Check the contents of the JSON output
-// RUN: %validate-json %t/deps_clang_target.json &>/dev/null
-// RUN: %FileCheck -check-prefix CHECK_CLANG_TARGET %s < %t/deps_clang_target.json
 
 /// check cas-fs content
 // RUN: %{python} %S/Inputs/SwiftDepsExtractor.py %t/deps.json E casFSRootID > %t/E_fs.casid
@@ -75,11 +67,6 @@ import SubE
 // CHECK-DAG:     "swift": "_cross_import_E"
 // CHECK: ],
 
-// CHECK:      "extraPcmArgs": [
-// CHECK-NEXT:    "-Xcc",
-// CHECK-NEXT:    "-target",
-// CHECK-NEXT:    "-Xcc",
-// CHECK:         "-fapinotes-swift-version=4"
 // CHECK-NOT: "error: cannot open Swift placeholder dependency module map from"
 // CHECK: "bridgingHeader":
 // CHECK-NEXT: "path":
@@ -184,13 +171,6 @@ import SubE
 // CHECK: "5"
 // CHECK: ],
 // CHECK: "contextHash": "{{.*}}",
-// CHECK_NO_CLANG_TARGET: "extraPcmArgs": [
-// CHECK_NO_CLANG_TARGET-NEXT:   "-Xcc",
-// CHECK_NO_CLANG_TARGET-NEXT:   "-target",
-// CHECK_CLANG_TARGET: "extraPcmArgs": [
-// CHECK_CLANG_TARGET-NEXT:   "-Xcc",
-// CHECK_CLANG_TARGET-NEXT:   "-fapinotes-swift-version={{.*}}"
-// CHECK_CLANG_TARGET-NEXT:   ]
 
 /// --------Swift module E
 // CHECK: "swift": "E"

@@ -6,7 +6,7 @@ set(CMAKE_C_COMPILER_TARGET "x86_64-apple-tvos${CMAKE_OSX_DEPLOYMENT_TARGET}-sim
 set(CMAKE_CXX_COMPILER_TARGET "x86_64-apple-tvos${CMAKE_OSX_DEPLOYMENT_TARGET}-simulator" CACHE STRING "")
 set(CMAKE_Swift_COMPILER_TARGET "x86_64-apple-tvos${CMAKE_OSX_DEPLOYMENT_TARGET}-simulator" CACHE STRING "")
 
-set(SwiftCore_ARCH_SUBDIR x86_64)
-set(SwiftCore_PLATFORM_SUBDIR appletvsimulator)
+set(SwiftCore_ARCH_SUBDIR x86_64 CACHE STRING "")
+set(SwiftCore_PLATFORM_SUBDIR appletvsimulator CACHE STRING "")
 
 include("${CMAKE_CURRENT_LIST_DIR}/apple-common.cmake")

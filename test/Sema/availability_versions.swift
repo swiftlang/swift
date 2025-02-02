@@ -238,7 +238,7 @@ protocol BaseProto {
 
   var property: A { get set } // expected-note {{overridden declaration is here}}
 
-  @available(OSX 10.51, *)
+  @available(OSX 51, *)
   var newProperty: A { get set } // expected-note {{overridden declaration is here}}
 
   func method() // expected-note {{overridden declaration is here}}
@@ -247,24 +247,24 @@ protocol BaseProto {
 protocol RefinesBaseProto_AsAvailableOverrides: BaseProto {
   var property: A { get set }
 
-  @available(OSX 10.51, *)
+  @available(OSX 51, *)
   var newProperty: A { get set }
 
   func method()
 }
 
 protocol RefinesBaseProto_LessAvailableOverrides: BaseProto {
-  @available(OSX 10.52, *)
+  @available(OSX 52, *)
   var property: A { get set } // expected-error {{overriding 'property' must be as available as declaration it overrides}}
 
-  @available(OSX 10.52, *)
+  @available(OSX 52, *)
   var newProperty: A { get set } // expected-error {{overriding 'newProperty' must be as available as declaration it overrides}}
 
-  @available(OSX 10.52, *)
+  @available(OSX 52, *)
   func method()  // expected-error {{overriding 'method' must be as available as declaration it overrides}}
 }
 
-@available(OSX 10.52, *)
+@available(OSX 52, *)
 protocol RefinesBaseProto_LessAvailable: BaseProto {
   var property: A { get set }
   var newProperty: A { get set }
@@ -889,6 +889,57 @@ class SubWithLimitedMemberAvailability : SuperWithAlwaysAvailableMembers {
     @available(OSX, introduced: 51)
     get { return 9 } // expected-error {{overriding getter for 'getterShouldAlwaysBeAvailableProperty' must be as available as declaration it overrides}}
     set(newVal) {}
+  }
+}
+
+extension ClassAvailableOn10_9 {
+  class NestedSubWithLimitedMemberAvailability: SuperWithAlwaysAvailableMembers {
+    @available(OSX, introduced: 10.9)
+    override func shouldAlwaysBeAvailableMethod() {}
+
+    @available(OSX, introduced: 10.9)
+    override var shouldAlwaysBeAvailableProperty: Int {
+      get { return 10 }
+      set(newVal) {}
+    }
+
+    override var setterShouldAlwaysBeAvailableProperty: Int {
+      get { return 9 }
+      @available(OSX, introduced: 10.9)
+      set(newVal) {}
+    }
+
+    override var getterShouldAlwaysBeAvailableProperty: Int {
+      @available(OSX, introduced: 10.9)
+      get { return 9 }
+      set(newVal) {}
+    }
+  }
+}
+
+@available(OSX, introduced: 51)
+extension ClassAvailableOn51 {
+  class NestedSubWithLimitedMemberAvailability: SuperWithAlwaysAvailableMembers {
+    @available(OSX, introduced: 51)
+    override func shouldAlwaysBeAvailableMethod() {}
+
+    @available(OSX, introduced: 51)
+    override var shouldAlwaysBeAvailableProperty: Int {
+      get { return 10 }
+      set(newVal) {}
+    }
+
+    override var setterShouldAlwaysBeAvailableProperty: Int {
+      get { return 9 }
+      @available(OSX, introduced: 51)
+      set(newVal) {}
+    }
+
+    override var getterShouldAlwaysBeAvailableProperty: Int {
+      @available(OSX, introduced: 51)
+      get { return 9 }
+      set(newVal) {}
+    }
   }
 }
 

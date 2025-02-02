@@ -86,7 +86,7 @@ bool AbstractFunctionDecl::hasEffect(EffectKind kind) const {
   case EffectKind::Async:
     return hasAsync();
   case EffectKind::Unsafe:
-    return isUnsafe();
+    return getExplicitSafety() == ExplicitSafety::Unsafe;
   }
   llvm_unreachable("Bad effect kind");
 }

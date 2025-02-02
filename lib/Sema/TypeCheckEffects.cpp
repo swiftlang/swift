@@ -274,7 +274,7 @@ bool ConformanceHasEffectRequest::evaluate(
     if (kind == EffectKind::Unsafe) {
       auto rootConf = current->getRootConformance();
       if (auto normalConf = dyn_cast<NormalProtocolConformance>(rootConf)) {
-        if (normalConf->isUnsafe())
+        if (normalConf->getExplicitSafety() == ExplicitSafety::Unsafe)
           return true;
       }
     }
@@ -544,7 +544,7 @@ public:
     if (auto patternBinding = dyn_cast<PatternBindingDecl>(D)) {
       if (patternBinding->isAsyncLet())
         recurse = asImpl().checkAsyncLet(patternBinding);
-    } else if (auto macroExpansionDecl = dyn_cast<MacroExpansionDecl>(D)) {
+    } else if (isa<MacroExpansionDecl>(D)) {
       recurse = ShouldRecurse;
     } else {
       recurse = ShouldNotRecurse;
@@ -584,7 +584,7 @@ public:
                                       declRef->isImplicitlyThrows());
     } else if (auto interpolated = dyn_cast<InterpolatedStringLiteralExpr>(E)) {
       recurse = asImpl().checkInterpolatedStringLiteral(interpolated);
-    } else if (auto macroExpansionExpr = dyn_cast<MacroExpansionExpr>(E)) {
+    } else if (isa<MacroExpansionExpr>(E)) {
       recurse = ShouldRecurse;
     } else if (auto *SVE = dyn_cast<SingleValueStmtExpr>(E)) {
       recurse = asImpl().checkSingleValueStmtExpr(SVE);
@@ -1504,7 +1504,7 @@ public:
     if (!E->getType() || E->getType()->hasError())
       return Classification::forInvalidCode();
 
-    if (auto *SAE = dyn_cast<SelfApplyExpr>(E)) {
+    if (isa<SelfApplyExpr>(E)) {
       assert(!E->isImplicitlyAsync());
     }
 
@@ -3168,11 +3168,15 @@ class CheckEffectsCoverage : public EffectsHandlingWalker<CheckEffectsCoverage> 
   /// Find the top location where we should put the await
   static Expr *walkToAnchor(Expr *e, llvm::DenseMap<Expr *, Expr *> &parentMap,
                             bool isInterpolatedString) {
+    llvm::SmallPtrSet<Expr *, 4> visited;
     Expr *parent = e;
     Expr *lastParent = e;
     while (parent && !isEffectAnchor(parent)) {
       lastParent = parent;
       parent = parentMap[parent];
+
+      if (!visited.insert(parent).second)
+        break;
     }
 
     if (parent && !isAnchorTooEarly(parent)) {

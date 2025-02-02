@@ -18,6 +18,7 @@
 #ifndef SWIFT_AST_AVAILABILITY_CONTEXT_H
 #define SWIFT_AST_AVAILABILITY_CONTEXT_H
 
+#include "swift/AST/AvailabilityDomain.h"
 #include "swift/AST/AvailabilityRange.h"
 #include "swift/AST/PlatformKind.h"
 #include "swift/Basic/Debug.h"
@@ -38,18 +39,20 @@ public:
   class Storage;
 
 private:
-  struct PlatformInfo;
+  class Info;
 
   /// A non-null pointer to uniqued storage for this availability context.
-  const Storage *Info;
+  const Storage *storage;
 
-  AvailabilityContext(const Storage *info) : Info(info) { assert(info); };
+  AvailabilityContext(const Storage *storage) : storage(storage) {
+    assert(storage);
+  };
 
   /// Retrieves an `AvailabilityContext` with the given platform availability
   /// parameters.
   static AvailabilityContext
   get(const AvailabilityRange &platformAvailability,
-      std::optional<PlatformKind> unavailablePlatform, bool deprecated,
+      std::optional<AvailabilityDomain> unavailableDomain, bool deprecated,
       ASTContext &ctx);
 
 public:
@@ -71,21 +74,15 @@ public:
   /// availability context, starting at its introduction version.
   AvailabilityRange getPlatformRange() const;
 
-  /// When the context is unavailable on the current platform this returns the
-  /// broadest `PlatformKind` for which the context is unavailable. Otherwise,
-  /// returns `nullopt`.
-  std::optional<PlatformKind> getUnavailablePlatformKind() const;
+  /// Returns the broadest AvailabilityDomain that is unavailable in this
+  /// context.
+  std::optional<AvailabilityDomain> getUnavailableDomain() const;
 
   /// Returns true if this context is unavailable.
-  bool isUnavailable() const {
-    return getUnavailablePlatformKind().has_value();
-  }
+  bool isUnavailable() const { return getUnavailableDomain().has_value(); }
 
   /// Returns true if this context is deprecated on the current platform.
   bool isDeprecated() const;
-
-  /// Returns true if this context is `@_unavailableInEmbedded`.
-  bool isUnavailableInEmbedded() const;
 
   /// Constrain with another `AvailabilityContext`.
   void constrainWithContext(const AvailabilityContext &other, ASTContext &ctx);
@@ -108,12 +105,12 @@ public:
 
   friend bool operator==(const AvailabilityContext &lhs,
                          const AvailabilityContext &rhs) {
-    return lhs.Info == rhs.Info;
+    return lhs.storage == rhs.storage;
   }
 
   friend bool operator!=(const AvailabilityContext &lhs,
                          const AvailabilityContext &rhs) {
-    return lhs.Info != rhs.Info;
+    return lhs.storage != rhs.storage;
   }
 
   void print(llvm::raw_ostream &os) const;

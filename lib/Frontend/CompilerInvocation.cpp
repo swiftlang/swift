@@ -384,6 +384,15 @@ void CompilerInvocation::computeCXXStdlibOptions() {
     LangOpts.CXXStdlib = toCXXStdlibKind(cxxStdlibKind);
     LangOpts.PlatformDefaultCXXStdlib = toCXXStdlibKind(cxxDefaultStdlibKind);
   }
+
+  if (!LangOpts.isUsingPlatformDefaultCXXStdlib()) {
+    // The CxxStdlib overlay was built for the platform default C++ stdlib, and
+    // its .swiftmodule file refers to implementation-specific symbols (such as
+    // namespace __1 in libc++, or namespace __cxx11 in libstdc++). Let's
+    // proactively rebuild the CxxStdlib module from its .swiftinterface if a
+    // non-default C++ stdlib is used.
+    FrontendOpts.PreferInterfaceForModules.push_back("CxxStdlib");
+  }
 }
 
 void CompilerInvocation::setRuntimeResourcePath(StringRef Path) {
@@ -915,11 +924,6 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   Opts.EnableExperimentalConcurrency |=
     Args.hasArg(OPT_enable_experimental_concurrency);
 
-  Opts.EnableInferPublicSendable |=
-    Args.hasFlag(OPT_enable_infer_public_concurrent_value,
-                 OPT_disable_infer_public_concurrent_value,
-                 false);
-
   Opts.DisableExperimentalClangImporterDiagnostics |=
       Args.hasArg(OPT_disable_experimental_clang_importer_diagnostics);
 
@@ -938,11 +942,6 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
 
   Opts.DisableImplicitCxxModuleImport |=
     Args.hasArg(OPT_disable_implicit_cxx_module_import);
-
-  Opts.DisableImplicitBacktracingModuleImport =
-    Args.hasFlag(OPT_disable_implicit_backtracing_module_import,
-                 OPT_enable_implicit_backtracing_module_import,
-                 true);
 
   if (Args.hasArg(OPT_enable_experimental_async_top_level))
     Diags.diagnose(SourceLoc(), diag::warn_flag_deprecated,
@@ -2276,8 +2275,6 @@ static bool ParseSearchPathArgs(SearchPathOptions &Opts, ArgList &Args,
   }
   if (const Arg *A = Args.getLastArg(OPT_placeholder_dependency_module_map))
     Opts.PlaceholderDependencyModuleMap = A->getValue();
-  if (const Arg *A = Args.getLastArg(OPT_batch_scan_input_file))
-    Opts.BatchScanInputFilePath = A->getValue();
 
   if (const Arg *A = Args.getLastArg(OPT_const_gather_protocols_file))
     Opts.ConstGatherProtocolListFilePath = A->getValue();
@@ -2297,9 +2294,10 @@ static bool ParseSearchPathArgs(SearchPathOptions &Opts, ArgList &Args,
   Opts.ScannerModuleValidation |= Args.hasFlag(OPT_scanner_module_validation,
                                                OPT_no_scanner_module_validation,
                                                CASOpts.EnableCaching);
+
   bool buildingFromInterface =
-      FrontendOptions::doesActionBuildModuleFromInterface(
-          FrontendOpts.RequestedAction);
+      FrontendOpts.InputMode ==
+      FrontendOptions::ParseInputMode::SwiftModuleInterface;
   auto firstInputPath =
       FrontendOpts.InputsAndOutputs.hasInputs()
           ? FrontendOpts.InputsAndOutputs.getFilenameOfFirstInput()
@@ -2617,7 +2615,9 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
   // If we're only emitting a module, stop optimizations once we've serialized
   // the SIL for the module.
   if (FEOpts.RequestedAction == FrontendOptions::ActionType::EmitModuleOnly ||
-      FEOpts.RequestedAction == FrontendOptions::ActionType::CompileModuleFromInterface)
+      FEOpts.RequestedAction ==
+          FrontendOptions::ActionType::CompileModuleFromInterface ||
+      FEOpts.RequestedAction == FrontendOptions::ActionType::EmitSIB)
     Opts.StopOptimizationAfterSerialization = true;
 
   if (Args.getLastArg(OPT_emit_empty_object_file)) {
@@ -3254,7 +3254,7 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
   if (auto A = Args.getLastArg(OPT_enable_round_trip_debug_types,
                                OPT_disable_round_trip_debug_types)) {
     Opts.DisableRoundTripDebugTypes =
-        Args.hasArg(OPT_disable_round_trip_debug_types);
+        A->getOption().matches(OPT_disable_round_trip_debug_types);
   }
 
   if (Args.hasArg(OPT_disable_debugger_shadow_copies))

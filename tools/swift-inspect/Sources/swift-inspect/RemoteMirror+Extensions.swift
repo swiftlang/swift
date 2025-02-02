@@ -12,7 +12,7 @@
 
 import SwiftRemoteMirror
 
-extension swift_metadata_allocation_t: Encodable {
+extension swift_metadata_allocation_t: @retroactive Encodable {
   internal var tag: swift_metadata_allocation_tag_t { return self.Tag }
   internal var ptr: swift_reflection_ptr_t { return self.Ptr }
   internal var size: Int { return Int(self.Size) }
@@ -29,7 +29,7 @@ extension swift_metadata_allocation_t: Encodable {
   }
 }
 
-extension swift_metadata_allocation_t: Comparable {
+extension swift_metadata_allocation_t: @retroactive Comparable {
   public static func == (lhs: Self, rhs: Self) -> Bool {
     lhs.ptr == rhs.ptr
   }

@@ -18,7 +18,7 @@ class MyObject : NSObject {
   // LOC-CHECK: ret
   @objc var MyArr = NSArray()
   // IMPORT-CHECK: filename: "{{.*}}test-foundation.swift"
-  // IMPORT-CHECK-DAG: [[FOUNDATION:[0-9]+]] = !DIModule({{.*}} name: "Foundation",{{.*}} includePath: {{.*}}Foundation.framework
+  // IMPORT-CHECK-DAG: [[FOUNDATION:[0-9]+]] = !DIModule({{.*}} name: "Foundation",{{.*}} includePath: {{.*}}Foundation.framework"
   // IMPORT-CHECK-DAG: [[OVERLAY:[0-9]+]] = !DIModule({{.*}} name: "Foundation",{{.*}} includePath: {{.*}}Foundation.swiftmodule
   // IMPORT-CHECK-DAG: !DICompositeType(tag: DW_TAG_structure_type, name: "NSArray", scope: ![[NSARRAY:[0-9]+]]
   //  IMPORT-CHECK-DAG: ![[NSARRAY]] = !DIModule(scope: ![[FOUNDATION:[0-9]+]], name: "NSArray"

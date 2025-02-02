@@ -447,6 +447,9 @@ SUPPRESSIBLE_EXPERIMENTAL_FEATURE(ABIAttribute, true)
 /// calling context.
 EXPERIMENTAL_FEATURE(NonIsolatedAsyncInheritsIsolationFromContext, false)
 
+/// Allow custom availability domains to be defined and referenced.
+SUPPRESSIBLE_EXPERIMENTAL_FEATURE(CustomAvailability, true)
+
 #undef EXPERIMENTAL_FEATURE_EXCLUDED_FROM_MODULE_INTERFACE
 #undef EXPERIMENTAL_FEATURE
 #undef UPCOMING_FEATURE

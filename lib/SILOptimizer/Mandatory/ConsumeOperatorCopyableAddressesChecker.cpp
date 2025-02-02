@@ -2539,7 +2539,7 @@ struct UnsupportedUseCaseDiagnosticEmitter {
   bool tryEmitCannotConsumeNonLocalMemoryError() const {
     auto src = stripAccessMarkers(mai->getSrc());
 
-    if (auto *gai = dyn_cast<GlobalAddrInst>(src)) {
+    if (isa<GlobalAddrInst>(src)) {
       auto diag = diag::sil_movekillscopyable_move_applied_to_nonlocal_memory;
       diagnose(getASTContext(), mai->getLoc().getSourceLoc(), diag, 0);
       return true;

@@ -333,6 +333,7 @@ struct BridgedDeclObj {
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedStringRef Type_getName() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedStringRef Value_getUserFacingName() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedSourceLoc Value_getNameLoc() const;
+  BRIDGED_INLINE bool hasClangNode() const;
   BRIDGED_INLINE bool Value_isObjC() const;
   BRIDGED_INLINE bool GenericType_isGenericAtAnyLevel() const;
   BRIDGED_INLINE bool NominalType_isGlobalActor() const;
@@ -600,6 +601,16 @@ SWIFT_NAME("BridgedABIAttr.createParsed(_:atLoc:range:abiDecl:)")
 BridgedABIAttr BridgedABIAttr_createParsed(
     BridgedASTContext cContext, BridgedSourceLoc atLoc,
     BridgedSourceRange range, BridgedNullableDecl abiDecl);
+
+enum ENUM_EXTENSIBILITY_ATTR(closed) BridgedExecutionKind {
+  BridgedExecutionKindConcurrent,
+  BridgedExecutionKindCaller,
+};
+
+SWIFT_NAME("BridgedExecutionAttr.createParsed(_:atLoc:range:behavior:)")
+BridgedExecutionAttr BridgedExecutionAttr_createParsed(
+    BridgedASTContext cContext, BridgedSourceLoc atLoc,
+    BridgedSourceRange range, BridgedExecutionKind behavior);
 
 enum ENUM_EXTENSIBILITY_ATTR(closed) BridgedAccessLevel {
   BridgedAccessLevelPrivate,

@@ -38,6 +38,8 @@
 #include <ptrauth.h>
 #endif
 
+#include "../CompatibilityOverride/CompatibilityOverride.h"
+
 using namespace swift;
 
 static Metadata *getExistentialTypeMetadata(OpaqueValue *object) {
@@ -897,8 +899,8 @@ static void handleRefCountsDestroy(const Metadata *metadata,
   }
 }
 
-extern "C" void
-swift_generic_destroy(swift::OpaqueValue *address, const Metadata *metadata) {
+static void swift_cvw_destroyImpl(swift::OpaqueValue *address,
+                                  const Metadata *metadata) {
   const uint8_t *layoutStr = metadata->getLayoutString();
   LayoutStringReader1 reader{layoutStr + layoutStringHeaderSize};
   uintptr_t addrOffset = 0;
@@ -912,7 +914,8 @@ swift_generic_destroy(swift::OpaqueValue *address, const Metadata *metadata) {
 #endif
 }
 
-void swift::swift_generic_arrayDestroy(swift::OpaqueValue *address, size_t count, size_t stride, const Metadata *metadata) {
+void swift::swift_cvw_arrayDestroy(swift::OpaqueValue *address, size_t count,
+                                   size_t stride, const Metadata *metadata) {
   const uint8_t *layoutStr = metadata->getLayoutString();
   uint8_t *addr = (uint8_t *)address;
   for (size_t i = 0; i < count; i++) {
@@ -1144,7 +1147,7 @@ static void handleRefCountsInitWithCopy(const Metadata *metadata,
     uintptr_t _addrOffset = addrOffset;
     auto tag = reader.readBytes<uint64_t>();
     auto offset = (tag & ~(0xFFULL << 56));
-    if (SWIFT_UNLIKELY(offset)) {
+    if (offset) {
       memcpy(dest + _addrOffset, src + _addrOffset, offset);
     }
     addrOffset = _addrOffset + offset;
@@ -1157,8 +1160,8 @@ static void handleRefCountsInitWithCopy(const Metadata *metadata,
   }
 }
 
-extern "C" swift::OpaqueValue *
-swift_generic_initWithCopy(swift::OpaqueValue *_dest, swift::OpaqueValue *_src,
+static swift::OpaqueValue *
+swift_cvw_initWithCopyImpl(swift::OpaqueValue *_dest, swift::OpaqueValue *_src,
                            const Metadata *metadata) {
   const uint8_t *layoutStr = metadata->getLayoutString();
   LayoutStringReader1 reader{layoutStr + layoutStringHeaderSize};
@@ -1178,10 +1181,10 @@ swift_generic_initWithCopy(swift::OpaqueValue *_dest, swift::OpaqueValue *_src,
   return _dest;
 }
 
-void swift::swift_generic_arrayInitWithCopy(swift::OpaqueValue *_dest,
-                                            swift::OpaqueValue *_src,
-                                            size_t count, size_t stride,
-                                            const Metadata *metadata) {
+void swift::swift_cvw_arrayInitWithCopy(swift::OpaqueValue *_dest,
+                                        swift::OpaqueValue *_src, size_t count,
+                                        size_t stride,
+                                        const Metadata *metadata) {
   const uint8_t *layoutStr = metadata->getLayoutString();
   uint8_t *dest = (uint8_t *)_dest;
   uint8_t *src = (uint8_t *)_src;
@@ -1302,7 +1305,7 @@ static void handleRefCountsInitWithTake(const Metadata *metadata,
     uintptr_t _addrOffset = addrOffset;
     auto tag = reader.readBytes<uint64_t>();
     auto offset = (tag & ~(0xFFULL << 56));
-    if (SWIFT_UNLIKELY(offset)) {
+    if (offset) {
       memcpy(dest + _addrOffset, src + _addrOffset, offset);
     }
     addrOffset += offset;
@@ -1315,8 +1318,8 @@ static void handleRefCountsInitWithTake(const Metadata *metadata,
   }
 }
 
-extern "C" swift::OpaqueValue *
-swift_generic_initWithTake(swift::OpaqueValue *_dest, swift::OpaqueValue *_src,
+static swift::OpaqueValue *
+swift_cvw_initWithTakeImpl(swift::OpaqueValue *_dest, swift::OpaqueValue *_src,
                            const Metadata *metadata) {
   if (SWIFT_LIKELY(metadata->getValueWitnesses()->isBitwiseTakable())) {
     size_t size = metadata->vw_size();
@@ -2067,8 +2070,8 @@ static void multiPayloadEnumFNAssignWithCopy(const Metadata *metadata,
   addrOffset += enumSize;
 }
 
-extern "C" swift::OpaqueValue *
-swift_generic_assignWithCopy(swift::OpaqueValue *_dest,
+static swift::OpaqueValue *
+swift_cvw_assignWithCopyImpl(swift::OpaqueValue *_dest,
                              swift::OpaqueValue *_src,
                              const Metadata *metadata) {
   uint8_t *dest = (uint8_t *)_dest;
@@ -2089,10 +2092,10 @@ swift_generic_assignWithCopy(swift::OpaqueValue *_dest,
   return _dest;
 }
 
-void swift::swift_generic_arrayAssignWithCopy(swift::OpaqueValue *_dest,
-                                              swift::OpaqueValue *_src,
-                                              size_t count, size_t stride,
-                                              const Metadata *metadata) {
+void swift::swift_cvw_arrayAssignWithCopy(swift::OpaqueValue *_dest,
+                                          swift::OpaqueValue *_src,
+                                          size_t count, size_t stride,
+                                          const Metadata *metadata) {
   uint8_t *dest = (uint8_t *)_dest;
   uint8_t *src = (uint8_t *)_src;
   const uint8_t *layoutStr = metadata->getLayoutString();
@@ -2109,19 +2112,20 @@ void swift::swift_generic_arrayAssignWithCopy(swift::OpaqueValue *_dest,
   }
 }
 
-extern "C" swift::OpaqueValue *
-swift_generic_assignWithTake(swift::OpaqueValue *dest, swift::OpaqueValue *src,
+static swift::OpaqueValue *
+swift_cvw_assignWithTakeImpl(swift::OpaqueValue *dest, swift::OpaqueValue *src,
                              const Metadata *metadata) {
-  swift_generic_destroy(dest, metadata);
-  return swift_generic_initWithTake(dest, src, metadata);
+  swift_cvw_destroy(dest, metadata);
+  return swift_cvw_initWithTake(dest, src, metadata);
 }
 
-extern "C" unsigned swift_singletonEnum_getEnumTag(swift::OpaqueValue *address,
-                                                   const Metadata *metadata) {
+extern "C" unsigned
+swift_cvw_singletonEnum_getEnumTag(swift::OpaqueValue *address,
+                                   const Metadata *metadata) {
   return 0;
 }
 
-extern "C" void swift_singletonEnum_destructiveInjectEnumTag(
+extern "C" void swift_cvw_singletonEnum_destructiveInjectEnumTag(
     swift::OpaqueValue *address, unsigned tag, const Metadata *metadata) {
   return;
 }
@@ -2154,8 +2158,8 @@ static inline T handleSinglePayloadEnumSimpleTag(
                    xiTagBytesOffset, payloadSize, numExtraTagBytes);
 }
 
-extern "C" unsigned swift_enumSimple_getEnumTag(swift::OpaqueValue *address,
-                                                const Metadata *metadata) {
+static unsigned swift_cvw_enumSimple_getEnumTagImpl(swift::OpaqueValue *address,
+                                                    const Metadata *metadata) {
   auto addr = reinterpret_cast<uint8_t *>(address);
   LayoutStringReader reader{metadata->getLayoutString(),
                             layoutStringHeaderSize + sizeof(uint64_t)};
@@ -2197,7 +2201,7 @@ extern "C" unsigned swift_enumSimple_getEnumTag(swift::OpaqueValue *address,
       reader, addr, extraTagBytesHandler, xihandler);
 }
 
-extern "C" void swift_enumSimple_destructiveInjectEnumTag(
+static void swift_cvw_enumSimple_destructiveInjectEnumTagImpl(
     swift::OpaqueValue *address, unsigned tag, const Metadata *metadata) {
   auto addr = reinterpret_cast<uint8_t *>(address);
   LayoutStringReader reader{metadata->getLayoutString(),
@@ -2255,9 +2259,8 @@ extern "C" void swift_enumSimple_destructiveInjectEnumTag(
                                          xihandler);
 }
 
-extern "C"
-unsigned swift_enumFn_getEnumTag(swift::OpaqueValue *address,
-                                 const Metadata *metadata) {
+static unsigned swift_cvw_enumFn_getEnumTagImpl(swift::OpaqueValue *address,
+                                                const Metadata *metadata) {
   auto addr = reinterpret_cast<const uint8_t *>(address);
   LayoutStringReader reader{metadata->getLayoutString(),
                             layoutStringHeaderSize + sizeof(uint64_t)};
@@ -2266,9 +2269,9 @@ unsigned swift_enumFn_getEnumTag(swift::OpaqueValue *address,
   return getEnumTag(addr);
 }
 
-extern "C" unsigned
-swift_multiPayloadEnumGeneric_getEnumTag(swift::OpaqueValue *address,
-                                         const Metadata *metadata) {
+static unsigned
+swift_cvw_multiPayloadEnumGeneric_getEnumTagImpl(swift::OpaqueValue *address,
+                                                 const Metadata *metadata) {
   auto addr = reinterpret_cast<const uint8_t *>(address);
   LayoutStringReader1 reader{metadata->getLayoutString() +
                             layoutStringHeaderSize + sizeof(uint64_t)};
@@ -2295,7 +2298,7 @@ swift_multiPayloadEnumGeneric_getEnumTag(swift::OpaqueValue *address,
   }
 }
 
-extern "C" void swift_multiPayloadEnumGeneric_destructiveInjectEnumTag(
+static void swift_cvw_multiPayloadEnumGeneric_destructiveInjectEnumTagImpl(
     swift::OpaqueValue *address, unsigned tag, const Metadata *metadata) {
   auto addr = reinterpret_cast<uint8_t *>(address);
   LayoutStringReader reader{metadata->getLayoutString(),
@@ -2358,9 +2361,9 @@ static inline T handleSinglePayloadEnumGenericTag(
                    numExtraTagBytes);
 }
 
-extern "C" unsigned
-swift_singlePayloadEnumGeneric_getEnumTag(swift::OpaqueValue *address,
-                                          const Metadata *metadata) {
+static unsigned
+swift_cvw_singlePayloadEnumGeneric_getEnumTagImpl(swift::OpaqueValue *address,
+                                                  const Metadata *metadata) {
   auto addr = reinterpret_cast<uint8_t *>(address);
   LayoutStringReader reader{metadata->getLayoutString(),
                             layoutStringHeaderSize + sizeof(uint64_t)};
@@ -2400,7 +2403,7 @@ swift_singlePayloadEnumGeneric_getEnumTag(swift::OpaqueValue *address,
       reader, addr, extraTagBytesHandler, xihandler);
 }
 
-extern "C" void swift_singlePayloadEnumGeneric_destructiveInjectEnumTag(
+static void swift_cvw_singlePayloadEnumGeneric_destructiveInjectEnumTagImpl(
     swift::OpaqueValue *address, unsigned tag, const Metadata *metadata) {
   auto addr = reinterpret_cast<uint8_t *>(address);
   LayoutStringReader reader{metadata->getLayoutString(),
@@ -2458,13 +2461,13 @@ extern "C" void swift_singlePayloadEnumGeneric_destructiveInjectEnumTag(
                                           xihandler);
 }
 
-extern "C" swift::OpaqueValue *
-swift_generic_initializeBufferWithCopyOfBuffer(swift::ValueBuffer *dest,
+static swift::OpaqueValue *
+swift_cvw_initializeBufferWithCopyOfBufferImpl(swift::ValueBuffer *dest,
                                                swift::ValueBuffer *src,
                                                const Metadata *metadata) {
   if (metadata->getValueWitnesses()->isValueInline()) {
-    return swift_generic_initWithCopy((swift::OpaqueValue *)dest,
-                                      (swift::OpaqueValue *)src, metadata);
+    return swift_cvw_initWithCopy((swift::OpaqueValue *)dest,
+                                  (swift::OpaqueValue *)src, metadata);
   } else {
     memcpy(dest, src, sizeof(swift::HeapObject *));
     swift_retain(*(swift::HeapObject **)src);
@@ -2472,10 +2475,10 @@ swift_generic_initializeBufferWithCopyOfBuffer(swift::ValueBuffer *dest,
   }
 }
 
-void swift::swift_resolve_resilientAccessors(uint8_t *layoutStr,
-                                             size_t layoutStrOffset,
-                                             const uint8_t *fieldLayoutStr,
-                                             const Metadata *fieldType) {
+void swift::swift_cvw_resolve_resilientAccessors(uint8_t *layoutStr,
+                                                 size_t layoutStrOffset,
+                                                 const uint8_t *fieldLayoutStr,
+                                                 const Metadata *fieldType) {
   LayoutStringWriter writer{layoutStr, layoutStrOffset};
   LayoutStringReader reader{fieldLayoutStr, 0};
   while (true) {
@@ -2554,9 +2557,9 @@ void swift::swift_resolve_resilientAccessors(uint8_t *layoutStr,
         size_t caseOffset = reader.readBytes<size_t>();
         const uint8_t *caseLayoutString = fieldCasesBeginOffset +
                                           caseOffset;
-        swift_resolve_resilientAccessors(layoutStr,
-                                         casesBeginOffset + caseOffset,
-                                         caseLayoutString, fieldType);
+        swift_cvw_resolve_resilientAccessors(layoutStr,
+                                             casesBeginOffset + caseOffset,
+                                             caseLayoutString, fieldType);
       }
       reader.skip(refCountBytes);
       break;
@@ -2586,8 +2589,217 @@ void swift::swift_resolve_resilientAccessors(uint8_t *layoutStr,
   }
 }
 
-extern "C"
-void swift_generic_instantiateLayoutString(const uint8_t* layoutStr,
-                                           Metadata* type) {
+static void swift_cvw_destroyMultiPayloadEnumFNImpl(swift::OpaqueValue *address,
+                                                    const Metadata *metadata) {
+  const uint8_t *layoutStr = metadata->getLayoutString();
+  LayoutStringReader1 reader{layoutStr + layoutStringHeaderSize};
+  uintptr_t addrOffset = 0;
+  uint8_t *addr = (uint8_t *)address;
+
+#ifndef NDEBUG
+  assert(reader.readBytes<uint64_t>() ==
+             ((uint64_t)RefCountingKind::MultiPayloadEnumFN) << 56 &&
+         "Invalid tag, expected MultiPayloadEnumFN");
+#else
+  reader.skip(sizeof(uint64_t));
+#endif
+
+  multiPayloadEnumFN<handleRefCountsDestroy>(metadata, reader, addrOffset,
+                                             addr);
+}
+
+static swift::OpaqueValue *
+swift_cvw_assignWithCopyMultiPayloadEnumFNImpl(swift::OpaqueValue *_dest,
+                                               swift::OpaqueValue *_src,
+                                               const Metadata *metadata) {
+  const uint8_t *layoutStr = metadata->getLayoutString();
+  LayoutStringReader1 reader{layoutStr + layoutStringHeaderSize};
+  uintptr_t addrOffset = 0;
+  uint8_t *dest = (uint8_t *)_dest;
+  uint8_t *src = (uint8_t *)_src;
+
+#ifndef NDEBUG
+  assert(reader.readBytes<uint64_t>() ==
+             ((uint64_t)RefCountingKind::MultiPayloadEnumFN) << 56 &&
+         "Invalid tag, expected MultiPayloadEnumFN");
+#else
+  reader.skip(sizeof(uint64_t));
+#endif
+
+  multiPayloadEnumFNAssignWithCopy(metadata, reader, addrOffset, dest, src);
+  return _dest;
+}
+
+static swift::OpaqueValue *
+swift_cvw_assignWithTakeMultiPayloadEnumFNImpl(swift::OpaqueValue *dest,
+                                               swift::OpaqueValue *src,
+                                               const Metadata *metadata) {
+  swift_cvw_destroyMultiPayloadEnumFN(dest, metadata);
+  return swift_cvw_initWithTake(dest, src, metadata);
+}
+
+static swift::OpaqueValue *
+swift_cvw_initWithCopyMultiPayloadEnumFNImpl(swift::OpaqueValue *_dest,
+                                             swift::OpaqueValue *_src,
+                                             const Metadata *metadata) {
+  const uint8_t *layoutStr = metadata->getLayoutString();
+  LayoutStringReader1 reader{layoutStr + layoutStringHeaderSize};
+  uintptr_t addrOffset = 0;
+  uint8_t *dest = (uint8_t *)_dest;
+  uint8_t *src = (uint8_t *)_src;
+
+#ifndef NDEBUG
+  assert(reader.readBytes<uint64_t>() ==
+             ((uint64_t)RefCountingKind::MultiPayloadEnumFN) << 56 &&
+         "Invalid tag, expected MultiPayloadEnumFN");
+#else
+  reader.skip(sizeof(uint64_t));
+#endif
+
+  multiPayloadEnumFN<handleRefCountsInitWithCopy>(metadata, reader, addrOffset,
+                                                  dest, src);
+  return _dest;
+}
+
+static swift::OpaqueValue *
+swift_cvw_initWithTakeMultiPayloadEnumFNImpl(swift::OpaqueValue *_dest,
+                                             swift::OpaqueValue *_src,
+                                             const Metadata *metadata) {
+  if (SWIFT_LIKELY(metadata->getValueWitnesses()->isBitwiseTakable())) {
+    size_t size = metadata->vw_size();
+    memcpy(_dest, _src, size);
+    return _dest;
+  }
+
+  const uint8_t *layoutStr = metadata->getLayoutString();
+  LayoutStringReader1 reader{layoutStr + layoutStringHeaderSize};
+  uintptr_t addrOffset = 0;
+  uint8_t *dest = (uint8_t *)_dest;
+  uint8_t *src = (uint8_t *)_src;
+
+#ifndef NDEBUG
+  assert(reader.readBytes<uint64_t>() ==
+             ((uint64_t)RefCountingKind::MultiPayloadEnumFN) << 56 &&
+         "Invalid tag, expected MultiPayloadEnumFN");
+#else
+  reader.skip(sizeof(uint64_t));
+#endif
+
+  multiPayloadEnumFN<handleRefCountsInitWithTake>(metadata, reader, addrOffset,
+                                                  dest, src);
+  return _dest;
+}
+
+static swift::OpaqueValue *
+swift_cvw_initializeBufferWithCopyOfBufferMultiPayloadEnumFNImpl(
+    swift::ValueBuffer *dest, swift::ValueBuffer *src,
+    const Metadata *metadata) {
+  if (metadata->getValueWitnesses()->isValueInline()) {
+    return swift_cvw_initWithCopyMultiPayloadEnumFN(
+        (swift::OpaqueValue *)dest, (swift::OpaqueValue *)src, metadata);
+  } else {
+    memcpy(dest, src, sizeof(swift::HeapObject *));
+    swift_retain(*(swift::HeapObject **)src);
+    return (swift::OpaqueValue *)&(*(swift::HeapObject **)dest)[1];
+  }
+}
+
+extern "C" void swift_cvw_instantiateLayoutString(const uint8_t *layoutStr,
+                                                  Metadata *type) {
   type->setLayoutString(layoutStr);
 }
+
+// Forwarders for compatibility reasons
+
+extern "C" void swift_generic_destroy(swift::OpaqueValue *address,
+                                      const Metadata *metadata) {
+  swift_cvw_destroy(address, metadata);
+}
+
+extern "C" swift::OpaqueValue *
+swift_generic_assignWithCopy(swift::OpaqueValue *dest, swift::OpaqueValue *src,
+                             const Metadata *metadata) {
+  return swift_cvw_assignWithCopy(dest, src, metadata);
+}
+
+extern "C" swift::OpaqueValue *
+swift_generic_assignWithTake(swift::OpaqueValue *dest, swift::OpaqueValue *src,
+                             const Metadata *metadata) {
+  return swift_cvw_assignWithTake(dest, src, metadata);
+}
+
+extern "C" swift::OpaqueValue *
+swift_generic_initWithCopy(swift::OpaqueValue *dest, swift::OpaqueValue *src,
+                           const Metadata *metadata) {
+  return swift_cvw_initWithCopy(dest, src, metadata);
+}
+
+extern "C" swift::OpaqueValue *
+swift_generic_initWithTake(swift::OpaqueValue *dest, swift::OpaqueValue *src,
+                           const Metadata *metadata) {
+  return swift_cvw_initWithTake(dest, src, metadata);
+}
+
+extern "C" swift::OpaqueValue *
+swift_generic_initializeBufferWithCopyOfBuffer(swift::ValueBuffer *dest,
+                                               swift::ValueBuffer *src,
+                                               const Metadata *metadata) {
+  return swift_cvw_initializeBufferWithCopyOfBuffer(dest, src, metadata);
+}
+
+extern "C" unsigned swift_enumSimple_getEnumTag(swift::OpaqueValue *address,
+                                                const Metadata *metadata) {
+  return swift_cvw_enumSimple_getEnumTag(address, metadata);
+}
+
+extern "C" void swift_enumSimple_destructiveInjectEnumTag(
+    swift::OpaqueValue *address, unsigned tag, const Metadata *metadata) {
+  swift_cvw_enumSimple_destructiveInjectEnumTag(address, tag, metadata);
+}
+
+extern "C" unsigned swift_enumFn_getEnumTag(swift::OpaqueValue *address,
+                                            const Metadata *metadata) {
+  return swift_cvw_enumFn_getEnumTag(address, metadata);
+}
+
+extern "C" unsigned
+swift_multiPayloadEnumGeneric_getEnumTag(swift::OpaqueValue *address,
+                                         const Metadata *metadata) {
+  return swift_cvw_multiPayloadEnumGeneric_getEnumTag(address, metadata);
+}
+
+extern "C" void swift_multiPayloadEnumGeneric_destructiveInjectEnumTag(
+    swift::OpaqueValue *address, unsigned tag, const Metadata *metadata) {
+  swift_cvw_multiPayloadEnumGeneric_destructiveInjectEnumTag(address, tag,
+                                                             metadata);
+}
+
+extern "C" unsigned
+swift_singlePayloadEnumGeneric_getEnumTag(swift::OpaqueValue *address,
+                                          const Metadata *metadata) {
+  return swift_cvw_singlePayloadEnumGeneric_getEnumTagImpl(address, metadata);
+}
+
+extern "C" void swift_singlePayloadEnumGeneric_destructiveInjectEnumTag(
+    swift::OpaqueValue *address, unsigned tag, const Metadata *metadata) {
+  swift_cvw_singlePayloadEnumGeneric_destructiveInjectEnumTag(address, tag,
+                                                              metadata);
+}
+
+extern "C" unsigned swift_singletonEnum_getEnumTag(swift::OpaqueValue *address,
+                                                   const Metadata *metadata) {
+  return 0;
+}
+
+extern "C" void swift_singletonEnum_destructiveInjectEnumTag(
+    swift::OpaqueValue *address, unsigned tag, const Metadata *metadata) {
+  return;
+}
+
+extern "C" void swift_generic_instantiateLayoutString(const uint8_t *layoutStr,
+                                                  Metadata *type) {
+  swift_cvw_instantiateLayoutString(layoutStr, type);
+}
+
+#define OVERRIDE_CVW COMPATIBILITY_OVERRIDE
+#include "../CompatibilityOverride/CompatibilityOverrideIncludePath.h"

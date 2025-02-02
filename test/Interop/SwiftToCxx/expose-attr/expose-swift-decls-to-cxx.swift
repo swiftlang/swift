@@ -98,11 +98,9 @@ public final class ExposedClass {
 // CHECK-NEXT:   _impl::$s6Expose8exposed1yyF();
 // CHECK-NEXT: }
 // CHECK-EMPTY:
-// CHECK-EMPTY:
 // CHECK-NEXT: SWIFT_INLINE_THUNK void exposed3() noexcept SWIFT_SYMBOL("{{.*}}") {
 // CHECK-NEXT:   _impl::$s6Expose8exposed3yyF();
 // CHECK-NEXT: }
-// CHECK-EMPTY:
 // CHECK-EMPTY:
 // CHECK-NEXT: SWIFT_INLINE_THUNK void exposed4() noexcept SWIFT_SYMBOL("{{.*}}") {
 // CHECK-NEXT:   _impl::$s6Expose15exposed4RenamedyyF();

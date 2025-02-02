@@ -686,6 +686,9 @@ public:
   SWIFT_DEBUG_DUMP;
   void dump(raw_ostream &os, bool parseIfNeeded = false) const;
 
+  /// Dumps this source file's AST in JSON format to the given output stream.
+  void dumpJSON(raw_ostream &os) const;
+
   /// Pretty-print the contents of this source file.
   ///
   /// \param Printer The AST printer used for printing the contents.

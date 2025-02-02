@@ -63,6 +63,7 @@ class SwiftTestCase(unittest.TestCase):
             swift_enable_backtracing=False,
             enable_synchronization=False,
             enable_volatile=False,
+            enable_runtime_module=False,
             build_early_swiftsyntax=False,
             build_swift_stdlib_static_print=False,
             build_swift_stdlib_unicode_data=True,
@@ -112,6 +113,7 @@ class SwiftTestCase(unittest.TestCase):
             '-DSWIFT_ENABLE_BACKTRACING:BOOL=FALSE',
             '-DSWIFT_ENABLE_SYNCHRONIZATION:BOOL=FALSE',
             '-DSWIFT_ENABLE_VOLATILE:BOOL=FALSE',
+            '-DSWIFT_ENABLE_RUNTIME_MODULE:BOOL=FALSE',
             '-DSWIFT_STDLIB_STATIC_PRINT=FALSE',
             '-DSWIFT_FREESTANDING_IS_DARWIN:BOOL=FALSE',
             '-DSWIFT_STDLIB_BUILD_PRIVATE:BOOL=TRUE',
@@ -146,6 +148,7 @@ class SwiftTestCase(unittest.TestCase):
             '-DSWIFT_ENABLE_BACKTRACING:BOOL=FALSE',
             '-DSWIFT_ENABLE_SYNCHRONIZATION:BOOL=FALSE',
             '-DSWIFT_ENABLE_VOLATILE:BOOL=FALSE',
+            '-DSWIFT_ENABLE_RUNTIME_MODULE:BOOL=FALSE',
             '-DSWIFT_STDLIB_STATIC_PRINT=FALSE',
             '-DSWIFT_FREESTANDING_IS_DARWIN:BOOL=FALSE',
             '-DSWIFT_STDLIB_BUILD_PRIVATE:BOOL=TRUE',
@@ -469,6 +472,19 @@ class SwiftTestCase(unittest.TestCase):
              'TRUE'],
             [x for x in swift.cmake_options
              if 'DSWIFT_ENABLE_VOLATILE' in x])
+
+    def test_runtime_module_flags(self):
+        self.args.enable_runtime_module = True
+        swift = Swift(
+            args=self.args,
+            toolchain=self.toolchain,
+            source_dir='/path/to/src',
+            build_dir='/path/to/build')
+        self.assertEqual(
+            ['-DSWIFT_ENABLE_RUNTIME_MODULE:BOOL='
+             'TRUE'],
+            [x for x in swift.cmake_options
+             if 'DSWIFT_ENABLE_RUNTIME_MODULE' in x])
 
     def test_freestanding_is_darwin_flags(self):
         self.args.swift_freestanding_is_darwin = True

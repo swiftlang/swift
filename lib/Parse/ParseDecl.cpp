@@ -537,67 +537,20 @@ ParserResult<AvailableAttr> Parser::parseExtendedAvailabilitySpecList(
     }
   }
 
-  if (!AnyAnnotations) {
+  if (!AnyAnnotations &&
+      !Context.LangOpts.hasFeature(Feature::CustomAvailability)) {
     diagnose(Tok.getLoc(), diag::attr_expected_comma, AttrName,
              /*isDeclModifier*/ false);
   }
 
-  auto PlatformKind = platformFromString(Platform);
-  auto Domain = (PlatformKind && *PlatformKind != PlatformKind::none)
-                    ? AvailabilityDomain::forPlatform(*PlatformKind)
-                    : AvailabilityDomain::forUniversal();
+  if (AnyArgumentInvalid)
+    return nullptr;
 
-  // Treat 'swift' as a valid version-qualifying token, when
-  // at least some versions were mentioned and no other
-  // platform-agnostic availability spec has been provided.
+  // Warn if any version is specified with the universal domain ('*').
   bool SomeVersion = (!Introduced.empty() ||
                       !Deprecated.empty() ||
                       !Obsoleted.empty());
-  if (!PlatformKind.has_value() &&
-      (Platform == "swift" || Platform == "_PackageDescription")) {
-
-    if (AttrKind == AvailableAttr::Kind::Deprecated) {
-      diagnose(AttrLoc,
-               diag::attr_availability_platform_agnostic_expected_deprecated_version,
-               AttrName, Platform);
-      return nullptr;
-    }
-    if (AttrKind == AvailableAttr::Kind::Unavailable) {
-      diagnose(AttrLoc, diag::attr_availability_platform_agnostic_infeasible_option,
-               "unavailable", AttrName, Platform);
-      return nullptr;
-    }
-    assert(AttrKind == AvailableAttr::Kind::Default);
-
-    if (!SomeVersion) {
-      diagnose(AttrLoc, diag::attr_availability_platform_agnostic_expected_option,
-               AttrName, Platform);
-      return nullptr;
-    }
-
-    PlatformKind = PlatformKind::none;
-    Domain = (Platform == "swift")
-                 ? AvailabilityDomain::forSwiftLanguage()
-                 : AvailabilityDomain::forPackageDescription();
-  }
-
-
-  if (AnyArgumentInvalid)
-    return nullptr;
-  if (!PlatformKind.has_value()) {
-    if (auto CorrectedPlatform = closestCorrectedPlatformString(Platform)) {
-      diagnose(PlatformLoc, diag::attr_availability_suggest_platform, Platform,
-               AttrName, *CorrectedPlatform)
-          .fixItReplace(SourceRange(PlatformLoc), *CorrectedPlatform);
-    } else {
-      diagnose(AttrLoc, diag::attr_availability_unknown_platform, Platform,
-               AttrName);
-    }
-    return nullptr;
-  }
-
-  // Warn if any version is specified for non-specific platform '*'.
-  if (Domain.isUniversal() && SomeVersion) {
+  if (Platform == "*" && SomeVersion) {
     auto diag = diagnose(AttrLoc,
         diag::attr_availability_nonspecific_platform_unexpected_version,
         AttrName);
@@ -613,24 +566,10 @@ ParserResult<AvailableAttr> Parser::parseExtendedAvailabilitySpecList(
     return nullptr;
   }
 
-  if (PlatformKind) {
-      if (!Introduced.empty())
-        Introduced.Version =
-            canonicalizePlatformVersion(*PlatformKind, Introduced.Version);
-
-      if (!Deprecated.empty())
-        Deprecated.Version =
-            canonicalizePlatformVersion(*PlatformKind, Deprecated.Version);
-
-      if (!Obsoleted.empty())
-        Obsoleted.Version =
-            canonicalizePlatformVersion(*PlatformKind, Obsoleted.Version);
-  }
-
   auto Attr = new (Context) AvailableAttr(
-      AtLoc, SourceRange(AttrLoc, Tok.getLoc()), Domain, AttrKind, Message,
-      Renamed, Introduced.Version, Introduced.Range, Deprecated.Version,
-      Deprecated.Range, Obsoleted.Version, Obsoleted.Range,
+      AtLoc, SourceRange(AttrLoc, Tok.getLoc()), Platform, PlatformLoc,
+      AttrKind, Message, Renamed, Introduced.Version, Introduced.Range,
+      Deprecated.Version, Deprecated.Range, Obsoleted.Version, Obsoleted.Range,
       /*Implicit=*/false, AttrName == SPI_AVAILABLE_ATTRNAME);
   return makeParserResult(Attr);
 
@@ -894,12 +833,9 @@ bool Parser::parseAvailability(
         continue;
       }
 
-      if (Domain.isPlatform())
-        Version =
-            canonicalizePlatformVersion(Domain.getPlatformKind(), Version);
-
       addAttribute(new (Context) AvailableAttr(
-          AtLoc, attrRange, Domain, AvailableAttr::Kind::Default,
+          AtLoc, attrRange, Domain, Spec->getSourceRange().Start,
+          AvailableAttr::Kind::Default,
           /*Message=*/StringRef(),
           /*Rename=*/StringRef(),
           /*Introduced=*/Version,
@@ -2706,6 +2642,8 @@ ParserResult<LifetimeAttr> Parser::parseLifetimeAttribute(SourceLoc atLoc,
       /* implicit */ false, lifetimeEntry.get()));
 }
 
+
+
 /// Parses a (possibly optional) argument for an attribute containing a single, arbitrary identifier.
 ///
 /// \param P The parser object.
@@ -4022,6 +3960,21 @@ ParserStatus Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
       Attributes.add(Attr.get());
     break;
   }
+
+  case DeclAttrKind::Execution: {
+    auto behavior = parseSingleAttrOption<ExecutionKind>(
+        *this, Loc, AttrRange, AttrName, DK,
+        {{Context.Id_concurrent, ExecutionKind::Concurrent},
+         {Context.Id_caller, ExecutionKind::Caller}});
+    if (!behavior)
+      return makeParserSuccess();
+
+    if (!DiscardAttribute)
+      Attributes.add(new (Context) ExecutionAttr(AtLoc, AttrRange, *behavior,
+                                                 /*Implicit*/ false));
+
+    break;
+  }
   }
 
   if (DuplicateAttribute) {
@@ -4392,12 +4345,11 @@ ParserStatus Parser::parseDeclAttribute(DeclAttributes &Attributes,
     if (Context.LangOpts.hasFeature(Feature::Embedded)) {
       StringRef Message = "unavailable in embedded Swift", Renamed;
       auto attr = new (Context) AvailableAttr(
-          AtLoc, SourceRange(AtLoc, attrLoc),
-          AvailabilityDomain::forUniversal(), AvailableAttr::Kind::Unavailable,
-          Message, Renamed, llvm::VersionTuple(), SourceRange(),
+          AtLoc, SourceRange(AtLoc, attrLoc), AvailabilityDomain::forEmbedded(),
+          SourceLoc(), AvailableAttr::Kind::Unavailable, Message, Renamed,
           llvm::VersionTuple(), SourceRange(), llvm::VersionTuple(),
-          SourceRange(),
-          /*Implicit=*/false, /*IsSPI=*/false, /*IsForEmbedded=*/true);
+          SourceRange(), llvm::VersionTuple(), SourceRange(),
+          /*Implicit=*/false, /*IsSPI=*/false);
       Attributes.add(attr);
     }
     return makeParserSuccess();
@@ -9729,7 +9681,7 @@ Parser::parseDeclSubscript(SourceLoc StaticLoc,
       }
     }
   }
-  
+
   ParserStatus Status;
   SourceLoc SubscriptLoc = consumeToken(tok::kw_subscript);
 

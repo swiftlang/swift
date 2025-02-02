@@ -856,6 +856,12 @@ public:
   /// returns the module \c Foo.
   ModuleDecl *getTopLevelModule(bool overlay = false);
 
+  /// Returns whether or not this module is a submodule of the given module.
+  /// If `this == M`, this returns false. If this is a submodule such as
+  /// `Foo.Bar.Baz`, and the given module is either `Foo` or `Foo.Bar`, this
+  /// returns true.
+  bool isSubmoduleOf(const ModuleDecl *M) const;
+
   bool isResilient() const {
     return getResilienceStrategy() != ResilienceStrategy::Default;
   }
@@ -1046,11 +1052,6 @@ public:
   /// This assumes that \p module was imported.
   bool isImportedImplementationOnly(const ModuleDecl *module) const;
 
-  /// Returns true if decl context or its content can be serialized by
-  /// cross-module-optimization.
-  /// The \p ctxt can e.g. be a NominalType or the context of a function.
-  bool canBeUsedForCrossModuleOptimization(DeclContext *ctxt) const;
-
   /// Finds all top-level decls of this module.
   ///
   /// This does a simple local lookup, not recursively looking through imports.
@@ -1094,15 +1095,6 @@ public:
   /// This does a simple local lookup, not recursively looking through imports.
   /// The order of the results is not guaranteed to be meaningful.
   void getPrecedenceGroups(SmallVectorImpl<PrecedenceGroupDecl*> &Results) const;
-
-  /// Determines whether this module should be recursed into when calling
-  /// \c getDisplayDecls.
-  ///
-  /// Some modules should not call \c getDisplayDecls, due to assertions
-  /// in their implementation. These are usually implicit imports that would be
-  /// recursed into for parsed modules. This function provides a guard against
-  /// recusing into modules that should not have decls collected.
-  bool shouldCollectDisplayDecls() const;
 
   /// Finds all top-level decls that should be displayed to a client of this
   /// module.

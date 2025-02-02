@@ -45,11 +45,6 @@ import SubE
 // CHECK: ],
 
 // CHECK:      "contextHash":
-// CHECK:      "extraPcmArgs": [
-// CHECK-NEXT:    "-Xcc",
-// CHECK-NEXT:    "-target",
-// CHECK-NEXT:    "-Xcc",
-// CHECK:         "-fapinotes-swift-version=4"
 // CHECK-NOT: "error: cannot open Swift placeholder dependency module map from"
 // CHECK: "bridgingHeader":
 // CHECK-NEXT: "path":
@@ -144,10 +139,6 @@ import SubE
 // CHECK: "5"
 // CHECK: ],
 // CHECK: "contextHash": "{{.*}}",
-// CHECK" "extraPcmArgs": [
-// CHECK"   "-target",
-// CHECK"   "-fapinotes-swift-version=5"
-// CHECK" ]
 
 /// --------Swift module E
 // CHECK: "swift": "E"

@@ -228,6 +228,19 @@ func testTrivialScope<T>(a: Array<T>) -> Span<T> {
   // expected-note  @-3{{this use causes the lifetime-dependent value to escape}}
 }
 
+extension Span {
+  public func withThrowingClosure<E: Error>(_ body: () throws(E) -> ()) throws(E) -> () {
+    try body()
+  }
+}
+
+// Test dependence on an local variable that needs to be extended into the dead-end block of a never-throwing apply.
+public func test(p: UnsafePointer<Int>) {
+  let pointer = p
+  let span = Span(base: pointer, count: 1)
+  span.withThrowingClosure {}
+}
+
 // =============================================================================
 // Scoped dependence on property access
 // =============================================================================

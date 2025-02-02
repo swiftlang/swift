@@ -460,8 +460,9 @@ func testAnyFixIt() {
   let _: (~Copyable)?
   // expected-error@+1 {{use of protocol 'HasAssoc' as a type must be written 'any HasAssoc'}}{{10-18=(any HasAssoc)}}
   let _: HasAssoc!
-  // expected-default-swift-mode-warning@+3 {{using '!' is not allowed here; treating this as '?' instead}}
-  // expected-swift-6-error@+2 {{using '!' is not allowed here; perhaps '?' was intended?}} {{19-20=?}}
+  // expected-note@+4 {{use '?' instead}}{{19-20=?}}
+  // expected-default-swift-mode-warning@+3 {{using '!' here is deprecated}}
+  // expected-swift-6-error@+2 {{using '!' is not allowed here}}
   // expected-error@+1 {{type '(any Copyable)?' cannot be suppressed}}
   let _: ~Copyable!
   // expected-error@+1 {{constraint that suppresses conformance requires 'any'}}{{11-20=any ~Copyable}}

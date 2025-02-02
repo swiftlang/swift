@@ -162,9 +162,9 @@ exit(%phi : @owned $C, %typhi : $S):
 sil @empty : $@convention(thin) () -> () {
 [global: ]
 bb0:
-  %0 = tuple ()                                   
-  return %0 : $()                                 
-} 
+  %0 = tuple ()
+  return %0 : $()
+}
 
 // Even though the apply of %empty is not a deinit barrier, verify that the
 // destroy is not hoisted, because MoS is move-only.
@@ -568,16 +568,16 @@ entry(%c1 : @owned $C):
 // CHECK:       bb0([[C1:%[^,]+]] : @owned $C):
 // CHECK:         [[TAKE_C:%[^,]+]] = function_ref @takeC
 // CHECK:         [[BARRIER:%[^,]+]] = function_ref @barrier
-// CHECK:         cond_br undef, [[LEFT]], [[RIGHT]]                         
-// CHECK:       [[LEFT]]:                                              
+// CHECK:         cond_br undef, [[LEFT]], [[RIGHT]]
+// CHECK:       [[LEFT]]:
 // CHECK:         [[M:%[^,]+]] = move_value [[C1]]
 // CHECK:         apply [[TAKE_C]]([[M]])
-// CHECK:         br [[EXIT]]                                          
-// CHECK:       [[RIGHT]]:                                              
+// CHECK:         br [[EXIT]]
+// CHECK:       [[RIGHT]]:
 // CHECK:         apply [[BARRIER]]()
 // CHECK:         destroy_value [[C1]]
-// CHECK:         br [[EXIT]]                                          
-// CHECK:       [[EXIT]]:                                              
+// CHECK:         br [[EXIT]]
+// CHECK:       [[EXIT]]:
 // CHECK:         apply [[BARRIER]]()
 // CHECK-LABEL: } // end sil function 'lexical_end_at_end_2'
 // CHECK-LABEL: end running test {{.*}} on lexical_end_at_end_2: canonicalize_ossa_lifetime
@@ -883,4 +883,38 @@ die:
   %reload = load_borrow %token
   apply undef(%reload) : $@convention(thin) (@guaranteed C) -> ()
   unreachable
+}
+
+// The destroy of a value must not be hoisted over a destroy of a copy of a
+// partial_apply [on_stack] which captures the value.
+// CHECK-LABEL: begin running test {{.*}} on destroy_after_pa_copy_destroy
+// CHECK-LABEL: sil [ossa] @destroy_after_pa_copy_destroy : {{.*}} {
+// CHECK:       bb0([[A:%[^,]+]] :
+// CHECK:         [[C:%[^,]+]] = move_value [[A]]
+// CHECK:         [[BORROW_C:%[^,]+]] = function_ref @borrowC
+// CHECK:         [[PA:%[^,]+]] = partial_apply [callee_guaranteed] [on_stack] [[BORROW_C]]([[C]])
+// CHECK:         [[PA2:%[^,]+]] = copy_value [[PA]]
+// CHECK:         destroy_value [[PA]]
+// CHECK:         destroy_value [[PA2]]
+// CHECK:         destroy_value [[C]]
+// CHECK:         apply undef()
+// CHECK-LABEL: } // end sil function 'destroy_after_pa_copy_destroy'
+// CHECK-LABEL: end running test {{.*}} on destroy_after_pa_copy_destroy
+sil [ossa] @destroy_after_pa_copy_destroy : $@convention(thin) (@owned C) -> () {
+entry(%a: @owned $C):
+  // To defeat deinit barriers (apply undef).
+  %c = move_value %a
+  specify_test "canonicalize_ossa_lifetime true false true %c"
+
+  %callee = function_ref @borrowC : $@convention(thin) (@guaranteed C) -> ()
+  %pa = partial_apply [callee_guaranteed] [on_stack] %callee(%c) : $@convention(thin) (@guaranteed C) -> ()
+  %pa2 = copy_value %pa
+  destroy_value %pa
+
+  destroy_value %pa2
+  // To defeat ignoredByDestroyHoisting.
+  apply undef() : $@convention(thin) () -> ()
+  destroy_value %c
+  %retval = tuple ()
+  return %retval
 }

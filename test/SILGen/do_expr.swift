@@ -56,6 +56,7 @@ func test6() -> Int {
 // CHECK:       try_apply [[THROWS_ERR_FN]]({{%[0-9]+}}) : $@convention(thin) (Int) -> (Int, @error any Error), normal [[BB_NORMAL:bb[0-9]+]], error [[BB_ERR:bb[0-9]+]]
 //
 // CHECK:       [[BB_NORMAL]]
+// CHECK-NEXT:  ignored_use
 // CHECK-NEXT:  store [[MVY]] to [trivial] [[RESULT]] : $*Int
 // CHECK-NEXT:  extend_lifetime [[MVY]] : $Int
 // CHECK-NEXT:  br [[BB_EXIT:bb[0-9]+]]

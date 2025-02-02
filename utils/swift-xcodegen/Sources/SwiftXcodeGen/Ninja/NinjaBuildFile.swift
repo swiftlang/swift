@@ -11,88 +11,179 @@
 //===----------------------------------------------------------------------===//
 
 struct NinjaBuildFile {
-  var attributes: [Attribute.Key: Attribute]
-  var buildRules: [BuildRule] = []
+  var bindings: Bindings
+  var rules: [String: Rule]
+  var buildEdges: [BuildEdge] = []
 
   init(
-    attributes: [Attribute.Key: Attribute],
-    buildRules: [BuildRule]
+    bindings: [String: String],
+    rules: [String: Rule],
+    buildEdges: [BuildEdge]
   ) {
-    self.attributes = attributes
-    self.buildRules = buildRules
+    self.bindings = Bindings(storage: bindings)
+    self.buildEdges = buildEdges
+    self.rules = rules
   }
 }
 
 extension NinjaBuildFile {
   var buildConfiguration: BuildConfiguration? {
-    attributes[.configuration]
-      .flatMap { BuildConfiguration(rawValue: $0.value) }
+    bindings[.configuration]
+      .flatMap { BuildConfiguration(rawValue: $0) }
   }
 }
 
 extension NinjaBuildFile {
-  struct BuildRule: Hashable {
+
+  struct Bindings: Hashable {
+    let values: [String: String]
+
+    init(storage: [String : String]) {
+      self.values = storage
+    }
+
+    subscript(key: String) -> String? {
+      values[key]
+    }
+  }
+
+  struct Rule: Equatable {
+    let name: String
+    var bindings: Bindings
+
+    init(name: String, bindings: [String: String]) {
+      self.name = name
+      self.bindings = Bindings(storage: bindings)
+    }
+  }
+
+  struct BuildEdge: Hashable {
+    let ruleName: String
     let inputs: [String]
     let outputs: [String]
     let dependencies: [String]
+    var bindings: Bindings
 
-    let attributes: [Attribute.Key: Attribute]
-    private(set) var isPhony = false
+    var isPhony: Bool {
+      ruleName == "phony"
+    }
 
     init(
+      ruleName: String,
       inputs: [String], outputs: [String], dependencies: [String],
-      attributes: [Attribute.Key : Attribute]
+      bindings: [String: String]
     ) {
+      self.ruleName = ruleName
       self.inputs = inputs
       self.outputs = outputs
       self.dependencies = dependencies
-      self.attributes = attributes
+      self.bindings = Bindings(storage: bindings)
     }
 
     static func phony(for outputs: [String], inputs: [String]) -> Self {
-      var rule = Self(
-        inputs: inputs, outputs: outputs, dependencies: [], attributes: [:]
+      return Self(
+        ruleName: "phony", inputs: inputs, outputs: outputs, dependencies: [], bindings: [:]
       )
-      rule.isPhony = true
-      return rule
     }
   }
 }
 
+
+fileprivate enum NinjaCommandLineError: Error {
+  case unknownRule(String)
+  case missingCommandBinding
+}
+
 extension NinjaBuildFile {
-  struct Attribute: Hashable {
-    var key: Key
-    var value: String
+
+  func commandLine(for edge: BuildEdge) throws -> String {
+    guard let rule = self.rules[edge.ruleName] else {
+      throw NinjaCommandLineError.unknownRule(edge.ruleName)
+    }
+
+    // Helper to get a substitution value for ${key}.
+    // Note that we don't do built-in substitutions (e.g. $in, $out) for now.
+    func value(for key: String) -> String? {
+      edge.bindings[key] ?? rule.bindings[key] ?? self.bindings[key]
+    }
+
+    func eval(string: String) -> String {
+      var result = ""
+      string.scanningUTF8 { scanner in
+        while scanner.hasInput {
+          if let prefix = scanner.eat(while: { $0 != "$" }) {
+            result += String(utf8: prefix)
+          }
+          guard scanner.tryEat("$") else {
+            // Reached the end.
+            break
+          }
+
+          let substituted: String? = scanner.tryEating { scanner in
+            // Parse the variable name.
+            let key: String
+            if scanner.tryEat("{"), let keyName = scanner.eat(while: { $0 != "}" }), scanner.tryEat("}") {
+              key = String(utf8: keyName)
+            } else if let keyName = scanner.eat(while: { $0.isNinjaVarName }) {
+              key = String(utf8: keyName)
+            } else {
+              return nil
+            }
+
+            return value(for: key)
+          }
+
+          if let substituted {
+            // Recursive substitutions.
+            result += eval(string: substituted)
+          } else {
+            // Was not a variable, restore '$' and move on.
+            result += "$"
+          }
+        }
+      }
+      return result
+    }
+
+    guard let commandLine = rule.bindings["command"] else {
+      throw NinjaCommandLineError.missingCommandBinding
+    }
+    return eval(string: commandLine)
+  }
+}
+
+extension Byte {
+  fileprivate var isNinjaVarName: Bool {
+    switch self {
+    case "0"..."9", "a"..."z", "A"..."Z", "_", "-":
+      return true
+    default:
+      return false
+    }
   }
 }
 
 extension NinjaBuildFile: CustomDebugStringConvertible {
   var debugDescription: String {
-    buildRules.map(\.debugDescription).joined(separator: "\n")
+    buildEdges.map(\.debugDescription).joined(separator: "\n")
   }
 }
 
-extension NinjaBuildFile.BuildRule: CustomDebugStringConvertible {
+extension NinjaBuildFile.BuildEdge: CustomDebugStringConvertible {
   var debugDescription: String {
     """
     {
       inputs: \(inputs)
       outputs: \(outputs)
       dependencies: \(dependencies)
-      attributes: \(attributes)
+      bindings: \(bindings)
       isPhony: \(isPhony)
     }
     """
   }
 }
 
-extension NinjaBuildFile.Attribute: CustomStringConvertible {
-  var description: String {
-    "\(key.rawValue) = \(value)"
-  }
-}
-
-extension NinjaBuildFile.Attribute {
+extension NinjaBuildFile.Bindings {
   enum Key: String {
     case configuration = "CONFIGURATION"
     case defines = "DEFINES"
@@ -102,6 +193,9 @@ extension NinjaBuildFile.Attribute {
     case swiftModuleName = "SWIFT_MODULE_NAME"
     case swiftLibraryName = "SWIFT_LIBRARY_NAME"
     case swiftSources = "SWIFT_SOURCES"
-    case command = "COMMAND"
+  }
+
+  subscript(key: Key) -> String? {
+    return self[key.rawValue]
   }
 }

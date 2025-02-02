@@ -470,3 +470,13 @@ bb0(%0 : @guaranteed $Klass):
   %9999 = tuple ()
   return %9999 : $()
 }
+
+// CHECK-LABEL: sil [ossa] @ignored_use_test : $@convention(thin) (@guaranteed Klass) -> () {
+// CHECK:   ignored_use %0 : $Klass
+// CHECK: } // end sil function 'ignored_use_test'
+sil [ossa] @ignored_use_test : $@convention(thin) (@guaranteed Klass) -> () {
+bb0(%0 : @guaranteed $Klass):
+  ignored_use %0 : $Klass
+  %9999 = tuple ()
+  return %9999 : $()
+}

@@ -824,4 +824,5 @@ Struct String.Index has added a conformance to an existing protocol CustomDebugS
 
 Enum _SwiftifyInfo is a new API without @available attribute
 Enum _SwiftifyExpr is a new API without @available attribute
+Enum _DependenceType is a new API without @available attribute
 // *** DO NOT DISABLE OR XFAIL THIS TEST. *** (See comment above.)

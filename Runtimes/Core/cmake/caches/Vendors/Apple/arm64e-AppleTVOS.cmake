@@ -6,7 +6,7 @@ set(CMAKE_C_COMPILER_TARGET "arm64e-apple-tvos${CMAKE_OSX_DEPLOYMENT_TARGET}" CA
 set(CMAKE_CXX_COMPILER_TARGET "arm64e-apple-tvos${CMAKE_OSX_DEPLOYMENT_TARGET}" CACHE STRING "")
 set(CMAKE_Swift_COMPILER_TARGET "arm64e-apple-tvos${CMAKE_OSX_DEPLOYMENT_TARGET}" CACHE STRING "")
 
-set(SwiftCore_ARCH_SUBDIR arm64e)
-set(SwiftCore_PLATFORM_SUBDIR appletvos)
+set(SwiftCore_ARCH_SUBDIR arm64e CACHE STRING "")
+set(SwiftCore_PLATFORM_SUBDIR appletvos CACHE STRING "")
 
 include("${CMAKE_CURRENT_LIST_DIR}/apple-common.cmake")

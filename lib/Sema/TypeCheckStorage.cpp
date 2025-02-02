@@ -478,11 +478,8 @@ const PatternBindingEntry *PatternBindingEntryRequest::evaluate(
     if (isReq) {
       continue;
     }
-    auto varSourceFile = binding->getDeclContext()->getParentSourceFile();
-    auto isVarInInterfaceFile =
-        varSourceFile && varSourceFile->Kind == SourceFileKind::Interface;
     // Don't diagnose too strictly for textual interfaces.
-    if (isVarInInterfaceFile) {
+    if (binding->getDeclContext()->isInSwiftinterface()) {
       continue;
     }
     // var is only allowed in a protocol.
@@ -2876,7 +2873,7 @@ IsAccessorTransparentRequest::evaluate(Evaluator &evaluator,
         }
       }
 
-      if (auto subscript = dyn_cast<SubscriptDecl>(storage)) {
+      if (isa<SubscriptDecl>(storage)) {
         break;
       }
 
@@ -3625,14 +3622,12 @@ static void finishNSManagedImplInfo(VarDecl *var,
   if (var->isLet())
     diagnoseAttrWithRemovalFixIt(var, attr, diag::attr_NSManaged_let_property);
 
-  SourceFile *parentFile = var->getDeclContext()->getParentSourceFile();
-
   auto diagnoseNotStored = [&](unsigned kind) {
     // Skip diagnosing @NSManaged declarations in module interfaces. They are
     // properties that are stored, but have specially synthesized observers
     // and we should allow them to have getters and setters in a module
     // interface.
-    if (parentFile && parentFile->Kind == SourceFileKind::Interface)
+    if (var->getDeclContext()->isInSwiftinterface())
       return;
 
     diagnoseAttrWithRemovalFixIt(var, attr, diag::attr_NSManaged_not_stored, kind);

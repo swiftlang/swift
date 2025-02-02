@@ -7,9 +7,10 @@ import SwiftSyntaxMacros
 // avoids depending on SwiftifyImport.swift
 // all instances are reparsed and reinstantiated by the macro anyways,
 // so linking is irrelevant
-enum SwiftifyExpr {
+enum SwiftifyExpr: Hashable {
   case param(_ index: Int)
   case `return`
+  case `self`
 }
 
 extension SwiftifyExpr: CustomStringConvertible {
@@ -17,8 +18,18 @@ extension SwiftifyExpr: CustomStringConvertible {
     switch self {
     case .param(let index): return ".param(\(index))"
     case .return: return ".return"
+    case .self: return ".self"
     }
   }
+}
+
+enum DependenceType {
+  case borrow, copy
+}
+
+struct LifetimeDependence {
+  let dependsOn: SwiftifyExpr
+  let type: DependenceType
 }
 
 protocol ParamInfo: CustomStringConvertible {
@@ -26,6 +37,7 @@ protocol ParamInfo: CustomStringConvertible {
   var original: SyntaxProtocol { get }
   var pointerIndex: SwiftifyExpr { get }
   var nonescaping: Bool { get set }
+  var dependencies: [LifetimeDependence] { get set }
 
   func getBoundsCheckedThunkBuilder(
     _ base: BoundsCheckedThunkBuilder, _ funcDecl: FunctionDeclSyntax,
@@ -38,6 +50,8 @@ func tryGetParamName(_ funcDecl: FunctionDeclSyntax, _ expr: SwiftifyExpr) -> To
   case .param(let i):
     let funcParam = getParam(funcDecl, i - 1)
     return funcParam.secondName ?? funcParam.firstName
+  case .`self`:
+    return .keyword(.self)
   default: return nil
   }
 }
@@ -49,14 +63,17 @@ func getSwiftifyExprType(_ funcDecl: FunctionDeclSyntax, _ expr: SwiftifyExpr) -
     return funcParam.type
   case .return:
     return funcDecl.signature.returnClause!.type
+  case .self:
+    return TypeSyntax(IdentifierTypeSyntax(name: TokenSyntax("Self")))
   }
 }
 
 struct CxxSpan: ParamInfo {
   var pointerIndex: SwiftifyExpr
   var nonescaping: Bool
-  var original: SyntaxProtocol
+  var dependencies: [LifetimeDependence]
   var typeMappings: [String: String]
+  var original: SyntaxProtocol
 
   var description: String {
     return "std::span(pointer: \(pointerIndex), nonescaping: \(nonescaping))"
@@ -71,9 +88,10 @@ struct CxxSpan: ParamInfo {
       return CxxSpanThunkBuilder(base: base, index: i - 1, signature: funcDecl.signature,
         typeMappings: typeMappings, node: original, nonescaping: nonescaping)
     case .return:
-      // TODO: actually implement std::span in return position
-      return CxxSpanThunkBuilder(base: base, index: -1, signature: funcDecl.signature,
-        typeMappings: typeMappings, node: original, nonescaping: nonescaping)
+      return CxxSpanReturnThunkBuilder(base: base, signature: funcDecl.signature,
+        typeMappings: typeMappings, node: original)
+    case .self:
+      return base
     }
   }
 }
@@ -83,6 +101,7 @@ struct CountedBy: ParamInfo {
   var count: ExprSyntax
   var sizedBy: Bool
   var nonescaping: Bool
+  var dependencies: [LifetimeDependence]
   var original: SyntaxProtocol
 
   var description: String {
@@ -107,6 +126,8 @@ struct CountedBy: ParamInfo {
         base: base, countExpr: count,
         signature: funcDecl.signature,
         nonescaping: nonescaping, isSizedBy: sizedBy)
+    case .self:
+      return base
     }
   }
 }
@@ -156,6 +177,8 @@ func getTypeName(_ type: TypeSyntax) throws -> TokenSyntax {
     return memberType.name
   case .identifierType:
     return type.as(IdentifierTypeSyntax.self)!.name
+  case .attributedType:
+    return try getTypeName(type.as(AttributedTypeSyntax.self)!.baseType)
   default:
     throw DiagnosticError("expected pointer type, got \(type) with kind \(type.kind)", node: type)
   }
@@ -167,6 +190,22 @@ func replaceTypeName(_ type: TypeSyntax, _ name: TokenSyntax) -> TypeSyntax {
   }
   let idType = type.as(IdentifierTypeSyntax.self)!
   return TypeSyntax(idType.with(\.name, name))
+}
+
+func replaceBaseType(_ type: TypeSyntax, _ base: TypeSyntax) -> TypeSyntax {
+  if let attributedType = type.as(AttributedTypeSyntax.self) {
+    return TypeSyntax(attributedType.with(\.baseType, base))
+  }
+  return base
+}
+
+// The generated type names for template instantiations sometimes contain
+// a `_const` suffix for diambiguation purposes. We need to remove that.
+func dropConstSuffix(_ typeName: String) -> String {
+  if typeName.hasSuffix("_const") {
+    return String(typeName.dropLast("_const".count))
+  }
+  return typeName
 }
 
 func getPointerMutability(text: String) -> Mutability? {
@@ -250,8 +289,10 @@ func transformType(_ prev: TypeSyntax, _ generateSpan: Bool, _ isSizedBy: Bool) 
 protocol BoundsCheckedThunkBuilder {
   func buildFunctionCall(_ pointerArgs: [Int: ExprSyntax]) throws -> ExprSyntax
   func buildBoundsChecks() throws -> [CodeBlockItemSyntax.Item]
+  // The second component of the return value is true when only the return type of the
+  // function signature was changed.
   func buildFunctionSignature(_ argTypes: [Int: TypeSyntax?], _ returnType: TypeSyntax?) throws
-    -> FunctionSignatureSyntax
+    -> (FunctionSignatureSyntax, Bool)
 }
 
 func getParam(_ signature: FunctionSignatureSyntax, _ paramIndex: Int) -> FunctionParameterSyntax {
@@ -269,6 +310,7 @@ func getParam(_ funcDecl: FunctionDeclSyntax, _ paramIndex: Int) -> FunctionPara
 
 struct FunctionCallBuilder: BoundsCheckedThunkBuilder {
   let base: FunctionDeclSyntax
+
   init(_ function: FunctionDeclSyntax) {
     base = function
   }
@@ -278,7 +320,7 @@ struct FunctionCallBuilder: BoundsCheckedThunkBuilder {
   }
 
   func buildFunctionSignature(_ argTypes: [Int: TypeSyntax?], _ returnType: TypeSyntax?) throws
-    -> FunctionSignatureSyntax {
+    -> (FunctionSignatureSyntax, Bool) {
     var newParams = base.signature.parameterClause.parameters.enumerated().filter {
       let type = argTypes[$0.offset]
       // filter out deleted parameters, i.e. ones where argTypes[i] _contains_ nil
@@ -286,14 +328,15 @@ struct FunctionCallBuilder: BoundsCheckedThunkBuilder {
     }.map { (i: Int, e: FunctionParameterSyntax) in
       e.with(\.type, (argTypes[i] ?? e.type)!)
     }
-    let last = newParams.popLast()!
-    newParams.append(last.with(\.trailingComma, nil))
+    if let last = newParams.popLast() {
+      newParams.append(last.with(\.trailingComma, nil))
+    }
 
     var sig = base.signature.with(\.parameterClause.parameters, FunctionParameterListSyntax(newParams))
     if returnType != nil {
       sig = sig.with(\.returnClause!.type, returnType!)
     }
-    return sig
+    return (sig, (argTypes.count == 0 && returnType != nil))
   }
 
   func buildFunctionCall(_ pointerArgs: [Int: ExprSyntax]) throws -> ExprSyntax {
@@ -341,7 +384,7 @@ struct CxxSpanThunkBuilder: ParamPointerBoundsThunkBuilder {
   }
 
   func buildFunctionSignature(_ argTypes: [Int: TypeSyntax?], _ returnType: TypeSyntax?) throws
-    -> FunctionSignatureSyntax {
+    -> (FunctionSignatureSyntax, Bool) {
     var types = argTypes
     let typeName = try getTypeName(oldType).text
     guard let desugaredType = typeMappings[typeName] else {
@@ -352,7 +395,8 @@ struct CxxSpanThunkBuilder: ParamPointerBoundsThunkBuilder {
     let parsedDesugaredType = TypeSyntax("\(raw: getUnqualifiedStdName(desugaredType)!)")
     let genericArg = TypeSyntax(parsedDesugaredType.as(IdentifierTypeSyntax.self)!
       .genericArgumentClause!.arguments.first!.argument)!
-    types[index] = TypeSyntax("Span<\(raw: try getTypeName(genericArg).text)>")
+    types[index] = replaceBaseType(param.type,
+      TypeSyntax("Span<\(raw: dropConstSuffix(try getTypeName(genericArg).text))>"))
     return try base.buildFunctionSignature(types, returnType)
   }
 
@@ -362,6 +406,38 @@ struct CxxSpanThunkBuilder: ParamPointerBoundsThunkBuilder {
     assert(args[index] == nil)
     args[index] = ExprSyntax("\(raw: typeName)(\(raw: name))")
     return try base.buildFunctionCall(args)
+  }
+}
+
+struct CxxSpanReturnThunkBuilder: BoundsCheckedThunkBuilder {
+  public let base: BoundsCheckedThunkBuilder
+  public let signature: FunctionSignatureSyntax
+  public let typeMappings: [String: String]
+  public let node: SyntaxProtocol
+
+  func buildBoundsChecks() throws -> [CodeBlockItemSyntax.Item] {
+    return []
+  }
+
+  func buildFunctionSignature(_ argTypes: [Int: TypeSyntax?], _ returnType: TypeSyntax?) throws
+    -> (FunctionSignatureSyntax, Bool) {
+    assert(returnType == nil)
+    let typeName = try getTypeName(signature.returnClause!.type).text
+    guard let desugaredType = typeMappings[typeName] else {
+      throw DiagnosticError(
+        "unable to desugar type with name '\(typeName)'", node: node)
+    }
+    let parsedDesugaredType = TypeSyntax("\(raw: getUnqualifiedStdName(desugaredType)!)")
+    let genericArg = TypeSyntax(parsedDesugaredType.as(IdentifierTypeSyntax.self)!
+      .genericArgumentClause!.arguments.first!.argument)!
+    let newType = replaceBaseType(signature.returnClause!.type,
+      TypeSyntax("Span<\(raw: dropConstSuffix(try getTypeName(genericArg).text))>"))
+    return try base.buildFunctionSignature(argTypes, newType)
+  }
+
+  func buildFunctionCall(_ pointerArgs: [Int: ExprSyntax]) throws -> ExprSyntax {
+    let call = try base.buildFunctionCall(pointerArgs)
+    return "Span(_unsafeCxxSpan: \(call))"
   }
 }
 
@@ -417,7 +493,7 @@ struct CountedOrSizedReturnPointerThunkBuilder: PointerBoundsThunkBuilder {
   }
 
   func buildFunctionSignature(_ argTypes: [Int: TypeSyntax?], _ returnType: TypeSyntax?) throws
-    -> FunctionSignatureSyntax {
+    -> (FunctionSignatureSyntax, Bool) {
     assert(returnType == nil)
     return try base.buildFunctionSignature(argTypes, newType)
   }
@@ -445,7 +521,7 @@ struct CountedOrSizedPointerThunkBuilder: ParamPointerBoundsThunkBuilder {
   public let skipTrivialCount: Bool
 
   func buildFunctionSignature(_ argTypes: [Int: TypeSyntax?], _ returnType: TypeSyntax?) throws
-    -> FunctionSignatureSyntax {
+    -> (FunctionSignatureSyntax, Bool) {
     var types = argTypes
     types[index] = try newType
     if skipTrivialCount {
@@ -693,9 +769,10 @@ public struct SwiftifyImportMacro: PeerMacro {
       let pointerParamIndex: Int = try getIntLiteralValue(pointerParamIndexArg.expression)
       return .param(pointerParamIndex)
     case "return": return .return
+    case "self": return .`self`
     default:
       throw DiagnosticError(
-        "expected 'param' or 'return', got '\(enumName)'",
+        "expected 'param', 'return', or 'self', got '\(enumName)'",
         node: expr)
     }
   }
@@ -723,7 +800,7 @@ public struct SwiftifyImportMacro: PeerMacro {
     }
     return CountedBy(
       pointerIndex: pointerExpr, count: unwrappedCountExpr, sizedBy: false,
-      nonescaping: false, original: ExprSyntax(enumConstructorExpr))
+      nonescaping: false, dependencies: [], original: ExprSyntax(enumConstructorExpr))
   }
 
   static func parseSizedByEnum(_ enumConstructorExpr: FunctionCallExprSyntax) throws -> ParamInfo {
@@ -738,7 +815,7 @@ public struct SwiftifyImportMacro: PeerMacro {
     let unwrappedCountExpr = ExprSyntax(stringLiteral: sizeExprStringLit.representedLiteralValue!)
     return CountedBy(
       pointerIndex: pointerExpr, count: unwrappedCountExpr, sizedBy: true, nonescaping: false,
-      original: ExprSyntax(enumConstructorExpr))
+      dependencies: [], original: ExprSyntax(enumConstructorExpr))
   }
 
   static func parseEndedByEnum(_ enumConstructorExpr: FunctionCallExprSyntax) throws -> ParamInfo {
@@ -756,6 +833,28 @@ public struct SwiftifyImportMacro: PeerMacro {
     let pointerExpr: SwiftifyExpr = try parseSwiftifyExpr(pointerExprArg)
     let pointerParamIndex: Int = paramOrReturnIndex(pointerExpr)
     return pointerParamIndex
+  }
+
+  static func parseLifetimeDependence(_ enumConstructorExpr: FunctionCallExprSyntax) throws -> (SwiftifyExpr, LifetimeDependence) {
+    let argumentList = enumConstructorExpr.arguments
+    let pointer: SwiftifyExpr = try parseSwiftifyExpr(try getArgumentByName(argumentList, "pointer"))
+    let dependsOnArg = try getArgumentByName(argumentList, "dependsOn")
+    let dependsOn: SwiftifyExpr = try parseSwiftifyExpr(dependsOnArg)
+    if dependsOn == .`return` {
+        throw DiagnosticError("lifetime cannot depend on the return value", node: dependsOnArg)
+    }
+    let type = try getArgumentByName(argumentList, "type") 
+    let depType: DependenceType
+    switch try parseEnumName(type) {
+      case "borrow":
+        depType = DependenceType.borrow
+      case "copy":
+        depType = DependenceType.copy
+      default:
+        throw DiagnosticError("expected '.copy' or '.borrow', got '\(type)'", node: type)
+    }
+    let dependence = LifetimeDependence(dependsOn: dependsOn, type: depType)
+    return (pointer, dependence)
   }
 
   static func parseTypeMappingParam(_ paramAST: LabeledExprSyntax?) throws -> [String: String]? {
@@ -786,7 +885,7 @@ public struct SwiftifyImportMacro: PeerMacro {
     return dict
   }
 
-  static func parseCxxSpanParams(
+  static func parseCxxSpansInSignature(
     _ signature: FunctionSignatureSyntax,
     _ typeMappings: [String: String]?
   ) throws -> [ParamInfo] {
@@ -794,23 +893,30 @@ public struct SwiftifyImportMacro: PeerMacro {
       return []
     }
     var result : [ParamInfo] = []
-    for (idx, param) in signature.parameterClause.parameters.enumerated() {
-      let typeName = try getTypeName(param.type).text;
+    let process = { type, expr, orig in
+      let typeName = try getTypeName(type).text;
       if let desugaredType = typeMappings[typeName] {
         if let unqualifiedDesugaredType = getUnqualifiedStdName(desugaredType) {
           if unqualifiedDesugaredType.starts(with: "span<") {
-            result.append(CxxSpan(pointerIndex: .param(idx + 1), nonescaping: false,
-              original: param, typeMappings: typeMappings))
+            result.append(CxxSpan(pointerIndex: expr, nonescaping: false,
+              dependencies: [], typeMappings: typeMappings, original: orig))
           }
         }
       }
+    }
+    for (idx, param) in signature.parameterClause.parameters.enumerated() {
+      try process(param.type, .param(idx + 1), param)
+    }
+    if let retClause = signature.returnClause {
+      try process(retClause.type, .`return`, retClause)
     }
     return result
   }
 
   static func parseMacroParam(
     _ paramAST: LabeledExprSyntax, _ signature: FunctionSignatureSyntax,
-    nonescapingPointers: inout Set<Int>
+    nonescapingPointers: inout Set<Int>,
+    lifetimeDependencies: inout [SwiftifyExpr: [LifetimeDependence]]
   ) throws -> ParamInfo? {
     let paramExpr = paramAST.expression
     guard let enumConstructorExpr = paramExpr.as(FunctionCallExprSyntax.self) else {
@@ -826,9 +932,24 @@ public struct SwiftifyImportMacro: PeerMacro {
       let index = try parseNonEscaping(enumConstructorExpr)
       nonescapingPointers.insert(index)
       return nil
+    case "lifetimeDependence":
+      let (expr, dependence) = try parseLifetimeDependence(enumConstructorExpr)
+      lifetimeDependencies[expr, default: []].append(dependence)
+      // We assume pointers annotated with lifetimebound do not escape.
+      let fromIdx = paramOrReturnIndex(dependence.dependsOn)
+      if dependence.type == DependenceType.copy && fromIdx != 0 {
+        nonescapingPointers.insert(fromIdx)
+      }
+      // The escaping is controlled when a parameter is the target of a lifetimebound.
+      // So we want to do the transformation to Swift's Span.
+      let idx = paramOrReturnIndex(expr)
+      if idx != -1 {
+        nonescapingPointers.insert(idx)
+      }
+      return nil
     default:
       throw DiagnosticError(
-        "expected 'countedBy', 'sizedBy', 'endedBy' or 'nonescaping', got '\(enumName)'",
+        "expected 'countedBy', 'sizedBy', 'endedBy', 'nonescaping' or 'lifetimeDependence', got '\(enumName)'",
         node: enumConstructorExpr)
     }
   }
@@ -886,6 +1007,8 @@ public struct SwiftifyImportMacro: PeerMacro {
           "multiple _SwiftifyInfos referring to return value: \(pointerInfo) and \(ret!)", node: pointerInfo.original)
       }
       ret = pointerInfo
+      case .self:
+        throw DiagnosticError("do not annotate self", node: pointerInfo.original)
       }
     }
   }
@@ -893,14 +1016,52 @@ public struct SwiftifyImportMacro: PeerMacro {
   static func paramOrReturnIndex(_ expr: SwiftifyExpr) -> Int {
     switch expr {
     case .param(let i): return i
+    case .`self`: return 0
     case .return: return -1
     }
   }
 
   static func setNonescapingPointers(_ args: inout [ParamInfo], _ nonescapingPointers: Set<Int>) {
+    if args.isEmpty {
+      return
+    }
     for i in 0...args.count - 1 where nonescapingPointers.contains(paramOrReturnIndex(args[i].pointerIndex)) {
       args[i].nonescaping = true
     }
+  }
+
+  static func setLifetimeDependencies(_ args: inout [ParamInfo], _ lifetimeDependencies: [SwiftifyExpr: [LifetimeDependence]]) {
+    if args.isEmpty {
+      return
+    }
+    for i in 0...args.count - 1 where lifetimeDependencies.keys.contains(args[i].pointerIndex) {
+      args[i].dependencies = lifetimeDependencies[args[i].pointerIndex]!
+    }
+  }
+
+  static func lifetimeAttributes(_ funcDecl: FunctionDeclSyntax,
+    _ dependencies: [SwiftifyExpr: [LifetimeDependence]]) -> [AttributeListSyntax.Element] {
+    let returnDependencies = dependencies[.`return`, default: []]
+    if returnDependencies.isEmpty {
+      return []
+    }
+    var args : [LabeledExprSyntax] = []
+    for dependence in returnDependencies {
+      if (dependence.type == .borrow) {
+        args.append(LabeledExprSyntax(expression: 
+          DeclReferenceExprSyntax(baseName: TokenSyntax("borrow"))))
+      }
+      args.append(LabeledExprSyntax(expression: 
+        DeclReferenceExprSyntax(baseName: TokenSyntax(tryGetParamName(funcDecl, dependence.dependsOn))!),
+        trailingComma: .commaToken()))
+    }
+    args[args.count - 1] = args[args.count - 1].with(\.trailingComma, nil)
+    return [.attribute(AttributeSyntax(
+              atSign: .atSignToken(),
+              attributeName: IdentifierTypeSyntax(name: "lifetime"),
+              leftParen: .leftParenToken(),
+              arguments: .argumentList(LabeledExprListSyntax(args)),
+              rightParen: .rightParenToken()))]
   }
 
   public static func expansion(
@@ -920,13 +1081,21 @@ public struct SwiftifyImportMacro: PeerMacro {
         arguments = arguments.dropLast()
       }
       var nonescapingPointers = Set<Int>()
+      var lifetimeDependencies : [SwiftifyExpr: [LifetimeDependence]] = [:]
       var parsedArgs = try arguments.compactMap {
-        try parseMacroParam($0, funcDecl.signature, nonescapingPointers: &nonescapingPointers)
+        try parseMacroParam($0, funcDecl.signature, nonescapingPointers: &nonescapingPointers,
+          lifetimeDependencies: &lifetimeDependencies)
       }
-      parsedArgs.append(contentsOf: try parseCxxSpanParams(funcDecl.signature, typeMappings))
+      parsedArgs.append(contentsOf: try parseCxxSpansInSignature(funcDecl.signature, typeMappings))
       setNonescapingPointers(&parsedArgs, nonescapingPointers)
+      setLifetimeDependencies(&parsedArgs, lifetimeDependencies)
+      // We only transform non-escaping spans.
       parsedArgs = parsedArgs.filter {
-        !($0 is CxxSpan) || ($0 as! CxxSpan).nonescaping
+        if let cxxSpanArg = $0 as? CxxSpan {
+          return cxxSpanArg.nonescaping || cxxSpanArg.pointerIndex == .return
+        } else {
+          return true
+        }
       }
       try checkArgs(parsedArgs, funcDecl)
       let baseBuilder = FunctionCallBuilder(funcDecl)
@@ -938,7 +1107,7 @@ public struct SwiftifyImportMacro: PeerMacro {
         { (prev, parsedArg) in
           parsedArg.getBoundsCheckedThunkBuilder(prev, funcDecl, skipTrivialCount)
         })
-      let newSignature = try builder.buildFunctionSignature([:], nil)
+      let (newSignature, onlyReturnTypeChanged) = try builder.buildFunctionSignature([:], nil)
       let checks =
         skipTrivialCount
         ? [] as [CodeBlockItemSyntax]
@@ -951,6 +1120,13 @@ public struct SwiftifyImportMacro: PeerMacro {
             returnKeyword: .keyword(.return, trailingTrivia: " "),
             expression: try builder.buildFunctionCall([:]))))
       let body = CodeBlockSyntax(statements: CodeBlockItemListSyntax(checks + [call]))
+      let lifetimeAttrs = lifetimeAttributes(funcDecl, lifetimeDependencies)
+      let disfavoredOverload : [AttributeListSyntax.Element] = (onlyReturnTypeChanged ? [
+        .attribute(
+          AttributeSyntax(
+            atSign: .atSignToken(),
+            attributeName: IdentifierTypeSyntax(name: "_disfavoredOverload")))
+      ] : [])
       let newFunc =
         funcDecl
         .with(\.signature, newSignature)
@@ -970,7 +1146,9 @@ public struct SwiftifyImportMacro: PeerMacro {
               AttributeSyntax(
                 atSign: .atSignToken(),
                 attributeName: IdentifierTypeSyntax(name: "_alwaysEmitIntoClient")))
-          ])
+          ]
+          + lifetimeAttrs
+          + disfavoredOverload)
       return [DeclSyntax(newFunc)]
     } catch let error as DiagnosticError {
       context.diagnose(

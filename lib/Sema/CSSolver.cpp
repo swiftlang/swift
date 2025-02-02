@@ -243,11 +243,6 @@ Solution ConstraintSystem::finalize() {
     solution.appliedPropertyWrappers.insert(appliedWrapper);
   }
 
-  // Remember implicit value conversions.
-  for (const auto &valueConversion : ImplicitValueConversions) {
-    solution.ImplicitValueConversions.push_back(valueConversion);
-  }
-
   // Remember argument lists.
   for (const auto &argListMapping : ArgumentLists) {
     solution.argumentLists.insert(argListMapping);
@@ -442,13 +437,6 @@ void ConstraintSystem::replaySolution(const Solution &solution,
         applyPropertyWrapper(getAsExpr(appliedWrapper.first), applied);
     } else {
       ASSERT(found->second.size() == appliedWrapper.second.size());
-    }
-  }
-
-  for (auto &valueConversion : solution.ImplicitValueConversions) {
-    if (ImplicitValueConversions.count(valueConversion.first) == 0) {
-      recordImplicitValueConversion(valueConversion.first,
-                                    valueConversion.second);
     }
   }
 
@@ -1309,8 +1297,8 @@ ConstraintSystem::findConstraintThroughOptionals(
   while (visitedVars.insert(rep).second) {
     // Look for a disjunction that binds this type variable to an overload set.
     TypeVariableType *optionalObjectTypeVar = nullptr;
-    auto constraints = getConstraintGraph().gatherConstraints(
-        rep, ConstraintGraph::GatheringKind::EquivalenceClass,
+    auto constraints = getConstraintGraph().gatherNearbyConstraints(
+        rep,
         [&](Constraint *match) {
           // If we have an "optional object of" constraint, we may need to
           // look through it to find the constraint we're looking for.
@@ -1918,9 +1906,8 @@ void DisjunctionChoice::propagateConversionInfo(ConstraintSystem &cs) const {
     }
   }
 
-  auto constraints = cs.CG.gatherConstraints(
+  auto constraints = cs.CG.gatherNearbyConstraints(
       typeVar,
-      ConstraintGraph::GatheringKind::EquivalenceClass,
       [](Constraint *constraint) -> bool {
         switch (constraint->getKind()) {
         case ConstraintKind::Conversion:
@@ -1945,6 +1932,17 @@ bool ConjunctionElement::attempt(ConstraintSystem &cs) const {
   {
     llvm::SmallPtrSet<TypeVariableType *, 4> referencedVars;
     findReferencedVariables(cs, referencedVars);
+
+    if (cs.isDebugMode()) {
+      auto indent = cs.solverState->getCurrentIndent();
+      auto &log = llvm::errs().indent(indent);
+      log << "(Element type variables in scope: ";
+      interleave(
+        referencedVars,
+        [&](TypeVariableType *typeVar) { log << "$T" << typeVar->getID(); },
+        [&] { log << ", "; });
+      log << ")\n";
+    }
 
     for (auto *typeVar : referencedVars)
       cs.addTypeVariable(typeVar);

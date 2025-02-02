@@ -193,10 +193,6 @@ public:
   /// reference other deprecated declarations without warning.
   bool isDeprecated() const { return Availability.isDeprecated(); }
 
-  std::optional<PlatformKind> getUnavailablePlatformKind() const {
-    return Availability.getUnavailablePlatformKind();
-  }
-
   /// If true, the context can only reference exported declarations, either
   /// because it is the signature context of an exported declaration, or
   /// because it is the function body context of an inlinable function.
