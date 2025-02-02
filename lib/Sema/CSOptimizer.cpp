@@ -152,8 +152,8 @@ NullablePtr<Constraint> getApplicableFnConstraint(ConstraintGraph &CG,
   if (!boundVar)
     return nullptr;
 
-  auto constraints = CG.gatherNearbyConstraints(
-      boundVar,
+  auto constraints = CG.gatherConstraints(
+      boundVar, ConstraintGraph::GatheringKind::EquivalenceClass,
       [](Constraint *constraint) {
         return constraint->getKind() == ConstraintKind::ApplicableFunction;
       });
@@ -1172,8 +1172,8 @@ selectBestBindingDisjunction(ConstraintSystem &cs,
     if (!firstBindDisjunction)
       firstBindDisjunction = disjunction;
 
-    auto constraints = cs.getConstraintGraph().gatherNearbyConstraints(
-        typeVar,
+    auto constraints = cs.getConstraintGraph().gatherConstraints(
+        typeVar, ConstraintGraph::GatheringKind::EquivalenceClass,
         [](Constraint *constraint) {
           return constraint->getKind() == ConstraintKind::Conversion;
         });
