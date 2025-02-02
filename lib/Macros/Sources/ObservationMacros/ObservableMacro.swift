@@ -338,7 +338,7 @@ public struct ObservationTrackedMacro: AccessorMacro {
       return []
     }
     
-    guard let container = context.lexicalContext[0].as(ClassDeclSyntax.self) else {
+    guard context.lexicalContext[0].as(ClassDeclSyntax.self) != nil else {
       return []
     }
 
@@ -406,11 +406,11 @@ extension ObservationTrackedMacro: PeerMacro {
   ) throws -> [DeclSyntax] {
     guard let property = declaration.as(VariableDeclSyntax.self),
           property.isValidForObservation,
-          let identifier = property.identifier?.trimmed else {
+          property.identifier?.trimmed != nil else {
       return []
     }
     
-    guard let container = context.lexicalContext[0].as(ClassDeclSyntax.self) else {
+    guard context.lexicalContext[0].as(ClassDeclSyntax.self) != nil else {
       return []
     }
     

@@ -51,6 +51,8 @@ static_assert((SwiftJobPriority)swift::JobPriority::Background
 static_assert((SwiftJobPriority)swift::JobPriority::Unspecified
               == SwiftUnspecifiedJobPriority);
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Winvalid-offsetof"
 // Job (has additional fields not exposed via SwiftJob)
 static_assert(sizeof(swift::Job) >= sizeof(SwiftJob));
 static_assert(offsetof(swift::Job, metadata) == offsetof(SwiftJob, metadata));
@@ -63,6 +65,7 @@ static_assert(offsetof(swift::Job, SchedulerPrivate) == offsetof(SwiftJob, sched
 static_assert(offsetof(swift::Job, SchedulerPrivate[0]) == offsetof(SwiftJob, schedulerPrivate[0]));
 static_assert(offsetof(swift::Job, SchedulerPrivate[1]) == offsetof(SwiftJob, schedulerPrivate[1]));
 static_assert(offsetof(swift::Job, Flags) == offsetof(SwiftJob, flags));
+#pragma clang diagnostic pop
 
 // SerialExecutorRef
 static_assert(sizeof(swift::SerialExecutorRef) == sizeof(SwiftExecutorRef));
