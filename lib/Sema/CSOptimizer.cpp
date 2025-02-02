@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2023 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2025 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -125,11 +125,20 @@ static bool isSupportedDisjunction(Constraint *disjunction) {
   // Non-operator disjunctions are supported only if they don't
   // have any generic choices.
   return llvm::all_of(choices, [&](Constraint *choice) {
+    if (choice->isDisabled())
+      return true;
+
     if (choice->getKind() != ConstraintKind::BindOverload)
       return false;
 
-    if (auto *decl = getOverloadChoiceDecl(choice))
+    if (auto *decl = getOverloadChoiceDecl(choice)) {
+      // Cannot optimize declarations that return IUO because
+      // they form a disjunction over a result type once attempted.
+      if (decl->isImplicitlyUnwrappedOptional())
+        return false;
+
       return decl->getInterfaceType()->is<FunctionType>();
+    }
 
     return false;
   });
@@ -143,8 +152,8 @@ NullablePtr<Constraint> getApplicableFnConstraint(ConstraintGraph &CG,
   if (!boundVar)
     return nullptr;
 
-  auto constraints = CG.gatherConstraints(
-      boundVar, ConstraintGraph::GatheringKind::EquivalenceClass,
+  auto constraints = CG.gatherNearbyConstraints(
+      boundVar,
       [](Constraint *constraint) {
         return constraint->getKind() == ConstraintKind::ApplicableFunction;
       });
@@ -174,6 +183,18 @@ void forEachDisjunctionChoice(
     auto *decl = choice.getDeclOrNull();
     if (!decl)
       continue;
+
+    // Ignore declarations that come from implicitly imported modules
+    // when `MemberImportVisibility` feature is enabled otherwise
+    // we might end up favoring an overload that would be diagnosed
+    // as unavailable later.
+    if (cs.getASTContext().LangOpts.hasFeature(
+            Feature::MemberImportVisibility)) {
+      if (auto *useDC = constraint->getOverloadUseDC()) {
+        if (!useDC->isDeclImported(decl))
+          continue;
+      }
+    }
 
     // If disjunction choice is unavailable or disfavored we cannot
     // do anything with it.
@@ -296,7 +317,13 @@ static void determineBestChoicesInContext(
     if (applicableFn.isNull()) {
       auto *locator = disjunction->getLocator();
       if (auto expr = getAsExpr(locator->getAnchor())) {
-        if (auto *parentExpr = cs.getParentExpr(expr)) {
+        auto *parentExpr = cs.getParentExpr(expr);
+        // Look through optional evaluation, so
+        // we can cover expressions like `a?.b + 2`.
+        if (isExpr<OptionalEvaluationExpr>(parentExpr))
+          parentExpr = cs.getParentExpr(parentExpr);
+
+        if (parentExpr) {
           // If this is a chained member reference or a direct operator
           // argument it could be prioritized since it helps to establish
           // context for other calls i.e. `(a.)b + 2` if `a` and/or `b`
@@ -370,9 +397,23 @@ static void determineBestChoicesInContext(
       FunctionType::relabelParams(argsWithLabels, argumentList);
     }
 
-    SmallVector<SmallVector<std::pair<Type, /*fromLiteral=*/bool>, 2>, 2>
-        candidateArgumentTypes;
-    candidateArgumentTypes.resize(argFuncType->getNumParams());
+    struct ArgumentCandidate {
+      Type type;
+      // The candidate type is derived from a literal expression.
+      bool fromLiteral : 1;
+      // The candidate type is derived from a call to an
+      // initializer i.e. `Double(...)`.
+      bool fromInitializerCall : 1;
+
+      ArgumentCandidate(Type type, bool fromLiteral = false,
+                        bool fromInitializerCall = false)
+          : type(type), fromLiteral(fromLiteral),
+            fromInitializerCall(fromInitializerCall) {}
+    };
+
+    SmallVector<SmallVector<ArgumentCandidate, 2>, 2>
+        argumentCandidates;
+    argumentCandidates.resize(argFuncType->getNumParams());
 
     llvm::TinyPtrVector<Type> resultTypes;
 
@@ -380,12 +421,12 @@ static void determineBestChoicesInContext(
       const auto &param = argFuncType->getParams()[i];
       auto argType = cs.simplifyType(param.getPlainType());
 
-      SmallVector<std::pair<Type, bool>, 2> types;
+      SmallVector<ArgumentCandidate, 2> types;
       if (auto *typeVar = argType->getAs<TypeVariableType>()) {
-        auto bindingSet = cs.getBindingsFor(typeVar, /*finalize=*/true);
+        auto bindingSet = cs.getBindingsFor(typeVar);
 
         for (const auto &binding : bindingSet.Bindings) {
-          types.push_back({binding.BindingType, /*fromLiteral=*/false});
+          types.push_back({binding.BindingType});
         }
 
         for (const auto &literal : bindingSet.Literals) {
@@ -408,7 +449,8 @@ static void determineBestChoicesInContext(
             if (auto *typeExpr = dyn_cast<TypeExpr>(call->getFn())) {
               auto instanceTy = cs.getType(typeExpr)->getMetatypeInstanceType();
               if (instanceTy->isDouble() || instanceTy->isCGFloat())
-                types.push_back({instanceTy, /*fromLiteral=*/false});
+                types.push_back({instanceTy, /*fromLiteral=*/false,
+                                 /*fromInitializerCall=*/true});
             }
           }
         }
@@ -416,12 +458,12 @@ static void determineBestChoicesInContext(
         types.push_back({argType, /*fromLiteral=*/false});
       }
 
-      candidateArgumentTypes[i].append(types);
+      argumentCandidates[i].append(types);
     }
 
     auto resultType = cs.simplifyType(argFuncType->getResult());
     if (auto *typeVar = resultType->getAs<TypeVariableType>()) {
-      auto bindingSet = cs.getBindingsFor(typeVar, /*finalize=*/true);
+      auto bindingSet = cs.getBindingsFor(typeVar);
 
       for (const auto &binding : bindingSet.Bindings) {
         resultTypes.push_back(binding.BindingType);
@@ -437,9 +479,9 @@ static void determineBestChoicesInContext(
         argFuncType->getNumParams() > 0 &&
         llvm::none_of(
             indices(argFuncType->getParams()), [&](const unsigned argIdx) {
-              auto &candidates = candidateArgumentTypes[argIdx];
+              auto &candidates = argumentCandidates[argIdx];
               return llvm::any_of(candidates, [&](const auto &candidate) {
-                return !candidate.second;
+                return !candidate.fromLiteral;
               });
             });
 
@@ -527,10 +569,11 @@ static void determineBestChoicesInContext(
     // type matches a parameter type (i.e. when partially resolved generic
     // types are matched) this function is going to produce \c std::nullopt
     // instead of `0` that indicates "not a match".
-    std::function<std::optional<double>(GenericSignature, Type, Type,
-                                        MatchOptions)>
+    std::function<std::optional<double>(GenericSignature, ValueDecl *, Type,
+                                        Type, MatchOptions)>
         scoreCandidateMatch =
-            [&](GenericSignature genericSig, Type candidateType, Type paramType,
+            [&](GenericSignature genericSig, ValueDecl *choice,
+                Type candidateType, Type paramType,
                 MatchOptions options) -> std::optional<double> {
       auto areEqual = [&](Type a, Type b) {
         return a->getDesugaredType()->isEqual(b->getDesugaredType());
@@ -618,13 +661,12 @@ static void determineBestChoicesInContext(
 
         if (!candidateOptionals.empty() || !paramOptionals.empty()) {
           if (paramOptionals.size() >= candidateOptionals.size()) {
-            auto score = scoreCandidateMatch(genericSig, candidateType,
+            auto score = scoreCandidateMatch(genericSig, choice, candidateType,
                                              paramType, options);
             // Injection lowers the score slightly to comply with
             // old behavior where exact matches on operator parameter
             // types were always preferred.
-            return score == 1 && isOperatorDisjunction(disjunction) ? 0.9
-                                                                    : score;
+            return score == 1 && choice->isOperator() ? 0.9 : score;
           }
 
           // Optionality mismatch.
@@ -746,7 +788,7 @@ static void determineBestChoicesInContext(
         // everything else the solver should try both concrete and
         // generic and disambiguate during ranking.
         if (result == CheckRequirementsResult::Success)
-          return isOperatorDisjunction(disjunction) ? 0.9 : 1.0;
+          return choice->isOperator() ? 0.9 : 1.0;
 
         return 0;
       }
@@ -846,7 +888,7 @@ static void determineBestChoicesInContext(
             auto argIdx = argIndices.front();
 
             // Looks like there is nothing know about the argument.
-            if (candidateArgumentTypes[argIdx].empty())
+            if (argumentCandidates[argIdx].empty())
               continue;
 
             const auto paramFlags = param.getParameterFlags();
@@ -873,32 +915,25 @@ static void determineBestChoicesInContext(
             // at this parameter position and remove the overload choice
             // from consideration.
             double bestCandidateScore = 0;
-            llvm::BitVector mismatches(candidateArgumentTypes[argIdx].size());
+            llvm::BitVector mismatches(argumentCandidates[argIdx].size());
 
             for (unsigned candidateIdx :
-                 indices(candidateArgumentTypes[argIdx])) {
+                 indices(argumentCandidates[argIdx])) {
               // If one of the candidates matched exactly there is no reason
               // to continue checking.
               if (bestCandidateScore == 1)
                 break;
 
-              Type candidateType;
-              bool isLiteralDefault;
-
-              std::tie(candidateType, isLiteralDefault) =
-                  candidateArgumentTypes[argIdx][candidateIdx];
+              auto candidate = argumentCandidates[argIdx][candidateIdx];
 
               // `inout` parameter accepts only l-value argument.
-              if (paramFlags.isInOut() && !candidateType->is<LValueType>()) {
+              if (paramFlags.isInOut() && !candidate.type->is<LValueType>()) {
                 mismatches.set(candidateIdx);
                 continue;
               }
 
-              // The specifier only matters for `inout` check.
-              candidateType = candidateType->getWithoutSpecifierType();
-
               MatchOptions options(MatchFlag::OnParam);
-              if (isLiteralDefault)
+              if (candidate.fromLiteral)
                 options |= MatchFlag::Literal;
               if (favorExactMatchesOnly)
                 options |= MatchFlag::ExactOnly;
@@ -913,8 +948,16 @@ static void determineBestChoicesInContext(
               if (n == 1 && decl->isOperator())
                 options |= MatchFlag::DisableCGFloatDoubleConversion;
 
+              // Disable implicit CGFloat -> Double widening conversion if
+              // argument is an explicit call to `CGFloat` initializer.
+              if (candidate.type->isCGFloat() &&
+                  candidate.fromInitializerCall)
+                options |= MatchFlag::DisableCGFloatDoubleConversion;
+
+              // The specifier for a candidate only matters for `inout` check.
               auto candidateScore = scoreCandidateMatch(
-                  genericSig, candidateType, paramType, options);
+                  genericSig, decl, candidate.type->getWithoutSpecifierType(),
+                  paramType, options);
 
               if (!candidateScore)
                 continue;
@@ -928,7 +971,7 @@ static void determineBestChoicesInContext(
               // Only established arguments could be considered mismatches,
               // literal default types should be regarded as holes if they
               // didn't match.
-              if (!isLiteralDefault && !candidateType->hasTypeVariable())
+              if (!candidate.fromLiteral && !candidate.type->hasTypeVariable())
                 mismatches.set(candidateIdx);
             }
 
@@ -958,7 +1001,7 @@ static void determineBestChoicesInContext(
           // Preferring outer disjunction first works better in situations
           // when contextual type for the whole chain becomes available at
           // some point during solving at it would allow for faster pruning.
-          if (score > 0 && onlyLiteralCandidates)
+          if (score > 0 && onlyLiteralCandidates && decl->isOperator())
             score = 0.1;
 
           // If one of the result types matches exactly, that's a good
@@ -984,7 +1027,7 @@ static void determineBestChoicesInContext(
                           ->isCGFloat())
                     return false;
 
-                  return scoreCandidateMatch(genericSig,
+                  return scoreCandidateMatch(genericSig, decl,
                                              overloadType->getResult(),
                                              candidateResultTy,
                                              /*options=*/{}) > 0;
@@ -1129,8 +1172,8 @@ selectBestBindingDisjunction(ConstraintSystem &cs,
     if (!firstBindDisjunction)
       firstBindDisjunction = disjunction;
 
-    auto constraints = cs.getConstraintGraph().gatherConstraints(
-        typeVar, ConstraintGraph::GatheringKind::EquivalenceClass,
+    auto constraints = cs.getConstraintGraph().gatherNearbyConstraints(
+        typeVar,
         [](Constraint *constraint) {
           return constraint->getKind() == ConstraintKind::Conversion;
         });

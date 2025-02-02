@@ -47,15 +47,15 @@ ERROR(error_no_group_info,none,
 NOTE(brace_stmt_suggest_do,none,
      "did you mean to use a 'do' statement?", ())
 
-// `error_in_future_swift_version` does not have a group because warnings of this kind
-// inherit the group from the wrapped error.
-WARNING(error_in_future_swift_version,none,
+// This does not have a group because warnings of this kind inherit the group
+// from the wrapped error.
+WARNING(error_in_swift_lang_mode,none,
         "%0; this is an error in the Swift %1 language mode",
         (DiagnosticInfo *, unsigned))
 
-// `error_in_a_future_swift_version` does not have a group because warnings of this kind
-// inherit the group from the wrapped error.
-WARNING(error_in_a_future_swift_version,none,
+// This does not have a group because warnings of this kind inherit the group
+// from the wrapped error.
+WARNING(error_in_a_future_swift_lang_mode,none,
         "%0; this will be an error in a future Swift language mode",
         (DiagnosticInfo *))
 

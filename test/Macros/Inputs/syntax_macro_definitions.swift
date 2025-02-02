@@ -161,12 +161,7 @@ public enum AddBlocker: ExpressionMacro {
                   changes: [
                     FixIt.Change.replace(
                       oldNode: Syntax(binOp.operator),
-                      newNode: Syntax(
-                        TokenSyntax(
-                          .binaryOperator("-"),
-                          presence: .present
-                        )
-                      )
+                      newNode: Syntax(binOp.operator.detached.with(\.tokenKind, .binaryOperator("-"))),
                     )
                   ]
                 ),

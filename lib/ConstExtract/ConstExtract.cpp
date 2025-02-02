@@ -198,8 +198,7 @@ static std::optional<std::string> extractRawLiteral(Expr *expr) {
     switch (expr->getKind()) {
     case ExprKind::BooleanLiteral:
     case ExprKind::FloatLiteral:
-    case ExprKind::IntegerLiteral:
-    case ExprKind::NilLiteral: {
+    case ExprKind::IntegerLiteral: {
       std::string literalOutput;
       llvm::raw_string_ostream OutputStream(literalOutput);
       expr->printConstExprValue(&OutputStream, nullptr);
@@ -230,7 +229,6 @@ static std::shared_ptr<CompileTimeValue> extractCompileTimeValue(Expr *expr) {
     case ExprKind::BooleanLiteral:
     case ExprKind::FloatLiteral:
     case ExprKind::IntegerLiteral:
-    case ExprKind::NilLiteral:
     case ExprKind::StringLiteral: {
       auto rawLiteral = extractRawLiteral(expr);
       if (rawLiteral.has_value()) {
@@ -238,6 +236,10 @@ static std::shared_ptr<CompileTimeValue> extractCompileTimeValue(Expr *expr) {
       }
 
       break;
+    }
+
+    case ExprKind::NilLiteral: {
+      return std::make_shared<NilLiteralValue>();
     }
 
     case ExprKind::Array: {
@@ -712,6 +714,11 @@ void writeValue(llvm::json::OStream &JSON,
   case CompileTimeValue::ValueKind::RawLiteral: {
     JSON.attribute("valueKind", "RawLiteral");
     JSON.attribute("value", cast<RawLiteralValue>(value)->getValue());
+    break;
+  }
+
+  case CompileTimeValue::ValueKind::NilLiteral: {
+    JSON.attribute("valueKind", "NilLiteral");
     break;
   }
 

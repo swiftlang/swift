@@ -159,10 +159,9 @@ entry(%0 : @owned $C, %1 : @owned $D, %2 : @guaranteed $D, %3 : $*D, %4 : $*D):
   %inguaranteed_arg_mark = mark_dependence [nonescaping] %guaranteed_arg_mark : $C on %3 : $*D
   specify_test "lifetime_dependence_scope %inguaranteed_arg_mark"
 // CHECK-LABEL: dependence_scope: lifetime_dependence_scope with: %inguaranteed_arg_mark
-// CHECK-NEXT: Initialized: %3 = argument of bb0 : $*D
+// CHECK-NEXT: Caller: %3 = argument of bb0 : $*D
 // CHECK-NEXT: Dependent:   %{{.*}} = mark_dependence [nonescaping] %{{.*}} : $C on %3 : $*D
-// CHECK-NEXT: begin:      bb0
-// CHECK-NEXT: ends:     
+// CHECK-NEXT: Caller range
 // CHECK: dependence_scope: lifetime_dependence_scope with: %inguaranteed_arg_mark
   
   %inout_arg_mark = mark_dependence [nonescaping] %inguaranteed_arg_mark : $C on %4 : $*D

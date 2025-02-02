@@ -441,7 +441,7 @@ int main(int argc, char **argv) {
                         "is quoted or escaped.\n";
         continue;
       }
-      if (!DemangleType && (name.starts_with("S") || name.starts_with("s"))) {
+      if (!DemangleType && (name.starts_with("S") || name.starts_with("s") || name.starts_with("e"))) {
         std::string correctedName = std::string("$") + name.str();
         demangle(llvm::outs(), correctedName, DCtx, options);
       } else {

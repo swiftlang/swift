@@ -742,7 +742,7 @@ func checkLocalFunctions() async {
 
   // Escaping closures can make the local function execute concurrently.
   acceptConcurrentClosure {
-    local2() // expected-warning{{capture of 'local2()' with non-sendable type '() -> ()' in a `@Sendable` closure}}
+    local2() // expected-warning{{capture of 'local2()' with non-sendable type '() -> ()' in a '@Sendable' closure}}
     // expected-note@-1{{a function type must be marked '@Sendable' to conform to 'Sendable'}}
   }
 
@@ -752,7 +752,7 @@ func checkLocalFunctions() async {
   var k = 17
   func local4() {
     acceptConcurrentClosure {
-      local3() // expected-warning{{capture of 'local3()' with non-sendable type '() -> ()' in a `@Sendable` closure}}
+      local3() // expected-warning{{capture of 'local3()' with non-sendable type '() -> ()' in a '@Sendable' closure}}
       // expected-note@-1{{a function type must be marked '@Sendable' to conform to 'Sendable'}}
     }
   }
@@ -1510,7 +1510,7 @@ protocol SGA_Proto {
 // try to override a MA method with inferred isolation from a protocol requirement
 class SGA_MA: MA, SGA_Proto {
   // expected-error@+2 {{call to global actor 'SomeGlobalActor'-isolated global function 'onions_sga()' in a synchronous main actor-isolated context}}
-  // expected-warning@+1 {{main actor-isolated instance method 'method()' cannot be used to satisfy global actor 'SomeGlobalActor'-isolated protocol requirement}}
+  // expected-warning@+1 {{main actor-isolated instance method 'method()' cannot be used to satisfy global actor 'SomeGlobalActor'-isolated requirement from protocol 'SGA_Proto'}}
   override func method() { onions_sga() }
   // expected-note@-1{{add 'nonisolated' to 'method()' to make this instance method not isolated to the actor}}{{3-3=nonisolated }}
 }
@@ -1614,13 +1614,13 @@ class OverridesNonsiolatedInit: SuperWithNonisolatedInit {
 class NonSendable {}
 
 protocol NonisolatedProtocol {
-  var ns: NonSendable { get } // expected-note {{'ns' declared here}}
+  var ns: NonSendable { get } // expected-note {{requirement 'ns' declared here}}
 }
 
 actor ActorWithNonSendableLet: NonisolatedProtocol {
   // expected-note@-1{{add '@preconcurrency' to the 'NonisolatedProtocol' conformance to defer isolation checking to run time}}{{32-32=@preconcurrency }}
 
-  // expected-warning@+1 {{actor-isolated property 'ns' cannot be used to satisfy nonisolated protocol requirement; this is an error in the Swift 6 language mode}}
+  // expected-warning@+1 {{actor-isolated property 'ns' cannot be used to satisfy nonisolated requirement from protocol 'NonisolatedProtocol'; this is an error in the Swift 6 language mode}}
   let ns = NonSendable()
 }
 

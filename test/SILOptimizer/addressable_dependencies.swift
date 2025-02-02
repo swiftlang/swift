@@ -7,6 +7,14 @@
 
 import Builtin
 
+// Copied from the stdlib until we have Builtin.overrideLifetime.
+@_unsafeNonescapableResult
+@lifetime(borrow source)
+internal func _overrideLifetime<T: ~Copyable & ~Escapable, U: ~Copyable & ~Escapable>(
+  _ dependent: consuming T, borrowing source: borrowing U) -> T {
+  dependent
+}
+
 struct NodeRef: ~Escapable {
     private var parent: UnsafePointer<Node>
 
@@ -69,12 +77,14 @@ struct Schmector {
         // CHECK-SAME:    (@in_guaranteed Schmector) ->
         @lifetime(borrow self)
         borrowing get {
-            return Spam(base: UnsafePointer(Builtin.addressOfBorrow(self)), count: 10)
+            let pointer = UnsafePointer<Int>(Builtin.addressOfBorrow(self))
+            let spam = Spam(base: pointer, count: 10)
+            return _overrideLifetime(spam, borrowing: self)
         }
     }
 }
 
 struct Spam: ~Escapable {
-    @_unsafeNonescapableResult
+    @lifetime(borrow base)
     init(base: UnsafePointer<Int>, count: Int) {}
 }

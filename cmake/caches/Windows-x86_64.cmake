@@ -27,62 +27,6 @@ set(LLVM_APPEND_VC_REV NO CACHE BOOL "")
 set(LLVM_ENABLE_PER_TARGET_RUNTIME_DIR YES CACHE BOOL "")
 set(LLVM_ENABLE_PYTHON YES CACHE BOOL "")
 
-set(DEFAULT_BUILTIN_TARGETS
-      x86_64-unknown-windows-msvc
-      aarch64-unknown-windows-msvc)
-# Build the android builtins if NDK path is provided.
-if(NOT "$ENV{NDKPATH}" STREQUAL "")
-  list(APPEND DEFAULT_BUILTIN_TARGETS
-       aarch64-unknown-linux-android
-       x86_64-unknown-linux-android)
-endif()
-
-# The builtin targets are used to build the compiler-rt builtins.
-set(LLVM_BUILTIN_TARGETS ${DEFAULT_BUILTIN_TARGETS} CACHE STRING "")
-
-# The runtime targets are used to build the compiler-rt profile library.
-set(LLVM_RUNTIME_TARGETS
-      x86_64-unknown-windows-msvc
-      aarch64-unknown-windows-msvc
-    CACHE STRING "")
-
-foreach(target ${LLVM_RUNTIME_TARGETS})
-  set(RUNTIMES_${target}_LLVM_ENABLE_RUNTIMES
-        compiler-rt
-      CACHE STRING "")
-  set(RUNTIMES_${target}_CMAKE_MT mt CACHE STRING "")
-  set(RUNTIMES_${target}_CMAKE_SYSTEM_NAME Windows CACHE STRING "")
-  set(RUNTIMES_${target}_CMAKE_BUILD_TYPE Release CACHE STRING "")
-  set(RUNTIMES_${target}_COMPILER_RT_BUILD_BUILTINS NO CACHE BOOL "")
-  set(RUNTIMES_${target}_COMPILER_RT_BUILD_CRT NO CACHE BOOL "")
-  set(RUNTIMES_${target}_COMPILER_RT_BUILD_LIBFUZZER NO CACHE BOOL "")
-  set(RUNTIMES_${target}_COMPILER_RT_BUILD_ORC NO CACHE BOOL "")
-  set(RUNTIMES_${target}_COMPILER_RT_BUILD_PROFILE YES CACHE BOOL "")
-  set(RUNTIMES_${target}_COMPILER_RT_BUILD_SANITIZERS NO CACHE BOOL "")
-  set(RUNTIMES_${target}_COMPILER_RT_BUILD_XRAY NO CACHE BOOL "")
-endforeach()
-
-foreach(target ${LLVM_BUILTIN_TARGETS})
-  set(BUILTINS_${target}_CMAKE_MT mt CACHE STRING "")
-  if(${target} MATCHES windows-msvc)
-    set(BUILTINS_${target}_CMAKE_SYSTEM_NAME Windows CACHE STRING "")
-  elseif(${target} MATCHES linux-android)
-    # Use a single 'linux' directory and arch-based lib names on Android.
-    set(BUILTINS_${target}_LLVM_ENABLE_PER_TARGET_RUNTIME_DIR NO CACHE BOOL "")
-    set(BUILTINS_${target}_CMAKE_SYSTEM_NAME Android CACHE STRING "")
-    if(${target} MATCHES aarch64)
-      set(BUILTINS_${target}_CMAKE_ANDROID_ARCH_ABI arm64-v8a CACHE STRING "")
-    else()
-      set(BUILTINS_${target}_CMAKE_ANDROID_ARCH_ABI x86_64 CACHE STRING "")
-    endif()
-    set(BUILTINS_${target}_CMAKE_ANDROID_NDK $ENV{NDKPATH} CACHE PATH "")
-    set(BUILTINS_${target}_CMAKE_ANDROID_API 21 CACHE STRING "")
-    set(BUILTINS_${target}_CMAKE_C_COMPILER_TARGET "${target}21" CACHE STRING "")
-    set(BUILTINS_${target}_CMAKE_CXX_COMPILER_TARGET "${target}21" CACHE STRING "")
-  endif()
-  set(BUILTINS_${target}_CMAKE_BUILD_TYPE Release CACHE STRING "")
-endforeach()
-
 set(LLVM_TARGETS_TO_BUILD AArch64 ARM WebAssembly X86 CACHE STRING "")
 
 # Disable certain targets to reduce the configure time or to avoid configuration
@@ -207,8 +151,6 @@ set(LLVM_DISTRIBUTION_COMPONENTS
       libclang
       libclang-headers
       LTO
-      builtins
-      runtimes
       ${LLVM_TOOLCHAIN_TOOLS}
       ${CLANG_TOOLS}
       ${LLD_TOOLS}

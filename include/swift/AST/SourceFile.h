@@ -25,9 +25,11 @@
 #include "llvm/ADT/STLExtras.h"
 
 namespace swift {
-
+class ASTScope;
+class AvailabilityScope;
 class PersistentParserState;
 struct SourceFileExtras;
+class Token;
 
 /// Kind of import affecting how a decl can be reexported.
 ///
@@ -685,6 +687,9 @@ public:
 
   SWIFT_DEBUG_DUMP;
   void dump(raw_ostream &os, bool parseIfNeeded = false) const;
+
+  /// Dumps this source file's AST in JSON format to the given output stream.
+  void dumpJSON(raw_ostream &os) const;
 
   /// Pretty-print the contents of this source file.
   ///

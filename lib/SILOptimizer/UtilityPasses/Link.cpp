@@ -49,10 +49,10 @@ public:
 
   void linkEmbeddedRuntimeFromStdlib() {
     using namespace RuntimeConstants;
-#define FUNCTION(ID, NAME, CC, AVAILABILITY, RETURNS, ARGS, ATTRS, EFFECT,     \
-                 MEMORY_EFFECTS)                                               \
+#define FUNCTION(ID, MODULE, NAME, CC, AVAILABILITY, RETURNS, ARGS, ATTRS,     \
+                 EFFECT, MEMORY_EFFECTS)                                       \
   linkEmbeddedRuntimeFunctionByName(#NAME, EFFECT);                            \
-  if (getModule()->getASTContext().hadError())                                  \
+  if (getModule()->getASTContext().hadError())                                 \
     return;
 
 #define RETURNS(...)

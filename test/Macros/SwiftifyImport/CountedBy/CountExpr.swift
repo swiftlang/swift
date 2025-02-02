@@ -2,7 +2,7 @@
 
 // RUN: %target-swift-frontend %s -swift-version 5 -module-name main -disable-availability-checking -typecheck -plugin-path %swift-plugin-dir -dump-macro-expansions 2>&1 | %FileCheck --match-full-lines %s
 
-@_SwiftifyImport(.countedBy(pointer: 1, count: "size * count"))
+@_SwiftifyImport(.countedBy(pointer: .param(1), count: "size * count"))
 func myFunc(_ ptr: UnsafePointer<CInt>, _ size: CInt, _ count: CInt) {
 }
 

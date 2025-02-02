@@ -36,6 +36,11 @@ def index_unit_output_path_filelist : Separate<["-"], "index-unit-output-path-fi
 def emit_module_doc_path
   : Separate<["-"], "emit-module-doc-path">, MetaVarName<"<path>">,
     HelpText<"Output module documentation file <path>">;
+def emit_variant_module_doc_path
+  : Separate<["-"], "emit-variant-module-doc-path">, MetaVarName<"<path>">,
+    Flags<[NewDriverOnlyOption]>,
+    HelpText<"Output module documentation file for the target variant to <path>">;
+
 def emit_dependencies_path
   : Separate<["-"], "emit-dependencies-path">, MetaVarName<"<path>">,
     HelpText<"Output basic Make-compatible dependencies file to <path>">;
@@ -49,6 +54,11 @@ def emit_fixits_path
 def emit_abi_descriptor_path
   : Separate<["-"], "emit-abi-descriptor-path">, MetaVarName<"<path>">,
     HelpText<"Output the ABI descriptor of current module to <path>">;
+def emit_variant_abi_descriptor_path
+  : Separate<["-"], "emit-variant-abi-descriptor-path">, MetaVarName<"<path>">,
+    Flags<[NewDriverOnlyOption]>,
+    HelpText<"Output the ABI descriptor of current target variant module to <path>">;
+
 def emit_module_semantic_info_path
   : Separate<["-"], "emit-module-semantic-info-path">, MetaVarName<"<path>">,
     HelpText<"Output semantic info of current module to <path>">;
@@ -249,10 +259,6 @@ def placeholder_dependency_module_map
   : Separate<["-"], "placeholder-dependency-module-map-file">, MetaVarName<"<path>">,
     HelpText<"Specify a JSON file containing information of external Swift module dependencies">;
 
-def batch_scan_input_file
-  : Separate<["-"], "batch-scan-input-file">, MetaVarName<"<path>">,
-    HelpText<"Specify a JSON file containing modules to perform batch dependencies scanning">;
-
 def import_prescan : Flag<["-"], "import-prescan">,
    HelpText<"When performing a dependency scan, only identify all imports of the main Swift module sources">;
 
@@ -280,9 +286,6 @@ def copy_propagation_state_EQ :
   Joined<["-"], "enable-copy-propagation=">,
   HelpText<"Whether to enable copy propagation">,
   MetaVarName<"true|requested-passes-only|false">;
-
-def enable_infer_public_concurrent_value : Flag<["-"], "enable-infer-public-sendable">,
-    HelpText<"Enable inference of Sendable conformances for public structs and enums">;
 
 def disable_infer_public_concurrent_value : Flag<["-"], "disable-infer-public-sendable">,
     HelpText<"Disable inference of Sendable conformances for public structs and enums">;
@@ -516,14 +519,6 @@ def disable_implicit_concurrency_module_import : Flag<["-"],
 def disable_implicit_string_processing_module_import : Flag<["-"],
   "disable-implicit-string-processing-module-import">,
   HelpText<"Disable the implicit import of the _StringProcessing module.">;
-
-def enable_implicit_backtracing_module_import : Flag<["-"],
-  "enable-implicit-backtracing-module-import">,
-  HelpText<"Enable the implicit import of the _Backtracing module.">;
-
-def disable_implicit_backtracing_module_import : Flag<["-"],
-  "disable-implicit-backtracing-module-import">,
-  HelpText<"Disable the implicit import of the _Backtracing module.">;
 
 def disable_implicit_cxx_module_import : Flag<["-"],
   "disable-implicit-cxx-module-import">,
@@ -825,15 +820,17 @@ def downgrade_typecheck_interface_error : Flag<["-"], "downgrade-typecheck-inter
 def enable_volatile_modules : Flag<["-"], "enable-volatile-modules">,
   HelpText<"Load Swift modules in memory">;
 
-def solver_expression_time_threshold_EQ : Joined<["-"], "solver-expression-time-threshold=">;
+def solver_expression_time_threshold_EQ : Joined<["-"], "solver-expression-time-threshold=">,
+  HelpText<"Expression type checking timeout, in seconds">;
 
-def solver_scope_threshold_EQ : Joined<["-"], "solver-scope-threshold=">;
+def solver_scope_threshold_EQ : Joined<["-"], "solver-scope-threshold=">,
+  HelpText<"Expression type checking scope limit">;
 
-def solver_trail_threshold_EQ : Joined<["-"], "solver-trail-threshold=">;
+def solver_trail_threshold_EQ : Joined<["-"], "solver-trail-threshold=">,
+  HelpText<"Expression type checking trail change limit">;
 
-def solver_disable_shrink :
-  Flag<["-"], "solver-disable-shrink">,
-  HelpText<"Disable the shrink phase of expression type checking">;
+def solver_disable_splitter : Flag<["-"], "solver-disable-splitter">,
+  HelpText<"Disable the component splitter phase of expression type checking">;
 
 def disable_constraint_solver_performance_hacks : Flag<["-"], "disable-constraint-solver-performance-hacks">,
   HelpText<"Disable all the hacks in the constraint solver">;

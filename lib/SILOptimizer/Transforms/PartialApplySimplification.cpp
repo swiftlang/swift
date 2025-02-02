@@ -781,7 +781,7 @@ rewriteKnownCalleeWithExplicitContext(SILFunction *callee,
       }
       auto param = partiallyAppliedParams[i];
 
-      switch (auto conv = param.getConvention()) {
+      switch (param.getConvention()) {
       case ParameterConvention::Direct_Owned:
       case ParameterConvention::Direct_Unowned:
       case ParameterConvention::Direct_Guaranteed:

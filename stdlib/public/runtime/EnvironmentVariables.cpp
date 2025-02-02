@@ -21,6 +21,10 @@
 #include <string.h>
 #include <inttypes.h>
 
+#if defined(__ANDROID__)
+#include <sys/system_properties.h>
+#endif
+
 using namespace swift;
 
 namespace {
@@ -187,9 +191,31 @@ extern "C" char **_environ;
 #endif
 #endif
 
+#if defined(__ANDROID__)
+// On Android, also try loading runtime debug env variables from system props.
+static void platformInitialize(void *context) {
+  (void)context;
+  char buffer[PROP_VALUE_MAX] = "";
+// Only system properties prefixed with "debug." can be set without root access.
+#define SYSPROP_PREFIX "debug.org.swift.runtime."
+#define VARIABLE(name, type, defaultValue, help)                \
+  if (__system_property_get(SYSPROP_PREFIX #name, buffer)) {    \
+    swift::runtime::environment::name##_isSet_variable = true;  \
+    swift::runtime::environment::name##_variable =              \
+        parse_##type(#name, buffer, defaultValue);              \
+  }
+#include "EnvironmentVariables.def"
+#undef VARIABLE
+}
+#else
+static void platformInitialize(void *context) {
+  (void)context;
+}
+#endif
+
 #if !SWIFT_STDLIB_HAS_ENVIRON
 void swift::runtime::environment::initialize(void *context) {
-  (void)context;
+  platformInitialize(context);
 }
 #elif defined(ENVIRON)
 void swift::runtime::environment::initialize(void *context) {
@@ -242,6 +268,8 @@ void swift::runtime::environment::initialize(void *context) {
     }
   }
 
+  platformInitialize(context);
+
   if (SWIFT_DEBUG_HELP_variable)
     printHelp(nullptr);
 }
@@ -257,6 +285,8 @@ void swift::runtime::environment::initialize(void *context) {
     name##_variable = parse_##type(#name, name##_string, defaultValue);        \
   } while (0);
 #include "EnvironmentVariables.def"
+
+  platformInitialize(context);
 
   // Print help if requested.
   if (parse_bool("SWIFT_DEBUG_HELP", getenv("SWIFT_DEBUG_HELP"), false))

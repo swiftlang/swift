@@ -215,6 +215,11 @@ extension AccessBase {
         return nil
       }
       baseAddr = arg
+    case let .storeBorrow(sbi):
+      guard case let .stack(allocStack) = sbi.destinationOperand.value.accessBase else {
+        return nil
+      }
+      return (initialAddress: allocStack, initializingStore: sbi)
     default:
       return nil
     }

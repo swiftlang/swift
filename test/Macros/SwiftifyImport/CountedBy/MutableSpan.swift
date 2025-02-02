@@ -4,7 +4,7 @@
 // RUN: not %target-swift-frontend %s -swift-version 5 -module-name main -disable-availability-checking -typecheck -plugin-path %swift-plugin-dir -dump-macro-expansions -enable-experimental-feature Span > %t.log 2>&1
 // RUN: %FileCheck --match-full-lines %s < %t.log
 
-@_SwiftifyImport(.countedBy(pointer: 1, count: "len"), .nonescaping(pointer: 1))
+@_SwiftifyImport(.countedBy(pointer: .param(1), count: "len"), .nonescaping(pointer: .param(1)))
 func myFunc(_ ptr: UnsafeMutablePointer<CInt>, _ len: CInt) {
 }
 

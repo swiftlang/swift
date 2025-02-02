@@ -1,6 +1,7 @@
 // RUN: %target-sil-opt -test-runner %s \
 // RUN:     -diagnostics -sil-verify-all \
 // RUN:     -enable-experimental-feature LifetimeDependence \
+// RUN:     -enable-experimental-feature Span \
 // RUN:     2>&1 | %FileCheck %s
 
 // Test SIL expected from SILGen output. Run all diagnostic passes which includes lifetime dependence handling:
@@ -12,6 +13,7 @@
 
 // REQUIRES: swift_in_compiler
 // REQUIRES: swift_feature_LifetimeDependence
+// REQUIRES: swift_feature_Span
 
 sil_stage raw
 
@@ -23,9 +25,15 @@ struct Owner {}
 struct NE: ~Escapable {}
 struct OtherNE: ~Escapable {}
 
+public struct Container {
+  var pointer: UnsafeRawPointer
+  var object: AnyObject
+}
+
 sil @getNE : $@convention(c) (@in_guaranteed Owner) -> @lifetime(borrow 0) @autoreleased NE
 sil @copyNE : $@convention(c) (NE, @lifetime(copy 0) @inout NE) -> ()
 sil @makeOwner : $@convention(c) () -> Owner
+sil @_overrideLifetimeBorrowing : $@convention(thin) <τ_0_0, τ_0_1 where τ_0_0 : ~Copyable, τ_0_0 : ~Escapable, τ_0_1 : ~Copyable, τ_0_1 : ~Escapable> (@in τ_0_0, @in_guaranteed τ_0_1) -> @lifetime(borrow 1) @out τ_0_0
 
 // Modify a local via 'inout' assignment.
 // Do not insert a mark_dep.
@@ -128,4 +136,65 @@ bb0:
   extend_lifetime %2 : $Owner
   %93 = tuple ()
   return %93 : $()
+}
+
+// Init.init()
+sil @$sSi22_builtinIntegerLiteralSiBI_tcfC : $@convention(method) (Builtin.IntLiteral, @thin Int.Type) -> Int
+// RawSpan.init()
+sil @$ss7RawSpanV12_unsafeStart9byteCountABSV_SitcfC : $@convention(method) (UnsafeRawPointer, Int, @thin RawSpan.Type) -> @lifetime(borrow 0) @owned RawSpan
+
+// Test dependence on an in_guaranteed address and a store_borrow.
+//
+// A mark_dependence will be created for %23 apply, but OnonSimplify will later remove it.
+//
+// CHECK-LABEL: sil [available 9999] [ossa] @testInGuaranteedRawSpan : $@convention(method) (@in_guaranteed Container) -> @lifetime(borrow 0) @owned RawSpan {
+// CHECK: bb0(%0 : $*Container):
+// CHECK: [[GETSPAN:%.*]] = apply %{{.*}}({{.*}}) : $@convention(method) (UnsafeRawPointer, Int, @thin RawSpan.Type) -> @lifetime(borrow 0) @owned RawSpan
+// CHECK: mark_dependence [nonescaping] [[GETSPAN]] on %0
+// CHECK: [[OUT:%.*]] = alloc_stack $RawSpan
+// CHECK: [[IN:%.*]] = alloc_stack $RawSpan
+// CHECK: store %{{.*}} to [init] [[IN]]
+// CHECK: [[LB:%.*]] = load_borrow %0
+// CHECK: [[BORROWSELF:%.*]] = alloc_stack $Container
+// CHECK: [[SB:%.*]] = store_borrow [[LB]] to [[BORROWSELF]]
+// CHECK: apply %{{.*}}<RawSpan, Container>([[OUT]], [[IN]], [[SB]]) : $@convention(thin) <τ_0_0, τ_0_1 where τ_0_0 : ~Copyable, τ_0_0 : ~Escapable, τ_0_1 : ~Copyable, τ_0_1 : ~Escapable> (@in τ_0_0, @in_guaranteed τ_0_1) -> @lifetime(borrow 1) @out τ_0_0
+// CHECK: [[RET:%.*]] = load [take] [[OUT]]
+// CHECK: return [[RET]]
+// CHECK-LABEL: } // end sil function 'testInGuaranteedRawSpan'
+sil [available 9999] [ossa] @testInGuaranteedRawSpan : $@convention(method) (@in_guaranteed Container) -> @lifetime(borrow 0) @owned RawSpan {
+bb0(%0 : $*Container):
+  debug_value %0, let, name "self", argno 1, expr op_deref
+  %2 = metatype $@thin RawSpan.Type
+  %3 = load_borrow %0
+  %4 = struct_extract %3, #Container.pointer
+  %5 = integer_literal $Builtin.IntLiteral, 0
+  %6 = metatype $@thin Int.Type
+  %7 = function_ref @$sSi22_builtinIntegerLiteralSiBI_tcfC : $@convention(method) (Builtin.IntLiteral, @thin Int.Type) -> Int
+  %8 = apply %7(%5, %6) : $@convention(method) (Builtin.IntLiteral, @thin Int.Type) -> Int
+
+  %9 = function_ref @$ss7RawSpanV12_unsafeStart9byteCountABSV_SitcfC : $@convention(method) (UnsafeRawPointer, Int, @thin RawSpan.Type) -> @lifetime(borrow 0) @owned RawSpan
+  %10 = apply %9(%4, %8, %2) : $@convention(method) (UnsafeRawPointer, Int, @thin RawSpan.Type) -> @lifetime(borrow 0) @owned RawSpan
+  end_borrow %3
+  %12 = move_value [var_decl] %10
+  debug_value %12, let, name "span"
+  %14 = alloc_stack $RawSpan
+  %15 = begin_borrow %12
+  %16 = copy_value %15
+  %17 = alloc_stack $RawSpan
+  store %16 to [init] %17
+  %19 = load_borrow %0
+  %20 = alloc_stack $Container
+  %21 = store_borrow %19 to %20
+
+  %22 = function_ref @_overrideLifetimeBorrowing : $@convention(thin) <τ_0_0, τ_0_1 where τ_0_0 : ~Copyable, τ_0_0 : ~Escapable, τ_0_1 : ~Copyable, τ_0_1 : ~Escapable> (@in τ_0_0, @in_guaranteed τ_0_1) -> @lifetime(borrow 1) @out τ_0_0
+  %23 = apply %22<RawSpan, Container>(%14, %17, %21) : $@convention(thin) <τ_0_0, τ_0_1 where τ_0_0 : ~Copyable, τ_0_0 : ~Escapable, τ_0_1 : ~Copyable, τ_0_1 : ~Escapable> (@in τ_0_0, @in_guaranteed τ_0_1) -> @lifetime(borrow 1) @out τ_0_0
+  end_borrow %21
+  dealloc_stack %20
+  end_borrow %19
+  dealloc_stack %17
+  end_borrow %15
+  %29 = load [take] %14
+  dealloc_stack %14
+  destroy_value %12
+  return %29
 }

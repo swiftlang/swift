@@ -2133,12 +2133,36 @@ static ManagedValue emitBuiltinEmplace(SILGenFunction &SGF,
   SILValue bufferPtr = SGF.B.createAddressToPointer(loc, buffer,
         SILType::getPrimitiveObjectType(SGF.getASTContext().TheRawPointerType),
         /*needs stack protection*/ true);
-  SGF.B.createApply(loc, args[0].getValue(), {}, bufferPtr);
-  
+
+  auto fnType = args[0].getValue()->getType().castTo<SILFunctionType>();
+
+  if (fnType->hasErrorResult()) {
+    auto normalBB = SGF.createBasicBlock();
+    auto errorBB = SGF.createBasicBlock();
+
+    SGF.B.createTryApply(loc, args[0].getValue(), {},
+                         {SGF.IndirectErrorResult, bufferPtr}, normalBB, errorBB);
+
+    // Error branch
+    {
+      SGF.B.emitBlock(errorBB);
+
+      SGF.Cleanups.emitCleanupsForReturn(CleanupLocation(loc), IsForUnwind);
+
+      SGF.B.createThrowAddr(loc);
+    }
+
+    SGF.B.emitBlock(normalBB);
+
+    normalBB->createPhiArgument(SILType::getEmptyTupleType(Ctx),
+                                OwnershipKind::Owned);
+  } else {
+    SGF.B.createApply(loc, args[0].getValue(), {}, bufferPtr);
+  }
+
   dest->finishInitialization(SGF);
   
   if (didEmitInto) {
-    C.getEmitInto()->finishInitialization(SGF);
     return ManagedValue::forInContext();
   }
   

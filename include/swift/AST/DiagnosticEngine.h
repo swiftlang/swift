@@ -54,6 +54,7 @@ namespace swift {
 
   enum class CXXStdlibKind : uint8_t;
   enum class DescriptivePatternKind : uint8_t;
+  enum class DiagGroupID : uint16_t;
   enum class SelfAccessKind : uint8_t;
   enum class ReferenceOwnership : uint8_t;
   enum class StaticSpellingKind : uint8_t;

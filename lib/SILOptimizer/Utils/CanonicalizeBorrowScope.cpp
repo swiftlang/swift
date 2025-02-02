@@ -96,29 +96,29 @@ bool CanonicalizeBorrowScope::isRewritableOSSAForward(SILInstruction *inst) {
   if (inst->getNumOperands() != 1)
     return false;
 
-  if (isa<OwnershipForwardingSingleValueInstruction>(inst) ||
-      isa<OwnershipForwardingMultipleValueInstruction>(inst)) {
-    Operand *forwardedOper = &inst->getOperandRef(0);
-    // Trivial conversions do not need to be hoisted out of a borrow scope.
-    auto operOwnership = forwardedOper->getOperandOwnership();
-    if (operOwnership == OperandOwnership::TrivialUse)
-      return false;
-    // Don't mess with unowned conversions. They need to be copied immediately.
-    if (operOwnership != OperandOwnership::GuaranteedForwarding &&
-        operOwnership != OperandOwnership::ForwardingConsume) {
-      return false;
-    }
-    assert(operOwnership == OperandOwnership::GuaranteedForwarding ||
-           operOwnership == OperandOwnership::ForwardingConsume);
+  if (!isa<OwnershipForwardingSingleValueInstruction>(inst) &&
+      !isa<OwnershipForwardingMultipleValueInstruction>(inst))
+    return false;
 
-    // Filter instructions that belong to a Forwarding*ValueInst mixin but
-    // cannot be converted to forward owned value (struct_extract).
-    if (!canOpcodeForwardOwnedValues(forwardedOper))
-      return false;
-
-    return true;
+  Operand *forwardedOper = &inst->getOperandRef(0);
+  // Trivial conversions do not need to be hoisted out of a borrow scope.
+  auto operOwnership = forwardedOper->getOperandOwnership();
+  if (operOwnership == OperandOwnership::TrivialUse)
+    return false;
+  // Don't mess with unowned conversions. They need to be copied immediately.
+  if (operOwnership != OperandOwnership::GuaranteedForwarding &&
+      operOwnership != OperandOwnership::ForwardingConsume) {
+    return false;
   }
-  return false;
+  assert(operOwnership == OperandOwnership::GuaranteedForwarding ||
+         operOwnership == OperandOwnership::ForwardingConsume);
+
+  // Filter instructions that belong to a Forwarding*ValueInst mixin but
+  // cannot be converted to forward owned value (struct_extract).
+  if (!canOpcodeForwardOwnedValues(forwardedOper))
+    return false;
+
+  return true;
 }
 
 /// Return the root of a borrowed extended lifetime for \p def or invalid.
@@ -218,8 +218,6 @@ SILValue CanonicalizeBorrowScope::findDefInBorrowScope(SILValue value) {
 ///
 /// \p innerValue is either the initial begin_borrow, or a forwarding operation
 /// within the borrow scope.
-///
-/// Note: This must always return true when innerValue is a function argument.
 template <typename Visitor>
 bool CanonicalizeBorrowScope::visitBorrowScopeUses(SILValue innerValue,
                                                    Visitor &visitor) {
@@ -277,14 +275,12 @@ bool CanonicalizeBorrowScope::visitBorrowScopeUses(SILValue innerValue,
       case OperandOwnership::PointerEscape:
         // Pointer escapes are only allowed if they use the guaranteed value,
         // which means that the escaped value must be confined to the current
-        // borrow scope. visitBorrowScopeUses must never return false when
-        // borrowedValue is a SILFunctionArgument.
+        // borrow scope.
         if (use->get()->getOwnershipKind() != OwnershipKind::Guaranteed &&
             !isa<SILFunctionArgument>(borrowedValue.value)) {
           return false;
         }
         if (!visitor.visitUse(use)) {
-          assert(!isa<SILFunctionArgument>(borrowedValue.value));
           return false;
         }
         break;
@@ -293,7 +289,6 @@ bool CanonicalizeBorrowScope::visitBorrowScopeUses(SILValue innerValue,
       case OperandOwnership::ForwardingConsume:
         if (CanonicalizeBorrowScope::isRewritableOSSAForward(user)) {
           if (!visitor.visitForwardingUse(use)) {
-            assert(!isa<SILFunctionArgument>(borrowedValue.value));
             return false;
           }
           break;
@@ -306,7 +301,6 @@ bool CanonicalizeBorrowScope::visitBorrowScopeUses(SILValue innerValue,
       case OperandOwnership::BitwiseEscape:
       case OperandOwnership::DestroyingConsume:
         if (!visitor.visitUse(use)) {
-          assert(!isa<SILFunctionArgument>(borrowedValue.value));
           return false;
         }
         break;
@@ -394,7 +388,7 @@ protected:
 
 } // namespace
 
-/// Erase users from \p outerUseInsts that are not within the borrow scope.
+/// Erase users from \p outerUseInsts that are actually within the borrow scope.
 void CanonicalizeBorrowScope::filterOuterBorrowUseInsts(
     OuterUsers &outerUseInsts) {
   auto *beginBorrow = cast<BeginBorrowInst>(borrowedValue.value);
@@ -451,6 +445,10 @@ public:
     }
     SILValue def = scope.findDefInBorrowScope(value);
     if (use->isConsuming()) {
+      if (use->get()->getType().isMoveOnly()) {
+        // Can't produce a copy of a non-copyable value on demand.  Bail out.
+        return false;
+      }
       // All in-scope consuming uses need a unique copy in the same block.
       auto *copy = dyn_cast<CopyValueInst>(use->get());
       if (copy && copy->hasOneUse() && copy->getParent() == user->getParent()) {
@@ -480,7 +478,9 @@ public:
       if (!hasValueOwnership(result)) {
         continue;
       }
-      scope.visitBorrowScopeUses(result, *this);
+      if (!scope.visitBorrowScopeUses(result, *this)) {
+        return false;
+      }
     }
     // Update this operand bypassing any copies.
     SILValue value = use->get();
@@ -796,9 +796,7 @@ bool CanonicalizeBorrowScope::consolidateBorrowScope() {
   if (outerUseInsts.empty()) {
     RewriteInnerBorrowUses innerRewriter(*this);
     beginVisitBorrowScopeUses(); // reset the def/use worklist
-    bool succeed = visitBorrowScopeUses(borrowedValue.value, innerRewriter);
-    assert(succeed && "should be filtered by FindBorrowScopeUses");
-    return true;
+    return visitBorrowScopeUses(borrowedValue.value, innerRewriter);
   }
   LLVM_DEBUG(llvm::dbgs() << "  Outer uses:\n";
              for (SILInstruction *inst
@@ -826,10 +824,24 @@ bool CanonicalizeBorrowScope::canonicalizeFunctionArgument(
   RewriteInnerBorrowUses innerRewriter(*this);
   beginVisitBorrowScopeUses(); // reset the def/use worklist
 
-  bool succeed = visitBorrowScopeUses(borrowedValue.value, innerRewriter);
-  assert(succeed && "must always succeed for function arguments");
-  return true;
+  return visitBorrowScopeUses(borrowedValue.value, innerRewriter);
 }
+
+namespace swift::test {
+// Arguments:
+// - SILFunctionArgument: function argument to canonicalize
+// Dumps:
+// - function after argument canonicalization
+static FunctionTest CanonicalizeFunctionArgumentTest(
+    "canonicalize_function_argument",
+    [](auto &function, auto &arguments, auto &test) {
+      auto *argument = cast<SILFunctionArgument>(arguments.takeBlockArgument());
+      InstructionDeleter deleter;
+      CanonicalizeBorrowScope canonicalizer(&function, deleter);
+      canonicalizer.canonicalizeFunctionArgument(argument);
+      function.print(llvm::outs());
+    });
+} // end namespace swift::test
 
 /// Canonicalize a worklist of extended lifetimes. This iterates after rewriting
 /// borrow scopes to handle new outer copies and new owned lifetimes from

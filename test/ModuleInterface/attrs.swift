@@ -1,8 +1,13 @@
-// RUN: %target-swift-emit-module-interface(%t.swiftinterface) %s -module-name attrs -enable-experimental-feature ABIAttribute
+// RUN: %target-swift-emit-module-interface(%t.swiftinterface) %s -module-name attrs \
+// RUN:  -enable-experimental-feature ABIAttribute \
+// RUN:  -enable-experimental-feature NonIsolatedAsyncInheritsIsolationFromContext
+
 // RUN: %target-swift-typecheck-module-from-interface(%t.swiftinterface) -module-name attrs
+
 // RUN: %FileCheck %s --input-file %t.swiftinterface
 
 // REQUIRES: swift_feature_ABIAttribute
+// REQUIRES: swift_feature_NonIsolatedAsyncInheritsIsolationFromContext
 
 // CHECK: @_transparent public func glass() -> Swift.Int { return 0 }{{$}}
 @_transparent public func glass() -> Int { return 0 }
@@ -49,3 +54,11 @@ public var abiAttrOnVar: Int = 42
 // CHECK: @available(*, unavailable, message: "this compiler cannot match the ABI specified by the @abi attribute")
 // CHECK: public var abiAttrOnVar: Swift.Int
 // CHECK: #endif
+
+@execution(concurrent)
+public func testExecutionConcurrent() async {}
+// CHECK: @execution(concurrent) public func testExecutionConcurrent() async
+
+@execution(caller)
+public func testExecutionCaller() async {}
+// CHECK: @execution(caller) public func testExecutionCaller() async

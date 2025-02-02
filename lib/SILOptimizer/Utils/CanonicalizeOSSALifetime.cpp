@@ -285,6 +285,43 @@ void CanonicalizeOSSALifetime::extendLivenessToDeadEnds() {
     completeLiveness.updateForUse(destroy, /*lifetimeEnding*/ true);
   }
 
+  // Demote consuming uses within complete liveness to non-consuming uses.
+  //
+  // OSSALifetimeCompletion considers the lifetime of a single value.  Such
+  // lifetimes never continue beyond consumes.
+  std::optional<llvm::SmallPtrSet<SILInstruction *, 8>> lastUsers;
+  auto isConsumeOnBoundary = [&](SILInstruction *instruction) -> bool {
+    if (!lastUsers) {
+      // Avoid computing lastUsers if possible.
+      auto *function = getCurrentDef()->getFunction();
+      auto *deadEnds = deadEndBlocksAnalysis->get(function);
+      llvm::SmallVector<SILBasicBlock *, 8> completeConsumingBlocks(
+          consumingBlocks.getArrayRef());
+      for (auto &block : *function) {
+        if (!deadEnds->isDeadEnd(&block))
+          continue;
+        completeConsumingBlocks.push_back(&block);
+      }
+      PrunedLivenessBoundary boundary;
+      liveness->computeBoundary(boundary, completeConsumingBlocks);
+
+      lastUsers.emplace();
+      for (auto *lastUser : boundary.lastUsers) {
+        lastUsers->insert(lastUser);
+      }
+    }
+    return lastUsers->contains(instruction);
+  };
+  for (auto pair : liveness->getAllUsers()) {
+    if (!pair.second.isEnding())
+      continue;
+    auto *instruction = pair.first;
+    if (isConsumeOnBoundary(instruction))
+      continue;
+    // Demote instruction's lifetime-ending-ness to non-lifetime-ending.
+    completeLiveness.updateForUse(pair.first, /*lifetimeEnding=*/false);
+  }
+
   OSSALifetimeCompletion::visitAvailabilityBoundary(
       getCurrentDef(), completeLiveness, [&](auto *unreachable, auto end) {
         if (end == OSSALifetimeCompletion::LifetimeEnd::Boundary) {

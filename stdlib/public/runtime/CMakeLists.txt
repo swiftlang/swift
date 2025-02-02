@@ -144,7 +144,11 @@ foreach(sdk ${SWIFT_SDKS})
   endif()
 endforeach()
 
-add_swift_target_library(swiftRuntime OBJECT_LIBRARY
+# In modern CMake, we would be able to use the previous name `swiftRuntime`
+# without clashing with the `Runtime` module, but the current build system
+# is architected in such a way that we had to rename this to `swiftRuntimeCore`
+# in order to avoid a clash with the new Swift module.
+add_swift_target_library(swiftRuntimeCore OBJECT_LIBRARY
   ${swift_runtime_sources}
   ${swift_runtime_objc_sources}
   ${swift_runtime_leaks_sources}
@@ -323,4 +327,3 @@ if(static_binary_lnk_file_list)
   add_dependencies(stdlib ${static_binary_lnk_file_list})
   add_custom_target(static_binary_magic ALL DEPENDS ${static_binary_lnk_file_list})
 endif()
-

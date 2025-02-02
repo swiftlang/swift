@@ -773,15 +773,14 @@ void SILGenFunction::emitValueConstructor(ConstructorDecl *ctor) {
     
     auto cleanupLoc = CleanupLocation(ctor);
 
+    if (selfLV.getType().isMoveOnly()) {
+      selfLV = B.createMarkUnresolvedNonCopyableValueInst(
+        cleanupLoc, selfLV,
+        MarkUnresolvedNonCopyableValueInst::CheckKind::
+        AssignableButNotConsumable);
+    }
     if (!F.getConventions().hasIndirectSILResults()) {
       // Otherwise, load and return the final 'self' value.
-      if (selfLV.getType().isMoveOnly()) {
-        selfLV = B.createMarkUnresolvedNonCopyableValueInst(
-            cleanupLoc, selfLV,
-            MarkUnresolvedNonCopyableValueInst::CheckKind::
-                AssignableButNotConsumable);
-      }
-
       selfValue = lowering.emitLoad(B, cleanupLoc, selfLV.getValue(),
                                     LoadOwnershipQualifier::Copy);
 
@@ -1396,7 +1395,7 @@ emitMemberInit(SILGenFunction &SGF, VarDecl *selfDecl, Pattern *pattern) {
       selfTy.getFieldType(field, SGF.SGM.M, SGF.getTypeExpansionContext());
     SILValue slot;
 
-    if (auto *structDecl = dyn_cast<StructDecl>(field->getDeclContext())) {
+    if (isa<StructDecl>(field->getDeclContext())) {
       slot = SGF.B.createStructElementAddr(pattern, self.forward(SGF), field,
                                            fieldTy.getAddressType());
     } else {

@@ -17,6 +17,7 @@
 
 #include "swift/Frontend/Frontend.h"
 #include "swift/AST/ASTContext.h"
+#include "swift/AST/AvailabilityDomain.h"
 #include "swift/AST/DiagnosticsFrontend.h"
 #include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/FileSystem.h"
@@ -29,6 +30,7 @@
 #include "swift/Basic/Platform.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Basic/Statistic.h"
+#include "swift/DependencyScan/ModuleDependencyScanner.h"
 #include "swift/Frontend/CachingUtils.h"
 #include "swift/Frontend/CompileJobCacheKey.h"
 #include "swift/Frontend/ModuleInterfaceLoader.h"
@@ -36,17 +38,15 @@
 #include "swift/SIL/SILModule.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/SILOptimizer/Utils/Generics.h"
+#include "swift/Serialization/ScanningLoaders.h"
 #include "swift/Serialization/SerializationOptions.h"
 #include "swift/Serialization/SerializedModuleLoader.h"
-#include "swift/Serialization/ScanningLoaders.h"
-#include "swift/DependencyScan/ModuleDependencyScanner.h"
 #include "swift/Strings.h"
 #include "swift/Subsystems.h"
 #include "clang/AST/ASTContext.h"
 #include "llvm/ADT/Hashing.h"
 #include "llvm/ADT/IntrusiveRefCntPtr.h"
 #include "llvm/ADT/SmallVector.h"
-#include "llvm/TargetParser/Triple.h"
 #include "llvm/CAS/ActionCache.h"
 #include "llvm/CAS/BuiltinUnifiedCASDatabases.h"
 #include "llvm/CAS/CASFileSystem.h"
@@ -55,8 +55,9 @@
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/Path.h"
 #include "llvm/Support/Process.h"
-#include "llvm/Support/VirtualOutputBackends.h"
 #include "llvm/Support/ThreadPool.h"
+#include "llvm/Support/VirtualOutputBackends.h"
+#include "llvm/TargetParser/Triple.h"
 #include <llvm/ADT/StringExtras.h>
 
 using namespace swift;
@@ -727,28 +728,11 @@ void CompilerInstance::setUpLLVMArguments() {
 }
 
 void CompilerInstance::setUpDiagnosticOptions() {
-  if (Invocation.getDiagnosticOptions().ShowDiagnosticsAfterFatalError) {
-    Diagnostics.setShowDiagnosticsAfterFatalError();
-  }
-  if (Invocation.getDiagnosticOptions().SuppressWarnings) {
-    Diagnostics.setSuppressWarnings(true);
-  }
-  if (Invocation.getDiagnosticOptions().SuppressRemarks) {
-    Diagnostics.setSuppressRemarks(true);
-  }
-  Diagnostics.setWarningsAsErrorsRules(
-      Invocation.getDiagnosticOptions().WarningsAsErrorsRules);
-  Diagnostics.setPrintDiagnosticNamesMode(
-      Invocation.getDiagnosticOptions().PrintDiagnosticNames);
-  Diagnostics.setDiagnosticDocumentationPath(
-      Invocation.getDiagnosticOptions().DiagnosticDocumentationPath);
-  Diagnostics.setLanguageVersion(
-      Invocation.getLangOptions().EffectiveLanguageVersion);
-  if (!Invocation.getDiagnosticOptions().LocalizationCode.empty()) {
-    Diagnostics.setLocalization(
-        Invocation.getDiagnosticOptions().LocalizationCode,
-        Invocation.getDiagnosticOptions().LocalizationPath);
-  }
+  // As a side-effect, argument parsing will have already partially configured
+  // the diagnostic engine. However, it needs to be reconfigured here in case
+  // there is any new configuration that should effect diagnostics for the rest
+  // of the compile.
+  Invocation.setUpDiagnosticEngine(Diagnostics);
 }
 
 // The ordering of ModuleLoaders is important!
@@ -1126,20 +1110,6 @@ bool CompilerInvocation::shouldImportSwiftStringProcessing() const {
         FrontendOptions::ParseInputMode::SwiftModuleInterface;
 }
 
-/// Enable Swift backtracing on a per-target basis
-static bool shouldImportSwiftBacktracingByDefault(const llvm::Triple &target) {
-  if (target.isOSDarwin() || target.isOSWindows() || target.isOSLinux())
-    return true;
-  return false;
-}
-
-bool CompilerInvocation::shouldImportSwiftBacktracing() const {
-  return shouldImportSwiftBacktracingByDefault(getLangOptions().Target) &&
-    !getLangOptions().DisableImplicitBacktracingModuleImport &&
-    getFrontendOptions().InputMode !=
-      FrontendOptions::ParseInputMode::SwiftModuleInterface;
-}
-
 bool CompilerInvocation::shouldImportCxx() const {
   // C++ Interop is disabled
   if (!getLangOptions().EnableCXXInterop)
@@ -1222,21 +1192,6 @@ void CompilerInstance::verifyImplicitStringProcessingImport() {
 bool CompilerInstance::canImportSwiftStringProcessing() const {
   ImportPath::Module::Builder builder(
       getASTContext().getIdentifier(SWIFT_STRING_PROCESSING_NAME));
-  auto modulePath = builder.get();
-  return getASTContext().testImportModule(modulePath);
-}
-
-void CompilerInstance::verifyImplicitBacktracingImport() {
-  if (Invocation.shouldImportSwiftBacktracing() &&
-      !canImportSwiftBacktracing()) {
-    Diagnostics.diagnose(SourceLoc(),
-                         diag::warn_implicit_backtracing_import_failed);
-  }
-}
-
-bool CompilerInstance::canImportSwiftBacktracing() const {
-  ImportPath::Module::Builder builder(
-      getASTContext().getIdentifier(SWIFT_BACKTRACING_NAME));
   auto modulePath = builder.get();
   return getASTContext().testImportModule(modulePath);
 }
@@ -1334,19 +1289,6 @@ ImplicitImportInfo CompilerInstance::getImplicitImportInfo() const {
     case ImplicitStdlibKind::Stdlib:
       if (canImportSwiftStringProcessing())
         pushImport(SWIFT_STRING_PROCESSING_NAME);
-      break;
-    }
-  }
-
-  if (Invocation.shouldImportSwiftBacktracing()) {
-    switch (imports.StdlibKind) {
-    case ImplicitStdlibKind::Builtin:
-    case ImplicitStdlibKind::None:
-      break;
-
-    case ImplicitStdlibKind::Stdlib:
-      if (canImportSwiftBacktracing())
-        pushImport(SWIFT_BACKTRACING_NAME);
       break;
     }
   }
@@ -1451,6 +1393,28 @@ bool CompilerInstance::createFilesForMainModule(
   return false;
 }
 
+static void configureAvailabilityDomains(const ASTContext &ctx,
+                                         const FrontendOptions &opts,
+                                         ModuleDecl *mainModule) {
+  llvm::SmallDenseMap<Identifier, CustomAvailabilityDomain *> domainMap;
+  auto createAndInsertDomain = [&](const std::string &name,
+                                   CustomAvailabilityDomain::Kind kind) {
+    auto *domain = CustomAvailabilityDomain::create(
+        ctx, name, mainModule, CustomAvailabilityDomain::Kind::Enabled);
+    bool inserted = domainMap.insert({domain->getName(), domain}).second;
+    ASSERT(inserted); // Domains must be unique.
+  };
+
+  for (auto enabled : opts.AvailabilityDomains.EnabledDomains)
+    createAndInsertDomain(enabled, CustomAvailabilityDomain::Kind::Enabled);
+  for (auto disabled : opts.AvailabilityDomains.DisabledDomains)
+    createAndInsertDomain(disabled, CustomAvailabilityDomain::Kind::Disabled);
+  for (auto dynamic : opts.AvailabilityDomains.DynamicDomains)
+    createAndInsertDomain(dynamic, CustomAvailabilityDomain::Kind::Dynamic);
+
+  mainModule->setAvailabilityDomains(std::move(domainMap));
+}
+
 ModuleDecl *CompilerInstance::getMainModule() const {
   if (MainModule)
     return MainModule;
@@ -1499,6 +1463,9 @@ ModuleDecl *CompilerInstance::getMainModule() const {
       MainModule->setSerializePackageEnabled();
     if (Invocation.getLangOptions().hasFeature(Feature::WarnUnsafe))
       MainModule->setStrictMemorySafety(true);
+
+    configureAvailabilityDomains(getASTContext(),
+                                 Invocation.getFrontendOptions(), MainModule);
 
     if (!Invocation.getFrontendOptions()
              .SwiftInterfaceCompilerVersion.empty()) {

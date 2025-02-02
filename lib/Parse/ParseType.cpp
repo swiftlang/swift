@@ -716,7 +716,7 @@ ParserStatus Parser::parseGenericArguments(SmallVectorImpl<TypeRepr *> &Args,
   // variadic generic types.
   if (!startsWithGreater(Tok)) {
     while (true) {
-      // Note: This can be a value type, e.g. 'Vector<3, Int>'.
+      // Note: This can be a value type, e.g. 'Slab<3, Int>'.
       ParserResult<TypeRepr> Ty = parseTypeOrValue(diag::expected_type);
       if (Ty.isNull() || Ty.hasCodeCompletion()) {
         // Skip until we hit the '>'.

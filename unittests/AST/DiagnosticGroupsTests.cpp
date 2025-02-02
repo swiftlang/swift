@@ -105,7 +105,7 @@ TEST(DiagnosticGroups, DiagnosticsWrappersInheritGroups) {
             .limitBehaviorUntilSwiftVersion(DiagnosticBehavior::Warning, 99);
       },
       [](const DiagnosticInfo &info) {
-        EXPECT_EQ(info.ID, diag::error_in_a_future_swift_version.ID);
+        EXPECT_EQ(info.ID, diag::error_in_a_future_swift_lang_mode.ID);
         EXPECT_TRUE(info.FormatString.ends_with(" [DeprecatedDeclaration]"));
       },
       /*expectedNumCallbackCalls=*/1);

@@ -30,6 +30,7 @@
 #include "llvm/Option/Arg.h"
 #include "llvm/Option/ArgList.h"
 #include "llvm/Option/Option.h"
+#include "llvm/Support/Compression.h"
 #include "llvm/Support/Process.h"
 #include "llvm/Support/FileSystem.h"
 #include "llvm/Support/LineIterator.h"
@@ -203,6 +204,32 @@ bool ArgsToFrontendOptionsConverter::convert(
   Opts.AllowModuleWithCompilerErrors |= Args.hasArg(OPT_experimental_allow_module_with_compiler_errors);
 
   computeDumpScopeMapLocations();
+
+  // Ensure that the compiler was built with zlib support if it was the
+  // requested AST format.
+  if (const Arg *A = Args.getLastArg(OPT_dump_ast_format)) {
+    auto format =
+        llvm::StringSwitch<std::optional<FrontendOptions::ASTFormat>>(A->getValue())
+            .Case("json", FrontendOptions::ASTFormat::JSON)
+            .Case("json-zlib", FrontendOptions::ASTFormat::JSONZlib)
+            .Case("default", FrontendOptions::ASTFormat::Default)
+            .Default(std::nullopt);
+    if (!format.has_value()) {
+      Diags.diagnose(SourceLoc(), diag::unknown_dump_ast_format, A->getValue());
+      return true;
+    }
+    if (format != FrontendOptions::ASTFormat::Default &&
+        !Args.hasArg(OPT_dump_ast)) {
+      Diags.diagnose(SourceLoc(), diag::ast_format_requires_dump_ast);
+      return true;
+    }
+    if (Opts.DumpASTFormat == FrontendOptions::ASTFormat::JSONZlib &&
+        !llvm::compression::zlib::isAvailable()) {
+      Diags.diagnose(SourceLoc(), diag::json_zlib_not_supported);
+      return true;
+    }
+    Opts.DumpASTFormat = *format;
+  }
 
   std::optional<FrontendInputsAndOutputs> inputsAndOutputs =
       ArgsToFrontendInputsConverter(Diags, Args).convert(buffers);
@@ -392,6 +419,10 @@ bool ArgsToFrontendOptionsConverter::convert(
   }
 
   Opts.DisableSandbox = Args.hasArg(OPT_disable_sandbox);
+
+  if (computeAvailabilityDomains())
+    return true;
+
   return false;
 }
 
@@ -519,6 +550,39 @@ void ArgsToFrontendOptionsConverter::computeDumpScopeMapLocations() {
 
   if (!invalid && Opts.DumpScopeMapLocations.empty())
     Diags.diagnose(SourceLoc(), diag::error_no_source_location_scope_map);
+}
+
+bool ArgsToFrontendOptionsConverter::computeAvailabilityDomains() {
+  using namespace options;
+
+  bool hadError = false;
+  llvm::SmallSet<std::string, 4> seenDomains;
+
+  for (const Arg *A :
+       Args.filtered_reverse(OPT_define_enabled_availability_domain,
+                             OPT_define_disabled_availability_domain,
+                             OPT_define_dynamic_availability_domain)) {
+    std::string domain = A->getValue();
+    if (!seenDomains.insert(domain).second)
+      continue;
+
+    if (!Lexer::isIdentifier(domain)) {
+      Diags.diagnose(SourceLoc(), diag::error_invalid_arg_value,
+                     A->getAsString(Args), A->getValue());
+      hadError = true;
+      continue;
+    }
+
+    auto &option = A->getOption();
+    if (option.matches(OPT_define_enabled_availability_domain))
+      Opts.AvailabilityDomains.EnabledDomains.emplace_back(domain);
+    else if (option.matches(OPT_define_disabled_availability_domain))
+      Opts.AvailabilityDomains.DisabledDomains.emplace_back(domain);
+    else if (option.matches(OPT_define_dynamic_availability_domain))
+      Opts.AvailabilityDomains.DynamicDomains.emplace_back(domain);
+  }
+
+  return hadError;
 }
 
 FrontendOptions::ActionType

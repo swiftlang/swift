@@ -26,7 +26,7 @@ class Bar : NonObjCProto { // expected-error {{type 'Bar' does not conform to pr
 
 // Complain about unavailable witnesses (error in Swift 4, warning in Swift 3)
 protocol P {
-  func foo(bar: Foo) // expected-note 2 {{requirement 'foo(bar:)' declared here}}
+  func foo(bar: Foo) // expected-note 3 {{requirement 'foo(bar:)' declared here}}
 }
 
 struct ConformsToP : P { // expected-error{{type 'ConformsToP' does not conform to protocol 'P'}}
@@ -62,6 +62,14 @@ struct ConformsToP5 {}
 extension ConformsToP5: P {
   @available(*, unavailable)
   func foo(bar: Foo) { }
+}
+
+struct ConformsToP6: P {} // expected-error{{type 'ConformsToP6' does not conform to protocol 'P'}}
+// expected-error@-1 {{unavailable instance method 'foo(bar:)' was used to satisfy a requirement of protocol 'P'}}
+
+@available(*, unavailable)
+extension ConformsToP6 {
+  func foo(bar: Foo) { } // expected-note {{'foo(bar:)' declared here}}
 }
 
 @available(*, unavailable)

@@ -1102,7 +1102,7 @@ public:
         resultType = FD->mapTypeIntoContext(resultType);
       } else if (auto closure = dyn_cast<AbstractClosureExpr>(func)) {
         resultType = closure->getResultType();
-      } else if (auto *CD = dyn_cast<ConstructorDecl>(func)) {
+      } else if (isa<ConstructorDecl>(func)) {
         resultType = TupleType::getEmpty(Ctx);
       } else {
         resultType = TupleType::getEmpty(Ctx);

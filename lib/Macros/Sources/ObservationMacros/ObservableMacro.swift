@@ -338,7 +338,7 @@ public struct ObservationTrackedMacro: AccessorMacro {
       return []
     }
     
-    guard let container = context.lexicalContext[0].as(ClassDeclSyntax.self) else {
+    guard context.lexicalContext[0].as(ClassDeclSyntax.self) != nil else {
       return []
     }
 
@@ -353,11 +353,10 @@ public struct ObservationTrackedMacro: AccessorMacro {
         _\(identifier) = initialValue
       }
       """
-
     let getAccessor: AccessorDeclSyntax =
       """
       get {
-        access(keyPath: \(container.trimmed.name)._cachedKeypath_\(identifier))
+        access(keyPath: \\.\(identifier))
         return _\(identifier)
       }
       """
@@ -368,7 +367,7 @@ public struct ObservationTrackedMacro: AccessorMacro {
         guard shouldNotifyObservers(_\(identifier), newValue) else {
           return
         }
-        withMutation(keyPath: \(container.trimmed.name)._cachedKeypath_\(identifier)) {
+        withMutation(keyPath: \\.\(identifier)) {
           _\(identifier) = newValue
         }
       }
@@ -385,10 +384,9 @@ public struct ObservationTrackedMacro: AccessorMacro {
     let modifyAccessor: AccessorDeclSyntax =
       """
       _modify {
-        let keyPath = \(container.trimmed.name)._cachedKeypath_\(identifier)
-        access(keyPath: keyPath)
-        \(raw: ObservableMacro.registrarVariableName).willSet(self, keyPath: keyPath)
-        defer { \(raw: ObservableMacro.registrarVariableName).didSet(self, keyPath: keyPath) }
+        access(keyPath: \\.\(identifier))
+        \(raw: ObservableMacro.registrarVariableName).willSet(self, keyPath: \\.\(identifier))
+        defer { \(raw: ObservableMacro.registrarVariableName).didSet(self, keyPath: \\.\(identifier)) }
         yield &_\(identifier)
       }
       """
@@ -408,11 +406,11 @@ extension ObservationTrackedMacro: PeerMacro {
   ) throws -> [DeclSyntax] {
     guard let property = declaration.as(VariableDeclSyntax.self),
           property.isValidForObservation,
-          let identifier = property.identifier?.trimmed else {
+          property.identifier?.trimmed != nil else {
       return []
     }
     
-    guard let container = context.lexicalContext[0].as(ClassDeclSyntax.self) else {
+    guard context.lexicalContext[0].as(ClassDeclSyntax.self) != nil else {
       return []
     }
     
@@ -422,11 +420,7 @@ extension ObservationTrackedMacro: PeerMacro {
     }
     
     let storage = DeclSyntax(property.privatePrefixed("_", addingAttribute: ObservableMacro.ignoredAttribute))
-    let cachedKeypath: DeclSyntax =
-      """
-      private static let _cachedKeypath_\(identifier) = \\\(container.name).\(identifier)
-      """
-    return [storage, cachedKeypath]
+    return [storage]
   }
 }
 

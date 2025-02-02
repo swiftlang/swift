@@ -351,7 +351,7 @@ func testLocalCaptures() {
   @Sendable
   func a2() -> NonSendable {
     return ns
-    // expected-complete-and-tns-warning @-1 {{capture of 'ns' with non-sendable type 'NonSendable' in a `@Sendable` local function}}
+    // expected-complete-and-tns-warning @-1 {{capture of 'ns' with non-sendable type 'NonSendable' in a '@Sendable' local function}}
   }
 }
 
@@ -433,7 +433,7 @@ struct DowngradeForPreconcurrency {
     preconcurrencyContext {
       Task {
         completion()
-        // expected-warning@-1 {{capture of 'completion' with non-sendable type '@MainActor () -> Void' in a `@Sendable` closure}}
+        // expected-warning@-1 {{capture of 'completion' with non-sendable type '@MainActor () -> Void' in a '@Sendable' closure}}
         // expected-warning@-2 {{capture of 'completion' with non-sendable type '@MainActor () -> Void' in an isolated closure}}
         // expected-note@-3 2 {{a function type must be marked '@Sendable' to conform to 'Sendable'}}
         // expected-warning@-4 {{expression is 'async' but is not marked with 'await'; this is an error in the Swift 6 language mode}}

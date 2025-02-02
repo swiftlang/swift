@@ -10,7 +10,7 @@ public:
   typedef int PublicTypedef;
   struct PublicStruct {};
   enum PublicEnum { PublicEnumValue1 };
-  enum { PublicAnonymousEnumValue };
+  enum { PublicAnonymousEnumValue1 };
   enum PublicClosedEnum {
     PublicClosedEnumValue1
   } __attribute__((enum_extensibility(closed)));

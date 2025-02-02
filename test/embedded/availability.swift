@@ -13,7 +13,7 @@ public struct UniverallyUnavailable {}
 
 @_unavailableInEmbedded
 public func unavailable_in_embedded() { }
-// expected-note@-1 2 {{'unavailable_in_embedded()' has been explicitly marked unavailable here}}
+// expected-note@-1 {{'unavailable_in_embedded()' has been explicitly marked unavailable here}}
 
 @available(*, unavailable, message: "always unavailable")
 public func universally_unavailable() { }
@@ -22,8 +22,8 @@ public func universally_unavailable() { }
 @_unavailableInEmbedded
 public func unused() { } // no error
 
-public struct S1 {} // expected-note {{found this candidate}}
-public struct S2 {} // expected-note {{found this candidate}}
+public struct S1 {} // expected-note 2 {{found this candidate}}
+public struct S2 {} // expected-note 2 {{found this candidate}}
 
 @_unavailableInEmbedded
 public func has_unavailable_in_embedded_overload(_ s1: S1) { }
@@ -61,8 +61,8 @@ public func also_universally_unavailable(
   _ uie: UnavailableInEmbedded, // OK
   _ uu: UniverallyUnavailable // OK
 ) {
-  unavailable_in_embedded() // expected-error {{'unavailable_in_embedded()' is unavailable: unavailable in embedded Swift}}
+  unavailable_in_embedded()
   universally_unavailable() // expected-error {{'universally_unavailable()' is unavailable: always unavailable}}
-  has_unavailable_in_embedded_overload(.init()) // not ambiguous, selects available overload
+  has_unavailable_in_embedded_overload(.init()) // expected-error {{ambiguous use of 'init()'}}
   has_universally_unavailable_overload(.init()) // not ambiguous, selects available overload
 }

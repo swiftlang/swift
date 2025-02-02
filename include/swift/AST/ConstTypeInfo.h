@@ -43,6 +43,7 @@ public:
     StaticFunctionCall,
     MemberReference,
     InterpolatedString,
+    NilLiteral,
     Runtime
   };
 
@@ -70,6 +71,22 @@ public:
 
 private:
   std::string Value;
+};
+
+/// A representation of an Optional<Wrapped> value declared as nil
+/// or left undeclared.
+///
+/// Nil values were previously represented as RawLiteralValue with
+/// value "nil". This caused ambiguous values when extracting values,
+/// such as an Optional<String> of value "nil".
+
+class NilLiteralValue : public CompileTimeValue {
+public:
+  NilLiteralValue() : CompileTimeValue(ValueKind::NilLiteral) {}
+
+  static bool classof(const CompileTimeValue *T) {
+    return T->getKind() == ValueKind::NilLiteral;
+  }
 };
 
 struct FunctionParameter {

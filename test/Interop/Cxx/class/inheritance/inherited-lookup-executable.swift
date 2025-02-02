@@ -6,11 +6,46 @@ import StdlibUnittest
 
 var InheritedMemberTestSuite = TestSuite("Test if inherited lookup works")
 
-InheritedMemberTestSuite.test("IIBase1::method() resolves to grandparent") {
-  let iibase1 = IIBase1()
-  expectEqual(iibase1.methodBase(), 1)
-  expectEqual(iibase1.methodIBase(), 11)
-  expectEqual(iibase1.methodIIBase(), 111)
+InheritedMemberTestSuite.test("Regular methods resolve to base classes") {
+  // No inheritance (sanity check)
+  let one = One()
+  expectEqual(one.method(), 1)
+
+  // One level of inheritance
+  let iOne = IOne()
+  expectEqual(iOne.method(), 1)
+  expectEqual(iOne.methodI(), -1)
+
+  // Two levels of inheritance
+  let iiOne = IIOne()
+  expectEqual(iiOne.method(), 1)
+  expectEqual(iiOne.methodI(), -1)
+  expectEqual(iiOne.methodII(), -11)
+
+  // Three levels of inheritance
+  let iiiOne = IIIOne()
+  expectEqual(iiiOne.method(), 1)
+  expectEqual(iiiOne.methodI(), -1)
+  expectEqual(iiiOne.methodII(), -11)
+  expectEqual(iiiOne.methodIII(), -111)
+}
+
+InheritedMemberTestSuite.test("Eagerly imported methods resolve to base classes") {
+  // No inheritance (sanity check)
+  let one = One()
+  expectEqual(one[0], 1)
+
+  // One level of inheritance
+  let iOne = IOne()
+  expectEqual(iOne[0], 1)
+
+  // Two levels of inheritance
+  let iiOne = IIOne()
+  expectEqual(iiOne[0], 1)
+
+  // Three levels of inheritance
+  let iiiOne = IIIOne()
+  expectEqual(iiiOne[0], 1)
 }
 
 runAllTests()

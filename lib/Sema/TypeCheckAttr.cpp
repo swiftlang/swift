@@ -253,6 +253,69 @@ private:
   }
 
 public:
+  void visitExecutionAttr(ExecutionAttr *attr) {
+    auto *F = dyn_cast<FuncDecl>(D);
+    if (!F)
+      return;
+
+    if (!F->hasAsync()) {
+      diagnoseAndRemoveAttr(attr, diag::attr_execution_concurrent_only_on_async,
+                            F);
+      return;
+    }
+
+    switch (attr->getBehavior()) {
+    case ExecutionKind::Concurrent: {
+      // 'concurrent' doesn't work with explicit `nonisolated`
+      if (F->hasExplicitIsolationAttribute()) {
+        if (F->getAttrs().hasAttribute<NonisolatedAttr>()) {
+          diagnoseAndRemoveAttr(
+              attr,
+              diag::attr_execution_concurrent_incompatible_with_nonisolated, F);
+          return;
+        }
+      }
+
+      auto parameters = F->getParameters();
+      if (!parameters)
+        return;
+
+      for (auto *P : *parameters) {
+        auto *repr = P->getTypeRepr();
+        if (!repr)
+          continue;
+
+        // isolated parameters affect isolation of the function itself
+        if (isa<IsolatedTypeRepr>(repr)) {
+          diagnoseAndRemoveAttr(
+              attr,
+              diag::attr_execution_concurrent_incompatible_isolated_parameter,
+              F, P);
+          return;
+        }
+
+        if (auto *attrType = dyn_cast<AttributedTypeRepr>(repr)) {
+          if (attrType->has(TypeAttrKind::Isolated)) {
+            diagnoseAndRemoveAttr(
+                attr,
+                diag::
+                    attr_execution_concurrent_incompatible_dynamically_isolated_parameter,
+                F, P);
+            return;
+          }
+        }
+      }
+
+      break;
+    }
+
+    case ExecutionKind::Caller: {
+      // no restrictions for now.
+      break;
+    }
+    }
+  }
+
   void visitABIAttr(ABIAttr *attr) {
     Decl *AD = attr->abiDecl;
     if (isa<VarDecl>(D) && isa<PatternBindingDecl>(AD)) {
@@ -1207,7 +1270,7 @@ bool AttributeChecker::visitAbstractAccessControlAttr(
   }
 
   SourceFile *File = D->getDeclContext()->getParentSourceFile();
-  if (auto importDecl = dyn_cast<ImportDecl>(D)) {
+  if (isa<ImportDecl>(D)) {
     if (attr->getAccess() == AccessLevel::Open) {
       diagnoseAndRemoveAttr(attr, diag::access_level_on_import_unsupported,
                             attr);
@@ -1327,9 +1390,9 @@ void AttributeChecker::visitAccessControlAttr(AccessControlAttr *attr) {
           // an extension.
           if (!VD->isObjC() && attr->getAccess() == AccessLevel::Open) {
             diagnose(attr->getLocation(),
-                     diag::access_control_non_objc_open_member,
-                     VD->getDescriptiveKind())
-                .fixItReplace(attr->getRange(), "public");
+                     diag::access_control_non_objc_open_member, VD)
+                .fixItReplace(attr->getRange(), "public")
+                .warnUntilSwiftVersion(7);
           }
         }
       }
@@ -1412,8 +1475,17 @@ void AttributeChecker::visitSPIAccessControlAttr(SPIAccessControlAttr *attr) {
     // VD must be public or open to use an @_spi attribute.
     auto declAccess = VD->getFormalAccess();
     auto DC = VD->getDeclContext()->getAsDecl();
-    if (declAccess < AccessLevel::Public &&
-        !VD->getAttrs().hasAttribute<UsableFromInlineAttr>() &&
+
+    AbstractStorageDecl *storage = nullptr;
+    if (auto *AD = dyn_cast<AccessorDecl>(VD))
+      storage = AD->getStorage();
+
+    auto canUseAttr = [](ValueDecl *VD) {
+      return VD->getFormalAccess() >= AccessLevel::Public ||
+        VD->getAttrs().hasAttribute<UsableFromInlineAttr>();
+    };
+    if (!canUseAttr(VD) &&
+        !(storage && canUseAttr(storage)) &&
         !(DC && DC->isSPI())) {
       diagnoseAndRemoveAttr(attr,
                             diag::spi_attribute_on_non_public,
@@ -1433,7 +1505,7 @@ void AttributeChecker::visitSPIAccessControlAttr(SPIAccessControlAttr *attr) {
     }
 
     // Forbid enum elements marked SPI in frozen types.
-    if (auto elt = dyn_cast<EnumElementDecl>(VD)) {
+    if (isa<EnumElementDecl>(VD)) {
       if (auto ED = dyn_cast<EnumDecl>(D->getDeclContext())) {
         if (ED->getAttrs().hasAttribute<FrozenAttr>(/*allowInvalid*/ true) &&
             !ED->isSPI()) {
@@ -2321,8 +2393,7 @@ void AttributeChecker::visitAvailableAttr(AvailableAttr *parsedAttr) {
 
   // Skip the remaining diagnostics in swiftinterfaces.
   auto *DC = D->getDeclContext();
-  auto *SF = DC->getParentSourceFile();
-  if (SF && SF->Kind == SourceFileKind::Interface)
+  if (DC->isInSwiftinterface())
     return;
 
   // The remaining diagnostics are only for attributes that are active.
@@ -2396,6 +2467,12 @@ void AttributeChecker::visitAvailableAttr(AvailableAttr *parsedAttr) {
           // not diagnosed previously, so only emit a warning in that case.
           if (isa<ExtensionDecl>(DC->getTopmostDeclarationDeclContext()))
             limit = DiagnosticBehavior::Warning;
+        } else if (enclosingAttr.getPlatform() != attr->getPlatform()) {
+          // Downgrade to a warning when the limiting attribute is for a more
+          // specific platform.
+          if (inheritsAvailabilityFromPlatform(enclosingAttr.getPlatform(),
+                                               attr->getPlatform()))
+            limit = DiagnosticBehavior::Warning;
         }
         diagnose(D->isImplicit() ? enclosingDecl->getLoc()
                                  : parsedAttr->getLocation(),
@@ -2444,7 +2521,7 @@ static bool canDeclareSymbolName(StringRef symbol, ModuleDecl *fromModule) {
   // promote this to an error after a while.
   
   return llvm::StringSwitch<bool>(symbol)
-#define FUNCTION(_, Name, ...) \
+#define FUNCTION(_, Module, Name, ...) \
     .Case(#Name, false) \
     .Case("_" #Name, false) \
     .Case(#Name "_", false) \
@@ -3242,7 +3319,7 @@ SynthesizeMainFunctionRequest::evaluate(Evaluator &evaluator,
     return nullptr;
   }
 
-  auto where = ExportContext::forDeclSignature(D);
+  auto where = ExportContext::forDeclSignature(D, nullptr);
   diagnoseDeclAvailability(mainFunction, attr->getRange(), nullptr, where,
                            std::nullopt);
 
@@ -3490,7 +3567,7 @@ SerializeAttrGenericSignatureRequest::evaluate(Evaluator &evaluator,
       /*addedRequirements=*/{},
       /*inferenceSources=*/{},
       attr->getLocation(),
-      /*isExtension=*/false,
+      /*forExtension=*/nullptr,
       /*allowInverses=*/true};
 
   auto specializedSig = evaluateOrDefault(Ctx.evaluator, request,
@@ -4338,6 +4415,77 @@ void AttributeChecker::visitFrozenAttr(FrozenAttr *attr) {
   }
 }
 
+static void checkGlobalActorAttr(
+    const Decl *decl,
+    std::pair<CustomAttr *, NominalTypeDecl *> &globalActorAttr) {
+  auto isolatedAttr = decl->getAttrs().getAttribute<IsolatedAttr>();
+  auto nonisolatedAttr = decl->getAttrs().getAttribute<NonisolatedAttr>();
+  auto executionAttr = decl->getAttrs().getAttribute<ExecutionAttr>();
+  struct NameAndRange {
+    StringRef name;
+    SourceRange range;
+
+    NameAndRange(StringRef _name, SourceRange _range)
+        : name(_name), range(_range) {}
+  };
+
+  llvm::SmallVector<NameAndRange, 4> attributes;
+
+  attributes.push_back(NameAndRange(globalActorAttr.second->getName().str(),
+                                    globalActorAttr.first->getRangeWithAt()));
+
+  if (isolatedAttr) {
+    attributes.push_back(NameAndRange(isolatedAttr->getAttrName(),
+                                      isolatedAttr->getRangeWithAt()));
+  }
+  if (nonisolatedAttr) {
+    attributes.push_back(NameAndRange(nonisolatedAttr->getAttrName(),
+                                      nonisolatedAttr->getRangeWithAt()));
+  }
+  if (executionAttr) {
+    attributes.push_back(NameAndRange(executionAttr->getAttrName(),
+                                      executionAttr->getRangeWithAt()));
+  }
+
+  if (attributes.size() == 1)
+    return;
+
+  if (attributes.size() == 2) {
+    decl->diagnose(diag::actor_isolation_multiple_attr_2, decl,
+                   attributes[0].name, attributes[1].name)
+        .highlight(attributes[0].range)
+        .highlight(attributes[1].range)
+        .warnUntilSwiftVersion(6)
+        .fixItRemove(attributes[1].range);
+    return;
+  }
+
+  if (attributes.size() == 3) {
+    decl->diagnose(diag::actor_isolation_multiple_attr_3, decl,
+                   attributes[0].name, attributes[1].name, attributes[2].name)
+        .highlight(attributes[0].range)
+        .highlight(attributes[1].range)
+        .highlight(attributes[2].range)
+        .warnUntilSwiftVersion(6)
+        .fixItRemove(attributes[1].range)
+        .fixItRemove(attributes[2].range);
+    return;
+  }
+
+  assert(attributes.size() == 4);
+  decl->diagnose(diag::actor_isolation_multiple_attr_4, decl,
+                 attributes[0].name, attributes[1].name, attributes[2].name,
+                 attributes[3].name)
+      .highlight(attributes[0].range)
+      .highlight(attributes[1].range)
+      .highlight(attributes[2].range)
+      .highlight(attributes[3].range)
+      .warnUntilSwiftVersion(6)
+      .fixItRemove(attributes[1].range)
+      .fixItRemove(attributes[2].range)
+      .fixItRemove(attributes[3].range);
+}
+
 void AttributeChecker::visitCustomAttr(CustomAttr *attr) {
   auto dc = D->getDeclContext();
 
@@ -4468,8 +4616,7 @@ void AttributeChecker::visitCustomAttr(CustomAttr *attr) {
         // Module interfaces don't print bodies for all getters, so allow getters
         // that don't have a body if we're compiling a module interface.
         // Within a protocol definition, there will never be a body.
-        SourceFile *parent = storage->getDeclContext()->getParentSourceFile();
-        bool isInInterface = parent && parent->Kind == SourceFileKind::Interface;
+        bool isInInterface = storage->getDeclContext()->isInSwiftinterface();
         if (!isInInterface && !getter->hasBody() &&
             !isa<ProtocolDecl>(storage->getDeclContext()))
           return true;
@@ -4522,7 +4669,10 @@ void AttributeChecker::visitCustomAttr(CustomAttr *attr) {
   // retrieval request perform checking for us.
   if (nominal->isGlobalActor()) {
     diagnoseIsolatedDeinitInValueTypes(attr);
-    (void)D->getGlobalActorAttr();
+    if (auto g = D->getGlobalActorAttr()) {
+      checkGlobalActorAttr(D, *g);
+    }
+
     if (auto value = dyn_cast<ValueDecl>(D)) {
       (void)getActorIsolation(value);
     } else {
@@ -4976,13 +5126,13 @@ void AttributeChecker::checkBackDeployedAttrs(
     if (Ctx.LangOpts.DisableAvailabilityChecking)
       continue;
 
-    auto availability =
-        TypeChecker::availabilityAtLocation(D->getLoc(), D->getDeclContext());
+    auto availability = TypeChecker::availabilityAtLocation(
+        D->getLoc(), D->getInnermostDeclContext());
 
     // Unavailable decls cannot be back deployed.
-    if (auto unavailablePlatform = availability.getUnavailablePlatformKind()) {
-      if (!inheritsAvailabilityFromPlatform(*unavailablePlatform,
-                                            Attr->Platform)) {
+    if (auto unavailableDomain = availability.getUnavailableDomain()) {
+      auto backDeployedDomain = AvailabilityDomain::forPlatform(Attr->Platform);
+      if (unavailableDomain->contains(backDeployedDomain)) {
         auto platformString = prettyPlatformString(Attr->Platform);
         llvm::VersionTuple ignoredVersion;
 
@@ -5153,7 +5303,7 @@ TypeChecker::diagnosticIfDeclCannotBePotentiallyUnavailable(const Decl *D) {
   auto *DC = D->getDeclContext();
 
   // A destructor is always called if declared.
-  if (auto *DD = dyn_cast<DestructorDecl>(D))
+  if (isa<DestructorDecl>(D))
     return Diagnostic(diag::availability_decl_no_potential, D);
 
   // Observing accessors are always called implicitly.
@@ -5181,9 +5331,7 @@ TypeChecker::diagnosticIfDeclCannotBePotentiallyUnavailable(const Decl *D) {
     // An enum element with an associated value cannot be potentially
     // unavailable.
     if (EED->hasAssociatedValues()) {
-      auto *SF = DC->getParentSourceFile();
-
-      if (SF->Kind == SourceFileKind::Interface) {
+      if (DC->isInSwiftinterface()) {
         return diag::availability_enum_element_no_potential_warn;
       } else {
         return diag::availability_enum_element_no_potential;
@@ -5205,7 +5353,7 @@ TypeChecker::diagnosticIfDeclCannotBeUnavailable(const Decl *D) {
   };
 
   // A destructor is always called if declared.
-  if (auto *DD = dyn_cast<DestructorDecl>(D)) {
+  if (isa<DestructorDecl>(D)) {
     if (parentIsUnavailable(D))
       return std::nullopt;
 
@@ -5214,7 +5362,7 @@ TypeChecker::diagnosticIfDeclCannotBeUnavailable(const Decl *D) {
 
   // The conformance checker does not know what to do with unavailable
   // associated types.
-  if (auto *AT = dyn_cast<AssociatedTypeDecl>(D))
+  if (isa<AssociatedTypeDecl>(D))
     return Diagnostic(diag::availability_decl_no_unavailable, D);
 
   // Observing accessors are always called implicitly.
@@ -6087,7 +6235,7 @@ bool resolveDifferentiableAttrDerivativeGenericSignature(
         /*addedRequirements=*/{},
         /*inferenceSources=*/{},
         attr->getLocation(),
-        /*isExtension=*/false,
+        /*forExtension=*/nullptr,
         /*allowInverses=*/true};
 
     // Compute generic signature for derivative functions.
@@ -6244,7 +6392,7 @@ typecheckDifferentiableAttrforDecl(AbstractFunctionDecl *original,
   auto &diags = ctx.Diags;
 
   // Diagnose if original function has opaque result types.
-  if (auto *opaqueResultTypeDecl = original->getOpaqueResultTypeDecl()) {
+  if (original->getOpaqueResultTypeDecl()) {
     diags.diagnose(
         attr->getLocation(),
         diag::autodiff_attr_opaque_result_type_unsupported);
@@ -6631,7 +6779,7 @@ static bool typeCheckDerivativeAttr(DerivativeAttr *attr) {
   }
 
   // Diagnose if original function has opaque result types.
-  if (auto *opaqueResultTypeDecl = originalAFD->getOpaqueResultTypeDecl()) {
+  if (originalAFD->getOpaqueResultTypeDecl()) {
     diags.diagnose(
         attr->getLocation(),
         diag::autodiff_attr_opaque_result_type_unsupported);
@@ -7185,7 +7333,7 @@ void AttributeChecker::visitTransposeAttr(TransposeAttr *attr) {
   attr->setOriginalFunction(originalAFD);
 
   // Diagnose if original function has opaque result types.
-  if (auto *opaqueResultTypeDecl = originalAFD->getOpaqueResultTypeDecl()) {
+  if (originalAFD->getOpaqueResultTypeDecl()) {
     diagnose(attr->getLocation(),
              diag::autodiff_attr_opaque_result_type_unsupported);
     attr->setInvalid();
@@ -7804,8 +7952,7 @@ void AttributeChecker::visitMacroRoleAttr(MacroRoleAttr *attr) {
       break;
     case MacroRole::Conformance: {
       // Suppress the conformance macro error in swiftinterfaces.
-      SourceFile *file = D->getDeclContext()->getParentSourceFile();
-      if (file && file->Kind == SourceFileKind::Interface)
+      if (D->getDeclContext()->isInSwiftinterface())
         break;
 
       diagnoseAndRemoveAttr(attr, diag::conformance_macro)
@@ -7989,7 +8136,7 @@ public:
         ctx.evaluator, GlobalActorAttributeRequest{closure}, std::nullopt);
 
     if (globalActorAttr && globalActorAttr->first == attr) {
-      // if there is an `isolated` parameter, then this global-actor attribute
+      // If there is an `isolated` parameter, then this global-actor attribute
       // is invalid.
       for (auto param : *closure->getParameters()) {
         if (param->isIsolated()) {
@@ -8183,6 +8330,144 @@ ValueDecl *RenamedDeclRequest::evaluate(Evaluator &evaluator,
   }
 
   return renamedDecl;
+}
+
+static std::optional<AvailabilityDomain>
+getAvailabilityDomainForName(StringRef name, const DeclContext *declContext) {
+  if (auto builtinDomain =
+          AvailabilityDomain::builtinDomainForString(name, declContext))
+    return builtinDomain;
+
+  auto &ctx = declContext->getASTContext();
+  auto identifier = ctx.getIdentifier(name);
+  if (auto customDomain =
+          ctx.MainModule->getAvailabilityDomainForIdentifier(identifier))
+    return customDomain;
+
+  return std::nullopt;
+}
+
+std::optional<SemanticAvailableAttr>
+SemanticAvailableAttrRequest::evaluate(swift::Evaluator &evaluator,
+                                       const AvailableAttr *attr,
+                                       const Decl *decl) const {
+  if (attr->hasCachedDomain())
+    return SemanticAvailableAttr(attr);
+
+  auto &ctx = decl->getASTContext();
+  auto &diags = ctx.Diags;
+  auto attrLoc = attr->getLocation();
+  auto attrName = attr->getAttrName();
+  auto domainLoc = attr->getDomainLoc();
+  auto introducedVersion = attr->getRawIntroduced();
+  auto deprecatedVersion = attr->getRawDeprecated();
+  auto obsoletedVersion = attr->getRawObsoleted();
+  auto mutableAttr = const_cast<AvailableAttr *>(attr);
+  auto domain = attr->getCachedDomain();
+
+  if (!domain) {
+    auto domainName = attr->getDomainString();
+    ASSERT(domainName);
+
+    // Attempt to resolve the domain specified for the attribute and diagnose
+    // if no domain is found.
+    auto declContext = decl->getInnermostDeclContext();
+    domain = getAvailabilityDomainForName(*domainName, declContext);
+    if (!domain) {
+      if (auto suggestion = closestCorrectedPlatformString(*domainName)) {
+        diags
+            .diagnose(domainLoc, diag::attr_availability_suggest_platform,
+                      *domainName, attrName, *suggestion)
+            .fixItReplace(SourceRange(domainLoc), *suggestion);
+      } else {
+        diags.diagnose(attrLoc, diag::attr_availability_unknown_platform,
+                       *domainName, attrName);
+      }
+      return std::nullopt;
+    }
+
+    if (domain->isCustom() &&
+        !ctx.LangOpts.hasFeature(Feature::CustomAvailability) &&
+        !declContext->isInSwiftinterface()) {
+      diags.diagnose(domainLoc,
+                     diag::attr_availability_requires_custom_availability,
+                     *domainName, attr);
+      return std::nullopt;
+    }
+
+    mutableAttr->setCachedDomain(*domain);
+  }
+
+  auto domainName = domain->getNameForAttributePrinting();
+  auto semanticAttr = SemanticAvailableAttr(attr);
+
+  bool hasVersionSpec =
+      (introducedVersion || deprecatedVersion || obsoletedVersion);
+
+  // FIXME: [availability] For the universal domain, this is currently
+  // diagnosed during parsing. That diagnostic should be subsumed by this one.
+  if (!domain->isVersioned() && hasVersionSpec && !domain->isUniversal()) {
+    SourceRange versionSourceRange;
+    if (introducedVersion)
+      versionSourceRange = semanticAttr.getIntroducedSourceRange();
+    else if (deprecatedVersion)
+      versionSourceRange = semanticAttr.getDeprecatedSourceRange();
+    else if (obsoletedVersion)
+      versionSourceRange = semanticAttr.getObsoletedSourceRange();
+
+    diags
+        .diagnose(attrLoc, diag::attr_availability_unexpected_version, attr,
+                  domainName)
+        .highlight(versionSourceRange);
+    return std::nullopt;
+  }
+
+  if (domain->isSwiftLanguage() || domain->isPackageDescription()) {
+    switch (attr->getKind()) {
+    case AvailableAttr::Kind::Deprecated:
+      diags.diagnose(attrLoc,
+                     diag::attr_availability_expected_deprecated_version,
+                     attrName, domainName);
+      return std::nullopt;
+
+    case AvailableAttr::Kind::Unavailable:
+      diags.diagnose(attrLoc, diag::attr_availability_cannot_be_used_for_domain,
+                     "unavailable", attrName, domainName);
+      return std::nullopt;
+
+    case AvailableAttr::Kind::NoAsync:
+      diags.diagnose(attrLoc, diag::attr_availability_cannot_be_used_for_domain,
+                     "noasync", attrName, domainName);
+      return std::nullopt;
+
+    case AvailableAttr::Kind::Default:
+      break;
+    }
+
+    if (!hasVersionSpec) {
+      diags.diagnose(attrLoc, diag::attr_availability_expected_version_spec,
+                     attrName, domainName);
+      return std::nullopt;
+    }
+  }
+
+  // Canonicalize platform versions.
+  // FIXME: [availability] This should be done when remapping versions instead.
+  if (domain->isPlatform()) {
+    auto canonicalizeVersion = [&](llvm::VersionTuple version) {
+      return canonicalizePlatformVersion(domain->getPlatformKind(), version);
+    };
+    if (introducedVersion)
+      mutableAttr->setRawIntroduced(canonicalizeVersion(*introducedVersion));
+
+    if (deprecatedVersion)
+      mutableAttr->setRawDeprecated(canonicalizeVersion(*deprecatedVersion));
+
+    if (obsoletedVersion)
+      mutableAttr->setRawObsoleted(canonicalizeVersion(*obsoletedVersion));
+  }
+
+  return semanticAttr;
 }
 
 template <typename ATTR>

@@ -40,6 +40,8 @@ SourceKit::Context::Context(
     StringRef DiagnosticDocumentationPath,
     llvm::function_ref<std::unique_ptr<LangSupport>(Context &)>
         LangSupportFactoryFn,
+    llvm::function_ref<std::shared_ptr<PluginSupport>(Context &)>
+        PluginSupportFactoryFn,
     bool shouldDispatchNotificationsOnMain)
     : SwiftExecutablePath(SwiftExecutablePath), RuntimeLibPath(RuntimeLibPath),
       DiagnosticDocumentationPath(DiagnosticDocumentationPath),
@@ -49,6 +51,7 @@ SourceKit::Context::Context(
       SlowRequestSim(new SlowRequestSimulator(ReqTracker)) {
   // Should be called last after everything is initialized.
   SwiftLang = LangSupportFactoryFn(*this);
+  Plugins = PluginSupportFactoryFn(*this);
 }
 
 SourceKit::Context::~Context() {

@@ -645,12 +645,13 @@ namespace {
         return Type();
 
       auto size = type->getSize().getZExtValue();
+
       // An array of size N is imported as an N-element tuple which
       // takes very long to compile. We chose 4096 as the upper limit because
       // we don't want to break arrays of size PATH_MAX.
       if (size > 4096)
         return Type();
-      
+
       if (size == 1)
         return elementType;
 
@@ -2329,7 +2330,7 @@ ImportedType ClangImporter::Implementation::importFunctionReturnType(
                        : ImportTypeKind::Result),
       ImportDiagnosticAdder(*this, clangDecl, clangDecl->getLocation()),
       allowNSUIntegerAsInt, Bridgeability::Full, getImportTypeAttrs(clangDecl),
-      OptionalityOfReturn, isBoundsAnnotated);
+      OptionalityOfReturn, true, std::nullopt, isBoundsAnnotated);
 }
 
 static Type
@@ -2686,14 +2687,18 @@ static ParamDecl *getParameterInfo(ClangImporter::Implementation *impl,
     }
   }
 
+  // Parameters of type const T& imported as T, make sure we borrow from them
+  // when they have lifetime annotations.
+  bool isBorrowing = (param->getAttr<clang::LifetimeBoundAttr>() ||
+                      param->getAttr<clang::LifetimeCaptureByAttr>()) &&
+                     param->getType()->isReferenceType();
   // Foreign references are already references so they don't need to be passed
   // as inout.
   paramInfo->setSpecifier(
       isConsuming ? ParamSpecifier::Consuming
                   : (isInOut ? ParamSpecifier::InOut
-                             : (param->getAttr<clang::LifetimeBoundAttr>()
-                                    ? ParamSpecifier::Borrowing
-                                    : ParamSpecifier::Default)));
+                             : (isBorrowing ? ParamSpecifier::Borrowing
+                                            : ParamSpecifier::Default)));
   paramInfo->setInterfaceType(swiftParamTy);
   impl->recordImplicitUnwrapForDecl(paramInfo, isParamTypeImplicitlyUnwrapped);
 

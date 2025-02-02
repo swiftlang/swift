@@ -7,7 +7,7 @@ public struct SpanOfInt {
     init(_ x: Span<CInt>) {}
 }
 
-@_SwiftifyImport(.nonescaping(pointer: 1), typeMappings: ["SpanOfInt" : "std.span<CInt>"])
+@_SwiftifyImport(.nonescaping(pointer: .param(1)), typeMappings: ["SpanOfInt" : "std.span<CInt>"])
 func myFunc(_ span: SpanOfInt, _ secondSpan: SpanOfInt) {
 }
 

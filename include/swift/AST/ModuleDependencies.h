@@ -229,18 +229,12 @@ public:
 
 struct CommonSwiftTextualModuleDependencyDetails {
   CommonSwiftTextualModuleDependencyDetails(
-      ArrayRef<StringRef> extraPCMArgs, ArrayRef<StringRef> buildCommandLine,
+      ArrayRef<StringRef> buildCommandLine,
       StringRef CASFileSystemRootID)
-      : extraPCMArgs(extraPCMArgs.begin(), extraPCMArgs.end()),
-        bridgingHeaderFile(std::nullopt),
+      : bridgingHeaderFile(std::nullopt),
         bridgingSourceFiles(), bridgingModuleDependencies(),
         buildCommandLine(buildCommandLine.begin(), buildCommandLine.end()),
         CASFileSystemRootID(CASFileSystemRootID) {}
-
-  /// To build a PCM to be used by this Swift module, we need to append these
-  /// arguments to the generic PCM build arguments reported from the dependency
-  /// graph.
-  const std::vector<std::string> extraPCMArgs;
 
   /// Bridging header file, if there is one.
   std::optional<std::string> bridgingHeaderFile;
@@ -299,7 +293,7 @@ public:
       ArrayRef<ScannerImportStatementInfo> moduleImports,
       ArrayRef<ScannerImportStatementInfo> optionalModuleImports,
       ArrayRef<StringRef> buildCommandLine, ArrayRef<LinkLibrary> linkLibraries,
-      ArrayRef<StringRef> extraPCMArgs, StringRef contextHash, bool isFramework,
+      StringRef contextHash, bool isFramework,
       bool isStatic, StringRef RootID, StringRef moduleCacheKey,
       StringRef userModuleVersion)
       : ModuleDependencyInfoStorageBase(ModuleDependencyKind::SwiftInterface,
@@ -310,7 +304,7 @@ public:
         compiledModuleCandidates(compiledModuleCandidates.begin(),
                                  compiledModuleCandidates.end()),
         contextHash(contextHash), isFramework(isFramework), isStatic(isStatic),
-        textualModuleDetails(extraPCMArgs, buildCommandLine, RootID),
+        textualModuleDetails(buildCommandLine, RootID),
         userModuleVersion(userModuleVersion) {}
 
   ModuleDependencyInfoStorageBase *clone() const override {
@@ -348,11 +342,10 @@ public:
       StringRef RootID, ArrayRef<StringRef> buildCommandLine,
       ArrayRef<ScannerImportStatementInfo> moduleImports,
       ArrayRef<ScannerImportStatementInfo> optionalModuleImports,
-      ArrayRef<StringRef> bridgingHeaderBuildCommandLine,
-      ArrayRef<StringRef> extraPCMArgs)
+      ArrayRef<StringRef> bridgingHeaderBuildCommandLine)
       : ModuleDependencyInfoStorageBase(ModuleDependencyKind::SwiftSource,
                                         moduleImports, optionalModuleImports, {}),
-        textualModuleDetails(extraPCMArgs, buildCommandLine, RootID),
+        textualModuleDetails(buildCommandLine, RootID),
         testableImports(llvm::StringSet<>()),
         bridgingHeaderBuildCommandLine(bridgingHeaderBuildCommandLine.begin(),
                                        bridgingHeaderBuildCommandLine.end()) {}
@@ -476,10 +469,6 @@ public:
   /// The file dependencies
   const std::vector<std::string> fileDependencies;
 
-  /// The swift-specific PCM arguments captured by this dependencies object
-  /// as found by the scanning action that discovered it
-  const std::vector<std::string> capturedPCMArgs;
-
   /// CASID for the Root of CASFS. Empty if CAS is not used.
   std::string CASFileSystemRootID;
 
@@ -493,7 +482,6 @@ public:
                                StringRef moduleMapFile, StringRef contextHash,
                                ArrayRef<std::string> buildCommandLine,
                                ArrayRef<std::string> fileDependencies,
-                               ArrayRef<std::string> capturedPCMArgs,
                                ArrayRef<LinkLibrary> linkLibraries,
                                StringRef CASFileSystemRootID,
                                StringRef clangIncludeTreeRoot,
@@ -504,7 +492,6 @@ public:
         pcmOutputPath(pcmOutputPath), mappedPCMPath(mappedPCMPath),
         moduleMapFile(moduleMapFile), contextHash(contextHash),
         buildCommandLine(buildCommandLine), fileDependencies(fileDependencies),
-        capturedPCMArgs(capturedPCMArgs),
         CASFileSystemRootID(CASFileSystemRootID),
         CASClangIncludeTreeRootID(clangIncludeTreeRoot), IsSystem(IsSystem) {}
 
@@ -588,7 +575,7 @@ public:
       ArrayRef<StringRef> compiledCandidates, ArrayRef<StringRef> buildCommands,
       ArrayRef<ScannerImportStatementInfo> moduleImports,
       ArrayRef<ScannerImportStatementInfo> optionalModuleImports,
-      ArrayRef<LinkLibrary> linkLibraries, ArrayRef<StringRef> extraPCMArgs,
+      ArrayRef<LinkLibrary> linkLibraries,
       StringRef contextHash, bool isFramework, bool isStatic,
       StringRef CASFileSystemRootID, StringRef moduleCacheKey,
       StringRef userModuleVersion) {
@@ -596,7 +583,7 @@ public:
         std::make_unique<SwiftInterfaceModuleDependenciesStorage>(
             moduleOutputPath, swiftInterfaceFile, compiledCandidates,
             moduleImports, optionalModuleImports,
-            buildCommands, linkLibraries, extraPCMArgs, contextHash,
+            buildCommands, linkLibraries, contextHash,
             isFramework, isStatic, CASFileSystemRootID, moduleCacheKey,
             userModuleVersion));
   }
@@ -624,13 +611,11 @@ public:
                        ArrayRef<StringRef> buildCommands,
                        ArrayRef<ScannerImportStatementInfo> moduleImports,
                        ArrayRef<ScannerImportStatementInfo> optionalModuleImports,
-                       ArrayRef<StringRef> bridgingHeaderBuildCommands,
-                       ArrayRef<StringRef> extraPCMArgs) {
+                       ArrayRef<StringRef> bridgingHeaderBuildCommands) {
     return ModuleDependencyInfo(
         std::make_unique<SwiftSourceModuleDependenciesStorage>(
             CASFileSystemRootID, buildCommands, moduleImports,
-            optionalModuleImports, bridgingHeaderBuildCommands,
-            extraPCMArgs));
+            optionalModuleImports, bridgingHeaderBuildCommands));
   }
 
   static ModuleDependencyInfo
@@ -640,7 +625,6 @@ public:
              StringRef(), ArrayRef<StringRef>(),
              ArrayRef<ScannerImportStatementInfo>(),
              ArrayRef<ScannerImportStatementInfo>(),
-             ArrayRef<StringRef>(),
              ArrayRef<StringRef>()));
   }
 
@@ -650,12 +634,11 @@ public:
       StringRef pcmOutputPath, StringRef mappedPCMPath, StringRef moduleMapFile,
       StringRef contextHash, ArrayRef<std::string> nonPathCommandLine,
       ArrayRef<std::string> fileDependencies,
-      ArrayRef<std::string> capturedPCMArgs,
       ArrayRef<LinkLibrary> linkLibraries, StringRef CASFileSystemRootID,
       StringRef clangIncludeTreeRoot, StringRef moduleCacheKey, bool IsSystem) {
     return ModuleDependencyInfo(std::make_unique<ClangModuleDependencyStorage>(
         pcmOutputPath, mappedPCMPath, moduleMapFile, contextHash,
-        nonPathCommandLine, fileDependencies, capturedPCMArgs, linkLibraries,
+        nonPathCommandLine, fileDependencies, linkLibraries,
         CASFileSystemRootID, clangIncludeTreeRoot, moduleCacheKey, IsSystem));
   }
 

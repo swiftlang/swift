@@ -172,6 +172,7 @@
 /lib/Sema/Constraint*                               @hborla @xedin
 /lib/Sema/DerivedConformance*                       @slavapestov
 /lib/Sema/DerivedConformanceDistributed*            @ktoso @slavapestov
+/lib/Sema/OpenedExistentials*                       @AnthonyLatsis @slavapestov
 /lib/Sema/TypeCheckDistributed*                     @hborla @ktoso @xedin
 /lib/Sema/TypeCheckProtocol*                        @AnthonyLatsis @hborla @slavapestov
 /lib/Sema/TypeCheckType*                            @AnthonyLatsis @hborla @slavapestov @xedin
@@ -189,7 +190,7 @@
 /stdlib/private/*Runtime*/                @rjmccall
 /stdlib/private/SwiftReflectionTest/      @slavapestov
 /stdlib/public/*Demangl*/                 @rjmccall
-/stdlib/public/Backtracing/               @al45tair
+/stdlib/public/RuntimeModule/             @al45tair @mikeash
 /stdlib/public/Concurrency/               @ktoso
 /stdlib/public/Cxx/                       @zoecarver @hyp @egorzhdan @Xazax-hun
 /stdlib/public/Distributed/               @ktoso

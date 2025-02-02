@@ -82,10 +82,10 @@ import NoncopyableGenerics_Misc
 
 // CHECK-MISC: public struct Hello<T> : ~Swift.Copyable, ~Swift.Escapable where T : ~Copyable, T : ~Escapable {
 
-// CHECK-MISC: extension NoncopyableGenerics_Misc.Hello : Swift.Escapable where T : Swift.Escapable {
+// CHECK-MISC: extension NoncopyableGenerics_Misc.Hello : Swift.Escapable where T : Swift.Escapable, T : ~Copyable {
 // CHECK-MISC-NEXT: }
 
-// CHECK-MISC: extension NoncopyableGenerics_Misc.Hello : Swift.Copyable where T : Swift.Copyable {
+// CHECK-MISC: extension NoncopyableGenerics_Misc.Hello : Swift.Copyable where T : Swift.Copyable, T : ~Escapable {
 // CHECK-MISC-NEXT: }
 
 // CHECK-MISC: public protocol TestAssocTypes {
@@ -118,7 +118,7 @@ import NoncopyableGenerics_Misc
 
 // CHECK-MISC: extension {{.*}}.Outer.InnerVariation1 : Swift.Copyable where A : Swift.Copyable, D : Swift.Copyable {
 
-// CHECK-MISC: extension {{.*}}.Outer.InnerVariation2 : Swift.Escapable where D : Swift.Escapable {
+// CHECK-MISC: extension {{.*}}.Outer.InnerVariation2 : Swift.Escapable where D : Swift.Escapable, A : ~Copyable {
 
 // CHECK-MISC: extension {{.*}}.Outer.InnerStruct {
 // CHECK-MISC-NEXT: #if compiler(>=5.3) && $NonescapableTypes
@@ -164,8 +164,8 @@ import NoncopyableGenerics_Misc
 // CHECK-MISC-NEXT: public struct Continuation<T, E> where E : Swift.Error, T : ~Copyable {
 
 // CHECK-MISC: @frozen public enum Moptional<Wrapped> : ~Swift.Copyable, ~Swift.Escapable where Wrapped : ~Copyable, Wrapped : ~Escapable {
-// CHECK-MISC: extension {{.*}}.Moptional : Swift.Copyable where Wrapped : Swift.Copyable {
-// CHECK-MISC: extension {{.*}}.Moptional : Swift.Escapable where Wrapped : Swift.Escapable {
+// CHECK-MISC: extension {{.*}}.Moptional : Swift.Copyable where Wrapped : Swift.Copyable, Wrapped : ~Escapable {
+// CHECK-MISC: extension {{.*}}.Moptional : Swift.Escapable where Wrapped : Swift.Escapable, Wrapped : ~Copyable {
 
 // CHECK-MISC-NOT:  ~
 

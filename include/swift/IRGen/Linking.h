@@ -1664,6 +1664,8 @@ public:
   /// Determine whether entity that represents a symbol is in DATA segment.
   bool isData() const { return !isText(); }
 
+  bool isTypeKind() const { return isTypeKind(getKind()); }
+
   bool isAlwaysSharedLinkage() const;
 #undef LINKENTITY_GET_FIELD
 #undef LINKENTITY_SET_FIELD

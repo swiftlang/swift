@@ -147,7 +147,7 @@ findGenericParameterReferencesRec(CanGenericSignature genericSig,
   }
 
   // Metatypes preserve variance.
-  if (auto metaTy = type->getAs<MetatypeType>()) {
+  if (auto metaTy = type->getAs<AnyMetatypeType>()) {
     return findGenericParameterReferencesRec(genericSig, origParam, openedParam,
                                              metaTy->getInstanceType(),
                                              position, canBeCovariantResult);
@@ -272,10 +272,9 @@ findGenericParameterReferencesRec(CanGenericSignature genericSig,
         TypePosition::Invariant, /*canBeCovariantResult=*/false);
   }
 
-  // Specifically ignore parameterized protocols and existential
-  // metatypes because we can erase them to the upper bound.
-  if (type->is<ParameterizedProtocolType>() ||
-      type->is<ExistentialMetatypeType>()) {
+  // Specifically ignore parameterized protocols because we can erase them to
+  // the upper bound.
+  if (type->is<ParameterizedProtocolType>()) {
     return GenericParameterReferenceInfo();
   }
 

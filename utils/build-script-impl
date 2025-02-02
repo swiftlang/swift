@@ -488,7 +488,6 @@ function verify_host_is_supported() {
       | appletvsimulator-x86_64 \
       | appletvsimulator-arm64  \
       | appletvos-arm64         \
-      | watchsimulator-i386     \
       | watchsimulator-x86_64   \
       | watchsimulator-arm64    \
       | watchos-armv7k          \
@@ -665,13 +664,6 @@ function set_build_options_for_host() {
                     llvm_target_arch="AArch64"
 
                     SWIFT_HOST_VARIANT_SDK="TVOS"
-                    cmake_osx_deployment_target=""
-                    ;;
-                watchsimulator-i386)
-                    SWIFT_HOST_TRIPLE="i386-apple-watchos${DARWIN_DEPLOYMENT_VERSION_WATCHOS}-simulator"
-                    llvm_target_arch="X86"
-
-                    SWIFT_HOST_VARIANT_SDK="WATCHOS_SIMULATOR"
                     cmake_osx_deployment_target=""
                     ;;
                 watchsimulator-x86_64)
@@ -2421,6 +2413,11 @@ for host in "${ALL_HOSTS[@]}"; do
                     continue
                 fi
 
+                if [[ "${BUILD_SWIFT_TOOLS}" == "0" ]]; then
+                    echo "Skipping building Foundation Macros for ${host}, because the host tools are not being built"
+                    continue
+                fi
+
                 if [[ "${SKIP_CLEAN_FOUNDATION}" == "0" ]]
                 then
                   # The Swift project might have been changed, but CMake might
@@ -2568,11 +2565,6 @@ for host in "${ALL_HOSTS[@]}"; do
                     # https://cmake.org/cmake/help/latest/command/find_package.html
                     cmake_options+=(
                         -DCMAKE_FIND_ROOT_PATH:PATH="${CROSS_COMPILE_DEPS_PATH}"
-                    )
-                fi
-                if [[ "${host}" == "android-"* ]]; then
-                    cmake_options+=(
-                        -DCMAKE_HAVE_LIBC_PTHREAD=True
                     )
                 fi
                 ;;
@@ -3018,6 +3010,11 @@ for host in "${ALL_HOSTS[@]}"; do
                 # FIXME: Foundation doesn't build from the script on OS X
                 if [[ ${host} == "macosx"* ]]; then
                     echo "Skipping Foundation on OS X -- Foundation does not build for this platform"
+                    continue
+                fi
+
+                if [[ "${BUILD_SWIFT_TOOLS}" == "0" && "${product}" == "foundation_macros" ]]; then
+                    echo "Skipping installing Foundation Macros for ${host}, because the host tools are not being built"
                     continue
                 fi
 

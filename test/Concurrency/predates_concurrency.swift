@@ -201,9 +201,9 @@ class C { // expected-complete-tns-note {{'C' does not conform to the 'Sendable'
     func doNext() { // expected-complete-tns-warning {{concurrently-executed local function 'doNext()' must be marked as '@Sendable'}}
       doPreconcurrency {
         self.ev?.scheduleTask(deadline: i, doNext)
-        // expected-complete-tns-warning @-1 {{capture of 'self' with non-sendable type 'C' in a `@Sendable` closure}}
+        // expected-complete-tns-warning @-1 {{capture of 'self' with non-sendable type 'C' in a '@Sendable' closure}}
         // expected-complete-tns-warning @-2 {{converting non-sendable function value to '@Sendable () throws -> ()' may introduce data races}}
-        // expected-complete-tns-warning @-3 {{capture of 'doNext()' with non-sendable type '() -> ()' in a `@Sendable` closure}}
+        // expected-complete-tns-warning @-3 {{capture of 'doNext()' with non-sendable type '() -> ()' in a '@Sendable' closure}}
         // expected-complete-tns-note @-4 {{a function type must be marked '@Sendable' to conform to 'Sendable'}}
         return
       }
@@ -235,7 +235,7 @@ extension MainActorPreconcurrency: NotIsolated {
   // expected-complete-tns-note@-2{{add '@preconcurrency' to the 'NotIsolated' conformance to defer isolation checking to run time}}{{36-36=@preconcurrency }}
 
   func requirement() {}
-  // expected-complete-tns-warning@-1 {{main actor-isolated instance method 'requirement()' cannot be used to satisfy nonisolated protocol requirement}}
+  // expected-complete-tns-warning@-1 {{main actor-isolated instance method 'requirement()' cannot be used to satisfy nonisolated requirement from protocol 'NotIsolated'}}
   // expected-complete-tns-note@-2 {{add 'nonisolated' to 'requirement()' to make this instance method not isolated to the actor}}
   // expected-complete-tns-note@-3 {{calls to instance method 'requirement()' from outside of its actor context are implicitly asynchronous}}
 

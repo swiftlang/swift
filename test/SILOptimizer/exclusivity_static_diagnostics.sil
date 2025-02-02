@@ -1363,10 +1363,9 @@ bb0(%0 : $*Int):
 
   %8 = function_ref @closureForWithoutActuallyEscapingVerify : $@convention(thin) (@guaranteed @callee_guaranteed () -> ()) -> ()
   %9 = apply %8(%6) : $@convention(thin) (@guaranteed @callee_guaranteed () -> ()) -> ()
-  %10 = is_escaping_closure %6 : $@callee_guaranteed () -> ()
+  %10 = destroy_not_escaped_closure %6 : $@callee_guaranteed () -> ()
   cond_fail %10 : $Builtin.Int1
   destroy_value %3 : $@callee_guaranteed () -> ()
-  destroy_value %6 : $@callee_guaranteed () -> ()
   %14 = tuple ()
   return %14 : $()
 }

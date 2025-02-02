@@ -39,6 +39,12 @@ private func devirtualize(destroy: some DevirtualizableDestroy, _ context: some 
     return true
   }
 
+  // We cannot de-virtualize C++ destructor calls of C++ move-only types because we cannot get
+  // its destructor (`nominal.valueTypeDestructor` is nil).
+  if nominal.hasClangNode {
+    return false
+  }
+
   if nominal.valueTypeDestructor != nil && !destroy.shouldDropDeinit {
     guard let deinitFunc = context.lookupDeinit(ofNominal: nominal) else {
       return false

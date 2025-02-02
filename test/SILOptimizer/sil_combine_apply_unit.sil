@@ -40,7 +40,7 @@ entry(%input : $*Input):
   %nunca = alloc_stack $Nunca
   %callee = function_ref @rdar127452206_callee : $@convention(thin) @Sendable @substituted <τ_0_0, τ_0_1, τ_0_2> (@in_guaranteed τ_0_0) -> (@out τ_0_2, @error_indirect τ_0_1) for <Input, Nunca, Output>
   %convert = convert_function %callee : $@convention(thin) @Sendable @substituted <τ_0_0, τ_0_1, τ_0_2> (@in_guaranteed τ_0_0) -> (@out τ_0_2, @error_indirect τ_0_1) for <Input, Nunca, Output> to $@convention(thin) @substituted <τ_0_0, τ_0_1, τ_0_2> (@in_guaranteed τ_0_0) -> (@out τ_0_2, @error_indirect τ_0_1) for <Input, Nunca, Output> // user: %216
-  specify_test "sil_combine_instruction @instruction[4]"
+  specify_test "sil_combine_visit_instruction @instruction[4]"
   apply [nothrow] %convert(%output, %nunca, %input) : $@convention(thin) @substituted <τ_0_0, τ_0_1, τ_0_2> (@in_guaranteed τ_0_0) -> (@out τ_0_2, @error_indirect τ_0_1) for <Input, Nunca, Output>
   dealloc_stack %nunca : $*Nunca
   dealloc_stack %output : $*Output
@@ -62,7 +62,7 @@ entry(%c : @owned $C):
   %borrowMaybeC = function_ref @borrowMaybeC : $@convention(thin) (@guaranteed Optional<C>) -> ()
   %borrowC = convert_function %borrowMaybeC to $@convention(thin) (@guaranteed C) -> ()
   %void = apply %borrowC(%c) : $@convention(thin) (@guaranteed C) -> ()
-  specify_test "sil_combine_instruction %void"
+  specify_test "sil_combine_visit_instruction %void"
   destroy_value %c
   %retval = tuple ()
   return %retval
@@ -89,7 +89,7 @@ entry(%c : @owned $C, %c2 : @owned $C):
   %borrowMaybeC2 = function_ref @borrowMaybeC2 : $@convention(thin) (@guaranteed Optional<C>, @guaranteed Optional<C>) -> ()
   %borrowC2 = convert_function %borrowMaybeC2 to $@convention(thin) (@guaranteed C, @guaranteed C) -> ()
   %void = apply %borrowC2(%c, %c2) : $@convention(thin) (@guaranteed C, @guaranteed C) -> ()
-  specify_test "sil_combine_instruction %void"
+  specify_test "sil_combine_visit_instruction %void"
   destroy_value %c
   destroy_value %c2
   %retval = tuple ()
@@ -116,7 +116,7 @@ sil [ossa] @convert_function__to_optional__owned_as_guaranteed__3 : $@convention
 entry(%c : @owned $C):
   %borrowMaybeC = function_ref @borrowMaybeCThrowing : $@convention(thin) (@guaranteed Optional<C>) -> (@error Error)
   %borrowC = convert_function %borrowMaybeC to $@convention(thin) (@guaranteed C) -> (@error Error)
-  specify_test "sil_combine_instruction @instruction"
+  specify_test "sil_combine_visit_instruction @instruction"
   try_apply %borrowC(%c) : $@convention(thin) (@guaranteed C) -> (@error Error),
     normal success,
     error failure
@@ -160,7 +160,7 @@ sil [ossa] @convert_function__to_optional__owned_as_guaranteed__4 : $@convention
 entry(%c : @owned $C, %c2 : @owned $C):
   %borrowMaybeC2 = function_ref @borrowMaybeC2Throwing : $@convention(thin) (@guaranteed Optional<C>, @guaranteed Optional<C>) -> (@error Error)
   %borrowC2 = convert_function %borrowMaybeC2 to $@convention(thin) (@guaranteed C, @guaranteed C) -> (@error Error)
-  specify_test "sil_combine_instruction @instruction"
+  specify_test "sil_combine_visit_instruction @instruction"
   try_apply %borrowC2(%c, %c2) : $@convention(thin) (@guaranteed C, @guaranteed C) -> (@error Error),
     normal success,
     error failure

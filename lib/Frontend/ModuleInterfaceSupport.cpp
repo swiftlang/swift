@@ -489,7 +489,6 @@ class InheritedProtocolCollector {
   static ProtocolConformanceOptions filterOptions(ProtocolConformanceOptions options) {
     options -= ProtocolConformanceFlags::Preconcurrency;
     options -= ProtocolConformanceFlags::Retroactive;
-    options -= ProtocolConformanceFlags::Safe;
     return options;
   }
 

@@ -368,9 +368,10 @@ protected:
     IsObjC : 1
   );
 
-  SWIFT_INLINE_BITFIELD_FULL(SequenceExpr, Expr, 32,
+  SWIFT_INLINE_BITFIELD_FULL(SequenceExpr, Expr, 32+1,
     : NumPadBits,
-    NumElements : 32
+    NumElements : 32,
+    IsFolded: 1
   );
 
   SWIFT_INLINE_BITFIELD(OpaqueValueExpr, Expr, 1,
@@ -2173,6 +2174,36 @@ public:
   }
 };
 
+/// UnsafeExpr - An 'unsafe' surrounding an expression, marking that the
+/// expression contains uses of unsafe declarations.
+///
+/// getSemanticsProvidingExpr() looks through this because it doesn't
+/// provide the value and only very specific clients care where the
+/// 'unsafe' was written.
+class UnsafeExpr final : public IdentityExpr {
+  SourceLoc UnsafeLoc;
+public:
+  UnsafeExpr(SourceLoc unsafeLoc, Expr *sub, Type type = Type(),
+            bool implicit = false)
+    : IdentityExpr(ExprKind::Unsafe, sub, type, implicit),
+      UnsafeLoc(unsafeLoc) {
+  }
+
+  static UnsafeExpr *createImplicit(ASTContext &ctx, SourceLoc unsafeLoc, Expr *sub, Type type = Type()) {
+    return new (ctx) UnsafeExpr(unsafeLoc, sub, type, /*implicit=*/true);
+  }
+
+  SourceLoc getLoc() const { return UnsafeLoc; }
+
+  SourceLoc getUnsafeLoc() const { return UnsafeLoc; }
+  SourceLoc getStartLoc() const { return UnsafeLoc; }
+  SourceLoc getEndLoc() const { return getSubExpr()->getEndLoc(); }
+
+  static bool classof(const Expr *e) {
+    return e->getKind() == ExprKind::Unsafe;
+  }
+};
+
 /// ConsumeExpr - A 'consume' surrounding an lvalue expression marking the
 /// lvalue as needing to be moved.
 class ConsumeExpr final : public Expr {
@@ -3970,6 +4001,13 @@ public:
   }
   void setElement(unsigned i, Expr *e) {
     getElements()[i] = e;
+  }
+
+  bool isFolded() const {
+    return static_cast<bool>(Bits.SequenceExpr.IsFolded);
+  }
+  void setFolded(bool folded) {
+    Bits.SequenceExpr.IsFolded = static_cast<unsigned>(folded);
   }
 
   // Implement isa/cast/dyncast/etc.

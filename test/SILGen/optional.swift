@@ -177,6 +177,7 @@ func implicit_iuo_unwrap_sourceLocation(_ value: Int!) {
 // CHECK:    br bb2
 
 // CHECK:      bb2:
+// CHECK-NEXT:   ignored_use [[MEM]]
 // CHECK-NEXT:   destroy_addr [[MEM]] : $*Any
 // CHECK-NEXT:   dealloc_stack [[MEM]] : $*Any
 // CHECK:        return

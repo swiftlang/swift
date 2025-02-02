@@ -145,6 +145,7 @@ add_library(swiftCore
   SetVariant.swift
   ShadowProtocols.swift
   Shims.swift
+  Slab.swift
   Slice.swift
   SmallString.swift
   Sort.swift
@@ -222,6 +223,7 @@ add_library(swiftCore
   Int128.swift
   Mirror.swift
   PlaygroundDisplay.swift
+  SwiftifyImport.swift
   CommandLine.swift
   SliceBuffer.swift
   StaticBigInt.swift
@@ -282,9 +284,14 @@ target_compile_options(swiftCore PRIVATE
   "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xfrontend -disable-autolinking-runtime-compatibility-concurrency>"
   "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xfrontend -disable-objc-attr-requires-foundation-module>"
   "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xfrontend -require-explicit-availability=ignore>"
-  "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xfrontend -prespecialize-generic-metadata>"
-  "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xllvm -sil-inline-generics>"
-  "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xllvm -sil-partial-specialization>")
+  "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xfrontend -prespecialize-generic-metadata>")
+
+if(NOT "${CMAKE_BUILD_TYPE}" STREQUAL "MinSizeRel")
+  # Using these in MinSizeRel would result in a 15% increase in the binary size
+  target_compile_options(swiftCore PRIVATE
+    "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xllvm -sil-inline-generics>"
+    "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xllvm -sil-partial-specialization>")
+endif()
 
 target_compile_definitions(swiftCore PRIVATE
   $<$<BOOL:${SwiftCore_ENABLE_REFLECTION}>:-DSWIFT_ENABLE_REFLECTION>
@@ -319,9 +326,12 @@ elseif(NOT APPLE AND NOT LINUX AND NOT ANDROID AND UNIX)
   target_link_libraries(swiftCore PRIVATE "${EXECINFO_LIBRARY}")
 endif()
 
-install(TARGETS swiftCore)
+install(TARGETS swiftCore
+  ARCHIVE DESTINATION "${SwiftCore_INSTALL_LIBDIR}"
+  LIBRARY DESTINATION "${SwiftCore_INSTALL_LIBDIR}"
+  RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}")
 install(FILES "${CMAKE_CURRENT_BINARY_DIR}/Swift.swiftmodule"
-  DESTINATION "${CMAKE_INSTALL_LIBDIR}/swift/Swift.swiftmodule"
+  DESTINATION "${SwiftCore_INSTALL_SWIFTMODULEDIR}/Swift.swiftmodule"
   RENAME "${SwiftCore_MODULE_TRIPLE}.swiftmodule")
 emit_swift_interface(swiftCore)
 install_swift_interface(swiftCore)

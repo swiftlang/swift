@@ -199,7 +199,7 @@ sil [ossa] @dont_copy_let_properties_with_guaranteed_base : $@convention(thin) (
 bb0(%x : @guaranteed $ClassLet):
   %f = function_ref @black_hole : $@convention(thin) (@guaranteed Klass) -> ()
 
-  %p = ref_element_addr %x : $ClassLet, #ClassLet.aLet
+  %p = ref_element_addr [immutable] %x : $ClassLet, #ClassLet.aLet
   %v = load [copy] %p : $*Klass
   %b = begin_borrow %v : $Klass
   apply %f(%b) : $@convention(thin) (@guaranteed Klass) -> ()
@@ -223,7 +223,7 @@ sil [ossa] @dont_copy_let_properties_with_guaranteed_base_and_forwarding_uses : 
 bb0(%x : @guaranteed $ClassLet):
   %f = function_ref @black_hole : $@convention(thin) (@guaranteed Klass) -> ()
 
-  %p = ref_element_addr %x : $ClassLet, #ClassLet.aLet
+  %p = ref_element_addr [immutable] %x : $ClassLet, #ClassLet.aLet
   %v = load [copy] %p : $*Klass
   %c = unchecked_ref_cast %v : $Klass to $Klass
   %b = begin_borrow %c : $Klass
@@ -247,7 +247,7 @@ bb0(%x : @guaranteed $SubclassLet):
   %f = function_ref @black_hole : $@convention(thin) (@guaranteed Klass) -> ()
 
   %u = upcast %x : $SubclassLet to $ClassLet
-  %p = ref_element_addr %u : $ClassLet, #ClassLet.aLet
+  %p = ref_element_addr [immutable] %u : $ClassLet, #ClassLet.aLet
   %v = load [copy] %p : $*Klass
   %b = begin_borrow %v : $Klass
   apply %f(%b) : $@convention(thin) (@guaranteed Klass) -> ()
@@ -293,7 +293,7 @@ sil [ossa] @dont_copy_let_properties_with_guaranteed_base_structural : $@convent
 bb0(%x : @guaranteed $ClassLet):
   %f = function_ref @black_hole : $@convention(thin) (@guaranteed Klass) -> ()
 
-  %p = ref_element_addr %x : $ClassLet, #ClassLet.aLetTuple
+  %p = ref_element_addr [immutable] %x : $ClassLet, #ClassLet.aLetTuple
   %q = tuple_element_addr %p : $*(Klass, Klass), 1
   %v = load [copy] %q : $*Klass
   %b = begin_borrow %v : $Klass
@@ -369,7 +369,7 @@ bb0(%x : @owned $ClassLet):
   %f = function_ref @black_hole : $@convention(thin) (@guaranteed Klass) -> ()
 
   %a = begin_borrow %x : $ClassLet
-  %p = ref_element_addr %a : $ClassLet, #ClassLet.aLet
+  %p = ref_element_addr [immutable] %a : $ClassLet, #ClassLet.aLet
   %v = load [copy] %p : $*Klass
   apply %f(%v) : $@convention(thin) (@guaranteed Klass) -> ()
   destroy_value %v : $Klass
@@ -409,7 +409,7 @@ bb0(%x : @owned $ClassLet):
   %f = function_ref @guaranteed_user : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
 
   %a = begin_borrow %x : $ClassLet
-  %p = ref_element_addr %a : $ClassLet, #ClassLet.aLet
+  %p = ref_element_addr [immutable] %a : $ClassLet, #ClassLet.aLet
   %v = load [copy] %p : $*Klass
   %v_cast = unchecked_ref_cast %v : $Klass to $Builtin.NativeObject
   apply %f(%v_cast) : $@convention(thin) (@guaranteed Builtin.NativeObject) -> ()
@@ -1145,7 +1145,7 @@ bb0(%0 : @guaranteed $FakeOptional<ClassLet>):
   switch_enum %0 : $FakeOptional<ClassLet>, case #FakeOptional.some!enumelt: bb1, case #FakeOptional.none!enumelt: bb2
 
 bb1(%1 : @guaranteed $ClassLet):
-  %2 = ref_element_addr %1 : $ClassLet, #ClassLet.aLet
+  %2 = ref_element_addr [immutable] %1 : $ClassLet, #ClassLet.aLet
   %3 = load [copy] %2 : $*Klass
   apply %f(%3) : $@convention(thin) (@guaranteed Klass) -> ()
   destroy_value %3 : $Klass
@@ -1171,7 +1171,7 @@ bb0(%0 : @owned $FakeOptional<ClassLet>):
   switch_enum %0a : $FakeOptional<ClassLet>, case #FakeOptional.some!enumelt: bb1, case #FakeOptional.none!enumelt: bb2
 
 bb1(%1 : @guaranteed $ClassLet):
-  %2 = ref_element_addr %1 : $ClassLet, #ClassLet.aLet
+  %2 = ref_element_addr [immutable] %1 : $ClassLet, #ClassLet.aLet
   %3 = load [copy] %2 : $*Klass
   apply %f(%3) : $@convention(thin) (@guaranteed Klass) -> ()
   destroy_value %3 : $Klass
@@ -1201,7 +1201,7 @@ bb0(%0 : $*FakeOptional<ClassLet>):
   switch_enum %0a : $FakeOptional<ClassLet>, case #FakeOptional.some!enumelt: bb1, case #FakeOptional.none!enumelt: bb2
 
 bb1(%1 : @guaranteed $ClassLet):
-  %2 = ref_element_addr %1 : $ClassLet, #ClassLet.aLet
+  %2 = ref_element_addr [immutable] %1 : $ClassLet, #ClassLet.aLet
   %3 = load [copy] %2 : $*Klass
   apply %f(%3) : $@convention(thin) (@guaranteed Klass) -> ()
   destroy_value %3 : $Klass
@@ -1240,7 +1240,7 @@ bb0c(%0c : @guaranteed $FakeOptional<ClassLet>):
   switch_enum %0d : $FakeOptional<ClassLet>, case #FakeOptional.some!enumelt: bb1, case #FakeOptional.none!enumelt: bb2
 
 bb1(%1 : @guaranteed $ClassLet):
-  %2 = ref_element_addr %1 : $ClassLet, #ClassLet.aLet
+  %2 = ref_element_addr [immutable] %1 : $ClassLet, #ClassLet.aLet
   %3 = load [copy] %2 : $*Klass
   apply %f(%3) : $@convention(thin) (@guaranteed Klass) -> ()
   destroy_value %3 : $Klass
@@ -1276,7 +1276,7 @@ bb1:
 bb2:
   %0b = begin_borrow %0 : $FakeOptional<ClassLet>
   %0b2 = unchecked_enum_data %0b : $FakeOptional<ClassLet>, #FakeOptional.some!enumelt
-  %2 = ref_element_addr %0b2 : $ClassLet, #ClassLet.aLet
+  %2 = ref_element_addr [immutable] %0b2 : $ClassLet, #ClassLet.aLet
   %3 = load [copy] %2 : $*Klass
   apply %f(%3) : $@convention(thin) (@guaranteed Klass) -> ()
   destroy_value %3 : $Klass
@@ -1520,12 +1520,9 @@ bbEnd:
   return %9999 : $()
 }
 
-// Just make sure that we do not crash on this code and convert the 2nd load
-// [copy] to a load_borrow.
+// Just make sure that we do not crash on this code
 //
 // CHECK-LABEL: sil [ossa] @improper_dead_end_block_crasher_test : $@convention(thin) (Builtin.RawPointer) -> () {
-// CHECK: load_borrow
-// CHECK: load_borrow
 // CHECK: } // end sil function 'improper_dead_end_block_crasher_test'
 sil [ossa] @improper_dead_end_block_crasher_test : $@convention(thin) (Builtin.RawPointer) -> () {
 bb0(%0 : $Builtin.RawPointer):

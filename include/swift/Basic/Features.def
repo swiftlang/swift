@@ -438,7 +438,7 @@ EXPERIMENTAL_FEATURE(CoroutineAccessorsAllocateInCallee, false)
 EXPERIMENTAL_FEATURE(GenerateForceToMainActorThunks, false)
 
 EXPERIMENTAL_FEATURE(AddressableParameters, true)
-EXPERIMENTAL_FEATURE(AddressableTypes, true)
+SUPPRESSIBLE_EXPERIMENTAL_FEATURE(AddressableTypes, true)
 
 /// Allow the @abi attribute.
 SUPPRESSIBLE_EXPERIMENTAL_FEATURE(ABIAttribute, true)
@@ -446,6 +446,9 @@ SUPPRESSIBLE_EXPERIMENTAL_FEATURE(ABIAttribute, true)
 /// Functions with nonisolated isolation inherit their isolation from the
 /// calling context.
 EXPERIMENTAL_FEATURE(NonIsolatedAsyncInheritsIsolationFromContext, false)
+
+/// Allow custom availability domains to be defined and referenced.
+SUPPRESSIBLE_EXPERIMENTAL_FEATURE(CustomAvailability, true)
 
 #undef EXPERIMENTAL_FEATURE_EXCLUDED_FROM_MODULE_INTERFACE
 #undef EXPERIMENTAL_FEATURE

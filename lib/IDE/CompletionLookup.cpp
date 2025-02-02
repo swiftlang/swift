@@ -771,7 +771,7 @@ Type CompletionLookup::getAssociatedTypeType(const AssociatedTypeDecl *ATD) {
         CurrDeclContext->getInnermostTypeContext()->getDeclaredTypeInContext();
   if (BaseTy) {
     BaseTy = BaseTy->getInOutObjectType()->getMetatypeInstanceType();
-    if (auto NTD = BaseTy->getAnyNominal()) {
+    if (BaseTy->getAnyNominal()) {
       auto Conformance = lookupConformance(BaseTy, ATD->getProtocol());
       if (Conformance.isConcrete()) {
         return Conformance.getConcrete()->getTypeWitness(
@@ -3182,7 +3182,6 @@ void CompletionLookup::getTypeAttributeKeywordCompletions(
       case TypeAttrKind::Preconcurrency:
       case TypeAttrKind::Unchecked:
       case TypeAttrKind::Unsafe:
-      case TypeAttrKind::Safe:
         // These attributes are only available in inheritance clasuses.
         return;
       default:

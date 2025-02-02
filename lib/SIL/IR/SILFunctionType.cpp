@@ -1673,8 +1673,7 @@ private:
     SmallBitVector paramsWithScopedDependencies(params.size(), false);
     for (auto &depInfo : Dependencies) {
       if (auto scopeIndices = depInfo.getScopeIndices()) {
-        paramsWithScopedDependencies
-          |= depInfo.getScopeIndices()->getBitVector();
+        paramsWithScopedDependencies |= scopeIndices->getBitVector();
       }
     }
     
@@ -2532,6 +2531,16 @@ static CanSILFunctionType getSILFunctionType(
     if (constant) {
       if (constant->kind == SILDeclRef::Kind::Deallocator) {
         actorIsolation = ActorIsolation::forNonisolated(false);
+      } else if (auto *decl = constant->getAbstractFunctionDecl();
+                 decl && decl->getExecutionBehavior().has_value()) {
+        switch (*decl->getExecutionBehavior()) {
+        case ExecutionKind::Concurrent:
+          actorIsolation = ActorIsolation::forNonisolated(false /*unsafe*/);
+          break;
+        case ExecutionKind::Caller:
+          actorIsolation = ActorIsolation::forCallerIsolationInheriting();
+          break;
+        }
       } else {
         actorIsolation =
             getActorIsolationOfContext(constant->getInnermostDeclContext());
@@ -3532,15 +3541,7 @@ public:
     if (FnType->getReturnType()
             ->getUnqualifiedDesugaredType()
             ->getAsCXXRecordDecl()) {
-      auto t = tl.getLoweredType().getASTType();
-      if (auto *classDecl = t.getPointer()
-                                ->lookThroughAllOptionalTypes()
-                                ->getClassOrBoundGenericClass()) {
-        assert(!classDecl->hasClangNode() &&
-               "unexpected imported class type in C function");
-        assert(!classDecl->isGeneric());
-        return ResultConvention::Owned;
-      }
+      return ResultConvention::Owned;
     }
 
     return ResultConvention::Autoreleased;
@@ -4600,7 +4601,7 @@ getAbstractionPatternForConstant(ASTContext &ctx, SILDeclRef constant,
       return AbstractionPattern(fnType, value->getType().getTypePtr());
     } else {
       assert(numParameterLists == 2);
-      if (auto method = dyn_cast<clang::CXXMethodDecl>(clangDecl)) {
+      if (isa<clang::CXXMethodDecl>(clangDecl)) {
         // C++ method.
         return AbstractionPattern::getCurriedCXXMethod(fnType, bridgedFn);
       } else {

@@ -589,7 +589,7 @@ bool swift::printAsClangHeader(raw_ostream &os, ModuleDecl *M,
                  clangHeaderSearchInfo, exposedModuleHeaderNames);
   });
   writePostImportPrologue(os, *M);
-  emitObjCConditional(os, [&] { os << objcModuleContents.str(); });
+  emitObjCConditional(os, [&] { os << "\n" << objcModuleContents.str(); });
   writeObjCEpilogue(os);
   emitCxxConditional(os, [&] {
     // FIXME: Expose Swift with @expose by default.
