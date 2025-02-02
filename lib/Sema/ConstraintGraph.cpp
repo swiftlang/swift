@@ -872,6 +872,10 @@ void ConstraintGraph::Component::addConstraint(Constraint *constraint) {
   constraints.push_back(constraint);
 }
 
+void ConstraintGraph::Component::recordDependency(const Component &component) {
+  dependencies.push_back(component.solutionIndex);
+}
+
 SmallVector<ConstraintGraph::Component, 1>
 ConstraintGraph::computeConnectedComponents(
            ArrayRef<TypeVariableType *> typeVars) {
@@ -1125,6 +1129,20 @@ void ConstraintGraph::printConnectedComponents(
                [&] {
                  out << ' ';
                });
+
+    auto dependencies = component.getDependencies();
+    if (dependencies.empty())
+      continue;
+
+    SmallVector<unsigned, 4> indices{dependencies.begin(), dependencies.end()};
+    // Sort dependencies so output is stable.
+    llvm::sort(indices);
+
+    // Print all of the one-way components.
+    out << " depends on ";
+    llvm::interleave(
+        indices, [&out](unsigned index) { out << index; },
+        [&out] { out << ", "; });
   }
 }
 

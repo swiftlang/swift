@@ -343,6 +343,12 @@ public:
     /// The constraints in this component.
     TinyPtrVector<Constraint *> constraints;
 
+    /// The set of components that this component depends on, such that
+    /// the partial solutions of the those components need to be available
+    /// before this component can be solved.
+    ///
+    SmallVector<unsigned, 2> dependencies;
+
   public:
     Component(unsigned solutionIndex) : solutionIndex(solutionIndex) { }
 
@@ -357,6 +363,11 @@ public:
     const TinyPtrVector<Constraint *> &getConstraints() const {
       return constraints;
     }
+
+    /// Records a component which this component depends on.
+    void recordDependency(const Component &component);
+
+    ArrayRef<unsigned> getDependencies() const { return dependencies; }
 
     unsigned getNumDisjunctions() const { return numDisjunctions; }
   };
