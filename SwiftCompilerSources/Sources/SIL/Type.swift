@@ -104,6 +104,8 @@ public struct Type : CustomStringConvertible, NoReflectionChildren {
   public var isBuiltinVector: Bool { bridged.isBuiltinVector() }
   public var builtinVectorElementType: Type { bridged.getBuiltinVectorElementType().type }
 
+  public var isLegalFormalType: Bool { bridged.isLegalFormalType() }
+
   public func isBuiltinInteger(withFixedWidth width: Int) -> Bool {
     bridged.isBuiltinFixedWidthInteger(width)
   }
