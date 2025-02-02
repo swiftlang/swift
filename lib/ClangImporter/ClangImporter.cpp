@@ -6223,6 +6223,11 @@ TinyPtrVector<ValueDecl *> ClangRecordMemberLookup::evaluate(
 
       auto memberClangDecl = namedMember->getClangDecl();
 
+      // Skip this base class member if it isn't from recordDecl; this happens
+      // when this member was inherited.
+      if (memberClangDecl != recordDecl->getClangDecl())
+        continue;
+
       // Skip this base class if this is a case of nested private inheritance.
       //
       // BUG: private base class members should be inherited but inaccessible.
