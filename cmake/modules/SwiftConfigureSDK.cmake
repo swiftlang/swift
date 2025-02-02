@@ -424,7 +424,7 @@ macro(configure_sdk_unix name architectures)
 
           # Find toolchain install dir
           execute_process(
-            COMMAND dirname $(find . -name crtbegin.o | grep ${SWIFT_SDK_LINUX_ARCH_${arch}_SUFFIX})
+            COMMAND dirname $(find ${CROSS_COMPILE_SYSROOT}/usr -name crtbegin.o | grep ${SWIFT_SDK_LINUX_ARCH_${arch}_SUFFIX})
             WORKING_DIRECTORY ${CROSS_COMPILE_SYSROOT}
             OUTPUT_VARIABLE GCC_INSTALL_DIR
             RESULT_VARIABLE FOUND_GCC_INSTALL_DIR)
