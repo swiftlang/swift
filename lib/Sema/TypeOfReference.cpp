@@ -2044,8 +2044,8 @@ void ConstraintSystem::bindOverloadType(
       increaseScore(SK_KeyPathSubscript, locator);
 
       auto boundTypeVar = boundType->castTo<TypeVariableType>();
-      auto constraints = getConstraintGraph().gatherNearbyConstraints(
-          boundTypeVar,
+      auto constraints = getConstraintGraph().gatherConstraints(
+          boundTypeVar, ConstraintGraph::GatheringKind::EquivalenceClass,
           [](Constraint *constraint) {
             return constraint->getKind() == ConstraintKind::ApplicableFunction;
           });

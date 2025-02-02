@@ -240,6 +240,10 @@ class SplitterStep final : public SolverStep {
 
   SmallVector<Constraint *, 4> OrphanedConstraints;
 
+  /// Whether to include the partial results of this component in the final
+  /// merged results.
+  SmallVector<bool, 4> IncludeInMergedResults;
+
 public:
   SplitterStep(ConstraintSystem &cs, SmallVectorImpl<Solution> &solutions)
       : SolverStep(cs, solutions) {}
@@ -263,6 +267,56 @@ private:
   ///
   /// \returns true if there are any solutions, false otherwise.
   bool mergePartialSolutions() const;
+};
+
+/// `DependentComponentSplitterStep` is responsible for composing the partial
+/// solutions from other components (on which this component depends) into
+/// the inputs based on which we can solve a particular component.
+class DependentComponentSplitterStep final : public SolverStep {
+  /// Constraints "in scope" of this step.
+  ConstraintList *Constraints;
+
+  /// Index into the parent splitter step.
+  unsigned Index;
+
+  /// The component that has dependencies.
+  ConstraintGraph::Component Component;
+
+  /// Array containing all of the partial solutions for the parent split.
+  MutableArrayRef<SmallVector<Solution, 4>> AllPartialSolutions;
+
+  /// The solutions computed the \c ComponentSteps created for each partial
+  /// solution combinations. Will be merged into the final \c Solutions vector
+  /// in \c resume.
+  std::vector<std::unique_ptr<SmallVector<Solution, 2>>> ContextualSolutions;
+
+  /// Take all of the constraints in this component and put them into
+  /// \c Constraints.
+  void injectConstraints() {
+    for (auto constraint : Component.getConstraints()) {
+      Constraints->erase(constraint);
+      Constraints->push_back(constraint);
+    }
+  }
+
+public:
+  DependentComponentSplitterStep(
+      ConstraintSystem &cs,
+      ConstraintList *constraints,
+      unsigned index,
+      ConstraintGraph::Component &&component,
+      MutableArrayRef<SmallVector<Solution, 4>> allPartialSolutions)
+    : SolverStep(cs, allPartialSolutions[index]), Constraints(constraints),
+      Index(index), Component(std::move(component)),
+      AllPartialSolutions(allPartialSolutions) {
+    assert(!Component.getDependencies().empty() && "Should use ComponentStep");
+    injectConstraints();
+  }
+
+  StepResult take(bool prevFailed) override;
+  StepResult resume(bool prevFailed) override;
+
+  void print(llvm::raw_ostream &Out) override;
 };
 
 
@@ -327,6 +381,10 @@ class ComponentStep final : public SolverStep {
   /// Constraints "in scope" of this step.
   ConstraintList *Constraints;
 
+  /// The set of partial solutions that should be composed before evaluating
+  /// this component.
+  SmallVector<const Solution *, 2> DependsOnPartialSolutions;
+
   /// Constraint which doesn't have any free type variables associated
   /// with it, which makes it disconnected in the graph.
   Constraint *OrphanedConstraint = nullptr;
@@ -361,6 +419,8 @@ public:
       constraints->erase(constraint);
       Constraints->push_back(constraint);
     }
+
+    assert(component.getDependencies().empty());
   }
 
   /// Create a component step that composes existing partial solutions before
@@ -369,11 +429,15 @@ public:
       ConstraintSystem &cs, unsigned index,
       ConstraintList *constraints,
       const ConstraintGraph::Component &component,
+      llvm::SmallVectorImpl<const Solution *> &&dependsOnPartialSolutions,
       SmallVectorImpl<Solution> &solutions)
         : SolverStep(cs, solutions), Index(index), IsSingle(false),
           OriginalScore(getCurrentScore()), OriginalBestScore(getBestScore()),
-          Constraints(constraints) {
+          Constraints(constraints),
+          DependsOnPartialSolutions(std::move(dependsOnPartialSolutions)) {
     TypeVars = component.typeVars;
+    assert(DependsOnPartialSolutions.size() ==
+           component.getDependencies().size());
 
     for (auto constraint : component.getConstraints()) {
       constraints->erase(constraint);
