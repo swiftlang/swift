@@ -606,6 +606,13 @@ struct TaskGroupStatus {
           .errorType = "task-group-violation",
           .currentStackDescription = "TaskGroup exceeded supported pending task count",
           .framesToSkip = 1,
+          .memoryAddress = nullptr,
+          .numExtraThreads = 0,
+          .threads = nullptr,
+          .numFixIts = 0,
+          .fixIts = nullptr,
+          .numNotes = 0,
+          .notes = nullptr,
       };
       _swift_reportToDebugger(RuntimeErrorFlagFatal, message, &details);
     }

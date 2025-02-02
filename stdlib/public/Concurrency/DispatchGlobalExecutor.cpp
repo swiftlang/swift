@@ -69,6 +69,8 @@ struct MinimalDispatchObjectHeader {
 
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wgnu-offsetof-extensions"
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Winvalid-offsetof"
 static_assert(
     offsetof(Job, metadata) == offsetof(MinimalDispatchObjectHeader, VTable),
     "Job Metadata field must match location of Dispatch VTable field.");
@@ -76,6 +78,7 @@ static_assert(offsetof(Job, SchedulerPrivate[Job::DispatchLinkageIndex]) ==
                   offsetof(MinimalDispatchObjectHeader, Linkage),
               "Dispatch Linkage field must match Job "
               "SchedulerPrivate[DispatchLinkageIndex].");
+#pragma clang diagnostic pop
 #pragma clang diagnostic pop
 
 /// The function passed to dispatch_async_f to execute a job.
