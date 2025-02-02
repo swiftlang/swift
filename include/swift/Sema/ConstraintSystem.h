@@ -4516,6 +4516,7 @@ public:
   /// \returns a possibly-sanitized initializer, or null if an error occurred.
   [[nodiscard]]
   Type generateConstraints(Pattern *P, ConstraintLocatorBuilder locator,
+                           bool bindPatternVarsOneWay,
                            PatternBindingDecl *patternBinding,
                            unsigned patternIndex);
 
@@ -5021,6 +5022,12 @@ private:
   SolutionKind simplifyPropertyWrapperConstraint(Type wrapperType, Type wrappedValueType,
                                                  TypeMatchOptions flags,
                                                  ConstraintLocatorBuilder locator);
+
+  /// Attempt to simplify a one-way constraint.
+  SolutionKind simplifyOneWayConstraint(ConstraintKind kind,
+                                        Type first, Type second,
+                                        TypeMatchOptions flags,
+                                        ConstraintLocatorBuilder locator);
 
   /// Simplify an equality constraint between result and base types of
   /// an unresolved member chain.

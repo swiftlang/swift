@@ -701,7 +701,8 @@ private:
 
   void visitCaseItemPattern(Pattern *pattern, ContextualTypeInfo context) {
     Type patternType = cs.generateConstraints(
-        pattern, locator, /*patternBinding=*/nullptr, /*patternIndex=*/0);
+        pattern, locator, /*bindPatternVarsOneWay=*/false,
+        /*patternBinding=*/nullptr, /*patternIndex=*/0);
 
     if (!patternType) {
       hadError = true;
@@ -789,7 +790,8 @@ private:
     // declaring local wrapped variables (yet).
     if (hasPropertyWrapper(pattern)) {
       auto target = SyntacticElementTarget::forInitialization(
-          init, patternType, patternBinding, index);
+          init, patternType, patternBinding, index,
+          /*bindPatternVarsOneWay=*/false);
 
       if (ConstraintSystem::preCheckTarget(target))
         return std::nullopt;
@@ -799,7 +801,8 @@ private:
 
     if (init) {
       return SyntacticElementTarget::forInitialization(
-          init, patternType, patternBinding, index);
+          init, patternType, patternBinding, index,
+          /*bindPatternVarsOneWay=*/false);
     }
 
     return SyntacticElementTarget::forUninitializedVar(patternBinding, index,

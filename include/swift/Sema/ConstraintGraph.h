@@ -300,18 +300,25 @@ public:
   /// to a type variable.
   void introduceToInference(TypeVariableType *typeVar, Type fixedType);
 
-  /// Gather constraints associated with all of the variables within the
-  /// same equivalence class as the given type variable, as well as its
-  /// immediate fixed bindings.
-  llvm::TinyPtrVector<Constraint *>
-  gatherAllConstraints(TypeVariableType *typeVar);
+  /// Describes which constraints \c gatherConstraints should gather.
+  enum class GatheringKind {
+    /// Gather constraints associated with all of the variables within the
+    /// same equivalence class as the given type variable, as well as its
+    /// immediate fixed bindings.
+    EquivalenceClass,
+    /// Gather all constraints that mention this type variable or type variables
+    /// that it is a fixed binding of. Unlike EquivalenceClass, this looks
+    /// through transitive fixed bindings. This can be used to find all the
+    /// constraints that may be affected when binding a type variable.
+    AllMentions,
+  };
 
-  /// Gather all constraints that mention this type variable or type variables
-  /// that it is a fixed binding of. Unlike EquivalenceClass, this looks
-  /// through transitive fixed bindings. This can be used to find all the
-  /// constraints that may be affected when binding a type variable.
+  /// Gather the set of constraints that involve the given type variable,
+  /// i.e., those constraints that will be affected when the type variable
+  /// gets merged or bound to a fixed type.
   llvm::TinyPtrVector<Constraint *>
-  gatherNearbyConstraints(TypeVariableType *typeVar,
+  gatherConstraints(TypeVariableType *typeVar,
+                    GatheringKind kind,
                     llvm::function_ref<bool(Constraint *)> acceptConstraint =
                         [](Constraint *constraint) { return true; });
 
@@ -336,6 +343,12 @@ public:
     /// The constraints in this component.
     TinyPtrVector<Constraint *> constraints;
 
+    /// The set of components that this component depends on, such that
+    /// the partial solutions of the those components need to be available
+    /// before this component can be solved.
+    ///
+    SmallVector<unsigned, 2> dependencies;
+
   public:
     Component(unsigned solutionIndex) : solutionIndex(solutionIndex) { }
 
@@ -350,6 +363,11 @@ public:
     const TinyPtrVector<Constraint *> &getConstraints() const {
       return constraints;
     }
+
+    /// Records a component which this component depends on.
+    void recordDependency(const Component &component);
+
+    ArrayRef<unsigned> getDependencies() const { return dependencies; }
 
     unsigned getNumDisjunctions() const { return numDisjunctions; }
   };
