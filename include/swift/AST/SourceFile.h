@@ -98,6 +98,9 @@ public:
 
     /// Validate the new SwiftSyntax parser diagnostics.
     ValidateNewParserDiagnostics = 1 << 6,
+
+    /// Consider every #if ... #endif region active.
+    PoundIfAllActive = 1 << 7,
   };
   using ParsingOptions = OptionSet<ParsingFlags>;
 
