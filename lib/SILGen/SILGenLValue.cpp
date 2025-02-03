@@ -1405,10 +1405,25 @@ namespace {
       if (base) {
         // Borrow the base, because we may need it again to invoke other
         // accessors.
-        result.base = SGF.prepareAccessorBaseArg(loc,
-                                             base.formalAccessBorrow(SGF, loc),
-                                             BaseFormalType,
+        base = base.formalAccessBorrow(SGF, loc);
+        // If the base needs to be materialized, do so in
+        // the outer formal evaluation scope, since an addressor or
+        // other dependent value may want to point into the materialization.
+        auto &baseInfo = SGF.getConstantInfo(SGF.getTypeExpansionContext(),
                                              accessor);
+                                             
+        if (!baseInfo.FormalPattern.isForeign()) {
+          auto baseFnTy = baseInfo.SILFnType;
+          
+          if (baseFnTy->getSelfParameter().isFormalIndirect()
+              && base.getType().isObject()
+              && SGF.silConv.useLoweredAddresses()) {
+            base = base.formallyMaterialize(SGF, loc);
+          }
+        }
+        
+        result.base = SGF.prepareAccessorBaseArg(loc, base, BaseFormalType,
+                                                 accessor);
       }
 
       if (!Indices.isNull())
@@ -2086,16 +2101,12 @@ namespace {
              "offsetting l-value for modification without writeback scope");
 
       ManagedValue addr;
-      {
-        FormalEvaluationScope scope(SGF);
-
-        auto args =
-            std::move(*this).prepareAccessorArgs(SGF, loc, base, Accessor);
-        addr = SGF.emitAddressorAccessor(
-            loc, Accessor, Substitutions, std::move(args.base), IsSuper,
-            IsDirectAccessorUse, std::move(args.Indices),
-            SubstFieldType, IsOnSelfParameter);
-      }
+      auto args =
+          std::move(*this).prepareAccessorArgs(SGF, loc, base, Accessor);
+      addr = SGF.emitAddressorAccessor(
+          loc, Accessor, Substitutions, std::move(args.base), IsSuper,
+          IsDirectAccessorUse, std::move(args.Indices),
+          SubstFieldType, IsOnSelfParameter);
 
       // Enter an unsafe access scope for the access.
       addr =
