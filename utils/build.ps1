@@ -971,6 +971,101 @@ function Fetch-Dependencies {
   }
 }
 
+$AndroidEmulatorPid = $null
+$AndroidEmulatorArchName = $null
+
+function AndroidEmulator-CreateDevice($ArchName) {
+  $DeviceName = "swift-test-device-$ArchName"
+  $Packages = "system-images;android-29;default;$ArchName"
+  $AvdTool = "$BinaryCache\android-sdk\cmdline-tools\latest\bin\avdmanager.bat"
+
+  $Output = & $AvdTool list avd
+  if ($Output -match $DeviceName) {
+    Write-Host "Found Android virtual device for arch $ArchName"
+  } else {
+    Write-Host "Create Android virtual device for arch $ArchName"
+    "no" | & $AvdTool create avd --force --name $DeviceName --package $Packages
+  }
+  return $DeviceName
+}
+
+function AndroidEmulator-Run($ArchName) {
+  if ($AndroidEmulatorArchName -ne $ArchName) {
+    AndroidEmulator-TearDown
+  }
+  if ($AndroidEmulatorPid -eq $null) {
+    Isolate-EnvVars {
+      $env:ANDROID_SDK_HOME = "$BinaryCache\android-sdk"
+      $env:JAVA_HOME = "$BinaryCache\android-sdk-jdk\jdk-17.0.14+7"
+      $env:Path = "${env:JAVA_HOME}\bin;${env:Path}"
+
+      Write-Host "ANDROID_SDK_HOME = $env:ANDROID_SDK_HOME"
+      $AvdTool = "$BinaryCache\android-sdk\cmdline-tools\latest\bin\avdmanager.bat"
+      Write-Host "$AvdTool list avd reports:"
+      Invoke-Program $AvdTool list avd
+
+      $Device = (AndroidEmulator-CreateDevice $ArchName)
+
+      Write-Host "$AvdTool list avd reports:"
+      Invoke-Program $AvdTool list avd
+
+      $EmuTool = "$BinaryCache\android-sdk\emulator\emulator.exe"
+      Write-Host "$EmuTool -list-avds reports:"
+      Invoke-Program $EmuTool -list-avds
+
+      Write-Host "Start Android emulator for arch $ArchName"
+      foreach($Attempt in 1..5) {
+        $Process = Start-Process -PassThru $EmuTool "@$Device"
+        #@("-avd", "$Device")
+        try {
+          Write-Host "Waiting for process $($Process.Id) to start"
+          Start-Sleep -Seconds 1
+          $_ = Get-Process -Id $Process.Id
+          break
+        } catch {
+          if ($Attempt -lt 5) {
+            Write-Host "Process $($Process.Id) failed to start, trying again..."
+            Start-Sleep -Seconds 3
+          } else {
+            throw "Android emulator process $($Process.Id) failed to start."
+          }
+        }
+      }
+
+      $global:AndroidEmulatorPid = $Process.Id
+      $global:AndroidEmulatorArchName = $ArchName
+
+      Write-Host "Waiting while Android emulator boots in process $AndroidEmulatorPid"
+      $adb = "$BinaryCache\android-sdk\platform-tools\adb.exe"
+      Invoke-Program $adb "wait-for-device"
+
+      Write-Host "SUCCESS: Emulator ready"
+    }
+  }
+}
+
+function AndroidEmulator-TearDown() {
+  if ($AndroidEmulatorPid -ne $null) {
+    if (Get-Process -Id $AndroidEmulatorPid -ErrorAction SilentlyContinue) {
+      Write-Host "Tear down Android emulator for arch $AndroidEmulatorArchName"
+      $adb = "$BinaryCache\android-sdk\platform-tools\adb.exe"
+      & $adb emu kill | Out-Null
+      & $adb kill-server | Out-Null
+
+      try {
+        Write-Host "Waiting for process $AndroidEmulatorPid to exit"
+        Wait-Process -Id $AndroidEmulatorPid -Timeout 1
+      } catch {
+        Write-Host "Process $AndroidEmulatorPid failed to exit. Shutting it down."
+        Stop-Process -Force -Id $AndroidEmulatorPid
+      }
+
+      $global:AndroidEmulatorPid = $null
+      $global:AndroidEmulatorArchName = $null
+    }
+  }
+}
+
 function Get-PinnedToolchainTool() {
   if (Test-Path "$BinaryCache\toolchains\${PinnedToolchain}\LocalApp\Programs\Swift\Toolchains\$(Get-PinnedToolchainVersion)+Asserts\usr\bin") {
     return "$BinaryCache\toolchains\${PinnedToolchain}\LocalApp\Programs\Swift\Toolchains\$(Get-PinnedToolchainVersion)+Asserts\usr\bin"
@@ -3082,7 +3177,8 @@ try {
 
 Fetch-Dependencies
 
-Test-Dispatch Android $AndroidX64
+AndroidEmulator-Run $AndroidX64.LLVMName
+AndroidEmulator-TearDown
 exit(1)
 
 if ($Clean) {
