@@ -1841,7 +1841,7 @@ public:
 
     return selfDeclAllowsImplicitSelf(DRE->getDecl(), ty, inClosure,
                                       /*validateParentClosures:*/ true,
-                                      /*validateSelfRebindings:*/ true);
+                                      /*validatingNestedClosure:*/ false);
   }
 
   /// Whether or not implicit self is allowed for this implicit self decl
@@ -1849,7 +1849,7 @@ public:
                                          const Type captureType,
                                          const AbstractClosureExpr *inClosure,
                                          bool validateParentClosures,
-                                         bool validateSelfRebindings) {
+                                         bool validatingNestedClosure) {
     ASTContext &ctx = inClosure->getASTContext();
 
     auto requiresSelfQualification =
@@ -1883,38 +1883,35 @@ public:
       }
     }
 
-    // If the self decl comes from a conditional statement, validate
-    // that it is an allowed `guard let self` or `if let self` condition.
+    // If the self decl refers to a `guard let self` / `if let self` conditon,
+    // we need to validate it.
+    auto selfDeclDefinedInConditionalStmt = false;
+    auto isInvalidSelfDeclRebinding = false;
+    if (auto condStmt = parentConditionalStmt(selfDecl)) {
+      selfDeclDefinedInConditionalStmt = true;
+      isInvalidSelfDeclRebinding = !hasValidSelfRebinding(condStmt, ctx);
+    }
+
+    // If the self decl refers to an invalid unwrapping conditon like
+    // `guard let self = somethingOtherThanSelf`, then implicit self is always
+    // disallowed.
     //  - Even if this closure doesn't have a `weak self` capture, it could
     //    be a closure nested in some parent closure with a `weak self`
     //    capture, so we should always validate the conditional statement
     //    that defines self if present.
-    if (validateSelfRebindings) {
-      if (auto conditionalStmt = parentConditionalStmt(selfDecl)) {
-        if (!hasValidSelfRebinding(conditionalStmt, ctx)) {
-          return false;
-        }
-      }
+    if (isInvalidSelfDeclRebinding) {
+      return false;
     }
 
-    // If this closure has a `weak self` capture, require that the
-    // closure unwraps self. If not, implicit self is not allowed
-    // in this closure or in any nested closure.
-    if (closureHasWeakSelfCapture(inClosure)) {
-      // If a `guard let self` or `if let self` unbinding condition exists,
-      // then it must not be invalid.
-      if (auto condStmt = parentConditionalStmt(selfDecl)) {
-        if (!hasValidSelfRebinding(condStmt, ctx)) {
-          return false;
-        }
-      }
-
-      // If the self decl hasn't been unwrapped, then this closure is
-      // invalid unless non-unwrapped weak self is explicitly enabled
-      // in this situation.
-      else if (validateSelfRebindings) {
-        return false;
-      }
+    // Within a closure with a `[weak self]` capture, implicit self is only
+    // allowed if self has been unwrapped in a previous conditional statement.
+    //  - When validating implicit self usage in a nested closure, it's not
+    //    necessary for self to be unwrapped in this parent closure. If self
+    //    isn't unwrapped correctly in the nested closure, we would have
+    //    already noticed when validating that closure.
+    if (closureHasWeakSelfCapture(inClosure) &&
+        !selfDeclDefinedInConditionalStmt && !validatingNestedClosure) {
+      return false;
     }
 
     if (auto autoclosure = dyn_cast<AutoClosureExpr>(inClosure)) {
@@ -2068,7 +2065,7 @@ public:
         if (!selfDeclAllowsImplicitSelf(outerSelfDecl, captureType,
                                         outerClosure,
                                         /*validateParentClosures:*/ false,
-                                        /*validateSelfRebindings:*/ false)) {
+                                        /*validatingNestedClosure:*/ true)) {
           return outerClosure;
         }
 
@@ -2082,7 +2079,7 @@ public:
       if (validateIntermediateParents) {
         if (!selfDeclAllowsImplicitSelf(selfDecl, captureType, outerClosure,
                                         /*validateParentClosures*/ false,
-                                        /*validateSelfRebindings*/ false)) {
+                                        /*validatingNestedClosure*/ true)) {
           return outerClosure;
         }
       }

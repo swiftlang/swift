@@ -1408,6 +1408,13 @@ class TestGithubIssue69911 {
       }
 
       doVoidStuff { [weak self] in
+        guard let self = self ?? TestGithubIssue69911.staticOptional else { return }
+        doVoidStuff { [self] in // expected-warning {{capture 'self' was never used}} expeced-note {{variable other than 'self' captured here under the name 'self' does not enable implicit 'self'}} expected-note {{variable other than 'self' captured here under the name 'self' does not enable implicit 'self'}}
+          x += 1 // expected-error {{reference to property 'x' in closure requires explicit use of 'self' to make capture semantics explicit}}
+        }
+      }
+
+      doVoidStuff { [weak self] in
         // Since this unwrapping is invalid, implicit self is disallowed in all nested closures:
         guard let self = self ?? TestGithubIssue69911.staticOptional else { return }
 
@@ -1801,6 +1808,34 @@ class TestLazyLocal {
       // expected-error@-1 {{call to method 'bar' in closure requires explicit use of 'self' to make capture semantics explicit}}
       // expected-note@-2 {{reference 'self.' explicitly}}
       return x
+    }
+  }
+}
+
+class TestExtensionOnOptionalSelf {
+  init() {}
+}
+
+extension TestExtensionOnOptionalSelf? {
+  func foo() {
+    _ = { [weak self] in // expected-warning {{variable 'self' was written to, but never read}}
+      foo() // expected-error {{call to method 'foo' in closure requires explicit use of 'self' to make capture semantics explicit}}
+    }
+
+    _ = {
+      foo()
+    }
+
+    _ = { [weak self] in // expected-warning {{variable 'self' was written to, but never read}}
+      _ = {
+        foo()
+      }
+    }
+
+    _ = { [weak self] in
+      _ = { [self] in // expected-warning {{capture 'self' was never used}}
+        foo()
+      }
     }
   }
 }
