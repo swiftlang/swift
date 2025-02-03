@@ -937,20 +937,24 @@ importer::addCommonInvocationArguments(
   }
 
   for (const auto &framepath : searchPathOpts.getFrameworkSearchPaths()) {
-    if (framepath.IsSystem) {
-      invocationArgStrs.push_back("-iframework");
-      invocationArgStrs.push_back(framepath.Path);
-    } else {
-      invocationArgStrs.push_back("-F" + framepath.Path);
+    if (!framepath.Path.empty()) {
+      if (framepath.IsSystem) {
+        invocationArgStrs.push_back("-iframework");
+        invocationArgStrs.push_back(framepath.Path);
+      } else {
+        invocationArgStrs.push_back("-F" + framepath.Path);
+      }
     }
   }
 
   for (const auto &path : searchPathOpts.getImportSearchPaths()) {
-    if (path.IsSystem) {
-      invocationArgStrs.push_back("-isystem");
-      invocationArgStrs.push_back(path.Path);
-    } else {
-      invocationArgStrs.push_back("-I" + path.Path);
+    if (!path.Path.empty()) {
+      if (path.IsSystem) {
+        invocationArgStrs.push_back("-isystem");
+        invocationArgStrs.push_back(path.Path);
+      } else {
+        invocationArgStrs.push_back("-I" + path.Path);
+      }
     }
   }
 }
