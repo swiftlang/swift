@@ -53,6 +53,18 @@ BindingSet::BindingSet(ConstraintSystem &CS, TypeVariableType *TypeVar,
   for (const auto &binding : info.Bindings)
     addBinding(binding, /*isTransitive=*/false);
 
+  for (auto *constraint : info.Constraints) {
+    switch (constraint->getKind()) {
+    case ConstraintKind::ConformsTo: {
+      if (constraint->getSecondType()->is<ProtocolType>())
+        Protocols.push_back(constraint);
+      break;
+    }
+    default:
+      break;
+    }
+  }
+
   for (auto *literal : info.Literals)
     addLiteralRequirement(literal);
 
@@ -1956,6 +1968,7 @@ void PotentialBindings::infer(ConstraintSystem &CS,
   case ConstraintKind::PackElementOf:
   case ConstraintKind::SameShape:
   case ConstraintKind::MaterializePackExpansion:
+  case ConstraintKind::ConformsTo:
     // Constraints from which we can't do anything.
     break;
 
@@ -1995,13 +2008,6 @@ void PotentialBindings::infer(ConstraintSystem &CS,
   case ConstraintKind::Disjunction:
     DelayedBy.push_back(constraint);
     break;
-
-  case ConstraintKind::ConformsTo: {
-    auto protocolTy = constraint->getSecondType();
-    if (protocolTy->is<ProtocolType>())
-      Protocols.push_back(constraint);
-    break;
-  }
 
   case ConstraintKind::LiteralConformsTo: {
     // Record constraint where protocol requirement originated
@@ -2084,7 +2090,7 @@ void PotentialBindings::retract(ConstraintSystem &CS,
 
   LLVM_DEBUG(
     llvm::dbgs() << Constraints.size() << " " << Bindings.size() << " "
-                 << Protocols.size() << " " << Literals.size() << " "
+                 << Literals.size() << " "
                  << AdjacentVars.size() << " " << DelayedBy.size() << " "
                  << SubtypeOf.size() << " " << SupertypeOf.size() << " "
                  << EquivalentTo.size() << "\n");
@@ -2096,22 +2102,7 @@ void PotentialBindings::retract(ConstraintSystem &CS,
                       }),
       Bindings.end());
 
-  auto isMatchingConstraint = [&constraint](Constraint *existing) {
-    return existing == constraint;
-  };
-
-  auto hasMatchingSource =
-      [&constraint](
-          const std::pair<TypeVariableType *, Constraint *> &adjacency) {
-        return adjacency.second == constraint;
-      };
-
   switch (constraint->getKind()) {
-  case ConstraintKind::ConformsTo:
-    Protocols.erase(llvm::remove_if(Protocols, isMatchingConstraint),
-                    Protocols.end());
-    break;
-
   case ConstraintKind::LiteralConformsTo:
     Literals.erase(constraint);
     break;
@@ -2137,8 +2128,18 @@ void PotentialBindings::retract(ConstraintSystem &CS,
       AdjacentVars.erase(std::make_pair(adjacentVar, constraint));
   }
 
+  auto isMatchingConstraint = [&constraint](Constraint *existing) {
+    return existing == constraint;
+  };
+
   DelayedBy.erase(llvm::remove_if(DelayedBy, isMatchingConstraint),
                   DelayedBy.end());
+
+  auto hasMatchingSource =
+      [&constraint](
+          const std::pair<TypeVariableType *, Constraint *> &adjacency) {
+        return adjacency.second == constraint;
+      };
 
   SubtypeOf.remove_if(hasMatchingSource);
   SupertypeOf.remove_if(hasMatchingSource);
@@ -2149,7 +2150,6 @@ void PotentialBindings::reset() {
   if (CONDITIONAL_ASSERT_enabled()) {
     ASSERT(Constraints.empty());
     ASSERT(Bindings.empty());
-    ASSERT(Protocols.empty());
     ASSERT(Literals.empty());
     ASSERT(Defaults.empty());
     ASSERT(DelayedBy.empty());

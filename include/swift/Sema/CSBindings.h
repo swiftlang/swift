@@ -224,9 +224,6 @@ struct PotentialBindings {
   /// The set of potential bindings.
   llvm::SmallVector<PotentialBinding, 4> Bindings;
 
-  /// The set of protocol requirements placed on this type variable.
-  llvm::SmallVector<Constraint *, 4> Protocols;
-
   /// The set of unique literal protocol requirements placed on this
   /// type variable or inferred transitively through subtype chains.
   ///
@@ -385,6 +382,10 @@ class BindingSet {
 
 public:
   swift::SmallSetVector<PotentialBinding, 4> Bindings;
+
+  /// The set of protocol conformance requirements placed on this type variable.
+  llvm::SmallVector<Constraint *, 4> Protocols;
+
   llvm::SmallMapVector<ProtocolDecl *, LiteralRequirement, 2> Literals;
   llvm::SmallDenseMap<CanType, Constraint *, 2> Defaults;
 
@@ -499,7 +500,7 @@ public:
   }
 
   ArrayRef<Constraint *> getConformanceRequirements() const {
-    return Info.Protocols;
+    return Protocols;
   }
 
   unsigned getNumViableLiteralBindings() const;
