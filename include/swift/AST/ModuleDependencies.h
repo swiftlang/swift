@@ -1129,6 +1129,9 @@ private:
   std::string scannerContextHash;
   /// The location of where the built modules will be output to
   std::string moduleOutputPath;
+  /// The timestamp of the beginning of the scanning query action
+  /// using this cache
+  const llvm::sys::TimePoint<> scanInitializationTime;
 
   /// Retrieve the dependencies map that corresponds to the given dependency
   /// kind.
@@ -1235,6 +1238,9 @@ public:
   /// Update stored dependencies for the given module.
   void updateDependency(ModuleDependencyID moduleID,
                         ModuleDependencyInfo dependencyInfo);
+  
+  /// Remove a given dependency info from the cache.
+  void removeDependency(ModuleDependencyID moduleID);
 
   /// Resolve this module's set of directly-imported Swift module
   /// dependencies
