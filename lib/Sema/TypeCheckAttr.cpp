@@ -2520,14 +2520,14 @@ static bool canDeclareSymbolName(StringRef symbol, ModuleDecl *fromModule) {
   // to predict ways. Warn when code attempts to do so; hopefully we can
   // promote this to an error after a while.
   
-  return llvm::StringSwitch<bool>(symbol)
 #define FUNCTION(_, Module, Name, ...) \
-    .Case(#Name, false) \
-    .Case("_" #Name, false) \
-    .Case(#Name "_", false) \
-    .Case("_" #Name "_", false)
+  if (symbol == #Name) { return false; } \
+  if (symbol == "_" #Name) { return false; } \
+  if (symbol == #Name "_") { return false; } \
+  if (symbol == "_" #Name "_") { return false; }
 #include "swift/Runtime/RuntimeFunctions.def"
-    .Default(true);
+
+  return true;
 }
 
 void AttributeChecker::visitCDeclAttr(CDeclAttr *attr) {
