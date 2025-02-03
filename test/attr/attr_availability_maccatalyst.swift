@@ -167,8 +167,8 @@ public extension AvailableOnMacCatalyst { } // ok
 
 @available(iOS, introduced: 14.0)
 @available(macCatalyst, introduced: 14.5)
-public struct AvailableLaterOnMacCatalyst { // expected-note {{enclosing scope requires availability of Mac Catalyst 14.5 or newer}}
-  @available(iOS, introduced: 14.0) // expected-warning {{instance method cannot be more available than enclosing scope}}
+public struct AvailableLaterOnMacCatalyst { // expected-note 2 {{enclosing scope requires availability of Mac Catalyst 14.5 or newer}}
+  @available(iOS, introduced: 14.0) // expected-error {{instance method cannot be more available than enclosing scope}}
   func iOSOnly() { }
 
   @available(macCatalyst, introduced: 14.5)
@@ -177,4 +177,43 @@ public struct AvailableLaterOnMacCatalyst { // expected-note {{enclosing scope r
   @available(iOS, introduced: 14.0)
   @available(macCatalyst, introduced: 14.5)
   func iOSAndMacCatalyst() { }
+
+  struct Nested {
+    @available(iOS, introduced: 14.0) // expected-error {{instance method cannot be more available than enclosing scope}}
+    func iOSOnlyNested() { }
+
+    @available(macCatalyst, introduced: 14.5)
+    func macCatalystOnlyNested() { }
+
+    @available(iOS, introduced: 14.0)
+    @available(macCatalyst, introduced: 14.5)
+    func iOSAndMacCatalystNested() { }
+  }
+}
+
+@available(iOS, introduced: 14.0)
+@available(macCatalyst, introduced: 14.5)
+extension AvailableLaterOnMacCatalyst { // expected-note 2 {{enclosing scope requires availability of Mac Catalyst 14.5 or newer}}
+  @available(iOS, introduced: 14.0) // expected-error {{instance method cannot be more available than enclosing scope}}
+  func iOSOnlyInExtension() { }
+
+  @available(macCatalyst, introduced: 14.5)
+  func macCatalystOnlyInExtension() { }
+
+  @available(iOS, introduced: 14.0)
+  @available(macCatalyst, introduced: 14.5)
+  func iOSAndMacCatalystInExtension() { }
+
+  struct NestedInExtension {
+    @available(iOS, introduced: 14.0) // expected-warning {{instance method cannot be more available than enclosing scope}}
+    func iOSOnlyNestedInExtension() { }
+
+    @available(macCatalyst, introduced: 14.5)
+    func macCatalystOnlyNestedInExtension() { }
+
+    @available(iOS, introduced: 14.0)
+    @available(macCatalyst, introduced: 14.5)
+    func iOSAndMacCatalystNestedInExtension() { }
+  }
+
 }

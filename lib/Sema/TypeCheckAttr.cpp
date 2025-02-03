@@ -2338,7 +2338,8 @@ static Decl *getEnclosingDeclForDecl(Decl *D) {
 
 static std::optional<std::pair<SemanticAvailableAttr, const Decl *>>
 getSemanticAvailableRangeDeclAndAttr(const Decl *decl) {
-  if (auto attr = decl->getAvailableAttrForPlatformIntroduction())
+  if (auto attr = decl->getAvailableAttrForPlatformIntroduction(
+          /*checkExtension=*/false))
     return std::make_pair(*attr, decl);
 
   if (auto *parent =
@@ -2466,12 +2467,6 @@ void AttributeChecker::visitAvailableAttr(AvailableAttr *parsedAttr) {
           // Members of extensions of nominal types with available ranges were
           // not diagnosed previously, so only emit a warning in that case.
           if (isa<ExtensionDecl>(DC->getTopmostDeclarationDeclContext()))
-            limit = DiagnosticBehavior::Warning;
-        } else if (enclosingAttr.getPlatform() != attr->getPlatform()) {
-          // Downgrade to a warning when the limiting attribute is for a more
-          // specific platform.
-          if (inheritsAvailabilityFromPlatform(enclosingAttr.getPlatform(),
-                                               attr->getPlatform()))
             limit = DiagnosticBehavior::Warning;
         }
         diagnose(D->isImplicit() ? enclosingDecl->getLoc()

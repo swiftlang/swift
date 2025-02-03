@@ -793,7 +793,7 @@ AvailabilityRange AvailabilityInference::annotatedAvailableRangeForAttr(
 }
 
 std::optional<SemanticAvailableAttr>
-Decl::getAvailableAttrForPlatformIntroduction() const {
+Decl::getAvailableAttrForPlatformIntroduction(bool checkExtension) const {
   if (auto attr = getDeclAvailableAttrForPlatformIntroduction(this))
     return attr;
 
@@ -804,6 +804,8 @@ Decl::getAvailableAttrForPlatformIntroduction() const {
   // if the declaration does not have an explicit @available attribute
   // itself. This check relies on the fact that we cannot have nested
   // extensions.
+  if (!checkExtension)
+    return std::nullopt;
 
   if (auto parent =
           AvailabilityInference::parentDeclForInferredAvailability(this)) {
