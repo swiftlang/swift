@@ -690,7 +690,7 @@ public:
        ASTDumpMemberLoading memberLoading = ASTDumpMemberLoading::None) const;
 
   /// Dumps this source file's AST in JSON format to the given output stream.
-  void dumpJSON(raw_ostream &os) const;
+  void dumpJSON(raw_ostream &os, ASTDumpMemberLoading memberLoading) const;
 
   /// Pretty-print the contents of this source file.
   ///

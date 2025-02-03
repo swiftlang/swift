@@ -2910,9 +2910,10 @@ void SourceFile::dump(llvm::raw_ostream &OS,
   llvm::errs() << '\n';
 }
 
-void SourceFile::dumpJSON(llvm::raw_ostream &OS) const {
+void SourceFile::dumpJSON(llvm::raw_ostream &OS,
+                          ASTDumpMemberLoading memberLoading) const {
   JSONWriter writer(OS, /*indent*/ 0);
-  PrintDecl(writer, ASTDumpMemberLoading::TypeChecked).visitSourceFile(*this);
+  PrintDecl(writer, memberLoading).visitSourceFile(*this);
 }
 
 void Pattern::dump() const {
