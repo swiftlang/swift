@@ -381,7 +381,7 @@ ParserStatus Parser::parseBraceItems(SmallVectorImpl<ASTNode> &Entries,
                             IsFollowingGuard);
 
             if (IsActive)
-              activeElements = std::move(elements);
+              activeElements.append(elements);
           });
       if (IfConfigResult.hasCodeCompletion() && isIDEInspectionFirstPass()) {
         consumeDecl(BeginParserPosition, IsTopLevel);
