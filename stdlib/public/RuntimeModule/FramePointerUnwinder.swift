@@ -36,7 +36,9 @@ public struct FramePointerUnwinder<C: Context, M: MemoryReader>: Sequence, Itera
   var reader: MemoryReader
 
   @_specialize(exported: true, kind: full, where C == HostContext, M == UnsafeLocalMemoryReader)
+  #if os(macOS) || os(Linux)
   @_specialize(exported: true, kind: full, where C == HostContext, M == RemoteMemoryReader)
+  #endif
   #if os(Linux)
   @_specialize(exported: true, kind: full, where C == HostContext, M == MemserverMemoryReader)
   #endif
@@ -77,7 +79,9 @@ public struct FramePointerUnwinder<C: Context, M: MemoryReader>: Sequence, Itera
   }
 
   @_specialize(exported: true, kind: full, where C == HostContext, M == UnsafeLocalMemoryReader)
+  #if os(macOS) || os(Linux)
   @_specialize(exported: true, kind: full, where C == HostContext, M == RemoteMemoryReader)
+  #endif
   #if os(Linux)
   @_specialize(exported: true, kind: full, where C == HostContext, M == MemserverMemoryReader)
   #endif
@@ -114,7 +118,9 @@ public struct FramePointerUnwinder<C: Context, M: MemoryReader>: Sequence, Itera
   }
 
   @_specialize(exported: true, kind: full, where C == HostContext, M == UnsafeLocalMemoryReader)
+  #if os(macOS) || os(Linux)
   @_specialize(exported: true, kind: full, where C == HostContext, M == RemoteMemoryReader)
+  #endif
   #if os(Linux)
   @_specialize(exported: true, kind: full, where C == HostContext, M == MemserverMemoryReader)
   #endif
@@ -129,7 +135,9 @@ public struct FramePointerUnwinder<C: Context, M: MemoryReader>: Sequence, Itera
   }
 
   @_specialize(exported: true, kind: full, where C == HostContext, M == UnsafeLocalMemoryReader)
+  #if os(macOS) || os(Linux)
   @_specialize(exported: true, kind: full, where C == HostContext, M == RemoteMemoryReader)
+  #endif
   #if os(Linux)
   @_specialize(exported: true, kind: full, where C == HostContext, M == MemserverMemoryReader)
   #endif
@@ -138,7 +146,9 @@ public struct FramePointerUnwinder<C: Context, M: MemoryReader>: Sequence, Itera
   }
 
   @_specialize(exported: true, kind: full, where C == HostContext, M == UnsafeLocalMemoryReader)
+  #if os(macOS) || os(Linux)
   @_specialize(exported: true, kind: full, where C == HostContext, M == RemoteMemoryReader)
+  #endif
   #if os(Linux)
   @_specialize(exported: true, kind: full, where C == HostContext, M == MemserverMemoryReader)
   #endif
@@ -155,7 +165,9 @@ public struct FramePointerUnwinder<C: Context, M: MemoryReader>: Sequence, Itera
   }
 
   @_specialize(exported: true, kind: full, where C == HostContext, M == UnsafeLocalMemoryReader)
+  #if os(macOS) || os(Linux)
   @_specialize(exported: true, kind: full, where C == HostContext, M == RemoteMemoryReader)
+  #endif
   #if os(Linux)
   @_specialize(exported: true, kind: full, where C == HostContext, M == MemserverMemoryReader)
   #endif
