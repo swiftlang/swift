@@ -66,6 +66,8 @@ struct LifetimeDependence : CustomStringConvertible {
     /// A local variable scope without ownership. The scope must be introduced by either move_value or
     /// begin_borrow. LinearLiveness computes the scope boundary.
     case local(VariableScopeInstruction)
+    /// A directly accessed global variable without exclusivity. Presumably immutable and therefore immortal.
+    case global(GlobalAddrInst)
     /// Singly-initialized addressable storage (likely for an immutable address-only value). The lifetime extends until
     /// the memory is destroyed. e.g. A value produced by an @in FunctionArgument, an @out apply, or an @inout
     /// FunctionArgument that is never modified inside the callee. Modified @inout FunctionArguments have caller scoped
@@ -82,6 +84,7 @@ struct LifetimeDependence : CustomStringConvertible {
       case let .owned(value): return value
       case let .borrowed(beginBorrow): return beginBorrow.value
       case let .local(varScope): return varScope.scopeBegin
+      case let .global(ga): return ga
       case let .initialized(initializer): return initializer.initialAddress
       case let .unknown(value): return value
       }
@@ -91,7 +94,7 @@ struct LifetimeDependence : CustomStringConvertible {
       switch self {
       case let .caller(argument):
         precondition(argument.ownership != .owned, "only guaranteed or inout arguments have a caller scope")
-      case .access, .local, .unknown:
+      case .access, .local, .global, .unknown:
         break        
       case let .yield(value):
         precondition(value.definingInstruction is BeginApplyInst)
@@ -119,6 +122,7 @@ struct LifetimeDependence : CustomStringConvertible {
         case .owned: return "Owned: "
         case .borrowed: return "Borrowed: "
         case .local: return "Local: "
+        case .global: return "Global: "
         case .initialized: return "Initialized: "
         case .unknown: return "Unknown: "
         }
@@ -254,8 +258,15 @@ extension LifetimeDependence.Scope {
     case let .box(projectBox):
       // Note: the box may be in a borrow scope.
       self.init(base: projectBox.operand.value, context)
-    case .stack, .global, .class, .tail, .pointer, .index, .unidentified:
-      self = .unknown(accessBase.address ?? address)
+    case .stack, .class, .tail, .pointer, .index, .unidentified:
+      self = .unknown(accessBase.address!)
+    case .global:
+      // TODO: When AccessBase stores global_addr, we don't need a check here and don't need to pass 'address' in.
+      if let ga = address as? GlobalAddrInst {
+        self = .global(ga)
+      } else {
+        self = .unknown(accessBase.address!)
+      }
     case let .argument(arg):
       if arg.convention.isIndirectIn {
         if arg.convention.isGuaranteed {
@@ -321,6 +332,8 @@ extension LifetimeDependence.Scope {
       self = .caller(arg)
     } else if let varScope = VariableScopeInstruction(value.definingInstruction) {
       self = .local(varScope)
+    } else if let ga = value as? GlobalAddrInst {
+      self = .global(ga)
     } else {
       self = .unknown(value)
     }
@@ -365,7 +378,7 @@ extension LifetimeDependence.Scope {
   /// Note: The caller must deinitialize the returned range.
   func computeRange(_ context: Context) -> InstructionRange? {
     switch self {
-    case .caller:
+    case .caller, .global:
       return nil
     case let .access(beginAccess):
       var range = InstructionRange(begin: beginAccess, context)

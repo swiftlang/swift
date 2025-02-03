@@ -39,17 +39,17 @@ internal func _overrideLifetime<
 
 // Lifetime dependence semantics by example.
 public struct Span<T>: ~Escapable {
-  private var base: UnsafePointer<T>
+  private var base: UnsafePointer<T>?
   private var count: Int
 
   @lifetime(borrow base)
-  init(base: UnsafePointer<T>, count: Int) {
+  init(base: UnsafePointer<T>?, count: Int) {
     self.base = base
     self.count = count
   }
 
   @lifetime(borrow generic)
-  init<S>(base: UnsafePointer<T>, count: Int, generic: borrowing S) {
+  init<S>(base: UnsafePointer<T>?, count: Int, generic: borrowing S) {
     self.base = base
     self.count = count
   }
@@ -57,7 +57,7 @@ public struct Span<T>: ~Escapable {
 
 extension Span {
   consuming func dropFirst() -> Span<T> {
-    let nextPointer = self.base + 1
+    let nextPointer = self.base.flatMap { $0 + 1 }
     let local = Span(base: nextPointer, count: self.count - 1)
     return _overrideLifetime(local, copying: self)
   }
@@ -67,8 +67,10 @@ extension Span {
   mutating func droppingPrefix(length: Int) -> /* */ Span<T> {
     let oldBase = base
     let result = Span(base: oldBase, count: length)
-    self.base += length
-    self.count -= length
+    if let base = self.base {
+      self.base = base + length
+      self.count -= length
+    }
     return _overrideLifetime(result, copying: self)
   }
 }
@@ -312,6 +314,28 @@ public func testTrivialLocalDeadEnd(p: UnsafePointer<Int>) {
 @lifetime(borrow p)
 public func testTrivialInoutBorrow(p: inout UnsafePointer<Int>) -> Span<Int> {
   return Span(base: p, count: 1)
+}
+
+// =============================================================================
+// Scoped dependence on global values
+// =============================================================================
+
+private let immortalInt = 0
+
+private let immortalString = ""
+
+@lifetime(immortal)
+func testImmortalInt() -> Span<Int> {
+  let nilBasedBuffer = UnsafeBufferPointer<Int>(start: nil, count: 0)
+  let span = Span(base: nilBasedBuffer.baseAddress, count: nilBasedBuffer.count)
+  return _overrideLifetime(span, borrowing: immortalInt)
+}
+
+@lifetime(immortal)
+func testImmortalString() -> Span<String> {
+  let nilBasedBuffer = UnsafeBufferPointer<String>(start: nil, count: 0)
+  let span = Span(base: nilBasedBuffer.baseAddress, count: nilBasedBuffer.count)
+  return _overrideLifetime(span, borrowing: immortalString)
 }
 
 // =============================================================================

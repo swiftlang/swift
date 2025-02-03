@@ -200,6 +200,10 @@ private struct DiagnoseDependence {
     if function.hasUnsafeNonEscapableResult {
       return .continueWalk
     }
+    // If the dependence scope is global, then it has immortal lifetime.
+    if case .global = dependence.scope {
+      return .continueWalk
+    }
     // Check that the parameter dependence for this result is the same
     // as the current dependence scope.
     if let arg = dependence.scope.parentValue as? FunctionArgument,
