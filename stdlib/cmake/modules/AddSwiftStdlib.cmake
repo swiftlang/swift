@@ -698,7 +698,7 @@ function(_add_swift_lipo_target)
         DEPENDS ${source_targets})
   endif()
 endfunction()
- 
+
 # Add a single variant of a new Swift library.
 #
 # Usage:
@@ -1317,38 +1317,46 @@ function(add_swift_target_library_single target name)
   # Set compile and link flags for the non-static target.
   # Do these LAST.
   set(target_static)
-  if(SWIFTLIB_SINGLE_IS_STDLIB AND SWIFTLIB_SINGLE_STATIC AND NOT SWIFTLIB_SINGLE_INSTALL_WITH_SHARED)
+  if(SWIFTLIB_SINGLE_IS_STDLIB AND SWIFTLIB_SINGLE_STATIC)
     set(target_static "${target}-static")
 
-    # We have already compiled Swift sources.  Link everything into a static
-    # library.
-    add_library(${target_static} STATIC
+    if (SWIFTLIB_SINGLE_INSTALL_WITH_SHARED)
+      # Create an interface library for the static version, and explicitly
+      # add the output path for the non-static version to its libraries.
+      add_library(${target_static} INTERFACE)
+      add_dependencies(${target_static} ${target})
+      target_link_libraries(${target_static} INTERFACE $<TARGET_FILE:${target}>)
+    else()
+      # We have already compiled Swift sources.  Link everything into a static
+      # library.
+      add_library(${target_static} STATIC
         ${SWIFTLIB_SINGLE_SOURCES}
         ${SWIFTLIB_INCORPORATED_OBJECT_LIBRARIES_EXPRESSIONS}
         ${SWIFTLIB_SINGLE_XCODE_WORKAROUND_SOURCES})
 
-    set_output_directory(${target_static}
+      set_output_directory(${target_static}
         BINARY_DIR ${out_bin_dir}
         LIBRARY_DIR ${out_lib_dir})
 
-    if(SWIFTLIB_INSTALL_WITH_SHARED)
-      set(swift_lib_dir ${lib_dir})
-    else()
-      set(swift_lib_dir ${static_lib_dir})
-    endif()
+      if(SWIFTLIB_INSTALL_WITH_SHARED)
+        set(swift_lib_dir ${lib_dir})
+      else()
+        set(swift_lib_dir ${static_lib_dir})
+      endif()
 
-    foreach(config ${CMAKE_CONFIGURATION_TYPES})
-      string(TOUPPER ${config} config_upper)
-      escape_path_for_xcode(
+      foreach(config ${CMAKE_CONFIGURATION_TYPES})
+        string(TOUPPER ${config} config_upper)
+        escape_path_for_xcode(
           "${config}" "${swift_lib_dir}" config_lib_dir)
-      set_target_properties(${target_static} PROPERTIES
-        LIBRARY_OUTPUT_DIRECTORY_${config_upper} ${config_lib_dir}/${output_sub_dir}
-        ARCHIVE_OUTPUT_DIRECTORY_${config_upper} ${config_lib_dir}/${output_sub_dir})
-    endforeach()
+        set_target_properties(${target_static} PROPERTIES
+          LIBRARY_OUTPUT_DIRECTORY_${config_upper} ${config_lib_dir}/${output_sub_dir}
+          ARCHIVE_OUTPUT_DIRECTORY_${config_upper} ${config_lib_dir}/${output_sub_dir})
+      endforeach()
 
-    set_target_properties(${target_static} PROPERTIES
-      LIBRARY_OUTPUT_DIRECTORY ${swift_lib_dir}/${output_sub_dir}
-      ARCHIVE_OUTPUT_DIRECTORY ${swift_lib_dir}/${output_sub_dir})
+      set_target_properties(${target_static} PROPERTIES
+        LIBRARY_OUTPUT_DIRECTORY ${swift_lib_dir}/${output_sub_dir}
+        ARCHIVE_OUTPUT_DIRECTORY ${swift_lib_dir}/${output_sub_dir})
+    endif()
   endif()
 
   set_target_properties(${target}
@@ -1644,9 +1652,10 @@ function(add_swift_target_library_single target name)
       LINKER_LANGUAGE "CXX")
   endif()
 
-  if(target_static)
+  if(target_static AND NOT SWIFTLIB_SINGLE_INSTALL_WITH_SHARED)
     target_compile_options(${target_static} PRIVATE
       ${c_compile_flags})
+
     # FIXME: The fallback paths here are going to be dynamic libraries.
 
     if(SWIFTLIB_INSTALL_WITH_SHARED)
