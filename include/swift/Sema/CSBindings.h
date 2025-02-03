@@ -224,14 +224,6 @@ struct PotentialBindings {
   /// The set of potential bindings.
   llvm::SmallVector<PotentialBinding, 4> Bindings;
 
-  /// The set of unique literal protocol requirements placed on this
-  /// type variable or inferred transitively through subtype chains.
-  ///
-  /// Note that ordering is important when it comes to bindings, we'd
-  /// like to add any "direct" default types first to attempt them
-  /// before transitive ones.
-  llvm::SmallPtrSet<Constraint *, 2> Literals;
-
   /// The set of constraints which would be used to infer default types.
   llvm::SmallPtrSet<Constraint *, 2> Defaults;
 
@@ -258,8 +250,6 @@ struct PotentialBindings {
   llvm::SmallSetVector<std::pair<TypeVariableType *, Constraint *>, 4> EquivalentTo;
 
   void addDefault(Constraint *constraint);
-
-  void addLiteral(Constraint *constraint);
 
   /// Add a potential binding to the list of bindings,
   /// coalescing supertype bounds when we are able to compute the meet.
@@ -386,7 +376,14 @@ public:
   /// The set of protocol conformance requirements placed on this type variable.
   llvm::SmallVector<Constraint *, 4> Protocols;
 
+  /// The set of unique literal protocol requirements placed on this
+  /// type variable or inferred transitively through subtype chains.
+  ///
+  /// Note that ordering is important when it comes to bindings, we'd
+  /// like to add any "direct" default types first to attempt them
+  /// before transitive ones.
   llvm::SmallMapVector<ProtocolDecl *, LiteralRequirement, 2> Literals;
+
   llvm::SmallDenseMap<CanType, Constraint *, 2> Defaults;
 
   /// The set of transitive protocol requirements inferred through

@@ -50,23 +50,25 @@ static std::optional<Type> checkTypeOfBinding(TypeVariableType *typeVar,
 BindingSet::BindingSet(ConstraintSystem &CS, TypeVariableType *TypeVar,
                        const PotentialBindings &info)
     : CS(CS), TypeVar(TypeVar), Info(info) {
+
   for (const auto &binding : info.Bindings)
     addBinding(binding, /*isTransitive=*/false);
 
   for (auto *constraint : info.Constraints) {
     switch (constraint->getKind()) {
-    case ConstraintKind::ConformsTo: {
+    case ConstraintKind::ConformsTo:
       if (constraint->getSecondType()->is<ProtocolType>())
         Protocols.push_back(constraint);
       break;
-    }
+
+    case ConstraintKind::LiteralConformsTo:
+      addLiteralRequirement(constraint);
+      break;
+
     default:
       break;
     }
   }
-
-  for (auto *literal : info.Literals)
-    addLiteralRequirement(literal);
 
   for (auto *constraint : info.Defaults)
     addDefault(constraint);
@@ -1311,10 +1313,6 @@ void PotentialBindings::addPotentialBinding(TypeVariableType *TypeVar,
   Bindings.push_back(std::move(binding));
 }
 
-void PotentialBindings::addLiteral(Constraint *constraint) {
-  Literals.insert(constraint);
-}
-
 bool BindingSet::isViable(PotentialBinding &binding, bool isTransitive) {
   // Prevent against checking against the same opened nominal type
   // over and over again. Doing so means redundant work in the best
@@ -1969,6 +1967,7 @@ void PotentialBindings::infer(ConstraintSystem &CS,
   case ConstraintKind::SameShape:
   case ConstraintKind::MaterializePackExpansion:
   case ConstraintKind::ConformsTo:
+  case ConstraintKind::LiteralConformsTo:
     // Constraints from which we can't do anything.
     break;
 
@@ -2008,13 +2007,6 @@ void PotentialBindings::infer(ConstraintSystem &CS,
   case ConstraintKind::Disjunction:
     DelayedBy.push_back(constraint);
     break;
-
-  case ConstraintKind::LiteralConformsTo: {
-    // Record constraint where protocol requirement originated
-    // this is useful to use for the binding later.
-    addLiteral(constraint);
-    break;
-  }
 
   case ConstraintKind::ApplicableFunction:
   case ConstraintKind::DynamicCallableApplicableFunction: {
@@ -2090,7 +2082,6 @@ void PotentialBindings::retract(ConstraintSystem &CS,
 
   LLVM_DEBUG(
     llvm::dbgs() << Constraints.size() << " " << Bindings.size() << " "
-                 << Literals.size() << " "
                  << AdjacentVars.size() << " " << DelayedBy.size() << " "
                  << SubtypeOf.size() << " " << SupertypeOf.size() << " "
                  << EquivalentTo.size() << "\n");
@@ -2103,10 +2094,6 @@ void PotentialBindings::retract(ConstraintSystem &CS,
       Bindings.end());
 
   switch (constraint->getKind()) {
-  case ConstraintKind::LiteralConformsTo:
-    Literals.erase(constraint);
-    break;
-
   case ConstraintKind::Defaultable:
   case ConstraintKind::FallbackType: {
     Defaults.erase(constraint);
@@ -2150,7 +2137,6 @@ void PotentialBindings::reset() {
   if (CONDITIONAL_ASSERT_enabled()) {
     ASSERT(Constraints.empty());
     ASSERT(Bindings.empty());
-    ASSERT(Literals.empty());
     ASSERT(Defaults.empty());
     ASSERT(DelayedBy.empty());
     ASSERT(AdjacentVars.empty());
