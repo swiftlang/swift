@@ -4711,6 +4711,21 @@ getIsolationFromAttributes(const Decl *decl, bool shouldDiagnose = true,
     return std::nullopt;
   }
 
+  // If the declaration is explicitly marked with 'execution', return the
+  // appropriate isolation.
+  //
+  // NOTE: It is important that this goes /before/ nonisolated since this is
+  // used to serialize the expected ActorIsolation, while the nonisolated check
+  // will allow for reinference to happen after deserializing.
+  if (concurrentExecutionAttr) {
+    switch (concurrentExecutionAttr->getBehavior()) {
+    case ExecutionKind::Concurrent:
+      return ActorIsolation::forConcurrent(false /*is unsafe*/);
+    case ExecutionKind::Caller:
+      return ActorIsolation::forNonisolated(false /*is unsafe*/);
+    }
+  }
+
   // If the declaration is explicitly marked 'nonisolated', report it as
   // independent.
   if (nonisolatedAttr) {
@@ -4815,17 +4830,6 @@ getIsolationFromAttributes(const Decl *decl, bool shouldDiagnose = true,
     return ActorIsolation::forGlobalActor(
         globalActorType->mapTypeOutOfContext())
         .withPreconcurrency(decl->preconcurrency() || isUnsafe);
-  }
-
-  // If the declaration is explicitly marked with 'execution', return the
-  // appropriate isolation.
-  if (concurrentExecutionAttr) {
-    switch (concurrentExecutionAttr->getBehavior()) {
-    case ExecutionKind::Concurrent:
-      return ActorIsolation::forConcurrent(false /*is unsafe*/);
-    case ExecutionKind::Caller:
-      return ActorIsolation::forNonisolated(false /*is unsafe*/);
-    }
   }
 
   llvm_unreachable("Forgot about an attribute?");
@@ -5500,10 +5504,17 @@ static void addAttributesForActorIsolation(ValueDecl *value,
   switch (isolation) {
   case ActorIsolation::Nonisolated:
   case ActorIsolation::NonisolatedUnsafe:
+    value->getAttrs().add(
+        new (ctx) NonisolatedAttr(isolation.isUnsafe(), /*implicit=*/true));
+    value->getAttrs().add(
+        new (ctx) ExecutionAttr(ExecutionKind::Caller, /*implicit=*/true));
+    break;
   case ActorIsolation::Concurrent:
   case ActorIsolation::ConcurrentUnsafe:
     value->getAttrs().add(
         new (ctx) NonisolatedAttr(isolation.isUnsafe(), /*implicit=*/true));
+    value->getAttrs().add(
+        new (ctx) ExecutionAttr(ExecutionKind::Concurrent, /*implicit=*/true));
     break;
   case ActorIsolation::GlobalActor: {
     auto typeExpr = TypeExpr::createImplicit(isolation.getGlobalActor(), ctx);
@@ -5526,7 +5537,14 @@ static void addAttributesForActorIsolation(ValueDecl *value,
       break;
     }
     case ActorIsolation::Unspecified: {
-      // Nothing to do. Default value for non-actors.
+      if (value->getASTContext().LangOpts.hasFeature(
+              Feature::NonIsolatedAsyncInheritsIsolationFromContext)) {
+        value->getAttrs().add(
+            new (ctx) ExecutionAttr(ExecutionKind::Caller, /*implicit=*/true));
+      } else {
+        value->getAttrs().add(new (ctx) ExecutionAttr(ExecutionKind::Concurrent,
+                                                      /*implicit=*/true));
+      }
       assert(!belongsToActor(value));
       break;
     }
@@ -5574,6 +5592,13 @@ InferredActorIsolation ActorIsolationRequest::evaluate(
     auto preconcurrency =
         new (ctx) PreconcurrencyAttr(/*isImplicit*/true);
     value->getAttrs().add(preconcurrency);
+  }
+
+  // If we have specifically nonisolated, mark it with the current compilation
+  // semantics for execution (caller or concurrent) so we preserve that through
+  // serialization.
+  if (isolationFromAttr && isolationFromAttr->isNonisolated()) {
+    addAttributesForActorIsolation(value, *isolationFromAttr);
   }
 
   if (FuncDecl *fd = dyn_cast<FuncDecl>(value)) {
@@ -5951,6 +5976,24 @@ InferredActorIsolation ActorIsolationRequest::evaluate(
               .withPreconcurrency(true)),
         IsolationSource(),
       };
+    }
+  }
+
+  if (auto *afd = dyn_cast<AbstractFunctionDecl>(value);
+      afd && afd->hasAsync() && !isa<ConstructorDecl>(value) &&
+      !isa<DestructorDecl>(value)) {
+    switch (defaultIsolation) {
+    case ActorIsolation::ActorInstance:
+    case ActorIsolation::GlobalActor:
+    case ActorIsolation::Erased:
+      break;
+    case ActorIsolation::Unspecified:
+    case ActorIsolation::Concurrent:
+    case ActorIsolation::ConcurrentUnsafe:
+    case ActorIsolation::Nonisolated:
+    case ActorIsolation::NonisolatedUnsafe:
+      addAttributesForActorIsolation(value, defaultIsolation);
+      break;
     }
   }
 
