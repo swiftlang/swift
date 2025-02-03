@@ -240,7 +240,7 @@ void SymbolGraph::recordMemberRelationship(Symbol S) {
     // doesn't exist), don't record a memberOf relationship.
     return;
   }
-  if (const auto *PublicDecl = Walker.PublicPrivateTypeAliases[ParentDecl]) {
+  if (const auto *PublicDecl = Walker.PublicPrivateTypeAliases.lookup(ParentDecl)) {
     // If our member target is a private type that has a public type alias,
     // point the membership to that type alias instead.
     ParentDecl = PublicDecl;
@@ -333,7 +333,7 @@ void SymbolGraph::recordConformanceSynthesizedMemberRelationships(Symbol S) {
   // synthesized members for the underlying type.
   if (const auto *TD = dyn_cast<TypeAliasDecl>(D)) {
     const auto *NTD = TD->getUnderlyingType()->getAnyNominal();
-    if (NTD && Walker.PublicPrivateTypeAliases[NTD] == D)
+    if (NTD && Walker.PublicPrivateTypeAliases.lookup(NTD) == D)
         D = NTD;
   }
 
@@ -423,8 +423,8 @@ void SymbolGraph::recordConformanceSynthesizedMemberRelationships(Symbol S) {
               }
 
               const ValueDecl *BaseDecl = OwningNominal;
-              if (Walker.PublicPrivateTypeAliases.contains(BaseDecl))
-                BaseDecl = Walker.PublicPrivateTypeAliases[BaseDecl];
+              if (const auto *PublicDecl = Walker.PublicPrivateTypeAliases.lookup(BaseDecl))
+                BaseDecl = PublicDecl;
 
               Symbol Source(this, SynthMember, BaseDecl);
 
@@ -463,7 +463,7 @@ SymbolGraph::recordInheritanceRelationships(Symbol S) {
   // for the underlying type instead.
   if (const auto *TD = dyn_cast<TypeAliasDecl>(D)) {
     const auto *NTD = TD->getUnderlyingType()->getAnyNominal();
-    if (NTD && Walker.PublicPrivateTypeAliases[NTD] == D)
+    if (NTD && Walker.PublicPrivateTypeAliases.lookup(NTD) == D)
       D = NTD;
   }
 
@@ -559,7 +559,7 @@ void SymbolGraph::recordConformanceRelationships(Symbol S) {
   // for the underlying type instead.
   if (const auto *TD = dyn_cast<TypeAliasDecl>(D)) {
     const auto *NTD = TD->getUnderlyingType()->getAnyNominal();
-    if (NTD && Walker.PublicPrivateTypeAliases[NTD] == D)
+    if (NTD && Walker.PublicPrivateTypeAliases.lookup(NTD) == D)
       D = NTD;
   }
 
