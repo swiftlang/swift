@@ -47,6 +47,22 @@ static bool hasConversions(Type);
 static std::optional<Type> checkTypeOfBinding(TypeVariableType *typeVar,
                                               Type type);
 
+BindingSet::BindingSet(ConstraintSystem &CS, TypeVariableType *TypeVar,
+                       const PotentialBindings &info)
+    : CS(CS), TypeVar(TypeVar), Info(info) {
+  for (const auto &binding : info.Bindings)
+    addBinding(binding, /*isTransitive=*/false);
+
+  for (auto *literal : info.Literals)
+    addLiteralRequirement(literal);
+
+  for (auto *constraint : info.Defaults)
+    addDefault(constraint);
+
+  for (auto &entry : info.AdjacentVars)
+    AdjacentVars.insert(entry.first);
+}
+
 bool BindingSet::forClosureResult() const {
   return TypeVar->getImpl().isClosureResultType();
 }
@@ -1884,7 +1900,7 @@ PotentialBindings::inferFromRelational(ConstraintSystem &CS,
 void PotentialBindings::infer(ConstraintSystem &CS,
                               TypeVariableType *TypeVar,
                               Constraint *constraint) {
-  if (!Constraints.insert(constraint).second)
+  if (!Constraints.insert(constraint))
     return;
 
   // Record the change, if there are active scopes.
@@ -2059,7 +2075,7 @@ void PotentialBindings::infer(ConstraintSystem &CS,
 void PotentialBindings::retract(ConstraintSystem &CS,
                                 TypeVariableType *TypeVar,
                                 Constraint *constraint) {
-  if (!Constraints.erase(constraint))
+  if (!Constraints.remove(constraint))
     return;
 
   // Record the change, if there are active scopes.

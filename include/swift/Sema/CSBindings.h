@@ -219,7 +219,7 @@ private:
 
 struct PotentialBindings {
   /// The set of all constraints that have been added via infer().
-  llvm::SmallPtrSet<Constraint *, 2> Constraints;
+  llvm::SmallSetVector<Constraint *, 2> Constraints;
 
   /// The set of potential bindings.
   llvm::SmallVector<PotentialBinding, 4> Bindings;
@@ -393,20 +393,7 @@ public:
   std::optional<llvm::SmallPtrSet<Constraint *, 4>> TransitiveProtocols;
 
   BindingSet(ConstraintSystem &CS, TypeVariableType *TypeVar,
-             const PotentialBindings &info)
-      : CS(CS), TypeVar(TypeVar), Info(info) {
-    for (const auto &binding : info.Bindings)
-      addBinding(binding, /*isTransitive=*/false);
-
-    for (auto *literal : info.Literals)
-      addLiteralRequirement(literal);
-
-    for (auto *constraint : info.Defaults)
-      addDefault(constraint);
-
-    for (auto &entry : info.AdjacentVars)
-      AdjacentVars.insert(entry.first);
-  }
+             const PotentialBindings &info);
 
   ConstraintSystem &getConstraintSystem() const { return CS; }
 
