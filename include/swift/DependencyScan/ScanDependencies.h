@@ -27,6 +27,10 @@ namespace swift {
 class CompilerInvocation;
 class CompilerInstance;
 class ModuleDependenciesCache;
+struct ModuleDependencyID;
+struct ModuleDependencyIDHash;
+using ModuleDependencyIDSet =
+    std::unordered_set<ModuleDependencyID, ModuleDependencyIDHash>;
 class SwiftDependencyScanningService;
 
 namespace dependencies {
@@ -58,6 +62,35 @@ performModulePrescan(CompilerInstance &instance,
                      DependencyScanDiagnosticCollector *diagnostics,
                      ModuleDependenciesCache &cache);
 
+namespace incremental {
+/// For the given module dependency graph captured in the 'cache',
+/// validate whether each dependency node is up-to-date w.r.t. serialization
+/// time-stamp. i.e. if any of the input files of a module dependency are newer
+/// than the serialized dependency graph, it is considered invalidated and must
+/// be re-scanned.
+void validateInterModuleDependenciesCache(
+    const ModuleDependencyID &rootModuleID, ModuleDependenciesCache &cache,
+    const llvm::sys::TimePoint<> &cacheTimeStamp, llvm::vfs::FileSystem &fs,
+    DiagnosticEngine &diags, bool emitRemarks = false);
+
+/// Perform a postorder DFS to locate modules whose build recipe is out-of-date
+/// with respect to their inputs. Upon encountering such a module, add it to the
+/// set of invalidated modules, along with the path from the root to this
+/// module.
+void outOfDateModuleScan(const ModuleDependencyID &sourceModuleID,
+                         const ModuleDependenciesCache &cache,
+                         const llvm::sys::TimePoint<> &cacheTimeStamp,
+                         llvm::vfs::FileSystem &fs, DiagnosticEngine &diags,
+                         bool emitRemarks, ModuleDependencyIDSet &visited,
+                         ModuleDependencyIDSet &modulesRequiringRescan);
+
+/// Validate whether all inputs of a given module dependency
+/// are older than the cache serialization time.
+bool verifyModuleDependencyUpToDate(
+    const ModuleDependencyID &moduleID, const ModuleDependenciesCache &cache,
+    const llvm::sys::TimePoint<> &cacheTimeStamp, llvm::vfs::FileSystem &fs,
+    DiagnosticEngine &diags, bool emitRemarks);
+} // end namespace incremental
 } // end namespace dependencies
 } // end namespace swift
 

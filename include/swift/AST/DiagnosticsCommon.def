@@ -212,17 +212,28 @@ ERROR(scanner_arguments_invalid, none,
 ERROR(error_scanner_extra, none,
       "failed inside dependency scanner: '%0'", (StringRef))
 
-WARNING(warn_scanner_deserialize_failed, none,
-        "Failed to load module scanning dependency cache from: '%0', re-building scanner cache from scratch.", (StringRef))
+REMARK(warn_scanner_deserialize_failed, none,
+       "Incremental module scan: Failed to load module scanning dependency cache from: '%0', re-building scanner cache from scratch.", (StringRef))
 
 REMARK(remark_reuse_cache, none,
-       "Re-using serialized module scanning dependency cache from: '%0'.", (StringRef))
+       "Incremental module scan: Re-using serialized module scanning dependency cache from: '%0'.", (StringRef))
 
 REMARK(remark_scanner_uncached_lookups, none,
        "Module Dependency Scanner queries executed: '%0'.", (unsigned))
 
 REMARK(remark_save_cache, none,
-       "Serializing module scanning dependency cache to: '%0'.", (StringRef))
+       "Incremental module scan: Serializing module scanning dependency cache to: '%0'.", (StringRef))
+
+REMARK(remark_scanner_stale_result_invalidate, none,
+       "Incremental module scan: Dependency info for module '%0' invalidated due to a modified input"
+       " since last scan: '%1'.", (StringRef, StringRef))
+
+REMARK(remark_scanner_invalidate_upstream, none,
+       "Incremental module scan: Dependency info for module '%0' invalidated due to an out-of-date"
+       " dependency.", (StringRef))
+
+REMARK(remark_cache_reuse_disabled_with_cas, none,
+       "Incremental module scan: Re-using serialized module scanning dependency cache disabled in Caching build", ())
 
 //------------------------------------------------------------------------------
 // MARK: custom attribute diagnostics

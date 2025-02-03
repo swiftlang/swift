@@ -363,6 +363,11 @@ public:
   /// Load and re-use a prior serialized dependency scanner cache.
   bool ReuseDependencyScannerCache = false;
 
+  /// Upon loading a prior serialized dependency scanner cache, filter out
+  /// dependency module information which is no longer up-to-date with respect
+  /// to input files of every given module.
+  bool ValidatePriorDependencyScannerCache = false;
+
   /// The path at which to either serialize or deserialize the dependency scanner cache.
   std::string SerializedDependencyScannerCachePath;
 

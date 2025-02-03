@@ -1979,6 +1979,11 @@ def driver_explicit_module_build:
   Flags<[HelpHidden, NewDriverOnlyOption]>,
   HelpText<"Prebuild module dependencies to make them explicit">;
 
+def incremental_dependency_scan:
+  Flag<["-"], "incremental-dependency-scan">,
+  Flags<[HelpHidden, NewDriverOnlyOption]>,
+  HelpText<"Re-use/validate prior build dependency scan artifacts">;
+
 def driver_experimental_explicit_module_build:
   Flag<["-"], "experimental-explicit-module-build">,
   Flags<[HelpHidden, NewDriverOnlyOption]>,

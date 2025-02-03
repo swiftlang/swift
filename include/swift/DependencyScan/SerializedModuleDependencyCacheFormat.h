@@ -95,6 +95,7 @@ namespace graph_block {
 enum {
   METADATA = 1,
   MODULE_NODE,
+  TIME_NODE,
   LINK_LIBRARY_NODE,
   LINK_LIBRARY_ARRAY_NODE,
   MACRO_DEPENDENCY_NODE,
@@ -113,13 +114,19 @@ enum {
 
 // Always the first record in the file.
 using MetadataLayout = BCRecordLayout<
-    METADATA,    // ID
-    BCFixed<16>, // Inter-Module Dependency graph format major version
-    BCFixed<16>, // Inter-Module Dependency graph format minor version
-    BCBlob       // Scanner Invocation Context Hash
+    METADATA,       // ID
+    BCFixed<16>,    // Inter-Module Dependency graph format major version
+    BCFixed<16>,    // Inter-Module Dependency graph format minor version
+    BCBlob          // Scanner Invocation Context Hash
     >;
 
-// After the metadata record, we have zero or more identifier records,
+// After the metadata record, emit serialization time-stamp.
+using TimeLayout = BCRecordLayout<
+    TIME_NODE,       // ID
+    BCBlob           // Nanoseconds since epoch as a string
+    >;
+
+// After the time stamp record, we have zero or more identifier records,
 // for each unique string that is referenced in the graph.
 //
 // Identifiers are referenced by their sequence number, starting from 1.
@@ -138,29 +145,31 @@ using IdentifierNodeLayout = BCRecordLayout<IDENTIFIER_NODE, BCBlob>;
 using IdentifierArrayLayout =
     BCRecordLayout<IDENTIFIER_ARRAY_NODE, IdentifierIDArryField>;
 
-// ACTODO: Comment
+// A record for a given link library node containing information
+// required for the build system client to capture a requirement
+// to link a given dependency library.
 using LinkLibraryLayout =
     BCRecordLayout<LINK_LIBRARY_NODE,            // ID
                    IdentifierIDField,            // libraryName
                    IsFrameworkField,             // isFramework
                    IsForceLoadField              // forceLoad
                    >;
-// ACTODO: Comment
 using LinkLibraryArrayLayout =
     BCRecordLayout<LINK_LIBRARY_ARRAY_NODE, IdentifierIDArryField>;
 
-// ACTODO: Comment
+// A record for a Macro module dependency of a given dependency
+// node.
 using MacroDependencyLayout =
     BCRecordLayout<MACRO_DEPENDENCY_NODE,        // ID
                    IdentifierIDField,            // macroModuleName
                    IdentifierIDField,            // libraryPath
                    IdentifierIDField             // executablePath
                    >;
-// ACTODO: Comment
 using MacroDependencyArrayLayout =
     BCRecordLayout<MACRO_DEPENDENCY_ARRAY_NODE, IdentifierIDArryField>;
 
-// ACTODO: Comment
+// A record capturing information about a given 'import' statement
+// captured in a dependency node, including its source location.
 using ImportStatementLayout =
     BCRecordLayout<IMPORT_STATEMENT_NODE,        // ID
                    IdentifierIDField,            // importIdentifier
@@ -169,7 +178,6 @@ using ImportStatementLayout =
                    ColumnNumberField,            // columnNumber
                    IsOptionalImport              // isOptional
                    >;
-// ACTODO: Comment
 using ImportStatementArrayLayout =
     BCRecordLayout<IMPORT_STATEMENT_ARRAY_NODE, IdentifierIDArryField>;
 using OptionalImportStatementArrayLayout =
@@ -268,12 +276,14 @@ using ClangModuleDetailsLayout =
 /// Tries to read the dependency graph from the given buffer.
 /// Returns \c true if there was an error.
 bool readInterModuleDependenciesCache(llvm::MemoryBuffer &buffer,
-                                      ModuleDependenciesCache &cache);
+                                      ModuleDependenciesCache &cache,
+                                      llvm::sys::TimePoint<> &serializedCacheTimeStamp);
 
 /// Tries to read the dependency graph from the given path name.
 /// Returns true if there was an error.
 bool readInterModuleDependenciesCache(llvm::StringRef path,
-                                      ModuleDependenciesCache &cache);
+                                      ModuleDependenciesCache &cache,
+                                      llvm::sys::TimePoint<> &serializedCacheTimeStamp);
 
 /// Tries to write the dependency graph to the given path name.
 /// Returns true if there was an error.
