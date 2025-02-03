@@ -1977,7 +1977,6 @@ private:
       auto *ClassTy = BaseTy->castTo<BoundGenericClassType>();
       auto *Decl = ClassTy->getDecl();
       auto L = getFileAndLocation(Decl);
-      unsigned FwdDeclLine = 0;
 
       if (Opts.DebugInfoLevel > IRGenDebugInfoLevel::ASTTypes)
         return createSpecializedStructOrClassType(

@@ -33,8 +33,9 @@
 #include "swift/Basic/Lazy.h"
 #include "swift/Runtime/Concurrency.h"
 #include "swift/Runtime/EnvironmentVariables.h"
-#include "swift/Runtime/HeapObject.h"
 #include "swift/Runtime/Heap.h"
+#include "swift/Runtime/HeapObject.h"
+#include "swift/Runtime/STLCompatibility.h"
 #include "swift/Threading/Mutex.h"
 #include <atomic>
 #include <new>
@@ -583,11 +584,8 @@ SWIFT_CC(swiftasync)
 static void task_wait_throwing_resume_adapter(SWIFT_ASYNC_CONTEXT AsyncContext *_context) {
 
   auto context = static_cast<TaskFutureWaitAsyncContext *>(_context);
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wcast-function-type-mismatch"
   auto resumeWithError =
-      reinterpret_cast<AsyncVoidClosureEntryPoint *>(context->ResumeParent);
-#pragma clang diagnostic pop
+      std::bit_cast<AsyncVoidClosureEntryPoint *>(context->ResumeParent);
   return resumeWithError(context->Parent, context->errorResult);
 }
 
@@ -962,11 +960,8 @@ swift_task_create_commonImpl(size_t rawTaskCreateFlags,
     auto asyncContextPrefix = reinterpret_cast<AsyncContextPrefix *>(
         reinterpret_cast<char *>(allocation) + headerSize -
         sizeof(AsyncContextPrefix));
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wcast-function-type-mismatch"
     asyncContextPrefix->asyncEntryPoint =
-        reinterpret_cast<AsyncVoidClosureEntryPoint *>(function);
-#pragma clang diagnostic pop
+        std::bit_cast<AsyncVoidClosureEntryPoint *>(function);
     asyncContextPrefix->closureContext = closureContext;
     function = non_future_adapter;
     assert(sizeof(AsyncContextPrefix) == 3 * sizeof(void *));
@@ -974,11 +969,8 @@ swift_task_create_commonImpl(size_t rawTaskCreateFlags,
     auto asyncContextPrefix = reinterpret_cast<FutureAsyncContextPrefix *>(
         reinterpret_cast<char *>(allocation) + headerSize -
         sizeof(FutureAsyncContextPrefix));
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wcast-function-type-mismatch"
     asyncContextPrefix->asyncEntryPoint =
-        reinterpret_cast<AsyncGenericClosureEntryPoint *>(function);
-#pragma clang diagnostic pop
+        std::bit_cast<AsyncGenericClosureEntryPoint *>(function);
     function = future_adapter;
     asyncContextPrefix->closureContext = closureContext;
     assert(sizeof(FutureAsyncContextPrefix) == 4 * sizeof(void *));
@@ -1049,8 +1041,6 @@ swift_task_create_commonImpl(size_t rawTaskCreateFlags,
   // Initialize the parent context pointer to null.
   initialContext->Parent = nullptr;
 
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wcast-function-type-mismatch"
   // Initialize the resumption funclet pointer (async return address) to
   // the final funclet for completing the task.
 
@@ -1064,21 +1054,20 @@ swift_task_create_commonImpl(size_t rawTaskCreateFlags,
   // The final funclet shouldn't release the task or the task function.
   } else if (asyncLet) {
     initialContext->ResumeParent =
-      reinterpret_cast<TaskContinuationFunction*>(&completeTask);
+        std::bit_cast<TaskContinuationFunction *>(&completeTask);
 
   // If we have a non-null closure context and the task function is not
   // consumed by calling it, use a final funclet that releases both the
   // task and the closure context.
   } else if (closureContext && !taskCreateFlags.isTaskFunctionConsumed()) {
     initialContext->ResumeParent =
-      reinterpret_cast<TaskContinuationFunction*>(&completeTaskWithClosure);
+        std::bit_cast<TaskContinuationFunction *>(&completeTaskWithClosure);
 
   // Otherwise, just release the task.
   } else {
     initialContext->ResumeParent =
-      reinterpret_cast<TaskContinuationFunction*>(&completeTaskAndRelease);
+        std::bit_cast<TaskContinuationFunction *>(&completeTaskAndRelease);
   }
-#pragma clang diagnostic pop
 
   // Initialize the task-local allocator and our other private runtime
   // state for the task.
@@ -1292,13 +1281,10 @@ AsyncTaskAndContext swift::swift_task_create(
             FutureAsyncSignature,
             SpecialPointerAuthDiscriminators::AsyncFutureFunction>(closureEntry);
 
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wcast-function-type-mismatch"
     return swift_task_create_common(
         rawTaskCreateFlags, options, futureResultType,
-        reinterpret_cast<TaskContinuationFunction *>(taskEntry), closureContext,
+        std::bit_cast<TaskContinuationFunction *>(taskEntry), closureContext,
         initialContextSize);
-#pragma clang diagnostic pop
   }
 }
 
@@ -1383,10 +1369,7 @@ void swift_task_future_wait_throwingImpl(
   waitingTask->ResumeTask = task_wait_throwing_resume_adapter;
   waitingTask->ResumeContext = callContext;
 
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wcast-function-type-mismatch"
-  auto resumeFn = reinterpret_cast<TaskContinuationFunction *>(resumeFunction);
-#pragma clang diagnostic pop
+  auto resumeFn = std::bit_cast<TaskContinuationFunction *>(resumeFunction);
 
   // Wait on the future.
   assert(task->isFuture());
