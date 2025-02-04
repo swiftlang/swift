@@ -314,7 +314,9 @@ static void determineBestChoicesInContext(
           return 0.01;
 
         if (llvm::all_of(protocolRequirements, [&](ProtocolDecl *protocol) {
-              return bool(cs.lookupConformance(candidateType, protocol));
+              return TypeChecker::conformsToProtocol(candidateType, protocol,
+                                                     cs.DC->getParentModule(),
+                                                     /*allowMissing=*/false);
             }))
           return 0.7;
       }
