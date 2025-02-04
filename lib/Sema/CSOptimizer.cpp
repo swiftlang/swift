@@ -370,23 +370,9 @@ static void determineBestChoicesInContext(
       FunctionType::relabelParams(argsWithLabels, argumentList);
     }
 
-    struct ArgumentCandidate {
-      Type type;
-      // The candidate type is derived from a literal expression.
-      bool fromLiteral : 1;
-      // The candidate type is derived from a call to an
-      // initializer i.e. `Double(...)`.
-      bool fromInitializerCall : 1;
-
-      ArgumentCandidate(Type type, bool fromLiteral = false,
-                        bool fromInitializerCall = false)
-          : type(type), fromLiteral(fromLiteral),
-            fromInitializerCall(fromInitializerCall) {}
-    };
-
-    SmallVector<SmallVector<ArgumentCandidate, 2>, 2>
-        argumentCandidates;
-    argumentCandidates.resize(argFuncType->getNumParams());
+    SmallVector<SmallVector<std::pair<Type, /*fromLiteral=*/bool>, 2>, 2>
+        candidateArgumentTypes;
+    candidateArgumentTypes.resize(argFuncType->getNumParams());
 
     llvm::TinyPtrVector<Type> resultTypes;
 
@@ -394,12 +380,12 @@ static void determineBestChoicesInContext(
       const auto &param = argFuncType->getParams()[i];
       auto argType = cs.simplifyType(param.getPlainType());
 
-      SmallVector<ArgumentCandidate, 2> types;
+      SmallVector<std::pair<Type, bool>, 2> types;
       if (auto *typeVar = argType->getAs<TypeVariableType>()) {
         auto bindingSet = cs.getBindingsFor(typeVar);
 
         for (const auto &binding : bindingSet.Bindings) {
-          types.push_back({binding.BindingType});
+          types.push_back({binding.BindingType, /*fromLiteral=*/false});
         }
 
         for (const auto &literal : bindingSet.Literals) {
@@ -422,8 +408,7 @@ static void determineBestChoicesInContext(
             if (auto *typeExpr = dyn_cast<TypeExpr>(call->getFn())) {
               auto instanceTy = cs.getType(typeExpr)->getMetatypeInstanceType();
               if (instanceTy->isDouble() || instanceTy->isCGFloat())
-                types.push_back({instanceTy, /*fromLiteral=*/false,
-                                 /*fromInitializerCall=*/true});
+                types.push_back({instanceTy, /*fromLiteral=*/false});
             }
           }
         }
@@ -431,7 +416,7 @@ static void determineBestChoicesInContext(
         types.push_back({argType, /*fromLiteral=*/false});
       }
 
-      argumentCandidates[i].append(types);
+      candidateArgumentTypes[i].append(types);
     }
 
     auto resultType = cs.simplifyType(argFuncType->getResult());
@@ -452,9 +437,9 @@ static void determineBestChoicesInContext(
         argFuncType->getNumParams() > 0 &&
         llvm::none_of(
             indices(argFuncType->getParams()), [&](const unsigned argIdx) {
-              auto &candidates = argumentCandidates[argIdx];
+              auto &candidates = candidateArgumentTypes[argIdx];
               return llvm::any_of(candidates, [&](const auto &candidate) {
-                return !candidate.fromLiteral;
+                return !candidate.second;
               });
             });
 
@@ -861,7 +846,7 @@ static void determineBestChoicesInContext(
             auto argIdx = argIndices.front();
 
             // Looks like there is nothing know about the argument.
-            if (argumentCandidates[argIdx].empty())
+            if (candidateArgumentTypes[argIdx].empty())
               continue;
 
             const auto paramFlags = param.getParameterFlags();
@@ -888,25 +873,32 @@ static void determineBestChoicesInContext(
             // at this parameter position and remove the overload choice
             // from consideration.
             double bestCandidateScore = 0;
-            llvm::BitVector mismatches(argumentCandidates[argIdx].size());
+            llvm::BitVector mismatches(candidateArgumentTypes[argIdx].size());
 
             for (unsigned candidateIdx :
-                 indices(argumentCandidates[argIdx])) {
+                 indices(candidateArgumentTypes[argIdx])) {
               // If one of the candidates matched exactly there is no reason
               // to continue checking.
               if (bestCandidateScore == 1)
                 break;
 
-              auto candidate = argumentCandidates[argIdx][candidateIdx];
+              Type candidateType;
+              bool isLiteralDefault;
+
+              std::tie(candidateType, isLiteralDefault) =
+                  candidateArgumentTypes[argIdx][candidateIdx];
 
               // `inout` parameter accepts only l-value argument.
-              if (paramFlags.isInOut() && !candidate.type->is<LValueType>()) {
+              if (paramFlags.isInOut() && !candidateType->is<LValueType>()) {
                 mismatches.set(candidateIdx);
                 continue;
               }
 
+              // The specifier only matters for `inout` check.
+              candidateType = candidateType->getWithoutSpecifierType();
+
               MatchOptions options(MatchFlag::OnParam);
-              if (candidate.fromLiteral)
+              if (isLiteralDefault)
                 options |= MatchFlag::Literal;
               if (favorExactMatchesOnly)
                 options |= MatchFlag::ExactOnly;
@@ -921,16 +913,8 @@ static void determineBestChoicesInContext(
               if (n == 1 && decl->isOperator())
                 options |= MatchFlag::DisableCGFloatDoubleConversion;
 
-              // Disable implicit CGFloat -> Double widening conversion if
-              // argument is an explicit call to `CGFloat` initializer.
-              if (candidate.type->isCGFloat() &&
-                  candidate.fromInitializerCall)
-                options |= MatchFlag::DisableCGFloatDoubleConversion;
-
-              // The specifier for a candidate only matters for `inout` check.
               auto candidateScore = scoreCandidateMatch(
-                  genericSig, decl, candidate.type->getWithoutSpecifierType(),
-                  paramType, options);
+                  genericSig, decl, candidateType, paramType, options);
 
               if (!candidateScore)
                 continue;
@@ -944,7 +928,7 @@ static void determineBestChoicesInContext(
               // Only established arguments could be considered mismatches,
               // literal default types should be regarded as holes if they
               // didn't match.
-              if (!candidate.fromLiteral && !candidate.type->hasTypeVariable())
+              if (!isLiteralDefault && !candidateType->hasTypeVariable())
                 mismatches.set(candidateIdx);
             }
 
