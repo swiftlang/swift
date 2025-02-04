@@ -167,17 +167,8 @@ static Constraint *determineBestChoicesInContext(
         applicableFn.get()->getFirstType()->getAs<FunctionType>();
 
     auto argumentList = cs.getArgumentList(applicableFn.get()->getLocator());
-    if (!argumentList)
+    if (!argumentList || cs.containsIDEInspectionTarget(argumentList))
       return nullptr;
-
-    for (const auto &argument : *argumentList) {
-      if (auto *expr = argument.getExpr()) {
-        // Directly `<#...#>` or has one inside.
-        if (isa<CodeCompletionExpr>(expr) ||
-            cs.containsIDEInspectionTarget(expr))
-          return nullptr;
-      }
-    }
 
     SmallVector<FunctionType::Param, 8> argsWithLabels;
     {
