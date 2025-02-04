@@ -14841,19 +14841,9 @@ ConstraintSystem::simplifyRestrictedConstraintImpl(
         restriction == ConversionRestrictionKind::CGFloatToDouble ? 2 : 10;
 
     if (restriction == ConversionRestrictionKind::DoubleToCGFloat) {
-      SmallVector<LocatorPathElt> originalPath;
-      auto anchor = locator.getLocatorParts(originalPath);
-
-      SourceRange range;
-      ArrayRef<LocatorPathElt> path(originalPath);
-      simplifyLocator(anchor, path, range);
-
-      if (path.empty() || llvm::all_of(path, [](const LocatorPathElt &elt) {
-            return elt.is<LocatorPathElt::OptionalPayload>();
-          })) {
-        if (auto *expr = getAsExpr(anchor))
-          if (auto depth = getExprDepth(expr))
-            impact = (*depth + 1) * impact;
+      if (auto *anchor = locator.trySimplifyToExpr()) {
+        if (auto depth = getExprDepth(anchor))
+          impact = (*depth + 1) * impact;
       }
     } else if (locator.directlyAt<AssignExpr>() ||
                locator.endsWith<LocatorPathElt::ContextualType>()) {
