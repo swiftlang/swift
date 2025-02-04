@@ -1074,7 +1074,8 @@ void swift_task_donateThreadToGlobalExecutorUntil(bool (*condition)(void*),
 
 enum swift_clock_id : int {
   swift_clock_id_continuous = 1,
-  swift_clock_id_suspending = 2
+  swift_clock_id_suspending = 2,
+  swift_clock_id_wall = 3
 };
 
 SWIFT_EXPORT_FROM(swift_Concurrency) SWIFT_CC(swift)
