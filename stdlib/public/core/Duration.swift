@@ -99,6 +99,7 @@ extension Duration {
   }
 }
 
+@available(SwiftStdlib 6.0, *)
 extension Duration {
   /// The duration represented in attoseconds.
   @available(SwiftStdlib 6.0, *)
