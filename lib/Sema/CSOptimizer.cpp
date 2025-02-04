@@ -171,7 +171,7 @@ static void determineBestChoicesInContext(
 
     // Match arguments to the given overload choice.
     auto matchArguments = [&](OverloadChoice choice, FunctionType *overloadType)
-			-> std::optional<MatchCallArgumentResult> {
+        -> llvm::Optional<MatchCallArgumentResult> {
       auto *decl = choice.getDeclOrNull();
       assert(decl);
 
@@ -186,7 +186,7 @@ static void determineBestChoicesInContext(
       return matchCallArguments(argsWithLabels, overloadType->getParams(),
                                 paramListInfo,
                                 argumentList->getFirstTrailingClosureIndex(),
-                                /*allow fixes*/ false, listener, std::nullopt);
+                                /*allow fixes*/ false, listener, llvm::None);
     };
 
     // Determine whether the candidate type is a subclass of the superclass
@@ -209,14 +209,15 @@ static void determineBestChoicesInContext(
           return false;
 
         return llvm::all_of(layout.getProtocols(), [&](ProtocolDecl *P) {
-          if (auto superclass = P->getSuperclassDecl()) {
-            if (!isSubclassOf(candidateType,
-                              superclass->getDeclaredInterfaceType()))
+          if (auto superclass = P->getSuperclass()) {
+            if (!isSubclassOf(candidateType, superclass))
               return false;
           }
 
-          return bool(TypeChecker::containsProtocol(candidateType, P,
-                                                    /*allowMissing=*/false));
+          return bool(TypeChecker::containsProtocol(
+              candidateType, P, cs.DC->getParentModule(),
+              /*skipConditionalRequirements=*/true,
+              /*allowMissing=*/false));
         });
       }
 
@@ -638,13 +639,13 @@ selectBestBindingDisjunction(ConstraintSystem &cs,
   return firstBindDisjunction;
 }
 
-std::optional<std::pair<Constraint *, llvm::TinyPtrVector<Constraint *>>>
+llvm::Optional<std::pair<Constraint *, llvm::TinyPtrVector<Constraint *>>>
 ConstraintSystem::selectDisjunction() {
   SmallVector<Constraint *, 4> disjunctions;
 
   collectDisjunctions(disjunctions);
   if (disjunctions.empty())
-    return std::nullopt;
+    return llvm::None;
 
   if (auto *disjunction = selectBestBindingDisjunction(*this, disjunctions))
     return std::make_pair(disjunction, llvm::TinyPtrVector<Constraint *>());
@@ -682,5 +683,5 @@ ConstraintSystem::selectDisjunction() {
   if (bestDisjunction != disjunctions.end())
     return std::make_pair(*bestDisjunction, favorings[*bestDisjunction]);
 
-  return std::nullopt;
+  return llvm::None;
 }
