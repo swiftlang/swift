@@ -71,15 +71,12 @@ enum class LiteralBindingKind : uint8_t {
 /// along with information that can be used to construct related
 /// bindings, e.g., the supertypes of a given type.
 struct PotentialBinding {
-  friend class BindingSet;
-
   /// The type to which the type variable can be bound.
   Type BindingType;
 
   /// The kind of bindings permitted.
   AllowedBindingKind Kind;
 
-protected:
   /// The source of the type information.
   ///
   /// Determines whether this binding represents a "hole" in
@@ -91,7 +88,6 @@ protected:
                    PointerUnion<Constraint *, ConstraintLocator *> source)
       : BindingType(type), Kind(kind), BindingSource(source) {}
 
-public:
   PotentialBinding(Type type, AllowedBindingKind kind, Constraint *source)
       : PotentialBinding(
             type, kind,

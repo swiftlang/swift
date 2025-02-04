@@ -2073,8 +2073,10 @@ void PotentialBindings::retract(ConstraintSystem &CS,
   if (!Constraints.remove(constraint))
     return;
 
+  bool recordingChanges = CS.solverState && !CS.solverState->Trail.isUndoActive();
+
   // Record the change, if there are active scopes.
-  if (CS.solverState && !CS.solverState->Trail.isUndoActive())
+  if (recordingChanges)
     CS.recordChange(SolverTrail::Change::RetractedBindings(TypeVar, constraint));
 
   LLVM_DEBUG(
@@ -2085,39 +2087,61 @@ void PotentialBindings::retract(ConstraintSystem &CS,
 
   Bindings.erase(
       llvm::remove_if(Bindings,
-                      [&constraint](const PotentialBinding &binding) {
-                        return binding.getSource() == constraint;
+                      [&](const PotentialBinding &binding) {
+                        if (binding.getSource() == constraint) {
+                          if (recordingChanges) {
+                            CS.recordChange(SolverTrail::Change::RetractedBinding(
+                                TypeVar, binding));
+                          }
+                          return true;
+                        }
+                        return false;
                       }),
       Bindings.end());
 
   DelayedBy.erase(
       llvm::remove_if(DelayedBy,
-                      [&constraint](Constraint *existing) {
-                        return existing == constraint;
+                      [&](Constraint *existing) {
+                        if (existing == constraint) {
+                          if (recordingChanges) {
+                            CS.recordChange(SolverTrail::Change::RetractedDelayedBy(
+                                TypeVar, constraint));
+                          }
+                          return true;
+                        }
+                        return false;
                       }),
       DelayedBy.end());
 
-  auto hasMatchingSource =
-      [&constraint](
-          const std::pair<TypeVariableType *, Constraint *> &adjacency) {
-        return adjacency.second == constraint;
-      };
+#define CALLBACK(ChangeKind)                                                   \
+  [&](std::pair<TypeVariableType *, Constraint *> pair) {                      \
+    if (pair.second == constraint) {                                           \
+      if (recordingChanges) {                                                  \
+        CS.recordChange(SolverTrail::Change::ChangeKind(                       \
+            TypeVar, pair.first, pair.second));                                \
+      }                                                                        \
+      return true;                                                             \
+    }                                                                          \
+    return false;                                                              \
+  }
 
   AdjacentVars.erase(
-    llvm::remove_if(AdjacentVars, hasMatchingSource),
+    llvm::remove_if(AdjacentVars, CALLBACK(RetractedAdjacentVar)),
     AdjacentVars.end());
 
   SubtypeOf.erase(
-    llvm::remove_if(SubtypeOf, hasMatchingSource),
+    llvm::remove_if(SubtypeOf, CALLBACK(RetractedSubtypeOf)),
     SubtypeOf.end());
 
   SupertypeOf.erase(
-    llvm::remove_if(SupertypeOf, hasMatchingSource),
+    llvm::remove_if(SupertypeOf, CALLBACK(RetractedSupertypeOf)),
     SupertypeOf.end());
 
   EquivalentTo.erase(
-    llvm::remove_if(EquivalentTo, hasMatchingSource),
+    llvm::remove_if(EquivalentTo, CALLBACK(RetractedEquivalentTo)),
     EquivalentTo.end());
+
+#undef CALLBACK
 }
 
 void PotentialBindings::reset() {
