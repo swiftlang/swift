@@ -2521,9 +2521,8 @@ private:
         }
       }
 
-      unsigned threshold =
-          cs->getASTContext().TypeCheckerOpts.SolverShrinkUnsolvedThreshold;
-      return unsolvedDisjunctions >= threshold;
+      // The threshold used to be `TypeCheckerOpts.SolverShrinkUnsolvedThreshold`
+      return unsolvedDisjunctions >= 10;
     }
   };
 
