@@ -199,9 +199,9 @@ class BuildScriptInvocation(object):
             impl_args += [
                 "--cross-compile-deps-path=%s" % args.cross_compile_deps_path
             ]
-        if args.cross_compile_sysroot is not None:
+        if args.cross_compile_sysroots is not None:
             impl_args += [
-                "--cross-compile-sysroot=%s" % args.cross_compile_sysroot
+                "--cross-compile-sysroots=%s" % args.cross_compile_sysroots
             ]
 
         if args.test_paths:

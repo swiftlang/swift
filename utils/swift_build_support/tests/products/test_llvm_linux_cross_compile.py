@@ -56,7 +56,7 @@ class LLVMLinuxCrossCompileTestCase(unittest.TestCase):
             clang_compiler_version=None,
             clang_user_visible_version=None,
             cross_compile_hosts='linux-aarch64',
-            cross_compile_sysroot=None
+            cross_compile_sysroots=None
         )
 
         llvm = LLVM(
@@ -75,7 +75,7 @@ class LLVMLinuxCrossCompileTestCase(unittest.TestCase):
             clang_compiler_version=None,
             clang_user_visible_version=None,
             cross_compile_hosts='linux-armv7',
-            cross_compile_sysroot='sysroot'
+            cross_compile_sysroots='sysroot'
         )
 
         llvm = LLVM(
@@ -95,7 +95,7 @@ class LLVMLinuxCrossCompileTestCase(unittest.TestCase):
             build_variant='Debug',
             clang_user_visible_version=None,
             cross_compile_hosts='linux-armv7',
-            cross_compile_sysroot='sysroot'
+            cross_compile_sysroots='sysroot'
         )
 
         llvm = LLVM(

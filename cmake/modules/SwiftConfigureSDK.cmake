@@ -419,19 +419,19 @@ macro(configure_sdk_unix name architectures)
         set(SWIFT_SDK_LINUX_ARCH_${arch}_TRIPLE "${arch}-unknown-${SWIFT_SDK_LINUX_ARCH_${arch}_SUFFIX}")
 
         # If we are using an external sysroot, update path and CXX compile flags to point to it
-        if(CROSS_COMPILE_SYSROOT)
-          set(SWIFT_SDK_${prefix}_ARCH_${arch}_PATH ${CROSS_COMPILE_SYSROOT})
+        if(CROSS_COMPILE_SYSROOTS)
+          set(SWIFT_SDK_${prefix}_ARCH_${arch}_PATH ${CROSS_COMPILE_SYSROOTS})
 
           # Find toolchain install dir
           execute_process(
-            COMMAND dirname $(find ${CROSS_COMPILE_SYSROOT}/usr -name crtbegin.o | grep ${SWIFT_SDK_LINUX_ARCH_${arch}_SUFFIX})
-            WORKING_DIRECTORY ${CROSS_COMPILE_SYSROOT}
+            COMMAND dirname $(find ${CROSS_COMPILE_SYSROOTS}/usr -name crtbegin.o | grep ${SWIFT_SDK_LINUX_ARCH_${arch}_SUFFIX})
+            WORKING_DIRECTORY ${CROSS_COMPILE_SYSROOTS}
             OUTPUT_VARIABLE GCC_INSTALL_DIR
             RESULT_VARIABLE FOUND_GCC_INSTALL_DIR)
           if(FOUND_GCC_INSTALL_DIR)
             set(SWIFT_SDK_${prefix}_CXX_OVERLAY_SWIFT_COMPILE_FLAGS -Xcc --gcc-install-dir=${GCC_INSTALL_DIR})
           else()
-            set(SWIFT_SDK_${prefix}_CXX_OVERLAY_SWIFT_COMPILE_FLAGS -Xcc --gcc-toolchain=${CROSS_COMPILE_SYSROOT})
+            set(SWIFT_SDK_${prefix}_CXX_OVERLAY_SWIFT_COMPILE_FLAGS -Xcc --gcc-toolchain=${CROSS_COMPILE_SYSROOTS})
           endif()
         endif()
       elseif("${prefix}" STREQUAL "FREEBSD")
