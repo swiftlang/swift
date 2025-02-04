@@ -1110,7 +1110,7 @@ function false_true() {
 CROSS_COMPILE_HOSTS=($CROSS_COMPILE_HOSTS)
 for t in "${CROSS_COMPILE_HOSTS[@]}"; do
     case ${t} in
-        macosx* | iphone* | appletv* | watch* | linux-* | android-* | openbsd-* | linux-static-* )
+        macosx* | iphone* | appletv* | watch* | linux-* | android-* | openbsd-* )
             ;;
         *)
             echo "Unknown host to cross-compile for: ${t}"
@@ -1743,7 +1743,6 @@ for host in "${ALL_HOSTS[@]}"; do
                         -DSWIFT_SDK_LINUX_STATIC_ARCHITECTURES:STRING="${LINUX_STATIC_ARCHS}"
                     )
                 fi
-
 
                 if [[ "${DARWIN_OVERLAY_TARGET}" != "" ]]; then
                     # Split LOCAL_HOST into a pair ``arch-sdk``
