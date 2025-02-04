@@ -100,7 +100,7 @@ static bool isOverloadedDeclRef(Constraint *disjunction) {
 
 /// Given a set of disjunctions, attempt to determine
 /// favored choices in the current context.
-static Constraint *determineBestChoicesInContext(
+static void determineBestChoicesInContext(
     ConstraintSystem &cs, SmallVectorImpl<Constraint *> &disjunctions,
     llvm::DenseMap<Constraint *, llvm::TinyPtrVector<Constraint *>>
         &favorings) {
@@ -122,7 +122,7 @@ static Constraint *determineBestChoicesInContext(
 
     auto argumentList = cs.getArgumentList(applicableFn.get()->getLocator());
     if (!argumentList || cs.containsIDEInspectionTarget(argumentList))
-      return nullptr;
+      return;
 
     SmallVector<FunctionType::Param, 8> argsWithLabels;
     {
@@ -623,22 +623,6 @@ static Constraint *determineBestChoicesInContext(
     for (auto *choice : favoredChoicesPerDisjunction[entry.first])
       favorings[entry.first].push_back(choice);
   }
-
-  if (bestOverallScore == 0)
-    return nullptr;
-
-  Constraint *bestDisjunction = nullptr;
-  for (auto *disjunction : disjunctions) {
-    if (disjunctionScores[disjunction] != bestOverallScore)
-      continue;
-
-    if (!bestDisjunction)
-      bestDisjunction = disjunction;
-    else // Multiple disjunctions with the same score.
-      return nullptr;
-  }
-
-  return bestDisjunction;
 }
 
 // Attempt to find a disjunction of bind constraints where all options
@@ -711,9 +695,7 @@ ConstraintSystem::selectDisjunction() {
     return std::make_pair(disjunction, llvm::TinyPtrVector<Constraint *>());
 
   llvm::DenseMap<Constraint *, llvm::TinyPtrVector<Constraint *>> favorings;
-  if (auto *bestDisjunction =
-          determineBestChoicesInContext(*this, disjunctions, favorings))
-    return std::make_pair(bestDisjunction, favorings[bestDisjunction]);
+  determineBestChoicesInContext(*this, disjunctions, favorings);
 
   // Pick the disjunction with the smallest number of favored, then active
   // choices.
