@@ -172,67 +172,9 @@ void forEachDisjunctionChoice(
   }
 }
 
-static OverloadedDeclRefExpr *isOverloadedDeclRef(Constraint *disjunction) {
+static bool isOverloadedDeclRef(Constraint *disjunction) {
   assert(disjunction->getKind() == ConstraintKind::Disjunction);
-
-  auto *locator = disjunction->getLocator();
-  if (locator->getPath().empty())
-    return getAsExpr<OverloadedDeclRefExpr>(locator->getAnchor());
-  return nullptr;
-}
-
-/// This maintains an "old hack" behavior where overloads  of some
-/// `OverloadedDeclRef` calls were favored purely based on number of
-/// argument and (non-defaulted) parameters matching.
-static void findFavoredChoicesBasedOnArity(
-    ConstraintSystem &cs, Constraint *disjunction, ArgumentList *argumentList,
-    llvm::function_ref<void(Constraint *)> favoredChoice) {
-  auto *ODRE = isOverloadedDeclRef(disjunction);
-  if (!ODRE)
-    return;
-
-  if (llvm::count_if(ODRE->getDecls(), [&argumentList](auto *choice) {
-        if (auto *paramList = getParameterList(choice))
-          return argumentList->size() == paramList->size();
-        return false;
-      }) > 1)
-    return;
-
-  auto isVariadicGenericOverload = [&](ValueDecl *choice) {
-    auto genericContext = choice->getAsGenericContext();
-    if (!genericContext)
-      return false;
-
-    auto *GPL = genericContext->getGenericParams();
-    if (!GPL)
-      return false;
-
-    return llvm::any_of(GPL->getParams(), [&](const GenericTypeParamDecl *GP) {
-      return GP->isParameterPack();
-    });
-  };
-
-  bool hasVariadicGenerics = false;
-  SmallVector<Constraint *> favored;
-
-  forEachDisjunctionChoice(
-      cs, disjunction,
-      [&](Constraint *choice, ValueDecl *decl, FunctionType *overloadType) {
-        if (isVariadicGenericOverload(decl))
-          hasVariadicGenerics = true;
-
-        if (overloadType->getNumParams() == argumentList->size() ||
-            llvm::count_if(*getParameterList(decl), [](auto *param) {
-              return !param->isDefaultArgument();
-            }) == argumentList->size())
-          favored.push_back(choice);
-      });
-
-  if (hasVariadicGenerics)
-    return;
-
-  for (auto *choice : favored)
-    favoredChoice(choice);
+  return disjunction->getLocator()->directlyAt<OverloadedDeclRefExpr>();
 }
 
 } // end anonymous namespace
@@ -251,6 +193,9 @@ static Constraint *determineBestChoicesInContext(
       favoredChoicesPerDisjunction;
 
   for (auto *disjunction : disjunctions) {
+    if (!isSupportedDisjunction(disjunction))
+      continue;
+
     auto applicableFn =
         getApplicableFnConstraint(cs.getConstraintGraph(), disjunction);
 
@@ -272,25 +217,6 @@ static Constraint *determineBestChoicesInContext(
           return nullptr;
       }
     }
-
-    // This maintains an "old hack" behavior where overloads
-    // of `OverloadedDeclRef` calls were favored purely
-    // based on arity of arguments and parameters matching.
-    {
-      findFavoredChoicesBasedOnArity(
-          cs, disjunction, argumentList, [&](Constraint *choice) {
-            favoredChoicesPerDisjunction[disjunction].push_back(choice);
-          });
-
-      if (!favoredChoicesPerDisjunction[disjunction].empty()) {
-        disjunctionScores[disjunction] = 0.01;
-        bestOverallScore = std::max(bestOverallScore, 0.01);
-        continue;
-      }
-    }
-
-    if (!isSupportedDisjunction(disjunction))
-      continue;
 
     SmallVector<FunctionType::Param, 8> argsWithLabels;
     {
