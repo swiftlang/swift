@@ -57,8 +57,19 @@ public:
     /// the actor is isolated to the instance of that actor.
     ActorInstance,
     /// The declaration is explicitly specified to be not isolated to any actor,
-    /// meaning that it can be used from any actor but is also unable to
-    /// refer to the isolated state of any given actor.
+    /// meaning it cannot itself access actor isolated state but /does/ allow
+    /// for indirect access to actor isolated state if the declaration can
+    /// guarantee that all code generated to work with the declaration will run
+    /// on said actor.
+    ///
+    /// E.x.: a nonisolated function can accept actor-isolated values as
+    /// arguments since the caller knows that it will not escape the values to
+    /// another isolation domain and that the function will remain on the
+    /// caller's actor.
+    ///
+    /// NOTE: This used to have the meaning of Concurrent which is a stricter
+    /// definition of nonisolated that prevents the code generated to work with
+    /// the declaration to never touch actor isolated state.
     Nonisolated,
     /// The declaration is explicitly specified to be not isolated and with the
     /// "unsafe" annotation, which means that we do not enforce isolation.
@@ -69,11 +80,20 @@ public:
     /// The actor isolation iss statically erased, as for a call to
     /// an isolated(any) function.  This is not possible for declarations.
     Erased,
-    /// Inherits isolation from the caller of the given function.
+    /// The declaration is explicitly specified to be not isolated to any actor,
+    /// meaning that it can be used from any actor but is also unable to
+    /// refer to the isolated state of any given actor.
     ///
-    /// DISCUSSION: This is used for nonisolated asynchronous functions that we
-    /// want to inherit from their context the context's actor isolation.
-    CallerIsolationInheriting,
+    /// NOTE: This used to be nonisolated, but we changed nonisolated to have a
+    /// weaker definition of nonisolated that allows for actor isolated state to
+    /// be manipulated by code generated to work with the actor as long as all
+    /// such code generation is guaranteed to always run on whatever actor
+    /// isolation it is invoked in consistently and not escape the value to any
+    /// other isolation domain.
+    Concurrent,
+    /// The declaration is explicitly specified to be concurrent and with the
+    /// "unsafe" annotation, which means that we do not enforce isolation.
+    ConcurrentUnsafe,
   };
 
 private:
@@ -88,7 +108,7 @@ private:
   /// Set to true if this was parsed from SIL.
   unsigned silParsed : 1;
 
-  unsigned parameterIndex : 27;
+  unsigned parameterIndex : 26;
 
   ActorIsolation(Kind kind, NominalTypeDecl *actor, unsigned parameterIndex);
 
@@ -112,10 +132,8 @@ public:
     return ActorIsolation(unsafe ? NonisolatedUnsafe : Nonisolated);
   }
 
-  static ActorIsolation forCallerIsolationInheriting() {
-    // NOTE: We do not use parameter indices since the parameter is implicit
-    // from the perspective of the AST.
-    return ActorIsolation(CallerIsolationInheriting);
+  static ActorIsolation forConcurrent(bool unsafe) {
+    return ActorIsolation(unsafe ? ConcurrentUnsafe : Concurrent);
   }
 
   static ActorIsolation forActorInstanceSelf(ValueDecl *decl);
@@ -165,9 +183,10 @@ public:
                   std::optional<ActorIsolation>(ActorIsolation::GlobalActor))
             .Case("global_actor_unsafe",
                   std::optional<ActorIsolation>(ActorIsolation::GlobalActor))
-            .Case("caller_isolation_inheriting",
-                  std::optional<ActorIsolation>(
-                      ActorIsolation::CallerIsolationInheriting))
+            .Case("concurrent",
+                  std::optional<ActorIsolation>(ActorIsolation::Concurrent))
+            .Case("concurrent_unsafe", std::optional<ActorIsolation>(
+                                           ActorIsolation::ConcurrentUnsafe))
             .Default(std::nullopt);
     if (kind == std::nullopt)
       return std::nullopt;
@@ -180,11 +199,17 @@ public:
 
   bool isUnspecified() const { return kind == Unspecified; }
 
+  bool isConcurrent() const {
+    return (kind == Concurrent) || (kind == ConcurrentUnsafe);
+  }
+
   bool isNonisolated() const {
     return (kind == Nonisolated) || (kind == NonisolatedUnsafe);
   }
 
-  bool isNonisolatedUnsafe() const { return kind == NonisolatedUnsafe; }
+  bool isUnsafe() const {
+    return kind == NonisolatedUnsafe || kind == ConcurrentUnsafe;
+  }
 
   /// Retrieve the parameter to which actor-instance isolation applies.
   ///
@@ -212,7 +237,8 @@ public:
     case Unspecified:
     case Nonisolated:
     case NonisolatedUnsafe:
-    case CallerIsolationInheriting:
+    case Concurrent:
+    case ConcurrentUnsafe:
       return false;
     }
   }
