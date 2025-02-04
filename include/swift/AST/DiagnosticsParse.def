@@ -1579,10 +1579,6 @@ ERROR(attr_availability_expected_equal,none,
 ERROR(attr_availability_expected_version,none,
       "expected version number in '%0' attribute", (StringRef))
 
-WARNING(attr_availability_nonspecific_platform_unexpected_version,none,
-      "unexpected version number in '%0' attribute for non-specific platform "
-      "'*'", (StringRef))
-
 WARNING(attr_availability_wildcard_ignored,none,
         "* as platform name has no effect in '%0' attribute", (StringRef))
 
