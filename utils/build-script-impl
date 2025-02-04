@@ -1425,6 +1425,9 @@ function swift_c_flags() {
         linux-static-*)
             echo -n " -D_GNU_SOURCE -DHAVE_DECL_PROGRAM_INVOCATION_SHORT_NAME"
             ;;
+        openbsd-aarch64)
+            echo -n " -Xclang=-msign-return-address=non-leaf -Xclang=-msign-return-address-key=a_key -Xclang=-mbranch-target-enforce"
+            ;;
     esac
 }
 
