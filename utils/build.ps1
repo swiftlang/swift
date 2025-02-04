@@ -984,7 +984,10 @@ function AndroidEmulator-CreateDevice($ArchName) {
     Write-Host "Found Android virtual device for arch $ArchName"
   } else {
     Write-Host "Create Android virtual device for arch $ArchName"
-    "no" | & $AvdTool create avd --force --name $DeviceName --package $Packages
+    # We had issues with not closing file handles to the created AVD, which
+    # caused the emulator to crash at startup. Using `Start-Process` instead of
+    # the `&` operator prevents that.
+    Start-Process "cmd.exe" -ArgumentList "/c echo no | $AvdTool create avd --force --name $DeviceName --package $Packages" -NoNewWindow -Wait
   }
   return $DeviceName
 }
