@@ -1019,7 +1019,6 @@ function AndroidEmulator-Run($ArchName) {
       Write-Host "Start Android emulator for arch $ArchName"
       foreach($Attempt in 1..5) {
         $Process = Start-Process -PassThru $EmuTool "@$Device"
-        #@("-avd", "$Device")
         try {
           Write-Host "Waiting for process $($Process.Id) to start"
           Start-Sleep -Seconds 1
@@ -1040,7 +1039,22 @@ function AndroidEmulator-Run($ArchName) {
 
       Write-Host "Waiting while Android emulator boots in process $AndroidEmulatorPid"
       $adb = "$BinaryCache\android-sdk\platform-tools\adb.exe"
-      Invoke-Program $adb "wait-for-device"
+      foreach($Attempt in 1..5) {
+        Start-Sleep -Seconds 10
+        $Process = Start-Process $adb "wait-for-device" -PassThru -NoNewWindow
+        try {
+          Write-Host "adb wait-for-device running in process $($Process.Id)"
+          Wait-Process -Id $Process.Id -Timeout 20
+          break
+        } catch {
+          if ($Attempt -lt 5) {
+            Write-Host "adb failed to connect. Shutting it down."
+            Stop-Process -Force -Id $Process.Id
+          } else {
+            throw "Android Debug Bridge process $($Process.Id) failed to connect."
+          }
+        }
+      }
 
       Write-Host "SUCCESS: Emulator ready"
     }
