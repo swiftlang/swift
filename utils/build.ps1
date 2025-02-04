@@ -2068,25 +2068,28 @@ function Write-SDKSettingsPlist([Platform]$Platform, $Arch) {
 }
 
 function Build-Dispatch([Platform]$Platform, $Arch, [switch]$Test = $false) {
-  if ($Test) {
-    $Targets = @("default", "ExperimentalTest")
-    $InstallPath = ""
-  } else {
-    $Targets = @("install")
-    $InstallPath = "$($Arch.SDKInstallRoot)\usr"
-  }
-
-  Build-CMakeProject `
-    -Src $SourceCache\swift-corelibs-libdispatch `
-    -Bin (Get-TargetProjectBinaryCache $Arch Dispatch) `
-    -InstallTo $InstallPath `
-    -Arch $Arch `
-    -Platform $Platform `
-    -BuildTargets $Targets `
-    -UseBuiltCompilers C,CXX,Swift `
-    -Defines @{
-      ENABLE_SWIFT = "YES";
+  Isolate-EnvVars {
+    if ($Test) {
+      $Targets = @("default", "ExperimentalTest")
+      $InstallPath = ""
+      $env:CTEST_OUTPUT_ON_FAILURE = "YES"
+    } else {
+      $Targets = @("install")
+      $InstallPath = "$($Arch.SDKInstallRoot)\usr"
     }
+
+    Build-CMakeProject `
+      -Src $SourceCache\swift-corelibs-libdispatch `
+      -Bin (Get-TargetProjectBinaryCache $Arch Dispatch) `
+      -InstallTo $InstallPath `
+      -Arch $Arch `
+      -Platform $Platform `
+      -BuildTargets $Targets `
+      -UseBuiltCompilers C,CXX,Swift `
+      -Defines @{
+        ENABLE_SWIFT = "YES";
+      }
+  }
 }
 
 function Build-Foundation([Platform]$Platform, $Arch, [switch]$Test = $false) {
