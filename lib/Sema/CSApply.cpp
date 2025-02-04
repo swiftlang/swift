@@ -8397,8 +8397,7 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
     // let's mark the call as implicitly throwing.
     if (isDistributedThunk(callee, apply->getFn())) {
       auto *FD = cast<AbstractFunctionDecl>(callee.getDecl());
-      if (!FD->hasThrows())
-        apply->setImplicitlyThrows(true);
+      apply->setImplicitlyThrows(true);
     }
 
     solution.setExprTypes(apply);

@@ -5656,9 +5656,6 @@ ERROR(distributed_actor_func_unsupported_specifier, none,
 ERROR(distributed_actor_func_variadic, none,
       "cannot declare variadic argument %0 in %kind1",
       (DeclName, const ValueDecl *))
-ERROR(distributed_actor_func_typed_throws, none,
-      "cannot declare distributed function with typed throws",
-      ())
 NOTE(actor_mutable_state,none,
      "mutation of this %0 is only permitted within the actor",
      (DescriptiveDeclKind))

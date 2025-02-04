@@ -3554,18 +3554,14 @@ namespace {
         }
 
         return std::make_pair(
-            /*setThrows=*/!afd->hasThrows(),
+            /*setThrows=*/true,
             /*isDistributedThunk=*/true);
       }
 
       if (auto *var = dyn_cast<VarDecl>(decl)) {
         if (var->isDistributed()) {
-          bool explicitlyThrowing = false;
-          if (auto getter = var->getAccessor(swift::AccessorKind::Get)) {
-            explicitlyThrowing = getter->hasThrows();
-          }
           return std::make_pair(
-              /*setThrows*/ !explicitlyThrowing,
+              /*setThrows*/ true,
               /*isDistributedThunk=*/true);
         }
 
