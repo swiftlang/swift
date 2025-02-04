@@ -116,13 +116,6 @@ static void determineBestChoicesInContext(
     if (!argumentList || cs.containsIDEInspectionTarget(argumentList))
       return;
 
-    SmallVector<FunctionType::Param, 8> argsWithLabels;
-    {
-      argsWithLabels.append(argFuncType->getParams().begin(),
-                            argFuncType->getParams().end());
-      FunctionType::relabelParams(argsWithLabels, argumentList);
-    }
-
     SmallVector<SmallVector<std::pair<Type, /*fromLiteral=*/bool>, 2>, 2>
         candidateArgumentTypes;
     candidateArgumentTypes.resize(argFuncType->getNumParams());
@@ -166,27 +159,6 @@ static void determineBestChoicesInContext(
       resultTypes.push_back(resultType);
     }
 
-    // Match arguments to the given overload choice.
-    auto matchArguments =
-        [&](OverloadChoice choice,
-            FunctionType *overloadType) -> Optional<MatchCallArgumentResult> {
-      auto *decl = choice.getDeclOrNull();
-      assert(decl);
-
-      auto hasAppliedSelf =
-          decl->hasCurriedSelf() &&
-          doesMemberRefApplyCurriedSelf(choice.getBaseType(), decl);
-
-      ParameterListInfo paramListInfo(overloadType->getParams(), decl,
-                                      hasAppliedSelf);
-
-      MatchCallArgumentListener listener;
-      return matchCallArguments(argsWithLabels, overloadType->getParams(),
-                                paramListInfo,
-                                argumentList->getFirstTrailingClosureIndex(),
-                                /*allow fixes*/ false, listener, None);
-    };
-
     // The choice with the best score.
     double bestScore = 0.0;
     SmallVector<std::pair<Constraint *, double>, 2> favoredChoices;
@@ -210,35 +182,27 @@ static void determineBestChoicesInContext(
               return;
           }
 
-          auto matchings =
-              matchArguments(choice->getOverloadChoice(), overloadType);
-          if (!matchings)
-            return;
+          ParameterListInfo paramListInfo(
+              overloadType->getParams(), decl,
+              hasAppliedSelf(cs, choice->getOverloadChoice()));
 
           double score = 0.0;
-          for (unsigned paramIdx = 0, n = overloadType->getNumParams();
-               paramIdx != n; ++paramIdx) {
-            const auto &param = overloadType->getParams()[paramIdx];
+          for (unsigned i = 0, n = overloadType->getNumParams(); i != n; ++i) {
+            const auto &param = overloadType->getParams()[i];
 
-            auto argIndices = matchings->parameterBindings[paramIdx];
-            switch (argIndices.size()) {
-            case 0:
-              // Current parameter is defaulted.
-              continue;
+            if (i >= candidateArgumentTypes.size()) {
+              // If parameter has a default - continue matching,
+              // all of the subsequence parameters should have defaults
+              // as well, if they don't the overload choice in not viable.
+              if (paramListInfo.hasDefaultArgument(i))
+                continue;
 
-            case 1:
-              // One-to-one match between argument and parameter.
-              break;
-
-            default:
-              // Cannot deal with multiple possible matchings at the moment.
+              // Early return because this overload choice is not viable
+              // without default value for the current parameter.
               return;
             }
 
-            auto argIdx = argIndices.front();
-
-            // Looks like there is nothing know about the argument.
-            if (candidateArgumentTypes[argIdx].empty())
+            if (candidateArgumentTypes[i].empty())
               continue;
 
             const auto paramFlags = param.getParameterFlags();
@@ -254,6 +218,9 @@ static void determineBestChoicesInContext(
             // because they have special rules for e.g. Concurrency
             // (around @Sendable) and @convention(c).
             if (paramType->is<FunctionType>())
+              continue;
+
+            if (candidateArgumentTypes[i].empty())
               continue;
 
             // Check protocol requirement(s) if this parameter is a
@@ -281,11 +248,11 @@ static void determineBestChoicesInContext(
             // all bound concrete types, we consider this is mismatch
             // at this parameter position and remove the overload choice
             // from consideration.
-            double bestCandidateScore = 0;
-            llvm::BitVector mismatches(candidateArgumentTypes[argIdx].size());
 
-            for (unsigned candidateIdx :
-                 indices(candidateArgumentTypes[argIdx])) {
+            double bestCandidateScore = 0;
+            llvm::BitVector mismatches(candidateArgumentTypes[i].size());
+
+            for (unsigned candidateIdx : indices(candidateArgumentTypes[i])) {
               // If one of the candidates matched exactly there is no reason
               // to continue checking.
               if (bestCandidateScore == 1)
@@ -295,7 +262,7 @@ static void determineBestChoicesInContext(
               bool isLiteralDefault;
 
               std::tie(candidateType, isLiteralDefault) =
-                  candidateArgumentTypes[argIdx][candidateIdx];
+                  candidateArgumentTypes[i][candidateIdx];
 
               // `inout` parameter accepts only l-value argument.
               if (paramFlags.isInOut() && !candidateType->is<LValueType>()) {
