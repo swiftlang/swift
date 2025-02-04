@@ -3,14 +3,12 @@
 # RUN:     %swift_src_root \
 # RUN:     %target-sil-opt -sdk %sdk -enable-sil-verify-all \
 # RUN:       -F %sdk/System/Library/PrivateFrameworks \
-# RUN:       -F "%xcode-extra-frameworks-dir"
+# RUN:       %xcode-extra-frameworks-search-path
 
 # REQUIRES: rdar143050566
 # REQUIRES: long_test
 # REQUIRES: nonexecutable_test
 
-# rdar://142441042
-# UNSUPPORTED: OS=linux-gnu
 
 import os
 import subprocess
