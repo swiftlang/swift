@@ -468,16 +468,15 @@ selectBestBindingDisjunction(ConstraintSystem &cs,
   return firstBindDisjunction;
 }
 
-Optional<std::pair<Constraint *, llvm::TinyPtrVector<Constraint *>>>
-ConstraintSystem::selectDisjunction() {
+Constraint *ConstraintSystem::selectDisjunction() {
   SmallVector<Constraint *, 4> disjunctions;
 
   collectDisjunctions(disjunctions);
   if (disjunctions.empty())
-    return None;
+    return nullptr;
 
   if (auto *disjunction = selectBestBindingDisjunction(*this, disjunctions))
-    return std::make_pair(disjunction, llvm::TinyPtrVector<Constraint *>());
+    return disjunction;
 
   llvm::DenseMap<Constraint *, llvm::TinyPtrVector<Constraint *>> favorings;
   determineBestChoicesInContext(*this, disjunctions, favorings);
@@ -509,8 +508,14 @@ ConstraintSystem::selectDisjunction() {
         return firstFavored < secondFavored;
       });
 
-  if (bestDisjunction != disjunctions.end())
-    return std::make_pair(*bestDisjunction, favorings[*bestDisjunction]);
+  if (bestDisjunction != disjunctions.end()) {
+    // If selected disjunction has any choices that should be favored
+    // let's record them now.
+    for (auto *choice : favorings[*bestDisjunction])
+      favorConstraint(choice);
 
-  return None;
+    return *bestDisjunction;
+  }
+
+  return nullptr;
 }
