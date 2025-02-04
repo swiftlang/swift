@@ -1651,8 +1651,7 @@ private:
     // enabled.
     if (TC.Context.LangOpts.hasFeature(
             Feature::NonIsolatedAsyncInheritsIsolationFromContext) &&
-        IsolationInfo &&
-        IsolationInfo->getKind() == ActorIsolation::CallerIsolationInheriting &&
+        IsolationInfo && IsolationInfo->isNonisolated() &&
         extInfoBuilder.isAsync()) {
       auto actorProtocol = TC.Context.getProtocol(KnownProtocolKind::Actor);
       auto actorType =
@@ -2530,15 +2529,15 @@ static CanSILFunctionType getSILFunctionType(
     std::optional<ActorIsolation> actorIsolation;
     if (constant) {
       if (constant->kind == SILDeclRef::Kind::Deallocator) {
-        actorIsolation = ActorIsolation::forNonisolated(false);
+        actorIsolation = ActorIsolation::forConcurrent(false);
       } else if (auto *decl = constant->getAbstractFunctionDecl();
                  decl && decl->getExecutionBehavior().has_value()) {
         switch (*decl->getExecutionBehavior()) {
         case ExecutionKind::Concurrent:
-          actorIsolation = ActorIsolation::forNonisolated(false /*unsafe*/);
+          actorIsolation = ActorIsolation::forConcurrent(false /*unsafe*/);
           break;
         case ExecutionKind::Caller:
-          actorIsolation = ActorIsolation::forCallerIsolationInheriting();
+          actorIsolation = ActorIsolation::forNonisolated(false /*unsafe*/);
           break;
         }
       } else {

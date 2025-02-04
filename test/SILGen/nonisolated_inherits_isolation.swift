@@ -18,7 +18,7 @@ func unspecifiedAsyncUse(_ t: NonSendableKlass) async {}
 //===----------------------------------------------------------------------===//
 
 // CHECK-LABEL: // nonisolatedAsync()
-// CHECK-NEXT: Isolation: caller_isolation_inheriting
+// CHECK-NEXT: Isolation: nonisolated
 // CHECK-NEXT: sil hidden [ossa] @$s30nonisolated_inherits_isolation0A5AsyncyyYaF : $@convention(thin) @async (@sil_isolated @sil_implicit_leading_param @guaranteed Optional<any Actor>) -> () {
 // CHECK: bb0([[ACTOR:%.*]] : @guaranteed $Optional<any Actor>):
 // CHECK:   hop_to_executor [[ACTOR]]
@@ -28,7 +28,7 @@ nonisolated func nonisolatedAsync() async {}
 func unspecifiedAsyncCallee() async {}
 
 // CHECK-LABEL: // unspecifiedAsync()
-// CHECK-NEXT: Isolation: caller_isolation_inheriting
+// CHECK-NEXT: Isolation: nonisolated
 // CHECK-NEXT: sil hidden [ossa] @$s30nonisolated_inherits_isolation16unspecifiedAsyncyyYaF : $@convention(thin) @async (@sil_isolated @sil_implicit_leading_param @guaranteed Optional<any Actor>) -> () {
 // CHECK: bb0([[ARG:%.*]] : @guaranteed $Optional<any Actor>):
 // CHECK:   hop_to_executor [[ACTOR]]
@@ -52,7 +52,7 @@ struct NonisolatedStruct {
   // Do apply it to sync initializers.
   //
   // CHECK-LABEL: // NonisolatedStruct.init(asynchronous:)
-  // CHECK-NEXT: // Isolation: caller_isolation_inheriting
+  // CHECK-NEXT: // Isolation: nonisolated
   // CHECK-NEXT: sil hidden [ossa] @$s30nonisolated_inherits_isolation17NonisolatedStructV12asynchronousACyt_tYacfC : $@convention(method) @async (@sil_isolated @sil_implicit_leading_param @guaranteed Optional<any Actor>, @thin NonisolatedStruct.Type) -> NonisolatedStruct {
   // CHECK: } // end sil function '$s30nonisolated_inherits_isolation17NonisolatedStructV12asynchronousACyt_tYacfC'
   init(asynchronous: ()) async {}
@@ -62,14 +62,14 @@ struct NonisolatedStruct {
 
   // But do apply it to async methods.
   // CHECK-LABEL: // NonisolatedStruct.asyncMethod()
-  // CHECK-NEXT: // Isolation: caller_isolation_inheriting
+  // CHECK-NEXT: // Isolation: nonisolated
   // CHECK-NEXT: sil hidden [ossa] @$s30nonisolated_inherits_isolation17NonisolatedStructV11asyncMethodyyYaF : $@convention(method) @async (@sil_isolated @sil_implicit_leading_param @guaranteed Optional<any Actor>, NonisolatedStruct) -> () {
   // CHECK: } // end sil function '$s30nonisolated_inherits_isolation17NonisolatedStructV11asyncMethodyyYaF'
   func asyncMethod() async {}
 }
 
 // CHECK-LABEL: // useNonisolatedStruct()
-// CHECK-NEXT: // Isolation: caller_isolation_inheriting
+// CHECK-NEXT: // Isolation: nonisolated
 // CHECK-NEXT: sil hidden [ossa] @$s30nonisolated_inherits_isolation20useNonisolatedStructyyYaF : $@convention(thin) @async (@sil_isolated @sil_implicit_leading_param @guaranteed Optional<any Actor>) -> () {
 // CHECK: bb0([[ACTOR:%.*]] :
 // CHECK:   hop_to_executor [[ACTOR]]
@@ -89,7 +89,7 @@ func useNonisolatedStruct() async {
 }
 
 // CHECK-LABEL: // useNonisolatedStruct2()
-// CHECK-NEXT: // Isolation: caller_isolation_inheriting
+// CHECK-NEXT: // Isolation: nonisolated
 // CHECK-NEXT: sil hidden [ossa] @$s30nonisolated_inherits_isolation21useNonisolatedStruct2yyYaF : $@convention(thin) @async (@sil_isolated @sil_implicit_leading_param @guaranteed Optional<any Actor>) -> () {
 // CHECK: bb0([[ACTOR:%.*]] :
 // CHECK:   hop_to_executor [[ACTOR]]
