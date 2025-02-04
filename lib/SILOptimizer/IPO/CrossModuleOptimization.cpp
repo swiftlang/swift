@@ -793,11 +793,26 @@ bool CrossModuleOptimization::checkImports(DeclContext *ctxt) const {
   ModuleDecl::ImportFilter filter;
 
   if (isPackageCMOEnabled(M.getSwiftModule())) {
-    // If Package CMO is enabled, decls imported with `package import`
+    // When Package CMO is enabled, types imported with `package import`
     // or `@_spiOnly import` into this module should be allowed to be
-    // serialized. They are used in decls with `package` or higher
-    // access level, with or without @_spi; a client of this module
-    // should be able to access them directly if in the same package.
+    // serialized. These types may be used in APIs with `package` or
+    // higher access level, with or without `@_spi`, and such APIs should
+    // be serializable to allow direct access by another module if it's
+    // in the same package.
+    //
+    // However, types are from modules imported as `@_implementationOnly`
+    // should not be serialized, even if their defining modules are SDK
+    // or system modules. Since these types are intended to remain hidden
+    // from external clients, their metadata (e.g. field offsets) may be
+    // stripped, making it unavailable for look up at runtime. If serialized,
+    // the client will attempt to use the serialized accessor and fail
+    // because the metadata is missing, leading to a linker error.
+    //
+    // This issue applies to transitively imported types as well;
+    // `@_implementationOnly import Foundation` imports `ObjectiveC`
+    // indirectly, and metadata for types like `NSObject` from `ObjectiveC`
+    // can also be stripped, thus such types should not be allowed for
+    // serialization.
     filter = { ModuleDecl::ImportFilterKind::ImplementationOnly };
   } else {
     // See if context is imported in a "regular" way, i.e. not with
@@ -813,17 +828,8 @@ bool CrossModuleOptimization::checkImports(DeclContext *ctxt) const {
 
   auto &imports = M.getSwiftModule()->getASTContext().getImportCache();
   for (auto &desc : results) {
-    if (imports.isImportedBy(moduleOfCtxt, desc.importedModule)) {
-      // E.g. `@_implementationOnly import QuartzCore_Private.CALayerPrivate`
-      // imports `Foundation` as its transitive dependency module; use of a
-      // a `public` decl in `Foundation` such as `IndexSet` in a function
-      // signature should not block serialization in Package CMO given the
-      // function has `package` or higher access level.
-      if (isPackageCMOEnabled(M.getSwiftModule()) &&
-          moduleOfCtxt->isNonUserModule())
-          continue;
+    if (imports.isImportedBy(moduleOfCtxt, desc.importedModule))
       return false;
-    }
   }
   return true;
 }
