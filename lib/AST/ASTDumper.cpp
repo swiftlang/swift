@@ -14,6 +14,7 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "swift/AST/ASTDumper.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTPrinter.h"
 #include "swift/AST/ASTVisitor.h"
@@ -27,6 +28,7 @@
 #include "swift/AST/ParameterList.h"
 #include "swift/AST/ProtocolConformance.h"
 #include "swift/AST/SourceFile.h"
+#include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/TypeVisitor.h"
 #include "swift/AST/USRGeneration.h"
 #include "swift/Basic/Assertions.h"
@@ -984,7 +986,7 @@ namespace {
   protected:
     PrintWriterBase &Writer;
   public:
-    bool ParseIfNeeded;
+    ASTDumpMemberLoading MemberLoading;
     llvm::function_ref<Type(Expr *)> GetTypeOfExpr;
     llvm::function_ref<Type(TypeRepr *)> GetTypeOfTypeRepr;
     llvm::function_ref<Type(KeyPathExpr *E, unsigned index)>
@@ -992,12 +994,13 @@ namespace {
     char quote = '"';
 
     explicit PrintBase(
-        PrintWriterBase &writer, bool parseIfNeeded = false,
+        PrintWriterBase &writer,
+        ASTDumpMemberLoading memberLoading = ASTDumpMemberLoading::None,
         llvm::function_ref<Type(Expr *)> getTypeOfExpr = defaultGetTypeOfExpr,
         llvm::function_ref<Type(TypeRepr *)> getTypeOfTypeRepr = nullptr,
         llvm::function_ref<Type(KeyPathExpr *E, unsigned index)>
             getTypeOfKeyPathComponent = defaultGetTypeOfKeyPathComponent)
-        : Writer(writer), ParseIfNeeded(parseIfNeeded),
+        : Writer(writer), MemberLoading(memberLoading),
           GetTypeOfExpr(getTypeOfExpr), GetTypeOfTypeRepr(getTypeOfTypeRepr),
           GetTypeOfKeyPathComponent(getTypeOfKeyPathComponent) {}
 
@@ -1903,6 +1906,21 @@ namespace {
       printSourceRange(D->getSourceRange(), &D->getASTContext());
       printFlag(D->TrailingSemiLoc.isValid(), "trailing_semi",
                 DeclModifierColor);
+
+      if (Writer.isParsable()) {
+        // Print just the USRs of any auxiliary decls associated with this decl,
+        // which lets us relate macro expansions back to their originating decl
+        // if desired.
+        std::vector<std::string> auxiliaryUSRs;
+        D->visitAuxiliaryDecls([&auxiliaryUSRs](Decl *auxDecl) {
+          if (auto usr = declUSR(auxDecl); !usr.empty()) {
+            auxiliaryUSRs.push_back(usr);
+          }
+        });
+        printStringListField(
+            auxiliaryUSRs, [&](auto usr) { return usr; },
+            Label::always("auxiliary_decl_usrs"));
+      }
     }
 
     void printInherited(InheritedTypes Inherited) {
@@ -2151,7 +2169,7 @@ namespace {
       }
 
       if (VD->hasInterfaceType()) {
-        printTypeField(VD->getInterfaceType(), Label::always("interface type"),
+        printTypeField(VD->getInterfaceType(), Label::always("interface_type"),
                        PrintOptions(), InterfaceTypeColor);
       }
 
@@ -2224,18 +2242,26 @@ namespace {
 
       printAttributes(IDC->getDecl());
 
-      if (Writer.isParsable()) {
-        // Parsable outputs are meant to be used for semantic analysis, so we
-        // want the full list of members, including macro-generated ones.
-        printList(IDC->getAllMembers(), [&](Decl *D, Label label) {
-          printRec(D, label);
-        }, Label::optional("members"));
-      } else {
-        auto members = ParseIfNeeded ? IDC->getMembers()
-                                     : IDC->getCurrentMembersWithoutLoading();
+      switch (MemberLoading) {
+      case ASTDumpMemberLoading::None:
+      case ASTDumpMemberLoading::Parsed: {
+        auto members = (MemberLoading == ASTDumpMemberLoading::Parsed)
+                           ? IDC->getMembers()
+                           : IDC->getCurrentMembersWithoutLoading();
         printList(members, [&](Decl *D, Label label) {
           printRec(D, label);
         }, Label::optional("members"));
+        break;
+      }
+
+      case ASTDumpMemberLoading::TypeChecked:
+        // This mode is used for semantic analysis, so we want the full list of
+        // members, including macro-generated ones.
+        printList(
+            IDC->getAllMembers(),
+            [&](Decl *D, Label label) { printRec(D, label); },
+            Label::optional("members"));
+        break;
       }
       printFoot();
     }
@@ -2264,23 +2290,50 @@ namespace {
         }, Label::always("compiler_version"));
       }
 
-      auto items =
-          ParseIfNeeded ? SF.getTopLevelItems() : SF.getCachedTopLevelItems();
-      if (items) {
-        printList(*items, [&](ASTNode item, Label label) {
-          if (item.isImplicit())
-            return;
+      std::vector<ASTNode> items;
+      bool shouldPrintImplicit;
 
+      switch (MemberLoading) {
+      case ASTDumpMemberLoading::None:
+        shouldPrintImplicit = false;
+        if (auto cached = SF.getCachedTopLevelItems()) {
+          items = *cached;
+        }
+        break;
+      case ASTDumpMemberLoading::Parsed:
+        shouldPrintImplicit = false;
+        items = SF.getTopLevelItems();
+        break;
+      case ASTDumpMemberLoading::TypeChecked:
+        shouldPrintImplicit = true;
+        for (ASTNode item : SF.getTopLevelItems()) {
+          items.push_back(item);
+
+          // If the item is a decl, also collect any auxiliary decls associated
+          // with it so that we get macro expansions.
           if (auto decl = item.dyn_cast<Decl *>()) {
-            printRec(decl, label);
-          } else if (auto stmt = item.dyn_cast<Stmt *>()) {
-            printRec(stmt, &SF.getASTContext(), label);
-          } else {
-            auto expr = item.get<Expr *>();
-            printRec(expr, label);
+            decl->visitAuxiliaryDecls(
+                [&items](Decl *auxDecl) { items.push_back(auxDecl); });
           }
-        }, Label::optional("items"));
+        }
+        break;
       }
+      printList(
+          items,
+          [&](ASTNode item, Label label) {
+            if (!shouldPrintImplicit && item.isImplicit())
+              return;
+
+            if (auto decl = item.dyn_cast<Decl *>()) {
+              printRec(decl, label);
+            } else if (auto stmt = item.dyn_cast<Stmt *>()) {
+              printRec(stmt, &SF.getASTContext(), label);
+            } else {
+              auto expr = item.get<Expr *>();
+              printRec(expr, label);
+            }
+          },
+          Label::optional("items"));
       printFoot();
     }
 
@@ -2342,7 +2395,7 @@ namespace {
                          IdentifierColor);
       if (PD->hasInterfaceType()) {
         printTypeField(PD->getInterfaceType(),
-                       Label::always("interface type"), PrintOptions(),
+                       Label::always("interface_type"), PrintOptions(),
                        InterfaceTypeColor);
       }
 
@@ -2531,7 +2584,8 @@ namespace {
         }, Label::optional("foreign_error_convention"));
       }
 
-      auto canParse = ParseIfNeeded && !D->isBodySkipped();
+      auto canParse =
+          (MemberLoading != ASTDumpMemberLoading::None) && !D->isBodySkipped();
       if (auto Body = D->getBody(canParse)) {
         printRec(Body, &D->getASTContext(), Label::optional("body"));
       }
@@ -2678,7 +2732,11 @@ namespace {
 
     void visitMacroExpansionDecl(MacroExpansionDecl *MED, Label label) {
       printCommon(MED, "macro_expansion_decl", label);
-      printName(MED->getMacroName().getFullName(), Label::optional("name"));
+      if (MemberLoading == ASTDumpMemberLoading::TypeChecked) {
+        printDeclRefField(MED->getMacroRef(), Label::always("macro"));
+      } else {
+        printName(MED->getMacroName().getFullName(), Label::optional("name"));
+      }
       printRec(MED->getArgs(), Label::optional("args"));
       printFoot();
     }
@@ -2845,15 +2903,17 @@ void SourceFile::dump() const {
   dump(llvm::errs());
 }
 
-void SourceFile::dump(llvm::raw_ostream &OS, bool parseIfNeeded) const {
+void SourceFile::dump(llvm::raw_ostream &OS,
+                      ASTDumpMemberLoading memberLoading) const {
   DefaultWriter writer(OS, /*indent*/ 0);
-  PrintDecl(writer, parseIfNeeded).visitSourceFile(*this);
+  PrintDecl(writer, memberLoading).visitSourceFile(*this);
   llvm::errs() << '\n';
 }
 
-void SourceFile::dumpJSON(llvm::raw_ostream &OS) const {
+void SourceFile::dumpJSON(llvm::raw_ostream &OS,
+                          ASTDumpMemberLoading memberLoading) const {
   JSONWriter writer(OS, /*indent*/ 0);
-  PrintDecl(writer, /*parseIfNeeded*/ true).visitSourceFile(*this);
+  PrintDecl(writer, memberLoading).visitSourceFile(*this);
 }
 
 void Pattern::dump() const {
@@ -2880,12 +2940,12 @@ public:
 
   PrintStmt(
       PrintWriterBase &writer, const ASTContext *ctx,
-      bool parseIfNeeded = false,
+      ASTDumpMemberLoading memberLoading = ASTDumpMemberLoading::None,
       llvm::function_ref<Type(Expr *)> getTypeOfExpr = defaultGetTypeOfExpr,
       llvm::function_ref<Type(TypeRepr *)> getTypeOfTypeRepr = nullptr,
       llvm::function_ref<Type(KeyPathExpr *E, unsigned index)>
           getTypeOfKeyPathComponent = defaultGetTypeOfKeyPathComponent)
-      : PrintBase(writer, parseIfNeeded, getTypeOfExpr, getTypeOfTypeRepr,
+      : PrintBase(writer, memberLoading, getTypeOfExpr, getTypeOfTypeRepr,
                   getTypeOfKeyPathComponent),
         Ctx(ctx) {}
 
@@ -4329,7 +4389,7 @@ void Expr::dump(raw_ostream &OS, llvm::function_ref<Type(Expr *)> getTypeOfExpr,
                     getTypeOfKeyPathComponent,
                 unsigned Indent) const {
   DefaultWriter writer(OS, Indent);
-  PrintExpr(writer, /*parseIfNeeded*/ false, getTypeOfExpr,
+  PrintExpr(writer, ASTDumpMemberLoading::None, getTypeOfExpr,
             getTypeOfTypeRepr, getTypeOfKeyPathComponent)
       .visit(const_cast<Expr *>(this), Label::optional(""));
 }
@@ -4653,12 +4713,12 @@ class PrintAttribute : public AttributeVisitor<PrintAttribute, void, Label>,
 public:
   PrintAttribute(
       PrintWriterBase &writer, const ASTContext *ctx, DeclContext *dc,
-      bool parseIfNeeded = false,
+      ASTDumpMemberLoading memberLoading = ASTDumpMemberLoading::None,
       llvm::function_ref<Type(Expr *)> getTypeOfExpr = defaultGetTypeOfExpr,
       llvm::function_ref<Type(TypeRepr *)> getTypeOfTypeRepr = nullptr,
       llvm::function_ref<Type(KeyPathExpr *E, unsigned index)>
           getTypeOfKeyPathComponent = defaultGetTypeOfKeyPathComponent)
-      : PrintBase(writer, parseIfNeeded, getTypeOfExpr, getTypeOfTypeRepr,
+      : PrintBase(writer, memberLoading, getTypeOfExpr, getTypeOfTypeRepr,
                   getTypeOfKeyPathComponent),
         Ctx(ctx), DC(dc) {}
 
@@ -4878,10 +4938,21 @@ public:
   }
   void visitCustomAttr(CustomAttr *Attr, Label label) {
     printCommon(Attr, "custom_attr", label);
-    printTypeField(Attr->getType(), Label::always("type"));
+    if (Attr->getType()) {
+      printTypeField(Attr->getType(), Label::always("type"));
+    } else if (MemberLoading == ASTDumpMemberLoading::TypeChecked) {
+      // If the type is null, it might be a macro reference. Try that if we're
+      // dumping the fully type-checked AST.
+      auto macroRef =
+          evaluateOrDefault(const_cast<ASTContext *>(Ctx)->evaluator,
+                            ResolveMacroRequest{Attr, DC}, ConcreteDeclRef());
+      if (macroRef) {
+        printDeclRefField(macroRef, Label::always("macro"));
+      }
+    }
     if (!Writer.isParsable()) {
       // The type has the semantic information we want for parsable outputs, so
-      // omit the `TypeRepr` there.
+      // omit the `TypeRepr` there. This also works for macro references.
       printRec(Attr->getTypeRepr(), Label::optional("type_repr"));
     }
     if (Attr->getArgs())
@@ -5225,7 +5296,7 @@ void PrintBase::printRec(Decl *D, Label label) {
       printHead("<null decl>", DeclColor, label);
       printFoot();
     } else {
-      PrintDecl(Writer, ParseIfNeeded, GetTypeOfExpr, GetTypeOfTypeRepr,
+      PrintDecl(Writer, MemberLoading, GetTypeOfExpr, GetTypeOfTypeRepr,
                 GetTypeOfKeyPathComponent)
           .visit(D, label);
     }
@@ -5237,7 +5308,7 @@ void PrintBase::printRec(Expr *E, Label label) {
       printHead("<null expr>", ExprColor, label);
       printFoot();
     } else {
-      PrintExpr(Writer, ParseIfNeeded, GetTypeOfExpr, GetTypeOfTypeRepr,
+      PrintExpr(Writer, MemberLoading, GetTypeOfExpr, GetTypeOfTypeRepr,
                 GetTypeOfKeyPathComponent)
           .visit(E, label);
     }
@@ -5249,8 +5320,8 @@ void PrintBase::printRec(Stmt *S, const ASTContext *Ctx, Label label) {
       printHead("<null stmt>", ExprColor, label);
       printFoot();
     } else {
-      PrintStmt(Writer, Ctx, ParseIfNeeded, GetTypeOfExpr,
-                GetTypeOfTypeRepr, GetTypeOfKeyPathComponent)
+      PrintStmt(Writer, Ctx, MemberLoading, GetTypeOfExpr, GetTypeOfTypeRepr,
+                GetTypeOfKeyPathComponent)
           .visit(S, label);
     }
   }, label);
@@ -5261,7 +5332,7 @@ void PrintBase::printRec(TypeRepr *T, Label label) {
       printHead("<null typerepr>", TypeReprColor, label);
       printFoot();
     } else {
-      PrintTypeRepr(Writer, ParseIfNeeded, GetTypeOfExpr, GetTypeOfTypeRepr,
+      PrintTypeRepr(Writer, MemberLoading, GetTypeOfExpr, GetTypeOfTypeRepr,
                     GetTypeOfKeyPathComponent)
           .visit(T, label);
     }
@@ -5273,7 +5344,7 @@ void PrintBase::printRec(const Pattern *P, Label label) {
       printHead("<null pattern>", PatternColor, label);
       printFoot();
     } else {
-      PrintPattern(Writer, ParseIfNeeded, GetTypeOfExpr, GetTypeOfTypeRepr,
+      PrintPattern(Writer, MemberLoading, GetTypeOfExpr, GetTypeOfTypeRepr,
                    GetTypeOfKeyPathComponent)
           .visit(const_cast<Pattern *>(P), label);
     }
@@ -5287,7 +5358,7 @@ void PrintBase::printRec(const DeclAttribute *Attr, const ASTContext *Ctx,
           printHead("<null attribute>", DeclAttributeColor, label);
           printFoot();
         } else {
-          PrintAttribute(Writer, Ctx, DC, ParseIfNeeded, GetTypeOfExpr,
+          PrintAttribute(Writer, Ctx, DC, MemberLoading, GetTypeOfExpr,
                          GetTypeOfTypeRepr, GetTypeOfKeyPathComponent)
               .visit(const_cast<DeclAttribute *>(Attr), label);
         }
@@ -6293,7 +6364,7 @@ namespace {
         printHead("<null type>", DeclColor, label);
         printFoot();
       } else {
-        PrintType(Writer, ParseIfNeeded, GetTypeOfExpr, GetTypeOfTypeRepr,
+        PrintType(Writer, MemberLoading, GetTypeOfExpr, GetTypeOfTypeRepr,
                   GetTypeOfKeyPathComponent)
             .visit(type, label);
       }
