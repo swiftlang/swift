@@ -441,7 +441,6 @@ static Constraint *determineBestChoicesInContext(
           }
 
           double score = 0.0;
-          unsigned numDefaulted = 0;
           for (unsigned paramIdx = 0, n = overloadType->getNumParams();
                paramIdx != n; ++paramIdx) {
             const auto &param = overloadType->getParams()[paramIdx];
@@ -449,8 +448,7 @@ static Constraint *determineBestChoicesInContext(
             auto argIndices = matchings->parameterBindings[paramIdx];
             switch (argIndices.size()) {
             case 0:
-              // Current parameter is defaulted, mark and continue.
-              ++numDefaulted;
+              // Current parameter is defaulted.
               continue;
 
             case 1:
@@ -544,14 +542,9 @@ static Constraint *determineBestChoicesInContext(
             score += bestCandidateScore;
           }
 
-          // An overload whether all of the parameters are defaulted
-          // that's called without arguments.
-          if (numDefaulted == overloadType->getNumParams())
-            return;
-
           // Average the score to avoid disfavoring disjunctions with fewer
           // parameters.
-          score /= (overloadType->getNumParams() - numDefaulted);
+          score /= overloadType->getNumParams();
 
           // If one of the result types matches exactly, that's a good
           // indication that overload choice should be favored.

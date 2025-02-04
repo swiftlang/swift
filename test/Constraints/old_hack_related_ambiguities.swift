@@ -39,25 +39,3 @@ do {
   }
 }
 
-// error: initializer for conditional binding must have Optional type, not 'S'
-do {
-  struct S {
-    let n: Int
-  }
-
-  func f(_: String, _ p: Bool = false) -> S? {
-    nil
-  }
-
-  func f(_ x: String) -> S {
-    fatalError()
-  }
-
-  func g(_ x: String) -> Int? {
-    guard let y = f(x) else {
-      return nil
-    }
-    return y.n
-  }
-}
-
