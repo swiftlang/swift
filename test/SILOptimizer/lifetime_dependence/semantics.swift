@@ -338,6 +338,15 @@ func testImmortalString() -> Span<String> {
   return _overrideLifetime(span, borrowing: immortalString)
 }
 
+let ptr = UnsafePointer<Int>(bitPattern: 1)!
+let globalTrivial = InnerTrivial(p: ptr)
+
+// An immortal span can depend on a caller's local borrow scope even though the callee sees no such dependency.
+@lifetime(borrow local)
+func testGlobal(local: InnerTrivial) -> Span<Int> {
+  globalTrivial.span()
+}
+
 // =============================================================================
 // Scoped dependence on mutable values
 // =============================================================================

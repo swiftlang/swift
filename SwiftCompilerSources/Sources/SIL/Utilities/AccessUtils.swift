@@ -428,7 +428,7 @@ private func canBeOperandOfIndexAddr(_ value: Value) -> Bool {
 /// %ptr = address_to_pointer %orig_addr
 /// %addr = pointer_to_address %ptr
 /// ```
-private extension PointerToAddressInst {
+public extension PointerToAddressInst {
   var originatingAddress: Value? {
 
     struct Walker : ValueUseDefWalker {
@@ -478,6 +478,33 @@ private extension PointerToAddressInst {
       return global
     }
     return nil
+  }
+}
+
+/// TODO: migrate AccessBase to use this instead of GlobalVariable because many utilities need to get back to a
+/// representative SIL Value.
+public enum GlobalAccessBase {
+  case global(GlobalAddrInst)
+  case initializer(PointerToAddressInst)
+
+  public init?(address: Value) {
+    switch address {
+    case let ga as GlobalAddrInst:
+      self = .global(ga)
+    case let p2a as PointerToAddressInst where p2a.resultOfGlobalAddressorCall != nil:
+      self = .initializer(p2a)
+    default:
+      return nil
+    }
+  }
+
+  public var address: Value {
+    switch self {
+      case let .global(ga):
+        return ga
+      case let .initializer(p2a):
+        return p2a
+    }
   }
 }
 

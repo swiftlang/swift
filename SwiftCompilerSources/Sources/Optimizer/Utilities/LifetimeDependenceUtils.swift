@@ -67,7 +67,7 @@ struct LifetimeDependence : CustomStringConvertible {
     /// begin_borrow. LinearLiveness computes the scope boundary.
     case local(VariableScopeInstruction)
     /// A directly accessed global variable without exclusivity. Presumably immutable and therefore immortal.
-    case global(GlobalAddrInst)
+    case global(GlobalAccessBase)
     /// Singly-initialized addressable storage (likely for an immutable address-only value). The lifetime extends until
     /// the memory is destroyed. e.g. A value produced by an @in FunctionArgument, an @out apply, or an @inout
     /// FunctionArgument that is never modified inside the callee. Modified @inout FunctionArguments have caller scoped
@@ -84,7 +84,7 @@ struct LifetimeDependence : CustomStringConvertible {
       case let .owned(value): return value
       case let .borrowed(beginBorrow): return beginBorrow.value
       case let .local(varScope): return varScope.scopeBegin
-      case let .global(ga): return ga
+      case let .global(ga): return ga.address
       case let .initialized(initializer): return initializer.initialAddress
       case let .unknown(value): return value
       }
@@ -261,11 +261,12 @@ extension LifetimeDependence.Scope {
     case .stack, .class, .tail, .pointer, .index, .unidentified:
       self = .unknown(accessBase.address!)
     case .global:
-      // TODO: When AccessBase stores global_addr, we don't need a check here and don't need to pass 'address' in.
-      if let ga = address as? GlobalAddrInst {
+      // TODO: When AccessBase directly stores GlobalAccessBase, we don't need a check here and don't need to pass
+      // 'address' in to this function.
+      if let ga = GlobalAccessBase(address: address) {
         self = .global(ga)
       } else {
-        self = .unknown(accessBase.address!)
+        self = .unknown(accessBase.address ?? address)
       }
     case let .argument(arg):
       if arg.convention.isIndirectIn {
@@ -332,7 +333,7 @@ extension LifetimeDependence.Scope {
       self = .caller(arg)
     } else if let varScope = VariableScopeInstruction(value.definingInstruction) {
       self = .local(varScope)
-    } else if let ga = value as? GlobalAddrInst {
+    } else if let ga = GlobalAccessBase(address: value) {
       self = .global(ga)
     } else {
       self = .unknown(value)
