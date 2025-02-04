@@ -403,6 +403,7 @@ namespace {
       Type fixedOutputType =
           CS.getFixedTypeRecursive(outputTy, /*wantRValue=*/false);
       if (!fixedOutputType->isTypeVariableOrMember()) {
+        CS.setFavoredType(anchor, fixedOutputType.getPointer());
         outputTy = fixedOutputType;
       }
 
@@ -802,6 +803,11 @@ namespace {
               return openPackElement(packType, locator,
                                      getParentPackExpansionExpr(E));
             }
+          }
+
+          if (!knownType->hasPlaceholder()) {
+            // Set the favored type for this expression to the known type.
+            CS.setFavoredType(E, knownType.getPointer());
           }
         }
       }
@@ -1281,6 +1287,9 @@ namespace {
                               CS.getASTContext());
       }
 
+      if (auto favoredTy = CS.getFavoredType(expr->getSubExpr())) {
+        CS.setFavoredType(expr, favoredTy);
+      }
       return CS.getType(expr->getSubExpr());
     }
 
@@ -2555,6 +2564,7 @@ namespace {
       Type fixedType =
           CS.getFixedTypeRecursive(resultType, /*wantRvalue=*/true);
       if (!fixedType->isTypeVariableOrMember()) {
+        CS.setFavoredType(expr, fixedType.getPointer());
         resultType = fixedType;
       }
 
