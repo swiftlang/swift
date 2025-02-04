@@ -8103,7 +8103,8 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
   if (type1->isArray() && type2->isSlab()) {
     // If the locator is pointing directly at an array literal, allow the
     // conversion.
-    if (isExpr<ArrayExpr>(locator.getAnchor())) {
+    if (locator.directlyAt<ArrayExpr>() ||
+        isExpr<ArrayExpr>(locator.getAnchor())) {
       conversionsOrFixes.push_back(
         ConversionRestrictionKind::ArrayLiteralToInlineArray);
     }
@@ -14877,6 +14878,7 @@ ConstraintSystem::simplifyRestrictedConstraintImpl(
     auto slabEltTy = slabTy->getGenericArgs()[1];
 
     addConstraint(ConstraintKind::Bind, arrayEltTy, slabEltTy, locator);
+    increaseScore(SK_ImplicitValueConversion, locator);
 
     // <let count: Int, Element>
     // Attempt to bind the number of elements in the literal with the

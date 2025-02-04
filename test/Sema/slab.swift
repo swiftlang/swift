@@ -83,3 +83,23 @@ extension Slab where Element: ~Copyable {
     }
   }
 }
+
+func test(_: [Int]) -> Int {
+  123
+}
+
+func test(_: Slab<2, Int>) -> String {
+  "123"
+}
+
+func takeInt(_: Int) {}
+func takeString(_: String) {}
+
+let g = test([1, 2])
+takeInt(g) // OK
+takeString(g) // expected-error {{cannot convert value of type 'Int' to expected argument type 'String'}}
+
+let h: String = test([1, 2])
+takeInt(h) // expected-error {{cannot convert value of type 'String' to expected argument type 'Int'}}
+takeString(h) // OK
+
