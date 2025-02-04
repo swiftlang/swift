@@ -65,13 +65,19 @@ BindingSet::BindingSet(ConstraintSystem &CS, TypeVariableType *TypeVar,
       addLiteralRequirement(constraint);
       break;
 
+    case ConstraintKind::Defaultable:
+    case ConstraintKind::FallbackType:
+      // Do these in a separate pass.
+      if (CS.getFixedTypeRecursive(constraint->getFirstType(), true)
+              ->getAs<TypeVariableType>() == TypeVar) {
+        addDefault(constraint);
+      }
+      break;
+
     default:
       break;
     }
   }
-
-  for (auto *constraint : info.Defaults)
-    addDefault(constraint);
 
   for (auto &entry : info.AdjacentVars)
     AdjacentVars.insert(entry.first);
@@ -1215,10 +1221,6 @@ findInferableTypeVars(Type type,
   type.walk(Walker(typeVars));
 }
 
-void PotentialBindings::addDefault(Constraint *constraint) {
-  Defaults.insert(constraint);
-}
-
 void BindingSet::addDefault(Constraint *constraint) {
   auto defaultTy = constraint->getSecondType();
   Defaults.insert({defaultTy->getCanonicalType(), constraint});
@@ -1968,6 +1970,8 @@ void PotentialBindings::infer(ConstraintSystem &CS,
   case ConstraintKind::MaterializePackExpansion:
   case ConstraintKind::ConformsTo:
   case ConstraintKind::LiteralConformsTo:
+  case ConstraintKind::Defaultable:
+  case ConstraintKind::FallbackType:
     // Constraints from which we can't do anything.
     break;
 
@@ -1994,15 +1998,6 @@ void PotentialBindings::infer(ConstraintSystem &CS,
     // This is right-hand side, let's continue.
     break;
   }
-
-  case ConstraintKind::Defaultable:
-  case ConstraintKind::FallbackType:
-    // Do these in a separate pass.
-    if (CS.getFixedTypeRecursive(constraint->getFirstType(), true)
-            ->getAs<TypeVariableType>() == TypeVar) {
-      addDefault(constraint);
-    }
-    break;
 
   case ConstraintKind::Disjunction:
     DelayedBy.push_back(constraint);
@@ -2093,17 +2088,6 @@ void PotentialBindings::retract(ConstraintSystem &CS,
                       }),
       Bindings.end());
 
-  switch (constraint->getKind()) {
-  case ConstraintKind::Defaultable:
-  case ConstraintKind::FallbackType: {
-    Defaults.erase(constraint);
-    break;
-  }
-
-  default:
-    break;
-  }
-
   {
     llvm::SmallPtrSet<TypeVariableType *, 2> unviable;
     for (const auto &adjacent : AdjacentVars) {
@@ -2137,7 +2121,6 @@ void PotentialBindings::reset() {
   if (CONDITIONAL_ASSERT_enabled()) {
     ASSERT(Constraints.empty());
     ASSERT(Bindings.empty());
-    ASSERT(Defaults.empty());
     ASSERT(DelayedBy.empty());
     ASSERT(AdjacentVars.empty());
     ASSERT(SubtypeOf.empty());

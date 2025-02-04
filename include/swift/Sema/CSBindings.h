@@ -224,9 +224,6 @@ struct PotentialBindings {
   /// The set of potential bindings.
   llvm::SmallVector<PotentialBinding, 4> Bindings;
 
-  /// The set of constraints which would be used to infer default types.
-  llvm::SmallPtrSet<Constraint *, 2> Defaults;
-
   /// The set of constraints which delay attempting this type variable.
   llvm::TinyPtrVector<Constraint *> DelayedBy;
 
@@ -248,8 +245,6 @@ struct PotentialBindings {
   llvm::SmallSetVector<std::pair<TypeVariableType *, Constraint *>, 4> SubtypeOf;
   llvm::SmallSetVector<std::pair<TypeVariableType *, Constraint *>, 4> SupertypeOf;
   llvm::SmallSetVector<std::pair<TypeVariableType *, Constraint *>, 4> EquivalentTo;
-
-  void addDefault(Constraint *constraint);
 
   /// Add a potential binding to the list of bindings,
   /// coalescing supertype bounds when we are able to compute the meet.
