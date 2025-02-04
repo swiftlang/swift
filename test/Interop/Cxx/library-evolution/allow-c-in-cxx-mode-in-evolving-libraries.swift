@@ -2,7 +2,7 @@
 // RUN: split-file %s %t
 // RUN: %target-swift-frontend %t/test.swift -I %t/Inputs -typecheck -enable-library-evolution -enable-experimental-cxx-interop -verify
 
-// REQUIRES: OS=macosx
+// REQUIRES: rdar144000451
 
 //--- Inputs/module.modulemap
 module CxxModule {
