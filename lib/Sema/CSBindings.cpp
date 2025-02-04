@@ -1646,8 +1646,9 @@ PotentialBindings::inferFromRelational(ConstraintSystem &CS,
     findInferableTypeVars(second, typeVars);
 
     if (typeVars.erase(TypeVar)) {
-      for (auto *typeVar : typeVars)
-        AdjacentVars.insert({typeVar, constraint});
+      for (auto *typeVar : typeVars) {
+        AdjacentVars.emplace_back(typeVar, constraint);
+      }
     }
 
     // Infer a binding from `inout $T <convertible to> Unsafe*Pointer<...>?`.
@@ -1772,7 +1773,7 @@ PotentialBindings::inferFromRelational(ConstraintSystem &CS,
       // Add all type variables encountered in the type except
       // to the current type variable.
       if (var != TypeVar) {
-        AdjacentVars.insert({var, constraint});
+        AdjacentVars.emplace_back(var, constraint);
         continue;
       }
 
@@ -1833,26 +1834,26 @@ PotentialBindings::inferFromRelational(ConstraintSystem &CS,
     case ConstraintKind::ArgumentConversion:
     case ConstraintKind::OperatorArgumentConversion: {
       if (kind == AllowedBindingKind::Subtypes) {
-        SubtypeOf.insert({bindingTypeVar, constraint});
+        SubtypeOf.emplace_back(bindingTypeVar, constraint);
       } else {
         assert(kind == AllowedBindingKind::Supertypes);
-        SupertypeOf.insert({bindingTypeVar, constraint});
+        SupertypeOf.emplace_back(bindingTypeVar, constraint);
       }
 
-      AdjacentVars.insert({bindingTypeVar, constraint});
+      AdjacentVars.emplace_back(bindingTypeVar, constraint);
       break;
     }
 
     case ConstraintKind::Bind:
     case ConstraintKind::BindParam:
     case ConstraintKind::Equal: {
-      EquivalentTo.insert({bindingTypeVar, constraint});
-      AdjacentVars.insert({bindingTypeVar, constraint});
+      EquivalentTo.emplace_back(bindingTypeVar, constraint);
+      AdjacentVars.emplace_back(bindingTypeVar, constraint);
       break;
     }
 
     case ConstraintKind::UnresolvedMemberChainBase: {
-      EquivalentTo.insert({bindingTypeVar, constraint});
+      EquivalentTo.emplace_back(bindingTypeVar, constraint);
 
       // Don't record adjacency between base and result types,
       // this is just an auxiliary constraint to enforce ordering.
@@ -1864,8 +1865,9 @@ PotentialBindings::inferFromRelational(ConstraintSystem &CS,
       // an un-inferred optional is adjacent to a type
       // variable that presents such optional (`bindingTypeVar`
       // in this case).
-      if (kind == AllowedBindingKind::Supertypes)
-        AdjacentVars.insert({bindingTypeVar, constraint});
+      if (kind == AllowedBindingKind::Supertypes) {
+        AdjacentVars.emplace_back(bindingTypeVar, constraint);
+      }
       break;
     }
 
@@ -2088,23 +2090,12 @@ void PotentialBindings::retract(ConstraintSystem &CS,
                       }),
       Bindings.end());
 
-  {
-    llvm::SmallPtrSet<TypeVariableType *, 2> unviable;
-    for (const auto &adjacent : AdjacentVars) {
-      if (adjacent.second == constraint)
-        unviable.insert(adjacent.first);
-    }
-
-    for (auto *adjacentVar : unviable)
-      AdjacentVars.erase(std::make_pair(adjacentVar, constraint));
-  }
-
-  auto isMatchingConstraint = [&constraint](Constraint *existing) {
-    return existing == constraint;
-  };
-
-  DelayedBy.erase(llvm::remove_if(DelayedBy, isMatchingConstraint),
-                  DelayedBy.end());
+  DelayedBy.erase(
+      llvm::remove_if(DelayedBy,
+                      [&constraint](Constraint *existing) {
+                        return existing == constraint;
+                      }),
+      DelayedBy.end());
 
   auto hasMatchingSource =
       [&constraint](
@@ -2112,9 +2103,21 @@ void PotentialBindings::retract(ConstraintSystem &CS,
         return adjacency.second == constraint;
       };
 
-  SubtypeOf.remove_if(hasMatchingSource);
-  SupertypeOf.remove_if(hasMatchingSource);
-  EquivalentTo.remove_if(hasMatchingSource);
+  AdjacentVars.erase(
+    llvm::remove_if(AdjacentVars, hasMatchingSource),
+    AdjacentVars.end());
+
+  SubtypeOf.erase(
+    llvm::remove_if(SubtypeOf, hasMatchingSource),
+    SubtypeOf.end());
+
+  SupertypeOf.erase(
+    llvm::remove_if(SupertypeOf, hasMatchingSource),
+    SupertypeOf.end());
+
+  EquivalentTo.erase(
+    llvm::remove_if(EquivalentTo, hasMatchingSource),
+    EquivalentTo.end());
 }
 
 void PotentialBindings::reset() {

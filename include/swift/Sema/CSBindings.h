@@ -233,18 +233,17 @@ struct PotentialBindings {
   /// bindings (contained in the binding type e.g. `Foo<$T0>`), or
   /// reachable through subtype/conversion  relationship e.g.
   /// `$T0 subtype of $T1` or `$T0 arg conversion $T1`.
-  llvm::SmallDenseSet<std::pair<TypeVariableType *, Constraint *>, 2>
-      AdjacentVars;
-
-  ASTNode AssociatedCodeCompletionToken = ASTNode();
+  llvm::SmallVector<std::pair<TypeVariableType *, Constraint *>, 2> AdjacentVars;
 
   /// A set of all not-yet-resolved type variables this type variable
   /// is a subtype of, supertype of or is equivalent to. This is used
   /// to determine ordering inside of a chain of subtypes to help infer
   /// transitive bindings  and protocol requirements.
-  llvm::SmallSetVector<std::pair<TypeVariableType *, Constraint *>, 4> SubtypeOf;
-  llvm::SmallSetVector<std::pair<TypeVariableType *, Constraint *>, 4> SupertypeOf;
-  llvm::SmallSetVector<std::pair<TypeVariableType *, Constraint *>, 4> EquivalentTo;
+  llvm::SmallVector<std::pair<TypeVariableType *, Constraint *>, 4> SubtypeOf;
+  llvm::SmallVector<std::pair<TypeVariableType *, Constraint *>, 4> SupertypeOf;
+  llvm::SmallVector<std::pair<TypeVariableType *, Constraint *>, 4> EquivalentTo;
+
+  ASTNode AssociatedCodeCompletionToken = ASTNode();
 
   /// Add a potential binding to the list of bindings,
   /// coalescing supertype bounds when we are able to compute the meet.
