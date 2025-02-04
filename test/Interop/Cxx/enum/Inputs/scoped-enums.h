@@ -19,3 +19,5 @@ enum class ScopedEnumInt : int { x, y, z };
 enum class ScopedEnumNegativeElement : int { x = -1, y = 0, z = 2 };
 
 enum class MiddleDefinedScopedEnum { x, y = 42, z };
+
+
