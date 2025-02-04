@@ -2120,15 +2120,15 @@ function Build-Runtime([Platform]$Platform, $Arch, [switch]$Test = $false) {
   }
 
   if ($Test -and $Platform -eq "Android") {
-    $Targets = @("upload-stdlib-android-x86_64", "check-swift-android-x86_64", "install")
-    AndroidEmulator-Run $Arch.LLVMName
+    $Targets = @("check-swift-all-only_non_executable-android-x86_64", "install")
+    #$Targets = @("upload-stdlib-android-x86_64", "check-swift-android-x86_64", "install")
+    #AndroidEmulator-Run $Arch.LLVMName
     $PlatformDefines += @{
       SWIFT_INCLUDE_TESTS = "YES";
       SWIFT_BUILD_SDK_OVERLAY = "YES";
       SWIFT_BUILD_STDLIB = "YES";
       SWIFT_BUILD_TEST_SUPPORT_MODULES = "YES";
       SWIFT_ANDROID_DEPLOY_DEVICE_PATH = "/data/local/tmp"
-      SWIFT_LIT_ARGS = "--filter=validation-test"
     }
   } else {
     $Targets = @("install")
@@ -2143,6 +2143,7 @@ function Build-Runtime([Platform]$Platform, $Arch, [switch]$Test = $false) {
       Get-HostProjectBinaryCache Compilers
     }
 
+    $NativeToolsPath = Join-Path -Path $CompilersBinaryCache -ChildPath "bin"
     Build-CMakeProject `
       -Src $SourceCache\swift `
       -Bin (Get-TargetProjectBinaryCache $Arch Runtime) `
@@ -2165,7 +2166,9 @@ function Build-Runtime([Platform]$Platform, $Arch, [switch]$Test = $false) {
         SWIFT_ENABLE_EXPERIMENTAL_STRING_PROCESSING = "YES";
         SWIFT_ENABLE_SYNCHRONIZATION = "YES";
         SWIFT_ENABLE_VOLATILE = "YES";
-        SWIFT_NATIVE_SWIFT_TOOLS_PATH = (Join-Path -Path $CompilersBinaryCache -ChildPath "bin");
+        SWIFT_NATIVE_CLANG_TOOLS_PATH = $NativeToolsPath;
+        SWIFT_NATIVE_LLVM_TOOLS_PATH = $NativeToolsPath;
+        SWIFT_NATIVE_SWIFT_TOOLS_PATH = $NativeToolsPath;
         SWIFT_PATH_TO_LIBDISPATCH_SOURCE = "$SourceCache\swift-corelibs-libdispatch";
         SWIFT_PATH_TO_STRING_PROCESSING_SOURCE = "$SourceCache\swift-experimental-string-processing";
         CMAKE_SHARED_LINKER_FLAGS = if ($Platform -eq "Windows") { @("/INCREMENTAL:NO", "/OPT:REF", "/OPT:ICF") } else { @() };
@@ -3173,8 +3176,16 @@ if (-not $SkipBuild) {
     Invoke-BuildStep Build-CURL Android $Arch
     Invoke-BuildStep Build-LLVM Android $Arch
 
+    # FIXME: We need a separate step Test-Runtime, so -SkipBuild won't skip it.
+    # However, this will require a reconfiguration of the binary cache which
+    # might cause more trouble. Let's get it to wrok like this first.
+    if ($Test -contains "android" -and $Arch -eq $AndroidX64) {
+      Invoke-BuildStep Build-Runtime Android $Arch -Test
+    } else {
+      Invoke-BuildStep Build-Runtime Android $Arch
+    }
+
     # Build platform: SDK, Redist and XCTest
-    Invoke-BuildStep Build-Runtime Android $Arch -Test:$TestAndroid
     Invoke-BuildStep Build-Dispatch Android $Arch
     Invoke-BuildStep Build-Foundation Android $Arch
     Invoke-BuildStep Build-Sanitizers Android $Arch
