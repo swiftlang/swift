@@ -540,11 +540,6 @@ void ConstraintGraph::unrelateTypeVariables(TypeVariableType *typeVar,
   node.removeReference(otherTypeVar);
 }
 
-void ConstraintGraph::inferBindings(TypeVariableType *typeVar,
-                                    Constraint *constraint) {
-  (*this)[typeVar].getPotentialBindings().infer(CS, typeVar, constraint);
-}
-
 void ConstraintGraph::retractBindings(TypeVariableType *typeVar,
                                       Constraint *constraint) {
   (*this)[typeVar].getPotentialBindings().retract(CS, typeVar, constraint);
