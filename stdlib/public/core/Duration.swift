@@ -102,13 +102,26 @@ extension Duration {
 @available(SwiftStdlib 6.0, *)
 extension Duration {
   /// The duration represented in attoseconds.
+  ///
+  /// This provides direct access to the underlying attosecond representation
+  /// of a `Duration` value.
+  ///
+  ///     let d = Duration.seconds(1)
+  ///     print(d.attoseconds) // 1_000_000_000_000_000_000
   @available(SwiftStdlib 6.0, *)
   @_alwaysEmitIntoClient
   public var attoseconds: Int128 {
     Int128(_low: _low, _high: _high)
   }
   
-  /// Initializes a `Duration` from the given number of attoseconds.
+  /// Construct a `Duration` from the given number of attoseconds.
+  ///
+  /// This directly constructs a `Duration` from the given number of attoseconds.
+  ///
+  ///     let d = Duration(attoseconds: 1_000_000_000_000_000_000)
+  ///     print(d) // 1.0 seconds
+  ///
+  /// - Parameter attoseconds: The total duration expressed in attoseconds.
   @available(SwiftStdlib 6.0, *)
   @_alwaysEmitIntoClient
   public init(attoseconds: Int128) {
