@@ -17,14 +17,17 @@
 #ifndef SWIFT_AST_AVAILABILITY_SPEC_H
 #define SWIFT_AST_AVAILABILITY_SPEC_H
 
+#include "swift/AST/ASTAllocated.h"
 #include "swift/AST/Identifier.h"
 #include "swift/AST/PlatformKind.h"
 #include "swift/Basic/SourceLoc.h"
 #include "llvm/ADT/DenseMap.h"
+#include "llvm/ADT/StringMap.h"
 #include "llvm/Support/VersionTuple.h"
 
 namespace swift {
 class ASTContext;
+class AvailabilityDomain;
 
 enum class VersionComparison { GreaterThanEqual };
 
@@ -54,6 +57,12 @@ public:
   AvailabilitySpecKind getKind() const { return Kind; }
 
   SourceRange getSourceRange() const;
+
+  std::optional<AvailabilityDomain> getDomain() const;
+
+  llvm::VersionTuple getVersion() const;
+
+  SourceRange getVersionSrcRange() const;
 };
 
 /// An availability specification that guards execution based on the
@@ -222,11 +231,40 @@ public:
 /// parsing a version tuple.
 class AvailabilityMacroMap {
 public:
-  typedef llvm::DenseMap<llvm::VersionTuple,
-                         SmallVector<AvailabilitySpec *, 4>> VersionEntry;
+  typedef llvm::DenseMap<llvm::VersionTuple, SmallVector<AvailabilitySpec *, 4>>
+      VersionEntry;
+  llvm::StringMap<VersionEntry> Impl;
 
-  bool WasParsed = false;
-  llvm::DenseMap<StringRef, VersionEntry> Impl;
+  bool hasMacroName(StringRef name) const {
+    return Impl.find(name) != Impl.end();
+  }
+
+  bool hasMacroNameVersion(StringRef name, llvm::VersionTuple version) const {
+    auto entry = Impl.find(name);
+    if (entry == Impl.end()) {
+      return false;
+    }
+    return entry->second.find(version) != entry->second.end();
+  }
+
+  void addEntry(StringRef name, llvm::VersionTuple version,
+                ArrayRef<AvailabilitySpec *> specs) {
+    assert(!hasMacroNameVersion(name, version));
+    Impl[name][version].assign(specs.begin(), specs.end());
+  }
+
+  ArrayRef<AvailabilitySpec *> getEntry(StringRef name,
+                                        llvm::VersionTuple version) {
+    auto versions = Impl.find(name);
+    if (versions == Impl.end()) {
+      return {};
+    }
+    auto entry = versions->second.find(version);
+    if (entry == versions->second.end()) {
+      return {};
+    }
+    return entry->second;
+  }
 };
 
 } // end namespace swift

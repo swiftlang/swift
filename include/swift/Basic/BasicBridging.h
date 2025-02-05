@@ -78,6 +78,7 @@
 namespace llvm {
 class raw_ostream;
 class StringRef;
+class VersionTuple;
 } // end namespace llvm
 
 namespace swift {
@@ -163,10 +164,13 @@ public:
 
 SWIFT_NAME("getter:BridgedArrayRef.data(self:)")
 BRIDGED_INLINE
-const void *_Nullable BridgedArrayRef_data(BridgedArrayRef arr);
+const void *_Nullable BridgedArrayRef_data(const BridgedArrayRef arr);
 
 SWIFT_NAME("getter:BridgedArrayRef.count(self:)")
-BRIDGED_INLINE SwiftInt BridgedArrayRef_count(BridgedArrayRef arr);
+BRIDGED_INLINE SwiftInt BridgedArrayRef_count(const BridgedArrayRef arr);
+
+SWIFT_NAME("getter:BridgedArrayRef.isEmpty(self:)")
+BRIDGED_INLINE bool BridgedArrayRef_isEmpty(const BridgedArrayRef arr);
 
 //===----------------------------------------------------------------------===//
 // MARK: Data
@@ -460,6 +464,44 @@ struct BridgedVirtualFile {
   BridgedStringRef Name;
   ptrdiff_t LineOffset;
   size_t NamePosition;
+};
+
+//===----------------------------------------------------------------------===//
+// MARK: VersionTuple
+//===----------------------------------------------------------------------===//
+
+struct BridgedVersionTuple {
+  unsigned Major : 32;
+
+  unsigned Minor : 31;
+  unsigned HasMinor : 1;
+
+  unsigned Subminor : 31;
+  unsigned HasSubminor : 1;
+
+  unsigned Build : 31;
+  unsigned HasBuild : 1;
+
+  BridgedVersionTuple()
+      : Major(0), Minor(0), HasMinor(false), Subminor(0), HasSubminor(false),
+        Build(0), HasBuild(false) {}
+  BridgedVersionTuple(unsigned Major)
+      : Major(Major), Minor(0), HasMinor(false), Subminor(0),
+        HasSubminor(false), Build(0), HasBuild(false) {}
+  BridgedVersionTuple(unsigned Major, unsigned Minor)
+      : Major(Major), Minor(Minor), HasMinor(true), Subminor(0),
+        HasSubminor(false), Build(0), HasBuild(false) {}
+  BridgedVersionTuple(unsigned Major, unsigned Minor, unsigned Subminor)
+      : Major(Major), Minor(Minor), HasMinor(true), Subminor(Subminor),
+        HasSubminor(true), Build(0), HasBuild(false) {}
+  BridgedVersionTuple(unsigned Major, unsigned Minor, unsigned Subminor,
+                      unsigned Build)
+      : Major(Major), Minor(Minor), HasMinor(true), Subminor(Subminor),
+        HasSubminor(true), Build(Build), HasBuild(true) {}
+
+  BridgedVersionTuple(llvm::VersionTuple);
+
+  llvm::VersionTuple unbridged() const;
 };
 
 SWIFT_END_NULLABILITY_ANNOTATIONS

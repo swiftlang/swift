@@ -251,8 +251,9 @@ bool shouldParseViaASTGen(SourceFile &SF) {
   return true;
 }
 
-void appendToVector(BridgedASTNode cNode, void *vecPtr) {
-  auto vec = static_cast<SmallVectorImpl<ASTNode> *>(vecPtr);
+template <typename Bridged, typename Native>
+void appendToVector(Bridged cNode, void *vecPtr) {
+  auto vec = static_cast<SmallVectorImpl<Native> *>(vecPtr);
   vec->push_back(cNode.unbridged());
 }
 
@@ -300,7 +301,8 @@ SourceFileParsingResult parseSourceFileViaASTGen(SourceFile &SF) {
   SmallVector<ASTNode, 128> items;
   swift_ASTGen_buildTopLevelASTNodes(
       &Diags, exportedSourceFile, declContext, Ctx,
-      static_cast<SmallVectorImpl<ASTNode> *>(&items), appendToVector);
+      static_cast<SmallVectorImpl<ASTNode> *>(&items),
+      appendToVector<BridgedASTNode, ASTNode>);
 
   // Fingerprint.
   // FIXME: Split request (SourceFileFingerprintRequest).
@@ -510,9 +512,126 @@ ArrayRef<Decl *> ParseTopLevelDeclsRequest::evaluate(
 }
 
 //----------------------------------------------------------------------------//
-// IDEInspectionSecondPassRequest computation.
+// AvailabilityMacroArgumentsRequest computation.
 //----------------------------------------------------------------------------//
 
+namespace {
+bool parseAvailabilityMacroDefinitionViaASTGen(
+    unsigned bufferID, ASTContext &ctx, std::string &name,
+    llvm::VersionTuple &version, SmallVectorImpl<AvailabilitySpec *> &specs) {
+  StringRef buffer = ctx.SourceMgr.getEntireTextForBuffer(bufferID);
+  DeclContext *dc = ctx.MainModule;
+
+  BridgedAvailabilityMacroDefinition parsed;
+  bool hadError = swift_ASTGen_parseAvailabilityMacroDefinition(ctx, dc, &ctx.Diags, buffer,
+                                                  &parsed);
+  if (hadError)
+    return true;
+  SWIFT_DEFER { swift_ASTGen_freeAvailabilityMacroDefinition(&parsed); };
+
+  name = parsed.name.unbridged();
+  version = parsed.version.unbridged();
+  specs.clear();
+  for (auto spec : parsed.specs.unbridged<BridgedAvailabilitySpec>()) {
+    // Currently availability macros only supports platform version specs.
+    if (auto *platformVersionSpec =
+            dyn_cast<PlatformVersionConstraintAvailabilitySpec>(
+                spec.unbridged()))
+      specs.push_back(platformVersionSpec);
+  }
+
+  return false;
+}
+
+bool parseAvailabilityMacroDefinitionViaLegacyParser(
+    unsigned bufferID, ASTContext &ctx, std::string &name,
+    llvm::VersionTuple &version, SmallVectorImpl<AvailabilitySpec *> &specs) {
+  auto &SM = ctx.SourceMgr;
+
+  // Create temporary parser.
+  swift::ParserUnit PU(SM, SourceFileKind::Main, bufferID, ctx.LangOpts,
+                       "unknown");
+
+  ForwardingDiagnosticConsumer PDC(ctx.Diags);
+  PU.getDiagnosticEngine().addConsumer(PDC);
+
+  // Parse the argument.
+  SmallVector<AvailabilitySpec *, 4> tmpSpecs;
+  ParserStatus status =
+      PU.getParser().parseAvailabilityMacroDefinition(name, version, tmpSpecs);
+  if (status.isError())
+    return true;
+
+  // Copy the Specs to the requesting ASTContext from the temporary context
+  // in the ParserUnit.
+  for (auto *spec : tmpSpecs) {
+    // Currently availability macros only supports platform version specs.
+    if (auto *platformVersionSpec =
+            dyn_cast<PlatformVersionConstraintAvailabilitySpec>(spec)) {
+      auto copy = new (ctx)
+          PlatformVersionConstraintAvailabilitySpec(*platformVersionSpec);
+      specs.push_back(copy);
+    }
+  }
+
+  return false;
+}
+
+bool parseAvailabilityMacroDefinition(
+    unsigned bufferID, ASTContext &ctx, std::string &name,
+    llvm::VersionTuple &version, SmallVectorImpl<AvailabilitySpec *> &specs) {
+#if SWIFT_BUILD_SWIFT_SYNTAX
+  if (ctx.LangOpts.hasFeature(Feature::ParserASTGen))
+    return parseAvailabilityMacroDefinitionViaASTGen(bufferID, ctx, name,
+                                                     version, specs);
+#endif
+  return parseAvailabilityMacroDefinitionViaLegacyParser(bufferID, ctx, name,
+                                                         version, specs);
+}
+
+} // namespace
+
+AvailabilityMacroMap *
+AvailabilityMacroArgumentsRequest::evaluate(Evaluator &evaluator,
+                                            ASTContext *ctx) const {
+  SourceManager &SM = ctx->SourceMgr;
+
+  // Allocate all buffers in one go to avoid repeating the sorting in
+  // findBufferContainingLocInternal.
+  llvm::SmallVector<unsigned, 4> bufferIDs;
+  for (auto macro : ctx->LangOpts.AvailabilityMacros) {
+    unsigned bufferID =
+        SM.addMemBufferCopy(macro, "-define-availability argument");
+    bufferIDs.push_back(bufferID);
+  }
+
+  auto *map = new AvailabilityMacroMap();
+  ctx->addCleanup([map]() { delete map; });
+
+  // Parse each macro definition.
+  for (unsigned bufferID : bufferIDs) {
+    std::string name;
+    llvm::VersionTuple version;
+    SmallVector<AvailabilitySpec *, 4> specs;
+    if (parseAvailabilityMacroDefinition(bufferID, *ctx, name, version, specs))
+      continue;
+
+    if (map->hasMacroNameVersion(name, version)) {
+      ctx->Diags.diagnose(SM.getLocForBufferStart(bufferID),
+                          diag::attr_availability_duplicate, name,
+                          version.getAsString());
+      continue;
+    }
+
+    map->addEntry(name, version, specs);
+  }
+
+  return map;
+}
+
+//----------------------------------------------------------------------------//
+// IDEInspectionSecondPassRequest computation.
+//----------------------------------------------------------------------------//
 
 void swift::simple_display(llvm::raw_ostream &out,
                            const IDEInspectionCallbacksFactory *factory) { }
