@@ -45,6 +45,9 @@ public:
 
   StringRef GroupInfoPath;
   StringRef ImportedHeader;
+  StringRef ImportedPCHPath;
+  bool SerializeBridgingHeader = false;
+  bool SerializeEmptyBridgingHeader = false;
   StringRef ModuleLinkName;
   StringRef ModuleInterface;
   std::vector<std::string> ExtraClangOptions;

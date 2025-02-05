@@ -577,6 +577,9 @@ public:
   /// "in-package", must not require package-only module dependencies.
   bool ResolveInPackageModuleDependencies = false;
 
+  /// Enable auto bridging header chaining.
+  bool BridgingHeaderChaining = false;
+
   /// Return all module search paths that (non-recursively) contain a file whose
   /// name is in \p Filenames.
   SmallVector<const ModuleSearchPath *, 4>

@@ -173,12 +173,12 @@ def verify_incremental_dependencies :
   Flag<["-"], "verify-incremental-dependencies">,
   Flags<[FrontendOption, HelpHidden]>,
   HelpText<"Enable the dependency verifier for each frontend job">;
-  
+
 def strict_implicit_module_context :
   Flag<["-"], "strict-implicit-module-context">,
   Flags<[FrontendOption, HelpHidden]>,
   HelpText<"Enable the strict forwarding of compilation context to downstream implicit module dependencies">;
-  
+
 def no_strict_implicit_module_context :
   Flag<["-"], "no-strict-implicit-module-context">,
   Flags<[FrontendOption, HelpHidden]>,
@@ -315,7 +315,7 @@ def tools_directory : Separate<["-"], "tools-directory">,
 
 def D : JoinedOrSeparate<["-"], "D">, Flags<[FrontendOption]>,
   HelpText<"Marks a conditional compilation flag as true">;
-  
+
 def e : Separate<["-"], "e">, Flags<[NewDriverOnlyOption]>,
   HelpText<"Executes a line of code provided on the command line">;
 
@@ -353,10 +353,20 @@ def import_objc_header : Separate<["-"], "import-objc-header">,
 def import_bridging_header : Separate<["-"], "import-bridging-header">,
   Flags<[FrontendOption, HelpHidden, ArgumentIsPath]>,
   Alias<import_objc_header>;
+def import_pch : Separate<["-"], "import-pch">,
+  Flags<[FrontendOption, HelpHidden, ArgumentIsPath]>,
+  HelpText<"Import bridging header PCH file">;
 
 def pch_output_dir: Separate<["-"], "pch-output-dir">,
   Flags<[FrontendOption, HelpHidden, ArgumentIsPath]>,
   HelpText<"Directory to persist automatically created precompiled bridging headers">;
+
+def auto_bridging_header_chaining: Flag<["-"], "auto-bridging-header-chaining">,
+  Flags<[FrontendOption, HelpHidden]>,
+  HelpText<"Automatically chaining all the bridging headers">;
+def no_auto_bridging_header_chaining: Flag<["-"], "no-auto-bridging-header-chaining">,
+  Flags<[FrontendOption, HelpHidden]>,
+  HelpText<"Do not automatically chaining all the bridging headers">;
 
 // FIXME: Unhide this once it doesn't depend on an output file map.
 def incremental : Flag<["-"], "incremental">,
@@ -2176,7 +2186,7 @@ def external_plugin_path : Separate<["-"], "external-plugin-path">, Group<plugin
   Flags<[FrontendOption, ArgumentIsPath, SwiftSymbolGraphExtractOption, SwiftAPIDigesterOption]>,
   HelpText<"Add directory to the plugin search path with a plugin server executable">,
   MetaVarName<"<path>#<plugin-server-path>">;
-  
+
 def cas_backend: Flag<["-"], "cas-backend">,
   Flags<[FrontendOption, NoDriverOption]>,
   HelpText<"Enable using CASBackend for object file output">;

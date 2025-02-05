@@ -334,6 +334,18 @@ swiftscan_string_ref_t swiftscan_swift_textual_detail_get_user_module_version(
   return details->swift_textual_details.user_module_version;
 }
 
+swiftscan_string_ref_t
+swiftscan_swift_textual_detail_get_chained_bridging_header_path(
+    swiftscan_module_details_t details) {
+  return details->swift_textual_details.chained_bridging_header_path;
+}
+
+swiftscan_string_ref_t
+swiftscan_swift_textual_detail_get_chained_bridging_header_content(
+    swiftscan_module_details_t details) {
+  return details->swift_textual_details.chained_bridging_header_content;
+}
+
 //=== Swift Binary Module Details query APIs ------------------------------===//
 
 swiftscan_string_ref_t swiftscan_swift_binary_detail_get_compiled_module_path(
@@ -570,7 +582,7 @@ swiftscan_scanner_diagnostics_query(swiftscan_scanner_t scanner) {
   swiftscan_diagnostic_set_t *Result = new swiftscan_diagnostic_set_t;
   Result->count = NumDiagnostics;
   Result->diagnostics = new swiftscan_diagnostic_info_t[NumDiagnostics];
-  
+
   for (size_t i = 0; i < NumDiagnostics; ++i) {
     const auto &Diagnostic = Diagnostics[i];
     swiftscan_diagnostic_info_s *DiagnosticInfo = new swiftscan_diagnostic_info_s;

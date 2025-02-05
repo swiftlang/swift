@@ -201,7 +201,7 @@ namespace swift {
     /// Maximum number of typo corrections we are allowed to perform.
     /// This is disabled by default until we can get typo-correction working within acceptable performance bounds.
     unsigned TypoCorrectionLimit = 0;
-    
+
     /// Should access control be respected?
     bool EnableAccessControl = true;
 
@@ -260,7 +260,7 @@ namespace swift {
 
     /// Emit a remark when indexing a system module.
     bool EnableIndexingSystemModuleRemarks = false;
-    
+
     /// Emit a remark on early exit in explicit interface build
     bool EnableSkipExplicitInterfaceModuleBuildRemarks = false;
 
@@ -684,7 +684,7 @@ namespace swift {
     void clearAllPlatformConditionValues() {
       PlatformConditionValues.clear();
     }
-    
+
     /// Returns the value for the given platform condition or an empty string.
     StringRef getPlatformConditionValue(PlatformConditionKind Kind) const;
 
@@ -864,7 +864,7 @@ namespace swift {
     /// 4.2 GHz Intel Core i7.
     /// (It's arbitrary, but will keep the compiler from taking too much time.)
     unsigned SwitchCheckingInvocationThreshold = 200000;
-    
+
     /// If true, the time it takes to type-check each function will be dumped
     /// to llvm::errs().
     bool DebugTimeFunctionBodies = false;
@@ -908,7 +908,7 @@ namespace swift {
 
     /// Enable experimental operator designated types feature.
     bool EnableOperatorDesignatedTypes = false;
-    
+
     /// Disable constraint system performance hacks.
     bool DisableConstraintSolverPerformanceHacks = false;
 
@@ -955,6 +955,9 @@ namespace swift {
 
     /// The bridging header or PCH that will be imported.
     std::string BridgingHeader;
+
+    /// The bridging header PCH file.
+    std::string BridgingHeaderPCH;
 
     /// When automatically generating a precompiled header from the bridging
     /// header, place it in this directory.
@@ -1077,6 +1080,9 @@ namespace swift {
     /// compilation source targets.
     std::vector<std::string>
     getReducedExtraArgsForSwiftModuleDependency() const;
+
+    /// Get PCH input path. Return empty string if there is no PCH input.
+    std::string getPCHInputPath() const;
   };
 
 } // end namespace swift

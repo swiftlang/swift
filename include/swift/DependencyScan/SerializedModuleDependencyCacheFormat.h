@@ -233,7 +233,9 @@ using SwiftSourceModuleDetailsLayout =
                    IdentifierIDField,                // CASFileSystemRootID
                    IdentifierIDField,                // bridgingHeaderIncludeTree
                    FlagIDArrayIDField,               // buildCommandLine
-                   FlagIDArrayIDField                // bridgingHeaderBuildCommandLine
+                   FlagIDArrayIDField,               // bridgingHeaderBuildCommandLine
+                   IdentifierIDField,                // chainedBridgingHeaderPath
+                   IdentifierIDField                 // chainedBridgingHeaderContent
                    >;
 
 using SwiftBinaryModuleDetailsLayout =
