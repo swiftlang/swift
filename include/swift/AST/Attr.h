@@ -3475,6 +3475,10 @@ protected:
     SWIFT_INLINE_BITFIELD_FULL(IsolatedTypeAttr, TypeAttribute, 8,
       Kind : 8
     );
+
+    SWIFT_INLINE_BITFIELD_FULL(ExecutionTypeAttr, TypeAttribute, 8,
+      Behavior : 8
+    );
   } Bits;
   // clang-format on
 
@@ -3736,6 +3740,28 @@ public:
     return getIsolationKindName(getIsolationKind());
   }
   static const char *getIsolationKindName(IsolationKind kind);
+
+  void printImpl(ASTPrinter &printer, const PrintOptions &options) const;
+};
+
+/// The @execution function type attribute.
+class ExecutionTypeAttr : public SimpleTypeAttrWithArgs<TypeAttrKind::Execution> {
+  SourceLoc BehaviorLoc;
+
+public:
+  ExecutionTypeAttr(SourceLoc atLoc, SourceLoc kwLoc, SourceRange parensRange,
+                    Located<ExecutionKind> behavior)
+      : SimpleTypeAttr(atLoc, kwLoc, parensRange), BehaviorLoc(behavior.Loc) {
+    Bits.ExecutionTypeAttr.Behavior = uint8_t(behavior.Item);
+  }
+
+  ExecutionKind getBehavior() const {
+    return ExecutionKind(Bits.ExecutionTypeAttr.Behavior);
+  }
+
+  SourceLoc getBehaviorLoc() const {
+    return BehaviorLoc;
+  }
 
   void printImpl(ASTPrinter &printer, const PrintOptions &options) const;
 };

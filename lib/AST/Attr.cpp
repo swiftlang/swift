@@ -303,6 +303,23 @@ void IsolatedTypeAttr::printImpl(ASTPrinter &printer,
   printer.printStructurePost(PrintStructureKind::BuiltinAttribute);
 }
 
+void ExecutionTypeAttr::printImpl(ASTPrinter &printer,
+                                  const PrintOptions &options) const {
+  printer.callPrintStructurePre(PrintStructureKind::BuiltinAttribute);
+  printer.printAttrName("@execution");
+  printer << "(";
+  switch (getBehavior()) {
+  case ExecutionKind::Concurrent:
+    printer << "concurrent";
+    break;
+  case ExecutionKind::Caller:
+    printer << "caller";
+    break;
+  }
+  printer << ")";
+  printer.printStructurePost(PrintStructureKind::BuiltinAttribute);
+}
+
 /// Given a name like "inline", return the decl attribute ID that corresponds
 /// to it.  Note that this is a many-to-one mapping, and that the identifier
 /// passed in may only be the first portion of the attribute (e.g. in the case
