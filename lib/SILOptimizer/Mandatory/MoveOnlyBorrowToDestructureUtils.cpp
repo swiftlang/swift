@@ -1190,7 +1190,7 @@ void Implementation::rewriteUses(InstructionDeleter *deleter) {
     LLVM_DEBUG(llvm::dbgs() << "    Computed available values for block bb"
                             << block->getDebugID() << '\n';
                availableValues.print(llvm::dbgs(), "        "));
-    // Then walk from the top to the bottom of the block rewriting as we go.
+    // Then walk from the beginning to the end of the block, rewriting as we go.
     for (auto ii = block->begin(), ie = block->end(); ii != ie;) {
       auto *inst = &*ii;
       ++ii;
@@ -1336,13 +1336,6 @@ void Implementation::rewriteUses(InstructionDeleter *deleter) {
                 borrowBuilder.createGuaranteedMoveOnlyWrapperToCopyableValue(
                     loc, value);
           }
-          // NOTE: oldInst may be nullptr if our operand is a SILArgument
-          // which can happen with switch_enum.
-          auto *oldInst = operand.get()->getDefiningInstruction();
-          operand.set(value);
-          if (oldInst && deleter)
-            deleter->forceTrackAsDead(oldInst);
-
           // If we have a terminator that is a trivial use (e.x.: we
           // struct_extract a trivial value). Just put the end_borrow before the
           // terminator.
@@ -1351,7 +1344,7 @@ void Implementation::rewriteUses(InstructionDeleter *deleter) {
                 operand.getOperandOwnership() == OperandOwnership::TrivialUse) {
               SILBuilderWithScope endBuilder(inst);
               endBuilder.createEndBorrow(getSafeLoc(inst), borrow);
-              continue;
+              goto update_operand;
             } else {
               // Otherwise, put the end_borrow.
               for (auto *succBlock : ti->getSuccessorBlocks()) {
@@ -1359,11 +1352,23 @@ void Implementation::rewriteUses(InstructionDeleter *deleter) {
                 SILBuilderWithScope endBuilder(nextInst);
                 endBuilder.createEndBorrow(getSafeLoc(nextInst), borrow);
               }
-              continue;
+              goto update_operand;
             }
           }
 
           insertEndBorrowsForNonConsumingUse(&operand, borrow);
+update_operand:
+          // We update the operand after placing end_borrows, since we might
+          // need the original operand's lifetime to correctly delineate the
+          // new lifetime, such as if there is an InteriorPointerOperand.
+          
+          // NOTE: oldInst may be nullptr if our operand is a SILArgument
+          // which can happen with switch_enum.
+          auto *oldInst = operand.get()->getDefiningInstruction();
+          operand.set(value);
+          if (oldInst && deleter)
+            deleter->forceTrackAsDead(oldInst);
+
           continue;
         }
 
