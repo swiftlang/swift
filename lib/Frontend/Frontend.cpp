@@ -197,7 +197,13 @@ SerializationOptions CompilerInvocation::computeSerializationOptions(
   serializationOpts.SourceInfoOutputPath = outs.ModuleSourceInfoOutputPath;
   serializationOpts.GroupInfoPath = opts.GroupInfoPath.c_str();
   if (opts.SerializeBridgingHeader && !outs.ModuleOutputPath.empty())
-    serializationOpts.ImportedHeader = opts.ImplicitObjCHeaderPath;
+    serializationOpts.SerializeBridgingHeader = true;
+  // For batch mode, emit empty header path as placeholder.
+  if (serializationOpts.SerializeBridgingHeader &&
+      opts.InputsAndOutputs.hasPrimaryInputs())
+    serializationOpts.SerializeEmptyBridgingHeader = true;
+  serializationOpts.ImportedHeader = opts.ImplicitObjCHeaderPath;
+  serializationOpts.ImportedPCHPath = opts.ImplicitObjCPCHPath;
   serializationOpts.ModuleLinkName = opts.ModuleLinkName;
   serializationOpts.UserModuleVersion = opts.UserModuleVersion;
   serializationOpts.AllowableClients = opts.AllowableClients;
@@ -317,7 +323,7 @@ bool CompilerInstance::setUpASTContextIfNeeded() {
   registerSILOptimizerRequestFunctions(Context->evaluator);
   registerTBDGenRequestFunctions(Context->evaluator);
   registerIRGenRequestFunctions(Context->evaluator);
-  
+
   // Migrator, indexing and typo correction need some IDE requests.
   // The integrated REPL needs IDE requests for completion.
   if (Invocation.getMigratorOptions().shouldRunMigrator() ||
@@ -653,13 +659,13 @@ bool CompilerInstance::setUpVirtualFileSystemOverlays() {
       if (auto loadedBuffer = loadCachedCompileResultFromCacheKey(
               getObjectStore(), getActionCache(), Diagnostics,
               CASOpts.BridgingHeaderPCHCacheKey, file_types::ID::TY_PCH,
-              ClangOpts.BridgingHeader))
-        MemFS->addFile(Invocation.getClangImporterOptions().BridgingHeader, 0,
-                       std::move(loadedBuffer));
+              ClangOpts.getPCHInputPath()))
+        MemFS->addFile(Invocation.getClangImporterOptions().getPCHInputPath(),
+                       0, std::move(loadedBuffer));
       else
         Diagnostics.diagnose(
             SourceLoc(), diag::error_load_input_from_cas,
-            Invocation.getClangImporterOptions().BridgingHeader);
+            Invocation.getClangImporterOptions().getPCHInputPath());
     }
     if (!CASOpts.InputFileKey.empty()) {
       if (Invocation.getFrontendOptions()
@@ -903,14 +909,9 @@ SourceFile *CompilerInstance::getIDEInspectionFile() const {
   return evaluateOrDefault(eval, IDEInspectionFileRequest{mod}, nullptr);
 }
 
-static inline bool isPCHFilenameExtension(StringRef path) {
-  return llvm::sys::path::extension(path)
-    .ends_with(file_types::getExtension(file_types::TY_PCH));
-}
-
 std::string CompilerInstance::getBridgingHeaderPath() const {
   const FrontendOptions &opts = Invocation.getFrontendOptions();
-  if (!isPCHFilenameExtension(opts.ImplicitObjCHeaderPath))
+  if (opts.ImplicitObjCPCHPath.empty())
     return opts.ImplicitObjCHeaderPath;
 
   auto clangImporter =
@@ -920,7 +921,7 @@ std::string CompilerInstance::getBridgingHeaderPath() const {
   if (!clangImporter)
     return std::string();
 
-  return clangImporter->getOriginalSourceFile(opts.ImplicitObjCHeaderPath);
+  return clangImporter->getOriginalSourceFile(opts.ImplicitObjCPCHPath);
 }
 
 bool CompilerInstance::setUpInputs() {
@@ -1301,7 +1302,10 @@ ImplicitImportInfo CompilerInstance::getImplicitImportInfo() const {
   }
 
   imports.ShouldImportUnderlyingModule = frontendOpts.ImportUnderlyingModule;
-  imports.BridgingHeaderPath = frontendOpts.ImplicitObjCHeaderPath;
+  if (frontendOpts.ImplicitObjCPCHPath.empty())
+    imports.BridgingHeaderPath = frontendOpts.ImplicitObjCHeaderPath;
+  else
+    imports.BridgingHeaderPath = frontendOpts.ImplicitObjCPCHPath;
   return imports;
 }
 

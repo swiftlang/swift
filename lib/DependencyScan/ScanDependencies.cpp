@@ -707,9 +707,10 @@ generateFullDependencyGraph(const CompilerInstance &instance,
             create_clone(swiftTextualDeps->textualModuleDetails
                              .CASBridgingHeaderIncludeTreeRootID.c_str()),
             create_clone(swiftTextualDeps->moduleCacheKey.c_str()),
-            createMacroDependencySet(
-                swiftTextualDeps->macroDependencies),
-            create_clone(swiftTextualDeps->userModuleVersion.c_str())};
+            createMacroDependencySet(swiftTextualDeps->macroDependencies),
+            create_clone(swiftTextualDeps->userModuleVersion.c_str()),
+            /*chained_bridging_header_path=*/create_clone(""),
+            /*chained_bridging_header_content=*/create_clone("")};
       } else if (swiftSourceDeps) {
         swiftscan_string_ref_t moduleInterfacePath = create_null();
         swiftscan_string_ref_t bridgingHeaderPath =
@@ -743,9 +744,11 @@ generateFullDependencyGraph(const CompilerInstance &instance,
             create_clone(swiftSourceDeps->textualModuleDetails
                              .CASBridgingHeaderIncludeTreeRootID.c_str()),
             /*CacheKey*/ create_clone(""),
-            createMacroDependencySet(
-                swiftSourceDeps->macroDependencies),
-            /*userModuleVersion*/ create_clone("")};
+            createMacroDependencySet(swiftSourceDeps->macroDependencies),
+            /*userModuleVersion*/ create_clone(""),
+            create_clone(swiftSourceDeps->chainedBridgingHeaderPath.c_str()),
+            create_clone(
+                swiftSourceDeps->chainedBridgingHeaderContent.c_str())};
       } else if (swiftPlaceholderDeps) {
         details->kind = SWIFTSCAN_DEPENDENCY_INFO_SWIFT_PLACEHOLDER;
         details->swift_placeholder_details = {
@@ -1320,6 +1323,7 @@ swift::dependencies::performModuleScan(
 
   auto topologicallySortedModuleList =
       computeTopologicalSortOfExplicitDependencies(allModules, cache);
+
   resolveDependencyCommandLineArguments(instance, cache,
                                         topologicallySortedModuleList);
   resolveImplicitLinkLibraries(instance, cache);

@@ -391,26 +391,25 @@ void ModuleDependencyInfo::addBridgingHeader(StringRef bridgingHeader) {
 }
 
 /// Add source files that the bridging header depends on.
-void ModuleDependencyInfo::addHeaderSourceFile(StringRef bridgingSourceFile) {
+void ModuleDependencyInfo::setHeaderSourceFiles(
+    const std::vector<std::string> &files) {
   switch (getKind()) {
   case swift::ModuleDependencyKind::SwiftInterface: {
     auto swiftInterfaceStorage =
         cast<SwiftInterfaceModuleDependenciesStorage>(storage.get());
-    swiftInterfaceStorage->textualModuleDetails.bridgingSourceFiles.push_back(
-        bridgingSourceFile.str());
+    swiftInterfaceStorage->textualModuleDetails.bridgingSourceFiles = files;
     break;
   }
   case swift::ModuleDependencyKind::SwiftSource: {
     auto swiftSourceStorage =
         cast<SwiftSourceModuleDependenciesStorage>(storage.get());
-    swiftSourceStorage->textualModuleDetails.bridgingSourceFiles.push_back(
-        bridgingSourceFile.str());
+    swiftSourceStorage->textualModuleDetails.bridgingSourceFiles = files;
     break;
   }
   case swift::ModuleDependencyKind::SwiftBinary: {
     auto swiftBinaryStorage =
         cast<SwiftBinaryModuleDependencyStorage>(storage.get());
-    swiftBinaryStorage->headerSourceFiles.push_back(bridgingSourceFile.str());
+    swiftBinaryStorage->headerSourceFiles = files;
     break;
   }
   default:
@@ -432,6 +431,20 @@ void ModuleDependencyInfo::addBridgingHeaderIncludeTree(StringRef ID) {
         cast<SwiftSourceModuleDependenciesStorage>(storage.get());
     swiftSourceStorage->textualModuleDetails
         .CASBridgingHeaderIncludeTreeRootID = ID.str();
+    break;
+  }
+  default:
+    llvm_unreachable("Unexpected dependency kind");
+  }
+}
+
+void ModuleDependencyInfo::setChainedBridgingHeaderBuffer(StringRef path,
+                                                          StringRef buffer) {
+  switch (getKind()) {
+  case swift::ModuleDependencyKind::SwiftSource: {
+    auto swiftSourceStorage =
+        cast<SwiftSourceModuleDependenciesStorage>(storage.get());
+    swiftSourceStorage->setChainedBridgingHeaderBuffer(path, buffer);
     break;
   }
   default:
@@ -678,6 +691,7 @@ bool SwiftDependencyScanningService::setupCachingDependencyScanningService(
   // Setup CAS.
   CASOpts = Instance.getInvocation().getCASOptions().CASOpts;
   CAS = Instance.getSharedCASInstance();
+  ActionCache = Instance.getSharedCacheInstance();
 
   auto CachingFS =
       llvm::cas::createCachingOnDiskFileSystem(Instance.getObjectStore());
@@ -771,14 +785,14 @@ ModuleDependenciesCache::findDependency(
     }
     return std::nullopt;
   }
-      
+
   assert(kind.has_value() && "Expected dependencies kind for lookup.");
   std::optional<const ModuleDependencyInfo *> optionalDep = std::nullopt;
   const auto &map = getDependenciesMap(kind.value());
   auto known = map.find(moduleName);
   if (known != map.end())
     optionalDep = &(known->second);
-      
+
   // During a scan, only produce the cached source module info for the current
   // module under scan.
   if (optionalDep.has_value()) {
@@ -899,7 +913,6 @@ void
 ModuleDependenciesCache::setHeaderClangDependencies(ModuleDependencyID moduleID,
                                                     const ArrayRef<ModuleDependencyID> dependencyIDs) {
   auto dependencyInfo = findKnownDependency(moduleID);
-  assert(dependencyInfo.getHeaderClangDependencies().empty());
 #ifndef NDEBUG
   for (const auto &depID : dependencyIDs)
     assert(depID.Kind == ModuleDependencyKind::Clang);
