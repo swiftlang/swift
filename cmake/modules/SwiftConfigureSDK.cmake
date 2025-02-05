@@ -422,17 +422,8 @@ macro(configure_sdk_unix name architectures)
         if(CROSS_COMPILE_SYSROOTS)
           set(SWIFT_SDK_${prefix}_ARCH_${arch}_PATH ${CROSS_COMPILE_SYSROOTS})
 
-          # Find toolchain install dir
-          execute_process(
-            COMMAND dirname $(find ${CROSS_COMPILE_SYSROOTS}/usr -name crtbegin.o | grep ${SWIFT_SDK_LINUX_ARCH_${arch}_SUFFIX})
-            WORKING_DIRECTORY ${CROSS_COMPILE_SYSROOTS}
-            OUTPUT_VARIABLE GCC_INSTALL_DIR
-            RESULT_VARIABLE FOUND_GCC_INSTALL_DIR)
-          if(FOUND_GCC_INSTALL_DIR)
-            set(SWIFT_SDK_${prefix}_CXX_OVERLAY_SWIFT_COMPILE_FLAGS -Xcc --gcc-install-dir=${GCC_INSTALL_DIR})
-          else()
-            set(SWIFT_SDK_${prefix}_CXX_OVERLAY_SWIFT_COMPILE_FLAGS -Xcc --gcc-toolchain=${CROSS_COMPILE_SYSROOTS})
-          endif()
+          # Clear hardcoded --gcc-toolchain to let the external sysroot be used to find libstdc++
+          set(SWIFT_SDK_${prefix}_CXX_OVERLAY_SWIFT_COMPILE_FLAGS "")
         endif()
       elseif("${prefix}" STREQUAL "FREEBSD")
         if(NOT arch MATCHES "(arm64|x86_64)")
