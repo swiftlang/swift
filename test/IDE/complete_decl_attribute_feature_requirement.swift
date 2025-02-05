@@ -7,8 +7,7 @@
 
 // RUN: %batch-code-completion -filecheck-additional-suffix _DISABLED
 // RUN: %batch-code-completion -filecheck-additional-suffix _ENABLED \
-// RUN:        -enable-experimental-feature ABIAttribute \
-// RUN:        -enable-experimental-feature NonIsolatedAsyncInheritsIsolationFromContext
+// RUN:        -enable-experimental-feature ABIAttribute
 
 // NOTE: Please do not include the ", N items" after "Begin completions". The
 // item count creates needless merge conflicts given that an "End completions"
@@ -18,18 +17,14 @@
 
 // KEYWORD2:              Begin completions
 // KEYWORD2_ENABLED-DAG:  Keyword/None:              abi[#Func Attribute#]; name=abi
-// KEYWORD2_ENABLED-DAG:  Keyword/None:              execution[#Func Attribute#]; name=execution
 // KEYWORD2_DISABLED-NOT: Keyword/None:              abi[#{{.*}} Attribute#]; name=abi
-// KEYWORD2_DISABLED-NOT: Keyword/None:              execution[#{{.*}} Attribute#]; name=execution
 // KEYWORD2:              End completions
 
 @#^KEYWORD3^# class C {}
 
 // KEYWORD3:              Begin completions
 // KEYWORD3_ENABLED-NOT:  Keyword/None:              abi[#{{.*}} Attribute#]; name=abi
-// KEYWORD3_ENABLED-NOT:  Keyword/None:              execution[#{{.*}} Attribute#]; name=execution
 // KEYWORD3_DISABLED-NOT: Keyword/None:              abi[#{{.*}} Attribute#]; name=abi
-// KEYWORD3_DISABLED-NOT: Keyword/None:              execution[#{{.*}} Attribute#]; name=execution
 // KEYWORD3:              End completions
 
 @#^KEYWORD3_2?check=KEYWORD3^#IB class C2 {}
@@ -38,60 +33,46 @@
 @#^KEYWORD4^# enum E {}
 // KEYWORD4:              Begin completions
 // KEYWORD4_ENABLED-NOT:  Keyword/None:              abi[#{{.*}} Attribute#]; name=abi
-// KEYWORD4_ENABLED-NOT:  Keyword/None:              execution[#{{.*}} Attribute#]; name=execution
 // KEYWORD4_DISABLED-NOT: Keyword/None:              abi[#{{.*}} Attribute#]; name=abi
-// KEYWORD4_DISABLED-NOT: Keyword/None:              execution[#{{.*}} Attribute#]; name=execution
 // KEYWORD4:              End completions
 
 @#^KEYWORD5^# struct S{}
 // KEYWORD5:              Begin completions
 // KEYWORD5_ENABLED-NOT:  Keyword/None:              abi[#{{.*}} Attribute#]; name=abi
-// KEYWORD5_ENABLED-NOT:  Keyword/None:              execution[#{{.*}} Attribute#]; name=execution
 // KEYWORD5_DISABLED-NOT: Keyword/None:              abi[#{{.*}} Attribute#]; name=abi
-// KEYWORD5_DISABLED-NOT: Keyword/None:              execution[#{{.*}} Attribute#]; name=execution
 // KEYWORD5:              End completions
 
 @#^ON_GLOBALVAR^# var globalVar
 // ON_GLOBALVAR:              Begin completions
 // ON_GLOBALVAR_ENABLED-DAG:  Keyword/None:              abi[#Var Attribute#]; name=abi
-// ON_GLOBALVAR_ENABLED-NOT:  Keyword/None:              execution[#{{.*}} Attribute#]; name=execution
 // ON_GLOBALVAR_DISABLED-NOT: Keyword/None:              abi[#{{.*}} Attribute#]; name=abi
-// ON_GLOBALVAR_DISABLED-NOT: Keyword/None:              execution[#{{.*}} Attribute#]; name=execution
 // ON_GLOBALVAR:              End completions
 
 struct _S {
   @#^ON_INIT^# init()
 // ON_INIT:              Begin completions
 // ON_INIT_ENABLED-DAG:  Keyword/None:              abi[#Constructor Attribute#]; name=abi
-// ON_INIT_ENABLED-NOT:  Keyword/None:              execution[#{{.*}} Attribute#]; name=execution
 // ON_INIT_DISABLED-NOT: Keyword/None:              abi[#{{.*}} Attribute#]; name=abi
-// ON_INIT_DISABLED-NOT: Keyword/None:              execution[#{{.*}} Attribute#]; name=execution
 // ON_INIT:              End completions
 
   @#^ON_PROPERTY^# var foo
 // ON_PROPERTY:              Begin completions
 // ON_PROPERTY_ENABLED-DAG:  Keyword/None:              abi[#Var Attribute#]; name=abi
-// ON_PROPERTY_ENABLED-NOT:  Keyword/None:              execution[#{{.*}} Attribute#]; name=execution
 // ON_PROPERTY_DISABLED-NOT: Keyword/None:              abi[#{{.*}} Attribute#]; name=abi
-// ON_PROPERTY_DISABLED-NOT: Keyword/None:              execution[#{{.*}} Attribute#]; name=execution
 // ON_PROPERTY:              End completions
 
   @#^ON_METHOD^# private
   func foo()
 // ON_METHOD:              Begin completions
 // ON_METHOD_ENABLED-DAG:  Keyword/None:              abi[#Func Attribute#]; name=abi
-// ON_METHOD_ENABLED-DAG:  Keyword/None:              execution[#Func Attribute#]; name=execution
 // ON_METHOD_DISABLED-NOT: Keyword/None:              abi[#{{.*}} Attribute#]; name=abi
-// ON_METHOD_DISABLED-NOT: Keyword/None:              execution[#{{.*}} Attribute#]; name=execution
 // ON_METHOD:              End completions
 
 
   func bar(@#^ON_PARAM_1?check=ON_PARAM^#)
 // ON_PARAM:              Begin completions
 // ON_PARAM_ENABLED-NOT:  Keyword/None:              abi[#{{.*}} Attribute#]; name=abi
-// ON_PARAM_ENABLED-NOT:  Keyword/None:              execution[#{{.*}} Attribute#]; name=execution
 // ON_PARAM_DISABLED-NOT: Keyword/None:              abi[#{{.*}} Attribute#]; name=abi
-// ON_PARAM_DISABLED-NOT: Keyword/None:              execution[#{{.*}} Attribute#]; name=execution
 // ON_PARAM:              End completions
 
   func bar(
@@ -114,9 +95,7 @@ struct _S {
   @#^ON_MEMBER_LAST^#
 // ON_MEMBER_LAST:              Begin completions
 // ON_MEMBER_LAST_ENABLED-DAG:  Keyword/None:              abi[#Declaration Attribute#]; name=abi
-// ON_MEMBER_LAST_ENABLED-DAG:  Keyword/None:              execution[#Declaration Attribute#]; name=execution
 // ON_MEMBER_LAST_DISABLED-NOT: Keyword/None:              abi[#{{.*}} Attribute#]; name=abi
-// ON_MEMBER_LAST_DISABLED-NOT: Keyword/None:              execution[#{{.*}} Attribute#]; name=execution
 // ON_MEMBER_LAST:              End completions
 }
 
@@ -128,9 +107,7 @@ func takeClosure(_: () -> Void) {
 // IN_CLOSURE:              Begin completions
 // FIXME: Not valid in this position (but CompletionLookup can't tell that)
 // IN_CLOSURE_ENABLED-DAG:  Keyword/None:              abi[#Declaration Attribute#]; name=abi
-// IN_CLOSURE_ENABLED-DAG:  Keyword/None:              execution[#Declaration Attribute#]; name=execution
 // IN_CLOSURE_DISABLED-NOT: Keyword/None:              abi[#{{.*}} Attribute#]; name=abi
-// IN_CLOSURE_DISABLED-NOT: Keyword/None:              execution[#{{.*}} Attribute#]; name=execution
 // IN_CLOSURE:              End completions
 
 @#^KEYWORD_INDEPENDENT_1?check=KEYWORD_LAST^#
@@ -146,7 +123,5 @@ func dummy2() {}
 
 // KEYWORD_LAST:              Begin completions
 // KEYWORD_LAST_ENABLED-DAG:  Keyword/None:              abi[#Declaration Attribute#]; name=abi
-// KEYWORD_LAST_ENABLED-DAG:  Keyword/None:              execution[#Declaration Attribute#]; name=execution
 // KEYWORD_LAST_DISABLED-NOT: Keyword/None:              abi[#Declaration Attribute#]; name=abi
-// KEYWORD_LAST_DISABLED-NOT: Keyword/None:              execution[#Declaration Attribute#]; name=execution
 // KEYWORD_LAST:              End completions
