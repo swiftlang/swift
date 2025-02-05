@@ -1117,6 +1117,8 @@ public:
     return Mapper->mapToString(Path);
   }
 
+  bool hasCAS() const { return (bool)CAS; }
+
   /// Setup caching service.
   bool setupCachingDependencyScanningService(CompilerInstance &Instance);
 
