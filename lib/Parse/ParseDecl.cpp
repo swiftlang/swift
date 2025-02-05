@@ -789,37 +789,18 @@ bool Parser::parseAvailability(
     //   @available(_PackageDescription, introduced: 4.2)
 
     for (auto *Spec : Specs) {
-      AvailabilityDomain Domain;
-      llvm::VersionTuple Version;
-      SourceRange VersionRange;
-
       // FIXME: [availability] Allow arbitrary availability domains.
-      if (auto *PlatformVersionSpec =
-              dyn_cast<PlatformVersionConstraintAvailabilitySpec>(Spec)) {
-        Domain =
-            AvailabilityDomain::forPlatform(PlatformVersionSpec->getPlatform());
-        Version = PlatformVersionSpec->getVersion();
-        VersionRange = PlatformVersionSpec->getVersionSrcRange();
-
-      } else if (auto *PlatformAgnosticVersionSpec = dyn_cast<
-                     PlatformAgnosticVersionConstraintAvailabilitySpec>(Spec)) {
-        Domain = PlatformAgnosticVersionSpec->isLanguageVersionSpecific()
-                     ? AvailabilityDomain::forSwiftLanguage()
-                     : AvailabilityDomain::forPackageDescription();
-        Version = PlatformAgnosticVersionSpec->getVersion();
-        VersionRange = PlatformAgnosticVersionSpec->getVersionSrcRange();
-
-      } else {
+      std::optional<AvailabilityDomain> Domain = Spec->getDomain();
+      if (!Domain)
         continue;
-      }
 
       addAttribute(new (Context) AvailableAttr(
-          AtLoc, attrRange, Domain, Spec->getSourceRange().Start,
+          AtLoc, attrRange, *Domain, Spec->getSourceRange().Start,
           AvailableAttr::Kind::Default,
           /*Message=*/StringRef(),
           /*Rename=*/StringRef(),
-          /*Introduced=*/Version,
-          /*IntroducedRange=*/VersionRange,
+          /*Introduced=*/Spec->getVersion(),
+          /*IntroducedRange=*/Spec->getVersionSrcRange(),
           /*Deprecated=*/llvm::VersionTuple(),
           /*DeprecatedRange=*/SourceRange(),
           /*Obsoleted=*/llvm::VersionTuple(),
@@ -1835,16 +1816,13 @@ void Parser::parseObjCSelector(SmallVector<Identifier, 4> &Names,
 }
 
 bool Parser::peekAvailabilityMacroName() {
-  AvailabilityMacroMap &Map = parseAllAvailabilityMacroArguments();
-
-  StringRef MacroName = Tok.getText();
-  return Map.Impl.find(MacroName) != Map.Impl.end();
+  return Context.getAvailabilityMacroMap().hasMacroName(Tok.getText());
 }
 
 ParserStatus
 Parser::parseAvailabilityMacro(SmallVectorImpl<AvailabilitySpec *> &Specs) {
   // Get the macros from the compiler arguments.
-  AvailabilityMacroMap &Map = parseAllAvailabilityMacroArguments();
+  const AvailabilityMacroMap &Map = Context.getAvailabilityMacroMap();
 
   StringRef MacroName = Tok.getText();
   auto NameMatch = Map.Impl.find(MacroName);
@@ -1861,8 +1839,8 @@ Parser::parseAvailabilityMacro(SmallVectorImpl<AvailabilitySpec *> &Specs) {
       return makeParserError();
   }
 
-  auto VersionMatch = NameMatch->getSecond().find(Version);
-  if (VersionMatch == NameMatch->getSecond().end()) {
+  auto VersionMatch = NameMatch->second.find(Version);
+  if (VersionMatch == NameMatch->second.end()) {
     diagnose(PreviousLoc, diag::attr_availability_unknown_version,
         Version.getAsString(), MacroName);
     return makeParserError(); // Failed to match the version, that's an error.
@@ -1882,77 +1860,6 @@ Parser::parseAvailabilityMacro(SmallVectorImpl<AvailabilitySpec *> &Specs) {
     }
 
   return makeParserSuccess();
-}
-
-AvailabilityMacroMap &Parser::parseAllAvailabilityMacroArguments() {
-  AvailabilityMacroMap &Map = Context.getAvailabilityMacroCache();
-  if (Map.WasParsed)
-    return Map;
-
-  SourceManager &SM = Context.SourceMgr;
-  LangOptions LangOpts = Context.LangOpts;
-
-  // Allocate all buffers in one go to avoid repeating the sorting in
-  // findBufferContainingLocInternal.
-  llvm::SmallVector<unsigned, 4> bufferIDs;
-  for (StringRef macro: LangOpts.AvailabilityMacros) {
-    unsigned bufferID = SM.addMemBufferCopy(macro,
-                                            "-define-availability argument");
-    bufferIDs.push_back(bufferID);
-  }
-
-  // Parse each macro definition.
-  for (unsigned bufferID: bufferIDs) {
-    // Create temporary parser.
-    swift::ParserUnit PU(SM, SourceFileKind::Main, bufferID, LangOpts,
-                         "unknown");
-
-    ForwardingDiagnosticConsumer PDC(Context.Diags);
-    PU.getDiagnosticEngine().addConsumer(PDC);
-
-    // Parse the argument.
-    AvailabilityMacroDefinition ParsedMacro;
-    ParserStatus Status =
-      PU.getParser().parseAvailabilityMacroDefinition(ParsedMacro);
-    if (Status.isError())
-      continue;
-
-    // Copy the Specs to the requesting ASTContext from the temporary context
-    // that parsed the argument.
-    auto SpecsCopy = SmallVector<AvailabilitySpec*, 4>();
-    for (auto *Spec : ParsedMacro.Specs)
-      if (auto *PlatformVersionSpec =
-          dyn_cast<PlatformVersionConstraintAvailabilitySpec>(Spec)) {
-        auto SpecCopy =
-          new (Context) PlatformVersionConstraintAvailabilitySpec(
-                                                         *PlatformVersionSpec);
-        SpecsCopy.push_back(SpecCopy);
-      }
-
-    ParsedMacro.Specs = SpecsCopy;
-
-    // Find the macro info by name.
-    AvailabilityMacroMap::VersionEntry MacroDefinition;
-    auto NameMatch = Map.Impl.find(ParsedMacro.Name);
-    if (NameMatch != Map.Impl.end()) {
-      MacroDefinition = NameMatch->getSecond();
-    }
-
-    // Set the macro info by version.
-    auto PreviousEntry =
-      MacroDefinition.insert({ParsedMacro.Version, ParsedMacro.Specs});
-    if (!PreviousEntry.second) {
-      diagnose(PU.getParser().PreviousLoc, diag::attr_availability_duplicate,
-               ParsedMacro.Name, ParsedMacro.Version.getAsString());
-    }
-
-    // Save back the macro spec.
-    Map.Impl.erase(ParsedMacro.Name);
-    Map.Impl.insert({ParsedMacro.Name, MacroDefinition});
-  }
-
-  Map.WasParsed = true;
-  return Map;
 }
 
 ParserStatus Parser::parsePlatformVersionInList(StringRef AttrName,

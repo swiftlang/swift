@@ -10,9 +10,10 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "swift/Basic/Assertions.h"
 #include "swift/Basic/BasicBridging.h"
+#include "swift/Basic/Assertions.h"
 #include "llvm/Support/Debug.h"
+#include "llvm/Support/VersionTuple.h"
 #include "llvm/Support/raw_ostream.h"
 
 #ifdef PURE_BRIDGING_MODE
@@ -93,4 +94,31 @@ BridgedCharSourceRangeVector::BridgedCharSourceRangeVector()
 void BridgedCharSourceRangeVector::push_back(BridgedCharSourceRange range) {
   static_cast<std::vector<CharSourceRange> *>(vector)->push_back(
       range.unbridged());
+}
+
+//===----------------------------------------------------------------------===//
+// MARK: BridgedVersionTuple
+//===----------------------------------------------------------------------===//
+
+BridgedVersionTuple::BridgedVersionTuple(llvm::VersionTuple version) {
+  if (version.getBuild())
+    *this = BridgedVersionTuple(version.getMajor(), *version.getMinor(),
+                                *version.getSubminor(), *version.getBuild());
+  else if (version.getSubminor())
+    *this = BridgedVersionTuple(version.getMajor(), *version.getMinor(),
+                                *version.getSubminor());
+  else if (version.getMinor())
+    *this = BridgedVersionTuple(version.getMajor(), *version.getMinor());
+  else
+    *this = BridgedVersionTuple(version.getMajor());
+}
+
+llvm::VersionTuple BridgedVersionTuple::unbridged() const {
+  if (HasBuild)
+    return llvm::VersionTuple(Major, Minor, Subminor, Build);
+  if (HasSubminor)
+    return llvm::VersionTuple(Major, Minor, Subminor);
+  if (HasMinor)
+    return llvm::VersionTuple(Major, Minor);
+  return llvm::VersionTuple(Major);
 }

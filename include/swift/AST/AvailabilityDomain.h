@@ -112,12 +112,6 @@ private:
 
   AvailabilityDomain(Storage storage) : storage(storage) {};
 
-  static AvailabilityDomain fromOpaque(void *opaque) {
-    return AvailabilityDomain(Storage::getFromOpaqueValue(opaque));
-  }
-
-  void *getOpaqueValue() const { return storage.getOpaqueValue(); }
-
   std::optional<InlineDomain> getInlineDomain() const {
     return storage.is<InlineDomainPtr>()
                ? static_cast<std::optional<InlineDomain>>(
@@ -160,6 +154,12 @@ public:
   /// Returns the built-in availability domain identified by the given string.
   static std::optional<AvailabilityDomain>
   builtinDomainForString(StringRef string, const DeclContext *declContext);
+
+  static AvailabilityDomain fromOpaque(void *opaque) {
+    return AvailabilityDomain(Storage::getFromOpaqueValue(opaque));
+  }
+
+  void *getOpaqueValue() const { return storage.getOpaqueValue(); }
 
   Kind getKind() const {
     if (auto inlineDomain = getInlineDomain())

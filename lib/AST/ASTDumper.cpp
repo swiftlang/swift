@@ -4885,8 +4885,12 @@ public:
   void visitAvailableAttr(AvailableAttr *Attr, Label label) {
     printCommon(Attr, "available_attr", label);
 
-    if (auto domain = Attr->getCachedDomain())
-      printField(domain->getNameForAttributePrinting(), Label::always("platform"));
+    if (auto domain = Attr->getCachedDomain()) {
+      printField(domain->getNameForAttributePrinting(),
+                 Label::always("domain"));
+    } else {
+      printField(*Attr->getDomainString(), Label::always("domainString"));
+    }
 
     switch (Attr->getKind()) {
     case swift::AvailableAttr::Kind::Default:

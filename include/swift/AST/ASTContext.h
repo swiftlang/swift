@@ -996,11 +996,8 @@ public:
     return getMultiPayloadEnumTagSinglePayloadAvailability();
   }
 
-  /// Cache of the availability macros parsed from the command line arguments.
-  ///
-  /// This is an implementation detail, access via
-  /// \c Parser::parseAllAvailabilityMacroArguments.
-  AvailabilityMacroMap &getAvailabilityMacroCache() const;
+  /// Availability macros parsed from the command line arguments.
+  const AvailabilityMacroMap &getAvailabilityMacroMap() const;
 
   /// Test support utility for loading a platform remap file
   /// in case an SDK is not specified to the compilation.
