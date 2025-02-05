@@ -1120,7 +1120,7 @@ private:
   }
 
   llvm::DICompositeType *
-  createStructType(DebugTypeInfo DbgTy, NominalTypeDecl *Decl, Type BaseTy,
+  createStructType(DebugTypeInfo DbgTy, NominalTypeDecl *Decl,
                    llvm::DIScope *Scope, llvm::DIFile *File, unsigned Line,
                    unsigned SizeInBits, unsigned AlignInBits,
                    llvm::DINode::DIFlags Flags, llvm::DIType *DerivedFrom,
@@ -1133,7 +1133,7 @@ private:
     SmallVector<llvm::Metadata *, 16> Elements;
     unsigned OffsetInBits = 0;
     for (VarDecl *VD : Decl->getStoredProperties()) {
-      auto memberTy = BaseTy->getTypeOfMember(VD);
+      auto memberTy = DbgTy.getType()->getTypeOfMember(VD);
 
       if (auto DbgTy = CompletedDebugTypeInfo::getFromTypeInfo(
               VD->getInterfaceType(),
@@ -1876,7 +1876,7 @@ private:
           return createSpecializedStructOrClassType(
               StructTy, Scope, L.File, L.Line, SizeInBits, AlignInBits,
               Flags, MangledName);
-        return createStructType(DbgTy, Decl, StructTy, Scope, L.File, L.Line,
+        return createStructType(DbgTy, Decl, Scope, L.File, L.Line,
                                 SizeInBits, AlignInBits, Flags, nullptr,
                                 llvm::dwarf::DW_LANG_Swift, MangledName);
       }
@@ -1911,7 +1911,7 @@ private:
               Flags, MangledName);
 
         auto *DIType = createStructType(
-            DbgTy, Decl, ClassTy, Scope, File, L.Line, SizeInBits, AlignInBits,
+            DbgTy, Decl, Scope, File, L.Line, SizeInBits, AlignInBits,
             Flags, nullptr, llvm::dwarf::DW_LANG_Swift, MangledName);
         assert(DIType && "Unexpected null DIType!");
         assert(DIType && "createStructType should never return null!");
