@@ -959,9 +959,57 @@ extension TestExtensionOnOptionalSelf? {
 
     _ = { [weak self] in
       _ = { [self] in
-        foo()
+        foo() // expected-error {{call to method 'foo' in closure requires explicit use of 'self' to make capture semantics explicit}}
         self.foo()
         self?.bar()
+      }
+    }
+  }
+}
+
+// non-optional self in this extension, but on a type with members defined on optional self
+extension TestExtensionOnOptionalSelf {
+  func foo() {
+    _ = { [weak self] in
+      foo() // expected-error {{implicit use of 'self' in closure; use 'self.' to make capture semantics explicit}}
+      self.foo()
+      self?.bar()
+    }
+
+    _ = { // expected-note {{capture 'self' explicitly to enable implicit 'self' in this closure}}
+      foo() // expected-error {{call to method 'foo' in closure requires explicit use of 'self' to make capture semantics explicit}} expected-note {{reference 'self.' explicitly}}
+      self.foo()
+    }
+
+    _ = { [weak self] in
+      _ = {
+        foo()
+        self.foo()
+      }
+    }
+
+    _ = { [weak self] in
+      _ = { [self] in
+        foo() // expected-error {{call to method 'foo' in closure requires explicit use of 'self' to make capture semantics explicit}}
+        self.foo()
+      }
+    }
+
+    _ = { [weak self] in
+      _ = { [self] in
+        _ = { [self] in
+          foo() // expected-error {{call to method 'foo' in closure requires explicit use of 'self' to make capture semantics explicit}}
+          self.foo()
+        }
+      }
+    }
+
+    _ = { [weak self] in
+      doVoidStuffNonEscaping {
+        _ = { [self] in
+          foo() // expected-error {{call to method 'foo' in closure requires explicit use of 'self' to make capture semantics explicit}}
+          self.foo()
+        }
       }
     }
   }

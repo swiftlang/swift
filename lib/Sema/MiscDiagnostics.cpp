@@ -1681,12 +1681,21 @@ static void diagRecursivePropertyAccess(const Expr *E, const DeclContext *DC) {
 }
 
 /// The `weak self` capture of this closure if present
-static VarDecl *weakSelfCapture(const AbstractClosureExpr *ACE) {
+static VarDecl *selfCapture(const AbstractClosureExpr *ACE) {
   if (auto closureExpr = dyn_cast<ClosureExpr>(ACE)) {
     if (auto selfDecl = closureExpr->getCapturedSelfDecl()) {
-      if (selfDecl->getInterfaceType()->is<WeakStorageType>()) {
-        return selfDecl;
-      }
+      return selfDecl;
+    }
+  }
+
+  return nullptr;
+}
+
+/// The `weak self` capture of this closure if present
+static VarDecl *weakSelfCapture(const AbstractClosureExpr *ACE) {
+  if (auto selfDecl = selfCapture(ACE)) {
+    if (selfDecl->getInterfaceType()->is<WeakStorageType>()) {
+      return selfDecl;
     }
   }
 
@@ -2032,6 +2041,25 @@ public:
         }
 
         return nullptr;
+      }
+
+      // If this closure has a non-weak capture, the parent closure
+      // has a weak capture, the implicit self decl refers directly
+      // to this closure's self capture, and that capture directly
+      // refers to the parent closure's weak self capture, then
+      // this is invalid.
+      //  - Normally this is rejected by the type checker because
+      //    self is optional here, but that doesn't happen when calling
+      //    a method defined on `Optional<Self>`.
+      if (!closureHasWeakSelfCapture(inClosure)) {
+        if (auto closureSelfCapture = selfCapture(inClosure)) {
+          if (auto parentWeakSelfCapture = weakSelfCapture(outerClosure)) {
+            if (selfDecl == closureSelfCapture &&
+                parentWeakSelfCapture == outerSelfDecl) {
+              return outerClosure;
+            }
+          }
+        }
       }
 
       // Check if this closure contains the self decl.
