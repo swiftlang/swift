@@ -225,7 +225,6 @@ public:
   typedef llvm::DenseMap<llvm::VersionTuple,
                          SmallVector<AvailabilitySpec *, 4>> VersionEntry;
 
-  bool WasParsed = false;
   llvm::DenseMap<StringRef, VersionEntry> Impl;
 };
 
