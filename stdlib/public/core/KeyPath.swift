@@ -360,11 +360,7 @@ public class KeyPath<Root, Value>: PartialKeyPath<Root> {
         )
       }
 
-      let bufferPtr = buffer.data.baseAddress._unsafelyUnwrappedUnchecked
-      let endOfBuffer = MemoryLayout<Int>._roundingUpToAlignment(
-        bufferPtr + buffer.data.count
-      )
-      let maxSize = endOfBuffer.load(as: Int.self)
+      let maxSize = buffer.maxSize
       let roundedMaxSize = 1 &<< (Int.bitWidth &- maxSize.leadingZeroBitCount)
 
       // 16 is the max alignment allowed on practically every platform we deploy
@@ -542,11 +538,7 @@ public class ReferenceWritableKeyPath<
 
       // Project out the reference prefix.
 
-      let bufferPtr = buffer.data.baseAddress._unsafelyUnwrappedUnchecked
-      let endOfBuffer = MemoryLayout<Int>._roundingUpToAlignment(
-        bufferPtr + buffer.data.count
-      )
-      let maxSize = endOfBuffer.load(as: Int.self)
+      let maxSize = buffer.maxSize
       let roundedMaxSize = 1 &<< (Int.bitWidth &- maxSize.leadingZeroBitCount)
 
       // 16 is the max alignment allowed on practically every platform we deploy
@@ -2043,6 +2035,15 @@ internal struct KeyPathBuffer {
     return UnsafeMutableRawBufferPointer(mutating: data)
   }
 
+  internal var maxSize: Int {
+    let bufferPtr = data.baseAddress._unsafelyUnwrappedUnchecked
+    let endOfBuffer = MemoryLayout<Int>._roundingUpToAlignment(
+      bufferPtr + data.count
+    )
+
+    return endOfBuffer.load(as: Int.self)
+  }
+
   internal struct Builder {
     internal var buffer: UnsafeMutableRawBufferPointer
     internal init(_ buffer: UnsafeMutableRawBufferPointer) {
@@ -2695,11 +2696,7 @@ internal func _appendingKeyPaths<
         
         let leafHasReferencePrefix = leafBuffer.hasReferencePrefix
 
-        let rootBufferPtr = rootBuffer.data.baseAddress._unsafelyUnwrappedUnchecked
-        let rootEndOfBuffer = MemoryLayout<Int>._roundingUpToAlignment(
-          rootBufferPtr + rootBuffer.data.count
-        )
-        let rootMaxSize = rootEndOfBuffer.load(as: Int.self)
+        let rootMaxSize = rootBuffer.maxSize
 
         // Clone the root components into the buffer.
         while true {
@@ -2728,11 +2725,7 @@ internal func _appendingKeyPaths<
           }
         }
 
-        let leafBufferPtr = leafBuffer.data.baseAddress._unsafelyUnwrappedUnchecked
-        let leafEndOfBuffer = MemoryLayout<Int>._roundingUpToAlignment(
-          leafBufferPtr + leafBuffer.data.count
-        )
-        let leafMaxSize = leafEndOfBuffer.load(as: Int.self)
+        let leafMaxSize = leafBuffer.maxSize
 
         // Clone the leaf components into the buffer.
         while true {
@@ -4283,9 +4276,18 @@ public func _rerootKeyPath<NewRoot>(
 
   let newKpTy = _openExistential(existingKpTy.rootType, do: openedRoot(_:))
 
+  // Buffer header + padding (if needed)
+  var capacity = MemoryLayout<Int>.size
+
+  // Size of components
+  capacity += componentSize
+
+  // Max size at the end of the buffer
+  capacity = MemoryLayout<Int>._roundingUpToAlignment(capacity)
+  capacity += MemoryLayout<Int>.size
+
   return newKpTy._create(
-    // This is the buffer header + padding (if needed) + size of components
-    capacityInBytes: MemoryLayout<Int>.size + componentSize
+    capacityInBytes: capacity
   ) {
     var builder = KeyPathBuffer.Builder($0)
     let header = KeyPathBuffer.Header(
@@ -4312,6 +4314,10 @@ public func _rerootKeyPath<NewRoot>(
           break
         }
       }
+
+      // Append the max size at the end of the existing keypath's buffer to the
+      // end of the new keypath's buffer.
+      builder.push(existingBuffer.maxSize)
     }
   } as! PartialKeyPath<NewRoot>
 }
