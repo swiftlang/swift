@@ -1,3 +1,5 @@
+// REQUIRES: rdar144229403
+
 // RUN: %target-typecheck-verify-swift
 // RUN: %target-swift-frontend -emit-sil -DMAKE_CORRECT %s -o - | %FileCheck %s
 
