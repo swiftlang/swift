@@ -5688,6 +5688,11 @@ static void diagnoseUnintendedOptionalBehavior(const Expr *E,
           .fixItInsertAfter(arg->getEndLoc(), ")");
 
       if (kind == UnintendedInterpolationKind::Optional) {
+        // Suggest using a default interpolation value parameter.
+        Ctx.Diags.diagnose(arg->getLoc(), diag::default_optional_parameter)
+          .highlight(arg->getSourceRange())
+          .fixItInsertAfter(arg->getEndLoc(), ", default: <#default value#>");
+
         // Suggest inserting a default value.
         Ctx.Diags.diagnose(arg->getLoc(), diag::default_optional_to_any)
           .highlight(arg->getSourceRange())
