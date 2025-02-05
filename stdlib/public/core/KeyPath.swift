@@ -352,12 +352,15 @@ public class KeyPath<Root, Value>: PartialKeyPath<Root> {
         var isBreak = false
         let (rawComponent, _) = buffer.next()
 
-        return rawComponent._projectReadOnly(
-          root,
-          to: Value.self,
-          endingWith: Value.self,
-          &isBreak
-        )
+        return Builtin.emplace {
+          rawComponent._projectReadOnly(
+            root,
+            to: Value.self,
+            endingWith: Value.self,
+            &isBreak,
+            pointer: UnsafeMutablePointer<Value>($0)
+          )
+        }
       }
 
       let maxSize = buffer.maxSize
@@ -385,35 +388,26 @@ public class KeyPath<Root, Value>: PartialKeyPath<Root> {
 
           func projectCurrent<Current>(_: Current.Type) {
             func projectNew<New>(_: New.Type) {
-              let newBase = currentValueBuffer.withMemoryRebound(
+              let base = currentValueBuffer.withMemoryRebound(
                 to: Current.self
               ) {
-                return rawComponent._projectReadOnly(
-                  $0.moveElement(from: 0),
+                $0.moveElement(from: 0)
+              }
+
+              currentValueBuffer.withMemoryRebound(to: New.self) {
+                rawComponent._projectReadOnly(
+                  base,
                   to: New.self,
                   endingWith: Value.self,
-                  &isBreak
+                  &isBreak,
+                  pointer: $0.baseAddress._unsafelyUnwrappedUnchecked
                 )
               }
 
               // If we've broken from the projection, it means we found nil
               // while optional chaining.
               guard _fastPath(!isBreak) else {
-                var value: Value = Builtin.zeroInitializer()
-
-                // Optional.none has a tag of 1
-                let tag: UInt32 = 1
-                Builtin.injectEnumTag(&value, tag._value)
-
-                currentValueBuffer.withMemoryRebound(to: Value.self) {
-                  $0.initializeElement(at: 0, to: value)
-                }
-
                 return
-              }
-
-              currentValueBuffer.withMemoryRebound(to: New.self) {
-                $0.initializeElement(at: 0, to: newBase)
               }
 
               currentType = newType
@@ -564,23 +558,24 @@ public class ReferenceWritableKeyPath<
             func projectCurrent<Current>(_: Current.Type) {
               var isBreak = false
 
-              let newBase = currentValueBuffer.withMemoryRebound(
+              let base = currentValueBuffer.withMemoryRebound(
                 to: Current.self
               ) {
-                return rawComponent._projectReadOnly(
-                  $0.moveElement(from: 0),
+                $0.moveElement(from: 0)
+              }
+
+              currentValueBuffer.withMemoryRebound(to: New.self) {
+                rawComponent._projectReadOnly(
+                  base,
                   to: New.self,
                   endingWith: Value.self,
-                  &isBreak
+                  &isBreak,
+                  pointer: $0.baseAddress._unsafelyUnwrappedUnchecked
                 )
               }
 
               guard _fastPath(!isBreak) else {
                 _preconditionFailure("should not have stopped key path projection")
-              }
-
-              currentValueBuffer.withMemoryRebound(to: New.self) {
-                $0.initializeElement(at: 0, to: newBase)
               }
 
               currentType = nextType
@@ -1781,40 +1776,22 @@ internal struct RawKeyPathComponent {
       count: buffer.count - componentSize)
   }
 
-  internal enum ProjectionResult<NewValue, LeafValue> {
-    /// Continue projecting the key path with the given new value.
-    case `continue`(NewValue)
-    /// Stop projecting the key path and use the given value as the final
-    /// result of the projection.
-    case `break`(LeafValue)
-
-    internal var assumingContinue: NewValue {
-      switch self {
-      case .continue(let x):
-        return x
-      case .break:
-        _internalInvariantFailure("should not have stopped key path projection")
-      }
-    }
-  }
-
   internal func _projectReadOnly<CurValue, NewValue, LeafValue>(
     _ base: CurValue,
     to: NewValue.Type,
     endingWith: LeafValue.Type,
-    _ isBreak: inout Bool
-  ) -> NewValue {
+    _ isBreak: inout Bool,
+    pointer: UnsafeMutablePointer<NewValue>
+  ) {
     switch value {
     case .struct(let offset):
-      let newValue = _withUnprotectedUnsafeBytes(of: base) {
+      _withUnprotectedUnsafeBytes(of: base) {
         let p = $0.baseAddress._unsafelyUnwrappedUnchecked + offset
 
         // The contents of the struct should be well-typed, so we can assume
         // typed memory here.
-        return p.assumingMemoryBound(to: NewValue.self).pointee
+        pointer.initialize(to: p.assumingMemoryBound(to: NewValue.self).pointee)
       }
-
-      return newValue
 
     case .class(let offset):
       _internalInvariant(CurValue.self is AnyObject.Type,
@@ -1830,20 +1807,23 @@ internal struct RawKeyPathComponent {
       // 'modify' access.
       Builtin.performInstantaneousReadAccess(offsetAddress._rawValue,
         NewValue.self)
-      return offsetAddress.assumingMemoryBound(to: NewValue.self).pointee
+
+      pointer.initialize(
+        to: offsetAddress.assumingMemoryBound(to: NewValue.self).pointee
+      )
 
     case .get(id: _, accessors: let accessors, argument: let argument),
          .mutatingGetSet(id: _, accessors: let accessors, argument: let argument),
          .nonmutatingGetSet(id: _, accessors: let accessors, argument: let argument):
       let getter: ComputedAccessorsPtr.Getter<CurValue, NewValue> = accessors.getter()
 
-      let newValue = getter(
-        base,
-        argument?.data.baseAddress ?? accessors._value,
-        argument?.data.count ?? 0
+      pointer.initialize(
+        to: getter(
+          base,
+          argument?.data.baseAddress ?? accessors._value,
+          argument?.data.count ?? 0
+        )
       )
-
-      return newValue
 
     case .optionalChain:
       _internalInvariant(CurValue.self == Optional<NewValue>.self,
@@ -1857,17 +1837,21 @@ internal struct RawKeyPathComponent {
       if _fastPath(tag == 0) {
         // Optional "shares" a layout with its Wrapped type meaning we can
         // reinterpret the base address as an address to its Wrapped value.
-        return Builtin.reinterpretCast(base)
+        pointer.initialize(to: Builtin.reinterpretCast(base))
+        return
       }
 
       // We found nil.
       isBreak = true
 
-      // Return some zeroed out value for NewValue if we break. The caller will
-      // handle returning nil. We do this to prevent allocating metadata in this
-      // function because returning something like 'NewValue?' would need to
-      // allocate the optional metadata for 'NewValue'.
-      return Builtin.zeroInitializer()
+      // Initialize the leaf optional value by simply injecting the tag (which
+      // we've found to be 1) directly.
+      pointer.withMemoryRebound(to: LeafValue.self, capacity: 1) {
+        Builtin.injectEnumTag(
+          &$0.pointee,
+          tag._value
+        )
+      }
 
     case .optionalForce:
       _internalInvariant(CurValue.self == Optional<NewValue>.self,
@@ -1879,7 +1863,8 @@ internal struct RawKeyPathComponent {
       if _fastPath(tag == 0) {
         // Optional "shares" a layout with its Wrapped type meaning we can
         // reinterpret the base address as an address to its Wrapped value.
-        return Builtin.reinterpretCast(base)
+        pointer.initialize(to: Builtin.reinterpretCast(base))
+        return
       }
 
       _preconditionFailure("unwrapped nil optional")
@@ -1893,7 +1878,7 @@ internal struct RawKeyPathComponent {
       let tag: UInt32 = 0
       Builtin.injectEnumTag(&new, tag._value)
 
-      return new
+      pointer.initialize(to: new)
     }
   }
 
@@ -2657,12 +2642,19 @@ internal func _appendingKeyPaths<
       // header, plus space for the middle type.
       // Align up the root so that we can put the component type after it.
       let rootSize = MemoryLayout<Int>._roundingUpToAlignment(rootBuffer.data.count)
-      var resultSize = rootSize + leafBuffer.data.count
-        + 2 * MemoryLayout<Int>.size
+      var resultSize = rootSize + // Root component size
+                       leafBuffer.data.count + // Leaf component size
+                       MemoryLayout<Int>.size // Middle type
+
+      // Size of just our components is equal to root + leaf + middle
       let componentSize = resultSize
-      // The first tail allocated member is the maxSize of the keypath.
+
+      resultSize += MemoryLayout<Int>.size // Header size (padding if needed)
+
+      // The first member after the components is the maxSize of the keypath.
       resultSize = MemoryLayout<Int>._roundingUpToAlignment(resultSize)
       resultSize += MemoryLayout<Int>.size
+
       // Immediately following is the tail-allocated space for the KVC string.
       let totalResultSize = MemoryLayout<Int32>
         ._roundingUpToAlignment(resultSize + appendedKVCLength)
@@ -2686,12 +2678,14 @@ internal func _appendingKeyPaths<
         // Save space for the header.
         let leafIsReferenceWritable = type(of: leaf).kind == .reference
         destBuilder.pushHeader(KeyPathBuffer.Header(
-          size: componentSize - MemoryLayout<Int>.size,
+          size: componentSize,
           trivial: rootBuffer.trivial && leafBuffer.trivial,
           hasReferencePrefix: rootBuffer.hasReferencePrefix
                               || leafIsReferenceWritable,
-          isSingleComponent: rootBuffer.isSingleComponent !=
-                             leafBuffer.isSingleComponent
+
+          // We've already checked if either is an identity, so both have at
+          // least 1 component.
+          isSingleComponent: false
         ))
         
         let leafHasReferencePrefix = leafBuffer.hasReferencePrefix
