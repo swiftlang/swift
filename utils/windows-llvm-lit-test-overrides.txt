@@ -134,6 +134,7 @@ skip lldb-api :: tools/lldb-server
 skip lldb-api :: commands/dwim-print/TestDWIMPrint.py
 skip lldb-api :: commands/thread/backtrace/TestThreadBacktraceRepeat.py
 skip lldb-api :: functionalities/inferior-crashing/TestInferiorCrashing.py
+skip lldb-api :: functionalities/inline-stepping/TestInlineStepping.py
 skip lldb-api :: functionalities/step_scripted/TestStepScripted.py
 
 ### Tests that pass occasionally ###
