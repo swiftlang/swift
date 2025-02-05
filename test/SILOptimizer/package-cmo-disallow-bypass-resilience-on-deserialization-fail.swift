@@ -20,6 +20,18 @@
 // RUN: -I %t/artifacts/ObjcBuilds -L %t/artifacts/ObjcBuilds \
 // RUN: -lObjCAPI -Xcc -DINCLUDE_FOO
 
+/// Build a swift module that depends on the above Core swift module without `INCLUDE_FOO`;
+/// it should fail and diagnose that there was a deserialization failure.
+// RUN: not %target-build-swift-dylib(%t/artifacts/SwiftBuilds/%target-library-name(MyUIA)) %t/src/UIA.swift \
+// RUN: -module-name MyUIA -emit-module -package-name pkg \
+// RUN: -enable-library-evolution -O -wmo \
+// RUN: -Xfrontend -experimental-package-cmo-abort-on-deserialization-fail \
+// RUN: -I %t/artifacts/SwiftBuilds -L %t/artifacts/SwiftBuilds \
+// RUN: -I %t/artifacts/ObjcBuilds -L %t/artifacts/ObjcBuilds \
+// RUN: -lMyCore -lObjCAPI -Rmodule-loading 2>&1 | tee %t/MyUIA-build.txt 
+// RUN: %FileCheck %s --check-prefix=CHECK-ERROR < %t/MyUIA-build.txt
+// CHECK-ERROR: error: cannot bypass resilience due to member deserialization failure while attempting to access missing member of 'PkgStructA' in module 'MyCore' from module 'MyUIA'
+
 /// Build another swift module that depends on Core; since FooObjc is not referenced
 /// in the call chain, there's no deserialization failure, and bypassing resilience is allowed.
 // RUN: %target-build-swift-dylib(%t/artifacts/SwiftBuilds/%target-library-name(MyUIB)) %t/src/UIB.swift \
@@ -35,10 +47,12 @@
 
 //--- UIA.swift
 package import MyCore
-package import ObjCAPI
+import ObjCAPI
 
 package func testWrapperA(_ arg: WrapperA) {
-  print(arg.varA, arg.varAdict, arg.varAarray)
+  if let x = arg.varA, let y = arg.varAdict, let z = arg.varAarray {
+      print(x, y, z)
+  }
 }
 
 package func testKlass(_ arg: Klass) {
@@ -47,11 +61,12 @@ package func testKlass(_ arg: Klass) {
 
 //--- UIB.swift
 public import MyCore
-public import ObjCAPI
+import ObjCAPI
 
 package func testWrapperB(_ arg: WrapperB) {
-  let v = arg.varB
-  print(v)
+  if let v = arg.varB {
+    print(v)
+  }
 }
 
 package func testKlass(_ arg: Klass) {

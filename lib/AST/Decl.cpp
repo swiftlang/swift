@@ -4811,20 +4811,10 @@ bool ValueDecl::bypassResilienceInPackage(ModuleDecl *accessingModule) const {
   if (declModule->isResilient() &&
       declModule->allowNonResilientAccess() &&
       declModule->serializePackageEnabled()) {
-    // Fail and diagnose if there is a member deserialization error,
-    // with an option to skip for temporary/migration purposes.
-    if (!getASTContext().LangOpts.SkipDeserializationChecksForPackageCMO) {
-      // Since we're checking for deserialization errors, make sure the
-      // accessing module is different from this decl's module.
-      if (accessingModule &&
-          accessingModule != declModule) {
-        if (auto IDC = dyn_cast<IterableDeclContext>(this)) {
-          // Recursively check if members and their members have failing
-          // deserialization, and emit a diagnostic.
-          // FIXME: It throws a warning for now; need to upgrade to an error.
-          IDC->checkDeserializeMemberErrorInPackage(accessingModule);
-        }
-      }
+    if (auto IDC = dyn_cast<IterableDeclContext>(this)) {
+      // Recursively check if this decl's members and their members have
+      // been deserialized correctly, and emit a diagnostic if not.
+      IDC->checkDeserializeMemberErrorInPackage(accessingModule);
     }
     return true;
   }
