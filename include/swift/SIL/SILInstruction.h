@@ -8895,7 +8895,9 @@ class CopyValueInst
   friend class SILBuilder;
 
   CopyValueInst(SILDebugLocation DebugLoc, SILValue operand)
-      : UnaryInstructionBase(DebugLoc, operand, operand->getType()) {}
+      : UnaryInstructionBase(DebugLoc, operand, operand->getType()) {
+    assert(operand->getType().isObject());
+  }
 };
 
 class ExplicitCopyValueInst
