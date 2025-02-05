@@ -975,6 +975,8 @@ bb0(%0 : @owned $Wrapper, %1 : $*Klass):
   %2 = begin_borrow %0 : $Wrapper
   %3 = struct_extract %2 : $Wrapper, #Wrapper.c
   %4 = mark_dependence [nonescaping] %1 : $*Klass on %3 : $Klass
-  end_borrow %2 : $Wrapper
+  unreachable
+}
+
   unreachable
 }
