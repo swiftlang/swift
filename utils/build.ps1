@@ -3179,7 +3179,8 @@ if (-not $SkipBuild) {
     # FIXME: We need a separate step Test-Runtime, so -SkipBuild won't skip it.
     # However, this will require a reconfiguration of the binary cache which
     # might cause more trouble. Let's get it to wrok like this first.
-    if ($Test -contains "android" -and $Arch -eq $AndroidX64) {
+    #if ($Test -contains "android" -and $Arch -eq $AndroidX64) {
+    if ($Arch -eq $AndroidX64) {
       Invoke-BuildStep Build-Runtime Android $Arch -Test
     } else {
       Invoke-BuildStep Build-Runtime Android $Arch
