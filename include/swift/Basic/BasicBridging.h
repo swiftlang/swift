@@ -164,13 +164,13 @@ public:
 
 SWIFT_NAME("getter:BridgedArrayRef.data(self:)")
 BRIDGED_INLINE
-const void *_Nullable BridgedArrayRef_data(const BridgedArrayRef arr);
+const void *_Nullable BridgedArrayRef_data(BridgedArrayRef arr);
 
 SWIFT_NAME("getter:BridgedArrayRef.count(self:)")
-BRIDGED_INLINE SwiftInt BridgedArrayRef_count(const BridgedArrayRef arr);
+BRIDGED_INLINE SwiftInt BridgedArrayRef_count(BridgedArrayRef arr);
 
 SWIFT_NAME("getter:BridgedArrayRef.isEmpty(self:)")
-BRIDGED_INLINE bool BridgedArrayRef_isEmpty(const BridgedArrayRef arr);
+BRIDGED_INLINE bool BridgedArrayRef_isEmpty(BridgedArrayRef arr);
 
 //===----------------------------------------------------------------------===//
 // MARK: Data
