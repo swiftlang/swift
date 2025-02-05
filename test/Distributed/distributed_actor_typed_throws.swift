@@ -1,7 +1,5 @@
-// REQUIRES: rdar144229403
-
-// RUN: %target-typecheck-verify-swift
-// RUN: %target-swift-frontend -emit-sil -DMAKE_CORRECT %s -o - | %FileCheck %s
+// RUN: %target-swift-frontend -typecheck -verify -target %target-swift-5.7-abi-triple %s
+// RUN: %target-swift-frontend -emit-sil -target %target-swift-5.7-abi-triple -DMAKE_CORRECT %s -o - | %FileCheck %s
 
 // UNSUPPORTED: back_deploy_concurrency
 // REQUIRES: concurrency
