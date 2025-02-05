@@ -1918,7 +1918,7 @@ void PotentialBindings::infer(ConstraintSystem &CS,
     return;
 
   // Record the change, if there are active scopes.
-  if (CS.solverState && !CS.solverState->Trail.isUndoActive())
+  if (CS.solverState)
     CS.recordChange(SolverTrail::Change::InferredBindings(TypeVar, constraint));
 
   switch (constraint->getKind()) {
