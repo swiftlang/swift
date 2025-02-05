@@ -188,6 +188,15 @@ private extension InstructionRange {
     }
     defer { visitor.deinitialize() }
 
+    // This is important to visit begin_borrows which don't have an end_borrow in dead-end blocks.
+    // TODO: we can remove this once we have complete lifetimes.
+    visitor.innerScopeHandler = {
+      if let inst = $0.definingInstruction {
+        liverange.insert(inst)
+      }
+      return .continueWalk
+    }
+
     _ = visitor.visitUses()
     self = liverange
   }
