@@ -3,9 +3,18 @@
 // RUN: %empty-directory(%t/include)
 // RUN: split-file %s %t
 
+// Compile shim.swift in C mode, then re-compile it in C++ mode:
+//
 // RUN: %target-swift-emit-module-interface(%t/lib/shim.swiftinterface) %t/shim.swift -module-name shim -I %t/include
 // RUN: %FileCheck %t/shim.swift < %t/lib/shim.swiftinterface
+// RUN: %swift-frontend %t/program.swift -typecheck -verify -cxx-interoperability-mode=default -I %t/include -I %t/lib
 
+// Compile cxxshim.swift in C++ mode, check that its interface is still usable
+// (despite using a mix of C/C++ decls):
+//
+// RUN: %empty-directory(%t/lib)
+// RUN: %target-swift-emit-module-interface(%t/lib/shim.swiftinterface) -cxx-interoperability-mode=default -enable-experimental-feature -AssumeResilientCxxTypes %t/cxxshim.swift -module-name shim -I %t/include
+// RUN: %FileCheck %t/cxxshim.swift < %t/lib/shim.swiftinterface
 // RUN: %swift-frontend %t/program.swift -typecheck -verify -cxx-interoperability-mode=default -I %t/include -I %t/lib
 
 //--- include/module.modulemap
@@ -30,8 +39,19 @@ namespace c2cxx { typedef c2cxx_number number; }; // only available in C++
 import c2cxx
 public func shimId(_ n: c2cxx_number) -> c2cxx_number { return n }
 // CHECK: public func shimId(_ n: c2cxx.c2cxx_number) -> c2cxx.c2cxx_number
+//                                ^^^^^`- refers to the module
+
+//--- cxxshim.swift
+// Another shim around c2cxx that refers to a mixture of namespaced (C++) and
+// top-level (C) decls; requires cxx-interoperability-mode
+import c2cxx
+public func shimId(_ n: c2cxx.number) -> c2cxx_number { return n }
+//                      ^^^^^`- refers to the namespace
+// CHECK: public func shimId(_ n: c2cxx.c2cxx.number) -> c2cxx.c2cxx_number
+//                                ^^^^^\^^^^^`-namespace ^^^^^`-module
+//                                      `-module
 
 //--- program.swift
 // Uses the shim and causes it to be (re)built from its interface
 import shim
-func numberwang() -> Bool { return shimId(42) == 42 }
+func numberwang() { let _ = shimId(42) }
