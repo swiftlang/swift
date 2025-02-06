@@ -171,6 +171,5 @@ bool BridgedASTContext_canImport(BridgedASTContext cContext,
 
 BridgedAvailabilityMacroMap
 BridgedASTContext_getAvailabilityMacroMap(BridgedASTContext cContext) {
-  return const_cast<AvailabilityMacroMap *>(
-      &cContext.unbridged().getAvailabilityMacroMap());
+  return &cContext.unbridged().getAvailabilityMacroMap();
 }

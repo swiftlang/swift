@@ -100,34 +100,42 @@ typedef uintptr_t SwiftUInt;
 // and Swift could import the underlying pointee type instead. We need to be
 // careful that the interface we expose remains consistent regardless of
 // PURE_BRIDGING_MODE.
-#define BRIDGING_WRAPPER_IMPL(Node, Name, Nullability)                         \
+#define BRIDGING_WRAPPER_IMPL(Node, Name, Qualifier, Nullability)              \
   class Bridged##Name {                                                        \
-    Node * Nullability Ptr;                                                    \
+    Qualifier Node *Nullability Ptr;                                           \
                                                                                \
   public:                                                                      \
     SWIFT_UNAVAILABLE("Use init(raw:) instead")                                \
-    Bridged##Name(Node * Nullability ptr) : Ptr(ptr) {}                        \
+    Bridged##Name(Qualifier Node *Nullability ptr) : Ptr(ptr) {}               \
                                                                                \
     SWIFT_UNAVAILABLE("Use '.raw' instead")                                    \
-    Node * Nullability unbridged() const { return Ptr; }                       \
+    Qualifier Node *Nullability unbridged() const { return Ptr; }              \
   };                                                                           \
                                                                                \
   SWIFT_NAME("getter:Bridged" #Name ".raw(self:)")                             \
-  inline void * Nullability Bridged##Name##_getRaw(Bridged##Name bridged) {    \
+  inline Qualifier void *Nullability Bridged##Name##_getRaw(                   \
+      Bridged##Name bridged) {                                                 \
     return bridged.unbridged();                                                \
   }                                                                            \
                                                                                \
   SWIFT_NAME("Bridged" #Name ".init(raw:)")                                    \
-  inline Bridged##Name Bridged##Name##_fromRaw(void * Nullability ptr) {       \
-    return static_cast<Node *>(ptr);                                           \
+  inline Bridged##Name Bridged##Name##_fromRaw(                                \
+      Qualifier void *Nullability ptr) {                                       \
+    return static_cast<Qualifier Node *>(ptr);                                 \
   }
 
 // Bridging wrapper macros for convenience.
-#define BRIDGING_WRAPPER_NONNULL(Node, Name) \
-  BRIDGING_WRAPPER_IMPL(Node, Name, _Nonnull)
+#define BRIDGING_WRAPPER_NONNULL(Node, Name)                                   \
+  BRIDGING_WRAPPER_IMPL(Node, Name, /*unqualified*/, _Nonnull)
 
-#define BRIDGING_WRAPPER_NULLABLE(Node, Name) \
-  BRIDGING_WRAPPER_IMPL(Node, Nullable##Name, _Nullable)
+#define BRIDGING_WRAPPER_NULLABLE(Node, Name)                                  \
+  BRIDGING_WRAPPER_IMPL(Node, Nullable##Name, /*unqualified*/, _Nullable)
+
+#define BRIDGING_WRAPPER_CONST_NONNULL(Node, Name)                             \
+  BRIDGING_WRAPPER_IMPL(Node, Name, const, _Nonnull)
+
+#define BRIDGING_WRAPPER_CONST_NULLABLE(Node, Name)                            \
+  BRIDGING_WRAPPER_IMPL(Node, Nullable##Name, const, _Nullable)
 
 void assertFail(const char * _Nonnull msg, const char * _Nonnull file,
                 SwiftUInt line, const char * _Nonnull function);
