@@ -1266,6 +1266,9 @@ std::optional<std::vector<std::string>> ClangImporter::getClangCC1Arguments(
   }
   CI->getFrontendOpts().ModuleMapFiles = FilteredModuleMapFiles;
 
+  // Clear clang debug flags.
+  CI->getCodeGenOpts().DwarfDebugFlags.clear();
+
   return CI->getCC1CommandLine();
 }
 
