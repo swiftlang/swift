@@ -415,9 +415,11 @@ extension OwnershipUseVisitor {
     case .borrow:
       return visitBorrowingUse(of: operand)
 
-    // TODO: Eventually, visit owned InteriorPointers as implicit borrows.
-    case .interiorPointer, .trivialUse, .endBorrow, .reborrow,
-      .guaranteedForwarding:
+    case .anyInteriorPointer:
+      return visitInteriorPointerUse(of: operand)
+
+    // TODO: .interiorPointer should instead be handled like .anyInteriorPointer.
+    case .interiorPointer, .trivialUse, .endBorrow, .reborrow, .guaranteedForwarding:
       fatalError("ownership incompatible with an owned value");
     }
   }
@@ -449,7 +451,7 @@ extension OwnershipUseVisitor {
     case .borrow:
       return visitBorrowingUse(of: operand)
 
-    case .interiorPointer:
+    case .interiorPointer, .anyInteriorPointer:
       return visitInteriorPointerUse(of: operand)
 
     case .trivialUse, .forwardingConsume, .destroyingConsume:
