@@ -349,8 +349,7 @@ static bool computeContainedByDeploymentTarget(AvailabilityScope *scope,
 static bool isInsideCompatibleUnavailableDeclaration(
     const Decl *D, AvailabilityContext availabilityContext,
     const SemanticAvailableAttr &attr) {
-  auto contextDomain = availabilityContext.getUnavailableDomain();
-  if (!contextDomain)
+  if (!availabilityContext.isUnavailable())
     return false;
 
   if (!attr.isUnconditionallyUnavailable())
@@ -364,7 +363,7 @@ static bool isInsideCompatibleUnavailableDeclaration(
       return false;
   }
 
-  return contextDomain->contains(declDomain);
+  return availabilityContext.containsUnavailableDomain(declDomain);
 }
 
 std::optional<SemanticAvailableAttr>

@@ -5125,34 +5125,33 @@ void AttributeChecker::checkBackDeployedAttrs(
         D->getLoc(), D->getInnermostDeclContext());
 
     // Unavailable decls cannot be back deployed.
-    if (auto unavailableDomain = availability.getUnavailableDomain()) {
-      auto backDeployedDomain = AvailabilityDomain::forPlatform(Attr->Platform);
-      if (unavailableDomain->contains(backDeployedDomain)) {
-        auto platformString = prettyPlatformString(Attr->Platform);
-        llvm::VersionTuple ignoredVersion;
+    auto backDeployedDomain = AvailabilityDomain::forPlatform(Attr->Platform);
+    if (auto unavailableDomain =
+            availability.containsUnavailableDomain(backDeployedDomain)) {
+      auto platformString = prettyPlatformString(Attr->Platform);
+      llvm::VersionTuple ignoredVersion;
 
-        AvailabilityInference::updateBeforePlatformForFallback(
-            Attr, Ctx, platformString, ignoredVersion);
+      AvailabilityInference::updateBeforePlatformForFallback(
+          Attr, Ctx, platformString, ignoredVersion);
 
-        diagnose(AtLoc, diag::attr_has_no_effect_on_unavailable_decl, Attr, VD,
-                 platformString);
+      diagnose(AtLoc, diag::attr_has_no_effect_on_unavailable_decl, Attr, VD,
+               platformString);
 
-        // Find the attribute that makes the declaration unavailable.
-        const Decl *attrDecl = D;
-        do {
-          if (auto unavailableAttr = attrDecl->getUnavailableAttr()) {
-            diagnose(unavailableAttr->getParsedAttr()->AtLoc,
-                     diag::availability_marked_unavailable, VD)
-                .highlight(unavailableAttr->getParsedAttr()->getRange());
-            break;
-          }
+      // Find the attribute that makes the declaration unavailable.
+      const Decl *attrDecl = D;
+      do {
+        if (auto unavailableAttr = attrDecl->getUnavailableAttr()) {
+          diagnose(unavailableAttr->getParsedAttr()->AtLoc,
+                   diag::availability_marked_unavailable, VD)
+              .highlight(unavailableAttr->getParsedAttr()->getRange());
+          break;
+        }
 
-          attrDecl = AvailabilityInference::parentDeclForInferredAvailability(
-              attrDecl);
-        } while (attrDecl);
+        attrDecl =
+            AvailabilityInference::parentDeclForInferredAvailability(attrDecl);
+      } while (attrDecl);
 
-        continue;
-      }
+      continue;
     }
 
     // Verify that the decl is available before the back deployment boundary.
