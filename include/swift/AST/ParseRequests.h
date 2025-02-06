@@ -196,7 +196,7 @@ private:
 /// Parse the '-define-availability' arguments.
 class AvailabilityMacroArgumentsRequest
     : public SimpleRequest<AvailabilityMacroArgumentsRequest,
-                           AvailabilityMacroMap *(ASTContext *),
+                           const AvailabilityMacroMap *(ASTContext *),
                            RequestFlags::Cached> {
 public:
   using SimpleRequest::SimpleRequest;
@@ -205,7 +205,8 @@ private:
   friend SimpleRequest;
 
   // Evaluation.
-  AvailabilityMacroMap *evaluate(Evaluator &evaluator, ASTContext *ctx) const;
+  const AvailabilityMacroMap *evaluate(Evaluator &evaluator,
+                                       ASTContext *ctx) const;
 
 public:
   // Caching.
