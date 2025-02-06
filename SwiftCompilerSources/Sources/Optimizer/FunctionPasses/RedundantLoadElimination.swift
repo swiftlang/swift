@@ -63,21 +63,33 @@ import SIL
 ///
 let redundantLoadElimination = FunctionPass(name: "redundant-load-elimination") {
     (function: Function, context: FunctionPassContext) in
-  eliminateRedundantLoads(in: function, ignoreArrays: false, context)
+  _ = eliminateRedundantLoads(in: function, variant: .regular, context)
 }
 
 // Early RLE does not touch loads from Arrays. This is important because later array optimizations,
 // like ABCOpt, get confused if an array load in a loop is converted to a pattern with a phi argument.
 let earlyRedundantLoadElimination = FunctionPass(name: "early-redundant-load-elimination") {
     (function: Function, context: FunctionPassContext) in
-  eliminateRedundantLoads(in: function, ignoreArrays: true, context)
+  _ = eliminateRedundantLoads(in: function, variant: .early, context)
 }
 
-private func eliminateRedundantLoads(in function: Function, ignoreArrays: Bool, _ context: FunctionPassContext) {
+let mandatoryRedundantLoadElimination = FunctionPass(name: "mandatory-redundant-load-elimination") {
+    (function: Function, context: FunctionPassContext) in
+  _ = eliminateRedundantLoads(in: function, variant: .mandatory, context)
+}
 
+enum RedundantLoadEliminationVariant {
+  case mandatory, mandatoryInGlobalInit, early, regular
+}
+
+func eliminateRedundantLoads(in function: Function,
+                             variant: RedundantLoadEliminationVariant,
+                             _ context: FunctionPassContext) -> Bool
+{
   // Avoid quadratic complexity by limiting the number of visited instructions.
   // This limit is sufficient for most "real-world" functions, by far.
   var complexityBudget = 50_000
+  var changed = false
 
   for block in function.blocks.reversed() {
 
@@ -89,49 +101,75 @@ private func eliminateRedundantLoads(in function: Function, ignoreArrays: Bool, 
 
       if let load = inst as? LoadInst {
         if !context.continueWithNextSubpassRun(for: load) {
-          return
+          return changed
         }
-        if ignoreArrays,
-           let nominal = load.type.nominal,
-           nominal == context.swiftArrayDecl
-        {
-          continue
+        if complexityBudget < 20 {
+          complexityBudget = 20
         }
-        // Check if the type can be expanded without a significant increase to
-        // code size.
-        // We block redundant load elimination because it might increase
-        // register pressure for large values. Furthermore, this pass also
-        // splits values into its projections (e.g
-        // shrinkMemoryLifetimeAndSplit).
-        if !load.type.shouldExpand(context) {
-           continue
+        if !load.isEligibleForElimination(in: variant, context) {
+          continue;
         }
-        tryEliminate(load: load, complexityBudget: &complexityBudget, context)
+        changed = tryEliminate(load: load, complexityBudget: &complexityBudget, context) || changed
       }
     }
   }
+  return changed
 }
 
-private func tryEliminate(load: LoadInst, complexityBudget: inout Int, _ context: FunctionPassContext) {
+private func tryEliminate(load: LoadInst, complexityBudget: inout Int, _ context: FunctionPassContext) -> Bool {
   switch load.isRedundant(complexityBudget: &complexityBudget, context) {
   case .notRedundant:
-    break
+    return false
   case .redundant(let availableValues):
     replace(load: load, with: availableValues, context)
+    return true
   case .maybePartiallyRedundant(let subPath):
     // Check if the a partial load would really be redundant to avoid unnecessary splitting.
     switch load.isRedundant(at: subPath, complexityBudget: &complexityBudget, context) {
       case .notRedundant, .maybePartiallyRedundant:
-        break
+        return false
       case .redundant:
         // The new individual loads are inserted right before the current load and
         // will be optimized in the following loop iterations.
-        load.trySplit(context)
+        return load.trySplit(context)
     }
   }
 }
 
 private extension LoadInst {
+
+  func isEligibleForElimination(in variant: RedundantLoadEliminationVariant, _ context: FunctionPassContext) -> Bool {
+    switch variant {
+    case .mandatory, .mandatoryInGlobalInit:
+      if loadOwnership == .take {
+        // load [take] would require to shrinkMemoryLifetime. But we don't want to do this in the mandatory
+        // pipeline to not shrink or remove an alloc_stack which is relevant for debug info.
+        return false
+      }
+      switch address.accessBase {
+      case .box, .stack:
+        break
+      default:
+        return false
+      }
+    case .early:
+      // See the comment of `earlyRedundantLoadElimination`.
+      if let nominal = self.type.nominal, nominal == context.swiftArrayDecl {
+        return false
+      }
+    case .regular:
+      break
+    }
+    // Check if the type can be expanded without a significant increase to code size.
+    // We block redundant load elimination because it might increase register pressure for large values.
+    // Furthermore, this pass also splits values into its projections (e.g shrinkMemoryLifetimeAndSplit).
+    // But: it is required to remove loads, even of large structs, in global init functions to ensure
+    // that globals (containing large structs) can be statically initialized.
+    if variant != .mandatoryInGlobalInit, !self.type.shouldExpand(context) {
+       return false
+    }
+    return true
+  }
 
   enum DataflowResult {
     case notRedundant

@@ -252,6 +252,8 @@ PASS(ARCSequenceOpts, "arc-sequence-opts",
      "ARC Sequence Optimization")
 PASS(ARCLoopOpts, "arc-loop-opts",
      "ARC Loop Optimization")
+SWIFT_FUNCTION_PASS(MandatoryRedundantLoadElimination, "mandatory-redundant-load-elimination",
+     "Mandatory Redundant Load Elimination")
 SWIFT_FUNCTION_PASS(EarlyRedundantLoadElimination, "early-redundant-load-elimination",
      "Early Redundant Load Elimination")
 SWIFT_FUNCTION_PASS(RedundantLoadElimination, "redundant-load-elimination",
