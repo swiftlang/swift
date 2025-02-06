@@ -87,12 +87,17 @@ public:
   /// Constrain with another `AvailabilityContext`.
   void constrainWithContext(const AvailabilityContext &other, ASTContext &ctx);
 
-  /// Constrain with the availability attributes of `decl`.
-  void constrainWithDecl(const Decl *decl);
-
   /// Constrain the platform availability range with `platformRange`.
   void constrainWithPlatformRange(const AvailabilityRange &platformRange,
                                   ASTContext &ctx);
+
+  /// Constrain the context by adding \p domain to the set of unavailable
+  /// domains.
+  void constrainWithUnavailableDomain(AvailabilityDomain domain,
+                                      ASTContext &ctx);
+
+  /// Constrain with the availability attributes of `decl`.
+  void constrainWithDecl(const Decl *decl);
 
   /// Constrain with the availability attributes of `decl`, intersecting the
   /// platform range of `decl` with `platformRange`.

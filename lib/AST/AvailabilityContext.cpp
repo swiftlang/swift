@@ -155,10 +155,6 @@ void AvailabilityContext::constrainWithContext(const AvailabilityContext &other,
   storage = Storage::get(info, ctx);
 }
 
-void AvailabilityContext::constrainWithDecl(const Decl *decl) {
-  constrainWithDeclAndPlatformRange(decl, AvailabilityRange::alwaysAvailable());
-}
-
 void AvailabilityContext::constrainWithPlatformRange(
     const AvailabilityRange &platformRange, ASTContext &ctx) {
 
@@ -167,6 +163,19 @@ void AvailabilityContext::constrainWithPlatformRange(
     return;
 
   storage = Storage::get(info, ctx);
+}
+
+void AvailabilityContext::constrainWithUnavailableDomain(
+    AvailabilityDomain domain, ASTContext &ctx) {
+  Info info{storage->info};
+  if (!info.constrainUnavailability(domain))
+    return;
+
+  storage = Storage::get(info, ctx);
+}
+
+void AvailabilityContext::constrainWithDecl(const Decl *decl) {
+  constrainWithDeclAndPlatformRange(decl, AvailabilityRange::alwaysAvailable());
 }
 
 void AvailabilityContext::constrainWithDeclAndPlatformRange(
