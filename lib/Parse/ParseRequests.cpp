@@ -591,7 +591,7 @@ bool parseAvailabilityMacroDefinition(
 
 } // namespace
 
-AvailabilityMacroMap *
+const AvailabilityMacroMap *
 AvailabilityMacroArgumentsRequest::evaluate(Evaluator &evaluator,
                                             ASTContext *ctx) const {
   SourceManager &SM = ctx->SourceMgr;
