@@ -183,9 +183,9 @@ extension WordPair: Hashable {
   }
 }
 
-@available(SwiftStdlib 6.2, *)
+@available(SwiftStdlib 6.1, *)
 extension WordPair: Comparable {
-  @available(SwiftStdlib 6.2, *)
+  @available(SwiftStdlib 6.1, *)
   @_alwaysEmitIntoClient
   @_transparent
   public static func <(lhs: WordPair, rhs: WordPair) -> Bool {
