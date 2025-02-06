@@ -76,12 +76,17 @@ namespace swift {
 
 // Define the bridging wrappers for each AST node.
 #define AST_BRIDGING_WRAPPER(Name) BRIDGING_WRAPPER_NONNULL(swift::Name, Name)
+#define AST_BRIDGING_WRAPPER_CONST(Name)                                       \
+  BRIDGING_WRAPPER_CONST_NONNULL(swift::Name, Name)
 #include "swift/AST/ASTBridgingWrappers.def"
 
 // For nullable nodes, also define a nullable variant.
 #define AST_BRIDGING_WRAPPER_NULLABLE(Name)                                    \
   BRIDGING_WRAPPER_NULLABLE(swift::Name, Name)
+#define AST_BRIDGING_WRAPPER_CONST_NULLABLE(Name)                              \
+  BRIDGING_WRAPPER_CONST_NULLABLE(swift::Name, Name)
 #define AST_BRIDGING_WRAPPER_NONNULL(Name)
+#define AST_BRIDGING_WRAPPER_CONST_NONNULL(Name)
 #include "swift/AST/ASTBridgingWrappers.def"
 
 //===----------------------------------------------------------------------===//

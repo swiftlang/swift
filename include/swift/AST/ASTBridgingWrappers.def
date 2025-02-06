@@ -31,6 +31,25 @@
 #define AST_BRIDGING_WRAPPER_NONNULL(Name) AST_BRIDGING_WRAPPER(Name)
 #endif
 
+/// AST_BRIDGING_WRAPPER_CONST(Name)
+///   The default macro to define a const bridging wrapper type.
+#ifndef AST_BRIDGING_WRAPPER_CONST
+#define AST_BRIDGING_WRAPPER_CONST(Name) AST_BRIDGING_WRAPPER(Name)
+#endif
+
+/// AST_BRIDGING_WRAPPER_CONST_NULLABLE(Name)
+///   Specifies that both a nullable and non-null variant of the wrapper should
+///   be created.
+#ifndef AST_BRIDGING_WRAPPER_CONST_NULLABLE
+#define AST_BRIDGING_WRAPPER_CONST_NULLABLE(Name) AST_BRIDGING_WRAPPER_CONST(Name)
+#endif
+
+/// AST_BRIDGING_WRAPPER_CONST_NONNULL(Name)
+///   Specifies that only a non-null variant of the wrapper should be created.
+#ifndef AST_BRIDGING_WRAPPER_CONST_NONNULL
+#define AST_BRIDGING_WRAPPER_CONST_NONNULL(Name) AST_BRIDGING_WRAPPER_CONST(Name)
+#endif
+
 #ifndef DECL
 #define DECL(Id, Parent) AST_BRIDGING_WRAPPER_NULLABLE(Id##Decl)
 #endif
@@ -91,11 +110,14 @@ AST_BRIDGING_WRAPPER_NULLABLE(AvailabilitySpec)
 AST_BRIDGING_WRAPPER_NULLABLE(PlatformVersionConstraintAvailabilitySpec)
 AST_BRIDGING_WRAPPER_NULLABLE(PlatformAgnosticVersionConstraintAvailabilitySpec)
 AST_BRIDGING_WRAPPER_NULLABLE(OtherPlatformAvailabilitySpec)
-AST_BRIDGING_WRAPPER_NONNULL(AvailabilityMacroMap)
+AST_BRIDGING_WRAPPER_CONST_NONNULL(AvailabilityMacroMap)
 
 // Non-AST types to generate wrappers for.
 AST_BRIDGING_WRAPPER_NULLABLE(DiagnosticEngine)
 
 #undef AST_BRIDGING_WRAPPER_NONNULL
 #undef AST_BRIDGING_WRAPPER_NULLABLE
+#undef AST_BRIDGING_WRAPPER_CONST_NONNULL
+#undef AST_BRIDGING_WRAPPER_CONST_NULLABLE
+#undef AST_BRIDGING_WRAPPER_CONST
 #undef AST_BRIDGING_WRAPPER

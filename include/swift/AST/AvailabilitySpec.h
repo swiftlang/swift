@@ -254,7 +254,7 @@ public:
   }
 
   ArrayRef<AvailabilitySpec *> getEntry(StringRef name,
-                                        llvm::VersionTuple version) {
+                                        llvm::VersionTuple version) const {
     auto versions = Impl.find(name);
     if (versions == Impl.end()) {
       return {};
