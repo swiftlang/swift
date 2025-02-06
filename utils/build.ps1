@@ -2015,7 +2015,7 @@ function Build-Runtime([Platform]$Platform, $Arch, [switch]$Test = $false) {
     }
   }
   if ($Test) {
-    $Targets += @("check-swift-all-only_non_executable")
+    $Targets += @("check-swift-only_non_executable", "check-swift-validation-only_non_executable")
     $PlatformDefines += @{
       SWIFT_INCLUDE_TESTS = "YES";
       SWIFT_BUILD_TEST_SUPPORT_MODULES = "YES";
