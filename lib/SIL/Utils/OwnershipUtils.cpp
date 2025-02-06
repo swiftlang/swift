@@ -715,6 +715,7 @@ bool BorrowingOperand::visitScopeEndingUses(
   case BorrowingOperandKind::MarkDependenceNonEscaping: {
     auto *user = cast<MarkDependenceInst>(op->getUser());
     assert(user->isNonEscaping() && "escaping dependencies don't borrow");
+    assert(user->getType().isObject() && "borrows only exist for values");
     return user->visitNonEscapingLifetimeEnds(visitScopeEnd, visitUnknownUse);
   }
   case BorrowingOperandKind::BeginAsyncLet: {
