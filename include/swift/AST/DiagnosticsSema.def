@@ -4745,7 +4745,10 @@ NOTE(ambiguous_because_of_trailing_closure,none,
      (bool, const ValueDecl *))
 
 // In-package resilience bypassing
-WARNING(cannot_bypass_resilience_due_to_missing_member,none,
+WARNING(cannot_bypass_resilience_due_to_missing_member_warn,none,
+      "cannot bypass resilience due to member deserialization failure while attempting to access %select{member %0|missing member}1 of %2 in module %3 from module %4",
+      (Identifier, bool, Identifier, Identifier, Identifier))
+ERROR(cannot_bypass_resilience_due_to_missing_member,none,
       "cannot bypass resilience due to member deserialization failure while attempting to access %select{member %0|missing member}1 of %2 in module %3 from module %4",
       (Identifier, bool, Identifier, Identifier, Identifier))
 

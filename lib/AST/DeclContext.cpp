@@ -1180,12 +1180,15 @@ void IterableDeclContext::loadAllMembers() const {
     --s->getFrontendCounters().NumUnloadedLazyIterableDeclContexts;
 }
 
-// Checks whether members of this decl and their respective members
-// (recursively) were deserialized correctly and emits a diagnostic
-// if deserialization failed. Requires accessing module and this decl's
-// module are in the same package, and this decl's module has package
-// optimization enabled.
+// Checks whether members of this decl and their respective member decls
+// (recursively) were deserialized into another module correctly, and
+// emits a diagnostic if deserialization failed. Requires the other module
+// module and this decl's module are in the same package, and this
+// decl's module has package optimization enabled.
 void IterableDeclContext::checkDeserializeMemberErrorInPackage(ModuleDecl *accessingModule) {
+  // For decls in the same module, we can skip deserialization error checks.
+  if (getDecl()->getModuleContext() == accessingModule)
+    return;
   // Only check if accessing module is in the same package as this
   // decl's module, which has package optimization enabled.
   if (!getDecl()->getModuleContext()->inSamePackage(accessingModule) ||
@@ -1220,6 +1223,10 @@ void IterableDeclContext::checkDeserializeMemberErrorInPackage(ModuleDecl *acces
       containerID = container->getBaseIdentifier();
     }
 
+    auto diagID = diag::cannot_bypass_resilience_due_to_missing_member_warn;
+    if (getASTContext().LangOpts.AbortOnDeserializationFailForPackageCMO)
+      diagID = diag::cannot_bypass_resilience_due_to_missing_member;
+
     auto foundMissing = false;
     for (auto member: memberList) {
       // Only storage vars can affect memory layout so
@@ -1237,7 +1244,7 @@ void IterableDeclContext::checkDeserializeMemberErrorInPackage(ModuleDecl *acces
           foundMissing = false;
           auto missingMemberID = missingMember->getName().getBaseIdentifier();
           getASTContext().Diags.diagnose(member->getLoc(),
-                                         diag::cannot_bypass_resilience_due_to_missing_member,
+                                         diagID,
                                          missingMemberID,
                                          missingMemberID.empty(),
                                          containerID,
@@ -1249,7 +1256,7 @@ void IterableDeclContext::checkDeserializeMemberErrorInPackage(ModuleDecl *acces
       // If not handled above, emit a diag here.
       if (foundMissing) {
         getASTContext().Diags.diagnose(getDecl()->getLoc(),
-                                       diag::cannot_bypass_resilience_due_to_missing_member,
+                                       diagID,
                                        Identifier(),
                                        true,
                                        containerID,
