@@ -470,6 +470,19 @@ static void determineBestChoicesInContext(
       for (const auto &binding : bindingSet.Bindings) {
         resultTypes.push_back(binding.BindingType);
       }
+
+      // Infer bindings for each side of a ternary condition.
+      bindingSet.forEachAdjacentVariable(
+          [&cs, &resultTypes](TypeVariableType *adjacentVar) {
+            auto *adjacentLoc = adjacentVar->getImpl().getLocator();
+            // This is one of the sides of a ternary operator.
+            if (adjacentLoc->directlyAt<TernaryExpr>()) {
+              auto adjacentBindings = cs.getBindingsFor(adjacentVar);
+
+              for (const auto &binding : adjacentBindings.Bindings)
+                resultTypes.push_back(binding.BindingType);
+            }
+          });
     } else {
       resultTypes.push_back(resultType);
     }
