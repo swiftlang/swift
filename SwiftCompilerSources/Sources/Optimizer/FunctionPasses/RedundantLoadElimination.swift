@@ -251,7 +251,7 @@ private func replace(load: LoadInst, with availableValues: [AvailableValue], _ c
   var ssaUpdater = SSAUpdater(function: load.parentFunction,
                               type: load.type, ownership: load.ownership, context)
 
-  for availableValue in availableValues {
+  for availableValue in availableValues.replaceCopyAddrsWithLoadsAndStores(context) {
     let block = availableValue.instruction.parentBlock
     let availableValue = provideValue(for: load, from: availableValue, context)
     ssaUpdater.addAvailableValue(availableValue, in: block)
@@ -342,6 +342,8 @@ private func shrinkMemoryLifetime(from load: LoadInst, to availableValue: Availa
       fatalError("unqualified store in ossa function?")
     }
     return valueToAdd
+  case .viaCopyAddr:
+    fatalError("copy_addr must be lowered before shrinking lifetime")
   }
 }
 
@@ -380,6 +382,8 @@ private func shrinkMemoryLifetimeAndSplit(from load: LoadInst, to availableValue
     let valueToAdd = builder.createLoad(fromAddress: addr, ownership: .take)
     availableStore.trySplit(context)
     return valueToAdd
+  case .viaCopyAddr:
+    fatalError("copy_addr must be lowered before shrinking lifetime")
   }
 }
 
@@ -387,25 +391,29 @@ private func shrinkMemoryLifetimeAndSplit(from load: LoadInst, to availableValue
 private enum AvailableValue {
   case viaLoad(LoadInst)
   case viaStore(StoreInst)
+  case viaCopyAddr(CopyAddrInst)
 
   var value: Value {
     switch self {
     case .viaLoad(let load):   return load
     case .viaStore(let store): return store.source
+    case .viaCopyAddr:         fatalError("copy_addr must be lowered")
     }
   }
 
   var address: Value {
     switch self {
-    case .viaLoad(let load):   return load.address
-    case .viaStore(let store): return store.destination
+    case .viaLoad(let load):         return load.address
+    case .viaStore(let store):       return store.destination
+    case .viaCopyAddr(let copyAddr): return copyAddr.destination
     }
   }
 
   var instruction: Instruction {
     switch self {
-    case .viaLoad(let load):   return load
-    case .viaStore(let store): return store
+    case .viaLoad(let load):         return load
+    case .viaStore(let store):       return store
+    case .viaCopyAddr(let copyAddr): return copyAddr
     }
   }
 
@@ -413,6 +421,19 @@ private enum AvailableValue {
     switch self {
     case .viaLoad(let load):   return Builder(after: load, context)
     case .viaStore(let store): return Builder(before: store, context)
+    case .viaCopyAddr:         fatalError("copy_addr must be lowered")
+    }
+  }
+}
+
+private extension Array where Element == AvailableValue {
+  func replaceCopyAddrsWithLoadsAndStores(_ context: FunctionPassContext) -> [AvailableValue] {
+    return map {
+      if case .viaCopyAddr(let copyAddr) = $0 {
+        return .viaStore(copyAddr.replaceWithLoadAndStore(context))
+      } else {
+        return $0
+      }
     }
   }
 }
@@ -520,6 +541,16 @@ private struct InstructionScanner {
         potentiallyRedundantSubpath = precedingStorePath
       }
 
+    case let preceedingCopy as CopyAddrInst where preceedingCopy.canProvideValue:
+      let copyPath = preceedingCopy.destination.constantAccessPath
+      if copyPath.getMaterializableProjection(to: accessPath) != nil {
+        availableValues.append(.viaCopyAddr(preceedingCopy))
+        return .available
+      }
+      if accessPath.getMaterializableProjection(to: copyPath) != nil, potentiallyRedundantSubpath == nil {
+        potentiallyRedundantSubpath = copyPath
+      }
+
     default:
       break
     }
@@ -604,5 +635,22 @@ private struct Liverange {
       }
     }
     return false
+  }
+}
+
+private extension CopyAddrInst {
+  var canProvideValue: Bool {
+    if !source.type.isLoadable(in: parentFunction) {
+      // Although the original load's type is loadable (obviously), it can be projected-out 
+      // from the copy_addr's type which might be not loadable.
+      return false
+    }
+    if !parentFunction.hasOwnership {
+      if !isTakeOfSrc || !isInitializationOfDest {
+        // For simplicity, bail if we would have to insert compensating retains and releases.
+        return false
+      }
+    }
+    return true
   }
 }

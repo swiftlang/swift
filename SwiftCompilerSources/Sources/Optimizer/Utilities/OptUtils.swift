@@ -863,6 +863,32 @@ extension CheckedCastAddrBranchInst {
   }
 }
 
+extension CopyAddrInst {
+  @discardableResult
+  func replaceWithLoadAndStore(_ context: some MutatingContext) -> StoreInst {
+    let loadOwnership: LoadInst.LoadOwnership
+    let storeOwnership: StoreInst.StoreOwnership
+    if parentFunction.hasOwnership {
+      if source.type.isTrivial(in: parentFunction) {
+        loadOwnership = .trivial
+        storeOwnership = .trivial
+      } else {
+        loadOwnership = isTakeOfSrc ? .take : .copy
+        storeOwnership = isInitializationOfDest ? .initialize : .assign
+      }
+    } else {
+      loadOwnership = .unqualified
+      storeOwnership = .unqualified
+    }
+    
+    let builder = Builder(before: self, context)
+    let value = builder.createLoad(fromAddress: source, ownership: loadOwnership)
+    let store = builder.createStore(source: value, destination: destination, ownership: storeOwnership)
+    context.erase(instruction: self)
+    return store
+  }
+}
+
 extension Type {
   /// True if a type can be expanded without a significant increase to code
   /// size.
