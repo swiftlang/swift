@@ -421,19 +421,40 @@ static void determineBestChoicesInContext(
       const auto &param = argFuncType->getParams()[i];
       auto argType = cs.simplifyType(param.getPlainType());
 
+      SmallVector<Type, 2> optionals;
+      // i.e. `??` operator could produce an optional type
+      // so `test(<<something>> ?? 0) could result in an optional
+      // argument that wraps a type variable. It should be possible
+      // to infer bindings from underlying type variable and restore
+      // optionality.
+      if (argType->hasTypeVariable()) {
+        if (auto *typeVar = argType->lookThroughAllOptionalTypes(optionals)
+                                ->getAs<TypeVariableType>())
+          argType = typeVar;
+      }
+
       SmallVector<ArgumentCandidate, 2> types;
       if (auto *typeVar = argType->getAs<TypeVariableType>()) {
         auto bindingSet = cs.getBindingsFor(typeVar);
 
+        auto restoreOptionality = [](Type type, unsigned numOptionals) {
+          for (unsigned i = 0; i != numOptionals; ++i)
+            type = type->wrapInOptionalType();
+          return type;
+        };
+
         for (const auto &binding : bindingSet.Bindings) {
-          types.push_back({binding.BindingType});
+          auto type = restoreOptionality(binding.BindingType, optionals.size());
+          types.push_back({type});
         }
 
         for (const auto &literal : bindingSet.Literals) {
           if (literal.second.hasDefaultType()) {
             // Add primary default type
-            types.push_back(
-                {literal.second.getDefaultType(), /*fromLiteral=*/true});
+            auto type = restoreOptionality(literal.second.getDefaultType(),
+                                           optionals.size());
+            types.push_back({type,
+                             /*fromLiteral=*/true});
           }
         }
 
