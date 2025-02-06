@@ -1849,16 +1849,14 @@ public:
       return selfDeclAllowsImplicitSelf510(DRE, ty, inClosure);
 
     return selfDeclAllowsImplicitSelf(DRE->getDecl(), ty, inClosure,
-                                      /*validateParentClosures:*/ true,
-                                      /*validatingNestedClosure:*/ false);
+                                      /*isValidatingParentClosures:*/ false);
   }
 
   /// Whether or not implicit self is allowed for this implicit self decl
   static bool selfDeclAllowsImplicitSelf(const ValueDecl *selfDecl,
                                          const Type captureType,
                                          const AbstractClosureExpr *inClosure,
-                                         bool validateParentClosures,
-                                         bool validatingNestedClosure) {
+                                         bool isValidatingParentClosures) {
     ASTContext &ctx = inClosure->getASTContext();
 
     auto requiresSelfQualification =
@@ -1919,7 +1917,14 @@ public:
     //    isn't unwrapped correctly in the nested closure, we would have
     //    already noticed when validating that closure.
     if (closureHasWeakSelfCapture(inClosure) &&
-        !selfDeclDefinedInConditionalStmt && !validatingNestedClosure) {
+        !selfDeclDefinedInConditionalStmt && !isValidatingParentClosures) {
+      return false;
+    }
+
+    // If the self decl refers to a weak capture in a parent closure,
+    // then implicit self is not allowed.
+    if (selfDecl->getInterfaceType()->is<WeakStorageType>() &&
+        !closureHasWeakSelfCapture(inClosure)) {
       return false;
     }
 
@@ -1945,7 +1950,7 @@ public:
     //  - We have to do this for all closures, even closures that typically
     //    don't require self qualificationm since an invalid self capture in
     //    a parent closure still disallows implicit self in a nested closure.
-    if (validateParentClosures) {
+    if (!isValidatingParentClosures) {
       return !implicitSelfDisallowedDueToInvalidParent(selfDecl, captureType,
                                                        inClosure);
     } else {
@@ -2043,25 +2048,6 @@ public:
         return nullptr;
       }
 
-      // If this closure has a non-weak capture, the parent closure
-      // has a weak capture, the implicit self decl refers directly
-      // to this closure's self capture, and that capture directly
-      // refers to the parent closure's weak self capture, then
-      // this is invalid.
-      //  - Normally this is rejected by the type checker because
-      //    self is optional here, but that doesn't happen when calling
-      //    a method defined on `Optional<Self>`.
-      if (!closureHasWeakSelfCapture(inClosure)) {
-        if (auto closureSelfCapture = selfCapture(inClosure)) {
-          if (auto parentWeakSelfCapture = weakSelfCapture(outerClosure)) {
-            if (selfDecl == closureSelfCapture &&
-                parentWeakSelfCapture == outerSelfDecl) {
-              return outerClosure;
-            }
-          }
-        }
-      }
-
       // Check if this closure contains the self decl.
       //  - If the self decl is defined in the closure's body, its
       //    decl context will be the closure itself.
@@ -2092,8 +2078,7 @@ public:
         // is sufficient to enable implicit self.
         if (!selfDeclAllowsImplicitSelf(outerSelfDecl, captureType,
                                         outerClosure,
-                                        /*validateParentClosures:*/ false,
-                                        /*validatingNestedClosure:*/ true)) {
+                                        /*isValidatingParentClosures:*/ true)) {
           return outerClosure;
         }
 
@@ -2106,8 +2091,7 @@ public:
       // parent closures, we don't need to do that separate for this closure.
       if (validateIntermediateParents) {
         if (!selfDeclAllowsImplicitSelf(selfDecl, captureType, outerClosure,
-                                        /*validateParentClosures*/ false,
-                                        /*validatingNestedClosure*/ true)) {
+                                        /*isValidatingParentClosures*/ true)) {
           return outerClosure;
         }
       }

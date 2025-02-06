@@ -501,14 +501,14 @@ class TestGithubIssue70089 {
       }
 
       doVoidStuff { [weak self] in
-        doVoidStuff { [self] in
-          x += 1 // expected-error@-1 {{value of optional type 'TestGithubIssue70089?' must be unwrapped to a value of type 'TestGithubIssue70089'}} expected-note@-1 {{coalesce using '??' to provide a default when the optional value contains 'nil'}} expected-note@-1 {{force-unwrap using '!' to abort execution if the optional value contains 'nil'}}
+        doVoidStuff { [self] in // expected-error {{value of optional type 'TestGithubIssue70089?' must be unwrapped to a value of type 'TestGithubIssue70089'}} expected-note {{coalesce using '??' to provide a default when the optional value contains 'nil'}} expected-note {{force-unwrap using '!' to abort execution if the optional value contains 'nil'}}
+          x += 1
         }
       }
 
       doVoidStuff { [weak self] in
-        doVoidStuff { [self] in // 
-          self.x += 1 // expected-error@-1 {{value of optional type 'TestGithubIssue70089?' must be unwrapped to a value of type 'TestGithubIssue70089'}} expected-note@-1 {{coalesce using '??' to provide a default when the optional value contains 'nil'}} expected-note@-1 {{force-unwrap using '!' to abort execution if the optional value contains 'nil'}}
+        doVoidStuff { [self] in // expected-error {{value of optional type 'TestGithubIssue70089?' must be unwrapped to a value of type 'TestGithubIssue70089'}} expected-note {{coalesce using '??' to provide a default when the optional value contains 'nil'}} expected-note {{force-unwrap using '!' to abort execution if the optional value contains 'nil'}}
+          self.x += 1
         }
       }
 
@@ -939,8 +939,6 @@ extension TestExtensionOnOptionalSelf? {
   func foo() {
     _ = { [weak self] in
       foo() // expected-error {{implicit use of 'self' in closure; use 'self.' to make capture semantics explicit}}
-      self.foo()
-      self?.bar()
     }
 
     _ = {
@@ -951,7 +949,7 @@ extension TestExtensionOnOptionalSelf? {
 
     _ = { [weak self] in
       _ = {
-        foo()
+        foo() // expected-error {{implicit use of 'self' in closure; use 'self.' to make capture semantics explicit}}
         self.foo()
         self?.bar()
       }
@@ -959,7 +957,7 @@ extension TestExtensionOnOptionalSelf? {
 
     _ = { [weak self] in
       _ = { [self] in
-        foo() // expected-error {{call to method 'foo' in closure requires explicit use of 'self' to make capture semantics explicit}}
+        foo()
         self.foo()
         self?.bar()
       }
@@ -983,6 +981,13 @@ extension TestExtensionOnOptionalSelf {
 
     _ = { [weak self] in
       _ = {
+        foo() // expected-error {{implicit use of 'self' in closure; use 'self.' to make capture semantics explicit}}
+        self.foo()
+      }
+    }
+
+    _ = { [weak self] in
+      _ = { [self] in
         foo()
         self.foo()
       }
@@ -990,15 +995,8 @@ extension TestExtensionOnOptionalSelf {
 
     _ = { [weak self] in
       _ = { [self] in
-        foo() // expected-error {{call to method 'foo' in closure requires explicit use of 'self' to make capture semantics explicit}}
-        self.foo()
-      }
-    }
-
-    _ = { [weak self] in
-      _ = { [self] in
         _ = { [self] in
-          foo() // expected-error {{call to method 'foo' in closure requires explicit use of 'self' to make capture semantics explicit}}
+          foo()
           self.foo()
         }
       }
@@ -1007,9 +1005,16 @@ extension TestExtensionOnOptionalSelf {
     _ = { [weak self] in
       doVoidStuffNonEscaping {
         _ = { [self] in
-          foo() // expected-error {{call to method 'foo' in closure requires explicit use of 'self' to make capture semantics explicit}}
+          foo()
           self.foo()
         }
+      }
+    }
+
+    _ = { [weak self] in
+      guard case let self = self else { return }
+      _ = { [self] in
+        foo()
       }
     }
   }
