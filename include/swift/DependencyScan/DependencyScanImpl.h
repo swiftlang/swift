@@ -69,6 +69,7 @@ struct swiftscan_dependency_info_s {
 
 struct swiftscan_link_library_info_s {
   swiftscan_string_ref_t name;
+  bool isStatic;
   bool isFramework;
   bool forceLoad;
 };
