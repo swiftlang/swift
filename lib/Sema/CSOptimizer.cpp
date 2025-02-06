@@ -23,6 +23,7 @@
 #include "swift/Sema/ConstraintSystem.h"
 #include "llvm/ADT/BitVector.h"
 #include "llvm/ADT/DenseMap.h"
+#include "llvm/ADT/PointerIntPair.h"
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/TinyPtrVector.h"
 #include "llvm/Support/SaveAndRestore.h"
@@ -142,6 +143,63 @@ static bool isSupportedDisjunction(Constraint *disjunction) {
 
     return false;
   });
+}
+
+/// Given the type variable that represents a result type of a
+/// function call, check whether that call is to an initializer
+/// and based on that deduce possible type for the result.
+///
+/// @return A type and a flag that indicates whether there
+/// are any viable failable overloads and empty pair if the
+/// type variable isn't a result of an initializer call.
+static llvm::PointerIntPair<Type, 1, bool>
+inferTypeFromInitializerResultType(ConstraintSystem &cs,
+                                   TypeVariableType *typeVar,
+                                   ArrayRef<Constraint *> disjunctions) {
+  assert(typeVar->getImpl().isFunctionResult());
+
+  auto *resultLoc = typeVar->getImpl().getLocator();
+  auto *call = getAsExpr<CallExpr>(resultLoc->getAnchor());
+  if (!call)
+    return {};
+
+  auto *fn = call->getFn()->getSemanticsProvidingExpr();
+
+  Type instanceTy;
+  ConstraintLocator *ctorLocator = nullptr;
+  if (auto *typeExpr = getAsExpr<TypeExpr>(fn)) {
+    instanceTy = cs.getType(typeExpr)->getMetatypeInstanceType();
+    ctorLocator =
+        cs.getConstraintLocator(call, {LocatorPathElt::ApplyFunction(),
+                                       LocatorPathElt::ConstructorMember()});
+  } else if (auto *UDE = getAsExpr<UnresolvedDotExpr>(fn)) {
+    if (!UDE->getName().getBaseName().isConstructor())
+      return {};
+    instanceTy = cs.getType(UDE->getBase())->getMetatypeInstanceType();
+    ctorLocator = cs.getConstraintLocator(UDE, LocatorPathElt::Member());
+  }
+
+  if (!instanceTy || !ctorLocator)
+    return {};
+
+  auto initRef =
+      llvm::find_if(disjunctions, [&ctorLocator](Constraint *disjunction) {
+        return disjunction->getLocator() == ctorLocator;
+      });
+
+  if (initRef == disjunctions.end())
+    return {};
+
+  bool hasFailable =
+      llvm::any_of((*initRef)->getNestedConstraints(), [](Constraint *choice) {
+        if (choice->isDisabled())
+          return false;
+        auto *decl =
+            dyn_cast_or_null<ConstructorDecl>(getOverloadChoiceDecl(choice));
+        return decl && decl->isFailable();
+      });
+
+  return {instanceTy, hasFailable};
 }
 
 NullablePtr<Constraint> getApplicableFnConstraint(ConstraintGraph &CG,
@@ -459,21 +517,22 @@ static void determineBestChoicesInContext(
           }
         }
 
-        // Helps situations like `1 + {Double, CGFloat}(...)` by inferring
-        // a type for the second operand of `+` based on a type being constructed.
-        //
-        // Currently limited to Double and CGFloat only since we need to 
-        // support implicit `Double<->CGFloat` conversion.
-        if (typeVar->getImpl().isFunctionResult() &&
-            isOperatorDisjunction(disjunction)) {
-          auto resultLoc = typeVar->getImpl().getLocator();
-          if (auto *call = getAsExpr<CallExpr>(resultLoc->getAnchor())) {
-            if (auto *typeExpr = dyn_cast<TypeExpr>(call->getFn())) {
-              auto instanceTy = cs.getType(typeExpr)->getMetatypeInstanceType();
-              if (instanceTy->isDouble() || instanceTy->isCGFloat())
-                types.push_back({instanceTy, /*fromLiteral=*/false,
-                                 /*fromInitializerCall=*/true});
-            }
+        // Help situations like `1 + {Double, CGFloat}(...)` by inferring
+        // a type for the second operand of `+` based on a type being
+        // constructed.
+        if (typeVar->getImpl().isFunctionResult()) {
+          auto binding =
+              inferTypeFromInitializerResultType(cs, typeVar, disjunctions);
+
+          if (auto instanceTy = binding.getPointer()) {
+            types.push_back({instanceTy,
+                             /*fromLiteral=*/false,
+                             /*fromInitializerCall=*/true});
+
+            if (binding.getInt())
+              types.push_back({instanceTy->wrapInOptionalType(),
+                               /*fromLiteral=*/false,
+                               /*fromInitializerCall=*/true});
           }
         }
       } else {
