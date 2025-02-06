@@ -203,9 +203,13 @@ public:
     return (kind == Concurrent) || (kind == ConcurrentUnsafe);
   }
 
+  bool isConcurrentUnsafe() const { return kind == ConcurrentUnsafe; }
+
   bool isNonisolated() const {
     return (kind == Nonisolated) || (kind == NonisolatedUnsafe);
   }
+
+  bool isNonisolatedUnsafe() const { return kind == NonisolatedUnsafe; }
 
   bool isUnsafe() const {
     return kind == NonisolatedUnsafe || kind == ConcurrentUnsafe;
