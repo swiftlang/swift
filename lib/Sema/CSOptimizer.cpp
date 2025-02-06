@@ -417,6 +417,7 @@ static void determineBestChoicesInContext(
 
     llvm::TinyPtrVector<Type> resultTypes;
 
+    bool hasArgumentCandidates = false;
     for (unsigned i = 0, n = argFuncType->getNumParams(); i != n; ++i) {
       const auto &param = argFuncType->getParams()[i];
       auto argType = cs.simplifyType(param.getPlainType());
@@ -459,6 +460,7 @@ static void determineBestChoicesInContext(
       }
 
       argumentCandidates[i].append(types);
+      hasArgumentCandidates |= !types.empty();
     }
 
     auto resultType = cs.simplifyType(argFuncType->getResult());
@@ -476,7 +478,7 @@ static void determineBestChoicesInContext(
     // This information is going to be used later on when we need to decide how to
     // score a matching choice.
     bool onlyLiteralCandidates =
-        argFuncType->getNumParams() > 0 &&
+        hasArgumentCandidates &&
         llvm::none_of(
             indices(argFuncType->getParams()), [&](const unsigned argIdx) {
               auto &candidates = argumentCandidates[argIdx];
@@ -841,10 +843,16 @@ static void determineBestChoicesInContext(
           if (!matchings)
             return;
 
-          // If all of the arguments are literals, let's prioritize exact
-          // matches to filter out non-default literal bindings which otherwise
-          // could cause "over-favoring".
-          bool favorExactMatchesOnly = onlyLiteralCandidates;
+          auto canUseContextualResultTypes = [&decl]() {
+            return decl->isOperator() && !isStandardComparisonOperator(decl);
+          };
+
+          // Require exact matches only if all of the arguments
+          // are literals and there are no usable contextual result
+          // types that could help narrow favored choices.
+          bool favorExactMatchesOnly =
+              onlyLiteralCandidates &&
+              (!canUseContextualResultTypes() || resultTypes.empty());
 
           if (preserveFavoringOfUnlabeledUnaryArgument) {
             // Old behavior completely disregarded the fact that some of
@@ -1007,12 +1015,12 @@ static void determineBestChoicesInContext(
           // If one of the result types matches exactly, that's a good
           // indication that overload choice should be favored.
           //
-          // If nothing is known about the arguments it's only safe to
-          // check result for operators (except to standard comparison
-          // ones that all have the same result type), regular
-          // functions/methods and especially initializers could end up
-          // with a lot of favored overloads because on the result type alone.
-          if (decl->isOperator() && !isStandardComparisonOperator(decl)) {
+          // It's only safe to match result types of operators
+          // because regular functions/methods/subscripts and
+          // especially initializers could end up with a lot of
+          // favored overloads because on the result type alone.
+          if (canUseContextualResultTypes() &&
+              (score > 0 || !hasArgumentCandidates)) {
             if (llvm::any_of(resultTypes, [&](const Type candidateResultTy) {
                   // Avoid increasing weight based on CGFloat result type
                   // match because that could require narrowing conversion
