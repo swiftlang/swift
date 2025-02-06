@@ -1100,6 +1100,7 @@ SILGenFunction::emitClosureValue(SILLocation loc, SILDeclRef constant,
         case ActorIsolation::NonisolatedUnsafe:
         case ActorIsolation::Concurrent:
         case ActorIsolation::ConcurrentUnsafe:
+        case ActorIsolation::CallerIsolationInheriting:
         case ActorIsolation::ActorInstance:
           break;
 

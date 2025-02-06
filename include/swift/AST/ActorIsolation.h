@@ -80,6 +80,11 @@ public:
     /// The actor isolation iss statically erased, as for a call to
     /// an isolated(any) function.  This is not possible for declarations.
     Erased,
+    /// Inherits isolation from the caller of the given function.
+    ///
+    /// DISCUSSION: This is used for nonisolated asynchronous functions that we
+    /// want to inherit from their context the context's actor isolation.
+    CallerIsolationInheriting,
     /// The declaration is explicitly specified to be not isolated to any actor,
     /// meaning that it can be used from any actor but is also unable to
     /// refer to the isolated state of any given actor.
@@ -102,7 +107,7 @@ private:
     Type globalActor;
     void *pointer;
   };
-  unsigned kind : 3;
+  unsigned kind : 4;
   unsigned isolatedByPreconcurrency : 1;
 
   /// Set to true if this was parsed from SIL.
@@ -134,6 +139,12 @@ public:
 
   static ActorIsolation forConcurrent(bool unsafe) {
     return ActorIsolation(unsafe ? ConcurrentUnsafe : Concurrent);
+  }
+
+  static ActorIsolation forCallerIsolationInheriting() {
+    // NOTE: We do not use parameter indices since the parameter is implicit
+    // from the perspective of the AST.
+    return ActorIsolation(CallerIsolationInheriting);
   }
 
   static ActorIsolation forActorInstanceSelf(ValueDecl *decl);
@@ -183,6 +194,9 @@ public:
                   std::optional<ActorIsolation>(ActorIsolation::GlobalActor))
             .Case("global_actor_unsafe",
                   std::optional<ActorIsolation>(ActorIsolation::GlobalActor))
+            .Case("caller_isolation_inheriting",
+                  std::optional<ActorIsolation>(
+                      ActorIsolation::CallerIsolationInheriting))
             .Case("concurrent",
                   std::optional<ActorIsolation>(ActorIsolation::Concurrent))
             .Case("concurrent_unsafe", std::optional<ActorIsolation>(
@@ -241,6 +255,7 @@ public:
     case Unspecified:
     case Nonisolated:
     case NonisolatedUnsafe:
+    case CallerIsolationInheriting:
     case Concurrent:
     case ConcurrentUnsafe:
       return false;

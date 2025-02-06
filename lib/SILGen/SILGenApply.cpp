@@ -3107,6 +3107,7 @@ done:
       case ActorIsolation::NonisolatedUnsafe:
       case ActorIsolation::Concurrent:
       case ActorIsolation::ConcurrentUnsafe:
+      case ActorIsolation::CallerIsolationInheriting:
         llvm_unreachable("Not isolated");
       }
 
@@ -5836,6 +5837,7 @@ RValue SILGenFunction::emitApply(
     case ActorIsolation::NonisolatedUnsafe:
     case ActorIsolation::Concurrent:
     case ActorIsolation::ConcurrentUnsafe:
+    case ActorIsolation::CallerIsolationInheriting:
       llvm_unreachable("Not isolated");
       break;
     }
