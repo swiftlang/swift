@@ -279,6 +279,10 @@ private func replace(load: LoadInst, with availableValues: [AvailableValue], _ c
     //
     newValue = ssaUpdater.getValue(inMiddleOf: load.parentBlock)
   }
+
+  // Make sure to keep dependencies valid after replacing the load
+  insertMarkDependencies(for: load, context)
+
   load.replace(with: newValue, context)
 }
 
@@ -303,6 +307,39 @@ private func provideValue(
     } else {
       return shrinkMemoryLifetimeAndSplit(from: load, to: availableValue, projectionPath: projectionPath, context)
     }
+  }
+}
+
+/// If the memory location depends on something, insert a dependency for the loaded value:
+///
+///     %2 = mark_dependence %1 on %0
+///     %3 = load %2
+/// ->
+///     %2 = mark_dependence %1 on %0 // not needed anymore, can be removed eventually
+///     %3 = load %2
+///     %4 = mark_dependence %3 on %0
+///     // replace %3 with %4
+///
+private func insertMarkDependencies(for load: LoadInst, _ context: FunctionPassContext) {
+  var inserter = MarkDependenceInserter(load: load, context: context)
+  _ = inserter.walkUp(address: load.address, path: UnusedWalkingPath())
+}
+
+private struct MarkDependenceInserter : AddressUseDefWalker {
+  let load: LoadInst
+  let context: FunctionPassContext
+  
+  mutating func walkUp(address: Value, path: UnusedWalkingPath) -> WalkResult {
+    if let mdi = address as? MarkDependenceInst {
+      let builder = Builder(after: load, context)
+      let newMdi = builder.createMarkDependence(value: load, base: mdi.base, kind: mdi.dependenceKind)
+      load.uses.ignore(user: newMdi).replaceAll(with: newMdi, context)
+    }
+    return walkUpDefault(address: address, path: path)
+  }
+  
+  mutating func rootDef(address: Value, path: UnusedWalkingPath) -> WalkResult {
+    return .continueWalk
   }
 }
 

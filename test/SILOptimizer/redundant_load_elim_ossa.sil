@@ -1271,6 +1271,39 @@ bb0(%0 : $*Builtin.Int64, %1 : @guaranteed $Builtin.NativeObject):
   return %6 : $(Builtin.Int64, Builtin.Int64)
 }
 
+// CHECK-LABEL: sil [ossa] @insert_mark_dependence :
+// CHECK:         mark_dependence
+// CHECK:         [[MD:%.*]] = mark_dependence %0 : $B on %1
+// CHECK:         return [[MD]]
+// CHECK-LABEL: } // end sil function 'insert_mark_dependence'
+sil [ossa] @insert_mark_dependence : $@convention(thin) (@owned B, @guaranteed B) -> @owned B {
+bb0(%0 : @owned $B, %1 : @guaranteed $B):
+  %2 = alloc_stack $B
+  store %0 to [init] %2
+  %4 = mark_dependence %2 on %1
+  %5 = load [take] %4
+  dealloc_stack %2
+  return %5
+}
+
+// CHECK-LABEL: sil [ossa] @insert_two_mark_dependences :
+// CHECK:         mark_dependence
+// CHECK:         mark_dependence
+// CHECK:         [[MD1:%.*]] = mark_dependence %0 : $B on %1
+// CHECK:         [[MD2:%.*]] = mark_dependence [[MD1]] : $B on %2
+// CHECK:         return [[MD2]]
+// CHECK-LABEL: } // end sil function 'insert_two_mark_dependences'
+sil [ossa] @insert_two_mark_dependences : $@convention(thin) (@owned B, @guaranteed B, @guaranteed B) -> @owned B {
+bb0(%0 : @owned $B, %1 : @guaranteed $B, %2 : @guaranteed $B):
+  %3 = alloc_stack $B
+  store %0 to [init] %3
+  %5 = mark_dependence %3 on %1
+  %6 = mark_dependence %5 on %2
+  %7 = load [take] %6
+  dealloc_stack %3
+  return %7
+}
+
 // CHECK-LABEL: sil [ossa] @dont_crash_on_index_addr_projection :
 // CHECK-LABEL: } // end sil function 'dont_crash_on_index_addr_projection'
 sil [ossa] @dont_crash_on_index_addr_projection : $@convention(thin) (Builtin.RawPointer) -> (Int, Int, Int, Int) {
