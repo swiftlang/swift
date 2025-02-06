@@ -1458,12 +1458,16 @@ public:
                 "kind since guaranteed and owned values can always be passed "
                 "in unowned positions");
 
-        require(operand.getOperandOwnership() !=
-                        OperandOwnership::InteriorPointer ||
-                    InteriorPointerOperandKind::get(&operand) !=
-                        InteriorPointerOperandKind::Invalid,
-                "All operands with InteriorPointer operand ownership should be "
-                "added to the InteriorPointerOperand utility");
+        switch (operand.getOperandOwnership()) {
+        default:
+          break;
+        case OperandOwnership::InteriorPointer:
+        case OperandOwnership::AnyInteriorPointer:
+          require(InteriorPointerOperandKind::get(&operand) !=
+                  InteriorPointerOperandKind::Invalid,
+                  "All operands with InteriorPointer operand ownership should be "
+                  "added to the InteriorPointerOperand utility");
+        }
       }
     }
 

@@ -243,6 +243,7 @@ bool MoveOnlyObjectCheckerPImpl::checkForSameInstMultipleUseErrors(
       instToOperandsMap.insert(nextUse->getUser(), nextUse);
       continue;
     case OperandOwnership::InteriorPointer:
+    case OperandOwnership::AnyInteriorPointer:
       // We do not care about interior pointer uses since there aren't any
       // interior pointer using instructions that are also consuming uses.
       continue;

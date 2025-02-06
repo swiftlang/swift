@@ -2009,6 +2009,7 @@ bool MarkDependenceInst::visitNonEscapingLifetimeEnds(
   llvm::function_ref<bool (Operand *)> visitUnknownUse) const {
   assert(getFunction()->hasOwnership() && isNonEscaping()
          && "only meaningful for nonescaping dependencies");
+  assert(getType().isObject() && "lifetime ends only exist for values");
   bool noUsers = true;
   if (!visitRecursivelyLifetimeEndingUses(this, noUsers, visitScopeEnd,
                                           visitUnknownUse)) {

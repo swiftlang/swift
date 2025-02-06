@@ -1687,6 +1687,7 @@ struct CopiedLoadBorrowEliminationVisitor
       case OperandOwnership::InstantaneousUse:
       case OperandOwnership::UnownedInstantaneousUse:
       case OperandOwnership::InteriorPointer:
+      case OperandOwnership::AnyInteriorPointer:
       case OperandOwnership::BitwiseEscape: {
         // Look through copy_value of a move only value. We treat copy_value of
         // copyable values as normal uses.
