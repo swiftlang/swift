@@ -1,20 +1,36 @@
 // RUN: %empty-directory(%t)
-// RUN: %empty-directory(%t/lib)
 // RUN: %empty-directory(%t/include)
 // RUN: split-file %s %t
 
-// Compile shim.swift in C mode, then re-compile it in C++ mode:
+// Compile shim.swift without C++ interop, then re-compile it with C++ interop.
 //
+// RUN: %empty-directory(%t/lib)
 // RUN: %target-swift-emit-module-interface(%t/lib/shim.swiftinterface) %t/shim.swift -module-name shim -I %t/include
 // RUN: %FileCheck %t/shim.swift < %t/lib/shim.swiftinterface
 // RUN: %swift-frontend %t/program.swift -typecheck -verify -cxx-interoperability-mode=default -I %t/include -I %t/lib
 
-// Compile cxxshim.swift in C++ mode, check that its interface is still usable
+// Compile cxxshim.swift with C++ interop, check that its interface is usable
 // (despite using a mix of C/C++ decls):
 //
 // RUN: %empty-directory(%t/lib)
-// RUN: %target-swift-emit-module-interface(%t/lib/shim.swiftinterface) -cxx-interoperability-mode=default %t/cxxshim.swift -module-name shim -I %t/include
+// RUN: %target-swift-emit-module-interface(%t/lib/shim.swiftinterface) %t/cxxshim.swift -cxx-interoperability-mode=default -module-name shim -I %t/include
 // RUN: %FileCheck %t/cxxshim.swift < %t/lib/shim.swiftinterface
+// RUN: %swift-frontend %t/program.swift -typecheck -verify -cxx-interoperability-mode=default -I %t/include -I %t/lib
+
+// Compile inlineshim.swift without C++ interop; the unqualified identifers in
+// its @inlinable func should still resolve correctly:
+//
+// RUN: %empty-directory(%t/lib)
+// RUN: %target-swift-emit-module-interface(%t/lib/shim.swiftinterface) %t/inlineshim.swift -module-name shim -I %t/include
+// RUN: %FileCheck %t/inlineshim.swift < %t/lib/shim.swiftinterface
+// RUN: %swift-frontend %t/program.swift -typecheck -verify -cxx-interoperability-mode=default -I %t/include -I %t/lib
+
+// Compile inlinecxxshim.swift with C++ interop; the unqualified identifers in
+// its @inlinable func should still resolve correctly:
+//
+// RUN: %empty-directory(%t/lib)
+// RUN: %target-swift-emit-module-interface(%t/lib/shim.swiftinterface) %t/inlinecxxshim.swift -cxx-interoperability-mode=default -module-name shim -I %t/include
+// RUN: %FileCheck %t/inlinecxxshim.swift < %t/lib/shim.swiftinterface
 // RUN: %swift-frontend %t/program.swift -typecheck -verify -cxx-interoperability-mode=default -I %t/include -I %t/lib
 
 //--- include/module.modulemap
@@ -50,6 +66,28 @@ public func shimId(_ n: c2cxx.number) -> c2cxx_number { return n }
 // CHECK: public func shimId(_ n: c2cxx.c2cxx.number) -> c2cxx.c2cxx_number
 //                                ^^^^^\^^^^^`-namespace ^^^^^`-module
 //                                      `-module
+
+//--- inlineshim.swift
+// Another shim around c2cxx using top-level C decls in an @inlinable func body;
+// these will get splatted into swiftinterface verbatim and still need to be
+// resolved correctly.
+import c2cxx
+@inlinable public func shimId(_ n: c2cxx_number) -> c2cxx_number {
+          let m: c2cxx_number = n
+// CHECK: let m: c2cxx_number = n
+          return m
+}
+
+//--- inlinecxxshim.swift
+// Another shim around c2cxx using namespaced C++ decls in an @inlinable func;
+// these will get splatted into swiftinterface verbatim and still need to be
+// resolved correctly.
+import c2cxx
+@inlinable public func shimId(_ n: c2cxx_number) -> c2cxx.number {
+          let m: c2cxx.number = n
+// CHECK: let m: c2cxx.number = n
+          return m
+}
 
 //--- program.swift
 // Uses the shim and causes it to be (re)built from its interface
