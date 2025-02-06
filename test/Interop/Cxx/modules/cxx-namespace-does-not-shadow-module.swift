@@ -13,7 +13,7 @@
 // (despite using a mix of C/C++ decls):
 //
 // RUN: %empty-directory(%t/lib)
-// RUN: %target-swift-emit-module-interface(%t/lib/shim.swiftinterface) -cxx-interoperability-mode=default -enable-experimental-feature -AssumeResilientCxxTypes %t/cxxshim.swift -module-name shim -I %t/include
+// RUN: %target-swift-emit-module-interface(%t/lib/shim.swiftinterface) -cxx-interoperability-mode=default %t/cxxshim.swift -module-name shim -I %t/include
 // RUN: %FileCheck %t/cxxshim.swift < %t/lib/shim.swiftinterface
 // RUN: %swift-frontend %t/program.swift -typecheck -verify -cxx-interoperability-mode=default -I %t/include -I %t/lib
 
