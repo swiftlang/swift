@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -target %target-cpu-apple-macosx10.15 -swift-version 5
+// RUN: %target-typecheck-verify-swift -target %target-cpu-apple-macosx10.15 -solver-scope-threshold=1000
 // REQUIRES: OS=macosx
 
 import SwiftUI
