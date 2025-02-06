@@ -552,6 +552,11 @@ class BuildScriptInvocation(object):
                 impl_env["HOST_VARIABLE_{}__{}".format(
                     host_target.replace("-", "_"), name)] = value
 
+        if args.verbose_build:
+            # This ensures all CMake builds (including the ones
+            # called with `ExternalProject`) have verbose output
+            impl_env["VERBOSE"] = "1"
+
         return (impl_env, impl_args)
 
     def compute_host_specific_variables(self):
