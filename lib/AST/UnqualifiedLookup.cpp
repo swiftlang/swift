@@ -282,6 +282,10 @@ void UnqualifiedLookupFactory::lookUpTopLevelNamesInModuleScopeContext(
     return;
   }
 
+  bool inInterface = false;
+  if (auto *File = DC->getOutermostParentSourceFile())
+    inInterface = File->Kind == SourceFileKind::Interface;
+
   addImportedResults(DC);
   addNamesKnownToDebugClient(DC);
   if (Results.empty()) {
@@ -291,6 +295,14 @@ void UnqualifiedLookupFactory::lookUpTopLevelNamesInModuleScopeContext(
     addUnavailableInnerResults();
     if (Results.empty())
       lookForAModuleWithTheGivenName(DC);
+  } else if (inInterface && Results.size() == 1) {
+    auto entry = Results[0];
+    if (llvm::isa_and_nonnull<clang::NamespaceDecl>(entry.getValueDecl()->getClangDecl())) {
+      Results.clear();
+      lookForAModuleWithTheGivenName(DC);
+      if (Results.empty())
+        Results.push_back(entry);
+    }
   }
   recordCompletionOfAScope();
 }
