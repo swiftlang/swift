@@ -340,7 +340,6 @@ private:
       llvm_unreachable("covered switch");
     }
   };
-  friend llvm::DenseMapInfo<Def>;
 
   /// The defs derived from currentDef whose uses are added to liveness.
   SmallVector<Def, 8> discoveredDefs;
