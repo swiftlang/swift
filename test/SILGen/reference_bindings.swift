@@ -35,10 +35,10 @@ func doSomething() {}
 // SIL:   [[BOX:%.*]] = alloc_stack [var_decl] $Int, var, name "x"
 // SIL:   [[INOUT_BOX:%.*]] = alloc_stack [var_decl] $Int, var, name "x2"
 // SIL:   [[ACCESS:%.*]] = begin_access [modify] [static] [[BOX]]
-// SIL:   store {{%.*}} to [[INOUT_BOX]]
+// SIL:   copy_addr [take] [[ACCESS]] to [init] [[INOUT_BOX]]
 // SIL:   [[FUNC:%.*]] = function_ref @$s18reference_bindings11doSomethingyyF : $@convention(thin) () -> ()
 // SIL:   apply [[FUNC]]()
-// SIL:   store {{%.*}} to [[ACCESS]]
+// SIL:   copy_addr [take] [[INOUT_BOX]] to [init] [[ACCESS]]
 // SIL:   end_access [[ACCESS]]
 // SIL: } // end sil function '$s18reference_bindings13testBindToVaryyF'
 func testBindToVar() {
@@ -64,11 +64,9 @@ func testBindToVar() {
 // SIL: bb0([[ARG:%.*]] : $*String):
 // SIL:   [[STACK:%.*]] = alloc_stack [var_decl] $String
 // SIL:   [[ACCESS:%.*]] = begin_access [modify] [static] [[ARG]]
-// SIL:   [[VAL:%.*]] = load [[ACCESS]]
-// SIL:   store [[VAL]] to [[STACK]]
+// SIL:   copy_addr [take] [[ACCESS]] to [init] [[STACK]]
 // SIL:   apply {{%.*}}
-// SIL:   [[VAL:%.*]] = load [[STACK]]
-// SIL:   store [[VAL]] to [[ACCESS]]
+// SIL:   copy_addr [take] [[STACK]] to [init] [[ACCESS]]
 // SIL:   end_access [[ACCESS]]
 // SIL:   dealloc_stack [[STACK]]
 // SIL: } // end sil function '$s18reference_bindings15testBindToInOutyySSzF'
