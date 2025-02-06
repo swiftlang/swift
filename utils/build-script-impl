@@ -1786,7 +1786,7 @@ for host in "${ALL_HOSTS[@]}"; do
                     if [ ! -z "${CROSS_COMPILE_SYSROOTS}" ]; then
                         cmake_options=(
                             "${cmake_options[@]}"
-                            -DCROSS_COMPILE_SYSROOTS:STRING="${CROSS_COMPILE_SYSROOTS}"
+                            -DSWIFT_CROSS_COMPILE_SYSROOTS:STRING="${CROSS_COMPILE_SYSROOTS}"
                             -DSWIFT_USE_LINKER:STRING="lld"
                         )
                     fi

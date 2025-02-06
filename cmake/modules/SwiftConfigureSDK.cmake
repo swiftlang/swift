@@ -417,8 +417,8 @@ macro(configure_sdk_unix name architectures)
         endif()
 
         # If we are using an external sysroot, update path and CXX compile flags to point to it
-        if(CROSS_COMPILE_SYSROOTS)
-          set(SWIFT_SDK_${prefix}_ARCH_${arch}_PATH ${CROSS_COMPILE_SYSROOTS})
+        if(SWIFT_CROSS_COMPILE_SYSROOTS)
+          set(SWIFT_SDK_${prefix}_ARCH_${arch}_PATH ${SWIFT_CROSS_COMPILE_SYSROOTS})
 
           # Clear hardcoded --gcc-toolchain to let the external sysroot be used to find libstdc++
           set(SWIFT_SDK_${prefix}_CXX_OVERLAY_SWIFT_COMPILE_FLAGS "")
