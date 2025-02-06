@@ -52,7 +52,7 @@ package import Utils
 package func clientFunc<T: PkgKlass>(_ list: [T]) {
   // closure #1 in clientFunc<A>(_:)
   // CHECK-CLIENT: sil private @$s6Client10clientFuncyySayxG5Utils8PkgKlassCRbzlFSo8NSObjectCxXEfU_ : $@convention(thin) <T where T : PkgKlass> (@in_guaranteed T) -> (@out NSObject, @error_indirect Never) {
-  // CHECK-CLIENT: class_method %5, #PkgKlass.second!getter : (PkgKlass) -> () -> NSObject, $@convention(method) (@guaranteed PkgKlass) -> @owned NSObject
+  // CHECK-CLIENT: class_method {{.*}} #PkgKlass.second!getter : (PkgKlass) -> () -> NSObject, $@convention(method) (@guaranteed PkgKlass) -> @owned NSObject
   // CHECK-CLIENT: } // end sil function '$s6Client10clientFuncyySayxG5Utils8PkgKlassCRbzlFSo8NSObjectCxXEfU_'
   let result = list.map { $0.second }
   print(result)
