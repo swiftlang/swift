@@ -500,7 +500,7 @@ private struct InstructionScanner {
 
   private mutating func visit(instruction: Instruction) -> ScanResult {
     switch instruction {
-    case is FixLifetimeInst, is EndAccessInst, is EndBorrowInst:
+    case is FixLifetimeInst, is BeginAccessInst, is EndAccessInst, is EndBorrowInst:
       // Those scope-ending instructions are only irrelevant if the preceding load is not changed.
       // If it is changed from `load [copy]` -> `load [take]` the memory effects of those scope-ending
       // instructions prevent that the `load [take]` will illegally mutate memory which is protected
