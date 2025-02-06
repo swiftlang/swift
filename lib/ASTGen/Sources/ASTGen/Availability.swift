@@ -19,20 +19,12 @@ import SwiftIfConfig
 @_spi(RawSyntax) @_spi(Compiler) import SwiftSyntax
 
 extension ASTGenVisitor {
-  /// E.g.:
-  ///   ```
-  ///   @available(macOS 10.12, iOS 13, *)
-  ///   @available(macOS, introduced: 10.12)
-  ///   ```
-  func generateAvailableAttr(attribute node: AttributeSyntax) -> [BridgedAvailableAttr] {
-    guard let args = node.arguments else {
-      self.diagnose(.expectedArgumentsInAttribute(node))
-      return []
-    }
-    guard let args = args.as(AvailabilityArgumentListSyntax.self) else {
-      // TODO: Diagnose.
-      return []
-    }
+  /// Implementation detail for `generateAvailableAttr(attribute:)` and `generateSpecializeAttr(attribute:)`.
+  func generateAvailableAttr(
+    atLoc: BridgedSourceLoc,
+    range: BridgedSourceRange,
+    args: AvailabilityArgumentListSyntax
+  ) -> [BridgedAvailableAttr] {
 
     // Check if this is "shorthand" syntax.
     if let firstArg = args.first?.argument {
@@ -48,17 +40,20 @@ extension ASTGenVisitor {
         isShorthand = false
       }
       if isShorthand {
-        return self.generateAvailableAttrShorthand(attribute: node)
+        return self.generateAvailableAttrShorthand(atLoc: atLoc, range: range, args: args)
       }
     }
 
     // E.g.
     //   @available(macOS, introduced: 10.12, deprecated: 11.2)
     //   @available(*, unavailable, message: "out of service")
-    if let generated =  self.generateAvailableAttrExtended(attribute: node) {
-      return [generated]
+    let attr = self.generateAvailableAttrExtended(atLoc: atLoc, range: range, args: args)
+
+    if let attr {
+      return [attr]
+    } else {
+      return []
     }
-    return []
   }
 
   func generate(versionTuple node: VersionTupleSyntax?) -> VersionTuple? {
@@ -68,13 +63,12 @@ extension ASTGenVisitor {
     return tuple
   }
 
-  func generateAvailableAttrShorthand(attribute node: AttributeSyntax) -> [BridgedAvailableAttr] {
-    let atLoc = self.generateSourceLoc(node.atSign)
-    let range = self.generateAttrSourceRange(node)
-    let specs = self.generateAvailabilitySpecList(
-      args: node.arguments!.cast(AvailabilityArgumentListSyntax.self),
-      context: .availableAttr
-    )
+  func generateAvailableAttrShorthand(
+    atLoc: BridgedSourceLoc,
+    range: BridgedSourceRange,
+    args: AvailabilityArgumentListSyntax
+  ) -> [BridgedAvailableAttr] {
+    let specs = self.generateAvailabilitySpecList(args: args, context: .availableAttr)
 
     var result: [BridgedAvailableAttr] = []
     for spec in specs {
@@ -103,8 +97,12 @@ extension ASTGenVisitor {
     return result
   }
 
-  func generateAvailableAttrExtended(attribute node: AttributeSyntax) -> BridgedAvailableAttr? {
-    var args = node.arguments!.cast(AvailabilityArgumentListSyntax.self)[...]
+  func generateAvailableAttrExtended(
+    atLoc: BridgedSourceLoc,
+    range: BridgedSourceRange,
+    args: AvailabilityArgumentListSyntax
+  ) -> BridgedAvailableAttr? {
+    var args = args[...]
 
     // The platfrom.
     guard let platformToken = args.popFirst()?.argument.as(TokenSyntax.self) else {
@@ -234,8 +232,8 @@ extension ASTGenVisitor {
 
     return BridgedAvailableAttr.createParsed(
       self.ctx,
-      atLoc: self.generateSourceLoc(node.atSign),
-      range: self.generateAttrSourceRange(node),
+      atLoc: atLoc,
+      range: range,
       domainString: platformStr.bridged,
       domainLoc: platformLoc,
       kind: attrKind,
@@ -274,6 +272,8 @@ extension ASTGenVisitor {
 
   enum AvailabilitySpecListContext {
     case availableAttr
+    case poundAvailable
+    case poundUnavailable
     case macro
   }
 
@@ -362,6 +362,76 @@ extension ASTGenVisitor {
 
     return result
   }
+
+  typealias GeneratedPlatformVersion = (platform: BridgedPlatformKind, version: BridgedVersionTuple)
+
+  func generate(platformVersionList node: PlatformVersionItemListSyntax) -> [GeneratedPlatformVersion] {
+    var result: [GeneratedPlatformVersion] = []
+
+    for element in node {
+      let platformVersionNode = element.platformVersion
+      let platformName =  platformVersionNode.platform.rawText
+      let version = self.generate(versionTuple: platformVersionNode.version)?.bridged ?? BridgedVersionTuple()
+
+      // If the name is a platform name, use it.
+      let platform = BridgedPlatformKind(from: platformName.bridged)
+      if platform != .none {
+        result.append((platform: platform, version: version))
+        continue
+      }
+
+      // If there's matching macro, use it.
+      let expanded = ctx.availabilityMacroMap.get(
+        name: platformName.bridged,
+        version: version
+      )
+      if !expanded.isEmpty {
+        expanded.withElements(ofType: UnsafeRawPointer.self) { buffer in
+          for ptr in buffer {
+            let spec = BridgedAvailabilitySpec(raw: UnsafeMutableRawPointer(mutating: ptr))
+            let platform = spec.platform
+            guard platform != .none else {
+              continue
+            }
+            result.append((platform: platform, version: spec.version))
+          }
+        }
+        continue
+      }
+
+      // Error.
+      // TODO: Diagnostics
+      fatalError("invalid platform name")
+    }
+    return result
+  }
+
+  func generate(availabilityCondition node: AvailabilityConditionSyntax) -> BridgedPoundAvailableInfo {
+    let specListContext: AvailabilitySpecListContext
+    switch node.availabilityKeyword.rawText {
+    case "#available":
+      specListContext = .poundAvailable
+    case "#unavailable":
+      specListContext = .poundUnavailable
+    default:
+      // TODO: Diagnostics?
+      fatalError("invalid availabilityKeyword")
+    }
+    let specs = self.generateAvailabilitySpecList(
+      args: node.availabilityArguments,
+      context: specListContext
+    )
+
+    return .createParsed(
+      self.ctx,
+      poundLoc: self.generateSourceLoc(node.availabilityKeyword),
+      lParenLoc: self.generateSourceLoc(node.leftParen),
+      specs: specs.lazy.bridgedArray(in: self),
+      rParenLoc: self.generateSourceLoc(node.rightParen),
+      isUnavailable: specListContext == .poundUnavailable
+    )
+  }
+
 }
 
 /// Parse an argument for '-define-availability' compiler option.

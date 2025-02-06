@@ -52,6 +52,20 @@ std::optional<AvailabilityDomain> AvailabilitySpec::getDomain() const {
   llvm_unreachable("bad AvailabilitySpecKind");
 }
 
+std::optional<PlatformKind> AvailabilitySpec::getPlatform() const {
+  switch (getKind()) {
+  case AvailabilitySpecKind::PlatformVersionConstraint: {
+    auto spec = cast<PlatformVersionConstraintAvailabilitySpec>(this);
+    return spec->getPlatform();
+  }
+  case AvailabilitySpecKind::LanguageVersionConstraint:
+  case AvailabilitySpecKind::PackageDescriptionVersionConstraint:
+  case AvailabilitySpecKind::OtherPlatform:
+    return std::nullopt;
+  }
+  llvm_unreachable("bad AvailabilitySpecKind");
+}
+
 llvm::VersionTuple AvailabilitySpec::getVersion() const {
   switch (getKind()) {
   case AvailabilitySpecKind::PlatformVersionConstraint: {

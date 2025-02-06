@@ -111,6 +111,7 @@ AST_BRIDGING_WRAPPER_NULLABLE(PlatformVersionConstraintAvailabilitySpec)
 AST_BRIDGING_WRAPPER_NULLABLE(PlatformAgnosticVersionConstraintAvailabilitySpec)
 AST_BRIDGING_WRAPPER_NULLABLE(OtherPlatformAvailabilitySpec)
 AST_BRIDGING_WRAPPER_CONST_NONNULL(AvailabilityMacroMap)
+AST_BRIDGING_WRAPPER_NONNULL(PoundAvailableInfo)
 
 // Non-AST types to generate wrappers for.
 AST_BRIDGING_WRAPPER_NULLABLE(DiagnosticEngine)
