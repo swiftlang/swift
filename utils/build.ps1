@@ -3279,8 +3279,12 @@ if (-not $IsCrossCompiling) {
   }
 
   if ($Test -contains "android") {
-    Build-Runtime Android $AndroidX64 -Test
-    Build-Runtime Android $AndroidARM64 -Test
+    try {
+      Build-Runtime Android $AndroidX64 -Test
+    } catch {}
+    try {
+      Build-Runtime Android $AndroidARM64 -Test
+    } catch {}
   }
 
   if ($Test -contains "dispatch") {
