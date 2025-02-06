@@ -191,6 +191,8 @@ LLVM_DUMP_METHOD void DebugTypeInfo::dump() const {
 std::optional<CompletedDebugTypeInfo>
 CompletedDebugTypeInfo::getFromTypeInfo(swift::Type Ty, const TypeInfo &Info,
                                         IRGenModule &IGM) {
+  if (!Ty || Ty->hasTypeParameter())
+    return {};
   auto *StorageType = IGM.getStorageTypeForUnlowered(Ty);
   std::optional<uint64_t> SizeInBits;
   if (StorageType->isSized())
