@@ -2530,12 +2530,12 @@ static CanSILFunctionType getSILFunctionType(
     std::optional<ActorIsolation> actorIsolation;
     if (constant) {
       if (constant->kind == SILDeclRef::Kind::Deallocator) {
-        actorIsolation = ActorIsolation::forConcurrent(false);
+        actorIsolation = ActorIsolation::forNonisolated(false);
       } else if (auto *decl = constant->getAbstractFunctionDecl();
                  decl && decl->getExecutionBehavior().has_value()) {
         switch (*decl->getExecutionBehavior()) {
         case ExecutionKind::Concurrent:
-          actorIsolation = ActorIsolation::forConcurrent(false /*unsafe*/);
+          actorIsolation = ActorIsolation::forNonisolated(false /*unsafe*/);
           break;
         case ExecutionKind::Caller:
           actorIsolation = ActorIsolation::forCallerIsolationInheriting();

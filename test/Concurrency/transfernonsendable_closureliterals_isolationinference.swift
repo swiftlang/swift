@@ -130,11 +130,11 @@ func test_CallerSyncNormal_CalleeSyncNonIsolated() async {
     normalAcceptsClosure { }
 
     // CHECK-LABEL: closure #2 in test_CallerSyncNormal_CalleeSyncNonIsolated()
-    // CHECK-NEXT: // Isolation: concurrent
+    // CHECK-NEXT: Isolation: nonisolated
     normalAcceptsSendingClosure { }
 
     // CHECK-LABEL: // closure #3 in test_CallerSyncNormal_CalleeSyncNonIsolated()
-    // CHECK-NEXT: // Isolation: concurrent
+    // CHECK-NEXT: // Isolation: nonisolated
     normalAcceptsSendableClosure { }
 }
 
@@ -168,11 +168,11 @@ func test_CallerSyncNormal_CalleeSyncMainActorIsolated() async {
     // expected-note @-1 {{sending global actor 'CustomActor'-isolated value of non-Sendable type '() -> ()' to main actor-isolated global function 'normalGlobalActorAcceptsClosure' risks causing races in between global actor 'CustomActor'-isolated and main actor-isolated uses}}
 
     // CHECK-LABEL: // closure #2 in test_CallerSyncNormal_CalleeSyncMainActorIsolated()
-    // CHECK-NEXT: // Isolation: concurrent
+    // CHECK-NEXT: // Isolation: nonisolated
     await normalGlobalActorAcceptsSendingClosure { }
 
     // CHECK-LABEL: // closure #3 in test_CallerSyncNormal_CalleeSyncMainActorIsolated()
-    // CHECK-NEXT: // Isolation: concurrent
+    // CHECK-NEXT: // Isolation: nonisolated
     await normalGlobalActorAcceptsSendableClosure { }
 }
 
@@ -209,11 +209,11 @@ func test_CallerSyncNormal_CalleeAsyncNonIsolated() async {
     normalAcceptsAsyncClosure { }
 
     // CHECK-LABEL: closure #2 in test_CallerSyncNormal_CalleeAsyncNonIsolated()
-    // CHECK-NEXT: // Isolation: concurrent
+    // CHECK-NEXT: Isolation: nonisolated
     normalAcceptsSendingAsyncClosure { }
 
     // CHECK-LABEL: // closure #3 in test_CallerSyncNormal_CalleeAsyncNonIsolated()
-    // CHECK-NEXT: // Isolation: concurrent
+    // CHECK-NEXT: // Isolation: nonisolated
     normalAcceptsSendableAsyncClosure { }
 }
 
@@ -244,11 +244,11 @@ func test_CallerSyncNormal_CalleeAsyncMainActorIsolated() async {
     // expected-note @-1 {{sending global actor 'CustomActor'-isolated value of non-Sendable type '() async -> ()' to main actor-isolated global function 'normalGlobalActorAcceptsAsyncClosure' risks causing races in between global actor 'CustomActor'-isolated and main actor-isolated uses}}
 
     // CHECK-LABEL: // closure #2 in test_CallerSyncNormal_CalleeAsyncMainActorIsolated()
-    // CHECK-NEXT: // Isolation: concurrent
+    // CHECK-NEXT: // Isolation: nonisolated
     await normalGlobalActorAcceptsSendingAsyncClosure { }
 
     // CHECK-LABEL: // closure #3 in test_CallerSyncNormal_CalleeAsyncMainActorIsolated()
-    // CHECK-NEXT: // Isolation: concurrent
+    // CHECK-NEXT: // Isolation: nonisolated
     await normalGlobalActorAcceptsSendableAsyncClosure { }
 }
 
@@ -285,11 +285,11 @@ func test_CallerAsyncNormal_CalleeSyncNonIsolated() async {
     // expected-note @-1 {{sending global actor 'CustomActor'-isolated value of non-Sendable type '() -> ()' to nonisolated global function 'asyncNormalAcceptsClosure' risks causing races in between global actor 'CustomActor'-isolated and nonisolated uses}}
 
     // CHECK-LABEL: closure #2 in test_CallerAsyncNormal_CalleeSyncNonIsolated()
-    // CHECK-NEXT: // Isolation: concurrent
+    // CHECK-NEXT: Isolation: nonisolated
     await asyncNormalAcceptsSendingClosure { }
 
     // CHECK-LABEL: // closure #3 in test_CallerAsyncNormal_CalleeSyncNonIsolated()
-    // CHECK-NEXT: // Isolation: concurrent
+    // CHECK-NEXT: // Isolation: nonisolated
     await asyncNormalAcceptsSendableClosure { }
 }
 
@@ -324,11 +324,11 @@ func test_CallerAsyncNormal_CalleeSyncMainActorIsolated() async {
     // expected-note @-1 {{sending global actor 'CustomActor'-isolated value of non-Sendable type '() -> ()' to main actor-isolated global function 'asyncNormalGlobalActorAcceptsClosure' risks causing races in between global actor 'CustomActor'-isolated and main actor-isolated uses}}
 
     // CHECK-LABEL: // closure #2 in test_CallerAsyncNormal_CalleeSyncMainActorIsolated()
-    // CHECK-NEXT: // Isolation: concurrent
+    // CHECK-NEXT: // Isolation: nonisolated
     await asyncNormalGlobalActorAcceptsSendingClosure { }
 
     // CHECK-LABEL: // closure #3 in test_CallerAsyncNormal_CalleeSyncMainActorIsolated()
-    // CHECK-NEXT: // Isolation: concurrent
+    // CHECK-NEXT: // Isolation: nonisolated
     await asyncNormalGlobalActorAcceptsSendableClosure { }
 }
 
@@ -367,11 +367,11 @@ func test_CallerAsyncNormal_CalleeAsyncNonIsolated() async {
     // expected-note @-1 {{sending global actor 'CustomActor'-isolated value of non-Sendable type '() async -> ()' to nonisolated global function 'asyncNormalAcceptsAsyncClosure' risks causing races in between global actor 'CustomActor'-isolated and nonisolated uses}}
 
     // CHECK-LABEL: closure #2 in test_CallerAsyncNormal_CalleeAsyncNonIsolated()
-    // CHECK-NEXT: // Isolation: concurrent
+    // CHECK-NEXT: Isolation: nonisolated
     await asyncNormalAcceptsSendingAsyncClosure { }
 
     // CHECK-LABEL: // closure #3 in test_CallerAsyncNormal_CalleeAsyncNonIsolated()
-    // CHECK-NEXT: // Isolation: concurrent
+    // CHECK-NEXT: // Isolation: nonisolated
     await asyncNormalAcceptsSendableAsyncClosure { }
 }
 
@@ -410,11 +410,11 @@ func test_CallerAsyncNormal_CalleeAsyncMainActorIsolated() async {
     // expected-note @-1 {{sending global actor 'CustomActor'-isolated value of non-Sendable type '() async -> ()' to main actor-isolated global function 'asyncNormalGlobalActorAcceptsAsyncClosure' risks causing races in between global actor 'CustomActor'-isolated and main actor-isolated uses}}
 
     // CHECK-LABEL: // closure #2 in test_CallerAsyncNormal_CalleeAsyncMainActorIsolated()
-    // CHECK-NEXT: // Isolation: concurrent
+    // CHECK-NEXT: // Isolation: nonisolated
     await asyncNormalGlobalActorAcceptsSendingAsyncClosure { }
 
     // CHECK-LABEL: // closure #3 in test_CallerAsyncNormal_CalleeAsyncMainActorIsolated()
-    // CHECK-NEXT: // Isolation: concurrent
+    // CHECK-NEXT: // Isolation: nonisolated
     await asyncNormalGlobalActorAcceptsSendableAsyncClosure { }
 }
 
@@ -456,11 +456,11 @@ extension MyActor {
         normalAcceptsClosure { print(self) }
 
         // CHECK-LABEL: closure #2 in MyActor.test_CallerSyncNormal_CalleeSyncNonIsolated()
-        // CHECK-NEXT: // Isolation: concurrent
+        // CHECK-NEXT: Isolation: nonisolated
         normalAcceptsSendingClosure { print(self) }
 
         // CHECK-LABEL: // closure #3 in MyActor.test_CallerSyncNormal_CalleeSyncNonIsolated()
-        // CHECK-NEXT: // Isolation: concurrent
+        // CHECK-NEXT: // Isolation: nonisolated
         normalAcceptsSendableClosure { print(self) }
     }
 
@@ -493,11 +493,11 @@ extension MyActor {
         // expected-note @-1 {{sending 'self'-isolated value of non-Sendable type '() -> ()' to main actor-isolated global function 'normalGlobalActorAcceptsClosure' risks causing races in between 'self'-isolated and main actor-isolated uses}}
 
         // CHECK-LABEL: // closure #2 in MyActor.test_CallerSyncNormal_CalleeSyncMainActorIsolated()
-        // CHECK-NEXT: // Isolation: concurrent
+        // CHECK-NEXT: // Isolation: nonisolated
         await normalGlobalActorAcceptsSendingClosure { print(self) }
 
         // CHECK-LABEL: // closure #3 in MyActor.test_CallerSyncNormal_CalleeSyncMainActorIsolated()
-        // CHECK-NEXT: // Isolation: concurrent
+        // CHECK-NEXT: // Isolation: nonisolated
         await normalGlobalActorAcceptsSendableClosure { print(self) }
     }
 
@@ -537,11 +537,11 @@ extension MyActor {
         normalAcceptsAsyncClosure { print(self) }
 
         // CHECK-LABEL: closure #2 in MyActor.test_CallerSyncNormal_CalleeAsyncNonIsolated()
-        // CHECK-NEXT: // Isolation: concurrent
+        // CHECK-NEXT: Isolation: nonisolated
         normalAcceptsSendingAsyncClosure { print(self) }
 
         // CHECK-LABEL: // closure #3 in MyActor.test_CallerSyncNormal_CalleeAsyncNonIsolated()
-        // CHECK-NEXT: // Isolation: concurrent
+        // CHECK-NEXT: // Isolation: nonisolated
         normalAcceptsSendableAsyncClosure { print(self) }
     }
 
@@ -570,11 +570,11 @@ extension MyActor {
         // expected-note @-1 {{sending 'self'-isolated value of non-Sendable type '() async -> ()' to main actor-isolated global function 'normalGlobalActorAcceptsAsyncClosure' risks causing races in between 'self'-isolated and main actor-isolated uses}}
 
         // CHECK-LABEL: // closure #2 in MyActor.test_CallerSyncNormal_CalleeAsyncMainActorIsolated()
-        // CHECK-NEXT: // Isolation: concurrent
+        // CHECK-NEXT: // Isolation: nonisolated
         await normalGlobalActorAcceptsSendingAsyncClosure { print(self) }
 
         // CHECK-LABEL: // closure #3 in MyActor.test_CallerSyncNormal_CalleeAsyncMainActorIsolated()
-        // CHECK-NEXT: // Isolation: concurrent
+        // CHECK-NEXT: // Isolation: nonisolated
         await normalGlobalActorAcceptsSendableAsyncClosure { print(self) }
     }
 
@@ -612,11 +612,11 @@ extension MyActor {
         // expected-note @-1 {{sending 'self'-isolated value of non-Sendable type '() -> ()' to nonisolated global function 'asyncNormalAcceptsClosure' risks causing races in between 'self'-isolated and nonisolated uses}}
 
         // CHECK-LABEL: closure #2 in MyActor.test_CallerAsyncNormal_CalleeSyncNonIsolated()
-        // CHECK-NEXT: // Isolation: concurrent
+        // CHECK-NEXT: Isolation: nonisolated
         await asyncNormalAcceptsSendingClosure { print(self) }
 
         // CHECK-LABEL: // closure #3 in MyActor.test_CallerAsyncNormal_CalleeSyncNonIsolated()
-        // CHECK-NEXT: // Isolation: concurrent
+        // CHECK-NEXT: // Isolation: nonisolated
         await asyncNormalAcceptsSendableClosure { print(self) }
     }
 
@@ -650,11 +650,11 @@ extension MyActor {
         // expected-note @-1 {{sending 'self'-isolated value of non-Sendable type '() -> ()' to main actor-isolated global function 'asyncNormalGlobalActorAcceptsClosure' risks causing races in between 'self'-isolated and main actor-isolated uses}}
 
         // CHECK-LABEL: // closure #2 in MyActor.test_CallerAsyncNormal_CalleeSyncMainActorIsolated()
-        // CHECK-NEXT: // Isolation: concurrent
+        // CHECK-NEXT: // Isolation: nonisolated
         await asyncNormalGlobalActorAcceptsSendingClosure { print(self) }
 
         // CHECK-LABEL: // closure #3 in MyActor.test_CallerAsyncNormal_CalleeSyncMainActorIsolated()
-        // CHECK-NEXT: // Isolation: concurrent
+        // CHECK-NEXT: // Isolation: nonisolated
         await asyncNormalGlobalActorAcceptsSendableClosure { print(self) }
     }
 
@@ -695,11 +695,11 @@ extension MyActor {
         // expected-note @-1 {{sending 'self'-isolated value of non-Sendable type '() async -> ()' to nonisolated global function 'asyncNormalAcceptsAsyncClosure' risks causing races in between 'self'-isolated and nonisolated uses}}
 
         // CHECK-LABEL: closure #2 in MyActor.test_CallerAsyncNormal_CalleeAsyncNonIsolated()
-        // CHECK-NEXT: // Isolation: concurrent
+        // CHECK-NEXT: Isolation: nonisolated
         await asyncNormalAcceptsSendingAsyncClosure { print(self) }
 
         // CHECK-LABEL: // closure #3 in MyActor.test_CallerAsyncNormal_CalleeAsyncNonIsolated()
-        // CHECK-NEXT: // Isolation: concurrent
+        // CHECK-NEXT: // Isolation: nonisolated
         await asyncNormalAcceptsSendableAsyncClosure { print(self) }
     }
 
@@ -736,11 +736,11 @@ extension MyActor {
         // expected-note @-1 {{sending 'self'-isolated value of non-Sendable type '() async -> ()' to main actor-isolated global function 'asyncNormalGlobalActorAcceptsAsyncClosure' risks causing races in between 'self'-isolated and main actor-isolated uses}}
 
         // CHECK-LABEL: // closure #2 in MyActor.test_CallerAsyncNormal_CalleeAsyncMainActorIsolated()
-        // CHECK-NEXT: // Isolation: concurrent
+        // CHECK-NEXT: // Isolation: nonisolated
         await asyncNormalGlobalActorAcceptsSendingAsyncClosure { print(self) }
 
         // CHECK-LABEL: // closure #3 in MyActor.test_CallerAsyncNormal_CalleeAsyncMainActorIsolated()
-        // CHECK-NEXT: // Isolation: concurrent
+        // CHECK-NEXT: // Isolation: nonisolated
         await asyncNormalGlobalActorAcceptsSendableAsyncClosure { print(self) }
     }
 
