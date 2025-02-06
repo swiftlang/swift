@@ -815,6 +815,7 @@ generateFullDependencyGraph(const CompilerInstance &instance,
       const auto &ll = linkLibraries[i];
       swiftscan_link_library_info_s *llInfo = new swiftscan_link_library_info_s;
       llInfo->name = create_clone(ll.getName().str().c_str());
+      llInfo->isStatic = ll.isStaticLibrary();
       llInfo->isFramework = ll.getKind() == LibraryKind::Framework;
       llInfo->forceLoad = ll.shouldForceLoad();
       linkLibrarySet->link_libraries[i] = llInfo;
@@ -1242,7 +1243,7 @@ static void resolveImplicitLinkLibraries(const CompilerInstance &instance,
   };
 
   if (langOpts.EnableObjCInterop)
-    addLinkLibrary({"objc", LibraryKind::Library});
+    addLinkLibrary(LinkLibrary{"objc", LibraryKind::Library, /*static=*/false});
 
   if (langOpts.EnableCXXInterop) {
     auto OptionalCxxDep = cache.findDependency(CXX_MODULE_NAME);

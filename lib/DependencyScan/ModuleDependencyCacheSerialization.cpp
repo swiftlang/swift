@@ -354,17 +354,18 @@ bool ModuleDependenciesCacheDeserializer::readGraph(
 
     case LINK_LIBRARY_NODE: {
       unsigned libraryIdentifierID;
-      bool isFramework, shouldForceLoad;
+      bool isFramework, isStatic, shouldForceLoad;
       LinkLibraryLayout::readRecord(Scratch, libraryIdentifierID, isFramework,
-                                    shouldForceLoad);
+                                    isStatic, shouldForceLoad);
       auto libraryIdentifier = getIdentifier(libraryIdentifierID);
       if (!libraryIdentifier)
         llvm::report_fatal_error("Bad link library identifier");
 
-      LinkLibraries.push_back(LinkLibrary(libraryIdentifier.value(),
-                                          isFramework ? LibraryKind::Framework
-                                                      : LibraryKind::Library,
-                                          shouldForceLoad));
+      LinkLibraries.emplace_back(
+          libraryIdentifier.value(),
+                      isFramework ? LibraryKind::Framework
+                                  : LibraryKind::Library,
+                      isStatic, shouldForceLoad);
       break;
     }
 
@@ -1311,13 +1312,12 @@ void ModuleDependenciesCacheSerializer::writeLinkLibraries(
 unsigned ModuleDependenciesCacheSerializer::writeLinkLibraryInfos(
     const ModuleDependencyInfo &dependencyInfo) {
   using namespace graph_block;
-  for (auto &linkLibrary : dependencyInfo.getLinkLibraries()) {
+  for (auto &linkLibrary : dependencyInfo.getLinkLibraries())
     LinkLibraryLayout::emitRecord(
         Out, ScratchRecord, AbbrCodes[LinkLibraryLayout::Code],
         getIdentifier(linkLibrary.getName().str()),
         linkLibrary.getKind() == LibraryKind::Framework,
-        linkLibrary.shouldForceLoad());
-  }
+        linkLibrary.isStaticLibrary(), linkLibrary.shouldForceLoad());
   return dependencyInfo.getLinkLibraries().size();
 }
 

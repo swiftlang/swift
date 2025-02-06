@@ -621,8 +621,9 @@ SerializedModuleLoaderBase::scanModuleFile(Twine modulePath, bool isFramework,
     llvm::copy(loadedModuleFile->getLinkLibraries(),
                std::back_inserter(linkLibraries));
     if (loadedModuleFile->isFramework())
-      linkLibraries.push_back(LinkLibrary(loadedModuleFile->getName(),
-                                          LibraryKind::Framework));
+      linkLibraries.emplace_back(
+          loadedModuleFile->getName(), LibraryKind::Framework,
+                      loadedModuleFile->isStaticLibrary());
   }
 
   // Attempt to resolve the module's defining .swiftinterface path
