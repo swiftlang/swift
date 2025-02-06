@@ -717,8 +717,11 @@ static void determineBestChoicesInContext(
                    : 0;
       }
 
-      if (options.contains(MatchFlag::ExactOnly))
-        return areEqual(candidateType, paramType) ? 1 : 0;
+      if (options.contains(MatchFlag::ExactOnly)) {
+        if (!areEqual(candidateType, paramType))
+          return 0;
+        return options.contains(MatchFlag::Literal) ? 0.3 : 1;
+      }
 
       // Exact match between candidate and parameter types.
       if (areEqual(candidateType, paramType)) {
@@ -726,20 +729,39 @@ static void determineBestChoicesInContext(
       }
 
       if (options.contains(MatchFlag::Literal)) {
-        // Integer and floating-point literals can match any parameter
-        // type that conforms to `ExpressibleBy{Integer, Float}Literal`
-        // protocol but since that would constitute a non-default binding
-        // the score has to be slightly lowered.
-        if (!paramType->hasTypeParameter()) {
-          if (candidateType->isInt() &&
-              TypeChecker::conformsToKnownProtocol(
-                  paramType, KnownProtocolKind::ExpressibleByIntegerLiteral))
-            return paramType->isDouble() ? 0.2 : 0.3;
+        if (candidateType->isInt() || candidateType->isDouble()) {
+          if (paramType->hasTypeParameter() ||
+              paramType->isAnyExistentialType()) {
+            // Attempt to match literal default to generic parameter.
+            // This helps to determine whether there are any generic
+            // overloads that are a possible match.
+            auto score =
+                scoreCandidateMatch(genericSig, choice, candidateType,
+                                    paramType, options - MatchFlag::Literal);
+            if (score == 0)
+              return 0;
 
-          if (candidateType->isDouble() &&
-              TypeChecker::conformsToKnownProtocol(
-                  paramType, KnownProtocolKind::ExpressibleByFloatLiteral))
-            return 0.3;
+            // Optional injection lowers the score for operators to match
+            // pre-optimizer behavior.
+            return choice->isOperator() && paramType->getOptionalObjectType()
+                       ? 0.2
+                       : 0.3;
+          } else {
+            // Integer and floating-point literals can match any parameter
+            // type that conforms to `ExpressibleBy{Integer, Float}Literal`
+            // protocol. Since this assessment is done in isolation we don't
+            // lower the score even though this would be a non-default binding
+            // for a literal.
+            if (candidateType->isInt() &&
+                TypeChecker::conformsToKnownProtocol(
+                    paramType, KnownProtocolKind::ExpressibleByIntegerLiteral))
+              return 0.3;
+
+            if (candidateType->isDouble() &&
+                TypeChecker::conformsToKnownProtocol(
+                    paramType, KnownProtocolKind::ExpressibleByFloatLiteral))
+              return 0.3;
+          }
         }
 
         return 0;
@@ -1069,10 +1091,7 @@ static void determineBestChoicesInContext(
                 continue;
               }
 
-              // Only established arguments could be considered mismatches,
-              // literal default types should be regarded as holes if they
-              // didn't match.
-              if (!candidate.fromLiteral && !candidate.type->hasTypeVariable())
+              if (!candidate.type->hasTypeVariable())
                 mismatches.set(candidateIdx);
             }
 
@@ -1092,18 +1111,6 @@ static void determineBestChoicesInContext(
           // Average the score to avoid disfavoring disjunctions with fewer
           // parameters.
           score /= (overloadType->getNumParams() - numDefaulted);
-
-          // Make sure that the score is uniform for all disjunction
-          // choices that match on literals only, this would make sure that
-          // in operator chains that consist purely of literals we'd
-          // always prefer outermost disjunction instead of innermost
-          // one.
-          //
-          // Preferring outer disjunction first works better in situations
-          // when contextual type for the whole chain becomes available at
-          // some point during solving at it would allow for faster pruning.
-          if (score > 0 && onlyLiteralCandidates && decl->isOperator())
-            score = 0.1;
 
           // If one of the result types matches exactly, that's a good
           // indication that overload choice should be favored.
