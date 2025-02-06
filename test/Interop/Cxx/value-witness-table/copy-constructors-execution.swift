@@ -48,6 +48,11 @@ var CXXCopyConstructorTestSuite = TestSuite("CXX Copy Constructor")
 //   expectTrue(result.0.box.numCopies + result.1.box.numCopies > 0)
 // }
 
+// CXXCopyConstructorTestSuite.test("Func with default args") {
+//   let result = simpleFuncWithDefaultArgs()
+//   expectEqual(result, 13)
+// }
+
 CXXCopyConstructorTestSuite.test("Copy constructor with default argument") {
   @inline(never)
 

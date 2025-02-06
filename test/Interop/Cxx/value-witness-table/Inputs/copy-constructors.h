@@ -36,6 +36,8 @@ struct HasCopyConstructorWithDefaultArgs {
       : value(other.value + value) {}
 };
 
+int simpleFuncWithDefaultArgs(int defaultXPTO = 12) { return defaultXPTO + 1; }
+
 // Make sure that we don't crash on struct templates with copy-constructors.
 template <typename T>
 struct S {

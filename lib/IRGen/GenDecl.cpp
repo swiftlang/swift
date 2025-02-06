@@ -3424,7 +3424,41 @@ llvm::Constant *swift::irgen::emitCXXConstructorThunkIfNeeded(
       Args.push_back(i);
   }
 
+  // DEBUG copy constructors (from cppreference)
+  // - given the class type as T, the first parameter is of type T&, const T&,
+  // volatile T& or const volatile T&, and
+  // - either there are no other parameters, or all other parameters have
+  // default arguments.
+  if (ctor->getParamDecl(1)->hasDefaultArg()) {
+    // TODO call clang default args function
+  }
+
+  // SmallVector<clang::ParmVarDecl *, 8> DefaultArgs;
+  // for (auto i = ctor->param_begin() + Args.size(), e = ctor->param_end();
+  //      i != e; ++i) {
+  // TODO redo
+  // auto *paramTy = ctorFnType->getParamType(i - ctorFnType->param_begin());
+  // auto *paramTy = i->getType();
+
+  // }
+
+  // TODO start from the end of Args
+  // for (auto *param : ctor->parameters().drop_front(Args.size())) {
+  //   param->dump();
+  //   if (param->hasDefaultArg()) {
+  //     DefaultArgs.push_back(param);
+  //   }
+  // }
+
   if (assumedFnType != ctorFnType) {
+    // DEBUG assumedFnType: ptr (ptr, ptr)
+    // DEBUG ctorFnType: ptr (ptr, ptr, i32)
+    // DEBUG f(int = 1, int) -> error: only trailing params can have default
+    // args
+    // DEBUG f(int n, int k = 1)
+    // DEBUG f(int n = 0, int k) -> correct: the
+    // default arg of 'k' is provided in the previous declaration in the same
+    // scope
     clang::CodeGen::ImplicitCXXConstructorArgs implicitArgs =
         clang::CodeGen::getImplicitCXXConstructorArgs(IGM.ClangCodeGen->CGM(),
                                                       ctor);
@@ -3470,6 +3504,8 @@ llvm::CallBase *swift::irgen::emitCXXConstructorCall(
     IRGenFunction &IGF, const clang::CXXConstructorDecl *ctor,
     llvm::FunctionType *ctorFnType, llvm::Constant *ctorAddress,
     llvm::ArrayRef<llvm::Value *> args) {
+
+  // DEBUG here we can get the default arg
   bool canThrow =
       IGF.IGM.isForeignExceptionHandlingEnabled() &&
       !IGF.IGM.isCxxNoThrow(const_cast<clang::CXXConstructorDecl *>(ctor));
