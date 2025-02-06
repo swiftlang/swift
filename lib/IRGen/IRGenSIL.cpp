@@ -4787,6 +4787,12 @@ void IRGenSILFunction::visitEndApply(BeginApplyInst *i, EndApplyInst *ei) {
       llvm::ConstantInt::get(IGM.Int1Ty, isAbort)
     });
 
+  // Destroy the temporaries before setting the lowered value for `ei`, since
+  // `setLoweredExplosion` will insert into the LoweredValues DenseMap and
+  // invalidate the `coroutine` reference.
+  coroutine.Temporaries.destroyAll(*this);
+  emitDeallocYieldOnceCoroutineBuffer(*this, coroutine.Buffer);
+
   if (!isAbort) {
     auto resultType = call->getType();
     if (!resultType->isVoidTy()) {
@@ -4794,13 +4800,12 @@ void IRGenSILFunction::visitEndApply(BeginApplyInst *i, EndApplyInst *ei) {
       // FIXME: Do we need to handle ABI-related conversions here?
       // It seems we cannot have C function convention for coroutines, etc.
       extractScalarResults(*this, resultType, call, e);
+      
+      // NOTE: This inserts a new entry into the LoweredValues DenseMap,
+      // invalidating the reference held by `coroutine`.
       setLoweredExplosion(ei, e);
     }
   }
-
-  coroutine.Temporaries.destroyAll(*this);
-
-  emitDeallocYieldOnceCoroutineBuffer(*this, coroutine.Buffer);
 }
 
 static llvm::BasicBlock *emitBBMapForSwitchValue(
