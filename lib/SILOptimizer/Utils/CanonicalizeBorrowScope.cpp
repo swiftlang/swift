@@ -264,6 +264,7 @@ bool CanonicalizeBorrowScope::visitBorrowScopeUses(SILValue innerValue,
         llvm_unreachable("this operand cannot handle ownership");
 
       case OperandOwnership::InteriorPointer:
+      case OperandOwnership::AnyInteriorPointer:
       case OperandOwnership::EndBorrow:
       case OperandOwnership::Reborrow:
         // Ignore uses that must be within the borrow scope.

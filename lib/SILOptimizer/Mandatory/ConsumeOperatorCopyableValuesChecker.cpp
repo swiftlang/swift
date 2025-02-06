@@ -175,7 +175,8 @@ bool CheckerLivenessInfo::compute() {
           return true;
         });
         break;
-      case OperandOwnership::InteriorPointer: {
+      case OperandOwnership::InteriorPointer:
+      case OperandOwnership::AnyInteriorPointer: {
         // An interior pointer user extends liveness until the end of the
         // interior pointer section.
         //

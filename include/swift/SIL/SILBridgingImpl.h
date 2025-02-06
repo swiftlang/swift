@@ -645,6 +645,8 @@ BridgedOperand::OperandOwnership BridgedOperand::getOperandOwnership() const {
     return OperandOwnership::ForwardingConsume;
   case swift::OperandOwnership::InteriorPointer:
     return OperandOwnership::InteriorPointer;
+  case swift::OperandOwnership::AnyInteriorPointer:
+    return OperandOwnership::AnyInteriorPointer;
   case swift::OperandOwnership::GuaranteedForwarding:
     return OperandOwnership::GuaranteedForwarding;
   case swift::OperandOwnership::EndBorrow:

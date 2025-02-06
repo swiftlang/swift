@@ -965,7 +965,7 @@ struct Wrapper {
 
 // CHECK-LABEL: begin running test {{.*}} on testInteriorMarkDepNonEscAddressValue: ossa_lifetime_completion
 // CHECK-LABEL: sil [ossa] @testInteriorMarkDepNonEscAddressValue : {{.*}} {
-// CHECK: mark_dependence
+// CHECK: mark_dependence [nonescaping]
 // CHECK: end_borrow
 // CHECK-LABEL: } // end sil function 'testInteriorMarkDepNonEscAddressValue'
 // CHECK-LABEL: end running test {{.*}} on testInteriorMarkDepNonEscAddressValue: ossa_lifetime_completion
@@ -975,6 +975,21 @@ bb0(%0 : @owned $Wrapper, %1 : $*Klass):
   %2 = begin_borrow %0 : $Wrapper
   %3 = struct_extract %2 : $Wrapper, #Wrapper.c
   %4 = mark_dependence [nonescaping] %1 : $*Klass on %3 : $Klass
-  end_borrow %2 : $Wrapper
+  unreachable
+}
+
+// CHECK-LABEL: begin running test {{.*}} on testOwnedMarkDepNonEscAddressValue: ossa_lifetime_completion
+// CHECK-LABEL: sil [ossa] @testOwnedMarkDepNonEscAddressValue : {{.*}} {
+// CHECK: end_borrow
+// CHECK: mark_dependence [nonescaping]
+// CHECK: destroy_value [dead_end] %0
+// CHECK-LABEL: } // end sil function 'testOwnedMarkDepNonEscAddressValue'
+// CHECK-LABEL: end running test {{.*}} on testOwnedMarkDepNonEscAddressValue: ossa_lifetime_completion
+sil [ossa] @testOwnedMarkDepNonEscAddressValue : $@convention(thin) (@owned Wrapper, @inout Klass) -> () {
+bb0(%0 : @owned $Wrapper, %1 : $*Klass):
+  specify_test "ossa_lifetime_completion %0 liveness"
+  %2 = begin_borrow %0 : $Wrapper
+  %3 = struct_extract %2 : $Wrapper, #Wrapper.c
+  %4 = mark_dependence [nonescaping] %1 : $*Klass on %0 : $Wrapper
   unreachable
 }

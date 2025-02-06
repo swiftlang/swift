@@ -373,6 +373,7 @@ struct BridgedOperand {
     DestroyingConsume,
     ForwardingConsume,
     InteriorPointer,
+    AnyInteriorPointer,
     GuaranteedForwarding,
     EndBorrow,
     Reborrow

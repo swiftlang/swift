@@ -678,7 +678,7 @@ OperandOwnershipClassifier::visitMarkDependenceInst(MarkDependenceInst *mdi) {
       // which we treat like a borrow.
       return OperandOwnership::Borrow;
     }
-    return OperandOwnership::InteriorPointer;
+    return OperandOwnership::AnyInteriorPointer;
   }
   if (mdi->hasUnresolvedEscape()) {
     // This creates a dependent value that may extend beyond the parent's

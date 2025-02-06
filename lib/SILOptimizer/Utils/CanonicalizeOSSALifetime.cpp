@@ -238,6 +238,7 @@ bool CanonicalizeOSSALifetime::computeCanonicalLiveness() {
         }
         break;
       case OperandOwnership::InteriorPointer:
+      case OperandOwnership::AnyInteriorPointer:
       case OperandOwnership::GuaranteedForwarding:
       case OperandOwnership::EndBorrow:
         // Guaranteed values are exposed by inner adjacent reborrows. If user is
