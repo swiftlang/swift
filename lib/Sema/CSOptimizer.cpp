@@ -1056,19 +1056,6 @@ static void determineBestChoicesInContext(
           if (canUseContextualResultTypes() &&
               (score > 0 || !hasArgumentCandidates)) {
             if (llvm::any_of(resultTypes, [&](const Type candidateResultTy) {
-                  // Avoid increasing weight based on CGFloat result type
-                  // match because that could require narrowing conversion
-                  // in the arguments and that is always detrimental.
-                  //
-                  // For example, `has_CGFloat_param(1.0 + 2.0)` should use
-                  // `+(_: Double, _: Double) -> Double` instead of
-                  // `+(_: CGFloat, _: CGFloat) -> CGFloat` which would match
-                  // parameter of `has_CGFloat_param` exactly but use a
-                  // narrowing conversion for both literals.
-                  if (candidateResultTy->lookThroughAllOptionalTypes()
-                          ->isCGFloat())
-                    return false;
-
                   return scoreCandidateMatch(genericSig, decl,
                                              overloadType->getResult(),
                                              candidateResultTy,
