@@ -1102,6 +1102,10 @@ def prespecialize_generic_metadata : Flag<["-"], "prespecialize-generic-metadata
    HelpText<"Statically specialize metadata for generic types at types that "
             "are known to be used in source.">;
 
+def emit_singleton_metadata_pointer : Flag<["-"], "emit-singleton-metadata-pointer">,
+   HelpText<"Emit a pointer to the corresponding type metadata into non-public "
+            "non-generic type descriptors.">;
+
 def read_legacy_type_info_path_EQ : Joined<["-"], "read-legacy-type-info-path=">,
   HelpText<"Read legacy type layout from the given path instead of default path">;
 
