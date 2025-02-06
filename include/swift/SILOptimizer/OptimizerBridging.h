@@ -259,7 +259,6 @@ struct BridgedPassContext {
                                                             BridgedLinkage linkage, bool isLet) const;
   void inlineFunction(BridgedInstruction apply, bool mandatoryInline) const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedValue getSILUndef(BridgedType type) const;
-  BRIDGED_INLINE bool optimizeMemoryAccesses(BridgedFunction f) const;
   BRIDGED_INLINE bool eliminateDeadAllocations(BridgedFunction f) const;
 
   BRIDGED_INLINE bool shouldExpand(BridgedType type) const;
