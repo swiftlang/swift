@@ -10,7 +10,7 @@
 class Klass {
   // Implicit deinit
   // CHECK: // Klass.deinit
-  // CHECK-NEXT: // Isolation: unspecified
+  // CHECK-NEXT: // Isolation: concurrent
   // CHECK-NEXT: sil hidden [ossa] @$s16assume_mainactor5KlassCfd : $@convention(method) (@guaranteed Klass) -> @owned Builtin.NativeObject {
 
   // Implicit deallocating deinit
@@ -189,7 +189,7 @@ actor MyActor {
 
   // Implicit deinit
   // CHECK: // MyActor.deinit
-  // CHECK-NEXT: // Isolation: unspecified
+  // CHECK-NEXT: // Isolation: concurrent
   // CHECK-NEXT: sil hidden [ossa] @$s16assume_mainactor7MyActorCfd : $@convention(method) (@guaranteed MyActor) -> @owned Builtin.NativeObject {
 
   // Non-async init should be nonisolated
