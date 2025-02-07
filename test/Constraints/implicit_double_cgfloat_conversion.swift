@@ -382,6 +382,10 @@ do {
 }
 
 func test_cgfloat_operator_is_attempted_with_literal_arguments(v: CGFloat?) {
+  // Make sure that @autoclosure thunk calls CGFloat./ and not Double./
+  // CHECK-LABEL: sil private [transparent] [ossa] @$s34implicit_double_cgfloat_conversion05test_C45_operator_is_attempted_with_literal_arguments1vy12CoreGraphics7CGFloatVSg_tFAFyKXEfu_
+  // CHECK: [[CGFLOAT_DIV_OP:%.*]] = function_ref @$s12CoreGraphics7CGFloatV34implicit_double_cgfloat_conversionE1doiyA2C_ACtFZ : $@convention(method) (CGFloat, CGFloat, @thin CGFloat.Type) -> CGFloat
+  // CHECK-NEXT: {{.*}} = apply [[CGFLOAT_DIV_OP]]({{.*}}, %2) : $@convention(method) (CGFloat, CGFloat, @thin CGFloat.Type) -> CGFloat
   let ratio = v ?? (2.0 / 16.0)
   let _: CGFloat = ratio // Ok
 }
