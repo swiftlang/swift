@@ -8078,7 +8078,11 @@ public:
   /// source buffers for e.g. code-completion.
   SourceRange getOriginalBodySourceRange() const;
 
-  /// Retrieve the source range of the function declaration name + patterns.
+  /// Retrieve the source range of the function declaration name and parameter list.
+  SourceRange getParameterListSourceRange() const;
+
+  /// Retrieve the source range of the function declaration name, parameter list,
+  /// and effects. For FuncDecl, this does not include the return type.
   SourceRange getSignatureSourceRange() const;
 
   CaptureInfo getCaptureInfo() const;
