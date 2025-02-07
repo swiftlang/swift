@@ -603,9 +603,8 @@ static bool ctorHopsInjectedByDefiniteInit(ConstructorDecl *ctor,
   case ActorIsolation::Unspecified:
   case ActorIsolation::Nonisolated:
   case ActorIsolation::NonisolatedUnsafe:
-  case ActorIsolation::Concurrent:
-  case ActorIsolation::ConcurrentUnsafe:
   case ActorIsolation::GlobalActor:
+  case ActorIsolation::CallerIsolationInheriting:
     return false;
   }
 }
@@ -1559,8 +1558,7 @@ void SILGenFunction::emitMemberInitializer(DeclContext *dc, VarDecl *selfDecl,
     case ActorIsolation::Unspecified:
     case ActorIsolation::Nonisolated:
     case ActorIsolation::NonisolatedUnsafe:
-    case ActorIsolation::Concurrent:
-    case ActorIsolation::ConcurrentUnsafe:
+    case ActorIsolation::CallerIsolationInheriting:
       break;
 
     case ActorIsolation::Erased:

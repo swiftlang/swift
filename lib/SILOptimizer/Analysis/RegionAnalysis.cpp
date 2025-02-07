@@ -2430,7 +2430,7 @@ public:
         // locations (which is how we grab our AST information).
         !(applyExpr && applyExpr->getIsolationCrossing()
                            ->getCalleeIsolation()
-                           .isConcurrent());
+                           .isNonisolated());
 
     for (auto result : applyResults) {
       if (auto value = tryToTrackValue(result)) {

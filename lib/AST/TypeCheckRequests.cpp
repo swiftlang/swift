@@ -1856,11 +1856,10 @@ SourceLoc MacroDefinitionRequest::getNearestLoc() const {
 
 bool ActorIsolation::requiresSubstitution() const {
   switch (kind) {
+  case CallerIsolationInheriting:
   case ActorInstance:
   case Nonisolated:
   case NonisolatedUnsafe:
-  case Concurrent:
-  case ConcurrentUnsafe:
   case Unspecified:
     return false;
 
@@ -1873,10 +1872,9 @@ bool ActorIsolation::requiresSubstitution() const {
 ActorIsolation ActorIsolation::subst(SubstitutionMap subs) const {
   switch (kind) {
   case ActorInstance:
+  case CallerIsolationInheriting:
   case Nonisolated:
   case NonisolatedUnsafe:
-  case Concurrent:
-  case ConcurrentUnsafe:
   case Unspecified:
     return *this;
 
@@ -1895,6 +1893,11 @@ void ActorIsolation::printForDiagnostics(llvm::raw_ostream &os,
     os << "actor" << (asNoun ? " isolation" : "-isolated");
     break;
 
+  case ActorIsolation::CallerIsolationInheriting:
+    os << "caller isolation inheriting"
+       << (asNoun ? " isolation" : "-isolated");
+    break;
+
   case ActorIsolation::GlobalActor: {
     if (isMainActor()) {
       os << "main actor" << (asNoun ? " isolation" : "-isolated");
@@ -1909,13 +1912,11 @@ void ActorIsolation::printForDiagnostics(llvm::raw_ostream &os,
     os << "@isolated(any)";
     break;
 
-  case ActorIsolation::Concurrent:
-  case ActorIsolation::ConcurrentUnsafe:
   case ActorIsolation::Nonisolated:
   case ActorIsolation::NonisolatedUnsafe:
   case ActorIsolation::Unspecified:
     os << "nonisolated";
-    if (isUnsafe()) {
+    if (*this == ActorIsolation::NonisolatedUnsafe) {
       os << "(unsafe)";
     }
     break;
@@ -1933,17 +1934,14 @@ void ActorIsolation::print(llvm::raw_ostream &os) const {
       os << ". name: '" << vd->getBaseIdentifier() << "'";
     }
     return;
+  case CallerIsolationInheriting:
+    os << "caller_isolation_inheriting";
+    return;
   case Nonisolated:
     os << "nonisolated";
     return;
   case NonisolatedUnsafe:
     os << "nonisolated_unsafe";
-    return;
-  case Concurrent:
-    os << "concurrent";
-    return;
-  case ConcurrentUnsafe:
-    os << "concurrent_unsafe";
     return;
   case GlobalActor:
     os << "global_actor. type: " << getGlobalActor();
@@ -1963,17 +1961,14 @@ void ActorIsolation::printForSIL(llvm::raw_ostream &os) const {
   case ActorInstance:
     os << "actor_instance";
     return;
+  case CallerIsolationInheriting:
+    os << "caller_isolation_inheriting";
+    return;
   case Nonisolated:
     os << "nonisolated";
     return;
   case NonisolatedUnsafe:
     os << "nonisolated_unsafe";
-    return;
-  case Concurrent:
-    os << "concurrent";
-    return;
-  case ConcurrentUnsafe:
-    os << "concurrent_unsafe";
     return;
   case GlobalActor:
     os << "global_actor";
@@ -2014,12 +2009,14 @@ void swift::simple_display(
       }
       break;
 
+    case ActorIsolation::CallerIsolationInheriting:
+      out << "isolated to isolation of caller";
+      break;
+
     case ActorIsolation::Nonisolated:
     case ActorIsolation::NonisolatedUnsafe:
-    case ActorIsolation::Concurrent:
-    case ActorIsolation::ConcurrentUnsafe:
       out << "nonisolated";
-      if (state.isUnsafe()) {
+      if (state == ActorIsolation::NonisolatedUnsafe) {
         out << "(unsafe)";
       }
       break;

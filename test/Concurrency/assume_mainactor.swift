@@ -15,17 +15,17 @@ class Klass {
 
   // Implicit deallocating deinit
   // CHECK: // Klass.__deallocating_deinit
-  // CHECK-NEXT: // Isolation: concurrent
+  // CHECK-NEXT: // Isolation: nonisolated
   // CHECK-NEXT: sil hidden [ossa] @$s16assume_mainactor5KlassCfD : $@convention(method) (@owned Klass) -> () {
 
   // Implicit allocating init
   // CHECK: // Klass.__allocating_init()
-  // CHECK-NEXT: // Isolation: concurrent
+  // CHECK-NEXT: // Isolation: nonisolated
   // CHECK-NEXT: sil hidden [exact_self_class] [ossa] @$s16assume_mainactor5KlassCACycfC : $@convention(method) (@thick Klass.Type) -> @owned Klass {
 
   // Implicit designated init
   // CHECK: // Klass.init()
-  // CHECK-NEXT: // Isolation: concurrent
+  // CHECK-NEXT: // Isolation: nonisolated
   // CHECK-NEXT: sil hidden [ossa] @$s16assume_mainactor5KlassCACycfc : $@convention(method) (@owned Klass) -> @owned Klass {
 }
 
@@ -44,7 +44,7 @@ struct StructContainingKlass {
   var k = Klass()
 
   // CHECK: // StructContainingKlass.init()
-  // CHECK-NEXT: // Isolation: concurrent
+  // CHECK-NEXT: // Isolation: nonisolated
   // CHECK-NEXT: sil hidden [ossa] @$s16assume_mainactor21StructContainingKlassVACycfC : $@convention(method) (@thin StructContainingKlass.Type) -> @owned StructContainingKlass {
 }
 
@@ -64,7 +64,7 @@ struct NonIsolatedStructContainingKlass {
   var k = Klass()
 
   // CHECK: // NonIsolatedStructContainingKlass.init()
-  // CHECK-NEXT: // Isolation: concurrent
+  // CHECK-NEXT: // Isolation: nonisolated
   // CHECK-NEXT: sil hidden [ossa] @$s16assume_mainactor32NonIsolatedStructContainingKlassVACycfC : $@convention(method) (@thin NonIsolatedStructContainingKlass.Type) -> @owned NonIsolatedStructContainingKlass {
 }
 
@@ -79,7 +79,7 @@ actor CustomActor {
 func unspecifiedAsync<T>(_ t: T) async {}
 
 // CHECK: // nonisolatedAsync<A>(_:)
-// CHECK-NEXT: // Isolation: concurrent
+// CHECK-NEXT: // Isolation: nonisolated
 // CHECK-NEXT: sil hidden [ossa] @$s16assume_mainactor16nonisolatedAsyncyyxYalF : $@convention(thin) @async <T> (@in_guaranteed T) -> () {
 nonisolated func nonisolatedAsync<T>(_ t: T) async {}
 
@@ -152,7 +152,7 @@ func unspecifiedFunctionTest3() async {
 }
 
 // CHECK: // nonisolatedFunctionTest()
-// CHECK-NEXT: // Isolation: concurrent
+// CHECK-NEXT: // Isolation: nonisolated
 // CHECK-NEXT: sil hidden [ossa] @$s16assume_mainactor23nonisolatedFunctionTestyyYaF : $@convention(thin) @async () -> () {
 nonisolated func nonisolatedFunctionTest() async {
   let k = NonIsolatedStructContainingKlass()
@@ -194,7 +194,7 @@ actor MyActor {
 
   // Non-async init should be nonisolated
   // CHECK: // MyActor.init()
-  // CHECK-NEXT: // Isolation: concurrent
+  // CHECK-NEXT: // Isolation: nonisolated
   // CHECK-NEXT: sil hidden [ossa] @$s16assume_mainactor7MyActorCACycfc : $@convention(method) (@owned MyActor) -> @owned MyActor {
 }
 
