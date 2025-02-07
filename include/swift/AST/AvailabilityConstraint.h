@@ -17,6 +17,7 @@
 #ifndef SWIFT_AST_AVAILABILITY_CONSTRAINT_H
 #define SWIFT_AST_AVAILABILITY_CONSTRAINT_H
 
+#include "swift/AST/Attr.h"
 #include "swift/AST/AvailabilityDomain.h"
 #include "swift/AST/AvailabilityRange.h"
 #include "swift/AST/PlatformKind.h"
@@ -25,7 +26,6 @@
 namespace swift {
 
 class ASTContext;
-class AvailableAttr;
 
 /// Represents the reason a declaration could be considered unavailable in a
 /// certain context.
