@@ -133,9 +133,16 @@ AvailabilityRange AvailabilityContext::getPlatformRange() const {
   return storage->info.Range;
 }
 
-std::optional<AvailabilityDomain>
-AvailabilityContext::getUnavailableDomain() const {
-  return storage->info.UnavailableDomain;
+bool AvailabilityContext::isUnavailable() const {
+  return storage->info.UnavailableDomain.has_value();
+}
+
+bool AvailabilityContext::containsUnavailableDomain(
+    AvailabilityDomain domain) const {
+  if (auto unavailableDomain = storage->info.UnavailableDomain)
+    return unavailableDomain->contains(domain);
+
+  return false;
 }
 
 bool AvailabilityContext::isDeprecated() const {
@@ -155,10 +162,6 @@ void AvailabilityContext::constrainWithContext(const AvailabilityContext &other,
   storage = Storage::get(info, ctx);
 }
 
-void AvailabilityContext::constrainWithDecl(const Decl *decl) {
-  constrainWithDeclAndPlatformRange(decl, AvailabilityRange::alwaysAvailable());
-}
-
 void AvailabilityContext::constrainWithPlatformRange(
     const AvailabilityRange &platformRange, ASTContext &ctx) {
 
@@ -167,6 +170,19 @@ void AvailabilityContext::constrainWithPlatformRange(
     return;
 
   storage = Storage::get(info, ctx);
+}
+
+void AvailabilityContext::constrainWithUnavailableDomain(
+    AvailabilityDomain domain, ASTContext &ctx) {
+  Info info{storage->info};
+  if (!info.constrainUnavailability(domain))
+    return;
+
+  storage = Storage::get(info, ctx);
+}
+
+void AvailabilityContext::constrainWithDecl(const Decl *decl) {
+  constrainWithDeclAndPlatformRange(decl, AvailabilityRange::alwaysAvailable());
 }
 
 void AvailabilityContext::constrainWithDeclAndPlatformRange(
@@ -203,7 +219,7 @@ stringForAvailability(const AvailabilityRange &availability) {
 void AvailabilityContext::print(llvm::raw_ostream &os) const {
   os << "version=" << stringForAvailability(getPlatformRange());
 
-  if (auto unavailableDomain = getUnavailableDomain())
+  if (auto unavailableDomain = storage->info.UnavailableDomain)
     os << " unavailable=" << unavailableDomain->getNameForAttributePrinting();
 
   if (isDeprecated())
