@@ -1793,8 +1793,9 @@ final class ElfImage<SomeElfTraits: ElfTraits>
     }
   }
 
-  private lazy var dwarfReader
-    = try? DwarfReader(source: self, shouldSwap: header.shouldByteSwap)
+  private lazy var dwarfReader = { [unowned self] in
+    try? DwarfReader(source: self, shouldSwap: header.shouldByteSwap)
+  }()
 
   typealias CallSiteInfo = DwarfReader<ElfImage>.CallSiteInfo
 
