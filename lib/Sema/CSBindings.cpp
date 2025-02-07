@@ -2895,6 +2895,21 @@ static bool shouldIgnoreHoleForCodeCompletion(ConstraintSystem &cs,
   if (typeVar->getImpl().isCodeCompletionToken())
     return true;
 
+  // When doing completion in a result builder, we avoid solving unrelated
+  // expressions by replacing them with unbound placeholder variables.
+  // As such, we need to avoid penalizing holes for references to
+  // placeholder variables.
+  if (srcLocator->isLastElement<LocatorPathElt::PlaceholderType>()) {
+    if (auto *DRE = getAsExpr<DeclRefExpr>(srcLocator->getAnchor())) {
+      if (auto *VD = dyn_cast_or_null<VarDecl>(DRE->getDecl())) {
+        if (auto *PBD = VD->getParentPatternBinding()) {
+          if (isPlaceholderVar(PBD))
+            return true;
+        }
+      }
+    }
+  }
+  
   // Don't penalize solutions with holes due to missing arguments after the
   // code completion position.
   auto argLoc = srcLocator->findLast<LocatorPathElt::SynthesizedArgument>();
