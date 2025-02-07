@@ -9,10 +9,10 @@
 // expected-error@-1 {{duplicate attribute}} expected-note@-1 {{attribute already specified here}}
 
 @execution(concurrent) func nonAsync1() {}
-// expected-error@-1 {{cannot use '@execution(concurrent)' on non-async global function 'nonAsync1()'}}
+// expected-error@-1 {{cannot use '@execution' on non-async global function 'nonAsync1()'}}
 
 @execution(caller) func nonAsync2() {}
-// expected-error@-1 {{cannot use '@execution(concurrent)' on non-async global function 'nonAsync2()'}}
+// expected-error@-1 {{cannot use '@execution' on non-async global function 'nonAsync2()'}}
 
 @execution(concurrent) func testGlobal() async {} // Ok
 
@@ -21,7 +21,7 @@ struct Test {
   // expected-error@-1 {{@execution(concurrent) may only be used on 'func' declarations}}
 
   @execution(concurrent) func member() {}
-  // expected-error@-1 {{cannot use '@execution(concurrent)' on non-async instance method 'member()'}}
+  // expected-error@-1 {{cannot use '@execution' on non-async instance method 'member()'}}
 
   @execution(concurrent) func member() async {} // Ok
 

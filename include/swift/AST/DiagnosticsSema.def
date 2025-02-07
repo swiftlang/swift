@@ -8257,9 +8257,13 @@ ERROR(attr_abi_incompatible_with_silgen_name,none,
 // MARK: @execution Attribute
 //===----------------------------------------------------------------------===//
 
-ERROR(attr_execution_concurrent_only_on_async,none,
-      "cannot use '@execution(concurrent)' on non-async %kind0",
+ERROR(attr_execution_only_on_async,none,
+      "cannot use '@execution' on non-async %kind0",
       (ValueDecl *))
+
+ERROR(attr_execution_type_attr_only_on_async,none,
+      "cannot use '@execution' on non-async function type",
+      ())
 
 ERROR(attr_execution_concurrent_incompatible_isolated_parameter,none,
       "cannot use '@execution(concurrent)' on %kind0 because it has "
@@ -8275,6 +8279,19 @@ ERROR(attr_execution_concurrent_incompatible_with_nonisolated,none,
       "cannot use '@execution(concurrent)' and 'nonisolated' on the same %0 "
       "because they serve the same purpose",
       (ValueDecl *))
+
+ERROR(attr_execution_concurrent_type_attr_incompatible_with_global_isolation,none,
+      "cannot use '@execution(concurrent)' because function type is "
+      "isolated to global actor %0",
+      (Type))
+
+ERROR(attr_execution_concurrent_type_attr_incompatible_with_isolated_param,none,
+      "cannot use '@execution(concurrent)' together with isolated parameter",
+      ())
+
+ERROR(attr_execution_concurrent_type_attr_incompatible_with_isolated_any,none,
+      "cannot use '@execution(concurrent)' together with @isolated(any)",
+      ())
 
 
 #define UNDEFINE_DIAGNOSTIC_MACROS

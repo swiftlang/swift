@@ -4197,6 +4197,51 @@ NeverNullType TypeResolver::resolveASTFunctionType(
     }
   }
 
+  if (auto executionAttr = claim<ExecutionTypeAttr>(attrs)) {
+    if (!repr->isAsync()) {
+      diagnoseInvalid(repr, executionAttr->getAtLoc(),
+                      diag::attr_execution_type_attr_only_on_async);
+    }
+
+    switch (isolation.getKind()) {
+    case FunctionTypeIsolation::Kind::NonIsolated:
+      break;
+
+    case FunctionTypeIsolation::Kind::GlobalActor:
+      diagnoseInvalid(
+          repr, executionAttr->getAtLoc(),
+          diag::
+              attr_execution_concurrent_type_attr_incompatible_with_global_isolation,
+          isolation.getGlobalActorType());
+      break;
+
+    case FunctionTypeIsolation::Kind::Parameter:
+      diagnoseInvalid(
+          repr, executionAttr->getAtLoc(),
+          diag::
+              attr_execution_concurrent_type_attr_incompatible_with_isolated_param);
+      break;
+
+    case FunctionTypeIsolation::Kind::Erased:
+      diagnoseInvalid(
+          repr, executionAttr->getAtLoc(),
+          diag::
+              attr_execution_concurrent_type_attr_incompatible_with_isolated_any);
+      break;
+    }
+
+    if (!repr->isInvalid()) {
+      switch (executionAttr->getBehavior()) {
+      case ExecutionKind::Concurrent:
+        // TODO: We need to introduce a new isolation kind to support this.
+        break;
+      case ExecutionKind::Caller:
+        isolation = FunctionTypeIsolation::forNonIsolated();
+        break;
+      }
+    }
+  }
+
   if (auto *lifetimeRepr = dyn_cast_or_null<LifetimeDependentTypeRepr>(
           repr->getResultTypeRepr())) {
     diagnoseInvalid(lifetimeRepr, lifetimeRepr->getLoc(),

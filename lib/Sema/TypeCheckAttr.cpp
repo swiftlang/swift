@@ -259,8 +259,7 @@ public:
       return;
 
     if (!F->hasAsync()) {
-      diagnoseAndRemoveAttr(attr, diag::attr_execution_concurrent_only_on_async,
-                            F);
+      diagnoseAndRemoveAttr(attr, diag::attr_execution_only_on_async, F);
       return;
     }
 
