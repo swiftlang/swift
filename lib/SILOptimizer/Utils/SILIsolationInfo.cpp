@@ -96,7 +96,7 @@ public:
       if (auto *mri = dyn_cast<MemberRefExpr>(expr)) {
         if (mri->hasDecl()) {
           auto isolation = swift::getActorIsolation(mri->getDecl().getDecl());
-          if (isolation.isUnsafe())
+          if (isolation.isNonisolatedUnsafe())
             return true;
         }
       }
@@ -485,16 +485,17 @@ SILIsolationInfo SILIsolationInfo::get(SILInstruction *inst) {
     if (nomDecl->isAnyActor())
       return SILIsolationInfo::getActorInstanceIsolated(rei, rei->getOperand(),
                                                         nomDecl)
-          .withUnsafeNonIsolated(varIsolation.isUnsafe());
+          .withUnsafeNonIsolated(varIsolation.isNonisolatedUnsafe());
 
     if (auto isolation = swift::getActorIsolation(nomDecl)) {
       assert(isolation.isGlobalActor());
       return SILIsolationInfo::getGlobalActorIsolated(
                  rei, isolation.getGlobalActor())
-          .withUnsafeNonIsolated(varIsolation.isUnsafe());
+          .withUnsafeNonIsolated(varIsolation.isNonisolatedUnsafe());
     }
 
-    return SILIsolationInfo::getDisconnected(varIsolation.isUnsafe());
+    return SILIsolationInfo::getDisconnected(
+        varIsolation.isNonisolatedUnsafe());
   }
 
   // Check if we have a global_addr inst.
@@ -507,7 +508,7 @@ SILIsolationInfo SILIsolationInfo::get(SILInstruction *inst) {
               ga, isolation.getGlobalActor());
         }
 
-        if (isolation.isUnsafe()) {
+        if (isolation.isNonisolatedUnsafe()) {
           return SILIsolationInfo::getDisconnected(
               true /*is nonisolated(unsafe)*/);
         }
@@ -544,7 +545,7 @@ SILIsolationInfo SILIsolationInfo::get(SILInstruction *inst) {
       }
 
       // Then check if we have something that is nonisolated unsafe.
-      if (isolation.isUnsafe()) {
+      if (isolation.isNonisolatedUnsafe()) {
         // First check if our function_ref is a method of a global actor
         // isolated type. In such a case, we create a global actor isolated
         // nonisolated(unsafe) so that if we assign the value to another
@@ -623,7 +624,7 @@ SILIsolationInfo SILIsolationInfo::get(SILInstruction *inst) {
             // Check if we have a global actor and handle it appropriately.
             if (isolation.getKind() == ActorIsolation::GlobalActor) {
               bool localNonIsolatedUnsafe =
-                  isNonIsolatedUnsafe | isolation.isUnsafe();
+                  isNonIsolatedUnsafe | isolation.isNonisolatedUnsafe();
               return SILIsolationInfo::getGlobalActorIsolated(
                          cmi, isolation.getGlobalActor())
                   .withUnsafeNonIsolated(localNonIsolatedUnsafe);
@@ -633,7 +634,7 @@ SILIsolationInfo SILIsolationInfo::get(SILInstruction *inst) {
             if (isolation.getKind() != ActorIsolation::ActorInstance &&
                 isolation.isActorInstanceForSelfParameter()) {
               bool localNonIsolatedUnsafe =
-                  isNonIsolatedUnsafe | isolation.isUnsafe();
+                  isNonIsolatedUnsafe | isolation.isNonisolatedUnsafe();
               return SILIsolationInfo::getActorInstanceIsolated(
                          cmi, cmi->getOperand(),
                          cmi->getOperand()
@@ -650,7 +651,7 @@ SILIsolationInfo SILIsolationInfo::get(SILInstruction *inst) {
               // Check if we have a global actor and handle it appropriately.
               if (isolation.getKind() == ActorIsolation::GlobalActor) {
                 bool localNonIsolatedUnsafe =
-                    isNonIsolatedUnsafe | isolation.isUnsafe();
+                    isNonIsolatedUnsafe | isolation.isNonisolatedUnsafe();
                 return SILIsolationInfo::getGlobalActorIsolated(
                            cmi, isolation.getGlobalActor())
                     .withUnsafeNonIsolated(localNonIsolatedUnsafe);
@@ -660,7 +661,7 @@ SILIsolationInfo SILIsolationInfo::get(SILInstruction *inst) {
               if (isolation.getKind() != ActorIsolation::ActorInstance &&
                   isolation.isActorInstanceForSelfParameter()) {
                 bool localNonIsolatedUnsafe =
-                    isNonIsolatedUnsafe | isolation.isUnsafe();
+                    isNonIsolatedUnsafe | isolation.isNonisolatedUnsafe();
                 return SILIsolationInfo::getActorInstanceIsolated(
                            cmi, cmi->getOperand(),
                            cmi->getOperand()
@@ -683,16 +684,20 @@ SILIsolationInfo SILIsolationInfo::get(SILInstruction *inst) {
     auto varIsolation = swift::getActorIsolation(sei->getField());
     if (auto isolation =
             SILIsolationInfo::getGlobalActorIsolated(sei, sei->getStructDecl()))
-      return isolation.withUnsafeNonIsolated(varIsolation.isUnsafe());
-    return SILIsolationInfo::getDisconnected(varIsolation.isUnsafe());
+      return isolation.withUnsafeNonIsolated(
+          varIsolation.isNonisolatedUnsafe());
+    return SILIsolationInfo::getDisconnected(
+        varIsolation.isNonisolatedUnsafe());
   }
 
   if (auto *seai = dyn_cast<StructElementAddrInst>(inst)) {
     auto varIsolation = swift::getActorIsolation(seai->getField());
     if (auto isolation = SILIsolationInfo::getGlobalActorIsolated(
             seai, seai->getStructDecl()))
-      return isolation.withUnsafeNonIsolated(varIsolation.isUnsafe());
-    return SILIsolationInfo::getDisconnected(varIsolation.isUnsafe());
+      return isolation.withUnsafeNonIsolated(
+          varIsolation.isNonisolatedUnsafe());
+    return SILIsolationInfo::getDisconnected(
+        varIsolation.isNonisolatedUnsafe());
   }
 
   // See if we have an unchecked_enum_data from a global actor isolated type.
@@ -770,7 +775,7 @@ SILIsolationInfo SILIsolationInfo::get(SILInstruction *inst) {
     if (asi->isFromVarDecl()) {
       if (auto *varDecl = asi->getLoc().getAsASTNode<VarDecl>()) {
         auto isolation = swift::getActorIsolation(varDecl);
-        if (isolation.isUnsafe()) {
+        if (isolation.getKind() == ActorIsolation::NonisolatedUnsafe) {
           return SILIsolationInfo::getDisconnected(
               true /*is nonisolated(unsafe)*/);
         }
@@ -790,7 +795,7 @@ SILIsolationInfo SILIsolationInfo::get(SILInstruction *inst) {
         if (auto *dbg = dyn_cast<DebugValueInst>(debugInfo->getUser())) {
           if (auto *varDecl = dbg->getLoc().getAsASTNode<VarDecl>()) {
             auto isolation = swift::getActorIsolation(varDecl);
-            if (isolation.isUnsafe()) {
+            if (isolation.getKind() == ActorIsolation::NonisolatedUnsafe) {
               return SILIsolationInfo::getDisconnected(
                   true /*is nonisolated(unsafe)*/);
             }
@@ -811,7 +816,7 @@ SILIsolationInfo SILIsolationInfo::get(SILInstruction *inst) {
   // caused by the actor instances not matching.
   if (ApplyExpr *apply = inst->getLoc().getAsASTNode<ApplyExpr>()) {
     if (auto crossing = apply->getIsolationCrossing()) {
-      if (crossing->getCalleeIsolation().isConcurrent()) {
+      if (crossing->getCalleeIsolation().isNonisolated()) {
         return SILIsolationInfo::getDisconnected(false /*nonisolated(unsafe)*/);
       }
     }

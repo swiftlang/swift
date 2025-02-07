@@ -3905,19 +3905,18 @@ public:
     switch (auto isolation = E->getActorIsolation()) {
     case ActorIsolation::Unspecified:
     case ActorIsolation::NonisolatedUnsafe:
-    case ActorIsolation::ConcurrentUnsafe:
       break;
 
     case ActorIsolation::Nonisolated:
       printFlag(true, "nonisolated", CapturesColor);
       break;
 
-    case ActorIsolation::Concurrent:
-      printFlag(true, "concurrent", CapturesColor);
-      break;
-
     case ActorIsolation::Erased:
       printFlag(true, "dynamically_isolated", CapturesColor);
+      break;
+
+    case ActorIsolation::CallerIsolationInheriting:
+      printFlag(true, "isolated_to_caller_isolation", CapturesColor);
       break;
 
     case ActorIsolation::ActorInstance:
