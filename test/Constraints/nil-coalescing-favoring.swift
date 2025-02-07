@@ -12,3 +12,19 @@ struct A {
     self.init(other ?? ._none)
   }
 }
+
+do {
+  class Super {}
+  class Sub: Super {}
+
+  func flatMap<R>(_: (Int) -> R?) -> R? {}
+
+  func test() {
+    let dict: Dictionary<Int, Sub>
+    let sup: Super
+
+    // CHECK: declref_expr type="(consuming Super?, @autoclosure () throws -> Super) throws -> Super" {{.*}} decl="Swift.(file).??
+    let x = flatMap { dict[$0] } ?? sup // Ok
+    let _: Super = x
+  }
+}
