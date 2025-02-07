@@ -2030,7 +2030,8 @@ static void
 lowerCaptureContextParameters(TypeConverter &TC, SILDeclRef function,
                               CanGenericSignature genericSig,
                               TypeExpansionContext expansion,
-                              SmallVectorImpl<SILParameterInfo> &inputs) {
+                              SmallVectorImpl<SILParameterInfo> &inputs,
+                              SILExtInfoBuilder &extInfo) {
 
   // If the function is a closure being converted to an @isolated(any) type,
   // add the implicit isolation parameter.
@@ -2039,6 +2040,7 @@ lowerCaptureContextParameters(TypeConverter &TC, SILDeclRef function,
       auto isolationTy = SILType::getOpaqueIsolationType(TC.Context);
       inputs.push_back({isolationTy.getASTType(),
                         ParameterConvention::Direct_Guaranteed});
+      extInfo = extInfo.withErasedIsolation(false);
     }
   }
 
@@ -2573,7 +2575,7 @@ static CanSILFunctionType getSILFunctionType(
     // don't need to keep its capture types opaque.
     lowerCaptureContextParameters(TC, *constant, genericSig,
                                   TC.getCaptureTypeExpansionContext(*constant),
-                                  inputs);
+                                  inputs, extInfoBuilder);
   }
   
   auto calleeConvention = ParameterConvention::Direct_Unowned;
