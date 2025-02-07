@@ -3248,7 +3248,7 @@ if (-not $SkipBuild) {
     }
     Invoke-BuildStep Write-SDKSettingsPlist Android $Arch
 
-    Invoke-BuildStep Build-ExperimentalRuntime -Static Android $Arch
+    #Invoke-BuildStep Build-ExperimentalRuntime -Static Android $Arch
     Invoke-BuildStep Build-Foundation -Static Android $Arch
   }
 
