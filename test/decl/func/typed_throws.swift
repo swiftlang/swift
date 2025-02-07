@@ -211,3 +211,8 @@ extension Result {
     }
   }
 }
+
+struct NotAnError<T> {}
+
+func badThrowingFunctionType<T>(_: () throws(NotAnError<T>) -> ()) {}
+// expected-error@-1 {{thrown type 'NotAnError<T>' does not conform to the 'Error' protocol}}
