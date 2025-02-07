@@ -670,10 +670,10 @@ def create_argument_parser():
                 'such as the libcurl dependency of FoundationNetworking')
 
     option('--cross-compile-sysroots', store_path,
-           help='The path to a directory that contains a C/C++ sysroot for a '
-                'different platform and/or architecture for cross-compiling Swift. '
-                'The sysroot must contain C/C++ libraries that match the '
-                'architecture that is being built for.')
+           help='Path(s) to one or more directories that contain C/C++ sysroots for '
+                'different platforms and/or architectures for cross-compiling Swift. '
+                'The sysroots must contain C/C++ libraries that match the '
+                'architectures that are being built for.')
 
     option('--cross-compile-append-host-target-to-destdir', toggle_true,
            default=True,
