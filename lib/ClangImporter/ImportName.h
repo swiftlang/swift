@@ -230,12 +230,16 @@ class ImportedName {
 
     unsigned hasAsyncAlternateInfo: 1;
 
+    /// Whether this declaration had a custom name that was ignored because it
+    /// was invalid.
+    unsigned hasInvalidCustomName : 1;
+
     Info()
         : errorInfo(), selfIndex(), initKind(CtorInitializerKind::Designated),
           accessorKind(ImportedAccessorKind::None), hasCustomName(false),
           droppedVariadic(false), importAsMember(false), hasSelfIndex(false),
           hasErrorInfo(false), hasAsyncInfo(false),
-          hasAsyncAlternateInfo(false) {}
+          hasAsyncAlternateInfo(false), hasInvalidCustomName(false) {}
   } info;
 
 public:
@@ -312,6 +316,10 @@ public:
   /// swift_name attribute.
   bool hasCustomName() const { return info.hasCustomName; }
   void setHasCustomName() { info.hasCustomName = true; }
+
+  /// Whether this declaration had a custom name that was ignored because it
+  /// was invalid.
+  bool hasInvalidCustomName() const { return info.hasInvalidCustomName; }
 
   /// Whether this was one of a special class of Objective-C
   /// initializers for which we drop the variadic argument rather
@@ -488,6 +496,10 @@ public:
   inline void enableSymbolicImportFeature(bool isEnabled) {
     importSymbolicCXXDecls = isEnabled;
   }
+
+  /// Retrieve a purported custom name even if it is invalid.
+  static std::optional<StringRef>
+  findCustomName(const clang::Decl *decl, ImportNameVersion version);
 
 private:
   bool enableObjCInterop() const { return swiftCtx.LangOpts.EnableObjCInterop; }
