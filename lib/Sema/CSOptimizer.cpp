@@ -78,7 +78,7 @@ static bool isSupportedOperator(Constraint *disjunction) {
 
   auto name = decl->getBaseIdentifier();
   if (name.isArithmeticOperator() || name.isStandardComparisonOperator() ||
-      name.isBitwiseOperator()) {
+      name.isBitwiseOperator() || name.isNilCoalescingOperator()) {
     return true;
   }
 
@@ -783,7 +783,8 @@ static void determineBestChoicesInContext(
             // Injection lowers the score slightly to comply with
             // old behavior where exact matches on operator parameter
             // types were always preferred.
-            return score == 1 && choice->isOperator() ? 0.9 : score;
+            return score > 0 && choice->isOperator() ? score.value() - 0.1
+                                                     : score;
           }
 
           // Optionality mismatch.
@@ -1023,6 +1024,9 @@ static void determineBestChoicesInContext(
 
             auto paramType = param.getPlainType();
 
+            if (paramFlags.isAutoClosure())
+              paramType = paramType->castTo<AnyFunctionType>()->getResult();
+
             // FIXME: Let's skip matching function types for now
             // because they have special rules for e.g. Concurrency
             // (around @Sendable) and @convention(c).
@@ -1146,7 +1150,7 @@ static void determineBestChoicesInContext(
                                [&resultTy](const auto &param) {
                                  return param.getPlainType()->isEqual(resultTy);
                                }))
-                score += 0.1;
+                score += 0.01;
             }
 
             favoredChoices.push_back({choice, score});
