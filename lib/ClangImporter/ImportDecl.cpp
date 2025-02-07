@@ -9973,13 +9973,14 @@ void ClangImporter::Implementation::loadAllMembersOfRecordDecl(
       // This means we found a member in a C++ record's base class.
       assert(swiftDecl->getClangDecl() != clangRecord);
       auto baseMember = cast<ValueDecl>(member);
+      auto *baseClangDecl = baseMember->getClangDecl();
 
       // Skip this member if this is a case of nested private inheritance.
       //
       // BUG: private base class members should be inherited but inaccessible.
       // Skipping them here may affect accurate overload resolution in cases of
       // multiple inheritance (which is currently buggy anyway).
-      if (baseMember->getClangDecl()->getAccess() == clang::AS_private)
+      if (baseClangDecl && baseClangDecl->getAccess() == clang::AS_private)
         continue;
 
       // Do not clone the base member into the derived class
