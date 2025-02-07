@@ -2143,6 +2143,18 @@ BridgedTypeAttribute BridgedTypeAttribute_createIsolated(
     BridgedSourceLoc cLPLoc, BridgedSourceLoc cIsolationLoc,
     BridgedIsolatedTypeAttrIsolationKind cIsolation, BridgedSourceLoc cRPLoc);
 
+enum ENUM_EXTENSIBILITY_ATTR(closed) BridgedExecutionTypeAttrExecutionKind {
+  BridgedExecutionTypeAttrExecutionKind_Concurrent,
+  BridgedExecutionTypeAttrExecutionKind_Caller
+};
+
+SWIFT_NAME("BridgedTypeAttribute.createExecution(_:atLoc:nameLoc:lpLoc:behaviorLoc:behavior:rpLoc:)")
+BridgedTypeAttribute BridgedTypeAttribute_createExecution(
+    BridgedASTContext cContext,
+    BridgedSourceLoc cAtLoc, BridgedSourceLoc cNameLoc,
+    BridgedSourceLoc cLPLoc, BridgedSourceLoc cBehaviorLoc,
+    BridgedExecutionTypeAttrExecutionKind behavior, BridgedSourceLoc cRPLoc);
+
 //===----------------------------------------------------------------------===//
 // MARK: TypeReprs
 //===----------------------------------------------------------------------===//

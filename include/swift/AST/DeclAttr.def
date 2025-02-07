@@ -545,7 +545,6 @@ DECL_ATTR_FEATURE_REQUIREMENT(ABI, ABIAttribute)
 DECL_ATTR(execution, Execution,
   OnFunc | ABIBreakingToAdd | ABIBreakingToRemove | APIBreakingToAdd | APIBreakingToRemove,
   166)
-DECL_ATTR_FEATURE_REQUIREMENT(Execution, NonIsolatedAsyncInheritsIsolationFromContext)
 
 LAST_DECL_ATTR(Execution)
 
