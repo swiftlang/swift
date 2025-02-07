@@ -227,7 +227,7 @@ extension Task {
   /// recommended that callers release any locks they might be
   /// holding before they call cancel.
   ///
-  /// If the task has already run past the last point where it could have 
+  /// If the task has already run past the last point where it could have
   /// performed a cancellation check, cancelling it may have no observable effects.
   ///
   /// - SeeAlso: `Task.checkCancellation()`
@@ -1253,7 +1253,7 @@ extension Task where Success == Never, Failure == Never {
       let job = _taskCreateNullaryContinuationJob(
           priority: Int(Task.currentPriority.rawValue),
           continuation: continuation)
-      _enqueueJobGlobal(job)
+      _enqueueJobGlobalDirect(job)
     }
   }
 }
@@ -1412,19 +1412,29 @@ func getJobFlags(_ task: Builtin.NativeObject) -> JobFlags
 @available(SwiftStdlib 5.1, *)
 @_silgen_name("swift_task_enqueueGlobal")
 @usableFromInline
-func _enqueueJobGlobal(_ task: Builtin.Job)
+func _enqueueJobGlobal(_ task: UnownedJob)
+
+@usableFromInline
+func _enqueueJobGlobalDirect(_ task: Builtin.Job) {
+  if #available(SwiftStdlib 5.9, *) {
+    _enqueueJobGlobal(UnownedJob(context: task))
+  } else {
+    // Shouldn't ever get here
+    Builtin.unreachable()
+  }
+}
 
 @available(SwiftStdlib 5.1, *)
 @_silgen_name("swift_task_enqueueGlobalWithDelay")
 @usableFromInline
-func _enqueueJobGlobalWithDelay(_ delay: UInt64, _ task: Builtin.Job)
+func _enqueueJobGlobalWithDelay(_ delay: UInt64, _ task: UnownedJob)
 
 @available(SwiftStdlib 5.7, *)
 @_silgen_name("swift_task_enqueueGlobalWithDeadline")
 @usableFromInline
 func _enqueueJobGlobalWithDeadline(_ seconds: Int64, _ nanoseconds: Int64,
                                    _ toleranceSec: Int64, _ toleranceNSec: Int64,
-                                   _ clock: Int32, _ task: Builtin.Job)
+                                   _ clock: Int32, _ task: UnownedJob)
 
 @usableFromInline
 @available(SwiftStdlib 6.2, *)

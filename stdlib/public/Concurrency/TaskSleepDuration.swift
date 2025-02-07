@@ -17,10 +17,10 @@ import Swift
 @_unavailableInEmbedded
 extension Task where Success == Never, Failure == Never {
   @available(SwiftStdlib 5.7, *)
-  internal static func _sleep(
-    until seconds: Int64, _ nanoseconds: Int64,
-    tolerance: Duration?,
-    clock: _ClockID
+  internal static func _sleep<C: Clock>(
+    until instant: C.Instant,
+    tolerance: C.Duration?,
+    clock: C
   ) async throws {
     // Create a token which will initially have the value "not started", which
     // means the continuation has neither been created nor completed.
@@ -53,20 +53,22 @@ extension Task where Success == Never, Failure == Never {
               let (sleepTask, _) = Builtin.createAsyncTask(sleepTaskFlags) {
                 unsafe onSleepWake(token)
               }
-              let toleranceSeconds: Int64
-              let toleranceNanoseconds: Int64
-              if let components = tolerance?.components {
-                toleranceSeconds = components.seconds
-                toleranceNanoseconds = components.attoseconds / 1_000_000_000
-              } else {
-                toleranceSeconds = 0
-                toleranceNanoseconds = -1
-              }
 
-              _enqueueJobGlobalWithDeadline(
-                  seconds, nanoseconds,
-                  toleranceSeconds, toleranceNanoseconds,
-                  clock.rawValue, Builtin.convertTaskToJob(sleepTask))
+              if #available(SwiftStdlib 6.2, *) {
+                let executor = Task.currentExecutor ?? Task.defaultExecutor
+                let job = ExecutorJob(context: Builtin.convertTaskToJob(sleepTask))
+
+                #if !$Embedded
+                executor.enqueue(job,
+                                 at: instant,
+                                 tolerance: tolerance,
+                                 clock: clock)
+                #endif
+              } else {
+                // Since we're building the new version of the stdlib,
+                // we should never get here
+                Builtin.unreachable()
+              }
               return
 
             case .activeContinuation, .finished:
@@ -119,7 +121,7 @@ extension Task where Success == Never, Failure == Never {
 
   /// Suspends the current task until the given deadline within a tolerance.
   ///
-  /// If the task is canceled before the time ends, this function throws 
+  /// If the task is canceled before the time ends, this function throws
   /// `CancellationError`.
   ///
   /// This function doesn't block the underlying thread.
@@ -130,14 +132,14 @@ extension Task where Success == Never, Failure == Never {
   public static func sleep<C: Clock>(
     until deadline: C.Instant,
     tolerance: C.Instant.Duration? = nil,
-    clock: C = ContinuousClock()
+    clock: C = .continuous
   ) async throws {
     try await clock.sleep(until: deadline, tolerance: tolerance)
   }
-  
+
   /// Suspends the current task for the given duration.
   ///
-  /// If the task is cancelled before the time ends, this function throws 
+  /// If the task is cancelled before the time ends, this function throws
   /// `CancellationError`.
   ///
   /// This function doesn't block the underlying thread.
@@ -149,7 +151,7 @@ extension Task where Success == Never, Failure == Never {
   public static func sleep<C: Clock>(
     for duration: C.Instant.Duration,
     tolerance: C.Instant.Duration? = nil,
-    clock: C = ContinuousClock()
+    clock: C = .continuous
   ) async throws {
     try await clock.sleep(for: duration, tolerance: tolerance)
   }
@@ -163,7 +165,7 @@ extension Task where Success == Never, Failure == Never {
   public static func sleep<C: Clock>(
     until deadline: C.Instant,
     tolerance: C.Instant.Duration? = nil,
-    clock: C = ContinuousClock()
+    clock: C = .continuous
   ) async throws {
     fatalError("Unavailable in task-to-thread concurrency model")
   }
@@ -173,7 +175,7 @@ extension Task where Success == Never, Failure == Never {
   public static func sleep<C: Clock>(
     for duration: C.Instant.Duration,
     tolerance: C.Instant.Duration? = nil,
-    clock: C = ContinuousClock()
+    clock: C = .continuous
   ) async throws {
     fatalError("Unavailable in task-to-thread concurrency model")
   }
