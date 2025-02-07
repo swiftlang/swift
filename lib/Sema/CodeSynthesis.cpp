@@ -818,16 +818,16 @@ createDesignatedInitOverride(ClassDecl *classDecl,
 
   // Create the initializer declaration, inheriting the name,
   // failability, and throws from the superclass initializer.
-  auto implCtx = classDecl->getImplementationContext()->getAsGenericContext();
+  auto implCtx = classDecl->getImplementationContext();
   auto ctor = new (ctx) ConstructorDecl(
-      superclassCtor->getName(), classDecl->getBraces().Start,
+      superclassCtor->getName(), implCtx->getBraces().Start,
       superclassCtor->isFailable(),
       /*FailabilityLoc=*/SourceLoc(),
       /*Async=*/superclassCtor->hasAsync(),
       /*AsyncLoc=*/SourceLoc(),
       /*Throws=*/superclassCtor->hasThrows(),
       /*ThrowsLoc=*/SourceLoc(), TypeLoc::withoutLoc(thrownType), bodyParams,
-      genericParams, implCtx,
+      genericParams, implCtx->getAsGenericContext(),
       /*LifetimeDependentTypeRepr*/ nullptr);
 
   ctor->setImplicit();
