@@ -3154,7 +3154,7 @@ if (-not $SkipBuild) {
     Invoke-BuildStep Write-SDKSettingsPlist Android $Arch
     Invoke-BuildStep Write-PlatformInfoPlist $Arch
 
-    Invoke-BuildStep Build-ExperimentalRuntime -Static Android $Arch
+    #Invoke-BuildStep Build-ExperimentalRuntime -Static Android $Arch
   }
 
   # Build Macros for distribution
