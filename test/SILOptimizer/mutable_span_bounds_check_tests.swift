@@ -1,5 +1,5 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend -emit-module-path %t/SpanExtras.swiftmodule %S/Inputs/SpanExtras.swift -enable-builtin-module  -enable-experimental-feature LifetimeDependence  -enable-experimental-feature AllowUnsafeAttribute -enable-experimental-feature Span
+// RUN: %target-swift-frontend -emit-module-path %t/SpanExtras.swiftmodule %S/Inputs/SpanExtras.swift -enable-builtin-module  -enable-experimental-feature LifetimeDependence  -enable-experimental-feature AllowUnsafeAttribute -enable-experimental-feature Span -O
 // RUN: %target-swift-frontend -I %t -O -emit-sil %s -enable-experimental-feature Span -disable-availability-checking | %FileCheck %s --check-prefix=CHECK-SIL 
 // RUN: %target-swift-frontend -I %t -O -emit-ir %s -enable-experimental-feature Span -disable-availability-checking
 

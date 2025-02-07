@@ -1,41 +1,53 @@
 import Builtin
 
+/// Unsafely discard any lifetime dependency on the `dependent` argument. Return
+/// a value identical to `dependent` with a lifetime dependency on the caller's
+/// borrow scope of the `source` argument.
+@unsafe
 @_unsafeNonescapableResult
-@inlinable @inline(__always)
+@_alwaysEmitIntoClient
+@_transparent
 @lifetime(borrow source)
-public func _overrideLifetime<
-  T: ~Copyable & ~Escapable,
-  U: ~Copyable & ~Escapable
+internal func _overrideLifetime<
+  T: ~Copyable & ~Escapable, U: ~Copyable & ~Escapable
 >(
-  of dependent: consuming T,
-  to source: borrowing U
+  _ dependent: consuming T, borrowing source: borrowing U
 ) -> T {
+  // TODO: Remove @_unsafeNonescapableResult. Instead, the unsafe dependence
+  // should be expressed by a builtin that is hidden within the function body.
   dependent
 }
 
+/// Unsafely discard any lifetime dependency on the `dependent` argument. Return
+/// a value identical to `dependent` that inherits all lifetime dependencies from
+/// the `source` argument.
+@unsafe
 @_unsafeNonescapableResult
-@inlinable @inline(__always)
+@_alwaysEmitIntoClient
+@_transparent
 @lifetime(source)
-public func _overrideLifetime<
-  T: ~Copyable & ~Escapable,
-  U: ~Copyable & ~Escapable
+internal func _overrideLifetime<
+  T: ~Copyable & ~Escapable, U: ~Copyable & ~Escapable
 >(
-  of dependent: consuming T,
-  copyingFrom source: consuming U
+  _ dependent: consuming T, copying source: borrowing U
 ) -> T {
+  // TODO: Remove @_unsafeNonescapableResult. Instead, the unsafe dependence
+  // should be expressed by a builtin that is hidden within the function body.
   dependent
 }
 
+@unsafe
 @_unsafeNonescapableResult
-@inlinable @inline(__always)
+@_alwaysEmitIntoClient
+@_transparent
 @lifetime(source)
-public func _overrideLifetime<
-  T: ~Copyable & ~Escapable,
-  U: ~Copyable & ~Escapable
+internal func _overrideLifetime<
+  T: ~Copyable & ~Escapable, U: ~Copyable & ~Escapable
 >(
-  of dependent: consuming T,
-  mutating source: inout U
+  _ dependent: consuming T, mutating source: inout U
 ) -> T {
+  // TODO: Remove @_unsafeNonescapableResult. Instead, the unsafe dependence
+  // should be expressed by a builtin that is hidden within the function body.
   dependent
 }
 
@@ -91,7 +103,7 @@ extension MutableSpan where Element: ~Copyable {
       "baseAddress must be properly aligned to access Element"
     )
     let ms = MutableSpan<Element>(_unchecked: buffer)
-    self = _overrideLifetime(of: ms, to: buffer)
+    self = _overrideLifetime(ms, borrowing: buffer)
   }
 
   @_alwaysEmitIntoClient
@@ -103,7 +115,7 @@ extension MutableSpan where Element: ~Copyable {
     precondition(count >= 0, "Count must not be negative")
     let buffer = UnsafeMutableBufferPointer(start: start, count: count)
     let ms = MutableSpan(_unsafeElements: buffer)
-    self = _overrideLifetime(of: ms, to: start)
+    self = _overrideLifetime(ms, borrowing: start)
   }
 }
 
@@ -117,7 +129,7 @@ extension MutableSpan {
   ) {
     let rb = UnsafeMutableBufferPointer(rebasing: elements)
     let ms = MutableSpan(_unsafeElements: rb)
-    self = _overrideLifetime(of: ms, to: rb)
+    self = _overrideLifetime(ms, borrowing: rb)
   }
 }
 
@@ -142,7 +154,7 @@ extension MutableSpan where Element: BitwiseCopyable {
       count: count
     )
     let ms = MutableSpan(_unsafeElements: elements)
-    self = _overrideLifetime(of: ms, to: buffer)
+    self = _overrideLifetime(ms, borrowing: buffer)
   }
 
   @_alwaysEmitIntoClient
@@ -154,7 +166,7 @@ extension MutableSpan where Element: BitwiseCopyable {
     precondition(byteCount >= 0, "Count must not be negative")
     let bytes = UnsafeMutableRawBufferPointer(start: pointer, count: byteCount)
     let ms = MutableSpan(_unsafeBytes: bytes)
-    self = _overrideLifetime(of: ms, to: pointer)
+    self = _overrideLifetime(ms, borrowing: pointer)
   }
 
   @_alwaysEmitIntoClient
@@ -164,7 +176,7 @@ extension MutableSpan where Element: BitwiseCopyable {
   ) {
     let bytes = UnsafeMutableRawBufferPointer(rebasing: buffer)
     let ms = MutableSpan(_unsafeBytes: bytes)
-    self = _overrideLifetime(of: ms, to: buffer)
+    self = _overrideLifetime(ms, borrowing: buffer)
   }
 }
 
@@ -176,7 +188,7 @@ extension Span where Element: ~Copyable {
     let pointer = mutableSpan._pointer?.assumingMemoryBound(to: Element.self)
     let buffer = UnsafeBufferPointer(start: pointer, count: mutableSpan.count)
     let span = Span(_unsafeElements: buffer)
-    self = _overrideLifetime(of: span, to: mutableSpan)
+    self = _overrideLifetime(span, borrowing: mutableSpan)
   }
 }
 
@@ -210,7 +222,7 @@ extension RawSpan {
     let byteCount = mutableSpan.count &* MemoryLayout<Element>.stride
     let buffer = UnsafeRawBufferPointer(start: pointer, count: byteCount)
     let rawSpan = RawSpan(_unsafeBytes: buffer)
-    self = _overrideLifetime(of: rawSpan, to: mutableSpan)
+    self = _overrideLifetime(rawSpan, borrowing: mutableSpan)
   }
 }
 
@@ -724,7 +736,7 @@ extension OutputSpan where Element: ~Copyable  {
     precondition(capacity >= 0, "Capacity must be 0 or greater")
     let buffer = UnsafeMutableBufferPointer(start: pointer, count: capacity)
     let os = OutputSpan(_initializing: buffer, initialized: initialized)
-    self = _overrideLifetime(of: os, to: pointer)
+    self = _overrideLifetime(os, borrowing: pointer)
   }
 }
 
@@ -739,7 +751,7 @@ extension OutputSpan {
   ) {
     let rebased = UnsafeMutableBufferPointer(rebasing: buffer)
     let os = OutputSpan(_initializing: rebased, initialized: 0)
-    self = _overrideLifetime(of: os, to: buffer)
+    self = _overrideLifetime(os, borrowing: buffer)
   }
 }
 
@@ -764,7 +776,7 @@ extension OutputSpan where Element: BitwiseCopyable {
     let os = OutputSpan(
       _unchecked: pointer, capacity: count, initialized: initialized
     )
-    self = _overrideLifetime(of: os, to: bytes)
+    self = _overrideLifetime(os, borrowing: bytes)
   }
 
   @_alwaysEmitIntoClient
@@ -777,7 +789,7 @@ extension OutputSpan where Element: BitwiseCopyable {
     precondition(capacity >= 0, "Capacity must be 0 or greater")
     let buffer = UnsafeMutableRawBufferPointer(start: pointer, count: capacity)
     let os = OutputSpan(_initializing: buffer, initialized: initialized)
-    self = _overrideLifetime(of: os, to: pointer)
+    self = _overrideLifetime(os, borrowing: pointer)
   }
 
   @_alwaysEmitIntoClient
@@ -788,7 +800,7 @@ extension OutputSpan where Element: BitwiseCopyable {
   ) {
     let rebased = UnsafeMutableRawBufferPointer(rebasing: buffer)
     let os = OutputSpan(_initializing: rebased, initialized: initialized)
-    self = _overrideLifetime(of: os, to: buffer)
+    self = _overrideLifetime(os, borrowing: buffer)
   }
 }
 
@@ -1000,7 +1012,7 @@ extension OutputSpan where Element: ~Copyable {
       let pointer = _pointer?.assumingMemoryBound(to: Element.self)
       let buffer = UnsafeBufferPointer(start: pointer, count: _initialized)
       let span = Span(_unsafeElements: buffer)
-      return _overrideLifetime(of: span, to: self)
+      return _overrideLifetime(span, borrowing: self)
     }
   }
 
@@ -1011,7 +1023,7 @@ extension OutputSpan where Element: ~Copyable {
       let pointer = _pointer?.assumingMemoryBound(to: Element.self)
       let buffer = UnsafeMutableBufferPointer(start: pointer, count: _initialized)
       let span = MutableSpan(_unsafeElements: buffer)
-      return _overrideLifetime(of: span, mutating: &self)
+      return _overrideLifetime(span, mutating: &self)
     }
   }
 }
@@ -1050,7 +1062,7 @@ extension Span {
 //    get {
 //      let nilBasedBuffer = UnsafeBufferPointer<Element>(start: nil, count: 0)
 //      let span = Span(_unsafeElements: nilBasedBuffer)
-//      return _overrideLifetime(of: span, to: immortalThing)
+//      return _overrideLifetime(span, to: immortalThing)
 //    }
 //  }
 //
@@ -1059,7 +1071,7 @@ extension Span {
 //  public init() {
 //    let nilBasedBuffer = UnsafeBufferPointer<Element>(start: nil, count: 0)
 //    let span = Span(_unsafeElements: nilBasedBuffer)
-//    self = _overrideLifetime(of: span, to: immortalThing)
+//    self = _overrideLifetime(span, to: immortalThing)
 //  }
 }
 
