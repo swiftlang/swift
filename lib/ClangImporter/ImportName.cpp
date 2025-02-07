@@ -1501,6 +1501,15 @@ static StringRef renameUnsafeMethod(ASTContext &ctx,
   return name;
 }
 
+std::optional<StringRef>
+NameImporter::findCustomName(const clang::Decl *decl,
+                             ImportNameVersion version) {
+  if (auto nameAttr = findSwiftNameAttr(decl, version)) {
+    return nameAttr->name;
+  }
+  return std::nullopt;
+}
+
 ImportedName NameImporter::importNameImpl(const clang::NamedDecl *D,
                                           ImportNameVersion version,
                                           clang::DeclarationName givenName) {
@@ -1676,6 +1685,11 @@ ImportedName NameImporter::importNameImpl(const clang::NamedDecl *D,
           // Note that this is an initializer.
           isInitializer = true;
         }
+      } else if (shouldImportAsInitializer(method, version, initPrefixLength)) {
+        // This is an initializer, but its custom name is ill-formed. Ignore
+        // the swift_name attribute.
+        skipCustomName = true;
+        result.info.hasInvalidCustomName = true;
       }
     }
 
