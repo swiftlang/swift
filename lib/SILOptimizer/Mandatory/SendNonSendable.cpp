@@ -1661,18 +1661,31 @@ bool SentNeverSendableDiagnosticInferrer::initForSendingPartialApply(
   }
 
   // Ok, we are not tracking an actual isolated value or we do not capture the
-  // isolated value directly... we need to be smarter here. First lets gather up
-  // all non-Sendable values captured by the closure.
+  // isolated value directly, we instead just emit a note on all the potential
+  // non-Sendable captures.
+
+  // First grab the calleeFunction of the closure so we can properly map our
+  // captured types into the closure's context so that we can determine
+  // non-Sendability.
+  auto *calleeFunction = pai->getCalleeFunction();
+  if (!calleeFunction) {
+    // We should always be able to find a callee function for a partial_apply
+    // created from a closure expr. If we don't, we want to flag this as an
+    // error to be reported.
+    diagnosticEmitter.emitUnknownPatternError();
+    return true;
+  }
+
   SmallVector<CapturedValue, 8> nonSendableCaptures;
   for (auto capture : ce->getCaptureInfo().getCaptures()) {
     auto *decl = capture.getDecl();
     auto type = decl->getInterfaceType()->getCanonicalType();
-    auto silType = SILType::getPrimitiveObjectType(type);
-    if (!SILIsolationInfo::isNonSendableType(silType, pai->getFunction()))
+    type = calleeFunction->mapTypeIntoContext(type)->getCanonicalType();
+    if (!SILIsolationInfo::isNonSendableType(type, calleeFunction))
       continue;
 
     auto *fromDC = decl->getInnermostDeclContext();
-    auto *nom = silType.getNominalOrBoundGenericNominal();
+    auto *nom = type.getNominalOrBoundGenericNominal();
     if (nom && fromDC) {
       if (auto diagnosticBehavior =
               getConcurrencyDiagnosticBehaviorLimit(nom, fromDC)) {
