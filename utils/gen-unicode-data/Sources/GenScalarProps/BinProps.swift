@@ -222,15 +222,15 @@ func generateBinaryProps(for platform: String, into result: inout String) {
   
   switch platform {
   case "Apple":
-    derivedCoreProps = readFile("Data/Apple/DerivedCoreProperties.txt")
+    derivedCoreProps = readFile("Data/16/Apple/DerivedCoreProperties.txt")
   default:
-    derivedCoreProps = readFile("Data/DerivedCoreProperties.txt")
+    derivedCoreProps = readFile("Data/16/DerivedCoreProperties.txt")
   }
   
-  let bidiMirrored = readFile("Data/DerivedBinaryProperties.txt")
-  let normalization = readFile("Data/DerivedNormalizationProps.txt")
-  let emoji = readFile("Data/emoji-data.txt")
-  let propList = readFile("Data/PropList.txt")
+  let bidiMirrored = readFile("Data/16/DerivedBinaryProperties.txt")
+  let normalization = readFile("Data/16/DerivedNormalizationProps.txt")
+  let emoji = readFile("Data/16/emoji-data.txt")
+  let propList = readFile("Data/16/PropList.txt")
   
   var binProps: [UInt32: BinProps] = [:]
   getBinaryProperties(from: derivedCoreProps, into: &binProps)

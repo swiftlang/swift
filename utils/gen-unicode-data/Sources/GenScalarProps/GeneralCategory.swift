@@ -153,6 +153,12 @@ func emitGeneralCategory(
   _ data: [(ClosedRange<UInt32>, GeneralCategory)],
   into result: inout String
 ) {
+  result += """
+  #define GENERAL_CATEGORY_COUNT \(data.count)
+
+
+  """
+
   emitCollection(
     data,
     name: "_swift_stdlib_generalCategory",
@@ -172,7 +178,7 @@ func emitGeneralCategory(
 }
 
 func generateGeneralCategory(into result: inout String) {
-  let derivedGeneralCategory = readFile("Data/DerivedGeneralCategory.txt")
+  let derivedGeneralCategory = readFile("Data/16/DerivedGeneralCategory.txt")
   
   var data: [(ClosedRange<UInt32>, GeneralCategory)] = []
   
