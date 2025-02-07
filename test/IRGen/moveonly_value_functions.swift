@@ -177,7 +177,7 @@ public func takeOuterDeinitingNC_1<T>(_ t: consuming OuterDeinitingNC_1<T>) {
 // CHECK-SAME:      ptr{{.*}} %0,
 // CHECK-SAME:      ptr %T)
 // CHECK-SAME:  {
-// CHECK:         call{{.*}} @"$s24moveonly_value_functions9OuterNC_1VyxGlWOs"(
+// CHECK:         call{{.*}} @"$s24moveonly_value_functions9OuterNC_1VyxGlWOh"(
 // CHECK-SAME:        ptr %0,
 // CHECK-SAME:        ptr %T)
 // CHECK:       }
@@ -185,8 +185,8 @@ public func takeOuterDeinitingNC_1<T>(_ t: consuming OuterDeinitingNC_1<T>) {
 // Verify that the outlined release function takes the metadata for the
 // move-only-with-deinit type InnerDeinitingReleasableNC<T> and passes it along
 // to that deinit.
-// $s24moveonly_value_functions9OuterNC_1VyxGlWOs ---> outlined release of moveonly_value_functions.OuterNC_2<A>
-// CHECK-LABEL: define{{.*}} @"$s24moveonly_value_functions9OuterNC_1VyxGlWOs"(
+// $s24moveonly_value_functions9OuterNC_1VyxGlWOh ---> outlined destroy of moveonly_value_functions.OuterNC_2<A>
+// CHECK-LABEL: define{{.*}} @"$s24moveonly_value_functions9OuterNC_1VyxGlWOh"(
 // CHECK-SAME:      ptr %0,
 // CHECK-SAME:      ptr %T)
 // CHECK-SAME:  {
@@ -298,24 +298,15 @@ public func takeOuterSinglePayloadNC_1<T>(_ e: consuming OuterSinglePayloadNC_1<
 //           :      ptr noalias nocapture dereferenceable(64) %0, 
 // CHECK-SAME:      ptr %T)
 // CHECK-SAME:  {
-// CHECK:         call{{.*}} @"$s24moveonly_value_functions22OuterSinglePayloadNC_2OyxGlWOs"(
+// CHECK:         call{{.*}} @"$s24moveonly_value_functions22OuterSinglePayloadNC_2OyxGlWOh"(
 // CHECK-SAME:        ptr %0, 
 // CHECK-SAME:        ptr %T)
 // CHECK:       }
-// CHECK-LABEL: define{{.*}} @"$s24moveonly_value_functions22OuterSinglePayloadNC_2OyxGlWOs"(
+// CHECK-LABEL: define{{.*}} @"$s24moveonly_value_functions22OuterSinglePayloadNC_2OyxGlWOh"(
 // CHECK-SAME:      ptr %0, 
 // CHECK-SAME:      ptr %T)
 // CHECK-SAME:  {
-// CHECK:         call{{.*}} @"$s24moveonly_value_functions22OuterSinglePayloadNC_2OyxGlWOe"(
-//            :       i64 %2, 
-//            :       i64 %4, 
-//            :       i64 %6, 
-//            :       i64 %8, 
-//            :       i64 %10, 
-//            :       i64 %12, 
-//            :       i64 %14, 
-//            :       i64 %16, 
-//            :       ptr %T)
+// CHECK:         call{{.*}} @"$s24moveonly_value_functions26InnerDeinitingReleasableNCVfD"(
 // CHECK:       }
 public func takeOuterSinglePayloadNC_2<T>(_ e: consuming OuterSinglePayloadNC_2<T>) {}
 
@@ -400,23 +391,15 @@ public func takeOuterMultiPayloadNC_2<T>(_ e: consuming OuterMultiPayloadNC_2<T>
 //           :      ptr noalias nocapture dereferenceable(64) %0, 
 // CHECK-SAME:      ptr %T)
 // CHECK-SAME:  {
-// CHECK:         call{{.*}} @"$s24moveonly_value_functions21OuterMultiPayloadNC_3OyxGlWOs"(
+// CHECK:         call{{.*}} @"$s24moveonly_value_functions21OuterMultiPayloadNC_3OyxGlWOh"(
 // CHECK-SAME:        ptr %0, 
 // CHECK-SAME:        ptr %T)
 // CHECK:       }
-// CHECK-LABEL: define{{.*}} @"$s24moveonly_value_functions21OuterMultiPayloadNC_3OyxGlWOs"(
+// CHECK-LABEL: define{{.*}} @"$s24moveonly_value_functions21OuterMultiPayloadNC_3OyxGlWOh"(
 // CHECK-SAME:      ptr %0, 
 // CHECK-SAME:      ptr %T)
 // CHECK-SAME:  {
 // CHECK:         call{{.*}} @"$s24moveonly_value_functions21OuterMultiPayloadNC_3OyxGlWOe"(
-//           :        i64 %2, 
-//           :        i64 %4, 
-//           :        i64 %6, 
-//           :        i64 %8, 
-//           :        i64 %10, 
-//           :        i64 %12, 
-//           :        i64 %14, 
-//           :        i64 %16, 
 // CHECK-SAME:        ptr %T)
 // CHECK:       }
 public func takeOuterMultiPayloadNC_3<T>(_ e: consuming OuterMultiPayloadNC_3<T>) {}
