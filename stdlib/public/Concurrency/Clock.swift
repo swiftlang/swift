@@ -11,24 +11,24 @@
 //===----------------------------------------------------------------------===//
 import Swift
 
-/// A mechanism in which to measure time, and delay work until a given point 
+/// A mechanism in which to measure time, and delay work until a given point
 /// in time.
 ///
-/// Types that conform to the `Clock` protocol define a concept of "now" which 
+/// Types that conform to the `Clock` protocol define a concept of "now" which
 /// is the specific instant in time that property is accessed. Any pair of calls
 /// to the `now` property may have a minimum duration between them - this
 /// minimum resolution is exposed by the `minimumResolution` property to inform
-/// any user of the type the expected granularity of accuracy. 
+/// any user of the type the expected granularity of accuracy.
 ///
 /// One of the primary uses for clocks is to schedule task sleeping. This method
 /// resumes the calling task after a given deadline has been met or passed with
-/// a given tolerance value. The tolerance is expected as a leeway around the 
-/// deadline. The clock may reschedule tasks within the tolerance to ensure 
+/// a given tolerance value. The tolerance is expected as a leeway around the
+/// deadline. The clock may reschedule tasks within the tolerance to ensure
 /// efficient execution of resumptions by reducing potential operating system
 /// wake-ups. If no tolerance is specified (i.e. nil is passed in) the sleep
-/// function is expected to schedule with a default tolerance strategy. 
+/// function is expected to schedule with a default tolerance strategy.
 ///
-/// For more information about specific clocks see `ContinuousClock` and 
+/// For more information about specific clocks see `ContinuousClock` and
 /// `SuspendingClock`.
 @available(SwiftStdlib 5.7, *)
 public protocol Clock<Duration>: Sendable {
@@ -41,8 +41,56 @@ public protocol Clock<Duration>: Sendable {
 #if !SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
   func sleep(until deadline: Instant, tolerance: Instant.Duration?) async throws
 #endif
-}
 
+#if !$Embedded
+  /// Choose which Dispatch clock to use with DispatchExecutor
+  ///
+  /// This controls which Dispatch clock is used to enqueue delayed jobs
+  /// when using this Clock.
+  @available(SwiftStdlib 6.2, *)
+  var dispatchClockID: DispatchClockID { get }
+#endif
+
+  /// Convert a Clock-specific Duration to a Swift Duration
+  ///
+  /// Some clocks may define `C.Duration` to be something other than a
+  /// `Swift.Duration`, but that makes it tricky to convert timestamps
+  /// between clocks, which is something we want to be able to support.
+  /// This method will convert whatever `C.Duration` is to a `Swift.Duration`.
+  ///
+  /// Parameters:
+  ///
+  /// - from duration: The `Duration` to convert
+  ///
+  /// Returns: A `Swift.Duration` representing the equivalent duration, or
+  ///          `nil` if this function is not supported.
+  @available(SwiftStdlib 6.2, *)
+  func convert(from duration: Duration) -> Swift.Duration?
+
+  /// Convert a Swift Duration to a Clock-specific Duration
+  ///
+  /// Parameters:
+  ///
+  /// - from duration: The `Swift.Duration` to convert.
+  ///
+  /// Returns: A `Duration` representing the equivalent duration, or
+  ///          `nil` if this function is not supported.
+  @available(SwiftStdlib 6.2, *)
+  func convert(from duration: Swift.Duration) -> Duration?
+
+  /// Convert an `Instant` from some other clock's `Instant`
+  ///
+  /// Parameters:
+  ///
+  /// - instant:    The instant to convert.
+  //  - from clock: The clock to convert from.
+  ///
+  /// Returns: An `Instant` representing the equivalent instant, or
+  ///          `nil` if this function is not supported.
+  @available(SwiftStdlib 6.2, *)
+  func convert<OtherClock: Clock>(instant: OtherClock.Instant,
+                                  from clock: OtherClock) -> Instant?
+}
 
 @available(SwiftStdlib 5.7, *)
 extension Clock {
@@ -85,6 +133,50 @@ extension Clock {
     try await work()
     let end = now
     return start.duration(to: end)
+  }
+}
+
+@available(SwiftStdlib 6.2, *)
+extension Clock {
+  #if !$Embedded
+  public var dispatchClockID: DispatchClockID {
+    return .suspending
+  }
+  #endif
+
+  // For compatibility, return `nil` if this is not implemented
+  public func convert(from duration: Duration) -> Swift.Duration? {
+    return nil
+  }
+
+  public func convert(from duration: Swift.Duration) -> Duration? {
+    return nil
+  }
+
+  public func convert<OtherClock: Clock>(instant: OtherClock.Instant,
+                                  from clock: OtherClock) -> Instant? {
+    let ourNow = now
+    let otherNow = clock.now
+    let otherDuration = otherNow.duration(to: instant)
+
+    // Convert to `Swift.Duration`
+    guard let duration = clock.convert(from: otherDuration) else {
+      return nil
+    }
+
+    // Convert from `Swift.Duration`
+    guard let ourDuration = convert(from: duration) else {
+      return nil
+    }
+
+    return ourNow.advanced(by: ourDuration)
+  }
+}
+
+@available(SwiftStdlib 6.2, *)
+extension Clock where Duration == Swift.Duration {
+  public func convert(from duration: Duration) -> Duration? {
+    return duration
   }
 }
 
