@@ -1819,6 +1819,7 @@ void ModuleDependenciesCacheSerializer::collectStringsAndArrays(
                           .CASBridgingHeaderIncludeTreeRootID);
         addIdentifier(swiftTextDeps->moduleCacheKey);
         addIdentifier(swiftTextDeps->userModuleVersion);
+        addIdentifier(swiftTextDeps->moduleCacheKey);
         break;
       }
       case swift::ModuleDependencyKind::SwiftBinary: {
@@ -1831,6 +1832,7 @@ void ModuleDependenciesCacheSerializer::collectStringsAndArrays(
         addIdentifier(swiftBinDeps->headerImport);
         addIdentifier(swiftBinDeps->definingModuleInterfacePath);
         addIdentifier(swiftBinDeps->userModuleVersion);
+        addIdentifier(swiftBinDeps->moduleCacheKey);
         addStringArray(moduleID,
                        ModuleIdentifierArrayKind::HeaderInputModuleDependencies,
                        clangHeaderDependencyNames);
@@ -1872,6 +1874,7 @@ void ModuleDependenciesCacheSerializer::collectStringsAndArrays(
             swiftSourceDeps->textualModuleDetails.CASFileSystemRootID);
         addIdentifier(swiftSourceDeps->chainedBridgingHeaderPath);
         addIdentifier(swiftSourceDeps->chainedBridgingHeaderContent);
+        addIdentifier(swiftSourceDeps->moduleCacheKey);
         break;
       }
       case swift::ModuleDependencyKind::Clang: {

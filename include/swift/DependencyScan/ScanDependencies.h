@@ -14,18 +14,24 @@
 #define SWIFT_DEPENDENCY_SCANDEPENDENCIES_H
 
 #include "swift-c/DependencyScan/DependencyScan.h"
-#include "llvm/ADT/StringRef.h"
-#include "llvm/ADT/StringSet.h"
-#include "llvm/Support/Error.h"
+#include "swift/AST/DiagnosticEngine.h"
+#include "llvm/ADT/StringMap.h"
+#include "llvm/Support/Chrono.h"
+#include "llvm/Support/ErrorOr.h"
+#include <unordered_set>
 
 namespace llvm {
 class StringSaver;
-}
+namespace vfs {
+class FileSystem;
+} // namespace vfs
+} // namespace llvm
 
 namespace swift {
 
 class CompilerInvocation;
 class CompilerInstance;
+class DiagnosticEngine;
 class ModuleDependenciesCache;
 struct ModuleDependencyID;
 struct ModuleDependencyIDHash;
