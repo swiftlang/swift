@@ -1,5 +1,9 @@
 // RUN: %target-typecheck-verify-swift -swift-version 5 -module-name test
 
+// Don't complain about <<error type>> not conforming to Error
+func invalidThrownType() throws(DoesNotExist) {}
+// expected-error@-1 {{cannot find type 'DoesNotExist' in scope}}
+
 // expected-note@+1{{type declared here}}
 enum MyError: Error {
   case fail

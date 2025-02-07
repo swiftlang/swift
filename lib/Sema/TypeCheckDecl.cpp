@@ -2545,7 +2545,7 @@ InterfaceTypeRequest::evaluate(Evaluator &eval, ValueDecl *D) const {
     if (thrownTy) {
       thrownTy = AFD->getThrownInterfaceType();
       ProtocolDecl *errorProto = Context.getErrorDecl();
-      if (thrownTy && errorProto) {
+      if (thrownTy && !thrownTy->hasError() && errorProto) {
         Type thrownTyInContext = AFD->mapTypeIntoContext(thrownTy);
         if (!checkConformance(thrownTyInContext, errorProto)) {
           SourceLoc loc;
