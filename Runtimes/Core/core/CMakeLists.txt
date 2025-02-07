@@ -274,6 +274,9 @@ if(APPLE AND BUILD_SHARED_LIBS)
 endif()
 
 target_compile_options(swiftCore PRIVATE
+  # STAGING: Temporarily avoids having to write #fileID in Swift.swiftinterface.
+  # see also 327ea8bce2d1107a847d444651b19ca6a2901c9e
+  "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xfrontend -enable-experimental-concise-pound-file>"
   $<$<COMPILE_LANGUAGE:Swift>:-parse-stdlib>
   $<$<COMPILE_LANGUAGE:Swift>:-nostdimport>
   $<$<COMPILE_LANGUAGE:Swift>:-explicit-module-build>
