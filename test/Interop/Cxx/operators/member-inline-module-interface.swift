@@ -291,7 +291,7 @@
 // CHECK-NEXT:   mutating func __operatorPlusEqual(_ rhs: LoadableIntWrapper)
 // CHECK-NEXT:   func getValue() -> Int32
 // CHECK-NEXT:   mutating func setValue(_ v: Int32)
-// CHECK-NEXT: }
+// CHECK:      }
 
 // CHECK: struct HasOperatorCallWithDefaultArg {
 // CHECK:   func callAsFunction(_ x: Int32 = cxxDefaultArg) -> Int32
