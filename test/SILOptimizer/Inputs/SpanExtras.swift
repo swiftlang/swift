@@ -528,45 +528,7 @@ extension MutableSpan {
 }
 
 @available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, visionOS 9999, *)
-extension MutableSpan where Element: ~Copyable {
 
-  @_alwaysEmitIntoClient
-  public mutating func moveUpdate(
-    fromContentsOf source: consuming OutputSpan<Element>
-  ) -> Index {
-    guard !source.isEmpty else { return 0 }
-    precondition(
-      source.count <= self.count,
-      "destination span cannot contain every element from source."
-    )
-    let buffer = source.relinquishBorrowedMemory()
-    // we must now deinitialize the returned UMBP
-    _start().moveInitializeMemory(
-      as: Element.self, from: buffer.baseAddress!, count: buffer.count
-    )
-    return buffer.count
-  }
-
-  public mutating func moveUpdate(
-    fromContentsOf source: UnsafeMutableBufferPointer<Element>
-  ) -> Index {
-    let source = OutputSpan(_initializing: source, initialized: source.count)
-    return self.moveUpdate(fromContentsOf: source)
-  }
-}
-
-@available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, visionOS 9999, *)
-extension MutableSpan {
-
-  public mutating func moveUpdate(
-    fromContentsOf source: Slice<UnsafeMutableBufferPointer<Element>>
-  ) -> Index {
-    self.moveUpdate(fromContentsOf: .init(rebasing: source))
-  }
-}
-
-
-@available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, visionOS 9999, *)
 extension MutableSpan where Element: BitwiseCopyable {
 
   @_alwaysEmitIntoClient
@@ -699,114 +661,11 @@ public struct OutputSpan<Element: ~Copyable>: ~Copyable, ~Escapable {
 extension OutputSpan: Sendable {}
 
 @available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, visionOS 9999, *)
-extension OutputSpan where Element: ~Copyable  {
-
-  @usableFromInline @inline(__always)
-  @lifetime(borrow buffer)
-  init(
-    _unchecked buffer: UnsafeMutableBufferPointer<Element>,
-    initialized: Int
-  ) {
-    _pointer = .init(buffer.baseAddress)
-    capacity = buffer.count
-    _initialized = initialized
-  }
-
-  @_alwaysEmitIntoClient
-  @lifetime(borrow buffer)
-  public init(
-    _initializing buffer: UnsafeMutableBufferPointer<Element>,
-    initialized: Int = 0
-  ) {
-    precondition(
-      ((Int(bitPattern: buffer.baseAddress) &
-        (MemoryLayout<Element>.alignment&-1)) == 0),
-      "baseAddress must be properly aligned to access Element"
-    )
-    self.init(_unchecked: buffer, initialized: initialized)
-  }
-
-  @_alwaysEmitIntoClient
-  @lifetime(borrow pointer)
-  public init(
-    _initializing pointer: UnsafeMutablePointer<Element>,
-    capacity: Int,
-    initialized: Int = 0
-  ) {
-    precondition(capacity >= 0, "Capacity must be 0 or greater")
-    let buffer = UnsafeMutableBufferPointer(start: pointer, count: capacity)
-    let os = OutputSpan(_initializing: buffer, initialized: initialized)
-    self = _overrideLifetime(os, borrowing: pointer)
-  }
-}
-
-@available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, visionOS 9999, *)
-extension OutputSpan {
-
-  @_alwaysEmitIntoClient
-  @lifetime(borrow buffer)
-  public init(
-    _initializing buffer: borrowing Slice<UnsafeMutableBufferPointer<Element>>,
-    initialized: Int = 0
-  ) {
-    let rebased = UnsafeMutableBufferPointer(rebasing: buffer)
-    let os = OutputSpan(_initializing: rebased, initialized: 0)
-    self = _overrideLifetime(os, borrowing: buffer)
-  }
-}
-
-@available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, visionOS 9999, *)
-extension OutputSpan where Element: BitwiseCopyable {
-
-  @_alwaysEmitIntoClient
-  @lifetime(borrow bytes)
-  public init(
-    _initializing bytes: UnsafeMutableRawBufferPointer,
-    initialized: Int = 0
-  ) {
-    precondition(
-      ((Int(bitPattern: bytes.baseAddress) &
-        (MemoryLayout<Element>.alignment&-1)) == 0),
-      "baseAddress must be properly aligned to access Element"
-    )
-    let (byteCount, stride) = (bytes.count, MemoryLayout<Element>.stride)
-    let (count, remainder) = byteCount.quotientAndRemainder(dividingBy: stride)
-    precondition(remainder == 0, "Span must contain a whole number of elements")
-    let pointer = bytes.baseAddress
-    let os = OutputSpan(
-      _unchecked: pointer, capacity: count, initialized: initialized
-    )
-    self = _overrideLifetime(os, borrowing: bytes)
-  }
-
-  @_alwaysEmitIntoClient
-  @lifetime(borrow pointer)
-  public init(
-    _initializing pointer: UnsafeMutableRawPointer,
-    capacity: Int,
-    initialized: Int = 0
-  ) {
-    precondition(capacity >= 0, "Capacity must be 0 or greater")
-    let buffer = UnsafeMutableRawBufferPointer(start: pointer, count: capacity)
-    let os = OutputSpan(_initializing: buffer, initialized: initialized)
-    self = _overrideLifetime(os, borrowing: pointer)
-  }
-
-  @_alwaysEmitIntoClient
-  @lifetime(borrow buffer)
-  public init(
-    _initializing buffer: borrowing Slice<UnsafeMutableRawBufferPointer>,
-    initialized: Int = 0
-  ) {
-    let rebased = UnsafeMutableRawBufferPointer(rebasing: buffer)
-    let os = OutputSpan(_initializing: rebased, initialized: initialized)
-    self = _overrideLifetime(os, borrowing: buffer)
-  }
-}
-
-@available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, visionOS 9999, *)
 extension OutputSpan where Element: ~Copyable {
 
+@available(macOS 9999, *)
+@available(macOS 9999, *)
+@available(macOS 9999, *)
   @_alwaysEmitIntoClient
   public mutating func append(_ value: consuming Element) {
     precondition(_initialized < capacity, "Output buffer overflow")
