@@ -1503,7 +1503,11 @@ Parser::parseExprPostfixSuffix(ParserResult<Expr> Result, bool isExprBasic,
         continue;
 
       // Extract the parsed expression as the result.
-      assert(activeElements.size() == 1 && activeElements[0].is<Expr *>());
+      assert(activeElements.size() == 1 ||
+             SF.getParsingOptions().contains(
+                 SourceFile::ParsingFlags::PoundIfAllActive));
+      // FIXME: 'PoundIfAllActive' mode should keep all the parsed AST nodes.
+      assert(activeElements[0].is<Expr *>());
       auto expr = activeElements[0].get<Expr *>();
       ParserStatus status(ICD);
       auto charRange = Lexer::getCharSourceRangeFromSourceRange(
