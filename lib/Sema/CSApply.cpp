@@ -8217,7 +8217,7 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
         // Resolve into a MakeTemporarilyEscapableExpr.
         auto *args = apply->getArgs();
         assert(args->size() == 2 && "should have two arguments");
-        auto *nonescaping = args->getExpr(0);
+        auto *nonescaping = cs.coerceToRValue(args->getExpr(0));
         auto *body = args->getExpr(1);
         auto bodyTy = cs.getType(body)->getWithoutSpecifierType();
         auto bodyFnTy = bodyTy->castTo<FunctionType>();
