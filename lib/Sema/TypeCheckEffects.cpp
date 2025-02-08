@@ -1018,6 +1018,16 @@ public:
 
     return result;
   }
+
+  /// Return a classification that is the same as this one, but drops the
+  /// 'unsafe' effect.
+  Classification withoutUnsafe() const {
+    Classification result(*this);
+    result.UnsafeKind = ConditionalEffectKind::None;
+    result.UnsafeUses.clear();
+    return result;
+  }
+
   /// Return a classification that promotes a typed throws effect to an
   /// untyped throws effect.
   Classification promoteToUntypedThrows() const {
@@ -3149,6 +3159,10 @@ class CheckEffectsCoverage : public EffectsHandlingWalker<CheckEffectsCoverage> 
   llvm::DenseMap<Expr *, std::vector<DiagnosticInfo>> uncoveredAsync;
   llvm::DenseMap<Expr *, Expr *> parentMap;
 
+  /// Expressions that are assumed to be safe because they are being
+  /// passed directly into an explicitly `@safe` function.
+  llvm::DenseSet<const Expr *> assumedSafeArguments;
+
   /// Tracks all of the uncovered uses of unsafe constructs based on their
   /// anchor expression, so we can emit diagnostics at the end.
   llvm::MapVector<Expr *, std::vector<UnsafeUse>> uncoveredUnsafeUses;
@@ -3526,6 +3540,12 @@ private:
   ShouldRecurse_t checkWithSubstitutionMap(Expr *E, SubstitutionMap subs) {
     auto classification = Classification::forSubstitutionMap(
         subs, E->getLoc());
+
+    // If this expression is covered as a safe argument, drop the unsafe
+    // classification.
+    if (assumedSafeArguments.contains(E))
+      classification = classification.withoutUnsafe();
+
     checkEffectSite(E, /*requiresTry=*/false, classification);
     return ShouldRecurse;
   }
@@ -3535,6 +3555,12 @@ private:
       ArrayRef<ProtocolConformanceRef> conformances) {
     auto classification = Classification::forConformances(
         conformances, E->getLoc());
+
+    // If this expression is covered as a safe argument, drop the unsafe
+    // classification.
+    if (assumedSafeArguments.contains(E))
+      classification = classification.withoutUnsafe();
+
     checkEffectSite(E, /*requiresTry=*/false, classification);
     return ShouldRecurse;
   }
@@ -3542,6 +3568,12 @@ private:
   ShouldRecurse_t checkType(Expr *E, TypeRepr *typeRepr, Type type) {
     SourceLoc loc = typeRepr ? typeRepr->getLoc() : E->getLoc();
     auto classification = Classification::forType(type, loc);
+
+    // If this expression is covered as a safe argument, drop the unsafe
+    // classification.
+    if (assumedSafeArguments.contains(E))
+      classification = classification.withoutUnsafe();
+
     checkEffectSite(E, /*requiresTry=*/false, classification);
     return ShouldRecurse;
   }
@@ -3646,6 +3678,36 @@ private:
     CurContext = savedContext;
   }
 
+  /// Mark an argument as safe if it is of a form where a @safe declaration
+  /// covers it.
+  void markArgumentSafe(Expr *arg) {
+    auto argValue = arg->findOriginalValue();
+
+    // Reference to a local variable or parameter.
+    if (auto argDRE = dyn_cast<DeclRefExpr>(argValue)) {
+      if (auto argDecl = argDRE->getDecl())
+        if (argDecl->getDeclContext()->isLocalContext())
+          assumedSafeArguments.insert(argDRE);
+    }
+
+    // Metatype reference.
+    if (isa<TypeExpr>(argValue))
+      assumedSafeArguments.insert(argValue);
+  }
+
+  /// Mark any of the local variable references within the given argument
+  /// list as safe, so we don't diagnose unsafe uses of them.
+  void markArgumentsSafe(ArgumentList *argumentList) {
+    if (!argumentList)
+      return;
+
+    for (const auto &arg: *argumentList) {
+      if (auto argExpr = arg.getExpr()) {
+        markArgumentSafe(argExpr);
+      }
+    }
+  }
+
   ShouldRecurse_t checkApply(ApplyExpr *E) {
     // An apply expression is a potential throw site if the function throws.
     // But if the expression didn't type-check, suppress diagnostics.
@@ -3673,6 +3735,14 @@ private:
       E->setNoAsync(true);
     }
 
+    // If this is calling a @safe function, treat local variables as being
+    // safe.
+    if (auto calleeDecl = E->getCalledValue()) {
+      if (calleeDecl->getExplicitSafety() == ExplicitSafety::Safe) {
+        markArgumentsSafe(E->getArgs());
+      }
+    }
+
     // If current apply expression did not type-check, don't attempt
     // walking inside of it. This accounts for the fact that we don't
     // erase types without type variables to enable better code complication,
@@ -3698,6 +3768,22 @@ private:
       E->setThrows(throwDest);
     }
 
+    // If the declaration we're referencing is explicitly @safe, mark arguments
+    // as potentially being safe.
+    if (auto decl = E->getMember().getDecl()) {
+      if (decl->getExplicitSafety() == ExplicitSafety::Safe) {
+        // The base can be considered safe.
+        markArgumentSafe(E->getBase());
+
+        // Mark subscript arguments safe.
+        if (auto subscript = dyn_cast<SubscriptExpr>(E)) {
+          markArgumentsSafe(subscript->getArgs());
+        } else if (auto dynSubscript = dyn_cast<DynamicSubscriptExpr>(E)) {
+          markArgumentsSafe(dynSubscript->getArgs());
+        }
+      }
+    }
+
     return ShouldRecurse;
   }
 
@@ -3711,6 +3797,10 @@ private:
       // If we aren't evaluating the reference, we only care about 'unsafe'.
       if (!isEvaluated)
         classification = classification.onlyUnsafe();
+
+      // If we're treating this expression as a safe argument, drop 'unsafe'.
+      if (assumedSafeArguments.contains(expr))
+        classification = classification.withoutUnsafe();
 
       auto throwDest = checkEffectSite(
           expr, classification.hasThrows(), classification);
