@@ -2879,6 +2879,55 @@ TypeVariableBinding::fixForHole(ConstraintSystem &cs) const {
   return std::nullopt;
 }
 
+static bool shouldIgnoreHoleForCodeCompletion(ConstraintSystem &cs,
+                                              TypeVariableType *typeVar,
+                                              ConstraintLocator *srcLocator) {
+  if (!cs.isForCodeCompletion())
+    return false;
+  
+  // Don't penalize solutions with unresolved generics.
+  if (typeVar->getImpl().getGenericParameter())
+    return true;
+
+  // Don't penalize solutions if we couldn't determine the type of the code
+  // completion token. We still want to examine the surrounding types in
+  // that case.
+  if (typeVar->getImpl().isCodeCompletionToken())
+    return true;
+
+  // When doing completion in a result builder, we avoid solving unrelated
+  // expressions by replacing them with unbound placeholder variables.
+  // As such, we need to avoid penalizing holes for references to
+  // placeholder variables.
+  if (srcLocator->isLastElement<LocatorPathElt::PlaceholderType>()) {
+    if (auto *DRE = getAsExpr<DeclRefExpr>(srcLocator->getAnchor())) {
+      if (auto *VD = dyn_cast_or_null<VarDecl>(DRE->getDecl())) {
+        if (auto *PBD = VD->getParentPatternBinding()) {
+          if (isPlaceholderVar(PBD))
+            return true;
+        }
+      }
+    }
+  }
+  
+  // Don't penalize solutions with holes due to missing arguments after the
+  // code completion position.
+  auto argLoc = srcLocator->findLast<LocatorPathElt::SynthesizedArgument>();
+  if (argLoc && argLoc->isAfterCodeCompletionLoc())
+    return true;
+
+  // Don't penalize solutions that have holes for ignored arguments.
+  if (cs.hasArgumentsIgnoredForCodeCompletion()) {
+    // Avoid simplifying the locator if the constraint system didn't ignore
+    // any arguments.
+    auto argExpr = simplifyLocatorToAnchor(typeVar->getImpl().getLocator());
+    if (cs.isArgumentIgnoredForCodeCompletion(argExpr.dyn_cast<Expr *>())) {
+      return true;
+    }
+  }
+  return false;
+}
+
 bool TypeVariableBinding::attempt(ConstraintSystem &cs) const {
   auto type = Binding.BindingType;
   auto *srcLocator = Binding.getLocator();
@@ -2934,33 +2983,9 @@ bool TypeVariableBinding::attempt(ConstraintSystem &cs) const {
   }
 
   auto reportHole = [&]() {
-    if (cs.isForCodeCompletion()) {
-      // Don't penalize solutions with unresolved generics.
-      if (TypeVar->getImpl().getGenericParameter())
-        return false;
-
-      // Don't penalize solutions if we couldn't determine the type of the code
-      // completion token. We still want to examine the surrounding types in
-      // that case.
-      if (TypeVar->getImpl().isCodeCompletionToken())
-        return false;
-
-      // Don't penalize solutions with holes due to missing arguments after the
-      // code completion position.
-      auto argLoc = srcLocator->findLast<LocatorPathElt::SynthesizedArgument>();
-      if (argLoc && argLoc->isAfterCodeCompletionLoc())
-        return false;
-
-      // Don't penalize solutions that have holes for ignored arguments.
-      if (cs.hasArgumentsIgnoredForCodeCompletion()) {
-        // Avoid simplifying the locator if the constraint system didn't ignore
-        // any arguments.
-        auto argExpr = simplifyLocatorToAnchor(TypeVar->getImpl().getLocator());
-        if (cs.isArgumentIgnoredForCodeCompletion(argExpr.dyn_cast<Expr *>())) {
-          return false;
-        }
-      }
-    }
+    if (shouldIgnoreHoleForCodeCompletion(cs, TypeVar, srcLocator))
+      return false;
+    
     // Reflect in the score that this type variable couldn't be
     // resolved and had to be bound to a placeholder "hole" type.
     cs.increaseScore(SK_Hole, srcLocator);
