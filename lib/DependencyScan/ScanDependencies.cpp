@@ -81,13 +81,22 @@ namespace {
 class ExplicitModuleDependencyResolver {
 public:
   ExplicitModuleDependencyResolver(
-      ModuleDependencyID moduleID, ModuleDependenciesCache &cache,
+      const ModuleDependencyID &moduleID, ModuleDependenciesCache &cache,
       CompilerInstance &instance, std::optional<SwiftDependencyTracker> tracker)
       : moduleID(moduleID), cache(cache), instance(instance),
         resolvingDepInfo(cache.findKnownDependency(moduleID)),
         tracker(std::move(tracker)) {
     // Copy commandline.
     commandline = resolvingDepInfo.getCommandline();
+
+    if (resolvingDepInfo.isSwiftInterfaceModule()) {
+      auto swiftTextualDeps = resolvingDepInfo.getAsSwiftInterfaceModule();
+      auto &interfacePath = swiftTextualDeps->swiftInterfaceFile;
+      auto SDKPath = instance.getASTContext().SearchPathOpts.getSDKPath();
+      nameExpander = std::make_unique<InterfaceModuleNameExpander>(
+          moduleID.ModuleName, interfacePath, SDKPath,
+          instance.getInvocation());
+    }
   }
 
   llvm::Error
@@ -171,6 +180,9 @@ public:
 
     pruneUnusedVFSOverlay();
 
+    if (resolvingDepInfo.isSwiftInterfaceModule())
+      updateSwiftInterfaceCommandLine();
+
     // Update the dependency in the cache with the modified command-line.
     if (resolvingDepInfo.isSwiftInterfaceModule() ||
         resolvingDepInfo.isClangModule()) {
@@ -219,6 +231,12 @@ private:
       depInfo.updateCommandLine(commandline);
       if (auto err = updateModuleCacheKey(depInfo))
         return err;
+    }
+
+    if (nameExpander) {
+      auto expandedName = nameExpander->getExpandedName();
+      depInfo.updateModuleOutputPath(expandedName.outputPath.c_str());
+      depInfo.updateContextHash(expandedName.hash.str());
     }
 
     return llvm::Error::success();
@@ -402,7 +420,60 @@ private:
       }
       resolvedCommandLine.push_back(*it);
     }
+
+    // Filter the extra args that we use to calculate the hash of the module.
+    // The key assumption is that these args are clang importer args, so we
+    // do not need to check for -Xcc.
+    auto extraArgsFilter = [&](InterfaceModuleNameExpander::ArgListTy &args) {
+      bool skip = false;
+      InterfaceModuleNameExpander::ArgListTy newArgs;
+      for (auto it = args.begin(), end = args.end(); it != end; it++) {
+        if (skip) {
+          skip = false;
+          continue;
+        }
+
+        if ((it + 1) != end && isVFSOverlayFlag(*it)) {
+          if (!usedVFSOverlayPaths.contains(*(it + 1))) {
+            skip = true;
+            continue;
+          }
+        }
+
+        newArgs.push_back(*it);
+      }
+      args = newArgs;
+      return;
+    };
+
+    if (nameExpander)
+      nameExpander->pruneExtraArgs(extraArgsFilter);
+
     commandline = std::move(resolvedCommandLine);
+  }
+
+  void updateSwiftInterfaceCommandLine() {
+    // The command line needs upadte once we prune the unused VFS overlays.
+    // The update consists of two steps.
+    // 1. Recompute the output path, which includes the module hash.
+    // 2. Update `-o `'s value on the command line with the new output path.
+
+    assert(nameExpander && "Can only update if we hae a nameExpander.");
+    auto expandedName = nameExpander->getExpandedName();
+
+    StringRef outputName = expandedName.outputPath.str();
+
+    bool isOutputPath = false;
+    for (auto &A : commandline) {
+      if (isOutputPath) {
+        A = outputName.str();
+        break;
+      } else if (A == "-o") {
+        isOutputPath = true;
+      }
+    }
+
+    return;
   }
 
   llvm::Error collectCASDependencies(ModuleDependencyInfo &dependencyInfoCopy) {
@@ -524,10 +595,11 @@ private:
   }
 
 private:
-  ModuleDependencyID moduleID;
+  const ModuleDependencyID &moduleID;
   ModuleDependenciesCache &cache;
   CompilerInstance &instance;
   const ModuleDependencyInfo &resolvingDepInfo;
+  std::unique_ptr<InterfaceModuleNameExpander> nameExpander;
 
   std::optional<SwiftDependencyTracker> tracker;
   std::vector<std::string> rootIDs;
@@ -540,7 +612,7 @@ private:
 };
 
 static llvm::Error resolveExplicitModuleInputs(
-    ModuleDependencyID moduleID,
+    const ModuleDependencyID &moduleID,
     const std::set<ModuleDependencyID> &dependencies,
     ModuleDependenciesCache &cache, CompilerInstance &instance,
     std::optional<std::set<ModuleDependencyID>> bridgingHeaderDeps,

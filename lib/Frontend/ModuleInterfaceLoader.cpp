@@ -2843,3 +2843,49 @@ std::unique_ptr<ExplicitCASModuleLoader> ExplicitCASModuleLoader::create(
 
   return result;
 }
+
+InterfaceModuleNameExpander::ResultTy
+InterfaceModuleNameExpander::getExpandedName() {
+  // Expand the name once, and reuse later.
+  if (!expanded) {
+    auto &outputPath = expandedName.outputPath;
+    outputPath = CI.getClangModuleCachePath();
+    llvm::sys::path::append(outputPath, moduleName);
+    outputPath.append("-");
+    auto hashStart = outputPath.size();
+    outputPath.append(getHash());
+    expandedName.hash = outputPath.str().substr(hashStart);
+    outputPath.append(".");
+    auto outExt = file_types::getExtension(file_types::TY_SwiftModuleFile);
+    outputPath.append(outExt);
+    expanded = true;
+  }
+  return expandedName;
+}
+
+std::string InterfaceModuleNameExpander::getHash() {
+  bool useStrictCacheHash = CI.getFrontendOptions().RequestedAction ==
+                            FrontendOptions::ActionType::ScanDependencies;
+  auto targetToHash =
+      useStrictCacheHash
+          ? CI.getLangOptions().Target
+          : getTargetSpecificModuleTriple(CI.getLangOptions().Target);
+
+  std::string sdkBuildVersion = getSDKBuildVersion(sdkPath);
+
+  llvm::hash_code H = llvm::hash_combine(
+      swift::version::getSwiftFullVersion(), interfacePath, targetToHash.str(),
+      CI.getSDKPath(), sdkBuildVersion, version::getCurrentCompilerChannel(),
+      CI.getFrontendOptions().shouldTrackSystemDependencies(),
+      CI.getCASOptions().getModuleScanningHashComponents(),
+      llvm::hash_combine_range(extraArgs.begin(), extraArgs.end()),
+      unsigned(CI.getLangOptions().EnableAppExtensionRestrictions),
+      unsigned(CI.getSILOptions().EnableOSSAModules));
+
+  return llvm::toString(llvm::APInt(64, H), 36, /*Signed=*/false);
+}
+
+void InterfaceModuleNameExpander::pruneExtraArgs(
+    std::function<void(ArgListTy &)> filter) {
+  filter(extraArgs);
+}

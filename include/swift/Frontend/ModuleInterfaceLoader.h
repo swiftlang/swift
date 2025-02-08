@@ -710,6 +710,41 @@ public:
                                     StringRef &CacheHash);
   std::string getCacheHash(StringRef useInterfacePath, StringRef sdkPath);
 };
+
+class InterfaceModuleNameExpander {
+public:
+  using ArgListTy = std::vector<std::string>;
+  struct ResultTy {
+    llvm::SmallString<256> outputPath;
+
+    // Hash points to a segment of outputPath.
+    StringRef hash;
+  };
+
+private:
+  const StringRef moduleName;
+  const StringRef interfacePath;
+  const StringRef sdkPath;
+  const CompilerInvocation &CI;
+  ArgListTy extraArgs;
+
+  ResultTy expandedName;
+
+  bool expanded = false;
+
+  std::string getHash();
+
+public:
+  InterfaceModuleNameExpander(const StringRef moduleName,
+                              const StringRef interfacePath,
+                              const StringRef sdkPath,
+                              const CompilerInvocation &CI)
+      : moduleName(moduleName), interfacePath(interfacePath), sdkPath(sdkPath),
+        CI(CI), extraArgs(CI.getClangImporterOptions()
+                              .getReducedExtraArgsForSwiftModuleDependency()) {}
+  ResultTy getExpandedName();
+  void pruneExtraArgs(std::function<void(ArgListTy &)> filter);
+};
 }
 
 #endif
