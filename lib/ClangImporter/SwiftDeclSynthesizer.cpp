@@ -311,6 +311,7 @@ ValueDecl *SwiftDeclSynthesizer::createConstant(
 static std::pair<BraceStmt *, bool>
 synthesizeConstantGetterBody(AbstractFunctionDecl *afd, void *voidContext) {
   ASTContext &ctx = afd->getASTContext();
+  auto loc = afd->getLoc();
   auto func = cast<AccessorDecl>(afd);
   VarDecl *constantVar = cast<VarDecl>(func->getStorage());
   Type type = func->mapTypeIntoContext(constantVar->getValueInterfaceType());
@@ -354,7 +355,8 @@ synthesizeConstantGetterBody(AbstractFunctionDecl *afd, void *voidContext) {
     // (rawValue: T) -> ...
     initTy = initTy->castTo<FunctionType>()->getResult();
 
-    auto *argList = ArgumentList::forImplicitSingle(ctx, ctx.Id_rawValue, expr);
+    auto *argList =
+        ArgumentList::forImplicitSingle(ctx, loc, ctx.Id_rawValue, expr);
     auto initCall = CallExpr::createImplicit(ctx, initRef, argList);
     initCall->setType(initTy);
     initCall->setThrows(nullptr);
