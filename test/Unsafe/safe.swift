@@ -171,8 +171,7 @@ func testMyArray(ints: MyArray<Int>) {
     let bufferCopy = unsafe buffer
     _ = unsafe bufferCopy
 
-    // expected-warning@+1{{expression uses unsafe constructs but is not marked with 'unsafe'}}
-    print(buffer.safeCount) // expected-note{{reference to parameter 'buffer' involves unsafe type 'UnsafeBufferPointer<Int>'}}
+    print(buffer.safeCount)
     unsafe print(buffer.baseAddress!)
   }
 }
