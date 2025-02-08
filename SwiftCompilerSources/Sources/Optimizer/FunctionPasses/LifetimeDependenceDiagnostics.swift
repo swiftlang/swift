@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2023 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2025 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -101,10 +101,11 @@ let lifetimeDependenceDiagnosticsPass = FunctionPass(
 private func analyze(dependence: LifetimeDependence, _ context: FunctionPassContext) -> Bool {
   log("Dependence scope:\n\(dependence)")
 
-  // Briefly, some versions of Span in the standard library violated trivial lifetimes; versions of the compiler built
-  // at that time simply ignored dependencies on trivial values. For now, disable trivial dependencies to allow newer
-  // compilers to build against those older standard libraries. This check is only relevant for ~6 mo (until July 2025).
   if dependence.parentValue.type.objectType.isTrivial(in: dependence.function) {
+    // Briefly, some versions of Span in the standard library violated trivial lifetimes; versions of the compiler built
+    // at that time simply ignored dependencies on trivial values. For now, disable trivial dependencies to allow newer
+    // compilers to build against those older standard libraries. This check is only relevant for ~6 mo (until July
+    // 2025).
     if let sourceFileKind = dependence.function.sourceFileKind, sourceFileKind == .interface {
       return true
     }
@@ -287,7 +288,7 @@ private struct LifetimeVariable {
 
   private func getFirstVariableIntroducer(of value: Value, _ context: some Context) -> Value? {
     var introducer: Value?
-    var useDefVisitor = VariableIntroducerUseDefWalker(context) {
+    var useDefVisitor = VariableIntroducerUseDefWalker(context, scopedValue: value) {
       introducer = $0
       return .abortWalk
     }

@@ -168,7 +168,7 @@ entry(%0 : @owned $C, %1 : @owned $D, %2 : @guaranteed $D, %3 : $*D, %4 : $*D):
 // We do not expect a direct dependence on in inout argument. Treat it as unknown.
 // Instead, mutable variable access should have an access scope.
 // CHECK-LABEL: dependence_scope: lifetime_dependence_scope with: %inout_arg_mark
-// CHECK-NEXT: Unknown:     %4 = argument of bb0 : $*D
+// CHECK-NEXT: Caller:     %4 = argument of bb0 : $*D
 // CHECK-NEXT: Dependent:  %{{.*}} = mark_dependence [nonescaping] %{{.*}} : $C on %4 : $*D
 // CHECK: dependence_scope: lifetime_dependence_scope with: %inout_arg_mark
 
