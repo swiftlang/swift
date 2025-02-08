@@ -3551,6 +3551,10 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
 
   Opts.InternalizeSymbols = FrontendOpts.Static;
 
+  if (Args.hasArg(OPT_mergeable_symbols)) {
+    Opts.MergeableSymbols = true;
+  }
+
   if (Args.hasArg(OPT_disable_preallocated_instantiation_caches)) {
     Opts.NoPreallocatedInstantiationCaches = true;
   }
