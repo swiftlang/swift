@@ -213,7 +213,7 @@ static void addMandatoryDiagnosticOptPipeline(SILPassPipelinePlan &P) {
 
   // Promote loads as necessary to ensure we have enough SSA formation to emit
   // SSA based diagnostics.
-  P.addPredictableMemoryAccessOptimizations();
+  P.addMandatoryRedundantLoadElimination();
 
   // This phase performs optimizations necessary for correct interoperation of
   // Swift os log APIs with C os_log ABIs.
