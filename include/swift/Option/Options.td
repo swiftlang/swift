@@ -2116,7 +2116,7 @@ def digester_mode:
 def nostartfiles:
   Flag<["-"], "nostartfiles">,
   Flags<[FrontendOption, DoesNotAffectIncrementalBuild, NoInteractiveOption,
-         HelpHidden, NewDriverOnlyOption]>,
+         HelpHidden]>,
   HelpText<"Do not link in the Swift language startup routines">;
 
 def gcc_toolchain: Separate<["-"], "gcc-toolchain">,
