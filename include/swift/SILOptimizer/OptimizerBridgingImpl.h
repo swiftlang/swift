@@ -260,9 +260,6 @@ BridgedValue BridgedPassContext::getSILUndef(BridgedType type) const {
   return {swift::SILUndef::get(invocation->getFunction(), type.unbridged())};
 }
 
-bool BridgedPassContext::optimizeMemoryAccesses(BridgedFunction f) const {
-  return swift::optimizeMemoryAccesses(f.getFunction());
-}
 bool BridgedPassContext::eliminateDeadAllocations(BridgedFunction f) const {
   return swift::eliminateDeadAllocations(f.getFunction(),
                                          this->getDomTree().di);

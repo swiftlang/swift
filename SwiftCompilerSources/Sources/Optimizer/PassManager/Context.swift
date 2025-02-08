@@ -346,14 +346,6 @@ struct FunctionPassContext : MutatingContext {
     _bridged.asNotificationHandler().notifyChanges(.effectsChanged)
   }
 
-  func optimizeMemoryAccesses(in function: Function) -> Bool {
-    if _bridged.optimizeMemoryAccesses(function.bridged) {
-      notifyInstructionsChanged()
-      return true
-    }
-    return false
-  }
-
   func eliminateDeadAllocations(in function: Function) -> Bool {
     if _bridged.eliminateDeadAllocations(function.bridged) {
       notifyInstructionsChanged()
