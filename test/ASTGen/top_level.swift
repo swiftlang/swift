@@ -22,5 +22,10 @@ if let first = [1,2,3].first {
 
 func foo(x: Int) {}
 
-// FIXME: Top-level pattern binding decl must be enclosed with TopLevelCodeDecl
-// let a = 42
+let a = 42
+
+var b = {
+  12 + a
+}() {
+  didSet { print("didSet") }
+}

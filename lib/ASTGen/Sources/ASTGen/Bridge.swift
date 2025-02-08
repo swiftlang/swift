@@ -318,3 +318,20 @@ extension BridgedArrayRef {
     return c(buffer)
   }
 }
+
+/// Utility to pass Swift closure to C/C++ bridging API.
+///
+/// C/C++ API can call the closure via `BridgedSwiftClosure::operator()` which
+/// calls `bridgedSwiftClosureCall_1(_:_:)` function below.
+func withBridgedSwiftClosure(closure: (UnsafeRawPointer?) -> Void, call: (BridgedSwiftClosure) -> Void) {
+  withoutActuallyEscaping(closure) { escapingClosure in
+    withUnsafePointer(to: escapingClosure) { ptr in
+      call(BridgedSwiftClosure(closure: ptr))
+    }
+  }
+}
+
+@_cdecl("swift_ASTGen_bridgedSwiftClosureCall_1")
+func bridgedSwiftClosureCall_1(_ bridged: BridgedSwiftClosure, _ arg: UnsafeRawPointer?) {
+  bridged.closure.assumingMemoryBound(to: ((UnsafeRawPointer?) -> Void).self).pointee(arg)
+}
