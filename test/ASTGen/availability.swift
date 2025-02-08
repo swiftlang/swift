@@ -45,3 +45,22 @@ func testMacroNameOnly() {}
 
 @available(_myProject 2.5, *)
 func testMacroWithVersion() {}
+
+@_specialize(exported: true, availability: _iOS54Aligned, *; where T == Int)
+func testSpecialize<T>(arg: T) -> T {}
+
+@backDeployed(before: _iOS53Aligned)
+public func testBackDeployed() {}
+
+@available(macOS 10, iOS 12, *)
+@_originallyDefinedIn(module: "OriginalModule", macOS 12.0, iOS 23.2)
+public func testOriginallyDefinedIn() {}
+
+
+func testPoundIf() {
+  if #available(_myProject 2.5, *) {
+    // pass
+  } else if #unavailable(macOS 80) {
+    // pass
+  }
+}

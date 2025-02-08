@@ -1873,20 +1873,18 @@ ParserStatus Parser::parsePlatformVersionInList(StringRef AttrName,
       return MacroStatus;
 
     for (auto *Spec : Specs) {
-      auto *PlatformVersionSpec =
-          dyn_cast<PlatformVersionConstraintAvailabilitySpec>(Spec);
+      auto Platform = Spec->getPlatform();
       // Since peekAvailabilityMacroName() only matches defined availability
-      // macros, we don't expect to get any other kind of spec here.
-      assert(PlatformVersionSpec && "Unexpected AvailabilitySpec kind");
+      // macros, we only expect platform specific constraints here.
+      assert(Platform && "Unexpected AvailabilitySpec kind");
 
-      auto Platform = PlatformVersionSpec->getPlatform();
-      auto Version = PlatformVersionSpec->getVersion();
+      auto Version = Spec->getVersion();
       if (Version.getSubminor().has_value() || Version.getBuild().has_value()) {
-        diagnose(PlatformVersionSpec->getVersionSrcRange().Start,
+        diagnose(Spec->getVersionSrcRange().Start,
                  diag::attr_availability_platform_version_major_minor_only,
                  AttrName);
       }
-      PlatformAndVersions.emplace_back(Platform, Version);
+      PlatformAndVersions.emplace_back(*Platform, Version);
     }
 
     return makeParserSuccess();
