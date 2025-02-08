@@ -55,6 +55,10 @@ public enum AccessBase : CustomStringConvertible, Hashable {
   case stack(AllocStackInst)
   
   /// The address of a global variable.
+  ///
+  /// TODO: make this payload the global address. Make AccessBase.address non-optional. Make AccessBase comparison see
+  /// though things like project_box and global_addr. Then cleanup APIs like LifetimeDependence.Scope that carry extra
+  /// address values around.
   case global(GlobalVariable)
   
   /// The address of a stored property of a class instance.
@@ -501,12 +505,37 @@ public enum EnclosingAccessScope {
   case access(BeginAccessInst)
   case base(AccessBase)
   case dependence(MarkDependenceInst)
+
+  // TODO: make this non-optional after fixing AccessBase.global.
+  public var address: Value? {
+    switch self {
+    case let .access(beginAccess):
+      return beginAccess
+    case let .base(accessBase):
+      return accessBase.address
+    case let .dependence(markDep):
+      return markDep
+    }
+  }
 }
 
 // An AccessBase with the nested enclosing scopes that contain the original address in bottom-up order.
 public struct AccessBaseAndScopes {
   public let base: AccessBase
   public let scopes: SingleInlineArray<EnclosingAccessScope>
+
+  public init(base: AccessBase, scopes: SingleInlineArray<EnclosingAccessScope>) {
+    self.base = base
+    self.scopes = scopes
+  }
+
+  public var outerAddress: Value? {
+    base.address ?? scopes.last?.address
+  }
+
+  public var enclosingAccess: EnclosingAccessScope {
+    return scopes.first ?? .base(base)
+  }
 
   public var innermostAccess: BeginAccessInst? {
     for scope in scopes {
@@ -515,6 +544,20 @@ public struct AccessBaseAndScopes {
       }
     }
     return nil
+  }
+}
+
+extension AccessBaseAndScopes {
+  // This must return false if a mark_dependence scope is present.
+  public var isOnlyReadAccess: Bool {
+    scopes.allSatisfy(
+      {
+        if case let .access(beginAccess) = $0 {
+          return beginAccess.accessKind == .read
+        }
+        // preserve any dependence scopes.
+        return false
+      })
   }
 }
 
