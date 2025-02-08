@@ -518,6 +518,32 @@ public struct AccessBaseAndScopes {
   }
 }
 
+extension BeginAccessInst {
+  // Recognize an access scope for a unsafe addressor:
+  // %adr = pointer_to_address
+  // %md = mark_dependence %adr
+  // begin_access [unsafe] %md
+  public var unsafeAddressorSelf: Value? {
+    guard self.isUnsafe else {
+      return nil
+    }
+    switch self.address.enclosingAccessScope {
+    case .access, .base:
+      return nil
+    case let .dependence(markDep):
+      switch markDep.value.enclosingAccessScope {
+      case .access, .dependence:
+        return nil
+      case let .base(accessBase):
+        guard case .pointer = accessBase else {
+          return nil
+        }
+        return markDep.base
+      }
+    }
+  }
+}
+
 private struct EnclosingAccessWalker : AddressUseDefWalker {
   var enclosingScope: EnclosingAccessScope?
 
