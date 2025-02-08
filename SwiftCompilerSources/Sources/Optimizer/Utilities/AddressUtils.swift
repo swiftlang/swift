@@ -201,25 +201,49 @@ extension AddressUseVisitor {
 }
 
 extension AccessBase {
-  /// If this access base has a single initializer, return it, along
-  /// with the initialized address. This does not guarantee that all
-  /// uses of that address are dominated by the store or even that the
-  /// store is a direct use of `address`.
-  func findSingleInitializer(_ context: some Context) -> (initialAddress: Value, initializingStore: Instruction)? {
+  enum Initializer {
+    // An @in or @inout argument that is never modified inside the function. Handling an unmodified @inout like an @in
+    // allows clients to ignore access scopes for the purpose of reaching definitions and lifetimes.
+    case argument(FunctionArgument)
+    // A yielded @in argument.
+    case yield(MultipleValueInstructionResult)
+    // A local variable or @out argument that is assigned once.
+    // 'initialAddress' is the first point at which address may be used. Typically the allocation.
+    case store(initializingStore: Instruction, initialAddress: Value)
+
+    var initialAddress: Value {
+      let address: Value
+      switch self {
+      case let .argument(arg):
+        address = arg
+      case let .yield(result):
+        address = result
+      case let .store(_, initialAddress):
+        address = initialAddress
+      }
+      assert(address.type.isAddress)
+      return address
+    }
+  }
+
+  /// If this access base has a single initializer, return it, along with the initialized address. This does not
+  /// guarantee that all uses of that address are dominated by the store or even that the store is a direct use of
+  /// `address`.
+  func findSingleInitializer(_ context: some Context) -> Initializer? {
     let baseAddr: Value
     switch self {
     case let .stack(allocStack):
       baseAddr = allocStack
     case let .argument(arg):
-      guard arg.convention.isIndirectOut else {
-        return nil
+      if arg.convention.isIndirectIn {
+        return .argument(arg)
       }
       baseAddr = arg
     case let .storeBorrow(sbi):
       guard case let .stack(allocStack) = sbi.destinationOperand.value.accessBase else {
         return nil
       }
-      return (initialAddress: allocStack, initializingStore: sbi)
+      return .store(initializingStore: sbi, initialAddress: allocStack)
     default:
       return nil
     }
@@ -254,33 +278,43 @@ extension AccessBase {
 // distinguishes between `mayWriteToMemory` for dependence vs. actual
 // modification of memory.
 struct AddressInitializationWalker: AddressDefUseWalker, AddressUseVisitor {
+  let baseAddress: Value
   let context: any Context
 
   var walkDownCache = WalkerCache<SmallProjectionPath>()
 
   var isProjected = false
-  var initializingStore: Instruction?
+  var initializer: AccessBase.Initializer?
 
   static func findSingleInitializer(ofAddress baseAddr: Value, context: some Context)
-    -> (initialAddress: Value, initializingStore: Instruction)? {
+    -> AccessBase.Initializer? {
 
-    var walker = AddressInitializationWalker(context: context)
+    var walker = AddressInitializationWalker(baseAddress: baseAddr, context)
     if walker.walkDownUses(ofAddress: baseAddr, path: SmallProjectionPath()) == .abortWalk {
       return nil
     }
-    guard let initializingStore = walker.initializingStore else {
-      return nil
+    return walker.initializer
+  }
+
+  private init(baseAddress: Value, _ context: some Context) {
+    self.baseAddress = baseAddress
+    self.context = context
+    if let arg = baseAddress as? FunctionArgument {
+      assert(!arg.convention.isIndirectIn, "@in arguments cannot be initialized")
+      if arg.convention.isInout {
+        initializer = .argument(arg)
+      }
+      // @out arguments are initialized normally via stores.
     }
-    return (initialAddress: baseAddr, initializingStore: initializingStore)
   }
 
   private mutating func setInitializer(instruction: Instruction) -> WalkResult {
     // An initializer must be unique and store the full value.
-    if initializingStore != nil || isProjected {
-      initializingStore = nil
+    if initializer != nil || isProjected {
+      initializer = nil
       return .abortWalk
     }
-    initializingStore = instruction
+    initializer = .store(initializingStore: instruction, initialAddress: baseAddress)
     return .continueWalk
   }
 }
