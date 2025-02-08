@@ -339,6 +339,52 @@ static void findFavoredChoicesBasedOnArity(
     favoredChoice(choice);
 }
 
+/// Preserves old behavior where, for unary calls, the solver would not previously
+/// consider choices that didn't match on the number of parameters (regardless of
+/// defaults and variadics) and only exact matches were favored.
+static std::optional<DisjunctionInfo> preserveFavoringOfUnlabeledUnaryArgument(
+    ConstraintSystem &cs, Constraint *disjunction, ArgumentList *argumentList) {
+  if (!argumentList->isUnlabeledUnary())
+    return std::nullopt;
+
+  auto ODRE = isOverloadedDeclRef(disjunction);
+  bool preserveFavoringOfUnlabeledUnaryArgument =
+      !ODRE || numOverloadChoicesMatchingOnArity(ODRE, argumentList) < 2;
+
+  if (!preserveFavoringOfUnlabeledUnaryArgument)
+    return std::nullopt;
+
+  auto *argument =
+      argumentList->getUnlabeledUnaryExpr()->getSemanticsProvidingExpr();
+  // The hack operated on "favored" types and only declaration references,
+  // applications, and (dynamic) subscripts had them if they managed to
+  // get an overload choice selected during constraint generation.
+  if (!(isExpr<DeclRefExpr>(argument) || isExpr<ApplyExpr>(argument) ||
+        isExpr<SubscriptExpr>(argument) ||
+        isExpr<DynamicSubscriptExpr>(argument)))
+    return {/*score=*/0};
+
+  auto argumentType = cs.getType(argument);
+  if (argumentType->hasTypeVariable() || argumentType->hasDependentMember())
+    return {/*score=*/0};
+
+  SmallVector<Constraint *, 2> favoredChoices;
+  forEachDisjunctionChoice(
+      cs, disjunction,
+      [&argumentType, &favoredChoices](Constraint *choice, ValueDecl *decl,
+                                       FunctionType *overloadType) {
+        if (overloadType->getNumParams() != 1)
+          return;
+
+        auto paramType = overloadType->getParams()[0].getPlainType();
+        if (paramType->isEqual(argumentType))
+          favoredChoices.push_back(choice);
+      });
+
+  return DisjunctionInfo(/*score=*/favoredChoices.empty() ? 0 : 1,
+                         favoredChoices);
+}
+
 } // end anonymous namespace
 
 /// Given a set of disjunctions, attempt to determine
@@ -443,6 +489,16 @@ static void determineBestChoicesInContext(
         recordResult(disjunction, {/*score=*/0.01, favoredChoices});
         continue;
       }
+    }
+
+    // Preserves old behavior where, for unary calls, the solver
+    // would not consider choices that didn't match on the number
+    // of parameters (regardless of defaults) and only exact
+    // matches were favored.
+    if (auto info = preserveFavoringOfUnlabeledUnaryArgument(cs, disjunction,
+                                                             argumentList)) {
+      recordResult(disjunction, std::move(info.value()));
+      continue;
     }
 
     if (!isSupportedDisjunction(disjunction))
@@ -931,17 +987,6 @@ static void determineBestChoicesInContext(
     double bestScore = 0.0;
     SmallVector<std::pair<Constraint *, double>, 2> favoredChoices;
 
-    // Preserves old behavior where, for unary calls, the solver
-    // would not consider choices that didn't match on the number
-    // of parameters (regardless of defaults) and only exact
-    // matches were favored.
-    bool preserveFavoringOfUnlabeledUnaryArgument = false;
-    if (argumentList->isUnlabeledUnary()) {
-      auto ODRE = isOverloadedDeclRef(disjunction);
-      preserveFavoringOfUnlabeledUnaryArgument =
-          !ODRE || numOverloadChoicesMatchingOnArity(ODRE, argumentList) < 2;
-    }
-
     forEachDisjunctionChoice(
         cs, disjunction,
         [&](Constraint *choice, ValueDecl *decl, FunctionType *overloadType) {
@@ -969,15 +1014,6 @@ static void determineBestChoicesInContext(
           bool favorExactMatchesOnly =
               onlyLiteralCandidates &&
               (!canUseContextualResultTypes() || resultTypes.empty());
-
-          if (preserveFavoringOfUnlabeledUnaryArgument) {
-            // Old behavior completely disregarded the fact that some of
-            // the parameters could be defaulted.
-            if (overloadType->getNumParams() != 1)
-              return;
-
-            favorExactMatchesOnly = true;
-          }
 
           // This is important for SIMD operators in particular because
           // a lot of their overloads have same-type requires to a concrete

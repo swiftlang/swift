@@ -6,14 +6,18 @@ func entity(_: Int) -> Int {
 
 struct Test {
   func test(_ v: Int) -> Int { v }
+  // expected-note@-1 {{found this candidate}}
   func test(_ v: Int?) -> Int? { v }
+  // expected-note@-1 {{found this candidate}}
 }
 
 func test_ternary_literal(v: Test) -> Int? {
-  true ? v.test(0) : nil // Ok
+  // Literals don't have a favored type
+  true ? v.test(0) : nil // expected-error {{ambiguous use of 'test'}}
 }
 
 func test_ternary(v: Test) -> Int? {
+  // Because calls had favored types set if they were resolved during constraint generation.
   true ? v.test(entity(0)) : nil // Ok
 }
 
@@ -159,12 +163,14 @@ do {
     var p: UnsafeMutableRawPointer { get { fatalError() } }
 
     func f(_ p: UnsafeMutableRawPointer) {
+      // The old hack (which is now removed) couldn't handle member references, only direct declaration references.
       guard let x = UnsafeMutablePointer<Double>(OpaquePointer(self.p)) else {
         return
       }
       _ = x
 
       guard let x = UnsafeMutablePointer<Double>(OpaquePointer(p)) else {
+        // expected-error@-1 {{initializer for conditional binding must have Optional type, not 'UnsafeMutablePointer<Double>'}}
         return
       }
       _ = x
@@ -256,4 +262,16 @@ extension Double {
 func test_non_default_literal_use(arg: Float) {
     let v = arg * 2.0 // shouldn't use `(Float, Double) -> Double` overload
     let _: Float = v // Ok
+}
+
+// This should be ambiguous without contextual type but was accepted before during to
+// unlabeled unary argument favoring.
+func test_variadic_static_member_is_preferred_over_partially_applied_instance_overload() {
+  struct Test {
+    func fn() {}
+    static func fn(_: Test...) {}
+  }
+
+  let t: Test
+  Test.fn(t) // Ok
 }
