@@ -51,6 +51,7 @@ enum class MacroRole : uint32_t;
 class MacroIntroducedDeclName;
 enum class MacroIntroducedDeclNameKind;
 enum class ParamSpecifier : uint8_t;
+enum class PlatformKind : uint8_t;
 class ProtocolConformanceRef;
 class RegexLiteralPatternFeature;
 class RegexLiteralPatternFeatureKind;
@@ -589,6 +590,8 @@ enum ENUM_EXTENSIBILITY_ATTR(closed) BridgedPlatformKind : size_t {
 SWIFT_NAME("BridgedPlatformKind.init(from:)")
 BridgedPlatformKind BridgedPlatformKind_fromString(BridgedStringRef cStr);
 
+swift::PlatformKind unbridge(BridgedPlatformKind cPlatform);
+
 SWIFT_NAME("BridgedAvailabilityMacroMap.has(self:name:)")
 bool BridgedAvailabilityMacroMap_hasName(BridgedAvailabilityMacroMap map,
                                          BridgedStringRef name);
@@ -626,6 +629,10 @@ BridgedAvailabilitySpec_getSourceRange(BridgedAvailabilitySpec spec);
 SWIFT_NAME("getter:BridgedAvailabilitySpec.domain(self:)")
 BridgedAvailabilityDomain
 BridgedAvailabilitySpec_getDomain(BridgedAvailabilitySpec spec);
+
+SWIFT_NAME("getter:BridgedAvailabilitySpec.platform(self:)")
+BridgedPlatformKind
+BridgedAvailabilitySpec_getPlatform(BridgedAvailabilitySpec spec);
 
 SWIFT_NAME("getter:BridgedAvailabilitySpec.version(self:)")
 BridgedVersionTuple
@@ -802,6 +809,13 @@ BridgedAllowFeatureSuppressionAttr_createParsed(
                                   bool inverted,
                                   BridgedArrayRef cFeatures);
 
+SWIFT_NAME(
+    "BridgedBackDeployedAttr.createParsed(_:atLoc:range:platform:version:)")
+BridgedBackDeployedAttr BridgedBackDeployedAttr_createParsed(
+    BridgedASTContext cContext, BridgedSourceLoc cAtLoc,
+    BridgedSourceRange cRange, BridgedPlatformKind cPlatform,
+    BridgedVersionTuple cVersion);
+
 SWIFT_NAME("BridgedCDeclAttr.createParsed(_:atLoc:range:name:)")
 BridgedCDeclAttr BridgedCDeclAttr_createParsed(BridgedASTContext cContext,
                                                BridgedSourceLoc cAtLoc,
@@ -948,6 +962,13 @@ BridgedMacroRoleAttr BridgedMacroRoleAttr_createParsed(
     BridgedSourceRange cRange, BridgedMacroSyntax cSyntax,
     BridgedSourceLoc cLParenLoc, BridgedMacroRole cRole, BridgedArrayRef cNames,
     BridgedArrayRef cConformances, BridgedSourceLoc cRParenLoc);
+
+SWIFT_NAME("BridgedOriginallyDefinedInAttr.createParsed(_:atLoc:range:"
+           "moduleName:platform:version:)")
+BridgedOriginallyDefinedInAttr BridgedOriginallyDefinedInAttr_createParsed(
+    BridgedASTContext cContext, BridgedSourceLoc cAtLoc,
+    BridgedSourceRange cRange, BridgedStringRef cModuleName,
+    BridgedPlatformKind cPlatform, BridgedVersionTuple cVersion);
 
 SWIFT_NAME("BridgedStorageRestrictionsAttr.createParsed(_:atLoc:range:"
            "initializes:accesses:)")
@@ -1948,6 +1969,17 @@ SWIFT_NAME("BridgedStmtConditionElement.createPatternBinding(_:introducerLoc:"
 BridgedStmtConditionElement BridgedStmtConditionElement_createPatternBinding(
     BridgedASTContext cContext, BridgedSourceLoc cIntroducerLoc,
     BridgedPattern cPattern, BridgedExpr cInitializer);
+
+SWIFT_NAME("BridgedStmtConditionElement.createPoundAvailable(info:)")
+BridgedStmtConditionElement BridgedStmtConditionElement_createPoundAvailable(
+    BridgedPoundAvailableInfo info);
+
+SWIFT_NAME("BridgedPoundAvailableInfo.createParsed(_:poundLoc:lParenLoc:specs:"
+           "rParenLoc:isUnavailable:)")
+BridgedPoundAvailableInfo BridgedPoundAvailableInfo_createParsed(
+    BridgedASTContext cContext, BridgedSourceLoc cPoundLoc,
+    BridgedSourceLoc cLParenLoc, BridgedArrayRef cSpecs,
+    BridgedSourceLoc cRParenLoc, bool isUnavailability);
 
 struct BridgedCaseLabelItemInfo {
   SWIFT_NAME("isDefault")

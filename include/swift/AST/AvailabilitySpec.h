@@ -60,6 +60,8 @@ public:
 
   std::optional<AvailabilityDomain> getDomain() const;
 
+  std::optional<PlatformKind> getPlatform() const;
+
   llvm::VersionTuple getVersion() const;
 
   SourceRange getVersionSrcRange() const;

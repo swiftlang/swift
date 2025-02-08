@@ -58,13 +58,25 @@ BridgedPlatformKind BridgedPlatformKind_fromString(BridgedStringRef cStr) {
   }
 }
 
-static PlatformKind unbridge(BridgedPlatformKind platform) {
+PlatformKind unbridge(BridgedPlatformKind platform) {
   switch (platform) {
   case BridgedPlatformKind_None:
     return PlatformKind::none;
 #define AVAILABILITY_PLATFORM(X, PrettyName)                                   \
   case BridgedPlatformKind_##X:                                                \
     return PlatformKind::X;
+#include "swift/AST/PlatformKinds.def"
+  }
+  llvm_unreachable("unhandled enum value");
+}
+
+static BridgedPlatformKind bridge(PlatformKind platform) {
+  switch (platform) {
+  case PlatformKind::none:
+    return BridgedPlatformKind_None;
+#define AVAILABILITY_PLATFORM(X, PrettyName)                                   \
+  case PlatformKind::X:                                                        \
+    return BridgedPlatformKind_##X;
 #include "swift/AST/PlatformKinds.def"
   }
   llvm_unreachable("unhandled enum value");
@@ -85,6 +97,14 @@ BridgedAvailabilitySpec_getDomain(BridgedAvailabilitySpec spec) {
   if (domain)
     return *domain;
   return BridgedAvailabilityDomain();
+}
+
+BridgedPlatformKind
+BridgedAvailabilitySpec_getPlatform(BridgedAvailabilitySpec spec) {
+  auto platform = spec.unbridged()->getPlatform();
+  if (platform)
+    return bridge(*platform);
+  return BridgedPlatformKind_None;
 }
 
 BridgedVersionTuple
