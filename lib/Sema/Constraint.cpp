@@ -988,7 +988,7 @@ Constraint *Constraint::createConjunction(
 Constraint *Constraint::createApplicableFunction(
     ConstraintSystem &cs, Type argumentFnType, Type calleeType,
     std::optional<TrailingClosureMatching> trailingClosureMatching,
-    ConstraintLocator *locator) {
+    DeclContext *useDC, ConstraintLocator *locator) {
   // Collect type variables.
   SmallPtrSet<TypeVariableType *, 4> typeVars;
   if (argumentFnType->hasTypeVariable())

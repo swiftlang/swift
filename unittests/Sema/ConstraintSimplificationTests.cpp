@@ -30,8 +30,8 @@ TEST_F(SemaTest, TestTrailingClosureMatchRecordingForIdenticalFunctions) {
   auto func = FunctionType::get(
       {FunctionType::Param(intType), FunctionType::Param(intType)}, floatType);
 
-  cs.addConstraint(
-      ConstraintKind::ApplicableFunction, func, func,
+  cs.addApplicationConstraint(
+      func, func, /*trailingClosureMatching=*/std::nullopt, DC,
       cs.getConstraintLocator({}, ConstraintLocator::ApplyFunction));
 
   SmallVector<Solution, 2> solutions;

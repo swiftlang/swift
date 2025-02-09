@@ -395,10 +395,9 @@ namespace {
 
       // Add the constraint that the index expression's type be convertible
       // to the input type of the subscript operator.
-      CS.addConstraint(ConstraintKind::ApplicableFunction,
-                       FunctionType::get(params, outputTy),
-                       memberTy,
-                       fnLocator);
+      CS.addApplicationConstraint(FunctionType::get(params, outputTy), memberTy,
+                                  /*trailingClosureMatching=*/std::nullopt,
+                                  CurDC, fnLocator);
 
       Type fixedOutputType =
           CS.getFixedTypeRecursive(outputTy, /*wantRValue=*/false);
@@ -721,9 +720,9 @@ namespace {
           CS.getConstraintLocator(expr, ConstraintLocator::FunctionResult),
           TVO_CanBindToNoEscape);
 
-      CS.addConstraint(ConstraintKind::ApplicableFunction,
-                       FunctionType::get(params, resultType), memberType,
-                       fnLoc);
+      CS.addApplicationConstraint(
+          FunctionType::get(params, resultType), memberType,
+          /*trailingClosureMatching=*/std::nullopt, CurDC, fnLoc);
 
       if (constr->isFailable())
         return OptionalType::get(witnessType);
@@ -2545,10 +2544,10 @@ namespace {
       SmallVector<AnyFunctionType::Param, 8> params;
       getMatchingParams(expr->getArgs(), params);
 
-      CS.addConstraint(ConstraintKind::ApplicableFunction,
-                       FunctionType::get(params, resultType, extInfo),
-                       CS.getType(fnExpr),
-        CS.getConstraintLocator(expr, ConstraintLocator::ApplyFunction));
+      CS.addApplicationConstraint(
+          FunctionType::get(params, resultType, extInfo), CS.getType(fnExpr),
+          /*trailingClosureMatching=*/std::nullopt, CurDC,
+          CS.getConstraintLocator(expr, ConstraintLocator::ApplyFunction));
 
       // If we ended up resolving the result type variable to a concrete type,
       // set it as the favored type for this expression.
@@ -3296,10 +3295,11 @@ namespace {
           CS.getConstraintLocator(expr, ConstraintLocator::FunctionResult),
           TVO_CanBindToNoEscape);
 
-      CS.addConstraint(
-          ConstraintKind::ApplicableFunction,
+      CS.addApplicationConstraint(
           FunctionType::get(params, resultType),
           macroRefType,
+          /*trailingClosureMatching=*/std::nullopt,
+          CurDC,
           CS.getConstraintLocator(
             expr, ConstraintLocator::ApplyFunction));
 
