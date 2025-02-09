@@ -1426,6 +1426,9 @@ ConstraintSystem::selectDisjunction() {
         unsigned firstActive = first->countActiveNestedConstraints();
         unsigned secondActive = second->countActiveNestedConstraints();
 
+        if (firstActive == 1 || secondActive == 1)
+          return secondActive != 1;
+
         auto &[firstScore, firstFavoredChoices] = favorings[first];
         auto &[secondScore, secondFavoredChoices] = favorings[second];
 
