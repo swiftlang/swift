@@ -423,3 +423,19 @@ func nestedMetatypeCaller() {
   let t = String.Type.Type.Type.self as (any Q.Type.Type.Type.Type)
   nestedMetatypeCallee(t)
 }
+
+// rdar://91922018
+do {
+  func f<E>(_ c: some Collection<E>) -> some Collection<E> {
+    return c
+  }
+  let c: any Collection<Int>
+  let result = f(c)
+  do {
+    struct G<T> {
+      init(_: T) {}
+    }
+    let t = G(result)
+    let _: G<any Collection<Int>> = t
+  }
+}
