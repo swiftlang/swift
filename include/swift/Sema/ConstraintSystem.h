@@ -4965,7 +4965,7 @@ private:
 
   /// Attempt to simplify the ApplicableFunction constraint.
   SolutionKind simplifyApplicableFnConstraint(
-      Type type1, Type type2,
+      FunctionType *appliedFn, Type calleeTy,
       std::optional<TrailingClosureMatching> trailingClosureMatching,
       DeclContext *useDC,
       TypeMatchOptions flags, ConstraintLocatorBuilder locator);
