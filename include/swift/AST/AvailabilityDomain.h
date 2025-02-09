@@ -21,6 +21,7 @@
 #include "swift/AST/ASTAllocated.h"
 #include "swift/AST/Identifier.h"
 #include "swift/AST/PlatformKind.h"
+#include "swift/Basic/Assertions.h"
 #include "swift/Basic/LLVM.h"
 #include "llvm/ADT/FoldingSet.h"
 #include "llvm/ADT/PointerEmbeddedInt.h"
@@ -102,7 +103,7 @@ private:
 
   AvailabilityDomain(Kind kind)
       : storage(InlineDomain(kind, PlatformKind::none).asInteger()) {
-    assert(kind != Kind::Platform);
+    DEBUG_ASSERT(kind != Kind::Platform);
   };
 
   AvailabilityDomain(PlatformKind platform)
@@ -120,7 +121,7 @@ private:
   }
 
   CustomAvailabilityDomain *getCustomDomain() const {
-    assert(isCustom());
+    ASSERT(isCustom());
     return storage.get<CustomAvailabilityDomain *>();
   }
 
@@ -132,6 +133,8 @@ public:
   }
 
   static AvailabilityDomain forPlatform(PlatformKind platformKind) {
+    bool isPlatform = platformKind != PlatformKind::none;
+    ASSERT(isPlatform);
     return AvailabilityDomain(platformKind);
   }
 
@@ -150,6 +153,11 @@ public:
   static AvailabilityDomain forCustom(CustomAvailabilityDomain *domain) {
     return AvailabilityDomain(domain);
   }
+
+  /// Returns the most specific platform domain that applies to the compilation
+  /// context.
+  static std::optional<AvailabilityDomain>
+  forTargetPlatform(const ASTContext &ctx);
 
   /// Returns the built-in availability domain identified by the given string.
   static std::optional<AvailabilityDomain>
@@ -212,6 +220,11 @@ public:
   /// this domain. The set of all availability domains form a lattice where the
   /// universal domain (`*`) is the bottom element.
   bool contains(const AvailabilityDomain &other) const;
+
+  /// Returns the root availability domain that this domain must be compatible
+  /// with. For example, macCatalyst and visionOS must both be ABI compatible
+  /// with iOS. The compatible domain must contain this domain.
+  AvailabilityDomain getABICompatibilityDomain() const;
 
   bool operator==(const AvailabilityDomain &other) const {
     return storage.getOpaqueValue() == other.storage.getOpaqueValue();
