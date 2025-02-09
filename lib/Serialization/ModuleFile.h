@@ -507,7 +507,7 @@ private:
   ///
   /// If the record at the cursor is not a generic param list, returns null
   /// without moving the cursor.
-  GenericParamList *maybeReadGenericParams(DeclContext *DC);
+  llvm::Expected<GenericParamList *> maybeReadGenericParams(DeclContext *DC);
 
   /// Reads a set of requirements from \c DeclTypeCursor.
   void deserializeGenericRequirements(ArrayRef<uint64_t> scratch,
