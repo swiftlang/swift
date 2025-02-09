@@ -25,23 +25,23 @@ PlatformKind AvailabilityConstraint::getPlatform() const {
 std::optional<AvailabilityRange>
 AvailabilityConstraint::getRequiredNewerAvailabilityRange(
     ASTContext &ctx) const {
-  switch (getKind()) {
-  case Kind::AlwaysUnavailable:
-  case Kind::RequiresVersion:
-  case Kind::Obsoleted:
+  switch (getReason()) {
+  case Reason::UnconditionallyUnavailable:
+  case Reason::Obsoleted:
+  case Reason::IntroducedInLaterVersion:
     return std::nullopt;
-  case Kind::IntroducedInNewerVersion:
+  case Reason::IntroducedInLaterDynamicVersion:
     return getAttr().getIntroducedRange(ctx);
   }
 }
 
 bool AvailabilityConstraint::isConditionallySatisfiable() const {
-  switch (getKind()) {
-  case Kind::AlwaysUnavailable:
-  case Kind::RequiresVersion:
-  case Kind::Obsoleted:
+  switch (getReason()) {
+  case Reason::UnconditionallyUnavailable:
+  case Reason::Obsoleted:
+  case Reason::IntroducedInLaterVersion:
     return false;
-  case Kind::IntroducedInNewerVersion:
+  case Reason::IntroducedInLaterDynamicVersion:
     return true;
   }
 }
@@ -84,7 +84,7 @@ swift::getAvailabilityConstraintForAttr(const Decl *decl,
     return std::nullopt;
 
   if (attr.isUnconditionallyUnavailable())
-    return AvailabilityConstraint::forAlwaysUnavailable(attr);
+    return AvailabilityConstraint::unconditionallyUnavailable(attr);
 
   auto &ctx = decl->getASTContext();
   auto deploymentVersion = attr.getActiveVersion(ctx);
@@ -101,16 +101,16 @@ swift::getAvailabilityConstraintForAttr(const Decl *decl,
   }
 
   if (obsoletedVersion && *obsoletedVersion <= deploymentVersion)
-    return AvailabilityConstraint::forObsoleted(attr);
+    return AvailabilityConstraint::obsoleted(attr);
 
   AvailabilityRange introducedRange = attr.getIntroducedRange(ctx);
 
   // FIXME: [availability] Expand this to cover custom versioned domains
   if (attr.isPlatformSpecific()) {
     if (!context.getPlatformRange().isContainedIn(introducedRange))
-      return AvailabilityConstraint::forIntroducedInNewerVersion(attr);
+      return AvailabilityConstraint::introducedInLaterDynamicVersion(attr);
   } else if (!deploymentRange.isContainedIn(introducedRange)) {
-    return AvailabilityConstraint::forRequiresVersion(attr);
+    return AvailabilityConstraint::introducedInLaterVersion(attr);
   }
 
   return std::nullopt;
