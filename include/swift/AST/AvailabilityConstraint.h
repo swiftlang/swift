@@ -33,6 +33,10 @@ class Decl;
 /// certain context.
 class AvailabilityConstraint {
 public:
+  /// The reason that the availability constraint is unsatisfied.
+  ///
+  /// NOTE: The order of this enum matters. Reasons are defined in descending
+  /// priority order.
   enum class Reason {
     /// The declaration is referenced in a context in which it is generally
     /// unavailable. For example, a reference to a declaration that is
@@ -133,37 +137,33 @@ public:
   /// Returns the required range for `IntroducedInNewerVersion` requirements, or
   /// `std::nullopt` otherwise.
   std::optional<AvailabilityRange>
-  getRequiredNewerAvailabilityRange(ASTContext &ctx) const;
+  getRequiredNewerAvailabilityRange(const ASTContext &ctx) const;
 
   /// Some availability constraints are active for type-checking but cannot
   /// be translated directly into an `if #available(...)` runtime query.
-  bool isActiveForRuntimeQueries(ASTContext &ctx) const;
+  bool isActiveForRuntimeQueries(const ASTContext &ctx) const;
 };
 
 /// Represents a set of availability constraints that restrict use of a
-/// declaration in a particular context.
+/// declaration in a particular context. There can only be one active constraint
+/// for a given `AvailabilityDomain`, but there may be multiple active
+/// constraints from separate domains.
 class DeclAvailabilityConstraints {
   using Storage = llvm::SmallVector<AvailabilityConstraint, 4>;
   Storage constraints;
 
 public:
   DeclAvailabilityConstraints() {}
+  DeclAvailabilityConstraints(const Storage &&constraints)
+      : constraints(constraints) {}
 
-  void addConstraint(const AvailabilityConstraint &constraint) {
-    constraints.emplace_back(constraint);
-  }
+  /// Returns the strongest availability constraint or `std::nullopt` if empty.
+  std::optional<AvailabilityConstraint> getPrimaryConstraint() const;
 
   using const_iterator = Storage::const_iterator;
   const_iterator begin() const { return constraints.begin(); }
   const_iterator end() const { return constraints.end(); }
 };
-
-/// Returns the `AvailabilityConstraint` that describes how \p attr restricts
-/// use of \p decl in \p context or `std::nullopt` if there is no restriction.
-std::optional<AvailabilityConstraint>
-getAvailabilityConstraintForAttr(const Decl *decl,
-                                 const SemanticAvailableAttr &attr,
-                                 const AvailabilityContext &context);
 
 /// Returns the set of availability constraints that restrict use of \p decl
 /// when it is referenced from the given context. In other words, it is the

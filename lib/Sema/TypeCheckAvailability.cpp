@@ -3000,11 +3000,10 @@ bool shouldHideDomainNameForConstraintDiagnostic(
   case AvailabilityDomain::Kind::Universal:
   case AvailabilityDomain::Kind::Embedded:
   case AvailabilityDomain::Kind::Custom:
+  case AvailabilityDomain::Kind::PackageDescription:
     return true;
   case AvailabilityDomain::Kind::Platform:
     return false;
-
-  case AvailabilityDomain::Kind::PackageDescription:
   case AvailabilityDomain::Kind::SwiftLanguage:
     switch (constraint.getReason()) {
     case AvailabilityConstraint::Reason::UnconditionallyUnavailable:
@@ -3081,44 +3080,9 @@ bool diagnoseExplicitUnavailability(SourceLoc loc,
 std::optional<AvailabilityConstraint>
 swift::getUnsatisfiedAvailabilityConstraint(
     const Decl *decl, AvailabilityContext availabilityContext) {
-  auto &ctx = decl->getASTContext();
-
-  // Generic parameters are always available.
-  if (isa<GenericTypeParamDecl>(decl))
-    return std::nullopt;
-
-  if (auto attr = decl->getUnavailableAttr()) {
-    if (isInsideCompatibleUnavailableDeclaration(decl, availabilityContext,
-                                                 *attr))
-      return std::nullopt;
-
-    switch (attr->getVersionAvailability(ctx)) {
-    case AvailableVersionComparison::Available:
-    case AvailableVersionComparison::PotentiallyUnavailable:
-      llvm_unreachable("Decl should be unavailable");
-
-    case AvailableVersionComparison::Unavailable:
-      if ((attr->isSwiftLanguageModeSpecific() ||
-           attr->isPackageDescriptionVersionSpecific()) &&
-          attr->getIntroduced().has_value())
-        return AvailabilityConstraint::introducedInLaterVersion(*attr);
-
-      return AvailabilityConstraint::unconditionallyUnavailable(*attr);
-
-    case AvailableVersionComparison::Obsoleted:
-      return AvailabilityConstraint::obsoleted(*attr);
-    }
-  }
-
-  // Check whether the declaration is available in a newer platform version.
-  if (auto rangeAttr = decl->getAvailableAttrForPlatformIntroduction()) {
-    auto range = rangeAttr->getIntroducedRange(ctx);
-    if (!availabilityContext.getPlatformRange().isContainedIn(range))
-      return AvailabilityConstraint::introducedInLaterDynamicVersion(
-          *rangeAttr);
-  }
-
-  return std::nullopt;
+  auto constraints =
+      swift::getAvailabilityConstraintsForDecl(decl, availabilityContext);
+  return constraints.getPrimaryConstraint();
 }
 
 std::optional<AvailabilityConstraint>
