@@ -846,7 +846,8 @@ deriveBodyHashable_hashValue(AbstractFunctionDecl *hashValueDecl, void *) {
                                       hashFuncType);
   Type hashFuncResultType =
       hashFuncType->castTo<AnyFunctionType>()->getResult();
-  auto *argList = ArgumentList::forImplicitSingle(C, C.Id_for, selfRef);
+  auto *argList =
+      ArgumentList::forImplicitSingle(C, SourceLoc(), C.Id_for, selfRef);
   auto *callExpr = CallExpr::createImplicit(C, hashExpr, argList);
   callExpr->setType(hashFuncResultType);
   callExpr->setThrows(nullptr);
