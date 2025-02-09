@@ -279,8 +279,16 @@ public:
                                      DebugTypeInfo DebugType,
                                      bool IsLocalToUnit,
                                      std::optional<SILLocation> Loc);
+
+  void emitArtificialVariable(IRGenFunction &IGF, llvm::Value *Metadata,
+                              StringRef Name, StringRef Identifier);
+
   void emitTypeMetadata(IRGenFunction &IGF, llvm::Value *Metadata,
                         unsigned Depth, unsigned Index, StringRef Name);
+
+  void emitWitnessTable(IRGenFunction &IGF, llvm::Value *Metadata,
+                        unsigned Depth, unsigned Index, ProtocolDecl *protocol);
+
   void emitPackCountParameter(IRGenFunction &IGF, llvm::Value *Metadata,
                               SILDebugVariable VarInfo);
 
@@ -3716,9 +3724,10 @@ void IRGenDebugInfoImpl::emitGlobalVariableDeclaration(
     Var->addDebugInfo(GV);
 }
 
-void IRGenDebugInfoImpl::emitTypeMetadata(IRGenFunction &IGF,
-                                          llvm::Value *Metadata, unsigned Depth,
-                                          unsigned Index, StringRef Name) {
+void IRGenDebugInfoImpl::emitArtificialVariable(IRGenFunction &IGF,
+                                                llvm::Value *Metadata,
+                                                StringRef Name,
+                                                StringRef Identifier) {
   if (Opts.DebugInfoLevel <= IRGenDebugInfoLevel::LineTables)
     return;
 
@@ -3727,23 +3736,45 @@ void IRGenDebugInfoImpl::emitTypeMetadata(IRGenFunction &IGF,
   if (!DS || DS->getInlinedFunction()->isTransparent())
     return;
 
+  auto id = IGF.getSwiftModule()->getASTContext().getIdentifier(Name);
+  uint64_t PtrWidthInBits =
+      CI.getTargetInfo().getPointerWidth(clang::LangAS::Default);
+  assert(PtrWidthInBits % 8 == 0);
+  auto DbgTy = DebugTypeInfo::getTypeMetadata(
+      getMetadataType(Identifier)->getDeclaredInterfaceType().getPointer(),
+      Size(PtrWidthInBits / 8),
+      Alignment(CI.getTargetInfo().getPointerAlign(clang::LangAS::Default)));
+  emitVariableDeclaration(
+      IGF.Builder, Metadata, DbgTy, IGF.getDebugScope(), {},
+      {id.str(), 0, false}, // swift.type is already a pointer type,
+                            // having a shadow copy doesn't add another
+                            // layer of indirection.
+      IGF.isAsync() ? CoroDirectValue : DirectValue, ArtificialValue);
+}
+
+void IRGenDebugInfoImpl::emitTypeMetadata(IRGenFunction &IGF,
+                                          llvm::Value *Metadata, unsigned Depth,
+                                          unsigned Index, StringRef Name) {
   llvm::SmallString<8> Buf;
   static const char *Tau = SWIFT_UTF8("\u03C4");
   llvm::raw_svector_ostream OS(Buf);
   OS << '$' << Tau << '_' << Depth << '_' << Index;
-  uint64_t PtrWidthInBits = CI.getTargetInfo().getPointerWidth(clang::LangAS::Default);
-  assert(PtrWidthInBits % 8 == 0);
-  auto DbgTy = DebugTypeInfo::getTypeMetadata(
-      getMetadataType(Name)->getDeclaredInterfaceType().getPointer(),
-      Size(PtrWidthInBits / 8),
-      Alignment(CI.getTargetInfo().getPointerAlign(clang::LangAS::Default)));
-  emitVariableDeclaration(IGF.Builder, Metadata, DbgTy, IGF.getDebugScope(),
-                          {}, {OS.str().str(), 0, false},
-                          // swift.type is already a pointer type,
-                          // having a shadow copy doesn't add another
-                          // layer of indirection.
-                          IGF.isAsync() ? CoroDirectValue : DirectValue,
-                          ArtificialValue);
+
+  emitArtificialVariable(IGF, Metadata, OS.str(), Name);
+}
+
+void IRGenDebugInfoImpl::emitWitnessTable(IRGenFunction &IGF,
+                                          llvm::Value *Metadata, unsigned Depth,
+                                          unsigned Index,
+                                          ProtocolDecl *protocol) {
+  llvm::SmallString<64> Buf;
+  static const char *Tau = SWIFT_UTF8("\u03C4");
+  llvm::raw_svector_ostream OS(Buf);
+  DebugTypeInfo DbgTy(protocol->getInterfaceType());
+  auto MangledName = getMangledName(DbgTy);
+  OS << "$WT_" << Tau << '_' << Depth << '_' << Index << "_" << MangledName;
+
+  emitArtificialVariable(IGF, Metadata, OS.str(), Buf.str());
 }
 
 void IRGenDebugInfoImpl::emitPackCountParameter(IRGenFunction &IGF,
@@ -3886,6 +3917,13 @@ void IRGenDebugInfo::emitTypeMetadata(IRGenFunction &IGF, llvm::Value *Metadata,
                                       StringRef Name) {
   static_cast<IRGenDebugInfoImpl *>(this)->emitTypeMetadata(IGF, Metadata,
                                                             Depth, Index, Name);
+}
+
+void IRGenDebugInfo::emitWitnessTable(IRGenFunction &IGF, llvm::Value *Metadata,
+                                      unsigned Depth, unsigned Index,
+                                      ProtocolDecl *protocol) {
+  static_cast<IRGenDebugInfoImpl *>(this)->emitWitnessTable(
+      IGF, Metadata, Depth, Index, protocol);
 }
 
 void IRGenDebugInfo::emitPackCountParameter(IRGenFunction &IGF,

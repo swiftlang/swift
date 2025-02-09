@@ -412,9 +412,13 @@ static void maybeEmitDebugInfoForLocalTypeData(IRGenFunction &IGF,
   if (DS && DS->getInlinedFunction() &&
       DS->getInlinedFunction()->isTransparent())
     return;
-  
-  // Only for formal type metadata.
-  if (key.Kind != LocalTypeDataKind::forFormalTypeMetadata())
+  // For formal type metadata and witness tables.
+  ProtocolDecl *proto = nullptr;
+  if (key.Kind.isAbstractProtocolConformance())
+    proto = key.Kind.getAbstractProtocolConformance();
+  else if (key.Kind.isConcreteProtocolConformance())
+    proto = key.Kind.getConcreteProtocolConformance()->getProtocol();
+  else if (key.Kind != LocalTypeDataKind::forFormalTypeMetadata())
     return;
 
   // Only for archetypes, and not for opened/opaque archetypes.
@@ -447,10 +451,12 @@ static void maybeEmitDebugInfoForLocalTypeData(IRGenFunction &IGF,
   if (!IGF.IGM.DebugInfo)
     return;
 
-  IGF.IGM.DebugInfo->emitTypeMetadata(IGF, data,
-                                      typeParam->getDepth(),
-                                      typeParam->getIndex(),
-                                      name);
+  if (proto) {
+    IGF.IGM.DebugInfo->emitWitnessTable(IGF, data, typeParam->getDepth(),
+                                        typeParam->getIndex(), proto);
+  } else
+    IGF.IGM.DebugInfo->emitTypeMetadata(IGF, data, typeParam->getDepth(),
+                                        typeParam->getIndex(), name);
 }
 
 void

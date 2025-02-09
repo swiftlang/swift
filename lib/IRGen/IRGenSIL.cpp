@@ -1132,6 +1132,14 @@ public:
           }
 
           emitTypeMetadataRef(archetype);
+
+          for (auto protocol : archetype->getConformsTo()) {
+            auto conformance =
+                ProtocolConformanceRef::forAbstract(archetype, protocol);
+            emitWitnessTableRef(*this, archetype->getCanonicalType(),
+                                conformance);
+          }
+
         } else if (auto packArchetype = dyn_cast<PackArchetypeType>(t)) {
           emitTypeMetadataRef(packArchetype);
         } else if (auto packtype = dyn_cast<SILPackType>(t)) {
