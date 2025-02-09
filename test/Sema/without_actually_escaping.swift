@@ -41,26 +41,31 @@ func rethrowThroughSendingNoEscapeAsyncWAE(f: sending () async throws -> Void) a
 }
 
 func passNoEscapeClosureViaVarWAE(f: () -> Void) {
-  var x = f // expected-warning {{variable 'x' was never mutated; consider changing to 'let' constant}}
+  var x = f
   withoutActuallyEscaping(x) { $0() }
+  x = {}
 }
 
 func passEscapingClosureViaVarWAE(f: @escaping () -> Void) {
-  var x = f // expected-warning {{variable 'x' was never mutated; consider changing to 'let' constant}}
+  var x = f
   withoutActuallyEscaping(x) { $0() }
+  x = {}
 }
 
 func passInoutClosureViaVarWAE(f: inout () -> Void) {
-  var x = f // expected-warning {{variable 'x' was never mutated; consider changing to 'let' constant}}
+  var x = f
   withoutActuallyEscaping(x) { $0() }
+  x = {}
 }
 
 func passConsumingClosureViaVarWAE(f: consuming @escaping () -> Void) {
-  var x = f // expected-warning {{variable 'x' was never mutated; consider changing to 'let' constant}}
+  var x = f
   withoutActuallyEscaping(x) { $0() }
+  x = {}
 }
 
 func passSendingClosureViaVarWAE(f: consuming @escaping () -> Void) {
-  var x = f // expected-warning {{variable 'x' was never mutated; consider changing to 'let' constant}}
+  var x = f
   withoutActuallyEscaping(x) { $0() }
+  x = {}
 }
