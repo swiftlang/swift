@@ -8,6 +8,9 @@
 // REQUIRES: swift_feature_Span
 // REQUIRES: swift_feature_AllowUnsafeAttribute
 
+// In Inputs/SpanExtras.swift we have @available(macOS 9999, *):
+// REQUIRES: OS=macosx
+
 import SpanExtras
 
 // Bounds check should be eliminated
