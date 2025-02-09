@@ -42,7 +42,7 @@ public func _overrideLifetime<
 // A MutableSpan<Element> represents a span of memory which
 // contains initialized `Element` instances.
 @frozen
-@available(macOS 9999, *)
+@available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, visionOS 9999, *)
 public struct MutableSpan<Element: ~Copyable>: ~Copyable & ~Escapable {
   @usableFromInline let _pointer: UnsafeMutableRawPointer?
 
@@ -64,10 +64,10 @@ public struct MutableSpan<Element: ~Copyable>: ~Copyable & ~Escapable {
   }
 }
 
-@available(macOS 9999, *)
+@available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, visionOS 9999, *)
 extension MutableSpan: @unchecked Sendable where Element: Sendable {}
 
-@available(macOS 9999, *)
+@available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, visionOS 9999, *)
 extension MutableSpan where Element: ~Copyable {
 
   @_alwaysEmitIntoClient
@@ -107,7 +107,7 @@ extension MutableSpan where Element: ~Copyable {
   }
 }
 
-@available(macOS 9999, *)
+@available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, visionOS 9999, *)
 extension MutableSpan {
 
   @_alwaysEmitIntoClient
@@ -121,7 +121,7 @@ extension MutableSpan {
   }
 }
 
-@available(macOS 9999, *)
+@available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, visionOS 9999, *)
 extension MutableSpan where Element: BitwiseCopyable {
 
   @_alwaysEmitIntoClient
@@ -168,7 +168,7 @@ extension MutableSpan where Element: BitwiseCopyable {
   }
 }
 
-@available(macOS 9999, *)
+@available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, visionOS 9999, *)
 extension Span where Element: ~Copyable {
 
   @_alwaysEmitIntoClient
@@ -180,7 +180,7 @@ extension Span where Element: ~Copyable {
   }
 }
 
-@available(macOS 9999, *)
+@available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, visionOS 9999, *)
 extension MutableSpan where Element: ~Copyable {
 
   @_alwaysEmitIntoClient
@@ -199,7 +199,7 @@ extension MutableSpan where Element: ~Copyable {
   }
 }
 
-@available(macOS 9999, *)
+@available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, visionOS 9999, *)
 extension RawSpan {
 
   @_alwaysEmitIntoClient
@@ -214,7 +214,7 @@ extension RawSpan {
   }
 }
 
-@available(macOS 9999, *)
+@available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, visionOS 9999, *)
 extension MutableSpan where Element: Equatable {
 
   @_alwaysEmitIntoClient
@@ -238,7 +238,7 @@ extension MutableSpan where Element: Equatable {
   }
 }
 
-@available(macOS 9999, *)
+@available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, visionOS 9999, *)
 extension MutableSpan where Element: ~Copyable {
 
   @_alwaysEmitIntoClient
@@ -249,7 +249,7 @@ extension MutableSpan where Element: ~Copyable {
 }
 
 //MARK: Collection, RandomAccessCollection
-@available(macOS 9999, *)
+@available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, visionOS 9999, *)
 extension MutableSpan where Element: ~Copyable {
 
   @_alwaysEmitIntoClient
@@ -266,7 +266,7 @@ extension MutableSpan where Element: ~Copyable {
   }
 }
 
-@available(macOS 9999, *)
+@available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, visionOS 9999, *)
 extension MutableSpan where Element: BitwiseCopyable {
 
   /// Construct a RawSpan over the memory represented by this span
@@ -277,7 +277,7 @@ extension MutableSpan where Element: BitwiseCopyable {
   public var _unsafeRawSpan: RawSpan { RawSpan(_unsafeMutableSpan: self) }
 }
 
-@available(macOS 9999, *)
+@available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, visionOS 9999, *)
 extension MutableSpan where Element: ~Copyable {
 
   /// Accesses the element at the specified position in the `Span`.
@@ -327,7 +327,7 @@ extension MutableSpan where Element: ~Copyable {
   }
 }
 
-@available(macOS 9999, *)
+@available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, visionOS 9999, *)
 extension MutableSpan where Element: ~Copyable {
 
   public mutating func swapAt(_ i: Index, _ j: Index) {
@@ -345,7 +345,7 @@ extension MutableSpan where Element: ~Copyable {
   }
 }
 
-@available(macOS 9999, *)
+@available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, visionOS 9999, *)
 extension MutableSpan where Element: BitwiseCopyable {
 
   /// Accesses the element at the specified position in the `Span`.
@@ -387,7 +387,7 @@ extension MutableSpan where Element: BitwiseCopyable {
   }
 }
 
-@available(macOS 9999, *)
+@available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, visionOS 9999, *)
 extension MutableSpan where Element: ~Copyable {
 
   //FIXME: mark closure parameter as non-escaping
@@ -415,7 +415,7 @@ extension MutableSpan where Element: ~Copyable {
   }
 }
 
-@available(macOS 9999, *)
+@available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, visionOS 9999, *)
 extension MutableSpan where Element: BitwiseCopyable {
 
   //FIXME: mark closure parameter as non-escaping
@@ -440,7 +440,7 @@ extension MutableSpan where Element: BitwiseCopyable {
 }
 
 //MARK: bulk-update functions
-@available(macOS 9999, *)
+@available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, visionOS 9999, *)
 extension MutableSpan {
 
   @_alwaysEmitIntoClient
@@ -515,7 +515,7 @@ extension MutableSpan {
   }
 }
 
-@available(macOS 9999, *)
+@available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, visionOS 9999, *)
 extension MutableSpan where Element: ~Copyable {
 
   @_alwaysEmitIntoClient
@@ -543,7 +543,7 @@ extension MutableSpan where Element: ~Copyable {
   }
 }
 
-@available(macOS 9999, *)
+@available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, visionOS 9999, *)
 extension MutableSpan {
 
   public mutating func moveUpdate(
@@ -554,7 +554,7 @@ extension MutableSpan {
 }
 
 
-@available(macOS 9999, *)
+@available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, visionOS 9999, *)
 extension MutableSpan where Element: BitwiseCopyable {
 
   @_alwaysEmitIntoClient
@@ -638,7 +638,7 @@ extension MutableSpan where Element: BitwiseCopyable {
 }
 
 @frozen
-@available(macOS 9999, *)
+@available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, visionOS 9999, *)
 public struct OutputSpan<Element: ~Copyable>: ~Copyable, ~Escapable {
   @usableFromInline let _pointer: UnsafeMutableRawPointer?
 
@@ -682,11 +682,11 @@ public struct OutputSpan<Element: ~Copyable>: ~Copyable, ~Escapable {
   }
 }
 
-@available(macOS 9999, *)
+@available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, visionOS 9999, *)
 @available(*, unavailable)
 extension OutputSpan: Sendable {}
 
-@available(macOS 9999, *)
+@available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, visionOS 9999, *)
 extension OutputSpan where Element: ~Copyable  {
 
   @usableFromInline @inline(__always)
@@ -728,7 +728,7 @@ extension OutputSpan where Element: ~Copyable  {
   }
 }
 
-@available(macOS 9999, *)
+@available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, visionOS 9999, *)
 extension OutputSpan {
 
   @_alwaysEmitIntoClient
@@ -743,7 +743,7 @@ extension OutputSpan {
   }
 }
 
-@available(macOS 9999, *)
+@available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, visionOS 9999, *)
 extension OutputSpan where Element: BitwiseCopyable {
 
   @_alwaysEmitIntoClient
@@ -792,7 +792,7 @@ extension OutputSpan where Element: BitwiseCopyable {
   }
 }
 
-@available(macOS 9999, *)
+@available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, visionOS 9999, *)
 extension OutputSpan where Element: ~Copyable {
 
   @_alwaysEmitIntoClient
@@ -821,7 +821,7 @@ extension OutputSpan where Element: ~Copyable {
 }
 
 //MARK: bulk-update functions
-@available(macOS 9999, *)
+@available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, visionOS 9999, *)
 extension OutputSpan {
 
   @_alwaysEmitIntoClient
@@ -931,7 +931,7 @@ extension OutputSpan {
   }
 }
 
-@available(macOS 9999, *)
+@available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, visionOS 9999, *)
 extension OutputSpan where Element: ~Copyable {
 
   @_alwaysEmitIntoClient
@@ -974,7 +974,7 @@ extension OutputSpan where Element: ~Copyable {
   }
 }
 
-@available(macOS 9999, *)
+@available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, visionOS 9999, *)
 extension OutputSpan {
 
   @_alwaysEmitIntoClient
@@ -985,12 +985,12 @@ extension OutputSpan {
   }
 }
 
-@available(macOS 9999, *)
+@available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, visionOS 9999, *)
 extension OutputSpan where Element: BitwiseCopyable {
 
 }
 
-@available(macOS 9999, *)
+@available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, visionOS 9999, *)
 extension OutputSpan where Element: ~Copyable {
 
   @_alwaysEmitIntoClient
@@ -1016,7 +1016,7 @@ extension OutputSpan where Element: ~Copyable {
   }
 }
 
-@available(macOS 9999, *)
+@available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, visionOS 9999, *)
 extension OutputSpan where Element: ~Copyable {
 
   @_alwaysEmitIntoClient
@@ -1028,7 +1028,7 @@ extension OutputSpan where Element: ~Copyable {
   }
 }
 
-@available(macOS 9999, *)
+@available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, visionOS 9999, *)
 extension OutputSpan where Element: BitwiseCopyable {
 
   @_alwaysEmitIntoClient
@@ -1041,10 +1041,10 @@ extension OutputSpan where Element: BitwiseCopyable {
 
 private let immortalThing = ""
 
-@available(macOS 9999, *)
+@available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, visionOS 9999, *)
 extension Span {
 
-//  @available(macOS 9999, *)
+//  @available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, visionOS 9999, *)
 //  public static var empty: Span {
 //    @lifetime(immortal)
 //    get {
@@ -1054,7 +1054,7 @@ extension Span {
 //    }
 //  }
 //
-//  @available(macOS 9999, *)
+//  @available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, visionOS 9999, *)
 //  @lifetime(immortal)
 //  public init() {
 //    let nilBasedBuffer = UnsafeBufferPointer<Element>(start: nil, count: 0)
@@ -1063,7 +1063,7 @@ extension Span {
 //  }
 }
 
-@available(macOS 9999, *)
+@available(macOS 9999, iOS 9999, tvOS 9999, watchOS 9999, visionOS 9999, *)
 extension Span where Element: Equatable {
 
   /// Returns a Boolean value indicating whether this and another span
