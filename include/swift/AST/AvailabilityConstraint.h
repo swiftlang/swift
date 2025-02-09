@@ -61,6 +61,16 @@ public:
     IntroducedInLaterDynamicVersion,
   };
 
+  /// Classifies constraints into different high level categories.
+  enum class Kind {
+    /// There are no contexts in which the declaration would be available.
+    Unavailable,
+
+    /// There are some contexts in which the declaration would be available if
+    /// additional constraints were added.
+    PotentiallyAvailable,
+  };
+
 private:
   llvm::PointerIntPair<SemanticAvailableAttr, 2, Reason> attrAndReason;
 
@@ -93,6 +103,26 @@ public:
     return static_cast<SemanticAvailableAttr>(attrAndReason.getPointer());
   }
 
+  Kind getKind() const {
+    switch (getReason()) {
+    case Reason::UnconditionallyUnavailable:
+    case Reason::Obsoleted:
+    case Reason::IntroducedInLaterVersion:
+      return Kind::Unavailable;
+    case Reason::IntroducedInLaterDynamicVersion:
+      return Kind::PotentiallyAvailable;
+    }
+  }
+
+  /// Returns true if the constraint cannot be satisfied at runtime.
+  bool isUnavailable() const { return getKind() == Kind::Unavailable; }
+
+  /// Returns true if the constraint is unsatisfied but could be satisfied at
+  /// runtime in a more constrained context.
+  bool isPotentiallyAvailable() const {
+    return getKind() == Kind::PotentiallyAvailable;
+  }
+
   /// Returns the domain that the constraint applies to.
   AvailabilityDomain getDomain() const { return getAttr().getDomain(); }
 
@@ -104,10 +134,6 @@ public:
   /// `std::nullopt` otherwise.
   std::optional<AvailabilityRange>
   getRequiredNewerAvailabilityRange(ASTContext &ctx) const;
-
-  /// Returns true if this unmet requirement can be satisfied by introducing an
-  /// `if #available(...)` condition in source.
-  bool isConditionallySatisfiable() const;
 
   /// Some availability constraints are active for type-checking but cannot
   /// be translated directly into an `if #available(...)` runtime query.

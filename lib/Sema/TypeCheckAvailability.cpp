@@ -3030,7 +3030,7 @@ bool diagnoseExplicitUnavailability(SourceLoc loc,
                                     const ExportContext &where,
                                     bool warnIfConformanceUnavailablePreSwift6,
                                     bool preconcurrency) {
-  if (constraint.isConditionallySatisfiable())
+  if (!constraint.isUnavailable())
     return false;
 
   // Invertible protocols are never unavailable.
@@ -3463,7 +3463,7 @@ bool diagnoseExplicitUnavailability(
     const ExportContext &Where, DeclAvailabilityFlags Flags,
     llvm::function_ref<void(InFlightDiagnostic &, StringRef)>
         attachRenameFixIts) {
-  if (constraint.isConditionallySatisfiable())
+  if (!constraint.isUnavailable())
     return false;
 
   auto Attr = constraint.getAttr();

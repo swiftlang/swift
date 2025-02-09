@@ -35,17 +35,6 @@ AvailabilityConstraint::getRequiredNewerAvailabilityRange(
   }
 }
 
-bool AvailabilityConstraint::isConditionallySatisfiable() const {
-  switch (getReason()) {
-  case Reason::UnconditionallyUnavailable:
-  case Reason::Obsoleted:
-  case Reason::IntroducedInLaterVersion:
-    return false;
-  case Reason::IntroducedInLaterDynamicVersion:
-    return true;
-  }
-}
-
 bool AvailabilityConstraint::isActiveForRuntimeQueries(ASTContext &ctx) const {
   if (getAttr().getPlatform() == PlatformKind::none)
     return true;

@@ -4918,11 +4918,11 @@ bool ConstraintSystem::isReadOnlyKeyPathComponent(
   // If the setter is unavailable, then the keypath ought to be read-only
   // in this context.
   if (auto setter = storage->getOpaqueAccessor(AccessorKind::Set)) {
-    // FIXME: Fully unavailable setters should cause the key path to be
-    // readonly too.
+    // FIXME: [availability] Fully unavailable setters should cause the key path
+    // to be readonly too.
     auto constraint =
         getUnsatisfiedAvailabilityConstraint(setter, DC, referenceLoc);
-    if (constraint && constraint->isConditionallySatisfiable())
+    if (constraint && constraint->isPotentiallyAvailable())
       return true;
   }
 
