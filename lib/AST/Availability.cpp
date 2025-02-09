@@ -16,6 +16,8 @@
 
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Attr.h"
+#include "swift/AST/AvailabilityConstraint.h"
+#include "swift/AST/AvailabilityContext.h"
 #include "swift/AST/AvailabilityDomain.h"
 #include "swift/AST/AvailabilityInference.h"
 #include "swift/AST/AvailabilityRange.h"
@@ -629,27 +631,84 @@ Decl::getUnavailableAttr(bool ignoreAppExtensions) const {
   return std::nullopt;
 }
 
-static bool isDeclCompletelyUnavailable(const Decl *decl) {
-  // Don't trust unavailability on declarations from clang modules.
+static llvm::SmallVector<AvailabilityDomain, 2>
+availabilityDomainsForABICompatibility(const ASTContext &ctx) {
+  llvm::SmallVector<AvailabilityDomain, 2> domains;
+
+  // Regardless of target platform, binaries built for Embedded do not require
+  // compatibility.
+  if (ctx.LangOpts.hasFeature(Feature::Embedded))
+    return domains;
+
+  if (auto targetDomain = AvailabilityDomain::forTargetPlatform(ctx))
+    domains.push_back(targetDomain->getABICompatibilityDomain());
+
+  return domains;
+}
+
+/// Returns true if \p decl is proven to be unavailable for all platforms that
+/// external modules interacting with this module could target. A declaration
+/// that is not proven to be unavailable in this way could be reachable at
+/// runtime, even if it is unavailable to all code in this module.
+static bool isUnavailableForAllABICompatiblePlatforms(const Decl *decl) {
+  // Don't trust unavailability on declarations from Clang modules.
   if (isa<ClangModuleUnit>(decl->getDeclContext()->getModuleScopeContext()))
     return false;
 
-  auto unavailableAttr = decl->getUnavailableAttr(/*ignoreAppExtensions=*/true);
-  if (!unavailableAttr)
+  auto &ctx = decl->getASTContext();
+  llvm::SmallVector<AvailabilityDomain, 2> compatibilityDomains =
+      availabilityDomainsForABICompatibility(ctx);
+
+  llvm::SmallSet<AvailabilityDomain, 8> unavailableDescendantDomains;
+  llvm::SmallSet<AvailabilityDomain, 8> availableDescendantDomains;
+
+  // Build up the collection of relevant available and unavailable platform
+  // domains by looking at all the @available attributes. Along the way, we
+  // may find an attribute that makes the declaration universally unavailable
+  // in which case platform availability is irrelevant.
+  for (auto attr : decl->getSemanticAvailableAttrs(/*includeInactive=*/true)) {
+    auto domain = attr.getDomain();
+    bool isCompabilityDomainDescendant =
+        llvm::find_if(compatibilityDomains,
+                      [&domain](AvailabilityDomain compatibilityDomain) {
+                        return compatibilityDomain.contains(domain);
+                      }) != compatibilityDomains.end();
+
+    if (isCompabilityDomainDescendant) {
+      // Record the whether the descendant domain is marked available
+      // or unavailable. Unavailability overrides availability.
+      if (attr.isUnconditionallyUnavailable()) {
+        availableDescendantDomains.erase(domain);
+        unavailableDescendantDomains.insert(domain);
+      } else if (!unavailableDescendantDomains.contains(domain)) {
+        availableDescendantDomains.insert(domain);
+      }
+    } else if (attr.isActive(ctx)) {
+      // The declaration is always unavailable if an active attribute from a
+      // domain outside the compatibility hierarchy indicates unavailability.
+      if (attr.isUnconditionallyUnavailable())
+        return true;
+    }
+  }
+
+  // If there aren't any compatibility domains to check and we didn't find any
+  // other active attributes that make the declaration unavailable, then it must
+  // be available.
+  if (compatibilityDomains.empty())
     return false;
 
-  // getUnavailableAttr() can return an @available attribute that is
-  // obsoleted for certain deployment targets or language modes. These decls
-  // can still be reached by code in other modules that is compiled with
-  // a different deployment target or language mode.
-  if (!unavailableAttr->isUnconditionallyUnavailable())
+  // Verify that the declaration has been marked unavailable in every
+  // compatibility domain.
+  for (auto compatibilityDomain : compatibilityDomains) {
+    if (!unavailableDescendantDomains.contains(compatibilityDomain))
+      return false;
+  }
+  
+  // Verify that there aren't any explicitly available descendant domains.
+  if (availableDescendantDomains.size() > 0)
     return false;
 
-  // Universally unavailable declarations are always completely unavailable.
-  if (unavailableAttr->getPlatform() == PlatformKind::none)
-    return true;
-
-  // FIXME: Support zippered frameworks (rdar://125371621)
+  // FIXME: [availability] Support zippered frameworks (rdar://125371621)
   // If we have a target variant (e.g. we're building a zippered macOS
   // framework) then the decl is only unreachable if it is unavailable for both
   // the primary target and the target variant.
@@ -670,7 +729,7 @@ SemanticDeclAvailabilityRequest::evaluate(Evaluator &evaluator,
   }
 
   if (inherited == SemanticDeclAvailability::CompletelyUnavailable ||
-      isDeclCompletelyUnavailable(decl))
+      isUnavailableForAllABICompatiblePlatforms(decl))
     return SemanticDeclAvailability::CompletelyUnavailable;
 
   if (inherited == SemanticDeclAvailability::ConditionallyUnavailable ||
@@ -698,14 +757,6 @@ static UnavailableDeclOptimization
 getEffectiveUnavailableDeclOptimization(ASTContext &ctx) {
   if (ctx.LangOpts.UnavailableDeclOptimizationMode.has_value())
     return *ctx.LangOpts.UnavailableDeclOptimizationMode;
-
-  // FIXME: Allow unavailable decl optimization on visionOS.
-  // visionOS must be ABI compatible with iOS. Enabling unavailable declaration
-  // optimizations naively would break compatibility since declarations marked
-  // unavailable on visionOS would be optimized regardless of whether they are
-  // available on iOS. rdar://116742214
-  if (ctx.LangOpts.Target.isXROS())
-    return UnavailableDeclOptimization::None;
 
   return UnavailableDeclOptimization::None;
 }

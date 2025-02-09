@@ -234,6 +234,11 @@ public:
     return !(*this == other);
   }
 
+  friend bool operator<(const AvailabilityDomain &lhs,
+                        const AvailabilityDomain &rhs) {
+    return lhs.storage.getOpaqueValue() < rhs.storage.getOpaqueValue();
+  }
+
   void Profile(llvm::FoldingSetNodeID &ID) const {
     ID.AddPointer(getOpaqueValue());
   }
