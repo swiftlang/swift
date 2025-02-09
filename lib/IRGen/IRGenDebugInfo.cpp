@@ -1119,24 +1119,22 @@ private:
     return FwdDecl;
   }
 
-  llvm::DICompositeType *
-  createStructType(DebugTypeInfo DbgTy, NominalTypeDecl *Decl, Type BaseTy,
-                   llvm::DIScope *Scope, llvm::DIFile *File, unsigned Line,
-                   unsigned SizeInBits, unsigned AlignInBits,
-                   llvm::DINode::DIFlags Flags, llvm::DIType *DerivedFrom,
-                   unsigned RuntimeLang, StringRef UniqueID) {
+  llvm::DICompositeType *createStructType(
+      NominalOrBoundGenericNominalType *Type, NominalTypeDecl *Decl,
+      llvm::DIScope *Scope, llvm::DIFile *File, unsigned Line,
+      unsigned SizeInBits, unsigned AlignInBits, llvm::DINode::DIFlags Flags,
+      StringRef MangledName, llvm::DIType *SpecificationOf = nullptr) {
     StringRef Name = Decl->getName().str();
     auto FwdDecl = createTemporaryReplaceableForwardDecl(
-        DbgTy.getType(), Scope, File, Line, SizeInBits, AlignInBits, Flags,
-        UniqueID, Name);
+        Type, Scope, File, Line, SizeInBits, AlignInBits, Flags, MangledName,
+        Name);
     // Collect the members.
     SmallVector<llvm::Metadata *, 16> Elements;
     unsigned OffsetInBits = 0;
     for (VarDecl *VD : Decl->getStoredProperties()) {
-      auto memberTy = BaseTy->getTypeOfMember(VD);
-
+      auto memberTy = Type->getTypeOfMember(VD);
       if (auto DbgTy = CompletedDebugTypeInfo::getFromTypeInfo(
-              VD->getInterfaceType(),
+              memberTy,
               IGM.getTypeInfoForUnlowered(
                   IGM.getSILTypes().getAbstractionPattern(VD), memberTy),
               IGM))
@@ -1145,13 +1143,14 @@ private:
       else
         // Without complete type info we can only create a forward decl.
         return DBuilder.createForwardDecl(
-            llvm::dwarf::DW_TAG_structure_type, UniqueID, Scope, File, Line,
+            llvm::dwarf::DW_TAG_structure_type, MangledName, Scope, File, Line,
             llvm::dwarf::DW_LANG_Swift, SizeInBits, 0);
     }
 
-    auto DITy = DBuilder.createStructType(
-        Scope, Name, File, Line, SizeInBits, AlignInBits, Flags, DerivedFrom,
-        DBuilder.getOrCreateArray(Elements), RuntimeLang, nullptr, UniqueID);
+    llvm::DINodeArray BoundParams = collectGenericParams(Type);
+    auto DITy = createStruct(
+        Scope, Name, File, Line, SizeInBits, AlignInBits, Flags, MangledName,
+        DBuilder.getOrCreateArray(Elements), BoundParams, SpecificationOf);
     DBuilder.replaceTemporary(std::move(FwdDecl), DITy);
     return DITy;
   }
@@ -1267,6 +1266,8 @@ private:
     auto *Decl = Type->getNominalOrBoundGenericNominal();
     if (!Decl)
       return nullptr;
+
+    // This temporary forward decl seems to be redundant. Can it be removed?
     StringRef Name = Decl->getName().str();
     auto FwdDecl = createTemporaryReplaceableForwardDecl(
         Type, Scope, File, Line, SizeInBits, AlignInBits, Flags, MangledName,
@@ -1298,11 +1299,10 @@ private:
       }
     }
 
+    // Create the substituted type.
     auto *OpaqueType =
-        createOpaqueStruct(Scope, Decl ? Decl->getNameStr() : "", File, Line,
-                           SizeInBits, AlignInBits, Flags, MangledName,
-                           collectGenericParams(Type), UnsubstitutedDITy);
-    DBuilder.replaceTemporary(std::move(FwdDecl), OpaqueType);
+        createStructType(Type, Decl, Scope, File, Line, SizeInBits, AlignInBits,
+                         Flags, MangledName, UnsubstitutedDITy);
     return OpaqueType;
   }
 
@@ -1712,21 +1712,30 @@ private:
   }
 
   llvm::DICompositeType *
+  createStruct(llvm::DIScope *Scope, StringRef Name, llvm::DIFile *File,
+               unsigned Line, unsigned SizeInBits, unsigned AlignInBits,
+               llvm::DINode::DIFlags Flags, StringRef MangledName,
+               llvm::DINodeArray Elements, llvm::DINodeArray BoundParams,
+               llvm::DIType *SpecificationOf) {
+
+    auto StructType = DBuilder.createStructType(
+        Scope, Name, File, Line, SizeInBits, AlignInBits, Flags,
+        /* DerivedFrom */ nullptr, Elements, llvm::dwarf::DW_LANG_Swift,
+        nullptr, MangledName, SpecificationOf);
+
+    if (BoundParams)
+      DBuilder.replaceArrays(StructType, nullptr, BoundParams);
+    return StructType;
+  }
+
+  llvm::DICompositeType *
   createOpaqueStruct(llvm::DIScope *Scope, StringRef Name, llvm::DIFile *File,
                      unsigned Line, unsigned SizeInBits, unsigned AlignInBits,
                      llvm::DINode::DIFlags Flags, StringRef MangledName,
                      llvm::DINodeArray BoundParams = {},
                      llvm::DIType *SpecificationOf = nullptr) {
-
-    auto StructType = DBuilder.createStructType(
-        Scope, Name, File, Line, SizeInBits, AlignInBits, Flags,
-        /* DerivedFrom */ nullptr,
-        DBuilder.getOrCreateArray(ArrayRef<llvm::Metadata *>()),
-        llvm::dwarf::DW_LANG_Swift, nullptr, MangledName, SpecificationOf);
-
-    if (BoundParams)
-      DBuilder.replaceArrays(StructType, nullptr, BoundParams);
-    return StructType;
+    return createStruct(Scope, Name, File, Line, SizeInBits, AlignInBits, Flags,
+                        MangledName, {}, BoundParams, SpecificationOf);
   }
 
   bool shouldCacheDIType(llvm::DIType *DITy, DebugTypeInfo &DbgTy) {
@@ -1794,7 +1803,20 @@ private:
       llvm_unreachable("not a real type");
 
     case TypeKind::BuiltinFixedArray: {
-      // TODO: provide proper array debug info
+      if (Opts.DebugInfoLevel > IRGenDebugInfoLevel::ASTTypes) {
+        auto *FixedArray = llvm::cast<swift::BuiltinFixedArrayType>(BaseTy);
+        llvm::DIType *ElementTy = getOrCreateType(FixedArray->getElementType());
+        llvm::SmallVector<llvm::Metadata *, 2> Subscripts;
+        if (auto NumElts = FixedArray->getFixedInhabitedSize()) {
+          auto *NumEltsNode = llvm::ConstantAsMetadata::get(
+              llvm::ConstantInt::get(IGM.Int64Ty, *NumElts));
+          Subscripts.push_back(DBuilder.getOrCreateSubrange(
+              NumEltsNode /*count*/, nullptr /*lowerBound*/,
+              nullptr /*upperBound*/, nullptr /*stride*/));
+        }
+        return DBuilder.createArrayType(SizeInBits, AlignInBits, ElementTy,
+                                        DBuilder.getOrCreateArray(Subscripts));
+      }
       unsigned FwdDeclLine = 0;
       return createOpaqueStruct(Scope, "Builtin.FixedArray", MainFile,
                                 FwdDeclLine, SizeInBits, AlignInBits, Flags,
@@ -1876,9 +1898,8 @@ private:
           return createSpecializedStructOrClassType(
               StructTy, Scope, L.File, L.Line, SizeInBits, AlignInBits,
               Flags, MangledName);
-        return createStructType(DbgTy, Decl, StructTy, Scope, L.File, L.Line,
-                                SizeInBits, AlignInBits, Flags, nullptr,
-                                llvm::dwarf::DW_LANG_Swift, MangledName);
+        return createStructType(StructTy, Decl, Scope, L.File, L.Line,
+                                SizeInBits, AlignInBits, Flags, MangledName);
       }
       StringRef Name = Decl->getName().str();
       if (!SizeInBitsOrNull)
@@ -1910,9 +1931,9 @@ private:
               ClassTy, Scope, L.File, L.Line, SizeInBits, AlignInBits,
               Flags, MangledName);
 
-        auto *DIType = createStructType(
-            DbgTy, Decl, ClassTy, Scope, File, L.Line, SizeInBits, AlignInBits,
-            Flags, nullptr, llvm::dwarf::DW_LANG_Swift, MangledName);
+        auto *DIType =
+            createStructType(ClassTy, Decl, Scope, File, L.Line, SizeInBits,
+                             AlignInBits, Flags, MangledName);
         assert(DIType && "Unexpected null DIType!");
         assert(DIType && "createStructType should never return null!");
         auto SuperClassTy = ClassTy->getSuperclass();
