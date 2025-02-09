@@ -309,6 +309,8 @@ const char *backtracer_argv[] = {
   "stdout",                     // 30
   "--symbolicate",              // 31
   "true",                       // 32
+  "--format",                   // 33
+  "text",                       // 34
   NULL
 };
 
@@ -415,6 +417,9 @@ run_backtracer()
   case OutputTo::Stderr:
     backtracer_argv[30] = "stderr";
     break;
+  case OutputTo::File:
+    backtracer_argv[30] = _swift_backtraceSettings.outputPath;
+    break;
   }
 
   backtracer_argv[28] = trueOrFalse(_swift_backtraceSettings.cache);
@@ -428,6 +433,15 @@ run_backtracer()
     break;
   case Symbolication::Full:
     backtracer_argv[32] = "full";
+    break;
+  }
+
+  switch (_swift_backtraceSettings.format) {
+  case OutputFormat::Text:
+    backtracer_argv[34] = "text";
+    break;
+  case OutputFormat::JSON:
+    backtracer_argv[34] = "json";
     break;
   }
 
@@ -450,4 +464,3 @@ run_backtracer()
 #endif // TARGET_OS_OSX || TARGET_OS_MACCATALYST
 
 #endif // __APPLE__
-

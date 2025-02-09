@@ -120,7 +120,7 @@ SWIFT_RUNTIME_STDLIB_INTERNAL BacktraceSettings _swift_backtraceSettings = {
   // top
   16,
 
-  // sanitize,
+  // sanitize
   SanitizePaths::Preset,
 
   // preset
@@ -129,14 +129,20 @@ SWIFT_RUNTIME_STDLIB_INTERNAL BacktraceSettings _swift_backtraceSettings = {
   // cache
   true,
 
-  // outputTo,
+  // outputTo
   OutputTo::Auto,
 
   // symbolicate
   Symbolication::Full,
 
+  // format
+  OutputFormat::Text,
+
   // swiftBacktracePath
   NULL,
+
+  // outputPath
+  NULL
 };
 
 }
@@ -349,6 +355,18 @@ BacktraceInitializer::BacktraceInitializer() {
                    "swift runtime: backtrace-on-crash is not supported for "
                    "privileged executables.\n");
     _swift_backtraceSettings.enabled = OnOffTty::Off;
+  }
+
+  // If we're outputting to a file, then the defaults are different
+  if (_swift_backtraceSettings.outputTo == OutputTo::File) {
+    if (_swift_backtraceSettings.interactive == OnOffTty::TTY)
+      _swift_backtraceSettings.interactive = OnOffTty::Off;
+    if (_swift_backtraceSettings.color == OnOffTty::TTY)
+      _swift_backtraceSettings.color = OnOffTty::Off;
+
+    // Unlike the other settings, this defaults to on if you specified a file
+    if (_swift_backtraceSettings.enabled == OnOffTty::TTY)
+      _swift_backtraceSettings.enabled = OnOffTty::On;
   }
 
   if (_swift_backtraceSettings.enabled == OnOffTty::TTY)
@@ -700,12 +718,28 @@ _swift_processBacktracingSetting(llvm::StringRef key,
     else if (value.equals_insensitive("stderr"))
       _swift_backtraceSettings.outputTo = OutputTo::Stderr;
     else {
-      swift::warning(0,
-                     "swift runtime: unknown output-to setting '%.*s'\n",
-                     static_cast<int>(value.size()), value.data());
+      size_t len = value.size();
+      char *path = (char *)std::malloc(len + 1);
+      std::copy(value.begin(), value.end(), path);
+      path[len] = 0;
+
+      std::free(const_cast<char *>(_swift_backtraceSettings.outputPath));
+
+      _swift_backtraceSettings.outputTo = OutputTo::File;
+      _swift_backtraceSettings.outputPath = path;
     }
   } else if (key.equals_insensitive("symbolicate")) {
     _swift_backtraceSettings.symbolicate = parseSymbolication(value);
+  } else if (key.equals_insensitive("format")) {
+    if (value.equals_insensitive("text")) {
+      _swift_backtraceSettings.format = OutputFormat::Text;
+    } else if (value.equals_insensitive("json")) {
+      _swift_backtraceSettings.format = OutputFormat::JSON;
+    } else {
+      swift::warning(0,
+                     "swift runtime: unknown backtrace format '%.*s'\n",
+                     static_cast<int>(value.size()), value.data());
+    }
 #if !defined(SWIFT_RUNTIME_FIXED_BACKTRACER_PATH)
   } else if (key.equals_insensitive("swift-backtrace")) {
     size_t len = value.size();
@@ -1036,10 +1070,10 @@ _swift_displayCrashMessage(int signum, const void *pc)
 #if !SWIFT_BACKTRACE_ON_CRASH_SUPPORTED
   return;
 #else
-  int fd = STDOUT_FILENO;
+  int fd = STDERR_FILENO;
 
-  if (_swift_backtraceSettings.outputTo == OutputTo::Stderr)
-    fd = STDERR_FILENO;
+  if (_swift_backtraceSettings.outputTo == OutputTo::Stdout)
+    fd = STDOUT_FILENO;
 
   const char *intro;
   if (_swift_backtraceSettings.color == OnOffTty::On) {
