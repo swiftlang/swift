@@ -71,13 +71,13 @@ bool AvailabilityContext::Info::constrainWith(
   for (auto constraint : constraints) {
     auto attr = constraint.getAttr();
     auto domain = attr.getDomain();
-    switch (constraint.getKind()) {
-    case AvailabilityConstraint::Kind::AlwaysUnavailable:
-    case AvailabilityConstraint::Kind::Obsoleted:
-    case AvailabilityConstraint::Kind::RequiresVersion:
+    switch (constraint.getReason()) {
+    case AvailabilityConstraint::Reason::UnconditionallyUnavailable:
+    case AvailabilityConstraint::Reason::Obsoleted:
+    case AvailabilityConstraint::Reason::IntroducedInLaterVersion:
       isConstrained |= constrainUnavailability(domain);
       break;
-    case AvailabilityConstraint::Kind::IntroducedInNewerVersion:
+    case AvailabilityConstraint::Reason::IntroducedInLaterDynamicVersion:
       // FIXME: [availability] Support versioning for other kinds of domains.
       DEBUG_ASSERT(domain.isPlatform());
       if (domain.isPlatform())
