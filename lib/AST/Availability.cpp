@@ -456,15 +456,11 @@ Decl::getSemanticAvailableAttr(const AvailableAttr *attr) const {
 }
 
 std::optional<SemanticAvailableAttr>
-Decl::getActiveAvailableAttrForCurrentPlatform(bool ignoreAppExtensions) const {
+Decl::getActiveAvailableAttrForCurrentPlatform() const {
   std::optional<SemanticAvailableAttr> bestAttr;
 
   for (auto attr : getSemanticAvailableAttrs(/*includingInactive=*/false)) {
     if (!attr.isPlatformSpecific())
-      continue;
-
-    if (ignoreAppExtensions &&
-        isApplicationExtensionPlatform(attr.getPlatform()))
       continue;
 
     // We have an attribute that is active for the platform, but is it more
@@ -577,21 +573,15 @@ bool Decl::isUnavailableInCurrentSwiftVersion() const {
   return false;
 }
 
-std::optional<SemanticAvailableAttr>
-getDeclUnavailableAttr(const Decl *D, bool ignoreAppExtensions) {
+std::optional<SemanticAvailableAttr> getDeclUnavailableAttr(const Decl *D) {
   auto &ctx = D->getASTContext();
   std::optional<SemanticAvailableAttr> result;
-  auto bestActive =
-      D->getActiveAvailableAttrForCurrentPlatform(ignoreAppExtensions);
+  auto bestActive = D->getActiveAvailableAttrForCurrentPlatform();
 
   for (auto attr : D->getSemanticAvailableAttrs(/*includingInactive=*/false)) {
     // If this is a platform-specific attribute and it isn't the most
     // specific attribute for the current platform, we're done.
     if (attr.isPlatformSpecific() && (!bestActive || attr != bestActive))
-      continue;
-
-    if (ignoreAppExtensions &&
-        isApplicationExtensionPlatform(attr.getPlatform()))
       continue;
 
     // Unconditional unavailable.
@@ -612,9 +602,8 @@ getDeclUnavailableAttr(const Decl *D, bool ignoreAppExtensions) {
   return result;
 }
 
-std::optional<SemanticAvailableAttr>
-Decl::getUnavailableAttr(bool ignoreAppExtensions) const {
-  if (auto attr = getDeclUnavailableAttr(this, ignoreAppExtensions))
+std::optional<SemanticAvailableAttr> Decl::getUnavailableAttr() const {
+  if (auto attr = getDeclUnavailableAttr(this))
     return attr;
 
   // If D is an extension member, check if the extension is unavailable.
@@ -626,7 +615,7 @@ Decl::getUnavailableAttr(bool ignoreAppExtensions) const {
   // and the availability of other categories. rdar://problem/53956555
   if (!getClangNode())
     if (auto ext = dyn_cast<ExtensionDecl>(getDeclContext()))
-      return ext->getUnavailableAttr(ignoreAppExtensions);
+      return ext->getUnavailableAttr();
 
   return std::nullopt;
 }
