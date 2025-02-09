@@ -28,6 +28,15 @@ AvailabilityDomain::forTargetPlatform(const ASTContext &ctx) {
 }
 
 std::optional<AvailabilityDomain>
+AvailabilityDomain::forTargetVariantPlatform(const ASTContext &ctx) {
+  auto platform = swift::targetVariantPlatform(ctx.LangOpts);
+  if (platform == PlatformKind::none)
+    return std::nullopt;
+
+  return forPlatform(platform);
+}
+
+std::optional<AvailabilityDomain>
 AvailabilityDomain::builtinDomainForString(StringRef string,
                                            const DeclContext *declContext) {
   // This parameter is used in downstream forks, do not remove.

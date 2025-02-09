@@ -642,6 +642,9 @@ availabilityDomainsForABICompatibility(const ASTContext &ctx) {
 
   if (auto targetDomain = AvailabilityDomain::forTargetPlatform(ctx))
     domains.push_back(targetDomain->getABICompatibilityDomain());
+  
+  if (auto variantDomain = AvailabilityDomain::forTargetVariantPlatform(ctx))
+    domains.push_back(variantDomain->getABICompatibilityDomain());
 
   return domains;
 }
@@ -706,13 +709,6 @@ static bool isUnavailableForAllABICompatiblePlatforms(const Decl *decl) {
   
   // Verify that there aren't any explicitly available descendant domains.
   if (availableDescendantDomains.size() > 0)
-    return false;
-
-  // FIXME: [availability] Support zippered frameworks (rdar://125371621)
-  // If we have a target variant (e.g. we're building a zippered macOS
-  // framework) then the decl is only unreachable if it is unavailable for both
-  // the primary target and the target variant.
-  if (decl->getASTContext().LangOpts.TargetVariant.has_value())
     return false;
 
   return true;

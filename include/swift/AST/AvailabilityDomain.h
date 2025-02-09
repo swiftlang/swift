@@ -154,10 +154,15 @@ public:
     return AvailabilityDomain(domain);
   }
 
-  /// Returns the most specific platform domain that applies to the compilation
-  /// context.
+  /// Returns the most specific platform domain for the target of the
+  /// compilation context.
   static std::optional<AvailabilityDomain>
   forTargetPlatform(const ASTContext &ctx);
+
+  /// Returns the most specific platform domain for the target variant of the
+  /// compilation context.
+  static std::optional<AvailabilityDomain>
+  forTargetVariantPlatform(const ASTContext &ctx);
 
   /// Returns the built-in availability domain identified by the given string.
   static std::optional<AvailabilityDomain>
