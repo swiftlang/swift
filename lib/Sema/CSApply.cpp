@@ -8217,7 +8217,18 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
         // Resolve into a MakeTemporarilyEscapableExpr.
         auto *args = apply->getArgs();
         assert(args->size() == 2 && "should have two arguments");
-        auto *nonescaping = cs.coerceToRValue(args->getExpr(0));
+
+        auto appliedWrappers =
+            solution.getAppliedPropertyWrappers(calleeLocator.getAnchor());
+        auto fnType = cs.getType(fn)->getAs<FunctionType>();
+        args = coerceCallArguments(
+            args, fnType, declRef, apply,
+            locator.withPathElement(ConstraintLocator::ApplyArgument),
+            appliedWrappers);
+        if (!args)
+          return nullptr;
+
+        auto *nonescaping = args->getExpr(0);
         auto *body = args->getExpr(1);
         auto bodyTy = cs.getType(body)->getWithoutSpecifierType();
         auto bodyFnTy = bodyTy->castTo<FunctionType>();
