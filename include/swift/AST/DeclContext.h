@@ -863,6 +863,8 @@ public:
     return LastDeclAndKind.getInt();
   }
 
+  SourceRange getBraces() const;
+
   bool hasUnparsedMembers() const;
 
   void setDeserializedMembers(bool deserialized) { DeserializedMembers = deserialized; }
