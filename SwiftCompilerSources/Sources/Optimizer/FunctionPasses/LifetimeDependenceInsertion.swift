@@ -235,7 +235,7 @@ private func insertResultDependencies(for apply: LifetimeDependentApply, _ conte
   guard var sources = apply.getResultDependenceSources() else {
     return
   }
-  log("Creating dependencies for \(apply.applySite)")
+  log("Creating result dependencies for \(apply.applySite)")
 
   // Find the dependence base for each source.
   sources.initializeBases(context)
@@ -247,12 +247,6 @@ private func insertResultDependencies(for apply: LifetimeDependentApply, _ conte
   for resultOper in apply.applySite.indirectResultOperands {
     let accessBase = resultOper.value.accessBase
     guard case let .store(initializingStore, initialAddress) = accessBase.findSingleInitializer(context) else {
-      continue
-    }
-    // TODO: This might bail-out on SIL that should be diagnosed. We should handle/cleanup projections and casts that
-    // occur before the initializingStore. Or check in the SIL verifier that all stores without an access scope follow
-    // this form. Then convert this bail-out to an assert.
-    guard initialAddress.usesOccurOnOrAfter(instruction: initializingStore, context) else {
       continue
     }
     assert(initializingStore == resultOper.instruction, "an indirect result is a store")
@@ -268,7 +262,7 @@ private func insertParameterDependencies(apply: LifetimeDependentApply, target: 
   guard var sources = apply.getParameterDependenceSources(target: target) else {
     return
   }
-  log("Creating dependencies for \(apply.applySite)")
+  log("Creating parameter dependencies for \(apply.applySite)")
 
   sources.initializeBases(context)
 
@@ -285,8 +279,13 @@ private func insertMarkDependencies(value: Value, initializer: Instruction?,
     let markDep = builder.createMarkDependence(
       value: currentValue, base: base, kind: .Unresolved)
 
-    // Address dependencies cannot be represented as SSA values, so it doesn not make sense to replace any uses of the
-    // dependent address. TODO: consider a separate mark_dependence_addr instruction since the semantics are different.
+    // Address dependencies cannot be represented as SSA values, so it does not make sense to replace any uses of the
+    // dependent address.
+    //
+    // TODO: either (1) insert a separate mark_dependence_addr instruction with no return value, or (2) perform data
+    // flow to replace all reachable address uses, and if any aren't dominated by base, then insert an extra
+    // escaping mark_dependence at this apply site that directly uses the mark_dependence [nonescaping] to force
+    // diagnostics to fail.
     if !value.type.isAddress {
       let uses = currentValue.uses.lazy.filter {
         if $0.isScopeEndingUse {

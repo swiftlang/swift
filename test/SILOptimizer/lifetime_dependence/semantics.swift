@@ -37,6 +37,20 @@ internal func _overrideLifetime<
   dependent
 }
 
+/// Unsafely discard any lifetime dependency on the `dependent` argument. Return
+/// a value identical to `dependent` that inherits all lifetime dependencies from
+/// the `source` argument.
+@_unsafeNonescapableResult
+@_transparent
+@lifetime(borrow source)
+internal func _overrideLifetime<
+  T: ~Copyable & ~Escapable, U: ~Copyable & ~Escapable
+>(
+  _ dependent: consuming T, mutating source: inout U
+) -> T {
+  dependent
+}
+
 // Lifetime dependence semantics by example.
 public struct Span<T>: ~Escapable {
   private var base: UnsafePointer<T>?
@@ -102,7 +116,7 @@ extension Array {
     /* not the real implementation */
     let p = self.withUnsafeMutableBufferPointer { $0.baseAddress! }
     let span = MutableSpan<Element>(base: p, count: 1)
-    return _overrideLifetime(span, borrowing: self)
+    return _overrideLifetime(span, mutating: &self)
   }
 }
 

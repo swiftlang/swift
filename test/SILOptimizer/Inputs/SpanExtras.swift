@@ -40,7 +40,7 @@ internal func _overrideLifetime<
 @_unsafeNonescapableResult
 @_alwaysEmitIntoClient
 @_transparent
-@lifetime(source)
+@lifetime(borrow source)
 internal func _overrideLifetime<
   T: ~Copyable & ~Escapable, U: ~Copyable & ~Escapable
 >(
@@ -129,7 +129,7 @@ extension MutableSpan {
   ) {
     let rb = UnsafeMutableBufferPointer(rebasing: elements)
     let ms = MutableSpan(_unsafeElements: rb)
-    self = _overrideLifetime(ms, borrowing: rb)
+    self = _overrideLifetime(ms, borrowing: elements)
   }
 }
 
