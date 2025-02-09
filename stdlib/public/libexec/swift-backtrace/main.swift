@@ -56,6 +56,7 @@ internal struct SwiftBacktrace {
   enum OutputTo {
     case stdout
     case stderr
+    case file
   }
 
   enum Symbolication {
@@ -81,6 +82,7 @@ internal struct SwiftBacktrace {
     var cache = true
     var outputTo: OutputTo = .stdout
     var symbolicate: Symbolication = .full
+    var outputPath: String = "/tmp"
   }
 
   static var args = Arguments()
@@ -97,15 +99,10 @@ internal struct SwiftBacktrace {
     }
   }
 
-  static var outputStream: CFileStream {
-    switch args.outputTo {
-      case .stdout: return standardOutput
-      case .stderr: return standardError
-    }
-  }
+  static var outputStream: CFileStream? = nil
 
   static func write(_ string: String, flush: Bool = false) {
-    var stream = outputStream
+    var stream = outputStream!
 
     print(string, terminator: "", to: &stream)
     if flush {
@@ -114,7 +111,7 @@ internal struct SwiftBacktrace {
   }
 
   static func writeln(_ string: String, flush: Bool = false) {
-    var stream = outputStream
+    var stream = outputStream!
 
     print(string, to: &stream)
     if flush {
@@ -207,6 +204,10 @@ Generate a backtrace for the parent process.
 
 --output-to <stream>    Set which output stream to use.  Options are "stdout"
 -o <stream>             and "stderr".  The default is "stdout".
+
+                        Alternatively, you may specify a file path here.  If
+                        the path points to a directory, a unique filename will
+                        be generated automatically.
 
 --crashinfo <addr>
 -a <addr>               Provide a pointer to a platform specific CrashInfo
@@ -405,10 +406,8 @@ Generate a backtrace for the parent process.
             case "stderr":
               args.outputTo = .stderr
             default:
-              print("swift-backtrace: unknown output-to setting '\(v)'",
-                    to: &standardError)
-              usage()
-              exit(1)
+              args.outputTo = .file
+              args.outputPath = v
           }
         } else {
           print("swift-backtrace: missing output-to value",
@@ -538,6 +537,71 @@ Generate a backtrace for the parent process.
                       symbolicate: args.symbolicate)
 
       currentThread = target!.crashingThreadNdx
+    }
+
+    // Set up the output stream
+    var didOpenOutput = false
+    switch args.outputTo {
+      case .stdout:
+        outputStream = standardOutput
+      case .stderr:
+        outputStream = standardError
+      case .file:
+        if isDir(args.outputPath) {
+          // If the output path is a directory, generate a filename
+          let name = target!.name
+          let pid = target!.pid
+          var now = timespec()
+
+          if clock_gettime(CLOCK_REALTIME, &now) != 0 {
+            now.tv_sec = time(nil)
+            now.tv_nsec = 0
+          }
+
+          var filename =
+            "\(args.outputPath)/\(name)-\(pid)-\(now.tv_sec).\(now.tv_nsec).log"
+
+          var fd = open(filename, O_RDWR|O_CREAT|O_EXCL, 0o644)
+          var ndx = 1
+          while fd < 0 && (errno == EEXIST || errno == EINTR) {
+            if errno != EINTR {
+              ndx += 1
+            }
+            filename = "\(args.outputPath)/\(name)-\(pid)-\(now.tv_sec).\(now.tv_nsec)-\(ndx).log"
+            fd = open(filename, O_RDWR|O_CREAT|O_EXCL, 0o644)
+          }
+
+          if fd < 0 {
+            print("swift-backtrace: unable to create \(filename) for writing",
+                  to: &standardError)
+            outputStream = standardError
+          }
+
+          if let cFile = fdopen(fd, "wt") {
+            didOpenOutput = true
+            outputStream = CFileStream(fp: cFile)
+          } else {
+            close(fd)
+            unlink(filename)
+
+            print("swift-backtrace: unable to fdopen \(filename) for writing",
+                  to: &standardError)
+            outputStream = standardError
+          }
+        } else if let cFile = fopen(args.outputPath, "wt") {
+          didOpenOutput = true
+          outputStream = CFileStream(fp: cFile)
+        } else {
+          print("swift-backtrace: unable to open \(args.outputPath) for writing",
+                to: &standardError)
+
+          outputStream = standardError
+        }
+    }
+    defer {
+      if didOpenOutput {
+        outputStream!.close()
+      }
     }
 
     printCrashLog()
@@ -707,11 +771,18 @@ Generate a backtrace for the parent process.
       description = "Program crashed: \(target.signalDescription) at \(hex(target.faultAddress))"
     }
 
-    // Clear (or complete) the message written by the crash handler
-    if args.color {
-      write("\r\u{1b}[0K")
+    // Clear (or complete) the message written by the crash handler; this
+    // is always on stdout or stderr, even if you specify a file for output.
+    var handlerOut: CFileStream
+    if args.outputTo == .stdout {
+      handlerOut = standardOutput
     } else {
-      write(" done ***\n\n")
+      handlerOut = standardError
+    }
+    if args.color {
+      print("\r\u{1b}[0K", terminator: "", to: &handlerOut)
+    } else {
+      print(" done ***\n\n", terminator: "", to: &handlerOut)
     }
 
     writeln(theme.crashReason(description))
@@ -838,7 +909,7 @@ Generate a backtrace for the parent process.
     }
 
     while true {
-      outputStream.flush()
+      outputStream!.flush()
       write(theme.prompt(">>> "), flush: true)
       guard let input = readLine() else {
         print("")
