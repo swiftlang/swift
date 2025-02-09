@@ -575,11 +575,10 @@ bool Decl::isUnavailableInCurrentSwiftVersion() const {
 
 std::optional<SemanticAvailableAttr> Decl::getUnavailableAttr() const {
   auto context = AvailabilityContext::forDeploymentTarget(getASTContext());
-  auto constraints = swift::getAvailabilityConstraintsForDecl(this, context);
-
-  for (auto const &constraint : constraints) {
-    if (constraint.isUnavailable())
-      return constraint.getAttr();
+  if (auto constraint = getAvailabilityConstraintsForDecl(this, context)
+                            .getPrimaryConstraint()) {
+    if (constraint->isUnavailable())
+      return constraint->getAttr();
   }
 
   return std::nullopt;

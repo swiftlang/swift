@@ -133,11 +133,11 @@ public:
   /// Returns the required range for `IntroducedInNewerVersion` requirements, or
   /// `std::nullopt` otherwise.
   std::optional<AvailabilityRange>
-  getRequiredNewerAvailabilityRange(ASTContext &ctx) const;
+  getRequiredNewerAvailabilityRange(const ASTContext &ctx) const;
 
   /// Some availability constraints are active for type-checking but cannot
   /// be translated directly into an `if #available(...)` runtime query.
-  bool isActiveForRuntimeQueries(ASTContext &ctx) const;
+  bool isActiveForRuntimeQueries(const ASTContext &ctx) const;
 };
 
 /// Represents a set of availability constraints that restrict use of a
@@ -149,9 +149,14 @@ class DeclAvailabilityConstraints {
 public:
   DeclAvailabilityConstraints() {}
 
-  void addConstraint(const AvailabilityConstraint &constraint) {
-    constraints.emplace_back(constraint);
-  }
+  /// Inserts a constraint into the collection. If the constraint has the same
+  /// kind and domain as an existing constraint, then the weaker constraint is
+  /// discarded.
+  void addConstraint(const AvailabilityConstraint &constraint,
+                     const ASTContext &ctx);
+
+  /// Returns the strongest availability constraint or `std::nullopt` if empty.
+  std::optional<AvailabilityConstraint> getPrimaryConstraint() const;
 
   using const_iterator = Storage::const_iterator;
   const_iterator begin() const { return constraints.begin(); }
