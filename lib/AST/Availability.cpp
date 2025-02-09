@@ -16,7 +16,6 @@
 
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Attr.h"
-#include "swift/AST/AvailabilityConstraint.h"
 #include "swift/AST/AvailabilityDomain.h"
 #include "swift/AST/AvailabilityInference.h"
 #include "swift/AST/AvailabilityRange.h"
@@ -65,43 +64,6 @@ AvailabilityRange AvailabilityRange::forInliningTarget(const ASTContext &Ctx) {
 
 AvailabilityRange AvailabilityRange::forRuntimeTarget(const ASTContext &Ctx) {
   return AvailabilityRange(VersionRange::allGTE(Ctx.LangOpts.RuntimeVersion));
-}
-
-PlatformKind AvailabilityConstraint::getPlatform() const {
-  return getAttr().getPlatform();
-}
-
-std::optional<AvailabilityRange>
-AvailabilityConstraint::getRequiredNewerAvailabilityRange(
-    ASTContext &ctx) const {
-  switch (getKind()) {
-  case Kind::AlwaysUnavailable:
-  case Kind::RequiresVersion:
-  case Kind::Obsoleted:
-    return std::nullopt;
-  case Kind::IntroducedInNewerVersion:
-    return getAttr().getIntroducedRange(ctx);
-  }
-}
-
-bool AvailabilityConstraint::isConditionallySatisfiable() const {
-  switch (getKind()) {
-  case Kind::AlwaysUnavailable:
-  case Kind::RequiresVersion:
-  case Kind::Obsoleted:
-    return false;
-  case Kind::IntroducedInNewerVersion:
-    return true;
-  }
-}
-
-bool AvailabilityConstraint::isActiveForRuntimeQueries(ASTContext &ctx) const {
-  if (getAttr().getPlatform() == PlatformKind::none)
-    return true;
-
-  return swift::isPlatformActive(getAttr().getPlatform(), ctx.LangOpts,
-                                 /*forTargetVariant=*/false,
-                                 /*forRuntimeQuery=*/true);
 }
 
 namespace {

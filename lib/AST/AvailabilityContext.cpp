@@ -12,6 +12,7 @@
 
 #include "swift/AST/AvailabilityContext.h"
 #include "swift/AST/ASTContext.h"
+#include "swift/AST/AvailabilityConstraint.h"
 #include "swift/AST/AvailabilityContextStorage.h"
 #include "swift/AST/AvailabilityInference.h"
 #include "swift/AST/Decl.h"
@@ -63,16 +64,27 @@ bool AvailabilityContext::Info::constrainWith(const Info &other) {
   return isConstrained;
 }
 
-bool AvailabilityContext::Info::constrainWith(const Decl *decl) {
+bool AvailabilityContext::Info::constrainWith(
+    const DeclAvailabilityConstraints &constraints, ASTContext &ctx) {
   bool isConstrained = false;
 
-  if (auto range = AvailabilityInference::annotatedAvailableRange(decl))
-    isConstrained |= constrainRange(Range, *range);
-
-  if (auto attr = decl->getUnavailableAttr())
-    isConstrained |= constrainUnavailability(attr->getDomain());
-
-  isConstrained |= CONSTRAIN_BOOL(IsDeprecated, decl->isDeprecated());
+  for (auto constraint : constraints) {
+    auto attr = constraint.getAttr();
+    auto domain = attr.getDomain();
+    switch (constraint.getKind()) {
+    case AvailabilityConstraint::Kind::AlwaysUnavailable:
+    case AvailabilityConstraint::Kind::Obsoleted:
+    case AvailabilityConstraint::Kind::RequiresVersion:
+      isConstrained |= constrainUnavailability(domain);
+      break;
+    case AvailabilityConstraint::Kind::IntroducedInNewerVersion:
+      // FIXME: [availability] Support versioning for other kinds of domains.
+      DEBUG_ASSERT(domain.isPlatform());
+      if (domain.isPlatform())
+        isConstrained |= constrainRange(Range, attr.getIntroducedRange(ctx));
+      break;
+    }
+  }
 
   return isConstrained;
 }
@@ -190,7 +202,9 @@ void AvailabilityContext::constrainWithDeclAndPlatformRange(
   bool isConstrained = false;
 
   Info info{storage->info};
-  isConstrained |= info.constrainWith(decl);
+  auto constraints = swift::getAvailabilityConstraintsForDecl(decl, *this);
+  isConstrained |= info.constrainWith(constraints, decl->getASTContext());
+  isConstrained |= CONSTRAIN_BOOL(info.IsDeprecated, decl->isDeprecated());
   isConstrained |= constrainRange(info.Range, platformRange);
 
   if (!isConstrained)
