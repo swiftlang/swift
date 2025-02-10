@@ -36,6 +36,7 @@
 #include "swift/ClangImporter/ClangModule.h"
 #include "clang/AST/ASTContext.h"
 #include "clang/AST/Decl.h"
+#include "clang/Basic/Specifiers.h"
 #include "clang/Lex/MacroInfo.h"
 #include "clang/Lex/Preprocessor.h"
 #include "clang/AST/DeclVisitor.h"
@@ -690,7 +691,9 @@ public:
 
   bool isDefaultArgSafeToImport(const clang::ParmVarDecl *param);
 
-  ValueDecl *importBaseMemberDecl(ValueDecl *decl, DeclContext *newContext);
+  ValueDecl *importBaseMemberDecl(ValueDecl *decl,
+                                  DeclContext *newContext,
+                                  clang::AccessSpecifier inheritance);
 
   static size_t getImportedBaseMemberDeclArity(const ValueDecl *valueDecl);
 
@@ -1636,7 +1639,8 @@ private:
   loadAllMembersOfObjcContainer(Decl *D,
                                 const clang::ObjCContainerDecl *objcContainer);
   void loadAllMembersOfRecordDecl(NominalTypeDecl *swiftDecl,
-                                  const clang::RecordDecl *clangRecord);
+                                  const clang::RecordDecl *clangRecord,
+                                  clang::AccessSpecifier inheritance);
 
   void collectMembersToAdd(const clang::ObjCContainerDecl *objcContainer,
                            Decl *D, DeclContext *DC,

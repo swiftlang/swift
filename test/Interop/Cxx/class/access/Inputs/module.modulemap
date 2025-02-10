@@ -1,0 +1,4 @@
+module NonPublicInheritance {
+    requires cplusplus
+    header "non-public-inheritance.h"
+}
