@@ -3167,12 +3167,13 @@ class CheckEffectsCoverage : public EffectsHandlingWalker<CheckEffectsCoverage> 
   /// anchor expression, so we can emit diagnostics at the end.
   llvm::MapVector<Expr *, std::vector<UnsafeUse>> uncoveredUnsafeUses;
 
-  static bool isEffectAnchor(Expr *e) {
+  static bool isEffectAnchor(Expr *e, bool stopAtAutoClosure) {
     if (e->getLoc().isInvalid())
       return false;
 
-    return isa<AbstractClosureExpr>(e) || isa<DiscardAssignmentExpr>(e) ||
-           isa<AssignExpr>(e) || (isa<DeclRefExpr>(e) && e->isImplicit());
+    return isa<ClosureExpr>(e) || isa<DiscardAssignmentExpr>(e) ||
+           isa<AssignExpr>(e) ||
+           (stopAtAutoClosure && isa<AutoClosureExpr>(e));
   }
 
   static bool isAnchorTooEarly(Expr *e) {
@@ -3181,11 +3182,12 @@ class CheckEffectsCoverage : public EffectsHandlingWalker<CheckEffectsCoverage> 
 
   /// Find the top location where we should put the await
   static Expr *walkToAnchor(Expr *e, llvm::DenseMap<Expr *, Expr *> &parentMap,
-                            bool isInterpolatedString) {
+                            bool isInterpolatedString,
+                            bool stopAtAutoClosure) {
     llvm::SmallPtrSet<Expr *, 4> visited;
     Expr *parent = e;
     Expr *lastParent = e;
-    while (parent && !isEffectAnchor(parent)) {
+    while (parent && !isEffectAnchor(parent, stopAtAutoClosure)) {
       lastParent = parent;
       parent = parentMap[parent];
 
@@ -3890,7 +3892,8 @@ private:
                  Flags.has(ContextFlags::InAsyncLet))) {
         Expr *expr = E.dyn_cast<Expr*>();
         Expr *anchor = walkToAnchor(expr, parentMap,
-                                    CurContext.isWithinInterpolatedString());
+                                    CurContext.isWithinInterpolatedString(),
+                                    /*stopAtAutoClosure=*/true);
         if (Flags.has(ContextFlags::StmtExprCoversAwait))
           classification.setDowngradeToWarning(true);
         if (uncoveredAsync.find(anchor) == uncoveredAsync.end())
@@ -3915,7 +3918,8 @@ private:
       if (!Flags.has(ContextFlags::IsUnsafeCovered)) {
         Expr *expr = E.dyn_cast<Expr*>();
         Expr *anchor = walkToAnchor(expr, parentMap,
-                                    CurContext.isWithinInterpolatedString());
+                                    CurContext.isWithinInterpolatedString(),
+                                    /*stopAtAutoClosure=*/false);
 
         // Figure out a location to use if the unsafe use didn't have one.
         SourceLoc replacementLoc;
