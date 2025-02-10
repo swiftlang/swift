@@ -4122,6 +4122,12 @@ private:
 
       if (auto parsedSequence = S->getParsedSequence()) {
         parentMap[typeCheckedExpr] = parsedSequence;
+
+        if (auto nextCall = S->getNextCall()) {
+          auto nextParentMap = nextCall->getParentMap();
+          parentMap.insert(nextParentMap.begin(), nextParentMap.end());
+          parentMap[nextCall] = parsedSequence;
+        }
       }
     }
 
