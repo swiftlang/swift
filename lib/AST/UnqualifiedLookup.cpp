@@ -282,6 +282,10 @@ void UnqualifiedLookupFactory::lookUpTopLevelNamesInModuleScopeContext(
     return;
   }
 
+  bool inInterface = false;
+  if (auto *File = DC->getOutermostParentSourceFile())
+    inInterface = File->Kind == SourceFileKind::Interface;
+
   addImportedResults(DC);
   addNamesKnownToDebugClient(DC);
   if (Results.empty()) {
@@ -291,6 +295,18 @@ void UnqualifiedLookupFactory::lookUpTopLevelNamesInModuleScopeContext(
     addUnavailableInnerResults();
     if (Results.empty())
       lookForAModuleWithTheGivenName(DC);
+  } else if (inInterface && Results.size() == 1) {
+    // If this was a successful, unambiguous lookup inside an interface file,
+    // check whether we found a C++ namespace, which often collide with C++
+    // module names. In such cases, prefer the module over the namespace in it.
+    auto entry = Results[0];
+    if (llvm::isa_and_nonnull<clang::NamespaceDecl>(entry.getValueDecl()->getClangDecl())) {
+      Results.clear();
+      lookForAModuleWithTheGivenName(DC);
+      if (Results.empty())
+        // There was no colliding module; return the decl we originally found
+        Results.push_back(entry);
+    }
   }
   recordCompletionOfAScope();
 }
