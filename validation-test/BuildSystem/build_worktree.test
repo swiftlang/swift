@@ -2,11 +2,9 @@
 # REQUIRES: standalone_build
 # REQUIRES: target-same-as-host
 
-# https://github.com/swiftlang/swift/issues/79256
-# REQUIRES: rdar144503319
-
 # RUN: %empty-directory(%t)
 # RUN: %empty-directory(%t/build)
+# RUN: %empty-directory(%t/ninja)
 
 # Set up a local clone of swift in a temporary workspace and add a sibling
 # linked worktree to the clone.
