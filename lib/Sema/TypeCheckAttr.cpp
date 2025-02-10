@@ -1475,8 +1475,17 @@ void AttributeChecker::visitSPIAccessControlAttr(SPIAccessControlAttr *attr) {
     // VD must be public or open to use an @_spi attribute.
     auto declAccess = VD->getFormalAccess();
     auto DC = VD->getDeclContext()->getAsDecl();
-    if (declAccess < AccessLevel::Public &&
-        !VD->getAttrs().hasAttribute<UsableFromInlineAttr>() &&
+
+    AbstractStorageDecl *storage = nullptr;
+    if (auto *AD = dyn_cast<AccessorDecl>(VD))
+      storage = AD->getStorage();
+
+    auto canUseAttr = [](ValueDecl *VD) {
+      return VD->getFormalAccess() >= AccessLevel::Public ||
+        VD->getAttrs().hasAttribute<UsableFromInlineAttr>();
+    };
+    if (!canUseAttr(VD) &&
+        !(storage && canUseAttr(storage)) &&
         !(DC && DC->isSPI())) {
       diagnoseAndRemoveAttr(attr,
                             diag::spi_attribute_on_non_public,
@@ -2329,7 +2338,8 @@ static Decl *getEnclosingDeclForDecl(Decl *D) {
 
 static std::optional<std::pair<SemanticAvailableAttr, const Decl *>>
 getSemanticAvailableRangeDeclAndAttr(const Decl *decl) {
-  if (auto attr = decl->getAvailableAttrForPlatformIntroduction())
+  if (auto attr = decl->getAvailableAttrForPlatformIntroduction(
+          /*checkExtension=*/false))
     return std::make_pair(*attr, decl);
 
   if (auto *parent =
@@ -2458,12 +2468,6 @@ void AttributeChecker::visitAvailableAttr(AvailableAttr *parsedAttr) {
           // not diagnosed previously, so only emit a warning in that case.
           if (isa<ExtensionDecl>(DC->getTopmostDeclarationDeclContext()))
             limit = DiagnosticBehavior::Warning;
-        } else if (enclosingAttr.getPlatform() != attr->getPlatform()) {
-          // Downgrade to a warning when the limiting attribute is for a more
-          // specific platform.
-          if (inheritsAvailabilityFromPlatform(enclosingAttr.getPlatform(),
-                                               attr->getPlatform()))
-            limit = DiagnosticBehavior::Warning;
         }
         diagnose(D->isImplicit() ? enclosingDecl->getLoc()
                                  : parsedAttr->getLocation(),
@@ -2511,14 +2515,14 @@ static bool canDeclareSymbolName(StringRef symbol, ModuleDecl *fromModule) {
   // to predict ways. Warn when code attempts to do so; hopefully we can
   // promote this to an error after a while.
   
-  return llvm::StringSwitch<bool>(symbol)
 #define FUNCTION(_, Module, Name, ...) \
-    .Case(#Name, false) \
-    .Case("_" #Name, false) \
-    .Case(#Name "_", false) \
-    .Case("_" #Name "_", false)
+  if (symbol == #Name) { return false; } \
+  if (symbol == "_" #Name) { return false; } \
+  if (symbol == #Name "_") { return false; } \
+  if (symbol == "_" #Name "_") { return false; }
 #include "swift/Runtime/RuntimeFunctions.def"
-    .Default(true);
+
+  return true;
 }
 
 void AttributeChecker::visitCDeclAttr(CDeclAttr *attr) {
@@ -8323,6 +8327,21 @@ ValueDecl *RenamedDeclRequest::evaluate(Evaluator &evaluator,
   return renamedDecl;
 }
 
+static std::optional<AvailabilityDomain>
+getAvailabilityDomainForName(StringRef name, const DeclContext *declContext) {
+  if (auto builtinDomain =
+          AvailabilityDomain::builtinDomainForString(name, declContext))
+    return builtinDomain;
+
+  auto &ctx = declContext->getASTContext();
+  auto identifier = ctx.getIdentifier(name);
+  if (auto customDomain =
+          ctx.MainModule->getAvailabilityDomainForIdentifier(identifier))
+    return customDomain;
+
+  return std::nullopt;
+}
+
 std::optional<SemanticAvailableAttr>
 SemanticAvailableAttrRequest::evaluate(swift::Evaluator &evaluator,
                                        const AvailableAttr *attr,
@@ -8330,7 +8349,8 @@ SemanticAvailableAttrRequest::evaluate(swift::Evaluator &evaluator,
   if (attr->hasCachedDomain())
     return SemanticAvailableAttr(attr);
 
-  auto &diags = decl->getASTContext().Diags;
+  auto &ctx = decl->getASTContext();
+  auto &diags = ctx.Diags;
   auto attrLoc = attr->getLocation();
   auto attrName = attr->getAttrName();
   auto domainLoc = attr->getDomainLoc();
@@ -8341,23 +8361,32 @@ SemanticAvailableAttrRequest::evaluate(swift::Evaluator &evaluator,
   auto domain = attr->getCachedDomain();
 
   if (!domain) {
-    auto string = attr->getDomainString();
-    ASSERT(string);
+    auto domainName = attr->getDomainString();
+    ASSERT(domainName);
 
     // Attempt to resolve the domain specified for the attribute and diagnose
     // if no domain is found.
     auto declContext = decl->getInnermostDeclContext();
-    domain = AvailabilityDomain::builtinDomainForString(*string, declContext);
+    domain = getAvailabilityDomainForName(*domainName, declContext);
     if (!domain) {
-      if (auto suggestion = closestCorrectedPlatformString(*string)) {
+      if (auto suggestion = closestCorrectedPlatformString(*domainName)) {
         diags
             .diagnose(domainLoc, diag::attr_availability_suggest_platform,
-                      *string, attrName, *suggestion)
+                      *domainName, attrName, *suggestion)
             .fixItReplace(SourceRange(domainLoc), *suggestion);
       } else {
         diags.diagnose(attrLoc, diag::attr_availability_unknown_platform,
-                       *string, attrName);
+                       *domainName, attrName);
       }
+      return std::nullopt;
+    }
+
+    if (domain->isCustom() &&
+        !ctx.LangOpts.hasFeature(Feature::CustomAvailability) &&
+        !declContext->isInSwiftinterface()) {
+      diags.diagnose(domainLoc,
+                     diag::attr_availability_requires_custom_availability,
+                     *domainName, attr);
       return std::nullopt;
     }
 
@@ -8365,6 +8394,26 @@ SemanticAvailableAttrRequest::evaluate(swift::Evaluator &evaluator,
   }
 
   auto domainName = domain->getNameForAttributePrinting();
+  auto semanticAttr = SemanticAvailableAttr(attr);
+
+  bool hasVersionSpec =
+      (introducedVersion || deprecatedVersion || obsoletedVersion);
+
+  if (!domain->isVersioned() && hasVersionSpec) {
+    SourceRange versionSourceRange;
+    if (introducedVersion)
+      versionSourceRange = semanticAttr.getIntroducedSourceRange();
+    else if (deprecatedVersion)
+      versionSourceRange = semanticAttr.getDeprecatedSourceRange();
+    else if (obsoletedVersion)
+      versionSourceRange = semanticAttr.getObsoletedSourceRange();
+
+    diags
+        .diagnose(attrLoc, diag::attr_availability_unexpected_version, attr,
+                  domainName)
+        .highlight(versionSourceRange);
+    return std::nullopt;
+  }
 
   if (domain->isSwiftLanguage() || domain->isPackageDescription()) {
     switch (attr->getKind()) {
@@ -8388,8 +8437,6 @@ SemanticAvailableAttrRequest::evaluate(swift::Evaluator &evaluator,
       break;
     }
 
-    bool hasVersionSpec =
-        (introducedVersion || deprecatedVersion || obsoletedVersion);
     if (!hasVersionSpec) {
       diags.diagnose(attrLoc, diag::attr_availability_expected_version_spec,
                      attrName, domainName);
@@ -8413,7 +8460,7 @@ SemanticAvailableAttrRequest::evaluate(swift::Evaluator &evaluator,
       mutableAttr->setRawObsoleted(canonicalizeVersion(*obsoletedVersion));
   }
 
-  return SemanticAvailableAttr(attr);
+  return semanticAttr;
 }
 
 template <typename ATTR>

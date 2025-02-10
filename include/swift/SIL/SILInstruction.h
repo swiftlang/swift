@@ -8895,7 +8895,9 @@ class CopyValueInst
   friend class SILBuilder;
 
   CopyValueInst(SILDebugLocation DebugLoc, SILValue operand)
-      : UnaryInstructionBase(DebugLoc, operand, operand->getType()) {}
+      : UnaryInstructionBase(DebugLoc, operand, operand->getType()) {
+    assert(operand->getType().isObject());
+  }
 };
 
 class ExplicitCopyValueInst
@@ -11031,6 +11033,10 @@ public:
 
   SILType getSourceLoweredType() const { return getOperand()->getType(); }
   CanType getSourceFormalType() const { return SrcFormalTy; }
+
+  void updateSourceFormalTypeFromOperandLoweredType() {
+    SrcFormalTy = getSourceLoweredType().getASTType();
+  }
 
   SILType getTargetLoweredType() const { return DestLoweredTy; }
   CanType getTargetFormalType() const { return DestFormalTy; }

@@ -164,7 +164,7 @@ void swift::diagnoseUnsafeUse(const UnsafeUse &use) {
 static bool isReferenceToNonisolatedUnsafe(ValueDecl *decl) {
   auto isolation = getActorIsolationForReference(
       decl, decl->getDeclContext());
-  if (!isolation.isNonisolated())
+  if (!isolation.isConcurrent())
     return false;
 
   auto attr = decl->getAttrs().getAttribute<NonisolatedAttr>();

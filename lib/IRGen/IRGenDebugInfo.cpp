@@ -1197,7 +1197,26 @@ private:
         Scope, Name, File, Line, SizeInBits, AlignInBits, Flags, DerivedFrom,
         DBuilder.getOrCreateArray(Elements), RuntimeLang, nullptr, UniqueID);
     DBuilder.replaceTemporary(std::move(FwdDecl), DITy);
-    return DITy;;
+    return DITy;
+  }
+
+  std::pair<bool, Type>
+  getUnsubstituedType(Type Ty, StringRef MangledName) {
+    if (!Ty)
+      return {false,{}};
+    // Go from Pair<Int, Double> to Pair<T, U>.
+    auto *Decl = Ty->getNominalOrBoundGenericNominal();
+    if (!Decl)
+      return {false, {}};
+    // Go from Pair<Int, Double> to Pair<T, U>.
+    Type InterfaceTy = Decl->getDeclaredInterfaceType();
+    Type UnsubstitutedTy = Decl->mapTypeIntoContext(InterfaceTy);
+
+    Mangle::ASTMangler Mangler(IGM.Context);
+    std::string DeclTypeMangledName = Mangler.mangleTypeForDebugger(
+        UnsubstitutedTy->mapTypeOutOfContext(), {});
+    bool IsUnsubstituted = (DeclTypeMangledName == MangledName);
+    return {IsUnsubstituted, UnsubstitutedTy};
   }
 
   llvm::DIType *
@@ -1206,28 +1225,24 @@ private:
                             unsigned SizeInBits, unsigned AlignInBits,
                             llvm::DIScope *Scope, llvm::DIFile *File,
                             unsigned Line, llvm::DINode::DIFlags Flags) {
-    auto UnsubstitutedTy = Decl->getDeclaredInterfaceType();
-    UnsubstitutedTy = Decl->mapTypeIntoContext(UnsubstitutedTy);
-
-    auto DbgTy = DebugTypeInfo::getFromTypeInfo(
+    auto [IsUnsubstituted, UnsubstitutedTy] =
+        getUnsubstituedType(EnumTy, MangledName);
+    auto UnsubstitutedDbgTy = DebugTypeInfo::getFromTypeInfo(
         UnsubstitutedTy, IGM.getTypeInfoForUnlowered(UnsubstitutedTy), IGM);
-    Mangle::ASTMangler Mangler(IGM.Context);
-    std::string DeclTypeMangledName = Mangler.mangleTypeForDebugger(
-        UnsubstitutedTy->mapTypeOutOfContext(), {});
-    if (DeclTypeMangledName == MangledName) {
-      return createUnsubstitutedVariantType(DbgTy, Decl, MangledName, Scope,
-                                            File, 0, Flags);
-    }
+    if (IsUnsubstituted)
+      return createUnsubstitutedVariantType(UnsubstitutedDbgTy, Decl,
+                                            MangledName, Scope, File, 0, Flags);
+
     StringRef Name = Decl->getName().str();
     auto FwdDecl = createTemporaryReplaceableForwardDecl(
         EnumTy, Scope, File, Line, SizeInBits, AlignInBits, Flags, MangledName,
         Name);
     // Force the creation of the unsubstituted type, don't create it
     // directly so it goes through all the caching/verification logic.
-    auto unsubstitutedDbgTy = getOrCreateType(DbgTy);
+    auto UnsubstitutedDITy = getOrCreateType(UnsubstitutedDbgTy);
     auto DIType = createOpaqueStruct(
         Scope, "", File, 0, SizeInBits, AlignInBits, Flags, MangledName,
-        collectGenericParams(EnumTy), unsubstitutedDbgTy);
+        collectGenericParams(EnumTy), UnsubstitutedDITy);
     DBuilder.replaceTemporary(std::move(FwdDecl), DIType);
     return DIType;
   }
@@ -1235,7 +1250,7 @@ private:
   /// Create a DICompositeType from a specialized struct. A specialized type
   /// is a generic type, or a child type whose parent is generic.
   llvm::DIType *createSpecializedStructOrClassType(
-      NominalOrBoundGenericNominalType *Type, NominalTypeDecl *Decl,
+      NominalOrBoundGenericNominalType *Type,
       llvm::DIScope *Scope, llvm::DIFile *File, unsigned Line,
       unsigned SizeInBits, unsigned AlignInBits, llvm::DINode::DIFlags Flags,
       StringRef MangledName, bool IsClass = false) {
@@ -1249,28 +1264,26 @@ private:
     // When emitting debug information for a type such as Pair<Int, Double>,
     // emit a description of all the fields for Pair<T, U>, and emit the regular
     // debug information for Pair<Int, Double>.
+    auto *Decl = Type->getNominalOrBoundGenericNominal();
+    if (!Decl)
+      return nullptr;
     StringRef Name = Decl->getName().str();
     auto FwdDecl = createTemporaryReplaceableForwardDecl(
         Type, Scope, File, Line, SizeInBits, AlignInBits, Flags, MangledName,
         Name);
 
-    // Go from Pair<Int, Double> to Pair<T, U>.
-    auto UnsubstitutedTy = Decl->getDeclaredInterfaceType();
-    UnsubstitutedTy = Decl->mapTypeIntoContext(UnsubstitutedTy);
-
-    auto DbgTy = DebugTypeInfo::getFromTypeInfo(
-        UnsubstitutedTy, IGM.getTypeInfoForUnlowered(UnsubstitutedTy), IGM);
-    Mangle::ASTMangler Mangler(IGM.Context);
-    std::string DeclTypeMangledName = Mangler.mangleTypeForDebugger(
-        UnsubstitutedTy->mapTypeOutOfContext(), {});
-    if (DeclTypeMangledName == MangledName) {
+    auto [IsUnsubstitued, UnsubstitutedType] =
+        getUnsubstituedType(Type, MangledName);
+    auto UnsubstitutedDbgTy = DebugTypeInfo::getFromTypeInfo(
+        UnsubstitutedType, IGM.getTypeInfoForUnlowered(UnsubstitutedType), IGM);
+    if (IsUnsubstitued)
       return createUnsubstitutedGenericStructOrClassType(
-          DbgTy, Decl, UnsubstitutedTy, Scope, File, Line, Flags, nullptr,
-          llvm::dwarf::DW_LANG_Swift, DeclTypeMangledName);
-    }
+          UnsubstitutedDbgTy, Decl, UnsubstitutedType, Scope, File, Line, Flags,
+          nullptr, llvm::dwarf::DW_LANG_Swift, MangledName);
+
     // Force the creation of the unsubstituted type, don't create it
     // directly so it goes through all the caching/verification logic.
-    auto UnsubstitutedType = getOrCreateType(DbgTy);
+    auto UnsubstitutedDITy = getOrCreateType(UnsubstitutedDbgTy);
 
     if (auto *ClassTy = llvm::dyn_cast<BoundGenericClassType>(Type)) {
       auto SuperClassTy = ClassTy->getSuperclass();
@@ -1280,19 +1293,15 @@ private:
 
         llvm::DIType *SuperClassDITy = getOrCreateType(SuperClassDbgTy);
         assert(SuperClassDITy && "getOrCreateType should never return null!");
-        DBuilder.createInheritance(UnsubstitutedType, SuperClassDITy, 0, 0,
+        DBuilder.createInheritance(UnsubstitutedDITy, SuperClassDITy, 0, 0,
                                    llvm::DINode::FlagZero);
       }
-
-      auto *OpaqueType = createPointerSizedStruct(
-          Scope, Decl ? Decl->getNameStr() : MangledName, File, 0, Flags,
-          MangledName, UnsubstitutedType);
-      return OpaqueType;
     }
 
-    auto *OpaqueType = createOpaqueStruct(
-        Scope, "", File, Line, SizeInBits, AlignInBits, Flags, MangledName,
-        collectGenericParams(Type), UnsubstitutedType);
+    auto *OpaqueType =
+        createOpaqueStruct(Scope, Decl ? Decl->getNameStr() : "", File, Line,
+                           SizeInBits, AlignInBits, Flags, MangledName,
+                           collectGenericParams(Type), UnsubstitutedDITy);
     DBuilder.replaceTemporary(std::move(FwdDecl), OpaqueType);
     return OpaqueType;
   }
@@ -1865,7 +1874,7 @@ private:
       if (Opts.DebugInfoLevel > IRGenDebugInfoLevel::ASTTypes) {
         if (StructTy->isSpecialized())
           return createSpecializedStructOrClassType(
-              StructTy, Decl, Scope, L.File, L.Line, SizeInBits, AlignInBits,
+              StructTy, Scope, L.File, L.Line, SizeInBits, AlignInBits,
               Flags, MangledName);
         return createStructType(DbgTy, Decl, StructTy, Scope, L.File, L.Line,
                                 SizeInBits, AlignInBits, Flags, nullptr,
@@ -1898,7 +1907,7 @@ private:
       if (Opts.DebugInfoLevel > IRGenDebugInfoLevel::ASTTypes) {
         if (ClassTy->isSpecialized())
           return createSpecializedStructOrClassType(
-              ClassTy, Decl, Scope, L.File, L.Line, SizeInBits, AlignInBits,
+              ClassTy, Scope, L.File, L.Line, SizeInBits, AlignInBits,
               Flags, MangledName);
 
         auto *DIType = createStructType(
@@ -1964,7 +1973,7 @@ private:
       unsigned FwdDeclLine = 0;
       if (Opts.DebugInfoLevel > IRGenDebugInfoLevel::ASTTypes)
         return createSpecializedStructOrClassType(
-            StructTy, Decl, Scope, L.File, L.Line, SizeInBits, AlignInBits,
+            StructTy, Scope, L.File, L.Line, SizeInBits, AlignInBits,
             Flags, MangledName);
 
       return createOpaqueStructWithSizedContainer(
@@ -1977,20 +1986,9 @@ private:
       auto *ClassTy = BaseTy->castTo<BoundGenericClassType>();
       auto *Decl = ClassTy->getDecl();
       auto L = getFileAndLocation(Decl);
-      unsigned FwdDeclLine = 0;
-
-      if (Opts.DebugInfoLevel > IRGenDebugInfoLevel::ASTTypes)
-        return createSpecializedStructOrClassType(
-            ClassTy, Decl, Scope, L.File, L.Line, SizeInBits, AlignInBits,
-            Flags, MangledName);
-
-      // TODO: We may want to peek at Decl->isObjC() and set this
-      // attribute accordingly.
-      assert(SizeInBits ==
-             CI.getTargetInfo().getPointerWidth(clang::LangAS::Default));
-      return createPointerSizedStruct(
-          Scope, Decl ? Decl->getNameStr() : MangledName, L.File, FwdDeclLine,
-          Flags, MangledName, SpecificationOf);
+      return createSpecializedStructOrClassType(ClassTy, Scope, L.File,
+                                                L.Line, SizeInBits, AlignInBits,
+                                                Flags, MangledName);
     }
 
     case TypeKind::Pack:
@@ -2174,8 +2172,14 @@ private:
           AliasedTy, DbgTy.getAlignment(), DbgTy.hasDefaultAlignment(),
           /* IsMetadataType = */ false, DbgTy.isFixedBuffer(),
           DbgTy.getNumExtraInhabitants());
-      return DBuilder.createTypedef(getOrCreateType(AliasedDbgTy), MangledName,
-                                    L.File, 0, Scope);
+      auto *TypeDef = DBuilder.createTypedef(getOrCreateType(AliasedDbgTy),
+                                             MangledName, L.File, 0, Scope);
+      // Bound generic types don't reference their type parameters in ASTTypes
+      // mode, so we need to artificially keep typealiases alive, since they can
+      // appear in reflection metadata.
+      if (Opts.DebugInfoLevel < IRGenDebugInfoLevel::DwarfTypes)
+        DBuilder.retainType(TypeDef);
+      return TypeDef;
     }
 
     case TypeKind::Locatable: {
@@ -2269,10 +2273,15 @@ private:
     // so skip the sanity check.
     if (CachedType->isTemporary())
       return true;
+    if (!isa<llvm::DICompositeType>(CachedType))
+      return true;
+    bool IsUnsubstituted =
+        getUnsubstituedType(DbgTy.getType(), getMangledName(DbgTy)).first;
     std::optional<uint64_t> SizeInBits;
-    std::optional<CompletedDebugTypeInfo> CompletedDbgTy = completeType(DbgTy);
-    if (CompletedDbgTy)
-      SizeInBits = CompletedDbgTy->getSizeInBits();
+    if (!IsUnsubstituted)
+      if (auto CompletedDbgTy = completeType(DbgTy))
+        SizeInBits = CompletedDbgTy->getSizeInBits();
+
     unsigned CachedSizeInBits = getSizeInBits(CachedType);
     if (SizeInBits && CachedSizeInBits != *SizeInBits) {
       // Note that CachedSizeInBits && !SizeInBits may happen and is benign,
@@ -2511,6 +2520,7 @@ private:
       // winning over a full definition.
       auto *FwdDecl = DBuilder.createReplaceableCompositeType(
           llvm::dwarf::DW_TAG_structure_type, MangledName, Scope, 0, 0,
+
           llvm::dwarf::DW_LANG_Swift);
       FwdDeclTypes.emplace_back(
           std::piecewise_construct, std::make_tuple(MangledName),

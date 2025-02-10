@@ -2005,15 +2005,19 @@ Builtin.RawPointer or a struct containing the same.
 `%base` may have either object or address type. In the latter case, the
 dependency is on the current value stored in the address.
 
-The optional `nonescaping` attribute indicates that no value derived from
-`%value` escapes the lifetime of `%base`. As with escaping `mark_dependence`,
-all values transitively forwarded from `%value` must be destroyed within the
-lifetime of `base`. Unlike escaping`mark_dependence`, this must be statically
-verifiable. Additionally, unlike escaping`mark_dependence`, derived values
-include copies of`%value`and values transitively forwarded from those copies.
-If`%base`must not be identical to`%value`. Unlike escaping`mark_dependence`,
-no value derived from`%value`may have a bitwise escape (conversion to
-UnsafePointer) or pointer escape (unknown use). 
+The optional `nonescaping` attribute indicates that no value derived
+from `%value` escapes the lifetime of `%base`. As with escaping
+`mark_dependence`, all values transitively forwarded from `%value`
+must be destroyed within the lifetime of `base`. Unlike escaping
+`mark_dependence`, this must be statically verifiable. Additionally,
+unlike escaping `mark_dependence`, nonescaping `mark_dependence` may
+produce a value of non-`Escapable` type. A non-`Escapable`
+`mark_dependence` extends the lifetime of `%base` into copies of
+`%value` and values transitively forwarded from those copies. If the
+`mark_dependence` forwards an address, then it extends the lifetime
+through loads from that address. Unlike escaping `mark_dependence`, no
+value derived from `%value` may have a bitwise escape (conversion to
+UnsafePointer) or pointer escape (unknown use).
 
 ### is_unique
 

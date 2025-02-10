@@ -86,6 +86,13 @@ private extension UnaryInstruction {
       operand.set(to: replacement, context)
     }
 
+    if let ccb = self as? CheckedCastBranchInst {
+        // Make sure that updating the formal type with the operand type is
+        // legal.
+        if operand.value.type.isLegalFormalType {
+            ccb.updateSourceFormalTypeFromOperandLoweredType()
+        }
+    }
     if canEraseInst {
       context.erase(instructionIncludingDebugUses: inst)
     }

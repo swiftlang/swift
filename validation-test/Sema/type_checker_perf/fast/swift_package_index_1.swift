@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -typecheck %s -solver-scope-threshold=1000
+// RUN: %target-swift-frontend -typecheck %s -solver-scope-threshold=500
 // REQUIRES: tools-release,no_asan
 
 public class Cookie {

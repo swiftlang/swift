@@ -12,18 +12,17 @@
 
 #define DEBUG_TYPE "flow-isolation"
 
-#include "llvm/Support/WithColor.h"
-#include "swift/AST/Expr.h"
-#include "swift/AST/ActorIsolation.h"
 #include "swift/AST/DiagnosticsSIL.h"
+#include "swift/AST/Expr.h"
 #include "swift/Basic/Assertions.h"
-#include "swift/Sema/Concurrency.h"
 #include "swift/SIL/ApplySite.h"
-#include "swift/SIL/BitDataflow.h"
 #include "swift/SIL/BasicBlockBits.h"
-#include "swift/SIL/DebugUtils.h"
 #include "swift/SIL/BasicBlockDatastructures.h"
+#include "swift/SIL/BitDataflow.h"
+#include "swift/SIL/DebugUtils.h"
 #include "swift/SILOptimizer/PassManager/Transforms.h"
+#include "swift/Sema/Concurrency.h"
+#include "llvm/Support/WithColor.h"
 
 using namespace swift;
 

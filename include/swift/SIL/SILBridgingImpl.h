@@ -445,6 +445,10 @@ bool BridgedType::isBuiltinVector() const {
   return unbridged().isBuiltinVector();
 }
 
+bool BridgedType::isLegalFormalType() const {
+  return unbridged().getASTType()->isLegalFormalType();
+}
+
 BridgedType BridgedType::getBuiltinVectorElementType() const {
   return unbridged().getBuiltinVectorElementType();
 }
@@ -1502,6 +1506,10 @@ void BridgedInstruction::GlobalValueInst_setIsBare() const {
 
 void BridgedInstruction::LoadInst_setOwnership(SwiftInt ownership) const {
   getAs<swift::LoadInst>()->setOwnershipQualifier((swift::LoadOwnershipQualifier)ownership);
+}
+
+void BridgedInstruction::CheckedCastBranch_updateSourceFormalTypeFromOperandLoweredType() const {
+  getAs<swift::CheckedCastBranchInst>()->updateSourceFormalTypeFromOperandLoweredType();
 }
 
 BridgedBasicBlock BridgedInstruction::CheckedCastBranch_getSuccessBlock() const {

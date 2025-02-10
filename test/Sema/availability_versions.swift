@@ -1184,9 +1184,14 @@ extension ClassToExtend : ProtocolAvailableOn51 {
 }
 
 @available(OSX, introduced: 51)
-extension ClassToExtend { // expected-note {{enclosing scope requires availability of macOS 51 or newer}}
+extension ClassToExtend { // expected-note 2 {{enclosing scope requires availability of macOS 51 or newer}}
   @available(OSX, introduced: 10.9) // expected-error {{instance method cannot be more available than enclosing scope}}
   func extensionMethod10_9() { }
+
+  struct Nested {
+    @available(OSX, introduced: 10.9) // expected-warning {{instance method cannot be more available than enclosing scope}}
+    func nestedTypeMethod10_9() { }
+  }
 }
 
 func usePotentiallyUnavailableExtension() {

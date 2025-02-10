@@ -25,7 +25,7 @@
 /// SWIFTSCAN_VERSION_MINOR should increase when there are API additions.
 /// SWIFTSCAN_VERSION_MAJOR is intended for "major" source/ABI breaking changes.
 #define SWIFTSCAN_VERSION_MAJOR 2
-#define SWIFTSCAN_VERSION_MINOR 0
+#define SWIFTSCAN_VERSION_MINOR 1
 
 SWIFTSCAN_BEGIN_DECLS
 
@@ -220,6 +220,14 @@ swiftscan_swift_textual_detail_get_module_cache_key(
 
 SWIFTSCAN_PUBLIC swiftscan_string_ref_t
 swiftscan_swift_textual_detail_get_user_module_version(
+    swiftscan_module_details_t details);
+
+SWIFTSCAN_PUBLIC swiftscan_string_ref_t
+swiftscan_swift_textual_detail_get_chained_bridging_header_path(
+    swiftscan_module_details_t details);
+
+SWIFTSCAN_PUBLIC swiftscan_string_ref_t
+swiftscan_swift_textual_detail_get_chained_bridging_header_content(
     swiftscan_module_details_t details);
 
 //=== Swift Binary Module Details query APIs ------------------------------===//

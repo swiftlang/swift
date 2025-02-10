@@ -1,3 +1,5 @@
+// REQUIRES: rdar144216380
+
 // RUN: %target-run-simple-swift
 // REQUIRES: executable_test
 

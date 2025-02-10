@@ -23,6 +23,7 @@
 #include "swift/FrontendTool/FrontendTool.h"
 #include "Dependencies.h"
 #include "TBD.h"
+#include "swift/AST/ASTDumper.h"
 #include "swift/AST/ASTMangler.h"
 #include "swift/AST/AvailabilityScope.h"
 #include "swift/AST/DiagnosticsFrontend.h"
@@ -463,20 +464,21 @@ getPrimaryOrMainSourceFile(const CompilerInstance &Instance) {
 
 /// Dumps the AST of all available primary source files. If corresponding output
 /// files were specified, use them; otherwise, dump the AST to stdout.
-static bool dumpAST(CompilerInstance &Instance) {
+static bool dumpAST(CompilerInstance &Instance,
+                    ASTDumpMemberLoading memberLoading) {
   const FrontendOptions &opts = Instance.getInvocation().getFrontendOptions();
   auto dumpAST = [&](SourceFile *SF, raw_ostream &out) {
     switch (opts.DumpASTFormat) {
     case FrontendOptions::ASTFormat::Default:
-      SF->dump(out, /*parseIfNeeded*/ true);
+      SF->dump(out, memberLoading);
       break;
     case FrontendOptions::ASTFormat::JSON:
-      SF->dumpJSON(out);
+      SF->dumpJSON(out, memberLoading);
       break;
     case FrontendOptions::ASTFormat::JSONZlib:
       std::string jsonText;
       llvm::raw_string_ostream jsonTextStream(jsonText);
-      SF->dumpJSON(jsonTextStream);
+      SF->dumpJSON(jsonTextStream, memberLoading);
 
       SmallVector<uint8_t, 0> compressed;
       llvm::compression::zlib::compress(llvm::arrayRefFromStringRef(jsonText),
@@ -1226,12 +1228,14 @@ static bool performAction(CompilerInstance &Instance,
 
   // MARK: Actions that Dump
   case FrontendOptions::ActionType::DumpParse:
-    return dumpAST(Instance);
+    return dumpAST(Instance, ASTDumpMemberLoading::Parsed);
   case FrontendOptions::ActionType::DumpAST:
     return withSemanticAnalysis(
-        Instance, observer, [](CompilerInstance &Instance) {
-          return dumpAST(Instance);
-        }, /*runDespiteErrors=*/true);
+        Instance, observer,
+        [](CompilerInstance &Instance) {
+          return dumpAST(Instance, ASTDumpMemberLoading::TypeChecked);
+        },
+        /*runDespiteErrors=*/true);
   case FrontendOptions::ActionType::PrintAST:
     return withSemanticAnalysis(
         Instance, observer, [](CompilerInstance &Instance) {

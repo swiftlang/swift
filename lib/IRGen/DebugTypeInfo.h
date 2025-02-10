@@ -97,7 +97,6 @@ public:
 
   Alignment getAlignment() const { return Align; }
   bool isNull() const { return !Type; }
-  bool isForwardDecl() const;
   bool isMetadataType() const { return IsMetadataType; }
   bool hasDefaultAlignment() const { return DefaultAlignment; }
   bool isFixedBuffer() const { return IsFixedBuffer; }

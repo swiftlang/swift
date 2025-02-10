@@ -1,4 +1,4 @@
-//===--- Attrs.swift ------------------------------------------------------===//
+//===--- DeclAttrs.swift --------------------------------------------------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -495,24 +495,6 @@ extension ASTGenVisitor {
       range: self.generateAttrSourceRange(node),
       name: name
     )
-  }
-
-  /// E.g.:
-  ///   ```
-  ///   @available(macOS 10.12, iOS: 13, *)
-  ///   @available(macOS, introduced: 10.12)
-  ///   ```
-  func generateAvailableAttr(attribute node: AttributeSyntax) -> [BridgedAvailableAttr] {
-    guard
-      // `@available` has special argument list syntax.
-      let args = node.arguments?.as(AvailabilityArgumentListSyntax.self)
-    else {
-      // TODO: Diagnose.
-      return []
-    }
-
-    _ = args
-    fatalError("unimplemented")
   }
 
   /// E.g:
@@ -1859,7 +1841,7 @@ extension ASTGenVisitor {
 }
 
 /// Simpler helper for handling attribute arguments in "generate" functions.
-private struct AttrArgumentState<Flag: RawRepresentable, SeenStorage: FixedWidthInteger> where Flag.RawValue: FixedWidthInteger {
+struct AttrArgumentState<Flag: RawRepresentable, SeenStorage: FixedWidthInteger> where Flag.RawValue: FixedWidthInteger {
   private var seen: SeenStorage = 0
 
   var current: Flag {

@@ -6,6 +6,9 @@
 // REQUIRES: concurrency_runtime
 // UNSUPPORTED: back_deployment_runtime
 
+// rdar://143894191
+// REQUIRES: swift_test_mode_optimize_none
+
 enum TL {
   @TaskLocal
   static var one: Int = 1

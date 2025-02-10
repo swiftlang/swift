@@ -30,11 +30,13 @@
 #include "llvm/ADT/DenseSet.h"
 #include "llvm/ADT/IntrusiveRefCntPtr.h"
 #include "llvm/ADT/StringSet.h"
+#include "llvm/CAS/ActionCache.h"
 #include "llvm/CAS/CASProvidingFileSystem.h"
 #include "llvm/CAS/CASReference.h"
 #include "llvm/CAS/CachingOnDiskFileSystem.h"
 #include "llvm/CAS/ObjectStore.h"
 #include "llvm/Support/Error.h"
+#include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/Mutex.h"
 #include "llvm/Support/PrefixMapper.h"
 #include "llvm/Support/VirtualFileSystem.h"
@@ -338,6 +340,12 @@ public:
   /// The Swift frontend invocation arguments to build bridging header.
   std::vector<std::string> bridgingHeaderBuildCommandLine;
 
+  /// The chained bridging header path if used.
+  std::string chainedBridgingHeaderPath;
+
+  /// The chained bridging header source buffer if used.
+  std::string chainedBridgingHeaderContent;
+
   SwiftSourceModuleDependenciesStorage(
       StringRef RootID, ArrayRef<StringRef> buildCommandLine,
       ArrayRef<ScannerImportStatementInfo> moduleImports,
@@ -354,6 +362,7 @@ public:
     return new SwiftSourceModuleDependenciesStorage(*this);
   }
 
+
   static bool classof(const ModuleDependencyInfoStorageBase *base) {
     return base->dependencyKind == ModuleDependencyKind::SwiftSource;
   }
@@ -369,6 +378,11 @@ public:
 
   void addTestableImport(ImportPath::Module module) {
     testableImports.insert(module.front().Item.str());
+  }
+
+  void setChainedBridgingHeaderBuffer(StringRef path, StringRef buffer) {
+    chainedBridgingHeaderPath = path.str();
+    chainedBridgingHeaderContent = buffer.str();
   }
 };
 
@@ -769,11 +783,11 @@ public:
   setLinkLibraries(const ArrayRef<LinkLibrary> linkLibraries) {
     storage->linkLibraries.assign(linkLibraries.begin(), linkLibraries.end());
   }
-  
+
   const ArrayRef<std::string> getAuxiliaryFiles() const {
     return storage->auxiliaryFiles;
   }
-  
+
   void
   setAuxiliaryFiles(const ArrayRef<std::string> auxiliaryFiles) {
     storage->auxiliaryFiles.assign(auxiliaryFiles.begin(), auxiliaryFiles.end());
@@ -961,10 +975,13 @@ public:
   void addSourceFile(StringRef sourceFile);
 
   /// Add source files that the header input depends on.
-  void addHeaderSourceFile(StringRef bridgingSourceFile);
+  void setHeaderSourceFiles(const std::vector<std::string> &sourceFiles);
 
   /// Add bridging header include tree.
   void addBridgingHeaderIncludeTree(StringRef ID);
+
+  /// Set the chained bridging header buffer.
+  void setChainedBridgingHeaderBuffer(StringRef path, StringRef buffer);
 
   /// Collect a map from a secondary module name to a list of cross-import
   /// overlays, when this current module serves as the primary module.
@@ -1025,8 +1042,9 @@ class SwiftDependencyScanningService {
   /// If use clang include tree.
   bool UseClangIncludeTree = false;
 
-  /// CAS ObjectStore Instance.
+  /// CAS Instance.
   std::shared_ptr<llvm::cas::ObjectStore> CAS;
+  std::shared_ptr<llvm::cas::ActionCache> ActionCache;
 
   /// File prefix mapper.
   std::unique_ptr<llvm::PrefixMapper> Mapper;
@@ -1129,6 +1147,9 @@ private:
   std::string scannerContextHash;
   /// The location of where the built modules will be output to
   std::string moduleOutputPath;
+  /// The timestamp of the beginning of the scanning query action
+  /// using this cache
+  const llvm::sys::TimePoint<> scanInitializationTime;
 
   /// Retrieve the dependencies map that corresponds to the given dependency
   /// kind.
@@ -1179,11 +1200,11 @@ public:
   /// Query all dependencies
   ModuleDependencyIDSetVector
   getAllDependencies(const ModuleDependencyID &moduleID) const;
-  
+
   /// Query all Clang module dependencies.
   ModuleDependencyIDSetVector
   getClangDependencies(const ModuleDependencyID &moduleID) const;
-  
+
   /// Query all directly-imported Swift dependencies
   llvm::ArrayRef<ModuleDependencyID>
   getImportedSwiftDependencies(const ModuleDependencyID &moduleID) const;
@@ -1235,6 +1256,9 @@ public:
   /// Update stored dependencies for the given module.
   void updateDependency(ModuleDependencyID moduleID,
                         ModuleDependencyInfo dependencyInfo);
+  
+  /// Remove a given dependency info from the cache.
+  void removeDependency(ModuleDependencyID moduleID);
 
   /// Resolve this module's set of directly-imported Swift module
   /// dependencies

@@ -55,7 +55,7 @@ enum TrailingSemi {
 };
 
 // The substitution map for a declref should be relatively unobtrusive.
-// CHECK-AST-LABEL:   (func_decl{{.*}}"generic(_:)" "<T : Hashable>" interface type="<T where T : Hashable> (T) -> ()" access=internal captures=(<generic> )
+// CHECK-AST-LABEL:   (func_decl{{.*}}"generic(_:)" "<T : Hashable>" interface_type="<T where T : Hashable> (T) -> ()" access=internal captures=(<generic> )
 func generic<T: Hashable>(_: T) {}
 // CHECK-AST:       (pattern_binding_decl
 // CHECK-AST:         (processed_init=declref_expr type="(Int) -> ()" location={{.*}} range={{.*}} decl="main.(file).generic@{{.*}} [with (substitution_map generic_signature=<T where T : Hashable> T -> Int)]" function_ref=unapplied))
@@ -67,14 +67,14 @@ escaping({ $0 })
 // CHECK-AST:        (declref_expr type="(@escaping (Int) -> Int) -> ()"
 // CHECK-AST-NEXT:        (argument_list
 // CHECK-AST-NEXT:          (argument
-// CHECK-AST-NEXT:            (closure_expr type="(Int) -> Int" {{.*}} discriminator=0 nonisolated escaping single_expression
+// CHECK-AST-NEXT:            (closure_expr type="(Int) -> Int" {{.*}} discriminator=0 concurrent escaping single_expression
 
 func nonescaping(_: (Int) -> Int) {}
 nonescaping({ $0 })
 // CHECK-AST:        (declref_expr type="((Int) -> Int) -> ()"
 // CHECK-AST-NEXT:        (argument_list
 // CHECK-AST-NEXT:          (argument
-// CHECK-AST-NEXT:            (closure_expr type="(Int) -> Int" {{.*}} discriminator=1 nonisolated single_expression
+// CHECK-AST-NEXT:            (closure_expr type="(Int) -> Int" {{.*}} discriminator=1 concurrent single_expression
 
 // CHECK-LABEL: (struct_decl range=[{{.+}}] "MyStruct")
 struct MyStruct {}

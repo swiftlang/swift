@@ -3319,7 +3319,7 @@ public:
     return attr->getRawIntroduced();
   }
 
-  /// The source range of the `introduced:` component.
+  /// The source range of the `introduced:` version component.
   SourceRange getIntroducedSourceRange() const { return attr->IntroducedRange; }
 
   /// Returns the effective range in which the declaration with this attribute
@@ -3331,10 +3331,16 @@ public:
     return attr->getRawDeprecated();
   }
 
+  /// The source range of the `deprecated:` version component.
+  SourceRange getDeprecatedSourceRange() const { return attr->DeprecatedRange; }
+
   /// The version tuple written in source for the `obsoleted:` component.
   std::optional<llvm::VersionTuple> getObsoleted() const {
     return attr->getRawObsoleted();
   }
+
+  /// The source range of the `obsoleted:` version component.
+  SourceRange getObsoletedSourceRange() const { return attr->ObsoletedRange; }
 
   /// Returns the `message:` field of the attribute, or an empty string.
   StringRef getMessage() const { return attr->Message; }

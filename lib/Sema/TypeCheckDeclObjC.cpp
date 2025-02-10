@@ -505,8 +505,9 @@ static bool checkObjCActorIsolation(const ValueDecl *VD, ObjCReason Reason) {
     llvm_unreachable("decl cannot have dynamic isolation");
 
   case ActorIsolation::Nonisolated:
-  case ActorIsolation::CallerIsolationInheriting:
   case ActorIsolation::NonisolatedUnsafe:
+  case ActorIsolation::Concurrent:
+  case ActorIsolation::ConcurrentUnsafe:
   case ActorIsolation::Unspecified:
     return false;
   }

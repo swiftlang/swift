@@ -41,6 +41,7 @@
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/Path.h"
 #include "llvm/Support/CommandLine.h"
+#include <memory>
 #include <optional>
 #include <system_error>
 
@@ -1555,6 +1556,21 @@ swift::extractUserModuleVersionFromInterface(StringRef moduleInterfacePath) {
     }
   }
   return result;
+}
+
+std::string swift::extractEmbeddedBridgingHeaderContent(
+    std::unique_ptr<llvm::MemoryBuffer> file, ASTContext &Context) {
+  std::shared_ptr<const ModuleFileSharedCore> loadedModuleFile;
+  serialization::ValidationInfo loadInfo = ModuleFileSharedCore::load(
+      "", "", std::move(file), nullptr, nullptr, false,
+      Context.SILOpts.EnableOSSAModules, Context.LangOpts.SDKName,
+      Context.SearchPathOpts.DeserializedPathRecoverer,
+      loadedModuleFile);
+
+  if (loadInfo.status != serialization::Status::Valid)
+    return {};
+
+  return loadedModuleFile->getEmbeddedHeader();
 }
 
 bool SerializedModuleLoaderBase::canImportModule(

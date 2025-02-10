@@ -1437,8 +1437,13 @@ public:
 
   /// Returns the active platform-specific `@available` attribute that should be
   /// used to determine the platform introduction version of the decl.
+  ///
+  /// If the declaration does not have a platform introduction attribute of its
+  /// own and is a member of an extension then the platform introduction
+  /// attribute attached to the extension will be returned instead unless \p
+  /// checkExtension is false.
   std::optional<SemanticAvailableAttr>
-  getAvailableAttrForPlatformIntroduction() const;
+  getAvailableAttrForPlatformIntroduction(bool checkExtension = true) const;
 
   /// Returns true if the declaration is deprecated at the current deployment
   /// target.
