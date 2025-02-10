@@ -483,7 +483,7 @@ extension Substring: StringProtocol {
   /// - Parameter nullTerminatedUTF8: A pointer to a sequence of contiguous,
   ///   UTF-8 encoded bytes ending just before the first zero byte.
   public init(cString nullTerminatedUTF8: UnsafePointer<CChar>) {
-    self.init(String(cString: nullTerminatedUTF8))
+    unsafe self.init(String(cString: nullTerminatedUTF8))
   }
 
   /// Creates a string from the null-terminated sequence of bytes at the given
@@ -500,7 +500,7 @@ extension Substring: StringProtocol {
     decodingCString nullTerminatedCodeUnits: UnsafePointer<Encoding.CodeUnit>,
     as sourceEncoding: Encoding.Type
   ) {
-    self.init(
+    unsafe self.init(
       String(decodingCString: nullTerminatedCodeUnits, as: sourceEncoding))
   }
 
@@ -522,7 +522,7 @@ extension Substring: StringProtocol {
     _ body: (UnsafePointer<CChar>) throws -> Result) rethrows -> Result {
     // TODO(String performance): Detect when we cover the rest of a nul-
     // terminated String, and thus can avoid a copy.
-    return try String(self).withCString(body)
+    return try unsafe String(self).withCString(body)
   }
 
   /// Calls the given closure with a pointer to the contents of the string,
@@ -548,7 +548,7 @@ extension Substring: StringProtocol {
   ) rethrows -> Result {
     // TODO(String performance): Detect when we cover the rest of a nul-
     // terminated String, and thus can avoid a copy.
-    return try String(self).withCString(encodedAs: targetEncoding, body)
+    return try unsafe String(self).withCString(encodedAs: targetEncoding, body)
   }
 }
 
@@ -708,7 +708,7 @@ extension Substring.UTF8View: BidirectionalCollection {
   public func withContiguousStorageIfAvailable<R>(
     _ body: (UnsafeBufferPointer<Element>) throws -> R
   ) rethrows -> R? {
-    return try _slice.withContiguousStorageIfAvailable(body)
+    return try unsafe _slice.withContiguousStorageIfAvailable(body)
   }
 
   @inlinable

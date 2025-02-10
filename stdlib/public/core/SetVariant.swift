@@ -29,6 +29,7 @@ internal protocol _SetBuffer {
 extension Set {
   @usableFromInline
   @frozen
+  @safe
   internal struct _Variant {
     @usableFromInline
     internal var object: _BridgeStorage<__RawSetStorage>
@@ -37,7 +38,7 @@ extension Set {
     @inline(__always)
     init(dummy: ()) {
 #if _pointerBitWidth(_64) && !$Embedded
-      self.object = _BridgeStorage(taggedPayload: 0)
+      self.object = unsafe _BridgeStorage(taggedPayload: 0)
 #elseif _pointerBitWidth(_32) || $Embedded
       self.init(native: _NativeSet())
 #else
@@ -48,14 +49,14 @@ extension Set {
     @inlinable
     @inline(__always)
     init(native: __owned _NativeSet<Element>) {
-      self.object = _BridgeStorage(native: native._storage)
+      self.object = unsafe _BridgeStorage(native: native._storage)
     }
 
 #if _runtime(_ObjC)
     @inlinable
     @inline(__always)
     init(cocoa: __owned __CocoaSet) {
-      self.object = _BridgeStorage(objC: cocoa.object)
+      self.object = unsafe _BridgeStorage(objC: cocoa.object)
     }
 #endif
   }
@@ -72,7 +73,7 @@ extension Set._Variant {
 
   @inlinable
   internal mutating func isUniquelyReferenced() -> Bool {
-    return object.isUniquelyReferencedUnflaggedNative()
+    return unsafe object.isUniquelyReferencedUnflaggedNative()
   }
 
 #if _runtime(_ObjC)
@@ -86,18 +87,18 @@ extension Set._Variant {
   @usableFromInline @_transparent
   internal var asNative: _NativeSet<Element> {
     get {
-      return _NativeSet(object.unflaggedNativeInstance)
+      return unsafe _NativeSet(object.unflaggedNativeInstance)
     }
     set {
       self = .init(native: newValue)
     }
     _modify {
-      var native = _NativeSet<Element>(object.unflaggedNativeInstance)
+      var native = unsafe _NativeSet<Element>(object.unflaggedNativeInstance)
       self = .init(dummy: ())
       defer {
         // This is in a defer block because yield might throw, and we need to
         // preserve Set's storage invariants when that happens.
-        object = .init(native: native._storage)
+        object = unsafe .init(native: native._storage)
       }
       yield &native
     }
@@ -106,7 +107,7 @@ extension Set._Variant {
 #if _runtime(_ObjC)
   @inlinable
   internal var asCocoa: __CocoaSet {
-    return __CocoaSet(object.objCInstance)
+    return unsafe __CocoaSet(object.objCInstance)
   }
 #endif
 

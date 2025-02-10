@@ -258,44 +258,44 @@ extension MemoryLayout where T: ~Copyable {
   }
 
   internal static func _roundingUpToAlignment(_ value: UnsafeRawPointer) -> UnsafeRawPointer {
-    return UnsafeRawPointer(bitPattern:
+    return unsafe UnsafeRawPointer(bitPattern:
      _roundingUpToAlignment(UInt(bitPattern: value))).unsafelyUnwrapped
   }
   internal static func _roundingDownToAlignment(_ value: UnsafeRawPointer) -> UnsafeRawPointer {
-    return UnsafeRawPointer(bitPattern:
+    return unsafe UnsafeRawPointer(bitPattern:
      _roundingDownToAlignment(UInt(bitPattern: value))).unsafelyUnwrapped
   }
 
   internal static func _roundingUpToAlignment(_ value: UnsafeMutableRawPointer) -> UnsafeMutableRawPointer {
-    return UnsafeMutableRawPointer(bitPattern:
+    return unsafe UnsafeMutableRawPointer(bitPattern:
      _roundingUpToAlignment(UInt(bitPattern: value))).unsafelyUnwrapped
   }
   internal static func _roundingDownToAlignment(_ value: UnsafeMutableRawPointer) -> UnsafeMutableRawPointer {
-    return UnsafeMutableRawPointer(bitPattern:
+    return unsafe UnsafeMutableRawPointer(bitPattern:
      _roundingDownToAlignment(UInt(bitPattern: value))).unsafelyUnwrapped
   }
 
   internal static func _roundingUpBaseToAlignment(_ value: UnsafeRawBufferPointer) -> UnsafeRawBufferPointer {
-    let baseAddressBits = Int(bitPattern: value.baseAddress)
+    let baseAddressBits = unsafe Int(bitPattern: value.baseAddress)
     var misalignment = baseAddressBits & _alignmentMask
     if misalignment != 0 {
       misalignment = _alignmentMask & -misalignment
-      return UnsafeRawBufferPointer(
+      return unsafe UnsafeRawBufferPointer(
         start: UnsafeRawPointer(bitPattern: baseAddressBits + misalignment),
         count: value.count - misalignment)
     }
-    return value
+    return unsafe value
   }
 
   internal static func _roundingUpBaseToAlignment(_ value: UnsafeMutableRawBufferPointer) -> UnsafeMutableRawBufferPointer {
-    let baseAddressBits = Int(bitPattern: value.baseAddress)
+    let baseAddressBits = unsafe Int(bitPattern: value.baseAddress)
     var misalignment = baseAddressBits & _alignmentMask
     if misalignment != 0 {
       misalignment = _alignmentMask & -misalignment
-      return UnsafeMutableRawBufferPointer(
+      return unsafe UnsafeMutableRawBufferPointer(
         start: UnsafeMutableRawPointer(bitPattern: baseAddressBits + misalignment),
         count: value.count - misalignment)
     }
-    return value
+    return unsafe value
   }
 }

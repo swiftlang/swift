@@ -202,7 +202,7 @@ internal func Equatable_isEqual_indirect<T: Equatable>(
   _ lhs: UnsafePointer<T>,
   _ rhs: UnsafePointer<T>
 ) -> Bool {
-  return lhs.pointee == rhs.pointee
+  return unsafe lhs.pointee == rhs.pointee
 }
 
 

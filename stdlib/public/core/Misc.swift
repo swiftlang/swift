@@ -62,8 +62,8 @@ public // SPI (Distributed)
 func _getFunctionFullNameFromMangledName(mangledName: String) -> String? {
   let mangledNameUTF8 = Array(mangledName.utf8)
   let (stringPtr, count) =
-    mangledNameUTF8.withUnsafeBufferPointer { (mangledNameUTF8) in
-    return _getFunctionFullNameFromMangledNameImpl(
+    unsafe mangledNameUTF8.withUnsafeBufferPointer { (mangledNameUTF8) in
+    return unsafe _getFunctionFullNameFromMangledNameImpl(
       mangledNameUTF8.baseAddress!,
       UInt(mangledNameUTF8.endIndex))
   }
@@ -72,7 +72,7 @@ func _getFunctionFullNameFromMangledName(mangledName: String) -> String? {
     return nil
   }
 
-  return String._fromUTF8Repairing(
+  return unsafe String._fromUTF8Repairing(
     UnsafeBufferPointer(start: stringPtr, count: Int(count))).0
 }
 
@@ -90,8 +90,8 @@ public func _getTypeName(_ type: Any.Type, qualified: Bool)
 @_unavailableInEmbedded
 public // @testable
 func _typeName(_ type: Any.Type, qualified: Bool = true) -> String {
-  let (stringPtr, count) = _getTypeName(type, qualified: qualified)
-  return String._fromUTF8Repairing(
+  let (stringPtr, count) = unsafe _getTypeName(type, qualified: qualified)
+  return unsafe String._fromUTF8Repairing(
     UnsafeBufferPointer(start: stringPtr, count: count)).0
 }
 
@@ -107,12 +107,12 @@ public func _getMangledTypeName(_ type: any ~Copyable.Type)
 @_preInverseGenerics
 public // SPI
 func _mangledTypeName(_ type: any ~Copyable.Type) -> String? {
-  let (stringPtr, count) = _getMangledTypeName(type)
+  let (stringPtr, count) = unsafe _getMangledTypeName(type)
   guard count > 0 else {
     return nil
   }
 
-  let (result, repairsMade) = String._fromUTF8Repairing(
+  let (result, repairsMade) = unsafe String._fromUTF8Repairing(
       UnsafeBufferPointer(start: stringPtr, count: count))
 
   _precondition(!repairsMade, "repairs made to _mangledTypeName, this is not expected since names should be valid UTF-8")
@@ -126,8 +126,8 @@ func _mangledTypeName(_ type: any ~Copyable.Type) -> String? {
 public // SPI(Foundation)
 func _typeByName(_ name: String) -> Any.Type? {
   let nameUTF8 = Array(name.utf8)
-  return nameUTF8.withUnsafeBufferPointer { (nameUTF8) in
-    return  _getTypeByMangledNameUntrusted(nameUTF8.baseAddress!,
+  return unsafe nameUTF8.withUnsafeBufferPointer { (nameUTF8) in
+    return  unsafe _getTypeByMangledNameUntrusted(nameUTF8.baseAddress!,
                                   UInt(nameUTF8.endIndex))
   }
 }

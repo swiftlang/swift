@@ -36,7 +36,7 @@ extension CommandLine {
   @usableFromInline
   internal static var _unsafeArgv:
     UnsafeMutablePointer<UnsafeMutablePointer<Int8>?>
-      = _swift_stdlib_getUnsafeArgvArgc(&_argc)
+      = unsafe _swift_stdlib_getUnsafeArgvArgc(&_argc)
 
   /// Access to the raw argc value from C.
   public static var argc: Int32 {
@@ -52,7 +52,7 @@ extension CommandLine {
     // over synchronizing access to argc and argv.
     var argc: Int32 = 0
 
-    while let _ = _unsafeArgv[Int(argc)] {
+    while let _ = unsafe _unsafeArgv[Int(argc)] {
       argc += 1
     }
 
@@ -68,14 +68,14 @@ extension CommandLine {
   ///   Where possible, use ``arguments`` instead.
   public static var unsafeArgv:
     UnsafeMutablePointer<UnsafeMutablePointer<Int8>?> {
-    return _unsafeArgv
+    return unsafe _unsafeArgv
   }
 
   // This is extremely unsafe and allows for concurrent writes with no
   // synchronization to the underlying data. In a future version of Swift you
   // will not be able to write to 'CommandLine.arguments'.
   static nonisolated(unsafe) var _arguments: [String] = (0 ..< Int(argc)).map {
-    String(cString: _unsafeArgv[$0]!)
+    unsafe String(cString: _unsafeArgv[$0]!)
   }
 
   /// An array that provides access to this program's command line arguments.

@@ -947,14 +947,14 @@ extension _StringObject {
   @inline(__always)
   @_alwaysEmitIntoClient
   internal var largeAddress: UnsafeRawPointer {
-    UnsafeRawPointer(bitPattern: largeAddressBits)
+    unsafe UnsafeRawPointer(bitPattern: largeAddressBits)
       ._unsafelyUnwrappedUnchecked
   }
 
   @inlinable @inline(__always)
   internal var nativeUTF8Start: UnsafePointer<UInt8> {
     _internalInvariant(largeFastIsTailAllocated)
-    return UnsafePointer(
+    return unsafe UnsafePointer(
       bitPattern: largeAddressBits &+ _StringObject.nativeBias
     )._unsafelyUnwrappedUnchecked
   }
@@ -962,7 +962,7 @@ extension _StringObject {
   @inlinable @inline(__always)
   internal var nativeUTF8: UnsafeBufferPointer<UInt8> {
     _internalInvariant(largeFastIsTailAllocated)
-    return UnsafeBufferPointer(start: nativeUTF8Start, count: largeCount)
+    return unsafe UnsafeBufferPointer(start: nativeUTF8Start, count: largeCount)
   }
 
   // Resilient way to fetch a pointer
@@ -972,25 +972,25 @@ extension _StringObject {
     _internalInvariant(largeFastIsShared)
 #if _runtime(_ObjC)
     if largeFastIsConstantCocoa {
-      return withCocoaObject {
-        _getNSCFConstantStringContentsPointer($0)
+      return unsafe withCocoaObject {
+        unsafe _getNSCFConstantStringContentsPointer($0)
       }
     }
     if largeIsCocoa {
-      return withCocoaObject {
-        stableCocoaUTF8Pointer($0)._unsafelyUnwrappedUnchecked
+      return unsafe withCocoaObject {
+        unsafe stableCocoaUTF8Pointer($0)._unsafelyUnwrappedUnchecked
       }
     }
 #endif
-    return withSharedStorage { $0.start }
+    return unsafe withSharedStorage { $0.start }
   }
 
   @usableFromInline
   internal var sharedUTF8: UnsafeBufferPointer<UInt8> {
     @_effects(releasenone) @inline(never) get {
       _internalInvariant(largeFastIsShared)
-      let start = self.getSharedUTF8Start()
-      return UnsafeBufferPointer(start: start, count: largeCount)
+      let start = unsafe self.getSharedUTF8Start()
+      return unsafe UnsafeBufferPointer(start: start, count: largeCount)
     }
   }
 
@@ -998,8 +998,8 @@ extension _StringObject {
   internal var nativeStorage: __StringStorage {
 #if _pointerBitWidth(_64)
     _internalInvariant(hasNativeStorage)
-    let unmanaged = Unmanaged<__StringStorage>.fromOpaque(largeAddress)
-    return unmanaged.takeUnretainedValue()
+    let unmanaged = unsafe Unmanaged<__StringStorage>.fromOpaque(largeAddress)
+    return unsafe unmanaged.takeUnretainedValue()
 #elseif _pointerBitWidth(_32) || _pointerBitWidth(_16)
     guard case .native(let storage) = _variant else {
       _internalInvariantFailure()
@@ -1022,8 +1022,8 @@ extension _StringObject {
   ) -> R {
 #if _pointerBitWidth(_64)
     _internalInvariant(hasNativeStorage)
-    let unmanaged = Unmanaged<__StringStorage>.fromOpaque(largeAddress)
-    return unmanaged._withUnsafeGuaranteedRef { body($0) }
+    let unmanaged = unsafe Unmanaged<__StringStorage>.fromOpaque(largeAddress)
+    return unsafe unmanaged._withUnsafeGuaranteedRef { body($0) }
 #elseif _pointerBitWidth(_32) || _pointerBitWidth(_16)
     // FIXME: Do this properly.
     return body(nativeStorage)
@@ -1037,8 +1037,8 @@ extension _StringObject {
 #if _pointerBitWidth(_64)
     _internalInvariant(largeFastIsShared && !largeIsCocoa)
     _internalInvariant(hasSharedStorage)
-    let unmanaged = Unmanaged<__SharedStringStorage>.fromOpaque(largeAddress)
-    return unmanaged.takeUnretainedValue()
+    let unmanaged = unsafe Unmanaged<__SharedStringStorage>.fromOpaque(largeAddress)
+    return unsafe unmanaged.takeUnretainedValue()
 #elseif _pointerBitWidth(_32) || _pointerBitWidth(_16)
     guard case .native(let storage) = _variant else {
       _internalInvariantFailure()
@@ -1060,8 +1060,8 @@ extension _StringObject {
 #if _pointerBitWidth(_64)
     _internalInvariant(largeFastIsShared && !largeIsCocoa)
     _internalInvariant(hasSharedStorage)
-    let unmanaged = Unmanaged<__SharedStringStorage>.fromOpaque(largeAddress)
-    return unmanaged._withUnsafeGuaranteedRef { body($0) }
+    let unmanaged = unsafe Unmanaged<__SharedStringStorage>.fromOpaque(largeAddress)
+    return unsafe unmanaged._withUnsafeGuaranteedRef { body($0) }
 #elseif _pointerBitWidth(_32) || _pointerBitWidth(_16)
     // FIXME: Do this properly.
     return body(sharedStorage)
@@ -1077,8 +1077,8 @@ extension _StringObject {
     fatalError("unreachable in embedded Swift")
 #elseif _pointerBitWidth(_64)
     _internalInvariant(largeIsCocoa && !isImmortal)
-    let unmanaged = Unmanaged<AnyObject>.fromOpaque(largeAddress)
-    return unmanaged.takeUnretainedValue()
+    let unmanaged = unsafe Unmanaged<AnyObject>.fromOpaque(largeAddress)
+    return unsafe unmanaged.takeUnretainedValue()
 #elseif _pointerBitWidth(_32) || _pointerBitWidth(_16)
     guard case .bridged(let object) = _variant else {
       _internalInvariantFailure()
@@ -1102,8 +1102,8 @@ extension _StringObject {
     _internalInvariant(
       (largeIsCocoa && !isImmortal) || largeFastIsConstantCocoa
     )
-    let unmanaged = Unmanaged<AnyObject>.fromOpaque(largeAddress)
-    return unmanaged._withUnsafeGuaranteedRef { body($0) }
+    let unmanaged = unsafe Unmanaged<AnyObject>.fromOpaque(largeAddress)
+    return unsafe unmanaged._withUnsafeGuaranteedRef { body($0) }
 #elseif _pointerBitWidth(_32) || _pointerBitWidth(_16)
     // FIXME: Do this properly.
     return body(cocoaObject)
@@ -1119,8 +1119,8 @@ extension _StringObject {
   internal var owner: AnyObject? {
     guard self.isMortal else { return nil }
     #if !$Embedded
-    let unmanaged = Unmanaged<AnyObject>.fromOpaque(largeAddress)
-    return unmanaged.takeUnretainedValue()
+    let unmanaged = unsafe Unmanaged<AnyObject>.fromOpaque(largeAddress)
+    return unsafe unmanaged.takeUnretainedValue()
     #else
     fatalError("unreachable in embedded Swift")
     #endif
@@ -1183,9 +1183,9 @@ extension _StringObject {
   internal var fastUTF8: UnsafeBufferPointer<UInt8> {
     _internalInvariant(self.isLarge && self.providesFastUTF8)
     guard _fastPath(self.largeFastIsTailAllocated) else {
-      return sharedUTF8
+      return unsafe sharedUTF8
     }
-    return UnsafeBufferPointer(
+    return unsafe UnsafeBufferPointer(
       _uncheckedStart: self.nativeUTF8Start, count: self.largeCount)
   }
 
@@ -1206,8 +1206,8 @@ extension _StringObject {
     fatalError("unreachable in embedded Swift")
 #else
     _internalInvariant(hasObjCBridgeableObject)
-    let unmanaged = Unmanaged<AnyObject>.fromOpaque(largeAddress)
-    return unmanaged.takeUnretainedValue()
+    let unmanaged = unsafe Unmanaged<AnyObject>.fromOpaque(largeAddress)
+    return unsafe unmanaged.takeUnretainedValue()
 #endif
   }
 
@@ -1235,7 +1235,7 @@ extension _StringObject {
       immortalCount: bufPtr.count, isASCII: isASCII)
 #if _pointerBitWidth(_64)
     // We bias to align code paths for mortal and immortal strings
-    let biasedAddress = UInt(
+    let biasedAddress = unsafe UInt(
       bitPattern: bufPtr.baseAddress._unsafelyUnwrappedUnchecked
     ) &- _StringObject.nativeBias
 
@@ -1422,8 +1422,8 @@ extension _StringObject {
       }
       if _countAndFlags.isNativelyStored {
         #if !$Embedded
-        let unmanaged = Unmanaged<AnyObject>.fromOpaque(largeAddress)
-        let anyObj = unmanaged.takeUnretainedValue()
+        let unmanaged = unsafe Unmanaged<AnyObject>.fromOpaque(largeAddress)
+        let anyObj = unsafe unmanaged.takeUnretainedValue()
         _internalInvariant(anyObj is __StringStorage)
         #endif
       }
@@ -1468,7 +1468,7 @@ extension _StringObject {
     case ._small:
       _SmallString(self)._dump()
     case ._immortal(address: let address):
-      print("""
+      print(unsafe """
         Immortal(\
         start: \(UnsafeRawPointer(bitPattern: address)!), \
         count: \(repr._count))
@@ -1481,8 +1481,8 @@ extension _StringObject {
         capacity: \(repr._capacity))
         """)
     case ._cocoa(object: let object):
-      let address: UnsafeRawPointer = Builtin.reinterpretCast(object)
-      print("Cocoa(address: \(address))")
+      let address: UnsafeRawPointer = unsafe Builtin.reinterpretCast(object)
+      print(unsafe "Cocoa(address: \(address))")
     }
 #endif // INTERNAL_CHECKS_ENABLED
   }

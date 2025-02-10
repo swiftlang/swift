@@ -20,6 +20,7 @@
 /// ensuring spcial safety and avoiding buffer overflow errors.
 @frozen
 @available(SwiftStdlib 6.1, *)
+@safe
 public struct Span<Element: ~Copyable & ~Escapable>
 : ~Escapable, Copyable, BitwiseCopyable {
 
@@ -35,7 +36,7 @@ public struct Span<Element: ~Copyable & ~Escapable>
 
   @_alwaysEmitIntoClient
   internal func _start() -> UnsafeRawPointer {
-    _pointer._unsafelyUnwrappedUnchecked
+    unsafe _pointer._unsafelyUnwrappedUnchecked
   }
 
   /// The number of elements in this `Span`.
@@ -75,7 +76,7 @@ public struct Span<Element: ~Copyable & ~Escapable>
     _unchecked pointer: UnsafeRawPointer?,
     count: Int
   ) {
-    _pointer = pointer
+    _pointer = unsafe pointer
     _count = count
   }
 }
@@ -100,8 +101,8 @@ extension Span where Element: ~Copyable {
     _unsafeElements buffer: UnsafeBufferPointer<Element>
   ) {
     //FIXME: Workaround for https://github.com/swiftlang/swift/issues/77235
-    let baseAddress = UnsafeRawPointer(buffer.baseAddress)
-    _precondition(
+    let baseAddress = unsafe UnsafeRawPointer(buffer.baseAddress)
+    unsafe _precondition(
       ((Int(bitPattern: baseAddress) &
         (MemoryLayout<Element>.alignment &- 1)) == 0),
       "baseAddress must be properly aligned to access Element"
@@ -109,7 +110,7 @@ extension Span where Element: ~Copyable {
     let span = Span(_unchecked: baseAddress, count: buffer.count)
     // As a trivial value, 'baseAddress' does not formally depend on the
     // lifetime of 'buffer'. Make the dependence explicit.
-    self = _overrideLifetime(span, borrowing: buffer)
+    self = unsafe _overrideLifetime(span, borrowing: buffer)
   }
 
   /// Unsafely create a `Span` over initialized memory.
@@ -129,7 +130,7 @@ extension Span where Element: ~Copyable {
     let span = Span(_unsafeElements: buf)
     // As a trivial value, 'buf' does not formally depend on the
     // lifetime of 'buffer'. Make the dependence explicit.
-    self = _overrideLifetime(span, borrowing: buffer)
+    self = unsafe _overrideLifetime(span, borrowing: buffer)
   }
 
   /// Unsafely create a `Span` over initialized memory.
@@ -149,11 +150,11 @@ extension Span where Element: ~Copyable {
     count: Int
   ) {
     _precondition(count >= 0, "Count must not be negative")
-    let buf = UnsafeBufferPointer(start: pointer, count: count)
+    let buf = unsafe UnsafeBufferPointer(start: pointer, count: count)
     let span = Span(_unsafeElements: buf)
     // As a trivial value, 'buf' does not formally depend on the
     // lifetime of 'pointer'. Make the dependence explicit.
-    self = _overrideLifetime(span, borrowing: pointer)
+    self = unsafe _overrideLifetime(span, borrowing: pointer)
   }
 }
 
@@ -173,11 +174,11 @@ extension Span {
   public init(
     _unsafeElements buffer: borrowing Slice<UnsafeBufferPointer<Element>>
   ) {
-    let buf = UnsafeBufferPointer(rebasing: buffer)
+    let buf = unsafe UnsafeBufferPointer(rebasing: buffer)
     let span = Span(_unsafeElements: buf)
     // As a trivial value, 'buf' does not formally depend on the
     // lifetime of 'buffer'. Make the dependence explicit.
-    self = _overrideLifetime(span, borrowing: buffer)
+    self = unsafe _overrideLifetime(span, borrowing: buffer)
   }
 
   /// Unsafely create a `Span` over initialized memory.
@@ -193,11 +194,11 @@ extension Span {
   public init(
     _unsafeElements buffer: borrowing Slice<UnsafeMutableBufferPointer<Element>>
   ) {
-    let buf = UnsafeBufferPointer(rebasing: buffer)
+    let buf = unsafe UnsafeBufferPointer(rebasing: buffer)
     let span = Span(_unsafeElements: buf)
     // As a trivial value, 'buf' does not formally depend on the
     // lifetime of 'buffer'. Make the dependence explicit.
-    self = _overrideLifetime(span, borrowing: buffer)
+    self = unsafe _overrideLifetime(span, borrowing: buffer)
   }
 }
 
@@ -223,7 +224,7 @@ extension Span where Element: BitwiseCopyable {
   ) {
     //FIXME: Workaround for https://github.com/swiftlang/swift/issues/77235
     let baseAddress = buffer.baseAddress
-    _precondition(
+    unsafe _precondition(
       ((Int(bitPattern: baseAddress) &
         (MemoryLayout<Element>.alignment &- 1)) == 0),
       "baseAddress must be properly aligned to access Element"
@@ -236,7 +237,7 @@ extension Span where Element: BitwiseCopyable {
     let span = Span(_unchecked: baseAddress, count: count)
     // As a trivial value, 'baseAddress' does not formally depend on the
     // lifetime of 'buffer'. Make the dependence explicit.
-    self = _overrideLifetime(span, borrowing: buffer)
+    self = unsafe _overrideLifetime(span, borrowing: buffer)
   }
 
   /// Unsafely create a `Span` over initialized memory.
@@ -260,7 +261,7 @@ extension Span where Element: BitwiseCopyable {
     let span = Span(_unsafeBytes: rawBuffer)
     // As a trivial value, 'buf' does not formally depend on the
     // lifetime of 'buffer'. Make the dependence explicit.
-    self = _overrideLifetime(span, borrowing: buffer)
+    self = unsafe _overrideLifetime(span, borrowing: buffer)
   }
 
   /// Unsafely create a `Span` over initialized memory.
@@ -284,11 +285,11 @@ extension Span where Element: BitwiseCopyable {
     byteCount: Int
   ) {
     _precondition(byteCount >= 0, "Count must not be negative")
-    let rawBuffer = UnsafeRawBufferPointer(start: pointer, count: byteCount)
+    let rawBuffer = unsafe UnsafeRawBufferPointer(start: pointer, count: byteCount)
     let span = Span(_unsafeBytes: rawBuffer)
     // As a trivial value, 'rawBuffer' does not formally depend on the
     // lifetime of 'pointer'. Make the dependence explicit.
-    self = _overrideLifetime(span, borrowing: pointer)
+    self = unsafe _overrideLifetime(span, borrowing: pointer)
   }
 
   /// Unsafely create a `Span` over initialized memory.
@@ -308,11 +309,11 @@ extension Span where Element: BitwiseCopyable {
   public init(
     _unsafeBytes buffer: borrowing Slice<UnsafeRawBufferPointer>
   ) {
-    let rawBuffer = UnsafeRawBufferPointer(rebasing: buffer)
+    let rawBuffer = unsafe UnsafeRawBufferPointer(rebasing: buffer)
     let span = Span(_unsafeBytes: rawBuffer)
     // As a trivial value, 'rawBuffer' does not formally depend on the
     // lifetime of 'buffer'. Make the dependence explicit.
-    self = _overrideLifetime(span, borrowing: buffer)
+    self = unsafe _overrideLifetime(span, borrowing: buffer)
   }
 
   /// Unsafely create a `Span` over initialized memory.
@@ -332,11 +333,11 @@ extension Span where Element: BitwiseCopyable {
   public init(
     _unsafeBytes buffer: borrowing Slice<UnsafeMutableRawBufferPointer>
   ) {
-    let rawBuffer = UnsafeRawBufferPointer(rebasing: buffer)
+    let rawBuffer = unsafe UnsafeRawBufferPointer(rebasing: buffer)
     let span = Span(_unsafeBytes: rawBuffer)
     // As a trivial value, 'rawBuffer' does not formally depend on the
     // lifetime of 'buffer'. Make the dependence explicit.
-    self = _overrideLifetime(span, borrowing: buffer)
+    self = unsafe _overrideLifetime(span, borrowing: buffer)
   }
 
   /// Create a `Span` over the bytes represented by a `RawSpan`
@@ -348,11 +349,11 @@ extension Span where Element: BitwiseCopyable {
   @lifetime(bytes)
   public init(_bytes bytes: consuming RawSpan) {
     let rawBuffer =
-      UnsafeRawBufferPointer(start: bytes._pointer, count: bytes.byteCount)
+      unsafe UnsafeRawBufferPointer(start: bytes._pointer, count: bytes.byteCount)
     let span = Span(_unsafeBytes: rawBuffer)
     // As a trivial value, 'rawBuffer' does not formally depend on the
     // lifetime of 'bytes'. Make the dependence explicit.
-    self = _overrideLifetime(span, copying: bytes)
+    self = unsafe _overrideLifetime(span, copying: bytes)
   }
 }
 
@@ -401,7 +402,7 @@ extension Span where Element: ~Copyable {
     //FIXME: change to unsafeRawAddress when ready
     unsafeAddress {
       _precondition(indices.contains(position), "Index out of bounds")
-      return _unsafeAddressOfElement(unchecked: position)
+      return unsafe _unsafeAddressOfElement(unchecked: position)
     }
   }
 
@@ -419,7 +420,7 @@ extension Span where Element: ~Copyable {
   public subscript(unchecked position: Index) -> Element {
     //FIXME: change to unsafeRawAddress when ready
     unsafeAddress {
-      _unsafeAddressOfElement(unchecked: position)
+      unsafe _unsafeAddressOfElement(unchecked: position)
     }
   }
 
@@ -429,8 +430,8 @@ extension Span where Element: ~Copyable {
     unchecked position: Index
   ) -> UnsafePointer<Element> {
     let elementOffset = position &* MemoryLayout<Element>.stride
-    let address = _start().advanced(by: elementOffset)
-    return address.assumingMemoryBound(to: Element.self)
+    let address = unsafe _start().advanced(by: elementOffset)
+    return unsafe address.assumingMemoryBound(to: Element.self)
   }
 }
 
@@ -450,7 +451,7 @@ extension Span where Element: BitwiseCopyable {
         UInt(bitPattern: position) <  UInt(bitPattern: _count),
         "Index out of bounds"
       )
-      return self[unchecked: position]
+      return unsafe self[unchecked: position]
     }
   }
 
@@ -468,8 +469,8 @@ extension Span where Element: BitwiseCopyable {
   public subscript(unchecked position: Index) -> Element {
     get {
       let elementOffset = position &* MemoryLayout<Element>.stride
-      let address = _start().advanced(by: elementOffset)
-      return address.loadUnaligned(as: Element.self)
+      let address = unsafe _start().advanced(by: elementOffset)
+      return unsafe address.loadUnaligned(as: Element.self)
     }
   }
 }
@@ -499,7 +500,7 @@ extension Span where Element: ~Copyable {
       UInt(bitPattern: bounds.upperBound) <= UInt(bitPattern: _count),
       "Index range out of bounds"
     )
-    return _extracting(unchecked: bounds)
+    return unsafe _extracting(unchecked: bounds)
   }
 
   /// Constructs a new span over the items within the supplied range of
@@ -522,11 +523,11 @@ extension Span where Element: ~Copyable {
   @lifetime(self)
   public func _extracting(unchecked bounds: Range<Index>) -> Self {
     let delta = bounds.lowerBound &* MemoryLayout<Element>.stride
-    let newStart = _pointer?.advanced(by: delta)
+    let newStart = unsafe _pointer?.advanced(by: delta)
     let newSpan = Span(_unchecked: newStart, count: bounds.count)
     // As a trivial value, 'newStart' does not formally depend on the
     // lifetime of 'self'. Make the dependence explicit.
-    return _overrideLifetime(newSpan, copying: self)
+    return unsafe _overrideLifetime(newSpan, copying: self)
   }
 
   /// Constructs a new span over the items within the supplied range of
@@ -569,7 +570,7 @@ extension Span where Element: ~Copyable {
   public func _extracting(
     unchecked bounds: some RangeExpression<Int>
   ) -> Self {
-    _extracting(unchecked: bounds.relative(to: indices))
+    unsafe _extracting(unchecked: bounds.relative(to: indices))
   }
 
   /// Constructs a new span over all the items of this span.
@@ -609,13 +610,13 @@ extension Span where Element: ~Copyable  {
     _ body: (_ buffer: UnsafeBufferPointer<Element>) throws(E) -> Result
   ) throws(E) -> Result {
     guard let pointer = _pointer else {
-      return try body(.init(start: nil, count: 0))
+      return try unsafe body(.init(start: nil, count: 0))
     }
     let binding = Builtin.bindMemory(
       pointer._rawValue, count._builtinWordValue, Element.self
     )
     defer { Builtin.rebindMemory(pointer._rawValue, binding) }
-    return try body(.init(start: .init(pointer._rawValue), count: count))
+    return try unsafe body(.init(start: .init(pointer._rawValue), count: count))
   }
 }
 
@@ -640,7 +641,7 @@ extension Span where Element: BitwiseCopyable {
   public func withUnsafeBytes<E: Error, Result: ~Copyable>(
     _ body: (_ buffer: UnsafeRawBufferPointer) throws(E) -> Result
   ) throws(E) -> Result {
-    try body(
+    try unsafe body(
       .init(start: _pointer, count: _count * MemoryLayout<Element>.stride)
     )
   }
@@ -652,7 +653,7 @@ extension Span where Element: ~Copyable {
   /// refer to the same region in memory.
   @_alwaysEmitIntoClient
   public func isIdentical(to other: Self) -> Bool {
-    (self._pointer == other._pointer) && (self._count == other._count)
+    unsafe (self._pointer == other._pointer) && (self._count == other._count)
   }
 
   /// Returns the indices within `self` where the memory represented by `span`
@@ -665,13 +666,13 @@ extension Span where Element: ~Copyable {
   public func indices(of other: borrowing Self) -> Range<Index>? {
     if other._count > _count { return nil }
     guard let spanStart = other._pointer, _count > 0 else {
-      return _pointer == other._pointer ? Range(_uncheckedBounds: (0, 0)) : nil
+      return unsafe _pointer == other._pointer ? Range(_uncheckedBounds: (0, 0)) : nil
     }
     let start = _start()
     let stride = MemoryLayout<Element>.stride
-    let spanEnd = spanStart + stride &* other._count
-    if spanStart < start || spanEnd > (start + stride &* _count) { return nil }
-    let byteOffset = start.distance(to: spanStart)
+    let spanEnd = unsafe spanStart + stride &* other._count
+    if unsafe spanStart < start || spanEnd > (start + stride &* _count) { return nil }
+    let byteOffset = unsafe start.distance(to: spanStart)
     let (lower, r) = byteOffset.quotientAndRemainder(dividingBy: stride)
     guard r == 0 else { return nil }
     return Range(_uncheckedBounds: (lower, lower &+ other._count))
@@ -748,11 +749,11 @@ extension Span where Element: ~Copyable {
     _precondition(maxLength >= 0, "Can't have a suffix of negative length")
     let newCount = min(maxLength, count)
     let offset = (count &- newCount) * MemoryLayout<Element>.stride
-    let newStart = _pointer?.advanced(by: offset)
+    let newStart = unsafe _pointer?.advanced(by: offset)
     let newSpan = Span(_unchecked: newStart, count: newCount)
     // As a trivial value, 'newStart' does not formally depend on the
     // lifetime of 'buffer'. Make the dependence explicit.
-    return _overrideLifetime(newSpan, copying: self)
+    return unsafe _overrideLifetime(newSpan, copying: self)
   }
 
   /// Returns a span over all but the given number of initial elements.
@@ -775,10 +776,10 @@ extension Span where Element: ~Copyable {
     _precondition(k >= 0, "Can't drop a negative number of elements")
     let droppedCount = min(k, count)
     let offset = droppedCount * MemoryLayout<Element>.stride
-    let newStart = _pointer?.advanced(by: offset)
+    let newStart = unsafe _pointer?.advanced(by: offset)
     let newSpan = Span(_unchecked: newStart, count: count &- droppedCount)
     // As a trivial value, 'newStart' does not formally depend on the
     // lifetime of 'buffer'. Make the dependence explicit.
-    return _overrideLifetime(newSpan, copying: self)
+    return unsafe _overrideLifetime(newSpan, copying: self)
   }
 }

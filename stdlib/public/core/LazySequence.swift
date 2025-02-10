@@ -209,7 +209,7 @@ extension LazySequence: Sequence {
   public __consuming func _copyContents(
     initializing buf: UnsafeMutableBufferPointer<Element>
   ) -> (Iterator, UnsafeMutableBufferPointer<Element>.Index) {
-    return _base._copyContents(initializing: buf)
+    return unsafe _base._copyContents(initializing: buf)
   }
 
   @inlinable // lazy-performance

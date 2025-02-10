@@ -145,9 +145,9 @@ extension _SmallString {
 
     // No bits should be set between the last code unit and the discriminator
     var copy = self
-    withUnsafeBytes(of: &copy._storage) {
-      _internalInvariant(
-        $0[count..<_SmallString.capacity].allSatisfy { $0 == 0 })
+    unsafe withUnsafeBytes(of: &copy._storage) {
+      unsafe _internalInvariant(
+        $0[count..<_SmallString.capacity].allSatisfy { unsafe $0 == 0 })
     }
   }
   #endif // INTERNAL_CHECKS_ENABLED
@@ -205,8 +205,8 @@ extension _SmallString: RandomAccessCollection, MutableCollection {
     get {
       // TODO(String performance): In-vector-register operation
       return self.withUTF8 { utf8 in
-        let rebased = UnsafeBufferPointer(rebasing: utf8[bounds])
-        return _SmallString(rebased)._unsafelyUnwrappedUnchecked
+        let rebased = unsafe UnsafeBufferPointer(rebasing: utf8[bounds])
+        return unsafe _SmallString(rebased)._unsafelyUnwrappedUnchecked
       }
     }
     // This setter is required for _SmallString to be a valid MutableCollection.
@@ -218,21 +218,22 @@ extension _SmallString: RandomAccessCollection, MutableCollection {
 
 extension _SmallString {
   @inlinable @inline(__always)
+  @safe
   internal func withUTF8<Result>(
     _ f: (UnsafeBufferPointer<UInt8>) throws -> Result
   ) rethrows -> Result {
     let count = self.count
     var raw = self.zeroTerminatedRawCodeUnits
-    return try Swift._withUnprotectedUnsafeBytes(of: &raw) {
-      let rawPtr = $0.baseAddress._unsafelyUnwrappedUnchecked
+    return try unsafe Swift._withUnprotectedUnsafeBytes(of: &raw) {
+      let rawPtr = unsafe $0.baseAddress._unsafelyUnwrappedUnchecked
       // Rebind the underlying (UInt64, UInt64) tuple to UInt8 for the
       // duration of the closure. Accessing self after this rebind is undefined.
-      let ptr = rawPtr.bindMemory(to: UInt8.self, capacity: count)
+      let ptr = unsafe rawPtr.bindMemory(to: UInt8.self, capacity: count)
       defer {
         // Restore the memory type of self._storage
-        _ = rawPtr.bindMemory(to: RawBitPattern.self, capacity: 1)
+        _ = unsafe rawPtr.bindMemory(to: RawBitPattern.self, capacity: 1)
       }
-      return try f(UnsafeBufferPointer(_uncheckedStart: ptr, count: count))
+      return try unsafe f(unsafe UnsafeBufferPointer(_uncheckedStart: ptr, count: count))
     }
   }
 
@@ -243,8 +244,8 @@ extension _SmallString {
   fileprivate mutating func withMutableCapacity(
     _ f: (UnsafeMutableRawBufferPointer) throws -> Int
   ) rethrows {
-    let len = try withUnsafeMutableBytes(of: &_storage) {
-      try f(.init(start: $0.baseAddress, count: _SmallString.capacity))
+    let len = try unsafe withUnsafeMutableBytes(of: &_storage) {
+      try unsafe f(.init(start: $0.baseAddress, count: _SmallString.capacity))
     }
 
     if len <= 0 {
@@ -300,9 +301,9 @@ extension _SmallString {
 
     // TODO(SIMD): The below can be replaced with just be a masked unaligned
     // vector load
-    let ptr = input.baseAddress._unsafelyUnwrappedUnchecked
-    let leading = _bytesToUInt64(ptr, Swift.min(input.count, 8))
-    let trailing = count > 8 ? _bytesToUInt64(ptr + 8, count &- 8) : 0
+    let ptr = unsafe input.baseAddress._unsafelyUnwrappedUnchecked
+    let leading = unsafe _bytesToUInt64(ptr, Swift.min(input.count, 8))
+    let trailing = unsafe count > 8 ? _bytesToUInt64(ptr + 8, count &- 8) : 0
 
     self.init(leading: leading, trailing: trailing, count: count)
   }
@@ -314,8 +315,8 @@ extension _SmallString {
     ) throws -> Int
   ) rethrows {
     self.init()
-    try self.withMutableCapacity {
-      try $0.withMemoryRebound(to: UInt8.self, initializer)
+    try unsafe self.withMutableCapacity {
+      try unsafe $0.withMemoryRebound(to: UInt8.self, initializer)
     }
     self._invariantCheck()
   }
@@ -350,12 +351,12 @@ extension _SmallString {
   internal init?(taggedCocoa cocoa: AnyObject) {
     self.init()
     var success = true
-    self.withMutableCapacity {
+    unsafe self.withMutableCapacity {
       /*
        For regular NSTaggedPointerStrings we will always succeed here, but
        tagged NSLocalizedStrings may not fit in a SmallString
        */
-      if let len = _bridgeTagged(cocoa, intoUTF8: $0) {
+      if let len = unsafe _bridgeTagged(cocoa, intoUTF8: $0) {
         return len
       }
       success = false
@@ -371,12 +372,12 @@ extension _SmallString {
   internal init?(taggedASCIICocoa cocoa: AnyObject) {
     self.init()
     var success = true
-    self.withMutableCapacity {
+    unsafe self.withMutableCapacity {
       /*
        For regular NSTaggedPointerStrings we will always succeed here, but
        tagged NSLocalizedStrings may not fit in a SmallString
        */
-      if let len = _bridgeTaggedASCII(cocoa, intoUTF8: $0) {
+      if let len = unsafe _bridgeTaggedASCII(cocoa, intoUTF8: $0) {
         return len
       }
       success = false
@@ -432,7 +433,7 @@ internal func _bytesToUInt64(
   var r: UInt64 = 0
   var shift: Int = 0
   for idx in 0..<c {
-    r = r | (UInt64(input[idx]) &<< shift)
+    r = unsafe r | (UInt64(input[idx]) &<< shift)
     shift = shift &+ 8
   }
   // Convert from little-endian to host byte order.
