@@ -30,8 +30,8 @@ TEST_F(SemaTest, TestTrailingClosureMatchRecordingForIdenticalFunctions) {
   auto func = FunctionType::get(
       {FunctionType::Param(intType), FunctionType::Param(intType)}, floatType);
 
-  cs.addConstraint(
-      ConstraintKind::ApplicableFunction, func, func,
+  cs.addApplicationConstraint(
+      func, func, /*trailingClosureMatching=*/std::nullopt, DC,
       cs.getConstraintLocator({}, ConstraintLocator::ApplyFunction));
 
   SmallVector<Solution, 2> solutions;
@@ -126,4 +126,99 @@ TEST_F(SemaTest, TestClosureInferenceFromOptionalContext) {
 
   ASSERT_TRUE(cs.simplifyType(paramTy)->isEqual(getStdlibType("Int")));
   ASSERT_TRUE(cs.simplifyType(resultTy)->isEqual(Context.TheEmptyTupleType));
+}
+
+/// Emulates code like this:
+///
+/// func test(_: (Int) -> Void) {}
+///
+/// test { Double($0) }
+///
+/// To make sure that constructor application sets correct
+/// declaration context for implicit `.init` member.
+TEST_F(SemaTest, TestInitializerUseDCIsSetCorrectlyInClosure) {
+  ConstraintSystem cs(DC, ConstraintSystemOptions());
+
+  DeclAttributes closureAttrs;
+
+  // Anonymous closure parameter
+  auto paramName = Context.getIdentifier("0");
+
+  auto *paramDecl =
+      new (Context) ParamDecl(/*specifierLoc=*/SourceLoc(),
+                              /*argumentNameLoc=*/SourceLoc(), paramName,
+                              /*parameterNameLoc=*/SourceLoc(), paramName, DC);
+
+  paramDecl->setSpecifier(ParamSpecifier::Default);
+
+  auto *closure = new (Context) ClosureExpr(
+      closureAttrs,
+      /*bracketRange=*/SourceRange(),
+      /*capturedSelfDecl=*/nullptr, ParameterList::create(Context, {paramDecl}),
+      /*asyncLoc=*/SourceLoc(),
+      /*throwsLoc=*/SourceLoc(),
+      /*thrownType=*/nullptr,
+      /*arrowLoc=*/SourceLoc(),
+      /*inLoc=*/SourceLoc(),
+      /*explicitResultType=*/nullptr,
+      /*parent=*/DC);
+  closure->setDiscriminator(0);
+
+  closure->setImplicit();
+
+  // Double($0)
+  auto initCall = CallExpr::createImplicit(
+      Context, TypeExpr::createImplicit(getStdlibType("Double"), Context),
+      ArgumentList::forImplicitUnlabeled(
+          Context, {new (Context) DeclRefExpr(ConcreteDeclRef(paramDecl),
+                                              /*Loc*/ DeclNameLoc(),
+                                              /*Implicit=*/true)}));
+
+  closure->setBody(BraceStmt::createImplicit(Context, {initCall}));
+
+  auto *closureLoc = cs.getConstraintLocator(closure);
+
+  auto *paramTy = cs.createTypeVariable(
+      cs.getConstraintLocator(closure, LocatorPathElt::TupleElement(0)),
+      /*options=*/TVO_CanBindToInOut);
+
+  auto *resultTy = cs.createTypeVariable(
+      cs.getConstraintLocator(closure, ConstraintLocator::ClosureResult),
+      /*options=*/0);
+
+  auto extInfo = FunctionType::ExtInfo();
+
+  auto defaultTy = FunctionType::get({FunctionType::Param(paramTy, paramName)},
+                                     resultTy, extInfo);
+
+  cs.setClosureType(closure, defaultTy);
+
+  auto *closureTy = cs.createTypeVariable(closureLoc, /*options=*/0);
+  cs.setType(closure, closureTy);
+
+  cs.addUnsolvedConstraint(Constraint::create(
+      cs, ConstraintKind::FallbackType, closureTy, defaultTy,
+      cs.getConstraintLocator(closure), /*referencedVars=*/{}));
+
+  auto contextualTy =
+      FunctionType::get({FunctionType::Param(getStdlibType("Int"))},
+                        Context.TheEmptyTupleType, extInfo);
+
+  cs.resolveClosure(closureTy, contextualTy, closureLoc);
+
+  auto &graph = cs.getConstraintGraph();
+
+  for (const auto &component :
+       graph.computeConnectedComponents(cs.getTypeVariables())) {
+    for (auto *constraint : component.getConstraints()) {
+      if (constraint->getKind() != ConstraintKind::Disjunction)
+        continue;
+
+      ASSERT_TRUE(constraint->getLocator()
+                      ->isLastElement<LocatorPathElt::ConstructorMember>());
+
+      for (auto *choice : constraint->getNestedConstraints())
+        ASSERT_EQ(choice->getOverloadUseDC(), closure);
+    }
+  }
 }
