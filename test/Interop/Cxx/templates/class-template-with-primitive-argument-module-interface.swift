@@ -1,4 +1,6 @@
-// RUN: %target-swift-ide-test -print-module -module-to-print=ClassTemplateWithPrimitiveArgument -I %S/Inputs -source-filename=x -enable-experimental-cxx-interop | %FileCheck %s
+// RUN: %target-swift-ide-test -source-filename=x -print-module -module-to-print=ClassTemplateWithPrimitiveArgument -I %S/Inputs -cxx-interoperability-mode=default > %t.swiftinterface
+// RUN: %FileCheck %s < %t.swiftinterface
+// RUN: %target-swift-typecheck-module-from-interface(%t.swiftinterface) -I %S/Inputs -cxx-interoperability-mode=default
 
 // CHECK: @available(*, unavailable
 // CHECK: struct MagicWrapper<T> {
