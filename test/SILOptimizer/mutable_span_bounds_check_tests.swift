@@ -1,12 +1,14 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend -emit-module-path %t/SpanExtras.swiftmodule %S/Inputs/SpanExtras.swift -enable-builtin-module  -enable-experimental-feature LifetimeDependence  -enable-experimental-feature AllowUnsafeAttribute -enable-experimental-feature Span
+// RUN: %target-swift-frontend -emit-module-path %t/SpanExtras.swiftmodule %S/Inputs/SpanExtras.swift -enable-builtin-module  -enable-experimental-feature LifetimeDependence  -enable-experimental-feature AllowUnsafeAttribute -enable-experimental-feature Span -O
 // RUN: %target-swift-frontend -I %t -O -emit-sil %s -enable-experimental-feature Span -disable-availability-checking | %FileCheck %s --check-prefix=CHECK-SIL 
-// RUN: %target-swift-frontend -I %t -O -emit-ir %s -enable-experimental-feature Span -disable-availability-checking
+// RUN: %target-swift-frontend -I %t -O -emit-ir %s -enable-experimental-feature Span -disable-availability-checking | %FileCheck %s --check-prefix=CHECK-IR
 
 // REQUIRES: swift_in_compiler
 // REQUIRES: swift_feature_LifetimeDependence
 // REQUIRES: swift_feature_Span
 // REQUIRES: swift_feature_AllowUnsafeAttribute
+
+// REQUIRES: swift_stdlib_no_asserts, optimized_stdlib
 
 // In Inputs/SpanExtras.swift we have @available(macOS 9999, *):
 // REQUIRES: OS=macosx
@@ -18,11 +20,14 @@ import SpanExtras
 // LLVM leaves behind a lower bound check outside the loop, does not vectorize the loop
 
 // CHECK-SIL-LABEL: sil @$s31mutable_span_bounds_check_tests0B10_zero_inityy10SpanExtras07MutableH0VySiGzF : 
-// CHECK: bb2:
-// CHECK: cond_fail {{.*}}, "Index out of bounds"
-// CHECK: cond_fail {{.*}}, "Index out of bounds"
-// CHECK: cond_br
+// CHECK-SIL: bb3({{.*}}):
+// CHECK-SIL: cond_fail {{.*}}, "precondition failure"
+// CHECK-SIL: cond_br
 // CHECK-SIL-LABEL: } // end sil function '$s31mutable_span_bounds_check_tests0B10_zero_inityy10SpanExtras07MutableH0VySiGzF'
+
+// CHECK-IR: define {{.*}} void @"$s31mutable_span_bounds_check_tests0B10_zero_inityy10SpanExtras07MutableH0VySiGzF"
+// CHECK-IR: vector.body
+// CHECK-IR: store <{{.*}}> zeroinitializer,
 public func span_zero_init(_ output: inout MutableSpan<Int>) {
   for i in output.indices {
     output[i] = 0
@@ -34,11 +39,14 @@ public func span_zero_init(_ output: inout MutableSpan<Int>) {
 // LLVM leaves behind a lower bound check outside the loop, does not vectorize the loop or reduce to a memcopy
 
 // CHECK-SIL-LABEL: sil @$s31mutable_span_bounds_check_tests0B14_copy_elemwiseyy10SpanExtras07MutableH0VySiGz_s0H0VySiGtF :
-// CHECK: bb2:
-// CHECK: cond_fail {{.*}}, "Index out of bounds"
-// CHECK: cond_fail {{.*}}, "Index out of bounds"
-// CHECK: cond_br
+// CHECK-SIL: bb3({{.*}}):
+// CHECK-SIL: cond_fail {{.*}}, "precondition failure"
+// CHECK-SIL: cond_br
 // CHECK-SIL-LABEL: } // end sil function '$s31mutable_span_bounds_check_tests0B14_copy_elemwiseyy10SpanExtras07MutableH0VySiGz_s0H0VySiGtF'
+
+// CHECK-IR: define {{.*}} void @"$s31mutable_span_bounds_check_tests0B14_copy_elemwiseyy10SpanExtras07MutableH0VySiGz_s0H0VySiGtF"
+// CHECK-IR: vector.body
+// CHECK-IR: store <{{.*}}>
 public func span_copy_elemwise(_ output: inout MutableSpan<Int>, _ input: Span<Int>) {
   precondition(output.count >= input.count)
   for i in input.indices {
@@ -50,11 +58,14 @@ public func span_copy_elemwise(_ output: inout MutableSpan<Int>, _ input: Span<I
 // SIL does not optimize this
 
 // CHECK-SIL-LABEL: sil @$s31mutable_span_bounds_check_tests0B16_append_elemwiseyy10SpanExtras06OutputH0VySiGz_s0H0VySiGtF : 
-// CHECK: bb2:
-// CHECK: cond_fail {{.*}}, "Index out of bounds"
-// CHECK: cond_fail {{.*}}, "Index out of bounds"
-// CHECK: cond_br
+// CHECK-SIL: bb3({{.*}}):
+// CHECK-SIL: cond_fail {{.*}}, "precondition failure"
+// CHECK-SIL: cond_br
 // CHECK-SIL-LABEL: } // end sil function '$s31mutable_span_bounds_check_tests0B16_append_elemwiseyy10SpanExtras06OutputH0VySiGz_s0H0VySiGtF'
+
+// CHECK-IR: define {{.*}} void @"$s31mutable_span_bounds_check_tests0B16_append_elemwiseyy10SpanExtras06OutputH0VySiGz_s0H0VySiGtF"
+// CHECK-IR: vector.body
+// CHECK-IR: store <{{.*}}>
 public func span_append_elemwise(_ output: inout OutputSpan<Int>, _ input: Span<Int>) {
   for i in input.indices {
     output.append(input[i])
@@ -65,11 +76,14 @@ public func span_append_elemwise(_ output: inout OutputSpan<Int>, _ input: Span<
 // SIL does not optimize this
 
 // CHECK-SIL-LABEL: sil @$s31mutable_span_bounds_check_tests0B12_sum_wo_trapyy10SpanExtras07MutableI0VySiGz_s0I0VySiGAItF : 
-// CHECK: bb2:
-// CHECK: cond_fail {{.*}}, "Index out of bounds"
-// CHECK: cond_fail {{.*}}, "Index out of bounds"
-// CHECK: cond_br
+// CHECK-SIL: bb3({{.*}}):
+// CHECK-SIL: cond_fail {{.*}}, "precondition failure"
+// CHECK-SIL: cond_br
 // CHECK-SIL-LABEL: } // end sil function '$s31mutable_span_bounds_check_tests0B12_sum_wo_trapyy10SpanExtras07MutableI0VySiGz_s0I0VySiGAItF'
+
+// CHECK-IR: define {{.*}} void @"$s31mutable_span_bounds_check_tests0B12_sum_wo_trapyy10SpanExtras07MutableI0VySiGz_s0I0VySiGAItF"
+// CHECK-IR: vector.body
+// CHECK-IR: store <{{.*}}>
 public func span_sum_wo_trap(_ output: inout MutableSpan<Int>, _ input1: Span<Int>, _ input2: Span<Int>) {
   precondition(input1.count == input2.count)
   precondition(output.count == input1.count)
@@ -79,11 +93,11 @@ public func span_sum_wo_trap(_ output: inout MutableSpan<Int>, _ input1: Span<In
 }
 
 // CHECK-SIL-LABEL: sil @$s31mutable_span_bounds_check_tests0B14_sum_with_trapyy10SpanExtras07MutableI0VySiGz_s0I0VySiGAItF :
-// CHECK: bb2:
-// CHECK: cond_fail {{.*}}, "Index out of bounds"
-// CHECK: cond_fail {{.*}}, "Index out of bounds"
-// CHECK: cond_br
+// CHECK-SIL: bb3({{.*}}):
+// CHECK-SIL: cond_fail {{.*}}, "precondition failure"
+// CHECK-SIL: cond_br
 // CHECK-SIL-LABEL: } // end sil function '$s31mutable_span_bounds_check_tests0B14_sum_with_trapyy10SpanExtras07MutableI0VySiGz_s0I0VySiGAItF'
+
 public func span_sum_with_trap(_ output: inout MutableSpan<Int>, _ input1: Span<Int>, _ input2: Span<Int>) {
   precondition(input1.count == input2.count)
   precondition(output.count == input1.count)
@@ -93,9 +107,9 @@ public func span_sum_with_trap(_ output: inout MutableSpan<Int>, _ input1: Span<
 }
 
 // CHECK-SIL-LABEL: sil @$s31mutable_span_bounds_check_tests0B12_bubble_sortyy10SpanExtras07MutableH0VySiGzF : 
-// CHECK: bb10:
-// CHECK: cond_fail {{.*}}, "Index out of bounds"
-// CHECK: cond_br
+// CHECK-SIL: bb11({{.*}}):
+// CHECK-SIL: cond_fail {{.*}}, "precondition failure"
+// CHECK-SIL: cond_br
 // CHECK-SIL-LABEL: } // end sil function '$s31mutable_span_bounds_check_tests0B12_bubble_sortyy10SpanExtras07MutableH0VySiGzF'
 public func span_bubble_sort(_ span: inout MutableSpan<Int>) {
   if span.count <= 1 {
@@ -113,9 +127,10 @@ public func span_bubble_sort(_ span: inout MutableSpan<Int>) {
 }
 
 // CHECK-SIL-LABEL: sil @$s31mutable_span_bounds_check_tests6sortedySb10SpanExtras07MutableG0VySiGF : 
-// CHECK: bb4:
-// CHECK: cond_fail {{.*}}, "Index out of bounds"
-// CHECK: cond_br
+// CHECK-SIL: bb4({{.*}}):
+// CHECK-SIL: cond_fail {{.*}}, "precondition failure"
+// CHECK-SIL: cond_fail {{.*}}, "precondition failure"
+// CHECK-SIL: cond_br
 // CHECK-SIL-LABEL: } // end sil function '$s31mutable_span_bounds_check_tests6sortedySb10SpanExtras07MutableG0VySiGF'
 public func sorted(_ span: borrowing MutableSpan<Int>) -> Bool {
   if span.count <= 1 {
