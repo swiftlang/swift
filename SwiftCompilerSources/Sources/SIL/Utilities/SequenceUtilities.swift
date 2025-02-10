@@ -167,4 +167,13 @@ public struct SingleInlineArray<Element>: RandomAccessCollection, FormattedLikeA
     }
     multipleElements.append(element)
   }
+
+  public mutating func popLast() -> Element? {
+    if multipleElements.isEmpty {
+      let last = singleElement
+      singleElement = nil
+      return last
+    }
+    return multipleElements.popLast()
+  }
 }
