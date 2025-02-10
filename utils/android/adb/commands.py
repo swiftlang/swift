@@ -26,6 +26,11 @@ DEVICE_TEMP_DIR = '/data/local/tmp'
 ENV_PREFIX = 'ANDROID_CHILD_'
 
 
+# Subprocess output might be bytes or str depending on OS and Python version
+def _as_str(s):
+    return s if isinstance(s, str) else str(s, 'utf-8')
+
+
 def shell(args):
     """
     Execute 'adb shell' with the given arguments.
@@ -54,7 +59,7 @@ def push(local_paths, device_path):
             ['adb', 'push', '--sync'] + local_paths + [device_path],
             stderr=subprocess.STDOUT).strip()
     except subprocess.CalledProcessError as e:
-        if "unrecognized option '--sync'" in e.output:
+        if "unrecognized option '--sync'" in _as_str(e.output):
             return subprocess.check_output(
                 ['adb', 'push'] + local_paths + [device_path],
                 stderr=subprocess.STDOUT).strip()
@@ -109,6 +114,7 @@ def execute_on_device(executable_path, executable_arguments):
     executable_name = os.path.basename(executable_path)
     executable = '{}/{}'.format(uuid_dir, executable_name)
     push(executable_path, executable)
+    shell(['chmod', '+x', executable])
 
     child_environment = ['{}="{}"'.format(k.replace(ENV_PREFIX, '', 1), v)
                          for (k, v) in os.environ.items()
@@ -167,8 +173,8 @@ def execute_on_device(executable_path, executable_arguments):
     shell([executable_piped])
 
     # Grab the results of running the executable on device.
-    stdout = shell(['cat', executable_stdout])
-    exitcode = shell(['cat', executable_succeeded])
+    stdout = _as_str(shell(['cat', executable_stdout]))
+    exitcode = _as_str(shell(['cat', executable_succeeded]))
     if not exitcode.startswith(succeeded_token):
         debug_command = '$ adb shell {}'.format(executable_with_args)
         print('Executable exited with a non-zero code on the Android device.\n'
