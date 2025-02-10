@@ -159,11 +159,11 @@ extension Array {
 extension _ArrayBuffer {
   @_specialize(exported: true,
                availability: SwiftStdlib 5.9, *;
-               target: _consumeAndCreateNew(bufferIsUnique:minimumCapacity:growForAppend:),
+               target: _consumeAndCreateNew(bufferIsUnique:minimumCapacity:growForAppend:rangeToNotCopy:),
                where @_noMetadata Element : _Class)
   @available(SwiftStdlib 5.9, *)
   @usableFromInline
-  func __specialize_class__consumeAndCreateNew(bufferIsUnique: Bool, minimumCapacity: Int, growForAppend: Bool) -> _ArrayBuffer<Element> { Builtin.unreachable() }
+  func __specialize_class__consumeAndCreateNew(bufferIsUnique: Bool, minimumCapacity: Int, growForAppend: Bool, rangetoNotCopy:Range<Int>) -> _ArrayBuffer<Element> { Builtin.unreachable() }
 
   @_specialize(exported: true,
                availability: SwiftStdlib 5.9, *;
@@ -228,7 +228,7 @@ extension ContiguousArray {
 
   @_specialize(exported: true,
                availability: SwiftStdlib 5.9, *;
-              target: _reserveCapacityImpl(minimumCapacity:growForAppend:),
+               target: _reserveCapacityImpl(minimumCapacity:growForAppend:),
               where @_noMetadata Element : _Class)
   @available(SwiftStdlib 5.9, *)
   @usableFromInline
@@ -255,9 +255,9 @@ extension ContiguousArray {
 extension _ContiguousArrayBuffer {
   @_specialize(exported: true,
                availability: SwiftStdlib 5.9, *;
-               target: _consumeAndCreateNew(bufferIsUnique:minimumCapacity:growForAppend:),
+               target: _consumeAndCreateNew(bufferIsUnique:minimumCapacity:growForAppend:rangeToNotCopy:),
                where @_noMetadata Element : _Class)
   @available(SwiftStdlib 5.9, *)
   @usableFromInline
-  func __specialize_class__consumeAndCreateNew(bufferIsUnique: Bool, minimumCapacity: Int, growForAppend: Bool) -> _ContiguousArrayBuffer<Element> { Builtin.unreachable() }
+  func __specialize_class__consumeAndCreateNew(bufferIsUnique: Bool, minimumCapacity: Int, growForAppend: Bool, rangeToNotCopy:Range<Int>) -> _ContiguousArrayBuffer<Element> { Builtin.unreachable() }
 }
