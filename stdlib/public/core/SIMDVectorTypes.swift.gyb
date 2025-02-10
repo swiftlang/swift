@@ -26,6 +26,7 @@ ordinalPositions = ['first', 'second', 'third', 'fourth']
 % storageN = 4 if n == 3 else n
 /// A vector of ${spelledNumbers[n]} scalar values.
 @frozen
+@_addressableForDependencies
 public struct SIMD${n}<Scalar>: SIMD where Scalar: SIMDScalar {
 
   public var _storage: Scalar.SIMD${storageN}Storage
