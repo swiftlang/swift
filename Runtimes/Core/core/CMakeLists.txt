@@ -274,14 +274,13 @@ if(APPLE AND BUILD_SHARED_LIBS)
 endif()
 
 target_compile_options(swiftCore PRIVATE
+  # STAGING: Temporarily avoids having to write #fileID in Swift.swiftinterface.
+  # see also 327ea8bce2d1107a847d444651b19ca6a2901c9e
+  "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xfrontend -enable-experimental-concise-pound-file>"
   $<$<COMPILE_LANGUAGE:Swift>:-parse-stdlib>
   $<$<COMPILE_LANGUAGE:Swift>:-nostdimport>
   $<$<COMPILE_LANGUAGE:Swift>:-explicit-module-build>
-  $<$<COMPILE_LANGUAGE:Swift>:-disable-autolinking-runtime-compatibility-dynamic-replacements>
-  $<$<COMPILE_LANGUAGE:Swift>:-no-link-objc-runtime>
-  $<$<COMPILE_LANGUAGE:Swift>:-warn-implicit-overrides>
   "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xfrontend -group-info-path -Xfrontend ${CMAKE_CURRENT_SOURCE_DIR}/GroupInfo.json>"
-  "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xfrontend -disable-autolinking-runtime-compatibility-concurrency>"
   "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xfrontend -disable-objc-attr-requires-foundation-module>"
   "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xfrontend -require-explicit-availability=ignore>")
 
