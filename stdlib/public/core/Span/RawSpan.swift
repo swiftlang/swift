@@ -325,7 +325,7 @@ extension RawSpan {
   }
 }
 
-//MARK: extracting sub-spans
+// MARK: extracting sub-spans
 @available(SwiftStdlib 6.1, *)
 extension RawSpan {
 
@@ -492,7 +492,7 @@ extension RawSpan {
   }
 }
 
-//MARK: load
+// MARK: load
 @available(SwiftStdlib 6.1, *)
 extension RawSpan {
 
@@ -638,7 +638,7 @@ extension RawSpan {
   }
 }
 
-//MARK: prefixes and suffixes
+// MARK: one-sided slicing operations
 @available(SwiftStdlib 6.1, *)
 extension RawSpan {
 
