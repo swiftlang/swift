@@ -734,10 +734,11 @@ namespace {
         "-working-directory=",
         "-working-directory"};
 
-  constexpr std::array<std::string_view, 15>
+  constexpr std::array<std::string_view, 16>
       knownClangDependencyIgnorablePrefiexes = {"-I",
                                                 "-F",
                                                 "-fmodule-map-file=",
+                                                "-ffile-compilation-dir",
                                                 "-iquote",
                                                 "-idirafter",
                                                 "-iframeworkwithsysroot",
