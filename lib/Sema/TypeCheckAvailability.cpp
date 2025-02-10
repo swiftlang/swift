@@ -22,6 +22,7 @@
 #include "TypeCheckUnsafe.h"
 #include "TypeChecker.h"
 #include "swift/AST/ASTWalker.h"
+#include "swift/AST/AvailabilityConstraint.h"
 #include "swift/AST/AvailabilityDomain.h"
 #include "swift/AST/AvailabilityInference.h"
 #include "swift/AST/AvailabilityScope.h"
@@ -2949,7 +2950,8 @@ void swift::diagnoseOverrideOfUnavailableDecl(ValueDecl *override,
   // recomputing it.
   ExportContext where = ExportContext::forDeclSignature(override, nullptr);
   auto constraint =
-      getUnsatisfiedAvailabilityConstraint(base, where.getAvailability());
+      getAvailabilityConstraintsForDecl(base, where.getAvailability())
+          .getPrimaryConstraint();
   if (!constraint)
     return;
 
@@ -3078,19 +3080,13 @@ bool diagnoseExplicitUnavailability(SourceLoc loc,
 }
 
 std::optional<AvailabilityConstraint>
-swift::getUnsatisfiedAvailabilityConstraint(
-    const Decl *decl, AvailabilityContext availabilityContext) {
-  auto constraints =
-      swift::getAvailabilityConstraintsForDecl(decl, availabilityContext);
-  return constraints.getPrimaryConstraint();
-}
-
-std::optional<AvailabilityConstraint>
 swift::getUnsatisfiedAvailabilityConstraint(const Decl *decl,
                                             const DeclContext *referenceDC,
                                             SourceLoc referenceLoc) {
-  return getUnsatisfiedAvailabilityConstraint(
-      decl, TypeChecker::availabilityAtLocation(referenceLoc, referenceDC));
+  return getAvailabilityConstraintsForDecl(
+             decl,
+             TypeChecker::availabilityAtLocation(referenceLoc, referenceDC))
+      .getPrimaryConstraint();
 }
 
 /// Check if this is a subscript declaration inside String or
@@ -4158,7 +4154,8 @@ bool swift::diagnoseDeclAvailability(const ValueDecl *D, SourceRange R,
   auto &ctx = DC->getASTContext();
 
   auto constraint =
-      getUnsatisfiedAvailabilityConstraint(D, Where.getAvailability());
+      getAvailabilityConstraintsForDecl(D, Where.getAvailability())
+          .getPrimaryConstraint();
 
   if (constraint) {
     if (diagnoseExplicitUnavailability(D, R, *constraint, Where, call, Flags))
@@ -4679,7 +4676,8 @@ swift::diagnoseConformanceAvailability(SourceLoc loc,
     }
 
     auto constraint =
-        getUnsatisfiedAvailabilityConstraint(ext, where.getAvailability());
+        getAvailabilityConstraintsForDecl(ext, where.getAvailability())
+            .getPrimaryConstraint();
     if (constraint) {
       if (diagnoseExplicitUnavailability(loc, *constraint, rootConf, ext, where,
                                          warnIfConformanceUnavailablePreSwift6,
