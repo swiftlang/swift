@@ -3565,6 +3565,11 @@ public:
   void addConstraint(Requirement req, ConstraintLocatorBuilder locator,
                      bool isFavored = false);
 
+  void addApplicationConstraint(
+      FunctionType *appliedFn, Type calleeType,
+      std::optional<TrailingClosureMatching> trailingClosureMatching,
+      DeclContext *useDC, ConstraintLocatorBuilder locator);
+
   /// Add the appropriate constraint for a contextual conversion.
   void addContextualConversionConstraint(Expr *expr, Type conversionType,
                                          ContextualTypePurpose purpose,
@@ -4960,8 +4965,9 @@ private:
 
   /// Attempt to simplify the ApplicableFunction constraint.
   SolutionKind simplifyApplicableFnConstraint(
-      Type type1, Type type2,
+      FunctionType *appliedFn, Type calleeTy,
       std::optional<TrailingClosureMatching> trailingClosureMatching,
+      DeclContext *useDC,
       TypeMatchOptions flags, ConstraintLocatorBuilder locator);
 
   /// Attempt to simplify the DynamicCallableApplicableFunction constraint.
