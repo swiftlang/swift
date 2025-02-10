@@ -3854,6 +3854,12 @@ generateForEachStmtConstraints(ConstraintSystem &cs, DeclContext *dc,
           AwaitExpr::createImplicit(ctx, nextCall->getLoc(), nextCall);
     }
 
+    // Wrap the 'next' call in 'unsafe', if there is one.
+    if (unsafeExpr) {
+      nextCall = new (ctx) UnsafeExpr(unsafeExpr->getLoc(), nextCall, Type(),
+                                      /*implicit=*/true);
+    }
+
     // The iterator type must conform to IteratorProtocol.
     {
       ProtocolDecl *iteratorProto = TypeChecker::getProtocol(
