@@ -1681,21 +1681,12 @@ static void diagRecursivePropertyAccess(const Expr *E, const DeclContext *DC) {
 }
 
 /// The `weak self` capture of this closure if present
-static VarDecl *selfCapture(const AbstractClosureExpr *ACE) {
+static VarDecl *weakSelfCapture(const AbstractClosureExpr *ACE) {
   if (auto closureExpr = dyn_cast<ClosureExpr>(ACE)) {
     if (auto selfDecl = closureExpr->getCapturedSelfDecl()) {
-      return selfDecl;
-    }
-  }
-
-  return nullptr;
-}
-
-/// The `weak self` capture of this closure if present
-static VarDecl *weakSelfCapture(const AbstractClosureExpr *ACE) {
-  if (auto selfDecl = selfCapture(ACE)) {
-    if (selfDecl->getInterfaceType()->is<WeakStorageType>()) {
-      return selfDecl;
+      if (selfDecl->getInterfaceType()->is<WeakStorageType>()) {
+        return selfDecl;
+      }
     }
   }
 
@@ -1890,13 +1881,15 @@ public:
       }
     }
 
-    // If the self decl refers to a `guard let self` / `if let self` conditon,
-    // we need to validate it.
-    auto selfDeclDefinedInConditionalStmt = false;
-    auto isInvalidSelfDeclRebinding = false;
-    if (auto condStmt = parentConditionalStmt(selfDecl)) {
-      selfDeclDefinedInConditionalStmt = true;
-      isInvalidSelfDeclRebinding = !hasValidSelfRebinding(condStmt, ctx);
+    // If the self decl refers to a weak capture, then implicit self is not
+    // allowed. Self must me unwrapped in a weak self closure.
+    //  - When validating implicit self usage in a nested closure, it's not
+    //    necessary for self to be unwrapped in this parent closure. If self
+    //    isn't unwrapped correctly in the nested closure, we would have
+    //    already noticed when validating that closure.
+    if (selfDecl->getInterfaceType()->is<WeakStorageType>() &&
+        !isValidatingParentClosures) {
+      return false;
     }
 
     // If the self decl refers to an invalid unwrapping conditon like
@@ -1906,26 +1899,10 @@ public:
     //    be a closure nested in some parent closure with a `weak self`
     //    capture, so we should always validate the conditional statement
     //    that defines self if present.
-    if (isInvalidSelfDeclRebinding) {
-      return false;
-    }
-
-    // Within a closure with a `[weak self]` capture, implicit self is only
-    // allowed if self has been unwrapped in a previous conditional statement.
-    //  - When validating implicit self usage in a nested closure, it's not
-    //    necessary for self to be unwrapped in this parent closure. If self
-    //    isn't unwrapped correctly in the nested closure, we would have
-    //    already noticed when validating that closure.
-    if (closureHasWeakSelfCapture(inClosure) &&
-        !selfDeclDefinedInConditionalStmt && !isValidatingParentClosures) {
-      return false;
-    }
-
-    // If the self decl refers to a weak capture in a parent closure,
-    // then implicit self is not allowed.
-    if (selfDecl->getInterfaceType()->is<WeakStorageType>() &&
-        !closureHasWeakSelfCapture(inClosure)) {
-      return false;
+    if (auto condStmt = parentConditionalStmt(selfDecl)) {
+      if (!hasValidSelfRebinding(condStmt, ctx)) {
+        return false;
+      }
     }
 
     if (auto autoclosure = dyn_cast<AutoClosureExpr>(inClosure)) {
