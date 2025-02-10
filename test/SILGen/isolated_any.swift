@@ -247,6 +247,7 @@ actor MyActor {
 func asyncAction() async {}
 
 func takeAsyncIsolatedAny(fn: @escaping @isolated(any) @Sendable () async -> ()) {}
+func takeAsyncIsolatedAnyAutoclosure(_: @autoclosure @isolated(any) () async -> Void) async {}
 func takeInheritingAsyncIsolatedAny(@_inheritActorContext fn: @escaping @isolated(any) @Sendable () async -> ()) {}
 
 // CHECK-LABEL: sil hidden [ossa] @$s4test0A28EraseAsyncNonIsolatedClosureyyF
@@ -324,6 +325,17 @@ func testEraseInheritingAsyncMainActorClosure() {
   takeInheritingAsyncIsolatedAny {
     await asyncAction()
   }
+}
+
+// rdar://142636640
+// CHECK-LABEL: sil hidden [ossa] @$s4test0A30EraseAsyncMainActorAutoclosureyyYaF
+// CHECK:         [[CLOSURE_FN:%.*]] = function_ref @$s4test0A30EraseAsyncMainActorAutoclosureyyYaFyyYaYAXEfu_ : $@convention(thin) @async (@guaranteed Optional<any Actor>) -> ()
+// CHECK-NEXT:    metatype $@thick MainActor.Type
+// CHECK-NEXT:    // function_ref static MainActor.shared.getter
+//   ...followed by the standard "get the main actor instance" stuff
+@MainActor
+func testEraseAsyncMainActorAutoclosure() async {
+  await takeAsyncIsolatedAnyAutoclosure(await asyncAction())
 }
 
 // Define a global actor that doesn't use Self as its instance type
