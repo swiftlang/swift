@@ -1123,6 +1123,7 @@ public:
       auto exprToCheck = yieldExprs[i];
 
       InOutExpr *inout = nullptr;
+      UnsafeExpr *unsafeExpr = nullptr;
 
       // Classify whether we're yielding by reference or by value.
       ContextualTypePurpose contextTypePurpose;
@@ -1130,6 +1131,11 @@ public:
       if (yieldResults[i].isInOut()) {
         contextTypePurpose = CTP_YieldByReference;
         contextType = LValueType::get(contextType);
+
+        // If present, remove an enclosing 'unsafe' expression.
+        unsafeExpr = dyn_cast<UnsafeExpr>(exprToCheck);
+        if (unsafeExpr)
+          exprToCheck = unsafeExpr->getSubExpr();
 
         // Check that the yielded expression is a &.
         if ((inout = dyn_cast<InOutExpr>(exprToCheck))) {
@@ -1156,6 +1162,13 @@ public:
         inout->setSubExpr(exprToCheck);
         inout->setType(InOutType::get(yieldType));
         exprToCheck = inout;
+      }
+
+      // Propagate the change to the unsafe expression we stripped before.
+      if (unsafeExpr) {
+        unsafeExpr->setSubExpr(exprToCheck);
+        unsafeExpr->setType(exprToCheck->getType());
+        exprToCheck = unsafeExpr;
       }
 
       // Note that this modifies the statement's expression list in-place.
