@@ -136,6 +136,13 @@ func testConstruction() {
   // expected-note@-1{{reference to unsafe initializer 'init(count:)'}}
 }
 
+func testRHS(b: Bool, x: Int) {
+  @unsafe let limit = 17
+  if b && x > limit { // expected-warning{{expression uses unsafe constructs but is not marked with 'unsafe' [Unsafe]}}{{6-6=unsafe }}
+    // expected-note@-1{{reference to unsafe let 'limit'}}
+  }
+}
+
 // -----------------------------------------------------------------------
 // Declaration references
 // -----------------------------------------------------------------------
