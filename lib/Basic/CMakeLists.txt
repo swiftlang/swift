@@ -97,6 +97,7 @@ _swift_gyb_target_sources(swiftBasic PRIVATE
     UnicodeExtendedGraphemeClusters.cpp.gyb)
 
 target_include_directories(swiftBasic PRIVATE
+  clangBasic
   ${UUID_INCLUDE})
 
 target_link_libraries(swiftBasic PUBLIC
