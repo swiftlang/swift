@@ -33,6 +33,8 @@ struct HasMethods {
 
   NonTrivialInWrapper nonConstPassThroughAsWrapper(int a) { return {a}; }
   NonTrivialInWrapper constPassThroughAsWrapper(int a) const { return {a}; }
+
+  void nonTrivialTakesRef(const NonTrivialInWrapper& w) const {}
 };
 
 struct ReferenceParams {
