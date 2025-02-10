@@ -2,7 +2,8 @@
 
 // REQUIRES: objc_interop
 // REQUIRES: OS=macosx
-
+// https://github.com/swiftlang/swift/issues/79255
+// REQUIRES: rdar141262107
 import SwiftUI
 
 struct ContentView : View {
