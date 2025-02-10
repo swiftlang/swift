@@ -3172,7 +3172,7 @@ class CheckEffectsCoverage : public EffectsHandlingWalker<CheckEffectsCoverage> 
       return false;
 
     return isa<AbstractClosureExpr>(e) || isa<DiscardAssignmentExpr>(e) ||
-           isa<AssignExpr>(e) || (isa<DeclRefExpr>(e) && e->isImplicit());
+           isa<AssignExpr>(e);
   }
 
   static bool isAnchorTooEarly(Expr *e) {
