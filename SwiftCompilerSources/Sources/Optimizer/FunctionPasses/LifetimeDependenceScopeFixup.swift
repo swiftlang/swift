@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2024 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2025 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -238,6 +238,8 @@ private struct ScopeExtension {
   var innerScope: LifetimeDependence.Scope { get { nestedScopes.first! } }
 
   /// `dependsOnArg` is set to the function argument that represents the caller's dependency source.
+  ///
+  /// Note: for non-address owners, this is equivalent to: owner as? FunctionArg?
   var dependsOnArg: FunctionArgument?
 
   /// `dependsOnCaller` is true if the dependent value is returned by the function.
@@ -272,36 +274,8 @@ private extension LifetimeDependence.Scope {
     var innerScopes = innerScopes ?? SingleInlineArray()
     switch self {
     case let .access(beginAccess):
-      // Finding the access base also finds all intermediate nested scopes; there is no need to recursively call
-      // gatherExtensions().
-      let accessBaseAndScopes = beginAccess.accessBaseWithScopes
-      let accessBase = accessBaseAndScopes.base
-      let ownerAddress: Value
-      var dependsOnArg: FunctionArgument? = nil
-      switch accessBase {
-      case .global, .unidentified:
-        ownerAddress = beginAccess.address
-      case let .argument(arg):
-        ownerAddress = beginAccess.address
-        dependsOnArg = arg
-      case .box, .stack, .class, .tail, .yield, .storeBorrow,
-           .pointer, .index:
-        ownerAddress = accessBase.address!
-      }
-      assert(!accessBaseAndScopes.scopes.isEmpty)
-      for nestedScope in accessBaseAndScopes.scopes {
-        switch nestedScope {
-        case let .access(beginAccess):
-          innerScopes.push(.access(beginAccess))
-        case .dependence, .base:
-          // ignore recursive mark_dependence base for the purpose of extending scopes. This pass will extend the base
-          // of that mark_dependence (if it is unresolved) later as a separate LifetimeDependence.Scope.
-          break
-        }
-      }
-      // TODO: could we have a nested access within an yielded inout address prior to inlining?
-      return SingleInlineArray(element: ScopeExtension(owner: ownerAddress, nestedScopes: innerScopes,
-                                                       dependsOnArg: dependsOnArg))
+      let accessExtension = gatherAccessExtension(beginAccess: beginAccess, innerScopes: &innerScopes)
+      return SingleInlineArray(element: accessExtension)
     case let .borrowed(beginBorrow):
       let borrowedValue = beginBorrow.baseOperand!.value
       let enclosingScope = LifetimeDependence.Scope(base: borrowedValue, context)
@@ -311,13 +285,9 @@ private extension LifetimeDependence.Scope {
       if let extensions = enclosingScope.gatherExtensions(innerScopes: innerBorrowScopes, context) {
         return extensions
       }
-      // This is the outermost scope that can be extended because gatherExtensions did not find an enclosing scope.
-      var dependsOnArg: FunctionArgument? = nil
-      if case let .caller(arg) = enclosingScope {
-        dependsOnArg = arg
-      }
-      return SingleInlineArray(element: ScopeExtension(owner: enclosingScope.parentValue, nestedScopes: innerScopes,
-                                                       dependsOnArg: dependsOnArg))
+      // This is the outermost scope to be extended because gatherExtensions did not find an enclosing scope.
+      return SingleInlineArray(element: getOuterExtension(owner: enclosingScope.parentValue, nestedScopes: innerScopes,
+                                                          context))
     case let .yield(yieldedValue):
       innerScopes.push(self)
       var extensions = SingleInlineArray<ScopeExtension>()
@@ -326,23 +296,69 @@ private extension LifetimeDependence.Scope {
         guard let dep = applySite.resultDependence(on: operand), dep == .scope else {
           continue
         }
-        let enclosingScope = LifetimeDependence.Scope(base: operand.value, context)
-        if let operandExtensions = enclosingScope.gatherExtensions(innerScopes: innerScopes, context) {
-          extensions.append(contentsOf: operandExtensions)
-        } else {
-          // This is the outermost scope that can be extended because gatherExtensions did not find an enclosing scope.
-          var dependsOnArg: FunctionArgument? = nil
-          if case let .caller(arg) = enclosingScope {
-            dependsOnArg = arg
-          }
-          extensions.push(ScopeExtension(owner: enclosingScope.parentValue, nestedScopes: innerScopes,
-                                         dependsOnArg: dependsOnArg))
-        }
+        // Pass a copy of innerScopes without modifying this one.
+        extensions.append(contentsOf: gatherOperandExtension(on: operand, innerScopes: innerScopes, context))
       }
       return extensions
     default:
       return nil
     }
+  }
+
+  /// Unlike LifetimeDependenceInsertion this does not use gatherVariableIntroducers. The purpose here is to extend
+  /// any enclosing OSSA scopes as far as possible to achieve the longest possible owner lifetime, rather than to
+  /// find the "dependence root" for a call argument.
+  func gatherOperandExtension(on operand: Operand, innerScopes: SingleInlineArray<LifetimeDependence.Scope>,
+                              _ context: FunctionPassContext) -> SingleInlineArray<ScopeExtension> {
+    let enclosingScope = LifetimeDependence.Scope(base: operand.value, context)
+    if let extensions = enclosingScope.gatherExtensions(innerScopes: innerScopes, context) {
+      return extensions
+    }
+    // This is the outermost scope to be extended because gatherExtensions did not find an enclosing scope.
+    return SingleInlineArray(element: getOuterExtension(owner: operand.value, nestedScopes: innerScopes, context))
+  }
+
+  func getOuterExtension(owner: Value, nestedScopes: SingleInlineArray<LifetimeDependence.Scope>,
+                         _ context: FunctionPassContext) -> ScopeExtension {
+    let dependsOnArg = owner as? FunctionArgument
+    return ScopeExtension(owner: owner, nestedScopes: nestedScopes, dependsOnArg: dependsOnArg)
+  }
+
+  // Find the nested access scopes that may be extended as if they are the same access. This includes any combination of
+  // read/modify accesses, regardless of whether they may cause an exclusivity violation. The outer accesses will only
+  // be extended as far as required such that the innermost access coveres all dependent uses.
+  // Set ScopeExtension.dependsOnArg if the nested accesses are all compatible with the argument's convention. Then, if
+  // all nested accesses were extended to the return statement, it is valid to logically combine them into a single
+  // access for the purpose of diagnostinc lifetime dependence.
+  func gatherAccessExtension(beginAccess: BeginAccessInst,
+                             innerScopes: inout SingleInlineArray<LifetimeDependence.Scope>) -> ScopeExtension {
+    // Finding the access base also finds all intermediate nested scopes; there is no need to recursively call
+    // gatherExtensions().
+    let accessBaseAndScopes = beginAccess.accessBaseWithScopes
+    var isCompatibleAccess = true
+    for nestedScope in accessBaseAndScopes.scopes {
+      switch nestedScope {
+      case let .access(nestedBeginAccess):
+        innerScopes.push(.access(nestedBeginAccess))
+        if nestedBeginAccess.accessKind != beginAccess.accessKind {
+          isCompatibleAccess = false
+        }
+      case .dependence, .base:
+        // ignore recursive mark_dependence base for the purpose of extending scopes. This pass will extend the base
+        // of that mark_dependence (if it is unresolved) later as a separate LifetimeDependence.Scope.
+        break
+      }
+    }
+    guard case let .access(outerBeginAccess) = innerScopes.last else {
+      // beginAccess is included in accessBaseWithScopes; so at least one access was added to innerScopes.
+      fatalError("missing outer access")
+    }
+    if case let .argument(arg) = accessBaseAndScopes.base {
+      if isCompatibleAccess && beginAccess.accessKind.isCompatible(with: arg.convention) {
+        return ScopeExtension(owner: outerBeginAccess.address, nestedScopes: innerScopes, dependsOnArg: arg)
+      }
+    }
+    return ScopeExtension(owner: outerBeginAccess, nestedScopes: innerScopes, dependsOnArg: nil)
   }
 }
 

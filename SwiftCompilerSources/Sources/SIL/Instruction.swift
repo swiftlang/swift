@@ -441,7 +441,7 @@ public enum VariableScopeInstruction {
   }
 
   public var endOperands: LazyFilterSequence<UseList> {
-    return scopeBegin.uses.endingLifetime
+    scopeBegin.uses.lazy.filter { $0.endsLifetime || $0.instruction is ExtendLifetimeInst }
   }
 
   // TODO: with SIL verification, we might be able to make varDecl non-Optional.

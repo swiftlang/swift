@@ -102,7 +102,7 @@ func test1() -> Int32 {
 // CHECK: [[PTR:%.*]] = apply [[ACCESSOR]]({{%.*}}, [[A]]) : $@convention(method) (Int32, A) -> UnsafePointer<Int32>
 // CHECK: [[T0:%.*]] = struct_extract [[PTR]] : $UnsafePointer<Int32>, #UnsafePointer._rawValue
 // CHECK: [[T1:%.*]] = pointer_to_address [[T0]] : $Builtin.RawPointer to [strict] $*Int32
-// CHECK: [[MD:%.*]] = mark_dependence [[T1]] : $*Int32 on [[A]] : $A
+// CHECK: [[MD:%.*]] = mark_dependence [nonescaping] [[T1]] : $*Int32 on [[A]] : $A
 // CHECK: [[ACCESS:%.*]] = begin_access [read] [unsafe] [[MD]] : $*Int32
 // CHECK: [[T2:%.*]] = load [[ACCESS]] : $*Int32
 // CHECK: return [[T2]] : $Int32

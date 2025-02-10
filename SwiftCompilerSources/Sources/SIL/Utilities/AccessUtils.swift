@@ -55,6 +55,10 @@ public enum AccessBase : CustomStringConvertible, Hashable {
   case stack(AllocStackInst)
   
   /// The address of a global variable.
+  ///
+  /// TODO: make this payload the global address. Make AccessBase.address non-optional. Make AccessBase comparison see
+  /// though things like project_box and global_addr. Then cleanup APIs like LifetimeDependence.Scope that carry extra
+  /// address values around.
   case global(GlobalVariable)
   
   /// The address of a stored property of a class instance.
@@ -424,7 +428,7 @@ private func canBeOperandOfIndexAddr(_ value: Value) -> Bool {
 /// %ptr = address_to_pointer %orig_addr
 /// %addr = pointer_to_address %ptr
 /// ```
-private extension PointerToAddressInst {
+public extension PointerToAddressInst {
   var originatingAddress: Value? {
 
     struct Walker : ValueUseDefWalker {
@@ -477,6 +481,33 @@ private extension PointerToAddressInst {
   }
 }
 
+/// TODO: migrate AccessBase to use this instead of GlobalVariable because many utilities need to get back to a
+/// representative SIL Value.
+public enum GlobalAccessBase {
+  case global(GlobalAddrInst)
+  case initializer(PointerToAddressInst)
+
+  public init?(address: Value) {
+    switch address {
+    case let ga as GlobalAddrInst:
+      self = .global(ga)
+    case let p2a as PointerToAddressInst where p2a.resultOfGlobalAddressorCall != nil:
+      self = .initializer(p2a)
+    default:
+      return nil
+    }
+  }
+
+  public var address: Value {
+    switch self {
+      case let .global(ga):
+        return ga
+      case let .initializer(p2a):
+        return p2a
+    }
+  }
+}
+
 /// The `EnclosingAccessScope` of an access is the innermost `begin_access`
 /// instruction that checks for exclusivity of the access.
 /// If there is no `begin_access` instruction found, then the scope is
@@ -501,12 +532,37 @@ public enum EnclosingAccessScope {
   case access(BeginAccessInst)
   case base(AccessBase)
   case dependence(MarkDependenceInst)
+
+  // TODO: make this non-optional after fixing AccessBase.global.
+  public var address: Value? {
+    switch self {
+    case let .access(beginAccess):
+      return beginAccess
+    case let .base(accessBase):
+      return accessBase.address
+    case let .dependence(markDep):
+      return markDep
+    }
+  }
 }
 
 // An AccessBase with the nested enclosing scopes that contain the original address in bottom-up order.
 public struct AccessBaseAndScopes {
   public let base: AccessBase
   public let scopes: SingleInlineArray<EnclosingAccessScope>
+
+  public init(base: AccessBase, scopes: SingleInlineArray<EnclosingAccessScope>) {
+    self.base = base
+    self.scopes = scopes
+  }
+
+  public var outerAddress: Value? {
+    base.address ?? scopes.last?.address
+  }
+
+  public var enclosingAccess: EnclosingAccessScope {
+    return scopes.first ?? .base(base)
+  }
 
   public var innermostAccess: BeginAccessInst? {
     for scope in scopes {
@@ -515,6 +571,46 @@ public struct AccessBaseAndScopes {
       }
     }
     return nil
+  }
+}
+
+extension AccessBaseAndScopes {
+  // This must return false if a mark_dependence scope is present.
+  public var isOnlyReadAccess: Bool {
+    scopes.allSatisfy(
+      {
+        if case let .access(beginAccess) = $0 {
+          return beginAccess.accessKind == .read
+        }
+        // preserve any dependence scopes.
+        return false
+      })
+  }
+}
+
+extension BeginAccessInst {
+  // Recognize an access scope for a unsafe addressor:
+  // %adr = pointer_to_address
+  // %md = mark_dependence %adr
+  // begin_access [unsafe] %md
+  public var unsafeAddressorSelf: Value? {
+    guard self.isUnsafe else {
+      return nil
+    }
+    switch self.address.enclosingAccessScope {
+    case .access, .base:
+      return nil
+    case let .dependence(markDep):
+      switch markDep.value.enclosingAccessScope {
+      case .access, .dependence:
+        return nil
+      case let .base(accessBase):
+        guard case .pointer = accessBase else {
+          return nil
+        }
+        return markDep.base
+      }
+    }
   }
 }
 
