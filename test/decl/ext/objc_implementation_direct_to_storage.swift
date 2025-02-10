@@ -4,22 +4,20 @@
 
 import objc_implementation_internal
 
+// FIXME: [availability] An implementation that is less available than the interface it implements should be diagnosed
 @available(*, unavailable)
 @objc @implementation extension ObjCPropertyTest {
-  // FIXME: Shouldn't this be on the `@available` above?
-  // expected-note@+1 {{'prop1' has been explicitly marked unavailable here}}
   let prop1: Int32
 
-  // expected-note@+1 2 {{'prop2' has been explicitly marked unavailable here}}
   var prop2: Int32 {
     didSet {
-      _ = prop2 // expected-error {{'prop2' is unavailable}}
+      _ = prop2
     }
   }
 
   override init() {
-    self.prop1 = 1 // expected-error {{'prop1' is unavailable}}
-    self.prop2 = 2 // expected-error {{'prop2' is unavailable}}
+    self.prop1 = 1
+    self.prop2 = 2
     super.init()
   }
 
@@ -27,4 +25,9 @@ import objc_implementation_internal
     _ = self.prop1
     _ = self.prop2
   }
+}
+
+func takesObjCPropertyTest(_ o: ObjCPropertyTest) {
+  _ = o.prop1
+  _ = o.prop2
 }

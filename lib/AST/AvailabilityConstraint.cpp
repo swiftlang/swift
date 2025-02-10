@@ -24,35 +24,78 @@ PlatformKind AvailabilityConstraint::getPlatform() const {
 
 std::optional<AvailabilityRange>
 AvailabilityConstraint::getRequiredNewerAvailabilityRange(
-    ASTContext &ctx) const {
-  switch (getKind()) {
-  case Kind::AlwaysUnavailable:
-  case Kind::RequiresVersion:
-  case Kind::Obsoleted:
+    const ASTContext &ctx) const {
+  switch (getReason()) {
+  case Reason::UnconditionallyUnavailable:
+  case Reason::Obsoleted:
+  case Reason::IntroducedInLaterVersion:
     return std::nullopt;
-  case Kind::IntroducedInNewerVersion:
+  case Reason::IntroducedInLaterDynamicVersion:
     return getAttr().getIntroducedRange(ctx);
   }
 }
 
-bool AvailabilityConstraint::isConditionallySatisfiable() const {
-  switch (getKind()) {
-  case Kind::AlwaysUnavailable:
-  case Kind::RequiresVersion:
-  case Kind::Obsoleted:
-    return false;
-  case Kind::IntroducedInNewerVersion:
-    return true;
-  }
-}
-
-bool AvailabilityConstraint::isActiveForRuntimeQueries(ASTContext &ctx) const {
+bool AvailabilityConstraint::isActiveForRuntimeQueries(
+    const ASTContext &ctx) const {
   if (getAttr().getPlatform() == PlatformKind::none)
     return true;
 
   return swift::isPlatformActive(getAttr().getPlatform(), ctx.LangOpts,
                                  /*forTargetVariant=*/false,
                                  /*forRuntimeQuery=*/true);
+}
+
+void DeclAvailabilityConstraints::addConstraint(
+    const AvailabilityConstraint &constraint, const ASTContext &ctx) {
+
+  auto existing = llvm::find_if(
+      constraints, [&constraint](AvailabilityConstraint &existing) {
+        return constraint.getKind() == existing.getKind() &&
+               constraint.getDomain() == existing.getDomain();
+      });
+
+  if (existing == constraints.end()) {
+    constraints.emplace_back(constraint);
+    return;
+  }
+
+  // Since the constraints have matching kinds and domains, choose the stronger
+  // constraint to keep.
+  switch (constraint.getKind()) {
+  case AvailabilityConstraint::Kind::Unavailable:
+    // All unavailable constraints are considered equal, just keep the first
+    // we encounter.
+    break;
+  case AvailabilityConstraint::Kind::PotentiallyAvailable:
+    // Replace the existing constraint if the required version is higher.
+    auto existingRange = existing->getRequiredNewerAvailabilityRange(ctx);
+    auto newRange = constraint.getRequiredNewerAvailabilityRange(ctx);
+    if (existingRange && newRange && newRange->isContainedIn(*existingRange))
+      *existing = constraint;
+    break;
+  }
+}
+
+std::optional<AvailabilityConstraint>
+DeclAvailabilityConstraints::getPrimaryConstraint() const {
+  std::optional<AvailabilityConstraint> result;
+
+  auto isStrongerConstraint = [](const AvailabilityConstraint &lhs,
+                                 const AvailabilityConstraint &rhs) {
+    // Pick the strongest constraint. Constraint kinds are defined in descending
+    // order of strength.
+    if (lhs.getKind() != rhs.getKind())
+      return lhs.getKind() < rhs.getKind();
+
+    return false;
+  };
+
+  for (auto const &constraint : constraints) {
+    if (!result || isStrongerConstraint(constraint, *result))
+      result.emplace(constraint);
+  }
+
+  return result;
 }
 
 static bool
@@ -84,7 +127,7 @@ swift::getAvailabilityConstraintForAttr(const Decl *decl,
     return std::nullopt;
 
   if (attr.isUnconditionallyUnavailable())
-    return AvailabilityConstraint::forAlwaysUnavailable(attr);
+    return AvailabilityConstraint::unconditionallyUnavailable(attr);
 
   auto &ctx = decl->getASTContext();
   auto deploymentVersion = attr.getActiveVersion(ctx);
@@ -101,16 +144,16 @@ swift::getAvailabilityConstraintForAttr(const Decl *decl,
   }
 
   if (obsoletedVersion && *obsoletedVersion <= deploymentVersion)
-    return AvailabilityConstraint::forObsoleted(attr);
+    return AvailabilityConstraint::obsoleted(attr);
 
   AvailabilityRange introducedRange = attr.getIntroducedRange(ctx);
 
   // FIXME: [availability] Expand this to cover custom versioned domains
   if (attr.isPlatformSpecific()) {
     if (!context.getPlatformRange().isContainedIn(introducedRange))
-      return AvailabilityConstraint::forIntroducedInNewerVersion(attr);
+      return AvailabilityConstraint::introducedInLaterDynamicVersion(attr);
   } else if (!deploymentRange.isContainedIn(introducedRange)) {
-    return AvailabilityConstraint::forRequiresVersion(attr);
+    return AvailabilityConstraint::introducedInLaterVersion(attr);
   }
 
   return std::nullopt;
@@ -143,6 +186,7 @@ static void
 getAvailabilityConstraintsForDecl(DeclAvailabilityConstraints &constraints,
                                   const Decl *decl,
                                   const AvailabilityContext &context) {
+  auto &ctx = decl->getASTContext();
   auto activePlatformDomain = activePlatformDomainForDecl(decl);
 
   for (auto attr :
@@ -154,7 +198,7 @@ getAvailabilityConstraintsForDecl(DeclAvailabilityConstraints &constraints,
 
     if (auto constraint =
             swift::getAvailabilityConstraintForAttr(decl, attr, context))
-      constraints.addConstraint(*constraint);
+      constraints.addConstraint(*constraint, ctx);
   }
 }
 

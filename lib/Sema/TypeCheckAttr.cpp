@@ -2418,9 +2418,13 @@ void AttributeChecker::visitAvailableAttr(AvailableAttr *parsedAttr) {
   }
 
   SourceLoc attrLoc = parsedAttr->getLocation();
-  auto versionAvailability = attr->getVersionAvailability(Ctx);
-  if (versionAvailability == AvailableVersionComparison::Obsoleted ||
-      versionAvailability == AvailableVersionComparison::Unavailable) {
+  // FIXME: [availability] This should diagnose any attribute that _can_ make
+  // the decl unavailable, even if it doesn't make the decl unavailable for the
+  // current module.
+  auto deploymentContext = AvailabilityContext::forDeploymentTarget(Ctx);
+  auto constraint =
+      getAvailabilityConstraintForAttr(D, *attr, deploymentContext);
+  if (constraint && constraint->isUnavailable()) {
     if (auto cannotBeUnavailable =
             TypeChecker::diagnosticIfDeclCannotBeUnavailable(D)) {
       diagnose(attrLoc, cannotBeUnavailable.value());

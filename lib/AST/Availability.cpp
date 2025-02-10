@@ -573,49 +573,13 @@ bool Decl::isUnavailableInCurrentSwiftVersion() const {
   return false;
 }
 
-std::optional<SemanticAvailableAttr> getDeclUnavailableAttr(const Decl *D) {
-  auto &ctx = D->getASTContext();
-  std::optional<SemanticAvailableAttr> result;
-  auto bestActive = D->getActiveAvailableAttrForCurrentPlatform();
-
-  for (auto attr : D->getSemanticAvailableAttrs(/*includingInactive=*/false)) {
-    // If this is a platform-specific attribute and it isn't the most
-    // specific attribute for the current platform, we're done.
-    if (attr.isPlatformSpecific() && (!bestActive || attr != bestActive))
-      continue;
-
-    // Unconditional unavailable.
-    if (attr.isUnconditionallyUnavailable())
-      return attr;
-
-    switch (attr.getVersionAvailability(ctx)) {
-    case AvailableVersionComparison::Available:
-    case AvailableVersionComparison::PotentiallyUnavailable:
-      break;
-
-    case AvailableVersionComparison::Obsoleted:
-    case AvailableVersionComparison::Unavailable:
-      result.emplace(attr);
-      break;
-    }
-  }
-  return result;
-}
-
 std::optional<SemanticAvailableAttr> Decl::getUnavailableAttr() const {
-  if (auto attr = getDeclUnavailableAttr(this))
-    return attr;
-
-  // If D is an extension member, check if the extension is unavailable.
-  //
-  // Skip decls imported from Clang, they could be associated to the wrong
-  // extension and inherit undesired unavailability. The ClangImporter
-  // associates Objective-C protocol members to the first category where the
-  // protocol is directly or indirectly adopted, no matter its availability
-  // and the availability of other categories. rdar://problem/53956555
-  if (!getClangNode())
-    if (auto ext = dyn_cast<ExtensionDecl>(getDeclContext()))
-      return ext->getUnavailableAttr();
+  auto context = AvailabilityContext::forDeploymentTarget(getASTContext());
+  if (auto constraint = getAvailabilityConstraintsForDecl(this, context)
+                            .getPrimaryConstraint()) {
+    if (constraint->isUnavailable())
+      return constraint->getAttr();
+  }
 
   return std::nullopt;
 }
