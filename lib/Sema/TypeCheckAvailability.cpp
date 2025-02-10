@@ -346,40 +346,6 @@ static bool computeContainedByDeploymentTarget(AvailabilityScope *scope,
       AvailabilityRange::forDeploymentTarget(ctx));
 }
 
-/// Returns true if the reference or any of its parents is an
-/// unconditional unavailable declaration for the same platform.
-static bool isInsideCompatibleUnavailableDeclaration(
-    const Decl *D, AvailabilityContext availabilityContext,
-    const SemanticAvailableAttr &attr) {
-  if (!availabilityContext.isUnavailable())
-    return false;
-
-  if (!attr.isUnconditionallyUnavailable())
-    return false;
-
-  // Refuse calling universally unavailable functions from unavailable code,
-  // but allow the use of types.
-  auto declDomain = attr.getDomain();
-  if (!isa<TypeDecl>(D) && !isa<ExtensionDecl>(D)) {
-    if (declDomain.isUniversal() || declDomain.isSwiftLanguage())
-      return false;
-  }
-
-  return availabilityContext.containsUnavailableDomain(declDomain);
-}
-
-std::optional<SemanticAvailableAttr>
-ExportContext::shouldDiagnoseDeclAsUnavailable(const Decl *D) const {
-  auto attr = D->getUnavailableAttr();
-  if (!attr)
-    return std::nullopt;
-
-  if (isInsideCompatibleUnavailableDeclaration(D, Availability, *attr))
-    return std::nullopt;
-
-  return attr;
-}
-
 static bool shouldAllowReferenceToUnavailableInSwiftDeclaration(
     const Decl *D, const ExportContext &where) {
   auto *DC = where.getDeclContext();
