@@ -97,6 +97,7 @@ func acceptClosures(x: () -> Void) {}
 func acceptClosures(x: () -> Void, y: () -> Int) {}
 func acceptClosures(x: () -> Void, y: () -> Int, _ z: () -> Void) {}
 func acceptClosures(x: (Int, String) -> Void) {}
+func acceptClosures(x: (Int, String, inout String) -> Void) {}
 func testTrailingClsure() {
   acceptClosures {}
   acceptClosures() {}
@@ -108,6 +109,13 @@ func testTrailingClsure() {
   acceptClosures { (x, y: String) -> Void in  }
   acceptClosures { x, y in  }
   acceptClosures { @Sendable x, y in  }
+
+  acceptClosures { $1.count == $0.bitWidth }
+  acceptClosures { $1.count }
+  acceptClosures {
+    _ = $1
+    acceptClosures { $2 = $1 }
+  }
 }
 
 func testInOut() {

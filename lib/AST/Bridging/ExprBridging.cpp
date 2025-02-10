@@ -146,9 +146,18 @@ BridgedClosureExpr BridgedClosureExpr_createParsed(
                   declContext);
 }
 
+BridgedParameterList
+BridgedClosureExpr_getParameterList(BridgedClosureExpr cClosure) {
+  return cClosure.unbridged()->getParameters();
+}
+
 void BridgedClosureExpr_setParameterList(BridgedClosureExpr cClosure,
                                          BridgedParameterList cParams) {
   cClosure.unbridged()->setParameterList(cParams.unbridged());
+}
+
+bool BridgedClosureExpr_hasAnonymousClosureVars(BridgedClosureExpr cClosure) {
+  return cClosure.unbridged()->hasAnonymousClosureVars();
 }
 
 void BridgedClosureExpr_setHasAnonymousClosureVars(

@@ -26,6 +26,11 @@ BridgedIdentifier BridgedASTContext_getIdentifier(BridgedASTContext cContext,
   return cContext.unbridged().getIdentifier(cStr.unbridged());
 }
 
+BridgedIdentifier
+BridgedASTContext_getDollarIdentifier(BridgedASTContext cContext, size_t idx) {
+  return cContext.unbridged().getDollarIdentifier(idx);
+}
+
 bool BridgedASTContext_langOptsHasFeature(BridgedASTContext cContext,
                                           BridgedFeature feature) {
   return cContext.unbridged().LangOpts.hasFeature((Feature)feature);

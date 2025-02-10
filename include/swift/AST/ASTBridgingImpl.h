@@ -134,6 +134,16 @@ bool BridgedDeclContext_isModuleScopeContext(BridgedDeclContext dc) {
   return dc.unbridged()->isModuleScopeContext();
 }
 
+bool BridgedDeclContext_isClosureExpr(BridgedDeclContext dc) {
+  return llvm::isa_and_present<swift::ClosureExpr>(
+      llvm::dyn_cast<swift::AbstractClosureExpr>(dc.unbridged()));
+}
+
+BridgedClosureExpr BridgedDeclContext_castToClosureExpr(BridgedDeclContext dc) {
+  return llvm::cast<swift::ClosureExpr>(
+      llvm::cast<swift::AbstractClosureExpr>(dc.unbridged()));
+}
+
 BridgedASTContext BridgedDeclContext_getASTContext(BridgedDeclContext dc) {
   return dc.unbridged()->getASTContext();
 }
@@ -268,6 +278,10 @@ swift::ParamSpecifier unbridge(BridgedParamSpecifier specifier) {
 void BridgedParamDecl_setSpecifier(BridgedParamDecl cDecl,
                                    BridgedParamSpecifier cSpecifier) {
   cDecl.unbridged()->setSpecifier(unbridge(cSpecifier));
+}
+
+void BridgedParamDecl_setImplicit(BridgedParamDecl cDecl) {
+  cDecl.unbridged()->setImplicit();
 }
 
 //===----------------------------------------------------------------------===//
