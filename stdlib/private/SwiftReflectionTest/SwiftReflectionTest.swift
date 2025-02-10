@@ -134,6 +134,8 @@ import Glibc
 import Musl
 #elseif canImport(Android)
 import Android
+#elseif canImport(FreeBSD)
+import FreeBSD
 #endif
 
 let rtldDefault: UnsafeMutableRawPointer? = nil

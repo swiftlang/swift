@@ -27,6 +27,8 @@ import Musl
 import Android
 #elseif canImport(WASILibc)
 import WASILibc
+#elseif canImport(FreeBSD)
+import FreeBSD
 #endif
 let (platform_read, platform_write, platform_close) = (read, write, close)
 #endif 

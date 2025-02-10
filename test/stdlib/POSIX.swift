@@ -11,6 +11,8 @@ import SwiftPrivateLibcExtras
   import Glibc
 #elseif canImport(Android)
   import Android
+#elseif canImport(FreeBSD)
+  import FreeBSD
 #else
 #error("Unsupported platform")
 #endif

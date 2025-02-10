@@ -17,6 +17,8 @@ import Glibc
 import Musl
 #elseif os(Windows)
 import MSVCRT
+#elseif canImport(FreeBSD)
+import FreeBSD
 #else
 import Darwin
 #endif

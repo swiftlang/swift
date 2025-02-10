@@ -625,8 +625,12 @@ ClangInvocationFileMapping swift::getClangInvocationFileMapping(
       sysroot = libcFileMapping[0].first;
       llvm::sys::path::remove_filename(sysroot);
     }
-  } else if (triple.isOSGlibc() || triple.isOSOpenBSD() ||
-             triple.isOSFreeBSD()) {
+  } else if (triple.isOSFreeBSD()) {
+    libcFileMapping = getLibcFileMapping(ctx, "freebsd.modulemap",
+                                         StringRef("SwiftFreeBSD.h"), vfs,
+                                         suppressDiagnostic);
+    result.requiresBuiltinHeadersInSystemModules = true;
+  } else if (triple.isOSGlibc() || triple.isOSOpenBSD()) {
     // BSD/Linux Mappings
     libcFileMapping = getLibcFileMapping(ctx, "glibc.modulemap",
                                          StringRef("SwiftGlibc.h"), vfs,

@@ -15,6 +15,8 @@ import Darwin.C
 import Glibc
 #elseif canImport(MSVCRT)
 import MSVCRT
+#elseif canImport(FreeBSD)
+import FreeBSD
 #endif
 
 @_cdecl("LLVMFuzzerTestOneInput")

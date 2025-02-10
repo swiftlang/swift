@@ -470,6 +470,8 @@ FuncDecl *SILGenModule::getExit() {
     mostLikelyIdentifier = C.getIdentifier("SwiftWASILibc");
   } else if (triple.isWindowsMSVCEnvironment()) {
     mostLikelyIdentifier = C.getIdentifier("ucrt");
+  } else if (triple.isOSFreeBSD()) {
+    mostLikelyIdentifier = C.getIdentifier("SwiftFreeBSD");
   } else {
     mostLikelyIdentifier = C.getIdentifier("SwiftGlibc");
   }

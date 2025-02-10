@@ -10,6 +10,7 @@ if(SWIFT_BUILD_SDK_OVERLAY)
   set(wincrt_sdk CRT WinSDK)
   set(glibc Glibc)
   set(musl Musl)
+  set(freebsd FreeBSD)
 endif()
 
 # Similarly, we only want the Runtime dependency if we're building
@@ -58,6 +59,7 @@ add_swift_target_executable(swift-backtrace BUILD_WITH_LIBEXEC
   SWIFT_MODULE_DEPENDS_WINDOWS      ${wincrt_sdk}
   SWIFT_MODULE_DEPENDS_LINUX        ${glibc}
   SWIFT_MODULE_DEPENDS_LINUX_STATIC ${musl}
+  SWIFT_MODULE_DEPENDS_FREEBSD      ${freebsd}
 
   DEPLOYMENT_VERSION_OSX ${osx_deployment_target}
 
@@ -87,6 +89,7 @@ if(static_target_sdks)
     SWIFT_MODULE_DEPENDS_WINDOWS      ${wincrt_sdk}
     SWIFT_MODULE_DEPENDS_LINUX        ${glibc}
     SWIFT_MODULE_DEPENDS_LINUX_STATIC ${musl}
+    SWIFT_MODULE_DEPENDS_FREEBSD      ${freebsd}
 
     DEPLOYMENT_VERSION_OSX ${osx_deployment_target}
 

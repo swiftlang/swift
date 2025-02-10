@@ -10,6 +10,8 @@ import SwiftPrivateThreadExtras
   import Glibc
 #elseif os(Windows)
   import MSVCRT
+#elseif canImport(FreeBSD)
+  import FreeBSD
 #else
 #error("Unsupported platform")
 #endif

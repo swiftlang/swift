@@ -18,6 +18,8 @@ import StdlibUnittest
     import Glibc
 #elseif canImport(Android)
     import Android
+#elseif canImport(FreeBSD)
+    import FreeBSD
 #endif
 
 var asyncTests = TestSuite("Async")

@@ -20,6 +20,8 @@ import Darwin
 import Glibc
 #elseif canImport(Android)
 import Android
+#elseif canImport(FreeBSD)
+import FreeBSD
 #endif
 
 enum TL {
