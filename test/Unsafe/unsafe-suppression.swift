@@ -116,3 +116,30 @@ extension UnsafeOuter {
 extension UnsafeOuter {
   func i(_: UnsafeType) { }
 }
+
+// -----------------------------------------------------------------------
+// Miscellaneous issues
+// -----------------------------------------------------------------------
+var yieldUnsafe: Int {
+  _read {
+    @unsafe let x = 5
+    yield x // expected-warning{{expression uses unsafe constructs but is not marked with 'unsafe' [Unsafe]}}
+    // expected-note@-1{{reference to unsafe let 'x'}}
+  }
+  _modify {
+    @unsafe var x = 5
+    yield &x // expected-warning{{expression uses unsafe constructs but is not marked with 'unsafe' [Unsafe]}}
+    // expected-note@-1{{reference to unsafe var 'x'}}
+  }
+}
+
+var yieldUnsafeOkay: Int {
+  _read {
+    @unsafe let x = 5
+    yield unsafe x
+  }
+  _modify {
+    @unsafe var x = 5
+    yield unsafe &x
+  }
+}
