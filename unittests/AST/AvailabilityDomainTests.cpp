@@ -10,10 +10,12 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "TestContext.h"
 #include "swift/AST/AvailabilityDomain.h"
 #include "gtest/gtest.h"
 
 using namespace swift;
+using namespace swift::unittest;
 
 class AvailabilityDomainLattice : public ::testing::Test {
 public:
@@ -71,19 +73,103 @@ TEST_F(AvailabilityDomainLattice, Contains) {
   EXPECT_FALSE(macOS.contains(macCatalyst));
   EXPECT_FALSE(macCatalyst.contains(macOS));
 
-  // Additionally, iOS is the ABI platform for both macCatalyst and visionOS and
-  // thus the iOS domain contains those domains.
+  // iOS is the ABI platform for macCatalyst and visionOS, so it contain those
+  // domains.
   EXPECT_TRUE(iOS.contains(iOS));
   EXPECT_TRUE(iOS.contains(iOSAppExt));
-  EXPECT_FALSE(iOSAppExt.contains(iOS));
   EXPECT_TRUE(iOS.contains(macCatalyst));
-  EXPECT_FALSE(macCatalyst.contains(iOS));
   EXPECT_TRUE(iOS.contains(macCatalystAppExt));
-  EXPECT_FALSE(macCatalystAppExt.contains(iOS));
   EXPECT_TRUE(iOS.contains(visionOS));
-  EXPECT_FALSE(visionOS.contains(iOS));
   EXPECT_TRUE(iOS.contains(visionOSAppExt));
-  EXPECT_FALSE(visionOSAppExt.contains(iOS));
   EXPECT_FALSE(iOS.contains(macOS));
   EXPECT_FALSE(iOS.contains(macOSAppExt));
+
+  EXPECT_TRUE(iOSAppExt.contains(iOSAppExt));
+  EXPECT_FALSE(iOSAppExt.contains(iOS));
+  EXPECT_FALSE(iOSAppExt.contains(macCatalyst));
+  EXPECT_TRUE(iOSAppExt.contains(macCatalystAppExt));
+  EXPECT_FALSE(iOSAppExt.contains(visionOS));
+  EXPECT_TRUE(iOSAppExt.contains(visionOSAppExt));
+  EXPECT_FALSE(iOSAppExt.contains(macOS));
+  EXPECT_FALSE(iOSAppExt.contains(macOSAppExt));
+
+  EXPECT_TRUE(macCatalyst.contains(macCatalyst));
+  EXPECT_TRUE(macCatalyst.contains(macCatalystAppExt));
+  EXPECT_FALSE(macCatalyst.contains(iOS));
+  EXPECT_FALSE(macCatalyst.contains(iOSAppExt));
+  EXPECT_FALSE(macCatalyst.contains(visionOS));
+  EXPECT_FALSE(macCatalyst.contains(visionOSAppExt));
+  EXPECT_FALSE(macCatalyst.contains(macOS));
+  EXPECT_FALSE(macCatalyst.contains(macOSAppExt));
+
+  EXPECT_TRUE(macCatalystAppExt.contains(macCatalystAppExt));
+  EXPECT_FALSE(macCatalystAppExt.contains(macCatalyst));
+  EXPECT_FALSE(macCatalystAppExt.contains(iOS));
+  EXPECT_FALSE(macCatalystAppExt.contains(iOSAppExt));
+  EXPECT_FALSE(macCatalystAppExt.contains(visionOS));
+  EXPECT_FALSE(macCatalystAppExt.contains(visionOSAppExt));
+  EXPECT_FALSE(macCatalystAppExt.contains(macOS));
+  EXPECT_FALSE(macCatalystAppExt.contains(macOSAppExt));
+
+  EXPECT_TRUE(visionOS.contains(visionOS));
+  EXPECT_TRUE(visionOS.contains(visionOSAppExt));
+  EXPECT_FALSE(visionOS.contains(iOS));
+  EXPECT_FALSE(visionOS.contains(iOSAppExt));
+  EXPECT_FALSE(visionOS.contains(macCatalyst));
+  EXPECT_FALSE(visionOS.contains(macCatalystAppExt));
+  EXPECT_FALSE(visionOS.contains(macOS));
+  EXPECT_FALSE(visionOS.contains(macOSAppExt));
+
+  EXPECT_TRUE(visionOSAppExt.contains(visionOSAppExt));
+  EXPECT_FALSE(visionOSAppExt.contains(visionOS));
+  EXPECT_FALSE(visionOSAppExt.contains(iOS));
+  EXPECT_FALSE(visionOSAppExt.contains(iOSAppExt));
+  EXPECT_FALSE(visionOSAppExt.contains(macCatalyst));
+  EXPECT_FALSE(visionOSAppExt.contains(macCatalystAppExt));
+  EXPECT_FALSE(visionOSAppExt.contains(macOS));
+  EXPECT_FALSE(visionOSAppExt.contains(macOSAppExt));
+}
+
+TEST_F(AvailabilityDomainLattice, ABICompatibilityDomain) {
+  EXPECT_EQ(Universal.getABICompatibilityDomain(), Universal);
+  EXPECT_EQ(Swift.getABICompatibilityDomain(), Swift);
+  EXPECT_EQ(Package.getABICompatibilityDomain(), Package);
+  EXPECT_EQ(Embedded.getABICompatibilityDomain(), Embedded);
+  EXPECT_EQ(macOS.getABICompatibilityDomain(), macOS);
+  EXPECT_EQ(macOSAppExt.getABICompatibilityDomain(), macOS);
+  EXPECT_EQ(iOS.getABICompatibilityDomain(), iOS);
+  EXPECT_EQ(iOSAppExt.getABICompatibilityDomain(), iOS);
+  EXPECT_EQ(macCatalyst.getABICompatibilityDomain(), iOS);
+  EXPECT_EQ(macCatalystAppExt.getABICompatibilityDomain(), iOS);
+  EXPECT_EQ(visionOS.getABICompatibilityDomain(), iOS);
+  EXPECT_EQ(visionOSAppExt.getABICompatibilityDomain(), iOS);
+}
+
+TEST(AvailabilityDomain, TargetPlatform) {
+  using namespace llvm;
+
+  struct TargetToPlatformKind {
+    Triple target;
+    PlatformKind platformKind;
+  };
+  TargetToPlatformKind tests[] = {
+      {Triple("x86_64", "apple", "macosx10.15"), PlatformKind::macOS},
+      {Triple("arm64", "apple", "ios13"), PlatformKind::iOS},
+      {Triple("arm64_32", "apple", "watchos8"), PlatformKind::watchOS},
+      {Triple("x86_64", "apple", "ios14", "macabi"), PlatformKind::macCatalyst},
+      {Triple("x86_64", "unknown", "windows", "msvc"), PlatformKind::none},
+      {Triple("x86_64", "unknown", "linux", "gnu"), PlatformKind::none},
+  };
+
+  for (TargetToPlatformKind test : tests) {
+    TestContext context{test.target};
+    auto domain = AvailabilityDomain::forTargetPlatform(context.Ctx);
+    if (test.platformKind != PlatformKind::none) {
+      EXPECT_TRUE(domain);
+      if (domain)
+        EXPECT_TRUE(domain->getPlatformKind() == test.platformKind);
+    } else {
+      EXPECT_FALSE(domain);
+    }
+  }
 }

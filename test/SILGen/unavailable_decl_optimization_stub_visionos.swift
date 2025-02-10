@@ -1,5 +1,5 @@
-// RUN: %target-swift-emit-silgen -module-name Test -parse-as-library %s -verify -target arm64-apple-xros1.0 | %FileCheck %s --check-prefixes=CHECK
-// RUN: %target-swift-emit-silgen -module-name Test -parse-as-library %s -verify -unavailable-decl-optimization=none -target arm64-apple-xros1.0 | %FileCheck %s --check-prefixes=CHECK
+// RUN: %target-swift-emit-silgen -module-name Test -parse-as-library %s -verify -unavailable-decl-optimization=stub -target arm64-apple-xros1.0 | %FileCheck %s --check-prefixes=CHECK
+// RUN: %target-swift-emit-silgen -module-name Test -parse-as-library %s -verify -unavailable-decl-optimization=stub -target arm64-apple-xros1.0 -application-extension | %FileCheck %s --check-prefixes=CHECK
 
 // REQUIRES: OS=xros
 
@@ -14,7 +14,8 @@ public func visionOSUnavailable() -> S {
 }
 
 // CHECK-LABEL: sil{{.*}}@$s4Test14iOSUnavailableAA1SVyF
-// CHECK-NOT:     ss31_diagnoseUnavailableCodeReacheds5NeverOyF
+// CHECK:         [[FNREF:%.*]] = function_ref @$ss31_diagnoseUnavailableCodeReacheds5NeverOyF : $@convention(thin) () -> Never
+// CHECK-NEXT:    [[APPLY:%.*]] = apply [[FNREF]]()
 // CHECK:       } // end sil function '$s4Test14iOSUnavailableAA1SVyF'
 @available(iOS, unavailable)
 public func iOSUnavailable() -> S {
@@ -39,12 +40,32 @@ public func iOSUnavailableVisionOSAvailable() -> S {
 }
 
 // CHECK-LABEL: sil{{.*}}@$s4Test25iOSAndVisionOSUnavailableAA1SVyF
-// CHECK-NOT:     ss31_diagnoseUnavailableCodeReacheds5NeverOyF
+// CHECK:         [[FNREF:%.*]] = function_ref @$ss31_diagnoseUnavailableCodeReacheds5NeverOyF : $@convention(thin) () -> Never
+// CHECK-NEXT:    [[APPLY:%.*]] = apply [[FNREF]]()
 // CHECK:       } // end sil function '$s4Test25iOSAndVisionOSUnavailableAA1SVyF'
 @available(iOS, unavailable)
 @available(visionOS, unavailable)
 public func iOSAndVisionOSUnavailable() -> S {
-  // FIXME: This function should be optimized (rdar://116742214)
+  return S()
+}
+
+// CHECK-LABEL: sil{{.*}}@$s4Test20iOSAppExtensionsOnlyAA1SVyF
+// CHECK-NOT:     ss31_diagnoseUnavailableCodeReacheds5NeverOyF
+// CHECK:       } // end sil function '$s4Test20iOSAppExtensionsOnlyAA1SVyF'
+@available(iOS, unavailable)
+@available(visionOS, unavailable)
+@available(iOSApplicationExtension, introduced: 1.0)
+public func iOSAppExtensionsOnly() -> S {
+  return S()
+}
+
+// CHECK-LABEL: sil{{.*}}@$s4Test25visionOSAppExtensionsOnlyAA1SVyF
+// CHECK-NOT:     ss31_diagnoseUnavailableCodeReacheds5NeverOyF
+// CHECK:       } // end sil function '$s4Test25visionOSAppExtensionsOnlyAA1SVyF'
+@available(iOS, unavailable)
+@available(visionOS, unavailable)
+@available(visionOSApplicationExtension, introduced: 1.0)
+public func visionOSAppExtensionsOnly() -> S {
   return S()
 }
 
@@ -58,11 +79,11 @@ public struct UnavailableOnVisionOS {
   }
 
   // CHECK-LABEL: sil{{.*}}@$s4Test21UnavailableOnVisionOSV022iOSUnavailableInheritsdF0AA1SVyF
-  // CHECK-NOT:     ss31_diagnoseUnavailableCodeReacheds5NeverOyF
+  // CHECK:         [[FNREF:%.*]] = function_ref @$ss31_diagnoseUnavailableCodeReacheds5NeverOyF : $@convention(thin) () -> Never
+  // CHECK-NEXT:    [[APPLY:%.*]] = apply [[FNREF]]()
   // CHECK:       } // end sil function '$s4Test21UnavailableOnVisionOSV022iOSUnavailableInheritsdF0AA1SVyF'
   @available(iOS, unavailable)
   public func iOSUnavailableInheritsVisionOSUnavailable() -> S {
-    // FIXME: This function should be optimized (rdar://116742214)
     return S()
   }
 }
