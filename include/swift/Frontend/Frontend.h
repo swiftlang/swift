@@ -734,11 +734,14 @@ private:
   bool setUpPluginLoader();
   bool setUpInputs();
   bool setUpASTContextIfNeeded();
-  void setupStatsReporter();
   void setupDependencyTrackerIfNeeded();
   bool setupCASIfNeeded(ArrayRef<const char *> Args);
   void setupOutputBackend();
   void setupCachingDiagnosticsProcessorIfNeeded();
+
+  /// Setup stats reporter.
+  void initStatsReporter();
+  void finalizeStatsReporter();
 
   /// \return false if successful, true on error.
   bool setupDiagnosticVerifierIfNeeded();
