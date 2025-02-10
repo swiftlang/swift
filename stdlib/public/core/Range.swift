@@ -232,7 +232,14 @@ where Bound: Strideable, Bound.Stride: SignedInteger
   @inlinable
   @inline(__always)
   public func index(after i: Index) -> Index {
-    _failEarlyRangeCheck(i, bounds: startIndex..<endIndex)
+    _precondition(i >= lowerBound)
+
+    // Explicitly don't use 'i < upperBound' because it blocks some
+    // optimizations from occuring for simple loops like '0 ..< n'. This branch
+    // should almost never be taken because it's illegal to craft a Range whose
+    // upperbound is greater than an integer max, so incrementing the index, as
+    // long as we're not the endIndex, will always succeed.
+    _precondition(i != upperBound)
 
     return i.advanced(by: 1)
   }
