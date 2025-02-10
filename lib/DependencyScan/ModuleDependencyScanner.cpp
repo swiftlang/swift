@@ -179,13 +179,25 @@ static bool isSwiftDependencyKind(ModuleDependencyKind Kind) {
          Kind == ModuleDependencyKind::SwiftPlaceholder;
 }
 
+static llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem>
+getClangInvocationOverlayScanningVFS(
+    ASTContext &ctx, llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> baseFS) {
+  auto fileMapping = swift::getClangInvocationFileMapping(
+      ctx, baseFS, /*suppressDiagnostic=*/true);
+  if (fileMapping.redirectedFiles.empty())
+    return baseFS;
+  return createClangInvocationFileMappingVFS(fileMapping, ctx, baseFS);
+}
+
 ModuleDependencyScanningWorker::ModuleDependencyScanningWorker(
     SwiftDependencyScanningService &globalScanningService,
     const CompilerInvocation &ScanCompilerInvocation,
     const SILOptions &SILOptions, ASTContext &ScanASTContext,
     swift::DependencyTracker &DependencyTracker, DiagnosticEngine &Diagnostics)
-    : clangScanningTool(*globalScanningService.ClangScanningService,
-                        globalScanningService.getClangScanningFS()) {
+    : clangScanningTool(
+          *globalScanningService.ClangScanningService,
+          getClangInvocationOverlayScanningVFS(
+              ScanASTContext, globalScanningService.getClangScanningFS())) {
   // Create a scanner-specific Invocation and ASTContext.
   workerCompilerInvocation =
       std::make_unique<CompilerInvocation>(ScanCompilerInvocation);
