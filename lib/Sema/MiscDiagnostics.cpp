@@ -1882,7 +1882,9 @@ public:
     }
 
     // If the self decl refers to a weak capture, then implicit self is not
-    // allowed. Self must me unwrapped in a weak self closure.
+    // allowed. Self must be unwrapped in a `guard let self` / `if let self`
+    // condition first. This is usually enforced by the type checker, but
+    // isn't in some cases (e.g. when calling a method on `Optional<Self>`).
     //  - When validating implicit self usage in a nested closure, it's not
     //    necessary for self to be unwrapped in this parent closure. If self
     //    isn't unwrapped correctly in the nested closure, we would have
