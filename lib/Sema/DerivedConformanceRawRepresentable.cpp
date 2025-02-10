@@ -20,6 +20,7 @@
 #include "TypeCheckAvailability.h"
 #include "TypeCheckDecl.h"
 #include "TypeChecker.h"
+#include "swift/AST/AvailabilityConstraint.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/ParameterList.h"
@@ -241,8 +242,8 @@ checkAvailability(const EnumElementDecl *elt,
                   AvailabilityContext availabilityContext,
                   std::optional<RuntimeVersionCheck> &versionCheck) {
   auto &C = elt->getASTContext();
-  auto constraint =
-      getUnsatisfiedAvailabilityConstraint(elt, availabilityContext);
+  auto constraint = getAvailabilityConstraintsForDecl(elt, availabilityContext)
+                        .getPrimaryConstraint();
 
   // Is it always available?
   if (!constraint)

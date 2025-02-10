@@ -251,14 +251,6 @@ void diagnoseOverrideOfUnavailableDecl(ValueDecl *override,
                                        SemanticAvailableAttr attr);
 
 /// Checks whether a declaration should be considered unavailable when referred
-/// to in the given declaration context and availability context and, if so,
-/// returns a result that describes the unsatisfied constraint.
-/// Returns `std::nullopt` if the declaration is available.
-std::optional<AvailabilityConstraint>
-getUnsatisfiedAvailabilityConstraint(const Decl *decl,
-                                     AvailabilityContext availabilityContext);
-
-/// Checks whether a declaration should be considered unavailable when referred
 /// to at the given source location in the given decl context and, if so,
 /// returns a result that describes the unsatisfied constraint.
 /// Returns `std::nullopt` if the declaration is available.
