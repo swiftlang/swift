@@ -24,6 +24,8 @@ internal import Android
 internal import WASILibc
 #elseif os(Windows)
 internal import CRT
+#elseif canImport(FreeBSD)
+internal import FreeBSD
 #endif
 
 #if _runtime(_ObjC)
