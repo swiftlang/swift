@@ -2,7 +2,8 @@
 # REQUIRES: standalone_build
 # REQUIRES: target-same-as-host
 
-# REQUIRES: https://github.com/swiftlang/swift/issues/79256
+# https://github.com/swiftlang/swift/issues/79256
+# REQUIRES: rdar144503319
 
 # RUN: %empty-directory(%t)
 # RUN: %empty-directory(%t/build)
