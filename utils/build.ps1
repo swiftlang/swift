@@ -113,12 +113,13 @@ param(
   [string] $SourceCache = "S:\SourceCache",
   [string] $BinaryCache = "S:\b",
   [string] $ImageRoot = "S:",
-  [ValidateSet("dwarf", "codeview")]
+  [ValidateSet("codeview", "dwarf")]
   [string] $CDebugFormat = "dwarf",
-  [ValidateSet("dwarf", "codeview")]
+  [ValidateSet("codeview", "dwarf")]
   [string] $SwiftDebugFormat = "dwarf",
   [ValidateRange(1, 36)]
   [int] $AndroidAPILevel = 28,
+  [ValidateSet("aarch64", "armv7", "i686", "x86_64")]
   [string[]] $AndroidSDKs = @(),
   [ValidateSet("X64", "X86", "Arm64")]
   [string[]] $WindowsSDKs = @("X64","X86","Arm64"),
@@ -151,6 +152,7 @@ param(
     "System", "Testing", "TestingMacros", "ToolsSupportCore", "XCTest", "XML2",
     "ZLib")]
   [string] $BuildTo = "",
+  [ValidateSet("AMD64", "ARM64")]
   [string] $HostArchName = $(if ($env:PROCESSOR_ARCHITEW6432 -ne $null) { "$env:PROCESSOR_ARCHITEW6432" } else { "$env:PROCESSOR_ARCHITECTURE" }),
   [switch] $Clean,
   [switch] $DebugInfo,
