@@ -21,7 +21,7 @@ internal import BacktracingImpl.Runtime
 
 typealias CrashInfo = swift.runtime.backtrace.CrashInfo
 
-#if os(Linux)
+#if os(Linux) || os(FreeBSD)
 typealias memserver_req = swift.runtime.backtrace.memserver_req
 typealias memserver_resp = swift.runtime.backtrace.memserver_resp
 typealias thread = swift.runtime.backtrace.thread

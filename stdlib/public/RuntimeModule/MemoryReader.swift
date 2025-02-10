@@ -182,7 +182,7 @@ public struct UncachedLocalMemoryReader: MemoryReader {
 }
 #endif
 
-#if os(Linux)
+#if os(Linux) || os(FreeBSD)
 @_spi(MemoryReaders) public struct POSIXError: Error {
   var errno: CInt
 }

@@ -30,7 +30,7 @@ internal import BacktracingImpl.Runtime
 
 typealias CrashInfo = swift.runtime.backtrace.CrashInfo
 
-#if os(Linux)
+#if os(Linux) || os(FreeBSD)
 typealias thread = swift.runtime.backtrace.thread
 #endif
 

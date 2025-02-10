@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#if (os(macOS) || os(Linux)) && (arch(x86_64) || arch(arm64))
+#if (os(macOS) || os(Linux) || os(FreeBSD)) && (arch(x86_64) || arch(arm64))
 
 #if canImport(Darwin)
 import Darwin
@@ -613,7 +613,7 @@ Generate a backtrace for the parent process.
     }
   }
 
-  #if os(Linux) || os(macOS) || os(iOS) || os(watchOS) || os(tvOS)
+  #if os(Linux) || os(macOS) || os(iOS) || os(watchOS) || os(tvOS) || os(FreeBSD)
   static func setRawMode() -> termios {
     var oldAttrs = termios()
     tcgetattr(0, &oldAttrs)
@@ -621,6 +621,8 @@ Generate a backtrace for the parent process.
     var newAttrs = oldAttrs
 
     #if os(Linux)
+    newAttrs.c_lflag &= ~UInt32(ICANON | ECHO)
+    #elseif os(FreeBSD)
     newAttrs.c_lflag &= ~UInt32(ICANON | ECHO)
     #else
     newAttrs.c_lflag &= ~UInt(ICANON | ECHO)

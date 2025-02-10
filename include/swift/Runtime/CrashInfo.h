@@ -45,13 +45,13 @@ struct CrashInfo {
   // Points to the mcontext_t structure for the crashing thread; other
   // threads' contexts can be recovered using Mach APIs later.
   uint64_t mctx;
-#elif defined(__linux__)
+#elif defined(__linux__) || defined(__FreeBSD__)
   // The head of the thread list; points at a "struct thread" (see below).
   uint64_t thread_list;
 #endif
 };
 
-#ifdef __linux__
+#if defined(__linux__) || defined(__FreeBSD__)
 
 // A memory server request packet.
 struct memserver_req {

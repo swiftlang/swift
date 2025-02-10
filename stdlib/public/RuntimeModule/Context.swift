@@ -317,6 +317,36 @@ extension arm_gprs {
   public static func fromHostMContext(_ mcontext: Any) -> HostContext {
     return X86_64Context(with: mcontext as! mcontext_t)
   }
+  #elseif os(FreeBSD) && arch(x86_64)
+  init(with mctx: mcontext_t) {
+    gprs.setR(X86_64Register.rax.rawValue, to: UInt64(bitPattern: Int64(mctx.mc_rax)))
+    gprs.setR(X86_64Register.rbx.rawValue, to: UInt64(bitPattern: Int64(mctx.mc_rbx)))
+    gprs.setR(X86_64Register.rcx.rawValue, to: UInt64(bitPattern: Int64(mctx.mc_rcx)))
+    gprs.setR(X86_64Register.rdx.rawValue, to: UInt64(bitPattern: Int64(mctx.mc_rdx)))
+    gprs.setR(X86_64Register.rdi.rawValue, to: UInt64(bitPattern: Int64(mctx.mc_rdi)))
+    gprs.setR(X86_64Register.rsi.rawValue, to: UInt64(bitPattern: Int64(mctx.mc_rsi)))
+    gprs.setR(X86_64Register.rbp.rawValue, to: UInt64(bitPattern: Int64(mctx.mc_rbp)))
+    gprs.setR(X86_64Register.rsp.rawValue, to: UInt64(bitPattern: Int64(mctx.mc_rsp)))
+    gprs.setR(X86_64Register.r8.rawValue,  to: UInt64(bitPattern: Int64(mctx.mc_r8)))
+    gprs.setR(X86_64Register.r9.rawValue,  to: UInt64(bitPattern: Int64(mctx.mc_r9)))
+    gprs.setR(X86_64Register.r10.rawValue, to: UInt64(bitPattern: Int64(mctx.mc_r10)))
+    gprs.setR(X86_64Register.r11.rawValue, to: UInt64(bitPattern: Int64(mctx.mc_r11)))
+    gprs.setR(X86_64Register.r12.rawValue, to: UInt64(bitPattern: Int64(mctx.mc_r12)))
+    gprs.setR(X86_64Register.r13.rawValue, to: UInt64(bitPattern: Int64(mctx.mc_r13)))
+    gprs.setR(X86_64Register.r14.rawValue, to: UInt64(bitPattern: Int64(mctx.mc_r14)))
+    gprs.setR(X86_64Register.r15.rawValue, to: UInt64(bitPattern: Int64(mctx.mc_r15)))
+    gprs.rip = UInt64(bitPattern: Int64(mctx.mc_rip))
+    gprs.rflags = UInt64(bitPattern: Int64(mctx.mc_rflags))
+    gprs.cs = UInt16(mctx.mc_cs)
+    gprs.fs = UInt16(mctx.mc_fs)
+    gprs.gs = UInt16(mctx.mc_gs)
+    gprs.valid = 0x1fffff
+  }
+
+  public static func fromHostMContext(_ mcontext: Any) -> HostContext {
+    return X86_64Context(with: mcontext as! mcontext_t)
+  }
+
   #endif
 
   #if os(Windows) || !SWIFT_ASM_AVAILABLE

@@ -34,6 +34,7 @@ set(BACKTRACING_SOURCES
   main.swift
   AnsiColor.swift
   TargetMacOS.swift
+  TargetFreeBSD.swift
   TargetLinux.swift
   Themes.swift
   Utils.swift
@@ -58,6 +59,7 @@ add_swift_target_executable(swift-backtrace BUILD_WITH_LIBEXEC
   SWIFT_MODULE_DEPENDS_WINDOWS      ${wincrt_sdk}
   SWIFT_MODULE_DEPENDS_LINUX        ${glibc}
   SWIFT_MODULE_DEPENDS_LINUX_STATIC ${musl}
+  SWIFT_MODULE_DEPENDS_FREEBSD      ${glibc}
 
   DEPLOYMENT_VERSION_OSX ${osx_deployment_target}
 
@@ -66,7 +68,7 @@ add_swift_target_executable(swift-backtrace BUILD_WITH_LIBEXEC
     ${BACKTRACING_COMPILE_FLAGS}
     -parse-as-library
 
-  TARGET_SDKS OSX LINUX)
+  TARGET_SDKS OSX LINUX FREEBSD)
 
 set(static_target_sdks)
 if(SWIFT_BUILD_STATIC_STDLIB)

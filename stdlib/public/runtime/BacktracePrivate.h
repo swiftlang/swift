@@ -130,7 +130,7 @@ inline bool _swift_backtrace_isEnabled() {
 
 SWIFT_RUNTIME_STDLIB_INTERNAL ErrorCode _swift_installCrashHandler();
 
-#ifdef __linux__
+#if defined(__linux__) || defined(__FreeBSD__)
 SWIFT_RUNTIME_STDLIB_INTERNAL bool _swift_spawnBacktracer(const ArgChar * const *argv, int memserver_fd);
 #else
 SWIFT_RUNTIME_STDLIB_INTERNAL bool _swift_spawnBacktracer(const ArgChar * const *argv);

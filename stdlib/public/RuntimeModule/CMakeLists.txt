@@ -12,10 +12,18 @@
 #
 #  The Runtime module isn't the runtime itself; that lives in libswiftCore;
 #  rather, it's a high level Swift interface to things
+if("${CMAKE_SYSTEM_NAME}" STREQUAL "FreeBSD")
+set(swift_runtime_link_libraries
+  swiftCore
+  swift_Concurrency
+  util
+)
+else()
 set(swift_runtime_link_libraries
   swiftCore
   swift_Concurrency
 )
+endif()
 
 set(concurrency)
 if(SWIFT_BUILD_STDLIB AND SWIFT_ENABLE_EXPERIMENTAL_CONCURRENCY)
@@ -44,6 +52,7 @@ set(RUNTIME_SOURCES
   ImageMap.swift
   ImageMap+Darwin.swift
   ImageMap+Linux.swift
+  ImageMap+FreeBSD.swift
   ImageSource.swift
   Libc.swift
   LimitSequence.swift
@@ -126,5 +135,5 @@ add_swift_target_library(swiftRuntime ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_STD
   INSTALL_IN_COMPONENT stdlib
   MACCATALYST_BUILD_FLAVOR "zippered"
 
-  TARGET_SDKS OSX LINUX LINUX_STATIC
+  TARGET_SDKS OSX LINUX LINUX_STATIC FREEBSD
 )

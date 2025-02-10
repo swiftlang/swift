@@ -572,6 +572,9 @@ swift_auth_code_function(T value, unsigned extra) {
 #elif defined(__linux__) && (defined(__aarch64__) || defined(__x86_64__))
 #  define SWIFT_BACKTRACE_ON_CRASH_SUPPORTED 1
 #  define SWIFT_BACKTRACE_SECTION "swift5_backtrace"
+#elif defined(__FreeBSD__) && (defined(__aarch64__) || defined(__x86_64__))
+#  define SWIFT_BACKTRACE_ON_CRASH_SUPPORTED 1
+#  define SWIFT_BACKTRACE_SECTION "swift5_backtrace"
 #else
 #  define SWIFT_BACKTRACE_ON_CRASH_SUPPORTED 0
 #endif

@@ -42,7 +42,7 @@
 #warning Backtracer settings will not be protected in this configuration.
 #endif
 
-#if TARGET_OS_OSX || TARGET_OS_MACCATALYST
+#if TARGET_OS_OSX || TARGET_OS_MACCATALYST || defined(__FreeBSD__)
 #if __has_include(<sys/codesign.h>)
 #include <sys/codesign.h>
 #else
@@ -69,6 +69,10 @@ extern "C" int csops(int, unsigned int, void *, size_t);
 #include <cxxabi.h>
 #endif
 
+#if defined(__FreeBSD__)
+#include <sys/wait.h>
+#endif
+
 #include "BacktracePrivate.h"
 
 #define DEBUG_BACKTRACING_SETTINGS 0
@@ -93,7 +97,7 @@ SWIFT_RUNTIME_STDLIB_INTERNAL BacktraceSettings _swift_backtraceSettings = {
   true,
 
   // interactive
-#if TARGET_OS_OSX || defined(__linux__) // || defined(_WIN32)
+#if TARGET_OS_OSX || defined(__linux__) || defined(__FreeBSD__) || defined(_WIN32)
   OnOffTty::TTY,
 #else
   OnOffTty::Off,
@@ -186,7 +190,7 @@ __declspec(allocate(SWIFT_BACKTRACE_SECTION)) WCHAR swiftBacktracePath[SWIFT_BAC
 
 __declspec(allocate(SWIFT_BACKTRACE_SECTION)) CHAR swiftBacktraceEnv[SWIFT_BACKTRACE_ENVIRONMENT_SIZE];
 
-#elif defined(__linux__) || TARGET_OS_OSX
+#elif defined(__linux__) || TARGET_OS_OSX || defined(__FreeBSD__)
 
 #if defined(SWIFT_RUNTIME_FIXED_BACKTRACER_PATH)
 const char swiftBacktracePath[] = SWIFT_RUNTIME_FIXED_BACKTRACER_PATH;
@@ -319,7 +323,7 @@ BacktraceInitializer::BacktraceInitializer() {
   if (_swift_backtraceSettings.enabled == OnOffTty::Default) {
 #if TARGET_OS_OSX
     _swift_backtraceSettings.enabled = OnOffTty::TTY;
-#elif defined(__linux__) // || defined(_WIN32)
+#elif defined(__linux__) || defined(__FreeBSD__) || defined(_WIN32)
     _swift_backtraceSettings.enabled = OnOffTty::On;
 #else
     _swift_backtraceSettings.enabled = OnOffTty::Off;
@@ -334,7 +338,6 @@ BacktraceInitializer::BacktraceInitializer() {
     _swift_backtraceSettings.enabled = OnOffTty::Off;
   }
 #else
-
   if (isPrivileged() && _swift_backtraceSettings.enabled != OnOffTty::Off) {
     // You'll only see this warning if you do e.g.
     //
@@ -976,7 +979,7 @@ _swift_backtrace_demangle(const char *mangledName,
 // and macOS, that means it must be async-signal-safe.  On Windows, there
 // isn't an equivalent notion but a similar restriction applies.
 SWIFT_RUNTIME_STDLIB_INTERNAL bool
-#ifdef __linux__
+#if defined(__linux__) || defined(__FreeBSD__)
 _swift_spawnBacktracer(const ArgChar * const *argv, int memserver_fd)
 #else
 _swift_spawnBacktracer(const ArgChar * const *argv)
@@ -984,7 +987,8 @@ _swift_spawnBacktracer(const ArgChar * const *argv)
 {
 #if !SWIFT_BACKTRACE_ON_CRASH_SUPPORTED
   return false;
-#elif TARGET_OS_OSX || TARGET_OS_MACCATALYST || defined(__linux__)
+#elif TARGET_OS_OSX || TARGET_OS_MACCATALYST || defined(__linux__) || defined(__FreeBSD__)
+
   pid_t child;
   const char *env[BACKTRACE_MAX_ENV_VARS + 1];
 
@@ -1003,6 +1007,15 @@ _swift_spawnBacktracer(const ArgChar * const *argv)
   int ret = safe_spawn(&child, swiftBacktracePath, memserver_fd,
                        const_cast<char * const *>(argv),
                        const_cast<char * const *>(env));
+#elif defined(__FreeBSD__)
+  posix_spawn_file_actions_t fa;
+  posix_spawn_file_actions_init(&fa);
+  posix_spawn_file_actions_adddup2(&fa, memserver_fd, 4);
+  posix_spawn_file_actions_addclose(&fa, memserver_fd);
+  int ret = posix_spawn(&child, swiftBacktracePath,
+                        &fa, nullptr,
+                        const_cast<char * const *>(argv),
+                        const_cast<char * const *>(env));
 #else
   int ret = posix_spawn(&child, swiftBacktracePath,
                         nullptr, nullptr,
