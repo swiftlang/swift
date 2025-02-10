@@ -1863,6 +1863,10 @@ public:
     assert(!IsSuppressed && "setting suppressed again!?");
     IsSuppressed = true;
   }
+
+  void dump(raw_ostream &os) const;
+
+  SWIFT_DEBUG_DUMP;
 };
 
 /// A wrapper for the collection of inherited types for either a `TypeDecl` or

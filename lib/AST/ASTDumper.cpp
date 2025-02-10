@@ -625,6 +625,16 @@ static StringRef getDumpString(ExecutionKind kind) {
     return "caller";
   }
 }
+static StringRef getDumpString(ExplicitSafety safety) {
+  switch (safety) {
+  case ExplicitSafety::Unspecified:
+    return "unspecified";
+  case ExplicitSafety::Safe:
+    return "safe";
+  case ExplicitSafety::Unsafe:
+    return "unsafe";
+  }
+}
 static StringRef getDumpString(StringRef s) {
   return s;
 }
@@ -1925,16 +1935,38 @@ namespace {
     }
 
     void printInherited(InheritedTypes Inherited) {
-      printStringListField(Inherited.getEntries(), [&](InheritedEntry Super) {
-        if (Writer.isParsable()) {
-          return typeUSR(Super.getType());
-        } else {
-          std::string value;
-          llvm::raw_string_ostream SOS(value);
-          Super.getType().print(SOS);
-          return value;
-        }
-      }, Label::always("inherits"), /*delimiter=*/ ", ");
+      if (Writer.isParsable()) {
+        printList(
+            Inherited.getEntries(),
+            [&](InheritedEntry Super, Label label) {
+              printRecArbitrary(
+                  [&](Label label) {
+                    printHead("inherited_entry", FieldLabelColor, label);
+                    printTypeField(Super.getType(), Label::always("type"));
+                    printFlag(Super.isPreconcurrency(), "preconcurrency");
+                    printFlag(Super.isRetroactive(), "retroactive");
+                    printFlag(Super.isSuppressed(), "suppressed");
+                    printFlag(Super.isUnchecked(), "unchecked");
+                    if (Super.getExplicitSafety() !=
+                        ExplicitSafety::Unspecified)
+                      printField(Super.getExplicitSafety(),
+                                 Label::always("safety"));
+                    printFoot();
+                  },
+                  label);
+            },
+            Label::always("inherits"));
+      } else {
+        printStringListField(
+            Inherited.getEntries(),
+            [&](InheritedEntry Super) {
+              std::string value;
+              llvm::raw_string_ostream SOS(value);
+              Super.dump(SOS);
+              return value;
+            },
+            Label::always("inherits"), /*delimiter=*/", ");
+      }
     }
 
     void printImportPath(ImportDecl *ID, Label label) {
@@ -6526,3 +6558,19 @@ void SILResultInfo::dump() const {
   print(llvm::errs());
   llvm::errs() << '\n';
 }
+
+void InheritedEntry::dump(llvm::raw_ostream &os) const {
+  if (isPreconcurrency())
+    os << "@preconcurrency ";
+  if (isRetroactive())
+    os << "@retroactive ";
+  if (isUnchecked())
+    os << "@unchecked ";
+  if (getExplicitSafety() != ExplicitSafety::Unspecified)
+    os << '@' << getDumpString(getExplicitSafety()) << ' ';
+  if (isSuppressed())
+    os << "~";
+  getType().print(os);
+}
+
+void InheritedEntry::dump() const { dump(llvm::errs()); }
