@@ -87,11 +87,11 @@ where Base: _SwiftNewtypeWrapper & Hashable, Base.RawValue: Hashable {
 
   func _downCastConditional<T>(into result: UnsafeMutablePointer<T>) -> Bool {
     if let value = _value as? T {
-      result.initialize(to: value)
+      unsafe result.initialize(to: value)
       return true
     }
     if let value = _value.rawValue as? T {
-      result.initialize(to: value)
+      unsafe result.initialize(to: value)
       return true
     }
     return false

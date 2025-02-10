@@ -130,7 +130,7 @@ public enum _DebuggerSupport {
 
   private static func asObjectAddress(_ value: Any) -> String {
     let address = checkValue(value,
-      ifClass: { return unsafeBitCast($0, to: Int.self) },
+      ifClass: { return unsafe unsafeBitCast($0, to: Int.self) },
       otherwise: { return 0 })
     return String(address, radix: 16, uppercase: false)
   }
@@ -344,8 +344,8 @@ internal func _withHeapObject<R>(
   _ body: (UnsafeMutableRawPointer) -> R
 ) -> R {
   defer { _fixLifetime(object) }
-  let unmanaged = Unmanaged.passUnretained(object)
-  return body(unmanaged.toOpaque())
+  let unmanaged = unsafe Unmanaged.passUnretained(object)
+  return unsafe body(unmanaged.toOpaque())
 }
 
 @_extern(c, "swift_retainCount") @usableFromInline
@@ -358,18 +358,18 @@ internal func _swift_weakRetainCount(_: UnsafeMutableRawPointer) -> Int
 // Utilities to get refcount(s) of class objects.
 @_alwaysEmitIntoClient
 public func _getRetainCount(_ object: AnyObject) -> UInt {
-  let count = _withHeapObject(of: object) { _swift_retainCount($0) }
+  let count = unsafe _withHeapObject(of: object) { unsafe _swift_retainCount($0) }
   return UInt(bitPattern: count)
 }
 
 @_alwaysEmitIntoClient
 public func _getUnownedRetainCount(_ object: AnyObject) -> UInt {
-  let count = _withHeapObject(of: object) { _swift_unownedRetainCount($0) }
+  let count = unsafe _withHeapObject(of: object) { unsafe _swift_unownedRetainCount($0) }
   return UInt(bitPattern: count)
 }
 
 @_alwaysEmitIntoClient
 public func _getWeakRetainCount(_ object: AnyObject) -> UInt {
-  let count = _withHeapObject(of: object) { _swift_weakRetainCount($0) }
+  let count = unsafe _withHeapObject(of: object) { unsafe _swift_weakRetainCount($0) }
   return UInt(bitPattern: count)
 }

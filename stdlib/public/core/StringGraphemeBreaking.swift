@@ -201,9 +201,9 @@ extension _StringGuts {
   internal func _opaqueCharacterStride(startingAt i: Int) -> Int {
     _internalInvariant(i < endIndex._encodedOffset)
     if isFastUTF8 {
-      let fast = withFastUTF8 { utf8 in
+      let fast = unsafe withFastUTF8 { utf8 in
         if i &+ 1 == utf8.count { return true }
-        let pair = UnsafeRawPointer(
+        let pair = unsafe UnsafeRawPointer(
           utf8.baseAddress.unsafelyUnwrapped
         ).loadUnaligned(fromByteOffset: i, as: UInt16.self)
         //& 0x8080 == 0 is "both not ASCII", != 0x0A0D is "not CRLF"
@@ -224,11 +224,11 @@ extension _StringGuts {
       return _foreignOpaqueCharacterStride(startingAt: i)
     }
 
-    let nextIdx = withFastUTF8 { utf8 in
+    let nextIdx = unsafe withFastUTF8 { utf8 in
       nextBoundary(startingAt: i) { j in
         _internalInvariant(j >= 0)
         guard j < utf8.count else { return nil }
-        let (scalar, len) = _decodeScalar(utf8, startingAt: j)
+        let (scalar, len) = unsafe _decodeScalar(utf8, startingAt: j)
         return (scalar, j &+ len)
       }
     }
@@ -250,8 +250,8 @@ extension _StringGuts {
       return i
     }
     if isFastUTF8 {
-      let fast = withFastUTF8 { utf8 in
-        let pair = UnsafeRawPointer(
+      let fast = unsafe withFastUTF8 { utf8 in
+        let pair = unsafe UnsafeRawPointer(
           utf8.baseAddress.unsafelyUnwrapped
         ).loadUnaligned(fromByteOffset: i &- 2, as: UInt16.self)
         //& 0x8080 == 0 is "both not ASCII", != 0x0A0D is "not CRLF"
@@ -272,11 +272,11 @@ extension _StringGuts {
       return _foreignOpaqueCharacterStride(endingAt: i)
     }
 
-    let previousIdx = withFastUTF8 { utf8 in
+    let previousIdx = unsafe withFastUTF8 { utf8 in
       previousBoundary(endingAt: i) { j in
         _internalInvariant(j <= utf8.count)
         guard j > 0 else { return nil }
-        let (scalar, len) = _decodeScalar(utf8, endingAt: j)
+        let (scalar, len) = unsafe _decodeScalar(utf8, endingAt: j)
         return (scalar, j &- len)
       }
     }
@@ -301,11 +301,11 @@ extension _StringGuts {
       return _foreignOpaqueCharacterStride(endingAt: i, in: bounds)
     }
 
-    let previousIdx = withFastUTF8 { utf8 in
+    let previousIdx = unsafe withFastUTF8 { utf8 in
       previousBoundary(endingAt: i) { j in
         _internalInvariant(j <= bounds.upperBound)
         guard j > bounds.lowerBound else { return nil }
-        let (scalar, len) = _decodeScalar(utf8, endingAt: j)
+        let (scalar, len) = unsafe _decodeScalar(utf8, endingAt: j)
         return (scalar, j &- len)
       }
     }
@@ -597,7 +597,7 @@ extension Unicode {
     ) -> Range<Int>? {
       var i = start
       while i < buffer.endIndex {
-        let (next, n) = _decodeScalar(buffer, startingAt: i)
+        let (next, n) = unsafe _decodeScalar(buffer, startingAt: i)
         if hasBreak(before: next) {
           return Range(_uncheckedBounds: (i, i &+ n))
         }

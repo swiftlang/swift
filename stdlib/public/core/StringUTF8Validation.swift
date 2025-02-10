@@ -44,15 +44,15 @@ extension UTF8ValidationResult: Equatable {}
 private struct UTF8ValidationError: Error {}
 
 internal func validateUTF8(_ buf: UnsafeBufferPointer<UInt8>) -> UTF8ValidationResult {
-  if _allASCII(buf) {
+  if unsafe _allASCII(buf) {
     return .success(UTF8ExtraInfo(isASCII: true))
   }
 
-  var iter = buf.makeIterator()
+  var iter = unsafe buf.makeIterator()
   var lastValidIndex = buf.startIndex
 
   @inline(__always) func guaranteeIn(_ f: (UInt8) -> Bool) throws(UTF8ValidationError) {
-    guard let cu = iter.next() else { throw UTF8ValidationError() }
+    guard let cu = unsafe iter.next() else { throw UTF8ValidationError() }
     guard f(cu) else { throw UTF8ValidationError() }
   }
   @inline(__always) func guaranteeContinuation() throws(UTF8ValidationError) {
@@ -84,42 +84,42 @@ internal func validateUTF8(_ buf: UnsafeBufferPointer<UInt8>) -> UTF8ValidationR
 
   func _legacyNarrowIllegalRange(buf: Slice<UnsafeBufferPointer<UInt8>>) -> Range<Int> {
     var reversePacked: UInt32 = 0
-    if let third = buf.dropFirst(2).first {
-      reversePacked |= UInt32(third)
+    if let third = unsafe buf.dropFirst(2).first {
+      unsafe reversePacked |= UInt32(third)
       reversePacked <<= 8
     }
-    if let second = buf.dropFirst().first {
-      reversePacked |= UInt32(second)
+    if let second = unsafe buf.dropFirst().first {
+      unsafe reversePacked |= UInt32(second)
       reversePacked <<= 8
     }
-    reversePacked |= UInt32(buf.first!)
+    unsafe reversePacked |= UInt32(buf.first!)
     let _buffer: (_storage: UInt32, x: ()) = (reversePacked, ())
     let invalids = _legacyInvalidLengthCalculation(_buffer)
-    return buf.startIndex ..< buf.startIndex + invalids
+    return unsafe buf.startIndex ..< buf.startIndex + invalids
   }
 
   func findInvalidRange(_ buf: Slice<UnsafeBufferPointer<UInt8>>) -> Range<Int> {
-    var endIndex = buf.startIndex
-    var iter = buf.makeIterator()
-    _ = iter.next()
-    while let cu = iter.next(), UTF8.isContinuation(cu) {
-      endIndex += 1
+    var endIndex = unsafe buf.startIndex
+    var iter = unsafe buf.makeIterator()
+    _ = unsafe iter.next()
+    while let cu = unsafe iter.next(), unsafe UTF8.isContinuation(cu) {
+      unsafe endIndex += 1
       // Unicode's Maximal subpart of an ill-formed subsequence will yield
       // at most 3 bytes of error.
-      if buf.distance(from: buf.startIndex, to: endIndex) >= 3 {
+      if unsafe buf.distance(from: buf.startIndex, to: endIndex) >= 3 {
         break
       }
     }
-    let illegalRange = Range(buf.startIndex...endIndex)
-    _internalInvariant(illegalRange.clamped(to: (buf.startIndex..<buf.endIndex)) == illegalRange,
+    let illegalRange = unsafe Range(buf.startIndex...endIndex)
+    unsafe _internalInvariant(illegalRange.clamped(to: (buf.startIndex..<buf.endIndex)) == illegalRange,
                  "illegal range out of full range")
     // FIXME: Remove the call to `_legacyNarrowIllegalRange` and return `illegalRange` directly
-    return _legacyNarrowIllegalRange(buf: buf[illegalRange])
+    return unsafe _legacyNarrowIllegalRange(buf: buf[illegalRange])
   }
 
   do {
     var isASCII = true
-    while let cu = iter.next() {
+    while let cu = unsafe iter.next() {
       if UTF8.isASCII(cu) { lastValidIndex &+= 1; continue }
       isASCII = false
       if _slowPath(!_isUTF8MultiByteLeading(cu)) {
@@ -167,7 +167,7 @@ internal func validateUTF8(_ buf: UnsafeBufferPointer<UInt8>) -> UTF8ValidationR
     }
     return .success(UTF8ExtraInfo(isASCII: isASCII))
   } catch {
-    return .error(toBeReplaced: findInvalidRange(buf[lastValidIndex...]))
+    return unsafe .error(toBeReplaced: findInvalidRange(buf[lastValidIndex...]))
   }
 }
 
@@ -192,27 +192,27 @@ internal func repairUTF8(_ input: UnsafeBufferPointer<UInt8>, firstKnownBrokenRa
   result.reserveCapacity(input.count + 5 * replacementCharacterCount) // extra space for some replacement characters
 
   var brokenRange: Range<Int> = firstKnownBrokenRange
-  var remainingInput = input
+  var remainingInput = unsafe input
   repeat {
     _internalInvariant(!brokenRange.isEmpty, "broken range empty")
     _internalInvariant(!remainingInput.isEmpty, "empty remaining input doesn't need to be repaired")
-    let goodChunk = remainingInput[..<brokenRange.startIndex]
+    let goodChunk = unsafe remainingInput[..<brokenRange.startIndex]
 
     // very likely this capacity reservation does not actually do anything because we reserved space for the entire
     // input plus up to five replacement characters up front
     result.reserveCapacity(result.count + remainingInput.count + replacementCharacterCount)
 
     // we can now safely append the next known good bytes and a replacement character
-    result.appendInPlace(UnsafeBufferPointer(rebasing: goodChunk),
+    unsafe result.appendInPlace(unsafe UnsafeBufferPointer(rebasing: goodChunk),
                          isASCII: false /* appending replacement character anyway, so let's not bother */)
     Unicode.Scalar._replacementCharacter.withUTF8CodeUnits {
-      result.appendInPlace($0, isASCII: false)
+      unsafe result.appendInPlace($0, isASCII: false)
     }
 
-    remainingInput = UnsafeBufferPointer(rebasing: remainingInput[brokenRange.endIndex...])
-    switch validateUTF8(remainingInput) {
+    unsafe remainingInput = unsafe UnsafeBufferPointer(rebasing: remainingInput[brokenRange.endIndex...])
+    switch unsafe validateUTF8(remainingInput) {
     case .success:
-      result.appendInPlace(remainingInput, isASCII: false)
+      unsafe result.appendInPlace(remainingInput, isASCII: false)
       return String(result)
     case .error(let newBrokenRange):
       brokenRange = newBrokenRange
