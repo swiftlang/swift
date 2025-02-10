@@ -157,13 +157,17 @@ if("${SwiftCore_OBJECT_FORMAT}" STREQUAL "elfx")
     DESTINATION "${CMAKE_INSTALL_LIBDIR}/swift/${SwiftCore_PLATFORM_SUBDIR}/${SwiftCore_ARCH_SUBDIR}"
     RENAME swiftrt.o)
 elseif("${SwiftCore_OBJECT_FORMAT}" STREQUAL "coffx")
+  add_library(swiftrtT OBJECT SwiftRT-COFF.cpp)
+  target_compile_definitions(swiftrtT PRIVATE
+    SWIFT_STATIC_STDLIB)
+  target_link_libraries(swiftrtT PRIVATE swiftShims)
+  install(FILES $<TARGET_OBJECTS:swiftrtT>
+    DESTINATION "${CMAKE_INSTALL_LIBDIR}/swift/${SwiftCore_PLATFORM_SUBDIR}/${SwiftCore_ARCH_SUBDIR}"
+    RENAME swiftrtT.obj)
+
   add_library(swiftrt OBJECT SwiftRT-COFF.cpp)
-  target_compile_definitions(swiftrt PRIVATE
-    $<$<NOT:$<BOOL:${BUILD_SHARED_LIBS}>>:SWIFT_STATIC_STDLIB>)
   target_link_libraries(swiftrt PRIVATE swiftShims)
   install(FILES $<TARGET_OBJECTS:swiftrt>
-    # The driver requires that swifrt.obj is under `usr/lib/swift/<platform>/<arch>`
-    # Regardless of settings
     DESTINATION "${CMAKE_INSTALL_LIBDIR}/swift/${SwiftCore_PLATFORM_SUBDIR}/${SwiftCore_ARCH_SUBDIR}"
     RENAME swiftrt.obj)
 elseif(NOT "${SwiftCore_OBJECT_FORMAT}" STREQUAL "x")
