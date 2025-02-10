@@ -9846,12 +9846,10 @@ Parser::parseDeclInit(ParseDeclOptions Flags, DeclAttributes &Attributes) {
 
   diagnoseWhereClauseInGenericParamList(GenericParams);
 
-  auto *CD = new (Context) ConstructorDecl(FullName, ConstructorLoc,
-                                           Failable, FailabilityLoc,
-                                           isAsync, asyncLoc,
-                                           throwsLoc.isValid(), throwsLoc,
-                                           thrownTy, BodyParams, GenericParams,
-                                           CurDeclContext, FuncRetTy);
+  auto *CD = new (Context)
+      ConstructorDecl(FullName, ConstructorLoc, Failable, FailabilityLoc,
+                      isAsync, asyncLoc, throwsLoc.isValid(), throwsLoc,
+                      thrownTy, BodyParams, GenericParams, CurDeclContext);
   CD->setImplicitlyUnwrappedOptional(IUO);
   CD->attachParsedAttrs(Attributes);
 
