@@ -119,9 +119,7 @@ param(
   [string] $SwiftDebugFormat = "dwarf",
   [ValidateRange(1, 36)]
   [int] $AndroidAPILevel = 28,
-  [ValidateSet("aarch64", "armv7", "i686", "x86_64")]
   [string[]] $AndroidSDKs = @(),
-  [ValidateSet("X64", "X86", "Arm64")]
   [string[]] $WindowsSDKs = @("X64","X86","Arm64"),
   [string] $ProductVersion = "0.0.0",
   [string] $ToolchainIdentifier = $(if (${env:TOOLCHAIN_VERSION}) { "${env:TOOLCHAIN_VERSION}" } else { "${env:USERNAME}.development" }),
@@ -138,9 +136,6 @@ param(
   [switch] $SkipBuild = $false,
   [switch] $SkipPackaging = $false,
   [switch] $IncludeDS2 = $false,
-  [ValidateSet("*", "clang", "dispatch", "foundation", "llbuild", "lldb", "lld",
-    "llvm", "sourcekit-lsp", "swift", "swift-format", "swiftpm", "testing",
-    "xctest")]
   [string[]] $Test = @(),
   [string] $Stage = "",
   [ValidateSet("ArgumentParser", "ASN1", "BuildTools", "Certificates", "CMark",
