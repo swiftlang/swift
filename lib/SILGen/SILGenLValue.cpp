@@ -3913,7 +3913,7 @@ static bool isCurrentFunctionAccessor(SILGenFunction &SGF,
          contextAccessorDecl->getAccessorKind() == accessorKind;
 }
 
-static bool isSynthesizedDefaultImplementionatThunk(SILGenFunction &SGF) {
+static bool isSynthesizedDefaultImplementionThunk(SILGenFunction &SGF) {
   if (!SGF.FunctionDC)
     return false;
 
@@ -3956,7 +3956,7 @@ LValue SILGenLValue::visitMemberRefExpr(MemberRefExpr *e,
   AccessStrategy strategy = var->getAccessStrategy(
       accessSemantics, getFormalAccessKind(accessKind),
       SGF.SGM.M.getSwiftModule(), SGF.F.getResilienceExpansion(),
-      /*useOldABI=*/isSynthesizedDefaultImplementionatThunk(SGF));
+      /*useOldABI=*/isSynthesizedDefaultImplementionThunk(SGF));
 
   bool isOnSelfParameter = isCallToSelfOfCurrentFunction(SGF, e);
 
@@ -4165,7 +4165,7 @@ LValue SILGenLValue::visitSubscriptExpr(SubscriptExpr *e,
   auto strategy = decl->getAccessStrategy(
       accessSemantics, getFormalAccessKind(accessKind),
       SGF.SGM.M.getSwiftModule(), SGF.F.getResilienceExpansion(),
-      /*useOldABI=*/isSynthesizedDefaultImplementionatThunk(SGF));
+      /*useOldABI=*/isSynthesizedDefaultImplementionThunk(SGF));
 
   bool isOnSelfParameter = isCallToSelfOfCurrentFunction(SGF, e);
   bool isContextRead = isCurrentFunctionAccessor(SGF, AccessorKind::Read);
