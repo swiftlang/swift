@@ -628,12 +628,8 @@ ControlFlowTests.test("Loops") {
     } while i < 2
     return result
   }
-  // FIXME(TF-584): Investigate incorrect (too big) gradient values for
-  // repeat-while loops.
-  // expectEqual((8, 12), valueWithGradient(at: 2, of: repeat_while_loop))
-  // expectEqual((27, 27), valueWithGradient(at: 3, of: repeat_while_loop))
-  expectEqual((8, 18), valueWithGradient(at: 2, of: repeat_while_loop))
-  expectEqual((27, 36), valueWithGradient(at: 3, of: repeat_while_loop))
+  expectEqual((8, 12), valueWithGradient(at: 2, of: repeat_while_loop))
+  expectEqual((27, 27), valueWithGradient(at: 3, of: repeat_while_loop))
 
   func repeat_while_loop_nonactive_initial_value(_ x: Float) -> Float {
     var result: Float = 1
@@ -644,12 +640,87 @@ ControlFlowTests.test("Loops") {
     } while i < 2
     return result
   }
-  // FIXME(TF-584): Investigate incorrect (too big) gradient values for
-  // repeat-while loops.
-  // expectEqual((4, 4), valueWithGradient(at: 2, of: repeat_while_loop_nonactive_initial_value))
-  // expectEqual((9, 6), valueWithGradient(at: 3, of: repeat_while_loop_nonactive_initial_value))
-  expectEqual((4, 5), valueWithGradient(at: 2, of: repeat_while_loop_nonactive_initial_value))
-  expectEqual((9, 7), valueWithGradient(at: 3, of: repeat_while_loop_nonactive_initial_value))
+  expectEqual((4, 4), valueWithGradient(at: 2, of: repeat_while_loop_nonactive_initial_value))
+  expectEqual((9, 6), valueWithGradient(at: 3, of: repeat_while_loop_nonactive_initial_value))
+
+  @differentiable(reverse)
+  func repeat_while_loop_nested_repeat(_ x: Float) -> Float {
+    var result = x
+    var i = 0
+    repeat {
+      var temp = x
+      var j = 0
+      repeat {
+        temp = temp * x
+        j += 1
+      } while j < 2
+      result = result * temp
+      i += 1
+    } while i < 2
+    return result
+  }
+
+  expectEqual((128, 448), valueWithGradient(at: 2, of: repeat_while_loop_nested_repeat))
+  expectEqual((2187, 5103), valueWithGradient(at: 3, of: repeat_while_loop_nested_repeat))
+
+  @differentiable(reverse)
+  func repeat_while_loop_nested_while(_ x: Float) -> Float {
+    var result = x
+    var i = 0
+    repeat {
+      var temp = x
+      var j = 0
+      while j < 2 {
+        temp = temp * x
+        j += 1
+      }
+      result = result * temp
+      i += 1
+    } while i < 2
+    return result
+  }
+
+  expectEqual((128, 448), valueWithGradient(at: 2, of: repeat_while_loop_nested_while))
+  expectEqual((2187, 5103), valueWithGradient(at: 3, of: repeat_while_loop_nested_while))
+
+  @differentiable(reverse)
+  func repeat_while_loop_nested_for(_ x: Float) -> Float {
+    var result = x
+    var i = 0
+    repeat {
+      var temp = x
+      for j in 0..<2 {
+        temp = temp * x
+      }
+      result = result * temp
+      i += 1
+    } while i < 2
+    return result
+  }
+
+  expectEqual((128, 448), valueWithGradient(at: 2, of: repeat_while_loop_nested_for))
+  expectEqual((2187, 5103), valueWithGradient(at: 3, of: repeat_while_loop_nested_for))
+
+  @differentiable(reverse)
+  func repeat_while_loop_condition(_ x: Float) -> Float {
+    var result = x
+    var i = 0
+    repeat {
+      if i == 2 {
+        break
+      }
+      if i == 0 {
+        result = result * x
+      } else {
+        result = result * result
+      }
+      i += 1
+    } while i < 10
+    return result
+  }
+
+  expectEqual((16, 32), valueWithGradient(at: 2, of: repeat_while_loop_condition))
+  expectEqual((81, 108), valueWithGradient(at: 3, of: repeat_while_loop_condition))
 
   func loop_continue(_ x: Float) -> Float {
     var result = x
