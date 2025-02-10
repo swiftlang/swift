@@ -1,4 +1,4 @@
-// RUN: %target-swift-ide-test -print-module -module-to-print=FakeToolchain -tools-directory %S/Inputs/fake-toolchain/bin -source-filename=x -enable-experimental-cxx-interop -Xcc -stdlib=libc++ | %FileCheck %s
+// RUN: %target-swift-ide-test -print-module -module-to-print=FakeToolchain -tools-directory %S/Inputs/fake-toolchain/bin -source-filename=x -enable-experimental-cxx-interop -Xcc -stdlib=libc++ -Xcc -I%S/Inputs/fake-toolchain/include/c++/v1 | %FileCheck %s
 
 // Clang driver on Windows doesn't support -stdlib=libc++
 // XFAIL: OS=windows-msvc
