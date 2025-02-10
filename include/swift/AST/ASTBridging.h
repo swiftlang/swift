@@ -244,6 +244,10 @@ SWIFT_NAME("BridgedASTContext.getIdentifier(self:_:)")
 BridgedIdentifier BridgedASTContext_getIdentifier(BridgedASTContext cContext,
                                                   BridgedStringRef cStr);
 
+SWIFT_NAME("BridgedASTContext.getDollarIdentifier(self:_:)")
+BridgedIdentifier
+BridgedASTContext_getDollarIdentifier(BridgedASTContext cContext, size_t idx);
+
 SWIFT_NAME("BridgedASTContext.langOptsHasFeature(self:_:)")
 bool BridgedASTContext_langOptsHasFeature(BridgedASTContext cContext,
                                           BridgedFeature feature);
@@ -552,6 +556,13 @@ BRIDGED_INLINE bool BridgedDeclContext_isTypeContext(BridgedDeclContext dc);
 SWIFT_NAME("getter:BridgedDeclContext.isModuleScopeContext(self:)")
 BRIDGED_INLINE bool
 BridgedDeclContext_isModuleScopeContext(BridgedDeclContext dc);
+
+SWIFT_NAME("getter:BridgedDeclContext.isClosureExpr(self:)")
+BRIDGED_INLINE bool BridgedDeclContext_isClosureExpr(BridgedDeclContext dc);
+
+SWIFT_NAME("BridgedDeclContext.castToClosureExpr(self:)")
+BRIDGED_INLINE BridgedClosureExpr
+BridgedDeclContext_castToClosureExpr(BridgedDeclContext dc);
 
 SWIFT_NAME("getter:BridgedDeclContext.astContext(self:)")
 BRIDGED_INLINE BridgedASTContext
@@ -1194,6 +1205,9 @@ BRIDGED_INLINE void
 BridgedParamDecl_setSpecifier(BridgedParamDecl cDecl,
                               BridgedParamSpecifier cSpecifier);
 
+SWIFT_NAME("BridgedParamDecl.setImplicit(self:)")
+BRIDGED_INLINE void BridgedParamDecl_setImplicit(BridgedParamDecl cDecl);
+
 SWIFT_NAME("BridgedConstructorDecl.setParsedBody(self:_:)")
 void BridgedConstructorDecl_setParsedBody(BridgedConstructorDecl decl,
                                           BridgedBraceStmt body);
@@ -1596,9 +1610,16 @@ BridgedClosureExpr BridgedClosureExpr_createParsed(
     BridgedSourceLoc cArrowLoc, BridgedNullableTypeRepr cExplicitResultType,
     BridgedSourceLoc cInLoc);
 
+SWIFT_NAME("BridgedClosureExpr.getParameterList(self:)")
+BridgedParameterList
+BridgedClosureExpr_getParameterList(BridgedClosureExpr cClosure);
+
 SWIFT_NAME("BridgedClosureExpr.setParameterList(self:_:)")
 void BridgedClosureExpr_setParameterList(BridgedClosureExpr cClosure,
                                          BridgedParameterList cParams);
+
+SWIFT_NAME("getter:BridgedClosureExpr.hasAnonymousClosureVars(self:)")
+bool BridgedClosureExpr_hasAnonymousClosureVars(BridgedClosureExpr cClosure);
 
 SWIFT_NAME("BridgedClosureExpr.setHasAnonymousClosureVars(self:)")
 void BridgedClosureExpr_setHasAnonymousClosureVars(BridgedClosureExpr cClosure);
@@ -2508,6 +2529,13 @@ SWIFT_NAME("BridgedParameterList.createParsed(_:leftParenLoc:parameters:"
 BridgedParameterList BridgedParameterList_createParsed(
     BridgedASTContext cContext, BridgedSourceLoc cLeftParenLoc,
     BridgedArrayRef cParameters, BridgedSourceLoc cRightParenLoc);
+
+SWIFT_NAME("getter:BridgedParameterList.size(self:)")
+size_t BridgedParameterList_size(BridgedParameterList cParameterList);
+
+SWIFT_NAME("BridgedParameterList.get(self:_:)")
+BridgedParamDecl BridgedParameterList_get(BridgedParameterList cParameterList,
+                                          size_t i);
 
 struct BridgedASTType {
   swift::TypeBase * _Nullable type;

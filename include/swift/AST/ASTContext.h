@@ -598,6 +598,10 @@ public:
   /// specified string.
   Identifier getIdentifier(StringRef Str) const;
 
+  /// getDollarIdentifier - Return the uniqued and AST-Context-owned version of
+  /// anonymous closure parameter (e.g. '$1') name by the index.
+  Identifier getDollarIdentifier(size_t Idx) const;
+
   /// Convert a given alias map to a map of Identifiers between module aliases and their actual names.
   /// For example, if '-module-alias Foo=X -module-alias Bar=Y' input is passed in, the aliases Foo and Bar are
   /// the names of the imported or referenced modules in source files in the main module, and X and Y

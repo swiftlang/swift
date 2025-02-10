@@ -971,6 +971,12 @@ Identifier ASTContext::getIdentifier(StringRef Str) const {
   return Identifier(I->getKeyData());
 }
 
+Identifier ASTContext::getDollarIdentifier(size_t Idx) const {
+  SmallVector<char, 4> StrBuf;
+  StringRef varName = ("$" + Twine(Idx)).toStringRef(StrBuf);
+  return getIdentifier(varName);
+}
+
 void ASTContext::lookupInModule(
     ModuleDecl *M,
     StringRef name,
