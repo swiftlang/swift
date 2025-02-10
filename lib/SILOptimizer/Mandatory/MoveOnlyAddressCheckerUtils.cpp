@@ -478,7 +478,7 @@ static bool visitScopeEndsRequiringInit(
 static bool isCopyableValue(SILValue value) {
   if (value->getType().isMoveOnly())
     return false;
-  if (auto *m = dyn_cast<MoveOnlyWrapperToCopyableAddrInst>(value))
+  if (isa<MoveOnlyWrapperToCopyableAddrInst>(value))
     return false;
   return true;
 }
@@ -1070,7 +1070,7 @@ addressBeginsInitialized(MarkUnresolvedNonCopyableValueInst *address) {
                       "adding mark_unresolved_non_copyable_value as init!\n");
         return true;
       }
-    } else if (auto *box = dyn_cast<AllocBoxInst>(
+    } else if (isa<AllocBoxInst>(
                    lookThroughOwnershipInsts(projectBox->getOperand()))) {
       LLVM_DEBUG(llvm::dbgs()
                  << "Found move only var allocbox use... "
@@ -1081,8 +1081,7 @@ addressBeginsInitialized(MarkUnresolvedNonCopyableValueInst *address) {
 
   // Check if our address is from a ref_element_addr. In such a case, we treat
   // the mark_unresolved_non_copyable_value as the initialization.
-  if (auto *refEltAddr =
-          dyn_cast<RefElementAddrInst>(stripAccessMarkers(operand))) {
+  if (isa<RefElementAddrInst>(stripAccessMarkers(operand))) {
     LLVM_DEBUG(llvm::dbgs()
                << "Found ref_element_addr use... "
                   "adding mark_unresolved_non_copyable_value as init!\n");
@@ -1091,8 +1090,7 @@ addressBeginsInitialized(MarkUnresolvedNonCopyableValueInst *address) {
 
   // Check if our address is from a global_addr. In such a case, we treat the
   // mark_unresolved_non_copyable_value as the initialization.
-  if (auto *globalAddr =
-          dyn_cast<GlobalAddrInst>(stripAccessMarkers(operand))) {
+  if (isa<GlobalAddrInst>(stripAccessMarkers(operand))) {
     LLVM_DEBUG(llvm::dbgs()
                << "Found global_addr use... "
                   "adding mark_unresolved_non_copyable_value as init!\n");
@@ -1108,15 +1106,14 @@ addressBeginsInitialized(MarkUnresolvedNonCopyableValueInst *address) {
     return true;
   }
 
-  if (auto *bai = dyn_cast_or_null<BeginApplyInst>(
+  if (isa_and_nonnull<BeginApplyInst>(
           stripAccessMarkers(operand)->getDefiningInstruction())) {
     LLVM_DEBUG(llvm::dbgs()
                << "Adding accessor coroutine begin_apply as init!\n");
     return true;
   }
 
-  if (auto *eai = dyn_cast<UncheckedTakeEnumDataAddrInst>(
-          stripAccessMarkers(operand))) {
+  if (isa<UncheckedTakeEnumDataAddrInst>(stripAccessMarkers(operand))) {
     LLVM_DEBUG(llvm::dbgs()
                << "Adding enum projection as init!\n");
     return true;
@@ -1139,14 +1136,14 @@ addressBeginsInitialized(MarkUnresolvedNonCopyableValueInst *address) {
   }
 
   // Assume a value whose deinit has been dropped has been initialized.
-  if (auto *ddi = dyn_cast<DropDeinitInst>(operand)) {
+  if (isa<DropDeinitInst>(operand)) {
     LLVM_DEBUG(llvm::dbgs()
                << "Adding copyable_to_move_only_wrapper as init!\n");
     return true;
   }
 
   // Assume a value wrapped in a MoveOnlyWrapper is initialized.
-  if (auto *m2c = dyn_cast<CopyableToMoveOnlyWrapperAddrInst>(operand)) {
+  if (isa<CopyableToMoveOnlyWrapperAddrInst>(operand)) {
     LLVM_DEBUG(llvm::dbgs()
                << "Adding copyable_to_move_only_wrapper as init!\n");
     return true;
@@ -1690,6 +1687,7 @@ struct CopiedLoadBorrowEliminationVisitor
       case OperandOwnership::InstantaneousUse:
       case OperandOwnership::UnownedInstantaneousUse:
       case OperandOwnership::InteriorPointer:
+      case OperandOwnership::AnyInteriorPointer:
       case OperandOwnership::BitwiseEscape: {
         // Look through copy_value of a move only value. We treat copy_value of
         // copyable values as normal uses.
@@ -2698,7 +2696,7 @@ bool GatherUsesVisitor::visitUse(Operand *op) {
     return true;
   }
 
-  if (auto *fixLifetime = dyn_cast<FixLifetimeInst>(op->getUser())) {
+  if (isa<FixLifetimeInst>(op->getUser())) {
     LLVM_DEBUG(llvm::dbgs() << "fix_lifetime use\n");
     SmallVector<TypeTreeLeafTypeRange, 2> leafRanges;
     TypeTreeLeafTypeRange::get(op, getRootAddress(), leafRanges);
@@ -2741,7 +2739,7 @@ bool GatherUsesVisitor::visitUse(Operand *op) {
     }
   }
 
-  if (auto *seai = dyn_cast<SwitchEnumAddrInst>(user)) {
+  if (isa<SwitchEnumAddrInst>(user)) {
     SmallVector<TypeTreeLeafTypeRange, 2> leafRanges;
     TypeTreeLeafTypeRange::get(op, getRootAddress(), leafRanges);
     if (!leafRanges.size()) {
@@ -2981,7 +2979,7 @@ bool GlobalLivenessChecker::testInstVectorLiveness(
             LLVM_DEBUG(llvm::dbgs() << "    Also a def block; skipping!\n");
             continue;
           }
-          [[clang::fallthrough]];
+          LLVM_FALLTHROUGH;
         }
         case IsLive::LiveWithin:
           if (isLive == IsLive::LiveWithin)

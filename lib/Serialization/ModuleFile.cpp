@@ -156,7 +156,8 @@ ModuleFile::loadDependenciesForFileContext(const FileUnit *file,
     if (dependency.isHeader()) {
       // The path may be empty if the file being loaded is a partial AST,
       // and the current compiler invocation is a merge-modules step.
-      if (!dependency.Core.RawPath.empty()) {
+      if (!dependency.Core.RawPath.empty() &&
+          !M->getASTContext().SearchPathOpts.BridgingHeaderChaining) {
         bool hadError =
             clangImporter->importHeader(dependency.Core.RawPath,
                                         file->getParentModule(),
@@ -830,7 +831,7 @@ ModuleFile::loadNamedMembers(const IterableDeclContext *IDC, DeclBaseName N,
       } else {
         if (!getContext().LangOpts.EnableDeserializationRecovery)
           fatal(mem.takeError());
-        consumeError(mem.takeError());
+        diagnoseAndConsumeError(mem.takeError());
       }
     }
   }
@@ -860,7 +861,7 @@ void ModuleFile::lookupClassMember(ImportPath::Access accessPath,
         if (!declOrError) {
           if (!getContext().LangOpts.EnableDeserializationRecovery)
             fatal(declOrError.takeError());
-          consumeError(declOrError.takeError());
+          diagnoseAndConsumeError(declOrError.takeError());
           continue;
         }
 
@@ -878,7 +879,7 @@ void ModuleFile::lookupClassMember(ImportPath::Access accessPath,
         if (!declOrError) {
           if (!getContext().LangOpts.EnableDeserializationRecovery)
             fatal(declOrError.takeError());
-          consumeError(declOrError.takeError());
+          diagnoseAndConsumeError(declOrError.takeError());
           continue;
         }
 
@@ -902,7 +903,7 @@ void ModuleFile::lookupClassMember(ImportPath::Access accessPath,
     if (!declOrError) {
       if (!getContext().LangOpts.EnableDeserializationRecovery)
         fatal(declOrError.takeError());
-      consumeError(declOrError.takeError());
+      diagnoseAndConsumeError(declOrError.takeError());
       continue;
     }
 
@@ -975,7 +976,7 @@ void ModuleFile::lookupObjCMethods(
     // Deserialize the method and add it to the list.
     auto declOrError = getDeclChecked(std::get<2>(result));
     if (!declOrError) {
-        consumeError(declOrError.takeError());
+        diagnoseAndConsumeError(declOrError.takeError());
         continue;
     }
 
@@ -989,7 +990,8 @@ ModuleFile::collectLinkLibraries(ModuleDecl::LinkLibraryCallback callback) const
   for (const auto &lib : Core->LinkLibraries)
     callback(lib);
   if (Core->Bits.IsFramework)
-    callback(LinkLibrary(Core->Name, LibraryKind::Framework));
+    callback(LinkLibrary{Core->Name, LibraryKind::Framework,
+                         static_cast<bool>(Core->Bits.IsStaticLibrary)});
 }
 
 void ModuleFile::getTopLevelDecls(
@@ -1002,13 +1004,16 @@ void ModuleFile::getTopLevelDecls(
       if (declOrError.errorIsA<DeclAttributesDidNotMatch>()) {
         // Decl rejected by matchAttributes, ignore it.
         assert(matchAttributes);
-        consumeError(declOrError.takeError());
+
+        // We don't diagnose DeclAttributesDidNotMatch at the moment but
+        // let's use the diagnose consume variant for consistency.
+        diagnoseAndConsumeError(declOrError.takeError());
         continue;
       }
 
       if (!getContext().LangOpts.EnableDeserializationRecovery)
         fatal(declOrError.takeError());
-      consumeError(declOrError.takeError());
+      diagnoseAndConsumeError(declOrError.takeError());
       continue;
     }
     if (!ABIRoleInfo(declOrError.get()).providesAPI()) // FIXME: flags
@@ -1024,7 +1029,7 @@ void ModuleFile::getExportedPrespecializations(
     if (!declOrError) {
       if (!getContext().LangOpts.EnableDeserializationRecovery)
         fatal(declOrError.takeError());
-      consumeError(declOrError.takeError());
+      diagnoseAndConsumeError(declOrError.takeError());
       continue;
     }
     results.push_back(declOrError.get());

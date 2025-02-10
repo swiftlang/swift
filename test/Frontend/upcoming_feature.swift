@@ -37,7 +37,6 @@
 // RUN: %target-swift-frontend -typecheck -disable-experimental-feature ConciseMagicFile -swift-version 6 %s 2>&1 | %FileCheck %s
 
 // REQUIRES: swift_feature_ConciseMagicFile
-// REQUIRES: !swift_feature_UnknownFeature
 
 // CHECK: warning: upcoming feature 'ConciseMagicFile' is already enabled as of Swift version 6
 

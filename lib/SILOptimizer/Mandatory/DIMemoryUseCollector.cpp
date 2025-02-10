@@ -930,7 +930,7 @@ void ElementUseCollector::collectUses(SILValue Pointer, unsigned BaseEltNo) {
       continue;
     }
 
-    if (auto *MAI = dyn_cast<MarkUnresolvedMoveAddrInst>(User)) {
+    if (isa<MarkUnresolvedMoveAddrInst>(User)) {
       // If this is the source of the copy_addr, then this is a load.  If it is
       // the destination, then this is an unknown assignment.  Note that we'll
       // revisit this instruction and add it to Uses twice if it is both a load

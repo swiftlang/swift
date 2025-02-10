@@ -252,6 +252,8 @@ PASS(ARCSequenceOpts, "arc-sequence-opts",
      "ARC Sequence Optimization")
 PASS(ARCLoopOpts, "arc-loop-opts",
      "ARC Loop Optimization")
+SWIFT_FUNCTION_PASS(MandatoryRedundantLoadElimination, "mandatory-redundant-load-elimination",
+     "Mandatory Redundant Load Elimination")
 SWIFT_FUNCTION_PASS(EarlyRedundantLoadElimination, "early-redundant-load-elimination",
      "Early Redundant Load Elimination")
 SWIFT_FUNCTION_PASS(RedundantLoadElimination, "redundant-load-elimination",
@@ -351,8 +353,6 @@ PASS(PerformanceConstantPropagation, "performance-constant-propagation",
      "Constant Propagation for Performance without Diagnostics")
 PASS(PerformanceDiagnostics, "performance-diagnostics",
      "Constant Propagation for Performance without Diagnostics")
-PASS(PredictableMemoryAccessOptimizations, "predictable-memaccess-opts",
-     "Predictable Memory Access Optimizations for Diagnostics")
 PASS(PredictableDeadAllocationElimination, "predictable-deadalloc-elim",
      "Eliminate dead temporary allocations after diagnostics")
 PASS(RedundantPhiElimination, "redundant-phi-elimination",

@@ -20,6 +20,8 @@
 #define NOMINMAX
 #include <windows.h>
 
+#pragma comment(lib, "synchronization.lib")
+
 #include "swift/Threading/Errors.h"
 #include "swift/Threading/Impl.h"
 

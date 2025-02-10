@@ -31,11 +31,11 @@ enum class ProtocolConformanceFlags {
   /// @unsafe conformance
   Unsafe = 0x04,
 
-  /// @safe(unchecked) conformance
-  Safe = 0x08,
-
   /// @retroactive conformance
-  Retroactive = 0x10,
+  Retroactive = 0x08,
+
+  /// @safe conformance
+  Safe = 0x10,
 
   // Note: whenever you add a bit here, update
   // NumProtocolConformanceOptions below.

@@ -188,7 +188,7 @@ static bool extractLinkerFlags(const llvm::object::Binary *Bin,
       }
     }
     return bool(Error);
-  } else if (auto *IRObjectFile = llvm::dyn_cast<llvm::object::IRObjectFile>(Bin)) {
+  } else if (llvm::isa<llvm::object::IRObjectFile>(Bin)) {
     // Ignore the LLVM IR files (LTO)
     return false;
   }  else {
@@ -230,9 +230,9 @@ int autolink_extract_main(ArrayRef<const char *> Args, const char *Argv0,
       "-lswift_StringProcessing",
       "-lswiftRegexBuilder",
       "-lswift_RegexParser",
-      "-lswift_Backtracing",
       "-lswift_Builtin_float",
       "-lswift_math",
+      "-lswiftRuntime",
       "-lswiftSynchronization",
       "-lswiftGlibc",
       "-lswiftAndroid",

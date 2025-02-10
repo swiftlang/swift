@@ -95,7 +95,7 @@ private struct CollectedEffects {
     case is CopyValueInst, is RetainValueInst, is StrongRetainInst:
       addEffects(.copy, to: inst.operands[0].value, fromInitialPath: SmallProjectionPath(.anyValueFields))
 
-    case is DestroyValueInst, is ReleaseValueInst, is StrongReleaseInst:
+    case is DestroyValueInst, is DestroyNotEscapedClosureInst, is ReleaseValueInst, is StrongReleaseInst:
       addDestroyEffects(ofValue: inst.operands[0].value)
 
     case let da as DestroyAddrInst:
@@ -180,8 +180,8 @@ private struct CollectedEffects {
       is CondFailInst:
       break
 
-    case is BeginCOWMutationInst, is IsUniqueInst, is IsEscapingClosureInst:
-      // Model reference count reading as "destroy" for now. Although we could intoduce a "read-refcount"
+    case is BeginCOWMutationInst, is IsUniqueInst:
+      // Model reference count reading as "destroy" for now. Although we could introduce a "read-refcount"
       // effect, it would not give any significant benefit in any of our current optimizations.
       addEffects(.destroy, to: inst.operands[0].value, fromInitialPath: SmallProjectionPath(.anyValueFields))
 

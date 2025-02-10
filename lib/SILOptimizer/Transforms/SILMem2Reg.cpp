@@ -1199,7 +1199,7 @@ SILInstruction *StackAllocationPromoter::promoteAllocationInBlock(
     }
 
     // Debug values will automatically be salvaged, we can ignore them.
-    if (auto *dvi = DebugValueInst::hasAddrVal(inst)) {
+    if (DebugValueInst::hasAddrVal(inst)) {
       continue;
     }
 
@@ -1455,7 +1455,7 @@ void StackAllocationPromoter::fixBranchesAndUses(
     SILBasicBlock *userBlock = user->getParent();
 
     // Debug values will automatically be salvaged, we can ignore them.
-    if (auto *dvi = DebugValueInst::hasAddrVal(user)) {
+    if (DebugValueInst::hasAddrVal(user)) {
       continue;
     }
 
@@ -2040,7 +2040,7 @@ void MemoryToRegisters::removeSingleBlockAllocation(AllocStackInst *asi) {
     }
 
     // Debug values will automatically be salvaged, we can ignore them.
-    if (auto *dvi = DebugValueInst::hasAddrVal(inst)) {
+    if (DebugValueInst::hasAddrVal(inst)) {
       continue;
     }
 

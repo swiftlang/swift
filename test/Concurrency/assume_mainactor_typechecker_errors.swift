@@ -51,7 +51,7 @@ func unspecifiedFunctionTest2() async {
 }
 
 nonisolated func nonisolatedFunctionTest() async {
-  let k = StructContainingKlass()
+  let k = await StructContainingKlass()
   await unspecifiedAsync(k.k) // expected-error {{non-sendable type 'Klass' of property 'k' cannot exit main actor-isolated context}}
   await nonisolatedAsync(k.k) // expected-error {{non-sendable type 'Klass' of property 'k' cannot exit main actor-isolated context}}
   await mainActorAsync(k.k) // expected-error {{non-sendable type 'Klass' of property 'k' cannot exit main actor-isolated context}}
@@ -66,7 +66,7 @@ func testTask() async {
 
 func testTaskDetached() async {
   Task.detached {
-    let k = Klass(getDataFromSocket())
+    let k = await Klass(getDataFromSocket())
     // Have to pop back onto the main thread to do something.
     await k.doSomething()
   }

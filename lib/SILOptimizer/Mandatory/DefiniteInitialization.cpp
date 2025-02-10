@@ -1734,8 +1734,13 @@ void LifetimeChecker::handleInOutUse(const DIMemoryUse &Use) {
       return;
     }
 
-    auto diagID = diag::variable_inout_before_initialized;
-    
+    // A self argument implicitly passed as an inout parameter is diagnosed as
+    // "used before initialized", because "passed by reference" might be a
+    // confusing diagnostic in this context.
+    auto diagID = (Use.Kind == DIUseKind::InOutSelfArgument)
+                      ? diag::variable_used_before_initialized
+                      : diag::variable_inout_before_initialized;
+
     if (isa<AddressToPointerInst>(Use.Inst))
       diagID = diag::variable_addrtaken_before_initialized;
 

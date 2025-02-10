@@ -4,6 +4,7 @@
 // UNSUPPORTED: wasm
 // UNSUPPORTED: OS=wasi
 // UNSUPPORTED: CPU=wasm32
+// REQUIRES: PTRSIZE=64
 
 sil_stage canonical
 

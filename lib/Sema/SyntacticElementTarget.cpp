@@ -57,6 +57,7 @@ SyntacticElementTarget::SyntacticElementTarget(
   expression.propertyWrapper.innermostWrappedValueInit = nullptr;
   expression.propertyWrapper.hasInitialWrappedValue = false;
   expression.isDiscarded = isDiscarded;
+  expression.bindPatternVarsOneWay = false;
   expression.initialization.patternBinding = nullptr;
   expression.initialization.patternBindingIndex = 0;
 }
@@ -135,7 +136,8 @@ void SyntacticElementTarget::maybeApplyPropertyWrapper() {
 
 SyntacticElementTarget
 SyntacticElementTarget::forInitialization(Expr *initializer, DeclContext *dc,
-                                          Type patternType, Pattern *pattern) {
+                                          Type patternType, Pattern *pattern,
+                                          bool bindPatternVarsOneWay) {
   // Determine the contextual type for the initialization.
   TypeLoc contextualType;
   if (!(isa<OptionalSomePattern>(pattern) && !pattern->isImplicit()) &&
@@ -159,20 +161,21 @@ SyntacticElementTarget::forInitialization(Expr *initializer, DeclContext *dc,
   SyntacticElementTarget target(initializer, dc, contextInfo,
                                 /*isDiscarded=*/false);
   target.expression.pattern = pattern;
+  target.expression.bindPatternVarsOneWay = bindPatternVarsOneWay;
   target.maybeApplyPropertyWrapper();
   return target;
 }
 
 SyntacticElementTarget SyntacticElementTarget::forInitialization(
     Expr *initializer, Type patternType, PatternBindingDecl *patternBinding,
-    unsigned patternBindingIndex) {
+    unsigned patternBindingIndex, bool bindPatternVarsOneWay) {
   auto *dc = patternBinding->getDeclContext();
   if (auto *initContext = patternBinding->getInitContext(patternBindingIndex))
     dc = initContext;
 
   auto result = forInitialization(
       initializer, dc, patternType,
-      patternBinding->getPattern(patternBindingIndex));
+      patternBinding->getPattern(patternBindingIndex), bindPatternVarsOneWay);
   result.expression.initialization.patternBinding = patternBinding;
   result.expression.initialization.patternBindingIndex = patternBindingIndex;
   return result;

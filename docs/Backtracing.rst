@@ -319,3 +319,14 @@ of the backtracer using
 
 If the runtime is unable to locate the backtracer, it will allow your program to
 crash as it would have done anyway.
+
+Backtrace Storage
+-----------------
+
+Backtraces are stored internally in a format called :download:`Compact Backtrace
+Format <CompactBacktraceFormat.md>`.  This provides us with a way to store a
+large number of frames in a much smaller space than would otherwise be possible.
+
+Similarly, where we need to store address to image mappings, we
+use :download:`Compact ImageMap Format <CompactImageMapFormat.md>` to minimise
+storage requirements.

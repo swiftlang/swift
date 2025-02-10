@@ -1,3 +1,13 @@
+public enum _SwiftifyExpr {
+    case param(_ index: Int)
+    case `return`
+    case `self`
+}
+
+public enum _DependenceType {
+    case borrow
+    case copy
+}
 /// Different ways to annotate pointer parameters using the `@_SwiftifyImport` macro.
 /// All indices into parameter lists start at 1. Indices __must__ be integer literals, and strings
 /// __must__ be string literals, because their contents are parsed by the `@_SwiftifyImport` macro.
@@ -13,23 +23,26 @@ public enum _SwiftifyInfo {
     /// `Unsafe[Mutable]Pointer<T>[?]`, i.e. not an `UnsafeRawPointer`.
     /// Parameter count: string containing valid Swift syntax containing the number of elements in
     /// the buffer.
-    case countedBy(pointer: Int, count: String)
+    case countedBy(pointer: _SwiftifyExpr, count: String)
     /// Corresponds to the C `__sized_by(size)` attribute.
     /// Parameter pointer: index of pointer in function parameter list. Must be of type
     /// `Unsafe[Mutable]RawPointer[?]`, i.e. not an `UnsafePointer<T>`.
     /// Parameter count: string containing valid Swift syntax containing the size of the buffer,
     /// in bytes.
-    case sizedBy(pointer: Int, size: String)
+    case sizedBy(pointer: _SwiftifyExpr, size: String)
     /// Corresponds to the C `__ended_by(end)` attribute.
     /// Parameter start: index of pointer in function parameter list.
     /// Parameter end: index of pointer in function parameter list, pointing one past the end of
     /// the same buffer as `start`.
-    case endedBy(start: Int, end: Int)
+    case endedBy(start: _SwiftifyExpr, end: Int)
     /// Corresponds to the C `noescape` attribute. Allows generated wrapper to use `Span`-types
     /// instead of `UnsafeBuffer`-types, because it is known that the function doesn't capture the
     /// object past the lifetime of the function.
     /// Parameter pointer: index of pointer in function parameter list.
-    case nonescaping(pointer: Int)
+    case nonescaping(pointer: _SwiftifyExpr)
+    /// Can express lifetime dependencies between inputs and outputs of a function.
+    /// 'dependsOn' is the input on which the output 'pointer' depends.
+    case lifetimeDependence(dependsOn: _SwiftifyExpr, pointer: _SwiftifyExpr, type: _DependenceType)
 }
 
 /// Generates a safe wrapper for function with Unsafe[Mutable][Raw]Pointer[?] or std::span arguments.

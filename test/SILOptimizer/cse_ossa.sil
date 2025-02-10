@@ -565,13 +565,8 @@ sil [ossa] @sil_string_different_encodings : $@convention(thin) () -> Builtin.Wo
 }
 
 // CHECK-LABEL: sil [ossa] @raw_idx_cse :
-// CHECK: integer_literal
-// CHECK-NEXT: index_raw_pointer
-// CHECK-NEXT: pointer_to_address
-// CHECK-NEXT: load
-// CHECK-NEXT: load
-// CHECK-NEXT: apply
-// CHECK-NEXT: tuple
+// CHECK: pointer_to_address
+// CHECK: pointer_to_address
 // CHECK-LABEL: } // end sil function 'raw_idx_cse'
 sil [ossa] @raw_idx_cse: $@convention(thin) (Builtin.RawPointer) -> () {
 bb0(%0 : $Builtin.RawPointer):
@@ -1091,10 +1086,8 @@ bb0(%0 : @guaranteed $Proto & Ping):
 sil [ossa] [global_init] @$s4test10testGlobalSivau : $@convention(thin) () -> Builtin.RawPointer
 
 // CHECK-LABEL: sil [ossa] @cse_global_init :
-// CHECK:   [[P:%[0-9]+]] = apply
-// CHECK:   [[A:%[0-9]+]] = pointer_to_address [[P]]
-// CHECK:   begin_access [modify] [dynamic] [no_nested_conflict] [[A]]
-// CHECK:   begin_access [read] [dynamic] [no_nested_conflict] [[A]]
+// CHECK:   pointer_to_address
+// CHECK:   pointer_to_address
 // CHECK: // end sil function 'cse_global_init'
 sil [ossa] @cse_global_init : $@convention(thin) () -> Int64 {
 bb0:

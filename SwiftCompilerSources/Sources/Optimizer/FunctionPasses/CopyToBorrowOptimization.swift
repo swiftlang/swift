@@ -122,7 +122,11 @@ private struct Uses {
   // Exit blocks of the load/copy_value's liverange which don't have a destroy.
   // Those are successor blocks of terminators, like `switch_enum`, which do _not_ forward the value.
   // E.g. the none-case of a switch_enum of an Optional.
-  private(set) var nonDestroyingLiverangeExits: Stack<BasicBlock>
+  private(set) var nonDestroyingLiverangeExits: Stack<Instruction>
+
+  var allLifetimeEndingInstructions: [Instruction] {
+    Array(destroys.lazy.map { $0 }) + Array(nonDestroyingLiverangeExits)
+  }
 
   private(set) var usersInDeadEndBlocks: Stack<Instruction>
 
@@ -179,8 +183,13 @@ private struct Uses {
       // A terminator instruction can implicitly end the lifetime of its operand in a success block,
       // e.g. a `switch_enum` with a non-payload case block. Such success blocks need an `end_borrow`, though.
       for succ in termInst.successors where !succ.arguments.contains(where: {$0.ownership == .owned}) {
-        nonDestroyingLiverangeExits.append(succ)
+        nonDestroyingLiverangeExits.append(succ.instructions.first!)
       }
+    } else if !forwardingInst.forwardedResults.contains(where: { $0.ownership == .owned }) {
+      // The forwarding instruction has no owned result, which means it ends the lifetime of its owned operand.
+      // This can happen with an `unchecked_enum_data` which extracts a trivial payload out of a
+      // non-trivial enum.
+      nonDestroyingLiverangeExits.append(forwardingInst.next!)
     }
   }
 
@@ -268,7 +277,7 @@ private func remove(copy: CopyValueInst, collectedUses: Uses, liverange: Instruc
   context.erase(instructions: collectedUses.destroys)
 }
 
-// Handle the special case if the `load` or `copy_valuw` is immediately followed by a single `move_value`.
+// Handle the special case if the `load` or `copy_value` is immediately followed by a single `move_value`.
 // In this case we have to preserve the move's flags by inserting a `begin_borrow` with the same flags.
 // For example:
 //
@@ -314,15 +323,11 @@ private func createEndBorrows(for beginBorrow: Value, atEndOf liverange: Instruc
   //   destroy_value %2
   //   destroy_value %3  // The final destroy. Here we need to create the `end_borrow`(s)
   //
-  for destroy in collectedUses.destroys where !liverange.contains(destroy) {
-    let builder = Builder(before: destroy, context)
-    builder.createEndBorrow(of: beginBorrow)
-  }
-  for liverangeExitBlock in collectedUses.nonDestroyingLiverangeExits where
-      !liverange.blockRange.contains(liverangeExitBlock)
-  {
-    let builder = Builder(atBeginOf: liverangeExitBlock, context)
-    builder.createEndBorrow(of: beginBorrow)
+  for endInst in collectedUses.allLifetimeEndingInstructions {
+    if !liverange.contains(endInst) {
+      let builder = Builder(before: endInst, context)
+      builder.createEndBorrow(of: beginBorrow)
+    }
   }
 }
 

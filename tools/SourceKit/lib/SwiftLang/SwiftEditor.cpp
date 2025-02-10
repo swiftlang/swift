@@ -1707,12 +1707,12 @@ private:
         auto SR = E->getSourceRange();
         if (SR.isValid() && SM.rangeContainsTokenLoc(SR, TargetLoc) &&
             !checkCallExpr(E) && !EnclosingCallAndArg.first) {
-          if (!isa<TryExpr>(E) && !isa<AwaitExpr>(E) &&
+          if (!isa<TryExpr>(E) && !isa<AwaitExpr>(E) && !isa<UnsafeExpr>(E) &&
               !isa<PrefixUnaryExpr>(E)) {
             // We don't want to expand to trailing closures if the call is
             // nested inside another expression that has closing characters,
             // like a `)` for a function call. This is not the case for
-            // `try`, `await` and prefix operator applications.
+            // `try`, `await`, `unsafe` and prefix operator applications.
             OuterExpr = E;
           }
         }

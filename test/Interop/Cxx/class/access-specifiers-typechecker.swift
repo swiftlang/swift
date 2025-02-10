@@ -1,5 +1,4 @@
-// Test that C++ access specifiers are honored, i.e. private members aren't
-// imported.
+// Test that C++ access specifiers are honored.
 
 // RUN: %target-typecheck-verify-swift -verify-ignore-unknown -I %S/Inputs -enable-experimental-cxx-interop
 
@@ -16,28 +15,33 @@ v.publicMemberFunc()
 var publicTypedefVar: PublicPrivate.PublicTypedef
 var publicStructVar: PublicPrivate.PublicStruct
 var publicEnumVar: PublicPrivate.PublicEnum
-// TODO: These enum values don't yet appear to be imported correctly into the
-// scope of PublicPrivate yet. Once they are, verify that they are accessible.
-// print(PublicPrivate.PublicEnumValue1)
-// print(PublicPrivate.PublicAnonymousEnumValue1)
 var publicClosedEnumVar: PublicPrivate.PublicClosedEnum
 var publicOpenEnumVar: PublicPrivate.PublicOpenEnum
 var publicFlagEnumVar: PublicPrivate.PublicFlagEnum
 
+// TODO: nested enum members aren't being imported correctly yet (#54905)
+// Once they are, verify that they are accessible.
+// print(PublicPrivate.PublicEnumValue1)
+// print(PublicPrivate.PublicAnonymousEnumValue)
+print(PublicPrivate.PublicClosedEnum.value1)
+print(PublicPrivate.PublicOpenEnum.value1)
+
 // Cannot access any private members and types.
 
 v.PrivateMemberVar = 1 // expected-error {{'PrivateMemberVar' is inaccessible due to 'private' protection level}}
-PublicPrivate.PrivateStaticMemberVar = 1 // expected-error {{'PublicPrivate' has no member 'PrivateStaticMemberVar'}}
-v.privateMemberFunc() // expected-error {{value of type 'PublicPrivate' has no member 'privateMemberFunc'}}
+PublicPrivate.PrivateStaticMemberVar = 1 // expected-error {{'PrivateStaticMemberVar' is inaccessible due to 'private' protection level}}
+v.privateMemberFunc() // expected-error {{'privateMemberFunc' is inaccessible due to 'private' protection level}}
 
-var privateTypedefVar: PublicPrivate.PrivateTypedef // expected-error {{'PrivateTypedef' is not a member type of struct 'AccessSpecifiers.PublicPrivate'}}
-var privateStructVar: PublicPrivate.PrivateStruct // expected-error {{'PrivateStruct' is not a member type of struct 'AccessSpecifiers.PublicPrivate'}}
-var privateEnumVar: PublicPrivate.PrivateEnum // expected-error {{'PrivateEnum' is not a member type of struct 'AccessSpecifiers.PublicPrivate'}}
-// TODO: PrivateEnumValue1 and PrivateAnonymousEnumValue1 give the expected
-// error, but only because these types of enums (private or public) aren't
-// currently imported at all. Once that is fixed, remove this TODO.
-print(PublicPrivate.PrivateEnumValue1) // expected-error {{'PublicPrivate' has no member 'PrivateEnumValue1'}}
-print(PublicPrivate.PrivateAnonymousEnumValue1) // expected-error {{'PublicPrivate' has no member 'PrivateAnonymousEnumValue1'}}
-var privateClosedEnumVar: PublicPrivate.PrivateClosedEnum // expected-error {{'PrivateClosedEnum' is not a member type of struct 'AccessSpecifiers.PublicPrivate'}}
-var privateOpenEnumVar: PublicPrivate.PrivateOpenEnum // expected-error {{'PrivateOpenEnum' is not a member type of struct 'AccessSpecifiers.PublicPrivate'}}
-var privateFlagEnumVar: PublicPrivate.PrivateFlagEnum // expected-error {{'PrivateFlagEnum' is not a member type of struct 'AccessSpecifiers.PublicPrivate'}}
+var privateTypedefVar: PublicPrivate.PrivateTypedef // expected-error {{'PrivateTypedef' is inaccessible due to 'private' protection level}}
+var privateStructVar: PublicPrivate.PrivateStruct // expected-error {{'PrivateStruct' is inaccessible due to 'private' protection level}}
+var privateEnumVar: PublicPrivate.PrivateEnum // expected-error {{'PrivateEnum' is inaccessible due to 'private' protection level}}
+var privateClosedEnumVar: PublicPrivate.PrivateClosedEnum // expected-error {{'PrivateClosedEnum' is inaccessible due to 'private' protection level}}
+var privateOpenEnumVar: PublicPrivate.PrivateOpenEnum // expected-error {{'PrivateOpenEnum' is inaccessible due to 'private' protection level}}
+var privateFlagEnumVar: PublicPrivate.PrivateFlagEnum // expected-error {{'PrivateFlagEnum' is inaccessible due to 'private' protection level}}
+
+// TODO: nested enum members aren't being imported correctly yet (#54905)
+// Once they are, verify that this throws an error (similar to above).
+// print(PublicPrivate.PrivateEnumValue1)
+// print(PublicPrivate.PrivateAnonymousEnumValue1)
+print(PublicPrivate.PrivateOpenEnum.value1) // expected-error {{'PrivateOpenEnum' is inaccessible due to 'private' protection level}}
+print(PublicPrivate.PrivateClosedEnum.value1) // expected-error {{'PrivateClosedEnum' is inaccessible due to 'private' protection level}}

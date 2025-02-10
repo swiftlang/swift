@@ -14,6 +14,8 @@
 #define SWIFT_BASIC_BASICBRIDGINGIMPL_H
 
 #include "swift/Basic/Assertions.h"
+#include "swift/Basic/SourceLoc.h"
+#include "llvm/ADT/StringRef.h"
 
 SWIFT_BEGIN_NULLABILITY_ANNOTATIONS
 
@@ -27,6 +29,10 @@ const void *_Nullable BridgedArrayRef_data(BridgedArrayRef arr) {
 
 SwiftInt BridgedArrayRef_count(BridgedArrayRef arr) {
   return static_cast<SwiftInt>(arr.Length);
+}
+
+bool BridgedArrayRef_isEmpty(BridgedArrayRef arr) {
+  return arr.Length == 0;
 }
 
 //===----------------------------------------------------------------------===//

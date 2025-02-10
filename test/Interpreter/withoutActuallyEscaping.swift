@@ -21,6 +21,7 @@ var testShouldThrow = false
 
 struct MyError : Error {}
 
+@inline(never)
 func letEscapeThrowing(f: () -> ()) throws -> () -> () {
   return try withoutActuallyEscaping(f) {
     if testShouldThrow {
@@ -29,6 +30,15 @@ func letEscapeThrowing(f: () -> ()) throws -> () -> () {
     return $0
   }
 }
+
+@inline(never)
+func letEscapeOnThrowingPath(f: () throws -> ()) throws {
+  try withoutActuallyEscaping(f) {
+    sink = $0
+    throw MyError()
+  }
+}
+
 
 WithoutEscapingSuite.test("ExpectNoCrash") {
   dontEscape(f: { print("foo") })
@@ -53,7 +63,7 @@ WithoutEscapingSuite.test("ExpectCrash") {
   sink = letEscape(f: { print("Context: \(context.a) \(context.b)") })
 }
 
-WithoutEscapingSuite.test("ExpectThrowingCrash") {
+WithoutEscapingSuite.test("ExpectNonThrowingCrash") {
   expectCrashLater()
   let context = Context()
   var testDidThrow = false
@@ -72,6 +82,18 @@ WithoutEscapingSuite.test("ExpectThrowingNoCrash") {
   testShouldThrow = true
   do {
     sink = try letEscapeThrowing(f: { print("Context: \(context.a) \(context.b)") })
+  } catch {
+    testDidThrow = true
+  }
+  expectTrue(testDidThrow)
+}
+
+WithoutEscapingSuite.test("ExpectThrowingCrash") {
+  expectCrashLater()
+  let context = Context()
+  var testDidThrow = false
+  do {
+    try letEscapeOnThrowingPath(f: { print("Context: \(context.a) \(context.b)") })
   } catch {
     testDidThrow = true
   }

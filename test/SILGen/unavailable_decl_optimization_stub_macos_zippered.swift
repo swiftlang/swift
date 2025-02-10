@@ -21,16 +21,15 @@ public func unavailableOnMacOSFunc() {}
 @available(iOS, unavailable)
 public func unavailableOniOSFunc() {}
 
-// FIXME: This function should diagnose (rdar://125930716)
 // CHECK-LABEL:     sil{{.*}}@$s4Test28unavailableOnMacCatalystFuncyyF
 // CHECK-NOT:         _diagnoseUnavailableCodeReached
 // CHECK:           } // end sil function '$s4Test28unavailableOnMacCatalystFuncyyF'
 @available(macCatalyst, unavailable)
 public func unavailableOnMacCatalystFunc() {}
 
-// FIXME: This function should diagnose (rdar://125930716)
 // CHECK-LABEL:     sil{{.*}}@$s4Test28unavailableOnMacOSAndiOSFuncyyF
-// CHECK-NOT:         _diagnoseUnavailableCodeReached
+// CHECK:             [[FNREF:%.*]] = function_ref @$ss31_diagnoseUnavailableCodeReacheds5NeverOyFTwb : $@convention(thin) () -> Never
+// CHECK-NEXT:        [[APPLY:%.*]] = apply [[FNREF]]()
 // CHECK:           } // end sil function '$s4Test28unavailableOnMacOSAndiOSFuncyyF'
 @available(macOS, unavailable)
 @available(iOS, unavailable)
@@ -43,7 +42,7 @@ public struct UnavailableOniOS {
   // CHECK:           } // end sil function '$s4Test16UnavailableOniOSV15availableMethodyyF'
   public func availableMethod() {}
 
-  // FIXME: This function should diagnose (rdar://125930716)
+  // FIXME: [availability] This method should diagnose
   // CHECK-LABEL:     sil{{.*}}@$s4Test16UnavailableOniOSV24unavailableOnMacOSMethodyyF
   // CHECK-NOT:         _diagnoseUnavailableCodeReached
   // CHECK:           } // end sil function '$s4Test16UnavailableOniOSV24unavailableOnMacOSMethodyyF'

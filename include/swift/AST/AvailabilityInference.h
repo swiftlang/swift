@@ -24,9 +24,9 @@
 
 namespace swift {
 class ASTContext;
-class AvailableAttr;
 class BackDeployedAttr;
 class Decl;
+class SemanticAvailableAttr;
 
 class AvailabilityInference {
 public:
@@ -63,26 +63,26 @@ public:
   /// values to the re-mapped platform's, if using a fallback platform.
   /// Returns `true` if a remap occured.
   static bool updateIntroducedPlatformForFallback(
-      const AvailableAttr *attr, const ASTContext &Ctx,
+      const SemanticAvailableAttr &attr, const ASTContext &Ctx,
       llvm::StringRef &Platform, llvm::VersionTuple &PlatformVer);
 
   /// For the attribute's deprecation version, update the platform and version
   /// values to the re-mapped platform's, if using a fallback platform.
   /// Returns `true` if a remap occured.
   static bool updateDeprecatedPlatformForFallback(
-      const AvailableAttr *attr, const ASTContext &Ctx,
+      const SemanticAvailableAttr &attr, const ASTContext &Ctx,
       llvm::StringRef &Platform, llvm::VersionTuple &PlatformVer);
 
   /// For the attribute's obsoletion version, update the platform and version
   /// values to the re-mapped platform's, if using a fallback platform.
   /// Returns `true` if a remap occured.
   static bool updateObsoletedPlatformForFallback(
-      const AvailableAttr *attr, const ASTContext &Ctx,
+      const SemanticAvailableAttr &attr, const ASTContext &Ctx,
       llvm::StringRef &Platform, llvm::VersionTuple &PlatformVer);
 
-  static void updatePlatformStringForFallback(
-      const AvailableAttr *attr, const ASTContext &Ctx,
-      llvm::StringRef &Platform);
+  static void updatePlatformStringForFallback(const SemanticAvailableAttr &attr,
+                                              const ASTContext &Ctx,
+                                              llvm::StringRef &Platform);
 
   /// For the attribute's before version, update the platform and version
   /// values to the re-mapped platform's, if using a fallback platform.

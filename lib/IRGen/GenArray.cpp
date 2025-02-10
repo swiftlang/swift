@@ -94,16 +94,21 @@ protected:
     }
     
     body(eltAddrs);
-    
+
+    // The just ran body may have generated new blocks. Get the current
+    // insertion block which will become the other incoming block to the phis
+    // we've generated.
+    predBB = IGF.Builder.GetInsertBlock();
+
     for (unsigned i : indices(addrPhis)) {
       addrPhis[i]->addIncoming(Element.indexArray(IGF, eltAddrs[i], one,
                                                   getElementSILType(IGF.IGM, T))
                                       .getAddress(),
-                               loopBB);
+                               predBB);
     }
 
     auto nextCount = IGF.Builder.CreateSub(countPhi, one);
-    countPhi->addIncoming(nextCount, loopBB);
+    countPhi->addIncoming(nextCount, predBB);
     
     auto done = IGF.Builder.CreateICmpEQ(nextCount, zero);
     IGF.Builder.CreateCondBr(done, endBB, loopBB);
@@ -206,10 +211,15 @@ protected:
       uint64_t paddingBytes = elementTI.getFixedStride().getValue()
         - elementTI.getFixedSize().getValue();
       auto byteTy = llvm::IntegerType::get(LLVMContext, 8);
-      elementTy = llvm::StructType::get(LLVMContext,
-        {elementTy,
-         llvm::ArrayType::get(byteTy, paddingBytes)},
-        /*packed*/ true);
+      auto paddingArrayTy = llvm::ArrayType::get(byteTy, paddingBytes);
+
+      if (elementTI.getFixedSize() == Size(0)) {
+        elementTy = paddingArrayTy;
+      } else {
+        elementTy = llvm::StructType::get(LLVMContext,
+          {elementTy, paddingArrayTy},
+          /*packed*/ true);
+      }
     }
     
     return llvm::ArrayType::get(elementTy, arraySize);

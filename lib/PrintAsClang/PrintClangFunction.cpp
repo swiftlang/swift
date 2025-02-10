@@ -348,7 +348,8 @@ public:
     if (typeUseKind == FunctionSignatureTypeUse::ParamType && !isInOutParam)
       os << "const ";
     printOptional(optionalKind, [&]() {
-      ClangSyntaxPrinter(CT->getASTContext(), os).printBaseName(CT->getDecl());
+      ClangSyntaxPrinter(CT->getASTContext(), os)
+          .printPrimaryCxxTypeName(cd, moduleContext);
     });
     if (typeUseKind == FunctionSignatureTypeUse::ParamType)
       os << "&";

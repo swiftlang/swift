@@ -10,7 +10,11 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "clang/AST/DeclObjC.h"
+#include "clang/Basic/Module.h"
 #include "llvm/ADT/StringSwitch.h"
+#include "swift/AST/ASTContext.h"
+#include "swift/AST/ClangModuleLoader.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/ProtocolConformance.h"
@@ -41,6 +45,36 @@ bool areModulesEqual(const ModuleDecl *lhs, const ModuleDecl *rhs, bool isClangE
   return true;
 }
 
+bool clangModuleExports(const clang::Module *ClangParent, const clang::Module *CM) {
+  if (!ClangParent || !CM) return false;
+  if (ClangParent == CM) return true;
+
+  for (auto ClangExport : ClangParent->Exports) {
+    auto *ExportedModule = ClangExport.getPointer();
+    if (ClangExport.getInt()) {
+      if (!ExportedModule && CM->isSubModuleOf(ClangParent)) {
+        return true;
+      } else if (ExportedModule && CM->isSubModuleOf(ExportedModule)) {
+        return true;
+      }
+    }
+    if (ExportedModule && clangModuleExports(ExportedModule, CM)) {
+      return true;
+    }
+  }
+
+  if (ClangParent->Exports.empty() && CM->isSubModuleOf(ClangParent)) {
+    // HACK: In the absence of an explicit export statement, consider any submodule to be exported.
+    return true;
+  }
+
+  return false;
+}
+
+bool underlyingClangModuleExports(const ModuleDecl *ParentModule, const ModuleDecl *M) {
+  return clangModuleExports(ParentModule->findUnderlyingClangModule(), M->findUnderlyingClangModule());
+}
+
 } // anonymous namespace
 
 SymbolGraphASTWalker::SymbolGraphASTWalker(ModuleDecl &M,
@@ -57,20 +91,32 @@ SymbolGraphASTWalker::SymbolGraphASTWalker(
       QualifiedExportedImports(QualifiedExportedImports),
       MainGraph(*this, M, std::nullopt, Ctx) {}
 
+ModuleDecl *SymbolGraphASTWalker::getRealModuleOf(const Decl *D) const {
+  ModuleDecl *Module = D->getModuleContext();
+  if (auto *ClangDecl = D->getClangDecl())
+    if (auto *ClangModule = ClangDecl->getOwningModule())
+      if (auto *ClangModuleLoader = D->getASTContext().getClangModuleLoader())
+        if (auto *M = ClangModuleLoader->getWrapperForModule(ClangModule))
+          Module = M;
+
+  return Module;
+}
+
 /// Get a "sub" symbol graph for the parent module of a type that
 /// the main module `M` is extending.
 SymbolGraph *SymbolGraphASTWalker::getModuleSymbolGraph(const Decl *D) {
-  auto *M = D->getModuleContext();
+  auto *M = getRealModuleOf(D);
   const auto *DC = D->getDeclContext();
   SmallVector<const NominalTypeDecl *, 2> ParentTypes = {};
   const Decl *ExtendedNominal = nullptr;
   while (DC) {
-    M = DC->getParentModule();
     if (const auto *NTD = dyn_cast_or_null<NominalTypeDecl>(DC->getAsDecl())) {
       DC = NTD->getDeclContext();
+      M = getRealModuleOf(NTD);
       ParentTypes.push_back(NTD);
     } else if (const auto *Ext = dyn_cast_or_null<ExtensionDecl>(DC->getAsDecl())) {
       DC = Ext->getExtendedNominal()->getDeclContext();
+      M = getRealModuleOf(Ext->getExtendedNominal());
       if (!ExtendedNominal)
         ExtendedNominal = Ext->getExtendedNominal();
     } else {
@@ -78,26 +124,42 @@ SymbolGraph *SymbolGraphASTWalker::getModuleSymbolGraph(const Decl *D) {
     }
   }
 
-  if (areModulesEqual(&this->M, M)) {
-    return &MainGraph;
-  } else if (MainGraph.DeclaringModule.has_value() &&
-             areModulesEqual(MainGraph.DeclaringModule.value(), M)) {
-    // Cross-import overlay modules already appear as "extensions" of their declaring module; we
-    // should put actual extensions of that module into the main graph
-    return &MainGraph;
-  }
+  auto moduleIsMainGraph = [&](const ModuleDecl *M) {
+    if (areModulesEqual(&this->M, M)) {
+      return true;
+    } else if (MainGraph.DeclaringModule.has_value() &&
+               areModulesEqual(MainGraph.DeclaringModule.value(), M)) {
+      // Cross-import overlay modules already appear as "extensions" of their declaring module; we
+      // should put actual extensions of that module into the main graph
+      return true;
+    }
 
-  // Check the module and decl separately since the extension could be from a different module
-  // than the decl itself.
-  if (isExportedImportedModule(M) || isQualifiedExportedImport(D)) {
+    // Check the module and decl separately since the extension could be from a different module
+    // than the decl itself.
+    if (isExportedImportedModule(M)) {
+      return true;
+    }
+
+    return false;
+  };
+
+  if (moduleIsMainGraph(M) || isQualifiedExportedImport(D))
     return &MainGraph;
-  }
 
   // If this type is the child of a type which was re-exported in a qualified export, use the main graph.
   if (llvm::any_of(ParentTypes, [&](const NominalTypeDecl *NTD){ return isQualifiedExportedImport(NTD); })) {
     return &MainGraph;
   }
-  
+
+  // As a shorthand when dealing with Clang submodules, use their top-level module's graph if the
+  // submodule is ultimately exported from its top-level module.
+  auto *TopLevelModule = M->getTopLevelModule();
+  if (TopLevelModule != M && underlyingClangModuleExports(TopLevelModule, M))
+    M = TopLevelModule;
+
+  if (moduleIsMainGraph(M))
+    return &MainGraph;
+
   auto Found = ExtendedModuleGraphs.find(M->getNameStr());
   if (Found != ExtendedModuleGraphs.end()) {
     return Found->getValue();
@@ -119,6 +181,9 @@ static bool isUnavailableOrObsoletedOnPlatform(const Decl *D) {
 }
 
 bool SymbolGraphASTWalker::walkToDeclPre(Decl *D, CharSourceRange Range) {
+  if (SynthesizedChildrenBaseDecl && D == SynthesizedChildrenBaseDecl)
+    return true;
+
   if (isUnavailableOrObsoletedOnPlatform(D)) {
     return false;
   }
@@ -239,7 +304,7 @@ bool SymbolGraphASTWalker::walkToDeclPre(Decl *D, CharSourceRange Range) {
 
   auto *VD = cast<ValueDecl>(D);
 
-  if (!SG->canIncludeDeclAsNode(VD)) {
+  if (!BaseDecl && !SG->canIncludeDeclAsNode(VD)) {
     return false;
   }
 
@@ -270,8 +335,21 @@ bool SymbolGraphASTWalker::walkToDeclPre(Decl *D, CharSourceRange Range) {
     }
   }
 
+  if (const auto *TD = dyn_cast_or_null<TypeAliasDecl>(VD)) {
+    const auto InnerType = TD->getUnderlyingType();
+    if (NominalTypeDecl *NTD = InnerType->getAnyNominal()) {
+      // Only fold typedefs together if the inner type is from our module and it
+      // otherwise isn't being shown
+      if (isOurModule(NTD->getModuleContext()) &&
+          !SG->canIncludeDeclAsNode(NTD)) {
+        PublicPrivateTypeAliases.insert_or_assign(NTD, TD);
+        synthesizeChildSymbols(NTD, TD);
+      }
+    }
+  }
+
   // Otherwise, record this in the main module `M`'s symbol graph.
-  SG->recordNode(Symbol(SG, VD, nullptr));
+  SG->recordNode(Symbol(SG, VD, BaseDecl));
 
   return true;
 }
@@ -312,7 +390,7 @@ bool SymbolGraphASTWalker::isConsideredExportedImported(const Decl *D) const {
 }
 
 bool SymbolGraphASTWalker::isFromExportedImportedModule(const Decl* D, bool countUnderlyingClangModule) const {
-  auto *M = D->getModuleContext();
+  auto *M = getRealModuleOf(D);
   return isQualifiedExportedImport(D) || isExportedImportedModule(M, countUnderlyingClangModule);
 }
 
@@ -339,4 +417,16 @@ bool SymbolGraphASTWalker::shouldBeRecordedAsExtension(
                           ED->getExtendedNominal()->getModuleContext()) &&
          !isExportedImportedModule(
              ED->getExtendedNominal()->getModuleContext());
+}
+
+bool SymbolGraphASTWalker::synthesizeChildSymbols(Decl *D,
+                                                  const ValueDecl *BD) {
+  BaseDecl = BD;
+  SynthesizedChildrenBaseDecl = D;
+  SWIFT_DEFER {
+    BaseDecl = nullptr;
+    SynthesizedChildrenBaseDecl = nullptr;
+  };
+
+  return walk(D);
 }

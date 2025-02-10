@@ -69,6 +69,7 @@ struct swiftscan_dependency_info_s {
 
 struct swiftscan_link_library_info_s {
   swiftscan_string_ref_t name;
+  bool isStatic;
   bool isFramework;
   bool forceLoad;
 };
@@ -107,11 +108,6 @@ typedef struct {
   /// Options to the compile command required to build bridging header.
   swiftscan_string_set_t *bridging_pch_command_line;
 
-  /// To build a PCM to be used by this Swift module, we need to append these
-  /// arguments to the generic PCM build arguments reported from the dependency
-  /// graph.
-  swiftscan_string_set_t *extra_pcm_args;
-
   /// The hash value that will be used for the generated module
   swiftscan_string_ref_t context_hash;
 
@@ -135,6 +131,13 @@ typedef struct {
 
   /// User module version
   swiftscan_string_ref_t user_module_version;
+
+  /// Chained bridging header path.
+  swiftscan_string_ref_t chained_bridging_header_path;
+
+  /// Chained bridging header content.
+  swiftscan_string_ref_t chained_bridging_header_content;
+
 } swiftscan_swift_textual_details_t;
 
 /// Swift modules with only a binary module file.
@@ -201,9 +204,6 @@ typedef struct {
   /// Options to the compile command required to build this clang modulemap
   swiftscan_string_set_t *command_line;
 
-  /// The swift-specific PCM arguments captured by this dependencies object
-  swiftscan_string_set_t *captured_pcm_args;
-
   /// The CASID for CASFileSystemRoot
   swiftscan_string_ref_t cas_fs_root_id;
 
@@ -222,12 +222,6 @@ struct swiftscan_module_details_s {
     swiftscan_swift_placeholder_details_t swift_placeholder_details;
     swiftscan_clang_details_t clang_details;
   };
-};
-
-struct swiftscan_batch_scan_entry_s {
-  swiftscan_string_ref_t module_name;
-  swiftscan_string_ref_t arguments;
-  bool is_swift;
 };
 
 struct swiftscan_import_set_s {

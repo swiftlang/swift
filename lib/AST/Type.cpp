@@ -808,8 +808,11 @@ CanType CanType::wrapInOptionalTypeImpl(CanType type) {
 
 Type TypeBase::isArrayType() {
   if (auto boundStruct = getAs<BoundGenericStructType>()) {
-    if (boundStruct->getDecl() == getASTContext().getArrayDecl())
+    if (isArray())
       return boundStruct->getGenericArgs()[0];
+
+    if (isSlab())
+      return boundStruct->getGenericArgs()[1];
   }
   return Type();
 }
@@ -3563,7 +3566,7 @@ RecursiveTypeProperties ArchetypeType::archetypeProperties(
   properties |= subs.getRecursiveProperties();
 
   for (auto proto : conformsTo) {
-    if (proto->isUnsafe()) {
+    if (proto->getExplicitSafety() == ExplicitSafety::Unsafe) {
       properties |= RecursiveTypeProperties::IsUnsafe;
       break;
     }

@@ -1024,6 +1024,8 @@ public:
 
   virtual ~LangSupport() { }
 
+  virtual void *getOpaqueSwiftIDEInspectionInstance() { return nullptr; }
+
   virtual void globalConfigurationUpdated(std::shared_ptr<GlobalConfig> Config) {};
 
   virtual void dependencyUpdated() {}

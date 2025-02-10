@@ -343,6 +343,12 @@ struct ASTContext::Implementation {
   /// The declaration of Swift.Optional<T>.None.
   EnumElementDecl *OptionalNoneDecl = nullptr;
 
+  /// The declaration of Optional<T>.TangentVector.init
+  ConstructorDecl *OptionalTanInitDecl = nullptr;
+
+  /// The declaration of Optional<T>.TangentVector.value
+  VarDecl *OptionalTanValueDecl = nullptr;
+  
   /// The declaration of Swift.Void.
   TypeAliasDecl *VoidDecl = nullptr;
 
@@ -426,9 +432,6 @@ struct ASTContext::Implementation {
 
   /// Singleton used to cache the import graph.
   swift::namelookup::ImportCache TheImportCache;
-
-  /// Cache of availability macros parsed from the command line.
-  AvailabilityMacroMap TheAvailabilityMacroCache;
 
   /// The module loader used to load Clang modules.
   ClangModuleLoader *TheClangModuleLoader = nullptr;
@@ -966,6 +969,12 @@ Identifier ASTContext::getIdentifier(StringRef Str) const {
   auto pair = std::make_pair(Str, Identifier::Aligner());
   auto I = getImpl().IdentifierTable.insert(pair).first;
   return Identifier(I->getKeyData());
+}
+
+Identifier ASTContext::getDollarIdentifier(size_t Idx) const {
+  SmallVector<char, 4> StrBuf;
+  StringRef varName = ("$" + Twine(Idx)).toStringRef(StrBuf);
+  return getIdentifier(varName);
 }
 
 void ASTContext::lookupInModule(
@@ -2245,6 +2254,52 @@ void ASTContext::loadObjCMethods(
   }
 }
 
+ConstructorDecl *ASTContext::getOptionalTanInitDecl(CanType optionalTanType) {
+  if (!getImpl().OptionalTanInitDecl) {
+    auto *optionalTanDecl = optionalTanType.getNominalOrBoundGenericNominal();
+    // Look up the `Optional<T>.TangentVector.init` declaration.
+    auto initLookup =
+      optionalTanDecl->lookupDirect(DeclBaseName::createConstructor());
+    ConstructorDecl *constructorDecl = nullptr;
+    for (auto *candidate : initLookup) {
+      auto candidateModule = candidate->getModuleContext();
+      if (candidateModule->getName() == Id_Differentiation ||
+          candidateModule->isStdlibModule()) {
+        assert(!constructorDecl && "Multiple `Optional.TangentVector.init`s");
+        constructorDecl = cast<ConstructorDecl>(candidate);
+#ifdef NDEBUG
+        break;
+#endif
+      }
+    }
+    assert(constructorDecl && "No `Optional.TangentVector.init`");
+
+    getImpl().OptionalTanInitDecl = constructorDecl;
+  }
+
+  return getImpl().OptionalTanInitDecl;
+}
+
+VarDecl *ASTContext::getOptionalTanValueDecl(CanType optionalTanType) {
+  if (!getImpl().OptionalTanValueDecl) {
+    // TODO: Maybe it would be better to have getters / setters here that we
+    // can call and hide this implementation detail?
+    StructDecl *optStructDecl = optionalTanType.getStructOrBoundGenericStruct();
+    assert(optStructDecl && "Unexpected type of Optional.TangentVector");
+
+    ArrayRef<VarDecl *> properties = optStructDecl->getStoredProperties();
+    assert(properties.size() == 1 && "Unexpected type of Optional.TangentVector");
+    VarDecl *wrappedValueVar = properties[0];
+
+    assert(wrappedValueVar->getTypeInContext()->getEnumOrBoundGenericEnum() ==
+           getOptionalDecl() && "Unexpected type of Optional.TangentVector");
+
+    getImpl().OptionalTanValueDecl = wrappedValueVar;
+  }
+
+  return getImpl().OptionalTanValueDecl;
+}
+
 void ASTContext::loadDerivativeFunctionConfigurations(
     AbstractFunctionDecl *originalAFD, unsigned previousGeneration,
     llvm::SetVector<AutoDiffConfig> &results) {
@@ -2297,8 +2352,10 @@ swift::namelookup::ImportCache &ASTContext::getImportCache() const {
   return getImpl().TheImportCache;
 }
 
-AvailabilityMacroMap &ASTContext::getAvailabilityMacroCache() const {
-  return getImpl().TheAvailabilityMacroCache;
+const AvailabilityMacroMap &ASTContext::getAvailabilityMacroMap() const {
+  auto *ctx = const_cast<ASTContext *>(this);
+  return *evaluateOrFatal(ctx->evaluator,
+                          AvailabilityMacroArgumentsRequest{ctx});
 }
 
 ClangModuleLoader *ASTContext::getClangModuleLoader() const {
@@ -4076,7 +4133,8 @@ get(GenericTypeDecl *TheDecl, Type Parent, const ASTContext &C) {
   UnboundGenericType::Profile(ID, TheDecl, Parent);
   void *InsertPos = nullptr;
   RecursiveTypeProperties properties;
-  if (TheDecl->isUnsafe()) properties |= RecursiveTypeProperties::IsUnsafe;
+  if (TheDecl->getExplicitSafety() == ExplicitSafety::Unsafe)
+    properties |= RecursiveTypeProperties::IsUnsafe;
   if (Parent) properties |= Parent->getRecursiveProperties();
 
   auto arena = getArena(properties);
@@ -4129,7 +4187,8 @@ BoundGenericType *BoundGenericType::get(NominalTypeDecl *TheDecl,
   llvm::FoldingSetNodeID ID;
   BoundGenericType::Profile(ID, TheDecl, Parent, GenericArgs);
   RecursiveTypeProperties properties;
-  if (TheDecl->isUnsafe()) properties |= RecursiveTypeProperties::IsUnsafe;
+  if (TheDecl->getExplicitSafety() == ExplicitSafety::Unsafe)
+    properties |= RecursiveTypeProperties::IsUnsafe;
   if (Parent) properties |= Parent->getRecursiveProperties();
   for (Type Arg : GenericArgs) {
     properties |= Arg->getRecursiveProperties();
@@ -4211,7 +4270,8 @@ EnumType::EnumType(EnumDecl *TheDecl, Type Parent, const ASTContext &C,
 
 EnumType *EnumType::get(EnumDecl *D, Type Parent, const ASTContext &C) {
   RecursiveTypeProperties properties;
-  if (D->isUnsafe()) properties |= RecursiveTypeProperties::IsUnsafe;
+  if (D->getExplicitSafety() == ExplicitSafety::Unsafe)
+    properties |= RecursiveTypeProperties::IsUnsafe;
   if (Parent) properties |= Parent->getRecursiveProperties();
   auto arena = getArena(properties);
 
@@ -4228,7 +4288,8 @@ StructType::StructType(StructDecl *TheDecl, Type Parent, const ASTContext &C,
 
 StructType *StructType::get(StructDecl *D, Type Parent, const ASTContext &C) {
   RecursiveTypeProperties properties;
-  if (D->isUnsafe()) properties |= RecursiveTypeProperties::IsUnsafe;
+  if (D->getExplicitSafety() == ExplicitSafety::Unsafe)
+    properties |= RecursiveTypeProperties::IsUnsafe;
   if (Parent) properties |= Parent->getRecursiveProperties();
   auto arena = getArena(properties);
 
@@ -4245,7 +4306,8 @@ ClassType::ClassType(ClassDecl *TheDecl, Type Parent, const ASTContext &C,
 
 ClassType *ClassType::get(ClassDecl *D, Type Parent, const ASTContext &C) {
   RecursiveTypeProperties properties;
-  if (D->isUnsafe()) properties |= RecursiveTypeProperties::IsUnsafe;
+  if (D->getExplicitSafety() == ExplicitSafety::Unsafe)
+    properties |= RecursiveTypeProperties::IsUnsafe;
   if (Parent) properties |= Parent->getRecursiveProperties();
   auto arena = getArena(properties);
 
@@ -5396,7 +5458,8 @@ OptionalType *OptionalType::get(Type base) {
 ProtocolType *ProtocolType::get(ProtocolDecl *D, Type Parent,
                                 const ASTContext &C) {
   RecursiveTypeProperties properties;
-  if (D->isUnsafe()) properties |= RecursiveTypeProperties::IsUnsafe;
+  if (D->getExplicitSafety() == ExplicitSafety::Unsafe)
+    properties |= RecursiveTypeProperties::IsUnsafe;
   if (Parent) properties |= Parent->getRecursiveProperties();
   auto arena = getArena(properties);
 
@@ -5651,10 +5714,9 @@ SubstitutionMap::Storage *SubstitutionMap::Storage::get(
 }
 
 const AvailabilityContext::Storage *
-AvailabilityContext::Storage::get(const PlatformInfo &platformInfo,
-                                  ASTContext &ctx) {
+AvailabilityContext::Storage::get(const Info &info, ASTContext &ctx) {
   llvm::FoldingSetNodeID id;
-  platformInfo.Profile(id);
+  info.Profile(id);
 
   auto &foldingSet =
       ctx.getImpl().getArena(AllocationArena::Permanent).AvailabilityContexts;
@@ -5665,7 +5727,7 @@ AvailabilityContext::Storage::get(const PlatformInfo &platformInfo,
 
   void *mem = ctx.Allocate(sizeof(AvailabilityContext::Storage),
                            alignof(AvailabilityContext::Storage));
-  auto *newNode = ::new (mem) AvailabilityContext::Storage(platformInfo);
+  auto *newNode = ::new (mem) AvailabilityContext::Storage(info);
   foldingSet.InsertNode(newNode, insertPos);
 
   return newNode;

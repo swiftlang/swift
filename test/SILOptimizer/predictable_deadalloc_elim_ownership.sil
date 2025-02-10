@@ -1,4 +1,8 @@
-// RUN: %target-sil-opt -sil-print-types -enable-sil-verify-all %s -predictable-deadalloc-elim | %FileCheck %s
+// RUN: %target-sil-opt -sil-print-types -enable-sil-verify-all %s -predictable-deadalloc-elim \
+// RUN: -enable-experimental-feature LifetimeDependence \
+// RUN: | %FileCheck %s
+
+// REQUIRES: swift_feature_LifetimeDependence
 
 sil_stage canonical
 
@@ -23,6 +27,8 @@ case some(T)
 
 protocol P {}
 struct S: P {}
+
+struct NE: ~Escapable {}
 
 ///////////
 // Tests //
@@ -761,4 +767,21 @@ bb0(%0 : $S):
   %4 = init_existential_addr %1 : $*any P, $S
   store %0 to [trivial] %4 : $*S
   unreachable
+}
+
+// Preserve ownership for empty ~Escapable structs.
+//
+// CHECK-LABEL: sil hidden [ossa] @testEmptyNonEscapable : $@convention(method) (@guaranteed NE) -> @lifetime(copy 0) @owned NE {
+// CHECK: bb0(%0 : @guaranteed $NE):
+// CHECK-NEXT:   %1 = copy_value %0 : $NE
+// CHECK-NEXT:   return %1 : $NE
+// CHECK-LABEL: } // end sil function 'testEmptyNonEscapable'
+sil hidden [ossa] @testEmptyNonEscapable : $@convention(method) (@guaranteed NE) -> @lifetime(copy 0) @owned NE {
+bb0(%0 : @guaranteed $NE):
+  %1 = copy_value %0
+  %13 = alloc_stack $NE
+  store %1 to [init] %13
+  %22 = load [take] %13
+  dealloc_stack %13
+  return %22
 }

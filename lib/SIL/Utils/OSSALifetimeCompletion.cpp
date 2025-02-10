@@ -80,6 +80,9 @@ static SILInstruction *endOSSALifetime(SILValue value,
   if (auto scopedAddress = ScopedAddressValue(value)) {
     return scopedAddress.createScopeEnd(builder.getInsertionPoint(), loc);
   }
+  if (value->getOwnershipKind() == OwnershipKind::None) {
+    return builder.createExtendLifetime(loc, value);
+  }
   return builder.createEndBorrow(loc, lookThroughBorrowedFromUser(value));
 }
 
@@ -297,9 +300,16 @@ void AvailabilityBoundaryVisitor::computeRegion(
     regionWorklist.push(block);
   };
 
-  for (auto *endBlock : boundary.endBlocks) {
-    if (!consumingBlocks.contains(endBlock)) {
-      collect(endBlock);
+  // Trivial values that correspond to local variables (as opposed to
+  // ScopedAddresses) are available only up to their last extend_lifetime on
+  // non-dead-end paths. They cannot be consumed, but are only "available" up to
+  // the end of their scope.
+  if (value->getOwnershipKind() != OwnershipKind::None
+      || ScopedAddressValue(value)) {
+    for (auto *endBlock : boundary.endBlocks) {
+      if (!consumingBlocks.contains(endBlock)) {
+        collect(endBlock);
+      }
     }
   }
   for (SILBasicBlock *edge : boundary.boundaryEdges) {
@@ -497,12 +507,21 @@ bool OSSALifetimeCompletion::analyzeAndUpdateLifetime(SILValue value,
   if (auto scopedAddress = ScopedAddressValue(value)) {
     return analyzeAndUpdateLifetime(scopedAddress, boundary);
   }
-
   // Called for inner borrows, inner adjacent reborrows, inner reborrows, and
   // scoped addresses.
   auto handleInnerScope = [this, boundary](SILValue innerBorrowedValue) {
     completeOSSALifetime(innerBorrowedValue, boundary);
   };
+  if (value->getOwnershipKind() == OwnershipKind::None) {
+    // Trivial variable lifetimes are only relevant up to the extend_lifetime
+    // instructions emitted by SILGen. Their other uses have no meaning with
+    // respect to lifetime. The only purpose of "completing" their lifetime is
+    // to insert extend_lifetime on dead-end blocks.
+    LinearLiveness liveness(value);
+    liveness.compute();
+    return endLifetimeAtBoundary(value, liveness.getLiveness(), boundary,
+                                 deadEndBlocks);
+  }
   InteriorLiveness liveness(value);
   liveness.compute(domInfo, handleInnerScope);
   // TODO: Rebuild outer adjacent phis on demand (SILGen does not currently

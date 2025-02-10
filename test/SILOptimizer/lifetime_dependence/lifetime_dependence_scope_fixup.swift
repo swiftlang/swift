@@ -228,3 +228,12 @@ public func test10() {
   }
 }
 
+// CHECK-LABEL: sil hidden @$s31lifetime_dependence_scope_fixup37testPointeeDependenceOnMutablePointer1pySPys5Int64VG_tF : $@convention(thin) (UnsafePointer<Int64>) -> () {
+// CHECK: bb0(%0 : $UnsafePointer<Int64>):
+// CHECK:   [[ALLOC:%.*]] = alloc_stack [var_decl] $UnsafePointer<Int64>, var, name "ptr", type $UnsafePointer<Int64>
+// CHECK:   mark_dependence [nonescaping] %{{.*}} on %0
+// CHECK-LABEL: } // end sil function '$s31lifetime_dependence_scope_fixup37testPointeeDependenceOnMutablePointer1pySPys5Int64VG_tF'
+func testPointeeDependenceOnMutablePointer(p: UnsafePointer<Int64>) {
+  var ptr = p
+  _ = ptr.pointee
+}

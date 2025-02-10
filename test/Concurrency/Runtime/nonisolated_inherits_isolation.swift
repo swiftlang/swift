@@ -33,6 +33,17 @@ struct CustomActor {
   }
 }
 
+@execution(caller)
+func executionCallerIsolation() async {
+  checkIfOnMainQueue()
+}
+
+// Expected to always crash
+@execution(concurrent)
+func executionConcurrentIsolation() async {
+  checkIfOnMainQueue()
+}
+
 let tests = TestSuite("NonIsolatedInheritsIsolation")
 
 tests.test("checkIfOnMainQueue does not crash on the main queue") { @MainActor () -> () in
@@ -85,6 +96,25 @@ tests.test("Check if nonisolated inheriting nonisolated crashes") { () async -> 
     await nonisolatedCheckIfOnMainQueue()
   }
   sleep(5)
+}
+
+tests.test("Check if execution concurrent isolation crashes (main actor)") { @MainActor () async -> () in
+  expectCrashLater()
+  await executionConcurrentIsolation()
+}
+
+tests.test("Check if execution concurrent isolation crashes (custom actor)") { @CustomActor () async -> () in
+  expectCrashLater()
+  await executionConcurrentIsolation()
+}
+
+tests.test("Check if execution concurrent isolation does not crash (main actor)") { @MainActor () async -> () in
+  await executionCallerIsolation()
+}
+
+tests.test("Check if execution concurrent isolation does crash (custom actor)") { @CustomActor () async -> () in
+  expectCrashLater()
+  await executionCallerIsolation()
 }
 
 @MainActor func run() async {

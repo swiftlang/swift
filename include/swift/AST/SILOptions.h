@@ -191,7 +191,7 @@ public:
   /// Do we always serialize SIL in OSSA form?
   ///
   /// If this is disabled we do not serialize in OSSA form when optimizing.
-  bool EnableOSSAModules = false;
+  bool EnableOSSAModules = true;
 
   /// Allow recompilation of a non-OSSA module to an OSSA module when imported
   /// from another OSSA module.

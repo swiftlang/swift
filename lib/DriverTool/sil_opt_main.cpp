@@ -310,9 +310,8 @@ struct SILOptOptions {
   EnableMoveInoutStackProtection = llvm::cl::opt<bool>("enable-move-inout-stack-protector",
                     llvm::cl::desc("Enable the stack protector by moving values to temporaries."));
 
-  llvm::cl::opt<bool>
-  EnableOSSAModules = llvm::cl::opt<bool>(
-      "enable-ossa-modules",
+  llvm::cl::opt<bool> EnableOSSAModules = llvm::cl::opt<bool>(
+      "enable-ossa-modules", llvm::cl::init(true),
       llvm::cl::desc("Do we always serialize SIL in OSSA form? If "
                      "this is disabled we do not serialize in OSSA "
                      "form when optimizing."));
@@ -794,6 +793,7 @@ int sil_opt_main(ArrayRef<const char *> argv, void *MainAddr) {
   }
 
   Invocation.getLangOptions().EnableCXXInterop = options.EnableCxxInterop;
+  Invocation.computeCXXStdlibOptions();
 
   Invocation.getLangOptions().UnavailableDeclOptimizationMode =
       options.UnavailableDeclOptimization;
@@ -883,7 +883,7 @@ int sil_opt_main(ArrayRef<const char *> argv, void *MainAddr) {
   SILOpts.EnableSILOpaqueValues = options.EnableSILOpaqueValues;
   SILOpts.OSSACompleteLifetimes = options.EnableOSSACompleteLifetimes;
   SILOpts.OSSAVerifyComplete = options.EnableOSSAVerifyComplete;
-
+  SILOpts.StopOptimizationAfterSerialization |= options.EmitSIB;
   if (options.CopyPropagationState) {
     SILOpts.CopyPropagation = *options.CopyPropagationState;
   }
@@ -1058,6 +1058,7 @@ int sil_opt_main(ArrayRef<const char *> argv, void *MainAddr) {
     serializationOpts.OutputPath = OutputFile;
     serializationOpts.SerializeAllSIL = options.EmitSIB;
     serializationOpts.IsSIB = options.EmitSIB;
+    serializationOpts.IsOSSA = SILOpts.EnableOSSAModules;
 
     symbolgraphgen::SymbolGraphOptions symbolGraphOptions;
 

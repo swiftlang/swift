@@ -513,15 +513,16 @@ extension StoreInst {
 }
 
 extension LoadInst {
-  func trySplit(_ context: FunctionPassContext) {
+  @discardableResult
+  func trySplit(_ context: FunctionPassContext) -> Bool {
     var elements = [Value]()
     let builder = Builder(before: self, context)
     if type.isStruct {
       if (type.nominal as! StructDecl).hasUnreferenceableStorage {
-        return
+        return false
       }
       guard let fields = type.getNominalFields(in: parentFunction) else {
-        return
+        return false
       }
       for idx in 0..<fields.count {
         let fieldAddr = builder.createStructElementAddr(structAddress: address, fieldIndex: idx)
@@ -530,6 +531,7 @@ extension LoadInst {
       }
       let newStruct = builder.createStruct(type: self.type, elements: elements)
       self.replace(with: newStruct, context)
+      return true
     } else if type.isTuple {
       var elements = [Value]()
       let builder = Builder(before: self, context)
@@ -540,7 +542,9 @@ extension LoadInst {
       }
       let newTuple = builder.createTuple(type: self.type, elements: elements)
       self.replace(with: newTuple, context)
+      return true
     }
+    return false
   }
 
   private func splitOwnership(for fieldValue: Value) -> LoadOwnership {
@@ -860,6 +864,32 @@ extension CheckedCastAddrBranchInst {
       case .willFail:    return false
       default: fatalError("unknown result from classifyDynamicCastBridged")
     }
+  }
+}
+
+extension CopyAddrInst {
+  @discardableResult
+  func replaceWithLoadAndStore(_ context: some MutatingContext) -> StoreInst {
+    let loadOwnership: LoadInst.LoadOwnership
+    let storeOwnership: StoreInst.StoreOwnership
+    if parentFunction.hasOwnership {
+      if source.type.isTrivial(in: parentFunction) {
+        loadOwnership = .trivial
+        storeOwnership = .trivial
+      } else {
+        loadOwnership = isTakeOfSrc ? .take : .copy
+        storeOwnership = isInitializationOfDest ? .initialize : .assign
+      }
+    } else {
+      loadOwnership = .unqualified
+      storeOwnership = .unqualified
+    }
+    
+    let builder = Builder(before: self, context)
+    let value = builder.createLoad(fromAddress: source, ownership: loadOwnership)
+    let store = builder.createStore(source: value, destination: destination, ownership: storeOwnership)
+    context.erase(instruction: self)
+    return store
   }
 }
 

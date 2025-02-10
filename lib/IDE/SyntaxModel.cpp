@@ -873,7 +873,7 @@ ASTWalker::PreWalkAction ModelASTWalker::walkToDeclPre(Decl *D) {
     SN.BodyRange = innerCharSourceRangeFromSourceRange(SM,
                                                    AFD->getBodySourceRange());
     SN.NameRange = charSourceRangeFromSourceRange(SM,
-                        AFD->getSignatureSourceRange());
+                        AFD->getParameterListSourceRange());
     if (FD) {
       SN.TypeRange = charSourceRangeFromSourceRange(SM,
                                     FD->getResultTypeSourceRange());

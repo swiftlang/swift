@@ -309,6 +309,71 @@ struct PreconcurrencyAppliesToParentToo : @preconcurrency Child {
 // CHECK: [[CHECK_EXEC_REF:%.*]] = function_ref @$ss22_checkExpectedExecutor14_filenameStart01_D6Length01_D7IsASCII5_line9_executoryBp_BwBi1_BwBetF
 // CHECK-NEXT: {{.*}} = apply [[CHECK_EXEC_REF]]({{.*}}, [[EXEC]])
 
+@available(*, unavailable)
+extension NotSendable: Sendable {}
+
+struct NotSendable: Equatable, Hashable {
+}
+
+@MainActor
+struct TestDerivedEquatable : @preconcurrency Equatable {
+  var x: NotSendable
+}
+
+// protocol witness for static Equatable.== infix(_:_:) in conformance TestDerivedEquatable
+// CHECK-LABEL: sil private [transparent] [thunk] [ossa] @$s27preconcurrency_conformances20TestDerivedEquatableVSQAASQ2eeoiySbx_xtFZTW
+// CHECK: [[MAIN_ACTOR:%.*]] = begin_borrow {{.*}} : $MainActor
+// CHECK-NEXT: [[EXEC:%.*]] = extract_executor [[MAIN_ACTOR]] : $MainActor
+// CHECK: [[CHECK_EXEC_REF:%.*]] = function_ref @$ss22_checkExpectedExecutor14_filenameStart01_D6Length01_D7IsASCII5_line9_executoryBp_BwBi1_BwBetF
+// CHECK-NEXT: {{.*}} = apply [[CHECK_EXEC_REF]]({{.*}}, [[EXEC]])
+
+@MainActor
+struct TestDerivedHashable : @preconcurrency Hashable {
+  var x: NotSendable
+}
+
+// protocol witness for Hashable.hashValue.getter in conformance TestDerivedHashable
+// CHECK-LABEL: sil private [transparent] [thunk] [ossa] @$s27preconcurrency_conformances19TestDerivedHashableVSHAASH9hashValueSivgTW
+// CHECK: [[MAIN_ACTOR:%.*]] = begin_borrow {{.*}} : $MainActor
+// CHECK-NEXT: [[EXEC:%.*]] = extract_executor [[MAIN_ACTOR]] : $MainActor
+// CHECK: [[CHECK_EXEC_REF:%.*]] = function_ref @$ss22_checkExpectedExecutor14_filenameStart01_D6Length01_D7IsASCII5_line9_executoryBp_BwBi1_BwBetF
+// CHECK-NEXT: {{.*}} = apply [[CHECK_EXEC_REF]]({{.*}}, [[EXEC]])
+
+// protocol witness for Hashable.hash(into:) in conformance TestDerivedHashable
+// CHECK-LABEL: sil private [transparent] [thunk] [ossa] @$s27preconcurrency_conformances19TestDerivedHashableVSHAASH4hash4intoys6HasherVz_tFTW
+// CHECK: [[MAIN_ACTOR:%.*]] = begin_borrow {{.*}} : $MainActor
+// CHECK-NEXT: [[EXEC:%.*]] = extract_executor [[MAIN_ACTOR]] : $MainActor
+// CHECK: [[CHECK_EXEC_REF:%.*]] = function_ref @$ss22_checkExpectedExecutor14_filenameStart01_D6Length01_D7IsASCII5_line9_executoryBp_BwBi1_BwBetF
+// CHECK-NEXT: {{.*}} = apply [[CHECK_EXEC_REF]]({{.*}}, [[EXEC]])
+
+// protocol witness for static Equatable.== infix(_:_:) in conformance TestDerivedHashable
+// CHECK-LABEL: sil private [transparent] [thunk] [ossa] @$s27preconcurrency_conformances19TestDerivedHashableVSQAASQ2eeoiySbx_xtFZTW
+// CHECK: [[MAIN_ACTOR:%.*]] = begin_borrow {{.*}} : $MainActor
+// CHECK-NEXT: [[EXEC:%.*]] = extract_executor [[MAIN_ACTOR]] : $MainActor
+// CHECK: [[CHECK_EXEC_REF:%.*]] = function_ref @$ss22_checkExpectedExecutor14_filenameStart01_D6Length01_D7IsASCII5_line9_executoryBp_BwBi1_BwBetF
+// CHECK-NEXT: {{.*}} = apply [[CHECK_EXEC_REF]]({{.*}}, [[EXEC]])
+
+extension NotSendable : Codable {}
+
+@MainActor
+struct TestDerivedCodable : @preconcurrency Codable {
+  var x: NotSendable
+}
+
+// protocol witness for Decodable.init(from:) in conformance TestDerivedCodable
+// CHECK-LABEL: sil private [transparent] [thunk] [ossa] @$s27preconcurrency_conformances18TestDerivedCodableVSeAASe4fromxs7Decoder_p_tKcfCTW
+// CHECK: [[MAIN_ACTOR:%.*]] = begin_borrow {{.*}} : $MainActor
+// CHECK-NEXT: [[EXEC:%.*]] = extract_executor [[MAIN_ACTOR]] : $MainActor
+// CHECK: [[CHECK_EXEC_REF:%.*]] = function_ref @$ss22_checkExpectedExecutor14_filenameStart01_D6Length01_D7IsASCII5_line9_executoryBp_BwBi1_BwBetF
+// CHECK-NEXT: {{.*}} = apply [[CHECK_EXEC_REF]]({{.*}}, [[EXEC]])
+
+// protocol witness for Encodable.encode(to:) in conformance TestDerivedCodable
+// CHECK-LABEL: sil private [transparent] [thunk] [ossa] @$s27preconcurrency_conformances18TestDerivedCodableVSEAASE6encode2toys7Encoder_p_tKFTW
+// CHECK: [[MAIN_ACTOR:%.*]] = begin_borrow {{.*}} : $MainActor
+// CHECK-NEXT: [[EXEC:%.*]] = extract_executor [[MAIN_ACTOR]] : $MainActor
+// CHECK: [[CHECK_EXEC_REF:%.*]] = function_ref @$ss22_checkExpectedExecutor14_filenameStart01_D6Length01_D7IsASCII5_line9_executoryBp_BwBi1_BwBetF
+// CHECK-NEXT: {{.*}} = apply [[CHECK_EXEC_REF]]({{.*}}, [[EXEC]])
+
 //--- checks_disabled.swift
 protocol P {
   associatedtype T
@@ -497,4 +562,51 @@ struct PreconcurrencyAppliesToParentToo : @preconcurrency Child {
 
 // protocol witness for Parent.a() in conformance PreconcurrencyAppliesToParentToo
 // CHECK-LABEL: sil private [transparent] [thunk] [ossa] @$s27preconcurrency_conformances32PreconcurrencyAppliesToParentTooVAA0F0A2aDP1ayyFTW : $@convention(witness_method: Parent) (@in_guaranteed PreconcurrencyAppliesToParentToo) -> ()
+// CHECK-NOT: [[CHECK_EXEC_REF:%.*]] = function_ref @$ss22_checkExpectedExecutor14_filenameStart01_D6Length01_D7IsASCII5_line9_executoryBp_BwBi1_BwBetF
+
+@available(*, unavailable)
+extension NotSendable: Sendable {}
+
+struct NotSendable: Equatable, Hashable {
+}
+
+@MainActor
+struct TestDerivedEquatable : @preconcurrency Equatable {
+  var x: NotSendable
+}
+
+// protocol witness for static Equatable.== infix(_:_:) in conformance TestDerivedEquatable
+// CHECK-LABEL: sil private [transparent] [thunk] [ossa] @$s27preconcurrency_conformances20TestDerivedEquatableVSQAASQ2eeoiySbx_xtFZTW
+// CHECK-NOT: [[CHECK_EXEC_REF:%.*]] = function_ref @$ss22_checkExpectedExecutor14_filenameStart01_D6Length01_D7IsASCII5_line9_executoryBp_BwBi1_BwBetF
+
+@MainActor
+struct TestDerivedHashable : @preconcurrency Hashable {
+  var x: NotSendable
+}
+
+// protocol witness for Hashable.hashValue.getter in conformance TestDerivedHashable
+// CHECK-LABEL: sil private [transparent] [thunk] [ossa] @$s27preconcurrency_conformances19TestDerivedHashableVSHAASH9hashValueSivgTW
+// CHECK-NOT: [[CHECK_EXEC_REF:%.*]] = function_ref @$ss22_checkExpectedExecutor14_filenameStart01_D6Length01_D7IsASCII5_line9_executoryBp_BwBi1_BwBetF
+
+// protocol witness for Hashable.hash(into:) in conformance TestDerivedHashable
+// CHECK-LABEL: sil private [transparent] [thunk] [ossa] @$s27preconcurrency_conformances19TestDerivedHashableVSHAASH4hash4intoys6HasherVz_tFTW
+// CHECK-NOT: [[CHECK_EXEC_REF:%.*]] = function_ref @$ss22_checkExpectedExecutor14_filenameStart01_D6Length01_D7IsASCII5_line9_executoryBp_BwBi1_BwBetF
+
+// protocol witness for static Equatable.== infix(_:_:) in conformance TestDerivedHashable
+// CHECK-LABEL: sil private [transparent] [thunk] [ossa] @$s27preconcurrency_conformances19TestDerivedHashableVSQAASQ2eeoiySbx_xtFZTW
+// CHECK-NOT: [[CHECK_EXEC_REF:%.*]] = function_ref @$ss22_checkExpectedExecutor14_filenameStart01_D6Length01_D7IsASCII5_line9_executoryBp_BwBi1_BwBetF
+
+extension NotSendable : Codable {}
+
+@MainActor
+struct TestDerivedCodable : @preconcurrency Codable {
+  var x: NotSendable
+}
+
+// protocol witness for Decodable.init(from:) in conformance TestDerivedCodable
+// CHECK-LABEL: sil private [transparent] [thunk] [ossa] @$s27preconcurrency_conformances18TestDerivedCodableVSeAASe4fromxs7Decoder_p_tKcfCTW
+// CHECK-NOT: [[CHECK_EXEC_REF:%.*]] = function_ref @$ss22_checkExpectedExecutor14_filenameStart01_D6Length01_D7IsASCII5_line9_executoryBp_BwBi1_BwBetF
+
+// protocol witness for Encodable.encode(to:) in conformance TestDerivedCodable
+// CHECK-LABEL: sil private [transparent] [thunk] [ossa] @$s27preconcurrency_conformances18TestDerivedCodableVSEAASE6encode2toys7Encoder_p_tKFTW
 // CHECK-NOT: [[CHECK_EXEC_REF:%.*]] = function_ref @$ss22_checkExpectedExecutor14_filenameStart01_D6Length01_D7IsASCII5_line9_executoryBp_BwBi1_BwBetF

@@ -936,7 +936,7 @@ bool swift::isRepresentableInObjC(
         boolDecl = ctx.getBoolDecl();
 
       if (boolDecl == nullptr) {
-        AFD->diagnose(diag::broken_bool);
+        AFD->diagnose(diag::broken_stdlib_type, "Bool");
         return false;
       }
 
@@ -1727,7 +1727,7 @@ bool IsObjCRequest::evaluate(Evaluator &evaluator, ValueDecl *VD) const {
     // Members of classes can be @objc.
     isObjC = shouldMarkAsObjC(VD, isa<ConstructorDecl>(VD));
   }
-  else if (auto classDecl = dyn_cast<ClassDecl>(VD)) {
+  else if (isa<ClassDecl>(VD)) {
     // Classes can be @objc.
 
 
@@ -3201,7 +3201,7 @@ public:
   {
     assert(!D->hasClangNode() && "passed interface, not impl, to checker");
 
-    if (auto func = dyn_cast<AbstractFunctionDecl>(D)) {
+    if (isa<AbstractFunctionDecl>(D)) {
       addCandidate(D);
       addRequirement(D->getImplementedObjCDecl());
 

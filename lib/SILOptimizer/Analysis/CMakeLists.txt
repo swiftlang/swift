@@ -25,5 +25,4 @@ target_sources(swiftSILOptimizer PRIVATE
   RegionAnalysis.cpp
   RCIdentityAnalysis.cpp
   SimplifyInstruction.cpp
-  TypeExpansionAnalysis.cpp
   ValueTracking.cpp)

@@ -134,12 +134,13 @@ namespace swift {
                                              ForEachStmt *forEach);
 
   class BaseDiagnosticWalker : public ASTWalker {
+  protected:
     PreWalkAction walkToDeclPre(Decl *D) override {
       // We don't walk into any nested local decls, except PatternBindingDecls,
       // which are type-checked along with the parent, and MacroExpansionDecl,
       // which needs to be visited to visit the macro arguments.
-      return Action::VisitNodeIf(isa<PatternBindingDecl>(D) ||
-                                 isa<MacroExpansionDecl>(D));
+      return Action::VisitChildrenIf(isa<PatternBindingDecl>(D) ||
+                                     isa<MacroExpansionDecl>(D));
     }
 
     MacroWalking getMacroWalkingBehavior() const override {

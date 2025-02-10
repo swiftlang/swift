@@ -3095,7 +3095,7 @@ CONSTANT_TRANSLATION(ExtendLifetimeInst, Ignored)
 CONSTANT_TRANSLATION(EndUnpairedAccessInst, Ignored)
 CONSTANT_TRANSLATION(HopToExecutorInst, Ignored)
 CONSTANT_TRANSLATION(InjectEnumAddrInst, Ignored)
-CONSTANT_TRANSLATION(IsEscapingClosureInst, Ignored)
+CONSTANT_TRANSLATION(DestroyNotEscapedClosureInst, Ignored)
 CONSTANT_TRANSLATION(MetatypeInst, Ignored)
 CONSTANT_TRANSLATION(EndApplyInst, Ignored)
 CONSTANT_TRANSLATION(AbortApplyInst, Ignored)
@@ -3103,6 +3103,7 @@ CONSTANT_TRANSLATION(DebugStepInst, Ignored)
 CONSTANT_TRANSLATION(IncrementProfilerCounterInst, Ignored)
 CONSTANT_TRANSLATION(SpecifyTestInst, Ignored)
 CONSTANT_TRANSLATION(TypeValueInst, Ignored)
+CONSTANT_TRANSLATION(IgnoredUseInst, Ignored)
 
 //===---
 // Require

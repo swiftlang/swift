@@ -493,6 +493,8 @@ static PossibleEffects getUnhandledEffects(ArrayRef<ASTNode> Nodes) {
         Effects |= EffectKind::Throws;
       if (isa<AwaitExpr>(E))
         Effects |= EffectKind::Async;
+      if (isa<UnsafeExpr>(E))
+        Effects |= EffectKind::Unsafe;
 
       return true;
     }

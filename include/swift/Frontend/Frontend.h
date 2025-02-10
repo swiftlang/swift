@@ -116,11 +116,16 @@ class CompilerInvocation {
 public:
   CompilerInvocation();
 
-  /// Initializes the compiler invocation for the list of arguments.
+  /// Initializes the compiler invocation and diagnostic engine for the list of
+  /// arguments.
   ///
   /// All parsing should be additive, i.e. options should not be reset to their
   /// default values given the /absence/ of a flag. This is because \c parseArgs
   /// may be used to modify an already partially configured invocation.
+  ///
+  /// As a side-effect of parsing, the diagnostic engine will be configured with
+  /// the options specified by the parsed arguments. This ensures that the
+  /// arguments can effect the behavior of diagnostics emitted during parsing.
   ///
   /// Any configuration files loaded as a result of parsing arguments will be
   /// stored in \p ConfigurationFileBuffers, if non-null. The contents of these
@@ -159,6 +164,9 @@ public:
                               const llvm::opt::ArgList &Args,
                               StringRef SDKPath,
                               StringRef ResourceDir);
+
+  /// Configures the diagnostic engine for the invocation's options.
+  void setUpDiagnosticEngine(DiagnosticEngine &diags);
 
   void setTargetTriple(const llvm::Triple &Triple);
   void setTargetTriple(StringRef Triple);
@@ -222,8 +230,8 @@ public:
     return ClangImporterOpts.ExtraArgs;
   }
 
-  void addLinkLibrary(StringRef name, LibraryKind kind) {
-    IRGenOpts.LinkLibraries.push_back({name, kind});
+  void addLinkLibrary(StringRef name, LibraryKind kind, bool isStaticLibrary) {
+    IRGenOpts.LinkLibraries.emplace_back(name, kind, isStaticLibrary);
   }
 
   ArrayRef<LinkLibrary> getLinkLibraries() const {
@@ -416,10 +424,6 @@ public:
   /// Whether the Swift String Processing support library should be implicitly
   /// imported.
   bool shouldImportSwiftStringProcessing() const;
-
-  /// Whether the Swift Backtracing support library should be implicitly
-  /// imported.
-  bool shouldImportSwiftBacktracing() const;
 
   /// Whether the CXX module should be implicitly imported.
   bool shouldImportCxx() const;
@@ -670,14 +674,6 @@ public:
   /// Whether the Swift String Processing support library can be imported
   /// i.e. if it can be found.
   bool canImportSwiftStringProcessing() const;
-
-  /// Verify that if an implicit import of the `Backtracing` module if
-  /// expected, it can actually be imported. Emit a warning, otherwise.
-  void verifyImplicitBacktracingImport();
-
-  /// Whether the Swift Backtracing support library can be imported
-  /// i.e. if it can be found.
-  bool canImportSwiftBacktracing() const;
 
   /// Whether the Cxx library can be imported
   bool canImportCxx() const;

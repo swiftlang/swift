@@ -21,6 +21,8 @@
 #define NOMINMAX
 #include <Windows.h>
 #include <DbgHelp.h>
+
+#pragma comment(lib, "DbgHelp.Lib")
 #endif
 
 #include "swift/Runtime/Win32.h"

@@ -1185,7 +1185,7 @@ extension RangeReplaceableCollection {
   ///
   ///     var str = "The rain in Spain stays mainly in the plain."
   ///     let vowels: Set<Character> = ["a", "e", "i", "o", "u"]
-  ///     let vowelIndices = str.subranges(where: { vowels.contains($0) })
+  ///     let vowelIndices = str.indices(where: { vowels.contains($0) })
   ///
   ///     str.removeSubranges(vowelIndices)
   ///     // str == "Th rn n Spn stys mnly n th pln."
@@ -1216,7 +1216,7 @@ extension MutableCollection where Self: RangeReplaceableCollection {
   /// numbers in the array, and then removes those values.
   ///
   ///     var numbers = [5, 7, -3, -8, 11, 2, -1, 6]
-  ///     let negativeIndices = numbers.subranges(where: { $0 < 0 })
+  ///     let negativeIndices = numbers.indices(where: { $0 < 0 })
   ///
   ///     numbers.removeSubranges(negativeIndices)
   ///     // numbers == [5, 7, 11, 2, 6]

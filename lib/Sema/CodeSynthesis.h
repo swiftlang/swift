@@ -41,6 +41,7 @@ class ParamDecl;
 class Type;
 class ValueDecl;
 class VarDecl;
+class DerivedConformance;
 
 enum class SelfAccessorKind {
   /// We're building a derived accessor on top of whatever this
@@ -84,6 +85,11 @@ ValueDecl *getProtocolRequirement(ProtocolDecl *protocol, Identifier name);
 // Returns true if given nominal type declaration has a `let` stored property
 // with an initial value.
 bool hasLetStoredPropertyWithInitialValue(NominalTypeDecl *nominal);
+
+/// Add 'nonisolated' to the synthesized declaration for a derived
+/// conformance when needed. Returns true if an attribute was added.
+bool addNonIsolatedToSynthesized(DerivedConformance &conformance,
+                                 ValueDecl *value);
 
 /// Add 'nonisolated' to the synthesized declaration when needed. Returns true
 /// if an attribute was added.

@@ -199,15 +199,10 @@ CatchNode ASTScope::lookupCatchNode(ModuleDecl *module, SourceLoc loc) {
 }
 
 #if SWIFT_COMPILER_IS_MSVC
-#pragma warning(push)
-#pragma warning(disable : 4996)
+#pragma warning(supress: 4996)
 #endif
 
 void ASTScope::dump() const { impl->dump(); }
-
-#if SWIFT_COMPILER_IS_MSVC
-#pragma warning(pop)
-#endif
 
 void ASTScope::print(llvm::raw_ostream &out) const { impl->print(out); }
 void ASTScope::dumpOneScopeMapLocation(std::pair<unsigned, unsigned> lineCol) {

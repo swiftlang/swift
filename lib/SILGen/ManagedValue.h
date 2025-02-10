@@ -34,6 +34,7 @@ namespace Lowering {
 
 class Initialization;
 class SILGenFunction;
+enum class SGFAccessKind : uint8_t;
 
 /// ManagedValue - represents a singular SIL value and an optional cleanup.
 /// Ownership of the ManagedValue can be "forwarded" to disable its cleanup when
@@ -252,6 +253,13 @@ public:
   static ManagedValue forInContext() {
     return ManagedValue(SILValue(), true, CleanupHandle::invalid());
   }
+  
+  /// Creates a managed value for an address that is undergoing a formal
+  /// access. This will be `forLValue` if the `accessKind` is a mutating
+  /// (exclusive) access or `forBorrowedRValueAddress` if the
+  /// `accessKind` is borrowing (shared).
+  static ManagedValue forFormalAccessedAddress(SILValue address,
+                                               SGFAccessKind accessKind);
 
   bool isValid() const {
     return valueAndFlag.getInt() || valueAndFlag.getPointer();

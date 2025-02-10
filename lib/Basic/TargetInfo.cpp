@@ -129,6 +129,9 @@ void targetinfo::printTripleInfo(
   writeEscaped(getTargetSpecificModuleTriple(triple).getTriple(), out);
   out << "\",\n";
 
+  out << "    \"platform\": \"" << getPlatformNameForTriple(triple) << "\",\n";
+  out << "    \"arch\": \"" << swift::getMajorArchitectureName(triple) << "\",\n";
+
   if (runtimeVersion) {
     out << "    \"swiftRuntimeCompatibilityVersion\": \"";
     writeEscaped(runtimeVersion->getAsString(), out);

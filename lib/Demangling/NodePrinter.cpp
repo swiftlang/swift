@@ -898,6 +898,18 @@ private:
       // handled earlier
       ++startIndex;
     }
+
+    // Be sure to check for function signature components in the same
+    // order that they're added by the demangler, which is the reverse
+    // of the order that they appear in the mangling grammar.
+
+    if (node->getChild(startIndex)->getKind() ==
+        Node::Kind::SendingResultFunctionType) {
+      ++startIndex;
+      hasSendingResult = true;
+    }
+
+    // function-isolation; note that these can't actually both appear.
     if (node->getChild(startIndex)->getKind()
             == Node::Kind::IsolatedAnyFunctionType) {
       print(node->getChild(startIndex), depth + 1);
@@ -908,6 +920,7 @@ private:
       print(node->getChild(startIndex), depth + 1);
       ++startIndex;
     }
+
     if (node->getChild(startIndex)->getKind() ==
         Node::Kind::DifferentiableFunctionType) {
       diffKind =
@@ -931,11 +944,6 @@ private:
     if (node->getChild(startIndex)->getKind() == Node::Kind::AsyncAnnotation) {
       ++startIndex;
       isAsync = true;
-    }
-    if (node->getChild(startIndex)->getKind() ==
-        Node::Kind::SendingResultFunctionType) {
-      ++startIndex;
-      hasSendingResult = true;
     }
 
     switch (diffKind) {

@@ -22,7 +22,10 @@ class size_without_trailing_padding {
   struct ExtraByte { char _size_without_trailing_padding_probe; };
   struct Probe: T, ExtraByte {};
 public:
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Winvalid-offsetof"
   enum { value = offsetof(Probe, _size_without_trailing_padding_probe) };
+#pragma clang diagnostic pop
 };
 
 namespace detail {

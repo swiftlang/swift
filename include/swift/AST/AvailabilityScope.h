@@ -27,7 +27,6 @@
 #include "swift/Basic/LLVM.h"
 #include "swift/Basic/STLExtras.h"
 #include "swift/Basic/SourceLoc.h"
-#include "llvm/ADT/PointerUnion.h"
 #include "llvm/Support/ErrorHandling.h"
 
 namespace swift {

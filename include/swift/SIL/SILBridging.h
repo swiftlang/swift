@@ -277,6 +277,7 @@ struct BridgedType {
   BRIDGED_INLINE bool isBuiltinInteger() const;
   BRIDGED_INLINE bool isBuiltinFloat() const;
   BRIDGED_INLINE bool isBuiltinVector() const;
+  BRIDGED_INLINE bool isLegalFormalType() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedType getBuiltinVectorElementType() const;
   BRIDGED_INLINE bool isBuiltinFixedWidthInteger(SwiftInt width) const;
   BRIDGED_INLINE bool isExactSuperclassOf(BridgedType t) const;
@@ -372,6 +373,7 @@ struct BridgedOperand {
     DestroyingConsume,
     ForwardingConsume,
     InteriorPointer,
+    AnyInteriorPointer,
     GuaranteedForwarding,
     EndBorrow,
     Reborrow
@@ -810,6 +812,7 @@ struct BridgedInstruction {
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedBasicBlock CheckedCastBranch_getFailureBlock() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedBasicBlock CheckedCastAddrBranch_getSuccessBlock() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedBasicBlock CheckedCastAddrBranch_getFailureBlock() const;
+  BRIDGED_INLINE void CheckedCastBranch_updateSourceFormalTypeFromOperandLoweredType() const;
   BRIDGED_INLINE CastConsumptionKind CheckedCastAddrBranch_getConsumptionKind() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedSubstitutionMap ApplySite_getSubstitutionMap() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedCanType ApplySite_getSubstitutedCalleeType() const;

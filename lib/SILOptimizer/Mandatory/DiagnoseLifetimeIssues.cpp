@@ -261,6 +261,7 @@ visitUses(SILValue def, bool updateLivenessAndWeakStores, int callDepth) {
         continue;
 
       case OperandOwnership::InteriorPointer:
+      case OperandOwnership::AnyInteriorPointer:
         // Treat most interior pointers as escapes until they can be audited.
         // But if the interior pointer cannot be used to copy the parent
         // reference, then it does not need to be considered an escape.

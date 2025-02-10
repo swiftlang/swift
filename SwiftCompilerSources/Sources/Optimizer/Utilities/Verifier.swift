@@ -96,6 +96,11 @@ private extension Phi {
 
 extension BorrowedFromInst : VerifiableInstruction {
   func verify(_ context: FunctionPassContext) {
+
+    for ev in enclosingValues {
+      require(ev.isValidEnclosingValueInBorrowedFrom, "invalid enclosing value in borrowed-from: \(ev)")
+    }
+
     var computedEVs = Stack<Value>(context)
     defer { computedEVs.deinitialize() }
 
@@ -110,6 +115,21 @@ extension BorrowedFromInst : VerifiableInstruction {
     for computedEV in computedEVs {
       require(existingEVs.contains(computedEV),
                    "\(computedEV)\n  missing in enclosing values of \(self)")
+    }
+  }
+}
+
+private extension Value {
+  var isValidEnclosingValueInBorrowedFrom: Bool {
+    switch ownership {
+    case .owned:
+      return true
+    case .guaranteed:
+      return BeginBorrowValue(self) != nil ||
+             self is BorrowedFromInst ||
+             forwardingInstruction != nil
+    case .none, .unowned:
+      return false
     }
   }
 }
@@ -164,7 +184,11 @@ private struct MutatingUsesWalker : AddressDefUseWalker {
 
       for use in startInst.uses {
         if let phi = Phi(using: use) {
-          linearLiveranges.pushIfNotVisited(phi.borrowedFrom!)
+          if let bf = phi.borrowedFrom {
+            linearLiveranges.pushIfNotVisited(bf)
+          } else {
+            require(false, "missing borrowed-from for \(phi.value)")
+          }
         }
       }
     }

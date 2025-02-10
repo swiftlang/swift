@@ -28,7 +28,8 @@ endif()
 
 target_compile_definitions(swiftStdlibStubs PRIVATE
   $<$<BOOL:${BUILD_SHARED_LIBS}>:-DswiftCore_EXPORTS>
-  $<$<BOOL:${SwiftCore_ENABLE_UNICODE_DATA}>:-DSWIFT_STDLIB_ENABLE_UNICODE_DATA>)
+  $<$<BOOL:${SwiftCore_ENABLE_UNICODE_DATA}>:-DSWIFT_STDLIB_ENABLE_UNICODE_DATA>
+  $<$<BOOL:${SwiftCore_HAS_LOCALE}>:-DSWIFT_STDLIB_HAS_LOCALE>)
 
 target_link_libraries(swiftStdlibStubs PRIVATE
   swiftShims)

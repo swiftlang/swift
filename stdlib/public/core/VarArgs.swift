@@ -159,7 +159,9 @@ public func withVaList<R>(_ args: [CVarArg],
   for a in args {
     builder.append(a)
   }
-  return _withVaList(builder, body)
+  let result = _withVaList(builder, body)
+  _fixLifetime(args)
+  return result
 }
 
 /// Invoke `body` with a C `va_list` argument derived from `builder`.

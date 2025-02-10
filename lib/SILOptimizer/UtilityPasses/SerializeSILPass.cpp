@@ -185,7 +185,7 @@ static bool hasOpaqueArchetype(TypeExpansionContext context,
 #include "swift/AST/ReferenceStorage.def"
   case SILInstructionKind::UncheckedOwnershipConversionInst:
   case SILInstructionKind::IsUniqueInst:
-  case SILInstructionKind::IsEscapingClosureInst:
+  case SILInstructionKind::DestroyNotEscapedClosureInst:
   case SILInstructionKind::LoadInst:
   case SILInstructionKind::LoadBorrowInst:
   case SILInstructionKind::BeginBorrowInst:
@@ -333,6 +333,7 @@ static bool hasOpaqueArchetype(TypeExpansionContext context,
   case SILInstructionKind::PackElementSetInst:
   case SILInstructionKind::TuplePackElementAddrInst:
   case SILInstructionKind::TypeValueInst:
+  case SILInstructionKind::IgnoredUseInst:
     // Handle by operand and result check.
     break;
 

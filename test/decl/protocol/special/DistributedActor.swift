@@ -55,12 +55,12 @@ distributed actor D4 {
 
 protocol P1: DistributedActor {
   distributed func dist() -> String
-  // expected-note@-1{{'dist()' declared here}}
+  // expected-note@-1{{requirement 'dist()' declared here}}
 }
 
 distributed actor D5: P1 {
   func dist() -> String { "" }
-  // expected-error@-1{{distributed actor-isolated instance method 'dist()' cannot be used to satisfy actor-isolated protocol requirement}}
+  // expected-error@-1{{distributed actor-isolated instance method 'dist()' cannot be used to satisfy actor-isolated requirement from protocol 'P1'}}
   // expected-note@-2{{add 'distributed' to 'dist()' to make this instance method satisfy the protocol requirement}}{{3-3=distributed }}
 }
 
@@ -84,6 +84,6 @@ protocol P {
 distributed actor A: P {
   typealias ActorSystem = LocalTestingDistributedActorSystem
   distributed func foo() { }
-  // expected-error@-1{{actor-isolated distributed instance method 'foo()' cannot be used to satisfy nonisolated protocol requirement}}
+  // expected-error@-1{{actor-isolated distributed instance method 'foo()' cannot be used to satisfy nonisolated requirement from protocol 'P'}}
 }
 // ---

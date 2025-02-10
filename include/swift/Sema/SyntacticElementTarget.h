@@ -114,6 +114,10 @@ private:
       /// Whether the expression result will be discarded at the end.
       bool isDiscarded;
 
+      /// Whether to bind the variables encountered within the pattern to
+      /// fresh type variables via one-way constraints.
+      bool bindPatternVarsOneWay;
+
       union {
         struct {
           /// The pattern binding declaration for an initialization, if any.
@@ -251,14 +255,14 @@ public:
   /// Form a target for the initialization of a pattern from an expression.
   static SyntacticElementTarget
   forInitialization(Expr *initializer, DeclContext *dc, Type patternType,
-                    Pattern *pattern);
+                    Pattern *pattern, bool bindPatternVarsOneWay);
 
   /// Form a target for the initialization of a pattern binding entry from
   /// an expression.
   static SyntacticElementTarget
   forInitialization(Expr *initializer, Type patternType,
                     PatternBindingDecl *patternBinding,
-                    unsigned patternBindingIndex);
+                    unsigned patternBindingIndex, bool bindPatternVarsOneWay);
 
   /// Form an expression target for a ReturnStmt.
   static SyntacticElementTarget
@@ -490,6 +494,14 @@ public:
 
     if (auto *PBD = getInitializationPatternBindingDecl())
       return PBD->isAsyncLet();
+    return false;
+  }
+
+  /// Whether to bind the types of any variables within the pattern via
+  /// one-way constraints.
+  bool shouldBindPatternVarsOneWay() const {
+    if (kind == Kind::expression)
+      return expression.bindPatternVarsOneWay;
     return false;
   }
 

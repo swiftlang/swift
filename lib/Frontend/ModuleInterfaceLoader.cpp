@@ -325,45 +325,6 @@ struct ModuleRebuildInfo {
     return false;
   }
 
-  const char *invalidModuleReason(serialization::Status status) {
-    using namespace serialization;
-    switch (status) {
-    case Status::FormatTooOld:
-      return "compiled with an older version of the compiler";
-    case Status::FormatTooNew:
-      return "compiled with a newer version of the compiler";
-    case Status::RevisionIncompatible:
-      return "compiled with a different version of the compiler";
-    case Status::ChannelIncompatible:
-      return "compiled for a different distribution channel";
-    case Status::NotInOSSA:
-      return "module was not built with OSSA";
-    case Status::MissingDependency:
-      return "missing dependency";
-    case Status::MissingUnderlyingModule:
-      return "missing underlying module";
-    case Status::CircularDependency:
-      return "circular dependency";
-    case Status::FailedToLoadBridgingHeader:
-      return "failed to load bridging header";
-    case Status::Malformed:
-      return "malformed";
-    case Status::MalformedDocumentation:
-      return "malformed documentation";
-    case Status::NameMismatch:
-      return "name mismatch";
-    case Status::TargetIncompatible:
-      return "compiled for a different target platform";
-    case Status::TargetTooNew:
-      return "target platform newer than current platform";
-    case Status::SDKMismatch:
-      return "SDK does not match";
-    case Status::Valid:
-      return nullptr;
-    }
-    llvm_unreachable("bad status");
-  }
-
   /// Emits a diagnostic for all out-of-date compiled or forwarding modules
   /// encountered while trying to load a module.
   template<typename... DiagArgs>
@@ -406,9 +367,9 @@ struct ModuleRebuildInfo {
       // If there was a compiled module that wasn't able to be read, diagnose
       // the reason we couldn't read it.
       if (auto status = mod.serializationStatus) {
-        if (auto reason = invalidModuleReason(*status)) {
+        if (auto reason = SerializedModuleLoaderBase::invalidModuleReason(*status)) {
           diags.diagnose(loc, diag::compiled_module_invalid_reason,
-              mod.path, reason);
+                         mod.path, reason.value());
         } else {
           diags.diagnose(loc, diag::compiled_module_invalid, mod.path);
         }
@@ -936,8 +897,17 @@ class ModuleInterfaceLoaderImpl {
         } else if (isInResourceDir(adjacentMod) &&
                    loadMode == ModuleLoadingMode::PreferSerialized &&
                    !version::isCurrentCompilerTagged() &&
-                   rebuildInfo.getOrInsertCandidateModule(adjacentMod).serializationStatus !=
-                     serialization::Status::SDKMismatch) {
+                   rebuildInfo.getOrInsertCandidateModule(adjacentMod)
+                           .serializationStatus !=
+                       serialization::Status::SDKMismatch &&
+                   // FIXME (meg-gupta): We need to support recompilation of
+                   // modules in the resource directory if the mismatch is due
+                   // to importing a non-ossa module to an ossa module. This is
+                   // needed during ossa bringup, once -enable-ossa-modules is
+                   // on by default, this can be deleted.
+                   rebuildInfo.getOrInsertCandidateModule(adjacentMod)
+                           .serializationStatus !=
+                       serialization::Status::NotInOSSA) {
           // Special-case here: If we're loading a .swiftmodule from the resource
           // dir adjacent to the compiler, defer to the serialized loader instead
           // of falling back. This is to support local development of Swift,
@@ -1805,8 +1775,9 @@ void InterfaceSubContextDelegateImpl::inheritOptionsForBuildingInterface(
 }
 
 bool InterfaceSubContextDelegateImpl::extractSwiftInterfaceVersionAndArgs(
-    CompilerInvocation &subInvocation, SwiftInterfaceInfo &interfaceInfo,
-    StringRef interfacePath, SourceLoc diagnosticLoc) {
+    CompilerInvocation &subInvocation, DiagnosticEngine &subInstanceDiags,
+    SwiftInterfaceInfo &interfaceInfo, StringRef interfacePath,
+    SourceLoc diagnosticLoc) {
   if (readSwiftInterfaceVersionAndArgs(SM, *Diags, ArgSaver, interfaceInfo,
                                        interfacePath, diagnosticLoc,
                                        subInvocation.getLangOptions().Target))
@@ -1824,7 +1795,7 @@ bool InterfaceSubContextDelegateImpl::extractSwiftInterfaceVersionAndArgs(
   }
 
   SmallString<32> ExpectedModuleName = subInvocation.getModuleName();
-  if (subInvocation.parseArgs(interfaceInfo.Arguments, *Diags)) {
+  if (subInvocation.parseArgs(interfaceInfo.Arguments, subInstanceDiags)) {
     return true;
   }
 
@@ -2022,6 +1993,15 @@ InterfaceSubContextDelegateImpl::InterfaceSubContextDelegateImpl(
 
     GenericArgs.push_back(
         ArgSaver.save("-cxx-interoperability-mode=" + compatVersion));
+
+    if (!langOpts.isUsingPlatformDefaultCXXStdlib() &&
+        langOpts.CXXStdlib == CXXStdlibKind::Libcxx) {
+      genericSubInvocation.getLangOptions().CXXStdlib = CXXStdlibKind::Libcxx;
+      genericSubInvocation.getClangImporterOptions().ExtraArgs.push_back(
+          "-stdlib=libc++");
+      GenericArgs.push_back("-Xcc");
+      GenericArgs.push_back("-stdlib=libc++");
+    }
   }
 }
 
@@ -2140,7 +2120,7 @@ InterfaceSubContextDelegateImpl::runInSubContext(StringRef moduleName,
                                                  StringRef outputPath,
                                                  SourceLoc diagLoc,
     llvm::function_ref<std::error_code(ASTContext&, ModuleDecl*, ArrayRef<StringRef>,
-                          ArrayRef<StringRef>, StringRef, StringRef)> action) {
+                          StringRef, StringRef)> action) {
   return runInSubCompilerInstance(moduleName, interfacePath, sdkPath, outputPath,
                                   diagLoc, /*silenceErrors=*/false,
                                   [&](SubCompilerInstanceInfo &info){
@@ -2149,7 +2129,6 @@ InterfaceSubContextDelegateImpl::runInSubContext(StringRef moduleName,
     return action(info.Instance->getASTContext(),
                   info.Instance->getMainModule(),
                   info.BuildArguments,
-                  info.ExtraPCMArgs,
                   info.Hash,
                   UserModuleVer);
   });
@@ -2193,7 +2172,12 @@ InterfaceSubContextDelegateImpl::runInSubCompilerInstance(StringRef moduleName,
 
   // FIXME: Hack for Darwin.swiftmodule, which cannot be rebuilt with C++
   // interop enabled by the Swift CI because it uses an old host SDK.
-  if (moduleName == "Darwin") {
+  // FIXME: Hack for CoreGraphics.swiftmodule, which cannot be rebuilt because
+  // of a CF_OPTIONS bug (rdar://142762174).
+  // FIXME: Hack for AppKit.swiftmodule / UIKit.swiftmodule, which cannot be
+  // rebuilt because of an NS_OPTIONS bug (rdar://143033209)
+  if (moduleName == "Darwin" || moduleName == "CoreGraphics"
+      || moduleName == "AppKit" || moduleName == "UIKit") {
     subInvocation.getLangOptions().EnableCXXInterop = false;
     subInvocation.getLangOptions().cxxInteropCompatVersion = {};
     BuildArgs.erase(llvm::remove_if(BuildArgs,
@@ -2227,11 +2211,21 @@ InterfaceSubContextDelegateImpl::runInSubCompilerInstance(StringRef moduleName,
   subInvocation.getFrontendOptions().InputsAndOutputs
     .setMainAndSupplementaryOutputs(outputFiles, ModuleOutputPaths);
 
+  CompilerInstance subInstance;
+  ForwardingDiagnosticConsumer FDC(*Diags);
+  NullDiagnosticConsumer noopConsumer;
+  if (!silenceErrors) {
+    subInstance.addDiagnosticConsumer(&FDC);
+  } else {
+    subInstance.addDiagnosticConsumer(&noopConsumer);
+  }
+
   SwiftInterfaceInfo interfaceInfo;
   // Extract compiler arguments from the interface file and use them to configure
   // the compiler invocation.
-  if (extractSwiftInterfaceVersionAndArgs(subInvocation, interfaceInfo,
-                                          interfacePath, diagLoc)) {
+  if (extractSwiftInterfaceVersionAndArgs(subInvocation, subInstance.getDiags(),
+                                          interfaceInfo, interfacePath,
+                                          diagLoc)) {
     return std::make_error_code(std::errc::not_supported);
   }
 
@@ -2243,20 +2237,11 @@ InterfaceSubContextDelegateImpl::runInSubCompilerInstance(StringRef moduleName,
   subInvocation.getFrontendOptions().StrictImplicitModuleContext =
       StrictImplicitModuleContext;
 
-  CompilerInstance subInstance;
   SubCompilerInstanceInfo info;
   info.Instance = &subInstance;
   info.CompilerVersion = interfaceInfo.CompilerVersion;
 
   subInstance.getSourceMgr().setFileSystem(SM.getFileSystem());
-
-  ForwardingDiagnosticConsumer FDC(*Diags);
-  NullDiagnosticConsumer noopConsumer;
-  if (!silenceErrors) {
-    subInstance.addDiagnosticConsumer(&FDC);
-  } else {
-    subInstance.addDiagnosticConsumer(&noopConsumer);
-  }
 
   std::string InstanceSetupError;
   if (subInstance.setup(subInvocation, InstanceSetupError)) {
@@ -2265,21 +2250,7 @@ InterfaceSubContextDelegateImpl::runInSubCompilerInstance(StringRef moduleName,
 
   info.BuildArguments = BuildArgs;
   info.Hash = CacheHash;
-  auto target = *(std::find(BuildArgs.rbegin(), BuildArgs.rend(), "-target") - 1);
-  auto langVersion = *(std::find(BuildArgs.rbegin(), BuildArgs.rend(),
-                                 "-swift-version") - 1);
 
-  std::vector<StringRef> ExtraPCMArgs = {
-    // PCMs should use the effective Swift language version for apinotes.
-    "-Xcc",
-    ArgSaver.save((llvm::Twine("-fapinotes-swift-version=") + langVersion).str())
-  };
-  if (!subInvocation.getLangOptions().ClangTarget.has_value()) {
-    ExtraPCMArgs.insert(ExtraPCMArgs.begin(), {"-Xcc", "-target",
-                                               "-Xcc", target});
-  }
-
-  info.ExtraPCMArgs = ExtraPCMArgs;
   // Run the action under the sub compiler instance.
   return action(info);
 }

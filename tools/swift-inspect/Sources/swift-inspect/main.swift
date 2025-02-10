@@ -136,7 +136,7 @@ internal struct SwiftInspect: ParsableCommand {
     DumpArrays.self,
     DumpConcurrency.self,
   ]
-#elseif os(Windows)
+#elseif os(Windows) || os(Android)
   static let subcommands: [ParsableCommand.Type] = [
     DumpConformanceCache.self,
     DumpRawMetadata.self,

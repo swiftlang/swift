@@ -121,4 +121,3 @@ BridgedOwnedString BridgedSubstitutionMap::getDebugDescription() const {
   unbridged().dump(os);
   return BridgedOwnedString(str);
 }
-

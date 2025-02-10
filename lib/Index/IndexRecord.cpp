@@ -458,7 +458,7 @@ isFileUpToDateForOutputFile(StringRef filePath, StringRef timeCompareFilePath) {
   };
   llvm::sys::fs::file_status unitStat;
   if (std::error_code ec = llvm::sys::fs::status(filePath, unitStat)) {
-    if (ec != std::errc::no_such_file_or_directory)
+    if (ec != std::errc::no_such_file_or_directory && ec != llvm::errc::delete_pending)
       return makeError(filePath, ec);
     return false;
   }
@@ -469,7 +469,7 @@ isFileUpToDateForOutputFile(StringRef filePath, StringRef timeCompareFilePath) {
   llvm::sys::fs::file_status compareStat;
   if (std::error_code ec =
           llvm::sys::fs::status(timeCompareFilePath, compareStat)) {
-    if (ec != std::errc::no_such_file_or_directory)
+    if (ec != std::errc::no_such_file_or_directory && ec != llvm::errc::delete_pending)
       return makeError(timeCompareFilePath, ec);
     return true;
   }

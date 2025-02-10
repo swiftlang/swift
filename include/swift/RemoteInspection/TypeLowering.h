@@ -117,6 +117,7 @@ enum class TypeInfoKind : unsigned {
   Reference,
   Invalid,
   Enum,
+  Array,
 };
 
 class TypeInfo {
@@ -347,6 +348,24 @@ public:
 
   static bool classof(const TypeInfo *TI) {
     return TI->getKind() == TypeInfoKind::Reference;
+  }
+};
+
+/// Array based layouts like Builtin.FixedArray<N, T>
+class ArrayTypeInfo : public TypeInfo {
+  const TypeInfo *ElementTI;
+
+public:
+  explicit ArrayTypeInfo(intptr_t size, const TypeInfo *elementTI);
+
+  bool readExtraInhabitantIndex(remote::MemoryReader &reader,
+                                remote::RemoteAddress address,
+                                int *extraInhabitantIndex) const override;
+
+  BitMask getSpareBits(TypeConverter &TC, bool &hasAddrOnly) const override;
+  const TypeInfo *getElementTypeInfo() const { return ElementTI; }
+  static bool classof(const TypeInfo *TI) {
+    return TI->getKind() == TypeInfoKind::Array;
   }
 };
 

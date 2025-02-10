@@ -23,6 +23,16 @@
 using namespace swift;
 using namespace Lowering;
 
+ManagedValue ManagedValue::forFormalAccessedAddress(SILValue address,
+                                                    SGFAccessKind accessKind) {
+  if (isReadAccess(accessKind)) {
+    return forBorrowedAddressRValue(address);
+  } else {
+    return forLValue(address);
+  }
+}
+
+
 ManagedValue ManagedValue::forForwardedRValue(SILGenFunction &SGF,
                                               SILValue value) {
   if (!value)

@@ -146,9 +146,18 @@ BridgedClosureExpr BridgedClosureExpr_createParsed(
                   declContext);
 }
 
+BridgedParameterList
+BridgedClosureExpr_getParameterList(BridgedClosureExpr cClosure) {
+  return cClosure.unbridged()->getParameters();
+}
+
 void BridgedClosureExpr_setParameterList(BridgedClosureExpr cClosure,
                                          BridgedParameterList cParams) {
   cClosure.unbridged()->setParameterList(cParams.unbridged());
+}
+
+bool BridgedClosureExpr_hasAnonymousClosureVars(BridgedClosureExpr cClosure) {
+  return cClosure.unbridged()->hasAnonymousClosureVars();
 }
 
 void BridgedClosureExpr_setHasAnonymousClosureVars(
@@ -281,6 +290,13 @@ BridgedUnresolvedSpecializeExpr BridgedUnresolvedSpecializeExpr_createParsed(
   return UnresolvedSpecializeExpr::create(
       cContext.unbridged(), cSubExpr.unbridged(), cLAngleLoc.unbridged(),
       cArguments.unbridged<TypeRepr *>(), cRAngleLoc.unbridged());
+}
+
+BridgedUnsafeExpr BridgedUnsafeExpr_createParsed(BridgedASTContext cContext,
+                                               BridgedSourceLoc cUnsafeLoc,
+                                               BridgedExpr cSubExpr) {
+  return new (cContext.unbridged())
+      UnsafeExpr(cUnsafeLoc.unbridged(), cSubExpr.unbridged());
 }
 
 BridgedInOutExpr BridgedInOutExpr_createParsed(BridgedASTContext cContext,

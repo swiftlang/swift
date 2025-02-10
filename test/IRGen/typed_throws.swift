@@ -295,3 +295,18 @@ enum LargeError: Error {
 func callClosureAsyncIndirectError(f: () async throws(LargeError) -> Int) async throws(LargeError) -> Int {
   return try await f()
 }
+
+protocol AsyncGenProto<A> {
+  associatedtype A
+  func fn(arg: Int) async throws(SmallError) -> A
+}
+
+// CHECK: define internal swifttailcc void @"$s12typed_throws23callAsyncIndirectResult1p1xxAA0D8GenProto_px1ARts_XP_SitYaAA10SmallErrorVYKlFTY0_"(ptr swiftasync %0)
+// CHECK:   musttail call swifttailcc void {{%.*}}(ptr noalias {{%.*}}, ptr swiftasync {{%.*}}, i64 {{%.*}}, ptr noalias swiftself {{%.*}}, ptr %swifterror, ptr {{%.*}}, ptr {{%.*}})
+// CHECK:   ret void
+// CHECK: }
+@inline(never)
+func callAsyncIndirectResult<A>(p: any AsyncGenProto<A>, x: Int) async throws(SmallError) -> A {
+  return try await p.fn(arg: x)
+}
+

@@ -18,6 +18,7 @@
 #include "swift/AST/ModuleDependencies.h"
 #include "swift/AST/ModuleLoader.h"
 #include "swift/AST/SearchPathOptions.h"
+#include "swift/Serialization/Validation.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/PrefixMapper.h"
 #include "llvm/TargetParser/Triple.h"
@@ -165,7 +166,8 @@ protected:
 
   /// Scan the given serialized module file to determine dependencies.
   llvm::ErrorOr<ModuleDependencyInfo>
-  scanModuleFile(Twine modulePath, bool isFramework, bool isTestableImport);
+  scanModuleFile(Twine modulePath, bool isFramework,
+                 bool isTestableImport, bool isCandidateForTextualModule);
 
   struct BinaryModuleImports {
     llvm::StringSet<> moduleImports;
@@ -267,6 +269,10 @@ public:
                         InterfaceSubContextDelegate &delegate,
                         llvm::PrefixMapper *mapper,
                         bool isTestableImport) override;
+
+  /// A textual reason why the compiler rejected a binary module load
+  /// attempt with a given status, to be used for diagnostic output.
+  static std::optional<std::string> invalidModuleReason(serialization::Status status);
 };
 
 /// Imports serialized Swift modules into an ASTContext.
@@ -430,7 +436,7 @@ public:
   getFilenameForPrivateDecl(const Decl *decl) const override;
 
   virtual TypeDecl *lookupLocalType(StringRef MangledName) const override;
-  
+
   virtual OpaqueTypeDecl *
   lookupOpaqueResultType(StringRef MangledName) override;
 
@@ -577,6 +583,11 @@ bool extractCompilerFlagsFromInterface(
 
 /// Extract the user module version number from an interface file.
 llvm::VersionTuple extractUserModuleVersionFromInterface(StringRef moduleInterfacePath);
+
+/// Extract embedded bridging header from binary module.
+std::string
+extractEmbeddedBridgingHeaderContent(std::unique_ptr<llvm::MemoryBuffer> file,
+                                     ASTContext &Context);
 } // end namespace swift
 
 #endif

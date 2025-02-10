@@ -33,7 +33,7 @@ enum class DiagGroupID : uint16_t {
 
 constexpr const auto DiagGroupsCount = [] {
   size_t count = 0;
-#define GROUP(Name, Version) count++;
+#define GROUP(Name, Version) ++count;
 #include "DiagnosticGroups.def"
   return count;
 }();

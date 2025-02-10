@@ -1145,6 +1145,7 @@ struct ParserUnit::Implementation {
     auto parsingOpts = SourceFile::getDefaultParsingOptions(LangOpts);
     parsingOpts |= ParsingFlags::DisableDelayedBodies;
     parsingOpts |= ParsingFlags::DisablePoundIfEvaluation;
+    parsingOpts |= ParsingFlags::PoundIfAllActive;
 
     auto *M = ModuleDecl::createEmpty(Ctx.getIdentifier(ModuleName), Ctx);
     SF = new (Ctx) SourceFile(*M, SFKind, BufferID, parsingOpts);

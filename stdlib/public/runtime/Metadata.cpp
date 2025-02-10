@@ -22,12 +22,12 @@
 #include <windows.h>
 #endif
 
-#include "MetadataCache.h"
 #include "BytecodeLayouts.h"
+#include "MetadataCache.h"
 #include "swift/ABI/TypeIdentity.h"
 #include "swift/Basic/Defer.h"
-#include "swift/Basic/MathUtils.h"
 #include "swift/Basic/Lazy.h"
+#include "swift/Basic/MathUtils.h"
 #include "swift/Basic/Range.h"
 #include "swift/Basic/STLExtras.h"
 #include "swift/Demangling/Demangler.h"
@@ -56,13 +56,14 @@
 extern "C" void _objc_setClassCopyFixupHandler(void (* _Nonnull newFixupHandler)
     (Class _Nonnull oldClass, Class _Nonnull newClass));
 #endif
-#include "llvm/ADT/DenseMap.h"
-#include "llvm/ADT/Hashing.h"
 #include "../CompatibilityOverride/CompatibilityOverride.h"
 #include "ErrorObject.h"
 #include "ExistentialMetadataImpl.h"
-#include "swift/Runtime/Debug.h"
+#include "GenericCacheEntry.h"
 #include "Private.h"
+#include "swift/Runtime/Debug.h"
+#include "llvm/ADT/DenseMap.h"
+#include "llvm/ADT/Hashing.h"
 
 #if SWIFT_OBJC_INTEROP
 #include "ObjCRuntimeGetImageNameFromClass.h"
@@ -309,143 +310,6 @@ swift::getResilientImmediateMembersOffset(const ClassDescriptor *description) {
 
   auto bounds = computeMetadataBoundsFromSuperclass(description, storedBounds);
   return bounds.ImmediateMembersOffset / sizeof(void*);
-}
-
-static bool
-areAllTransitiveMetadataComplete_cheap(const Metadata *metadata);
-
-static MetadataDependency
-checkTransitiveCompleteness(const Metadata *metadata);
-
-static PrivateMetadataState inferStateForMetadata(Metadata *metadata) {
-  if (metadata->getValueWitnesses()->isIncomplete())
-    return PrivateMetadataState::Abstract;
-
-  // TODO: internal vs. external layout-complete?
-  return PrivateMetadataState::LayoutComplete;
-}
-
-namespace {
-  struct GenericCacheEntry final :
-      VariadicMetadataCacheEntryBase<GenericCacheEntry> {
-    static const char *getName() { return "GenericCache"; }
-
-    // The constructor/allocate operations that take a `const Metadata *`
-    // are used for the insertion of canonical specializations.
-    // The metadata is always complete after construction.
-
-    GenericCacheEntry(MetadataCacheKey key,
-                      MetadataWaitQueue::Worker &worker,
-                      MetadataRequest request,
-                      const Metadata *candidate)
-      : VariadicMetadataCacheEntryBase(key, worker,
-                                       PrivateMetadataState::Complete,
-                                       const_cast<Metadata*>(candidate)) {}
-
-    AllocationResult allocate(const Metadata *candidate) {
-      swift_unreachable("always short-circuited");
-    }
-
-    static bool allowMangledNameVerification(const Metadata *candidate) {
-      // Disallow mangled name verification for specialized candidates
-      // because it will trigger recursive entry into the swift_once
-      // in cacheCanonicalSpecializedMetadata.
-      // TODO: verify mangled names in a second pass in that function.
-      return false;
-    }
-
-    // The constructor/allocate operations that take a descriptor
-    // and arguments are used along the normal allocation path.
-
-    GenericCacheEntry(MetadataCacheKey key,
-                      MetadataWaitQueue::Worker &worker,
-                      MetadataRequest request,
-                      const TypeContextDescriptor *description,
-                      const void * const *arguments)
-      : VariadicMetadataCacheEntryBase(key, worker,
-                                       PrivateMetadataState::Allocating,
-                                       /*candidate*/ nullptr) {}
-
-    AllocationResult allocate(const TypeContextDescriptor *description,
-                              const void * const *arguments) {
-      if (auto *prespecialized =
-              getLibPrespecializedMetadata(description, arguments))
-        return {prespecialized, PrivateMetadataState::Complete};
-
-      // Find a pattern.  Currently we always use the default pattern.
-      auto &generics = description->getFullGenericContextHeader();
-      auto pattern = generics.DefaultInstantiationPattern.get();
-
-      // Call the pattern's instantiation function.
-      auto metadata =
-        pattern->InstantiationFunction(description, arguments, pattern);
-
-      // If there's no completion function, do a quick-and-dirty check to
-      // see if all of the type arguments are already complete.  If they
-      // are, we can broadcast completion immediately and potentially avoid
-      // some extra locking.
-      PrivateMetadataState state;
-      if (pattern->CompletionFunction.isNull()) {
-        if (areAllTransitiveMetadataComplete_cheap(metadata)) {
-          state = PrivateMetadataState::Complete;
-        } else {
-          state = PrivateMetadataState::NonTransitiveComplete;
-        }
-      } else {
-        state = inferStateForMetadata(metadata);
-      }
-
-      return { metadata, state };
-    }
-
-    static bool allowMangledNameVerification(
-                                  const TypeContextDescriptor *description,
-                                             const void * const *arguments) {
-      return true;
-    }
-
-    MetadataStateWithDependency tryInitialize(Metadata *metadata,
-                                      PrivateMetadataState state,
-                               PrivateMetadataCompletionContext *context) {
-      assert(state != PrivateMetadataState::Complete);
-
-      // Finish the completion function.
-      if (state < PrivateMetadataState::NonTransitiveComplete) {
-        // Find a pattern.  Currently we always use the default pattern.
-        auto &generics = metadata->getTypeContextDescriptor()
-                                 ->getFullGenericContextHeader();
-        auto pattern = generics.DefaultInstantiationPattern.get();
-
-        // Complete the metadata's instantiation.
-        auto dependency =
-          pattern->CompletionFunction(metadata, &context->Public, pattern);
-
-        // If this failed with a dependency, infer the current metadata state
-        // and return.
-        if (dependency) {
-          return { inferStateForMetadata(metadata), dependency };
-        }
-      }
-
-      // Check for transitive completeness.
-      if (auto dependency = checkTransitiveCompleteness(metadata)) {
-        return { PrivateMetadataState::NonTransitiveComplete, dependency };
-      }
-
-      // We're done.
-      return { PrivateMetadataState::Complete, MetadataDependency() };
-    }
-  };
-} // end anonymous namespace
-
-namespace swift {
-  struct StaticAssertGenericMetadataCacheEntryValueOffset {
-    static_assert(
-      offsetof(GenericCacheEntry, Value) ==
-      offsetof(swift::GenericMetadataCacheEntry<InProcess::StoredPointer>,
-               Value),
-      "The generic metadata cache entry layout mismatch");
-  };
 }
 
 namespace {
@@ -753,14 +617,20 @@ swift::swift_allocateGenericClassMetadata(const ClassDescriptor *description,
   return metadata;
 }
 
-ClassMetadata *
-swift::swift_allocateGenericClassMetadataWithLayoutString(
-    const ClassDescriptor *description,
-    const void *arguments,
+static ClassMetadata *
+swift_cvw_allocateGenericClassMetadataWithLayoutStringImpl(
+    const ClassDescriptor *description, const void *arguments,
     const GenericClassMetadataPattern *pattern) {
   return swift::swift_allocateGenericClassMetadata(description,
                                                    arguments,
                                                    pattern);
+}
+
+ClassMetadata *swift::swift_allocateGenericClassMetadataWithLayoutString(
+    const ClassDescriptor *description, const void *arguments,
+    const GenericClassMetadataPattern *pattern) {
+  return swift_cvw_allocateGenericClassMetadataWithLayoutString(
+      description, arguments, pattern);
 }
 
 static void
@@ -834,16 +704,21 @@ swift::swift_allocateGenericValueMetadata(const ValueTypeDescriptor *description
   return metadata;
 }
 
-ValueMetadata *
-swift::swift_allocateGenericValueMetadataWithLayoutString(
-    const ValueTypeDescriptor *description,
-    const void *arguments,
-    const GenericValueMetadataPattern *pattern,
-    size_t extraDataSize) {
+static ValueMetadata *
+swift_cvw_allocateGenericValueMetadataWithLayoutStringImpl(
+    const ValueTypeDescriptor *description, const void *arguments,
+    const GenericValueMetadataPattern *pattern, size_t extraDataSize) {
   return swift::swift_allocateGenericValueMetadata(description,
                                                    arguments,
                                                    pattern,
                                                    extraDataSize);
+}
+
+ValueMetadata *swift::swift_allocateGenericValueMetadataWithLayoutString(
+    const ValueTypeDescriptor *description, const void *arguments,
+    const GenericValueMetadataPattern *pattern, size_t extraDataSize) {
+  return swift_cvw_allocateGenericValueMetadataWithLayoutString(
+      description, arguments, pattern, extraDataSize);
 }
 
 // Look into the canonical prespecialized metadata attached to the type
@@ -1762,7 +1637,7 @@ public:
                                     PrivateMetadataCompletionContext *context);
 
   MetadataStateWithDependency checkTransitiveCompleteness() {
-    auto dependency = ::checkTransitiveCompleteness(&Data);
+    auto dependency = swift::checkTransitiveCompleteness(&Data);
     return { dependency ? PrivateMetadataState::NonTransitiveComplete
                         : PrivateMetadataState::Complete,
              dependency };
@@ -2101,7 +1976,7 @@ public:
                                     PrivateMetadataCompletionContext *context);
 
   MetadataStateWithDependency checkTransitiveCompleteness() {
-    auto dependency = ::checkTransitiveCompleteness(&Data);
+    auto dependency = swift::checkTransitiveCompleteness(&Data);
     return { dependency ? PrivateMetadataState::NonTransitiveComplete
                         : PrivateMetadataState::Complete,
              dependency };
@@ -3078,7 +2953,7 @@ void swift::swift_initStructMetadata(StructMetadata *structType,
   vwtable->publishLayout(layout);
 }
 
-void swift::swift_initStructMetadataWithLayoutString(
+static void swift_cvw_initStructMetadataWithLayoutStringImpl(
     StructMetadata *structType, StructLayoutFlags layoutFlags, size_t numFields,
     const uint8_t *const *fieldTypes, const uint8_t *fieldTags,
     uint32_t *fieldOffsets) {
@@ -3188,11 +3063,6 @@ void swift::swift_initStructMetadataWithLayoutString(
   structType->setLayoutString(layoutStr);
 
   auto *vwtable = getMutableVWTableForInit(structType, layoutFlags);
-  vwtable->destroy = swift_generic_destroy;
-  vwtable->initializeWithCopy = swift_generic_initWithCopy;
-  vwtable->initializeWithTake = swift_generic_initWithTake;
-  vwtable->assignWithCopy = swift_generic_assignWithCopy;
-  vwtable->assignWithTake = swift_generic_assignWithTake;
 
   layout.extraInhabitantCount = extraInhabitantCount;
 
@@ -3200,6 +3070,14 @@ void swift::swift_initStructMetadataWithLayoutString(
   installCommonValueWitnesses(layout, vwtable);
 
   vwtable->publishLayout(layout);
+}
+
+void swift::swift_initStructMetadataWithLayoutString(
+    StructMetadata *structType, StructLayoutFlags layoutFlags, size_t numFields,
+    const uint8_t *const *fieldTypes, const uint8_t *fieldTags,
+    uint32_t *fieldOffsets) {
+  swift_cvw_initStructMetadataWithLayoutString(
+      structType, layoutFlags, numFields, fieldTypes, fieldTags, fieldOffsets);
 }
 
 size_t swift::_swift_refCountBytesForMetatype(const Metadata *type) {
@@ -3299,8 +3177,9 @@ void swift::_swift_addRefCountStringForMetatype(LayoutStringWriter &writer,
              reader.layoutStr + layoutStringHeaderSize, fieldRefCountBytes);
 
       if (fieldFlags & LayoutStringFlags::HasRelativePointers) {
-        swift_resolve_resilientAccessors(writer.layoutStr, writer.offset,
-                                         reader.layoutStr + layoutStringHeaderSize, fieldType);
+        swift_cvw_resolve_resilientAccessors(
+            writer.layoutStr, writer.offset,
+            reader.layoutStr + layoutStringHeaderSize, fieldType);
       }
 
       if (offset) {
@@ -7606,9 +7485,9 @@ static bool findAnyTransitiveMetadata(const Metadata *type, T &&predicate) {
   return false;
 }
 
+namespace swift {
 /// Do a quick check to see if all the transitive type metadata are complete.
-static bool
-areAllTransitiveMetadataComplete_cheap(const Metadata *type) {
+bool areAllTransitiveMetadataComplete_cheap(const Metadata *type) {
   // Look for any transitive metadata that's *incomplete*.
   return !findAnyTransitiveMetadata(type, [](const Metadata *type) {
     struct IsIncompleteCallbacks {
@@ -7651,6 +7530,14 @@ areAllTransitiveMetadataComplete_cheap(const Metadata *type) {
   });
 }
 
+PrivateMetadataState inferStateForMetadata(Metadata *metadata) {
+  if (metadata->getValueWitnesses()->isIncomplete())
+    return PrivateMetadataState::Abstract;
+
+  // TODO: internal vs. external layout-complete?
+  return PrivateMetadataState::LayoutComplete;
+}
+
 /// Check for transitive completeness.
 ///
 /// The key observation here is that all we really care about is whether
@@ -7660,8 +7547,7 @@ areAllTransitiveMetadataComplete_cheap(const Metadata *type) {
 /// scan its transitive metadata and actually try to find something that's
 /// incomplete.  If we don't find anything, then we know all the transitive
 /// dependencies actually hold, and we can keep going.
-static MetadataDependency
-checkTransitiveCompleteness(const Metadata *initialType) {
+MetadataDependency checkTransitiveCompleteness(const Metadata *initialType) {
   llvm::SmallVector<const Metadata *, 8> worklist;
   
   // An efficient hash-set implementation in the spirit of llvm's SmallPtrSet:
@@ -7742,6 +7628,7 @@ checkTransitiveCompleteness(const Metadata *initialType) {
   // Otherwise, we're transitively complete.
   return MetadataDependency();
 }
+} // namespace swift
 
 /// Diagnose a metadata dependency cycle.
 SWIFT_NORETURN static void
@@ -8239,6 +8126,7 @@ const HeapObject *swift_getKeyPathImpl(const void *pattern,
 
 #define OVERRIDE_KEYPATH COMPATIBILITY_OVERRIDE
 #define OVERRIDE_WITNESSTABLE COMPATIBILITY_OVERRIDE
+#define OVERRIDE_CVW_METADATA COMPATIBILITY_OVERRIDE
 #include "../CompatibilityOverride/CompatibilityOverrideIncludePath.h"
 
 // Autolink with libc++, for cases where libswiftCore is linked statically.

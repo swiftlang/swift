@@ -339,7 +339,12 @@ public:
     if (auto *FD = dyn_cast<FuncDecl>(D)) {
       if (BraceStmt *B = FD->getTypecheckedBody()) {
         const ParameterList *PL = FD->getParameters();
+
+        // Use FD's DeclContext as TypeCheckDC for transforms in func body
+        // then swap back TypeCheckDC at end of scope.
+        llvm::SaveAndRestore<DeclContext *> localDC(TypeCheckDC, FD);
         BraceStmt *NB = transformBraceStmt(B, PL);
+
         // Since it would look strange going straight to the first line in a
         // function body, we throw in a before/after pointing at the function
         // decl at the start of the transformed body

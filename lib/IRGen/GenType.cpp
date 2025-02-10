@@ -2375,7 +2375,7 @@ const TypeInfo *TypeConverter::convertType(CanType ty) {
   case TypeKind::SILToken:
     llvm_unreachable("should not be asking for representation of a SILToken");
   case TypeKind::Integer:
-    llvm_unreachable("implement me");
+    llvm_unreachable("should not be asking for the type info an IntegerType");
   }
   }
   llvm_unreachable("bad type kind");

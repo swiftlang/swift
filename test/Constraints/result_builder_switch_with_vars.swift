@@ -49,9 +49,9 @@ func tuplify<T>(@TupleBuilder body: (E) throws -> T) rethrows {
 tuplify {
   switch $0 {
   // CHECK: (case_body_variables
-  // CHECK-NEXT: (var_decl implicit {{.*}} "a" interface type="String" let readImpl=stored immutable
+  // CHECK-NEXT: (var_decl implicit {{.*}} "a" interface_type="String" let readImpl=stored immutable
   // CHECK-NEXT:   (has_storage_attr implicit))
-  // CHECK-NEXT: (var_decl implicit {{.*}} "b" interface type="Int" let readImpl=stored immutable
+  // CHECK-NEXT: (var_decl implicit {{.*}} "b" interface_type="Int" let readImpl=stored immutable
   // CHECK-NEXT:   (has_storage_attr implicit))
   case let .test(a, b):
     a
@@ -60,9 +60,9 @@ tuplify {
 
   switch $0 {
     // CHECK: (case_body_variables
-    // CHECK-NEXT: (var_decl implicit {{.*}} "a" interface type="String" let readImpl=stored immutable
+    // CHECK-NEXT: (var_decl implicit {{.*}} "a" interface_type="String" let readImpl=stored immutable
     // CHECK-NEXT:   (has_storage_attr implicit))
-    // CHECK-NEXT: (var_decl implicit {{.*}} "b" interface type="Int" let readImpl=stored immutable
+    // CHECK-NEXT: (var_decl implicit {{.*}} "b" interface_type="Int" let readImpl=stored immutable
     // CHECK-NEXT:   (has_storage_attr implicit))
   case .test(let a, let b):
     a
@@ -71,21 +71,21 @@ tuplify {
 
   switch $0 {
     // CHECK: (case_body_variables
-    // CHECK-NEXT: (var_decl implicit {{.*}} "value" interface type="(a: String, b: Int)" let readImpl=stored immutable
+    // CHECK-NEXT: (var_decl implicit {{.*}} "value" interface_type="(a: String, b: Int)" let readImpl=stored immutable
   case let .test((value)):
     value.a
   }
 
   switch $0 {
     // CHECK: (case_body_variables
-    // CHECK-NEXT: (var_decl implicit {{.*}} "value" interface type="(a: String, b: Int)" let readImpl=stored immutable
+    // CHECK-NEXT: (var_decl implicit {{.*}} "value" interface_type="(a: String, b: Int)" let readImpl=stored immutable
   case let .test(value):
     value.a
   }
 
   switch $0 {
     // CHECK: (case_body_variables
-    // CHECK-NEXT: (var_decl implicit {{.*}} "value" interface type="(a: String, b: Int)" let readImpl=stored immutable
+    // CHECK-NEXT: (var_decl implicit {{.*}} "value" interface_type="(a: String, b: Int)" let readImpl=stored immutable
   case .test(let value):
     value.a
   }

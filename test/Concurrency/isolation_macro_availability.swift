@@ -2,7 +2,7 @@
 
 // REQUIRES: concurrency
 // REQUIRES: swift_swift_parser
-// REQUIRES: VENDOR=apple
+// REQUIRES: OS=macosx || OS=ios || OS=tvos || OS=watchos
 
 // rdar://126118470
 // UNSUPPORTED: CPU=arm64e

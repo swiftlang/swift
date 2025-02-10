@@ -670,7 +670,7 @@ void SILGenFunction::emitMoveOnlyMemberDestruction(SILValue selfValue,
   }
   // self has been stored into a temporary
   assert(!selfValue->getType().isObject());
-  if (auto *structDecl = dyn_cast<StructDecl>(nom)) {
+  if (isa<StructDecl>(nom)) {
     for (VarDecl *vd : nom->getStoredProperties()) {
       const TypeLowering &ti = getTypeLowering(vd->getTypeInContext());
       if (ti.isTrivial())

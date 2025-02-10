@@ -17,9 +17,8 @@ public struct S {
 // CHECK: [[WRITE:%.*]] = begin_access [modify] [static] [[STK]] : $*S
 // CHECK: store %{{.*}} to [[WRITE]] : $*S
 // CHECK: end_access [[WRITE]]
-// CHECK: bb3:
+// CHECK: bb3([[RET:%.*]] : $S):
 // CHECK: [[READ:%.*]] = begin_access [read] [static] [[STK]] : $*S
-// CHECK: [[RET:%.*]] = load [[READ]] : $*S
 // CHECK: end_access [[READ]]
 // CHECK: destroy_addr [[STK]]
 // CHECK: dealloc_stack [[STK]]

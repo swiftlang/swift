@@ -144,18 +144,18 @@ struct MyStruct<T: ~Copyable & ~Escapable>: ~Copyable & ~Escapable {
     var x: T
 }
 
-extension MyStruct: Copyable where T: Copyable {}
+extension MyStruct: Copyable where T: Copyable, T: ~Escapable {}
 
-extension MyStruct: Escapable where T: Escapable {}
+extension MyStruct: Escapable where T: Escapable, T: ~Copyable {}
 
 enum MyEnum<T: ~Copyable & ~Escapable>: ~Copyable & ~Escapable {
     case x(T)
     case knoll
 }
 
-extension MyEnum: Copyable where T: Copyable {}
+extension MyEnum: Copyable where T: Copyable, T: ~Escapable {}
 
-extension MyEnum: Escapable where T: Escapable {}
+extension MyEnum: Escapable where T: Escapable, T: ~Copyable {}
 
 enum Trivial {
     case a, b, c

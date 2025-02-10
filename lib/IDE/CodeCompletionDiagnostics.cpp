@@ -94,7 +94,7 @@ bool CodeCompletionDiagnostics::getDiagnosticForDeprecated(
 
   llvm::VersionTuple RemappedDeprecatedVersion;
   if (AvailabilityInference::updateDeprecatedPlatformForFallback(
-          Attr.getParsedAttr(), Ctx, Platform, RemappedDeprecatedVersion))
+          Attr, Ctx, Platform, RemappedDeprecatedVersion))
     DeprecatedVersion = RemappedDeprecatedVersion;
 
   auto Message = Attr.getMessage();

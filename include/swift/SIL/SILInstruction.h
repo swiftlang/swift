@@ -1195,9 +1195,12 @@ public:
 };
 
 struct SILNodeOffsetChecker {
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Winvalid-offsetof"
   static_assert(offsetof(SingleValueInstruction, kind) ==
                 offsetof(NonSingleValueInstruction, kind),
                 "wrong SILNode layout in SILInstruction");
+#pragma clang diagnostic pop
 };
 
 inline SILNodePointer::SILNodePointer(const SingleValueInstruction *svi) :
@@ -8892,7 +8895,9 @@ class CopyValueInst
   friend class SILBuilder;
 
   CopyValueInst(SILDebugLocation DebugLoc, SILValue operand)
-      : UnaryInstructionBase(DebugLoc, operand, operand->getType()) {}
+      : UnaryInstructionBase(DebugLoc, operand, operand->getType()) {
+    assert(operand->getType().isObject());
+  }
 };
 
 class ExplicitCopyValueInst
@@ -9471,14 +9476,14 @@ public:
 
 /// Given an escaping closure return true iff it has a non-nil context and the
 /// context has a strong reference count greater than 1.
-class IsEscapingClosureInst
-    : public UnaryInstructionBase<SILInstructionKind::IsEscapingClosureInst,
+class DestroyNotEscapedClosureInst
+    : public UnaryInstructionBase<SILInstructionKind::DestroyNotEscapedClosureInst,
                                   SingleValueInstruction> {
   friend SILBuilder;
 
   unsigned VerificationType;
 
-  IsEscapingClosureInst(SILDebugLocation DebugLoc, SILValue Operand,
+  DestroyNotEscapedClosureInst(SILDebugLocation DebugLoc, SILValue Operand,
                         SILType BoolTy, unsigned VerificationType)
       : UnaryInstructionBase(DebugLoc, Operand, BoolTy),
         VerificationType(VerificationType) {}
@@ -11029,6 +11034,10 @@ public:
   SILType getSourceLoweredType() const { return getOperand()->getType(); }
   CanType getSourceFormalType() const { return SrcFormalTy; }
 
+  void updateSourceFormalTypeFromOperandLoweredType() {
+    SrcFormalTy = getSourceLoweredType().getASTType();
+  }
+
   SILType getTargetLoweredType() const { return DestLoweredTy; }
   CanType getTargetFormalType() const { return DestFormalTy; }
 };
@@ -11720,6 +11729,17 @@ public:
   OperandValueArrayRef getArguments() const {
     return OperandValueArrayRef(getAllOperands());
   }
+};
+
+/// An instruction that represents a semantic-less use that is used to
+/// suppresses unused value variable warnings. E.x.: _ = x.
+class IgnoredUseInst final
+    : public UnaryInstructionBase<SILInstructionKind::IgnoredUseInst,
+                                  NonValueInstruction> {
+  friend SILBuilder;
+
+  IgnoredUseInst(SILDebugLocation loc, SILValue operand)
+      : UnaryInstructionBase(loc, operand) {}
 };
 
 inline SILType *AllocRefInstBase::getTypeStorage() {

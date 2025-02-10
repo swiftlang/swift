@@ -84,7 +84,6 @@ enum RepresentationError {
   UnrepresentableEnumCaseTuple,
   UnrepresentableProtocol,
   UnrepresentableMoveOnly,
-  UnrepresentableNested,
   UnrepresentableMacro,
   UnrepresentableZeroSizedValueType,
 };

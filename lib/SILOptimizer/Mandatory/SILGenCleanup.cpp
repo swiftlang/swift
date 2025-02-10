@@ -267,7 +267,9 @@ bool SILGenCleanup::completeOSSALifetimes(SILFunction *function) {
   }
 
   bool changed = false;
-  OSSALifetimeCompletion completion(function, /*DomInfo*/ nullptr, *deba);
+  OSSALifetimeCompletion completion(
+    function, /*DomInfo*/ nullptr, *deba,
+    OSSALifetimeCompletion::ExtendTrivialVariable);
   BasicBlockSet completed(function);
   for (auto *root : roots) {
     if (root == function->getEntryBlock()) {

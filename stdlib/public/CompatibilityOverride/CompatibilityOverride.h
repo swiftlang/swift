@@ -82,10 +82,10 @@
 #define COMPATIBILITY_OVERRIDE_H
 
 #include "../runtime/Private.h"
+#include "swift/Runtime/CMakeConfig.h"
 #include "swift/Runtime/Concurrency.h"
 #include "swift/Runtime/Metadata.h"
-#include "swift/Runtime/Once.h"
-#include "swift/Runtime/CMakeConfig.h"
+#include <atomic>
 #include <type_traits>
 
 namespace swift {
@@ -123,7 +123,7 @@ namespace swift {
 // Include path computation. Code that includes this file can write `#include
 // "..CompatibilityOverride/CompatibilityOverrideIncludePath.h"` to include the
 // appropriate .def file for the current library.
-#define COMPATIBILITY_OVERRIDE_INCLUDE_PATH_swiftRuntime                       \
+#define COMPATIBILITY_OVERRIDE_INCLUDE_PATH_swiftRuntimeCore                   \
   "../CompatibilityOverride/CompatibilityOverrideRuntime.def"
 #define COMPATIBILITY_OVERRIDE_INCLUDE_PATH_swift_Concurrency                  \
   "../CompatibilityOverride/CompatibilityOverrideConcurrency.def"
@@ -155,7 +155,7 @@ namespace swift {
 // resolve to string literal containing the appropriate section name for the
 // current library.
 // Turns into '__swift<major><minor>_hooks'
-#define COMPATIBILITY_OVERRIDE_SECTION_NAME_swiftRuntime "__swift" \
+#define COMPATIBILITY_OVERRIDE_SECTION_NAME_swiftRuntimeCore "__swift" \
   SWIFT_VERSION_MAJOR \
   SWIFT_VERSION_MINOR \
   "_hooks"
@@ -192,15 +192,38 @@ namespace swift {
 /// functionality must be available as swift_funcNameHereImpl.
 #define COMPATIBILITY_OVERRIDE(name, ret, attrs, ccAttrs, namespace,           \
                                typedArgs, namedArgs)                           \
+  /* We are creating this separate function for the override case, */          \
+  /* to prevent a stack frame from being created for the default case. */      \
+  SWIFT_NOINLINE                                                               \
+  static ret swift_##name##Slow(COMPATIBILITY_UNPAREN_WITH_COMMA(typedArgs)    \
+                                    std::atomic<uintptr_t> &Override,          \
+                                uintptr_t fn, Original_##name defaultImpl) {   \
+    constexpr uintptr_t DEFAULT_IMPL_SENTINEL = 0x1;                           \
+    if (SWIFT_UNLIKELY(fn == 0x0)) {                                           \
+      fn = (uintptr_t)getOverride_##name();                                    \
+      if (fn == 0x0) {                                                         \
+        Override.store(DEFAULT_IMPL_SENTINEL,                                  \
+                       std::memory_order::memory_order_relaxed);               \
+        return defaultImpl COMPATIBILITY_PAREN(namedArgs);                     \
+      }                                                                        \
+      Override.store(fn, std::memory_order::memory_order_relaxed);             \
+    }                                                                          \
+    return ((Override_##name)fn)(COMPATIBILITY_UNPAREN_WITH_COMMA(namedArgs)   \
+                                     defaultImpl);                             \
+  }                                                                            \
   attrs ccAttrs ret namespace swift_##name COMPATIBILITY_PAREN(typedArgs) {    \
-    static Override_##name Override;                                           \
-    static swift_once_t Predicate;                                             \
-    swift_once(                                                                \
-        &Predicate, [](void *) { Override = getOverride_##name(); }, nullptr); \
-    if (Override != nullptr)                                                   \
-      return Override(COMPATIBILITY_UNPAREN_WITH_COMMA(namedArgs)              \
-                          swift_##name##Impl);                                 \
-    return swift_##name##Impl COMPATIBILITY_PAREN(namedArgs);                  \
+    constexpr uintptr_t DEFAULT_IMPL_SENTINEL = 0x1;                           \
+    static std::atomic<uintptr_t> Override;                                    \
+    uintptr_t fn = Override.load(std::memory_order::memory_order_relaxed);     \
+    if (SWIFT_LIKELY(fn == DEFAULT_IMPL_SENTINEL)) {                           \
+      return swift_##name##Impl COMPATIBILITY_PAREN(namedArgs);                \
+    } else if (SWIFT_UNLIKELY(fn == 0x0)) {                                    \
+      return swift_##name##Slow(COMPATIBILITY_UNPAREN_WITH_COMMA(namedArgs)    \
+                                    Override,                                  \
+                                fn, &swift_##name##Impl);                      \
+    }                                                                          \
+    return ((Override_##name)fn)(COMPATIBILITY_UNPAREN_WITH_COMMA(namedArgs) & \
+                                 swift_##name##Impl);                          \
   }
 
 #endif // #else SWIFT_STDLIB_SUPPORT_BACK_DEPLOYMENT

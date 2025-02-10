@@ -503,6 +503,12 @@ private func handleApplies(for rootClosure: SingleValueInstruction, callSiteMap:
       continue
     }
 
+    // Workaround for a problem with OSSA: https://github.com/swiftlang/swift/issues/78847
+    // TODO: remove this if-statement once the underlying problem is fixed.
+    if callee.hasOwnership {
+      continue
+    }
+
     if callee.isDefinedExternally {
       continue
     }

@@ -3304,23 +3304,61 @@ Expr *SILGenFunction::findStorageReferenceExprForMoveOnly(Expr *argExpr,
   // referenced is a move-only type.
 
   AbstractStorageDecl *storage = nullptr;
+  AccessSemantics accessSemantics;
   Type type;
   if (auto dre = dyn_cast<DeclRefExpr>(result.getStorageRef())) {
     storage = dyn_cast<AbstractStorageDecl>(dre->getDecl());
     type = dre->getType();
+    accessSemantics = dre->getAccessSemantics();
   } else if (auto mre = dyn_cast<MemberRefExpr>(result.getStorageRef())) {
     storage = dyn_cast<AbstractStorageDecl>(mre->getDecl().getDecl());
     type = mre->getType();
+    accessSemantics = mre->getAccessSemantics();
   } else if (auto se = dyn_cast<SubscriptExpr>(result.getStorageRef())) {
     storage = dyn_cast<AbstractStorageDecl>(se->getDecl().getDecl());
     type = se->getType();
+    accessSemantics = se->getAccessSemantics();
   }
 
   if (!storage)
     return nullptr;
-  if (!storage->hasStorage() && storage->getReadImpl() != ReadImplKind::Read &&
-      storage->getReadImpl() != ReadImplKind::Read2 &&
-      storage->getReadImpl() != ReadImplKind::Address) {
+  // This should match the strategy computation used in
+  // SILGenLValue::visit{DeclRef,Member}RefExpr.
+  auto strategy = storage->getAccessStrategy(accessSemantics,
+         AccessKind::Read, SGM.M.getSwiftModule(), F.getResilienceExpansion(),
+         /* old abi*/ false);
+  
+  switch (strategy.getKind()) {
+  case AccessStrategy::Storage:
+    // Storage can benefit from direct borrowing/consumption.
+    break;
+  case AccessStrategy::DirectToAccessor:
+  case AccessStrategy::DispatchToAccessor:
+    // If the accessor naturally produces a borrow, then we benefit from
+    // directly borrowing it.
+    switch (strategy.getAccessor()) {
+    case AccessorKind::Address:
+    case AccessorKind::MutableAddress:
+    case AccessorKind::Read:
+    case AccessorKind::Read2:
+    case AccessorKind::Modify:
+    case AccessorKind::Modify2:
+      // Accessors that produce a borrow/inout value can be borrowed.
+      break;
+    
+    case AccessorKind::Get:
+    case AccessorKind::Set:
+    case AccessorKind::DistributedGet:
+    case AccessorKind::Init:
+    case AccessorKind::WillSet:
+    case AccessorKind::DidSet:
+      // Other accessors can't.
+      return nullptr;
+    }
+    break;
+  
+  case AccessStrategy::MaterializeToTemporary:
+  case AccessStrategy::DispatchToDistributedThunk:
     return nullptr;
   }
 
@@ -6974,13 +7012,20 @@ bool AccessorBaseArgPreparer::shouldLoadBaseAddress() const {
   // base isn't a temporary.  We aren't allowed to pass aliased
   // memory to 'in', and we have pass at +1.
   case ParameterConvention::Indirect_In:
-  case ParameterConvention::Indirect_In_Guaranteed:
   case ParameterConvention::Indirect_In_CXX:
     // TODO: We shouldn't be able to get an lvalue here, but the AST
     // sometimes produces an inout base for non-mutating accessors.
     // rdar://problem/19782170
     // assert(!base.isLValue());
-    return base.isLValue() || base.isPlusZeroRValueOrTrivial();
+    return base.isLValue() || base.isPlusZeroRValueOrTrivial()
+      || !SGF.silConv.useLoweredAddresses();
+
+  case ParameterConvention::Indirect_In_Guaranteed:
+    // We can pass the memory we already have at +0. The memory referred to
+    // by the base should be already immutable unless it was lowered as an
+    // lvalue.
+    return base.isLValue()
+      || !SGF.silConv.useLoweredAddresses();
 
   // If the accessor wants the value directly, we definitely have to
   // load.
@@ -7039,7 +7084,7 @@ ArgumentSource AccessorBaseArgPreparer::prepareAccessorAddressBaseArg() {
 
   // Otherwise, we have a value that we can forward without any additional
   // handling.
-  return ArgumentSource(loc, RValue(SGF, loc, baseFormalType, base));
+  return ArgumentSource(loc, RValue(SGF, {base}, baseFormalType));
 }
 
 ArgumentSource AccessorBaseArgPreparer::prepareAccessorObjectBaseArg() {

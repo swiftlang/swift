@@ -92,7 +92,7 @@ class IRGenPrepare : public SILFunctionTransform {
       // Even de-serialized functions must be code-gen'd.
       SILLinkage linkage = F->getLinkage();
       if (isAvailableExternally(linkage)) {
-        F->setLinkage(stripExternalFromLinkage(linkage));
+        F->setLinkage(SILLinkage::Hidden);
       }
     }
 

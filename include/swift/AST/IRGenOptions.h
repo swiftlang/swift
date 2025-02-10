@@ -33,6 +33,7 @@
 #include "llvm/Support/VersionTuple.h"
 #include <optional>
 #include <string>
+#include <tuple>
 #include <vector>
 
 namespace swift {
@@ -258,7 +259,7 @@ public:
   SmallVector<LinkLibrary, 4> LinkLibraries;
 
   /// The public dependent libraries specified on the command line.
-  std::vector<std::string> PublicLinkLibraries;
+  std::vector<std::tuple<std::string, bool>> PublicLinkLibraries;
 
   /// If non-empty, the (unmangled) name of a dummy symbol to emit that can be
   /// used to force-load this module.

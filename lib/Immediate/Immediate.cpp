@@ -30,6 +30,7 @@
 #include "swift/Basic/LLVM.h"
 #include "swift/Frontend/Frontend.h"
 #include "swift/IRGen/IRGenPublic.h"
+#include "swift/Runtime/Config.h"
 #include "swift/SILOptimizer/PassManager/Passes.h"
 #include "swift/Subsystems.h"
 #include "llvm/ADT/SmallString.h"
@@ -230,7 +231,8 @@ static void addMergedLibraries(SmallVectorImpl<LinkLibrary> &AllLinkLibraries,
   }
 
   for (StringRef NewLib : NewLibs)
-    AllLinkLibraries.push_back(LinkLibrary(NewLib, LibraryKind::Library));
+    AllLinkLibraries.emplace_back(
+        NewLib, LibraryKind::Library, /*static=*/false);
 }
 
 bool swift::immediate::autolinkImportedModules(ModuleDecl *M,

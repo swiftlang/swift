@@ -13,7 +13,7 @@
 // which presumably doesn't have a frame pointer.  When we add the Dwarf EH
 // unwinder, we should be able to turn this test on.
 
-import _Backtracing
+import Runtime
 
 func kablam() {
   kerpow()
@@ -36,7 +36,9 @@ func splat() {
 }
 
 func pow() {
-  let backtrace = try! Backtrace.capture().symbolicated(useSymbolCache: false)!
+  let backtrace = try! Backtrace.capture().symbolicated(
+    options: [ .showInlineFrames, .showSourceLocations ]
+  )!
 
   // CHECK:      0{{[ \t]+}}0x{{[0-9a-f]+}} [ra] [0] SymbolicatedBacktraceInline pow()
   // CHECK:      1{{[ \t]+}}0x{{[0-9a-f]+}} [ra] [inlined] [0] SymbolicatedBacktraceInline splat()

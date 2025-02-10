@@ -111,6 +111,14 @@ swift_ASTGen_virtualFiles(void *_Nonnull sourceFile,
 void swift_ASTGen_freeBridgedVirtualFiles(
     BridgedVirtualFile *_Nullable virtualFiles, size_t numFiles);
 
+bool swift_ASTGen_parseAvailabilityMacroDefinition(
+    BridgedASTContext ctx, BridgedDeclContext dc, BridgedDiagnosticEngine diags,
+    BridgedStringRef buffer,
+    BridgedAvailabilityMacroDefinition *_Nonnull outPtr);
+
+void swift_ASTGen_freeAvailabilityMacroDefinition(
+    BridgedAvailabilityMacroDefinition *_Nonnull definition);
+
 #ifdef __cplusplus
 }
 #endif

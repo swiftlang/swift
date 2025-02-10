@@ -55,7 +55,7 @@ enum TrailingSemi {
 };
 
 // The substitution map for a declref should be relatively unobtrusive.
-// CHECK-AST-LABEL:   (func_decl{{.*}}"generic(_:)" "<T : Hashable>" interface type="<T where T : Hashable> (T) -> ()" access=internal captures=(<generic> )
+// CHECK-AST-LABEL:   (func_decl{{.*}}"generic(_:)" "<T : Hashable>" interface_type="<T where T : Hashable> (T) -> ()" access=internal captures=(<generic> )
 func generic<T: Hashable>(_: T) {}
 // CHECK-AST:       (pattern_binding_decl
 // CHECK-AST:         (processed_init=declref_expr type="(Int) -> ()" location={{.*}} range={{.*}} decl="main.(file).generic@{{.*}} [with (substitution_map generic_signature=<T where T : Hashable> T -> Int)]" function_ref=unapplied))
@@ -110,11 +110,11 @@ _ = { (v: MyEnum) in }
 // CHECK-LABEL: (struct_decl range=[{{.+}}] "SelfParam"
 struct SelfParam {
 
-  // CHECK-LABEL: (func_decl range=[{{.+}}] "createOptional()" type
+  // CHECK-LABEL: (func_decl range=[{{.+}}] "createOptional()" static
   // CHECK-NEXT:    (parameter "self")
-  // CHECK-NEXT:    (parameter_list range=[{{.+}}])
   // CHECK-NEXT:    (result=type_optional
   // CHECK-NEXT:      (type_unqualified_ident id="SelfParam" unbound))
+  // CHECK-NEXT:    (parameter_list range=[{{.+}}])
   static func createOptional() -> SelfParam? {
 
     // CHECK-LABEL: (call_expr type="<null>"
@@ -125,8 +125,8 @@ struct SelfParam {
 }
 
 // CHECK-LABEL: (func_decl range=[{{.+}}] "dumpMemberTypeRepr()"
-// CHECK-NEXT:    (parameter_list range=[{{.+}}])
 // CHECK-NEXT:    (result=type_qualified_ident id="Element" unbound
 // CHECK-NEXT:      (type_unqualified_ident id="Array" unbound
 // CHECK-NEXT:        (type_unqualified_ident id="Bool" unbound))
+// CHECK-NEXT:    (parameter_list range=[{{.+}}])
 func dumpMemberTypeRepr() -> Array<Bool>.Element { true }

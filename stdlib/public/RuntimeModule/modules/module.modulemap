@@ -1,0 +1,37 @@
+module BacktracingImpl {
+  module ImageFormats {
+    module Elf {
+      header "ImageFormats/Elf/elf.h"
+      requires cplusplus
+      export *
+    }
+    module Dwarf {
+      header "ImageFormats/Dwarf/dwarf.h"
+      header "ImageFormats/Dwarf/eh_frame_hdr.h"
+      requires cplusplus
+      export *
+    }
+    export *
+  }
+
+  module OS {
+    module Darwin { header "OS/Darwin.h" }
+    module Windows { header "OS/Windows.h" }
+    module Libc { header "OS/Libc.h" }
+  }
+
+  module Runtime {
+    header "Runtime/Runtime.h"
+    requires cplusplus
+  }
+
+  module FixedLayout {
+    header "FixedLayout.h"
+    requires cplusplus
+  }
+
+  module CompressionLibs {
+    header "Compression.h"
+    requires cplusplus
+  }
+}

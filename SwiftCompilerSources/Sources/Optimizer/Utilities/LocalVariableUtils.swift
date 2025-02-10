@@ -43,6 +43,7 @@ struct LocalVariableAccess: CustomStringConvertible {
     case inoutYield       // indirect yield from this accessor
     case beginAccess // Reading or reassigning a 'var'
     case load        // Reading a 'let'. Returning 'var' from an initializer.
+    case dependence  // A mark_dependence after an apply with an indirect result. No effect.
     case store       // 'var' initialization and destruction
     case apply       // indirect arguments
     case escape      // alloc_box captures
@@ -76,7 +77,7 @@ struct LocalVariableAccess: CustomStringConvertible {
       case .`init`, .modify:
         return true
       }
-    case .load:
+    case .load, .dependence:
       return false
     case .incomingArgument, .outgoingArgument, .store, .inoutYield:
       return true
@@ -115,6 +116,8 @@ struct LocalVariableAccess: CustomStringConvertible {
       str += "beginAccess"
     case .load:
       str += "load"
+    case .dependence:
+      str += "dependence"
     case .store:
       str += "store"
     case .apply:
@@ -149,7 +152,7 @@ class LocalVariableAccessInfo: CustomStringConvertible {
       case .`init`, .modify:
         break // lazily compute full assignment
       }
-    case .load:
+    case .load, .dependence:
       self._isFullyAssigned = false
     case .store:
       if let store = localAccess.instruction as? StoringInstruction {
@@ -197,7 +200,7 @@ class LocalVariableAccessInfo: CustomStringConvertible {
   }
 
   var description: String {
-    return "full-assign: \(_isFullyAssigned == nil ? "unknown" : String(describing: _isFullyAssigned!)) "
+    return "full-assign: \(_isFullyAssigned == nil ? "unknown" : String(describing: _isFullyAssigned!)), "
       + "\(access)"
   }
 
@@ -205,12 +208,10 @@ class LocalVariableAccessInfo: CustomStringConvertible {
   // assignment. This should match any instructions that the LocalVariableAccessMap initializer below recognizes as an
   // allocation.
   static private func isBase(address: Value) -> Bool {
-    switch address {
-    case is AllocBoxInst, is AllocStackInst, is BeginAccessInst:
-      return true
-    default:
-      return false
-    }
+    // TODO: create an API alternative to 'accessPath' that bails out on the first path component and succeeds on the
+    // first begin_access.
+    let path = address.accessPath
+    return path.base.isLocal && path.projectionPath.isEmpty
   }
 }
 
@@ -362,6 +363,9 @@ extension LocalVariableAccessWalker : ForwardingDefUseWalker {
       visit(LocalVariableAccess(.store, operand))
     case is DeallocBoxInst:
       break
+    case let markDep as MarkDependenceInst:
+      assert(markDep.baseOperand == operand)
+      visit(LocalVariableAccess(.dependence, operand))
     default:
       visit(LocalVariableAccess(.escape, operand))
     }
@@ -377,6 +381,10 @@ extension LocalVariableAccessWalker : ForwardingDefUseWalker {
 extension LocalVariableAccessWalker: AddressUseVisitor {
   private mutating func walkDownAddressUses(address: Value) -> WalkResult {
     for operand in address.uses.ignoreTypeDependence {
+      if let md = operand.instruction as? MarkDependenceInst, operand == md.valueOperand {
+        // Record the forwarding mark_dependence as a fake access before continuing to walk down.
+        visit(LocalVariableAccess(.dependence, operand))
+      }
       if classifyAddress(operand: operand) == .abortWalk {
         return .abortWalk
       }

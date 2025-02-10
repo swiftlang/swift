@@ -126,6 +126,7 @@ func copyOrThrowIntoTuple<each T>(_ args: repeat each T) throws -> (repeat each 
 // CHECK-NEXT:    [[MV:%.*]] = move_value [var_decl] %39 : $Int
 // CHECK-NEXT:    debug_value [[MV]] : $Int
 // CHECK-NEXT:    [[B:%.*]] = load [take] [[R1]] : $*String
+// CHECK-NEXT:    ignored_use [[B]]
 // CHECK-NEXT:    [[C:%.*]] = load [take] [[R2]] : $*String
 // CHECK-NEXT:    [[C_LIFETIME:%.*]] = move_value [var_decl] [[C]]
 // CHECK-NEXT:    debug_value [[C_LIFETIME]] : $String

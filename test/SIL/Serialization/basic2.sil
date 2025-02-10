@@ -15,6 +15,16 @@ class Klass {}
 sil @getC : $@convention(thin) () -> (@owned C)
 sil @getKlass : $@convention(thin) () -> (@owned Klass)
 
+// CHECK-LABEL: sil [ossa] @ignored_use_test : $@convention(thin) (@guaranteed Klass) -> () {
+// CHECK: ignored_use %0 : $Klass
+// CHECK: } // end sil function 'ignored_use_test'
+sil [ossa] @ignored_use_test : $@convention(thin) (@guaranteed Klass) -> () {
+bb0(%0 : @guaranteed $Klass):
+  ignored_use %0 : $Klass
+  %9999 = tuple ()
+  return %9999 : $()
+}
+
 // CHECK-LABEL: sil [ossa] @merge_isolation_region : $@convention(thin) (@guaranteed Klass) -> () {
 // CHECK: merge_isolation_region %0 : $Klass, %1 : $*C
 // CHECK: merge_isolation_region %1 : $*C, %0 : $Klass, %0 : $Klass
@@ -365,3 +375,4 @@ bb0(%0 : $*Builtin.NativeObject, %1 : @owned $Builtin.NativeObject):
   %9999 = tuple ()
   return %9999 : $()
 }
+

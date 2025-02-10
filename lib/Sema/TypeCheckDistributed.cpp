@@ -494,10 +494,10 @@ bool swift::checkDistributedActorSystem(const NominalTypeDecl *system) {
 
   if (auto alias = dyn_cast<TypeAliasType>(requirementTy.getPointer())) {
     auto concreteReqTy = alias->getDesugaredType();
-    if (auto comp = dyn_cast<ProtocolCompositionType>(concreteReqTy)) {
+    if (isa<ProtocolCompositionType>(concreteReqTy)) {
       // ok, protocol composition is fine as requirement,
       // since special case of just a single protocol
-    } else if (auto proto = dyn_cast<ProtocolType>(concreteReqTy)) {
+    } else if (isa<ProtocolType>(concreteReqTy)) {
       // ok, protocols is exactly what we want to be used as constraints here
     } else {
       nominal->diagnose(diag::distributed_actor_system_serialization_req_must_be_protocol,
@@ -669,13 +669,13 @@ bool swift::checkDistributedActorProperty(VarDecl *var, bool diagnose) {
 void swift::checkDistributedActorProperties(const NominalTypeDecl *decl) {
   auto &C = decl->getASTContext();
 
-  if (auto sourceFile = decl->getDeclContext()->getParentSourceFile()) {
-    if (sourceFile->Kind == SourceFileKind::Interface) {
-      // Don't diagnose properties in swiftinterfaces.
-      return;
-    }
-  } else {
+  if (!decl->getDeclContext()->getParentSourceFile()) {
     // Don't diagnose when checking without source file (e.g. from module, importer etc).
+    return;
+  }
+
+  if (decl->getDeclContext()->isInSwiftinterface()) {
+    // Don't diagnose properties in swiftinterfaces.
     return;
   }
 

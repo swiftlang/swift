@@ -933,6 +933,21 @@ static bool isRuntimeInstatiatedLayoutString(IRGenModule &IGM,
   return false;
 }
 
+static bool
+useMultiPayloadEnumFNSpecialization(IRGenModule &IGM,
+                                    const TypeLayoutEntry *typeLayoutEntry,
+                                    GenericSignature genericSig) {
+  // if (!typeLayoutEntry->layoutString(IGM, genericSig)) {
+  //   return false;
+  // }
+  // auto *enumTLE = typeLayoutEntry->getAsEnum();
+  // return enumTLE && enumTLE->isFixedSize(IGM) &&
+  // enumTLE->isMultiPayloadEnum();
+
+  // Disabled for now
+  return false;
+}
+
 static llvm::Constant *getEnumTagFunction(IRGenModule &IGM,
                                      const EnumTypeLayoutEntry *typeLayoutEntry,
                                           GenericSignature genericSig) {
@@ -953,19 +968,7 @@ static llvm::Constant *getEnumTagFunction(IRGenModule &IGM,
   } else if (typeLayoutEntry->isMultiPayloadEnum()) {
     return IGM.getEnumFnGetEnumTagFn();
   } else {
-    auto &payloadTI = **(typeLayoutEntry->cases[0]->getFixedTypeInfo());
-    auto mask = payloadTI.getFixedExtraInhabitantMask(IGM);
-    auto tzCount = mask.countTrailingZeros();
-    auto shiftedMask = mask.lshr(tzCount);
-    // auto toCount = shiftedMask.countTrailingOnes();
-    // if (payloadTI.mayHaveExtraInhabitants(IGM) &&
-    //     (mask.popcount() > 64 ||
-    //      toCount != mask.popcount() ||
-    //      (tzCount % toCount != 0))) {
-      return IGM.getEnumFnGetEnumTagFn();
-    // } else {
-    //   return IGM.getEnumSimpleGetEnumTagFn();
-    // }
+    return IGM.getEnumFnGetEnumTagFn();
   }
 }
 
@@ -990,18 +993,7 @@ getDestructiveInjectEnumTagFunction(IRGenModule &IGM,
   } else if (typeLayoutEntry->isMultiPayloadEnum()) {
     return nullptr;
   } else {
-    auto &payloadTI = **(typeLayoutEntry->cases[0]->getFixedTypeInfo());
-    auto mask = payloadTI.getFixedExtraInhabitantMask(IGM);
-    auto tzCount = mask.countTrailingZeros();
-    auto shiftedMask = mask.lshr(tzCount);
-    // auto toCount = shiftedMask.countTrailingOnes();
-    // if (payloadTI.mayHaveExtraInhabitants(IGM) &&
-    //     (mask.popcount() > 64 || toCount != mask.popcount() ||
-    //      (tzCount % toCount != 0))) {
-      return nullptr;
-    // } else {
-    //   return IGM.getEnumSimpleDestructiveInjectEnumTagFn();
-    // }
+    return nullptr;
   }
 }
 
@@ -1072,7 +1064,12 @@ static void addValueWitness(IRGenModule &IGM, ConstantStructBuilder &B,
                               ->getGenericSignature();
         if (typeLayoutEntry->layoutString(IGM, genericSig) ||
             isRuntimeInstatiatedLayoutString(IGM, typeLayoutEntry)) {
-          return addFunction(IGM.getGenericDestroyFn());
+          if (useMultiPayloadEnumFNSpecialization(IGM, typeLayoutEntry,
+                                                  genericSig)) {
+            return addFunction(IGM.getGenericDestroyMultiPayloadEnumFNFn());
+          } else {
+            return addFunction(IGM.getGenericDestroyFn());
+          }
         }
       }
     }
@@ -1101,8 +1098,14 @@ static void addValueWitness(IRGenModule &IGM, ConstantStructBuilder &B,
                               ->getGenericSignature();
         if (typeLayoutEntry->layoutString(IGM, genericSig) ||
             isRuntimeInstatiatedLayoutString(IGM, typeLayoutEntry)) {
-          return addFunction(
-              IGM.getGenericInitializeBufferWithCopyOfBufferFn());
+          if (useMultiPayloadEnumFNSpecialization(IGM, typeLayoutEntry,
+                                                  genericSig)) {
+            return addFunction(
+                IGM.getGenericInitializeBufferWithCopyOfBufferMultiPayloadEnumFNFn());
+          } else {
+            return addFunction(
+                IGM.getGenericInitializeBufferWithCopyOfBufferFn());
+          }
         }
       }
     }
@@ -1121,7 +1124,13 @@ static void addValueWitness(IRGenModule &IGM, ConstantStructBuilder &B,
                               ->getGenericSignature();
         if (typeLayoutEntry->layoutString(IGM, genericSig) ||
             isRuntimeInstatiatedLayoutString(IGM, typeLayoutEntry)) {
-          return addFunction(IGM.getGenericInitWithTakeFn());
+          if (useMultiPayloadEnumFNSpecialization(IGM, typeLayoutEntry,
+                                                  genericSig)) {
+            return addFunction(
+                IGM.getGenericInitWithTakeMultiPayloadEnumFNFn());
+          } else {
+            return addFunction(IGM.getGenericInitWithTakeFn());
+          }
         }
       }
     }
@@ -1142,7 +1151,13 @@ static void addValueWitness(IRGenModule &IGM, ConstantStructBuilder &B,
                               ->getGenericSignature();
         if (typeLayoutEntry->layoutString(IGM, genericSig) ||
             isRuntimeInstatiatedLayoutString(IGM, typeLayoutEntry)) {
-          return addFunction(IGM.getGenericAssignWithCopyFn());
+          if (useMultiPayloadEnumFNSpecialization(IGM, typeLayoutEntry,
+                                                  genericSig)) {
+            return addFunction(
+                IGM.getGenericAssignWithCopyMultiPayloadEnumFNFn());
+          } else {
+            return addFunction(IGM.getGenericAssignWithCopyFn());
+          }
         }
       }
     }
@@ -1163,7 +1178,13 @@ static void addValueWitness(IRGenModule &IGM, ConstantStructBuilder &B,
                               ->getGenericSignature();
         if (typeLayoutEntry->layoutString(IGM, genericSig) ||
             isRuntimeInstatiatedLayoutString(IGM, typeLayoutEntry)) {
-          return addFunction(IGM.getGenericAssignWithTakeFn());
+          if (useMultiPayloadEnumFNSpecialization(IGM, typeLayoutEntry,
+                                                  genericSig)) {
+            return addFunction(
+                IGM.getGenericAssignWithTakeMultiPayloadEnumFNFn());
+          } else {
+            return addFunction(IGM.getGenericAssignWithTakeFn());
+          }
         }
       }
     }
@@ -1184,7 +1205,13 @@ static void addValueWitness(IRGenModule &IGM, ConstantStructBuilder &B,
                               ->getGenericSignature();
         if (typeLayoutEntry->layoutString(IGM, genericSig) ||
             isRuntimeInstatiatedLayoutString(IGM, typeLayoutEntry)) {
-          return addFunction(IGM.getGenericInitWithCopyFn());
+          if (useMultiPayloadEnumFNSpecialization(IGM, typeLayoutEntry,
+                                                  genericSig)) {
+            return addFunction(
+                IGM.getGenericInitWithCopyMultiPayloadEnumFNFn());
+          } else {
+            return addFunction(IGM.getGenericInitWithCopyFn());
+          }
         }
       }
     }
@@ -1492,16 +1519,6 @@ getAddrOfKnownValueWitnessTable(IRGenModule &IGM, CanType type,
     }
   }
   return {};
-}
-
-llvm::Constant *
-IRGenModule::getAddrOfEffectiveValueWitnessTable(CanType concreteType,
-                                                 ConstantInit init) {
-  if (auto known =
-          getAddrOfKnownValueWitnessTable(*this, concreteType, false)) {
-    return known.getValue();
-  }
-  return getAddrOfValueWitnessTable(concreteType);
 }
 
 /// Emit a value-witness table for the given type.

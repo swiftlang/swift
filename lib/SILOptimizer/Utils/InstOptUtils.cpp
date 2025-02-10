@@ -859,7 +859,7 @@ namespace {
 } // end anonymous namespace
 
 bool swift::layoutIsTypeDependent(NominalTypeDecl *decl) {
-  if (auto *classDecl = dyn_cast<ClassDecl>(decl)) {
+  if (isa<ClassDecl>(decl)) {
     return false;
   } else if (auto *structDecl = dyn_cast<StructDecl>(decl)) {
     return TypeDependentVisitor().visitStructDecl(structDecl);
@@ -1365,10 +1365,10 @@ bool swift::analyzeStaticInitializer(
 /// FIXME: This must be kept in sync with replaceLoadSequence()
 /// below. What a horrible design.
 bool swift::canReplaceLoadSequence(SILInstruction *inst) {
-  if (auto *cai = dyn_cast<CopyAddrInst>(inst))
+  if (isa<CopyAddrInst>(inst))
     return true;
 
-  if (auto *li = dyn_cast<LoadInst>(inst))
+  if (isa<LoadInst>(inst))
     return true;
 
   if (auto *seai = dyn_cast<StructElementAddrInst>(inst)) {
@@ -2452,7 +2452,7 @@ SILValue swift::getInitOfTemporaryAllocStack(AllocStackInst *asi) {
     }
 
     TransitiveUseVisitation visitTransitiveUseAsEndPointUse(Operand *use) {
-      if (auto *sbi = dyn_cast<StoreBorrowInst>(use->getUser()))
+      if (isa<StoreBorrowInst>(use->getUser()))
         return TransitiveUseVisitation::OnlyUser;
       return TransitiveUseVisitation::OnlyUses;
     }

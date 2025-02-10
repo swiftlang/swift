@@ -91,6 +91,7 @@ private func registerSwiftPasses() {
   registerPass(stripObjectHeadersPass, { stripObjectHeadersPass.run($0) })
   registerPass(deadStoreElimination, { deadStoreElimination.run($0) })
   registerPass(redundantLoadElimination, { redundantLoadElimination.run($0) })
+  registerPass(mandatoryRedundantLoadElimination, { mandatoryRedundantLoadElimination.run($0) })
   registerPass(earlyRedundantLoadElimination, { earlyRedundantLoadElimination.run($0) })
   registerPass(deinitDevirtualizer, { deinitDevirtualizer.run($0) })
   registerPass(lifetimeDependenceDiagnosticsPass, { lifetimeDependenceDiagnosticsPass.run($0) })

@@ -20,6 +20,7 @@
 
 #include <set>
 #include <string>
+#include <tuple>
 #include <vector>
 
 namespace swift {
@@ -45,6 +46,9 @@ public:
 
   StringRef GroupInfoPath;
   StringRef ImportedHeader;
+  StringRef ImportedPCHPath;
+  bool SerializeBridgingHeader = false;
+  bool SerializeEmptyBridgingHeader = false;
   StringRef ModuleLinkName;
   StringRef ModuleInterface;
   std::vector<std::string> ExtraClangOptions;
@@ -147,7 +151,7 @@ public:
     uint64_t getSize() const { return Size; }
   };
   ArrayRef<FileDependency> Dependencies;
-  ArrayRef<std::string> PublicDependentLibraries;
+  ArrayRef<std::tuple<std::string, bool>> PublicDependentLibraries;
 
   bool AutolinkForceLoad = false;
   bool SerializeAllSIL = false;

@@ -2047,21 +2047,13 @@ public:
   ParserStatus
   parseAvailabilityMacro(SmallVectorImpl<AvailabilitySpec *> &Specs);
 
-  /// Parse the availability macros definitions passed as arguments.
-  AvailabilityMacroMap &parseAllAvailabilityMacroArguments();
-
-  /// Result of parsing an availability macro definition.
-  struct AvailabilityMacroDefinition {
-    StringRef Name;
-    llvm::VersionTuple Version;
-    SmallVector<AvailabilitySpec *, 4> Specs;
-  };
-
   /// Parse an availability macro definition from a command line argument.
-  /// This function should be called on a Parser set up on the command line
+  /// This function should only be called on a Parser set up on the command line
   /// argument code.
   ParserStatus
-  parseAvailabilityMacroDefinition(AvailabilityMacroDefinition &Result);
+  parseAvailabilityMacroDefinition(std::string &Name,
+                                   llvm::VersionTuple &Version,
+                                   SmallVectorImpl<AvailabilitySpec *> &Specs);
 
   ParserResult<AvailabilitySpec> parseAvailabilitySpec();
   ParserResult<PlatformVersionConstraintAvailabilitySpec>

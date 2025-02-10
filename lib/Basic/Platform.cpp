@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/Basic/Assertions.h"
+#include "swift/Basic/Pack.h"
 #include "swift/Basic/Platform.h"
 #include "llvm/ADT/StringExtras.h"
 #include "llvm/ADT/StringSwitch.h"
@@ -413,6 +414,10 @@ llvm::Triple swift::getTargetSpecificModuleTriple(const llvm::Triple &triple) {
                         triple.getOSName(), environment);
   }
 
+  if (triple.isOSFreeBSD()) {
+    return swift::getUnversionedTriple(triple);
+  }
+
   // Other platforms get no normalization.
   return triple;
 }
@@ -431,147 +436,372 @@ llvm::Triple swift::getUnversionedTriple(const llvm::Triple &triple) {
                       unversionedOSName);
 }
 
+namespace {
+
+// Here, we statically reflect the entire contents of RuntimeVersions.def
+// into the template-argument structure of the type AllStaticSwiftReleases.
+// We then use template metaprogramming on this type to synthesize arrays
+// of PlatformSwiftRelease for each of the target platforms with
+// deployment restrictions. This would be much simpler with the recent
+// generalizations of constexpr and non-type template parameters, but
+// those remain above our baseline for now, so we have to do this the
+// old way.
+
+/// A specific release of a platform that provides a specific Swift
+/// runtime version. Ultimately, all the variadic goop below is just
+/// building an array of these for each platform, which is what we'll
+/// use at runtime.
+struct PlatformSwiftRelease {
+  llvm::VersionTuple swiftVersion;
+  llvm::VersionTuple platformVersion;
+};
+
+/// A deployment-restricted platform.
+enum class PlatformKind {
+  macOS,
+  iOS,
+  watchOS,
+  visionOS
+};
+
+/// A template which statically reflects a version tuple. Generalized
+/// template parameters would theoretically let us just use
+/// llvm::VersionTuple.
+template <unsigned... Components>
+struct StaticVersion;
+
+/// A template which statically reflects a single PLATFORM in
+/// RuntimeVersions.def.
+template <PlatformKind Kind, class Version>
+struct StaticPlatformRelease;
+
+/// A template which statically reflects a single RUNTIME_VERSION in
+/// RuntimeVersions.def.
+template <class SwiftVersion, class PlatformReleases>
+struct StaticSwiftRelease;
+
+/// In the assumed context of a particular platform, the release
+/// of the platform that first provided a particular Swift version.
+template <class SwiftVersion, class PlatformVersion>
+struct StaticPlatformSwiftRelease;
+
+// C++ does not allow template argument lists to have trailing commas,
+// so to make the macro metaprogramming side of this work, we have to
+// include an extra type here (and special-case it in the transforms
+// below) for the sole purpose of terminating the list without a comma.
+struct Terminal;
+
+#define UNPARENTHESIZE(...) __VA_ARGS__
+
+using AllStaticSwiftReleases =
+  packs::Pack<
+#define PLATFORM(NAME, VERSION)                                    \
+      StaticPlatformRelease<                                       \
+        PlatformKind::NAME,                                        \
+        StaticVersion<UNPARENTHESIZE VERSION>                      \
+      >,
+#define FUTURE
+#define RUNTIME_VERSION(SWIFT_TUPLE, PROVIDERS)                    \
+    StaticSwiftRelease<StaticVersion<UNPARENTHESIZE SWIFT_TUPLE>,  \
+                       packs::Pack<PROVIDERS Terminal>>,
+#include "swift/AST/RuntimeVersions.def"
+    Terminal
+  >;
+
+#undef UNPARENTHESIZE
+
+/// A template for comparing two StaticVersion type values.
+template <class A, class B>
+struct StaticVersionGT;
+// 0.0 is not strictly greater than any version.
+template <class Second>
+struct StaticVersionGT<
+    StaticVersion<>,
+    Second
+  > {
+  static constexpr bool value = false;
+};
+// A version is strictly greater than 0.0 if it has any nonzero component.
+template <unsigned FirstHead, unsigned... FirstTail>
+struct StaticVersionGT<
+    StaticVersion<FirstHead, FirstTail...>,
+    StaticVersion<>
+  > {
+  static constexpr bool value =
+    (FirstHead > 0) ? true :
+    StaticVersionGT<StaticVersion<FirstTail...>,
+                    StaticVersion<>>::value;
+};
+// a.b is strictly greater than c.d if (a > c || (a == c && b > d)).
+template <unsigned FirstHead, unsigned... FirstTail,
+          unsigned SecondHead, unsigned... SecondTail>
+struct StaticVersionGT<
+    StaticVersion<FirstHead, FirstTail...>,
+    StaticVersion<SecondHead, SecondTail...>
+  > {
+  static constexpr bool value =
+    (FirstHead > SecondHead) ? true :
+    (FirstHead < SecondHead) ? false :
+    StaticVersionGT<StaticVersion<FirstTail...>,
+                    StaticVersion<SecondTail...>>::value;
+};
+
+/// A template for turning a StaticVersion into an llvm::VersionTuple.
+template <class>
+struct BuildVersionTuple;
+
+template <unsigned... Components>
+struct BuildVersionTuple<StaticVersion<Components...>> {
+  static constexpr llvm::VersionTuple get() {
+    return llvm::VersionTuple(Components...);
+  }
+};
+
+/// A transform that takes a StaticPlatformRelease, checks if it
+/// matches the given platform, and turns it into a
+/// StaticPlatformSwiftRelease if so. The result is returned as an
+/// optional pack which will be empty if the release is for a different
+/// platform.
+template <class, class>
+struct BuildStaticPlatformSwiftReleaseHelper;
+template <PlatformKind Platform, class SwiftVersion>
+struct BuildStaticPlatformSwiftReleaseHelper_Arg;
+
+// Matching case.
+template <PlatformKind Platform, class SwiftVersion, class PlatformVersion>
+struct BuildStaticPlatformSwiftReleaseHelper<
+         BuildStaticPlatformSwiftReleaseHelper_Arg<Platform, SwiftVersion>,
+         StaticPlatformRelease<Platform, PlatformVersion>> {
+  using result = packs::Pack<
+    StaticPlatformSwiftRelease<SwiftVersion, PlatformVersion>
+  >;
+};
+
+// Non-matching case.
+template <PlatformKind Platform, class SwiftVersion,
+          PlatformKind OtherPlatform, class PlatformVersion>
+struct BuildStaticPlatformSwiftReleaseHelper<
+         BuildStaticPlatformSwiftReleaseHelper_Arg<Platform, SwiftVersion>,
+         StaticPlatformRelease<OtherPlatform, PlatformVersion>> {
+  using result = packs::Pack<>;
+};
+
+// Terminal case (see above).
+template <PlatformKind Platform, class SwiftVersion>
+struct BuildStaticPlatformSwiftReleaseHelper<
+         BuildStaticPlatformSwiftReleaseHelper_Arg<Platform, SwiftVersion>,
+         Terminal> {
+  using result = packs::Pack<>;
+};
+
+
+/// A transform that takes a StaticSwiftRelease, finds the platform
+/// release in it that matches the given platform, and turns it into
+/// StaticPlatformSwiftRelease. The result is returned as an optional
+/// pack which will be empty if there is no release for the given
+/// platform in this SSR.
+template <class, class>
+struct BuildStaticPlatformSwiftRelease;
+template <PlatformKind Platform>
+struct BuildStaticPlatformSwiftRelease_Arg;
+
+// Main case: destructure the arguments, then flat-map our helper
+// transform above. Note that we assume that there aren't multiple
+// entries for the same platform in the platform releases of a given
+// Swift release.
+template <PlatformKind Platform, class SwiftVersion,
+          class StaticPlatformReleases>
+struct BuildStaticPlatformSwiftRelease<
+         BuildStaticPlatformSwiftRelease_Arg<Platform>,
+         StaticSwiftRelease<SwiftVersion, StaticPlatformReleases>>
+  : packs::PackFlatMap<
+      BuildStaticPlatformSwiftReleaseHelper,
+      BuildStaticPlatformSwiftReleaseHelper_Arg<Platform, SwiftVersion>,
+      StaticPlatformReleases> {};
+
+// Terminal case (see above).
+template <PlatformKind Platform>
+struct BuildStaticPlatformSwiftRelease<
+         BuildStaticPlatformSwiftRelease_Arg<Platform>,
+         Terminal> {
+  using result = packs::Pack<>;
+};
+
+/// A template for generating a PlatformSwiftRelease array element
+/// from a StaticPlatformSwiftRelease type value.
+template <class>
+struct BuildPlatformSwiftRelease;
+
+template <class SwiftVersion, class PlatformVersion>
+struct BuildPlatformSwiftRelease<
+         StaticPlatformSwiftRelease<SwiftVersion, PlatformVersion>
+       > {
+  static constexpr PlatformSwiftRelease get() {
+    return { BuildVersionTuple<SwiftVersion>::get(),
+             BuildVersionTuple<PlatformVersion>::get() };
+  }
+};
+
+/// A template for comparing two StaticPlatformSwiftRelease type values,
+/// for the purposes of a well-ordered assertion we want to make:
+/// We don't call this GT because it's not really a general-purpose
+/// comparison.
+template <class, class>
+struct StaticPlatformSwiftReleaseStrictlyDescend;
+
+template <class FirstSwift, class FirstPlatform,
+          class SecondSwift, class SecondPlatform>
+struct StaticPlatformSwiftReleaseStrictlyDescend<
+    StaticPlatformSwiftRelease<FirstSwift, FirstPlatform>,
+    StaticPlatformSwiftRelease<SecondSwift, SecondPlatform>
+  > {
+  static constexpr bool value =
+    StaticVersionGT<FirstSwift, SecondSwift>::value &&
+    StaticVersionGT<FirstPlatform, SecondPlatform>::value;
+};
+
+/// A helper template for BuildPlatformSwiftReleaseArray, below.
+template <class P>
+struct BuildPlatformSwiftReleaseArrayHelper;
+
+template <class... StaticPlatformSwiftReleases>
+struct BuildPlatformSwiftReleaseArrayHelper<
+         packs::Pack<StaticPlatformSwiftReleases...>
+       > {
+  // After we reverse the entries, we expect them to strictly
+  // descend in both the Swift version and the platform version.
+  static_assert(packs::PackComponentsAreOrdered<
+                  StaticPlatformSwiftReleaseStrictlyDescend,
+                  StaticPlatformSwiftReleases...
+                >::value,
+                "RuntimeVersions.def is not properly ordered?");
+  static constexpr PlatformSwiftRelease releases[] = {
+    BuildPlatformSwiftRelease<StaticPlatformSwiftReleases>::get()...
+  };
+};
+
+/// Build a static constexpr array of PlatformRelease objects matching
+/// the given platform.
+template <PlatformKind Platform>
+struct BuildPlatformSwiftReleaseArray
+  : BuildPlatformSwiftReleaseArrayHelper<
+      // Turn each entry in AllStaticSwiftReleases into an optional
+      // StaticPlatformSwiftRelease representing whether there is a
+      // platform release providing that Swift release for the given
+      // platform. Flatten that pack, then reverse it so that it's in
+      // order of descending release versions. Finally, build an array
+      // of PlatformRelease objects for the remaining values.
+      typename packs::PackReverse<
+        typename packs::PackFlatMap<
+          BuildStaticPlatformSwiftRelease,
+          BuildStaticPlatformSwiftRelease_Arg<Platform>,
+          AllStaticSwiftReleases
+        >::result
+      >::result
+    > {};
+
+} // end anonymous namespace
+
+static std::optional<llvm::VersionTuple>
+findSwiftRuntimeVersionHelper(llvm::VersionTuple targetPlatformVersion,
+                              llvm::VersionTuple minimumSwiftVersion,
+                              ArrayRef<PlatformSwiftRelease> allReleases) {
+  #define MAX(a, b) ((a) > (b) ? (a) : (b))
+
+  // Scan forward in our filtered platform release array for the given
+  // platform.
+  for (auto &release : allReleases) {
+    // If the provider version is <= the deployment target, then
+    // the deployment target includes support for the given Swift
+    // release. Since we're scanning in reverse order of Swift
+    // releases (because of the order of entries in RuntimeVersions.def),
+    // this must be the highest supported Swift release.
+    if (release.platformVersion <= targetPlatformVersion) {
+      return std::max(release.swiftVersion, minimumSwiftVersion);
+    }
+  }
+
+  // If we didn't find anything, but the target release is at least the
+  // notional future-release version, return that we aren't
+  // deployment-limited.
+  if (targetPlatformVersion >= llvm::VersionTuple(99, 99))
+    return std::nullopt;
+
+  // Otherwise, return the minimum Swift version.
+  return minimumSwiftVersion;
+}
+
+/// Return the highest Swift release that matches the given platform and
+/// has a version no greater than the target version. Don't return a version
+/// older that the minimum. Returns null if the target version matches the
+/// notional future release version.
+template <PlatformKind TargetPlatform>
+static std::optional<llvm::VersionTuple>
+findSwiftRuntimeVersion(llvm::VersionTuple targetPlatformVersion,
+                        llvm::VersionTuple minimumSwiftVersion) {
+  auto &allReleases =
+    BuildPlatformSwiftReleaseArray<TargetPlatform>::releases;
+
+  return findSwiftRuntimeVersionHelper(targetPlatformVersion,
+                                       minimumSwiftVersion,
+                                       allReleases);
+}
+
 std::optional<llvm::VersionTuple>
 swift::getSwiftRuntimeCompatibilityVersionForTarget(
     const llvm::Triple &Triple) {
-#define MAX(a, b) ((a) > (b) ? (a) : (b))
 
   if (Triple.isMacOSX()) {
     llvm::VersionTuple OSVersion;
     Triple.getMacOSXVersion(OSVersion);
-    unsigned Major = OSVersion.getMajor();
-    unsigned Minor = OSVersion.getMinor().value_or(0);
 
-    auto floorFor64 = [&Triple](llvm::VersionTuple v) {
-      if (!Triple.isAArch64()) return v;
-      // macOS got first arm64(e) support in 11.0, i.e. VersionTuple(5, 3)
-      return MAX(v, llvm::VersionTuple(5, 3));
-    };
+    // macOS releases predate the stable ABI, so use Swift 5.0 as our base.
+    auto baseRelease = llvm::VersionTuple(5, 0);
 
-    if (Major == 10) {
-      if (Triple.isAArch64() && Minor <= 16)
-        return floorFor64(llvm::VersionTuple(5, 3));
+    // macOS got its first arm64(e) support in 11.0, which included Swift 5.3.
+    if (Triple.isAArch64())
+      baseRelease = llvm::VersionTuple(5, 3);
 
-      if (Minor <= 14) {
-        return floorFor64(llvm::VersionTuple(5, 0));
-      } else if (Minor <= 15) {
-        if (OSVersion.getSubminor().value_or(0) <= 3) {
-          return floorFor64(llvm::VersionTuple(5, 1));
-        } else {
-          return floorFor64(llvm::VersionTuple(5, 2));
-        }
-      }
-    } else if (Major == 11) {
-      if (Minor <= 2)
-        return floorFor64(llvm::VersionTuple(5, 3));
-      return floorFor64(llvm::VersionTuple(5, 4));
-    } else if (Major == 12) {
-      if (Minor <= 2)
-        return floorFor64(llvm::VersionTuple(5, 5));
-      return floorFor64(llvm::VersionTuple(5, 6));
-    } else if (Major == 13) {
-      if (Minor <= 2)
-        return floorFor64(llvm::VersionTuple(5, 7));
-      return floorFor64(llvm::VersionTuple(5, 8));
-    } else if (Major == 14) {
-      if (Minor <= 3)
-        return floorFor64(llvm::VersionTuple(5, 9));
-      return floorFor64(llvm::VersionTuple(5, 10));
-    }
+    return findSwiftRuntimeVersion<PlatformKind::macOS>(OSVersion, baseRelease);
+
   } else if (Triple.isiOS()) { // includes tvOS
     llvm::VersionTuple OSVersion = Triple.getiOSVersion();
-    unsigned Major = OSVersion.getMajor();
-    unsigned Minor = OSVersion.getMinor().value_or(0);
 
-    auto floorForArchitecture = [&Triple, Major](llvm::VersionTuple v) {
-      // arm64 simulators and macCatalyst are introduced in iOS 14.0/tvOS 14.0
-      // with Swift 5.3
-      if (Triple.isAArch64() && Major <= 14 &&
-          (Triple.isSimulatorEnvironment() ||
-           Triple.isMacCatalystEnvironment()))
-        return MAX(v, llvm::VersionTuple(5, 3));
+    // iOS releases predate the stable ABI, so use Swift 5.0 as our base.
+    auto baseRelease = llvm::VersionTuple(5, 0);
 
-      if (Triple.getArchName() != "arm64e") return v;
+    // arm64 simulators and macCatalyst were introduced in iOS 14.0/tvOS 14.0,
+    // which included Swift 5.3.
+    if (Triple.isAArch64() &&
+        (Triple.isSimulatorEnvironment() ||
+         Triple.isMacCatalystEnvironment()))
+      baseRelease = llvm::VersionTuple(5, 3);
 
-      // iOS got first arm64e support in 12.0, which has a Swift runtime version
-      // older than 5.0, so let's floor at VersionTuple(5, 0) instead.
-      return MAX(v, llvm::VersionTuple(5, 0));
-    };
+    // iOS first got arm64e support in 12.0, which did not yet support the
+    // Swift stable ABI, so it does not provide a useful version bump.
 
-    if (Major <= 12) {
-      return floorForArchitecture(llvm::VersionTuple(5, 0));
-    } else if (Major <= 13) {
-      if (Minor <= 3) {
-        return floorForArchitecture(llvm::VersionTuple(5, 1));
-      } else {
-        return floorForArchitecture(llvm::VersionTuple(5, 2));
-      }
-    } else if (Major <= 14) {
-      if (Minor <= 4)
-        return floorForArchitecture(llvm::VersionTuple(5, 3));
+    return findSwiftRuntimeVersion<PlatformKind::iOS>(OSVersion, baseRelease);
 
-      return floorForArchitecture(llvm::VersionTuple(5, 4));
-    } else if (Major <= 15) {
-      if (Minor <= 3)
-        return floorForArchitecture(llvm::VersionTuple(5, 5));
-      return floorForArchitecture(llvm::VersionTuple(5, 6));
-    } else if (Major <= 16) {
-      if (Minor <= 3)
-        return floorForArchitecture(llvm::VersionTuple(5, 7));
-      return floorForArchitecture(llvm::VersionTuple(5, 8));
-    } else if (Major <= 17) {
-      if (Minor <= 3)
-        return floorForArchitecture(llvm::VersionTuple(5, 9));
-      return floorForArchitecture(llvm::VersionTuple(5, 10));
-    }
   } else if (Triple.isWatchOS()) {
     llvm::VersionTuple OSVersion = Triple.getWatchOSVersion();
-    unsigned Major = OSVersion.getMajor();
-    unsigned Minor = OSVersion.getMinor().value_or(0);
 
-    auto floorFor64bits = [&Triple](llvm::VersionTuple v) {
-      if (!Triple.isArch64Bit()) return v;
-      // 64-bit watchOS was introduced with Swift 5.3
-      return MAX(v, llvm::VersionTuple(5, 3));
-    };
+    // watchOS releases predate the stable ABI, so use Swift 5.0 as our base.
+    auto baseRelease = llvm::VersionTuple(5, 0);
 
-    if (Major <= 5) {
-      return floorFor64bits(llvm::VersionTuple(5, 0));
-    } else if (Major <= 6) {
-      if (Minor <= 1) {
-        return floorFor64bits(llvm::VersionTuple(5, 1));
-      } else {
-        return floorFor64bits(llvm::VersionTuple(5, 2));
-      }
-    } else if (Major <= 7) {
-      if (Minor <= 3)
-        return floorFor64bits(llvm::VersionTuple(5, 3));
+    // 64-bit watchOS was first supported by watchOS 7, which provided
+    // Swift 5.3.
+    if (Triple.isArch64Bit())
+      baseRelease = llvm::VersionTuple(5, 3);
 
-      return floorFor64bits(llvm::VersionTuple(5, 4));
-    } else if (Major <= 8) {
-      if (Minor <= 4)
-        return floorFor64bits(llvm::VersionTuple(5, 5));
-      return floorFor64bits(llvm::VersionTuple(5, 6));
-    } else if (Major <= 9) {
-      if (Minor <= 3)
-        return floorFor64bits(llvm::VersionTuple(5, 7));
-      return floorFor64bits(llvm::VersionTuple(5, 8));
-    } else if (Major <= 10) {
-      if (Minor <= 3)
-        return floorFor64bits(llvm::VersionTuple(5, 9));
-      return floorFor64bits(llvm::VersionTuple(5, 10));
-    }
-  }
-  else if (Triple.isXROS()) {
+    return findSwiftRuntimeVersion<PlatformKind::watchOS>(OSVersion, baseRelease);
+
+  } else if (Triple.isXROS()) {
     llvm::VersionTuple OSVersion = Triple.getOSVersion();
-    unsigned Major = OSVersion.getMajor();
-    unsigned Minor = OSVersion.getMinor().value_or(0);
 
-    if (Major <= 1) {
-      if (Minor <= 0)
-        return llvm::VersionTuple(5, 9);
-      return llvm::VersionTuple(5, 10);
-    }
+    // visionOS 1.0 provided Swift 5.9.
+    auto baseRelease = llvm::VersionTuple(5, 9);
+
+    return findSwiftRuntimeVersion<PlatformKind::visionOS>(OSVersion, baseRelease);
   }
 
   return std::nullopt;

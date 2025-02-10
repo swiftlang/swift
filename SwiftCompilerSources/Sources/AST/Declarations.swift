@@ -20,6 +20,9 @@ public class Decl: CustomStringConvertible, Hashable {
 
   public var description: String { String(taking: bridged.getDebugDescription()) }
 
+  // True if this declaration is imported from C/C++/ObjC.
+  public var hasClangNode: Bool { bridged.hasClangNode() }
+
   public static func ==(lhs: Decl, rhs: Decl) -> Bool { lhs === rhs }
 
   public func hash(into hasher: inout Hasher) {

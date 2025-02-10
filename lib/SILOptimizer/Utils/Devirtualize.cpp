@@ -633,11 +633,13 @@ replaceBeginApplyInst(SILBuilder &builder, SILPassManager *pm, SILLocation loc,
     // Insert any end_borrow if the yielded value before the token's uses.
     SmallVector<SILInstruction *, 4> users(
       makeUserIteratorRange(oldYield->getUses()));
-    auto yieldCastRes = castValueToABICompatibleType(
-      &builder, pm, loc, newYield, newYield->getType(), oldYield->getType(),
-      users);
-    oldYield->replaceAllUsesWith(yieldCastRes.first);
-    changedCFG |= yieldCastRes.second;
+    if (!users.empty()) {
+      auto yieldCastRes = castValueToABICompatibleType(
+        &builder, pm, loc, newYield, newYield->getType(), oldYield->getType(),
+        users);
+      oldYield->replaceAllUsesWith(yieldCastRes.first);
+      changedCFG |= yieldCastRes.second;
+    }
   }
 
   if (newArgBorrows.empty())

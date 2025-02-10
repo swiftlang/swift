@@ -23,65 +23,59 @@
 
 namespace swift {
 
-/// Summarizes platform specific availability constraints.
-struct AvailabilityContext::PlatformInfo {
+class DeclAvailabilityConstraints;
+
+/// Summarizes availability the constraints contained by an AvailabilityContext.
+class AvailabilityContext::Info {
+public:
   /// The introduction version.
   AvailabilityRange Range;
 
-  /// When `IsUnavailable` is true, this value stores the broadest platform
-  /// kind for which the context is unavailable.
-  PlatformKind UnavailablePlatform;
-
-  /// Whether or not the context is considered unavailable on the current
-  /// platform.
-  unsigned IsUnavailable : 1;
-
-  /// Whether or not the context is `@_unavailableInEmbedded`.
-  unsigned IsUnavailableInEmbedded : 1;
+  /// The broadest unavailable domain.
+  std::optional<AvailabilityDomain> UnavailableDomain;
 
   /// Whether or not the context is considered deprecated on the current
   /// platform.
   unsigned IsDeprecated : 1;
 
-  /// Whether or not the context allows unsafe code within it, e.g., via the
-  /// `@unsafe` attribute.
-  unsigned AllowsUnsafe: 1;
-
   /// Sets each field to the value of the corresponding field in `other` if the
   /// other is more restrictive. Returns true if any field changed as a result
   /// of adding this constraint.
-  bool constrainWith(const PlatformInfo &other);
+  bool constrainWith(const Info &other);
 
-  /// Updates each field to reflect the availability of `decl`, if that
-  /// availability is more restrictive. Returns true if any field was updated.
-  bool constrainWith(const Decl *decl);
+  /// Constrains each field using the given constraints if they are more
+  /// restrictive than the current values. Returns true if any field was
+  /// updated.
+  bool constrainWith(const DeclAvailabilityConstraints &constraints,
+                     ASTContext &ctx);
 
-  bool constrainUnavailability(std::optional<PlatformKind> unavailablePlatform);
+  bool constrainUnavailability(std::optional<AvailabilityDomain> domain);
 
   /// Returns true if `other` is as available or is more available.
-  bool isContainedIn(const PlatformInfo &other) const;
+  bool isContainedIn(const Info &other) const;
 
   void Profile(llvm::FoldingSetNodeID &ID) const {
     Range.getRawVersionRange().Profile(ID);
-    ID.AddBoolean(IsUnavailable);
-    ID.AddBoolean(IsUnavailableInEmbedded);
-    ID.AddInteger(static_cast<uint8_t>(UnavailablePlatform));
+    if (UnavailableDomain) {
+      UnavailableDomain->Profile(ID);
+    } else {
+      ID.AddPointer(nullptr);
+    }
     ID.AddBoolean(IsDeprecated);
-    ID.AddBoolean(AllowsUnsafe);
   }
 };
 
 /// As an implementation detail, the values that make up an `Availability`
 /// context are uniqued and stored as folding set nodes.
 class AvailabilityContext::Storage final : public llvm::FoldingSetNode {
-  Storage(const PlatformInfo &platformInfo) : Platform(platformInfo){};
+  Storage(const Info &info) : info(info){};
 
 public:
-  PlatformInfo Platform;
+  Info info;
 
-  static const Storage *get(const PlatformInfo &platformInfo, ASTContext &ctx);
+  static const Storage *get(const Info &info, ASTContext &ctx);
 
-  void Profile(llvm::FoldingSetNodeID &ID) const;
+  void Profile(llvm::FoldingSetNodeID &ID) const { info.Profile(ID); }
 };
 
 } // end namespace swift

@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2023 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2025 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -101,10 +101,11 @@ let lifetimeDependenceDiagnosticsPass = FunctionPass(
 private func analyze(dependence: LifetimeDependence, _ context: FunctionPassContext) -> Bool {
   log("Dependence scope:\n\(dependence)")
 
-  // Briefly, some versions of Span in the standard library violated trivial lifetimes; versions of the compiler built
-  // at that time simply ignored dependencies on trivial values. For now, disable trivial dependencies to allow newer
-  // compilers to build against those older standard libraries. This check is only relevant for ~6 mo (until July 2025).
   if dependence.parentValue.type.objectType.isTrivial(in: dependence.function) {
+    // Briefly, some versions of Span in the standard library violated trivial lifetimes; versions of the compiler built
+    // at that time simply ignored dependencies on trivial values. For now, disable trivial dependencies to allow newer
+    // compilers to build against those older standard libraries. This check is only relevant for ~6 mo (until July
+    // 2025).
     if let sourceFileKind = dependence.function.sourceFileKind, sourceFileKind == .interface {
       return true
     }
@@ -199,19 +200,8 @@ private struct DiagnoseDependence {
     if function.hasUnsafeNonEscapableResult {
       return .continueWalk
     }
-    // FIXME: remove this condition once we have a Builtin.dependence,
-    // which developers should use to model the unsafe
-    // dependence. Builtin.lifetime_dependence will be lowered to
-    // mark_dependence [unresolved], which will be checked
-    // independently. Instead, of this function result check, allow
-    // isUnsafeApplyResult to be used be mark_dependence [unresolved]
-    // without checking its dependents.
-    //
-    // Allow returning an apply result (@_unsafeNonescapableResult) if
-    // the calling function has a dependence. This implicitly makes
-    // the unsafe nonescapable result dependent on the calling
-    // function's lifetime dependence arguments.
-    if dependence.isUnsafeApplyResult, function.hasResultDependence {
+    // If the dependence scope is global, then it has immortal lifetime.
+    if case .global = dependence.scope {
       return .continueWalk
     }
     // Check that the parameter dependence for this result is the same
@@ -302,7 +292,7 @@ private struct LifetimeVariable {
 
   private func getFirstVariableIntroducer(of value: Value, _ context: some Context) -> Value? {
     var introducer: Value?
-    var useDefVisitor = VariableIntroducerUseDefWalker(context) {
+    var useDefVisitor = VariableIntroducerUseDefWalker(context, scopedValue: value) {
       introducer = $0
       return .abortWalk
     }

@@ -339,11 +339,6 @@ static void printImports(raw_ostream &out,
       continue;
     }
 
-    if (llvm::count(Opts.ModulesToSkipInPublicInterface,
-                    importedModule->getName().str())) {
-      continue;
-    }
-
     llvm::SmallSetVector<Identifier, 4> spis;
     M->lookupImportedSPIGroups(importedModule, spis);
 
@@ -489,7 +484,6 @@ class InheritedProtocolCollector {
   static ProtocolConformanceOptions filterOptions(ProtocolConformanceOptions options) {
     options -= ProtocolConformanceFlags::Preconcurrency;
     options -= ProtocolConformanceFlags::Retroactive;
-    options -= ProtocolConformanceFlags::Safe;
     return options;
   }
 

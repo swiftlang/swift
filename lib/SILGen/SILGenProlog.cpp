@@ -1643,9 +1643,12 @@ uint16_t SILGenFunction::emitBasicProlog(
     emitIndirectErrorParameter(*this, *errorType, *origErrorType, DC);
   }
   
-  // Parameters with scoped dependencies may lower differently.
+  // Parameters with scoped dependencies may lower differently. Parameters are
+  // relative to the current SILGenFunction, not the passed in DeclContext. For
+  // example, the an argument initializer's DeclContext is the enclosing
+  // function definition rather that the initializer's generator function.
   llvm::SmallPtrSet<ParamDecl *, 2> scopedDependencyParams;
-  if (auto afd = dyn_cast<AbstractFunctionDecl>(DC)) {
+  if (auto afd = dyn_cast<AbstractFunctionDecl>(FunctionDC)) {
     if (auto deps = afd->getLifetimeDependencies()) {
       for (auto &dep : *deps) {
         auto scoped = dep.getScopeIndices();

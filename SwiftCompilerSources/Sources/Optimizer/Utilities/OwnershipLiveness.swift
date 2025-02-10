@@ -55,10 +55,8 @@ private func log(_ message: @autoclosure () -> String) {
 func computeLinearLiveness(for definingValue: Value, _ context: Context)
   -> InstructionRange {
 
-  assert(definingValue.ownership == .owned
-           || BeginBorrowValue(definingValue) != nil
-           || VariableScopeInstruction(definingValue.definingInstruction) != nil,
-         "value must define an OSSA lifetime or variable scope")
+  assert(definingValue.ownership == .owned || BeginBorrowValue(definingValue) != nil,
+         "value must define an OSSA lifetime")
 
   // InstructionRange cannot directly represent the beginning of the block
   // so we fake it with getRepresentativeInstruction().
@@ -415,9 +413,11 @@ extension OwnershipUseVisitor {
     case .borrow:
       return visitBorrowingUse(of: operand)
 
-    // TODO: Eventually, visit owned InteriorPointers as implicit borrows.
-    case .interiorPointer, .trivialUse, .endBorrow, .reborrow,
-      .guaranteedForwarding:
+    case .anyInteriorPointer:
+      return visitInteriorPointerUse(of: operand)
+
+    // TODO: .interiorPointer should instead be handled like .anyInteriorPointer.
+    case .interiorPointer, .trivialUse, .endBorrow, .reborrow, .guaranteedForwarding:
       fatalError("ownership incompatible with an owned value");
     }
   }
@@ -449,7 +449,7 @@ extension OwnershipUseVisitor {
     case .borrow:
       return visitBorrowingUse(of: operand)
 
-    case .interiorPointer:
+    case .interiorPointer, .anyInteriorPointer:
       return visitInteriorPointerUse(of: operand)
 
     case .trivialUse, .forwardingConsume, .destroyingConsume:

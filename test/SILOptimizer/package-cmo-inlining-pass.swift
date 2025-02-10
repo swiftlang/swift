@@ -27,27 +27,27 @@ package struct PkgStruct {
 }
 
 /// BEFORE perf inlining pass.
-// CHECK: sil package @$s3Lib3fooyS2iF : $@convention(thin) (Int) -> Int {
+// CHECK: sil package [ossa] @$s3Lib3fooyS2iF : $@convention(thin) (Int) -> Int {
 // CHECK:  [[PKG_STACK:%.*]] = alloc_stack $PkgStruct
 // CHECK:  [[FUNC_REF:%.*]] = function_ref @$s3Lib9PkgStructVyACSi_SitcfC : $@convention(method) (Int, Int, @thin PkgStruct.Type) -> @out PkgStruct
 // CHECK:   apply [[FUNC_REF]]
 // CHECK:   [[F1:%.*]] = struct_element_addr [[PKG_STACK]] : $*PkgStruct, #PkgStruct.field1
-// CHECK:   load [[F1]] : $*Int
+// CHECK:   load [trivial] [[F1]] : $*Int
 // CHECK:   [[F2:%.*]] = struct_element_addr [[PKG_STACK]] : $*PkgStruct, #PkgStruct.field2
-// CHECK:   load [[F2]] : $*Int
+// CHECK:   load [trivial] [[F2]] : $*Int
  
 /// AFTER perf inlining pass; body of `@$s3Lib9PkgStructVyACSi_SitcfC` gets inlined.
 // CHECK: *** SIL function after {{.*}} EarlyPerfInliner (early-inline)
-// CHECK: sil package @$s3Lib3fooyS2iF : $@convention(thin) (Int) -> Int {
+// CHECK: sil package [ossa] @$s3Lib3fooyS2iF : $@convention(thin) (Int) -> Int {
 // CHECK:   [[PKG_ALLOC:%.*]] = alloc_stack $PkgStruct
 // CHECK:   [[PKG_INIT:%.*]] = alloc_stack [var_decl] $PkgStruct, var, name "self"
 // CHECK:   [[FIELD1_IVAR:%.*]] = struct_element_addr [[PKG_INIT]] : $*PkgStruct, #PkgStruct.field1
-// CHECK:   store {{.*}} to [[FIELD1_IVAR]] : $*Int
+// CHECK:   store {{.*}} to [trivial] [[FIELD1_IVAR]] : $*Int
 // CHECK:   [[FIELD2_IVAR:%.*]] = struct_element_addr [[PKG_INIT]] : $*PkgStruct, #PkgStruct.field2
-// CHECK:   store {{.*}} to [[FIELD2_IVAR]] : $*Int
-// CHECK:   [[PKG_STR:%.*]] = struct $PkgStruct
-// CHECK:   store [[PKG_STR]] to [[PKG_ALLOC]] : $*PkgStruct
+// CHECK:   store {{.*}} to [trivial] [[FIELD2_IVAR]] : $*Int
+// CHECK:   [[PKG_STR:%.*]] = load [trivial] [[PKG_INIT]]
+// CHECK:   store [[PKG_STR]] to [trivial] [[PKG_ALLOC]] : $*PkgStruct
 // CHECK:   [[FIELD1:%.*]] = struct_element_addr [[PKG_ALLOC]] : $*PkgStruct, #PkgStruct.field1
-// CHECK:   load [[FIELD1]] : $*Int
+// CHECK:   load [trivial] [[FIELD1]] : $*Int
 // CHECK:   [[FIELD2:%.*]] = struct_element_addr [[PKG_ALLOC]] : $*PkgStruct, #PkgStruct.field2
-// CHECK:   load [[FIELD2]] : $*Int
+// CHECK:   load [trivial] [[FIELD2]] : $*Int

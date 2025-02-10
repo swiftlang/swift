@@ -97,13 +97,11 @@ func testSMod(s: inout S) {
 
 // Accessing s.data causes an escaping dependence because we don't extend the local access scope of 's'.
 //
-// TODO: could we notice the local access is already nested inside the same kind of access (modify) and consider this to
-// be 'mark_dependence [nonescaping]'?
-//
 // CHECK-LABEL: sil hidden @$s4main16testSInoutBorrow5mut_syAA1SVz_tF : $@convention(thin) (@inout S) -> () {
 // CHECK: [[ACCESS:%.*]] = begin_access [read] [static] %0
+// CHECK: [[LD:%.*]] = load [[ACCESS]]
 // CHECK: [[ADR:%.*]] = pointer_to_address %{{.*}} to [strict] $*NC
-// CHECK: [[MD:%.*]] = mark_dependence [[ADR]] on [[ACCESS]]
+// CHECK: [[MD:%.*]] = mark_dependence [nonescaping] [[ADR]] on [[LD]]
 // CHECK: begin_access [read] [unsafe] [[MD]]
 // CHECK: apply
 // CHECK: end_access
@@ -114,8 +112,9 @@ func testSInoutBorrow(mut_s s: inout S) {
 
 // CHECK-LABEL: sil hidden @$s4main19testSInoutMutBorrow5mut_syAA1SVz_tF : $@convention(thin) (@inout S) -> () {
 // CHECK: [[ACCESS:%.*]] = begin_access [read] [static] %0
+// CHECK: [[LD:%.*]] = load [[ACCESS]]
 // CHECK: [[ADR:%.*]] = pointer_to_address %{{.*}} to [strict] $*NC
-// CHECK: [[MD:%.*]] = mark_dependence [nonescaping] [[ADR]] on [[ACCESS]]
+// CHECK: [[MD:%.*]] = mark_dependence [nonescaping] [[ADR]] on [[LD]]
 // CHECK: begin_access [read] [unsafe] [[MD]]
 // CHECK: apply
 // CHECK: end_access

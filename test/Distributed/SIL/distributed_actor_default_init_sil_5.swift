@@ -37,7 +37,7 @@ distributed actor MyDistActor {
 // CHECK:   [[SYS_FIELD:%[0-9]+]] = ref_element_addr [[SELF]] : $MyDistActor, #MyDistActor.actorSystem
 // CHECK:   store [[SYSTEM]] to [[SYS_FIELD]] : $*FakeActorSystem
 // CHECK:   [[ID_FIELD:%[0-9]+]] = ref_element_addr [[SELF]] : $MyDistActor, #MyDistActor.id
-// CHECK:   store {{.*}} to [[ID_FIELD]] : $*ActorAddress
+// CHECK:   copy_addr {{.*}} to [init] [[ID_FIELD]] : $*ActorAddress
 // CHECK:   [[RAW_BOOL:%[0-9]+]] = struct_extract [[COND]] : $Bool, #Bool._value
 // CHECK:   cond_br [[RAW_BOOL]], [[TRUE_BB:bb[0-9]+]], [[FALSE_BB:bb[0-9]+]]
 
@@ -51,7 +51,7 @@ distributed actor MyDistActor {
 // CHECK: [[FALSE_BB]]:
 // CHECK:   br [[JOIN]]
 
-// CHECK: [[JOIN]]:
+// CHECK: [[JOIN]]({{.*}} : $Builtin.Int3):
 // CHECK:   cond_br {{%[0-9]+}}, [[PARTIAL_DEINIT:bb[0-9]+]], [[NO_DEINIT:bb[0-9]+]]
 
 // CHECK: [[PARTIAL_DEINIT]]:

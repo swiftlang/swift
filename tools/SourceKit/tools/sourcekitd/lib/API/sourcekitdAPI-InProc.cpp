@@ -50,9 +50,11 @@ public:
     Int64,
     UID,
     Bool,
+    Double,
     CustomData,
     Error,
   };
+
 private:
   ObjectKind Kind;
 protected:
@@ -78,6 +80,7 @@ public:
   virtual std::optional<StringRef> getString() const { return std::nullopt; }
   virtual const char *getCString() const { return nullptr; }
   virtual bool getBool() const { return false; }
+  virtual double getDouble() const { return 0.0; }
   virtual const void *getDataPtr() const { return nullptr; }
   virtual size_t getDataSize() const { return 0; }
 };
@@ -101,8 +104,8 @@ public:
     return it != Storage.end() ? it->second : nullptr;
   }
 
-  bool 
-  apply(llvm::function_ref<bool(sourcekitd_uid_t, SKDObjectRef)> Applier) const {
+  bool apply(
+      llvm::function_ref<bool(sourcekitd_uid_t, SKDObjectRef)> Applier) const {
     for (const auto& kv : Storage) {
       if (!Applier(kv.first, kv.second))
         return false;
@@ -236,6 +239,31 @@ private:
   bool Storage;
 };
 
+class SKDDouble : public SKDObject {
+public:
+  SKDDouble(double Value) : SKDObject(ObjectKind::Double), Storage(Value) {}
+
+  sourcekitd_variant_type_t getVariantType() const override {
+    return SOURCEKITD_VARIANT_TYPE_DOUBLE;
+  }
+
+  double getDouble() const override { return Storage; }
+
+  static bool classof(const SKDObject *O) {
+    return O->getKind() == ObjectKind::Double;
+  }
+
+private:
+  double Storage;
+};
+
+} // end anonymous namespace
+
+static sourcekitd_variant_t variantFromSKDObject(SKDObjectRef Object);
+static sourcekitd_variant_t variantFromSKDObjectPtr(const SKDObject *Object);
+
+namespace {
+
 class SKDCustomData: public SKDObject {
 public:
   SKDCustomData(std::unique_ptr<llvm::MemoryBuffer> MemBuf)
@@ -260,8 +288,10 @@ public:
         return SOURCEKITD_VARIANT_TYPE_ARRAY;
       case CustomBufferKind::RawData:
         return SOURCEKITD_VARIANT_TYPE_DATA;
-    }
-    llvm::report_fatal_error("sourcekitd object did not resolve to a known type");
+      default:
+        return getPluginVariantFunctions(static_cast<size_t>(getBufferKind()))
+            ->get_type(variantFromSKDObjectPtr(this));
+      }
   }
 
   CustomBufferKind getBufferKind() const {
@@ -481,6 +511,86 @@ sourcekitd_request_dictionary_set_uid(sourcekitd_object_t dict,
 }
 
 sourcekitd_object_t
+sourcekitd_request_dictionary_get_value(sourcekitd_object_t dict,
+                                        sourcekitd_uid_t key) {
+  return static_cast<sourcekitd_object_t>(static_cast<SKDObject *>(dict)->get(key).get());
+}
+
+const char *sourcekitd_request_dictionary_get_string(sourcekitd_object_t dict,
+                                                     sourcekitd_uid_t key) {
+  auto value = static_cast<SKDObject *>(dict)->get(key);
+  if (!value) {
+    return nullptr;
+  }
+  return value->getCString();
+}
+
+int64_t sourcekitd_request_dictionary_get_int64(sourcekitd_object_t dict,
+                                                sourcekitd_uid_t key) {
+  return *static_cast<SKDObject *>(dict)->get(key)->getInt64();
+}
+
+bool sourcekitd_request_dictionary_get_bool(sourcekitd_object_t dict,
+                                            sourcekitd_uid_t key) {
+  return static_cast<SKDObject *>(dict)->get(key)->getBool();
+}
+
+sourcekitd_uid_t sourcekitd_request_dictionary_get_uid(sourcekitd_object_t dict,
+                                                       sourcekitd_uid_t key) {
+  return static_cast<SKDObject *>(dict)->get(key)->getUID();
+}
+
+size_t sourcekitd_request_array_get_count(sourcekitd_object_t array) {
+  return static_cast<SKDObject *>(array)->getCount();
+}
+
+sourcekitd_object_t
+sourcekitd_request_array_get_value(sourcekitd_object_t array, size_t index) {
+  return static_cast<sourcekitd_object_t>(static_cast<SKDObject *>(array)->get(index).get());
+}
+
+const char *sourcekitd_request_array_get_string(sourcekitd_object_t array,
+                                                size_t index) {
+  return static_cast<SKDObject *>(array)->get(index)->getCString();
+}
+
+int64_t sourcekitd_request_array_get_int64(sourcekitd_object_t array,
+                                           size_t index) {
+  return *static_cast<SKDObject *>(array)->get(index)->getInt64();
+}
+
+bool sourcekitd_request_array_get_bool(sourcekitd_object_t array,
+                                       size_t index) {
+  return static_cast<SKDObject *>(array)->get(index)->getBool();
+}
+
+sourcekitd_uid_t sourcekitd_request_array_get_uid(sourcekitd_object_t array,
+                                                  size_t index) {
+  return static_cast<SKDObject *>(array)->get(index)->getUID();
+}
+
+int64_t sourcekitd_request_int64_get_value(sourcekitd_object_t obj) {
+  return *static_cast<SKDObject *>(obj)->getInt64();
+}
+
+bool sourcekitd_request_bool_get_value(sourcekitd_object_t obj) {
+  return static_cast<SKDObject *>(obj)->getBool();
+}
+
+size_t sourcekitd_request_string_get_length(sourcekitd_object_t obj) {
+  return static_cast<SKDString *>(obj)->getString()->size();
+}
+
+const char *sourcekitd_request_string_get_ptr(sourcekitd_object_t obj) {
+  return static_cast<SKDString *>(obj)->getCString();
+}
+
+sourcekitd_uid_t sourcekitd_request_uid_get_value(sourcekitd_object_t obj) {
+  return static_cast<SKDUID *>(obj)->getUID();
+}
+
+
+sourcekitd_object_t
 sourcekitd_request_array_create(const sourcekitd_object_t *objects,
                                 size_t count) {
   SKDArray *Array = new SKDArray();
@@ -565,8 +675,6 @@ sourcekitd_response_error_get_description(sourcekitd_response_t obj) {
     return Error->getDescription().c_str();
   llvm::report_fatal_error("invalid sourcekitd error object");
 }
-
-static sourcekitd_variant_t variantFromSKDObject(SKDObjectRef Object);
 
 sourcekitd_variant_t
 sourcekitd_response_get_value(sourcekitd_response_t resp) {
@@ -816,6 +924,12 @@ sourcekitd::createErrorRequestFailed(StringRef Description) {
 }
 
 sourcekitd_response_t
+sourcekitd::createErrorRequestInterrupted(StringRef Description) {
+  return retained(new SKDError(SOURCEKITD_ERROR_CONNECTION_INTERRUPTED,
+                               Description));
+}
+
+sourcekitd_response_t
 sourcekitd::createErrorRequestCancelled() {
   return retained(new SKDError(SOURCEKITD_ERROR_REQUEST_CANCELLED, 
                                StringRef("")));
@@ -836,15 +950,21 @@ static sourcekitd_variant_type_t SKDVar_get_type(sourcekitd_variant_t var) {
 
 static bool SKDVar_array_apply(
     sourcekitd_variant_t array,
-    llvm::function_ref<bool(size_t, sourcekitd_variant_t)> applier) {
+    sourcekitd_variant_array_applier_f_t applier,
+    void *context) {
   return dyn_cast<SKDArray>(SKD_OBJ(array))->apply([&](size_t Index, 
                                                        SKDObjectRef Object){
-    return applier(Index, variantFromSKDObject(Object));
+    return applier(Index, variantFromSKDObject(Object), context);
   });
 }
 
 static bool SKDVar_array_get_bool(sourcekitd_variant_t array, size_t index) {
   return SKD_OBJ(array)->get(index)->getBool();
+}
+
+static double SKDVar_array_get_double(sourcekitd_variant_t array,
+                                      size_t index) {
+  return SKD_OBJ(array)->get(index)->getDouble();
 }
 
 static size_t SKDVar_array_get_count(sourcekitd_variant_t array) {
@@ -874,12 +994,17 @@ static bool SKDVar_bool_get_value(sourcekitd_variant_t obj) {
   return SKD_OBJ(obj)->getBool();
 }
 
+static double SKDVar_double_get_value(sourcekitd_variant_t obj) {
+  return SKD_OBJ(obj)->getDouble();
+}
+
 static bool SKDVar_dictionary_apply(
     sourcekitd_variant_t dict,
-    llvm::function_ref<bool(sourcekitd_uid_t, sourcekitd_variant_t)> applier) {
+    sourcekitd_variant_dictionary_applier_f_t applier,
+    void *context) {
   return dyn_cast<SKDDictionary>(SKD_OBJ(dict))->apply([&](sourcekitd_uid_t Key, 
                                                            SKDObjectRef Object){
-    return applier(Key, variantFromSKDObject(Object));
+    return applier(Key, variantFromSKDObject(Object), context);
   });
 }
 
@@ -889,6 +1014,14 @@ SKDVar_dictionary_get_bool(sourcekitd_variant_t dict, sourcekitd_uid_t key) {
     return Object->getBool();
   }
   return false;
+}
+
+static double SKDVar_dictionary_get_double(sourcekitd_variant_t dict,
+                                           sourcekitd_uid_t key) {
+  if (auto Object = SKD_OBJ(dict)->get(key)) {
+    return Object->getDouble();
+  }
+  return 0.0;
 }
 
 static int64_t
@@ -946,30 +1079,37 @@ static size_t SKDVar_data_get_size(sourcekitd_variant_t obj) {
 }
 
 static VariantFunctions SKDVariantFuncs = {
-  SKDVar_get_type,
-  SKDVar_array_apply,
-  SKDVar_array_get_bool,
-  SKDVar_array_get_count,
-  SKDVar_array_get_int64,
-  SKDVar_array_get_string,
-  SKDVar_array_get_uid,
-  SKDVar_array_get_value,
-  SKDVar_bool_get_value,
-  SKDVar_dictionary_apply,
-  SKDVar_dictionary_get_bool,
-  SKDVar_dictionary_get_int64,
-  SKDVar_dictionary_get_string,
-  SKDVar_dictionary_get_value,
-  SKDVar_dictionary_get_uid,
-  SKDVar_string_get_length,
-  SKDVar_string_get_ptr,
-  SKDVar_int64_get_value,
-  SKDVar_uid_get_value,
-  SKDVar_data_get_size,
-  SKDVar_data_get_ptr,
+    SKDVar_get_type,
+    SKDVar_array_apply,
+    SKDVar_array_get_bool,
+    SKDVar_array_get_double,
+    SKDVar_array_get_count,
+    SKDVar_array_get_int64,
+    SKDVar_array_get_string,
+    SKDVar_array_get_uid,
+    SKDVar_array_get_value,
+    SKDVar_bool_get_value,
+    SKDVar_double_get_value,
+    SKDVar_dictionary_apply,
+    SKDVar_dictionary_get_bool,
+    SKDVar_dictionary_get_double,
+    SKDVar_dictionary_get_int64,
+    SKDVar_dictionary_get_string,
+    SKDVar_dictionary_get_value,
+    SKDVar_dictionary_get_uid,
+    SKDVar_string_get_length,
+    SKDVar_string_get_ptr,
+    SKDVar_int64_get_value,
+    SKDVar_uid_get_value,
+    SKDVar_data_get_size,
+    SKDVar_data_get_ptr,
 };
 
 static sourcekitd_variant_t variantFromSKDObject(SKDObjectRef Object) {
+  return variantFromSKDObjectPtr(Object.get());
+}
+
+static sourcekitd_variant_t variantFromSKDObjectPtr(const SKDObject *Object) {
   if (!Object)
     return makeNullVariant();
 
@@ -1010,8 +1150,159 @@ static sourcekitd_variant_t variantFromSKDObject(SKDObjectRef Object) {
         return {{ (uintptr_t)getVariantFunctionsForRawData(),
                   (uintptr_t)DataObject->getDataPtr(),
                   (uintptr_t)DataObject->getDataSize() }};
+      default:
+        return {{(uintptr_t)getPluginVariantFunctions(
+                     static_cast<size_t>(DataObject->getBufferKind())),
+                 (uintptr_t)DataObject->getDataPtr(),
+                 (uintptr_t)DataObject->getDataSize()}};
     }
   }
-  
-  return {{ (uintptr_t)&SKDVariantFuncs, (uintptr_t)Object.get(), 0 }};
+
+  return {{(uintptr_t)&SKDVariantFuncs, (uintptr_t)Object, 0}};
+}
+
+sourcekitd_response_t
+sourcekitd_response_error_create(sourcekitd_error_t kind,
+                                 const char *description) {
+  SKDError *error = new SKDError(kind, description);
+  return retained(error);
+}
+
+sourcekitd_response_t
+sourcekitd_response_dictionary_create(const sourcekitd_uid_t *keys,
+                                      const sourcekitd_response_t *values,
+                                      size_t count) {
+  // Request and response dictionaries are represented by the same type.
+  return sourcekitd_request_dictionary_create(keys, values, count);
+}
+
+void sourcekitd_response_dictionary_set_value(sourcekitd_response_t dict,
+                                              sourcekitd_uid_t key,
+                                              sourcekitd_response_t value) {
+  static_cast<SKDObject *>(dict)->set(key, static_cast<SKDObject *>(value));
+}
+
+void sourcekitd_response_dictionary_set_string(sourcekitd_response_t dict,
+                                               sourcekitd_uid_t key,
+                                               const char *string) {
+  static_cast<SKDObject *>(dict)->set(key, new SKDString(std::string(string)));
+}
+
+void sourcekitd_response_dictionary_set_stringbuf(sourcekitd_response_t dict,
+                                                  sourcekitd_uid_t key,
+                                                  const char *buf,
+                                                  size_t length) {
+  llvm::SmallString<512> SS;
+  SS += StringRef(buf, length);
+  sourcekitd_response_dictionary_set_string(dict, key, SS.c_str());
+}
+
+void sourcekitd_response_dictionary_set_int64(sourcekitd_response_t dict,
+                                              sourcekitd_uid_t key,
+                                              int64_t val) {
+  static_cast<SKDObject *>(dict)->set(key, new SKDInt64(val));
+}
+
+void sourcekitd_response_dictionary_set_bool(sourcekitd_response_t dict,
+                                             sourcekitd_uid_t key, bool val) {
+  static_cast<SKDObject *>(dict)->set(key, new SKDBool(val));
+}
+
+void sourcekitd_response_dictionary_set_double(sourcekitd_response_t dict,
+                                               sourcekitd_uid_t key,
+                                               double val) {
+  static_cast<SKDObject *>(dict)->set(key, new SKDDouble(val));
+}
+
+void sourcekitd_response_dictionary_set_uid(sourcekitd_response_t dict,
+                                            sourcekitd_uid_t key,
+                                            sourcekitd_uid_t uid) {
+  static_cast<SKDObject *>(dict)->set(key, new SKDUID(uid));
+}
+
+sourcekitd_response_t
+sourcekitd_response_array_create(const sourcekitd_response_t *objects,
+                                 size_t count) {
+  // Request and response arrays are represented by the same type.
+  return sourcekitd_request_array_create(objects, count);
+}
+
+void sourcekitd_response_array_set_value(sourcekitd_response_t array,
+                                         size_t index,
+                                         sourcekitd_response_t value) {
+  static_cast<SKDObject *>(array)->set(index, static_cast<SKDObject *>(value));
+}
+
+void sourcekitd_response_array_set_string(sourcekitd_response_t array,
+                                          size_t index, const char *string) {
+  static_cast<SKDObject *>(array)->set(index,
+                                       new SKDString(std::string(string)));
+}
+
+void sourcekitd_response_array_set_stringbuf(sourcekitd_response_t array,
+                                             size_t index, const char *buf,
+                                             size_t length) {
+  llvm::SmallString<512> SS;
+  SS += StringRef(buf, length);
+  sourcekitd_response_array_set_string(array, index, SS.c_str());
+}
+
+void sourcekitd_response_array_set_int64(sourcekitd_response_t array,
+                                         size_t index, int64_t val) {
+  static_cast<SKDObject *>(array)->set(index, new SKDInt64(val));
+}
+
+void sourcekitd_response_array_set_double(sourcekitd_response_t array,
+                                          size_t index, double val) {
+  static_cast<SKDObject *>(array)->set(index, new SKDDouble(val));
+}
+
+void sourcekitd_response_array_set_uid(sourcekitd_response_t array,
+                                       size_t index, sourcekitd_uid_t uid) {
+  static_cast<SKDObject *>(array)->set(index, new SKDUID(uid));
+}
+
+sourcekitd_response_t sourcekitd_response_retain(sourcekitd_response_t object) {
+  return retained(static_cast<SKDObject *>(object));
+}
+
+sourcekitd_variant_type_t sourcekitd_request_get_type(sourcekitd_object_t obj) {
+  if (!obj) {
+    return SOURCEKITD_VARIANT_TYPE_NULL;
+  }
+  switch (static_cast<SKDObject *>(obj)->getKind()) {
+  case SKDObject::ObjectKind::Dictionary:
+    return SOURCEKITD_VARIANT_TYPE_DICTIONARY;
+  case SKDObject::ObjectKind::Array:
+    return SOURCEKITD_VARIANT_TYPE_ARRAY;
+  case SKDObject::ObjectKind::String:
+    return SOURCEKITD_VARIANT_TYPE_STRING;
+  case SKDObject::ObjectKind::Int64:
+    return SOURCEKITD_VARIANT_TYPE_INT64;
+  case SKDObject::ObjectKind::UID:
+    return SOURCEKITD_VARIANT_TYPE_UID;
+  case SKDObject::ObjectKind::Bool:
+    return SOURCEKITD_VARIANT_TYPE_BOOL;
+  case SKDObject::ObjectKind::Double:
+    return SOURCEKITD_VARIANT_TYPE_DOUBLE;
+  case SKDObject::ObjectKind::CustomData:
+    return static_cast<SKDObject *>(obj)->getVariantType();
+  case SKDObject::ObjectKind::Error:
+    llvm_unreachable("Should not be part of a request");
+  }
+}
+
+void sourcekitd_response_dictionary_set_custom_buffer(
+    sourcekitd_response_t dict, sourcekitd_uid_t key, const void *ptr,
+    size_t size) {
+#ifndef NDEBUG
+  assert(size >= sizeof(uint64_t));
+  auto bufKind = *(const uint64_t *)ptr;
+  assert(bufKind >= (uint64_t)CustomBufferKind::CustomBufferKind_End);
+#endif
+  std::unique_ptr<llvm::WritableMemoryBuffer> Buf;
+  Buf = llvm::WritableMemoryBuffer::getNewUninitMemBuffer(size);
+  memcpy(Buf->getBufferStart(), ptr, size);
+  static_cast<SKDObject *>(dict)->set(key,
+                                      new SKDCustomData(std::move(Buf)));
 }

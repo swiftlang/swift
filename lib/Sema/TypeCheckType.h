@@ -748,18 +748,6 @@ bool diagnoseMissingOwnership(ParamSpecifier ownership,
                               TypeRepr *repr, Type ty,
                               const TypeResolution &resolution);
 
-/// If the given type involves an unsafe type, diagnose it by calling the
-/// diagnose function with the most specific unsafe type that can be provided.
-void diagnoseUnsafeType(ASTContext &ctx, SourceLoc loc, Type type,
-                        AvailabilityContext availability,
-                        llvm::function_ref<void(Type)> diagnose);
-
-/// If the given type involves an unsafe type, diagnose it by calling the
-/// diagnose function with the most specific unsafe type that can be provided.
-void diagnoseUnsafeType(ASTContext &ctx, SourceLoc loc, Type type,
-                        const DeclContext *dc,
-                        llvm::function_ref<void(Type)> diagnose);
-
 } // end namespace swift
 
 #endif /* SWIFT_SEMA_TYPE_CHECK_TYPE_H */

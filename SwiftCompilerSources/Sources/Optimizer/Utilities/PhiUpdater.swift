@@ -50,7 +50,7 @@ func updateBorrowedFrom(for phis: some Sequence<Phi>, _ context: some MutatingCo
       return
     }
     if phi.value.ownership == .guaranteed {
-      createBorrowedFrom(for: phi, context)
+      createEmptyBorrowedFrom(for: phi, context)
     }
   }
 
@@ -113,42 +113,32 @@ private func updateBorrowedFrom(for phi: Phi, _ context: some MutatingContext) -
   defer { computedEVs.deinitialize() }
   gatherEnclosingValuesFromPredecessors(for: phi, in: &computedEVs, context)
 
-  var changed = false
-  for use in phi.value.uses {
-    if let bfi = use.forwardingBorrowedFromUser {
-      changed = addEnclosingValues(computedEVs, to: bfi, context) || changed
-    }
-  }
-  return changed
-}
-
-private func createBorrowedFrom(for phi: Phi, _ context: some MutatingContext) {
-  if !phi.value.uses.contains(where: { $0.forwardingBorrowedFromUser != nil }) {
-    let builder = Builder(atBeginOf: phi.value.parentBlock, context)
-    let bfi = builder.createBorrowedFrom(borrowedValue: phi.value, enclosingValues: [])
-    phi.value.uses.ignoreUsers(ofType: BorrowedFromInst.self).replaceAll(with: bfi, context)
-  }
-}
-
-private func addEnclosingValues(
-  _ newEVs: some Sequence<Value>,
-  to borrowedFrom: BorrowedFromInst,
-  _ context: some MutatingContext) -> Bool
-{
+  let borrowedFrom = phi.borrowedFrom!
   var existingEVs = ValueSet(insertContentsOf: borrowedFrom.enclosingValues, context)
   defer { existingEVs.deinitialize() }
 
-  if newEVs.allSatisfy({ existingEVs.contains($0) }) {
+  if computedEVs.allSatisfy({ existingEVs.contains($0) }) {
     return false
   }
-
   var evs = Array<Value>(borrowedFrom.enclosingValues)
-  evs.append(contentsOf: newEVs.lazy.filter { !existingEVs.contains($0) })
+  evs.append(contentsOf: computedEVs.lazy.filter { !existingEVs.contains($0) })
 
   let builder = Builder(before: borrowedFrom, context)
   let newBfi = builder.createBorrowedFrom(borrowedValue: borrowedFrom.borrowedValue, enclosingValues: evs)
   borrowedFrom.replace(with: newBfi, context)
   return true
+}
+
+private func createEmptyBorrowedFrom(for phi: Phi, _ context: some MutatingContext) {
+  if let existingBfi = phi.borrowedFrom {
+    if existingBfi.enclosingValues.isEmpty {
+      return
+    }
+    existingBfi.replace(with: phi.value, context)
+  }
+  let builder = Builder(atBeginOf: phi.value.parentBlock, context)
+  let bfi = builder.createBorrowedFrom(borrowedValue: phi.value, enclosingValues: [])
+  phi.value.uses.ignoreUsers(ofType: BorrowedFromInst.self).replaceAll(with: bfi, context)
 }
 
 /// Replaces a phi with the unique incoming value if all incoming values are the same:

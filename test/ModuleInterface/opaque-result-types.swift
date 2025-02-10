@@ -50,7 +50,6 @@ public protocol AssocTypeInference {
   subscript() -> AssocSubscript { get }
 }
 
-// CHECK-LABEL: public struct Bar<T> : OpaqueResultTypes.AssocTypeInference
 @available(SwiftStdlib 5.1, *)
 public struct Bar<T>: AssocTypeInference {
   public init() {}
@@ -258,30 +257,5 @@ public struct Zim: AssocTypeInference {
   @available(SwiftStdlib 5.1, *)
   public subscript() -> some Foo {
     return 123
-  }
-}
-
-public protocol PrimaryAssociatedTypeInference<Assoc> {
-  associatedtype Assoc
-
-  func foo(_: Int) -> Assoc
-}
-
-// CHECK-LABEL: public struct Baz : OpaqueResultTypes.PrimaryAssociatedTypeInference
-
-public struct Baz: PrimaryAssociatedTypeInference {
-  // CHECK-LABEL: public func foo(_: Swift.Int) -> some OpaqueResultTypes.Foo
-  public func foo(_: Int) -> some Foo {
-    return 123
-  }
-
-  // CHECK-LABEL: public func callsFoo() -> @_opaqueReturnTypeOf("$s17OpaqueResultTypes3BazV3fooyQrSiF", 0) __
-  public func callsFoo() -> Assoc {
-    return foo(123)
-  }
-
-  // CHECK-LABEL: public func identity() -> some OpaqueResultTypes.PrimaryAssociatedTypeInference<@_opaqueReturnTypeOf("$s17OpaqueResultTypes3BazV3fooyQrSiF", 0) __>
-  public func identity() -> some PrimaryAssociatedTypeInference<Assoc> {
-    return self
   }
 }

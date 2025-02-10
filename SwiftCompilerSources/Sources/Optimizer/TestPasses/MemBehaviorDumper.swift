@@ -65,6 +65,7 @@ private extension Instruction {
          is EndCOWMutationInst,
          is CopyValueInst,
          is DestroyValueInst,
+         is StrongReleaseInst,
          is IsUniqueInst,
          is EndBorrowInst,
          is LoadInst,

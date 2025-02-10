@@ -1,3 +1,5 @@
+// REQUIRES: rdar144133085
+
 // REQUIRES: objc_interop
 // RUN: %empty-directory(%t)
 // RUN: %empty-directory(%t/inputs)

@@ -169,7 +169,7 @@ Type swift::getConcreteReplacementForProtocolActorSystemType(
   }
 
   /// === Maybe the value is declared in a protocol?
-  if (auto protocol = DC->getSelfProtocolDecl()) {
+  if (DC->getSelfProtocolDecl()) {
     GenericSignature signature;
     if (auto *genericContext = anyValue->getAsGenericContext()) {
       signature = genericContext->getGenericSignature();

@@ -61,12 +61,12 @@ SIMPLE_TYPE_ATTR(retroactive, Retroactive)
 SIMPLE_TYPE_ATTR(unchecked, Unchecked)
 SIMPLE_TYPE_ATTR(preconcurrency, Preconcurrency)
 SIMPLE_TYPE_ATTR(unsafe, Unsafe)
-SIMPLE_TYPE_ATTR(safe, Safe)
 SIMPLE_TYPE_ATTR(_local, Local)
 SIMPLE_TYPE_ATTR(_noMetadata, NoMetadata)
 TYPE_ATTR(_opaqueReturnTypeOf, OpaqueReturnTypeOf)
 TYPE_ATTR(isolated, Isolated)
 SIMPLE_TYPE_ATTR(_addressable, Addressable)
+TYPE_ATTR(execution, Execution)
 
 // SIL-specific attributes
 SIMPLE_SIL_TYPE_ATTR(async, Async)

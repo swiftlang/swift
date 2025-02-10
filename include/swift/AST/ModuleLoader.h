@@ -184,7 +184,6 @@ struct SubCompilerInstanceInfo {
   CompilerInstance* Instance;
   StringRef Hash;
   ArrayRef<StringRef> BuildArguments;
-  ArrayRef<StringRef> ExtraPCMArgs;
 };
 
 /// Abstract interface for a checker of module interfaces and prebuilt modules.
@@ -213,7 +212,6 @@ struct InterfaceSubContextDelegate {
                                           StringRef outputPath,
                                           SourceLoc diagLoc,
     llvm::function_ref<std::error_code(ASTContext&, ModuleDecl*,
-                                       ArrayRef<StringRef>,
                                        ArrayRef<StringRef>, StringRef,
                                        StringRef)> action) = 0;
   virtual std::error_code runInSubCompilerInstance(StringRef moduleName,

@@ -1095,6 +1095,68 @@ public:
   }
 };
 
+class IntegerTypeRef final : public TypeRef {
+  intptr_t Value;
+
+  static TypeRefID Profile(const intptr_t &Value) {
+    TypeRefID ID;
+    ID.addInteger((uint64_t)Value);
+    return ID;
+  }
+
+public:
+  IntegerTypeRef(const intptr_t &Value)
+    : TypeRef(TypeRefKind::Integer), Value(Value) {}
+
+  template <typename Allocator>
+  static const IntegerTypeRef *create(Allocator &A, intptr_t Value) {
+    FIND_OR_CREATE_TYPEREF(A, IntegerTypeRef, Value);
+  }
+
+  const intptr_t &getValue() const {
+    return Value;
+  }
+
+  static bool classof(const TypeRef *TR) {
+    return TR->getKind() == TypeRefKind::Integer;
+  }
+};
+
+class BuiltinFixedArrayTypeRef final : public TypeRef {
+  const TypeRef *Size;
+  const TypeRef *Element;
+
+  static TypeRefID Profile(const TypeRef *Size, const TypeRef *Element) {
+    TypeRefID ID;
+    ID.addPointer(Size);
+    ID.addPointer(Element);
+    return ID;
+  }
+
+public:
+  BuiltinFixedArrayTypeRef(const TypeRef *Size, const TypeRef *Element)
+    : TypeRef(TypeRefKind::BuiltinFixedArray), Size(Size), Element(Element) {}
+
+  template <typename Allocator>
+  static const BuiltinFixedArrayTypeRef *create(Allocator &A,
+                                                const TypeRef *Size,
+                                                const TypeRef *Element) {
+    FIND_OR_CREATE_TYPEREF(A, BuiltinFixedArrayTypeRef, Size, Element);
+  }
+
+  const TypeRef *getSizeType() const {
+    return Size;
+  }
+
+  const TypeRef *getElementType() const {
+    return Element;
+  }
+
+  static bool classof(const TypeRef *TR) {
+    return TR->getKind() == TypeRefKind::BuiltinFixedArray;
+  }
+};
+
 template <typename ImplClass, typename RetTy = void, typename... Args>
 class TypeRefVisitor {
 public:

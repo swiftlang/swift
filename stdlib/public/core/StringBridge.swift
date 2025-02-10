@@ -661,6 +661,19 @@ internal func _SwiftCreateBridgedString_DoNotCall(
   return Unmanaged<AnyObject>.passRetained(str._bridgeToObjectiveCImpl())
 }
 
+@available(SwiftStdlib 6.1, *)
+@_spi(Foundation) public func _SwiftCreateImmortalString_ForFoundation(
+  buffer: UnsafeBufferPointer<UInt8>,
+  isASCII: Bool
+) -> String? {
+  switch validateUTF8(buffer) {
+  case .success(let extraInfo):
+    return String(_StringGuts(buffer, isASCII: extraInfo.isASCII))
+  default:
+    return nil
+  }
+}
+
 // At runtime, this class is derived from `__SwiftNativeNSStringBase`,
 // which is derived from `NSString`.
 //

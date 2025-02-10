@@ -654,9 +654,11 @@ private:
                                      bool suppressRemarks,
                                      RequireOSSAModules_t requireOSSAModules);
   bool extractSwiftInterfaceVersionAndArgs(CompilerInvocation &subInvocation,
+                                           DiagnosticEngine &subInstanceDiags,
                                            SwiftInterfaceInfo &interfaceInfo,
                                            StringRef interfacePath,
                                            SourceLoc diagnosticLoc);
+
 public:
   InterfaceSubContextDelegateImpl(
       SourceManager &SM, DiagnosticEngine *Diags,
@@ -688,7 +690,7 @@ public:
                                   StringRef outputPath,
                                   SourceLoc diagLoc,
     llvm::function_ref<std::error_code(ASTContext&, ModuleDecl*,
-                                       ArrayRef<StringRef>, ArrayRef<StringRef>,
+                                       ArrayRef<StringRef>,
                                        StringRef, StringRef)> action) override;
   std::error_code runInSubCompilerInstance(StringRef moduleName,
                                            StringRef interfacePath,

@@ -561,4 +561,10 @@ public:
   }
 };
 
+struct ClassWithOperatorEqualsParamUnnamed {
+  bool operator==(const ClassWithOperatorEqualsParamUnnamed &) const {
+    return false;
+  }
+};
+
 #endif

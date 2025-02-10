@@ -131,6 +131,16 @@ const clang::Module *ClangNode::getClangModule() const {
   return nullptr;
 }
 
+const clang::Module *ClangNode::getOwningClangModule() const {
+  if (auto *M = getAsModule())
+    return M;
+  if (auto D = getAsDecl())
+    return D->getOwningModule();
+  if (auto MI = getAsModuleMacro())
+    return MI->getOwningModule();
+  return nullptr;
+}
+
 void ClangNode::dump() const {
   if (auto D = getAsDecl())
     D->dump();
@@ -571,12 +581,9 @@ const Decl *Decl::getInnermostDeclWithAvailability() const {
 
 std::optional<llvm::VersionTuple>
 Decl::getIntroducedOSVersion(PlatformKind Kind) const {
-  for (auto *attr: getAttrs()) {
-    if (auto *ava = dyn_cast<AvailableAttr>(attr)) {
-      if (ava->getPlatform() == Kind && ava->Introduced) {
-        return ava->Introduced;
-      }
-    }
+  for (auto attr : getSemanticAvailableAttrs()) {
+    if (attr.getPlatform() == Kind && attr.getIntroduced().has_value())
+      return attr.getIntroduced();
   }
   return std::nullopt;
 }
@@ -1090,15 +1097,54 @@ bool Decl::preconcurrency() const {
   return false;
 }
 
-bool Decl::isUnsafe() const {
-  return evaluateOrDefault(
-      getASTContext().evaluator,
-      IsUnsafeRequest{const_cast<Decl *>(this)},
-      false);
+/// Look at the attributes to determine whether they involve an attribute
+/// that explicitly specifies the safety of the declaration.
+static std::optional<ExplicitSafety>
+getExplicitSafetyFromAttrs(const Decl *decl) {
+  // If it's marked @unsafe, it's unsafe.
+  if (decl->getAttrs().hasAttribute<UnsafeAttr>())
+    return ExplicitSafety::Unsafe;
+
+  // If it's marked @safe, it's safe.
+  if (decl->getAttrs().hasAttribute<SafeAttr>())
+    return ExplicitSafety::Safe;
+
+  return std::nullopt;
 }
 
-bool Decl::allowsUnsafe() const {
-  return isUnsafe();
+ExplicitSafety Decl::getExplicitSafety() const {
+  // Check the attributes on the declaration itself.
+  if (auto safety = getExplicitSafetyFromAttrs(this))
+    return *safety;
+
+  // Inference: Check the enclosing context.
+  if (auto enclosingDC = getDeclContext()) {
+    // Is this an extension with @safe or @unsafe on it?
+    if (auto ext = dyn_cast<ExtensionDecl>(enclosingDC)) {
+      if (auto extSafety = getExplicitSafetyFromAttrs(ext))
+        return *extSafety;
+    }
+
+    if (auto enclosingNominal = enclosingDC->getSelfNominalTypeDecl())
+      if (auto nominalSafety = getExplicitSafetyFromAttrs(enclosingNominal))
+        return *nominalSafety;
+  }
+
+  // If an extension extends an unsafe nominal type, it's unsafe.
+  if (auto ext = dyn_cast<ExtensionDecl>(this)) {
+    if (auto nominal = ext->getExtendedNominal())
+      if (nominal->getExplicitSafety() == ExplicitSafety::Unsafe)
+        return ExplicitSafety::Unsafe;
+  }
+
+  // If this is a pattern binding declaration, check whether the first
+  // variable is @unsafe.
+  if (auto patternBinding = dyn_cast<PatternBindingDecl>(this)) {
+    if (auto var = patternBinding->getSingleVar())
+      return var->getExplicitSafety();
+  }
+
+  return ExplicitSafety::Unspecified;
 }
 
 Type AbstractFunctionDecl::getThrownInterfaceType() const {
@@ -1107,6 +1153,14 @@ Type AbstractFunctionDecl::getThrownInterfaceType() const {
 
   auto mutableThis = const_cast<AbstractFunctionDecl *>(this);
   return CatchNode(mutableThis).getExplicitCaughtType(getASTContext());
+}
+
+std::optional<Type> AbstractFunctionDecl::getCachedThrownInterfaceType() const {
+  if (!getThrownTypeRepr())
+    return ThrownType.getType();
+
+  auto mutableThis = const_cast<AbstractFunctionDecl *>(this);
+  return CatchNode(mutableThis).getCachedExplicitCaughtType(getASTContext());
 }
 
 std::optional<Type> AbstractFunctionDecl::getEffectiveThrownErrorType() const {
@@ -1647,7 +1701,7 @@ AccessLevel ImportDecl::getAccessLevel() const {
 }
 
 bool ImportDecl::isAccessLevelImplicit() const {
-  if (auto attr = getAttrs().getAttribute<AccessControlAttr>()) {
+  if (getAttrs().hasAttribute<AccessControlAttr>()) {
     return false;
   }
   return true;
@@ -1683,8 +1737,6 @@ InheritedEntry::InheritedEntry(const TypeLoc &typeLoc)
       setOption(ProtocolConformanceFlags::Retroactive);
     if (typeRepr->findAttrLoc(TypeAttrKind::Unsafe).isValid())
       setOption(ProtocolConformanceFlags::Unsafe);
-    if (typeRepr->findAttrLoc(TypeAttrKind::Safe).isValid())
-      setOption(ProtocolConformanceFlags::Safe);
     if (typeRepr->findAttrLoc(TypeAttrKind::Preconcurrency).isValid())
       setOption(ProtocolConformanceFlags::Preconcurrency);
   }
@@ -1996,7 +2048,8 @@ Type ExtensionDecl::getExtendedType() const {
   return ErrorType::get(ctx);
 }
 
-bool ExtensionDecl::isAddingConformanceToInvertible() const {
+std::optional<InvertibleProtocolKind>
+ExtensionDecl::isAddingConformanceToInvertible() const {
   const unsigned numEntries = getInherited().size();
   for (unsigned i = 0; i < numEntries; ++i) {
     InheritedTypeRequest request{this, i, TypeResolutionStage::Structural};
@@ -2014,10 +2067,10 @@ bool ExtensionDecl::isAddingConformanceToInvertible() const {
 
     if (inheritedTy)
       if (auto kp = inheritedTy->getKnownProtocol())
-        if (getInvertibleProtocolKind(*kp))
-          return true;
+        if (auto kind = getInvertibleProtocolKind(*kp))
+          return kind;
   }
-  return false;
+  return std::nullopt;
 }
 
 bool Decl::isObjCImplementation() const {
@@ -3942,6 +3995,12 @@ OpaqueTypeDecl *ValueDecl::getOpaqueResultTypeDecl() const {
     nullptr);
 }
 
+std::optional<OpaqueTypeDecl *>
+ValueDecl::getCachedOpaqueResultTypeDecl() const {
+  return OpaqueResultTypeRequest{const_cast<ValueDecl *>(this)}
+      .getCachedResult();
+}
+
 bool ValueDecl::isObjC() const {
   ASTContext &ctx = getASTContext();
   return evaluateOrDefault(ctx.evaluator,
@@ -4629,7 +4688,7 @@ static AccessLevel getAdjustedFormalAccess(const ValueDecl *VD,
   if (useDC) {
     // If the use site decl context is PackageUnit, just return
     // the access level that's passed in
-    if (auto usePkg = useDC->getPackageContext())
+    if (useDC->getPackageContext())
       return access;
     // Check whether we need to modify the access level based on
     // @testable/@_private import attributes.
@@ -4723,14 +4782,42 @@ bool ValueDecl::hasOpenAccess(const DeclContext *useDC) const {
 }
 
 bool ValueDecl::bypassResilienceInPackage(ModuleDecl *accessingModule) const {
-  // If the defining module is built with package-cmo, bypass
-  // resilient access from the use site that belongs to a module
-  // in the same package.
+  // To allow bypassing resilience when accessing this decl from another
+  // module, it should be in the same package as this decl's module.
   auto declModule = getModuleContext();
-  return declModule->inSamePackage(accessingModule) &&
-         declModule->isResilient() &&
-         declModule->allowNonResilientAccess() &&
-         declModule->serializePackageEnabled();
+  if (!declModule->inSamePackage(accessingModule))
+    return false;
+  // Package optimization allows bypassing resilience, but it assumes the
+  // memory layout of the decl being accessed is correct. When this assumption
+  // fails due to a deserialization error of its members, the use site incorrectly
+  // accesses the layout of the decl with a wrong field offset, resulting in UB
+  // or a crash.
+  // The deserialization error is currently not caught at compile time due to
+  // LangOpts.EnableDeserializationRecovery being enabled by default (to allow
+  // for recovery of some of the deserialization errors at a later time). In case
+  // of member deserialization, however, it's not necessarily recovered later on
+  // and is silently dropped, causing UB or a crash at runtime.
+  // The following tracks errors in member deserialization by recursively loading
+  // members of a type (if not done already) and checking whether the type's
+  // members, and their respective types (recursively), encountered deserialization
+  // failures.
+  // If any such type is found, it fails and emits a diagnostic at compile time.
+  // Simply disallowing resilience bypassing for this decl here is insufficient
+  // because it would cause a type requirement mismatch later during SIL
+  // deserialiaztion; e.g. generated SIL in the imported module might contain
+  // an instruction that allows a direct access, while the caller in client module
+  // might require a non-direct access due to a deserialization error.
+  if (declModule->isResilient() &&
+      declModule->allowNonResilientAccess() &&
+      declModule->serializePackageEnabled()) {
+    if (auto IDC = dyn_cast<IterableDeclContext>(this)) {
+      // Recursively check if this decl's members and their members have
+      // been deserialized correctly, and emit a diagnostic if not.
+      IDC->checkDeserializeMemberErrorInPackage(accessingModule);
+    }
+    return true;
+  }
+  return false;
 }
 
 /// Given the formal access level for using \p VD, compute the scope where
@@ -4786,7 +4873,11 @@ getAccessScopeForFormalAccess(const ValueDecl *VD,
   if (localImportRestriction.has_value()) {
     AccessLevel importAccessLevel =
       localImportRestriction.value().accessLevel;
-    if (access > importAccessLevel) {
+    auto isVisible = access >= AccessLevel::Public ||
+      (access == AccessLevel::Package &&
+       useDC->getParentModule()->inSamePackage(resultDC->getParentModule()));
+
+    if (access > importAccessLevel && isVisible) {
       access = std::min(access, importAccessLevel);
       resultDC = useDC->getParentSourceFile();
     }
@@ -7923,7 +8014,7 @@ bool VarDecl::isMemberwiseInitialized(bool preferDeclaredProperties) const {
   // memberwise initializable when it could be used to initialize
   // other stored properties.
   if (hasInitAccessor()) {
-    if (auto *init = getAccessor(AccessorKind::Init))
+    if (getAccessor(AccessorKind::Init))
       return true;
   }
 
@@ -8438,6 +8529,14 @@ void VarDecl::emitLetToVarNoteIfSimple(DeclContext *UseDC) const {
   }
 }
 
+std::optional<ExecutionKind>
+AbstractFunctionDecl::getExecutionBehavior() const {
+  auto *attr = getAttrs().getAttribute<ExecutionAttr>();
+  if (!attr)
+    return {};
+  return attr->getBehavior();
+}
+
 clang::PointerAuthQualifier VarDecl::getPointerAuthQualifier() const {
   if (auto *clangDecl = getClangDecl()) {
     if (auto *valueDecl = dyn_cast<clang::ValueDecl>(clangDecl)) {
@@ -8536,7 +8635,7 @@ static DefaultArgumentKind computeDefaultArgumentKind(DeclContext *dc,
     // expected to include them explicitly in subclasses. A default argument of
     // '= super' in a parameter of such initializer indicates that the default
     // argument is inherited.
-    if (dc->getParentSourceFile()->Kind == SourceFileKind::Interface) {
+    if (dc->isInSwiftinterface()) {
       return DefaultArgumentKind::Inherited;
     } else {
       return DefaultArgumentKind::Normal;
@@ -9840,13 +9939,30 @@ SourceRange AbstractFunctionDecl::getSignatureSourceRange() const {
   if (isImplicit())
     return SourceRange();
 
-  auto paramList = getParameters();
+  SourceLoc endLoc;
 
-  auto endLoc = paramList->getSourceRange().End;
-  if (endLoc.isValid())
-    return SourceRange(getNameLoc(), endLoc);
+  // name(parameter list...) async throws(E)
+  if (auto *typeRepr = getThrownTypeRepr())
+    endLoc = typeRepr->getSourceRange().End;
+  if (endLoc.isInvalid())
+    endLoc = getThrowsLoc();
+  if (endLoc.isInvalid())
+    endLoc = getAsyncLoc();
 
-  return getNameLoc();
+  if (endLoc.isInvalid())
+    return getParameterListSourceRange();
+  return SourceRange(getNameLoc(), endLoc);
+}
+
+SourceRange AbstractFunctionDecl::getParameterListSourceRange() const {
+  if (isImplicit())
+    return SourceRange();
+
+  auto endLoc = getParameters()->getSourceRange().End;
+  if (endLoc.isInvalid())
+    return getNameLoc();
+
+  return SourceRange(getNameLoc(), endLoc);
 }
 
 std::optional<Fingerprint> AbstractFunctionDecl::getBodyFingerprint() const {
@@ -10610,6 +10726,9 @@ AccessorDecl *AccessorDecl::createParsed(
       // The cloned parameter is implicit.
       param->setImplicit();
 
+      if (subscriptParam->isSending())
+        param->setSending();
+
       newParams.push_back(param);
     }
   }
@@ -10733,6 +10852,11 @@ Type FuncDecl::getResultInterfaceType() const {
                            Type()))
     return type;
   return ErrorType::get(ctx);
+}
+
+std::optional<Type> FuncDecl::getCachedResultInterfaceType() const {
+  auto mutableThis = const_cast<FuncDecl *>(this);
+  return ResultTypeRequest{mutableThis}.getCachedResult();
 }
 
 bool FuncDecl::isUnaryOperator() const {
@@ -10875,43 +10999,32 @@ DestructorDecl *DestructorDecl::getSuperDeinit() const {
 }
 
 SourceRange FuncDecl::getSourceRange() const {
-  SourceLoc StartLoc = getStartLoc();
+  SourceLoc startLoc = getStartLoc();
 
-  if (StartLoc.isInvalid())
+  if (startLoc.isInvalid())
     return SourceRange();
 
   if (getBodyKind() == BodyKind::Unparsed)
-    return { StartLoc, BodyRange.End };
+    return { startLoc, BodyRange.End };
 
-  SourceLoc RBraceLoc = getOriginalBodySourceRange().End;
-  if (RBraceLoc.isValid()) {
-    return { StartLoc, RBraceLoc };
+  SourceLoc endLoc = getOriginalBodySourceRange().End;
+  if (endLoc.isInvalid()) {
+    if (isa<AccessorDecl>(this))
+      return startLoc;
+
+    if (getBodyKind() == BodyKind::Synthesize)
+      return SourceRange();
+
+    endLoc = getGenericTrailingWhereClauseSourceRange().End;
   }
+  if (endLoc.isInvalid())
+    endLoc = getResultTypeSourceRange().End;
+  if (endLoc.isInvalid())
+    endLoc = getSignatureSourceRange().End;
+  if (endLoc.isInvalid())
+    endLoc = startLoc;
 
-  if (isa<AccessorDecl>(this))
-    return StartLoc;
-
-  if (getBodyKind() == BodyKind::Synthesize)
-    return SourceRange();
-
-  auto TrailingWhereClauseSourceRange = getGenericTrailingWhereClauseSourceRange();
-  if (TrailingWhereClauseSourceRange.isValid())
-    return { StartLoc, TrailingWhereClauseSourceRange.End };
-
-  const auto ResultTyEndLoc = getResultTypeSourceRange().End;
-  if (ResultTyEndLoc.isValid())
-    return { StartLoc, ResultTyEndLoc };
-
-  if (hasThrows())
-    return { StartLoc, getThrowsLoc() };
-
-  if (hasAsync())
-    return { StartLoc, getAsyncLoc() };
-
-  auto LastParamListEndLoc = getParameters()->getSourceRange().End;
-  if (LastParamListEndLoc.isValid())
-    return { StartLoc, LastParamListEndLoc };
-  return StartLoc;
+  return { startLoc, endLoc };
 }
 
 EnumElementDecl::EnumElementDecl(SourceLoc IdentifierLoc, DeclName Name,
@@ -11015,8 +11128,6 @@ SourceRange ConstructorDecl::getSourceRange() const {
   SourceLoc End = getOriginalBodySourceRange().End;
   if (End.isInvalid())
     End = getGenericTrailingWhereClauseSourceRange().End;
-  if (End.isInvalid())
-    End = getThrowsLoc();
   if (End.isInvalid())
     End = getSignatureSourceRange().End;
 
@@ -11414,7 +11525,7 @@ ActorIsolation swift::getActorIsolationOfContext(
     return getClosureActorIsolation(closure);
   }
 
-  if (auto *tld = dyn_cast<TopLevelCodeDecl>(dcToUse)) {
+  if (isa<TopLevelCodeDecl>(dcToUse)) {
     if (dcToUse->isAsyncContext() ||
         dcToUse->getASTContext().LangOpts.StrictConcurrencyLevel >=
             StrictConcurrency::Complete) {
@@ -11892,6 +12003,11 @@ Type MacroDecl::getResultInterfaceType() const {
   return ErrorType::get(ctx);
 }
 
+std::optional<Type> MacroDecl::getCachedResultInterfaceType() const {
+  auto mutableThis = const_cast<MacroDecl *>(this);
+  return ResultTypeRequest{mutableThis}.getCachedResult();
+}
+
 SourceRange MacroDecl::getSourceRange() const {
   SourceLoc endLoc = getNameLoc();
   if (parameterList)
@@ -12320,6 +12436,11 @@ CatchNode::getThrownErrorTypeInContext(ASTContext &ctx) const {
 Type CatchNode::getExplicitCaughtType(ASTContext &ctx) const {
   return evaluateOrDefault(
       ctx.evaluator, ExplicitCaughtTypeRequest{&ctx, *this}, Type());
+}
+
+std::optional<Type>
+CatchNode::getCachedExplicitCaughtType(ASTContext &ctx) const {
+  return ExplicitCaughtTypeRequest{&ctx, *this}.getCachedResult();
 }
 
 void swift::simple_display(llvm::raw_ostream &out, CatchNode catchNode) {

@@ -179,8 +179,11 @@ SWIFT_CC(swiftasync)
 static void task_wait_throwing_resume_adapter(SWIFT_ASYNC_CONTEXT AsyncContext *_context) {
 
   auto context = static_cast<TaskFutureWaitAsyncContext *>(_context);
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wcast-function-type-mismatch"
   auto resumeWithError =
       reinterpret_cast<AsyncVoidClosureEntryPoint *>(context->ResumeParent);
+#pragma clang diagnostic pop
   return resumeWithError(context->Parent, context->errorResult);
 }
 
@@ -212,7 +215,10 @@ void SWIFT_CC(swiftasync) swift::swift56override_swift_task_future_wait_throwing
   waitingTask->ResumeTask = task_wait_throwing_resume_adapter;
   waitingTask->ResumeContext = callContext;
 
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wcast-function-type-mismatch"
   auto resumeFn = reinterpret_cast<TaskContinuationFunction *>(resumeFunction);
+#pragma clang diagnostic pop
 
   // Wait on the future.
   assert(task->isFuture());

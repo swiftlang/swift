@@ -1,3 +1,8 @@
+module AccessInversion {
+  header "access-inversion.h"
+  requires cplusplus
+}
+
 module AccessSpecifiers {
   header "access-specifiers.h"
   requires cplusplus
@@ -150,4 +155,10 @@ module CopyMoveAssignment {
 module Closure {
   header "closure.h"
   requires cplusplus
+}
+
+module PIMPL {
+  header "pimpl.h"
+  requires cplusplus
+  export *
 }

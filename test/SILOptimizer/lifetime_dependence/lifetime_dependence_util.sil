@@ -133,8 +133,7 @@ entry(%0 : @owned $C, %1 : @owned $D, %2 : @guaranteed $D, %3 : $*D, %4 : $*D):
 // CHECK-LABEL: dependence_scope: lifetime_dependence_scope with: %trivial_mark
 // CHECK-NEXT: Unknown:   %{{.*}} = integer_literal $Builtin.Int1, 0
 // CHECK-NEXT: Dependent: %{{.*}} = mark_dependence [nonescaping]
-// CHECK-NEXT: begin:     %{{.*}} = integer_literal $Builtin.Int1, 0
-// CHECK-NEXT: ends:{{[ ]+$}}
+// CHECK-NEXT: Caller range
 // CHECK: dependence_scope: lifetime_dependence_scope with: %trivial_mark
 
   %f = ref_element_addr %borrow : $D, #D.object
@@ -159,14 +158,15 @@ entry(%0 : @owned $C, %1 : @owned $D, %2 : @guaranteed $D, %3 : $*D, %4 : $*D):
   %inguaranteed_arg_mark = mark_dependence [nonescaping] %guaranteed_arg_mark : $C on %3 : $*D
   specify_test "lifetime_dependence_scope %inguaranteed_arg_mark"
 // CHECK-LABEL: dependence_scope: lifetime_dependence_scope with: %inguaranteed_arg_mark
-// CHECK-NEXT: Initialized: %3 = argument of bb0 : $*D
+// CHECK-NEXT: Caller: %3 = argument of bb0 : $*D
 // CHECK-NEXT: Dependent:   %{{.*}} = mark_dependence [nonescaping] %{{.*}} : $C on %3 : $*D
-// CHECK-NEXT: begin:      bb0
-// CHECK-NEXT: ends:     
+// CHECK-NEXT: Caller range
 // CHECK: dependence_scope: lifetime_dependence_scope with: %inguaranteed_arg_mark
   
   %inout_arg_mark = mark_dependence [nonescaping] %inguaranteed_arg_mark : $C on %4 : $*D
   specify_test "lifetime_dependence_scope %inout_arg_mark"
+// We do not expect a direct dependence on in inout argument. Treat it as unknown.
+// Instead, mutable variable access should have an access scope.
 // CHECK-LABEL: dependence_scope: lifetime_dependence_scope with: %inout_arg_mark
 // CHECK-NEXT: Caller:     %4 = argument of bb0 : $*D
 // CHECK-NEXT: Dependent:  %{{.*}} = mark_dependence [nonescaping] %{{.*}} : $C on %4 : $*D
@@ -177,37 +177,6 @@ entry(%0 : @owned $C, %1 : @owned $D, %2 : @guaranteed $D, %3 : $*D, %4 : $*D):
   end_apply %token as $()
   end_borrow %borrow : $D
   destroy_value %move : $D
-  %99 = tuple()
-  return %99 : $()
-}
-
-sil [ossa] @dependence_root : $@convention(thin) (@owned D, @owned C) -> () {
-entry(%0 : @owned $D, %1 : @owned $C):
-  %copy = copy_value %0 : $D
-  %move = move_value %copy : $D
-  %borrow = begin_borrow %move : $D
-  %d2c = upcast %borrow : $D to $C
-  %pair = struct $PairC(%d2c : $C, %d2c : $C)
-  %mark_pair = mark_dependence [nonescaping] %1 : $C on %pair : $PairC
-  specify_test "lifetime_dependence_root %mark_pair"
-// CHECK-LABEL: dependence_root: lifetime_dependence_root with: %mark_pair
-// CHECK-NEXT: Scope: Owned: %0 = argument of bb0 : $D
-// CHECK-NEXT: dependence_root: lifetime_dependence_root with: %mark_pair
-
-  %f = ref_element_addr %borrow : $D, #D.object
-  %access = begin_access [read] [static] %f : $*C
-  %load = load [copy] %access : $*C
-  specify_test "lifetime_dependence_root %load"
-// CHECK-LABEL: dependence_root: lifetime_dependence_root with: %load
-// CHECK-NEXT: Scope: Unknown:   %{{.*}} = ref_element_addr %{{.*}} : $D, #D.object
-// CHECK-NEXT: dependence_root: lifetime_dependence_root with: %load
-
-  destroy_value %load : $C
-  end_access %access : $*C
-  destroy_value %mark_pair : $C
-  end_borrow %borrow : $D
-  destroy_value %move : $D
-  destroy_value %0 : $D
   %99 = tuple()
   return %99 : $()
 }

@@ -221,7 +221,7 @@ inline void once_impl(once_t &predicate, void (*fn)(void *), void *context) {
 #endif
 
 using tls_key_t = ::tss_t;
-using tls_dtor_t = void (*)(void *);
+using tls_dtor_t = ::tss_dtor_t;
 
 inline bool tls_alloc(tls_key_t &key, tls_dtor_t dtor) {
   return ::tss_create(&key, dtor) == thrd_success;

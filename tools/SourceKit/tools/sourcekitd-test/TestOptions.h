@@ -135,8 +135,6 @@ struct TestOptions {
   bool measureInstructions = false;
   bool DisableImplicitConcurrencyModuleImport = false;
   bool DisableImplicitStringProcessingModuleImport = false;
-  bool EnableImplicitBacktracingModuleImport = false;
-  bool DisableImplicitBacktracingModuleImport = false;
   std::optional<unsigned> CompletionCheckDependencyInterval;
   unsigned repeatRequest = 1;
   struct VFSFile {

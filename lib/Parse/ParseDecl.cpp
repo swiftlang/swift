@@ -333,8 +333,7 @@ ParserResult<AvailableAttr> Parser::parseExtendedAvailabilitySpecList(
 
   StringRef Message, Renamed;
   VersionArg Introduced, Deprecated, Obsoleted;
-  auto PlatformAgnostic = PlatformAgnosticAvailabilityKind::None;
-
+  auto AttrKind = AvailableAttr::Kind::Default;
   bool HasUpcomingEntry = false;
 
   {
@@ -377,24 +376,16 @@ ParserResult<AvailableAttr> Parser::parseExtendedAvailabilitySpecList(
                          .Default(IsInvalid);
     }
 
-    auto platformAgnosticKindToStr = [](PlatformAgnosticAvailabilityKind kind) {
+    auto attrKindToStr = [](AvailableAttr::Kind kind) {
       switch (kind) {
-      case PlatformAgnosticAvailabilityKind::None:
-        return "none";
-      case PlatformAgnosticAvailabilityKind::Deprecated:
+      case AvailableAttr::Kind::Default:
+        return "default";
+      case AvailableAttr::Kind::Deprecated:
         return "deprecated";
-      case PlatformAgnosticAvailabilityKind::Unavailable:
+      case AvailableAttr::Kind::Unavailable:
         return "unavailable";
-      case PlatformAgnosticAvailabilityKind::NoAsync:
+      case AvailableAttr::Kind::NoAsync:
         return "noasync";
-
-      // These are possible platform agnostic availability kinds.
-      // I'm not sure what their spellings are at the moment, so I'm
-      // crashing instead of handling them.
-      case PlatformAgnosticAvailabilityKind::UnavailableInSwift:
-      case PlatformAgnosticAvailabilityKind::SwiftVersionSpecific:
-      case PlatformAgnosticAvailabilityKind::PackageDescriptionVersionSpecific:
-        llvm_unreachable("Unknown availability kind for parser");
       }
     };
 
@@ -471,12 +462,12 @@ ParserResult<AvailableAttr> Parser::parseExtendedAvailabilitySpecList(
 
     case IsDeprecated:
       if (!findAttrValueDelimiter()) {
-        if (PlatformAgnostic != PlatformAgnosticAvailabilityKind::None) {
+        if (AttrKind != AvailableAttr::Kind::Default) {
           diagnose(Tok, diag::attr_availability_multiple_kinds, AttrName,
-                   "deprecated", platformAgnosticKindToStr(PlatformAgnostic));
+                   "deprecated", attrKindToStr(AttrKind));
         }
 
-        PlatformAgnostic = PlatformAgnosticAvailabilityKind::Deprecated;
+        AttrKind = AvailableAttr::Kind::Deprecated;
         break;
       }
       LLVM_FALLTHROUGH;
@@ -517,20 +508,21 @@ ParserResult<AvailableAttr> Parser::parseExtendedAvailabilitySpecList(
     }
 
     case IsUnavailable:
-      if (PlatformAgnostic != PlatformAgnosticAvailabilityKind::None) {
+      if (AttrKind != AvailableAttr::Kind::Default) {
         diagnose(Tok, diag::attr_availability_multiple_kinds, AttrName,
-                 "unavailable", platformAgnosticKindToStr(PlatformAgnostic));
+                 "unavailable", attrKindToStr(AttrKind));
       }
 
-      PlatformAgnostic = PlatformAgnosticAvailabilityKind::Unavailable;
+      AttrKind = AvailableAttr::Kind::Unavailable;
       break;
 
     case IsNoAsync:
-      if (PlatformAgnostic != PlatformAgnosticAvailabilityKind::None) {
+      if (AttrKind != AvailableAttr::Kind::Default) {
         diagnose(Tok, diag::attr_availability_multiple_kinds, AttrName,
-                 "noasync", platformAgnosticKindToStr(PlatformAgnostic));
+                 "noasync", attrKindToStr(AttrKind));
       }
-      PlatformAgnostic = PlatformAgnosticAvailabilityKind::NoAsync;
+
+      AttrKind = AvailableAttr::Kind::NoAsync;
       break;
 
     case IsInvalid:
@@ -545,97 +537,19 @@ ParserResult<AvailableAttr> Parser::parseExtendedAvailabilitySpecList(
     }
   }
 
-  if (!AnyAnnotations) {
+  if (!AnyAnnotations &&
+      !Context.LangOpts.hasFeature(Feature::CustomAvailability)) {
     diagnose(Tok.getLoc(), diag::attr_expected_comma, AttrName,
              /*isDeclModifier*/ false);
   }
 
-  auto PlatformKind = platformFromString(Platform);
-
-  // Treat 'swift' as a valid version-qualifying token, when
-  // at least some versions were mentioned and no other
-  // platform-agnostic availability spec has been provided.
-  bool SomeVersion = (!Introduced.empty() ||
-                      !Deprecated.empty() ||
-                      !Obsoleted.empty());
-  if (!PlatformKind.has_value() &&
-      (Platform == "swift" || Platform == "_PackageDescription")) {
-
-    if (PlatformAgnostic == PlatformAgnosticAvailabilityKind::Deprecated) {
-      diagnose(AttrLoc,
-               diag::attr_availability_platform_agnostic_expected_deprecated_version,
-               AttrName, Platform);
-      return nullptr;
-    }
-    if (PlatformAgnostic == PlatformAgnosticAvailabilityKind::Unavailable) {
-      diagnose(AttrLoc, diag::attr_availability_platform_agnostic_infeasible_option,
-               "unavailable", AttrName, Platform);
-      return nullptr;
-    }
-    assert(PlatformAgnostic == PlatformAgnosticAvailabilityKind::None);
-
-    if (!SomeVersion) {
-      diagnose(AttrLoc, diag::attr_availability_platform_agnostic_expected_option,
-               AttrName, Platform);
-      return nullptr;
-    }
-
-    PlatformKind = PlatformKind::none;
-    PlatformAgnostic = (Platform == "swift") ?
-                         PlatformAgnosticAvailabilityKind::SwiftVersionSpecific :
-                         PlatformAgnosticAvailabilityKind::PackageDescriptionVersionSpecific;
-  }
-
-
   if (AnyArgumentInvalid)
     return nullptr;
-  if (!PlatformKind.has_value()) {
-    if (auto CorrectedPlatform = closestCorrectedPlatformString(Platform)) {
-      diagnose(PlatformLoc, diag::attr_availability_suggest_platform, Platform,
-               AttrName, *CorrectedPlatform)
-          .fixItReplace(SourceRange(PlatformLoc), *CorrectedPlatform);
-    } else {
-      diagnose(AttrLoc, diag::attr_availability_unknown_platform, Platform,
-               AttrName);
-    }
-    return nullptr;
-  }
-
-  // Warn if any version is specified for non-specific platform '*'.
-  if (Platform == "*" && SomeVersion) {
-    auto diag = diagnose(AttrLoc,
-        diag::attr_availability_nonspecific_platform_unexpected_version,
-        AttrName);
-    if (!Introduced.empty())
-      diag.fixItRemove(SourceRange(Introduced.DelimiterLoc,
-                                   Introduced.Range.End));
-    if (!Deprecated.empty())
-      diag.fixItRemove(SourceRange(Deprecated.DelimiterLoc,
-                                   Deprecated.Range.End));
-    if (!Obsoleted.empty())
-      diag.fixItRemove(SourceRange(Obsoleted.DelimiterLoc,
-                                   Obsoleted.Range.End));
-    return nullptr;
-  }
-
-  if (PlatformKind) {
-      if (!Introduced.empty())
-        Introduced.Version =
-            canonicalizePlatformVersion(*PlatformKind, Introduced.Version);
-
-      if (!Deprecated.empty())
-        Deprecated.Version =
-            canonicalizePlatformVersion(*PlatformKind, Deprecated.Version);
-
-      if (!Obsoleted.empty())
-        Obsoleted.Version =
-            canonicalizePlatformVersion(*PlatformKind, Obsoleted.Version);
-  }
 
   auto Attr = new (Context) AvailableAttr(
-      AtLoc, SourceRange(AttrLoc, Tok.getLoc()), PlatformKind.value(), Message,
-      Renamed, Introduced.Version, Introduced.Range, Deprecated.Version,
-      Deprecated.Range, Obsoleted.Version, Obsoleted.Range, PlatformAgnostic,
+      AtLoc, SourceRange(AttrLoc, Tok.getLoc()), Platform, PlatformLoc,
+      AttrKind, Message, Renamed, Introduced.Version, Introduced.Range,
+      Deprecated.Version, Deprecated.Range, Obsoleted.Version, Obsoleted.Range,
       /*Implicit=*/false, AttrName == SPI_AVAILABLE_ATTRNAME);
   return makeParserResult(Attr);
 
@@ -875,47 +789,23 @@ bool Parser::parseAvailability(
     //   @available(_PackageDescription, introduced: 4.2)
 
     for (auto *Spec : Specs) {
-      PlatformKind Platform;
-      llvm::VersionTuple Version;
-      SourceRange VersionRange;
-      PlatformAgnosticAvailabilityKind PlatformAgnostic;
-
-      if (auto *PlatformVersionSpec =
-              dyn_cast<PlatformVersionConstraintAvailabilitySpec>(Spec)) {
-        Platform = PlatformVersionSpec->getPlatform();
-        Version = PlatformVersionSpec->getVersion();
-        VersionRange = PlatformVersionSpec->getVersionSrcRange();
-        PlatformAgnostic = PlatformAgnosticAvailabilityKind::None;
-
-      } else if (auto *PlatformAgnosticVersionSpec = dyn_cast<
-                     PlatformAgnosticVersionConstraintAvailabilitySpec>(Spec)) {
-        Platform = PlatformKind::none;
-        Version = PlatformAgnosticVersionSpec->getVersion();
-        VersionRange = PlatformAgnosticVersionSpec->getVersionSrcRange();
-        PlatformAgnostic =
-            PlatformAgnosticVersionSpec->isLanguageVersionSpecific()
-                ? PlatformAgnosticAvailabilityKind::SwiftVersionSpecific
-                : PlatformAgnosticAvailabilityKind::
-                      PackageDescriptionVersionSpecific;
-
-      } else {
+      // FIXME: [availability] Allow arbitrary availability domains.
+      std::optional<AvailabilityDomain> Domain = Spec->getDomain();
+      if (!Domain)
         continue;
-      }
-
-      Version = canonicalizePlatformVersion(Platform, Version);
 
       addAttribute(new (Context) AvailableAttr(
-          AtLoc, attrRange, Platform,
+          AtLoc, attrRange, *Domain, Spec->getSourceRange().Start,
+          AvailableAttr::Kind::Default,
           /*Message=*/StringRef(),
           /*Rename=*/StringRef(),
-          /*Introduced=*/Version,
-          /*IntroducedRange=*/VersionRange,
+          /*Introduced=*/Spec->getVersion(),
+          /*IntroducedRange=*/Spec->getVersionSrcRange(),
           /*Deprecated=*/llvm::VersionTuple(),
           /*DeprecatedRange=*/SourceRange(),
           /*Obsoleted=*/llvm::VersionTuple(),
-          /*ObsoletedRange=*/SourceRange(), PlatformAgnostic,
-          /*Implicit=*/false,
-          AttrName == SPI_AVAILABLE_ATTRNAME));
+          /*ObsoletedRange=*/SourceRange(),
+          /*Implicit=*/false, AttrName == SPI_AVAILABLE_ATTRNAME));
     }
 
     return true;
@@ -1926,16 +1816,13 @@ void Parser::parseObjCSelector(SmallVector<Identifier, 4> &Names,
 }
 
 bool Parser::peekAvailabilityMacroName() {
-  AvailabilityMacroMap &Map = parseAllAvailabilityMacroArguments();
-
-  StringRef MacroName = Tok.getText();
-  return Map.Impl.find(MacroName) != Map.Impl.end();
+  return Context.getAvailabilityMacroMap().hasMacroName(Tok.getText());
 }
 
 ParserStatus
 Parser::parseAvailabilityMacro(SmallVectorImpl<AvailabilitySpec *> &Specs) {
   // Get the macros from the compiler arguments.
-  AvailabilityMacroMap &Map = parseAllAvailabilityMacroArguments();
+  const AvailabilityMacroMap &Map = Context.getAvailabilityMacroMap();
 
   StringRef MacroName = Tok.getText();
   auto NameMatch = Map.Impl.find(MacroName);
@@ -1952,8 +1839,8 @@ Parser::parseAvailabilityMacro(SmallVectorImpl<AvailabilitySpec *> &Specs) {
       return makeParserError();
   }
 
-  auto VersionMatch = NameMatch->getSecond().find(Version);
-  if (VersionMatch == NameMatch->getSecond().end()) {
+  auto VersionMatch = NameMatch->second.find(Version);
+  if (VersionMatch == NameMatch->second.end()) {
     diagnose(PreviousLoc, diag::attr_availability_unknown_version,
         Version.getAsString(), MacroName);
     return makeParserError(); // Failed to match the version, that's an error.
@@ -1975,77 +1862,6 @@ Parser::parseAvailabilityMacro(SmallVectorImpl<AvailabilitySpec *> &Specs) {
   return makeParserSuccess();
 }
 
-AvailabilityMacroMap &Parser::parseAllAvailabilityMacroArguments() {
-  AvailabilityMacroMap &Map = Context.getAvailabilityMacroCache();
-  if (Map.WasParsed)
-    return Map;
-
-  SourceManager &SM = Context.SourceMgr;
-  LangOptions LangOpts = Context.LangOpts;
-
-  // Allocate all buffers in one go to avoid repeating the sorting in
-  // findBufferContainingLocInternal.
-  llvm::SmallVector<unsigned, 4> bufferIDs;
-  for (StringRef macro: LangOpts.AvailabilityMacros) {
-    unsigned bufferID = SM.addMemBufferCopy(macro,
-                                            "-define-availability argument");
-    bufferIDs.push_back(bufferID);
-  }
-
-  // Parse each macro definition.
-  for (unsigned bufferID: bufferIDs) {
-    // Create temporary parser.
-    swift::ParserUnit PU(SM, SourceFileKind::Main, bufferID, LangOpts,
-                         "unknown");
-
-    ForwardingDiagnosticConsumer PDC(Context.Diags);
-    PU.getDiagnosticEngine().addConsumer(PDC);
-
-    // Parse the argument.
-    AvailabilityMacroDefinition ParsedMacro;
-    ParserStatus Status =
-      PU.getParser().parseAvailabilityMacroDefinition(ParsedMacro);
-    if (Status.isError())
-      continue;
-
-    // Copy the Specs to the requesting ASTContext from the temporary context
-    // that parsed the argument.
-    auto SpecsCopy = SmallVector<AvailabilitySpec*, 4>();
-    for (auto *Spec : ParsedMacro.Specs)
-      if (auto *PlatformVersionSpec =
-          dyn_cast<PlatformVersionConstraintAvailabilitySpec>(Spec)) {
-        auto SpecCopy =
-          new (Context) PlatformVersionConstraintAvailabilitySpec(
-                                                         *PlatformVersionSpec);
-        SpecsCopy.push_back(SpecCopy);
-      }
-
-    ParsedMacro.Specs = SpecsCopy;
-
-    // Find the macro info by name.
-    AvailabilityMacroMap::VersionEntry MacroDefinition;
-    auto NameMatch = Map.Impl.find(ParsedMacro.Name);
-    if (NameMatch != Map.Impl.end()) {
-      MacroDefinition = NameMatch->getSecond();
-    }
-
-    // Set the macro info by version.
-    auto PreviousEntry =
-      MacroDefinition.insert({ParsedMacro.Version, ParsedMacro.Specs});
-    if (!PreviousEntry.second) {
-      diagnose(PU.getParser().PreviousLoc, diag::attr_availability_duplicate,
-               ParsedMacro.Name, ParsedMacro.Version.getAsString());
-    }
-
-    // Save back the macro spec.
-    Map.Impl.erase(ParsedMacro.Name);
-    Map.Impl.insert({ParsedMacro.Name, MacroDefinition});
-  }
-
-  Map.WasParsed = true;
-  return Map;
-}
-
 ParserStatus Parser::parsePlatformVersionInList(StringRef AttrName,
     llvm::SmallVector<PlatformAndVersion, 4> &PlatformAndVersions,
     bool &ParsedUnrecognizedPlatformName) {
@@ -2057,20 +1873,18 @@ ParserStatus Parser::parsePlatformVersionInList(StringRef AttrName,
       return MacroStatus;
 
     for (auto *Spec : Specs) {
-      auto *PlatformVersionSpec =
-          dyn_cast<PlatformVersionConstraintAvailabilitySpec>(Spec);
+      auto Platform = Spec->getPlatform();
       // Since peekAvailabilityMacroName() only matches defined availability
-      // macros, we don't expect to get any other kind of spec here.
-      assert(PlatformVersionSpec && "Unexpected AvailabilitySpec kind");
+      // macros, we only expect platform specific constraints here.
+      assert(Platform && "Unexpected AvailabilitySpec kind");
 
-      auto Platform = PlatformVersionSpec->getPlatform();
-      auto Version = PlatformVersionSpec->getVersion();
+      auto Version = Spec->getVersion();
       if (Version.getSubminor().has_value() || Version.getBuild().has_value()) {
-        diagnose(PlatformVersionSpec->getVersionSrcRange().Start,
+        diagnose(Spec->getVersionSrcRange().Start,
                  diag::attr_availability_platform_version_major_minor_only,
                  AttrName);
       }
-      PlatformAndVersions.emplace_back(Platform, Version);
+      PlatformAndVersions.emplace_back(*Platform, Version);
     }
 
     return makeParserSuccess();
@@ -2713,6 +2527,8 @@ ParserResult<LifetimeAttr> Parser::parseLifetimeAttribute(SourceLoc atLoc,
       /* implicit */ false, lifetimeEntry.get()));
 }
 
+
+
 /// Parses a (possibly optional) argument for an attribute containing a single, arbitrary identifier.
 ///
 /// \param P The parser object.
@@ -3211,69 +3027,6 @@ ParserStatus Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
   case DeclAttrKind::Extern: {
     if (!parseExternAttribute(Attributes, DiscardAttribute, AttrName, AtLoc, Loc))
       return makeParserSuccess();
-    break;
-  }
-
-  case DeclAttrKind::Safe: {
-    if (!consumeIfAttributeLParen()) {
-      diagnose(Loc, diag::attr_expected_lparen, AttrName,
-               DeclAttribute::isDeclModifier(DK));
-      return makeParserError();
-    }
-
-    StringRef parsedName = Tok.getText();
-    if (!consumeIf(tok::identifier) || parsedName != "unchecked") {
-      diagnose(Loc, diag::safe_attr_unchecked);
-      errorAndSkipUntilConsumeRightParen(*this, AttrName);
-      return makeParserError();
-    }
-
-    StringRef message;
-    if (consumeIf(tok::comma)) {
-      if (!Tok.is(tok::identifier)) {
-        diagnose(Tok, diag::attr_expected_label, "message", AttrName);
-        errorAndSkipUntilConsumeRightParen(*this, AttrName);
-        return makeParserError();
-      }
-
-      StringRef flag = Tok.getText();
-
-      if (flag != "message") {
-        diagnose(Tok.getLoc(), diag::attr_unknown_option, flag, AttrName);
-        errorAndSkipUntilConsumeRightParen(*this, AttrName);
-        return makeParserError();
-      }
-      consumeToken();
-      if (!consumeIf(tok::colon)) {
-        diagnose(Tok.getLoc(), diag::attr_expected_colon_after_label, flag);
-        errorAndSkipUntilConsumeRightParen(*this, AttrName);
-        return makeParserError();
-      }
-      if (!Tok.is(tok::string_literal)) {
-        diagnose(Tok.getLoc(), diag::attr_expected_string_literal, AttrName);
-        errorAndSkipUntilConsumeRightParen(*this, AttrName);
-        return makeParserSuccess();
-      }
-
-      std::optional<StringRef> value =
-          getStringLiteralIfNotInterpolated(Tok.getLoc(), flag);
-      if (!value) {
-        errorAndSkipUntilConsumeRightParen(*this, AttrName);
-        return makeParserError();
-      }
-      consumeToken();
-      message = *value;
-    }
-
-    if (!consumeIf(tok::r_paren)) {
-      diagnose(PreviousLoc, diag::attr_expected_rparen,
-          AttrName, /*isModifier*/false)
-        .fixItInsertAfter(PreviousLoc, ")");
-    }
-    AttrRange = SourceRange(Loc, PreviousLoc);
-
-    if (!DiscardAttribute)
-      Attributes.add(new (Context) SafeAttr(AtLoc, AttrRange, message));
     break;
   }
 
@@ -4092,6 +3845,21 @@ ParserStatus Parser::parseNewDeclAttribute(DeclAttributes &Attributes,
       Attributes.add(Attr.get());
     break;
   }
+
+  case DeclAttrKind::Execution: {
+    auto behavior = parseSingleAttrOption<ExecutionKind>(
+        *this, Loc, AttrRange, AttrName, DK,
+        {{Context.Id_concurrent, ExecutionKind::Concurrent},
+         {Context.Id_caller, ExecutionKind::Caller}});
+    if (!behavior)
+      return makeParserSuccess();
+
+    if (!DiscardAttribute)
+      Attributes.add(new (Context) ExecutionAttr(AtLoc, AttrRange, *behavior,
+                                                 /*Implicit*/ false));
+
+    break;
+  }
   }
 
   if (DuplicateAttribute) {
@@ -4462,11 +4230,11 @@ ParserStatus Parser::parseDeclAttribute(DeclAttributes &Attributes,
     if (Context.LangOpts.hasFeature(Feature::Embedded)) {
       StringRef Message = "unavailable in embedded Swift", Renamed;
       auto attr = new (Context) AvailableAttr(
-          AtLoc, SourceRange(AtLoc, attrLoc), PlatformKind::none, Message,
-          Renamed, llvm::VersionTuple(), SourceRange(), llvm::VersionTuple(),
+          AtLoc, SourceRange(AtLoc, attrLoc), AvailabilityDomain::forEmbedded(),
+          SourceLoc(), AvailableAttr::Kind::Unavailable, Message, Renamed,
+          llvm::VersionTuple(), SourceRange(), llvm::VersionTuple(),
           SourceRange(), llvm::VersionTuple(), SourceRange(),
-          PlatformAgnosticAvailabilityKind::Unavailable,
-          /*Implicit=*/false, /*IsSPI=*/false, /*IsForEmbedded=*/true);
+          /*Implicit=*/false, /*IsSPI=*/false);
       Attributes.add(attr);
     }
     return makeParserSuccess();
@@ -4901,6 +4669,50 @@ ParserStatus Parser::parseTypeAttribute(TypeOrCustomAttr &result,
       result = new (Context) IsolatedTypeAttr(AtLoc, attrLoc,
                                               {lpLoc, rpLoc},
                                               {*kind, kindLoc});
+    }
+    return makeParserSuccess();
+  }
+
+  case TypeAttrKind::Execution: {
+    SourceLoc lpLoc = Tok.getLoc(), behaviorLoc, rpLoc;
+    if (!consumeIfNotAtStartOfLine(tok::l_paren)) {
+      if (!justChecking) {
+        diagnose(Tok, diag::attr_execution_expected_lparen);
+        // TODO: should we suggest removing the `@`?
+      }
+      return makeParserError();
+    }
+
+    bool invalid = false;
+    std::optional<ExecutionKind> behavior;
+    if (isIdentifier(Tok, "concurrent")) {
+      behaviorLoc = consumeToken(tok::identifier);
+      behavior = ExecutionKind::Concurrent;
+    } else if (isIdentifier(Tok, "caller")) {
+      behaviorLoc = consumeToken(tok::identifier);
+      behavior = ExecutionKind::Caller;
+    } else {
+      if (!justChecking) {
+        diagnose(Tok, diag::attr_execution_expected_kind);
+      }
+      invalid = true;
+      consumeIf(tok::identifier);
+    }
+
+    if (justChecking && !Tok.is(tok::r_paren))
+      return makeParserError();
+    if (parseMatchingToken(tok::r_paren, rpLoc,
+                           diag::attr_execution_expected_rparen,
+                           lpLoc))
+      return makeParserError();
+
+    if (invalid)
+      return makeParserError();
+    assert(behavior);
+
+    if (!justChecking) {
+      result = new (Context) ExecutionTypeAttr(AtLoc, attrLoc, {lpLoc, rpLoc},
+                                               {*behavior, behaviorLoc});
     }
     return makeParserSuccess();
   }
@@ -9798,7 +9610,7 @@ Parser::parseDeclSubscript(SourceLoc StaticLoc,
       }
     }
   }
-  
+
   ParserStatus Status;
   SourceLoc SubscriptLoc = consumeToken(tok::kw_subscript);
 

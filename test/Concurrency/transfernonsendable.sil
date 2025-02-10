@@ -21,16 +21,21 @@ import _Concurrency
 
 class Klass {}
 
-class NonSendableKlass { // expected-note 2{{}}
+class NonSendableKlass { // expected-note 4{{}}
   var klass: Klass
 
   func asyncCall() async
+
+  @MainActor static func getValue() -> sending NonSendableKlass
 }
 
 sil @transferNonSendableKlass : $@convention(thin) @async (@guaranteed NonSendableKlass) -> ()
 sil @useNonSendableKlass : $@convention(thin) (@guaranteed NonSendableKlass) -> ()
+sil @useNonSendableKlassAsync : $@convention(thin) @async (@guaranteed NonSendableKlass) -> ()
 sil @constructNonSendableKlass : $@convention(thin) () -> @owned NonSendableKlass
 sil @useUnmanagedNonSendableKlass : $@convention(thin) (@guaranteed @sil_unmanaged NonSendableKlass) -> ()
+sil @constructNonSendableKlassAsync : $@convention(thin) @async () -> @owned NonSendableKlass
+sil @constructNonSendableKlassAsyncSending : $@convention(thin) @async () -> @sil_sending @owned NonSendableKlass
 
 final class SendableKlass : Sendable {}
 
@@ -376,11 +381,60 @@ bb0(%0 : @guaranteed $Self):
   return %9999 : $()
 }
 
+sil [ossa] @sending_direct_result_from_callee : $@convention(thin) @async () -> () {
+bb0:
+  %0 = function_ref @constructNonSendableKlassAsyncSending : $@convention(thin) @async () -> @sil_sending @owned NonSendableKlass
+  %1 = apply [caller_isolation=nonisolated] [callee_isolation=global_actor] %0() : $@convention(thin) @async () -> @sil_sending @owned NonSendableKlass
+
+  %useValue = function_ref @useNonSendableKlassAsync : $@convention(thin) @async (@guaranteed NonSendableKlass) -> ()
+  apply [caller_isolation=nonisolated] [callee_isolation=actor_instance] %useValue(%1) : $@convention(thin) @async (@guaranteed NonSendableKlass) -> ()
+  destroy_value %1
+
+  // Double check we actually error without @sil_sending
+  %2 = function_ref @constructNonSendableKlassAsync : $@convention(thin) @async () -> @owned NonSendableKlass
+  %3 = apply [caller_isolation=nonisolated] [callee_isolation=global_actor] %2() : $@convention(thin) @async () -> @owned NonSendableKlass
+  // expected-warning @-1 {{non-Sendable 'NonSendableKlass'-typed result can not be returned from global actor '<null>'-isolated function to nonisolated context}}
+
+  apply [caller_isolation=nonisolated] [callee_isolation=actor_instance] %useValue(%3) : $@convention(thin) @async (@guaranteed NonSendableKlass) -> ()
+  // expected-warning @-1 {{sending value of non-Sendable type 'NonSendableKlass' risks causing data races}}
+  // expected-note @-2 {{}}
+
+  destroy_value %3
+
+  %9999 = tuple ()
+  return %9999 : $()
+}
+
+sil [ossa] @sending_direct_result_from_callee_2 : $@convention(thin) @async () -> () {
+bb0:
+  %0 = function_ref @constructNonSendableKlassAsyncSending : $@convention(thin) @async () -> @sil_sending @owned NonSendableKlass
+  %1 = apply [caller_isolation=global_actor] [callee_isolation=global_actor] %0() : $@convention(thin) @async () -> @sil_sending @owned NonSendableKlass
+
+  %useValue = function_ref @useNonSendableKlassAsync : $@convention(thin) @async (@guaranteed NonSendableKlass) -> ()
+  apply [caller_isolation=global_actor] [callee_isolation=actor_instance] %useValue(%1) : $@convention(thin) @async (@guaranteed NonSendableKlass) -> ()
+  destroy_value %1
+
+  // Double check we actually error without @sil_sending
+  %2 = function_ref @constructNonSendableKlassAsync : $@convention(thin) @async () -> @owned NonSendableKlass
+  %3 = apply [caller_isolation=global_actor] [callee_isolation=global_actor] %2() : $@convention(thin) @async () -> @owned NonSendableKlass
+  // expected-warning @-1 {{non-Sendable 'NonSendableKlass'-typed result can not be returned from global actor '<null>'-isolated function to global actor '<null>'-isolated context}}
+
+  apply [caller_isolation=global_actor] [callee_isolation=actor_instance] %useValue(%3) : $@convention(thin) @async (@guaranteed NonSendableKlass) -> ()
+  // expected-warning @-1 {{sending value of non-Sendable type 'NonSendableKlass' risks causing data races}}
+  // expected-note @-2 {{}}
+
+  destroy_value %3
+
+  %9999 = tuple ()
+  return %9999 : $()
+}
+
+
 sil @closureForCheckedContinuation : $@convention(thin) <τ_0_0> (@in_guaranteed CheckedContinuation<τ_0_0, Never>) -> ()
 sil @withCheckedContinuation : $@convention(thin) @async <τ_0_0> (@sil_isolated @guaranteed Optional<any Actor>, @guaranteed @noescape @callee_guaranteed <τ_0_0> (@in_guaranteed CheckedContinuation<τ_0_0, Never>) -> ()) -> @sil_sending @out τ_0_0
 
 // We shouldn't emit any error here due to sil_sending.
-sil [ossa] @sending_result_from_callee : $@convention(thin) @async () -> () {
+sil [ossa] @sending_indirect_result_from_callee : $@convention(thin) @async () -> () {
 bb0:
   %0 = alloc_stack $NonSendableKlass
   %1 = function_ref @closureForCheckedContinuation : $@convention(thin) <τ_0_0> (@in_guaranteed CheckedContinuation<τ_0_0, Never>) -> ()

@@ -244,6 +244,15 @@ extension ASTGenVisitor {
     return generateSourceRange(start: start, end: node.lastToken(viewMode: .sourceAccurate)!)
   }
 
+  /// Obtains bridged token source range of a syntax node.
+  @inline(__always)
+  func generateSourceRange(_ node: (some SyntaxProtocol)?) -> BridgedSourceRange {
+    guard let node = node else {
+      return BridgedSourceRange(start: nil, end: nil)
+    }
+    return generateSourceRange(node)
+  }
+
   /// Obtains bridged character source range.
   @inline(__always)
   func generateCharSourceRange(start: AbsolutePosition, length: SourceLength) -> BridgedCharSourceRange {

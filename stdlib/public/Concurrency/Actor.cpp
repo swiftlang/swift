@@ -653,6 +653,13 @@ void swift::swift_task_reportUnexpectedExecutor(
         .errorType = "actor-isolation-violation",
         .currentStackDescription = "Actor-isolated function called from another thread",
         .framesToSkip = 1,
+        .memoryAddress = nullptr,
+        .numExtraThreads = 0,
+        .threads = nullptr,
+        .numFixIts = 0,
+        .fixIts = nullptr,
+        .numNotes = 0,
+        .notes = nullptr,
     };
     _swift_reportToDebugger(
         isFatalError ? RuntimeErrorFlagFatal : RuntimeErrorFlagNone, message,

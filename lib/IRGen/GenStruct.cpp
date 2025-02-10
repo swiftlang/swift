@@ -1451,6 +1451,7 @@ private:
   /// Place the next struct field at its appropriate offset.
   void addStructField(const clang::FieldDecl *clangField,
                       VarDecl *swiftField, const clang::ASTRecordLayout &layout) {
+    bool isZeroSized = clangField->isZeroSize(ClangContext);
     unsigned fieldOffset = layout.getFieldOffset(clangField->getFieldIndex());
     assert(!clangField->isBitField());
     Size offset( SubobjectAdjustment.getValue() + fieldOffset / 8);
@@ -1460,12 +1461,12 @@ private:
       auto &fieldTI = cast<FixedTypeInfo>(IGM.getTypeInfo(
           SwiftType.getFieldType(swiftField, IGM.getSILModule(),
                                  IGM.getMaximalTypeExpansionContext())));
-      addField(swiftField, offset, fieldTI);
+      addField(swiftField, offset, fieldTI, isZeroSized);
       return;
     }
 
     // Otherwise, add it as an opaque blob.
-    auto fieldSize = ClangContext.getTypeSizeInChars(clangField->getType());
+    auto fieldSize = isZeroSized ? clang::CharUnits::Zero() : ClangContext.getTypeSizeInChars(clangField->getType());
     return addOpaqueField(offset, Size(fieldSize.getQuantity()));
   }
 
@@ -1491,23 +1492,23 @@ private:
     if (fieldSize.isZero()) return;
 
     auto &opaqueTI = IGM.getOpaqueStorageTypeInfo(fieldSize, Alignment(1));
-    addField(nullptr, offset, opaqueTI);
+    addField(nullptr, offset, opaqueTI, false);
   }
 
   /// Add storage for an (optional) Swift field at the given offset.
   void addField(VarDecl *swiftField, Size offset,
-                const FixedTypeInfo &fieldType) {
-    assert(offset >= NextOffset && "adding fields out of order");
+                const FixedTypeInfo &fieldType, bool isZeroSized) {
+    assert(isZeroSized || offset >= NextOffset && "adding fields out of order");
 
     // Add a padding field if required.
-    if (offset != NextOffset)
+    if (!isZeroSized && offset != NextOffset)
       addPaddingField(offset);
 
-    addFieldInfo(swiftField, fieldType);
+    addFieldInfo(swiftField, fieldType, isZeroSized);
   }
 
   /// Add information to track a value field at the current offset.
-  void addFieldInfo(VarDecl *swiftField, const FixedTypeInfo &fieldType) {
+  void addFieldInfo(VarDecl *swiftField, const FixedTypeInfo &fieldType, bool isZeroSized) {
     bool isLoadableField = isa<LoadableTypeInfo>(fieldType);
     unsigned explosionSize = 0;
     if (isLoadableField)
@@ -1517,11 +1518,15 @@ private:
     unsigned explosionEnd = NextExplosionIndex;
 
     ElementLayout layout = ElementLayout::getIncomplete(fieldType);
-    auto isEmpty = fieldType.isKnownEmpty(ResilienceExpansion::Maximal);
-    if (isEmpty)
-      layout.completeEmptyTailAllocatedCType(
-          fieldType.isTriviallyDestroyable(ResilienceExpansion::Maximal), NextOffset);
-    else
+    auto isEmpty = isZeroSized || fieldType.isKnownEmpty(ResilienceExpansion::Maximal);
+    if (isEmpty) {
+      if (isZeroSized)
+        layout.completeEmpty(
+            fieldType.isTriviallyDestroyable(ResilienceExpansion::Maximal), NextOffset);
+      else
+        layout.completeEmptyTailAllocatedCType(
+            fieldType.isTriviallyDestroyable(ResilienceExpansion::Maximal), NextOffset);
+    } else
       layout.completeFixed(fieldType.isTriviallyDestroyable(ResilienceExpansion::Maximal),
                            NextOffset, LLVMFields.size());
 

@@ -223,8 +223,7 @@ static FuncDecl *diagnoseMissingIntrinsic(SILGenModule &sgm,
 
 #define KNOWN_SDK_FUNC_DECL(MODULE, NAME, ID)                                  \
   FuncDecl *SILGenModule::get##NAME(SILLocation loc) {                         \
-    if (ModuleDecl *M = getASTContext().getLoadedModule(                       \
-            getASTContext().Id_##MODULE)) {                                    \
+    if (getASTContext().getLoadedModule(getASTContext().Id_##MODULE)) {        \
       if (auto fn = getASTContext().get##NAME())                               \
         return fn;                                                             \
     }                                                                          \

@@ -6,7 +6,8 @@
 // REQUIRES: asserts
 
 // RUN: %batch-code-completion -filecheck-additional-suffix _DISABLED
-// RUN: %batch-code-completion -filecheck-additional-suffix _ENABLED -enable-experimental-feature ABIAttribute
+// RUN: %batch-code-completion -filecheck-additional-suffix _ENABLED \
+// RUN:        -enable-experimental-feature ABIAttribute
 
 // NOTE: Please do not include the ", N items" after "Begin completions". The
 // item count creates needless merge conflicts given that an "End completions"

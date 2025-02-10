@@ -7,7 +7,7 @@ import local_type_originally_defined_in_other
 
 public func definedInOtherModule() {
   let s = Sheep()
-  // CHECK: DICompositeType(tag: DW_TAG_structure_type, name: "Sheep"{{.*}}identifier: "$s4Barn5SheepCD
+  // CHECK-DAG: DICompositeType(tag: DW_TAG_structure_type, name: "Sheep"{{.*}}identifier: "$s4Barn5SheepCD
 }
 public func localTypeAliasTest(horse: Horse) {
   // The local type mangling for 'A' mentions 'Horse', which must
@@ -18,7 +18,7 @@ public func localTypeAliasTest(horse: Horse) {
 
   let info = UnsafeMutablePointer<A>.allocate(capacity: 1)
   _ = info
-  // CHECK: DIDerivedType(tag: DW_TAG_typedef, name: "$s32local_type_originally_defined_in0A13TypeAliasTest5horsey4Barn5HorseV_tF1AL_aD"
+  // CHECK-DAG: DIDerivedType(tag: DW_TAG_typedef, name: "$s32local_type_originally_defined_in0A13TypeAliasTest5horsey4Barn5HorseV_tF1AL_aD"
 }
 
 
@@ -31,7 +31,7 @@ public func localTypeTest(horse: Horse) {
 
   let info = UnsafeMutablePointer<LocalStruct>.allocate(capacity: 1)
   _ = info
-  // CHECK: DICompositeType(tag: DW_TAG_structure_type, name: "$s32local_type_originally_defined_in0A8TypeTest5horsey4Barn5HorseV_tF11LocalStructL_VD"
+  // CHECK-DAG: DICompositeType(tag: DW_TAG_structure_type, {{.*}}identifier: "$s32local_type_originally_defined_in0A8TypeTest5horsey4Barn5HorseV_tF11LocalStructL_VD"
 }
 
 public func localTypeAliasTest() -> Horse {
@@ -40,7 +40,7 @@ public func localTypeAliasTest() -> Horse {
   let info = UnsafeMutablePointer<B>.allocate(capacity: 1)
   _ = info
   return Horse()
-  // CHECK: DIDerivedType(tag: DW_TAG_typedef, name: "$s32local_type_originally_defined_in0A13TypeAliasTest4Barn5HorseVyF1BL_aD"
+  // CHECK-DAG: DIDerivedType(tag: DW_TAG_typedef, name: "$s32local_type_originally_defined_in0A13TypeAliasTest4Barn5HorseVyF1BL_aD"
 }
 
 public func localTypeAliasTestGeneric<T: Cow>(cow: T) {

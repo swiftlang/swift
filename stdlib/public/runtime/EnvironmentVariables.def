@@ -128,7 +128,7 @@ VARIABLE(SWIFT_IS_CURRENT_EXECUTOR_LEGACY_MODE_OVERRIDE, string, "",
          " 'legacy' (Legacy behavior), "
          " 'swift6' (Swift 6.0+ behavior)")
 
-VARIABLE(SWIFT_DUMP_ACCESSIBLE_FUNCTIONS, string, "",
+VARIABLE(SWIFT_DUMP_ACCESSIBLE_FUNCTIONS, bool, false,
          "Dump a listing of all 'AccessibleFunctionRecord's upon first access. "
          "These are used to obtain function pointers from accessible function "
          "record names, e.g. by the Distributed runtime to invoke distributed "

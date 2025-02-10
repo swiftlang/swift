@@ -1,13 +1,18 @@
 #pragma once
 
-struct Base1 {
-  int methodBase(void) const { return 1; }
+struct One {
+  int method(void) const { return 1; }
+  int operator[](int i) const { return 1; }
 };
 
-struct IBase1 : Base1 {
-  int methodIBase(void) const { return 11; }
+struct IOne : One {
+  int methodI(void) const { return -1; }
 };
 
-struct IIBase1 : IBase1 {
-  int methodIIBase(void) const { return 111; }
+struct IIOne : IOne {
+  int methodII(void) const { return -11; }
+};
+
+struct IIIOne : IIOne {
+  int methodIII(void) const { return -111; }
 };

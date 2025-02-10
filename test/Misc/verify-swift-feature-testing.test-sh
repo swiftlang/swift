@@ -16,6 +16,7 @@ EXCEPTIONAL_FILES = [
     pathlib.Path("test/Frontend/experimental-features-no-asserts.swift"),
     # Tests for UnknownFeature not existing
     pathlib.Path("test/Frontend/upcoming_feature.swift"),
+    pathlib.Path("test/Frontend/strict_features.swift"),
     # Tests for ModuleInterfaceExportAs being ignored
     pathlib.Path("test/ModuleInterface/swift-export-as.swift"),
     # Uses the pseudo-feature AvailabilityMacro=

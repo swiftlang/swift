@@ -249,11 +249,6 @@ swift::cxx_translation::getDeclRepresentation(
         return {Unsupported, UnrepresentableGeneric};
       genericSignature = typeDecl->getGenericSignature();
     }
-    // Nested classes are not yet supported.
-    if (isa<ClassDecl>(VD) && !typeDecl->hasClangNode() &&
-        isa_and_nonnull<NominalTypeDecl>(
-            typeDecl->getDeclContext()->getAsDecl()))
-      return {Unsupported, UnrepresentableNested};
     if (!isa<ClassDecl>(typeDecl) && isZeroSized && (*isZeroSized)(typeDecl))
       return {Unsupported, UnrepresentableZeroSizedValueType};
   }
@@ -392,8 +387,6 @@ swift::cxx_translation::diagnoseRepresenationError(RepresentationError error,
     return Diagnostic(diag::expose_protocol_to_cxx_unsupported, vd);
   case UnrepresentableMoveOnly:
     return Diagnostic(diag::expose_move_only_to_cxx, vd);
-  case UnrepresentableNested:
-    return Diagnostic(diag::expose_nested_type_to_cxx, vd);
   case UnrepresentableMacro:
     return Diagnostic(diag::expose_macro_to_cxx, vd);
   case UnrepresentableZeroSizedValueType:

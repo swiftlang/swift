@@ -83,6 +83,9 @@ bool isPlatformActive(PlatformKind Platform, const LangOptions &LangOpts,
 /// Returns the target platform for the given language options.
 PlatformKind targetPlatform(const LangOptions &LangOpts);
 
+/// Returns the target variant platform for the given language options.
+PlatformKind targetVariantPlatform(const LangOptions &LangOpts);
+
 /// Returns true when availability attributes from the "parent" platform
 /// should also apply to the "child" platform for declarations without
 /// an explicit attribute for the child.

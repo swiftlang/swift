@@ -776,7 +776,7 @@ InferredGenericSignatureRequest::evaluate(
         WhereClauseOwner whereClause,
         SmallVector<Requirement, 2> addedRequirements,
         SmallVector<TypeBase *, 2> inferenceSources,
-        SourceLoc loc, bool isExtension, bool allowInverses) const {
+        SourceLoc loc, ExtensionDecl *forExtension, bool allowInverses) const {
   GenericSignature parentSig(parentSigImpl);
 
   SmallVector<GenericTypeParamType *, 4> genericParams(
@@ -784,7 +784,7 @@ InferredGenericSignatureRequest::evaluate(
       parentSig.getGenericParams().end());
 
   unsigned numOuterParams = genericParams.size();
-  if (isExtension) {
+  if (forExtension) {
     numOuterParams = 0;
   }
 
@@ -889,6 +889,68 @@ InferredGenericSignatureRequest::evaluate(
   SmallVector<StructuralRequirement, 2> defaults;
   InverseRequirement::expandDefaults(ctx, paramTypes, defaults);
   applyInverses(ctx, paramTypes, inverses, defaults, errors);
+  
+  // Any remaining implicit defaults in a conditional inverse requirement
+  // extension must be made explicit.
+  if (forExtension) {
+    auto invertibleProtocol = forExtension->isAddingConformanceToInvertible();
+    // FIXME: to workaround a reverse condfail, always infer the requirements if
+    //  the extension is in a swiftinterface file. This is temporary and should
+    //  be removed soon. (rdar://130424971)
+    if (auto *sf = forExtension->getOutermostParentSourceFile()) {
+      if (sf->Kind == SourceFileKind::Interface
+          && !ctx.LangOpts.hasFeature(Feature::SE427NoInferenceOnExtension)) {
+        invertibleProtocol = std::nullopt;
+      }
+    }
+    if (invertibleProtocol) {
+      for (auto &def : defaults) {
+        // Check whether a corresponding explicit requirement was provided.
+        for (auto &req : requirements) {
+          // An explicit requirement can match the default exactly.
+          if (req.req.getCanonical() == def.req.getCanonical()) {
+            goto next;
+          }
+          
+          // Disregard requirements on other parameters.
+          if (!req.req.getFirstType()->isEqual(def.req.getFirstType())) {
+            continue;
+          }
+          
+          // Or it can be implied by a requirement on something that's inherently
+          // copyable.
+          if (req.req.getKind() == RequirementKind::Superclass) {
+            // classes are currently always escapable and copyable
+            goto next;
+          }
+          if (req.req.getKind() == RequirementKind::Layout) {
+            // layout constraints currently always imply escapable and copyable
+            goto next;
+          }
+          if (req.req.getKind() == RequirementKind::Conformance
+              && req.req.getProtocolDecl()
+                        ->inheritsFrom(def.req.getProtocolDecl())) {
+            goto next;
+          }
+
+          // A same-type constraint removes the ability for the copyability
+          // to vary independently at all.
+          if (req.req.getKind() == RequirementKind::SameType) {
+            goto next;
+          }
+        }
+        ctx.Diags.diagnose(loc,diag::inverse_conditional_must_be_fully_explicit,
+           ctx.getProtocol(getKnownProtocolKind(*invertibleProtocol)),
+                           def.req.getFirstType(),
+                           def.req.getProtocolDecl());
+      next:;
+      }
+      // Don't actually apply the inferred requirements since they should be
+      // stated explicitly.
+      defaults.clear();
+    }
+  }
+  
   requirements.append(defaults);
 
   auto &rewriteCtx = ctx.getRewriteContext();
@@ -954,7 +1016,7 @@ InferredGenericSignatureRequest::evaluate(
     if (attempt == 0) {
       machine->computeRequirementDiagnostics(errors, inverses, loc);
       diagnoseRequirementErrors(ctx, errors,
-                                (isExtension || !genericParamList)
+                                (forExtension || !genericParamList)
                                 ? AllowConcreteTypePolicy::All
                                 : AllowConcreteTypePolicy::AssocTypes);
     }
@@ -985,7 +1047,7 @@ InferredGenericSignatureRequest::evaluate(
                                            std::move(machine));
     }
 
-    if (genericParamList && !isExtension) {
+    if (genericParamList && !forExtension) {
       for (auto genericParam : result.getInnermostGenericParams()) {
         auto reduced = result.getReducedType(genericParam);
 

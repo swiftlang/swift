@@ -1,10 +1,19 @@
-// RUN: %target-swift-frontend -emit-sil -enable-experimental-feature BuiltinModule -enable-experimental-feature LifetimeDependence -enable-experimental-feature AddressableTypes %s | %FileCheck %s
+// RUN: %target-swift-frontend -emit-sil -enable-experimental-feature BuiltinModule -enable-experimental-feature LifetimeDependence -enable-experimental-feature AddressableTypes -enable-experimental-feature ValueGenerics %s | %FileCheck %s
 
 // REQUIRES: swift_feature_BuiltinModule
 // REQUIRES: swift_feature_AddressableTypes
 // REQUIRES: swift_feature_LifetimeDependence
+// REQUIRES: swift_feature_ValueGenerics
 
 import Builtin
+
+// Copied from the stdlib until we have Builtin.overrideLifetime.
+@_unsafeNonescapableResult
+@lifetime(borrow source)
+internal func _overrideLifetime<T: ~Copyable & ~Escapable, U: ~Copyable & ~Escapable>(
+  _ dependent: consuming T, borrowing source: borrowing U) -> T {
+  dependent
+}
 
 struct NodeRef: ~Escapable {
     private var parent: UnsafePointer<Node>
@@ -58,3 +67,24 @@ struct AllocatedNode: ~Copyable {
     }
 }
 
+struct Schmector {
+    // structurally addressable-for-dependencies by virtue of containing a
+    // Builtin.FixedArray
+    private var elements: Builtin.FixedArray<10, Int>
+
+    var storage: Spam {
+        // CHECK-LABEL: sil {{.*}}@${{.*}}9SchmectorV7storage{{.*}}Vvg :
+        // CHECK-SAME:    (@in_guaranteed Schmector) ->
+        @lifetime(borrow self)
+        borrowing get {
+            let pointer = UnsafePointer<Int>(Builtin.addressOfBorrow(self))
+            let spam = Spam(base: pointer, count: 10)
+            return _overrideLifetime(spam, borrowing: self)
+        }
+    }
+}
+
+struct Spam: ~Escapable {
+    @lifetime(borrow base)
+    init(base: UnsafePointer<Int>, count: Int) {}
+}

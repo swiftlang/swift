@@ -72,6 +72,7 @@ public:
                                     getRuntimeLibPath(),
                                     /*diagnosticDocumentationPath*/ "",
                                     SourceKit::createSwiftLangSupport,
+                                    [](SourceKit::Context &Ctx){ return nullptr; },
                                     /*dispatchOnMain=*/false)) {
     INITIALIZE_LLVM();
     // This is avoiding destroying \p SourceKit::Context because another

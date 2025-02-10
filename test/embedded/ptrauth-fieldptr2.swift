@@ -6,7 +6,6 @@
 // RUN: %target-swift-frontend -O -emit-ir %t/Main.swift -I%t -enable-experimental-feature Embedded -import-objc-header %t/header.h
 
 // REQUIRES: swift_in_compiler
-// REQUIRES: OS=macosx || OS=linux-gnu
 // REQUIRES: CPU=arm64e
 // REQUIRES: swift_feature_Embedded
 

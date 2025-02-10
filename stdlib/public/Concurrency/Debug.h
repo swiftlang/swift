@@ -17,6 +17,8 @@
 #ifndef SWIFT_CONCURRENCY_DEBUG_H
 #define SWIFT_CONCURRENCY_DEBUG_H
 
+#include <cstdint>
+
 #include "swift/Runtime/Config.h"
 
 namespace swift {

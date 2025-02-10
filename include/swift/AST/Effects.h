@@ -40,7 +40,8 @@ class ProtocolDecl;
 
 enum class EffectKind : uint8_t {
   Throws = 1 << 0,
-  Async  = 1 << 1
+  Async  = 1 << 1,
+  Unsafe = 1 << 2,
 };
 using PossibleEffects = OptionSet<EffectKind>;
 

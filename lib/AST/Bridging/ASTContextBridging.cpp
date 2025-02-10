@@ -13,6 +13,7 @@
 #include "swift/AST/ASTBridging.h"
 
 #include "swift/AST/ASTContext.h"
+#include "swift/AST/AvailabilitySpec.h"
 
 using namespace swift;
 
@@ -23,6 +24,11 @@ using namespace swift;
 BridgedIdentifier BridgedASTContext_getIdentifier(BridgedASTContext cContext,
                                                   BridgedStringRef cStr) {
   return cContext.unbridged().getIdentifier(cStr.unbridged());
+}
+
+BridgedIdentifier
+BridgedASTContext_getDollarIdentifier(BridgedASTContext cContext, size_t idx) {
+  return cContext.unbridged().getDollarIdentifier(idx);
 }
 
 bool BridgedASTContext_langOptsHasFeature(BridgedASTContext cContext,
@@ -166,4 +172,9 @@ bool BridgedASTContext_canImport(BridgedASTContext cContext,
   return cContext.unbridged().canImportModule(
       builder.get(), canImportLoc.unbridged(), version,
       versionKind == CanImportUnderlyingVersion);
+}
+
+BridgedAvailabilityMacroMap
+BridgedASTContext_getAvailabilityMacroMap(BridgedASTContext cContext) {
+  return &cContext.unbridged().getAvailabilityMacroMap();
 }

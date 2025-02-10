@@ -7201,8 +7201,7 @@ GenericArgumentMetadata irgen::addGenericRequirements(
     case RequirementKind::Layout:
       ++metadata.NumRequirements;
 
-      switch (auto layoutKind =
-                requirement.getLayoutConstraint()->getKind()) {
+      switch (requirement.getLayoutConstraint()->getKind()) {
       case LayoutConstraintKind::Class: {
         // Encode the class constraint.
         auto flags = GenericRequirementFlags(abiKind,

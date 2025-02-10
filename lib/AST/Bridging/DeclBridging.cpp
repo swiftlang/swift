@@ -728,6 +728,10 @@ bool BridgedNominalTypeDecl_isStructWithUnreferenceableStorage(
   return false;
 }
 
+//===----------------------------------------------------------------------===//
+// MARK: BridgedParameterList
+//===----------------------------------------------------------------------===//
+
 BridgedParameterList BridgedParameterList_createParsed(
     BridgedASTContext cContext, BridgedSourceLoc cLeftParenLoc,
     BridgedArrayRef cParameters, BridgedSourceLoc cRightParenLoc) {
@@ -735,4 +739,13 @@ BridgedParameterList BridgedParameterList_createParsed(
   return ParameterList::create(context, cLeftParenLoc.unbridged(),
                                cParameters.unbridged<ParamDecl *>(),
                                cRightParenLoc.unbridged());
+}
+
+size_t BridgedParameterList_size(BridgedParameterList cParameterList) {
+  return cParameterList.unbridged()->size();
+}
+
+BridgedParamDecl BridgedParameterList_get(BridgedParameterList cParameterList,
+                                          size_t i) {
+  return cParameterList.unbridged()->get(i);
 }

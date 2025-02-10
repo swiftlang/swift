@@ -260,9 +260,6 @@ private:
         auto VD = dyn_cast<ValueDecl>(member);
         if (!VD || !shouldInclude(VD))
           continue;
-        // TODO: support nested classes.
-        if (isa<ClassDecl>(member))
-          continue;
         if (const auto *TD = dyn_cast<NominalTypeDecl>(member))
           printUsingForNestedType(TD, TD->getModuleContext());
       }

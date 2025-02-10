@@ -16,6 +16,11 @@
 
 class NonSendableKlass {}
 
+nonisolated class NonIsolatedNonSendableKlass {
+  func unspecifiedMethod() async {}
+  nonisolated func nonisolatedMethod() async {}
+}
+
 func unspecifiedSyncUse<T>(_ t: T) {}
 func unspecifiedAsyncUse<T>(_ t: T) async {}
 nonisolated func nonisolatedSyncUse<T>(_ t: T) {}
@@ -147,4 +152,18 @@ class MainActorKlass {
     await sendToCustom(x4) // expected-enabled-error {{sending 'x4' risks causing data races}}
     // expected-enabled-note @-1 {{sending main actor-isolated 'x4' to global actor 'CustomActor'-isolated global function 'sendToCustom' risks causing data races between global actor 'CustomActor'-isolated and main actor-isolated uses}}
   }
+}
+
+// We should not error on either of these since c is in the main actor's region
+// and our nonisolated/unspecified methods are inheriting the main actor
+// isolation which is safe since they are type checked as something that cannot
+// access any state that is outside of the current actor that c is reachable from.
+@MainActor
+func validateNonisolatedOnClassMeansCallerIsolationInheritingOnFuncDecl(
+  c: NonIsolatedNonSendableKlass
+) async {
+  await c.unspecifiedMethod() // expected-disabled-error {{sending 'c' risks causing data races}}
+  // expected-disabled-note @-1 {{sending main actor-isolated 'c' to nonisolated instance method 'unspecifiedMethod()' risks causing data races between nonisolated and main actor-isolated uses}}
+  await c.nonisolatedMethod() // expected-disabled-error {{sending 'c' risks causing data races}}
+  // expected-disabled-note @-1 {{sending main actor-isolated 'c' to nonisolated instance method 'nonisolatedMethod()' risks causing data races between nonisolated and main actor-isolated uses}}
 }

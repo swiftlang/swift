@@ -26,6 +26,7 @@
 #include "swift/ABI/TaskOptions.h"
 #include "swift/Runtime/Heap.h"
 #include "swift/Runtime/HeapObject.h"
+#include "swift/Runtime/STLCompatibility.h"
 #include "swift/Threading/Mutex.h"
 #include "llvm/ADT/PointerIntPair.h"
 
@@ -287,8 +288,8 @@ static void _asyncLet_get_throwing_continuation(
   }
 
   // Continue the caller's execution.
-  auto throwingResume
-    = reinterpret_cast<ThrowingTaskFutureWaitContinuationFunction*>(callContext->ResumeParent);
+  auto throwingResume =
+      std::bit_cast<ThrowingTaskFutureWaitContinuationFunction*>(callContext->ResumeParent);
   return throwingResume(callContext->Parent, error);
 }
 
@@ -305,8 +306,8 @@ static void swift_asyncLet_get_throwingImpl(
   }
 
   auto aletContext = static_cast<AsyncLetContinuationContext*>(callContext);
-  aletContext->ResumeParent
-    = reinterpret_cast<TaskContinuationFunction*>(resumeFunction);
+  aletContext->ResumeParent =
+      std::bit_cast<TaskContinuationFunction*>(resumeFunction);
   aletContext->Parent = callerContext;
   aletContext->alet = alet;
   auto futureContext = asImpl(alet)->getFutureContext();
@@ -376,7 +377,7 @@ static void asyncLet_finish_after_task_completion(SWIFT_ASYNC_CONTEXT AsyncConte
     swift_task_dealloc(task);
   }
 
-  return reinterpret_cast<ThrowingTaskFutureWaitContinuationFunction*>(resumeFunction)
+  return std::bit_cast<ThrowingTaskFutureWaitContinuationFunction*>(resumeFunction)
     (callerContext, error);
 }
 
@@ -528,14 +529,14 @@ static void swift_asyncLet_consume_throwingImpl(
   if (asImpl(alet)->hasResultInBuffer()) {
     return asyncLet_finish_after_task_completion(callerContext,
                    alet,
-                   reinterpret_cast<TaskContinuationFunction*>(resumeFunction),
+                   std::bit_cast<TaskContinuationFunction*>(resumeFunction),
                    callContext,
                    nullptr);
   }
 
   auto aletContext = static_cast<AsyncLetContinuationContext*>(callContext);
-  aletContext->ResumeParent
-    = reinterpret_cast<TaskContinuationFunction*>(resumeFunction);
+  aletContext->ResumeParent =
+      std::bit_cast<TaskContinuationFunction*>(resumeFunction);
   aletContext->Parent = callerContext;
   aletContext->alet = alet;
   auto futureContext = asImpl(alet)->getFutureContext();

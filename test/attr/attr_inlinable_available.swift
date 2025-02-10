@@ -1690,3 +1690,170 @@ public enum UnavailableEnumWithClasses {
   public class InheritsAfterDeploymentTarget: AfterDeploymentTargetClass {}
   public class InheritsUnavailable: UnavailableClass {}
 }
+
+// MARK: - Overrides
+
+public class Base {
+  @available(macOS 10.9, *)
+  public func beforeInliningTargetMethod() {} // expected-note 3 {{overridden declaration is here}}
+
+  @available(macOS 10.10, *)
+  public func atInliningTargetMethod() {}// expected-note 3 {{overridden declaration is here}}
+
+  @available(macOS 10.14.5, *)
+  public func betweenTargetsMethod() {}// expected-note 3 {{overridden declaration is here}}
+
+  @available(macOS 10.15, *)
+  public func atDeploymentTargetMethod() {}// expected-note 2 {{overridden declaration is here}}
+
+  @available(macOS 11, *)
+  public func afterDeploymentTargetMethod() {}// expected-note {{overridden declaration is here}}
+}
+
+public class DerivedNoAvailable: Base {
+  public override func beforeInliningTargetMethod() {}
+  public override func atInliningTargetMethod() {}
+  public override func betweenTargetsMethod() {}
+  public override func atDeploymentTargetMethod() {}
+  public override func afterDeploymentTargetMethod() {}
+}
+
+@available(macOS 10.9, *)
+public class DerivedBeforeInliningTarget: Base {
+  @available(macOS 10.9, *)
+  public override func beforeInliningTargetMethod() {}
+  @available(macOS 10.9, *)
+  public override func atInliningTargetMethod() {}
+  @available(macOS 10.9, *)
+  public override func betweenTargetsMethod() {}
+  @available(macOS 10.9, *)
+  public override func atDeploymentTargetMethod() {}
+  @available(macOS 10.9, *)
+  public override func afterDeploymentTargetMethod() {}
+}
+
+@available(macOS 10.10, *)
+public class DerivedAtInliningTarget: Base {
+  @available(macOS 10.10, *)
+  public override func beforeInliningTargetMethod() {}
+  @available(macOS 10.10, *)
+  public override func atInliningTargetMethod() {}
+  @available(macOS 10.10, *)
+  public override func betweenTargetsMethod() {}
+  @available(macOS 10.10, *)
+  public override func atDeploymentTargetMethod() {}
+  @available(macOS 10.10, *)
+  public override func afterDeploymentTargetMethod() {}
+}
+
+@available(macOS 10.14.5, *)
+public class DerivedBetweenTargets: Base {
+  @available(macOS 10.14.5, *)
+  public override func beforeInliningTargetMethod() {}
+  @available(macOS 10.14.5, *)
+  public override func atInliningTargetMethod() {}
+  @available(macOS 10.14.5, *)
+  public override func betweenTargetsMethod() {}
+  @available(macOS 10.14.5, *)
+  public override func atDeploymentTargetMethod() {}
+  @available(macOS 10.14.5, *)
+  public override func afterDeploymentTargetMethod() {}
+}
+
+@available(macOS 10.15, *)
+public class DerivedAtDeploymentTarget: Base {
+  @available(macOS 10.15, *)
+  public override func beforeInliningTargetMethod() {}
+  @available(macOS 10.15, *)
+  public override func atInliningTargetMethod() {}
+  @available(macOS 10.15, *)
+  public override func betweenTargetsMethod() {}
+  @available(macOS 10.15, *)
+  public override func atDeploymentTargetMethod() {}
+  @available(macOS 10.15, *)
+  public override func afterDeploymentTargetMethod() {}
+}
+
+@available(macOS 11, *)
+public class DerivedAfterDeploymentTarget: Base {
+  @available(macOS 11, *)
+  public override func beforeInliningTargetMethod() {}
+  @available(macOS 11, *)
+  public override func atInliningTargetMethod() {}
+  @available(macOS 11, *)
+  public override func betweenTargetsMethod() {}
+  @available(macOS 11, *)
+  public override func atDeploymentTargetMethod() {}
+  @available(macOS 11, *)
+  public override func afterDeploymentTargetMethod() {}
+}
+
+public class DerivedAtDeploymentTargetOverrides: Base {
+  @available(macOS 10.15, *)
+  public override func beforeInliningTargetMethod() {} // expected-error {{overriding 'beforeInliningTargetMethod' must be as available as declaration it overrides}}
+
+  @available(macOS 10.15, *)
+  public override func atInliningTargetMethod() {} // expected-error {{overriding 'atInliningTargetMethod' must be as available as declaration it overrides}}
+
+  @available(macOS 10.15, *)
+  public override func betweenTargetsMethod() {} // expected-error {{overriding 'betweenTargetsMethod' must be as available as declaration it overrides}}
+
+  @available(macOS 10.15, *)
+  public override func atDeploymentTargetMethod() {}
+
+  @available(macOS 10.15, *)
+  public override func afterDeploymentTargetMethod() {}
+}
+
+public class DerivedFutureOverrides: Base {
+  @available(macOS 12, *)
+  public override func beforeInliningTargetMethod() {} // expected-error {{overriding 'beforeInliningTargetMethod' must be as available as declaration it overrides}}
+
+  @available(macOS 12, *)
+  public override func atInliningTargetMethod() {} // expected-error {{overriding 'atInliningTargetMethod' must be as available as declaration it overrides}}
+
+  @available(macOS 12, *)
+  public override func betweenTargetsMethod() {} // expected-error {{overriding 'betweenTargetsMethod' must be as available as declaration it overrides}}
+
+  @available(macOS 12, *)
+  public override func atDeploymentTargetMethod() {} // expected-error {{overriding 'atDeploymentTargetMethod' must be as available as declaration it overrides}}
+
+  @available(macOS 12, *)
+  public override func afterDeploymentTargetMethod() {} // expected-error {{overriding 'afterDeploymentTargetMethod' must be as available as declaration it overrides}}
+}
+
+extension AtDeploymentTarget {
+  public class DerivedAtDeploymentTargetOverrides: Base {
+    @available(macOS 10.15, *)
+    public override func beforeInliningTargetMethod() {}
+
+    @available(macOS 10.15, *)
+    public override func atInliningTargetMethod() {}
+
+    @available(macOS 10.15, *)
+    public override func betweenTargetsMethod() {}
+
+    @available(macOS 10.15, *)
+    public override func atDeploymentTargetMethod() {}
+
+    @available(macOS 10.15, *)
+    public override func afterDeploymentTargetMethod() {}
+  }
+
+  public class DerivedAfterDeploymentTargetOverrides: Base {
+    @available(macOS 11, *)
+    public override func beforeInliningTargetMethod() {} // expected-error {{overriding 'beforeInliningTargetMethod' must be as available as declaration it overrides}}
+
+    @available(macOS 11, *)
+    public override func atInliningTargetMethod() {} // expected-error {{overriding 'atInliningTargetMethod' must be as available as declaration it overrides}}
+
+    @available(macOS 11, *)
+    public override func betweenTargetsMethod() {} // expected-error {{overriding 'betweenTargetsMethod' must be as available as declaration it overrides}}
+
+    @available(macOS 11, *)
+    public override func atDeploymentTargetMethod() {} // expected-error {{overriding 'atDeploymentTargetMethod' must be as available as declaration it overrides}}
+
+    @available(macOS 11, *)
+    public override func afterDeploymentTargetMethod() {}
+  }
+}

@@ -717,7 +717,7 @@ public func testInitTake<T>(_ ptr: UnsafeMutablePointer<T>, to x: consuming T) {
 
 @inline(never)
 public func testDestroy<T>(_ ptr: UnsafeMutablePointer<T>) {
-    ptr.deinitialize(count: 1)
+    _ = ptr.move()
 }
 
 @inline(never)

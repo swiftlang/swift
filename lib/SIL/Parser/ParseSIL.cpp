@@ -3469,16 +3469,16 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
     ResultVal = B.createEndCOWMutation(InstLoc, Val, keepUnique);
     break;
   }
-  case SILInstructionKind::IsEscapingClosureInst: {
+  case SILInstructionKind::DestroyNotEscapedClosureInst: {
     bool IsObjcVerificationType = false;
     if (parseSILOptional(IsObjcVerificationType, *this, "objc"))
       return true;
     if (parseTypedValueRef(Val, B) || parseSILDebugLocation(InstLoc, B))
       return true;
-    ResultVal = B.createIsEscapingClosure(
+    ResultVal = B.createDestroyNotEscapedClosure(
         InstLoc, Val,
-        IsObjcVerificationType ? IsEscapingClosureInst::ObjCEscaping
-                              : IsEscapingClosureInst::WithoutActuallyEscaping);
+        IsObjcVerificationType ? DestroyNotEscapedClosureInst::ObjCEscaping
+                              : DestroyNotEscapedClosureInst::WithoutActuallyEscaping);
     break;
   }
 
@@ -5077,6 +5077,11 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
     }
     break;
   }
+  case SILInstructionKind::IgnoredUseInst:
+    if (parseTypedValueRef(Val, B) || parseSILDebugLocation(InstLoc, B))
+      return true;
+    ResultVal = B.createIgnoredUse(InstLoc, Val);
+    break;
 
   case SILInstructionKind::DeallocStackInst:
     if (parseTypedValueRef(Val, B) || parseSILDebugLocation(InstLoc, B))

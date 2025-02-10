@@ -307,6 +307,7 @@ bool swift::addStatusRecord(AsyncTask *task, TaskStatusRecord *newRecord,
     // Wait for any active lock to be released.
     if (oldStatus.isStatusRecordLocked()) {
       bool selfLocked = waitForStatusRecordUnlockIfNotSelfLocked(task, oldStatus);
+      static_cast<void>(selfLocked);
       assert(!selfLocked);
     }
 
@@ -368,6 +369,7 @@ static void removeStatusRecordLocked(ActiveTaskStatus status, TaskStatusRecord *
     }
     cur = next;
   }
+  static_cast<void>(removedRecord);
   assert(removedRecord);
 }
 

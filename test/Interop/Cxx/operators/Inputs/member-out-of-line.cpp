@@ -39,3 +39,13 @@ int& ReadWriteIntArray::operator[](int x) {
 int NonTrivialIntArrayByVal::operator[](int x) {
   return values[x];
 }
+
+bool ClassWithOperatorEqualsParamUnnamed::operator==(
+    const ClassWithOperatorEqualsParamUnnamed &other) const {
+  return false;
+}
+
+bool ClassWithOperatorEqualsParamUnnamed::operator!=(
+    const ClassWithOperatorEqualsParamUnnamed &) const {
+  return true;
+}
