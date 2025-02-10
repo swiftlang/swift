@@ -628,6 +628,17 @@ struct SwiftInterfaceInfo {
   std::optional<version::Version> CompilerToolsVersion;
 };
 
+/// A small helper class that expands the module name to a full output path
+/// with context hash.
+/// The cannonical way to use this class is the following:
+/// 1. Create an instance through the constructor.
+/// 2. Optional: prune the extra args if necessary.
+/// 3. Obtain the expanded name that contains a full path, and a hash.
+/// expandedName is computed only once, and never updated.
+/// Currently, there is no use case where we first obtain expandedName,
+/// then prune the extra args, and finally obtain expandedName again.
+/// Pruning always happens before the first time we call getExpandedName().
+/// Therefore it is correct to calculate expandedName only once.
 class InterfaceModuleNameExpander {
 public:
   using ArgListTy = std::vector<std::string>;
