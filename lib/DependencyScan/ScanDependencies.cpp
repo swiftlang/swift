@@ -180,6 +180,9 @@ public:
 
     pruneUnusedVFSOverlay();
 
+    // It is necessary to update the command line to take
+    // the pruned unused VFS overlay into account before remapping the
+    // command line.
     if (resolvingDepInfo.isSwiftInterfaceModule())
       updateSwiftInterfaceCommandLine();
 
@@ -453,13 +456,14 @@ private:
   }
 
   void updateSwiftInterfaceCommandLine() {
-    // The command line needs upadte once we prune the unused VFS overlays.
+    // The command line needs update once we prune the unused VFS overlays.
     // The update consists of two steps.
-    // 1. Recompute the output path, which includes the module hash.
+    // 1. Obtain the output path, which includes the module hash that takes the
+    // VFS pruning into account.
     // 2. Update `-o `'s value on the command line with the new output path.
 
     assert(nameExpander && "Can only update if we hae a nameExpander.");
-    auto expandedName = nameExpander->getExpandedName();
+    const auto &expandedName = nameExpander->getExpandedName();
 
     StringRef outputName = expandedName.outputPath.str();
 

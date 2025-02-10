@@ -1098,11 +1098,9 @@ class ModuleInterfaceLoaderImpl {
         requiresOSSAModules);
 
     // Compute the output path if we're loading or emitting a cached module.
-    llvm::SmallString<256> cachedOutputPath;
-    StringRef CacheHash;
-    astDelegate.computeCachedOutputPath(moduleName, interfacePath,
-                                        ctx.SearchPathOpts.getSDKPath(),
-                                        cachedOutputPath, CacheHash);
+    auto expandedName = astDelegate.getCachedOutputPath(
+        moduleName, interfacePath, ctx.SearchPathOpts.getSDKPath());
+    auto &cachedOutputPath = expandedName.outputPath;
 
     // Try to find the right module for this interface, either alongside it,
     // in the cache, or in the prebuilt cache.
@@ -2007,110 +2005,13 @@ InterfaceSubContextDelegateImpl::InterfaceSubContextDelegateImpl(
 
 /// Calculate an output filename in \p genericSubInvocation's cache path that
 /// includes a hash of relevant key data.
-StringRef InterfaceSubContextDelegateImpl::computeCachedOutputPath(
-                             StringRef moduleName,
-                             StringRef useInterfacePath,
-                             StringRef sdkPath,
-                             llvm::SmallString<256> &OutPath,
-                             StringRef &CacheHash) {
-  OutPath = genericSubInvocation.getClangModuleCachePath();
-  llvm::sys::path::append(OutPath, moduleName);
-  OutPath.append("-");
-  auto hashStart = OutPath.size();
-  OutPath.append(getCacheHash(useInterfacePath, sdkPath));
-  CacheHash = OutPath.str().substr(hashStart);
-  OutPath.append(".");
-  auto OutExt = file_types::getExtension(file_types::TY_SwiftModuleFile);
-  OutPath.append(OutExt);
-  return OutPath.str();
-}
-
-/// Construct a cache key for the .swiftmodule being generated. There is a
-/// balance to be struck here between things that go in the cache key and
-/// things that go in the "up to date" check of the cache entry. We want to
-/// avoid fighting over a single cache entry too much when (say) running
-/// different compiler versions on the same machine or different inputs
-/// that happen to have the same short module name, so we will disambiguate
-/// those in the key. But we want to invalidate and rebuild a cache entry
-/// -- rather than making a new one and potentially filling up the cache
-/// with dead entries -- when other factors change, such as the contents of
-/// the .swiftinterface input or its dependencies.
-std::string
-InterfaceSubContextDelegateImpl::getCacheHash(StringRef useInterfacePath,
-                                              StringRef sdkPath) {
-  // When doing dependency scanning for explicit module, use strict context hash
-  // to ensure sound module hash.
-  bool useStrictCacheHash =
-      genericSubInvocation.getFrontendOptions().RequestedAction ==
-      FrontendOptions::ActionType::ScanDependencies;
-
-  // Include the normalized target triple when not using strict hash.
-  // Otherwise, use the full target to ensure soundness of the hash. In
-  // practice, .swiftinterface files will be in target-specific subdirectories
-  // and would have target-specific pieces #if'd out. However, it doesn't hurt
-  // to include it, and it guards against mistakenly reusing cached modules
-  // across targets. Note that this normalization explicitly doesn't include the
-  // minimum deployment target (e.g. the '12.0' in 'ios12.0').
-  auto targetToHash = useStrictCacheHash
-                          ? genericSubInvocation.getLangOptions().Target
-                          : getTargetSpecificModuleTriple(
-                                genericSubInvocation.getLangOptions().Target);
-
-  std::string sdkBuildVersion = getSDKBuildVersion(sdkPath);
-  const auto ExtraArgs = genericSubInvocation.getClangImporterOptions()
-                             .getReducedExtraArgsForSwiftModuleDependency();
-
-  llvm::hash_code H = hash_combine(
-      // Start with the compiler version (which will be either tag names or
-      // revs). Explicitly don't pass in the "effective" language version --
-      // this would mean modules built in different -swift-version modes would
-      // rebuild their dependencies.
-      swift::version::getSwiftFullVersion(),
-
-      // Simplest representation of input "identity" (not content) is just a
-      // pathname, and probably all we can get from the VFS in this regard
-      // anyways.
-      useInterfacePath,
-
-      // The target triple to hash.
-      targetToHash.str(),
-
-      // The SDK path is going to affect how this module is imported, so
-      // include it.
-      genericSubInvocation.getSDKPath(),
-
-      // The SDK build version may identify differences in headers
-      // that affects references serialized in the cached file.
-      sdkBuildVersion,
-
-      // Applying the distribution channel of the current compiler enables
-      // different compilers to share a module cache location.
-      version::getCurrentCompilerChannel(),
-
-      // Whether or not we're tracking system dependencies affects the
-      // invalidation behavior of this cache item.
-      genericSubInvocation.getFrontendOptions().shouldTrackSystemDependencies(),
-
-      // Whether or not caching is enabled affects if the instance is able to
-      // correctly load the dependencies.
-      genericSubInvocation.getCASOptions().getModuleScanningHashComponents(),
-
-      // Clang ExtraArgs that affects how clang types are imported into swift
-      // module.
-      llvm::hash_combine_range(ExtraArgs.begin(), ExtraArgs.end()),
-
-      /// Application extension.
-      unsigned(
-          genericSubInvocation.getLangOptions().EnableAppExtensionRestrictions),
-
-      // Whether or not OSSA modules are enabled.
-      //
-      // If OSSA modules are enabled, we use a separate namespace of modules to
-      // ensure that we compile all swift interface files with the option set.
-      unsigned(genericSubInvocation.getSILOptions().EnableOSSAModules)
-      );
-
-  return llvm::toString(llvm::APInt(64, H), 36, /*Signed=*/false);
+InterfaceModuleNameExpander::ResultTy
+InterfaceSubContextDelegateImpl::getCachedOutputPath(StringRef moduleName,
+                                                     StringRef interfacePath,
+                                                     StringRef sdkPath) {
+  InterfaceModuleNameExpander expander(moduleName, interfacePath, sdkPath,
+                                       genericSubInvocation);
+  return expander.getExpandedName();
 }
 
 std::error_code
@@ -2189,13 +2090,11 @@ InterfaceSubContextDelegateImpl::runInSubCompilerInstance(StringRef moduleName,
   }
 
   // Calculate output path of the module.
-  llvm::SmallString<256> buffer;
-  StringRef CacheHash;
-  auto hashedOutput = computeCachedOutputPath(moduleName, interfacePath,
-                                              sdkPath, buffer, CacheHash);
+  auto expandedName = getCachedOutputPath(moduleName, interfacePath, sdkPath);
+
   // If no specific output path is given, use the hashed output path.
   if (outputPath.empty()) {
-    outputPath = hashedOutput;
+    outputPath = expandedName.outputPath;
   }
 
   // Configure the outputs in front-end options. There must be an equal number of
@@ -2249,7 +2148,7 @@ InterfaceSubContextDelegateImpl::runInSubCompilerInstance(StringRef moduleName,
   }
 
   info.BuildArguments = BuildArgs;
-  info.Hash = CacheHash;
+  info.Hash = expandedName.hash;
 
   // Run the action under the sub compiler instance.
   return action(info);
@@ -2846,26 +2745,45 @@ std::unique_ptr<ExplicitCASModuleLoader> ExplicitCASModuleLoader::create(
 
 InterfaceModuleNameExpander::ResultTy
 InterfaceModuleNameExpander::getExpandedName() {
-  // Expand the name once, and reuse later.
-  if (!expanded) {
-    auto &outputPath = expandedName.outputPath;
+  if (!expandedName) {
+    expandedName = std::make_unique<ResultTy>();
+    auto &outputPath = expandedName->outputPath;
     outputPath = CI.getClangModuleCachePath();
     llvm::sys::path::append(outputPath, moduleName);
     outputPath.append("-");
     auto hashStart = outputPath.size();
     outputPath.append(getHash());
-    expandedName.hash = outputPath.str().substr(hashStart);
+    expandedName->hash = outputPath.str().substr(hashStart);
     outputPath.append(".");
     auto outExt = file_types::getExtension(file_types::TY_SwiftModuleFile);
     outputPath.append(outExt);
-    expanded = true;
   }
-  return expandedName;
+  return *expandedName;
 }
 
+/// Construct a key for the .swiftmodule being generated. There is a
+/// balance to be struck here between things that go in the cache key and
+/// things that go in the "up to date" check of the cache entry. We want to
+/// avoid fighting over a single cache entry too much when (say) running
+/// different compiler versions on the same machine or different inputs
+/// that happen to have the same short module name, so we will disambiguate
+/// those in the key. But we want to invalidate and rebuild a cache entry
+/// -- rather than making a new one and potentially filling up the cache
+/// with dead entries -- when other factors change, such as the contents of
+/// the .swiftinterface input or its dependencies.
 std::string InterfaceModuleNameExpander::getHash() {
+  // When doing dependency scanning for explicit module, use strict context hash
+  // to ensure sound module hash.
   bool useStrictCacheHash = CI.getFrontendOptions().RequestedAction ==
                             FrontendOptions::ActionType::ScanDependencies;
+
+  // Include the normalized target triple when not using strict hash.
+  // Otherwise, use the full target to ensure soundness of the hash. In
+  // practice, .swiftinterface files will be in target-specific subdirectories
+  // and would have target-specific pieces #if'd out. However, it doesn't hurt
+  // to include it, and it guards against mistakenly reusing cached modules
+  // across targets. Note that this normalization explicitly doesn't include the
+  // minimum deployment target (e.g. the '12.0' in 'ios12.0').
   auto targetToHash =
       useStrictCacheHash
           ? CI.getLangOptions().Target
@@ -2874,12 +2792,50 @@ std::string InterfaceModuleNameExpander::getHash() {
   std::string sdkBuildVersion = getSDKBuildVersion(sdkPath);
 
   llvm::hash_code H = llvm::hash_combine(
-      swift::version::getSwiftFullVersion(), interfacePath, targetToHash.str(),
-      CI.getSDKPath(), sdkBuildVersion, version::getCurrentCompilerChannel(),
+      // Start with the compiler version (which will be either tag names or
+      // revs). Explicitly don't pass in the "effective" language version --
+      // this would mean modules built in different -swift-version modes would
+      // rebuild their dependencies.
+      swift::version::getSwiftFullVersion(),
+
+      // Simplest representation of input "identity" (not content) is just a
+      // pathname, and probably all we can get from the VFS in this regard
+      // anyways.
+      interfacePath,
+
+      // The target triple to hash.
+      targetToHash.str(),
+
+      // The SDK path is going to affect how this module is imported, so
+      // include it.
+      CI.getSDKPath(),
+
+      // The SDK build version may identify differences in headers
+      // that affects references serialized in the cached file.
+      sdkBuildVersion,
+
+      // Applying the distribution channel of the current compiler enables
+      // different compilers to share a module cache location.
+      version::getCurrentCompilerChannel(),
+
+      // Whether or not we're tracking system dependencies affects the
+      // invalidation behavior of this cache item.
       CI.getFrontendOptions().shouldTrackSystemDependencies(),
+
+      // Whether or not caching is enabled affects if the instance is able to
+      // correctly load the dependencies.
       CI.getCASOptions().getModuleScanningHashComponents(),
+
+      // Take care of any extra arguments that should affect the hash.
       llvm::hash_combine_range(extraArgs.begin(), extraArgs.end()),
+
+      // Application extension.
       unsigned(CI.getLangOptions().EnableAppExtensionRestrictions),
+
+      // Whether or not OSSA modules are enabled.
+      //
+      // If OSSA modules are enabled, we use a separate namespace of modules to
+      // ensure that we compile all swift interface files with the option set.
       unsigned(CI.getSILOptions().EnableOSSAModules));
 
   return llvm::toString(llvm::APInt(64, H), 36, /*Signed=*/false);
