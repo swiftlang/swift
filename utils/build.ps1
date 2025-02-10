@@ -113,25 +113,43 @@ param(
   [string] $SourceCache = "S:\SourceCache",
   [string] $BinaryCache = "S:\b",
   [string] $ImageRoot = "S:",
+  [ValidateSet("dwarf", "codeview")]
   [string] $CDebugFormat = "dwarf",
+  [ValidateSet("dwarf", "codeview")]
   [string] $SwiftDebugFormat = "dwarf",
-  [string] $AndroidAPILevel = 28,
+  [ValidateRange(1, 36)]
+  [int] $AndroidAPILevel = 28,
   [string[]] $AndroidSDKs = @(),
+  [ValidateSet("X64", "X86", "Arm64")]
   [string[]] $WindowsSDKs = @("X64","X86","Arm64"),
   [string] $ProductVersion = "0.0.0",
   [string] $ToolchainIdentifier = $(if (${env:TOOLCHAIN_VERSION}) { "${env:TOOLCHAIN_VERSION}" } else { "${env:USERNAME}.development" }),
   [string] $PinnedBuild = "",
+  [ValidatePattern("^[A-Fa-f0-9]{64}$")]
   [string] $PinnedSHA256 = "",
   [string] $PinnedVersion = "",
   [string] $PythonVersion = "3.9.10",
+  [ValidatePattern("^r(?:[1-9]|[1-9][0-9])(?:[a-z])?$")]
   [string] $AndroidNDKVersion = "r26b",
+  [ValidatePattern("^\d+\.\d+\.\d+(?:-\w+)?")]
   [string] $WinSDKVersion = "",
   [switch] $Android = $false,
   [switch] $SkipBuild = $false,
   [switch] $SkipPackaging = $false,
   [switch] $IncludeDS2 = $false,
+  [ValidateSet("*", "clang", "dispatch", "foundation", "llbuild", "lldb", "lld",
+    "llvm", "sourcekit-lsp", "swift", "swift-format", "swiftpm", "testing",
+    "xctest")]
   [string[]] $Test = @(),
   [string] $Stage = "",
+  [ValidateSet("ArgumentParser", "ASN1", "BuildTools", "Certificates", "CMark",
+    "Collections", "Compilers", "Crypto", "CURL", "Dispatch", "DocC", "Driver",
+    "DS2", "ExperimentalRuntime", "Format", "Foundation", "FoundationMacros",
+    "IndexStoreDB", "Inspect", "Installer", "LLBuild", "LLVM", "LMDB",
+    "Markdown", "mimalloc", "PackageManager", "PlatformInfoPlist", "RegsGen2",
+    "Runtime", "Sanitizers", "SDKSettingsPlist", "SourceKitLSP", "SQLite",
+    "System", "Testing", "TestingMacros", "ToolsSupportCore", "XCTest", "XML2",
+    "ZLib")]
   [string] $BuildTo = "",
   [string] $HostArchName = $(if ($env:PROCESSOR_ARCHITEW6432 -ne $null) { "$env:PROCESSOR_ARCHITEW6432" } else { "$env:PROCESSOR_ARCHITECTURE" }),
   [switch] $Clean,
