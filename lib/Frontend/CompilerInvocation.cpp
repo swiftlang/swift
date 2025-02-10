@@ -525,9 +525,6 @@ static void ParseModuleInterfaceArgs(ModuleInterfaceOptions &Opts,
       Opts.setInterfaceMode(PrintOptions::InterfaceMode::Private);
     }
   }
-  for (auto val: Args.getAllArgValues(OPT_skip_import_in_public_interface)) {
-    Opts.ModulesToSkipInPublicInterface.push_back(val);
-  }
 }
 
 /// Checks if an arg is generally allowed to be included
