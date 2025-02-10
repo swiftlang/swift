@@ -3106,9 +3106,7 @@ Expr *Parser::parseExprAnonClosureArg() {
   auto &decls = AnonClosureVars.back().Item;
   while (ArgNo >= decls.size()) {
     unsigned nextIdx = decls.size();
-    SmallVector<char, 4> StrBuf;
-    StringRef varName = ("$" + Twine(nextIdx)).toStringRef(StrBuf);
-    Identifier ident = Context.getIdentifier(varName);
+    Identifier ident = Context.getDollarIdentifier(nextIdx);
     SourceLoc varLoc = leftBraceLoc;
     auto *var = new (Context)
         ParamDecl(SourceLoc(), SourceLoc(),
