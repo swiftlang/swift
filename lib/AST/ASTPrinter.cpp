@@ -7742,7 +7742,7 @@ std::string TypeBase::getStringAsComponent(const PrintOptions &PO) const {
   return OS.str();
 }
 
-void TypeBase::dumpPrint() const {
+void TypeBase::print() const {
   print(llvm::errs());
   llvm::errs() << '\n';
 }
