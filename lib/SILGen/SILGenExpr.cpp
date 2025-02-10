@@ -4286,11 +4286,13 @@ SILGenModule::emitKeyPathComponentForDecl(SILLocation loc,
       // The mapTypeIntoContext() / mapTypeOutOfContext() dance is there
       // to handle the case where baseTy being a type parameter subject
       // to a superclass requirement.
-      componentTy = var->getValueInterfaceType().subst(
-        GenericEnvironment::mapTypeIntoContext(genericEnv, baseTy)
-          ->getContextSubstitutionMap(var->getDeclContext()))
-          ->mapTypeOutOfContext()
-          ->getCanonicalType();
+      componentTy =
+          var->getValueInterfaceType()
+              .subst(GenericEnvironment::mapTypeIntoContext(
+                         genericEnv, baseTy->getMetatypeInstanceType())
+                         ->getContextSubstitutionMap(var->getDeclContext()))
+              ->mapTypeOutOfContext()
+              ->getCanonicalType();
     }
 
     // The component type for an @objc optional requirement needs to be
