@@ -306,7 +306,8 @@ target_link_libraries(swiftCore
     swiftDemangling
     swiftShims
     swiftStdlibStubs
-    swiftThreading)
+    swiftThreading
+    $<$<NOT:$<PLATFORM_ID:Darwin>>:swiftrt$<$<PLATFORM_ID:Windows>:T>>)
 target_link_options(swiftCore PRIVATE
   -nostartfiles)
 if(NOT POLICY CMP0157)
