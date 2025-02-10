@@ -61,6 +61,9 @@ public:
       ShouldDeclareOptionalTypes optionals = DoNotDeclareOptionalTypes,
       llvm::Triple target = llvm::Triple(llvm::sys::getProcessTriple()));
 
+  TestContext(llvm::Triple target)
+      : TestContext(DoNotDeclareOptionalTypes, target) {};
+
   template <typename Nominal>
   typename std::enable_if<!std::is_same<Nominal, swift::ClassDecl>::value,
                           Nominal *>::type

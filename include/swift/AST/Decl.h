@@ -1432,8 +1432,8 @@ public:
   /// Returns the active platform-specific `@available` attribute for this decl.
   /// There may be multiple `@available` attributes that are relevant to the
   /// current platform, but the returned one has the highest priority.
-  std::optional<SemanticAvailableAttr> getActiveAvailableAttrForCurrentPlatform(
-      bool ignoreAppExtensions = false) const;
+  std::optional<SemanticAvailableAttr>
+  getActiveAvailableAttrForCurrentPlatform() const;
 
   /// Returns the active platform-specific `@available` attribute that should be
   /// used to determine the platform introduction version of the decl.
@@ -1479,8 +1479,7 @@ public:
   /// If the decl is always unavailable in the current compilation
   /// context, returns the attribute attached to the decl (or its parent
   /// extension) that makes it unavailable.
-  std::optional<SemanticAvailableAttr>
-  getUnavailableAttr(bool ignoreAppExtensions = false) const;
+  std::optional<SemanticAvailableAttr> getUnavailableAttr() const;
 
   /// Returns true if the decl is effectively always unavailable in the current
   /// compilation context. This query differs from \c isUnavailable() because it

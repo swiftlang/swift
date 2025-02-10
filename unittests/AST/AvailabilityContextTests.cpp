@@ -30,7 +30,7 @@ static AvailabilityRange getAvailabilityRange(unsigned major, unsigned minor) {
 class AvailabilityContextTest : public ::testing::Test {
 public:
   const TestContext defaultTestContext{
-      DoNotDeclareOptionalTypes, llvm::Triple("x86_64", "apple", "macosx10.9")};
+      llvm::Triple("x86_64", "apple", "macosx10.9")};
 
   struct {
     const AvailabilityDomain universal = AvailabilityDomain::forUniversal();
