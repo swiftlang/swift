@@ -1239,11 +1239,6 @@ def new_driver_path
   : Separate<["-"], "new-driver-path">, MetaVarName<"<path>">,
   HelpText<"Path of the new driver to be used">;
 
-def skip_import_in_public_interface:
-  Separate<["-"], "skip-import-in-public-interface">,
-  HelpText<"Skip the import statement corresponding to a module name "
-           "when printing the public interface.">;
-
 def disable_fine_module_tracing:
   Flag<["-"], "disable-fine-module-tracing">,
   HelpText<"Skip the emission of fine grained module tracing file.">;
