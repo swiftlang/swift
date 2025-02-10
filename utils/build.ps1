@@ -638,7 +638,7 @@ function Invoke-VsDevShell($Arch) {
   if ($ToBatch) {
     Write-Output "call `"$VSInstallRoot\Common7\Tools\VsDevCmd.bat`" $DevCmdArguments"
   } else {
-    # This dll path is valid for VS2019 and VS2022, but it was under a vsdevcmd subfolder in VS2017 
+    # This dll path is valid for VS2019 and VS2022, but it was under a vsdevcmd subfolder in VS2017
     Import-Module "$VSInstallRoot\Common7\Tools\Microsoft.VisualStudio.DevShell.dll"
     Enter-VsDevShell -VsInstallPath $VSInstallRoot -SkipAutomaticLocation -DevCmdArguments $DevCmdArguments
 
@@ -720,7 +720,6 @@ function Fetch-Dependencies {
     Expand-Archive -Path $source -DestinationPath $destination -Force
   }
 
-
   function Extract-Toolchain {
     param
     (
@@ -754,7 +753,12 @@ function Fetch-Dependencies {
     }
   }
 
-  if ($SkipBuild -and $SkipPackaging) { return }
+  if ($SkipBuild -and $SkipPackaging -and -not $Test) { return }
+
+  $Stopwatch = [Diagnostics.Stopwatch]::StartNew()
+  if ($ToBatch) {
+    Write-Host -ForegroundColor Cyan "[$([DateTime]::Now.ToString("yyyy-MM-dd HH:mm:ss"))] Fetch-Dependencies..."
+  }
 
   $Stopwatch = [Diagnostics.Stopwatch]::StartNew()
   if ($ToBatch) {
@@ -766,7 +770,7 @@ function Fetch-Dependencies {
   DownloadAndVerify $WixURL "$BinaryCache\WiX-$WiXVersion.zip" $WiXHash
   Extract-ZipFile WiX-$WiXVersion.zip $BinaryCache WiX-$WiXVersion
 
-  if ($SkipBuild) { return }
+  if ($SkipBuild -and -not $Test) { return }
 
   DownloadAndVerify $PinnedBuild "$BinaryCache\$PinnedToolchain.exe" $PinnedSHA256
 
@@ -866,6 +870,57 @@ function Fetch-Dependencies {
     DownloadAndVerify $NDKURL "$BinaryCache\android-ndk-$AndroidNDKVersion-windows.zip" $NDKHash
 
     Extract-ZipFile -ZipFileName "android-ndk-$AndroidNDKVersion-windows.zip" -BinaryCache $BinaryCache -ExtractPath "android-ndk-$AndroidNDKVersion" -CreateExtractPath $false
+
+    # FIXME: Both Java and Android emulator must be available in the environment.
+    # This is a terrible workaround. It's a waste of time and resources.
+    $SDKDir = "$BinaryCache\android-sdk"
+    if ($Test -and -not(Test-Path "$SDKDir\licenses")) {
+      # Download Java Runtime
+      switch ($BuildArchName) {
+        "AMD64" {
+          $JavaURL = "https://aka.ms/download-jdk/microsoft-jdk-17.0.14-windows-x64.zip"
+          $JavaHash = "3619082f4a667f52c97cce983364a517993f798ae248c411765becfd9705767f"
+        }
+        "ARM64" {
+          $JavaURL = "https://aka.ms/download-jdk/microsoft-jdk-17.0.14-windows-aarch64.zip"
+          $JavaHash = "2a12c7b3d46712de9671f5f011a3cae9ee53d5ff3b0604136ee079a906146448"
+        }
+        default { throw "Unsupported processor architecture" }
+      }
+      DownloadAndVerify $JavaURL "$BinaryCache\microsoft-jdk.zip" $JavaHash
+      Extract-ZipFile -ZipFileName "microsoft-jdk.zip" -BinaryCache $BinaryCache -ExtractPath "android-sdk-jdk"
+
+      # Download cmdline-tools
+      $CLToolsURL = "https://dl.google.com/android/repository/commandlinetools-win-11076708_latest.zip"
+      $CLToolsHash = "4d6931209eebb1bfb7c7e8b240a6a3cb3ab24479ea294f3539429574b1eec862"
+      DownloadAndVerify $CLToolsURL "$BinaryCache\android-cmdline-tools.zip" $CLToolsHash
+      Extract-ZipFile -ZipFileName "android-cmdline-tools.zip" -BinaryCache $BinaryCache -ExtractPath "android-sdk-cmdline-tools"
+
+      # Accept licenses
+      New-Item -Type Directory -Path "$SDKDir\licenses" -ErrorAction Ignore | Out-Null
+      Set-Content -Path "$SDKDir\licenses\android-sdk-license" -Value "24333f8a63b6825ea9c5514f83c2829b004d1fee"
+      Set-Content -Path "$SDKDir\licenses\android-sdk-preview-license" -Value "84831b9409646a918e30573bab4c9c91346d8abd"
+
+      # Install packages and create test device
+      Isolate-EnvVars {
+        $env:JAVA_HOME = "$BinaryCache\android-sdk-jdk\jdk-17.0.14+7"
+        $env:Path = "${env:JAVA_HOME}\bin;${env:Path}"
+
+        # Let cmdline-tools install itself. This is idiomatic for installing the Android SDK.
+        Invoke-Program "$BinaryCache\android-sdk-cmdline-tools\cmdline-tools\bin\sdkmanager.bat" -OutNull "--sdk_root=$SDKDir" '"cmdline-tools;latest"' '--channel=3'
+        $AndroidSdkMgr = "$SDKDir\cmdline-tools\latest\bin\sdkmanager.bat"
+        foreach ($Package in @('"system-images;android-29;default;x86_64"', '"platforms;android-29"', '"platform-tools"')) {
+          Write-Host "$AndroidSdkMgr $Package"
+          Invoke-Program -OutNull $AndroidSdkMgr $Package
+        }
+
+        # There is no way to disable interactive mode in avdmanager
+        "no" | & "$SDKDir\cmdline-tools\latest\bin\avdmanager.bat" create avd --force --name '"swift-test-device"' --package '"system-images;android-29;default;x86_64"'
+
+        # Dump virtual devices to confirm that swift-test-device exists
+        Invoke-Program "$SDKDir\cmdline-tools\latest\bin\avdmanager.bat" list avd
+      }
+    }
   }
 
   if ($IncludeDS2) {
@@ -914,6 +969,118 @@ function Fetch-Dependencies {
       Checkout = 'Fetch-Dependencies'
       "Elapsed Time" = $Stopwatch.Elapsed.ToString()
     })
+  }
+}
+
+$AndroidEmulatorPid = $null
+$AndroidEmulatorArchName = $null
+
+function AndroidEmulator-CreateDevice($ArchName) {
+  $DeviceName = "swift-test-device-$ArchName"
+  $Packages = "system-images;android-29;default;$ArchName"
+  $AvdTool = "$BinaryCache\android-sdk\cmdline-tools\latest\bin\avdmanager.bat"
+
+  $Output = & $AvdTool list avd
+  if ($Output -match $DeviceName) {
+    Write-Host "Found Android virtual device for arch $ArchName"
+  } else {
+    Write-Host "Create Android virtual device for arch $ArchName"
+    # We had issues with not closing file handles to the created AVD, which
+    # caused the emulator to crash at startup. Using `Start-Process` instead of
+    # the `&` operator prevents that.
+    Start-Process "cmd.exe" -ArgumentList "/c echo no | $AvdTool create avd --force --name $DeviceName --package $Packages" -NoNewWindow -Wait
+  }
+  return $DeviceName
+}
+
+function AndroidEmulator-Run($ArchName) {
+  if ($AndroidEmulatorArchName -ne $ArchName) {
+    AndroidEmulator-TearDown
+  }
+  if ($AndroidEmulatorPid -eq $null) {
+    Isolate-EnvVars {
+      $env:ANDROID_SDK_HOME = "$BinaryCache\android-sdk"
+      $env:JAVA_HOME = "$BinaryCache\android-sdk-jdk\jdk-17.0.14+7"
+      $env:Path = "${env:JAVA_HOME}\bin;${env:Path}"
+
+      Write-Host "ANDROID_SDK_HOME = $env:ANDROID_SDK_HOME"
+      $AvdTool = "$BinaryCache\android-sdk\cmdline-tools\latest\bin\avdmanager.bat"
+      Write-Host "$AvdTool list avd reports:"
+      Invoke-Program $AvdTool list avd
+
+      $Device = (AndroidEmulator-CreateDevice $ArchName)
+
+      Write-Host "$AvdTool list avd reports:"
+      Invoke-Program $AvdTool list avd
+
+      $EmuTool = "$BinaryCache\android-sdk\emulator\emulator.exe"
+      Write-Host "$EmuTool -list-avds reports:"
+      Invoke-Program $EmuTool -list-avds
+
+      Write-Host "Start Android emulator for arch $ArchName"
+      foreach($Attempt in 1..5) {
+        $Process = Start-Process -PassThru $EmuTool "@$Device"
+        try {
+          Write-Host "Waiting for process $($Process.Id) to start"
+          Start-Sleep -Seconds 1
+          $_ = Get-Process -Id $Process.Id
+          break
+        } catch {
+          if ($Attempt -lt 5) {
+            Write-Host "Process $($Process.Id) failed to start, trying again..."
+            Start-Sleep -Seconds 3
+          } else {
+            throw "Android emulator process $($Process.Id) failed to start."
+          }
+        }
+      }
+
+      $global:AndroidEmulatorPid = $Process.Id
+      $global:AndroidEmulatorArchName = $ArchName
+
+      Write-Host "Waiting while Android emulator boots in process $AndroidEmulatorPid"
+      $adb = "$BinaryCache\android-sdk\platform-tools\adb.exe"
+      foreach($Attempt in 1..5) {
+        Start-Sleep -Seconds 10
+        $Process = Start-Process $adb "wait-for-device" -PassThru -NoNewWindow
+        try {
+          Write-Host "adb wait-for-device running in process $($Process.Id)"
+          Wait-Process -Id $Process.Id -Timeout 20
+          break
+        } catch {
+          if ($Attempt -lt 5) {
+            Write-Host "adb failed to connect. Shutting it down."
+            Stop-Process -Force -Id $Process.Id
+          } else {
+            throw "Android Debug Bridge process $($Process.Id) failed to connect."
+          }
+        }
+      }
+
+      Write-Host "SUCCESS: Emulator ready"
+    }
+  }
+}
+
+function AndroidEmulator-TearDown() {
+  if ($AndroidEmulatorPid -ne $null) {
+    if (Get-Process -Id $AndroidEmulatorPid -ErrorAction SilentlyContinue) {
+      Write-Host "Tear down Android emulator for arch $AndroidEmulatorArchName"
+      $adb = "$BinaryCache\android-sdk\platform-tools\adb.exe"
+      & $adb emu kill | Out-Null
+      & $adb kill-server | Out-Null
+
+      try {
+        Write-Host "Waiting for process $AndroidEmulatorPid to exit"
+        Wait-Process -Id $AndroidEmulatorPid -Timeout 1
+      } catch {
+        Write-Host "Process $AndroidEmulatorPid failed to exit. Shutting it down."
+        Stop-Process -Force -Id $AndroidEmulatorPid
+      }
+
+      $global:AndroidEmulatorPid = $null
+      $global:AndroidEmulatorArchName = $null
+    }
   }
 }
 
@@ -1450,7 +1617,7 @@ function Build-WiXProject() {
   $ProductVersionArg = $ProductVersion
   if (-not $Bundle) {
     # WiX v4 will accept a semantic version string for Bundles,
-    # but Packages still require a purely numerical version number, 
+    # but Packages still require a purely numerical version number,
     # so trim any semantic versioning suffixes
     $ProductVersionArg = [regex]::Replace($ProductVersion, "[-+].*", "")
   }
@@ -2149,6 +2316,50 @@ function Build-Dispatch([Platform]$Platform, $Arch, [switch]$Test = $false) {
   }
 }
 
+function Test-Dispatch([Platform]$Platform) {
+  # Install packages and create test device
+  Isolate-EnvVars {
+    $env:JAVA_HOME = "$BinaryCache\android-sdk-jdk\jdk-17.0.14+7"
+    $env:Path = "${env:JAVA_HOME}\bin;${env:Path}"
+
+    # TODO: One emulator instance for all tests?
+    $emulator = "$BinaryCache\android-sdk\emulator\emulator.exe"
+    Write-Host    "$emulator -version"
+    Invoke-Program $emulator "-version"
+
+    # Dump virtual devices (again) to confirm that swift-test-device exists
+    Invoke-Program "$BinaryCache\android-sdk\cmdline-tools\latest\bin\avdmanager.bat" list avd
+
+    Start-Process -FilePath $emulator -ArgumentList "@swift-test-device"
+    Start-Sleep -Seconds 30
+
+    # This is just a hack for now
+    $CachePath = (Get-TargetProjectBinaryCache $AndroidX64 Dispatch)
+    $CacheName = Split-Path $CachePath -Leaf
+    $RemoteRoot = "/data/local/tmp"
+
+    # TODO: On my local machine I have to grant adb.exe network access once. How to do that in CI?
+    $adb = "$BinaryCache\android-sdk\platform-tools\adb.exe"
+    Write-Host    "$adb version"
+    Invoke-Program $adb "version"
+    Write-Host    "$adb get-state @swift-test-device"
+    &              $adb get-state "@swift-test-device"
+    Write-Host    "$adb logcat -d @swift-test-device"
+    &              $adb logcat -d "@swift-test-device"
+    #Write-Host    "$BinaryCache\android-sdk\.temp\emulator.out log:"
+    #Write-Host    (Get-Content -Path "$BinaryCache\android-sdk\.temp\emulator.out")
+    #Write-Host    "$BinaryCache\android-sdk\.temp\emulator.err log:"
+    #Write-Host    (Get-Content -Path "$BinaryCache\android-sdk\.temp\emulator.err")
+    Invoke-Program $adb "wait-for-device"
+    Write-Host    "$adb push $CachePath $RemoteRoot"
+    Invoke-Program $adb push $CachePath $RemoteRoot
+    Write-Host    "$adb shell sh $RemoteRoot/$CacheName/tests/ctest-android.sh"
+    Invoke-Program $adb shell "sh $RemoteRoot/$CacheName/tests/ctest-android.sh"
+    Invoke-Program $adb emu kill
+    Invoke-Program $adb kill-server
+  }
+}
+
 function Build-Foundation([Platform]$Platform, $Arch, [switch]$Test = $false) {
   if ($Test) {
     # Foundation tests build via swiftpm rather than CMake
@@ -2719,7 +2930,7 @@ function Test-Format {
     "-Xswiftc", "-I$(Get-HostProjectBinaryCache Format)\swift",
     "-Xlinker", "-L$(Get-HostProjectBinaryCache Format)\lib"
   )
-  
+
   Isolate-EnvVars {
     $env:SWIFTFORMAT_BUILD_ONLY_TESTS=1
     # Testing swift-format is faster in serial mode than in parallel mode, probably because parallel test execution
@@ -3067,6 +3278,10 @@ try {
 
 Fetch-Dependencies
 
+AndroidEmulator-Run $AndroidX64.LLVMName
+AndroidEmulator-TearDown
+exit(1)
+
 if ($Clean) {
   10..[HostComponent].getEnumValues()[-1] | ForEach-Object { Remove-Item -Force -Recurse "$BinaryCache\$_" -ErrorAction Ignore }
   # In case of a previous test run, clear out the swiftmodules as they are not a stable format.
@@ -3224,6 +3439,10 @@ if (-not $IsCrossCompiling) {
 
   if ($Test -contains "dispatch") {
     Build-Dispatch Windows $HostArch -Test
+    # TODO: This is a hack. We need different devices for different arches.
+    if ($AndroidSDKs -contains "x86_64") {
+      Test-Dispatch Android $AndroidX64
+    }
   }
   if ($Test -contains "foundation") {
     Build-Foundation Windows $HostArch -Test
@@ -3267,6 +3486,12 @@ if (-not $IsCrossCompiling) {
 
   exit 1
 } finally {
+  $adb = "$BinaryCache\android-sdk\platform-tools\adb.exe"
+  if (Test-Path $adb) {
+    & $adb emu kill | Out-Null
+    & $adb kill-server | Out-Null
+  }
+
   if ($Summary) {
     $TimingData | Select-Object Platform,Arch,Checkout,"Elapsed Time" | Sort-Object -Descending -Property "Elapsed Time" | Format-Table -AutoSize
   }
