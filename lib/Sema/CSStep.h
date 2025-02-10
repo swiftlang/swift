@@ -39,7 +39,7 @@ class SolverStep;
 class ComponentStep;
 
 /// Represents available states which every
-/// given step could be in during it's lifetime.
+/// given step could be in during its lifetime.
 enum class StepState { Setup, Ready, Running, Suspended, Done };
 
 /// Represents result of the step execution,
