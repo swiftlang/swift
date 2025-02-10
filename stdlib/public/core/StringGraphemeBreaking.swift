@@ -203,7 +203,7 @@ extension _StringGuts {
     if isFastUTF8 {
       let fast = withFastUTF8 { utf8 in
         if i &+ 1 == utf8.count { return true }
-        let pair = UnsafeRawPointer(
+        let pair = unsafe UnsafeRawPointer(
           utf8.baseAddress.unsafelyUnwrapped
         ).loadUnaligned(fromByteOffset: i, as: UInt16.self)
         //& 0x8080 == 0 is "both not ASCII", != 0x0A0D is "not CRLF"
@@ -251,7 +251,7 @@ extension _StringGuts {
     }
     if isFastUTF8 {
       let fast = withFastUTF8 { utf8 in
-        let pair = UnsafeRawPointer(
+        let pair = unsafe UnsafeRawPointer(
           utf8.baseAddress.unsafelyUnwrapped
         ).loadUnaligned(fromByteOffset: i &- 2, as: UInt16.self)
         //& 0x8080 == 0 is "both not ASCII", != 0x0A0D is "not CRLF"

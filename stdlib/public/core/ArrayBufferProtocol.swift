@@ -169,14 +169,14 @@ extension _ArrayBufferProtocol {
     let holeStart = elements + subrange.lowerBound
     let holeEnd = holeStart + newCount
     let eraseCount = subrange.count
-    holeStart.deinitialize(count: eraseCount)
+    unsafe holeStart.deinitialize(count: eraseCount)
 
     let growth = newCount - eraseCount
 
     if growth != 0 {
       let tailStart = elements + subrange.upperBound
       let tailCount = self.count - subrange.upperBound
-      holeEnd.moveInitialize(from: tailStart, count: tailCount)
+      unsafe holeEnd.moveInitialize(from: tailStart, count: tailCount)
       self.count += growth
     }
 
@@ -190,13 +190,13 @@ extension _ArrayBufferProtocol {
           $0.count == newCount,
           "invalid Collection: count differed in successive traversals"
         )
-        holeStart.initialize(from: $0.baseAddress!, count: newCount)
+        unsafe holeStart.initialize(from: $0.baseAddress!, count: newCount)
       }
       if done == nil {
         var place = holeStart
         var i = newValues.startIndex
         while place < holeEnd {
-          place.initialize(to: newValues[i])
+          unsafe place.initialize(to: newValues[i])
           place += 1
           newValues.formIndex(after: &i)
         }

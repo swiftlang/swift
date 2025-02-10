@@ -100,12 +100,12 @@ extension _NativeDictionary { // Primitive fields
   // This API is unsafe and needs a `_fixLifetime` in the caller.
   @inlinable
   internal var _keys: UnsafeMutablePointer<Key> {
-    return _storage._rawKeys.assumingMemoryBound(to: Key.self)
+    return unsafe _storage._rawKeys.assumingMemoryBound(to: Key.self)
   }
 
   @inlinable
   internal var _values: UnsafeMutablePointer<Value> {
-    return _storage._rawValues.assumingMemoryBound(to: Value.self)
+    return unsafe _storage._rawValues.assumingMemoryBound(to: Value.self)
   }
 
   @inlinable
@@ -121,7 +121,7 @@ extension _NativeDictionary { // Low-level unchecked operations
   internal func uncheckedKey(at bucket: Bucket) -> Key {
     defer { _fixLifetime(self) }
     _internalInvariant(hashTable.isOccupied(bucket))
-    return _keys[bucket.offset]
+    return unsafe _keys[bucket.offset]
   }
 
   @inlinable
@@ -129,7 +129,7 @@ extension _NativeDictionary { // Low-level unchecked operations
   internal func uncheckedValue(at bucket: Bucket) -> Value {
     defer { _fixLifetime(self) }
     _internalInvariant(hashTable.isOccupied(bucket))
-    return _values[bucket.offset]
+    return unsafe _values[bucket.offset]
   }
 
   @inlinable // FIXME(inline-always) was usableFromInline
@@ -140,8 +140,8 @@ extension _NativeDictionary { // Low-level unchecked operations
     value: __owned Value) {
     defer { _fixLifetime(self) }
     _internalInvariant(hashTable.isValid(bucket))
-    (_keys + bucket.offset).initialize(to: key)
-    (_values + bucket.offset).initialize(to: value)
+    unsafe (_keys + bucket.offset).initialize(to: key)
+    unsafe (_values + bucket.offset).initialize(to: value)
   }
 
   @inlinable // FIXME(inline-always) was usableFromInline
@@ -149,8 +149,8 @@ extension _NativeDictionary { // Low-level unchecked operations
   internal func uncheckedDestroy(at bucket: Bucket) {
     defer { _fixLifetime(self) }
     _internalInvariant(hashTable.isValid(bucket))
-    (_keys + bucket.offset).deinitialize(count: 1)
-    (_values + bucket.offset).deinitialize(count: 1)
+    unsafe (_keys + bucket.offset).deinitialize(count: 1)
+    unsafe (_values + bucket.offset).deinitialize(count: 1)
   }
 }
 
@@ -199,8 +199,8 @@ extension _NativeDictionary { // ensureUnique
         let key: Key
         let value: Value
         if moveElements {
-          key = (_keys + bucket.offset).move()
-          value = (_values + bucket.offset).move()
+          key = unsafe (_keys + bucket.offset).move()
+          value = unsafe (_values + bucket.offset).move()
         } else {
           key = self.uncheckedKey(at: bucket)
           value = self.uncheckedValue(at: bucket)
@@ -415,14 +415,14 @@ extension _NativeDictionary {
       let (bucket, found) = mutatingFind(key, isUnique: isUnique)
       // If found, move the old value out of storage, wrapping it into an
       // optional before yielding it.
-      var value: Value? = (found ? (_values + bucket.offset).move() : nil)
+      var value: Value? = unsafe (found ? (_values + bucket.offset).move() : nil)
       defer {
         // This is in a defer block because yield might throw, and we need to
         // preserve Dictionary invariants when that happens.
         if let value = value {
           if found {
             // **Mutation.** Initialize storage to new value.
-            (_values + bucket.offset).initialize(to: value)
+            unsafe (_values + bucket.offset).initialize(to: value)
           } else {
             // **Insertion.** Insert the new entry at the correct place.  Note
             // that `mutatingFind` already ensured that we have enough capacity.
@@ -432,7 +432,7 @@ extension _NativeDictionary {
           if found {
             // **Removal.** We've already deinitialized the value; deinitialize
             // the key too and register the removal.
-            (_keys + bucket.offset).deinitialize(count: 1)
+            unsafe (_keys + bucket.offset).deinitialize(count: 1)
             _delete(at: bucket)
           } else {
             // Noop
@@ -505,8 +505,8 @@ extension _NativeDictionary { // Insertions
       // collisions arising from equality transitions during bridging, and in
       // that case it is desirable to keep values paired with their original
       // keys. This is not how `updateValue(_:, forKey:)` works.
-      (_keys + bucket.offset).pointee = key
-      (_values + bucket.offset).pointee = value
+      unsafe (_keys + bucket.offset).pointee = key
+      unsafe (_values + bucket.offset).pointee = value
     } else {
       _precondition(count < capacity)
       _insert(at: bucket, key: key, value: value)
@@ -573,8 +573,8 @@ extension _NativeDictionary { // Insertions
   ) -> Value? {
     let (bucket, found) = mutatingFind(key, isUnique: isUnique)
     if found {
-      let oldValue = (_values + bucket.offset).move()
-      (_values + bucket.offset).initialize(to: value)
+      let oldValue = unsafe (_values + bucket.offset).move()
+      unsafe (_values + bucket.offset).initialize(to: value)
       return oldValue
     }
     _insert(at: bucket, key: key, value: value)
@@ -589,7 +589,7 @@ extension _NativeDictionary { // Insertions
   ) {
     let (bucket, found) = mutatingFind(key, isUnique: isUnique)
     if found {
-      (_values + bucket.offset).pointee = value
+      unsafe (_values + bucket.offset).pointee = value
     } else {
       _insert(at: bucket, key: key, value: value)
     }
@@ -607,9 +607,9 @@ extension _NativeDictionary {
     let rehashed = ensureUnique(isUnique: isUnique, capacity: capacity)
     _internalInvariant(!rehashed)
     _internalInvariant(hashTable.isOccupied(a) && hashTable.isOccupied(b))
-    let value = (_values + a.offset).move()
-    (_values + a.offset).moveInitialize(from: _values + b.offset, count: 1)
-    (_values + b.offset).initialize(to: value)
+    let value = unsafe (_values + a.offset).move()
+    unsafe (_values + a.offset).moveInitialize(from: _values + b.offset, count: 1)
+    unsafe (_values + b.offset).initialize(to: value)
   }
   
   @_alwaysEmitIntoClient
@@ -683,9 +683,9 @@ extension _NativeDictionary: _HashTableDelegate {
   internal func moveEntry(from source: Bucket, to target: Bucket) {
     _internalInvariant(hashTable.isValid(source))
     _internalInvariant(hashTable.isValid(target))
-    (_keys + target.offset)
+    unsafe (_keys + target.offset)
       .moveInitialize(from: _keys + source.offset, count: 1)
-    (_values + target.offset)
+    unsafe (_values + target.offset)
       .moveInitialize(from: _values + source.offset, count: 1)
   }
 
@@ -694,8 +694,8 @@ extension _NativeDictionary: _HashTableDelegate {
   internal func swapEntry(_ left: Bucket, with right: Bucket) {
     _internalInvariant(hashTable.isValid(left))
     _internalInvariant(hashTable.isValid(right))
-    swap(&_keys[left.offset], &_keys[right.offset])
-    swap(&_values[left.offset], &_values[right.offset])
+    unsafe swap(&_keys[left.offset], &_keys[right.offset])
+    unsafe swap(&_values[left.offset], &_values[right.offset])
   }
 }
 
@@ -719,8 +719,8 @@ extension _NativeDictionary { // Deletion
     _internalInvariant(hashTable.isOccupied(bucket))
     let rehashed = ensureUnique(isUnique: isUnique, capacity: capacity)
     _internalInvariant(!rehashed)
-    let oldKey = (_keys + bucket.offset).move()
-    let oldValue = (_values + bucket.offset).move()
+    let oldKey = unsafe (_keys + bucket.offset).move()
+    let oldValue = unsafe (_values + bucket.offset).move()
     _delete(at: bucket)
     return (oldKey, oldValue)
   }
@@ -736,8 +736,8 @@ extension _NativeDictionary { // Deletion
       return
     }
     for bucket in hashTable {
-      (_keys + bucket.offset).deinitialize(count: 1)
-      (_values + bucket.offset).deinitialize(count: 1)
+      unsafe (_keys + bucket.offset).deinitialize(count: 1)
+      unsafe (_values + bucket.offset).deinitialize(count: 1)
     }
     hashTable.clear()
     _storage._count = 0
@@ -777,7 +777,7 @@ extension _NativeDictionary { // High-level operations
       if found {
         do {
           let newValue = try combine(uncheckedValue(at: bucket), value)
-          _values[bucket.offset] = newValue
+          unsafe _values[bucket.offset] = newValue
         } catch _MergeError.keyCollision {
           #if !$Embedded
           fatalError("Duplicate values for key: '\(key)'")
@@ -805,7 +805,7 @@ extension _NativeDictionary { // High-level operations
       if found {
         do throws(_MergeError) {
           let newValue = try combine(uncheckedValue(at: bucket), value)
-          _values[bucket.offset] = newValue
+          unsafe _values[bucket.offset] = newValue
         } catch {
           #if !$Embedded
           fatalError("Duplicate values for key: '\(key)'")
@@ -831,7 +831,7 @@ extension _NativeDictionary { // High-level operations
       let key = try keyForValue(value)
       let (bucket, found) = mutatingFind(key, isUnique: true)
       if found {
-        _values[bucket.offset].append(value)
+        unsafe _values[bucket.offset].append(value)
       } else {
         _insert(at: bucket, key: key, value: [value])
       }

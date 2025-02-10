@@ -106,14 +106,14 @@ extension _NativeDictionary {
     // If the capacity is 0, then our storage is the empty singleton. Those are
     // read only, so we shouldn't attempt to write to them.
     if capacity == 0 {
-      let c = initializer(
+      let c = unsafe initializer(
         UnsafeMutableBufferPointer(start: nil, count: 0), 
         UnsafeMutableBufferPointer(start: nil, count: 0))
       _precondition(c == 0)
       return
     }
 
-    let initializedCount = initializer(
+    let initializedCount = unsafe initializer(
       UnsafeMutableBufferPointer(start: _keys, count: capacity),
       UnsafeMutableBufferPointer(start: _values, count: capacity))
     _precondition(initializedCount >= 0 && initializedCount <= capacity)
@@ -146,7 +146,7 @@ extension _NativeDictionary {
       // Find the target bucket for this entry and mark it as in use.
       let target: Bucket
       if _isDebugAssertConfiguration() || allowingDuplicates {
-        let (b, found) = find(_keys[bucket.offset])
+        let (b, found) = unsafe find(_keys[bucket.offset])
         if found {
           _internalInvariant(b != bucket)
           _precondition(allowingDuplicates, "Duplicate keys found")
@@ -159,7 +159,7 @@ extension _NativeDictionary {
         hashTable.insert(b)
         target = b
       } else {
-        let hashValue = self.hashValue(for: _keys[bucket.offset])
+        let hashValue = unsafe self.hashValue(for: _keys[bucket.offset])
         target = hashTable.insertNew(hashValue: hashValue)
       }
 

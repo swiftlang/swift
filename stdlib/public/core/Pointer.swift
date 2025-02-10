@@ -50,7 +50,7 @@ extension _Pointer {
   /// - Parameter from: The opaque pointer to convert to a typed pointer.
   @_transparent
   public init(_ from: OpaquePointer) {
-    self.init(from._rawValue)
+    unsafe self.init(from._rawValue)
   }
 
   /// Creates a new typed pointer from the given opaque pointer.

@@ -129,14 +129,14 @@ public func _specialize<T, U>(_ x: T, for: U.Type) -> U? {
 /// `unsafeBitCast` something to `AnyObject`.
 @usableFromInline @_transparent
 internal func _reinterpretCastToAnyObject<T>(_ x: T) -> AnyObject {
-  return unsafeBitCast(x, to: AnyObject.self)
+  return unsafe unsafeBitCast(x, to: AnyObject.self)
 }
 
 @usableFromInline @_transparent
 internal func == (
   lhs: Builtin.NativeObject, rhs: Builtin.NativeObject
 ) -> Bool {
-  return unsafeBitCast(lhs, to: Int.self) == unsafeBitCast(rhs, to: Int.self)
+  return unsafe unsafeBitCast(lhs, to: Int.self) == unsafeBitCast(rhs, to: Int.self)
 }
 
 @usableFromInline @_transparent
@@ -150,7 +150,7 @@ internal func != (
 internal func == (
   lhs: Builtin.RawPointer, rhs: Builtin.RawPointer
 ) -> Bool {
-  return unsafeBitCast(lhs, to: Int.self) == unsafeBitCast(rhs, to: Int.self)
+  return unsafe unsafeBitCast(lhs, to: Int.self) == unsafeBitCast(rhs, to: Int.self)
 }
 
 @usableFromInline @_transparent

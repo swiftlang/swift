@@ -52,7 +52,7 @@ extension CommandLine {
     // over synchronizing access to argc and argv.
     var argc: Int32 = 0
 
-    while let _ = _unsafeArgv[Int(argc)] {
+    while let _ = unsafe _unsafeArgv[Int(argc)] {
       argc += 1
     }
 
@@ -75,7 +75,7 @@ extension CommandLine {
   // synchronization to the underlying data. In a future version of Swift you
   // will not be able to write to 'CommandLine.arguments'.
   static nonisolated(unsafe) var _arguments: [String] = (0 ..< Int(argc)).map {
-    String(cString: _unsafeArgv[$0]!)
+    unsafe String(cString: _unsafeArgv[$0]!)
   }
 
   /// An array that provides access to this program's command line arguments.

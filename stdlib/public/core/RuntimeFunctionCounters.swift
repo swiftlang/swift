@@ -44,7 +44,7 @@ internal func _collectAllReferencesInsideObjectImpl(
   if type(of: value) is AnyObject.Type {
     // Object is a class (but not an ObjC-bridged struct)
     let toAnyObject = _unsafeDowncastToAnyObject(fromAny: value)
-    ref = UnsafeRawPointer(Unmanaged.passUnretained(toAnyObject).toOpaque())
+    ref = unsafe UnsafeRawPointer(Unmanaged.passUnretained(toAnyObject).toOpaque())
     id = ObjectIdentifier(toAnyObject)
   } else if type(of: value) is Builtin.BridgeObject.Type {
     ref = UnsafeRawPointer(
@@ -125,7 +125,7 @@ struct _RuntimeFunctionCounters {
     var functionNames: [String] = []
     functionNames.reserveCapacity(numRuntimeFunctionCounters)
     for index in 0..<numRuntimeFunctionCounters {
-      let name = String(cString: names[index])
+      let name = unsafe String(cString: names[index])
       functionNames.append(name)
     }
     return functionNames
@@ -293,8 +293,8 @@ internal struct _RuntimeFunctionCountersState: _RuntimeFunctionCountersStats {
       }
       var tmpCounters = counters
       let counter: UInt32 = withUnsafePointer(to: &tmpCounters) { ptr in
-        return ptr.withMemoryRebound(to: UInt32.self, capacity: 64) { buf in
-          return buf[index]
+        return unsafe ptr.withMemoryRebound(to: UInt32.self, capacity: 64) { buf in
+          return unsafe buf[index]
         }
       }
       return counter
@@ -307,8 +307,8 @@ internal struct _RuntimeFunctionCountersState: _RuntimeFunctionCountersStats {
           "0..<\(_RuntimeFunctionCounters.numRuntimeFunctionCounters)")
       }
       withUnsafeMutablePointer(to: &counters) {
-        $0.withMemoryRebound(to: UInt32.self, capacity: 64) {
-          $0[index] = newValue
+        unsafe $0.withMemoryRebound(to: UInt32.self, capacity: 64) {
+          unsafe $0[index] = newValue
         }
       }
     }
@@ -383,7 +383,7 @@ extension _RuntimeFunctionCountersStats {
       print("counter \(i) : " +
         "\(Counters.runtimeFunctionNames[i])" +
         " at offset: " +
-        "\(Counters.runtimeFunctionCountersOffsets[i]):" +
+        "\(unsafe Counters.runtimeFunctionCountersOffsets[i]):" +
         "  \(self[i])", to: &to)
     }
   }
@@ -403,7 +403,7 @@ extension _RuntimeFunctionCountersStats {
       print("counter \(i) : " +
         "\(Counters.runtimeFunctionNames[i])" +
         " at offset: " +
-        "\(Counters.runtimeFunctionCountersOffsets[i]): " +
+        "\(unsafe Counters.runtimeFunctionCountersOffsets[i]): " +
         "before \(self[i]) " +
         "after \(after[i])" + " diff=\(after[i]-self[i])", to: &to)
     }

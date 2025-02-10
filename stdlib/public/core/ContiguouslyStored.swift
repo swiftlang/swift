@@ -46,9 +46,9 @@ extension UnsafeBufferPointer: _HasContiguousBytes {
   func withUnsafeBytes<R>(
     _ body: (UnsafeRawBufferPointer) throws -> R
   ) rethrows -> R {
-    let ptr = UnsafeRawPointer(self.baseAddress)
+    let ptr = unsafe UnsafeRawPointer(self.baseAddress)
     let len = self.count &* MemoryLayout<Element>.stride
-    return try body(UnsafeRawBufferPointer(start: ptr, count: len))
+    return try unsafe body(UnsafeRawBufferPointer(start: ptr, count: len))
   }
 }
 extension UnsafeMutableBufferPointer: _HasContiguousBytes {
@@ -56,9 +56,9 @@ extension UnsafeMutableBufferPointer: _HasContiguousBytes {
   func withUnsafeBytes<R>(
     _ body: (UnsafeRawBufferPointer) throws -> R
   ) rethrows -> R {
-    let ptr = UnsafeRawPointer(self.baseAddress)
+    let ptr = unsafe UnsafeRawPointer(self.baseAddress)
     let len = self.count &* MemoryLayout<Element>.stride
-    return try body(UnsafeRawBufferPointer(start: ptr, count: len))
+    return try unsafe body(UnsafeRawBufferPointer(start: ptr, count: len))
   }
 }
 extension UnsafeRawBufferPointer: _HasContiguousBytes {

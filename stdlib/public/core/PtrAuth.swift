@@ -105,7 +105,7 @@ internal enum _PtrAuth {
       key._value._value,
       discriminator._value))
 
-    return UnsafeRawPointer(bitPattern:
+    return unsafe UnsafeRawPointer(bitPattern:
       UInt(truncatingIfNeeded: bitPattern)).unsafelyUnwrapped
   }
 
@@ -124,7 +124,7 @@ internal enum _PtrAuth {
       newKey._value._value,
       newDiscriminator._value))
 
-    return UnsafeRawPointer(bitPattern:
+    return unsafe UnsafeRawPointer(bitPattern:
       UInt(truncatingIfNeeded: bitPattern)).unsafelyUnwrapped
   }
 
@@ -189,7 +189,7 @@ extension UnsafeRawPointer {
 
     let srcDiscriminator = _PtrAuth.blend(pointer: src,
                                           discriminator: discriminator)
-    let ptr = src.load(as: UnsafeRawPointer.self)
+    let ptr = unsafe src.load(as: UnsafeRawPointer.self)
     let resigned = _PtrAuth.authenticateAndResign(
       pointer: ptr,
       oldKey: .processIndependentCode,
@@ -197,7 +197,7 @@ extension UnsafeRawPointer {
       newKey: .processIndependentCode,
       newDiscriminator: _PtrAuth.discriminator(for: type))
 
-    return unsafeBitCast(resigned, to: type)
+    return unsafe unsafeBitCast(resigned, to: type)
   }
 
   @_semantics("no.preserve.debugger") // Don't keep the generic version alive
@@ -211,7 +211,7 @@ extension UnsafeRawPointer {
 
     let srcDiscriminator = _PtrAuth.blend(pointer: src,
                                           discriminator: discriminator)
-    guard let ptr = src.load(as: Optional<UnsafeRawPointer>.self) else {
+    guard let ptr = unsafe src.load(as: Optional<UnsafeRawPointer>.self) else {
       return nil
     }
     let resigned = _PtrAuth.authenticateAndResign(
@@ -221,7 +221,7 @@ extension UnsafeRawPointer {
       newKey: .processIndependentCode,
       newDiscriminator: _PtrAuth.discriminator(for: T.self))
 
-    return .some(unsafeBitCast(resigned, to: T.self))
+    return unsafe .some(unsafeBitCast(resigned, to: T.self))
   }
 
 }
@@ -240,7 +240,7 @@ extension UnsafeMutableRawPointer {
     let destDiscriminator = _PtrAuth.blend(pointer: self,
                                            discriminator: discriminator)
 
-    let ptr = src.load(as: UnsafeRawPointer.self)
+    let ptr = unsafe src.load(as: UnsafeRawPointer.self)
     let resigned = _PtrAuth.authenticateAndResign(
       pointer: ptr,
       oldKey: .processIndependentCode,
@@ -248,7 +248,7 @@ extension UnsafeMutableRawPointer {
       newKey: .processIndependentCode,
       newDiscriminator: destDiscriminator)
 
-    storeBytes(of: resigned, as: UnsafeRawPointer.self)
+    unsafe storeBytes(of: resigned, as: UnsafeRawPointer.self)
   }
 
   @_transparent
@@ -261,6 +261,6 @@ extension UnsafeMutableRawPointer {
     let signed = _PtrAuth.sign(pointer: unsignedPointer,
                                key: .processIndependentCode,
                                discriminator: destDiscriminator)
-    storeBytes(of: signed, as: UnsafeRawPointer.self)
+    unsafe storeBytes(of: signed, as: UnsafeRawPointer.self)
   }
 }

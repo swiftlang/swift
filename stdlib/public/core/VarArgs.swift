@@ -656,14 +656,14 @@ final internal class __VaListBuilder {
       // count is updated below
 
       if let allocatedOldStorage = oldStorage {
-        newStorage.moveInitialize(from: allocatedOldStorage, count: oldCount)
+        unsafe newStorage.moveInitialize(from: allocatedOldStorage, count: oldCount)
         deallocStorage(wordCount: oldAllocated, storage: allocatedOldStorage)
       }
     }
 
     let allocatedStorage = storage!
     for word in words {
-      allocatedStorage[count] = word
+      unsafe allocatedStorage[count] = word
       count += 1
     }
   }

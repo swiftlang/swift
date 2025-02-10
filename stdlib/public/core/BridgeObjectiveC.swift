@@ -95,9 +95,9 @@ internal func _SwiftCreateBridgedArray_DoNotCall(
   values: UnsafePointer<AnyObject>,
   numValues: Int
 ) -> Unmanaged<AnyObject> {
-  let bufPtr = UnsafeBufferPointer(start: values, count: numValues)
-  let bridged = Array(bufPtr)._bridgeToObjectiveCImpl()
-  return Unmanaged<AnyObject>.passRetained(bridged)
+  let bufPtr = unsafe UnsafeBufferPointer(start: values, count: numValues)
+  let bridged = unsafe Array(bufPtr)._bridgeToObjectiveCImpl()
+  return unsafe Unmanaged<AnyObject>.passRetained(bridged)
 }
 
 // Note: This function is not intended to be called from Swift.  The
@@ -110,9 +110,9 @@ internal func _SwiftCreateBridgedMutableArray_DoNotCall(
   values: UnsafePointer<AnyObject>,
   numValues: Int
 ) -> Unmanaged<AnyObject> {
-  let bufPtr = UnsafeBufferPointer(start: values, count: numValues)
-  let bridged = _SwiftNSMutableArray(Array(bufPtr))
-  return Unmanaged<AnyObject>.passRetained(bridged)
+  let bufPtr = unsafe UnsafeBufferPointer(start: values, count: numValues)
+  let bridged = unsafe _SwiftNSMutableArray(Array(bufPtr))
+  return unsafe Unmanaged<AnyObject>.passRetained(bridged)
 }
 
 @_silgen_name("swift_stdlib_connectNSBaseClasses")
@@ -207,7 +207,7 @@ extension _BridgeableMetatype: Sendable {}
 @inlinable
 public func _bridgeAnythingToObjectiveC<T>(_ x: T) -> AnyObject {
   if _fastPath(_isClassOrObjCExistential(T.self)) {
-    return unsafeBitCast(x, to: AnyObject.self)
+    return unsafe unsafeBitCast(x, to: AnyObject.self)
   }
   return _bridgeAnythingNonVerbatimToObjectiveC(x)
 }
@@ -328,7 +328,7 @@ internal func _bridgeNonVerbatimBoxedValue<NativeType>(
     _ x: UnsafePointer<NativeType>,
     _ result: inout NativeType?
 ) {
-  result = x.pointee
+  result = unsafe x.pointee
 }
 
 /// Runtime optional to conditionally perform a bridge from an object to a value
@@ -440,15 +440,15 @@ public struct AutoreleasingUnsafeMutablePointer<Pointee /* TODO : class */>
       // optional type, so we actually need to load it as an optional, and
       // explicitly handle the nil case.
       let unmanaged =
-        UnsafePointer<Optional<Unmanaged<AnyObject>>>(_rawValue).pointee
-      return _unsafeReferenceCast(
+        unsafe UnsafePointer<Optional<Unmanaged<AnyObject>>>(_rawValue).pointee
+      return unsafe _unsafeReferenceCast(
         unmanaged?.takeUnretainedValue(),
         to: Pointee.self)
     }
 
     @_transparent nonmutating set {
       // Autorelease the object reference.
-      let object = _unsafeReferenceCast(newValue, to: Optional<AnyObject>.self)
+      let object = unsafe _unsafeReferenceCast(newValue, to: Optional<AnyObject>.self)
       Builtin.retain(object)
       Builtin.autorelease(object)
 
@@ -456,11 +456,11 @@ public struct AutoreleasingUnsafeMutablePointer<Pointee /* TODO : class */>
       // memory addressed by this pointer.
       let unmanaged: Optional<Unmanaged<AnyObject>>
       if let object = object {
-        unmanaged = Unmanaged.passUnretained(object)
+        unmanaged = unsafe Unmanaged.passUnretained(object)
       } else {
         unmanaged = nil
       }
-      UnsafeMutablePointer<Optional<Unmanaged<AnyObject>>>(_rawValue).pointee =
+      unsafe UnsafeMutablePointer<Optional<Unmanaged<AnyObject>>>(_rawValue).pointee =
         unmanaged
     }
   }

@@ -202,7 +202,7 @@ public struct StaticString: Sendable {
     _ body: (UnsafeBufferPointer<UInt8>) -> R
   ) -> R {
     if hasPointerRepresentation {
-      return body(UnsafeBufferPointer(
+      return unsafe body(UnsafeBufferPointer(
         start: utf8Start, count: utf8CodeUnitCount))
     } else {
       #if $Embedded

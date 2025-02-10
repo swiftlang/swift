@@ -1755,7 +1755,7 @@ internal final class _IndexBox<BaseIndex: Comparable>: _AnyIndexBox {
 
   @inlinable
   internal func _unsafeUnbox(_ other: _AnyIndexBox) -> BaseIndex {
-    return unsafeDowncast(other, to: _IndexBox.self)._base
+    return unsafe unsafeDowncast(other, to: _IndexBox.self)._base
   }
 
   @inlinable

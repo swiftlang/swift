@@ -130,7 +130,7 @@ public enum _DebuggerSupport {
 
   private static func asObjectAddress(_ value: Any) -> String {
     let address = checkValue(value,
-      ifClass: { return unsafeBitCast($0, to: Int.self) },
+      ifClass: { return unsafe unsafeBitCast($0, to: Int.self) },
       otherwise: { return 0 })
     return String(address, radix: 16, uppercase: false)
   }
@@ -344,7 +344,7 @@ internal func _withHeapObject<R>(
   _ body: (UnsafeMutableRawPointer) -> R
 ) -> R {
   defer { _fixLifetime(object) }
-  let unmanaged = Unmanaged.passUnretained(object)
+  let unmanaged = unsafe Unmanaged.passUnretained(object)
   return body(unmanaged.toOpaque())
 }
 

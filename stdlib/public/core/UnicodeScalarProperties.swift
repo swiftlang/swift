@@ -763,7 +763,7 @@ extension Unicode.Scalar.Properties {
     )
 
     if let specialMapping = specialMappingPtr, specialMappingLength != 0 {
-      let buffer = UnsafeBufferPointer<UInt8>(
+      let buffer = unsafe UnsafeBufferPointer<UInt8>(
         start: specialMapping,
         count: specialMappingLength
       )
@@ -1253,7 +1253,7 @@ extension Unicode.Scalar.Properties {
     let largestCount = Int(SWIFT_STDLIB_LARGEST_NAME_COUNT)
 
     let name = String(_uninitializedCapacity: largestCount) { buffer in
-      _swift_stdlib_getScalarName(
+      unsafe _swift_stdlib_getScalarName(
         _scalar.value,
         buffer.baseAddress,
         buffer.count

@@ -145,8 +145,8 @@ extension _SmallString {
 
     // No bits should be set between the last code unit and the discriminator
     var copy = self
-    withUnsafeBytes(of: &copy._storage) {
-      _internalInvariant(
+    unsafe withUnsafeBytes(of: &copy._storage) {
+      unsafe _internalInvariant(
         $0[count..<_SmallString.capacity].allSatisfy { $0 == 0 })
     }
   }
@@ -205,7 +205,7 @@ extension _SmallString: RandomAccessCollection, MutableCollection {
     get {
       // TODO(String performance): In-vector-register operation
       return self.withUTF8 { utf8 in
-        let rebased = UnsafeBufferPointer(rebasing: utf8[bounds])
+        let rebased = unsafe UnsafeBufferPointer(rebasing: utf8[bounds])
         return _SmallString(rebased)._unsafelyUnwrappedUnchecked
       }
     }
@@ -223,16 +223,16 @@ extension _SmallString {
   ) rethrows -> Result {
     let count = self.count
     var raw = self.zeroTerminatedRawCodeUnits
-    return try Swift._withUnprotectedUnsafeBytes(of: &raw) {
-      let rawPtr = $0.baseAddress._unsafelyUnwrappedUnchecked
+    return try unsafe Swift._withUnprotectedUnsafeBytes(of: &raw) {
+      let rawPtr = unsafe $0.baseAddress._unsafelyUnwrappedUnchecked
       // Rebind the underlying (UInt64, UInt64) tuple to UInt8 for the
       // duration of the closure. Accessing self after this rebind is undefined.
-      let ptr = rawPtr.bindMemory(to: UInt8.self, capacity: count)
+      let ptr = unsafe rawPtr.bindMemory(to: UInt8.self, capacity: count)
       defer {
         // Restore the memory type of self._storage
-        _ = rawPtr.bindMemory(to: RawBitPattern.self, capacity: 1)
+        _ = unsafe rawPtr.bindMemory(to: RawBitPattern.self, capacity: 1)
       }
-      return try f(UnsafeBufferPointer(_uncheckedStart: ptr, count: count))
+      return try f(unsafe UnsafeBufferPointer(_uncheckedStart: ptr, count: count))
     }
   }
 
@@ -243,8 +243,8 @@ extension _SmallString {
   fileprivate mutating func withMutableCapacity(
     _ f: (UnsafeMutableRawBufferPointer) throws -> Int
   ) rethrows {
-    let len = try withUnsafeMutableBytes(of: &_storage) {
-      try f(.init(start: $0.baseAddress, count: _SmallString.capacity))
+    let len = try unsafe withUnsafeMutableBytes(of: &_storage) {
+      try unsafe f(.init(start: $0.baseAddress, count: _SmallString.capacity))
     }
 
     if len <= 0 {
@@ -300,7 +300,7 @@ extension _SmallString {
 
     // TODO(SIMD): The below can be replaced with just be a masked unaligned
     // vector load
-    let ptr = input.baseAddress._unsafelyUnwrappedUnchecked
+    let ptr = unsafe input.baseAddress._unsafelyUnwrappedUnchecked
     let leading = _bytesToUInt64(ptr, Swift.min(input.count, 8))
     let trailing = count > 8 ? _bytesToUInt64(ptr + 8, count &- 8) : 0
 
@@ -315,7 +315,7 @@ extension _SmallString {
   ) rethrows {
     self.init()
     try self.withMutableCapacity {
-      try $0.withMemoryRebound(to: UInt8.self, initializer)
+      try unsafe $0.withMemoryRebound(to: UInt8.self, initializer)
     }
     self._invariantCheck()
   }
@@ -432,7 +432,7 @@ internal func _bytesToUInt64(
   var r: UInt64 = 0
   var shift: Int = 0
   for idx in 0..<c {
-    r = r | (UInt64(input[idx]) &<< shift)
+    r = unsafe r | (UInt64(input[idx]) &<< shift)
     shift = shift &+ 8
   }
   // Convert from little-endian to host byte order.

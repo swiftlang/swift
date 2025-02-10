@@ -425,7 +425,7 @@ extension String {
   >(_ input: C) -> (result: String, repairsMade: Bool) {
     _internalInvariant(C.Element.self == UInt8.self)
     return Array(input).withUnsafeBufferPointer {
-      UnsafeRawBufferPointer($0).withMemoryRebound(to: UInt8.self) {
+      unsafe UnsafeRawBufferPointer($0).withMemoryRebound(to: UInt8.self) {
         String._fromUTF8Repairing($0)
       }
     }
@@ -460,7 +460,7 @@ extension String {
       (buffer: UnsafeBufferPointer<C.Element>) -> String in
       Builtin.onFastPath() // encourage SIL Optimizer to inline this closure :-(
       let rawBufPtr = UnsafeRawBufferPointer(buffer)
-      return String._fromUTF8Repairing(
+      return unsafe String._fromUTF8Repairing(
         UnsafeBufferPointer(
           start: rawBufPtr.baseAddress?.assumingMemoryBound(to: UInt8.self),
           count: rawBufPtr.count)).0
@@ -476,7 +476,7 @@ extension String {
     {
       self = contigBytes.withUnsafeBytes { rawBufPtr in
         Builtin.onFastPath() // encourage SIL Optimizer to inline this closure
-        return String._fromUTF8Repairing(
+        return unsafe String._fromUTF8Repairing(
           UnsafeBufferPointer(
             start: rawBufPtr.baseAddress?.assumingMemoryBound(to: UInt8.self),
             count: rawBufPtr.count)).0
@@ -581,7 +581,7 @@ extension String {
     as encoding: Encoding.Type
   ) where Encoding: Unicode.Encoding, Encoding.CodeUnit == UInt8 {
     let contiguousResult = codeUnits.withContiguousStorageIfAvailable {
-      $0.withMemoryRebound(to: UInt8.self) {
+      unsafe $0.withMemoryRebound(to: UInt8.self) {
         String._validate($0, as: Encoding.self)
       }
     }
@@ -664,7 +664,7 @@ extension String {
   ) rethrows {
     if _fastPath(capacity <= _SmallString.capacity) {
       let smol = try _SmallString(initializingUTF8With: {
-        try initializer(.init(start: $0.baseAddress, count: capacity))
+        try unsafe initializer(.init(start: $0.baseAddress, count: capacity))
       })
       // Fast case where we fit in a _SmallString and don't need UTF8 validation
       if _fastPath(smol.isASCII) {
@@ -727,7 +727,7 @@ extension String {
       return try self.withCString {
         (cPtr: UnsafePointer<CChar>) -> Result  in
         _internalInvariant(UInt8.self == TargetEncoding.CodeUnit.self)
-        let ptr = UnsafeRawPointer(cPtr).assumingMemoryBound(
+        let ptr = unsafe UnsafeRawPointer(cPtr).assumingMemoryBound(
           to: TargetEncoding.CodeUnit.self)
         return try body(ptr)
       }
@@ -745,7 +745,7 @@ extension String {
     return try copy.withUTF8 { utf8 in
       var arg = Array<TargetEncoding.CodeUnit>()
       arg.reserveCapacity(1 &+ self._guts.count / 4)
-      let repaired = transcode(
+      let repaired = unsafe transcode(
         utf8.makeIterator(),
         from: UTF8.self,
         to: targetEncoding,
@@ -794,7 +794,7 @@ extension String: _ExpressibleByBuiltinStringLiteral {
     utf8CodeUnitCount: Builtin.Word,
     isASCII: Builtin.Int1
     ) {
-    let bufPtr = UnsafeBufferPointer(
+    let bufPtr = unsafe UnsafeBufferPointer(
       start: UnsafeRawPointer(start).assumingMemoryBound(to: UInt8.self),
       count: Int(utf8CodeUnitCount))
     if let smol = _SmallString(bufPtr) {
@@ -1028,7 +1028,7 @@ extension String {
       return _guts.withFastUTF8 { utf8 in
         return String(_uninitializedCapacity: utf8.count) { buffer in
           for i in 0 ..< utf8.count {
-            buffer[i] = _lowercaseASCII(utf8[i])
+            unsafe buffer[i] = unsafe _lowercaseASCII(utf8[i])
           }
           return utf8.count
         }
@@ -1062,7 +1062,7 @@ extension String {
       return _guts.withFastUTF8 { utf8 in
         return String(_uninitializedCapacity: utf8.count) { buffer in
           for i in 0 ..< utf8.count {
-            buffer[i] = _uppercaseASCII(utf8[i])
+            unsafe buffer[i] = unsafe _uppercaseASCII(utf8[i])
           }
           return utf8.count
         }
@@ -1150,7 +1150,7 @@ extension _StringGutsSlice {
       // of accessing the UTF8 view on String.
       if isNFCQC {
         try withFastUTF8 {
-          for byte in $0 {
+          for byte in unsafe $0 {
             try f(byte)
           }
         }
@@ -1176,7 +1176,7 @@ extension _StringGutsSlice {
 
     for scalar in substring.unicodeScalars._internalNFC {
       try scalar.withUTF8CodeUnits {
-        for byte in $0 {
+        for byte in unsafe $0 {
           try f(byte)
         }
       }
@@ -1190,10 +1190,10 @@ extension _StringGutsSlice {
       while position < utf8.count {
         // If our first byte is less than 0xCC, then it means we're under the
         // 0x300 scalar value and everything up to 0x300 is NFC already.
-        if utf8[position] < 0xCC {
+        if unsafe utf8[position] < 0xCC {
           // If our first byte is less than 0xC0, then it means it is ASCII
           // and only takes up a single byte.
-          if utf8[position] < 0xC0 {
+          if unsafe utf8[position] < 0xC0 {
             position &+= 1
           } else {
             // Otherwise, this is a 2 byte < 0x300 sequence.

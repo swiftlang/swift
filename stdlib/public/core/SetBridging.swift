@@ -17,7 +17,7 @@ import SwiftShims
 /// Equivalent to `NSSet.allObjects`, but does not leave objects on the
 /// autorelease pool.
 internal func _stdlib_NSSet_allObjects(_ object: AnyObject) -> _BridgingBuffer {
-  let nss = unsafeBitCast(object, to: _NSSet.self)
+  let nss = unsafe unsafeBitCast(object, to: _NSSet.self)
   let count = nss.count
   let storage = _BridgingBuffer(count)
   nss.getObjects(storage.baseAddress)
@@ -38,7 +38,7 @@ extension _NativeSet { // Bridging
     if _storage === __RawSetStorage.empty || count == 0 {
       nsSet = __RawSetStorage.empty
     } else if _isBridgedVerbatimToObjectiveC(Element.self) {
-      nsSet = unsafeDowncast(_storage, to: _SetStorage<Element>.self)
+      nsSet = unsafe unsafeDowncast(_storage, to: _SetStorage<Element>.self)
     } else {
       nsSet = _SwiftDeferredNSSet(self)
     }
@@ -116,7 +116,7 @@ final internal class _SwiftSetNSEnumerator<Element: Hashable>
     objects: UnsafeMutablePointer<AnyObject>,
     count: Int
   ) -> Int {
-    var theState = state.pointee
+    var theState = unsafe state.pointee
     if theState.state == 0 {
       theState.state = 1 // Arbitrary non-zero value.
       theState.itemsPtr = AutoreleasingUnsafeMutablePointer(objects)
@@ -124,7 +124,7 @@ final internal class _SwiftSetNSEnumerator<Element: Hashable>
     }
 
     if nextBucket == endBucket {
-      state.pointee = theState
+      unsafe state.pointee = theState
       return 0
     }
 
@@ -133,7 +133,7 @@ final internal class _SwiftSetNSEnumerator<Element: Hashable>
     let unmanagedObjects = _UnmanagedAnyObjectArray(objects)
     unmanagedObjects[0] = self.bridgedElement(at: nextBucket)
     nextBucket = base.hashTable.occupiedBucket(after: nextBucket)
-    state.pointee = theState
+    unsafe state.pointee = theState
     return 1
   }
 }
@@ -167,7 +167,7 @@ final internal class _SwiftDeferredNSSet<Element: Hashable>
   /// Set elements.
   @nonobjc
   private var _bridgedElementsPtr: UnsafeMutablePointer<AnyObject?> {
-    return _getUnsafePointerToStoredProperties(self)
+    return unsafe _getUnsafePointerToStoredProperties(self)
       .assumingMemoryBound(to: Optional<AnyObject>.self)
   }
 
@@ -177,7 +177,7 @@ final internal class _SwiftDeferredNSSet<Element: Hashable>
     guard let ref = _stdlib_atomicLoadARCRef(object: _bridgedElementsPtr) else {
       return nil
     }
-    return unsafeDowncast(ref, to: __BridgingHashBuffer.self)
+    return unsafe unsafeDowncast(ref, to: __BridgingHashBuffer.self)
   }
 
   /// Attach a buffer for bridged Set elements.
@@ -249,7 +249,7 @@ final internal class _SwiftDeferredNSSet<Element: Hashable>
     defer { _fixLifetime(self) }
     let hashTable = native.hashTable
 
-    var theState = state.pointee
+    var theState = unsafe state.pointee
     if theState.state == 0 {
       theState.state = 1 // Arbitrary non-zero value.
       theState.itemsPtr = AutoreleasingUnsafeMutablePointer(objects)
@@ -281,7 +281,7 @@ final internal class _SwiftDeferredNSSet<Element: Hashable>
       bucket = hashTable.occupiedBucket(after: bucket)
     }
     theState.extra.0 = CUnsignedLong(bucket.offset)
-    state.pointee = theState
+    unsafe state.pointee = theState
     return stored
   }
 }
@@ -314,7 +314,7 @@ extension __CocoaSet {
 
   @usableFromInline
   internal func member(for element: AnyObject) -> AnyObject? {
-    let nss = unsafeBitCast(object, to: _NSSet.self)
+    let nss = unsafe unsafeBitCast(object, to: _NSSet.self)
     return nss.member(element)
   }
 }
@@ -393,13 +393,13 @@ extension __CocoaSet: _SetBuffer {
 
   @usableFromInline
   internal var count: Int {
-    let nss = unsafeBitCast(object, to: _NSSet.self)
+    let nss = unsafe unsafeBitCast(object, to: _NSSet.self)
     return nss.count
   }
 
   @usableFromInline
   internal func contains(_ element: AnyObject) -> Bool {
-    let nss = unsafeBitCast(object, to: _NSSet.self)
+    let nss = unsafe unsafeBitCast(object, to: _NSSet.self)
     return nss.member(element) != nil
   }
 
@@ -423,7 +423,7 @@ extension __CocoaSet {
       @inline(__always)
       get {
         let storage = _bridgeObject(toNative: _storage)
-        return unsafeDowncast(storage, to: Storage.self)
+        return unsafe unsafeDowncast(storage, to: Storage.self)
       }
     }
 
@@ -467,7 +467,7 @@ extension __CocoaSet.Index {
   internal var handleBitPattern: UInt {
     @_effects(readonly)
     get {
-      return unsafeBitCast(storage, to: UInt.self)
+      return unsafe unsafeBitCast(storage, to: UInt.self)
     }
   }
 }
@@ -534,13 +534,13 @@ extension __CocoaSet: Sequence {
 
     internal var _fastEnumerationStatePtr:
       UnsafeMutablePointer<_SwiftNSFastEnumerationState> {
-      return _getUnsafePointerToStoredProperties(self).assumingMemoryBound(
+      return unsafe _getUnsafePointerToStoredProperties(self).assumingMemoryBound(
         to: _SwiftNSFastEnumerationState.self)
     }
 
     internal var _fastEnumerationStackBufPtr:
       UnsafeMutablePointer<_CocoaFastEnumerationStackBuf> {
-      return UnsafeMutableRawPointer(_fastEnumerationStatePtr + 1)
+      return unsafe UnsafeMutableRawPointer(_fastEnumerationStatePtr + 1)
         .assumingMemoryBound(to: _CocoaFastEnumerationStackBuf.self)
     }
 
@@ -581,7 +581,7 @@ extension __CocoaSet.Iterator: IteratorProtocol {
       // properties, because doing so might introduce a writeback storage, but
       // fast enumeration relies on the pointer identity of the enumeration
       // state struct.
-      itemCount = base.object.countByEnumerating(
+      itemCount = unsafe base.object.countByEnumerating(
         with: _fastEnumerationStatePtr,
         objects: UnsafeMutableRawPointer(_fastEnumerationStackBufPtr)
           .assumingMemoryBound(to: AnyObject.self),
@@ -593,7 +593,7 @@ extension __CocoaSet.Iterator: IteratorProtocol {
       itemIndex = 0
     }
     let itemsPtrUP =
-    UnsafeMutableRawPointer(_fastEnumerationState.itemsPtr!)
+    unsafe UnsafeMutableRawPointer(_fastEnumerationState.itemsPtr!)
       .assumingMemoryBound(to: AnyObject.self)
     let itemsPtr = _UnmanagedAnyObjectArray(itemsPtrUP)
     let key: AnyObject = itemsPtr[itemIndex]

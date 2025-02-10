@@ -171,7 +171,7 @@ extension ${Self}: LosslessStringConvertible {
       self = 0.0
       let success = _withUnprotectedUnsafeMutablePointer(to: &self) { p -> Bool in
         text.withCString { chars -> Bool in
-          switch chars[0] {
+          switch unsafe chars[0] {
           case 9, 10, 11, 12, 13, 32:
             return false // Reject leading whitespace
           case 0:
@@ -181,7 +181,7 @@ extension ${Self}: LosslessStringConvertible {
           }
           let endPtr = _swift_stdlib_strto${cFuncSuffix2[bits]}_clocale(chars, p)
           // Succeed only if endPtr points to end of C string
-          return endPtr != nil && endPtr![0] == 0
+          return unsafe endPtr != nil && endPtr![0] == 0
         }
       }
       if !success {
@@ -200,7 +200,7 @@ extension ${Self}: LosslessStringConvertible {
     self = 0.0
     let success = _withUnprotectedUnsafeMutablePointer(to: &self) { p -> Bool in
       text.withCString { chars -> Bool in
-        switch chars[0] {
+        switch unsafe chars[0] {
         case 9, 10, 11, 12, 13, 32:
           return false // Reject leading whitespace
         case 0:
@@ -210,7 +210,7 @@ extension ${Self}: LosslessStringConvertible {
         }
         let endPtr = _swift_stdlib_strto${cFuncSuffix2[bits]}_clocale(chars, p)
         // Succeed only if endPtr points to end of C string
-        return endPtr != nil && endPtr![0] == 0
+        return unsafe endPtr != nil && endPtr![0] == 0
       }
     }
     if !success {

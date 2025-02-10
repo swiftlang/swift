@@ -91,7 +91,7 @@ extension ManagedBuffer where Element: ~Copyable {
          minimumCapacity._builtinWordValue, Element.self)
 
     let initHeaderVal = try factory(p)
-    p.headerAddress.initialize(to: initHeaderVal)
+    unsafe p.headerAddress.initialize(to: initHeaderVal)
     // The _fixLifetime is not really needed, because p is used afterwards.
     // But let's be conservative and fix the lifetime after we use the
     // headerAddress.
@@ -110,7 +110,7 @@ extension ManagedBuffer where Element: ~Copyable {
   public final var capacity: Int {
     let storageAddr = UnsafeMutableRawPointer(Builtin.bridgeToRawPointer(self))
     let endAddr = storageAddr + _swift_stdlib_malloc_size(storageAddr)
-    let realCapacity = endAddr.assumingMemoryBound(to: Element.self) -
+    let realCapacity = unsafe endAddr.assumingMemoryBound(to: Element.self) -
       firstElementAddress
     return realCapacity
   }
@@ -279,7 +279,7 @@ public struct ManagedBufferPointer<
 
     // initialize the header field
     try withUnsafeMutablePointerToHeader {
-      $0.initialize(to:
+      unsafe $0.initialize(to:
         try factory(
           self.buffer,
           {
@@ -393,10 +393,10 @@ extension ManagedBufferPointer where Element: ~Copyable {
   @inlinable
   public var header: Header {
     _read {
-      yield _headerPointer.pointee
+      yield unsafe _headerPointer.pointee
     }
     _modify {
-      yield &_headerPointer.pointee
+      yield unsafe &_headerPointer.pointee
     }
   }
 }
@@ -587,7 +587,7 @@ extension ManagedBufferPointer where Element: ~Copyable {
   @inlinable
   internal var _headerPointer: UnsafeMutablePointer<Header> {
     _onFastPath()
-    return (_address + ManagedBufferPointer._headerOffset).assumingMemoryBound(
+    return unsafe (_address + ManagedBufferPointer._headerOffset).assumingMemoryBound(
       to: Header.self)
   }
 
@@ -598,7 +598,7 @@ extension ManagedBufferPointer where Element: ~Copyable {
   @inlinable
   internal var _elementPointer: UnsafeMutablePointer<Element> {
     _onFastPath()
-    return (_address + ManagedBufferPointer._elementOffset).assumingMemoryBound(
+    return unsafe (_address + ManagedBufferPointer._elementOffset).assumingMemoryBound(
       to: Element.self)
   }
 

@@ -24,25 +24,25 @@ internal func _loadPartialUnalignedUInt64LE(
   var result: UInt64 = 0
   switch byteCount {
   case 7:
-    result |= UInt64(p.load(fromByteOffset: 6, as: UInt8.self)) &<< 48
+    unsafe result |= UInt64(p.load(fromByteOffset: 6, as: UInt8.self)) &<< 48
     fallthrough
   case 6:
-    result |= UInt64(p.load(fromByteOffset: 5, as: UInt8.self)) &<< 40
+    unsafe result |= UInt64(p.load(fromByteOffset: 5, as: UInt8.self)) &<< 40
     fallthrough
   case 5:
-    result |= UInt64(p.load(fromByteOffset: 4, as: UInt8.self)) &<< 32
+    unsafe result |= UInt64(p.load(fromByteOffset: 4, as: UInt8.self)) &<< 32
     fallthrough
   case 4:
-    result |= UInt64(p.load(fromByteOffset: 3, as: UInt8.self)) &<< 24
+    unsafe result |= UInt64(p.load(fromByteOffset: 3, as: UInt8.self)) &<< 24
     fallthrough
   case 3:
-    result |= UInt64(p.load(fromByteOffset: 2, as: UInt8.self)) &<< 16
+    unsafe result |= UInt64(p.load(fromByteOffset: 2, as: UInt8.self)) &<< 16
     fallthrough
   case 2:
-    result |= UInt64(p.load(fromByteOffset: 1, as: UInt8.self)) &<< 8
+    unsafe result |= UInt64(p.load(fromByteOffset: 1, as: UInt8.self)) &<< 8
     fallthrough
   case 1:
-    result |= UInt64(p.load(fromByteOffset: 0, as: UInt8.self))
+    unsafe result |= UInt64(p.load(fromByteOffset: 0, as: UInt8.self))
     fallthrough
   case 0:
     return result
@@ -213,7 +213,7 @@ extension Hasher {
     internal mutating func combine(bytes: UnsafeRawBufferPointer) {
       var remaining = bytes.count
       guard remaining > 0 else { return }
-      var data = bytes.baseAddress!
+      var data = unsafe bytes.baseAddress!
 
       // Load first unaligned partial word of data
       do {
@@ -233,7 +233,7 @@ extension Hasher {
 
       // Load as many aligned words as there are in the input buffer
       while remaining >= MemoryLayout<UInt64>.size {
-        combine(UInt64(littleEndian: data.load(as: UInt64.self)))
+        unsafe combine(UInt64(littleEndian: data.load(as: UInt64.self)))
         data += MemoryLayout<UInt64>.size
         remaining -= MemoryLayout<UInt64>.size
       }

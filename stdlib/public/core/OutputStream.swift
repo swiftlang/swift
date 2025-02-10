@@ -284,13 +284,13 @@ internal func _opaqueSummary(_ metadata: Any.Type) -> UnsafePointer<CChar>?
 internal func _fallbackEnumRawValue<T>(_ value: T) -> Int64? {
   switch MemoryLayout.size(ofValue: value) {
   case 8:
-    return unsafeBitCast(value, to:Int64.self)
+    return unsafe unsafeBitCast(value, to:Int64.self)
   case 4:
-    return Int64(unsafeBitCast(value, to:Int32.self))
+    return unsafe Int64(unsafeBitCast(value, to:Int32.self))
   case 2:
-    return Int64(unsafeBitCast(value, to:Int16.self))
+    return unsafe Int64(unsafeBitCast(value, to:Int16.self))
   case 1:
-    return Int64(unsafeBitCast(value, to:Int8.self))
+    return unsafe Int64(unsafeBitCast(value, to:Int8.self))
   default:
     return nil
   }
@@ -568,7 +568,7 @@ internal struct _Stdout: TextOutputStream {
 
     var string = string
     _ = string.withUTF8 { utf8 in
-      _swift_stdlib_fwrite_stdout(utf8.baseAddress!, 1, utf8.count)
+      unsafe _swift_stdlib_fwrite_stdout(utf8.baseAddress!, 1, utf8.count)
     }
   }
 }

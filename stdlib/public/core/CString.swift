@@ -46,8 +46,8 @@ extension String {
   ///     A pointer to a null-terminated sequence of UTF-8 code units.
   public init(cString nullTerminatedUTF8: UnsafePointer<CChar>) {
     let len = UTF8._nullCodeUnitOffset(in: nullTerminatedUTF8)
-    let buffer = UnsafeBufferPointer(start: nullTerminatedUTF8, count: len)
-    self = buffer.withMemoryRebound(to: UInt8.self) {
+    let buffer = unsafe UnsafeBufferPointer(start: nullTerminatedUTF8, count: len)
+    self = unsafe buffer.withMemoryRebound(to: UInt8.self) {
       String._fromUTF8Repairing($0).0
     }
   }
@@ -72,18 +72,18 @@ extension String {
   )
   public init(cString nullTerminatedUTF8: [CChar]) {
     self = nullTerminatedUTF8.withUnsafeBufferPointer {
-      $0.withMemoryRebound(to: UInt8.self, String.init(_checkingCString:))
+      unsafe $0.withMemoryRebound(to: UInt8.self, String.init(_checkingCString:))
     }
   }
 
   @_alwaysEmitIntoClient
   internal init(_checkingCString bytes: UnsafeBufferPointer<UInt8>) {
-    guard let length = bytes.firstIndex(of: 0) else {
+    guard let length = unsafe bytes.firstIndex(of: 0) else {
       _preconditionFailure(
         "input of String.init(cString:) must be null-terminated"
       )
     }
-    self = String._fromUTF8Repairing(
+    self = unsafe String._fromUTF8Repairing(
       UnsafeBufferPointer(
         start: bytes.baseAddress._unsafelyUnwrappedUnchecked,
         count: length
@@ -113,7 +113,7 @@ extension String {
   ///     A pointer to a null-terminated sequence of UTF-8 code units.
   public init(cString nullTerminatedUTF8: UnsafePointer<UInt8>) {
     let len = UTF8._nullCodeUnitOffset(in: nullTerminatedUTF8)
-    self = String._fromUTF8Repairing(
+    self = unsafe String._fromUTF8Repairing(
       UnsafeBufferPointer(start: nullTerminatedUTF8, count: len)).0
   }
 
@@ -189,10 +189,10 @@ extension String {
   @_silgen_name("$sSS14validatingUTF8SSSgSPys4Int8VG_tcfC")
   public init?(validatingCString nullTerminatedUTF8: UnsafePointer<CChar>) {
     let len = UTF8._nullCodeUnitOffset(in: nullTerminatedUTF8)
-    let validated = nullTerminatedUTF8.withMemoryRebound(
+    let validated = unsafe nullTerminatedUTF8.withMemoryRebound(
       to: UInt8.self,
       capacity: len,
-      { String._tryFromUTF8(UnsafeBufferPointer(start: $0, count: len)) }
+      { unsafe String._tryFromUTF8(UnsafeBufferPointer(start: $0, count: len)) }
     )
     guard let validated else { return nil }
     self = validated
@@ -260,7 +260,7 @@ extension String {
       )
     }
     let string = nullTerminatedUTF8.prefix(length).withUnsafeBufferPointer {
-      $0.withMemoryRebound(to: UInt8.self, String._tryFromUTF8(_:))
+      unsafe $0.withMemoryRebound(to: UInt8.self, String._tryFromUTF8(_:))
     }
     guard let string else { return nil }
     self = string
@@ -373,11 +373,11 @@ extension String {
     guard let cPtr = cString else { return nil }
 
     if _fastPath(encoding == Unicode.UTF8.self) {
-      let len = UTF8._nullCodeUnitOffset(
+      let len = unsafe UTF8._nullCodeUnitOffset(
         in: UnsafeRawPointer(cPtr).assumingMemoryBound(to: UInt8.self)
       )
-      let bytes = UnsafeBufferPointer(start: cPtr, count: len)
-      return bytes.withMemoryRebound(to: UInt8.self) { codeUnits in
+      let bytes = unsafe UnsafeBufferPointer(start: cPtr, count: len)
+      return unsafe bytes.withMemoryRebound(to: UInt8.self) { codeUnits in
         if isRepairing {
           return String._fromUTF8Repairing(codeUnits)
         }
@@ -389,10 +389,10 @@ extension String {
     }
 
     var end = cPtr
-    while end.pointee != 0 { end += 1 }
+    while unsafe end.pointee != 0 { end += 1 }
     let len = end - cPtr
-    let codeUnits = UnsafeBufferPointer(start: cPtr, count: len)
-    return String._fromCodeUnits(
+    let codeUnits = unsafe UnsafeBufferPointer(start: cPtr, count: len)
+    return unsafe String._fromCodeUnits(
       codeUnits, encoding: encoding, repair: isRepairing)
   }
 
@@ -412,7 +412,7 @@ extension String {
     if _fastPath(encoding == Unicode.UTF8.self) {
       return cString.prefix(length).withUnsafeBufferPointer {
         buffer -> (result: String, repairsMade: Bool)? in
-        return buffer.withMemoryRebound(to: UInt8.self) { codeUnits in
+        return unsafe buffer.withMemoryRebound(to: UInt8.self) { codeUnits in
           if isRepairing {
             return String._fromUTF8Repairing(codeUnits)
           }
@@ -426,7 +426,7 @@ extension String {
 
     return cString.prefix(length).withUnsafeBufferPointer {
       buf -> (result: String, repairsMade: Bool)? in
-      String._fromCodeUnits(buf, encoding: encoding, repair: isRepairing)
+      unsafe String._fromCodeUnits(buf, encoding: encoding, repair: isRepairing)
     }
   }
 
@@ -543,7 +543,7 @@ extension UnsafePointer where Pointee == UInt8 {
   @inlinable
   internal var _asCChar: UnsafePointer<CChar> {
     @inline(__always) get {
-      return UnsafeRawPointer(self).assumingMemoryBound(to: CChar.self)
+      return unsafe UnsafeRawPointer(self).assumingMemoryBound(to: CChar.self)
     }
   }
 }
@@ -551,7 +551,7 @@ extension UnsafePointer where Pointee == CChar {
   @inlinable
   internal var _asUInt8: UnsafePointer<UInt8> {
     @inline(__always) get {
-      return UnsafeRawPointer(self).assumingMemoryBound(to: UInt8.self)
+      return unsafe UnsafeRawPointer(self).assumingMemoryBound(to: UInt8.self)
     }
   }
 }

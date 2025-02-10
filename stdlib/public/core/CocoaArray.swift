@@ -40,7 +40,7 @@ internal struct _CocoaArrayWrapper: RandomAccessCollection {
 
   internal var core: _NSArrayCore {
     @inline(__always) get {
-      return unsafeBitCast(buffer, to: _NSArrayCore.self)
+      return unsafe unsafeBitCast(buffer, to: _NSArrayCore.self)
     }
   }
 
@@ -88,11 +88,11 @@ internal struct _CocoaArrayWrapper: RandomAccessCollection {
       _uninitializedCount: boundsCount,
       minimumCapacity: 0)
     
-    let base = UnsafeMutableRawPointer(result.firstElementAddress)
+    let base = unsafe UnsafeMutableRawPointer(result.firstElementAddress)
       .assumingMemoryBound(to: AnyObject.self)
       
     for idx in 0..<boundsCount {
-      (base + idx).initialize(to: core.objectAt(idx + bounds.lowerBound))
+      unsafe (base + idx).initialize(to: core.objectAt(idx + bounds.lowerBound))
     }
 
     return _SliceBuffer(_buffer: result, shiftedToStartIndex: bounds.lowerBound)
@@ -123,7 +123,7 @@ internal struct _CocoaArrayWrapper: RandomAccessCollection {
       core.countByEnumerating(with: $0, objects: nil, count: 0)
     }
 
-    return contiguousCount >= subRange.upperBound
+    return unsafe contiguousCount >= subRange.upperBound
       ? UnsafeMutableRawPointer(enumerationState.itemsPtr!)
           .assumingMemoryBound(to: AnyObject.self)
         + subRange.lowerBound
@@ -146,7 +146,7 @@ internal struct _CocoaArrayWrapper: RandomAccessCollection {
       // Make another pass to retain the copied objects
       var result = target
       for _ in bounds {
-        result.initialize(to: result.pointee)
+        unsafe result.initialize(to: result.pointee)
         result += 1
       }
       return result
@@ -158,7 +158,7 @@ internal struct _CocoaArrayWrapper: RandomAccessCollection {
     initializing buffer: UnsafeMutableBufferPointer<Element>
   ) -> (Iterator, UnsafeMutableBufferPointer<Element>.Index) {
     guard buffer.count > 0 else { return (makeIterator(), 0) }
-    let start = buffer.baseAddress!
+    let start = unsafe buffer.baseAddress!
     let c = Swift.min(self.count, buffer.count)
     _ = _copyContents(subRange: 0 ..< c, initializing: start)
     return (IndexingIterator(_elements: self, _position: c), c)

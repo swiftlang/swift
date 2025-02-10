@@ -757,7 +757,7 @@ extension Array: RandomAccessCollection, MutableCollection {
       _checkSubscript_mutating(index)
       let address = _buffer.mutableFirstElementAddress + index
       defer { _endMutation() }
-      yield &address.pointee
+      yield unsafe &address.pointee
     }
   }
 
@@ -797,7 +797,7 @@ extension Array: RandomAccessCollection, MutableCollection {
       _checkIndex(bounds.upperBound)
       // If the replacement buffer has same identity, and the ranges match,
       // then this was a pinned in-place modification, nothing further needed.
-      if self[bounds]._buffer.identity != rhs._buffer.identity
+      if unsafe self[bounds]._buffer.identity != rhs._buffer.identity
       || bounds != rhs.startIndex..<rhs.endIndex {
         self.replaceSubrange(bounds, with: rhs)
       }
@@ -914,7 +914,7 @@ extension Array: RangeReplaceableCollection {
     var p: UnsafeMutablePointer<Element>
     (self, p) = Array._allocateUninitialized(count)
     for _ in 0..<count {
-      p.initialize(to: repeatedValue)
+      unsafe p.initialize(to: repeatedValue)
       p += 1
     }
     _endMutation()
@@ -1166,7 +1166,7 @@ extension Array: RangeReplaceableCollection {
     _internalInvariant(_buffer.mutableCapacity >= _buffer.mutableCount &+ 1)
 
     _buffer.mutableCount = oldCount &+ 1
-    (_buffer.mutableFirstElementAddress + oldCount).initialize(to: newElement)
+    unsafe (_buffer.mutableFirstElementAddress + oldCount).initialize(to: newElement)
   }
 
   /// Adds a new element at the end of the array.
@@ -1235,11 +1235,11 @@ extension Array: RangeReplaceableCollection {
 
     let oldCount = _buffer.mutableCount
     let startNewElements = _buffer.mutableFirstElementAddress + oldCount
-    let buf = UnsafeMutableBufferPointer(
+    let buf = unsafe UnsafeMutableBufferPointer(
                 start: startNewElements, 
                 count: _buffer.mutableCapacity - oldCount)
 
-    var (remainder,writtenUpTo) = buf.initialize(from: newElements)
+    var (remainder,writtenUpTo) = unsafe buf.initialize(from: newElements)
     
     // trap on underflow from the sequence's underestimate:
     let writtenCount = buf.distance(from: buf.startIndex, to: writtenUpTo)
@@ -1276,7 +1276,7 @@ extension Array: RangeReplaceableCollection {
 
         // fill while there is another item and spare capacity
         while let next = nextItem, newCount < currentCapacity {
-          (base + newCount).initialize(to: next)
+          unsafe (base + newCount).initialize(to: next)
           newCount += 1
           nextItem = remainder.next()
         }
@@ -1305,7 +1305,7 @@ extension Array: RangeReplaceableCollection {
     let newCount = _buffer.mutableCount - 1
     _precondition(newCount >= 0, "Can't removeLast from an empty Array")
     let pointer = (_buffer.mutableFirstElementAddress + newCount)
-    let element = pointer.move()
+    let element = unsafe pointer.move()
     _buffer.mutableCount = newCount
     _endMutation()
     return element
@@ -1338,8 +1338,8 @@ extension Array: RangeReplaceableCollection {
     _precondition(index >= 0, "Index out of range")
     let newCount = currentCount - 1
     let pointer = (_buffer.mutableFirstElementAddress + index)
-    let result = pointer.move()
-    pointer.moveInitialize(from: pointer + 1, count: newCount - index)
+    let result = unsafe pointer.move()
+    unsafe pointer.moveInitialize(from: pointer + 1, count: newCount - index)
     _buffer.mutableCount = newCount
     _endMutation()
     return result
@@ -1510,7 +1510,7 @@ extension Array {
       Array._allocateUninitialized(_unsafeUninitializedCapacity)
 
     var initializedCount = 0
-    var buffer = UnsafeMutableBufferPointer<Element>(
+    var buffer = unsafe UnsafeMutableBufferPointer<Element>(
       start: firstElementAddress, count: _unsafeUninitializedCapacity)
     defer {
       // Update self.count even if initializer throws an error.
@@ -1518,7 +1518,7 @@ extension Array {
         initializedCount <= _unsafeUninitializedCapacity,
         "Initialized count set to greater than specified capacity."
       )
-      _precondition(
+      unsafe _precondition(
         buffer.baseAddress == firstElementAddress,
         "Can't reassign buffer in Array(unsafeUninitializedCapacity:initializingWith:)"
       )
@@ -1626,11 +1626,11 @@ extension Array {
 
     // Create an UnsafeBufferPointer that we can pass to body
     let pointer = _buffer.mutableFirstElementAddress
-    var inoutBufferPointer = UnsafeMutableBufferPointer(
+    var inoutBufferPointer = unsafe UnsafeMutableBufferPointer(
       start: pointer, count: count)
 
     defer {
-      _precondition(
+      unsafe _precondition(
         inoutBufferPointer.baseAddress == pointer &&
         inoutBufferPointer.count == count,
         "Array withUnsafeMutableBufferPointer: replacing the buffer is not allowed")
@@ -1693,11 +1693,11 @@ extension Array {
 
     // Create an UnsafeBufferPointer that we can pass to body
     let pointer = _buffer.mutableFirstElementAddress
-    var inoutBufferPointer = UnsafeMutableBufferPointer(
+    var inoutBufferPointer = unsafe UnsafeMutableBufferPointer(
       start: pointer, count: count)
 
     defer {
-      _precondition(
+      unsafe _precondition(
         inoutBufferPointer.baseAddress == pointer &&
         inoutBufferPointer.count == count,
         "Array withUnsafeMutableBufferPointer: replacing the buffer is not allowed")
@@ -1718,26 +1718,26 @@ extension Array {
 
     // It is not OK for there to be no pointer/not enough space, as this is
     // a precondition and Array never lies about its count.
-    guard var p = buffer.baseAddress
+    guard var p = unsafe buffer.baseAddress
       else { _preconditionFailure("Attempt to copy contents into nil buffer pointer") }
     _precondition(self.count <= buffer.count, 
       "Insufficient space allocated to copy array contents")
 
     if let s = _baseAddressIfContiguous {
-      p.initialize(from: s, count: self.count)
+      unsafe p.initialize(from: s, count: self.count)
       // Need a _fixLifetime bracketing the _baseAddressIfContiguous getter
       // and all uses of the pointer it returns:
       _fixLifetime(self._owner)
     } else {
       for x in self {
-        p.initialize(to: x)
+        unsafe p.initialize(to: x)
         p += 1
       }
     }
 
     var it = IndexingIterator(_elements: self)
     it._position = endIndex
-    return (it,buffer.index(buffer.startIndex, offsetBy: self.count))
+    return (it,unsafe buffer.index(buffer.startIndex, offsetBy: self.count))
   }
 }
 
@@ -2075,7 +2075,7 @@ internal struct _ArrayAnyHashableBox<Element: Hashable>
     into result: UnsafeMutablePointer<T>
   ) -> Bool {
     guard let value = _value as? T else { return false }
-    result.initialize(to: value)
+    unsafe result.initialize(to: value)
     return true
   }
 }

@@ -77,7 +77,7 @@ extension __SwiftNativeNSArrayWithContiguousStorage {
       _precondition(
         _isValidArraySubscript(index, count: objects.count),
         "Array index out of range")
-      return Unmanaged.passUnretained(objects[index])
+      return unsafe Unmanaged.passUnretained(objects[index])
     }
   }
   
@@ -112,7 +112,7 @@ extension __SwiftNativeNSArrayWithContiguousStorage {
       // These objects are "returned" at +0, so treat them as pointer values to
       // avoid retains. Copy bytes via a raw pointer to circumvent reference
       // counting while correctly aliasing with all other pointer types.
-      UnsafeMutableRawPointer(aBuffer).copyMemory(
+      unsafe UnsafeMutableRawPointer(aBuffer).copyMemory(
         from: objects.baseAddress! + range.location,
         byteCount: range.length * MemoryLayout<AnyObject>.stride)
     }
@@ -123,7 +123,7 @@ extension __SwiftNativeNSArrayWithContiguousStorage {
     with state: UnsafeMutablePointer<_SwiftNSFastEnumerationState>,
     objects: UnsafeMutablePointer<AnyObject>?, count: Int
   ) -> Int {
-    var enumerationState = state.pointee
+    var enumerationState = unsafe state.pointee
 
     if enumerationState.state != 0 {
       return 0
@@ -133,9 +133,9 @@ extension __SwiftNativeNSArrayWithContiguousStorage {
       objects in
       enumerationState.mutationsPtr = _fastEnumerationStorageMutationsPtr
       enumerationState.itemsPtr =
-        AutoreleasingUnsafeMutablePointer(objects.baseAddress)
+        unsafe AutoreleasingUnsafeMutablePointer(objects.baseAddress)
       enumerationState.state = 1
-      state.pointee = enumerationState
+      unsafe state.pointee = enumerationState
       return objects.count
     }
   }
@@ -166,14 +166,14 @@ extension __SwiftNativeNSArrayWithContiguousStorage {
   @_effects(readonly)
   dynamic internal func objectAtSubscript(_ index: Int) -> Unmanaged<AnyObject> {
     //TODO: exception instead of precondition, once that's possible
-    return Unmanaged.passUnretained(contents[index])
+    return unsafe Unmanaged.passUnretained(contents[index])
   }
 
   @objc(objectAtIndex:)
   @_effects(readonly)
   dynamic internal func objectAt(_ index: Int) -> Unmanaged<AnyObject> {
     //TODO: exception instead of precondition, once that's possible
-    return Unmanaged.passUnretained(contents[index])
+    return unsafe Unmanaged.passUnretained(contents[index])
   }
 
   @objc internal func getObjects(
@@ -196,7 +196,7 @@ extension __SwiftNativeNSArrayWithContiguousStorage {
       // These objects are "returned" at +0, so treat them as pointer values to
       // avoid retains. Copy bytes via a raw pointer to circumvent reference
       // counting while correctly aliasing with all other pointer types.
-      UnsafeMutableRawPointer(aBuffer).copyMemory(
+      unsafe UnsafeMutableRawPointer(aBuffer).copyMemory(
         from: objects.baseAddress! + range.location,
         byteCount: range.length * MemoryLayout<AnyObject>.stride)
     }!
@@ -207,7 +207,7 @@ extension __SwiftNativeNSArrayWithContiguousStorage {
     with state: UnsafeMutablePointer<_SwiftNSFastEnumerationState>,
     objects: UnsafeMutablePointer<AnyObject>?, count: Int
   ) -> Int {
-    var enumerationState = state.pointee
+    var enumerationState = unsafe state.pointee
 
     if enumerationState.state != 0 {
       return 0
@@ -217,9 +217,9 @@ extension __SwiftNativeNSArrayWithContiguousStorage {
       objects in
       enumerationState.mutationsPtr = _fastEnumerationStorageMutationsPtr
       enumerationState.itemsPtr =
-        AutoreleasingUnsafeMutablePointer(objects.baseAddress)
+        unsafe AutoreleasingUnsafeMutablePointer(objects.baseAddress)
       enumerationState.state = 1
-      state.pointee = enumerationState
+      unsafe state.pointee = enumerationState
       return objects.count
     }!
   }
@@ -269,13 +269,13 @@ extension __SwiftNativeNSArrayWithContiguousStorage {
                                with objects: UnsafePointer<AnyObject>,
                                count: Int) {
     let range = range.location ..< range.location + range.length
-    let buf = UnsafeBufferPointer(start: objects, count: count)
+    let buf = unsafe UnsafeBufferPointer(start: objects, count: count)
     if range == contents.startIndex..<contents.endIndex {
-      contents = Array(buf)
+      contents = unsafe Array(buf)
     } else {
       // We make an Array here to make sure that something is holding onto the
       // objects in `buf`, since replaceSubrange could release them
-      contents.replaceSubrange(range, with: Array(buf))
+      unsafe contents.replaceSubrange(range, with: Array(buf))
     }
   }
   
@@ -283,8 +283,8 @@ extension __SwiftNativeNSArrayWithContiguousStorage {
   dynamic internal func insertObjects(_ objects: UnsafePointer<AnyObject>,
                               count: Int,
                               at index: Int) {
-    let buf = UnsafeBufferPointer(start: objects, count: count)
-    contents.insert(contentsOf: buf, at: index)
+    let buf = unsafe UnsafeBufferPointer(start: objects, count: count)
+    unsafe contents.insert(contentsOf: buf, at: index)
   }
     
   @objc(indexOfObjectIdenticalTo:)
@@ -347,14 +347,14 @@ extension __SwiftNativeNSArrayWithContiguousStorage {
 
   @nonobjc
   internal final var _heapBufferBridgedPtr: UnsafeMutablePointer<AnyObject?> {
-    return _getUnsafePointerToStoredProperties(self).assumingMemoryBound(
+    return unsafe _getUnsafePointerToStoredProperties(self).assumingMemoryBound(
       to: Optional<AnyObject>.self)
   }
 
   internal final var _heapBufferBridged: __BridgingBufferStorage? {
     if let ref =
       _stdlib_atomicLoadARCRef(object: _heapBufferBridgedPtr) {
-      return unsafeBitCast(ref, to: __BridgingBufferStorage.self)
+      return unsafe unsafeBitCast(ref, to: __BridgingBufferStorage.self)
     }
     return nil
   }
@@ -370,7 +370,7 @@ extension __SwiftNativeNSArrayWithContiguousStorage {
       withExtendedLifetime(bridgedStorage) {
         let buffer = _BridgingBuffer(bridgedStorage)
         let count = buffer.count
-        buffer.baseAddress.deinitialize(count: count)
+        unsafe buffer.baseAddress.deinitialize(count: count)
       }
     }
   }
@@ -388,7 +388,7 @@ extension __SwiftNativeNSArrayWithContiguousStorage {
       // If we've already got a buffer of bridged objects, just use it
       if let bridgedStorage = _heapBufferBridged {
         let bridgingBuffer = _BridgingBuffer(bridgedStorage)
-        buffer = UnsafeBufferPointer(
+        buffer = unsafe UnsafeBufferPointer(
             start: bridgingBuffer.baseAddress, count: bridgingBuffer.count)
       }
 
@@ -408,7 +408,7 @@ extension __SwiftNativeNSArrayWithContiguousStorage {
           object: _heapBufferBridgedPtr, desired: objects.storage!) {
 
           // Another thread won the race.  Throw out our buffer.
-          _destroyBridgedStorage(
+          unsafe _destroyBridgedStorage(
             unsafeDowncast(objects.storage!, to: __BridgingBufferStorage.self))
         }
         continue // Try again
@@ -447,7 +447,7 @@ internal final class __SwiftDeferredStaticNSArray<Element>
       // If we've already got a buffer of bridged objects, just use it
       if let bridgedStorage = _heapBufferBridged {
         let bridgingBuffer = _BridgingBuffer(bridgedStorage)
-        buffer = UnsafeBufferPointer(
+        buffer = unsafe UnsafeBufferPointer(
             start: bridgingBuffer.baseAddress, count: bridgingBuffer.count)
       }
       else {
@@ -462,7 +462,7 @@ internal final class __SwiftDeferredStaticNSArray<Element>
           object: _heapBufferBridgedPtr, desired: objects.storage!) {
 
           // Another thread won the race.  Throw out our buffer.
-          _destroyBridgedStorage(
+          unsafe _destroyBridgedStorage(
             unsafeDowncast(objects.storage!, to: __BridgingBufferStorage.self))
         }
         continue // Try again
@@ -482,7 +482,7 @@ internal final class __SwiftDeferredStaticNSArray<Element>
     let resultPtr = result.baseAddress
     let p = UnsafeMutablePointer<Element>(Builtin.projectTailElems(_nativeStorage, Element.self))
     for i in 0..<count {
-      (resultPtr + i).initialize(to: _bridgeAnythingToObjectiveC(p[i]))
+      unsafe (resultPtr + i).initialize(to: _bridgeAnythingToObjectiveC(p[i]))
     }
     _fixLifetime(self)
     return result

@@ -46,7 +46,7 @@ extension Slab where Element: ~Copyable {
   @_alwaysEmitIntoClient
   @_transparent
   internal var _buffer: UnsafeBufferPointer<Element> {
-    UnsafeBufferPointer<Element>(start: _address, count: count)
+    unsafe UnsafeBufferPointer<Element>(start: _address, count: count)
   }
 
   /// Returns a mutable pointer to the first element in the vector.
@@ -65,7 +65,7 @@ extension Slab where Element: ~Copyable {
   @_transparent
   internal var _mutableBuffer: UnsafeMutableBufferPointer<Element> {
     mutating get {
-      UnsafeMutableBufferPointer<Element>(start: _mutableAddress, count: count)
+      unsafe UnsafeMutableBufferPointer<Element>(start: _mutableAddress, count: count)
     }
   }
 
@@ -77,7 +77,7 @@ extension Slab where Element: ~Copyable {
   internal static func _initializationBuffer(
     start: Builtin.RawPointer
   ) -> UnsafeMutableBufferPointer<Element> {
-    UnsafeMutableBufferPointer<Element>(
+    unsafe UnsafeMutableBufferPointer<Element>(
       start: UnsafeMutablePointer<Element>(start),
       count: count
     )
@@ -110,12 +110,12 @@ extension Slab where Element: ~Copyable {
 
       for i in 0 ..< count {
         do throws(E) {
-          try buffer.initializeElement(at: i, to: body(i))
+          try unsafe buffer.initializeElement(at: i, to: body(i))
         } catch {
           // The closure threw an error. We need to deinitialize every element
           // we've initialized up to this point.
           for j in 0 ..< i {
-            buffer.deinitializeElement(at: j)
+            unsafe buffer.deinitializeElement(at: j)
           }
 
           // Throw the error we were given back out to the caller.
@@ -156,16 +156,16 @@ extension Slab where Element: ~Copyable {
     self = try Builtin.emplace { (rawPtr) throws(E) -> () in
       let buffer = Slab<count, Element>._initializationBuffer(start: rawPtr)
 
-      buffer.initializeElement(at: 0, to: o.take()._consumingUncheckedUnwrapped())
+      unsafe buffer.initializeElement(at: 0, to: o.take()._consumingUncheckedUnwrapped())
 
       for i in 1 ..< count {
         do throws(E) {
-          try buffer.initializeElement(at: i, to: next(buffer[i &- 1]))
+          try unsafe buffer.initializeElement(at: i, to: next(buffer[i &- 1]))
         } catch {
           // The closure threw an error. We need to deinitialize every element
           // we've initialized up to this point.
           for j in 0 ..< i {
-            buffer.deinitializeElement(at: j)
+            unsafe buffer.deinitializeElement(at: j)
           }
 
           throw error
@@ -186,7 +186,7 @@ extension Slab where Element: Copyable {
     self = Builtin.emplace {
       let buffer = Slab<count, Element>._initializationBuffer(start: $0)
 
-      buffer.initialize(repeating: value)
+      unsafe buffer.initialize(repeating: value)
     }
   }
 }
@@ -376,10 +376,10 @@ extension Slab where Element: ~Copyable {
     _precondition(indices.contains(i), "Index out of bounds")
     _precondition(indices.contains(j), "Index out of bounds")
 
-    let ithElement = _mutableBuffer.moveElement(from: i)
-    let jthElement = _mutableBuffer.moveElement(from: j)
-    _mutableBuffer.initializeElement(at: i, to: jthElement)
-    _mutableBuffer.initializeElement(at: j, to: ithElement)
+    let ithElement = unsafe _mutableBuffer.moveElement(from: i)
+    let jthElement = unsafe _mutableBuffer.moveElement(from: j)
+    unsafe _mutableBuffer.initializeElement(at: i, to: jthElement)
+    unsafe _mutableBuffer.initializeElement(at: j, to: ithElement)
   }
 }
 

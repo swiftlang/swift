@@ -220,7 +220,7 @@ internal func _fallBackToHeapAllocation<R: ~Copyable>(
     alignment: alignment
   )
   defer {
-    buffer.deallocate()
+    unsafe buffer.deallocate()
   }
   return try body(buffer._rawValue)
 }
@@ -269,7 +269,7 @@ public func withUnsafeTemporaryAllocation<R: ~Copyable>(
     capacity: byteCount,
     alignment: alignment
   ) { pointer in
-    let buffer = UnsafeMutableRawBufferPointer(
+    let buffer = unsafe UnsafeMutableRawBufferPointer(
       start: .init(pointer),
       count: byteCount
     )
@@ -293,7 +293,7 @@ public func _withUnprotectedUnsafeTemporaryAllocation<R: ~Copyable>(
     capacity: byteCount,
     alignment: alignment
   ) { pointer in
-    let buffer = UnsafeMutableRawBufferPointer(
+    let buffer = unsafe UnsafeMutableRawBufferPointer(
       start: .init(pointer),
       count: byteCount
     )
@@ -346,7 +346,7 @@ public func withUnsafeTemporaryAllocation<
     alignment: MemoryLayout<T>.alignment
   ) { pointer in
     Builtin.bindMemory(pointer, capacity._builtinWordValue, type)
-    let buffer = UnsafeMutableBufferPointer<T>(
+    let buffer = unsafe UnsafeMutableBufferPointer<T>(
       start: .init(pointer),
       count: capacity
     )
@@ -373,7 +373,7 @@ public func _withUnprotectedUnsafeTemporaryAllocation<
     alignment: MemoryLayout<T>.alignment
   ) { pointer in
     Builtin.bindMemory(pointer, capacity._builtinWordValue, type)
-    let buffer = UnsafeMutableBufferPointer<T>(
+    let buffer = unsafe UnsafeMutableBufferPointer<T>(
       start: .init(pointer),
       count: capacity
     )

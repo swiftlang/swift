@@ -547,7 +547,7 @@ extension ArraySlice: RandomAccessCollection, MutableCollection {
       _checkSubscript_native(index)
       let address = _buffer.subscriptBaseAddress + index
       defer { _endMutation() }
-      yield &address.pointee
+      yield unsafe &address.pointee
     }
   }
 
@@ -587,7 +587,7 @@ extension ArraySlice: RandomAccessCollection, MutableCollection {
       _checkIndex(bounds.upperBound)
       // If the replacement buffer has same identity, and the ranges match,
       // then this was a pinned in-place modification, nothing further needed.
-      if self[bounds]._buffer.identity != rhs._buffer.identity
+      if unsafe self[bounds]._buffer.identity != rhs._buffer.identity
       || bounds != rhs.startIndex..<rhs.endIndex {
         self.replaceSubrange(bounds, with: rhs)
       }
@@ -705,7 +705,7 @@ extension ArraySlice: RangeReplaceableCollection {
       _buffer.count = count
       var p = _buffer.firstElementAddress
       for _ in 0..<count {
-        p.initialize(to: repeatedValue)
+        unsafe p.initialize(to: repeatedValue)
         p += 1
       }
     } else {
@@ -892,7 +892,7 @@ extension ArraySlice: RangeReplaceableCollection {
     _internalInvariant(_buffer.capacity >= _buffer.count &+ 1)
 
     _buffer.count = oldCount &+ 1
-    (_buffer.firstElementAddress + oldCount).initialize(to: newElement)
+    unsafe (_buffer.firstElementAddress + oldCount).initialize(to: newElement)
   }
 
   /// Adds a new element at the end of the array.
@@ -953,11 +953,11 @@ extension ArraySlice: RangeReplaceableCollection {
 
     let oldCount = self.count
     let startNewElements = _buffer.firstElementAddress + oldCount
-    let buf = UnsafeMutableBufferPointer(
+    let buf = unsafe UnsafeMutableBufferPointer(
                 start: startNewElements, 
                 count: self.capacity - oldCount)
 
-    let (remainder,writtenUpTo) = buf.initialize(from: newElements)
+    let (remainder,writtenUpTo) = unsafe buf.initialize(from: newElements)
     
     // trap on underflow from the sequence's underestimate:
     let writtenCount = buf.distance(from: buf.startIndex, to: writtenUpTo)
@@ -1273,11 +1273,11 @@ extension ArraySlice {
 
     // Create an UnsafeBufferPointer that we can pass to body
     let pointer = _buffer.firstElementAddress
-    var inoutBufferPointer = UnsafeMutableBufferPointer(
+    var inoutBufferPointer = unsafe UnsafeMutableBufferPointer(
       start: pointer, count: count)
 
     defer {
-      _precondition(
+      unsafe _precondition(
         inoutBufferPointer.baseAddress == pointer &&
         inoutBufferPointer.count == count,
         "ArraySlice withUnsafeMutableBufferPointer: replacing the buffer is not allowed")
@@ -1298,26 +1298,26 @@ extension ArraySlice {
 
     // It is not OK for there to be no pointer/not enough space, as this is
     // a precondition and Array never lies about its count.
-    guard var p = buffer.baseAddress
+    guard var p = unsafe buffer.baseAddress
       else { _preconditionFailure("Attempt to copy contents into nil buffer pointer") }
     _precondition(self.count <= buffer.count, 
       "Insufficient space allocated to copy array contents")
 
     if let s = _baseAddressIfContiguous {
-      p.initialize(from: s, count: self.count)
+      unsafe p.initialize(from: s, count: self.count)
       // Need a _fixLifetime bracketing the _baseAddressIfContiguous getter
       // and all uses of the pointer it returns:
       _fixLifetime(self._owner)
     } else {
       for x in self {
-        p.initialize(to: x)
+        unsafe p.initialize(to: x)
         p += 1
       }
     }
 
     var it = IndexingIterator(_elements: self)
     it._position = endIndex
-    return (it,buffer.index(buffer.startIndex, offsetBy: self.count))
+    return (it,unsafe buffer.index(buffer.startIndex, offsetBy: self.count))
   }
 }
 

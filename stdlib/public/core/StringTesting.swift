@@ -157,12 +157,12 @@ extension _StringGuts {
       let smol = self.asSmall
       if let scratch = scratch, scratch.count > smol.count {
         let scratchStart =
-          scratch.baseAddress!
+          unsafe scratch.baseAddress!
         smol.withUTF8 { smolUTF8 -> () in
-          scratchStart.initializeMemory(
+          unsafe scratchStart.initializeMemory(
             as: UInt8.self, from: smolUTF8.baseAddress!, count: smolUTF8.count)
         }
-        scratch[smol.count] = 0
+        unsafe scratch[smol.count] = 0
         return (
           owner: nil,
           _convertPointerToPointerArgument(scratchStart),
@@ -171,7 +171,7 @@ extension _StringGuts {
       }
     } else if _fastPath(self.isFastUTF8) {
       let ptr: ToPointer =
-        _convertPointerToPointerArgument(self._object.fastUTF8.baseAddress!)
+        unsafe _convertPointerToPointerArgument(self._object.fastUTF8.baseAddress!)
       return (
         owner: self._object.owner,
         ptr,

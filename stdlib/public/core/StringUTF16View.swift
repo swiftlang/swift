@@ -333,19 +333,19 @@ extension String.UTF16View: BidirectionalCollection {
     if _slowPath(_guts.isForeign) {
       let lower = self.index(start, offsetBy: offsets.lowerBound)
       let upper = _foreignIndex(lower, offsetBy: offsets.count)
-      return Range(uncheckedBounds: (lower, upper))
+      return unsafe Range(uncheckedBounds: (lower, upper))
     }
 
     if _guts.isASCII {
       let lower = self.index(start, offsetBy: offsets.lowerBound)
       let upper = self.index(lower, offsetBy: offsets.count)
-      return Range(uncheckedBounds: (lower, upper))
+      return unsafe Range(uncheckedBounds: (lower, upper))
     }
 
     if offsets.count < _breadcrumbStride / 2 {
       let lower = self.index(start, offsetBy: offsets.lowerBound)
       let upper = _index(lower, offsetBy: offsets.count)._knownUTF8
-      return Range(uncheckedBounds: (lower, upper))
+      return unsafe Range(uncheckedBounds: (lower, upper))
     }
 
     let bias = _nativeGetOffset(for: start)
@@ -354,7 +354,7 @@ extension String.UTF16View: BidirectionalCollection {
       ? _index(start, offsetBy: offsets.lowerBound)
       : _nativeGetIndex(for: bias + offsets.lowerBound))
     let upper = _nativeGetIndex(for: bias + offsets.upperBound)
-    return Range(uncheckedBounds: (lower, upper))
+    return unsafe Range(uncheckedBounds: (lower, upper))
   }
 
   internal func _offsetRange(
@@ -377,14 +377,14 @@ extension String.UTF16View: BidirectionalCollection {
     if _slowPath(_guts.isForeign) {
       let lowerOffset = _foreignDistance(from: start, to: lower)
       let distance = _foreignDistance(from: lower, to: upper)
-      return Range(uncheckedBounds: (lowerOffset, lowerOffset + distance))
+      return unsafe Range(uncheckedBounds: (lowerOffset, lowerOffset + distance))
     }
 
     let utf8Distance = upper._encodedOffset - lower._encodedOffset
 
     if _guts.isASCII {
       let lowerOffset = lower._encodedOffset - start._encodedOffset
-      return Range(uncheckedBounds: (lowerOffset, lowerOffset + utf8Distance))
+      return unsafe Range(uncheckedBounds: (lowerOffset, lowerOffset + utf8Distance))
     }
 
     if utf8Distance.magnitude <= _breadcrumbStride / 2 {
@@ -392,7 +392,7 @@ extension String.UTF16View: BidirectionalCollection {
       upper = _utf16AlignNativeIndex(upper)
       let lowerOffset = distance(from: start, to: lower)
       let distance = _utf16Distance(from: lower, to: upper)
-      return Range(uncheckedBounds: (lowerOffset, lowerOffset + distance))
+      return unsafe Range(uncheckedBounds: (lowerOffset, lowerOffset + distance))
     }
 
     let bias = _nativeGetOffset(for: start)
@@ -402,7 +402,7 @@ extension String.UTF16View: BidirectionalCollection {
       ? _utf16Distance(from: start, to: lower)
       : _nativeGetOffset(for: lower) - bias)
     let upperOffset = _nativeGetOffset(for: upper) - bias
-    return Range(uncheckedBounds: (lowerOffset, upperOffset))
+    return unsafe Range(uncheckedBounds: (lowerOffset, upperOffset))
   }
 
   /// Accesses the code unit at the given position.
@@ -734,12 +734,12 @@ extension String.UTF16View {
     
     while readPtr + MemoryLayout<U>.stride < endPtr {
       //Find the number of continuations (0b10xxxxxx)
-      let sValue = readPtr.loadUnaligned(as: S.self)
+      let sValue = unsafe readPtr.loadUnaligned(as: S.self)
       let continuations = S.zero.replacing(with: S.one, where: sValue .< -65 + 1)
             
       //Find the number of 4 byte code points (0b11110xxx)
-      let uValue = readPtr.loadUnaligned(as: U.self)
-      let fourBytes = S.zero.replacing(
+      let uValue = unsafe readPtr.loadUnaligned(as: U.self)
+      let fourBytes = unsafe S.zero.replacing(
         with: S.one,
         where: unsafeBitCast(
           uValue .>= 0b11110000,
@@ -766,13 +766,13 @@ extension String.UTF16View {
       guard rawBuffer.count > 0 else { return 0 }
       
       var utf16Count = 0
-      var readPtr = rawBuffer.baseAddress.unsafelyUnwrapped
+      var readPtr = unsafe rawBuffer.baseAddress.unsafelyUnwrapped
       let initialReadPtr = readPtr
       let endPtr = readPtr + rawBuffer.count
       
       //eat leading continuations
       while readPtr < endPtr {
-        let byte = readPtr.load(as: UInt8.self)
+        let byte = unsafe readPtr.load(as: UInt8.self)
         if !UTF8.isContinuation(byte) {
           break
         }
@@ -794,13 +794,13 @@ extension String.UTF16View {
       
       //back up to the start of the current scalar if we may have a trailing
       //incomplete scalar
-      if utf16Count > 0 && UTF8.isContinuation(readPtr.load(as: UInt8.self)) {
-        while readPtr > initialReadPtr && UTF8.isContinuation(readPtr.load(as: UInt8.self)) {
+      if unsafe utf16Count > 0 && UTF8.isContinuation(readPtr.load(as: UInt8.self)) {
+        while unsafe readPtr > initialReadPtr && UTF8.isContinuation(readPtr.load(as: UInt8.self)) {
           readPtr -= 1
         }
         
         //The trailing scalar may be incomplete, subtract it out and check below
-        let byte = readPtr.load(as: UInt8.self)
+        let byte = unsafe readPtr.load(as: UInt8.self)
         let len = _utf8ScalarLength(byte)
         utf16Count &-= len == 4 ? 2 : 1
         if readPtr == initialReadPtr {
@@ -813,11 +813,11 @@ extension String.UTF16View {
 
       //trailing bytes
       while readPtr < endPtr {
-        let byte = readPtr.load(as: UInt8.self)
+        let byte = unsafe readPtr.load(as: UInt8.self)
         let len = _utf8ScalarLength(byte)
         // if we don't have enough bytes left, we don't have a complete scalar,
         // so don't add it to the count.
-        if readPtr + len <= endPtr {
+        if unsafe readPtr + len <= endPtr {
           utf16Count &+= len == 4 ? 2 : 1
         }
         readPtr += len
@@ -856,10 +856,10 @@ extension String.UTF16View {
 
     // Simple and common: endIndex aka `length`.
     if idx == endIndex {
-      return breadcrumbs._withUnsafeGuaranteedRef { $0.utf16Length }
+      return unsafe breadcrumbs._withUnsafeGuaranteedRef { $0.utf16Length }
     }
 
-    return breadcrumbs._withUnsafeGuaranteedRef { crumbs in
+    return unsafe breadcrumbs._withUnsafeGuaranteedRef { crumbs in
       // Otherwise, find the nearest lower-bound breadcrumb and count from there
       // FIXME: Starting from the upper-bound crumb when that is closer would
       // cut the average cost of the subsequent iteration by 50%.
@@ -897,13 +897,13 @@ extension String.UTF16View {
 
     // Simple and common: endIndex aka `length`.
     let breadcrumbs = _guts.loadUnmanagedBreadcrumbs()
-    let utf16Count = breadcrumbs._withUnsafeGuaranteedRef { $0.utf16Length }
+    let utf16Count = unsafe breadcrumbs._withUnsafeGuaranteedRef { $0.utf16Length }
     if offset == utf16Count { return endIndex }
 
     // Otherwise, find the nearest lower-bound breadcrumb and advance that
     // FIXME: Starting from the upper-bound crumb when that is closer would cut
     // the average cost of the subsequent iteration by 50%.
-    let (crumb, remaining) = breadcrumbs._withUnsafeGuaranteedRef {
+    let (crumb, remaining) = unsafe breadcrumbs._withUnsafeGuaranteedRef {
       $0.getBreadcrumb(forOffset: offset)
     }
     _internalInvariant(crumb._canBeUTF8 && crumb._encodedOffset <= _guts.count)
@@ -926,7 +926,7 @@ extension String.UTF16View {
 
       while true {
         _precondition(readIdx < readEnd, "String index is out of bounds")
-        let len = _utf8ScalarLength(utf8[_unchecked: readIdx])
+        let len = unsafe _utf8ScalarLength(utf8[_unchecked: readIdx])
         let utf16Len = len == 4 ? 2 : 1
         utf16I &+= utf16Len
 
@@ -975,8 +975,8 @@ extension String.UTF16View {
         _internalInvariant(range.lowerBound.transcodedOffset == 0)
         _internalInvariant(range.upperBound.transcodedOffset == 0)
         while readIdx < readEnd {
-          _internalInvariant(utf8[readIdx] < 0x80)
-          buffer[_unchecked: writeIdx] = UInt16(
+          unsafe _internalInvariant(utf8[readIdx] < 0x80)
+          unsafe buffer[_unchecked: writeIdx] = unsafe UInt16(
             truncatingIfNeeded: utf8[_unchecked: readIdx])
           readIdx &+= 1
           writeIdx &+= 1
@@ -990,7 +990,7 @@ extension String.UTF16View {
         let (scalar, len) = _decodeScalar(utf8, startingAt: readIdx)
         // Note: this is intentionally not using the _unchecked subscript.
         // (We rely on debug assertions to catch out of bounds access.)
-        buffer[writeIdx] = scalar.utf16[1]
+        unsafe buffer[writeIdx] = scalar.utf16[1]
         readIdx &+= len
         writeIdx &+= 1
       }
@@ -998,13 +998,13 @@ extension String.UTF16View {
       // Transcode middle
       while readIdx < readEnd {
         let (scalar, len) = _decodeScalar(utf8, startingAt: readIdx)
-        buffer[writeIdx] = scalar.utf16[0]
+        unsafe buffer[writeIdx] = scalar.utf16[0]
         readIdx &+= len
         writeIdx &+= 1
         if _slowPath(scalar.utf16.count == 2) {
           // Note: this is intentionally not using the _unchecked subscript.
           // (We rely on debug assertions to catch out of bounds access.)
-          buffer[writeIdx] = scalar.utf16[1]
+          unsafe buffer[writeIdx] = scalar.utf16[1]
           writeIdx &+= 1
         }
       }
@@ -1017,7 +1017,7 @@ extension String.UTF16View {
 
         // Note: this is intentionally not using the _unchecked subscript.
         // (We rely on debug assertions to catch out of bounds access.)
-        buffer[writeIdx] = scalar.utf16[0]
+        unsafe buffer[writeIdx] = scalar.utf16[0]
         writeIdx &+= 1
       }
       _internalInvariant(writeIdx <= writeEnd)

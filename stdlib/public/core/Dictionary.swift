@@ -912,7 +912,7 @@ extension Dictionary {
       }
       let address = native._values + bucket.offset
       defer { _fixLifetime(self) }
-      yield &address.pointee
+      yield unsafe &address.pointee
     }
   }
 
@@ -1461,7 +1461,7 @@ extension Dictionary {
         let bucket = native.validatedBucket(for: position)
         let address = native._values + bucket.offset
         defer { _fixLifetime(self) }
-        yield &address.pointee
+        yield unsafe &address.pointee
       }
     }
 
@@ -1685,7 +1685,7 @@ internal struct _DictionaryAnyHashableBox<Key: Hashable, Value: Hashable>
     into result: UnsafeMutablePointer<T>
   ) -> Bool {
     guard let value = _value as? T else { return false }
-    result.initialize(to: value)
+    unsafe result.initialize(to: value)
     return true
   }
 }
