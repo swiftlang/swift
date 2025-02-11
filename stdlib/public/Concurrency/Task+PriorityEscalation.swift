@@ -15,6 +15,7 @@ import Swift
 
 // ==== Task Priority Escalation -----------------------------------------------
 
+@available(SwiftStdlib 6.2, *)
 extension Task {
   /// Escalate the task `priority` of the passed in task to the `newPriority`.
   ///
@@ -47,6 +48,7 @@ extension Task {
   }
 }
 
+@available(SwiftStdlib 6.2, *)
 extension UnsafeCurrentTask {
   /// Escalate the task `priority` of the passed in task to the `newPriority`.
   ///
