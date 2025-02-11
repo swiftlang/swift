@@ -924,6 +924,18 @@ ASTContext &IterableDeclContext::getASTContext() const {
   return getDecl()->getASTContext();
 }
 
+SourceRange IterableDeclContext::getBraces() const {
+  switch (getIterableContextKind()) {
+  case IterableDeclContextKind::NominalTypeDecl:
+    return cast<NominalTypeDecl>(this)->getBraces();
+    break;
+
+  case IterableDeclContextKind::ExtensionDecl:
+    return cast<ExtensionDecl>(this)->getBraces();
+    break;
+  }
+}
+
 DeclRange IterableDeclContext::getCurrentMembersWithoutLoading() const {
   return DeclRange(FirstDeclAndLazyMembers.getPointer(), nullptr);
 }
