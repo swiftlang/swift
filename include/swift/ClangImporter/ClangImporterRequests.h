@@ -138,9 +138,9 @@ private:
 /// for which we separately keep track of the derived class where we started
 /// looking (startDecl) and the access level for the current inheritance.
 struct ClangRecordMemberLookupDescriptor final {
-  NominalTypeDecl *recordDecl;        // Where we are currently looking
-  NominalTypeDecl *inheritingDecl;    // Where we started looking from
-  DeclName name;                      // What we are looking for
+  NominalTypeDecl *recordDecl;     // Where we are currently looking
+  NominalTypeDecl *inheritingDecl; // Where we started looking from
+  DeclName name;                   // What we are looking for
   ClangInheritanceInfo inheritance;
 
   ClangRecordMemberLookupDescriptor(NominalTypeDecl *recordDecl, DeclName name)
@@ -151,7 +151,8 @@ struct ClangRecordMemberLookupDescriptor final {
 
   friend llvm::hash_code
   hash_value(const ClangRecordMemberLookupDescriptor &desc) {
-    return llvm::hash_combine(desc.name, desc.recordDecl, desc.inheritingDecl, desc.inheritance);
+    return llvm::hash_combine(desc.name, desc.recordDecl, desc.inheritingDecl,
+                              desc.inheritance);
   }
 
   friend bool operator==(const ClangRecordMemberLookupDescriptor &lhs,
@@ -171,15 +172,15 @@ private:
 
   // This private constructor should only be used in ClangRecordMemberLookup,
   // for recursively traversing base classes that inheritingDecl inherites from.
-  ClangRecordMemberLookupDescriptor(NominalTypeDecl *recordDecl,
-                                    DeclName name,
+  ClangRecordMemberLookupDescriptor(NominalTypeDecl *recordDecl, DeclName name,
                                     NominalTypeDecl *inheritingDecl,
                                     ClangInheritanceInfo inheritance)
       : recordDecl(recordDecl), inheritingDecl(inheritingDecl), name(name),
         inheritance(inheritance) {
     assert(isa<clang::RecordDecl>(recordDecl->getClangDecl()));
     assert(isa<clang::CXXRecordDecl>(inheritingDecl->getClangDecl()));
-    assert(inheritance.isInheriting() && "recursive calls should indicate inheritance");
+    assert(inheritance.isInheriting() &&
+           "recursive calls should indicate inheritance");
     assert(recordDecl != inheritingDecl &&
            "recursive calls should lookup elsewhere");
   }

@@ -659,8 +659,7 @@ public:
   /// Imports a clang decl directly, rather than looking up it's name.
   Decl *importDeclDirectly(const clang::NamedDecl *decl) override;
 
-  ValueDecl *importBaseMemberDecl(ValueDecl *decl,
-                                  DeclContext *newContext,
+  ValueDecl *importBaseMemberDecl(ValueDecl *decl, DeclContext *newContext,
                                   ClangInheritanceInfo inheritance) override;
 
   /// Emits diagnostics for any declarations named name
@@ -769,13 +768,14 @@ class ClangInheritanceInfo {
   bool nestedPrivate;
 
 public:
-  ClangInheritanceInfo() : cumulativeAccess(clang::AS_none), nestedPrivate(false) {}
+  ClangInheritanceInfo()
+      : cumulativeAccess(clang::AS_none), nestedPrivate(false) {}
 
   /// For nested inheritance, clamp inheritance to least permissive level
   /// which is the largest numerical value for clang::AccessSpecifier
-  ClangInheritanceInfo(ClangInheritanceInfo prev, clang::CXXBaseSpecifier base) :
-    cumulativeAccess(computeCumulativeAccess(prev, base)),
-    nestedPrivate(prev && base.getAccessSpecifier() == clang::AS_private) {}
+  ClangInheritanceInfo(ClangInheritanceInfo prev, clang::CXXBaseSpecifier base)
+      : cumulativeAccess(computeCumulativeAccess(prev, base)),
+        nestedPrivate(prev && base.getAccessSpecifier() == clang::AS_private) {}
 
   /// Whether this is info represents a case of C++ inheritance.
   bool isInheriting() const { return cumulativeAccess != clang::AS_none; }
@@ -798,7 +798,8 @@ public:
   /// cannot be accessed from the derived class, either because \param baseDecl
   /// was declared as private in the base class, or because \param clonedDecl
   /// was inherited with private inheritance.
-  void setUnavailableIfNecessary(const ValueDecl *baseDecl, ValueDecl *clonedDecl);
+  void setUnavailableIfNecessary(const ValueDecl *baseDecl,
+                                 ValueDecl *clonedDecl);
 
 private:
   static clang::AccessSpecifier

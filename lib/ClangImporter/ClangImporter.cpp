@@ -6038,9 +6038,8 @@ void cloneImportedAttributes(ValueDecl *fromDecl, ValueDecl* toDecl) {
   }
 }
 
-static ValueDecl *cloneBaseMemberDecl(ValueDecl *decl,
-                                       DeclContext *newContext,
-                                       ClangInheritanceInfo inheritance) {
+static ValueDecl *cloneBaseMemberDecl(ValueDecl *decl, DeclContext *newContext,
+                                      ClangInheritanceInfo inheritance) {
   assert(inheritance && "only inherited members should be cloned");
 
   // Adjust access according to whichever is more restrictive, between what decl
@@ -6215,7 +6214,7 @@ TinyPtrVector<ValueDecl *> ClangRecordMemberLookup::evaluate(
         continue;
 
       auto *imported = clangModuleLoader->importBaseMemberDecl(
-              namedMember, inheritingDecl, inheritance);
+          namedMember, inheritingDecl, inheritance);
       if (!imported)
         continue;
 
@@ -6255,7 +6254,8 @@ TinyPtrVector<ValueDecl *> ClangRecordMemberLookup::evaluate(
         auto baseResults = evaluateOrDefault(
             ctx.evaluator,
             ClangRecordMemberLookup({cast<NominalTypeDecl>(import), name,
-                                     inheritingDecl, baseInheritance}), {});
+                                     inheritingDecl, baseInheritance}),
+            {});
 
         for (auto foundInBase : baseResults) {
           // Do not add duplicate entry with the same arity,
@@ -7515,10 +7515,9 @@ Decl *ClangImporter::importDeclDirectly(const clang::NamedDecl *decl) {
   return Impl.importDecl(decl, Impl.CurrentVersion);
 }
 
-ValueDecl *
-ClangImporter::Implementation::importBaseMemberDecl(ValueDecl *decl,
-                                                    DeclContext *newContext,
-                                                    ClangInheritanceInfo inheritance) {
+ValueDecl *ClangImporter::Implementation::importBaseMemberDecl(
+    ValueDecl *decl, DeclContext *newContext,
+    ClangInheritanceInfo inheritance) {
 
   // Make sure we don't clone the decl again for this class, as that would
   // result in multiple definitions of the same symbol.
@@ -7542,9 +7541,9 @@ size_t ClangImporter::Implementation::getImportedBaseMemberDeclArity(
   return 0;
 }
 
-ValueDecl *ClangImporter::importBaseMemberDecl(ValueDecl *decl,
-                                               DeclContext *newContext,
-                                               ClangInheritanceInfo inheritance) {
+ValueDecl *
+ClangImporter::importBaseMemberDecl(ValueDecl *decl, DeclContext *newContext,
+                                    ClangInheritanceInfo inheritance) {
   return Impl.importBaseMemberDecl(decl, newContext, inheritance);
 }
 
@@ -8328,21 +8327,25 @@ AccessLevel importer::convertClangAccess(clang::AccessSpecifier access) {
 AccessLevel ClangInheritanceInfo::accessForBaseDecl(const ValueDecl *baseDecl) {
   static_assert(AccessLevel::Private < AccessLevel::Public &&
                 "std::min() relies on this ordering");
-  return std::min(baseDecl->getFormalAccess(), importer::convertClangAccess(cumulativeAccess));
+  return std::min(baseDecl->getFormalAccess(),
+                  importer::convertClangAccess(cumulativeAccess));
 }
 
-void ClangInheritanceInfo::setUnavailableIfNecessary(const ValueDecl *baseDecl, ValueDecl *clonedDecl) {
-  auto *clangDecl = llvm::cast_if_present<clang::NamedDecl>(baseDecl->getClangDecl());
+void ClangInheritanceInfo::setUnavailableIfNecessary(const ValueDecl *baseDecl,
+                                                     ValueDecl *clonedDecl) {
+  auto *clangDecl =
+      llvm::cast_if_present<clang::NamedDecl>(baseDecl->getClangDecl());
   if (!clangDecl)
     return;
 
   const char *msg = nullptr;
 
   if (clangDecl->getAccess() == clang::AS_private)
-    msg =     "this base member is not accessible because it is private";
+    msg = "this base member is not accessible because it is private";
   else if (nestedPrivate)
-    msg =     "this base member is not accessible because of private inheritance";
+    msg = "this base member is not accessible because of private inheritance";
 
   if (msg)
-    clonedDecl->getAttrs().add(AvailableAttr::createUniversallyUnavailable(clonedDecl->getASTContext(), msg));
+    clonedDecl->getAttrs().add(AvailableAttr::createUniversallyUnavailable(
+        clonedDecl->getASTContext(), msg));
 }

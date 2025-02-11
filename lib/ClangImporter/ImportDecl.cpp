@@ -4584,9 +4584,9 @@ namespace {
         // It does not matter what access level we inherit targetMethod with
         // because we will overwrite it according to the access specifier of
         // the using decl.
-        auto clonedMethod = dyn_cast_or_null<FuncDecl>(
-            Impl.importBaseMemberDecl(importedBaseMethod, importedDC,
-                                      ClangInheritanceInfo()));
+        auto clonedMethod =
+            dyn_cast_or_null<FuncDecl>(Impl.importBaseMemberDecl(
+                importedBaseMethod, importedDC, ClangInheritanceInfo()));
         if (!clonedMethod)
           return nullptr;
 
@@ -9977,8 +9977,7 @@ void ClangImporter::Implementation::loadAllMembersOfRecordDecl(
       // Do not clone the base member into the derived class
       // when the derived class already has a member of such
       // name and arity.
-      auto memberArity =
-          getImportedBaseMemberDeclArity(baseMember);
+      auto memberArity = getImportedBaseMemberDeclArity(baseMember);
       bool shouldAddBaseMember = true;
       for (const auto *currentMember : swiftDecl->getMembers()) {
         auto vd = dyn_cast<ValueDecl>(currentMember);
@@ -9993,7 +9992,8 @@ void ClangImporter::Implementation::loadAllMembersOfRecordDecl(
         continue;
 
       // So we need to clone the member into the derived class.
-      if (auto cloned = importBaseMemberDecl(baseMember, swiftDecl, inheritance))
+      if (auto cloned =
+              importBaseMemberDecl(baseMember, swiftDecl, inheritance))
         swiftDecl->addMember(cloned);
 
       continue;

@@ -211,10 +211,9 @@ public:
   /// This function uses a cache so that it is idempotent; successive
   /// invocations will only generate one cloned ValueDecl (and all return
   /// a pointer to it). Returns a NULL pointer upon failure.
-  virtual ValueDecl *
-  importBaseMemberDecl(ValueDecl *decl,
-                       DeclContext *newContext,
-                       ClangInheritanceInfo inheritance) = 0;
+  virtual ValueDecl *importBaseMemberDecl(ValueDecl *decl,
+                                          DeclContext *newContext,
+                                          ClangInheritanceInfo inheritance) = 0;
 
   /// Emits diagnostics for any declarations named name
   /// whose direct declaration context is a TU.
