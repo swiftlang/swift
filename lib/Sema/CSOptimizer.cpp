@@ -117,11 +117,47 @@ static bool isArithmeticOperator(ValueDecl *decl) {
   return decl->isOperator() && decl->getBaseIdentifier().isArithmeticOperator();
 }
 
+/// Generic choices are supported only if they are not complex enough
+/// that would they'd require solving to figure out whether they are a
+/// potential match or not.
+static bool isSupportedGenericOverloadChoice(ValueDecl *decl,
+                                             GenericFunctionType *choiceType) {
+  // Same type requirements cannot be handled because each
+  // candidate-parameter pair is (currently) considered in isolation.
+  if (llvm::any_of(choiceType->getRequirements(), [](const Requirement &req) {
+        switch (req.getKind()) {
+        case RequirementKind::SameType:
+        case RequirementKind::SameShape:
+          return true;
+
+        case RequirementKind::Conformance:
+        case RequirementKind::Superclass:
+        case RequirementKind::Layout:
+          return false;
+        }
+      }))
+    return false;
+
+  // If there are no same-type requirements, allow signatures
+  // that use only concrete types or generic parameters directly
+  // in their parameter positions i.e. `(T, Int)`.
+
+  auto *paramList = getParameterList(decl);
+  if (!paramList)
+    return false;
+
+  return llvm::all_of(paramList->getArray(), [](const ParamDecl *P) {
+    auto paramType = P->getInterfaceType();
+    return paramType->is<GenericTypeParamType>() ||
+           !paramType->hasTypeParameter();
+  });
+}
+
 static bool isSupportedDisjunction(Constraint *disjunction) {
   auto choices = disjunction->getNestedConstraints();
 
-  if (isSupportedOperator(disjunction))
-    return true;
+  if (isOperatorDisjunction(disjunction))
+    return isSupportedOperator(disjunction);
 
   if (auto *ctor = dyn_cast_or_null<ConstructorDecl>(
           getOverloadChoiceDecl(choices.front()))) {
@@ -130,7 +166,7 @@ static bool isSupportedDisjunction(Constraint *disjunction) {
   }
 
   // Non-operator disjunctions are supported only if they don't
-  // have any generic choices.
+  // have any complex generic choices.
   return llvm::all_of(choices, [&](Constraint *choice) {
     if (choice->isDisabled())
       return true;
@@ -144,7 +180,18 @@ static bool isSupportedDisjunction(Constraint *disjunction) {
       if (decl->isImplicitlyUnwrappedOptional())
         return false;
 
-      return decl->getInterfaceType()->is<FunctionType>();
+      auto choiceType = decl->getInterfaceType()->getAs<AnyFunctionType>();
+      if (!choiceType || choiceType->hasError())
+        return false;
+
+      // Non-generic choices are always supported.
+      if (choiceType->is<FunctionType>())
+        return true;
+
+      if (auto *genericFn = choiceType->getAs<GenericFunctionType>())
+        return isSupportedGenericOverloadChoice(decl, genericFn);
+
+      return false;
     }
 
     return false;
