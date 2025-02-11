@@ -479,6 +479,24 @@ swift_reflection_ptr_t
 swift_reflection_nextJob(SwiftReflectionContextRef ContextRef,
                          swift_reflection_ptr_t JobPtr);
 
+/// Determine if a given pointer points to an unrealized Objective-C class. This
+/// is done with a heuristic looking at the contents of the candidate class, and
+/// following the superclass chain until a known realized class is reached. The
+/// IsKnownRealizedClass callback must be implemented by the caller to check,
+/// by whatever means at its disposal, whether a given pointer is a realized
+/// Objective-C class.
+///
+/// Returns NULL on success, with OutIsUnrealizedObjCClass set to 1 if it was
+/// recognized as an unrealized class, or 0 if it was not. On error, returns a
+/// pointer to a C string describing the error. This pointer remains valid until
+/// the next swift_reflection call on the given context.
+SWIFT_REMOTE_MIRROR_LINKAGE
+const char *swift_reflection_pointerIsUnrealizedObjCClass(
+    SwiftReflectionContextRef ContextRef,
+    swift_reflection_ptr_t CandidateClassPtr,
+    bool (*IsKnownRealizedClass)(void *Context, swift_reflection_ptr_t Ptr),
+    void *IsKnownRealizedClassContext, int *OutIsUnrealizedObjCClass);
+
 #ifdef __cplusplus
 } // extern "C"
 #endif
