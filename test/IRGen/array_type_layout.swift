@@ -3,7 +3,7 @@
 // REQUIRES: swift_feature_ValueGenerics
 
 struct VerySmallSlab<T> {
-  var inline: Slab<16, T?>
+  var inline: InlineArray<16, T?>
   var count = 0
 
   init() {

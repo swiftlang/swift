@@ -13,26 +13,26 @@
 /// A fixed-size array.
 @available(SwiftStdlib 6.2, *)
 @frozen
-public struct Slab<let count: Int, Element: ~Copyable>: ~Copyable {
+public struct InlineArray<let count: Int, Element: ~Copyable>: ~Copyable {
   @usableFromInline
   internal let _storage: Builtin.FixedArray<count, Element>
 }
 
 @available(SwiftStdlib 6.2, *)
-extension Slab: Copyable where Element: Copyable {}
+extension InlineArray: Copyable where Element: Copyable {}
 
 @available(SwiftStdlib 6.2, *)
-extension Slab: BitwiseCopyable where Element: BitwiseCopyable {}
+extension InlineArray: BitwiseCopyable where Element: BitwiseCopyable {}
 
 @available(SwiftStdlib 6.2, *)
-extension Slab: @unchecked Sendable where Element: Sendable & ~Copyable {}
+extension InlineArray: @unchecked Sendable where Element: Sendable & ~Copyable {}
 
 //===----------------------------------------------------------------------===//
 // Address & Buffer
 //===----------------------------------------------------------------------===//
 
 @available(SwiftStdlib 6.2, *)
-extension Slab where Element: ~Copyable {
+extension InlineArray where Element: ~Copyable {
   /// Returns a read-only pointer to the first element in the vector.
   @available(SwiftStdlib 6.2, *)
   @_alwaysEmitIntoClient
@@ -89,7 +89,7 @@ extension Slab where Element: ~Copyable {
 //===----------------------------------------------------------------------===//
 
 @available(SwiftStdlib 6.2, *)
-extension Slab where Element: ~Copyable {
+extension InlineArray where Element: ~Copyable {
   /// Initializes every element in this vector running the given closure value
   /// that returns the element to emplace at the given index.
   ///
@@ -106,7 +106,9 @@ extension Slab where Element: ~Copyable {
   @_alwaysEmitIntoClient
   public init<E: Error>(_ body: (Int) throws(E) -> Element) throws(E) {
     self = try Builtin.emplace { (rawPtr) throws(E) -> () in
-      let buffer = Slab<count, Element>._initializationBuffer(start: rawPtr)
+      let buffer = InlineArray<count, Element>._initializationBuffer(
+        start: rawPtr
+      )
 
       for i in 0 ..< count {
         do throws(E) {
@@ -154,7 +156,9 @@ extension Slab where Element: ~Copyable {
     var o: Element? = first
 
     self = try Builtin.emplace { (rawPtr) throws(E) -> () in
-      let buffer = Slab<count, Element>._initializationBuffer(start: rawPtr)
+      let buffer = InlineArray<count, Element>._initializationBuffer(
+        start: rawPtr
+      )
 
       buffer.initializeElement(at: 0, to: o.take()._consumingUncheckedUnwrapped())
 
@@ -176,7 +180,7 @@ extension Slab where Element: ~Copyable {
 }
 
 @available(SwiftStdlib 6.2, *)
-extension Slab where Element: Copyable {
+extension InlineArray where Element: Copyable {
   /// Initializes every element in this vector to a copy of the given value.
   ///
   /// - Parameter value: The instance to initialize this vector with.
@@ -184,7 +188,7 @@ extension Slab where Element: Copyable {
   @_alwaysEmitIntoClient
   public init(repeating value: Element) {
     self = Builtin.emplace {
-      let buffer = Slab<count, Element>._initializationBuffer(start: $0)
+      let buffer = InlineArray<count, Element>._initializationBuffer(start: $0)
 
       buffer.initialize(repeating: value)
     }
@@ -196,7 +200,7 @@ extension Slab where Element: Copyable {
 //===----------------------------------------------------------------------===//
 
 @available(SwiftStdlib 6.2, *)
-extension Slab where Element: ~Copyable {
+extension InlineArray where Element: ~Copyable {
   /// The type of the container's elements.
   @available(SwiftStdlib 6.2, *)
   public typealias Element = Element
@@ -351,7 +355,7 @@ extension Slab where Element: ~Copyable {
 //===----------------------------------------------------------------------===//
 
 @available(SwiftStdlib 6.2, *)
-extension Slab where Element: ~Copyable {
+extension InlineArray where Element: ~Copyable {
   /// Exchanges the values at the specified indices of the vector.
   ///
   /// Both parameters must be valid indices of the vector and not
@@ -388,7 +392,7 @@ extension Slab where Element: ~Copyable {
 //===----------------------------------------------------------------------===//
 
 @available(SwiftStdlib 6.2, *)
-extension Slab where Element: ~Copyable {
+extension InlineArray where Element: ~Copyable {
   /// Calls a closure with a pointer to the vector's contiguous storage.
   ///
   /// Often, the optimizer can eliminate bounds checks within a vector
@@ -399,7 +403,7 @@ extension Slab where Element: ~Copyable {
   /// buffer pointer:
   ///
   ///     // "[1, 2, 3, 4, 5]"
-  ///     let numbers = Slab<5, Int> {
+  ///     let numbers = InlineArray<5, Int> {
   ///       $0 + 1
   ///     }
   ///
@@ -443,7 +447,7 @@ extension Slab where Element: ~Copyable {
   /// the vector:
   ///
   ///     // "[1, 2, 3, 4, 5]"
-  ///     var numbers = Slab<5, Int> {
+  ///     var numbers = InlineArray<5, Int> {
   ///       $0 + 1
   ///     }
   ///

@@ -86,6 +86,7 @@ add_library(swiftCore
   HashTable.swift
   Identifiable.swift
   Indices.swift
+  InlineArray.swift
   InputStream.swift
   IntegerParsing.swift
   Integers.swift
@@ -145,7 +146,6 @@ add_library(swiftCore
   SetVariant.swift
   ShadowProtocols.swift
   Shims.swift
-  Slab.swift
   Slice.swift
   SmallString.swift
   Sort.swift
