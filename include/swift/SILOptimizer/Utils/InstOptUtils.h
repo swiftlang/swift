@@ -35,6 +35,7 @@ namespace swift {
 class DominanceInfo;
 class DeadEndBlocks;
 class BasicCalleeAnalysis;
+class DestructorAnalysis;
 template <class T> class NullablePtr;
 
 /// Transform a Use Range (Operand*) into a User Range (SILInstruction *)
@@ -620,6 +621,9 @@ bool findUnreferenceableStorage(StructDecl *decl, SILType structType,
                                 SILFunction *func);
 
 SILValue getInitOfTemporaryAllocStack(AllocStackInst *asi);
+
+bool isDestructorSideEffectFree(SILInstruction *mayRelease,
+                                DestructorAnalysis *DA);
 
 } // end namespace swift
 
