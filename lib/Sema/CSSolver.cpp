@@ -1297,8 +1297,8 @@ ConstraintSystem::findConstraintThroughOptionals(
   while (visitedVars.insert(rep).second) {
     // Look for a disjunction that binds this type variable to an overload set.
     TypeVariableType *optionalObjectTypeVar = nullptr;
-    auto constraints = getConstraintGraph().gatherNearbyConstraints(
-        rep,
+    auto constraints = getConstraintGraph().gatherConstraints(
+        rep, ConstraintGraph::GatheringKind::EquivalenceClass,
         [&](Constraint *match) {
           // If we have an "optional object of" constraint, we may need to
           // look through it to find the constraint we're looking for.
@@ -1906,8 +1906,9 @@ void DisjunctionChoice::propagateConversionInfo(ConstraintSystem &cs) const {
     }
   }
 
-  auto constraints = cs.CG.gatherNearbyConstraints(
+  auto constraints = cs.CG.gatherConstraints(
       typeVar,
+      ConstraintGraph::GatheringKind::EquivalenceClass,
       [](Constraint *constraint) -> bool {
         switch (constraint->getKind()) {
         case ConstraintKind::Conversion:

@@ -2207,7 +2207,7 @@ void IRGenerator::emitEntryPointInfo() {
   enum EntryPointFlags : unsigned {
     HasAtMainTypeFlag = 1 << 0,
   };
-  if (auto *mainTypeDecl = SIL.getSwiftModule()->getMainTypeDecl()) {
+  if (SIL.getSwiftModule()->getMainTypeDecl()) {
     flags |= HasAtMainTypeFlag;
   }
   entrypointInfo.addInt(IGM.Int32Ty, flags);
@@ -2249,10 +2249,16 @@ getIRLinkage(StringRef name, const UniversalLinkageInfo &info,
 
   switch (linkage) {
   case SILLinkage::Public:
-  case SILLinkage::Package:
-    return {llvm::GlobalValue::ExternalLinkage, PublicDefinitionVisibility,
+  case SILLinkage::Package: {
+    auto linkage = llvm::GlobalValue::ExternalLinkage;
+
+    if (info.MergeableSymbols)
+      linkage = llvm::GlobalValue::LinkOnceODRLinkage;
+
+    return {linkage, PublicDefinitionVisibility,
             info.Internalize ? llvm::GlobalValue::DefaultStorageClass
                              : ExportedStorage};
+  }
 
   case SILLinkage::PublicNonABI:
   case SILLinkage::PackageNonABI:
@@ -2264,6 +2270,9 @@ getIRLinkage(StringRef name, const UniversalLinkageInfo &info,
                         : RESULT(External, Hidden, Default);
 
   case SILLinkage::Hidden:
+    if (info.MergeableSymbols)
+      return RESULT(LinkOnceODR, Hidden, Default);
+
     return RESULT(External, Hidden, Default);
 
   case SILLinkage::Private: {

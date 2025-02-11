@@ -342,7 +342,7 @@ bool SymbolGraphASTWalker::walkToDeclPre(Decl *D, CharSourceRange Range) {
       // otherwise isn't being shown
       if (isOurModule(NTD->getModuleContext()) &&
           !SG->canIncludeDeclAsNode(NTD)) {
-        PublicPrivateTypeAliases[NTD] = TD;
+        PublicPrivateTypeAliases.insert_or_assign(NTD, TD);
         synthesizeChildSymbols(NTD, TD);
       }
     }

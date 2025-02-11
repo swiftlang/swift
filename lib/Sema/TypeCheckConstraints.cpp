@@ -790,9 +790,11 @@ bool TypeChecker::typeCheckBinding(Pattern *&pattern, Expr *&initializer,
                                    TypeCheckExprOptions options) {
   SyntacticElementTarget target =
       PBD ? SyntacticElementTarget::forInitialization(
-                initializer, patternType, PBD, patternNumber)
+                initializer, patternType, PBD, patternNumber,
+                /*bindPatternVarsOneWay=*/false)
           : SyntacticElementTarget::forInitialization(
-                initializer, DC, patternType, pattern);
+                initializer, DC, patternType, pattern,
+                /*bindPatternVarsOneWay=*/false);
 
   // Type-check the initializer.
   auto resultTarget = typeCheckExpression(target, options);
@@ -900,8 +902,7 @@ bool TypeChecker::typeCheckForEachPreamble(DeclContext *dc, ForEachStmt *stmt,
     if (!boolType)
       return failed();
 
-    SyntacticElementTarget whereClause(stmt->getWhere(), dc,
-                                       {boolType, CTP_Condition},
+    SyntacticElementTarget whereClause(where, dc, {boolType, CTP_Condition},
                                        /*isDiscarded=*/false);
     auto result = typeCheckTarget(whereClause);
     if (!result)

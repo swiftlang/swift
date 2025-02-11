@@ -35,6 +35,7 @@
 #include "swift/SILOptimizer/Analysis/ArraySemantic.h"
 #include "swift/SILOptimizer/Analysis/BasicCalleeAnalysis.h"
 #include "swift/SILOptimizer/Analysis/DominanceAnalysis.h"
+#include "swift/SILOptimizer/Analysis/DestructorAnalysis.h"
 #include "swift/SILOptimizer/OptimizerBridging.h"
 #include "swift/SILOptimizer/Utils/CFGOptUtils.h"
 #include "swift/SILOptimizer/Utils/DebugOptUtils.h"
@@ -859,7 +860,7 @@ namespace {
 } // end anonymous namespace
 
 bool swift::layoutIsTypeDependent(NominalTypeDecl *decl) {
-  if (auto *classDecl = dyn_cast<ClassDecl>(decl)) {
+  if (isa<ClassDecl>(decl)) {
     return false;
   } else if (auto *structDecl = dyn_cast<StructDecl>(decl)) {
     return TypeDependentVisitor().visitStructDecl(structDecl);
@@ -1365,10 +1366,10 @@ bool swift::analyzeStaticInitializer(
 /// FIXME: This must be kept in sync with replaceLoadSequence()
 /// below. What a horrible design.
 bool swift::canReplaceLoadSequence(SILInstruction *inst) {
-  if (auto *cai = dyn_cast<CopyAddrInst>(inst))
+  if (isa<CopyAddrInst>(inst))
     return true;
 
-  if (auto *li = dyn_cast<LoadInst>(inst))
+  if (isa<LoadInst>(inst))
     return true;
 
   if (auto *seai = dyn_cast<StructElementAddrInst>(inst)) {
@@ -2452,7 +2453,7 @@ SILValue swift::getInitOfTemporaryAllocStack(AllocStackInst *asi) {
     }
 
     TransitiveUseVisitation visitTransitiveUseAsEndPointUse(Operand *use) {
-      if (auto *sbi = dyn_cast<StoreBorrowInst>(use->getUser()))
+      if (isa<StoreBorrowInst>(use->getUser()))
         return TransitiveUseVisitation::OnlyUser;
       return TransitiveUseVisitation::OnlyUses;
     }
@@ -2469,4 +2470,131 @@ SILValue swift::getInitOfTemporaryAllocStack(AllocStackInst *asi) {
   if (asi->getType().is<TupleType>())
     return findRootValueForTupleTempAllocation(asi, state);
   return findRootValueForNonTupleTempAllocation(asi, state);
+}
+
+SILType getTypeOfLoadOfArrayOperandStorage(SILValue val) {
+  // The projection should look something like this:
+  // %29 = struct_element_addr %28 : $*Array<UInt8>, #Array._buffer
+  // %30 = struct_element_addr %29 : $*_ArrayBuffer<UInt8>, #_ArrayBuffer._storage
+  // %31 = struct_element_addr %30 : $*_BridgeStorage<__ContiguousArrayStorageBase>, #_BridgeStorage.rawValue
+  // %32 = load %31 : $*Builtin.BridgeObject
+
+  // We can strip casts and init_existential_ref leading to a load.
+  if (auto initExistRef = dyn_cast<InitExistentialRefInst>(val))
+    val = initExistRef->getOperand();
+  auto ld = dyn_cast<LoadInst>(stripCasts(val));
+  if (!ld)
+    return SILType();
+
+  auto opd = ld->getOperand();
+  auto opdTy = opd->getType();
+  if (opdTy.getObjectType() !=
+      SILType::getBridgeObjectType(opdTy.getASTContext()))
+    return SILType();
+
+  auto bridgedStoragePrj = dyn_cast<StructElementAddrInst>(opd);
+  if (!bridgedStoragePrj)
+    return SILType();
+
+  auto arrayBufferStoragePrj =
+    dyn_cast<StructElementAddrInst>(bridgedStoragePrj->getOperand());
+  if (!arrayBufferStoragePrj)
+    return SILType();
+
+  // If successfull return _ArrayBuffer<UInt8>.
+  return arrayBufferStoragePrj->getOperand()->getType().getObjectType();
+}
+
+static bool isBoxTypeWithoutSideEffectsOnRelease(SILFunction *f,
+                                                 DestructorAnalysis *DA,
+                                                 SILType ty) {
+  auto silBoxedTy = ty.getSILBoxFieldType(f);
+  if (silBoxedTy && !DA->mayStoreToMemoryOnDestruction(silBoxedTy))
+   return true;
+  return false;
+}
+
+
+static bool isReleaseOfClosureWithoutSideffects(SILFunction *f,
+                                                DestructorAnalysis *DA,
+                                                SILValue opd) {
+  auto fnTy = dyn_cast<SILFunctionType>(opd->getType().getASTType());
+  if (!fnTy)
+    return false;
+
+  if (fnTy->isNoEscape() &&
+      fnTy->getRepresentation() == SILFunctionType::Representation::Thick)
+    return true;
+
+  auto pa = dyn_cast<PartialApplyInst>(lookThroughOwnershipInsts(opd));
+  if (!pa)
+    return false;
+
+  // Check that all captured argument types are "trivial".
+  for (auto &opd: pa->getArgumentOperands()) {
+    auto OpdTy = opd.get()->getType().getObjectType();
+    if (!DA->mayStoreToMemoryOnDestruction(OpdTy))
+      continue;
+    if (isBoxTypeWithoutSideEffectsOnRelease(f, DA, OpdTy))
+      continue;
+    return false;
+  }
+
+  return true;
+}
+
+bool swift::isDestructorSideEffectFree(SILInstruction *mayRelease,
+                                       DestructorAnalysis *DA) {
+  switch (mayRelease->getKind()) {
+  case SILInstructionKind::DestroyValueInst:
+  case SILInstructionKind::StrongReleaseInst:
+  case SILInstructionKind::ReleaseValueInst: {
+    auto opd = mayRelease->getOperand(0);
+    auto opdTy = opd->getType();
+    if (!DA->mayStoreToMemoryOnDestruction(opdTy))
+      return true;
+
+    auto arrayTy = getTypeOfLoadOfArrayOperandStorage(opd);
+    if (arrayTy &&  !DA->mayStoreToMemoryOnDestruction(arrayTy))
+      return true;
+
+    if (isReleaseOfClosureWithoutSideffects(mayRelease->getFunction(), DA, opd))
+      return true;
+
+    if (isBoxTypeWithoutSideEffectsOnRelease(mayRelease->getFunction(), DA,
+                                             opdTy))
+      return true;
+
+    return false;
+  }
+  case SILInstructionKind::BuiltinInst: {
+    auto *builtin = cast<BuiltinInst>(mayRelease);
+    switch (builtin->getBuiltinInfo().ID) {
+    case BuiltinValueKind::CopyArray:
+    case BuiltinValueKind::TakeArrayNoAlias:
+    case BuiltinValueKind::TakeArrayFrontToBack:
+    case BuiltinValueKind::TakeArrayBackToFront:
+      return true; // nothing is released, harmless regardless of type
+    case BuiltinValueKind::AssignCopyArrayNoAlias:
+    case BuiltinValueKind::AssignCopyArrayFrontToBack:
+    case BuiltinValueKind::AssignCopyArrayBackToFront:
+    case BuiltinValueKind::AssignTakeArray:
+    case BuiltinValueKind::DestroyArray: {
+      SubstitutionMap substitutions = builtin->getSubstitutions();
+      auto eltTy = substitutions.getReplacementTypes()[0];
+      return !DA->mayStoreToMemoryOnDestruction(
+        builtin->getFunction()->getLoweredType(eltTy));
+      // Only harmless if the array element type destruction is harmless.
+    }
+    default:
+      break;
+    }
+    return false;
+  }
+  // Unhandled instruction.
+  default:
+    return false;
+  }
+
+  return false;
 }

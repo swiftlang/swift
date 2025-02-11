@@ -977,7 +977,7 @@ emitRValueForDecl(SILLocation loc, ConcreteDeclRef declRef, Type ncRefType,
   }
 
   // If this is a reference to a var, emit it as an l-value and then load.
-  if (auto *var = dyn_cast<VarDecl>(decl))
+  if (isa<VarDecl>(decl))
     return emitRValueForNonMemberVarDecl(loc, declRef, refType, semantics, C);
 
   assert(!isa<TypeDecl>(decl));
@@ -4286,11 +4286,13 @@ SILGenModule::emitKeyPathComponentForDecl(SILLocation loc,
       // The mapTypeIntoContext() / mapTypeOutOfContext() dance is there
       // to handle the case where baseTy being a type parameter subject
       // to a superclass requirement.
-      componentTy = var->getValueInterfaceType().subst(
-        GenericEnvironment::mapTypeIntoContext(genericEnv, baseTy)
-          ->getContextSubstitutionMap(var->getDeclContext()))
-          ->mapTypeOutOfContext()
-          ->getCanonicalType();
+      componentTy =
+          var->getValueInterfaceType()
+              .subst(GenericEnvironment::mapTypeIntoContext(
+                         genericEnv, baseTy->getMetatypeInstanceType())
+                         ->getContextSubstitutionMap(var->getDeclContext()))
+              ->mapTypeOutOfContext()
+              ->getCanonicalType();
     }
 
     // The component type for an @objc optional requirement needs to be

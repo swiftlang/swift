@@ -69,6 +69,7 @@ struct swiftscan_dependency_info_s {
 
 struct swiftscan_link_library_info_s {
   swiftscan_string_ref_t name;
+  bool isStatic;
   bool isFramework;
   bool forceLoad;
 };
@@ -130,6 +131,13 @@ typedef struct {
 
   /// User module version
   swiftscan_string_ref_t user_module_version;
+
+  /// Chained bridging header path.
+  swiftscan_string_ref_t chained_bridging_header_path;
+
+  /// Chained bridging header content.
+  swiftscan_string_ref_t chained_bridging_header_content;
+
 } swiftscan_swift_textual_details_t;
 
 /// Swift modules with only a binary module file.

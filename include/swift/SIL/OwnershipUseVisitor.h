@@ -397,6 +397,9 @@ bool OwnershipUseVisitor<Impl>::visitOwnedUse(Operand *use) {
     }
     return handleUsePoint(use, UseLifetimeConstraint::LifetimeEnding);
 
+  case OperandOwnership::AnyInteriorPointer:
+    return visitInteriorPointerUses(use);
+
   case OperandOwnership::PointerEscape:
     // TODO: Change ProjectBox ownership to InteriorPointer and allow them to
     // take owned values.
@@ -416,7 +419,7 @@ bool OwnershipUseVisitor<Impl>::visitOwnedUse(Operand *use) {
   case OperandOwnership::Borrow:
     return visitInnerBorrow(use);
 
-  // TODO: Eventually, handle owned InteriorPointers as implicit borrows.
+  // TODO: InteriorPointer should be handled like AnyInteriorPointer.
   case OperandOwnership::InteriorPointer:
   case OperandOwnership::TrivialUse:
   case OperandOwnership::EndBorrow:
@@ -479,6 +482,7 @@ bool OwnershipUseVisitor<Impl>::visitGuaranteedUse(Operand *use) {
     return visitInnerBorrow(use);
 
   case OperandOwnership::InteriorPointer:
+  case OperandOwnership::AnyInteriorPointer:
     return visitInteriorPointerUses(use);
 
   case OperandOwnership::TrivialUse:
@@ -490,8 +494,9 @@ bool OwnershipUseVisitor<Impl>::visitGuaranteedUse(Operand *use) {
 
 template <typename Impl>
 bool OwnershipUseVisitor<Impl>::visitInteriorPointerUses(Operand *use) {
-  assert(use->getOperandOwnership() == OperandOwnership::InteriorPointer ||
-         isa<ProjectBoxInst>(use->getUser()));
+  assert(use->getOperandOwnership() == OperandOwnership::InteriorPointer
+         || use->getOperandOwnership() == OperandOwnership::AnyInteriorPointer
+         || isa<ProjectBoxInst>(use->getUser()));
 
   if (auto scopedAddress = ScopedAddressValue::forUse(use)) {
     // e.g. client may need to insert end_borrow if scopedAddress is a store_borrow.

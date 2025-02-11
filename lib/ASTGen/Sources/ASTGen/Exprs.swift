@@ -309,6 +309,38 @@ extension ASTGenVisitor {
       inLoc: signature.inLoc
     )
 
+    if signature.params == nil {
+      let loc = self.generateSourceLoc(node.leftBrace)
+      var params: [BridgedParamDecl] = []
+      if let anonymousParamMaxIndex = findMaxAnonymousClosureParamUsage(closureExpr: node) {
+        for idx in 0...anonymousParamMaxIndex {
+          let param = BridgedParamDecl.createParsed(
+            self.ctx,
+            declContext: expr.asDeclContext,
+            specifierLoc: nil,
+            argName: nil,
+            argNameLoc: nil,
+            paramName: ctx.getDollarIdentifier(idx),
+            paramNameLoc: loc,
+            type: nil,
+            defaultValue: nil
+          )
+          param.setSpecifier(.default)
+          param.setImplicit()
+          params.append(param)
+        }
+      }
+
+      let paramList = BridgedParameterList.createParsed(
+        self.ctx,
+        leftParenLoc: loc,
+        parameters: params.lazy.bridgedArray(in: self),
+        rightParenLoc: loc
+      )
+      expr.setParameterList(paramList)
+      expr.setHasAnonymousClosureVars()
+    }
+
     let body = self.withDeclContext(expr.asDeclContext) {
       BridgedBraceStmt.createParsed(
         self.ctx,
@@ -316,19 +348,6 @@ extension ASTGenVisitor {
         elements: self.generate(codeBlockItemList: node.statements),
         rBraceLoc: self.generateSourceLoc(node.rightBrace)
       )
-    }
-
-    if signature.params == nil {
-      // TODO: Handle doller identifiers inside the closure.
-      let loc = self.generateSourceLoc(node.leftBrace)
-      let params = BridgedParameterList.createParsed(
-        self.ctx,
-        leftParenLoc: loc,
-        parameters: .init(),
-        rightParenLoc: loc
-      )
-      expr.setParameterList(params)
-      expr.setHasAnonymousClosureVars()
     }
 
     expr.setBody(body)
@@ -539,13 +558,54 @@ extension ASTGenVisitor {
     )
   }
 
+  func generateDollarIdentifierExpr(token: TokenSyntax) -> BridgedExpr {
+    let loc = self.generateSourceLoc(token)
+
+    guard self.declContext.isClosureExpr else {
+      // TODO: Diagnose dollar identifier not in ClosureExpr
+      fatalError("dollar identifier not in ClosureExpr")
+    }
+
+    guard let idx = parseDollarIdentifierIndex(text: token.rawText) else {
+      // TODO: Diagnose.
+      fatalError("(compiler bug) malformed dollar identifier token")
+    }
+
+    let closure = self.declContext.castToClosureExpr()
+    let params = closure.getParameterList()
+
+    if !closure.hasAnonymousClosureVars {
+      // TODO: Diagnose and fix it to the named parameter.
+      // Fall through, bind to the parameter even though the name doesn't match.
+    }
+
+    guard idx < params.size else {
+      // TODO: Diagnose out of range (but should be unreachable)
+      fatalError("(compiler bug) out-of-bound dollar identifier number")
+    }
+
+    let param = params.get(idx)
+
+    return BridgedDeclRefExpr.create(
+      self.ctx,
+      decl: param.asDecl,
+      loc: .createParsed(loc),
+      isImplicit: false
+    ).asExpr
+  }
+
   func generate(declReferenceExpr node: DeclReferenceExprSyntax) -> BridgedExpr {
     if node.baseName.isEditorPlaceholder {
+      if node.argumentNames != nil {
+        // TODO: Diagnose.
+      }
       return generateEditorPlaceholderExpr(token: node.baseName).asExpr
     }
     if node.baseName.rawTokenKind == .dollarIdentifier {
-      // TODO: Handle dollar identifier in closure decl context.
-      // It's done in C++ Parser because it needs to handle inactive #if regions.
+      if node.argumentNames != nil {
+        // TODO: Diagnose.
+      }
+      return generateDollarIdentifierExpr(token: node.baseName)
     }
     let nameAndLoc = generateDeclNameRef(declReferenceExpr: node)
     return BridgedUnresolvedDeclRefExpr.createParsed(
@@ -1168,3 +1228,128 @@ extension ASTGenVisitor {
     );
   }
 }
+
+private func parseDollarIdentifierIndex(text: SyntaxText) -> Int? {
+  precondition(text.first == UInt8(ascii: "$"))
+  var result = 0
+  for c in text.dropFirst() {
+    switch c {
+    case UInt8(ascii: "0")...UInt8(ascii: "9"):
+      let digit = Int(c &- UInt8(ascii: "0"))
+      result = result * 10 + digit
+    default:
+      return nil
+    }
+  }
+  return result
+}
+
+func findMaxAnonymousClosureParamUsage(closureExpr node: ClosureExprSyntax) -> Int? {
+  let visitor = ClosureAnonymousParameterFinder()
+  visitor.walk(node.statements)
+  return visitor.maxIndex
+
+  class ClosureAnonymousParameterFinder: SyntaxVisitor {
+    var maxIndex: Int? = nil
+
+    init() {
+      super.init(viewMode: .sourceAccurate)
+    }
+
+    override func visit(_ node: DeclReferenceExprSyntax) -> SyntaxVisitorContinueKind {
+      if
+        node.baseName.rawTokenKind == .dollarIdentifier,
+        let idx = parseDollarIdentifierIndex(text: node.baseName.rawText)
+      {
+        self.maxIndex = max(self.maxIndex ?? 0, idx)
+      }
+      return .skipChildren
+    }
+
+    // Nodes that change the decl context.
+
+    override func visit(_ node: ClosureExprSyntax) -> SyntaxVisitorContinueKind {
+      return .skipChildren
+    }
+    override func visit(_ node: ClassDeclSyntax) -> SyntaxVisitorContinueKind {
+      return .skipChildren
+    }
+    override func visit(_ node: ActorDeclSyntax) -> SyntaxVisitorContinueKind {
+      return .skipChildren
+    }
+    override func visit(_ node: EnumDeclSyntax) -> SyntaxVisitorContinueKind {
+      return .skipChildren
+    }
+    override func visit(_ node: ProtocolDeclSyntax) -> SyntaxVisitorContinueKind {
+      return .skipChildren
+    }
+    override func visit(_ node: StructDeclSyntax) -> SyntaxVisitorContinueKind {
+      return .skipChildren
+    }
+    override func visit(_ node: FunctionDeclSyntax) -> SyntaxVisitorContinueKind {
+      return .skipChildren
+    }
+    override func visit(_ node: SubscriptDeclSyntax) -> SyntaxVisitorContinueKind {
+      return .skipChildren
+    }
+    override func visit(_ node: InitializerDeclSyntax) -> SyntaxVisitorContinueKind {
+      return .skipChildren
+    }
+    override func visit(_ node: DeinitializerDeclSyntax) -> SyntaxVisitorContinueKind {
+      return .skipChildren
+    }
+    override func visit(_ node: AccessorBlockSyntax) -> SyntaxVisitorContinueKind {
+      return .skipChildren
+    }
+    override func visit(_ node: ExtensionDeclSyntax) -> SyntaxVisitorContinueKind {
+      return .skipChildren
+    }
+    override func visit(_ node: MacroDeclSyntax) -> SyntaxVisitorContinueKind {
+      return .skipChildren
+    }
+    override func visit(_ node: EnumCaseDeclSyntax) -> SyntaxVisitorContinueKind {
+      return .skipChildren
+    }
+
+    // Nodes that never contain expressions, but can have many descendant nodes.
+
+    override func visit(_ node: ArrayTypeSyntax) -> SyntaxVisitorContinueKind {
+      return .skipChildren
+    }
+    override func visit(_ node: AttributedTypeSyntax) -> SyntaxVisitorContinueKind {
+      return .skipChildren
+    }
+    override func visit(_ node: CompositionTypeSyntax) -> SyntaxVisitorContinueKind {
+      return .skipChildren
+    }
+    override func visit(_ node: DictionaryTypeSyntax) -> SyntaxVisitorContinueKind {
+      return .skipChildren
+    }
+    override func visit(_ node: FunctionTypeSyntax) -> SyntaxVisitorContinueKind {
+      return .skipChildren
+    }
+    override func visit(_ node: MemberTypeSyntax) -> SyntaxVisitorContinueKind {
+      return .skipChildren
+    }
+    override func visit(_ node: TupleTypeSyntax) -> SyntaxVisitorContinueKind {
+      return .skipChildren
+    }
+    override func visit(_ node: TypeAliasDeclSyntax) -> SyntaxVisitorContinueKind {
+      return .skipChildren
+    }
+    override func visit(_ node: AssociatedTypeDeclSyntax) -> SyntaxVisitorContinueKind {
+      return .skipChildren
+    }
+    override func visit(_ node: PrecedenceGroupDeclSyntax) -> SyntaxVisitorContinueKind {
+      return .skipChildren
+    }
+    override func visit(_ node: ImportDeclSyntax) -> SyntaxVisitorContinueKind {
+      return .skipChildren
+    }
+    override func visit(_ node: PoundSourceLocationSyntax) -> SyntaxVisitorContinueKind {
+      return .skipChildren
+    }
+  }
+
+}
+

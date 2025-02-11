@@ -91,10 +91,6 @@ function(remove_sdk_unsupported_archs name os sdk_path deployment_version archit
       # 32-bit watchOS is not listed explicitly in SDK settings.
       message(STATUS "Assuming ${name} SDK at ${sdk_path} supports architecture ${arch}")
       list(APPEND architectures ${arch})
-    elseif(arch STREQUAL "i386" AND os STREQUAL "watchsimulator")
-      # 32-bit watchOS simulator is not listed explicitly in SDK settings.
-      message(STATUS "Assuming ${name} SDK at ${sdk_path} supports architecture ${arch}")
-      list(APPEND architectures ${arch})
     else()
       message(STATUS "${name} SDK at ${sdk_path} does not support architecture ${arch}")
     endif()
@@ -431,7 +427,7 @@ macro(configure_sdk_unix name architectures)
         string(REGEX REPLACE "[-].*" "" freebsd_system_version ${CMAKE_SYSTEM_VERSION})
         message(STATUS "FreeBSD Version: ${freebsd_system_version}")
 
-        set(SWIFT_SDK_FREEBSD_ARCH_${arch}_TRIPLE "${arch}-unknown-freebsd${freebsd_system_version}")
+        set(SWIFT_SDK_FREEBSD_ARCH_${arch}_TRIPLE "${arch}-unknown-freebsd")
       elseif("${prefix}" STREQUAL "OPENBSD")
         if(NOT arch STREQUAL "x86_64" AND NOT arch STREQUAL "aarch64")
           message(FATAL_ERROR "unsupported arch for OpenBSD: ${arch}")

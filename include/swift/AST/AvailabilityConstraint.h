@@ -17,6 +17,7 @@
 #ifndef SWIFT_AST_AVAILABILITY_CONSTRAINT_H
 #define SWIFT_AST_AVAILABILITY_CONSTRAINT_H
 
+#include "swift/AST/Attr.h"
 #include "swift/AST/AvailabilityDomain.h"
 #include "swift/AST/AvailabilityRange.h"
 #include "swift/AST/PlatformKind.h"
@@ -25,7 +26,8 @@
 namespace swift {
 
 class ASTContext;
-class AvailableAttr;
+class AvailabilityContext;
+class Decl;
 
 /// Represents the reason a declaration could be considered unavailable in a
 /// certain context.
@@ -110,6 +112,37 @@ public:
   bool isActiveForRuntimeQueries(ASTContext &ctx) const;
 };
 
+/// Represents a set of availability constraints that restrict use of a
+/// declaration in a particular context.
+class DeclAvailabilityConstraints {
+  using Storage = llvm::SmallVector<AvailabilityConstraint, 4>;
+  Storage constraints;
+
+public:
+  DeclAvailabilityConstraints() {}
+
+  void addConstraint(const AvailabilityConstraint &constraint) {
+    constraints.emplace_back(constraint);
+  }
+
+  using const_iterator = Storage::const_iterator;
+  const_iterator begin() const { return constraints.begin(); }
+  const_iterator end() const { return constraints.end(); }
+};
+
+/// Returns the `AvailabilityConstraint` that describes how \p attr restricts
+/// use of \p decl in \p context or `std::nullopt` if there is no restriction.
+std::optional<AvailabilityConstraint>
+getAvailabilityConstraintForAttr(const Decl *decl,
+                                 const SemanticAvailableAttr &attr,
+                                 const AvailabilityContext &context);
+
+/// Returns the set of availability constraints that restrict use of \p decl
+/// when it is referenced from the given context. In other words, it is the
+/// collection of of `@available` attributes with unsatisfied conditions.
+DeclAvailabilityConstraints
+getAvailabilityConstraintsForDecl(const Decl *decl,
+                                  const AvailabilityContext &context);
 } // end namespace swift
 
 #endif

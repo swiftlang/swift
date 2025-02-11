@@ -8,6 +8,8 @@
             "remote": { "id": "swiftlang/swift-cmark" } },
         "llbuild": {
             "remote": { "id": "swiftlang/swift-llbuild" } },
+        "swift-build": {
+            "remote": { "id": "swiftlang/swift-build" } },
         "swift-argument-parser": {
             "remote": { "id": "apple/swift-argument-parser" } },
         "swift-async-algorithms": {
@@ -131,6 +133,7 @@
                 "swift": "main",
                 "cmark": "gfm",
                 "llbuild": "main",
+                "swift-build": "main",
                 "swift-toolchain-sqlite": "1.0.1",
                 "swift-tools-support-core": "main",
                 "swiftpm": "main",
@@ -338,6 +341,7 @@
                 "swift": "rebranch",
                 "cmark": "gfm",
                 "llbuild": "main",
+                "swift-build": "main",
                 "swift-toolchain-sqlite": "1.0.1",
                 "swift-tools-support-core": "main",
                 "swiftpm": "main",
@@ -395,6 +399,7 @@
                 "swift": "next",
                 "cmark": "gfm",
                 "llbuild": "main",
+                "swift-build": "main",
                 "swift-toolchain-sqlite": "1.0.1",
                 "swift-tools-support-core": "main",
                 "swiftpm": "main",

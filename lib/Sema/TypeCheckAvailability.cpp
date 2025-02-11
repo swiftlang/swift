@@ -349,8 +349,7 @@ static bool computeContainedByDeploymentTarget(AvailabilityScope *scope,
 static bool isInsideCompatibleUnavailableDeclaration(
     const Decl *D, AvailabilityContext availabilityContext,
     const SemanticAvailableAttr &attr) {
-  auto contextDomain = availabilityContext.getUnavailableDomain();
-  if (!contextDomain)
+  if (!availabilityContext.isUnavailable())
     return false;
 
   if (!attr.isUnconditionallyUnavailable())
@@ -364,7 +363,7 @@ static bool isInsideCompatibleUnavailableDeclaration(
       return false;
   }
 
-  return contextDomain->contains(declDomain);
+  return availabilityContext.containsUnavailableDomain(declDomain);
 }
 
 std::optional<SemanticAvailableAttr>
@@ -565,7 +564,7 @@ private:
         // If the context is the same source file, don't treat it as an
         // expansion.
         auto introNode = scope->getIntroductionNode();
-        switch (auto reason = scope->getReason()) {
+        switch (scope->getReason()) {
         case AvailabilityScope::Reason::Root:
           if (auto contextFile = introNode.getAsSourceFile())
             if (declFile == contextFile)
@@ -3006,6 +3005,7 @@ bool shouldHideDomainNameForConstraintDiagnostic(
   switch (constraint.getDomain().getKind()) {
   case AvailabilityDomain::Kind::Universal:
   case AvailabilityDomain::Kind::Embedded:
+  case AvailabilityDomain::Kind::Custom:
     return true;
   case AvailabilityDomain::Kind::Platform:
     return false;
@@ -3765,7 +3765,7 @@ public:
     assert(ExprStack.back() == E);
     ExprStack.pop_back();
 
-    if (auto *apply = dyn_cast<ApplyExpr>(E)) {
+    if (isa<ApplyExpr>(E)) {
       PreconcurrencyCalleeStack.pop_back();
     }
 

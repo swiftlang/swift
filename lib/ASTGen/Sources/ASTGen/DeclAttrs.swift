@@ -1,4 +1,4 @@
-//===--- Attrs.swift ------------------------------------------------------===//
+//===--- DeclAttrs.swift --------------------------------------------------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -122,7 +122,7 @@ extension ASTGenVisitor {
       case .available:
         return self.generateAvailableAttr(attribute: node).forEach { handle($0.asDeclAttribute) }
       case .backDeployed:
-        fatalError("unimplemented")
+        return self.generateBackDeployedAttr(attribute: node).forEach { handle($0.asDeclAttribute) }
       case .cDecl:
         return handle(self.generateCDeclAttr(attribute: node)?.asDeclAttribute)
       case .derivative:
@@ -160,8 +160,7 @@ extension ASTGenVisitor {
       case .optimize:
         return handle(self.generateOptimizeAttr(attribute: node)?.asDeclAttribute)
       case .originallyDefinedIn:
-        // FIXME: handle multiple results.
-        return handle(self.generateOriginallyDefinedInAttr(attribute: node).first?.asDeclAttribute)
+        return self.generateOriginallyDefinedInAttr(attribute: node).forEach { handle($0.asDeclAttribute) }
       case .privateImport:
         return handle(self.generatePrivateImportAttr(attribute: node)?.asDeclAttribute)
       case .projectedValueProperty:
@@ -473,6 +472,60 @@ extension ASTGenVisitor {
 
   /// E.g.:
   ///   ```
+  ///   @available(macOS 10.12, iOS 13, *)
+  ///   @available(macOS, introduced: 10.12)
+  ///   ```
+  func generateAvailableAttr(attribute node: AttributeSyntax) -> [BridgedAvailableAttr] {
+    guard let args = node.arguments else {
+      self.diagnose(.expectedArgumentsInAttribute(node))
+      return []
+    }
+    guard let args = args.as(AvailabilityArgumentListSyntax.self) else {
+      // TODO: Diagnose.
+      return []
+    }
+
+    return self.generateAvailableAttr(
+      atLoc: self.generateSourceLoc(node.atSign),
+      range: self.generateAttrSourceRange(node),
+      args: args
+    )
+  }
+
+  /// E.g.:
+  ///   ```
+  ///   @backDeployed(before: SwiftStdlib 5.9)
+  ///   ```
+  func generateBackDeployedAttr(attribute node: AttributeSyntax) -> [BridgedBackDeployedAttr] {
+    guard let args = node.arguments else {
+      self.diagnose(.expectedArgumentsInAttribute(node))
+      return []
+    }
+    guard let args = args.as(BackDeployedAttributeArgumentsSyntax.self) else {
+      // TODO: Diagnose.
+      return []
+    }
+
+    let atLoc = self.generateSourceLoc(node.atSign)
+    let range = self.generateAttrSourceRange(node)
+
+    let platformVersions = self.generate(platformVersionList: args.platforms)
+    var result: [BridgedBackDeployedAttr] = []
+    for platformVersion in platformVersions {
+      let attr = BridgedBackDeployedAttr.createParsed(
+        ctx,
+        atLoc: atLoc,
+        range: range,
+        platform: platformVersion.platform,
+        version: platformVersion.version
+      )
+      result.append(attr)
+    }
+    return result
+  }
+
+  /// E.g.:
+  ///   ```
   ///   @_cdecl("c_function_name")
   ///   ```
   func generateCDeclAttr(attribute node: AttributeSyntax) -> BridgedCDeclAttr? {
@@ -495,24 +548,6 @@ extension ASTGenVisitor {
       range: self.generateAttrSourceRange(node),
       name: name
     )
-  }
-
-  /// E.g.:
-  ///   ```
-  ///   @available(macOS 10.12, iOS: 13, *)
-  ///   @available(macOS, introduced: 10.12)
-  ///   ```
-  func generateAvailableAttr(attribute node: AttributeSyntax) -> [BridgedAvailableAttr] {
-    guard
-      // `@available` has special argument list syntax.
-      let args = node.arguments?.as(AvailabilityArgumentListSyntax.self)
-    else {
-      // TODO: Diagnose.
-      return []
-    }
-
-    _ = args
-    fatalError("unimplemented")
   }
 
   /// E.g:
@@ -1200,6 +1235,10 @@ extension ASTGenVisitor {
     )
   }
 
+  /// E.g.:
+  ///   ```
+  ///   @_originallyDefinedIn(module: "OriginalModule", macOS 2.0)
+  ///   ```
   func generateOriginallyDefinedInAttr(attribute node: AttributeSyntax) -> [BridgedOriginallyDefinedInAttr] {
     guard
       // `@_OriginallyDefinedIn` has special argument list syntax.
@@ -1209,8 +1248,32 @@ extension ASTGenVisitor {
       return []
     }
 
-    _ = args
-    fatalError("unimplemented")
+    guard
+      let moduleName = self.generateStringLiteralTextIfNotInterpolated(expr: args.moduleName),
+      !moduleName.isEmpty
+    else {
+      // TODO: Diagnose
+      fatalError("expected non-empty string literal without interpolations")
+    }
+
+    let atLoc = self.generateSourceLoc(node.atSign)
+    let range = self.generateAttrSourceRange(node)
+    let moduleNameInCtx = self.ctx.allocateCopy(string: moduleName)
+
+    let platformVersions = self.generate(platformVersionList: args.platforms)
+    var result: [BridgedOriginallyDefinedInAttr] = []
+    for platformVersion in platformVersions {
+      let attr = BridgedOriginallyDefinedInAttr.createParsed(
+        ctx,
+        atLoc: atLoc,
+        range: range,
+        moduleName: moduleNameInCtx,
+        platform: platformVersion.platform,
+        version: platformVersion.version
+      )
+      result.append(attr)
+    }
+    return result
   }
 
   func generatePrivateImportAttr(attribute node: AttributeSyntax) -> BridgedPrivateImportAttr? {
@@ -1381,10 +1444,14 @@ extension ASTGenVisitor {
         }
         targetFunction = self.generateDeclNameRef(declReferenceExpr: arg.declName).name
       case .specializeAvailabilityArgument(let arg):
-        // TODO: Implement
-        _ = arg
-        _ = availableAttrs = availableAttrs
-        fatalError("unimplemented")
+        availableAttrs = self.generateAvailableAttr(
+          atLoc: self.generateSourceLoc(arg.availabilityLabel),
+          range: self.generateSourceRange(
+            start: arg.availabilityArguments.firstToken(viewMode: .all)!,
+            end: arg.semicolon
+          ),
+          args: arg.availabilityArguments
+        )
       case .labeledSpecializeArgument(let arg):
         // FIXME: Can be 'LabeledExprSyntax'.
         switch arg.label.rawText {
@@ -1859,7 +1926,7 @@ extension ASTGenVisitor {
 }
 
 /// Simpler helper for handling attribute arguments in "generate" functions.
-private struct AttrArgumentState<Flag: RawRepresentable, SeenStorage: FixedWidthInteger> where Flag.RawValue: FixedWidthInteger {
+struct AttrArgumentState<Flag: RawRepresentable, SeenStorage: FixedWidthInteger> where Flag.RawValue: FixedWidthInteger {
   private var seen: SeenStorage = 0
 
   var current: Flag {

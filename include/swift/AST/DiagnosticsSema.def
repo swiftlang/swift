@@ -4745,7 +4745,10 @@ NOTE(ambiguous_because_of_trailing_closure,none,
      (bool, const ValueDecl *))
 
 // In-package resilience bypassing
-WARNING(cannot_bypass_resilience_due_to_missing_member,none,
+WARNING(cannot_bypass_resilience_due_to_missing_member_warn,none,
+      "cannot bypass resilience due to member deserialization failure while attempting to access %select{member %0|missing member}1 of %2 in module %3 from module %4",
+      (Identifier, bool, Identifier, Identifier, Identifier))
+ERROR(cannot_bypass_resilience_due_to_missing_member,none,
       "cannot bypass resilience due to member deserialization failure while attempting to access %select{member %0|missing member}1 of %2 in module %3 from module %4",
       (Identifier, bool, Identifier, Identifier, Identifier))
 
@@ -5656,9 +5659,6 @@ ERROR(distributed_actor_func_unsupported_specifier, none,
 ERROR(distributed_actor_func_variadic, none,
       "cannot declare variadic argument %0 in %kind1",
       (DeclName, const ValueDecl *))
-ERROR(distributed_actor_func_typed_throws, none,
-      "cannot declare distributed function with typed throws",
-      ())
 NOTE(actor_mutable_state,none,
      "mutation of this %0 is only permitted within the actor",
      (DescriptiveDeclKind))
@@ -6731,6 +6731,13 @@ WARNING(attr_availability_cannot_be_used_for_domain, none,
 WARNING(attr_availability_expected_version_spec, none,
        "expected 'introduced', 'deprecated', or 'obsoleted' in '%0' attribute "
        "for platform '%1'", (StringRef, StringRef))
+ERROR(attr_availability_requires_custom_availability, none,
+      "specifying '%0' in '%1' attribute requires "
+      "-enable-experimental-feature CustomAvailability",
+      (StringRef, const DeclAttribute))
+WARNING(attr_availability_unexpected_version,none,
+       "unexpected version number in '%0' attribute for '%1'",
+       (const DeclAttribute, StringRef))
 
 ERROR(availability_decl_unavailable, none,
       "%0 is unavailable%select{ in %2|}1%select{|: %3}3",
@@ -8250,9 +8257,13 @@ ERROR(attr_abi_incompatible_with_silgen_name,none,
 // MARK: @execution Attribute
 //===----------------------------------------------------------------------===//
 
-ERROR(attr_execution_concurrent_only_on_async,none,
-      "cannot use '@execution(concurrent)' on non-async %kind0",
+ERROR(attr_execution_only_on_async,none,
+      "cannot use '@execution' on non-async %kind0",
       (ValueDecl *))
+
+ERROR(attr_execution_type_attr_only_on_async,none,
+      "cannot use '@execution' on non-async function type",
+      ())
 
 ERROR(attr_execution_concurrent_incompatible_isolated_parameter,none,
       "cannot use '@execution(concurrent)' on %kind0 because it has "
@@ -8268,6 +8279,19 @@ ERROR(attr_execution_concurrent_incompatible_with_nonisolated,none,
       "cannot use '@execution(concurrent)' and 'nonisolated' on the same %0 "
       "because they serve the same purpose",
       (ValueDecl *))
+
+ERROR(attr_execution_concurrent_type_attr_incompatible_with_global_isolation,none,
+      "cannot use '@execution(concurrent)' because function type is "
+      "isolated to global actor %0",
+      (Type))
+
+ERROR(attr_execution_concurrent_type_attr_incompatible_with_isolated_param,none,
+      "cannot use '@execution(concurrent)' together with isolated parameter",
+      ())
+
+ERROR(attr_execution_concurrent_type_attr_incompatible_with_isolated_any,none,
+      "cannot use '@execution(concurrent)' together with @isolated(any)",
+      ())
 
 
 #define UNDEFINE_DIAGNOSTIC_MACROS

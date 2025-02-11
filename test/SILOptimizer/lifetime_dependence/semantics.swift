@@ -8,19 +8,62 @@
 // REQUIRES: swift_in_compiler
 // REQUIRES: swift_feature_LifetimeDependence
 
+@_unsafeNonescapableResult
+@_transparent
+@lifetime(borrow source)
+internal func _overrideLifetime<
+  T: ~Copyable & ~Escapable, U: ~Copyable & ~Escapable
+>(
+  _ dependent: consuming T, borrowing source: borrowing U
+) -> T {
+  // TODO: Remove @_unsafeNonescapableResult. Instead, the unsafe dependence
+  // should be expressed by a builtin that is hidden within the function body.
+  dependent
+}
+
+/// Unsafely discard any lifetime dependency on the `dependent` argument. Return
+/// a value identical to `dependent` that inherits all lifetime dependencies from
+/// the `source` argument.
+@_unsafeNonescapableResult
+@_transparent
+@lifetime(source)
+internal func _overrideLifetime<
+  T: ~Copyable & ~Escapable, U: ~Copyable & ~Escapable
+>(
+  _ dependent: consuming T, copying source: borrowing U
+) -> T {
+  // TODO: Remove @_unsafeNonescapableResult. Instead, the unsafe dependence
+  // should be expressed by a builtin that is hidden within the function body.
+  dependent
+}
+
+/// Unsafely discard any lifetime dependency on the `dependent` argument. Return
+/// a value identical to `dependent` that inherits all lifetime dependencies from
+/// the `source` argument.
+@_unsafeNonescapableResult
+@_transparent
+@lifetime(borrow source)
+internal func _overrideLifetime<
+  T: ~Copyable & ~Escapable, U: ~Copyable & ~Escapable
+>(
+  _ dependent: consuming T, mutating source: inout U
+) -> T {
+  dependent
+}
+
 // Lifetime dependence semantics by example.
-struct Span<T>: ~Escapable {
-  private var base: UnsafePointer<T>
+public struct Span<T>: ~Escapable {
+  private var base: UnsafePointer<T>?
   private var count: Int
 
   @lifetime(borrow base)
-  init(base: UnsafePointer<T>, count: Int) {
+  init(base: UnsafePointer<T>?, count: Int) {
     self.base = base
     self.count = count
   }
 
   @lifetime(borrow generic)
-  init<S>(base: UnsafePointer<T>, count: Int, generic: borrowing S) {
+  init<S>(base: UnsafePointer<T>?, count: Int, generic: borrowing S) {
     self.base = base
     self.count = count
   }
@@ -28,39 +71,32 @@ struct Span<T>: ~Escapable {
 
 extension Span {
   consuming func dropFirst() -> Span<T> {
-    let nextPointer = self.base + 1
+    let nextPointer = self.base.flatMap { $0 + 1 }
     let local = Span(base: nextPointer, count: self.count - 1)
-    return unsafeLifetime(dependent: local, dependsOn: self)
+    return _overrideLifetime(local, copying: self)
   }
-}
-
-// TODO: Remove @_unsafeNonescapableResult. Instead, the unsafe dependence should be expressed by a builtin that is
-// hidden within the function body.
-@_unsafeNonescapableResult
-@lifetime(source)
-func unsafeLifetime<T: ~Copyable & ~Escapable, U: ~Copyable & ~Escapable>(
-  dependent: consuming T, dependsOn source: borrowing U)
-  -> T {
-  dependent
-}
-
-// TODO: Remove @_unsafeNonescapableResult. Instead, the unsafe dependence should be expressed by a builtin that is
-// hidden within the function body.
-@_unsafeNonescapableResult
-@lifetime(borrow source)
-func unsafeLifetime<T: ~Copyable & ~Escapable, U: ~Copyable & ~Escapable>(
-  dependent: consuming T, scope source: borrowing U)
-  -> T {
-  dependent
 }
 
 extension Span {
   mutating func droppingPrefix(length: Int) -> /* */ Span<T> {
     let oldBase = base
     let result = Span(base: oldBase, count: length)
-    self.base += length
-    self.count -= length
-    return unsafeLifetime(dependent: result, dependsOn: self)
+    if let base = self.base {
+      self.base = base + length
+      self.count -= length
+    }
+    return _overrideLifetime(result, copying: self)
+  }
+}
+
+struct MutableSpan<T>: ~Escapable, ~Copyable {
+  let base: UnsafeMutablePointer<T>
+  let count: Int
+
+  @lifetime(borrow base)
+  init(base: UnsafeMutablePointer<T>, count: Int) {
+    self.base = base
+    self.count = count
   }
 }
 
@@ -70,7 +106,17 @@ extension Array {
     /* not the real implementation */
     let p = self.withUnsafeBufferPointer { $0.baseAddress! }
     let span = Span(base: p, count: 1)
-    return unsafeLifetime(dependent: span, scope: self)
+    return _overrideLifetime(span, borrowing: self)
+  }
+}
+
+extension Array {
+  @lifetime(borrow self)
+  mutating func mutableSpan() -> MutableSpan<Element> {
+    /* not the real implementation */
+    let p = self.withUnsafeMutableBufferPointer { $0.baseAddress! }
+    let span = MutableSpan<Element>(base: p, count: 1)
+    return _overrideLifetime(span, mutating: &self)
   }
 }
 
@@ -131,6 +177,47 @@ struct Outer {
 
 func parse(_ span: Span<Int>) {}
 
+func copySpan<T>(_ arg: Span<T>) -> /* */ Span<T> { arg }
+
+@lifetime(borrow arg)
+func reborrowSpan<T>(_ arg: Span<T>) -> Span<T> { arg }
+
+// =============================================================================
+// Initialization
+// =============================================================================
+
+struct View: ~Escapable {
+  let owner: AnyObject
+
+  @lifetime(borrow owner)
+  init(owner: borrowing AnyObject) {
+    self.owner = copy owner // OK
+  }
+}
+
+struct MutableView: ~Escapable, ~Copyable {
+  let owner: AnyObject
+
+  // A copy of a borrow is indistinguishable with the borrow scope.
+  @lifetime(borrow owner)
+  init(owner: borrowing AnyObject) {
+    self.owner = copy owner // OK
+  }
+
+  @lifetime(borrow mutableOwner)
+  init(mutableOwner: inout AnyObject) {
+    // Initialization of a ~Escapable value is unenforced. So we can initialize
+    // the `owner` property without locally borrowing `mutableOwner`.
+    self.owner = mutableOwner // OK
+  }
+}
+
+struct Container<T> {
+  var owner: AnyObject
+  let pointer: UnsafeMutablePointer<T>
+  let count: Int
+}
+
 // =============================================================================
 // Scoped dependence on values
 // =============================================================================
@@ -159,8 +246,6 @@ func testScopedCopy(_ arg: [Int] ) {
 // =============================================================================
 // Inherited dependence on values
 // =============================================================================
-
-func copySpan<T>(_ arg: Span<T>) -> /* */ Span<T> { arg }
 
 func testInheritedCopy(_ arg: [Int] ) {
   let a: Array<Int> = arg
@@ -191,9 +276,6 @@ func testInheritedCopyVar(_ arg: [Int] ) {
 // =============================================================================
 // Scoped dependence on inherited dependence
 // =============================================================================
-
-@lifetime(borrow arg)
-func reborrowSpan<T>(_ arg: Span<T>) -> Span<T> { arg }
 
 func testScopedOfInheritedWithCall(_ arg: [Int] ) {
   let a: Array<Int> = arg
@@ -235,15 +317,107 @@ extension Span {
 }
 
 // Test dependence on an local variable that needs to be extended into the dead-end block of a never-throwing apply.
-public func test(p: UnsafePointer<Int>) {
+public func testTrivialLocalDeadEnd(p: UnsafePointer<Int>) {
   let pointer = p
   let span = Span(base: pointer, count: 1)
   span.withThrowingClosure {}
 }
 
+// Test dependence on a borrow of a trivial inout. The access scope can be ignored since we don't care about the
+// in-memory value.
+@lifetime(borrow p)
+public func testTrivialInoutBorrow(p: inout UnsafePointer<Int>) -> Span<Int> {
+  return Span(base: p, count: 1)
+}
+
+// =============================================================================
+// Scoped dependence on global values
+// =============================================================================
+
+private let immortalInt = 0
+
+private let immortalString = ""
+
+@lifetime(immortal)
+func testImmortalInt() -> Span<Int> {
+  let nilBasedBuffer = UnsafeBufferPointer<Int>(start: nil, count: 0)
+  let span = Span(base: nilBasedBuffer.baseAddress, count: nilBasedBuffer.count)
+  return _overrideLifetime(span, borrowing: immortalInt)
+}
+
+@lifetime(immortal)
+func testImmortalString() -> Span<String> {
+  let nilBasedBuffer = UnsafeBufferPointer<String>(start: nil, count: 0)
+  let span = Span(base: nilBasedBuffer.baseAddress, count: nilBasedBuffer.count)
+  return _overrideLifetime(span, borrowing: immortalString)
+}
+
+let ptr = UnsafePointer<Int>(bitPattern: 1)!
+let globalTrivial = InnerTrivial(p: ptr)
+
+// An immortal span can depend on a caller's local borrow scope even though the callee sees no such dependency.
+@lifetime(borrow local)
+func testGlobal(local: InnerTrivial) -> Span<Int> {
+  globalTrivial.span()
+}
+
+// =============================================================================
+// Scoped dependence on mutable values
+// =============================================================================
+
+@lifetime(borrow a)
+func testInoutBorrow(a: inout [Int]) -> Span<Int> {
+  a.span() // expected-error {{lifetime-dependent value escapes its scope}}
+  // expected-note @-1{{it depends on this scoped access to variable 'a'}}
+} // expected-note {{this use causes the lifetime-dependent value to escape}}
+
+@lifetime(borrow a)
+func testInoutMutableBorrow(a: inout [Int]) -> MutableSpan<Int> {
+  a.mutableSpan()
+}
+
 // =============================================================================
 // Scoped dependence on property access
 // =============================================================================
+
+extension Container {
+  @lifetime(borrow self)
+  func span() -> Span<T> {
+    // borrowing the 'pointer' member is allowed.
+    Span(base: self.pointer, count: self.count) // OK
+  }
+
+  @lifetime(borrow self)
+  func view() -> View {
+    // borrowing the 'view' member is allowed.
+    View(owner: self.owner) // OK
+  }
+
+  @lifetime(borrow self)
+  mutating func mutableView() -> MutableView {
+    // Reading 'self.owner' creates a local borrow scope. This new MutableView
+    // depends on a the local borrow scope for 'self.owner', so it cannot be
+    // returned.
+    MutableView(owner: self.owner) // expected-error {{lifetime-dependent value escapes its scope}}
+    // expected-note @-1{{it depends on this scoped access to variable 'self'}}
+  } // expected-note    {{this use causes the lifetime-dependent value to escape}}
+
+  @lifetime(borrow self)
+  mutating func mutableViewModifiesOwner() -> MutableView {
+    // Passing '&self.owner' inout creates a nested exclusive access that must extend to all uses of the new
+    // MutableView. This is allowed because the nested access is logically extended to the end of the function (without
+    // violating exclusivity).
+    MutableView(mutableOwner: &self.owner)
+  }
+
+  @lifetime(borrow self)
+  mutating func mutableSpan() -> MutableSpan<T> {
+    // Reading 'self.pointer' creates a local borrow scope. The local borrow
+    // scope is ignored because 'pointer' is a trivial value. Instead, the new
+    // MutableSpan depends directly on 'inout self'.
+    MutableSpan(base: self.pointer, count: self.count) // OK
+  }
+}
 
 @lifetime(borrow outer)
 func testBorrowStoredTrivial(outer: Outer) -> Span<Int> {
@@ -267,9 +441,6 @@ func testBorrowObjectAddressProjection(outer: Outer) -> Span<Int> {
 
 func testExprExtendTrivialTemp(outer: Outer) {
   parse(outer.innerTrivialTemp.span())
-  // expected-error @-1{{lifetime-dependent value escapes its scope}}
-  // expected-note  @-2{{it depends on the lifetime of this parent value}}
-  // expected-note  @-3{{this use of the lifetime-dependent value is out of scope}}
 }
 
 func testExprExtendObjectTemp(outer: Outer) {
@@ -281,9 +452,7 @@ func testExprExtendObjectTemp(outer: Outer) {
 
 func testLocalExtendTrivialTemp(outer: Outer) {
   let span = outer.innerTrivialTemp.span()
-  // expected-error @-1{{lifetime-dependent variable 'span' escapes its scope}}
-  // expected-note  @-2{{it depends on the lifetime of this parent value}}
-  parse(span) // expected-note {{this use of the lifetime-dependent value is out of scope}}
+  parse(span)
 }
 
 func testLocalExtendObjectTemp(outer: Outer) {

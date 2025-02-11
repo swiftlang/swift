@@ -1793,8 +1793,9 @@ final class ElfImage<SomeElfTraits: ElfTraits>
     }
   }
 
-  private lazy var dwarfReader
-    = try? DwarfReader(source: self, shouldSwap: header.shouldByteSwap)
+  private lazy var dwarfReader = { [unowned self] in
+    try? DwarfReader(source: self, shouldSwap: header.shouldByteSwap)
+  }()
 
   typealias CallSiteInfo = DwarfReader<ElfImage>.CallSiteInfo
 
@@ -1879,7 +1880,9 @@ typealias Elf64Image = ElfImage<Elf64Traits>
 /// Test if there is a valid ELF image at the specified address; if there is,
 /// extract the address range for the text segment and the UUID, if any.
 @_specialize(kind: full, where R == UnsafeLocalMemoryReader)
+#if os(macOS) || os(Linux)
 @_specialize(kind: full, where R == RemoteMemoryReader)
+#endif
 #if os(Linux)
 @_specialize(kind: full, where R == MemserverMemoryReader)
 #endif
@@ -1915,8 +1918,10 @@ func getElfImageInfo<R: MemoryReader>(at address: R.Address,
 
 @_specialize(kind: full, where R == UnsafeLocalMemoryReader, Traits == Elf32Traits)
 @_specialize(kind: full, where R == UnsafeLocalMemoryReader, Traits == Elf64Traits)
+#if os(macOS) || os(Linux)
 @_specialize(kind: full, where R == RemoteMemoryReader, Traits == Elf32Traits)
 @_specialize(kind: full, where R == RemoteMemoryReader, Traits == Elf64Traits)
+#endif
 #if os(Linux)
 @_specialize(kind: full, where R == MemserverMemoryReader, Traits == Elf32Traits)
 @_specialize(kind: full, where R == MemserverMemoryReader, Traits == Elf64Traits)

@@ -4,7 +4,7 @@
 // RUN: mkdir -p %t/clang-module-cache
 // RUN: mkdir -p %t/cas
 
-// RUN: %target-swift-frontend -scan-dependencies -module-load-mode prefer-interface -module-cache-path %t/clang-module-cache %s -o %t/deps.json -I %S/../ScanDependencies/Inputs/CHeaders -I %S/../ScanDependencies/Inputs/Swift -emit-dependencies -emit-dependencies-path %t/deps.d -import-objc-header %S/../ScanDependencies/Inputs/CHeaders/Bridging.h -swift-version 4 -enable-cross-import-overlays -cache-compile-job -cas-path %t/cas
+// RUN: %target-swift-frontend -scan-dependencies -module-load-mode prefer-interface -module-cache-path %t/clang-module-cache %s -o %t/deps.json -I %S/../ScanDependencies/Inputs/CHeaders -I %S/../ScanDependencies/Inputs/Swift -emit-dependencies -emit-dependencies-path %t/deps.d -import-objc-header %S/../ScanDependencies/Inputs/CHeaders/Bridging.h -swift-version 4 -enable-cross-import-overlays -cache-compile-job -cas-path %t/cas -auto-bridging-header-chaining
 
 // Check the contents of the JSON output
 // RUN: %FileCheck %s -check-prefix CHECK -check-prefix CHECK-NO-SEARCH-PATHS < %t/deps.json
@@ -12,10 +12,10 @@
 // Check the make-style dependencies file
 // RUN: %FileCheck %s -check-prefix CHECK-MAKE-DEPS < %t/deps.d
 
-// RUN: %target-swift-frontend -scan-dependencies -module-load-mode prefer-interface -test-dependency-scan-cache-serialization -module-cache-path %t/clang-module-cache %s -o %t/deps.json -I %S/../ScanDependencies/Inputs/CHeaders -I %S/../ScanDependencies/Inputs/Swift -import-objc-header %S/../ScanDependencies/Inputs/CHeaders/Bridging.h -swift-version 4 -enable-cross-import-overlays -cache-compile-job -cas-path %t/cas
+// RUN: %target-swift-frontend -scan-dependencies -module-load-mode prefer-interface -test-dependency-scan-cache-serialization -module-cache-path %t/clang-module-cache %s -o %t/deps.json -I %S/../ScanDependencies/Inputs/CHeaders -I %S/../ScanDependencies/Inputs/Swift -import-objc-header %S/../ScanDependencies/Inputs/CHeaders/Bridging.h -swift-version 4 -enable-cross-import-overlays -cache-compile-job -cas-path %t/cas -auto-bridging-header-chaining
 
 // Ensure that scanning with `-clang-target` makes sure that Swift modules' respective PCM-dependency-build-argument sets do not contain target triples.
-// RUN: %target-swift-frontend -scan-dependencies -module-load-mode prefer-interface -module-cache-path %t/clang-module-cache %s -o %t/deps_clang_target.json -I %S/../ScanDependencies/Inputs/CHeaders -I %S/../ScanDependencies/Inputs/Swift -import-objc-header %S/../ScanDependencies/Inputs/CHeaders/Bridging.h -swift-version 4 -enable-cross-import-overlays -clang-target %target-cpu-apple-macosx10.14 -cache-compile-job -cas-path %t/cas
+// RUN: %target-swift-frontend -scan-dependencies -module-load-mode prefer-interface -module-cache-path %t/clang-module-cache %s -o %t/deps_clang_target.json -I %S/../ScanDependencies/Inputs/CHeaders -I %S/../ScanDependencies/Inputs/Swift -import-objc-header %S/../ScanDependencies/Inputs/CHeaders/Bridging.h -swift-version 4 -enable-cross-import-overlays -clang-target %target-cpu-apple-macosx10.14 -cache-compile-job -cas-path %t/cas -auto-bridging-header-chaining
 
 /// check cas-fs content
 // RUN: %{python} %S/Inputs/SwiftDepsExtractor.py %t/deps.json E casFSRootID > %t/E_fs.casid
@@ -73,6 +73,7 @@ import SubE
 // CHECK-SAME: Bridging.h
 
 // CHECK-NEXT: "sourceFiles":
+// CHECK-NEXT: ChainedBridgingHeader.h
 // CHECK-NEXT: Bridging.h
 // CHECK-NEXT: BridgingOther.h
 
@@ -119,7 +120,6 @@ import SubE
 // CHECK-MAKE-DEPS-SAME: A.swiftinterface
 // CHECK-MAKE-DEPS-SAME: G.swiftinterface
 // CHECK-MAKE-DEPS-SAME: B.h
-// CHECK-MAKE-DEPS-SAME: F.h
 // CHECK-MAKE-DEPS-SAME: Bridging.h
 // CHECK-MAKE-DEPS-SAME: BridgingOther.h
 // CHECK-MAKE-DEPS-SAME: module.modulemap

@@ -303,13 +303,6 @@ class CMakeProduct(product.Product):
                 swift_host_variant_sdk = 'TVOS'
                 cmake_osx_deployment_target = None
 
-            elif host_target == 'watchsimulator-i386':
-                swift_host_triple = 'i386-apple-watchos{}-simulator'.format(
-                    self.args.darwin_deployment_version_watchos)
-                llvm_target_arch = 'X86'
-                swift_host_variant_sdk = 'WATCHOS_SIMULATOR'
-                cmake_osx_deployment_target = None
-
             elif host_target == 'watchsimulator-x86_64':
                 swift_host_triple = 'x86_64-apple-watchos{}-simulator'.format(
                     self.args.darwin_deployment_version_watchos)

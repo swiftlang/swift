@@ -116,9 +116,12 @@ void ClangClassTypePrinter::printClassTypeDecl(
 void ClangClassTypePrinter::printClassTypeReturnScaffold(
     raw_ostream &os, const ClassDecl *type, const ModuleDecl *moduleContext,
     llvm::function_ref<void(void)> bodyPrinter) {
+  ClangSyntaxPrinter printer(type->getASTContext(), os);
   os << "  return ";
-  ClangSyntaxPrinter(type->getASTContext(), os).printModuleNamespaceQualifiersIfNeeded(
-      type->getModuleContext(), moduleContext);
+  printer.printModuleNamespaceQualifiersIfNeeded(type->getModuleContext(),
+                                                 moduleContext);
+  if (!printer.printNestedTypeNamespaceQualifiers(type))
+    os << "::";
   os << cxx_synthesis::getCxxImplNamespaceName() << "::";
   ClangValueTypePrinter::printCxxImplClassName(os, type);
   os << "::makeRetained(";

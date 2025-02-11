@@ -771,7 +771,7 @@ Type CompletionLookup::getAssociatedTypeType(const AssociatedTypeDecl *ATD) {
         CurrDeclContext->getInnermostTypeContext()->getDeclaredTypeInContext();
   if (BaseTy) {
     BaseTy = BaseTy->getInOutObjectType()->getMetatypeInstanceType();
-    if (auto NTD = BaseTy->getAnyNominal()) {
+    if (BaseTy->getAnyNominal()) {
       auto Conformance = lookupConformance(BaseTy, ATD->getProtocol());
       if (Conformance.isConcrete()) {
         return Conformance.getConcrete()->getTypeWitness(

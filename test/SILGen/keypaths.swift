@@ -670,6 +670,8 @@ func test_metatype_keypaths() {
   let _: KeyPath<M.Type, N.Type> = \M.Type.[76]
   // CHECK: keypath $KeyPath<M, Optional<Int>>, (root $M; gettable_property $Optional<N.Type>, id #M.degrees!getter : (M) -> () -> N.Type?, getter @$s8keypaths1MC7degreesAA1NVmSgvpACTK : $@convention(keypath_accessor_getter) (@in_guaranteed M) -> @out Optional<@thick N.Type>; optional_chain : $N.Type; gettable_property $Int, id @$s8keypaths1NV6kelvinSivgZ : $@convention(method) (@thin N.Type) -> Int, getter @$s8keypaths1NV6kelvinSivpZACmTK : $@convention(keypath_accessor_getter) (@in_guaranteed @thick N.Type) -> @out Int; optional_wrap : $Optional<Int>)
   let _: KeyPath<M, Int?> = \.degrees?.kelvin
+  // CHECK: keypath $KeyPath<Int.Type, Int>, (root $Int.Type; gettable_property $Int, id @$ss18AdditiveArithmeticPss27ExpressibleByIntegerLiteralRzrlE4zeroxvgZ : $@convention(method) <τ_0_0 where τ_0_0 : AdditiveArithmetic, τ_0_0 : ExpressibleByIntegerLiteral> (@thick τ_0_0.Type) -> @out τ_0_0, getter @$ss18AdditiveArithmeticPss27ExpressibleByIntegerLiteralRzrlE4zeroxvpZSimTK : $@convention(keypath_accessor_getter) (@in_guaranteed @thick Int.Type) -> @out Int, external #AdditiveArithmetic.zero<Int>)
+  let _: KeyPath<Int.Type, Int> = \Int.Type.zero
 }
 
 

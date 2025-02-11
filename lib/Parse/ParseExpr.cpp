@@ -1503,7 +1503,11 @@ Parser::parseExprPostfixSuffix(ParserResult<Expr> Result, bool isExprBasic,
         continue;
 
       // Extract the parsed expression as the result.
-      assert(activeElements.size() == 1 && activeElements[0].is<Expr *>());
+      assert(activeElements.size() == 1 ||
+             SF.getParsingOptions().contains(
+                 SourceFile::ParsingFlags::PoundIfAllActive));
+      // FIXME: 'PoundIfAllActive' mode should keep all the parsed AST nodes.
+      assert(activeElements[0].is<Expr *>());
       auto expr = activeElements[0].get<Expr *>();
       ParserStatus status(ICD);
       auto charRange = Lexer::getCharSourceRangeFromSourceRange(
@@ -3102,9 +3106,7 @@ Expr *Parser::parseExprAnonClosureArg() {
   auto &decls = AnonClosureVars.back().Item;
   while (ArgNo >= decls.size()) {
     unsigned nextIdx = decls.size();
-    SmallVector<char, 4> StrBuf;
-    StringRef varName = ("$" + Twine(nextIdx)).toStringRef(StrBuf);
-    Identifier ident = Context.getIdentifier(varName);
+    Identifier ident = Context.getDollarIdentifier(nextIdx);
     SourceLoc varLoc = leftBraceLoc;
     auto *var = new (Context)
         ParamDecl(SourceLoc(), SourceLoc(),

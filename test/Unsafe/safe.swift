@@ -140,7 +140,7 @@ func testKeyPath() {
 func takesAutoclosure<T>(_ body: @autoclosure () -> T) { }
 
 func testAutoclosure() {
-  // expected-warning@+1{{expression uses unsafe constructs but is not marked with 'unsafe'}}{{20-20=unsafe }}
+  // expected-warning@+1{{expression uses unsafe constructs but is not marked with 'unsafe'}}{{3-3=unsafe }}
   takesAutoclosure(unsafeFunction()) // expected-note{{reference to unsafe global function 'unsafeFunction()'}}
 
   unsafe takesAutoclosure(unsafeFunction())
@@ -171,8 +171,7 @@ func testMyArray(ints: MyArray<Int>) {
     let bufferCopy = unsafe buffer
     _ = unsafe bufferCopy
 
-    // expected-warning@+1{{expression uses unsafe constructs but is not marked with 'unsafe'}}
-    print(buffer.safeCount) // expected-note{{reference to parameter 'buffer' involves unsafe type 'UnsafeBufferPointer<Int>'}}
+    print(buffer.safeCount)
     unsafe print(buffer.baseAddress!)
   }
 }

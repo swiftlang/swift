@@ -759,7 +759,7 @@ static MetadataResponse emitNominalMetadataRef(IRGenFunction &IGF,
                  IGF.IGM, theType, NoncanonicalSpecializedMetadata)) {
     response = emitNominalPrespecializedGenericMetadataRef(
         IGF, theDecl, theType, request, NoncanonicalSpecializedMetadata);
-  } else if (auto theClass = dyn_cast<ClassDecl>(theDecl)) {
+  } else if (isa<ClassDecl>(theDecl)) {
     if (isSpecializedNominalTypeMetadataStaticallyAddressable(
             IGF.IGM, theType, CanonicalSpecializedMetadata,
             ForUseOnlyFromAccessor)) {
@@ -853,7 +853,7 @@ bool irgen::isSpecializedNominalTypeMetadataStaticallyAddressable(
                  AncestryOptions(AncestryFlags::ClangImported))) {
       return false;
     }
-    if (auto *theSuperclass = theClass->getSuperclassDecl()) {
+    if (theClass->getSuperclassDecl()) {
       auto superclassType =
           type->getSuperclass(/*useArchetypes=*/false)->getCanonicalType();
       if (!isCanonicalInitializableTypeMetadataStaticallyAddressable(
@@ -2762,7 +2762,7 @@ irgen::emitCanonicalSpecializedGenericTypeMetadataAccessFunction(
     auto parameter = requirement.getTypeParameter();
     auto noncanonicalArgument = parameter.subst(substitutions);
     auto argument = noncanonicalArgument->getCanonicalType();
-    if (auto *classDecl = argument->getClassOrBoundGenericClass()) {
+    if (argument->getClassOrBoundGenericClass()) {
       emitIdempotentCanonicalSpecializedClassMetadataInitializationComponent(
           IGF, argument, initializedTypes);
     }

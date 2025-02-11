@@ -159,6 +159,14 @@ private func optimize(function: Function, _ context: FunctionPassContext, _ modu
         {
           fri.referencedFunction.set(linkage: .public, moduleContext)
         }
+        
+      case let copy as CopyAddrInst:
+        if function.isGlobalInitOnceFunction, copy.source.type.isLoadable(in: function) {
+          // In global init functions we have to make sure that redundant load elimination can remove all
+          // loads (from temporary stack locations) so that globals can be statically initialized.
+          // For this it's necessary to load copy_addr instructions to loads and stores.
+          copy.replaceWithLoadAndStore(simplifyCtxt)
+        }
 
       default:
         break
@@ -170,7 +178,13 @@ private func optimize(function: Function, _ context: FunctionPassContext, _ modu
     removeUnusedMetatypeInstructions(in: function, context)
 
     // If this is a just specialized function, try to optimize copy_addr, etc.
-    changed = context.optimizeMemoryAccesses(in: function) || changed
+    if eliminateRedundantLoads(in: function,
+                               variant: function.isGlobalInitOnceFunction ? .mandatoryInGlobalInit : .mandatory,
+                               context)
+    {
+      changed = true
+    }
+
     changed = context.eliminateDeadAllocations(in: function) || changed
   }
 }

@@ -16,6 +16,7 @@
 #include "swift/AST/ModuleDependencies.h"
 #include "swift/Frontend/ModuleInterfaceLoader.h"
 #include "swift/Serialization/SerializedModuleLoader.h"
+#include "llvm/CAS/CASReference.h"
 #include "llvm/Support/ThreadPool.h"
 
 namespace swift {
@@ -48,6 +49,11 @@ private:
                                          llvm::PrefixMapper *prefixMapper,
                                          bool isTestableImport = false);
 
+  /// Store cache entry for include tree.
+  llvm::Error
+  createCacheKeyForEmbeddedHeader(std::string embeddedHeaderIncludeTree,
+                                  std::string chainedHeaderIncludeTree);
+
   // Worker-specific instance of CompilerInvocation
   std::unique_ptr<CompilerInvocation> workerCompilerInvocation;
   // Worker-specific instance of ASTContext
@@ -59,6 +65,9 @@ private:
   // Swift and Clang module loaders acting as scanners.
   std::unique_ptr<ModuleInterfaceLoader> swiftScannerModuleLoader;
   std::unique_ptr<ClangImporter> clangScannerModuleLoader;
+  // CAS instance.
+  std::shared_ptr<llvm::cas::ObjectStore> CAS;
+  std::shared_ptr<llvm::cas::ActionCache> ActionCache;
   // Restrict access to the parent scanner class.
   friend class ModuleDependencyScanner;
 };
@@ -116,10 +125,9 @@ private:
   resolveAllClangModuleDependencies(ArrayRef<ModuleDependencyID> swiftModules,
                                     ModuleDependenciesCache &cache,
                                     ModuleDependencyIDSetVector &discoveredClangModules);
-  void
-  resolveHeaderDependencies(ArrayRef<ModuleDependencyID> swiftModules,
-                            ModuleDependenciesCache &cache,
-                            ModuleDependencyIDSetVector &discoveredHeaderDependencyClangModules);
+  void resolveHeaderDependencies(
+      ArrayRef<ModuleDependencyID> swiftModules, ModuleDependenciesCache &cache,
+      ModuleDependencyIDSetVector &discoveredHeaderDependencyClangModules);
   void
   resolveSwiftOverlayDependencies(ArrayRef<ModuleDependencyID> swiftModules,
                                   ModuleDependenciesCache &cache,
@@ -150,6 +158,12 @@ private:
       StringRef mainModuleName, ArrayRef<ModuleDependencyID> allDependencies,
       ModuleDependenciesCache &cache,
       llvm::function_ref<void(ModuleDependencyID)> action);
+
+  /// Performance BridgingHeader Chaining.
+  llvm::Error
+  performBridgingHeaderChaining(const ModuleDependencyID &rootModuleID,
+                                ModuleDependenciesCache &cache,
+                                ModuleDependencyIDSetVector &allModules);
 
   /// Perform an operation utilizing one of the Scanning workers
   /// available to this scanner.

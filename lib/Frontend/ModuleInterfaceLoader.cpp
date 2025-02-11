@@ -2250,9 +2250,6 @@ InterfaceSubContextDelegateImpl::runInSubCompilerInstance(StringRef moduleName,
 
   info.BuildArguments = BuildArgs;
   info.Hash = CacheHash;
-  auto target = *(std::find(BuildArgs.rbegin(), BuildArgs.rend(), "-target") - 1);
-  auto langVersion = *(std::find(BuildArgs.rbegin(), BuildArgs.rend(),
-                                 "-swift-version") - 1);
 
   // Run the action under the sub compiler instance.
   return action(info);

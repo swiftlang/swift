@@ -1,8 +1,8 @@
-// RUN: %target-sil-opt -test-runner %s \
+// RUN: %target-sil-opt %s \
 // RUN:     -diagnostics -sil-verify-all \
 // RUN:     -enable-experimental-feature LifetimeDependence \
 // RUN:     -enable-experimental-feature Span \
-// RUN:     2>&1 | %FileCheck %s
+// RUN:     | %FileCheck %s
 
 // Test SIL expected from SILGen output. Run all diagnostic passes which includes lifetime dependence handling:
 // -lifetime-dependence-insertion

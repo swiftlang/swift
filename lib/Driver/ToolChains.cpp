@@ -204,8 +204,16 @@ void ToolChain::addCommonFrontendArgs(const OutputInfo &OI,
     arguments.push_back("-disable-objc-interop");
   }
 
-  if (const Arg *arg = inputArgs.getLastArg(
-        options::OPT_experimental_serialize_debug_info)) {
+  if (Triple.isOSOpenBSD() && Triple.getArch() == llvm::Triple::aarch64) {
+    arguments.push_back("-Xcc");
+    arguments.push_back("-Xclang=-mbranch-target-enforce");
+    arguments.push_back("-Xcc");
+    arguments.push_back("-Xclang=-msign-return-address=non-leaf");
+    arguments.push_back("-Xcc");
+    arguments.push_back("-Xclang=-msign-return-address-key=a_key");
+  }
+
+  if (inputArgs.getLastArg(options::OPT_experimental_serialize_debug_info)) {
     arguments.push_back(
         inputArgs.MakeArgString(Twine("-experimental-serialize-debug-info")));
   }

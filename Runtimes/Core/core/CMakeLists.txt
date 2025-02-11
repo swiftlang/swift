@@ -283,8 +283,7 @@ target_compile_options(swiftCore PRIVATE
   "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xfrontend -group-info-path -Xfrontend ${CMAKE_CURRENT_SOURCE_DIR}/GroupInfo.json>"
   "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xfrontend -disable-autolinking-runtime-compatibility-concurrency>"
   "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xfrontend -disable-objc-attr-requires-foundation-module>"
-  "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xfrontend -require-explicit-availability=ignore>"
-  "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xfrontend -prespecialize-generic-metadata>")
+  "$<$<COMPILE_LANGUAGE:Swift>:SHELL:-Xfrontend -require-explicit-availability=ignore>")
 
 if(NOT "${CMAKE_BUILD_TYPE}" STREQUAL "MinSizeRel")
   # Using these in MinSizeRel would result in a 15% increase in the binary size
@@ -307,7 +306,8 @@ target_link_libraries(swiftCore
     swiftDemangling
     swiftShims
     swiftStdlibStubs
-    swiftThreading)
+    swiftThreading
+    $<$<NOT:$<PLATFORM_ID:Darwin>>:swiftrt$<$<PLATFORM_ID:Windows>:T>>)
 target_link_options(swiftCore PRIVATE
   -nostartfiles)
 if(NOT POLICY CMP0157)
@@ -319,9 +319,7 @@ if(NOT POLICY CMP0157)
     $<TARGET_OBJECTS:swiftThreading>)
 endif()
 
-if(WIN32)
-  target_link_libraries(swiftCore PRIVATE shell32 DbgHelp Synchronization)
-elseif(NOT APPLE AND NOT LINUX AND NOT ANDROID AND UNIX)
+if(NOT ANDROID AND NOT APPLE AND NOT LINUX AND NOT WIN32 AND UNIX)
   find_library(EXECINFO_LIBRARY execinfo)
   target_link_libraries(swiftCore PRIVATE "${EXECINFO_LIBRARY}")
 endif()

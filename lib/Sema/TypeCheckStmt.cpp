@@ -409,7 +409,7 @@ unsigned LocalDiscriminatorsRequest::evaluate(
   ASTContext &ctx = dc->getASTContext();
 
   // Autoclosures aren't their own contexts; look to the parent instead.
-  if (auto autoclosure = dyn_cast<AutoClosureExpr>(dc)) {
+  if (isa<AutoClosureExpr>(dc)) {
     return evaluateOrDefault(evaluator,
                              LocalDiscriminatorsRequest{dc->getParent()}, 0);
   }
@@ -1123,6 +1123,7 @@ public:
       auto exprToCheck = yieldExprs[i];
 
       InOutExpr *inout = nullptr;
+      UnsafeExpr *unsafeExpr = nullptr;
 
       // Classify whether we're yielding by reference or by value.
       ContextualTypePurpose contextTypePurpose;
@@ -1130,6 +1131,11 @@ public:
       if (yieldResults[i].isInOut()) {
         contextTypePurpose = CTP_YieldByReference;
         contextType = LValueType::get(contextType);
+
+        // If present, remove an enclosing 'unsafe' expression.
+        unsafeExpr = dyn_cast<UnsafeExpr>(exprToCheck);
+        if (unsafeExpr)
+          exprToCheck = unsafeExpr->getSubExpr();
 
         // Check that the yielded expression is a &.
         if ((inout = dyn_cast<InOutExpr>(exprToCheck))) {
@@ -1156,6 +1162,13 @@ public:
         inout->setSubExpr(exprToCheck);
         inout->setType(InOutType::get(yieldType));
         exprToCheck = inout;
+      }
+
+      // Propagate the change to the unsafe expression we stripped before.
+      if (unsafeExpr) {
+        unsafeExpr->setSubExpr(exprToCheck);
+        unsafeExpr->setType(exprToCheck->getType());
+        exprToCheck = unsafeExpr;
       }
 
       // Note that this modifies the statement's expression list in-place.
@@ -1225,7 +1238,7 @@ public:
       if (auto decl = outerDC->getAsDecl()) {
         ctx.Diags.diagnose(DS->getDiscardLoc(), diag::discard_wrong_context_decl,
                            decl->getDescriptiveKind());
-      } else if (auto clos = dyn_cast<AbstractClosureExpr>(outerDC)) {
+      } else if (isa<AbstractClosureExpr>(outerDC)) {
         ctx.Diags.diagnose(DS->getDiscardLoc(),
                            diag::discard_wrong_context_closure);
       } else {
@@ -2396,7 +2409,7 @@ bool TypeCheckASTNodeAtLocRequest::evaluate(
         auto i = patternInit->getBindingIndex();
         PBD->getPattern(i)->forEachVariable(
             [](VarDecl *VD) { (void)VD->getInterfaceType(); });
-        if (auto Init = PBD->getInit(i)) {
+        if (PBD->getInit(i)) {
           if (!PBD->isInitializerChecked(i)) {
             typeCheckPatternBinding(PBD, i);
             // Retrieve the accessor's body to trigger RecontextualizeClosures
@@ -2757,7 +2770,7 @@ PreCheckFunctionBodyRequest::evaluate(Evaluator &evaluator,
   // For constructors, we make sure that the body ends with a "return"
   // stmt, which we either implicitly synthesize, or the user can write.
   // This simplifies SILGen.
-  if (auto *ctor = dyn_cast<ConstructorDecl>(AFD)) {
+  if (isa<ConstructorDecl>(AFD)) {
     if (body->empty() || !isKnownEndOfConstructor(body->getLastElement())) {
       SmallVector<ASTNode, 8> Elts(body->getElements().begin(),
                                    body->getElements().end());
