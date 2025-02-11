@@ -1767,6 +1767,31 @@ static void swift_task_removeCancellationHandlerImpl(
 }
 
 SWIFT_CC(swift)
+static EscalationNotificationStatusRecord*
+swift_task_addPriorityEscalationHandlerImpl(
+    EscalationNotificationStatusRecord::FunctionType handler,
+    void *context) {
+  void *allocation =
+      swift_task_alloc(sizeof(EscalationNotificationStatusRecord));
+  auto unsigned_handler = swift_auth_code(handler, 62877);
+  auto *record = ::new (allocation)
+      EscalationNotificationStatusRecord(handler, context);
+
+  addStatusRecordToSelf(record, [&](ActiveTaskStatus oldStatus, ActiveTaskStatus& newStatus) {
+    return true;
+  });
+
+  return record;
+}
+
+SWIFT_CC(swift)
+static void swift_task_removePriorityEscalationHandlerImpl(
+    EscalationNotificationStatusRecord *record) {
+  removeStatusRecordFromSelf(record);
+  swift_task_dealloc(record);
+}
+
+SWIFT_CC(swift)
 static NullaryContinuationJob*
 swift_task_createNullaryContinuationJobImpl(
     size_t priority,
