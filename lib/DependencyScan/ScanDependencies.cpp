@@ -93,7 +93,7 @@ public:
       auto swiftTextualDeps = resolvingDepInfo.getAsSwiftInterfaceModule();
       auto &interfacePath = swiftTextualDeps->swiftInterfaceFile;
       auto SDKPath = instance.getASTContext().SearchPathOpts.getSDKPath();
-      nameExpander = std::make_unique<InterfaceModuleNameExpander>(
+      outputPathResolver = std::make_unique<InterfaceModuleOutputPathResolver>(
           moduleID.ModuleName, interfacePath, SDKPath,
           instance.getInvocation());
     }
@@ -178,13 +178,13 @@ public:
       }
     }
 
-    pruneUnusedVFSOverlay();
-
     // It is necessary to update the command line to take
     // the pruned unused VFS overlay into account before remapping the
     // command line.
-    if (resolvingDepInfo.isSwiftInterfaceModule())
-      updateSwiftInterfaceCommandLine();
+    if (resolvingDepInfo.isSwiftInterfaceModule()) {
+      pruneUnusedVFSOverlay();
+      updateSwiftInterfaceModuleOutputPath();
+    }
 
     // Update the dependency in the cache with the modified command-line.
     if (resolvingDepInfo.isSwiftInterfaceModule() ||
@@ -236,8 +236,8 @@ private:
         return err;
     }
 
-    if (nameExpander) {
-      auto expandedName = nameExpander->getExpandedName();
+    if (outputPathResolver) {
+      auto expandedName = outputPathResolver->getOutputPath();
       depInfo.updateModuleOutputPath(expandedName.outputPath.c_str());
       depInfo.updateContextHash(expandedName.hash.str());
     }
@@ -427,43 +427,45 @@ private:
     // Filter the extra args that we use to calculate the hash of the module.
     // The key assumption is that these args are clang importer args, so we
     // do not need to check for -Xcc.
-    auto extraArgsFilter = [&](InterfaceModuleNameExpander::ArgListTy &args) {
-      bool skip = false;
-      InterfaceModuleNameExpander::ArgListTy newArgs;
-      for (auto it = args.begin(), end = args.end(); it != end; it++) {
-        if (skip) {
-          skip = false;
-          continue;
-        }
+    auto extraArgsFilter =
+        [&](InterfaceModuleOutputPathResolver::ArgListTy &args) {
+          bool skip = false;
+          InterfaceModuleOutputPathResolver::ArgListTy newArgs;
+          for (auto it = args.begin(), end = args.end(); it != end; it++) {
+            if (skip) {
+              skip = false;
+              continue;
+            }
 
-        if ((it + 1) != end && isVFSOverlayFlag(*it)) {
-          if (!usedVFSOverlayPaths.contains(*(it + 1))) {
-            skip = true;
-            continue;
+            if ((it + 1) != end && isVFSOverlayFlag(*it)) {
+              if (!usedVFSOverlayPaths.contains(*(it + 1))) {
+                skip = true;
+                continue;
+              }
+            }
+
+            newArgs.push_back(*it);
           }
-        }
+          args = std::move(newArgs);
+          return;
+        };
 
-        newArgs.push_back(*it);
-      }
-      args = std::move(newArgs);
-      return;
-    };
-
-    if (nameExpander)
-      nameExpander->pruneExtraArgs(extraArgsFilter);
+    if (outputPathResolver)
+      outputPathResolver->pruneExtraArgs(extraArgsFilter);
 
     commandline = std::move(resolvedCommandLine);
   }
 
-  void updateSwiftInterfaceCommandLine() {
+  void updateSwiftInterfaceModuleOutputPath() {
     // The command line needs update once we prune the unused VFS overlays.
     // The update consists of two steps.
     // 1. Obtain the output path, which includes the module hash that takes the
     // VFS pruning into account.
     // 2. Update `-o `'s value on the command line with the new output path.
 
-    assert(nameExpander && "Can only update if we hae a nameExpander.");
-    const auto &expandedName = nameExpander->getExpandedName();
+    assert(outputPathResolver &&
+           "Can only update if we have an outputPathResolver.");
+    const auto &expandedName = outputPathResolver->getOutputPath();
 
     StringRef outputName = expandedName.outputPath.str();
 
@@ -603,7 +605,7 @@ private:
   ModuleDependenciesCache &cache;
   CompilerInstance &instance;
   const ModuleDependencyInfo &resolvingDepInfo;
-  std::unique_ptr<InterfaceModuleNameExpander> nameExpander;
+  std::unique_ptr<InterfaceModuleOutputPathResolver> outputPathResolver;
 
   std::optional<SwiftDependencyTracker> tracker;
   std::vector<std::string> rootIDs;

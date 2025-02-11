@@ -1098,9 +1098,9 @@ class ModuleInterfaceLoaderImpl {
         requiresOSSAModules);
 
     // Compute the output path if we're loading or emitting a cached module.
-    auto expandedName = astDelegate.getCachedOutputPath(
+    auto resolvedOutputPath = astDelegate.getCachedOutputPath(
         moduleName, interfacePath, ctx.SearchPathOpts.getSDKPath());
-    auto &cachedOutputPath = expandedName.outputPath;
+    auto &cachedOutputPath = resolvedOutputPath.outputPath;
 
     // Try to find the right module for this interface, either alongside it,
     // in the cache, or in the prebuilt cache.
@@ -2005,13 +2005,13 @@ InterfaceSubContextDelegateImpl::InterfaceSubContextDelegateImpl(
 
 /// Calculate an output filename in \p genericSubInvocation's cache path that
 /// includes a hash of relevant key data.
-InterfaceModuleNameExpander::ResultTy
+InterfaceModuleOutputPathResolver::ResultTy
 InterfaceSubContextDelegateImpl::getCachedOutputPath(StringRef moduleName,
                                                      StringRef interfacePath,
                                                      StringRef sdkPath) {
-  InterfaceModuleNameExpander expander(moduleName, interfacePath, sdkPath,
-                                       genericSubInvocation);
-  return expander.getExpandedName();
+  InterfaceModuleOutputPathResolver resolver(moduleName, interfacePath, sdkPath,
+                                             genericSubInvocation);
+  return resolver.getOutputPath();
 }
 
 std::error_code
@@ -2090,11 +2090,12 @@ InterfaceSubContextDelegateImpl::runInSubCompilerInstance(StringRef moduleName,
   }
 
   // Calculate output path of the module.
-  auto expandedName = getCachedOutputPath(moduleName, interfacePath, sdkPath);
+  auto resolvedOutputPath =
+      getCachedOutputPath(moduleName, interfacePath, sdkPath);
 
   // If no specific output path is given, use the hashed output path.
   if (outputPath.empty()) {
-    outputPath = expandedName.outputPath;
+    outputPath = resolvedOutputPath.outputPath;
   }
 
   // Configure the outputs in front-end options. There must be an equal number of
@@ -2148,7 +2149,7 @@ InterfaceSubContextDelegateImpl::runInSubCompilerInstance(StringRef moduleName,
   }
 
   info.BuildArguments = BuildArgs;
-  info.Hash = expandedName.hash;
+  info.Hash = resolvedOutputPath.hash;
 
   // Run the action under the sub compiler instance.
   return action(info);
@@ -2743,22 +2744,22 @@ std::unique_ptr<ExplicitCASModuleLoader> ExplicitCASModuleLoader::create(
   return result;
 }
 
-InterfaceModuleNameExpander::ResultTy
-InterfaceModuleNameExpander::getExpandedName() {
-  if (!expandedName) {
-    expandedName = std::make_unique<ResultTy>();
-    auto &outputPath = expandedName->outputPath;
+InterfaceModuleOutputPathResolver::ResultTy
+InterfaceModuleOutputPathResolver::getOutputPath() {
+  if (!resolvedOutputPath) {
+    resolvedOutputPath = std::make_unique<ResultTy>();
+    auto &outputPath = resolvedOutputPath->outputPath;
     outputPath = CI.getClangModuleCachePath();
     llvm::sys::path::append(outputPath, moduleName);
     outputPath.append("-");
     auto hashStart = outputPath.size();
     outputPath.append(getHash());
-    expandedName->hash = outputPath.str().substr(hashStart);
+    resolvedOutputPath->hash = outputPath.str().substr(hashStart);
     outputPath.append(".");
     auto outExt = file_types::getExtension(file_types::TY_SwiftModuleFile);
     outputPath.append(outExt);
   }
-  return *expandedName;
+  return *resolvedOutputPath;
 }
 
 /// Construct a key for the .swiftmodule being generated. There is a
@@ -2771,7 +2772,7 @@ InterfaceModuleNameExpander::getExpandedName() {
 /// -- rather than making a new one and potentially filling up the cache
 /// with dead entries -- when other factors change, such as the contents of
 /// the .swiftinterface input or its dependencies.
-std::string InterfaceModuleNameExpander::getHash() {
+std::string InterfaceModuleOutputPathResolver::getHash() {
   // When doing dependency scanning for explicit module, use strict context hash
   // to ensure sound module hash.
   bool useStrictCacheHash = CI.getFrontendOptions().RequestedAction ==
@@ -2841,7 +2842,9 @@ std::string InterfaceModuleNameExpander::getHash() {
   return llvm::toString(llvm::APInt(64, H), 36, /*Signed=*/false);
 }
 
-void InterfaceModuleNameExpander::pruneExtraArgs(
+void InterfaceModuleOutputPathResolver::pruneExtraArgs(
     std::function<void(ArgListTy &)> filter) {
+  assert(!resolvedOutputPath &&
+         "Cannot prune again after the output path has been resolved.");
   filter(extraArgs);
 }

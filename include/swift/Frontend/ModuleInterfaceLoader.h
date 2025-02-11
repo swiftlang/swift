@@ -639,7 +639,7 @@ struct SwiftInterfaceInfo {
 /// then prune the extra args, and finally obtain expandedName again.
 /// Pruning always happens before the first time we call getExpandedName().
 /// Therefore it is correct to calculate expandedName only once.
-class InterfaceModuleNameExpander {
+class InterfaceModuleOutputPathResolver {
 public:
   using ArgListTy = std::vector<std::string>;
   struct ResultTy {
@@ -660,19 +660,19 @@ private:
   // and see pruneExtraArgs to see how it can be updated.
   ArgListTy extraArgs;
 
-  std::unique_ptr<ResultTy> expandedName;
+  std::unique_ptr<ResultTy> resolvedOutputPath;
 
   std::string getHash();
 
 public:
-  InterfaceModuleNameExpander(const StringRef moduleName,
-                              const StringRef interfacePath,
-                              const StringRef sdkPath,
-                              const CompilerInvocation &CI)
+  InterfaceModuleOutputPathResolver(const StringRef moduleName,
+                                    const StringRef interfacePath,
+                                    const StringRef sdkPath,
+                                    const CompilerInvocation &CI)
       : moduleName(moduleName), interfacePath(interfacePath), sdkPath(sdkPath),
         CI(CI), extraArgs(CI.getClangImporterOptions()
                               .getReducedExtraArgsForSwiftModuleDependency()) {}
-  ResultTy getExpandedName();
+  ResultTy getOutputPath();
   void pruneExtraArgs(std::function<void(ArgListTy &)> filter);
 };
 
@@ -751,7 +751,7 @@ public:
   ~InterfaceSubContextDelegateImpl() = default;
 
   /// includes a hash of relevant key data.
-  InterfaceModuleNameExpander::ResultTy
+  InterfaceModuleOutputPathResolver::ResultTy
   getCachedOutputPath(StringRef moduleName, StringRef interfacePath,
                       StringRef sdkPath);
 };
