@@ -1081,6 +1081,12 @@ MemoryBehavior SILInstruction::getMemoryBehavior() const {
     llvm_unreachable("Covered switch isn't covered?!");
   }
   
+  if (auto *mdi = dyn_cast<MarkDependenceInst>(this)) {
+    if (mdi->getBase()->getType().isAddress())
+      return MemoryBehavior::MayRead;
+    return MemoryBehavior::None;
+  }
+  
   // TODO: An UncheckedTakeEnumDataAddr instruction has no memory behavior if
   // it is nondestructive. Setting this currently causes LICM to miscompile
   // because access paths do not account for enum projections.

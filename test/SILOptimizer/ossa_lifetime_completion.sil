@@ -216,11 +216,12 @@ bb3:
 }
 
 // Ensure no assert fires while handling lifetime end of partial_apply
-sil [ossa] @testPartialApplyStack2 : $@convention(thin) (@guaranteed C) -> () {
-bb0(%0 : @guaranteed $C):
+sil [ossa] @testPartialApplyStack2 : $@convention(thin) (@owned C) -> () {
+bb0(%0 : @owned $C):
   specify_test "ossa_lifetime_completion @instruction[1] availability"
   %2 = alloc_stack $C
   %3 = copy_value %0 : $C
+  store %0 to [init] %2
   %4 = begin_borrow %3 : $C
   %5 = function_ref @foo : $@convention(thin) (@guaranteed C) -> ()
   %6 = partial_apply [callee_guaranteed] [on_stack] %5(%4) : $@convention(thin) (@guaranteed C) -> ()
@@ -228,6 +229,7 @@ bb0(%0 : @guaranteed $C):
   destroy_value %7 : $@noescape @callee_guaranteed () -> ()
   end_borrow %4 : $C
   destroy_value %3 : $C
+  destroy_addr %2 : $*C
   dealloc_stack %2 : $*C
   %12 = tuple ()
   return %12 : $()

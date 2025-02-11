@@ -792,3 +792,20 @@ bb0(%0: $*Inner):
   return %r : $()
 }
 
+// CHECK: SIL memory lifetime failure in @mark_dependence_uninit_base: memory is not initialized, but should be
+sil [ossa] @mark_dependence_uninit_base : $@convention(thin) (@owned T, @owned Inner) -> @owned Inner {
+bb0(%0 : @owned $T, %1 : @owned $Inner):
+  %2 = alloc_stack $T
+  store %0 to [init] %2
+  %4 = alloc_stack $Inner
+  store %1 to [init] %4
+  destroy_addr %2
+  %6 = mark_dependence %4 on %2
+  %7 = begin_access [read] [dynamic] %6
+  %8 = load [take] %7
+  end_access %7
+  dealloc_stack %4
+  dealloc_stack %2
+  return %8
+}
+
