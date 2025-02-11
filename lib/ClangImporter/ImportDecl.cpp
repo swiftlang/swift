@@ -3946,6 +3946,9 @@ namespace {
           }
           if (selfIdx) {
             func->setSelfIndex(selfIdx.value());
+            if (Impl.SwiftContext.LangOpts.hasFeature(
+                    Feature::AddressableParameters))
+              func->getImplicitSelfDecl()->setAddressable();
           } else {
             func->setStatic();
             func->setImportAsStaticMember();
