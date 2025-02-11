@@ -1804,3 +1804,31 @@ class TestLazyLocal {
     }
   }
 }
+
+class TestExtensionOnOptionalSelf {
+   init() {}
+ }
+
+ extension TestExtensionOnOptionalSelf? {
+   func foo() {
+     _ = { [weak self] in // expected-warning {{variable 'self' was written to, but never read}}
+       foo() // expected-error {{call to method 'foo' in closure requires explicit use of 'self' to make capture semantics explicit}}
+     }
+
+     _ = {
+       foo()
+     }
+
+     _ = { [weak self] in // expected-warning {{variable 'self' was written to, but never read}}
+       _ = {
+         foo()
+       }
+     }
+
+     _ = { [weak self] in
+       _ = { [self] in // expected-warning {{capture 'self' was never used}}
+         foo()
+       }
+     }
+   }
+ }
