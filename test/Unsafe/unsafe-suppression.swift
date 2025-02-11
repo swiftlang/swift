@@ -143,3 +143,15 @@ var yieldUnsafeOkay: Int {
     yield unsafe &x
   }
 }
+
+struct UnsafeSequence: @unsafe IteratorProtocol, @unsafe Sequence {
+  @unsafe func next() -> Int? { nil }
+}
+
+func forEachLoop(us: UnsafeSequence) {
+  for _ in us { } // expected-warning{{expression uses unsafe constructs but is not marked with 'unsafe' [Unsafe]}}{{12-12=unsafe }}
+  // expected-note@-1{{@unsafe conformance of 'UnsafeSequence' to protocol 'Sequence' involves unsafe code}}
+  // expected-note@-2{{reference to unsafe instance method 'next()'}}
+
+  for _ in unsafe us { }
+}
