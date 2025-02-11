@@ -350,9 +350,8 @@ void swift_task_enqueueGlobalWithDeadlineImpl(long long sec,
 
   job->schedulerPrivate[SwiftJobDispatchQueueIndex] =
       DISPATCH_QUEUE_GLOBAL_EXECUTOR;
-
-  uint64_t deadline = sec * NSEC_PER_SEC + nsec;
-  dispatch_time_t when = clock_and_value_to_time(clock, deadline);
+  
+  dispatch_time_t when = clock_and_value_to_time(clock, sec, nsec);
   
   if (tnsec != -1) {
     uint64_t leeway = tsec * NSEC_PER_SEC + tnsec;
