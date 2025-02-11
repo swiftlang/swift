@@ -7717,8 +7717,6 @@ void SILGlobalVariable::verify() const {
       assert(!init->use_empty() && "dead instruction in static initializer");
       assert(!isa<ObjectInst>(init) &&
              "object instruction is only allowed for final initial value");
-      assert(!isa<VectorInst>(init) &&
-             "vector instruction is only allowed for final initial value");
     }
     assert(I.getParent() == &StaticInitializerBlock);
   }
