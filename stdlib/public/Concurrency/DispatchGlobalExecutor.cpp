@@ -295,7 +295,11 @@ platform_time(uint64_t nsec) {
 
 static inline dispatch_time_t
 clock_and_value_to_time(int clock, long long sec, long long nsec) {
-  uint64_t deadline = sec * NSEC_PER_SEC + nsec;
+  uint64_t deadline;
+  if (__builtin_mul_overflow(sec, NSEC_PER_SEC, &deadline)
+      || __builtin_add_overflow(nsec, deadline, &deadline)) {
+    deadline = UINT64_MAX;
+  }
   uint64_t value = platform_time((uint64_t)deadline);
   if (value >= DISPATCH_TIME_MAX_VALUE) {
     return DISPATCH_TIME_FOREVER;
@@ -340,13 +344,7 @@ void swift_dispatchEnqueueWithDeadline(bool global,
     job->schedulerPrivate[SwiftJobDispatchQueueIndex] = queue;
   }
 
-  uint64_t deadline;
-  if (__builtin_mul_overflow(sec, NSEC_PER_SEC, &deadline)
-      || __builtin_add_overflow(nsec, deadline, &deadline)) {
-    deadline = UINT64_MAX;
-  }
-
-  dispatch_time_t when = clock_and_value_to_time(clock, deadline);
+  dispatch_time_t when = clock_and_value_to_time(clock, sec, nsec);
 
   if (tnsec != -1) {
     uint64_t leeway;
