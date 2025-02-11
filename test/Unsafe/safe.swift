@@ -89,7 +89,7 @@ func returnsExistentialP() -> any P {
 
 // FIXME: Should work even if the IteratorProtocol conformance is safe
 struct UnsafeAsSequence: @unsafe Sequence, @unsafe IteratorProtocol {
-  mutating func next() -> Int? { nil }
+  @unsafe mutating func next() -> Int? { nil }
 }
 
 func testUnsafeAsSequenceForEach() {
