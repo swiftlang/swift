@@ -563,12 +563,18 @@ void GetWindowsFileMappings(
     // __msvc_bit_utils.hpp was added in a recent VS 2022 version. It has to be
     // referenced from the modulemap directly to avoid modularization errors.
     // Older VS versions might not have it. Let's inject an empty header file if
-    // it isn't available.
-    llvm::sys::path::remove_filename(VCToolsInjection);
-    llvm::sys::path::append(VCToolsInjection, "__msvc_bit_utils.hpp");
-    if (!llvm::sys::fs::exists(VCToolsInjection))
-      fileMapping.overridenFiles.emplace_back(std::string(VCToolsInjection),
-                                              "");
+    // it isn't available. Same applies to a few more headers.
+    ArrayRef<StringRef> headersToInjectIfAbsent = {
+        "__msvc_bit_utils.hpp",
+        "__msvc_string_view.hpp",
+    };
+    for (auto headerToInject : headersToInjectIfAbsent) {
+      llvm::sys::path::remove_filename(VCToolsInjection);
+      llvm::sys::path::append(VCToolsInjection, headerToInject);
+      if (!llvm::sys::fs::exists(VCToolsInjection))
+        fileMapping.overridenFiles.emplace_back(std::string(VCToolsInjection),
+                                                "");
+    }
   }
 }
 } // namespace
