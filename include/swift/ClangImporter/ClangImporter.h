@@ -809,6 +809,10 @@ public:
   void setUnavailableIfNecessary(const ValueDecl *baseDecl,
                                  ValueDecl *clonedDecl);
 
+  friend llvm::hash_code
+  hash_value(const ClangInheritanceInfo &info) {
+    return llvm::hash_combine(info.cumulativeAccess, info.nestedPrivate);
+  }
 private:
   static clang::AccessSpecifier
   computeCumulativeAccess(ClangInheritanceInfo prev,
