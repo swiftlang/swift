@@ -8709,7 +8709,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyConformsToConstraint(
     auto anchor = loc->getAnchor();
     auto arrayLiteral = getAsExpr<ArrayExpr>(anchor);
 
-    // If we're attempting to bind an array literal to a n'InlineArray'
+    // If we're attempting to bind an array literal to an 'InlineArray'
     // parameter, then check if the counts are equal and solve.
     if (kind == ConstraintKind::LiteralConformsTo &&
         protocol == arrayLiteralProto &&
