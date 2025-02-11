@@ -16,6 +16,9 @@
 
 // RUN: %swift_driver -print-target-info -target x86_64-apple-ios12.0 | %FileCheck -check-prefix CHECK-IOS-SIM %s
 
+// RUN: %swift_frontend_plain -target thumbv7-unknown-windows-msvc -print-target-info | %FileCheck -check-prefix CHECK-PTR-SIZE-32 %s
+// RUN: %swift_frontend_plain -target aarch64-unknown-windows-msvc -print-target-info | %FileCheck -check-prefix CHECK-PTR-SIZE-64 %s
+
 // CHECK-IOS:   "compilerVersion": "{{.*}}Swift version
 
 // CHECK-IOS:   "target": {
@@ -107,3 +110,15 @@
 // CHECK-IOS-SIM:     "swiftRuntimeCompatibilityVersion": "5.0",
 // CHECK-IOS-SIM:     "librariesRequireRPath": true
 // CHECK-IOS-SIM:   }
+
+// CHECK-PTR-SIZE-32: "target": {
+// CHECK-PTR-SIZE-32:   "triple": "thumbv7-unknown-windows-msvc",
+// CHECK-PTR-SIZE-32:   "pointerWidthInBits": 32,
+// CHECK-PTR-SIZE-32:   "pointerWidthInBytes": 4,
+// CHECK-PTR-SIZE-32: }
+
+// CHECK-PTR-SIZE-64: "target": {
+// CHECK-PTR-SIZE-64:   "triple": "aarch64-unknown-windows-msvc",
+// CHECK-PTR-SIZE-64:   "pointerWidthInBits": 64,
+// CHECK-PTR-SIZE-64:   "pointerWidthInBytes": 8,
+// CHECK-PTR-SIZE-64: }
