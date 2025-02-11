@@ -6,8 +6,8 @@ let a: InlineArray = [1, 2, 3] // Ok, InlineArray<3, Int>
 let b: InlineArray<_, Int> = [1, 2, 3] // Ok, InlineArray<3, Int>
 let c: InlineArray<3, _> = [1, 2, 3] // Ok, InlineArray<3, Int>
 
-let d: InlineArray<2, _> = [1, 2, 3] // expected-error {{expected '2' elements in slab literal, but got '3'}}
-let e: InlineArray<2, _> = [1] // expected-error {{expected '2' elements in slab literal, but got '1'}}
+let d: InlineArray<2, _> = [1, 2, 3] // expected-error {{expected '2' elements in inline array literal, but got '3'}}
+let e: InlineArray<2, _> = [1] // expected-error {{expected '2' elements in inline array literal, but got '1'}}
 
 let f: InlineArray<_, Int> = ["hello"] // expected-error {{cannot convert value of type 'String' to expected element type 'Int'}}
 
