@@ -87,8 +87,9 @@ func returnsExistentialP() -> any P {
   // expected-note@-1{{@unsafe conformance of 'Int' to protocol 'P' involves unsafe code}}
 }
 
-struct UnsafeAsSequence: @unsafe Sequence, IteratorProtocol {
-  mutating func next() -> Int? { nil }
+// FIXME: Should work even if the IteratorProtocol conformance is safe
+struct UnsafeAsSequence: @unsafe Sequence, @unsafe IteratorProtocol {
+  @unsafe mutating func next() -> Int? { nil }
 }
 
 func testUnsafeAsSequenceForEach() {
@@ -96,6 +97,7 @@ func testUnsafeAsSequenceForEach() {
 
   // expected-warning@+1{{expression uses unsafe constructs but is not marked with 'unsafe'}}{{12-12=unsafe }}
   for _ in uas { } // expected-note{{conformance}}
+  // expected-note@-1{{reference}}
 
   for _ in unsafe uas { } // okay
 }
