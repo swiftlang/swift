@@ -5,9 +5,6 @@
 
 // REQUIRES: executable_test
 
-// TODO: test failed in Windows PR testing: rdar://144384453
-// UNSUPPORTED: OS=windows-msvc
-
 import StdlibUnittest
 import CxxStdlib
 import StdStringView
