@@ -1301,8 +1301,7 @@ public:
   void mapAsyncParameters(FunctionPointer fnPtr) override {
     llvm::Value *dynamicContextSize32;
     std::tie(calleeFunction, dynamicContextSize32) = getAsyncFunctionAndSize(
-        subIGF, origType->getRepresentation(), fnPtr, nullptr,
-        std::make_pair(true, true));
+        subIGF, fnPtr, nullptr, std::make_pair(true, true));
     auto *dynamicContextSize =
         subIGF.Builder.CreateZExt(dynamicContextSize32, subIGF.IGM.SizeTy);
     calleeContextBuffer =

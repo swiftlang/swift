@@ -2514,9 +2514,8 @@ llvm::Value *emitIndirectAsyncFunctionPointer(IRGenFunction &IGF,
 }
 
 std::pair<llvm::Value *, llvm::Value *> irgen::getAsyncFunctionAndSize(
-    IRGenFunction &IGF, SILFunctionTypeRepresentation representation,
-    FunctionPointer functionPointer, llvm::Value *thickContext,
-    std::pair<bool, bool> values) {
+    IRGenFunction &IGF, FunctionPointer functionPointer,
+    llvm::Value *thickContext, std::pair<bool, bool> values) {
   assert(values.first || values.second);
   assert(functionPointer.getKind() != FunctionPointer::Kind::Function);
 
@@ -2960,8 +2959,7 @@ public:
 
     llvm::Value *dynamicContextSize32;
     std::tie(calleeFunction, dynamicContextSize32) = getAsyncFunctionAndSize(
-        IGF, CurCallee.getOrigFunctionType()->getRepresentation(),
-        CurCallee.getFunctionPointer(), thickContext);
+        IGF, CurCallee.getFunctionPointer(), thickContext);
     auto *dynamicContextSize =
         IGF.Builder.CreateZExt(dynamicContextSize32, IGF.IGM.SizeTy);
     if (auto staticSize = dyn_cast<llvm::ConstantInt>(dynamicContextSize)) {
