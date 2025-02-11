@@ -1840,16 +1840,14 @@ public:
       return selfDeclAllowsImplicitSelf510(DRE, ty, inClosure);
 
     return selfDeclAllowsImplicitSelf(DRE->getDecl(), ty, inClosure,
-                                      /*validateParentClosures:*/ true,
-                                      /*validateSelfRebindings:*/ true);
+                                      /*isValidatingParentClosures:*/ false);
   }
 
   /// Whether or not implicit self is allowed for this implicit self decl
   static bool selfDeclAllowsImplicitSelf(const ValueDecl *selfDecl,
                                          const Type captureType,
                                          const AbstractClosureExpr *inClosure,
-                                         bool validateParentClosures,
-                                         bool validateSelfRebindings) {
+                                         bool isValidatingParentClosures) {
     ASTContext &ctx = inClosure->getASTContext();
 
     auto requiresSelfQualification =
@@ -1883,26 +1881,30 @@ public:
       }
     }
 
-    // If the self decl comes from a conditional statement, validate
-    // that it is an allowed `guard let self` or `if let self` condition.
+    // If the self decl refers to a weak capture, then implicit self is not
+    // allowed. Self must be unwrapped in a `guard let self` / `if let self`
+    // condition first. This is usually enforced by the type checker, but
+    // isn't in some cases (e.g. when calling a method on `Optional<Self>`).
+    //  - When validating implicit self usage in a nested closure, it's not
+    //    necessary for self to be unwrapped in this parent closure. If self
+    //    isn't unwrapped correctly in the nested closure, we would have
+    //    already noticed when validating that closure.
+    if (selfDecl->getInterfaceType()->is<WeakStorageType>() &&
+        !isValidatingParentClosures) {
+      return false;
+    }
+
+    // If the self decl refers to an invalid unwrapping conditon like
+    // `guard let self = somethingOtherThanSelf`, then implicit self is always
+    // disallowed.
     //  - Even if this closure doesn't have a `weak self` capture, it could
     //    be a closure nested in some parent closure with a `weak self`
     //    capture, so we should always validate the conditional statement
     //    that defines self if present.
-    if (validateSelfRebindings) {
-      if (auto conditionalStmt = parentConditionalStmt(selfDecl)) {
-        if (!hasValidSelfRebinding(conditionalStmt, ctx)) {
-          return false;
-        }
+    if (auto condStmt = parentConditionalStmt(selfDecl)) {
+      if (!hasValidSelfRebinding(condStmt, ctx)) {
+        return false;
       }
-    }
-
-    // If this closure has a `weak self` capture, require that the
-    // closure unwraps self. If not, implicit self is not allowed
-    // in this closure or in any nested closure.
-    if (closureHasWeakSelfCapture(inClosure) &&
-        !hasValidSelfRebinding(parentConditionalStmt(selfDecl), ctx)) {
-      return false;
     }
 
     if (auto autoclosure = dyn_cast<AutoClosureExpr>(inClosure)) {
@@ -1927,7 +1929,7 @@ public:
     //  - We have to do this for all closures, even closures that typically
     //    don't require self qualificationm since an invalid self capture in
     //    a parent closure still disallows implicit self in a nested closure.
-    if (validateParentClosures) {
+    if (!isValidatingParentClosures) {
       return !implicitSelfDisallowedDueToInvalidParent(selfDecl, captureType,
                                                        inClosure);
     } else {
@@ -2048,10 +2050,14 @@ public:
         // Check whether implicit self is disallowed due to this specific
         // closure, or if its disallowed due to some parent of this closure,
         // so we can return the specific closure that is invalid.
+        //
+        // If this is a `weak self` capture, we don't need to validate that
+        // that capture has been unwrapped in a `let self = self` binding
+        // within the parent closure. A self rebinding in this inner closure
+        // is sufficient to enable implicit self.
         if (!selfDeclAllowsImplicitSelf(outerSelfDecl, captureType,
                                         outerClosure,
-                                        /*validateParentClosures:*/ false,
-                                        /*validateSelfRebindings:*/ true)) {
+                                        /*isValidatingParentClosures:*/ true)) {
           return outerClosure;
         }
 
@@ -2064,8 +2070,7 @@ public:
       // parent closures, we don't need to do that separate for this closure.
       if (validateIntermediateParents) {
         if (!selfDeclAllowsImplicitSelf(selfDecl, captureType, outerClosure,
-                                        /*validateParentClosures*/ false,
-                                        /*validateSelfRebindings*/ false)) {
+                                        /*isValidatingParentClosures*/ true)) {
           return outerClosure;
         }
       }
