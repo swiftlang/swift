@@ -5902,19 +5902,47 @@ TypeResolver::resolveExistentialType(ExistentialTypeRepr *repr,
   if (constraintType->hasError())
     return ErrorType::get(getASTContext());
 
+  auto contextualConstraintType = constraintType;
+
+  // Map the constraint type into context before performing validity checks.
+  switch (this->resolution.getStage()) {
+  case TypeResolutionStage::Structural:
+    // In the structural stage we are not allowed to compute the generic
+    // signature because we may already be in the middle of computing it.
+    // If validity is questionable, i.e., the constraint type is a type
+    // parameter, assume the constraint type is valid.
+    if (constraintType->isTypeParameter()) {
+      return ExistentialType::get(constraintType);
+    }
+
+    break;
+  case TypeResolutionStage::Interface:
+    contextualConstraintType = this->resolution.getGenericSignature()
+                                   .getGenericEnvironment()
+                                   ->mapTypeIntoContext(constraintType);
+
+    // If there was a problem with the type, don't emit another diagnostic.
+    if (contextualConstraintType->hasError()) {
+      return ErrorType::get(getASTContext());
+    }
+
+    break;
+  }
+
   //TO-DO: generalize this and emit the same erorr for some P?
-  if (!constraintType->isConstraintType()) {
+  if (!contextualConstraintType->isConstraintType()) {
     // Emit a tailored diagnostic for the incorrect optional
     // syntax 'any P?' with a fix-it to add parenthesis.
-    auto wrapped = constraintType->getOptionalObjectType();
+    auto wrapped = contextualConstraintType->getOptionalObjectType();
     if (wrapped && (wrapped->is<ExistentialType>() ||
                     wrapped->is<ExistentialMetatypeType>())) {
       std::string fix;
       llvm::raw_string_ostream OS(fix);
-      constraintType->print(OS, PrintOptions::forDiagnosticArguments());
+      contextualConstraintType->print(OS,
+                                      PrintOptions::forDiagnosticArguments());
       diagnose(repr->getLoc(), diag::incorrect_optional_any,
-               constraintType)
-        .fixItReplace(repr->getSourceRange(), fix);
+               contextualConstraintType)
+          .fixItReplace(repr->getSourceRange(), fix);
 
       // Recover by returning the intended type, but mark the type
       // representation as invalid to prevent it from being diagnosed elsewhere.
@@ -5924,15 +5952,16 @@ TypeResolver::resolveExistentialType(ExistentialTypeRepr *repr,
     
     // Diagnose redundant `any` on an already existential type e.g. any (any P)
     // with a fix-it to remove first any.
-    if (constraintType->is<ExistentialType>()) {
+    if (contextualConstraintType->is<ExistentialType>()) {
       diagnose(repr->getLoc(), diag::redundant_any_in_existential,
-               ExistentialType::get(constraintType))
+               ExistentialType::get(contextualConstraintType))
           .fixItRemove(repr->getAnyLoc());
       return constraintType;
     }
 
     diagnose(repr->getLoc(), diag::any_not_existential,
-             constraintType->isTypeParameter(), constraintType)
+             contextualConstraintType->is<ArchetypeType>(),
+             contextualConstraintType)
         .fixItRemove(repr->getAnyLoc());
     return constraintType;
   }
