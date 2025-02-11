@@ -22,6 +22,7 @@
 #include "swift/AST/AvailabilityRange.h"
 #include "swift/AST/PlatformKind.h"
 #include "swift/Basic/LLVM.h"
+#include "swift/Basic/OptionSet.h"
 
 namespace swift {
 
@@ -165,12 +166,22 @@ public:
   const_iterator end() const { return constraints.end(); }
 };
 
+enum class AvailabilityConstraintFlag : uint8_t {
+  /// By default, the availability constraints for the members of extensions
+  /// include the constraints for `@available` attributes that were written on
+  /// the enclosing extension, since these members can be referred to without
+  /// referencing the extension. When this flag is specified, though, only the
+  /// attributes directly attached to the declaration are considered.
+  SkipEnclosingExtension = 1 << 0,
+};
+using AvailabilityConstraintFlags = OptionSet<AvailabilityConstraintFlag>;
+
 /// Returns the set of availability constraints that restrict use of \p decl
 /// when it is referenced from the given context. In other words, it is the
 /// collection of of `@available` attributes with unsatisfied conditions.
-DeclAvailabilityConstraints
-getAvailabilityConstraintsForDecl(const Decl *decl,
-                                  const AvailabilityContext &context);
+DeclAvailabilityConstraints getAvailabilityConstraintsForDecl(
+    const Decl *decl, const AvailabilityContext &context,
+    AvailabilityConstraintFlags flags = std::nullopt);
 } // end namespace swift
 
 #endif

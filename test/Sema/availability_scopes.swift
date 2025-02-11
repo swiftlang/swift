@@ -358,7 +358,7 @@ extension SomeEnum {
 // CHECK-NEXT: {{^}}  (decl_implicit version=50 decl=extension.SomeEnum
 // CHECK-NEXT: {{^}}    (decl version=50 unavailable=macOS decl=extension.SomeEnum
 // CHECK-NEXT: {{^}}      (decl_implicit version=50 unavailable=macOS decl=availableMacOS_52
-// CHECK-NEXT: {{^}}        (decl version=50 unavailable=macOS decl=availableMacOS_52
+// CHECK-NEXT: {{^}}        (decl version=52 unavailable=macOS decl=availableMacOS_52
 // CHECK-NEXT: {{^}}      (decl version=50 unavailable=* decl=neverAvailable()
 
 @available(macOS, unavailable)

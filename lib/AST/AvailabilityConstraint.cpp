@@ -228,7 +228,8 @@ static void getAvailabilityConstraintsForDecl(
 
 DeclAvailabilityConstraints
 swift::getAvailabilityConstraintsForDecl(const Decl *decl,
-                                         const AvailabilityContext &context) {
+                                         const AvailabilityContext &context,
+                                         AvailabilityConstraintFlags flags) {
   llvm::SmallVector<AvailabilityConstraint, 4> constraints;
 
   // Generic parameters are always available.
@@ -238,6 +239,9 @@ swift::getAvailabilityConstraintsForDecl(const Decl *decl,
   decl = abstractSyntaxDeclForAvailableAttribute(decl);
 
   getAvailabilityConstraintsForDecl(constraints, decl, context);
+
+  if (flags.contains(AvailabilityConstraintFlag::SkipEnclosingExtension))
+    return constraints;
 
   // If decl is an extension member, query the attributes of the extension, too.
   //
