@@ -69,6 +69,12 @@ static bool isUnboundArrayType(Type type) {
   return false;
 }
 
+static bool isUnboundDictionaryType(Type type) {
+  if (auto *UGT = type->getAs<UnboundGenericType>())
+    return UGT->getDecl() == type->getASTContext().getDictionaryDecl();
+  return false;
+}
+
 static bool isSupportedOperator(Constraint *disjunction) {
   if (!isOperatorDisjunction(disjunction))
     return false;
@@ -749,31 +755,17 @@ static void determineBestChoicesInContext(
         }
       }
 
-      // Match `[...]` to Array<...> and/or `ExpressibleByArrayLiteral`
-      // conforming types.
-      if (options.contains(MatchFlag::OnParam) &&
-          options.contains(MatchFlag::Literal) &&
-          isUnboundArrayType(candidateType)) {
+      if (options.contains(MatchFlag::ExactOnly)) {
         // If an exact match is requested favor only `[...]` to `Array<...>`
         // since everything else is going to increase to score.
-        if (options.contains(MatchFlag::ExactOnly))
-          return paramType->isArrayType() ? 1 : 0;
+        if (options.contains(MatchFlag::Literal)) {
+          if (isUnboundArrayType(candidateType))
+            return paramType->isArrayType() ? 0.3 : 0;
 
-        // Otherwise, check if the other side conforms to
-        // `ExpressibleByArrayLiteral` protocol (in some way).
-        // We want an overly optimistic result here to avoid
-        // under-favoring.
-        auto &ctx = cs.getASTContext();
-        return checkConformanceWithoutContext(
-                   paramType,
-                   ctx.getProtocol(
-                       KnownProtocolKind::ExpressibleByArrayLiteral),
-                   /*allowMissing=*/true)
-                   ? 0.3
-                   : 0;
-      }
+          if (isUnboundDictionaryType(candidateType))
+            return cs.isDictionaryType(paramType) ? 0.3 : 0;
+        }
 
-      if (options.contains(MatchFlag::ExactOnly)) {
         if (!areEqual(candidateType, paramType))
           return 0;
         return options.contains(MatchFlag::Literal) ? 0.3 : 1;
@@ -785,39 +777,73 @@ static void determineBestChoicesInContext(
       }
 
       if (options.contains(MatchFlag::Literal)) {
-        if (candidateType->isInt() || candidateType->isDouble()) {
-          if (paramType->hasTypeParameter() ||
-              paramType->isAnyExistentialType()) {
-            // Attempt to match literal default to generic parameter.
-            // This helps to determine whether there are any generic
-            // overloads that are a possible match.
-            auto score =
-                scoreCandidateMatch(genericSig, choice, candidateType,
-                                    paramType, options - MatchFlag::Literal);
-            if (score == 0)
-              return 0;
+        if (paramType->hasTypeParameter() ||
+            paramType->isAnyExistentialType()) {
+          // Attempt to match literal default to generic parameter.
+          // This helps to determine whether there are any generic
+          // overloads that are a possible match.
+          auto score =
+              scoreCandidateMatch(genericSig, choice, candidateType,
+                                  paramType, options - MatchFlag::Literal);
+          if (score == 0)
+            return 0;
 
-            // Optional injection lowers the score for operators to match
-            // pre-optimizer behavior.
-            return choice->isOperator() && paramType->getOptionalObjectType()
-                       ? 0.2
-                       : 0.3;
-          } else {
-            // Integer and floating-point literals can match any parameter
-            // type that conforms to `ExpressibleBy{Integer, Float}Literal`
-            // protocol. Since this assessment is done in isolation we don't
-            // lower the score even though this would be a non-default binding
-            // for a literal.
-            if (candidateType->isInt() &&
-                TypeChecker::conformsToKnownProtocol(
-                    paramType, KnownProtocolKind::ExpressibleByIntegerLiteral))
-              return 0.3;
+          // Optional injection lowers the score for operators to match
+          // pre-optimizer behavior.
+          return choice->isOperator() && paramType->getOptionalObjectType()
+                      ? 0.2
+                      : 0.3;
+        } else {
+          // Integer and floating-point literals can match any parameter
+          // type that conforms to `ExpressibleBy{Integer, Float}Literal`
+          // protocol. Since this assessment is done in isolation we don't
+          // lower the score even though this would be a non-default binding
+          // for a literal.
+          if (candidateType->isInt() &&
+              TypeChecker::conformsToKnownProtocol(
+                  paramType, KnownProtocolKind::ExpressibleByIntegerLiteral))
+            return 0.3;
 
-            if (candidateType->isDouble() &&
-                TypeChecker::conformsToKnownProtocol(
-                    paramType, KnownProtocolKind::ExpressibleByFloatLiteral))
-              return 0.3;
-          }
+          if (candidateType->isDouble() &&
+              TypeChecker::conformsToKnownProtocol(
+                  paramType, KnownProtocolKind::ExpressibleByFloatLiteral))
+            return 0.3;
+
+          if (candidateType->isBool() &&
+              TypeChecker::conformsToKnownProtocol(
+                  paramType, KnownProtocolKind::ExpressibleByBooleanLiteral))
+            return 0.3;
+
+          if (candidateType->isString() &&
+              (TypeChecker::conformsToKnownProtocol(
+                   paramType, KnownProtocolKind::ExpressibleByStringLiteral) ||
+               TypeChecker::conformsToKnownProtocol(
+                   paramType,
+                   KnownProtocolKind::ExpressibleByStringInterpolation)))
+            return 0.3;
+
+          auto &ctx = cs.getASTContext();
+
+          // Check if the other side conforms to `ExpressibleByArrayLiteral`
+          // protocol (in some way). We want an overly optimistic result
+          // here to avoid under-favoring.
+          if (candidateType->isArray() &&
+              checkConformanceWithoutContext(
+                  paramType,
+                  ctx.getProtocol(KnownProtocolKind::ExpressibleByArrayLiteral),
+                  /*allowMissing=*/true))
+            return 0.3;
+
+          // Check if the other side conforms to
+          // `ExpressibleByDictionaryLiteral` protocol (in some way).
+          // We want an overly optimistic result here to avoid under-favoring.
+          if (candidateType->isDictionary() &&
+              checkConformanceWithoutContext(
+                  paramType,
+                  ctx.getProtocol(
+                      KnownProtocolKind::ExpressibleByDictionaryLiteral),
+                  /*allowMissing=*/true))
+            return 0.3;
         }
 
         return 0;
@@ -896,6 +922,7 @@ static void determineBestChoicesInContext(
         // dependent member type (i.e. `Self.T`), let's check conformances
         // only and lower the score.
         if (candidateType->hasTypeVariable() ||
+            candidateType->hasUnboundGenericType() ||
             paramType->is<DependentMemberType>()) {
           return checkProtocolRequirementsOnly();
         }
