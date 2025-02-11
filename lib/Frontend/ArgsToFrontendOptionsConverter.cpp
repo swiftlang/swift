@@ -901,7 +901,7 @@ void ArgsToFrontendOptionsConverter::computeImportObjCHeaderOptions() {
       Opts.ImplicitObjCHeaderPath = A->getValue();
     // If `-import-object-header` is used, it means the module has a direct
     // bridging header dependency and it can be serialized into binary module.
-    Opts.SerializeBridgingHeader |= true;
+    Opts.ModuleHasBridgingHeader |= true;
   }
   if (const Arg *A = Args.getLastArgNoClaim(OPT_import_pch))
     Opts.ImplicitObjCPCHPath = A->getValue();

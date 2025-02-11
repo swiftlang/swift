@@ -196,7 +196,7 @@ SerializationOptions CompilerInvocation::computeSerializationOptions(
   serializationOpts.DocOutputPath = outs.ModuleDocOutputPath;
   serializationOpts.SourceInfoOutputPath = outs.ModuleSourceInfoOutputPath;
   serializationOpts.GroupInfoPath = opts.GroupInfoPath.c_str();
-  if (opts.SerializeBridgingHeader && !outs.ModuleOutputPath.empty())
+  if (opts.ModuleHasBridgingHeader && !outs.ModuleOutputPath.empty())
     serializationOpts.SerializeBridgingHeader = true;
   // For batch mode, emit empty header path as placeholder.
   if (serializationOpts.SerializeBridgingHeader &&
@@ -1302,10 +1302,12 @@ ImplicitImportInfo CompilerInstance::getImplicitImportInfo() const {
   }
 
   imports.ShouldImportUnderlyingModule = frontendOpts.ImportUnderlyingModule;
-  if (frontendOpts.ImplicitObjCPCHPath.empty())
-    imports.BridgingHeaderPath = frontendOpts.ImplicitObjCHeaderPath;
-  else
-    imports.BridgingHeaderPath = frontendOpts.ImplicitObjCPCHPath;
+  if (frontendOpts.ModuleHasBridgingHeader) {
+    if (frontendOpts.ImplicitObjCPCHPath.empty())
+      imports.BridgingHeaderPath = frontendOpts.ImplicitObjCHeaderPath;
+    else
+      imports.BridgingHeaderPath = frontendOpts.ImplicitObjCPCHPath;
+  }
   return imports;
 }
 

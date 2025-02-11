@@ -286,7 +286,7 @@ public:
 
   /// If set, the header provided in ImplicitObjCHeaderPath will be rewritten
   /// by the Clang importer as part of semantic analysis.
-  bool SerializeBridgingHeader = false;
+  bool ModuleHasBridgingHeader = false;
 
   /// Indicates whether or not the frontend should print statistics upon
   /// termination.
