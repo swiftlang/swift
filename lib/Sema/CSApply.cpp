@@ -7307,6 +7307,16 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
 
       return outerCall;
     }
+
+    case ConversionRestrictionKind::ArrayLiteralToInlineArray: {
+      cs.setType(expr, toType);
+
+      if (!finishArrayExpr(cast<ArrayExpr>(expr))) {
+        return nullptr;
+      }
+
+      return expr;
+    }
     }
   }
 

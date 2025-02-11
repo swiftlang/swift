@@ -32,12 +32,15 @@ takeVectorOf2Int([1]) // expected-error {{expected '2' elements in slab literal,
 
 takeVectorOf2Int([1, 2, 3]) // expected-error {{expected '2' elements in slab literal, but got '3'}}
 
-takeVectorOf2Int(["hello"]) // expected-error {{cannot convert value of type '[String]' to expected argument type 'Slab<2, Int>'}}
+takeVectorOf2Int(["hello"]) // expected-error {{expected '2' elements in slab literal, but got '1'}}
+                            // expected-error@-1 {{cannot convert value of type 'String' to expected element type 'Int'}}
 
 takeVectorOf2Int(["hello", "world"]) // expected-error {{cannot convert value of type 'String' to expected element type 'Int'}}
                                      // expected-error@-1 {{cannot convert value of type 'String' to expected element type 'Int'}}
 
-takeVectorOf2Int(["hello", "world", "!"]) // expected-error {{cannot convert value of type '[String]' to expected argument type 'Slab<2, Int>'}}
+takeVectorOf2Int(["hello", "world", "!"]) // expected-error {{cannot convert value of type 'String' to expected element type 'Int'}}
+                                          // expected-error@-1 {{cannot convert value of type 'String' to expected element type 'Int'}}
+                                          // expected-error@-2 {{cannot convert value of type 'String' to expected element type 'Int'}}
 
 struct X {
   var sprites: Slab<2, Int>
@@ -80,3 +83,23 @@ extension Slab where Element: ~Copyable {
     }
   }
 }
+
+func test(_: [Int]) -> Int {
+  123
+}
+
+func test(_: Slab<2, Int>) -> String {
+  "123"
+}
+
+func takeInt(_: Int) {}
+func takeString(_: String) {}
+
+let g = test([1, 2])
+takeInt(g) // OK
+takeString(g) // expected-error {{cannot convert value of type 'Int' to expected argument type 'String'}}
+
+let h: String = test([1, 2])
+takeInt(h) // expected-error {{cannot convert value of type 'String' to expected argument type 'Int'}}
+takeString(h) // OK
+
