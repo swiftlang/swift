@@ -245,7 +245,7 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB AND SWIFT_SHOULD_BUILD_EMBEDDED_CONCURRENC
       set(extra_c_compile_flags)
       set(extra_swift_compile_flags)
     elseif (SWIFT_HOST_VARIANT STREQUAL "macosx")
-      if(NOT "${mod}" MATCHES "-macos$")
+      if((NOT "${mod}" MATCHES "-macos$") AND (NOT "${arch}" MATCHES "^wasm"))
         continue()
       endif()
       if("${mod}" MATCHES "riscv")
