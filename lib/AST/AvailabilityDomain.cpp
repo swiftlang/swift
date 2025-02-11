@@ -14,6 +14,7 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/DiagnosticsSema.h"
+#include "swift/AST/Module.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/Basic/Assertions.h"
 #include "llvm/ADT/StringSwitch.h"
@@ -200,6 +201,33 @@ AvailabilityDomain AvailabilityDomain::copy(ASTContext &ctx) const {
     // To support this, the CustomAvailabilityDomain content would need to
     // be copied to the other context, allocating new storage if necessary.
     llvm::report_fatal_error("unsupported");
+  }
+}
+
+bool StableAvailabilityDomainComparator::operator()(
+    const AvailabilityDomain &lhs, const AvailabilityDomain &rhs) const {
+  auto lhsKind = lhs.getKind();
+  auto rhsKind = rhs.getKind();
+  if (lhsKind != rhsKind)
+    return lhsKind < rhsKind;
+
+  switch (lhsKind) {
+  case AvailabilityDomain::Kind::Universal:
+  case AvailabilityDomain::Kind::SwiftLanguage:
+  case AvailabilityDomain::Kind::PackageDescription:
+  case AvailabilityDomain::Kind::Embedded:
+    return false;
+  case AvailabilityDomain::Kind::Platform:
+    return lhs.getPlatformKind() < rhs.getPlatformKind();
+  case AvailabilityDomain::Kind::Custom: {
+    auto lhsMod = lhs.getModule();
+    auto rhsMod = rhs.getModule();
+    if (lhsMod != rhsMod)
+      return lhsMod->getName() < rhsMod->getName();
+
+    return lhs.getNameForAttributePrinting() <
+           rhs.getNameForAttributePrinting();
+  }
   }
 }
 
