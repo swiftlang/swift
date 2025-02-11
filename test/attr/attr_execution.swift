@@ -42,7 +42,6 @@ do {
 
 struct TestAttributeCollisions {
   @execution(concurrent) nonisolated func testNonIsolated() async {}
-  // expected-error@-1 {{cannot use '@execution(concurrent)' and 'nonisolated' on the same 'testNonIsolated()' because they serve the same purpose}}
 
   @execution(concurrent) func test(arg: isolated MainActor) async {}
   // expected-error@-1 {{cannot use '@execution(concurrent)' on instance method 'test(arg:)' because it has an isolated parameter: 'arg'}}
