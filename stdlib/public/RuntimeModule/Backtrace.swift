@@ -194,6 +194,30 @@ public struct Backtrace: CustomStringConvertible, Sendable {
           return "..."
       }
     }
+
+    /// A JSON description of this frame, less the surrounding braces.
+    /// This is useful if you want to add extra information.
+    @_spi(Internal)
+    public var jsonBody: String {
+      switch self {
+        case let .programCounter(addr):
+          return "\"kind\": \"programCounter\", \"address\": \"\(addr)\""
+        case let .returnAddress(addr):
+          return "\"kind\": \"returnAddress\", \"address\": \"\(addr)\""
+        case let .asyncResumePoint(addr):
+          return "\"kind\": \"asyncResumePoint\", \"address\": \"\(addr)\""
+        case let .omittedFrames(count):
+          return "\"kind\": \"omittedFrames\", \"count\": \(count)"
+        case .truncated:
+          return "\"kind\": \"truncated\""
+      }
+    }
+
+    /// A JSON description of this frame.
+    @_spi(Internal)
+    public var jsonDescription: String {
+      return "{ \(jsonBody) }"
+    }
   }
 
   /// Represents an image loaded in the process's address space
