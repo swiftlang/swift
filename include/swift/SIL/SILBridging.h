@@ -929,7 +929,7 @@ struct BridgedSuccessorArray {
 };
 
 struct BridgedDeclRef {
-  uint64_t storage[3];
+  uint64_t storage[4];
 
   BRIDGED_INLINE BridgedDeclRef(swift::SILDeclRef declRef);
   BRIDGED_INLINE swift::SILDeclRef unbridged() const;
@@ -940,7 +940,7 @@ struct BridgedDeclRef {
 };
 
 struct BridgedVTableEntry {
-  uint64_t storage[5];
+  uint64_t storage[6];
 
   enum class Kind {
     Normal,
@@ -982,7 +982,7 @@ struct OptionalBridgedVTable {
 };
 
 struct BridgedWitnessTableEntry {
-  uint64_t storage[5];
+  uint64_t storage[6];
 
   enum class Kind {
     invalid,
