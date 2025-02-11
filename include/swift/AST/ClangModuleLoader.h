@@ -32,6 +32,7 @@ class SourceLocation;
 
 namespace swift {
 
+class ClangInheritanceInfo;
 class ConcreteDeclRef;
 class Decl;
 class FuncDecl;
@@ -213,7 +214,7 @@ public:
   virtual ValueDecl *
   importBaseMemberDecl(ValueDecl *decl,
                        DeclContext *newContext,
-                       clang::AccessSpecifier inheritance) = 0;
+                       ClangInheritanceInfo inheritance) = 0;
 
   /// Emits diagnostics for any declarations named name
   /// whose direct declaration context is a TU.

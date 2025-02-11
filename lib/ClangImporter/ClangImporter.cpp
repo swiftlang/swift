@@ -6040,15 +6040,12 @@ void cloneImportedAttributes(ValueDecl *fromDecl, ValueDecl* toDecl) {
 
 static ValueDecl *cloneBaseMemberDecl(ValueDecl *decl,
                                        DeclContext *newContext,
-                                       clang::AccessSpecifier inheritance) {
-  assert(inheritance != clang::AS_none &&
-          "public/protected/private inheritance was not specified");
-  static_assert(AccessLevel::Private < AccessLevel::Public &&
-          "std::min() relies on this ordering");
+                                       ClangInheritanceInfo inheritance) {
+  assert(inheritance && "only inherited members should be cloned");
+
   // Adjust access according to whichever is more restrictive, between what decl
   // was declared with (in its base class) or what it is being inherited with.
-  AccessLevel access = std::min(decl->getFormalAccess(),
-                                importer::convertClangAccess(inheritance));
+  AccessLevel access = inheritance.accessForBaseDecl(decl);
   ASTContext &context = decl->getASTContext();
 
   if (auto fn = dyn_cast<FuncDecl>(decl)) {
@@ -6075,6 +6072,7 @@ static ValueDecl *cloneBaseMemberDecl(ValueDecl *decl,
         fn->getResultInterfaceType(), newContext);
     cloneImportedAttributes(decl, out);
     out->setAccess(access);
+    inheritance.setUnavailableIfNecessary(decl, out);
     out->setBodySynthesizer(synthesizeBaseClassMethodBody, fn);
     out->setSelfAccessKind(fn->getSelfAccessKind());
     return out;
@@ -6093,6 +6091,7 @@ static ValueDecl *cloneBaseMemberDecl(ValueDecl *decl,
         subscript->getIndices(), subscript->getNameLoc(), subscript->getElementInterfaceType(),
         newContext, subscript->getGenericParams());
     out->setAccess(access);
+    inheritance.setUnavailableIfNecessary(decl, out);
     out->setAccessors(SourceLoc(),
                       makeBaseClassMemberAccessors(newContext, out, subscript),
                       SourceLoc());
@@ -6117,6 +6116,7 @@ static ValueDecl *cloneBaseMemberDecl(ValueDecl *decl,
     out->setIsObjC(var->isObjC());
     out->setIsDynamic(var->isDynamic());
     out->setAccess(access);
+    inheritance.setUnavailableIfNecessary(decl, out);
     out->getASTContext().evaluator.cacheOutput(HasStorageRequest{out}, false);
     auto accessors = makeBaseClassMemberAccessors(newContext, out, var);
     out->setAccessors(SourceLoc(), accessors, SourceLoc());
@@ -6143,6 +6143,7 @@ static ValueDecl *cloneBaseMemberDecl(ValueDecl *decl,
                       typeAlias->getGenericParams(), newContext);
     out->setUnderlyingType(typeAlias->getUnderlyingType());
     out->setAccess(access);
+    inheritance.setUnavailableIfNecessary(decl, out);
     return out;
   }
 
@@ -6154,6 +6155,7 @@ static ValueDecl *cloneBaseMemberDecl(ValueDecl *decl,
         typeDecl->getLoc(), nullptr, newContext);
     out->setUnderlyingType(typeDecl->getInterfaceType());
     out->setAccess(access);
+    inheritance.setUnavailableIfNecessary(decl, out);
     return out;
   }
 
@@ -6165,8 +6167,7 @@ TinyPtrVector<ValueDecl *> ClangRecordMemberLookup::evaluate(
   NominalTypeDecl *recordDecl = desc.recordDecl;
   NominalTypeDecl *inheritingDecl = desc.inheritingDecl;
   DeclName name = desc.name;
-  clang::AccessSpecifier inheritance = desc.inheritance;
-  bool inheritedLookup = recordDecl != inheritingDecl;
+  ClangInheritanceInfo inheritance = desc.inheritance;
 
   auto &ctx = recordDecl->getASTContext();
   auto directResults = evaluateOrDefault(
@@ -6187,21 +6188,13 @@ TinyPtrVector<ValueDecl *> ClangRecordMemberLookup::evaluate(
     if (isa<clang::CXXConstructorDecl>(found) && isa<ClassDecl>(recordDecl))
       continue;
 
-    // Skip this base class member if it is private.
-    //
-    // BUG: private base class members should be inherited but inaccessible.
-    // Skipping them here may affect accurate overload resolution in cases of
-    // multiple inheritance (which is currently buggy anyway).
-    if (inheritedLookup && found->getAccess() == clang::AS_private)
-      continue;
-
     auto imported = clangModuleLoader->importDeclDirectly(found);
     if (!imported)
       continue;
 
     // If this member is found due to inheritance, clone it from the base class
     // by synthesizing getters and setters.
-    if (inheritedLookup) {
+    if (inheritance) {
       imported = clangModuleLoader->importBaseMemberDecl(
           cast<ValueDecl>(imported), inheritingDecl, inheritance);
       if (!imported)
@@ -6210,7 +6203,7 @@ TinyPtrVector<ValueDecl *> ClangRecordMemberLookup::evaluate(
     result.push_back(cast<ValueDecl>(imported));
   }
 
-  if (inheritedLookup) {
+  if (inheritance) {
     // For inherited members, add members that are synthesized eagerly, such as
     // subscripts. This is not necessary for non-inherited members because those
     // should already be in the lookup table.
@@ -6221,19 +6214,12 @@ TinyPtrVector<ValueDecl *> ClangRecordMemberLookup::evaluate(
           namedMember->getName().getBaseName() != name)
         continue;
 
-      auto *memberClangDecl = namedMember->getClangDecl();
-
-      // Skip this base class if this is a case of nested private inheritance.
-      //
-      // BUG: private base class members should be inherited but inaccessible.
-      // Skipping them here may affect accurate overload resolution in cases of
-      // multiple inheritance (which is currently buggy anyway).
-      if (memberClangDecl && memberClangDecl->getAccess() == clang::AS_private)
+      auto *imported = clangModuleLoader->importBaseMemberDecl(
+              namedMember, inheritingDecl, inheritance);
+      if (!imported)
         continue;
 
-      if (auto imported = clangModuleLoader->importBaseMemberDecl(
-              namedMember, inheritingDecl, inheritance))
-        result.push_back(cast<ValueDecl>(imported));
+      result.push_back(cast<ValueDecl>(imported));
     }
   }
 
@@ -6250,17 +6236,6 @@ TinyPtrVector<ValueDecl *> ClangRecordMemberLookup::evaluate(
       foundNameArities.insert(getArity(valueDecl));
 
     for (auto base : cxxRecord->bases()) {
-      clang::AccessSpecifier baseInheritance = base.getAccessSpecifier();
-      // Skip this base class if this is a case of nested private inheritance.
-      //
-      // BUG: members of private base classes should actually be imported but
-      // inaccessible. Skipping them here may affect accurate overload
-      // resolution in cases of multiple inheritance (which is currently buggy
-      // anyway).
-      if (inheritance != clang::AS_none &&
-          baseInheritance == clang::AS_private)
-        continue;
-
       clang::QualType baseType = base.getType();
       if (auto spectType = dyn_cast<clang::TemplateSpecializationType>(baseType))
         baseType = spectType->desugar();
@@ -6274,13 +6249,7 @@ TinyPtrVector<ValueDecl *> ClangRecordMemberLookup::evaluate(
         if (cast<ValueDecl>(import)->getName() == name)
           continue;
 
-        if (inheritance != clang::AS_none)
-          // For nested inheritance, clamp inheritance to least permissive level
-          // which is the largest numerical value for clang::AccessSpecifier
-          baseInheritance = std::max(inheritance, baseInheritance);
-        static_assert(clang::AS_private > clang::AS_protected &&
-                      clang::AS_protected > clang::AS_public &&
-                      "using std::max() relies on this ordering");
+        auto baseInheritance = ClangInheritanceInfo(inheritance, base);
 
         // Add Clang members that are imported lazily.
         auto baseResults = evaluateOrDefault(
@@ -7546,7 +7515,11 @@ Decl *ClangImporter::importDeclDirectly(const clang::NamedDecl *decl) {
   return Impl.importDecl(decl, Impl.CurrentVersion);
 }
 
-ValueDecl *ClangImporter::Implementation::importBaseMemberDecl(ValueDecl *decl, DeclContext *newContext, clang::AccessSpecifier inheritance) {
+ValueDecl *
+ClangImporter::Implementation::importBaseMemberDecl(ValueDecl *decl,
+                                                    DeclContext *newContext,
+                                                    ClangInheritanceInfo inheritance) {
+
   // Make sure we don't clone the decl again for this class, as that would
   // result in multiple definitions of the same symbol.
   std::pair<ValueDecl *, DeclContext *> key = {decl, newContext};
@@ -7571,7 +7544,7 @@ size_t ClangImporter::Implementation::getImportedBaseMemberDeclArity(
 
 ValueDecl *ClangImporter::importBaseMemberDecl(ValueDecl *decl,
                                                DeclContext *newContext,
-                                               clang::AccessSpecifier inheritance) {
+                                               ClangInheritanceInfo inheritance) {
   return Impl.importBaseMemberDecl(decl, newContext, inheritance);
 }
 
@@ -8350,4 +8323,26 @@ AccessLevel importer::convertClangAccess(clang::AccessSpecifier access) {
     // about Swift 'public' vs 'open'; see above).
     return AccessLevel::Public;
   }
+}
+
+AccessLevel ClangInheritanceInfo::accessForBaseDecl(const ValueDecl *baseDecl) {
+  static_assert(AccessLevel::Private < AccessLevel::Public &&
+                "std::min() relies on this ordering");
+  return std::min(baseDecl->getFormalAccess(), importer::convertClangAccess(cumulativeAccess));
+}
+
+void ClangInheritanceInfo::setUnavailableIfNecessary(const ValueDecl *baseDecl, ValueDecl *clonedDecl) {
+  auto *clangDecl = llvm::cast_if_present<clang::NamedDecl>(baseDecl->getClangDecl());
+  if (!clangDecl)
+    return;
+
+  const char *msg = nullptr;
+
+  if (clangDecl->getAccess() == clang::AS_private)
+    msg =     "this base member is not accessible because it is private";
+  else if (nestedPrivate)
+    msg =     "this base member is not accessible because of private inheritance";
+
+  if (msg)
+    clonedDecl->getAttrs().add(AvailableAttr::createUniversallyUnavailable(clonedDecl->getASTContext(), msg));
 }

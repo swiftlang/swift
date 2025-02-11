@@ -16,6 +16,7 @@
 #ifndef SWIFT_CLANG_IMPORTER_H
 #define SWIFT_CLANG_IMPORTER_H
 
+#include "swift/AST/Attr.h"
 #include "swift/AST/AttrKind.h"
 #include "swift/AST/ClangModuleLoader.h"
 #include "clang/Basic/Specifiers.h"
@@ -72,6 +73,7 @@ namespace swift {
 class ASTContext;
 class CompilerInvocation;
 class ClangImporterOptions;
+class ClangInheritanceInfo;
 class ClangModuleUnit;
 class ClangNode;
 class ConcreteDeclRef;
@@ -659,7 +661,7 @@ public:
 
   ValueDecl *importBaseMemberDecl(ValueDecl *decl,
                                   DeclContext *newContext,
-                                  clang::AccessSpecifier inheritance) override;
+                                  ClangInheritanceInfo inheritance) override;
 
   /// Emits diagnostics for any declarations named name
   /// whose direct declaration context is a TU.
@@ -759,6 +761,60 @@ ClangInvocationFileMapping getClangInvocationFileMapping(
     ASTContext &ctx,
     llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> vfs = nullptr,
     bool suppressDiagnostic = false);
+
+/// Cumulative inheritance information that is used to compute access levels
+/// through one or more levels of C++ inheritance.
+class ClangInheritanceInfo {
+  clang::AccessSpecifier cumulativeAccess;
+  bool nestedPrivate;
+
+public:
+  ClangInheritanceInfo() : cumulativeAccess(clang::AS_none), nestedPrivate(false) {}
+
+  /// For nested inheritance, clamp inheritance to least permissive level
+  /// which is the largest numerical value for clang::AccessSpecifier
+  ClangInheritanceInfo(ClangInheritanceInfo prev, clang::CXXBaseSpecifier base) :
+    cumulativeAccess(computeCumulativeAccess(prev, base)),
+    nestedPrivate(prev && base.getAccessSpecifier() == clang::AS_private) {}
+
+  /// Whether this is info represents a case of C++ inheritance.
+  bool isInheriting() const { return cumulativeAccess != clang::AS_none; }
+
+  /// Whether this is info represents a case of C++ inheritance.
+  operator bool() const { return isInheriting(); }
+
+  /// Compute the (Swift) access level for inherited base member \param decl,
+  /// for when its inherited (cloned) member in the derived class.
+  ///
+  /// This access level is determined by whichever is more restrictive: what the
+  /// \param decl was declared with (in its base class), or what it is being
+  /// inherited with (ClangInheritanceInfo::cumulativeAccess).
+  ///
+  /// Returns swift::AccessLevel::Public (i.e., corresponding to clang::AS_none)
+  /// if this is not inheriting.
+  AccessLevel accessForBaseDecl(const ValueDecl *baseDecl);
+
+  /// Marks \param clonedDecl as unavailable (using \c @unavailable) if it
+  /// cannot be accessed from the derived class, either because \param baseDecl
+  /// was declared as private in the base class, or because \param clonedDecl
+  /// was inherited with private inheritance.
+  void setUnavailableIfNecessary(const ValueDecl *baseDecl, ValueDecl *clonedDecl);
+
+private:
+  static clang::AccessSpecifier
+  computeCumulativeAccess(ClangInheritanceInfo prev,
+                          clang::CXXBaseSpecifier base) {
+    assert(base.getAccessSpecifier() != clang::AS_none &&
+           "this should always be public, protected, or private");
+    static_assert(clang::AS_private > clang::AS_protected &&
+                  clang::AS_protected > clang::AS_public &&
+                  "using std::max() relies on this ordering");
+    if (prev)
+      return std::max(prev.cumulativeAccess, base.getAccessSpecifier());
+
+    return base.getAccessSpecifier();
+  }
+};
 
 } // end namespace swift
 

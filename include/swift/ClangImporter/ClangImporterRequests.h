@@ -141,12 +141,11 @@ struct ClangRecordMemberLookupDescriptor final {
   NominalTypeDecl *recordDecl;        // Where we are currently looking
   NominalTypeDecl *inheritingDecl;    // Where we started looking from
   DeclName name;                      // What we are looking for
-  clang::AccessSpecifier inheritance; // public/protected/private inheritance
-                                      // (clang::AS_none means no inheritance)
+  ClangInheritanceInfo inheritance;
 
   ClangRecordMemberLookupDescriptor(NominalTypeDecl *recordDecl, DeclName name)
       : recordDecl(recordDecl), inheritingDecl(recordDecl), name(name),
-        inheritance(clang::AS_none) {
+        inheritance(ClangInheritanceInfo()) {
     assert(isa<clang::RecordDecl>(recordDecl->getClangDecl()));
   }
 
@@ -175,12 +174,12 @@ private:
   ClangRecordMemberLookupDescriptor(NominalTypeDecl *recordDecl,
                                     DeclName name,
                                     NominalTypeDecl *inheritingDecl,
-                                    clang::AccessSpecifier inheritance)
+                                    ClangInheritanceInfo inheritance)
       : recordDecl(recordDecl), inheritingDecl(inheritingDecl), name(name),
         inheritance(inheritance) {
     assert(isa<clang::RecordDecl>(recordDecl->getClangDecl()));
     assert(isa<clang::CXXRecordDecl>(inheritingDecl->getClangDecl()));
-    assert(inheritance != clang::AS_none && "");
+    assert(inheritance.isInheriting() && "recursive calls should indicate inheritance");
     assert(recordDecl != inheritingDecl &&
            "recursive calls should lookup elsewhere");
   }

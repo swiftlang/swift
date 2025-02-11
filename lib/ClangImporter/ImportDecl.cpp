@@ -4586,7 +4586,7 @@ namespace {
         // the using decl.
         auto clonedMethod = dyn_cast_or_null<FuncDecl>(
             Impl.importBaseMemberDecl(importedBaseMethod, importedDC,
-                                      /*inheritance=*/clang::AS_public));
+                                      ClangInheritanceInfo()));
         if (!clonedMethod)
           return nullptr;
 
@@ -9941,7 +9941,7 @@ static void loadAllMembersOfSuperclassIfNeeded(ClassDecl *CD) {
 
 void ClangImporter::Implementation::loadAllMembersOfRecordDecl(
     NominalTypeDecl *swiftDecl, const clang::RecordDecl *clangRecord,
-    clang::AccessSpecifier inheritance) {
+    ClangInheritanceInfo inheritance) {
   // Import all of the members.
   llvm::SmallVector<Decl *, 16> members;
   for (const clang::Decl *m : clangRecord->decls()) {
@@ -9969,19 +9969,10 @@ void ClangImporter::Implementation::loadAllMembersOfRecordDecl(
 
   // Add the members here.
   for (auto member : members) {
-    if (inheritance != clang::AS_none) {
+    if (inheritance) {
       // This means we found a member in a C++ record's base class.
       assert(swiftDecl->getClangDecl() != clangRecord);
       auto baseMember = cast<ValueDecl>(member);
-      auto *baseClangDecl = baseMember->getClangDecl();
-
-      // Skip this member if this is a case of nested private inheritance.
-      //
-      // BUG: private base class members should be inherited but inaccessible.
-      // Skipping them here may affect accurate overload resolution in cases of
-      // multiple inheritance (which is currently buggy anyway).
-      if (baseClangDecl && baseClangDecl->getAccess() == clang::AS_private)
-        continue;
 
       // Do not clone the base member into the derived class
       // when the derived class already has a member of such
@@ -10025,24 +10016,6 @@ void ClangImporter::Implementation::loadAllMembersOfRecordDecl(
   // If this is a C++ record, look through the base classes too.
   if (auto cxxRecord = dyn_cast<clang::CXXRecordDecl>(clangRecord)) {
     for (auto base : cxxRecord->bases()) {
-      clang::AccessSpecifier baseInheritance = base.getAccessSpecifier();
-      // Skip this base class if this is a case of nested private inheritance.
-      //
-      // BUG: members of private base classes should actually be imported but
-      // inaccessible. Skipping them here may affect accurate overload
-      // resolution in cases of multiple inheritance (which is currently buggy
-      // anyway).
-      if (inheritance != clang::AS_none && baseInheritance == clang::AS_private)
-        continue;
-
-      if (inheritance != clang::AS_none)
-        // For nested inheritance, clamp inheritance to least permissive level
-        // which is the largest numerical value for clang::AccessSpecifier
-        baseInheritance = std::max(inheritance, baseInheritance);
-      static_assert(clang::AS_private > clang::AS_protected &&
-                    clang::AS_protected > clang::AS_public &&
-                    "using std::max() relies on this ordering");
-
       clang::QualType baseType = base.getType();
       if (auto spectType = dyn_cast<clang::TemplateSpecializationType>(baseType))
         baseType = spectType->desugar();
@@ -10052,6 +10025,7 @@ void ClangImporter::Implementation::loadAllMembersOfRecordDecl(
         continue;
 
       auto *baseRecord = cast<clang::RecordType>(baseType)->getDecl();
+      auto baseInheritance = ClangInheritanceInfo(inheritance, base);
       loadAllMembersOfRecordDecl(swiftDecl, baseRecord, baseInheritance);
     }
   }
@@ -10094,7 +10068,7 @@ ClangImporter::Implementation::loadAllMembers(Decl *D, uint64_t extra) {
   if (isa_and_nonnull<clang::RecordDecl>(D->getClangDecl())) {
     loadAllMembersOfRecordDecl(cast<NominalTypeDecl>(D),
                                cast<clang::RecordDecl>(D->getClangDecl()),
-                               /*inheritance=*/clang::AS_none);
+                               ClangInheritanceInfo());
     if (IDC) // Set member deserialization status
       IDC->setDeserializedMembers(true);
     return;

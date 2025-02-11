@@ -693,7 +693,7 @@ public:
 
   ValueDecl *importBaseMemberDecl(ValueDecl *decl,
                                   DeclContext *newContext,
-                                  clang::AccessSpecifier inheritance);
+                                  ClangInheritanceInfo inheritance);
 
   static size_t getImportedBaseMemberDeclArity(const ValueDecl *valueDecl);
 
@@ -1640,7 +1640,7 @@ private:
                                 const clang::ObjCContainerDecl *objcContainer);
   void loadAllMembersOfRecordDecl(NominalTypeDecl *swiftDecl,
                                   const clang::RecordDecl *clangRecord,
-                                  clang::AccessSpecifier inheritance);
+                                  ClangInheritanceInfo inheritance);
 
   void collectMembersToAdd(const clang::ObjCContainerDecl *objcContainer,
                            Decl *D, DeclContext *DC,
