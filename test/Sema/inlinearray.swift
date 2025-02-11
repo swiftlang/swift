@@ -16,21 +16,21 @@ func takeVectorOf2<T>(_: InlineArray<2, T>) {}
 takeVectorOf2([1, 2]) // Ok
 takeVectorOf2(["hello", "world"]) // Ok
 
-takeVectorOf2([1]) // expected-error {{expected '2' elements in slab literal, but got '1'}}
+takeVectorOf2([1]) // expected-error {{expected '2' elements in inline array literal, but got '1'}}
 
-takeVectorOf2([1, 2, 3]) // expected-error {{expected '2' elements in slab literal, but got '3'}}
+takeVectorOf2([1, 2, 3]) // expected-error {{expected '2' elements in inline array literal, but got '3'}}
 
-takeVectorOf2(["hello"]) // expected-error {{expected '2' elements in slab literal, but got '1'}}
+takeVectorOf2(["hello"]) // expected-error {{expected '2' elements in inline array literal, but got '1'}}
 
-takeVectorOf2(["hello", "world", "!"]) // expected-error {{expected '2' elements in slab literal, but got '3'}}
+takeVectorOf2(["hello", "world", "!"]) // expected-error {{expected '2' elements in inline array literal, but got '3'}}
 
 func takeVectorOf2Int(_: InlineArray<2, Int>) {}
 
 takeVectorOf2Int([1, 2]) // Ok
 
-takeVectorOf2Int([1]) // expected-error {{expected '2' elements in slab literal, but got '1'}}
+takeVectorOf2Int([1]) // expected-error {{expected '2' elements in inline array literal, but got '1'}}
 
-takeVectorOf2Int([1, 2, 3]) // expected-error {{expected '2' elements in slab literal, but got '3'}}
+takeVectorOf2Int([1, 2, 3]) // expected-error {{expected '2' elements in inline array literal, but got '3'}}
 
 takeVectorOf2Int(["hello"]) // expected-error {{cannot convert value of type '[String]' to expected argument type 'InlineArray<2, Int>'}}
 
