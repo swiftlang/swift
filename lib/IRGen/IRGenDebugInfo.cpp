@@ -284,6 +284,10 @@ public:
   void emitPackCountParameter(IRGenFunction &IGF, llvm::Value *Metadata,
                               SILDebugVariable VarInfo);
 
+  /// Return flags which enable debug info emission for call sites, provided
+  /// that it is supported and enabled.
+  llvm::DINode::DIFlags getCallSiteRelatedAttrs() const;
+
   /// Return the DIBuilder.
   llvm::DIBuilder &getBuilder() { return DBuilder; }
 
@@ -3042,6 +3046,33 @@ void IRGenDebugInfoImpl::emitImport(ImportDecl *D) {
   ImportedModules.insert(Imported.importedModule);
 }
 
+/// This is effectively \p clang::CGDebugInfo::getCallSiteRelatedAttrs().
+llvm::DINode::DIFlags IRGenDebugInfoImpl::getCallSiteRelatedAttrs() const {
+
+  // Do not generate callsite attributes if unless the -gen-callsite-info flag
+  // is passed.
+  if (!Opts.DebugCallsiteInfo)
+    return llvm::DINode::FlagZero;
+
+  auto SwiftLangOpts = IGM.Context.LangOpts;
+  auto Loader = IGM.getSILModule().getASTContext().getClangModuleLoader();
+  auto *Importer = static_cast<ClangImporter *>(&*Loader);
+  auto &CGO = Importer->getCodeGenOpts();
+
+  // Do not generate callsite attributes if there is no debug info to be
+  // emitted.
+  if (CGO.getDebugInfo() == llvm::codegenoptions::NoDebugInfo ||
+      CGO.getDebugInfo() == llvm::codegenoptions::LocTrackingOnly)
+    return llvm::DINode::FlagZero;
+
+  // Callsite attributes are available in DWARFv5. However, for swift, lldb can
+  // accept these attributes as if they were part of DWARFv4.
+  if (Opts.DWARFVersion < 4)
+    return llvm::DINode::FlagZero;
+
+  return llvm::DINode::FlagAllCallsDescribed;
+}
+
 llvm::DISubprogram *IRGenDebugInfoImpl::emitFunction(SILFunction &SILFn,
                                                      llvm::Function *Fn) {
   auto *DS = SILFn.getDebugScope();
@@ -3193,9 +3224,10 @@ IRGenDebugInfoImpl::emitFunction(const SILDebugScope *DS, llvm::Function *Fn,
   }
 
   // Construct the DISubprogram.
-  llvm::DISubprogram *SP = DBuilder.createFunction(
-      Scope, Name, LinkageName, File, Line, DIFnTy, ScopeLine, Flags, SPFlags,
-      TemplateParameters, Decl, Error);
+  llvm::DISubprogram *SP =
+      DBuilder.createFunction(Scope, Name, LinkageName, File, Line, DIFnTy,
+                              ScopeLine, Flags | getCallSiteRelatedAttrs(),
+                              SPFlags, TemplateParameters, Decl, Error);
 
   if (Fn && !Fn->isDeclaration())
     Fn->setSubprogram(SP);
