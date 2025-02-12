@@ -1098,8 +1098,10 @@ class ModuleInterfaceLoaderImpl {
         requiresOSSAModules);
 
     // Compute the output path if we're loading or emitting a cached module.
-    auto resolvedOutputPath = astDelegate.getCachedOutputPath(
-        moduleName, interfacePath, ctx.SearchPathOpts.getSDKPath());
+    SwiftInterfaceModuleOutputPathResolution::ResultTy resolvedOutputPath;
+    astDelegate.getCachedOutputPath(resolvedOutputPath, moduleName,
+                                    interfacePath,
+                                    ctx.SearchPathOpts.getSDKPath());
     auto &cachedOutputPath = resolvedOutputPath.outputPath;
 
     // Try to find the right module for this interface, either alongside it,
@@ -2005,13 +2007,14 @@ InterfaceSubContextDelegateImpl::InterfaceSubContextDelegateImpl(
 
 /// Calculate an output filename in \p genericSubInvocation's cache path that
 /// includes a hash of relevant key data.
-InterfaceModuleOutputPathResolver::ResultTy
-InterfaceSubContextDelegateImpl::getCachedOutputPath(StringRef moduleName,
-                                                     StringRef interfacePath,
-                                                     StringRef sdkPath) {
-  InterfaceModuleOutputPathResolver resolver(moduleName, interfacePath, sdkPath,
-                                             genericSubInvocation);
-  return resolver.getOutputPath();
+void InterfaceSubContextDelegateImpl::getCachedOutputPath(
+    SwiftInterfaceModuleOutputPathResolution::ResultTy &resolvedOutputPath,
+    StringRef moduleName, StringRef interfacePath, StringRef sdkPath) {
+  SwiftInterfaceModuleOutputPathResolution::getOutputPath(
+      resolvedOutputPath, moduleName, interfacePath, sdkPath,
+      genericSubInvocation,
+      genericSubInvocation.getClangImporterOptions()
+          .getReducedExtraArgsForSwiftModuleDependency());
 }
 
 std::error_code
@@ -2090,8 +2093,8 @@ InterfaceSubContextDelegateImpl::runInSubCompilerInstance(StringRef moduleName,
   }
 
   // Calculate output path of the module.
-  auto resolvedOutputPath =
-      getCachedOutputPath(moduleName, interfacePath, sdkPath);
+  SwiftInterfaceModuleOutputPathResolution::ResultTy resolvedOutputPath;
+  getCachedOutputPath(resolvedOutputPath, moduleName, interfacePath, sdkPath);
 
   // If no specific output path is given, use the hashed output path.
   if (outputPath.empty()) {
@@ -2744,24 +2747,7 @@ std::unique_ptr<ExplicitCASModuleLoader> ExplicitCASModuleLoader::create(
   return result;
 }
 
-InterfaceModuleOutputPathResolver::ResultTy
-InterfaceModuleOutputPathResolver::getOutputPath() {
-  if (!resolvedOutputPath) {
-    resolvedOutputPath = std::make_unique<ResultTy>();
-    auto &outputPath = resolvedOutputPath->outputPath;
-    outputPath = CI.getClangModuleCachePath();
-    llvm::sys::path::append(outputPath, moduleName);
-    outputPath.append("-");
-    auto hashStart = outputPath.size();
-    outputPath.append(getHash());
-    resolvedOutputPath->hash = outputPath.str().substr(hashStart);
-    outputPath.append(".");
-    auto outExt = file_types::getExtension(file_types::TY_SwiftModuleFile);
-    outputPath.append(outExt);
-  }
-  return *resolvedOutputPath;
-}
-
+namespace swift::SwiftInterfaceModuleOutputPathResolution {
 /// Construct a key for the .swiftmodule being generated. There is a
 /// balance to be struck here between things that go in the cache key and
 /// things that go in the "up to date" check of the cache entry. We want to
@@ -2772,7 +2758,10 @@ InterfaceModuleOutputPathResolver::getOutputPath() {
 /// -- rather than making a new one and potentially filling up the cache
 /// with dead entries -- when other factors change, such as the contents of
 /// the .swiftinterface input or its dependencies.
-std::string InterfaceModuleOutputPathResolver::getHash() {
+static std::string getContextHash(const CompilerInvocation &CI,
+                                  const StringRef &interfacePath,
+                                  const StringRef &sdkPath,
+                                  const ArgListTy &extraArgs) {
   // When doing dependency scanning for explicit module, use strict context hash
   // to ensure sound module hash.
   bool useStrictCacheHash = CI.getFrontendOptions().RequestedAction ==
@@ -2842,9 +2831,19 @@ std::string InterfaceModuleOutputPathResolver::getHash() {
   return llvm::toString(llvm::APInt(64, H), 36, /*Signed=*/false);
 }
 
-void InterfaceModuleOutputPathResolver::pruneExtraArgs(
-    std::function<void(ArgListTy &)> filter) {
-  assert(!resolvedOutputPath &&
-         "Cannot prune again after the output path has been resolved.");
-  filter(extraArgs);
+void getOutputPath(ResultTy &resolvedOutputPath, const StringRef &moduleName,
+                   const StringRef &interfacePath, const StringRef &sdkPath,
+                   const CompilerInvocation &CI, const ArgListTy &extraArgs) {
+  auto &outputPath = resolvedOutputPath.outputPath;
+  outputPath = CI.getClangModuleCachePath();
+  llvm::sys::path::append(outputPath, moduleName);
+  outputPath.append("-");
+  auto hashStart = outputPath.size();
+  outputPath.append(getContextHash(CI, interfacePath, sdkPath, extraArgs));
+  resolvedOutputPath.hash = outputPath.str().substr(hashStart);
+  outputPath.append(".");
+  auto outExt = file_types::getExtension(file_types::TY_SwiftModuleFile);
+  outputPath.append(outExt);
+  return;
 }
+} // namespace swift::SwiftInterfaceModuleOutputPathResolution

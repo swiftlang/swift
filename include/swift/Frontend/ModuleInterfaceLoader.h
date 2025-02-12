@@ -628,53 +628,20 @@ struct SwiftInterfaceInfo {
   std::optional<version::Version> CompilerToolsVersion;
 };
 
-/// A small helper class that expands the module name to a full output path
-/// with context hash.
-/// The cannonical way to use this class is the following:
-/// 1. Create an instance through the constructor.
-/// 2. Optional: prune the extra args if necessary.
-/// 3. Obtain the expanded name that contains a full path, and a hash.
-/// expandedName is computed only once, and never updated.
-/// Currently, there is no use case where we first obtain expandedName,
-/// then prune the extra args, and finally obtain expandedName again.
-/// Pruning always happens before the first time we call getExpandedName().
-/// Therefore it is correct to calculate expandedName only once.
-class InterfaceModuleOutputPathResolver {
-public:
-  using ArgListTy = std::vector<std::string>;
-  struct ResultTy {
-    llvm::SmallString<256> outputPath;
+namespace SwiftInterfaceModuleOutputPathResolution {
+struct ResultTy {
+  llvm::SmallString<256> outputPath;
 
-    // Hash points to a segment of outputPath.
-    StringRef hash;
-  };
-
-private:
-  const StringRef moduleName;
-  const StringRef interfacePath;
-  const StringRef sdkPath;
-  const CompilerInvocation &CI;
-
-  // This field contains the clang ExtraArgs that affect how clang types are
-  // imported into swift module. See the constructor for how this field is set,
-  // and see pruneExtraArgs to see how it can be updated.
-  ArgListTy extraArgs;
-
-  std::unique_ptr<ResultTy> resolvedOutputPath;
-
-  std::string getHash();
-
-public:
-  InterfaceModuleOutputPathResolver(const StringRef moduleName,
-                                    const StringRef interfacePath,
-                                    const StringRef sdkPath,
-                                    const CompilerInvocation &CI)
-      : moduleName(moduleName), interfacePath(interfacePath), sdkPath(sdkPath),
-        CI(CI), extraArgs(CI.getClangImporterOptions()
-                              .getReducedExtraArgsForSwiftModuleDependency()) {}
-  ResultTy getOutputPath();
-  void pruneExtraArgs(std::function<void(ArgListTy &)> filter);
+  // Hash points to a segment of outputPath.
+  StringRef hash;
 };
+
+using ArgListTy = std::vector<std::string>;
+
+void getOutputPath(ResultTy &outputPath, const StringRef &moduleName,
+                   const StringRef &interfacePath, const StringRef &sdkPath,
+                   const CompilerInvocation &CI, const ArgListTy &extraArgs);
+} // namespace SwiftInterfaceModuleOutputPathResolution
 
 struct InterfaceSubContextDelegateImpl : InterfaceSubContextDelegate {
 private:
@@ -750,11 +717,12 @@ public:
 
   ~InterfaceSubContextDelegateImpl() = default;
 
-  /// includes a hash of relevant key data.
-  InterfaceModuleOutputPathResolver::ResultTy
-  getCachedOutputPath(StringRef moduleName, StringRef interfacePath,
-                      StringRef sdkPath);
+  /// resolvedOutputPath includes a hash of relevant key data.
+  void getCachedOutputPath(
+      SwiftInterfaceModuleOutputPathResolution::ResultTy &resolvedOutputPath,
+      StringRef moduleName, StringRef interfacePath, StringRef sdkPath);
 };
+
 } // namespace swift
 
 #endif

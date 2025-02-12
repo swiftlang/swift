@@ -88,15 +88,6 @@ public:
         tracker(std::move(tracker)) {
     // Copy commandline.
     commandline = resolvingDepInfo.getCommandline();
-
-    if (resolvingDepInfo.isSwiftInterfaceModule()) {
-      auto swiftTextualDeps = resolvingDepInfo.getAsSwiftInterfaceModule();
-      auto &interfacePath = swiftTextualDeps->swiftInterfaceFile;
-      auto SDKPath = instance.getASTContext().SearchPathOpts.getSDKPath();
-      outputPathResolver = std::make_unique<InterfaceModuleOutputPathResolver>(
-          moduleID.ModuleName, interfacePath, SDKPath,
-          instance.getInvocation());
-    }
   }
 
   llvm::Error
@@ -178,12 +169,10 @@ public:
       }
     }
 
-    // It is necessary to update the command line to take
-    // the pruned unused VFS overlay into account before remapping the
-    // command line.
+    SwiftInterfaceModuleOutputPathResolution::ResultTy swiftInterfaceOutputPath;
     if (resolvingDepInfo.isSwiftInterfaceModule()) {
-      pruneUnusedVFSOverlay();
-      updateSwiftInterfaceModuleOutputPath();
+      pruneUnusedVFSOverlay(swiftInterfaceOutputPath);
+      updateSwiftInterfaceModuleOutputPath(swiftInterfaceOutputPath);
     }
 
     // Update the dependency in the cache with the modified command-line.
@@ -197,7 +186,7 @@ public:
     }
 
     auto dependencyInfoCopy = resolvingDepInfo;
-    if (auto err = finalize(dependencyInfoCopy))
+    if (auto err = finalize(dependencyInfoCopy, swiftInterfaceOutputPath))
       return err;
 
     dependencyInfoCopy.setIsFinalized(true);
@@ -207,15 +196,16 @@ public:
 
 private:
   // Finalize the resolving dependency info.
-  llvm::Error finalize(ModuleDependencyInfo &depInfo) {
+  llvm::Error finalize(ModuleDependencyInfo &depInfo,
+                       const SwiftInterfaceModuleOutputPathResolution::ResultTy
+                           &swiftInterfaceModuleOutputPath) {
     if (resolvingDepInfo.isSwiftPlaceholderModule())
       return llvm::Error::success();
 
-    if (outputPathResolver) {
-      auto resolvedPath = outputPathResolver->getOutputPath();
-      depInfo.setOutputPathAndHash(resolvedPath.outputPath.str().str(),
-                                   resolvedPath.hash.str());
-    }
+    if (resolvingDepInfo.isSwiftInterfaceModule())
+      depInfo.setOutputPathAndHash(
+          swiftInterfaceModuleOutputPath.outputPath.str().str(),
+          swiftInterfaceModuleOutputPath.hash.str());
 
     // Add macros.
     for (auto &macro : macros)
@@ -396,16 +386,18 @@ private:
     }
   }
 
-  void pruneUnusedVFSOverlay() {
+  void pruneUnusedVFSOverlay(
+      SwiftInterfaceModuleOutputPathResolution::ResultTy &outputPath) {
     // Pruning of unused VFS overlay options for Clang dependencies is performed
     // by the Clang dependency scanner.
     if (moduleID.Kind == ModuleDependencyKind::Clang)
       return;
 
+    // Prune the command line.
     std::vector<std::string> resolvedCommandLine;
     size_t skip = 0;
-    for (auto it = commandline.begin(), end = commandline.end();
-         it != end; it++) {
+    for (auto it = commandline.begin(), end = commandline.end(); it != end;
+         it++) {
       if (skip) {
         skip--;
         continue;
@@ -423,50 +415,50 @@ private:
       resolvedCommandLine.push_back(*it);
     }
 
-    // Filter the extra args that we use to calculate the hash of the module.
-    // The key assumption is that these args are clang importer args, so we
-    // do not need to check for -Xcc.
-    auto extraArgsFilter =
-        [&](InterfaceModuleOutputPathResolver::ArgListTy &args) {
-          bool skip = false;
-          InterfaceModuleOutputPathResolver::ArgListTy newArgs;
-          for (auto it = args.begin(), end = args.end(); it != end; it++) {
-            if (skip) {
-              skip = false;
-              continue;
-            }
-
-            if ((it + 1) != end && isVFSOverlayFlag(*it)) {
-              if (!usedVFSOverlayPaths.contains(*(it + 1))) {
-                skip = true;
-                continue;
-              }
-            }
-
-            newArgs.push_back(*it);
-          }
-          args = std::move(newArgs);
-          return;
-        };
-
-    if (outputPathResolver)
-      outputPathResolver->pruneExtraArgs(extraArgsFilter);
-
     commandline = std::move(resolvedCommandLine);
+
+    // Prune the clang impoter options. We do not need to deal with -Xcc because
+    // these are clang options.
+    const auto &CI = instance.getInvocation();
+
+    SwiftInterfaceModuleOutputPathResolution::ArgListTy extraArgsList;
+    const SwiftInterfaceModuleOutputPathResolution::ArgListTy
+        &clangImpporterOptions =
+            CI.getClangImporterOptions()
+                .getReducedExtraArgsForSwiftModuleDependency();
+
+    skip = 0;
+    for (auto it = clangImpporterOptions.begin(),
+              end = clangImpporterOptions.end();
+         it != end; it++) {
+      if (skip) {
+        skip = 0;
+        continue;
+      }
+
+      if ((it + 1) != end && isVFSOverlayFlag(*it)) {
+        if (!usedVFSOverlayPaths.contains(*(it + 1))) {
+          skip = 1;
+          continue;
+        }
+      }
+
+      extraArgsList.push_back(*it);
+    }
+
+    auto swiftTextualDeps = resolvingDepInfo.getAsSwiftInterfaceModule();
+    auto &interfacePath = swiftTextualDeps->swiftInterfaceFile;
+    auto sdkPath = instance.getASTContext().SearchPathOpts.getSDKPath();
+    SwiftInterfaceModuleOutputPathResolution::getOutputPath(
+        outputPath, moduleID.ModuleName, interfacePath, sdkPath, CI,
+        extraArgsList);
+
+    return;
   }
 
-  void updateSwiftInterfaceModuleOutputPath() {
-    // The command line needs update once we prune the unused VFS overlays.
-    // The update consists of two steps.
-    // 1. Obtain the output path, which includes the module hash that takes the
-    // VFS pruning into account.
-    // 2. Update `-o `'s value on the command line with the new output path.
-
-    assert(outputPathResolver &&
-           "Can only update if we have an outputPathResolver.");
-    const auto &expandedName = outputPathResolver->getOutputPath();
-
-    StringRef outputName = expandedName.outputPath.str();
+  void updateSwiftInterfaceModuleOutputPath(
+      const SwiftInterfaceModuleOutputPathResolution::ResultTy &outputPath) {
+    StringRef outputName = outputPath.outputPath.str();
 
     bool isOutputPath = false;
     for (auto &A : commandline) {
@@ -604,7 +596,6 @@ private:
   ModuleDependenciesCache &cache;
   CompilerInstance &instance;
   const ModuleDependencyInfo &resolvingDepInfo;
-  std::unique_ptr<InterfaceModuleOutputPathResolver> outputPathResolver;
 
   std::optional<SwiftDependencyTracker> tracker;
   std::vector<std::string> rootIDs;
