@@ -135,10 +135,10 @@ BridgedPlatformVersionConstraintAvailabilitySpec
 BridgedPlatformVersionConstraintAvailabilitySpec_createParsed(
     BridgedASTContext cContext, BridgedPlatformKind cPlatform,
     BridgedSourceLoc cPlatformLoc, BridgedVersionTuple cVersion,
-    BridgedVersionTuple cRuntimeVersion, BridgedSourceRange cVersionSrcRange) {
+    BridgedSourceRange cVersionSrcRange) {
   return new (cContext.unbridged()) PlatformVersionConstraintAvailabilitySpec(
       unbridge(cPlatform), cPlatformLoc.unbridged(), cVersion.unbridged(),
-      cRuntimeVersion.unbridged(), cVersionSrcRange.unbridged());
+      cVersionSrcRange.unbridged());
 }
 
 BridgedPlatformAgnosticVersionConstraintAvailabilitySpec

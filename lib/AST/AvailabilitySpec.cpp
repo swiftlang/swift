@@ -116,6 +116,27 @@ SourceRange PlatformAgnosticVersionConstraintAvailabilitySpec::getSourceRange() 
   return SourceRange(PlatformAgnosticNameLoc, VersionSrcRange.End);
 }
 
+llvm::VersionTuple
+PlatformVersionConstraintAvailabilitySpec::getVersion() const {
+  // For macOS Big Sur, we canonicalize 10.16 to 11.0 for compile-time
+  // checking since clang canonicalizes availability markup. However, to
+  // support Beta versions of macOS Big Sur where the OS
+  // reports 10.16 at run time, we need to compare against 10.16,
+  //
+  // This means for:
+  //
+  // if #available(macOS 10.16, *) { ... }
+  //
+  // we need to store the uncanonicalized version for codegen and canonicalize
+  // it as necessary for compile-time checks.
+  return canonicalizePlatformVersion(Platform, Version);
+}
+
+llvm::VersionTuple
+PlatformVersionConstraintAvailabilitySpec::getRuntimeVersion() const {
+  return Version;
+}
+
 void PlatformAgnosticVersionConstraintAvailabilitySpec::print(raw_ostream &OS,
                                                       unsigned Indent) const {
   OS.indent(Indent) << '('

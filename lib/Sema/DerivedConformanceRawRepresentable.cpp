@@ -201,9 +201,7 @@ struct RuntimeVersionCheck {
   Stmt *createEarlyReturnStmt(ASTContext &C) const {
     // platformSpec = "\(attr.platform) \(attr.introduced)"
     auto platformSpec = new (C) PlatformVersionConstraintAvailabilitySpec(
-                            Platform, SourceLoc(),
-                            Version, Version, SourceLoc()
-                        );
+        Platform, SourceLoc(), Version, SourceLoc());
 
     // otherSpec = "*"
     auto otherSpec = new (C) OtherPlatformAvailabilitySpec(SourceLoc());
