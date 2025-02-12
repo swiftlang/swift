@@ -54,6 +54,10 @@ The toolchain snapshot to build the early components with.
 .PARAMETER PinnedSHA256
 The SHA256 for the pinned toolchain.
 
+.PARAMETER PinnedToolchainVariant
+The toolchain variant to use while building the toolchain. Defaults to
+`Asserts`.
+
 .PARAMETER AndroidNDKVersion
 The version number of the Android NDK to be used.
 
@@ -102,6 +106,9 @@ in batch file format instead of executing them.
 .PARAMETER HostArchName
 The architecture where the toolchain will execute.
 
+.PARAMETER Variant
+The toolchain variant to build. Defaults to `Asserts`.
+
 .EXAMPLE
 PS> .\Build.ps1
 
@@ -128,6 +135,8 @@ param
   [ValidatePattern("^[A-Fa-f0-9]{64}$")]
   [string] $PinnedSHA256 = "",
   [string] $PinnedVersion = "",
+  [ValidateSet("Asserts", "NoAsserts")]
+  [string] $PinnedToolchainVariant = "Asserts",
   [string] $PythonVersion = "3.9.10",
   [ValidatePattern("^r(?:[1-9]|[1-9][0-9])(?:[a-z])?$")]
   [string] $AndroidNDKVersion = "r26b",
@@ -150,6 +159,8 @@ param
   [string] $BuildTo = "",
   [ValidateSet("AMD64", "ARM64")]
   [string] $HostArchName = $(if ($env:PROCESSOR_ARCHITEW6432 -ne $null) { "$env:PROCESSOR_ARCHITEW6432" } else { "$env:PROCESSOR_ARCHITECTURE" }),
+  [ValidateSet("Asserts", "NoAsserts")]
+  [string] $Variant = "Asserts",
   [switch] $Clean,
   [switch] $DebugInfo,
   [switch] $EnableCaching,
@@ -236,7 +247,7 @@ $ArchX64 = @{
   ExperimentalSDKInstallRoot = "$BinaryCache\x64\Windows.platform\Developer\SDKs\WindowsExperimental.sdk";
   XCTestInstallRoot = "$BinaryCache\x64\Windows.platform\Developer\Library\XCTest-development";
   SwiftTestingInstallRoot = "$BinaryCache\x64\Windows.platform\Developer\Library\Testing-development";
-  ToolchainInstallRoot = "$BinaryCache\x64\toolchains\$ProductVersion+Asserts";
+  ToolchainInstallRoot = "$BinaryCache\x64\toolchains\$ProductVersion+$Variant";
   Cache = @{};
 }
 
@@ -266,7 +277,7 @@ $ArchARM64 = @{
   SDKInstallRoot = "$BinaryCache\arm64\Windows.platform\Developer\SDKs\Windows.sdk";
   ExperimentalSDKInstallRoot = "$BinaryCache\arm64\Windows.platform\Developer\SDKs\WindowsExperimental.sdk";
   XCTestInstallRoot = "$BinaryCache\arm64\Windows.platform\Developer\Library\XCTest-development";
-  ToolchainInstallRoot = "$BinaryCache\arm64\toolchains\$ProductVersion+Asserts";
+  ToolchainInstallRoot = "$BinaryCache\arm64\toolchains\$ProductVersion+$Variant";
   SwiftTestingInstallRoot = "$BinaryCache\arm64\Windows.platform\Developer\Library\Testing-development";
   Cache = @{};
 }
@@ -391,7 +402,7 @@ $LibraryRoot = "$ImageRoot\Library"
 
 # For dev productivity, install the host toolchain directly using CMake.
 # This allows iterating on the toolchain using ninja builds.
-$HostArch.ToolchainInstallRoot = "$(Get-InstallDir $HostArch)\Toolchains\$ProductVersion+Asserts"
+$HostArch.ToolchainInstallRoot = "$(Get-InstallDir $HostArch)\Toolchains\$ProductVersion+$Variant"
 
 # Resolve the architectures received as argument
 $AndroidSDKArchs = @($AndroidSDKs | ForEach-Object {
@@ -917,20 +928,25 @@ function Fetch-Dependencies {
 }
 
 function Get-PinnedToolchainToolsDir() {
-  # NOTE: add a workaround for the main snapshots that used the wrong version
-  # when building that was not noticed. This allows use of the nightly snapshot
+  $ToolchainsRoot = [IO.Path]::Combine("$BinaryCache", "toolchains", "$PinnedToolchain", "LocalApp", "Programs", "Swift", "Toolchains")
+  $VariantToolchainPath = [IO.Path]::Combine($ToolchainsRoot, "$(Get-PinnedToolchainVersion)+$PinnedToolchainVariant", "usr", "bin")
+
+  # NOTE: Add a workaround for the main snapshots that inadvertently used the
+  # wrong version when they were built. This allows use of the nightly snapshot
   # as a pinned toolchain.
   if ((Get-PinnedToolchainVersion) -eq "0.0.0") {
-    if (-not (Test-Path "$BinaryCache\toolchains\${PinnedToolchain}\LocalApp\Programs\Swift\Toolchains\0.0.0+Asserts\usr\bin")) {
-      if (Test-Path "$BinaryCache\toolchains\${PinnedToolchain}\LocalApp\Programs\Swift\Toolchains\6.0.0+Asserts\usr\bin") {
-        return "$BinaryCache\toolchains\${PinnedToolchain}\LocalApp\Programs\Swift\Toolchains\6.0.0+Asserts\usr\bin"
+    if (-not (Test-Path "$ToolchainsRoot\0.0.0+Asserts\usr\bin")) {
+      if (Test-Path "$ToolchainsRoot\6.0.0+Asserts\usr\bin") {
+        return "$ToolchainsRoot\6.0.0+Asserts\usr\bin"
       }
     }
   }
-  if (Test-Path "$BinaryCache\toolchains\${PinnedToolchain}\LocalApp\Programs\Swift\Toolchains\$(Get-PinnedToolchainVersion)+Asserts\usr\bin") {
-    return "$BinaryCache\toolchains\${PinnedToolchain}\LocalApp\Programs\Swift\Toolchains\$(Get-PinnedToolchainVersion)+Asserts\usr\bin"
+
+  if (Test-Path $VariantToolchainPath) {
+    return $VariantToolchainPath
   }
-  return "$BinaryCache\toolchains\${PinnedToolchain}\Library\Developer\Toolchains\unknown-Asserts-development.xctoolchain\usr\bin"
+
+  return "$BinaryCache\toolchains\${PinnedToolchain}\Library\Developer\Toolchains\unknown-$PinnedToolchainVariant-development.xctoolchain\usr\bin"
 }
 
 function Get-PinnedToolchainSDK() {
@@ -1666,9 +1682,10 @@ function Build-Compilers() {
         LLDB_TABLEGEN = (Join-Path -Path $BuildTools -ChildPath "lldb-tblgen.exe");
         LLDB_TEST_MAKE = "$BinaryCache\GnuWin32Make-4.4.1\bin\make.exe";
         LLVM_CONFIG_PATH = (Join-Path -Path $BuildTools -ChildPath "llvm-config.exe");
+        LLVM_ENABLE_ASSERTIONS = $(if ($Variant -eq "Asserts") { "YES" } else { "NO" })
         LLVM_EXTERNAL_SWIFT_SOURCE_DIR = "$SourceCache\swift";
-        LLVM_NATIVE_TOOL_DIR = $BuildTools;
         LLVM_HOST_TRIPLE = $BuildArch.LLVMTarget;
+        LLVM_NATIVE_TOOL_DIR = $BuildTools;
         LLVM_TABLEGEN = (Join-Path $BuildTools -ChildPath "llvm-tblgen.exe");
         LLVM_USE_HOST_TOOLS = "NO";
         Python3_EXECUTABLE = (Get-PythonExecutable);
@@ -1686,9 +1703,11 @@ function Build-Compilers() {
         SWIFT_ENABLE_SYNCHRONIZATION = "YES";
         SWIFT_ENABLE_VOLATILE = "YES";
         SWIFT_PATH_TO_LIBDISPATCH_SOURCE = "$SourceCache\swift-corelibs-libdispatch";
-        SWIFT_PATH_TO_SWIFT_SYNTAX_SOURCE = "$SourceCache\swift-syntax";
         SWIFT_PATH_TO_STRING_PROCESSING_SOURCE = "$SourceCache\swift-experimental-string-processing";
         SWIFT_PATH_TO_SWIFT_SDK = (Get-PinnedToolchainSDK);
+        SWIFT_PATH_TO_SWIFT_SYNTAX_SOURCE = "$SourceCache\swift-syntax";
+        SWIFT_STDLIB_ASSERTIONS = "NO";
+        SWIFTSYNTAX_ENABLE_ASSERTIONS = "NO";
         "cmark-gfm_DIR" = "$($Arch.ToolchainInstallRoot)\usr\lib\cmake";
       })
   }
@@ -3099,8 +3118,7 @@ if ($Clean) {
   }
 
   # In case of a previous test run, clear out the swiftmodules as they are not a stable format.
-  Remove-Item -Force -Recurse -Path "$($HostARch.ToolchainInstallRoot)\usr\lib\swift\windows\*.swiftmodule" -ErrorAction Ignore
-
+  Remove-Item -Force -Recurse -Path "$($HostArch.ToolchainInstallRoot)\usr\lib\swift\windows\*.swiftmodule" -ErrorAction Ignore
   foreach ($Arch in $WindowsSDKArchs) {
     foreach ($project in [TargetComponent]::GetNames([TargetComponent])) {
       Remove-Item -Force -Recurse -Path "$BinaryCache\$($Arch.LLVMTarget)\$project" -ErrorAction Ignore
