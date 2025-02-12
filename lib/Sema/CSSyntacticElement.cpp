@@ -122,7 +122,7 @@ public:
           // relative to this element's context.
           if (CS.simplifyType(type)->hasTypeVariable()) {
             auto transformedTy = type.transformRec([&](Type type) -> std::optional<Type> {
-              if (auto *typeVar = type->getAs<TypeVariableType>()) {
+              if (type->is<TypeVariableType>()) {
                 return Type(ErrorType::get(CS.getASTContext()));
               }
               return std::nullopt;
@@ -199,7 +199,7 @@ public:
   }
 
   PostWalkResult<Expr *> walkToExprPost(Expr *expr) override {
-    if (auto *closure = dyn_cast<ClosureExpr>(expr)) {
+    if (isa<ClosureExpr>(expr)) {
       ClosureDCs.pop_back();
     }
     return Action::Continue(expr);
@@ -686,13 +686,8 @@ private:
   ///
   /// - From sequence to pattern, when pattern has no type information.
   void visitForEachPattern(Pattern *pattern, ForEachStmt *forEachStmt) {
-    // The `where` clause should be ignored because \c visitForEachStmt
-    // records it as a separate conjunction element to allow for a more
-    // granular control over what contextual information is brought into
-    // the scope during pattern + sequence and `where` clause solving.
     auto target = SyntacticElementTarget::forForEachPreamble(
-        forEachStmt, context.getAsDeclContext(),
-        /*ignoreWhereClause=*/true);
+        forEachStmt, context.getAsDeclContext());
 
     if (cs.generateConstraints(target)) {
       hadError = true;
@@ -908,7 +903,7 @@ private:
     if (auto *elseStmt = ifStmt->getElseStmt()) {
       auto *elseLoc = cs.getConstraintLocator(
           locator, LocatorPathElt::TernaryBranch(/*then=*/false));
-      elements.push_back(makeElement(ifStmt->getElseStmt(), elseLoc));
+      elements.push_back(makeElement(elseStmt, elseLoc));
     }
 
     createConjunction(elements, locator);
@@ -1901,10 +1896,20 @@ private:
   ASTNode visitForEachStmt(ForEachStmt *forEachStmt) {
     ConstraintSystem &cs = solution.getConstraintSystem();
 
-    auto forEachTarget = rewriter.rewriteTarget(*cs.getTargetFor(forEachStmt));
-
-    if (!forEachTarget)
+    // Apply solution to the preamble first.
+    if (!rewriter.rewriteTarget(*cs.getTargetFor(forEachStmt))) {
       hadError = true;
+    }
+
+    // Then apply the solution to the filtering condition, if there is one.
+    if (auto *whereExpr = forEachStmt->getWhere()) {
+      auto whereTarget = *cs.getTargetFor(whereExpr);
+      if (auto rewrittenWhereTarget = rewriter.rewriteTarget(whereTarget)) {
+        forEachStmt->setWhere(rewrittenWhereTarget->getAsExpr());
+      } else {
+        hadError = true;
+      }
+    }
 
     auto body = visit(forEachStmt->getBody()).get<Stmt *>();
     forEachStmt->setBody(cast<BraceStmt>(body));
@@ -1989,8 +1994,7 @@ private:
     for (auto *expected : caseStmt->getCaseBodyVariablesOrEmptyArray()) {
       assert(expected->hasName());
       auto prev = expected->getParentVarDecl();
-      auto type = solution.resolveInterfaceType(
-          solution.getType(prev)->mapTypeOutOfContext());
+      auto type = solution.getResolvedType(prev)->mapTypeOutOfContext();
       expected->setInterfaceType(type);
     }
   }

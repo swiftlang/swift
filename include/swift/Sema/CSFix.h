@@ -109,12 +109,6 @@ enum class FixKind : uint8_t {
   /// Fix up the generic arguments of two types so they match each other.
   GenericArgumentsMismatch,
 
-  /// Fix up @autoclosure argument to the @autoclosure parameter,
-  /// to for a call to be able to forward it properly, since
-  /// @autoclosure conversions are unsupported starting from
-  /// Swift version 5.
-  AutoClosureForwarding,
-
   /// Remove `!` or `?` because base is not an optional type.
   RemoveUnwrap,
 
@@ -489,6 +483,10 @@ enum class FixKind : uint8_t {
   /// sending result, but is passed a function typed parameter without a sending
   /// result.
   AllowSendingMismatch,
+
+  /// Ignore when a 'Slab' literal has mismatched number of elements to the
+  /// type it's attempting to bind to.
+  AllowSlabLiteralCountMismatch,
 };
 
 class ConstraintFix {
@@ -1216,33 +1214,6 @@ private:
 
   MutableArrayRef<unsigned> getMismatchesBuf() {
     return {getTrailingObjects<unsigned>(), NumMismatches};
-  }
-};
-
-/// Detect situations when argument of the @autoclosure parameter is itself
-/// marked as @autoclosure and is not applied. Form a fix which suggests a
-/// proper way to forward such arguments, e.g.:
-///
-/// ```swift
-/// func foo(_ fn: @autoclosure () -> Int) {}
-/// func bar(_ fn: @autoclosure () -> Int) {
-///   foo(fn) // error - fn should be called
-/// }
-/// ```
-class AutoClosureForwarding final : public ConstraintFix {
-  AutoClosureForwarding(ConstraintSystem &cs, ConstraintLocator *locator)
-      : ConstraintFix(cs, FixKind::AutoClosureForwarding, locator) {}
-
-public:
-  std::string getName() const override { return "fix @autoclosure forwarding"; }
-
-  bool diagnose(const Solution &solution, bool asNote = false) const override;
-
-  static AutoClosureForwarding *create(ConstraintSystem &cs,
-                                       ConstraintLocator *locator);
-
-  static bool classof(const ConstraintFix *fix) {
-    return fix->getKind() == FixKind::AutoClosureForwarding;
   }
 };
 
@@ -3867,6 +3838,30 @@ public:
 
   static bool classof(const ConstraintFix *fix) {
     return fix->getKind() == FixKind::IgnoreKeyPathSubscriptIndexMismatch;
+  }
+};
+
+class AllowSlabLiteralCountMismatch final : public ConstraintFix {
+  Type lhsCount, rhsCount;
+
+  AllowSlabLiteralCountMismatch(ConstraintSystem &cs, Type lhsCount,
+                                Type rhsCount, ConstraintLocator *locator)
+      : ConstraintFix(cs, FixKind::AllowSlabLiteralCountMismatch, locator),
+        lhsCount(lhsCount), rhsCount(rhsCount) {}
+
+public:
+  std::string getName() const override {
+    return "allow vector literal count mismatch";
+  }
+
+  bool diagnose(const Solution &solution, bool asNote = false) const override;
+
+  static AllowSlabLiteralCountMismatch *
+  create(ConstraintSystem &cs, Type lhsCount, Type rhsCount,
+         ConstraintLocator *locator);
+
+  static bool classof(const ConstraintFix *fix) {
+    return fix->getKind() == FixKind::AllowSlabLiteralCountMismatch;
   }
 };
 

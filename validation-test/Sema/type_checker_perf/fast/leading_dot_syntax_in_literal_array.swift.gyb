@@ -1,0 +1,23 @@
+// RUN: %scale-test --begin 1 --end 15 --step 1 --select NumLeafScopes %s --expected-exit-code 0
+// REQUIRES: asserts,no_asan
+
+enum E {
+    case a
+    case b
+    case c(Int32)
+}
+
+struct Tester {
+  mutating func test(arr: [E], cond: Bool = false) {}
+  mutating func test(arr: E..., cond: Bool = false) {}
+}
+
+func test() {
+  var tester = Tester()
+  tester.test(arr: [
+    .c(1), .a,
+%for i in range(N):
+    .c(1 << 4 | 8), .c(0),
+%end
+    .c(1), .b])
+}

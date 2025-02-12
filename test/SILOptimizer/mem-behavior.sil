@@ -19,6 +19,11 @@ class C {
   @_hasStorage @_hasInitialValue final var prop: Builtin.Int32 { get }
 }
 
+class CL {
+  @_hasStorage let x: String
+}
+
+
 class Parent {
   @_hasStorage var child: C { get set }
 }
@@ -34,6 +39,7 @@ sil @nouser_func : $@convention(thin) () -> ()
 sil @in_ptr : $@convention(thin) (@in Builtin.RawPointer) -> ()
 sil @init_C : $@convention(thin) () -> @out C
 sil @read_C : $@convention(thin) (@in_guaranteed C) -> ()
+sil @consume : $@convention(thin) (@owned CL) -> ()
 
 sil @store_to_int : $@convention(thin) (Int32, @inout Int32) -> () {
 [%1: write v**]
@@ -857,7 +863,22 @@ bb0:
 // CHECK-NEXT:     %2 = apply %1(%0) : $@convention(thin) () -> @out C
 // CHECK-NEXT:     %0 = global_addr @globalC : $*C
 // CHECK-NEXT:   r=1,w=1
-sil hidden @testInitGlobalLet : $@convention(thin) () -> () {
+sil hidden [global_init_once_fn] @testInitGlobalLet : $@convention(thin) () -> () {
+bb0:
+  %0 = global_addr @globalC : $*C
+  %1 = function_ref @init_C : $@convention(thin) () -> @out C
+  %2 = apply %1(%0) : $@convention(thin) () -> @out C
+  %3 = load %0 : $*C
+  %8 = tuple ()
+  return %8 : $()
+}
+
+// CHECK-LABEL: @main
+// CHECK:      PAIR #0.
+// CHECK-NEXT:     %2 = apply %1(%0) : $@convention(thin) () -> @out C
+// CHECK-NEXT:     %0 = global_addr @globalC : $*C
+// CHECK-NEXT:   r=1,w=1
+sil [global_init_once_fn] @main : $@convention(thin) () -> () {
 bb0:
   %0 = global_addr @globalC : $*C
   %1 = function_ref @init_C : $@convention(thin) () -> @out C
@@ -1788,3 +1809,74 @@ bb0(%0 :  $*X):
   return %2 : $C
 }
 
+// CHECK-LABEL: @test_release_of_class_with_let
+// CHECK:       PAIR #0.
+// CHECK-NEXT:     strong_release %0 : $CL
+// CHECK-NEXT:     %1 = ref_element_addr [immutable] %0 : $CL, #CL.x
+// CHECK-NEXT:   r=1,w=1
+sil @test_release_of_class_with_let : $@convention(thin) (@owned CL) -> () {
+bb0(%0 : $CL):
+  %1 = ref_element_addr [immutable] %0, #CL.x
+  strong_release %0
+  %3 = tuple ()
+  return %3
+}
+
+// CHECK-LABEL: @test_consume_of_class_with_let
+// CHECK:       PAIR #0.
+// CHECK-NEXT:      %3 = apply %2(%0) : $@convention(thin) (@owned CL) -> ()
+// CHECK-NEXT:      %1 = ref_element_addr [immutable] %0 : $CL, #CL.x
+// CHECK-NEXT:    r=1,w=1
+sil @test_consume_of_class_with_let : $@convention(thin) (@owned CL) -> () {
+bb0(%0 : $CL):
+  %1 = ref_element_addr [immutable] %0, #CL.x
+  %4 = function_ref @consume : $@convention(thin) (@owned CL) -> ()
+  apply %4(%0) : $@convention(thin) (@owned CL) -> ()
+  %3 = tuple ()
+  return %3
+}
+
+// CHECK-LABEL: @test_ossa_consume_of_class_with_let
+// CHECK:       PAIR #1.
+// CHECK-NEXT:      %5 = apply %4(%0) : $@convention(thin) (@owned CL) -> ()
+// CHECK-NEXT:      %2 = ref_element_addr [immutable] %1 : $CL, #CL.x
+// CHECK-NEXT:    r=1,w=1
+sil [ossa] @test_ossa_consume_of_class_with_let : $@convention(thin) (@owned CL) -> () {
+bb0(%0 : @owned $CL):
+  %1 = begin_borrow %0
+  %2 = ref_element_addr [immutable] %1, #CL.x
+  end_borrow %1
+  %4 = function_ref @consume : $@convention(thin) (@owned CL) -> ()
+  apply %4(%0) : $@convention(thin) (@owned CL) -> ()
+  %3 = tuple ()
+  return %3
+}
+
+// CHECK-LABEL: @test_mark_dependence
+// CHECK:       PAIR #0.
+// CHECK-NEXT:      %3 = mark_dependence %1 : $*C on %2 : $C
+// CHECK-NEXT:    %0 = argument of bb0 : $*C
+// CHECK-NEXT:    r=0,w=0
+// CHECK:       PAIR #3.
+// CHECK-NEXT:      %4 = mark_dependence %2 : $C on %0 : $*C
+// CHECK-NEXT:    %0 = argument of bb0 : $*C
+// CHECK-NEXT:    r=1,w=0
+// CHECK:       PAIR #4.
+// CHECK-NEXT:      %4 = mark_dependence %2 : $C on %0 : $*C
+// CHECK-NEXT:    %1 = argument of bb0 : $*C
+// CHECK-NEXT:    r=0,w=0
+// CHECK:       PAIR #7.
+// CHECK-NEXT:      %5 = mark_dependence %1 : $*C on %0 : $*C
+// CHECK-NEXT:    %0 = argument of bb0 : $*C
+// CHECK-NEXT:    r=1,w=0
+// CHECK:       PAIR #8.
+// CHECK-NEXT:      %5 = mark_dependence %1 : $*C on %0 : $*C
+// CHECK-NEXT:    %1 = argument of bb0 : $*C
+// CHECK-NEXT:    r=0,w=0
+sil [ossa] @test_mark_dependence : $@convention(thin) (@in_guaranteed C, @in_guaranteed C, @owned C) -> @owned C {
+bb0(%0 : $*C, %1 : $*C, %2 : @owned $C):
+  %3 = mark_dependence %1 on %2
+  %4 = mark_dependence %2 on %0
+  %5 = mark_dependence %1 on %0
+  return %4
+}

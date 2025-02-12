@@ -606,7 +606,8 @@ func testAddressor(p: UnsafePointer<Int>) -> Int {
 // CHECK:   apply
 // CHECK:   struct_extract
 // CHECK:   [[ADR:%.*]] = pointer_to_address
-// CHECK:   [[ACCESS:%.*]] = begin_access [read] [unsafe] [[ADR]] : $*Int
+// CHECK:   [[MD:%.*]] = mark_dependence [unresolved] [[ADR]] : $*Int on %0 : $UnsafePointer<Int>
+// CHECK:   [[ACCESS:%.*]] = begin_access [read] [unsafe] [[MD]] : $*Int
 // CHECK:   load [trivial] [[ACCESS]] : $*Int
 // CHECK:   return
 // CHECK-LABEL: } // end sil function '$s20access_marker_verify13testAddressor1pSiSPySiG_tF'
@@ -1021,7 +1022,8 @@ func testPointerInit(x: Int, y: UnsafeMutablePointer<Int>) {
 // CHECK: [[POINTEE:%.*]] = apply %{{.*}}<Int>(%1) : $@convention(method) <τ_0_0 where τ_0_0 : ~Copyable> (UnsafeMutablePointer<τ_0_0>) -> UnsafeMutablePointer<τ_0_0>
 // CHECK: [[RAWPTR:%.*]] = struct_extract [[POINTEE]] : $UnsafeMutablePointer<Int>, #UnsafeMutablePointer._rawValue
 // CHECK: [[ADR:%.*]] = pointer_to_address [[RAWPTR]] : $Builtin.RawPointer to [strict] $*Int
-// CHECK: [[ACCESS:%.*]] = begin_access [modify] [unsafe] [[ADR]] : $*Int
+// CHECK: [[MD:%.*]] = mark_dependence [unresolved] [[ADR]] : $*Int on %1 : $UnsafeMutablePointer<Int> // user: %9
+// CHECK: [[ACCESS:%.*]] = begin_access [modify] [unsafe] [[MD]] : $*Int
 // CHECK: assign %0 to [[ACCESS]] : $*Int
 // CHECK-LABEL: } // end sil function '$s20access_marker_verify15testPointerInit1x1yySi_SpySiGtF'
 

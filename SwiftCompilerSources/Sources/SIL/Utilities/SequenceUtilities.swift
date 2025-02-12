@@ -119,7 +119,7 @@ extension LazyFilterSequence : /*@retroactive*/ SIL.CollectionLikeSequence,
 //===----------------------------------------------------------------------===//
 
 public struct SingleInlineArray<Element>: RandomAccessCollection, FormattedLikeArray {
-  private var singleElement: Element?
+  public var singleElement: Element?
   private var multipleElements: [Element] = []
 
   public init() {}
@@ -166,5 +166,14 @@ public struct SingleInlineArray<Element>: RandomAccessCollection, FormattedLikeA
       return
     }
     multipleElements.append(element)
+  }
+
+  public mutating func popLast() -> Element? {
+    if multipleElements.isEmpty {
+      let last = singleElement
+      singleElement = nil
+      return last
+    }
+    return multipleElements.popLast()
   }
 }

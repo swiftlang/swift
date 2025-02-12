@@ -11,9 +11,10 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/AST/DeclContext.h"
-#include "swift/AST/AccessScope.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTWalker.h"
+#include "swift/AST/AccessScope.h"
+#include "swift/AST/AvailabilityInference.h"
 #include "swift/AST/ClangModuleLoader.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/FileUnit.h"
@@ -23,16 +24,17 @@
 #include "swift/AST/Module.h"
 #include "swift/AST/ParseRequests.h"
 #include "swift/AST/SourceFile.h"
-#include "swift/AST/Types.h"
 #include "swift/AST/TypeCheckRequests.h"
+#include "swift/AST/Types.h"
+#include "swift/AST/DiagnosticsSema.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Basic/Statistic.h"
+#include "clang/AST/ASTContext.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/Statistic.h"
-#include "llvm/Support/raw_ostream.h"
 #include "llvm/Support/SaveAndRestore.h"
-#include "clang/AST/ASTContext.h"
+#include "llvm/Support/raw_ostream.h"
 using namespace swift;
 
 #define DEBUG_TYPE "Name lookup"
@@ -306,7 +308,7 @@ DeclContext *DeclContext::getParentForLookup() const {
     // outer types.
     return getModuleScopeContext();
   }
-  if (isa<ProtocolDecl>(this) && getParent()->isGenericContext()) {
+  if (isUnsupportedNestedProtocol()) {
     // Protocols in generic contexts must not look in to their parents,
     // as the parents may contain types with inferred implicit
     // generic parameters not present in the protocol's generic signature.
@@ -409,6 +411,11 @@ SourceFile *DeclContext::getOutermostParentSourceFile() const {
     sf = enclosingSF;
 
   return sf;
+}
+
+bool DeclContext::isInSwiftinterface() const {
+  auto sf = getParentSourceFile();
+  return sf && sf->Kind == SourceFileKind::Interface;
 }
 
 DeclContext *DeclContext::getModuleScopeContext() const {
@@ -917,6 +924,18 @@ ASTContext &IterableDeclContext::getASTContext() const {
   return getDecl()->getASTContext();
 }
 
+SourceRange IterableDeclContext::getBraces() const {
+  switch (getIterableContextKind()) {
+  case IterableDeclContextKind::NominalTypeDecl:
+    return cast<NominalTypeDecl>(this)->getBraces();
+    break;
+
+  case IterableDeclContextKind::ExtensionDecl:
+    return cast<ExtensionDecl>(this)->getBraces();
+    break;
+  }
+}
+
 DeclRange IterableDeclContext::getCurrentMembersWithoutLoading() const {
   return DeclRange(FirstDeclAndLazyMembers.getPointer(), nullptr);
 }
@@ -1171,6 +1190,152 @@ void IterableDeclContext::loadAllMembers() const {
   // FIXME: (transitional) decrement the redundant "always-on" counter.
   if (auto s = ctx.Stats)
     --s->getFrontendCounters().NumUnloadedLazyIterableDeclContexts;
+}
+
+// Checks whether members of this decl and their respective member decls
+// (recursively) were deserialized into another module correctly, and
+// emits a diagnostic if deserialization failed. Requires the other module
+// module and this decl's module are in the same package, and this
+// decl's module has package optimization enabled.
+void IterableDeclContext::checkDeserializeMemberErrorInPackage(ModuleDecl *accessingModule) {
+  // For decls in the same module, we can skip deserialization error checks.
+  if (getDecl()->getModuleContext() == accessingModule)
+    return;
+  // Only check if accessing module is in the same package as this
+  // decl's module, which has package optimization enabled.
+  if (!getDecl()->getModuleContext()->inSamePackage(accessingModule) ||
+      !getDecl()->getModuleContext()->isResilient() ||
+      !getDecl()->getModuleContext()->serializePackageEnabled())
+    return;
+  // Bail if already checked for an error.
+  if (checkedForDeserializeMemberError())
+    return;
+  // If members were not deserialized, force load here.
+  if (!didDeserializeMembers()) {
+    // This needs to be set to force load all members if not done already.
+    setHasLazyMembers(true);
+    // Calling getMembers actually loads the members.
+    (void)getMembers();
+    assert(!hasLazyMembers());
+    assert(didDeserializeMembers());
+  }
+  // Members could have been deserialized from other flows. Check
+  // for an error here. First mark this decl 'checked' to prevent
+  // infinite recursion in case of self-referencing members.
+  setCheckedForDeserializeMemberError(true);
+
+  // If members are already loaded above or by other flows,
+  // calling getMembers here should be inexpensive.
+  auto memberList = getMembers();
+
+  // This decl contains a member deserialization error; emit a diag.
+  if (hasDeserializeMemberError()) {
+    auto containerID = Identifier();
+    if (auto container = dyn_cast<NominalTypeDecl>(getDecl())) {
+      containerID = container->getBaseIdentifier();
+    }
+
+    auto diagID = diag::cannot_bypass_resilience_due_to_missing_member_warn;
+    if (getASTContext().LangOpts.AbortOnDeserializationFailForPackageCMO)
+      diagID = diag::cannot_bypass_resilience_due_to_missing_member;
+
+    auto foundMissing = false;
+    for (auto member: memberList) {
+      // Only storage vars can affect memory layout so
+      // look up pattern binding decl or var decl.
+      if (auto *PBD = dyn_cast<PatternBindingDecl>(member)) {
+        // If this pattern binding decl is empty, we have
+        // a missing member.
+        if (PBD->getNumPatternEntries() == 0)
+          foundMissing = true;
+      }
+      // Check if a member can be cast to MissingMemberDecl.
+      if (auto missingMember = dyn_cast<MissingMemberDecl>(member)) {
+        if (!missingMember->getName().getBaseName().isSpecial() &&
+            foundMissing) {
+          foundMissing = false;
+          auto missingMemberID = missingMember->getName().getBaseIdentifier();
+          getASTContext().Diags.diagnose(member->getLoc(),
+                                         diagID,
+                                         missingMemberID,
+                                         missingMemberID.empty(),
+                                         containerID,
+                                         getDecl()->getModuleContext()->getBaseIdentifier(),
+                                         accessingModule->getBaseIdentifier());
+          continue;
+        }
+      }
+      // If not handled above, emit a diag here.
+      if (foundMissing) {
+        getASTContext().Diags.diagnose(getDecl()->getLoc(),
+                                       diagID,
+                                       Identifier(),
+                                       true,
+                                       containerID,
+                                       getDecl()->getModuleContext()->getBaseIdentifier(),
+                                       accessingModule->getBaseIdentifier());
+      }
+    }
+  } else {
+    // This decl does not contain a member deserialization error.
+    // Check for members of this decl's members recursively to
+    // see if a member deserialization failed.
+    for (auto member: memberList) {
+      // Only storage vars can affect memory layout so
+      // look up pattern binding decl or var decl.
+      if (auto *PBD = dyn_cast<PatternBindingDecl>(member)) {
+        for (auto i : range(PBD->getNumPatternEntries())) {
+          auto pattern = PBD->getPattern(i);
+          pattern->forEachVariable([&](const VarDecl *VD) {
+            // Bail if the var is static or has no storage
+            if (VD->isStatic() ||
+               !VD->hasStorageOrWrapsStorage())
+              return;
+            // Unwrap in case this var is optional.
+            auto varType = VD->getInterfaceType()->getCanonicalType();
+            if (auto unwrapped = varType->getCanonicalType()->getOptionalObjectType()) {
+              varType = unwrapped->getCanonicalType();
+            }
+            // Handle BoundGenericType, e.g. [Foo: Bar], Dictionary<Foo, Bar>.
+            // Check for its arguments types, i.e. Foo, Bar.
+            if (auto boundGeneric = varType->getAs<BoundGenericType>()) {
+                for (auto arg : boundGeneric->getGenericArgs()) {
+                  if (auto argNominal = arg->getNominalOrBoundGenericNominal()) {
+                    if (auto argIDC = dyn_cast<IterableDeclContext>(argNominal)) {
+                      argIDC->checkDeserializeMemberErrorInPackage(getDecl()->getModuleContext());
+                      if (argIDC->hasDeserializeMemberError()) {
+                         setHasDeserializeMemberError(true);
+                        break;
+                      }
+                    }
+                  }
+                }
+            } else if (auto tupleType = varType->getAs<TupleType>()) {
+              // Handle TupleType, e.g. (Foo, Var).
+              for (auto element : tupleType->getElements()) {
+                if (auto elementNominal = element.getType()->getNominalOrBoundGenericNominal()) {
+                    if (auto elementIDC = dyn_cast<IterableDeclContext>(elementNominal)) {
+                      elementIDC->checkDeserializeMemberErrorInPackage(getDecl()->getModuleContext());
+                      if (elementIDC->hasDeserializeMemberError()) {
+                         setHasDeserializeMemberError(true);
+                        break;
+                      }
+                    }
+                  }
+                }
+            } else if (auto varNominal = varType->getNominalOrBoundGenericNominal()) {
+              if (auto varIDC = dyn_cast<IterableDeclContext>(varNominal)) {
+                varIDC->checkDeserializeMemberErrorInPackage(getDecl()->getModuleContext());
+                if (varIDC->hasDeserializeMemberError()) {
+                   setHasDeserializeMemberError(true);
+                }
+              }
+            }
+          });
+        }
+      }
+    }
+  }
 }
 
 bool IterableDeclContext::wasDeserialized() const {
@@ -1532,6 +1697,10 @@ bool DeclContext::isInSpecializeExtensionContext() const {
    return isSpecializeExtensionContext(this);
 }
 
+bool DeclContext::isUnsupportedNestedProtocol() const {
+  return isa<ProtocolDecl>(this) && getParent()->isGenericContext();
+}
+
 bool DeclContext::isAlwaysAvailableConformanceContext() const {
   auto *ext = dyn_cast<ExtensionDecl>(this);
   if (ext == nullptr)
@@ -1548,11 +1717,4 @@ bool DeclContext::isAlwaysAvailableConformanceContext() const {
   auto deploymentTarget = AvailabilityRange::forDeploymentTarget(ctx);
 
   return deploymentTarget.isContainedIn(conformanceAvailability);
-}
-
-bool DeclContext::allowsUnsafe() const {
-  if (auto decl = getAsDecl())
-    return decl->allowsUnsafe();
-
-  return false;
 }

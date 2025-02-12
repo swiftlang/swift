@@ -30,6 +30,7 @@
 #include "llvm/Option/Arg.h"
 #include "llvm/Option/ArgList.h"
 #include "llvm/Option/Option.h"
+#include "llvm/Support/Compression.h"
 #include "llvm/Support/Process.h"
 #include "llvm/Support/FileSystem.h"
 #include "llvm/Support/LineIterator.h"
@@ -152,6 +153,7 @@ bool ArgsToFrontendOptionsConverter::convert(
 
   Opts.SerializeDependencyScannerCache |= Args.hasArg(OPT_serialize_dependency_scan_cache);
   Opts.ReuseDependencyScannerCache |= Args.hasArg(OPT_reuse_dependency_scan_cache);
+  Opts.ValidatePriorDependencyScannerCache |= Args.hasArg(OPT_validate_prior_dependency_scan_cache);
   Opts.EmitDependencyScannerCacheRemarks |= Args.hasArg(OPT_dependency_scan_cache_remarks);
   Opts.ParallelDependencyScan = Args.hasFlag(OPT_parallel_scan,
                                              OPT_no_parallel_scan,
@@ -159,6 +161,9 @@ bool ArgsToFrontendOptionsConverter::convert(
   if (const Arg *A = Args.getLastArg(OPT_dependency_scan_cache_path)) {
     Opts.SerializedDependencyScannerCachePath = A->getValue();
   }
+
+  Opts.ScannerOutputDir = Args.getLastArgValue(OPT_scanner_output_dir);
+  Opts.WriteScannerOutput |= Args.hasArg(OPT_scanner_debug_write_output);
 
   Opts.DisableCrossModuleIncrementalBuild |=
       Args.hasArg(OPT_disable_incremental_imports);
@@ -203,6 +208,32 @@ bool ArgsToFrontendOptionsConverter::convert(
   Opts.AllowModuleWithCompilerErrors |= Args.hasArg(OPT_experimental_allow_module_with_compiler_errors);
 
   computeDumpScopeMapLocations();
+
+  // Ensure that the compiler was built with zlib support if it was the
+  // requested AST format.
+  if (const Arg *A = Args.getLastArg(OPT_dump_ast_format)) {
+    auto format =
+        llvm::StringSwitch<std::optional<FrontendOptions::ASTFormat>>(A->getValue())
+            .Case("json", FrontendOptions::ASTFormat::JSON)
+            .Case("json-zlib", FrontendOptions::ASTFormat::JSONZlib)
+            .Case("default", FrontendOptions::ASTFormat::Default)
+            .Default(std::nullopt);
+    if (!format.has_value()) {
+      Diags.diagnose(SourceLoc(), diag::unknown_dump_ast_format, A->getValue());
+      return true;
+    }
+    if (format != FrontendOptions::ASTFormat::Default &&
+        !Args.hasArg(OPT_dump_ast)) {
+      Diags.diagnose(SourceLoc(), diag::ast_format_requires_dump_ast);
+      return true;
+    }
+    if (Opts.DumpASTFormat == FrontendOptions::ASTFormat::JSONZlib &&
+        !llvm::compression::zlib::isAvailable()) {
+      Diags.diagnose(SourceLoc(), diag::json_zlib_not_supported);
+      return true;
+    }
+    Opts.DumpASTFormat = *format;
+  }
 
   std::optional<FrontendInputsAndOutputs> inputsAndOutputs =
       ArgsToFrontendInputsConverter(Diags, Args).convert(buffers);
@@ -370,11 +401,11 @@ bool ArgsToFrontendOptionsConverter::convert(
   computeLLVMArgs();
 
   Opts.EmitSymbolGraph |= Args.hasArg(OPT_emit_symbol_graph);
-  
+
   if (const Arg *A = Args.getLastArg(OPT_emit_symbol_graph_dir)) {
     Opts.SymbolGraphOutputDir = A->getValue();
   }
-  
+
   Opts.SkipInheritedDocs = Args.hasArg(OPT_skip_inherited_docs);
   Opts.IncludeSPISymbolsInSymbolGraph = Args.hasArg(OPT_include_spi_symbols);
 
@@ -392,7 +423,10 @@ bool ArgsToFrontendOptionsConverter::convert(
   }
 
   Opts.DisableSandbox = Args.hasArg(OPT_disable_sandbox);
-  Opts.DisableFineModuleTracing = Args.hasArg(OPT_disable_fine_module_tracing);
+
+  if (computeAvailabilityDomains())
+    return true;
+
   return false;
 }
 
@@ -520,6 +554,39 @@ void ArgsToFrontendOptionsConverter::computeDumpScopeMapLocations() {
 
   if (!invalid && Opts.DumpScopeMapLocations.empty())
     Diags.diagnose(SourceLoc(), diag::error_no_source_location_scope_map);
+}
+
+bool ArgsToFrontendOptionsConverter::computeAvailabilityDomains() {
+  using namespace options;
+
+  bool hadError = false;
+  llvm::SmallSet<std::string, 4> seenDomains;
+
+  for (const Arg *A :
+       Args.filtered_reverse(OPT_define_enabled_availability_domain,
+                             OPT_define_disabled_availability_domain,
+                             OPT_define_dynamic_availability_domain)) {
+    std::string domain = A->getValue();
+    if (!seenDomains.insert(domain).second)
+      continue;
+
+    if (!Lexer::isIdentifier(domain)) {
+      Diags.diagnose(SourceLoc(), diag::error_invalid_arg_value,
+                     A->getAsString(Args), A->getValue());
+      hadError = true;
+      continue;
+    }
+
+    auto &option = A->getOption();
+    if (option.matches(OPT_define_enabled_availability_domain))
+      Opts.AvailabilityDomains.EnabledDomains.emplace_back(domain);
+    else if (option.matches(OPT_define_disabled_availability_domain))
+      Opts.AvailabilityDomains.DisabledDomains.emplace_back(domain);
+    else if (option.matches(OPT_define_dynamic_availability_domain))
+      Opts.AvailabilityDomains.DynamicDomains.emplace_back(domain);
+  }
+
+  return hadError;
 }
 
 FrontendOptions::ActionType
@@ -819,12 +886,25 @@ bool ArgsToFrontendOptionsConverter::checkUnusedSupplementaryOutputPaths()
   return false;
 }
 
+static inline bool isPCHFilenameExtension(StringRef path) {
+  return llvm::sys::path::extension(path)
+    .ends_with(file_types::getExtension(file_types::TY_PCH));
+}
+
 void ArgsToFrontendOptionsConverter::computeImportObjCHeaderOptions() {
   using namespace options;
   if (const Arg *A = Args.getLastArgNoClaim(OPT_import_objc_header)) {
-    Opts.ImplicitObjCHeaderPath = A->getValue();
-    Opts.SerializeBridgingHeader |= !Opts.InputsAndOutputs.hasPrimaryInputs();
+    // Legacy support for passing PCH file through `-import-objc-header`.
+    if (isPCHFilenameExtension(A->getValue()))
+      Opts.ImplicitObjCPCHPath = A->getValue();
+    else
+      Opts.ImplicitObjCHeaderPath = A->getValue();
+    // If `-import-object-header` is used, it means the module has a direct
+    // bridging header dependency and it can be serialized into binary module.
+    Opts.SerializeBridgingHeader |= true;
   }
+  if (const Arg *A = Args.getLastArgNoClaim(OPT_import_pch))
+    Opts.ImplicitObjCPCHPath = A->getValue();
 }
 void ArgsToFrontendOptionsConverter::
 computeImplicitImportModuleNames(OptSpecifier id, bool isTestable) {
@@ -853,7 +933,7 @@ bool ModuleAliasesConverter::computeModuleAliases(std::vector<std::string> args,
     // ModuleAliasMap should initially be empty as setting
     // it should be called only once
     options.ModuleAliasMap.clear();
-    
+
     auto validate = [&options, &diags](StringRef value, bool allowModuleName) -> bool
     {
       if (!allowModuleName) {
@@ -871,14 +951,14 @@ bool ModuleAliasesConverter::computeModuleAliases(std::vector<std::string> args,
       }
       return true;
     };
-    
+
     for (auto item: args) {
       auto str = StringRef(item);
       // splits to an alias and its real name
       auto pair = str.split('=');
       auto lhs = pair.first;
       auto rhs = pair.second;
-      
+
       if (rhs.empty()) { // '=' is missing
         diags.diagnose(SourceLoc(), diag::error_module_alias_invalid_format, str);
         return false;
@@ -886,7 +966,7 @@ bool ModuleAliasesConverter::computeModuleAliases(std::vector<std::string> args,
       if (!validate(lhs, false) || !validate(rhs, true)) {
         return false;
       }
-      
+
       // First, add the real name as a key to prevent it from being
       // used as an alias
       if (!options.ModuleAliasMap.insert({rhs, StringRef()}).second) {

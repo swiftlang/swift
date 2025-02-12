@@ -59,9 +59,31 @@ struct TemplateInstantiationNamePrinter
         namedArg = typeDefDecl;
       llvm::SmallString<128> storage;
       llvm::raw_svector_ostream buffer(storage);
-      nameImporter->importName(namedArg, version, clang::DeclarationName())
-          .getDeclName()
-          .print(buffer);
+
+      // Print the fully-qualified type name.
+      std::vector<DeclName> qualifiedNameComponents;
+      auto unqualifiedName = nameImporter->importName(namedArg, version);
+      qualifiedNameComponents.push_back(unqualifiedName.getDeclName());
+      const clang::DeclContext *parentCtx =
+          unqualifiedName.getEffectiveContext().getAsDeclContext();
+      while (parentCtx) {
+        if (auto namedParentDecl = dyn_cast<clang::NamedDecl>(parentCtx)) {
+          // If this component of the fully-qualified name is a decl that is
+          // imported into Swift, remember its name.
+          auto componentName =
+              nameImporter->importName(namedParentDecl, version);
+          qualifiedNameComponents.push_back(componentName.getDeclName());
+          parentCtx = componentName.getEffectiveContext().getAsDeclContext();
+        } else {
+          // If this component is not imported into Swift, skip it.
+          parentCtx = parentCtx->getParent();
+        }
+      }
+
+      llvm::interleave(
+          llvm::reverse(qualifiedNameComponents),
+          [&](const DeclName &each) { each.print(buffer); },
+          [&]() { buffer << "."; });
       return buffer.str().str();
     }
     return "_";

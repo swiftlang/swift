@@ -823,6 +823,7 @@ public:
     RefTailAddr,
     OpenExistentialBox,
     ProjectBox,
+    MarkDependenceNonEscaping,
   };
 
 private:
@@ -851,6 +852,12 @@ public:
       return Kind::OpenExistentialBox;
     case SILInstructionKind::ProjectBoxInst:
       return Kind::ProjectBox;
+    case SILInstructionKind::MarkDependenceInst: {
+      auto *mdi = cast<MarkDependenceInst>(use->getUser());
+      return mdi->isNonEscaping() && mdi->getType().isAddress()
+                 ? Kind::MarkDependenceNonEscaping
+                 : Kind::Invalid;
+    }
     }
   }
 
@@ -869,6 +876,12 @@ public:
       return Kind::OpenExistentialBox;
     case ValueKind::ProjectBoxInst:
       return Kind::ProjectBox;
+    case ValueKind::MarkDependenceInst: {
+      auto *mdi = cast<MarkDependenceInst>(value->getDefiningInstruction());
+      return mdi->isNonEscaping() && mdi->getType().isAddress()
+                 ? Kind::MarkDependenceNonEscaping
+                 : Kind::Invalid;
+    }
     }
   }
 
@@ -880,9 +893,6 @@ public:
 /// object with guaranteed ownership. All transitive address uses of the
 /// interior pointer must be within the lifetime of the guaranteed lifetime. As
 /// such, these must be treated as implicit uses of the parent guaranteed value.
-///
-/// FIXME: This should probably also handle project_box once we support
-/// borrowing a box.
 struct InteriorPointerOperand {
   Operand *operand;
   InteriorPointerOperandKind kind;
@@ -931,6 +941,13 @@ struct InteriorPointerOperand {
           &cast<SingleValueInstruction>(resultValue)->getAllOperands()[0];
       return InteriorPointerOperand(op, kind);
     }
+    case InteriorPointerOperandKind::MarkDependenceNonEscaping: {
+      auto *mdi =
+          cast<MarkDependenceInst>(resultValue->getDefiningInstruction());
+      assert(mdi->isNonEscaping() && mdi->getType().isAddress());
+      return InteriorPointerOperand(
+          &mdi->getAllOperands()[MarkDependenceInst::Base], kind);
+    }
     }
     llvm_unreachable("covered switch");
   }
@@ -968,6 +985,8 @@ struct InteriorPointerOperand {
       return cast<OpenExistentialBoxInst>(operand->getUser());
     case InteriorPointerOperandKind::ProjectBox:
       return cast<ProjectBoxInst>(operand->getUser());
+    case InteriorPointerOperandKind::MarkDependenceNonEscaping:
+      return cast<MarkDependenceInst>(operand->getUser());
     }
     llvm_unreachable("Covered switch isn't covered?!");
   }
@@ -1027,7 +1046,9 @@ struct AddressOwnership {
 
   AddressOwnership(AccessBase base) : base(base) {}
 
-  operator bool() const { return bool(base); }
+  operator bool() const {
+    return bool(base) && base.getKind() != AccessRepresentation::Unidentified;
+  }
 
   bool operator==(const AddressOwnership &other) const {
     return base.hasIdenticalAccessInfo(other.base);

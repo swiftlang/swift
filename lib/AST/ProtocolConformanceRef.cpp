@@ -17,7 +17,6 @@
 
 #include "swift/AST/ProtocolConformanceRef.h"
 #include "swift/AST/ASTContext.h"
-#include "swift/AST/Availability.h"
 #include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/GenericEnvironment.h"

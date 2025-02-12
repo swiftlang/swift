@@ -594,17 +594,18 @@ static bool ctorHopsInjectedByDefiniteInit(ConstructorDecl *ctor,
 
   // must be self-isolated
   switch (isolation) {
-    case ActorIsolation::ActorInstance:
-      return isolation.getActorInstanceParameter() == 0;
+  case ActorIsolation::ActorInstance:
+    return isolation.getActorInstanceParameter() == 0;
 
-    case ActorIsolation::Erased:
-      llvm_unreachable("constructor cannot have erased isolation");
+  case ActorIsolation::Erased:
+    llvm_unreachable("constructor cannot have erased isolation");
 
-    case ActorIsolation::Unspecified:
-    case ActorIsolation::Nonisolated:
-    case ActorIsolation::NonisolatedUnsafe:
-    case ActorIsolation::GlobalActor:
-      return false;
+  case ActorIsolation::Unspecified:
+  case ActorIsolation::Nonisolated:
+  case ActorIsolation::NonisolatedUnsafe:
+  case ActorIsolation::GlobalActor:
+  case ActorIsolation::CallerIsolationInheriting:
+    return false;
   }
 }
 
@@ -772,15 +773,14 @@ void SILGenFunction::emitValueConstructor(ConstructorDecl *ctor) {
     
     auto cleanupLoc = CleanupLocation(ctor);
 
+    if (selfLV.getType().isMoveOnly()) {
+      selfLV = B.createMarkUnresolvedNonCopyableValueInst(
+        cleanupLoc, selfLV,
+        MarkUnresolvedNonCopyableValueInst::CheckKind::
+        AssignableButNotConsumable);
+    }
     if (!F.getConventions().hasIndirectSILResults()) {
       // Otherwise, load and return the final 'self' value.
-      if (selfLV.getType().isMoveOnly()) {
-        selfLV = B.createMarkUnresolvedNonCopyableValueInst(
-            cleanupLoc, selfLV,
-            MarkUnresolvedNonCopyableValueInst::CheckKind::
-                AssignableButNotConsumable);
-      }
-
       selfValue = lowering.emitLoad(B, cleanupLoc, selfLV.getValue(),
                                     LoadOwnershipQualifier::Copy);
 
@@ -1395,7 +1395,7 @@ emitMemberInit(SILGenFunction &SGF, VarDecl *selfDecl, Pattern *pattern) {
       selfTy.getFieldType(field, SGF.SGM.M, SGF.getTypeExpansionContext());
     SILValue slot;
 
-    if (auto *structDecl = dyn_cast<StructDecl>(field->getDeclContext())) {
+    if (isa<StructDecl>(field->getDeclContext())) {
       slot = SGF.B.createStructElementAddr(pattern, self.forward(SGF), field,
                                            fieldTy.getAddressType());
     } else {
@@ -1558,6 +1558,7 @@ void SILGenFunction::emitMemberInitializer(DeclContext *dc, VarDecl *selfDecl,
     case ActorIsolation::Unspecified:
     case ActorIsolation::Nonisolated:
     case ActorIsolation::NonisolatedUnsafe:
+    case ActorIsolation::CallerIsolationInheriting:
       break;
 
     case ActorIsolation::Erased:

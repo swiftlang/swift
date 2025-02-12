@@ -115,8 +115,9 @@ static AccessorKind unbridged(BridgedAccessorKind kind) {
   return static_cast<AccessorKind>(kind);
 }
 
-void BridgedDecl_setAttrs(BridgedDecl decl, BridgedDeclAttributes attrs) {
-  decl.unbridged()->getAttrs() = attrs.unbridged();
+void BridgedDecl_attachParsedAttrs(BridgedDecl decl,
+                                   BridgedDeclAttributes attrs) {
+  decl.unbridged()->attachParsedAttrs(attrs.unbridged());
 }
 
 BridgedAccessorDecl BridgedAccessorDecl_createParsed(
@@ -146,7 +147,7 @@ BridgedPatternBindingDecl BridgedPatternBindingDecl_createParsed(
 
     // Configure all vars.
     pattern->forEachVariable([&](VarDecl *VD) {
-      VD->getAttrs() = cAttrs.unbridged();
+      VD->attachParsedAttrs(cAttrs.unbridged());
       VD->setStatic(isStatic);
       VD->setIntroducer(introducer);
     });
@@ -727,6 +728,10 @@ bool BridgedNominalTypeDecl_isStructWithUnreferenceableStorage(
   return false;
 }
 
+//===----------------------------------------------------------------------===//
+// MARK: BridgedParameterList
+//===----------------------------------------------------------------------===//
+
 BridgedParameterList BridgedParameterList_createParsed(
     BridgedASTContext cContext, BridgedSourceLoc cLeftParenLoc,
     BridgedArrayRef cParameters, BridgedSourceLoc cRightParenLoc) {
@@ -734,4 +739,13 @@ BridgedParameterList BridgedParameterList_createParsed(
   return ParameterList::create(context, cLeftParenLoc.unbridged(),
                                cParameters.unbridged<ParamDecl *>(),
                                cRightParenLoc.unbridged());
+}
+
+size_t BridgedParameterList_size(BridgedParameterList cParameterList) {
+  return cParameterList.unbridged()->size();
+}
+
+BridgedParamDecl BridgedParameterList_get(BridgedParameterList cParameterList,
+                                          size_t i) {
+  return cParameterList.unbridged()->get(i);
 }

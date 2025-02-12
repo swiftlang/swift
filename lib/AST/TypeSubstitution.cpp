@@ -105,7 +105,7 @@ operator()(CanType dependentType, Type conformingReplacementType,
            ProtocolDecl *conformedProtocol) const {
   // Lookup conformances for archetypes that conform concretely
   // via a superclass.
-  if (auto archetypeType = conformingReplacementType->getAs<ArchetypeType>()) {
+  if (conformingReplacementType->is<ArchetypeType>()) {
     return lookupConformance(
         conformingReplacementType, conformedProtocol,
         /*allowMissing=*/true);
@@ -667,7 +667,7 @@ SubstitutionMap TypeBase::getContextSubstitutionMap() {
     }
 
     // This case indicates we have invalid nesting of types.
-    if (auto protocolTy = baseTy->getAs<ProtocolType>()) {
+    if (baseTy->is<ProtocolType>()) {
       if (!first)
         break;
 
@@ -997,8 +997,7 @@ ReplaceOpaqueTypesWithUnderlyingTypes::shouldPerformSubstitution(
   // resilient expansion if the context's and the opaque type's module are in
   // the same package.
   if (contextExpansion == ResilienceExpansion::Maximal &&
-      module->isResilient() && module->serializePackageEnabled() &&
-      module->inSamePackage(contextModule))
+      namingDecl->bypassResilienceInPackage(contextModule))
     return OpaqueSubstitutionKind::SubstituteSamePackageMaximalResilience;
 
   // Allow general replacement from non resilient modules. Otherwise, disallow.

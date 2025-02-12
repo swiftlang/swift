@@ -12,6 +12,7 @@
 
 import ASTBridging
 import BasicBridging
+import SwiftIfConfig
 @_spi(RawSyntax) import SwiftSyntax
 
 public protocol BridgedNullable: ExpressibleByNilLiteral {
@@ -26,6 +27,7 @@ extension BridgedNullable {
 
 extension BridgedSourceLoc: /*@retroactive*/ swiftASTGen.BridgedNullable {}
 extension BridgedIdentifier: /*@retroactive*/ swiftASTGen.BridgedNullable {}
+extension BridgedNullableDecl: /*@retroactive*/ swiftASTGen.BridgedNullable {}
 extension BridgedNullableExpr: /*@retroactive*/ swiftASTGen.BridgedNullable {}
 extension BridgedNullableStmt: /*@retroactive*/ swiftASTGen.BridgedNullable {}
 extension BridgedNullableTypeRepr: /*@retroactive*/ swiftASTGen.BridgedNullable {}
@@ -59,6 +61,9 @@ extension Optional where Wrapped: BridgedHasNullable {
 
 extension BridgedStmt: BridgedHasNullable {
   typealias Nullable = BridgedNullableStmt
+}
+extension BridgedDecl: BridgedHasNullable {
+  typealias Nullable = BridgedNullableDecl
 }
 extension BridgedExpr: BridgedHasNullable {
   typealias Nullable = BridgedNullableExpr
@@ -154,6 +159,25 @@ public func freeBridgedString(bridged: BridgedStringRef) {
 extension BridgedStringRef: /*@retroactive*/ Swift.ExpressibleByStringLiteral {
   public init(stringLiteral str: StaticString) {
     self.init(data: str.utf8Start, count: str.utf8CodeUnitCount)
+  }
+}
+
+extension VersionTuple {
+  var bridged: BridgedVersionTuple {
+    switch self.components.count {
+    case 4:
+      return BridgedVersionTuple(CUnsignedInt(components[0]), CUnsignedInt(components[1]), CUnsignedInt(components[2]), CUnsignedInt(components[3]))
+    case 3:
+      return BridgedVersionTuple(CUnsignedInt(components[0]), CUnsignedInt(components[1]), CUnsignedInt(components[2]))
+    case 2:
+      return BridgedVersionTuple(CUnsignedInt(components[0]), CUnsignedInt(components[1]))
+    case 1:
+      return BridgedVersionTuple(CUnsignedInt(components[0]))
+    case 0:
+      return BridgedVersionTuple()
+    default:
+      fatalError("unsuported version form")
+    }
   }
 }
 
@@ -284,5 +308,13 @@ extension ConcatCollection: LazyCollectionProtocol {
     case .c1(let i): return c1[i]
     case .c2(let i): return c2[i]
     }
+  }
+}
+
+extension BridgedArrayRef {
+  public func withElements<T, R>(ofType ty: T.Type, _ c: (UnsafeBufferPointer<T>) -> R) -> R {
+    let start = data?.assumingMemoryBound(to: ty)
+    let buffer = UnsafeBufferPointer(start: start, count: count)
+    return c(buffer)
   }
 }

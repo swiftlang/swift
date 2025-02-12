@@ -169,6 +169,20 @@ extension Sequence where Element == Operand {
   public var endingLifetime: LazyFilterSequence<Self> {
     return self.lazy.filter { $0.endsLifetime }
   }
+
+  public var users: LazyMapSequence<Self, Instruction> {
+    return self.lazy.map { $0.instruction }
+  }
+
+  // This intentinally returns a Sequence of `Instruction` and not a Sequence of `I` to be able to use
+  // it as argument to `InstructionSet.insert(contentsOf:)`.
+  public func users<I: Instruction>(ofType: I.Type) -> LazyMapSequence<LazyFilterSequence<Self>, Instruction> {
+    self.lazy.filter{ $0.instruction is I }.users
+  }
+}
+
+extension Value {
+  public var users: LazyMapSequence<UseList, Instruction> { uses.users }
 }
 
 extension Operand {
@@ -254,7 +268,11 @@ public enum OperandOwnership {
   /// Interior Pointer. Propagates a trivial value (e.g. address, pointer, or no-escape closure) that depends on the guaranteed value within the base's borrow scope. The verifier checks that all uses of the trivial
   /// value are in scope. (ref_element_addr, open_existential_box)
   case interiorPointer
-  
+
+  /// Any Interior Pointer. An interior pointer that allows any operand ownership. This will be removed as soon as SIL
+  /// migrates away from extraneous borrow scopes.
+  case anyInteriorPointer
+
   /// Forwarded Borrow. Propagates the guaranteed value within the base's borrow scope. (tuple_extract, struct_extract, cast, switch)
   case guaranteedForwarding
   
@@ -268,7 +286,7 @@ public enum OperandOwnership {
     switch self {
     case .nonUse, .trivialUse, .instantaneousUse, .unownedInstantaneousUse,
          .forwardingUnowned, .pointerEscape, .bitwiseEscape, .borrow,
-         .interiorPointer, .guaranteedForwarding:
+         .interiorPointer, .anyInteriorPointer, .guaranteedForwarding:
       return false
     case .destroyingConsume, .forwardingConsume, .endBorrow, .reborrow:
       return true
@@ -299,6 +317,8 @@ public enum OperandOwnership {
       return BridgedOperand.OperandOwnership.ForwardingConsume
     case .interiorPointer:
       return BridgedOperand.OperandOwnership.InteriorPointer
+    case .anyInteriorPointer:
+      return BridgedOperand.OperandOwnership.AnyInteriorPointer
     case .guaranteedForwarding:
       return BridgedOperand.OperandOwnership.GuaranteedForwarding
     case .endBorrow:
@@ -323,6 +343,7 @@ extension Operand {
     case .DestroyingConsume: return .destroyingConsume
     case .ForwardingConsume: return .forwardingConsume
     case .InteriorPointer: return .interiorPointer
+    case .AnyInteriorPointer: return .anyInteriorPointer
     case .GuaranteedForwarding: return .guaranteedForwarding
     case .EndBorrow: return .endBorrow
     case .Reborrow: return .reborrow

@@ -53,7 +53,6 @@ ArrayCallKind swift::getArraySemanticsKind(SILFunction *f) {
                   ArrayCallKind::kWithUnsafeMutableBufferPointer)
             .Case("array.append_contentsOf", ArrayCallKind::kAppendContentsOf)
             .Case("array.append_element", ArrayCallKind::kAppendElement)
-            .Case("array.copy_into_vector", ArrayCallKind::kCopyIntoVector)
             .Default(ArrayCallKind::kNone);
     if (Tmp != ArrayCallKind::kNone) {
       assert(Kind == ArrayCallKind::kNone && "Multiple array semantic "
@@ -496,6 +495,10 @@ ApplyInst *swift::ArraySemanticsCall::hoistOrCopy(SILInstruction *InsertBefore,
                              ->begin());
       } else {
         NewArrayProps = IsNative.copyTo(InsertBefore, DT);
+        ArraySemanticsCall NewIsNative(NewArrayProps);
+        if (NewIsNative.getSelf() != HoistedSelf) {
+          NewIsNative.getSelfOperand().set(HoistedSelf);
+        }
       }
 
       // Replace all uses of the check subscript call by a use of the empty

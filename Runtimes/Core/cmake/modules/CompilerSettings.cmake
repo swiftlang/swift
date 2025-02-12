@@ -44,3 +44,8 @@ HAVE_SWIFT_ASYNC_CALL)
 if(NOT HAVE_SWIFT_ASYNC_CALL)
   message(SEND_ERROR "CXX Compiler must support Swift async calling conventions")
 endif()
+
+check_compiler_flag(CXX "-mcx16" HAVE_CXX_MCX16)
+if(HAVE_CXX_MCX16)
+  add_compile_options($<$<COMPILE_LANGUAGE:CXX>:-mcx16>)
+endif()

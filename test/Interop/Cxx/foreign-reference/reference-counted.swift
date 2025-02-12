@@ -20,7 +20,7 @@ public func blackHole<T>(_ _: T) {  }
 func localTest() {
     var x = NS.LocalCount.create()
 #if NO_OPTIMIZATIONS
-    expectEqual(x.value, 8) // This is 8 because of "var x" "x.value" * 2, two method calls on x, and "(x, x, x)".
+    expectEqual(x.value, 2)
 #endif
 
     expectEqual(x.returns42(), 42)

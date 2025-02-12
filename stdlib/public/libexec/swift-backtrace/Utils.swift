@@ -26,6 +26,14 @@ import CRT
 
 import Swift
 
+internal import BacktracingImpl.Runtime
+
+typealias CrashInfo = swift.runtime.backtrace.CrashInfo
+
+#if os(Linux)
+typealias thread = swift.runtime.backtrace.thread
+#endif
+
 internal func hex<T: FixedWidthInteger>(_ value: T,
                                         withPrefix: Bool = true) -> String {
   let digits = String(value, radix: 16)
@@ -142,6 +150,18 @@ internal func spawn(_ path: String, args: [String]) throws {
 }
 
 #endif // os(macOS)
+
+extension Sequence {
+  /// Return the first element in a Sequence.
+  ///
+  /// This is not, in general, a safe thing to do, because the sequence might
+  /// not be restartable.  For the cases where we're using it here, it's OK
+  /// though.
+  public var unsafeFirst: Element? {
+    var iterator = makeIterator()
+    return iterator.next()
+  }
+}
 
 struct CFileStream: TextOutputStream {
   var fp: UnsafeMutablePointer<FILE>

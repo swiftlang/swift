@@ -32,6 +32,14 @@ extension MyCStruct {
   }
 }
 
+public func getMyCEnum() -> MyCEnum {
+  return MCE_One
+}
+
+public func getMyCFixedEnum() -> MyCFixedEnum {
+  return MCFE_One
+}
+
 //--- main.swift
 
 import UsesCLibrary
@@ -39,3 +47,5 @@ import UsesCLibrary
 let _ = getMyCStruct()
 let _ = getMyCStruct().y
 let _ = getMyCStruct().anotherInstanceOfSelf
+let _ = getMyCEnum()
+let _ = getMyCFixedEnum()

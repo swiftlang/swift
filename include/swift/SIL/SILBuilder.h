@@ -437,16 +437,6 @@ public:
         isFromVarDecl, wasMoved));
   }
 
-  AllocVectorInst *
-  createAllocVector(SILLocation loc, SILValue capacity, SILType elementType) {
-    if (isInsertingIntoGlobal()) {
-      return insert(AllocVectorInst::createInInitializer(
-          getSILDebugLocation(loc, true), capacity, elementType, getModule()));
-    }
-    return insert(AllocVectorInst::create(
-        getSILDebugLocation(loc, true), capacity, elementType, getFunction()));
-  }
-
   AllocPackInst *createAllocPack(SILLocation loc, SILType packType) {
     return insert(AllocPackInst::create(getSILDebugLocation(loc), packType,
                                         getFunction()));
@@ -2371,11 +2361,11 @@ public:
     return insert(new (getModule()) EndCOWMutationInst(getSILDebugLocation(Loc),
                                                   operand, keepUnique));
   }
-  IsEscapingClosureInst *createIsEscapingClosure(SILLocation Loc,
+  DestroyNotEscapedClosureInst *createDestroyNotEscapedClosure(SILLocation Loc,
                                                  SILValue operand,
                                                  unsigned VerificationType) {
     auto Int1Ty = SILType::getBuiltinIntegerType(1, getASTContext());
-    return insert(new (getModule()) IsEscapingClosureInst(
+    return insert(new (getModule()) DestroyNotEscapedClosureInst(
         getSILDebugLocation(Loc), operand, Int1Ty, VerificationType));
   }
 
@@ -3087,6 +3077,15 @@ public:
   HasSymbolInst *createHasSymbol(SILLocation Loc, ValueDecl *Decl) {
     return insert(new (getModule()) HasSymbolInst(
         getModule(), getSILDebugLocation(Loc), Decl));
+  }
+
+  //===--------------------------------------------------------------------===//
+  // Misc Uses
+  //===--------------------------------------------------------------------===//
+
+  IgnoredUseInst *createIgnoredUse(SILLocation loc, SILValue value) {
+    return insert(new (getModule())
+                      IgnoredUseInst(getSILDebugLocation(loc), value));
   }
 
   //===--------------------------------------------------------------------===//

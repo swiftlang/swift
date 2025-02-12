@@ -47,14 +47,6 @@ sil_global @static_global_vector : $Int32 = {
   %initval = vector (%1 : $Int32, %3 : $Int32)
 }
 
-// CHECK-LABEL: sil_global @static_global_uninitialized_vector : $Int = {
-// CHECK:         %initval = alloc_vector $Int, %0 : $Builtin.Word
-// CHECK-NEXT:  }       
-sil_global @static_global_uninitialized_vector : $Int = {
-  %0 = integer_literal $Builtin.Word, 10
-  %initval = alloc_vector $Int, %0 : $Builtin.Word
-}
-
 // Type references
 
 // Some cyclic type references between SIL function bodies.
@@ -579,17 +571,6 @@ bb0:
   %0 = global_value @static_array : $TestArrayStorage
   %1 = struct $TestArray (%0 : $TestArrayStorage)
   return %1 : $TestArray
-}
-
-// CHECK-LABEL: sil @alloc_vector :
-sil @alloc_vector : $@convention(thin) () -> () {
-bb0:
-  %0 = integer_literal $Builtin.Word, 42
-  // CHECK: %1 = alloc_vector $Int, %0 : $Builtin.Word
-  %1 = alloc_vector $Int, %0 : $Builtin.Word
-  dealloc_stack %1 : $*Int
-  %3 = tuple ()
-  return %3 : $()
 }
 
 // CHECK-LABEL: @global_code : $@convention(thin) () -> ()
@@ -1524,13 +1505,13 @@ bb0(%0 : $*Builtin.NativeObject):
   return %1 : $Builtin.Int1
 }
 
-// CHECK-LABEL: sil @is_escaping_closure
-sil @is_escaping_closure : $@convention(thin)(@guaranteed @callee_guaranteed () -> ()) -> Builtin.Int1 {
+// CHECK-LABEL: sil @destroy_not_escaped_closure
+sil @destroy_not_escaped_closure : $@convention(thin)(@guaranteed @callee_guaranteed () -> ()) -> Builtin.Int1 {
 bb0(%0 : $@callee_guaranteed () -> ()):
-  // CHECK: %1 = is_escaping_closure %0 : $@callee_guaranteed () -> ()
-  // CHECK: %2 = is_escaping_closure [objc] %0 : $@callee_guaranteed () -> ()
-  %1 = is_escaping_closure %0: $@callee_guaranteed () -> ()
-  %2 = is_escaping_closure [objc] %0: $@callee_guaranteed () -> ()
+  // CHECK: %1 = destroy_not_escaped_closure %0 : $@callee_guaranteed () -> ()
+  // CHECK: %2 = destroy_not_escaped_closure [objc] %0 : $@callee_guaranteed () -> ()
+  %1 = destroy_not_escaped_closure %0: $@callee_guaranteed () -> ()
+  %2 = destroy_not_escaped_closure [objc] %0: $@callee_guaranteed () -> ()
   return %1 : $Builtin.Int1
 }
 

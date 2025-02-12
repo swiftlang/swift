@@ -629,9 +629,6 @@ bool SILCombiner::optimizeStackAllocatedEnum(AllocStackInst *AS) {
 }
 
 SILInstruction *SILCombiner::visitAllocStackInst(AllocStackInst *AS) {
-  if (AS->getFunction()->hasOwnership())
-    return nullptr;
-
   if (optimizeStackAllocatedEnum(AS))
     return nullptr;
 

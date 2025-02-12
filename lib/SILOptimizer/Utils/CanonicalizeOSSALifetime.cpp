@@ -135,7 +135,7 @@ bool CanonicalizeOSSALifetime::computeCanonicalLiveness() {
   SmallVector<unsigned, 8> indexWorklist;
   ValueSet visitedDefs(getCurrentDef()->getFunction());
   auto addDefToWorklist = [&](Def def) {
-    if (!visitedDefs.insert(def.getValue()))
+    if (!visitedDefs.insert(def.value))
       return;
     discoveredDefs.push_back(def);
     indexWorklist.push_back(discoveredDefs.size() - 1);
@@ -154,25 +154,25 @@ bool CanonicalizeOSSALifetime::computeCanonicalLiveness() {
   while (!indexWorklist.empty()) {
     auto index = indexWorklist.pop_back_val();
     auto def = discoveredDefs[index];
-    auto value = def.getValue();
+    auto value = def.value;
     LLVM_DEBUG(llvm::dbgs() << "  Uses of value:\n";
                value->print(llvm::dbgs()));
 
     for (Operand *use : value->getUses()) {
       LLVM_DEBUG(llvm::dbgs() << "    Use:\n";
                  use->getUser()->print(llvm::dbgs()));
-      
+
       auto *user = use->getUser();
       // Recurse through copies.
       if (auto *copy = dyn_cast<CopyValueInst>(user)) {
         // Don't recurse through copies of borrowed-froms or reborrows.
-        switch (def) {
-        case Def::Kind::Root:
-        case Def::Kind::Copy:
+        switch (def.kind) {
+        case Def::Root:
+        case Def::Copy:
           addDefToWorklist(Def::copy(copy));
           break;
-        case Def::Kind::Reborrow:
-        case Def::Kind::BorrowedFrom:
+        case Def::Reborrow:
+        case Def::BorrowedFrom:
           break;
         }
         continue;
@@ -238,6 +238,7 @@ bool CanonicalizeOSSALifetime::computeCanonicalLiveness() {
         }
         break;
       case OperandOwnership::InteriorPointer:
+      case OperandOwnership::AnyInteriorPointer:
       case OperandOwnership::GuaranteedForwarding:
       case OperandOwnership::EndBorrow:
         // Guaranteed values are exposed by inner adjacent reborrows. If user is
@@ -283,6 +284,43 @@ void CanonicalizeOSSALifetime::extendLivenessToDeadEnds() {
     if (liveness->isWithinBoundary(destroy, /*deadEndBlocks=*/nullptr))
       continue;
     completeLiveness.updateForUse(destroy, /*lifetimeEnding*/ true);
+  }
+
+  // Demote consuming uses within complete liveness to non-consuming uses.
+  //
+  // OSSALifetimeCompletion considers the lifetime of a single value.  Such
+  // lifetimes never continue beyond consumes.
+  std::optional<llvm::SmallPtrSet<SILInstruction *, 8>> lastUsers;
+  auto isConsumeOnBoundary = [&](SILInstruction *instruction) -> bool {
+    if (!lastUsers) {
+      // Avoid computing lastUsers if possible.
+      auto *function = getCurrentDef()->getFunction();
+      auto *deadEnds = deadEndBlocksAnalysis->get(function);
+      llvm::SmallVector<SILBasicBlock *, 8> completeConsumingBlocks(
+          consumingBlocks.getArrayRef());
+      for (auto &block : *function) {
+        if (!deadEnds->isDeadEnd(&block))
+          continue;
+        completeConsumingBlocks.push_back(&block);
+      }
+      PrunedLivenessBoundary boundary;
+      liveness->computeBoundary(boundary, completeConsumingBlocks);
+
+      lastUsers.emplace();
+      for (auto *lastUser : boundary.lastUsers) {
+        lastUsers->insert(lastUser);
+      }
+    }
+    return lastUsers->contains(instruction);
+  };
+  for (auto pair : liveness->getAllUsers()) {
+    if (!pair.second.isEnding())
+      continue;
+    auto *instruction = pair.first;
+    if (isConsumeOnBoundary(instruction))
+      continue;
+    // Demote instruction's lifetime-ending-ness to non-lifetime-ending.
+    completeLiveness.updateForUse(pair.first, /*lifetimeEnding=*/false);
   }
 
   OSSALifetimeCompletion::visitAvailabilityBoundary(
@@ -1214,15 +1252,15 @@ void CanonicalizeOSSALifetime::rewriteCopies(
 
   // Perform a def-use traversal, visiting each use operand.
   for (auto def : discoveredDefs) {
-    switch (def) {
-    case Def::Kind::BorrowedFrom:
-    case Def::Kind::Reborrow:
+    switch (def.kind) {
+    case Def::BorrowedFrom:
+    case Def::Reborrow:
       // Direct uses of these defs never need to be rewritten.  Being guaranteed
       // values, none of their direct uses consume an owned value.
-      assert(def.getValue()->getOwnershipKind() == OwnershipKind::Guaranteed);
+      assert(def.value->getOwnershipKind() == OwnershipKind::Guaranteed);
       break;
-    case Def::Kind::Root: {
-      SILValue value = def.getValue();
+    case Def::Root: {
+      SILValue value = def.value;
       for (auto useIter = value->use_begin(), endIter = value->use_end();
            useIter != endIter;) {
         Operand *use = *useIter++;
@@ -1232,8 +1270,8 @@ void CanonicalizeOSSALifetime::rewriteCopies(
       }
       break;
     }
-    case Def::Kind::Copy: {
-      SILValue value = def.getValue();
+    case Def::Copy: {
+      SILValue value = def.value;
       CopyValueInst *srcCopy = cast<CopyValueInst>(value);
       // Recurse through copies while replacing their uses.
       Operand *reusedCopyOp = nullptr;

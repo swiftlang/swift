@@ -1736,13 +1736,21 @@ public:
   /// move_value, begin_borrow.
   ///   Original: y = copy_value x
   ///    Adjoint: adj[x] += adj[y]
-  void visitValueOwnershipInst(SingleValueInstruction *svi) {
+  void visitValueOwnershipInst(SingleValueInstruction *svi,
+                               bool needZeroResAdj = false) {
     assert(svi->getNumOperands() == 1);
     auto *bb = svi->getParent();
     switch (getTangentValueCategory(svi)) {
     case SILValueCategory::Object: {
       auto adj = getAdjointValue(bb, svi);
       addAdjointValue(bb, svi->getOperand(0), adj, svi->getLoc());
+      if (needZeroResAdj) {
+        assert(svi->getNumResults() == 1);
+        SILValue val = svi->getResult(0);
+        setAdjointValue(
+            bb, val,
+            makeZeroAdjointValue(getRemappedTangentType(val->getType())));
+      }
       break;
     }
     case SILValueCategory::Address: {
@@ -1768,8 +1776,16 @@ public:
 
   /// Handle `move_value` instruction.
   ///   Original: y = move_value x
-  ///    Adjoint: adj[x] += adj[y]
-  void visitMoveValueInst(MoveValueInst *mvi) { visitValueOwnershipInst(mvi); }
+  ///    Adjoint: adj[x] += adj[y]; adj[y] = 0
+  void visitMoveValueInst(MoveValueInst *mvi) {
+    switch (getTangentValueCategory(mvi)) {
+    case SILValueCategory::Address:
+      llvm::report_fatal_error("AutoDiff does not support move_value with "
+                               "SILValueCategory::Address");
+    case SILValueCategory::Object:
+      visitValueOwnershipInst(mvi, /*needZeroResAdj=*/true);
+    }
+  }
 
   void visitEndInitLetRefInst(EndInitLetRefInst *eir) { visitValueOwnershipInst(eir); }
 
@@ -1836,27 +1852,9 @@ public:
 
     auto adjOpt = getAdjointValue(bb, ei);
     auto adjStruct = materializeAdjointDirect(adjOpt, loc);
-    StructDecl *adjStructDecl =
-        adjStruct->getType().getStructOrBoundGenericStruct();
 
-    VarDecl *adjOptVar = nullptr;
-    if (adjStructDecl) {
-      ArrayRef<VarDecl *> properties = adjStructDecl->getStoredProperties();
-      adjOptVar = properties.size() == 1 ? properties[0] : nullptr;
-    }
-
-    EnumDecl *adjOptDecl =
-        adjOptVar ? adjOptVar->getTypeInContext()->getEnumOrBoundGenericEnum()
-                  : nullptr;
-
-    // Optional<T>.TangentVector should be a struct with a single
-    // Optional<T.TangentVector> property. This is an implementation detail of
-    // OptionalDifferentiation.swift
-    // TODO: Maybe it would be better to have getters / setters here that we
-    // can call and hide this implementation detail?
-    if (!adjOptDecl || adjOptDecl != optionalEnumDecl)
-      llvm_unreachable("Unexpected type of Optional.TangentVector");
-
+    VarDecl *adjOptVar =
+      getASTContext().getOptionalTanValueDecl(adjStruct->getType().getASTType());
     auto *adjVal = builder.createStructExtract(loc, adjStruct, adjOptVar);
 
     EnumElementDecl *someElemDecl = getASTContext().getOptionalSomeDecl();
@@ -1915,24 +1913,8 @@ public:
     }
 
     SILValue adjDest = getAdjointBuffer(bb, origEnum);
-    StructDecl *adjStructDecl =
-        adjDest->getType().getStructOrBoundGenericStruct();
-
-    VarDecl *adjOptVar = nullptr;
-    if (adjStructDecl) {
-      ArrayRef<VarDecl *> properties = adjStructDecl->getStoredProperties();
-      adjOptVar = properties.size() == 1 ? properties[0] : nullptr;
-    }
-
-    EnumDecl *adjOptDecl =
-        adjOptVar ? adjOptVar->getTypeInContext()->getEnumOrBoundGenericEnum()
-                  : nullptr;
-
-    // Optional<T>.TangentVector should be a struct with a single
-    // Optional<T.TangentVector> property. This is an implementation detail of
-    // OptionalDifferentiation.swift
-    if (!adjOptDecl || adjOptDecl != optionalEnumDecl)
-      llvm_unreachable("Unexpected type of Optional.TangentVector");
+    VarDecl *adjOptVar =
+      getASTContext().getOptionalTanValueDecl(adjDest->getType().getASTType());
 
     SILLocation loc = origData->getLoc();
     StructElementAddrInst *adjOpt =
@@ -2191,7 +2173,7 @@ bool PullbackCloner::Implementation::run() {
       //
       // Do not diagnose `Optional`-typed values, which will have special-case
       // differentiation support.
-      if (auto *enumDecl = type.getEnumOrBoundGenericEnum()) {
+      if (type.getEnumOrBoundGenericEnum()) {
         if (!type.getASTType()->isOptional()) {
           getContext().emitNondifferentiabilityError(
               v, getInvoker(), diag::autodiff_enums_unsupported);
@@ -2662,24 +2644,9 @@ AllocStackInst *PullbackCloner::Implementation::createOptionalAdjoint(
   auto optionalOfWrappedTanType = SILType::getOptionalType(wrappedTanType);
   // `Optional<T>.TangentVector`
   auto optionalTanTy = getRemappedTangentType(optionalTy);
-  auto *optionalTanDecl = optionalTanTy.getNominalOrBoundGenericNominal();
   // Look up the `Optional<T>.TangentVector.init` declaration.
-  auto initLookup =
-      optionalTanDecl->lookupDirect(DeclBaseName::createConstructor());
-  ConstructorDecl *constructorDecl = nullptr;
-  for (auto *candidate : initLookup) {
-    auto candidateModule = candidate->getModuleContext();
-    if (candidateModule->getName() ==
-            builder.getASTContext().Id_Differentiation ||
-        candidateModule->isStdlibModule()) {
-      assert(!constructorDecl && "Multiple `Optional.TangentVector.init`s");
-      constructorDecl = cast<ConstructorDecl>(candidate);
-#ifdef NDEBUG
-      break;
-#endif
-    }
-  }
-  assert(constructorDecl && "No `Optional.TangentVector.init`");
+  ConstructorDecl *constructorDecl =
+    getASTContext().getOptionalTanInitDecl(optionalTanTy.getASTType());
 
   // Allocate a local buffer for the `Optional` adjoint value.
   auto *optTanAdjBuf = builder.createAllocStack(pbLoc, optionalTanTy);
@@ -3284,7 +3251,7 @@ SILValue PullbackCloner::Implementation::getAdjointProjection(
     auto adjSource = getAdjointBuffer(origBB, source);
     if (!adjSource->getType().is<TupleType>())
       return adjSource;
-    auto origTupleTy = source->getType().castTo<TupleType>();
+    auto origTupleTy = remapType(source->getType()).castTo<TupleType>();
     unsigned adjIndex = 0;
     for (unsigned i : range(teai->getFieldIndex())) {
       if (getTangentSpace(

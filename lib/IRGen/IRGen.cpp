@@ -143,6 +143,11 @@ swift::getIRTargetOptions(const IRGenOptions &Opts, ASTContext &Ctx) {
   // Set UseInitArray appropriately.
   TargetOpts.UseInitArray = Clang->getCodeGenOpts().UseInitArray;
 
+  // Set emulated TLS in inlined C/C++ functions based on what clang is doing,
+  // ie either setting the default based on the OS or -Xcc -f{no-,}emulated-tls
+  // command-line flags.
+  TargetOpts.EmulatedTLS = Clang->getCodeGenOpts().EmulatedTLS;
+
   // WebAssembly doesn't support atomics yet, see
   // https://github.com/apple/swift/issues/54533 for more details.
   if (Clang->getTargetInfo().getTriple().isOSBinFormatWasm())

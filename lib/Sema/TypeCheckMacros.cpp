@@ -202,8 +202,7 @@ MacroDefinition MacroDefinitionRequest::evaluate(
 
   // If the expanded macro was one of the the magic literal expressions
   // (like #file), there's nothing to expand.
-  if (auto magicLiteral =
-          dyn_cast<MagicIdentifierLiteralExpr>(definition)) {
+  if (isa<MagicIdentifierLiteralExpr>(definition)) {
     StringRef expansionText = externalMacroName.unbridged();
     return MacroDefinition::forExpanded(ctx, expansionText, { }, { });
   }
@@ -1789,8 +1788,20 @@ static TinyPtrVector<ProtocolDecl *> getIntroducedConformances(
     bool hasExistingConformance = llvm::any_of(
         existingConformances,
         [&](ProtocolConformance *conformance) {
-          return conformance->getSourceKind() !=
-              ConformanceEntryKind::PreMacroExpansion;
+          // The conformance is coming from a macro expansion, so ignore it.
+          if (conformance->getSourceKind() ==
+                ConformanceEntryKind::PreMacroExpansion)
+            return false;
+
+          // Check whether the conformance comes from an extension defined by
+          // a macro.
+          if (auto conformingExt =
+                  dyn_cast<ExtensionDecl>(conformance->getDeclContext())) {
+            if (conformingExt->isInMacroExpansionInContext())
+              return false;
+          }
+
+          return true;
         });
 
     if (!hasExistingConformance) {

@@ -1,5 +1,14 @@
-// RUN: %target-swift-emit-sil -sil-verify-all -verify -enable-experimental-feature NoImplicitCopy -enable-experimental-feature MoveOnlyClasses -enable-experimental-feature LifetimeDependence %s -Xllvm -sil-print-final-ossa-module | %FileCheck %s
-// RUN: %target-swift-emit-sil -O -sil-verify-all -verify -enable-experimental-feature NoImplicitCopy -enable-experimental-feature MoveOnlyClasses -enable-experimental-feature LifetimeDependence %s
+// RUN: %target-swift-emit-sil -sil-verify-all -verify \
+// RUN: -enable-experimental-feature NoImplicitCopy \
+// RUN: -enable-experimental-feature MoveOnlyClasses \
+// RUN: -enable-experimental-feature LifetimeDependence \
+// RUN: -Xllvm -sil-print-final-ossa-module %s | %FileCheck %s
+
+// RUN: %target-swift-emit-sil -O -sil-verify-all -verify \
+// RUN: -enable-experimental-feature NoImplicitCopy \
+// RUN: -enable-experimental-feature MoveOnlyClasses \
+// RUN: -enable-experimental-feature LifetimeDependence \
+// RUN: %s
 
 // REQUIRES: swift_feature_MoveOnlyClasses
 // REQUIRES: swift_feature_NoImplicitCopy

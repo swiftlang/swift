@@ -75,7 +75,7 @@ void TypeVariableType::Implementation::print(llvm::raw_ostream &OS) {
   if (isPackExpansion())
     bindingOptions.push_back(TypeVariableOptions::TVO_PackExpansion);
   if (!bindingOptions.empty()) {
-    OS << " [allows bindings to: ";
+    OS << " [can bind to: ";
     interleave(bindingOptions, OS,
                [&](TypeVariableOptions option) {
                   (OS << getTypeVariableOptions(option));},
@@ -202,6 +202,14 @@ bool TypeVariableType::Implementation::isOpaqueType() const {
 bool TypeVariableType::Implementation::isCollectionLiteralType() const {
   return locator && (locator->directlyAt<ArrayExpr>() ||
                      locator->directlyAt<DictionaryExpr>());
+}
+
+bool TypeVariableType::Implementation::isNumberLiteralType() const {
+  return locator && locator->directlyAt<NumberLiteralExpr>();
+}
+
+bool TypeVariableType::Implementation::isFunctionResult() const {
+  return locator && locator->isLastElement<LocatorPathElt::FunctionResult>();
 }
 
 void *operator new(size_t bytes, ConstraintSystem& cs,
@@ -450,10 +458,6 @@ TypeChecker::typeCheckTarget(SyntacticElementTarget &target,
     // diagnostics and is a hint for various performance optimizations.
     cs.setContextualInfo(expr, target.getExprContextualTypeInfo());
 
-    // Try to shrink the system by reducing disjunction domains. This
-    // goes through every sub-expression and generate its own sub-system, to
-    // try to reduce the domains of those subexpressions.
-    cs.shrink(expr);
     target.setExpr(expr);
   }
 
@@ -888,10 +892,24 @@ bool TypeChecker::typeCheckForEachPreamble(DeclContext *dc, ForEachStmt *stmt,
     return true;
   };
 
-  auto target = SyntacticElementTarget::forForEachPreamble(
-      stmt, dc, /*ignoreWhereClause=*/false, packElementEnv);
+  auto target =
+      SyntacticElementTarget::forForEachPreamble(stmt, dc, packElementEnv);
   if (!typeCheckTarget(target))
     return failed();
+
+  if (auto *where = stmt->getWhere()) {
+    auto boolType = dc->getASTContext().getBoolType();
+    if (!boolType)
+      return failed();
+
+    SyntacticElementTarget whereClause(where, dc, {boolType, CTP_Condition},
+                                       /*isDiscarded=*/false);
+    auto result = typeCheckTarget(whereClause);
+    if (!result)
+      return true;
+
+    stmt->setWhere(result->getAsExpr());
+  }
 
   // Check to see if the sequence expr is throwing (in async context),
   // if so require the stmt to have a `try`.

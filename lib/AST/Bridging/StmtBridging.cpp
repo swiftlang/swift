@@ -52,6 +52,23 @@ BridgedStmtConditionElement BridgedStmtConditionElement_createPatternBinding(
       cInitializer.unbridged()));
 }
 
+BridgedStmtConditionElement BridgedStmtConditionElement_createPoundAvailable(
+    BridgedPoundAvailableInfo info) {
+  return StmtConditionElement(info.unbridged());
+}
+
+BridgedPoundAvailableInfo BridgedPoundAvailableInfo_createParsed(
+    BridgedASTContext cContext, BridgedSourceLoc cPoundLoc,
+    BridgedSourceLoc cLParenLoc, BridgedArrayRef cSpecs,
+    BridgedSourceLoc cRParenLoc, bool isUnavailability) {
+  SmallVector<AvailabilitySpec *, 4> specs;
+  for (auto cSpec : cSpecs.unbridged<BridgedAvailabilitySpec>())
+    specs.push_back(cSpec.unbridged());
+  return PoundAvailableInfo::create(cContext.unbridged(), cPoundLoc.unbridged(),
+                                    cLParenLoc.unbridged(), specs,
+                                    cRParenLoc.unbridged(), isUnavailability);
+}
+
 BridgedBraceStmt BridgedBraceStmt_createParsed(BridgedASTContext cContext,
                                                BridgedSourceLoc cLBLoc,
                                                BridgedArrayRef elements,

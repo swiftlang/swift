@@ -1,0 +1,18 @@
+// RUN: %scale-test --invert-result --begin 1 --end 5 --step 1 --select NumLeafScopes %s -Xfrontend=-typecheck
+// REQUIRES: asserts, no_asan
+
+struct Value: RandomAccessCollection, RangeReplaceableCollection {
+  let startIndex = 0
+  let endIndex = 0
+
+  subscript(_: Int) -> Int { 0 }
+
+  func replaceSubrange<C: Collection>(_: Range<Int>, with: C) {}
+}
+
+func f(v: Value) {
+  let _ = v
+%for i in range(0, N):
+	  + v
+%end
+}

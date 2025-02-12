@@ -196,8 +196,8 @@ static Expr *makeBinOp(ASTContext &Ctx, Expr *Op, Expr *LHS, Expr *RHS,
   if (!LHS || !RHS)
     return nullptr;
 
-  // If the left-hand-side is a 'try' or 'await', hoist it up turning
-  // "(try x) + y" into try (x + y).
+  // If the left-hand-side is a 'try', 'await', or 'unsafe', hoist it up
+  // turning "(try x) + y" into try (x + y).
   if (auto *tryEval = dyn_cast<AnyTryExpr>(LHS)) {
     auto sub = makeBinOp(Ctx, Op, tryEval->getSubExpr(), RHS,
                          opPrecedence, isEndOfSequence);
@@ -212,9 +212,16 @@ static Expr *makeBinOp(ASTContext &Ctx, Expr *Op, Expr *LHS, Expr *RHS,
     return await;
   }
 
-  // If the right operand is a try or await, it's an error unless the operator
-  // is an assignment or conditional operator and there's nothing to
-  // the right that didn't parse as part of the right operand.
+  if (auto *unsafe = dyn_cast<UnsafeExpr>(LHS)) {
+    auto sub = makeBinOp(Ctx, Op, unsafe->getSubExpr(), RHS,
+                         opPrecedence, isEndOfSequence);
+    unsafe->setSubExpr(sub);
+    return unsafe;
+  }
+
+  // If the right operand is a try, await, or unsafe, it's an error unless
+  // the operator is an assignment or conditional operator and there's
+  // nothing to the right that didn't parse as part of the right operand.
   //
   // Generally, nothing to the right will fail to parse as part of the
   // right operand because there are no standard operators that have
@@ -228,13 +235,14 @@ static Expr *makeBinOp(ASTContext &Ctx, Expr *Op, Expr *LHS, Expr *RHS,
   //   x ? try foo() : try bar() $#! 1
   // assuming $#! is some crazy operator with lower precedence
   // than the conditional operator.
-  if (isa<AnyTryExpr>(RHS) || isa<AwaitExpr>(RHS)) {
+  if (isa<AnyTryExpr>(RHS) || isa<AwaitExpr>(RHS) || isa<UnsafeExpr>(RHS)) {
     // If you change this, also change TRY_KIND_SELECT in diagnostics.
     enum class TryKindForDiagnostics : unsigned {
       Try,
       ForceTry,
       OptionalTry,
-      Await
+      Await,
+      Unsafe,
     };
     TryKindForDiagnostics tryKind;
     switch (RHS->getKind()) {
@@ -249,6 +257,9 @@ static Expr *makeBinOp(ASTContext &Ctx, Expr *Op, Expr *LHS, Expr *RHS,
       break;
     case ExprKind::Await:
       tryKind = TryKindForDiagnostics::Await;
+      break;
+    case ExprKind::Unsafe:
+      tryKind = TryKindForDiagnostics::Unsafe;
       break;
     default:
       llvm_unreachable("unknown try-like expression");
@@ -515,6 +526,9 @@ Expr *TypeChecker::buildRefExpr(ArrayRef<ValueDecl *> Decls,
                                 DeclContext *UseDC, DeclNameLoc NameLoc,
                                 bool Implicit, FunctionRefInfo functionRefInfo) {
   assert(!Decls.empty() && "Must have at least one declaration");
+  ASSERT(llvm::any_of(Decls, [](ValueDecl *VD) {
+            return ABIRoleInfo(VD).providesAPI();
+          }) && "DeclRefExpr can't refer to ABI-only decl");
 
   auto &Context = UseDC->getASTContext();
 
@@ -769,7 +783,7 @@ Expr *CallerSideDefaultArgExprRequest::evaluate(
     return new (ctx) ErrorExpr(initExpr->getSourceRange(), paramTy);
   }
   if (param->getDefaultArgumentKind() == DefaultArgumentKind::ExpressionMacro) {
-    TypeChecker::contextualizeCallSideDefaultArgument(dc, initExpr);
+    TypeChecker::contextualizeExpr(initExpr, dc);
     TypeChecker::checkCallerSideDefaultArgumentEffects(dc, initExpr);
   }
   return initExpr;

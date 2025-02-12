@@ -11,7 +11,7 @@ class X : B {}
 
 // CHECK-LABEL: sil [ossa] @test_ossa :
 // CHECK:         %0 = alloc_ref
-// CHECK-NEXT:  checked_cast_br AnyObject in %0 : $X
+// CHECK-NEXT:  checked_cast_br X in %0 : $X
 // CHECK:     bb2([[A:%.*]] : @owned $X):
 // CHECK-NEXT:  [[U:%.*]] = upcast [[A]] : $X to $B, loc "takethis":1:1
 // CHECK-NEXT:  [[E:%.*]] = init_existential_ref [[U]] {{.+}}, loc "takethis":1:1

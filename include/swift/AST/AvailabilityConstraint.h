@@ -17,14 +17,17 @@
 #ifndef SWIFT_AST_AVAILABILITY_CONSTRAINT_H
 #define SWIFT_AST_AVAILABILITY_CONSTRAINT_H
 
-#include "swift/AST/Availability.h"
+#include "swift/AST/Attr.h"
+#include "swift/AST/AvailabilityDomain.h"
+#include "swift/AST/AvailabilityRange.h"
 #include "swift/AST/PlatformKind.h"
 #include "swift/Basic/LLVM.h"
 
 namespace swift {
 
 class ASTContext;
-class AvailableAttr;
+class AvailabilityContext;
+class Decl;
 
 /// Represents the reason a declaration could be considered unavailable in a
 /// certain context.
@@ -59,33 +62,37 @@ public:
   };
 
 private:
-  Kind kind;
-  const AvailableAttr *attr;
+  llvm::PointerIntPair<SemanticAvailableAttr, 2, Kind> attrAndKind;
 
-  AvailabilityConstraint(Kind kind, const AvailableAttr *attr)
-      : kind(kind), attr(attr) {};
+  AvailabilityConstraint(Kind kind, SemanticAvailableAttr attr)
+      : attrAndKind(attr, kind) {};
 
 public:
   static AvailabilityConstraint
-  forAlwaysUnavailable(const AvailableAttr *attr) {
+  forAlwaysUnavailable(SemanticAvailableAttr attr) {
     return AvailabilityConstraint(Kind::AlwaysUnavailable, attr);
   }
 
-  static AvailabilityConstraint forObsoleted(const AvailableAttr *attr) {
+  static AvailabilityConstraint forObsoleted(SemanticAvailableAttr attr) {
     return AvailabilityConstraint(Kind::Obsoleted, attr);
   }
 
-  static AvailabilityConstraint forRequiresVersion(const AvailableAttr *attr) {
+  static AvailabilityConstraint forRequiresVersion(SemanticAvailableAttr attr) {
     return AvailabilityConstraint(Kind::RequiresVersion, attr);
   }
 
   static AvailabilityConstraint
-  forIntroducedInNewerVersion(const AvailableAttr *attr) {
+  forIntroducedInNewerVersion(SemanticAvailableAttr attr) {
     return AvailabilityConstraint(Kind::IntroducedInNewerVersion, attr);
   }
 
-  Kind getKind() const { return kind; }
-  const AvailableAttr *getAttr() const { return attr; }
+  Kind getKind() const { return attrAndKind.getInt(); }
+  SemanticAvailableAttr getAttr() const {
+    return static_cast<SemanticAvailableAttr>(attrAndKind.getPointer());
+  }
+
+  /// Returns the domain that the constraint applies to.
+  AvailabilityDomain getDomain() const { return getAttr().getDomain(); }
 
   /// Returns the platform that this constraint applies to, or
   /// `PlatformKind::none` if it is not platform specific.
@@ -105,6 +112,37 @@ public:
   bool isActiveForRuntimeQueries(ASTContext &ctx) const;
 };
 
+/// Represents a set of availability constraints that restrict use of a
+/// declaration in a particular context.
+class DeclAvailabilityConstraints {
+  using Storage = llvm::SmallVector<AvailabilityConstraint, 4>;
+  Storage constraints;
+
+public:
+  DeclAvailabilityConstraints() {}
+
+  void addConstraint(const AvailabilityConstraint &constraint) {
+    constraints.emplace_back(constraint);
+  }
+
+  using const_iterator = Storage::const_iterator;
+  const_iterator begin() const { return constraints.begin(); }
+  const_iterator end() const { return constraints.end(); }
+};
+
+/// Returns the `AvailabilityConstraint` that describes how \p attr restricts
+/// use of \p decl in \p context or `std::nullopt` if there is no restriction.
+std::optional<AvailabilityConstraint>
+getAvailabilityConstraintForAttr(const Decl *decl,
+                                 const SemanticAvailableAttr &attr,
+                                 const AvailabilityContext &context);
+
+/// Returns the set of availability constraints that restrict use of \p decl
+/// when it is referenced from the given context. In other words, it is the
+/// collection of of `@available` attributes with unsatisfied conditions.
+DeclAvailabilityConstraints
+getAvailabilityConstraintsForDecl(const Decl *decl,
+                                  const AvailabilityContext &context);
 } // end namespace swift
 
 #endif

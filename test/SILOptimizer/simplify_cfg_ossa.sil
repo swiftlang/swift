@@ -1939,3 +1939,35 @@ bb3:
   return %t : $()
 }
 
+// CHECK-LABEL: sil [ossa] @replace_phi_arg_with_borrowed_from_use :
+// CHECK:       bb3([[R:%.*]] : @reborrow $B):
+// CHECK:       bb6([[G:%.*]] : @guaranteed $E):
+// CHECK-NEXT:    [[X:%.*]] = borrowed [[G]] : $E from ([[R]] : $B)
+// CHECK-NEXT:    fix_lifetime [[X]]
+// CHECK:       } // end sil function 'replace_phi_arg_with_borrowed_from_use'
+sil [ossa] @replace_phi_arg_with_borrowed_from_use : $@convention(thin) (@in_guaranteed B) -> () {
+bb0(%0 : $*B):
+  cond_br undef, bb1, bb2
+bb1:
+  %4 = load_borrow %0
+  br bb3(%4)
+bb2:
+  %6 = load_borrow %0
+  br bb3(%6)
+bb3(%8 : @reborrow $B):
+  %9 = borrowed %8 from ()
+  cond_br undef, bb4, bb5
+bb4:
+  %11 = unchecked_ref_cast %9 to $E
+  br bb6(%11, %9)
+bb5:
+  %13 = unchecked_ref_cast %9 to $E
+  br bb6(%13, %9)
+bb6(%15: @guaranteed $E, %16 : @reborrow $B):
+  %17 = borrowed %15 from (%16)
+  %18 = borrowed %16 from ()
+  fix_lifetime %17
+  end_borrow %18
+  %r = tuple()
+  return %r
+}

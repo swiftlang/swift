@@ -95,6 +95,12 @@ void SplitterStep::computeFollowupSteps(
   // Contract the edges of the constraint graph.
   CG.optimize();
 
+  if (CS.getASTContext().TypeCheckerOpts.SolverDisableSplitter) {
+    steps.push_back(std::make_unique<ComponentStep>(
+          CS, 0, &CS.InactiveConstraints, Solutions));
+    return;
+  }
+
   // Compute the connected components of the constraint graph.
   auto components = CG.computeConnectedComponents(CS.getTypeVariables());
   unsigned numComponents = components.size();
@@ -360,7 +366,7 @@ StepResult ComponentStep::take(bool prevFailed) {
     }
   });
 
-  auto *disjunction = CS.selectDisjunction();
+  auto disjunction = CS.selectDisjunction();
   auto *conjunction = CS.selectConjunction();
 
   if (CS.isDebugMode()) {
@@ -403,7 +409,8 @@ StepResult ComponentStep::take(bool prevFailed) {
     // Bindings usually happen first, but sometimes we want to prioritize a
     // disjunction or conjunction.
     if (bestBindings) {
-      if (disjunction && !bestBindings->favoredOverDisjunction(disjunction))
+      if (disjunction &&
+          !bestBindings->favoredOverDisjunction(disjunction->first))
         return StepKind::Disjunction;
 
       if (conjunction && !bestBindings->favoredOverConjunction(conjunction))
@@ -426,9 +433,9 @@ StepResult ComponentStep::take(bool prevFailed) {
       return suspend(
           std::make_unique<TypeVariableStep>(*bestBindings, Solutions));
     case StepKind::Disjunction: {
-      CS.retireConstraint(disjunction);
+      CS.retireConstraint(disjunction->first);
       return suspend(
-          std::make_unique<DisjunctionStep>(CS, disjunction, Solutions));
+          std::make_unique<DisjunctionStep>(CS, *disjunction, Solutions));
     }
     case StepKind::Conjunction: {
       CS.retireConstraint(conjunction);
@@ -737,7 +744,9 @@ bool DisjunctionStep::shouldSkip(const DisjunctionChoice &choice) const {
     auto *declA = LastSolvedChoice->first->getOverloadChoice().getDecl();
     auto *declB = static_cast<Constraint *>(choice)->getOverloadChoice().getDecl();
 
-    if (declA->getBaseIdentifier().isArithmeticOperator() &&
+    if ((declA->getBaseIdentifier().isArithmeticOperator() ||
+         declA->getBaseIdentifier().isBitwiseOperator() ||
+         declA->getBaseIdentifier().isShiftOperator()) &&
         TypeChecker::isDeclRefinementOf(declA, declB)) {
       return skip("subtype");
     }

@@ -1,4 +1,5 @@
 // RUN: %target-swift-frontend %s -O -Xllvm -sil-print-types -emit-sil | %FileCheck %s
+// RUN: %target-swift-frontend %s -O -Xllvm -sil-print-types -enable-ossa-modules -emit-sil | %FileCheck %s
 
 func curry<T1, T2, T3, T4>(_ f: @escaping (T1, T2, T3) -> T4) -> (T1) -> (T2) -> (T3) -> T4 {
   return { x in { y in { z in f(x, y, z) } } }

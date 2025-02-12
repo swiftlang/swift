@@ -139,6 +139,11 @@ struct OwnershipModelEliminatorVisitor
   bool visitExplicitCopyAddrInst(ExplicitCopyAddrInst *cai);
   bool visitApplyInst(ApplyInst *ai);
 
+  bool visitIgnoredUseInst(IgnoredUseInst *iui) {
+    eraseInstruction(iui);
+    return true;
+  }
+
   void splitDestroy(DestroyValueInst *destroy);
   bool peepholeTupleConstructorUser(DestructureTupleInst *dti);
   bool visitDestroyValueInst(DestroyValueInst *dvi);
@@ -545,7 +550,7 @@ void OwnershipModelEliminatorVisitor::splitDestroy(DestroyValueInst *destroy) {
   auto operandTy = operand->getType();
   NominalTypeDecl *nominalDecl = operandTy.getNominalOrBoundGenericNominal();
 
-  if (auto *sd = dyn_cast<StructDecl>(nominalDecl)) {
+  if (isa<StructDecl>(nominalDecl)) {
     withBuilder<void>(destroy, [&](SILBuilder &builder, SILLocation loc) {
       llvm::SmallVector<Projection, 8> projections;
       Projection::getFirstLevelProjections(

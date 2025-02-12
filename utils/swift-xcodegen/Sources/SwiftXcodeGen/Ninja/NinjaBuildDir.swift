@@ -13,22 +13,30 @@
 public final class NinjaBuildDir: Sendable {
   public let path: AbsolutePath
   public let projectRootDir: AbsolutePath
-  public let tripleSuffix: String
+  private let _tripleSuffix: Result<String, Error>
 
   private let repoBuildDirs = MutexBox<[Repo: RepoBuildDir]>()
 
   private static func detectTripleSuffix(
     buildDir: AbsolutePath
-  ) throws -> String {
-    for dir in try buildDir.getDirContents() {
-      guard buildDir.appending(dir).isDirectory,
-            let triple = dir.fileName.tryDropPrefix("swift-") else {
-        continue
+  ) -> Result<String, Error> {
+    Result {
+      for dir in try buildDir.getDirContents() {
+        guard buildDir.appending(dir).isDirectory,
+              let triple = dir.fileName.tryDropPrefix("swift-") else {
+          continue
+        }
+        return triple
       }
-      return triple
+      let couldBeParent = buildDir.fileName.hasPrefix("swift-")
+      throw XcodeGenError.noSwiftBuildDir(buildDir, couldBeParent: couldBeParent)
     }
-    let couldBeParent = buildDir.fileName.hasPrefix("swift-")
-    throw XcodeGenError.noSwiftBuildDir(buildDir, couldBeParent: couldBeParent)
+  }
+
+  public var tripleSuffix: String {
+    get throws {
+      try _tripleSuffix.get()
+    }
   }
 
   // We can infer the project root from the location of swift-xcodegen itself.
@@ -51,7 +59,7 @@ public final class NinjaBuildDir: Sendable {
       throw XcodeGenError.pathNotFound(path)
     }
     self.path = path
-    self.tripleSuffix = try Self.detectTripleSuffix(buildDir: path)
+    self._tripleSuffix = Self.detectTripleSuffix(buildDir: path)
     self.projectRootDir = try projectRootDir ?? Self.detectProjectRoot()
   }
   

@@ -5,10 +5,14 @@
 // Test the -profile-sample-use= flag using bogus data, to ensure it's actually
 // reaching LLVM in the expected way.
 
-// RUN: %target-swift-frontend %t/program.swift -module-name test -emit-ir \
-// RUN:                  -O -profile-sample-use=%t/profile.txt -o %t/has-data.ll
+// RUN: %target-swiftc_driver -v %t/program.swift -module-name test -emit-ir \
+// RUN:                -O -profile-sample-use=%t/profile.txt -o %t/has-data.ll \
+// RUN:                > %t/flags.txt
 
-// RUN: %FileCheck %s < %t/has-data.ll
+// RUN: %FileCheck %s --check-prefix CHECK-STDERR --input-file %t/flags.txt
+// CHECK-STDERR: -Xllvm -sample-profile-use-profi
+
+// RUN: %FileCheck %s --input-file %t/has-data.ll
 
 // CHECK: define{{.*}} @"$s4test8anythingyyF"() #[[ATTRID:[0-9]+]]
 // CHECK: attributes #[[ATTRID]] = {{.*}} "use-sample-profile"
@@ -32,6 +36,11 @@
 
 // CHECK-NODATA-LABEL: !llvm.module.flags
 // CHECK-NODATA-NOT: Profile
+
+// FIXME: It appears that Windows does not use the new swift-driver.
+// This test in particular includes end-to-end testing coverage via
+// that driver to ensure the flag works.
+// REQUIRES: OS=macosx || OS=linux-gnu
 
 
 //--- program.swift

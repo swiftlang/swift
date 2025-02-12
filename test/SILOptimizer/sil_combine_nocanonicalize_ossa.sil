@@ -27,10 +27,9 @@ class KlassWithTailAllocatedElems {
 // CHECK: [[PROJ:%.*]] = project_box [[BORROW]]
 // CHECK-NOT: pointer_to_address
 // CHECK-NOT: address_to_pointer
-// CHECK: [[CAST_RESULT:%.*]] = unchecked_addr_cast [[PROJ]]
 // CHECK-NOT: pointer_to_address
 // CHECK-NOT: address_to_pointer
-// CHECK: load [trivial] [[CAST_RESULT]]
+// CHECK: load [trivial] [[PROJ]]
 // CHECK: end_borrow [[BORROW]]
 // CHECK: destroy_value [[BOX]]
 // CHECK-LABEL: } // end sil function 'unchecked_addr_cast_borrowed_box'

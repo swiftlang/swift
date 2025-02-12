@@ -554,6 +554,8 @@ namespace {
       if (auto wrapped = pointeeType->wrapInPointer(pointerKind)) {
         return {wrapped, ImportHint::OtherPointer};
       } else {
+        addImportDiagnostic(Diagnostic(diag::bridged_pointer_type_not_found,
+                                       pointerKind));
         return Type();
       }
     }
@@ -611,8 +613,11 @@ namespace {
         pointerKind = PTK_UnsafeMutablePointer;
       }
 
-      return {pointeeType->wrapInPointer(pointerKind),
-              ImportHint::None};
+      auto pointerType = pointeeType->wrapInPointer(pointerKind);
+      if (!pointerType)
+        addImportDiagnostic(Diagnostic(diag::bridged_pointer_type_not_found,
+                                       pointerKind));
+      return {pointerType, ImportHint::None};
     }
 
     ImportResult VisitMemberPointer(const clang::MemberPointerType *type) {
@@ -640,12 +645,13 @@ namespace {
         return Type();
 
       auto size = type->getSize().getZExtValue();
+
       // An array of size N is imported as an N-element tuple which
       // takes very long to compile. We chose 4096 as the upper limit because
       // we don't want to break arrays of size PATH_MAX.
       if (size > 4096)
         return Type();
-      
+
       if (size == 1)
         return elementType;
 
@@ -1414,7 +1420,8 @@ static Type maybeImportNSErrorOutParameter(ClangImporter::Implementation &impl,
 
 static Type maybeImportCFOutParameter(ClangImporter::Implementation &impl,
                                       Type importedType,
-                                      ImportTypeAttrs attrs) {
+                                      ImportTypeAttrs attrs,
+                                      llvm::function_ref<void(Diagnostic &&)> addImportDiagnostic) {
   PointerTypeKind PTK;
   auto elementType = importedType->getAnyPointerElementType(PTK);
   if (!elementType || PTK != PTK_UnsafeMutablePointer)
@@ -1446,6 +1453,9 @@ static Type maybeImportCFOutParameter(ClangImporter::Implementation &impl,
     pointerKind = PTK_AutoreleasingUnsafeMutablePointer;
 
   resultTy = resultTy->wrapInPointer(pointerKind);
+  if (!resultTy)
+    addImportDiagnostic(Diagnostic(diag::bridged_pointer_type_not_found,
+                                   pointerKind));
   return resultTy;
 }
 
@@ -1483,7 +1493,12 @@ static ImportedType adjustTypeForConcreteImport(
         importKind != ImportTypeKind::Result) {
       return {Type(), false};
     }
-    importedType = impl.getNamedSwiftType(impl.getStdlibModule(), "Void");
+    importedType = impl.SwiftContext.getVoidType();
+    if (!importedType) {
+      addImportDiagnostic(Diagnostic(diag::bridged_type_not_found_in_module,
+                                     "Void", "Swift"));
+      return {Type(), false};
+    }
     break;
 
   case ImportHint::ObjCBridged:
@@ -1599,7 +1614,8 @@ static ImportedType adjustTypeForConcreteImport(
     if (attrs.contains(ImportTypeAttr::CFRetainedOutParameter) ||
         attrs.contains(ImportTypeAttr::CFUnretainedOutParameter)) {
       if (Type outParamTy =
-              maybeImportCFOutParameter(impl, importedType, attrs)) {
+              maybeImportCFOutParameter(impl, importedType, attrs,
+                                        addImportDiagnostic)) {
         importedType = outParamTy;
         break;
       }
@@ -2220,8 +2236,15 @@ ImportedType ClangImporter::Implementation::importFunctionReturnType(
        op == clang::OverloadedOperatorKind::OO_MinusEqual ||
        op == clang::OverloadedOperatorKind::OO_StarEqual ||
        op == clang::OverloadedOperatorKind::OO_SlashEqual) &&
-      clangDecl->getReturnType()->isReferenceType())
-    return {SwiftContext.getVoidType(), false};
+      clangDecl->getReturnType()->isReferenceType()) {
+    auto voidTy = SwiftContext.getVoidType();
+    if (!voidTy)
+      addImportDiagnostic(clangDecl,
+                          Diagnostic(diag::bridged_type_not_found_in_module,
+                                     "Void", "Swift"),
+                          clangDecl->getLocation());
+    return {voidTy, false};
+  }
 
   // Fix up optionality.
   OptionalTypeKind OptionalityOfReturn;
@@ -2307,7 +2330,7 @@ ImportedType ClangImporter::Implementation::importFunctionReturnType(
                        : ImportTypeKind::Result),
       ImportDiagnosticAdder(*this, clangDecl, clangDecl->getLocation()),
       allowNSUIntegerAsInt, Bridgeability::Full, getImportTypeAttrs(clangDecl),
-      OptionalityOfReturn, isBoundsAnnotated);
+      OptionalityOfReturn, true, std::nullopt, isBoundsAnnotated);
 }
 
 static Type
@@ -2388,7 +2411,10 @@ ImportedType ClangImporter::Implementation::importFunctionParamsAndReturnType(
     auto genericType =
         findGenericTypeInGenericDecls(*this, templateParamType, genericParams,
                                       getImportTypeAttrs(clangDecl), addDiag);
-    importedType = {genericType->wrapInPointer(pointerKind), false};
+    auto genericPointerType = genericType->wrapInPointer(pointerKind);
+    if (!genericPointerType)
+      addDiag(Diagnostic(diag::bridged_pointer_type_not_found, pointerKind));
+    importedType = {genericPointerType, false};
   } else if (!(isa<clang::RecordType>(returnType) ||
                isa<clang::TemplateSpecializationType>(returnType)) ||
              // TODO: we currently don't lazily load operator return types, but
@@ -2472,8 +2498,11 @@ ClangImporter::Implementation::importParameterType(
     auto genericType = findGenericTypeInGenericDecls(
         *this, templateParamType, genericParams, attrs, addImportDiagnosticFn);
     swiftParamTy = genericType->wrapInPointer(pointerKind);
-    if (!swiftParamTy)
+    if (!swiftParamTy) {
+      addImportDiagnosticFn(Diagnostic(diag::bridged_pointer_type_not_found,
+                                       pointerKind));
       return std::nullopt;
+    }
   } else if (isa<clang::ReferenceType>(paramTy) &&
              isa<clang::TemplateTypeParmType>(paramTy->getPointeeType())) {
     // We don't support universal reference, bail.
@@ -2647,10 +2676,10 @@ static ParamDecl *getParameterInfo(ClangImporter::Implementation *impl,
       impl->importSourceLoc(param->getLocation()), bodyName,
       impl->ImportedHeaderUnit);
 
+  auto &ASTContext = paramInfo->getASTContext();
   // If SendingArgsAndResults are enabled and we have a sending argument,
   // set that the param was sending.
-  if (paramInfo->getASTContext().LangOpts.hasFeature(
-          Feature::SendingArgsAndResults)) {
+  if (ASTContext.LangOpts.hasFeature(Feature::SendingArgsAndResults)) {
     if (auto *attr = param->getAttr<clang::SwiftAttrAttr>()) {
       if (attr->getAttribute() == "sending") {
         paramInfo->setSending();
@@ -2658,14 +2687,26 @@ static ParamDecl *getParameterInfo(ClangImporter::Implementation *impl,
     }
   }
 
+  // C++ types taking a reference might return a reference/pointer to a
+  // subobject of the referenced storage. In those cases we need to prevent the
+  // Swift compiler to pass in a temporary copy to prevent dangling.
+  if (ASTContext.LangOpts.hasFeature(Feature::AddressableParameters) &&
+      !param->getType().isNull() && param->getType()->isReferenceType()) {
+    paramInfo->setAddressable();
+  }
+
+  // Parameters of type const T& imported as T, make sure we borrow from them
+  // when they have lifetime annotations.
+  bool isBorrowing = (param->getAttr<clang::LifetimeBoundAttr>() ||
+                      param->getAttr<clang::LifetimeCaptureByAttr>()) &&
+                     param->getType()->isReferenceType();
   // Foreign references are already references so they don't need to be passed
   // as inout.
   paramInfo->setSpecifier(
       isConsuming ? ParamSpecifier::Consuming
                   : (isInOut ? ParamSpecifier::InOut
-                             : (param->getAttr<clang::LifetimeBoundAttr>()
-                                    ? ParamSpecifier::Borrowing
-                                    : ParamSpecifier::Default)));
+                             : (isBorrowing ? ParamSpecifier::Borrowing
+                                            : ParamSpecifier::Default)));
   paramInfo->setInterfaceType(swiftParamTy);
   impl->recordImplicitUnwrapForDecl(paramInfo, isParamTypeImplicitlyUnwrapped);
 
@@ -3515,6 +3556,11 @@ ImportedType ClangImporter::Implementation::importAccessorParamsAndReturnType(
 
     *params = ParameterList::create(SwiftContext, paramInfo);
     resultTy = SwiftContext.getVoidType();
+    if (!resultTy)
+      addImportDiagnostic(clangDecl,
+                          Diagnostic(diag::bridged_type_not_found_in_module,
+                                     "Void", "Swift"),
+                          clangDecl->getLocation());
     isIUO = false;
   }
 

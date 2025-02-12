@@ -38,6 +38,11 @@ using MallocTypeId = unsigned long long;
 SWIFT_RETURNS_NONNULL SWIFT_NODISCARD
 void *swift_slowAllocTyped(size_t bytes, size_t alignMask, MallocTypeId typeId);
 
+// If SWIFT_STDLIB_HAS_MALLOC_TYPE is defined, allocate typed memory.
+// Otherwise, allocate plain memory.
+SWIFT_RUNTIME_EXPORT
+void *swift_coroFrameAlloc(size_t bytes, MallocTypeId typeId);
+
 // If the caller cannot promise to zero the object during destruction,
 // then call these corresponding APIs:
 SWIFT_RUNTIME_EXPORT

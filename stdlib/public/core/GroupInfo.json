@@ -190,7 +190,7 @@
   ],
   "Pointer": [
     "Pointer.swift",
-    "PointerBounds.swift",
+    "SwiftifyImport.swift",
     "TemporaryAllocation.swift",
     "UnsafePointer.swift",
     "UnsafeRawPointer.swift",
@@ -256,7 +256,8 @@
     "Instant.swift",
     "EmbeddedRuntime.swift",
     "EmbeddedStubs.swift",
-    "EmbeddedPrint.swift"
+    "EmbeddedPrint.swift",
+    "Slab.swift"
   ],
   "Result": [
     "Result.swift"

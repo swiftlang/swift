@@ -415,8 +415,11 @@ private:
     /// Whether this module is built with -package-cmo.
     unsigned SerializePackageEnabled : 1;
 
+    /// Whether this module enabled strict memory safety.
+    unsigned StrictMemorySafety : 1;
+
     // Explicitly pad out to the next word boundary.
-    unsigned : 3;
+    unsigned : 2;
   } Bits = {};
   static_assert(sizeof(ModuleBits) <= 8, "The bit set should be small");
 
@@ -598,7 +601,7 @@ public:
 
   /// Outputs information useful for diagnostics to \p out
   void outputDiagnosticInfo(llvm::raw_ostream &os) const;
-  
+
   // Out of line to avoid instantiation OnDiskChainedHashTable here.
   ~ModuleFileSharedCore();
 
@@ -650,6 +653,12 @@ public:
     return MacroModuleNames;
   }
 
+  /// Get embedded bridging header.
+  std::string getEmbeddedHeader() const {
+    // Don't include the '\0' in the end.
+    return importedHeaderInfo.contents.drop_back().str();
+  }
+
   /// If the module-defining `.swiftinterface` file is an SDK-relative path,
   /// resolve it to be absolute to the specified SDK.
   std::string resolveModuleDefiningFilePath(const StringRef SDKPath) const;
@@ -666,6 +675,8 @@ public:
   bool hasSourceInfo() const;
 
   bool isConcurrencyChecked() const { return Bits.IsConcurrencyChecked; }
+
+  bool strictMemorySafety() const { return Bits.StrictMemorySafety; }
 
   /// How should \p dependency be loaded for a transitive import via \c this?
   ///

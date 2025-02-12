@@ -228,6 +228,9 @@ ERROR(let_cannot_be_addressed_property,none,
 ERROR(disallowed_var_multiple_getset,none,
       "'var' declarations with multiple variables cannot have explicit"
       " getters/setters", ())
+ERROR(stub_decl_cannot_have_body,none,
+      "stub %0 cannot have body",
+      (DescriptiveDeclKind))
 
 ERROR(disallowed_init,none,
       "initial value is not allowed here", ())
@@ -1368,6 +1371,8 @@ ERROR(expected_expr_after_ternary_colon,none,
       "expected expression after '? ... :' in ternary expression", ())
 ERROR(expected_expr_after_await, none,
       "expected expression after 'await'", ())
+ERROR(expected_expr_after_unsafe, none,
+      "expected expression after 'unsafe'", ())
 ERROR(expected_expr_after_move, none,
       "expected expression after 'consume'", ())
 ERROR(expected_expr_after_copy, none,
@@ -1574,20 +1579,6 @@ ERROR(attr_availability_expected_equal,none,
 ERROR(attr_availability_expected_version,none,
       "expected version number in '%0' attribute", (StringRef))
 
-WARNING(attr_availability_platform_agnostic_expected_option,none,
-      "expected 'introduced', 'deprecated', or 'obsoleted' in '%0' attribute "
-      "for platform '%1'", (StringRef, StringRef))
-WARNING(attr_availability_platform_agnostic_expected_deprecated_version,none,
-      "expected version number with 'deprecated' in '%0' attribute for "
-      "platform '%1'", (StringRef, StringRef))
-WARNING(attr_availability_platform_agnostic_infeasible_option,none,
-      "'%0' cannot be used in '%1' attribute for platform '%2'",
-      (StringRef, StringRef, StringRef))
-
-WARNING(attr_availability_nonspecific_platform_unexpected_version,none,
-      "unexpected version number in '%0' attribute for non-specific platform "
-      "'*'", (StringRef))
-
 WARNING(attr_availability_wildcard_ignored,none,
         "* as platform name has no effect in '%0' attribute", (StringRef))
 
@@ -1687,6 +1678,14 @@ ERROR(attr_isolated_expected_rparen,none,
       "expected ')' after isolation kind", ())
 ERROR(attr_isolated_expected_kind,none,
       "expected 'any' as the isolation kind", ())
+
+ERROR(attr_execution_expected_lparen,none,
+      "expected '(' after '@execution'",
+      ())
+ERROR(attr_execution_expected_rparen,none,
+      "expected ')' after execution behavior", ())
+ERROR(attr_execution_expected_kind,none,
+      "expected 'concurrent' or 'caller' as the execution behavior", ())
 
 ERROR(attr_private_import_expected_rparen,none,
       "expected ')' after function name for @_private", ())
@@ -2105,9 +2104,6 @@ ERROR(parser_round_trip_error,none,
 ERROR(parser_new_parser_errors,none,
       "new Swift parser generated errors for code that C++ parser accepted",
        ())
-
-ERROR(safe_attr_unchecked,none,
-      "'@safe' attribute must be written as '@safe(unchecked)'", ())
 
 // MARK: Reference Binding Diagnostics
 ERROR(sil_markuncheckedreferencebinding_requires_attribute,none,

@@ -309,6 +309,11 @@ private:
 /// specified lexical value.
 bool areUsesWithinLexicalValueLifetime(SILValue, ArrayRef<Operand *>);
 
+/// Whether the provided uses lie within the current liveness of the
+/// specified value.
+bool areUsesWithinValueLifetime(SILValue value, ArrayRef<Operand *> uses,
+                                DeadEndBlocks *deBlocks);
+
 /// A utility composed ontop of OwnershipFixupContext that knows how to replace
 /// a single use of a value with another value with a different ownership. We
 /// allow for the values to have different types.
@@ -366,6 +371,8 @@ void updateGuaranteedPhis(SILPassManager *pm, ArrayRef<SILPhiArgument *> phis);
 
 /// Replaces phis with the unique incoming values if all incoming values are the same.
 void replacePhisWithIncomingValues(SILPassManager *pm, ArrayRef<SILPhiArgument *> phis);
+
+bool hasOwnershipOperandsOrResults(SILInstruction *inst);
 
 } // namespace swift
 

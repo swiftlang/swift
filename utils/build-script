@@ -601,7 +601,7 @@ def main_preset():
             with open(file, 'r') as f:
                 for _, line in enumerate(f):
                     name, value = line.split("=", 1)
-                    args.preset_substitutions[name] = value
+                    args.preset_substitutions[name] = value.strip()
 
     for arg in args.preset_substitutions_raw:
         name, value = arg.split("=", 1)

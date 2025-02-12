@@ -1,5 +1,0 @@
-module CountedByClang {
-    header "counted-by.h"
-    export *
-}
-

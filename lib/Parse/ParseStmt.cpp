@@ -16,6 +16,7 @@
 
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/Attr.h"
+#include "swift/AST/AvailabilitySpec.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/FileUnit.h"
 #include "swift/Basic/Assertions.h"
@@ -381,7 +382,7 @@ ParserStatus Parser::parseBraceItems(SmallVectorImpl<ASTNode> &Entries,
                             IsFollowingGuard);
 
             if (IsActive)
-              activeElements = std::move(elements);
+              activeElements.append(elements);
           });
       if (IfConfigResult.hasCodeCompletion() && isIDEInspectionFirstPass()) {
         consumeDecl(BeginParserPosition, IsTopLevel);
@@ -1305,24 +1306,25 @@ validateAvailabilitySpecList(Parser &P,
   for (auto *Spec : Specs) {
     RecognizedSpecs.push_back(Spec);
     if (auto *OtherPlatSpec = dyn_cast<OtherPlatformAvailabilitySpec>(Spec)) {
-      OtherPlatformSpecLoc = OtherPlatSpec->getStarLoc();
+      OtherPlatformSpecLoc = OtherPlatSpec->getStartLoc();
       continue;
     }
 
     if (auto *PlatformAgnosticSpec =
          dyn_cast<PlatformAgnosticVersionConstraintAvailabilitySpec>(Spec)) {
-      P.diagnose(PlatformAgnosticSpec->getPlatformAgnosticNameLoc(),
+      bool isLanguageVersionSpecific = PlatformAgnosticSpec->getDomain()->isSwiftLanguage();
+      P.diagnose(PlatformAgnosticSpec->getStartLoc(),
                  diag::availability_must_occur_alone,
-                 PlatformAgnosticSpec->isLanguageVersionSpecific() 
-                   ? "swift" 
-                   : "_PackageDescription");
+                 isLanguageVersionSpecific
+                     ? "swift"
+                     : "_PackageDescription");
       continue;
     }
 
     auto *VersionSpec = cast<PlatformVersionConstraintAvailabilitySpec>(Spec);
     // We keep specs for unrecognized platforms around for error recovery
     // during parsing but remove them once parsing is completed.
-    if (VersionSpec->isUnrecognizedPlatform()) {
+    if (!VersionSpec->getDomain().has_value()) {
       RecognizedSpecs.pop_back();
       continue;
     }
@@ -1333,7 +1335,7 @@ validateAvailabilitySpecList(Parser &P,
       // For example, we emit an error for
       /// #available(OSX 10.10, OSX 10.11, *)
       PlatformKind Platform = VersionSpec->getPlatform();
-      P.diagnose(VersionSpec->getPlatformLoc(),
+      P.diagnose(VersionSpec->getStartLoc(),
                  diag::availability_query_repeated_platform,
                  platformString(Platform));
     }
@@ -1403,8 +1405,9 @@ ParserResult<PoundAvailableInfo> Parser::parseStmtConditionPoundAvailable() {
   for (auto *Spec : Specs) {
     if (auto *PlatformAgnostic =
           dyn_cast<PlatformAgnosticVersionConstraintAvailabilitySpec>(Spec)) {
-      diagnose(PlatformAgnostic->getPlatformAgnosticNameLoc(),
-               PlatformAgnostic->isLanguageVersionSpecific()
+      bool isLanguageVersionSpecific = PlatformAgnostic->getDomain()->isSwiftLanguage();
+      diagnose(PlatformAgnostic->getStartLoc(),
+               isLanguageVersionSpecific
                    ? diag::pound_available_swift_not_allowed
                    : diag::pound_available_package_description_not_allowed,
                getTokenText(MainToken));
@@ -1434,8 +1437,9 @@ ParserResult<PoundAvailableInfo> Parser::parseStmtConditionPoundAvailable() {
   return makeParserResult(Status, result);
 }
 
-ParserStatus
-Parser::parseAvailabilityMacroDefinition(AvailabilityMacroDefinition &Result) {
+ParserStatus Parser::parseAvailabilityMacroDefinition(
+    std::string &Name, llvm::VersionTuple &Version,
+    SmallVectorImpl<AvailabilitySpec *> &Specs) {
 
   // Prime the lexer.
   if (Tok.is(tok::NUM_TOKENS))
@@ -1446,23 +1450,23 @@ Parser::parseAvailabilityMacroDefinition(AvailabilityMacroDefinition &Result) {
     return makeParserError();
   }
 
-  Result.Name = Tok.getText();
+  Name = Tok.getText();
   consumeToken();
 
   if (Tok.isAny(tok::integer_literal, tok::floating_literal)) {
     SourceRange VersionRange;
-    if (parseVersionTuple(Result.Version, VersionRange,
+    if (parseVersionTuple(Version, VersionRange,
                           diag::avail_query_expected_version_number)) {
       return makeParserError();
     }
   }
 
   if (!consumeIf(tok::colon)) {
-    diagnose(Tok, diag::attr_availability_expected_colon_macro, Result.Name);
+    diagnose(Tok, diag::attr_availability_expected_colon_macro, Name);
     return makeParserError();
   }
 
-  return parseAvailabilitySpecList(Result.Specs, AvailabilitySpecSource::Macro);
+  return parseAvailabilitySpecList(Specs, AvailabilitySpecSource::Macro);
 }
 
 ParserStatus
@@ -1549,11 +1553,10 @@ Parser::parseAvailabilitySpecList(SmallVectorImpl<AvailabilitySpec *> &Specs,
             auto *PlatformSpec =
                 cast<PlatformVersionConstraintAvailabilitySpec>(Previous);
 
-            auto PlatformNameEndLoc =
-              Lexer::getLocForEndOfToken(SourceManager,
-                                         PlatformSpec->getPlatformLoc());
+            auto PlatformNameEndLoc = Lexer::getLocForEndOfToken(
+                SourceManager, PlatformSpec->getStartLoc());
 
-            diagnose(PlatformSpec->getPlatformLoc(),
+            diagnose(PlatformSpec->getStartLoc(),
                      diag::avail_query_meant_introduced)
                 .fixItInsert(PlatformNameEndLoc, ", introduced:");
           }

@@ -695,10 +695,6 @@ option(SWIFT_IMPLICIT_CONCURRENCY_IMPORT
   "Implicitly import the Swift concurrency module"
   TRUE)
 
-option(SWIFT_IMPLICIT_BACKTRACING_IMPORT
-  "Implicitly import the Swift backtracing module"
-  FALSE)
-
 option(SWIFT_ENABLE_EXPERIMENTAL_CONCURRENCY
   "Enable build of the Swift concurrency module"
   FALSE)
@@ -731,6 +727,10 @@ option(SWIFT_ENABLE_SYNCHRONIZATION
   "Enable build of the Swift Synchronization module"
   FALSE)
 
+option(SWIFT_ENABLE_RUNTIME_MODULE
+  "Build the Swift Runtime module"
+  FALSE)
+
 option(SWIFT_ENABLE_VOLATILE
   "Enable build of the Swift Volatile module"
   FALSE)
@@ -745,10 +745,6 @@ option(SWIFT_ENABLE_GLOBAL_ISEL_ARM64
 
 option(SWIFT_ENABLE_EXPERIMENTAL_PARSER_VALIDATION
   "Enable experimental SwiftParser validation by default"
-  FALSE)
-
-option(SWIFT_ENABLE_EXPERIMENTAL_POINTER_BOUNDS
-  "Enable experimental safe wrappers around external functions"
   FALSE)
 
 cmake_dependent_option(SWIFT_BUILD_SOURCEKIT
@@ -868,11 +864,6 @@ if (CMAKE_Swift_COMPILER)
   swift_supports_implicit_module("string-processing"
     SWIFT_SUPPORTS_DISABLE_IMPLICIT_STRING_PROCESSING_MODULE_IMPORT)
   message(STATUS "  Implicit 'string-processing' import: ${SWIFT_SUPPORTS_DISABLE_IMPLICIT_STRING_PROCESSING_MODULE_IMPORT}")
-
-  # Same for _Backtracing.
-  swift_supports_implicit_module("backtracing"
-    SWIFT_SUPPORTS_DISABLE_IMPLICIT_BACKTRACING_MODULE_IMPORT)
-  message(STATUS "  Implicit 'backtracing' import: ${SWIFT_SUPPORTS_DISABLE_IMPLICIT_BACKTRACING_MODULE_IMPORT}")
 
   swift_get_package_cmo_support(
     Swift_COMPILER_PACKAGE_CMO_SUPPORT)
@@ -1090,6 +1081,9 @@ endif()
 # Enable additional warnings.
 #
 swift_common_cxx_warnings()
+
+# Set sanitizer options for Swift compiler.
+swift_common_sanitizer_config()
 
 # Check if we're build with MSVC or Clang-cl, as these compilers have similar command line arguments.
 if("${CMAKE_C_COMPILER_ID}" STREQUAL "MSVC" OR "${CMAKE_CXX_SIMULATE_ID}" STREQUAL "MSVC")
@@ -1398,6 +1392,7 @@ if(SWIFT_BUILD_STDLIB OR SWIFT_BUILD_SDK_OVERLAY)
   message(STATUS "Synchronization Support:            ${SWIFT_ENABLE_SYNCHRONIZATION}")
   message(STATUS "Volatile Support:                   ${SWIFT_ENABLE_VOLATILE}")
   message(STATUS "Pointer Bounds Support:             ${SWIFT_ENABLE_EXPERIMENTAL_POINTER_BOUNDS}")
+  message(STATUS "Runtime Support:                    ${SWIFT_ENABLE_RUNTIME_MODULE}")
   message(STATUS "")
 else()
   message(STATUS "Not building Swift standard library, SDK overlays, and runtime")
@@ -1582,6 +1577,7 @@ endif()
 # New standard library build
 option(SWIFT_ENABLE_NEW_RUNTIME_BUILD "Build Swift runtimes with new build system" OFF)
 if(SWIFT_ENABLE_NEW_RUNTIME_BUILD)
+  message(STATUS "New runtime build enabled")
 
   add_custom_target(PopulateRuntimeSourceDir
     COMMAND "${CMAKE_COMMAND}" -P "${CMAKE_CURRENT_SOURCE_DIR}/Runtimes/Resync.cmake"
@@ -1598,6 +1594,13 @@ if(SWIFT_ENABLE_NEW_RUNTIME_BUILD)
       if(${SWIFT_SDK_${sdk}_${arch}_CACHE})
         set(stdlib_cache_file_flag -C ${SWIFT_SDK_${sdk}_${arch}_CACHE})
       endif()
+
+      set(stdlib_target_triple ${SWIFT_SDK_${sdk}_ARCH_${arch}_TRIPLE})
+      if(SWIFT_SDK_${sdk}_DEPLOYMENT_VERSION)
+        string(APPEND stdlib_target_triple ${SWIFT_SDK_${sdk}_DEPLOYMENT_VERSION})
+        set(stdlib_deployment_version_flag -DCMAKE_OSX_DEPLOYMENT_TARGET=${SWIFT_SDK_${sdk}_DEPLOYMENT_VERSION})
+      endif()
+
       ExternalProject_Add("${stdlib_target}-core"
         SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/Runtimes/Core"
         # TODO: Add this once we're ready to start swapping out the libraries
@@ -1611,12 +1614,19 @@ if(SWIFT_ENABLE_NEW_RUNTIME_BUILD)
           -DCMAKE_Swift_COMPILER_WORKS:BOOLEAN=YES
           -DBUILD_SHARED_LIBS:BOOLEAN=YES # TODO: Make this configurable
           ${stdlib_cache_file_flag}
+          ${stdlib_deployment_version_flag}
           -DCMAKE_BUILD_TYPE:STRING=${CMAKE_BUILD_TYPE}
           -DCMAKE_INSTALL_PREFIX:FILEPATH=<INSTALL_DIR>
           -DCMAKE_Swift_COMPILER:FILEPATH=$<IF:$<BOOL:${CMAKE_CROSSCOMPILING}>,${CMAKE_Swift_COMPILER},$<PATH:REPLACE_FILENAME,$<TARGET_FILE:swift-frontend>,swiftc>>
           -DCMAKE_C_COMPILER:FILEPATH=${CMAKE_C_COMPILER}
           -DCMAKE_CXX_COMPILER:FILEPATH=${CMAKE_CXX_COMPILER}
-          -DCMAKE_COLOR_DIAGNOSTICS:BOOLEAN=${CMAKE_COLOR_DIAGNOSTICS})
+          -DCMAKE_Swift_COMPILER_TARGET:STRING=${stdlib_target_triple}
+          -DCMAKE_C_COMPILER_TARGET:STRING=${stdlib_target_triple}
+          -DCMAKE_CXX_COMPILER_TARGET:STRING=${stdlib_target_triple}
+          -DCMAKE_COLOR_DIAGNOSTICS:BOOLEAN=${CMAKE_COLOR_DIAGNOSTICS}
+          -DCMAKE_MAKE_PROGRAM=${CMAKE_MAKE_PROGRAM}
+          -DSwiftCore_PLATFORM_SUBDIR=${SWIFT_SDK_${sdk}_LIB_SUBDIR}
+          -DSwiftCore_ARCH_SUBDIR=${arch})
       if(NOT ${CMAKE_CROSSCOMPILING})
         add_dependencies("${stdlib_target}" swift-frontend)
       endif()

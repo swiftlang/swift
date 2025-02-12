@@ -20,14 +20,14 @@
 
 // CHECK-IOSFWD: enum std {
 // CHECK-IOSFWD:   enum __1 {
-// CHECK-IOSFWD:     struct basic_string<CChar, char_traits<CChar>, allocator<CChar>> : CxxMutableRandomAccessCollection {
+// CHECK-IOSFWD:     struct basic_string<CChar, std.__1.char_traits<CChar>, std.__1.allocator<CChar>> : CxxMutableRandomAccessCollection {
 // CHECK-IOSFWD:       typealias value_type = CChar
 // CHECK-IOSFWD:     }
-// CHECK-IOSFWD:     struct basic_string<CWideChar, char_traits<CWideChar>, allocator<CWideChar>> : CxxMutableRandomAccessCollection {
+// CHECK-IOSFWD:     struct basic_string<CWideChar, std.__1.char_traits<CWideChar>, std.__1.allocator<CWideChar>> : CxxMutableRandomAccessCollection {
 // CHECK-IOSFWD:       typealias value_type = CWideChar
 // CHECK-IOSFWD:     }
-// CHECK-IOSFWD:     typealias string = std.__1.basic_string<CChar, char_traits<CChar>, allocator<CChar>>
-// CHECK-IOSFWD:     typealias wstring = std.__1.basic_string<CWideChar, char_traits<CWideChar>, allocator<CWideChar>>
+// CHECK-IOSFWD:     typealias string = std.__1.basic_string<CChar, std.__1.char_traits<CChar>, std.__1.allocator<CChar>>
+// CHECK-IOSFWD:     typealias wstring = std.__1.basic_string<CWideChar, std.__1.char_traits<CWideChar>, std.__1.allocator<CWideChar>>
 // CHECK-IOSFWD:   }
 // CHECK-IOSFWD: }
 // CHECK-IOSFWD-NOT: enum std

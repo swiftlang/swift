@@ -75,7 +75,6 @@ Constraint::Constraint(ConstraintKind Kind, Type First, Type Second,
   case ConstraintKind::OpenedExistentialOf:
   case ConstraintKind::OptionalObject:
   case ConstraintKind::OneWayEqual:
-  case ConstraintKind::OneWayBindParam:
   case ConstraintKind::UnresolvedMemberChainBase:
   case ConstraintKind::PropertyWrapper:
   case ConstraintKind::BindTupleOfFunctionParams:
@@ -88,11 +87,9 @@ Constraint::Constraint(ConstraintKind Kind, Type First, Type Second,
     assert(!First.isNull());
     assert(!Second.isNull());
     break;
-  case ConstraintKind::ApplicableFunction:
   case ConstraintKind::DynamicCallableApplicableFunction:
     assert(First->is<FunctionType>()
            && "The left-hand side type should be a function type");
-    trailingClosureMatching = 0;
     break;
 
   case ConstraintKind::ValueMember:
@@ -121,6 +118,10 @@ Constraint::Constraint(ConstraintKind Kind, Type First, Type Second,
 
   case ConstraintKind::SyntacticElement:
     llvm_unreachable("Syntactic element constraint should use create()");
+
+  case ConstraintKind::ApplicableFunction:
+    llvm_unreachable(
+        "Application constraint should use create()");
   }
 
   std::uninitialized_copy(typeVars.begin(), typeVars.end(),
@@ -164,7 +165,6 @@ Constraint::Constraint(ConstraintKind Kind, Type First, Type Second, Type Third,
   case ConstraintKind::Disjunction:
   case ConstraintKind::Conjunction:
   case ConstraintKind::OneWayEqual:
-  case ConstraintKind::OneWayBindParam:
   case ConstraintKind::FallbackType:
   case ConstraintKind::UnresolvedMemberChainBase:
   case ConstraintKind::PropertyWrapper:
@@ -289,6 +289,27 @@ Constraint::Constraint(ASTNode node, ContextualTypeInfo context,
   std::copy(typeVars.begin(), typeVars.end(), getTypeVariablesBuffer().begin());
 }
 
+Constraint::Constraint(FunctionType *appliedFn, Type calleeType,
+                       unsigned trailingClosureMatching, DeclContext *useDC,
+                       ConstraintLocator *locator,
+                       SmallPtrSetImpl<TypeVariableType *> &typeVars)
+    : Kind(ConstraintKind::ApplicableFunction), HasFix(false),
+      HasRestriction(false), IsActive(false), IsDisabled(false),
+      IsDisabledForPerformance(false), RememberChoice(false), IsFavored(false),
+      IsIsolated(false), NumTypeVariables(typeVars.size()), Locator(locator) {
+  assert(appliedFn);
+  assert(calleeType);
+  assert(trailingClosureMatching >= 0 && trailingClosureMatching <= 2);
+  assert(useDC);
+
+  Apply.AppliedFn = appliedFn;
+  Apply.Callee = calleeType;
+  Apply.TrailingClosureMatching = trailingClosureMatching;
+  Apply.UseDC = useDC;
+
+  std::copy(typeVars.begin(), typeVars.end(), getTypeVariablesBuffer().begin());
+}
+
 ProtocolDecl *Constraint::getProtocol() const {
   assert((Kind == ConstraintKind::ConformsTo ||
           Kind == ConstraintKind::LiteralConformsTo ||
@@ -398,7 +419,6 @@ void Constraint::print(llvm::raw_ostream &Out, SourceManager *sm,
   case ConstraintKind::EscapableFunctionOf: Out << " @escaping type of "; break;
   case ConstraintKind::OpenedExistentialOf: Out << " opened archetype of "; break;
   case ConstraintKind::OneWayEqual: Out << " one-way bind to "; break;
-  case ConstraintKind::OneWayBindParam: Out << " one-way bind param to "; break;
   case ConstraintKind::FallbackType:
     Out << " can fallback to ";
     break;
@@ -568,13 +588,9 @@ void Constraint::dump(SourceManager *sm) const {
 void Constraint::dump(ConstraintSystem *CS) const {
   // Disable MSVC warning: only for use within the debugger.
 #if SWIFT_COMPILER_IS_MSVC
-#pragma warning(push)
-#pragma warning(disable: 4996)
+#pragma warning(suppress: 4996)
 #endif
   dump(&CS->getASTContext().SourceMgr);
-#if SWIFT_COMPILER_IS_MSVC
-#pragma warning(pop)
-#endif
 }
 
 
@@ -679,7 +695,6 @@ gatherReferencedTypeVars(Constraint *constraint,
   case ConstraintKind::LiteralConformsTo:
   case ConstraintKind::TransitivelyConformsTo:
   case ConstraintKind::OneWayEqual:
-  case ConstraintKind::OneWayBindParam:
   case ConstraintKind::FallbackType:
   case ConstraintKind::UnresolvedMemberChainBase:
   case ConstraintKind::PropertyWrapper:
@@ -709,17 +724,6 @@ gatherReferencedTypeVars(Constraint *constraint,
                     constraint->getTypeVariables().end());
     break;
   }
-}
-
-unsigned Constraint::countResolvedArgumentTypes(ConstraintSystem &cs) const {
-  auto *argumentFuncType = cs.getAppliedDisjunctionArgumentFunction(this);
-  if (!argumentFuncType)
-    return 0;
-
-  return llvm::count_if(argumentFuncType->getParams(), [&](const AnyFunctionType::Param arg) {
-    auto argType = cs.getFixedTypeRecursive(arg.getPlainType(), /*wantRValue=*/true);
-    return !argType->isTypeVariableOrMember();
-  });
 }
 
 bool Constraint::isExplicitConversion() const {
@@ -1005,9 +1009,9 @@ Constraint *Constraint::createConjunction(
 }
 
 Constraint *Constraint::createApplicableFunction(
-    ConstraintSystem &cs, Type argumentFnType, Type calleeType,
+    ConstraintSystem &cs, FunctionType *argumentFnType, Type calleeType,
     std::optional<TrailingClosureMatching> trailingClosureMatching,
-    ConstraintLocator *locator) {
+    DeclContext *useDC, ConstraintLocator *locator) {
   // Collect type variables.
   SmallPtrSet<TypeVariableType *, 4> typeVars;
   if (argumentFnType->hasTypeVariable())
@@ -1015,29 +1019,28 @@ Constraint *Constraint::createApplicableFunction(
   if (calleeType->hasTypeVariable())
     calleeType->getTypeVariables(typeVars);
 
-  // Create the constraint.
+  // Encode the trailing closure matching.
+  unsigned rawTrailingClosureMatching = 0;
+  if (trailingClosureMatching) {
+    switch (*trailingClosureMatching) {
+      case TrailingClosureMatching::Forward:
+        rawTrailingClosureMatching = 1;
+        break;
+
+      case TrailingClosureMatching::Backward:
+        rawTrailingClosureMatching = 2;
+        break;
+    }
+  }
+
+    // Create the constraint.
   auto size =
     totalSizeToAlloc<TypeVariableType *, ConstraintFix *, OverloadChoice>(
       typeVars.size(), /*hasFix=*/0, /*hasOverloadChoice=*/0);
   void *mem = cs.getAllocator().Allocate(size, alignof(Constraint));
-  auto constraint = new (mem) Constraint(
-      ConstraintKind::ApplicableFunction, argumentFnType, calleeType, locator,
-      typeVars);
-
-  // Encode the trailing closure matching.
-  if (trailingClosureMatching) {
-    switch (*trailingClosureMatching) {
-      case TrailingClosureMatching::Forward:
-        constraint->trailingClosureMatching = 1;
-        break;
-
-      case TrailingClosureMatching::Backward:
-        constraint->trailingClosureMatching = 2;
-        break;
-    }
-  } else {
-    constraint->trailingClosureMatching = 0;
-  }
+  auto constraint = new (mem)
+      Constraint(argumentFnType, calleeType, rawTrailingClosureMatching, useDC,
+                 locator, typeVars);
 
   return constraint;
 }
@@ -1070,7 +1073,7 @@ Constraint *Constraint::createSyntacticElement(ConstraintSystem &cs,
 std::optional<TrailingClosureMatching>
 Constraint::getTrailingClosureMatching() const {
   assert(Kind == ConstraintKind::ApplicableFunction);
-  switch (trailingClosureMatching) {
+  switch (Apply.TrailingClosureMatching) {
   case 0:
     return std::nullopt;
   case 1: return TrailingClosureMatching::Forward;

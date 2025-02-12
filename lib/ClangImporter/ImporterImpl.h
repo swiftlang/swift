@@ -1203,9 +1203,9 @@ public:
 
   /// Create a decl with error type and an "unavailable" attribute on it
   /// with the specified message.
-  ValueDecl *createUnavailableDecl(Identifier name, DeclContext *dc,
-                                   Type type, StringRef UnavailableMessage,
-                                   bool isStatic, ClangNode ClangN);
+  ValueDecl *createUnavailableDecl(Identifier name, DeclContext *dc, Type type,
+                                   StringRef UnavailableMessage, bool isStatic,
+                                   ClangNode ClangN, AccessLevel access);
 
   /// Add a synthesized typealias to the given nominal type.
   void addSynthesizedTypealias(NominalTypeDecl *nominal, Identifier name,
@@ -1746,6 +1746,7 @@ public:
 
   void importSwiftAttrAttributes(Decl *decl);
   void importBoundsAttributes(FuncDecl *MappedDecl);
+  void importSpanAttributes(FuncDecl *MappedDecl);
 
   /// Find the lookup table that corresponds to the given Clang module.
   ///

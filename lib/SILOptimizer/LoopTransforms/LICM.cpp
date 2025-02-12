@@ -32,6 +32,7 @@
 #include "swift/SILOptimizer/PassManager/Transforms.h"
 #include "swift/SILOptimizer/Utils/CFGOptUtils.h"
 #include "swift/SILOptimizer/Utils/InstOptUtils.h"
+#include "swift/SILOptimizer/Utils/OwnershipOptUtils.h"
 #include "swift/SILOptimizer/Utils/SILSSAUpdater.h"
 
 #include "llvm/ADT/DepthFirstIterator.h"
@@ -849,21 +850,6 @@ static bool analyzeBeginAccess(BeginAccessInst *BI,
   return true;
 }
 
-static bool hasOwnershipOperandsOrResults(SILInstruction *inst) {
-  if (!inst->getFunction()->hasOwnership())
-    return false;
-
-  for (SILValue result : inst->getResults()) {
-    if (result->getOwnershipKind() != OwnershipKind::None)
-      return true;
-  }
-  for (Operand &op : inst->getAllOperands()) {
-    if (op.get()->getOwnershipKind() != OwnershipKind::None)
-      return true;
-  }
-  return false;
-}
-
 // Analyzes current loop for hosting/sinking potential:
 // Computes set of instructions we may be able to move out of the loop
 // Important Note:
@@ -904,6 +890,10 @@ void LoopTreeOptimization::analyzeCurrentLoop(
     for (auto &Inst : *BB) {
       if (hasOwnershipOperandsOrResults(&Inst)) {
         checkSideEffects(Inst, sideEffects, sideEffectsInBlock);
+        // Collect fullApplies to be checked in analyzeBeginAccess
+        if (auto fullApply = FullApplySite::isa(&Inst)) {
+          fullApplies.push_back(fullApply);
+        }
         continue;
       }
       switch (Inst.getKind()) {

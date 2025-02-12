@@ -46,6 +46,14 @@ extension Context {
 
   var moduleIsSerialized: Bool { _bridged.moduleIsSerialized() }
 
+  /// Enable diagnostics requiring WMO (for @noLocks, @noAllocation
+  /// annotations, Embedded Swift, and class specialization). SourceKit is the
+  /// only consumer that has this disabled today (as it disables WMO
+  /// explicitly).
+  var enableWMORequiredDiagnostics: Bool {
+    _bridged.enableWMORequiredDiagnostics()
+  }
+
   func canMakeStaticObjectReadOnly(objectType: Type) -> Bool {
     _bridged.canMakeStaticObjectReadOnly(objectType.bridged)
   }
@@ -336,14 +344,6 @@ struct FunctionPassContext : MutatingContext {
 
   fileprivate func notifyEffectsChanged() {
     _bridged.asNotificationHandler().notifyChanges(.effectsChanged)
-  }
-
-  func optimizeMemoryAccesses(in function: Function) -> Bool {
-    if _bridged.optimizeMemoryAccesses(function.bridged) {
-      notifyInstructionsChanged()
-      return true
-    }
-    return false
   }
 
   func eliminateDeadAllocations(in function: Function) -> Bool {
@@ -735,6 +735,14 @@ extension LoadInst {
   func set(ownership: LoadInst.LoadOwnership, _ context: some MutatingContext) {
     context.notifyInstructionsChanged()
     bridged.LoadInst_setOwnership(ownership.rawValue)
+    context.notifyInstructionChanged(self)
+  }
+}
+
+extension PointerToAddressInst {
+  func set(alignment: Int?, _ context: some MutatingContext) {
+    context.notifyInstructionsChanged()
+    bridged.PointerToAddressInst_setAlignment(UInt64(alignment ?? 0))
     context.notifyInstructionChanged(self)
   }
 }

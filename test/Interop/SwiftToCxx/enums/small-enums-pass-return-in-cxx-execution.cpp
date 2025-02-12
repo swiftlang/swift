@@ -14,8 +14,6 @@
 #include <cstddef>
 #include "enums.h"
 
-#define MAX(a, b) ((a) >= (b) ? (a) : (b))
-
 int main() {
     using namespace Enums;
 

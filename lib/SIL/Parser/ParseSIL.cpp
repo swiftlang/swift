@@ -3469,16 +3469,16 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
     ResultVal = B.createEndCOWMutation(InstLoc, Val, keepUnique);
     break;
   }
-  case SILInstructionKind::IsEscapingClosureInst: {
+  case SILInstructionKind::DestroyNotEscapedClosureInst: {
     bool IsObjcVerificationType = false;
     if (parseSILOptional(IsObjcVerificationType, *this, "objc"))
       return true;
     if (parseTypedValueRef(Val, B) || parseSILDebugLocation(InstLoc, B))
       return true;
-    ResultVal = B.createIsEscapingClosure(
+    ResultVal = B.createDestroyNotEscapedClosure(
         InstLoc, Val,
-        IsObjcVerificationType ? IsEscapingClosureInst::ObjCEscaping
-                              : IsEscapingClosureInst::WithoutActuallyEscaping);
+        IsObjcVerificationType ? DestroyNotEscapedClosureInst::ObjCEscaping
+                              : DestroyNotEscapedClosureInst::WithoutActuallyEscaping);
     break;
   }
 
@@ -4988,21 +4988,6 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
                              isFromVarDecl, usesMoveableValueDebugInfo);
     break;
   }
-  case SILInstructionKind::AllocVectorInst: {
-    SILType Ty;
-    if (parseSILType(Ty))
-      return true;
-
-    if (P.parseToken(tok::comma, diag::expected_tok_in_sil_instr, ","))
-      return true;
-
-    SILValue capacity;
-    if (parseTypedValueRef(capacity, B))
-      return true;
-
-    ResultVal = B.createAllocVector(InstLoc, capacity, Ty);
-    break;
-  }
   case SILInstructionKind::MetatypeInst: {
     SILType Ty;
     if (parseSILType(Ty))
@@ -5077,6 +5062,11 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
     }
     break;
   }
+  case SILInstructionKind::IgnoredUseInst:
+    if (parseTypedValueRef(Val, B) || parseSILDebugLocation(InstLoc, B))
+      return true;
+    ResultVal = B.createIgnoredUse(InstLoc, Val);
+    break;
 
   case SILInstructionKind::DeallocStackInst:
     if (parseTypedValueRef(Val, B) || parseSILDebugLocation(InstLoc, B))

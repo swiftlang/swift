@@ -137,8 +137,8 @@ int main() {
   }
 // CHECK: create NonTrivialTemplate
 // CHECK-NEXT: copy NonTrivialTemplate
-// CHECK-NEXT: x and y: 1, 2
 // CHECK-NEXT: ~NonTrivialTemplate
+// CHECK-NEXT: x and y: 1, 2
 // CHECK-NEXT: DoneCall
 // CHECK-NEXT: ~NonTrivialTemplate
   {

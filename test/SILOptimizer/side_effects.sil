@@ -1147,13 +1147,13 @@ bb0(%0 : $*X):
   return %3 : $()
 }
 
-// CHECK-LABEL: sil @is_escaping_closure_test
-// CHECK-NEXT:  [%0: destroy v**]
-// CHECK-NEXT:  [global: ]
+// CHECK-LABEL: sil @destroy_not_escaped_closure_test
+// CHECK-NEXT:  [%0: read v**.c*.v**, write v**.c*.v**, copy v**.c*.v**, destroy v**.c*.v**]
+// CHECK-NEXT:  [global: read,write,copy,destroy,allocate,deinit_barrier]
 // CHECK-NEXT:  {{^[^[]}}
-sil @is_escaping_closure_test : $@convention(thin)(@guaranteed @callee_guaranteed () -> ()) -> Builtin.Int1 {
+sil @destroy_not_escaped_closure_test : $@convention(thin)(@owned @callee_guaranteed () -> ()) -> Builtin.Int1 {
 bb0(%0 : $@callee_guaranteed () -> ()):
-  %1 = is_escaping_closure %0: $@callee_guaranteed () -> ()
+  %1 = destroy_not_escaped_closure %0: $@callee_guaranteed () -> ()
   return %1 : $Builtin.Int1
 }
 

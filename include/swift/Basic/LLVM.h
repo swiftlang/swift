@@ -34,10 +34,10 @@
 
 // Don't pre-declare certain LLVM types in the runtime, which must
 // not put things in namespace llvm for ODR reasons.
-#if !defined(swiftCore_EXPORTS)
-#define SWIFT_LLVM_ODR_SAFE 1
-#else
+#if defined(SWIFT_RUNTIME)
 #define SWIFT_LLVM_ODR_SAFE 0
+#else
+#define SWIFT_LLVM_ODR_SAFE 1
 #endif
 
 // Forward declarations.

@@ -265,3 +265,48 @@ func conditionallyCallsThrowError(b: Bool) throws(SmallError) -> Int {
     return 0
   }
 }
+
+func passthroughFixedErrorCall<T>(_ body: () throws(TinyError) -> T) throws(TinyError) -> T {
+  try body()
+}
+
+func passthroughFixedErrorAsync<T>(_ body: () async throws(TinyError) -> T) async throws(TinyError) -> T {
+  try await body()
+}
+
+func callClosureSync<T>(t: T) {
+  _ = try! passthroughFixedErrorCall { () throws(TinyError) -> T in
+    return t
+  }
+}
+
+func callClosureAsync<T>(t: T) async {
+  _ = try! await passthroughFixedErrorAsync { () async throws(TinyError) -> T in
+    return t
+  }
+}
+
+enum LargeError: Error {
+  case x
+  case y(Int64, Int64, Int64, Int64, Int64)
+}
+
+// Used to crash the compiler because
+func callClosureAsyncIndirectError(f: () async throws(LargeError) -> Int) async throws(LargeError) -> Int {
+  return try await f()
+}
+
+protocol AsyncGenProto<A> {
+  associatedtype A
+  func fn(arg: Int) async throws(SmallError) -> A
+}
+
+// CHECK: define internal swifttailcc void @"$s12typed_throws23callAsyncIndirectResult1p1xxAA0D8GenProto_px1ARts_XP_SitYaAA10SmallErrorVYKlFTY0_"(ptr swiftasync %0)
+// CHECK:   musttail call swifttailcc void {{%.*}}(ptr noalias {{%.*}}, ptr swiftasync {{%.*}}, i64 {{%.*}}, ptr noalias swiftself {{%.*}}, ptr %swifterror, ptr {{%.*}}, ptr {{%.*}})
+// CHECK:   ret void
+// CHECK: }
+@inline(never)
+func callAsyncIndirectResult<A>(p: any AsyncGenProto<A>, x: Int) async throws(SmallError) -> A {
+  return try await p.fn(arg: x)
+}
+

@@ -168,9 +168,13 @@
 // FIXME: this #else should be some sort of #elif Windows
 #else // !__MACH__ && !__ELF__
 
-// On PE/COFF, we use dllimport and dllexport.
-# define SWIFT_ATTRIBUTE_FOR_EXPORTS __declspec(dllexport)
-# define SWIFT_ATTRIBUTE_FOR_IMPORTS __declspec(dllimport)
+# if defined(SWIFT_STATIC_STDLIB)
+#   define SWIFT_ATTRIBUTE_FOR_EXPORTS /**/
+#   define SWIFT_ATTRIBUTE_FOR_IMPORTS /**/
+# else
+#   define SWIFT_ATTRIBUTE_FOR_EXPORTS __declspec(dllexport)
+#   define SWIFT_ATTRIBUTE_FOR_IMPORTS __declspec(dllimport)
+# endif
 
 #endif
 

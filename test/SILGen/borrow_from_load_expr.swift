@@ -16,7 +16,8 @@ public struct FA<T> {
 // CHECK:         [[POINTER:%[^,]+]] = apply [[ADDRESSOR]]
 // CHECK:         [[RAW_POINTER:%[^,]+]] = struct_extract [[POINTER]]
 // CHECK:         [[ADDR:%[^,]+]] = pointer_to_address [[RAW_POINTER]]
-// CHECK:         [[ACCESS:%[^,]+]] = begin_access [read] [unsafe] [[ADDR]]
+// CHECK:         [[MD:%.*]] = mark_dependence [unresolved] [[ADDR]] : $*T
+// CHECK:         [[ACCESS:%[^,]+]] = begin_access [read] [unsafe] [[MD]]
 // Verify that no spurious temporary is emitted.
 // CHECK-NOT:     alloc_stack
 // CHECK:         yield [[ACCESS]] : $*T, resume [[SUCCESS:bb[0-9]+]], unwind [[FAILURE:bb[0-9]+]]

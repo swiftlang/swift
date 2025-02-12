@@ -154,13 +154,17 @@ namespace {
     /// The location of the "preconcurrency" attribute if present.
     const SourceLoc preconcurrencyLoc;
 
+    /// The location of the "unsafe" attribute if present.
+    const SourceLoc unsafeLoc;
+
     ConformanceConstructionInfo() { }
 
     ConformanceConstructionInfo(ProtocolDecl *item, SourceLoc loc,
                                 SourceLoc uncheckedLoc,
-                                SourceLoc preconcurrencyLoc)
+                                SourceLoc preconcurrencyLoc,
+                                SourceLoc unsafeLoc)
         : Located(item, loc), uncheckedLoc(uncheckedLoc),
-          preconcurrencyLoc(preconcurrencyLoc) {}
+          preconcurrencyLoc(preconcurrencyLoc), unsafeLoc(unsafeLoc) {}
   };
 }
 
@@ -216,7 +220,7 @@ void ConformanceLookupTable::forEachInStage(ConformanceStage stage,
       registerProtocolConformances(next, conformances);
       for (auto conf : conformances) {
         protocols.push_back(
-            {conf->getProtocol(), SourceLoc(), SourceLoc(), SourceLoc()});
+            {conf->getProtocol(), SourceLoc(), SourceLoc(), SourceLoc(), SourceLoc()});
       }
     } else if (next->getParentSourceFile() ||
                next->getParentModule()->isBuiltinModule()) {
@@ -226,7 +230,8 @@ void ConformanceLookupTable::forEachInStage(ConformanceStage stage,
                getDirectlyInheritedNominalTypeDecls(next, inverses, anyObject)) {
         if (auto proto = dyn_cast<ProtocolDecl>(found.Item))
           protocols.push_back(
-              {proto, found.Loc, found.uncheckedLoc, found.preconcurrencyLoc});
+              {proto, found.Loc, found.uncheckedLoc,
+               found.preconcurrencyLoc, found.unsafeLoc});
       }
     }
 
@@ -315,7 +320,8 @@ void ConformanceLookupTable::updateLookupTable(NominalTypeDecl *nominal,
             if (!found.isSuppressed) {
               addProtocol(proto, found.Loc,
                           source.withUncheckedLoc(found.uncheckedLoc)
-                                .withPreconcurrencyLoc(found.preconcurrencyLoc));
+                                .withPreconcurrencyLoc(found.preconcurrencyLoc)
+                                .withUnsafeLoc(found.unsafeLoc));
             }
           }
 
@@ -330,7 +336,8 @@ void ConformanceLookupTable::updateLookupTable(NominalTypeDecl *nominal,
             addProtocol(
                 locAndProto.Item, locAndProto.Loc,
                 source.withUncheckedLoc(locAndProto.uncheckedLoc)
-                      .withPreconcurrencyLoc(locAndProto.preconcurrencyLoc));
+                      .withPreconcurrencyLoc(locAndProto.preconcurrencyLoc)
+                      .withUnsafeLoc(locAndProto.unsafeLoc));
         });
     break;
 
@@ -981,8 +988,7 @@ ConformanceLookupTable::getConformance(NominalTypeDecl *nominal,
     auto normalConf = ctx.getNormalConformance(
         conformingType, protocol, conformanceLoc, conformingDC,
         ProtocolConformanceState::Incomplete,
-        entry->Source.getUncheckedLoc().isValid(),
-        entry->Source.getPreconcurrencyLoc().isValid(),
+        entry->Source.getOptions(),
         entry->Source.getPreconcurrencyLoc());
     // Invalid code may cause the getConformance call below to loop, so break
     // the infinite recursion by setting this eagerly to shortcircuit with the

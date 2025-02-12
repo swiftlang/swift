@@ -13,6 +13,7 @@
 // TODO: This really ought to be defined in swift-xcodegen
 public enum Repo: CaseIterable, Sendable {
   case swift
+  case swiftRuntimes
   case lldb
   case llvm
   case cmark
@@ -20,15 +21,17 @@ public enum Repo: CaseIterable, Sendable {
   public var relativePath: RelativePath {
     switch self {
     case .swift: "swift"
+    case .swiftRuntimes: "swift/Runtimes"
     case .cmark: "cmark"
     case .lldb:  "llvm-project/lldb"
     case .llvm:  "llvm-project"
     }
   }
 
-  public var buildDirPrefix: String {
+  public var buildDirPrefix: String? {
     switch self {
     case .swift: "swift"
+    case .swiftRuntimes: nil
     case .cmark: "cmark"
     case .lldb:  "lldb"
     case .llvm:  "llvm"

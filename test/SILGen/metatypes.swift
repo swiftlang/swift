@@ -94,6 +94,7 @@ func existential_metatype_from_thin() -> Any.Type {
 // CHECK-NEXT: [[T2:%.*]] = apply [[T0]]([[T1]])
 // CHECK-NEXT: [[MV:%.*]] = move_value [var_decl] [[T2]] : $SomeStruct
 // CHECK-NEXT: debug_value [[MV]] : $SomeStruct, let, name "s"
+// CHECK-NEXT: ignored_use
 // CHECK-NEXT: [[T0:%.*]] = metatype $@thin SomeStruct.Type
 // CHECK-NEXT: [[T1:%.*]] = metatype $@thick SomeStruct.Type
 // CHECK-NEXT: [[T2:%.*]] = init_existential_metatype [[T1]] : $@thick SomeStruct.Type, $@thick any Any.Type

@@ -222,6 +222,19 @@ struct ProjectOptions: ParsableArguments {
   )
   var useBuildableFolders: Bool = true
 
+  @Option(
+    name: .customLong("runtimes-build-dir"),
+    help: """
+      Experimental: The path to a build directory for the new 'Runtimes/'
+      stdlib CMake build. This creates a separate 'SwiftRuntimes' project, along
+      with a 'Swift+Runtimes' workspace.
+      
+      Note: This requires passing '-DCMAKE_EXPORT_COMPILE_COMMANDS=YES' to
+      CMake.
+      """
+  )
+  var runtimesBuildDir: AnyPath?
+
   @Option(help: .hidden)
   var blueFolders: String = ""
 }

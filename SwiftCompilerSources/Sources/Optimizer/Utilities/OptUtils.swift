@@ -236,7 +236,7 @@ extension Value {
   -> Bool {
     var users = InstructionSet(context)
     defer { users.deinitialize() }
-    uses.lazy.map({ $0.instruction }).forEach { users.insert($0) }
+    users.insert(contentsOf: self.users)
 
     var worklist = InstructionWorklist(context)
     defer { worklist.deinitialize() }
@@ -308,6 +308,14 @@ extension Value {
     let builder = Builder(before: insertionPoint, context)
     let copiedValue = builder.createCopyValue(operand: self)
     return copiedValue.makeAvailable(in: destBlock, context)
+  }
+}
+
+extension SingleValueInstruction {
+  /// Replaces all uses with `replacement` and then erases the instruction.
+  func replace(with replacement: Value, _ context: some MutatingContext) {
+    uses.replaceAll(with: replacement, context)
+    context.erase(instruction: self)
   }
 }
 
@@ -416,7 +424,6 @@ extension Instruction {
          is FloatLiteralInst,
          is ObjectInst,
          is VectorInst,
-         is AllocVectorInst,
          is UncheckedRefCastInst,
          is UpcastInst,
          is ValueToBridgeObjectInst,
@@ -505,15 +512,16 @@ extension StoreInst {
 }
 
 extension LoadInst {
-  func trySplit(_ context: FunctionPassContext) {
+  @discardableResult
+  func trySplit(_ context: FunctionPassContext) -> Bool {
     var elements = [Value]()
     let builder = Builder(before: self, context)
     if type.isStruct {
       if (type.nominal as! StructDecl).hasUnreferenceableStorage {
-        return
+        return false
       }
       guard let fields = type.getNominalFields(in: parentFunction) else {
-        return
+        return false
       }
       for idx in 0..<fields.count {
         let fieldAddr = builder.createStructElementAddr(structAddress: address, fieldIndex: idx)
@@ -521,7 +529,8 @@ extension LoadInst {
         elements.append(splitLoad)
       }
       let newStruct = builder.createStruct(type: self.type, elements: elements)
-      self.uses.replaceAll(with: newStruct, context)
+      self.replace(with: newStruct, context)
+      return true
     } else if type.isTuple {
       var elements = [Value]()
       let builder = Builder(before: self, context)
@@ -531,11 +540,10 @@ extension LoadInst {
         elements.append(splitLoad)
       }
       let newTuple = builder.createTuple(type: self.type, elements: elements)
-      self.uses.replaceAll(with: newTuple, context)
-    } else {
-      return
+      self.replace(with: newTuple, context)
+      return true
     }
-    context.erase(instruction: self)
+    return false
   }
 
   private func splitOwnership(for fieldValue: Value) -> LoadOwnership {
@@ -624,8 +632,7 @@ extension SimplifyContext {
       }
     }
 
-    second.uses.replaceAll(with: replacement, self)
-    erase(instruction: second)
+    second.replace(with: replacement, self)
 
     if canEraseFirst {
       erase(instructionIncludingDebugUses: first)
@@ -741,8 +748,7 @@ extension GlobalVariable {
     for initInst in initInsts {
       switch initInst {
       case let beginAccess as BeginAccessInst:
-        beginAccess.uses.replaceAll(with: beginAccess.address, context)
-        context.erase(instruction: beginAccess)
+        beginAccess.replace(with: beginAccess.address, context)
       case let endAccess as EndAccessInst:
         context.erase(instruction: endAccess)
       default:
@@ -857,6 +863,32 @@ extension CheckedCastAddrBranchInst {
       case .willFail:    return false
       default: fatalError("unknown result from classifyDynamicCastBridged")
     }
+  }
+}
+
+extension CopyAddrInst {
+  @discardableResult
+  func replaceWithLoadAndStore(_ context: some MutatingContext) -> StoreInst {
+    let loadOwnership: LoadInst.LoadOwnership
+    let storeOwnership: StoreInst.StoreOwnership
+    if parentFunction.hasOwnership {
+      if source.type.isTrivial(in: parentFunction) {
+        loadOwnership = .trivial
+        storeOwnership = .trivial
+      } else {
+        loadOwnership = isTakeOfSrc ? .take : .copy
+        storeOwnership = isInitializationOfDest ? .initialize : .assign
+      }
+    } else {
+      loadOwnership = .unqualified
+      storeOwnership = .unqualified
+    }
+    
+    let builder = Builder(before: self, context)
+    let value = builder.createLoad(fromAddress: source, ownership: loadOwnership)
+    let store = builder.createStore(source: value, destination: destination, ownership: storeOwnership)
+    context.erase(instruction: self)
+    return store
   }
 }
 

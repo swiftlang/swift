@@ -33,15 +33,15 @@ func twoShorthandsFollowedByDeprecated() {}
 // Missing/wrong warning message for '*' or 'swift' platform.
 
 @available(*, deprecated: 4.2)
-// expected-warning@-1 {{unexpected version number in 'available' attribute for non-specific platform '*'}} {{25-30=}}
+// expected-warning@-1 {{unexpected version number in '@available' attribute for '*'}}
 func allPlatformsDeprecatedVersion() {}
 
 @available(*, deprecated, obsoleted: 4.2)
-// expected-warning@-1 {{unexpected version number in 'available' attribute for non-specific platform '*'}} {{36-41=}}
+// expected-warning@-1 {{unexpected version number in '@available' attribute for '*'}}
 func allPlatformsDeprecatedAndObsoleted() {}
 
 @available(*, introduced: 4.0, deprecated: 4.1, obsoleted: 4.2)
-// expected-warning@-1 {{unexpected version number in 'available' attribute for non-specific platform '*'}} {{25-30=}} {{42-47=}} {{58-63=}}
+// expected-warning@-1 {{unexpected version number in '@available' attribute for '*'}}
 func allPlatformsDeprecatedAndObsoleted2() {}
 
 @available(swift, unavailable)

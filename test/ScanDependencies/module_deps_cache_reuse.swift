@@ -1,7 +1,5 @@
 // RUN: %empty-directory(%t)
 // RUN: mkdir -p %t/clang-module-cache
-// Temporarily disabled while the cache serialization code is being brought back from being stale/disabled for a long time
-// XFAIL: *
 
 // Run the scanner once, emitting the serialized scanner cache
 // RUN: %target-swift-frontend -scan-dependencies -module-load-mode prefer-interface -Rdependency-scan-cache -serialize-dependency-scan-cache -dependency-scan-cache-path %t/cache.moddepcache -module-cache-path %t/clang-module-cache %s -o %t/deps_initial.json -I %S/Inputs/CHeaders -I %S/Inputs/Swift -import-objc-header %S/Inputs/CHeaders/Bridging.h -swift-version 4 -enable-cross-import-overlays 2>&1 | %FileCheck %s -check-prefix CHECK-REMARK-SAVE
@@ -21,8 +19,8 @@ import E
 import G
 import SubE
 
-// CHECK-REMARK-SAVE: remark: Serializing module scanning dependency cache to:
-// CHECK-REMARK-LOAD: remark: Re-using serialized module scanning dependency cache from:
+// CHECK-REMARK-SAVE: remark: Incremental module scan: Serializing module scanning dependency cache to:
+// CHECK-REMARK-LOAD: remark: Incremental module scan: Re-using serialized module scanning dependency cache from:
 
 // CHECK: "mainModuleName": "deps"
 
@@ -47,11 +45,6 @@ import SubE
 // CHECK: ],
 
 // CHECK:      "contextHash":
-// CHECK:      "extraPcmArgs": [
-// CHECK-NEXT:    "-Xcc",
-// CHECK-NEXT:    "-target",
-// CHECK-NEXT:    "-Xcc",
-// CHECK:         "-fapinotes-swift-version=4"
 // CHECK-NOT: "error: cannot open Swift placeholder dependency module map from"
 // CHECK: "bridgingHeader":
 // CHECK-NEXT: "path":
@@ -146,10 +139,6 @@ import SubE
 // CHECK: "5"
 // CHECK: ],
 // CHECK: "contextHash": "{{.*}}",
-// CHECK" "extraPcmArgs": [
-// CHECK"   "-target",
-// CHECK"   "-fapinotes-swift-version=5"
-// CHECK" ]
 
 /// --------Swift module E
 // CHECK: "swift": "E"

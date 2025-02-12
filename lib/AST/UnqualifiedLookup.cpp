@@ -481,6 +481,8 @@ void UnqualifiedLookupFactory::addImportedResults(const DeclContext *const dc) {
     nlOptions |= NL_IncludeUsableFromInline;
   if (options.contains(Flags::ExcludeMacroExpansions))
     nlOptions |= NL_ExcludeMacroExpansions;
+  if (options.contains(Flags::ABIProviding))
+    nlOptions |= NL_ABIProviding;
   lookupInModule(dc, Name.getFullName(), CurModuleResults,
                  NLKind::UnqualifiedLookup, resolutionKind, dc,
                  Loc, nlOptions);
@@ -595,6 +597,8 @@ NLOptions UnqualifiedLookupFactory::computeBaseNLOptions(
     baseNLOptions |= NL_IgnoreAccessControl;
   if (options.contains(Flags::IgnoreMissingImports))
     baseNLOptions |= NL_IgnoreMissingImports;
+  if (options.contains(Flags::ABIProviding))
+    baseNLOptions |= NL_ABIProviding;
   return baseNLOptions;
 }
 
@@ -701,9 +705,12 @@ bool ASTScopeDeclConsumerForUnqualifiedLookup::consume(
         continue;
     }
 
+    if (!ABIRoleInfo(value).matchesOptions(factory.options))
+      continue;
+
     factory.Results.push_back(LookupResultEntry(value));
 #ifndef NDEBUG
-    factory.stopForDebuggingIfAddingTargetLookupResult(factory.Results.back());
+    factory.addedResult(factory.Results.back());
 #endif
   }
   factory.recordCompletionOfAScope();
@@ -716,10 +723,14 @@ bool ASTScopeDeclConsumerForUnqualifiedLookup::consumePossiblyNotInScope(
     return false;
 
   for (auto *var : vars) {
-    if (!factory.Name.getFullName().isSimpleName(var->getName()))
+    if (!factory.Name.getFullName().isSimpleName(var->getName())
+        || !ABIRoleInfo(var).matchesOptions(factory.options))
       continue;
 
     factory.Results.push_back(LookupResultEntry(var));
+#ifndef NDEBUG
+    factory.addedResult(factory.Results.back());
+#endif
   }
 
   return false;
@@ -872,14 +883,19 @@ class ASTScopeDeclConsumerForLocalLookup
     : public AbstractASTScopeDeclConsumer {
   DeclName name;
   bool stopAfterInnermostBraceStmt;
+  ABIRole roleFilter;
   SmallVectorImpl<ValueDecl *> &results;
 
 public:
   ASTScopeDeclConsumerForLocalLookup(
       DeclName name, bool stopAfterInnermostBraceStmt,
-      SmallVectorImpl<ValueDecl *> &results)
+      ABIRole roleFilter, SmallVectorImpl<ValueDecl *> &results)
     : name(name), stopAfterInnermostBraceStmt(stopAfterInnermostBraceStmt),
-      results(results) {}
+      roleFilter(roleFilter), results(results) {}
+
+  bool hasCorrectABIRole(ValueDecl *vd) const {
+    return ABIRoleInfo(vd).matches(roleFilter);
+  }
 
   bool consume(ArrayRef<ValueDecl *> values,
                NullablePtr<DeclContext> baseDC) override {
@@ -888,14 +904,16 @@ public:
       if (auto *varDecl = dyn_cast<VarDecl>(value)) {
         // Check if the name matches any auxiliary decls not in the AST
         varDecl->visitAuxiliaryDecls([&](VarDecl *auxiliaryVar) {
-          if (name.isSimpleName(auxiliaryVar->getName())) {
+          if (name.isSimpleName(auxiliaryVar->getName())
+                && hasCorrectABIRole(auxiliaryVar)) {
             results.push_back(auxiliaryVar);
             foundMatch = true;
           }
         });
       }
 
-      if (!foundMatch && value->getName().matchesRef(name))
+      if (!foundMatch && value->getName().matchesRef(name)
+              && hasCorrectABIRole(value))
         results.push_back(value);
     }
 
@@ -923,9 +941,10 @@ public:
 /// interface type computation.
 void ASTScope::lookupLocalDecls(SourceFile *sf, DeclName name, SourceLoc loc,
                                 bool stopAfterInnermostBraceStmt,
+                                ABIRole roleFilter,
                                 SmallVectorImpl<ValueDecl *> &results) {
   ASTScopeDeclConsumerForLocalLookup consumer(name, stopAfterInnermostBraceStmt,
-                                              results);
+                                              roleFilter, results);
   ASTScope::unqualifiedLookup(sf, loc, consumer);
 }
 

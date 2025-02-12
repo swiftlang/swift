@@ -213,7 +213,7 @@ static void addMandatoryDiagnosticOptPipeline(SILPassPipelinePlan &P) {
 
   // Promote loads as necessary to ensure we have enough SSA formation to emit
   // SSA based diagnostics.
-  P.addPredictableMemoryAccessOptimizations();
+  P.addMandatoryRedundantLoadElimination();
 
   // This phase performs optimizations necessary for correct interoperation of
   // Swift os log APIs with C os_log ABIs.
@@ -257,7 +257,6 @@ static void addMandatoryDiagnosticOptPipeline(SILPassPipelinePlan &P) {
 
   P.addMandatoryPerformanceOptimizations();
   P.addOnoneSimplification();
-  P.addAllocVectorLowering();
   P.addInitializeStaticGlobals();
 
   // MandatoryPerformanceOptimizations might create specializations that are not
@@ -1011,11 +1010,14 @@ SILPassPipelinePlan::getPerformancePassPipeline(const SILOptions &Options) {
   // importing this module.
   P.addSerializeSILPass();
 
-  // Strip any transparent functions that still have ownership.
-  P.addOwnershipModelEliminator();
-
   if (Options.StopOptimizationAfterSerialization)
     return P;
+
+  if (P.getOptions().EnableOSSAModules && SILPrintFinalOSSAModule) {
+    addModulePrinterPipeline(P, "SIL Print Final OSSA Module");
+  }
+  // Strip any transparent functions that still have ownership.
+  P.addOwnershipModelEliminator();
 
   P.addAutodiffClosureSpecialization();
 
@@ -1079,6 +1081,9 @@ SILPassPipelinePlan::getOnonePassPipeline(const SILOptions &Options) {
   P.startPipeline("Serialization");
   P.addSerializeSILPass();
 
+  if (Options.StopOptimizationAfterSerialization)
+    return P;
+
   // Now that we have serialized, propagate debug info.
   P.addMovedAsyncVarDebugInfoPropagator();
 
@@ -1091,7 +1096,11 @@ SILPassPipelinePlan::getOnonePassPipeline(const SILOptions &Options) {
 
   // Finally perform some small transforms.
   P.startPipeline("Rest of Onone");
-  P.addUsePrespecialized();
+
+  // There are not pre-specialized parts of the stdlib in embedded mode.
+  if (!Options.EmbeddedSwift) {
+    P.addUsePrespecialized();
+  }
 
   // Has only an effect if the -assume-single-thread option is specified.
   if (P.getOptions().AssumeSingleThreaded) {

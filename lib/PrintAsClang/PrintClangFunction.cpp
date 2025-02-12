@@ -348,7 +348,8 @@ public:
     if (typeUseKind == FunctionSignatureTypeUse::ParamType && !isInOutParam)
       os << "const ";
     printOptional(optionalKind, [&]() {
-      ClangSyntaxPrinter(CT->getASTContext(), os).printBaseName(CT->getDecl());
+      ClangSyntaxPrinter(CT->getASTContext(), os)
+          .printPrimaryCxxTypeName(cd, moduleContext);
     });
     if (typeUseKind == FunctionSignatureTypeUse::ParamType)
       os << "&";
@@ -918,7 +919,7 @@ ClangRepresentation DeclAndTypeClangFunctionPrinter::printFunctionSignature(
           interopContext, CFunctionSignatureTypePrinterModifierDelegate(),
           emittedModule, declPrinter);
       auto s = typePrinter.visit(ty, optionalKind, param.isInOut());
-      assert(!s.isUnsupported());
+      resultingRepresentation.merge(s);
     };
     signature.visitParameterList(
         [&](const LoweredFunctionSignature::IndirectResultValue

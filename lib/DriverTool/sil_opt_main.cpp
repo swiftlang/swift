@@ -310,9 +310,8 @@ struct SILOptOptions {
   EnableMoveInoutStackProtection = llvm::cl::opt<bool>("enable-move-inout-stack-protector",
                     llvm::cl::desc("Enable the stack protector by moving values to temporaries."));
 
-  llvm::cl::opt<bool>
-  EnableOSSAModules = llvm::cl::opt<bool>(
-      "enable-ossa-modules",
+  llvm::cl::opt<bool> EnableOSSAModules = llvm::cl::opt<bool>(
+      "enable-ossa-modules", llvm::cl::init(true),
       llvm::cl::desc("Do we always serialize SIL in OSSA form? If "
                      "this is disabled we do not serialize in OSSA "
                      "form when optimizing."));
@@ -663,8 +662,12 @@ int sil_opt_main(ArrayRef<const char *> argv, void *MainAddr) {
       llvm::sys::fs::getMainExecutable(argv[0], MainAddr));
 
   // Give the context the list of search paths to use for modules.
-  Invocation.setImportSearchPaths(options.ImportPaths);
-  std::vector<SearchPathOptions::FrameworkSearchPath> FramePaths;
+  std::vector<SearchPathOptions::SearchPath> ImportPaths;
+  for (const auto &path : options.ImportPaths) {
+    ImportPaths.push_back({path, /*isSystem=*/false});
+  }
+  Invocation.setImportSearchPaths(ImportPaths);
+  std::vector<SearchPathOptions::SearchPath> FramePaths;
   for (const auto &path : options.FrameworkPaths) {
     FramePaths.push_back({path, /*isSystem=*/false});
   }
@@ -790,6 +793,7 @@ int sil_opt_main(ArrayRef<const char *> argv, void *MainAddr) {
   }
 
   Invocation.getLangOptions().EnableCXXInterop = options.EnableCxxInterop;
+  Invocation.computeCXXStdlibOptions();
 
   Invocation.getLangOptions().UnavailableDeclOptimizationMode =
       options.UnavailableDeclOptimization;
@@ -879,7 +883,7 @@ int sil_opt_main(ArrayRef<const char *> argv, void *MainAddr) {
   SILOpts.EnableSILOpaqueValues = options.EnableSILOpaqueValues;
   SILOpts.OSSACompleteLifetimes = options.EnableOSSACompleteLifetimes;
   SILOpts.OSSAVerifyComplete = options.EnableOSSAVerifyComplete;
-
+  SILOpts.StopOptimizationAfterSerialization |= options.EmitSIB;
   if (options.CopyPropagationState) {
     SILOpts.CopyPropagation = *options.CopyPropagationState;
   }
@@ -1054,6 +1058,7 @@ int sil_opt_main(ArrayRef<const char *> argv, void *MainAddr) {
     serializationOpts.OutputPath = OutputFile;
     serializationOpts.SerializeAllSIL = options.EmitSIB;
     serializationOpts.IsSIB = options.EmitSIB;
+    serializationOpts.IsOSSA = SILOpts.EnableOSSAModules;
 
     symbolgraphgen::SymbolGraphOptions symbolGraphOptions;
 

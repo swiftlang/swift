@@ -158,7 +158,6 @@ BASELINE_LANGUAGE_FEATURE(BuiltinCreateAsyncTaskWithExecutor, 0, "Task create bu
 BASELINE_LANGUAGE_FEATURE(BuiltinCreateAsyncDiscardingTaskInGroupWithExecutor, 0, "Task create in discarding task group with extra executor preference")
 BASELINE_LANGUAGE_FEATURE(BuiltinStackAlloc, 0, "Builtin.stackAlloc")
 BASELINE_LANGUAGE_FEATURE(BuiltinUnprotectedStackAlloc, 0, "Builtin.unprotectedStackAlloc")
-BASELINE_LANGUAGE_FEATURE(BuiltinAllocVector, 0, "Builtin.allocVector")
 BASELINE_LANGUAGE_FEATURE(BuiltinTaskRunInline, 0, "Builtin.taskRunInline")
 BASELINE_LANGUAGE_FEATURE(BuiltinUnprotectedAddressOf, 0, "Builtin.unprotectedAddressOf")
 BASELINE_LANGUAGE_FEATURE(NewCxxMethodSafetyHeuristics, 0, "Only import C++ methods that return pointers (projections) on owned types as unsafe")
@@ -254,7 +253,6 @@ EXPERIMENTAL_FEATURE(MoveOnlyTuples, true)
 EXPERIMENTAL_FEATURE(MoveOnlyPartialReinitialization, true)
 EXPERIMENTAL_FEATURE(ConsumeSelfInDeinit, true)
 
-EXPERIMENTAL_FEATURE(OneWayClosureParameters, false)
 EXPERIMENTAL_FEATURE(LayoutPrespecialization, true)
 
 EXPERIMENTAL_FEATURE(AccessLevelOnImport, true)
@@ -300,6 +298,10 @@ EXPERIMENTAL_FEATURE(ParserRoundTrip, false)
 /// Whether to perform validation of the parse tree produced by the Swift
 /// Swift parser.
 EXPERIMENTAL_FEATURE(ParserValidation, false)
+
+/// Whether to perform validation of the unqualified lookup produced by
+/// ASTScope and SwiftLexicalLookup
+EXPERIMENTAL_FEATURE(UnqualifiedLookupValidation, false)
 
 /// Enables implicit some while also enabling existential `any`
 EXPERIMENTAL_FEATURE(ImplicitSome, false)
@@ -363,9 +365,6 @@ EXPERIMENTAL_FEATURE(StaticExclusiveOnly, true)
 
 /// Enable the @extractConstantsFromMembers attribute.
 EXPERIMENTAL_FEATURE(ExtractConstantsFromMembers, false)
-
-/// Enables the FixedArray data type.
-EXPERIMENTAL_FEATURE(FixedArrays, true)
 
 // Group Main Actor Isolation Errors by Scope
 EXPERIMENTAL_FEATURE(GroupActorErrors, true)
@@ -431,10 +430,21 @@ EXPERIMENTAL_FEATURE(CoroutineAccessorsUnwindOnCallerError, false)
 /// modify/read coroutines use the callee-allocated ABI
 EXPERIMENTAL_FEATURE(CoroutineAccessorsAllocateInCallee, false)
 
-// When a parameter has unspecified isolation, infer it as main actor isolated.
+/// When a parameter has unspecified isolation, infer it as main actor isolated.
 EXPERIMENTAL_FEATURE(GenerateForceToMainActorThunks, false)
 
 EXPERIMENTAL_FEATURE(AddressableParameters, true)
+SUPPRESSIBLE_EXPERIMENTAL_FEATURE(AddressableTypes, true)
+
+/// Allow the @abi attribute.
+SUPPRESSIBLE_EXPERIMENTAL_FEATURE(ABIAttribute, true)
+
+/// Functions with nonisolated isolation inherit their isolation from the
+/// calling context.
+EXPERIMENTAL_FEATURE(NonIsolatedAsyncInheritsIsolationFromContext, false)
+
+/// Allow custom availability domains to be defined and referenced.
+SUPPRESSIBLE_EXPERIMENTAL_FEATURE(CustomAvailability, true)
 
 #undef EXPERIMENTAL_FEATURE_EXCLUDED_FROM_MODULE_INTERFACE
 #undef EXPERIMENTAL_FEATURE

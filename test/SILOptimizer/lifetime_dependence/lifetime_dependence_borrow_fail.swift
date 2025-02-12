@@ -31,13 +31,17 @@ struct NC : ~Copyable {
     BV(p, i)
   }
 
+  // @lifetime(borrow self)
   borrowing func getEmpty() -> Empty {
     Empty()
   }
 }
 
 // Test dependencies on an empty struct.
-public struct Empty: ~Escapable {}
+public struct Empty: ~Escapable {
+  @lifetime(immortal)
+  init() {}
+}
 
 func use(e: Empty) {}
 
@@ -75,14 +79,6 @@ func bv_incorrect_annotation1(_ bv1: borrowing BV, _ bv2: borrowing BV) -> BV { 
 func bv_incorrect_annotation2(_ w1: borrowing Wrapper, _ w2: borrowing Wrapper) -> BV { // expected-error {{lifetime-dependent variable 'w1' escapes its scope}}
   return w1.bv                                                                                        // expected-note @-1{{it depends on the lifetime of argument 'w1'}}
 }                                                                                                     // expected-note @-1{{this use causes the lifetime-dependent value to escape}}
-
-let ptr = UnsafeRawPointer(bitPattern: 1)!
-let nc = NC(ptr, 0)
-
-func bv_global(dummy: BV) -> BV {
-  nc.getBV()  // expected-error {{lifetime-dependent value escapes its scope}}
-  // expected-note @-4{{it depends on the lifetime of variable 'nc'}}
-} // expected-note {{this use causes the lifetime-dependent value to escape}}
 
 func testEmpty(nc: consuming NC) {
   var e: Empty // expected-error {{lifetime-dependent variable 'e' escapes its scope}}

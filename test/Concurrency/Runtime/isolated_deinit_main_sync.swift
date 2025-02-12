@@ -3,6 +3,7 @@
 // REQUIRES: executable_test
 // REQUIRES: concurrency
 // REQUIRES: concurrency_runtime
+// UNSUPPORTED: back_deployment_runtime
 
 var isDead: Bool = false
 

@@ -13,7 +13,7 @@
 #ifndef SWIFT_SIL_SILFUNCTIONBUILDER_H
 #define SWIFT_SIL_SILFUNCTIONBUILDER_H
 
-#include "swift/AST/Availability.h"
+#include "swift/AST/AvailabilityRange.h"
 #include "swift/SIL/SILModule.h"
 
 namespace swift {

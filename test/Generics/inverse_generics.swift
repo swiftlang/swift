@@ -11,16 +11,20 @@ struct AttemptImplicitConditionalConformance<T: ~Copyable>: ~Copyable {
 }
 extension AttemptImplicitConditionalConformance: Copyable {}
 // expected-error@-1 {{generic struct 'AttemptImplicitConditionalConformance' required to be 'Copyable' but is marked with '~Copyable'}}
+// expected-error@-2 {{must explicitly state whether 'T' is required to conform to 'Copyable'}}
 
 enum Hello<T: ~Escapable & ~Copyable>: ~Escapable & ~Copyable {}
 extension Hello: Escapable {} // expected-error {{generic enum 'Hello' required to be 'Escapable' but is marked with '~Escapable'}}
+// expected-error@-1 {{must explicitly state whether 'T' is required to conform to 'Copyable'}}
+// expected-error@-2 {{must explicitly state whether 'T' is required to conform to 'Escapable'}}
 extension Hello: Copyable {} // expected-error {{generic enum 'Hello' required to be 'Copyable' but is marked with '~Copyable'}}
+// expected-error@-1 {{must explicitly state whether 'T' is required to conform to 'Copyable'}}
+// expected-error@-2 {{must explicitly state whether 'T' is required to conform to 'Escapable'}}
 
 enum HelloExplicitlyFixed<T: ~Escapable & ~Copyable>: Escapable, Copyable {}
 
 struct NoInverseBecauseNoDefault<T: ~Copyable & ~Escapable>: ~Copyable {}
 extension NoInverseBecauseNoDefault: Copyable where T: Copyable, T: ~Escapable {}
-// expected-error@-1 {{cannot suppress '~Escapable' on generic parameter 'T' defined in outer scope}}
 
 // Check support for explicit conditional conformance
 public struct ExplicitCond<T: ~Copyable>: ~Copyable {}

@@ -358,6 +358,7 @@ ConcreteDeclRef Expr::getReferencedDecl(bool stopAtParenExpr) const {
   PASS_THROUGH_REFERENCE(UnresolvedMemberChainResult, getSubExpr);
   PASS_THROUGH_REFERENCE(DotSelf, getSubExpr);
   PASS_THROUGH_REFERENCE(Await, getSubExpr);
+  PASS_THROUGH_REFERENCE(Unsafe, getSubExpr);
   PASS_THROUGH_REFERENCE(Consume, getSubExpr);
   PASS_THROUGH_REFERENCE(Copy, getSubExpr);
   PASS_THROUGH_REFERENCE(Borrow, getSubExpr);
@@ -444,6 +445,7 @@ ConcreteDeclRef Expr::getReferencedDecl(bool stopAtParenExpr) const {
   PASS_THROUGH_REFERENCE(UnderlyingToOpaque, getSubExpr);
   PASS_THROUGH_REFERENCE(Unreachable, getSubExpr);
   PASS_THROUGH_REFERENCE(ActorIsolationErasure, getSubExpr);
+  PASS_THROUGH_REFERENCE(UnsafeCast, getSubExpr);
   NO_REFERENCE(Coerce);
   NO_REFERENCE(ForcedCheckedCast);
   NO_REFERENCE(ConditionalCheckedCast);
@@ -460,7 +462,6 @@ ConcreteDeclRef Expr::getReferencedDecl(bool stopAtParenExpr) const {
   NO_REFERENCE(KeyPath);
   NO_REFERENCE(KeyPathDot);
   PASS_THROUGH_REFERENCE(CurrentContextIsolation, getActor);
-  PASS_THROUGH_REFERENCE(OneWay, getSubExpr);
   NO_REFERENCE(Tap);
   NO_REFERENCE(TypeJoin);
   SIMPLE_REFERENCE(MacroExpansion, getMacroRef);
@@ -661,7 +662,6 @@ bool Expr::canAppendPostfixExpression(bool appendingPostfixOperator) const {
   case ExprKind::Error:
   case ExprKind::CodeCompletion:
   case ExprKind::LazyInitializer:
-  case ExprKind::OneWay:
     return false;
 
   case ExprKind::NilLiteral:
@@ -737,6 +737,7 @@ bool Expr::canAppendPostfixExpression(bool appendingPostfixOperator) const {
     return true;
 
   case ExprKind::Await:
+  case ExprKind::Unsafe:
   case ExprKind::Consume:
   case ExprKind::Copy:
   case ExprKind::Borrow:
@@ -813,6 +814,7 @@ bool Expr::canAppendPostfixExpression(bool appendingPostfixOperator) const {
   case ExprKind::UnderlyingToOpaque:
   case ExprKind::Unreachable:
   case ExprKind::ActorIsolationErasure:
+  case ExprKind::UnsafeCast:
   case ExprKind::TypeValue:
     // Implicit conversion nodes have no syntax of their own; defer to the
     // subexpression.
@@ -954,6 +956,7 @@ bool Expr::isValidParentOfTypeExpr(Expr *typeExpr) const {
   case ExprKind::Sequence:
   case ExprKind::Paren:
   case ExprKind::Await:
+  case ExprKind::Unsafe:
   case ExprKind::Consume:
   case ExprKind::Copy:
   case ExprKind::Borrow:
@@ -1035,7 +1038,6 @@ bool Expr::isValidParentOfTypeExpr(Expr *typeExpr) const {
   case ExprKind::ObjCSelector:
   case ExprKind::KeyPath:
   case ExprKind::KeyPathDot:
-  case ExprKind::OneWay:
   case ExprKind::Tap:
   case ExprKind::SingleValueStmt:
   case ExprKind::TypeJoin:
@@ -1043,6 +1045,7 @@ bool Expr::isValidParentOfTypeExpr(Expr *typeExpr) const {
   case ExprKind::CurrentContextIsolation:
   case ExprKind::ActorIsolationErasure:
   case ExprKind::ExtractFunctionIsolation:
+  case ExprKind::UnsafeCast:
     return false;
   }
 
@@ -1934,11 +1937,13 @@ unsigned AbstractClosureExpr::getDiscriminator() const {
   // If we don't have a discriminator, and either
   //   1. We have ill-formed code and we're able to assign a discriminator, or
   //   2. We are in a macro expansion buffer
+  //   3. We are within top-level code where there's nothing to anchor to
   //
   // then assign the next discriminator now.
   if (getRawDiscriminator() == InvalidDiscriminator &&
       (ctx.Diags.hadAnyError() ||
-       getParentSourceFile()->getFulfilledMacroRole() != std::nullopt)) {
+       getParentSourceFile()->getFulfilledMacroRole() != std::nullopt ||
+       getParent()->isModuleScopeContext())) {
     auto discriminator = ctx.getNextDiscriminator(getParent());
     ctx.setMaxAssignedDiscriminator(getParent(), discriminator + 1);
     const_cast<AbstractClosureExpr *>(this)->
@@ -2575,9 +2580,9 @@ SingleValueStmtExpr::tryDigOutSingleValueStmtExpr(Expr *E) {
       if (isa<CoerceExpr>(E))
         return Action::Continue(E);
 
-      // Look through try/await (this is invalid, but we'll error on it in
-      // effect checking).
-      if (isa<AnyTryExpr>(E) || isa<AwaitExpr>(E))
+      // Look through try/await/unsafe (this is invalid, but we'll error on
+      // it in effect checking).
+      if (isa<AnyTryExpr>(E) || isa<AwaitExpr>(E) || isa<UnsafeExpr>(E))
         return Action::Continue(E);
 
       return Action::Stop();

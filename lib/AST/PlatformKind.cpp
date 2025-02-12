@@ -181,40 +181,54 @@ bool swift::isPlatformActive(PlatformKind Platform, const LangOptions &LangOpts,
                                    LangOpts.EnableAppExtensionRestrictions, ForRuntimeQuery);
 }
 
-PlatformKind swift::targetPlatform(const LangOptions &LangOpts) {
-  if (LangOpts.Target.isMacOSX()) {
-    return (LangOpts.EnableAppExtensionRestrictions
+static PlatformKind platformForTriple(const llvm::Triple &triple,
+                                      bool enableAppExtensionRestrictions) {
+  if (triple.isMacOSX()) {
+    return (enableAppExtensionRestrictions
                 ? PlatformKind::macOSApplicationExtension
                 : PlatformKind::macOS);
   }
 
-  if (LangOpts.Target.isTvOS()) {
-    return (LangOpts.EnableAppExtensionRestrictions
-            ? PlatformKind::tvOSApplicationExtension
-            : PlatformKind::tvOS);
+  if (triple.isTvOS()) {
+    return (enableAppExtensionRestrictions
+                ? PlatformKind::tvOSApplicationExtension
+                : PlatformKind::tvOS);
   }
 
-  if (LangOpts.Target.isWatchOS()) {
-    return (LangOpts.EnableAppExtensionRestrictions
-            ? PlatformKind::watchOSApplicationExtension
-            : PlatformKind::watchOS);
+  if (triple.isWatchOS()) {
+    return (enableAppExtensionRestrictions
+                ? PlatformKind::watchOSApplicationExtension
+                : PlatformKind::watchOS);
   }
 
-  if (LangOpts.Target.isiOS()) {
-    if (tripleIsMacCatalystEnvironment(LangOpts.Target))
-      return (LangOpts.EnableAppExtensionRestrictions
+  if (triple.isiOS()) {
+    if (tripleIsMacCatalystEnvironment(triple))
+      return (enableAppExtensionRestrictions
                   ? PlatformKind::macCatalystApplicationExtension
                   : PlatformKind::macCatalyst);
-    return (LangOpts.EnableAppExtensionRestrictions
+    return (enableAppExtensionRestrictions
                 ? PlatformKind::iOSApplicationExtension
                 : PlatformKind::iOS);
   }
 
-  if (LangOpts.Target.isXROS()) {
-    return (LangOpts.EnableAppExtensionRestrictions
-            ? PlatformKind::visionOSApplicationExtension
-            : PlatformKind::visionOS);
+  if (triple.isXROS()) {
+    return (enableAppExtensionRestrictions
+                ? PlatformKind::visionOSApplicationExtension
+                : PlatformKind::visionOS);
   }
+
+  return PlatformKind::none;
+}
+
+PlatformKind swift::targetPlatform(const LangOptions &LangOpts) {
+  return platformForTriple(LangOpts.Target,
+                           LangOpts.EnableAppExtensionRestrictions);
+}
+
+PlatformKind swift::targetVariantPlatform(const LangOptions &LangOpts) {
+  if (auto variant = LangOpts.TargetVariant)
+    return platformForTriple(*LangOpts.TargetVariant,
+                             LangOpts.EnableAppExtensionRestrictions);
 
   return PlatformKind::none;
 }

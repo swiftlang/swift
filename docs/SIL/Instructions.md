@@ -55,27 +55,6 @@ type, use `alloc_box`.
 
 `T` must not be a pack type. To allocate a pack, use `alloc_pack`.
 
-### alloc_vector
-
-```
-sil-instruction ::= 'alloc_vector' sil-type, sil-operand
-
-%1 = alloc_vector $T, %0 : $Builtin.Word
-// %1 has type $*T
-```
-
-Allocates uninitialized memory that is sufficiently aligned on the stack
-to contain a vector of values of type `T`. The result of the instruction
-is the address of the allocated memory. The number of vector elements is
-specified by the operand, which must be a builtin integer value.
-
-`alloc_vector` either allocates memory on the stack or - if contained in
-a global variable static initializer list - in the data section.
-
-`alloc_vector` is a stack allocation instruction, unless it's contained
-in a global initializer list. See the section above on stack discipline.
-The corresponding stack deallocation instruction is `dealloc_stack`.
-
 ### alloc_pack
 
 ```
@@ -2005,15 +1984,19 @@ Builtin.RawPointer or a struct containing the same.
 `%base` may have either object or address type. In the latter case, the
 dependency is on the current value stored in the address.
 
-The optional `nonescaping` attribute indicates that no value derived from
-`%value` escapes the lifetime of `%base`. As with escaping `mark_dependence`,
-all values transitively forwarded from `%value` must be destroyed within the
-lifetime of `base`. Unlike escaping`mark_dependence`, this must be statically
-verifiable. Additionally, unlike escaping`mark_dependence`, derived values
-include copies of`%value`and values transitively forwarded from those copies.
-If`%base`must not be identical to`%value`. Unlike escaping`mark_dependence`,
-no value derived from`%value`may have a bitwise escape (conversion to
-UnsafePointer) or pointer escape (unknown use). 
+The optional `nonescaping` attribute indicates that no value derived
+from `%value` escapes the lifetime of `%base`. As with escaping
+`mark_dependence`, all values transitively forwarded from `%value`
+must be destroyed within the lifetime of `base`. Unlike escaping
+`mark_dependence`, this must be statically verifiable. Additionally,
+unlike escaping `mark_dependence`, nonescaping `mark_dependence` may
+produce a value of non-`Escapable` type. A non-`Escapable`
+`mark_dependence` extends the lifetime of `%base` into copies of
+`%value` and values transitively forwarded from those copies. If the
+`mark_dependence` forwards an address, then it extends the lifetime
+through loads from that address. Unlike escaping `mark_dependence`, no
+value derived from `%value` may have a bitwise escape (conversion to
+UnsafePointer) or pointer escape (unknown use).
 
 ### is_unique
 
@@ -2084,18 +2067,19 @@ not replace this reference with a not uniquely reference object.
 
 For details see [Copy-on-Write Representation](SIL.md#Copy-on-Write-Representation).
 
-### is_escaping_closure
+### destroy_not_escaped_closure
 
 ```
-sil-instruction ::= 'is_escaping_closure' sil-operand
+sil-instruction ::= 'destroy_not_escaped_closure' sil-operand
 
-%1 = is_escaping_closure %0 : $@callee_guaranteed () -> ()
+%1 = destroy_not_escaped_closure %0 : $@callee_guaranteed () -> ()
 // %0 must be an escaping swift closure.
 // %1 will be of type Builtin.Int1
 ```
 
-Checks whether the context reference is not nil and bigger than one and
-returns true if it is.
+Checks if the closure context escaped and then destroys the context.
+The escape-check is done by checking if its reference count is exactly 1.
+Returns true if it is.
 
 ### copy_block
 
@@ -5551,3 +5535,21 @@ sil-instruction ::= 'has_symbol' sil-decl-ref
 Returns true if each of the underlying symbol addresses associated with
 the given declaration are non-null. This can be used to determine
 whether a weakly-imported declaration is available at runtime.
+
+## Miscellaneous instructions
+
+### ignored_use
+
+```none
+sil-instruction ::= 'ignored_use'
+```
+
+This instruction acts as a synthetic use instruction that suppresses unused
+variable warnings. In Swift the equivalent operation is '_ = x'. This
+importantly also provides a way to find the source location for '_ = x' when
+emitting SIL diagnostics. It is only legal in Raw SIL and is removed as dead
+code when we convert to Canonical SIL.
+
+DISCUSSION: Before the introduction of this instruction, in certain cases,
+SILGen would just not emit anything for '_ = x'... so one could not emit
+diagnostics upon this case.

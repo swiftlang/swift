@@ -109,22 +109,22 @@ distributed actor Nope1_StrictlyLocal: StrictlyLocal {
   // expected-note@-1{{add '@preconcurrency' to the 'StrictlyLocal' conformance to defer isolation checking to run time}}
 
   func local() {}
-  // expected-error@-1{{distributed actor-isolated instance method 'local()' cannot be used to satisfy nonisolated protocol requirement}}
+  // expected-error@-1{{distributed actor-isolated instance method 'local()' cannot be used to satisfy nonisolated requirement from protocol 'StrictlyLocal'}}
   // expected-note@-2{{add 'nonisolated' to 'local()' to make this instance method not isolated to the actor}}
   func localThrows() throws {}
-  // expected-error@-1{{distributed actor-isolated instance method 'localThrows()' cannot be used to satisfy nonisolated protocol requirement}}
+  // expected-error@-1{{distributed actor-isolated instance method 'localThrows()' cannot be used to satisfy nonisolated requirement from protocol 'StrictlyLocal'}}
   // expected-note@-2{{add 'nonisolated' to 'localThrows()' to make this instance method not isolated to the actor}}
   func localAsync() async {}
-  // expected-error@-1{{distributed actor-isolated instance method 'localAsync()' cannot be used to satisfy nonisolated protocol requirement}}
+  // expected-error@-1{{distributed actor-isolated instance method 'localAsync()' cannot be used to satisfy nonisolated requirement from protocol 'StrictlyLocal'}}
   // expected-note@-2{{add 'nonisolated' to 'localAsync()' to make this instance method not isolated to the actor}}
 }
 distributed actor Nope2_StrictlyLocal: StrictlyLocal {
   distributed func local() {}
-  // expected-error@-1{{actor-isolated distributed instance method 'local()' cannot be used to satisfy nonisolated protocol requirement}}
+  // expected-error@-1{{actor-isolated distributed instance method 'local()' cannot be used to satisfy nonisolated requirement from protocol 'StrictlyLocal'}}
   distributed func localThrows() throws {}
-  // expected-error@-1{{actor-isolated distributed instance method 'localThrows()' cannot be used to satisfy nonisolated protocol requirement}}
+  // expected-error@-1{{actor-isolated distributed instance method 'localThrows()' cannot be used to satisfy nonisolated requirement from protocol 'StrictlyLocal'}}
   distributed func localAsync() async {}
-  // expected-error@-1{{actor-isolated distributed instance method 'localAsync()' cannot be used to satisfy nonisolated protocol requirement}}
+  // expected-error@-1{{actor-isolated distributed instance method 'localAsync()' cannot be used to satisfy nonisolated requirement from protocol 'StrictlyLocal'}}
 }
 distributed actor OK_StrictlyLocal: StrictlyLocal {
   nonisolated func local() {}
@@ -162,7 +162,7 @@ distributed actor Nope1_AsyncThrowsAll: AsyncThrowsAll {
   // expected-note@-1{{add '@preconcurrency' to the 'AsyncThrowsAll' conformance to defer isolation checking to run time}}
 
   func maybe(param: String, int: Int) async throws -> Int { 111 }
-  // expected-error@-1{{distributed actor-isolated instance method 'maybe(param:int:)' cannot be used to satisfy nonisolated protocol requirement}}
+  // expected-error@-1{{distributed actor-isolated instance method 'maybe(param:int:)' cannot be used to satisfy nonisolated requirement from protocol 'AsyncThrowsAll'}}
   // expected-note@-2{{add 'nonisolated' to 'maybe(param:int:)' to make this instance method not isolated to the actor}}
   // expected-note@-3{{add 'distributed' to 'maybe(param:int:)' to make this instance method satisfy the protocol requirement}}
 }
@@ -209,7 +209,7 @@ distributed actor DA_TerminationWatchingA: TerminationWatchingA {
   // expected-note@-1{{add '@preconcurrency' to the 'TerminationWatchingA' conformance to defer isolation checking to run time}}
 
   func terminated(a: String) { }
-  // expected-error@-1{{distributed actor-isolated instance method 'terminated(a:)' cannot be used to satisfy nonisolated protocol requirement}}
+  // expected-error@-1{{distributed actor-isolated instance method 'terminated(a:)' cannot be used to satisfy nonisolated requirement from protocol 'TerminationWatchingA'}}
   // expected-note@-2{{add 'nonisolated' to 'terminated(a:)' to make this instance method not isolated to the actor}}
 }
 

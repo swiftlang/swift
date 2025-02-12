@@ -270,7 +270,7 @@ enum BorrowingInstruction : CustomStringConvertible, Hashable {
 }
 
 /// A value that introduces a borrow scope:
-/// begin_borrow, load_borrow, reborrow, guaranteed function argument.
+/// begin_borrow, load_borrow, reborrow, guaranteed function argument, begin_apply, unchecked_ownership_conversion.
 ///
 /// If the value introduces a local scope, then that scope is
 /// terminated by scope ending operands. Function arguments do not
@@ -280,19 +280,22 @@ enum BorrowingInstruction : CustomStringConvertible, Hashable {
 /// one of the yielded values. In any case, the scope ending operands
 /// are on the end_apply or abort_apply instructions that use the
 /// token.
-///
-/// Note: equivalent to C++ BorrowedValue, but also handles begin_apply.
 enum BeginBorrowValue {
   case beginBorrow(BeginBorrowInst)
   case loadBorrow(LoadBorrowInst)
   case beginApply(Value)
+  case uncheckOwnershipConversion(UncheckedOwnershipConversionInst)
   case functionArgument(FunctionArgument)
   case reborrow(Phi)
 
   init?(_ value: Value) {
     switch value {
-    case let bbi as BeginBorrowInst: self = .beginBorrow(bbi)
-    case let lbi as LoadBorrowInst: self = .loadBorrow(lbi)
+    case let bbi as BeginBorrowInst:
+      self = .beginBorrow(bbi)
+    case let lbi as LoadBorrowInst:
+      self = .loadBorrow(lbi)
+    case let uoci as UncheckedOwnershipConversionInst where uoci.ownership == .guaranteed:
+      self = .uncheckOwnershipConversion(uoci)
     case let arg as FunctionArgument where arg.ownership == .guaranteed:
       self = .functionArgument(arg)
     case let arg as Argument where arg.isReborrow:
@@ -311,6 +314,7 @@ enum BeginBorrowValue {
     case .beginBorrow(let bbi): return bbi
     case .loadBorrow(let lbi): return lbi
     case .beginApply(let v): return v
+    case .uncheckOwnershipConversion(let uoci): return uoci
     case .functionArgument(let arg): return arg
     case .reborrow(let phi): return phi.value
     }
@@ -347,7 +351,7 @@ enum BeginBorrowValue {
 
   var hasLocalScope: Bool {
     switch self {
-    case .beginBorrow, .loadBorrow, .beginApply, .reborrow:
+    case .beginBorrow, .loadBorrow, .beginApply, .reborrow, .uncheckOwnershipConversion:
       return true
     case .functionArgument:
       return false
@@ -364,7 +368,7 @@ enum BeginBorrowValue {
     return beginBorrow.operand
     case let .loadBorrow(loadBorrow):
       return loadBorrow.operand
-    case .beginApply, .functionArgument, .reborrow:
+    case .beginApply, .functionArgument, .reborrow, .uncheckOwnershipConversion:
       return nil
     }
   }
@@ -452,7 +456,7 @@ final class EnclosingValueIterator : IteratorProtocol {
       case let .beginBorrow(bbi):
         // Gather the outer enclosing borrow scope.
         worklist.pushIfNotVisited(bbi.borrowedValue)
-      case .loadBorrow, .beginApply, .functionArgument:
+      case .loadBorrow, .beginApply, .functionArgument, .uncheckOwnershipConversion:
         // There is no enclosing value on this path.
         break
       case .reborrow(let phi):

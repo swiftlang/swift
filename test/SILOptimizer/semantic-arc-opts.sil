@@ -1612,3 +1612,32 @@ bb4(%4 : @owned $Klass):
   return %t : $()
 }
 
+// CHECK-LABEL: sil [ossa] @test_borrowed_from_updating : 
+// CHECK:       bb3({{.*}}):
+// CHECK-NEXT:    borrowed {{.*}} from (%0 : $FakeOptional<Klass>)
+// CHECK-NEXT:    borrowed {{.*}} from (%0 : $FakeOptional<Klass>)
+// CHECK-LABEL: } // end sil function 'test_borrowed_from_updating'
+sil [ossa] @test_borrowed_from_updating : $@convention(thin) (@guaranteed FakeOptional<Klass>) -> () {
+bb0(%0 : @guaranteed $FakeOptional<Klass>):
+  %1 = enum $FakeOptional<Klass>, #FakeOptional.none!enumelt
+  %2 = begin_borrow %1
+  %3 = copy_value %0
+  switch_enum %3, case #FakeOptional.some!enumelt: bb1, case #FakeOptional.none!enumelt: bb2
+
+bb1(%5 : @owned $Klass):
+  end_borrow %2
+  %7 = enum $FakeOptional<Klass>, #FakeOptional.some!enumelt, %5
+  %8 = begin_borrow %7
+  br bb3(%8, %7)
+
+bb2:
+  br bb3(%2, %1)
+
+bb3(%11 : @reborrow $FakeOptional<Klass>, %12 : @owned $FakeOptional<Klass>):
+  %13 = borrowed %11 from (%12)
+  end_borrow %13
+  destroy_value %12
+  %16 = tuple ()
+  return %16
+}
+

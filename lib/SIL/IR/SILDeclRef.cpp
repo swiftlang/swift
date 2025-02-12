@@ -477,7 +477,7 @@ static LinkageLimit getLinkageLimit(SILDeclRef constant) {
       return Limit::OnDemand;
   }
   
-  if (auto dd = dyn_cast<DestructorDecl>(d)) {
+  if (isa<DestructorDecl>(d)) {
     // The destructor of a class implemented with @_objcImplementation is only
     // ever called by its ObjC thunk, so it should not be public.
     if (d->getDeclContext()->getSelfNominalTypeDecl()->hasClangNode())
@@ -649,14 +649,6 @@ SILLinkage SILDeclRef::getDefinitionLinkage() const {
     auto storageAccess = accessor->getStorage()->getEffectiveAccess();
     if (accessor->isSetter() && storageAccess >= AccessLevel::Internal)
       effectiveAccess = std::max(effectiveAccess, AccessLevel::Internal);
-  }
-
-  // Declarations with a @_silgen_name attribute and no body may be forward
-  // declarations of functions defined in another module. Therefore they must
-  // always have external (public) linkage, regardless of declared access level.
-  if (auto afd = getAbstractFunctionDecl()) {
-    if (!afd->hasBody() && afd->getAttrs().hasAttribute<SILGenNameAttr>())
-      effectiveAccess = AccessLevel::Public;
   }
 
   switch (effectiveAccess) {
