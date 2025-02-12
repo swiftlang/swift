@@ -1151,8 +1151,11 @@ void SILPerformanceInliner::collectAppliesToInline(
         // caller block limit at this point. In such a case, we continue. This
         // will ensure that any further non inline always functions are skipped,
         // but we /do/ inline any inline_always functions remaining.
-        if (NumCallerBlocks > OverallCallerBlockLimit)
+        if (NumCallerBlocks > OverallCallerBlockLimit &&
+            // Still allow inlining of small functions.
+            !hasMaxNumberOfBasicBlocks(Callee, 8)) {
           continue;
+        }
 
         // Otherwise, calculate our block weights and determine if we want to
         // inline this.
