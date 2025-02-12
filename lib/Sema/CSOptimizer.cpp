@@ -49,6 +49,84 @@ struct DisjunctionInfo {
       : Score(score), FavoredChoices(favoredChoices) {}
 };
 
+static DeclContext *getDisjunctionDC(Constraint *disjunction) {
+  auto *choice = disjunction->getNestedConstraints()[0];
+  switch (choice->getKind()) {
+  case ConstraintKind::BindOverload:
+    return choice->getOverloadUseDC();
+  case ConstraintKind::ValueMember:
+  case ConstraintKind::UnresolvedValueMember:
+  case ConstraintKind::ValueWitness:
+    return choice->getMemberUseDC();
+  default:
+    return nullptr;
+  }
+}
+
+static std::optional<bool> isBeforeInBuffer(ASTContext &ctx,
+                                            Constraint *disjunctionA,
+                                            Constraint *disjunctionB) {
+  auto *anchorA = getAsExpr(disjunctionA->getLocator()->getAnchor());
+  auto *anchorB = getAsExpr(disjunctionB->getLocator()->getAnchor());
+
+  auto locA = anchorA ? anchorA->getLoc() : SourceLoc();
+  auto locB = anchorB ? anchorB->getLoc() : SourceLoc();
+
+  if (!locA || !locB)
+    return std::nullopt;
+
+  return ctx.SourceMgr.isBeforeInBuffer(locA, locB);
+}
+
+/// Determine whether the given disjunction appears in a context
+/// transformed by a result builder.
+static bool isInResultBuilderContext(ConstraintSystem &cs,
+                                     Constraint *disjunction) {
+  auto *DC = getDisjunctionDC(disjunction);
+  if (!DC)
+    return false;
+
+  do {
+    auto fnContext = AnyFunctionRef::fromDeclContext(DC);
+    if (!fnContext)
+      return false;
+
+    if (cs.getAppliedResultBuilderTransform(*fnContext))
+      return true;
+
+  } while ((DC = DC->getParent()));
+
+  return false;
+}
+
+/// Check whether this given disjunction appears in an operator context.
+/// It could be a binary operator chain i.e. `1 + Double(x)`, an unary
+/// operator i.e. `-Test(x)`, or a ternary `cond ? 1 + 2 : 3`
+static bool isInOperatorContext(ConstraintSystem &cs, Constraint *disjunction) {
+  auto *curr = castToExpr(disjunction->getLocator()->getAnchor());
+
+  do {
+    switch (curr->getKind()) {
+    /// Something like `1 + arr.map { <<disjunction>> }`
+    case ExprKind::Closure:
+      return false;
+
+    case ExprKind::Binary:
+    case ExprKind::PrefixUnary:
+    case ExprKind::PostfixUnary:
+      return true;
+
+    case ExprKind::Ternary:
+      return true;
+
+    default:
+      break;
+    }
+  } while ((curr = cs.getParentExpr(curr)));
+
+  return false;
+}
+
 // TODO: both `isIntegerType` and `isFloatType` should be available on Type
 // as `isStdlib{Integer, Float}Type`.
 
@@ -1400,77 +1478,40 @@ selectBestBindingDisjunction(ConstraintSystem &cs,
   return firstBindDisjunction;
 }
 
-/// Prioritize `build{Block, Expression, ...}` and any chained
-/// members that are connected to individual builder elements
-/// i.e. `ForEach(...) { ... }.padding(...)`, once `ForEach`
-/// is resolved, `padding` should be prioritized because its
-/// requirements can help prune the solution space before the
-/// body is checked.
-static Constraint *
-selectDisjunctionInResultBuilderContext(ConstraintSystem &cs,
-                                        ArrayRef<Constraint *> disjunctions) {
-  auto context = AnyFunctionRef::fromDeclContext(cs.DC);
-  if (!context)
-    return nullptr;
+static std::optional<bool> isPreferable(ConstraintSystem &cs,
+                                        Constraint *disjunctionA,
+                                        Constraint *disjunctionB) {
+  // If both sides are either operators or non-operators, there is
+  // no preference.
+  if (isOperatorDisjunction(disjunctionA) ==
+      isOperatorDisjunction(disjunctionB))
+    return std::nullopt;
 
-  if (!cs.getAppliedResultBuilderTransform(context.value()))
-    return nullptr;
+  // Prefer outer disjunctions to inner ones. This would make sure that
+  // i.e. we don't select operators inside of a closure before outer
+  // members that precede it are selected.
+  {
+    auto *dcA = getDisjunctionDC(disjunctionA);
+    auto *dcB = getDisjunctionDC(disjunctionB);
 
-  std::pair<Constraint *, unsigned> best{nullptr, 0};
-  for (auto *disjunction : disjunctions) {
-    auto *member =
-        getAsExpr<UnresolvedDotExpr>(disjunction->getLocator()->getAnchor());
-    if (!member)
-      continue;
-
-    // Attempt `build{Block, Expression, ...} first because they
-    // provide contextual information for the inner calls.
-    if (isResultBuilderMethodReference(cs.getASTContext(), member))
-      return disjunction;
-
-    Expr *curr = member;
-    bool disqualified = false;
-    // Walk up the parent expression chain and check whether this
-    // disjunction represents one of the members in a chain that
-    // leads up to `buildExpression` (if defined by the builder)
-    // or to a pattern binding for `$__builderN` (the walk won't
-    // find any argument position locations in that case).
-    while (auto parent = cs.getParentExpr(curr)) {
-      if (!(isExpr<CallExpr>(parent) || isExpr<UnresolvedDotExpr>(parent))) {
-        disqualified = true;
-        break;
-      }
-
-      if (auto *call = getAsExpr<CallExpr>(parent)) {
-        // The current parent appears in an argument position.
-        if (call->getFn() != curr) {
-          // Allow expressions that appear in a argument position to
-          // `build{Expression, Block, ...} methods.
-          if (auto *UDE = getAsExpr<UnresolvedDotExpr>(call->getFn())) {
-            disqualified =
-                !isResultBuilderMethodReference(cs.getASTContext(), UDE);
-          } else {
-            disqualified = true;
-          }
-        }
-      }
-
-      if (disqualified)
-        break;
-
-      curr = parent;
-    }
-
-    if (disqualified)
-      continue;
-
-    if (auto depth = cs.getExprDepth(member)) {
-      if (!best.first || best.second > depth)
-        best = std::make_pair(disjunction, depth.value());
+    if (dcA && dcB && dcA != dcB) {
+      return isBeforeInBuffer(cs.getASTContext(), disjunctionA, disjunctionB);
     }
   }
 
-  return best.first;
+  // If disjunctions appear in the same declaration context and it
+  // happens to be a result builder, we need to prefer members
+  // over operators if member doesn't appear in an operator context
+  // itself.
+  if (isInResultBuilderContext(cs, disjunctionA)) {
+    if (isOperatorDisjunction(disjunctionA)) {
+      return isInOperatorContext(cs, disjunctionB);
+    } else {
+      return !isInOperatorContext(cs, disjunctionA);
+    }
+  }
+
+  return std::nullopt;
 }
 
 std::optional<std::pair<Constraint *, llvm::TinyPtrVector<Constraint *>>>
@@ -1487,11 +1528,6 @@ ConstraintSystem::selectDisjunction() {
   llvm::DenseMap<Constraint *, DisjunctionInfo> favorings;
   determineBestChoicesInContext(*this, disjunctions, favorings);
 
-  if (auto *disjunction =
-          selectDisjunctionInResultBuilderContext(*this, disjunctions)) {
-    return std::make_pair(disjunction, favorings[disjunction].FavoredChoices);
-  }
-
   // Pick the disjunction with the smallest number of favored, then active
   // choices.
   auto bestDisjunction = std::min_element(
@@ -1505,6 +1541,11 @@ ConstraintSystem::selectDisjunction() {
 
         auto &[firstScore, firstFavoredChoices] = favorings[first];
         auto &[secondScore, secondFavoredChoices] = favorings[second];
+
+        // Determine whether `first` is better based on a non-score
+        // preference rule first.
+        if (auto preference = isPreferable(*this, first, second))
+          return preference.value();
 
         // Rank based on scores only if both disjunctions are supported.
         if (firstScore && secondScore) {
