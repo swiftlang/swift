@@ -3067,12 +3067,14 @@ bool TypeConverter::visitAggregateLeaves(
                            origTy.getPackExpansionPatternType(),
                            field, index);
       } else if (auto array = dyn_cast<BuiltinFixedArrayType>(ty)) {
-        auto origBFA = origTy.getAs<BuiltinFixedArrayType>();
-        insertIntoWorklist(
-            array->getElementType(),
-            AbstractionPattern(origTy.getGenericSignatureOrNull(),
-                               origBFA->getElementType()),
-            field, index);
+        auto origEltTy = AbstractionPattern::getOpaque();
+
+        if (auto origBFA = origTy.getAs<BuiltinFixedArrayType>()) {
+          origEltTy = AbstractionPattern(origTy.getGenericSignatureOrNull(),
+                                         origBFA->getElementType());
+        }
+
+        insertIntoWorklist(array->getElementType(), origEltTy, field, index);
       } else if (auto *decl = ty.getStructOrBoundGenericStruct()) {
         for (auto *structField : decl->getStoredProperties()) {
           auto subMap = ty->getContextSubstitutionMap();
