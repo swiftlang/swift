@@ -897,6 +897,9 @@ namespace {
       return X->getElementType() == RHS->getElementType();
     }
 
+    bool visitTypeValueInst(const TypeValueInst *RHS) {
+      return true;
+    }
   private:
     const SILInstruction *LHS;
   };
