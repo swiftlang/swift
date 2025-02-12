@@ -2962,7 +2962,7 @@ public:
 
   ArrayRef<Identifier> getSuppressedFeatures() const {
     return {getTrailingObjects<Identifier>(),
-            Bits.AllowFeatureSuppressionAttr.NumFeatures};
+            static_cast<size_t>(Bits.AllowFeatureSuppressionAttr.NumFeatures)};
   }
 
   static bool classof(const DeclAttribute *DA) {

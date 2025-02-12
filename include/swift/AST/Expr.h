@@ -2453,10 +2453,10 @@ public:
 
   /// Retrieve the elements stored in the collection.
   ArrayRef<Expr *> getElements() const {
-    return {getTrailingObjectsPointer(), Bits.CollectionExpr.NumSubExprs};
+    return {getTrailingObjectsPointer(), static_cast<size_t>(Bits.CollectionExpr.NumSubExprs)};
   }
   MutableArrayRef<Expr *> getElements() {
-    return {getTrailingObjectsPointer(), Bits.CollectionExpr.NumSubExprs};
+    return {getTrailingObjectsPointer(), static_cast<size_t>(Bits.CollectionExpr.NumSubExprs)};
   }
   Expr *getElement(unsigned i) const { return getElements()[i]; }
   void setElement(unsigned i, Expr *E) { getElements()[i] = E; }
@@ -3517,7 +3517,7 @@ public:
   /// that corresponding protocol).
   ArrayRef<ProtocolConformanceRef> getConformances() const {
     return {getTrailingObjects<ProtocolConformanceRef>(),
-            Bits.ErasureExpr.NumConformances };
+            static_cast<size_t>(Bits.ErasureExpr.NumConformances) };
   }
 
   /// Retrieve the conversion expressions mapping requirements from any
@@ -3719,7 +3719,7 @@ public:
   /// been bound to archetypes of the entity to be specialized.
   ArrayRef<TypeRepr *> getUnresolvedParams() const {
     return {getTrailingObjects<TypeRepr *>(),
-            Bits.UnresolvedSpecializeExpr.NumUnresolvedParams};
+            static_cast<size_t>(Bits.UnresolvedSpecializeExpr.NumUnresolvedParams)};
   }
   
   SourceLoc getLoc() const { return LAngleLoc; }
@@ -3989,11 +3989,11 @@ public:
   unsigned getNumElements() const { return Bits.SequenceExpr.NumElements; }
 
   MutableArrayRef<Expr*> getElements() {
-    return {getTrailingObjects<Expr*>(), Bits.SequenceExpr.NumElements};
+    return {getTrailingObjects<Expr*>(), static_cast<size_t>(Bits.SequenceExpr.NumElements)};
   }
 
   ArrayRef<Expr*> getElements() const {
-    return {getTrailingObjects<Expr*>(), Bits.SequenceExpr.NumElements};
+    return {getTrailingObjects<Expr*>(), static_cast<size_t>(Bits.SequenceExpr.NumElements)};
   }
 
   Expr *getElement(unsigned i) const {
@@ -4592,7 +4592,7 @@ public:
 
   ArrayRef<CaptureListEntry> getCaptureList() {
     return {getTrailingObjects<CaptureListEntry>(),
-            Bits.CaptureListExpr.NumCaptures};
+            static_cast<size_t>(Bits.CaptureListExpr.NumCaptures)};
   }
   AbstractClosureExpr *getClosureBody() { return closureBody; }
   const AbstractClosureExpr *getClosureBody() const { return closureBody; }
