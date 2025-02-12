@@ -1275,10 +1275,6 @@ final public class AllocStackInst : SingleValueInstruction, Allocation, DebugVar
   }
 }
 
-final public class AllocVectorInst : SingleValueInstruction, Allocation, UnaryInstruction {
-  public var capacity: Value { operand.value }
-}
-
 public class AllocRefInstBase : SingleValueInstruction, Allocation {
   final public var isObjC: Bool { bridged.AllocRefInstBase_isObjc() }
 

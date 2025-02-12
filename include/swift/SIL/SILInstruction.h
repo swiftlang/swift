@@ -2213,35 +2213,6 @@ public:
   DeallocStackInst *getSingleDeallocStack() const;
 };
 
-/// AllocVectorInst - Like AllocStackInst, but allocates a vector of elements.
-class AllocVectorInst final
-    : public UnaryInstructionWithTypeDependentOperandsBase<
-           SILInstructionKind::AllocVectorInst, AllocVectorInst, AllocationInst> {
-  friend SILBuilder;
-
-  AllocVectorInst(SILDebugLocation loc, SILValue capacity, SILType resultType,
-                  ArrayRef<SILValue> typeDependentOperands)
-    : UnaryInstructionWithTypeDependentOperandsBase(loc, capacity,
-                                                    typeDependentOperands,
-                                                    resultType) {
-  }
-
-  static AllocVectorInst *create(SILDebugLocation Loc, SILValue capacity,
-                                 SILType elementType, SILFunction &F);
-
-  static AllocVectorInst *createInInitializer(SILDebugLocation Loc,
-                        SILValue capacity, SILType elementType, SILModule &M);
-
-public:
-  /// getElementType - Get the type of the allocated memory (as opposed to the
-  /// type of the instruction itself, which will be an address type).
-  SILType getElementType() const {
-    return getType().getObjectType();
-  }
-
-  SILValue getCapacity() const { return getOperand(); }
-};
-
 /// AllocPackInst - This represents the allocation of a value pack
 /// in stack memory.  The memory is provided uninitialized.
 class AllocPackInst final

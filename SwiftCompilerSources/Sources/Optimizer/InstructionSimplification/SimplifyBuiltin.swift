@@ -47,7 +47,6 @@ extension BuiltinInst : OnoneSimplifiable {
            .AssignCopyArrayFrontToBack,
            .AssignCopyArrayBackToFront,
            .AssignTakeArray,
-           .AllocVector,
            .IsPOD:
         optimizeArgumentToThinMetatype(argument: 0, context)
       case .ICMP_EQ:

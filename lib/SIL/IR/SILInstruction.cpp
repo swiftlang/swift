@@ -1277,7 +1277,6 @@ namespace {
 
 bool SILInstruction::isAllocatingStack() const {
   if (isa<AllocStackInst>(this) ||
-      isa<AllocVectorInst>(this) ||
       isa<AllocPackInst>(this) ||
       isa<AllocPackMetadataInst>(this))
     return true;
