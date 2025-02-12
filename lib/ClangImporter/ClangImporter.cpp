@@ -7851,6 +7851,14 @@ static bool isSufficientlyTrivial(const clang::CXXRecordDecl *decl) {
   return true;
 }
 
+static bool hasNonFirstDefaultArg(const clang::CXXConstructorDecl *ctor) {
+  if (ctor->getNumParams() < 2)
+    return false;
+
+  auto lastParam = ctor->parameters().back();
+  return lastParam->hasDefaultArg();
+}
+
 /// Checks if a record provides the required value type lifetime operations
 /// (copy and destroy).
 static bool hasCopyTypeOperations(const clang::CXXRecordDecl *decl) {
@@ -7867,6 +7875,7 @@ static bool hasCopyTypeOperations(const clang::CXXRecordDecl *decl) {
   // struct.
   return llvm::any_of(decl->ctors(), [](clang::CXXConstructorDecl *ctor) {
     return ctor->isCopyConstructor() && !ctor->isDeleted() &&
+           !hasNonFirstDefaultArg(ctor) &&
            ctor->getAccess() == clang::AccessSpecifier::AS_public;
   });
 }
