@@ -1456,12 +1456,12 @@ function Build-WiXProject() {
     [Parameter(Position = 0, Mandatory = $true)]
     [string]$FileName,
     [Parameter(Mandatory = $true)]
-    [hashtable]$Arch,
+    [string]$ArchName,
+    [Parameter(Mandatory = $true)]
+    [string]$BinaryCache,
     [switch]$Bundle,
     [hashtable]$Properties = @{}
   )
-
-  $ArchName = $Arch.VSName
 
   $ProductVersionArg = $ProductVersion
   if (-not $Bundle) {
@@ -1473,7 +1473,7 @@ function Build-WiXProject() {
 
   $Properties = $Properties.Clone()
   TryAdd-KeyValue $Properties Configuration Release
-  TryAdd-KeyValue $Properties BaseOutputPath "$($Arch.BinaryCache)\installer\"
+  TryAdd-KeyValue $Properties BaseOutputPath "$($BinaryCache)\installer\"
   TryAdd-KeyValue $Properties ProductArchitecture $ArchName
   TryAdd-KeyValue $Properties ProductVersion $ProductVersionArg
 
@@ -1488,7 +1488,7 @@ function Build-WiXProject() {
       $MSBuildArgs += "-p:$($Property.Key)=$($Property.Value)"
     }
   }
-  $MSBuildArgs += "-binaryLogger:$($Arch.BinaryCache)\msi\$ArchName-$([System.IO.Path]::GetFileNameWithoutExtension($FileName)).binlog"
+  $MSBuildArgs += "-binaryLogger:$($BinaryCache)\msi\$ArchName-$([System.IO.Path]::GetFileNameWithoutExtension($FileName)).binlog"
   $MSBuildArgs += "-detailedSummary:False"
 
   Invoke-Program $msbuild @MSBuildArgs
@@ -3042,6 +3042,16 @@ function Test-PackageManager() {
   }
 }
 
+function Build-AndroidSDK($Arch) {
+  $Properties = @{
+    BundleFlavor = "offline";
+    PLATFORM_ROOT = "$($Arch.PlatformInstallRoot)\";
+    SDK_ROOT = "$($Arch.SDKInstallRoot)\"
+  }
+
+  Build-WiXProject android_sdk\android_sdk.wixproj -ArchName $Arch.LLVMName -BinaryCache $Arch.BinaryCache -Bundle -Properties $Properties
+}
+
 function Build-Installer($Arch) {
   # TODO(hjyamauchi) Re-enable the swift-inspect and swift-docc builds
   # when cross-compiling https://github.com/apple/swift/issues/71655
@@ -3073,7 +3083,7 @@ function Build-Installer($Arch) {
     $Properties["SDK_ROOT_$($SDK.VSName.ToUpperInvariant())"] = "$($SDK.SDKInstallRoot)\"
   }
 
-  Build-WiXProject bundle\installer.wixproj -Arch $Arch -Bundle -Properties $Properties
+  Build-WiXProject bundle\installer.wixproj -ArchName $Arch.VSName -BinaryCache $Arch.BinaryCache -Bundle -Properties $Properties
 }
 
 function Stage-BuildArtifacts($Arch) {
@@ -3234,6 +3244,12 @@ if (-not $SkipBuild) {
 
 if (-not $SkipBuild -and -not $IsCrossCompiling) {
   Invoke-BuildStep Build-DocC $HostArch
+}
+
+if (-not $SkipPackaging -and $Android) {
+  foreach ($Arch in $AndroidSDKArchs) {
+    Invoke-BuildStep Build-AndroidSDK $Arch
+  }
 }
 
 if (-not $SkipPackaging) {
