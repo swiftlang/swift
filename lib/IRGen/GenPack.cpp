@@ -430,7 +430,7 @@ static void emitPackExpansionPack(
   auto *next = IGF.Builder.CreateAdd(phi,
                                      llvm::ConstantInt::get(IGF.IGM.SizeTy, 1));
 
-  phi->addIncoming(next, loop);
+  phi->addIncoming(next, IGF.Builder.GetInsertBlock());
 
   // Repeat the loop.
   IGF.Builder.CreateBr(check);
