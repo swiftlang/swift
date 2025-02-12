@@ -1118,7 +1118,7 @@ namespace {
               printHead("platform_agnostic_version_constraint_"
                         "availability_spec",
                         PatternColor, label);
-              printField(agnostic->isLanguageVersionSpecific()
+              printField(agnostic->getDomain()->isSwiftLanguage()
                              ? "swift"
                              : "package_description",
                          Label::always("kind"));

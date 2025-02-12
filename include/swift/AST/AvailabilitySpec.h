@@ -76,10 +76,15 @@ public:
   AvailabilitySpecKind getKind() const { return Kind; }
 
   SourceRange getSourceRange() const { return SrcRange; }
+  SourceLoc getStartLoc() const { return SrcRange.Start; }
 
   std::optional<AvailabilityDomain> getDomain() const { return Domain; }
 
-  std::optional<PlatformKind> getPlatform() const;
+  PlatformKind getPlatform() const {
+    if (auto domain = getDomain())
+      return domain->getPlatformKind();
+    return PlatformKind::none;
+  }
 
   // The platform version to compare against.
   llvm::VersionTuple getVersion() const;
@@ -114,22 +119,6 @@ public:
                          getDomainForPlatform(Platform),
                          SourceRange(PlatformLoc, VersionSrcRange.End), Version,
                          VersionSrcRange.Start) {}
-
-  /// The required platform.
-  PlatformKind getPlatform() const {
-    if (auto domain = getDomain())
-      return domain->getPlatformKind();
-    return PlatformKind::none;
-  }
-  SourceLoc getPlatformLoc() const { return getSourceRange().Start; }
-
-  /// Returns true when the constraint is for a platform that was not
-  /// recognized. This enables better recovery during parsing but should never
-  /// be true after parsing is completed.
-  bool isUnrecognizedPlatform() const {
-    return getPlatform() == PlatformKind::none;
-  }
-
   // The version to be used in codegen for version comparisons at run time.
   // This is required to support beta versions of macOS Big Sur that
   // report 10.16 at run time.
@@ -180,14 +169,6 @@ public:
            AvailabilitySpecKind == AvailabilitySpecKind::PackageDescriptionVersionConstraint);
   }
 
-  SourceLoc getPlatformAgnosticNameLoc() const {
-    return getSourceRange().Start;
-  }
-
-  bool isLanguageVersionSpecific() const {
-      return getKind() == AvailabilitySpecKind::LanguageVersionConstraint;
-  }
-
   void print(raw_ostream &OS, unsigned Indent) const;
 
   static bool classof(const AvailabilitySpec *Spec) {
@@ -219,8 +200,6 @@ public:
                          StarLoc,
                          /*Version=*/{},
                          /*VersionStartLoc=*/{}) {}
-
-  SourceLoc getStarLoc() const { return getSourceRange().Start; }
 
   void print(raw_ostream &OS, unsigned Indent) const;
 

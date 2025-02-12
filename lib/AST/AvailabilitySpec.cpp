@@ -21,20 +21,6 @@
 
 using namespace swift;
 
-std::optional<PlatformKind> AvailabilitySpec::getPlatform() const {
-  switch (getKind()) {
-  case AvailabilitySpecKind::PlatformVersionConstraint: {
-    auto spec = cast<PlatformVersionConstraintAvailabilitySpec>(this);
-    return spec->getPlatform();
-  }
-  case AvailabilitySpecKind::LanguageVersionConstraint:
-  case AvailabilitySpecKind::PackageDescriptionVersionConstraint:
-  case AvailabilitySpecKind::OtherPlatform:
-    return std::nullopt;
-  }
-  llvm_unreachable("bad AvailabilitySpecKind");
-}
-
 llvm::VersionTuple AvailabilitySpec::getVersion() const {
   switch (getKind()) {
   case AvailabilitySpecKind::PlatformVersionConstraint: {
@@ -77,7 +63,7 @@ void PlatformAgnosticVersionConstraintAvailabilitySpec::print(raw_ostream &OS,
   OS.indent(Indent) << '('
                     << "platform_agnostic_version_constraint_availability_spec"
                     << " kind='"
-                    << (isLanguageVersionSpecific() ?
+                    << (getDomain()->isSwiftLanguage() ?
                          "swift" : "package_description")
                     << "'"
                     << " version='" << getVersion() << "'"

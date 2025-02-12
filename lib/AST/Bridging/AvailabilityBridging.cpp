@@ -101,10 +101,7 @@ BridgedAvailabilitySpec_getDomain(BridgedAvailabilitySpec spec) {
 
 BridgedPlatformKind
 BridgedAvailabilitySpec_getPlatform(BridgedAvailabilitySpec spec) {
-  auto platform = spec.unbridged()->getPlatform();
-  if (platform)
-    return bridge(*platform);
-  return BridgedPlatformKind_None;
+  return bridge(spec.unbridged()->getPlatform());
 }
 
 BridgedVersionTuple

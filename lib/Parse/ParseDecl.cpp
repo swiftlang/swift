@@ -1877,7 +1877,7 @@ ParserStatus Parser::parsePlatformVersionInList(StringRef AttrName,
       auto Platform = Spec->getPlatform();
       // Since peekAvailabilityMacroName() only matches defined availability
       // macros, we only expect platform specific constraints here.
-      assert(Platform && "Unexpected AvailabilitySpec kind");
+      DEBUG_ASSERT(Platform != PlatformKind::none);
 
       auto Version = Spec->getVersion();
       if (Version.getSubminor().has_value() || Version.getBuild().has_value()) {
@@ -1885,7 +1885,7 @@ ParserStatus Parser::parsePlatformVersionInList(StringRef AttrName,
                  diag::attr_availability_platform_version_major_minor_only,
                  AttrName);
       }
-      PlatformAndVersions.emplace_back(*Platform, Version);
+      PlatformAndVersions.emplace_back(Platform, Version);
     }
 
     return makeParserSuccess();
