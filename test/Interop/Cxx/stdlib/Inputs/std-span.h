@@ -85,4 +85,28 @@ struct X {
   inline void methodWithSafeWrapper(ConstSpanOfInt s [[clang::noescape]]) {}
 };
 
+inline ConstSpanOfInt mixedFuncWithSafeWrapper1(const int * __counted_by(len) p
+                                           [[clang::lifetimebound]], int len) {
+  return ConstSpanOfInt(p, len);
+}
+
+inline const int * __counted_by(len) mixedFuncWithSafeWrapper2(const VecOfInt &v
+                                           [[clang::lifetimebound]], int len) {
+  if (v.size() <= len)
+    return v.data();
+  return nullptr;
+}
+
+inline void mixedFuncWithSafeWrapper3(ConstSpanOfInt s [[clang::noescape]],
+                                      int * __counted_by(len) p, int len) {}
+
+inline void mixedFuncWithSafeWrapper4(ConstSpanOfInt s [[clang::noescape]],
+                                      const int * __counted_by(len) p [[clang::noescape]], int len) {}
+
+inline void mixedFuncWithSafeWrapper5(ConstSpanOfInt s,
+                                      const int * __counted_by(len) p [[clang::noescape]], int len) {}
+
+inline void mixedFuncWithSafeWrapper6(ConstSpanOfInt s,
+                                      int * __counted_by(len) p, int len) {}
+
 #endif // TEST_INTEROP_CXX_STDLIB_INPUTS_STD_SPAN_H

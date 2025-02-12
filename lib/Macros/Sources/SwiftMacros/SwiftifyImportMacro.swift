@@ -894,14 +894,18 @@ public struct SwiftifyImportMacro: PeerMacro {
     }
     var result : [ParamInfo] = []
     let process = { type, expr, orig in
-      let typeName = try getTypeName(type).text;
-      if let desugaredType = typeMappings[typeName] {
-        if let unqualifiedDesugaredType = getUnqualifiedStdName(desugaredType) {
-          if unqualifiedDesugaredType.starts(with: "span<") {
-            result.append(CxxSpan(pointerIndex: expr, nonescaping: false,
-              dependencies: [], typeMappings: typeMappings, original: orig))
+      do {
+        let typeName = try getTypeName(type).text
+        if let desugaredType = typeMappings[typeName] {
+          if let unqualifiedDesugaredType = getUnqualifiedStdName(desugaredType) {
+            if unqualifiedDesugaredType.starts(with: "span<") {
+              result.append(CxxSpan(pointerIndex: expr, nonescaping: false,
+                dependencies: [], typeMappings: typeMappings, original: orig))
+            }
           }
         }
+      } catch is DiagnosticError {
+        // type doesn't match expected pattern
       }
     }
     for (idx, param) in signature.parameterClause.parameters.enumerated() {
