@@ -47,6 +47,17 @@ struct DisjunctionInfo {
   DisjunctionInfo() = default;
   DisjunctionInfo(double score, ArrayRef<Constraint *> favoredChoices = {})
       : Score(score), FavoredChoices(favoredChoices) {}
+
+  bool allGeneric() const {
+    if (FavoredChoices.empty())
+      return false;
+
+    return llvm::all_of(FavoredChoices, [](Constraint *choice) {
+      if (auto *decl = getOverloadChoiceDecl(choice))
+        return decl->getInterfaceType()->is<GenericFunctionType>();
+      return false;
+    });
+  }
 };
 
 static DeclContext *getDisjunctionDC(Constraint *disjunction) {
@@ -189,6 +200,13 @@ static bool isSupportedSpecialConstructor(ConstructorDecl *ctor) {
 static bool isStandardComparisonOperator(ValueDecl *decl) {
   return decl->isOperator() &&
          decl->getBaseIdentifier().isStandardComparisonOperator();
+}
+
+static bool isStandardComparisonOperatorDisjunction(Constraint *disjunction) {
+  auto *choice = disjunction->getNestedConstraints()[0];
+  if (auto *decl = getOverloadChoiceDecl(choice))
+    return isStandardComparisonOperator(decl);
+  return false;
 }
 
 static bool isArithmeticOperator(ValueDecl *decl) {
@@ -1480,7 +1498,27 @@ selectBestBindingDisjunction(ConstraintSystem &cs,
 
 static std::optional<bool> isPreferable(ConstraintSystem &cs,
                                         Constraint *disjunctionA,
-                                        Constraint *disjunctionB) {
+                                        const DisjunctionInfo &infoA,
+                                        Constraint *disjunctionB,
+                                        const DisjunctionInfo &infoB) {
+  // Disfavor standard comparison operators when other wise has some
+  // non-generic favored choices. Operators like `==` and `!=`
+  // tend to get multiple generic matches through conformance to `Equatable`
+  // and it's better to attempt them as a last resort.
+  {
+    if (isStandardComparisonOperatorDisjunction(disjunctionA) &&
+        isOperatorDisjunction(disjunctionB)) {
+      if (infoA.allGeneric() && (infoB.Score > 0 && !infoB.allGeneric()))
+        return false;
+    }
+
+    if (isStandardComparisonOperatorDisjunction(disjunctionB) &&
+        isOperatorDisjunction(disjunctionA)) {
+      if (infoB.allGeneric() && (infoA.Score > 0 && !infoA.allGeneric()))
+        return true;
+    }
+  }
+
   // If both sides are either operators or non-operators, there is
   // no preference.
   if (isOperatorDisjunction(disjunctionA) ==
@@ -1539,24 +1577,25 @@ ConstraintSystem::selectDisjunction() {
         if (firstActive == 1 || secondActive == 1)
           return secondActive != 1;
 
-        auto &[firstScore, firstFavoredChoices] = favorings[first];
-        auto &[secondScore, secondFavoredChoices] = favorings[second];
+        auto &firstInfo = favorings[first];
+        auto &secondInfo = favorings[second];
 
         // Determine whether `first` is better based on a non-score
         // preference rule first.
-        if (auto preference = isPreferable(*this, first, second))
+        if (auto preference =
+                isPreferable(*this, first, firstInfo, second, secondInfo))
           return preference.value();
 
         // Rank based on scores only if both disjunctions are supported.
-        if (firstScore && secondScore) {
+        if (firstInfo.Score && secondInfo.Score) {
           // If both disjunctions have the same score they should be ranked
           // based on number of favored/active choices.
-          if (*firstScore != *secondScore)
-            return *firstScore > *secondScore;
+          if (*firstInfo.Score != *secondInfo.Score)
+            return *firstInfo.Score > *secondInfo.Score;
         }
 
-        unsigned numFirstFavored = firstFavoredChoices.size();
-        unsigned numSecondFavored = secondFavoredChoices.size();
+        unsigned numFirstFavored = firstInfo.FavoredChoices.size();
+        unsigned numSecondFavored = secondInfo.FavoredChoices.size();
 
         if (numFirstFavored == numSecondFavored) {
           if (firstActive != secondActive)
