@@ -336,6 +336,7 @@ EXPECTED_DEFAULTS = {
     'xros_all': False,
     'llvm_install_components': defaults.llvm_install_components(),
     'clean_install_destdir': False,
+    'use_linker': None,
 }
 
 
@@ -894,4 +895,5 @@ EXPECTED_OPTIONS = [
     IgnoreOption('--xros-all'),
 
     StrOption('--llvm-install-components'),
+    ChoicesOption('--use-linker', dest='use_linker', choices=['gold', 'lld']),
 ]

@@ -43,6 +43,9 @@ class LLVM(cmake_product.CMakeProduct):
         # Add the cmake options for compiler version information.
         self.cmake_options.extend(self._version_flags)
 
+        # Add linker flags if specified
+        self.cmake_options.extend(self._use_linker)
+
     @classmethod
     def is_build_script_impl_product(cls):
         """is_build_script_impl_product -> bool
@@ -82,6 +85,12 @@ class LLVM(cmake_product.CMakeProduct):
                 'CLANG_REPOSITORY_STRING',
                 "clang-{}".format(self.args.clang_compiler_version))
         return result
+
+    @property
+    def _use_linker(self):
+        if self.args.use_linker is None:
+            return []
+        return [('CLANG_DEFAULT_LINKER', self.args.use_linker)]
 
     @classmethod
     def get_dependencies(cls):
