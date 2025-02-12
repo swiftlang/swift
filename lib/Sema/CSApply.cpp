@@ -3804,7 +3804,7 @@ namespace {
       Type arrayTy = cs.getType(expr);
       Type elementType;
 
-      if (arrayTy->isSlab()) {
+      if (arrayTy->isInlineArray()) {
         // <let count: Int, Element>
         elementType = arrayTy->castTo<BoundGenericStructType>()->getGenericArgs()[1];
       } else {

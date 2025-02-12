@@ -8709,30 +8709,30 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyConformsToConstraint(
     auto anchor = loc->getAnchor();
     auto arrayLiteral = getAsExpr<ArrayExpr>(anchor);
 
-    // If we're attempting to bind an array literal to a 'Slab' parameter,
-    // then check if the counts are equal and solve.
+    // If we're attempting to bind an array literal to an 'InlineArray'
+    // parameter, then check if the counts are equal and solve.
     if (kind == ConstraintKind::LiteralConformsTo &&
         protocol == arrayLiteralProto &&
-        type->isSlab() &&
+        type->isInlineArray() &&
         arrayLiteral) {
-      auto slabTy = type->castTo<BoundGenericStructType>();
+      auto iaTy = type->castTo<BoundGenericStructType>();
 
       // <let count: Int, Element>
       // Attempt to bind the number of elements in the literal with the
       // contextual count. This will diagnose if the literal does not enough
       // or too many elements.
-      auto contextualCount = slabTy->getGenericArgs()[0];
+      auto contextualCount = iaTy->getGenericArgs()[0];
       auto literalCount = IntegerType::get(
           std::to_string(arrayLiteral->getNumElements()),
           /* isNegative */ false,
-          slabTy->getASTContext());
+          iaTy->getASTContext());
 
       // If the counts are already equal, '2' == '2', then we're done.
       if (contextualCount->isEqual(literalCount)) {
         return SolutionKind::Solved;
       }
 
-      // If our contextual count is not known, e.g., Slab<_, Int> = [1, 2],
+      // If our contextual count is not known, e.g., InlineArray<_, Int> = [1, 2],
       // then just eagerly bind the count to what the literal count is.
       if (contextualCount->isTypeVariableOrMember()) {
         addConstraint(ConstraintKind::Bind, contextualCount, literalCount,
@@ -8744,8 +8744,9 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyConformsToConstraint(
       if (!shouldAttemptFixes())
         return SolutionKind::Error;
 
-      auto fix = AllowSlabLiteralCountMismatch::create(*this, contextualCount,
-                                                       literalCount, loc);
+      auto fix = AllowInlineArrayLiteralCountMismatch::create(*this,
+                                                              contextualCount,
+                                                              literalCount, loc);
       return recordFix(fix) ? SolutionKind::Error : SolutionKind::Solved;
     }
   } break;
@@ -15640,7 +15641,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
   case FixKind::IgnoreInvalidPlaceholder:
   case FixKind::IgnoreOutOfPlaceThenStmt:
   case FixKind::IgnoreMissingEachKeyword:
-  case FixKind::AllowSlabLiteralCountMismatch:
+  case FixKind::AllowInlineArrayLiteralCountMismatch:
     llvm_unreachable("handled elsewhere");
   }
 

@@ -848,17 +848,17 @@ Added: _$ss15_DependenceTypeOSQsWP
 // Eager-lazy Array bridging
 Added: _$ss12_ArrayBufferV14associationKeySVvpZMV
 
-// Slab metadata accessor
-Added: _$ss4SlabVMa
+// InlineArray metadata accessor
+Added: _$ss11InlineArrayVMa
 
-// Slab nominal type descriptor
-Added: _$ss4SlabVMn
+// InlineArray nominal type descriptor
+Added: _$ss11InlineArrayVMn
 
-// Slab.count property descriptor
-Added: _$ss4SlabVsRi__rlE5countSivpZMV
+// InlineArray.count property descriptor
+Added: _$ss11InlineArrayVsRi__rlE5countSivpZMV
 
-// Slab._storage _read accessor
-Added: _$ss4SlabVsRi__rlE8_storagexq_BVvr
+// InlineArray._storage _read accessor
+Added: _$ss11InlineArrayVsRi__rlE8_storagexq_BVvr
 
 // Shared string creation for Foundation
 Added: _$ss40_SwiftCreateImmortalString_ForFoundation6buffer7isASCIISSSgSRys5UInt8VG_SbtF
