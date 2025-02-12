@@ -585,12 +585,12 @@ bool ModuleDependenciesCacheDeserializer::readGraph(
 
       // Form the dependencies storage object
       auto moduleDep = ModuleDependencyInfo::forSwiftInterfaceModule(
-          outputModulePath.value(), optionalSwiftInterfaceFile.value(),
-          compiledCandidatesRefs, buildCommandRefs, importStatements,
-          optionalImportStatements, linkLibraries, *contextHash,
-          isFramework, isStatic, *rootFileSystemID, *moduleCacheKey,
-          *userModuleVersion);
+          optionalSwiftInterfaceFile.value(), compiledCandidatesRefs,
+          buildCommandRefs, importStatements, optionalImportStatements,
+          linkLibraries, isFramework, isStatic, *rootFileSystemID,
+          *moduleCacheKey, *userModuleVersion);
 
+      moduleDep.setOutputPathAndHash(*outputModulePath, *contextHash);
       addCommonDependencyInfo(moduleDep);
       addSwiftCommonDependencyInfo(moduleDep);
       addSwiftTextualDependencyInfo(

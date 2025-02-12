@@ -465,6 +465,21 @@ void ModuleDependencyInfo::addSourceFile(StringRef sourceFile) {
   }
 }
 
+void ModuleDependencyInfo::setOutputPathAndHash(StringRef outputPath,
+                                                StringRef hash) {
+  switch (getKind()) {
+  case swift::ModuleDependencyKind::SwiftInterface: {
+    auto swiftInterfaceStorage =
+        cast<SwiftInterfaceModuleDependenciesStorage>(storage.get());
+    swiftInterfaceStorage->moduleOutputPath = outputPath.str();
+    swiftInterfaceStorage->contextHash = hash.str();
+    break;
+  }
+  default:
+    llvm_unreachable("Unexpected dependency kind");
+  }
+}
+
 SwiftDependencyScanningService::SwiftDependencyScanningService() {
   ClangScanningService.emplace(
       clang::tooling::dependencies::ScanningMode::DependencyDirectivesScan,

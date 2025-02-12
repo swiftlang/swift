@@ -211,10 +211,16 @@ private:
     if (resolvingDepInfo.isSwiftPlaceholderModule())
       return llvm::Error::success();
 
+    if (outputPathResolver) {
+      auto resolvedPath = outputPathResolver->getOutputPath();
+      depInfo.setOutputPathAndHash(resolvedPath.outputPath.str().str(),
+                                   resolvedPath.hash.str());
+    }
+
     // Add macros.
     for (auto &macro : macros)
-      depInfo.addMacroDependency(
-          macro.first(), macro.second.LibraryPath, macro.second.ExecutablePath);
+      depInfo.addMacroDependency(macro.first(), macro.second.LibraryPath,
+                                 macro.second.ExecutablePath);
 
     for (auto &macro : depInfo.getMacroDependencies()) {
       std::string arg = macro.second.LibraryPath + "#" +
@@ -228,18 +234,11 @@ private:
       return err;
 
     if (!bridgingHeaderBuildCmd.empty())
-      depInfo.updateBridgingHeaderCommandLine(
-          bridgingHeaderBuildCmd);
+      depInfo.updateBridgingHeaderCommandLine(bridgingHeaderBuildCmd);
     if (!resolvingDepInfo.isSwiftBinaryModule()) {
       depInfo.updateCommandLine(commandline);
       if (auto err = updateModuleCacheKey(depInfo))
         return err;
-    }
-
-    if (outputPathResolver) {
-      auto expandedName = outputPathResolver->getOutputPath();
-      depInfo.updateModuleOutputPath(expandedName.outputPath.c_str());
-      depInfo.updateContextHash(expandedName.hash.str());
     }
 
     return llvm::Error::success();
