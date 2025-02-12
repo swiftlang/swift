@@ -1640,9 +1640,11 @@ function Build-Compilers() {
     $PythonRoot = "$BinaryCache\Python$($Arch.CMakeName)-$PythonVersion\tools"
     $PythonLibName = "python{0}{1}" -f ([System.Version]$PythonVersion).Major, ([System.Version]$PythonVersion).Minor
 
-    # The STL in VS 17.10 requires Clang 17 or higher, but released Swift toolchains currently include older versions
-    # of Clang. If bootstrapping with an older toolchain, we need to relax this requirement by defining
-    # _ALLOW_COMPILER_AND_STL_VERSION_MISMATCH. Developer builds are (currently) up-to-date.
+    # The STL in the latest versions of VS typically require a newer version of
+    # Clang than released Swift toolchains include. If bootstrapping with an
+    # older toolchain, we need to relax this requirement by defining
+    # _ALLOW_COMPILER_AND_STL_VERSION_MISMATCH. Developer builds are (currently)
+    # up-to-date.
     $SwiftFlags = @();
     if ([System.Version](Get-PinnedToolchainVersion) -ne [System.Version]"0.0.0") {
       $SwiftFlags += @("-Xcc", "-D_ALLOW_COMPILER_AND_STL_VERSION_MISMATCH");
