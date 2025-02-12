@@ -14,6 +14,7 @@
 #define SWIFT_AST_CONST_TYPE_INFO_H
 
 #include "swift/AST/Attr.h"
+#include "swift/AST/AvailabilitySpec.h"
 #include "swift/AST/Type.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include <memory>

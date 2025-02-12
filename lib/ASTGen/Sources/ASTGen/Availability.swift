@@ -334,7 +334,6 @@ extension ASTGenVisitor {
             platform: platform,
             platformLoc: nameLoc,
             version: version.bridged,
-            runtimeVersion: version.bridged,
             versionRange: versionRange
           )
           result.append(spec.asAvailabilitySpec)
