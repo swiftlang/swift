@@ -2478,8 +2478,9 @@ ModuleDecl *ClangImporter::Implementation::finishLoadingClangModule(
   // well, and may do unnecessary work.
   ClangModuleUnit *wrapperUnit = getWrapperForModule(clangModule, importLoc);
   ModuleDecl *result = wrapperUnit->getParentModule();
-  if (!ModuleWrappers[clangModule].getInt()) {
-    ModuleWrappers[clangModule].setInt(true);
+  auto &moduleWrapper = ModuleWrappers[clangModule];
+  if (!moduleWrapper.getInt()) {
+    moduleWrapper.setInt(true);
     (void) namelookup::getAllImports(result);
   }
 
@@ -2889,11 +2890,11 @@ void ClangImporter::Implementation::addImportDiagnostic(
     ImportDiagnosticTarget target, Diagnostic &&diag,
     clang::SourceLocation loc) {
   ImportDiagnostic importDiag = ImportDiagnostic(target, diag, loc);
-  if (SwiftContext.LangOpts.DisableExperimentalClangImporterDiagnostics ||
-      CollectedDiagnostics.count(importDiag))
+  if (SwiftContext.LangOpts.DisableExperimentalClangImporterDiagnostics)
     return;
-
-  CollectedDiagnostics.insert(importDiag);
+  auto [_, inserted] = CollectedDiagnostics.insert(importDiag);
+  if (!inserted)
+    return;
   ImportDiagnostics[target].push_back(importDiag);
 }
 
@@ -6846,8 +6847,9 @@ void ClangImporter::Implementation::dumpSwiftLookupTables() {
   // Print out the lookup tables for the various modules.
   for (auto moduleName : moduleNames) {
     llvm::errs() << "<<" << moduleName << " lookup table>>\n";
-    LookupTables[moduleName]->deserializeAll();
-    LookupTables[moduleName]->dump(llvm::errs());
+    auto &lookupTable = LookupTables[moduleName];
+    lookupTable->deserializeAll();
+    lookupTable->dump(llvm::errs());
   }
 
   llvm::errs() << "<<Bridging header lookup table>>\n";
@@ -7410,8 +7412,10 @@ ClangImporter::getCXXFunctionTemplateSpecialization(SubstitutionMap subst,
   if (!newFn)
     return ConcreteDeclRef(decl);
 
-  if (Impl.specializedFunctionTemplates.count(newFn))
-    return ConcreteDeclRef(Impl.specializedFunctionTemplates[newFn]);
+  auto [fnIt, inserted] =
+      Impl.specializedFunctionTemplates.try_emplace(newFn, nullptr);
+  if (!inserted)
+    return ConcreteDeclRef(fnIt->second);
 
   auto newDecl = cast_or_null<ValueDecl>(
       decl->getASTContext().getClangModuleLoader()->importDeclDirectly(
@@ -7434,7 +7438,7 @@ ClangImporter::getCXXFunctionTemplateSpecialization(SubstitutionMap subst,
     }
   }
 
-  Impl.specializedFunctionTemplates[newFn] = newDecl;
+  fnIt->getSecond() = newDecl;
   return ConcreteDeclRef(newDecl);
 }
 
@@ -8006,7 +8010,7 @@ CxxRecordAsSwiftType::evaluate(Evaluator &evaluator,
   mod->lookupValue(desc.ctx.getIdentifier(swiftName), NLKind::UnqualifiedLookup,
                    results);
   if (results.size() == 1) {
-    if (dyn_cast<ClassDecl>(results[0]))
+    if (isa<ClassDecl>(results[0]))
       return results[0];
   }
   return nullptr;
