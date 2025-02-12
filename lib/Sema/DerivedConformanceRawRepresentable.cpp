@@ -247,14 +247,14 @@ checkAvailability(const EnumElementDecl *elt,
   if (!constraint)
     return true;
 
+  // Is it never available?
+  if (constraint->isUnavailable())
+    return false;
+
   // Some constraints are active for type checking but can't translate to
   // runtime restrictions.
   if (!constraint->isActiveForRuntimeQueries(C))
     return true;
-
-  // Is it never available?
-  if (!constraint->isConditionallySatisfiable())
-    return false;
 
   // It's conditionally available; create a version constraint and return true.
   auto platform = constraint->getPlatform();
