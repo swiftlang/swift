@@ -12,7 +12,7 @@
 
 import SIL
 
-extension BuiltinInst : OnoneSimplifyable {
+extension BuiltinInst : OnoneSimplifiable {
   func simplify(_ context: SimplifyContext) {
     switch id {
       case .IsConcrete:
@@ -62,7 +62,7 @@ extension BuiltinInst : OnoneSimplifyable {
   }
 }
 
-extension BuiltinInst : LateOnoneSimplifyable {
+extension BuiltinInst : LateOnoneSimplifiable {
   func simplifyLate(_ context: SimplifyContext) {
     if id == .IsConcrete {
       // At the end of the pipeline we can be sure that the isConcrete's type doesn't get "more" concrete.

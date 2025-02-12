@@ -12,7 +12,7 @@
 
 import SIL
 
-extension KeyPathInst : OnoneSimplifyable {
+extension KeyPathInst : OnoneSimplifiable {
   func simplify(_ context: SimplifyContext) {
     if allUsesRemovable(instruction: self) {
       if parentFunction.hasOwnership {
