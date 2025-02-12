@@ -2,7 +2,7 @@ add_library(swiftSwiftOnoneSupport
   SwiftOnoneSupport.swift
   "${PROJECT_SOURCE_DIR}/linker-support/magic-symbols-for-install-name.c")
 
-set_target_properties(swiftSwiftOnoneSupport PROPERTIES 
+set_target_properties(swiftSwiftOnoneSupport PROPERTIES
  Swift_MODULE_NAME SwiftOnoneSupport)
 
 if(APPLE AND BUILD_SHARED_LIBS)
