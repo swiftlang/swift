@@ -118,7 +118,14 @@ class SwiftPM(product.Product):
         shell.call(helper_cmd)
 
     def build(self, host_target):
-        self.run_bootstrap_script('build', host_target, ["--reconfigure"])
+        self.run_bootstrap_script(
+            'build',
+            host_target,
+            additional_params=[
+                "--reconfigure",
+                "--verbose",
+            ],
+        )
 
     def should_test(self, host_target):
         return self.args.test_swiftpm
@@ -128,6 +135,9 @@ class SwiftPM(product.Product):
             'test',
             host_target,
             compile_only_for_running_host_architecture=True,
+            additional_params=[
+                '--verbose'
+            ]
         )
 
     def should_clean(self, host_target):
@@ -144,6 +154,7 @@ class SwiftPM(product.Product):
         install_prefix = install_destdir + self.args.install_prefix
 
         self.run_bootstrap_script('install', host_target, [
+            '--verbose',
             '--prefix', install_prefix
         ])
 
