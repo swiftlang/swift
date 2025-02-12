@@ -420,11 +420,16 @@ extension _StringGuts {
 }
 
 extension Unicode.Scalar {
-  fileprivate var _isLinkingConsonant: Bool {
-    _swift_stdlib_isLinkingConsonant(value)
+  fileprivate var _isInCBConsonant: Bool {
+    _swift_stdlib_isInCB_Consonant(value)
   }
 
-  fileprivate var _isVirama: Bool {
+  fileprivate var _isInCBExtend: Bool {
+    // Assuming that we're already an Extend or ZWJ...
+    !(_isInCBConsonant || _isInCBLinker || value == 0x200C)
+  }
+
+  fileprivate var _isInCBLinker: Bool {
     switch value {
     // Devanagari
     case 0x94D:
@@ -453,10 +458,10 @@ extension Unicode.Scalar {
 
 internal struct _GraphemeBreakingState: Sendable, Equatable {
   // When we're looking through an indic sequence, one of the requirements is
-  // that there is at LEAST 1 Virama present between two linking consonants.
+  // that there is at LEAST 1 InCB=Linker present between two InCB=Consonant.
   // This value helps ensure that when we ultimately need to decide whether or
   // not to break that we've at least seen 1 when walking.
-  var hasSeenVirama = false
+  var hasSeenInCBLinker = false
 
   // When walking forwards in a string, we need to know whether or not we've
   // entered an emoji sequence to be able to eventually break after all of the
@@ -483,7 +488,7 @@ internal struct _GraphemeBreakingState: Sendable, Equatable {
 extension _GraphemeBreakingState: CustomStringConvertible {
   var description: String {
     var r = "["
-    if hasSeenVirama { r += "V" }
+    if hasSeenInCBLinker { r += "L" }
     if isInEmojiSequence { r += "E" }
     if isInIndicSequence { r += "I" }
     if shouldBreakRI { r += "R" }
@@ -729,8 +734,8 @@ extension _GraphemeBreakingState {
     var enterIndicSequence = false
 
     defer {
-      self.isInEmojiSequence = enterEmojiSequence
-      self.isInIndicSequence = enterIndicSequence
+      isInEmojiSequence = enterEmojiSequence
+      isInIndicSequence = enterIndicSequence
     }
     
     let y = Unicode._GraphemeBreakProperty(from: scalar2)
@@ -767,7 +772,7 @@ extension _GraphemeBreakingState {
          (.t, .t):
       return false
 
-    // GB9 (partial GB11)
+    // GB9 (partial GB9c and partial GB11)
     case (_, .extend),
          (_, .zwj):
 
@@ -780,29 +785,52 @@ extension _GraphemeBreakingState {
       // sequence; the sequence continues through subsequent extend/extend and
       // extend/zwj pairs.
       if (
-        x == .extendedPictographic || (self.isInEmojiSequence && x == .extend)
+        x == .extendedPictographic || (isInEmojiSequence && x == .extend)
       ) {
         enterEmojiSequence = true
       }
 
-      // If we're currently in an indic sequence (or if our lhs is a linking
-      // consonant), then this check and everything underneath ensures that
-      // we continue being in one and may check if this extend is a Virama.
-      if self.isInIndicSequence || scalar1._isLinkingConsonant {
-        if y == .extend {
-          let extendNormData = Unicode._NormData(scalar2, fastUpperbound: 0x300)
+      // GB9c: InCB=Consonant [InCB=Extend InCB=Linker]* InCB=Linker [InCB=Extend InCB=Linker]* × InCB=Consonant
+      //
+      // If our lhs is an InCB=Consonant and our rhs is either an InCB=Extend or
+      // an InCB=Linker, then enter into an indic sequence and mark if scalar 2
+      // is a linker and that we've seen a linker.
+      //
+      // If the lhs is not an InCB=Consonant, then check if we're currently in
+      // an indic sequence to properly propagate that back to the state.
+      // Otherwise, we're not in an indic sequence, but our rhs is still an
+      // extension scalar so don't break regardless right here. If we are in an
+      // indic sequence, tell the state that we've seen a linker if our rhs is
+      // one.
+      switch (scalar1._isInCBConsonant, scalar2._isInCBExtend, scalar2._isInCBLinker) {
+      // (InCB=Consonant, InCB=Extend)
+      case (true, true, false):
+        enterIndicSequence = true
 
-          // If our extend's CCC is 0, then this rule does not apply.
-          guard extendNormData.ccc != 0 else {
-            return false
-          }
+      // (InCB=Consonant, InCB=Linker)
+      case (true, false, true):
+        enterIndicSequence = true
+        hasSeenInCBLinker = true
+
+      // (_, InCB=Extend)
+      case (false, true, false):
+        guard isInIndicSequence else {
+          break
         }
 
         enterIndicSequence = true
 
-        if scalar2._isVirama {
-          self.hasSeenVirama = true
+      // (_, InCB=Linker)
+      case (false, false, true):
+        guard isInIndicSequence else {
+          break
         }
+
+        enterIndicSequence = true
+        hasSeenInCBLinker = true
+
+      default:
+        break
       }
 
       return false
@@ -817,25 +845,21 @@ extension _GraphemeBreakingState {
 
     // GB11
     case (.zwj, .extendedPictographic):
-      return !self.isInEmojiSequence
+      return !isInEmojiSequence
 
     // GB12 & GB13
     case (.regionalIndicator, .regionalIndicator):
       defer {
-        self.shouldBreakRI.toggle()
+        shouldBreakRI.toggle()
       }
 
-      return self.shouldBreakRI
+      return shouldBreakRI
 
     // GB999
     default:
       // GB9c
-      if
-        self.isInIndicSequence,
-        self.hasSeenVirama,
-        scalar2._isLinkingConsonant
-      {
-        self.hasSeenVirama = false
+      if isInIndicSequence, hasSeenInCBLinker, scalar2._isInCBConsonant {
+        hasSeenInCBLinker = false
         return false
       }
 
@@ -905,7 +929,7 @@ extension _StringGuts {
          (.t, .t):
       return false
 
-    // GB9 (partial GB11)
+    // GB9
     case (_, .extend),
          (_, .zwj):
       return false
@@ -929,22 +953,19 @@ extension _StringGuts {
     // GB999
     default:
       // GB9c
-      switch (x, scalar2._isLinkingConsonant) {
-      case (.extend, true):
-        let extendNormData = Unicode._NormData(scalar1, fastUpperbound: 0x300)
-
-        guard extendNormData.ccc != 0 else {
-          return true
-        }
-
+      //
+      // Check if our rhs is an InCB=Consonant first because we can more easily
+      // exit out of this branch in most cases. Otherwise, this is a consonant.
+      // Check that the lhs is an InCB=Extend or InCB=Linker (we have to check
+      // if it's an .extend or .zwj first because _isInCBExtend assumes that it
+      // is true).
+      if scalar2._isInCBConsonant,
+         (x == .extend || x == .zwj),
+         (scalar1._isInCBExtend || scalar1._isInCBLinker) {
         return !checkIfInIndicSequence(at: index, with: previousScalar)
-
-      case (.zwj, true):
-        return !checkIfInIndicSequence(at: index, with: previousScalar)
-
-      default:
-        return true
       }
+
+      return true
     }
   }
 
@@ -1013,32 +1034,33 @@ extension _StringGuts {
   }
 
   // When walking backwards, it's impossible to know whether we break when we
-  // see our first ((.extend|.zwj), .linkingConsonant) without walking
-  // further backwards. This walks the string backwards enough until we figure
-  // out whether or not to break this indic sequence. For example:
+  // see our first (InCB=Extend, InCB=Consonant) or (InCB=Linker, InCB=Consonant)
+  // without walking further backwards. This walks the string backwards enough
+  // until we figure out whether or not to break this indic sequence. For example:
   //
   // Scalar view #1:
   //
-  //     [.virama, .extend, .linkingConsonant]
-  //                       ^
-  //                       | = To be able to know whether or not to break these
-  //                           two, we need to walk backwards to determine if
-  //                           this is a legitimate indic sequence.
+  //     [InCB=Linker, InCB=Extend, InCB=Consonant]
+  //                               ^
+  //                               | = To be able to know whether or not to
+  //                                   break these two, we need to walk
+  //                                   backwards to determine if this is a
+  //                                   legitimate indic sequence.
   //      ^
-  //      | = The scalar sequence ends without a starting linking consonant,
+  //      | = The scalar sequence ends without a starting InCB=Consonant,
   //          so this is in fact not an indic sequence, so we can break the two.
   //
   // Scalar view #2:
   //
-  //     [.linkingConsonant, .virama, .extend, .linkingConsonant]
-  //                                          ^
-  //                                          | = Same as above
+  //     [InCB=Consonant, InCB=Linker, InCB=Extend, InCB=Consonant]
+  //                                               ^
+  //                                               | = Same as above
   //                            ^
-  //                            | = This is a virama, so we at least have seen
+  //                            | = This is a Linker, so we at least have seen
   //                                1 to be able to return true if we see a
-  //                                linking consonant later.
+  //                                consonant later.
   //         ^
-  //         | = Is a linking consonant and we've seen a virama, so this is a
+  //         | = Is a consonant and we've seen a linker, so this is a
   //             legitimate indic sequence, so do NOT break the initial question.
   internal func checkIfInIndicSequence(
     at index: Int,
@@ -1046,36 +1068,39 @@ extension _StringGuts {
   ) -> Bool {
     guard let p = previousScalar(index) else { return false }
 
-    var hasSeenVirama = p.scalar._isVirama
+    var hasSeenInCBLinker = p.scalar._isInCBLinker
     var i = p.start
 
     while let (scalar, prev) = previousScalar(i) {
       i = prev
+
+      if scalar._isInCBConsonant {
+        return hasSeenInCBLinker
+      }
+
       let gbp = Unicode._GraphemeBreakProperty(from: scalar)
 
-      switch (gbp, scalar._isLinkingConsonant) {
-      case (.extend, false):
-        let extendNormData = Unicode._NormData(scalar, fastUpperbound: 0x300)
+      guard gbp == .extend || gbp == .zwj else {
+        return false
+      }
 
-        guard extendNormData.ccc != 0 else {
-          return false
-        }
+      switch (scalar._isInCBExtend, scalar._isInCBLinker) {
+      case (false, false):
+        return false
 
-        if scalar._isVirama {
-          hasSeenVirama = true
-        }
+      case (false, true):
+        hasSeenInCBLinker = true
 
-      case (.zwj, false):
+      case (true, false):
         continue
 
-      // LinkingConsonant
-      case (_, true):
-        return hasSeenVirama
-
-      default:
+      case (true, true):
+        // This case should never happen, but if it does then just be cautious
+        // and say this is invalid.
         return false
       }
     }
+
     return false
   }
 

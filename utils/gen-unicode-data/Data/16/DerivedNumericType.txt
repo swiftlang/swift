@@ -1,8 +1,8 @@
-# DerivedNumericType-15.0.0.txt
-# Date: 2022-02-26, 00:38:36 GMT
-# © 2022 Unicode®, Inc.
+# DerivedNumericType-16.0.0.txt
+# Date: 2024-04-30, 21:48:20 GMT
+# © 2024 Unicode®, Inc.
 # Unicode and the Unicode Logo are registered trademarks of Unicode, Inc. in the U.S. and other countries.
-# For terms of use, see https://www.unicode.org/terms_of_use.html
+# For terms of use and license, see https://www.unicode.org/terms_of_use.html
 #
 # Unicode Character Database
 #   For documentation, see https://www.unicode.org/reports/tr44/
@@ -67,15 +67,19 @@
 4E03          ; Numeric # Lo       CJK UNIFIED IDEOGRAPH-4E03
 4E07          ; Numeric # Lo       CJK UNIFIED IDEOGRAPH-4E07
 4E09          ; Numeric # Lo       CJK UNIFIED IDEOGRAPH-4E09
+4E24          ; Numeric # Lo       CJK UNIFIED IDEOGRAPH-4E24
 4E5D          ; Numeric # Lo       CJK UNIFIED IDEOGRAPH-4E5D
 4E8C          ; Numeric # Lo       CJK UNIFIED IDEOGRAPH-4E8C
 4E94          ; Numeric # Lo       CJK UNIFIED IDEOGRAPH-4E94
 4E96          ; Numeric # Lo       CJK UNIFIED IDEOGRAPH-4E96
+4EAC          ; Numeric # Lo       CJK UNIFIED IDEOGRAPH-4EAC
 4EBF..4EC0    ; Numeric # Lo   [2] CJK UNIFIED IDEOGRAPH-4EBF..CJK UNIFIED IDEOGRAPH-4EC0
 4EDF          ; Numeric # Lo       CJK UNIFIED IDEOGRAPH-4EDF
 4EE8          ; Numeric # Lo       CJK UNIFIED IDEOGRAPH-4EE8
 4F0D          ; Numeric # Lo       CJK UNIFIED IDEOGRAPH-4F0D
 4F70          ; Numeric # Lo       CJK UNIFIED IDEOGRAPH-4F70
+4FE9          ; Numeric # Lo       CJK UNIFIED IDEOGRAPH-4FE9
+5006          ; Numeric # Lo       CJK UNIFIED IDEOGRAPH-5006
 5104          ; Numeric # Lo       CJK UNIFIED IDEOGRAPH-5104
 5146          ; Numeric # Lo       CJK UNIFIED IDEOGRAPH-5146
 5169          ; Numeric # Lo       CJK UNIFIED IDEOGRAPH-5169
@@ -92,17 +96,23 @@
 5EFE..5EFF    ; Numeric # Lo   [2] CJK UNIFIED IDEOGRAPH-5EFE..CJK UNIFIED IDEOGRAPH-5EFF
 5F0C..5F0E    ; Numeric # Lo   [3] CJK UNIFIED IDEOGRAPH-5F0C..CJK UNIFIED IDEOGRAPH-5F0E
 5F10          ; Numeric # Lo       CJK UNIFIED IDEOGRAPH-5F10
+62D0          ; Numeric # Lo       CJK UNIFIED IDEOGRAPH-62D0
 62FE          ; Numeric # Lo       CJK UNIFIED IDEOGRAPH-62FE
 634C          ; Numeric # Lo       CJK UNIFIED IDEOGRAPH-634C
 67D2          ; Numeric # Lo       CJK UNIFIED IDEOGRAPH-67D2
+6D1E          ; Numeric # Lo       CJK UNIFIED IDEOGRAPH-6D1E
 6F06          ; Numeric # Lo       CJK UNIFIED IDEOGRAPH-6F06
 7396          ; Numeric # Lo       CJK UNIFIED IDEOGRAPH-7396
 767E          ; Numeric # Lo       CJK UNIFIED IDEOGRAPH-767E
+7695          ; Numeric # Lo       CJK UNIFIED IDEOGRAPH-7695
+79ED          ; Numeric # Lo       CJK UNIFIED IDEOGRAPH-79ED
 8086          ; Numeric # Lo       CJK UNIFIED IDEOGRAPH-8086
 842C          ; Numeric # Lo       CJK UNIFIED IDEOGRAPH-842C
 8CAE          ; Numeric # Lo       CJK UNIFIED IDEOGRAPH-8CAE
 8CB3          ; Numeric # Lo       CJK UNIFIED IDEOGRAPH-8CB3
 8D30          ; Numeric # Lo       CJK UNIFIED IDEOGRAPH-8D30
+920E          ; Numeric # Lo       CJK UNIFIED IDEOGRAPH-920E
+94A9          ; Numeric # Lo       CJK UNIFIED IDEOGRAPH-94A9
 9621          ; Numeric # Lo       CJK UNIFIED IDEOGRAPH-9621
 9646          ; Numeric # Lo       CJK UNIFIED IDEOGRAPH-9646
 964C          ; Numeric # Lo       CJK UNIFIED IDEOGRAPH-964C
@@ -182,7 +192,7 @@ F9FD          ; Numeric # Lo       CJK COMPATIBILITY IDEOGRAPH-F9FD
 2626D         ; Numeric # Lo       CJK UNIFIED IDEOGRAPH-2626D
 2F890         ; Numeric # Lo       CJK COMPATIBILITY IDEOGRAPH-2F890
 
-# Total code points: 1104
+# Total code points: 1114
 
 # ================================================
 
@@ -250,6 +260,7 @@ ABF0..ABF9    ; Decimal # Nd  [10] MEETEI MAYEK DIGIT ZERO..MEETEI MAYEK DIGIT N
 FF10..FF19    ; Decimal # Nd  [10] FULLWIDTH DIGIT ZERO..FULLWIDTH DIGIT NINE
 104A0..104A9  ; Decimal # Nd  [10] OSMANYA DIGIT ZERO..OSMANYA DIGIT NINE
 10D30..10D39  ; Decimal # Nd  [10] HANIFI ROHINGYA DIGIT ZERO..HANIFI ROHINGYA DIGIT NINE
+10D40..10D49  ; Decimal # Nd  [10] GARAY DIGIT ZERO..GARAY DIGIT NINE
 11066..1106F  ; Decimal # Nd  [10] BRAHMI DIGIT ZERO..BRAHMI DIGIT NINE
 110F0..110F9  ; Decimal # Nd  [10] SORA SOMPENG DIGIT ZERO..SORA SOMPENG DIGIT NINE
 11136..1113F  ; Decimal # Nd  [10] CHAKMA DIGIT ZERO..CHAKMA DIGIT NINE
@@ -259,23 +270,29 @@ FF10..FF19    ; Decimal # Nd  [10] FULLWIDTH DIGIT ZERO..FULLWIDTH DIGIT NINE
 114D0..114D9  ; Decimal # Nd  [10] TIRHUTA DIGIT ZERO..TIRHUTA DIGIT NINE
 11650..11659  ; Decimal # Nd  [10] MODI DIGIT ZERO..MODI DIGIT NINE
 116C0..116C9  ; Decimal # Nd  [10] TAKRI DIGIT ZERO..TAKRI DIGIT NINE
+116D0..116E3  ; Decimal # Nd  [20] MYANMAR PAO DIGIT ZERO..MYANMAR EASTERN PWO KAREN DIGIT NINE
 11730..11739  ; Decimal # Nd  [10] AHOM DIGIT ZERO..AHOM DIGIT NINE
 118E0..118E9  ; Decimal # Nd  [10] WARANG CITI DIGIT ZERO..WARANG CITI DIGIT NINE
 11950..11959  ; Decimal # Nd  [10] DIVES AKURU DIGIT ZERO..DIVES AKURU DIGIT NINE
+11BF0..11BF9  ; Decimal # Nd  [10] SUNUWAR DIGIT ZERO..SUNUWAR DIGIT NINE
 11C50..11C59  ; Decimal # Nd  [10] BHAIKSUKI DIGIT ZERO..BHAIKSUKI DIGIT NINE
 11D50..11D59  ; Decimal # Nd  [10] MASARAM GONDI DIGIT ZERO..MASARAM GONDI DIGIT NINE
 11DA0..11DA9  ; Decimal # Nd  [10] GUNJALA GONDI DIGIT ZERO..GUNJALA GONDI DIGIT NINE
 11F50..11F59  ; Decimal # Nd  [10] KAWI DIGIT ZERO..KAWI DIGIT NINE
+16130..16139  ; Decimal # Nd  [10] GURUNG KHEMA DIGIT ZERO..GURUNG KHEMA DIGIT NINE
 16A60..16A69  ; Decimal # Nd  [10] MRO DIGIT ZERO..MRO DIGIT NINE
 16AC0..16AC9  ; Decimal # Nd  [10] TANGSA DIGIT ZERO..TANGSA DIGIT NINE
 16B50..16B59  ; Decimal # Nd  [10] PAHAWH HMONG DIGIT ZERO..PAHAWH HMONG DIGIT NINE
+16D70..16D79  ; Decimal # Nd  [10] KIRAT RAI DIGIT ZERO..KIRAT RAI DIGIT NINE
+1CCF0..1CCF9  ; Decimal # Nd  [10] OUTLINED DIGIT ZERO..OUTLINED DIGIT NINE
 1D7CE..1D7FF  ; Decimal # Nd  [50] MATHEMATICAL BOLD DIGIT ZERO..MATHEMATICAL MONOSPACE DIGIT NINE
 1E140..1E149  ; Decimal # Nd  [10] NYIAKENG PUACHUE HMONG DIGIT ZERO..NYIAKENG PUACHUE HMONG DIGIT NINE
 1E2F0..1E2F9  ; Decimal # Nd  [10] WANCHO DIGIT ZERO..WANCHO DIGIT NINE
 1E4F0..1E4F9  ; Decimal # Nd  [10] NAG MUNDARI DIGIT ZERO..NAG MUNDARI DIGIT NINE
+1E5F1..1E5FA  ; Decimal # Nd  [10] OL ONAL DIGIT ZERO..OL ONAL DIGIT NINE
 1E950..1E959  ; Decimal # Nd  [10] ADLAM DIGIT ZERO..ADLAM DIGIT NINE
 1FBF0..1FBF9  ; Decimal # Nd  [10] SEGMENTED DIGIT ZERO..SEGMENTED DIGIT NINE
 
-# Total code points: 680
+# Total code points: 760
 
 # EOF

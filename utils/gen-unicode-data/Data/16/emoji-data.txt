@@ -1,11 +1,11 @@
 # emoji-data.txt
-# Date: 2022-08-02, 00:26:10 GMT
-# © 2022 Unicode®, Inc.
+# Date: 2024-05-01, 21:25:24 GMT
+# © 2024 Unicode®, Inc.
 # Unicode and the Unicode Logo are registered trademarks of Unicode, Inc. in the U.S. and other countries.
-# For terms of use, see https://www.unicode.org/terms_of_use.html
+# For terms of use and license, see https://www.unicode.org/terms_of_use.html
 #
 # Emoji Data for UTS #51
-# Used with Emoji Version 15.0 and subsequent minor revisions (if any)
+# Used with Emoji Version 16.0 and subsequent minor revisions (if any)
 #
 # For documentation and usage, see https://www.unicode.org/reports/tr51
 #
@@ -407,6 +407,8 @@
 1FA80..1FA82  ; Emoji                # E12.0  [3] (🪀..🪂)    yo-yo..parachute
 1FA83..1FA86  ; Emoji                # E13.0  [4] (🪃..🪆)    boomerang..nesting dolls
 1FA87..1FA88  ; Emoji                # E15.0  [2] (🪇..🪈)    maracas..flute
+1FA89         ; Emoji                # E16.0  [1] (🪉)       harp
+1FA8F         ; Emoji                # E16.0  [1] (🪏)       shovel
 1FA90..1FA95  ; Emoji                # E12.0  [6] (🪐..🪕)    ringed planet..banjo
 1FA96..1FAA8  ; Emoji                # E13.0 [19] (🪖..🪨)    military helmet..rock
 1FAA9..1FAAC  ; Emoji                # E14.0  [4] (🪩..🪬)    mirror ball..hamsa
@@ -414,19 +416,24 @@
 1FAB0..1FAB6  ; Emoji                # E13.0  [7] (🪰..🪶)    fly..feather
 1FAB7..1FABA  ; Emoji                # E14.0  [4] (🪷..🪺)    lotus..nest with eggs
 1FABB..1FABD  ; Emoji                # E15.0  [3] (🪻..🪽)    hyacinth..wing
+1FABE         ; Emoji                # E16.0  [1] (🪾)       leafless tree
 1FABF         ; Emoji                # E15.0  [1] (🪿)       goose
 1FAC0..1FAC2  ; Emoji                # E13.0  [3] (🫀..🫂)    anatomical heart..people hugging
 1FAC3..1FAC5  ; Emoji                # E14.0  [3] (🫃..🫅)    pregnant man..person with crown
+1FAC6         ; Emoji                # E16.0  [1] (🫆)       fingerprint
 1FACE..1FACF  ; Emoji                # E15.0  [2] (🫎..🫏)    moose..donkey
 1FAD0..1FAD6  ; Emoji                # E13.0  [7] (🫐..🫖)    blueberries..teapot
 1FAD7..1FAD9  ; Emoji                # E14.0  [3] (🫗..🫙)    pouring liquid..jar
 1FADA..1FADB  ; Emoji                # E15.0  [2] (🫚..🫛)    ginger root..pea pod
+1FADC         ; Emoji                # E16.0  [1] (🫜)       root vegetable
+1FADF         ; Emoji                # E16.0  [1] (🫟)       splatter
 1FAE0..1FAE7  ; Emoji                # E14.0  [8] (🫠..🫧)    melting face..bubbles
 1FAE8         ; Emoji                # E15.0  [1] (🫨)       shaking face
+1FAE9         ; Emoji                # E16.0  [1] (🫩)       face with bags under eyes
 1FAF0..1FAF6  ; Emoji                # E14.0  [7] (🫰..🫶)    hand with index finger and thumb crossed..heart hands
 1FAF7..1FAF8  ; Emoji                # E15.0  [2] (🫷..🫸)    leftwards pushing hand..rightwards pushing hand
 
-# Total elements: 1424
+# Total elements: 1431
 
 # ================================================
 
@@ -696,6 +703,8 @@
 1FA80..1FA82  ; Emoji_Presentation   # E12.0  [3] (🪀..🪂)    yo-yo..parachute
 1FA83..1FA86  ; Emoji_Presentation   # E13.0  [4] (🪃..🪆)    boomerang..nesting dolls
 1FA87..1FA88  ; Emoji_Presentation   # E15.0  [2] (🪇..🪈)    maracas..flute
+1FA89         ; Emoji_Presentation   # E16.0  [1] (🪉)       harp
+1FA8F         ; Emoji_Presentation   # E16.0  [1] (🪏)       shovel
 1FA90..1FA95  ; Emoji_Presentation   # E12.0  [6] (🪐..🪕)    ringed planet..banjo
 1FA96..1FAA8  ; Emoji_Presentation   # E13.0 [19] (🪖..🪨)    military helmet..rock
 1FAA9..1FAAC  ; Emoji_Presentation   # E14.0  [4] (🪩..🪬)    mirror ball..hamsa
@@ -703,19 +712,24 @@
 1FAB0..1FAB6  ; Emoji_Presentation   # E13.0  [7] (🪰..🪶)    fly..feather
 1FAB7..1FABA  ; Emoji_Presentation   # E14.0  [4] (🪷..🪺)    lotus..nest with eggs
 1FABB..1FABD  ; Emoji_Presentation   # E15.0  [3] (🪻..🪽)    hyacinth..wing
+1FABE         ; Emoji_Presentation   # E16.0  [1] (🪾)       leafless tree
 1FABF         ; Emoji_Presentation   # E15.0  [1] (🪿)       goose
 1FAC0..1FAC2  ; Emoji_Presentation   # E13.0  [3] (🫀..🫂)    anatomical heart..people hugging
 1FAC3..1FAC5  ; Emoji_Presentation   # E14.0  [3] (🫃..🫅)    pregnant man..person with crown
+1FAC6         ; Emoji_Presentation   # E16.0  [1] (🫆)       fingerprint
 1FACE..1FACF  ; Emoji_Presentation   # E15.0  [2] (🫎..🫏)    moose..donkey
 1FAD0..1FAD6  ; Emoji_Presentation   # E13.0  [7] (🫐..🫖)    blueberries..teapot
 1FAD7..1FAD9  ; Emoji_Presentation   # E14.0  [3] (🫗..🫙)    pouring liquid..jar
 1FADA..1FADB  ; Emoji_Presentation   # E15.0  [2] (🫚..🫛)    ginger root..pea pod
+1FADC         ; Emoji_Presentation   # E16.0  [1] (🫜)       root vegetable
+1FADF         ; Emoji_Presentation   # E16.0  [1] (🫟)       splatter
 1FAE0..1FAE7  ; Emoji_Presentation   # E14.0  [8] (🫠..🫧)    melting face..bubbles
 1FAE8         ; Emoji_Presentation   # E15.0  [1] (🫨)       shaking face
+1FAE9         ; Emoji_Presentation   # E16.0  [1] (🫩)       face with bags under eyes
 1FAF0..1FAF6  ; Emoji_Presentation   # E14.0  [7] (🫰..🫶)    hand with index finger and thumb crossed..heart hands
 1FAF7..1FAF8  ; Emoji_Presentation   # E15.0  [2] (🫷..🫸)    leftwards pushing hand..rightwards pushing hand
 
-# Total elements: 1205
+# Total elements: 1212
 
 # ================================================
 
@@ -1289,7 +1303,9 @@ E0020..E007F  ; Emoji_Component      # E0.0  [96] (󠀠..󠁿)      tag space..c
 1FA80..1FA82  ; Extended_Pictographic# E12.0  [3] (🪀..🪂)    yo-yo..parachute
 1FA83..1FA86  ; Extended_Pictographic# E13.0  [4] (🪃..🪆)    boomerang..nesting dolls
 1FA87..1FA88  ; Extended_Pictographic# E15.0  [2] (🪇..🪈)    maracas..flute
-1FA89..1FA8F  ; Extended_Pictographic# E0.0   [7] (🪉..🪏)    <reserved-1FA89>..<reserved-1FA8F>
+1FA89         ; Extended_Pictographic# E16.0  [1] (🪉)       harp
+1FA8A..1FA8E  ; Extended_Pictographic# E0.0   [5] (🪊..🪎)    <reserved-1FA8A>..<reserved-1FA8E>
+1FA8F         ; Extended_Pictographic# E16.0  [1] (🪏)       shovel
 1FA90..1FA95  ; Extended_Pictographic# E12.0  [6] (🪐..🪕)    ringed planet..banjo
 1FA96..1FAA8  ; Extended_Pictographic# E13.0 [19] (🪖..🪨)    military helmet..rock
 1FAA9..1FAAC  ; Extended_Pictographic# E14.0  [4] (🪩..🪬)    mirror ball..hamsa
@@ -1297,19 +1313,23 @@ E0020..E007F  ; Emoji_Component      # E0.0  [96] (󠀠..󠁿)      tag space..c
 1FAB0..1FAB6  ; Extended_Pictographic# E13.0  [7] (🪰..🪶)    fly..feather
 1FAB7..1FABA  ; Extended_Pictographic# E14.0  [4] (🪷..🪺)    lotus..nest with eggs
 1FABB..1FABD  ; Extended_Pictographic# E15.0  [3] (🪻..🪽)    hyacinth..wing
-1FABE         ; Extended_Pictographic# E0.0   [1] (🪾)       <reserved-1FABE>
+1FABE         ; Extended_Pictographic# E16.0  [1] (🪾)       leafless tree
 1FABF         ; Extended_Pictographic# E15.0  [1] (🪿)       goose
 1FAC0..1FAC2  ; Extended_Pictographic# E13.0  [3] (🫀..🫂)    anatomical heart..people hugging
 1FAC3..1FAC5  ; Extended_Pictographic# E14.0  [3] (🫃..🫅)    pregnant man..person with crown
-1FAC6..1FACD  ; Extended_Pictographic# E0.0   [8] (🫆..🫍)    <reserved-1FAC6>..<reserved-1FACD>
+1FAC6         ; Extended_Pictographic# E16.0  [1] (🫆)       fingerprint
+1FAC7..1FACD  ; Extended_Pictographic# E0.0   [7] (🫇..🫍)    <reserved-1FAC7>..<reserved-1FACD>
 1FACE..1FACF  ; Extended_Pictographic# E15.0  [2] (🫎..🫏)    moose..donkey
 1FAD0..1FAD6  ; Extended_Pictographic# E13.0  [7] (🫐..🫖)    blueberries..teapot
 1FAD7..1FAD9  ; Extended_Pictographic# E14.0  [3] (🫗..🫙)    pouring liquid..jar
 1FADA..1FADB  ; Extended_Pictographic# E15.0  [2] (🫚..🫛)    ginger root..pea pod
-1FADC..1FADF  ; Extended_Pictographic# E0.0   [4] (🫜..🫟)    <reserved-1FADC>..<reserved-1FADF>
+1FADC         ; Extended_Pictographic# E16.0  [1] (🫜)       root vegetable
+1FADD..1FADE  ; Extended_Pictographic# E0.0   [2] (🫝..🫞)    <reserved-1FADD>..<reserved-1FADE>
+1FADF         ; Extended_Pictographic# E16.0  [1] (🫟)       splatter
 1FAE0..1FAE7  ; Extended_Pictographic# E14.0  [8] (🫠..🫧)    melting face..bubbles
 1FAE8         ; Extended_Pictographic# E15.0  [1] (🫨)       shaking face
-1FAE9..1FAEF  ; Extended_Pictographic# E0.0   [7] (🫩..🫯)    <reserved-1FAE9>..<reserved-1FAEF>
+1FAE9         ; Extended_Pictographic# E16.0  [1] (🫩)       face with bags under eyes
+1FAEA..1FAEF  ; Extended_Pictographic# E0.0   [6] (🫪..🫯)    <reserved-1FAEA>..<reserved-1FAEF>
 1FAF0..1FAF6  ; Extended_Pictographic# E14.0  [7] (🫰..🫶)    hand with index finger and thumb crossed..heart hands
 1FAF7..1FAF8  ; Extended_Pictographic# E15.0  [2] (🫷..🫸)    leftwards pushing hand..rightwards pushing hand
 1FAF9..1FAFF  ; Extended_Pictographic# E0.0   [7] (🫹..🫿)    <reserved-1FAF9>..<reserved-1FAFF>
