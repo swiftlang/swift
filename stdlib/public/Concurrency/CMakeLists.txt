@@ -239,7 +239,7 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB AND SWIFT_SHOULD_BUILD_EMBEDDED_CONCURRENC
     list(GET list 2 triple)
 
     if (SWIFT_HOST_VARIANT STREQUAL "linux")
-      if(NOT "${mod}" MATCHES "-linux-gnu$")
+      if((NOT "${mod}" MATCHES "-linux-gnu$") AND (NOT "${arch}" MATCHES "^wasm"))
         continue()
       endif()
       set(extra_c_compile_flags)
