@@ -1,6 +1,5 @@
 include(macCatalystUtils)
 include(SwiftList)
-include(SwiftXcodeSupport)
 include(SwiftWindowsSupport)
 include(SwiftAndroidSupport)
 include(SwiftCXXUtils)
@@ -687,24 +686,6 @@ function(add_swift_host_library name)
   # As a workaround, include `demangle` component whenever `support` is mentioned.
   if("support" IN_LIST ASHL_LLVM_LINK_COMPONENTS)
     list(APPEND ASHL_LLVM_LINK_COMPONENTS "demangle")
-  endif()
-
-  if(XCODE)
-    get_filename_component(base_dir ${CMAKE_CURRENT_SOURCE_DIR} NAME)
-  
-    file(GLOB_RECURSE ASHL_HEADERS
-      ${SWIFT_SOURCE_DIR}/include/swift/${base_dir}/*.h
-      ${SWIFT_SOURCE_DIR}/include/swift/${base_dir}/*.def
-      ${CMAKE_CURRENT_SOURCE_DIR}/*.h
-      ${CMAKE_CURRENT_SOURCE_DIR}/*.def)
-    file(GLOB_RECURSE ASHL_TDS
-      ${SWIFT_SOURCE_DIR}/include/swift${base_dir}/*.td)
-
-    set_source_files_properties(${ASHL_HEADERS} ${ASHL_TDS} PROPERTIES
-      HEADER_FILE_ONLY true)
-    source_group("TableGen descriptions" FILES ${ASHL_TDS})
-
-    set(ASHL_SOURCES ${ASHL_SOURCES} ${ASHL_HEADERS} ${ASHL_TDS})
   endif()
 
   if(ASHL_SHARED)
