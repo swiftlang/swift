@@ -20,7 +20,6 @@
 #include "swift/AST/ASTAllocated.h"
 #include "swift/AST/ASTNode.h"
 #include "swift/AST/AvailabilityRange.h"
-#include "swift/AST/AvailabilitySpec.h"
 #include "swift/AST/ConcreteDeclRef.h"
 #include "swift/AST/IfConfigClause.h"
 #include "swift/AST/ThrownErrorDestination.h"
@@ -36,6 +35,7 @@ namespace swift {
 class AnyPattern;
 class ASTContext;
 class ASTWalker;
+class AvailabilitySpec;
 class Decl;
 class DeclContext;
 class Evaluator;
