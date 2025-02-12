@@ -318,14 +318,6 @@ public:
   void updateCommandLine(const std::vector<std::string> &newCommandLine) {
     textualModuleDetails.buildCommandLine = newCommandLine;
   }
-
-  void updateModuleOutputPath(const std::string &newPath) {
-    const_cast<std::string &>(moduleOutputPath) = newPath;
-  }
-
-  void updateContextHash(const std::string &newContextHash) {
-    const_cast<std::string &>(contextHash) = newContextHash;
-  }
 };
 
 /// Describes the dependencies of a Swift module
@@ -877,20 +869,6 @@ public:
           rootID;
     else
       llvm_unreachable("Unexpected type");
-  }
-
-  void updateModuleOutputPath(const std::string &newPath) {
-    if (isSwiftInterfaceModule())
-      return cast<SwiftInterfaceModuleDependenciesStorage>(storage.get())
-          ->updateModuleOutputPath(newPath);
-    llvm_unreachable("Unexpected type");
-  }
-
-  void updateContextHash(const std::string &newContextHash) {
-    if (isSwiftInterfaceModule())
-      return cast<SwiftInterfaceModuleDependenciesStorage>(storage.get())
-          ->updateContextHash(newContextHash);
-    llvm_unreachable("Unexpected type");
   }
 
   /// Whether explicit input paths of all the module dependencies
