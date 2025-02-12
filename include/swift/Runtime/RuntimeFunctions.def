@@ -2099,7 +2099,7 @@ FUNCTION(Free, c, free, C_CC, AlwaysAvailable,
          NO_ATTRS,
          EFFECT(Deallocating),
          UNKNOWN_MEMEFFECTS)
-FUNCTION(CoroFrameAlloc, c, swift_coroFrameAlloc, C_CC, AlwaysAvailable,
+FUNCTION(CoroFrameAlloc, Swift, swift_coroFrameAlloc, C_CC, AlwaysAvailable,
          RETURNS(Int8PtrTy),
          ARGS(SizeTy, Int64Ty),
          NO_ATTRS,
