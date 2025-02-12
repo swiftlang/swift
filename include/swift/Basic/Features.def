@@ -367,9 +367,6 @@ EXPERIMENTAL_FEATURE(StaticExclusiveOnly, true)
 /// Enable the @extractConstantsFromMembers attribute.
 EXPERIMENTAL_FEATURE(ExtractConstantsFromMembers, false)
 
-/// Enables the FixedArray data type.
-EXPERIMENTAL_FEATURE(FixedArrays, true)
-
 // Group Main Actor Isolation Errors by Scope
 EXPERIMENTAL_FEATURE(GroupActorErrors, true)
 
