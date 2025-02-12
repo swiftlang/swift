@@ -760,7 +760,8 @@ unsigned DeclContext::printContext(raw_ostream &OS, const unsigned indent,
   case DeclContextKind::EnumElementDecl:  Kind = "EnumElementDecl"; break;
   case DeclContextKind::MacroDecl:    Kind = "MacroDecl"; break;
   }
-  OS.indent(Depth*2 + indent) << (void*)this << " " << Kind;
+  OS.indent(Depth * 2 + indent)
+      << static_cast<const void *>(this) << " " << Kind;
 
   switch (getContextKind()) {
   case DeclContextKind::Package:

@@ -467,9 +467,13 @@ getPrimaryOrMainSourceFile(const CompilerInstance &Instance) {
 static bool dumpAST(CompilerInstance &Instance,
                     ASTDumpMemberLoading memberLoading) {
   const FrontendOptions &opts = Instance.getInvocation().getFrontendOptions();
-  auto dumpAST = [&](SourceFile *SF, raw_ostream &out) {
+  auto dumpAST = [&](SourceFile *SF, llvm::raw_ostream &out) {
     switch (opts.DumpASTFormat) {
     case FrontendOptions::ASTFormat::Default:
+      SF->dump(out, memberLoading);
+      break;
+    case FrontendOptions::ASTFormat::DefaultWithDeclContext:
+      swift::dumpDeclContextHierarchy(out, *SF);
       SF->dump(out, memberLoading);
       break;
     case FrontendOptions::ASTFormat::JSON:
@@ -495,7 +499,7 @@ static bool dumpAST(CompilerInstance &Instance,
       auto OutputFilename = PSPs.OutputFilename;
       if (withOutputPath(Instance.getASTContext().Diags,
                          Instance.getOutputBackend(), OutputFilename,
-                         [&](raw_ostream &out) -> bool {
+                         [&](llvm::raw_ostream &out) -> bool {
                            dumpAST(sourceFile, out);
                            return false;
                          }))
