@@ -1475,15 +1475,6 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
     return;
   }
 
-  if (Builtin.ID == BuiltinValueKind::AllocVector) {
-    (void)args.claimAll();
-    IGF.emitTrap("escaped vector allocation", /*EmitUnreachable=*/true);
-    out.add(llvm::UndefValue::get(IGF.IGM.Int8PtrTy));
-    llvm::BasicBlock *contBB = llvm::BasicBlock::Create(IGF.IGM.getLLVMContext());
-    IGF.Builder.emitBlock(contBB);
-    return;
-  }
-
   if (Builtin.ID == BuiltinValueKind::GetEnumTag) {
     auto arg = args.claimNext();
     auto ty = argTypes[0];
