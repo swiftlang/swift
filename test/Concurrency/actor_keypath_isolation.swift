@@ -88,3 +88,41 @@ func tryKeypaths() {
     _ = \Door.[0] // expected-error{{cannot form key path to actor-isolated subscript 'subscript(_:)'}}
     _ = \Door.["hello"] // expected-warning {{cannot form key path to main actor-isolated subscript 'subscript(_:)'; this is an error in the Swift 6 language mode}}
 }
+
+// Make sure that these diagnostics have a source location.
+do {
+  struct S1 {
+    @MainActor
+    var prop: Int { get {} }
+  }
+  @dynamicMemberLookup struct S2 {
+    subscript(dynamicMember keyPath: KeyPath<S1, Int>) -> Int { get {} }
+  }
+  @dynamicMemberLookup struct S3 {
+    subscript(dynamicMember keyPath: KeyPath<S2, Int>) -> Int { get {} }
+  }
+
+  nonisolated func test(s3: S3) {
+    let _ = s3.prop
+    // expected-warning@-1:15 {{cannot form key path that captures non-sendable type 'KeyPath<S1, Int>'; this is an error in the Swift 6 language mode}}
+    // expected-warning@-2:16 {{cannot form key path to main actor-isolated property 'prop'; this is an error in the Swift 6 language mode}}
+  }
+}
+do {
+  struct S1 {
+    var prop: Int { get {} }
+  }
+  @dynamicMemberLookup struct S2 {
+    @MainActor
+    subscript(dynamicMember keyPath: KeyPath<S1, Int>) -> Int { get {} }
+  }
+  @dynamicMemberLookup struct S3 {
+    subscript(dynamicMember keyPath: KeyPath<S2, Int>) -> Int { get {} }
+  }
+
+  nonisolated func test(s3: S3) {
+    let _ = s3.prop // s3[dynamicMember: \.[dynamicMember: \.prop]]
+    // expected-warning@-1:15 {{cannot form key path that captures non-sendable type 'KeyPath<S1, Int>'; this is an error in the Swift 6 language mode}}
+    // expected-warning@-2:15 {{cannot form key path to main actor-isolated subscript 'subscript(dynamicMember:)'; this is an error in the Swift 6 language mode}}
+  }
+}
