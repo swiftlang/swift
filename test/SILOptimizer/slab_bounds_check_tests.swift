@@ -19,7 +19,6 @@
 
 // CHECK-SIL-LABEL: sil @$s23slab_bounds_check_tests0A29_sum_iterate_to_count_wo_trapySis4SlabVyxSiGSiRVzlF :
 // CHECK-SIL: bb3
-// CHECK-SIL: cond_fail {{.*}}, "Index out of bounds"
 // CHECK-SIL-NOT: cond_fail {{.*}}, "Index out of bounds"
 // CHECK-SIL: cond_br
 // CHECK-SIL-LABEL: } // end sil function '$s23slab_bounds_check_tests0A29_sum_iterate_to_count_wo_trapySis4SlabVyxSiGSiRVzlF'
@@ -41,7 +40,6 @@ public func slab_sum_iterate_to_count_wo_trap<let N: Int>(_ v: Slab<N, Int>) -> 
 
 // CHECK-SIL-LABEL: sil @$s23slab_bounds_check_tests0A31_sum_iterate_to_count_with_trapySis4SlabVyxSiGSiRVzlF :
 // CHECK-SIL: bb3
-// CHECK-SIL: cond_fail {{.*}}, "Index out of bounds"
 // CHECK-SIL-NOT: cond_fail {{.*}}, "Index out of bounds"
 // CHECK-SIL: cond_br
 // CHECK-SIL-LABEL: } // end sil function '$s23slab_bounds_check_tests0A31_sum_iterate_to_count_with_trapySis4SlabVyxSiGSiRVzlF'
@@ -183,7 +181,6 @@ public func slab_sum_iterate_to_deducible_count2_with_trap<let N: Int>(_ v: Slab
 
 // CHECK-SIL-LABEL: sil @$s23slab_bounds_check_tests0A29_iterate_over_indices_wo_trapySis4SlabVyxSiGSiRVzlF : 
 // CHECK-SIL: bb3
-// CHECK-SIL: cond_fail {{.*}}, "Index out of bounds"
 // CHECK-SIL-NOT: cond_fail {{.*}}, "Index out of bounds"
 // CHECK-SIL: cond_br
 // CHECK-SIL-LABEL: } // end sil function '$s23slab_bounds_check_tests0A29_iterate_over_indices_wo_trapySis4SlabVyxSiGSiRVzlF'
@@ -204,7 +201,6 @@ public func slab_iterate_over_indices_wo_trap<let N: Int>(_ v: Slab<N, Int>) -> 
 
 // CHECK-SIL-LABEL: sil @$s23slab_bounds_check_tests0A31_iterate_over_indices_with_trapySis4SlabVyxSiGSiRVzlF : 
 // CHECK-SIL: bb3
-// CHECK-SIL: cond_fail {{.*}}, "Index out of bounds"
 // CHECK-SIL-NOT: cond_fail {{.*}}, "Index out of bounds"
 // CHECK-SIL: cond_br
 // CHECK-SIL-LABEL: } // end sil function '$s23slab_bounds_check_tests0A31_iterate_over_indices_with_trapySis4SlabVyxSiGSiRVzlF'
@@ -231,7 +227,7 @@ public func slab_element_equality<let N: Int>(_ v: Slab<N, Int>, _ i: Int) -> Bo
 
 // CHECK-SIL-LABEL: sil @$s23slab_bounds_check_tests0A12_element_sumySis4SlabVyxSiG_SitSiRVzlF :
 // CHECK-SIL: cond_fail {{.*}}, "Index out of bounds"
-// CHECK-SIL: cond_fail {{.*}}, "Index out of bounds"
+// CHECK-SIL-NOT: cond_fail {{.*}}, "Index out of bounds"
 // CHECK-SIL-LABEL: } // end sil function '$s23slab_bounds_check_tests0A12_element_sumySis4SlabVyxSiG_SitSiRVzlF'
 public func slab_element_sum<let N: Int>(_ v: Slab<N, Int>, _ i: Int) -> Int {
   return v[i] &+ v[i]
