@@ -226,7 +226,6 @@ public func registerSILClasses() {
   register(IsUniqueInst.self)
   register(DestroyNotEscapedClosureInst.self)
   register(AllocStackInst.self)
-  register(AllocVectorInst.self)
   register(AllocPackInst.self)
   register(AllocPackMetadataInst.self)
   register(AllocRefInst.self)

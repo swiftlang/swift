@@ -101,10 +101,7 @@ BridgedAvailabilitySpec_getDomain(BridgedAvailabilitySpec spec) {
 
 BridgedPlatformKind
 BridgedAvailabilitySpec_getPlatform(BridgedAvailabilitySpec spec) {
-  auto platform = spec.unbridged()->getPlatform();
-  if (platform)
-    return bridge(*platform);
-  return BridgedPlatformKind_None;
+  return bridge(spec.unbridged()->getPlatform());
 }
 
 BridgedVersionTuple
@@ -135,10 +132,10 @@ BridgedPlatformVersionConstraintAvailabilitySpec
 BridgedPlatformVersionConstraintAvailabilitySpec_createParsed(
     BridgedASTContext cContext, BridgedPlatformKind cPlatform,
     BridgedSourceLoc cPlatformLoc, BridgedVersionTuple cVersion,
-    BridgedVersionTuple cRuntimeVersion, BridgedSourceRange cVersionSrcRange) {
+    BridgedSourceRange cVersionSrcRange) {
   return new (cContext.unbridged()) PlatformVersionConstraintAvailabilitySpec(
       unbridge(cPlatform), cPlatformLoc.unbridged(), cVersion.unbridged(),
-      cRuntimeVersion.unbridged(), cVersionSrcRange.unbridged());
+      cVersionSrcRange.unbridged());
 }
 
 BridgedPlatformAgnosticVersionConstraintAvailabilitySpec

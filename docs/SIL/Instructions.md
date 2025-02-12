@@ -55,27 +55,6 @@ type, use `alloc_box`.
 
 `T` must not be a pack type. To allocate a pack, use `alloc_pack`.
 
-### alloc_vector
-
-```
-sil-instruction ::= 'alloc_vector' sil-type, sil-operand
-
-%1 = alloc_vector $T, %0 : $Builtin.Word
-// %1 has type $*T
-```
-
-Allocates uninitialized memory that is sufficiently aligned on the stack
-to contain a vector of values of type `T`. The result of the instruction
-is the address of the allocated memory. The number of vector elements is
-specified by the operand, which must be a builtin integer value.
-
-`alloc_vector` either allocates memory on the stack or - if contained in
-a global variable static initializer list - in the data section.
-
-`alloc_vector` is a stack allocation instruction, unless it's contained
-in a global initializer list. See the section above on stack discipline.
-The corresponding stack deallocation instruction is `dealloc_stack`.
-
 ### alloc_pack
 
 ```

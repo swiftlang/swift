@@ -53,7 +53,9 @@ namespace swift {
   class SILParserStateBase;
   class SourceManager;
   class UUID;
-  
+  class PlatformVersionConstraintAvailabilitySpec;
+  class PlatformAgnosticVersionConstraintAvailabilitySpec;
+
   struct EnumElementInfo;
 
   /// Different contexts in which BraceItemList are parsed.

@@ -95,7 +95,7 @@ private func optimize(function: Function, _ context: FunctionPassContext, _ modu
   var changed = true
   while changed {
     changed = runSimplification(on: function, context, preserveDebugInfo: true) { instruction, simplifyCtxt in
-      if let i = instruction as? OnoneSimplifyable {
+      if let i = instruction as? OnoneSimplifiable {
         i.simplify(simplifyCtxt)
         if instruction.isDeleted {
           return

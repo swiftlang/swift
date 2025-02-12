@@ -21,87 +21,28 @@
 
 using namespace swift;
 
-SourceRange AvailabilitySpec::getSourceRange() const {
-  switch (getKind()) {
-  case AvailabilitySpecKind::PlatformVersionConstraint:
-    return cast<PlatformVersionConstraintAvailabilitySpec>(this)->getSourceRange();
-
- case AvailabilitySpecKind::LanguageVersionConstraint:
- case AvailabilitySpecKind::PackageDescriptionVersionConstraint:
-   return cast<PlatformAgnosticVersionConstraintAvailabilitySpec>(this)->getSourceRange();
-
-  case AvailabilitySpecKind::OtherPlatform:
-    return cast<OtherPlatformAvailabilitySpec>(this)->getSourceRange();
-  }
-  llvm_unreachable("bad AvailabilitySpecKind");
-}
-
-std::optional<AvailabilityDomain> AvailabilitySpec::getDomain() const {
-  switch (getKind()) {
-  case AvailabilitySpecKind::PlatformVersionConstraint: {
-    auto spec = cast<PlatformVersionConstraintAvailabilitySpec>(this);
-    return AvailabilityDomain::forPlatform(spec->getPlatform());
-  }
-  case AvailabilitySpecKind::LanguageVersionConstraint:
-    return AvailabilityDomain::forSwiftLanguage();
-  case AvailabilitySpecKind::PackageDescriptionVersionConstraint:
-    return AvailabilityDomain::forPackageDescription();
-  case AvailabilitySpecKind::OtherPlatform:
-    return std::nullopt;
-  }
-  llvm_unreachable("bad AvailabilitySpecKind");
-}
-
-std::optional<PlatformKind> AvailabilitySpec::getPlatform() const {
-  switch (getKind()) {
-  case AvailabilitySpecKind::PlatformVersionConstraint: {
-    auto spec = cast<PlatformVersionConstraintAvailabilitySpec>(this);
-    return spec->getPlatform();
-  }
-  case AvailabilitySpecKind::LanguageVersionConstraint:
-  case AvailabilitySpecKind::PackageDescriptionVersionConstraint:
-  case AvailabilitySpecKind::OtherPlatform:
-    return std::nullopt;
-  }
-  llvm_unreachable("bad AvailabilitySpecKind");
-}
-
 llvm::VersionTuple AvailabilitySpec::getVersion() const {
   switch (getKind()) {
   case AvailabilitySpecKind::PlatformVersionConstraint: {
     auto spec = cast<PlatformVersionConstraintAvailabilitySpec>(this);
-    return spec->getVersion();
+    // For macOS Big Sur, we canonicalize 10.16 to 11.0 for compile-time
+    // checking since clang canonicalizes availability markup. However, to
+    // support Beta versions of macOS Big Sur where the OS
+    // reports 10.16 at run time, we need to compare against 10.16,
+    //
+    // This means for:
+    //
+    // if #available(macOS 10.16, *) { ... }
+    //
+    // we need to store the uncanonicalized version for codegen and canonicalize
+    // it as necessary for compile-time checks.
+    return canonicalizePlatformVersion(spec->getPlatform(), Version);
   }
   case AvailabilitySpecKind::LanguageVersionConstraint:
-  case AvailabilitySpecKind::PackageDescriptionVersionConstraint: {
-    auto spec = cast<PlatformAgnosticVersionConstraintAvailabilitySpec>(this);
-    return spec->getVersion();
-  }
+  case AvailabilitySpecKind::PackageDescriptionVersionConstraint:
   case AvailabilitySpecKind::OtherPlatform:
-    return llvm::VersionTuple();
+    return Version;
   }
-  llvm_unreachable("bad AvailabilitySpecKind");
-}
-
-SourceRange AvailabilitySpec::getVersionSrcRange() const {
-  switch (getKind()) {
-  case AvailabilitySpecKind::PlatformVersionConstraint: {
-    auto spec = cast<PlatformVersionConstraintAvailabilitySpec>(this);
-    return spec->getVersionSrcRange();
-  }
-  case AvailabilitySpecKind::LanguageVersionConstraint:
-  case AvailabilitySpecKind::PackageDescriptionVersionConstraint: {
-    auto spec = cast<PlatformAgnosticVersionConstraintAvailabilitySpec>(this);
-    return spec->getVersionSrcRange();
-  }
-  case AvailabilitySpecKind::OtherPlatform:
-    return SourceRange();
-  }
-  llvm_unreachable("bad AvailabilitySpecKind");
-}
-
-SourceRange PlatformVersionConstraintAvailabilitySpec::getSourceRange() const {
-  return SourceRange(PlatformLoc, VersionSrcRange.End);
 }
 
 void PlatformVersionConstraintAvailabilitySpec::print(raw_ostream &OS,
@@ -112,8 +53,9 @@ void PlatformVersionConstraintAvailabilitySpec::print(raw_ostream &OS,
                     << ')';
 }
 
-SourceRange PlatformAgnosticVersionConstraintAvailabilitySpec::getSourceRange() const {
-  return SourceRange(PlatformAgnosticNameLoc, VersionSrcRange.End);
+llvm::VersionTuple
+PlatformVersionConstraintAvailabilitySpec::getRuntimeVersion() const {
+  return Version;
 }
 
 void PlatformAgnosticVersionConstraintAvailabilitySpec::print(raw_ostream &OS,
@@ -121,7 +63,7 @@ void PlatformAgnosticVersionConstraintAvailabilitySpec::print(raw_ostream &OS,
   OS.indent(Indent) << '('
                     << "platform_agnostic_version_constraint_availability_spec"
                     << " kind='"
-                    << (isLanguageVersionSpecific() ?
+                    << (getDomain()->isSwiftLanguage() ?
                          "swift" : "package_description")
                     << "'"
                     << " version='" << getVersion() << "'"
