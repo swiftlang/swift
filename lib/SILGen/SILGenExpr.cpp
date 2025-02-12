@@ -4098,7 +4098,6 @@ lowerKeyPathSubscriptIndexTypes(
                  SmallVectorImpl<IndexTypePair> &indexPatterns,
                  SubscriptDecl *subscript,
                  SubstitutionMap subscriptSubs,
-                 ResilienceExpansion expansion,
                  bool &needsGenericContext) {
   // Capturing an index value dependent on the generic context means we
   // need the generic context captured in the key path.
@@ -4118,7 +4117,8 @@ lowerKeyPathSubscriptIndexTypes(
 
     auto indexLoweredTy = SGM.Types.getLoweredType(
         AbstractionPattern::getOpaque(), indexTy,
-        TypeExpansionContext::noOpaqueTypeArchetypesSubstitution(expansion));
+        TypeExpansionContext::noOpaqueTypeArchetypesSubstitution(
+          ResilienceExpansion::Minimal));
     indexLoweredTy = indexLoweredTy.mapTypeOutOfContext();
     indexPatterns.push_back({indexTy->mapTypeOutOfContext()
                                     ->getCanonicalType(),
@@ -4345,7 +4345,6 @@ SILGenModule::emitKeyPathComponentForDecl(SILLocation loc,
     SmallVector<IndexTypePair, 4> indexTypes;
     lowerKeyPathSubscriptIndexTypes(*this, indexTypes,
                                     decl, subs,
-                                    expansion,
                                     needsGenericContext);
     
     SmallVector<KeyPathPatternComponent::Index, 4> indexPatterns;
