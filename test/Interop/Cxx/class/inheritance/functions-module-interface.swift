@@ -199,6 +199,8 @@
 // CHECK-NEXT:   public func getX() -> Int32
 // CHECK-NEXT:   @discardableResult
 // CHECK-NEXT:   public mutating func getXMut() -> Int32
+// CHECK-NEXT:   @available(*, unavailable, message: "this base member is not accessible because it is private")
+// CHECK-NEXT:   private var x: Int32
 // CHECK-NEXT: }
 
 // CHECK-NEXT: public struct NonEmptyBase {
@@ -214,11 +216,14 @@
 // CHECK-NEXT:   @_transparent public init()
 // CHECK-NEXT:   @discardableResult
 // CHECK-NEXT:   public func getY() -> Int32
+// CHECK-NEXT:   @available(*, unavailable, message: "this base member is not accessible because it is private")
+// CHECK-NEXT:   private var y: Int32
 // CHECK-NEXT:   @discardableResult
 // CHECK-NEXT:   public func getDerivedX() -> Int32
 // CHECK-NEXT:   @discardableResult
 // CHECK-NEXT:   public func getX() -> Int32
 // CHECK-NEXT:   @discardableResult
 // CHECK-NEXT:   public mutating func getXMut() -> Int32
+// CHECK-NEXT:   @available(*, unavailable, message: "this base member is not accessible because it is private")
+// CHECK-NEXT:   private var x: Int32
 // CHECK-NEXT: }
-

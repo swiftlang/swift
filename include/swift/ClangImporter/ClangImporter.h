@@ -769,24 +769,36 @@ ClangInvocationFileMapping getClangInvocationFileMapping(
     llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> vfs = nullptr,
     bool suppressDiagnostic = false);
 
-/// Cumulative inheritance information that is used to compute access levels
-/// through one or more levels of C++ inheritance.
+/// Information used to compute the access level of inherited C++ members.
 class ClangInheritanceInfo {
-  clang::AccessSpecifier cumulativeAccess;
+  clang::AccessSpecifier inheritedAccess;
   bool nestedPrivate;
+  bool shadowedByUsing;
 
 public:
+  /// Default instance of this class, used as the base case when recursively
+  /// walking up a class inheritance hierarchy. Indicates no inheritance info
+  /// (ClangInheritanceInfo::isInheriting() returns \c false).
   ClangInheritanceInfo()
-      : cumulativeAccess(clang::AS_none), nestedPrivate(false) {}
+      : inheritedAccess(clang::AS_none), nestedPrivate(false),
+        shadowedByUsing(false) {}
 
   /// For nested inheritance, clamp inheritance to least permissive level
   /// which is the largest numerical value for clang::AccessSpecifier
   ClangInheritanceInfo(ClangInheritanceInfo prev, clang::CXXBaseSpecifier base)
-      : cumulativeAccess(computeCumulativeAccess(prev, base)),
-        nestedPrivate(prev && base.getAccessSpecifier() == clang::AS_private) {}
+      : inheritedAccess(computeCumulativeAccess(prev, base)),
+        nestedPrivate(prev && base.getAccessSpecifier() == clang::AS_private),
+        shadowedByUsing(false) {
+    assert(!prev.shadowedByUsing &&
+           "inheritance info for 'using' decls shouldn't be mixed with nested "
+           "inheritance");
+  }
+
+  static ClangInheritanceInfo
+  forUsingDecl(const clang::UsingShadowDecl *usingDecl);
 
   /// Whether this is info represents a case of C++ inheritance.
-  bool isInheriting() const { return cumulativeAccess != clang::AS_none; }
+  bool isInheriting() const { return inheritedAccess != clang::AS_none; }
 
   /// Whether this is info represents a case of C++ inheritance.
   operator bool() const { return isInheriting(); }
@@ -800,19 +812,19 @@ public:
   ///
   /// Returns swift::AccessLevel::Public (i.e., corresponding to clang::AS_none)
   /// if this is not inheriting.
-  AccessLevel accessForBaseDecl(const ValueDecl *baseDecl);
+  AccessLevel accessForBaseDecl(const ValueDecl *baseDecl) const;
 
-  /// Marks \param clonedDecl as unavailable (using \c @unavailable) if it
+  /// Marks \param clonedDecl as unavailable (using \c @available) if it
   /// cannot be accessed from the derived class, either because \param baseDecl
   /// was declared as private in the base class, or because \param clonedDecl
   /// was inherited with private inheritance.
   void setUnavailableIfNecessary(const ValueDecl *baseDecl,
-                                 ValueDecl *clonedDecl);
+                                 ValueDecl *clonedDecl) const;
 
-  friend llvm::hash_code
-  hash_value(const ClangInheritanceInfo &info) {
-    return llvm::hash_combine(info.cumulativeAccess, info.nestedPrivate);
+  friend llvm::hash_code hash_value(const ClangInheritanceInfo &info) {
+    return llvm::hash_combine(info.inheritedAccess, info.nestedPrivate);
   }
+
 private:
   static clang::AccessSpecifier
   computeCumulativeAccess(ClangInheritanceInfo prev,
@@ -823,7 +835,7 @@ private:
                   clang::AS_protected > clang::AS_public &&
                   "using std::max() relies on this ordering");
     if (prev)
-      return std::max(prev.cumulativeAccess, base.getAccessSpecifier());
+      return std::max(prev.inheritedAccess, base.getAccessSpecifier());
 
     return base.getAccessSpecifier();
   }

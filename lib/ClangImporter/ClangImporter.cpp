@@ -8356,15 +8356,49 @@ AccessLevel importer::convertClangAccess(clang::AccessSpecifier access) {
   }
 }
 
-AccessLevel ClangInheritanceInfo::accessForBaseDecl(const ValueDecl *baseDecl) {
-  static_assert(AccessLevel::Private < AccessLevel::Public &&
-                "std::min() relies on this ordering");
-  return std::min(baseDecl->getFormalAccess(),
-                  importer::convertClangAccess(cumulativeAccess));
+ClangInheritanceInfo
+ClangInheritanceInfo::forUsingDecl(const clang::UsingShadowDecl *usingDecl) {
+  ClangInheritanceInfo info;
+
+  auto *derivedRecord =
+      llvm::cast_if_present<clang::CXXRecordDecl>(usingDecl->getDeclContext());
+  auto *baseMember =
+      llvm::cast_if_present<clang::NamedDecl>(usingDecl->getTargetDecl());
+  if (!derivedRecord || !baseMember)
+    return info;
+
+  auto *baseRecord =
+      llvm::cast_if_present<clang::CXXRecordDecl>(baseMember->getDeclContext());
+  if (!baseRecord)
+    return info;
+
+  if (!derivedRecord->isDerivedFrom(baseRecord))
+    return info;
+
+  // NOTE: inheritedAccess usually indicates the cumulative inheritance access
+  // level, rather than the access level of individual members, but here we're
+  // conflating those concepts in order to reuse the field.
+  info.inheritedAccess = usingDecl->getAccess();
+  info.shadowedByUsing = true;
+
+  assert(info.inheritedAccess != clang::AS_none &&
+         "'using' decls should have an explicit access level");
+  return info;
 }
 
-void ClangInheritanceInfo::setUnavailableIfNecessary(const ValueDecl *baseDecl,
-                                                     ValueDecl *clonedDecl) {
+AccessLevel
+ClangInheritanceInfo::accessForBaseDecl(const ValueDecl *baseDecl) const {
+  auto inherited = importer::convertClangAccess(inheritedAccess);
+  if (shadowedByUsing)
+    return inherited;
+
+  static_assert(AccessLevel::Private < AccessLevel::Public &&
+                "std::min() relies on this ordering");
+  return std::min(baseDecl->getFormalAccess(), inherited);
+}
+
+void ClangInheritanceInfo::setUnavailableIfNecessary(
+    const ValueDecl *baseDecl, ValueDecl *clonedDecl) const {
   auto *clangDecl =
       llvm::cast_if_present<clang::NamedDecl>(baseDecl->getClangDecl());
   if (!clangDecl)

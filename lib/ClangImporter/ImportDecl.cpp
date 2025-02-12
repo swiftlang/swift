@@ -4546,52 +4546,28 @@ namespace {
       }
       if (auto targetMethod =
               dyn_cast<clang::CXXMethodDecl>(decl->getTargetDecl())) {
-        auto dc = dyn_cast<clang::CXXRecordDecl>(decl->getDeclContext());
 
-        auto targetDC = targetMethod->getDeclContext();
-        auto targetRecord = dyn_cast<clang::CXXRecordDecl>(targetDC);
-        if (!targetRecord)
+        auto inheritance = ClangInheritanceInfo::forUsingDecl(decl);
+
+        // Only import this using decl if we can ascertain its inheritance info
+        if (!inheritance)
           return nullptr;
 
-        // If this struct is not inherited from the struct where the method is
-        // defined, bail.
-        if (!dc->isDerivedFrom(targetRecord))
-          return nullptr;
-
-        // Using Base::targetMethod() is only valid if targetMethod is protected
-        // or public, because otherwise it would not be inherited.
-        if (targetMethod->getAccess() == clang::AS_private)
-          return nullptr;
-
-        // NOTE: it is possible that targetMethod is not actually accessible
-        // from the inheriting class, importedDC, because of private inheritance
-        // occuring somewhere along the class hierarchy. We rely on Clang to
-        // flag that as an error and assume targetMethod is accessible here.
-        //
-        // BUG: If the derived class already has a member with the same name,
+        // TODO: If the derived class already has a member with the same name,
         // parameter list, and qualifications, the derived class member should
         // hide or override (rather than conflict with) the member that is
-        // introduced from the base class.
+        // introduced from the base class. Need to check this.
 
         auto importedBaseMethod = dyn_cast_or_null<FuncDecl>(
             Impl.importDecl(targetMethod, getActiveSwiftVersion()));
         if (!importedBaseMethod)
           return nullptr;
 
-        // It does not matter what access level we inherit targetMethod with
-        // because we will overwrite it according to the access specifier of
-        // the using decl.
         auto clonedMethod =
             dyn_cast_or_null<FuncDecl>(Impl.importBaseMemberDecl(
-                importedBaseMethod, importedDC, ClangInheritanceInfo()));
+                importedBaseMethod, importedDC, inheritance));
         if (!clonedMethod)
           return nullptr;
-
-        // The clonedMethod's access level needs to be overwritten because it is
-        // possible for a using decl to promote a protected method into a public
-        // method, which importBaseMemberDecl() does not account for.
-        clonedMethod->overwriteAccess(
-            importer::convertClangAccess(decl->getAccess()));
 
         bool success = processSpecialImportedFunc(
             clonedMethod, importedName, targetMethod->getOverloadedOperator());
