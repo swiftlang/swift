@@ -500,7 +500,7 @@ internal struct _SetAnyHashableBox<Element: Hashable>: _AnyHashableBox {
     into result: UnsafeMutablePointer<T>
   ) -> Bool {
     guard let value = _value as? T else { return false }
-    result.initialize(to: value)
+    unsafe result.initialize(to: value)
     return true
   }
 }

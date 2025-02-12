@@ -155,14 +155,13 @@ public typealias CBool = Bool
 /// Opaque pointers are used to represent C pointers to types that
 /// cannot be represented in Swift, such as incomplete struct types.
 @frozen
-@unsafe
 public struct OpaquePointer {
-  @usableFromInline
+  @unsafe @usableFromInline
   internal var _rawValue: Builtin.RawPointer
 
   @usableFromInline @_transparent
   internal init(_ v: Builtin.RawPointer) {
-    self._rawValue = v
+    unsafe self._rawValue = v
   }
 }
 
@@ -178,7 +177,7 @@ extension OpaquePointer {
   @_transparent
   public init?(bitPattern: Int) {
     if bitPattern == 0 { return nil }
-    self._rawValue = Builtin.inttoptr_Word(bitPattern._builtinWordValue)
+    unsafe self._rawValue = Builtin.inttoptr_Word(bitPattern._builtinWordValue)
   }
 
   /// Creates a new `OpaquePointer` from the given address, specified as a bit
@@ -189,7 +188,7 @@ extension OpaquePointer {
   @_transparent
   public init?(bitPattern: UInt) {
     if bitPattern == 0 { return nil }
-    self._rawValue = Builtin.inttoptr_Word(bitPattern._builtinWordValue)
+    unsafe self._rawValue = Builtin.inttoptr_Word(bitPattern._builtinWordValue)
   }
 }
 
@@ -198,7 +197,7 @@ extension OpaquePointer {
   @_transparent
   @_preInverseGenerics
   public init<T: ~Copyable>(@_nonEphemeral _ from: UnsafePointer<T>) {
-    self._rawValue = from._rawValue
+    unsafe self._rawValue = from._rawValue
   }
 
   /// Converts a typed `UnsafePointer` to an opaque C pointer.
@@ -217,7 +216,7 @@ extension OpaquePointer {
   @_transparent
   @_preInverseGenerics
   public init<T: ~Copyable>(@_nonEphemeral _ from: UnsafeMutablePointer<T>) {
-    self._rawValue = from._rawValue
+    unsafe self._rawValue = from._rawValue
   }
 
   /// Converts a typed `UnsafeMutablePointer` to an opaque C pointer.
@@ -234,7 +233,7 @@ extension OpaquePointer {
 extension OpaquePointer: Equatable {
   @inlinable // unsafe-performance
   public static func == (lhs: OpaquePointer, rhs: OpaquePointer) -> Bool {
-    return Bool(Builtin.cmp_eq_RawPointer(lhs._rawValue, rhs._rawValue))
+    return unsafe Bool(Builtin.cmp_eq_RawPointer(lhs._rawValue, rhs._rawValue))
   }
 }
 
@@ -246,7 +245,7 @@ extension OpaquePointer: Hashable {
   ///   of this instance.
   @inlinable
   public func hash(into hasher: inout Hasher) {
-    hasher.combine(Int(Builtin.ptrtoint_Word(_rawValue)))
+    unsafe hasher.combine(Int(Builtin.ptrtoint_Word(_rawValue)))
   }
 }
 
@@ -254,7 +253,7 @@ extension OpaquePointer: Hashable {
 extension OpaquePointer: CustomDebugStringConvertible {
   /// A textual representation of the pointer, suitable for debugging.
   public var debugDescription: String {
-    return _rawPointerToString(_rawValue)
+    return unsafe _rawPointerToString(_rawValue)
   }
 }
 
@@ -289,9 +288,8 @@ extension UInt {
 /// A wrapper around a C `va_list` pointer.
 #if arch(arm64) && !(os(macOS) || os(iOS) || os(tvOS) || os(watchOS) || os(visionOS) ||  os(Windows))
 @frozen
-@unsafe
 public struct CVaListPointer {
-  @usableFromInline // unsafe-performance
+  @unsafe @usableFromInline // unsafe-performance
   internal var _value: (__stack: UnsafeMutablePointer<Int>?,
                         __gr_top: UnsafeMutablePointer<Int>?,
                         __vr_top: UnsafeMutablePointer<Int>?,
@@ -323,15 +321,14 @@ extension CVaListPointer: CustomDebugStringConvertible {
 #else
 
 @frozen
-@unsafe
 public struct CVaListPointer {
-  @usableFromInline // unsafe-performance
+  @unsafe @usableFromInline // unsafe-performance
   internal var _value: UnsafeMutableRawPointer
 
   @inlinable // unsafe-performance
   public // @testable
   init(_fromUnsafeMutablePointer from: UnsafeMutableRawPointer) {
-    _value = from
+    unsafe _value = from
   }
 }
 
@@ -339,7 +336,7 @@ public struct CVaListPointer {
 extension CVaListPointer: CustomDebugStringConvertible {
   /// A textual representation of the pointer, suitable for debugging.
   public var debugDescription: String {
-    return _value.debugDescription
+    return unsafe _value.debugDescription
   }
 }
 

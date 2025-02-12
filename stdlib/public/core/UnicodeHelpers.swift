@@ -65,15 +65,15 @@ internal func _decodeUTF8(
 internal func _decodeScalar(
   _ utf8: UnsafeBufferPointer<UInt8>, startingAt i: Int
 ) -> (Unicode.Scalar, scalarLength: Int) {
-  let cu0 = utf8[_unchecked: i]
+  let cu0 = unsafe utf8[_unchecked: i]
   let len = _utf8ScalarLength(cu0)
   switch  len {
   case 1: return (_decodeUTF8(cu0), len)
-  case 2: return (_decodeUTF8(cu0, utf8[_unchecked: i &+ 1]), len)
-  case 3: return (_decodeUTF8(
+  case 2: return unsafe (_decodeUTF8(cu0, utf8[_unchecked: i &+ 1]), len)
+  case 3: return unsafe (_decodeUTF8(
     cu0, utf8[_unchecked: i &+ 1], utf8[_unchecked: i &+ 2]), len)
   case 4:
-    return (_decodeUTF8(
+    return unsafe (_decodeUTF8(
       cu0,
       utf8[_unchecked: i &+ 1],
       utf8[_unchecked: i &+ 2],
@@ -106,10 +106,10 @@ internal func _utf8ScalarLength(
   _ utf8: UnsafeBufferPointer<UInt8>, endingAt i: Int
   ) -> Int {
   var len = 1
-  while UTF8.isContinuation(utf8[_unchecked: i &- len]) {
+  while unsafe UTF8.isContinuation(utf8[_unchecked: i &- len]) {
     len &+= 1
   }
-  _internalInvariant(len == _utf8ScalarLength(utf8[i &- len]))
+  unsafe _internalInvariant(len == _utf8ScalarLength(utf8[i &- len]))
   return len
 }
 
@@ -126,7 +126,7 @@ internal func _scalarAlign(
   guard _fastPath(idx != utf8.count) else { return idx }
 
   var i = idx
-  while _slowPath(UTF8.isContinuation(utf8[_unchecked: i])) {
+  while unsafe _slowPath(UTF8.isContinuation(utf8[_unchecked: i])) {
     i &-= 1
     _internalInvariant(i >= 0,
       "Malformed contents: starts with continuation byte")
@@ -186,7 +186,7 @@ extension _StringGuts {
   @inlinable
   internal func fastUTF8ScalarLength(startingAt i: Int) -> Int {
     _internalInvariant(isFastUTF8)
-    let len = _utf8ScalarLength(self.withFastUTF8 { $0[_unchecked: i] })
+    let len = _utf8ScalarLength(self.withFastUTF8 { unsafe $0[_unchecked: i] })
     _internalInvariant((1...4) ~= len)
     return len
   }
@@ -196,9 +196,9 @@ extension _StringGuts {
     _internalInvariant(isFastUTF8)
 
     return self.withFastUTF8 { utf8 in
-      _internalInvariant(i == utf8.count || !UTF8.isContinuation(utf8[i]))
+      unsafe _internalInvariant(i == utf8.count || !UTF8.isContinuation(utf8[i]))
       var len = 1
-      while UTF8.isContinuation(utf8[i &- len]) {
+      while unsafe UTF8.isContinuation(utf8[i &- len]) {
         _internalInvariant(i &- len > 0)
         len += 1
       }
@@ -231,7 +231,7 @@ extension _StringGuts {
 
     if _fastPath(isFastUTF8) {
       return self.withFastUTF8 {
-        return !UTF8.isContinuation($0[_unchecked: i._encodedOffset])
+        return unsafe !UTF8.isContinuation($0[_unchecked: i._encodedOffset])
       }
     }
 
@@ -387,7 +387,7 @@ extension _StringGuts {
       of: UInt16.self, capacity: count
     ) { buffer in
       self._object.withCocoaObject {
-        _cocoaStringCopyCharacters(
+        unsafe _cocoaStringCopyCharacters(
           from: $0,
           range: start..<end,
           into: buffer.baseAddress._unsafelyUnwrappedUnchecked

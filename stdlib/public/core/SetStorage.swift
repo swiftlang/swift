@@ -192,13 +192,13 @@ extension __EmptySetSingleton: _NSSetCore {
   ) -> Int {
     // Even though we never do anything in here, we need to update the
     // state so that callers know we actually ran.
-    var theState = state.pointee
+    var theState = unsafe state.pointee
     if theState.state == 0 {
       theState.state = 1 // Arbitrary non-zero value.
       theState.itemsPtr = AutoreleasingUnsafeMutablePointer(objects)
       theState.mutationsPtr = _fastEnumerationStorageMutationsPtr
     }
-    state.pointee = theState
+    unsafe state.pointee = theState
     return 0
   }
 #endif
@@ -219,7 +219,7 @@ final internal class _SetStorage<Element: Hashable>
     if !_isPOD(Element.self) {
       let elements = _elements
       for bucket in _hashTable {
-        (elements + bucket.offset).deinitialize(count: 1)
+        unsafe (elements + bucket.offset).deinitialize(count: 1)
       }
     }
     _fixLifetime(self)
@@ -229,7 +229,7 @@ final internal class _SetStorage<Element: Hashable>
   final internal var _elements: UnsafeMutablePointer<Element> {
     @inline(__always)
     get {
-      return self._rawElements.assumingMemoryBound(to: Element.self)
+      return unsafe self._rawElements.assumingMemoryBound(to: Element.self)
     }
   }
 
@@ -265,7 +265,7 @@ final internal class _SetStorage<Element: Hashable>
   ) -> Int {
     defer { _fixLifetime(self) }
     let hashTable = _hashTable
-    var theState = state.pointee
+    var theState = unsafe state.pointee
     if theState.state == 0 {
       theState.state = 1 // Arbitrary non-zero value.
       theState.itemsPtr = AutoreleasingUnsafeMutablePointer(objects)
@@ -288,13 +288,13 @@ final internal class _SetStorage<Element: Hashable>
     var stored = 0
     for i in 0..<count {
       if bucket == endBucket { break }
-      let element = _elements[bucket.offset]
+      let element = unsafe _elements[bucket.offset]
       unmanagedObjects[i] = _bridgeAnythingToObjectiveC(element)
       stored += 1
       bucket = hashTable.occupiedBucket(after: bucket)
     }
     theState.extra.0 = CUnsignedLong(bucket.offset)
-    state.pointee = theState
+    unsafe state.pointee = theState
     return stored
   }
 
@@ -305,7 +305,7 @@ final internal class _SetStorage<Element: Hashable>
 
     let (bucket, found) = asNative.find(native)
     guard found else { return nil }
-    return _bridgeAnythingToObjectiveC(_elements[bucket.offset])
+    return unsafe _bridgeAnythingToObjectiveC(_elements[bucket.offset])
   }
 #endif
 }

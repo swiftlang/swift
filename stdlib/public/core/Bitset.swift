@@ -97,7 +97,7 @@ extension _UnsafeBitset {
   internal func uncheckedContains(_ element: Int) -> Bool {
     _internalInvariant(isValid(element))
     let (word, bit) = _UnsafeBitset.split(element)
-    return words[word].uncheckedContains(bit)
+    return unsafe words[word].uncheckedContains(bit)
   }
 
   @inlinable
@@ -106,7 +106,7 @@ extension _UnsafeBitset {
   internal func uncheckedInsert(_ element: Int) -> Bool {
     _internalInvariant(isValid(element))
     let (word, bit) = _UnsafeBitset.split(element)
-    return words[word].uncheckedInsert(bit)
+    return unsafe words[word].uncheckedInsert(bit)
   }
 
   @inlinable
@@ -115,13 +115,13 @@ extension _UnsafeBitset {
   internal func uncheckedRemove(_ element: Int) -> Bool {
     _internalInvariant(isValid(element))
     let (word, bit) = _UnsafeBitset.split(element)
-    return words[word].uncheckedRemove(bit)
+    return unsafe words[word].uncheckedRemove(bit)
   }
 
   @inlinable
   @inline(__always)
   internal func clear() {
-    words.update(repeating: .empty, count: wordCount)
+    unsafe words.update(repeating: .empty, count: wordCount)
   }
 }
 
@@ -133,7 +133,7 @@ extension _UnsafeBitset: Sequence {
   internal var count: Int {
     var count = 0
     for w in 0 ..< wordCount {
-      count += words[w].count
+      unsafe count += words[w].count
     }
     return count
   }
@@ -162,7 +162,7 @@ extension _UnsafeBitset: Sequence {
     internal init(_ bitset: _UnsafeBitset) {
       self.bitset = bitset
       self.index = 0
-      self.word = bitset.wordCount > 0 ? bitset.words[0] : .empty
+      self.word = unsafe bitset.wordCount > 0 ? bitset.words[0] : .empty
     }
 
     @inlinable
@@ -172,7 +172,7 @@ extension _UnsafeBitset: Sequence {
       }
       while (index + 1) < bitset.wordCount {
         index += 1
-        word = bitset.words[index]
+        word = unsafe bitset.words[index]
         if let bit = word.next() {
           return _UnsafeBitset.join(word: index, bit: bit)
         }
@@ -358,7 +358,7 @@ extension _UnsafeBitset {
     try withUnsafeTemporaryAllocation(
       of: _UnsafeBitset.Word.self, capacity: wordCount
     ) { buffer in
-      let bitset = _UnsafeBitset(
+      let bitset = unsafe _UnsafeBitset(
         words: buffer.baseAddress!, wordCount: buffer.count)
       return try body(bitset)
     }
@@ -390,7 +390,7 @@ extension _UnsafeBitset {
     try _withTemporaryUninitializedBitset(
       wordCount: original.wordCount
     ) { bitset in
-      bitset.words.initialize(from: original.words, count: original.wordCount)
+      unsafe bitset.words.initialize(from: original.words, count: original.wordCount)
       return try body(bitset)
     }
   }

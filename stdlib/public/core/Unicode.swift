@@ -649,7 +649,7 @@ extension UnicodeCodec {
     in input: UnsafePointer<CodeUnit>
   ) -> Int {
     var length = 0
-    while input[length] != 0 {
+    while unsafe input[length] != 0 {
       length += 1
     }
     return length

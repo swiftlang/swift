@@ -351,18 +351,18 @@ extension Collection {
 extension UnsafeMutablePointer {
   @available(swift, deprecated: 4.1, obsoleted: 5.0, renamed: "initialize(repeating:count:)")
   public func initialize(to newValue: Pointee, count: Int = 1) { 
-    initialize(repeating: newValue, count: count)
+    unsafe initialize(repeating: newValue, count: count)
   }
 
   @available(swift, deprecated: 4.1, obsoleted: 5.0, message: "the default argument to deinitialize(count:) has been removed, please specify the count explicitly") 
   @discardableResult
   public func deinitialize() -> UnsafeMutableRawPointer {
-    return deinitialize(count: 1)
+    return unsafe deinitialize(count: 1)
   }
   
   @available(swift, deprecated: 4.1, obsoleted: 5.0, message: "Swift currently only supports freeing entire heap blocks, use deallocate() instead")
   public func deallocate(capacity _: Int) { 
-    self.deallocate()
+    unsafe self.deallocate()
   }
 
   /// Initializes memory starting at this pointer's address with the elements
@@ -379,7 +379,7 @@ extension UnsafeMutablePointer {
   @available(swift, deprecated: 4.2, obsoleted: 5.0, message: "it will be removed in Swift 5.0.  Please use 'UnsafeMutableBufferPointer.initialize(from:)' instead")
   public func initialize<C: Collection>(from source: C)
     where C.Element == Pointee {
-    let buf = UnsafeMutableBufferPointer(start: self, count: numericCast(source.count))
+    let buf = unsafe UnsafeMutableBufferPointer(start: self, count: numericCast(source.count))
     var (remainders,writtenUpTo) = source._copyContents(initializing: buf)
     // ensure that exactly rhs.count elements were written
     _precondition(remainders.next() == nil, "rhs underreported its count")
@@ -476,12 +476,12 @@ extension UnsafeMutableRawPointer {
   
   @available(swift, deprecated: 4.1, obsoleted: 5.0, renamed: "deallocate()", message: "Swift currently only supports freeing entire heap blocks, use deallocate() instead")
   public func deallocate(bytes _: Int, alignedTo _: Int) { 
-    self.deallocate()
+    unsafe self.deallocate()
   }
 
   @available(swift, deprecated: 4.1, obsoleted: 5.0, renamed: "copyMemory(from:byteCount:)")
   public func copyBytes(from source: UnsafeRawPointer, count: Int) {
-    copyMemory(from: source, byteCount: count)
+    unsafe copyMemory(from: source, byteCount: count)
   }
 
   @available(swift, deprecated: 4.1, obsoleted: 5.0, renamed: "initializeMemory(as:repeating:count:)")
@@ -489,7 +489,7 @@ extension UnsafeMutableRawPointer {
   public func initializeMemory<T>(
     as type: T.Type, at offset: Int = 0, count: Int = 1, to repeatedValue: T
   ) -> UnsafeMutablePointer<T> { 
-    return (self + offset * MemoryLayout<T>.stride).initializeMemory(
+    return unsafe (self + offset * MemoryLayout<T>.stride).initializeMemory(
       as: type, repeating: repeatedValue, count: count)
   }
 
@@ -502,7 +502,7 @@ extension UnsafeMutableRawPointer {
     // Initialize and bind each element of the container.
     var ptr = self
     for element in source {
-      ptr.initializeMemory(as: C.Element.self, repeating: element, count: 1)
+      unsafe ptr.initializeMemory(as: C.Element.self, repeating: element, count: 1)
       ptr += MemoryLayout<C.Element>.stride
     }
     return UnsafeMutablePointer(_rawValue)
@@ -518,7 +518,7 @@ extension UnsafeMutableRawBufferPointer {
 
   @available(swift, deprecated: 4.1, obsoleted: 5.0, renamed: "copyMemory(from:)")
   public func copyBytes(from source: UnsafeRawBufferPointer) {
-    copyMemory(from: source)
+    unsafe copyMemory(from: source)
   }
 }
 

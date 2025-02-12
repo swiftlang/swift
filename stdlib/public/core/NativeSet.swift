@@ -103,7 +103,7 @@ extension _NativeSet { // Primitive fields
   // This API is unsafe and needs a `_fixLifetime` in the caller.
   @inlinable
   internal var _elements: UnsafeMutablePointer<Element> {
-    return _storage._rawElements.assumingMemoryBound(to: Element.self)
+    return unsafe _storage._rawElements.assumingMemoryBound(to: Element.self)
   }
 
   @inlinable
@@ -119,7 +119,7 @@ extension _NativeSet { // Low-level unchecked operations
   internal func uncheckedElement(at bucket: Bucket) -> Element {
     defer { _fixLifetime(self) }
     _internalInvariant(hashTable.isOccupied(bucket))
-    return _elements[bucket.offset]
+    return unsafe _elements[bucket.offset]
   }
 
   @inlinable
@@ -129,7 +129,7 @@ extension _NativeSet { // Low-level unchecked operations
     to element: __owned Element
   ) {
     _internalInvariant(hashTable.isValid(bucket))
-    (_elements + bucket.offset).initialize(to: element)
+    unsafe (_elements + bucket.offset).initialize(to: element)
   }
 
   @_alwaysEmitIntoClient @inlinable // Introduced in 5.1
@@ -139,7 +139,7 @@ extension _NativeSet { // Low-level unchecked operations
     to element: __owned Element
   ) {
     _internalInvariant(hashTable.isOccupied(bucket))
-    (_elements + bucket.offset).pointee = element
+    unsafe (_elements + bucket.offset).pointee = element
   }
 }
 
@@ -188,7 +188,7 @@ extension _NativeSet { // ensureUnique
         move: true))
     if count > 0 {
       for bucket in hashTable {
-        let element = (self._elements + bucket.offset).move()
+        let element = unsafe (self._elements + bucket.offset).move()
         result._unsafeInsertNew(element)
       }
       // Clear out old storage, ensuring that its deinit won't overrelease the
@@ -458,7 +458,7 @@ extension _NativeSet { // Insertions
       bucket = b
     }
     if found {
-      let old = (_elements + bucket.offset).move()
+      let old = unsafe (_elements + bucket.offset).move()
       uncheckedInitialize(at: bucket, to: element)
       return old
     }
@@ -521,7 +521,7 @@ extension _NativeSet: _HashTableDelegate {
   @inlinable
   @inline(__always)
   internal func moveEntry(from source: Bucket, to target: Bucket) {
-    (_elements + target.offset)
+    unsafe (_elements + target.offset)
       .moveInitialize(from: _elements + source.offset, count: 1)
   }
 }
@@ -544,7 +544,7 @@ extension _NativeSet { // Deletion
     _internalInvariant(hashTable.isOccupied(bucket))
     let rehashed = ensureUnique(isUnique: isUnique, capacity: capacity)
     _internalInvariant(!rehashed)
-    let old = (_elements + bucket.offset).move()
+    let old = unsafe (_elements + bucket.offset).move()
     _delete(at: bucket)
     return old
   }
@@ -560,7 +560,7 @@ extension _NativeSet { // Deletion
       return
     }
     for bucket in hashTable {
-      (_elements + bucket.offset).deinitialize(count: 1)
+      unsafe (_elements + bucket.offset).deinitialize(count: 1)
     }
     hashTable.clear()
     _storage._count = 0

@@ -402,7 +402,7 @@ extension _StringGuts {
         var utf8: [UInt8] = []
         utf8.reserveCapacity(c)
         utf8 = newElements.reduce(into: utf8) { utf8, next in
-          next.withUTF8CodeUnits { utf8.append(contentsOf: $0) }
+          next.withUTF8CodeUnits { unsafe utf8.append(contentsOf: $0) }
         }
         return uniqueNativeReplaceSubrange(bounds, with: utf8)
       }

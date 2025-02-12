@@ -156,13 +156,13 @@ extension __EmptyDictionarySingleton: _NSDictionaryCore {
     // Even though we never do anything in here, we need to update the
     // state so that callers know we actually ran.
 
-    var theState = state.pointee
+    var theState = unsafe state.pointee
     if theState.state == 0 {
       theState.state = 1 // Arbitrary non-zero value.
       theState.itemsPtr = AutoreleasingUnsafeMutablePointer(objects)
       theState.mutationsPtr = _fastEnumerationStorageMutationsPtr
     }
-    state.pointee = theState
+    unsafe state.pointee = theState
 
     return 0
   }
@@ -226,8 +226,8 @@ extension __RawDictionaryStorage {
   internal final func uncheckedKey<Key: Hashable>(at bucket: _HashTable.Bucket) -> Key {
     defer { _fixLifetime(self) }
     _internalInvariant(_hashTable.isOccupied(bucket))
-    let keys = _rawKeys.assumingMemoryBound(to: Key.self)
-    return keys[bucket.offset]
+    let keys = unsafe _rawKeys.assumingMemoryBound(to: Key.self)
+    return unsafe keys[bucket.offset]
   }
 
   @_alwaysEmitIntoClient
@@ -266,13 +266,13 @@ final internal class _DictionaryStorage<Key: Hashable, Value>
     if !_isPOD(Key.self) {
       let keys = self._keys
       for bucket in _hashTable {
-        (keys + bucket.offset).deinitialize(count: 1)
+        unsafe (keys + bucket.offset).deinitialize(count: 1)
       }
     }
     if !_isPOD(Value.self) {
       let values = self._values
       for bucket in _hashTable {
-        (values + bucket.offset).deinitialize(count: 1)
+        unsafe (values + bucket.offset).deinitialize(count: 1)
       }
     }
     _count = 0
@@ -283,7 +283,7 @@ final internal class _DictionaryStorage<Key: Hashable, Value>
   final internal var _keys: UnsafeMutablePointer<Key> {
     @inline(__always)
     get {
-      return self._rawKeys.assumingMemoryBound(to: Key.self)
+      return unsafe self._rawKeys.assumingMemoryBound(to: Key.self)
     }
   }
 
@@ -291,7 +291,7 @@ final internal class _DictionaryStorage<Key: Hashable, Value>
   final internal var _values: UnsafeMutablePointer<Value> {
     @inline(__always)
     get {
-      return self._rawValues.assumingMemoryBound(to: Value.self)
+      return unsafe self._rawValues.assumingMemoryBound(to: Value.self)
     }
   }
 
@@ -332,7 +332,7 @@ final internal class _DictionaryStorage<Key: Hashable, Value>
     defer { _fixLifetime(self) }
     let hashTable = _hashTable
 
-    var theState = state.pointee
+    var theState = unsafe state.pointee
     if theState.state == 0 {
       theState.state = 1 // Arbitrary non-zero value.
       theState.itemsPtr = AutoreleasingUnsafeMutablePointer(objects)
@@ -356,14 +356,14 @@ final internal class _DictionaryStorage<Key: Hashable, Value>
     for i in 0..<count {
       if bucket == endBucket { break }
 
-      let key = _keys[bucket.offset]
+      let key = unsafe _keys[bucket.offset]
       unmanagedObjects[i] = _bridgeAnythingToObjectiveC(key)
 
       stored += 1
       bucket = hashTable.occupiedBucket(after: bucket)
     }
     theState.extra.0 = CUnsignedLong(bucket.offset)
-    state.pointee = theState
+    unsafe state.pointee = theState
     return stored
   }
 

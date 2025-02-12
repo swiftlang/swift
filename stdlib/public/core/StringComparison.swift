@@ -171,7 +171,7 @@ private func _stringCompareFastUTF8Abnormal(
     _findBoundary(utf8Right, before: diffIdx))
   _internalInvariant(boundaryIdx <= diffIdx)
 
-  return _stringCompareSlow(
+  return unsafe _stringCompareSlow(
     UnsafeBufferPointer(rebasing: utf8Left[boundaryIdx...]),
     UnsafeBufferPointer(rebasing: utf8Right[boundaryIdx...]),
     expecting: expecting)
@@ -220,7 +220,7 @@ private func _findDiffIdx(
   let count = Swift.min(left.count, right.count)
   var idx = 0
   while idx < count {
-    guard left[_unchecked: idx] == right[_unchecked: idx] else {
+    guard unsafe left[_unchecked: idx] == right[_unchecked: idx] else {
       return idx
     }
     idx &+= 1
@@ -250,7 +250,7 @@ private func _findBoundary(
   }
 
   // Back up to scalar boundary
-  while UTF8.isContinuation(utf8[_unchecked: idx]) {
+  while unsafe UTF8.isContinuation(utf8[_unchecked: idx]) {
     idx &-= 1
   }
 
@@ -297,7 +297,7 @@ internal enum _StringComparisonResult {
 internal func _binaryCompare<UInt8>(
   _ lhs: UnsafeBufferPointer<UInt8>, _ rhs: UnsafeBufferPointer<UInt8>
 ) -> Int {
-  var cmp = Int(truncatingIfNeeded:
+  var cmp = unsafe Int(truncatingIfNeeded:
     _swift_stdlib_memcmp(
       lhs.baseAddress._unsafelyUnwrappedUnchecked,
       rhs.baseAddress._unsafelyUnwrappedUnchecked,

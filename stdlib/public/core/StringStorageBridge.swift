@@ -24,12 +24,12 @@ extension String {
     let knownOther = _KnownCocoaString(_nativeStorage)
     switch knownOther {
     case .storage:
-      self = _unsafeUncheckedDowncast(
+      self = unsafe _unsafeUncheckedDowncast(
         _nativeStorage,
         to: __StringStorage.self
       ).asString
     case .shared:
-      self = _unsafeUncheckedDowncast(
+      self = unsafe _unsafeUncheckedDowncast(
         _nativeStorage,
         to: __SharedStringStorage.self
       ).asString
@@ -57,7 +57,7 @@ extension _AbstractStringStorage {
     let range = Range(
       _uncheckedBounds: (aRange.location, aRange.location+aRange.length))
     let str = asString
-    str._copyUTF16CodeUnits(
+    unsafe str._copyUTF16CodeUnits(
       into: UnsafeMutableBufferPointer(start: buffer, count: range.count),
       range: range)
   }
@@ -71,8 +71,8 @@ extension _AbstractStringStorage {
     case (_cocoaASCIIEncoding, true),
          (_cocoaUTF8Encoding, _):
       guard maxLength >= count + 1 else { return 0 }
-      outputPtr.initialize(from: start, count: count)
-      outputPtr[count] = 0
+      unsafe outputPtr.initialize(from: start, count: count)
+      unsafe outputPtr[count] = 0
       return 1
     default:
       return  _cocoaGetCStringTrampoline(self, outputPtr, maxLength, encoding)
@@ -118,10 +118,10 @@ extension _AbstractStringStorage {
     let knownOther = _KnownCocoaString(other)
     switch knownOther {
     case .storage:
-      return _nativeIsEqual(
+      return unsafe _nativeIsEqual(
         _unsafeUncheckedDowncast(other, to: __StringStorage.self))
     case .shared:
-      return _nativeIsEqual(
+      return unsafe _nativeIsEqual(
         _unsafeUncheckedDowncast(other, to: __SharedStringStorage.self))
     default:
           // We're allowed to crash, but for compatibility reasons NSCFString allows

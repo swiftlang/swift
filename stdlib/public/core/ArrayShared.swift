@@ -155,7 +155,7 @@ extension _ArrayBufferProtocol {
         var p = rawMemory
         var q = newValues.startIndex
         for _ in 0..<count {
-          p.initialize(to: newValues[q])
+          unsafe p.initialize(to: newValues[q])
           newValues.formIndex(after: &q)
           p += 1
         }
@@ -301,24 +301,24 @@ extension _ArrayBufferProtocol {
       // its real first element
       let backingStart = backing.firstElementAddress
       let sourceOffset = sourceStart - backingStart
-      backingStart.deinitialize(count: sourceOffset)
+      unsafe backingStart.deinitialize(count: sourceOffset)
 
       // Move the head items
-      destStart.moveInitialize(from: sourceStart, count: headCount)
+      unsafe destStart.moveInitialize(from: sourceStart, count: headCount)
 
       // Destroy unused source items
-      oldStart.deinitialize(count: oldCount)
+      unsafe oldStart.deinitialize(count: oldCount)
 
       initializeNewElements(newStart, newCount)
 
       // Move the tail items
-      newEnd.moveInitialize(from: oldStart + oldCount, count: tailCount)
+      unsafe newEnd.moveInitialize(from: oldStart + oldCount, count: tailCount)
 
       // Destroy any items that may be lurking in a _SliceBuffer after
       // its real last element
       let backingEnd = backingStart + backing.count
       let sourceEnd = sourceStart + sourceCount
-      sourceEnd.deinitialize(count: backingEnd - sourceEnd)
+      unsafe sourceEnd.deinitialize(count: backingEnd - sourceEnd)
       backing.count = 0
     }
     else {
@@ -383,7 +383,7 @@ extension _ArrayBufferProtocol {
 
       // fill while there is another item and spare capacity
       while let next = nextItem, newCount < currentCapacity {
-        (base + newCount).initialize(to: next)
+        unsafe (base + newCount).initialize(to: next)
         newCount += 1
         nextItem = stream.next()
       }

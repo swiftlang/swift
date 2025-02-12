@@ -34,7 +34,7 @@ where Header == _BridgingBufferHeader, Element == AnyObject {
       _uncheckedBufferClass: __BridgingBufferStorage.self,
       minimumCapacity: count)
     self.withUnsafeMutablePointerToHeader {
-      $0.initialize(to: Header(count))
+      unsafe $0.initialize(to: Header(count))
     }
   }
 
@@ -52,7 +52,7 @@ where Header == _BridgingBufferHeader, Element == AnyObject {
   internal subscript(i: Int) -> Element {
     @inline(__always)
     get {
-      return withUnsafeMutablePointerToElements { $0[i] }
+      return withUnsafeMutablePointerToElements { unsafe $0[i] }
     }
   }
 

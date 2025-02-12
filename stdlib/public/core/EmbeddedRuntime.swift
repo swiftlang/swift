@@ -171,9 +171,9 @@ public func swift_allocObject(metadata: Builtin.RawPointer, requiredSize: Int, r
 
 func swift_allocObject(metadata: UnsafeMutablePointer<ClassMetadata>, requiredSize: Int, requiredAlignmentMask: Int) -> UnsafeMutablePointer<HeapObject> {
   let p = swift_slowAlloc(requiredSize, requiredAlignmentMask)!
-  let object = p.assumingMemoryBound(to: HeapObject.self)
+  let object = unsafe p.assumingMemoryBound(to: HeapObject.self)
   _swift_embedded_set_heap_object_metadata_pointer(object, metadata)
-  object.pointee.refcount = 1
+  unsafe object.pointee.refcount = 1
   return object
 }
 
@@ -192,7 +192,7 @@ public func swift_deallocClassInstance(object: Builtin.RawPointer, allocatedSize
 }
 
 func swift_deallocClassInstance(object: UnsafeMutablePointer<HeapObject>, allocatedSize: Int, allocatedAlignMask: Int) {
-  if (object.pointee.refcount & HeapObject.doNotFreeBit) != 0 {
+  if (unsafe object.pointee.refcount & HeapObject.doNotFreeBit) != 0 {
     return
   }
 
@@ -205,10 +205,10 @@ public func swift_deallocPartialClassInstance(object: Builtin.RawPointer, metada
 }
 
 func swift_deallocPartialClassInstance(object: UnsafeMutablePointer<HeapObject>, metadata: UnsafeMutablePointer<ClassMetadata>, allocatedSize: Int, allocatedAlignMask: Int) {
-  var classMetadata = _swift_embedded_get_heap_object_metadata_pointer(object).assumingMemoryBound(to: ClassMetadata.self)
+  var classMetadata = unsafe _swift_embedded_get_heap_object_metadata_pointer(object).assumingMemoryBound(to: ClassMetadata.self)
   while classMetadata != metadata {
     _swift_embedded_invoke_heap_object_optional_ivardestroyer(object, classMetadata)
-    guard let superclassMetadata = classMetadata.pointee.superclassMetadata else { break }
+    guard let superclassMetadata = unsafe classMetadata.pointee.superclassMetadata else { break }
     classMetadata = superclassMetadata
   }
 }
@@ -220,7 +220,7 @@ public func swift_initStaticObject(metadata: Builtin.RawPointer, object: Builtin
 
 func swift_initStaticObject(metadata: UnsafeMutablePointer<ClassMetadata>, object: UnsafeMutablePointer<HeapObject>) -> UnsafeMutablePointer<HeapObject> {
   _swift_embedded_set_heap_object_metadata_pointer(object, metadata)
-  object.pointee.refcount = HeapObject.immortalRefCount | HeapObject.doNotFreeBit
+  unsafe object.pointee.refcount = HeapObject.immortalRefCount | HeapObject.doNotFreeBit
   return object
 }
 
@@ -231,7 +231,7 @@ public func swift_initStackObject(metadata: Builtin.RawPointer, object: Builtin.
 
 func swift_initStackObject(metadata: UnsafeMutablePointer<ClassMetadata>, object: UnsafeMutablePointer<HeapObject>) -> UnsafeMutablePointer<HeapObject> {
   _swift_embedded_set_heap_object_metadata_pointer(object, metadata)
-  object.pointee.refcount = 1 | HeapObject.doNotFreeBit
+  unsafe object.pointee.refcount = 1 | HeapObject.doNotFreeBit
   return object
 }
 
@@ -256,11 +256,11 @@ public func swift_setDeallocating(object: Builtin.RawPointer) {
 
 @_cdecl("swift_dynamicCastClass")
 public func swift_dynamicCastClass(object: UnsafeMutableRawPointer, targetMetadata: UnsafeRawPointer) -> UnsafeMutableRawPointer? {
-  let sourceObj = object.assumingMemoryBound(to: HeapObject.self)
-  var type = _swift_embedded_get_heap_object_metadata_pointer(sourceObj).assumingMemoryBound(to: ClassMetadata.self)
-  let targetType = targetMetadata.assumingMemoryBound(to: ClassMetadata.self)
+  let sourceObj = unsafe object.assumingMemoryBound(to: HeapObject.self)
+  var type = unsafe _swift_embedded_get_heap_object_metadata_pointer(sourceObj).assumingMemoryBound(to: ClassMetadata.self)
+  let targetType = unsafe targetMetadata.assumingMemoryBound(to: ClassMetadata.self)
   while type != targetType {
-    guard let superType = type.pointee.superclassMetadata else {
+    guard let superType = unsafe type.pointee.superclassMetadata else {
       return nil
     }
     type = UnsafeMutablePointer(superType)
@@ -416,7 +416,7 @@ public func swift_retainCount(object: Builtin.RawPointer) -> Int {
 
 fileprivate func refcountPointer(for object: UnsafeMutablePointer<HeapObject>) -> UnsafeMutablePointer<Int> {
   // TODO: This should use MemoryLayout<HeapObject>.offset(to: \.refcount) but we don't have KeyPaths yet
-  return UnsafeMutablePointer<Int>(UnsafeRawPointer(object).advanced(by: MemoryLayout<Int>.size)._rawValue)
+  return unsafe UnsafeMutablePointer<Int>(UnsafeRawPointer(object).advanced(by: MemoryLayout<Int>.size)._rawValue)
 }
 
 fileprivate func loadRelaxed(_ atomic: UnsafeMutablePointer<Int>) -> Int {
@@ -519,9 +519,9 @@ public func swift_clearSensitive(buf: UnsafeMutableRawPointer, nbytes: Int) {
   // TODO: use memset_s if available
   // Though, it shouldn't make too much difference because the `@inline(never)` should prevent
   // the optimizer from removing the loop below.
-  let bytePtr = buf.assumingMemoryBound(to: UInt8.self)
+  let bytePtr = unsafe buf.assumingMemoryBound(to: UInt8.self)
   for i in 0..<nbytes {
-    bytePtr[i] = 0
+    unsafe bytePtr[i] = 0
   }
 }
 

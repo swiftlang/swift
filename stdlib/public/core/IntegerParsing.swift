@@ -34,7 +34,7 @@ internal func _parseIntegerDigits<Result: FixedWidthInteger>(
   }
   let multiplicand = Result(truncatingIfNeeded: radix)
   var result = 0 as Result
-  for digit in codeUnits {
+  for digit in unsafe codeUnits {
     let digitValue: Result
     if _fastPath(digit >= _0 && digit < numericalUpperBound) {
       digitValue = Result(truncatingIfNeeded: digit &- _0)
@@ -66,14 +66,14 @@ internal func _parseInteger<Result: FixedWidthInteger>(
   // ASCII constants, named for clarity:
   let _plus = 43 as UInt8, _minus = 45 as UInt8
   
-  let first = codeUnits[0]
+  let first = unsafe codeUnits[0]
   if first == _minus {
-    return _parseIntegerDigits(
+    return unsafe _parseIntegerDigits(
       ascii: UnsafeBufferPointer(rebasing: codeUnits[1...]),
       radix: radix, isNegative: true)
   }
   if first == _plus {
-    return _parseIntegerDigits(
+    return unsafe _parseIntegerDigits(
       ascii: UnsafeBufferPointer(rebasing: codeUnits[1...]),
       radix: radix, isNegative: false)
   }

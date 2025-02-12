@@ -17,7 +17,7 @@ import SwiftShims
 internal func _isClassType(_ type: Any.Type) -> Bool {
   // a thick metatype is represented with a pointer metadata structure,
   // so this unsafeBitCast is a safe operation here.
-  return swift_isClassType(unsafeBitCast(type, to: UnsafeRawPointer.self))
+  return unsafe swift_isClassType(unsafeBitCast(type, to: UnsafeRawPointer.self))
 }
 
 @_silgen_name("swift_getMetadataKind")
@@ -88,8 +88,8 @@ internal func _getClassPlaygroundQuickLook(
   _ object: AnyObject
 ) -> _PlaygroundQuickLook? {
   if _is(object, kindOf: "NSNumber") {
-    let number: _NSNumber = unsafeBitCast(object, to: _NSNumber.self)
-    switch UInt8(number.objCType[0]) {
+    let number: _NSNumber = unsafe unsafeBitCast(object, to: _NSNumber.self)
+    switch unsafe UInt8(number.objCType[0]) {
     case UInt8(ascii: "d"):
       return .double(number.doubleValue)
     case UInt8(ascii: "f"):
@@ -365,7 +365,7 @@ public func _forEachFieldWithKeyPath<Root>(
         hasReferencePrefix: false,
         isSingleComponent: true
       ))
-      let component = RawKeyPathComponent(
+      let component = unsafe RawKeyPathComponent(
            header: RawKeyPathComponent.Header(stored: .struct,
                                               mutable: field.isVar,
                                               inlineOffset: UInt32(offset)),

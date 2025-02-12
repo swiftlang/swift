@@ -54,14 +54,14 @@ internal struct _UnmanagedAnyObjectArray {
 
   internal subscript(i: Int) -> AnyObject {
     get {
-      let unmanaged = value.load(
+      let unmanaged = unsafe value.load(
         fromByteOffset: i * MemoryLayout<AnyObject>.stride,
         as: Unmanaged<AnyObject>.self)
-      return unmanaged.takeUnretainedValue()
+      return unsafe unmanaged.takeUnretainedValue()
     }
     nonmutating set(newValue) {
-      let unmanaged = Unmanaged.passUnretained(newValue)
-      value.storeBytes(of: unmanaged,
+      let unmanaged = unsafe Unmanaged.passUnretained(newValue)
+      unsafe value.storeBytes(of: unmanaged,
         toByteOffset: i * MemoryLayout<AnyObject>.stride,
         as: Unmanaged<AnyObject>.self)
     }
@@ -94,13 +94,13 @@ final internal class __SwiftEmptyNSEnumerator
   ) -> Int {
     // Even though we never do anything in here, we need to update the
     // state so that callers know we actually ran.
-    var theState = state.pointee
+    var theState = unsafe state.pointee
     if theState.state == 0 {
       theState.state = 1 // Arbitrary non-zero value.
       theState.itemsPtr = AutoreleasingUnsafeMutablePointer(objects)
       theState.mutationsPtr = _fastEnumerationStorageMutationsPtr
     }
-    state.pointee = theState
+    unsafe state.pointee = theState
     return 0
   }
 }
@@ -135,12 +135,12 @@ internal final class __BridgingHashBuffer
     let buffer = self.create(minimumCapacity: hashTable.bucketCount) { _ in
       Header(owner: owner, hashTable: hashTable)
     }
-    return unsafeDowncast(buffer, to: __BridgingHashBuffer.self)
+    return unsafe unsafeDowncast(buffer, to: __BridgingHashBuffer.self)
   }
 
   deinit {
     for bucket in header.hashTable {
-      (firstElementAddress + bucket.offset).deinitialize(count: 1)
+      unsafe (firstElementAddress + bucket.offset).deinitialize(count: 1)
     }
     _fixLifetime(self)
   }
@@ -149,14 +149,14 @@ internal final class __BridgingHashBuffer
     @inline(__always) get {
       _internalInvariant(header.hashTable.isOccupied(bucket))
       defer { _fixLifetime(self) }
-      return firstElementAddress[bucket.offset]
+      return unsafe firstElementAddress[bucket.offset]
     }
   }
 
   @inline(__always)
   internal func initialize(at bucket: _HashTable.Bucket, to object: AnyObject) {
     _internalInvariant(header.hashTable.isOccupied(bucket))
-    (firstElementAddress + bucket.offset).initialize(to: object)
+    unsafe (firstElementAddress + bucket.offset).initialize(to: object)
     _fixLifetime(self)
   }
 }

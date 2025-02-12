@@ -20,7 +20,7 @@ public final class _stdlib_AtomicInt {
   internal var _value: Int
 
   internal var _valuePtr: UnsafeMutablePointer<Int> {
-    return _getUnsafePointerToStoredProperties(self).assumingMemoryBound(
+    return unsafe _getUnsafePointerToStoredProperties(self).assumingMemoryBound(
       to: Int.self)
   }
 
@@ -70,14 +70,14 @@ internal func _swift_stdlib_atomicCompareExchangeStrongInt(
   desired: Int) -> Bool {
 #if _pointerBitWidth(_64)
   let (oldValue, won) = Builtin.cmpxchg_seqcst_seqcst_Int64(
-    target._rawValue, expected.pointee._value, desired._value)
+    target._rawValue, unsafe expected.pointee._value, desired._value)
 #elseif _pointerBitWidth(_32)
   let (oldValue, won) = Builtin.cmpxchg_seqcst_seqcst_Int32(
-    target._rawValue, expected.pointee._value, desired._value)
+    target._rawValue, unsafe expected.pointee._value, desired._value)
 #else
 #error("Unknown platform")
 #endif
-  expected.pointee._value = oldValue
+  unsafe expected.pointee._value = oldValue
   return Bool(won)
 }
 
@@ -122,11 +122,11 @@ func _swift_stdlib_atomicFetch${operation}Int(
   let rawTarget = UnsafeMutableRawPointer(target)
 #if _pointerBitWidth(_64)
   let value = _swift_stdlib_atomicFetch${operation}Int64(
-    object: rawTarget.assumingMemoryBound(to: Int64.self),
+    object: unsafe rawTarget.assumingMemoryBound(to: Int64.self),
     operand: Int64(operand))
 #elseif _pointerBitWidth(_32)
   let value = _swift_stdlib_atomicFetch${operation}Int32(
-    object: rawTarget.assumingMemoryBound(to: Int32.self),
+    object: unsafe rawTarget.assumingMemoryBound(to: Int32.self),
     operand: Int32(operand))
 #else
 #error("Unknown platform")

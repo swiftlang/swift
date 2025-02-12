@@ -233,7 +233,7 @@ extension String.UTF8View: BidirectionalCollection {
   @_alwaysEmitIntoClient @inline(__always)
   internal subscript(_unchecked i: Index) -> UTF8.CodeUnit {
     if _fastPath(_guts.isFastUTF8) {
-      return _guts.withFastUTF8 { utf8 in utf8[_unchecked: i._encodedOffset] }
+      return _guts.withFastUTF8 { utf8 in unsafe utf8[_unchecked: i._encodedOffset] }
     }
 
     return _foreignSubscript(position: i)
@@ -278,7 +278,7 @@ extension String {
     @_effects(readonly) @_semantics("string.getUTF8CString")
     get {
       if _fastPath(_guts.isFastUTF8) {
-        var result = _guts.withFastCChar { ContiguousArray($0) }
+        var result = _guts.withFastCChar { unsafe ContiguousArray($0) }
         result.append(0)
         return result
       }
@@ -422,7 +422,7 @@ extension String.UTF8View {
   public func _copyContents(
     initializing buffer: UnsafeMutableBufferPointer<Iterator.Element>
   ) -> (Iterator, UnsafeMutableBufferPointer<Iterator.Element>.Index) {
-    guard buffer.baseAddress != nil else {
+    guard unsafe buffer.baseAddress != nil else {
         _preconditionFailure(
           "Attempt to copy string contents into nil buffer pointer")
     }
@@ -432,7 +432,7 @@ extension String.UTF8View {
     }
 
     let it = String().utf8.makeIterator()
-    return (it, buffer.index(buffer.startIndex, offsetBy: written))
+    return (it, unsafe buffer.index(buffer.startIndex, offsetBy: written))
   }
 }
 

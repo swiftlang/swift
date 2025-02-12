@@ -20,7 +20,7 @@ internal func _allASCII(_ input: UnsafeBufferPointer<UInt8>) -> Bool {
   // TODO(String performance): SIMD-ize
   //
   let count = input.count
-  var ptr = UnsafeRawPointer(input.baseAddress._unsafelyUnwrappedUnchecked)
+  var ptr = unsafe UnsafeRawPointer(input.baseAddress._unsafelyUnwrappedUnchecked)
 
   let asciiMask64 = 0x8080_8080_8080_8080 as UInt64
   let asciiMask32 = UInt32(truncatingIfNeeded: asciiMask64)
@@ -35,7 +35,7 @@ internal func _allASCII(_ input: UnsafeBufferPointer<UInt8>) -> Bool {
 
   
   while ptr < end128 {
-    let pair = ptr.loadUnaligned(as: (UInt64, UInt64).self)
+    let pair = unsafe ptr.loadUnaligned(as: (UInt64, UInt64).self)
     let result = (pair.0 | pair.1) & asciiMask64
     guard result == 0 else { return false }
     ptr = ptr + MemoryLayout<(UInt64, UInt64)>.stride
@@ -44,25 +44,25 @@ internal func _allASCII(_ input: UnsafeBufferPointer<UInt8>) -> Bool {
   // If we had enough bytes for two iterations of this, we would have hit
   // the loop above, so we only need to do this once
   if ptr < end64 {
-    let value = ptr.loadUnaligned(as: UInt64.self)
+    let value = unsafe ptr.loadUnaligned(as: UInt64.self)
     guard value & asciiMask64 == 0 else { return false }
     ptr = ptr + MemoryLayout<UInt64>.stride
   }
   
   if ptr < end32 {
-    let value = ptr.loadUnaligned(as: UInt32.self)
+    let value = unsafe ptr.loadUnaligned(as: UInt32.self)
     guard value & asciiMask32 == 0 else { return false }
     ptr = ptr + MemoryLayout<UInt32>.stride
   }
   
   if ptr < end16 {
-    let value = ptr.loadUnaligned(as: UInt16.self)
+    let value = unsafe ptr.loadUnaligned(as: UInt16.self)
     guard value & asciiMask16 == 0 else { return false }
     ptr = ptr + MemoryLayout<UInt16>.stride
   }
 
   if ptr < end {
-    let value = ptr.loadUnaligned(fromByteOffset: 0, as: UInt8.self)
+    let value = unsafe ptr.loadUnaligned(fromByteOffset: 0, as: UInt8.self)
     guard value & asciiMask8 == 0 else { return false }
   }
   _internalInvariant(ptr == end || ptr + 1 == end)
@@ -192,7 +192,7 @@ extension String {
     // into a StringStorage space.
     var contents: [UInt8] = []
     contents.reserveCapacity(input.count)
-    let repaired = transcode(
+    let repaired = unsafe transcode(
       input.makeIterator(),
       from: UTF16.self,
       to: UTF8.self,
@@ -262,7 +262,7 @@ extension String {
     if let contigBytes = input as? _HasContiguousBytes,
       contigBytes._providesContiguousBytesNoCopy {
       return resultOrSlow(contigBytes.withUnsafeBytes { rawBufPtr in
-        let buffer = UnsafeBufferPointer(
+        let buffer = unsafe UnsafeBufferPointer(
           start: rawBufPtr.baseAddress?.assumingMemoryBound(to: UInt8.self),
           count: rawBufPtr.count)
         return String._fromASCIIValidating(buffer)
@@ -273,14 +273,14 @@ extension String {
     // Fast path for user-defined Collections
     if let strOpt = input.withContiguousStorageIfAvailable({
       (buffer: UnsafeBufferPointer<Input.Element>) -> String? in
-      return String._fromASCIIValidating(
+      return unsafe String._fromASCIIValidating(
         UnsafeRawBufferPointer(buffer).bindMemory(to: UInt8.self))
     }) {
       return resultOrSlow(strOpt)
     }
 
     return resultOrSlow(Array(input).withUnsafeBufferPointer {
-        let buffer = UnsafeRawBufferPointer($0).bindMemory(to: UInt8.self)
+        let buffer = unsafe UnsafeRawBufferPointer($0).bindMemory(to: UInt8.self)
         return String._fromASCIIValidating(buffer)
       })
   }
@@ -289,7 +289,7 @@ extension String {
   static func _fromInvalidUTF16(
     _ utf16: UnsafeBufferPointer<UInt16>
   ) -> String {
-    return String._fromCodeUnits(utf16, encoding: UTF16.self, repair: true)!.0
+    return unsafe String._fromCodeUnits(utf16, encoding: UTF16.self, repair: true)!.0
   }
 
   @usableFromInline
@@ -345,11 +345,11 @@ extension String {
     var written = buffer.startIndex
 
     var parser = Encoding.ForwardParser()
-    var input = input.makeIterator()
+    var input = unsafe input.makeIterator()
 
     transcodingLoop:
     while true {
-      switch parser.parseScalar(from: &input) {
+      switch unsafe parser.parseScalar(from: &input) {
       case .valid(let s):
         let scalar = Encoding.decode(s)
         guard let utf8 = Unicode.UTF8.encode(scalar) else {
@@ -360,29 +360,29 @@ extension String {
           let newCapacity = buffer.count + (buffer.count >> 1)
           let copy: UnsafeMutableBufferPointer<UInt8>
           copy = UnsafeMutableBufferPointer.allocate(capacity: newCapacity)
-          let copied = copy.moveInitialize(
+          let copied = unsafe copy.moveInitialize(
             fromContentsOf: buffer.prefix(upTo: written)
           )
-          buffer.deallocate()
+          unsafe buffer.deallocate()
           buffer = copy
           written = copied
         }
         if isASCII && utf8.count > 1 {
           isASCII = false
         }
-        written = buffer.suffix(from: written).initialize(fromContentsOf: utf8)
+        written = unsafe buffer.suffix(from: written).initialize(fromContentsOf: utf8)
         break
       case .error:
         // validation error: clean up and return nil
-        buffer.prefix(upTo: written).deinitialize()
-        buffer.deallocate()
+        unsafe buffer.prefix(upTo: written).deinitialize()
+        unsafe buffer.deallocate()
         return nil
       case .emptyInput:
         break transcodingLoop
       }
     }
 
-    let storage = buffer.baseAddress.map {
+    let storage = unsafe buffer.baseAddress.map {
       __SharedStringStorage(
         _mortal: $0,
         countAndFlags: _StringObject.CountAndFlags(

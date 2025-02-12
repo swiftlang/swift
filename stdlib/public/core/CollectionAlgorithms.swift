@@ -400,7 +400,7 @@ extension MutableCollection where Self: BidirectionalCollection {
   ) rethrows -> Index {
     let maybeOffset = try withContiguousMutableStorageIfAvailable {
       (bufferPointer) -> Int in
-      let unsafeBufferPivot = try bufferPointer._partitionImpl(
+      let unsafeBufferPivot = try unsafe bufferPointer._partitionImpl(
         by: belongsInSecondPartition)
       return unsafeBufferPivot - bufferPointer.startIndex
     }

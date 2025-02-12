@@ -37,7 +37,7 @@ public func readLine(strippingNewline: Bool = true) -> String? {
   guard utf8Count > 0 else {
     return nil
   }
-  let utf8Buffer = UnsafeBufferPointer(start: utf8Start, count: utf8Count)
+  let utf8Buffer = unsafe UnsafeBufferPointer(start: utf8Start, count: utf8Count)
   var result = String._fromUTF8Repairing(utf8Buffer).result
   if strippingNewline, result.last == "\n" || result.last == "\r\n" {
     _ = result.removeLast()

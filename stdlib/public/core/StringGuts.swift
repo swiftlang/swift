@@ -175,7 +175,7 @@ extension _StringGuts {
     _ f: (UnsafeBufferPointer<UInt8>) throws -> R
   ) rethrows -> R {
     return try self.withFastUTF8 { wholeUTF8 in
-      return try f(UnsafeBufferPointer(rebasing: wholeUTF8[range]))
+      return try f(unsafe UnsafeBufferPointer(rebasing: wholeUTF8[range]))
     }
   }
 
@@ -184,7 +184,7 @@ extension _StringGuts {
     _ f: (UnsafeBufferPointer<CChar>) throws -> R
   ) rethrows -> R {
     return try self.withFastUTF8 { utf8 in
-      return try utf8.withMemoryRebound(to: CChar.self, f)
+      return try unsafe utf8.withMemoryRebound(to: CChar.self, f)
     }
   }
 }
@@ -226,7 +226,7 @@ extension _StringGuts {
     }
 
     return try self.withFastCChar {
-      return try body($0.baseAddress._unsafelyUnwrappedUnchecked)
+      return try unsafe body($0.baseAddress._unsafelyUnwrappedUnchecked)
     }
   }
 
@@ -237,7 +237,7 @@ extension _StringGuts {
   ) rethrows -> Result {
     _internalInvariant(!_object.isFastZeroTerminated)
     return try String(self).utf8CString.withUnsafeBufferPointer {
-      let ptr = $0.baseAddress._unsafelyUnwrappedUnchecked
+      let ptr = unsafe $0.baseAddress._unsafelyUnwrappedUnchecked
       return try body(ptr)
     }
   }
@@ -248,13 +248,13 @@ extension _StringGuts {
   // Contents of the buffer are unspecified if nil is returned.
   @inlinable
   internal func copyUTF8(into mbp: UnsafeMutableBufferPointer<UInt8>) -> Int? {
-    let ptr = mbp.baseAddress._unsafelyUnwrappedUnchecked
+    let ptr = unsafe mbp.baseAddress._unsafelyUnwrappedUnchecked
     if _fastPath(self.isFastUTF8) {
       return self.withFastUTF8 { utf8 in
         guard utf8.count <= mbp.count else { return nil }
 
-        let utf8Start = utf8.baseAddress._unsafelyUnwrappedUnchecked
-        ptr.initialize(from: utf8Start, count: utf8.count)
+        let utf8Start = unsafe utf8.baseAddress._unsafelyUnwrappedUnchecked
+        unsafe ptr.initialize(from: utf8Start, count: utf8.count)
         return utf8.count
       }
     }
@@ -276,11 +276,11 @@ extension _StringGuts {
     // If the NSString contains invalid UTF8 (e.g. unpaired surrogates), we
     // can get nil from cocoaStringCopyUTF8 in situations where a character by
     // character loop would get something more useful like repaired contents
-    var ptr = mbp.baseAddress._unsafelyUnwrappedUnchecked
+    var ptr = unsafe mbp.baseAddress._unsafelyUnwrappedUnchecked
     var numWritten = 0
     for cu in String(self).utf8 {
       guard numWritten < mbp.count else { return nil }
-      ptr.initialize(to: cu)
+      unsafe ptr.initialize(to: cu)
       ptr += 1
       numWritten += 1
     }
@@ -433,7 +433,7 @@ extension _StringGuts {
   // FIXME: Mark as obsoleted. Still used by swift-corelibs-foundation.
   @available(*, deprecated)
   public var startASCII: UnsafeMutablePointer<UInt8> {
-    return UnsafeMutablePointer(mutating: _object.fastUTF8.baseAddress!)
+    return unsafe UnsafeMutablePointer(mutating: _object.fastUTF8.baseAddress!)
   }
 
   // FIXME: Previously used by swift-corelibs-foundation. Aging for removal.
@@ -449,7 +449,7 @@ public func _persistCString(_ p: UnsafePointer<CChar>?) -> [CChar]? {
   guard let s = p else { return nil }
   let bytesToCopy = UTF8._nullCodeUnitOffset(in: s) + 1 // +1 for the terminating NUL
   let result = [CChar](unsafeUninitializedCapacity: bytesToCopy) { buf, initedCount in
-    buf.baseAddress!.update(from: s, count: bytesToCopy)
+    unsafe buf.baseAddress!.update(from: s, count: bytesToCopy)
     initedCount = bytesToCopy
   }
   return result

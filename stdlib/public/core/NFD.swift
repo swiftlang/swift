@@ -370,7 +370,7 @@ extension Unicode._NFDNormalizer {
 
     while utf8.count > 0 {
       let (scalar, len) = _decodeScalar(utf8, startingAt: 0)
-      utf8 = UnsafeBufferPointer(rebasing: utf8[len...])
+      utf8 = unsafe UnsafeBufferPointer(rebasing: utf8[len...])
 
       // Fast path: Because this will be emitted into the completed NFD buffer,
       // we don't need to look at NFD_QC anymore which lets us do a larger

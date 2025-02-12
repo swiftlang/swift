@@ -28,11 +28,11 @@ func _stdlib_atomicCompareExchangeStrongPtr(
   desired: UnsafeRawPointer?
 ) -> Bool {
   // We use Builtin.Word here because Builtin.RawPointer can't be nil.
-  let (oldValue, won) = Builtin.cmpxchg_seqcst_seqcst_Word(
+  let (oldValue, won) = unsafe Builtin.cmpxchg_seqcst_seqcst_Word(
     target._rawValue,
     UInt(bitPattern: expected.pointee)._builtinWordValue,
     UInt(bitPattern: desired)._builtinWordValue)
-  expected.pointee = UnsafeRawPointer(bitPattern: Int(oldValue))
+  unsafe expected.pointee = UnsafeRawPointer(bitPattern: Int(oldValue))
   return Bool(won)
 }
 
@@ -70,9 +70,9 @@ func _stdlib_atomicCompareExchangeStrongPtr<T>(
   expected: UnsafeMutablePointer<UnsafeMutablePointer<T>>,
   desired: UnsafeMutablePointer<T>
 ) -> Bool {
-  let rawTarget = UnsafeMutableRawPointer(target).assumingMemoryBound(
+  let rawTarget = unsafe UnsafeMutableRawPointer(target).assumingMemoryBound(
     to: Optional<UnsafeRawPointer>.self)
-  let rawExpected = UnsafeMutableRawPointer(expected).assumingMemoryBound(
+  let rawExpected = unsafe UnsafeMutableRawPointer(expected).assumingMemoryBound(
     to: Optional<UnsafeRawPointer>.self)
   return _stdlib_atomicCompareExchangeStrongPtr(
     object: rawTarget,
@@ -114,9 +114,9 @@ func _stdlib_atomicCompareExchangeStrongPtr<T>(
   expected: UnsafeMutablePointer<UnsafeMutablePointer<T>?>,
   desired: UnsafeMutablePointer<T>?
 ) -> Bool {
-  let rawTarget = UnsafeMutableRawPointer(target).assumingMemoryBound(
+  let rawTarget = unsafe UnsafeMutableRawPointer(target).assumingMemoryBound(
     to: Optional<UnsafeRawPointer>.self)
-  let rawExpected = UnsafeMutableRawPointer(expected).assumingMemoryBound(
+  let rawExpected = unsafe UnsafeMutableRawPointer(expected).assumingMemoryBound(
     to: Optional<UnsafeRawPointer>.self)
   return _stdlib_atomicCompareExchangeStrongPtr(
     object: rawTarget,
@@ -135,9 +135,9 @@ func _stdlib_atomicInitializeARCRef(
   // Note: this assumes that AnyObject? is layout-compatible with a RawPointer
   // that simply points to the same memory.
   var expected: UnsafeRawPointer? = nil
-  let unmanaged = Unmanaged.passRetained(desired)
+  let unmanaged = unsafe Unmanaged.passRetained(desired)
   let desiredPtr = unmanaged.toOpaque()
-  let rawTarget = UnsafeMutableRawPointer(target).assumingMemoryBound(
+  let rawTarget = unsafe UnsafeMutableRawPointer(target).assumingMemoryBound(
     to: Optional<UnsafeRawPointer>.self)
   let wonRace = withUnsafeMutablePointer(to: &expected) {
     _stdlib_atomicCompareExchangeStrongPtr(
@@ -147,7 +147,7 @@ func _stdlib_atomicInitializeARCRef(
   if !wonRace {
     // Some other thread initialized the value.  Balance the retain that we
     // performed on 'desired'.
-    unmanaged.release()
+    unsafe unmanaged.release()
   }
   return wonRace
 }
@@ -160,7 +160,7 @@ func _stdlib_atomicLoadARCRef(
 ) -> AnyObject? {
   let value = Builtin.atomicload_seqcst_Word(target._rawValue)
   if let unwrapped = UnsafeRawPointer(bitPattern: Int(value)) {
-    return Unmanaged<AnyObject>.fromOpaque(unwrapped).takeUnretainedValue()
+    return unsafe Unmanaged<AnyObject>.fromOpaque(unwrapped).takeUnretainedValue()
   }
   return nil
 }
@@ -175,7 +175,7 @@ public func _stdlib_atomicAcquiringInitializeARCRef<T: AnyObject>(
   // Note: this assumes that AnyObject? is layout-compatible with a RawPointer
   // that simply points to the same memory, and that `nil` is represented by an
   // all-zero bit pattern.
-  let unmanaged = Unmanaged.passRetained(desired)
+  let unmanaged = unsafe Unmanaged.passRetained(desired)
   let desiredPtr = unmanaged.toOpaque()
 
   let (value, won) = Builtin.cmpxchg_acqrel_acquire_Word(
@@ -187,9 +187,9 @@ public func _stdlib_atomicAcquiringInitializeARCRef<T: AnyObject>(
 
   // Some other thread initialized the value before us. Balance the retain that
   // we performed on 'desired', and return what we loaded.
-  unmanaged.release()
+  unsafe unmanaged.release()
   let ptr = UnsafeRawPointer(Builtin.inttoptr_Word(value))
-  return Unmanaged<T>.fromOpaque(ptr)
+  return unsafe Unmanaged<T>.fromOpaque(ptr)
 }
 
 @_alwaysEmitIntoClient
@@ -200,7 +200,7 @@ public func _stdlib_atomicAcquiringLoadARCRef<T: AnyObject>(
   let value = Builtin.atomicload_acquire_Word(target._rawValue)
   if Int(value) == 0 { return nil }
   let opaque = UnsafeRawPointer(Builtin.inttoptr_Word(value))
-  return Unmanaged<T>.fromOpaque(opaque)
+  return unsafe Unmanaged<T>.fromOpaque(opaque)
 }
 
 //===----------------------------------------------------------------------===//
@@ -248,7 +248,7 @@ internal struct _Buffer32 {
     _ body: (UnsafeMutablePointer<UInt8>) throws -> Result
   ) rethrows -> Result {
     return try withUnsafeMutablePointer(to: &self) {
-      try body(UnsafeMutableRawPointer($0).assumingMemoryBound(to: UInt8.self))
+      try unsafe body(UnsafeMutableRawPointer($0).assumingMemoryBound(to: UInt8.self))
     }
   }
 }
@@ -334,7 +334,7 @@ internal struct _Buffer72 {
     _ body: (UnsafeMutablePointer<UInt8>) throws -> Result
   ) rethrows -> Result {
     return try withUnsafeMutablePointer(to: &self) {
-      try body(UnsafeMutableRawPointer($0).assumingMemoryBound(to: UInt8.self))
+      try unsafe body(UnsafeMutableRawPointer($0).assumingMemoryBound(to: UInt8.self))
     }
   }
 }
@@ -483,7 +483,7 @@ internal func _int64ToString(
     var buffer = _Buffer32()
     return buffer.withBytes { (bufferPtr) in
       let actualLength = _int64ToStringImpl(bufferPtr, 32, value, radix, uppercase)
-      return String._fromASCII(UnsafeBufferPointer(
+      return unsafe String._fromASCII(UnsafeBufferPointer(
         start: bufferPtr, count: Int(truncatingIfNeeded: actualLength)
       ))
     }
@@ -491,7 +491,7 @@ internal func _int64ToString(
     var buffer = _Buffer72()
     return buffer.withBytes { (bufferPtr) in
       let actualLength = _int64ToStringImpl(bufferPtr, 72, value, radix, uppercase)
-      return String._fromASCII(UnsafeBufferPointer(
+      return unsafe String._fromASCII(UnsafeBufferPointer(
         start: bufferPtr, count: Int(truncatingIfNeeded: actualLength)
       ))
     }
@@ -533,7 +533,7 @@ func _uint64ToString(
     var buffer = _Buffer32()
     return buffer.withBytes { (bufferPtr) in
       let actualLength = _uint64ToStringImpl(bufferPtr, 32, value, radix, uppercase)
-      return String._fromASCII(UnsafeBufferPointer(
+      return unsafe String._fromASCII(UnsafeBufferPointer(
         start: bufferPtr, count: Int(truncatingIfNeeded: actualLength)
       ))
     }
@@ -541,7 +541,7 @@ func _uint64ToString(
     var buffer = _Buffer72()
     return buffer.withBytes { (bufferPtr) in
       let actualLength = _uint64ToStringImpl(bufferPtr, 72, value, radix, uppercase)
-      return String._fromASCII(UnsafeBufferPointer(
+      return unsafe String._fromASCII(UnsafeBufferPointer(
         start: bufferPtr, count: Int(truncatingIfNeeded: actualLength)
       ))
     }
