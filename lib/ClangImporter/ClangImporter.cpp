@@ -7628,9 +7628,11 @@ void ClangImporter::diagnoseMemberValue(const DeclName &name,
 }
 
 SourceLoc ClangImporter::importSourceLocation(clang::SourceLocation loc) {
-  auto &bufferImporter = Impl.getBufferImporterForDiagnostics();
-  return bufferImporter.resolveSourceLocation(
-      getClangASTContext().getSourceManager(), loc);
+  return Impl.importSourceLoc(loc);
+}
+
+SourceRange ClangImporter::importSourceRange(clang::SourceRange range) {
+  return Impl.importSourceRange(range);
 }
 
 llvm::Expected<llvm::cas::ObjectRef>
