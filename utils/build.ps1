@@ -927,8 +927,8 @@ function Fetch-Dependencies {
   }
 }
 
-function Get-PinnedToolchainToolsDir() {
-  $ToolchainsRoot = [IO.Path]::Combine("$BinaryCache", "toolchains", "$PinnedToolchain", "LocalApp", "Programs", "Swift", "Toolchains")
+function Get-PinnedToolchainTool() {
+  $ToolchainsRoot = [IO.Path]::Combine("$BinaryCache\toolchains", "$PinnedToolchain", "LocalApp", "Programs", "Swift", "Toolchains")
   $VariantToolchainPath = [IO.Path]::Combine($ToolchainsRoot, "$(Get-PinnedToolchainVersion)+$PinnedToolchainVariant", "usr", "bin")
 
   # NOTE: Add a workaround for the main snapshots that inadvertently used the
