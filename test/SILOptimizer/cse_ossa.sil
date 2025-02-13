@@ -1,4 +1,7 @@
 // RUN: %target-sil-opt -sil-print-types -enable-sil-verify-all %s -update-borrowed-from -cse -enable-experimental-feature ValueGenerics | %FileCheck %s
+
+// REQUIRES: swift_feature_ValueGenerics
+
 sil_stage canonical
 
 import Builtin
@@ -1332,8 +1335,8 @@ exit(%proj : @guaranteed $C, %borrow : @guaranteed $S, %owned_s_2 : @owned $S):
 // CHECK:         type_value
 // CHECK-NOT:     type_value
 // CHECK-LABEL: } // end sil function 'type_value_test'
-sil [ossa] @type_value_test : $@convention(thin) <let N : Int> (@in_guaranteed Slab<N, Int>, Int) -> () {
-bb0(%0 : $*Slab<N, Int>, %1 : $Int):
+sil [ossa] @type_value_test : $@convention(thin) <let N : Int> (@in_guaranteed InlineArray<N, Int>, Int) -> () {
+bb0(%0 : $*InlineArray<N, Int>, %1 : $Int):
   %2 = integer_literal $Builtin.Int64, 0
   %3 = type_value $Int for N
   %4 = struct_extract %1, #Int._value
