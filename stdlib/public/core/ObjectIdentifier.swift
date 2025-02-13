@@ -65,6 +65,20 @@ public struct ObjectIdentifier: Sendable {
   public init(_ x: Any.Type) {
     self._value = unsafeBitCast(x, to: Builtin.RawPointer.self)
   }
+
+  /// Creates an instance that uniquely identifies the given metatype.
+  ///
+  /// - Parameters:
+  ///   - x: A metatype.
+  @_alwaysEmitIntoClient
+  @_disfavoredOverload
+  public init<T: ~Copyable & ~Escapable>(_ x: T.Type) {
+    // FIXME: This should rather use an existential:
+    // FIXME:    init(_ x: any (~Copyable & ~Escapable).Type)
+    // FIXME: Unfortunately, that syntax does not survive into the
+    // FIXME: swiftinterface. rdar://139465298
+    self._value = unsafeBitCast(x, to: Builtin.RawPointer.self)
+  }
 }
 
 #else
@@ -79,8 +93,8 @@ public struct ObjectIdentifier: Sendable {
     self._value = Builtin.bridgeToRawPointer(x)
   }
 
-  @inlinable // trivial-implementation
-  public init<Object>(_ x: Object.Type) {
+  @inlinable
+  public init<T: ~Copyable & ~Escapable>(_ x: T.Type) {
     self._value = unsafeBitCast(x, to: Builtin.RawPointer.self)
   }
 }
