@@ -65,6 +65,6 @@ suite.test("comparable") {
   expectTrue(c4 < c5)
   expectFalse(c5 < c4)
 }
-} // if #available(SwiftStdlib 6.2, *)
+} // if #available(SwiftStdlib 6.1, *)
 
 runAllTests()
