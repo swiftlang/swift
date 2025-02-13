@@ -1085,13 +1085,15 @@ public:
 class MagicIdentifierLiteralExpr : public BuiltinLiteralExpr {
 public:
   enum Kind : unsigned {
-#define MAGIC_IDENTIFIER(NAME, STRING, SYNTAX_KIND) NAME,
+#define MAGIC_IDENTIFIER(NAME, STRING) NAME,
 #include "swift/AST/MagicIdentifierKinds.def"
   };
 
   static StringRef getKindString(MagicIdentifierLiteralExpr::Kind value) {
     switch (value) {
-#define MAGIC_IDENTIFIER(NAME, STRING, SYNTAX_KIND) case NAME: return STRING;
+#define MAGIC_IDENTIFIER(NAME, STRING)                                         \
+  case NAME:                                                                   \
+    return STRING;
 #include "swift/AST/MagicIdentifierKinds.def"
     }
 
@@ -1116,11 +1118,11 @@ public:
 
   bool isString() const {
     switch (getKind()) {
-#define MAGIC_STRING_IDENTIFIER(NAME, STRING, SYNTAX_KIND) \
-    case NAME: \
+#define MAGIC_STRING_IDENTIFIER(NAME, STRING)                                  \
+    case NAME:                                                                 \
       return true;
-#define MAGIC_IDENTIFIER(NAME, STRING, SYNTAX_KIND) \
-    case NAME: \
+#define MAGIC_IDENTIFIER(NAME, STRING)                                         \
+    case NAME:                                                                 \
       return false;
 #include "swift/AST/MagicIdentifierKinds.def"
     }

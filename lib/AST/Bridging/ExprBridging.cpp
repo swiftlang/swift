@@ -384,7 +384,9 @@ BridgedMacroExpansionExpr BridgedMacroExpansionExpr_createParsed(
 BridgedMagicIdentifierLiteralKind
 BridgedMagicIdentifierLiteralKind_fromString(BridgedStringRef cStr) {
   StringRef str = cStr.unbridged();
-#define MAGIC_IDENTIFIER(NAME, STRING, SYNTAX_KIND)                            \
+
+  // Note: STRING includes '#' e.g. '#fileID'.
+#define MAGIC_IDENTIFIER(NAME, STRING)                                         \
   if (str == StringRef(STRING).drop_front())                                   \
     return BridgedMagicIdentifierLiteralKind##NAME;
 #include "swift/AST/MagicIdentifierKinds.def"
@@ -394,7 +396,7 @@ BridgedMagicIdentifierLiteralKind_fromString(BridgedStringRef cStr) {
 static std::optional<MagicIdentifierLiteralExpr::Kind>
 unbridge(BridgedMagicIdentifierLiteralKind cKind) {
   switch (cKind) {
-#define MAGIC_IDENTIFIER(NAME, STRING, SYNTAX_KIND)                            \
+#define MAGIC_IDENTIFIER(NAME, STRING)                                         \
   case BridgedMagicIdentifierLiteralKind##NAME:                                \
     return MagicIdentifierLiteralExpr::Kind::NAME;
 #include "swift/AST/MagicIdentifierKinds.def"

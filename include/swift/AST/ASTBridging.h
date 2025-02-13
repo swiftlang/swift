@@ -1766,7 +1766,7 @@ BridgedMacroExpansionExpr BridgedMacroExpansionExpr_createParsed(
     BridgedSourceLoc cRightAngleLoc, BridgedNullableArgumentList cArgList);
 
 enum ENUM_EXTENSIBILITY_ATTR(open) BridgedMagicIdentifierLiteralKind : uint8_t {
-#define MAGIC_IDENTIFIER(NAME, STRING, SYNTAX_KIND)                            \
+#define MAGIC_IDENTIFIER(NAME, STRING)                                         \
   BridgedMagicIdentifierLiteralKind##NAME,
 #include "swift/AST/MagicIdentifierKinds.def"
   BridgedMagicIdentifierLiteralKindNone,

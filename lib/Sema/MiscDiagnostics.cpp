@@ -630,8 +630,8 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
     std::optional<MagicIdentifierLiteralExpr::Kind>
     getMagicIdentifierDefaultArgKind(const ParamDecl *param) {
       switch (param->getDefaultArgumentKind()) {
-#define MAGIC_IDENTIFIER(NAME, STRING, SYNTAX_KIND) \
-      case DefaultArgumentKind::NAME: \
+#define MAGIC_IDENTIFIER(NAME, STRING)                                         \
+      case DefaultArgumentKind::NAME:                                          \
         return MagicIdentifierLiteralExpr::Kind::NAME;
 #include "swift/AST/MagicIdentifierKinds.def"
 
