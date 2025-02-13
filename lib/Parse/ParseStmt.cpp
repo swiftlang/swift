@@ -1292,7 +1292,7 @@ validateAvailabilitySpecList(Parser &P,
                              SmallVectorImpl<AvailabilitySpec *> &Specs,
                              Parser::AvailabilitySpecSource Source) {
   llvm::SmallSet<PlatformKind, 4> Platforms;
-  std::optional<SourceLoc> OtherPlatformSpecLoc = std::nullopt;
+  std::optional<SourceLoc> WildcardSpecLoc = std::nullopt;
 
   if (Specs.size() == 1 &&
       isa<PlatformAgnosticVersionConstraintAvailabilitySpec>(Specs[0])) {
@@ -1305,8 +1305,8 @@ validateAvailabilitySpecList(Parser &P,
   SmallVector<AvailabilitySpec *, 5> RecognizedSpecs;
   for (auto *Spec : Specs) {
     RecognizedSpecs.push_back(Spec);
-    if (auto *OtherPlatSpec = dyn_cast<OtherPlatformAvailabilitySpec>(Spec)) {
-      OtherPlatformSpecLoc = OtherPlatSpec->getStartLoc();
+    if (Spec->isWildcard()) {
+      WildcardSpecLoc = Spec->getStartLoc();
       continue;
     }
 
@@ -1343,7 +1343,7 @@ validateAvailabilitySpecList(Parser &P,
 
   switch (Source) {
   case Parser::AvailabilitySpecSource::Available: {
-    if (OtherPlatformSpecLoc == std::nullopt) {
+    if (WildcardSpecLoc == std::nullopt) {
       SourceLoc InsertWildcardLoc = P.PreviousLoc;
       P.diagnose(InsertWildcardLoc, diag::availability_query_wildcard_required)
         .fixItInsertAfter(InsertWildcardLoc, ", *");
@@ -1351,16 +1351,16 @@ validateAvailabilitySpecList(Parser &P,
     break;
   }
   case Parser::AvailabilitySpecSource::Unavailable: {
-    if (OtherPlatformSpecLoc != std::nullopt) {
-      SourceLoc Loc = OtherPlatformSpecLoc.value();
+    if (WildcardSpecLoc != std::nullopt) {
+      SourceLoc Loc = WildcardSpecLoc.value();
       P.diagnose(Loc, diag::unavailability_query_wildcard_not_required)
         .fixItRemove(Loc);
     }
     break;
   }
   case Parser::AvailabilitySpecSource::Macro: {
-    if (OtherPlatformSpecLoc != std::nullopt) {
-      SourceLoc Loc = OtherPlatformSpecLoc.value();
+    if (WildcardSpecLoc != std::nullopt) {
+      SourceLoc Loc = WildcardSpecLoc.value();
       P.diagnose(Loc, diag::attr_availability_wildcard_in_macro);
     }
     break;

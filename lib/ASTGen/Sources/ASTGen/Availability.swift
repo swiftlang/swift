@@ -344,11 +344,11 @@ extension ASTGenVisitor {
     for parsed in node {
       switch parsed.argument {
       case .token(let tok) where tok.rawText == "*":
-        let spec = BridgedOtherPlatformAvailabilitySpec.createParsed(
+        let spec = BridgedAvailabilitySpec.createWildcard(
           self.ctx,
           loc: self.generateSourceLoc(tok)
         )
-        result.append(spec.asAvailabilitySpec)
+        result.append(spec)
       case .token(let tok):
         handle(domainNode: tok, versionNode: nil)
       case .availabilityVersionRestriction(let platformVersion):

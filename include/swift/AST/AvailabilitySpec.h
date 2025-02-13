@@ -30,18 +30,19 @@ namespace swift {
 class ASTContext;
 
 enum class AvailabilitySpecKind {
-    /// A platform-version constraint of the form "PlatformName X.Y.Z"
-    PlatformVersionConstraint,
+  /// A platform-version constraint of the form "PlatformName X.Y.Z"
+  PlatformVersionConstraint,
 
-    /// A wildcard constraint, spelled '*', that is equivalent
-    /// to CurrentPlatformName >= MinimumDeploymentTargetVersion
-    OtherPlatform,
+  /// A wildcard constraint, spelled '*', that is equivalent
+  /// to CurrentPlatformName >= MinimumDeploymentTargetVersion
+  Wildcard,
 
-    /// A language-version constraint of the form "swift X.Y.Z"
-    LanguageVersionConstraint,
+  /// A language-version constraint of the form "swift X.Y.Z"
+  LanguageVersionConstraint,
 
-    /// A PackageDescription version constraint of the form "_PackageDescription X.Y.Z"
-    PackageDescriptionVersionConstraint,
+  /// A PackageDescription version constraint of the form "_PackageDescription
+  /// X.Y.Z"
+  PackageDescriptionVersionConstraint,
 };
 
 /// The root class for specifications of API availability in availability
@@ -65,7 +66,6 @@ protected:
   // Location of the availability macro expanded to create this spec.
   SourceLoc MacroLoc;
 
-public:
   AvailabilitySpec(AvailabilitySpecKind Kind,
                    std::optional<AvailabilityDomain> Domain,
                    SourceRange SrcRange, llvm::VersionTuple Version,
@@ -73,7 +73,21 @@ public:
       : Kind(Kind), Domain(Domain), SrcRange(SrcRange), Version(Version),
         VersionStartLoc(VersionStartLoc) {}
 
+public:
+  /// Creates a wildcard availability specification that guards execution
+  /// by checking that the run-time version is greater than the minimum
+  /// deployment target. This specification is designed to ease porting
+  /// to new platforms. Because new platforms typically branch from
+  /// existing platforms, the wildcard allows an #available() check to do the
+  /// "right" thing (executing the guarded branch) on the new platform without
+  /// requiring a modification to every availability guard in the program. Note
+  /// that we still do compile-time availability checking with '*', so the
+  /// compiler will still catch references to potentially unavailable symbols.
+  static AvailabilitySpec *createWildcard(ASTContext &ctx, SourceLoc starLoc);
+
   AvailabilitySpecKind getKind() const { return Kind; }
+
+  bool isWildcard() { return getKind() == AvailabilitySpecKind::Wildcard; }
 
   SourceRange getSourceRange() const { return SrcRange; }
   SourceLoc getStartLoc() const { return SrcRange.Start; }
@@ -147,7 +161,7 @@ class PlatformAgnosticVersionConstraintAvailabilitySpec
   static AvailabilityDomain getDomainForSpecKind(AvailabilitySpecKind Kind) {
     switch (Kind) {
     case AvailabilitySpecKind::PlatformVersionConstraint:
-    case AvailabilitySpecKind::OtherPlatform:
+    case AvailabilitySpecKind::Wildcard:
       llvm_unreachable("unexpected spec kind");
     case AvailabilitySpecKind::LanguageVersionConstraint:
       return AvailabilityDomain::forSwiftLanguage();
@@ -179,37 +193,6 @@ public:
   void *
   operator new(size_t Bytes, ASTContext &C,
                unsigned Alignment = alignof(PlatformAgnosticVersionConstraintAvailabilitySpec)){
-    return AvailabilitySpec::operator new(Bytes, C, AllocationArena::Permanent,
-                                          Alignment);
-  }
-};
-
-/// A wildcard availability specification that guards execution
-/// by checking that the run-time version is greater than the minimum
-/// deployment target. This specification is designed to ease porting
-/// to new platforms. Because new platforms typically branch from
-/// existing platforms, the wildcard allows an #available() check to do the
-/// "right" thing (executing the guarded branch) on the new platform without
-/// requiring a modification to every availability guard in the program. Note
-/// that we still do compile-time availability checking with '*', so the
-/// compiler will still catch references to potentially unavailable symbols.
-class OtherPlatformAvailabilitySpec : public AvailabilitySpec {
-public:
-  OtherPlatformAvailabilitySpec(SourceLoc StarLoc)
-      : AvailabilitySpec(AvailabilitySpecKind::OtherPlatform, std::nullopt,
-                         StarLoc,
-                         /*Version=*/{},
-                         /*VersionStartLoc=*/{}) {}
-
-  void print(raw_ostream &OS, unsigned Indent) const;
-
-  static bool classof(const AvailabilitySpec *Spec) {
-    return Spec->getKind() == AvailabilitySpecKind::OtherPlatform;
-  }
-
-  void *
-  operator new(size_t Bytes, ASTContext &C,
-               unsigned Alignment = alignof(OtherPlatformAvailabilitySpec)) {
     return AvailabilitySpec::operator new(Bytes, C, AllocationArena::Permanent,
                                           Alignment);
   }

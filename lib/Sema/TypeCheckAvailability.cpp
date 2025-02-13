@@ -1273,7 +1273,7 @@ private:
         Query->setVariantAvailableRange(VariantRange);
       }
 
-      if (Spec->getKind() == AvailabilitySpecKind::OtherPlatform) {
+      if (Spec->isWildcard()) {
         // The wildcard spec '*' represents the minimum deployment target, so
         // there is no need to create an availability scope for this query.
         // Further, we won't diagnose for useless #available() conditions
@@ -1379,12 +1379,12 @@ private:
   /// such spec exists.
   AvailabilitySpec *bestActiveSpecForQuery(PoundAvailableInfo *available,
                                            bool forTargetVariant = false) {
-    OtherPlatformAvailabilitySpec *FoundOtherSpec = nullptr;
+    AvailabilitySpec *FoundWildcardSpec = nullptr;
     PlatformVersionConstraintAvailabilitySpec *BestSpec = nullptr;
 
     for (auto *Spec : available->getQueries()) {
-      if (auto *OtherSpec = dyn_cast<OtherPlatformAvailabilitySpec>(Spec)) {
-        FoundOtherSpec = OtherSpec;
+      if (Spec->isWildcard()) {
+        FoundWildcardSpec = Spec;
         continue;
       }
 
@@ -1412,12 +1412,12 @@ private:
 
     // If we have reached this point, we found no spec for our target, so
     // we return the other spec ('*'), if we found it, or nullptr, if not.
-    if (FoundOtherSpec) {
-      return FoundOtherSpec;
+    if (FoundWildcardSpec) {
+      return FoundWildcardSpec;
     } else if (available->isUnavailability()) {
       // For #unavailable, imply the presence of a wildcard.
       SourceLoc Loc = available->getRParenLoc();
-      return new (Context) OtherPlatformAvailabilitySpec(Loc);
+      return AvailabilitySpec::createWildcard(Context, Loc);
     } else {
       return nullptr;
     }
@@ -1426,7 +1426,7 @@ private:
   /// Return the availability context for the given spec.
   AvailabilityRange contextForSpec(AvailabilitySpec *Spec,
                                    bool GetRuntimeContext) {
-    if (isa<OtherPlatformAvailabilitySpec>(Spec)) {
+    if (Spec->isWildcard()) {
       return AvailabilityRange::alwaysAvailable();
     }
 

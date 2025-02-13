@@ -203,12 +203,12 @@ struct RuntimeVersionCheck {
     auto platformSpec = new (C) PlatformVersionConstraintAvailabilitySpec(
         Platform, SourceLoc(), Version, SourceLoc());
 
-    // otherSpec = "*"
-    auto otherSpec = new (C) OtherPlatformAvailabilitySpec(SourceLoc());
+    // wildcardSpec = "*"
+    auto wildcardSpec = AvailabilitySpec::createWildcard(C, SourceLoc());
 
-    // availableInfo = "#available(\(platformSpec), \(otherSpec))"
+    // availableInfo = "#available(\(platformSpec), \(wildcardSpec))"
     auto availableInfo = PoundAvailableInfo::create(
-        C, SourceLoc(), SourceLoc(), { platformSpec, otherSpec }, SourceLoc(),
+        C, SourceLoc(), SourceLoc(), {platformSpec, wildcardSpec}, SourceLoc(),
         false);
 
     // This won't be filled in by TypeCheckAvailability because we have

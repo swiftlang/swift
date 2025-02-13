@@ -3689,7 +3689,7 @@ ParserResult<AvailabilitySpec> Parser::parseAvailabilitySpec() {
     SourceLoc StarLoc = Tok.getLoc();
     consumeToken();
 
-    return makeParserResult(new (Context) OtherPlatformAvailabilitySpec(StarLoc));
+    return makeParserResult(AvailabilitySpec::createWildcard(Context, StarLoc));
   }
   if (Tok.isIdentifierOrUnderscore() &&
        (Tok.getText() == "swift" || Tok.getText() == "_PackageDescription"))

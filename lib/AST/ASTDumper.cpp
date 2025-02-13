@@ -1128,8 +1128,8 @@ namespace {
               printFoot();
               break;
             }
-            case AvailabilitySpecKind::OtherPlatform:
-              printHead("other_constraint_availability_spec", PatternColor,
+            case AvailabilitySpecKind::Wildcard:
+              printHead("wildcard_constraint_availability_spec", PatternColor,
                         label);
               printFoot();
               break;
