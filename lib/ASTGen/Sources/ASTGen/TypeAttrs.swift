@@ -89,10 +89,10 @@ extension ASTGenVisitor {
         fatalError("unimplemented")
 
       case .isolated:
-        return self.generateIsolatedTypeAttr(attribute: node)
+        return self.generateIsolatedTypeAttr(attribute: node)?.asTypeAttribute
 
       case .execution:
-        return self.generateExecutionTypeAttr(attribute: node)
+        return self.generateExecutionTypeAttr(attribute: node)?.asTypeAttribute
 
       // SIL type attributes are not supported.
       case .autoreleased,
@@ -145,8 +145,8 @@ extension ASTGenVisitor {
       nameLoc: self.generateSourceLoc(node.attributeName)
     )
   }
-
-  func generateIsolatedTypeAttr(attribute node: AttributeSyntax) -> BridgedTypeAttribute? {
+  
+  func generateIsolatedTypeAttr(attribute node: AttributeSyntax) -> BridgedIsolatedTypeAttr? {
     guard case .argumentList(let isolatedArgs) = node.arguments,
           isolatedArgs.count == 1,
           let labelArg = isolatedArgs.first,
@@ -167,17 +167,18 @@ extension ASTGenVisitor {
       return nil
     }
 
-    return BridgedTypeAttribute.createIsolated(
+    return BridgedIsolatedTypeAttr.createParsed(
       self.ctx,
       atLoc: self.generateSourceLoc(node.atSign),
       nameLoc: self.generateSourceLoc(node.attributeName),
       lpLoc: self.generateSourceLoc(node.leftParen!),
       isolationKindLoc: self.generateSourceLoc(isolationKindExpr.baseName),
       isolationKind: isolationKind,
-      rpLoc: self.generateSourceLoc(node.rightParen!))
+      rpLoc: self.generateSourceLoc(node.rightParen!)
+    )
   }
 
-  func generateExecutionTypeAttr(attribute node: AttributeSyntax) -> BridgedTypeAttribute? {
+  func generateExecutionTypeAttr(attribute node: AttributeSyntax) -> BridgedExecutionTypeAttr? {
     guard case .argumentList(let executionArgs) = node.arguments,
           executionArgs.count == 1,
           let labelArg = executionArgs.first,
@@ -198,13 +199,14 @@ extension ASTGenVisitor {
       return nil
     }
 
-    return BridgedTypeAttribute.createExecution(
+    return BridgedExecutionTypeAttr.createParsed(
       self.ctx,
       atLoc: self.generateSourceLoc(node.atSign),
       nameLoc: self.generateSourceLoc(node.attributeName),
       lpLoc: self.generateSourceLoc(node.leftParen!),
       behaviorLoc: self.generateSourceLoc(behaviorExpr.baseName),
       behavior: behavior,
-      rpLoc: self.generateSourceLoc(node.rightParen!))
+      rpLoc: self.generateSourceLoc(node.rightParen!)
+    )
   }
 }

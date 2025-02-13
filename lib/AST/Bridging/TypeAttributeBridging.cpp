@@ -23,6 +23,16 @@ using namespace swift;
 // MARK: TypeAttributes
 //===----------------------------------------------------------------------===//
 
+// Define `.asTypeAttr` on each BridgedXXXTypeAttr type.
+#define SIMPLE_TYPE_ATTR(...)
+#define TYPE_ATTR(SPELLING, CLASS)                                             \
+  SWIFT_NAME("getter:Bridged" #CLASS "TypeAttr.asTypeAttribute(self:)")        \
+  BridgedTypeAttribute Bridged##CLASS##TypeAttr_asTypeAttribute(               \
+      Bridged##CLASS##TypeAttr attr) {                                         \
+    return attr.unbridged();                                                   \
+  }
+#include "swift/AST/TypeAttr.def"
+
 BridgedTypeAttrKind BridgedTypeAttrKind_fromString(BridgedStringRef cStr) {
   auto optKind = TypeAttribute::getAttrKindFromString(cStr.unbridged());
   if (!optKind)
@@ -74,7 +84,7 @@ BridgedTypeAttribute BridgedTypeAttribute_createSimple(
                                      cAtLoc.unbridged(), cNameLoc.unbridged());
 }
 
-BridgedTypeAttribute BridgedTypeAttribute_createIsolated(
+BridgedIsolatedTypeAttr BridgedIsolatedTypeAttr_createParsed(
     BridgedASTContext cContext, BridgedSourceLoc cAtLoc,
     BridgedSourceLoc cNameLoc, BridgedSourceLoc cLPLoc,
     BridgedSourceLoc cIsolationLoc,
@@ -92,7 +102,7 @@ BridgedTypeAttribute BridgedTypeAttribute_createIsolated(
                        {isolationKind, cIsolationLoc.unbridged()});
 }
 
-BridgedTypeAttribute BridgedTypeAttribute_createExecution(
+BridgedExecutionTypeAttr BridgedExecutionTypeAttr_createParsed(
     BridgedASTContext cContext, BridgedSourceLoc cAtLoc,
     BridgedSourceLoc cNameLoc, BridgedSourceLoc cLPLoc,
     BridgedSourceLoc cBehaviorLoc,
