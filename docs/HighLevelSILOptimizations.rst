@@ -412,6 +412,11 @@ optimize.sil.specialize.owned2guarantee.never
   Disable function signature optimization which converts an "owned" to a
   "guaranteed" function parameter.
 
+optimize.sil.inline.aggressive
+
+  Inlines into this function more aggressively than it would be done without
+  this attribute.
+
 Availability checks
 ~~~~~~~~~~~~~~~~~~~
 

@@ -1153,7 +1153,8 @@ void SILPerformanceInliner::collectAppliesToInline(
         // but we /do/ inline any inline_always functions remaining.
         if (NumCallerBlocks > OverallCallerBlockLimit &&
             // Still allow inlining of small functions.
-            !hasMaxNumberOfBasicBlocks(Callee, 8)) {
+            !hasMaxNumberOfBasicBlocks(Callee, 8) &&
+            !Caller->hasSemanticsAttr(semantics::OPTIMIZE_SIL_INLINE_AGGRESSIVE)) {
           continue;
         }
 
