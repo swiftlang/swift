@@ -306,6 +306,10 @@ void MemoryLifetimeVerifier::requireBitsSetForArgument(const Bits &bits, Operand
 }
 
 bool MemoryLifetimeVerifier::applyMayRead(Operand *argOp, SILValue addr) {
+  // Conservatively assume that a partial_apply does _not_ read an argument.
+  if (isa<PartialApplyInst>(argOp->getUser()))
+    return false;
+  
   FullApplySite as(argOp->getUser());
   CalleeList callees;
   if (calleeCache) {
@@ -879,6 +883,18 @@ void MemoryLifetimeVerifier::checkBlock(SILBasicBlock *block, Bits &bits) {
         // Needed to clear any bits of trivial locations (which are not required
         // to be zero).
         locations.clearBits(bits, opVal);
+        break;
+      }
+      case SILInstructionKind::MarkDependenceInst: {
+        auto *mdi = cast<MarkDependenceInst>(&I);
+        if (mdi->getBase()->getType().isAddress() &&
+            // In case the mark_dependence is used for a closure it might be that the base
+            // is "self" in an initializer and "self" is not fully initialized, yet.
+            !mdi->getType().isFunction()) {
+          requireBitsSet(bits, mdi->getBase(), &I);
+        }
+        // TODO: check that the base operand is alive during the whole lifetime
+        // of the value operand.
         break;
       }
       default:

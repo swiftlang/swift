@@ -55,27 +55,6 @@ type, use `alloc_box`.
 
 `T` must not be a pack type. To allocate a pack, use `alloc_pack`.
 
-### alloc_vector
-
-```
-sil-instruction ::= 'alloc_vector' sil-type, sil-operand
-
-%1 = alloc_vector $T, %0 : $Builtin.Word
-// %1 has type $*T
-```
-
-Allocates uninitialized memory that is sufficiently aligned on the stack
-to contain a vector of values of type `T`. The result of the instruction
-is the address of the allocated memory. The number of vector elements is
-specified by the operand, which must be a builtin integer value.
-
-`alloc_vector` either allocates memory on the stack or - if contained in
-a global variable static initializer list - in the data section.
-
-`alloc_vector` is a stack allocation instruction, unless it's contained
-in a global initializer list. See the section above on stack discipline.
-The corresponding stack deallocation instruction is `dealloc_stack`.
-
 ### alloc_pack
 
 ```
@@ -2005,15 +1984,19 @@ Builtin.RawPointer or a struct containing the same.
 `%base` may have either object or address type. In the latter case, the
 dependency is on the current value stored in the address.
 
-The optional `nonescaping` attribute indicates that no value derived from
-`%value` escapes the lifetime of `%base`. As with escaping `mark_dependence`,
-all values transitively forwarded from `%value` must be destroyed within the
-lifetime of `base`. Unlike escaping`mark_dependence`, this must be statically
-verifiable. Additionally, unlike escaping`mark_dependence`, derived values
-include copies of`%value`and values transitively forwarded from those copies.
-If`%base`must not be identical to`%value`. Unlike escaping`mark_dependence`,
-no value derived from`%value`may have a bitwise escape (conversion to
-UnsafePointer) or pointer escape (unknown use). 
+The optional `nonescaping` attribute indicates that no value derived
+from `%value` escapes the lifetime of `%base`. As with escaping
+`mark_dependence`, all values transitively forwarded from `%value`
+must be destroyed within the lifetime of `base`. Unlike escaping
+`mark_dependence`, this must be statically verifiable. Additionally,
+unlike escaping `mark_dependence`, nonescaping `mark_dependence` may
+produce a value of non-`Escapable` type. A non-`Escapable`
+`mark_dependence` extends the lifetime of `%base` into copies of
+`%value` and values transitively forwarded from those copies. If the
+`mark_dependence` forwards an address, then it extends the lifetime
+through loads from that address. Unlike escaping `mark_dependence`, no
+value derived from `%value` may have a bitwise escape (conversion to
+UnsafePointer) or pointer escape (unknown use).
 
 ### is_unique
 

@@ -1673,8 +1673,7 @@ private:
     SmallBitVector paramsWithScopedDependencies(params.size(), false);
     for (auto &depInfo : Dependencies) {
       if (auto scopeIndices = depInfo.getScopeIndices()) {
-        paramsWithScopedDependencies
-          |= depInfo.getScopeIndices()->getBitVector();
+        paramsWithScopedDependencies |= scopeIndices->getBitVector();
       }
     }
     
@@ -2032,7 +2031,8 @@ static void
 lowerCaptureContextParameters(TypeConverter &TC, SILDeclRef function,
                               CanGenericSignature genericSig,
                               TypeExpansionContext expansion,
-                              SmallVectorImpl<SILParameterInfo> &inputs) {
+                              SmallVectorImpl<SILParameterInfo> &inputs,
+                              SILExtInfoBuilder &extInfo) {
 
   // If the function is a closure being converted to an @isolated(any) type,
   // add the implicit isolation parameter.
@@ -2041,6 +2041,7 @@ lowerCaptureContextParameters(TypeConverter &TC, SILDeclRef function,
       auto isolationTy = SILType::getOpaqueIsolationType(TC.Context);
       inputs.push_back({isolationTy.getASTType(),
                         ParameterConvention::Direct_Guaranteed});
+      extInfo = extInfo.withErasedIsolation(false);
     }
   }
 
@@ -2575,7 +2576,7 @@ static CanSILFunctionType getSILFunctionType(
     // don't need to keep its capture types opaque.
     lowerCaptureContextParameters(TC, *constant, genericSig,
                                   TC.getCaptureTypeExpansionContext(*constant),
-                                  inputs);
+                                  inputs, extInfoBuilder);
   }
   
   auto calleeConvention = ParameterConvention::Direct_Unowned;
@@ -4602,7 +4603,7 @@ getAbstractionPatternForConstant(ASTContext &ctx, SILDeclRef constant,
       return AbstractionPattern(fnType, value->getType().getTypePtr());
     } else {
       assert(numParameterLists == 2);
-      if (auto method = dyn_cast<clang::CXXMethodDecl>(clangDecl)) {
+      if (isa<clang::CXXMethodDecl>(clangDecl)) {
         // C++ method.
         return AbstractionPattern::getCurriedCXXMethod(fnType, bridgedFn);
       } else {

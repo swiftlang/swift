@@ -267,7 +267,7 @@ void OpenedTypeAttr::printImpl(ASTPrinter &printer,
   printer << "(\"" << getUUID() << "\"";
   if (auto constraintType = getConstraintType()) {
     printer << ", ";
-    getConstraintType()->print(printer, options);
+    constraintType->print(printer, options);
   }
   printer << ")";
   printer.printStructurePost(PrintStructureKind::BuiltinAttribute);
@@ -300,6 +300,23 @@ void IsolatedTypeAttr::printImpl(ASTPrinter &printer,
   printer.callPrintStructurePre(PrintStructureKind::BuiltinAttribute);
   printer.printAttrName("@isolated");
   printer << "(" << getIsolationKindName() << ")";
+  printer.printStructurePost(PrintStructureKind::BuiltinAttribute);
+}
+
+void ExecutionTypeAttr::printImpl(ASTPrinter &printer,
+                                  const PrintOptions &options) const {
+  printer.callPrintStructurePre(PrintStructureKind::BuiltinAttribute);
+  printer.printAttrName("@execution");
+  printer << "(";
+  switch (getBehavior()) {
+  case ExecutionKind::Concurrent:
+    printer << "concurrent";
+    break;
+  case ExecutionKind::Caller:
+    printer << "caller";
+    break;
+  }
+  printer << ")";
   printer.printStructurePost(PrintStructureKind::BuiltinAttribute);
 }
 

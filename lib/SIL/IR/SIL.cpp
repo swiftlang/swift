@@ -371,9 +371,9 @@ bool AbstractStorageDecl::exportsPropertyDescriptor() const {
   if (isa<ProtocolDecl>(getDeclContext()))
     return false;
 
-  // Static properties in protocol extensions do not need
+  // Static properties declared directly in protocol do not need
   // descriptors as existential Any.Type will not resolve to a value.
-  if (isStatic() && getDeclContext()->getSelfProtocolDecl())
+  if (isStatic() && isa<ProtocolDecl>(getDeclContext()))
     return false;
 
   // FIXME: We should support properties and subscripts with '_read' accessors;

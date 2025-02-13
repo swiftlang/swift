@@ -1081,6 +1081,12 @@ MemoryBehavior SILInstruction::getMemoryBehavior() const {
     llvm_unreachable("Covered switch isn't covered?!");
   }
   
+  if (auto *mdi = dyn_cast<MarkDependenceInst>(this)) {
+    if (mdi->getBase()->getType().isAddress())
+      return MemoryBehavior::MayRead;
+    return MemoryBehavior::None;
+  }
+  
   // TODO: An UncheckedTakeEnumDataAddr instruction has no memory behavior if
   // it is nondestructive. Setting this currently causes LICM to miscompile
   // because access paths do not account for enum projections.
@@ -1271,7 +1277,6 @@ namespace {
 
 bool SILInstruction::isAllocatingStack() const {
   if (isa<AllocStackInst>(this) ||
-      isa<AllocVectorInst>(this) ||
       isa<AllocPackInst>(this) ||
       isa<AllocPackMetadataInst>(this))
     return true;
@@ -2009,6 +2014,7 @@ bool MarkDependenceInst::visitNonEscapingLifetimeEnds(
   llvm::function_ref<bool (Operand *)> visitUnknownUse) const {
   assert(getFunction()->hasOwnership() && isNonEscaping()
          && "only meaningful for nonescaping dependencies");
+  assert(getType().isObject() && "lifetime ends only exist for values");
   bool noUsers = true;
   if (!visitRecursivelyLifetimeEndingUses(this, noUsers, visitScopeEnd,
                                           visitUnknownUse)) {

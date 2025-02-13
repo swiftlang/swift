@@ -428,6 +428,11 @@ extension Backtrace {
         return Backtrace(architecture: context.architecture,
                          frames: unwinder.dropFirst(offset),
                          images: images)
+
+      @unknown default:
+        // This will never execute but its needed to avoid warnings when
+        // the Backtrace library is built with library evolution.
+        fatalError()
     }
   }
 }

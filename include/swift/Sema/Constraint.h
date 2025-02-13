@@ -150,6 +150,11 @@ enum class ConstraintKind : char {
   /// The key path type is chosen based on the selection of overloads for the
   /// member references along the path.
   KeyPath,
+  /// The first type will be equal to the second type, but only when the
+  /// second type has been fully determined (and mapped down to a concrete
+  /// type). At that point, this constraint will be treated like an `Equal`
+  /// constraint.
+  OneWayEqual,
   /// If there is no contextual info e.g. `_ = { 42 }` default first type
   /// to a second type. This is effectively a `Defaultable` constraint
   /// which one significant difference:
@@ -375,10 +380,6 @@ class Constraint final : public llvm::ilist_node<Constraint>,
   /// The kind of function reference, for member references.
   unsigned TheFunctionRefInfo : 3;
 
-  /// The trailing closure matching for an applicable function constraint,
-  /// if any. 0 = None, 1 = Forward, 2 = Backward.
-  unsigned trailingClosureMatching : 2;
-
   union {
     struct {
       /// The first type.
@@ -434,6 +435,21 @@ class Constraint final : public llvm::ilist_node<Constraint>,
       /// Identifies whether result of this node is unused.
       bool IsDiscarded;
     } SyntacticElement;
+
+    struct {
+      /// The function type that is being applied where parameters
+      /// represent argument types passed to callee and result type
+      /// represents result type of the application.
+      FunctionType *AppliedFn;
+      /// The type being called, primarily a function type, but could
+      /// be a metatype, a tuple or a nominal type.
+      Type Callee;
+      /// The trailing closure matching for an applicable function constraint,
+      /// if any. 0 = None, 1 = Forward, 2 = Backward.
+      unsigned TrailingClosureMatching : 2;
+      /// The declaration context in which the application appears.
+      DeclContext *UseDC;
+    } Apply;
   };
 
   /// The locator that describes where in the expression this
@@ -487,6 +503,11 @@ class Constraint final : public llvm::ilist_node<Constraint>,
 
   /// Construct a closure body element constraint.
   Constraint(ASTNode node, ContextualTypeInfo context, bool isDiscarded,
+             ConstraintLocator *locator,
+             SmallPtrSetImpl<TypeVariableType *> &typeVars);
+
+  Constraint(FunctionType *appliedFn, Type calleeType,
+             unsigned trailingClosureMatching, DeclContext *useDC,
              ConstraintLocator *locator,
              SmallPtrSetImpl<TypeVariableType *> &typeVars);
 
@@ -575,9 +596,9 @@ public:
 
   /// Create a new Applicable Function constraint.
   static Constraint *createApplicableFunction(
-      ConstraintSystem &cs, Type argumentFnType, Type calleeType,
+      ConstraintSystem &cs, FunctionType *argumentFnType, Type calleeType,
       std::optional<TrailingClosureMatching> trailingClosureMatching,
-      ConstraintLocator *locator);
+      DeclContext *useDC, ConstraintLocator *locator);
 
   static Constraint *createSyntacticElement(ConstraintSystem &cs,
                                               ASTNode node,
@@ -675,6 +696,7 @@ public:
     case ConstraintKind::DynamicCallableApplicableFunction:
     case ConstraintKind::BindOverload:
     case ConstraintKind::OptionalObject:
+    case ConstraintKind::OneWayEqual:
     case ConstraintKind::FallbackType:
     case ConstraintKind::UnresolvedMemberChainBase:
     case ConstraintKind::PackElementOf:
@@ -733,6 +755,9 @@ public:
     case ConstraintKind::SyntacticElement:
       llvm_unreachable("closure body element constraint has no type operands");
 
+    case ConstraintKind::ApplicableFunction:
+      return Apply.AppliedFn;
+
     default:
       return Types.First;
     }
@@ -751,6 +776,9 @@ public:
     case ConstraintKind::UnresolvedValueMember:
     case ConstraintKind::ValueWitness:
       return Member.Second;
+
+    case ConstraintKind::ApplicableFunction:
+      return Apply.Callee;
 
     default:
       return Types.Second;
@@ -812,6 +840,11 @@ public:
     });
   }
 
+  /// Returns the number of resolved argument types for an applied disjunction
+  /// constraint. This is always zero for disjunctions that do not represent
+  /// an applied overload.
+  unsigned countResolvedArgumentTypes(ConstraintSystem &cs) const;
+
   /// Determine if this constraint represents explicit conversion,
   /// e.g. coercion constraint "as X" which forms a disjunction.
   bool isExplicitConversion() const;
@@ -819,6 +852,11 @@ public:
   /// Determine whether this constraint should be solved in isolation
   /// from the rest of the constraint system.
   bool isIsolated() const { return IsIsolated; }
+
+  /// Whether this is a one-way constraint.
+  bool isOneWayConstraint() const {
+    return Kind == ConstraintKind::OneWayEqual;
+  }
 
   /// Retrieve the overload choice for an overload-binding constraint.
   OverloadChoice getOverloadChoice() const {
@@ -838,6 +876,21 @@ public:
            Kind == ConstraintKind::UnresolvedValueMember ||
            Kind == ConstraintKind::ValueWitness);
     return Member.UseDC;
+  }
+
+  FunctionType *getAppliedFunctionType() const {
+    assert(Kind == ConstraintKind::ApplicableFunction);
+    return Apply.AppliedFn;
+  }
+
+  Type getCalleeType() const {
+    assert(Kind == ConstraintKind::ApplicableFunction);
+    return Apply.Callee;
+  }
+
+  DeclContext *getApplicationDC() const {
+    assert(Kind == ConstraintKind::ApplicableFunction);
+    return Apply.UseDC;
   }
 
   ASTNode getSyntacticElement() const {

@@ -14,6 +14,8 @@
 #define SWIFT_BASIC_BASICBRIDGINGIMPL_H
 
 #include "swift/Basic/Assertions.h"
+#include "swift/Basic/SourceLoc.h"
+#include "llvm/ADT/StringRef.h"
 
 SWIFT_BEGIN_NULLABILITY_ANNOTATIONS
 
@@ -27,6 +29,10 @@ const void *_Nullable BridgedArrayRef_data(BridgedArrayRef arr) {
 
 SwiftInt BridgedArrayRef_count(BridgedArrayRef arr) {
   return static_cast<SwiftInt>(arr.Length);
+}
+
+bool BridgedArrayRef_isEmpty(BridgedArrayRef arr) {
+  return arr.Length == 0;
 }
 
 //===----------------------------------------------------------------------===//
@@ -133,6 +139,14 @@ BridgedSwiftVersion::BridgedSwiftVersion(SwiftInt major, SwiftInt minor)
     : Major(major), Minor(minor) {
   ASSERT(major >= 0 && minor >= 0);
   ASSERT(major == Major && minor == Minor);
+}
+
+extern "C" void
+swift_ASTGen_bridgedSwiftClosureCall_1(const void *_Nonnull closure,
+                                       const void *_Nullable arg1);
+
+void BridgedSwiftClosure::operator()(const void *_Nullable arg1) {
+  swift_ASTGen_bridgedSwiftClosureCall_1(closure, arg1);
 }
 
 SWIFT_END_NULLABILITY_ANNOTATIONS

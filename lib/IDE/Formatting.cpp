@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/AST/ASTWalker.h"
+#include "swift/AST/AvailabilitySpec.h"
 #include "swift/AST/GenericParamList.h"
 #include "swift/AST/TypeRepr.h"
 #include "swift/Basic/Assertions.h"
@@ -524,7 +525,7 @@ private:
       SourceRange Braces(PGD->getLBraceLoc(), PGD->getRBraceLoc());
       if (!handleBraces(Braces, ContextLoc))
         return Action::Stop();
-    } else if (auto *PDD = dyn_cast<PoundDiagnosticDecl>(D)) {
+    } else if (isa<PoundDiagnosticDecl>(D)) {
       // TODO: add paren locations to PoundDiagnosticDecl
     }
 
@@ -580,7 +581,7 @@ private:
     } else if (auto *WS = dyn_cast<WhileStmt>(S)) {
       if (!handleBraceStmt(WS->getBody(), WS->getWhileLoc()))
         return Action::Stop();
-    } else if (auto *PAS = dyn_cast<PoundAssertStmt>(S)) {
+    } else if (isa<PoundAssertStmt>(S)) {
       // TODO: add paren locations to PoundAssertStmt
     }
 

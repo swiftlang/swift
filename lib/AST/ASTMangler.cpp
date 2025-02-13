@@ -3056,7 +3056,7 @@ void ASTMangler::appendAnyGenericType(const GenericTypeDecl *decl,
       appendIdentifier(interface->getObjCRuntimeNameAsString());
     } else if (UseObjCRuntimeNames && protocol) {
       appendIdentifier(protocol->getObjCRuntimeNameAsString());
-    } else if (auto ctsd = dyn_cast<clang::ClassTemplateSpecializationDecl>(namedDecl)) {
+    } else if (isa<clang::ClassTemplateSpecializationDecl>(namedDecl)) {
       // If this is a `ClassTemplateSpecializationDecl`, it was
       // imported as a Swift decl with `__CxxTemplateInst...` name.
       // `ClassTemplateSpecializationDecl`'s name does not include information about
@@ -3253,7 +3253,7 @@ void ASTMangler::appendFunctionSignature(AnyFunctionType *fn,
       appendOperator("YK");
     }
   }
-  switch (auto diffKind = fn->getDifferentiabilityKind()) {
+  switch (fn->getDifferentiabilityKind()) {
   case DifferentiabilityKind::NonDifferentiable:
     break;
   case DifferentiabilityKind::Forward:
@@ -4164,11 +4164,11 @@ void ASTMangler::appendAccessorEntity(StringRef accessorKindCode,
 
   BaseEntitySignature base(decl);
   appendContextOf(decl, base);
-  if (auto *varDecl = dyn_cast<VarDecl>(decl)) {
+  if (isa<VarDecl>(decl)) {
     appendDeclName(decl);
     appendDeclType(decl, base);
     appendOperator("v", accessorKindCode);
-  } else if (auto *subscriptDecl = dyn_cast<SubscriptDecl>(decl)) {
+  } else if (isa<SubscriptDecl>(decl)) {
     appendDeclType(decl, base);
 
     StringRef privateDiscriminator = getPrivateDiscriminatorIfNecessary(decl);
@@ -4963,7 +4963,7 @@ getPrecheckedLocalContextDiscriminator(const Decl *decl, Identifier name) {
 std::string ASTMangler::mangleAttachedMacroExpansion(
     const Decl *decl, CustomAttr *attr, MacroRole role) {
   if (auto abiDecl = getABIDecl(decl)) {
-    return mangleAttachedMacroExpansion(decl, attr, role);
+    return mangleAttachedMacroExpansion(abiDecl, attr, role);
   }
 
   // FIXME(kavon): using the decl causes a cycle. Is a null base fine?

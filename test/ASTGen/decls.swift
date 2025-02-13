@@ -299,3 +299,7 @@ extension ValueStruct where 123 == N {}
 extension ValueStruct where N == -123 {}
 extension ValueStruct where -123 == N {}
 
+func testMagicIdentifier(file: String = #file, line: Int = #line) {
+    let _: String = file
+    let _: Int = line
+}

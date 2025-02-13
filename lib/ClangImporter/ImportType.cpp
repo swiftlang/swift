@@ -2676,15 +2676,23 @@ static ParamDecl *getParameterInfo(ClangImporter::Implementation *impl,
       impl->importSourceLoc(param->getLocation()), bodyName,
       impl->ImportedHeaderUnit);
 
+  auto &ASTContext = paramInfo->getASTContext();
   // If SendingArgsAndResults are enabled and we have a sending argument,
   // set that the param was sending.
-  if (paramInfo->getASTContext().LangOpts.hasFeature(
-          Feature::SendingArgsAndResults)) {
+  if (ASTContext.LangOpts.hasFeature(Feature::SendingArgsAndResults)) {
     if (auto *attr = param->getAttr<clang::SwiftAttrAttr>()) {
       if (attr->getAttribute() == "sending") {
         paramInfo->setSending();
       }
     }
+  }
+
+  // C++ types taking a reference might return a reference/pointer to a
+  // subobject of the referenced storage. In those cases we need to prevent the
+  // Swift compiler to pass in a temporary copy to prevent dangling.
+  if (ASTContext.LangOpts.hasFeature(Feature::AddressableParameters) &&
+      !param->getType().isNull() && param->getType()->isReferenceType()) {
+    paramInfo->setAddressable();
   }
 
   // Parameters of type const T& imported as T, make sure we borrow from them

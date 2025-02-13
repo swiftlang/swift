@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift-c/DependencyScan/DependencyScan.h"
+#include "swift/AST/DiagnosticsCommon.h"
 #include "swift/Basic/PrettyStackTrace.h"
 
 #include "swift/AST/ASTContext.h"
@@ -707,9 +708,10 @@ generateFullDependencyGraph(const CompilerInstance &instance,
             create_clone(swiftTextualDeps->textualModuleDetails
                              .CASBridgingHeaderIncludeTreeRootID.c_str()),
             create_clone(swiftTextualDeps->moduleCacheKey.c_str()),
-            createMacroDependencySet(
-                swiftTextualDeps->macroDependencies),
-            create_clone(swiftTextualDeps->userModuleVersion.c_str())};
+            createMacroDependencySet(swiftTextualDeps->macroDependencies),
+            create_clone(swiftTextualDeps->userModuleVersion.c_str()),
+            /*chained_bridging_header_path=*/create_clone(""),
+            /*chained_bridging_header_content=*/create_clone("")};
       } else if (swiftSourceDeps) {
         swiftscan_string_ref_t moduleInterfacePath = create_null();
         swiftscan_string_ref_t bridgingHeaderPath =
@@ -743,9 +745,11 @@ generateFullDependencyGraph(const CompilerInstance &instance,
             create_clone(swiftSourceDeps->textualModuleDetails
                              .CASBridgingHeaderIncludeTreeRootID.c_str()),
             /*CacheKey*/ create_clone(""),
-            createMacroDependencySet(
-                swiftSourceDeps->macroDependencies),
-            /*userModuleVersion*/ create_clone("")};
+            createMacroDependencySet(swiftSourceDeps->macroDependencies),
+            /*userModuleVersion*/ create_clone(""),
+            create_clone(swiftSourceDeps->chainedBridgingHeaderPath.c_str()),
+            create_clone(
+                swiftSourceDeps->chainedBridgingHeaderContent.c_str())};
       } else if (swiftPlaceholderDeps) {
         details->kind = SWIFTSCAN_DEPENDENCY_INFO_SWIFT_PLACEHOLDER;
         details->swift_placeholder_details = {
@@ -812,6 +816,7 @@ generateFullDependencyGraph(const CompilerInstance &instance,
       const auto &ll = linkLibraries[i];
       swiftscan_link_library_info_s *llInfo = new swiftscan_link_library_info_s;
       llInfo->name = create_clone(ll.getName().str().c_str());
+      llInfo->isStatic = ll.isStaticLibrary();
       llInfo->isFramework = ll.getKind() == LibraryKind::Framework;
       llInfo->forceLoad = ll.shouldForceLoad();
       linkLibrarySet->link_libraries[i] = llInfo;
@@ -1081,41 +1086,23 @@ static bool diagnoseCycle(const CompilerInstance &instance,
 
 bool swift::dependencies::scanDependencies(CompilerInstance &CI) {
   ASTContext &ctx = CI.getASTContext();
-  const FrontendOptions &opts = CI.getInvocation().getFrontendOptions();
-  std::string depGraphOutputPath = opts.InputsAndOutputs.getSingleOutputFilename();
+  std::string depGraphOutputPath =
+    CI.getInvocation().getFrontendOptions().InputsAndOutputs.getSingleOutputFilename();
   // `-scan-dependencies` invocations use a single new instance
   // of a module cache
-  SwiftDependencyScanningService *service = ctx.Allocate<SwiftDependencyScanningService>();
+  SwiftDependencyScanningService *service =
+      ctx.Allocate<SwiftDependencyScanningService>();
   ModuleDependenciesCache cache(
       *service, CI.getMainModule()->getNameStr().str(),
       CI.getInvocation().getFrontendOptions().ExplicitModulesOutputPath,
       CI.getInvocation().getModuleScanningHash());
 
-  // Load the dependency cache if -reuse-dependency-scan-cache
-  // is specified
-  if (opts.ReuseDependencyScannerCache) {
-    auto cachePath = opts.SerializedDependencyScannerCachePath;
-    module_dependency_cache_serialization::readInterModuleDependenciesCache(cachePath, cache);
-    if (opts.EmitDependencyScannerCacheRemarks)
-      ctx.Diags.diagnose(SourceLoc(), diag::remark_reuse_cache, cachePath);
-  }
-  
   if (service->setupCachingDependencyScanningService(CI))
     return true;
 
   // Execute scan
   llvm::ErrorOr<swiftscan_dependency_graph_t> dependenciesOrErr =
       performModuleScan(CI, nullptr, cache);
-
-  // Serialize the dependency cache if -serialize-dependency-scan-cache
-  // is specified
-  if (opts.SerializeDependencyScannerCache) {
-    auto savePath = opts.SerializedDependencyScannerCachePath;
-    module_dependency_cache_serialization::writeInterModuleDependenciesCache(
-          ctx.Diags, CI.getOutputBackend(), savePath, cache);
-    if (opts.EmitDependencyScannerCacheRemarks)
-      ctx.Diags.diagnose(SourceLoc(), diag::remark_save_cache, savePath);
-  }
 
   if (dependenciesOrErr.getError())
     return true;
@@ -1257,7 +1244,7 @@ static void resolveImplicitLinkLibraries(const CompilerInstance &instance,
   };
 
   if (langOpts.EnableObjCInterop)
-    addLinkLibrary({"objc", LibraryKind::Library});
+    addLinkLibrary(LinkLibrary{"objc", LibraryKind::Library, /*static=*/false});
 
   if (langOpts.EnableCXXInterop) {
     auto OptionalCxxDep = cache.findDependency(CXX_MODULE_NAME);
@@ -1283,6 +1270,34 @@ swift::dependencies::performModuleScan(
     CompilerInstance &instance,
     DependencyScanDiagnosticCollector *diagnosticCollector,
     ModuleDependenciesCache &cache) {
+  const ASTContext &ctx = instance.getASTContext();
+  const FrontendOptions &opts = instance.getInvocation().getFrontendOptions();
+  // Load the dependency cache if -reuse-dependency-scan-cache
+  // is specified
+  if (opts.ReuseDependencyScannerCache) {
+    auto cachePath = opts.SerializedDependencyScannerCachePath;
+    if (opts.EmitDependencyScannerCacheRemarks)
+      ctx.Diags.diagnose(SourceLoc(), diag::remark_reuse_cache, cachePath);
+
+    llvm::sys::TimePoint<> serializedCacheTimeStamp;
+    bool loadFailure =
+        module_dependency_cache_serialization::readInterModuleDependenciesCache(
+            cachePath, cache, serializedCacheTimeStamp);
+    if (opts.EmitDependencyScannerCacheRemarks && loadFailure)
+      ctx.Diags.diagnose(SourceLoc(), diag::warn_scanner_deserialize_failed,
+                         cachePath);
+
+    if (!loadFailure && opts.ValidatePriorDependencyScannerCache) {
+      auto mainModuleID =
+          ModuleDependencyID{instance.getMainModule()->getNameStr().str(),
+                             ModuleDependencyKind::SwiftSource};
+      incremental::validateInterModuleDependenciesCache(
+          mainModuleID, cache, serializedCacheTimeStamp,
+          *instance.getSourceMgr().getFileSystem(), ctx.Diags,
+          opts.EmitDependencyScannerCacheRemarks);
+    }
+  }
+
   auto scanner = ModuleDependencyScanner(
       cache.getScanService(), instance.getInvocation(),
       instance.getSILOptions(), instance.getASTContext(),
@@ -1305,13 +1320,24 @@ swift::dependencies::performModuleScan(
 
   auto topologicallySortedModuleList =
       computeTopologicalSortOfExplicitDependencies(allModules, cache);
+
   resolveDependencyCommandLineArguments(instance, cache,
                                         topologicallySortedModuleList);
   resolveImplicitLinkLibraries(instance, cache);
   updateDependencyTracker(instance, cache, allModules);
 
-  if (instance.getInvocation().getFrontendOptions().EmitDependencyScannerCacheRemarks)
-    instance.getASTContext().Diags.diagnose(SourceLoc(), diag::remark_scanner_uncached_lookups, scanner.getNumLookups());
+  if (ctx.Stats)
+    ctx.Stats->getFrontendCounters().NumDepScanFilesystemLookups = scanner.getNumLookups();
+
+  // Serialize the dependency cache if -serialize-dependency-scan-cache
+  // is specified
+  if (opts.SerializeDependencyScannerCache) {
+    auto savePath = opts.SerializedDependencyScannerCachePath;
+    module_dependency_cache_serialization::writeInterModuleDependenciesCache(
+        ctx.Diags, instance.getOutputBackend(), savePath, cache);
+    if (opts.EmitDependencyScannerCacheRemarks)
+      ctx.Diags.diagnose(SourceLoc(), diag::remark_save_cache, savePath);
+  }
 
   return generateFullDependencyGraph(instance, diagnosticCollector, cache,
                                      topologicallySortedModuleList);
@@ -1351,4 +1377,137 @@ swift::dependencies::performModulePrescan(CompilerInstance &instance,
           ? mapCollectedDiagnosticsForOutput(diagnosticCollector)
           : nullptr;
   return importSet;
+}
+
+void swift::dependencies::incremental::validateInterModuleDependenciesCache(
+    const ModuleDependencyID &rootModuleID, ModuleDependenciesCache &cache,
+    const llvm::sys::TimePoint<> &cacheTimeStamp, llvm::vfs::FileSystem &fs,
+    DiagnosticEngine &diags, bool emitRemarks) {
+  ModuleDependencyIDSet visited;
+  ModuleDependencyIDSet modulesRequiringRescan;
+  outOfDateModuleScan(rootModuleID, cache, cacheTimeStamp, fs, diags,
+                      emitRemarks, visited, modulesRequiringRescan);
+  for (const auto &outOfDateModID : modulesRequiringRescan)
+    cache.removeDependency(outOfDateModID);
+
+  // Regardless of invalidation, always re-scan main module.
+  cache.removeDependency(rootModuleID);
+}
+
+void swift::dependencies::incremental::outOfDateModuleScan(
+    const ModuleDependencyID &moduleID, const ModuleDependenciesCache &cache,
+    const llvm::sys::TimePoint<> &cacheTimeStamp, llvm::vfs::FileSystem &fs,
+    DiagnosticEngine &diags, bool emitRemarks, ModuleDependencyIDSet &visited,
+    ModuleDependencyIDSet &modulesRequiringRescan) {
+  // Visit the module's dependencies
+  bool hasOutOfDateModuleDependency = false;
+  for (const auto &depID : cache.getAllDependencies(moduleID)) {
+    // If we have not already visited this module, recurse.
+    if (visited.find(depID) == visited.end())
+      outOfDateModuleScan(depID, cache, cacheTimeStamp, fs, diags, emitRemarks,
+                          visited, modulesRequiringRescan);
+
+    // Even if we're not revisiting a dependency, we must check if it's
+    // already known to be out of date.
+    hasOutOfDateModuleDependency |=
+        (modulesRequiringRescan.find(depID) != modulesRequiringRescan.end());
+  }
+
+  if (hasOutOfDateModuleDependency) {
+    if (emitRemarks)
+      diags.diagnose(SourceLoc(), diag::remark_scanner_invalidate_upstream,
+                     moduleID.ModuleName);
+    modulesRequiringRescan.insert(moduleID);
+  } else if (!verifyModuleDependencyUpToDate(moduleID, cache, cacheTimeStamp,
+                                             fs, diags, emitRemarks))
+    modulesRequiringRescan.insert(moduleID);
+
+  visited.insert(moduleID);
+}
+
+bool swift::dependencies::incremental::verifyModuleDependencyUpToDate(
+    const ModuleDependencyID &moduleID, const ModuleDependenciesCache &cache,
+    const llvm::sys::TimePoint<> &cacheTimeStamp, llvm::vfs::FileSystem &fs,
+    DiagnosticEngine &diags, bool emitRemarks) {
+  const auto &moduleInfo = cache.findKnownDependency(moduleID);
+  auto verifyInputOlderThanCacheTimeStamp = [&cacheTimeStamp, &fs, &diags,
+                                             emitRemarks](StringRef moduleName,
+                                                          StringRef inputPath) {
+    llvm::sys::TimePoint<> inputModTime = llvm::sys::TimePoint<>::max();
+    if (auto Status = fs.status(inputPath))
+      inputModTime = Status->getLastModificationTime();
+    if (inputModTime > cacheTimeStamp) {
+      if (emitRemarks)
+        diags.diagnose(SourceLoc(),
+                       diag::remark_scanner_stale_result_invalidate, moduleName,
+                       inputPath);
+      return false;
+    }
+    return true;
+  };
+
+  auto verifyCASID = [&cache, &diags, emitRemarks](StringRef moduleName,
+                                                   const std::string &casID) {
+    if (!cache.getScanService().hasCAS()) {
+      // If the wrong cache is passed.
+      if (emitRemarks)
+        diags.diagnose(SourceLoc(),
+                       diag::remark_scanner_invalidate_configuration,
+                       moduleName);
+      return false;
+    }
+    auto &CAS = cache.getScanService().getCAS();
+    auto ID = CAS.parseID(casID);
+    if (!ID) {
+      if (emitRemarks)
+        diags.diagnose(SourceLoc(), diag::remark_scanner_invalidate_cas_error,
+                       moduleName, toString(ID.takeError()));
+      return false;
+    }
+    if (!CAS.getReference(*ID)) {
+      if (emitRemarks)
+        diags.diagnose(SourceLoc(), diag::remark_scanner_invalidate_missing_cas,
+                       moduleName, casID);
+      return false;
+    }
+    return true;
+  };
+
+  // Check CAS inputs exist
+  if (const auto casID = moduleInfo.getClangIncludeTree())
+    if (!verifyCASID(moduleID.ModuleName, *casID))
+      return false;
+  if (const auto casID = moduleInfo.getCASFSRootID())
+    if (!verifyCASID(moduleID.ModuleName, *casID))
+      return false;
+
+  // Check interface file for Swift textual modules
+  if (const auto &textualModuleDetails = moduleInfo.getAsSwiftInterfaceModule())
+    if (!verifyInputOlderThanCacheTimeStamp(
+            moduleID.ModuleName, textualModuleDetails->swiftInterfaceFile))
+      return false;
+
+  // Check binary module file for Swift binary-only modules
+  if (const auto &binaryModuleDetails = moduleInfo.getAsSwiftBinaryModule())
+    if (!verifyInputOlderThanCacheTimeStamp(
+            moduleID.ModuleName, binaryModuleDetails->compiledModulePath))
+      return false;
+
+  // Check header input source files (bridging header etc.)
+  for (const auto &headerInput : moduleInfo.getHeaderInputSourceFiles())
+    if (!verifyInputOlderThanCacheTimeStamp(moduleID.ModuleName, headerInput))
+      return false;
+
+  // Auxiliary files
+  for (const auto &auxInput : moduleInfo.getAuxiliaryFiles())
+    if (!verifyInputOlderThanCacheTimeStamp(moduleID.ModuleName, auxInput))
+      return false;
+
+  // Check header/modulemap source files for a Clang dependency
+  if (const auto &clangModuleDetails = moduleInfo.getAsClangModule())
+    for (const auto &fileInput : clangModuleDetails->fileDependencies)
+      if (!verifyInputOlderThanCacheTimeStamp(moduleID.ModuleName, fileInput))
+        return false;
+
+  return true;
 }

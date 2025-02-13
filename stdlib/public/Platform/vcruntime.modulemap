@@ -707,6 +707,11 @@ module std [system] {
       export *
     }
 
+    explicit module __msvc_string_view {
+      header "__msvc_string_view.hpp"
+      export *
+    }
+
     explicit module xatomic {
       header "xatomic.h"
       export *

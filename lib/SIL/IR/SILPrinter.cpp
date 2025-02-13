@@ -1515,9 +1515,6 @@ public:
     printDebugVar(AVI->getVarInfo(false),
                   &AVI->getModule().getASTContext().SourceMgr);
   }
-  void visitAllocVectorInst(AllocVectorInst *AVI) {
-    *this << AVI->getElementType() << ", " << getIDAndType(AVI->getCapacity());
-  }
   void visitAllocPackInst(AllocPackInst *API) {
     *this << API->getType().getObjectType();
   }
@@ -2889,7 +2886,7 @@ public:
           << ", resume " << Ctx.getID(AI->getResumeBB());
     
     if (auto errorBB = AI->getErrorBB()) {
-      *this << ", error " << Ctx.getID(AI->getErrorBB());
+      *this << ", error " << Ctx.getID(errorBB);
     }
   }
 

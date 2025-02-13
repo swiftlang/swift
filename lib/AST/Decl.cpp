@@ -636,6 +636,39 @@ bool Decl::hasBackDeployedAttr() const {
   return false;
 }
 
+void Decl::forEachDeclToHoist(llvm::function_ref<void(Decl *)> callback) const {
+  switch (getKind()) {
+  case DeclKind::TopLevelCode: {
+    auto *TLCD = cast<TopLevelCodeDecl>(this);
+    if (TLCD->getBody()) {
+      for (auto node : TLCD->getBody()->getElements())
+        if (auto *d = node.dyn_cast<Decl *>())
+          d->forEachDeclToHoist(callback);
+    }
+    break;
+  }
+  case DeclKind::PatternBinding: {
+    auto *PBD = cast<PatternBindingDecl>(this);
+    // Variable declarations are part of the list on par with pattern binding
+    // declarations.
+    for (auto i : range(PBD->getNumPatternEntries())) {
+      PBD->getPattern(i)->forEachVariable([&](VarDecl *VD) { callback(VD); });
+    }
+    break;
+  }
+  case DeclKind::EnumCase: {
+    auto *ECD = cast<EnumCaseDecl>(this);
+    // Each enum case element is part of the members list.
+    for (auto *EED : ECD->getElements()) {
+      callback(EED);
+    }
+    break;
+  }
+  default:
+    break;
+  }
+}
+
 llvm::raw_ostream &swift::operator<<(llvm::raw_ostream &OS,
                                      StaticSpellingKind SSK) {
   switch (SSK) {
@@ -1701,7 +1734,7 @@ AccessLevel ImportDecl::getAccessLevel() const {
 }
 
 bool ImportDecl::isAccessLevelImplicit() const {
-  if (auto attr = getAttrs().getAttribute<AccessControlAttr>()) {
+  if (getAttrs().hasAttribute<AccessControlAttr>()) {
     return false;
   }
   return true;
@@ -4688,7 +4721,7 @@ static AccessLevel getAdjustedFormalAccess(const ValueDecl *VD,
   if (useDC) {
     // If the use site decl context is PackageUnit, just return
     // the access level that's passed in
-    if (auto usePkg = useDC->getPackageContext())
+    if (useDC->getPackageContext())
       return access;
     // Check whether we need to modify the access level based on
     // @testable/@_private import attributes.
@@ -4810,20 +4843,10 @@ bool ValueDecl::bypassResilienceInPackage(ModuleDecl *accessingModule) const {
   if (declModule->isResilient() &&
       declModule->allowNonResilientAccess() &&
       declModule->serializePackageEnabled()) {
-    // Fail and diagnose if there is a member deserialization error,
-    // with an option to skip for temporary/migration purposes.
-    if (!getASTContext().LangOpts.SkipDeserializationChecksForPackageCMO) {
-      // Since we're checking for deserialization errors, make sure the
-      // accessing module is different from this decl's module.
-      if (accessingModule &&
-          accessingModule != declModule) {
-        if (auto IDC = dyn_cast<IterableDeclContext>(this)) {
-          // Recursively check if members and their members have failing
-          // deserialization, and emit a diagnostic.
-          // FIXME: It throws a warning for now; need to upgrade to an error.
-          IDC->checkDeserializeMemberErrorInPackage(accessingModule);
-        }
-      }
+    if (auto IDC = dyn_cast<IterableDeclContext>(this)) {
+      // Recursively check if this decl's members and their members have
+      // been deserialized correctly, and emit a diagnostic if not.
+      IDC->checkDeserializeMemberErrorInPackage(accessingModule);
     }
     return true;
   }
@@ -8024,7 +8047,7 @@ bool VarDecl::isMemberwiseInitialized(bool preferDeclaredProperties) const {
   // memberwise initializable when it could be used to initialize
   // other stored properties.
   if (hasInitAccessor()) {
-    if (auto *init = getAccessor(AccessorKind::Init))
+    if (getAccessor(AccessorKind::Init))
       return true;
   }
 
@@ -8657,7 +8680,7 @@ static DefaultArgumentKind computeDefaultArgumentKind(DeclContext *dc,
     return DefaultArgumentKind::Normal;
 
   switch (magic->getKind()) {
-#define MAGIC_IDENTIFIER(NAME, STRING, SYNTAX_KIND)                            \
+#define MAGIC_IDENTIFIER(NAME, STRING)                                         \
   case MagicIdentifierLiteralExpr::NAME:                                       \
     return DefaultArgumentKind::NAME;
 #include "swift/AST/MagicIdentifierKinds.def"
@@ -8877,7 +8900,7 @@ bool ParamDecl::hasDefaultExpr() const {
   case DefaultArgumentKind::StoredProperty:
     return false;
   case DefaultArgumentKind::Normal:
-#define MAGIC_IDENTIFIER(NAME, STRING, SYNTAX_KIND) \
+#define MAGIC_IDENTIFIER(NAME, STRING)                                         \
   case DefaultArgumentKind::NAME:
 #include "swift/AST/MagicIdentifierKinds.def"
   case DefaultArgumentKind::ExpressionMacro:
@@ -8898,7 +8921,7 @@ bool ParamDecl::hasCallerSideDefaultExpr() const {
   case DefaultArgumentKind::StoredProperty:
   case DefaultArgumentKind::Normal:
     return false;
-#define MAGIC_IDENTIFIER(NAME, STRING, SYNTAX_KIND) \
+#define MAGIC_IDENTIFIER(NAME, STRING)                                         \
   case DefaultArgumentKind::NAME:
 #include "swift/AST/MagicIdentifierKinds.def"
   case DefaultArgumentKind::NilLiteral:
@@ -9200,7 +9223,7 @@ ParamDecl::getDefaultValueStringRepresentation(
     return extractInlinableText(getASTContext(), init, scratch);
   }
   case DefaultArgumentKind::Inherited: return "super";
-#define MAGIC_IDENTIFIER(NAME, STRING, SYNTAX_KIND) \
+#define MAGIC_IDENTIFIER(NAME, STRING)                                         \
   case DefaultArgumentKind::NAME: return STRING;
 #include "swift/AST/MagicIdentifierKinds.def"
   case DefaultArgumentKind::NilLiteral: return "nil";
@@ -9949,13 +9972,30 @@ SourceRange AbstractFunctionDecl::getSignatureSourceRange() const {
   if (isImplicit())
     return SourceRange();
 
-  auto paramList = getParameters();
+  SourceLoc endLoc;
 
-  auto endLoc = paramList->getSourceRange().End;
-  if (endLoc.isValid())
-    return SourceRange(getNameLoc(), endLoc);
+  // name(parameter list...) async throws(E)
+  if (auto *typeRepr = getThrownTypeRepr())
+    endLoc = typeRepr->getSourceRange().End;
+  if (endLoc.isInvalid())
+    endLoc = getThrowsLoc();
+  if (endLoc.isInvalid())
+    endLoc = getAsyncLoc();
 
-  return getNameLoc();
+  if (endLoc.isInvalid())
+    return getParameterListSourceRange();
+  return SourceRange(getNameLoc(), endLoc);
+}
+
+SourceRange AbstractFunctionDecl::getParameterListSourceRange() const {
+  if (isImplicit())
+    return SourceRange();
+
+  auto endLoc = getParameters()->getSourceRange().End;
+  if (endLoc.isInvalid())
+    return getNameLoc();
+
+  return SourceRange(getNameLoc(), endLoc);
 }
 
 std::optional<Fingerprint> AbstractFunctionDecl::getBodyFingerprint() const {
@@ -10719,6 +10759,9 @@ AccessorDecl *AccessorDecl::createParsed(
       // The cloned parameter is implicit.
       param->setImplicit();
 
+      if (subscriptParam->isSending())
+        param->setSending();
+
       newParams.push_back(param);
     }
   }
@@ -10989,43 +11032,32 @@ DestructorDecl *DestructorDecl::getSuperDeinit() const {
 }
 
 SourceRange FuncDecl::getSourceRange() const {
-  SourceLoc StartLoc = getStartLoc();
+  SourceLoc startLoc = getStartLoc();
 
-  if (StartLoc.isInvalid())
+  if (startLoc.isInvalid())
     return SourceRange();
 
   if (getBodyKind() == BodyKind::Unparsed)
-    return { StartLoc, BodyRange.End };
+    return { startLoc, BodyRange.End };
 
-  SourceLoc RBraceLoc = getOriginalBodySourceRange().End;
-  if (RBraceLoc.isValid()) {
-    return { StartLoc, RBraceLoc };
+  SourceLoc endLoc = getOriginalBodySourceRange().End;
+  if (endLoc.isInvalid()) {
+    if (isa<AccessorDecl>(this))
+      return startLoc;
+
+    if (getBodyKind() == BodyKind::Synthesize)
+      return SourceRange();
+
+    endLoc = getGenericTrailingWhereClauseSourceRange().End;
   }
+  if (endLoc.isInvalid())
+    endLoc = getResultTypeSourceRange().End;
+  if (endLoc.isInvalid())
+    endLoc = getSignatureSourceRange().End;
+  if (endLoc.isInvalid())
+    endLoc = startLoc;
 
-  if (isa<AccessorDecl>(this))
-    return StartLoc;
-
-  if (getBodyKind() == BodyKind::Synthesize)
-    return SourceRange();
-
-  auto TrailingWhereClauseSourceRange = getGenericTrailingWhereClauseSourceRange();
-  if (TrailingWhereClauseSourceRange.isValid())
-    return { StartLoc, TrailingWhereClauseSourceRange.End };
-
-  const auto ResultTyEndLoc = getResultTypeSourceRange().End;
-  if (ResultTyEndLoc.isValid())
-    return { StartLoc, ResultTyEndLoc };
-
-  if (hasThrows())
-    return { StartLoc, getThrowsLoc() };
-
-  if (hasAsync())
-    return { StartLoc, getAsyncLoc() };
-
-  auto LastParamListEndLoc = getParameters()->getSourceRange().End;
-  if (LastParamListEndLoc.isValid())
-    return { StartLoc, LastParamListEndLoc };
-  return StartLoc;
+  return { startLoc, endLoc };
 }
 
 EnumElementDecl::EnumElementDecl(SourceLoc IdentifierLoc, DeclName Name,
@@ -11129,8 +11161,6 @@ SourceRange ConstructorDecl::getSourceRange() const {
   SourceLoc End = getOriginalBodySourceRange().End;
   if (End.isInvalid())
     End = getGenericTrailingWhereClauseSourceRange().End;
-  if (End.isInvalid())
-    End = getThrowsLoc();
   if (End.isInvalid())
     End = getSignatureSourceRange().End;
 
@@ -11528,7 +11558,7 @@ ActorIsolation swift::getActorIsolationOfContext(
     return getClosureActorIsolation(closure);
   }
 
-  if (auto *tld = dyn_cast<TopLevelCodeDecl>(dcToUse)) {
+  if (isa<TopLevelCodeDecl>(dcToUse)) {
     if (dcToUse->isAsyncContext() ||
         dcToUse->getASTContext().LangOpts.StrictConcurrencyLevel >=
             StrictConcurrency::Complete) {

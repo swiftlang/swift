@@ -151,7 +151,7 @@ static bool isPrespecilizationDeclWithTarget(const ValueDecl *vd) {
   for (auto *attr : vd->getAttrs().getAttributes<SpecializeAttr>()) {
     if (!attr->isExported())
       continue;
-    if (auto *targetFun = attr->getTargetFunctionDecl(vd))
+    if (attr->getTargetFunctionDecl(vd))
       return true;
   }
   return false;
@@ -4008,8 +4008,7 @@ void PrintAST::printOneParameter(const ParamDecl *param,
     Printer << " = ";
 
     switch (param->getDefaultArgumentKind()) {
-#define MAGIC_IDENTIFIER(NAME, STRING, SYNTAX_KIND) \
-    case DefaultArgumentKind::NAME:
+#define MAGIC_IDENTIFIER(NAME, STRING) case DefaultArgumentKind::NAME:
 #include "swift/AST/MagicIdentifierKinds.def"
       Printer.printKeyword(defaultArgStr, Options);
       break;
@@ -4136,7 +4135,7 @@ void PrintAST::visitAccessorDecl(AccessorDecl *decl) {
   // Explicitly print 'mutating' and 'nonmutating' if needed.
   printSelfAccessKindModifiersIfNeeded(decl);
 
-  switch (auto kind = decl->getAccessorKind()) {
+  switch (decl->getAccessorKind()) {
   case AccessorKind::Get:
   case AccessorKind::DistributedGet:
   case AccessorKind::Address:
@@ -4773,13 +4772,13 @@ void PrintAST::visitErrorExpr(ErrorExpr *expr) {
 
 void PrintAST::visitTernaryExpr(TernaryExpr *expr) {
   if (auto condExpr = expr->getCondExpr()) {
-    visit(expr->getCondExpr());
+    visit(condExpr);
   }
   Printer << " ? ";
   visit(expr->getThenExpr());
   Printer << " : ";
   if (auto elseExpr = expr->getElseExpr()) {
-    visit(expr->getElseExpr());
+    visit(elseExpr);
   }
 }
 
@@ -6060,7 +6059,7 @@ public:
       } else if (auto *VD = originator.dyn_cast<VarDecl *>()) {
         Printer << "decl = ";
         Printer << VD->getName();
-      } else if (auto *EE = originator.dyn_cast<ErrorExpr *>()) {
+      } else if (originator.is<ErrorExpr *>()) {
         Printer << "error_expr";
       } else if (auto *DMT = originator.dyn_cast<DependentMemberType *>()) {
         visit(DMT);

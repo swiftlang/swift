@@ -445,6 +445,10 @@ bool BridgedType::isBuiltinVector() const {
   return unbridged().isBuiltinVector();
 }
 
+bool BridgedType::isLegalFormalType() const {
+  return unbridged().getASTType()->isLegalFormalType();
+}
+
 BridgedType BridgedType::getBuiltinVectorElementType() const {
   return unbridged().getBuiltinVectorElementType();
 }
@@ -641,6 +645,8 @@ BridgedOperand::OperandOwnership BridgedOperand::getOperandOwnership() const {
     return OperandOwnership::ForwardingConsume;
   case swift::OperandOwnership::InteriorPointer:
     return OperandOwnership::InteriorPointer;
+  case swift::OperandOwnership::AnyInteriorPointer:
+    return OperandOwnership::AnyInteriorPointer;
   case swift::OperandOwnership::GuaranteedForwarding:
     return OperandOwnership::GuaranteedForwarding;
   case swift::OperandOwnership::EndBorrow:
@@ -1504,6 +1510,10 @@ void BridgedInstruction::LoadInst_setOwnership(SwiftInt ownership) const {
   getAs<swift::LoadInst>()->setOwnershipQualifier((swift::LoadOwnershipQualifier)ownership);
 }
 
+void BridgedInstruction::CheckedCastBranch_updateSourceFormalTypeFromOperandLoweredType() const {
+  getAs<swift::CheckedCastBranchInst>()->updateSourceFormalTypeFromOperandLoweredType();
+}
+
 BridgedBasicBlock BridgedInstruction::CheckedCastBranch_getSuccessBlock() const {
   return {getAs<swift::CheckedCastBranchInst>()->getSuccessBB()};
 }
@@ -1991,10 +2001,6 @@ BridgedInstruction BridgedBuilder::createAllocStack(BridgedType type,
       swift::HasDynamicLifetime_t(hasDynamicLifetime),
       swift::IsLexical_t(isLexical), swift::IsFromVarDecl_t(isFromVarDecl),
       swift::UsesMoveableValueDebugInfo_t(wasMoved), /*skipVarDeclAssert=*/ true)};
-}
-
-BridgedInstruction BridgedBuilder::createAllocVector(BridgedValue capacity, BridgedType type) const {
-  return {unbridged().createAllocVector(regularLoc(), capacity.getSILValue(), type.unbridged())};
 }
 
 BridgedInstruction BridgedBuilder::createDeallocStack(BridgedValue operand) const {

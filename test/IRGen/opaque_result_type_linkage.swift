@@ -10,6 +10,10 @@ struct G<T>: P {
   lazy var lazyVar: A = a
 
   var a: some Any {
+    b()
+  }
+
+  consuming func b() -> some Any {
     "hello"
   }
 }

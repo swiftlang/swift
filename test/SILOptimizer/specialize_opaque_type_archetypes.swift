@@ -377,15 +377,15 @@ public func testResilientInlinablePropertyCallsResilientInlinable() {
 // RESILIENT:       {{bb[0-9]+}}({{%[^,]+}} : $Int, {{%[^,]+}} : @_eagerMove $
 // RESILIENT-LABEL: } // end sil function '$s9External218ResilientContainerV33genericEagerMoveInlineableContextyyxlFSi_Tgq5'
 
-// RESILIENT-LABEL: sil [serialized] [canonical] @$s9External218ResilientContainerV33genericEagerMoveInlineableContextyyxlF : {{.*}} {
+// RESILIENT-LABEL: sil [serialized] [canonical] [ossa] @$s9External218ResilientContainerV33genericEagerMoveInlineableContextyyxlF : {{.*}} {
 // RESILIENT:       {{bb[0-9]+}}({{%[^,]+}} : $*T, {{%[^,]+}} : @_eagerMove $
 // RESILIENT-LABEL: } // end sil function '$s9External218ResilientContainerV33genericEagerMoveInlineableContextyyxlF'
 
-// RESILIENT-LABEL: sil [serialized] [canonical] @$s9External218ResilientContainerV26eagerMoveInlineableContextyyF : $@convention(method) (@in_guaranteed ResilientContainer) -> () {
+// RESILIENT-LABEL: sil [serialized] [canonical] [ossa] @$s9External218ResilientContainerV26eagerMoveInlineableContextyyF : $@convention(method) (@in_guaranteed ResilientContainer) -> () {
 // RESILIENT:       {{bb[0-9]+}}({{%[^,]+}} : @_eagerMove $
 // RESILIENT-LABEL: } // end sil function '$s9External218ResilientContainerV26eagerMoveInlineableContextyyF'
 
-// RESILIENT-LABEL: sil [serialized] [canonical] @$s9External218ResilientContainerV17inlineableContextyyF
+// RESILIENT-LABEL: sil [serialized] [canonical] [ossa] @$s9External218ResilientContainerV17inlineableContextyyF
 // RESILIENT:  [[RES:%.*]] = alloc_stack [var_decl] $@_opaqueReturnTypeOf("$s9External218ResilientContainerV16computedPropertyQrvp", 0)
 // RESILIENT:  [[FUN:%.*]] = function_ref @$s9External218ResilientContainerV16computedPropertyQrvg
 // RESILIENT:  apply [[FUN]]([[RES]], %0)

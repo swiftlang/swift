@@ -719,7 +719,6 @@ Generate a backtrace for the parent process.
     var mentionedImages = Set<Int>()
     let formatter = backtraceFormatter()
 
-    let platform = target.images.platform
     let architecture: String
     switch crashingThread.backtrace {
       case let .raw(backtrace):

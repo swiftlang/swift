@@ -1326,3 +1326,14 @@ do {
     var items: [Test.Item] { .init(list.items.compactMap { .init(item: $0) }) } // Ok
   }
 }
+
+// This should type check
+func rdar143338891() {
+  func takesAny(_: Any?) {}
+
+  class Test {
+    func test() {
+      _ = { [weak self] in takesAny(self) }
+    }
+  }
+}

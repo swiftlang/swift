@@ -508,6 +508,8 @@ public:
   /// information will be augmented with information about the given
   /// textual header inputs.
   ///
+  /// \param headerPath the path to the header to be scanned.
+  ///
   /// \param clangScanningTool The clang dependency scanner.
   ///
   /// \param cache The module dependencies cache to update, with information
@@ -515,7 +517,8 @@ public:
   ///
   /// \returns \c true if an error occurred, \c false otherwise
   bool getHeaderDependencies(
-      ModuleDependencyID moduleID,
+      ModuleDependencyID moduleID, std::optional<StringRef> headerPath,
+      std::optional<llvm::MemoryBufferRef> sourceBuffer,
       clang::tooling::dependencies::DependencyScanningTool &clangScanningTool,
       ModuleDependenciesCache &cache,
       ModuleDependencyIDSetVector &headerClangModuleDependencies,
@@ -676,6 +679,11 @@ public:
 
   const clang::TypedefType *getTypeDefForCXXCFOptionsDefinition(
       const clang::Decl *candidateDecl) override;
+
+  /// Create cache key for embedded bridging header.
+  static llvm::Expected<llvm::cas::ObjectRef>
+  createEmbeddedBridgingHeaderCacheKey(
+      llvm::cas::ObjectStore &CAS, llvm::cas::ObjectRef ChainedPCHIncludeTree);
 
   SourceLoc importSourceLocation(clang::SourceLocation loc) override;
 };

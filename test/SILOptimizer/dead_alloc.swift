@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -O -emit-sil -parse-as-library %s | %FileCheck %s
+// RUN: %target-swift-frontend -O -emit-sil -parse-as-library %s | grep -v debug_value | %FileCheck %s
 
 // REQUIRES: swift_stdlib_no_asserts,optimized_stdlib
 // REQUIRES: swift_in_compiler
@@ -28,7 +28,6 @@ func g<T : P>(_ x : T) -> Bool {
 
 // CHECK-LABEL: sil @$s10dead_alloc0A10AllocStackySbAA1XVF :
 // CHECK:      bb0({{.*}}):
-// CHECK-NEXT:   debug_value
 // CHECK-NEXT:   integer_literal
 // CHECK-NEXT:   struct
 // CHECK-NEXT:   return
@@ -52,7 +51,6 @@ public func deadClassInstance() {
 
 // CHECK-LABEL: sil @$s10dead_alloc0A13ManagedBufferyyF :
 // CHECK:       bb0:
-// CHECK-NEXT:    debug_value undef
 // CHECK-NEXT:    tuple
 // CHECK-NEXT:    return
 // CHECK-NEXT:  } // end sil function '$s10dead_alloc0A13ManagedBufferyyF'

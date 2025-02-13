@@ -190,7 +190,7 @@ ManagedValue
 SILGenFunction::emitPreconditionOptionalHasValue(SILLocation loc,
                                                  ManagedValue optional,
                                                  bool isImplicitUnwrap) {
-  // Generate code to the optional is present, and if not, abort with a message
+  // Generate code to check if the optional is present, and if not, abort with a message
   // (provided by the stdlib).
   SILBasicBlock *contBB = createBasicBlock();
   SILBasicBlock *failBB = createBasicBlock();

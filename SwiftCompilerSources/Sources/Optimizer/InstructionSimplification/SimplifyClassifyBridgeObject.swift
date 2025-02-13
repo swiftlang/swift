@@ -13,7 +13,7 @@
 import AST
 import SIL
 
-extension ClassifyBridgeObjectInst : OnoneSimplifyable, SILCombineSimplifyable {
+extension ClassifyBridgeObjectInst : OnoneSimplifiable, SILCombineSimplifiable {
   func simplify(_ context: SimplifyContext) {
     // Constant fold `classify_bridge_object` to `(false, false)` if the operand is known
     // to be a swift class.

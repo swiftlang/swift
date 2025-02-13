@@ -81,7 +81,8 @@ bool swift::findPointerEscape(SILValue original) {
         });
         break;
       }
-      case OperandOwnership::InteriorPointer: {
+      case OperandOwnership::InteriorPointer:
+      case OperandOwnership::AnyInteriorPointer: {
         if (InteriorPointerOperand(use).findTransitiveUses() !=
             AddressUseKind::NonEscaping) {
           return true;
@@ -247,6 +248,7 @@ bool swift::findInnerTransitiveGuaranteedUses(
       break;
 
     case OperandOwnership::InteriorPointer:
+    case OperandOwnership::AnyInteriorPointer:
 #if 0 // FIXME!!! Enable in a following commit that fixes RAUW
       // If our base guaranteed value does not have any consuming uses
       // (consider function arguments), we need to be sure to include interior
@@ -387,6 +389,7 @@ bool swift::findExtendedUsesOfSimpleBorrowedValue(
       break;
 
     case OperandOwnership::InteriorPointer:
+    case OperandOwnership::AnyInteriorPointer:
       if (InteriorPointerOperandKind::get(use) ==
           InteriorPointerOperandKind::Invalid)
         return false;
@@ -712,6 +715,7 @@ bool BorrowingOperand::visitScopeEndingUses(
   case BorrowingOperandKind::MarkDependenceNonEscaping: {
     auto *user = cast<MarkDependenceInst>(op->getUser());
     assert(user->isNonEscaping() && "escaping dependencies don't borrow");
+    assert(user->getType().isObject() && "borrows only exist for values");
     return user->visitNonEscapingLifetimeEnds(visitScopeEnd, visitUnknownUse);
   }
   case BorrowingOperandKind::BeginAsyncLet: {

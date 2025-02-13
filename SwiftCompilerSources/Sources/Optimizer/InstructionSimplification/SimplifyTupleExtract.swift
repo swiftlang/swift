@@ -12,7 +12,7 @@
 
 import SIL
 
-extension TupleExtractInst : OnoneSimplifyable {
+extension TupleExtractInst : OnoneSimplifiable {
   func simplify(_ context: SimplifyContext) {
 
     // Replace tuple_extract(tuple(x)) -> x

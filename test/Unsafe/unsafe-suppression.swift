@@ -116,3 +116,42 @@ extension UnsafeOuter {
 extension UnsafeOuter {
   func i(_: UnsafeType) { }
 }
+
+// -----------------------------------------------------------------------
+// Miscellaneous issues
+// -----------------------------------------------------------------------
+var yieldUnsafe: Int {
+  _read {
+    @unsafe let x = 5
+    yield x // expected-warning{{expression uses unsafe constructs but is not marked with 'unsafe' [Unsafe]}}
+    // expected-note@-1{{reference to unsafe let 'x'}}
+  }
+  _modify {
+    @unsafe var x = 5
+    yield &x // expected-warning{{expression uses unsafe constructs but is not marked with 'unsafe' [Unsafe]}}
+    // expected-note@-1{{reference to unsafe var 'x'}}
+  }
+}
+
+var yieldUnsafeOkay: Int {
+  _read {
+    @unsafe let x = 5
+    yield unsafe x
+  }
+  _modify {
+    @unsafe var x = 5
+    yield unsafe &x
+  }
+}
+
+struct UnsafeSequence: @unsafe IteratorProtocol, @unsafe Sequence {
+  @unsafe func next() -> Int? { nil }
+}
+
+func forEachLoop(us: UnsafeSequence) {
+  for _ in us { } // expected-warning{{expression uses unsafe constructs but is not marked with 'unsafe' [Unsafe]}}{{12-12=unsafe }}
+  // expected-note@-1{{@unsafe conformance of 'UnsafeSequence' to protocol 'Sequence' involves unsafe code}}
+  // expected-note@-2{{reference to unsafe instance method 'next()'}}
+
+  for _ in unsafe us { }
+}

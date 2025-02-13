@@ -414,6 +414,10 @@ llvm::Triple swift::getTargetSpecificModuleTriple(const llvm::Triple &triple) {
                         triple.getOSName(), environment);
   }
 
+  if (triple.isOSFreeBSD()) {
+    return swift::getUnversionedTriple(triple);
+  }
+
   // Other platforms get no normalization.
   return triple;
 }

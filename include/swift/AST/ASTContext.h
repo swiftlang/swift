@@ -598,6 +598,10 @@ public:
   /// specified string.
   Identifier getIdentifier(StringRef Str) const;
 
+  /// getDollarIdentifier - Return the uniqued and AST-Context-owned version of
+  /// anonymous closure parameter (e.g. '$1') name by the index.
+  Identifier getDollarIdentifier(size_t Idx) const;
+
   /// Convert a given alias map to a map of Identifiers between module aliases and their actual names.
   /// For example, if '-module-alias Foo=X -module-alias Bar=Y' input is passed in, the aliases Foo and Bar are
   /// the names of the imported or referenced modules in source files in the main module, and X and Y
@@ -996,11 +1000,8 @@ public:
     return getMultiPayloadEnumTagSinglePayloadAvailability();
   }
 
-  /// Cache of the availability macros parsed from the command line arguments.
-  ///
-  /// This is an implementation detail, access via
-  /// \c Parser::parseAllAvailabilityMacroArguments.
-  AvailabilityMacroMap &getAvailabilityMacroCache() const;
+  /// Availability macros parsed from the command line arguments.
+  const AvailabilityMacroMap &getAvailabilityMacroMap() const;
 
   /// Test support utility for loading a platform remap file
   /// in case an SDK is not specified to the compilation.
@@ -1123,6 +1124,16 @@ public:
   void loadDerivativeFunctionConfigurations(
       AbstractFunctionDecl *originalAFD, unsigned previousGeneration,
       llvm::SetVector<AutoDiffConfig> &results);
+
+  /// Given `Optional<T>.TangentVector` type, retrieve the
+  /// `Optional<T>.TangentVector.init` declaration.
+  ConstructorDecl *getOptionalTanInitDecl(CanType optionalTanType);
+
+  /// Optional<T>.TangentVector is a struct with a single
+  /// Optional<T.TangentVector> `value` property. This is an implementation
+  /// detail of OptionalDifferentiation.swift. Retrieve `VarDecl` corresponding
+  /// to this property.
+  VarDecl *getOptionalTanValueDecl(CanType optionalTanType);
 
   /// Retrieve the next macro expansion discriminator within the given
   /// name and context.
