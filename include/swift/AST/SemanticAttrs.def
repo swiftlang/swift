@@ -75,6 +75,8 @@ SEMANTICS_ATTR(OPTIMIZE_SIL_SPECIALIZE_GENERIC_SIZE_NEVER,
           "optimize.sil.specialize.generic.size.never")
 SEMANTICS_ATTR(OPTIMIZE_SIL_SPECIALIZE_OWNED2GUARANTEE_NEVER,
           "optimize.sil.specialize.owned2guarantee.never")
+SEMANTICS_ATTR(OPTIMIZE_SIL_INLINE_AGGRESSIVE,
+          "optimize.sil.inline.aggressive")
 
 // To be used on a nominal type declaration.
 // Assumes that a class (or class references inside a nominal type) are immortal.
