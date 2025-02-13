@@ -892,3 +892,6 @@ Added: _swift_cvw_destroyMultiPayloadEnumFN
 Added: _swift_cvw_initWithCopyMultiPayloadEnumFN
 Added: _swift_cvw_initWithTakeMultiPayloadEnumFN
 Added: _swift_cvw_initializeBufferWithCopyOfBufferMultiPayloadEnumFN
+
+// SE-0457 Expose attosecond representation of Duration
+Added: _$ss8DurationV11attosecondss6Int128VvpMV

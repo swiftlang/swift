@@ -381,6 +381,38 @@ BridgedMacroExpansionExpr BridgedMacroExpansionExpr_createParsed(
                           : getFreestandingMacroRoles());
 }
 
+BridgedMagicIdentifierLiteralKind
+BridgedMagicIdentifierLiteralKind_fromString(BridgedStringRef cStr) {
+  StringRef str = cStr.unbridged();
+
+  // Note: STRING includes '#' e.g. '#fileID'.
+#define MAGIC_IDENTIFIER(NAME, STRING)                                         \
+  if (str == StringRef(STRING).drop_front())                                   \
+    return BridgedMagicIdentifierLiteralKind##NAME;
+#include "swift/AST/MagicIdentifierKinds.def"
+  return BridgedMagicIdentifierLiteralKindNone;
+}
+
+static std::optional<MagicIdentifierLiteralExpr::Kind>
+unbridge(BridgedMagicIdentifierLiteralKind cKind) {
+  switch (cKind) {
+#define MAGIC_IDENTIFIER(NAME, STRING)                                         \
+  case BridgedMagicIdentifierLiteralKind##NAME:                                \
+    return MagicIdentifierLiteralExpr::Kind::NAME;
+#include "swift/AST/MagicIdentifierKinds.def"
+  case BridgedMagicIdentifierLiteralKindNone:
+    return std::nullopt;
+  }
+}
+
+BridgedMagicIdentifierLiteralExpr
+BridgedMagicIdentifierLiteralExpr_createParsed(
+    BridgedASTContext cContext, BridgedMagicIdentifierLiteralKind cKind,
+    BridgedSourceLoc cLoc) {
+  return new (cContext.unbridged())
+      MagicIdentifierLiteralExpr(*unbridge(cKind), cLoc.unbridged());
+}
+
 BridgedNilLiteralExpr
 BridgedNilLiteralExpr_createParsed(BridgedASTContext cContext,
                                    BridgedSourceLoc cNilKeywordLoc) {
