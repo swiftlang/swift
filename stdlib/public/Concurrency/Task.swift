@@ -1071,6 +1071,20 @@ func _enqueueJobGlobalWithDeadline(_ seconds: Int64, _ nanoseconds: Int64,
                                    _ toleranceSec: Int64, _ toleranceNSec: Int64,
                                    _ clock: Int32, _ task: Builtin.Job)
 
+@usableFromInline
+@available(SwiftStdlib 6.2, *)
+@_silgen_name("swift_task_addPriorityEscalationHandler")
+func _taskAddPriorityEscalationHandler(
+  handler: (UInt8) -> Void
+) -> UnsafeRawPointer /*EscalationNotificationStatusRecord*/
+
+@usableFromInline
+@available(SwiftStdlib 6.2, *)
+@_silgen_name("swift_task_removePriorityEscalationHandler")
+func _taskRemovePriorityEscalationHandler(
+  record: UnsafeRawPointer /*EscalationNotificationStatusRecord*/
+)
+
 @available(SwiftStdlib 5.1, *)
 @usableFromInline
 @_silgen_name("swift_task_asyncMainDrainQueue")
@@ -1152,6 +1166,11 @@ func _taskIsCancelled(_ task: Builtin.NativeObject) -> Bool
 @_silgen_name("swift_task_currentPriority")
 internal func _taskCurrentPriority(_ task: Builtin.NativeObject) -> UInt8
 
+@available(SwiftStdlib 6.2, *)
+@_silgen_name("swift_task_escalate")
+internal func _taskEscalate(_ task: Builtin.NativeObject, newPriority: UInt8)
+
+@available(SwiftStdlib 5.1, *)
 @_silgen_name("swift_task_basePriority")
 internal func _taskBasePriority(_ task: Builtin.NativeObject) -> UInt8
 

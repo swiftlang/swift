@@ -25,6 +25,7 @@
 #include "swift/AST/AvailabilityDomain.h"
 #include "swift/AST/AvailabilityInference.h"
 #include "swift/AST/AvailabilityScope.h"
+#include "swift/AST/AvailabilitySpec.h"
 #include "swift/AST/ClangModuleLoader.h"
 #include "swift/AST/DiagnosticsParse.h"
 #include "swift/AST/GenericEnvironment.h"
@@ -3012,12 +3013,12 @@ bool shouldHideDomainNameForConstraintDiagnostic(
 
   case AvailabilityDomain::Kind::PackageDescription:
   case AvailabilityDomain::Kind::SwiftLanguage:
-    switch (constraint.getKind()) {
-    case AvailabilityConstraint::Kind::AlwaysUnavailable:
-    case AvailabilityConstraint::Kind::IntroducedInNewerVersion:
+    switch (constraint.getReason()) {
+    case AvailabilityConstraint::Reason::UnconditionallyUnavailable:
+    case AvailabilityConstraint::Reason::IntroducedInLaterVersion:
       return false;
-    case AvailabilityConstraint::Kind::RequiresVersion:
-    case AvailabilityConstraint::Kind::Obsoleted:
+    case AvailabilityConstraint::Reason::IntroducedInLaterDynamicVersion:
+    case AvailabilityConstraint::Reason::Obsoleted:
       return true;
     }
   }
@@ -3030,7 +3031,7 @@ bool diagnoseExplicitUnavailability(SourceLoc loc,
                                     const ExportContext &where,
                                     bool warnIfConformanceUnavailablePreSwift6,
                                     bool preconcurrency) {
-  if (constraint.isConditionallySatisfiable())
+  if (!constraint.isUnavailable())
     return false;
 
   // Invertible protocols are never unavailable.
@@ -3061,24 +3062,24 @@ bool diagnoseExplicitUnavailability(SourceLoc loc,
       .limitBehaviorWithPreconcurrency(behavior, preconcurrency)
       .warnUntilSwiftVersionIf(warnIfConformanceUnavailablePreSwift6, 6);
 
-  switch (constraint.getKind()) {
-  case AvailabilityConstraint::Kind::AlwaysUnavailable:
+  switch (constraint.getReason()) {
+  case AvailabilityConstraint::Reason::UnconditionallyUnavailable:
     diags
         .diagnose(ext, diag::conformance_availability_marked_unavailable, type,
                   proto)
         .highlight(attr.getParsedAttr()->getRange());
     break;
-  case AvailabilityConstraint::Kind::RequiresVersion:
+  case AvailabilityConstraint::Reason::IntroducedInLaterVersion:
     diags.diagnose(ext, diag::conformance_availability_introduced_in_version,
                    type, proto, versionedPlatform, *attr.getIntroduced());
     break;
-  case AvailabilityConstraint::Kind::Obsoleted:
+  case AvailabilityConstraint::Reason::Obsoleted:
     diags
         .diagnose(ext, diag::conformance_availability_obsoleted, type, proto,
                   versionedPlatform, *attr.getObsoleted())
         .highlight(attr.getParsedAttr()->getRange());
     break;
-  case AvailabilityConstraint::Kind::IntroducedInNewerVersion:
+  case AvailabilityConstraint::Reason::IntroducedInLaterDynamicVersion:
     llvm_unreachable("unexpected constraint");
   }
   return true;
@@ -3107,12 +3108,12 @@ swift::getUnsatisfiedAvailabilityConstraint(
       if ((attr->isSwiftLanguageModeSpecific() ||
            attr->isPackageDescriptionVersionSpecific()) &&
           attr->getIntroduced().has_value())
-        return AvailabilityConstraint::forRequiresVersion(*attr);
+        return AvailabilityConstraint::introducedInLaterVersion(*attr);
 
-      return AvailabilityConstraint::forAlwaysUnavailable(*attr);
+      return AvailabilityConstraint::unconditionallyUnavailable(*attr);
 
     case AvailableVersionComparison::Obsoleted:
-      return AvailabilityConstraint::forObsoleted(*attr);
+      return AvailabilityConstraint::obsoleted(*attr);
     }
   }
 
@@ -3120,7 +3121,8 @@ swift::getUnsatisfiedAvailabilityConstraint(
   if (auto rangeAttr = decl->getAvailableAttrForPlatformIntroduction()) {
     auto range = rangeAttr->getIntroducedRange(ctx);
     if (!availabilityContext.getPlatformRange().isContainedIn(range))
-      return AvailabilityConstraint::forIntroducedInNewerVersion(*rangeAttr);
+      return AvailabilityConstraint::introducedInLaterDynamicVersion(
+          *rangeAttr);
   }
 
   return std::nullopt;
@@ -3462,7 +3464,7 @@ bool diagnoseExplicitUnavailability(
     const ExportContext &Where, DeclAvailabilityFlags Flags,
     llvm::function_ref<void(InFlightDiagnostic &, StringRef)>
         attachRenameFixIts) {
-  if (constraint.isConditionallySatisfiable())
+  if (!constraint.isUnavailable())
     return false;
 
   auto Attr = constraint.getAttr();
@@ -3526,24 +3528,24 @@ bool diagnoseExplicitUnavailability(
   }
 
   auto sourceRange = Attr.getParsedAttr()->getRange();
-  switch (constraint.getKind()) {
-  case AvailabilityConstraint::Kind::AlwaysUnavailable:
+  switch (constraint.getReason()) {
+  case AvailabilityConstraint::Reason::UnconditionallyUnavailable:
     diags.diagnose(D, diag::availability_marked_unavailable, D)
         .highlight(sourceRange);
     break;
-  case AvailabilityConstraint::Kind::RequiresVersion:
+  case AvailabilityConstraint::Reason::IntroducedInLaterVersion:
     diags
         .diagnose(D, diag::availability_introduced_in_version, D,
                   versionedPlatform, *Attr.getIntroduced())
         .highlight(sourceRange);
     break;
-  case AvailabilityConstraint::Kind::Obsoleted:
+  case AvailabilityConstraint::Reason::Obsoleted:
     diags
         .diagnose(D, diag::availability_obsoleted, D, versionedPlatform,
                   *Attr.getObsoleted())
         .highlight(sourceRange);
     break;
-  case AvailabilityConstraint::Kind::IntroducedInNewerVersion:
+  case AvailabilityConstraint::Reason::IntroducedInLaterDynamicVersion:
     llvm_unreachable("unexpected constraint");
     break;
   }

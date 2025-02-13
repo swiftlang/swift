@@ -76,23 +76,6 @@ class CMakeProduct(product.Product):
         ):
             cmake_opts = [self.build_dir, "--config", build_type]
 
-            if self.args.cmake_generator == "Xcode":
-                # CMake automatically adds "--target ALL_BUILD" if we don't
-                # pass this.
-                cmake_opts += ["--target", "ZERO_CHECK"]
-
-                # Xcode generator uses "ALL_BUILD" instead of "all".
-                # Also, xcodebuild uses -target instead of bare names.
-                build_targets = build_targets[:]
-                build_targets = [val for target in build_targets
-                                 for val in ["-target",
-                                             target if target != "all"
-                                             else "ALL_BUILD"]]
-
-                # Xcode can't restart itself if it turns out we need to reconfigure.
-                # Do an advance build to handle that.
-                shell.call(["env"] + cmake_build + cmake_opts)
-
             shell.call(
                 ["env"] + cmake_build + cmake_opts + ["--"] + build_args
                         + _cmake.build_args() + build_targets
@@ -117,13 +100,8 @@ class CMakeProduct(product.Product):
                       "--config", build_type, "--"]
         cmake_build.extend(cmake_args + build_args + _cmake.build_args())
 
-        def target_flag(target):
-            if self.args.cmake_generator == "Xcode":
-                return ["-target", target]
-            return [target]
-
         if executable_target:
-            shell.call(cmake_build + target_flag(executable_target))
+            shell.call(cmake_build + [executable_target])
 
         for target in results_targets:
             if target:
@@ -134,7 +112,7 @@ class CMakeProduct(product.Product):
 
                 # note that passing variables via test_env won't affect lit tests -
                 # lit.cfg will filter environment variables out!
-                shell.call(cmake_build + target_flag(test_target), env=test_env)
+                shell.call(cmake_build + [test_target], env=test_env)
 
                 print("--- %s finished ---" % target)
 

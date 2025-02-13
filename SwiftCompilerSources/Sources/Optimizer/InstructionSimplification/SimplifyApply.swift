@@ -12,7 +12,7 @@
 
 import SIL
 
-extension ApplyInst : OnoneSimplifyable {
+extension ApplyInst : OnoneSimplifiable {
   func simplify(_ context: SimplifyContext) {
     if tryTransformThickToThinCallee(of: self, context) {
       return
@@ -25,13 +25,13 @@ extension ApplyInst : OnoneSimplifyable {
   }
 }
 
-extension TryApplyInst : OnoneSimplifyable {
+extension TryApplyInst : OnoneSimplifiable {
   func simplify(_ context: SimplifyContext) {
     _ = context.tryDevirtualize(apply: self, isMandatory: false)
   }
 }
 
-extension BeginApplyInst : OnoneSimplifyable {
+extension BeginApplyInst : OnoneSimplifiable {
   func simplify(_ context: SimplifyContext) {
     _ = context.tryDevirtualize(apply: self, isMandatory: false)
   }

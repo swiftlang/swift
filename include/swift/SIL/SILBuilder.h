@@ -437,16 +437,6 @@ public:
         isFromVarDecl, wasMoved));
   }
 
-  AllocVectorInst *
-  createAllocVector(SILLocation loc, SILValue capacity, SILType elementType) {
-    if (isInsertingIntoGlobal()) {
-      return insert(AllocVectorInst::createInInitializer(
-          getSILDebugLocation(loc, true), capacity, elementType, getModule()));
-    }
-    return insert(AllocVectorInst::create(
-        getSILDebugLocation(loc, true), capacity, elementType, getFunction()));
-  }
-
   AllocPackInst *createAllocPack(SILLocation loc, SILType packType) {
     return insert(AllocPackInst::create(getSILDebugLocation(loc), packType,
                                         getFunction()));

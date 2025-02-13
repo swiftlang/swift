@@ -424,7 +424,6 @@ extension Instruction {
          is FloatLiteralInst,
          is ObjectInst,
          is VectorInst,
-         is AllocVectorInst,
          is UncheckedRefCastInst,
          is UpcastInst,
          is ValueToBridgeObjectInst,

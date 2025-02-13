@@ -12,7 +12,7 @@
 
 import SIL
 
-extension LoadInst : OnoneSimplifyable, SILCombineSimplifyable {
+extension LoadInst : OnoneSimplifiable, SILCombineSimplifiable {
   func simplify(_ context: SimplifyContext) {
     if optimizeLoadOfAddrUpcast(context) {
       return

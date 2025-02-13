@@ -3994,7 +3994,7 @@ public:
   /// type parameter.
   ///
   /// \code
-  /// struct Slab<let count: Int, Element: ~Copyable>
+  /// struct InlineArray<let count: Int, Element: ~Copyable>
   /// \endcode
   bool isValue() const {
     return getParamKind() == GenericTypeParamKind::Value;

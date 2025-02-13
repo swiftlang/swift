@@ -47,14 +47,6 @@ sil_global @static_global_vector : $Int32 = {
   %initval = vector (%1 : $Int32, %3 : $Int32)
 }
 
-// CHECK-LABEL: sil_global @static_global_uninitialized_vector : $Int = {
-// CHECK:         %initval = alloc_vector $Int, %0 : $Builtin.Word
-// CHECK-NEXT:  }       
-sil_global @static_global_uninitialized_vector : $Int = {
-  %0 = integer_literal $Builtin.Word, 10
-  %initval = alloc_vector $Int, %0 : $Builtin.Word
-}
-
 // Type references
 
 // Some cyclic type references between SIL function bodies.
@@ -579,17 +571,6 @@ bb0:
   %0 = global_value @static_array : $TestArrayStorage
   %1 = struct $TestArray (%0 : $TestArrayStorage)
   return %1 : $TestArray
-}
-
-// CHECK-LABEL: sil @alloc_vector :
-sil @alloc_vector : $@convention(thin) () -> () {
-bb0:
-  %0 = integer_literal $Builtin.Word, 42
-  // CHECK: %1 = alloc_vector $Int, %0 : $Builtin.Word
-  %1 = alloc_vector $Int, %0 : $Builtin.Word
-  dealloc_stack %1 : $*Int
-  %3 = tuple ()
-  return %3 : $()
 }
 
 // CHECK-LABEL: @global_code : $@convention(thin) () -> ()

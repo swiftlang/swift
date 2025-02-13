@@ -68,17 +68,10 @@ def _apply_default_arguments(args):
     # Set the default CMake generator.
     if args.cmake_generator is None:
         args.cmake_generator = 'Ninja'
-    elif args.cmake_generator == 'Xcode':
-        # Building with Xcode is deprecated.
-        args.skip_build = True
-        args.build_early_swift_driver = False
-        args.build_early_swiftsyntax = False
 
     # Set the default build variant.
     if args.build_variant is None:
-        args.build_variant = (
-            'MinSizeRel' if args.cmake_generator == 'Xcode' else 'Debug'
-        )
+        args.build_variant = 'Debug'
 
     if args.llvm_build_variant is None:
         args.llvm_build_variant = args.build_variant
@@ -1041,9 +1034,11 @@ def create_argument_parser():
     option(['-m', '--make'], store('cmake_generator'),
            const='Unix Makefiles',
            help="use CMake's Makefile generator (%(default)s by default)")
+
+    # Xcode generation is no longer supported, leave the option so we can
+    # inform the user.
     option(['-x', '--xcode'], store('cmake_generator'),
-           const='Xcode',
-           help="use CMake's Xcode generator (%(default)s by default)")
+           const='Xcode', help=argparse.SUPPRESS)
 
     # -------------------------------------------------------------------------
     in_group('Run tests')
@@ -1669,10 +1664,6 @@ To run OS X and iOS tests that don't require a device:
 To use 'make' instead of 'ninja', use '-m':
 
   [~/src/s]$ ./swift/utils/build-script -m -R
-
-To create Xcode projects that can build Swift, use '-x':
-
-  [~/src/s]$ ./swift/utils/build-script -x -R
 
 Preset mode in build-script
 ---------------------------

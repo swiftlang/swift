@@ -1515,9 +1515,6 @@ public:
     printDebugVar(AVI->getVarInfo(false),
                   &AVI->getModule().getASTContext().SourceMgr);
   }
-  void visitAllocVectorInst(AllocVectorInst *AVI) {
-    *this << AVI->getElementType() << ", " << getIDAndType(AVI->getCapacity());
-  }
   void visitAllocPackInst(AllocPackInst *API) {
     *this << API->getType().getObjectType();
   }

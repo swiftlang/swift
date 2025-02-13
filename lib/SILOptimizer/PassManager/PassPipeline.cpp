@@ -257,7 +257,6 @@ static void addMandatoryDiagnosticOptPipeline(SILPassPipelinePlan &P) {
 
   P.addMandatoryPerformanceOptimizations();
   P.addOnoneSimplification();
-  P.addAllocVectorLowering();
   P.addInitializeStaticGlobals();
 
   // MandatoryPerformanceOptimizations might create specializations that are not

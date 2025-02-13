@@ -17,6 +17,7 @@
 #include "swift/AST/Stmt.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTWalker.h"
+#include "swift/AST/AvailabilitySpec.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/Pattern.h"

@@ -12,7 +12,7 @@
 
 import SIL
 
-extension DestructureTupleInst : OnoneSimplifyable, SILCombineSimplifyable {
+extension DestructureTupleInst : OnoneSimplifiable, SILCombineSimplifiable {
   func simplify(_ context: SimplifyContext) {
 
     // If the tuple is trivial, replace
@@ -56,7 +56,7 @@ extension DestructureTupleInst : OnoneSimplifyable, SILCombineSimplifyable {
   }
 }
 
-extension DestructureStructInst : OnoneSimplifyable, SILCombineSimplifyable {
+extension DestructureStructInst : OnoneSimplifiable, SILCombineSimplifiable {
   func simplify(_ context: SimplifyContext) {
 
     // If the struct is trivial, replace

@@ -782,7 +782,6 @@ RuntimeEffect swift::getRuntimeEffect(SILInstruction *inst, SILType &impactType)
     return RuntimeEffect::MetaData;
 
   case SILInstructionKind::AllocStackInst:
-  case SILInstructionKind::AllocVectorInst:
   case SILInstructionKind::ProjectBoxInst: {
     SILType allocType = cast<SingleValueInstruction>(inst)->getType();
     if (allocType.hasArchetype() && !allocType.isLoadable(*inst->getFunction())) {

@@ -1933,8 +1933,9 @@ void ConstraintSystem::bindOverloadType(
         {FunctionType::Param(argTy, ctx.Id_dynamicMember)}, resultTy);
 
     ConstraintLocatorBuilder builder(callLoc);
-    addConstraint(ConstraintKind::ApplicableFunction, callerTy, fnTy,
-                  builder.withPathElement(ConstraintLocator::ApplyFunction));
+    addApplicationConstraint(
+        callerTy, fnTy, /*trailingClosureMatching=*/std::nullopt, useDC,
+        builder.withPathElement(ConstraintLocator::ApplyFunction));
 
     if (isExpr<KeyPathExpr>(locator->getAnchor())) {
       auto paramTy = fnTy->getParams()[0].getParameterType();
@@ -2088,8 +2089,9 @@ void ConstraintSystem::bindOverloadType(
       // Add a constraint for the inner application that uses the args of the
       // original call-site, and a fresh type var result equal to the leaf type.
       ConstraintLocatorBuilder kpLocBuilder(keyPathLoc);
-      addConstraint(
-          ConstraintKind::ApplicableFunction, adjustedFnTy, memberTy,
+      addApplicationConstraint(
+          adjustedFnTy, memberTy, /*trailingClosureMatching=*/std::nullopt,
+          useDC,
           kpLocBuilder.withPathElement(ConstraintLocator::ApplyFunction));
 
       addConstraint(ConstraintKind::Equal, subscriptResultTy, leafTy,

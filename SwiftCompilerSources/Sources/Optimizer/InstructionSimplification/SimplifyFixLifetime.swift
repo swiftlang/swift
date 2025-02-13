@@ -30,7 +30,7 @@ import SIL
 /// operand).
 /// The benefit of this transformation is that it enables other optimizations, like mem2reg.
 ///
-extension FixLifetimeInst : Simplifyable, SILCombineSimplifyable {
+extension FixLifetimeInst : Simplifiable, SILCombineSimplifiable {
   func simplify(_ context: SimplifyContext) {
     let opValue = operand.value
     guard opValue is AllocStackInst || opValue is StoreBorrowInst,

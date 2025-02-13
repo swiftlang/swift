@@ -253,6 +253,12 @@ struct AliasAnalysis {
     case let storeBorrow as StoreBorrowInst:
       return memLoc.mayAlias(with: storeBorrow.destination, self) ? .init(write: true) : .noEffects
 
+    case let mdi as MarkDependenceInst:
+      if mdi.base.type.isAddress && memLoc.mayAlias(with: mdi.base, self) {
+        return .init(read: true)
+      }
+      return .noEffects
+
     case let copy as SourceDestAddrInstruction:
       let mayRead = memLoc.mayAlias(with: copy.source, self)
       let mayWrite = memLoc.mayAlias(with: copy.destination, self)

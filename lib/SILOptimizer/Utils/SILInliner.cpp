@@ -1043,7 +1043,6 @@ InlineCost swift::instructionInlineCost(SILInstruction &I) {
   case SILInstructionKind::AllocRefInst:
   case SILInstructionKind::AllocRefDynamicInst:
   case SILInstructionKind::AllocStackInst:
-  case SILInstructionKind::AllocVectorInst:
   case SILInstructionKind::AllocPackInst:
   case SILInstructionKind::AllocPackMetadataInst:
   case SILInstructionKind::BeginApplyInst:

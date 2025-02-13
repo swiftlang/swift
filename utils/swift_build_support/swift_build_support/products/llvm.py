@@ -250,13 +250,9 @@ class LLVM(cmake_product.CMakeProduct):
             build_targets = ['llvm-tblgen', 'clang-resource-headers',
                              'intrinsics_gen', 'clang-tablegen-targets']
 
-            # If we are not performing a toolchain-only build or generating
-            # Xcode projects, then we also want to include the following
-            # targets for testing purposes.
-            if (
-                not self.args.build_toolchain_only
-                and self.args.cmake_generator != 'Xcode'
-            ):
+            # If we are not performing a toolchain-only build, then we
+            # also want to include the following targets for testing purposes.
+            if not self.args.build_toolchain_only:
                 build_targets.extend([
                     'FileCheck',
                     'not',

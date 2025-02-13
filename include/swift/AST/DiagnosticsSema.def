@@ -8212,11 +8212,11 @@ ERROR(invalid_value_for_type_same_type,none,
       "cannot constrain type parameter %0 to be integer %1", (Type, Type))
 
 //===----------------------------------------------------------------------===//
-// MARK: Slab
+// MARK: InlineArray
 //===----------------------------------------------------------------------===//
 
-ERROR(slab_literal_incorrect_count,none,
-      "expected %0 elements in slab literal, but got %1", (Type, Type))
+ERROR(inlinearray_literal_incorrect_count,none,
+      "expected %0 elements in inline array literal, but got %1", (Type, Type))
 
 //===----------------------------------------------------------------------===//
 // MARK: @abi Attribute

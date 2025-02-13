@@ -33,12 +33,12 @@ class Decl;
 /// certain context.
 class AvailabilityConstraint {
 public:
-  enum class Kind {
+  enum class Reason {
     /// The declaration is referenced in a context in which it is generally
     /// unavailable. For example, a reference to a declaration that is
     /// unavailable on macOS from a context that may execute on macOS has this
     /// constraint.
-    AlwaysUnavailable,
+    UnconditionallyUnavailable,
 
     /// The declaration is referenced in a context in which it is considered
     /// obsolete. For example, a reference to a declaration that is obsolete in
@@ -46,10 +46,10 @@ public:
     /// constraint.
     Obsoleted,
 
-    /// The declaration is only available in a different version. For example,
+    /// The declaration is only available in a later version. For example,
     /// the declaration might only be introduced in the Swift 6 language mode
     /// while the module is being compiled in the Swift 5 language mode.
-    RequiresVersion,
+    IntroducedInLaterVersion,
 
     /// The declaration is referenced in a context that does not have an
     /// adequate minimum version constraint. For example, a reference to a
@@ -58,37 +58,69 @@ public:
     /// kind of constraint can be satisfied by tightening the minimum
     /// version of the context with `if #available(...)` or by adding or
     /// adjusting an `@available` attribute.
-    IntroducedInNewerVersion,
+    IntroducedInLaterDynamicVersion,
+  };
+
+  /// Classifies constraints into different high level categories.
+  enum class Kind {
+    /// There are no contexts in which the declaration would be available.
+    Unavailable,
+
+    /// There are some contexts in which the declaration would be available if
+    /// additional constraints were added.
+    PotentiallyAvailable,
   };
 
 private:
-  llvm::PointerIntPair<SemanticAvailableAttr, 2, Kind> attrAndKind;
+  llvm::PointerIntPair<SemanticAvailableAttr, 2, Reason> attrAndReason;
 
-  AvailabilityConstraint(Kind kind, SemanticAvailableAttr attr)
-      : attrAndKind(attr, kind) {};
+  AvailabilityConstraint(Reason reason, SemanticAvailableAttr attr)
+      : attrAndReason(attr, reason) {};
 
 public:
   static AvailabilityConstraint
-  forAlwaysUnavailable(SemanticAvailableAttr attr) {
-    return AvailabilityConstraint(Kind::AlwaysUnavailable, attr);
+  unconditionallyUnavailable(SemanticAvailableAttr attr) {
+    return AvailabilityConstraint(Reason::UnconditionallyUnavailable, attr);
   }
 
-  static AvailabilityConstraint forObsoleted(SemanticAvailableAttr attr) {
-    return AvailabilityConstraint(Kind::Obsoleted, attr);
-  }
-
-  static AvailabilityConstraint forRequiresVersion(SemanticAvailableAttr attr) {
-    return AvailabilityConstraint(Kind::RequiresVersion, attr);
+  static AvailabilityConstraint obsoleted(SemanticAvailableAttr attr) {
+    return AvailabilityConstraint(Reason::Obsoleted, attr);
   }
 
   static AvailabilityConstraint
-  forIntroducedInNewerVersion(SemanticAvailableAttr attr) {
-    return AvailabilityConstraint(Kind::IntroducedInNewerVersion, attr);
+  introducedInLaterVersion(SemanticAvailableAttr attr) {
+    return AvailabilityConstraint(Reason::IntroducedInLaterVersion, attr);
   }
 
-  Kind getKind() const { return attrAndKind.getInt(); }
+  static AvailabilityConstraint
+  introducedInLaterDynamicVersion(SemanticAvailableAttr attr) {
+    return AvailabilityConstraint(Reason::IntroducedInLaterDynamicVersion,
+                                  attr);
+  }
+
+  Reason getReason() const { return attrAndReason.getInt(); }
   SemanticAvailableAttr getAttr() const {
-    return static_cast<SemanticAvailableAttr>(attrAndKind.getPointer());
+    return static_cast<SemanticAvailableAttr>(attrAndReason.getPointer());
+  }
+
+  Kind getKind() const {
+    switch (getReason()) {
+    case Reason::UnconditionallyUnavailable:
+    case Reason::Obsoleted:
+    case Reason::IntroducedInLaterVersion:
+      return Kind::Unavailable;
+    case Reason::IntroducedInLaterDynamicVersion:
+      return Kind::PotentiallyAvailable;
+    }
+  }
+
+  /// Returns true if the constraint cannot be satisfied at runtime.
+  bool isUnavailable() const { return getKind() == Kind::Unavailable; }
+
+  /// Returns true if the constraint is unsatisfied but could be satisfied at
+  /// runtime in a more constrained context.
+  bool isPotentiallyAvailable() const {
+    return getKind() == Kind::PotentiallyAvailable;
   }
 
   /// Returns the domain that the constraint applies to.
@@ -102,10 +134,6 @@ public:
   /// `std::nullopt` otherwise.
   std::optional<AvailabilityRange>
   getRequiredNewerAvailabilityRange(ASTContext &ctx) const;
-
-  /// Returns true if this unmet requirement can be satisfied by introducing an
-  /// `if #available(...)` condition in source.
-  bool isConditionallySatisfiable() const;
 
   /// Some availability constraints are active for type-checking but cannot
   /// be translated directly into an `if #available(...)` runtime query.

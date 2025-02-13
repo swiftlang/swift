@@ -114,7 +114,6 @@ static bool hasOpaqueArchetype(TypeExpansionContext context,
   // Check substitution maps.
   switch (inst.getKind()) {
   case SILInstructionKind::AllocStackInst:
-  case SILInstructionKind::AllocVectorInst:
   case SILInstructionKind::AllocPackInst:
   case SILInstructionKind::AllocPackMetadataInst:
   case SILInstructionKind::AllocRefInst:

@@ -20,6 +20,7 @@
 #include "swift/AST/ASTVisitor.h"
 #include "swift/AST/Attr.h"
 #include "swift/AST/AutoDiff.h"
+#include "swift/AST/AvailabilitySpec.h"
 #include "swift/AST/ClangModuleLoader.h"
 #include "swift/AST/ForeignAsyncConvention.h"
 #include "swift/AST/ForeignErrorConvention.h"
@@ -1117,7 +1118,7 @@ namespace {
               printHead("platform_agnostic_version_constraint_"
                         "availability_spec",
                         PatternColor, label);
-              printField(agnostic->isLanguageVersionSpecific()
+              printField(agnostic->getDomain()->isSwiftLanguage()
                              ? "swift"
                              : "package_description",
                          Label::always("kind"));

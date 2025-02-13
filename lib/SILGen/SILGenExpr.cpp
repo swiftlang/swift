@@ -4098,7 +4098,6 @@ lowerKeyPathSubscriptIndexTypes(
                  SmallVectorImpl<IndexTypePair> &indexPatterns,
                  SubscriptDecl *subscript,
                  SubstitutionMap subscriptSubs,
-                 ResilienceExpansion expansion,
                  bool &needsGenericContext) {
   // Capturing an index value dependent on the generic context means we
   // need the generic context captured in the key path.
@@ -4118,7 +4117,8 @@ lowerKeyPathSubscriptIndexTypes(
 
     auto indexLoweredTy = SGM.Types.getLoweredType(
         AbstractionPattern::getOpaque(), indexTy,
-        TypeExpansionContext::noOpaqueTypeArchetypesSubstitution(expansion));
+        TypeExpansionContext::noOpaqueTypeArchetypesSubstitution(
+          ResilienceExpansion::Minimal));
     indexLoweredTy = indexLoweredTy.mapTypeOutOfContext();
     indexPatterns.push_back({indexTy->mapTypeOutOfContext()
                                     ->getCanonicalType(),
@@ -4347,7 +4347,6 @@ SILGenModule::emitKeyPathComponentForDecl(SILLocation loc,
     SmallVector<IndexTypePair, 4> indexTypes;
     lowerKeyPathSubscriptIndexTypes(*this, indexTypes,
                                     decl, subs,
-                                    expansion,
                                     needsGenericContext);
     
     SmallVector<KeyPathPatternComponent::Index, 4> indexPatterns;
@@ -4600,17 +4599,17 @@ visitMagicIdentifierLiteralExpr(MagicIdentifierLiteralExpr *E, SGFContext C) {
   llvm_unreachable("Unhandled MagicIdentifierLiteralExpr in switch.");
 }
 
-static RValue emitSlabLiteral(SILGenFunction &SGF, CollectionExpr *E,
+static RValue emitInlineArrayLiteral(SILGenFunction &SGF, CollectionExpr *E,
                               SGFContext C) {
   ArgumentScope scope(SGF, E);
 
-  auto slabType = E->getType()->castTo<BoundGenericType>();
-  auto loweredSlabType = SGF.getLoweredType(slabType);
-  auto elementType = slabType->getGenericArgs()[1]->getCanonicalType();
+  auto iaTy = E->getType()->castTo<BoundGenericType>();
+  auto loweredIAType = SGF.getLoweredType(iaTy);
+  auto elementType = iaTy->getGenericArgs()[1]->getCanonicalType();
   auto loweredElementType = SGF.getLoweredType(elementType);
   auto &eltTL = SGF.getTypeLowering(AbstractionPattern::getOpaque(), elementType);
 
-  SILValue alloc = SGF.emitTemporaryAllocation(E, loweredSlabType);
+  SILValue alloc = SGF.emitTemporaryAllocation(E, loweredIAType);
   SILValue addr = SGF.B.createUncheckedAddrCast(E, alloc,
                                             loweredElementType.getAddressType());
 
@@ -4643,31 +4642,31 @@ static RValue emitSlabLiteral(SILGenFunction &SGF, CollectionExpr *E,
         .forwardInto(SGF, AbstractionPattern::getOpaque(), &init, eltTL);
   }
 
-  // Kill the per-element cleanups. The slab will take ownership of them.
+  // Kill the per-element cleanups. The inline array will take ownership of them.
   for (auto destCleanup : cleanups)
     SGF.Cleanups.setCleanupState(destCleanup, CleanupState::Dead);
 
-  SILValue slabVal;
+  SILValue iaVal;
 
-  // If the slab is naturally address-only, then we can adopt the stack slot
-  // as the value directly.
-  if (loweredSlabType.isAddressOnly(SGF.F)) {
-    slabVal = SGF.B.createUncheckedAddrCast(E, alloc, loweredSlabType);
+  // If the inline array is naturally address-only, then we can adopt the stack
+  // slot as the value directly.
+  if (loweredIAType.isAddressOnly(SGF.F)) {
+    iaVal = SGF.B.createUncheckedAddrCast(E, alloc, loweredIAType);
   } else {
-    // Otherwise, this slab is loadable. Load it.
-    slabVal = SGF.B.createTrivialLoadOr(E, alloc, LoadOwnershipQualifier::Take);
+    // Otherwise, this inline array is loadable. Load it.
+    iaVal = SGF.B.createTrivialLoadOr(E, alloc, LoadOwnershipQualifier::Take);
   }
 
-  auto slabMV = SGF.emitManagedRValueWithCleanup(slabVal);
-  auto slab = RValue(SGF, E, slabMV);
+  auto iaMV = SGF.emitManagedRValueWithCleanup(iaVal);
+  auto ia = RValue(SGF, E, iaMV);
 
-  return scope.popPreservingValue(std::move(slab));
+  return scope.popPreservingValue(std::move(ia));
 }
 
 RValue RValueEmitter::visitCollectionExpr(CollectionExpr *E, SGFContext C) {
-  // Handle 'Slab' literals separately.
-  if (E->getType()->isSlab()) {
-    return emitSlabLiteral(SGF, E, C);
+  // Handle 'InlineArray' literals separately.
+  if (E->getType()->isInlineArray()) {
+    return emitInlineArrayLiteral(SGF, E, C);
   }
 
   auto loc = SILLocation(E);

@@ -1023,11 +1023,6 @@ set(SWIFT_GYB_FLAGS
 set(SWIFT_MODULE_CACHE_PATH
     "${CMAKE_BINARY_DIR}/${CMAKE_CFG_INTDIR}/module-cache")
 
-# Xcode: use libc++ and c++11 using proper build settings.
-if(XCODE)
-  swift_common_xcode_cxx_config()
-endif()
-
 # Check what linux distribution is being used.
 # This can be used to determine the default linker to use.
 if(CMAKE_VERSION VERSION_GREATER_EQUAL "3.22")

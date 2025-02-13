@@ -10,18 +10,16 @@
 
 // REQUIRES: swift_stdlib_no_asserts, optimized_stdlib
 
-// In Inputs/SpanExtras.swift we have @available(macOS 9999, *):
-// REQUIRES: OS=macosx
-
 import SpanExtras
 
 // Bounds check should be eliminated
-// SIL does not optimize this
-// LLVM leaves behind a lower bound check outside the loop, does not vectorize the loop
+// SIL removes lower bounds check
+// LLVM removes upper bounds check and vectorizes the loop
 
 // CHECK-SIL-LABEL: sil @$s31mutable_span_bounds_check_tests0B10_zero_inityy10SpanExtras07MutableH0VySiGzF : 
 // CHECK-SIL: bb3({{.*}}):
 // CHECK-SIL: cond_fail {{.*}}, "precondition failure"
+// CHECK-SIL-NOT: cond_fail {{.*}}, "precondition failure"
 // CHECK-SIL: cond_br
 // CHECK-SIL-LABEL: } // end sil function '$s31mutable_span_bounds_check_tests0B10_zero_inityy10SpanExtras07MutableH0VySiGzF'
 
@@ -35,12 +33,13 @@ public func span_zero_init(_ output: inout MutableSpan<Int>) {
 }
 
 // Bounds check should be eliminated
-// SIL does not optimize this
-// LLVM leaves behind a lower bound check outside the loop, does not vectorize the loop or reduce to a memcopy
+// SIL removes lower bounds check
+// LLVM removes upper bounds check and vectorizes the loop
 
 // CHECK-SIL-LABEL: sil @$s31mutable_span_bounds_check_tests0B14_copy_elemwiseyy10SpanExtras07MutableH0VySiGz_s0H0VySiGtF :
 // CHECK-SIL: bb3({{.*}}):
 // CHECK-SIL: cond_fail {{.*}}, "precondition failure"
+// CHECK-SIL-NOT: cond_fail {{.*}}, "precondition failure"
 // CHECK-SIL: cond_br
 // CHECK-SIL-LABEL: } // end sil function '$s31mutable_span_bounds_check_tests0B14_copy_elemwiseyy10SpanExtras07MutableH0VySiGz_s0H0VySiGtF'
 
@@ -55,11 +54,13 @@ public func span_copy_elemwise(_ output: inout MutableSpan<Int>, _ input: Span<I
 }
 
 // Bounds check should be eliminated
-// SIL does not optimize this
+// SIL removes lower bounds check
+// LLVM removes upper bounds check and vectorizes the loop
 
 // CHECK-SIL-LABEL: sil @$s31mutable_span_bounds_check_tests0B16_append_elemwiseyy10SpanExtras06OutputH0VySiGz_s0H0VySiGtF : 
 // CHECK-SIL: bb3({{.*}}):
 // CHECK-SIL: cond_fail {{.*}}, "precondition failure"
+// CHECK-SIL-NOT: cond_fail {{.*}}, "precondition failure"
 // CHECK-SIL: cond_br
 // CHECK-SIL-LABEL: } // end sil function '$s31mutable_span_bounds_check_tests0B16_append_elemwiseyy10SpanExtras06OutputH0VySiGz_s0H0VySiGtF'
 
@@ -73,11 +74,11 @@ public func span_append_elemwise(_ output: inout OutputSpan<Int>, _ input: Span<
 }
 
 // Bounds check should be eliminated
-// SIL does not optimize this
 
 // CHECK-SIL-LABEL: sil @$s31mutable_span_bounds_check_tests0B12_sum_wo_trapyy10SpanExtras07MutableI0VySiGz_s0I0VySiGAItF : 
 // CHECK-SIL: bb3({{.*}}):
 // CHECK-SIL: cond_fail {{.*}}, "precondition failure"
+// CHECK-SIL-NOT: cond_fail {{.*}}, "precondition failure"
 // CHECK-SIL: cond_br
 // CHECK-SIL-LABEL: } // end sil function '$s31mutable_span_bounds_check_tests0B12_sum_wo_trapyy10SpanExtras07MutableI0VySiGz_s0I0VySiGAItF'
 
@@ -95,6 +96,7 @@ public func span_sum_wo_trap(_ output: inout MutableSpan<Int>, _ input1: Span<In
 // CHECK-SIL-LABEL: sil @$s31mutable_span_bounds_check_tests0B14_sum_with_trapyy10SpanExtras07MutableI0VySiGz_s0I0VySiGAItF :
 // CHECK-SIL: bb3({{.*}}):
 // CHECK-SIL: cond_fail {{.*}}, "precondition failure"
+// CHECK-SIL-NOT: cond_fail {{.*}}, "precondition failure"
 // CHECK-SIL: cond_br
 // CHECK-SIL-LABEL: } // end sil function '$s31mutable_span_bounds_check_tests0B14_sum_with_trapyy10SpanExtras07MutableI0VySiGz_s0I0VySiGAItF'
 
@@ -108,6 +110,7 @@ public func span_sum_with_trap(_ output: inout MutableSpan<Int>, _ input1: Span<
 
 // CHECK-SIL-LABEL: sil @$s31mutable_span_bounds_check_tests0B12_bubble_sortyy10SpanExtras07MutableH0VySiGzF : 
 // CHECK-SIL: bb11({{.*}}):
+// CHECK-SIL: cond_fail {{.*}}, "precondition failure"
 // CHECK-SIL: cond_fail {{.*}}, "precondition failure"
 // CHECK-SIL: cond_br
 // CHECK-SIL-LABEL: } // end sil function '$s31mutable_span_bounds_check_tests0B12_bubble_sortyy10SpanExtras07MutableH0VySiGzF'
@@ -127,7 +130,7 @@ public func span_bubble_sort(_ span: inout MutableSpan<Int>) {
 }
 
 // CHECK-SIL-LABEL: sil @$s31mutable_span_bounds_check_tests6sortedySb10SpanExtras07MutableG0VySiGF : 
-// CHECK-SIL: bb4({{.*}}):
+// CHECK-SIL: bb4:
 // CHECK-SIL: cond_fail {{.*}}, "precondition failure"
 // CHECK-SIL: cond_fail {{.*}}, "precondition failure"
 // CHECK-SIL: cond_br

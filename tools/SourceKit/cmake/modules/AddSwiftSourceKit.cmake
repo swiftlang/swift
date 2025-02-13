@@ -212,7 +212,7 @@ macro(add_sourcekit_library name)
   set(srcs ${SOURCEKITLIB_UNPARSED_ARGUMENTS})
 
   llvm_process_sources(srcs ${srcs})
-  if(MSVC_IDE OR XCODE)
+  if(MSVC_IDE)
     # Add public headers
     file(RELATIVE_PATH lib_path
       ${SOURCEKIT_SOURCE_DIR}/lib/
@@ -406,9 +406,9 @@ macro(add_sourcekit_framework name)
     endif()
   endforeach()
 
-  if(MSVC_IDE OR XCODE)
+  if(MSVC_IDE)
     set_source_files_properties(${headers} PROPERTIES HEADER_FILE_ONLY ON)
-  endif(MSVC_IDE OR XCODE)
+  endif(MSVC_IDE)
 
   if(LLVM_COMMON_DEPENDS)
     add_dependencies(${name} ${LLVM_COMMON_DEPENDS})

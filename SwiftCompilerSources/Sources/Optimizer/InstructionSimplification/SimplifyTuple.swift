@@ -12,7 +12,7 @@
 
 import SIL
 
-extension TupleInst : OnoneSimplifyable {
+extension TupleInst : OnoneSimplifiable {
   func simplify(_ context: SimplifyContext) {
 
     // Eliminate the redundant instruction pair

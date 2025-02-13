@@ -1801,13 +1801,6 @@ public:
     // It's illegal code but the compiler should not crash on it.
   }
 
-  void checkAllocVectorInst(AllocVectorInst *AI) {
-    require(AI->getType().isAddress(),
-            "result of alloc_vector must be an address type");
-    require(AI->getOperand()->getType().is<BuiltinIntegerType>(),
-            "capacity needs integer type");
-  }
-
   void checkAllocPackInst(AllocPackInst *AI) {
     requireAddressType(SILPackType, AI->getType(),
                        "result of alloc_pack must be an address of "
@@ -3804,13 +3797,10 @@ public:
     };
     require(isa<SILUndef>(DI->getOperand()) ||
                 isa<AllocStackInst>(DI->getOperand()) ||
-                isa<AllocVectorInst>(DI->getOperand()) ||
                 (isa<PartialApplyInst>(DI->getOperand()) &&
                  cast<PartialApplyInst>(DI->getOperand())->isOnStack()) ||
                 (isTokenFromCalleeAllocatedBeginApply(DI->getOperand())),
-            "Operand of dealloc_stack must be an alloc_stack, alloc_vector or "
-            "partial_apply "
-            "[stack]");
+            "Operand of dealloc_stack must be an alloc_stack or partial_apply [stack]");
   }
   void checkDeallocPackInst(DeallocPackInst *DI) {
     require(isa<SILUndef>(DI->getOperand()) ||

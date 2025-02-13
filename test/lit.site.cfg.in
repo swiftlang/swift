@@ -121,13 +121,6 @@ if "@SWIFT_ENABLE_REFLECTION@" == "TRUE":
 if "@SWIFT_ENABLE_RUNTIME_FUNCTION_COUNTERS@" == "TRUE":
     config.available_features.add('runtime_function_counters')
 
-if "@CMAKE_GENERATOR@" == "Xcode":
-    xcode_bin_dir = os.path.join(config.llvm_obj_root, "@LLVM_BUILD_TYPE@",
-                                 'bin')
-    lit_config.note('Adding to path: ' + xcode_bin_dir)
-    config.environment['PATH'] = \
-      os.path.pathsep.join((xcode_bin_dir, config.environment['PATH']))
-
 config.available_features.add("CMAKE_GENERATOR=@CMAKE_GENERATOR@")
 
 if "@SWIFT_ENABLE_MACCATALYST@" == "TRUE":

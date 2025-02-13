@@ -8364,8 +8364,9 @@ ConstraintSystem::simplifyConstructionConstraint(
                   paramTypeVar, locator);
   }
 
-  addConstraint(ConstraintKind::ApplicableFunction, fnType, memberType,
-                fnLocator);
+  addApplicationConstraint(fnType, memberType,
+                           /*trailingClosureMatching=*/std::nullopt, useDC,
+                           fnLocator);
 
   return SolutionKind::Solved;
 }
@@ -8708,30 +8709,30 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyConformsToConstraint(
     auto anchor = loc->getAnchor();
     auto arrayLiteral = getAsExpr<ArrayExpr>(anchor);
 
-    // If we're attempting to bind an array literal to a 'Slab' parameter,
-    // then check if the counts are equal and solve.
+    // If we're attempting to bind an array literal to an 'InlineArray'
+    // parameter, then check if the counts are equal and solve.
     if (kind == ConstraintKind::LiteralConformsTo &&
         protocol == arrayLiteralProto &&
-        type->isSlab() &&
+        type->isInlineArray() &&
         arrayLiteral) {
-      auto slabTy = type->castTo<BoundGenericStructType>();
+      auto iaTy = type->castTo<BoundGenericStructType>();
 
       // <let count: Int, Element>
       // Attempt to bind the number of elements in the literal with the
       // contextual count. This will diagnose if the literal does not enough
       // or too many elements.
-      auto contextualCount = slabTy->getGenericArgs()[0];
+      auto contextualCount = iaTy->getGenericArgs()[0];
       auto literalCount = IntegerType::get(
           std::to_string(arrayLiteral->getNumElements()),
           /* isNegative */ false,
-          slabTy->getASTContext());
+          iaTy->getASTContext());
 
       // If the counts are already equal, '2' == '2', then we're done.
       if (contextualCount->isEqual(literalCount)) {
         return SolutionKind::Solved;
       }
 
-      // If our contextual count is not known, e.g., Slab<_, Int> = [1, 2],
+      // If our contextual count is not known, e.g., InlineArray<_, Int> = [1, 2],
       // then just eagerly bind the count to what the literal count is.
       if (contextualCount->isTypeVariableOrMember()) {
         addConstraint(ConstraintKind::Bind, contextualCount, literalCount,
@@ -8743,8 +8744,9 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyConformsToConstraint(
       if (!shouldAttemptFixes())
         return SolutionKind::Error;
 
-      auto fix = AllowSlabLiteralCountMismatch::create(*this, contextualCount,
-                                                       literalCount, loc);
+      auto fix = AllowInlineArrayLiteralCountMismatch::create(*this,
+                                                              contextualCount,
+                                                              literalCount, loc);
       return recordFix(fix) ? SolutionKind::Error : SolutionKind::Solved;
     }
   } break;
@@ -13106,14 +13108,11 @@ createImplicitRootForCallAsFunction(ConstraintSystem &cs, Type refType,
 }
 
 ConstraintSystem::SolutionKind ConstraintSystem::simplifyApplicableFnConstraint(
-    Type type1, Type type2,
+    FunctionType *func1, Type type2,
     std::optional<TrailingClosureMatching> trailingClosureMatching,
+    DeclContext *useDC,
     TypeMatchOptions flags, ConstraintLocatorBuilder locator) {
   auto &ctx = getASTContext();
-
-  // By construction, the left hand side is a type that looks like the
-  // following: $T1 -> $T2.
-  auto func1 = type1->castTo<FunctionType>();
 
   // Before stripping lvalue-ness and optional types, save the original second
   // type for handling `func callAsFunction` and `@dynamicCallable`
@@ -13171,7 +13170,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyApplicableFnConstraint(
   auto formUnsolved = [&](bool activate = false) {
     if (flags.contains(TMF_GenerateConstraints)) {
       auto *application = Constraint::createApplicableFunction(
-          *this, type1, type2, trailingClosureMatching,
+          *this, func1, type2, trailingClosureMatching, useDC,
           getConstraintLocator(locator));
 
       addUnsolvedConstraint(application);
@@ -13201,7 +13200,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyApplicableFnConstraint(
   // If the types are obviously equivalent, we're done. This optimization
   // is not valid for operators though, where an inout parameter does not
   // have an explicit inout argument.
-  if (type1.getPointer() == desugar2) {
+  if (func1 == desugar2) {
     // Note that this could throw.
     recordPotentialThrowSite(
         PotentialThrowSite::Application, Type(desugar2), outerLocator);
@@ -13232,8 +13231,8 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyApplicableFnConstraint(
                              /*outerAlternatives*/ {}, memberLoc);
     // Add new applicable function constraint based on the member type
     // variable.
-    addConstraint(ConstraintKind::ApplicableFunction, func1, memberTy,
-                  locator);
+    addApplicationConstraint(func1, memberTy, trailingClosureMatching, useDC,
+                             locator);
     return SolutionKind::Solved;
   }
 
@@ -13348,9 +13347,9 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyApplicableFnConstraint(
         // Form an unsolved constraint to apply trailing closures to a
         // callable type produced by `.init`. This constraint would become
         // active when `callableType` is bound.
-        addUnsolvedConstraint(Constraint::create(
-            *this, ConstraintKind::ApplicableFunction, callAsFunctionArguments,
-            callableType,
+        addUnsolvedConstraint(Constraint::createApplicableFunction(
+            *this, callAsFunctionArguments, callableType,
+            trailingClosureMatching, useDC,
             getConstraintLocator(implicitRef,
                                  ConstraintLocator::ApplyFunction)));
         break;
@@ -13368,12 +13367,13 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyApplicableFnConstraint(
 
       auto applyLocator = getConstraintLocator(locator);
       auto forwardConstraint = Constraint::createApplicableFunction(
-          *this, type1, type2, TrailingClosureMatching::Forward, applyLocator);
-      auto backwardConstraint = Constraint::createApplicableFunction(
-          *this, type1, type2, TrailingClosureMatching::Backward,
+          *this, func1, type2, TrailingClosureMatching::Forward, useDC,
           applyLocator);
-      addDisjunctionConstraint(
-          { forwardConstraint, backwardConstraint}, applyLocator);
+      auto backwardConstraint = Constraint::createApplicableFunction(
+          *this, func1, type2, TrailingClosureMatching::Backward, useDC,
+          applyLocator);
+      addDisjunctionConstraint({forwardConstraint, backwardConstraint},
+                               applyLocator);
       break;
     }
 
@@ -13450,7 +13450,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyApplicableFnConstraint(
     // Construct the instance from the input arguments.
     auto simplified = simplifyConstructionConstraint(
         instance2, func1, subflags,
-        /*FIXME?*/ DC, FunctionRefInfo::singleBaseNameApply(),
+        useDC, FunctionRefInfo::singleBaseNameApply(),
         getConstraintLocator(outerLocator));
 
     // Record any fixes we attempted to get to the correct solution.
@@ -13469,7 +13469,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyApplicableFnConstraint(
 
   // Handle applications of @dynamicCallable types.
   auto result = simplifyDynamicCallableApplicableFnConstraint(
-      type1, origType2, subflags, locator);
+      func1, origType2, subflags, locator);
 
   if (shouldAttemptFixes() && result == SolutionKind::Error) {
     // Skip this fix if the type is not yet resolved or
@@ -15641,7 +15641,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
   case FixKind::IgnoreInvalidPlaceholder:
   case FixKind::IgnoreOutOfPlaceThenStmt:
   case FixKind::IgnoreMissingEachKeyword:
-  case FixKind::AllowSlabLiteralCountMismatch:
+  case FixKind::AllowInlineArrayLiteralCountMismatch:
     llvm_unreachable("handled elsewhere");
   }
 
@@ -15673,15 +15673,6 @@ ConstraintSystem::addConstraintImpl(ConstraintKind kind, Type first,
   case ConstraintKind::BridgingConversion:
     return simplifyBridgingConstraint(first, second, subflags, locator);
 
-  case ConstraintKind::ApplicableFunction: {
-    // First try to simplify the overload set for the function being applied.
-    if (simplifyAppliedOverloads(second, first->castTo<FunctionType>(),
-                                 locator)) {
-      return SolutionKind::Error;
-    }
-    return simplifyApplicableFnConstraint(first, second, std::nullopt, subflags,
-                                          locator);
-  }
   case ConstraintKind::DynamicCallableApplicableFunction:
     return simplifyDynamicCallableApplicableFnConstraint(first, second,
                                                          subflags, locator);
@@ -15762,6 +15753,7 @@ ConstraintSystem::addConstraintImpl(ConstraintKind kind, Type first,
   case ConstraintKind::KeyPathApplication:
   case ConstraintKind::FallbackType:
   case ConstraintKind::SyntacticElement:
+  case ConstraintKind::ApplicableFunction:
     llvm_unreachable("Use the correct addConstraint()");
   }
 
@@ -15990,6 +15982,41 @@ void ConstraintSystem::addConstraint(ConstraintKind kind, Type first,
   }
 }
 
+void ConstraintSystem::addApplicationConstraint(
+    FunctionType *appliedFn, Type calleeType,
+    std::optional<TrailingClosureMatching> trailingClosureMatching,
+    DeclContext *useDC,
+    ConstraintLocatorBuilder locator) {
+  auto recordFailure = [&]() {
+    if (shouldRecordFailedConstraint()) {
+      auto *c = Constraint::createApplicableFunction(
+          *this, appliedFn, calleeType, trailingClosureMatching, useDC,
+          getConstraintLocator(locator));
+      recordFailedConstraint(c);
+    }
+  };
+
+  // First try to simplify the overload set for the function being applied.
+  if (simplifyAppliedOverloads(calleeType, appliedFn, locator)) {
+    recordFailure();
+    return;
+  }
+
+  switch (simplifyApplicableFnConstraint(appliedFn, calleeType,
+                                         trailingClosureMatching, useDC,
+                                         TMF_GenerateConstraints, locator)) {
+  case SolutionKind::Error:
+    recordFailure();
+    break;
+
+  case SolutionKind::Unsolved:
+    llvm_unreachable("should have generated constraints");
+
+  case SolutionKind::Solved:
+    return;
+  }
+}
+
 void ConstraintSystem::addContextualConversionConstraint(
     Expr *expr, Type conversionType, ContextualTypePurpose purpose,
     ConstraintLocator *locator) {
@@ -16174,8 +16201,9 @@ ConstraintSystem::simplifyConstraint(const Constraint &constraint) {
 
   case ConstraintKind::ApplicableFunction:
     return simplifyApplicableFnConstraint(
-        constraint.getFirstType(), constraint.getSecondType(),
-        constraint.getTrailingClosureMatching(), std::nullopt,
+        constraint.getAppliedFunctionType(), constraint.getCalleeType(),
+        constraint.getTrailingClosureMatching(),
+        constraint.getApplicationDC(), /*flags=*/std::nullopt,
         constraint.getLocator());
 
   case ConstraintKind::DynamicCallableApplicableFunction:

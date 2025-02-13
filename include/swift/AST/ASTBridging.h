@@ -654,12 +654,12 @@ BridgedSourceRange
 BridgedAvailabilitySpec_getVersionRange(BridgedAvailabilitySpec spec);
 
 SWIFT_NAME("BridgedPlatformVersionConstraintAvailabilitySpec.createParsed(_:"
-           "platform:platformLoc:version:runtimeVersion:versionRange:)")
+           "platform:platformLoc:version:versionRange:)")
 BridgedPlatformVersionConstraintAvailabilitySpec
 BridgedPlatformVersionConstraintAvailabilitySpec_createParsed(
     BridgedASTContext cContext, BridgedPlatformKind cPlatform,
     BridgedSourceLoc cPlatformLoc, BridgedVersionTuple cVersion,
-    BridgedVersionTuple cRuntimeVersion, BridgedSourceRange cVersionSrcRange);
+    BridgedSourceRange cVersionSrcRange);
 
 SWIFT_NAME("BridgedPlatformAgnosticVersionConstraintAvailabilitySpec."
            "createParsed(_:kind:nameLoc:version:versionRange:)")

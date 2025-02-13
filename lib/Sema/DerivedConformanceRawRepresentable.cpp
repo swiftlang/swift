@@ -20,6 +20,7 @@
 #include "TypeCheckAvailability.h"
 #include "TypeCheckDecl.h"
 #include "TypeChecker.h"
+#include "swift/AST/AvailabilitySpec.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/ParameterList.h"
@@ -200,9 +201,7 @@ struct RuntimeVersionCheck {
   Stmt *createEarlyReturnStmt(ASTContext &C) const {
     // platformSpec = "\(attr.platform) \(attr.introduced)"
     auto platformSpec = new (C) PlatformVersionConstraintAvailabilitySpec(
-                            Platform, SourceLoc(),
-                            Version, Version, SourceLoc()
-                        );
+        Platform, SourceLoc(), Version, SourceLoc());
 
     // otherSpec = "*"
     auto otherSpec = new (C) OtherPlatformAvailabilitySpec(SourceLoc());
@@ -248,14 +247,14 @@ checkAvailability(const EnumElementDecl *elt,
   if (!constraint)
     return true;
 
+  // Is it never available?
+  if (constraint->isUnavailable())
+    return false;
+
   // Some constraints are active for type checking but can't translate to
   // runtime restrictions.
   if (!constraint->isActiveForRuntimeQueries(C))
     return true;
-
-  // Is it never available?
-  if (!constraint->isConditionallySatisfiable())
-    return false;
 
   // It's conditionally available; create a version constraint and return true.
   auto platform = constraint->getPlatform();

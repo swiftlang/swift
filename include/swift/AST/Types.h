@@ -7246,7 +7246,7 @@ public:
   /// Returns \c true if this type parameter is declared as a value.
   ///
   /// \code
-  /// struct Slab<let count: Int, Element: ~Copyable>
+  /// struct InlineArray<let count: Int, Element: ~Copyable>
   /// \endcode
   bool isValue() const {
     return ParamKind == GenericTypeParamKind::Value;

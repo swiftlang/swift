@@ -1021,12 +1021,6 @@ if [[ "${CHECK_ARGS_ONLY}" ]]; then
     exit 0
 fi
 
-# FIXME: We currently do not support building compiler-rt with the
-# Xcode generator.
-if [[ "${CMAKE_GENERATOR}" == "Xcode" ]]; then
-    SKIP_BUILD_COMPILER_RT=1
-fi
-
 if [[ "${SKIP_RECONFIGURE}" ]]; then
     RECONFIGURE=""
 fi
@@ -1295,10 +1289,6 @@ eval BUILD_ARGS=(${BUILD_ARGS})
 eval CMAKE_BUILD=("${DISTCC_PUMP}" "${CMAKE}" "--build")
 
 
-if [[ "${CMAKE_GENERATOR}" == "Xcode" ]]; then
-    BUILD_TARGET_FLAG="-target"
-fi
-
 function build_directory() {
     host=$1
     product=$2
@@ -1309,40 +1299,7 @@ function build_directory_bin() {
     host=$1
     product=$2
     root="$(build_directory ${host} ${product})"
-    if [[ "${CMAKE_GENERATOR}" == "Xcode" ]] ; then
-        case ${product} in
-            llvm)
-                echo "${root}/${LLVM_BUILD_TYPE}/bin"
-                ;;
-            libcxx)
-                # Reuse LLVM's build type.
-                echo "${root}/${LLVM_BUILD_TYPE}/bin"
-                ;;
-            swift)
-                echo "${root}/${SWIFT_BUILD_TYPE}/bin"
-                ;;
-            lldb)
-                ;;
-            llbuild)
-                echo "${root}/${LLBUILD_BUILD_TYPE}/bin"
-                ;;
-            xctest)
-                echo "${root}/${XCTEST_BUILD_TYPE}/bin"
-                ;;
-            foundation|foundation_static|foundation_macros)
-                echo "${root}/${FOUNDATION_BUILD_TYPE}/bin"
-                ;;
-            libdispatch|libdispatch_static)
-                echo "${root}/${LIBDISPATCH_BUILD_TYPE}/bin"
-                ;;
-            *)
-                echo "error: unknown product: ${product}"
-                exit 1
-                ;;
-        esac
-    else
-        echo "${root}/bin"
-    fi
+    echo "${root}/bin"
 }
 
 function is_cmake_release_build_type() {
@@ -1447,41 +1404,6 @@ function common_swift_flags() {
         exit 1
     fi
     echo -n "${SWIFT_FLAGS[@]} ${COMMON_SWIFT_FLAGS} -module-cache-path \"${module_cache}\" "
-}
-
-function cmake_config_opt() {
-    product=$1
-    if [[ "${CMAKE_GENERATOR}" == "Xcode" ]] ; then
-        # CMake automatically adds --target ALL_BUILD if we don't pass this.
-        echo "--target ZERO_CHECK "
-        case ${product} in
-            libcxx)
-                # Reuse LLVM's build type.
-                echo "--config ${LLVM_BUILD_TYPE}"
-                ;;
-            swift)
-                echo "--config ${SWIFT_BUILD_TYPE}"
-                ;;
-            lldb)
-                ;;
-            llbuild)
-                echo "--config ${LLBUILD_BUILD_TYPE}"
-                ;;
-            xctest)
-                echo "--config ${XCTEST_BUILD_TYPE}"
-                ;;
-            foundation|foundation_static|foundation_macros)
-                echo "--config ${FOUNDATION_BUILD_TYPE}"
-                ;;
-            libdispatch|libdispatch_static)
-                echo "--config ${LIBDISPATCH_BUILD_TYPE}"
-                ;;
-            *)
-                echo "error: unknown product: ${product}"
-                exit 1
-                ;;
-        esac
-    fi
 }
 
 #
@@ -2639,18 +2561,7 @@ for host in "${ALL_HOSTS[@]}"; do
 
         # Build.
         if [[ $(not ${SKIP_BUILD}) ]]; then
-            if [[ "${CMAKE_GENERATOR}" == "Xcode" ]] ; then
-                # Xcode generator uses "ALL_BUILD" instead of "all".
-                # Also, xcodebuild uses -target instead of bare names.
-                build_targets=("${build_targets[@]/all/ALL_BUILD}")
-                build_targets=("${build_targets[@]/#/${BUILD_TARGET_FLAG} }")
-
-                # Xcode can't restart itself if it turns out we need to reconfigure.
-                # Do an advance build to handle that.
-                call "${CMAKE_BUILD[@]}" "${build_dir}" $(cmake_config_opt ${product})
-            fi
-
-            call "${CMAKE_BUILD[@]}" "${build_dir}" $(cmake_config_opt ${product}) -- "${BUILD_ARGS[@]}" ${build_targets[@]}
+            call "${CMAKE_BUILD[@]}" "${build_dir}" -- "${BUILD_ARGS[@]}" ${build_targets[@]}
         fi
     done
 done
@@ -2867,11 +2778,11 @@ for host in "${ALL_HOSTS[@]}"; do
 
         trap "tests_busted ${product} ''" ERR
         build_dir=$(build_directory ${host} ${product})
-        build_cmd=("${CMAKE_BUILD[@]}" "${build_dir}" $(cmake_config_opt ${product}) -- "${BUILD_ARGS[@]}")
+        build_cmd=("${CMAKE_BUILD[@]}" "${build_dir}" -- "${BUILD_ARGS[@]}")
 
         if [[ "${executable_target}" != "" ]]; then
             echo "--- Building tests for ${product} ---"
-            call "${build_cmd[@]}" ${BUILD_TARGET_FLAG} "${executable_target}"
+            call "${build_cmd[@]}" "${executable_target}"
         fi
 
         # We can only run tests built for the host machine, because
@@ -2892,7 +2803,7 @@ for host in "${ALL_HOSTS[@]}"; do
                     test_target="${test_target}-custom"
                 fi
 
-                call "${build_cmd[@]}" ${BUILD_TARGET_FLAG} ${test_target}
+                call "${build_cmd[@]}" ${test_target}
 
                 echo "-- ${target} finished --"
             fi

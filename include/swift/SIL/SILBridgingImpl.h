@@ -2003,10 +2003,6 @@ BridgedInstruction BridgedBuilder::createAllocStack(BridgedType type,
       swift::UsesMoveableValueDebugInfo_t(wasMoved), /*skipVarDeclAssert=*/ true)};
 }
 
-BridgedInstruction BridgedBuilder::createAllocVector(BridgedValue capacity, BridgedType type) const {
-  return {unbridged().createAllocVector(regularLoc(), capacity.getSILValue(), type.unbridged())};
-}
-
 BridgedInstruction BridgedBuilder::createDeallocStack(BridgedValue operand) const {
   return {unbridged().createDeallocStack(regularLoc(), operand.getSILValue())};
 }
