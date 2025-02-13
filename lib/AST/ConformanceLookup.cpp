@@ -381,10 +381,36 @@ static ProtocolConformanceRef getBuiltinMetaTypeTypeConformance(
     Type type, const AnyMetatypeType *metatypeType, ProtocolDecl *protocol) {
   ASTContext &ctx = protocol->getASTContext();
 
-  // All metatypes are Sendable, Copyable, Escapable, and BitwiseCopyable.
+  // All metatypes are Copyable, Escapable, and BitwiseCopyable.
   if (auto kp = protocol->getKnownProtocolKind()) {
     switch (*kp) {
     case KnownProtocolKind::Sendable:
+      // Metatypes are generally Sendable, but under StrictSendableMetatypes we
+      // cannot assume that metatypes based on type parameters are Sendable.
+      if (ctx.LangOpts.hasFeature(Feature::StrictSendableMetatypes)) {
+        Type instanceType = metatypeType->getInstanceType();
+
+        // If the instance type is a type parameter, it is not necessarily
+        // Sendable. There will need to be a Sendable requirement.
+        if (instanceType->isTypeParameter())
+          break;
+
+        // If the instance type is an archetype or existential, check whether
+        // it conforms to Sendable.
+        // FIXME: If the requirement machine were to infer T.Type: Sendable
+        // from T: Sendable, we wouldn't need this for archetypes.
+        if (instanceType->is<ArchetypeType>() ||
+            instanceType->isAnyExistentialType()) {
+          auto instanceConformance = lookupConformance(instanceType, protocol);
+          if (instanceConformance.isInvalid() ||
+              instanceConformance.hasMissingConformance())
+            break;
+        }
+
+        // Every other metatype is Sendable.
+      }
+      LLVM_FALLTHROUGH;
+
     case KnownProtocolKind::Copyable:
     case KnownProtocolKind::Escapable:
     case KnownProtocolKind::BitwiseCopyable:
