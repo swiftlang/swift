@@ -422,14 +422,13 @@ private:
     const auto &CI = instance.getInvocation();
 
     SwiftInterfaceModuleOutputPathResolution::ArgListTy extraArgsList;
-    const SwiftInterfaceModuleOutputPathResolution::ArgListTy
-        &clangImpporterOptions =
-            CI.getClangImporterOptions()
-                .getReducedExtraArgsForSwiftModuleDependency();
+    const auto &clangImporterOptions =
+        CI.getClangImporterOptions()
+            .getReducedExtraArgsForSwiftModuleDependency();
 
     skip = 0;
-    for (auto it = clangImpporterOptions.begin(),
-              end = clangImpporterOptions.end();
+    for (auto it = clangImporterOptions.begin(),
+              end = clangImporterOptions.end();
          it != end; it++) {
       if (skip) {
         skip = 0;
@@ -449,7 +448,7 @@ private:
     auto swiftTextualDeps = resolvingDepInfo.getAsSwiftInterfaceModule();
     auto &interfacePath = swiftTextualDeps->swiftInterfaceFile;
     auto sdkPath = instance.getASTContext().SearchPathOpts.getSDKPath();
-    SwiftInterfaceModuleOutputPathResolution::getOutputPath(
+    SwiftInterfaceModuleOutputPathResolution::setOutputPath(
         outputPath, moduleID.ModuleName, interfacePath, sdkPath, CI,
         extraArgsList);
 

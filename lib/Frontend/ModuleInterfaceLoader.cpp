@@ -2010,7 +2010,7 @@ InterfaceSubContextDelegateImpl::InterfaceSubContextDelegateImpl(
 void InterfaceSubContextDelegateImpl::getCachedOutputPath(
     SwiftInterfaceModuleOutputPathResolution::ResultTy &resolvedOutputPath,
     StringRef moduleName, StringRef interfacePath, StringRef sdkPath) {
-  SwiftInterfaceModuleOutputPathResolution::getOutputPath(
+  SwiftInterfaceModuleOutputPathResolution::setOutputPath(
       resolvedOutputPath, moduleName, interfacePath, sdkPath,
       genericSubInvocation,
       genericSubInvocation.getClangImporterOptions()
@@ -2831,7 +2831,7 @@ static std::string getContextHash(const CompilerInvocation &CI,
   return llvm::toString(llvm::APInt(64, H), 36, /*Signed=*/false);
 }
 
-void getOutputPath(ResultTy &resolvedOutputPath, const StringRef &moduleName,
+void setOutputPath(ResultTy &resolvedOutputPath, const StringRef &moduleName,
                    const StringRef &interfacePath, const StringRef &sdkPath,
                    const CompilerInvocation &CI, const ArgListTy &extraArgs) {
   auto &outputPath = resolvedOutputPath.outputPath;

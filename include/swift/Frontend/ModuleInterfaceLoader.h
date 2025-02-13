@@ -638,7 +638,7 @@ struct ResultTy {
 
 using ArgListTy = std::vector<std::string>;
 
-void getOutputPath(ResultTy &outputPath, const StringRef &moduleName,
+void setOutputPath(ResultTy &outputPath, const StringRef &moduleName,
                    const StringRef &interfacePath, const StringRef &sdkPath,
                    const CompilerInvocation &CI, const ArgListTy &extraArgs);
 } // namespace SwiftInterfaceModuleOutputPathResolution
