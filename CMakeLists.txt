@@ -157,6 +157,8 @@ else()
     set(SWIFT_HOST_VARIANT_SDK_default "OSX")
   elseif("${CMAKE_SYSTEM_NAME}" STREQUAL "WASI")
     set(SWIFT_HOST_VARIANT_SDK_default "WASI")
+  elseif("${CMAKE_SYSTEM_NAME}" STREQUAL "Emscripten")
+    set(SWIFT_HOST_VARIANT_SDK_default "EMSCRIPTEN")
   else()
     message(FATAL_ERROR "Unable to detect SDK for host system: ${CMAKE_SYSTEM_NAME}")
   endif()
@@ -1238,6 +1240,15 @@ elseif("${SWIFT_HOST_VARIANT_SDK}" STREQUAL "WASI")
       "Deployment OS for Swift host tools (the compiler) [wasi]")
 
   configure_sdk_unix("WASI" "wasm32")
+  set(SWIFT_PRIMARY_VARIANT_SDK_default  "${SWIFT_HOST_VARIANT_SDK}")
+  set(SWIFT_PRIMARY_VARIANT_ARCH_default "${SWIFT_HOST_VARIANT_ARCH}")
+
+elseif("${SWIFT_HOST_VARIANT_SDK}" STREQUAL "EMSCRIPTEN")
+
+  set(SWIFT_HOST_VARIANT "emscripten" CACHE STRING
+      "Deployment OS for Swift host tools (the compiler) [emscripten]")
+
+  configure_sdk_unix("Emscripten" "wasm32")
   set(SWIFT_PRIMARY_VARIANT_SDK_default  "${SWIFT_HOST_VARIANT_SDK}")
   set(SWIFT_PRIMARY_VARIANT_ARCH_default "${SWIFT_HOST_VARIANT_ARCH}")
 

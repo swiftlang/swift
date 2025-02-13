@@ -106,6 +106,12 @@ function(_add_host_variant_c_compile_link_flags name)
     if("${CMAKE_C_COMPILER_FRONTEND_VARIANT}" STREQUAL "MSVC") # clang-cl options
       target_compile_options(${name} PRIVATE $<$<COMPILE_LANGUAGE:C,CXX,OBJC,OBJCXX>:--target=${SWIFT_HOST_TRIPLE}>)
       target_link_options(${name} PRIVATE $<$<COMPILE_LANGUAGE:C,CXX,OBJC,OBJCXX>:--target=${SWIFT_HOST_TRIPLE}>)
+    elseif("${SWIFT_HOST_VARIANT_SDK}" STREQUAL "EMSCRIPTEN") # emcc options
+      # some older emcc don't understand -target=<triple>
+      # FIXME: remove this when we no longer support Emscripten < 3.1.44
+      # https://github.com/emscripten-core/emscripten/pull/19840
+      target_compile_options(${name} PRIVATE $<$<COMPILE_LANGUAGE:C,CXX,OBJC,OBJCXX>:--target=${SWIFT_HOST_TRIPLE}>)
+      target_link_options(${name} PRIVATE $<$<COMPILE_LANGUAGE:C,CXX,OBJC,OBJCXX>:-target=${SWIFT_HOST_TRIPLE}>)
     else()
       target_compile_options(${name} PRIVATE $<$<COMPILE_LANGUAGE:C,CXX,OBJC,OBJCXX>:-target;${SWIFT_HOST_TRIPLE}>)
       target_link_options(${name} PRIVATE $<$<COMPILE_LANGUAGE:C,CXX,OBJC,OBJCXX>:-target;${SWIFT_HOST_TRIPLE}>)
