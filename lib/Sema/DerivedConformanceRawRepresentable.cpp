@@ -200,15 +200,15 @@ struct RuntimeVersionCheck {
   /// fails, e.g. "guard #available(iOS 10, *) else { return nil }".
   Stmt *createEarlyReturnStmt(ASTContext &C) const {
     // platformSpec = "\(attr.platform) \(attr.introduced)"
-    auto platformSpec = new (C) PlatformVersionConstraintAvailabilitySpec(
-        Platform, SourceLoc(), Version, SourceLoc());
+    auto platformSpec = AvailabilitySpec::createPlatformVersioned(
+        C, Platform, SourceLoc(), Version, SourceLoc());
 
-    // otherSpec = "*"
-    auto otherSpec = new (C) OtherPlatformAvailabilitySpec(SourceLoc());
+    // wildcardSpec = "*"
+    auto wildcardSpec = AvailabilitySpec::createWildcard(C, SourceLoc());
 
-    // availableInfo = "#available(\(platformSpec), \(otherSpec))"
+    // availableInfo = "#available(\(platformSpec), \(wildcardSpec))"
     auto availableInfo = PoundAvailableInfo::create(
-        C, SourceLoc(), SourceLoc(), { platformSpec, otherSpec }, SourceLoc(),
+        C, SourceLoc(), SourceLoc(), {platformSpec, wildcardSpec}, SourceLoc(),
         false);
 
     // This won't be filled in by TypeCheckAvailability because we have

@@ -1292,50 +1292,46 @@ validateAvailabilitySpecList(Parser &P,
                              SmallVectorImpl<AvailabilitySpec *> &Specs,
                              Parser::AvailabilitySpecSource Source) {
   llvm::SmallSet<PlatformKind, 4> Platforms;
-  std::optional<SourceLoc> OtherPlatformSpecLoc = std::nullopt;
+  std::optional<SourceLoc> WildcardSpecLoc = std::nullopt;
 
-  if (Specs.size() == 1 &&
-      isa<PlatformAgnosticVersionConstraintAvailabilitySpec>(Specs[0])) {
+  if (Specs.size() == 1) {
     // @available(swift N) and @available(_PackageDescription N) are allowed
     // only in isolation; they cannot be combined with other availability specs
     // in a single list.
-    return;
+    auto domain = Specs[0]->getDomain();
+    if (domain && !domain->isPlatform())
+      return;
   }
 
   SmallVector<AvailabilitySpec *, 5> RecognizedSpecs;
   for (auto *Spec : Specs) {
     RecognizedSpecs.push_back(Spec);
-    if (auto *OtherPlatSpec = dyn_cast<OtherPlatformAvailabilitySpec>(Spec)) {
-      OtherPlatformSpecLoc = OtherPlatSpec->getStartLoc();
+    if (Spec->isWildcard()) {
+      WildcardSpecLoc = Spec->getStartLoc();
       continue;
     }
 
-    if (auto *PlatformAgnosticSpec =
-         dyn_cast<PlatformAgnosticVersionConstraintAvailabilitySpec>(Spec)) {
-      bool isLanguageVersionSpecific = PlatformAgnosticSpec->getDomain()->isSwiftLanguage();
-      P.diagnose(PlatformAgnosticSpec->getStartLoc(),
-                 diag::availability_must_occur_alone,
-                 isLanguageVersionSpecific
-                     ? "swift"
-                     : "_PackageDescription");
-      continue;
-    }
-
-    auto *VersionSpec = cast<PlatformVersionConstraintAvailabilitySpec>(Spec);
-    // We keep specs for unrecognized platforms around for error recovery
+    // We keep specs for unrecognized domains around for error recovery
     // during parsing but remove them once parsing is completed.
-    if (!VersionSpec->getDomain().has_value()) {
+    auto Domain = Spec->getDomain();
+    if (!Domain) {
       RecognizedSpecs.pop_back();
       continue;
     }
 
-    bool Inserted = Platforms.insert(VersionSpec->getPlatform()).second;
+    if (!Domain->isPlatform()) {
+      P.diagnose(Spec->getStartLoc(), diag::availability_must_occur_alone,
+                 Domain->getNameForAttributePrinting());
+      continue;
+    }
+
+    bool Inserted = Platforms.insert(Spec->getPlatform()).second;
     if (!Inserted) {
       // Rule out multiple version specs referring to the same platform.
       // For example, we emit an error for
       /// #available(OSX 10.10, OSX 10.11, *)
-      PlatformKind Platform = VersionSpec->getPlatform();
-      P.diagnose(VersionSpec->getStartLoc(),
+      PlatformKind Platform = Spec->getPlatform();
+      P.diagnose(Spec->getStartLoc(),
                  diag::availability_query_repeated_platform,
                  platformString(Platform));
     }
@@ -1343,7 +1339,7 @@ validateAvailabilitySpecList(Parser &P,
 
   switch (Source) {
   case Parser::AvailabilitySpecSource::Available: {
-    if (OtherPlatformSpecLoc == std::nullopt) {
+    if (WildcardSpecLoc == std::nullopt) {
       SourceLoc InsertWildcardLoc = P.PreviousLoc;
       P.diagnose(InsertWildcardLoc, diag::availability_query_wildcard_required)
         .fixItInsertAfter(InsertWildcardLoc, ", *");
@@ -1351,16 +1347,16 @@ validateAvailabilitySpecList(Parser &P,
     break;
   }
   case Parser::AvailabilitySpecSource::Unavailable: {
-    if (OtherPlatformSpecLoc != std::nullopt) {
-      SourceLoc Loc = OtherPlatformSpecLoc.value();
+    if (WildcardSpecLoc != std::nullopt) {
+      SourceLoc Loc = WildcardSpecLoc.value();
       P.diagnose(Loc, diag::unavailability_query_wildcard_not_required)
         .fixItRemove(Loc);
     }
     break;
   }
   case Parser::AvailabilitySpecSource::Macro: {
-    if (OtherPlatformSpecLoc != std::nullopt) {
-      SourceLoc Loc = OtherPlatformSpecLoc.value();
+    if (WildcardSpecLoc != std::nullopt) {
+      SourceLoc Loc = WildcardSpecLoc.value();
       P.diagnose(Loc, diag::attr_availability_wildcard_in_macro);
     }
     break;
@@ -1403,16 +1399,15 @@ ParserResult<PoundAvailableInfo> Parser::parseStmtConditionPoundAvailable() {
   ParserStatus Status = parseAvailabilitySpecList(Specs, Source);
 
   for (auto *Spec : Specs) {
-    if (auto *PlatformAgnostic =
-          dyn_cast<PlatformAgnosticVersionConstraintAvailabilitySpec>(Spec)) {
-      bool isLanguageVersionSpecific = PlatformAgnostic->getDomain()->isSwiftLanguage();
-      diagnose(PlatformAgnostic->getStartLoc(),
-               isLanguageVersionSpecific
-                   ? diag::pound_available_swift_not_allowed
-                   : diag::pound_available_package_description_not_allowed,
-               getTokenText(MainToken));
-      Status.setIsParseError();
-    }
+    if (Spec->getPlatform() != PlatformKind::none || Spec->isWildcard())
+      continue;
+
+    diagnose(Spec->getStartLoc(),
+             Spec->getDomain()->isSwiftLanguage()
+                 ? diag::pound_available_swift_not_allowed
+                 : diag::pound_available_package_description_not_allowed,
+             getTokenText(MainToken));
+    Status.setIsParseError();
   }
 
   SourceLoc RParenLoc;
@@ -1548,15 +1543,12 @@ Parser::parseAvailabilitySpecList(SmallVectorImpl<AvailabilitySpec *> &Specs,
           // can guess that the intention was to treat it as 'introduced' and
           // suggest a fix-it to combine them.
           if (Specs.size() == 1 &&
-              PlatformVersionConstraintAvailabilitySpec::classof(Previous) &&
+              Previous->getPlatform() != PlatformKind::none &&
               Text != "introduced") {
-            auto *PlatformSpec =
-                cast<PlatformVersionConstraintAvailabilitySpec>(Previous);
-
             auto PlatformNameEndLoc = Lexer::getLocForEndOfToken(
-                SourceManager, PlatformSpec->getStartLoc());
+                SourceManager, Previous->getStartLoc());
 
-            diagnose(PlatformSpec->getStartLoc(),
+            diagnose(Previous->getStartLoc(),
                      diag::avail_query_meant_introduced)
                 .fixItInsert(PlatformNameEndLoc, ", introduced:");
           }
