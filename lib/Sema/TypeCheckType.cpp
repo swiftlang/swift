@@ -5406,6 +5406,8 @@ NeverNullType TypeResolver::resolveImplicitlyUnwrappedOptionalType(
 
   bool doDiag = false;
   switch (options.getContext()) {
+  case TypeResolverContext::ExistentialConstraint:
+    break ;
   case TypeResolverContext::None:
   case TypeResolverContext::InoutFunctionInput:
     if (!isDirect || !(options & allowIUO))
@@ -5431,7 +5433,6 @@ NeverNullType TypeResolver::resolveImplicitlyUnwrappedOptionalType(
   case TypeResolverContext::TypeAliasDecl:
   case TypeResolverContext::GenericTypeAliasDecl:
   case TypeResolverContext::GenericRequirement:
-  case TypeResolverContext::ExistentialConstraint:
   case TypeResolverContext::SameTypeRequirement:
   case TypeResolverContext::ProtocolMetatypeBase:
   case TypeResolverContext::MetatypeBase:
@@ -5938,6 +5939,20 @@ TypeResolver::resolveCompositionType(CompositionTypeRepr *repr,
   return composition;
 }
 
+
+bool shouldDiagnoseImplicitlyUnwrappedOptionalType(TypeResolutionOptions options) {
+  if (
+      // to match `let _: (Int, any P!)`
+      options.is(TypeResolverContext::TupleElement) ||
+      // to match `let _: G<any P!>`
+      options.is(TypeResolverContext::ScalarGenericArgument) ||
+      // because  `let _ = (any P!) -> Void` is illegal, but not `let _ = any P!`
+      !options.is(TypeResolverContext::PatternBindingDecl)) {
+    return true;
+  }
+  return false;
+}
+
 NeverNullType
 TypeResolver::resolveExistentialType(ExistentialTypeRepr *repr,
                                      TypeResolutionOptions options) {
@@ -5952,16 +5967,30 @@ TypeResolver::resolveExistentialType(ExistentialTypeRepr *repr,
 
   //TO-DO: generalize this and emit the same erorr for some P?
   if (!constraintType->isConstraintType()) {
+    auto wrapped = constraintType->getOptionalObjectType();
+
+    auto isWrappedExistential = (wrapped && (wrapped->is<ExistentialType>() || wrapped->is<ExistentialMetatypeType>())) ;
+    auto shouldDiagnoseImplicitlyUnwrappedOptional = shouldDiagnoseImplicitlyUnwrappedOptionalType(options);
+    auto isImplicitlyUnwrapped =  isa<ImplicitlyUnwrappedOptionalTypeRepr>(repr->getConstraint()) ;
+    // Handles cases like `let _: any P!` by suggesting `let _: (any P)!
+    // while making sure that it's not an existential wrapped in a tuple like `let _: (Int, any P!)`
+    // so we won't suggest `let _: (Int, (any P)!)` as it's illegal.
+    if (isImplicitlyUnwrapped && !shouldDiagnoseImplicitlyUnwrappedOptional && isWrappedExistential)  {
+      diagnose(repr->getLoc(),
+               diag::incorrect_iuo_any,
+               wrapped->getMetatypeInstanceType().getString())
+          .fixItReplace(repr->getSourceRange(), "(" + wrapped.getString() + ")!");
+      return constraintType;
+    }
+
     // Emit a tailored diagnostic for the incorrect optional
     // syntax 'any P?' with a fix-it to add parenthesis.
-    auto wrapped = constraintType->getOptionalObjectType();
     if (wrapped && (wrapped->is<ExistentialType>() ||
                     wrapped->is<ExistentialMetatypeType>())) {
       std::string fix;
       llvm::raw_string_ostream OS(fix);
       constraintType->print(OS, PrintOptions::forDiagnosticArguments());
-      diagnose(repr->getLoc(), diag::incorrect_optional_any,
-               constraintType)
+      diagnose(repr->getLoc(), diag::incorrect_optional_any)
         .fixItReplace(repr->getSourceRange(), fix);
 
       // Recover by returning the intended type, but mark the type
