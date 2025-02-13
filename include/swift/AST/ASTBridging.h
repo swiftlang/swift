@@ -626,12 +626,32 @@ struct BridgedAvailabilityMacroDefinition {
 
 enum ENUM_EXTENSIBILITY_ATTR(closed) BridgedAvailabilitySpecKind {
   BridgedAvailabilitySpecKindPlatformVersionConstraint,
-  BridgedAvailabilitySpecKindOtherPlatform,
+  BridgedAvailabilitySpecKindWildcard,
   BridgedAvailabilitySpecKindLanguageVersionConstraint,
   BridgedAvailabilitySpecKindPackageDescriptionVersionConstraint,
 };
 
 struct BridgedAvailabilityDomain;
+
+SWIFT_NAME("BridgedAvailabilitySpec.createWildcard(_:loc:)")
+BridgedAvailabilitySpec
+BridgedAvailabilitySpec_createWildcard(BridgedASTContext cContext,
+                                       BridgedSourceLoc cLoc);
+
+SWIFT_NAME(
+    "BridgedAvailabilitySpec.createPlatformAgnostic(_:kind:nameLoc:version:"
+    "versionRange:)")
+BridgedAvailabilitySpec BridgedAvailabilitySpec_createPlatformAgnostic(
+    BridgedASTContext cContext, BridgedAvailabilitySpecKind cKind,
+    BridgedSourceLoc cLoc, BridgedVersionTuple cVersion,
+    BridgedSourceRange cVersionRange);
+
+SWIFT_NAME("BridgedAvailabilitySpec.createPlatformVersioned(_:platform:"
+           "platformLoc:version:versionRange:)")
+BridgedAvailabilitySpec BridgedAvailabilitySpec_createPlatformVersioned(
+    BridgedASTContext cContext, BridgedPlatformKind cPlatform,
+    BridgedSourceLoc cPlatformLoc, BridgedVersionTuple cVersion,
+    BridgedSourceRange cVersionSrcRange);
 
 SWIFT_NAME("getter:BridgedAvailabilitySpec.sourceRange(self:)")
 BridgedSourceRange
@@ -652,44 +672,6 @@ BridgedAvailabilitySpec_getVersion(BridgedAvailabilitySpec spec);
 SWIFT_NAME("getter:BridgedAvailabilitySpec.versionRange(self:)")
 BridgedSourceRange
 BridgedAvailabilitySpec_getVersionRange(BridgedAvailabilitySpec spec);
-
-SWIFT_NAME("BridgedPlatformVersionConstraintAvailabilitySpec.createParsed(_:"
-           "platform:platformLoc:version:versionRange:)")
-BridgedPlatformVersionConstraintAvailabilitySpec
-BridgedPlatformVersionConstraintAvailabilitySpec_createParsed(
-    BridgedASTContext cContext, BridgedPlatformKind cPlatform,
-    BridgedSourceLoc cPlatformLoc, BridgedVersionTuple cVersion,
-    BridgedSourceRange cVersionSrcRange);
-
-SWIFT_NAME("BridgedPlatformAgnosticVersionConstraintAvailabilitySpec."
-           "createParsed(_:kind:nameLoc:version:versionRange:)")
-BridgedPlatformAgnosticVersionConstraintAvailabilitySpec
-BridgedPlatformAgnosticVersionConstraintAvailabilitySpec_createParsed(
-    BridgedASTContext cContext, BridgedAvailabilitySpecKind cKind,
-    BridgedSourceLoc cNameLoc, BridgedVersionTuple cVersion,
-    BridgedSourceRange cVersionSrcRange);
-
-SWIFT_NAME("BridgedOtherPlatformAvailabilitySpec.createParsed(_:loc:)")
-BridgedOtherPlatformAvailabilitySpec
-BridgedOtherPlatformAvailabilitySpec_createParsed(BridgedASTContext cContext,
-                                                  BridgedSourceLoc cLoc);
-
-SWIFT_NAME("getter:BridgedPlatformVersionConstraintAvailabilitySpec."
-           "asAvailabilitySpec(self:)")
-BridgedAvailabilitySpec
-BridgedPlatformVersionConstraintAvailabilitySpec_asAvailabilitySpec(
-    BridgedPlatformVersionConstraintAvailabilitySpec spec);
-
-SWIFT_NAME("getter:BridgedPlatformAgnosticVersionConstraintAvailabilitySpec."
-           "asAvailabilitySpec(self:)")
-BridgedAvailabilitySpec
-BridgedPlatformAgnosticVersionConstraintAvailabilitySpec_asAvailabilitySpec(
-    BridgedPlatformAgnosticVersionConstraintAvailabilitySpec spec);
-
-SWIFT_NAME(
-    "getter:BridgedOtherPlatformAvailabilitySpec.asAvailabilitySpec(self:)")
-BridgedAvailabilitySpec BridgedOtherPlatformAvailabilitySpec_asAvailabilitySpec(
-    BridgedOtherPlatformAvailabilitySpec spec);
 
 struct BridgedAvailabilityDomain {
   void *_Nullable opaque;

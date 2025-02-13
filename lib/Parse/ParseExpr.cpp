@@ -3689,7 +3689,7 @@ ParserResult<AvailabilitySpec> Parser::parseAvailabilitySpec() {
     SourceLoc StarLoc = Tok.getLoc();
     consumeToken();
 
-    return makeParserResult(new (Context) OtherPlatformAvailabilitySpec(StarLoc));
+    return makeParserResult(AvailabilitySpec::createWildcard(Context, StarLoc));
   }
   if (Tok.isIdentifierOrUnderscore() &&
        (Tok.getText() == "swift" || Tok.getText() == "_PackageDescription"))
@@ -3704,7 +3704,7 @@ ParserResult<AvailabilitySpec> Parser::parseAvailabilitySpec() {
 ///     "swift" version-tuple
 ///  package-description-version-constraint-spec:
 ///     "_PackageDescription" version-tuple
-ParserResult<PlatformAgnosticVersionConstraintAvailabilitySpec>
+ParserResult<AvailabilitySpec>
 Parser::parsePlatformAgnosticVersionConstraintSpec() {
   SourceLoc PlatformAgnosticNameLoc;
   llvm::VersionTuple Version;
@@ -3727,17 +3727,15 @@ Parser::parsePlatformAgnosticVersionConstraintSpec() {
                         diag::avail_query_expected_version_number)) {
     return nullptr;
   }
-  return makeParserResult(new (Context)
-                          PlatformAgnosticVersionConstraintAvailabilitySpec(
-                            Kind.value(), PlatformAgnosticNameLoc, Version, VersionRange));
+  return makeParserResult(AvailabilitySpec::createPlatformAgnostic(
+      Context, Kind.value(), PlatformAgnosticNameLoc, Version, VersionRange));
 }
 
 /// Parse platform-version constraint specification.
 ///
 ///  platform-version-constraint-spec:
 ///     identifier version-comparison version-tuple
-ParserResult<PlatformVersionConstraintAvailabilitySpec>
-Parser::parsePlatformVersionConstraintSpec() {
+ParserResult<AvailabilitySpec> Parser::parsePlatformVersionConstraintSpec() {
   Identifier PlatformIdentifier;
   SourceLoc PlatformLoc;
   if (Tok.is(tok::code_complete)) {
@@ -3787,7 +3785,6 @@ Parser::parsePlatformVersionConstraintSpec() {
   // Register the platform name as a keyword token.
   TokReceiver->registerTokenKindChange(PlatformLoc, tok::contextual_keyword);
 
-  return makeParserResult(
-      new (Context) PlatformVersionConstraintAvailabilitySpec(
-          Platform.value(), PlatformLoc, Version, VersionRange));
+  return makeParserResult(AvailabilitySpec::createPlatformVersioned(
+      Context, Platform.value(), PlatformLoc, Version, VersionRange));
 }

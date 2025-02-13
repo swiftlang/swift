@@ -218,8 +218,7 @@ public:
   class ConditionalMember : public BuilderMember {
   public:
     ConditionalMember(MemberKind MemberKind,
-                      std::vector<PlatformVersionConstraintAvailabilitySpec>
-                          AvailabilityAttributes,
+                      std::vector<AvailabilitySpec> AvailabilityAttributes,
                       std::vector<std::shared_ptr<BuilderMember>> IfElements,
                       std::vector<std::shared_ptr<BuilderMember>> ElseElements)
         : BuilderMember(MemberKind),
@@ -239,7 +238,7 @@ public:
              (Kind == MemberKind::Optional);
     }
 
-    std::optional<std::vector<PlatformVersionConstraintAvailabilitySpec>>
+    std::optional<std::vector<AvailabilitySpec>>
     getAvailabilityAttributes() const {
       return AvailabilityAttributes;
     }
@@ -251,8 +250,7 @@ public:
     }
 
   private:
-    std::optional<std::vector<PlatformVersionConstraintAvailabilitySpec>>
-        AvailabilityAttributes;
+    std::optional<std::vector<AvailabilitySpec>> AvailabilityAttributes;
     std::vector<std::shared_ptr<BuilderMember>> IfElements;
     std::vector<std::shared_ptr<BuilderMember>> ElseElements;
   };

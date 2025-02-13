@@ -1001,7 +1001,7 @@ getResultBuilderElementFromASTNode(const ASTNode node) {
 
 BuilderValue::ConditionalMember
 getConditionalMemberFromIfStmt(const IfStmt *ifStmt) {
-  std::vector<PlatformVersionConstraintAvailabilitySpec> AvailabilityAttributes;
+  std::vector<AvailabilitySpec> AvailabilityAttributes;
   std::vector<std::shared_ptr<BuilderValue::BuilderMember>> IfElements;
   std::vector<std::shared_ptr<BuilderValue::BuilderMember>> ElseElements;
   if (auto thenBraceStmt = ifStmt->getThenStmt()) {
@@ -1034,9 +1034,8 @@ getConditionalMemberFromIfStmt(const IfStmt *ifStmt) {
   for (auto elt : ifStmt->getCond()) {
     if (elt.getKind() == StmtConditionElement::CK_Availability) {
       for (auto *Q : elt.getAvailability()->getQueries()) {
-        if (auto *availability =
-                dyn_cast<PlatformVersionConstraintAvailabilitySpec>(Q)) {
-          AvailabilityAttributes.push_back(*availability);
+        if (Q->getPlatform() != PlatformKind::none) {
+          AvailabilityAttributes.push_back(*Q);
         }
       }
       memberKind = BuilderValue::LimitedAvailability;
