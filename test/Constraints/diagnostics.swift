@@ -995,7 +995,8 @@ do {
   // expected-note@+1 {{overloads for '+' exist with these partially matching parameter lists: (Float, Float), (S_48822, Int)}}
   let _: Float = S_48822(integerLiteral: 42) + x
 
-  // expected-error@+1 {{cannot convert value of type 'Double' to expected argument type 'Int'}} {{48-48=Int(}} {{52-52=)}}
+  // expected-error@+2 {{binary operator '+' cannot be applied to operands of type 'S_48822' and 'Double'}} {{none}}
+  // expected-note@+1 {{overloads for '+' exist with these partially matching parameter lists: (Float, Float), (S_48822, Int)}}
   let _: Float = S_48822(integerLiteral: 42) + 42.0
 
   // expected-error@+2 {{binary operator '+' cannot be applied to operands of type 'S_48822' and 'Float'}} {{none}}
