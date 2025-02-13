@@ -1775,6 +1775,21 @@ BridgedNilLiteralExpr
 BridgedNilLiteralExpr_createParsed(BridgedASTContext cContext,
                                    BridgedSourceLoc cNilKeywordLoc);
 
+enum ENUM_EXTENSIBILITY_ATTR(open) BridgedObjectLiteralKind : size_t {
+#define POUND_OBJECT_LITERAL(Name, Desc, Proto) BridgedObjectLiteralKind_##Name,
+#include "swift/AST/TokenKinds.def"
+  BridgedObjectLiteralKind_none,
+};
+
+SWIFT_NAME("BridgedObjectLiteralKind.init(from:)")
+BridgedObjectLiteralKind
+BridgedObjectLiteralKind_fromString(BridgedStringRef cStr);
+
+SWIFT_NAME("BridgedObjectLiteralExpr.createParsed(_:poundLoc:kind:args:)")
+BridgedObjectLiteralExpr BridgedObjectLiteralExpr_createParsed(
+    BridgedASTContext cContext, BridgedSourceLoc cPoundLoc,
+    BridgedObjectLiteralKind cKind, BridgedArgumentList args);
+
 SWIFT_NAME("BridgedOptionalTryExpr.createParsed(_:tryLoc:subExpr:questionLoc:)")
 BridgedOptionalTryExpr BridgedOptionalTryExpr_createParsed(
     BridgedASTContext cContext, BridgedSourceLoc cTryLoc, BridgedExpr cSubExpr,
