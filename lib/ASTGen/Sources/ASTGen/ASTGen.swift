@@ -18,44 +18,6 @@ import SwiftIfConfig
 
 import struct SwiftDiagnostics.Diagnostic
 
-enum ASTNode {
-  case decl(BridgedDecl)
-  case stmt(BridgedStmt)
-  case expr(BridgedExpr)
-
-  var castToExpr: BridgedExpr {
-    guard case .expr(let bridged) = self else {
-      fatalError("Expected an expr")
-    }
-    return bridged
-  }
-
-  var castToStmt: BridgedStmt {
-    guard case .stmt(let bridged) = self else {
-      fatalError("Expected a stmt")
-    }
-    return bridged
-  }
-
-  var castToDecl: BridgedDecl {
-    guard case .decl(let bridged) = self else {
-      fatalError("Expected a decl")
-    }
-    return bridged
-  }
-
-  var bridged: BridgedASTNode {
-    switch self {
-    case .expr(let e):
-      return BridgedASTNode(raw: e.raw, kind: .expr)
-    case .stmt(let s):
-      return BridgedASTNode(raw: s.raw, kind: .stmt)
-    case .decl(let d):
-      return BridgedASTNode(raw: d.raw, kind: .decl)
-    }
-  }
-}
-
 /// Little utility wrapper that lets us have some mutable state within
 /// immutable structs, and is therefore pretty evil.
 @propertyWrapper
@@ -95,8 +57,8 @@ struct ASTGenVisitor {
     self.configuredRegions = configuredRegions
   }
 
-  func generate(sourceFile node: SourceFileSyntax) -> [ASTNode] {
-    var out = [ASTNode]()
+  func generate(sourceFile node: SourceFileSyntax) -> [BridgedASTNode] {
+    var out = [BridgedASTNode]()
     let isTopLevel = self.declContext.isModuleScopeContext
 
     visitIfConfigElements(
@@ -105,7 +67,7 @@ struct ASTGenVisitor {
       split: Self.splitCodeBlockItemIfConfig
     ) { element in
 
-      func generateStmtOrExpr(_ body: () -> ASTNode) -> ASTNode {
+      func generateStmtOrExpr(_ body: () -> BridgedASTNode) -> BridgedASTNode {
         if !isTopLevel {
           return body()
         }
@@ -117,7 +79,7 @@ struct ASTGenVisitor {
 
         // Diagnose top level code in non-script file.
         if (!declContext.parentSourceFile.isScriptMode) {
-          switch astNode {
+          switch element.item {
           case .stmt:
             self.diagnose(.illegalTopLevelStmt(element))
           case .expr:
@@ -131,7 +93,7 @@ struct ASTGenVisitor {
         let body = BridgedBraceStmt.createImplicit(
           self.ctx,
           lBraceLoc: bodyRange.start,
-          element: astNode.bridged,
+          element: astNode,
           rBraceLoc: bodyRange.end
         )
         topLevelDecl.setBody(body: body)
@@ -147,7 +109,7 @@ struct ASTGenVisitor {
           // Hoist 'VarDecl' to the top-level.
           withBridgedSwiftClosure { ptr in
             let hoisted = ptr!.load(as: BridgedDecl.self)
-            out.append(ASTNode.decl(hoisted))
+            out.append(.decl(hoisted))
           } call: { handle in
             d.forEachDeclToHoist(handle)
           }
@@ -476,11 +438,11 @@ public func buildTopLevelASTNodes(
   switch sourceFile.pointee.syntax.as(SyntaxEnum.self) {
   case .sourceFile(let node):
     for elem in visitor.generate(sourceFile: node) {
-      callback(elem.bridged, outputContext)
+      callback(elem, outputContext)
     }
   case .memberBlockItemList(let node):
     for elem in visitor.generate(memberBlockItemList: node) {
-      callback(ASTNode.decl(elem).bridged, outputContext)
+      callback(.decl(elem), outputContext)
     }
   default:
     fatalError("invalid syntax for a source file")
