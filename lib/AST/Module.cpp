@@ -3781,7 +3781,8 @@ SourceFile::FileIDStr::parse(StringRef fileID) {
   auto moduleName = names.first;
   auto fileName = names.second;
 
-  if (moduleName.empty() || fileName.empty() || !fileName.ends_with(".swift"))
+  if (moduleName.empty() || fileName.empty() || !fileName.ends_with(".swift") ||
+      fileName.contains('/'))
     return {};
 
   return {

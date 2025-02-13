@@ -62,8 +62,9 @@ TEST_PRIVATE:
 
 /// A C++ templated class, whose non-public fields should be accessible in
 /// extensions of the (instantiated) class in blessed.swift.
-template <typename T> TEST_CLASS
-__attribute__((__swift_attr__("private_fileid:main/blessed.swift"))) MyClassTemplate {
+template <typename T>
+TEST_CLASS __attribute__((
+    __swift_attr__("private_fileid:main/blessed.swift"))) MyClassTemplate {
 public:
   T publMethodT(T t) const { return t; }
   T publVarT;
