@@ -905,6 +905,9 @@ namespace swift {
     /// is for testing purposes.
     std::vector<std::string> DebugForbidTypecheckPrefixes;
 
+    /// Disable the shrink phase of the expression type checker.
+    bool SolverDisableShrink = false;
+
     /// Enable experimental operator designated types feature.
     bool EnableOperatorDesignatedTypes = false;
 
