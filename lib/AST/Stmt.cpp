@@ -771,7 +771,7 @@ CaseStmt::CaseStmt(CaseParentKind parentKind, SourceLoc itemIntroducerLoc,
   }
 
   MutableArrayRef<CaseLabelItem> items{getTrailingObjects<CaseLabelItem>(),
-                                       Bits.CaseStmt.NumPatterns};
+                                       static_cast<size_t>(Bits.CaseStmt.NumPatterns)};
 
   // At the beginning mark all of our var decls as being owned by this
   // statement. In the typechecker we wireup the case stmt var decl list since

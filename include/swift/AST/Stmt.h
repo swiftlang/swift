@@ -212,12 +212,12 @@ public:
 
   /// The elements contained within the BraceStmt.
   MutableArrayRef<ASTNode> getElements() {
-    return {getTrailingObjects<ASTNode>(), Bits.BraceStmt.NumElements};
+    return {getTrailingObjects<ASTNode>(), static_cast<size_t>(Bits.BraceStmt.NumElements)};
   }
 
   /// The elements contained within the BraceStmt (const version).
   ArrayRef<ASTNode> getElements() const {
-    return {getTrailingObjects<ASTNode>(), Bits.BraceStmt.NumElements};
+    return {getTrailingObjects<ASTNode>(), static_cast<size_t>(Bits.BraceStmt.NumElements)};
   }
 
   ASTNode findAsyncNode();
@@ -330,10 +330,10 @@ public:
   SourceLoc getEndLoc() const;
 
   ArrayRef<Expr*> getYields() const {
-    return {getTrailingObjects<Expr*>(), Bits.YieldStmt.NumYields};
+    return {getTrailingObjects<Expr*>(), static_cast<size_t>(Bits.YieldStmt.NumYields)};
   }
   MutableArrayRef<Expr*> getMutableYields() {
-    return {getTrailingObjects<Expr*>(), Bits.YieldStmt.NumYields};
+    return {getTrailingObjects<Expr*>(), static_cast<size_t>(Bits.YieldStmt.NumYields)};
   }
   
   static bool classof(const Stmt *S) { return S->getKind() == StmtKind::Yield; }
@@ -1259,11 +1259,11 @@ public:
   }
 
   ArrayRef<CaseLabelItem> getCaseLabelItems() const {
-    return {getTrailingObjects<CaseLabelItem>(), Bits.CaseStmt.NumPatterns};
+    return {getTrailingObjects<CaseLabelItem>(), static_cast<size_t>(Bits.CaseStmt.NumPatterns)};
   }
 
   MutableArrayRef<CaseLabelItem> getMutableCaseLabelItems() {
-    return {getTrailingObjects<CaseLabelItem>(), Bits.CaseStmt.NumPatterns};
+    return {getTrailingObjects<CaseLabelItem>(), static_cast<size_t>(Bits.CaseStmt.NumPatterns)};
   }
 
   unsigned getNumCaseLabelItems() const { return Bits.CaseStmt.NumPatterns; }
@@ -1448,7 +1448,7 @@ public:
   void setSubjectExpr(Expr *e) { SubjectExpr = e; }
 
   ArrayRef<ASTNode> getRawCases() const {
-    return {getTrailingObjects<ASTNode>(), Bits.SwitchStmt.CaseCount};
+    return {getTrailingObjects<ASTNode>(), static_cast<size_t>(Bits.SwitchStmt.CaseCount)};
   }
 
 private:
@@ -1541,10 +1541,10 @@ public:
   void setBody(Stmt *s) { Body = s; }
 
   ArrayRef<CaseStmt *> getCatches() const {
-    return {getTrailingObjects<CaseStmt *>(), Bits.DoCatchStmt.NumCatches};
+    return {getTrailingObjects<CaseStmt *>(), static_cast<size_t>(Bits.DoCatchStmt.NumCatches)};
   }
   MutableArrayRef<CaseStmt *> getMutableCatches() {
-    return {getTrailingObjects<CaseStmt *>(), Bits.DoCatchStmt.NumCatches};
+    return {getTrailingObjects<CaseStmt *>(), static_cast<size_t>(Bits.DoCatchStmt.NumCatches)};
   }
 
   /// Retrieve the complete set of branches for this do-catch statement.
