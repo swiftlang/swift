@@ -387,7 +387,7 @@ extension ASTGenVisitor {
     case .typeAlias(let typealiasDecl):
       abiDecl = self.generate(typeAliasDecl: typealiasDecl)?.asDecl
     case .variable(let varDecl):
-      abiDecl = self.generate(variableDecl: varDecl).asDecl
+      abiDecl = self.generate(variableDecl: varDecl)
     case .missing(_):
       // This error condition will have been diagnosed in SwiftSyntax.
       abiDecl = nil
