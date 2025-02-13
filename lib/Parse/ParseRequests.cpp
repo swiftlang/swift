@@ -534,11 +534,7 @@ bool parseAvailabilityMacroDefinitionViaASTGen(
   version = parsed.version.unbridged();
   specs.clear();
   for (auto spec : parsed.specs.unbridged<BridgedAvailabilitySpec>()) {
-    // Currently availability macros only supports platform version specs.
-    if (auto *platformVersionSpec =
-            dyn_cast<PlatformVersionConstraintAvailabilitySpec>(
-                spec.unbridged()))
-      specs.push_back(platformVersionSpec);
+    specs.push_back(spec.unbridged());
   }
 
   return false;
@@ -566,13 +562,7 @@ bool parseAvailabilityMacroDefinitionViaLegacyParser(
   // Copy the Specs to the requesting ASTContext from the temporary context
   // in the ParserUnit.
   for (auto *spec : tmpSpecs) {
-    // Currently availability macros only supports platform version specs.
-    if (auto *platformVersionSpec =
-            dyn_cast<PlatformVersionConstraintAvailabilitySpec>(spec)) {
-      auto copy = new (ctx)
-          PlatformVersionConstraintAvailabilitySpec(*platformVersionSpec);
-      specs.push_back(copy);
-    }
+    specs.push_back(spec->clone(ctx));
   }
 
   return false;

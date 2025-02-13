@@ -3735,8 +3735,7 @@ Parser::parsePlatformAgnosticVersionConstraintSpec() {
 ///
 ///  platform-version-constraint-spec:
 ///     identifier version-comparison version-tuple
-ParserResult<PlatformVersionConstraintAvailabilitySpec>
-Parser::parsePlatformVersionConstraintSpec() {
+ParserResult<AvailabilitySpec> Parser::parsePlatformVersionConstraintSpec() {
   Identifier PlatformIdentifier;
   SourceLoc PlatformLoc;
   if (Tok.is(tok::code_complete)) {
@@ -3786,7 +3785,6 @@ Parser::parsePlatformVersionConstraintSpec() {
   // Register the platform name as a keyword token.
   TokReceiver->registerTokenKindChange(PlatformLoc, tok::contextual_keyword);
 
-  return makeParserResult(
-      new (Context) PlatformVersionConstraintAvailabilitySpec(
-          Platform.value(), PlatformLoc, Version, VersionRange));
+  return makeParserResult(AvailabilitySpec::createPlatformVersioned(
+      Context, Platform.value(), PlatformLoc, Version, VersionRange));
 }

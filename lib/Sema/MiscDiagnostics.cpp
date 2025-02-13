@@ -5125,16 +5125,13 @@ static bool diagnoseAvailabilityCondition(PoundAvailableInfo *info,
   // swiftinterfaces or be parsable as macros by module clients.
   auto fragileKind = DC->getFragileFunctionKind();
   if (fragileKind.kind != FragileFunctionKind::None) {
-    for (auto queries : info->getQueries()) {
-      if (auto availSpec =
-              dyn_cast<PlatformVersionConstraintAvailabilitySpec>(queries)) {
-        if (availSpec->getMacroLoc().isValid()) {
-          DC->getASTContext().Diags.diagnose(
-              availSpec->getMacroLoc(),
-              swift::diag::availability_macro_in_inlinable,
-              fragileKind.getSelector());
-          return true;
-        }
+    for (auto availSpec : info->getQueries()) {
+      if (availSpec->getMacroLoc().isValid()) {
+        DC->getASTContext().Diags.diagnose(
+            availSpec->getMacroLoc(),
+            swift::diag::availability_macro_in_inlinable,
+            fragileKind.getSelector());
+        return true;
       }
     }
   }

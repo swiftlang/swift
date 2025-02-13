@@ -1297,15 +1297,13 @@ private:
         DiagnosticEngine &Diags = Context.Diags;
         if (CurrentScope->getReason() != AvailabilityScope::Reason::Root) {
           PlatformKind BestPlatform = targetPlatform(Context.LangOpts);
-          auto *PlatformSpec =
-              dyn_cast<PlatformVersionConstraintAvailabilitySpec>(Spec);
 
           // If possible, try to report the diagnostic in terms for the
           // platform the user uttered in the '#available()'. For a platform
           // that inherits availability from another platform it may be
           // different from the platform specified in the target triple.
-          if (PlatformSpec)
-            BestPlatform = PlatformSpec->getPlatform();
+          if (Spec->getPlatform() != PlatformKind::none)
+            BestPlatform = Spec->getPlatform();
           Diags.diagnose(Query->getLoc(),
                          diag::availability_query_useless_enclosing_scope,
                          platformString(BestPlatform));
@@ -1380,7 +1378,7 @@ private:
   AvailabilitySpec *bestActiveSpecForQuery(PoundAvailableInfo *available,
                                            bool forTargetVariant = false) {
     AvailabilitySpec *FoundWildcardSpec = nullptr;
-    PlatformVersionConstraintAvailabilitySpec *BestSpec = nullptr;
+    AvailabilitySpec *BestSpec = nullptr;
 
     for (auto *Spec : available->getQueries()) {
       if (Spec->isWildcard()) {
@@ -1388,21 +1386,19 @@ private:
         continue;
       }
 
-      auto *VersionSpec =
-          dyn_cast<PlatformVersionConstraintAvailabilitySpec>(Spec);
-      if (!VersionSpec)
+      auto Domain = Spec->getDomain();
+      if (!Domain || !Domain->isPlatform())
         continue;
 
       // FIXME: This is not quite right: we want to handle AppExtensions
       // properly. For example, on the OSXApplicationExtension platform
       // we want to chose the OS X spec unless there is an explicit
       // OSXApplicationExtension spec.
-      if (isPlatformActive(VersionSpec->getPlatform(), Context.LangOpts,
+      if (isPlatformActive(Spec->getPlatform(), Context.LangOpts,
                            forTargetVariant, /* ForRuntimeQuery */ true)) {
-        if (!BestSpec ||
-            inheritsAvailabilityFromPlatform(VersionSpec->getPlatform(),
-                                             BestSpec->getPlatform())) {
-          BestSpec = VersionSpec;
+        if (!BestSpec || inheritsAvailabilityFromPlatform(
+                             Spec->getPlatform(), BestSpec->getPlatform())) {
+          BestSpec = Spec;
         }
       }
     }
@@ -1430,11 +1426,8 @@ private:
       return AvailabilityRange::alwaysAvailable();
     }
 
-    auto *VersionSpec = cast<PlatformVersionConstraintAvailabilitySpec>(Spec);
-
-    llvm::VersionTuple Version = (GetRuntimeContext ?
-                                    VersionSpec->getRuntimeVersion() :
-                                    VersionSpec->getVersion());
+    llvm::VersionTuple Version =
+        (GetRuntimeContext ? Spec->getRuntimeVersion() : Spec->getVersion());
 
     return AvailabilityRange(VersionRange::allGTE(Version));
   }

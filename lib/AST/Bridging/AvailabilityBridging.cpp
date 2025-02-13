@@ -116,6 +116,15 @@ BridgedAvailabilitySpec BridgedAvailabilitySpec_createPlatformAgnostic(
       cVersion.unbridged(), cVersionRange.unbridged());
 }
 
+BridgedAvailabilitySpec BridgedAvailabilitySpec_createPlatformVersioned(
+    BridgedASTContext cContext, BridgedPlatformKind cPlatform,
+    BridgedSourceLoc cPlatformLoc, BridgedVersionTuple cVersion,
+    BridgedSourceRange cVersionSrcRange) {
+  return AvailabilitySpec::createPlatformVersioned(
+      cContext.unbridged(), unbridge(cPlatform), cPlatformLoc.unbridged(),
+      cVersion.unbridged(), cVersionSrcRange.unbridged());
+}
+
 BridgedSourceRange
 BridgedAvailabilitySpec_getSourceRange(BridgedAvailabilitySpec spec) {
   return spec.unbridged()->getSourceRange();
@@ -142,22 +151,6 @@ BridgedAvailabilitySpec_getVersion(BridgedAvailabilitySpec spec) {
 BridgedSourceRange
 BridgedAvailabilitySpec_getVersionRange(BridgedAvailabilitySpec spec) {
   return spec.unbridged()->getVersionSrcRange();
-}
-
-BridgedPlatformVersionConstraintAvailabilitySpec
-BridgedPlatformVersionConstraintAvailabilitySpec_createParsed(
-    BridgedASTContext cContext, BridgedPlatformKind cPlatform,
-    BridgedSourceLoc cPlatformLoc, BridgedVersionTuple cVersion,
-    BridgedSourceRange cVersionSrcRange) {
-  return new (cContext.unbridged()) PlatformVersionConstraintAvailabilitySpec(
-      unbridge(cPlatform), cPlatformLoc.unbridged(), cVersion.unbridged(),
-      cVersionSrcRange.unbridged());
-}
-
-BridgedAvailabilitySpec
-BridgedPlatformVersionConstraintAvailabilitySpec_asAvailabilitySpec(
-    BridgedPlatformVersionConstraintAvailabilitySpec spec) {
-  return static_cast<AvailabilitySpec *>(spec.unbridged());
 }
 
 //===----------------------------------------------------------------------===//

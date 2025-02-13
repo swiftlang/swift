@@ -42,6 +42,7 @@ namespace llvm {
 }
 
 namespace swift {
+  class AvailabilitySpec;
   class CodeCompletionCallbacks;
   class DoneParsingCallback;
   class DefaultArgumentInitializer;
@@ -53,7 +54,6 @@ namespace swift {
   class SILParserStateBase;
   class SourceManager;
   class UUID;
-  class PlatformVersionConstraintAvailabilitySpec;
 
   struct EnumElementInfo;
 
@@ -2057,8 +2057,7 @@ public:
                                    SmallVectorImpl<AvailabilitySpec *> &Specs);
 
   ParserResult<AvailabilitySpec> parseAvailabilitySpec();
-  ParserResult<PlatformVersionConstraintAvailabilitySpec>
-  parsePlatformVersionConstraintSpec();
+  ParserResult<AvailabilitySpec> parsePlatformVersionConstraintSpec();
   ParserResult<AvailabilitySpec> parsePlatformAgnosticVersionConstraintSpec();
   bool
   parseAvailability(bool parseAsPartOfSpecializeAttr, StringRef AttrName,

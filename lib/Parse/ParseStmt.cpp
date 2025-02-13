@@ -1313,27 +1313,25 @@ validateAvailabilitySpecList(Parser &P,
 
     // We keep specs for unrecognized domains around for error recovery
     // during parsing but remove them once parsing is completed.
-    auto domain = Spec->getDomain();
-    if (!domain) {
+    auto Domain = Spec->getDomain();
+    if (!Domain) {
       RecognizedSpecs.pop_back();
       continue;
     }
 
-    if (!domain->isPlatform()) {
+    if (!Domain->isPlatform()) {
       P.diagnose(Spec->getStartLoc(), diag::availability_must_occur_alone,
-                 domain->getNameForAttributePrinting());
+                 Domain->getNameForAttributePrinting());
       continue;
     }
 
-    auto *VersionSpec = cast<PlatformVersionConstraintAvailabilitySpec>(Spec);
-
-    bool Inserted = Platforms.insert(VersionSpec->getPlatform()).second;
+    bool Inserted = Platforms.insert(Spec->getPlatform()).second;
     if (!Inserted) {
       // Rule out multiple version specs referring to the same platform.
       // For example, we emit an error for
       /// #available(OSX 10.10, OSX 10.11, *)
-      PlatformKind Platform = VersionSpec->getPlatform();
-      P.diagnose(VersionSpec->getStartLoc(),
+      PlatformKind Platform = Spec->getPlatform();
+      P.diagnose(Spec->getStartLoc(),
                  diag::availability_query_repeated_platform,
                  platformString(Platform));
     }
@@ -1545,15 +1543,12 @@ Parser::parseAvailabilitySpecList(SmallVectorImpl<AvailabilitySpec *> &Specs,
           // can guess that the intention was to treat it as 'introduced' and
           // suggest a fix-it to combine them.
           if (Specs.size() == 1 &&
-              PlatformVersionConstraintAvailabilitySpec::classof(Previous) &&
+              Previous->getPlatform() != PlatformKind::none &&
               Text != "introduced") {
-            auto *PlatformSpec =
-                cast<PlatformVersionConstraintAvailabilitySpec>(Previous);
-
             auto PlatformNameEndLoc = Lexer::getLocForEndOfToken(
-                SourceManager, PlatformSpec->getStartLoc());
+                SourceManager, Previous->getStartLoc());
 
-            diagnose(PlatformSpec->getStartLoc(),
+            diagnose(Previous->getStartLoc(),
                      diag::avail_query_meant_introduced)
                 .fixItInsert(PlatformNameEndLoc, ", introduced:");
           }

@@ -94,6 +94,19 @@ public:
                                                   llvm::VersionTuple version,
                                                   SourceRange versionRange);
 
+  /// Creates an availability specification that guards execution based on the
+  /// run-time platform and version, e.g., macOS >= 10.10.
+  static AvailabilitySpec *createPlatformVersioned(ASTContext &ctx,
+                                                   PlatformKind platform,
+                                                   SourceLoc platformLoc,
+                                                   llvm::VersionTuple version,
+                                                   SourceRange versionRange);
+
+  AvailabilitySpec *clone(ASTContext &ctx) const {
+    return new (ctx)
+        AvailabilitySpec(Kind, Domain, SrcRange, Version, VersionStartLoc);
+  }
+
   AvailabilitySpecKind getKind() const { return Kind; }
 
   bool isWildcard() { return getKind() == AvailabilitySpecKind::Wildcard; }
@@ -112,6 +125,11 @@ public:
   // The platform version to compare against.
   llvm::VersionTuple getVersion() const;
 
+  // The version to be used in codegen for version comparisons at run time.
+  // This is required to support beta versions of macOS Big Sur that
+  // report 10.16 at run time.
+  llvm::VersionTuple getRuntimeVersion() const { return Version; }
+
   SourceRange getVersionSrcRange() const {
     if (!VersionStartLoc)
       return SourceRange();
@@ -121,44 +139,6 @@ public:
   // Location of the macro expanded to create this spec.
   SourceLoc getMacroLoc() const { return MacroLoc; }
   void setMacroLoc(SourceLoc loc) { MacroLoc = loc; }
-};
-
-/// An availability specification that guards execution based on the
-/// run-time platform and version, e.g., OS X >= 10.10.
-class PlatformVersionConstraintAvailabilitySpec : public AvailabilitySpec {
-  static std::optional<AvailabilityDomain>
-  getDomainForPlatform(PlatformKind Platform) {
-    if (Platform != PlatformKind::none)
-      return AvailabilityDomain::forPlatform(Platform);
-    return std::nullopt;
-  }
-
-public:
-  PlatformVersionConstraintAvailabilitySpec(PlatformKind Platform,
-                                            SourceLoc PlatformLoc,
-                                            llvm::VersionTuple Version,
-                                            SourceRange VersionSrcRange)
-      : AvailabilitySpec(AvailabilitySpecKind::PlatformVersionConstraint,
-                         getDomainForPlatform(Platform),
-                         SourceRange(PlatformLoc, VersionSrcRange.End), Version,
-                         VersionSrcRange.Start) {}
-  // The version to be used in codegen for version comparisons at run time.
-  // This is required to support beta versions of macOS Big Sur that
-  // report 10.16 at run time.
-  llvm::VersionTuple getRuntimeVersion() const;
-
-  void print(raw_ostream &OS, unsigned Indent) const;
-  
-  static bool classof(const AvailabilitySpec *Spec) {
-    return Spec->getKind() == AvailabilitySpecKind::PlatformVersionConstraint;
-  }
-
-  void *
-  operator new(size_t Bytes, ASTContext &C,
-               unsigned Alignment = alignof(PlatformVersionConstraintAvailabilitySpec)){
-    return AvailabilitySpec::operator new(Bytes, C, AllocationArena::Permanent,
-                                          Alignment);
-  }
 };
 
 /// Maps of macro name and version to availability specifications.

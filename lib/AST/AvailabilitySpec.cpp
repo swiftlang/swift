@@ -49,39 +49,33 @@ AvailabilitySpec *AvailabilitySpec::createPlatformAgnostic(
                                     version, versionRange.Start);
 }
 
+static std::optional<AvailabilityDomain>
+getDomainForPlatform(PlatformKind Platform) {
+  if (Platform != PlatformKind::none)
+    return AvailabilityDomain::forPlatform(Platform);
+  return std::nullopt;
+}
+
+AvailabilitySpec *AvailabilitySpec::createPlatformVersioned(
+    ASTContext &ctx, PlatformKind platform, SourceLoc platformLoc,
+    llvm::VersionTuple version, SourceRange versionRange) {
+  return new (ctx) AvailabilitySpec(
+      AvailabilitySpecKind::PlatformVersionConstraint,
+      getDomainForPlatform(platform),
+      SourceRange(platformLoc, versionRange.End), version, versionRange.Start);
+}
+
 llvm::VersionTuple AvailabilitySpec::getVersion() const {
-  switch (getKind()) {
-  case AvailabilitySpecKind::PlatformVersionConstraint: {
-    auto spec = cast<PlatformVersionConstraintAvailabilitySpec>(this);
-    // For macOS Big Sur, we canonicalize 10.16 to 11.0 for compile-time
-    // checking since clang canonicalizes availability markup. However, to
-    // support Beta versions of macOS Big Sur where the OS
-    // reports 10.16 at run time, we need to compare against 10.16,
-    //
-    // This means for:
-    //
-    // if #available(macOS 10.16, *) { ... }
-    //
-    // we need to store the uncanonicalized version for codegen and canonicalize
-    // it as necessary for compile-time checks.
-    return canonicalizePlatformVersion(spec->getPlatform(), Version);
-  }
-  case AvailabilitySpecKind::LanguageVersionConstraint:
-  case AvailabilitySpecKind::PackageDescriptionVersionConstraint:
-  case AvailabilitySpecKind::Wildcard:
-    return Version;
-  }
-}
-
-void PlatformVersionConstraintAvailabilitySpec::print(raw_ostream &OS,
-                                              unsigned Indent) const {
-  OS.indent(Indent) << '(' << "platform_version_constraint_availability_spec"
-                    << " platform='" << platformString(getPlatform()) << "'"
-                    << " version='" << getVersion() << "'"
-                    << ')';
-}
-
-llvm::VersionTuple
-PlatformVersionConstraintAvailabilitySpec::getRuntimeVersion() const {
-  return Version;
+  // For macOS Big Sur, we canonicalize 10.16 to 11.0 for compile-time
+  // checking since clang canonicalizes availability markup. However, to
+  // support Beta versions of macOS Big Sur where the OS
+  // reports 10.16 at run time, we need to compare against 10.16,
+  //
+  // This means for:
+  //
+  // if #available(macOS 10.16, *) { ... }
+  //
+  // we need to store the uncanonicalized version for codegen and canonicalize
+  // it as necessary for compile-time checks.
+  return canonicalizePlatformVersion(getPlatform(), Version);
 }

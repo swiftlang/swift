@@ -263,15 +263,13 @@ getAvailabilityConditionVersionSourceRange(const PoundAvailableInfo *PAI,
                                            PlatformKind Platform,
                                            const llvm::VersionTuple &Version) {
   SourceRange Range;
-  for (auto *S : PAI->getQueries()) {
-    if (auto *V = dyn_cast<PlatformVersionConstraintAvailabilitySpec>(S)) {
-      if (V->getPlatform() == Platform && V->getVersion() == Version) {
-        // More than one: return invalid range, no unique choice.
-        if (Range.isValid())
-          return SourceRange();
-        else
-          Range = V->getVersionSrcRange();
-      }
+  for (auto *Spec : PAI->getQueries()) {
+    if (Spec->getPlatform() == Platform && Spec->getVersion() == Version) {
+      // More than one: return invalid range, no unique choice.
+      if (Range.isValid())
+        return SourceRange();
+      else
+        Range = Spec->getVersionSrcRange();
     }
   }
   return Range;

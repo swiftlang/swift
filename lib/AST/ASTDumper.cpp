@@ -1100,13 +1100,12 @@ namespace {
           [&](Label label) {
             switch (Spec->getKind()) {
             case AvailabilitySpecKind::PlatformVersionConstraint: {
-              auto plat = cast<PlatformVersionConstraintAvailabilitySpec>(Spec);
               printHead("platform_version_constraint_availability_spec",
                         PatternColor, label);
-              printField(platformString(plat->getPlatform()),
+              printField(platformString(Spec->getPlatform()),
                          Label::always("platform"));
               printFieldRaw(
-                  [&](llvm::raw_ostream &OS) { OS << plat->getVersion(); },
+                  [&](llvm::raw_ostream &OS) { OS << Spec->getVersion(); },
                   Label::always("version"));
               printFoot();
               break;

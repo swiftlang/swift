@@ -329,14 +329,14 @@ extension ASTGenVisitor {
             // TODO: Diagnostics.
             fatalError("expected version")
           }
-          let spec = BridgedPlatformVersionConstraintAvailabilitySpec.createParsed(
+          let spec = BridgedAvailabilitySpec.createPlatformVersioned(
             self.ctx,
             platform: platform,
             platformLoc: nameLoc,
             version: version.bridged,
             versionRange: versionRange
           )
-          result.append(spec.asAvailabilitySpec)
+          result.append(spec)
         }
       }
     }
