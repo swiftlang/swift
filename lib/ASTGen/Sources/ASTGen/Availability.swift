@@ -291,14 +291,14 @@ extension ASTGenVisitor {
           ? .languageVersionConstraint
           : .packageDescriptionVersionConstraint
 
-        let spec = BridgedPlatformAgnosticVersionConstraintAvailabilitySpec.createParsed(
+        let spec = BridgedAvailabilitySpec.createPlatformAgnostic(
           self.ctx,
           kind: kind,
           nameLoc: nameLoc,
           version: version?.bridged ?? BridgedVersionTuple(),
           versionRange: versionRange
         )
-        result.append(spec.asAvailabilitySpec)
+        result.append(spec)
 
       case let name:
         var macroMatched = false;

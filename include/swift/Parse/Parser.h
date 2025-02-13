@@ -54,7 +54,6 @@ namespace swift {
   class SourceManager;
   class UUID;
   class PlatformVersionConstraintAvailabilitySpec;
-  class PlatformAgnosticVersionConstraintAvailabilitySpec;
 
   struct EnumElementInfo;
 
@@ -2060,8 +2059,7 @@ public:
   ParserResult<AvailabilitySpec> parseAvailabilitySpec();
   ParserResult<PlatformVersionConstraintAvailabilitySpec>
   parsePlatformVersionConstraintSpec();
-  ParserResult<PlatformAgnosticVersionConstraintAvailabilitySpec>
-  parsePlatformAgnosticVersionConstraintSpec();
+  ParserResult<AvailabilitySpec> parsePlatformAgnosticVersionConstraintSpec();
   bool
   parseAvailability(bool parseAsPartOfSpecializeAttr, StringRef AttrName,
                     bool &DiscardAttribute, SourceRange &attrRange,

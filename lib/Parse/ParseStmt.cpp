@@ -1294,12 +1294,13 @@ validateAvailabilitySpecList(Parser &P,
   llvm::SmallSet<PlatformKind, 4> Platforms;
   std::optional<SourceLoc> WildcardSpecLoc = std::nullopt;
 
-  if (Specs.size() == 1 &&
-      isa<PlatformAgnosticVersionConstraintAvailabilitySpec>(Specs[0])) {
+  if (Specs.size() == 1) {
     // @available(swift N) and @available(_PackageDescription N) are allowed
     // only in isolation; they cannot be combined with other availability specs
     // in a single list.
-    return;
+    auto domain = Specs[0]->getDomain();
+    if (domain && !domain->isPlatform())
+      return;
   }
 
   SmallVector<AvailabilitySpec *, 5> RecognizedSpecs;
@@ -1310,24 +1311,21 @@ validateAvailabilitySpecList(Parser &P,
       continue;
     }
 
-    if (auto *PlatformAgnosticSpec =
-         dyn_cast<PlatformAgnosticVersionConstraintAvailabilitySpec>(Spec)) {
-      bool isLanguageVersionSpecific = PlatformAgnosticSpec->getDomain()->isSwiftLanguage();
-      P.diagnose(PlatformAgnosticSpec->getStartLoc(),
-                 diag::availability_must_occur_alone,
-                 isLanguageVersionSpecific
-                     ? "swift"
-                     : "_PackageDescription");
+    // We keep specs for unrecognized domains around for error recovery
+    // during parsing but remove them once parsing is completed.
+    auto domain = Spec->getDomain();
+    if (!domain) {
+      RecognizedSpecs.pop_back();
+      continue;
+    }
+
+    if (!domain->isPlatform()) {
+      P.diagnose(Spec->getStartLoc(), diag::availability_must_occur_alone,
+                 domain->getNameForAttributePrinting());
       continue;
     }
 
     auto *VersionSpec = cast<PlatformVersionConstraintAvailabilitySpec>(Spec);
-    // We keep specs for unrecognized platforms around for error recovery
-    // during parsing but remove them once parsing is completed.
-    if (!VersionSpec->getDomain().has_value()) {
-      RecognizedSpecs.pop_back();
-      continue;
-    }
 
     bool Inserted = Platforms.insert(VersionSpec->getPlatform()).second;
     if (!Inserted) {
@@ -1403,16 +1401,15 @@ ParserResult<PoundAvailableInfo> Parser::parseStmtConditionPoundAvailable() {
   ParserStatus Status = parseAvailabilitySpecList(Specs, Source);
 
   for (auto *Spec : Specs) {
-    if (auto *PlatformAgnostic =
-          dyn_cast<PlatformAgnosticVersionConstraintAvailabilitySpec>(Spec)) {
-      bool isLanguageVersionSpecific = PlatformAgnostic->getDomain()->isSwiftLanguage();
-      diagnose(PlatformAgnostic->getStartLoc(),
-               isLanguageVersionSpecific
-                   ? diag::pound_available_swift_not_allowed
-                   : diag::pound_available_package_description_not_allowed,
-               getTokenText(MainToken));
-      Status.setIsParseError();
-    }
+    if (Spec->getPlatform() != PlatformKind::none || Spec->isWildcard())
+      continue;
+
+    diagnose(Spec->getStartLoc(),
+             Spec->getDomain()->isSwiftLanguage()
+                 ? diag::pound_available_swift_not_allowed
+                 : diag::pound_available_package_description_not_allowed,
+             getTokenText(MainToken));
+    Status.setIsParseError();
   }
 
   SourceLoc RParenLoc;

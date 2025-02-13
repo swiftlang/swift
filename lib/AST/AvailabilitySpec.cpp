@@ -29,6 +29,26 @@ AvailabilitySpec *AvailabilitySpec::createWildcard(ASTContext &ctx,
                        /*VersionStartLoc=*/{});
 }
 
+static AvailabilityDomain getDomainForSpecKind(AvailabilitySpecKind Kind) {
+  switch (Kind) {
+  case AvailabilitySpecKind::PlatformVersionConstraint:
+  case AvailabilitySpecKind::Wildcard:
+    llvm_unreachable("unexpected spec kind");
+  case AvailabilitySpecKind::LanguageVersionConstraint:
+    return AvailabilityDomain::forSwiftLanguage();
+  case AvailabilitySpecKind::PackageDescriptionVersionConstraint:
+    return AvailabilityDomain::forPackageDescription();
+  }
+}
+
+AvailabilitySpec *AvailabilitySpec::createPlatformAgnostic(
+    ASTContext &ctx, AvailabilitySpecKind kind, SourceLoc nameLoc,
+    llvm::VersionTuple version, SourceRange versionRange) {
+  return new (ctx) AvailabilitySpec(kind, getDomainForSpecKind(kind),
+                                    SourceRange(nameLoc, versionRange.End),
+                                    version, versionRange.Start);
+}
+
 llvm::VersionTuple AvailabilitySpec::getVersion() const {
   switch (getKind()) {
   case AvailabilitySpecKind::PlatformVersionConstraint: {
@@ -64,16 +84,4 @@ void PlatformVersionConstraintAvailabilitySpec::print(raw_ostream &OS,
 llvm::VersionTuple
 PlatformVersionConstraintAvailabilitySpec::getRuntimeVersion() const {
   return Version;
-}
-
-void PlatformAgnosticVersionConstraintAvailabilitySpec::print(raw_ostream &OS,
-                                                      unsigned Indent) const {
-  OS.indent(Indent) << '('
-                    << "platform_agnostic_version_constraint_availability_spec"
-                    << " kind='"
-                    << (getDomain()->isSwiftLanguage() ?
-                         "swift" : "package_description")
-                    << "'"
-                    << " version='" << getVersion() << "'"
-                    << ')';
 }

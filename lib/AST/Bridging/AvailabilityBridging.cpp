@@ -86,11 +86,34 @@ static BridgedPlatformKind bridge(PlatformKind platform) {
 // MARK: AvailabilitySpec
 //===----------------------------------------------------------------------===//
 
+static AvailabilitySpecKind unbridge(BridgedAvailabilitySpecKind kind) {
+  switch (kind) {
+  case BridgedAvailabilitySpecKindPlatformVersionConstraint:
+    return AvailabilitySpecKind::PlatformVersionConstraint;
+  case BridgedAvailabilitySpecKindWildcard:
+    return AvailabilitySpecKind::Wildcard;
+  case BridgedAvailabilitySpecKindLanguageVersionConstraint:
+    return AvailabilitySpecKind::LanguageVersionConstraint;
+  case BridgedAvailabilitySpecKindPackageDescriptionVersionConstraint:
+    return AvailabilitySpecKind::PackageDescriptionVersionConstraint;
+  }
+  llvm_unreachable("unhandled enum value");
+}
+
 BridgedAvailabilitySpec
 BridgedAvailabilitySpec_createWildcard(BridgedASTContext cContext,
                                        BridgedSourceLoc cLoc) {
   return AvailabilitySpec::createWildcard(cContext.unbridged(),
                                           cLoc.unbridged());
+}
+
+BridgedAvailabilitySpec BridgedAvailabilitySpec_createPlatformAgnostic(
+    BridgedASTContext cContext, BridgedAvailabilitySpecKind cKind,
+    BridgedSourceLoc cLoc, BridgedVersionTuple cVersion,
+    BridgedSourceRange cVersionRange) {
+  return AvailabilitySpec::createPlatformAgnostic(
+      cContext.unbridged(), unbridge(cKind), cLoc.unbridged(),
+      cVersion.unbridged(), cVersionRange.unbridged());
 }
 
 BridgedSourceRange
@@ -121,20 +144,6 @@ BridgedAvailabilitySpec_getVersionRange(BridgedAvailabilitySpec spec) {
   return spec.unbridged()->getVersionSrcRange();
 }
 
-static AvailabilitySpecKind unbridge(BridgedAvailabilitySpecKind kind) {
-  switch (kind) {
-  case BridgedAvailabilitySpecKindPlatformVersionConstraint:
-    return AvailabilitySpecKind::PlatformVersionConstraint;
-  case BridgedAvailabilitySpecKindWildcard:
-    return AvailabilitySpecKind::Wildcard;
-  case BridgedAvailabilitySpecKindLanguageVersionConstraint:
-    return AvailabilitySpecKind::LanguageVersionConstraint;
-  case BridgedAvailabilitySpecKindPackageDescriptionVersionConstraint:
-    return AvailabilitySpecKind::PackageDescriptionVersionConstraint;
-  }
-  llvm_unreachable("unhandled enum value");
-}
-
 BridgedPlatformVersionConstraintAvailabilitySpec
 BridgedPlatformVersionConstraintAvailabilitySpec_createParsed(
     BridgedASTContext cContext, BridgedPlatformKind cPlatform,
@@ -145,26 +154,9 @@ BridgedPlatformVersionConstraintAvailabilitySpec_createParsed(
       cVersionSrcRange.unbridged());
 }
 
-BridgedPlatformAgnosticVersionConstraintAvailabilitySpec
-BridgedPlatformAgnosticVersionConstraintAvailabilitySpec_createParsed(
-    BridgedASTContext cContext, BridgedAvailabilitySpecKind cKind,
-    BridgedSourceLoc cNameLoc, BridgedVersionTuple cVersion,
-    BridgedSourceRange cVersionSrcRange) {
-  return new (cContext.unbridged())
-      PlatformAgnosticVersionConstraintAvailabilitySpec(
-          unbridge(cKind), cNameLoc.unbridged(), cVersion.unbridged(),
-          cVersionSrcRange.unbridged());
-}
-
 BridgedAvailabilitySpec
 BridgedPlatformVersionConstraintAvailabilitySpec_asAvailabilitySpec(
     BridgedPlatformVersionConstraintAvailabilitySpec spec) {
-  return static_cast<AvailabilitySpec *>(spec.unbridged());
-}
-
-BridgedAvailabilitySpec
-BridgedPlatformAgnosticVersionConstraintAvailabilitySpec_asAvailabilitySpec(
-    BridgedPlatformAgnosticVersionConstraintAvailabilitySpec spec) {
   return static_cast<AvailabilitySpec *>(spec.unbridged());
 }
 

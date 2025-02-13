@@ -3704,7 +3704,7 @@ ParserResult<AvailabilitySpec> Parser::parseAvailabilitySpec() {
 ///     "swift" version-tuple
 ///  package-description-version-constraint-spec:
 ///     "_PackageDescription" version-tuple
-ParserResult<PlatformAgnosticVersionConstraintAvailabilitySpec>
+ParserResult<AvailabilitySpec>
 Parser::parsePlatformAgnosticVersionConstraintSpec() {
   SourceLoc PlatformAgnosticNameLoc;
   llvm::VersionTuple Version;
@@ -3727,9 +3727,8 @@ Parser::parsePlatformAgnosticVersionConstraintSpec() {
                         diag::avail_query_expected_version_number)) {
     return nullptr;
   }
-  return makeParserResult(new (Context)
-                          PlatformAgnosticVersionConstraintAvailabilitySpec(
-                            Kind.value(), PlatformAgnosticNameLoc, Version, VersionRange));
+  return makeParserResult(AvailabilitySpec::createPlatformAgnostic(
+      Context, Kind.value(), PlatformAgnosticNameLoc, Version, VersionRange));
 }
 
 /// Parse platform-version constraint specification.

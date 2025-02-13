@@ -85,6 +85,15 @@ public:
   /// compiler will still catch references to potentially unavailable symbols.
   static AvailabilitySpec *createWildcard(ASTContext &ctx, SourceLoc starLoc);
 
+  /// Creates an availability specification that guards execution based on the
+  /// compile-time platform agnostic version, e.g., swift >= 3.0.1,
+  /// package-description >= 4.0.
+  static AvailabilitySpec *createPlatformAgnostic(ASTContext &ctx,
+                                                  AvailabilitySpecKind kind,
+                                                  SourceLoc nameLoc,
+                                                  llvm::VersionTuple version,
+                                                  SourceRange versionRange);
+
   AvailabilitySpecKind getKind() const { return Kind; }
 
   bool isWildcard() { return getKind() == AvailabilitySpecKind::Wildcard; }
@@ -147,52 +156,6 @@ public:
   void *
   operator new(size_t Bytes, ASTContext &C,
                unsigned Alignment = alignof(PlatformVersionConstraintAvailabilitySpec)){
-    return AvailabilitySpec::operator new(Bytes, C, AllocationArena::Permanent,
-                                          Alignment);
-  }
-};
-
-/// An availability specification that guards execution based on the
-/// compile-time platform agnostic version, e.g., swift >= 3.0.1,
-/// package-description >= 4.0.
-class PlatformAgnosticVersionConstraintAvailabilitySpec
-    : public AvailabilitySpec {
-
-  static AvailabilityDomain getDomainForSpecKind(AvailabilitySpecKind Kind) {
-    switch (Kind) {
-    case AvailabilitySpecKind::PlatformVersionConstraint:
-    case AvailabilitySpecKind::Wildcard:
-      llvm_unreachable("unexpected spec kind");
-    case AvailabilitySpecKind::LanguageVersionConstraint:
-      return AvailabilityDomain::forSwiftLanguage();
-    case AvailabilitySpecKind::PackageDescriptionVersionConstraint:
-      return AvailabilityDomain::forPackageDescription();
-    }
-  }
-
-public:
-  PlatformAgnosticVersionConstraintAvailabilitySpec(
-      AvailabilitySpecKind AvailabilitySpecKind,
-      SourceLoc PlatformAgnosticNameLoc, llvm::VersionTuple Version,
-      SourceRange VersionSrcRange)
-      : AvailabilitySpec(
-            AvailabilitySpecKind, getDomainForSpecKind(AvailabilitySpecKind),
-            SourceRange(PlatformAgnosticNameLoc, VersionSrcRange.End), Version,
-            VersionSrcRange.Start) {
-    assert(AvailabilitySpecKind == AvailabilitySpecKind::LanguageVersionConstraint ||
-           AvailabilitySpecKind == AvailabilitySpecKind::PackageDescriptionVersionConstraint);
-  }
-
-  void print(raw_ostream &OS, unsigned Indent) const;
-
-  static bool classof(const AvailabilitySpec *Spec) {
-    return Spec->getKind() == AvailabilitySpecKind::LanguageVersionConstraint ||
-      Spec->getKind() == AvailabilitySpecKind::PackageDescriptionVersionConstraint;
-  }
-
-  void *
-  operator new(size_t Bytes, ASTContext &C,
-               unsigned Alignment = alignof(PlatformAgnosticVersionConstraintAvailabilitySpec)){
     return AvailabilitySpec::operator new(Bytes, C, AllocationArena::Permanent,
                                           Alignment);
   }

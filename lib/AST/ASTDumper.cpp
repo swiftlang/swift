@@ -1113,17 +1113,15 @@ namespace {
             }
             case AvailabilitySpecKind::LanguageVersionConstraint:
             case AvailabilitySpecKind::PackageDescriptionVersionConstraint: {
-              auto agnostic =
-                  cast<PlatformAgnosticVersionConstraintAvailabilitySpec>(Spec);
               printHead("platform_agnostic_version_constraint_"
                         "availability_spec",
                         PatternColor, label);
-              printField(agnostic->getDomain()->isSwiftLanguage()
+              printField(Spec->getDomain()->isSwiftLanguage()
                              ? "swift"
                              : "package_description",
                          Label::always("kind"));
               printFieldRaw(
-                  [&](llvm::raw_ostream &OS) { OS << agnostic->getVersion(); },
+                  [&](llvm::raw_ostream &OS) { OS << Spec->getVersion(); },
                   Label::always("version"));
               printFoot();
               break;
