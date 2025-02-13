@@ -4206,7 +4206,7 @@ NeverNullType TypeResolver::resolveASTFunctionType(
     switch (isolation.getKind()) {
     case FunctionTypeIsolation::Kind::NonIsolated:
       break;
-
+         
     case FunctionTypeIsolation::Kind::GlobalActor:
       diagnoseInvalid(
           repr, executionAttr->getAtLoc(),
@@ -4228,15 +4228,19 @@ NeverNullType TypeResolver::resolveASTFunctionType(
           diag::
               attr_execution_concurrent_type_attr_incompatible_with_isolated_any);
       break;
+
+    case FunctionTypeIsolation::Kind::NonIsolatedCaller:
+      llvm_unreachable("cannot happen because multiple @execution attributes "
+                       "aren't allowed.");
     }
 
     if (!repr->isInvalid()) {
       switch (executionAttr->getBehavior()) {
       case ExecutionKind::Concurrent:
-        // TODO: We need to introduce a new isolation kind to support this.
+        isolation = FunctionTypeIsolation::forNonIsolated();
         break;
       case ExecutionKind::Caller:
-        isolation = FunctionTypeIsolation::forNonIsolated();
+        isolation = FunctionTypeIsolation::forNonIsolatedCaller();
         break;
       }
     }
