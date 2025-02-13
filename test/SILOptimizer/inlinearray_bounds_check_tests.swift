@@ -4,7 +4,6 @@
 
 // RUN: %target-swift-frontend %s -emit-ir -O \
 // RUN:   -disable-availability-checking \
-// RUN:   -enable-experimental-feature InlineArray \
 // RUN:   -enable-experimental-feature ValueGenerics | %FileCheck %s  --check-prefix=CHECK-IR 
 
 // REQUIRES: swift_in_compiler
