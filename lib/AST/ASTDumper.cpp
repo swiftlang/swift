@@ -1020,6 +1020,10 @@ namespace {
       return Writer.hasNonStandardOutput();
     }
 
+    bool isTypeChecked() const {
+      return MemberLoading == ASTDumpMemberLoading::TypeChecked;
+    }
+
     /// Call `Body` in a context where the printer is ready for a child to be
     /// printed.
     void printRecArbitrary(std::function<void(Label)> body, Label label) {
@@ -1614,11 +1618,17 @@ namespace {
       }
     }
 
+    template <typename T>
+    void printDeclContext(const T *D) {
+      printField(static_cast<void *>(D->getDeclContext()),
+                 Label::always("decl_context"));
+    }
+
     /// Prints a field containing the name or the USR (based on parsability of
     /// the output) of a decl that is being referenced elsewhere.
     template <typename T>
     void printReferencedDeclField(const T *D, Label label) {
-      if (Writer.isParsable()) {
+      if (Writer.isParsable() && isTypeChecked()) {
         printFieldQuoted(declUSR(D), label);
       } else {
         printFieldQuoted(D->getName(), label);
@@ -1630,7 +1640,7 @@ namespace {
     template <typename T>
     void printReferencedDeclWithContextField(const T *D, Label label,
                                              TerminalColor Color = DeclColor) {
-      if (Writer.isParsable()) {
+      if (Writer.isParsable() && isTypeChecked()) {
         printFieldQuoted(declUSR(D), label, Color);
       } else {
         printFieldQuoted(D->printRef(), label, Color);
@@ -1640,7 +1650,7 @@ namespace {
     /// Print a field containing a concrete reference to a declaration.
     void printDeclRefField(ConcreteDeclRef declRef, Label label,
                            TerminalColor Color = DeclColor) {
-      if (Writer.isParsable()) {
+      if (Writer.isParsable() && isTypeChecked()) {
         // Just omit the key/value for parsable formats if there's no decl.
         if (!declRef.getDecl())
           return;
@@ -1809,6 +1819,7 @@ namespace {
     }
     void visitExprPattern(ExprPattern *P, Label label) {
       printCommon(P, "pattern_expr", label);
+      printDeclContext(P);
       switch (P->getCachedMatchOperandOwnership()) {
       case ValueOwnership::Default:
         break;
@@ -1839,6 +1850,7 @@ namespace {
     }
     void visitEnumElementPattern(EnumElementPattern *P, Label label) {
       printCommon(P, "pattern_enum_element", label);
+      printDeclContext(P);
 
       if (Writer.isParsable()) {
         printName(P->getName().getFullName(), Label::always("element"));
@@ -1895,11 +1907,13 @@ namespace {
       // Parsable outputs include the USR for each decl since they can be used
       // to cross-reference them (within the AST dump itself and with other data
       // sources like indexstore and SourceKit).
-      if (Writer.isParsable()) {
+      if (Writer.isParsable() && isTypeChecked()) {
         if (auto usr = declUSR(D); !usr.empty()) {
           printFieldQuoted(usr, Label::always("usr"));
         }
       }
+
+      printDeclContext(D);
 
       printFlag(D->isImplicit(), "implicit", DeclModifierColor);
       printFlag(D->isHoisted(), "hoisted", DeclModifierColor);
@@ -1919,7 +1933,7 @@ namespace {
       printFlag(D->TrailingSemiLoc.isValid(), "trailing_semi",
                 DeclModifierColor);
 
-      if (Writer.isParsable()) {
+      if (Writer.isParsable() && isTypeChecked()) {
         // Print just the USRs of any auxiliary decls associated with this decl,
         // which lets us relate macro expansions back to their originating decl
         // if desired.
@@ -2098,13 +2112,15 @@ namespace {
 
       printWhereRequirements(decl);
       if (decl->overriddenDeclsComputed()) {
-        printStringListField(decl->getOverriddenDecls(),
-                             [&](AssociatedTypeDecl *overridden) {
-          if (Writer.isParsable()) {
-            return declUSR(overridden->getProtocol());
-          }
-          return std::string(overridden->getProtocol()->getName().str());
-        }, Label::always("overridden"), /*delimiter=*/ ", ");
+        printStringListField(
+            decl->getOverriddenDecls(),
+            [&](AssociatedTypeDecl *overridden) {
+              if (Writer.isParsable() && isTypeChecked()) {
+                return declUSR(overridden->getProtocol());
+              }
+              return std::string(overridden->getProtocol()->getName().str());
+            },
+            Label::always("overridden"), /*delimiter=*/", ");
       }
 
       printAttributes(decl);
@@ -2214,15 +2230,18 @@ namespace {
 
       if (VD->overriddenDeclsComputed()) {
         auto overridden = VD->getOverriddenDecls();
-        printStringListField(overridden, [&](ValueDecl *overridden) {
-          if (Writer.isParsable()) {
-            return declUSR(overridden);
-          }
-          std::string value;
-          llvm::raw_string_ostream SOS(value);
-          overridden->dumpRef(SOS);
-          return value;
-        }, Label::always("override"), /*delimiter=*/ ", ", OverrideColor);
+        printStringListField(
+            overridden,
+            [&](ValueDecl *overridden) {
+              if (Writer.isParsable() && isTypeChecked()) {
+                return declUSR(overridden);
+              }
+              std::string value;
+              llvm::raw_string_ostream SOS(value);
+              overridden->dumpRef(SOS);
+              return value;
+            },
+            Label::always("override"), /*delimiter=*/", ", OverrideColor);
       }
 
       auto VarD = dyn_cast<VarDecl>(VD);
@@ -2424,6 +2443,8 @@ namespace {
       printHead("parameter", ParameterColor, label);
 
       printDeclName(PD, Label::optional("name"));
+
+      printDeclContext(PD);
       if (!PD->getArgumentName().empty())
         printFieldQuoted(PD->getArgumentName(), Label::always("apiName"),
                          IdentifierColor);
@@ -2522,23 +2543,32 @@ namespace {
       printCommon(PBD, "pattern_binding_decl", label);
       printAttributes(PBD);
 
-      printList(range(PBD->getNumPatternEntries()), [&](auto idx, Label label) {
-        // Ensure that we have an object structure printed in parsable modes
-        // so that the children aren't directly rendered as array elements.
-        if (Writer.isParsable())
-          printHead("pattern_entry", FieldLabelColor, label);
+      printList(
+          range(PBD->getNumPatternEntries()),
+          [&](auto idx, Label label) {
+            printRecArbitrary(
+                [&](Label label) {
+                  printHead("pattern_entry", FieldLabelColor, label);
 
-        printRec(PBD->getPattern(idx), Label::optional("pattern"));
-        if (PBD->getOriginalInit(idx)) {
-          printRec(PBD->getOriginalInit(idx), Label::always("original_init"));
-        }
-        if (PBD->getInit(idx)) {
-          printRec(PBD->getInit(idx), Label::always("processed_init"));
-        }
+                  if (PBD->getInitContext(idx))
+                    printField(PBD->getInitContext(idx),
+                               Label::always("init_context"));
 
-        if (Writer.isParsable())
-          printFoot();
-      }, Label::optional("pattern_entries"));
+                  printRec(PBD->getPattern(idx), Label::optional("pattern"));
+                  if (PBD->getOriginalInit(idx)) {
+                    printRec(PBD->getOriginalInit(idx),
+                             Label::always("original_init"));
+                  }
+                  if (PBD->getInit(idx)) {
+                    printRec(PBD->getInit(idx),
+                             Label::always("processed_init"));
+                  }
+
+                  printFoot();
+                },
+                Label::optional("pattern_entry"));
+          },
+          Label::optional("pattern_entries"));
       printFoot();
     }
 
@@ -3095,14 +3125,17 @@ public:
   }
   void visitBreakStmt(BreakStmt *S, Label label) {
     printCommon(S, "break_stmt", label);
+    printDeclContext(S);
     printFoot();
   }
   void visitContinueStmt(ContinueStmt *S, Label label) {
     printCommon(S, "continue_stmt", label);
+    printDeclContext(S);
     printFoot();
   }
   void visitFallthroughStmt(FallthroughStmt *S, Label label) {
     printCommon(S, "fallthrough_stmt", label);
+    printDeclContext(S);
     printFoot();
   }
   void visitSwitchStmt(SwitchStmt *S, Label label) {
@@ -3186,6 +3219,7 @@ public:
 
   void visitDoCatchStmt(DoCatchStmt *S, Label label) {
     printCommon(S, "do_catch_stmt", label);
+    printDeclContext(S);
     printThrowDest(S->rethrows(), /*wantNothrow=*/true);
     printRec(S->getBody(), Label::always("body"));
     printRecRange(S->getCatches(), Ctx, Label::always("catch_stmts"));
@@ -4348,6 +4382,7 @@ public:
 
   void visitSingleValueStmtExpr(SingleValueStmtExpr *E, Label label) {
     printCommon(E, "single_value_stmt_expr", label);
+    printDeclContext(E);
     printRec(E->getStmt(), &E->getDeclContext()->getASTContext(),
              Label::optional("stmt"));
     printFoot();
@@ -4382,6 +4417,7 @@ public:
 
   void visitMacroExpansionExpr(MacroExpansionExpr *E, Label label) {
     printCommon(E, "macro_expansion_expr", label);
+    printDeclContext(E);
 
     printFieldQuoted(E->getMacroName(), Label::always("name"), IdentifierColor);
     printField(E->getRawDiscriminator(), Label::always("discriminator"),
@@ -4483,6 +4519,7 @@ public:
     printFieldQuoted(T->getNameRef(), Label::always("id"), IdentifierColor);
     if (T->isBound()) {
       printReferencedDeclWithContextField(T->getBoundDecl(), Label::always("bind"));
+      printDeclContext(T);
     } else {
       printFlag("unbound");
     }
@@ -4975,6 +5012,11 @@ public:
   }
   void visitCustomAttr(CustomAttr *Attr, Label label) {
     printCommon(Attr, "custom_attr", label);
+
+    printField(
+        static_cast<void *>(static_cast<DeclContext *>(Attr->getInitContext())),
+        Label::always("init_context"));
+
     if (Attr->getType()) {
       printTypeField(Attr->getType(), Label::always("type"));
     } else if (MemberLoading == ASTDumpMemberLoading::TypeChecked) {
@@ -5051,7 +5093,7 @@ public:
   }
   void visitImplementsAttr(ImplementsAttr *Attr, Label label) {
     printCommon(Attr, "implements_attr", label);
-    if (Writer.isParsable()) {
+    if (Writer.isParsable() && isTypeChecked()) {
       // Print the resolved protocol's USR in parsable outputs, not the
       // TypeRepr.
       if (auto PD = Attr->getCachedProtocol(DC); PD && *PD != nullptr) {
@@ -5213,7 +5255,7 @@ public:
                                         Label label) {
     printCommon(Attr, "restated_objc_conformance_attr", label);
     if (Attr->Proto) {
-      if (Writer.isParsable()) {
+      if (Writer.isParsable() && isTypeChecked()) {
         printFieldQuoted(declUSR(Attr->Proto), Label::optional("proto"));
       } else {
         printFieldRaw([&](auto &out) { Attr->Proto->dumpRef(out); },
@@ -5294,7 +5336,7 @@ public:
                                     Label label) {
     printCommon(Attr, "synthesized_protocol_attr", label);
     printFlag(Attr->isUnchecked(), "unchecked");
-    if (Writer.isParsable()) {
+    if (Writer.isParsable() && isTypeChecked()) {
       printFieldQuoted(declUSR(Attr->getProtocol()),
                        Label::optional("protocol"));
     } else {
@@ -5491,7 +5533,7 @@ public:
                   printFlag("no_witness");
                 else if (witness.getDecl() == req)
                   printFlag("dynamic_witness");
-                else if (Writer.isParsable()) {
+                else if (Writer.isParsable() && isTypeChecked()) {
                   printFieldQuoted(declUSR(witness.getDecl()),
                                    Label::always("witness"));
                 } else {
