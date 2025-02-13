@@ -1475,6 +1475,17 @@ void irgen::emitBuiltinCall(IRGenFunction &IGF, const BuiltinInfo &Builtin,
     return;
   }
 
+  if (Builtin.ID == BuiltinValueKind::AllocVector) {
+    // Obsolete: only there to be able to read old Swift.interface files which still
+    // contain the builtin.
+    (void)args.claimAll();
+    IGF.emitTrap("vector allocation not supported anymore", /*EmitUnreachable=*/true);
+    out.add(llvm::UndefValue::get(IGF.IGM.Int8PtrTy));
+    llvm::BasicBlock *contBB = llvm::BasicBlock::Create(IGF.IGM.getLLVMContext());
+    IGF.Builder.emitBlock(contBB);
+    return;
+  }
+
   if (Builtin.ID == BuiltinValueKind::GetEnumTag) {
     auto arg = args.claimNext();
     auto ty = argTypes[0];
