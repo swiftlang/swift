@@ -122,6 +122,8 @@ option(SwiftCore_INSTALL_NESTED_SUBDIR "Install libraries under a platform and a
 set(SwiftCore_INSTALL_LIBDIR "${CMAKE_INSTALL_LIBDIR}/swift$<$<NOT:$<BOOL:${BUILD_SHARED_LIBS}>>:_static>$<$<BOOL:${SwiftCore_INSTALL_NESTED_SUBDIR}>:/${SwiftCore_PLATFORM_SUBDIR}/${SwiftCore_ARCH_SUBDIR}>")
 set(SwiftCore_INSTALL_SWIFTMODULEDIR "${CMAKE_INSTALL_LIBDIR}/swift$<$<NOT:$<BOOL:${BUILD_SHARED_LIBS}>>:_static>$<$<BOOL:${SwiftCore_INSTALL_NESTED_SUBDIR}>:/${SwiftCore_PLATFORM_SUBDIR}>")
 
+option(SwiftCore_ENABLE_ONONESUPPORT "Enable Onone Support" YES)
+
 # TODO: Most of these should be attached to specific targets rather than applied
 #       globally. They can be applied as part of the library interface if they
 #       affect the behavior of libraries that build against a given target.
@@ -204,3 +206,6 @@ add_subdirectory(runtime)
 add_subdirectory(stubs)
 add_subdirectory(CommandLineSupport)
 add_subdirectory(core)
+if(SwiftCore_ENABLE_ONONESUPPORT)
+  add_subdirectory(SwiftOnoneSupport)
+endif()
