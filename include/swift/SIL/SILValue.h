@@ -1033,7 +1033,7 @@ class Operand {
 public:
   enum { numCustomBits = 8 };
 
-  constexpr static const size_t maxBitfieldID =
+  constexpr static const uint64_t maxBitfieldID =
       std::numeric_limits<uint64_t>::max() >> numCustomBits;
 
 private:
