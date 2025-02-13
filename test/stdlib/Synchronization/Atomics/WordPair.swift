@@ -49,7 +49,7 @@ suite.test("basics") {
 
 } // if #available(SwiftStdlib 6.0, *)
 
-if #available(SwiftStdlib 6.2, *) {
+if #available(SwiftStdlib 6.1, *) {
 suite.test("comparable") {
   let c0 = WordPair(first: 0, second: 0)
   let c1 = WordPair(first: 1, second: 0)
