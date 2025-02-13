@@ -11,6 +11,9 @@
 #define TEST_PRIVATE private
 #endif
 
+/// A C++ class with various kinds of public and non-public fields, all of which
+/// should be imported. Non-public fields should only be accessible inside
+/// MyClass extensions in blessed.swift.
 TEST_CLASS
 __attribute__((__swift_attr__("private_fileid:main/blessed.swift"))) MyClass {
 
@@ -56,5 +59,30 @@ TEST_PRIVATE:
   } __attribute__((enum_extensibility(open)));
   enum privEnumFlag {} __attribute__((flag_enum));
 };
+
+/// A C++ templated class, whose non-public fields should be accessible in
+/// extensions of the (instantiated) class in blessed.swift.
+template <typename T> TEST_CLASS
+__attribute__((__swift_attr__("private_fileid:main/blessed.swift"))) MyClassTemplate {
+public:
+  T publMethodT(T t) const { return t; }
+  T publVarT;
+  typedef T publTypedefT;
+
+  void publMethod(void) const {}
+  int publVar;
+  typedef int publTypedef;
+TEST_PRIVATE:
+  T privMethodT(T t) const { return t; }
+  T privVarT;
+  typedef T privTypedefT;
+
+  void privMethod(void) const {}
+  int privVar;
+  typedef int privTypedef;
+};
+
+typedef MyClassTemplate<float> MyFloatyClass;
+typedef MyClassTemplate<MyClass> MyClassyClass;
 
 #endif /* NON_PUBLIC_H */
