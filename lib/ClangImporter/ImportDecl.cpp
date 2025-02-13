@@ -4009,10 +4009,10 @@ namespace {
                                               /*isImmortal*/ true);
       if (const auto *funDecl = dyn_cast<FuncDecl>(result))
         if (hasUnsafeAPIAttr(decl) && !funDecl->getResultInterfaceType()->isEscapable()) {
+          lifetimeDependencies.push_back(immortalLifetime);
           Impl.SwiftContext.evaluator.cacheOutput(
               LifetimeDependenceInfoRequest{result},
               Impl.SwiftContext.AllocateCopy(lifetimeDependencies));
-          lifetimeDependencies.push_back(immortalLifetime);
           return;
         }
 
