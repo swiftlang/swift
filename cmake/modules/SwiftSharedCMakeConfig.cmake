@@ -258,7 +258,7 @@ macro(swift_common_unified_build_config product)
   set(LLVM_CMAKE_DIR "${CMAKE_SOURCE_DIR}/cmake/modules")
   set(CLANG_INCLUDE_DIRS
     "${LLVM_EXTERNAL_CLANG_SOURCE_DIR}/include"
-    "${CMAKE_BINARY_DIR}/tools/clang/include")
+    "${LLVM_BINARY_DIR}/tools/clang/include")
 
   include_directories(${CLANG_INCLUDE_DIRS})
 
