@@ -382,7 +382,7 @@ static StringRef getDumpString(ForeignErrorConvention::Kind value) {
 static StringRef getDumpString(DefaultArgumentKind value) {
   switch (value) {
     case DefaultArgumentKind::None: return "none";
-#define MAGIC_IDENTIFIER(NAME, STRING, SYNTAX_KIND) \
+#define MAGIC_IDENTIFIER(NAME, STRING)                                         \
     case DefaultArgumentKind::NAME: return STRING;
 #include "swift/AST/MagicIdentifierKinds.def"
     case DefaultArgumentKind::Inherited: return "inherited";

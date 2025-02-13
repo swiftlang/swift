@@ -71,7 +71,7 @@ extension ASTGenVisitor {
     case .keyPathExpr(let node):
       return self.generate(keyPathExpr: node)
     case .macroExpansionExpr(let node):
-      return self.generate(macroExpansionExpr: node).asExpr
+      return self.generate(macroExpansionExpr: node)
     case .memberAccessExpr(let node):
       return self.generate(memberAccessExpr: node)
     case .missingExpr:
@@ -797,9 +797,43 @@ extension ASTGenVisitor {
     )
   }
 
-  func generate(macroExpansionExpr node: MacroExpansionExprSyntax) -> BridgedMacroExpansionExpr {
+  func generateObjCSelectorExpr(macroExpansionExpr node: MacroExpansionExprSyntax) -> BridgedObjCSelectorExpr {
+    fatalError("unimplemented")
+  }
+
+  func generateObjCKeyPathExpr(macroExpansionExpr node: MacroExpansionExprSyntax) -> BridgedKeyPathExpr {
+    fatalError("unimplemented")
+  }
+
+  func generate(macroExpansionExpr node: MacroExpansionExprSyntax) -> BridgedExpr {
+    // '#file', '#line' etc.
+    let magicIdentifierKind = BridgedMagicIdentifierLiteralKind(from: node.macroName.rawText.bridged)
+    if magicIdentifierKind != .none {
+      guard node.lastToken(viewMode: .sourceAccurate) == node.macroName else {
+        // TODO: Diagnose
+        fatalError("magic identifier token with arguments")
+      }
+
+      return BridgedMagicIdentifierLiteralExpr.createParsed(
+        self.ctx,
+        kind: magicIdentifierKind,
+        loc: self.generateSourceLoc(node.macroName)
+      ).asExpr
+    }
+
+    // Other built-in pound expressions.
+    switch node.macroName.rawText {
+    case "selector":
+      return self.generateObjCSelectorExpr(macroExpansionExpr: node).asExpr
+    case "keyPath":  
+      return self.generateObjCKeyPathExpr(macroExpansionExpr: node).asExpr
+    default:
+      // Fallback to MacroExpansionExpr.
+      break
+    }
+
     let info = self.generate(freestandingMacroExpansion: node)
-    return .createParsed(
+    return BridgedMacroExpansionExpr.createParsed(
       self.declContext,
       poundLoc: info.poundLoc,
       macroNameRef: info.macroNameRef,
@@ -808,7 +842,7 @@ extension ASTGenVisitor {
       genericArgs: info.genericArgs,
       rightAngleLoc: info.rightAngleLoc,
       args: info.arguments
-    )
+    ).asExpr
   }
 
   func generate(memberAccessExpr node: MemberAccessExprSyntax, postfixIfConfigBaseExpr: BridgedExpr? = nil) -> BridgedExpr {
