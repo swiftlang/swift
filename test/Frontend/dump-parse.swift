@@ -76,25 +76,25 @@ nonescaping({ $0 })
 // CHECK-AST-NEXT:          (argument
 // CHECK-AST-NEXT:            (closure_expr type="(Int) -> Int" {{.*}} discriminator=1 nonisolated single_expression
 
-// CHECK-LABEL: (struct_decl range=[{{.+}}] "MyStruct")
+// CHECK-LABEL: (struct_decl decl_context=0x{{[0-9a-z]+}} range=[{{.+}}] "MyStruct")
 struct MyStruct {}
 
-// CHECK-LABEL: (enum_decl range=[{{.+}}] "MyEnum"
+// CHECK-LABEL: (enum_decl decl_context=0x{{[0-9a-z]+}} range=[{{.+}}] "MyEnum"
 enum MyEnum {
 
-    // CHECK-LABEL: (enum_case_decl range=[{{.+}}]
-    // CHECK-NEXT:    (enum_element_decl range=[{{.+}}]  "foo(x:)"
+    // CHECK-LABEL: (enum_case_decl decl_context=0x{{[0-9a-z]+}} range=[{{.+}}]
+    // CHECK-NEXT:    (enum_element_decl decl_context=0x{{[0-9a-z]+}} range=[{{.+}}]  "foo(x:)"
     // CHECK-NEXT:      (parameter_list range=[{{.+}}]
-    // CHECK-NEXT:         (parameter "x" apiName="x")))
-    // CHECK-NEXT:     (enum_element_decl range=[{{.+}}] "bar"))
-    // CHECK-NEXT:  (enum_element_decl range=[{{.+}}] "foo(x:)"
+    // CHECK-NEXT:         (parameter "x" decl_context=0x{{[0-9a-z]+}} apiName="x")))
+    // CHECK-NEXT:     (enum_element_decl decl_context=0x{{[0-9a-z]+}} range=[{{.+}}] "bar"))
+    // CHECK-NEXT:  (enum_element_decl decl_context=0x{{[0-9a-z]+}} range=[{{.+}}] "foo(x:)"
     // CHECK-NEXT:    (parameter_list range=[{{.+}}]
-    // CHECK-NEXT:      (parameter "x" apiName="x")))
-    // CHECK-NEXT:  (enum_element_decl range=[{{.+}}] "bar"))
+    // CHECK-NEXT:      (parameter "x" decl_context=0x{{[0-9a-z]+}} apiName="x")))
+    // CHECK-NEXT:  (enum_element_decl decl_context=0x{{[0-9a-z]+}} range=[{{.+}}] "bar"))
     case foo(x: MyStruct), bar
 }
 
-// CHECK-LABEL: (top_level_code_decl range=[{{.+}}]
+// CHECK-LABEL: (top_level_code_decl decl_context=0x{{[0-9a-z]+}} range=[{{.+}}]
 // CHECK-NEXT:    (brace_stmt implicit range=[{{.+}}]
 // CHECK-NEXT:      (sequence_expr type="<null>"
 // CHECK-NEXT:        (discard_assignment_expr type="<null>")
@@ -103,15 +103,15 @@ enum MyEnum {
 // CHECK-NEXT:          (<null expr>))
 // CHECK-NEXT:        (closure_expr type="<null>" discriminator={{[0-9]+}}
 // CHECK-NEXT:          (parameter_list range=[{{.+}}]
-// CHECK-NEXT:            (parameter "v"))
+// CHECK-NEXT:            (parameter "v" decl_context=0x{{[0-9a-z]+}}))
 // CHECK-NEXT:          (brace_stmt range=[{{.+}}])))))
 _ = { (v: MyEnum) in }
 
-// CHECK-LABEL: (struct_decl range=[{{.+}}] "SelfParam"
+// CHECK-LABEL: (struct_decl decl_context=0x{{[0-9a-z]+}} range=[{{.+}}] "SelfParam"
 struct SelfParam {
 
-  // CHECK-LABEL: (func_decl range=[{{.+}}] "createOptional()" static
-  // CHECK-NEXT:    (parameter "self")
+  // CHECK-LABEL: (func_decl decl_context=0x{{[0-9a-z]+}} range=[{{.+}}] "createOptional()" static
+  // CHECK-NEXT:    (parameter "self" decl_context=0x{{[0-9a-z]+}})
   // CHECK-NEXT:    (result=type_optional
   // CHECK-NEXT:      (type_unqualified_ident id="SelfParam" unbound))
   // CHECK-NEXT:    (parameter_list range=[{{.+}}])
@@ -124,7 +124,7 @@ struct SelfParam {
   }
 }
 
-// CHECK-LABEL: (func_decl range=[{{.+}}] "dumpMemberTypeRepr()"
+// CHECK-LABEL: (func_decl decl_context=0x{{[0-9a-z]+}} range=[{{.+}}] "dumpMemberTypeRepr()"
 // CHECK-NEXT:    (result=type_qualified_ident id="Element" unbound
 // CHECK-NEXT:      (type_unqualified_ident id="Array" unbound
 // CHECK-NEXT:        (type_unqualified_ident id="Bool" unbound))

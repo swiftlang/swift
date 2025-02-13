@@ -325,6 +325,9 @@ namespace swift {
   /// Dump YAML describing all fixed-size types imported from the given module.
   bool performDumpTypeInfo(const IRGenOptions &Opts, SILModule &SILMod);
 
+  /// Dump DeclContext hierarchy of the all nodes in \c SF .
+  void dumpDeclContextHierarchy(llvm::raw_ostream &OS, SourceFile &SF);
+
   /// Creates a TargetMachine from the IRGen opts and AST Context.
   std::unique_ptr<llvm::TargetMachine>
   createTargetMachine(const IRGenOptions &Opts, ASTContext &Ctx);

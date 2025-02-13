@@ -42,6 +42,7 @@ add_swift_host_library(swiftAST STATIC
   ConformanceLookupTable.cpp
   Decl.cpp
   DeclContext.cpp
+  DeclContextDumper.cpp
   DeclNameLoc.cpp
   DiagnosticBridge.cpp
   DiagnosticConsumer.cpp
