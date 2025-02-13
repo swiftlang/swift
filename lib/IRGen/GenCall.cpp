@@ -4541,8 +4541,8 @@ void CallEmission::emitToUnmappedExplosionWithDirectTypedError(
 
   Explosion errorExplosion;
   if (!errorSchema.empty()) {
-    if (auto *structTy =
-            dyn_cast<llvm::StructType>(errorSchema.getExpandedType(IGF.IGM))) {
+    auto *expandedType = errorSchema.getExpandedType(IGF.IGM);
+    if (auto *structTy = dyn_cast<llvm::StructType>(expandedType)) {
       for (unsigned i = 0, e = structTy->getNumElements(); i < e; ++i) {
         llvm::Value *elt = values[combined.errorValueMapping[i]];
         auto *nativeTy = structTy->getElementType(i);
@@ -4552,7 +4552,7 @@ void CallEmission::emitToUnmappedExplosionWithDirectTypedError(
     } else {
       auto *converted =
           convertForDirectError(IGF, values[combined.errorValueMapping[0]],
-                                combined.combinedTy, /*forExtraction*/ true);
+                                expandedType, /*forExtraction*/ true);
       errorExplosion.add(converted);
     }
 
@@ -4565,8 +4565,8 @@ void CallEmission::emitToUnmappedExplosionWithDirectTypedError(
   // If the regular result type is void, there is nothing to explode
   if (!nativeSchema.empty()) {
     Explosion resultExplosion;
-    if (auto *structTy =
-            dyn_cast<llvm::StructType>(nativeSchema.getExpandedType(IGF.IGM))) {
+    auto *expandedType = nativeSchema.getExpandedType(IGF.IGM);
+    if (auto *structTy = dyn_cast<llvm::StructType>(expandedType)) {
       for (unsigned i = 0, e = structTy->getNumElements(); i < e; ++i) {
         auto *nativeTy = structTy->getElementType(i);
         auto *converted = convertForDirectError(IGF, values[i], nativeTy,
@@ -4574,8 +4574,8 @@ void CallEmission::emitToUnmappedExplosionWithDirectTypedError(
         resultExplosion.add(converted);
       }
     } else {
-      auto *converted = convertForDirectError(
-          IGF, values[0], combined.combinedTy, /*forExtraction*/ true);
+      auto *converted = convertForDirectError(IGF, values[0], expandedType,
+                                              /*forExtraction*/ true);
       resultExplosion.add(converted);
     }
     out = nativeSchema.mapFromNative(IGF.IGM, IGF, resultExplosion, resultType);
