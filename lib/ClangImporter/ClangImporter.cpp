@@ -8321,14 +8321,16 @@ SmallVector<std::pair<StringRef, clang::SourceLocation>, 1>
 importer::getPrivateFileIDAttrs(const clang::Decl *decl) {
   llvm::SmallVector<std::pair<StringRef, clang::SourceLocation>, 1> files;
 
-  auto prefix = StringRef("private_fileid:");
+  constexpr auto prefix = StringRef("private_fileid:");
 
-  if (decl->hasAttrs())
-    for (const auto *attr : decl->getAttrs())
-      if (const auto *swiftAttr = dyn_cast<clang::SwiftAttrAttr>(attr))
-        if (swiftAttr->getAttribute().starts_with(prefix))
-          files.push_back({swiftAttr->getAttribute().drop_front(prefix.size()),
-                           attr->getLocation()});
+  if (decl->hasAttrs()) {
+    for (const auto *attr : decl->getAttrs()) {
+      const auto *swiftAttr = dyn_cast<clang::SwiftAttrAttr>(attr);
+      if (swiftAttr && swiftAttr->getAttribute().starts_with(prefix))
+        files.push_back({swiftAttr->getAttribute().drop_front(prefix.size()),
+                         attr->getLocation()});
+    }
+  }
 
   return files;
 }

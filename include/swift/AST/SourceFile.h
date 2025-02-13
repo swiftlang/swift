@@ -662,14 +662,6 @@ public:
     Scope = nullptr;
   }
 
-  /// Whether the given string matches the file ID of this file.
-  bool matchesFileID(StringRef fileID) const;
-
-  /// Parses a file ID string into the module name and file name (with ".swift"
-  /// suffix). Returns nullopt if the file ID string is invalid.
-  static std::optional<std::pair<StringRef, StringRef>>
-  parseFileID(StringRef fileID);
-
   /// Retrieves the previously set delayed parser state, asserting that it
   /// exists.
   PersistentParserState *getDelayedParserState() {
@@ -824,6 +816,22 @@ public:
   bool isAsyncTopLevelSourceFile() const;
 
   ArrayRef<TypeDecl *> getLocalTypeDecls() const;
+
+  /// Uniquely identifies a source file without exposing its full file path.
+  ///
+  /// A valid file ID should always be of the format "modulename/filename.swift"
+  struct FileIDStr {
+    StringRef moduleName;
+    StringRef fileName;
+
+    /// Parse a string as a SourceFile::FileIDStr.
+    ///
+    /// Returns \c nullopt if \param fileID could not be parsed.
+    static std::optional<FileIDStr> parse(StringRef fileID);
+
+    /// Whether this SourceFile::FileID matches that of the given \param file.
+    bool matches(const SourceFile *file) const;
+  };
 
 private:
 

@@ -742,6 +742,9 @@ AccessLevel convertClangAccess(clang::AccessSpecifier access);
 /// May return >1 fileID when a decl is annotated more than once, which should
 /// be treated as an error and appropriately diagnosed (using the included
 /// SourceLocation).
+///
+/// The returned fileIDs may not be of a valid format (e.g., missing a '/'),
+/// and should be parsed using swift::SourceFile::FileIDStr::parse().
 SmallVector<std::pair<StringRef, clang::SourceLocation>, 1>
 getPrivateFileIDAttrs(const clang::Decl *decl);
 } // namespace importer

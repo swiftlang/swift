@@ -1455,7 +1455,7 @@ bool AccessScope::allowsPrivateAccess(const DeclContext *useDC, const DeclContex
     return false;
 
   // Do not allow access if the sourceDC is in a different file
-  auto useSF = useDC->getOutermostParentSourceFile();
+  auto *useSF = useDC->getOutermostParentSourceFile();
   if (useSF != sourceDC->getOutermostParentSourceFile()) {
     // This might be a C++ declaration with a SWIFT_PRIVATE_FILEID
     // attribute, which asks us to treat it as if it were defined in the file
@@ -1465,9 +1465,18 @@ bool AccessScope::allowsPrivateAccess(const DeclContext *useDC, const DeclContex
     if (!clangDecl)
       return false;
 
-    auto blessedFileID = importer::getPrivateFileIDAttrs(clangDecl);
-    if (blessedFileID.empty() || !useSF->matchesFileID(blessedFileID[0].first))
+    // Diagnostics should enforce that there is at most SWIFT_PRIVATE_FILEID,
+    // but this handles the case where there is more than anyway (whether that
+    // is a feature or a bug). Allow access check to proceed if useSF is blessed
+    // by any of the SWIFT_PRIVATE_FILEID annotations (i.e., disallow private
+    // access if none of them bless useSF).
+    if (!llvm::any_of(
+            importer::getPrivateFileIDAttrs(clangDecl), [&](auto &blessed) {
+              auto blessedFileID = SourceFile::FileIDStr::parse(blessed.first);
+              return blessedFileID && blessedFileID->matches(useSF);
+            })) {
       return false;
+    }
   }
 
   // Compare the private scopes and iterate over the parent types.
