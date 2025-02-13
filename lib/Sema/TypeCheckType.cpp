@@ -4203,35 +4203,37 @@ NeverNullType TypeResolver::resolveASTFunctionType(
                       diag::attr_execution_type_attr_only_on_async);
     }
 
-    switch (isolation.getKind()) {
-    case FunctionTypeIsolation::Kind::NonIsolated:
-      break;
-         
-    case FunctionTypeIsolation::Kind::GlobalActor:
-      diagnoseInvalid(
-          repr, executionAttr->getAtLoc(),
-          diag::
-              attr_execution_concurrent_type_attr_incompatible_with_global_isolation,
-          isolation.getGlobalActorType());
-      break;
+    if (executionAttr->getBehavior() == ExecutionKind::Concurrent) {
+      switch (isolation.getKind()) {
+      case FunctionTypeIsolation::Kind::NonIsolated:
+        break;
 
-    case FunctionTypeIsolation::Kind::Parameter:
-      diagnoseInvalid(
-          repr, executionAttr->getAtLoc(),
-          diag::
-              attr_execution_concurrent_type_attr_incompatible_with_isolated_param);
-      break;
+      case FunctionTypeIsolation::Kind::GlobalActor:
+        diagnoseInvalid(
+            repr, executionAttr->getAtLoc(),
+            diag::
+                attr_execution_concurrent_type_attr_incompatible_with_global_isolation,
+            isolation.getGlobalActorType());
+        break;
 
-    case FunctionTypeIsolation::Kind::Erased:
-      diagnoseInvalid(
-          repr, executionAttr->getAtLoc(),
-          diag::
-              attr_execution_concurrent_type_attr_incompatible_with_isolated_any);
-      break;
+      case FunctionTypeIsolation::Kind::Parameter:
+        diagnoseInvalid(
+            repr, executionAttr->getAtLoc(),
+            diag::
+                attr_execution_concurrent_type_attr_incompatible_with_isolated_param);
+        break;
 
-    case FunctionTypeIsolation::Kind::NonIsolatedCaller:
-      llvm_unreachable("cannot happen because multiple @execution attributes "
-                       "aren't allowed.");
+      case FunctionTypeIsolation::Kind::Erased:
+        diagnoseInvalid(
+            repr, executionAttr->getAtLoc(),
+            diag::
+                attr_execution_concurrent_type_attr_incompatible_with_isolated_any);
+        break;
+
+      case FunctionTypeIsolation::Kind::NonIsolatedCaller:
+        llvm_unreachable("cannot happen because multiple @execution attributes "
+                         "aren't allowed.");
+      }
     }
 
     if (!repr->isInvalid()) {
