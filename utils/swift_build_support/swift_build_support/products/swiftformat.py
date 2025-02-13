@@ -137,13 +137,16 @@ class SwiftFormat(product.Product):
         shell.call(linting_cmd, env={'SWIFTCI_USE_LOCAL_DEPS': '1'})
 
     def lint_sourcekitlsp(self):
+        format_path = os.path.join(self.build_dir, self.configuration(), 'swift-format')
+        lsp_path = os.path.join(os.path.dirname(self.source_dir), 'sourcekit-lsp')
+        shell.call([format_path, '-h'])
         linting_cmd = [
-            os.path.join(self.build_dir, self.configuration(), 'swift-format'),
+            format_path,
             'lint',
             '--parallel',
             '--strict',
             '--recursive',
-            os.path.join(os.path.dirname(self.source_dir), 'sourcekit-lsp'),
+            lsp_path,
         ]
         shell.call(linting_cmd)
 
