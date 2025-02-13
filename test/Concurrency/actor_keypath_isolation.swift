@@ -115,6 +115,7 @@ do {
   @dynamicMemberLookup struct S2 {
     @MainActor
     subscript(dynamicMember keyPath: KeyPath<S1, Int>) -> Int { get {} }
+    // expected-note@-1 {{'subscript(dynamicMember:)' declared here}}
   }
   @dynamicMemberLookup struct S3 {
     subscript(dynamicMember keyPath: KeyPath<S2, Int>) -> Int { get {} }
