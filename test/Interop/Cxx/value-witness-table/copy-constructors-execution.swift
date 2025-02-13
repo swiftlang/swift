@@ -67,4 +67,24 @@ CXXCopyConstructorTestSuite.test("Copy constructor with one parameter that has a
   expectEqual(copy.numCopies, 1)
 }
 
+CXXCopyConstructorTestSuite.test("Move constructor with default arguments") {
+  // When in the presence of a C++ copy constructor with default args, we make the type non-copyable
+  // let originalObj = HasMoveConstructorWithDefaultArgs(5)
+  // expectEqual(originalObj.value, 5)
+
+  // // move originalObj
+  // let newObj = originalObj
+  // expectEqual(newObj.value, 5)
+  // expectEqual(originalObj.value, 5)
+
+  @inline(never)
+  func createHasUserProvidedMoveConstructor() -> HasMoveConstructorWithDefaultArgs {
+    let userCC = HasMoveConstructorWithDefaultArgs(0)
+    return userCC
+  }
+  
+  let result = createHasUserProvidedMoveConstructor()
+  expectTrue(result.value > 0)
+}
+
 runAllTests()
