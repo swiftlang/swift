@@ -68,7 +68,7 @@ extension ASTGenVisitor {
     case .typeAliasDecl(let node):
       return self.generate(typeAliasDecl: node)?.asDecl
     case .variableDecl(let node):
-      return self.generate(variableDecl: node).asDecl
+      return self.generate(variableDecl: node)
     }
   }
 
@@ -496,8 +496,9 @@ extension ASTGenVisitor {
     }
   }
 
-  func generate(patternBinding binding: PatternBindingSyntax, attrs: DeclAttributesResult) -> BridgedPatternBindingEntry {
+  func generate(patternBinding binding: PatternBindingSyntax, attrs: DeclAttributesResult, topLevelDecl: BridgedTopLevelCodeDecl?) -> BridgedPatternBindingEntry {
     let pattern = generate(pattern: binding.pattern)
+
     let equalLoc = generateSourceLoc(binding.initializer?.equal)
 
     var initExpr: BridgedExpr?
@@ -506,10 +507,10 @@ extension ASTGenVisitor {
       // Create a PatternBindingInitializer if we're not in a local context (this
       // ensures that property initializers are correctly treated as being in a
       // local context).
-      if !self.declContext.isLocalContext {
+      if !self.declContext.isLocalContext, topLevelDecl == nil {
         initContext = .create(declContext: self.declContext)
       }
-      initExpr = withDeclContext(initContext?.asDeclContext ?? self.declContext) {
+      initExpr = withDeclContext(topLevelDecl?.asDeclContext ?? initContext?.asDeclContext ?? self.declContext) {
         generate(expr: initializer.value)
       }
     }
@@ -531,14 +532,14 @@ extension ASTGenVisitor {
     )
   }
 
-  private func generateBindingEntries(for node: VariableDeclSyntax, attrs: DeclAttributesResult) -> BridgedArrayRef {
+  private func generateBindingEntries(for node: VariableDeclSyntax, attrs: DeclAttributesResult, topLevelDecl: BridgedTopLevelCodeDecl?) -> BridgedArrayRef {
     var propagatedType: BridgedTypeRepr?
     var entries: [BridgedPatternBindingEntry] = []
 
     // Generate the bindings in reverse, keeping track of the TypeRepr to
     // propagate to earlier patterns if needed.
     for binding in node.bindings.reversed() {
-      var entry = self.generate(patternBinding: binding, attrs: attrs)
+      var entry = self.generate(patternBinding: binding, attrs: attrs, topLevelDecl: topLevelDecl)
 
       // We can potentially propagate a type annotation back if we don't have an initializer, and are a bare NamedPattern.
       let canPropagateType = binding.initializer == nil && binding.pattern.is(IdentifierPatternSyntax.self)
@@ -571,19 +572,38 @@ extension ASTGenVisitor {
     return entries.reversed().bridgedArray(in: self)
   }
 
-  func generate(variableDecl node: VariableDeclSyntax) -> BridgedPatternBindingDecl {
+  func generate(variableDecl node: VariableDeclSyntax) -> BridgedDecl {
     let attrs = self.generateDeclAttributes(node, allowStatic: true)
     let isLet = node.bindingSpecifier.keywordKind == .let
+    let topLevelDecl: BridgedTopLevelCodeDecl?
+    if self.declContext.isModuleScopeContext, self.declContext.parentSourceFile.isScriptMode {
+      topLevelDecl = BridgedTopLevelCodeDecl.create(self.ctx, declContext: self.declContext)
+    } else {
+      topLevelDecl = nil
+    }
 
-    return .createParsed(
+    let decl = BridgedPatternBindingDecl.createParsed(
       self.ctx,
-      declContext: self.declContext,
+      declContext: topLevelDecl?.asDeclContext ?? self.declContext,
       bindingKeywordLoc: self.generateSourceLoc(node.bindingSpecifier),
-      entries: self.generateBindingEntries(for: node, attrs: attrs),
+      entries: self.generateBindingEntries(for: node, attrs: attrs, topLevelDecl: topLevelDecl),
       attributes: attrs.attributes,
       isStatic: attrs.staticLoc.isValid,
       isLet: isLet
     )
+    if let topLevelDecl {
+      let range = self.generateImplicitBraceRange(node)
+      let body = BridgedBraceStmt.createImplicit(
+        self.ctx,
+        lBraceLoc: range.start,
+        element: ASTNode.decl(decl.asDecl).bridged,
+        rBraceLoc: range.end
+      )
+      topLevelDecl.setBody(body: body);
+      return topLevelDecl.asDecl
+    } else {
+      return decl.asDecl
+    }
   }
 
   func generate(subscriptDecl node: SubscriptDeclSyntax) -> BridgedSubscriptDecl {
@@ -958,6 +978,14 @@ extension ASTGenVisitor {
       }
       // TODO: Set semicolon loc.
       allMembers.append(member)
+
+      // Hoist 'VarDecl' and 'EnumElementDecl' to the block.
+      withBridgedSwiftClosure { ptr in
+        let d = ptr!.load(as: BridgedDecl.self)
+        allMembers.append(d)
+      } call: { handle in
+        member.forEachDeclToHoist(handle)
+      }
     }
 
     return allMembers

@@ -90,6 +90,16 @@ extension ASTGenVisitor {
         return
       }
       allItems.append(item.bridged)
+
+      // Hoist 'VarDecl' to the block.
+      if case .decl(let decl) = item {
+        withBridgedSwiftClosure { ptr in
+          let d = ptr!.load(as: BridgedDecl.self)
+          allItems.append(ASTNode.decl(d).bridged)
+        } call: { handle in
+          decl.forEachDeclToHoist(handle)
+        }
+      }
     }
 
     return allItems.lazy.bridgedArray(in: self)

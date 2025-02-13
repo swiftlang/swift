@@ -104,52 +104,62 @@ struct ASTGenVisitor {
       of: CodeBlockItemSyntax.self,
       split: Self.splitCodeBlockItemIfConfig
     ) { element in
-      guard let astNode = generate(codeBlockItem: element) else {
-        return
-      }
-      if !isTopLevel {
-        out.append(astNode)
-        return
-      }
 
-      func getRange() -> (start: BridgedSourceLoc, end: BridgedSourceLoc) {
-        let loc = self.generateSourceLoc(element)
-        if let endTok = element.lastToken(viewMode: .sourceAccurate) {
-          switch endTok.parent?.kind {
-          case .stringLiteralExpr, .regexLiteralExpr:
-            // string/regex literal are single token in AST.
-            return (loc, self.generateSourceLoc(endTok.parent))
-          default:
-            return (loc, self.generateSourceLoc(endTok))
-          }
-        } else {
-          return (loc, loc)
+      func generateStmtOrExpr(_ body: () -> ASTNode) -> ASTNode {
+        if !isTopLevel {
+          return body()
         }
+
+        let topLevelDecl = BridgedTopLevelCodeDecl.create(self.ctx, declContext: self.declContext)
+        let astNode = withDeclContext(topLevelDecl.asDeclContext) {
+          body()
+        }
+
+        // Diagnose top level code in non-script file.
+        if (!declContext.parentSourceFile.isScriptMode) {
+          switch astNode {
+          case .stmt:
+            self.diagnose(.illegalTopLevelStmt(element))
+          case .expr:
+            self.diagnose(.illegalTopLevelExpr(element))
+          case .decl:
+            fatalError("unreachable")
+          }
+        }
+
+        let bodyRange = self.generateImplicitBraceRange(element)
+        let body = BridgedBraceStmt.createImplicit(
+          self.ctx,
+          lBraceLoc: bodyRange.start,
+          element: astNode.bridged,
+          rBraceLoc: bodyRange.end
+        )
+        topLevelDecl.setBody(body: body)
+        return .decl(topLevelDecl.asDecl)
       }
 
-      switch astNode {
-      case .decl(let d):
-        out.append(.decl(d))
-      case .stmt(let s):
-        let range = getRange()
-        let topLevelDecl = BridgedTopLevelCodeDecl.createParsed(
-          self.ctx,
-          declContext: self.declContext,
-          startLoc: range.start,
-          stmt: s,
-          endLoc: range.end
-        )
-        out.append(.decl(topLevelDecl.asDecl))
-      case .expr(let e):
-        let range = getRange()
-        let topLevelDecl = BridgedTopLevelCodeDecl.createParsed(
-          self.ctx,
-          declContext: self.declContext,
-          startLoc: range.start,
-          expr: e,
-          endLoc: range.end
-        )
-        out.append(.decl(topLevelDecl.asDecl))
+      // TODO: Set semicolon loc.
+      switch element.item {
+      case .decl(let node):
+        if let d = self.generate(decl: node) {
+          out.append(.decl(d))
+
+          // Hoist 'VarDecl' to the top-level.
+          withBridgedSwiftClosure { ptr in
+            let hoisted = ptr!.load(as: BridgedDecl.self)
+            out.append(ASTNode.decl(hoisted))
+          } call: { handle in
+            d.forEachDeclToHoist(handle)
+          }
+        }
+      case .stmt(let node):
+        out.append(generateStmtOrExpr {
+          .stmt(self.generate(stmt: node))
+        })
+      case .expr(let node):
+        out.append(generateStmtOrExpr {
+          .expr(self.generate(expr: node))
+        })
       }
     }
 
@@ -251,6 +261,23 @@ extension ASTGenVisitor {
       return BridgedSourceRange(start: nil, end: nil)
     }
     return generateSourceRange(node)
+  }
+
+  /// Obtains bridged token source range for a syntax node.
+  /// Unlike `generateSourceRange(_:)`, this correctly emulates the string/regex literal token SourceLoc in AST.
+  func generateImplicitBraceRange(_ node: some SyntaxProtocol) -> BridgedSourceRange {
+    let loc = self.generateSourceLoc(node)
+    if let endTok = node.lastToken(viewMode: .sourceAccurate) {
+      switch endTok.parent?.kind {
+      case .stringLiteralExpr, .regexLiteralExpr:
+        // string/regex literal are single token in AST.
+        return BridgedSourceRange(start:loc, end: self.generateSourceLoc(endTok.parent))
+      default:
+        return BridgedSourceRange(start:loc, end: self.generateSourceLoc(endTok))
+      }
+    } else {
+      return BridgedSourceRange(start:loc, end: loc)
+    }
   }
 
   /// Obtains bridged character source range.

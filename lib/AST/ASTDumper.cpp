@@ -2395,6 +2395,15 @@ namespace {
       printFlag(VD->getAttrs().hasAttribute<LazyAttr>(), "lazy",
                 DeclModifierColor);
       printStorageImpl(VD);
+      printFlag(VD->isSelfParamCapture(), "self_param_capture",
+                DeclModifierColor);
+      printFlag(VD->isDebuggerVar(), "debugger_var", DeclModifierColor);
+      printFlag(VD->isLazyStorageProperty(), "lazy_storage_property",
+                DeclModifierColor);
+      printFlag(VD->isTopLevelGlobal(), "top_level_global", DeclModifierColor);
+      printFlag(VD->isLazyStorageProperty(), "lazy_storage_property",
+                DeclModifierColor);
+
       printFlag(VD->getAttrs().hasAttribute<KnownToBeLocalAttr>(),
                 "known_to_be_local", DeclModifierColor);
       if (auto *nonisolatedAttr =
