@@ -3046,8 +3046,8 @@ void IRGenModule::createReplaceableProlog(IRGenFunction &IGF, SILFunction *f) {
         f->getForwardingSubstitutionMap());
     llvm::Value *dynamicContextSize32;
     llvm::Value *calleeFunction;
-    std::tie(calleeFunction, dynamicContextSize32) = getAsyncFunctionAndSize(
-        IGF, asyncFnPtr, nullptr, std::make_pair(false, true));
+    std::tie(calleeFunction, dynamicContextSize32) =
+        getAsyncFunctionAndSize(IGF, asyncFnPtr, std::make_pair(false, true));
     auto *dynamicContextSize =
         Builder.CreateZExt(dynamicContextSize32, IGM.SizeTy);
     auto calleeContextBuffer = emitAllocAsyncContext(IGF, dynamicContextSize);
