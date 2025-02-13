@@ -10,6 +10,9 @@ protocol Q {
 
 nonisolated func acceptMeta<T>(_: T.Type) { }
 
+@MainActor
+func acceptMetaOnMainActor<T>(_: T.Type) { }
+
 // -------------------------------------------------------------------------
 // Non-Sendable metatype instances that cross into other isolation domains.
 // -------------------------------------------------------------------------
@@ -48,6 +51,12 @@ nonisolated func passMetaSmuggledAny<T: Q>(_: T.Type) {
   }
 }
 
+nonisolated func passToMainActorSmuggledAny<T: Q>(_: T.Type) async {
+  let x: Any.Type = T.self
+  await acceptMetaOnMainActor(x) // expected-error{{sending value of non-Sendable type '(Any).Type' risks causing data races}}
+  // expected-note@-1{{sending task-isolated value of non-Sendable type '(Any).Type' to main actor-isolated global function}}
+}
+
 // -------------------------------------------------------------------------
 // Sendable metatype instances that cross into other isolation domains.
 // -------------------------------------------------------------------------
@@ -65,6 +74,11 @@ nonisolated func passMetaWithSendableSmuggled<T: Sendable & Q>(_: T.Type) {
     acceptMeta(x) // okay, because T is Sendable implies T.Type: Sendable
     x.g() // okay, because T is Sendable implies T.Type: Sendable
   }
+}
+
+nonisolated func passSendableToMainActorSmuggledAny<T: Sendable>(_: T.Type) async {
+  let x: Sendable.Type = T.self
+  await acceptMetaOnMainActor(x)
 }
 
 // -------------------------------------------------------------------------
