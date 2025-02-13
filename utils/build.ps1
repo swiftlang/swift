@@ -934,6 +934,16 @@ function Fetch-Dependencies {
 }
 
 function Get-PinnedToolchainTool() {
+  # NOTE: add a workaround for the main snapshots that used the wrong version
+  # when building that was not noticed. This allows use of the nightly snapshot
+  # as a pinned toolchain.
+  if ((Get-PinnedToolchainVersion) -eq "0.0.0") {
+    if (-not (Test-Path "$BinaryCache\toolchains\${PinnedToolchain}\LocalApp\Programs\Swift\Toolchains\0.0.0+Asserts\usr\bin")) {
+      if (Test-Path "$BinaryCache\toolchains\${PinnedToolchain}\LocalApp\Programs\Swift\Toolchains\6.0.0+Asserts\usr\bin") {
+        return "$BinaryCache\toolchains\${PinnedToolchain}\LocalApp\Programs\Swift\Toolchains\6.0.0+Asserts\usr\bin"
+      }
+    }
+  }
   if (Test-Path "$BinaryCache\toolchains\${PinnedToolchain}\LocalApp\Programs\Swift\Toolchains\$(Get-PinnedToolchainVersion)+Asserts\usr\bin") {
     return "$BinaryCache\toolchains\${PinnedToolchain}\LocalApp\Programs\Swift\Toolchains\$(Get-PinnedToolchainVersion)+Asserts\usr\bin"
   }
