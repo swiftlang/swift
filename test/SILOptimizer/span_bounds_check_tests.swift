@@ -1,16 +1,15 @@
 // RUN: %target-swift-frontend %s -emit-sil -O \
 // RUN:   -disable-availability-checking \
 // RUN:   -enable-experimental-feature LifetimeDependence \
-// RUN:   -enable-experimental-feature Span  | %FileCheck %s --check-prefix=CHECK-SIL 
+// RUN:   | %FileCheck %s --check-prefix=CHECK-SIL 
 
 // RUN: %target-swift-frontend %s -emit-ir -O \
 // RUN:   -disable-availability-checking \
 // RUN:   -enable-experimental-feature LifetimeDependence \
-// RUN:   -enable-experimental-feature Span  | %FileCheck %s  --check-prefix=CHECK-IR 
+// RUN:   | %FileCheck %s  --check-prefix=CHECK-IR 
 
 // REQUIRES: swift_in_compiler
 // REQUIRES: swift_feature_LifetimeDependence
-// REQUIRES: swift_feature_Span
 // REQUIRES: swift_stdlib_no_asserts, optimized_stdlib
 
 // Bounds check should be eliminated

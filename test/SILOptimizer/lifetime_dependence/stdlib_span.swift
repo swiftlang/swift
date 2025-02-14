@@ -4,12 +4,10 @@
 // RUN:   -sil-verify-all \
 // RUN:   -module-name test \
 // RUN:   -disable-access-control \
-// RUN:   -enable-experimental-feature LifetimeDependence \
-// RUN:   -enable-experimental-feature Span
+// RUN:   -enable-experimental-feature LifetimeDependence
 
 // REQUIRES: swift_in_compiler
 // REQUIRES: swift_feature_LifetimeDependence
-// REQUIRES: swift_feature_Span
 
 // Test dependencies on the standard library Span APIs.
 

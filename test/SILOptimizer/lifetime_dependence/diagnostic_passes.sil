@@ -1,7 +1,6 @@
 // RUN: %target-sil-opt %s \
 // RUN:     -diagnostics -sil-verify-all \
 // RUN:     -enable-experimental-feature LifetimeDependence \
-// RUN:     -enable-experimental-feature Span \
 // RUN:     | %FileCheck %s
 
 // Test SIL expected from SILGen output. Run all diagnostic passes which includes lifetime dependence handling:
@@ -13,7 +12,6 @@
 
 // REQUIRES: swift_in_compiler
 // REQUIRES: swift_feature_LifetimeDependence
-// REQUIRES: swift_feature_Span
 
 sil_stage raw
 
