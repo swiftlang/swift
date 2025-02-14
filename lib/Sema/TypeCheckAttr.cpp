@@ -40,6 +40,7 @@
 #include "swift/AST/PropertyWrappers.h"
 #include "swift/AST/SourceFile.h"
 #include "swift/AST/StorageImpl.h"
+#include "swift/AST/ASTPrinter.h"
 #include "swift/AST/SwiftNameTranslation.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include "swift/AST/Types.h"
@@ -192,14 +193,6 @@ public:
 #undef IGNORED_ATTR
 
 private:
-  static unsigned getABIArity(AbstractFunctionDecl *afd) {
-    unsigned arity = afd->getParameters()->size();
-    arity += afd->getGenericSignature().getGenericParams().size();
-    if (afd->hasImplicitSelfDecl())
-      arity += 1;
-    return arity;
-  }
-
   void checkABIAttrPBD(PatternBindingDecl *APBD, VarDecl *VD) {
     auto PBD = VD->getParentPatternBinding();
 
@@ -253,6 +246,8 @@ private:
   }
 
 public:
+  void visitABIAttr(ABIAttr *attr);
+  
   void visitExecutionAttr(ExecutionAttr *attr) {
     auto *F = dyn_cast<FuncDecl>(D);
     if (!F)
@@ -313,81 +308,6 @@ public:
       break;
     }
     }
-  }
-
-  void visitABIAttr(ABIAttr *attr) {
-    Decl *AD = attr->abiDecl;
-    if (isa<VarDecl>(D) && isa<PatternBindingDecl>(AD)) {
-      auto VD = cast<VarDecl>(D);
-      auto APBD = cast<PatternBindingDecl>(AD);
-
-      // Diagnose dissimilar PBD structures.
-      checkABIAttrPBD(APBD, VD);
-
-      // Do the rest of this checking on the corresponding VarDecl, not the
-      // PBD that's actually in the attribute. Note that `AD` will become null
-      // if they're too dissimilar to match up.
-      AD = APBD->getVarAtSimilarStructuralPosition(VD);
-    }
-    // TODO: EnumElementDecl?
-
-    if (!AD)
-      return;
-
-    // Check the ABI decl and bail if there was a problem with it.
-    TypeChecker::typeCheckDecl(AD);
-    if (AD->isInvalid())
-      return;
-
-    // Do the declarations have the same kind, broadly speaking? Many kinds have
-    // special mangling behavior (e.g. inits vs normal funcs) that make it
-    // unrealistic to treat one kind as though it were another.
-    if (D->getKind() != AD->getKind()) {
-      // FIXME: DescriptiveDeclKind is overly specific; we really just want to
-      //        say that e.g. a `func` can't have the ABI of a `var`.
-      diagnoseAndRemoveAttr(attr, diag::attr_abi_mismatched_kind,
-                            D, AD->getDescriptiveKind());
-      return;
-    }
-
-    if (isa<AbstractFunctionDecl>(D)) {
-      auto AFD = cast<AbstractFunctionDecl>(D);
-      auto AAFD = cast<AbstractFunctionDecl>(AD);
-
-      // FIXME: How much should we diagnose in IRGen for more precise ABI info?
-
-      // Do the declarations have roughly the same number of parameters? We'll
-      // allow some fuzziness for what these parameters *are*, since there isn't
-      // always an ABI difference between e.g. a free function with N parameters
-      // and an instance method with N-1 parameters (plus an implicit `self`).
-      if (getABIArity(AFD) != getABIArity(AAFD)) {
-        diagnoseAndRemoveAttr(attr, diag::attr_abi_mismatched_arity,
-                              AFD);
-      }
-
-      // Do the declarations match in throwing behavior? We don't care about
-      // `throws` vs. `rethrows` here, just whether callers will account for an
-      // error return.
-      // FIXME: Typed throws?
-      if (AFD->hasThrows() != AAFD->hasThrows()) {
-        diagnoseAndRemoveAttr(attr, diag::attr_abi_mismatched_throws,
-                              AFD, /*abiCanThrow=*/AAFD->hasThrows());
-      }
-
-      // Do the declarations match in async-ness?
-      if (AFD->hasAsync() != AAFD->hasAsync()) {
-        diagnoseAndRemoveAttr(attr, diag::attr_abi_mismatched_async,
-                              AFD, /*abiHasAsync=*/AAFD->hasAsync());
-      }
-    }
-
-    // TODO: Diagnose if Protocol::isMarkerProtocol() - contradiction in terms
-    //       (and mangler can't handle invertible protocols with @abi)
-
-    // TODO: Validate more
-    // FIXME: The list of properties that have to match is practically endless
-    // and will grow as new features are added to the compiler. We might want to
-    // write an AttributeVisitor just to help us catch omissions over time.
   }
 
   void visitAlignmentAttr(AlignmentAttr *attr) {
@@ -1810,6 +1730,10 @@ static SourceRange getArgListRange(ASTContext &Ctx, DeclAttribute *attr) {
 
 void AttributeChecker::
 visitObjCImplementationAttr(ObjCImplementationAttr *attr) {
+  // If `D` is ABI-only, let ABIDeclChecker diagnose the bad attribute.
+  if (!ABIRoleInfo(D).providesAPI())
+    return;
+
   DeclAttribute * langAttr =
     D->getAttrs().getAttribute<ObjCAttr>(/*AllowInvalid=*/true);
   if (!langAttr)
@@ -5125,7 +5049,8 @@ void AttributeChecker::checkBackDeployedAttrs(
     }
 
     if (auto *AFD = dyn_cast<AbstractFunctionDecl>(D)) {
-      if (!AFD->hasBody()) {
+      // Ignore this for ABI-only decls; ABIDeclChecker will diagnose it better.
+      if (!AFD->hasBody() && ABIRoleInfo(AFD).providesAPI()) {
         diagnoseAndRemoveAttr(Attr, diag::back_deployed_requires_body, Attr,
                               VD);
         continue;
@@ -6637,6 +6562,12 @@ static bool typeCheckDerivativeAttr(DerivativeAttr *attr) {
   // Note: Implementation must be idempotent because it may be called multiple
   // times for the same attribute.
   Decl *D = attr->getOriginalDeclaration();
+
+  // ABI-only decls can't have @derivative; bail out and let ABIDeclChecker
+  // diagnose this.
+  if (!ABIRoleInfo(D).providesAPI())
+    return false;
+
   auto &Ctx = D->getASTContext();
   auto &diags = Ctx.Diags;
   // `@derivative` attribute requires experimental differentiable programming
@@ -8562,3 +8493,1225 @@ ArrayRef<VarDecl *> InitAccessorReferencedVariablesRequest::evaluate(
 
   return ctx.AllocateCopy(results);
 }
+
+/// Like ASTVisitor, but the visit methods are passed a pair of nodes to compare.
+/// Either node might be \c nil , indicating that a matching node was not found.
+template <typename ImplClass, typename... AttrArgs>
+class ASTComparisonVisitor {
+public:
+  bool visit(Decl *D1, Decl *D2) {
+    DeclKind kind = D1 ? D1->getKind() : D2->getKind();
+    switch (kind) {
+#define DECL(CLASS, PARENT) \
+    case DeclKind::CLASS: \
+      return static_cast<ImplClass*>(this) \
+        ->visit##CLASS##Decl(static_cast<CLASS##Decl*>(D1), \
+                             static_cast<CLASS##Decl*>(D2));
+#include "swift/AST/DeclNodes.def"
+    }
+    llvm_unreachable("Not reachable, all cases handled");
+  }
+
+#define DECL(CLASS, PARENT) \
+  bool visitParentOf##CLASS##Decl(CLASS##Decl *D1, CLASS##Decl *D2) {\
+    return static_cast<ImplClass*>(this)->visit##PARENT(D1, D2); \
+  }
+#define ABSTRACT_DECL(CLASS, PARENT) DECL(CLASS, PARENT)
+#include "swift/AST/DeclNodes.def"
+
+  bool visit(DeclAttribute *A1, DeclAttribute *A2, AttrArgs... AA) {
+    DeclAttrKind kind = A1 ? A1->getKind() : A2->getKind();
+    switch (kind) {
+#define DECL_ATTR(_, CLASS, ...) \
+  case DeclAttrKind::CLASS: \
+    return static_cast<ImplClass *>(this)->visit##CLASS##Attr( \
+        static_cast<CLASS##Attr*>(A1), static_cast<CLASS##Attr*>(A2), \
+        ::std::forward<AttrArgs>(AA)...);
+#include "swift/AST/DeclAttr.def"
+    }
+  }
+};
+
+struct DeclEffects {
+  PossibleEffects effects;
+  PossibleEffects polymorphicEffects;
+
+  SourceLoc asyncLoc;
+  SourceLoc throwsLoc;
+
+  std::optional<Type> effectiveThrownType;
+  TypeRepr *thrownTypeRepr;
+
+  DeclEffects(AbstractFunctionDecl *afd)
+    : effects(), polymorphicEffects(),
+      asyncLoc(afd->getAsyncLoc()), throwsLoc(afd->getThrowsLoc()),
+      effectiveThrownType(afd->getEffectiveThrownErrorType()),
+      thrownTypeRepr(afd->getThrownTypeRepr())
+  {
+    if (afd->hasEffect(EffectKind::Async))
+      effects |= EffectKind::Async;
+    if (afd->hasPolymorphicEffect(EffectKind::Async))
+      polymorphicEffects |= EffectKind::Async;
+
+    if (afd->hasEffect(EffectKind::Throws))
+      effects |= EffectKind::Throws;
+    if (afd->hasPolymorphicEffect(EffectKind::Throws))
+      polymorphicEffects |= EffectKind::Throws;
+  }
+
+  bool anyContains(EffectKind effect) const {
+    return effects.contains(effect) || polymorphicEffects.contains(effect);
+  }
+};
+
+class ABIDeclChecker
+    : public ASTComparisonVisitor<ABIDeclChecker, Decl *, Decl *> {
+  ASTContext &ctx;
+  AttributeChecker &parentChecker;
+  ABIAttr *abiAttr;
+
+  /// This emits a diagnostic with a fixit to remove the attribute.
+  template<typename ...ArgTypes>
+  InFlightDiagnostic diagnoseAndRemoveAttr(DeclAttribute *attr,
+                                           ArgTypes &&...Args) {
+    return parentChecker.diagnoseAndRemoveAttr(attr,
+                                        std::forward<ArgTypes>(Args)...);
+  }
+
+  /// Emit a fix-it replacing \p charRange with \p newText , inserting or
+  /// removing whitespace after \c charRange in a way suitable for editing a
+  /// sequence of whitespce-separated keywords.
+  void fixItReplaceKeywords(InFlightDiagnostic &diag,
+                            CharSourceRange charRange,
+                            StringRef newText) {
+    auto &SM = ctx.SourceMgr;
+    auto charRangeIsFollowedByWhitespace = [&]() -> bool {
+      auto str = SM.extractText({ charRange.getEnd(), 1 });
+      return str.empty() ? false : isspace(str.front());
+    };
+
+    SmallString<32> scratch;
+    scratch += newText;
+
+    if (newText.empty()) {
+      // Eat trailing whitespace.
+      while (charRangeIsFollowedByWhitespace()) {
+        charRange = { charRange.getStart(), charRange.getByteLength() + 1 };
+      }
+    } else {
+      if (!charRangeIsFollowedByWhitespace()) {
+        scratch.push_back(' ');
+      }
+    }
+
+    diag.fixItReplaceChars(charRange.getStart(), charRange.getEnd(), scratch);
+  }
+
+  /// Emit a fix-it replacing \p range with \p newText , inserting or
+  /// removing whitespace after \c range in a way suitable for editing a
+  /// sequence of whitespce-separated keywords.
+  void fixItReplaceKeywords(InFlightDiagnostic &diag,
+                            SourceRange range,
+                            StringRef newText) {
+    auto &SM = ctx.SourceMgr;
+    auto charRange = Lexer::getCharSourceRangeFromSourceRange(SM, range);
+    return fixItReplaceKeywords(diag, charRange, newText);
+  }
+
+public:
+  ABIDeclChecker(ASTContext &ctx, AttributeChecker &parentChecker,
+                 ABIAttr *abiAttr)
+    : ctx(ctx), parentChecker(parentChecker), abiAttr(abiAttr) {}
+
+  // MARK: @abi checking - decls
+
+  void check(Decl *api, Decl *abi) {
+    // Do the declarations have the same kind, broadly speaking? Many kinds have
+    // special mangling behavior (e.g. inits vs normal funcs) that make it
+    // unrealistic to treat one kind as though it were another.
+    // (And if they don't, we can't really compare them properly.
+    if (api->getKind() != abi->getKind()) {
+      // FIXME: DescriptiveDeclKind is overly specific; we really just want to
+      //        say that e.g. a `func` can't have the ABI of a `var`.
+      diagnoseAndRemoveAttr(abiAttr, diag::attr_abi_mismatched_kind,
+                            api, abi->getDescriptiveKind());
+      return;
+    }
+
+    visit(api, abi);
+  }
+
+  SourceLoc getTypeLoc(AbstractStorageDecl *storage, Decl *owner = nullptr) {
+    auto loc = storage->getTypeSourceRangeForDiagnostics().Start;
+    if (loc.isInvalid())
+      loc = storage->getLoc();
+    if (loc.isInvalid() && owner)
+      loc = owner->getLoc();
+    return loc;
+  }
+
+  bool checkParameterFlags(ParameterTypeFlags api, ParameterTypeFlags abi,
+                           ParameterTypeFlags apiOrig,
+                           ParameterTypeFlags abiOrig,
+                           Type apiType, Type abiType,
+                           SourceLoc apiTypeLoc, SourceLoc abiTypeLoc) {
+    bool didDiagnose = false;
+
+    // These assertions represent values that should have been normalized.
+    ASSERT(!api.isVariadic() && !abi.isVariadic());
+    ASSERT(!api.isAutoClosure() && !abi.isAutoClosure());
+    ASSERT(!api.isNonEphemeral() && !abi.isNonEphemeral());
+    ASSERT(!api.isIsolated() && !abi.isIsolated());
+    ASSERT(!api.isSending() && !abi.isSending());
+    ASSERT(!api.isCompileTimeConst() && !abi.isCompileTimeConst());
+
+    if (api.getOwnershipSpecifier() != abi.getOwnershipSpecifier()) {
+      auto getSpelling = [](ParamSpecifier spec) -> StringRef {
+        // Customize a couple of names to match what the developer would
+        // actually write.
+        if (spec == ParamSpecifier::Default)
+          return "";
+        if (spec == ParamSpecifier::ImplicitlyCopyableConsuming)
+          return "sending";
+        return getNameForParamSpecifier(spec);
+      };
+
+      ctx.Diags.diagnose(abiTypeLoc, diag::attr_abi_mismatched_param_modifier,
+                         getSpelling(abiOrig.getOwnershipSpecifier()),
+                         getSpelling(apiOrig.getOwnershipSpecifier()),
+                         /*isModifier=*/true);
+      ctx.Diags.diagnose(apiTypeLoc, diag::attr_abi_should_match_type_here);
+      didDiagnose = true;
+    }
+
+    if (api.isNoDerivative() != abi.isNoDerivative()) {
+      ctx.Diags.diagnose(abiTypeLoc, diag::attr_abi_mismatched_param_modifier,
+                         abiOrig.isNoDerivative() ? "noDerivative" : "",
+                         apiOrig.isNoDerivative() ? "noDerivative" : "",
+                         /*isModifier=*/false);
+      ctx.Diags.diagnose(apiTypeLoc, diag::attr_abi_should_match_type_here);
+      didDiagnose = true;
+    }
+
+
+    if (api.isAddressable() != abi.isAddressable()) {
+      ctx.Diags.diagnose(abiTypeLoc, diag::attr_abi_mismatched_param_modifier,
+                         abiOrig.isAddressable() ? "_addressable" : "",
+                         apiOrig.isAddressable() ? "_addressable" : "",
+                         /*isModifier=*/false);
+      ctx.Diags.diagnose(apiTypeLoc, diag::attr_abi_should_match_type_here);
+      didDiagnose = true;
+    }
+
+    if (!didDiagnose && api != abi) {
+      // Flag difference not otherwise diagnosed. This is a fallback diagnostic.
+      ctx.Diags.diagnose(abiTypeLoc, diag::attr_abi_mismatched_type,
+                         abiType, apiType);
+      ctx.Diags.diagnose(apiTypeLoc, diag::attr_abi_should_match_type_here);
+      didDiagnose = true;
+    }
+
+    return didDiagnose;
+  }
+
+  bool checkParameter(ParamDecl *api, ParamDecl *abi,
+                      ValueDecl *apiDecl, ValueDecl *abiDecl) {
+    ASSERT(api && abi);
+
+    bool didDiagnose = false;
+    if (auto defaultExpr = abi->getStructuralDefaultExpr()) {
+      // Forbidden.
+      ctx.Diags.diagnose(defaultExpr->getLoc(),
+                         diag::attr_abi_no_default_arguments, abi);
+      // TODO: Fix removing default arg (requires SourceLoc for equal sign)
+
+      // Don't return immediately because we can independently check the type.
+      didDiagnose = true;
+    }
+
+    auto apiOrig = api->toFunctionParam();
+    auto abiOrig = abi->toFunctionParam();
+    auto apiNorm = normalizeParam(apiOrig, apiDecl);
+    auto abiNorm = normalizeParam(abiOrig, abiDecl);
+
+    SourceLoc apiTypeLoc = getTypeLoc(api, apiDecl);
+    SourceLoc abiTypeLoc = getTypeLoc(abi, abiDecl);
+
+    didDiagnose |= checkType(apiNorm.getPlainType(), abiNorm.getPlainType(),
+                             apiTypeLoc, abiTypeLoc);
+
+    didDiagnose |= checkParameterFlags(apiNorm.getParameterFlags(),
+                                       abiNorm.getParameterFlags(),
+                                       apiOrig.getParameterFlags(),
+                                       abiOrig.getParameterFlags(),
+                                       apiNorm.getPlainType(),
+                                       abiNorm.getPlainType(),
+                                       apiTypeLoc, abiTypeLoc);
+
+    didDiagnose |= checkAttrs(api->getAttrs(), abi->getAttrs(), api, abi);
+
+    return didDiagnose;
+  }
+
+  bool checkParameterList(ParameterList *api, ParameterList *abi,
+                          ValueDecl *apiDecl, ValueDecl *abiDecl) {
+    // Do the declarations have the same number of parameters?
+    if (api->size() != abi->size()) {
+      diagnoseAndRemoveAttr(abiAttr, diag::attr_abi_mismatched_arity, apiDecl,
+                            /*genericParams=*/false);
+      return true;
+    }
+
+    bool didDiagnose = false;
+
+    for (auto pair : llvm::zip(*api, *abi)) {
+      didDiagnose |= checkParameter(std::get<0>(pair), std::get<1>(pair),
+                                    apiDecl, abiDecl);
+    }
+
+    return didDiagnose;
+  }
+
+  bool checkImplicitSelfParam(ParamDecl *api, ParamDecl *abi,
+                              ValueDecl *apiDecl, ValueDecl *abiDecl) {
+    if (!api && !abi)
+      // Nothing to check
+      return false;
+
+    if ((api && !abi) || (!api && abi)) {
+      diagnoseAndRemoveAttr(abiAttr, diag::attr_abi_mismatched_arity,
+                            apiDecl, /*genericParams=*/false);
+      return true;
+    }
+
+    return checkParameter(api, abi, apiDecl, abiDecl);
+  }
+
+  bool checkGenericSignature(GenericSignature api, GenericSignature abi,
+                             Decl *apiDecl, Decl *abiDecl) {
+    if (api.isNull() && abi.isNull())
+      return false;
+
+    if (api.isNull()) {
+      abiDecl->diagnose(diag::attr_abi_extra_generic_signature, apiDecl);
+      return true;
+    }
+
+    if (abi.isNull()) {
+      abiDecl->diagnose(diag::attr_abi_missing_generic_signature,
+                        api.getAsString());
+      return true;
+    }
+
+    auto apiNorm = normalizeGenericSignature(api);
+    auto abiNorm = normalizeGenericSignature(abi);
+
+    if (!apiNorm->isEqual(abiNorm)) {
+      abiDecl->diagnose(diag::attr_abi_mismatched_generic_signature,
+                        abi.getAsString(), api.getAsString());
+      apiDecl->diagnose(diag::attr_abi_should_match_type_here);
+      return true;
+    }
+
+    return false;
+  }
+
+  bool checkEffects(DeclEffects api, DeclEffects abi, Decl *apiDecl,
+                    Decl *abiDecl) {
+    bool didDiagnose = false;
+    // Do the declarations match in throwing behavior? We don't care about
+    // `throws` vs. `rethrows` here, just whether callers will account for an
+    // error return.
+    if (api.anyContains(EffectKind::Throws) != abi.anyContains(EffectKind::Throws)) {
+      diagnoseAndRemoveAttr(abiAttr, diag::attr_abi_mismatched_throws,
+                            apiDecl, /*abiCanThrow=*/abi.anyContains(EffectKind::Throws));
+      didDiagnose = true;
+      // FIXME: Typed throws?
+    }
+
+    // Do the declarations match in async-ness?
+    if (api.anyContains(EffectKind::Async) != abi.anyContains(EffectKind::Async)) {
+      diagnoseAndRemoveAttr(abiAttr, diag::attr_abi_mismatched_async,
+                            apiDecl, /*abiHasAsync=*/abi.anyContains(EffectKind::Async));
+      didDiagnose = true;
+    }
+
+    return didDiagnose;
+  }
+
+  bool checkStaticAndFinal(ValueDecl *api, ValueDecl *abi) {
+    // The `static`, `class`, and `final` keywords all need to be evaluated
+    // together because of their intertwined semantics. This pile of code
+    // diagnoses errors in either or both.
+
+    /// Returns the type and location of the declaration's `static` or `class` keyword, if any.
+    auto getStaticSpelling = [](Decl *decl) -> Located<StaticSpellingKind> {
+      if (auto var = dyn_cast<VarDecl>(decl))
+        decl = var->getParentPatternBinding();
+
+      if (auto pbd = dyn_cast<PatternBindingDecl>(decl))
+        return { pbd->getStaticSpelling(), pbd->getStaticLoc() };
+
+      if (auto subscript = dyn_cast<SubscriptDecl>(decl))
+        return { subscript->getStaticSpelling(), subscript->getStaticLoc() };
+
+      if (auto func = dyn_cast<FuncDecl>(decl))
+        return { func->getStaticSpelling(), func->getStaticLoc() };
+
+      return { StaticSpellingKind::None, SourceLoc() };
+    };
+
+    /// Represents the combination of `class`, `static`, and `final` keywords
+    /// for a given declaration.
+    enum class StaticnessAndFinality : uint8_t {
+      InstanceAndOverridable,
+      ClassAndOverridable,
+      InstanceAndFinal,
+      ClassAndFinal,
+      Static,
+    };
+
+    /// Returns a `StaticnessAndFinality` corresponding to the given values.
+    auto getStaticnessAndFinality = [](StaticSpellingKind staticSpelling,
+                                       bool isFinal) {
+      switch (staticSpelling) {
+      case StaticSpellingKind::None:
+        return isFinal ? StaticnessAndFinality::InstanceAndFinal
+                       : StaticnessAndFinality::InstanceAndOverridable;
+
+      case StaticSpellingKind::KeywordStatic:
+        return StaticnessAndFinality::Static;
+
+      case StaticSpellingKind::KeywordClass:
+        return isFinal ? StaticnessAndFinality::ClassAndFinal
+                       : StaticnessAndFinality::ClassAndOverridable;
+      }
+
+      llvm_unreachable("unknown StaticSpellingKind");
+    };
+
+    auto apiSAF = getStaticnessAndFinality(getStaticSpelling(api).Item,
+                                           api->isFinal());
+
+    auto abiStaticSpelling = getStaticSpelling(abi);
+    auto abiSAF = getStaticnessAndFinality(abiStaticSpelling.Item,
+                                           abi->isFinal());
+
+    /// Collapses down the difference between `Static` and `ClassAndFinal`.
+    auto getSemantics = [](StaticnessAndFinality syntax) {
+      if (syntax == StaticnessAndFinality::ClassAndFinal)
+        return StaticnessAndFinality::Static;
+      return syntax;
+    };
+
+    if (getSemantics(apiSAF) != getSemantics(abiSAF)) {
+      auto diag = abi->diagnose(diag::attr_abi_static_final_mismatch,
+                                uint8_t(abiSAF), abi, uint8_t(apiSAF), api,
+                                api->getDeclContext()->getSelfClassDecl());
+
+      SourceLoc insertLoc = abi->getAttributeInsertionLoc(/*forModifier=*/true);
+      SourceLoc replaceLoc = abiStaticSpelling.Loc;
+      SourceLoc deleteLoc;
+
+      // If there's a (non-implicit) `final`, we may want to fix it.
+      auto finalAttr = abi->getAttrs().getAttribute<FinalAttr>();
+      if (finalAttr && !finalAttr->isImplicit())
+        deleteLoc = finalAttr->getLocation();
+
+      // If only one is valid, that should be `replaceLoc`; if both are valid,
+      // `replaceLoc` should come before `deleteLoc`.
+      if (deleteLoc.isValid() && (replaceLoc.isInvalid() ||
+                                 ctx.SourceMgr.isBefore(deleteLoc, replaceLoc)))
+        std::swap(deleteLoc, replaceLoc);
+
+      // Delete the keyword at `deleteLoc`, if there is one.
+      if (deleteLoc.isValid())
+        fixItReplaceKeywords(diag, deleteLoc, "");
+
+      StringRef spellings[] = { "", "class", "final", "final class", "static" };
+      auto newKeywords = spellings[uint8_t(apiSAF)];
+
+      // Either replace the first keyword, or insert new keywords.
+      if (replaceLoc.isValid())
+        fixItReplaceKeywords(diag, replaceLoc, newKeywords);
+      else
+        fixItReplaceKeywords(diag, CharSourceRange(insertLoc, 0), newKeywords);
+
+      return true;
+    }
+
+    return false;
+  }
+
+  /// This declaration should not be in an `@abi` attribute.
+#define UNSUPPORTED_DECL(NAME) \
+  bool visit##NAME##Decl(NAME##Decl *api, NAME##Decl *abi) { \
+    return visitParentOf##NAME##Decl(api, abi); \
+  }
+
+  /// This declaration has no additional validation logic.
+#define PASSTHROUGH_DECL(NAME) \
+  bool visit##NAME##Decl(NAME##Decl *api, NAME##Decl *abi) { \
+    return visitParentOf##NAME##Decl(api, abi); \
+  }
+
+  bool visitDecl(Decl *api, Decl *abi) {
+    bool didDiagnose = checkAttrs(api->getAttrs(), abi->getAttrs(), api, abi);
+
+    if (auto apiGenericCtx = api->getAsGenericContext()) {
+      auto abiGenericCtx = abi->getAsGenericContext();
+      didDiagnose |= checkGenericSignature(apiGenericCtx->getGenericSignature(),
+                                           abiGenericCtx->getGenericSignature(),
+                                           api, abi);
+    }
+    
+    return didDiagnose;
+  }
+
+  bool visitValueDecl(ValueDecl *api, ValueDecl *abi) {
+    if (visitParentOfValueDecl(api, abi))
+      return true;
+
+    return checkStaticAndFinal(api, abi);
+  }
+
+  PASSTHROUGH_DECL(Type)
+  PASSTHROUGH_DECL(GenericType)
+  PASSTHROUGH_DECL(NominalType)
+  PASSTHROUGH_DECL(Operator)
+
+  UNSUPPORTED_DECL(Enum)
+  UNSUPPORTED_DECL(Struct)
+  UNSUPPORTED_DECL(Class)
+  UNSUPPORTED_DECL(Protocol)
+  UNSUPPORTED_DECL(BuiltinTuple)
+  UNSUPPORTED_DECL(OpaqueType)
+  UNSUPPORTED_DECL(TypeAlias)
+  UNSUPPORTED_DECL(GenericTypeParam)
+  UNSUPPORTED_DECL(AssociatedType)
+  UNSUPPORTED_DECL(Module)
+  UNSUPPORTED_DECL(Param)
+  UNSUPPORTED_DECL(Destructor)
+  UNSUPPORTED_DECL(Macro)
+  UNSUPPORTED_DECL(EnumElement)
+  UNSUPPORTED_DECL(Extension)
+  UNSUPPORTED_DECL(TopLevelCode)
+  UNSUPPORTED_DECL(Import)
+  UNSUPPORTED_DECL(PoundDiagnostic)
+  UNSUPPORTED_DECL(PrecedenceGroup)
+  UNSUPPORTED_DECL(Missing)
+  UNSUPPORTED_DECL(MissingMember)
+  UNSUPPORTED_DECL(PatternBinding)
+  UNSUPPORTED_DECL(EnumCase)
+  UNSUPPORTED_DECL(Accessor)
+  UNSUPPORTED_DECL(InfixOperator)
+  UNSUPPORTED_DECL(PrefixOperator)
+  UNSUPPORTED_DECL(PostfixOperator)
+  UNSUPPORTED_DECL(MacroExpansion)
+
+  bool visitAbstractFunctionDecl(AbstractFunctionDecl *api,
+                                 AbstractFunctionDecl *abi) {
+    if (visitParentOfAbstractFunctionDecl(api, abi))
+      return true;
+
+    // FIXME: How much should we diagnose in IRGen for more precise ABI info?
+
+    if (checkImplicitSelfParam(api->getImplicitSelfDecl(),
+                               abi->getImplicitSelfDecl(),
+                               api, abi))
+      return true;
+
+    if (checkParameterList(api->getParameters(), abi->getParameters(),
+                           api, abi))
+      return true;
+
+    return checkEffects(DeclEffects(api), DeclEffects(abi), api, abi);
+    // NOTE: Does not check result type--that's the subclass's responsibility!
+  }
+
+  bool visitFuncDecl(FuncDecl *api, FuncDecl *abi) {
+    if (visitParentOfFuncDecl(api, abi))
+      return true;
+
+    // Intentionally ignoring `hasSendingResult()` because it doesn't affect
+    // calling convention.
+
+    return checkType(api->getResultInterfaceType(),
+                     abi->getResultInterfaceType(),
+                     api->getResultTypeSourceRange().Start,
+                     abi->getResultTypeSourceRange().Start);
+  }
+
+  bool visitConstructorDecl(ConstructorDecl *api, ConstructorDecl *abi) {
+    if (visitParentOfConstructorDecl(api, abi))
+      return true;
+
+    // FIXME: Diagnose failability
+    // Also make sure attrs diagnose designated/convenience
+    return false;
+  }
+
+  bool visitAbstractStorageDecl(AbstractStorageDecl *api,
+                                AbstractStorageDecl *abi) {
+    if (visitParentOfAbstractStorageDecl(api, abi))
+      return true;
+
+    if (checkType(api->getValueInterfaceType(), abi->getValueInterfaceType(),
+                  getTypeLoc(api), getTypeLoc(abi)))
+      return true;
+
+    // TODO: ABI decl does not have its own accessors; should get from the API
+
+    return false;
+  }
+
+  bool visitVarDecl(VarDecl *api, VarDecl *abi) {
+    if (visitParentOfVarDecl(api, abi))
+      return true;
+    return false;
+  }
+
+  bool visitSubscriptDecl(SubscriptDecl *api, SubscriptDecl *abi) {
+    if (visitParentOfSubscriptDecl(api, abi))
+      return true;
+
+    if (checkParameterList(api->getIndices(), abi->getIndices(), api, abi))
+      return true;
+
+    return false;
+  }
+
+#undef UNSUPPORTED_DECL
+#undef PASSTHROUGH_DECL
+
+  // MARK: @abi checking - attributes
+
+  bool canCompareAttrs(DeclAttribute *api, DeclAttribute *abi,
+                       Decl *apiDecl, Decl *abiDecl) {
+    if (api->getKind() != abi->getKind())
+      return false;
+
+    auto getAvailableDomain = [](Decl *D, DeclAttribute *A) {
+      return D->getSemanticAvailableAttr(cast<AvailableAttr>(A))->getDomain();
+    };
+
+    // Extra logic for specific attributes.
+    switch (api->getKind()) {
+    case DeclAttrKind::Expose:
+      return cast<ExposeAttr>(api)->getExposureKind()
+                  == cast<ExposeAttr>(abi)->getExposureKind();
+
+    case DeclAttrKind::Extern:
+      return cast<ExternAttr>(api)->getExternKind()
+                  == cast<ExternAttr>(abi)->getExternKind();
+
+    case DeclAttrKind::Available:
+      return getAvailableDomain(apiDecl, api)
+                  == getAvailableDomain(abiDecl, abi);
+      return true;
+
+    default:
+      break;
+    }
+
+    return true;
+  }
+
+  bool checkAttrs(DeclAttributes api, DeclAttributes abi,
+                  Decl *apiDecl, Decl *abiDecl) {
+    bool didDiagnose = false;
+    SmallVector<DeclAttribute*, 32> remainingABIDeclAttrs;
+    for (auto *abiDeclAttr : abi) {
+      remainingABIDeclAttrs.push_back(abiDeclAttr);
+    }
+
+    // Visit each API attr, pairing it with an ABI attr if possible.
+    // Note that this will visit even invalid attributes.
+    for (auto *apiDeclAttr : api) {
+      auto abiAttrIter = llvm::find_if(remainingABIDeclAttrs,
+                                        [&](DeclAttribute *abiDeclAttr) {
+        return abiDeclAttr && canCompareAttrs(apiDeclAttr, abiDeclAttr,
+                                              apiDecl, abiDecl);
+      });
+      DeclAttribute *abiDeclAttr = nullptr;
+      if (abiAttrIter != remainingABIDeclAttrs.end()) {
+        abiDeclAttr = *abiAttrIter;
+        *abiAttrIter = nullptr;
+      }
+      didDiagnose |= visit(apiDeclAttr, abiDeclAttr, apiDecl, abiDecl);
+    }
+
+    // Visit leftover ABI attrs.
+    for (auto *abiDeclAttr : remainingABIDeclAttrs) {
+      if (abiDeclAttr)
+        didDiagnose |= visit(nullptr, abiDeclAttr, apiDecl, abiDecl);
+    }
+    return didDiagnose;
+  }
+
+  StringRef printAttr(DeclAttribute *attr,
+                      Decl *decl,
+                      SmallVectorImpl<char> &scratch,
+                      bool toInsert = false) {
+    auto opts = PrintOptions::printForDiagnostics(AccessLevel::Private,
+                                ctx.TypeCheckerOpts.PrintFullConvention);
+    opts.PrintLongAttrsOnSeparateLines = false;
+
+    llvm::raw_svector_ostream os{scratch};
+    StreamPrinter printer{os};
+    attr->print(printer, opts, decl);
+
+    auto str = StringRef(scratch.begin(), scratch.size());
+    if (!toInsert)
+      str = str.trim(' ');
+    return str;
+  }
+
+  void noteAttrHere(DeclAttribute *attr, Decl *decl, bool isMatch = false) {
+    SourceLoc loc = attr->getLocation();
+    if (loc.isValid())
+      ctx.Diags.diagnose(loc, diag::attr_abi_matching_attr_here,
+                         isMatch, attr->isDeclModifier(), attr->isImplicit());
+    else
+      ctx.Diags.diagnose(decl, diag::attr_abi_matching_attr_here,
+                         isMatch, attr->isDeclModifier(), attr->isImplicit());
+  }
+
+  bool checkAttrMissing(DeclAttribute *api, DeclAttribute *abi,
+                        Decl *apiDecl, Decl *abiDecl) {
+    if (!api) {
+      diagnoseAndRemoveAttr(abi, diag::attr_abi_extra_attr,
+                            abi->getAttrName(), abi->isDeclModifier(),
+                            abi->isImplicit());
+      return true;
+    }
+
+    if (!abi) {
+      SmallString<64> scratch;
+      auto apiAttrAsString = printAttr(api, apiDecl, scratch,
+                                       /*toInsert=*/true);
+
+      ctx.Diags.diagnose(abiDecl, diag::attr_abi_missing_attr,
+                         api->getAttrName(), api->isDeclModifier())
+        .fixItInsert(abiDecl->getAttributeInsertionLoc(api->isDeclModifier()),
+                     apiAttrAsString);
+      noteAttrHere(api, apiDecl);
+      return true;
+    }
+
+    return false;
+  }
+
+  template<typename AttrType>
+  bool checkAttrEquivalent(AttrType *api, AttrType *abi,
+                      Decl *apiDecl, Decl *abiDecl) {
+    if (checkAttrMissing(api, abi, apiDecl, abiDecl))
+      return true;
+
+    if (!api->isEquivalent(abi, apiDecl)) {
+      SmallString<64> scratch;
+      auto apiAttrAsString = printAttr(api, apiDecl, scratch);
+
+      ctx.Diags.diagnose(abi->getLocation(), diag::attr_abi_mismatched_attr,
+                         abi->getAttrName(), abi->isDeclModifier(),
+                         apiAttrAsString)
+        .fixItReplace(abi->getRangeWithAt(), apiAttrAsString);
+      noteAttrHere(api, apiDecl);
+      return true;
+    }
+
+    return false;
+  }
+
+  bool checkAttrNonABI(DeclAttribute *api, DeclAttribute *abi, Decl *apiDecl,
+                       Decl *abiDecl) {
+    if (abi) {
+      diagnoseAndRemoveAttr(abi, diag::attr_abi_forbidden_attr,
+                            abi->getAttrName(), abi->isDeclModifier());
+      return true;
+    }
+    return false;
+  }
+
+  SmallSetVector<SourceLoc, 4> diagnosedAvailableAttrSourceLocs;
+
+  bool checkAttrNonABI(AvailableAttr *api, AvailableAttr *abi, Decl *apiDecl,
+                       Decl *abiDecl) {
+    // A shorthand `@available(foo 1, bar 2, *)` attribute gets unpacked into
+    // several separate `AvailableAttr`s, each with the full range of the
+    // shorthand attribute. If we've already diagnosed one of them, don't bother
+    // checking the rest.
+    if (abi && diagnosedAvailableAttrSourceLocs.count(abi->getLocation()))
+      return true;
+
+    // Run normal logic.
+    bool didDiagnose = checkAttrNonABI(static_cast<DeclAttribute*>(api),
+                                       static_cast<DeclAttribute*>(abi),
+                                       apiDecl, abiDecl);
+
+    if (abi && didDiagnose) {
+      diagnosedAvailableAttrSourceLocs.insert(abi->getLocation());
+    }
+    return didDiagnose;
+  }
+
+  template<typename AttrType>
+  bool checkAttrCloned(AttrType *api, AttrType *abi, Decl *apiDecl,
+                       Decl *abiDecl) {
+    if (!abi && api && api->canClone()) {
+      // Infer an identical attribute.
+      abi = api->clone(ctx);
+      abi->setImplicit(true);
+      abiDecl->getAttrs().add(abi);
+
+      if (ctx.LangOpts.EnableABIInferenceRemarks) {
+        SmallString<64> scratch;
+        auto abiAttrAsString = printAttr(abi, abiDecl, scratch);
+
+        abiDecl->diagnose(diag::abi_attr_inferred_attribute,
+                          abiAttrAsString, api->isDeclModifier());
+        noteAttrHere(api, apiDecl, /*isMatch=*/true);
+      }
+    }
+
+    return checkAttrEquivalent(api, abi, apiDecl, abiDecl);
+  }
+
+  bool bothAreValid(DeclAttribute *api, DeclAttribute *abi) {
+    return !(api && api->isInvalid()) && !(abi && abi->isInvalid());
+  }
+
+  // The ABI and API attributes may vary in any way whatsoever.
+#define UNCONSTRAINED_ATTR(NAME) \
+  bool visit##NAME##Attr(NAME##Attr *api, NAME##Attr *abi, Decl *apiDecl, \
+                         Decl *abiDecl) { return false; }
+
+  // The ABI and API attributes must have an equivalent effect on the decl.
+#define EQUIVALENT_ATTR(NAME) \
+  bool visit##NAME##Attr(NAME##Attr *api, NAME##Attr *abi, Decl *apiDecl, \
+                         Decl *abiDecl) { \
+    if (!bothAreValid(api, abi)) return true; \
+    return checkAttrEquivalent(api, abi, apiDecl, abiDecl); \
+  }
+
+  // There must be no ABI attribute even if there's an API attribute.
+#define NONABI_ATTR(NAME) \
+  bool visit##NAME##Attr(NAME##Attr *api, NAME##Attr *abi, Decl *apiDecl, \
+                         Decl *abiDecl) { \
+    if (!bothAreValid(api, abi)) return true; \
+    return checkAttrNonABI(api, abi, apiDecl, abiDecl); \
+  }
+
+  // The ABI and API attributes must match; if there is no ABI attribute, the
+  // API attribute will be cloned and attached to it.
+#define CLONED_ATTR(NAME) \
+  bool visit##NAME##Attr(NAME##Attr *api, NAME##Attr *abi, Decl *apiDecl, \
+                         Decl *abiDecl) { \
+    if (!bothAreValid(api, abi)) return true; \
+    return checkAttrCloned(api, abi, apiDecl, abiDecl); \
+  }
+
+  // Intentionally permitted to vary
+  UNCONSTRAINED_ATTR(OriginallyDefinedIn)
+  UNCONSTRAINED_ATTR(Sendable)
+  UNCONSTRAINED_ATTR(Preconcurrency)
+  UNCONSTRAINED_ATTR(PreInverseGenerics)
+
+  // Isolation is intentionally permitted to vary
+  UNCONSTRAINED_ATTR(Nonisolated)
+  UNCONSTRAINED_ATTR(Custom) // Only global actor isolation CustomAttrs mangle
+  UNCONSTRAINED_ATTR(Execution)
+
+  // Separately validated along with static-ness
+  UNCONSTRAINED_ATTR(Final)
+
+  // No ABI effects -- should be omitted
+  NONABI_ATTR(NSCopying)
+  NONABI_ATTR(LLDBDebuggerFunction)
+  NONABI_ATTR(CompilerInitialized)
+  NONABI_ATTR(HasStorage)
+  NONABI_ATTR(DiscardableResult)
+  NONABI_ATTR(WarnUnqualifiedAccess)
+  NONABI_ATTR(DisfavoredOverload)
+  NONABI_ATTR(NonEphemeral)
+  NONABI_ATTR(ImplicitSelfCapture)
+  NONABI_ATTR(InheritActorContext)
+  NONABI_ATTR(Exclusivity)
+  NONABI_ATTR(NoAllocation)
+  NONABI_ATTR(NoLocks)
+  NONABI_ATTR(NoImplicitCopy)
+  NONABI_ATTR(NoObjCBridging)
+  NONABI_ATTR(NoExistentials)
+  NONABI_ATTR(NoRuntime)
+  NONABI_ATTR(NoEagerMove)
+  NONABI_ATTR(EagerMove)
+  NONABI_ATTR(LexicalLifetimes)
+  NONABI_ATTR(EmitAssemblyVisionRemarks)
+  NONABI_ATTR(Extern)
+  NONABI_ATTR(Used)
+  NONABI_ATTR(ReferenceOwnership)
+  NONABI_ATTR(ABI) // `@abi(@abi(...) ...) ...` not valid
+  NONABI_ATTR(Unsafe)
+  NONABI_ATTR(Safe)
+
+  // Access levels are inherited in requests
+  NONABI_ATTR(AccessControl)
+  NONABI_ATTR(SetterAccess)
+  NONABI_ATTR(UsableFromInline)
+  NONABI_ATTR(SPIAccessControl)
+
+  // Availability is inherited in requests
+  NONABI_ATTR(Available)
+  NONABI_ATTR(UnavailableFromAsync)
+  NONABI_ATTR(BackDeployed)
+
+  // Override behavior is inherited in requests
+  NONABI_ATTR(Override)
+  NONABI_ATTR(NonOverride)
+
+  // Otherwise inappropriate on ABI attribute
+  NONABI_ATTR(SILGenName) // would be ignored if permitted
+  NONABI_ATTR(Documentation)
+  NONABI_ATTR(AllowFeatureSuppression) // put on parent
+
+  // Foreign language ABI-affecting attributes must match
+  NONABI_ATTR(ObjC)
+  NONABI_ATTR(IBAction)
+  NONABI_ATTR(IBInspectable)
+  NONABI_ATTR(GKInspectable)
+  NONABI_ATTR(IBOutlet)
+  NONABI_ATTR(IBSegueAction)
+  NONABI_ATTR(NSManaged)
+  NONABI_ATTR(NonObjC)
+  NONABI_ATTR(Optional)
+  NONABI_ATTR(Dynamic)
+  NONABI_ATTR(CDecl)
+  NONABI_ATTR(ObjCImplementation)
+  NONABI_ATTR(Expose)
+
+  NONABI_ATTR(Section)
+
+  CLONED_ATTR(Inlinable)
+  CLONED_ATTR(Inline)
+  CLONED_ATTR(Transparent)
+  CLONED_ATTR(AlwaysEmitIntoClient)
+
+  NONABI_ATTR(Optimize)
+
+  // While these don't have direct mangling impact, I could imagine there being
+  // some value in the future for "faking" them for typechecking purposes. To
+  // keep that door open, let's require them to exist and match for now.
+  EQUIVALENT_ATTR(Convenience)
+  EQUIVALENT_ATTR(Required)
+
+  CLONED_ATTR(Lazy)
+  NONABI_ATTR(FixedLayout)
+
+  // TODO: Maybe use @_specialize in @abi to tweak the ABI of specializations.
+  // Ban it for now, since there's nothing useful you can do with it yet.
+  NONABI_ATTR(Specialize)
+
+  NONABI_ATTR(Effects)
+  NONABI_ATTR(Implements)
+  NONABI_ATTR(DynamicReplacement)
+  NONABI_ATTR(WeakLinked)
+  CLONED_ATTR(Borrowed)
+
+  // TODO: Probably possible to make these unconstrained as long as we ensure
+  // that `@_addressableForDependencies` doesn't cause a calling convention
+  // change.
+  EQUIVALENT_ATTR(Lifetime)
+  EQUIVALENT_ATTR(UnsafeNonEscapableResult)
+
+  EQUIVALENT_ATTR(DistributedActor)
+
+  UNCONSTRAINED_ATTR(CompileTimeConst)
+
+  // Too complex to infer or check
+  // TODO: Figure out if there's something we could do here.
+  NONABI_ATTR(Derivative)
+  NONABI_ATTR(Differentiable)
+  NONABI_ATTR(Transpose)
+  NONABI_ATTR(NoDerivative)
+
+  // Feels super weird to infer
+  EQUIVALENT_ATTR(Infix)
+  EQUIVALENT_ATTR(Prefix)
+  EQUIVALENT_ATTR(Postfix)
+
+  EQUIVALENT_ATTR(Borrowing)
+  EQUIVALENT_ATTR(Consuming)
+  EQUIVALENT_ATTR(LegacyConsuming)
+  EQUIVALENT_ATTR(Mutating)
+  EQUIVALENT_ATTR(NonMutating)
+  EQUIVALENT_ATTR(AddressableSelf)
+
+  // Not validated at the level of individual attrs
+  UNCONSTRAINED_ATTR(Rethrows)
+  UNCONSTRAINED_ATTR(Async)
+  UNCONSTRAINED_ATTR(Reasync)
+
+  // Internal, don't check
+  UNCONSTRAINED_ATTR(SynthesizedProtocol)
+  UNCONSTRAINED_ATTR(PropertyWrapper) // ?
+  UNCONSTRAINED_ATTR(ProjectedValueProperty) // ?
+  UNCONSTRAINED_ATTR(HasMissingDesignatedInitializers)
+  UNCONSTRAINED_ATTR(InheritsConvenienceInitializers)
+  UNCONSTRAINED_ATTR(RestatedObjCConformance) // ?
+  UNCONSTRAINED_ATTR(HasInitialValue)
+  UNCONSTRAINED_ATTR(ForbidSerializingReference)
+  UNCONSTRAINED_ATTR(ClangImporterSynthesizedType)
+  UNCONSTRAINED_ATTR(NonSendable)
+  UNCONSTRAINED_ATTR(UnsafeInheritExecutor)
+  UNCONSTRAINED_ATTR(RawDocComment)
+  UNCONSTRAINED_ATTR(Semantics)
+  UNCONSTRAINED_ATTR(KnownToBeLocal)
+
+  // Shouldn't occur on decls that can be used with `@abi`
+  EQUIVALENT_ATTR(Exported)
+  EQUIVALENT_ATTR(ImplementationOnly)
+  EQUIVALENT_ATTR(PrivateImport)
+  EQUIVALENT_ATTR(SPIOnly)
+  EQUIVALENT_ATTR(NoMetadata)
+  EQUIVALENT_ATTR(MacroRole)
+  EQUIVALENT_ATTR(Testable)
+
+  // Type-only; out of scope for now.
+  EQUIVALENT_ATTR(RawLayout)
+  EQUIVALENT_ATTR(NonEscapable)
+  EQUIVALENT_ATTR(ObjCMembers)
+  EQUIVALENT_ATTR(MainType)
+  EQUIVALENT_ATTR(NSApplicationMain)
+  EQUIVALENT_ATTR(UIApplicationMain)
+  EQUIVALENT_ATTR(DynamicMemberLookup)
+  EQUIVALENT_ATTR(DynamicCallable)
+  EQUIVALENT_ATTR(StaticInitializeObjCMetadata)
+  EQUIVALENT_ATTR(TypeEraser)
+  EQUIVALENT_ATTR(ResultBuilder)
+  EQUIVALENT_ATTR(StaticExclusiveOnly)
+  EQUIVALENT_ATTR(ExtractConstantsFromMembers)
+  EQUIVALENT_ATTR(Sensitive)
+  EQUIVALENT_ATTR(Marker)
+  EQUIVALENT_ATTR(SpecializeExtension)
+  EQUIVALENT_ATTR(ShowInInterface)
+  EQUIVALENT_ATTR(IBDesignable)
+  EQUIVALENT_ATTR(SwiftNativeObjCRuntimeBase)
+  EQUIVALENT_ATTR(ObjCRuntimeName)
+  EQUIVALENT_ATTR(Frozen)
+  EQUIVALENT_ATTR(UnsafeNoObjCTaggedPointer)
+  EQUIVALENT_ATTR(RequiresStoredPropertyInits)
+  EQUIVALENT_ATTR(ObjCBridged)
+  EQUIVALENT_ATTR(ObjCNonLazyRealization)
+  EQUIVALENT_ATTR(Alignment)
+  EQUIVALENT_ATTR(AtRethrows)
+  EQUIVALENT_ATTR(AtReasync)
+  EQUIVALENT_ATTR(AlwaysEmitConformanceMetadata)
+  EQUIVALENT_ATTR(GlobalActor)
+  EQUIVALENT_ATTR(MoveOnly)
+  EQUIVALENT_ATTR(AddressableForDependencies)
+  EQUIVALENT_ATTR(Actor)
+
+  // Enum- and enum-element-only; out of scope for now.
+  EQUIVALENT_ATTR(Indirect)
+
+  // Destructor-only; out of scope for now.
+  EQUIVALENT_ATTR(Isolated)
+
+  // Accessor-only; out of scope for now.
+  EQUIVALENT_ATTR(StorageRestrictions)
+
+  // MARK: @abi checking - types
+
+  bool checkType(Type api, Type abi, SourceLoc apiLoc, SourceLoc abiLoc) {
+    if (!api.isNull() && !abi.isNull()) {
+      Type apiNorm = normalizeType(api);
+      Type abiNorm = normalizeType(abi);
+      if (apiNorm->isEqual(abiNorm)) {
+        return false;
+      }
+    }
+
+    ctx.Diags.diagnose(abiLoc, diag::attr_abi_mismatched_type, abi, api);
+    ctx.Diags.diagnose(apiLoc, diag::attr_abi_should_match_type_here);
+    return true;
+  }
+
+  /// Fold away details of \p original that do not affect the calling
+  /// conventions used for this type.
+  static Type normalizeType(Type original) {
+    return original.transformRec(&tryNormalizeOutermostType);
+  }
+
+  /// Fold away details of \p original that do not affect the calling
+  /// conventions used for this parameter. Does \em not fully normalize
+  /// \c original.getPlainType() , though it may slightly modify it.
+  /// Pass \c nullptr to \p forDecl for a parameter belonging to a closure.
+  static AnyFunctionType::Param
+  normalizeParam(const AnyFunctionType::Param &original, ValueDecl *forDecl) {
+    Type ty = original.getPlainType();
+    auto flags = original.getParameterFlags();
+
+    // We will smash away (non-parameter pack) variadics; turn the type into
+    // an array.
+    if (flags.isVariadic()) {
+      ty = original.getParameterType();
+    }
+
+    // Flatten ownership information down to consume/borrow/inout, which are the
+    // only distinctions that matter for calling conventions and memory
+    // management. This removes the distinction between e.g. `__owned` and
+    // `consuming`, or between the declaration's default parameter ownership
+    // convention and an explicit equivalent.
+    auto ownership = normalizeOwnership(flags.getOwnershipSpecifier(),
+                                        forDecl);
+
+    // Eliminate flags with no effect on the calling convention.
+    flags = flags
+      .withVariadic(false)
+      .withCompileTimeConst(false)
+      .withAutoClosure(false)
+      .withNonEphemeral(false)
+      .withIsolated(false)
+      .withSending(false)
+      .withOwnershipSpecifier(ownership);
+
+    return AnyFunctionType::Param(ty, Identifier(), flags, Identifier());
+  }
+
+  /// Folds away \p original to one of \c Consuming , \c Borrowing , or
+  /// \c InOut , which are the only parameter ownership behaviors relevant to ABI.
+  /// Pass \c nullptr to \p forDecl for a parameter belonging to a closure.
+  static ParamSpecifier normalizeOwnership(ParamSpecifier original,
+                                           ValueDecl *forDecl) {
+    switch (original) {
+    case ParamSpecifier::Default:
+      return getDefaultParamSpecifier(forDecl);
+      break;
+    case swift::ParamSpecifier::InOut:
+      return ParamSpecifier::InOut;
+      break;
+    case ParamSpecifier::Borrowing:
+    case ParamSpecifier::LegacyShared:
+      return ParamSpecifier::Borrowing;
+      break;
+    case swift::ParamSpecifier::Consuming:
+    case swift::ParamSpecifier::LegacyOwned:
+    case swift::ParamSpecifier::ImplicitlyCopyableConsuming:
+      return ParamSpecifier::Consuming;
+      break;
+    }
+  }
+
+  static GenericSignature normalizeGenericSignature(GenericSignature original) {
+    // FIXME: Are there other ABI-tolerable generic signature differences?
+    return original.withoutMarkerProtocols();
+  }
+
+  static
+  FunctionTypeIsolation normalizeIsolation(FunctionTypeIsolation original) {
+    // Isolation doesn't affect the ABI, except that `@isolated(any)` (a.k.a.
+    // `FunctionTypeIsolation::Kind::Erased`) has a different ABI from all the
+    // others. See docs/SIL/Types.td for details.
+    return original.isErased() ? FunctionTypeIsolation::forErased()
+                               : FunctionTypeIsolation::forNonIsolated();
+  }
+
+  static std::optional<Type> tryNormalizeOutermostType(TypeBase *original) {
+    // Function types: Eliminate anything that doesn't affect calling convention.
+    if (auto func = original->getAs<AnyFunctionType>()) {
+      // Ignore `@escaping`, `@Sendable`, `sending` on result, and most
+      // isolation; they have no ABI effect.
+      auto normalizedExt = func->getExtInfo().intoBuilder()
+        .withNoEscape(false)
+        .withSendable(false)
+        .withSendingResult(false)
+        .withIsolation(normalizeIsolation(func->getIsolation()))
+        .build();
+
+      // Ignore ignorable parts of parameters.
+      SmallVector<AnyFunctionType::Param, 8> normalizedParams;
+      for (auto param : func->getParams()) {
+        auto normalizedParam = normalizeParam(param, /*forDecl=*/nullptr);
+        normalizedParam = normalizedParam.withType(
+                                 normalizeType(normalizedParam.getPlainType()));
+        normalizedParams.push_back(normalizedParam);
+      }
+
+      if (isa<FunctionType>(func))
+        return FunctionType::get(normalizedParams,
+                                 normalizeType(func->getResult()),
+                                 normalizedExt);
+
+      ASSERT(isa<GenericFunctionType>(func));
+
+      // Ignore ignorable parts of the generic signature.
+      auto sig = original->getAs<GenericFunctionType>()->getGenericSignature();
+      return GenericFunctionType::get(normalizeGenericSignature(sig),
+                                      normalizedParams,
+                                      normalizeType(func->getResult()),
+                                      normalizedExt);
+    }
+
+    // Protocol-related types: Remove marker protocols.
+    if (auto comp = original->getAs<ProtocolCompositionType>()) {
+      auto normalized = comp->withoutMarkerProtocols();
+      if (!normalized->isEqual(comp))
+        return normalized;
+    }
+
+    if (auto proto = original->getAs<ProtocolType>()) {
+      if (proto->getDecl()->isMarkerProtocol())
+        return proto->getASTContext().TheAnyType;
+    }
+
+    if (auto existential = original->getAs<ExistentialType>()) {
+      // Pull out the constraint and see how it'll normalize.
+      auto normConstraint = normalizeType(existential->getConstraintType());
+
+      // If the constraint is no longer existential, pull it out of the type.
+      if (!normConstraint->isExistentialType())
+        return normConstraint;
+    }
+
+    // TODO: Allow Optional/non-Optional variance when ABI-compatible?
+    // TODO: Allow variance in exact class of object?
+
+    return std::nullopt;
+  }
+};
+
+void AttributeChecker::visitABIAttr(ABIAttr *attr) {
+  Decl *AD = attr->abiDecl;
+  if (isa<VarDecl>(D) && isa<PatternBindingDecl>(AD)) {
+    auto VD = cast<VarDecl>(D);
+    auto APBD = cast<PatternBindingDecl>(AD);
+
+    // Diagnose dissimilar PBD structures.
+    checkABIAttrPBD(APBD, VD);
+
+    // Do the rest of this checking on the corresponding VarDecl, not the
+    // PBD that's actually in the attribute. Note that `AD` will become null
+    // if they're too dissimilar to match up.
+    AD = APBD->getVarAtSimilarStructuralPosition(VD);
+  }
+  // TODO: EnumElementDecl?
+
+  if (!AD)
+    return;
+
+  // Check the ABI decl and bail if there was a problem with it.
+  TypeChecker::typeCheckDecl(AD);
+  if (AD->isInvalid())
+    return;
+
+  ABIDeclChecker(Ctx, *this, attr).check(D, AD);
+
+  // TODO: Diagnose if Protocol::isMarkerProtocol() - contradiction in terms
+  //       (and mangler can't handle invertible protocols with @abi)
+
+  // TODO: Validate more
+  // FIXME: The list of properties that have to match is practically endless
+  // and will grow as new features are added to the compiler. We might want to
+  // write an AttributeVisitor just to help us catch omissions over time.
+}
+
