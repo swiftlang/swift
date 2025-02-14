@@ -335,12 +335,6 @@ bool BridgedASTContext_canImport(BridgedASTContext cContext,
 // MARK: AST nodes
 //===----------------------------------------------------------------------===//
 
-enum ENUM_EXTENSIBILITY_ATTR(open) ASTNodeKind : size_t {
-  ASTNodeKindExpr,
-  ASTNodeKindStmt,
-  ASTNodeKindDecl
-};
-
 void registerBridgedDecl(BridgedStringRef bridgedClassName, SwiftMetatype metatype);
 
 struct OptionalBridgedDeclObj {
@@ -376,15 +370,52 @@ struct BridgedDeclObj {
   BRIDGED_INLINE bool Destructor_isIsolated() const;
 };
 
-struct BridgedASTNode {
-  SWIFT_NAME("raw")
-  void *_Nonnull Raw;
+enum ENUM_EXTENSIBILITY_ATTR(open) BridgedASTNodeKind : uint8_t {
+  BridgedASTNodeKindExpr,
+  BridgedASTNodeKindStmt,
+  BridgedASTNodeKindDecl
+};
 
-  SWIFT_NAME("kind")
-  ASTNodeKind Kind;
+class BridgedASTNode {
+  intptr_t opaque;
+
+  BRIDGED_INLINE BridgedASTNode(void *_Nonnull pointer,
+                                BridgedASTNodeKind kind);
+
+  void *_Nonnull getPointer() const {
+    return reinterpret_cast<void *>(opaque & ~0x7);
+  }
+
+public:
+  SWIFT_NAME("decl(_:)")
+  static BridgedASTNode createDecl(BridgedDecl d) {
+    return BridgedASTNode(d.unbridged(), BridgedASTNodeKindDecl);
+  }
+  SWIFT_NAME("stmt(_:)")
+  static BridgedASTNode createStmt(BridgedStmt s) {
+    return BridgedASTNode(s.unbridged(), BridgedASTNodeKindStmt);
+  }
+  SWIFT_NAME("expr(_:)")
+  static BridgedASTNode createExor(BridgedExpr e) {
+    return BridgedASTNode(e.unbridged(), BridgedASTNodeKindExpr);
+  }
+
+  SWIFT_UNAVAILABLE("use .kind")
+  BridgedASTNodeKind getKind() const {
+    return static_cast<BridgedASTNodeKind>(opaque & 0x7);
+  }
+
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedExpr castToExpr() const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedStmt castToStmt() const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedDecl castToDecl() const;
 
   BRIDGED_INLINE swift::ASTNode unbridged() const;
 };
+
+SWIFT_NAME("getter:BridgedASTNode.kind(self:)")
+inline BridgedASTNodeKind BridgedASTNode_getKind(BridgedASTNode node) {
+  return node.getKind();
+}
 
 // Declare `.asDecl` on each BridgedXXXDecl type, which upcasts a wrapper for
 // a Decl subclass to a BridgedDecl.

@@ -596,7 +596,7 @@ extension ASTGenVisitor {
       let body = BridgedBraceStmt.createImplicit(
         self.ctx,
         lBraceLoc: range.start,
-        element: ASTNode.decl(decl.asDecl).bridged,
+        element: .decl(decl.asDecl),
         rBraceLoc: range.end
       )
       topLevelDecl.setBody(body: body);
