@@ -413,24 +413,23 @@ static void emitPackExpansionPack(
   IGF.Builder.emitBlock(loop);
   ConditionalDominanceScope condition(IGF);
 
-  auto *element = elementForIndex(phi);
+  IGF.withLocalStackPackAllocs([&]() {
+    auto *element = elementForIndex(phi);
 
-  // Store the element metadata into to the current destination index.
-  auto *eltIndex = IGF.Builder.CreateAdd(dynamicIndex, phi);
-  Address eltPtr(
-      IGF.Builder.CreateInBoundsGEP(pack.getElementType(),
-                                    pack.getAddress(),
-                                    eltIndex),
-      pack.getElementType(),
-      pack.getAlignment());
+    // Store the element metadata into to the current destination index.
+    auto *eltIndex = IGF.Builder.CreateAdd(dynamicIndex, phi);
+    Address eltPtr(IGF.Builder.CreateInBoundsGEP(pack.getElementType(),
+                                                 pack.getAddress(), eltIndex),
+                   pack.getElementType(), pack.getAlignment());
 
-  IGF.Builder.CreateStore(element, eltPtr);
+    IGF.Builder.CreateStore(element, eltPtr);
+  });
 
   // Increment our counter.
   auto *next = IGF.Builder.CreateAdd(phi,
                                      llvm::ConstantInt::get(IGF.IGM.SizeTy, 1));
 
-  phi->addIncoming(next, loop);
+  phi->addIncoming(next, IGF.Builder.GetInsertBlock());
 
   // Repeat the loop.
   IGF.Builder.CreateBr(check);
@@ -717,6 +716,20 @@ void IRGenFunction::eraseStackPackWitnessTableAlloc(StackAddress addr,
   (void)removed;
 }
 
+void IRGenFunction::withLocalStackPackAllocs(llvm::function_ref<void()> fn) {
+  auto oldSize = OutstandingStackPackAllocs.size();
+  fn();
+  SmallVector<StackPackAlloc, 2> allocs;
+  for (auto index = oldSize, size = OutstandingStackPackAllocs.size();
+       index < size; ++index) {
+    allocs.push_back(OutstandingStackPackAllocs[index]);
+  }
+  while (OutstandingStackPackAllocs.size() > oldSize) {
+    OutstandingStackPackAllocs.pop_back();
+  }
+  cleanupStackAllocPacks(*this, allocs);
+}
+
 llvm::Value *irgen::emitWitnessTablePackRef(IRGenFunction &IGF,
                                             CanPackType packType,
                                             PackConformance *conformance) {
@@ -970,42 +983,46 @@ llvm::Value *irgen::emitTypeMetadataPackElementRef(
     auto *materialize = IGF.createBasicBlock("pack-index-element-metadata");
     IGF.Builder.emitBlock(materialize);
 
-    llvm::Value *metadata = nullptr;
-    llvm::SmallVector<llvm::Value *, 2> wtables;
-    wtables.reserve(conformances.size());
-    if (auto expansionTy = dyn_cast<PackExpansionType>(elementTy)) {
-      // Actually materialize %inner.  Then use it to get the metadata from the
-      // pack expansion at that index.
-      auto *relativeIndex = IGF.Builder.CreateSub(index, lowerBound);
-      auto context =
-          OpenedElementContext::createForContextualExpansion(IGF.IGM.Context, expansionTy);
-      auto patternTy = expansionTy.getPatternType();
-      metadata = emitPackExpansionElementMetadata(IGF, context, patternTy,
-                                                  relativeIndex, request);
-      for (auto conformance : conformances) {
-        auto patternConformance = conformance.getPack()->getPatternConformances()[i];
-        auto *wtable = emitPackExpansionElementWitnessTable(
-            IGF, context, patternTy, patternConformance,
-            &metadata, relativeIndex);
-        wtables.push_back(wtable);
+    IGF.withLocalStackPackAllocs([&]() {
+      llvm::Value *metadata = nullptr;
+      llvm::SmallVector<llvm::Value *, 2> wtables;
+      wtables.reserve(conformances.size());
+      if (auto expansionTy = dyn_cast<PackExpansionType>(elementTy)) {
+        // Actually materialize %inner.  Then use it to get the metadata from
+        // the pack expansion at that index.
+        auto *relativeIndex = IGF.Builder.CreateSub(index, lowerBound);
+        auto context = OpenedElementContext::createForContextualExpansion(
+            IGF.IGM.Context, expansionTy);
+        auto patternTy = expansionTy.getPatternType();
+        metadata = emitPackExpansionElementMetadata(IGF, context, patternTy,
+                                                    relativeIndex, request);
+        for (auto conformance : conformances) {
+          auto patternConformance =
+              conformance.getPack()->getPatternConformances()[i];
+          auto *wtable = emitPackExpansionElementWitnessTable(
+              IGF, context, patternTy, patternConformance, &metadata,
+              relativeIndex);
+          wtables.push_back(wtable);
+        }
+      } else {
+        metadata = IGF.emitTypeMetadataRef(elementTy, request).getMetadata();
+        for (auto conformance : conformances) {
+          auto patternConformance =
+              conformance.getPack()->getPatternConformances()[i];
+          llvm::Value *_metadata = nullptr;
+          auto *wtable = emitWitnessTableRef(IGF, elementTy,
+                                             /*srcMetadataCache=*/&_metadata,
+                                             patternConformance);
+          wtables.push_back(wtable);
+        }
       }
-    } else {
-      metadata = IGF.emitTypeMetadataRef(elementTy, request).getMetadata();
-      for (auto conformance : conformances) {
-        auto patternConformance = conformance.getPack()->getPatternConformances()[i];
-        llvm::Value *_metadata = nullptr;
-        auto *wtable =
-            emitWitnessTableRef(IGF, elementTy, /*srcMetadataCache=*/&_metadata,
-                                patternConformance);
-        wtables.push_back(wtable);
+      metadataPhi->addIncoming(metadata, IGF.Builder.GetInsertBlock());
+      for (auto i : indices(wtables)) {
+        auto *wtable = wtables[i];
+        auto *wtablePhi = wtablePhis[i];
+        wtablePhi->addIncoming(wtable, IGF.Builder.GetInsertBlock());
       }
-    }
-    metadataPhi->addIncoming(metadata, IGF.Builder.GetInsertBlock());
-    for (auto i : indices(wtables)) {
-      auto *wtable = wtables[i];
-      auto *wtablePhi = wtablePhis[i];
-      wtablePhi->addIncoming(wtable, IGF.Builder.GetInsertBlock());
-    }
+    });
     IGF.Builder.CreateBr(exit);
     // }} Finished emitting emit_i.
 
