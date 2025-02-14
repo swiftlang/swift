@@ -109,10 +109,11 @@ PS> .\Build.ps1
 PS> .\Build.ps1 -WindowsSDKs x64 -ProductVersion 1.2.3 -Test foundation,xctest
 #>
 [CmdletBinding(PositionalBinding = $false)]
-param(
-  [string] $SourceCache = "S:\SourceCache",
-  [string] $BinaryCache = "S:\b",
-  [string] $ImageRoot = "S:",
+param
+(
+  [System.IO.FileInfo] $SourceCache = "S:\SourceCache",
+  [System.IO.FileInfo] $BinaryCache = "S:\b",
+  [System.IO.FileInfo] $ImageRoot = "S:",
   [ValidateSet("codeview", "dwarf")]
   [string] $CDebugFormat = "dwarf",
   [ValidateSet("codeview", "dwarf")]
