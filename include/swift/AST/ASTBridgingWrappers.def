@@ -85,6 +85,12 @@
 #endif
 #include "swift/AST/DeclAttr.def"
 
+#ifndef TYPE_ATTR
+#define SIMPLE_TYPE_ATTR(...)
+#define TYPE_ATTR(SPELLING, CLASS) AST_BRIDGING_WRAPPER_NONNULL(CLASS##TypeAttr)
+#endif
+#include "swift/AST/TypeAttr.def"
+
 // Some of the base classes need to be nullable to allow them to be used as
 // optional parameters.
 AST_BRIDGING_WRAPPER_NULLABLE(Decl)

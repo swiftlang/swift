@@ -797,6 +797,44 @@ extension ASTGenVisitor {
     )
   }
 
+  func generateMagicIdentifierExpr(macroExpansionExpr node: MacroExpansionExprSyntax, kind: BridgedMagicIdentifierLiteralKind) -> BridgedMagicIdentifierLiteralExpr {
+    guard node.lastToken(viewMode: .sourceAccurate) == node.macroName else {
+      // TODO: Diagnose.
+      fatalError("magic identifier token with arguments")
+    }
+
+    return BridgedMagicIdentifierLiteralExpr.createParsed(
+      self.ctx,
+      kind: kind,
+      loc: self.generateSourceLoc(node.macroName)
+    )
+
+  }
+
+  func generateObjectLiteralExpr(macroExpansionExpr node: MacroExpansionExprSyntax, kind: BridgedObjectLiteralKind) -> BridgedObjectLiteralExpr {
+    guard
+      node.genericArgumentClause == nil,
+      node.trailingClosure == nil,
+      node.additionalTrailingClosures.isEmpty
+    else {
+      // TODO: Diagnose.
+      fatalError("object identifier with generic specialization")
+    }
+
+    return BridgedObjectLiteralExpr.createParsed(
+      self.ctx,
+      poundLoc: self.generateSourceLoc(node.pound),
+      kind: kind,
+      args: self.generateArgumentList(
+        leftParen: node.leftParen,
+        labeledExprList: node.arguments,
+        rightParen: node.rightParen,
+        trailingClosure: nil,
+        additionalTrailingClosures: nil
+      )
+    )
+  }
+
   func generateObjCSelectorExpr(macroExpansionExpr node: MacroExpansionExprSyntax) -> BridgedObjCSelectorExpr {
     fatalError("unimplemented")
   }
@@ -806,27 +844,35 @@ extension ASTGenVisitor {
   }
 
   func generate(macroExpansionExpr node: MacroExpansionExprSyntax) -> BridgedExpr {
-    // '#file', '#line' etc.
-    let magicIdentifierKind = BridgedMagicIdentifierLiteralKind(from: node.macroName.rawText.bridged)
-    if magicIdentifierKind != .none {
-      guard node.lastToken(viewMode: .sourceAccurate) == node.macroName else {
-        // TODO: Diagnose
-        fatalError("magic identifier token with arguments")
-      }
+    let macroNameText = node.macroName.rawText;
 
-      return BridgedMagicIdentifierLiteralExpr.createParsed(
-        self.ctx,
-        kind: magicIdentifierKind,
-        loc: self.generateSourceLoc(node.macroName)
+    // '#file', '#line' etc.
+    let magicIdentifierKind = BridgedMagicIdentifierLiteralKind(from: macroNameText.bridged)
+    if magicIdentifierKind != .none {
+      return self.generateMagicIdentifierExpr(
+        macroExpansionExpr: node,
+        kind: magicIdentifierKind
+      ).asExpr
+    }
+
+    // '#colorLiteral' et al.
+    let objectLiteralKind = BridgedObjectLiteralKind(from: macroNameText.bridged)
+    if objectLiteralKind != .none {
+      return self.generateObjectLiteralExpr(
+        macroExpansionExpr: node,
+        kind: objectLiteralKind
       ).asExpr
     }
 
     // Other built-in pound expressions.
-    switch node.macroName.rawText {
+    switch macroNameText {
     case "selector":
       return self.generateObjCSelectorExpr(macroExpansionExpr: node).asExpr
     case "keyPath":  
       return self.generateObjCKeyPathExpr(macroExpansionExpr: node).asExpr
+    case "assert" where ctx.langOptsHasFeature(.StaticAssert), "error", "warning":
+      // TODO: Diagnose.
+      fatalError("Directives in expression position");
     default:
       // Fallback to MacroExpansionExpr.
       break

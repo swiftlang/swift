@@ -84,15 +84,16 @@ extension ASTGenVisitor {
       case .differentiable:
         fatalError("unimplemented")
       case .convention:
+        return self.generateConventionTypeAttr(attribute: node)?.asTypeAttribute
         fatalError("unimplemented")
       case .opaqueReturnTypeOf:
         fatalError("unimplemented")
 
       case .isolated:
-        return self.generateIsolatedTypeAttr(attribute: node)
+        return self.generateIsolatedTypeAttr(attribute: node)?.asTypeAttribute
 
       case .execution:
-        return self.generateExecutionTypeAttr(attribute: node)
+        return self.generateExecutionTypeAttr(attribute: node)?.asTypeAttribute
 
       // SIL type attributes are not supported.
       case .autoreleased,
@@ -145,8 +146,41 @@ extension ASTGenVisitor {
       nameLoc: self.generateSourceLoc(node.attributeName)
     )
   }
-
-  func generateIsolatedTypeAttr(attribute node: AttributeSyntax) -> BridgedTypeAttribute? {
+  
+  func generateConventionTypeAttr(attribute node: AttributeSyntax) -> BridgedConventionTypeAttr? {
+    // FIXME: This don't need custom attribute arguments syntax.
+    // FIXME: Support 'witness_method' argument.
+    guard let args = node.arguments?.as(ConventionAttributeArgumentsSyntax.self) else {
+      // TODO: Diangose.
+      return nil
+    }
+    
+    let cTypeName: BridgedStringRef?
+    let cTypeNameLoc: BridgedSourceLoc?
+    if let ctypeString = args.cTypeString {
+      cTypeName = self.generateStringLiteralTextIfNotInterpolated(expr: ctypeString)
+      cTypeNameLoc = cTypeName != nil ? self.generateSourceLoc(ctypeString) : nil
+    } else {
+      cTypeName = nil
+      cTypeNameLoc = nil
+    }
+    
+    let witnessMethodProtocol: BridgedDeclNameRef = BridgedDeclNameRef()
+    
+    return .createParsed(
+      self.ctx,
+      atLoc: self.generateSourceLoc(node.atSign),
+      nameLoc: self.generateSourceLoc(node.attributeName),
+      parensRange: self.generateSourceRange(start: node.leftParen!, end: node.rightParen!),
+      name: ctx.allocateCopy(string: args.conventionLabel.rawText.bridged),
+      nameLoc: self.generateSourceLoc(args.conventionLabel),
+      witnessMethodProtocol: witnessMethodProtocol,
+      clangType: cTypeName ?? BridgedStringRef(),
+      clangTypeLoc: cTypeNameLoc ?? BridgedSourceLoc()
+    )
+  }
+  
+  func generateIsolatedTypeAttr(attribute node: AttributeSyntax) -> BridgedIsolatedTypeAttr? {
     guard case .argumentList(let isolatedArgs) = node.arguments,
           isolatedArgs.count == 1,
           let labelArg = isolatedArgs.first,
@@ -167,17 +201,18 @@ extension ASTGenVisitor {
       return nil
     }
 
-    return BridgedTypeAttribute.createIsolated(
+    return BridgedIsolatedTypeAttr.createParsed(
       self.ctx,
       atLoc: self.generateSourceLoc(node.atSign),
       nameLoc: self.generateSourceLoc(node.attributeName),
       lpLoc: self.generateSourceLoc(node.leftParen!),
       isolationKindLoc: self.generateSourceLoc(isolationKindExpr.baseName),
       isolationKind: isolationKind,
-      rpLoc: self.generateSourceLoc(node.rightParen!))
+      rpLoc: self.generateSourceLoc(node.rightParen!)
+    )
   }
 
-  func generateExecutionTypeAttr(attribute node: AttributeSyntax) -> BridgedTypeAttribute? {
+  func generateExecutionTypeAttr(attribute node: AttributeSyntax) -> BridgedExecutionTypeAttr? {
     guard case .argumentList(let executionArgs) = node.arguments,
           executionArgs.count == 1,
           let labelArg = executionArgs.first,
@@ -198,13 +233,14 @@ extension ASTGenVisitor {
       return nil
     }
 
-    return BridgedTypeAttribute.createExecution(
+    return BridgedExecutionTypeAttr.createParsed(
       self.ctx,
       atLoc: self.generateSourceLoc(node.atSign),
       nameLoc: self.generateSourceLoc(node.attributeName),
       lpLoc: self.generateSourceLoc(node.leftParen!),
       behaviorLoc: self.generateSourceLoc(behaviorExpr.baseName),
       behavior: behavior,
-      rpLoc: self.generateSourceLoc(node.rightParen!))
+      rpLoc: self.generateSourceLoc(node.rightParen!)
+    )
   }
 }

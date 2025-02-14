@@ -437,6 +437,8 @@ public:
   void recordStackPackWitnessTableAlloc(StackAddress addr, llvm::Value *shape);
   void eraseStackPackWitnessTableAlloc(StackAddress addr, llvm::Value *shape);
 
+  void withLocalStackPackAllocs(llvm::function_ref<void()> fn);
+
   /// Emit a load of a reference to the given Objective-C selector.
   llvm::Value *emitObjCSelectorRefLoad(StringRef selector);
 
