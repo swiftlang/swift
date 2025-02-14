@@ -2822,6 +2822,7 @@ function Build-SourceKitLSP($Arch) {
       TSC_DIR = (Get-HostProjectCMakeModules ToolsSupportCore);
       LLBuild_DIR = (Get-HostProjectCMakeModules LLBuild);
       ArgumentParser_DIR = (Get-HostProjectCMakeModules ArgumentParser);
+      SwiftASN1_DIR = (Get-HostProjectCMakeModules ASN1);
       SwiftCrypto_DIR = (Get-HostProjectCMakeModules Crypto);
       SwiftCollections_DIR = (Get-HostProjectCMakeModules Collections);
       SwiftPM_DIR = (Get-HostProjectCMakeModules PackageManager);
