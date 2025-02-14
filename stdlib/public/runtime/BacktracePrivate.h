@@ -119,6 +119,7 @@ struct BacktraceSettings {
   bool             cache;
   OutputTo         outputTo;
   Symbolication    symbolicate;
+  bool             suppressWarnings;
   const char      *swiftBacktracePath;
 };
 
