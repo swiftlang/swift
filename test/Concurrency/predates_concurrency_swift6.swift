@@ -289,3 +289,22 @@ func testErasureDowngrade(ns: NotSendable, us: UnavailableSendable, c: C) {
     // expected-error@-1 {{conformance of 'UnavailableSendable' to 'Sendable' is unavailable}}
   }
 }
+
+// The member itself could be non-preconcurrency but the base could be.
+do {
+  @preconcurrency var d: [String: any Sendable] = [:]
+
+  let data: [String: Any] = [:]
+  d.merge(data, uniquingKeysWith: { _, rhs in rhs})
+  // expected-warning@-1 {{type 'Any' does not conform to the 'Sendable' protocol}}
+
+  struct Test {
+    @preconcurrency var info: [String: any Sendable] = [:]
+  }
+
+  func test(s: inout Test) {
+    s.info["hello"] = { }
+    // expected-warning@-1 {{type '() -> ()' does not conform to the 'Sendable' protocol}}
+    // expected-note@-2 {{a function type must be marked '@Sendable' to conform to 'Sendable'}}
+  }
+}
