@@ -403,6 +403,7 @@ unbridge(BridgedMagicIdentifierLiteralKind cKind) {
   case BridgedMagicIdentifierLiteralKindNone:
     return std::nullopt;
   }
+  llvm_unreachable("unhandled enum value");
 }
 
 BridgedMagicIdentifierLiteralExpr
@@ -417,6 +418,38 @@ BridgedNilLiteralExpr
 BridgedNilLiteralExpr_createParsed(BridgedASTContext cContext,
                                    BridgedSourceLoc cNilKeywordLoc) {
   return new (cContext.unbridged()) NilLiteralExpr(cNilKeywordLoc.unbridged());
+}
+
+SWIFT_NAME("BridgedObjectLiteralKind.init(from:)")
+BridgedObjectLiteralKind
+BridgedObjectLiteralKind_fromString(BridgedStringRef cStr) {
+  return llvm::StringSwitch<BridgedObjectLiteralKind>(cStr.unbridged())
+#define POUND_OBJECT_LITERAL(Name, Desc, Proto)                                \
+  .Case(#Name, BridgedObjectLiteralKind_##Name)
+#include "swift/AST/TokenKinds.def"
+      .Default(BridgedObjectLiteralKind_none);
+}
+
+static std::optional<ObjectLiteralExpr::LiteralKind>
+unbridge(BridgedObjectLiteralKind kind) {
+  switch (kind) {
+#define POUND_OBJECT_LITERAL(Name, Desc, Proto)                                \
+  case BridgedObjectLiteralKind_##Name:                                        \
+    return ObjectLiteralExpr::LiteralKind::Name;
+#include "swift/AST/TokenKinds.def"
+  case BridgedObjectLiteralKind_none:
+    return std::nullopt;
+  }
+  llvm_unreachable("unhandled enum value");
+}
+
+SWIFT_NAME("BridgedObjectLiteralExpr.createParsed(_:poundLoc:kind:args:)")
+BridgedObjectLiteralExpr BridgedObjectLiteralExpr_createParsed(
+    BridgedASTContext cContext, BridgedSourceLoc cPoundLoc,
+    BridgedObjectLiteralKind cKind, BridgedArgumentList cArgs) {
+  return ObjectLiteralExpr::create(cContext.unbridged(), cPoundLoc.unbridged(),
+                                   *unbridge(cKind), cArgs.unbridged(),
+                                   /*implicit=*/false);
 }
 
 BridgedOptionalTryExpr BridgedOptionalTryExpr_createParsed(
