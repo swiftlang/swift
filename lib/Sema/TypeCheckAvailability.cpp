@@ -3623,17 +3623,9 @@ public:
 
     ExprStack.push_back(E);
 
-    if (auto *apply = dyn_cast<ApplyExpr>(E)) {
-      bool preconcurrency = false;
-      auto *fn = apply->getFn();
-      if (auto *selfApply = dyn_cast<SelfApplyExpr>(fn)) {
-        fn = selfApply->getFn();
-      }
-      auto declRef = fn->getReferencedDecl();
-      if (auto *decl = declRef.getDecl()) {
-        preconcurrency = decl->preconcurrency();
-      }
-      PreconcurrencyCalleeStack.push_back(preconcurrency);
+    if (isa<ApplyExpr>(E)) {
+      PreconcurrencyCalleeStack.push_back(
+          hasReferenceToPreconcurrencyDecl(E));
     }
 
     if (auto DR = dyn_cast<DeclRefExpr>(E)) {
@@ -3659,6 +3651,8 @@ public:
       if (S->hasDecl()) {
         diagnoseDeclRefAvailability(S->getDecl(), S->getSourceRange(), S);
         maybeDiagStorageAccess(S->getDecl().getDecl(), S->getSourceRange(), DC);
+        PreconcurrencyCalleeStack.push_back(
+            hasReferenceToPreconcurrencyDecl(S));
       }
     }
 
@@ -4037,6 +4031,41 @@ private:
     if (diagnoseDeclAvailability(D, ReferenceRange, /*call*/ nullptr, Where,
                                  Flags))
       return;
+  }
+
+  /// Check whether the given expression references any
+  /// @preconcurrency declarations.
+  /// Calls, subscripts, member references can have @preconcurrency
+  /// declarations at any point in their base chain.
+  bool hasReferenceToPreconcurrencyDecl(Expr *expr) {
+    if (auto declRef = expr->getReferencedDecl()) {
+      if (declRef.getDecl()->preconcurrency())
+        return true;
+    }
+
+    if (auto *selfApply = dyn_cast<SelfApplyExpr>(expr)) {
+      if (hasReferenceToPreconcurrencyDecl(selfApply->getFn()))
+        return true;
+
+      // Base could be a preconcurrency declaration i.e.
+      //
+      // @preconcurrency var x: [any Sendable]
+      // x.append(...)
+      //
+      // If thought `append` might not be `@preconcurrency`
+      // the "base" is.
+      return hasReferenceToPreconcurrencyDecl(selfApply->getBase());
+    }
+
+    if (auto *LE = dyn_cast<LookupExpr>(expr)) {
+      // If subscript itself is not @preconcurrency, it's base could be.
+      return hasReferenceToPreconcurrencyDecl(LE->getBase());
+    }
+
+    if (auto *apply = dyn_cast<ApplyExpr>(expr))
+      return hasReferenceToPreconcurrencyDecl(apply->getFn());
+
+    return false;
   }
 };
 } // end anonymous namespace
