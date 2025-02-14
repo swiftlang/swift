@@ -8236,16 +8236,16 @@ ERROR(attr_abi_mismatched_kind,none,
 
 ERROR(attr_abi_mismatched_arity,none,
       "cannot give %kind0 the ABI of a %kindonly0 with a different number of "
-      "low-level parameters",
-      (ValueDecl *))
+      "%select{|generic }1parameters",
+      (Decl *, /*genericParams=*/bool))
 
 ERROR(attr_abi_mismatched_throws,none,
       "cannot give %0 the ABI of a %kindonly0 which %select{cannot|can}1 throw",
-      (ValueDecl *, /*abiCanThrow=*/bool))
+      (Decl *, /*abiCanThrow=*/bool))
 
 ERROR(attr_abi_mismatched_async,none,
       "cannot give %0 the ABI of %select{a non-async|an async}1 %kindonly0",
-      (ValueDecl *, /*abiIsAsync=*/bool))
+      (Decl *, /*abiIsAsync=*/bool))
 
 ERROR(attr_abi_mismatched_pbd_size,none,
       "cannot give pattern binding the ABI of a binding with "
@@ -8254,12 +8254,56 @@ ERROR(attr_abi_mismatched_pbd_size,none,
 
 ERROR(attr_abi_mismatched_var,none,
       "no match for %select{%kind0 in the ABI|ABI %kind0}1",
-      (ValueDecl *, /*isABI=*/bool))
+      (Decl *, /*isABI=*/bool))
 
 ERROR(attr_abi_incompatible_with_silgen_name,none,
       "cannot use '@_silgen_name' and '@abi' on the same %0 because they serve "
       "the same purpose",
       (DescriptiveDeclKind))
+
+ERROR(attr_abi_missing_attr,none,
+      "missing %0 %select{attribute|modifier}1 in '@abi'",
+      (DeclAttribute, bool))
+ERROR(attr_abi_extra_attr,none,
+      "extra %0 %select{attribute|modifier}1 in '@abi'",
+      (DeclAttribute, bool))
+ERROR(attr_abi_forbidden_attr,none,
+      "unused %0 %select{attribute|modifier}1 in '@abi'",
+      (DeclAttribute, bool))
+
+ERROR(attr_abi_mismatched_attr,none,
+      "%0 %select{attribute|modifier}1 in '@abi' should match '%2'",
+      (DeclAttribute, bool, StringRef))
+NOTE(attr_abi_should_match_attr_here,none,
+     "should match attribute here",
+     ())
+
+ERROR(attr_abi_mismatched_type,none,
+      "type %0 in '@abi' should match %1",
+      (Type, Type))
+NOTE(attr_abi_should_match_type_here,none,
+     "should match type here", ())
+
+ERROR(attr_abi_mismatched_generic_signature,none,
+      "generic signature '%0' in '@abi' is not compatible with '%1'",
+      (StringRef, StringRef))
+ERROR(attr_abi_missing_generic_signature,none,
+      "declaration in '@abi' should have generic signature compatible with "
+      "'%0'",
+      (StringRef))
+ERROR(attr_abi_extra_generic_signature,none,
+      "declaration in '@abi' should not have generic signature because %0 "
+      "is not generic",
+      (Decl *))
+
+ERROR(attr_abi_mismatched_param_modifier,none,
+      "%select{default |}0%select{type attribute|parameter modifier}2 "
+      "%select{|'%0' }0in '@abi' is not compatible with %select{default|'%1'}1",
+      (StringRef, StringRef, /*isModifier=*/bool))
+ERROR(attr_abi_no_default_arguments,none,
+      "%0 in '@abi' should not have a default argument; it does not "
+      "affect the parameter's ABI",
+      (Decl *))
 
 //===----------------------------------------------------------------------===//
 // MARK: @execution Attribute
