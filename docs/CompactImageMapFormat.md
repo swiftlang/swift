@@ -106,7 +106,7 @@ need to be stored in CIF data:
 |   8  | `/System/Applications`              |
 |   9  | `/Applications`                     |
 |  10  | `C:\Windows\System32`               |
-|  11  | `C:\Program Files\`                 |
+|  11  | `C:\Program Files`                  |
 
 Codes below 32 are reserved for future expansion of the fixed list.
 
