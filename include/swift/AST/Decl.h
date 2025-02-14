@@ -5592,12 +5592,6 @@ public:
   ///   value requirement.
   bool hasSelfOrAssociatedTypeRequirements() const;
 
-  /// Determine whether an existential type constrained by this protocol must
-  /// be written using `any` syntax.
-  ///
-  /// \Note This method takes language feature state into account.
-  bool existentialRequiresAny() const;
-
   /// Returns a list of protocol requirements that must be assessed to
   /// determine a concrete's conformance effect polymorphism kind.
   PolymorphicEffectRequirementList getPolymorphicEffectRequirements(
