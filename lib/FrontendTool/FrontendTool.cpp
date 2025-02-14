@@ -1095,6 +1095,8 @@ static bool printSwiftVersion(const CompilerInvocation &Invocation) {
                << '\n';
   llvm::outs() << "Target: " << Invocation.getLangOptions().Target.str()
                << '\n';
+  if (!llvm::cl::getCompilerBuildConfig().empty())
+    llvm::cl::printBuildConfig(llvm::outs());
   return false;
 }
 
