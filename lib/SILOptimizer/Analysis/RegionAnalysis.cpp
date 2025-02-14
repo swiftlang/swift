@@ -3002,6 +3002,8 @@ CONSTANT_TRANSLATION(IndexRawPointerInst, Assign)
 CONSTANT_TRANSLATION(InitExistentialMetatypeInst, Assign)
 CONSTANT_TRANSLATION(OpenExistentialMetatypeInst, Assign)
 CONSTANT_TRANSLATION(ObjCToThickMetatypeInst, Assign)
+CONSTANT_TRANSLATION(ValueMetatypeInst, Assign)
+CONSTANT_TRANSLATION(ExistentialMetatypeInst, Assign)
 
 // These are used by SIL to aggregate values together in a gep like way. We
 // want to look at uses of structs, not the struct uses itself. So just
@@ -3124,10 +3126,6 @@ CONSTANT_TRANSLATION(UnmanagedAutoreleaseValueInst, Require)
 CONSTANT_TRANSLATION(RebindMemoryInst, Require)
 CONSTANT_TRANSLATION(BindMemoryInst, Require)
 CONSTANT_TRANSLATION(BeginUnpairedAccessInst, Require)
-// Require of the value we extract the metatype from.
-CONSTANT_TRANSLATION(ValueMetatypeInst, Require)
-// Require of the value we extract the metatype from.
-CONSTANT_TRANSLATION(ExistentialMetatypeInst, Require)
 // These can take a parameter. If it is non-Sendable, use a require.
 CONSTANT_TRANSLATION(GetAsyncContinuationAddrInst, Require)
 
