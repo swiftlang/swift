@@ -234,7 +234,7 @@ extension ASTGenVisitor {
       self.ctx,
       atLoc: atLoc,
       range: range,
-      domainString: platformStr.bridged,
+      domainIdentifier: self.ctx.getIdentifier(platformStr.bridged),
       domainLoc: platformLoc,
       kind: attrKind,
       message: message ?? BridgedStringRef(),

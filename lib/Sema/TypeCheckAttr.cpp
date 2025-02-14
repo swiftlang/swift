@@ -8326,13 +8326,13 @@ ValueDecl *RenamedDeclRequest::evaluate(Evaluator &evaluator,
 }
 
 static std::optional<AvailabilityDomain>
-getAvailabilityDomainForName(StringRef name, const DeclContext *declContext) {
-  if (auto builtinDomain =
-          AvailabilityDomain::builtinDomainForString(name, declContext))
+getAvailabilityDomainForName(Identifier identifier,
+                             const DeclContext *declContext) {
+  if (auto builtinDomain = AvailabilityDomain::builtinDomainForString(
+          identifier.str(), declContext))
     return builtinDomain;
 
   auto &ctx = declContext->getASTContext();
-  auto identifier = ctx.getIdentifier(name);
   if (auto customDomain =
           ctx.MainModule->getAvailabilityDomainForIdentifier(identifier))
     return customDomain;
@@ -8359,22 +8359,23 @@ SemanticAvailableAttrRequest::evaluate(swift::Evaluator &evaluator,
   auto domain = attr->getCachedDomain();
 
   if (!domain) {
-    auto domainName = attr->getDomainString();
-    ASSERT(domainName);
+    auto domainIdentifier = attr->getDomainIdentifier();
+    ASSERT(domainIdentifier);
 
     // Attempt to resolve the domain specified for the attribute and diagnose
     // if no domain is found.
     auto declContext = decl->getInnermostDeclContext();
-    domain = getAvailabilityDomainForName(*domainName, declContext);
+    domain = getAvailabilityDomainForName(*domainIdentifier, declContext);
     if (!domain) {
-      if (auto suggestion = closestCorrectedPlatformString(*domainName)) {
+      auto domainString = domainIdentifier->str();
+      if (auto suggestion = closestCorrectedPlatformString(domainString)) {
         diags
             .diagnose(domainLoc, diag::attr_availability_suggest_platform,
-                      *domainName, attrName, *suggestion)
+                      domainString, attrName, *suggestion)
             .fixItReplace(SourceRange(domainLoc), *suggestion);
       } else {
         diags.diagnose(attrLoc, diag::attr_availability_unknown_platform,
-                       *domainName, attrName);
+                       domainString, attrName);
       }
       return std::nullopt;
     }
@@ -8384,7 +8385,7 @@ SemanticAvailableAttrRequest::evaluate(swift::Evaluator &evaluator,
         !declContext->isInSwiftinterface()) {
       diags.diagnose(domainLoc,
                      diag::attr_availability_requires_custom_availability,
-                     *domainName, attr);
+                     domain->getNameForAttributePrinting(), attr);
       return std::nullopt;
     }
 

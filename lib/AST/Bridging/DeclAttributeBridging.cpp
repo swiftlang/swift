@@ -106,17 +106,18 @@ BridgedAvailableAttr BridgedAvailableAttr_createParsed(
                     /*IsSPI=*/false);
 }
 
-BridgedAvailableAttr BridgedAvailableAttr_createParsedStr(
+BridgedAvailableAttr BridgedAvailableAttr_createParsedIdentifier(
     BridgedASTContext cContext, BridgedSourceLoc cAtLoc,
-    BridgedSourceRange cRange, BridgedStringRef cDomainString,
+    BridgedSourceRange cRange, BridgedIdentifier cDomainIdentifier,
     BridgedSourceLoc cDomainLoc, BridgedAvailableAttrKind cKind,
     BridgedStringRef cMessage, BridgedStringRef cRenamed,
     BridgedVersionTuple cIntroduced, BridgedSourceRange cIntroducedRange,
     BridgedVersionTuple cDeprecated, BridgedSourceRange cDeprecatedRange,
     BridgedVersionTuple cObsoleted, BridgedSourceRange cObsoletedRange) {
+
   return new (cContext.unbridged())
       AvailableAttr(cAtLoc.unbridged(), cRange.unbridged(),
-                    cDomainString.unbridged(), cDomainLoc.unbridged(),
+                    cDomainIdentifier.unbridged(), cDomainLoc.unbridged(),
                     unbridge(cKind), cMessage.unbridged(), cRenamed.unbridged(),
                     cIntroduced.unbridged(), cIntroducedRange.unbridged(),
                     cDeprecated.unbridged(), cDeprecatedRange.unbridged(),

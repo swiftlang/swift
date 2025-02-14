@@ -151,13 +151,12 @@ protected:
       Value : 32
     );
 
-    SWIFT_INLINE_BITFIELD(AvailableAttr, DeclAttribute, 4+1+1+1+1+1,
+    SWIFT_INLINE_BITFIELD(AvailableAttr, DeclAttribute, 4+1+1+1+1,
       /// An `AvailableAttr::Kind` value.
       Kind : 4,
 
       /// State storage for `SemanticAvailableAttrRequest`.
       HasComputedSemanticAttr : 1,
-      HasDomain : 1,
 
       /// State storage for `RenamedDeclRequest`.
       HasComputedRenamedDecl : 1,
@@ -737,16 +736,8 @@ public:
     NoAsync,
   };
 
-  AvailableAttr(SourceLoc AtLoc, SourceRange Range, AvailabilityDomain Domain,
-                SourceLoc DomainLoc, Kind Kind, StringRef Message,
-                StringRef Rename, const llvm::VersionTuple &Introduced,
-                SourceRange IntroducedRange,
-                const llvm::VersionTuple &Deprecated,
-                SourceRange DeprecatedRange,
-                const llvm::VersionTuple &Obsoleted, SourceRange ObsoletedRange,
-                bool Implicit, bool IsSPI);
-
-  AvailableAttr(SourceLoc AtLoc, SourceRange Range, StringRef DomainString,
+  AvailableAttr(SourceLoc AtLoc, SourceRange Range,
+                AvailabilityDomainOrIdentifier DomainOrIdentifier,
                 SourceLoc DomainLoc, Kind Kind, StringRef Message,
                 StringRef Rename, const llvm::VersionTuple &Introduced,
                 SourceRange IntroducedRange,
@@ -758,10 +749,7 @@ public:
 private:
   friend class SemanticAvailableAttr;
 
-  union {
-    AvailabilityDomain Domain;
-    StringRef DomainString;
-  };
+  AvailabilityDomainOrIdentifier DomainOrIdentifier;
   const SourceLoc DomainLoc;
 
   const StringRef Message;
@@ -777,24 +765,20 @@ private:
 public:
   /// Returns true if the `AvailabilityDomain` associated with the attribute
   /// has been resolved successfully.
-  bool hasCachedDomain() const { return Bits.AvailableAttr.HasDomain; }
+  bool hasCachedDomain() const { return DomainOrIdentifier.isDomain(); }
 
   /// Returns the `AvailabilityDomain` associated with the attribute, or
   /// `std::nullopt` if it has either not yet been resolved or could not be
   /// resolved successfully.
   std::optional<AvailabilityDomain> getCachedDomain() const {
-    if (hasCachedDomain())
-      return Domain;
-    return std::nullopt;
+    return DomainOrIdentifier.getAsDomain();
   }
 
   /// If the attribute does not already have a cached `AvailabilityDomain`, this
-  /// returns the domain string that was written in source, from which an
+  /// returns the domain identifier that was written in source, from which an
   /// `AvailabilityDomain` can be resolved.
-  std::optional<StringRef> getDomainString() const {
-    if (hasCachedDomain())
-      return std::nullopt;
-    return DomainString;
+  std::optional<Identifier> getDomainIdentifier() const {
+    return DomainOrIdentifier.getAsIdentifier();
   }
 
   SourceLoc getDomainLoc() const { return DomainLoc; }
@@ -919,9 +903,8 @@ private:
   void setRawObsoleted(llvm::VersionTuple version) { Obsoleted = version; }
 
   void setCachedDomain(AvailabilityDomain domain) {
-    assert(!Bits.AvailableAttr.HasDomain);
-    Domain = domain;
-    Bits.AvailableAttr.HasDomain = true;
+    assert(!DomainOrIdentifier.isDomain());
+    DomainOrIdentifier.setDomain(domain);
   }
 
   bool hasComputedSemanticAttr() const {

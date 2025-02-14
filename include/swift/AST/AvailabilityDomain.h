@@ -277,6 +277,40 @@ public:
   ModuleDecl *getModule() const { return mod; }
 };
 
+/// Represents either a resolved availability domain or an identifier written
+/// in source that has not yet been resolved to a domain.
+class AvailabilityDomainOrIdentifier {
+  using Storage = llvm::PointerUnion<AvailabilityDomain, Identifier>;
+  Storage storage;
+
+public:
+  AvailabilityDomainOrIdentifier(Identifier identifier)
+      : storage(identifier) {};
+  AvailabilityDomainOrIdentifier(AvailabilityDomain domain)
+      : storage(domain) {};
+
+  bool isDomain() const { return storage.is<AvailabilityDomain>(); }
+  bool isIdentifier() const { return storage.is<Identifier>(); }
+
+  /// Overwrites the existing domain or identifier with the given domain.
+  void setDomain(AvailabilityDomain domain) { storage = Storage(domain); }
+
+  /// Returns the resolved domain, or `std::nullopt` if there isn't one.
+  std::optional<AvailabilityDomain> getAsDomain() const {
+    if (isDomain())
+      return storage.get<AvailabilityDomain>();
+    return std::nullopt;
+  }
+
+  /// Returns the unresolved identifier, or `std::nullopt` if the domain has
+  /// been resolved.
+  std::optional<Identifier> getAsIdentifier() const {
+    if (isIdentifier())
+      return storage.get<Identifier>();
+    return std::nullopt;
+  }
+};
+
 } // end namespace swift
 
 namespace llvm {
