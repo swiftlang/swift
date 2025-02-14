@@ -190,3 +190,5 @@ do {
     @execution(concurrent) func testMember() async {} // Ok
   }
 }
+
+func testConvention(fn: @convention(c) (Int) -> Int) {}
