@@ -2037,13 +2037,14 @@ namespace {
     void visitTypeAliasDecl(TypeAliasDecl *TAD, Label label) {
       printCommon(TAD, "typealias", label);
 
+      printWhereRequirements(TAD);
+      printAttributes(TAD);
+      
       if (auto underlying = TAD->getCachedUnderlyingType()) {
         printTypeField(underlying, Label::always("type"));
       } else {
-        printFlag("unresolved_type", TypeColor);
+        printRec(TAD->getUnderlyingTypeRepr(), Label::always("type_repr"));
       }
-      printWhereRequirements(TAD);
-      printAttributes(TAD);
 
       printFoot();
     }

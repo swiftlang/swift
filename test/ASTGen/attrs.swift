@@ -20,11 +20,12 @@
 // RUN: %diff -u %t/astgen.ast %t/cpp-parser.ast
 
 // RUN: %target-typecheck-verify-swift \
+// RUN:   -module-abi-name ASTGen \
+// RUN:   -enable-experimental-feature ParserASTGen \
 // RUN:   -enable-experimental-feature SymbolLinkageMarkers \
 // RUN:   -enable-experimental-feature ABIAttribute \
 // RUN:   -enable-experimental-feature Extern \
 // RUN:   -enable-experimental-move-only \
-// RUN:   -enable-experimental-feature ParserASTGen \
 // RUN:   -enable-experimental-feature NonIsolatedAsyncInheritsIsolationFromContext
 
 // REQUIRES: executable_test
@@ -190,4 +191,14 @@ do {
   }
 }
 
-func testConvention(fn: @convention(c) (Int) -> Int) {}
+typealias testConvention = @convention(c) (Int) -> Int
+typealias testExecution = @execution(concurrent) () async -> Void
+typealias testIsolated = @isolated(any) () -> Void
+
+protocol OpProto {}
+struct OpStruct: OpProto {}
+struct OpTest {
+  func opResult() -> some OpProto { OpStruct() }
+  // FIXME: Implement SF->addUnvalidatedDeclWithOpaqueResultType() in ASTGen
+  // typealias Result = @_opaqueReturnTypeOf("$s6ASTGen6OpTestV8opResultQryF", 0) __
+}
