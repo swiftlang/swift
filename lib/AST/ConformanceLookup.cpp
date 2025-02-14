@@ -367,6 +367,8 @@ static ProtocolConformanceRef getBuiltinFunctionTypeConformance(
       if (isBitwiseCopyableFunctionType(functionType))
         return synthesizeConformance();
       break;
+    case KnownProtocolKind::SendableMetatype:
+      return synthesizeConformance();
     default:
       break;
     }
@@ -387,21 +389,22 @@ static ProtocolConformanceRef getBuiltinMetaTypeTypeConformance(
     case KnownProtocolKind::Sendable:
       // Metatypes are generally Sendable, but under StrictSendableMetatypes we
       // cannot assume that metatypes based on type parameters are Sendable.
+      // Therefore, check for conformance to SendableMetatype.
       if (ctx.LangOpts.hasFeature(Feature::StrictSendableMetatypes)) {
-        Type instanceType = metatypeType->getInstanceType();
+        auto sendableMetatypeProto = 
+            ctx.getProtocol(KnownProtocolKind::SendableMetatype);
+        if (sendableMetatypeProto) {
+          Type instanceType = metatypeType->getInstanceType();
 
-        // If the instance type is a type parameter, it is not necessarily
-        // Sendable. There will need to be a Sendable requirement.
-        if (instanceType->isTypeParameter())
-          break;
+          // If the instance type is a type parameter, it is not necessarily
+          // Sendable. There will need to be a Sendable requirement.
+          if (instanceType->isTypeParameter())
+            break;
 
-        // If the instance type is an archetype or existential, check whether
-        // it conforms to Sendable.
-        // FIXME: If the requirement machine were to infer T.Type: Sendable
-        // from T: Sendable, we wouldn't need this for archetypes.
-        if (instanceType->is<ArchetypeType>() ||
-            instanceType->isAnyExistentialType()) {
-          auto instanceConformance = lookupConformance(instanceType, protocol);
+          // If the instance type conforms to SendableMetatype, then its
+          // metatype is Sendable.
+          auto instanceConformance = lookupConformance(
+              instanceType, sendableMetatypeProto);
           if (instanceConformance.isInvalid() ||
               instanceConformance.hasMissingConformance())
             break;
@@ -414,6 +417,7 @@ static ProtocolConformanceRef getBuiltinMetaTypeTypeConformance(
     case KnownProtocolKind::Copyable:
     case KnownProtocolKind::Escapable:
     case KnownProtocolKind::BitwiseCopyable:
+    case KnownProtocolKind::SendableMetatype:
       return ProtocolConformanceRef(
           ctx.getBuiltinConformance(type, protocol,
                                     BuiltinConformanceKind::Synthesized));
@@ -433,6 +437,7 @@ getBuiltinBuiltinTypeConformance(Type type, const BuiltinType *builtinType,
   if (auto kp = protocol->getKnownProtocolKind()) {
     switch (*kp) {
     case KnownProtocolKind::Sendable:
+    case KnownProtocolKind::SendableMetatype:
     case KnownProtocolKind::Copyable:
     case KnownProtocolKind::Escapable: {
       ASTContext &ctx = protocol->getASTContext();
@@ -447,7 +452,8 @@ getBuiltinBuiltinTypeConformance(Type type, const BuiltinType *builtinType,
         break;
       }
     
-      // All other builtin types are Sendable, Copyable, and Escapable.
+      // All other builtin types are Sendable, SendableMetatype, Copyable, and
+      // Escapable.
       return ProtocolConformanceRef(
           ctx.getBuiltinConformance(type, protocol,
                                   BuiltinConformanceKind::Synthesized));
@@ -615,6 +621,13 @@ LookupConformanceInModuleRequest::evaluate(
   // If we don't have a nominal type, there are no conformances.
   if (!nominal || isa<ProtocolDecl>(nominal))
     return ProtocolConformanceRef::forMissingOrInvalid(type, protocol);
+
+  // All nominal types implicitly conform to SendableMetatype.
+  if (protocol->isSpecificProtocol(KnownProtocolKind::SendableMetatype)) {
+    return ProtocolConformanceRef(
+      ctx.getBuiltinConformance(type, protocol,
+                                BuiltinConformanceKind::Synthesized));
+  }
 
   // Expand conformances added by extension macros.
   //

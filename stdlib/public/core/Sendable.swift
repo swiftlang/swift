@@ -10,6 +10,9 @@
 //
 //===----------------------------------------------------------------------===//
 
+/// A type `T` whose metatype `T.Type` is `Sendable`.
+@_marker public protocol SendableMetatype: ~Copyable, ~Escapable { }
+
 /// A thread-safe type whose values can be shared across arbitrary concurrent
 /// contexts without introducing a risk of data races. Values of the type may
 /// have no shared mutable state, or they may protect that state with a lock or
@@ -132,7 +135,7 @@
 /// ### Sendable Metatypes
 ///
 /// Metatypes such as `Int.Type` implicitly conform to the `Sendable` protocol.
-@_marker public protocol Sendable: ~Copyable, ~Escapable { }
+@_marker public protocol Sendable: SendableMetatype, ~Copyable, ~Escapable { }
 
 ///
 /// A type whose values can safely be passed across concurrency domains by copying,

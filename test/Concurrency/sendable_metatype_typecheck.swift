@@ -51,7 +51,21 @@ nonisolated func passMetaSendable<T: Sendable & Q>(_: T.Type) {
   }
 }
 
+nonisolated func passMetaSendableMeta<T: SendableMetatype & Q>(_: T.Type) {
+  Task.detached {
+    acceptMeta(T.self)
+  }
+}
+
 nonisolated func passMetaWithSendableVal<T: Sendable & Q>(_: T.Type) {
+  let x = T.self
+  Task.detached {
+    acceptMeta(x) // okay, because T is Sendable implies T.Type: Sendable
+    x.g() // okay, because T is Sendable implies T.Type: Sendable
+  }
+}
+
+nonisolated func passMetaWithMetaSendableVal<T: SendableMetatype & Q>(_: T.Type) {
   let x = T.self
   Task.detached {
     acceptMeta(x) // okay, because T is Sendable implies T.Type: Sendable

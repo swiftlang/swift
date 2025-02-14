@@ -54,6 +54,14 @@ nonisolated func passMetaWithSendableSmuggled<T: Sendable & Q>(_: T.Type) {
   }
 }
 
+nonisolated func passMetaWithSendableSmuggled<T: SendableMetatype & Q>(_: T.Type) {
+  let x: any Q.Type = T.self
+  Task.detached {
+    acceptMeta(x) // okay, because T: SendableMetatype implies T.Type: Sendable
+    x.g() // okay, because T: SendableMetatype implies T.Type: Sendable
+  }
+}
+
 nonisolated func passSendableToMainActorSmuggledAny<T: Sendable>(_: T.Type) async {
   let x: Sendable.Type = T.self
   await acceptMetaOnMainActor(x)
