@@ -4553,6 +4553,8 @@ Expr *ConstraintSystem::buildAutoClosureExpr(Expr *expr,
 Expr *ConstraintSystem::buildTypeErasedExpr(Expr *expr, DeclContext *dc,
                                             Type contextualType,
                                             ContextualTypePurpose purpose) {
+  auto &ctx = dc->getASTContext();
+
   if (purpose != CTP_ReturnStmt)
     return expr;
 
@@ -4571,13 +4573,33 @@ Expr *ConstraintSystem::buildTypeErasedExpr(Expr *expr, DeclContext *dc,
     return expr;
 
   auto *PD = protocols.front();
-  auto *attr = PD->getAttrs().getAttribute<TypeEraserAttr>();
-  if (!attr)
+
+  auto contextAvailability =
+      TypeChecker::availabilityAtLocation(expr->getLoc(), dc);
+  auto refinedAvailability =
+      AvailabilityContext::forPlatformRange(
+        AvailabilityRange::alwaysAvailable(), ctx);
+
+  // The least available type eraser for the enclosing context.
+  Type typeEraser;
+  for (auto *attr : PD->getAttrs().getAttributes<TypeEraserAttr>()) {
+    auto eraser = attr->getResolvedType(PD);
+    assert(eraser && "Failed to resolve eraser type!");
+
+    auto *nominal = eraser->getAnyNominal();
+    auto nominalAvailability =
+        TypeChecker::availabilityForDeclSignature(nominal);
+
+    if (contextAvailability.isContainedIn(nominalAvailability) &&
+        nominalAvailability.isContainedIn(refinedAvailability)) {
+      refinedAvailability = nominalAvailability;
+      typeEraser = eraser;
+    }
+  }
+
+  if (!typeEraser)
     return expr;
 
-  auto typeEraser = attr->getResolvedType(PD);
-  assert(typeEraser && "Failed to resolve eraser type!");
-  auto &ctx = dc->getASTContext();
   auto *argList = ArgumentList::forImplicitSingle(ctx, ctx.Id_erasing, expr);
   return CallExpr::createImplicit(
       ctx, TypeExpr::createImplicit(typeEraser, ctx), argList);
