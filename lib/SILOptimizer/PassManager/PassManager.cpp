@@ -743,6 +743,11 @@ void SILPassManager::runPassOnFunction(unsigned TransIdx, SILFunction *F) {
       
       // Continue time measurement (including flushing deleted instructions).
       startTime = std::chrono::system_clock::now();
+    } else {
+      if (Mod->hasInstructionsScheduledForDeletion()) {
+        // Last chance for invalidating analysis if the pass forgot to call invalidateAnalysis.
+        invalidateAnalysis(F, SILAnalysis::InvalidationKind::FunctionBody);
+      }
     }
     Mod->flushDeletedInsts();
   }
@@ -915,6 +920,12 @@ void SILPassManager::runModulePass(unsigned TransIdx) {
   assert(analysesUnlocked() && "Expected all analyses to be unlocked!");
   SMT->run();
   assert(analysesUnlocked() && "Expected all analyses to be unlocked!");
+  
+  if (!CurrentPassHasInvalidated && Mod->hasInstructionsScheduledForDeletion()) {
+    // Last chance for invalidating analysis if the pass forgot to call invalidateAnalysis.
+    invalidateAllAnalysis();
+  }
+  
   Mod->flushDeletedInsts();
   swiftPassInvocation.finishedModulePassRun();
 
