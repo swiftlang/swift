@@ -335,6 +335,7 @@ install_swift_interface(swiftCore)
 
 # Configure plist creation for Darwin platforms.
 generate_plist("${CMAKE_PROJECT_NAME}" "${CMAKE_PROJECT_VERSION}" swiftCore)
+embed_manifest(swiftCore)
 
 include("${SwiftCore_VENDOR_MODULE_DIR}/swiftCore.cmake" OPTIONAL)
 
