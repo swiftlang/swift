@@ -4425,6 +4425,10 @@ TypeConverter::getLoweredLocalCaptures(SILDeclRef fn) {
   // Captured pack element environments.
   llvm::SetVector<GenericEnvironment *> genericEnv;
 
+  // Captured types.
+  SmallVector<CapturedType, 4> capturedTypes;
+  llvm::SmallDenseSet<CanType, 4> alreadyCapturedTypes;
+
   bool capturesGenericParams = false;
   DynamicSelfType *capturesDynamicSelf = nullptr;
   OpaqueValueExpr *capturesOpaqueValue = nullptr;
@@ -4620,6 +4624,13 @@ TypeConverter::getLoweredLocalCaptures(SILDeclRef fn) {
       // Collect non-function captures.
       recordCapture(capture);
     }
+
+    for (const auto &capturedType : captureInfo.getCapturedTypes()) {
+      if (alreadyCapturedTypes.insert(capturedType.getType()->getCanonicalType())
+              .second) {
+        capturedTypes.push_back(capturedType);
+      }
+    }
   };
 
   collectFunctionCaptures = [&](AnyFunctionRef curFn) {
@@ -4697,7 +4708,8 @@ TypeConverter::getLoweredLocalCaptures(SILDeclRef fn) {
   // Cache the result.
   CaptureInfo info(Context, resultingCaptures,
                    capturesDynamicSelf, capturesOpaqueValue,
-                   capturesGenericParams, genericEnv.getArrayRef());
+                   capturesGenericParams, genericEnv.getArrayRef(),
+                   capturedTypes);
   auto inserted = LoweredCaptures.insert({fn, info});
   assert(inserted.second && "already in map?!");
   (void)inserted;

@@ -55,7 +55,7 @@ enum TrailingSemi {
 };
 
 // The substitution map for a declref should be relatively unobtrusive.
-// CHECK-AST-LABEL:   (func_decl{{.*}}"generic(_:)" "<T : Hashable>" interface_type="<T where T : Hashable> (T) -> ()" access=internal captures=(<generic> )
+// CHECK-AST-LABEL:   (func_decl{{.*}}"generic(_:)" "<T : Hashable>" interface_type="<T where T : Hashable> (T) -> ()" access=internal captures=(<generic> {{.*}})
 func generic<T: Hashable>(_: T) {}
 // CHECK-AST:       (pattern_binding_decl
 // CHECK-AST:         (processed_init=declref_expr type="(Int) -> ()" location={{.*}} range={{.*}} decl="main.(file).generic@{{.*}} [with (substitution_map generic_signature=<T where T : Hashable> T -> Int)]" function_ref=unapplied))
