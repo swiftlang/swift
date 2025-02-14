@@ -551,6 +551,44 @@ class LinkEntity {
     /// Pointer is the (generalized) existential type.
     /// SecondaryPointer is the GenericSignatureImpl*.
     ExtendedExistentialTypeShape,
+
+    /// A global struct containing a relative pointer to the single-yield
+    /// coroutine ramp function and the fixed-size to be allocated in the
+    /// caller.
+    /// The pointer is a SILFunction*.
+    CoroFunctionPointer,
+
+    /// The same as CoroFunctionPointer but with a different stored value, for
+    /// use by TBDGen.
+    /// The pointer is an AbstractFunctionDecl*.
+    CoroFunctionPointerAST,
+
+    /// An coro function pointer for a method dispatch thunk.  The pointer is
+    /// a FuncDecl* inside a protocol or a class.
+    DispatchThunkCoroFunctionPointer,
+
+    /// An coro function pointer for a method dispatch thunk for an
+    /// initializing constructor.  The pointer is a ConstructorDecl* inside a
+    /// class.
+    DispatchThunkInitializerCoroFunctionPointer,
+
+    /// An coro function pointer for a method dispatch thunk for an allocating
+    /// constructor.  The pointer is a ConstructorDecl* inside a protocol or
+    /// a class.
+    DispatchThunkAllocatorCoroFunctionPointer,
+
+    /// An coro function pointer for a distributed thunk.
+    /// The pointer is a FuncDecl* inside an actor (class).
+    DistributedThunkCoroFunctionPointer,
+
+    /// An coro function pointer to a partial apply forwarder.
+    /// The pointer is the llvm::Function* for a partial apply forwarder.
+    PartialApplyForwarderCoroFunctionPointer,
+
+    /// An coro function pointer for a distributed accessor (method or
+    /// property).
+    /// The pointer is a SILFunction*.
+    DistributedAccessorCoroFunctionPointer,
   };
   friend struct llvm::DenseMapInfo<LinkEntity>;
 
@@ -1454,6 +1492,98 @@ public:
         LINKENTITY_SET_FIELD(Kind, unsigned(Kind::ExtendedExistentialTypeShape))
       | LINKENTITY_SET_FIELD(ExtendedExistentialIsUnique, unsigned(isUnique))
       | LINKENTITY_SET_FIELD(ExtendedExistentialIsShared, unsigned(isShared));
+    return entity;
+  }
+
+  static LinkEntity forCoroFunctionPointer(LinkEntity other) {
+    LinkEntity entity;
+    entity.Pointer = other.Pointer;
+    entity.SecondaryPointer = nullptr;
+
+    switch (other.getKind()) {
+    case LinkEntity::Kind::SILFunction:
+      entity.Data = LINKENTITY_SET_FIELD(
+          Kind, unsigned(LinkEntity::Kind::CoroFunctionPointer));
+      break;
+
+    case LinkEntity::Kind::DispatchThunk:
+      entity.Data = LINKENTITY_SET_FIELD(
+          Kind, unsigned(LinkEntity::Kind::DispatchThunkCoroFunctionPointer));
+      break;
+
+    case LinkEntity::Kind::DispatchThunkInitializer:
+      entity.Data = LINKENTITY_SET_FIELD(
+          Kind,
+          unsigned(
+              LinkEntity::Kind::DispatchThunkInitializerCoroFunctionPointer));
+      break;
+
+    case LinkEntity::Kind::DispatchThunkAllocator:
+      entity.Data = LINKENTITY_SET_FIELD(
+          Kind,
+          unsigned(
+              LinkEntity::Kind::DispatchThunkAllocatorCoroFunctionPointer));
+      break;
+    case LinkEntity::Kind::PartialApplyForwarder:
+      entity.Data = LINKENTITY_SET_FIELD(
+          Kind,
+          unsigned(LinkEntity::Kind::PartialApplyForwarderCoroFunctionPointer));
+      break;
+
+    case LinkEntity::Kind::DistributedAccessor: {
+      entity.Data = LINKENTITY_SET_FIELD(
+          Kind,
+          unsigned(LinkEntity::Kind::DistributedAccessorCoroFunctionPointer));
+      break;
+    }
+
+    default:
+      llvm_unreachable("Link entity kind cannot have an coro function pointer");
+    }
+
+    return entity;
+  }
+
+  LinkEntity getUnderlyingEntityForCoroFunctionPointer() const {
+    LinkEntity entity;
+    entity.Pointer = Pointer;
+    entity.SecondaryPointer = nullptr;
+
+    switch (getKind()) {
+    case LinkEntity::Kind::CoroFunctionPointer:
+      entity.Data =
+          LINKENTITY_SET_FIELD(Kind, unsigned(LinkEntity::Kind::SILFunction));
+      break;
+
+    case LinkEntity::Kind::DispatchThunkCoroFunctionPointer:
+      entity.Data =
+          LINKENTITY_SET_FIELD(Kind, unsigned(LinkEntity::Kind::DispatchThunk));
+      break;
+
+    case LinkEntity::Kind::DispatchThunkInitializerCoroFunctionPointer:
+      entity.Data = LINKENTITY_SET_FIELD(
+          Kind, unsigned(LinkEntity::Kind::DispatchThunkInitializer));
+      break;
+
+    case LinkEntity::Kind::DispatchThunkAllocatorCoroFunctionPointer:
+      entity.Data = LINKENTITY_SET_FIELD(
+          Kind, unsigned(LinkEntity::Kind::DispatchThunkAllocator));
+      break;
+
+    case LinkEntity::Kind::PartialApplyForwarderCoroFunctionPointer:
+      entity.Data = LINKENTITY_SET_FIELD(
+          Kind, unsigned(LinkEntity::Kind::PartialApplyForwarder));
+      break;
+
+    case LinkEntity::Kind::DistributedAccessorCoroFunctionPointer:
+      entity.Data = LINKENTITY_SET_FIELD(
+          Kind, unsigned(LinkEntity::Kind::DistributedAccessor));
+      break;
+
+    default:
+      llvm_unreachable("Link entity is not an coro function pointer");
+    }
+
     return entity;
   }
 

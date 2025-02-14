@@ -550,6 +550,28 @@ std::string LinkEntity::mangleAsString(ASTContext &Ctx) const {
     return mangler.mangleExtendedExistentialTypeShapeSymbol(
                      genSig, existentialType, isUnique);
   }
+  case Kind::CoroFunctionPointer:
+  case Kind::DispatchThunkCoroFunctionPointer:
+  case Kind::DispatchThunkInitializerCoroFunctionPointer:
+  case Kind::DispatchThunkAllocatorCoroFunctionPointer:
+  case Kind::PartialApplyForwarderCoroFunctionPointer:
+  case Kind::DistributedAccessorCoroFunctionPointer: {
+    std::string Result(
+        getUnderlyingEntityForCoroFunctionPointer().mangleAsString(Ctx));
+    Result.append("Tv");
+    return Result;
+  }
+  case Kind::DistributedThunkCoroFunctionPointer: {
+    std::string Result = getSILDeclRef().mangle();
+    Result.append("TE");
+    Result.append("Tv");
+    return Result;
+  }
+  case Kind::CoroFunctionPointerAST: {
+    std::string Result = getSILDeclRef().mangle();
+    Result.append("Tv");
+    return Result;
+  }
   }
   llvm_unreachable("bad entity kind!");
 }
@@ -907,6 +929,17 @@ SILLinkage LinkEntity::getLinkage(ForDefinition_t forDefinition) const {
   case Kind::ExtendedExistentialTypeShape:
     return (isExtendedExistentialTypeShapeShared()
               ? SILLinkage::Shared : SILLinkage::Private);
+  case Kind::CoroFunctionPointer:
+  case Kind::DispatchThunkCoroFunctionPointer:
+  case Kind::DispatchThunkInitializerCoroFunctionPointer:
+  case Kind::DispatchThunkAllocatorCoroFunctionPointer:
+  case Kind::PartialApplyForwarderCoroFunctionPointer:
+  case Kind::DistributedAccessorCoroFunctionPointer:
+    return getUnderlyingEntityForCoroFunctionPointer().getLinkage(
+        forDefinition);
+  case Kind::CoroFunctionPointerAST:
+  case Kind::DistributedThunkCoroFunctionPointer:
+    return getSILLinkage(getDeclLinkage(getDecl()), forDefinition);
   }
   llvm_unreachable("bad link entity kind");
 }
@@ -1001,6 +1034,14 @@ bool LinkEntity::isContextDescriptor() const {
   case Kind::DistributedAccessor:
   case Kind::AccessibleFunctionRecord:
   case Kind::ExtendedExistentialTypeShape:
+  case Kind::CoroFunctionPointer:
+  case Kind::DispatchThunkCoroFunctionPointer:
+  case Kind::DispatchThunkInitializerCoroFunctionPointer:
+  case Kind::DispatchThunkAllocatorCoroFunctionPointer:
+  case Kind::PartialApplyForwarderCoroFunctionPointer:
+  case Kind::DistributedAccessorCoroFunctionPointer:
+  case Kind::CoroFunctionPointerAST:
+  case Kind::DistributedThunkCoroFunctionPointer:
     return false;
   }
   llvm_unreachable("invalid descriptor");
@@ -1128,6 +1169,15 @@ llvm::Type *LinkEntity::getDefaultDeclarationType(IRGenModule &IGM) const {
     return IGM.AccessibleFunctionRecordTy;
   case Kind::ExtendedExistentialTypeShape:
     return IGM.RelativeAddressTy;
+  case Kind::CoroFunctionPointer:
+  case Kind::DispatchThunkCoroFunctionPointer:
+  case Kind::DispatchThunkInitializerCoroFunctionPointer:
+  case Kind::DispatchThunkAllocatorCoroFunctionPointer:
+  case Kind::PartialApplyForwarderCoroFunctionPointer:
+  case Kind::DistributedAccessorCoroFunctionPointer:
+  case Kind::CoroFunctionPointerAST:
+  case Kind::DistributedThunkCoroFunctionPointer:
+    return IGM.CoroFunctionPointerPtrTy;
   default:
     llvm_unreachable("declaration LLVM type not specified");
   }
@@ -1196,6 +1246,14 @@ Alignment LinkEntity::getAlignment(IRGenModule &IGM) const {
   case Kind::NoncanonicalSpecializedGenericTypeMetadata:
   case Kind::NoncanonicalSpecializedGenericTypeMetadataCacheVariable:
   case Kind::PartialApplyForwarder:
+  case Kind::CoroFunctionPointer:
+  case Kind::DispatchThunkCoroFunctionPointer:
+  case Kind::DispatchThunkInitializerCoroFunctionPointer:
+  case Kind::DispatchThunkAllocatorCoroFunctionPointer:
+  case Kind::PartialApplyForwarderCoroFunctionPointer:
+  case Kind::DistributedAccessorCoroFunctionPointer:
+  case Kind::CoroFunctionPointerAST:
+  case Kind::DistributedThunkCoroFunctionPointer:
     return IGM.getPointerAlignment();
   case Kind::CanonicalPrespecializedGenericTypeCachingOnceToken:
   case Kind::TypeMetadataDemanglingCacheVariable:
@@ -1244,6 +1302,9 @@ bool LinkEntity::isText() const {
   case Kind::AsyncFunctionPointerAST:
   case Kind::ProtocolWitnessTable:
   case Kind::TypeMetadata:
+  case Kind::DispatchThunkCoroFunctionPointer:
+  case Kind::DistributedThunkCoroFunctionPointer:
+  case Kind::CoroFunctionPointerAST:
     return false;
   // The following cases do not currently generate linkable symbols
   // through TBDGen. The full enumeration is captured to ensure
@@ -1303,6 +1364,11 @@ bool LinkEntity::isText() const {
   case Kind::CanonicalSpecializedGenericSwiftMetaclassStub:
   case Kind::NoncanonicalSpecializedGenericTypeMetadata:
   case Kind::AccessibleFunctionRecord:
+  case Kind::CoroFunctionPointer:
+  case Kind::DispatchThunkInitializerCoroFunctionPointer:
+  case Kind::DispatchThunkAllocatorCoroFunctionPointer:
+  case Kind::PartialApplyForwarderCoroFunctionPointer:
+  case Kind::DistributedAccessorCoroFunctionPointer:
     return false;
   }
 }
@@ -1358,6 +1424,8 @@ bool LinkEntity::isWeakImported(ModuleDecl *module) const {
 
   case Kind::AsyncFunctionPointerAST:
   case Kind::DistributedThunkAsyncFunctionPointer:
+  case Kind::CoroFunctionPointerAST:
+  case Kind::DistributedThunkCoroFunctionPointer:
   case Kind::DispatchThunk:
   case Kind::DispatchThunkDerivative:
   case Kind::DispatchThunkInitializer:
@@ -1450,12 +1518,20 @@ bool LinkEntity::isWeakImported(ModuleDecl *module) const {
   case Kind::DistributedAccessorAsyncPointer:
     return getUnderlyingEntityForAsyncFunctionPointer()
         .isWeakImported(module);
-  case Kind::KnownAsyncFunctionPointer:
+  case Kind::KnownAsyncFunctionPointer: {
     auto &context = module->getASTContext();
     auto deploymentAvailability =
         AvailabilityRange::forDeploymentTarget(context);
     return !deploymentAvailability.isContainedIn(
         context.getConcurrencyAvailability());
+  }
+  case Kind::CoroFunctionPointer:
+  case Kind::DispatchThunkCoroFunctionPointer:
+  case Kind::DispatchThunkInitializerCoroFunctionPointer:
+  case Kind::DispatchThunkAllocatorCoroFunctionPointer:
+  case Kind::PartialApplyForwarderCoroFunctionPointer:
+  case Kind::DistributedAccessorCoroFunctionPointer:
+    return getUnderlyingEntityForCoroFunctionPointer().isWeakImported(module);
   }
 
   llvm_unreachable("Bad link entity kind");
@@ -1465,6 +1541,8 @@ DeclContext *LinkEntity::getDeclContextForEmission() const {
   switch (getKind()) {
   case Kind::AsyncFunctionPointerAST:
   case Kind::DistributedThunkAsyncFunctionPointer:
+  case Kind::CoroFunctionPointerAST:
+  case Kind::DistributedThunkCoroFunctionPointer:
   case Kind::DispatchThunk:
   case Kind::DispatchThunkDerivative:
   case Kind::DispatchThunkInitializer:
@@ -1585,6 +1663,14 @@ DeclContext *LinkEntity::getDeclContextForEmission() const {
 
   case Kind::AccessibleFunctionRecord: {
     return getSILFunction()->getParentModule();
+  case Kind::CoroFunctionPointer:
+  case Kind::DispatchThunkCoroFunctionPointer:
+  case Kind::DispatchThunkInitializerCoroFunctionPointer:
+  case Kind::DispatchThunkAllocatorCoroFunctionPointer:
+  case Kind::PartialApplyForwarderCoroFunctionPointer:
+  case Kind::DistributedAccessorCoroFunctionPointer:
+    return getUnderlyingEntityForCoroFunctionPointer()
+        .getDeclContextForEmission();
   }
   }
   llvm_unreachable("invalid decl kind");
