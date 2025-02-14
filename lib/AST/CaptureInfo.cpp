@@ -54,6 +54,11 @@ CaptureInfo::CaptureInfoStorage::getGenericEnvironments() const {
   return llvm::ArrayRef(this->getTrailingObjects<GenericEnvironment *>(), NumGenericEnvironments);
 }
 
+ArrayRef<CapturedType>
+CaptureInfo::CaptureInfoStorage::getCapturedTypes() const {
+  return llvm::ArrayRef(this->getTrailingObjects<CapturedType>(), NumCapturedTypes);
+}
+
 //===----------------------------------------------------------------------===//
 //                             MARK: CaptureInfo
 //===----------------------------------------------------------------------===//
@@ -62,7 +67,8 @@ CaptureInfo::CaptureInfo(ASTContext &ctx, ArrayRef<CapturedValue> captures,
                          DynamicSelfType *dynamicSelf,
                          OpaqueValueExpr *opaqueValue,
                          bool genericParamCaptures,
-                         ArrayRef<GenericEnvironment *> genericEnv) {
+                         ArrayRef<GenericEnvironment *> genericEnv,
+                         ArrayRef<CapturedType> capturedTypes) {
   static_assert(IsTriviallyDestructible<CapturedValue>::value,
                 "Capture info is alloc'd on the ASTContext and not destroyed");
   static_assert(IsTriviallyDestructible<CaptureInfo::CaptureInfoStorage>::value,
@@ -79,7 +85,8 @@ CaptureInfo::CaptureInfo(ASTContext &ctx, ArrayRef<CapturedValue> captures,
   if (genericParamCaptures)
     flags |= Flags::HasGenericParamCaptures;
 
-  if (captures.empty() && genericEnv.empty() && !dynamicSelf && !opaqueValue) {
+  if (captures.empty() && genericEnv.empty() && !dynamicSelf && !opaqueValue &&
+      capturedTypes.empty()) {
     *this = CaptureInfo::empty();
     StorageAndFlags.setInt(flags);
     return;
@@ -87,27 +94,38 @@ CaptureInfo::CaptureInfo(ASTContext &ctx, ArrayRef<CapturedValue> captures,
 
   size_t storageToAlloc =
       CaptureInfoStorage::totalSizeToAlloc<CapturedValue,
-                                           GenericEnvironment *>(captures.size(),
-                                                                 genericEnv.size());
+                                           GenericEnvironment *,
+                                           CapturedType>(captures.size(),
+                                                         genericEnv.size(),
+                                                         capturedTypes.size());
   void *storageBuf = ctx.Allocate(storageToAlloc, alignof(CaptureInfoStorage));
   auto *storage = new (storageBuf) CaptureInfoStorage(dynamicSelf,
                                                       opaqueValue,
                                                       captures.size(),
-                                                      genericEnv.size());
+                                                      genericEnv.size(),
+                                                      capturedTypes.size());
   StorageAndFlags.setPointerAndInt(storage, flags);
   std::uninitialized_copy(captures.begin(), captures.end(),
                           storage->getTrailingObjects<CapturedValue>());
   std::uninitialized_copy(genericEnv.begin(), genericEnv.end(),
                           storage->getTrailingObjects<GenericEnvironment *>());
+  std::uninitialized_copy(capturedTypes.begin(), capturedTypes.end(),
+                          storage->getTrailingObjects<CapturedType>());
 }
 
 CaptureInfo CaptureInfo::empty() {
   static const CaptureInfoStorage empty{/*dynamicSelf*/nullptr,
                                         /*opaqueValue*/nullptr,
-                                        0, 0};
+                                        0, 0, 0};
   CaptureInfo result;
   result.StorageAndFlags.setPointer(&empty);
   return result;
+}
+
+bool CaptureInfo::isTrivial() const {
+  assert(hasBeenComputed());
+  return getCaptures().empty() && !hasGenericParamCaptures() &&
+         !hasDynamicSelfCapture() && !hasOpaqueValueCapture();
 }
 
 VarDecl *CaptureInfo::getIsolatedParamCapture() const {
@@ -176,6 +194,12 @@ void CaptureInfo::print(raw_ostream &OS) const {
              [&](GenericEnvironment *genericEnv) {
                OS << " shape_class=";
                OS << genericEnv->getOpenedElementShapeClass();
+             },
+             [&] { OS << ","; });
+
+  interleave(getCapturedTypes(),
+             [&](CapturedType type) {
+               OS << " type=" << type.getType().getString();
              },
              [&] { OS << ","; });
   OS << ')';

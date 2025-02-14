@@ -2777,6 +2777,17 @@ namespace {
 
     /// Check closure captures for Sendable violations.
     void checkLocalCaptures(AnyFunctionRef localFunc) {
+      auto *dc = getDeclContext();
+      ASTContext &ctx = dc->getASTContext();
+
+      auto *closure = localFunc.getAbstractClosureExpr();
+      auto *explicitClosure = dyn_cast_or_null<ClosureExpr>(closure);
+
+      bool preconcurrency = false;
+      if (explicitClosure) {
+        preconcurrency = explicitClosure->isIsolatedByPreconcurrency();
+      }
+
       for (const auto &capture : localFunc.getCaptureInfo().getCaptures()) {
         if (!capture.isLocalCapture())
           continue;
@@ -2785,18 +2796,9 @@ namespace {
         if (capture.isOpaqueValue())
           continue;
 
-        auto *closure = localFunc.getAbstractClosureExpr();
-        auto *explicitClosure = dyn_cast_or_null<ClosureExpr>(closure);
-
-        bool preconcurrency = false;
-        if (explicitClosure) {
-          preconcurrency = explicitClosure->isIsolatedByPreconcurrency();
-        }
-
         // Diagnose a `self` capture inside an escaping `sending`
         // `@Sendable` closure in a deinit, which almost certainly
         // means `self` would escape deinit at runtime.
-        auto *dc = getDeclContext();
         if (explicitClosure && isa<DestructorDecl>(dc) &&
             !explicitClosure->getType()->isNoEscape() &&
             (explicitClosure->isPassedToSendingParameter() ||
@@ -2865,6 +2867,49 @@ namespace {
                                    capture.getLoc(),
                                    diag::non_sendable_isolated_capture,
                                    decl->getName(),
+                                   /*closure=*/closure != nullptr);
+        }
+      }
+
+      // FIXME: When passing to a sending parameter, should this be handled
+      // by region isolation? Or should it always be handled by region
+      // isolation?
+      if (ctx.LangOpts.hasFeature(Feature::StrictSendableMetatypes) &&
+          (mayExecuteConcurrentlyWith(
+              localFunc.getAsDeclContext(), getDeclContext()) ||
+           (explicitClosure && explicitClosure->isPassedToSendingParameter()))) {
+        GenericSignature genericSig;
+        if (auto afd = localFunc.getAbstractFunctionDecl())
+          genericSig = afd->getGenericSignature();
+
+        for (const auto &capturedType :
+                 localFunc.getCaptureInfo().getCapturedTypes()) {
+          unsigned genericDepth;
+          Type type = capturedType.getType();
+          if (auto archetype = type->getAs<ArchetypeType>()) {
+            genericDepth = archetype->getInterfaceType()->getRootGenericParam()
+                ->getDepth();
+          } else if (type->isTypeParameter()) {
+            genericDepth = type->getRootGenericParam()->getDepth();
+
+            type = localFunc.getAsDeclContext()->mapTypeIntoContext(type);
+          } else {
+            continue;
+          }
+
+          // If the local function is generic and this is one of its generic
+          // parameters, ignore it.
+          if (genericSig.getNextDepth() > 0 &&
+              genericDepth < genericSig.getNextDepth() - 1)
+            continue;
+
+          // Check that the metatype is sendable.
+          SendableCheckContext sendableContext(getDeclContext(), preconcurrency);
+          diagnoseNonSendableTypes(MetatypeType::get(type),
+                                   sendableContext,
+                                   /*inDerivedConformance*/Type(),
+                                   capturedType.getLoc(),
+                                   diag::non_sendable_metatype_capture,
                                    /*closure=*/closure != nullptr);
         }
       }

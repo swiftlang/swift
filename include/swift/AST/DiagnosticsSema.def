@@ -5607,6 +5607,10 @@ ERROR(non_sendable_isolated_capture,none,
       "capture of %1 with non-sendable type %0 in an isolated "
       "%select{local function|closure}2",
       (Type, DeclName, bool))
+ERROR(non_sendable_metatype_capture,none,
+      "capture of non-sendable type %0 in an isolated "
+      "%select{local function|closure}1",
+      (Type, bool))
 ERROR(self_capture_deinit_task,none,
       "capture of 'self' in a closure that outlives deinit",
       ())
