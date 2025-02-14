@@ -1,5 +1,5 @@
-#ifndef NON_PUBLIC_INHERTIANCE_H
-#define NON_PUBLIC_INHERTIANCE_H
+#ifndef NON_PUBLIC_INHERITANCE_H
+#define NON_PUBLIC_INHERITANCE_H
 
 // TODO: dependent on private_fileid feature
 // #define BLESS __attribute__((__swift_attr__("private_fileid:main/blessed.swift")))
@@ -36,4 +36,4 @@ class BLESS PublPrivBase : public PrivBase {};
 class BLESS ProtPrivBase : protected PrivBase {};
 class BLESS PrivPrivBase : private PrivBase {};
 
-#endif /* NON_PUBLIC_INHERTIANCE_H */
+#endif /* NON_PUBLIC_INHERITANCE_H */
