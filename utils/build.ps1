@@ -927,7 +927,7 @@ function Fetch-Dependencies {
   }
 }
 
-function Get-PinnedToolchainTool() {
+function Get-PinnedToolchainToolsDir() {
   $ToolchainsRoot = [IO.Path]::Combine("$BinaryCache\toolchains", "$PinnedToolchain", "LocalApp", "Programs", "Swift", "Toolchains")
   $VariantToolchainPath = [IO.Path]::Combine($ToolchainsRoot, "$(Get-PinnedToolchainVersion)+$PinnedToolchainVariant", "usr", "bin")
 
