@@ -1,4 +1,5 @@
 // RUN: %target-build-swift-dylib(%t/%target-library-name(TypedThrowsABI)) -enable-library-evolution %S/Inputs/typed_throws_abi_impl.swift -emit-module -emit-module-path %t/TypedThrowsABI.swiftmodule -module-name TypedThrowsABI
+// RUN: %target-codesign %t/%target-library-name(TypedThrowsABI)
 
 // RUN: %target-build-swift -parse-as-library -Xfrontend -disable-availability-checking %s -lTypedThrowsABI -I %t -L %t -o %t/main %target-rpath(%t)
 // RUN: %target-codesign %t/main
@@ -284,10 +285,35 @@ func checkAsync() async {
     await invoke { try await impl.nonMatching_f1(false) }
 }
 
+enum MyError: Error {
+    case x
+    case y
+}
+
+protocol AsyncGenProto<A> {
+  associatedtype A
+  func fn(arg: Int) async throws(MyError) -> A
+}
+
+@inline(never)
+func callAsyncIndirectResult<A>(p: any AsyncGenProto<A>, x: Int) async throws(MyError) -> A {
+  return try await p.fn(arg: x)
+}
+
+
+struct AsyncGenProtoImpl: AsyncGenProto {
+    func fn(arg: Int) async throws(MyError) -> Int {
+        print("Arg is \(arg)")
+        return arg
+    }
+}
+
 @main
 public struct Main {
     public static func main() async {
         await checkSync()
         await checkAsync()
+        // CHECK: Arg is 10
+        print(try! await callAsyncIndirectResult(p: AsyncGenProtoImpl(), x: 10))
     }
 }

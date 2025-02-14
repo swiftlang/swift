@@ -13,7 +13,7 @@
 enum XcodeGenError: Error, CustomStringConvertible {
   case pathNotFound(AbsolutePath)
   case noSwiftBuildDir(AbsolutePath, couldBeParent: Bool)
-  case expectedParent(AbsolutePath)
+  case couldNotInferProjectRoot(reason: String)
 
   var description: String {
     switch self {
@@ -23,8 +23,11 @@ enum XcodeGenError: Error, CustomStringConvertible {
       let base = "no swift build directory found in '\(basePath)'"
       let note = "; did you mean to pass the path of the parent?"
       return couldBeParent ? "\(base)\(note)" : base
-    case .expectedParent(let basePath):
-      return "expected '\(basePath)' to have parent directory"
+    case .couldNotInferProjectRoot(let reason):
+      return """
+        could not infer project root path; \(reason); please manually specify \
+        using '--project-root-dir' instead
+        """
     }
   }
 }

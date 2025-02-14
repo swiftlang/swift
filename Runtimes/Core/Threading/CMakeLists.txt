@@ -8,3 +8,8 @@ add_library(swiftThreading OBJECT
   "${SwiftCore_SWIFTC_SOURCE_DIR}/lib/Threading/Pthreads.cpp"
   "${SwiftCore_SWIFTC_SOURCE_DIR}/lib/Threading/Win32.cpp")
 target_link_libraries(swiftThreading PRIVATE swiftShims)
+
+# FIXME: We should split out the parts that are needed by the runtime
+#        to avoid pulling in headers from the compiler.
+target_include_directories(swiftThreading PRIVATE
+  "${SwiftCore_SWIFTC_SOURCE_DIR}/include")

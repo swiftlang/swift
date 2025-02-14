@@ -408,6 +408,8 @@ ERROR(embedded_swift_allocating,none,
       "cannot use allocating operation in -no-allocations mode", ())
 ERROR(embedded_capture_of_generic_value_with_deinit,none,
       "capturing generic non-copyable type with deinit in escaping closure not supported in embedded Swift", ())
+ERROR(wrong_linkage_for_serialized_function,none,
+      "function has wrong linkage to be called from %0", (StringRef))
 NOTE(performance_called_from,none,
       "called from here", ())
 
@@ -790,6 +792,11 @@ NOTE(box_to_stack_cannot_promote_box_to_stack_due_to_escape_location, none,
 
 WARNING(semantic_function_improper_nesting, none, "'@_semantics' function calls non-'@_semantics' function with nested '@_semantics' calls", ())
 
+// SDK mismatch diagnostics
+ERROR(missing_deinit_on_executor_function, none,
+      "Missing 'swift_task_deinitOnExecutor' function! "
+      "This is likely due to an outdated/incompatible SDK.", ())
+
 // Capture promotion diagnostics
 WARNING(capturepromotion_concurrentcapture_mutation, none,
         "'%0' mutated after capture by sendable closure", (StringRef))
@@ -1049,6 +1056,12 @@ NOTE(regionbasedisolation_typed_tns_passed_to_sending_closure_helper_have_value_
 NOTE(regionbasedisolation_typed_tns_passed_to_sending_closure_helper_multiple_value, none,
      "closure captures non-Sendable %0",
      (DeclName))
+NOTE(regionbasedisolation_closure_captures, none,
+     "closure captures %0",
+     (DeclName))
+NOTE(regionbasedisolation_closure_captures_actor, none,
+     "closure captures %0 allowing access to %1 state within the closure",
+     (DeclName, StringRef))
 
 NOTE(regionbasedisolation_typed_tns_passed_to_sending_callee, none,
      "Passing %0 value of non-Sendable type %1 as a 'sending' parameter to %2 %3 risks causing races inbetween %0 uses and uses reachable from %3",
@@ -1098,6 +1111,28 @@ NOTE(regionbasedisolation_out_sending_cannot_be_actor_isolated_note_named, none,
       "returning %1 %0 risks causing data races since the caller assumes that %0 can be safely sent to other isolation domains",
       (Identifier, StringRef))
 
+//===
+// non-Sendable Results
+
+// Example: returning main-actor isolated result to a custom-actor isolated context risks causing data races
+ERROR(rbi_isolation_crossing_result, none,
+      "non-Sendable %0-typed result can not be returned from %1 %kind2 to %3 context",
+      (Type, ActorIsolation, const ValueDecl *, ActorIsolation))
+ERROR(rbi_isolation_crossing_result_no_decl, none,
+      "non-Sendable %0-typed result can not be returned from %1 function to %2 context",
+      (Type, ActorIsolation, ActorIsolation))
+NOTE(rbi_non_sendable_nominal,none,
+     "%kind0 does not conform to the 'Sendable' protocol",
+      (const ValueDecl *))
+NOTE(rbi_nonsendable_function_type,none,
+     "a function type must be marked '@Sendable' to conform to 'Sendable'", ())
+NOTE(rbi_add_nominal_sendable_conformance,none,
+     "consider making %kind0 conform to the 'Sendable' protocol",
+     (const ValueDecl *))
+NOTE(rbi_add_generic_parameter_sendable_conformance,none,
+     "consider making generic parameter %0 conform to the 'Sendable' protocol",
+     (Type))
+
 //===----------------------------------------------------------------------===//
 //                           MARK: Misc Diagnostics
 //===----------------------------------------------------------------------===//
@@ -1105,12 +1140,6 @@ NOTE(regionbasedisolation_out_sending_cannot_be_actor_isolated_note_named, none,
 // TODO: print the name of the nominal type
 ERROR(deinit_not_visible, none,
       "deinit of non-copyable type not visible in the current module", ())
-
-ERROR(vector_capacity_not_constant, none,
-      "vector capacity needs to be constant", ())
-
-ERROR(fixed_arrays_not_available, none,
-      "fixed arrays are only available with -enable-experimental-feature FixedArrays", ())
 
 ERROR(lifetime_variable_outside_scope, none,
       "lifetime-dependent variable '%0' escapes its scope", (Identifier))

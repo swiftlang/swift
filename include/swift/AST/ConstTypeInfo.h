@@ -14,6 +14,7 @@
 #define SWIFT_AST_CONST_TYPE_INFO_H
 
 #include "swift/AST/Attr.h"
+#include "swift/AST/AvailabilitySpec.h"
 #include "swift/AST/Type.h"
 #include "swift/AST/TypeCheckRequests.h"
 #include <memory>
@@ -43,6 +44,7 @@ public:
     StaticFunctionCall,
     MemberReference,
     InterpolatedString,
+    NilLiteral,
     Runtime
   };
 
@@ -70,6 +72,22 @@ public:
 
 private:
   std::string Value;
+};
+
+/// A representation of an Optional<Wrapped> value declared as nil
+/// or left undeclared.
+///
+/// Nil values were previously represented as RawLiteralValue with
+/// value "nil". This caused ambiguous values when extracting values,
+/// such as an Optional<String> of value "nil".
+
+class NilLiteralValue : public CompileTimeValue {
+public:
+  NilLiteralValue() : CompileTimeValue(ValueKind::NilLiteral) {}
+
+  static bool classof(const CompileTimeValue *T) {
+    return T->getKind() == ValueKind::NilLiteral;
+  }
 };
 
 struct FunctionParameter {
@@ -200,8 +218,7 @@ public:
   class ConditionalMember : public BuilderMember {
   public:
     ConditionalMember(MemberKind MemberKind,
-                      std::vector<PlatformVersionConstraintAvailabilitySpec>
-                          AvailabilityAttributes,
+                      std::vector<AvailabilitySpec> AvailabilityAttributes,
                       std::vector<std::shared_ptr<BuilderMember>> IfElements,
                       std::vector<std::shared_ptr<BuilderMember>> ElseElements)
         : BuilderMember(MemberKind),
@@ -221,7 +238,7 @@ public:
              (Kind == MemberKind::Optional);
     }
 
-    std::optional<std::vector<PlatformVersionConstraintAvailabilitySpec>>
+    std::optional<std::vector<AvailabilitySpec>>
     getAvailabilityAttributes() const {
       return AvailabilityAttributes;
     }
@@ -233,8 +250,7 @@ public:
     }
 
   private:
-    std::optional<std::vector<PlatformVersionConstraintAvailabilitySpec>>
-        AvailabilityAttributes;
+    std::optional<std::vector<AvailabilitySpec>> AvailabilityAttributes;
     std::vector<std::shared_ptr<BuilderMember>> IfElements;
     std::vector<std::shared_ptr<BuilderMember>> ElseElements;
   };

@@ -1,0 +1,397 @@
+// RUN: %target-sil-opt -destroy-hoisting %s | %FileCheck %s
+
+sil_stage canonical
+
+import Builtin
+import Swift
+
+class Klass {
+}
+
+class C {
+  @_hasStorage var k: Klass
+}
+
+struct S {
+  var k: Klass
+  var i: Int
+}
+
+
+sil [ossa] @deinit_barrier : $@convention(thin) () -> ()
+sil [ossa] @createKlass : $@convention(thin) () -> @owned Klass
+sil [ossa] @createC : $@convention(thin) () -> @owned C
+sil [ossa] @useKlass : $@convention(thin) (@guaranteed Klass) -> ()
+
+// CHECK-LABEL: sil [ossa] @extend_forwarded_lifetime :
+// CHECK:         %2 = copy_value %0
+// CHECK-NEXT:    destroy_value %0
+// CHECK:       } // end sil function 'extend_forwarded_lifetime'
+sil [ossa] @extend_forwarded_lifetime : $@convention(thin) (@owned Klass, Int) -> @owned S {
+bb0(%0 : @owned $Klass, %1 : $Int):
+  %2 = copy_value %0
+  %3 = move_value [lexical] %2
+  %4 = function_ref @deinit_barrier : $@convention(thin) () -> ()
+  %5 = apply %4() : $@convention(thin) () -> ()
+  destroy_value %0
+  %7 = struct $S (%3, %1)
+  return %7
+}
+
+// CHECK-LABEL: sil [ossa] @extend_forwarded_lifetime2 :
+// CHECK:         %4 = copy_value %3
+// CHECK-NEXT:    destroy_value %3
+// CHECK:       } // end sil function 'extend_forwarded_lifetime2'
+sil [ossa] @extend_forwarded_lifetime2 : $@convention(thin) (Int) -> @owned S {
+bb0(%0 : $Int):
+  %1 = function_ref @createKlass : $@convention(thin) () -> @owned Klass
+  %2 = apply %1() : $@convention(thin) () -> @owned Klass
+  %3 = move_value [lexical] [var_decl] %2
+  %4 = copy_value %3
+  %5 = move_value [lexical] %4
+  %6 = struct $S (%5, %0)
+  %7 = move_value [lexical] [var_decl] %6
+  %8 = function_ref @deinit_barrier : $@convention(thin) () -> ()
+  %9 = apply %8() : $@convention(thin) () -> ()
+  destroy_value %3
+  return %7
+} // end sil function '$s3nix6testitAA1SVyF'
+
+// CHECK-LABEL: sil [ossa] @no_hoisting_into_non_lexical_lifetime :
+// CHECK:         apply
+// CHECK-NEXT:    destroy_value %0
+// CHECK:       } // end sil function 'no_hoisting_into_non_lexical_lifetime'
+sil [ossa] @no_hoisting_into_non_lexical_lifetime : $@convention(thin) (@owned Klass, Int) -> @owned S {
+bb0(%0 : @owned  $Klass, %1 : $Int):
+  %3 = copy_value %0
+  %4 = struct $S (%3, %1)
+  %5 = function_ref @deinit_barrier : $@convention(thin) () -> ()
+  apply %5() : $@convention(thin) () -> () 
+  destroy_value %0
+  return %4
+}
+
+// CHECK-LABEL: sil [ossa] @degenerated_liferange :
+// CHECK:       bb0(%0 : @owned  $Klass):
+// CHECK-NEXT:    destroy_value %0
+// CHECK:       } // end sil function 'degenerated_liferange'
+sil [ossa] @degenerated_liferange : $@convention(method) (@owned Klass) -> () {
+bb0(%0 : @owned  $Klass):
+  destroy_value %0
+  %2 = tuple ()
+  return %2
+}
+
+// CHECK-LABEL: sil [ossa] @hoist_multi_block :
+// CHECK:         %4 = copy_value %0
+// CHECK-NEXT:    destroy_value %0
+// CHECK-NEXT:    destroy_value %4
+// CHECK:       bb2:
+// CHECK-NEXT:    destroy_value %0
+// CHECK:       } // end sil function 'hoist_multi_block'
+sil [ossa] @hoist_multi_block : $@convention(thin) (@owned Klass, Int) -> @owned S {
+bb0(%0 : @owned $Klass, %1 : $Int):
+  %2 = copy_value %0
+  cond_br undef, bb1, bb2
+bb1:
+  %4 = copy_value %0
+  destroy_value %4
+  destroy_value %0
+  br bb3
+bb2:
+  %8 = function_ref @deinit_barrier : $@convention(thin) () -> ()
+  apply %8() : $@convention(thin) () -> () 
+  destroy_value %0
+  br bb3
+bb3:
+  %12 = move_value [lexical] %2
+  %13 = struct $S (%12, %1)
+  return %13
+}
+
+// CHECK-LABEL: sil [ossa] @partial_hoist_multi_block :
+// CHECK:         %6 = copy_value %0
+// CHECK-NEXT:    destroy_value %6
+// CHECK-NEXT:    destroy_value %0
+// CHECK:       bb2:
+// CHECK-NEXT:    destroy_value %0
+// CHECK:       } // end sil function 'partial_hoist_multi_block'
+sil [ossa] @partial_hoist_multi_block : $@convention(thin) (@owned Klass, Int) -> () {
+bb0(%0 : @owned $Klass, %1 : $Int):
+  %2 = copy_value %0
+  %3 = move_value [lexical] %2
+  cond_br undef, bb1, bb2
+bb1:
+  destroy_value %3
+  %6 = copy_value %0
+  destroy_value %6
+  destroy_value %0
+  br bb3
+bb2:
+  %9 = function_ref @deinit_barrier : $@convention(thin) () -> ()
+  apply %9() : $@convention(thin) () -> () 
+  destroy_value %0
+  destroy_value %3
+  br bb3
+bb3:
+  %14 = tuple ()
+  return %14
+}
+
+// CHECK-LABEL: sil [ossa] @already_at_lifetime_end :
+// CHECK:         %4 = copy_value %0
+// CHECK-NEXT:    destroy_value %0
+// CHECK-NEXT:    destroy_value %4
+// CHECK:       bb2:
+// CHECK-NEXT:    destroy_value %0
+// CHECK:       } // end sil function 'already_at_lifetime_end'
+sil [ossa] @already_at_lifetime_end : $@convention(thin) (@owned Klass, Int) -> @owned S {
+bb0(%0 : @owned $Klass, %1 : $Int):
+  %2 = copy_value %0
+  cond_br undef, bb1, bb2
+bb1:
+  %4 = copy_value %0
+  destroy_value %0
+  destroy_value %4
+  br bb3
+bb2:
+  destroy_value %0
+  br bb3
+bb3:
+  %10 = move_value [lexical] %2
+  %11 = struct $S (%10, %1)
+  return %11
+}
+
+// CHECK-LABEL: sil [ossa] @reborrow_phi :
+// CHECK:         end_borrow
+// CHECK-NEXT:    destroy_value %0
+// CHECK:       } // end sil function 'reborrow_phi'
+sil [ossa] @reborrow_phi : $@convention(thin) (@owned Klass, Int) -> @owned S {
+bb0(%0 : @owned $Klass, %1 : $Int):
+  %2 = copy_value %0
+  cond_br undef, bb1, bb2
+bb1:
+  %4 = begin_borrow %0
+  br bb3(%4)
+bb2:
+  %6 = begin_borrow %0
+  br bb3(%6)
+bb3(%8 : @reborrow $Klass):
+  %9 = borrowed %8 from (%0)
+  end_borrow %9
+  %11 = function_ref @deinit_barrier : $@convention(thin) () -> ()
+  apply %11() : $@convention(thin) () -> () 
+  destroy_value %0
+  %14 = move_value [lexical] %2
+  %15 = struct $S (%14, %1)
+  return %15
+}
+
+// CHECK-LABEL: sil [ossa] @store :
+// CHECK:         %2 = copy_value %0
+// CHECK-NEXT:    destroy_value %0
+// CHECK:       } // end sil function 'store'
+sil [ossa] @store : $@convention(method) (@owned Klass, @guaranteed C) -> () {
+bb0(%0 : @owned  $Klass, %1 : @guaranteed  $C):
+  %2 = copy_value %0
+  %3 = ref_element_addr %1, #C.k
+  %4 = begin_access [modify] [dynamic] %3
+  store %2 to [assign] %4
+  end_access %4
+  destroy_value %0
+  %8 = tuple ()
+  return %8
+}
+
+// CHECK-LABEL: sil [ossa] @dominating_store :
+// CHECK:         %2 = copy_value %0
+// CHECK-NEXT:    destroy_value %0
+// CHECK:       } // end sil function 'dominating_store'
+sil [ossa] @dominating_store : $@convention(method) (@owned Klass, @guaranteed C) -> () {
+bb0(%0 : @owned  $Klass, %1 : @guaranteed  $C):
+  %2 = copy_value %0
+  %3 = ref_element_addr %1, #C.k
+  %4 = begin_access [modify] [dynamic] %3
+  store %2 to [assign] %4
+  end_access %4
+  cond_br undef, bb1, bb2
+bb1:
+  destroy_value %0
+  br bb3
+bb2:
+  destroy_value %0
+  br bb3
+bb3:
+  %8 = tuple ()
+  return %8
+}
+
+// CHECK-LABEL: sil [ossa] @not_dominating_store :
+// CHECK:       bb3:
+// CHECK-NEXT:    destroy_value %0
+// CHECK:       } // end sil function 'not_dominating_store'
+sil [ossa] @not_dominating_store : $@convention(method) (@owned Klass, @guaranteed C) -> () {
+bb0(%0 : @owned  $Klass, %1 : @guaranteed  $C):
+  cond_br undef, bb1, bb2
+bb1:
+  %2 = copy_value %0
+  %3 = ref_element_addr %1, #C.k
+  %4 = begin_access [modify] [dynamic] %3
+  store %2 to [assign] %4
+  end_access %4
+  br bb3
+bb2:
+  br bb3
+bb3:
+  destroy_value %0
+  %8 = tuple ()
+  return %8
+}
+
+// CHECK-LABEL: sil [ossa] @write_to_memory :
+// CHECK:       bb3:
+// CHECK-NEXT:    destroy_value %0
+// CHECK:       } // end sil function 'write_to_memory'
+sil [ossa] @write_to_memory : $@convention(method) (@owned Klass, @guaranteed C) -> () {
+bb0(%0 : @owned  $Klass, %1 : @guaranteed  $C):
+  %2 = copy_value %0
+  %3 = ref_element_addr %1, #C.k
+  %4 = begin_access [modify] [dynamic] %3
+  store %2 to [assign] %4
+  end_access %4
+  cond_br undef, bb1, bb2
+bb1:
+  destroy_addr %4
+  br bb3
+bb2:
+  br bb3
+bb3:
+  destroy_value %0
+  %8 = tuple ()
+  return %8
+}
+
+// CHECK-LABEL: sil [ossa] @not_lexical_access_base :
+// CHECK:         end_borrow
+// CHECK-NEXT:    destroy_value %0
+// CHECK:       } // end sil function 'not_lexical_access_base'
+sil [ossa] @not_lexical_access_base : $@convention(method) (@owned Klass) -> () {
+bb0(%0 : @owned  $Klass):
+  %1 = copy_value %0
+  %2 = function_ref @createC : $@convention(thin) () -> @owned C
+  %3 = apply %2() : $@convention(thin) () -> @owned C
+  %4 = begin_borrow %3
+  %5 = ref_element_addr %4, #C.k
+  store %1 to [assign] %5
+  end_borrow %4
+  destroy_value %0
+  destroy_value %3
+  %11 = tuple ()
+  return %11
+}
+
+// CHECK-LABEL: sil [ossa] @lexical_access_base :
+// CHECK:         %1 = copy_value %0
+// CHECK-NEXT:    destroy_value %0
+// CHECK:       } // end sil function 'lexical_access_base'
+sil [ossa] @lexical_access_base : $@convention(method) (@owned Klass) -> () {
+bb0(%0 : @owned  $Klass):
+  %1 = copy_value %0
+  %2 = function_ref @createC : $@convention(thin) () -> @owned C
+  %3 = apply %2() : $@convention(thin) () -> @owned C
+  %4 = move_value [lexical] %3
+  %5 = begin_borrow %4
+  %6 = ref_element_addr %5, #C.k
+  store %1 to [assign] %6
+  end_borrow %5
+  destroy_value %0
+  destroy_value %4
+  %11 = tuple ()
+  return %11
+}
+
+// CHECK-LABEL: sil [ossa] @destroy_of_access_base :
+// CHECK:         end_borrow
+// CHECK-NEXT:    destroy_value
+// CHECK-NEXT:    destroy_value %0
+// CHECK:       } // end sil function 'destroy_of_access_base'
+sil [ossa] @destroy_of_access_base : $@convention(method) (@owned Klass) -> () {
+bb0(%0 : @owned  $Klass):
+  %1 = copy_value %0
+  %2 = function_ref @createC : $@convention(thin) () -> @owned C
+  %3 = apply %2() : $@convention(thin) () -> @owned C
+  %4 = move_value [lexical] %3
+  %5 = begin_borrow %4
+  %6 = ref_element_addr %5, #C.k
+  store %1 to [assign] %6
+  end_borrow %5
+  destroy_value %4
+  destroy_value %0
+  %11 = tuple ()
+  return %11
+}
+
+// CHECK-LABEL: sil [ossa] @incomplete_liferange_at_unreachable :
+// CHECK:       bb2:
+// CHECK-NOT:     destroy_value %0
+// CHECK:       } // end sil function 'incomplete_liferange_at_unreachable'
+sil [ossa] @incomplete_liferange_at_unreachable : $@convention(thin) (@owned Klass, Int) -> @owned S {
+bb0(%0 : @owned $Klass, %1 : $Int):
+  %2 = copy_value %0
+  %3 = alloc_stack $Klass
+  %4 = store_borrow %0 to %3
+  cond_br undef, bb1, bb2
+bb1:
+  end_borrow %4
+  dealloc_stack %3
+  destroy_value %0
+  %14 = move_value %2
+  %15 = struct $S (%14, %1)
+  return %15
+bb2:
+  end_borrow %4
+  dealloc_stack %3
+  unreachable
+}
+
+// CHECK-LABEL: sil [ossa] @partial_apply_liferange :
+// CHECK:         %3 = convert_function %2
+// CHECK-NEXT:    destroy_value %3
+// CHECK-NEXT:    destroy_value %0
+// CHECK:       } // end sil function 'partial_apply_liferange'
+sil [ossa] @partial_apply_liferange : $@convention(thin) (@owned Klass) -> () {
+bb0(%0 : @owned $Klass):
+  %1 = function_ref @useKlass : $@convention(thin) (@guaranteed Klass) -> ()
+  %2 = partial_apply [callee_guaranteed] [on_stack] %1(%0) : $@convention(thin) (@guaranteed Klass) -> ()
+  %3 = convert_function %2 to $@noescape @callee_guaranteed () -> ()
+  destroy_value %3
+  destroy_value %0
+  %r = tuple ()
+  return %r
+}
+
+// CHECK-LABEL: sil [ossa] @borrow_in_deadend_block :
+// CHECK:       bb1:
+// CHECK-NEXT:    destroy_value %1
+// CHECK-NEXT:    destroy_value %2
+// CHECK:       } // end sil function 'borrow_in_deadend_block'
+sil [ossa] @borrow_in_deadend_block : $@convention(thin) (@in Klass) -> () {
+bb0(%0 : $*Klass):
+  %1 = load [take] %0
+  %2 = copy_value %1
+  %3 = begin_borrow %1
+  end_borrow %3
+  cond_br undef, bb1, bb2
+
+bb1:
+  destroy_value %1
+  destroy_value %2
+  %8 = tuple ()
+  return %8
+
+bb2:
+  %10 = begin_borrow %1
+  unreachable
+}
+

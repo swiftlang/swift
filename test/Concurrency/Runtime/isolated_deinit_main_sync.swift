@@ -1,9 +1,9 @@
-// RUN: %target-run-simple-swift(-enable-experimental-feature IsolatedDeinit -target %target-swift-5.1-abi-triple) | %FileCheck %s
+// RUN: %target-run-simple-swift(-target %target-future-triple) | %FileCheck %s
 
 // REQUIRES: executable_test
 // REQUIRES: concurrency
 // REQUIRES: concurrency_runtime
-// REQUIRES: swift_feature_IsolatedDeinit
+// UNSUPPORTED: back_deployment_runtime
 
 var isDead: Bool = false
 

@@ -1,6 +1,5 @@
-// RUN: %target-swift-frontend -typecheck -verify %s  -disable-availability-checking -package-name myPkg -enable-experimental-feature IsolatedDeinit
+// RUN: %target-swift-frontend -typecheck -verify %s  -disable-availability-checking -package-name myPkg
 // REQUIRES: concurrency
-// REQUIRES: swift_feature_IsolatedDeinit
 
 actor SomeActor { }
 
@@ -99,7 +98,7 @@ struct Container {
 // Redundant attributes
 // -----------------------------------------------------------------------
 extension SomeActor {
-  @GA1 nonisolated func conflict1() { } // expected-error 3{{instance method 'conflict1()' has multiple actor-isolation attributes ('nonisolated' and 'GA1')}}
+  @GA1 nonisolated func conflict1() { } // expected-warning {{instance method 'conflict1()' has multiple actor-isolation attributes ('GA1' and 'nonisolated')}}
 }
 
 

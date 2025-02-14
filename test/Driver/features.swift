@@ -11,7 +11,7 @@
 // REQUIRES: swift_feature_ParserValidation
 // REQUIRES: swift_feature_MemberImportVisibility
 
-// CHECK: {{.*}}swift{{c|-frontend}}{{(.exe)?"?}} -frontend
+// CHECK: {{.*}}swift{{c|c-legacy-driver|-frontend}}{{(.exe)?"?}} -frontend
 // CHECK-SAME: -enable-upcoming-feature MemberImportVisibility
 // CHECK-SAME: -enable-experimental-feature ParserValidation
 // CHECK-SAME: -disable-upcoming-feature MemberImportVisibility

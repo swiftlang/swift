@@ -83,6 +83,7 @@ public:
     Ctx = std::make_shared<SourceKit::Context>(
         getSwiftExecutablePath(), getRuntimeLibPath(),
         /*diagnosticDocumentationPath*/ "", SourceKit::createSwiftLangSupport,
+        [](SourceKit::Context &Ctx){ return nullptr; },
         /*dispatchOnMain=*/false);
   }
 

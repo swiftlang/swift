@@ -59,4 +59,8 @@ PARTITION_OP_ERROR(InOutSendingNotDisconnectedAtExit)
 /// to our user so that we can emit that error as we process.
 PARTITION_OP_ERROR(UnknownCodePattern)
 
+/// Used to signify that an isolation crossing function is returning a
+/// non-Sendable value.
+PARTITION_OP_ERROR(NonSendableIsolationCrossingResult)
+
 #undef PARTITION_OP_ERROR

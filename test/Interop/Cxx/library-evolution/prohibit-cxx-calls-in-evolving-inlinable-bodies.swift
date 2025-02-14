@@ -2,6 +2,8 @@
 // RUN: split-file %s %t
 // RUN: %target-swift-frontend %t/test.swift -I %t/Inputs -typecheck -enable-library-evolution -enable-experimental-cxx-interop -disable-implicit-cxx-module-import -verify
  
+// REQUIRES: OS=macosx
+
 //--- Inputs/module.modulemap
 module CxxModule {
     header "header.h"

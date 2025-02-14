@@ -1,5 +1,5 @@
-// RUN: %target-swift-emit-silgen -enable-experimental-feature MoveOnlyEnumDeinits -module-name test %s | %FileCheck %s --enable-var-scope
-// RUN: %target-swift-emit-sil -enable-experimental-feature MoveOnlyEnumDeinits -module-name test -sil-verify-all %s | %FileCheck %s --check-prefix CHECK-SIL --enable-var-scope
+// RUN: %target-swift-emit-silgen -Xllvm -sil-print-types -enable-experimental-feature MoveOnlyEnumDeinits -module-name test %s | %FileCheck %s --enable-var-scope
+// RUN: %target-swift-emit-sil -Xllvm -sil-print-types -enable-experimental-feature MoveOnlyEnumDeinits -module-name test -sil-verify-all %s | %FileCheck %s --check-prefix CHECK-SIL --enable-var-scope
 
 // Swift sources are require to remove struct_extract so this check-not line passes:
 // "CHECK-SIL-NOT: struct_extract"

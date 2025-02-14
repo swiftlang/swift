@@ -1,4 +1,4 @@
-// RUN: %target-swift-emit-silgen -enable-experimental-feature RawLayout -enable-builtin-module %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -Xllvm -sil-print-types -enable-experimental-feature RawLayout -enable-builtin-module %s | %FileCheck %s
 
 // REQUIRES: swift_feature_RawLayout
 

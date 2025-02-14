@@ -91,3 +91,23 @@ BridgedTypeAttribute BridgedTypeAttribute_createIsolated(
                        {cLPLoc.unbridged(), cRPLoc.unbridged()},
                        {isolationKind, cIsolationLoc.unbridged()});
 }
+
+BridgedTypeAttribute BridgedTypeAttribute_createExecution(
+    BridgedASTContext cContext, BridgedSourceLoc cAtLoc,
+    BridgedSourceLoc cNameLoc, BridgedSourceLoc cLPLoc,
+    BridgedSourceLoc cBehaviorLoc,
+    BridgedExecutionTypeAttrExecutionKind behavior, BridgedSourceLoc cRPLoc) {
+  auto behaviorKind = [=] {
+    switch (behavior) {
+    case BridgedExecutionTypeAttrExecutionKind_Concurrent:
+      return ExecutionKind::Concurrent;
+    case BridgedExecutionTypeAttrExecutionKind_Caller:
+      return ExecutionKind::Caller;
+    }
+    llvm_unreachable("bad kind");
+  }();
+  return new (cContext.unbridged())
+      ExecutionTypeAttr(cAtLoc.unbridged(), cNameLoc.unbridged(),
+                        {cLPLoc.unbridged(), cRPLoc.unbridged()},
+                        {behaviorKind, cBehaviorLoc.unbridged()});
+}

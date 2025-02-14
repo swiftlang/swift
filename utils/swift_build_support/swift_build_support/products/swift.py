@@ -10,6 +10,8 @@
 #
 # ----------------------------------------------------------------------------
 
+from build_swift.build_swift.constants import SWIFT_REPO_NAME
+
 from . import cmark
 from . import earlyswiftdriver
 from . import libcxx
@@ -57,9 +59,6 @@ class Swift(product.Product):
         self.cmake_options.extend(self._enable_experimental_cxx_interop)
         self.cmake_options.extend(self._enable_cxx_interop_swift_bridging_header)
 
-        # Add experimental c interop flag.
-        self.cmake_options.extend(self._enable_experimental_pointer_bounds)
-
         # Add experimental distributed flag.
         self.cmake_options.extend(self._enable_experimental_distributed)
 
@@ -74,6 +73,9 @@ class Swift(product.Product):
 
         # Add volatile flag.
         self.cmake_options.extend(self._enable_volatile)
+
+        # Add runtime module flag.
+        self.cmake_options.extend(self._enable_runtime_module)
 
         # Add static vprintf flag
         self.cmake_options.extend(self._enable_stdlib_static_vprintf)
@@ -98,6 +100,14 @@ class Swift(product.Product):
             self._enable_experimental_parser_validation)
 
         self._handle_swift_debuginfo_non_lto_args()
+
+    @classmethod
+    def product_source_name(cls):
+        """product_source_name() -> str
+
+        The name of the source code directory of this product.
+        """
+        return SWIFT_REPO_NAME
 
     @classmethod
     def is_build_script_impl_product(cls):
@@ -219,11 +229,6 @@ updated without updating swift.py?")
                  self.args.enable_experimental_observation)]
 
     @property
-    def _enable_experimental_pointer_bounds(self):
-        return [('SWIFT_ENABLE_EXPERIMENTAL_POINTER_BOUNDS:BOOL',
-                 self.args.enable_experimental_pointer_bounds)]
-
-    @property
     def _enable_synchronization(self):
         return [('SWIFT_ENABLE_SYNCHRONIZATION:BOOL',
                  self.args.enable_synchronization)]
@@ -232,6 +237,11 @@ updated without updating swift.py?")
     def _enable_volatile(self):
         return [('SWIFT_ENABLE_VOLATILE:BOOL',
                  self.args.enable_volatile)]
+
+    @property
+    def _enable_runtime_module(self):
+        return [('SWIFT_ENABLE_RUNTIME_MODULE:BOOL',
+                 self.args.enable_runtime_module)]
 
     @property
     def _enable_stdlib_static_vprintf(self):

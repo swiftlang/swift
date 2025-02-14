@@ -133,6 +133,19 @@ enum class QualifiedIdentTypeReprWalkingScheme {
   ASTOrderRecursive
 };
 
+/// Specifies the behavior for walking SequenceExprs.
+enum class SequenceWalking {
+  /// Walk into every element of the sequence, regardless of what state the
+  /// sequence is in.
+  Default,
+
+  /// If the sequence has been folded by type checking, only walk into the
+  /// elements that represent the operator nodes. This will ensure that the walk
+  /// does not visit the same AST nodes twice when it encounters a sequence that
+  /// has already been folded but hasn't been removed from the AST.
+  OnlyWalkFirstOperatorWhenFolded
+};
+
 /// An abstract class used to traverse an AST.
 class ASTWalker {
 public:
@@ -614,6 +627,13 @@ public:
   /// This method configures how the walker should walk into uses of macros.
   virtual MacroWalking getMacroWalkingBehavior() const {
     return MacroWalking::ArgumentsAndExpansion;
+  }
+
+  /// This method configures how the walker should walk into SequenceExprs.
+  /// Needing to customize this behavior should be rare, as sequence expressions
+  /// are only encountered in un-typechecked ASTs.
+  virtual SequenceWalking getSequenceWalkingBehavior() const {
+    return SequenceWalking::Default;
   }
 
   /// This method determines whether the given declaration should be

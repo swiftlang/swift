@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend  -target %target-swift-5.7-abi-triple %s -parse-as-library -parse-stdlib -emit-sil -o - | %FileCheck %s -check-prefix=CHECK-SIL
+// RUN: %target-swift-frontend  -target %target-swift-5.7-abi-triple %s -parse-as-library -parse-stdlib -Xllvm -sil-print-types -emit-sil -o - | %FileCheck %s -check-prefix=CHECK-SIL
 
 // RUN: %target-swift-frontend  -target %target-swift-5.7-abi-triple %s -parse-as-library -parse-stdlib -emit-ir -o - | %FileCheck %s -check-prefix=CHECK-IR
 

@@ -1,5 +1,5 @@
-// RUN: %target-swift-emit-silgen %s | %FileCheck %s
-// RUN: %target-swift-emit-silgen %s -enable-library-evolution | %FileCheck %s --check-prefix=CHECK-LIB
+// RUN: %target-swift-emit-silgen -Xllvm -sil-print-types %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -Xllvm -sil-print-types %s -enable-library-evolution | %FileCheck %s --check-prefix=CHECK-LIB
 
 public protocol Foo {
   static var button: Self { get }

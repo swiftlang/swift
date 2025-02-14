@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -enable-sil-opaque-values -enable-sil-verify-all -generic-specializer %s | %FileCheck %s
+// RUN: %target-sil-opt -sil-print-types -enable-sil-opaque-values -enable-sil-verify-all -generic-specializer %s | %FileCheck %s
 
 sil_stage raw
 

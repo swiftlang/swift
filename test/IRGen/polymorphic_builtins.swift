@@ -7,7 +7,7 @@
 // the builtin's contract, we expect IRGen to convert them to traps, not
 // anything before.
 //
-// RUN: %target-swift-frontend  -enable-builtin-module -emit-sil -parse-as-library -Xllvm -sil-disable-pass=Simplification %s | %FileCheck --check-prefix=SIL %s
+// RUN: %target-swift-frontend  -enable-builtin-module -Xllvm -sil-print-types -emit-sil -parse-as-library -Xllvm -sil-disable-pass=Simplification %s | %FileCheck --check-prefix=SIL %s
 
 import Builtin
 

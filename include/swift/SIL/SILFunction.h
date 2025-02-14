@@ -18,7 +18,7 @@
 #define SWIFT_SIL_SILFUNCTION_H
 
 #include "swift/AST/ASTNode.h"
-#include "swift/AST/Availability.h"
+#include "swift/AST/AvailabilityRange.h"
 #include "swift/AST/Module.h"
 #include "swift/AST/ResilienceExpansion.h"
 #include "swift/Basic/ProfileCounter.h"
@@ -1095,7 +1095,9 @@ public:
 
   /// Get the source location of the function.
   SILLocation getLocation() const {
-    assert(DebugScope && "no scope/location");
+    if (!DebugScope) {
+      return SILLocation::invalid();
+    }
     return getDebugScope()->Loc;
   }
 
@@ -1563,6 +1565,17 @@ public:
     }
   }
 
+  /// Populate \p output with every block terminated by an unreachable
+  /// instruction.
+  void visitUnreachableTerminatedBlocks(
+      llvm::function_ref<void(SILBasicBlock &)> visitor) const {
+    for (auto &block : const_cast<SILFunction &>(*this)) {
+      if (isa<UnreachableInst>(block.getTerminator())) {
+        visitor(block);
+      }
+    }
+  }
+
   //===--------------------------------------------------------------------===//
   // Argument Helper Methods
   //===--------------------------------------------------------------------===//
@@ -1656,6 +1669,11 @@ public:
 
   /// Verifies the lifetime of memory locations in the function.
   void verifyMemoryLifetime(CalleeCache *calleeCache);
+
+  /// Verifies ownership of the function.
+  /// Since we don't have complete lifetimes everywhere, computes DeadEndBlocks
+  /// and calls verifyOwnership(DeadEndBlocks *deadEndBlocks)
+  void verifyOwnership() const;
 
   /// Run the SIL ownership verifier to check that all values with ownership
   /// have a linear lifetime. Regular OSSA invariants are checked separately in

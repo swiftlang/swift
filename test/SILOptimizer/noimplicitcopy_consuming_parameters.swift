@@ -68,22 +68,30 @@ func consumeVal<T : P>(_ x: consuming GenericNonTrivialStruct<T>) {}
 // MARK: Simple Loadable Borrowing Tests //
 ///////////////////////////////////////////
 
-func testLoadableConsumingConsume(_ x: consuming NonTrivialStruct) {
-    // expected-error @-1 {{'x' used after consume}}
-    let _ = x // expected-note {{consumed here}}
-    let _ = x.k // expected-note {{used here}}
-}
-
-func testLoadableConsumingConsume1a(_ x: consuming NonTrivialStruct) {
+func testIgnoredUse(_ x: consuming NonTrivialStruct) {
     let _ = x
-    x = NonTrivialStruct()
     let _ = x.k
 }
 
+func consume(_: consuming NonTrivialStruct) {}
+func consume(_: consuming Klass) {}
+
+func testLoadableConsumingConsume1(_ x: consuming NonTrivialStruct) {
+    // expected-error @-1 {{'x' used after consume}}
+    consume(x) // expected-note {{consumed here}}
+    consume(x.k) // expected-note {{used here}}
+}
+
+func testLoadableConsumingConsume1a(_ x: consuming NonTrivialStruct) {
+    consume(x)
+    x = NonTrivialStruct()
+    consume(x.k)
+}
+
 func testLoadableConsumingConsume2(_ x: consuming NonTrivialStruct) {
-    // expected-error @-1 {{'x' consumed more than once}}
+    // expected-error @-1 {{'x' used after consume}}
     var y = x // expected-note {{consumed here}}
-    y = x // expected-note {{consumed again here}}
+    y = x // expected-note {{used here}}
     _ = y
 }
 
@@ -93,22 +101,22 @@ func testLoadableConsumingConsume3(_ x: consuming NonTrivialStruct) {
 }
 
 func testLoadableConsumingUse(_ x: consuming NonTrivialStruct) {
-    _ = x
+    consume(x)
 }
 
 func testLoadableConsumingUseAndConsume(_ x: consuming NonTrivialStruct) {
     borrowValBorrowing(x)
-    let _ = x
+    consume(x)
 }
 
 func testLoadableConsumingConsumeAndUse(_ x: consuming NonTrivialStruct) {
     // expected-error @-1 {{'x' used after consume}}
-    let _ = x // expected-note {{consumed here}}
+    consume(x) // expected-note {{consumed here}}
     borrowValBorrowing(x) // expected-note {{used here}}
 }
 
 func testLoadableConsumingConsumeAndUseReinit(_ x: consuming NonTrivialStruct) {
-    let _ = x
+    consume(x)
     x = NonTrivialStruct()
     borrowValBorrowing(x)
 }
@@ -146,16 +154,16 @@ func testLoadableConsumingCallMethodSelfMutating(_ x: consuming NonTrivialStruct
 func testLoadableConsumingEscapingClosure(_ x: consuming NonTrivialStruct) {
     var f: () -> () = {}
     f = {
-        _ = x // expected-error{{noncopyable 'x' cannot be consumed when captured by an escaping closure}}
+        consume(x) // expected-error{{noncopyable 'x' cannot be consumed when captured by an escaping closure}}
     }
     _ = f
 }
 
 func testLoadableConsumingEscapingClosure2(_ x: consuming NonTrivialStruct) {
-    _ = x // expected-error {{noncopyable 'x' cannot be consumed when captured by an escaping closure}}
+    consume(x) // expected-error {{noncopyable 'x' cannot be consumed when captured by an escaping closure}}
     var f: () -> () = {}
     f = {
-        _ = x // expected-error{{noncopyable 'x' cannot be consumed when captured by an escaping closure}}
+        consume(x) // expected-error{{noncopyable 'x' cannot be consumed when captured by an escaping closure}}
     }
     _ = f
 }
@@ -163,26 +171,26 @@ func testLoadableConsumingEscapingClosure2(_ x: consuming NonTrivialStruct) {
 func testLoadableConsumingEscapingClosure3(_ x: consuming NonTrivialStruct) {
     var f: () -> () = {}
     f = {
-        _ = x // expected-error{{noncopyable 'x' cannot be consumed when captured by an escaping closure}}
+        consume(x) // expected-error{{noncopyable 'x' cannot be consumed when captured by an escaping closure}}
     }
     _ = f
-    _ = x // expected-error {{noncopyable 'x' cannot be consumed when captured by an escaping closure}}
+    consume(x) // expected-error {{noncopyable 'x' cannot be consumed when captured by an escaping closure}}
 }
 
 func testLoadableConsumingNonEscapingClosure(_ x: consuming NonTrivialStruct) { // expected-error{{}}
     func useNonEscaping(_ f: () -> ()) {}
     useNonEscaping {
-        _ = x // expected-note{{consumed here}}
+        consume(x) // expected-note{{consumed here}}
     }
 }
 
 func testLoadableConsumingNonEscapingClosure2(_ x: consuming NonTrivialStruct) {
     // expected-error @-1 {{'x' used after consume}}
     // expected-error @-2 {{}}
-    let _ = x // expected-note {{consumed here}}
+    consume(x) // expected-note {{consumed here}}
     func useNonEscaping(_ f: () -> ()) {}
     useNonEscaping { // expected-note {{used here}}
-        _ = x // expected-note {{consumed here}}
+        consume(x) // expected-note {{consumed here}}
     }
 }
 
@@ -217,10 +225,9 @@ func testLoadableConsumingEnum(_ x: consuming LoadableEnum) {
 }
 
 func testLoadableConsumingEnum2(_ x: consuming LoadableEnum) {
-    // expected-error @-1 {{'x' consumed more than once}}
-    switch x { // expected-note {{consumed here}}
+    switch x {
     case let .x(y):
-        _ = consume x // expected-note {{consumed again here}}
+        _ = consume x
         _ = y
         break
     case .y:
@@ -240,16 +247,19 @@ func testLoadableConsumingTrivialLetField(_ x: consuming NonTrivialStruct) -> In
 // MARK: Trivial Struct Consuming Tests //
 //////////////////////////////////////////
 
+func consume(_: consuming TrivialStruct) {}
+func consume(_: consuming Int) {}
+
 func testTrivialConsumingConsume(_ x: consuming TrivialStruct) {
     // expected-error @-1 {{'x' used after consume}}
-    let _ = x // expected-note {{consumed here}}
-    let _ = x.k // expected-note {{used here}}
+    consume(x) // expected-note {{consumed here}}
+    consume(x.k) // expected-note {{used here}}
 }
 
 func testTrivialConsumingConsume2(_ x: consuming TrivialStruct) {
-    // expected-error @-1 {{'x' consumed more than once}}
+    // expected-error @-1 {{'x' used after consume}}
     var y = x // expected-note {{consumed here}}
-    y = x // expected-note {{consumed again here}}
+    y = x // expected-note {{used here}}
     _ = y
 }
 
@@ -259,22 +269,22 @@ func testTrivialConsumingConsume3(_ x: consuming TrivialStruct) {
 }
 
 func testTrivialConsumingUse(_ x: consuming TrivialStruct) {
-    _ = x
+    consume(x)
 }
 
 func testTrivialConsumingUseAndConsume(_ x: consuming TrivialStruct) {
     borrowValBorrowing(x)
-    let _ = x
+    consume(x)
 }
 
 func testTrivialConsumingConsumeAndUse(_ x: consuming TrivialStruct) {
     // expected-error @-1 {{'x' used after consume}}
-    let _ = x // expected-note {{consumed here}}
+    consume(x) // expected-note {{consumed here}}
     borrowValBorrowing(x) // expected-note {{used here}}
 }
 
 func testTrivialConsumingConsumeAndUseReinit(_ x: consuming TrivialStruct) {
-    let _ = x
+    consume(x)
     x = TrivialStruct()
     borrowValBorrowing(x)
 }
@@ -302,16 +312,16 @@ func testTrivialConsumingCallMethodSelfConsuming(_ x: consuming TrivialStruct) {
 func testTrivialConsumingEscapingClosure(_ x: consuming TrivialStruct) {
     var f: () -> () = {}
     f = {
-        _ = x
+        consume(x)
     }
     _ = f
 }
 
 func testTrivialConsumingEscapingClosure2(_ x: consuming TrivialStruct) {
-    let _ = x // expected-error {{noncopyable 'x' cannot be consumed when captured by an escaping closure}}
+    consume(x) // expected-error {{noncopyable 'x' cannot be consumed when captured by an escaping closure}}
     var f: () -> () = {}
     f = {
-        _ = x
+        consume(x)
     }
     _ = f
 }
@@ -319,25 +329,25 @@ func testTrivialConsumingEscapingClosure2(_ x: consuming TrivialStruct) {
 func testTrivialConsumingEscapingClosure3(_ x: consuming TrivialStruct) {
     var f: () -> () = {}
     f = {
-        _ = x
+        consume(x)
     }
     _ = f
-    let _ = x // expected-error {{noncopyable 'x' cannot be consumed when captured by an escaping closure}}
+    consume(x) // expected-error {{noncopyable 'x' cannot be consumed when captured by an escaping closure}}
 }
 
 func testTrivialConsumingNonEscapingClosure(_ x: consuming TrivialStruct) {
     func useNonEscaping(_ f: () -> ()) {}
     useNonEscaping {
-        _ = x
+        consume(x)
     }
 }
 
 func testTrivialConsumingNonEscapingClosure2(_ x: consuming TrivialStruct) {
     // expected-error @-1 {{'x' used after consume}}
-    let _ = x // expected-note {{consumed here}}
+    consume(x) // expected-note {{consumed here}}
     func useNonEscaping(_ f: () -> ()) {}
     useNonEscaping { // expected-note {{used here}}
-        _ = x
+        consume(x)
     }
 }
 
@@ -356,13 +366,12 @@ func testTrivialConsumingEnum(_ x: consuming TrivialEnum) {
 }
 
 func testTrivialConsumingEnum2(_ x: consuming TrivialEnum) {
-    // expected-error @-1 {{'x' used after consume}}
-    switch x { // expected-note {{consumed here}}
+    switch x {
     case let .x(y):
         _ = y
         break
     case .y:
-        _ = copy x // expected-note {{used here}}
+        _ = copy x
         break
     }
 }
@@ -541,6 +550,8 @@ func testAddressOnlyCopyOperator<T>(_ x: consuming GenericNonTrivialStruct<T>) {
 // MARK: Loadable Self Tests //
 ///////////////////////////////
 
+func consume(_: consuming LoadableSelfTest) {}
+
 struct LoadableSelfTest {
     var k = Klass()
 
@@ -551,7 +562,7 @@ struct LoadableSelfTest {
     mutating func doSomethingMutating() {}
 
     consuming func testUseSelf() {
-        _ = self
+        consume(self)
     }
 
     consuming func testUseSelf2() {
@@ -570,7 +581,7 @@ struct LoadableSelfTest {
     }
 
     consuming func testLetUseSelf() {
-        let _ = self
+        consume(self)
     }
 
     consuming func callDoSomethingDefault() {
@@ -652,7 +663,7 @@ struct LoadableSelfTest {
     }
 
     consuming func testCallEscapingClosure2() {
-        let _ = self // expected-error {{noncopyable 'self' cannot be consumed when captured by an escaping closure}}
+        consume(self) // expected-error {{noncopyable 'self' cannot be consumed when captured by an escaping closure}}
         var f: () -> () = {}
         f = {
             let _ = copy self
@@ -666,7 +677,7 @@ struct LoadableSelfTest {
             let _ = copy self
         }
         f()
-        let _ = self // expected-error {{noncopyable 'self' cannot be consumed when captured by an escaping closure}}
+        consume(self) // expected-error {{noncopyable 'self' cannot be consumed when captured by an escaping closure}}
     }
 
     consuming func testCallNonEscapingClosure() {
@@ -678,7 +689,7 @@ struct LoadableSelfTest {
 
     consuming func testCallNonEscapingClosure2() {
         // expected-error @-1 {{'self' used after consume}}
-        let _ = self // expected-note {{consumed here}}
+        consume(self) // expected-note {{consumed here}}
         func f(_ x: () -> ()) {}
         f { // expected-note {{used here}}
             _ = copy self
@@ -686,7 +697,7 @@ struct LoadableSelfTest {
     }
 
     consuming func testCallNonEscapingClosure3() {
-        let _ = self
+        consume(self)
         self = LoadableSelfTest()
         func f(_ x: () -> ()) {}
         f {
@@ -865,6 +876,8 @@ func consumeAddressOnlySelfTest<T>(_ x: consuming AddressOnlySelfTest<T>) {}
 // MARK: Trivial Self Tests //
 //////////////////////////////
 
+func consume(_: consuming TrivialSelfTest) {}
+
 struct TrivialSelfTest {
     var t = 5
 
@@ -880,23 +893,18 @@ struct TrivialSelfTest {
 
     consuming func testUseSelf2() {
         // expected-error @-1 {{'self' consumed more than once}}
-        _ = self // expected-note {{consumed here}}
-        _ = self // expected-note {{consumed again here}}
+        consume(self) // expected-note {{consumed here}}
+        consume(self) // expected-note {{consumed again here}}
     }
 
     consuming func testUseSelf3() {
-        // expected-error @-1 {{'self' consumed more than once}}
-        //
-        // TODO: This is why we need to change SILFunctionType to contain
-        // information about default conventions.
-        self.doSomethingDefault() // expected-note {{consumed here}}
-        self.doSomethingDefault() // expected-note {{consumed again here}}
+        self.doSomethingDefault()
+        self.doSomethingDefault()
     }
 
     consuming func testUseSelf4() {
-        // expected-error @-1 {{'self' used after consume}}
-        self.doSomethingDefault() // expected-note {{consumed here}}
-        self.doSomethingBorrowing() // expected-note {{used here}}
+        self.doSomethingDefault()
+        self.doSomethingBorrowing()
     }
 
     consuming func testUseSelf5() {
@@ -962,7 +970,7 @@ struct TrivialSelfTest {
     }
 
     consuming func testCallEscapingClosure2() {
-        let _ = self // expected-error {{noncopyable 'self' cannot be consumed when captured by an escaping closure}}
+        consume(self) // expected-error {{noncopyable 'self' cannot be consumed when captured by an escaping closure}}
         var f: () -> () = {}
         f = {
             let _ = self
@@ -979,7 +987,7 @@ struct TrivialSelfTest {
 
     consuming func testCallNonEscapingClosure2() {
         // expected-error @-1 {{'self' used after consume}}
-        let _ = self // expected-note {{consumed here}}
+        consume(self) // expected-note {{consumed here}}
         func f(_ x: () -> ()) {}
         f { // expected-note {{used here}}
             _ = self
@@ -987,7 +995,7 @@ struct TrivialSelfTest {
     }
 
     consuming func testCallNonEscapingClosure3() {
-        let _ = self
+        consume(self)
         self = TrivialSelfTest()
         func f(_ x: () -> ()) {}
         f {

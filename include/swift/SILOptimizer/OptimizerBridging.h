@@ -134,8 +134,9 @@ struct BridgedUtilities {
   typedef void (* _Nonnull UpdatePhisFn)(BridgedPassContext, BridgedArrayRef);
 
   static void registerVerifier(VerifyFunctionFn verifyFunctionFn);
-  static void registerGuaranteedPhiUpdater(UpdateFunctionFn updateBorrowedFromFn,
-                                           UpdatePhisFn updateBorrowedFromPhisFn);
+  static void registerPhiUpdater(UpdateFunctionFn updateBorrowedFromFn,
+                                 UpdatePhisFn updateBorrowedFromPhisFn,
+                                 UpdatePhisFn replacePhisWithIncomingValuesFn);
 };
 
 struct BridgedBasicBlockSet {
@@ -255,10 +256,9 @@ struct BridgedPassContext {
                                                                BridgedFunction applySiteCallee) const;
 
   SWIFT_IMPORT_UNSAFE BridgedGlobalVar createGlobalVariable(BridgedStringRef name, BridgedType type,
-                                                            bool isPrivate) const;
+                                                            BridgedLinkage linkage, bool isLet) const;
   void inlineFunction(BridgedInstruction apply, bool mandatoryInline) const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedValue getSILUndef(BridgedType type) const;
-  BRIDGED_INLINE bool optimizeMemoryAccesses(BridgedFunction f) const;
   BRIDGED_INLINE bool eliminateDeadAllocations(BridgedFunction f) const;
 
   BRIDGED_INLINE bool shouldExpand(BridgedType type) const;
@@ -380,6 +380,7 @@ struct BridgedPassContext {
   BRIDGED_INLINE bool enableMoveInoutStackProtection() const;
   BRIDGED_INLINE AssertConfiguration getAssertConfiguration() const;
   bool enableSimplificationFor(BridgedInstruction inst) const;
+  BRIDGED_INLINE bool enableWMORequiredDiagnostics() const;
 
   // Closure specializer
   SWIFT_IMPORT_UNSAFE BridgedFunction ClosureSpecializer_createEmptyFunctionWithSpecializedSignature(BridgedStringRef specializedName,

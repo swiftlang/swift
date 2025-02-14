@@ -1,0 +1,575 @@
+# NameAliases-16.0.0.txt
+# Date: 2024-04-24
+# © 2024 Unicode®, Inc.
+# Unicode and the Unicode Logo are registered trademarks of Unicode, Inc. in the U.S. and other countries.
+# For terms of use and license, see https://www.unicode.org/terms_of_use.html
+#
+# Unicode Character Database
+# For documentation, see https://www.unicode.org/reports/tr44/
+#
+# This file is a normative contributory data file in the
+# Unicode Character Database.
+#
+# This file defines the formal name aliases for Unicode characters.
+#
+# For informative aliases, see NamesList.txt
+#
+# The formal name aliases are divided into five types, each with a distinct label.
+#
+# Type Labels:
+#
+# 1. correction
+#      Corrections for serious problems in the character names
+# 2. control
+#      ISO 6429 names for C0 and C1 control functions, and other
+#      commonly occurring names for control codes
+# 3. alternate
+#      A few widely used alternate names for format characters
+# 4. figment
+#      Several documented labels for C1 control code points which
+#      were never actually approved in any standard
+# 5. abbreviation
+#      Commonly occurring abbreviations (or acronyms) for control codes,
+#      format characters, spaces, and variation selectors
+#
+# The formal name aliases are part of the Unicode character namespace, which
+# includes the character names and the names of named character sequences.
+# The inclusion of ISO 6429 names and other commonly occurring names and
+# abbreviations for control codes and format characters as formal name aliases
+# is to help avoid name collisions between Unicode character names and the
+# labels which commonly appear in text and/or in implementations such as regex, for
+# control codes (which for historical reasons have no Unicode character name)
+# or for format characters.
+#
+# For documentation, see NamesList.html and https://www.unicode.org/reports/tr44/
+#
+# FORMAT
+#
+# Each line has three fields, as described here:
+#
+# First field:  Code point
+# Second field: Alias
+# Third field:  Type
+#
+# The type labels used are defined above. As for property values, comparisons
+# of type labels should ignore case.
+#
+# The type labels can be mapped to other strings for display, if desired.
+#
+# In case multiple aliases are assigned, additional aliases
+# are provided on separate lines. Parsers of this data file should
+# take note that the same code point can (and does) occur more than once.
+#
+# Note that currently the only instances of multiple aliases of the same
+# type for a single code point are either of type "control" or "abbreviation".
+# An alias of type "abbreviation" can, in principle, be added for any code
+# point, although currently aliases of type "correction" do not have
+# any additional aliases of type "abbreviation". Such relationships
+# are not enforced by stability policies.
+#
+#-----------------------------------------------------------------
+
+0000;NULL;control
+0000;NUL;abbreviation
+0001;START OF HEADING;control
+0001;SOH;abbreviation
+0002;START OF TEXT;control
+0002;STX;abbreviation
+0003;END OF TEXT;control
+0003;ETX;abbreviation
+0004;END OF TRANSMISSION;control
+0004;EOT;abbreviation
+0005;ENQUIRY;control
+0005;ENQ;abbreviation
+0006;ACKNOWLEDGE;control
+0006;ACK;abbreviation
+
+# Note that no formal name alias for the ISO 6429 "BELL" is
+# provided for U+0007, because of the existing name collision
+# with U+1F514 BELL.
+
+0007;ALERT;control
+0007;BEL;abbreviation
+
+0008;BACKSPACE;control
+0008;BS;abbreviation
+0009;CHARACTER TABULATION;control
+0009;HORIZONTAL TABULATION;control
+0009;HT;abbreviation
+0009;TAB;abbreviation
+000A;LINE FEED;control
+000A;NEW LINE;control
+000A;END OF LINE;control
+000A;LF;abbreviation
+000A;NL;abbreviation
+000A;EOL;abbreviation
+000B;LINE TABULATION;control
+000B;VERTICAL TABULATION;control
+000B;VT;abbreviation
+000C;FORM FEED;control
+000C;FF;abbreviation
+000D;CARRIAGE RETURN;control
+000D;CR;abbreviation
+000E;SHIFT OUT;control
+000E;LOCKING-SHIFT ONE;control
+000E;SO;abbreviation
+000F;SHIFT IN;control
+000F;LOCKING-SHIFT ZERO;control
+000F;SI;abbreviation
+0010;DATA LINK ESCAPE;control
+0010;DLE;abbreviation
+0011;DEVICE CONTROL ONE;control
+0011;DC1;abbreviation
+0012;DEVICE CONTROL TWO;control
+0012;DC2;abbreviation
+0013;DEVICE CONTROL THREE;control
+0013;DC3;abbreviation
+0014;DEVICE CONTROL FOUR;control
+0014;DC4;abbreviation
+0015;NEGATIVE ACKNOWLEDGE;control
+0015;NAK;abbreviation
+0016;SYNCHRONOUS IDLE;control
+0016;SYN;abbreviation
+0017;END OF TRANSMISSION BLOCK;control
+0017;ETB;abbreviation
+0018;CANCEL;control
+0018;CAN;abbreviation
+0019;END OF MEDIUM;control
+0019;EOM;abbreviation
+0019;EM;abbreviation
+001A;SUBSTITUTE;control
+001A;SUB;abbreviation
+001B;ESCAPE;control
+001B;ESC;abbreviation
+001C;INFORMATION SEPARATOR FOUR;control
+001C;FILE SEPARATOR;control
+001C;FS;abbreviation
+001D;INFORMATION SEPARATOR THREE;control
+001D;GROUP SEPARATOR;control
+001D;GS;abbreviation
+001E;INFORMATION SEPARATOR TWO;control
+001E;RECORD SEPARATOR;control
+001E;RS;abbreviation
+001F;INFORMATION SEPARATOR ONE;control
+001F;UNIT SEPARATOR;control
+001F;US;abbreviation
+0020;SP;abbreviation
+007F;DELETE;control
+007F;DEL;abbreviation
+
+# PADDING CHARACTER and HIGH OCTET PRESET represent
+# architectural concepts initially proposed for early
+# drafts of ISO/IEC 10646-1. They were never actually
+# approved or standardized: hence their designation
+# here as the "figment" type. Formal name aliases
+# (and corresponding abbreviations) for these code
+# points are included here because these names leaked
+# out from the draft documents and were published in
+# at least one RFC whose names for code points were
+# implemented in Perl regex expressions.
+
+0080;PADDING CHARACTER;figment
+0080;PAD;abbreviation
+0081;HIGH OCTET PRESET;figment
+0081;HOP;abbreviation
+
+0082;BREAK PERMITTED HERE;control
+0082;BPH;abbreviation
+0083;NO BREAK HERE;control
+0083;NBH;abbreviation
+0084;INDEX;control
+0084;IND;abbreviation
+0085;NEXT LINE;control
+0085;NEL;abbreviation
+0086;START OF SELECTED AREA;control
+0086;SSA;abbreviation
+0087;END OF SELECTED AREA;control
+0087;ESA;abbreviation
+0088;CHARACTER TABULATION SET;control
+0088;HORIZONTAL TABULATION SET;control
+0088;HTS;abbreviation
+0089;CHARACTER TABULATION WITH JUSTIFICATION;control
+0089;HORIZONTAL TABULATION WITH JUSTIFICATION;control
+0089;HTJ;abbreviation
+008A;LINE TABULATION SET;control
+008A;VERTICAL TABULATION SET;control
+008A;VTS;abbreviation
+008B;PARTIAL LINE FORWARD;control
+008B;PARTIAL LINE DOWN;control
+008B;PLD;abbreviation
+008C;PARTIAL LINE BACKWARD;control
+008C;PARTIAL LINE UP;control
+008C;PLU;abbreviation
+008D;REVERSE LINE FEED;control
+008D;REVERSE INDEX;control
+008D;RI;abbreviation
+008E;SINGLE SHIFT TWO;control
+008E;SINGLE-SHIFT-2;control
+008E;SS2;abbreviation
+008F;SINGLE SHIFT THREE;control
+008F;SINGLE-SHIFT-3;control
+008F;SS3;abbreviation
+0090;DEVICE CONTROL STRING;control
+0090;DCS;abbreviation
+0091;PRIVATE USE ONE;control
+0091;PRIVATE USE-1;control
+0091;PU1;abbreviation
+0092;PRIVATE USE TWO;control
+0092;PRIVATE USE-2;control
+0092;PU2;abbreviation
+0093;SET TRANSMIT STATE;control
+0093;STS;abbreviation
+0094;CANCEL CHARACTER;control
+0094;CCH;abbreviation
+0095;MESSAGE WAITING;control
+0095;MW;abbreviation
+0096;START OF GUARDED AREA;control
+0096;START OF PROTECTED AREA;control
+0096;SPA;abbreviation
+0097;END OF GUARDED AREA;control
+0097;END OF PROTECTED AREA;control
+0097;EPA;abbreviation
+0098;START OF STRING;control
+0098;SOS;abbreviation
+
+# SINGLE GRAPHIC CHARACTER INTRODUCER is another
+# architectural concept from early drafts of ISO/IEC 10646-1
+# which was never approved and standardized.
+
+0099;SINGLE GRAPHIC CHARACTER INTRODUCER;figment
+0099;SGC;abbreviation
+
+009A;SINGLE CHARACTER INTRODUCER;control
+009A;SCI;abbreviation
+009B;CONTROL SEQUENCE INTRODUCER;control
+009B;CSI;abbreviation
+009C;STRING TERMINATOR;control
+009C;ST;abbreviation
+009D;OPERATING SYSTEM COMMAND;control
+009D;OSC;abbreviation
+009E;PRIVACY MESSAGE;control
+009E;PM;abbreviation
+009F;APPLICATION PROGRAM COMMAND;control
+009F;APC;abbreviation
+00A0;NBSP;abbreviation
+00AD;SHY;abbreviation
+01A2;LATIN CAPITAL LETTER GHA;correction
+01A3;LATIN SMALL LETTER GHA;correction
+034F;CGJ;abbreviation
+0616;ARABIC SMALL HIGH LIGATURE ALEF WITH YEH BARREE;correction
+061C;ALM;abbreviation
+0709;SYRIAC SUBLINEAR COLON SKEWED LEFT;correction
+0CDE;KANNADA LETTER LLLA;correction
+0E9D;LAO LETTER FO FON;correction
+0E9F;LAO LETTER FO FAY;correction
+0EA3;LAO LETTER RO;correction
+0EA5;LAO LETTER LO;correction
+0FD0;TIBETAN MARK BKA- SHOG GI MGO RGYAN;correction
+11EC;HANGUL JONGSEONG YESIEUNG-KIYEOK;correction
+11ED;HANGUL JONGSEONG YESIEUNG-SSANGKIYEOK;correction
+11EE;HANGUL JONGSEONG SSANGYESIEUNG;correction
+11EF;HANGUL JONGSEONG YESIEUNG-KHIEUKH;correction
+180B;FVS1;abbreviation
+180C;FVS2;abbreviation
+180D;FVS3;abbreviation
+180E;MVS;abbreviation
+180F;FVS4;abbreviation
+1BBD;SUNDANESE LETTER ARCHAIC I;correction
+200B;ZWSP;abbreviation
+200C;ZWNJ;abbreviation
+200D;ZWJ;abbreviation
+200E;LRM;abbreviation
+200F;RLM;abbreviation
+202A;LRE;abbreviation
+202B;RLE;abbreviation
+202C;PDF;abbreviation
+202D;LRO;abbreviation
+202E;RLO;abbreviation
+202F;NNBSP;abbreviation
+205F;MMSP;abbreviation
+2060;WJ;abbreviation
+2066;LRI;abbreviation
+2067;RLI;abbreviation
+2068;FSI;abbreviation
+2069;PDI;abbreviation
+2118;WEIERSTRASS ELLIPTIC FUNCTION;correction
+2448;MICR ON US SYMBOL;correction
+2449;MICR DASH SYMBOL;correction
+2B7A;LEFTWARDS TRIANGLE-HEADED ARROW WITH DOUBLE VERTICAL STROKE;correction
+2B7C;RIGHTWARDS TRIANGLE-HEADED ARROW WITH DOUBLE VERTICAL STROKE;correction
+A015;YI SYLLABLE ITERATION MARK;correction
+AA6E;MYANMAR LETTER KHAMTI LLA;correction
+FE00;VS1;abbreviation
+FE01;VS2;abbreviation
+FE02;VS3;abbreviation
+FE03;VS4;abbreviation
+FE04;VS5;abbreviation
+FE05;VS6;abbreviation
+FE06;VS7;abbreviation
+FE07;VS8;abbreviation
+FE08;VS9;abbreviation
+FE09;VS10;abbreviation
+FE0A;VS11;abbreviation
+FE0B;VS12;abbreviation
+FE0C;VS13;abbreviation
+FE0D;VS14;abbreviation
+FE0E;VS15;abbreviation
+FE0F;VS16;abbreviation
+FE18;PRESENTATION FORM FOR VERTICAL RIGHT WHITE LENTICULAR BRACKET;correction
+FEFF;BYTE ORDER MARK;alternate
+FEFF;BOM;abbreviation
+FEFF;ZWNBSP;abbreviation
+122D4;CUNEIFORM SIGN NU11 TENU;correction
+122D5;CUNEIFORM SIGN NU11 OVER NU11 BUR OVER BUR;correction
+12327;CUNEIFORM SIGN KALAM;correction
+1680B;BAMUM LETTER PHASE-A MAEMGBIEE;correction
+16E56;MEDEFAIDRIN CAPITAL LETTER H;correction
+16E57;MEDEFAIDRIN CAPITAL LETTER NG;correction
+16E76;MEDEFAIDRIN SMALL LETTER H;correction
+16E77;MEDEFAIDRIN SMALL LETTER NG;correction
+1B001;HENTAIGANA LETTER E-1;correction
+1D0C5;BYZANTINE MUSICAL SYMBOL FTHORA SKLIRON CHROMA VASIS;correction
+1E899;MENDE KIKAKUI SYLLABLE M172 MBO;correction
+1E89A;MENDE KIKAKUI SYLLABLE M174 MBOO;correction
+E0100;VS17;abbreviation
+E0101;VS18;abbreviation
+E0102;VS19;abbreviation
+E0103;VS20;abbreviation
+E0104;VS21;abbreviation
+E0105;VS22;abbreviation
+E0106;VS23;abbreviation
+E0107;VS24;abbreviation
+E0108;VS25;abbreviation
+E0109;VS26;abbreviation
+E010A;VS27;abbreviation
+E010B;VS28;abbreviation
+E010C;VS29;abbreviation
+E010D;VS30;abbreviation
+E010E;VS31;abbreviation
+E010F;VS32;abbreviation
+E0110;VS33;abbreviation
+E0111;VS34;abbreviation
+E0112;VS35;abbreviation
+E0113;VS36;abbreviation
+E0114;VS37;abbreviation
+E0115;VS38;abbreviation
+E0116;VS39;abbreviation
+E0117;VS40;abbreviation
+E0118;VS41;abbreviation
+E0119;VS42;abbreviation
+E011A;VS43;abbreviation
+E011B;VS44;abbreviation
+E011C;VS45;abbreviation
+E011D;VS46;abbreviation
+E011E;VS47;abbreviation
+E011F;VS48;abbreviation
+E0120;VS49;abbreviation
+E0121;VS50;abbreviation
+E0122;VS51;abbreviation
+E0123;VS52;abbreviation
+E0124;VS53;abbreviation
+E0125;VS54;abbreviation
+E0126;VS55;abbreviation
+E0127;VS56;abbreviation
+E0128;VS57;abbreviation
+E0129;VS58;abbreviation
+E012A;VS59;abbreviation
+E012B;VS60;abbreviation
+E012C;VS61;abbreviation
+E012D;VS62;abbreviation
+E012E;VS63;abbreviation
+E012F;VS64;abbreviation
+E0130;VS65;abbreviation
+E0131;VS66;abbreviation
+E0132;VS67;abbreviation
+E0133;VS68;abbreviation
+E0134;VS69;abbreviation
+E0135;VS70;abbreviation
+E0136;VS71;abbreviation
+E0137;VS72;abbreviation
+E0138;VS73;abbreviation
+E0139;VS74;abbreviation
+E013A;VS75;abbreviation
+E013B;VS76;abbreviation
+E013C;VS77;abbreviation
+E013D;VS78;abbreviation
+E013E;VS79;abbreviation
+E013F;VS80;abbreviation
+E0140;VS81;abbreviation
+E0141;VS82;abbreviation
+E0142;VS83;abbreviation
+E0143;VS84;abbreviation
+E0144;VS85;abbreviation
+E0145;VS86;abbreviation
+E0146;VS87;abbreviation
+E0147;VS88;abbreviation
+E0148;VS89;abbreviation
+E0149;VS90;abbreviation
+E014A;VS91;abbreviation
+E014B;VS92;abbreviation
+E014C;VS93;abbreviation
+E014D;VS94;abbreviation
+E014E;VS95;abbreviation
+E014F;VS96;abbreviation
+E0150;VS97;abbreviation
+E0151;VS98;abbreviation
+E0152;VS99;abbreviation
+E0153;VS100;abbreviation
+E0154;VS101;abbreviation
+E0155;VS102;abbreviation
+E0156;VS103;abbreviation
+E0157;VS104;abbreviation
+E0158;VS105;abbreviation
+E0159;VS106;abbreviation
+E015A;VS107;abbreviation
+E015B;VS108;abbreviation
+E015C;VS109;abbreviation
+E015D;VS110;abbreviation
+E015E;VS111;abbreviation
+E015F;VS112;abbreviation
+E0160;VS113;abbreviation
+E0161;VS114;abbreviation
+E0162;VS115;abbreviation
+E0163;VS116;abbreviation
+E0164;VS117;abbreviation
+E0165;VS118;abbreviation
+E0166;VS119;abbreviation
+E0167;VS120;abbreviation
+E0168;VS121;abbreviation
+E0169;VS122;abbreviation
+E016A;VS123;abbreviation
+E016B;VS124;abbreviation
+E016C;VS125;abbreviation
+E016D;VS126;abbreviation
+E016E;VS127;abbreviation
+E016F;VS128;abbreviation
+E0170;VS129;abbreviation
+E0171;VS130;abbreviation
+E0172;VS131;abbreviation
+E0173;VS132;abbreviation
+E0174;VS133;abbreviation
+E0175;VS134;abbreviation
+E0176;VS135;abbreviation
+E0177;VS136;abbreviation
+E0178;VS137;abbreviation
+E0179;VS138;abbreviation
+E017A;VS139;abbreviation
+E017B;VS140;abbreviation
+E017C;VS141;abbreviation
+E017D;VS142;abbreviation
+E017E;VS143;abbreviation
+E017F;VS144;abbreviation
+E0180;VS145;abbreviation
+E0181;VS146;abbreviation
+E0182;VS147;abbreviation
+E0183;VS148;abbreviation
+E0184;VS149;abbreviation
+E0185;VS150;abbreviation
+E0186;VS151;abbreviation
+E0187;VS152;abbreviation
+E0188;VS153;abbreviation
+E0189;VS154;abbreviation
+E018A;VS155;abbreviation
+E018B;VS156;abbreviation
+E018C;VS157;abbreviation
+E018D;VS158;abbreviation
+E018E;VS159;abbreviation
+E018F;VS160;abbreviation
+E0190;VS161;abbreviation
+E0191;VS162;abbreviation
+E0192;VS163;abbreviation
+E0193;VS164;abbreviation
+E0194;VS165;abbreviation
+E0195;VS166;abbreviation
+E0196;VS167;abbreviation
+E0197;VS168;abbreviation
+E0198;VS169;abbreviation
+E0199;VS170;abbreviation
+E019A;VS171;abbreviation
+E019B;VS172;abbreviation
+E019C;VS173;abbreviation
+E019D;VS174;abbreviation
+E019E;VS175;abbreviation
+E019F;VS176;abbreviation
+E01A0;VS177;abbreviation
+E01A1;VS178;abbreviation
+E01A2;VS179;abbreviation
+E01A3;VS180;abbreviation
+E01A4;VS181;abbreviation
+E01A5;VS182;abbreviation
+E01A6;VS183;abbreviation
+E01A7;VS184;abbreviation
+E01A8;VS185;abbreviation
+E01A9;VS186;abbreviation
+E01AA;VS187;abbreviation
+E01AB;VS188;abbreviation
+E01AC;VS189;abbreviation
+E01AD;VS190;abbreviation
+E01AE;VS191;abbreviation
+E01AF;VS192;abbreviation
+E01B0;VS193;abbreviation
+E01B1;VS194;abbreviation
+E01B2;VS195;abbreviation
+E01B3;VS196;abbreviation
+E01B4;VS197;abbreviation
+E01B5;VS198;abbreviation
+E01B6;VS199;abbreviation
+E01B7;VS200;abbreviation
+E01B8;VS201;abbreviation
+E01B9;VS202;abbreviation
+E01BA;VS203;abbreviation
+E01BB;VS204;abbreviation
+E01BC;VS205;abbreviation
+E01BD;VS206;abbreviation
+E01BE;VS207;abbreviation
+E01BF;VS208;abbreviation
+E01C0;VS209;abbreviation
+E01C1;VS210;abbreviation
+E01C2;VS211;abbreviation
+E01C3;VS212;abbreviation
+E01C4;VS213;abbreviation
+E01C5;VS214;abbreviation
+E01C6;VS215;abbreviation
+E01C7;VS216;abbreviation
+E01C8;VS217;abbreviation
+E01C9;VS218;abbreviation
+E01CA;VS219;abbreviation
+E01CB;VS220;abbreviation
+E01CC;VS221;abbreviation
+E01CD;VS222;abbreviation
+E01CE;VS223;abbreviation
+E01CF;VS224;abbreviation
+E01D0;VS225;abbreviation
+E01D1;VS226;abbreviation
+E01D2;VS227;abbreviation
+E01D3;VS228;abbreviation
+E01D4;VS229;abbreviation
+E01D5;VS230;abbreviation
+E01D6;VS231;abbreviation
+E01D7;VS232;abbreviation
+E01D8;VS233;abbreviation
+E01D9;VS234;abbreviation
+E01DA;VS235;abbreviation
+E01DB;VS236;abbreviation
+E01DC;VS237;abbreviation
+E01DD;VS238;abbreviation
+E01DE;VS239;abbreviation
+E01DF;VS240;abbreviation
+E01E0;VS241;abbreviation
+E01E1;VS242;abbreviation
+E01E2;VS243;abbreviation
+E01E3;VS244;abbreviation
+E01E4;VS245;abbreviation
+E01E5;VS246;abbreviation
+E01E6;VS247;abbreviation
+E01E7;VS248;abbreviation
+E01E8;VS249;abbreviation
+E01E9;VS250;abbreviation
+E01EA;VS251;abbreviation
+E01EB;VS252;abbreviation
+E01EC;VS253;abbreviation
+E01ED;VS254;abbreviation
+E01EE;VS255;abbreviation
+E01EF;VS256;abbreviation
+
+# EOF

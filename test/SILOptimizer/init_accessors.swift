@@ -1,5 +1,5 @@
-// RUN: %target-swift-frontend -primary-file %s -Onone -emit-sil \
-// RUN:   -Xllvm -sil-print-after=raw-sil-inst-lowering \
+// RUN: %target-swift-frontend -primary-file %s -Onone -Xllvm -sil-print-types -emit-sil \
+// RUN:   -Xllvm -sil-print-types -Xllvm -sil-print-after=raw-sil-inst-lowering \
 // RUN:   -o /dev/null -module-name init_accessors 2>&1 | %FileCheck %s
 
 class NSObject {}

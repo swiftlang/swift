@@ -1,6 +1,5 @@
-// RUN: %target-swift-frontend -target %target-swift-5.1-abi-triple -enable-experimental-feature IsolatedDeinit -parse-as-library -emit-silgen -verify %s
+// RUN: %target-swift-frontend -target %target-future-triple -parse-as-library -emit-silgen -verify %s
 
-// REQUIRES: swift_feature_IsolatedDeinit
 
 @globalActor final actor FirstActor {
   static let shared = FirstActor()

@@ -287,7 +287,7 @@ std::optional<Type> TypeChecker::checkObjCKeyPathExpr(DeclContext *dc,
     if (lookup.size() > 1) {
       lookup.filter([&](LookupResultEntry result, bool isOuter) -> bool {
           // Drop unavailable candidates.
-          if (result.getValueDecl()->getAttrs().isUnavailable(Context))
+          if (result.getValueDecl()->isUnavailable())
             return false;
 
           // Drop non-property, non-type candidates.

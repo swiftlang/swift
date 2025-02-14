@@ -416,7 +416,7 @@ static std::string getSpecializedName(SILFunction *f,
                                       SerializedKind_t serialized,
                                       IndicesSet &promotableIndices) {
   auto p = Demangle::SpecializationPass::CapturePromotion;
-  Mangle::FunctionSignatureSpecializationMangler mangler(p, serialized, f);
+  Mangle::FunctionSignatureSpecializationMangler mangler(f->getASTContext(), p, serialized, f);
   auto fnConv = f->getConventions();
 
   for (unsigned argIdx = 0, endIdx = fnConv.getNumSILArguments();

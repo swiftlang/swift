@@ -15,6 +15,7 @@
 
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ArgumentList.h"
+#include "swift/AST/AvailabilityDomain.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/IfConfigClauseRangeInfo.h"
@@ -24,6 +25,7 @@
 #include "swift/AST/SourceFile.h"
 #include "swift/AST/Stmt.h"
 #include "swift/Basic/Assertions.h"
+#include "swift/Basic/Fingerprint.h"
 
 SWIFT_BEGIN_NULLABILITY_ANNOTATIONS
 
@@ -38,6 +40,11 @@ swift::Identifier BridgedIdentifier::unbridged() const {
   return swift::Identifier::getFromOpaquePointer(Raw);
 }
 
+SWIFT_NAME("getter:BridgedIdentifier.isOperator(self:)")
+bool BridgedIdentifier_isOperator(const BridgedIdentifier ident) {
+  return ident.unbridged().isOperator();
+}
+
 //===----------------------------------------------------------------------===//
 // MARK: BridgedDeclBaseName
 //===----------------------------------------------------------------------===//
@@ -48,6 +55,15 @@ BridgedDeclBaseName::BridgedDeclBaseName(swift::DeclBaseName baseName)
 swift::DeclBaseName BridgedDeclBaseName::unbridged() const {
   return swift::DeclBaseName(Ident.unbridged());
 }
+
+//===----------------------------------------------------------------------===//
+// MARK: BridgedDeclBaseName
+//===----------------------------------------------------------------------===//
+
+BridgedConsumedLookupResult::BridgedConsumedLookupResult(
+    swift::Identifier name, swift::SourceLoc sourceLoc, SwiftInt flag)
+    : Name(BridgedIdentifier(name)), NameLoc(BridgedSourceLoc(sourceLoc)),
+      Flag(flag) {}
 
 //===----------------------------------------------------------------------===//
 // MARK: BridgedDeclNameRef
@@ -118,8 +134,31 @@ bool BridgedDeclContext_isModuleScopeContext(BridgedDeclContext dc) {
   return dc.unbridged()->isModuleScopeContext();
 }
 
+bool BridgedDeclContext_isClosureExpr(BridgedDeclContext dc) {
+  return llvm::isa_and_present<swift::ClosureExpr>(
+      llvm::dyn_cast<swift::AbstractClosureExpr>(dc.unbridged()));
+}
+
+BridgedClosureExpr BridgedDeclContext_castToClosureExpr(BridgedDeclContext dc) {
+  return llvm::cast<swift::ClosureExpr>(
+      llvm::cast<swift::AbstractClosureExpr>(dc.unbridged()));
+}
+
 BridgedASTContext BridgedDeclContext_getASTContext(BridgedDeclContext dc) {
   return dc.unbridged()->getASTContext();
+}
+
+BridgedSourceFile
+BridgedDeclContext_getParentSourceFile(BridgedDeclContext dc) {
+  return dc.unbridged()->getParentSourceFile();
+}
+
+//===----------------------------------------------------------------------===//
+// MARK: BridgedSoureFile
+//===----------------------------------------------------------------------===//
+
+BRIDGED_INLINE bool BridgedSourceFile_isScriptMode(BridgedSourceFile sf) {
+  return sf.unbridged()->isScriptMode();
 }
 
 //===----------------------------------------------------------------------===//
@@ -141,6 +180,10 @@ BridgedStringRef BridgedDeclObj::Value_getUserFacingName() const {
 
 BridgedSourceLoc BridgedDeclObj::Value_getNameLoc() const {
   return BridgedSourceLoc(getAs<swift::ValueDecl>()->getNameLoc().getOpaquePointerValue());
+}
+
+bool BridgedDeclObj::hasClangNode() const {
+  return unbridged()->hasClangNode();
 }
 
 bool BridgedDeclObj::Value_isObjC() const {
@@ -217,6 +260,14 @@ swift::DeclAttributes BridgedDeclAttributes::unbridged() const {
   return attrs;
 }
 
+BridgedAvailabilityDomain::BridgedAvailabilityDomain(
+    swift::AvailabilityDomain domain)
+    : opaque(domain.getOpaqueValue()) {}
+
+swift::AvailabilityDomain BridgedAvailabilityDomain::unbridged() const {
+  return swift::AvailabilityDomain::fromOpaque(opaque);
+}
+
 //===----------------------------------------------------------------------===//
 // MARK: BridgedParamDecl
 //===----------------------------------------------------------------------===//
@@ -240,6 +291,10 @@ swift::ParamSpecifier unbridge(BridgedParamSpecifier specifier) {
 void BridgedParamDecl_setSpecifier(BridgedParamDecl cDecl,
                                    BridgedParamSpecifier cSpecifier) {
   cDecl.unbridged()->setSpecifier(unbridge(cSpecifier));
+}
+
+void BridgedParamDecl_setImplicit(BridgedParamDecl cDecl) {
+  cDecl.unbridged()->setImplicit();
 }
 
 //===----------------------------------------------------------------------===//
@@ -321,6 +376,10 @@ BridgedASTType BridgedASTType::subst(BridgedSubstitutionMap substMap) const {
 // MARK: BridgedCanType
 //===----------------------------------------------------------------------===//
 
+static_assert((int)BridgedCanType::TraitResult::IsNot == (int)swift::TypeTraitResult::IsNot);
+static_assert((int)BridgedCanType::TraitResult::CanBe == (int)swift::TypeTraitResult::CanBe);
+static_assert((int)BridgedCanType::TraitResult::Is == (int)swift::TypeTraitResult::Is);
+
 BridgedCanType::BridgedCanType(swift::CanType ty) : type(ty.getPointer()) {
 }
 
@@ -331,6 +390,19 @@ swift::CanType BridgedCanType::unbridged() const {
 BridgedASTType BridgedCanType::getType() const {
   return {type};
 }
+
+BridgedCanType::TraitResult BridgedCanType::canBeClass() const {
+  return (TraitResult)unbridged()->canBeClass();
+}
+
+//===----------------------------------------------------------------------===//
+// MARK: BridgedASTTypeArray
+//===----------------------------------------------------------------------===//
+
+BridgedASTType BridgedASTTypeArray::getAt(SwiftInt index) const {
+  return {typeArray.unbridged<swift::Type>()[index].getPointer()};
+}
+
 
 //===----------------------------------------------------------------------===//
 // MARK: BridgedConformance
@@ -454,6 +526,18 @@ SwiftInt BridgedSubstitutionMap::getNumConformances() const {
 
 BridgedConformance BridgedSubstitutionMap::getConformance(SwiftInt index) const {
   return unbridged().getConformances()[index];
+}
+
+BridgedASTTypeArray BridgedSubstitutionMap::getReplacementTypes() const {
+  return {unbridged().getReplacementTypes()};
+}
+
+//===----------------------------------------------------------------------===//
+// MARK: BridgedFingerprint
+//===----------------------------------------------------------------------===//
+
+swift::Fingerprint BridgedFingerprint::unbridged() const {
+  return swift::Fingerprint(swift::Fingerprint::Core{this->v1, this->v2});
 }
 
 //===----------------------------------------------------------------------===//

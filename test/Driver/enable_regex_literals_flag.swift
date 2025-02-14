@@ -3,7 +3,7 @@
 
 // REQUIRES: cplusplus_driver
 
-// CHECK: {{.*}}swift{{c|-frontend}}{{(.exe)?"?}} -frontend{{.*}}-enable-bare-slash-regex
+// CHECK: {{.*}}swift{{c|c-legacy-driver|-frontend}}{{(.exe)?"?}} -frontend{{.*}}-enable-bare-slash-regex
 
 public func foo() -> Int {
     return 42

@@ -1,4 +1,4 @@
-// RUN: %target-swift-emit-silgen %s -disable-objc-attr-requires-foundation-module | %FileCheck %s
+// RUN: %target-swift-emit-silgen -Xllvm -sil-print-types %s -disable-objc-attr-requires-foundation-module | %FileCheck %s
 // REQUIRES: objc_interop
 
 public protocol Proto {

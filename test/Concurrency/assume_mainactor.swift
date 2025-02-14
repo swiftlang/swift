@@ -10,7 +10,7 @@
 class Klass {
   // Implicit deinit
   // CHECK: // Klass.deinit
-  // CHECK-NEXT: // Isolation: nonisolated
+  // CHECK-NEXT: // Isolation: unspecified
   // CHECK-NEXT: sil hidden [ossa] @$s16assume_mainactor5KlassCfd : $@convention(method) (@guaranteed Klass) -> @owned Builtin.NativeObject {
 
   // Implicit deallocating deinit
@@ -70,7 +70,7 @@ struct NonIsolatedStructContainingKlass {
 
 @globalActor
 actor CustomActor {
-  static let shared = CustomActor()
+  static nonisolated let shared = CustomActor()
 }
 
 // CHECK: // unspecifiedAsync<A>(_:)
@@ -163,7 +163,7 @@ nonisolated func nonisolatedFunctionTest() async {
 
 actor MyActor {
   // CHECK: // variable initialization expression of MyActor.k
-  // CHECK-NEXT: // Isolation: actor_instance
+  // CHECK-NEXT: // Isolation: unspecified
   // CHECK-NEXT: sil hidden [transparent] [ossa] @$s16assume_mainactor7MyActorC1kAA5KlassCvpfi : $@convention(thin) () -> @owned Klass {
 
   // CHECK: // MyActor.k.getter
@@ -175,9 +175,21 @@ actor MyActor {
   // CHECK-NEXT: sil hidden [transparent] [ossa] @$s16assume_mainactor7MyActorC1kAA5KlassCvs : $@convention(method) (@owned Klass, @sil_isolated @guaranteed MyActor) -> () {
   var k = Klass()
 
+  // CHECK: // static MyActor.f()
+  // CHECK-NEXT: // Isolation: unspecified
+  // CHECK-NEXT: sil hidden [ossa] @$s16assume_mainactor7MyActorC1fyyFZ : $@convention(method) (@thick MyActor.Type) -> ()
+  static func f() {}
+
+  struct Nested {
+    // CHECK: // MyActor.Nested.f()
+    // CHECK-NEXT: // Isolation: unspecified
+    // CHECK-NEXT: sil hidden [ossa] @$s16assume_mainactor7MyActorC6NestedV1fyyF : $@convention(method) (MyActor.Nested) -> ()
+    func f() {}
+  }
+
   // Implicit deinit
   // CHECK: // MyActor.deinit
-  // CHECK-NEXT: // Isolation: nonisolated
+  // CHECK-NEXT: // Isolation: unspecified
   // CHECK-NEXT: sil hidden [ossa] @$s16assume_mainactor7MyActorCfd : $@convention(method) (@guaranteed MyActor) -> @owned Builtin.NativeObject {
 
   // Non-async init should be nonisolated
@@ -198,4 +210,10 @@ actor MyActor2 {
   // CHECK-NEXT: sil hidden [ossa] @$s16assume_mainactor8MyActor2C1xACyt_tcfc : $@convention(method) (@owned MyActor2) -> @owned MyActor2 {
   @CustomActor
   init(x: ()) {}
+}
+
+@CustomActor func validateThatPrintIsStillNonIsolated() {
+  // Since we are in a CustomActor, we can only call this if print is
+  // NonIsolated and not if print was inferred to be main actor.
+  print("123")
 }

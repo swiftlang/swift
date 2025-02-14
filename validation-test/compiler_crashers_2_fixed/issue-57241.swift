@@ -8,9 +8,10 @@ struct S {
 
   func test() {
     ForEach(data) { group in
-      ForEach(group) { month in // expected-error {{type '()' cannot conform to 'View'}}
-        // expected-note@-1 {{only concrete types such as structs, enums and classes can conform to protocols}}
+      ForEach(group) { month in
         self.f()
+        // expected-error@-1 {{type '()' cannot conform to 'View'}}
+        // expected-note@-2 {{only concrete types such as structs, enums and classes can conform to protocols}}
       }
     }
   }

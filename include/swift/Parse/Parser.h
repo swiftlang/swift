@@ -42,6 +42,7 @@ namespace llvm {
 }
 
 namespace swift {
+  class AvailabilitySpec;
   class CodeCompletionCallbacks;
   class DoneParsingCallback;
   class DefaultArgumentInitializer;
@@ -53,7 +54,7 @@ namespace swift {
   class SILParserStateBase;
   class SourceManager;
   class UUID;
-  
+
   struct EnumElementInfo;
 
   /// Different contexts in which BraceItemList are parsed.
@@ -933,7 +934,7 @@ public:
   bool isStartOfGetSetAccessor();
 
   /// Flags that control the parsing of declarations.
-  enum ParseDeclFlags {
+  enum ParseDeclFlags : uint16_t {
     PD_Default              = 0,
     PD_AllowTopLevel        = 1 << 1,
     PD_HasContainerType     = 1 << 2,
@@ -944,6 +945,7 @@ public:
     PD_InExtension          = 1 << 7,
     PD_InStruct             = 1 << 8,
     PD_InEnum               = 1 << 9,
+    PD_StubOnly             = 1 << 10,
   };
 
   /// Options that control the parsing of declarations.
@@ -953,20 +955,24 @@ public:
 
   ParserStatus parseDecl(bool IsAtStartOfLineOrPreviousHadSemi,
                          bool IfConfigsAreDeclAttrs,
-                         llvm::function_ref<void(Decl *)> Handler);
+                         llvm::function_ref<void(Decl *)> Handler,
+                         bool stubOnly = false);
 
   std::pair<std::vector<Decl *>, std::optional<Fingerprint>>
   parseDeclListDelayed(IterableDeclContext *IDC);
 
   bool parseMemberDeclList(SourceLoc &LBLoc, SourceLoc &RBLoc,
                            Diag<> LBraceDiag, Diag<> RBraceDiag,
-                           IterableDeclContext *IDC);
+                           IterableDeclContext *IDC,
+                           ParseDeclOptions Flags);
 
   bool canDelayMemberDeclParsing(bool &HasOperatorDeclarations,
                                  bool &HasNestedClassDeclarations,
-                                 bool &HasDerivativeDeclarations);
+                                 bool &HasDerivativeDeclarations,
+                                 ParseDeclOptions Flags);
 
-  bool canDelayFunctionBodyParsing(bool &HasNestedTypeDeclarations);
+  bool canDelayFunctionBodyParsing(bool &HasNestedTypeDeclarations,
+                                   ParseDeclOptions Flags);
 
   bool delayParsingDeclList(SourceLoc LBLoc, SourceLoc &RBLoc,
                             IterableDeclContext *IDC);
@@ -998,8 +1004,7 @@ public:
 
   /// Parse an #if ... #endif containing only attributes.
   ParserStatus parseIfConfigAttributes(
-    DeclAttributes &attributes, bool ifConfigsAreDeclAttrs,
-    PatternBindingInitializer *initContext);
+    DeclAttributes &attributes, bool ifConfigsAreDeclAttrs);
 
   /// Parse a #error or #warning diagnostic.
   ParserResult<PoundDiagnosticDecl> parseDeclPoundDiagnostic();
@@ -1021,13 +1026,6 @@ public:
   /// Parse the optional attributes before a declaration.
   ParserStatus parseDeclAttributeList(DeclAttributes &Attributes,
                                       bool IfConfigsAreDeclAttrs = false);
-
-  /// Parse the optional attributes before a declaration.
-  ///
-  /// This is the inner loop, which can be called recursively.
-  ParserStatus parseDeclAttributeList(DeclAttributes &Attributes,
-                                      bool IfConfigsAreDeclAttrs,
-                                      PatternBindingInitializer *initContext);
 
   /// Parse the optional attributes before a closure declaration.
   ParserStatus parseClosureDeclAttributeList(DeclAttributes &Attributes);
@@ -1083,7 +1081,6 @@ public:
       AvailabilityRange *SILAvailability,
       SmallVectorImpl<Identifier> &spiGroups,
       SmallVectorImpl<AvailableAttr *> &availableAttrs,
-      size_t &typeErasedParamsCount,
       llvm::function_ref<bool(Parser &)> parseSILTargetName,
       llvm::function_ref<bool(Parser &)> parseSILSIPModule);
 
@@ -1163,7 +1160,6 @@ public:
   /// Parse a specific attribute.
   ParserStatus parseDeclAttribute(DeclAttributes &Attributes, SourceLoc AtLoc,
                                   SourceLoc AtEndLoc,
-                                  PatternBindingInitializer *&initContext,
                                   bool isFromClangAttribute = false);
 
   bool isCustomAttributeArgument();
@@ -1172,13 +1168,7 @@ public:
   /// Parse a custom attribute after the initial '@'.
   ///
   /// \param atLoc The location of the already-parsed '@'.
-  ///
-  /// \param initContext A reference to the initializer context used
-  /// for the set of custom attributes. This should start as nullptr, and
-  /// will get filled in by this function. The same variable should be provided
-  /// for every custom attribute within the same attribute list.
-  ParserResult<CustomAttr> parseCustomAttribute(
-      SourceLoc atLoc, PatternBindingInitializer *&initContext);
+  ParserResult<CustomAttr> parseCustomAttribute(SourceLoc atLoc);
 
   ParserStatus parseNewDeclAttribute(DeclAttributes &Attributes,
                                      SourceLoc AtLoc, DeclAttrKind DK,
@@ -1334,7 +1324,8 @@ public:
                                        bool HasFuncKeyword = true);
   BodyAndFingerprint
   parseAbstractFunctionBodyImpl(AbstractFunctionDecl *AFD);
-  void parseAbstractFunctionBody(AbstractFunctionDecl *AFD);
+  void parseAbstractFunctionBody(AbstractFunctionDecl *AFD,
+                                 ParseDeclOptions Flags);
   BodyAndFingerprint
   parseAbstractFunctionBodyDelayed(AbstractFunctionDecl *AFD);
 
@@ -1480,7 +1471,6 @@ public:
 
   ParserStatus parseTypeAttribute(TypeOrCustomAttr &result, SourceLoc AtLoc,
                                   SourceLoc AtEndLoc, ParseTypeReason reason,
-                                  PatternBindingInitializer *&initContext,
                                   bool justChecking = false);
 
   ParserResult<TypeRepr> parseOldStyleProtocolComposition();
@@ -2042,7 +2032,7 @@ public:
   };
 
   /// Parse a comma-separated list of availability specifications. Try to
-  /// expand availability macros when /p Source is not a command line macro.
+  /// expand availability macros when \p Source is not a command line macro.
   ParserStatus
   parseAvailabilitySpecList(SmallVectorImpl<AvailabilitySpec *> &Specs,
                             AvailabilitySpecSource Source);
@@ -2058,27 +2048,17 @@ public:
   ParserStatus
   parseAvailabilityMacro(SmallVectorImpl<AvailabilitySpec *> &Specs);
 
-  /// Parse the availability macros definitions passed as arguments.
-  AvailabilityMacroMap &parseAllAvailabilityMacroArguments();
-
-  /// Result of parsing an availability macro definition.
-  struct AvailabilityMacroDefinition {
-    StringRef Name;
-    llvm::VersionTuple Version;
-    SmallVector<AvailabilitySpec *, 4> Specs;
-  };
-
   /// Parse an availability macro definition from a command line argument.
-  /// This function should be called on a Parser set up on the command line
+  /// This function should only be called on a Parser set up on the command line
   /// argument code.
   ParserStatus
-  parseAvailabilityMacroDefinition(AvailabilityMacroDefinition &Result);
+  parseAvailabilityMacroDefinition(std::string &Name,
+                                   llvm::VersionTuple &Version,
+                                   SmallVectorImpl<AvailabilitySpec *> &Specs);
 
   ParserResult<AvailabilitySpec> parseAvailabilitySpec();
-  ParserResult<PlatformVersionConstraintAvailabilitySpec>
-  parsePlatformVersionConstraintSpec();
-  ParserResult<PlatformAgnosticVersionConstraintAvailabilitySpec>
-  parsePlatformAgnosticVersionConstraintSpec();
+  ParserResult<AvailabilitySpec> parsePlatformVersionConstraintSpec();
+  ParserResult<AvailabilitySpec> parsePlatformAgnosticVersionConstraintSpec();
   bool
   parseAvailability(bool parseAsPartOfSpecializeAttr, StringRef AttrName,
                     bool &DiscardAttribute, SourceRange &attrRange,

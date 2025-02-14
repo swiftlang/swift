@@ -152,7 +152,7 @@ class SILSymbolVisitorImpl : public ASTVisitor<SILSymbolVisitorImpl> {
     auto *loweredParamIndices = autodiff::getLoweredParameterIndices(
         config.parameterIndices,
         original->getInterfaceType()->castTo<AnyFunctionType>());
-    Mangle::ASTMangler mangler;
+    Mangle::ASTMangler mangler(original->getASTContext());
     AutoDiffConfig silConfig{
         loweredParamIndices, config.resultIndices,
         autodiff::getDifferentiabilityWitnessGenericSignature(
@@ -207,7 +207,7 @@ class SILSymbolVisitorImpl : public ASTVisitor<SILSymbolVisitorImpl> {
         autodiff::getDifferentiabilityWitnessGenericSignature(
             original->getGenericSignature(), derivativeGenericSignature)};
 
-    Mangle::ASTMangler mangler;
+    Mangle::ASTMangler mangler(original->getASTContext());
     auto mangledName = mangler.mangleSILDifferentiabilityWitness(
         originalMangledName, kind, config);
 

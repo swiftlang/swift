@@ -120,6 +120,18 @@ void *swift::swift_slowAllocTyped(size_t size, size_t alignMask,
   return swift_slowAlloc(size, alignMask);
 }
 
+void *swift::swift_coroFrameAlloc(size_t size,
+                                  MallocTypeId typeId) {
+#if SWIFT_STDLIB_HAS_MALLOC_TYPE
+  if (__builtin_available(macOS 15, iOS 17, tvOS 17, watchOS 10, *)) {
+    void *p = malloc_type_malloc(size, typeId);
+    if (!p) swift::crash("Could not allocate memory.");
+    return p;
+  }
+#endif
+  return malloc(size);
+}
+
 // Unknown alignment is specified by passing alignMask == ~(size_t(0)), forcing
 // the AlignedFree deallocation path for unknown alignment. The memory
 // deallocated with unknown alignment must have been allocated with either

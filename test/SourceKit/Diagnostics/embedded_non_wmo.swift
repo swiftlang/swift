@@ -18,6 +18,8 @@ func foo() {
 
 @main
 struct Main {
+    var someClass = SomeClass()
+
     static func main() {
         foo()
     }
@@ -25,9 +27,9 @@ struct Main {
 
 //--- file2.swift
 
-func bar<T>(_ T: T.Type) {
-    
-}
+final class SomeClass {}
+
+func bar<T>(_ T: T.Type) {}
 
 // CHECK:      {
 // CHECK-NEXT:   key.diagnostics: [

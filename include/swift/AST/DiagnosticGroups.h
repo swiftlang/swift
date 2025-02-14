@@ -18,13 +18,13 @@
 #ifndef SWIFT_DIAGNOSTICGROUPS_H
 #define SWIFT_DIAGNOSTICGROUPS_H
 
-#include "swift/AST/DiagnosticList.h"
 #include "llvm/ADT/ArrayRef.h"
 #include <array>
 #include <string_view>
 #include <unordered_map>
 
 namespace swift {
+enum class DiagID : uint32_t;
 
 enum class DiagGroupID : uint16_t {
 #define GROUP(Name, Version) Name,
@@ -33,7 +33,7 @@ enum class DiagGroupID : uint16_t {
 
 constexpr const auto DiagGroupsCount = [] {
   size_t count = 0;
-#define GROUP(Name, Version) count++;
+#define GROUP(Name, Version) ++count;
 #include "DiagnosticGroups.def"
   return count;
 }();

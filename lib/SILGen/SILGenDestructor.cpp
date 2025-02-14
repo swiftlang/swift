@@ -17,6 +17,7 @@
 #include "SwitchEnumBuilder.h"
 #include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/Decl.h"
+#include "swift/AST/DiagnosticsSIL.h"
 #include "swift/AST/GenericSignature.h"
 #include "swift/AST/SubstitutionMap.h"
 #include "swift/Basic/Assertions.h"
@@ -373,8 +374,10 @@ void SILGenFunction::emitIsolatingDestructor(DestructorDecl *dd) {
 
     // Get deinitOnExecutor
     FuncDecl *swiftDeinitOnExecutorDecl = SGM.getDeinitOnExecutor();
-    assert(swiftDeinitOnExecutorDecl &&
-           "Failed to find swift_task_deinitOnExecutor function decl");
+    if (!swiftDeinitOnExecutorDecl) {
+      dd->diagnose(diag::missing_deinit_on_executor_function);
+      return;
+    }
     SILFunction *swiftDeinitOnExecutorSILFunc = SGM.getFunction(
         SILDeclRef(swiftDeinitOnExecutorDecl, SILDeclRef::Kind::Func),
         NotForDefinition);
@@ -667,7 +670,7 @@ void SILGenFunction::emitMoveOnlyMemberDestruction(SILValue selfValue,
   }
   // self has been stored into a temporary
   assert(!selfValue->getType().isObject());
-  if (auto *structDecl = dyn_cast<StructDecl>(nom)) {
+  if (isa<StructDecl>(nom)) {
     for (VarDecl *vd : nom->getStoredProperties()) {
       const TypeLowering &ti = getTypeLowering(vd->getTypeInContext());
       if (ti.isTrivial())

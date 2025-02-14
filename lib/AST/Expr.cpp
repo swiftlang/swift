@@ -41,21 +41,6 @@ using namespace swift;
                 "Exprs are BumpPtrAllocated; the destructor is never called");
 #include "swift/AST/ExprNodes.def"
 
-StringRef swift::getFunctionRefKindStr(FunctionRefKind refKind) {
-  switch (refKind) {
-  case FunctionRefKind::Unapplied:
-    return "unapplied";
-  case FunctionRefKind::SingleApply:
-    return "single";
-  case FunctionRefKind::DoubleApply:
-    return "double";
-  case FunctionRefKind::Compound:
-    return "compound";
-  }
-
-  llvm_unreachable("Unhandled FunctionRefKind in switch.");
-}
-
 //===----------------------------------------------------------------------===//
 // Expr methods.
 //===----------------------------------------------------------------------===//
@@ -373,6 +358,7 @@ ConcreteDeclRef Expr::getReferencedDecl(bool stopAtParenExpr) const {
   PASS_THROUGH_REFERENCE(UnresolvedMemberChainResult, getSubExpr);
   PASS_THROUGH_REFERENCE(DotSelf, getSubExpr);
   PASS_THROUGH_REFERENCE(Await, getSubExpr);
+  PASS_THROUGH_REFERENCE(Unsafe, getSubExpr);
   PASS_THROUGH_REFERENCE(Consume, getSubExpr);
   PASS_THROUGH_REFERENCE(Copy, getSubExpr);
   PASS_THROUGH_REFERENCE(Borrow, getSubExpr);
@@ -459,6 +445,7 @@ ConcreteDeclRef Expr::getReferencedDecl(bool stopAtParenExpr) const {
   PASS_THROUGH_REFERENCE(UnderlyingToOpaque, getSubExpr);
   PASS_THROUGH_REFERENCE(Unreachable, getSubExpr);
   PASS_THROUGH_REFERENCE(ActorIsolationErasure, getSubExpr);
+  PASS_THROUGH_REFERENCE(UnsafeCast, getSubExpr);
   NO_REFERENCE(Coerce);
   NO_REFERENCE(ForcedCheckedCast);
   NO_REFERENCE(ConditionalCheckedCast);
@@ -475,7 +462,6 @@ ConcreteDeclRef Expr::getReferencedDecl(bool stopAtParenExpr) const {
   NO_REFERENCE(KeyPath);
   NO_REFERENCE(KeyPathDot);
   PASS_THROUGH_REFERENCE(CurrentContextIsolation, getActor);
-  PASS_THROUGH_REFERENCE(OneWay, getSubExpr);
   NO_REFERENCE(Tap);
   NO_REFERENCE(TypeJoin);
   SIMPLE_REFERENCE(MacroExpansion, getMacroRef);
@@ -676,7 +662,6 @@ bool Expr::canAppendPostfixExpression(bool appendingPostfixOperator) const {
   case ExprKind::Error:
   case ExprKind::CodeCompletion:
   case ExprKind::LazyInitializer:
-  case ExprKind::OneWay:
     return false;
 
   case ExprKind::NilLiteral:
@@ -752,6 +737,7 @@ bool Expr::canAppendPostfixExpression(bool appendingPostfixOperator) const {
     return true;
 
   case ExprKind::Await:
+  case ExprKind::Unsafe:
   case ExprKind::Consume:
   case ExprKind::Copy:
   case ExprKind::Borrow:
@@ -828,6 +814,7 @@ bool Expr::canAppendPostfixExpression(bool appendingPostfixOperator) const {
   case ExprKind::UnderlyingToOpaque:
   case ExprKind::Unreachable:
   case ExprKind::ActorIsolationErasure:
+  case ExprKind::UnsafeCast:
   case ExprKind::TypeValue:
     // Implicit conversion nodes have no syntax of their own; defer to the
     // subexpression.
@@ -872,6 +859,25 @@ ArgumentList *Expr::getArgs() const {
   if (auto *ME = dyn_cast<MacroExpansionExpr>(this))
     return ME->getArgs();
   return nullptr;
+}
+
+DeclNameLoc Expr::getNameLoc() const {
+  if (auto *DRE = dyn_cast<DeclRefExpr>(this))
+    return DRE->getNameLoc();
+  if (auto *UDRE = dyn_cast<UnresolvedDeclRefExpr>(this))
+    return UDRE->getNameLoc();
+  if (auto *ODRE = dyn_cast<OverloadedDeclRefExpr>(this))
+    return ODRE->getNameLoc();
+  if (auto *UDE = dyn_cast<UnresolvedDotExpr>(this))
+    return UDE->getNameLoc();
+  if (auto *UME = dyn_cast<UnresolvedMemberExpr>(this))
+    return UME->getNameLoc();
+  if (auto *MRE = dyn_cast<MemberRefExpr>(this))
+    return MRE->getNameLoc();
+  if (auto *DRME = dyn_cast<DynamicMemberRefExpr>(this))
+    return DRME->getNameLoc();
+
+  return DeclNameLoc();
 }
 
 llvm::DenseMap<Expr *, Expr *> Expr::getParentMap() {
@@ -950,6 +956,7 @@ bool Expr::isValidParentOfTypeExpr(Expr *typeExpr) const {
   case ExprKind::Sequence:
   case ExprKind::Paren:
   case ExprKind::Await:
+  case ExprKind::Unsafe:
   case ExprKind::Consume:
   case ExprKind::Copy:
   case ExprKind::Borrow:
@@ -1031,7 +1038,6 @@ bool Expr::isValidParentOfTypeExpr(Expr *typeExpr) const {
   case ExprKind::ObjCSelector:
   case ExprKind::KeyPath:
   case ExprKind::KeyPathDot:
-  case ExprKind::OneWay:
   case ExprKind::Tap:
   case ExprKind::SingleValueStmt:
   case ExprKind::TypeJoin:
@@ -1039,6 +1045,7 @@ bool Expr::isValidParentOfTypeExpr(Expr *typeExpr) const {
   case ExprKind::CurrentContextIsolation:
   case ExprKind::ActorIsolationErasure:
   case ExprKind::ExtractFunctionIsolation:
+  case ExprKind::UnsafeCast:
     return false;
   }
 
@@ -1930,11 +1937,13 @@ unsigned AbstractClosureExpr::getDiscriminator() const {
   // If we don't have a discriminator, and either
   //   1. We have ill-formed code and we're able to assign a discriminator, or
   //   2. We are in a macro expansion buffer
+  //   3. We are within top-level code where there's nothing to anchor to
   //
   // then assign the next discriminator now.
   if (getRawDiscriminator() == InvalidDiscriminator &&
       (ctx.Diags.hadAnyError() ||
-       getParentSourceFile()->getFulfilledMacroRole() != std::nullopt)) {
+       getParentSourceFile()->getFulfilledMacroRole() != std::nullopt ||
+       getParent()->isModuleScopeContext())) {
     auto discriminator = ctx.getNextDiscriminator(getParent());
     ctx.setMaxAssignedDiscriminator(getParent(), discriminator + 1);
     const_cast<AbstractClosureExpr *>(this)->
@@ -2585,9 +2594,9 @@ SingleValueStmtExpr::tryDigOutSingleValueStmtExpr(Expr *E) {
       if (isa<CoerceExpr>(E))
         return Action::Continue(E);
 
-      // Look through try/await (this is invalid, but we'll error on it in
-      // effect checking).
-      if (isa<AnyTryExpr>(E) || isa<AwaitExpr>(E))
+      // Look through try/await/unsafe (this is invalid, but we'll error on
+      // it in effect checking).
+      if (isa<AnyTryExpr>(E) || isa<AwaitExpr>(E) || isa<UnsafeExpr>(E))
         return Action::Continue(E);
 
       return Action::Stop();

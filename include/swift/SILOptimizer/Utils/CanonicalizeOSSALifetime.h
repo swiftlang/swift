@@ -96,7 +96,6 @@
 #ifndef SWIFT_SILOPTIMIZER_UTILS_CANONICALOSSALIFETIME_H
 #define SWIFT_SILOPTIMIZER_UTILS_CANONICALOSSALIFETIME_H
 
-#include "swift/Basic/GraphNodeWorklist.h"
 #include "swift/Basic/SmallPtrSetVector.h"
 #include "swift/SIL/PrunedLiveness.h"
 #include "swift/SIL/SILInstruction.h"
@@ -279,8 +278,28 @@ private:
   /// outside the pruned liveness at the time it is discovered.
   llvm::SmallPtrSet<DebugValueInst *, 8> debugValues;
 
-  /// Visited set for general def-use traversal that prevents revisiting values.
-  GraphNodeWorklist<SILValue, 8> defUseWorklist;
+  struct Def {
+    enum Kind {
+      Root,
+      Copy,
+      BorrowedFrom,
+      Reborrow,
+    };
+    const Kind kind;
+    const SILValue value;
+    static Def root(SILValue value) { return {Root, value}; }
+    static Def copy(CopyValueInst *cvi) { return {Copy, cvi}; }
+    static Def borrowedFrom(BorrowedFromInst *bfi) {
+      return {BorrowedFrom, bfi};
+    }
+    static Def reborrow(SILArgument *argument) { return {Reborrow, argument}; }
+
+  private:
+    Def(Kind kind, SILValue value) : kind(kind), value(value) {}
+  };
+
+  /// The defs derived from currentDef whose uses are added to liveness.
+  SmallVector<Def, 8> discoveredDefs;
 
   /// The blocks that were discovered by PrunedLiveness.
   SmallVector<SILBasicBlock *, 32> discoveredBlocks;

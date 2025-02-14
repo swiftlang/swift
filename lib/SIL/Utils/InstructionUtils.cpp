@@ -172,6 +172,7 @@ SILValue swift::stripCasts(SILValue v) {
     if (auto *svi = dyn_cast<SingleValueInstruction>(v)) {
       if (isIdentityPreservingRefCast(svi) ||
           isa<UncheckedTrivialBitCastInst>(v) || isa<MarkDependenceInst>(v) ||
+          isa<UncheckedOwnershipConversionInst>(v) ||
           isa<BeginAccessInst>(v)) {
         v = cast<SingleValueInstruction>(v)->getOperand(0);
         continue;
@@ -334,7 +335,21 @@ bool swift::isEndOfScopeMarker(SILInstruction *user) {
 
 bool swift::isIncidentalUse(SILInstruction *user) {
   return isEndOfScopeMarker(user) || user->isDebugInstruction() ||
-         isa<FixLifetimeInst>(user) || isa<EndLifetimeInst>(user);
+         isa<FixLifetimeInst>(user) || isa<EndLifetimeInst>(user) ||
+         isa<IgnoredUseInst>(user);
+}
+
+bool swift::isMoveOnlyWrapperUse(SILInstruction *user) {
+  switch (user->getKind()) {
+  case SILInstructionKind::MoveOnlyWrapperToCopyableValueInst:
+  case SILInstructionKind::MoveOnlyWrapperToCopyableBoxInst:
+  case SILInstructionKind::MoveOnlyWrapperToCopyableAddrInst:
+  case SILInstructionKind::CopyableToMoveOnlyWrapperValueInst:
+  case SILInstructionKind::CopyableToMoveOnlyWrapperAddrInst:
+    return true;
+  default:
+    return false;
+  }
 }
 
 bool swift::onlyAffectsRefCount(SILInstruction *user) {
@@ -364,7 +379,7 @@ bool swift::onlyAffectsRefCount(SILInstruction *user) {
 }
 
 bool swift::mayCheckRefCount(SILInstruction *User) {
-  return isa<IsUniqueInst>(User) || isa<IsEscapingClosureInst>(User) ||
+  return isa<IsUniqueInst>(User) || isa<DestroyNotEscapedClosureInst>(User) ||
          isa<BeginCOWMutationInst>(User);
 }
 
@@ -463,6 +478,27 @@ static RuntimeEffect metadataEffect(SILType ty) {
   if (cl && !cl->hasKnownSwiftImplementation())
     return RuntimeEffect::MetaData | RuntimeEffect::ObjectiveC;
   return RuntimeEffect::MetaData;
+}
+
+/// Whether this particular SIL function is known a prior not to use the
+/// generic metadata it is given.
+static bool knownToNotUseGenericMetadata(SILFunction &f) {
+  // swift_willThrowTypedImpl only uses the generic metadata when a global
+  // hook has been installed, so we treat it as if the generic metadata is
+  // unused.
+  if (f.getName() == "swift_willThrowTypedImpl")
+    return true;
+
+  return false;
+}
+
+/// Whether this apply site is a call to a functio that is known not to use
+/// the generic metadata it is given.
+static bool knownToNotUseGenericMetadata(ApplySite &as) {
+  if (auto *callee = as.getCalleeFunction()) {
+    return knownToNotUseGenericMetadata(*callee);
+  }
+  return false;
 }
 
 RuntimeEffect swift::getRuntimeEffect(SILInstruction *inst, SILType &impactType) {
@@ -601,6 +637,7 @@ RuntimeEffect swift::getRuntimeEffect(SILInstruction *inst, SILType &impactType)
   case SILInstructionKind::DebugStepInst:
   case SILInstructionKind::FunctionExtractIsolationInst:
   case SILInstructionKind::TypeValueInst:
+  case SILInstructionKind::IgnoredUseInst:
     return RuntimeEffect::NoEffect;
       
   case SILInstructionKind::OpenExistentialMetatypeInst:
@@ -745,7 +782,6 @@ RuntimeEffect swift::getRuntimeEffect(SILInstruction *inst, SILType &impactType)
     return RuntimeEffect::MetaData;
 
   case SILInstructionKind::AllocStackInst:
-  case SILInstructionKind::AllocVectorInst:
   case SILInstructionKind::ProjectBoxInst: {
     SILType allocType = cast<SingleValueInstruction>(inst)->getType();
     if (allocType.hasArchetype() && !allocType.isLoadable(*inst->getFunction())) {
@@ -894,7 +930,7 @@ RuntimeEffect swift::getRuntimeEffect(SILInstruction *inst, SILType &impactType)
   case SILInstructionKind::BeginDeallocRefInst:
   case SILInstructionKind::EndInitLetRefInst:
   case SILInstructionKind::IsUniqueInst:
-  case SILInstructionKind::IsEscapingClosureInst:
+  case SILInstructionKind::DestroyNotEscapedClosureInst:
   case SILInstructionKind::CopyBlockInst:
   case SILInstructionKind::CopyBlockWithoutEscapingInst:
     return ifNonTrivial(inst->getOperand(0)->getType(),
@@ -1017,7 +1053,7 @@ RuntimeEffect swift::getRuntimeEffect(SILInstruction *inst, SILType &impactType)
       }
     }
 
-    if (!as.getSubstitutionMap().empty())
+    if (!as.getSubstitutionMap().empty() && !knownToNotUseGenericMetadata(as))
       rt |= RuntimeEffect::MetaData;
     if (auto *pa = dyn_cast<PartialApplyInst>(inst)) {
       if (!pa->isOnStack())

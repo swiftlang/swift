@@ -18,8 +18,10 @@
 #ifndef SWIFT_AST_AVAILABILITY_CONTEXT_H
 #define SWIFT_AST_AVAILABILITY_CONTEXT_H
 
-#include "swift/AST/Availability.h"
+#include "swift/AST/AvailabilityDomain.h"
+#include "swift/AST/AvailabilityRange.h"
 #include "swift/AST/PlatformKind.h"
+#include "swift/Basic/Debug.h"
 #include "swift/Basic/LLVM.h"
 #include <optional>
 
@@ -37,55 +39,64 @@ public:
   class Storage;
 
 private:
-  struct PlatformInfo;
+  class Info;
 
   /// A non-null pointer to uniqued storage for this availability context.
-  const Storage *Info;
+  const Storage *storage;
 
-  AvailabilityContext(const Storage *info) : Info(info) { assert(info); };
+  AvailabilityContext(const Storage *storage) : storage(storage) {
+    assert(storage);
+  };
 
-  /// Retrieves a uniqued `AvailabilityContext` with the given platform
-  /// availability parameters.
+  /// Retrieves an `AvailabilityContext` with the given platform availability
+  /// parameters.
   static AvailabilityContext
   get(const AvailabilityRange &platformAvailability,
-      std::optional<PlatformKind> unavailablePlatform, bool deprecated,
+      std::optional<AvailabilityDomain> unavailableDomain, bool deprecated,
       ASTContext &ctx);
 
 public:
-  /// Retrieves the default `AvailabilityContext`, which is maximally available.
-  /// The platform availability range will be set to the deployment target (or
-  /// minimum inlining target when applicable).
-  static AvailabilityContext getDefault(ASTContext &ctx);
+  /// Retrieves an `AvailabilityContext` constrained by the given platform
+  /// availability range.
+  static AvailabilityContext forPlatformRange(const AvailabilityRange &range,
+                                              ASTContext &ctx);
+
+  /// Retrieves the maximally available `AvailabilityContext` for the
+  /// compilation. The platform availability range will be set to the minimum
+  /// inlining target (which may just be the deployment target).
+  static AvailabilityContext forInliningTarget(ASTContext &ctx);
+
+  /// Retrieves an `AvailabilityContext` with the platform availability range
+  /// set to the deployment target.
+  static AvailabilityContext forDeploymentTarget(ASTContext &ctx);
 
   /// Returns the range of platform versions which may execute code in the
   /// availability context, starting at its introduction version.
   AvailabilityRange getPlatformRange() const;
 
-  /// When the context is unavailable on the current platform this returns the
-  /// broadest `PlatformKind` for which the context is unavailable. Otherwise,
-  /// returns `nullopt`.
-  std::optional<PlatformKind> getUnavailablePlatformKind() const;
+  /// Returns true if this context contains any unavailable domains.
+  bool isUnavailable() const;
 
-  /// Returns true if this context is unavailable.
-  bool isUnavailable() const {
-    return getUnavailablePlatformKind().has_value();
-  }
+  /// Returns true if \p domain is unavailable in this context.
+  bool containsUnavailableDomain(AvailabilityDomain domain) const;
 
   /// Returns true if this context is deprecated on the current platform.
   bool isDeprecated() const;
 
-  /// Returns true if this context is `@_unavailableInEmbedded`.
-  bool isUnavailableInEmbedded() const;
-
   /// Constrain with another `AvailabilityContext`.
   void constrainWithContext(const AvailabilityContext &other, ASTContext &ctx);
-
-  /// Constrain with the availability attributes of `decl`.
-  void constrainWithDecl(const Decl *decl);
 
   /// Constrain the platform availability range with `platformRange`.
   void constrainWithPlatformRange(const AvailabilityRange &platformRange,
                                   ASTContext &ctx);
+
+  /// Constrain the context by adding \p domain to the set of unavailable
+  /// domains.
+  void constrainWithUnavailableDomain(AvailabilityDomain domain,
+                                      ASTContext &ctx);
+
+  /// Constrain with the availability attributes of `decl`.
+  void constrainWithDecl(const Decl *decl);
 
   /// Constrain with the availability attributes of `decl`, intersecting the
   /// platform range of `decl` with `platformRange`.
@@ -98,12 +109,12 @@ public:
 
   friend bool operator==(const AvailabilityContext &lhs,
                          const AvailabilityContext &rhs) {
-    return lhs.Info == rhs.Info;
+    return lhs.storage == rhs.storage;
   }
 
   friend bool operator!=(const AvailabilityContext &lhs,
                          const AvailabilityContext &rhs) {
-    return lhs.Info != rhs.Info;
+    return lhs.storage != rhs.storage;
   }
 
   void print(llvm::raw_ostream &os) const;

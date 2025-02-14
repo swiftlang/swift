@@ -588,7 +588,7 @@ void TypeTreeLeafTypeRange::get(
   }
 
   // An `inject_enum_addr` only initializes the enum tag.
-  if (auto inject = dyn_cast<InjectEnumAddrInst>(op->getUser())) {
+  if (isa<InjectEnumAddrInst>(op->getUser())) {
     // Subtract the deinit bit, if any: the discriminator bit is before it:
     //
     // [ case1 bits ..., case2 bits, ..., discriminator bit, deinit bit ]

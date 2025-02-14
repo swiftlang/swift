@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend %s -emit-silgen | %FileCheck %s
+// RUN: %target-swift-frontend %s -Xllvm -sil-print-types -emit-silgen | %FileCheck %s
 
 public struct ID {
   var a: Int = 0
@@ -31,7 +31,7 @@ struct Test {
   // CHECK-NEXT: [[INIT:%.*]] = partial_apply [callee_guaranteed] [on_stack] [[INIT_REF]]([[METATYPE]]) : $@convention(thin) (@owned String, @thin Test.Type) -> @out String
   // CHECK: [[SETTER_REF:%.*]] = function_ref @$s4main4TestV4nameSSvs : $@convention(method) (@owned String, @in_guaranteed Test) -> ()
   // CHECK-NEXT: [[SETTER:%.*]] = partial_apply [callee_guaranteed] [on_stack] [[SETTER_REF]]([[SELF_REF]]) : $@convention(method) (@owned String, @in_guaranteed Test) -> ()
-  // CHECK-NEXT: assign_or_init #Test.name, self [[SELF_REF]] : $*Test, value {{.*}} : $String, init [[INIT]] : $@noescape @callee_guaranteed (@owned String) -> @out String, set [[SETTER]] : $@noescape @callee_guaranteed (@owned String) -> ()
+  // CHECK-NEXT: assign_or_init #Test.name, self [[SELF]] : $*Test, value {{.*}} : $String, init [[INIT]] : $@noescape @callee_guaranteed (@owned String) -> @out String, set [[SETTER]] : $@noescape @callee_guaranteed (@owned String) -> ()
   init(id: ID, name: String) {
     self.id = id
     self.name = name

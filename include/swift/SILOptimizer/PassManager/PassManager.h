@@ -444,8 +444,9 @@ public:
 
   void executePassPipelinePlan(const SILPassPipelinePlan &Plan);
 
-  bool continueWithNextSubpassRun(SILInstruction *forInst, SILFunction *function,
-                                  SILTransform *trans);
+  using Transformee = llvm::PointerUnion<SILValue, SILInstruction *>;
+  bool continueWithNextSubpassRun(std::optional<Transformee> forTransformee,
+                                  SILFunction *function, SILTransform *trans);
 
   static bool isPassDisabled(StringRef passName);
   static bool isInstructionPassDisabled(StringRef instName);

@@ -149,6 +149,7 @@ class ExtendedValidationInfo {
     unsigned HasCxxInteroperability : 1;
     unsigned AllowNonResilientAccess: 1;
     unsigned SerializePackageEnabled: 1;
+    unsigned StrictMemorySafety: 1;
   } Bits;
 public:
   ExtendedValidationInfo() : Bits() {}
@@ -246,6 +247,13 @@ public:
   void setIsConcurrencyChecked(bool val = true) {
     Bits.IsConcurrencyChecked = val;
   }
+  bool strictMemorySafety() const {
+    return Bits.StrictMemorySafety;
+  }
+  void setStrictMemorySafety(bool val = true) {
+    Bits.StrictMemorySafety = val;
+  }
+  
   bool hasCxxInteroperability() const { return Bits.HasCxxInteroperability; }
   void setHasCxxInteroperability(bool val) {
     Bits.HasCxxInteroperability = val;

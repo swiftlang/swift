@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -enable-builtin-module -emit-silgen %s | %FileCheck %s
+// RUN: %target-swift-frontend -enable-builtin-module -Xllvm -sil-print-types -emit-silgen %s | %FileCheck %s
 
 import Builtin
 

@@ -704,6 +704,9 @@ public:
   /// \c true if this module was built with complete checking for concurrency.
   bool isConcurrencyChecked() const { return Core->isConcurrencyChecked(); }
 
+  /// \c true if this module was built with strict memory safety.
+  bool strictMemorySafety() const { return Core->strictMemorySafety(); }
+
   /// Associates this module file with the AST node representing it.
   ///
   /// Checks that the file is compatible with the AST module it's being loaded
@@ -763,7 +766,8 @@ public:
   ModuleDecl *getUnderlyingModule() const { return UnderlyingModule; }
 
   /// Searches the module's top-level decls for the given identifier.
-  void lookupValue(DeclName name, SmallVectorImpl<ValueDecl*> &results);
+  void lookupValue(DeclName name, OptionSet<ModuleLookupFlags> flags,
+                   SmallVectorImpl<ValueDecl*> &results);
 
   /// Searches the module's local type decls for the given mangled name.
   TypeDecl *lookupLocalType(StringRef MangledName);

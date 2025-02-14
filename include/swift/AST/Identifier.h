@@ -118,6 +118,14 @@ public:
     return is("+") || is("-") || is("*") || is("/") || is("%");
   }
 
+  bool isBitwiseOperator() const {
+    return is("~") || is("&") || is("|") || is("^");
+  }
+
+  bool isShiftOperator() const {
+    return is("<<") || is(">>");
+  }
+
   // Returns whether this is a standard comparison operator,
   // such as '==', '>=' or '!=='.
   bool isStandardComparisonOperator() const {

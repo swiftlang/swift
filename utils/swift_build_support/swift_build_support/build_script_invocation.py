@@ -138,6 +138,7 @@ class BuildScriptInvocation(object):
             '--build-swift-clang-overlays', str(
                 args.build_swift_clang_overlays).lower(),
             '--build-swift-remote-mirror', str(args.build_swift_remote_mirror).lower(),
+            "--swift-source-dirname", products.Swift.product_source_name(),
         ]
 
         # Compute any product specific cmake arguments.
@@ -550,6 +551,11 @@ class BuildScriptInvocation(object):
                 # from the `build-script-impl`.
                 impl_env["HOST_VARIABLE_{}__{}".format(
                     host_target.replace("-", "_"), name)] = value
+
+        if args.verbose_build:
+            # This ensures all CMake builds (including the ones
+            # called with `ExternalProject`) have verbose output
+            impl_env["VERBOSE"] = "1"
 
         return (impl_env, impl_args)
 

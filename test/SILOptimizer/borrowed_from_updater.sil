@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -update-borrowed-from -sil-disable-input-verify %s | %FileCheck %s
+// RUN: %target-sil-opt -sil-print-types -update-borrowed-from -sil-disable-input-verify %s | %FileCheck %s
 //
 // REQUIRES: swift_in_compiler
 

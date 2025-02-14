@@ -52,11 +52,6 @@ using namespace inference;
 
 #define DEBUG_TYPE "ConstraintSystem"
 
-ExpressionTimer::ExpressionTimer(AnchorType Anchor, ConstraintSystem &CS)
-    : ExpressionTimer(
-          Anchor, CS,
-          CS.getASTContext().TypeCheckerOpts.ExpressionTimeoutThreshold) {}
-
 ExpressionTimer::ExpressionTimer(AnchorType Anchor, ConstraintSystem &CS,
                                  unsigned thresholdInSecs)
     : Anchor(Anchor), Context(CS.getASTContext()),
@@ -122,7 +117,7 @@ ConstraintSystem::ConstraintSystem(DeclContext *dc,
   : Context(dc->getASTContext()), DC(dc), Options(options),
     diagnosticTransaction(diagnosticTransaction),
     Arena(dc->getASTContext(), Allocator),
-    CG(*new ConstraintGraph(*this))
+    CG(*this)
 {
   assert(DC && "context required");
   // Respect the global debugging flag, but turn off debugging while
@@ -136,12 +131,25 @@ ConstraintSystem::ConstraintSystem(DeclContext *dc,
 }
 
 ConstraintSystem::~ConstraintSystem() {
-  delete &CG;
+  for (unsigned i = 0, n = TypeVariables.size(); i != n; ++i) {
+    auto &impl = TypeVariables[i]->getImpl();
+    delete impl.getGraphNode();
+    impl.setGraphNode(nullptr);
+  }
+}
+
+void ConstraintSystem::startExpressionTimer(ExpressionTimer::AnchorType anchor) {
+  ASSERT(!Timer);
+
+  unsigned timeout = getASTContext().TypeCheckerOpts.ExpressionTimeoutThreshold;
+  if (timeout == 0)
+    return;
+
+  Timer.emplace(anchor, *this, timeout);
 }
 
 void ConstraintSystem::incrementScopeCounter() {
-  ++CountScopes;
-  // FIXME: (transitional) increment the redundant "always-on" counter.
+  ++NumSolverScopes;
   if (auto *Stats = getASTContext().Stats)
     ++Stats->getFrontendCounters().NumConstraintScopes;
 }
@@ -162,7 +170,7 @@ void ConstraintSystem::addTypeVariable(TypeVariableType *typeVar) {
   TypeVariables.insert(typeVar);
 
   // Notify the constraint graph.
-  (void)CG[typeVar];
+  CG.addTypeVariable(typeVar);
 }
 
 void ConstraintSystem::mergeEquivalenceClasses(TypeVariableType *typeVar1,
@@ -173,9 +181,13 @@ void ConstraintSystem::mergeEquivalenceClasses(TypeVariableType *typeVar1,
   assert(typeVar2 == getRepresentative(typeVar2) &&
          "typeVar2 is not the representative");
   assert(typeVar1 != typeVar2 && "cannot merge type with itself");
-  typeVar1->getImpl().mergeEquivalenceClasses(typeVar2, getTrail());
 
-  // Merge nodes in the constraint graph.
+  // Always merge 'up' the constraint stack, because it is simpler.
+  if (typeVar1->getImpl().getID() > typeVar2->getImpl().getID())
+    std::swap(typeVar1, typeVar2);
+
+  CG.mergeNodesPre(typeVar2);
+  typeVar1->getImpl().mergeEquivalenceClasses(typeVar2, getTrail());
   CG.mergeNodes(typeVar1, typeVar2);
 
   if (updateWorkList) {
@@ -205,6 +217,7 @@ void ConstraintSystem::assignFixedType(TypeVariableType *typeVar, Type type,
   assert(!type->hasError() &&
          "Should not be assigning a type involving ErrorType!");
 
+  CG.retractFromInference(typeVar, type);
   typeVar->getImpl().assignFixedType(type, getTrail());
 
   if (!updateState)
@@ -475,7 +488,7 @@ void ConstraintSystem::recordPotentialThrowSite(
 
   // do..catch statements without an explicit `throws` clause do infer
   // thrown types.
-  if (auto doCatch = catchNode.dyn_cast<DoCatchStmt *>()) {
+  if (catchNode.is<DoCatchStmt *>()) {
     PotentialThrowSite site{kind, type, getConstraintLocator(locator)};
     recordPotentialThrowSite(catchNode, site);
     return;
@@ -840,8 +853,9 @@ ConstraintLocator *ConstraintSystem::getOpenOpaqueLocator(
       { LocatorPathElt::OpenedOpaqueArchetype(opaqueDecl) }, 0);
 }
 
-std::pair<Type, OpenedArchetypeType *> ConstraintSystem::openExistentialType(
-    Type type, ConstraintLocator *locator) {
+std::pair<Type, OpenedArchetypeType *>
+ConstraintSystem::openAnyExistentialType(Type type,
+                                         ConstraintLocator *locator) {
   Type result = OpenedArchetypeType::getAny(type);
   Type t = result;
   while (t->is<MetatypeType>())
@@ -1060,7 +1074,7 @@ Type ConstraintSystem::getFixedTypeRecursive(Type type, TypeMatchOptions &flags,
 
   // Tuple types can lose their tuple structure under substitution
   // when a parameter pack is substituted with one element.
-  if (auto tuple = type->getAs<TupleType>()) {
+  if (type->is<TupleType>()) {
     auto simplified = simplifyType(type);
     if (simplified.getPointer() == type.getPointer())
       return type;
@@ -1068,7 +1082,7 @@ Type ConstraintSystem::getFixedTypeRecursive(Type type, TypeMatchOptions &flags,
     return getFixedTypeRecursive(simplified, flags, wantRValue);
   }
 
-  if (auto metatype = type->getAs<AnyMetatypeType>()) {
+  if (type->is<AnyMetatypeType>()) {
     auto simplified = simplifyType(type);
     if (simplified.getPointer() == type.getPointer())
       return type;
@@ -1093,9 +1107,9 @@ TypeVariableType *ConstraintSystem::isRepresentativeFor(
   if (getRepresentative(typeVar) != typeVar)
     return nullptr;
 
-  auto &CG = getConstraintGraph();
-  auto result = CG.lookupNode(typeVar);
-  auto equivalence = result.first.getEquivalenceClass();
+  auto &CG = const_cast<ConstraintSystem *>(this)->getConstraintGraph();
+  auto &result = CG[typeVar];
+  auto equivalence = result.getEquivalenceClass();
   auto member = llvm::find_if(equivalence, [=](TypeVariableType *eq) {
     auto *loc = eq->getImpl().getLocator();
     if (!loc)
@@ -1652,6 +1666,20 @@ struct TypeSimplifier {
         auto *proto = assocType->getProtocol();
         auto conformance = CS.lookupConformance(lookupBaseType, proto);
         if (!conformance) {
+          // Special case: When building slab literals, we go through the same
+          // array literal machinery, so there will be a conversion constraint
+          // for the element to ExpressibleByArrayLiteral.ArrayLiteralType.
+          if (lookupBaseType->isInlineArray()) {
+            auto &ctx = CS.getASTContext();
+            auto arrayProto =
+                ctx.getProtocol(KnownProtocolKind::ExpressibleByArrayLiteral);
+            auto elementAssocTy = arrayProto->getAssociatedTypeMembers()[0];
+
+            if (proto == arrayProto && assocType == elementAssocTy) {
+              return lookupBaseType->isArrayType();
+            }
+          }
+
           // If the base type doesn't conform to the associatedtype's protocol,
           // there will be a missing conformance fix applied in diagnostic mode,
           // so the concrete dependent member type is considered a "hole" in
@@ -1708,14 +1736,29 @@ void Solution::recordSingleArgMatchingChoice(ConstraintLocator *locator) {
        MatchCallArgumentResult::forArity(1)});
 }
 
-Type Solution::simplifyType(Type type) const {
+Type Solution::simplifyType(Type type, bool wantInterfaceType) const {
+  // If we've been asked for an interface type, start by mapping any archetypes
+  // out of context.
+  if (wantInterfaceType)
+    type = type->mapTypeOutOfContext();
+
   if (!(type->hasTypeVariable() || type->hasPlaceholder()))
     return type;
 
   // Map type variables to fixed types from bindings.
   auto &cs = getConstraintSystem();
-  auto resolvedType = cs.simplifyTypeImpl(
-      type, [&](TypeVariableType *tvt) -> Type { return getFixedType(tvt); });
+  auto resolvedType =
+      cs.simplifyTypeImpl(type, [&](TypeVariableType *tvt) -> Type {
+        // If we want the interface type, use the generic parameter if we
+        // have one, otherwise map the fixed type out of context.
+        if (wantInterfaceType) {
+          if (auto *gp = tvt->getImpl().getGenericParameter())
+            return gp;
+          return getFixedType(tvt)->mapTypeOutOfContext();
+        }
+        return getFixedType(tvt);
+      });
+  ASSERT(!(wantInterfaceType && resolvedType->hasPrimaryArchetype()));
 
   // Placeholders shouldn't be reachable through a solution, they are only
   // useful to determine what went wrong exactly.
@@ -1801,8 +1844,15 @@ Type Solution::simplifyTypeForCodeCompletion(Type Ty) const {
     // variable representing the argument to retrieve protocol requirements from
     // it. Look for a ArgumentConversion constraint that allows us to retrieve
     // the argument type var.
-    for (auto argConstraint :
-         CS.getConstraintGraph()[typeVar].getConstraints()) {
+    auto &cg = CS.getConstraintGraph();
+
+    // FIXME: The type variable is not going to be part of the constraint graph
+    // at this point unless it was created at the outermost decision level;
+    // otherwise it has already been rolled back! Work around this by creating
+    // an empty node if one doesn't exist.
+    cg.addTypeVariable(typeVar);
+
+    for (auto argConstraint : cg[typeVar].getConstraints()) {
       if (argConstraint->getKind() == ConstraintKind::ArgumentConversion &&
           argConstraint->getFirstType()->getRValueType()->isEqual(typeVar)) {
         if (auto argTV =
@@ -1867,7 +1917,7 @@ size_t Solution::getTotalMemory() const {
     return *TotalMemory;
 
   const_cast<Solution *>(this)->TotalMemory
-       = sizeof(*this) + typeBindings.getMemorySize() +
+       = sizeof(*this) + size_in_bytes(typeBindings) +
          overloadChoices.getMemorySize() +
          ConstraintRestrictions.getMemorySize() +
          (Fixes.size() * sizeof(void *)) + DisjunctionChoices.getMemorySize() +
@@ -1936,16 +1986,15 @@ OverloadChoice::getIUOReferenceKind(ConstraintSystem &cs,
   if (!decl->getInterfaceType()->is<AnyFunctionType>())
     return IUOReferenceKind::Value;
 
-  auto refKind = getFunctionRefKind();
-  assert(!forSecondApplication || refKind == FunctionRefKind::DoubleApply);
+  auto refKind = getFunctionRefInfo();
+  assert(!forSecondApplication || refKind.isDoubleApply());
 
-  switch (refKind) {
-  case FunctionRefKind::Unapplied:
-  case FunctionRefKind::Compound:
+  switch (refKind.getApplyLevel()) {
+  case FunctionRefInfo::ApplyLevel::Unapplied:
     // Such references never produce IUOs.
     return std::nullopt;
-  case FunctionRefKind::SingleApply:
-  case FunctionRefKind::DoubleApply: {
+  case FunctionRefInfo::ApplyLevel::SingleApply:
+  case FunctionRefInfo::ApplyLevel::DoubleApply:
     // Check whether this is a curried function reference e.g
     // (Self) -> (Args...) -> Ret. Such a function reference can only produce
     // an IUO on the second application.
@@ -1953,7 +2002,6 @@ OverloadChoice::getIUOReferenceKind(ConstraintSystem &cs,
     if (forSecondApplication != isCurried)
       return std::nullopt;
     break;
-  }
   }
   return IUOReferenceKind::ReturnValue;
 }
@@ -3371,8 +3419,7 @@ void constraints::simplifyLocator(ASTNode &anchor,
       continue;
     }
 
-    case ConstraintLocator::ApplyFunction:
-    case ConstraintLocator::FunctionResult:
+    case ConstraintLocator::ApplyFunction: {
       // Extract application function.
       if (auto applyExpr = getAsExpr<ApplyExpr>(anchor)) {
         anchor = applyExpr->getFn();
@@ -3394,7 +3441,7 @@ void constraints::simplifyLocator(ASTNode &anchor,
       }
 
       break;
-
+    }
     case ConstraintLocator::AutoclosureResult:
     case ConstraintLocator::LValueConversion:
     case ConstraintLocator::DynamicType:
@@ -3462,7 +3509,7 @@ void constraints::simplifyLocator(ASTNode &anchor,
       LLVM_FALLTHROUGH;
 
     case ConstraintLocator::Member:
-      if (auto UDE = getAsExpr<UnresolvedDotExpr>(anchor)) {
+      if (isExpr<UnresolvedDotExpr>(anchor)) {
         path = path.slice(1);
         continue;
       }
@@ -3659,6 +3706,7 @@ void constraints::simplifyLocator(ASTNode &anchor,
     case ConstraintLocator::SynthesizedArgument:
       break;
 
+    case ConstraintLocator::FunctionResult:
     case ConstraintLocator::DynamicLookupResult:
     case ConstraintLocator::KeyPathComponentResult:
       break;
@@ -3948,6 +3996,14 @@ ArgumentList *Solution::getArgumentList(ConstraintLocator *locator) const {
   return nullptr;
 }
 
+std::optional<ConversionRestrictionKind>
+Solution::getConversionRestriction(CanType type1, CanType type2) const {
+  auto restriction = ConstraintRestrictions.find({type1, type2});
+  if (restriction != ConstraintRestrictions.end())
+    return restriction->second;
+  return std::nullopt;
+}
+
 #ifndef NDEBUG
 /// Given an apply expr, returns true if it is expected to have a direct callee
 /// overload, resolvable using `getChoiceFor`. Otherwise, returns false.
@@ -3987,32 +4043,6 @@ ASTNode ConstraintSystem::includingParentApply(ASTNode node) {
     }
   }
   return node;
-}
-
-Type Solution::resolveInterfaceType(Type type) const {
-  auto resolvedType = type.transformRec([&](Type type) -> std::optional<Type> {
-    if (auto *tvt = type->getAs<TypeVariableType>()) {
-      // If this type variable is for a generic parameter, return that.
-      if (auto *gp = tvt->getImpl().getGenericParameter())
-        return gp;
-
-      // Otherwise resolve its fixed type, mapped out of context.
-      auto fixed = simplifyType(tvt);
-      return resolveInterfaceType(fixed->mapTypeOutOfContext());
-    }
-    if (auto *dmt = type->getAs<DependentMemberType>()) {
-      // For a dependent member, first resolve the base.
-      auto newBase = resolveInterfaceType(dmt->getBase());
-
-      // Then reconstruct using its associated type.
-      assert(dmt->getAssocType());
-      return DependentMemberType::get(newBase, dmt->getAssocType());
-    }
-    return std::nullopt;
-  });
-
-  assert(!resolvedType->hasArchetype());
-  return resolvedType;
 }
 
 std::optional<FunctionArgApplyInfo>
@@ -4107,13 +4137,12 @@ Solution::getFunctionArgApplyInfo(ConstraintLocator *locator) const {
   auto *callee = choice ? choice->getDeclOrNull() : nullptr;
   if (callee && callee->hasInterfaceType()) {
     // If we have a callee with an interface type, we can use it. This is
-    // preferable to resolveInterfaceType, as this will allow us to get a
-    // GenericFunctionType for generic decls.
+    // preferable to simplifyType for the function, as this will allow us to get
+    // a GenericFunctionType for generic decls.
     //
     // Note that it's possible to find a callee without an interface type. This
     // can happen for example with closure parameters, where the interface type
-    // isn't set until the solution is applied. In that case, use
-    // resolveInterfaceType.
+    // isn't set until the solution is applied. In that case, use simplifyType.
     fnInterfaceType = callee->getInterfaceType();
 
     // Strip off the curried self parameter if necessary.
@@ -4134,7 +4163,7 @@ Solution::getFunctionArgApplyInfo(ConstraintLocator *locator) const {
     }
 #endif
   } else {
-    fnInterfaceType = resolveInterfaceType(rawFnType);
+    fnInterfaceType = simplifyType(rawFnType, /*wantInterfaceType*/ true);
   }
 
   auto argIdx = applyArgElt->getArgIdx();
@@ -4672,7 +4701,7 @@ void ConstraintSystem::diagnoseFailureFor(SyntacticElementTarget target) {
       nominal->diagnose(diag::property_wrapper_declared_here,
                         nominal->getName());
     }
-  } else if (auto *var = target.getAsUninitializedVar()) {
+  } else if (target.getAsUninitializedVar()) {
     DE.diagnose(target.getLoc(), diag::failed_to_produce_diagnostic);
   } else if (target.isForEachPreamble()) {
     DE.diagnose(target.getLoc(), diag::failed_to_produce_diagnostic);
@@ -4889,11 +4918,11 @@ bool ConstraintSystem::isReadOnlyKeyPathComponent(
   // If the setter is unavailable, then the keypath ought to be read-only
   // in this context.
   if (auto setter = storage->getOpaqueAccessor(AccessorKind::Set)) {
-    // FIXME: Fully unavailable setters should cause the key path to be
-    // readonly too.
+    // FIXME: [availability] Fully unavailable setters should cause the key path
+    // to be readonly too.
     auto constraint =
         getUnsatisfiedAvailabilityConstraint(setter, DC, referenceLoc);
-    if (constraint && constraint->isConditionallySatisfiable())
+    if (constraint && constraint->isPotentiallyAvailable())
       return true;
   }
 
@@ -5079,6 +5108,7 @@ ConstraintSystem::inferKeyPathLiteralCapability(KeyPathExpr *keyPath) {
       switch (getActorIsolation(storage)) {
       case ActorIsolation::Unspecified:
       case ActorIsolation::Nonisolated:
+      case ActorIsolation::CallerIsolationInheriting:
       case ActorIsolation::NonisolatedUnsafe:
         break;
 

@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend %s -emit-sil | %FileCheck %s
-// RUN: %target-swift-frontend %s -emit-sil -O | %FileCheck -check-prefix=OPT %s
+// RUN: %target-swift-frontend %s -Xllvm -sil-print-types -emit-sil | %FileCheck %s
+// RUN: %target-swift-frontend %s -Xllvm -sil-print-types -emit-sil -O | %FileCheck -check-prefix=OPT %s
 
 // REQUIRES: optimized_stdlib
 // REQUIRES: swift_in_compiler

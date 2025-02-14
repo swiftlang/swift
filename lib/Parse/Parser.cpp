@@ -1145,8 +1145,9 @@ struct ParserUnit::Implementation {
     auto parsingOpts = SourceFile::getDefaultParsingOptions(LangOpts);
     parsingOpts |= ParsingFlags::DisableDelayedBodies;
     parsingOpts |= ParsingFlags::DisablePoundIfEvaluation;
+    parsingOpts |= ParsingFlags::PoundIfAllActive;
 
-    auto *M = ModuleDecl::create(Ctx.getIdentifier(ModuleName), Ctx);
+    auto *M = ModuleDecl::createEmpty(Ctx.getIdentifier(ModuleName), Ctx);
     SF = new (Ctx) SourceFile(*M, SFKind, BufferID, parsingOpts);
   }
 
@@ -1198,8 +1199,11 @@ void ParserUnit::parse() {
   if (auto tokens = P.takeTokenReceiver()->finalize())
     tokensRef = ctx.AllocateCopy(*tokens);
 
-  auto result = SourceFileParsingResult{ctx.AllocateCopy(items), tokensRef,
-                                        P.CurrentTokenHash};
+  std::optional<Fingerprint> fp;
+  if (P.CurrentTokenHash)
+    fp = Fingerprint(std::move(*P.CurrentTokenHash));
+
+  auto result = SourceFileParsingResult{ctx.AllocateCopy(items), tokensRef, fp};
   ctx.evaluator.cacheOutput(ParseSourceFileRequest{&P.SF}, std::move(result));
 }
 

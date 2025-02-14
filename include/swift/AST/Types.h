@@ -83,7 +83,9 @@ class PlaceholderTypeRepr;
 enum class ReferenceCounting : uint8_t;
 enum class ResilienceExpansion : unsigned;
 class SILModule;
+class SILFunction;
 class SILType;
+class SourceLoc;
 class TypeAliasDecl;
 class TypeDecl;
 class NominalTypeDecl;
@@ -523,14 +525,14 @@ protected:
     GenericArgCount : 32
   );
 
-  SWIFT_INLINE_BITFIELD_FULL(TypeAliasType, SugarType, 1+1,
+  SWIFT_INLINE_BITFIELD_FULL(TypeAliasType, SugarType, 1+1+30,
     : NumPadBits,
 
     /// Whether we have a parent type.
     HasParent : 1,
 
-    /// Whether we have a substitution map.
-    HasSubstitutionMap : 1
+    /// The number of generic arguments.
+    GenericArgCount : 31
   );
 
   SWIFT_INLINE_BITFIELD_FULL(IntegerType, TypeBase, 1,
@@ -673,6 +675,9 @@ public:
 
   /// Is this an existential containing only marker protocols?
   bool isMarkerExistential();
+
+  /// Is this `any Sendable` type?
+  bool isSendableExistential();
 
   bool isPlaceholder();
 
@@ -817,6 +822,12 @@ public:
   /// type variables referenced by this type.
   void getTypeVariables(SmallPtrSetImpl<TypeVariableType *> &typeVariables);
 
+private:
+  /// If the receiver is a `DependentMemberType`, returns its root. Otherwise,
+  /// returns the receiver.
+  Type getDependentMemberRoot();
+
+public:
   /// Determine whether this type is a type parameter, which is either a
   /// GenericTypeParamType or a DependentMemberType.
   ///
@@ -2252,7 +2263,7 @@ public:
 /// set of substitutions to apply to make the type concrete.
 class TypeAliasType final
   : public SugarType, public llvm::FoldingSetNode,
-    llvm::TrailingObjects<TypeAliasType, Type, SubstitutionMap>
+    llvm::TrailingObjects<TypeAliasType, Type>
 {
   TypeAliasDecl *typealias;
 
@@ -2260,29 +2271,25 @@ class TypeAliasType final
   friend TrailingObjects;
 
   TypeAliasType(TypeAliasDecl *typealias, Type parent,
-                SubstitutionMap substitutions, Type underlying,
+                ArrayRef<Type> genericArgs, Type underlying,
                 RecursiveTypeProperties properties);
 
   size_t numTrailingObjects(OverloadToken<Type>) const {
-    return Bits.TypeAliasType.HasParent ? 1 : 0;
-  }
-
-  size_t numTrailingObjects(OverloadToken<SubstitutionMap>) const {
-    return Bits.TypeAliasType.HasSubstitutionMap ? 1 : 0;
+    return (Bits.TypeAliasType.HasParent ? 1 : 0) +
+           Bits.TypeAliasType.GenericArgCount;
   }
 
 public:
   /// Retrieve the generic signature used for substitutions.
-  GenericSignature getGenericSignature() const {
-    return getSubstitutionMap().getGenericSignature();
-  }
+  GenericSignature getGenericSignature() const;
 
-  static TypeAliasType *get(TypeAliasDecl *typealias, Type parent,
-                            SubstitutionMap substitutions, Type underlying);
+  static TypeAliasType *get(TypeAliasDecl *typealias,
+                            Type parent,
+                            ArrayRef<Type> genericArgs,
+                            Type underlying);
 
   /// Returns the declaration that declares this type.
   TypeAliasDecl *getDecl() const {
-    // Avoid requiring the definition of TypeAliasDecl.
     return typealias;
   }
 
@@ -2295,17 +2302,17 @@ public:
 
   /// Retrieve the substitution map applied to the declaration's underlying
   /// to produce the described type.
-  SubstitutionMap getSubstitutionMap() const {
-    if (!Bits.TypeAliasType.HasSubstitutionMap)
-      return SubstitutionMap();
-
-    return *getTrailingObjects<SubstitutionMap>();
-  }
+  SubstitutionMap getSubstitutionMap() const;
 
   /// Get the direct generic arguments, which correspond to the generic
   /// arguments that are directly applied to the typealias declaration
   /// this type references.
-  ArrayRef<Type> getDirectGenericArgs() const;
+  ArrayRef<Type> getDirectGenericArgs() const {
+    return ArrayRef<Type>(
+        getTrailingObjects<Type>() +
+        (Bits.TypeAliasType.HasParent ? 1 : 0),
+        Bits.TypeAliasType.GenericArgCount);
+  }
 
   SmallVector<Type, 2> getExpandedGenericArgs();
 
@@ -2313,12 +2320,34 @@ public:
   void Profile(llvm::FoldingSetNodeID &id) const;
 
   static void Profile(llvm::FoldingSetNodeID &id, TypeAliasDecl *typealias,
-                      Type parent, SubstitutionMap substitutions,
+                      Type parent, ArrayRef<Type> genericArgs,
                       Type underlying);
 
   // Implement isa/cast/dyncast/etc.
   static bool classof(const TypeBase *T) {
     return T->getKind() == TypeKind::TypeAlias;
+  }
+};
+
+/// A type has been introduced at some fixed location in the AST.
+class LocatableType final : public SugarType, public llvm::FoldingSetNode {
+  SourceLoc Loc;
+
+  LocatableType(SourceLoc loc, Type underlying,
+                RecursiveTypeProperties properties);
+
+public:
+  SourceLoc getLoc() const { return Loc; }
+
+  static LocatableType *get(SourceLoc loc, Type underlying);
+
+  void Profile(llvm::FoldingSetNodeID &id) const;
+
+  static void Profile(llvm::FoldingSetNodeID &id, SourceLoc loc,
+                      Type underlying);
+
+  static bool classof(const TypeBase *T) {
+    return T->getKind() == TypeKind::Locatable;
   }
 };
 
@@ -2365,7 +2394,8 @@ class ParameterTypeFlags {
     Isolated = 1 << 7,
     CompileTimeConst = 1 << 8,
     Sending = 1 << 9,
-    NumBits = 10
+    Addressable = 1 << 10,
+    NumBits = 11
   };
   OptionSet<ParameterFlags> value;
   static_assert(NumBits <= 8*sizeof(OptionSet<ParameterFlags>), "overflowed");
@@ -2380,20 +2410,21 @@ public:
 
   ParameterTypeFlags(bool variadic, bool autoclosure, bool nonEphemeral,
                      ParamSpecifier specifier, bool isolated, bool noDerivative,
-                     bool compileTimeConst, bool isSending)
+                     bool compileTimeConst, bool isSending, bool isAddressable)
       : value((variadic ? Variadic : 0) | (autoclosure ? AutoClosure : 0) |
               (nonEphemeral ? NonEphemeral : 0) |
               uint8_t(specifier) << SpecifierShift | (isolated ? Isolated : 0) |
               (noDerivative ? NoDerivative : 0) |
               (compileTimeConst ? CompileTimeConst : 0) |
-              (isSending ? Sending : 0)) {}
+              (isSending ? Sending : 0) |
+              (isAddressable ? Addressable : 0)) {}
 
   /// Create one from what's present in the parameter type
   inline static ParameterTypeFlags
   fromParameterType(Type paramTy, bool isVariadic, bool isAutoClosure,
                     bool isNonEphemeral, ParamSpecifier ownership,
                     bool isolated, bool isNoDerivative, bool compileTimeConst,
-                    bool isSending);
+                    bool isSending, bool isAddressable);
 
   bool isNone() const { return !value; }
   bool isVariadic() const { return value.contains(Variadic); }
@@ -2406,6 +2437,7 @@ public:
   bool isCompileTimeConst() const { return value.contains(CompileTimeConst); }
   bool isNoDerivative() const { return value.contains(NoDerivative); }
   bool isSending() const { return value.contains(Sending); }
+  bool isAddressable() const { return value.contains(Addressable); }
 
   /// Get the spelling of the parameter specifier used on the parameter.
   ParamSpecifier getOwnershipSpecifier() const {
@@ -2472,6 +2504,12 @@ public:
     return ParameterTypeFlags(withSending
                                   ? value | ParameterTypeFlags::Sending
                                   : value - ParameterTypeFlags::Sending);
+  }
+
+  ParameterTypeFlags withAddressable(bool withAddressable) const {
+    return ParameterTypeFlags(withAddressable
+                                  ? value | ParameterTypeFlags::Addressable
+                                  : value - ParameterTypeFlags::Addressable);
   }
 
   bool operator ==(const ParameterTypeFlags &other) const {
@@ -2567,7 +2605,8 @@ public:
                               /*nonEphemeral*/ false, getOwnershipSpecifier(),
                               /*isolated*/ false, /*noDerivative*/ false,
                               /*compileTimeConst*/ false,
-                              /*is sending*/ false);
+                              /*is sending*/ false,
+                              /*is addressable*/ false);
   }
 
   bool operator ==(const YieldTypeFlags &other) const {
@@ -3363,6 +3402,8 @@ public:
 
     /// Whether the parameter is marked '@noDerivative'.
     bool isNoDerivative() const { return Flags.isNoDerivative(); }
+    
+    bool isAddressable() const { return Flags.isAddressable(); }
 
     /// Whether the parameter might be a semantic result for autodiff purposes.
     /// This includes inout parameters.
@@ -4398,6 +4439,16 @@ public:
     /// that the parameter must be an Optional actor or something that conforms
     /// to AnyActor.
     Isolated = 0x4,
+
+    /// Set if the given parameter is an implicit parameter that is not part of
+    /// the formal type. These are always located after the return values and
+    /// before the main parameters. This is because we want to at the SIL level
+    /// generally treat them as normal parameters... but when working with the
+    /// AST during lowering, we need to handle ignoring them appropriately.
+    ///
+    /// DISCUSSION: These are enforced by the SIL verifier to always be in
+    /// between indirect results and the explicit parameters.
+    ImplicitLeading = 0x8,
   };
 
   using Options = OptionSet<Flag>;
@@ -4424,6 +4475,11 @@ public:
   ///
   /// \c t must refer back to the function type this is a parameter for.
   CanType getArgumentType(SILModule &M, const SILFunctionType *t, TypeExpansionContext context) const;
+
+  /// Helper function that just grabs the module, type, and context out of \arg
+  /// fn and then calls getArgumentType.
+  CanType getArgumentType(SILFunction *fn) const;
+
   ParameterConvention getConvention() const { return convention; }
   // Does this parameter convention require indirect storage? This reflects a
   // SILFunctionType's formal (immutable) conventions, as opposed to the
@@ -4786,12 +4842,12 @@ public:
   SILType getSILStorageInterfaceType() const;
   /// Return a version of this result info with the type replaced.
   SILResultInfo getWithInterfaceType(CanType type) const {
-    return SILResultInfo(type, getConvention());
+    return SILResultInfo(type, getConvention(), getOptions());
   }
 
   /// Return a version of this result info with the convention replaced.
   SILResultInfo getWithConvention(ResultConvention c) const {
-    return SILResultInfo(getInterfaceType(), c);
+    return SILResultInfo(getInterfaceType(), c, getOptions());
   }
 
   // Does this result convention require indirect storage? This reflects a
@@ -6936,8 +6992,6 @@ class OpenedArchetypeType final : public LocalArchetypeType,
   friend ArchetypeType;
   friend GenericEnvironment;
 
-  UUID ID;
-
   /// Create a new opened archetype in the given environment representing
   /// the interface type.
   ///
@@ -6953,10 +7007,7 @@ public:
   /// of an existential value.
   ///
   /// \param existential The existential type to open.
-  /// \param knownID When non-empty, the known ID of the archetype. When empty,
-  /// a fresh archetype with a unique ID will be opened.
-  static CanTypeWrapper<OpenedArchetypeType>
-  get(CanType existential, std::optional<UUID> knownID = std::nullopt);
+  static CanTypeWrapper<OpenedArchetypeType> get(CanType existential);
 
   /// Create a new archetype that represents the opened type
   /// of an existential value.
@@ -7030,8 +7081,6 @@ class ElementArchetypeType final : public LocalArchetypeType,
   friend TrailingObjects;
   friend ArchetypeType;
   friend GenericEnvironment;
-
-  UUID ID;
 
   /// Create a new element archetype in the given environment representing
   /// the interface type.
@@ -7197,7 +7246,7 @@ public:
   /// Returns \c true if this type parameter is declared as a value.
   ///
   /// \code
-  /// struct Vector<Element, let N: Int>
+  /// struct InlineArray<let count: Int, Element: ~Copyable>
   /// \endcode
   bool isValue() const {
     return ParamKind == GenericTypeParamKind::Value;
@@ -7828,36 +7877,9 @@ inline ASTContext &TypeBase::getASTContext() const {
   return *const_cast<ASTContext*>(getCanonicalType()->Context);
 }
 
-inline bool TypeBase::isTypeVariableOrMember() {
-  Type t(this);
-
-  while (auto *memberTy = t->getAs<DependentMemberType>())
-    t = memberTy->getBase();
-
-  return t->is<TypeVariableType>();
-}
-
-inline bool TypeBase::isTypeParameter() {
-  Type t(this);
-
-  while (auto *memberTy = t->getAs<DependentMemberType>())
-    t = memberTy->getBase();
-
-  return t->is<GenericTypeParamType>();
-}
-
 // TODO: This will become redundant once InOutType is removed.
 inline bool TypeBase::isMaterializable() {
   return !(hasLValueType() || is<InOutType>());
-}
-
-inline GenericTypeParamType *TypeBase::getRootGenericParam() {
-  Type t(this);
-
-  while (auto *memberTy = t->getAs<DependentMemberType>())
-    t = memberTy->getBase();
-
-  return t->castTo<GenericTypeParamType>();
 }
 
 inline bool TypeBase::isConstraintType() const {
@@ -8069,7 +8091,7 @@ inline TupleTypeElt TupleTypeElt::getWithType(Type T) const {
 inline ParameterTypeFlags ParameterTypeFlags::fromParameterType(
     Type paramTy, bool isVariadic, bool isAutoClosure, bool isNonEphemeral,
     ParamSpecifier ownership, bool isolated, bool isNoDerivative,
-    bool compileTimeConst, bool isSending) {
+    bool compileTimeConst, bool isSending, bool isAddressable) {
   // FIXME(Remove InOut): The last caller that needs this is argument
   // decomposition.  Start by enabling the assertion there and fixing up those
   // callers, then remove this, then remove
@@ -8080,7 +8102,8 @@ inline ParameterTypeFlags ParameterTypeFlags::fromParameterType(
     ownership = ParamSpecifier::InOut;
   }
   return {isVariadic, isAutoClosure,  isNonEphemeral,   ownership,
-          isolated,   isNoDerivative, compileTimeConst, isSending};
+          isolated,   isNoDerivative, compileTimeConst, isSending,
+          isAddressable};
 }
 
 inline const Type *BoundGenericType::getTrailingObjectsPointer() const {

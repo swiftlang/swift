@@ -203,7 +203,7 @@ class WasmLLVMRuntimeLibs(cmake_product.CMakeProduct):
         self.cmake_options.define('LIBCXX_ENABLE_SHARED:BOOL', 'FALSE')
         self.cmake_options.define('LIBCXX_ENABLE_EXPERIMENTAL_LIBRARY:BOOL', 'FALSE')
         self.cmake_options.define('LIBCXX_ENABLE_EXCEPTIONS:BOOL', 'FALSE')
-        self.cmake_options.define('LIBCXX_ENABLE_FILESYSTEM:BOOL', 'FALSE')
+        self.cmake_options.define('LIBCXX_ENABLE_FILESYSTEM:BOOL', 'TRUE')
         self.cmake_options.define('LIBCXX_CXX_ABI', 'libcxxabi')
         self.cmake_options.define('LIBCXX_HAS_MUSL_LIBC:BOOL', 'TRUE')
 

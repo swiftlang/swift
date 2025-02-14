@@ -68,17 +68,10 @@ def _apply_default_arguments(args):
     # Set the default CMake generator.
     if args.cmake_generator is None:
         args.cmake_generator = 'Ninja'
-    elif args.cmake_generator == 'Xcode':
-        # Building with Xcode is deprecated.
-        args.skip_build = True
-        args.build_early_swift_driver = False
-        args.build_early_swiftsyntax = False
 
     # Set the default build variant.
     if args.build_variant is None:
-        args.build_variant = (
-            'MinSizeRel' if args.cmake_generator == 'Xcode' else 'Debug'
-        )
+        args.build_variant = 'Debug'
 
     if args.llvm_build_variant is None:
         args.llvm_build_variant = args.build_variant
@@ -766,6 +759,10 @@ def create_argument_parser():
     option('--test-sourcekit-lsp-sanitize-all',
            toggle_true('test_sourcekitlsp_sanitize_all'),
            help='run sourcekit-lsp tests under all sanitizers')
+    option('--sourcekit-lsp-verify-generated-files',
+           toggle_true('sourcekitlsp_verify_generated_files'),
+           help='set to verify that the generated files in the source tree ' +
+                'match the ones that would be generated from current main')
     option('--sourcekit-lsp-lint',
            toggle_true('sourcekitlsp_lint'),
            help='verify that sourcekit-lsp Source code is formatted correctly')
@@ -1037,9 +1034,11 @@ def create_argument_parser():
     option(['-m', '--make'], store('cmake_generator'),
            const='Unix Makefiles',
            help="use CMake's Makefile generator (%(default)s by default)")
+
+    # Xcode generation is no longer supported, leave the option so we can
+    # inform the user.
     option(['-x', '--xcode'], store('cmake_generator'),
-           const='Xcode',
-           help="use CMake's Xcode generator (%(default)s by default)")
+           const='Xcode', help=argparse.SUPPRESS)
 
     # -------------------------------------------------------------------------
     in_group('Run tests')
@@ -1268,10 +1267,6 @@ def create_argument_parser():
     option('--skip-test-ios-simulator',
            toggle_false('test_ios_simulator'),
            help='skip testing iOS simulator targets')
-    option('--skip-test-watchos-32bit-simulator',
-           toggle_false('test_watchos_32bit_simulator'),
-           default=False,
-           help='skip testing watchOS 32 bit simulator targets')
     option('--skip-test-ios-host',
            toggle_false('test_ios_host'),
            help='skip testing iOS device targets on the host machine (the '
@@ -1489,13 +1484,13 @@ def create_argument_parser():
            default=True,
            help='Enable Volatile module.')
 
+    option('--enable-runtime-module', toggle_true,
+           default=True,
+           help='Enable Runtime module.')
+
     option('--enable-experimental-parser-validation', toggle_true,
            default=True,
            help='Enable experimental Swift Parser validation by default.')
-
-    option('--enable-experimental-pointer-bounds', toggle_true,
-           default=False,
-           help='Enable experimental bounds safe C interop.')
 
     # -------------------------------------------------------------------------
     in_group('Unsupported options')
@@ -1669,10 +1664,6 @@ To run OS X and iOS tests that don't require a device:
 To use 'make' instead of 'ninja', use '-m':
 
   [~/src/s]$ ./swift/utils/build-script -m -R
-
-To create Xcode projects that can build Swift, use '-x':
-
-  [~/src/s]$ ./swift/utils/build-script -x -R
 
 Preset mode in build-script
 ---------------------------

@@ -1,5 +1,5 @@
 
-// RUN: %target-swift-emit-silgen -module-name multi_file -primary-file %s %S/Inputs/multi_file_helper.swift | %FileCheck %s
+// RUN: %target-swift-emit-silgen -Xllvm -sil-print-types -module-name multi_file -primary-file %s %S/Inputs/multi_file_helper.swift | %FileCheck %s
 
 func markUsed<T>(_ t: T) {}
 

@@ -19,7 +19,7 @@
 #define SWIFT_SEMA_CONSTRAINT_H
 
 #include "swift/AST/ASTNode.h"
-#include "swift/AST/FunctionRefKind.h"
+#include "swift/AST/FunctionRefInfo.h"
 #include "swift/AST/Identifier.h"
 #include "swift/AST/Type.h"
 #include "swift/AST/TypeLoc.h"
@@ -155,12 +155,6 @@ enum class ConstraintKind : char {
   /// type). At that point, this constraint will be treated like an `Equal`
   /// constraint.
   OneWayEqual,
-  /// The second type is the type of a function parameter, and the first type
-  /// is the type of a reference to that function parameter within the body.
-  /// Once the second type has been fully determined (and mapped down to a
-  /// concrete type), this constraint will be treated like a 'BindParam'
-  /// constraint.
-  OneWayBindParam,
   /// If there is no contextual info e.g. `_ = { 42 }` default first type
   /// to a second type. This is effectively a `Defaultable` constraint
   /// which one significant difference:
@@ -384,11 +378,7 @@ class Constraint final : public llvm::ilist_node<Constraint>,
   unsigned NumTypeVariables : 11;
 
   /// The kind of function reference, for member references.
-  unsigned TheFunctionRefKind : 2;
-
-  /// The trailing closure matching for an applicable function constraint,
-  /// if any. 0 = None, 1 = Forward, 2 = Backward.
-  unsigned trailingClosureMatching : 2;
+  unsigned TheFunctionRefInfo : 3;
 
   union {
     struct {
@@ -445,6 +435,21 @@ class Constraint final : public llvm::ilist_node<Constraint>,
       /// Identifies whether result of this node is unused.
       bool IsDiscarded;
     } SyntacticElement;
+
+    struct {
+      /// The function type that is being applied where parameters
+      /// represent argument types passed to callee and result type
+      /// represents result type of the application.
+      FunctionType *AppliedFn;
+      /// The type being called, primarily a function type, but could
+      /// be a metatype, a tuple or a nominal type.
+      Type Callee;
+      /// The trailing closure matching for an applicable function constraint,
+      /// if any. 0 = None, 1 = Forward, 2 = Backward.
+      unsigned TrailingClosureMatching : 2;
+      /// The declaration context in which the application appears.
+      DeclContext *UseDC;
+    } Apply;
   };
 
   /// The locator that describes where in the expression this
@@ -471,14 +476,14 @@ class Constraint final : public llvm::ilist_node<Constraint>,
 
   /// Construct a new member constraint.
   Constraint(ConstraintKind kind, Type first, Type second, DeclNameRef member,
-             DeclContext *useDC, FunctionRefKind functionRefKind,
+             DeclContext *useDC, FunctionRefInfo functionRefInfo,
              ConstraintLocator *locator,
              SmallPtrSetImpl<TypeVariableType *> &typeVars);
 
   /// Construct a new value witness constraint.
   Constraint(ConstraintKind kind, Type first, Type second,
              ValueDecl *requirement, DeclContext *useDC,
-             FunctionRefKind functionRefKind, ConstraintLocator *locator,
+             FunctionRefInfo functionRefInfo, ConstraintLocator *locator,
              SmallPtrSetImpl<TypeVariableType *> &typeVars);
 
   /// Construct a new overload-binding constraint, which might have a fix.
@@ -498,6 +503,11 @@ class Constraint final : public llvm::ilist_node<Constraint>,
 
   /// Construct a closure body element constraint.
   Constraint(ASTNode node, ContextualTypeInfo context, bool isDiscarded,
+             ConstraintLocator *locator,
+             SmallPtrSetImpl<TypeVariableType *> &typeVars);
+
+  Constraint(FunctionType *appliedFn, Type calleeType,
+             unsigned trailingClosureMatching, DeclContext *useDC,
              ConstraintLocator *locator,
              SmallPtrSetImpl<TypeVariableType *> &typeVars);
 
@@ -534,21 +544,21 @@ public:
   /// alternatives.
   static Constraint *createMemberOrOuterDisjunction(
       ConstraintSystem &cs, ConstraintKind kind, Type first, Type second,
-      DeclNameRef member, DeclContext *useDC, FunctionRefKind functionRefKind,
+      DeclNameRef member, DeclContext *useDC, FunctionRefInfo functionRefInfo,
       ArrayRef<OverloadChoice> outerAlternatives, ConstraintLocator *locator);
 
   /// Create a new member constraint.
   static Constraint *createMember(ConstraintSystem &cs, ConstraintKind kind,
                                   Type first, Type second, DeclNameRef member,
                                   DeclContext *useDC,
-                                  FunctionRefKind functionRefKind,
+                                  FunctionRefInfo functionRefInfo,
                                   ConstraintLocator *locator);
 
   /// Create a new value witness constraint.
   static Constraint *createValueWitness(
       ConstraintSystem &cs, ConstraintKind kind, Type first, Type second,
       ValueDecl *requirement, DeclContext *useDC,
-      FunctionRefKind functionRefKind, ConstraintLocator *locator);
+      FunctionRefInfo functionRefInfo, ConstraintLocator *locator);
 
   /// Create an overload-binding constraint, possibly with a fix.
   static Constraint *createBindOverload(ConstraintSystem &cs, Type type, 
@@ -586,9 +596,9 @@ public:
 
   /// Create a new Applicable Function constraint.
   static Constraint *createApplicableFunction(
-      ConstraintSystem &cs, Type argumentFnType, Type calleeType,
+      ConstraintSystem &cs, FunctionType *argumentFnType, Type calleeType,
       std::optional<TrailingClosureMatching> trailingClosureMatching,
-      ConstraintLocator *locator);
+      DeclContext *useDC, ConstraintLocator *locator);
 
   static Constraint *createSyntacticElement(ConstraintSystem &cs,
                                               ASTNode node,
@@ -687,7 +697,6 @@ public:
     case ConstraintKind::BindOverload:
     case ConstraintKind::OptionalObject:
     case ConstraintKind::OneWayEqual:
-    case ConstraintKind::OneWayBindParam:
     case ConstraintKind::FallbackType:
     case ConstraintKind::UnresolvedMemberChainBase:
     case ConstraintKind::PackElementOf:
@@ -746,6 +755,9 @@ public:
     case ConstraintKind::SyntacticElement:
       llvm_unreachable("closure body element constraint has no type operands");
 
+    case ConstraintKind::ApplicableFunction:
+      return Apply.AppliedFn;
+
     default:
       return Types.First;
     }
@@ -764,6 +776,9 @@ public:
     case ConstraintKind::UnresolvedValueMember:
     case ConstraintKind::ValueWitness:
       return Member.Second;
+
+    case ConstraintKind::ApplicableFunction:
+      return Apply.Callee;
 
     default:
       return Types.Second;
@@ -798,14 +813,12 @@ public:
   }
 
   /// Determine the kind of function reference we have for a member reference.
-  FunctionRefKind getFunctionRefKind() const {
-    if (Kind == ConstraintKind::ValueMember ||
-        Kind == ConstraintKind::UnresolvedValueMember ||
-        Kind == ConstraintKind::ValueWitness)
-      return static_cast<FunctionRefKind>(TheFunctionRefKind);
+  FunctionRefInfo getFunctionRefInfo() const {
+    ASSERT(Kind == ConstraintKind::ValueMember ||
+           Kind == ConstraintKind::UnresolvedValueMember ||
+           Kind == ConstraintKind::ValueWitness);
 
-    // Conservative answer: drop all of the labels.
-    return FunctionRefKind::Compound;
+    return FunctionRefInfo::fromOpaque(TheFunctionRefInfo);
   }
 
   /// Retrieve the set of constraints in a disjunction.
@@ -842,8 +855,7 @@ public:
 
   /// Whether this is a one-way constraint.
   bool isOneWayConstraint() const {
-    return Kind == ConstraintKind::OneWayEqual ||
-        Kind == ConstraintKind::OneWayBindParam;
+    return Kind == ConstraintKind::OneWayEqual;
   }
 
   /// Retrieve the overload choice for an overload-binding constraint.
@@ -864,6 +876,21 @@ public:
            Kind == ConstraintKind::UnresolvedValueMember ||
            Kind == ConstraintKind::ValueWitness);
     return Member.UseDC;
+  }
+
+  FunctionType *getAppliedFunctionType() const {
+    assert(Kind == ConstraintKind::ApplicableFunction);
+    return Apply.AppliedFn;
+  }
+
+  Type getCalleeType() const {
+    assert(Kind == ConstraintKind::ApplicableFunction);
+    return Apply.Callee;
+  }
+
+  DeclContext *getApplicationDC() const {
+    assert(Kind == ConstraintKind::ApplicableFunction);
+    return Apply.UseDC;
   }
 
   ASTNode getSyntacticElement() const {

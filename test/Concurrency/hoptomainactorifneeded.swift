@@ -1,5 +1,5 @@
-// RUN: %target-swift-frontend -swift-version 6 -enable-experimental-feature GenerateForceToMainActorThunks -import-objc-header %S/Inputs/hoptomainactorifneeded.h -emit-silgen %s | %FileCheck %s
-// RUN: %target-swift-frontend -swift-version 6 -enable-experimental-feature GenerateForceToMainActorThunks -import-objc-header %S/Inputs/hoptomainactorifneeded.h -emit-lowered-sil %s | %FileCheck -check-prefix=LOWERED %s
+// RUN: %target-swift-frontend -swift-version 6 -enable-experimental-feature GenerateForceToMainActorThunks -import-objc-header %S/Inputs/hoptomainactorifneeded.h -Xllvm -sil-print-types -emit-silgen %s | %FileCheck %s
+// RUN: %target-swift-frontend -swift-version 6 -enable-experimental-feature GenerateForceToMainActorThunks -import-objc-header %S/Inputs/hoptomainactorifneeded.h -Xllvm -sil-print-types -emit-lowered-sil %s | %FileCheck -check-prefix=LOWERED %s
 
 // READ THIS: This test validates that basic lowering of hop to main actor if
 // needed works. For fuller tests that validate that things actually hop, see

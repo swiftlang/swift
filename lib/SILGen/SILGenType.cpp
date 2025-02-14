@@ -94,7 +94,7 @@ SILGenModule::emitVTableMethod(ClassDecl *theClass, SILDeclRef derived,
     implFn = getDynamicThunk(
         derived, Types.getConstantInfo(TypeExpansionContext::minimal(), derived)
                      .SILFnType);
-  } else if (auto *derivativeId = derived.getDerivativeFunctionIdentifier()) {
+  } else if (derived.getDerivativeFunctionIdentifier()) {
     // For JVP/VJP methods, create a vtable entry thunk. The thunk contains an
     // `differentiable_function` instruction, which is later filled during the
     // differentiation transform.
@@ -160,7 +160,7 @@ SILGenModule::emitVTableMethod(ClassDecl *theClass, SILDeclRef derived,
   // Generate the thunk name.
   std::string name;
   {
-    Mangle::ASTMangler mangler;
+    Mangle::ASTMangler mangler(getASTContext());
     if (isa<FuncDecl>(baseDecl)) {
       name = mangler.mangleVTableThunk(
         cast<FuncDecl>(baseDecl),
@@ -813,7 +813,7 @@ SILFunction *SILGenModule::emitProtocolWitness(
       witnessRef, witnessSubsForTypeLowering, conformance);
 
   // Mangle the name of the witness thunk.
-  Mangle::ASTMangler NewMangler;
+  Mangle::ASTMangler NewMangler(M.getASTContext());
   std::string nameBuffer =
       NewMangler.mangleWitnessThunk(manglingConformance, requirement.getDecl());
   // TODO(TF-685): Proper mangling for derivative witness thunks.
@@ -932,7 +932,7 @@ static SILFunction *emitSelfConformanceWitness(SILGenModule &SGM,
 
   // Mangle the name of the witness thunk.
   std::string name = [&] {
-    Mangle::ASTMangler mangler;
+    Mangle::ASTMangler mangler(requirement.getASTContext());
     return mangler.mangleWitnessThunk(conformance, requirement.getDecl());
   }();
 
@@ -1233,7 +1233,7 @@ public:
   }
 
   void visitDestructorDecl(DestructorDecl *dd) {
-    if (auto *cd = dyn_cast<ClassDecl>(theType))
+    if (isa<ClassDecl>(theType))
       return SGM.emitDestructor(cast<ClassDecl>(theType), dd);
     if (auto *nom = dyn_cast<NominalTypeDecl>(theType)) {
       if (!nom->canBeCopyable()) {

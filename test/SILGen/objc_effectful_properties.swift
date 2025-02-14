@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -emit-silgen -checked-async-objc-bridging=off -target %target-swift-5.1-abi-triple -I %S/Inputs/custom-modules %s -verify | %FileCheck --enable-var-scope --check-prefix=CHECK --check-prefix=CHECK-%target-cpu %s
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -Xllvm -sil-print-types -emit-silgen -checked-async-objc-bridging=off -target %target-swift-5.1-abi-triple -I %S/Inputs/custom-modules %s -verify | %FileCheck --enable-var-scope --check-prefix=CHECK --check-prefix=CHECK-%target-cpu %s
 // REQUIRES: concurrency
 // REQUIRES: objc_interop
 

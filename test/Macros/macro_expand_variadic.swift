@@ -7,6 +7,9 @@
 // RUN: %target-codesign %t/main
 // RUN: %target-run %t/main | %FileCheck %s
 
+// This test needs a Swift 5.9 runtime or newer.
+// UNSUPPORTED: back_deployment_runtime
+
 @freestanding(expression) macro print<each Value>(_ value: repeat each Value) = #externalMacro(module: "MacroDefinition", type: "PrintMacro")
 
 @freestanding(expression) macro Print<each Value>(_ value: repeat each Value) = #externalMacro(module: "MacroDefinition", type: "PrintMacro")

@@ -13,6 +13,7 @@
 #ifndef SWIFT_BASIC_MANGLER_H
 #define SWIFT_BASIC_MANGLER_H
 
+#include "swift/Demangling/ManglingFlavor.h"
 #include "swift/Demangling/ManglingUtils.h"
 #include "swift/Demangling/NamespaceMacros.h"
 #include "swift/Basic/Debug.h"
@@ -69,6 +70,8 @@ protected:
   SubstitutionMerging SubstMerging;
 
   size_t MaxNumWords = 26;
+
+  ManglingFlavor Flavor = ManglingFlavor::Default;
 
   /// If enabled, non-ASCII names are encoded in modified Punycode.
   bool UsePunycode = true;
@@ -135,7 +138,7 @@ protected:
   void finalize(llvm::raw_ostream &stream);
 
   /// Verify that demangling and remangling works.
-  static void verify(StringRef mangledName);
+  static void verify(StringRef mangledName, ManglingFlavor Flavor);
 
   SWIFT_DEBUG_DUMP;
 

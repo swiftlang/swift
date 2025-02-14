@@ -218,9 +218,9 @@ void CodeCompletionResultBuilder::setAssociatedDecl(const Decl *D) {
     CurrentModule = MD;
   }
 
-  if (D->getAttrs().isDeprecated(D->getASTContext()))
+  if (D->isDeprecated())
     setContextFreeNotRecommended(ContextFreeNotRecommendedReason::Deprecated);
-  else if (D->getAttrs().getSoftDeprecated(D->getASTContext()))
+  else if (D->getSoftDeprecatedAttr())
     setContextFreeNotRecommended(
         ContextFreeNotRecommendedReason::SoftDeprecated);
 

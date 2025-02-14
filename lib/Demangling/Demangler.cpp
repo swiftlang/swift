@@ -185,6 +185,7 @@ int swift::Demangle::getManglingPrefixLength(llvm::StringRef mangledName) {
     /*Swift 4*/   "_T0",
     /*Swift 4.x*/ "$S", "_$S",
     /*Swift 5+*/  "$s", "_$s",
+    /*Swift 5+ Embedded Swift*/  "$e", "_$e",
     /*Swift 5+ for filenames*/ "@__swiftmacro_",
   };
 
@@ -324,7 +325,8 @@ bool swift::Demangle::isStruct(llvm::StringRef mangledName) {
 }
 
 std::string swift::Demangle::mangledNameForTypeMetadataAccessor(
-    StringRef moduleName, StringRef typeName, Node::Kind typeKind) {
+    StringRef moduleName, StringRef typeName, Node::Kind typeKind,
+    Mangle::ManglingFlavor Flavor) {
   using namespace Demangle;
 
   //  kind=Global
@@ -353,7 +355,7 @@ std::string swift::Demangle::mangledNameForTypeMetadataAccessor(
     global->addChild(nominalDescriptor, D);
   }
 
-  auto mangleResult = mangleNode(global);
+  auto mangleResult = mangleNode(global, Flavor);
   assert(mangleResult.isSuccess());
   return mangleResult.result();
 }
@@ -746,6 +748,9 @@ NodePointer Demangler::demangleSymbol(StringRef MangledName,
   unsigned PrefixLength = getManglingPrefixLength(MangledName);
   if (PrefixLength == 0)
     return nullptr;
+
+  if (MangledName.starts_with(MANGLING_PREFIX_EMBEDDED_STR))
+    Flavor = ManglingFlavor::Embedded;
 
   IsOldFunctionTypeMangling = isOldFunctionTypeMangling(MangledName);
   Pos += PrefixLength;
@@ -1590,14 +1595,15 @@ static void setParentForOpaqueReturnTypeNodesImpl(
 /// Associate any \c OpaqueReturnType nodes with the declaration whose opaque
 /// return type they refer back to.
 static Node *setParentForOpaqueReturnTypeNodes(Demangler &D, Node *parent,
-                                               Node *visitedNode) {
+                                               Node *visitedNode,
+                                               ManglingFlavor Flavor) {
   if (!parent || !visitedNode)
     return nullptr;
   std::string parentID;
   setParentForOpaqueReturnTypeNodesImpl(D, *visitedNode, [&] {
     if (!parentID.empty())
       return StringRef(parentID);
-    const auto mangleResult = mangleNode(parent);
+    const auto mangleResult = mangleNode(parent, Flavor);
     assert(mangleResult.isSuccess());
     parentID = mangleResult.result();
     return StringRef(parentID);
@@ -1622,30 +1628,57 @@ NodePointer Demangler::demanglePlainFunction() {
     ? createWithChildren(Node::Kind::Function, Ctx, Name, LabelList, Type)
     : createWithChildren(Node::Kind::Function, Ctx, Name, Type);
     
-  result = setParentForOpaqueReturnTypeNodes(*this, result, Type);
+  result = setParentForOpaqueReturnTypeNodes(*this, result, Type, Flavor);
   return result;
 }
 
 NodePointer Demangler::popFunctionType(Node::Kind kind, bool hasClangType) {
   NodePointer FuncType = createNode(kind);
+
+  // Demangle a C function type if the function node kind says that
+  // one follows.
   NodePointer ClangType = nullptr;
   if (hasClangType) {
     ClangType = demangleClangType();
   }
   addChild(FuncType, ClangType);
-  addChild(FuncType, popNode(Node::Kind::GlobalActorFunctionType));
-  addChild(FuncType, popNode(Node::Kind::IsolatedAnyFunctionType));
+
+  // The components of function-signature. Note that these need to be
+  // popped in the reverse of the order they're mangled. If you add a
+  // new component, be sure to add a demangling test case for combinations
+  // of specifiers.
+
+  // sending-result?
   addChild(FuncType, popNode(Node::Kind::SendingResultFunctionType));
+
+  // function-isolation?
+  auto isFunctionIsolation = [](Node::Kind kind) {
+    return kind == Node::Kind::GlobalActorFunctionType ||
+           kind == Node::Kind::IsolatedAnyFunctionType;
+  };
+  addChild(FuncType, popNode(isFunctionIsolation));
+
+  // differentiable?
   addChild(FuncType, popNode(Node::Kind::DifferentiableFunctionType));
+
+  // throws?
   addChild(FuncType, popNode([](Node::Kind kind) {
     return kind == Node::Kind::ThrowsAnnotation ||
       kind == Node::Kind::TypedThrowsAnnotation;
   }));
+
+  // sendable?
   addChild(FuncType, popNode(Node::Kind::ConcurrentFunctionType));
+
+  // async?
   addChild(FuncType, popNode(Node::Kind::AsyncAnnotation));
 
+  // params-type
   FuncType = addChild(FuncType, popFunctionParams(Node::Kind::ArgumentTuple));
+
+  // result-type
   FuncType = addChild(FuncType, popFunctionParams(Node::Kind::ReturnType));
+
   return createType(FuncType);
 }
 
@@ -1675,14 +1708,14 @@ NodePointer Demangler::popFunctionParamLabels(NodePointer Type) {
     return nullptr;
 
   unsigned FirstChildIdx = 0;
+  if (FuncType->getChild(FirstChildIdx)->getKind() ==
+      Node::Kind::SendingResultFunctionType)
+    ++FirstChildIdx;
   if (FuncType->getChild(FirstChildIdx)->getKind()
         == Node::Kind::GlobalActorFunctionType)
     ++FirstChildIdx;
   if (FuncType->getChild(FirstChildIdx)->getKind()
         == Node::Kind::IsolatedAnyFunctionType)
-    ++FirstChildIdx;
-  if (FuncType->getChild(FirstChildIdx)->getKind() ==
-      Node::Kind::SendingResultFunctionType)
     ++FirstChildIdx;
   if (FuncType->getChild(FirstChildIdx)->getKind()
         == Node::Kind::DifferentiableFunctionType)
@@ -2385,6 +2418,10 @@ NodePointer Demangler::demangleImplFunctionType() {
                    *this);
   }
 
+  if (nextIf('T')) {
+    type->addChild(createNode(Node::Kind::ImplSendingResult), *this);
+  }
+
   addChild(type, GenSig);
 
   int NumTypesToAdd = 0;
@@ -2396,10 +2433,6 @@ NodePointer Demangler::demangleImplFunctionType() {
     if (auto Sending = demangleImplParameterSending())
       Param = addChild(Param, Sending);
     ++NumTypesToAdd;
-  }
-
-  if (nextIf('T')) {
-    type->addChild(createNode(Node::Kind::ImplSendingResult), *this);
   }
 
   while (NodePointer Result = demangleImplResultConvention(
@@ -2434,7 +2467,7 @@ NodePointer Demangler::demangleImplFunctionType() {
       return nullptr;
     type->getChild(type->getNumChildren() - Idx - 1)->addChild(ConvTy, *this);
   }
-  
+
   return createType(type);
 }
 
@@ -4092,7 +4125,7 @@ NodePointer Demangler::demangleEntity(Node::Kind Kind) {
   auto result = LabelList ? createWithChildren(Kind, Context, Name, LabelList, Type)
                           : createWithChildren(Kind, Context, Name, Type);
                           
-  result = setParentForOpaqueReturnTypeNodes(*this, result, Type);
+  result = setParentForOpaqueReturnTypeNodes(*this, result, Type, Flavor);
   return result;
 }
 
@@ -4116,7 +4149,7 @@ NodePointer Demangler::demangleSubscript() {
   Subscript = addChild(Subscript, Type);
   addChild(Subscript, PrivateName);
   
-  Subscript = setParentForOpaqueReturnTypeNodes(*this, Subscript, Type);
+  Subscript = setParentForOpaqueReturnTypeNodes(*this, Subscript, Type, Flavor);
 
   return demangleAccessor(Subscript);
 }

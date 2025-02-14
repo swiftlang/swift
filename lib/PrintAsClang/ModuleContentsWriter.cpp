@@ -488,7 +488,6 @@ public:
         (inserted || !it->second.second))
       ClangValueTypePrinter::forwardDeclType(os, CD, printer);
     it->second = {EmissionState::Defined, true};
-    os << '\n';
     printer.print(CD);
     return true;
   }
@@ -507,7 +506,6 @@ public:
           forwardDeclareType(TD);
         });
 
-    os << '\n';
     printer.print(FD);
     return true;
   }
@@ -550,7 +548,6 @@ public:
       return false;
 
     seenTypes[PD] = { EmissionState::Defined, true };
-    os << '\n';
     printer.print(PD);
     return true;
   }
@@ -576,7 +573,6 @@ public:
     if (!forwardDeclareMemberTypes(ED->getAllMembers(), ED))
       return false;
 
-    os << '\n';
     printer.print(ED);
     return true;
   }
@@ -741,7 +737,7 @@ public:
       // FIXME: It'd be nice to share the mangler or even memoize mangled names,
       //        but we'd have to stop using `llvm::array_pod_sort()` so that we
       //        could capture some outside state.
-      Mangle::ASTMangler mangler;
+      Mangle::ASTMangler mangler((*lhs)->getASTContext());
       auto getMangledName = [&](const Decl *D) {
         auto VD = dyn_cast<ValueDecl>(D);
         if (!VD && isa<ExtensionDecl>(D))
@@ -840,6 +836,7 @@ public:
     while (!declsToWrite.empty()) {
       const Decl *D = declsToWrite.back();
       bool success = true;
+      auto posBefore = os.tell();
 
       if (auto ED = dyn_cast<EnumDecl>(D)) {
         success = writeEnum(ED);
@@ -870,7 +867,10 @@ public:
 
       if (success) {
         assert(declsToWrite.back() == D);
-        os << "\n";
+        // If we actually wrote something to the file, add a newline after it.
+        // (As opposed to, for instance, an extension we decided to skip.)
+        if (posBefore != os.tell())
+          os << "\n";
         declsToWrite.pop_back();
       }
     }
@@ -961,10 +961,10 @@ public:
         if (nmtd->isGeneric()) {
           auto genericSignature =
               nmtd->getGenericSignature().getCanonicalSignature();
-          ClangSyntaxPrinter(os).printGenericSignature(genericSignature);
+          ClangSyntaxPrinter(nmtd->getASTContext(), os).printGenericSignature(genericSignature);
         }
         os << "class ";
-        ClangSyntaxPrinter(os).printBaseName(vd);
+        ClangSyntaxPrinter(nmtd->getASTContext(), os).printBaseName(vd);
         os << " { } SWIFT_UNAVAILABLE_MSG(\"";
 
         auto diag =
@@ -977,8 +977,8 @@ public:
                       const_cast<ValueDecl *>(vd));
         // Emit a specific unavailable message when we know why a decl can't be
         // exposed, or a generic message otherwise.
-        auto diagString = M.getASTContext().Diags.diagnosticStringFor(
-            diag.getID(), PrintDiagnosticNamesMode::None);
+        auto diagString =
+            M.getASTContext().Diags.diagnosticStringFor(diag.getID());
         DiagnosticEngine::formatDiagnosticText(os, diagString, diag.getArgs(),
                                                DiagnosticFormatOptions());
         os << "\");\n";
@@ -1023,7 +1023,7 @@ EmittedClangHeaderDependencyInfo swift::printModuleContentsAsCxx(
   os << "#undef SWIFT_SYMBOL\n";
   os << "#endif\n";
   os << "#define SWIFT_SYMBOL(usrValue) SWIFT_SYMBOL_MODULE_USR(\"";
-  ClangSyntaxPrinter(os).printBaseName(&M);
+  ClangSyntaxPrinter(M.getASTContext(), os).printBaseName(&M);
   os << "\", usrValue)\n";
 
   // FIXME: Use getRequiredAccess once @expose is supported.
@@ -1039,7 +1039,7 @@ EmittedClangHeaderDependencyInfo swift::printModuleContentsAsCxx(
     os << "#endif\n";
     os << "#include <new>\n";
     // Embed an overlay for the standard library.
-    ClangSyntaxPrinter(moduleOS).printIncludeForShimHeader(
+    ClangSyntaxPrinter(M.getASTContext(), moduleOS).printIncludeForShimHeader(
         "_SwiftStdlibCxxOverlay.h");
     // Ignore typos in Swift stdlib doc comments.
     os << "#pragma clang diagnostic push\n";
@@ -1060,9 +1060,9 @@ EmittedClangHeaderDependencyInfo swift::printModuleContentsAsCxx(
       os << "#endif\n";
     os << "#ifdef __cplusplus\n";
     os << "namespace ";
-    ClangSyntaxPrinter(os).printBaseName(&M);
+    ClangSyntaxPrinter(M.getASTContext(), os).printBaseName(&M);
     os << " SWIFT_PRIVATE_ATTR";
-    ClangSyntaxPrinter(os).printSymbolUSRAttribute(&M);
+    ClangSyntaxPrinter(M.getASTContext(), os).printSymbolUSRAttribute(&M);
     os << " {\n";
     os << "namespace " << cxx_synthesis::getCxxImplNamespaceName() << " {\n";
     os << "extern \"C\" {\n";
@@ -1080,8 +1080,8 @@ EmittedClangHeaderDependencyInfo swift::printModuleContentsAsCxx(
   os << "#pragma clang diagnostic push\n";
   os << "#pragma clang diagnostic ignored \"-Wreserved-identifier\"\n";
   // Construct a C++ namespace for the module.
-  ClangSyntaxPrinter(os).printNamespace(
-      [&](raw_ostream &os) { ClangSyntaxPrinter(os).printBaseName(&M); },
+  ClangSyntaxPrinter(M.getASTContext(), os).printNamespace(
+      [&](raw_ostream &os) { ClangSyntaxPrinter(M.getASTContext(), os).printBaseName(&M); },
       [&](raw_ostream &os) { os << moduleOS.str(); },
       ClangSyntaxPrinter::NamespaceTrivia::AttributeSwiftPrivate, &M);
   os << "#pragma clang diagnostic pop\n";

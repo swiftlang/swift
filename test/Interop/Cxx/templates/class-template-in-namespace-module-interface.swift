@@ -5,4 +5,16 @@
 // CHECK:   struct Ship<> {
 // CHECK:   }
 // CHECK:   typealias Orbiter = Space.Ship<((CBool) -> Void)>
+
+// CHECK:   typealias IntBoxWithinNS = Space.Box<CInt>
+// CHECK:   typealias BoxOfIntBoxWithinNS = Space.Box<Space.Box<CInt>>
+
+// CHECK:   enum NestedNS1 {
+// CHECK:     typealias ImplBox1 = Space.Box<Space.NestedNS1.Impl>
+// CHECK:   }
+
+// CHECK:   enum NestedNS2 {
+// CHECK:     typealias ImplBox2 = Space.Box<Space.NestedNS2.Impl>
+// CHECK:   }
+
 // CHECK: }

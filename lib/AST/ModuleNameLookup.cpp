@@ -27,7 +27,9 @@ namespace {
 /// Encapsulates the work done for a recursive qualified lookup into a module.
 ///
 /// The \p LookupStrategy handles the non-recursive part of the lookup. It
-/// must be a subclass of ModuleNameLookup.
+/// must be a subclass of ModuleNameLookup. It should provide a
+/// \c doLocalLookup() method; this method will be passed appropriate
+/// \c NLOptions but does not necessarily need to honor them.
 template <typename LookupStrategy>
 class ModuleNameLookup {
   ASTContext &ctx;
@@ -183,6 +185,8 @@ void ModuleNameLookup<LookupStrategy>::lookupInModule(
         if (respectAccessControl &&
             !declIsVisibleToNameLookup(VD, moduleScopeContext, options))
           return true;
+        if (!ABIRoleInfo(VD).matchesOptions(options))
+          return true;
         return false;
       });
     decls.erase(newEnd, decls.end());
@@ -193,6 +197,8 @@ void ModuleNameLookup<LookupStrategy>::lookupInModule(
   OptionSet<ModuleLookupFlags> currentModuleLookupFlags = {};
   if (options & NL_ExcludeMacroExpansions)
     currentModuleLookupFlags |= ModuleLookupFlags::ExcludeMacroExpansions;
+  if (options & NL_ABIProviding)
+    currentModuleLookupFlags |= ModuleLookupFlags::ABIProviding;
 
   // Do the lookup into the current module.
   auto *module = moduleOrFile->getParentModule();
@@ -217,6 +223,10 @@ void ModuleNameLookup<LookupStrategy>::lookupInModule(
   if (!canReturnEarly) {
     auto &imports = ctx.getImportCache().getImportSet(moduleOrFile);
 
+    OptionSet<ModuleLookupFlags> importedModuleLookupFlags = {};
+    if (options & NL_ABIProviding)
+      currentModuleLookupFlags |= ModuleLookupFlags::ABIProviding;
+
     auto visitImport = [&](ImportedModule import,
                            const DeclContext *moduleScopeContext) {
       if (import.accessPath.empty())
@@ -226,7 +236,7 @@ void ModuleNameLookup<LookupStrategy>::lookupInModule(
         return;
 
       getDerived()->doLocalLookup(import.importedModule, import.accessPath,
-                                  { }, decls);
+                                  importedModuleLookupFlags, decls);
       updateNewDecls(moduleScopeContext);
     };
 

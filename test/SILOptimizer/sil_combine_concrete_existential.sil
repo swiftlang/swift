@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -enable-objc-interop -enable-sil-verify-all %s -sil-combine -sil-print-generic-specialization-info | %FileCheck %s
+// RUN: %target-sil-opt -sil-print-types -enable-objc-interop -enable-sil-verify-all %s -sil-combine -sil-print-generic-specialization-info | %FileCheck %s
 // RUN: %target-swift-frontend -O %s -emit-ir
 
 // REQUIRES: swift_in_compiler

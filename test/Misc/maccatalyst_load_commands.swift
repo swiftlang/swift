@@ -2,6 +2,7 @@
 // REQUIRES: maccatalyst_support
 // REQUIRES: CPU=x86_64
 
+// REQUIRES: rdar136779081
 
 // Zippered libraries
 

@@ -204,6 +204,8 @@ static void validateDependencyScanningArgs(DiagnosticEngine &diags,
       args.getLastArg(options::OPT_reuse_dependency_scan_cache);
   const Arg *CacheSerializationPath =
       args.getLastArg(options::OPT_dependency_scan_cache_path);
+  const Arg *ValidatePriorCache =
+      args.getLastArg(options::OPT_validate_prior_dependency_scan_cache);
 
   if (ExternalDependencyMap && !ScanDependencies) {
     diags.diagnose(SourceLoc(), diag::error_requirement_not_met,
@@ -235,6 +237,11 @@ static void validateDependencyScanningArgs(DiagnosticEngine &diags,
     diags.diagnose(SourceLoc(), diag::error_requirement_not_met,
                    "-serialize-dependency-scan-cache",
                    "-dependency-scan-cache-path");
+  }
+  if (ValidatePriorCache && !ReuseCache) {
+    diags.diagnose(SourceLoc(), diag::error_requirement_not_met,
+                   "-validate-prior-dependency-scan-cache",
+                   "-load-dependency-scan-cache");
   }
 }
 
@@ -1691,6 +1698,7 @@ void Driver::buildActions(SmallVectorImpl<const Action *> &TopLevelActions,
       case file_types::TY_PCH:
       case file_types::TY_ImportedModules:
       case file_types::TY_ModuleTrace:
+      case file_types::TY_FineModuleTrace:
       case file_types::TY_YAMLOptRecord:
       case file_types::TY_BitstreamOptRecord:
       case file_types::TY_SwiftModuleInterfaceFile:
@@ -1707,6 +1715,7 @@ void Driver::buildActions(SmallVectorImpl<const Action *> &TopLevelActions,
       case file_types::TY_SwiftFixIt:
       case file_types::TY_ModuleSemanticInfo:
       case file_types::TY_CachedDiagnostics:
+      case file_types::TY_SymbolGraphFile:
         // We could in theory handle assembly or LLVM input, but let's not.
         // FIXME: What about LTO?
         Diags.diagnose(SourceLoc(), diag::error_unexpected_input_file,

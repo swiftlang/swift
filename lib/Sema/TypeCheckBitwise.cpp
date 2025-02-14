@@ -379,8 +379,7 @@ DeriveImplicitBitwiseCopyableConformance::synthesizeConformance(
   auto conformance = context.getNormalConformance(
       nominal->getDeclaredInterfaceType(), protocol, nominal->getLoc(), dc,
       ProtocolConformanceState::Complete,
-      /*isUnchecked=*/false,
-      /*isPreconcurrency=*/false);
+      ProtocolConformanceOptions());
   conformance->setSourceKindAndImplyingConformance(
       ConformanceEntryKind::Synthesized, nullptr);
 
@@ -413,7 +412,7 @@ bool swift::checkBitwiseCopyableConformance(ProtocolConformance *conformance,
 
   // If this is an always-unavailable conformance, there's nothing to check.
   if (auto ext = dyn_cast<ExtensionDecl>(conformanceDC)) {
-    if (AvailableAttr::isUnavailable(ext))
+    if (ext->isUnavailable())
       return false;
   }
 

@@ -1378,11 +1378,6 @@ namespace {
                                const llvm::Twine &name) const override {
       llvm_unreachable("should not call on an immovable opaque type");
     }
-    StackAddress allocateVector(IRGenFunction &IGF, SILType T,
-                                llvm::Value *capacity,
-                                const Twine &name) const override {
-      llvm_unreachable("should not call on an immovable opaque type");
-    }
     void deallocateStack(IRGenFunction &IGF, StackAddress addr,
                          SILType T) const override {
       llvm_unreachable("should not call on an immovable opaque type");
@@ -1490,7 +1485,7 @@ bool TypeConverter::readLegacyTypeInfo(llvm::vfs::FileSystem &fs,
 }
 
 static std::string mangleTypeAsContext(const NominalTypeDecl *decl) {
-  Mangle::ASTMangler Mangler;
+  Mangle::ASTMangler Mangler(decl->getASTContext());
   return Mangler.mangleTypeAsContextUSR(decl);
 }
 
@@ -2375,7 +2370,7 @@ const TypeInfo *TypeConverter::convertType(CanType ty) {
   case TypeKind::SILToken:
     llvm_unreachable("should not be asking for representation of a SILToken");
   case TypeKind::Integer:
-    llvm_unreachable("implement me");
+    llvm_unreachable("should not be asking for the type info an IntegerType");
   }
   }
   llvm_unreachable("bad type kind");
@@ -2752,7 +2747,7 @@ llvm::StructType *IRGenModule::createNominalType(CanType type) {
     type = type.getNominalOrBoundGenericNominal()->getDeclaredType()
                                                  ->getCanonicalType();
 
-  IRGenMangler Mangler;
+  IRGenMangler Mangler(Context);
   std::string typeName = Mangler.mangleTypeForLLVMTypeName(type);
   return llvm::StructType::create(getLLVMContext(), StringRef(typeName));
 }
@@ -2764,7 +2759,7 @@ llvm::StructType *IRGenModule::createNominalType(CanType type) {
 /// distinguish different cases.
 llvm::StructType *
 IRGenModule::createNominalType(ProtocolCompositionType *type) {
-  IRGenMangler Mangler;
+  IRGenMangler Mangler(Context);
   std::string typeName = Mangler.mangleProtocolForLLVMTypeName(type);
   return llvm::StructType::create(getLLVMContext(), StringRef(typeName));
 }

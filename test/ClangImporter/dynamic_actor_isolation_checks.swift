@@ -1,8 +1,8 @@
 // RUN: %empty-directory(%t/src)
 // RUN: split-file %s %t/src
 
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -disable-availability-checking -enable-upcoming-feature DynamicActorIsolation -emit-silgen -module-name preconcurrency_conformances %t/src/checks.swift | %FileCheck %t/src/checks.swift
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -disable-availability-checking -swift-version 6 -disable-dynamic-actor-isolation -emit-silgen -module-name preconcurrency_conformances %t/src/checks_disabled.swift | %FileCheck %t/src/checks_disabled.swift
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -disable-availability-checking -enable-upcoming-feature DynamicActorIsolation -Xllvm -sil-print-types -emit-silgen -module-name preconcurrency_conformances %t/src/checks.swift | %FileCheck %t/src/checks.swift
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -disable-availability-checking -swift-version 6 -disable-dynamic-actor-isolation -Xllvm -sil-print-types -emit-silgen -module-name preconcurrency_conformances %t/src/checks_disabled.swift | %FileCheck %t/src/checks_disabled.swift
 
 // REQUIRES: concurrency
 // REQUIRES: objc_interop

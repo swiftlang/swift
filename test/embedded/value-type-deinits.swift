@@ -5,7 +5,6 @@
 // RUN: %target-swift-frontend -emit-sil -I %t %t/Main.swift -enable-experimental-feature Embedded -parse-as-library | %FileCheck %s
 
 // REQUIRES: swift_in_compiler
-// REQUIRES: OS=macosx || OS=linux-gnu
 // REQUIRES: swift_feature_Embedded
 
 // BEGIN MyModule.swift
@@ -32,6 +31,6 @@ public func test() {
   createFoo(x: 1)
 }
 
-// CHECK-LABEL: sil @$s8MyModule9createFoo1xyx_ts17FixedWidthIntegerRzlFSi_Ttg5 :
+// CHECK-LABEL: sil @$e8MyModule9createFoo1xyx_ts17FixedWidthIntegerRzlFSi_Ttg5 :
 // CHECK-NOT:     release
-// CHECK:       } // end sil function '$s8MyModule9createFoo1xyx_ts17FixedWidthIntegerRzlFSi_Ttg5'
+// CHECK:       } // end sil function '$e8MyModule9createFoo1xyx_ts17FixedWidthIntegerRzlFSi_Ttg5'

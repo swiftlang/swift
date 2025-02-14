@@ -1,5 +1,5 @@
 
-// RUN: %target-swift-emit-silgen -module-name if_while_binding -Xllvm -sil-full-demangle %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -Xllvm -sil-print-types -module-name if_while_binding -Xllvm -sil-full-demangle %s | %FileCheck %s
 
 func foo() -> String? { return "" }
 func bar() -> String? { return "" }

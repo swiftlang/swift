@@ -66,13 +66,13 @@ public:
   /// Create an mangler for an outlined bridged method.
   OutlinerMangler(SILDeclRef Method, llvm::BitVector *ParameterBridged,
                   llvm::BitVector *IsParameterGuaranteed, bool ReturnBridged)
-      : IsParameterBridged(ParameterBridged),
+      : ASTMangler(Method.getASTContext()), IsParameterBridged(ParameterBridged),
         IsParameterGuaranteed(IsParameterGuaranteed), MethodDecl(Method),
         Kind(BridgedMethod), IsReturnBridged(ReturnBridged) {}
 
   /// Create an mangler for an outlined bridged property.
   OutlinerMangler(SILDeclRef Method, bool IsAddress, bool ConsumesValue)
-      : IsParameterBridged(nullptr), IsParameterGuaranteed(nullptr),
+      : ASTMangler(Method.getASTContext()), IsParameterBridged(nullptr), IsParameterGuaranteed(nullptr),
         MethodDecl(Method),
         Kind(IsAddress ? BridgedPropertyAddress
                        : (ConsumesValue ? BridgedProperty_Consuming
@@ -757,7 +757,8 @@ public:
       : BridgeFun(nullptr), BridgeCall(nullptr), OptionalResult(nullptr),
         ReleaseAfterBridge(nullptr), ReleaseArgAfterCall(nullptr), Idx(0) {}
 
-  static BridgedArgument match(unsigned ArgIdx, SILValue Arg, ApplyInst *AI);
+  static BridgedArgument match(unsigned ArgIdx, SILValue Arg, ApplyInst *AI,
+                               DeadEndBlocks *deBlocks);
 
   operator bool() const { return BridgeFun != nullptr; }
   SILValue bridgedValue() { return BridgedValue; }
@@ -826,7 +827,7 @@ static SILInstruction *findReleaseOf(SILValue releasedValue,
 }
 
 BridgedArgument BridgedArgument::match(unsigned ArgIdx, SILValue Arg,
-                                       ApplyInst *AI) {
+                                       ApplyInst *AI, DeadEndBlocks *deBlocks) {
   // Match
   // %15 = function_ref @$SSS10FoundationE19_bridgeToObjectiveCSo8NSStringCyF
   // %16 = apply %15(%14) : $@convention(method) (@guaranteed String) -> @owned NSString
@@ -879,6 +880,7 @@ BridgedArgument BridgedArgument::match(unsigned ArgIdx, SILValue Arg,
 
   if (SILBasicBlock::iterator(BridgeCall) == BridgeCall->getParent()->begin())
     return BridgedArgument();
+
   auto *FunRef =
       dyn_cast<FunctionRefInst>(std::prev(SILBasicBlock::iterator(BridgeCall)));
   if (!FunRef || !FunRef->hasOneUse() || BridgeCall->getCallee() != FunRef)
@@ -912,6 +914,12 @@ BridgedArgument BridgedArgument::match(unsigned ArgIdx, SILValue Arg,
       BridgeFun->getName() != bridgeWitness.mangle())
     return BridgedArgument();
 
+  if (hasOwnership && !BridgedValueRelease) {
+    SmallVector<Operand *> newUses{&AI->getOperandRef(ArgIdx)};
+    if (!areUsesWithinValueLifetime(BridgedValue, newUses, deBlocks)) {
+      return BridgedArgument();
+    }
+  }
   return BridgedArgument(ArgIdx, FunRef, BridgeCall, Enum, BridgedValueRelease,
                          ReleaseAfter);
 }
@@ -1087,10 +1095,6 @@ ObjCMethodCall::outline(SILModule &M) {
       if (BridgedArgIdx < BridgedArguments.size() &&
           BridgedArguments[BridgedArgIdx].Idx == OrigSigIdx) {
         auto bridgedArgValue = BridgedArguments[BridgedArgIdx].bridgedValue();
-        if (bridgedArgValue->getOwnershipKind() == OwnershipKind::Guaranteed) {
-          bridgedArgValue = makeGuaranteedValueAvailable(
-              bridgedArgValue, BridgedCall, *deBlocks);
-        }
         Args.push_back(bridgedArgValue);
         ++BridgedArgIdx;
       } else {
@@ -1215,7 +1219,8 @@ bool ObjCMethodCall::matchInstSequence(SILBasicBlock::iterator I) {
     if (Ty.isAnyObject())
       continue;
 
-    auto BridgedArg = BridgedArgument::match(CurIdx, Param.get(), BridgedCall);
+    auto BridgedArg =
+        BridgedArgument::match(CurIdx, Param.get(), BridgedCall, deBlocks);
     if (!BridgedArg)
       continue;
 

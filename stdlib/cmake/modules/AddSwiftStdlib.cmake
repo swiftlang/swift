@@ -529,6 +529,7 @@ function(_add_target_variant_link_flags)
     list(APPEND link_libraries "pthread")
   elseif("${LFLAGS_SDK}" STREQUAL "OPENBSD")
     list(APPEND link_libraries "pthread")
+    list(APPEND result "-Wl,-Bsymbolic")
   elseif("${LFLAGS_SDK}" STREQUAL "CYGWIN")
     # No extra libraries required.
   elseif("${LFLAGS_SDK}" STREQUAL "WINDOWS")
@@ -554,15 +555,22 @@ function(_add_target_variant_link_flags)
     list(APPEND link_libraries "dl" "log")
     # We need to add the math library, which is linked implicitly by libc++
     list(APPEND result "-lm")
-    if(NOT CMAKE_HOST_SYSTEM MATCHES Windows)
+    if(NOT CMAKE_HOST_SYSTEM MATCHES Windows AND NOT "${SWIFT_ANDROID_NDK_PATH}" STREQUAL "")
       # The Android resource dir is specified from build.ps1 on windows.
-      if(NOT "${SWIFT_ANDROID_NDK_PATH}" STREQUAL "")
-        if("${SWIFT_ANDROID_NDK_PATH}" MATCHES "r26|r27")
+      if(EXISTS "${SWIFT_ANDROID_NDK_PATH}/source.properties")
+        file(READ "${SWIFT_ANDROID_NDK_PATH}/source.properties" NDK_VERSION)
+        if(NOT NDK_VERSION MATCHES "Pkg\\.Revision = ([0-9\\.]+)")
+          message(FATAL_ERROR "Could not find NDK version in source.properties: ${NDK_VERSION}")
+        endif()
+
+        if("${CMAKE_MATCH_1}" VERSION_GREATER_EQUAL "26")
           file(GLOB RESOURCE_DIR ${SWIFT_SDK_ANDROID_ARCH_${LFLAGS_ARCH}_PATH}/../lib/clang/*)
         else()
           file(GLOB RESOURCE_DIR ${SWIFT_SDK_ANDROID_ARCH_${LFLAGS_ARCH}_PATH}/../lib64/clang/*)
         endif()
         list(APPEND result "-resource-dir=${RESOURCE_DIR}")
+      else()
+        message(FATAL_ERROR "Could not detect NDK version: ${SWIFT_ANDROID_NDK_PATH}/source.properties not found")
       endif()
     endif()
 
@@ -690,7 +698,7 @@ function(_add_swift_lipo_target)
         DEPENDS ${source_targets})
   endif()
 endfunction()
- 
+
 # Add a single variant of a new Swift library.
 #
 # Usage:
@@ -918,25 +926,6 @@ function(add_swift_target_library_single target name)
     endif()
   endif()
 
-  if(XCODE)
-    string(REGEX MATCHALL "/[^/]+" split_path ${CMAKE_CURRENT_SOURCE_DIR})
-    list(GET split_path -1 dir)
-    file(GLOB_RECURSE SWIFTLIB_SINGLE_HEADERS
-      ${SWIFT_SOURCE_DIR}/include/swift${dir}/*.h
-      ${SWIFT_SOURCE_DIR}/include/swift${dir}/*.def
-      ${CMAKE_CURRENT_SOURCE_DIR}/*.def)
-
-    file(GLOB_RECURSE SWIFTLIB_SINGLE_TDS
-      ${SWIFT_SOURCE_DIR}/include/swift${dir}/*.td)
-
-    set_source_files_properties(${SWIFTLIB_SINGLE_HEADERS} ${SWIFTLIB_SINGLE_TDS}
-      PROPERTIES
-      HEADER_FILE_ONLY true)
-    source_group("TableGen descriptions" FILES ${SWIFTLIB_SINGLE_TDS})
-
-    set(SWIFTLIB_SINGLE_SOURCES ${SWIFTLIB_SINGLE_SOURCES} ${SWIFTLIB_SINGLE_HEADERS} ${SWIFTLIB_SINGLE_TDS})
-  endif()
-
   # FIXME: swiftDarwin currently trips an assertion in SymbolGraphGen
   if (SWIFTLIB_IS_STDLIB AND SWIFT_STDLIB_BUILD_SYMBOL_GRAPHS AND NOT ${name} STREQUAL "swiftDarwin")
     list(APPEND SWIFTLIB_SINGLE_SWIFT_COMPILE_FLAGS "-Xfrontend;-emit-symbol-graph")
@@ -1114,14 +1103,6 @@ function(add_swift_target_library_single target name)
         $<TARGET_OBJECTS:${object_library}${VARIANT_SUFFIX}>)
   endforeach()
 
-  set(SWIFTLIB_SINGLE_XCODE_WORKAROUND_SOURCES)
-  if(XCODE)
-    set(SWIFTLIB_SINGLE_XCODE_WORKAROUND_SOURCES
-        # Note: the dummy.cpp source file provides no definitions. However,
-        # it forces Xcode to properly link the static library.
-        ${SWIFT_SOURCE_DIR}/cmake/dummy.cpp)
-  endif()
-
   set(INCORPORATED_OBJECT_LIBRARIES_EXPRESSIONS ${SWIFTLIB_INCORPORATED_OBJECT_LIBRARIES_EXPRESSIONS})
   if(libkind STREQUAL "SHARED")
     list(APPEND INCORPORATED_OBJECT_LIBRARIES_EXPRESSIONS
@@ -1140,8 +1121,7 @@ function(add_swift_target_library_single target name)
   add_library("${target}" ${libkind}
               ${SWIFTLIB_SINGLE_SOURCES}
               ${SWIFTLIB_SINGLE_EXTERNAL_SOURCES}
-              ${INCORPORATED_OBJECT_LIBRARIES_EXPRESSIONS}
-              ${SWIFTLIB_SINGLE_XCODE_WORKAROUND_SOURCES})
+              ${INCORPORATED_OBJECT_LIBRARIES_EXPRESSIONS})
   if (NOT SWIFTLIB_SINGLE_OBJECT_LIBRARY AND TARGET "${install_in_component}")
     add_dependencies("${install_in_component}" "${target}")
   endif()
@@ -1241,10 +1221,9 @@ function(add_swift_target_library_single target name)
 
   foreach(config ${CMAKE_CONFIGURATION_TYPES})
     string(TOUPPER ${config} config_upper)
-    escape_path_for_xcode("${config}" "${swiftlib_prefix}" config_lib_dir)
     set_target_properties(${target} PROPERTIES
-      LIBRARY_OUTPUT_DIRECTORY_${config_upper} ${config_lib_dir}/${output_sub_dir}
-      ARCHIVE_OUTPUT_DIRECTORY_${config_upper} ${config_lib_dir}/${output_sub_dir})
+      LIBRARY_OUTPUT_DIRECTORY_${config_upper} ${swiftlib_prefix}/${output_sub_dir}
+      ARCHIVE_OUTPUT_DIRECTORY_${config_upper} ${swiftlib_prefix}/${output_sub_dir})
   endforeach()
 
   if(SWIFTLIB_SINGLE_SDK IN_LIST SWIFT_DARWIN_PLATFORMS)
@@ -1309,38 +1288,43 @@ function(add_swift_target_library_single target name)
   # Set compile and link flags for the non-static target.
   # Do these LAST.
   set(target_static)
-  if(SWIFTLIB_SINGLE_IS_STDLIB AND SWIFTLIB_SINGLE_STATIC AND NOT SWIFTLIB_SINGLE_INSTALL_WITH_SHARED)
+  if(SWIFTLIB_SINGLE_IS_STDLIB AND SWIFTLIB_SINGLE_STATIC)
     set(target_static "${target}-static")
 
-    # We have already compiled Swift sources.  Link everything into a static
-    # library.
-    add_library(${target_static} STATIC
+    if (SWIFTLIB_SINGLE_INSTALL_WITH_SHARED)
+      # Create an interface library for the static version, and explicitly
+      # add the output path for the non-static version to its libraries.
+      add_library(${target_static} INTERFACE)
+      add_dependencies(${target_static} ${target})
+      target_link_libraries(${target_static} INTERFACE $<TARGET_FILE:${target}>)
+    else()
+      # We have already compiled Swift sources.  Link everything into a static
+      # library.
+      add_library(${target_static} STATIC
         ${SWIFTLIB_SINGLE_SOURCES}
-        ${SWIFTLIB_INCORPORATED_OBJECT_LIBRARIES_EXPRESSIONS}
-        ${SWIFTLIB_SINGLE_XCODE_WORKAROUND_SOURCES})
+        ${SWIFTLIB_INCORPORATED_OBJECT_LIBRARIES_EXPRESSIONS})
 
-    set_output_directory(${target_static}
+      set_output_directory(${target_static}
         BINARY_DIR ${out_bin_dir}
         LIBRARY_DIR ${out_lib_dir})
 
-    if(SWIFTLIB_INSTALL_WITH_SHARED)
-      set(swift_lib_dir ${lib_dir})
-    else()
-      set(swift_lib_dir ${static_lib_dir})
-    endif()
+      if(SWIFTLIB_INSTALL_WITH_SHARED)
+        set(swift_lib_dir ${lib_dir})
+      else()
+        set(swift_lib_dir ${static_lib_dir})
+      endif()
 
-    foreach(config ${CMAKE_CONFIGURATION_TYPES})
-      string(TOUPPER ${config} config_upper)
-      escape_path_for_xcode(
-          "${config}" "${swift_lib_dir}" config_lib_dir)
+      foreach(config ${CMAKE_CONFIGURATION_TYPES})
+        string(TOUPPER ${config} config_upper)
+        set_target_properties(${target_static} PROPERTIES
+          LIBRARY_OUTPUT_DIRECTORY_${config_upper} ${swift_lib_dir}/${output_sub_dir}
+          ARCHIVE_OUTPUT_DIRECTORY_${config_upper} ${swift_lib_dir}/${output_sub_dir})
+      endforeach()
+
       set_target_properties(${target_static} PROPERTIES
-        LIBRARY_OUTPUT_DIRECTORY_${config_upper} ${config_lib_dir}/${output_sub_dir}
-        ARCHIVE_OUTPUT_DIRECTORY_${config_upper} ${config_lib_dir}/${output_sub_dir})
-    endforeach()
-
-    set_target_properties(${target_static} PROPERTIES
-      LIBRARY_OUTPUT_DIRECTORY ${swift_lib_dir}/${output_sub_dir}
-      ARCHIVE_OUTPUT_DIRECTORY ${swift_lib_dir}/${output_sub_dir})
+        LIBRARY_OUTPUT_DIRECTORY ${swift_lib_dir}/${output_sub_dir}
+        ARCHIVE_OUTPUT_DIRECTORY ${swift_lib_dir}/${output_sub_dir})
+    endif()
   endif()
 
   set_target_properties(${target}
@@ -1636,9 +1620,10 @@ function(add_swift_target_library_single target name)
       LINKER_LANGUAGE "CXX")
   endif()
 
-  if(target_static)
+  if(target_static AND NOT SWIFTLIB_SINGLE_INSTALL_WITH_SHARED)
     target_compile_options(${target_static} PRIVATE
       ${c_compile_flags})
+
     # FIXME: The fallback paths here are going to be dynamic libraries.
 
     if(SWIFTLIB_INSTALL_WITH_SHARED)
@@ -2064,7 +2049,7 @@ function(add_swift_target_library name)
     list(APPEND SWIFTLIB_SWIFT_COMPILE_FLAGS "-Xfrontend;-enable-lexical-lifetimes=false")
   endif()
 
-  if (NOT DEFINED IMPORTS_NON_OSSA)
+  if (NOT SWIFTLIB_IMPORTS_NON_OSSA)
     list(APPEND SWIFTLIB_SWIFT_COMPILE_FLAGS "-Xfrontend;-enable-ossa-modules")
   endif()
 
@@ -2082,11 +2067,6 @@ function(add_swift_target_library name)
 
   # Turn off implicit import of _StringProcessing when building libraries
   list(APPEND SWIFTLIB_SWIFT_COMPILE_FLAGS "-Xfrontend;-disable-implicit-string-processing-module-import")
-
-  # Turn off implicit import of _Backtracing when building libraries
-  if(SWIFT_COMPILER_SUPPORTS_BACKTRACING)
-    list(APPEND SWIFTLIB_SWIFT_COMPILE_FLAGS "-Xfrontend;-disable-implicit-backtracing-module-import")
-  endif()
 
   if(SWIFTLIB_IS_STDLIB AND SWIFT_STDLIB_ENABLE_PRESPECIALIZATION)
     list(APPEND SWIFTLIB_SWIFT_COMPILE_FLAGS "-Xfrontend;-prespecialize-generic-metadata")
@@ -3116,10 +3096,6 @@ function(add_swift_target_executable name)
   if(SWIFT_ENABLE_EXPERIMENTAL_STRING_PROCESSING)
     list(APPEND SWIFTEXE_TARGET_COMPILE_FLAGS
                       "-Xfrontend;-disable-implicit-string-processing-module-import")
-  endif()
-
-  if(SWIFT_IMPLICIT_BACKTRACING_IMPORT)
-    list(APPEND SWIFTEXE_TARGET_COMPILE_FLAGS "-Xfrontend;-disable-implicit-backtracing-module-import")
   endif()
 
   if(SWIFT_BUILD_STDLIB)

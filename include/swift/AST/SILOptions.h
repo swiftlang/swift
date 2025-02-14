@@ -153,12 +153,17 @@ public:
   /// Enables SIL-level diagnostics for NonescapableTypes.
   bool EnableLifetimeDependenceDiagnostics = true;
 
-  /// Enables SIL-level performance diagnostics (for @noLocks, @noAllocation
-  /// annotations and for Embedded Swift).
-  bool EnablePerformanceDiagnostics = true;
+  /// Enable diagnostics requiring WMO (for @noLocks, @noAllocation
+  /// annotations, Embedded Swift, and class specialization). SourceKit is the
+  /// only consumer that has this disabled today (as it disables WMO
+  /// explicitly).
+  bool EnableWMORequiredDiagnostics = true;
 
   /// Controls whether or not paranoid verification checks are run.
   bool VerifyAll = false;
+
+  /// Verify ownership after every pass.
+  bool VerifyOwnershipAll = false;
 
   /// If true, no SIL verification is done at all.
   bool VerifyNone = false;
@@ -186,7 +191,7 @@ public:
   /// Do we always serialize SIL in OSSA form?
   ///
   /// If this is disabled we do not serialize in OSSA form when optimizing.
-  bool EnableOSSAModules = false;
+  bool EnableOSSAModules = true;
 
   /// Allow recompilation of a non-OSSA module to an OSSA module when imported
   /// from another OSSA module.

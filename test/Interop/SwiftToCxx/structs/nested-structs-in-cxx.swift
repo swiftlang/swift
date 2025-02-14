@@ -60,3 +60,9 @@ public func makeRecordConfig() -> RecordConfig {
 public func makeAudioFileType() -> AudioFileType {
     return AudioFileType.CAF(AudioFileType.SubType(id: 42))
 }
+
+public class TestObject {
+    enum CustomError: Swift.Error {
+        case invalid
+    }
+}

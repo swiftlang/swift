@@ -75,7 +75,6 @@ Constraint::Constraint(ConstraintKind Kind, Type First, Type Second,
   case ConstraintKind::OpenedExistentialOf:
   case ConstraintKind::OptionalObject:
   case ConstraintKind::OneWayEqual:
-  case ConstraintKind::OneWayBindParam:
   case ConstraintKind::UnresolvedMemberChainBase:
   case ConstraintKind::PropertyWrapper:
   case ConstraintKind::BindTupleOfFunctionParams:
@@ -88,11 +87,9 @@ Constraint::Constraint(ConstraintKind Kind, Type First, Type Second,
     assert(!First.isNull());
     assert(!Second.isNull());
     break;
-  case ConstraintKind::ApplicableFunction:
   case ConstraintKind::DynamicCallableApplicableFunction:
     assert(First->is<FunctionType>()
            && "The left-hand side type should be a function type");
-    trailingClosureMatching = 0;
     break;
 
   case ConstraintKind::ValueMember:
@@ -121,6 +118,10 @@ Constraint::Constraint(ConstraintKind Kind, Type First, Type Second,
 
   case ConstraintKind::SyntacticElement:
     llvm_unreachable("Syntactic element constraint should use create()");
+
+  case ConstraintKind::ApplicableFunction:
+    llvm_unreachable(
+        "Application constraint should use create()");
   }
 
   std::uninitialized_copy(typeVars.begin(), typeVars.end(),
@@ -164,7 +165,6 @@ Constraint::Constraint(ConstraintKind Kind, Type First, Type Second, Type Third,
   case ConstraintKind::Disjunction:
   case ConstraintKind::Conjunction:
   case ConstraintKind::OneWayEqual:
-  case ConstraintKind::OneWayBindParam:
   case ConstraintKind::FallbackType:
   case ConstraintKind::UnresolvedMemberChainBase:
   case ConstraintKind::PropertyWrapper:
@@ -192,7 +192,7 @@ Constraint::Constraint(ConstraintKind Kind, Type First, Type Second, Type Third,
 
 Constraint::Constraint(ConstraintKind kind, Type first, Type second,
                        DeclNameRef member, DeclContext *useDC,
-                       FunctionRefKind functionRefKind,
+                       FunctionRefInfo functionRefInfo,
                        ConstraintLocator *locator,
                        SmallPtrSetImpl<TypeVariableType *> &typeVars)
     : Kind(kind), HasFix(false), HasRestriction(false), IsActive(false),
@@ -202,8 +202,8 @@ Constraint::Constraint(ConstraintKind kind, Type first, Type second,
       Locator(locator) {
   assert(kind == ConstraintKind::ValueMember ||
          kind == ConstraintKind::UnresolvedValueMember);
-  TheFunctionRefKind = static_cast<unsigned>(functionRefKind);
-  assert(getFunctionRefKind() == functionRefKind);
+  TheFunctionRefInfo = functionRefInfo.getOpaqueValue();
+  assert(getFunctionRefInfo() == functionRefInfo);
   assert(member && "Member constraint has no member");
   assert(useDC && "Member constraint has no use DC");
 
@@ -212,7 +212,7 @@ Constraint::Constraint(ConstraintKind kind, Type first, Type second,
 
 Constraint::Constraint(ConstraintKind kind, Type first, Type second,
                        ValueDecl *requirement, DeclContext *useDC,
-                       FunctionRefKind functionRefKind,
+                       FunctionRefInfo functionRefInfo,
                        ConstraintLocator *locator,
                        SmallPtrSetImpl<TypeVariableType *> &typeVars)
     : Kind(kind), HasFix(false), HasRestriction(false), IsActive(false),
@@ -223,10 +223,10 @@ Constraint::Constraint(ConstraintKind kind, Type first, Type second,
   Member.Second = second;
   Member.Member.Ref = requirement;
   Member.UseDC = useDC;
-  TheFunctionRefKind = static_cast<unsigned>(functionRefKind);
+  TheFunctionRefInfo = functionRefInfo.getOpaqueValue();
 
   assert(kind == ConstraintKind::ValueWitness);
-  assert(getFunctionRefKind() == functionRefKind);
+  assert(getFunctionRefInfo() == functionRefInfo);
   assert(requirement && "Value witness constraint has no requirement");
   assert(useDC && "Member constraint has no use DC");
 
@@ -286,6 +286,27 @@ Constraint::Constraint(ASTNode node, ContextualTypeInfo context,
       NumTypeVariables(typeVars.size()), SyntacticElement{node, context,
                                                           isDiscarded},
       Locator(locator) {
+  std::copy(typeVars.begin(), typeVars.end(), getTypeVariablesBuffer().begin());
+}
+
+Constraint::Constraint(FunctionType *appliedFn, Type calleeType,
+                       unsigned trailingClosureMatching, DeclContext *useDC,
+                       ConstraintLocator *locator,
+                       SmallPtrSetImpl<TypeVariableType *> &typeVars)
+    : Kind(ConstraintKind::ApplicableFunction), HasFix(false),
+      HasRestriction(false), IsActive(false), IsDisabled(false),
+      IsDisabledForPerformance(false), RememberChoice(false), IsFavored(false),
+      IsIsolated(false), NumTypeVariables(typeVars.size()), Locator(locator) {
+  assert(appliedFn);
+  assert(calleeType);
+  assert(trailingClosureMatching >= 0 && trailingClosureMatching <= 2);
+  assert(useDC);
+
+  Apply.AppliedFn = appliedFn;
+  Apply.Callee = calleeType;
+  Apply.TrailingClosureMatching = trailingClosureMatching;
+  Apply.UseDC = useDC;
+
   std::copy(typeVars.begin(), typeVars.end(), getTypeVariablesBuffer().begin());
 }
 
@@ -398,7 +419,6 @@ void Constraint::print(llvm::raw_ostream &Out, SourceManager *sm,
   case ConstraintKind::EscapableFunctionOf: Out << " @escaping type of "; break;
   case ConstraintKind::OpenedExistentialOf: Out << " opened archetype of "; break;
   case ConstraintKind::OneWayEqual: Out << " one-way bind to "; break;
-  case ConstraintKind::OneWayBindParam: Out << " one-way bind param to "; break;
   case ConstraintKind::FallbackType:
     Out << " can fallback to ";
     break;
@@ -568,13 +588,9 @@ void Constraint::dump(SourceManager *sm) const {
 void Constraint::dump(ConstraintSystem *CS) const {
   // Disable MSVC warning: only for use within the debugger.
 #if SWIFT_COMPILER_IS_MSVC
-#pragma warning(push)
-#pragma warning(disable: 4996)
+#pragma warning(suppress: 4996)
 #endif
   dump(&CS->getASTContext().SourceMgr);
-#if SWIFT_COMPILER_IS_MSVC
-#pragma warning(pop)
-#endif
 }
 
 
@@ -679,7 +695,6 @@ gatherReferencedTypeVars(Constraint *constraint,
   case ConstraintKind::LiteralConformsTo:
   case ConstraintKind::TransitivelyConformsTo:
   case ConstraintKind::OneWayEqual:
-  case ConstraintKind::OneWayBindParam:
   case ConstraintKind::FallbackType:
   case ConstraintKind::UnresolvedMemberChainBase:
   case ConstraintKind::PropertyWrapper:
@@ -786,10 +801,10 @@ Constraint *Constraint::create(ConstraintSystem &cs, ConstraintKind kind,
 
 Constraint *Constraint::createMemberOrOuterDisjunction(
     ConstraintSystem &cs, ConstraintKind kind, Type first, Type second,
-    DeclNameRef member, DeclContext *useDC, FunctionRefKind functionRefKind,
+    DeclNameRef member, DeclContext *useDC, FunctionRefInfo functionRefInfo,
     ArrayRef<OverloadChoice> outerAlternatives, ConstraintLocator *locator) {
   auto memberConstraint = createMember(cs, kind, first, second, member,
-                             useDC, functionRefKind, locator);
+                             useDC, functionRefInfo, locator);
 
   if (outerAlternatives.empty())
     return memberConstraint;
@@ -808,7 +823,7 @@ Constraint *Constraint::createMemberOrOuterDisjunction(
 Constraint *Constraint::createMember(ConstraintSystem &cs, ConstraintKind kind, 
                                      Type first, Type second,
                                      DeclNameRef member, DeclContext *useDC,
-                                     FunctionRefKind functionRefKind,
+                                     FunctionRefInfo functionRefInfo,
                                      ConstraintLocator *locator) {
   // Collect type variables.
   SmallPtrSet<TypeVariableType *, 4> typeVars;
@@ -823,13 +838,13 @@ Constraint *Constraint::createMember(ConstraintSystem &cs, ConstraintKind kind,
       typeVars.size(), /*hasFix=*/0, /*hasOverloadChoice=*/0);
   void *mem = cs.getAllocator().Allocate(size, alignof(Constraint));
   return new (mem) Constraint(kind, first, second, member, useDC,
-                              functionRefKind, locator, typeVars);
+                              functionRefInfo, locator, typeVars);
 }
 
 Constraint *Constraint::createValueWitness(
     ConstraintSystem &cs, ConstraintKind kind, Type first, Type second,
     ValueDecl *requirement, DeclContext *useDC,
-    FunctionRefKind functionRefKind, ConstraintLocator *locator) {
+    FunctionRefInfo functionRefInfo, ConstraintLocator *locator) {
   assert(kind == ConstraintKind::ValueWitness);
 
   // Collect type variables.
@@ -845,7 +860,7 @@ Constraint *Constraint::createValueWitness(
       typeVars.size(), /*hasFix=*/0, /*hasOverloadChoice=*/0);
   void *mem = cs.getAllocator().Allocate(size, alignof(Constraint));
   return new (mem) Constraint(kind, first, second, requirement, useDC,
-                              functionRefKind, locator, typeVars);
+                              functionRefInfo, locator, typeVars);
 }
 
 Constraint *Constraint::createBindOverload(ConstraintSystem &cs, Type type, 
@@ -1005,9 +1020,9 @@ Constraint *Constraint::createConjunction(
 }
 
 Constraint *Constraint::createApplicableFunction(
-    ConstraintSystem &cs, Type argumentFnType, Type calleeType,
+    ConstraintSystem &cs, FunctionType *argumentFnType, Type calleeType,
     std::optional<TrailingClosureMatching> trailingClosureMatching,
-    ConstraintLocator *locator) {
+    DeclContext *useDC, ConstraintLocator *locator) {
   // Collect type variables.
   SmallPtrSet<TypeVariableType *, 4> typeVars;
   if (argumentFnType->hasTypeVariable())
@@ -1015,29 +1030,28 @@ Constraint *Constraint::createApplicableFunction(
   if (calleeType->hasTypeVariable())
     calleeType->getTypeVariables(typeVars);
 
-  // Create the constraint.
+  // Encode the trailing closure matching.
+  unsigned rawTrailingClosureMatching = 0;
+  if (trailingClosureMatching) {
+    switch (*trailingClosureMatching) {
+      case TrailingClosureMatching::Forward:
+        rawTrailingClosureMatching = 1;
+        break;
+
+      case TrailingClosureMatching::Backward:
+        rawTrailingClosureMatching = 2;
+        break;
+    }
+  }
+
+    // Create the constraint.
   auto size =
     totalSizeToAlloc<TypeVariableType *, ConstraintFix *, OverloadChoice>(
       typeVars.size(), /*hasFix=*/0, /*hasOverloadChoice=*/0);
   void *mem = cs.getAllocator().Allocate(size, alignof(Constraint));
-  auto constraint = new (mem) Constraint(
-      ConstraintKind::ApplicableFunction, argumentFnType, calleeType, locator,
-      typeVars);
-
-  // Encode the trailing closure matching.
-  if (trailingClosureMatching) {
-    switch (*trailingClosureMatching) {
-      case TrailingClosureMatching::Forward:
-        constraint->trailingClosureMatching = 1;
-        break;
-
-      case TrailingClosureMatching::Backward:
-        constraint->trailingClosureMatching = 2;
-        break;
-    }
-  } else {
-    constraint->trailingClosureMatching = 0;
-  }
+  auto constraint = new (mem)
+      Constraint(argumentFnType, calleeType, rawTrailingClosureMatching, useDC,
+                 locator, typeVars);
 
   return constraint;
 }
@@ -1070,7 +1084,7 @@ Constraint *Constraint::createSyntacticElement(ConstraintSystem &cs,
 std::optional<TrailingClosureMatching>
 Constraint::getTrailingClosureMatching() const {
   assert(Kind == ConstraintKind::ApplicableFunction);
-  switch (trailingClosureMatching) {
+  switch (Apply.TrailingClosureMatching) {
   case 0:
     return std::nullopt;
   case 1: return TrailingClosureMatching::Forward;

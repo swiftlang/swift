@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -emit-silgen -target %target-swift-5.1-abi-triple %s -module-name accessors -swift-version 5 | %FileCheck --enable-var-scope %s
+// RUN: %target-swift-frontend -Xllvm -sil-print-types -emit-silgen -target %target-swift-5.1-abi-triple %s -module-name accessors -swift-version 5 | %FileCheck --enable-var-scope %s
 
 class C {
   // CHECK-DAG: sil hidden [ossa] @$s9accessors1CC16prop_asyncThrowsSivg : $@convention(method) @async (@guaranteed C) -> (Int, @error any Error) {

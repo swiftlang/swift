@@ -17,6 +17,8 @@
 #include "swift/AST/AvailabilityScope.h"
 
 #include "swift/AST/ASTContext.h"
+#include "swift/AST/AvailabilityInference.h"
+#include "swift/AST/AvailabilitySpec.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/Module.h"
@@ -261,15 +263,13 @@ getAvailabilityConditionVersionSourceRange(const PoundAvailableInfo *PAI,
                                            PlatformKind Platform,
                                            const llvm::VersionTuple &Version) {
   SourceRange Range;
-  for (auto *S : PAI->getQueries()) {
-    if (auto *V = dyn_cast<PlatformVersionConstraintAvailabilitySpec>(S)) {
-      if (V->getPlatform() == Platform && V->getVersion() == Version) {
-        // More than one: return invalid range, no unique choice.
-        if (Range.isValid())
-          return SourceRange();
-        else
-          Range = V->getVersionSrcRange();
-      }
+  for (auto *Spec : PAI->getQueries()) {
+    if (Spec->getPlatform() == Platform && Spec->getVersion() == Version) {
+      // More than one: return invalid range, no unique choice.
+      if (Range.isValid())
+        return SourceRange();
+      else
+        Range = Spec->getVersionSrcRange();
     }
   }
   return Range;
@@ -294,21 +294,19 @@ static SourceRange getAvailabilityConditionVersionSourceRange(
 }
 
 static SourceRange
-getAvailabilityConditionVersionSourceRange(const DeclAttributes &DeclAttrs,
-                                           PlatformKind Platform,
+getAvailabilityConditionVersionSourceRange(const Decl *D, PlatformKind Platform,
                                            const llvm::VersionTuple &Version) {
   SourceRange Range;
-  for (auto *Attr : DeclAttrs) {
-    if (auto *AA = dyn_cast<AvailableAttr>(Attr)) {
-      if (AA->Introduced.has_value() && AA->Introduced.value() == Version &&
-          AA->Platform == Platform) {
+  for (auto Attr : D->getSemanticAvailableAttrs()) {
+    if (Attr.getIntroduced().has_value() &&
+        Attr.getIntroduced().value() == Version &&
+        Attr.getPlatform() == Platform) {
 
-        // More than one: return invalid range.
-        if (Range.isValid())
-          return SourceRange();
-        else
-          Range = AA->IntroducedRange;
-      }
+      // More than one: return invalid range.
+      if (Range.isValid())
+        return SourceRange();
+      else
+        Range = Attr.getIntroducedSourceRange();
     }
   }
   return Range;
@@ -318,8 +316,8 @@ SourceRange AvailabilityScope::getAvailabilityConditionVersionSourceRange(
     PlatformKind Platform, const llvm::VersionTuple &Version) const {
   switch (getReason()) {
   case Reason::Decl:
-    return ::getAvailabilityConditionVersionSourceRange(
-        Node.getAsDecl()->getAttrs(), Platform, Version);
+    return ::getAvailabilityConditionVersionSourceRange(Node.getAsDecl(),
+                                                        Platform, Version);
 
   case Reason::IfStmtThenBranch:
   case Reason::IfStmtElseBranch:
@@ -355,8 +353,8 @@ AvailabilityScope::getExplicitAvailabilityRange() const {
 
   case Reason::Decl: {
     auto decl = Node.getAsDecl();
-    if (auto attr = AvailabilityInference::attrForAnnotatedAvailableRange(decl))
-      return AvailabilityInference::availableRange(attr, decl->getASTContext());
+    if (auto attr = decl->getAvailableAttrForPlatformIntroduction())
+      return attr->getIntroducedRange(decl->getASTContext());
 
     return std::nullopt;
   }

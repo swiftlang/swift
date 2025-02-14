@@ -95,6 +95,12 @@ void SplitterStep::computeFollowupSteps(
   // Contract the edges of the constraint graph.
   CG.optimize();
 
+  if (CS.getASTContext().TypeCheckerOpts.SolverDisableSplitter) {
+    steps.push_back(std::make_unique<ComponentStep>(
+          CS, 0, &CS.InactiveConstraints, Solutions));
+    return;
+  }
+
   // Compute the connected components of the constraint graph.
   auto components = CG.computeConnectedComponents(CS.getTypeVariables());
   unsigned numComponents = components.size();
@@ -737,7 +743,9 @@ bool DisjunctionStep::shouldSkip(const DisjunctionChoice &choice) const {
     auto *declA = LastSolvedChoice->first->getOverloadChoice().getDecl();
     auto *declB = static_cast<Constraint *>(choice)->getOverloadChoice().getDecl();
 
-    if (declA->getBaseIdentifier().isArithmeticOperator() &&
+    if ((declA->getBaseIdentifier().isArithmeticOperator() ||
+         declA->getBaseIdentifier().isBitwiseOperator() ||
+         declA->getBaseIdentifier().isShiftOperator()) &&
         TypeChecker::isDeclRefinementOf(declA, declB)) {
       return skip("subtype");
     }
@@ -891,16 +899,18 @@ bool ConjunctionStep::attempt(const ConjunctionElement &element) {
   // by dropping all scoring information.
   CS.clearScore();
 
-  // Reset the scope counter to avoid "too complex" failures
-  // when closure has a lot of elements in the body.
-  CS.CountScopes = 0;
+  // Reset the scope and trail counters to avoid "too complex"
+  // failures when closure has a lot of elements in the body.
+  CS.NumSolverScopes = 0;
+  CS.NumTrailSteps = 0;
 
   // If timer is enabled, let's reset it so that each element
   // (expression) gets a fresh time slice to get solved. This
   // is important for closures with large number of statements
   // in them.
   if (CS.Timer) {
-    CS.Timer.emplace(element.getLocator(), CS);
+    CS.Timer.reset();
+    CS.startExpressionTimer(element.getLocator());
   }
 
   auto success = element.attempt(CS);

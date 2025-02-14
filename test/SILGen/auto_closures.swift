@@ -1,5 +1,5 @@
 
-// RUN: %target-swift-emit-silgen -module-name auto_closures -parse-stdlib -swift-version 5 %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -Xllvm -sil-print-types -module-name auto_closures -parse-stdlib -swift-version 5 %s | %FileCheck %s
 
 struct Bool {}
 var false_ = Bool()

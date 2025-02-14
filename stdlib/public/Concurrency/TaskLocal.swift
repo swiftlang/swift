@@ -100,6 +100,7 @@ public macro TaskLocal() =
 ///     func enter() {
 ///         Example.$traceID.withValue("1234") {
 ///             read() // always "1234", regardless if enter() was called from inside a task or not:
+///         }    
 ///     }
 ///    
 ///     func read() -> String {
@@ -157,7 +158,7 @@ public macro TaskLocal() =
 ///       }
 ///     }
 ///
-/// - SeeAlso: ``TaskLocal-macro``
+/// - SeeAlso: ``TaskLocal()-macro``
 @available(SwiftStdlib 5.1, *)
 public final class TaskLocal<Value: Sendable>: Sendable, CustomStringConvertible {
   let defaultValue: Value

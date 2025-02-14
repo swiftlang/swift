@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend %s -emit-sil \
+// RUN: %target-swift-frontend %s -Xllvm -sil-print-types -emit-sil \
 // RUN:   -sil-verify-all \
 // RUN:   -module-name test \
 // RUN:   -enable-experimental-feature LifetimeDependence \

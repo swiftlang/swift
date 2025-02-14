@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend %s -O -I %t -emit-sil -emit-verbose-sil -o - \
+// RUN: %target-swift-frontend %s -O -I %t -Xllvm -sil-print-types -emit-sil -emit-verbose-sil -o - \
 // RUN:    | %FileCheck %s --check-prefix=CHECK-SIL
 // RUN: %target-swift-frontend %s -O -I %t -emit-ir -g -o - | %FileCheck %s
 

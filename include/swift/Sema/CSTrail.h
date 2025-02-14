@@ -38,6 +38,10 @@ namespace constraints {
 class Constraint;
 struct SyntacticElementTargetKey;
 
+namespace inference {
+struct PotentialBinding;
+}
+
 class SolverTrail {
 public:
 
@@ -90,6 +94,12 @@ public:
       } Relation;
 
       struct {
+        TypeVariableType *TypeVar;
+        TypeVariableType *OtherTypeVar;
+        Constraint *Constraint;
+      } BindingRelation;
+
+      struct {
         /// The type variable being updated.
         TypeVariableType *TypeVar;
 
@@ -128,6 +138,15 @@ public:
         Constraint *Constraint;
       } Retiree;
 
+      struct {
+        TypeVariableType *TypeVar;
+
+        /// These two fields together with 'Options' above store the contents
+        /// of a PotentialBinding.
+        Type BindingType;
+        PointerUnion<Constraint *, ConstraintLocator *> BindingSource;
+      } Binding;
+
       ConstraintFix *TheFix;
       ConstraintLocator *TheLocator;
       PackExpansionType *TheExpansion;
@@ -155,6 +174,9 @@ public:
 #define SCORE_CHANGE(Name) static Change Name(ScoreKind kind, unsigned value);
 #define GRAPH_NODE_CHANGE(Name) static Change Name(TypeVariableType *typeVar, \
                                                    Constraint *constraint);
+#define BINDING_RELATION_CHANGE(Name) static Change Name(TypeVariableType *typeVar, \
+                                                         TypeVariableType *otherTypeVar, \
+                                                         Constraint *constraint);
 #include "swift/Sema/CSTrail.def"
 
     /// Create a change that added a type variable.
@@ -226,6 +248,11 @@ public:
     static Change RetiredConstraint(llvm::ilist<Constraint>::iterator where,
                                     Constraint *constraint);
 
+    /// Create a change that removed a binding from a type variable's potential
+    /// bindings.
+    static Change RetractedBinding(TypeVariableType *typeVar,
+                                   inference::PotentialBinding binding);
+
     /// Undo this change, reverting the constraint graph to the state it
     /// had prior to this change.
     ///
@@ -259,6 +286,10 @@ public:
   }
 
   void undo(unsigned toIndex);
+
+  SWIFT_DEBUG_DUMP;
+  void dump(raw_ostream &OS, unsigned fromIndex = 0,
+            unsigned indent = 0) const LLVM_ATTRIBUTE_USED;
 
 private:
   ConstraintSystem &CS;

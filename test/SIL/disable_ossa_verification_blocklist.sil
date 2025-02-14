@@ -1,0 +1,20 @@
+// RUN: %empty-directory(%t)
+
+// RUN: echo "---" > %t/blocklist.yml
+// RUN: echo "ShouldDisableOwnershipVerification:" >> %t/blocklist.yml
+// RUN: echo "  ModuleName:" >> %t/blocklist.yml
+// RUN: echo "    - Foo" >> %t/blocklist.yml
+
+// RUN: %target-swift-frontend -emit-sil -module-name Foo -blocklist-file %t/blocklist.yml %s | %FileCheck %s
+
+class Klass {}
+
+// CHECK-LABEL: sil @invalid_destroy
+// CHECK: strong_release
+sil [ossa] @invalid_destroy : $@convention(thin) (@guaranteed Klass) -> () {
+bb0(%0 : @guaranteed $Klass):
+  destroy_value %0 : $Klass
+  %t = tuple ()
+  return %t : $()
+}
+

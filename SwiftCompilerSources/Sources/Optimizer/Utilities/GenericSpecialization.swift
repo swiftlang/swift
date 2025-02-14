@@ -49,7 +49,9 @@ private struct VTableSpecializer {
 
     let classDecl = classType.nominal! as! ClassDecl
     guard let origVTable = context.lookupVTable(for: classDecl) else {
-      context.diagnosticEngine.diagnose(errorLocation.sourceLoc, .cannot_specialize_class, classType)
+      if context.enableWMORequiredDiagnostics {
+        context.diagnosticEngine.diagnose(errorLocation.sourceLoc, .cannot_specialize_class, classType)
+      }
       return
     }
 

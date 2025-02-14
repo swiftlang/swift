@@ -184,7 +184,7 @@ class ValidateIfConfigCondition :
     if (!UDE)
       return getDeclRefStr(E, DeclRefKind::Ordinary).has_value();
 
-    return UDE->getFunctionRefKind() == FunctionRefKind::Unapplied &&
+    return UDE->getFunctionRefInfo().isUnappliedBaseName() &&
            isModulePath(UDE->getBase());
   }
 
@@ -834,6 +834,11 @@ Result Parser::parseIfConfigRaw(
       // determined solely by which block has the completion token.
       !ideInspectionClauseLoc.isValid();
 
+  // For constructing syntactic structures, we need AST nodes even for
+  // non-active regions.
+  bool allActive = SF.getParsingOptions().contains(
+      SourceFile::ParsingFlags::PoundIfAllActive);
+
   bool foundActive = false;
   bool isVersionCondition = false;
   CharSourceRange activeBodyRange;
@@ -892,6 +897,9 @@ Result Parser::parseIfConfigRaw(
     // Treat the region containing code completion token as "active".
     if (ideInspectionClauseLoc.isValid() && !foundActive)
       isActive = (ClauseLoc == ideInspectionClauseLoc);
+
+    if (allActive)
+      isActive = true;
 
     foundActive |= isActive;
 
@@ -991,21 +999,18 @@ ParserStatus Parser::parseIfConfig(
 }
 
 ParserStatus Parser::parseIfConfigAttributes(
-    DeclAttributes &attributes, bool ifConfigsAreDeclAttrs,
-    PatternBindingInitializer *initContext) {
+    DeclAttributes &attributes, bool ifConfigsAreDeclAttrs) {
   ParserStatus status = makeParserSuccess();
   return parseIfConfigRaw<ParserStatus>(
       IfConfigContext::DeclAttrs,
       [&](SourceLoc clauseLoc, Expr *condition, bool isActive,
           IfConfigElementsRole role) {
         if (isActive) {
-          status |= parseDeclAttributeList(
-              attributes, ifConfigsAreDeclAttrs, initContext);
+          status |= parseDeclAttributeList(attributes, ifConfigsAreDeclAttrs);
         } else if (role != IfConfigElementsRole::Skipped) {
           DeclAttributes skippedAttributes;
-          PatternBindingInitializer *skippedInitContext = nullptr;
           status |= parseDeclAttributeList(
-              skippedAttributes, ifConfigsAreDeclAttrs, skippedInitContext);
+              skippedAttributes, ifConfigsAreDeclAttrs);
         }
       },
       [&](SourceLoc endLoc, bool hadMissingEnd) {

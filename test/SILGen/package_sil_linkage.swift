@@ -11,11 +11,11 @@
 // RUN: %target-swift-frontend -typecheck %t/Client.swift -I %t -swift-version 5 -package-name mypkg -verify
 
 /// Check serialization in SILGEN with resilience enabled.
-// RUN: %target-swift-emit-silgen -emit-verbose-sil -sil-verify-all -enable-library-evolution -module-name Utils %t/Utils.swift -package-name mypkg -I %t > %t/Utils-Res.sil
+// RUN: %target-swift-emit-silgen -Xllvm -sil-print-types -emit-verbose-sil -sil-verify-all -enable-library-evolution -module-name Utils %t/Utils.swift -package-name mypkg -I %t > %t/Utils-Res.sil
 // RUN: %FileCheck %s --check-prefixes=UTILS-RES,UTILS-COMMON -input-file=%t/Utils-Res.sil
 
 /// Check for indirect access with a resiliently built module dependency.
-// RUN: %target-swift-emit-silgen -sil-verify-all %t/Client.swift -package-name mypkg -I %t > %t/Client-Res.sil
+// RUN: %target-swift-emit-silgen -Xllvm -sil-print-types -sil-verify-all %t/Client.swift -package-name mypkg -I %t > %t/Client-Res.sil
 // RUN: %FileCheck %s --check-prefixes=CLIENT-RES,CLIENT-COMMON -input-file=%t/Client-Res.sil
 
 // RUN: rm -rf %t/Utils.swiftmodule
@@ -29,11 +29,11 @@
 // RUN: %target-swift-frontend -typecheck %t/Client.swift -I %t -swift-version 5 -package-name mypkg -verify
 
 /// Check serialization in SILGEN with resilience not enabled.
-// RUN: %target-swift-emit-silgen -emit-verbose-sil -sil-verify-all -module-name Utils %t/Utils.swift -package-name mypkg -I %t > %t/Utils-NonRes.sil
+// RUN: %target-swift-emit-silgen -Xllvm -sil-print-types -emit-verbose-sil -sil-verify-all -module-name Utils %t/Utils.swift -package-name mypkg -I %t > %t/Utils-NonRes.sil
 // RUN: %FileCheck %s --check-prefixes=UTILS-NONRES,UTILS-COMMON -input-file %t/Utils-NonRes.sil
 
 /// Check for indirect access with a non-resiliently built module dependency.
-// RUN: %target-swift-emit-silgen -sil-verify-all %t/Client.swift -package-name mypkg -I %t > %t/Client-NonRes.sil
+// RUN: %target-swift-emit-silgen -Xllvm -sil-print-types -sil-verify-all %t/Client.swift -package-name mypkg -I %t > %t/Client-NonRes.sil
 // RUN: %FileCheck %s --check-prefixes=CLIENT-NONRES,CLIENT-COMMON -input-file %t/Client-NonRes.sil
 
 

@@ -167,6 +167,21 @@ struct SwiftXcodegen: AsyncParsableCommand, Sendable {
     return try spec.generateAndWrite(into: outputDir)
   }
 
+  func writeSwiftRuntimesXcodeProject(
+    for ninja: NinjaBuildDir, into outputDir: AbsolutePath
+  ) throws -> GeneratedProject {
+    let buildDir = try ninja.buildDir(for: .swiftRuntimes)
+    var spec = newProjectSpec("SwiftRuntimes", for: buildDir)
+
+    spec.addClangTarget(at: "core", mayHaveUnbuildableFiles: true)
+    spec.addSwiftTargets(below: "core")
+
+    if self.addDocs {
+      spec.addTopLevelDocs()
+    }
+    return try spec.generateAndWrite(into: outputDir)
+  }
+
   @discardableResult
   func writeClangXcodeProject(
     for ninja: NinjaBuildDir, into outputDir: AbsolutePath
@@ -288,6 +303,34 @@ struct SwiftXcodegen: AsyncParsableCommand, Sendable {
     return task
   }
 
+  func showCaveatsIfNeeded() {
+    guard log.logLevel <= .note else { return }
+
+    var notes: [String] = []
+    if projectOpts.useBuildableFolders {
+      notes.append("""
+        - Buildable folders are enabled by default, which requires Xcode 16. You
+          can pass '--no-buildable-folders' to disable this. See the '--help'
+          entry for more info.
+        """)
+    }
+
+    if !projectOpts.addStdlibSwift {
+      notes.append("""
+        - Swift standard library targets are disabled by default since they require
+          using a development snapshot of Swift with Xcode. You can pass '--stdlib-swift'
+          to enable. See the '--help' entry for more info.
+        """)
+    }
+    guard !notes.isEmpty else { return }
+    log.note("Caveats:")
+    for note in notes {
+      for line in note.components(separatedBy: .newlines) {
+        log.note(line)
+      }
+    }
+  }
+
   func generate() async throws {
     let buildDirPath = buildDir.absoluteInWorkingDir.resolvingSymlinks
     log.info("Generating project for '\(buildDirPath)'...")
@@ -299,6 +342,15 @@ struct SwiftXcodegen: AsyncParsableCommand, Sendable {
     let swiftProj = try await runTask {
       try writeSwiftXcodeProject(for: buildDir, into: outputDir)
     }
+    let runtimesProj = try await runTask { () -> GeneratedProject? in
+      guard let runtimesBuildDir = self.runtimesBuildDir?.absoluteInWorkingDir else {
+        return nil
+      }
+      let buildDir = try NinjaBuildDir(
+        at: runtimesBuildDir, projectRootDir: projectRootDir
+      )
+      return try writeSwiftRuntimesXcodeProject(for: buildDir, into: outputDir)
+    }
     let llvmProj = try await runTask {
       self.addLLVM ? try writeLLVMXcodeProject(for: buildDir, into: outputDir) : nil
     }
@@ -309,7 +361,12 @@ struct SwiftXcodegen: AsyncParsableCommand, Sendable {
       self.addLLDB ? try writeLLDBXcodeProject(for: buildDir, into: outputDir) : nil
     }
 
-    let swiftWorkspace = try await getWorkspace(for: swiftProj.value)
+    var swiftWorkspace = try await getWorkspace(for: swiftProj.value)
+
+    if let runtimesProj = try await runtimesProj.value {
+      swiftWorkspace.addProject(runtimesProj)
+      try swiftWorkspace.write("Swift+Runtimes", into: outputDir)
+    }
 
     if let llvmProj = try await llvmProj.value {
       var swiftLLVMWorkspace = swiftWorkspace
@@ -342,6 +399,7 @@ struct SwiftXcodegen: AsyncParsableCommand, Sendable {
         try lldbLLVMWorkspace.write("LLDB+LLVM", into: outputDir)
       }
     }
+    showCaveatsIfNeeded()
   }
 
   func run() async {

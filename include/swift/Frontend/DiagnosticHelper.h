@@ -34,15 +34,13 @@ public:
   /// OS is the stream to print diagnostics. useQuasiPID determines if using
   /// real PID when priting parseable output.
   static DiagnosticHelper create(CompilerInstance &instance,
+                                 const CompilerInvocation &invocation,
+                                 ArrayRef<const char *> args,
                                  llvm::raw_pwrite_stream &OS = llvm::errs(),
                                  bool useQuasiPID = false);
 
-  /// Initialized all DiagConsumers and add to the CompilerInstance.
-  void initDiagConsumers(CompilerInvocation &invocation);
-
   /// Begin emitting the message, specifically the parseable output message.
-  void beginMessage(CompilerInvocation &invocation,
-                    ArrayRef<const char *> args);
+  void beginMessage();
 
   /// End emitting all diagnostics. This has to be called if beginMessage() is
   /// called.
@@ -61,7 +59,9 @@ public:
   ~DiagnosticHelper();
 
 private:
-  DiagnosticHelper(CompilerInstance &instance, llvm::raw_pwrite_stream &OS,
+  DiagnosticHelper(CompilerInstance &instance,
+                   const CompilerInvocation &invocation,
+                   ArrayRef<const char *> args, llvm::raw_pwrite_stream &OS,
                    bool useQuasiPID);
 };
 

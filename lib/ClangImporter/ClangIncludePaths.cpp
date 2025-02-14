@@ -27,14 +27,18 @@ using namespace swift;
 using Path = SmallString<128>;
 
 static std::optional<Path> getActualModuleMapPath(
-    StringRef name, SearchPathOptions &Opts, const llvm::Triple &triple,
-    bool isArchSpecific,
+    StringRef name, SearchPathOptions &Opts, const LangOptions &LangOpts,
+    const llvm::Triple &triple, bool isArchSpecific,
     const llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> &vfs) {
   StringRef platform;
   if (swift::tripleIsMacCatalystEnvironment(triple))
     platform = "macosx";
   else
     platform = swift::getPlatformNameForTriple(triple);
+
+  if (LangOpts.hasFeature(Feature::Embedded))
+    platform = "embedded";
+
   StringRef arch = swift::getMajorArchitectureName(triple);
 
   Path result;
@@ -95,16 +99,18 @@ static std::optional<Path> getInjectedModuleMapPath(
 }
 
 static std::optional<Path> getLibStdCxxModuleMapPath(
-    SearchPathOptions &opts, const llvm::Triple &triple,
+    SearchPathOptions &opts, const LangOptions &langOpts,
+    const llvm::Triple &triple,
     const llvm::IntrusiveRefCntPtr<llvm::vfs::FileSystem> &vfs) {
-  return getActualModuleMapPath("libstdcxx.modulemap", opts, triple,
+  return getActualModuleMapPath("libstdcxx.modulemap", opts, langOpts, triple,
                                 /*isArchSpecific*/ false, vfs);
 }
 
 std::optional<SmallString<128>>
 swift::getCxxShimModuleMapPath(SearchPathOptions &opts,
+                               const LangOptions &langOpts,
                                const llvm::Triple &triple) {
-  return getActualModuleMapPath("libcxxshim.modulemap", opts, triple,
+  return getActualModuleMapPath("libcxxshim.modulemap", opts, langOpts, triple,
                                 /*isArchSpecific*/ false,
                                 llvm::vfs::getRealFileSystem());
 }
@@ -225,7 +231,8 @@ getLibcFileMapping(ASTContext &ctx, StringRef modulemapFileName,
 
   Path actualModuleMapPath;
   if (auto path = getActualModuleMapPath(modulemapFileName, ctx.SearchPathOpts,
-                                         triple, /*isArchSpecific*/ true, vfs))
+                                         ctx.LangOpts, triple,
+                                         /*isArchSpecific*/ true, vfs))
     actualModuleMapPath = path.value();
   else
     // FIXME: Emit a warning of some kind.
@@ -288,6 +295,12 @@ static void getLibStdCxxFileMapping(
                                               stdlibArgStrings);
   auto parsedStdlibArgs = parseClangDriverArgs(clangDriver, stdlibArgStrings);
 
+  // If we were explicitly asked to not bring in the C++ stdlib, bail.
+  if (parsedStdlibArgs.hasArg(clang::driver::options::OPT_nostdinc,
+                              clang::driver::options::OPT_nostdincxx,
+                              clang::driver::options::OPT_nostdlibinc))
+    return;
+
   Path cxxStdlibDir;
   if (auto dir = findFirstIncludeDir(parsedStdlibArgs,
                                      {"cstdlib", "string", "vector"}, vfs)) {
@@ -299,7 +312,8 @@ static void getLibStdCxxFileMapping(
   }
 
   Path actualModuleMapPath;
-  if (auto path = getLibStdCxxModuleMapPath(ctx.SearchPathOpts, triple, vfs))
+  if (auto path = getLibStdCxxModuleMapPath(ctx.SearchPathOpts, ctx.LangOpts,
+                                            triple, vfs))
     actualModuleMapPath = path.value();
   else
     return;
@@ -546,15 +560,26 @@ void GetWindowsFileMappings(
       fileMapping.redirectedFiles.emplace_back(std::string(VCToolsInjection),
                                                AuxiliaryFile);
 
-    // __msvc_bit_utils.hpp was added in a recent VS 2022 version. It has to be
-    // referenced from the modulemap directly to avoid modularization errors.
-    // Older VS versions might not have it. Let's inject an empty header file if
-    // it isn't available.
-    llvm::sys::path::remove_filename(VCToolsInjection);
-    llvm::sys::path::append(VCToolsInjection, "__msvc_bit_utils.hpp");
-    if (!llvm::sys::fs::exists(VCToolsInjection))
-      fileMapping.overridenFiles.emplace_back(std::string(VCToolsInjection),
-                                              "");
+    // Because we wish to be backwards compatible with older Visual Studio
+    // releases, we inject empty headers which allow us to have definitions for
+    // modules referencing headers which may not exist. We stub out the headers
+    // with empty files to allow a single module definition to work across
+    // different MSVC STL releases.
+    //
+    // __msvc_bit_utils.hpp was introduced in VS 2022 STL release 17.8.
+    // __msvc_string_view.hpp was introduced in VS 2022 STL release 17.11.
+    static const char * const kInjectedHeaders[] = {
+      "__msvc_bit_utils.hpp",
+      "__msvc_string_view.hpp",
+    };
+
+    for (const char * const header : kInjectedHeaders) {
+      llvm::sys::path::remove_filename(VCToolsInjection);
+      llvm::sys::path::append(VCToolsInjection, header);
+      if (!llvm::sys::fs::exists(VCToolsInjection))
+        fileMapping.overridenFiles.emplace_back(std::string{VCToolsInjection},
+                                                "");
+    }
   }
 }
 } // namespace

@@ -1067,6 +1067,7 @@ void LifetimeChecker::injectActorHops() {
 
   case ActorIsolation::Unspecified:
   case ActorIsolation::Nonisolated:
+  case ActorIsolation::CallerIsolationInheriting:
   case ActorIsolation::NonisolatedUnsafe:
   case ActorIsolation::GlobalActor:
     return;
@@ -1733,8 +1734,13 @@ void LifetimeChecker::handleInOutUse(const DIMemoryUse &Use) {
       return;
     }
 
-    auto diagID = diag::variable_inout_before_initialized;
-    
+    // A self argument implicitly passed as an inout parameter is diagnosed as
+    // "used before initialized", because "passed by reference" might be a
+    // confusing diagnostic in this context.
+    auto diagID = (Use.Kind == DIUseKind::InOutSelfArgument)
+                      ? diag::variable_used_before_initialized
+                      : diag::variable_inout_before_initialized;
+
     if (isa<AddressToPointerInst>(Use.Inst))
       diagID = diag::variable_addrtaken_before_initialized;
 
@@ -2741,6 +2747,12 @@ void LifetimeChecker::processUninitializedRelease(SILInstruction *Release,
     if (Pointer->getType().isAddress())
       Pointer = B.createLoad(Loc, Pointer, LoadOwnershipQualifier::Take);
 
+    // Cast back down from an upcast.
+    if (auto *UI = dyn_cast<UpcastInst>(Pointer)) {
+      Pointer =
+          B.createUncheckedRefCast(Loc, Pointer, UI->getOperand()->getType());
+    }
+
     auto MetatypeTy = CanMetatypeType::get(TheMemory.getASTType(),
                                            MetatypeRepresentation::Thick);
     auto SILMetatypeTy = SILType::getPrimitiveObjectType(MetatypeTy);
@@ -2761,12 +2773,6 @@ void LifetimeChecker::processUninitializedRelease(SILInstruction *Release,
       if (classDecl && classDecl->isRootDefaultActor()) {
           emitDefaultActorDestroy(B, Loc, Pointer);
       }
-    }
-
-    // Cast back down from an upcast.
-    if (auto *UI = dyn_cast<UpcastInst>(Pointer)) {
-      Pointer =
-          B.createUncheckedRefCast(Loc, Pointer, UI->getOperand()->getType());
     }
 
     // We've already destroyed any instance variables initialized by this

@@ -292,8 +292,7 @@ void CompletionLookup::addSubModuleNames(
   for (auto &Pair : SubModuleNameVisibilityPairs) {
     CodeCompletionResultBuilder Builder = makeResultBuilder(
         CodeCompletionResultKind::Declaration, SemanticContextKind::None);
-    auto MD = ModuleDecl::create(Ctx.getIdentifier(Pair.first), Ctx);
-    MD->setFailedToLoad();
+    auto *MD = ModuleDecl::createEmpty(Ctx.getIdentifier(Pair.first), Ctx);
     Builder.setAssociatedDecl(MD);
     Builder.addBaseName(MD->getNameStr());
     Builder.addTypeAnnotation("Module");
@@ -367,8 +366,7 @@ void CompletionLookup::addImportModuleNames() {
     if (ModuleName == mainModuleName || isHiddenModuleName(ModuleName))
       continue;
 
-    auto MD = ModuleDecl::create(ModuleName, Ctx);
-    MD->setFailedToLoad();
+    auto *MD = ModuleDecl::createEmpty(ModuleName, Ctx);
 
     std::optional<ContextualNotRecommendedReason> Reason = std::nullopt;
 
@@ -715,8 +713,8 @@ Type CompletionLookup::getTypeOfMember(const ValueDecl *VD, Type ExprType) {
         return T;
 
       // If we are doing implicit member lookup on a protocol and we have found
-      // a declaration in an extension, use the extension's `Self` type for the
-      // generic substitution.
+      // a declaration in a constrained extension, use the extension's `Self`
+      // type for the generic substitution.
       // Eg in the following, the `Self` type returned by `qux` is
       // `MyGeneric<Int>`, not `MyProto` because of the `Self` type restriction.
       // ```
@@ -732,9 +730,11 @@ Type CompletionLookup::getTypeOfMember(const ValueDecl *VD, Type ExprType) {
       // ```
       if (MaybeNominalType->isExistentialType()) {
         Type SelfType;
-        if (auto ED = dyn_cast<ExtensionDecl>(VD->getDeclContext())) {
-          SelfType = ED->getGenericSignature()->getConcreteType(
-              ED->getSelfInterfaceType());
+        if (auto *ED = dyn_cast<ExtensionDecl>(VD->getDeclContext())) {
+          if (ED->getSelfProtocolDecl() && ED->isConstrainedExtension()) {
+            auto Sig = ED->getGenericSignature();
+            SelfType = Sig->getConcreteType(ED->getSelfInterfaceType());
+          }
         }
         if (SelfType) {
           MaybeNominalType = SelfType;
@@ -771,7 +771,7 @@ Type CompletionLookup::getAssociatedTypeType(const AssociatedTypeDecl *ATD) {
         CurrDeclContext->getInnermostTypeContext()->getDeclaredTypeInContext();
   if (BaseTy) {
     BaseTy = BaseTy->getInOutObjectType()->getMetatypeInstanceType();
-    if (auto NTD = BaseTy->getAnyNominal()) {
+    if (BaseTy->getAnyNominal()) {
       auto Conformance = lookupConformance(BaseTy, ATD->getProtocol());
       if (Conformance.isConcrete()) {
         return Conformance.getConcrete()->getTypeWitness(
@@ -827,6 +827,7 @@ void CompletionLookup::analyzeActorIsolation(
     break;
   case ActorIsolation::Unspecified:
   case ActorIsolation::Nonisolated:
+  case ActorIsolation::CallerIsolationInheriting:
   case ActorIsolation::NonisolatedUnsafe:
     return;
   }
@@ -998,7 +999,7 @@ bool CompletionLookup::hasInterestingDefaultValue(const ParamDecl *param) {
     return true;
 
   case DefaultArgumentKind::None:
-#define MAGIC_IDENTIFIER(NAME, STRING, SYNTAX_KIND)                            \
+#define MAGIC_IDENTIFIER(NAME, STRING)                                         \
   case DefaultArgumentKind::NAME:
 #include "swift/AST/MagicIdentifierKinds.def"
   case DefaultArgumentKind::ExpressionMacro:
@@ -3023,7 +3024,7 @@ void CompletionLookup::getGenericRequirementCompletions(
 }
 
 bool CompletionLookup::canUseAttributeOnDecl(DeclAttrKind DAK, bool IsInSil,
-                                             bool IsConcurrencyEnabled,
+                                             const LangOptions &langOpts,
                                              std::optional<DeclKind> DK,
                                              StringRef Name) {
   if (DeclAttribute::isUserInaccessible(DAK))
@@ -3034,8 +3035,12 @@ bool CompletionLookup::canUseAttributeOnDecl(DeclAttrKind DAK, bool IsInSil,
     return false;
   if (!IsInSil && DeclAttribute::isSilOnly(DAK))
     return false;
-  if (!IsConcurrencyEnabled && DeclAttribute::isConcurrencyOnly(DAK))
+  if (!langOpts.EnableExperimentalConcurrency
+        && DeclAttribute::isConcurrencyOnly(DAK))
     return false;
+  if (auto feature = DeclAttribute::getRequiredFeature(DAK))
+    if (!langOpts.hasFeature(*feature))
+      return false;
   if (!DK.has_value())
     return true;
   // Hide underscored attributes even if they are not marked as user
@@ -3059,11 +3064,10 @@ void CompletionLookup::getAttributeDeclCompletions(bool IsInSil,
 #include "swift/AST/DeclNodes.def"
     }
   }
-  bool IsConcurrencyEnabled = Ctx.LangOpts.EnableExperimentalConcurrency;
   std::string Description = TargetName.str() + " Attribute";
 #define DECL_ATTR_ALIAS(KEYWORD, NAME) DECL_ATTR(KEYWORD, NAME, 0, 0)
 #define DECL_ATTR(KEYWORD, NAME, ...)                                          \
-  if (canUseAttributeOnDecl(DeclAttrKind::NAME, IsInSil, IsConcurrencyEnabled, \
+  if (canUseAttributeOnDecl(DeclAttrKind::NAME, IsInSil, Ctx.LangOpts,         \
                             DK, #KEYWORD))                                     \
     addDeclAttrKeyword(#KEYWORD, Description);
 #include "swift/AST/DeclAttr.def"
@@ -3177,6 +3181,7 @@ void CompletionLookup::getTypeAttributeKeywordCompletions(
       case TypeAttrKind::Retroactive:
       case TypeAttrKind::Preconcurrency:
       case TypeAttrKind::Unchecked:
+      case TypeAttrKind::Unsafe:
         // These attributes are only available in inheritance clasuses.
         return;
       default:

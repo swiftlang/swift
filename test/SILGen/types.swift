@@ -1,5 +1,5 @@
 
-// RUN: %target-swift-emit-silgen -module-name types -parse-as-library %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -Xllvm -sil-print-types -module-name types -parse-as-library %s | %FileCheck %s
 
 class C {
   var member: Int = 0

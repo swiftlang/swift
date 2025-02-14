@@ -1,4 +1,4 @@
-//===----------------------------------------------------------------------===//
+//===--- Diagnostics.swift ------------------------------------------------===//
 //
 // This source file is part of the Swift.org open source project
 //
@@ -127,6 +127,23 @@ extension ASTGenDiagnostic {
     Self(
       node: specifier,
       message: "unknown accessor specifier '\(specifier.text)'"
+    )
+  }
+}
+
+/// Decl diagnostics
+extension ASTGenDiagnostic {
+  static func illegalTopLevelStmt(_ stmt: some SyntaxProtocol) -> Self {
+    Self(
+      node: stmt,
+      message: "statements are not allowed at the top level"
+    )
+  }
+
+  static func illegalTopLevelExpr(_ expr: some SyntaxProtocol) -> Self {
+    Self(
+      node: expr,
+      message: "expressions are not allowed at the top level"
     )
   }
 }

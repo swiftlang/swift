@@ -17,7 +17,6 @@
 
 #include "swift/AST/ProtocolConformanceRef.h"
 #include "swift/AST/ASTContext.h"
-#include "swift/AST/Availability.h"
 #include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/GenericEnvironment.h"
@@ -335,7 +334,7 @@ bool ProtocolConformanceRef::hasUnavailableConformance() const {
   auto concrete = getConcrete();
   auto *dc = concrete->getRootConformance()->getDeclContext();
   auto ext = dyn_cast<ExtensionDecl>(dc);
-  if (ext && AvailableAttr::isUnavailable(ext))
+  if (ext && ext->isUnavailable())
     return true;
 
   // Check the conformances in the substitution map.

@@ -145,7 +145,7 @@ getAddrOfLLVMVariableForClangDecl(IRGenModule &IGM, ValueDecl *decl,
     return silFn ? IGM.getAddrOfSILFunction(silFn, NotForDefinition) : nullptr;
   }
 
-  if (auto var = dyn_cast<clang::ObjCInterfaceDecl>(clangDecl))
+  if (isa<clang::ObjCInterfaceDecl>(clangDecl))
     return IGM.getAddrOfObjCClass(cast<ClassDecl>(decl), NotForDefinition);
 
   llvm::report_fatal_error("Unexpected clang decl kind");
@@ -171,7 +171,7 @@ getSymbolAddrsForDecl(IRGenModule &IGM, ValueDecl *decl,
 llvm::Function *IRGenModule::emitHasSymbolFunction(ValueDecl *decl) {
 
   PrettyStackTraceDecl trace("emitting #_hasSymbol query for", decl);
-  Mangle::ASTMangler mangler;
+  Mangle::ASTMangler mangler(Context);
 
   auto func = cast<llvm::Function>(getOrCreateHelperFunction(
       mangler.mangleHasSymbolQuery(decl), Int1Ty, {},

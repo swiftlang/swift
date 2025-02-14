@@ -313,8 +313,6 @@ ABSTRACT_VALUE_AND_INST(SingleValueInstruction, ValueBase, SILInstruction)
   ABSTRACT_SINGLE_VALUE_INST(AllocationInst, SingleValueInstruction)
     SINGLE_VALUE_INST(AllocStackInst, alloc_stack,
                               AllocationInst, None, DoesNotRelease)
-    SINGLE_VALUE_INST(AllocVectorInst, alloc_vector,
-                              AllocationInst, None, DoesNotRelease)
     SINGLE_VALUE_INST(AllocPackInst, alloc_pack,
                               AllocationInst, None, DoesNotRelease)
     SINGLE_VALUE_INST(AllocPackMetadataInst, alloc_pack_metadata,
@@ -529,8 +527,8 @@ ABSTRACT_VALUE_AND_INST(SingleValueInstruction, ValueBase, SILInstruction)
   SINGLE_VALUE_INST(EndCOWMutationInst, end_cow_mutation,
                             SingleValueInstruction, None, DoesNotRelease)
 
-  SINGLE_VALUE_INST(IsEscapingClosureInst, is_escaping_closure,
-                    SingleValueInstruction, MayRead, DoesNotRelease)
+  SINGLE_VALUE_INST(DestroyNotEscapedClosureInst, destroy_not_escaped_closure,
+                    SingleValueInstruction, MayHaveSideEffects, MayRelease)
 
   // Accessing memory
   SINGLE_VALUE_INST(LoadInst, load,
@@ -895,6 +893,9 @@ NON_VALUE_INST(MarkUnresolvedMoveAddrInst, mark_unresolved_move_addr,
                SILInstruction, None, DoesNotRelease)
 
 NON_VALUE_INST(MergeIsolationRegionInst, merge_isolation_region,
+               SILInstruction, None, DoesNotRelease)
+
+NON_VALUE_INST(IgnoredUseInst, ignored_use,
                SILInstruction, None, DoesNotRelease)
 
 NON_VALUE_INST(IncrementProfilerCounterInst, increment_profiler_counter,

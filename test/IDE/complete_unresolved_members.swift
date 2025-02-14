@@ -748,3 +748,39 @@ func testNestedExprPatternCompletion(_ x: SomeEnum1) {
   // UNRESOLVED_NESTED4: Decl[EnumElement]/CurrNominal/Flair[ExprSpecific]/TypeRelation[Convertible]: North[#SomeEnum1#]; name=North
   // UNRESOLVED_NESTED4: Decl[InstanceMethod]/CurrNominal/TypeRelation[Invalid]: hash({#(self): SomeEnum1#})[#(into: inout Hasher) -> Void#]; name=hash(:)
 }
+
+protocol P1 {}
+protocol P2 {}
+struct S1: P1, P2 {}
+
+extension P1 where Self == S1 {
+  static func foo() -> Self { fatalError() }
+}
+extension P2 where Self == S1 {
+  static func bar() -> Self { fatalError() }
+}
+
+func testComposition() {
+  func foo(_ x: any P1 & P2) {}
+  foo(.#^EXISTENTIAL_COMPOSITION^#)
+  // EXISTENTIAL_COMPOSITION-DAG: Decl[StaticMethod]/CurrNominal/TypeRelation[Convertible]: foo()[#S1#]; name=foo()
+  // EXISTENTIAL_COMPOSITION-DAG: Decl[StaticMethod]/CurrNominal/TypeRelation[Convertible]: bar()[#S1#]; name=bar()
+}
+
+protocol P3 {
+  associatedtype X
+}
+struct S3<T> {}
+extension S3: P3 {
+  typealias X = Int
+}
+
+extension P3 where Self == S3<X> {
+  static func foo() -> Self {}
+}
+
+func testGenericSelfClause() {
+  func foo(_ x: any P3) {}
+  foo(.#^GENERIC_SELF_CLAUSE^#)
+  // GENERIC_SELF_CLAUSE: Decl[StaticMethod]/CurrNominal/TypeRelation[Convertible]: foo()[#S3<Int>#]; name=foo()
+}

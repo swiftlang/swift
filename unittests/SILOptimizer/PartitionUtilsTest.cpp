@@ -97,6 +97,7 @@ struct MockedPartitionOpEvaluatorWithFailureCallback final
     case PartitionOpError::AssignNeverSendableIntoSendingResult:
     case PartitionOpError::InOutSendingNotInitializedAtExit:
     case PartitionOpError::InOutSendingNotDisconnectedAtExit:
+    case PartitionOpError::NonSendableIsolationCrossingResult:
       llvm_unreachable("Unsupported");
     case PartitionOpError::LocalUseAfterSend: {
       auto state = error.getLocalUseAfterSendError();

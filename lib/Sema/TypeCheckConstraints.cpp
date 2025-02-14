@@ -75,7 +75,7 @@ void TypeVariableType::Implementation::print(llvm::raw_ostream &OS) {
   if (isPackExpansion())
     bindingOptions.push_back(TypeVariableOptions::TVO_PackExpansion);
   if (!bindingOptions.empty()) {
-    OS << " [allows bindings to: ";
+    OS << " [can bind to: ";
     interleave(bindingOptions, OS,
                [&](TypeVariableOptions option) {
                   (OS << getTypeVariableOptions(option));},
@@ -173,16 +173,6 @@ bool TypeVariableType::Implementation::isSubscriptResultType() const {
   return component.getKind() == KeyPathExpr::Component::Kind::Subscript ||
          component.getKind() ==
              KeyPathExpr::Component::Kind::UnresolvedSubscript;
-}
-
-bool TypeVariableType::Implementation::isApplicationResultType() const {
-  if (!(locator && locator->getAnchor()))
-    return false;
-
-  if (!locator->isLastElement<LocatorPathElt::FunctionResult>())
-    return false;
-
-  return isExpr<ApplyExpr>(locator->getAnchor()) || isSubscriptResultType();
 }
 
 bool TypeVariableType::Implementation::isParameterPack() const {
@@ -898,10 +888,24 @@ bool TypeChecker::typeCheckForEachPreamble(DeclContext *dc, ForEachStmt *stmt,
     return true;
   };
 
-  auto target = SyntacticElementTarget::forForEachPreamble(
-      stmt, dc, /*ignoreWhereClause=*/false, packElementEnv);
+  auto target =
+      SyntacticElementTarget::forForEachPreamble(stmt, dc, packElementEnv);
   if (!typeCheckTarget(target))
     return failed();
+
+  if (auto *where = stmt->getWhere()) {
+    auto boolType = dc->getASTContext().getBoolType();
+    if (!boolType)
+      return failed();
+
+    SyntacticElementTarget whereClause(where, dc, {boolType, CTP_Condition},
+                                       /*isDiscarded=*/false);
+    auto result = typeCheckTarget(whereClause);
+    if (!result)
+      return true;
+
+    stmt->setWhere(result->getAsExpr());
+  }
 
   // Check to see if the sequence expr is throwing (in async context),
   // if so require the stmt to have a `try`.

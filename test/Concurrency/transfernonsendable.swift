@@ -593,14 +593,14 @@ func testConversionsAndSendable(a: MyActor, f: @Sendable () -> Void, f2: () -> V
 func testSendableClosureCapturesNonSendable(a: MyActor) {
   let klass = NonSendableKlass()
   let _ = { @Sendable in
-    _ = klass // expected-warning {{capture of 'klass' with non-sendable type 'NonSendableKlass' in a `@Sendable` closure}}
+    _ = klass // expected-warning {{capture of 'klass' with non-sendable type 'NonSendableKlass' in a '@Sendable' closure}}
   }
 }
 
 func testSendableClosureCapturesNonSendable2(a: FinalMainActorIsolatedKlass) {
   let klass = NonSendableKlass()
   let _ = { @Sendable @MainActor in
-    a.klass = klass // expected-complete-warning {{capture of 'klass' with non-sendable type 'NonSendableKlass' in a `@Sendable` closure}}
+    a.klass = klass // expected-complete-warning {{capture of 'klass' with non-sendable type 'NonSendableKlass' in a '@Sendable' closure}}
   }
 }
 
@@ -887,8 +887,8 @@ func letSendableNonTrivialLetStructFieldTest() async {
   await transferToMain(test) // expected-tns-warning {{sending 'test' risks causing data races}}
   // expected-tns-note @-1 {{sending 'test' to main actor-isolated global function 'transferToMain' risks causing data races between main actor-isolated and local nonisolated uses}}
   // expected-complete-warning @-2 {{passing argument of non-sendable type 'StructFieldTests' into main actor-isolated context may introduce data races}}
-  _ = test.letSendableNonTrivial
-  useValue(test) // expected-tns-note {{access can happen concurrently}}
+  _ = test.letSendableNonTrivial // expected-tns-note {{access can happen concurrently}}
+  useValue(test)
 }
 
 func letNonSendableNonTrivialLetStructFieldTest() async {
@@ -968,8 +968,8 @@ func varSendableNonTrivialLetStructFieldTest() async {
   await transferToMain(test) // expected-tns-warning {{sending 'test' risks causing data races}}
   // expected-tns-note @-1 {{sending 'test' to main actor-isolated global function 'transferToMain' risks causing data races between main actor-isolated and local nonisolated uses}}
   // expected-complete-warning @-2 {{passing argument of non-sendable type 'StructFieldTests' into main actor-isolated context may introduce data races}}
-  _ = test.varSendableNonTrivial
-  useValue(test) // expected-tns-note {{access can happen concurrently}}
+  _ = test.varSendableNonTrivial // expected-tns-note {{access can happen concurrently}}
+  useValue(test)
 }
 
 func varNonSendableNonTrivialLetStructFieldTest() async {
@@ -1548,7 +1548,7 @@ func functionArgumentIntoClosure(_ x: @escaping () -> ()) async {
   let _ = { @MainActor in
     let _ = x // expected-tns-warning {{sending 'x' risks causing data races}}
     // expected-tns-note @-1 {{task-isolated 'x' is captured by a main actor-isolated closure. main actor-isolated uses in closure may race against later nonisolated uses}}
-    // expected-complete-warning @-2 {{capture of 'x' with non-sendable type '() -> ()' in a `@Sendable` closure}}
+    // expected-complete-warning @-2 {{capture of 'x' with non-sendable type '() -> ()' in a '@Sendable' closure}}
     // expected-complete-note @-3 {{a function type must be marked '@Sendable' to conform to 'Sendable'}}
   }
 }
@@ -1736,7 +1736,7 @@ func sendableGlobalActorIsolated() {
   let _ = { @Sendable @MainActor in
     print(x) // expected-tns-warning {{sending 'x' risks causing data races}}
     // expected-tns-note @-1 {{'x' is captured by a main actor-isolated closure. main actor-isolated uses in closure may race against later nonisolated uses}}
-    // expected-complete-warning @-2 {{capture of 'x' with non-sendable type 'NonSendableKlass' in a `@Sendable` closure}}
+    // expected-complete-warning @-2 {{capture of 'x' with non-sendable type 'NonSendableKlass' in a '@Sendable' closure}}
   }
   print(x) // expected-tns-note {{access can happen concurrently}}
 }
@@ -1904,5 +1904,32 @@ func offByOneWithImplicitPartialApply() {
             // expected-tns-note @-1 {{task-isolated 'self' is captured by a main actor-isolated closure. main actor-isolated uses in closure may race against later nonisolated uses}}
           }
       }
+  }
+}
+
+// We should not error in either of the cases below due to sending.
+func testIndirectAndDirectSendingResultsWithGlobalActor() async {
+  @MainActor
+  struct S {
+    let ns = NonSendableKlass()
+
+    func getNonSendableKlassIndirect<T>() -> sending T {
+      fatalError()
+    }
+    func getNonSendableKlassDirect() -> sending NonSendableKlass {
+      fatalError()
+    }
+  }
+
+  let s = await S()
+  let ns: NonSendableKlass = await s.getNonSendableKlassDirect()
+
+  Task.detached {
+    _ = ns
+  }
+
+  let ns2: NonSendableKlass = await s.getNonSendableKlassIndirect()
+  Task.detached {
+    _ = ns2
   }
 }

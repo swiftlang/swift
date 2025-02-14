@@ -145,7 +145,7 @@ class DeclAndTypePrinter::Implementation
 public:
   explicit Implementation(raw_ostream &out, DeclAndTypePrinter &owner,
                           OutputLanguageMode outputLang)
-      : ClangSyntaxPrinter(out), owningPrinter(owner), outputLang(outputLang) {}
+      : ClangSyntaxPrinter(owner.M.getASTContext(), out), owningPrinter(owner), outputLang(outputLang) {}
 
   void print(const Decl *D) {
     PrettyStackTraceDecl trace("printing", D);
@@ -242,9 +242,9 @@ private:
     if (TD->isImplicit() || TD->isSynthesized())
       return;
     os << "  using ";
-    ClangSyntaxPrinter(os).printBaseName(TD);
+    ClangSyntaxPrinter(getASTContext(), os).printBaseName(TD);
     os << "=";
-    ClangSyntaxPrinter(os).printNominalTypeReference(TD, moduleContext);
+    ClangSyntaxPrinter(getASTContext(), os).printNominalTypeReference(TD, moduleContext);
     os << ";\n";
   }
 
@@ -257,8 +257,8 @@ private:
       for (const Decl *member : members) {
         if (member->getModuleContext()->isStdlibModule())
           break;
-        // TODO: support nested classes.
-        if (isa<ClassDecl>(member))
+        auto VD = dyn_cast<ValueDecl>(member);
+        if (!VD || !shouldInclude(VD))
           continue;
         if (const auto *TD = dyn_cast<NominalTypeDecl>(member))
           printUsingForNestedType(TD, TD->getModuleContext());
@@ -480,13 +480,13 @@ private:
 
     ClangValueTypePrinter valueTypePrinter(os, owningPrinter.prologueOS,
                                            owningPrinter.interopContext);
-    ClangSyntaxPrinter syntaxPrinter(os);
+    ClangSyntaxPrinter syntaxPrinter(ED->getASTContext(), os);
     DeclAndTypeClangFunctionPrinter clangFuncPrinter(
         os, owningPrinter.prologueOS, owningPrinter.typeMapping,
         owningPrinter.interopContext, owningPrinter);
 
     auto &outOfLineOS = owningPrinter.outOfLineDefinitionsOS;
-    ClangSyntaxPrinter outOfLineSyntaxPrinter(outOfLineOS);
+    ClangSyntaxPrinter outOfLineSyntaxPrinter(ED->getASTContext(), outOfLineOS);
     DeclAndTypeClangFunctionPrinter outOfLineFuncPrinter(
         owningPrinter.outOfLineDefinitionsOS, owningPrinter.prologueOS,
         owningPrinter.typeMapping, owningPrinter.interopContext, owningPrinter);
@@ -504,17 +504,17 @@ private:
     auto printIsFunction = [&](StringRef caseName, EnumDecl *ED) {
       std::string declName, defName, name;
       llvm::raw_string_ostream declOS(declName), defOS(defName), nameOS(name);
-      ClangSyntaxPrinter(nameOS).printIdentifier(caseName);
+      ClangSyntaxPrinter(ED->getASTContext(), nameOS).printIdentifier(caseName);
       name[0] = std::toupper(name[0]);
 
       os << "  ";
-      ClangSyntaxPrinter(os).printInlineForThunk();
+      ClangSyntaxPrinter(ED->getASTContext(), os).printInlineForThunk();
       os << "bool is" << name << "() const;\n";
 
       outOfLineSyntaxPrinter
           .printNominalTypeOutsideMemberDeclTemplateSpecifiers(ED);
       outOfLineOS << "  ";
-      ClangSyntaxPrinter(outOfLineOS).printInlineForThunk();
+      ClangSyntaxPrinter(ED->getASTContext(), outOfLineOS).printInlineForThunk();
       outOfLineOS << " bool ";
       outOfLineSyntaxPrinter.printNominalTypeQualifier(
           ED, /*moduleContext=*/ED->getModuleContext());
@@ -538,7 +538,7 @@ private:
 
       std::string declName, defName, name;
       llvm::raw_string_ostream declOS(declName), defOS(defName), nameOS(name);
-      ClangSyntaxPrinter(nameOS).printIdentifier(elementDecl->getNameStr());
+      ClangSyntaxPrinter(elementDecl->getASTContext(), nameOS).printIdentifier(elementDecl->getNameStr());
       name[0] = std::toupper(name[0]);
 
       clangFuncPrinter.printCustomCxxFunction(
@@ -547,12 +547,12 @@ private:
           [&](auto &types) {
             // Printing function name and return type
             os << "  ";
-            ClangSyntaxPrinter(os).printInlineForThunk();
+            ClangSyntaxPrinter(elementDecl->getASTContext(), os).printInlineForThunk();
             os << types[paramType] << " get" << name;
             outOfLineSyntaxPrinter
                 .printNominalTypeOutsideMemberDeclTemplateSpecifiers(ED);
             outOfLineOS << "  ";
-            ClangSyntaxPrinter(outOfLineOS).printInlineForThunk();
+            ClangSyntaxPrinter(elementDecl->getASTContext(), outOfLineOS).printInlineForThunk();
             outOfLineOS << types[paramType] << ' ';
             outOfLineSyntaxPrinter.printNominalTypeQualifier(
                 ED, /*moduleContext=*/ED->getModuleContext());
@@ -700,7 +700,7 @@ private:
               if (paramType) {
                 if (paramType->getAs<GenericTypeParamType>()) {
                   auto type = types[paramType];
-                  ClangSyntaxPrinter(outOfLineOS)
+                  ClangSyntaxPrinter(paramType->getASTContext(), outOfLineOS)
                       .printIgnoredCxx17ExtensionDiagnosticBlock([&]() {
                         // FIXME: handle C++ types.
                         outOfLineOS << "if constexpr (std::is_base_of<::swift::"
@@ -876,7 +876,7 @@ private:
 
           // Printing operator cases()
           os << "  ";
-          ClangSyntaxPrinter(os).printInlineForThunk();
+          ClangSyntaxPrinter(ED->getASTContext(), os).printInlineForThunk();
           os << "operator cases() const {\n";
           if (ED->isResilient()) {
             if (!elementTagMapping.empty()) {
@@ -1610,7 +1610,7 @@ private:
                     owningPrinter.interopContext.getIrABIDetails()
                         .getClassBaseOffsetSymbolType();
                 os << "SWIFT_EXTERN ";
-                ClangSyntaxPrinter(os).printKnownCType(
+                ClangSyntaxPrinter(getASTContext(), os).printKnownCType(
                     baseClassOffsetType, owningPrinter.typeMapping);
                 os << ' ' << dispatchInfo->getBaseOffsetSymbolName()
                    << "; // class metadata base offset\n";
@@ -1685,12 +1685,12 @@ public:
       hasPrintedAnything = true;
     };
 
-    for (auto AvAttr : D->getAttrs().getAttributes<AvailableAttr>()) {
-      if (AvAttr->Platform == PlatformKind::none) {
-        if (AvAttr->PlatformAgnostic ==
-            PlatformAgnosticAvailabilityKind::Unavailable) {
+    for (auto AvAttr : D->getSemanticAvailableAttrs()) {
+      if (AvAttr.getPlatform() == PlatformKind::none) {
+        if (AvAttr.isUnconditionallyUnavailable() &&
+            !AvAttr.getDomain().isSwiftLanguage()) {
           // Availability for *
-          if (!AvAttr->Rename.empty() && isa<ValueDecl>(D)) {
+          if (!AvAttr.getRename().empty() && isa<ValueDecl>(D)) {
             // rename
             maybePrintLeadingSpace();
             os << "SWIFT_UNAVAILABLE_MSG(\"'"
@@ -1698,15 +1698,15 @@ public:
                << "' has been renamed to '";
             printRenameForDecl(os, AvAttr, cast<ValueDecl>(D), false);
             os << '\'';
-            if (!AvAttr->Message.empty()) {
+            if (!AvAttr.getMessage().empty()) {
               os << ": ";
-              printEncodedString(os, AvAttr->Message, false);
+              printEncodedString(os, AvAttr.getMessage(), false);
             }
             os << "\")";
-          } else if (!AvAttr->Message.empty()) {
+          } else if (!AvAttr.getMessage().empty()) {
             maybePrintLeadingSpace();
             os << "SWIFT_UNAVAILABLE_MSG(";
-            printEncodedString(os, AvAttr->Message);
+            printEncodedString(os, AvAttr.getMessage());
             os << ")";
           } else {
             maybePrintLeadingSpace();
@@ -1714,12 +1714,12 @@ public:
           }
           break;
         }
-        if (AvAttr->isUnconditionallyDeprecated()) {
-          if (!AvAttr->Rename.empty() || !AvAttr->Message.empty()) {
+        if (AvAttr.isUnconditionallyDeprecated()) {
+          if (!AvAttr.getRename().empty() || !AvAttr.getMessage().empty()) {
             maybePrintLeadingSpace();
             os << "SWIFT_DEPRECATED_MSG(";
-            printEncodedString(os, AvAttr->Message);
-            if (!AvAttr->Rename.empty()) {
+            printEncodedString(os, AvAttr.getMessage());
+            if (!AvAttr.getRename().empty()) {
               os << ", ";
               printRenameForDecl(os, AvAttr, cast<ValueDecl>(D), true);
             }
@@ -1733,15 +1733,16 @@ public:
       }
 
       // Availability for a specific platform
-      if (!AvAttr->Introduced.has_value() && !AvAttr->Deprecated.has_value() &&
-          !AvAttr->Obsoleted.has_value() &&
-          !AvAttr->isUnconditionallyDeprecated() &&
-          !AvAttr->isUnconditionallyUnavailable()) {
+      if (!AvAttr.getIntroduced().has_value() &&
+          !AvAttr.getDeprecated().has_value() &&
+          !AvAttr.getObsoleted().has_value() &&
+          !AvAttr.isUnconditionallyDeprecated() &&
+          !AvAttr.isUnconditionallyUnavailable()) {
         continue;
       }
 
       const char *plat;
-      switch (AvAttr->Platform) {
+      switch (AvAttr.getPlatform()) {
       case PlatformKind::macOS:
         plat = "macos";
         break;
@@ -1790,40 +1791,41 @@ public:
 
       maybePrintLeadingSpace();
       os << "SWIFT_AVAILABILITY(" << plat;
-      if (AvAttr->isUnconditionallyUnavailable()) {
+      if (AvAttr.isUnconditionallyUnavailable()) {
         os << ",unavailable";
       } else {
-        if (AvAttr->Introduced.has_value()) {
-          os << ",introduced=" << AvAttr->Introduced.value().getAsString();
+        if (AvAttr.getIntroduced().has_value()) {
+          os << ",introduced=" << AvAttr.getIntroduced().value().getAsString();
         }
-        if (AvAttr->Deprecated.has_value()) {
-          os << ",deprecated=" << AvAttr->Deprecated.value().getAsString();
-        } else if (AvAttr->isUnconditionallyDeprecated()) {
+        if (AvAttr.getDeprecated().has_value()) {
+          os << ",deprecated=" << AvAttr.getDeprecated().value().getAsString();
+        } else if (AvAttr.isUnconditionallyDeprecated()) {
           // We need to specify some version, we can't just say deprecated.
           // We also can't deprecate it before it's introduced.
-          if (AvAttr->Introduced.has_value()) {
-            os << ",deprecated=" << AvAttr->Introduced.value().getAsString();
+          if (AvAttr.getIntroduced().has_value()) {
+            os << ",deprecated="
+               << AvAttr.getIntroduced().value().getAsString();
           } else {
             os << ",deprecated=0.0.1";
           }
         }
-        if (AvAttr->Obsoleted.has_value()) {
-          os << ",obsoleted=" << AvAttr->Obsoleted.value().getAsString();
+        if (AvAttr.getObsoleted().has_value()) {
+          os << ",obsoleted=" << AvAttr.getObsoleted().value().getAsString();
         }
       }
-      if (!AvAttr->Rename.empty() && isa<ValueDecl>(D)) {
+      if (!AvAttr.getRename().empty() && isa<ValueDecl>(D)) {
         os << ",message=\"'" << cast<ValueDecl>(D)->getBaseName()
            << "' has been renamed to '";
         printRenameForDecl(os, AvAttr, cast<ValueDecl>(D), false);
         os << '\'';
-        if (!AvAttr->Message.empty()) {
+        if (!AvAttr.getMessage().empty()) {
           os << ": ";
-          printEncodedString(os, AvAttr->Message, false);
+          printEncodedString(os, AvAttr.getMessage(), false);
         }
         os << "\"";
-      } else if (!AvAttr->Message.empty()) {
+      } else if (!AvAttr.getMessage().empty()) {
         os << ",message=";
-        printEncodedString(os, AvAttr->Message);
+        printEncodedString(os, AvAttr.getMessage());
       }
       os << ")";
     }
@@ -1831,12 +1833,11 @@ public:
   }
 
 private:
-  void printRenameForDecl(raw_ostream &os, const AvailableAttr *AvAttr,
+  void printRenameForDecl(raw_ostream &os, SemanticAvailableAttr AvAttr,
                           const ValueDecl *D, bool includeQuotes) {
-    assert(!AvAttr->Rename.empty());
+    assert(!AvAttr.getRename().empty());
 
-    auto *renamedDecl = evaluateOrDefault(
-        getASTContext().evaluator, RenamedDeclRequest{D, AvAttr}, nullptr);
+    auto *renamedDecl = D->getRenamedDecl(AvAttr.getParsedAttr());
     if (renamedDecl) {
       assert(shouldInclude(renamedDecl) &&
              "ObjC printer logic mismatch with renamed decl");
@@ -1845,7 +1846,7 @@ private:
           renamedDecl->getObjCRuntimeName()->getString(scratch);
       printEncodedString(os, renamedObjCRuntimeName, includeQuotes);
     } else {
-      printEncodedString(os, AvAttr->Rename, includeQuotes);
+      printEncodedString(os, AvAttr.getRename(), includeQuotes);
     }
   }
 

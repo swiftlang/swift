@@ -27,7 +27,9 @@ add_swift_host_library(swiftAST STATIC
   Attr.cpp
   AutoDiff.cpp
   Availability.cpp
+  AvailabilityConstraint.cpp
   AvailabilityContext.cpp
+  AvailabilityDomain.cpp
   AvailabilityScope.cpp
   AvailabilitySpec.cpp
   Builtins.cpp
@@ -40,6 +42,7 @@ add_swift_host_library(swiftAST STATIC
   ConformanceLookupTable.cpp
   Decl.cpp
   DeclContext.cpp
+  DeclContextDumper.cpp
   DeclNameLoc.cpp
   DiagnosticBridge.cpp
   DiagnosticConsumer.cpp
@@ -58,6 +61,7 @@ add_swift_host_library(swiftAST STATIC
   FineGrainedDependencyFormat.cpp
   FreestandingMacroExpansion.cpp
   FrontendSourceFileDepGraphFactory.cpp
+  FunctionRefInfo.cpp
   GenericEnvironment.cpp
   GenericParamList.cpp
   GenericSignature.cpp
@@ -168,5 +172,10 @@ target_link_libraries(swiftAST INTERFACE
 target_link_libraries(swiftAST
   PUBLIC swiftBasic
   PRIVATE swiftMarkup)
+
+if (SWIFT_BUILD_SWIFT_SYNTAX)
+  target_link_libraries(swiftAST
+    PRIVATE swiftASTGen)
+endif()
 
 set_swift_llvm_is_available(swiftAST)

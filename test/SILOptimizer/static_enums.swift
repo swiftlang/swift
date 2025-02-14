@@ -202,7 +202,7 @@ public enum FunctionEnum {
 // CHECK-LABEL: sil_global hidden @$s4test2feAA12FunctionEnumOvp : $FunctionEnum = {
 var fe = FunctionEnum.f(printClass)
 
-// CHECK-LABEL: sil_global private @$s4test9createArrSaySiSgGyFTv_ : $_ContiguousArrayStorage<Optional<Int>> = {
+// CHECK-LABEL: sil_global private [let] @$s4test9createArrSaySiSgGyFTv_ : $_ContiguousArrayStorage<Optional<Int>> = {
 @inline(never)
 func createArr() -> [Int?] {
   return [ 27, 42, nil, 103 ]

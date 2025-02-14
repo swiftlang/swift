@@ -1188,7 +1188,6 @@ public:
   void emitDebugInfoForAllocStack(AllocStackInst *i, const TypeInfo &type,
                                   llvm::Value *addr);
   void visitAllocStackInst(AllocStackInst *i);
-  void visitAllocVectorInst(AllocVectorInst *i);
   void visitAllocPackInst(AllocPackInst *i);
   void visitAllocPackMetadataInst(AllocPackMetadataInst *i);
   void visitAllocRefInst(AllocRefInst *i);
@@ -1273,6 +1272,9 @@ public:
   visitMoveOnlyWrapperToCopyableBoxInst(MoveOnlyWrapperToCopyableBoxInst *i) {
     llvm_unreachable("OSSA instruction");
   }
+
+  void visitIgnoredUseInst(IgnoredUseInst *i) {}
+
   void
   visitMoveOnlyWrapperToCopyableAddrInst(MoveOnlyWrapperToCopyableAddrInst *i) {
     auto e = getLoweredExplosion(i->getOperand());
@@ -1408,7 +1410,7 @@ public:
   void visitIsUniqueInst(IsUniqueInst *i);
   void visitBeginCOWMutationInst(BeginCOWMutationInst *i);
   void visitEndCOWMutationInst(EndCOWMutationInst *i);
-  void visitIsEscapingClosureInst(IsEscapingClosureInst *i);
+  void visitDestroyNotEscapedClosureInst(DestroyNotEscapedClosureInst *i);
   void visitDeallocStackInst(DeallocStackInst *i);
   void visitDeallocStackRefInst(DeallocStackRefInst *i);
   void visitDeallocPackInst(DeallocPackInst *i);
@@ -2146,12 +2148,11 @@ static void emitEntryPointArgumentsNativeCC(IRGenSILFunction &IGF,
   case SILCoroutineKind::None:
     break;
   case SILCoroutineKind::YieldOnce2:
-    if (IGF.IGM.IRGen.Opts.EmitYieldOnce2AsYieldOnce) {
-      LLVM_FALLTHROUGH;
-    } else {
+    if (!IGF.IGM.IRGen.Opts.EmitYieldOnce2AsYieldOnce) {
       emitYieldOnce2CoroutineEntry(IGF, funcTy, *emission);
       break;
     }
+    LLVM_FALLTHROUGH;
   case SILCoroutineKind::YieldOnce:
     emitYieldOnceCoroutineEntry(IGF, funcTy, *emission);
     break;
@@ -2519,7 +2520,7 @@ static void noteUseOfMetadataByCXXInterop(IRGenerator &IRGen,
       Walker(IRGenerator &IRGen) : IRGen(IRGen) {}
 
       Action walkToTypePre(Type ty) override {
-        if (auto *BGT = ty->getAs<BoundGenericType>())
+        if (ty->is<BoundGenericType>())
           genericDepth++;
         else if (auto *nominal = ty->getAs<NominalType>())
           noteUseOfTypeMetadata(nominal->getDecl());
@@ -2527,7 +2528,7 @@ static void noteUseOfMetadataByCXXInterop(IRGenerator &IRGen,
       }
 
       Action walkToTypePost(Type ty) override {
-        if (auto *BGT = ty->getAs<BoundGenericType>())
+        if (ty->is<BoundGenericType>())
           genericDepth--;
 
         return Action::Continue;
@@ -2564,7 +2565,7 @@ void IRGenModule::emitSILFunction(SILFunction *f) {
     return;
 
   // Type metadata for foreign references is not yet supported on Windows. Bug #76168.
-  if (Context.LangOpts.EnableCXXInterop &&
+  if (Context.LangOpts.EnableCXXInterop && !Context.LangOpts.hasFeature(Feature::Embedded) &&
       f->getLinkage() == SILLinkage::Public &&
       !Context.LangOpts.Target.isOSWindows())
     noteUseOfMetadataByCXXInterop(IRGen, f, TypeExpansionContext(*f));
@@ -3118,6 +3119,8 @@ static bool mayDirectlyCallAsync(SILFunction *fn) {
 
 void IRGenSILFunction::visitFunctionRefBaseInst(FunctionRefBaseInst *i) {
   auto fn = i->getInitiallyReferencedFunction();
+  PrettyStackTraceSILFunction entry("lowering reference to", fn);
+
   auto fnType = fn->getLoweredFunctionType();
 
   auto fpKind = irgen::classifyFunctionPointerKind(fn);
@@ -3866,12 +3869,10 @@ void IRGenSILFunction::visitFullApplySite(FullApplySite site) {
     break;
 
   case SILCoroutineKind::YieldOnce2:
-    if (IGM.IRGen.Opts.EmitYieldOnce2AsYieldOnce) {
-      LLVM_FALLTHROUGH;
-    } else {
-      // @yield_once_2 coroutines allocate in the callee
+    // @yield_once_2 coroutines allocate in the callee
+    if (!IGM.IRGen.Opts.EmitYieldOnce2AsYieldOnce)
       break;
-    }
+    LLVM_FALLTHROUGH;
 
   case SILCoroutineKind::YieldOnce:
     coroutineBuffer = emitAllocYieldOnceCoroutineBuffer(*this);
@@ -4785,6 +4786,12 @@ void IRGenSILFunction::visitEndApply(BeginApplyInst *i, EndApplyInst *ei) {
       llvm::ConstantInt::get(IGM.Int1Ty, isAbort)
     });
 
+  // Destroy the temporaries before setting the lowered value for `ei`, since
+  // `setLoweredExplosion` will insert into the LoweredValues DenseMap and
+  // invalidate the `coroutine` reference.
+  coroutine.Temporaries.destroyAll(*this);
+  emitDeallocYieldOnceCoroutineBuffer(*this, coroutine.Buffer);
+
   if (!isAbort) {
     auto resultType = call->getType();
     if (!resultType->isVoidTy()) {
@@ -4792,13 +4799,12 @@ void IRGenSILFunction::visitEndApply(BeginApplyInst *i, EndApplyInst *ei) {
       // FIXME: Do we need to handle ABI-related conversions here?
       // It seems we cannot have C function convention for coroutines, etc.
       extractScalarResults(*this, resultType, call, e);
+      
+      // NOTE: This inserts a new entry into the LoweredValues DenseMap,
+      // invalidating the reference held by `coroutine`.
       setLoweredExplosion(ei, e);
     }
   }
-
-  coroutine.Temporaries.destroyAll(*this);
-
-  emitDeallocYieldOnceCoroutineBuffer(*this, coroutine.Buffer);
 }
 
 static llvm::BasicBlock *emitBBMapForSwitchValue(
@@ -5397,18 +5403,14 @@ void IRGenSILFunction::visitRetainValueInst(swift::RetainValueInst *i) {
 void IRGenSILFunction::visitRetainValueAddrInst(swift::RetainValueAddrInst *i) {
   SILValue operandValue = i->getOperand();
   assert(!operandValue->getType().isMoveOnly());
-  Address addr = getLoweredAddress(operandValue);
-  SILType addrTy = operandValue->getType();
-  SILType objectT = addrTy.getObjectType();
-  llvm::Type *llvmType = addr.getAddress()->getType();
-  const TypeInfo &addrTI = getTypeInfo(addrTy);
-  auto atomicity = i->isAtomic() ? Atomicity::Atomic : Atomicity::NonAtomic;
-  auto *outlinedF = cast<llvm::Function>(
-      IGM.getOrCreateRetainFunction(addrTI, objectT, llvmType, atomicity));
-  llvm::Value *args[] = {addr.getAddress()};
-  llvm::CallInst *call =
-      Builder.CreateCall(outlinedF->getFunctionType(), outlinedF, args);
-  call->setCallingConv(IGM.DefaultCC);
+
+  auto objTy = operandValue->getType().getObjectType();
+  const TypeInfo &type = getTypeInfo(objTy);
+  auto stackAddr = type.allocateStack(*this, objTy, "retain.value.addr.tmp");
+  Address src = getLoweredAddress(operandValue);
+  type.initializeWithCopy(*this, stackAddr.getAddress(), src,
+                          operandValue->getType(), false);
+  type.deallocateStack(*this, stackAddr, operandValue->getType());
 }
 
 void IRGenSILFunction::visitCopyValueInst(swift::CopyValueInst *i) {
@@ -5487,15 +5489,10 @@ void IRGenSILFunction::visitReleaseValueInst(swift::ReleaseValueInst *i) {
 void IRGenSILFunction::visitReleaseValueAddrInst(
     swift::ReleaseValueAddrInst *i) {
   SILValue operandValue = i->getOperand();
-  Address addr = getLoweredAddress(operandValue);
   SILType addrTy = operandValue->getType();
-  SILType objectT = addrTy.getObjectType();
-  if (tryEmitDestroyUsingDeinit(*this, addr, addrTy)) {
-    return;
-  }
   const TypeInfo &addrTI = getTypeInfo(addrTy);
-  auto atomicity = i->isAtomic() ? Atomicity::Atomic : Atomicity::NonAtomic;
-  addrTI.callOutlinedRelease(*this, addr, objectT, atomicity);
+  Address base = getLoweredAddress(operandValue);
+  addrTI.destroy(*this, base, addrTy, false /*isOutlined*/);
 }
 
 void IRGenSILFunction::visitDestroyValueInst(swift::DestroyValueInst *i) {
@@ -6333,8 +6330,8 @@ void IRGenSILFunction::visitEndCOWMutationInst(EndCOWMutationInst *i) {
   setLoweredExplosion(i, v);
 }
 
-void IRGenSILFunction::visitIsEscapingClosureInst(
-    swift::IsEscapingClosureInst *i) {
+void IRGenSILFunction::visitDestroyNotEscapedClosureInst(
+    swift::DestroyNotEscapedClosureInst *i) {
   // The closure operand is allowed to be an optional closure.
   auto operandType = i->getOperand()->getType();
   if (operandType.getOptionalObjectType())
@@ -6346,21 +6343,19 @@ void IRGenSILFunction::visitIsEscapingClosureInst(
 
   // This code relies on that an optional<()->()>'s tag fits in the function
   // pointer.
-  auto &TI = cast<LoadableTypeInfo>(getTypeInfo(operandType));
+  auto &TI = cast<ReferenceTypeInfo>(getTypeInfo(operandType));
   assert(TI.mayHaveExtraInhabitants(IGM) &&
          "Must have extra inhabitants to be able to handle the optional "
          "closure case");
   (void)TI;
 
   Explosion closure = getLoweredExplosion(i->getOperand());
-  auto func = closure.claimNext();
-  (void)func;
-  auto context = closure.claimNext();
-  assert(closure.empty());
+  auto context = closure.getAll()[1];
   if (context->getType()->isIntegerTy())
     context = Builder.CreateIntToPtr(context, IGM.RefCountedPtrTy);
   auto result = emitIsEscapingClosureCall(context, i->getLoc().getSourceLoc(),
                                           i->getVerificationType());
+  TI.strongRelease(*this, closure, irgen::Atomicity::Atomic);
   Explosion out;
   out.add(result);
   setLoweredExplosion(i, out);
@@ -6483,15 +6478,6 @@ void IRGenSILFunction::visitAllocStackInst(swift::AllocStackInst *i) {
   }
   emitDebugInfoForAllocStack(i, type, addr.getAddress());
 }
-
-void IRGenSILFunction::visitAllocVectorInst(AllocVectorInst *i) {
-  const TypeInfo &type = getTypeInfo(i->getElementType());
-  Explosion capacity = getLoweredExplosion(i->getCapacity());
-  auto stackAddr = type.allocateVector(*this, i->getElementType(),
-                                       capacity.claimNext(), StringRef());
-  setLoweredStackAddress(i, stackAddr);
-}
-
 
 void IRGenSILFunction::visitAllocPackInst(swift::AllocPackInst *i) {
   auto addr = allocatePack(*this, i->getPackType());
@@ -8101,6 +8087,8 @@ void IRGenSILFunction::visitWitnessMethodInst(swift::WitnessMethodInst *i) {
   CanType baseTy = i->getLookupType();
   ProtocolConformanceRef conformance = i->getConformance();
   SILDeclRef member = i->getMember();
+  PrettyStackTraceSILDeclRef entry("lowering use of witness method", member);
+
   auto fnType = IGM.getSILTypes().getConstantFunctionType(
       IGM.getMaximalTypeExpansionContext(), member);
 
@@ -8285,6 +8273,7 @@ void IRGenSILFunction::visitSuperMethodInst(swift::SuperMethodInst *i) {
   llvm::Value *baseValue = base.claimNext();
 
   auto method = i->getMember().getOverriddenVTableEntry();
+  PrettyStackTraceSILDeclRef entry("lowering super call to", method);
   auto methodType = i->getType().castTo<SILFunctionType>();
 
   auto *classDecl = cast<ClassDecl>(method.getDecl()->getDeclContext());
@@ -8381,11 +8370,21 @@ void IRGenSILFunction::visitClassMethodInst(swift::ClassMethodInst *i) {
   llvm::Value *baseValue = base.claimNext();
 
   SILDeclRef method = i->getMember().getOverriddenVTableEntry();
+  PrettyStackTraceSILDeclRef entry("lowering class method call to", method);
+
   auto methodType = i->getType().castTo<SILFunctionType>();
 
+  AccessLevel methodAccess = method.getDecl()->getEffectiveAccess();
   auto *classDecl = cast<ClassDecl>(method.getDecl()->getDeclContext());
   bool shouldUseDispatchThunk = false;
-  if (IGM.hasResilientMetadata(classDecl, ResilienceExpansion::Maximal)) {
+  // Because typechecking for the debugger has more lax rules, check the access
+  // level of the getter to decide whether to use a dispatch thunk for the
+  // debugger.
+  bool shouldUseDispatchThunkIfInDebugger =
+      !classDecl->getASTContext().LangOpts.DebuggerSupport ||
+      methodAccess == AccessLevel::Public;
+  if (IGM.hasResilientMetadata(classDecl, ResilienceExpansion::Maximal) &&
+      shouldUseDispatchThunkIfInDebugger) {
     shouldUseDispatchThunk = true;
   } else if (IGM.getOptions().VirtualFunctionElimination) {
     // For VFE, use a thunk if the target class is in another module. This

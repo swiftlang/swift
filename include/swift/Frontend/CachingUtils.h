@@ -29,6 +29,8 @@
 
 namespace swift {
 
+class DiagnosticHelper;
+
 /// Create a swift caching output backend that stores the output from
 /// compiler into a CAS.
 llvm::IntrusiveRefCntPtr<cas::SwiftCASOutputBackend>
@@ -36,7 +38,7 @@ createSwiftCachingOutputBackend(
     llvm::cas::ObjectStore &CAS, llvm::cas::ActionCache &Cache,
     llvm::cas::ObjectRef BaseKey,
     const FrontendInputsAndOutputs &InputsAndOutputs,
-    FrontendOptions::ActionType Action);
+    const FrontendOptions &Opts, FrontendOptions::ActionType Action);
 
 /// Replay the output of the compilation from cache.
 /// Return true if outputs are replayed, false otherwise.
@@ -47,6 +49,19 @@ bool replayCachedCompilerOutputs(llvm::cas::ObjectStore &CAS,
                                  const FrontendOptions &Opts,
                                  CachingDiagnosticsProcessor &CDP,
                                  bool CacheRemarks, bool UseCASBackend);
+
+/// Replay the output of the compilation from cache for one input file.
+/// Return true if outputs are replayed, false otherwise.
+bool replayCachedCompilerOutputsForInput(llvm::cas::ObjectStore &CAS,
+                                         llvm::cas::ObjectRef OutputRef,
+                                         const InputFile &Input,
+                                         unsigned InputIndex,
+                                         DiagnosticEngine &Diag,
+                                         DiagnosticHelper &DiagHelper,
+                                         llvm::vfs::OutputBackend &OutBackend,
+                                         const FrontendOptions &Opts,
+                                         CachingDiagnosticsProcessor &CDP,
+                                         bool CacheRemarks, bool UseCASBackend);
 
 /// Load the cached compile result from cache.
 std::unique_ptr<llvm::MemoryBuffer> loadCachedCompileResultFromCacheKey(

@@ -809,7 +809,7 @@ PromotedParamCloner::PromotedParamCloner(SILOptFunctionBuilder &FuncBuilder,
 static std::string getClonedName(SILFunction *F, SerializedKind_t Serialized,
                                  ArgIndexList &PromotedArgIndices) {
   auto P = Demangle::SpecializationPass::AllocBoxToStack;
-  Mangle::FunctionSignatureSpecializationMangler Mangler(P, Serialized, F);
+  Mangle::FunctionSignatureSpecializationMangler Mangler(F->getASTContext(), P, Serialized, F);
   for (unsigned i : PromotedArgIndices) {
     Mangler.setArgumentBoxToStack(i);
   }

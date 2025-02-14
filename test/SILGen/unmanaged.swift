@@ -1,5 +1,5 @@
 
-// RUN: %target-swift-emit-sil -module-name unmanaged %s | %FileCheck %s
+// RUN: %target-swift-emit-sil -Xllvm -sil-print-types -module-name unmanaged %s | %FileCheck %s
 
 class C {}
 

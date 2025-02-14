@@ -32,6 +32,27 @@
 
 using namespace swift;
 
+void swift::simple_display(llvm::raw_ostream &out, NameLookupOptions options) {
+  using Flag = std::pair<NameLookupFlags, StringRef>;
+  Flag possibleFlags[] = {
+      {NameLookupFlags::IgnoreAccessControl, "IgnoreAccessControl"},
+      {NameLookupFlags::IncludeOuterResults, "IncludeOuterResults"},
+      {NameLookupFlags::IncludeUsableFromInline, "IncludeUsableFromInline"},
+      {NameLookupFlags::ExcludeMacroExpansions, "ExcludeMacroExpansions"},
+      {NameLookupFlags::IgnoreMissingImports, "IgnoreMissingImports"},
+      {NameLookupFlags::ABIProviding, "ABIProviding"},
+  };
+
+  auto flagsToPrint = llvm::make_filter_range(
+      possibleFlags, [&](Flag flag) { return options.contains(flag.first); });
+
+  out << "{ ";
+  interleave(
+      flagsToPrint, [&](Flag flag) { out << flag.second; },
+      [&] { out << ", "; });
+  out << " }";
+}
+
 namespace {
   /// Builder that helps construct a lookup result from the raw lookup
   /// data.
@@ -225,6 +246,8 @@ convertToUnqualifiedLookupOptions(NameLookupOptions options) {
     newOptions |= UnqualifiedLookupFlags::ExcludeMacroExpansions;
   if (options.contains(NameLookupFlags::IgnoreMissingImports))
     newOptions |= UnqualifiedLookupFlags::IgnoreMissingImports;
+  if (options.contains(NameLookupFlags::ABIProviding))
+    newOptions |= UnqualifiedLookupFlags::ABIProviding;
 
   return newOptions;
 }
@@ -266,7 +289,7 @@ LookupResult TypeChecker::lookupUnqualified(DeclContext *dc, DeclNameRef name,
     if (auto *typeDC = found.getDeclContext()) {
       if (!typeDC->isTypeContext()) {
         // If we don't have a type context this is an implicit 'self' reference.
-        if (auto *CE = dyn_cast<ClosureExpr>(typeDC)) {
+        if (isa<ClosureExpr>(typeDC)) {
           typeDC = typeDC->getInnermostTypeContext();
         } else {
           // Otherwise, we must have the method context.
@@ -330,6 +353,8 @@ LookupResult TypeChecker::lookupMember(DeclContext *dc,
     subOptions |= NL_IgnoreAccessControl;
   if (options.contains(NameLookupFlags::IgnoreMissingImports))
     subOptions |= NL_IgnoreMissingImports;
+  if (options.contains(NameLookupFlags::ABIProviding))
+    subOptions |= NL_ABIProviding;
 
   // We handle our own overriding/shadowing filtering.
   subOptions &= ~NL_RemoveOverridden;
@@ -430,6 +455,8 @@ LookupTypeResult TypeChecker::lookupMemberType(DeclContext *dc,
     subOptions |= NL_IgnoreMissingImports;
   if (options.contains(NameLookupFlags::IncludeUsableFromInline))
     subOptions |= NL_IncludeUsableFromInline;
+  if (options.contains(NameLookupFlags::ABIProviding))
+    subOptions |= NL_ABIProviding;
 
   // Make sure we've resolved implicit members, if we need them.
   namelookup::installSemanticMembersIfNeeded(type, name);
@@ -548,14 +575,15 @@ unsigned TypeChecker::getCallEditDistance(DeclNameRef writtenName,
     return 0;
   }
 
-  StringRef writtenBase = writtenName.getBaseName().userFacingName();
-  StringRef correctedBase = correctedName.getBaseName().userFacingName();
-
   // Don't typo-correct to a name with a leading underscore unless the typed
   // name also begins with an underscore.
-  if (correctedBase.starts_with("_") && !writtenBase.starts_with("_")) {
+  if (correctedName.getBaseIdentifier().hasUnderscoredNaming() &&
+      !writtenName.getBaseIdentifier().hasUnderscoredNaming()) {
     return UnreasonableCallEditDistance;
   }
+
+  StringRef writtenBase = writtenName.getBaseName().userFacingName();
+  StringRef correctedBase = correctedName.getBaseName().userFacingName();
 
   unsigned distance = writtenBase.edit_distance(correctedBase, maxEditDistance);
 

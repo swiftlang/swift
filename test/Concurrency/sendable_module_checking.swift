@@ -2,8 +2,7 @@
 // RUN: %target-swift-frontend -emit-module -emit-module-path %t/StrictModule.swiftmodule -module-name StrictModule -strict-concurrency=complete %S/Inputs/StrictModule.swift
 // RUN: %target-swift-frontend -emit-module -emit-module-path %t/NonStrictModule.swiftmodule -module-name NonStrictModule %S/Inputs/NonStrictModule.swift
 
-// We leave this as just type check since we are checking something that is cross module.
-// RUN: %target-swift-frontend -typecheck -strict-concurrency=targeted -disable-availability-checking -I %t 2>&1 %s | %FileCheck %s
+// RUN: %target-swift-frontend -c -strict-concurrency=complete -disable-availability-checking -I %t 2>&1 %s | %FileCheck %s
 
 // REQUIRES: concurrency
 
@@ -15,9 +14,9 @@ actor A {
 }
 
 func testA(a: A) async {
-  _ = await a.f() // CHECK: warning: cannot call function returning non-sendable type '[StrictStruct : NonStrictClass]' across actors}}
-  // CHECK: note: struct 'StrictStruct' does not conform to the 'Sendable' protocol
-  // CHECK: note: class 'NonStrictClass' does not conform to the 'Sendable' protocol
+  _ = await a.f()
+  // CHECK: warning: non-Sendable '[StrictStruct : NonStrictClass]'-typed result can not be returned from actor-isolated instance method 'f()' to nonisolated context; this is an error in the Swift 6 language mode
+  // CHECK: note: note: generic struct 'Dictionary' does not conform to the 'Sendable' protocol
 }
 
 extension NonStrictStruct: @unchecked Sendable { }

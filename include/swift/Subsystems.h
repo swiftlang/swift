@@ -117,6 +117,9 @@ namespace swift {
                               bool TokenizeInterpolatedString = true,
                               ArrayRef<Token> SplitTokens = ArrayRef<Token>());
 
+  /// Perform import resolution for the module.
+  void performImportResolution(ModuleDecl *M);
+
   /// This walks the AST to resolve imports.
   void performImportResolution(SourceFile &SF);
 
@@ -266,7 +269,10 @@ namespace swift {
   /// Given an already created LLVM module, construct a pass pipeline and run
   /// the Swift LLVM Pipeline upon it. This will include the emission of LLVM IR
   /// if requested (\out is not null).
-  void performLLVMOptimizations(const IRGenOptions &Opts, llvm::Module *Module,
+  void performLLVMOptimizations(const IRGenOptions &Opts,
+                                DiagnosticEngine &Diags,
+                                llvm::sys::Mutex *DiagMutex,
+                                llvm::Module *Module,
                                 llvm::TargetMachine *TargetMachine,
                                 llvm::raw_pwrite_stream *out);
 
@@ -318,6 +324,9 @@ namespace swift {
 
   /// Dump YAML describing all fixed-size types imported from the given module.
   bool performDumpTypeInfo(const IRGenOptions &Opts, SILModule &SILMod);
+
+  /// Dump DeclContext hierarchy of the all nodes in \c SF .
+  void dumpDeclContextHierarchy(llvm::raw_ostream &OS, SourceFile &SF);
 
   /// Creates a TargetMachine from the IRGen opts and AST Context.
   std::unique_ptr<llvm::TargetMachine>

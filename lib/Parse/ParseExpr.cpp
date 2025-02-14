@@ -16,6 +16,7 @@
 
 #include "swift/AST/ASTWalker.h"
 #include "swift/AST/Attr.h"
+#include "swift/AST/AvailabilitySpec.h"
 #include "swift/AST/DiagnosticsParse.h"
 #include "swift/AST/TypeRepr.h"
 #include "swift/Basic/Assertions.h"
@@ -397,6 +398,7 @@ done:
 ///     'try' expr-sequence-element(Mode)
 ///     'try' '?' expr-sequence-element(Mode)
 ///     'try' '!' expr-sequence-element(Mode)
+///     'unsafe' expr-sequence-element(Mode)
 ///     '_move' expr-sequence-element(Mode)
 ///     'borrow' expr-sequence-element(Mode)
 ///     expr-unary(Mode)
@@ -431,7 +433,20 @@ ParserResult<Expr> Parser::parseExprSequenceElement(Diag<> message,
       sub = makeParserResult(new (Context) AwaitExpr(awaitLoc, sub.get()));
     }
 
-   return sub;
+    return sub;
+  }
+
+  if (Context.LangOpts.hasFeature(Feature::WarnUnsafe) &&
+      Tok.isContextualKeyword("unsafe")) {
+    Tok.setKind(tok::contextual_keyword);
+    SourceLoc unsafeLoc = consumeToken();
+    ParserResult<Expr> sub =
+      parseExprSequenceElement(diag::expected_expr_after_unsafe, isExprBasic);
+    if (!sub.hasCodeCompletion() && !sub.isNull()) {
+      sub = makeParserResult(new (Context) UnsafeExpr(unsafeLoc, sub.get()));
+    }
+
+    return sub;
   }
 
   if (Tok.isContextualKeyword("consume")
@@ -1489,7 +1504,11 @@ Parser::parseExprPostfixSuffix(ParserResult<Expr> Result, bool isExprBasic,
         continue;
 
       // Extract the parsed expression as the result.
-      assert(activeElements.size() == 1 && activeElements[0].is<Expr *>());
+      assert(activeElements.size() == 1 ||
+             SF.getParsingOptions().contains(
+                 SourceFile::ParsingFlags::PoundIfAllActive));
+      // FIXME: 'PoundIfAllActive' mode should keep all the parsed AST nodes.
+      assert(activeElements[0].is<Expr *>());
       auto expr = activeElements[0].get<Expr *>();
       ParserStatus status(ICD);
       auto charRange = Lexer::getCharSourceRangeFromSourceRange(
@@ -3088,9 +3107,7 @@ Expr *Parser::parseExprAnonClosureArg() {
   auto &decls = AnonClosureVars.back().Item;
   while (ArgNo >= decls.size()) {
     unsigned nextIdx = decls.size();
-    SmallVector<char, 4> StrBuf;
-    StringRef varName = ("$" + Twine(nextIdx)).toStringRef(StrBuf);
-    Identifier ident = Context.getIdentifier(varName);
+    Identifier ident = Context.getDollarIdentifier(nextIdx);
     SourceLoc varLoc = leftBraceLoc;
     auto *var = new (Context)
         ParamDecl(SourceLoc(), SourceLoc(),
@@ -3672,7 +3689,7 @@ ParserResult<AvailabilitySpec> Parser::parseAvailabilitySpec() {
     SourceLoc StarLoc = Tok.getLoc();
     consumeToken();
 
-    return makeParserResult(new (Context) OtherPlatformAvailabilitySpec(StarLoc));
+    return makeParserResult(AvailabilitySpec::createWildcard(Context, StarLoc));
   }
   if (Tok.isIdentifierOrUnderscore() &&
        (Tok.getText() == "swift" || Tok.getText() == "_PackageDescription"))
@@ -3687,7 +3704,7 @@ ParserResult<AvailabilitySpec> Parser::parseAvailabilitySpec() {
 ///     "swift" version-tuple
 ///  package-description-version-constraint-spec:
 ///     "_PackageDescription" version-tuple
-ParserResult<PlatformAgnosticVersionConstraintAvailabilitySpec>
+ParserResult<AvailabilitySpec>
 Parser::parsePlatformAgnosticVersionConstraintSpec() {
   SourceLoc PlatformAgnosticNameLoc;
   llvm::VersionTuple Version;
@@ -3710,17 +3727,15 @@ Parser::parsePlatformAgnosticVersionConstraintSpec() {
                         diag::avail_query_expected_version_number)) {
     return nullptr;
   }
-  return makeParserResult(new (Context)
-                          PlatformAgnosticVersionConstraintAvailabilitySpec(
-                            Kind.value(), PlatformAgnosticNameLoc, Version, VersionRange));
+  return makeParserResult(AvailabilitySpec::createPlatformAgnostic(
+      Context, Kind.value(), PlatformAgnosticNameLoc, Version, VersionRange));
 }
 
 /// Parse platform-version constraint specification.
 ///
 ///  platform-version-constraint-spec:
 ///     identifier version-comparison version-tuple
-ParserResult<PlatformVersionConstraintAvailabilitySpec>
-Parser::parsePlatformVersionConstraintSpec() {
+ParserResult<AvailabilitySpec> Parser::parsePlatformVersionConstraintSpec() {
   Identifier PlatformIdentifier;
   SourceLoc PlatformLoc;
   if (Tok.is(tok::code_complete)) {
@@ -3770,11 +3785,6 @@ Parser::parsePlatformVersionConstraintSpec() {
   // Register the platform name as a keyword token.
   TokReceiver->registerTokenKindChange(PlatformLoc, tok::contextual_keyword);
 
-  // Keep the original version around for run-time checks to support
-  // macOS Big Sur betas that report 10.16 at
-  // run time.
-  llvm::VersionTuple RuntimeVersion = Version;
-  Version = canonicalizePlatformVersion(*Platform, Version);
-  return makeParserResult(new (Context) PlatformVersionConstraintAvailabilitySpec(
-      Platform.value(), PlatformLoc, Version, RuntimeVersion, VersionRange));
+  return makeParserResult(AvailabilitySpec::createPlatformVersioned(
+      Context, Platform.value(), PlatformLoc, Version, VersionRange));
 }

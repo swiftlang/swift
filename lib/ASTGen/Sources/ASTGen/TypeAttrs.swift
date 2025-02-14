@@ -51,6 +51,7 @@ extension ASTGenVisitor {
       switch attrKind {
       // Simple type attributes.
       case .autoclosure,
+        .addressable,
         .escaping,
         .noEscape,
         .noDerivative,
@@ -58,6 +59,7 @@ extension ASTGenVisitor {
         .sendable,
         .retroactive,
         .unchecked,
+        .unsafe,
         .preconcurrency,
         .local,
         .noMetadata,
@@ -89,6 +91,9 @@ extension ASTGenVisitor {
       case .isolated:
         return self.generateIsolatedTypeAttr(attribute: node)
 
+      case .execution:
+        return self.generateExecutionTypeAttr(attribute: node)
+
       // SIL type attributes are not supported.
       case .autoreleased,
         .blockStorage,
@@ -117,6 +122,7 @@ extension ASTGenVisitor {
         .silUnowned,
         .silWeak,
         .silSending,
+        .silImplicitLeadingParam,
         .unownedInnerPointer:
         break;
 
@@ -168,6 +174,37 @@ extension ASTGenVisitor {
       lpLoc: self.generateSourceLoc(node.leftParen!),
       isolationKindLoc: self.generateSourceLoc(isolationKindExpr.baseName),
       isolationKind: isolationKind,
+      rpLoc: self.generateSourceLoc(node.rightParen!))
+  }
+
+  func generateExecutionTypeAttr(attribute node: AttributeSyntax) -> BridgedTypeAttribute? {
+    guard case .argumentList(let executionArgs) = node.arguments,
+          executionArgs.count == 1,
+          let labelArg = executionArgs.first,
+          labelArg.label == nil,
+          let behaviorExpr = labelArg.expression.as(DeclReferenceExprSyntax.self),
+          behaviorExpr.argumentNames == nil
+    else {
+      // TODO: Diagnose.
+      return nil
+    }
+
+    var behavior: BridgedExecutionTypeAttrExecutionKind
+    switch behaviorExpr.baseName {
+    case "concurrent": behavior = .concurrent
+    case "caller": behavior = .caller
+    default:
+      // TODO: Diagnose.
+      return nil
+    }
+
+    return BridgedTypeAttribute.createExecution(
+      self.ctx,
+      atLoc: self.generateSourceLoc(node.atSign),
+      nameLoc: self.generateSourceLoc(node.attributeName),
+      lpLoc: self.generateSourceLoc(node.leftParen!),
+      behaviorLoc: self.generateSourceLoc(behaviorExpr.baseName),
+      behavior: behavior,
       rpLoc: self.generateSourceLoc(node.rightParen!))
   }
 }

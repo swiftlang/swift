@@ -213,7 +213,7 @@ static void addMandatoryDiagnosticOptPipeline(SILPassPipelinePlan &P) {
 
   // Promote loads as necessary to ensure we have enough SSA formation to emit
   // SSA based diagnostics.
-  P.addPredictableMemoryAccessOptimizations();
+  P.addMandatoryRedundantLoadElimination();
 
   // This phase performs optimizations necessary for correct interoperation of
   // Swift os log APIs with C os_log ABIs.
@@ -257,7 +257,6 @@ static void addMandatoryDiagnosticOptPipeline(SILPassPipelinePlan &P) {
 
   P.addMandatoryPerformanceOptimizations();
   P.addOnoneSimplification();
-  P.addAllocVectorLowering();
   P.addInitializeStaticGlobals();
 
   // MandatoryPerformanceOptimizations might create specializations that are not
@@ -403,7 +402,6 @@ void addHighLevelLoopOptPasses(SILPassPipelinePlan &P) {
   P.addSimplifyCFG();
   P.addPerformanceConstantPropagation();
   P.addSimplifyCFG();
-  P.addArrayElementPropagation();
   // End of unrolling passes.
   P.addABCOpt();
   // Cleanup.
@@ -467,14 +465,10 @@ void addFunctionPasses(SILPassPipelinePlan &P,
 
   addSimplifyCFGSILCombinePasses(P);
 
-  P.addArrayElementPropagation();
-
   // Perform a round of loop/array optimization in the mid-level pipeline after
   // potentially inlining semantic calls, e.g. Array append. The high level
   // pipeline only optimizes semantic calls *after* inlining (see
-  // addHighLevelLoopOptPasses). For example, the high-level pipeline may
-  // perform ArrayElementPropagation and after inlining a level of semantic
-  // calls, the mid-level pipeline may handle uniqueness hoisting. Do this as
+  // addHighLevelLoopOptPasses). Do this as
   // late as possible before inlining because it must run between runs of the
   // inliner when the pipeline restarts.
   if (OpLevel == OptimizationLevelKind::MidLevel) {
@@ -513,11 +507,12 @@ void addFunctionPasses(SILPassPipelinePlan &P,
 
   // We earlier eliminated ownership if we are not compiling the stdlib. Now
   // handle the stdlib functions, re-simplifying, eliminating ARC as we do.
+  P.addDestroyHoisting();
   if (P.getOptions().CopyPropagation != CopyPropagationOption::Off) {
     P.addCopyPropagation();
   }
   P.addSemanticARCOpts();
-  P.addLoadCopyToBorrowOptimization();
+  P.addCopyToBorrowOptimization();
 
   if (!P.getOptions().EnableOSSAModules) {
     if (P.getOptions().StopOptimizationBeforeLoweringOwnership)
@@ -547,7 +542,7 @@ void addFunctionPasses(SILPassPipelinePlan &P,
       P.addCopyPropagation();
     }
     P.addSemanticARCOpts();
-    P.addLoadCopyToBorrowOptimization();
+    P.addCopyToBorrowOptimization();
   }
 
   // Promote stack allocations to values and eliminate redundant
@@ -576,7 +571,7 @@ void addFunctionPasses(SILPassPipelinePlan &P,
   }
   // Optimize copies created during RLE.
   P.addSemanticARCOpts();
-  P.addLoadCopyToBorrowOptimization();
+  P.addCopyToBorrowOptimization();
 
   P.addCOWOpts();
   P.addPerformanceConstantPropagation();
@@ -610,11 +605,12 @@ void addFunctionPasses(SILPassPipelinePlan &P,
 
   // Run a final round of ARC opts when ownership is enabled.
   if (P.getOptions().EnableOSSAModules) {
+    P.addDestroyHoisting();
     if (P.getOptions().CopyPropagation != CopyPropagationOption::Off) {
       P.addCopyPropagation();
     }
     P.addSemanticARCOpts();
-    P.addLoadCopyToBorrowOptimization();
+    P.addCopyToBorrowOptimization();
   }
 }
 
@@ -652,7 +648,7 @@ static void addPerfEarlyModulePassPipeline(SILPassPipelinePlan &P) {
     P.addCopyPropagation();
   }
   P.addSemanticARCOpts();
-  P.addLoadCopyToBorrowOptimization();
+  P.addCopyToBorrowOptimization();
 
   // Devirtualizes differentiability witnesses into functions that reference them.
   // This unblocks many other passes' optimizations (e.g. inlining) and this is
@@ -891,7 +887,10 @@ static void addLastChanceOptPassPipeline(SILPassPipelinePlan &P) {
 
   // Verify AccessStorage once again after optimizing and lowering OSSA.
 #ifndef NDEBUG
-  P.addAccessPathVerification();
+  // Temporarily disabled because it triggers a false alarm when building
+  // SwiftDocC on linux: rdar://141270464
+  // TODO: re-enable when the problem is fixed.
+  // P.addAccessPathVerification();
 #endif
 
   // Only has an effect if the -assume-single-thread option is specified.
@@ -999,7 +998,7 @@ SILPassPipelinePlan::getPerformancePassPipeline(const SILOptions &Options) {
       P.addCopyPropagation();
     }
     P.addSemanticARCOpts();
-    P.addLoadCopyToBorrowOptimization();
+    P.addCopyToBorrowOptimization();
   }
 
   P.addCrossModuleOptimization();
@@ -1011,11 +1010,14 @@ SILPassPipelinePlan::getPerformancePassPipeline(const SILOptions &Options) {
   // importing this module.
   P.addSerializeSILPass();
 
-  // Strip any transparent functions that still have ownership.
-  P.addOwnershipModelEliminator();
-
   if (Options.StopOptimizationAfterSerialization)
     return P;
+
+  if (P.getOptions().EnableOSSAModules && SILPrintFinalOSSAModule) {
+    addModulePrinterPipeline(P, "SIL Print Final OSSA Module");
+  }
+  // Strip any transparent functions that still have ownership.
+  P.addOwnershipModelEliminator();
 
   P.addAutodiffClosureSpecialization();
 
@@ -1079,6 +1081,9 @@ SILPassPipelinePlan::getOnonePassPipeline(const SILOptions &Options) {
   P.startPipeline("Serialization");
   P.addSerializeSILPass();
 
+  if (Options.StopOptimizationAfterSerialization)
+    return P;
+
   // Now that we have serialized, propagate debug info.
   P.addMovedAsyncVarDebugInfoPropagator();
 
@@ -1091,7 +1096,11 @@ SILPassPipelinePlan::getOnonePassPipeline(const SILOptions &Options) {
 
   // Finally perform some small transforms.
   P.startPipeline("Rest of Onone");
-  P.addUsePrespecialized();
+
+  // There are not pre-specialized parts of the stdlib in embedded mode.
+  if (!Options.EmbeddedSwift) {
+    P.addUsePrespecialized();
+  }
 
   // Has only an effect if the -assume-single-thread option is specified.
   if (P.getOptions().AssumeSingleThreaded) {

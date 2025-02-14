@@ -45,6 +45,40 @@ extension Value {
     }
   }
 
+  func isInLexicalLiverange(_ context: some Context) -> Bool {
+    var worklist = ValueWorklist(context)
+    defer { worklist.deinitialize() }
+
+    worklist.pushIfNotVisited(self)
+    while let v = worklist.pop() {
+      if v.ownership == .none {
+        continue
+      }
+      if v.isLexical {
+        return true
+      }
+      switch v {
+      case let fw as ForwardingInstruction:
+        worklist.pushIfNotVisited(contentsOf: fw.definedOperands.lazy.map { $0.value })
+      case let bf as BorrowedFromInst:
+        worklist.pushIfNotVisited(bf.borrowedValue)
+      case let bb as BeginBorrowInst:
+        worklist.pushIfNotVisited(bb.borrowedValue)
+      case let arg as Argument:
+        if let phi = Phi(arg) {
+          worklist.pushIfNotVisited(contentsOf: phi.incomingValues)
+        } else if let termResult = TerminatorResult(arg),
+               let fw = termResult.terminator as? ForwardingInstruction
+        {
+          worklist.pushIfNotVisited(contentsOf: fw.definedOperands.lazy.map { $0.value })
+        }
+      default:
+        continue
+      }
+    }
+    return false
+  }
+
   /// Walks over all fields of an aggregate and checks if a reference count
   /// operation for this value is required. This differs from a simple `Type.isTrivial`
   /// check, because it treats a value_to_bridge_object instruction as "trivial".
@@ -202,7 +236,7 @@ extension Value {
   -> Bool {
     var users = InstructionSet(context)
     defer { users.deinitialize() }
-    uses.lazy.map({ $0.instruction }).forEach { users.insert($0) }
+    users.insert(contentsOf: self.users)
 
     var worklist = InstructionWorklist(context)
     defer { worklist.deinitialize() }
@@ -274,6 +308,14 @@ extension Value {
     let builder = Builder(before: insertionPoint, context)
     let copiedValue = builder.createCopyValue(operand: self)
     return copiedValue.makeAvailable(in: destBlock, context)
+  }
+}
+
+extension SingleValueInstruction {
+  /// Replaces all uses with `replacement` and then erases the instruction.
+  func replace(with replacement: Value, _ context: some MutatingContext) {
+    uses.replaceAll(with: replacement, context)
+    context.erase(instruction: self)
   }
 }
 
@@ -382,7 +424,6 @@ extension Instruction {
          is FloatLiteralInst,
          is ObjectInst,
          is VectorInst,
-         is AllocVectorInst,
          is UncheckedRefCastInst,
          is UpcastInst,
          is ValueToBridgeObjectInst,
@@ -471,15 +512,16 @@ extension StoreInst {
 }
 
 extension LoadInst {
-  func trySplit(_ context: FunctionPassContext) {
+  @discardableResult
+  func trySplit(_ context: FunctionPassContext) -> Bool {
     var elements = [Value]()
     let builder = Builder(before: self, context)
     if type.isStruct {
       if (type.nominal as! StructDecl).hasUnreferenceableStorage {
-        return
+        return false
       }
       guard let fields = type.getNominalFields(in: parentFunction) else {
-        return
+        return false
       }
       for idx in 0..<fields.count {
         let fieldAddr = builder.createStructElementAddr(structAddress: address, fieldIndex: idx)
@@ -487,7 +529,8 @@ extension LoadInst {
         elements.append(splitLoad)
       }
       let newStruct = builder.createStruct(type: self.type, elements: elements)
-      self.uses.replaceAll(with: newStruct, context)
+      self.replace(with: newStruct, context)
+      return true
     } else if type.isTuple {
       var elements = [Value]()
       let builder = Builder(before: self, context)
@@ -497,11 +540,10 @@ extension LoadInst {
         elements.append(splitLoad)
       }
       let newTuple = builder.createTuple(type: self.type, elements: elements)
-      self.uses.replaceAll(with: newTuple, context)
-    } else {
-      return
+      self.replace(with: newTuple, context)
+      return true
     }
-    context.erase(instruction: self)
+    return false
   }
 
   private func splitOwnership(for fieldValue: Value) -> LoadOwnership {
@@ -590,8 +632,7 @@ extension SimplifyContext {
       }
     }
 
-    second.uses.replaceAll(with: replacement, self)
-    erase(instruction: second)
+    second.replace(with: replacement, self)
 
     if canEraseFirst {
       erase(instructionIncludingDebugUses: first)
@@ -707,8 +748,7 @@ extension GlobalVariable {
     for initInst in initInsts {
       switch initInst {
       case let beginAccess as BeginAccessInst:
-        beginAccess.uses.replaceAll(with: beginAccess.address, context)
-        context.erase(instruction: beginAccess)
+        beginAccess.replace(with: beginAccess.address, context)
       case let endAccess as EndAccessInst:
         context.erase(instruction: endAccess)
       default:
@@ -751,10 +791,13 @@ extension InstructionRange {
 ///   %i = some_const_initializer_insts
 ///   store %i to %a
 /// ```
+/// 
+/// For all other instructions `handleUnknownInstruction` is called and such an instruction
+/// is accepted if `handleUnknownInstruction` returns true.
 func getGlobalInitialization(
   of function: Function,
-  forStaticInitializer: Bool,
-  _ context: some Context
+  _ context: some Context,
+  handleUnknownInstruction: (Instruction) -> Bool
 ) -> (allocInst: AllocGlobalInst, storeToGlobal: StoreInst)? {
   guard let block = function.blocks.singleElement else {
     return nil
@@ -771,34 +814,36 @@ func getGlobalInitialization(
          is DebugStepInst,
          is BeginAccessInst,
          is EndAccessInst:
-      break
+      continue
     case let agi as AllocGlobalInst:
-      if allocInst != nil {
-        return nil
+      if allocInst == nil {
+        allocInst = agi
+        continue
       }
-      allocInst = agi
     case let ga as GlobalAddrInst:
       if let agi = allocInst, agi.global == ga.global {
         globalAddr = ga
       }
+      continue
     case let si as StoreInst:
-      if store != nil {
-        return nil
+      if store == nil,
+         let ga = globalAddr,
+         si.destination == ga
+      {
+        store = si
+        continue
       }
-      guard let ga = globalAddr else {
-        return nil
-      }
-      if si.destination != ga {
-        return nil
-      }
-      store = si
-    case is GlobalValueInst where !forStaticInitializer:
-      break
+    // Note that the initializer must not contain a `global_value` because `global_value` needs to
+    // initialize the class metadata at runtime.
     default:
-      if !inst.isValidInStaticInitializerOfGlobal(context) {
-        return nil
+      if inst.isValidInStaticInitializerOfGlobal(context) {
+        continue
       }
     }
+    if handleUnknownInstruction(inst) {
+      continue
+    }
+    return nil
   }
   if let store = store {
     return (allocInst: allocInst!, storeToGlobal: store)
@@ -823,6 +868,32 @@ extension CheckedCastAddrBranchInst {
       case .willFail:    return false
       default: fatalError("unknown result from classifyDynamicCastBridged")
     }
+  }
+}
+
+extension CopyAddrInst {
+  @discardableResult
+  func replaceWithLoadAndStore(_ context: some MutatingContext) -> StoreInst {
+    let loadOwnership: LoadInst.LoadOwnership
+    let storeOwnership: StoreInst.StoreOwnership
+    if parentFunction.hasOwnership {
+      if source.type.isTrivial(in: parentFunction) {
+        loadOwnership = .trivial
+        storeOwnership = .trivial
+      } else {
+        loadOwnership = isTakeOfSrc ? .take : .copy
+        storeOwnership = isInitializationOfDest ? .initialize : .assign
+      }
+    } else {
+      loadOwnership = .unqualified
+      storeOwnership = .unqualified
+    }
+    
+    let builder = Builder(before: self, context)
+    let value = builder.createLoad(fromAddress: source, ownership: loadOwnership)
+    let store = builder.createStore(source: value, destination: destination, ownership: storeOwnership)
+    context.erase(instruction: self)
+    return store
   }
 }
 

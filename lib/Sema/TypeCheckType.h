@@ -24,6 +24,7 @@
 namespace swift {
 
 class ASTContext;
+class AvailabilityContext;
 class QualifiedIdentTypeRepr;
 class TypeRepr;
 class PackElementTypeRepr;
@@ -746,11 +747,6 @@ void diagnoseInvalidGenericArguments(SourceLoc loc, ValueDecl *decl,
 bool diagnoseMissingOwnership(ParamSpecifier ownership,
                               TypeRepr *repr, Type ty,
                               const TypeResolution &resolution);
-
-/// If the given type involves an unsafe type, diagnose it by calling the
-/// diagnose function with the most specific unsafe type that can be provided.
-void diagnoseUnsafeType(ASTContext &ctx, SourceLoc loc, Type type,
-                        llvm::function_ref<void(Type)> diagnose);
 
 } // end namespace swift
 

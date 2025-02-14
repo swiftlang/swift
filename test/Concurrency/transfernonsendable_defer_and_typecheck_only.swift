@@ -14,7 +14,6 @@
  */
 
 class NonSendable {
-// expected-note@-1 3{{class 'NonSendable' does not conform to the 'Sendable' protocol}}
     var x = 0
 }
 
@@ -31,10 +30,8 @@ func callActorFuncsFromNonisolated(a : A, ns : NonSendable) async {
     // Non-sendable value passed from actor isolated to nonisolated
 
     await a.actorTakesNS(ns)
-    //deferred-warning@-1{{passing argument of non-sendable type 'NonSendable' into actor-isolated context may introduce data races}}
 
     _ = await a.actorRetsNS()
-    //expected-warning@-1{{non-sendable result type 'NonSendable' cannot be sent from actor-isolated context in call to instance method 'actorRetsNS()'}}
 }
 
 @available(SwiftStdlib 5.1, *)
@@ -52,7 +49,6 @@ actor A {
         //deferred-warning@-1{{passing argument of non-sendable type 'NonSendable' outside of actor-isolated context may introduce data races}}
 
         _ = await retsNS()
-        //expected-warning@-1{{non-sendable result type 'NonSendable' cannot be sent from nonisolated context in call to global function 'retsNS()'}}
     }
 
     func callActorFuncsFromDiffActor(ns : NonSendable, a : A) async {
@@ -62,6 +58,5 @@ actor A {
         //deferred-warning@-1{{passing argument of non-sendable type 'NonSendable' into actor-isolated context may introduce data races}}
 
         _ = await a.actorRetsNS()
-        //expected-warning@-1{{non-sendable result type 'NonSendable' cannot be sent from actor-isolated context in call to instance method 'actorRetsNS()'}}
     }
 }

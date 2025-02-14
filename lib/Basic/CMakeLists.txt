@@ -58,6 +58,7 @@ add_swift_host_library(swiftBasic STATIC
   ParseableOutput.cpp
   JSONSerialization.cpp
   LangOptions.cpp
+  LoadDynamicLibrary.cpp
   Located.cpp
   Mangler.cpp
   OutputFileMap.cpp
@@ -96,6 +97,7 @@ _swift_gyb_target_sources(swiftBasic PRIVATE
     UnicodeExtendedGraphemeClusters.cpp.gyb)
 
 target_include_directories(swiftBasic PRIVATE
+  clangBasic
   ${UUID_INCLUDE})
 
 target_link_libraries(swiftBasic PUBLIC

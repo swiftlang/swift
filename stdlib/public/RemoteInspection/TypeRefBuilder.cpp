@@ -182,7 +182,7 @@ TypeRefBuilder::ReflectionTypeDescriptorFinder::normalizeReflectionName(
           reflectionNameRemoteAddress, std::optional<std::string>()));
       return {};
     default:
-      auto mangling = mangleNode(node);
+      auto mangling = mangleNode(node, Mangle::ManglingFlavor::Default);
       if (!mangling.isSuccess()) {
         NormalizedReflectionNameCache.insert(std::make_pair(
             reflectionNameRemoteAddress, std::optional<std::string>()));

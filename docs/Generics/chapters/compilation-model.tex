@@ -105,7 +105,7 @@ The compilation pipeline will vary slightly depending on what the driver and fro
 
 \paragraph{Frontend flags.}
 \index{frontend flag}
-The flags we listed above for dumping various stages of compiler output are understood by both the driver and the frontend; the driver passes them down to the frontend. Various other flags used for compiler development and debugging and only known to the frontend. If the driver is invoked with the \IndexFlag{frontend}\texttt{-frontend} flag as the first command line flag, then instead of scheduling frontend jobs, the driver spawns a single frontend job, passing it the rest of the command line without further processing:
+The flags we listed above for dumping various stages of compiler output are understood by both the driver and the frontend; the driver passes them down to the frontend. Various other flags used for compiler development and debugging are only known to the frontend. If the driver is invoked with the \IndexFlag{frontend}\texttt{-frontend} flag as the first command line flag, then instead of scheduling frontend jobs, the driver spawns a single frontend job, passing it the rest of the command line without further processing:
 \begin{Verbatim}
 $ swiftc -frontend -typecheck -primary-file a.swift b.swift
 \end{Verbatim}

@@ -115,8 +115,17 @@ static AccessorKind unbridged(BridgedAccessorKind kind) {
   return static_cast<AccessorKind>(kind);
 }
 
-void BridgedDecl_setAttrs(BridgedDecl decl, BridgedDeclAttributes attrs) {
-  decl.unbridged()->getAttrs() = attrs.unbridged();
+void BridgedDecl_attachParsedAttrs(BridgedDecl decl,
+                                   BridgedDeclAttributes attrs) {
+  decl.unbridged()->attachParsedAttrs(attrs.unbridged());
+}
+
+void BridgedDecl_forEachDeclToHoist(BridgedDecl cDecl,
+                                    BridgedSwiftClosure closure) {
+  cDecl.unbridged()->forEachDeclToHoist([&](Decl *D) {
+    BridgedDecl bridged(D);
+    closure(&bridged);
+  });
 }
 
 BridgedAccessorDecl BridgedAccessorDecl_createParsed(
@@ -134,8 +143,7 @@ BridgedAccessorDecl BridgedAccessorDecl_createParsed(
 
 BridgedPatternBindingDecl BridgedPatternBindingDecl_createParsed(
     BridgedASTContext cContext, BridgedDeclContext cDeclContext,
-    BridgedSourceLoc cBindingKeywordLoc, BridgedArrayRef cBindingEntries,
-    bool isStatic, bool isLet) {
+    BridgedSourceLoc cBindingKeywordLoc, BridgedArrayRef cBindingEntries, BridgedDeclAttributes cAttrs, bool isStatic, bool isLet) {
   ASTContext &context = cContext.unbridged();
   DeclContext *declContext = cDeclContext.unbridged();
 
@@ -147,8 +155,10 @@ BridgedPatternBindingDecl BridgedPatternBindingDecl_createParsed(
 
     // Configure all vars.
     pattern->forEachVariable([&](VarDecl *VD) {
+      VD->attachParsedAttrs(cAttrs.unbridged());
       VD->setStatic(isStatic);
       VD->setIntroducer(introducer);
+      VD->setTopLevelGlobal(isa<TopLevelCodeDecl>(declContext));
     });
 
     entries.emplace_back(pattern, entry.equalLoc.unbridged(),
@@ -338,45 +348,33 @@ BridgedTypeAliasDecl BridgedTypeAliasDecl_createParsed(
   return decl;
 }
 
-static void setParsedMembers(IterableDeclContext *IDC,
-                             BridgedArrayRef bridgedMembers) {
+static void setParsedMembers(IterableDeclContext *IDC, BridgedArrayRef cMembers,
+                             BridgedFingerprint cFingerprint) {
   auto &ctx = IDC->getDecl()->getASTContext();
 
-  SmallVector<Decl *> members;
-  for (auto *decl : bridgedMembers.unbridged<Decl *>()) {
-    members.push_back(decl);
+  Fingerprint fp = cFingerprint.unbridged();
 
-    // Add any variables bound to the list of decls.
-    if (auto *PBD = dyn_cast<PatternBindingDecl>(decl)) {
-      for (auto idx : range(PBD->getNumPatternEntries())) {
-        PBD->getPattern(idx)->forEachVariable(
-            [&](VarDecl *VD) { members.push_back(VD); });
-      }
-    }
-    // Each enum case element is also part of the members list according to the
-    // legacy parser.
-    if (auto *ECD = dyn_cast<EnumCaseDecl>(decl)) {
-      for (auto *EED : ECD->getElements()) {
-        members.push_back(EED);
-      }
-    }
-  }
+  ArrayRef<Decl *> members =
+      ctx.AllocateTransform<Decl *>(cMembers.unbridged<BridgedDecl>(),
+                                    [](auto decl) { return decl.unbridged(); });
 
   IDC->setMaybeHasOperatorDeclarations();
   IDC->setMaybeHasNestedClassDeclarations();
-  ctx.evaluator.cacheOutput(
-      ParseMembersRequest{IDC},
-      FingerprintAndMembers{std::nullopt, ctx.AllocateCopy(members)});
+  // FIXME: Split requests. e.g. DeclMembersFingerprintRequest.
+  ctx.evaluator.cacheOutput(ParseMembersRequest{IDC},
+                            FingerprintAndMembers{fp, members});
 }
 
-void BridgedNominalTypeDecl_setParsedMembers(BridgedNominalTypeDecl bridgedDecl,
-                                             BridgedArrayRef bridgedMembers) {
-  setParsedMembers(bridgedDecl.unbridged(), bridgedMembers);
+void BridgedNominalTypeDecl_setParsedMembers(BridgedNominalTypeDecl cDecl,
+                                             BridgedArrayRef cMembers,
+                                             BridgedFingerprint cFingerprint) {
+  setParsedMembers(cDecl.unbridged(), cMembers, cFingerprint);
 }
 
-void BridgedExtensionDecl_setParsedMembers(BridgedExtensionDecl bridgedDecl,
-                                           BridgedArrayRef bridgedMembers) {
-  setParsedMembers(bridgedDecl.unbridged(), bridgedMembers);
+void BridgedExtensionDecl_setParsedMembers(BridgedExtensionDecl cDecl,
+                                           BridgedArrayRef cMembers,
+                                           BridgedFingerprint cFingerprint) {
+  setParsedMembers(cDecl.unbridged(), cMembers, cFingerprint);
 }
 
 static ArrayRef<InheritedEntry>
@@ -654,32 +652,15 @@ BridgedSubscriptDecl BridgedSubscriptDecl_createParsed(
       cGenericParamList.unbridged());
 }
 
-BridgedTopLevelCodeDecl BridgedTopLevelCodeDecl_createStmt(
-    BridgedASTContext cContext, BridgedDeclContext cDeclContext,
-    BridgedSourceLoc cStartLoc, BridgedStmt statement,
-    BridgedSourceLoc cEndLoc) {
-  ASTContext &context = cContext.unbridged();
-  DeclContext *declContext = cDeclContext.unbridged();
-
-  auto *S = statement.unbridged();
-  auto Brace = BraceStmt::create(context, cStartLoc.unbridged(), {S},
-                                 cEndLoc.unbridged(),
-                                 /*Implicit=*/true);
-  return new (context) TopLevelCodeDecl(declContext, Brace);
+BridgedTopLevelCodeDecl
+BridgedTopLevelCodeDecl_create(BridgedASTContext cContext,
+                               BridgedDeclContext cDeclContext) {
+  return new (cContext.unbridged()) TopLevelCodeDecl(cDeclContext.unbridged());
 }
 
-BridgedTopLevelCodeDecl BridgedTopLevelCodeDecl_createExpr(
-    BridgedASTContext cContext, BridgedDeclContext cDeclContext,
-    BridgedSourceLoc cStartLoc, BridgedExpr expression,
-    BridgedSourceLoc cEndLoc) {
-  ASTContext &context = cContext.unbridged();
-  DeclContext *declContext = cDeclContext.unbridged();
-
-  auto *E = expression.unbridged();
-  auto Brace = BraceStmt::create(context, cStartLoc.unbridged(), {E},
-                                 cEndLoc.unbridged(),
-                                 /*Implicit=*/true);
-  return new (context) TopLevelCodeDecl(declContext, Brace);
+void BridgedTopLevelCodeDecl_setBody(BridgedTopLevelCodeDecl cDecl,
+                                     BridgedBraceStmt cBody) {
+  cDecl.unbridged()->setBody(cBody.unbridged());
 }
 
 BridgedVarDecl BridgedVarDec_createImplicitStringInterpolationVar(
@@ -722,6 +703,10 @@ bool BridgedNominalTypeDecl_isStructWithUnreferenceableStorage(
   return false;
 }
 
+//===----------------------------------------------------------------------===//
+// MARK: BridgedParameterList
+//===----------------------------------------------------------------------===//
+
 BridgedParameterList BridgedParameterList_createParsed(
     BridgedASTContext cContext, BridgedSourceLoc cLeftParenLoc,
     BridgedArrayRef cParameters, BridgedSourceLoc cRightParenLoc) {
@@ -729,4 +714,13 @@ BridgedParameterList BridgedParameterList_createParsed(
   return ParameterList::create(context, cLeftParenLoc.unbridged(),
                                cParameters.unbridged<ParamDecl *>(),
                                cRightParenLoc.unbridged());
+}
+
+size_t BridgedParameterList_size(BridgedParameterList cParameterList) {
+  return cParameterList.unbridged()->size();
+}
+
+BridgedParamDecl BridgedParameterList_get(BridgedParameterList cParameterList,
+                                          size_t i) {
+  return cParameterList.unbridged()->get(i);
 }

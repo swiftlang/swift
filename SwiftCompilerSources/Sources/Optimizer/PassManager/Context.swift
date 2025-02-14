@@ -46,6 +46,14 @@ extension Context {
 
   var moduleIsSerialized: Bool { _bridged.moduleIsSerialized() }
 
+  /// Enable diagnostics requiring WMO (for @noLocks, @noAllocation
+  /// annotations, Embedded Swift, and class specialization). SourceKit is the
+  /// only consumer that has this disabled today (as it disables WMO
+  /// explicitly).
+  var enableWMORequiredDiagnostics: Bool {
+    _bridged.enableWMORequiredDiagnostics()
+  }
+
   func canMakeStaticObjectReadOnly(objectType: Type) -> Bool {
     _bridged.canMakeStaticObjectReadOnly(objectType.bridged)
   }
@@ -153,6 +161,12 @@ extension MutatingContext {
     erase(instruction: inst)
   }
 
+  func erase<S: Sequence>(instructions: S) where S.Element: Instruction {
+    for inst in instructions {
+      erase(instruction: inst)
+    }
+  }
+
   func erase(instructionIncludingDebugUses inst: Instruction) {
     precondition(inst.results.allSatisfy { $0.uses.ignoreDebugUses.isEmpty })
     erase(instructionIncludingAllUsers: inst)
@@ -225,6 +239,14 @@ extension MutatingContext {
     if let instAfterInling = instAfterInling {
       notifyNewInstructions(from: apply, to: instAfterInling)
     }
+  }
+
+  func loadFunction(function: Function, loadCalleesRecursively: Bool) -> Bool {
+    if function.isDefinition {
+      return true
+    }
+    _bridged.loadFunction(function.bridged, loadCalleesRecursively)
+    return function.isDefinition
   }
 
   private func notifyNewInstructions(from: Instruction, to: Instruction) {
@@ -305,14 +327,6 @@ struct FunctionPassContext : MutatingContext {
     }
   }
 
-  func loadFunction(function: Function, loadCalleesRecursively: Bool) -> Bool {
-    if function.isDefinition {
-      return true
-    }
-    _bridged.loadFunction(function.bridged, loadCalleesRecursively)
-    return function.isDefinition
-  }
-
   /// Looks up a function in the `Swift` module.
   /// The `name` is the source name of the function and not the mangled name.
   /// Returns nil if no such function or multiple matching functions are found.
@@ -330,14 +344,6 @@ struct FunctionPassContext : MutatingContext {
 
   fileprivate func notifyEffectsChanged() {
     _bridged.asNotificationHandler().notifyChanges(.effectsChanged)
-  }
-
-  func optimizeMemoryAccesses(in function: Function) -> Bool {
-    if _bridged.optimizeMemoryAccesses(function.bridged) {
-      notifyInstructionsChanged()
-      return true
-    }
-    return false
   }
 
   func eliminateDeadAllocations(in function: Function) -> Bool {
@@ -391,9 +397,9 @@ struct FunctionPassContext : MutatingContext {
     }
   }
 
-  func createGlobalVariable(name: String, type: Type, isPrivate: Bool) -> GlobalVariable {
+  func createGlobalVariable(name: String, type: Type, linkage: Linkage, isLet: Bool) -> GlobalVariable {
     let gv = name._withBridgedStringRef {
-      _bridged.createGlobalVariable($0, type.bridged, isPrivate)
+      _bridged.createGlobalVariable($0, type.bridged, linkage.bridged, isLet)
     }
     return gv.globalVar
   }
@@ -729,6 +735,14 @@ extension LoadInst {
   func set(ownership: LoadInst.LoadOwnership, _ context: some MutatingContext) {
     context.notifyInstructionsChanged()
     bridged.LoadInst_setOwnership(ownership.rawValue)
+    context.notifyInstructionChanged(self)
+  }
+}
+
+extension PointerToAddressInst {
+  func set(alignment: Int?, _ context: some MutatingContext) {
+    context.notifyInstructionsChanged()
+    bridged.PointerToAddressInst_setAlignment(UInt64(alignment ?? 0))
     context.notifyInstructionChanged(self)
   }
 }

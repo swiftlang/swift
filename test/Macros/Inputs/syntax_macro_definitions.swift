@@ -161,12 +161,7 @@ public enum AddBlocker: ExpressionMacro {
                   changes: [
                     FixIt.Change.replace(
                       oldNode: Syntax(binOp.operator),
-                      newNode: Syntax(
-                        TokenSyntax(
-                          .binaryOperator("-"),
-                          presence: .present
-                        )
-                      )
+                      newNode: Syntax(binOp.operator.detached.with(\.tokenKind, .binaryOperator("-"))),
                     )
                   ]
                 ),
@@ -1813,6 +1808,46 @@ public struct AddAllConformancesMacro: ExtensionMacro {
   }
 }
 
+public struct ListConformancesMacro { }
+
+extension ListConformancesMacro: ExtensionMacro {
+  public static func expansion(
+    of node: AttributeSyntax,
+    attachedTo decl: some DeclGroupSyntax,
+    providingExtensionsOf type: some TypeSyntaxProtocol,
+    conformingTo protocols: [TypeSyntax],
+    in context: some MacroExpansionContext
+  ) throws -> [ExtensionDeclSyntax] {
+    protocols.map { proto in
+      let decl: DeclSyntax =
+        """
+        extension \(type): \(proto) {}
+        """
+      return decl.cast(ExtensionDeclSyntax.self)
+    }
+  }
+}
+
+extension ListConformancesMacro: MemberMacro {
+  public static func expansion(
+    of node: AttributeSyntax,
+    providingMembersOf declaration: some DeclGroupSyntax,
+    conformingTo protocols: [TypeSyntax],
+    in context: some MacroExpansionContext
+  ) throws -> [DeclSyntax] {
+    let typeName = declaration.asProtocol(NamedDeclSyntax.self)!.name.text
+
+    let protocolNames: [ExprSyntax] = protocols.map { "\(literal: $0.trimmedDescription)" }
+    let protocolsArray: ExprSyntax =
+      "[ \(raw: protocolNames.map { $0.description }.joined(separator: ", ")) ]"
+    let unknownDecl: DeclSyntax =
+    """
+    @_nonoverride static func conformances() -> [String: [String]] { [ \(literal: typeName): \(protocolsArray) ] }
+    """
+    return [unknownDecl]
+  }
+}
+
 public struct AlwaysAddCodable: ExtensionMacro {
   public static func expansion(
     of node: AttributeSyntax,
@@ -2806,4 +2841,20 @@ public struct HangingMacro: PeerMacro {
       DeclSyntax(mockProperty)
     ]
   }
+}
+
+public struct BigEndianAccessorMacro: AccessorMacro {
+    public static func expansion(
+        of node: AttributeSyntax,
+        providingAccessorsOf declaration: some DeclSyntaxProtocol,
+        in context: some MacroExpansionContext
+    ) throws -> [AccessorDeclSyntax] {
+        [
+            """
+            get {
+                __value.bigEndian
+            }
+            """
+        ]
+    }
 }

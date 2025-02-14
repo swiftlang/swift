@@ -116,23 +116,25 @@ ModuleDecl *ClangImporter::Implementation::loadModuleDWARF(
   if (it != DWARFModuleUnits.end())
     return it->second->getParentModule();
 
-  auto *decl = ModuleDecl::create(name, SwiftContext);
-  decl->setIsNonSwiftModule();
-  decl->setHasResolvedImports();
-  auto *wrapperUnit = new (SwiftContext) DWARFModuleUnit(*decl, *this);
-  DWARFModuleUnits.insert({name, wrapperUnit});
-  decl->addFile(*wrapperUnit);
+  auto *M = ModuleDecl::create(name, SwiftContext,
+                               [&](ModuleDecl *M, auto addFile) {
+    auto *wrapperUnit = new (SwiftContext) DWARFModuleUnit(*M, *this);
+    DWARFModuleUnits.insert({name, wrapperUnit});
+    addFile(wrapperUnit);
+  });
+  M->setIsNonSwiftModule();
+  M->setHasResolvedImports();
 
   // Force load overlay modules for all imported modules.
-  assert(namelookup::getAllImports(decl).size() == 1 &&
-         namelookup::getAllImports(decl).front().importedModule == decl &&
+  assert(namelookup::getAllImports(M).size() == 1 &&
+         namelookup::getAllImports(M).front().importedModule == M &&
          "DWARF module depends on additional modules?");
 
   // Register the module with the ASTContext so it is available for lookups.
   if (!SwiftContext.getLoadedModule(name))
-    SwiftContext.addLoadedModule(decl);
+    SwiftContext.addLoadedModule(M);
 
-  return decl;
+  return M;
 }
 
 // This function exists to defeat the lazy member importing mechanism. The

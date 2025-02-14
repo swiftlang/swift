@@ -802,17 +802,6 @@ GenericArgumentsMismatch *GenericArgumentsMismatch::create(
       GenericArgumentsMismatch(cs, actual, required, mismatches, locator);
 }
 
-bool AutoClosureForwarding::diagnose(const Solution &solution,
-                                     bool asNote) const {
-  AutoClosureForwardingFailure failure(solution, getLocator());
-  return failure.diagnose(asNote);
-}
-
-AutoClosureForwarding *AutoClosureForwarding::create(ConstraintSystem &cs,
-                                                     ConstraintLocator *locator) {
-  return new (cs.getAllocator()) AutoClosureForwarding(cs, locator);
-}
-
 bool AllowAutoClosurePointerConversion::diagnose(const Solution &solution,
                                                  bool asNote) const {
   AutoClosurePointerConversionFailure failure(solution, getFromType(),
@@ -2249,10 +2238,15 @@ bool SpecifyBaseTypeForOptionalUnresolvedMember::diagnose(
 SpecifyBaseTypeForOptionalUnresolvedMember *
 SpecifyBaseTypeForOptionalUnresolvedMember::attempt(
     ConstraintSystem &cs, ConstraintKind kind, Type baseTy,
-    DeclNameRef memberName, FunctionRefKind functionRefKind,
+    DeclNameRef memberName, FunctionRefInfo functionRefInfo,
     MemberLookupResult result, ConstraintLocator *locator) {
 
   if (kind != ConstraintKind::UnresolvedValueMember)
+    return nullptr;
+
+  // Only diagnose for UnresolvedMemberExprs.
+  // TODO: We ought to support diagnosing EnumElementPatterns too.
+  if (!isExpr<UnresolvedMemberExpr>(locator->getAnchor()))
     return nullptr;
 
   // None or only one viable candidate, there is no ambiguity.
@@ -2264,7 +2258,7 @@ SpecifyBaseTypeForOptionalUnresolvedMember::attempt(
     return nullptr;
 
   // Don't diagnose for function members e.g. Foo? = .none(0).
-  if (functionRefKind != FunctionRefKind::Unapplied)
+  if (!functionRefInfo.isUnappliedBaseName())
     return nullptr;
 
   Type underlyingBaseType = baseTy->getMetatypeInstanceType();
@@ -2344,7 +2338,7 @@ SpecifyBaseTypeForOptionalUnresolvedMember::attempt(
 
   MemberLookupResult unwrappedResult =
       cs.performMemberLookup(kind, memberName, MetatypeType::get(unwrappedType),
-                             functionRefKind, locator,
+                             functionRefInfo, locator,
                              /*includeInaccessibleMembers*/ false);
   SmallVector<OverloadChoice, 4> unwrappedViableCandidates;
   filterViableCandidates(unwrappedResult.ViableCandidates,
@@ -2727,4 +2721,19 @@ IgnoreKeyPathSubscriptIndexMismatch::create(ConstraintSystem &cs, Type argType,
                                             ConstraintLocator *locator) {
   return new (cs.getAllocator())
       IgnoreKeyPathSubscriptIndexMismatch(cs, argType, locator);
+}
+
+AllowInlineArrayLiteralCountMismatch *
+AllowInlineArrayLiteralCountMismatch::create(ConstraintSystem &cs, Type lhsCount,
+                                             Type rhsCount,
+                                             ConstraintLocator *locator) {
+  return new (cs.getAllocator())
+      AllowInlineArrayLiteralCountMismatch(cs, lhsCount, rhsCount, locator);
+}
+
+bool AllowInlineArrayLiteralCountMismatch::diagnose(const Solution &solution,
+                                                    bool asNote) const {
+  IncorrectInlineArrayLiteralCount failure(solution, lhsCount, rhsCount,
+                                           getLocator());
+  return failure.diagnose(asNote);
 }

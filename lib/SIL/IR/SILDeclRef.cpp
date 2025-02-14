@@ -477,7 +477,7 @@ static LinkageLimit getLinkageLimit(SILDeclRef constant) {
       return Limit::OnDemand;
   }
   
-  if (auto dd = dyn_cast<DestructorDecl>(d)) {
+  if (isa<DestructorDecl>(d)) {
     // The destructor of a class implemented with @_objcImplementation is only
     // ever called by its ObjC thunk, so it should not be public.
     if (d->getDeclContext()->getSelfNominalTypeDecl()->hasClangNode())
@@ -1198,7 +1198,7 @@ static std::string mangleClangDecl(Decl *decl, bool isForeign) {
 
 std::string SILDeclRef::mangle(ManglingKind MKind) const {
   using namespace Mangle;
-  ASTMangler mangler;
+  ASTMangler mangler(getASTContext());
 
   if (auto *derivativeFunctionIdentifier = getDerivativeFunctionIdentifier()) {
     std::string originalMangled = asAutoDiffOriginalFunction().mangle(MKind);
@@ -1239,7 +1239,7 @@ std::string SILDeclRef::mangle(ManglingKind MKind) const {
     auto *funcDecl = cast<AbstractFunctionDecl>(getDecl());
     auto genericSig = funcDecl->getGenericSignature();
     return GenericSpecializationMangler::manglePrespecialization(
-        mangledNonSpecializedString, genericSig, getSpecializedSignature());
+        getASTContext(), mangledNonSpecializedString, genericSig, getSpecializedSignature());
   }
 
   ASTMangler::SymbolKind SKind = ASTMangler::SymbolKind::Default;

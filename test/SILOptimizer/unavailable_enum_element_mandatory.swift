@@ -2,7 +2,7 @@
 // RUN: %target-swift-frontend -emit-module -enable-library-evolution -unavailable-decl-optimization=none -emit-module-path=%t/resilient_struct.swiftmodule -module-name=resilient_struct %S/../Inputs/resilient_struct.swift
 // RUN: %target-swift-frontend -emit-module -enable-library-evolution -unavailable-decl-optimization=none -emit-module-path=%t/resilient_enum.swiftmodule -module-name=resilient_enum -I %t %S/../Inputs/resilient_enum.swift
 
-// RUN: %target-swift-emit-sil -module-name Test -parse-as-library %s -verify -unavailable-decl-optimization=complete -Onone -I %t | %FileCheck %s
+// RUN: %target-swift-emit-sil -Xllvm -sil-print-types -module-name Test -parse-as-library %s -verify -unavailable-decl-optimization=complete -Onone -I %t | %FileCheck %s
 
 import resilient_struct
 import resilient_enum

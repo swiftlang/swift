@@ -25,4 +25,16 @@ class PathTests: XCTestCase {
     XCTAssertEqual(AbsolutePath("/foo").parentDir, "/")
     XCTAssertEqual(AbsolutePath("/foo/bar").parentDir, "/foo")
   }
+
+  func testDropLast() throws {
+    XCTAssertEqual(AbsolutePath("/").dropLast(), "/")
+    XCTAssertEqual(AbsolutePath("/foo/bar").dropLast(), "/foo")
+    XCTAssertEqual(AbsolutePath("/foo/bar").dropLast(2), "/")
+    XCTAssertEqual(AbsolutePath("/foo/bar").dropLast(5), "/")
+
+    XCTAssertEqual(RelativePath("").dropLast(), "")
+    XCTAssertEqual(RelativePath("foo/bar").dropLast(), "foo")
+    XCTAssertEqual(RelativePath("foo/bar").dropLast(2), "")
+    XCTAssertEqual(RelativePath("foo/bar").dropLast(5), "")
+  }
 }

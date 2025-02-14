@@ -195,8 +195,6 @@ public:
   virtual Identifier
   getDiscriminatorForPrivateDecl(const Decl *D) const = 0;
 
-  virtual bool shouldCollectDisplayDecls() const { return true; }
-
   /// Finds all top-level decls in this file.
   ///
   /// This does a simple local lookup, not recursively looking through imports.
@@ -486,9 +484,11 @@ void simple_display(llvm::raw_ostream &out, const FileUnit *file);
 inline FileUnit &ModuleDecl::getMainFile(FileUnitKind expectedKind) const {
   assert(expectedKind != FileUnitKind::Source &&
          "must use specific source kind; see getMainSourceFile");
-  assert(!Files.empty() && "No files added yet");
-  assert(Files.front()->getKind() == expectedKind);
-  return *Files.front();
+
+  auto files = getFiles();
+  assert(!files.empty() && "No files in module");
+  assert(files.front()->getKind() == expectedKind);
+  return *files.front();
 }
 
 } // end namespace swift

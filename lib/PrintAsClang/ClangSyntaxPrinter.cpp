@@ -157,7 +157,7 @@ void ClangSyntaxPrinter::printNominalTypeReference(
                                          moduleContext);
   if (!printNestedTypeNamespaceQualifiers(typeDecl))
     os << "::";
-  ClangSyntaxPrinter(os).printBaseName(typeDecl);
+  ClangSyntaxPrinter(typeDecl->getASTContext(), os).printBaseName(typeDecl);
   if (typeDecl->isGeneric())
     printGenericSignatureParams(
         typeDecl->getGenericSignature().getCanonicalSignature());

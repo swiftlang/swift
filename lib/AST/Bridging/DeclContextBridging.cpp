@@ -31,6 +31,16 @@ BridgedDeclContext BridgedPatternBindingInitializer_asDeclContext(
   return cInit.unbridged();
 }
 
+BridgedCustomAttributeInitializer
+BridgedCustomAttributeInitializer_create(BridgedDeclContext cDeclContext) {
+  return CustomAttributeInitializer::create(cDeclContext.unbridged());
+}
+
+BridgedDeclContext BridgedCustomAttributeInitializer_asDeclContext(
+    BridgedCustomAttributeInitializer cInit) {
+  return cInit.unbridged();
+}
+
 BridgedDeclContext
 BridgedClosureExpr_asDeclContext(BridgedClosureExpr cClosure) {
   return cClosure.unbridged();

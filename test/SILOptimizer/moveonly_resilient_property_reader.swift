@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -enable-library-evolution -emit-sil %s | %FileCheck %s
+// RUN: %target-swift-frontend -enable-library-evolution -Xllvm -sil-print-types -emit-sil %s | %FileCheck %s
 
 public struct ResilientMemberC {}
 public struct ResilientMemberNC: ~Copyable {}

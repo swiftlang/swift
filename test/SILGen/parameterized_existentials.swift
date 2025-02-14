@@ -1,4 +1,4 @@
-// RUN: %target-swift-emit-silgen -module-name parameterized -target %target-swift-5.7-abi-triple %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -Xllvm -sil-print-types -module-name parameterized -target %target-swift-5.7-abi-triple %s | %FileCheck %s
 
 protocol P<T, U, V> {
   associatedtype T

@@ -1,4 +1,4 @@
-// RUN: %target-swift-emit-silgen -disable-experimental-parser-round-trip -disable-availability-checking -enable-experimental-feature ValueGenerics -enable-experimental-feature BuiltinModule %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen -Xllvm -sil-print-types -disable-experimental-parser-round-trip -disable-availability-checking -enable-experimental-feature ValueGenerics -enable-experimental-feature BuiltinModule %s | %FileCheck %s
 
 // REQUIRES: swift_feature_BuiltinModule
 // REQUIRES: swift_feature_ValueGenerics

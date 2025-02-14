@@ -1,0 +1,35 @@
+// RUN: %target-sil-opt -test-runner %s -o /dev/null 2>&1 | %FileCheck %s
+
+sil_stage canonical
+
+import Builtin
+
+class C {}
+class D {
+  var object: C
+}
+
+// An address live range can be extended by a dependent value.
+//
+// CHECK-LABEL: testMarkDepAddressBase: address_ownership_live_range with: %f0
+// CHECK-NEXT: Address:   [[F0:%.*]] = ref_element_addr %0 : $D, #D.object
+// CHECK-NEXT: Base: class  -   [[F0]] = ref_element_addr %0 : $D, #D.object
+// CHECK-NEXT: borrow: functionArgument(%0 = argument of bb0 : $D
+// CHECK-NEXT: begin:      [[F0]] = ref_element_addr %0 : $D, #D.object
+// CHECK-NEXT: ends:       end_borrow %{{.*}} : $C
+// CHECK-NEXT: exits:
+// CHECK-NEXT: interiors:  %{{.*}} = load_borrow %{{.*}} : $*C
+// CHECK-NEXT:             %{{.*}} = mark_dependence %{{.*}} : $*C on [[F0]] : $*C
+// CHECK-NEXT:             [[F0]] = ref_element_addr %0 : $D, #D.object
+// CHECK-LABEL: end running test 1 of 1 on testMarkDepAddressBase: address_ownership_live_range with: %f0
+sil [ossa] @testMarkDepAddressBase : $@convention(thin) (@guaranteed D, @guaranteed D) -> () {
+bb0(%0 : @guaranteed $D, %1 : @guaranteed $D):
+  %f0 = ref_element_addr %0 : $D, #D.object
+  %f1 = ref_element_addr %1 : $D, #D.object
+  specify_test "address_ownership_live_range %f0"
+  %dependence = mark_dependence %f1 on %f0
+  %load = load_borrow %dependence
+  end_borrow %load
+  %99 = tuple()
+  return %99 : $()
+}

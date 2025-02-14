@@ -341,6 +341,7 @@ func isolatedClosures() {
   }
 }
 
+// expected-warning@+3 {{global function 'allOfEm' has multiple actor-isolation attributes ('MainActor' and 'nonisolated')}}
 // expected-warning@+2 {{global function with 'isolated' parameter cannot be 'nonisolated'; this is an error in the Swift 6 language mode}}{{12-24=}}
 // expected-warning@+1 {{global function with 'isolated' parameter cannot have a global actor; this is an error in the Swift 6 language mode}}{{1-12=}}
 @MainActor nonisolated func allOfEm(_ a: isolated A) {

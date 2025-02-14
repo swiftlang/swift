@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -enable-experimental-feature MoveOnlyEnumDeinits -enable-sil-verify-all %s -simplification -simplify-instruction=retain_value | %FileCheck %s
+// RUN: %target-sil-opt -sil-print-types -enable-experimental-feature MoveOnlyEnumDeinits -enable-sil-verify-all %s -simplification -simplify-instruction=retain_value | %FileCheck %s
 
 // REQUIRES: swift_in_compiler
 // REQUIRES: swift_feature_MoveOnlyEnumDeinits

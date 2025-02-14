@@ -15,6 +15,7 @@
 //===----------------------------------------------------------------------===//
 #include "swift/AST/ParseRequests.h"
 #include "swift/AST/ASTContext.h"
+#include "swift/AST/AvailabilitySpec.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/DeclContext.h"
 #include "swift/AST/Module.h"
@@ -219,14 +220,14 @@ bool shouldParseViaASTGen(SourceFile &SF) {
     return false;
 
   switch (SF.Kind) {
-  case SourceFileKind::SIL:
-    return false;
-  case SourceFileKind::Library:
-  case SourceFileKind::Main:
-  case SourceFileKind::Interface:
-  case SourceFileKind::MacroExpansion:
-  case SourceFileKind::DefaultArgument:
-    break;
+    case SourceFileKind::SIL:
+      return false;
+    case SourceFileKind::Library:
+    case SourceFileKind::Main:
+    case SourceFileKind::Interface:
+    case SourceFileKind::MacroExpansion:
+    case SourceFileKind::DefaultArgument:
+      break;
   }
 
   // TODO: Migrate SourceKit features to Syntax based.
@@ -241,17 +242,26 @@ bool shouldParseViaASTGen(SourceFile &SF) {
   if (ctx.SourceMgr.getIDEInspectionTargetBufferID() == SF.getBufferID())
     return false;
 
+  if (auto *generatedInfo = SF.getGeneratedSourceFileInfo()) {
+    // TODO: Handle generated.
+    if (generatedInfo->kind == GeneratedSourceInfo::Kind::AttributeFromClang) {
+      return false;
+    }
+  }
+
   return true;
 }
 
-void appendToVector(BridgedASTNode cNode, void *vecPtr) {
-  auto vec = static_cast<SmallVectorImpl<ASTNode> *>(vecPtr);
+template <typename Bridged, typename Native>
+void appendToVector(Bridged cNode, void *vecPtr) {
+  auto vec = static_cast<SmallVectorImpl<Native> *>(vecPtr);
   vec->push_back(cNode.unbridged());
 }
 
 SourceFileParsingResult parseSourceFileViaASTGen(SourceFile &SF) {
   ASTContext &Ctx = SF.getASTContext();
   DiagnosticEngine &Diags = Ctx.Diags;
+  SourceManager &SM = Ctx.SourceMgr;
   const LangOptions &langOpts = Ctx.LangOpts;
   const GeneratedSourceInfo *genInfo = SF.getGeneratedSourceFileInfo();
 
@@ -264,6 +274,24 @@ SourceFileParsingResult parseSourceFileViaASTGen(SourceFile &SF) {
   auto *exportedSourceFile = SF.getExportedSourceFile();
   assert(exportedSourceFile && "Couldn't parse via SyntaxParser");
 
+  // Collect virtual files.
+  // FIXME: Avoid side effects in the request.
+  // FIXME: Do this lazily in SourceManager::getVirtualFile().
+  BridgedVirtualFile *virtualFiles = nullptr;
+  size_t numVirtualFiles =
+      swift_ASTGen_virtualFiles(exportedSourceFile, &virtualFiles);
+  SourceLoc bufferStart = SM.getLocForBufferStart(SF.getBufferID());
+  for (size_t i = 0; i != numVirtualFiles; ++i) {
+    auto &VF = virtualFiles[i];
+    Ctx.SourceMgr.createVirtualFile(
+        bufferStart.getAdvancedLoc(VF.StartPosition), VF.Name.unbridged(),
+        VF.LineOffset, VF.EndPosition - VF.StartPosition);
+    StringRef name = Ctx.AllocateCopy(VF.Name.unbridged());
+    SF.VirtualFilePaths.emplace_back(
+        name, bufferStart.getAdvancedLoc(VF.NamePosition));
+  }
+  swift_ASTGen_freeBridgedVirtualFiles(virtualFiles, numVirtualFiles);
+
   // Emit parser diagnostics.
   (void)swift_ASTGen_emitParserDiagnostics(
       Ctx, &Diags, exportedSourceFile, /*emitOnlyErrors=*/false,
@@ -274,12 +302,19 @@ SourceFileParsingResult parseSourceFileViaASTGen(SourceFile &SF) {
   SmallVector<ASTNode, 128> items;
   swift_ASTGen_buildTopLevelASTNodes(
       &Diags, exportedSourceFile, declContext, Ctx,
-      static_cast<SmallVectorImpl<ASTNode> *>(&items), appendToVector);
+      static_cast<SmallVectorImpl<ASTNode> *>(&items),
+      appendToVector<BridgedASTNode, ASTNode>);
+
+  // Fingerprint.
+  // FIXME: Split request (SourceFileFingerprintRequest).
+  std::optional<Fingerprint> fp;
+  if (SF.hasInterfaceHash())
+    fp = swift_ASTGen_getSourceFileFingerprint(exportedSourceFile, Ctx)
+             .unbridged();
 
   return SourceFileParsingResult{/*TopLevelItems=*/Ctx.AllocateCopy(items),
                                  /*CollectedTokens=*/std::nullopt,
-                                 // FIXME: Implement interface hash.
-                                 /*InterfaceHasher=*/std::nullopt};
+                                 /*Fingerprint=*/fp};
 }
 #endif // SWIFT_BUILD_SWIFT_SYNTAX
 
@@ -405,8 +440,11 @@ SourceFileParsingResult parseSourceFile(SourceFile &SF) {
   if (auto tokens = parser.takeTokenReceiver()->finalize())
     tokensRef = ctx.AllocateCopy(*tokens);
 
-  return SourceFileParsingResult{ctx.AllocateCopy(items), tokensRef,
-                                 parser.CurrentTokenHash};
+  std::optional<Fingerprint> fp;
+  if (parser.CurrentTokenHash)
+    fp = Fingerprint(std::move(*parser.CurrentTokenHash));
+
+  return SourceFileParsingResult{ctx.AllocateCopy(items), tokensRef, fp};
 }
 
 } // namespace
@@ -446,7 +484,7 @@ ParseSourceFileRequest::getCachedResult() const {
     return std::nullopt;
 
   return SourceFileParsingResult{*items, SF->AllCollectedTokens,
-                                 SF->InterfaceHasher};
+                                 SF->InterfaceHash};
 }
 
 void ParseSourceFileRequest::cacheResult(SourceFileParsingResult result) const {
@@ -454,7 +492,7 @@ void ParseSourceFileRequest::cacheResult(SourceFileParsingResult result) const {
   assert(!SF->Items);
   SF->Items = result.TopLevelItems;
   SF->AllCollectedTokens = result.CollectedTokens;
-  SF->InterfaceHasher = result.InterfaceHasher;
+  SF->InterfaceHash = result.Fingerprint;
 
   // Verify the parsed source file.
   verify(*SF);
@@ -475,9 +513,116 @@ ArrayRef<Decl *> ParseTopLevelDeclsRequest::evaluate(
 }
 
 //----------------------------------------------------------------------------//
-// IDEInspectionSecondPassRequest computation.
+// AvailabilityMacroArgumentsRequest computation.
 //----------------------------------------------------------------------------//
 
+namespace {
+bool parseAvailabilityMacroDefinitionViaASTGen(
+    unsigned bufferID, ASTContext &ctx, std::string &name,
+    llvm::VersionTuple &version, SmallVectorImpl<AvailabilitySpec *> &specs) {
+  StringRef buffer = ctx.SourceMgr.getEntireTextForBuffer(bufferID);
+  DeclContext *dc = ctx.MainModule;
+
+  BridgedAvailabilityMacroDefinition parsed;
+  bool hadError = swift_ASTGen_parseAvailabilityMacroDefinition(ctx, dc, &ctx.Diags, buffer,
+                                                  &parsed);
+  if (hadError)
+    return true;
+  SWIFT_DEFER { swift_ASTGen_freeAvailabilityMacroDefinition(&parsed); };
+
+  name = parsed.name.unbridged();
+  version = parsed.version.unbridged();
+  specs.clear();
+  for (auto spec : parsed.specs.unbridged<BridgedAvailabilitySpec>()) {
+    specs.push_back(spec.unbridged());
+  }
+
+  return false;
+}
+
+bool parseAvailabilityMacroDefinitionViaLegacyParser(
+    unsigned bufferID, ASTContext &ctx, std::string &name,
+    llvm::VersionTuple &version, SmallVectorImpl<AvailabilitySpec *> &specs) {
+  auto &SM = ctx.SourceMgr;
+
+  // Create temporary parser.
+  swift::ParserUnit PU(SM, SourceFileKind::Main, bufferID, ctx.LangOpts,
+                       "unknown");
+
+  ForwardingDiagnosticConsumer PDC(ctx.Diags);
+  PU.getDiagnosticEngine().addConsumer(PDC);
+
+  // Parse the argument.
+  SmallVector<AvailabilitySpec *, 4> tmpSpecs;
+  ParserStatus status =
+      PU.getParser().parseAvailabilityMacroDefinition(name, version, tmpSpecs);
+  if (status.isError())
+    return true;
+
+  // Copy the Specs to the requesting ASTContext from the temporary context
+  // in the ParserUnit.
+  for (auto *spec : tmpSpecs) {
+    specs.push_back(spec->clone(ctx));
+  }
+
+  return false;
+}
+
+bool parseAvailabilityMacroDefinition(
+    unsigned bufferID, ASTContext &ctx, std::string &name,
+    llvm::VersionTuple &version, SmallVectorImpl<AvailabilitySpec *> &specs) {
+#if SWIFT_BUILD_SWIFT_SYNTAX
+  if (ctx.LangOpts.hasFeature(Feature::ParserASTGen))
+    return parseAvailabilityMacroDefinitionViaASTGen(bufferID, ctx, name,
+                                                     version, specs);
+#endif
+  return parseAvailabilityMacroDefinitionViaLegacyParser(bufferID, ctx, name,
+                                                         version, specs);
+}
+
+} // namespace
+
+const AvailabilityMacroMap *
+AvailabilityMacroArgumentsRequest::evaluate(Evaluator &evaluator,
+                                            ASTContext *ctx) const {
+  SourceManager &SM = ctx->SourceMgr;
+
+  // Allocate all buffers in one go to avoid repeating the sorting in
+  // findBufferContainingLocInternal.
+  llvm::SmallVector<unsigned, 4> bufferIDs;
+  for (auto macro : ctx->LangOpts.AvailabilityMacros) {
+    unsigned bufferID =
+        SM.addMemBufferCopy(macro, "-define-availability argument");
+    bufferIDs.push_back(bufferID);
+  }
+
+  auto *map = new AvailabilityMacroMap();
+  ctx->addCleanup([map]() { delete map; });
+
+  // Parse each macro definition.
+  for (unsigned bufferID : bufferIDs) {
+    std::string name;
+    llvm::VersionTuple version;
+    SmallVector<AvailabilitySpec *, 4> specs;
+    if (parseAvailabilityMacroDefinition(bufferID, *ctx, name, version, specs))
+      continue;
+
+    if (map->hasMacroNameVersion(name, version)) {
+      ctx->Diags.diagnose(SM.getLocForBufferStart(bufferID),
+                          diag::attr_availability_duplicate, name,
+                          version.getAsString());
+      continue;
+    }
+
+    map->addEntry(name, version, specs);
+  }
+
+  return map;
+}
+
+//----------------------------------------------------------------------------//
+// IDEInspectionSecondPassRequest computation.
+//----------------------------------------------------------------------------//
 
 void swift::simple_display(llvm::raw_ostream &out,
                            const IDEInspectionCallbacksFactory *factory) { }

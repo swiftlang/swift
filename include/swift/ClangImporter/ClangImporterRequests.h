@@ -134,26 +134,42 @@ private:
 /// The input type for a record member lookup request.
 struct ClangRecordMemberLookupDescriptor final {
   NominalTypeDecl *recordDecl;
+  NominalTypeDecl *inheritingDecl;
   DeclName name;
 
   ClangRecordMemberLookupDescriptor(NominalTypeDecl *recordDecl, DeclName name)
-      : recordDecl(recordDecl), name(name) {
+      : recordDecl(recordDecl), inheritingDecl(recordDecl), name(name) {
     assert(isa<clang::RecordDecl>(recordDecl->getClangDecl()));
   }
 
   friend llvm::hash_code
   hash_value(const ClangRecordMemberLookupDescriptor &desc) {
-    return llvm::hash_combine(desc.name, desc.recordDecl);
+    return llvm::hash_combine(desc.name, desc.recordDecl, desc.inheritingDecl);
   }
 
   friend bool operator==(const ClangRecordMemberLookupDescriptor &lhs,
                          const ClangRecordMemberLookupDescriptor &rhs) {
-    return lhs.name == rhs.name && lhs.recordDecl == rhs.recordDecl;
+    return lhs.name == rhs.name && lhs.recordDecl == rhs.recordDecl &&
+           lhs.inheritingDecl == rhs.inheritingDecl;
   }
 
   friend bool operator!=(const ClangRecordMemberLookupDescriptor &lhs,
                          const ClangRecordMemberLookupDescriptor &rhs) {
     return !(lhs == rhs);
+  }
+
+private:
+  friend class ClangRecordMemberLookup;
+
+  // This private constructor should only be used in ClangRecordMemberLookup,
+  // for recursively traversing base classes that inheritingDecl inherites from.
+  ClangRecordMemberLookupDescriptor(NominalTypeDecl *recordDecl, DeclName name,
+                                    NominalTypeDecl *inheritingDecl)
+      : recordDecl(recordDecl), inheritingDecl(inheritingDecl), name(name) {
+    assert(isa<clang::RecordDecl>(recordDecl->getClangDecl()));
+    assert(isa<clang::CXXRecordDecl>(inheritingDecl->getClangDecl()));
+    assert(recordDecl != inheritingDecl &&
+           "recursive calls should lookup elsewhere");
   }
 };
 
@@ -327,9 +343,15 @@ struct CxxRecordSemanticsDescriptor final {
   const clang::RecordDecl *decl;
   ASTContext &ctx;
 
-  CxxRecordSemanticsDescriptor(const clang::RecordDecl *decl,
-                               ASTContext &ctx)
-      : decl(decl), ctx(ctx) {}
+  /// Whether to emit warnings for missing destructor or copy constructor
+  /// whenever the classification of the type assumes that they exist (e.g. for
+  /// a value type).
+  bool shouldDiagnoseLifetimeOperations;
+
+  CxxRecordSemanticsDescriptor(const clang::RecordDecl *decl, ASTContext &ctx,
+                               bool shouldDiagnoseLifetimeOperations = true)
+      : decl(decl), ctx(ctx),
+        shouldDiagnoseLifetimeOperations(shouldDiagnoseLifetimeOperations) {}
 
   friend llvm::hash_code hash_value(const CxxRecordSemanticsDescriptor &desc) {
     return llvm::hash_combine(desc.decl);

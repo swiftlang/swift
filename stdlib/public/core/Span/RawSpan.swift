@@ -70,10 +70,10 @@ public struct RawSpan: ~Escapable, Copyable, BitwiseCopyable {
   @inline(__always)
   @lifetime(borrow pointer)
   internal init(
-    _unchecked pointer: borrowing UnsafeRawPointer?,
+    _unchecked pointer: UnsafeRawPointer?,
     byteCount: Int
   ) {
-    _pointer = copy pointer
+    _pointer = pointer
     _count = byteCount
   }
 }
@@ -95,11 +95,13 @@ extension RawSpan {
   @_alwaysEmitIntoClient
   @lifetime(borrow buffer)
   public init(
-    _unsafeBytes buffer: borrowing UnsafeRawBufferPointer
+    _unsafeBytes buffer: UnsafeRawBufferPointer
   ) {
-    self.init(
-      _unchecked: buffer.baseAddress, byteCount: buffer.count
-    )
+    let baseAddress = buffer.baseAddress
+    let span = RawSpan(_unchecked: baseAddress, byteCount: buffer.count)
+    // As a trivial value, 'baseAddress' does not formally depend on the
+    // lifetime of 'buffer'. Make the dependence explicit.
+    self = _overrideLifetime(span, borrowing: buffer)
   }
 
   /// Unsafely create a `RawSpan` over initialized memory.
@@ -115,7 +117,11 @@ extension RawSpan {
   public init(
     _unsafeBytes buffer: borrowing Slice<UnsafeRawBufferPointer>
   ) {
-    self.init(_unsafeBytes: UnsafeRawBufferPointer(rebasing: buffer))
+    let rawBuffer = UnsafeRawBufferPointer(rebasing: buffer)
+    let span = RawSpan(_unsafeBytes: rawBuffer)
+    // As a trivial value, 'rawBuffer' does not formally depend on the
+    // lifetime of 'buffer'. Make the dependence explicit.
+    self = _overrideLifetime(span, borrowing: buffer)
   }
 
   /// Unsafely create a `RawSpan` over initialized memory.
@@ -129,9 +135,13 @@ extension RawSpan {
   @_alwaysEmitIntoClient
   @lifetime(borrow buffer)
   public init(
-    _unsafeBytes buffer: borrowing UnsafeMutableRawBufferPointer
+    _unsafeBytes buffer: UnsafeMutableRawBufferPointer
   ) {
-    self.init(_unsafeBytes: UnsafeRawBufferPointer(buffer))
+    let rawBuffer = UnsafeRawBufferPointer(buffer)
+    let span = RawSpan(_unsafeBytes: rawBuffer)
+    // As a trivial value, 'rawBuffer' does not formally depend on the
+    // lifetime of 'buffer'. Make the dependence explicit.
+    self = _overrideLifetime(span, borrowing: buffer)
   }
 
   @_alwaysEmitIntoClient
@@ -139,7 +149,12 @@ extension RawSpan {
   public init(
     _unsafeBytes buffer: borrowing Slice<UnsafeMutableRawBufferPointer>
   ) {
-    self.init(_unsafeBytes: UnsafeRawBufferPointer(rebasing: buffer))
+    let rawBuffer =
+      UnsafeRawBufferPointer(UnsafeMutableRawBufferPointer(rebasing: buffer))
+    let span = RawSpan(_unsafeBytes: rawBuffer)
+    // As a trivial value, 'rawBuffer' does not formally depend on the
+    // lifetime of 'buffer'. Make the dependence explicit.
+    self = _overrideLifetime(span, borrowing: buffer)
   }
 
   /// Unsafely create a `RawSpan` over initialized memory.
@@ -155,11 +170,11 @@ extension RawSpan {
   @_alwaysEmitIntoClient
   @lifetime(borrow pointer)
   public init(
-    _unsafeStart pointer: borrowing UnsafeRawPointer,
+    _unsafeStart pointer: UnsafeRawPointer,
     byteCount: Int
   ) {
     _precondition(byteCount >= 0, "Count must not be negative")
-    self.init(_unchecked: copy pointer, byteCount: byteCount)
+    self.init(_unchecked: pointer, byteCount: byteCount)
   }
 
   /// Unsafely create a `RawSpan` over initialized memory.
@@ -173,9 +188,13 @@ extension RawSpan {
   @_alwaysEmitIntoClient
   @lifetime(borrow buffer)
   public init<T: BitwiseCopyable>(
-    _unsafeElements buffer: borrowing UnsafeBufferPointer<T>
+    _unsafeElements buffer: UnsafeBufferPointer<T>
   ) {
-    self.init(_unsafeBytes: UnsafeRawBufferPointer(buffer))
+    let rawBuffer = UnsafeRawBufferPointer(buffer)
+    let span = RawSpan(_unsafeBytes: rawBuffer)
+    // As a trivial value, 'rawBuffer' does not formally depend on the
+    // lifetime of 'buffer'. Make the dependence explicit.
+    self = _overrideLifetime(span, borrowing: buffer)
   }
 
   /// Unsafely create a `RawSpan` over initialized memory.
@@ -191,9 +210,11 @@ extension RawSpan {
   public init<T: BitwiseCopyable>(
     _unsafeElements buffer: borrowing Slice<UnsafeBufferPointer<T>>
   ) {
-    self.init(
-      _unsafeBytes: .init(UnsafeBufferPointer(rebasing: buffer))
-    )
+    let rawBuffer = UnsafeRawBufferPointer(UnsafeBufferPointer(rebasing: buffer))
+    let span = RawSpan(_unsafeBytes: rawBuffer)
+    // As a trivial value, 'rawBuffer' does not formally depend on the
+    // lifetime of 'buffer'. Make the dependence explicit.
+    self = _overrideLifetime(span, borrowing: buffer)
   }
 
   /// Unsafely create a `RawSpan` over initialized memory.
@@ -207,9 +228,13 @@ extension RawSpan {
   @_alwaysEmitIntoClient
   @lifetime(borrow buffer)
   public init<T: BitwiseCopyable>(
-    _unsafeElements buffer: borrowing UnsafeMutableBufferPointer<T>
+    _unsafeElements buffer: UnsafeMutableBufferPointer<T>
   ) {
-    self.init(_unsafeElements: UnsafeBufferPointer(buffer))
+    let rawBuffer = UnsafeRawBufferPointer(buffer)
+    let span = RawSpan(_unsafeBytes: rawBuffer)
+    // As a trivial value, 'rawBuffer' does not formally depend on the
+    // lifetime of 'buffer'. Make the dependence explicit.
+    self = _overrideLifetime(span, borrowing: buffer)
   }
 
   /// Unsafely create a `RawSpan` over initialized memory.
@@ -225,9 +250,12 @@ extension RawSpan {
   public init<T: BitwiseCopyable>(
     _unsafeElements buffer: borrowing Slice<UnsafeMutableBufferPointer<T>>
   ) {
-    self.init(
-      _unsafeBytes: .init(UnsafeBufferPointer(rebasing: buffer))
-    )
+    let rawBuffer =
+      UnsafeRawBufferPointer(UnsafeMutableBufferPointer(rebasing: buffer))
+    let span = RawSpan(_unsafeBytes: rawBuffer)
+    // As a trivial value, 'rawBuffer' does not formally depend on the
+    // lifetime of 'buffer'. Make the dependence explicit.
+    self = _overrideLifetime(span, borrowing: buffer)
   }
 
   /// Unsafely create a `RawSpan` over initialized memory.
@@ -243,12 +271,12 @@ extension RawSpan {
   @_alwaysEmitIntoClient
   @lifetime(borrow pointer)
   public init<T: BitwiseCopyable>(
-    _unsafeStart pointer: borrowing UnsafePointer<T>,
+    _unsafeStart pointer: UnsafePointer<T>,
     count: Int
   ) {
     _precondition(count >= 0, "Count must not be negative")
     self.init(
-      _unchecked: copy pointer, byteCount: count * MemoryLayout<T>.stride
+      _unchecked: pointer, byteCount: count * MemoryLayout<T>.stride
     )
   }
 
@@ -344,10 +372,9 @@ extension RawSpan {
   @_alwaysEmitIntoClient
   @lifetime(self)
   public func _extracting(unchecked bounds: Range<Int>) -> Self {
-    RawSpan(
-      _unchecked: _pointer?.advanced(by: bounds.lowerBound),
-      byteCount: bounds.count
-    )
+    let newStart = _pointer?.advanced(by: bounds.lowerBound)
+    let newSpan = RawSpan(_unchecked: newStart, byteCount: bounds.count)
+    return _overrideLifetime(newSpan, copying: self)
   }
 
   /// Constructs a new span over the bytes within the supplied range of
@@ -457,7 +484,11 @@ extension RawSpan {
   consuming public func _unsafeView<T: BitwiseCopyable>(
     as type: T.Type
   ) -> Span<T> {
-    Span(_unsafeBytes: .init(start: _pointer, count: _count))
+    let rawBuffer = UnsafeRawBufferPointer(start: _pointer, count: _count)
+    let newSpan = Span<T>(_unsafeBytes: rawBuffer)
+    // As a trivial value, 'rawBuffer' does not formally depend on the
+    // lifetime of 'self'. Make the dependence explicit.
+    return _overrideLifetime(newSpan, copying: self)
   }
 }
 
@@ -677,7 +708,10 @@ extension RawSpan {
     _precondition(maxLength >= 0, "Can't have a suffix of negative length")
     let newCount = min(maxLength, byteCount)
     let newStart = _pointer?.advanced(by: byteCount &- newCount)
-    return Self(_unchecked: newStart, byteCount: newCount)
+    let newSpan = RawSpan(_unchecked: newStart, byteCount: newCount)
+    // As a trivial value, 'newStart' does not formally depend on the
+    // lifetime of 'self'. Make the dependence explicit.
+    return _overrideLifetime(newSpan, copying: self)
   }
 
   /// Returns a span over all but the given number of initial bytes.
@@ -700,6 +734,9 @@ extension RawSpan {
     _precondition(k >= 0, "Can't drop a negative number of elements")
     let droppedCount = min(k, byteCount)
     let newStart = _pointer?.advanced(by: droppedCount)
-    return Self(_unchecked: newStart, byteCount: byteCount &- droppedCount)
+    let newSpan = RawSpan(_unchecked: newStart, byteCount: byteCount &- droppedCount)
+    // As a trivial value, 'newStart' does not formally depend on the
+    // lifetime of 'self'. Make the dependence explicit.
+    return _overrideLifetime(newSpan, copying: self)
   }
 }

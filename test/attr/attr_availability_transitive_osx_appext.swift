@@ -49,8 +49,8 @@ func never_available_func(
   _: OSXAppExtensionsUnavailable
 ) {
   never() // expected-error {{'never()' is unavailable}}
-  osx() // expected-error {{'osx()' is unavailable}}
-  osx_extension() // expected-error {{'osx_extension()' is unavailable in application extensions for macOS}}
+  osx()
+  osx_extension()
 }
 
 @available(OSX, unavailable)
@@ -94,8 +94,8 @@ var never_var: (
   OSXAppExtensionsUnavailable
 ) = (
   never(), // expected-error {{'never()' is unavailable}}
-  osx(), // expected-error {{'osx()' is unavailable}}
-  osx_extension() // expected-error {{'osx_extension()' is unavailable in application extensions for macOS}}
+  osx(),
+  osx_extension()
 )
 
 @available(OSX, unavailable)
@@ -134,8 +134,8 @@ struct AlwaysAvailabileContainer {
 @available(*, unavailable)
 struct NeverAvailableContainer { // expected-note {{'NeverAvailableContainer' has been explicitly marked unavailable here}}
   let never_var: NeverAvailable = never() // expected-error {{'never()' is unavailable}}
-  let osx_var: OSXUnavailable = osx() // expected-error {{'osx()' is unavailable}}
-  let osx_extension_var: OSXAppExtensionsUnavailable = osx_extension() // expected-error {{'osx_extension()' is unavailable in application extensions for macOS}}
+  let osx_var: OSXUnavailable = osx()
+  let osx_extension_var: OSXAppExtensionsUnavailable = osx_extension()
 }
 
 @available(OSX, unavailable)
@@ -201,8 +201,8 @@ extension ExtendMe {
     _: OSXAppExtensionsUnavailable
   ) {
     never() // expected-error {{'never()' is unavailable}}
-    osx() // expected-error {{'osx()' is unavailable}}
-    osx_extension() // expected-error {{'osx_extension()' is unavailable in application extensions for macOS}}
+    osx()
+    osx_extension()
   }
 
   @available(*, unavailable)
@@ -212,8 +212,8 @@ extension ExtendMe {
     _: OSXAppExtensionsUnavailable
   ) {
     never() // expected-error {{'never()' is unavailable}}
-    osx() // expected-error {{'osx()' is unavailable}}
-    osx_extension() // expected-error {{'osx_extension()' is unavailable in application extensions for macOS}}
+    osx()
+    osx_extension()
   }
 
   @available(OSX, unavailable)
@@ -223,8 +223,8 @@ extension ExtendMe {
     _: OSXAppExtensionsUnavailable
   ) {
     never() // expected-error {{'never()' is unavailable}}
-    osx() // expected-error {{'osx()' is unavailable}}
-    osx_extension() // expected-error {{'osx_extension()' is unavailable in application extensions for macOS}}
+    osx()
+    osx_extension()
   }
 
   @available(OSXApplicationExtension, unavailable)
@@ -234,8 +234,8 @@ extension ExtendMe {
     _: OSXAppExtensionsUnavailable
   ) {
     never() // expected-error {{'never()' is unavailable}}
-    osx() // expected-error {{'osx()' is unavailable}}
-    osx_extension() // expected-error {{'osx_extension()' is unavailable in application extensions for macOS}}
+    osx()
+    osx_extension()
   }
 }
 
@@ -263,8 +263,8 @@ extension ExtendMe {
     _: OSXAppExtensionsUnavailable
   ) {
     never() // expected-error {{'never()' is unavailable}}
-    osx() // expected-error {{'osx()' is unavailable}}
-    osx_extension() // expected-error {{'osx_extension()' is unavailable in application extensions for macOS}}
+    osx()
+    osx_extension()
   }
 
   @available(OSX, unavailable)
@@ -314,8 +314,8 @@ extension ExtendMe {
     _: OSXAppExtensionsUnavailable
   ) {
     never() // expected-error {{'never()' is unavailable}}
-    osx() // expected-error {{'osx()' is unavailable}}
-    osx_extension() // expected-error {{'osx_extension()' is unavailable in application extensions for macOS}}
+    osx()
+    osx_extension()
   }
 
   @available(OSX, unavailable)

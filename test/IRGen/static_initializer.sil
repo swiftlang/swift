@@ -97,18 +97,6 @@ sil_global @static_optional_int_vector : $Optional<Int32> = {
 }
 // CHECK: @static_optional_int_vector = {{(dllexport )?}}{{(protected )?}}global [3 x <{ i32, i1, i8, i8, i8 }>] [<{ i32, i1, i8, i8, i8 }> <{ i32 2, i1 false, i8 undef, i8 undef, i8 undef }>, <{ i32, i1, i8, i8, i8 }> <{ i32 10, i1 false, i8 undef, i8 undef, i8 undef }>, <{ i32, i1, i8, i8, i8 }> <{ i32 20, i1 false, i8 undef, i8 undef, i8 undef }>], align 4
 
-sil_global @static_alloc_vector : $Int64 = {
-  %0 = integer_literal $Builtin.Word, 3
-  %initval = alloc_vector $Int64, %0 : $Builtin.Word
-}
-// CHECK: @static_alloc_vector = {{(dllexport )?}}{{(protected )?}}global [3 x %Ts5Int64V] zeroinitializer, align 8
-
-sil_global @static_alloc_vector_optional : $Int64 = {
-  %0 = integer_literal $Builtin.Word, 3
-  %initval = alloc_vector $Optional<Int32>, %0 : $Builtin.Word
-}
-// CHECK: @static_alloc_vector_optional = {{(dllexport )?}}{{(protected )?}}global [3 x { %Ts5Int32VSg, [3 x i8] }] zeroinitializer, align 8
-
 sil_global @static_aligned_array : $TestArrayStorage = {
   %0 = integer_literal $Builtin.Int32, 2
   %1 = float_literal $Builtin.FPIEEE80, 0x3FFE8000000000000000

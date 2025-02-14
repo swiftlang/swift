@@ -837,3 +837,13 @@ do {
     // expected-note@-2 {{cast 'Any' to 'AnyObject' or use 'as!' to force downcast to a more specific type to access members}}
   }
 }
+
+func testCompoundLeadingDot() {
+  struct S {
+    static func foo(x: Int) -> Self { .init() }
+  }
+
+  // Make sure we correctly strip the argument label.
+  let _: S = .foo(x:)(0)
+  let _: S = .foo(x:)(x: 0) // expected-error {{extraneous argument label 'x:' in call}}
+}

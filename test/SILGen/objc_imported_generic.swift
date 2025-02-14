@@ -1,5 +1,5 @@
 
-// RUN: %target-swift-emit-silgen(mock-sdk: %clang-importer-sdk) -module-name objc_imported_generic %s | %FileCheck %s
+// RUN: %target-swift-emit-silgen(mock-sdk: %clang-importer-sdk) -Xllvm -sil-print-types -module-name objc_imported_generic %s | %FileCheck %s
 // For integration testing, ensure we get through IRGen too.
 // RUN: %target-swift-emit-ir(mock-sdk: %clang-importer-sdk) -module-name objc_imported_generic -verify -DIRGEN_INTEGRATION_TEST %s
 

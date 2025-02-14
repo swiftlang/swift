@@ -164,8 +164,13 @@ struct ProjectOptions: ParsableArguments {
     name: .customLong("stdlib-swift"), inversion: .prefixedNo,
     help: """
       Generate targets for Swift files in the standard library. This requires
-      using Xcode with a main development snapshot (and as such is disabled
-      by default).
+      using Xcode with a main development Swift snapshot, and as such is
+      disabled by default. 
+      
+      A development snapshot is necessary to avoid spurious build/live issues
+      due to the fact that the the stdlib is built using the just-built Swift
+      compiler, which may support features not yet supported by the Swift
+      compiler in Xcode's toolchain.
       """
   )
   var addStdlibSwift: Bool = false
@@ -200,7 +205,7 @@ struct ProjectOptions: ParsableArguments {
       files
       """
   )
-  var preferFolderRefs: Bool = false
+  var preferFolderRefs: Bool = true
 
   @Flag(
     name: .customLong("buildable-folders"), inversion: .prefixedNo,
@@ -215,7 +220,20 @@ struct ProjectOptions: ParsableArguments {
       cannot currently use buildable folders.
       """
   )
-  var useBuildableFolders: Bool = false
+  var useBuildableFolders: Bool = true
+
+  @Option(
+    name: .customLong("runtimes-build-dir"),
+    help: """
+      Experimental: The path to a build directory for the new 'Runtimes/'
+      stdlib CMake build. This creates a separate 'SwiftRuntimes' project, along
+      with a 'Swift+Runtimes' workspace.
+      
+      Note: This requires passing '-DCMAKE_EXPORT_COMPILE_COMMANDS=YES' to
+      CMake.
+      """
+  )
+  var runtimesBuildDir: AnyPath?
 
   @Option(help: .hidden)
   var blueFolders: String = ""

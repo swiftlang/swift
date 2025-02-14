@@ -10,7 +10,6 @@
 
 // REQUIRES: swift_in_compiler
 // REQUIRES: executable_test
-// REQUIRES: OS=macosx || OS=linux-gnu
 // REQUIRES: swift_feature_Embedded
 
 //--- MyModuleA.swift

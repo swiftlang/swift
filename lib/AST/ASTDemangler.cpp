@@ -155,7 +155,7 @@ Type ASTBuilder::createNominalType(GenericTypeDecl *decl, Type parent) {
     return Type();
 
   // If the declaration is generic, fail.
-  if (auto list = nominalDecl->getGenericParams())
+  if (nominalDecl->isGeneric())
     return Type();
 
   // Imported types can be renamed to be members of other (non-generic)
@@ -256,7 +256,7 @@ Type ASTBuilder::resolveOpaqueType(NodePointer opaqueDescriptor,
     auto definingDecl = opaqueDescriptor->getChild(0);
     auto definingGlobal = Factory.createNode(Node::Kind::Global);
     definingGlobal->addChild(definingDecl, Factory);
-    auto mangling = mangleNode(definingGlobal);
+    auto mangling = mangleNode(definingGlobal, ManglingFlavor);
     if (!mangling.isSuccess())
       return Type();
     auto mangledName = mangling.result();
@@ -677,6 +677,10 @@ Type ASTBuilder::createImplFunctionType(
     auto type = result.getType()->getCanonicalType();
     auto conv = getResultConvention(result.getConvention());
     auto options = *getResultOptions(result.getOptions());
+    // We currently set sending result at the function level, but we set sending
+    // result on each result.
+    if (flags.hasSendingResult())
+      options |= SILResultInfo::IsSending;
     funcResults.emplace_back(type, conv, options);
   }
 
@@ -1135,7 +1139,7 @@ ASTBuilder::getAcceptableTypeDeclCandidate(ValueDecl *decl,
 
 DeclContext *ASTBuilder::getNotionalDC() {
   if (!NotionalDC) {
-    NotionalDC = ModuleDecl::create(Ctx.getIdentifier(".RemoteAST"), Ctx);
+    NotionalDC = ModuleDecl::createEmpty(Ctx.getIdentifier(".RemoteAST"), Ctx);
     NotionalDC = new (Ctx) TopLevelCodeDecl(NotionalDC);
   }
   return NotionalDC;
@@ -1286,7 +1290,7 @@ ASTBuilder::findDeclContext(NodePointer node) {
         return nullptr;
 
       // Look up the local type by its mangling.
-      auto mangling = Demangle::mangleNode(node);
+      auto mangling = Demangle::mangleNode(node, ManglingFlavor);
       if (!mangling.isSuccess())
         return nullptr;
       auto mangledName = mangling.result();

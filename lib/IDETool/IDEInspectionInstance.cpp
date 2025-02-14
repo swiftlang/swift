@@ -253,7 +253,7 @@ bool IDEInspectionInstance::performCachedOperationIfPossible(
   registerClangImporterRequestFunctions(tmpCtx->evaluator);
   registerConstExtractRequestFunctions(tmpCtx->evaluator);
   registerSILGenRequestFunctions(tmpCtx->evaluator);
-  ModuleDecl *tmpM = ModuleDecl::create(Identifier(), *tmpCtx);
+  ModuleDecl *tmpM = ModuleDecl::createEmpty(Identifier(), *tmpCtx);
   SourceFile *tmpSF = new (*tmpCtx)
       SourceFile(*tmpM, oldSF->Kind, tmpBufferID, oldSF->getParsingOptions());
 
@@ -389,18 +389,20 @@ bool IDEInspectionInstance::performCachedOperationIfPossible(
 
     // Create a new module and a source file using the current AST context.
     auto &Ctx = oldM->getASTContext();
-    auto *newM = ModuleDecl::createMainModule(Ctx, oldM->getName(),
-                                              oldM->getImplicitImportInfo());
+    auto *newM = ModuleDecl::createMainModule(
+        Ctx, oldM->getName(), oldM->getImplicitImportInfo(),
+        [&](ModuleDecl *newM, auto addFile) {
+      addFile(new (Ctx) SourceFile(*newM, SourceFileKind::Main, newBufferID,
+                                   oldSF->getParsingOptions()));
+    });
     newM->setABIName(oldM->getABIName());
-    auto *newSF = new (Ctx) SourceFile(*newM, SourceFileKind::Main, newBufferID,
-                                       oldSF->getParsingOptions());
-    newM->addFile(*newSF);
 
     // Tell the compiler instance we've replaced the main module.
     CachedCI->setMainModule(newM);
 
     // Re-process the whole file (parsing will be lazily triggered). Still
     // re-use imported modules.
+    auto *newSF = &newM->getMainSourceFile();
     performImportResolution(*newSF);
     bindExtensions(*newM);
 

@@ -154,13 +154,13 @@ public func registerOptimizerTests() {
   // Register each test.
   registerFunctionTests(
     getAccessBaseTest,
+    addressOwnershipLiveRangeTest,
     argumentConventionsTest,
     borrowIntroducersTest,
     enclosingValuesTest,
     forwardingDefUseTest,
     forwardingUseDefTest,
     interiorLivenessTest,
-    lifetimeDependenceRootTest,
     lifetimeDependenceScopeTest,
     lifetimeDependenceUseTest,
     linearLivenessTest,

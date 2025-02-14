@@ -39,6 +39,10 @@ class DeadEndBlocks;
 enum class LifetimeCompletion { NoLifetime, AlreadyComplete, WasCompleted };
 
 class OSSALifetimeCompletion {
+public:
+  enum HandleTrivialVariable_t { IgnoreTrivialVariable, ExtendTrivialVariable };
+
+private:
   // If domInfo is nullptr, then InteriorLiveness never assumes dominance. As a
   // result it may report extra unenclosedPhis. In that case, any attempt to
   // create a new phi would result in an immediately redundant phi.
@@ -50,11 +54,15 @@ class OSSALifetimeCompletion {
   // recomputing their lifetimes.
   ValueSet completedValues;
 
+  // Extend trivial variables for lifetime diagnostics (only in SILGenCleanup).
+  HandleTrivialVariable_t handleTrivialVariable;
+
 public:
   OSSALifetimeCompletion(SILFunction *function, const DominanceInfo *domInfo,
-                         DeadEndBlocks &deadEndBlocks)
+                         DeadEndBlocks &deadEndBlocks,
+                         HandleTrivialVariable_t handleTrivialVariable = IgnoreTrivialVariable)
       : domInfo(domInfo), deadEndBlocks(deadEndBlocks),
-        completedValues(function) {}
+        completedValues(function), handleTrivialVariable(handleTrivialVariable) {}
 
   // The kind of boundary at which to complete the lifetime.
   //
@@ -90,13 +98,25 @@ public:
   ///
   /// Returns true if any new instructions were created to complete the
   /// lifetime.
-  ///
-  /// TODO: We also need to complete scoped addresses (e.g. store_borrow)!
   LifetimeCompletion completeOSSALifetime(SILValue value, Boundary boundary) {
-    if (value->getOwnershipKind() == OwnershipKind::None)
+    switch (value->getOwnershipKind()) {
+    case OwnershipKind::None: {
+      if (auto scopedAddress = ScopedAddressValue(value)) {
+        break;
+      }
+      // During SILGenCleanup, extend move_value [var_decl].
+      if (handleTrivialVariable == ExtendTrivialVariable
+          && value->isFromVarDecl()) {
+        break;
+      }
       return LifetimeCompletion::NoLifetime;
-
-    if (value->getOwnershipKind() != OwnershipKind::Owned) {
+    }
+    case OwnershipKind::Owned:
+      break;
+    case OwnershipKind::Any:
+      llvm::report_fatal_error("value with any ownership kind!?");
+    case OwnershipKind::Guaranteed:
+    case OwnershipKind::Unowned: {
       BorrowedValue borrowedValue(value);
       if (!borrowedValue)
         return LifetimeCompletion::NoLifetime;
@@ -104,6 +124,8 @@ public:
       if (!borrowedValue.isLocalScope())
         return LifetimeCompletion::AlreadyComplete;
     }
+    }
+
     if (!completedValues.insert(value))
       return LifetimeCompletion::AlreadyComplete;
 
@@ -125,6 +147,7 @@ public:
 
 protected:
   bool analyzeAndUpdateLifetime(SILValue value, Boundary boundary);
+  bool analyzeAndUpdateLifetime(ScopedAddressValue value, Boundary boundary);
 };
 
 //===----------------------------------------------------------------------===//

@@ -233,9 +233,7 @@ Type SubstitutionMap::lookupSubstitution(GenericTypeParamType *genericParam) con
 
 ProtocolConformanceRef
 SubstitutionMap::lookupConformance(CanType type, ProtocolDecl *proto) const {
-  ASSERT(type->isTypeParameter());
-
-  if (empty())
+  if (!type->isTypeParameter() || empty())
     return ProtocolConformanceRef::forInvalid();
 
   auto genericSig = getGenericSignature();
@@ -408,7 +406,7 @@ SubstitutionMap::getOverrideSubstitutions(
                                       const ValueDecl *baseDecl,
                                       const ValueDecl *derivedDecl) {
   // For overrides within a protocol hierarchy, substitute the Self type.
-  if (auto baseProto = baseDecl->getDeclContext()->getSelfProtocolDecl()) {
+  if (baseDecl->getDeclContext()->getSelfProtocolDecl()) {
     auto baseSig = baseDecl->getInnermostDeclContext()
         ->getGenericSignatureOfContext();
     return baseSig->getIdentitySubstitutionMap();

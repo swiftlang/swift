@@ -421,7 +421,7 @@ getMetadataFromNameKeyedMap(const LibPrespecializedState &state,
                       "tree for generic type lookup.",
                       ref);
   };
-  auto mangling = Demangle::mangleNode(mangleNode, resolver, dem);
+  auto mangling = Demangle::mangleNode(mangleNode, resolver, dem, Mangle::ManglingFlavor::Default);
   if (!mangling.isSuccess()) {
     swift::warning(0,
                    "Mangling for prespecialized metadata failed with code %d",
@@ -567,7 +567,7 @@ swift::getLibPrespecializedTypeDescriptor(Demangle::NodePointer node) {
   ExpandResolvedSymbolicReferences resolver{dem};
 
   if (SWIFT_UNLIKELY(prespecializedLoggingEnabled)) {
-    auto mangling = Demangle::mangleNode(node, resolver, dem);
+    auto mangling = Demangle::mangleNode(node, resolver, dem, Mangle::ManglingFlavor::Default);
     if (!mangling.isSuccess()) {
       LOG("Failed to build demangling for node %p.", node);
       return {LibPrespecializedLookupResult::NonDefinitiveNotFound, nullptr};
@@ -585,7 +585,7 @@ swift::getLibPrespecializedTypeDescriptor(Demangle::NodePointer node) {
     return {LibPrespecializedLookupResult::NonDefinitiveNotFound, nullptr};
   }
 
-  auto simplifiedMangling = Demangle::mangleNode(simplifiedNode, resolver, dem);
+  auto simplifiedMangling = Demangle::mangleNode(simplifiedNode, resolver, dem, Mangle::ManglingFlavor::Default);
   if (!simplifiedMangling.isSuccess()) {
     LOG("Failed to build demangling for simplified node %p.\n", node);
     return {LibPrespecializedLookupResult::NonDefinitiveNotFound, nullptr};

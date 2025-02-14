@@ -116,13 +116,6 @@ if "@SWIFT_ENABLE_OBSERVATION@" == "TRUE":
 if "@SWIFT_BUILT_STANDALONE@" == "TRUE":
     config.available_features.add('standalone_build')
 
-if "@CMAKE_GENERATOR@" == "Xcode":
-    xcode_bin_dir = os.path.join(config.llvm_obj_root, "@LLVM_BUILD_TYPE@",
-                                 'bin')
-    lit_config.note('Adding to path: ' + xcode_bin_dir)
-    config.environment['PATH'] = \
-      os.path.pathsep.join((xcode_bin_dir, config.environment['PATH']))
-
 config.available_features.add("CMAKE_GENERATOR=@CMAKE_GENERATOR@")
 
 if "@SWIFT_ENABLE_EXPERIMENTAL_DIFFERENTIABLE_PROGRAMMING@" == "TRUE":
@@ -133,8 +126,6 @@ if "@SWIFT_ENABLE_EXPERIMENTAL_DISTRIBUTED@" == "TRUE":
     config.available_features.add('distributed')
 if "@SWIFT_ENABLE_EXPERIMENTAL_STRING_PROCESSING@" == "TRUE":
     config.available_features.add('string_processing')
-if "@SWIFT_ENABLE_EXPERIMENTAL_POINTER_BOUNDS@" == "TRUE":
-    config.available_features.add('pointer_bounds')
 if "@SWIFT_STDLIB_ENABLE_DEBUG_PRECONDITIONS_IN_RELEASE@" == "TRUE":
     config.available_features.add('swift_stdlib_debug_preconditions_in_release')
 

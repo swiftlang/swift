@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -module-name test -target %target-swift-5.1-abi-triple -swift-version 5 -sil-verify-all -emit-sil %s | %FileCheck --enable-var-scope --implicit-check-not='hop_to_executor' %s
+// RUN: %target-swift-frontend -module-name test -target %target-swift-5.1-abi-triple -swift-version 5 -sil-verify-all -Xllvm -sil-print-types -emit-sil %s | %FileCheck --enable-var-scope --implicit-check-not='hop_to_executor' %s
 
 // REQUIRES: concurrency
 // REQUIRES: swift_in_compiler
@@ -188,9 +188,9 @@ actor BoringActor {
    // CHECK:         store [[INIT2]] to [[SELF_ALLOC]] : $*SingleVarActor
    // CHECK-NEXT:    hop_to_executor [[INIT2]] : $SingleVarActor
 
+   // CHECK:         bb3([[T0:%.*]] : $SingleVarActor):
    // CHECK:         [[ARBITRARY_FN:%.*]] = function_ref @$s4test14arbitraryAsyncyyYaF
    // CHECK-NEXT:    apply [[ARBITRARY_FN]]()
-   // CHECK-NEXT:    [[T0:%.*]] = load [[SELF_ALLOC]] :
    // CHECK-NEXT:    strong_retain [[T0]]
    // CHECK-NEXT:    [[T1:%.*]] = init_existential_ref [[T0]] :
    // CHECK-NEXT:    [[T2:%.*]] = enum $Optional<any Actor>, #Optional.some!enumelt, [[T1]] :

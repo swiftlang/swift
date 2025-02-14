@@ -48,6 +48,22 @@ class SourceKitLSP(product.Product):
     def should_build(self, host_target):
         return True
 
+    def _run_swift_syntax_dev_utils(self, host_target, command, arguments=[]):
+        sourcekit_lsp_dev_utils = os.path.join(self.source_dir, 'SourceKitLSPDevUtils')
+
+        run_cmd = [
+            os.path.join(self.install_toolchain_path(host_target), "bin", "swift"),
+            'run',
+            '--package-path', sourcekit_lsp_dev_utils,
+            'sourcekit-lsp-dev-utils',
+            command,
+        ] + arguments
+
+        env = dict(os.environ)
+        env["SWIFTCI_USE_LOCAL_DEPS"] = "1"
+
+        shell.call(run_cmd, env=env)
+
     def _for_each_host_target(self, base_target, body):
         body(base_target)
 
@@ -58,6 +74,10 @@ class SourceKitLSP(product.Product):
                 body(target)
 
     def build(self, host_target):
+        if self.args.sourcekitlsp_verify_generated_files:
+            self._run_swift_syntax_dev_utils(
+                host_target, 'verify-config-schema')
+
         self._for_each_host_target(
             host_target,
             lambda target: self.run_build_script_helper('build', host_target, target)

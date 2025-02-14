@@ -44,6 +44,13 @@ public func unavailableOnMacOSExtensionFunc() {}
 @available(macOSApplicationExtension, unavailable) // FIXME: Seems like this should be diagnosed as redundant
 public func unavailableOnMacOSAndMacOSExtensionFunc() {}
 
+// CHECK-LABEL:     sil{{.*}}@$s4Test33availableOnMacOSExtensionOnlyFuncyyF
+// CHECK-NOT:         _diagnoseUnavailableCodeReached
+// CHECK:           } // end sil function '$s4Test33availableOnMacOSExtensionOnlyFuncyyF'
+@available(macOS, unavailable)
+@available(macOSApplicationExtension, introduced: 10.9)
+public func availableOnMacOSExtensionOnlyFunc() {}
+
 // CHECK-LABEL:     sil{{.*}}@$s4Test20unavailableOniOSFuncyyF
 // CHECK-NOT:         _diagnoseUnavailableCodeReached
 // CHECK:           } // end sil function '$s4Test20unavailableOniOSFuncyyF'

@@ -44,6 +44,7 @@
 #include "swift/SIL/SILModule.h"
 #include "swift/SIL/Test.h"
 #include "clang/AST/Type.h"
+#include "clang/AST/Decl.h"
 #include "llvm/Support/Compiler.h"
 #include "llvm/Support/Debug.h"
 
@@ -313,6 +314,12 @@ namespace {
     }
 
     RecursiveProperties
+    getTrivialOpaqueRecursiveProperties(IsTypeExpansionSensitive_t isSensitive) {
+      return mergeIsTypeExpansionSensitive(isSensitive,
+                                           RecursiveProperties::forTrivial());
+    }
+
+    RecursiveProperties
     getReferenceRecursiveProperties(IsTypeExpansionSensitive_t isSensitive) {
       return mergeIsTypeExpansionSensitive(isSensitive,
                                            RecursiveProperties::forReference());
@@ -381,6 +388,11 @@ namespace {
                                       TC, Expansion));
       
       props = mergeIsTypeExpansionSensitive(isSensitive, props);
+      
+      // Fixed array regions are implied to be addressable-for-dependencies,
+      // since the developer probably wants to be able to form Spans etc.
+      // over them.
+      props.setAddressableForDependencies();
       
       // If the size isn't a known literal, then the layout is also dependent,
       // so make it address-only. If the size is massive, also treat it as
@@ -643,19 +655,29 @@ namespace {
       return visitAbstractTypeParamType(type, origType, isSensitive);
     }
 
-    Type getConcreteReferenceStorageReferent(Type type,
+    Type getConcreteReferenceStorageReferent(Type substType,
                                              AbstractionPattern origType) {
-      if (type->isTypeParameter()) {
-        auto genericSig = origType.getGenericSignature();
-        if (auto concreteType = genericSig->getConcreteType(type))
-          return concreteType;
-        if (auto superclassType = genericSig->getSuperclassBound(type))
-          return superclassType;
-        assert(genericSig->requiresClass(type));
+      substType = substType->getReferenceStorageReferent();
+      origType = origType.getReferenceStorageReferentType();
+
+      if (auto objectType = substType->getOptionalObjectType()) {
+        substType = objectType;
+        origType = origType.getOptionalObjectType();
+      }
+
+      if (substType->isTypeParameter()) {
+        if (auto genericSig = origType.getGenericSignature()) {
+          auto type = origType.getType();
+          if (auto concreteType = genericSig->getConcreteType(type))
+            return concreteType;
+          if (auto superclassType = genericSig->getSuperclassBound(type))
+            return superclassType;
+          assert(genericSig->requiresClass(type));
+        }
         return TC.Context.getAnyObjectType();
       }
 
-      return type;
+      return substType;
     }
 
 #define NEVER_LOADABLE_CHECKED_REF_STORAGE(Name, ...) \
@@ -698,9 +720,7 @@ namespace {
     RetTy visit##Name##StorageType(Can##Name##StorageType type, \
                                    AbstractionPattern origType, \
                                    IsTypeExpansionSensitive_t isSensitive) { \
-      auto referentType = \
-        type->getReferentType()->lookThroughSingleOptionalType(); \
-      auto concreteType = getConcreteReferenceStorageReferent(referentType, origType); \
+      auto concreteType = getConcreteReferenceStorageReferent(type, origType); \
       if (Name##StorageType::get(concreteType, TC.Context) \
             ->isLoadable(Expansion.getResilienceExpansion())) { \
         return asImpl().visitLoadable##Name##StorageType(type, origType, \
@@ -739,11 +759,11 @@ namespace {
       if (LayoutInfo) {
         if (LayoutInfo->isFixedSizeTrivial()) {
           return asImpl().handleTrivial(
-              type, getTrivialRecursiveProperties(isSensitive));
+              type, getTrivialOpaqueRecursiveProperties(isSensitive));
         }
 
         if (LayoutInfo->isAddressOnlyTrivial()) {
-          auto properties = getTrivialRecursiveProperties(isSensitive);
+          auto properties = getTrivialOpaqueRecursiveProperties(isSensitive);
           properties.setAddressOnly();
           return asImpl().handleAddressOnly(type, properties);
         }
@@ -2442,13 +2462,8 @@ namespace {
         // The same should happen if the type was resilient and serialized in
         // another module in the same package with package-cmo enabled, which
         // treats those modules to be in the same resilience domain.
-        auto declModule = D->getModuleContext();
-        bool sameModule = (declModule == &TC.M);
-        bool serializedPackage = declModule != &TC.M &&
-                                 declModule->inSamePackage(&TC.M) &&
-                                 declModule->isResilient() &&
-                                 declModule->serializePackageEnabled();
-        auto inSameResilienceDomain = sameModule || serializedPackage;
+        auto inSameResilienceDomain = D->getModuleContext() == &TC.M ||
+                                      D->bypassResilienceInPackage(&TC.M);
         if (inSameResilienceDomain)
           properties.addSubobject(RecursiveProperties::forResilient());
 
@@ -2503,9 +2518,19 @@ namespace {
       }
 
       if (D->isCxxNonTrivial()) {
+        properties.setAddressableForDependencies();
         properties.setAddressOnly();
         properties.setNonTrivial();
         properties.setLexical(IsLexical);
+      }
+
+      if (auto *clangDecl = D->getClangDecl()) {
+        if (auto *recordDecl = dyn_cast<clang::RecordDecl>(clangDecl)) {
+          // C unions are imported as opaque types. Therefore we have to assume
+          // that a union contains a pointer.
+          if (recordDecl->isOrContainsUnion())
+            properties.setIsOrContainsRawPointer();
+        }
       }
 
       // [is_or_contains_pack_unsubstituted] Visit the fields of the
@@ -2523,6 +2548,7 @@ namespace {
       // If the type has raw storage, it is move-only and address-only.
       if (D->getAttrs().hasAttribute<RawLayoutAttr>()) {
         properties.setAddressOnly();
+        properties.setAddressableForDependencies();
         properties.setNonTrivial();
         properties.setLexical(IsLexical);
         return handleMoveOnlyAddressOnly(structType, properties);
@@ -2533,6 +2559,10 @@ namespace {
         properties.setNonTrivial();
         properties.setLexical(IsLexical);
         return handleAddressOnly(structType, properties);
+      }
+      
+      if (D->getAttrs().hasAttribute<AddressableForDependenciesAttr>()) {
+        properties.setAddressableForDependencies();
       }
 
       auto subMap = structType->getContextSubstitutionMap();
@@ -2603,6 +2633,10 @@ namespace {
 
       if (handleResilience(enumType, D, properties))
         return handleAddressOnly(enumType, properties);
+
+      if (D->getAttrs().hasAttribute<AddressableForDependenciesAttr>()) {
+        properties.setAddressableForDependencies();
+      }
 
       // [is_or_contains_pack_unsubstituted] Visit the elements of the
       // unsubstituted type to find pack types which would be substituted away.
@@ -3012,6 +3046,9 @@ bool TypeConverter::visitAggregateLeaves(
     std::optional<unsigned> index;
     std::tie(ty, origTy, field, index) = popFromWorklist();
     assert(!field || !index && "both field and index!?");
+    if (auto origEltTy = origTy.getVanishingTupleElementPatternType()) {
+      origTy = *origEltTy;
+    }
     if (isAggregate(ty) && !isLeafAggregate(ty, origTy, field, index)) {
       if (auto packTy = dyn_cast<SILPackType>(ty)) {
         for (auto packIndex : indices(packTy->getElementTypes())) {

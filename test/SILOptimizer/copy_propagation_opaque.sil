@@ -1,5 +1,5 @@
-// RUN: %target-sil-opt -copy-propagation -canonical-ossa-rewrite-borrows -enable-sil-opaque-values -enable-sil-verify-all %s | %FileCheck %s --check-prefixes=CHECK,CHECK-OPT
-// RUN: %target-sil-opt -copy-propagation -canonical-ossa-rewrite-borrows -enable-sil-opaque-values -debug-only=copy-propagation %s -o /dev/null 2>&1 | %FileCheck %s --check-prefix=CHECK-TRACE
+// RUN: %target-sil-opt -sil-print-types -copy-propagation -canonical-ossa-rewrite-borrows -enable-sil-opaque-values -enable-sil-verify-all %s | %FileCheck %s --check-prefixes=CHECK,CHECK-OPT
+// RUN: %target-sil-opt -sil-print-types -copy-propagation -canonical-ossa-rewrite-borrows -enable-sil-opaque-values -debug-only=copy-propagation %s -o /dev/null 2>&1 | %FileCheck %s --check-prefix=CHECK-TRACE
 //
 // Mandatory copy propagation does not currently handle address-only
 // types. It needs a visible layout to inject poison refs.
@@ -242,7 +242,7 @@ bb(%0 : @owned $T):
 // CHECK-ONONE-NEXT:  [[CP:%.*]] = copy_value [[INSTANCE]] : $T
 // CHECK-NEXT:  // function_ref takeMultipleOwned
 // CHECK-NEXT:  function_ref @takeMultipleOwned : $@convention(thin) <τ_0_0> (@in τ_0_0, @in τ_0_0) -> ()
-// CHECK-NEXT:  apply %{{.*}}<T>([[INSTANCE]], [[CP]]) : $@convention(thin) <τ_0_0> (@in τ_0_0, @in τ_0_0) -> ()
+// CHECK-NEXT:  apply %{{.*}}<T>([[CP]], [[INSTANCE]]) : $@convention(thin) <τ_0_0> (@in τ_0_0, @in τ_0_0) -> ()
 // CHECK-ONONE-NEXT:  destroy_value
 // CHECK-NEXT:  tuple ()
 // CHECK-NEXT:  return

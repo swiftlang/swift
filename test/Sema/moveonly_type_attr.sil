@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -verify %s | %FileCheck %s
+// RUN: %target-sil-opt -sil-print-types -verify %s | %FileCheck %s
 
 sil_stage raw
 

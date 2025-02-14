@@ -190,12 +190,23 @@ StructLayout::StructLayout(IRGenModule &IGM, std::optional<CanType> type,
       Ty = (typeToFill ? typeToFill : IGM.OpaqueTy);
     }
   } else {
+    // A heap object containing an empty but non-trivially-destroyable
+    // noncopyable type needs to exist in order to run deinits when the
     bool nonEmpty = builder.addFields(Elements, strategy);
+
+    IsKnownTriviallyDestroyable
+      = triviallyDestroyable & builder.isTriviallyDestroyable();
+    IsKnownCopyable = copyable & builder.isCopyable();
 
     // Special-case: there's nothing to store.
     // In this case, produce an opaque type;  this tends to cause lovely
     // assertions.
-    if (!nonEmpty) {
+    //
+    // If a heap object contains an empty but non-trivially-destroyable type,
+    // then we still want to create a non-empty heap object, since the heap
+    // object's destructor will run deinits for the value.
+    if (!nonEmpty
+        && (IsKnownTriviallyDestroyable || !requiresHeapHeader(layoutKind))) {
       assert(!builder.empty() == requiresHeapHeader(layoutKind));
       MinimumAlign = Alignment(1);
       MinimumSize = Size(0);
@@ -203,10 +214,8 @@ StructLayout::StructLayout(IRGenModule &IGM, std::optional<CanType> type,
       SpareBits.clear();
       IsFixedLayout = true;
       IsLoadable = true;
-      IsKnownTriviallyDestroyable = triviallyDestroyable & builder.isTriviallyDestroyable();
       IsKnownBitwiseTakable = builder.isBitwiseTakable();
       IsKnownAlwaysFixedSize = builder.isAlwaysFixedSize();
-      IsKnownCopyable = copyable & builder.isCopyable();
       Ty = (typeToFill ? typeToFill : IGM.OpaqueTy);
     } else {
       MinimumAlign = builder.getAlignment();
@@ -215,10 +224,8 @@ StructLayout::StructLayout(IRGenModule &IGM, std::optional<CanType> type,
       SpareBits = builder.getSpareBits();
       IsFixedLayout = builder.isFixedLayout();
       IsLoadable = builder.isLoadable();
-      IsKnownTriviallyDestroyable = triviallyDestroyable & builder.isTriviallyDestroyable();
       IsKnownBitwiseTakable = bitwiseTakable & builder.isBitwiseTakable();
       IsKnownAlwaysFixedSize = builder.isAlwaysFixedSize();
-      IsKnownCopyable = copyable & builder.isCopyable();
       if (typeToFill) {
         builder.setAsBodyOfStruct(typeToFill);
         Ty = typeToFill;

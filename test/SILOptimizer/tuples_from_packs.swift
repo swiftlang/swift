@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -parse-as-library -O -emit-sil %s | %FileCheck %s
+// RUN: %target-swift-frontend -parse-as-library -O -Xllvm -sil-print-types -emit-sil %s | %FileCheck %s
 
 @_transparent func makeTuple<each T>(_ t: repeat each T) -> (repeat each T) {
   return (repeat each t)

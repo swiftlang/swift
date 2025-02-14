@@ -163,6 +163,17 @@ bool TypeBase::isMarkerExistential() {
   return true;
 }
 
+bool TypeBase::isSendableExistential() {
+  Type constraint = this;
+  if (auto existential = constraint->getAs<ExistentialType>())
+    constraint = existential->getConstraintType();
+
+  if (!constraint->isConstraintType())
+    return false;
+
+  return constraint->getKnownProtocol() == KnownProtocolKind::Sendable;
+}
+
 bool TypeBase::isPlaceholder() {
   return is<PlaceholderType>();
 }
@@ -562,22 +573,55 @@ Type TypeBase::addCurriedSelfType(const DeclContext *dc) {
 void TypeBase::getTypeVariables(
     SmallPtrSetImpl<TypeVariableType *> &typeVariables) {
   // If we know we don't have any type variables, we're done.
-  if (hasTypeVariable()) {
-    auto addTypeVariables = [&](Type type) -> bool {
-      if (auto tv = dyn_cast<TypeVariableType>(type.getPointer())) {
+  if (!hasTypeVariable())
+    return;
+
+  class Walker : public TypeWalker {
+    SmallPtrSetImpl<TypeVariableType *> &typeVariables;
+
+  public:
+    explicit Walker(SmallPtrSetImpl<TypeVariableType *> &typeVariables)
+        : typeVariables(typeVariables) {}
+
+    Action walkToTypePre(Type ty) override {
+      // Skip children that don't contain type variables.
+      if (!ty->hasTypeVariable())
+        return Action::SkipNode;
+
+      if (auto tv = dyn_cast<TypeVariableType>(ty.getPointer())) {
         typeVariables.insert(tv);
       }
 
-      return false;
-    };
+      return Action::Continue;
+    }
+  };
 
-    // Use Type::findIf() to walk the types, finding type variables along the
-    // way.
-    getCanonicalType().findIf(addTypeVariables);
-    Type(this).findIf(addTypeVariables);
-    assert((!typeVariables.empty() || hasError()) &&
-           "Did not find type variables!");
-  }
+  Walker walker(typeVariables);
+  Type(this).walk(walker);
+
+  assert((!typeVariables.empty() || hasError()) &&
+         "Did not find type variables!");
+}
+
+Type TypeBase::getDependentMemberRoot() {
+  Type t(this);
+
+  while (auto *dmt = t->getAs<DependentMemberType>())
+    t = dmt->getBase();
+
+  return t;
+}
+
+bool TypeBase::isTypeVariableOrMember() {
+  return getDependentMemberRoot()->is<TypeVariableType>();
+}
+
+bool TypeBase::isTypeParameter() {
+  return getDependentMemberRoot()->is<GenericTypeParamType>();
+}
+
+GenericTypeParamType *TypeBase::getRootGenericParam() {
+  return getDependentMemberRoot()->castTo<GenericTypeParamType>();
 }
 
 static bool isLegalSILType(CanType type);
@@ -764,8 +808,11 @@ CanType CanType::wrapInOptionalTypeImpl(CanType type) {
 
 Type TypeBase::isArrayType() {
   if (auto boundStruct = getAs<BoundGenericStructType>()) {
-    if (boundStruct->getDecl() == getASTContext().getArrayDecl())
+    if (isArray())
       return boundStruct->getGenericArgs()[0];
+
+    if (isInlineArray())
+      return boundStruct->getGenericArgs()[1];
   }
   return Type();
 }
@@ -1921,6 +1968,8 @@ Type SugarType::getSinglyDesugaredTypeSlow() {
 #include "swift/AST/TypeNodes.def"
   case TypeKind::TypeAlias:
     llvm_unreachable("bound type alias types always have an underlying type");
+  case TypeKind::Locatable:
+    llvm_unreachable("locatable types always have an underlying type");
   case TypeKind::ArraySlice:
   case TypeKind::VariadicSequence:
     implDecl = Context->getArrayDecl();
@@ -1950,12 +1999,33 @@ Type SugarType::getSinglyDesugaredTypeSlow() {
   return UnderlyingType;
 }
 
-ArrayRef<Type> TypeAliasType::getDirectGenericArgs() const {
-  if (!typealias->isGeneric()) return { };
+GenericSignature TypeAliasType::getGenericSignature() const {
+  return typealias->getGenericSignature();
+}
 
-  // Otherwise, the innermost replacement types are the direct
-  // generic arguments.
-  return getSubstitutionMap().getInnermostReplacementTypes();
+SubstitutionMap TypeAliasType::getSubstitutionMap() const {
+  auto genericSig = typealias->getGenericSignature();
+  if (!genericSig)
+    return SubstitutionMap();
+
+  SubstitutionMap parentSubMap;
+  DeclContext *dc = typealias->getDeclContext();
+
+  if (dc->isLocalContext()) {
+    if (auto parentSig = dc->getGenericSignatureOfContext())
+      parentSubMap = parentSig->getIdentitySubstitutionMap();
+  } else if (auto parent = getParent()) {
+    parentSubMap = parent->getContextSubstitutionMap(dc);
+  }
+
+  SmallVector<Type, 4> replacements(
+      parentSubMap.getReplacementTypes().begin(),
+      parentSubMap.getReplacementTypes().end());
+  for (auto arg : getDirectGenericArgs())
+    replacements.push_back(arg);
+
+  return SubstitutionMap::get(genericSig, replacements,
+                              LookUpConformanceInModule());
 }
 
 GenericTypeParamType::GenericTypeParamType(GenericTypeParamDecl *param,
@@ -3496,7 +3566,7 @@ RecursiveTypeProperties ArchetypeType::archetypeProperties(
   properties |= subs.getRecursiveProperties();
 
   for (auto proto : conformsTo) {
-    if (proto->isUnsafe()) {
+    if (proto->getExplicitSafety() == ExplicitSafety::Unsafe) {
       properties |= RecursiveTypeProperties::IsUnsafe;
       break;
     }
@@ -4843,6 +4913,7 @@ StringRef swift::getNameForParamSpecifier(ParamSpecifier specifier) {
   case ParamSpecifier::ImplicitlyCopyableConsuming:
     return "implicitly_copyable_consuming";
   }
+  llvm_unreachable("bad ParamSpecifier");
 }
 
 std::optional<DiagnosticBehavior>

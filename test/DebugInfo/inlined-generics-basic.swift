@@ -1,6 +1,6 @@
 // SIL.
 // RUN: %target-swift-frontend -parse-as-library -module-name A \
-// RUN:      -Xllvm -sil-print-debuginfo %s -g -O -o - -emit-sil \
+// RUN:      -Xllvm -sil-print-types -Xllvm -sil-print-debuginfo %s -g -O -o - -emit-sil \
 // RUN:    | %FileCheck %s --check-prefix=SIL
 // IR.
 // RUN: %target-swift-frontend -parse-as-library -module-name A \

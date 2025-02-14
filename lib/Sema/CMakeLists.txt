@@ -77,6 +77,7 @@ add_swift_host_library(swiftSema STATIC
   TypeCheckStorage.cpp
   TypeCheckSwitchStmt.cpp
   TypeCheckType.cpp
+  TypeCheckUnsafe.cpp
   TypeChecker.cpp
   IDETypeCheckingRequests.cpp)
 if(SWIFT_FORCE_OPTIMIZED_TYPECHECKER)

@@ -90,6 +90,16 @@ extension ASTGenVisitor {
         return
       }
       allItems.append(item.bridged)
+
+      // Hoist 'VarDecl' to the block.
+      if case .decl(let decl) = item {
+        withBridgedSwiftClosure { ptr in
+          let d = ptr!.load(as: BridgedDecl.self)
+          allItems.append(ASTNode.decl(d).bridged)
+        } call: { handle in
+          decl.forEachDeclToHoist(handle)
+        }
+      }
     }
 
     return allItems.lazy.bridgedArray(in: self)
@@ -119,9 +129,10 @@ extension ASTGenVisitor {
   func generate(conditionElement node: ConditionElementSyntax) -> BridgedStmtConditionElement {
     // FIXME: _hasSymbol is not implemented in SwiftSyntax/SwiftParser.
     switch node.condition {
-    case .availability(_):
-      fatalError("unimplemented")
-      break
+    case .availability(let node):
+      return .createPoundAvailable(
+        info: self.generate(availabilityCondition: node)
+      )
     case .expression(let node):
       return .createBoolean(
         expr: self.generate(expr: node)

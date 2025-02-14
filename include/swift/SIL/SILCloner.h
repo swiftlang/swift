@@ -1053,17 +1053,6 @@ SILCloner<ImplClass>::visitAllocStackInst(AllocStackInst *Inst) {
 }
 
 template <typename ImplClass>
-void SILCloner<ImplClass>::visitAllocVectorInst(
-    AllocVectorInst *Inst) {
-  getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
-  recordClonedInstruction(Inst, getBuilder().createAllocVector(
-                                    getOpLocation(Inst->getLoc()),
-                                    getOpValue(Inst->getCapacity()),
-                                    getOpType(Inst->getElementType())));
-}
-
-
-template <typename ImplClass>
 void SILCloner<ImplClass>::visitAllocPackMetadataInst(
     AllocPackMetadataInst *Inst) {
   getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
@@ -3185,11 +3174,11 @@ void SILCloner<ImplClass>::visitEndCOWMutationInst(EndCOWMutationInst *Inst) {
                         getOpValue(Inst->getOperand()), Inst->doKeepUnique()));
 }
 template <typename ImplClass>
-void SILCloner<ImplClass>::visitIsEscapingClosureInst(
-    IsEscapingClosureInst *Inst) {
+void SILCloner<ImplClass>::visitDestroyNotEscapedClosureInst(
+    DestroyNotEscapedClosureInst *Inst) {
   getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
   recordClonedInstruction(
-      Inst, getBuilder().createIsEscapingClosure(getOpLocation(Inst->getLoc()),
+      Inst, getBuilder().createDestroyNotEscapedClosure(getOpLocation(Inst->getLoc()),
                                                  getOpValue(Inst->getOperand()),
                                                  Inst->getVerificationType()));
 }
@@ -3794,6 +3783,14 @@ void SILCloner<ImplClass>::visitHasSymbolInst(HasSymbolInst *Inst) {
   recordClonedInstruction(
       Inst, getBuilder().createHasSymbol(getOpLocation(Inst->getLoc()),
                                          Inst->getDecl()));
+}
+
+template <typename ImplClass>
+void SILCloner<ImplClass>::visitIgnoredUseInst(IgnoredUseInst *Inst) {
+  getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
+  recordClonedInstruction(
+      Inst, getBuilder().createIgnoredUse(getOpLocation(Inst->getLoc()),
+                                          getOpValue(Inst->getOperand())));
 }
 
 } // end namespace swift

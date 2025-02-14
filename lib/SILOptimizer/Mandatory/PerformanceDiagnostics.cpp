@@ -213,8 +213,6 @@ bool PerformanceDiagnostics::visitFunctionEmbeddedSwift(
     return false;
   visitedFuncs[function] = PerformanceConstraints::None;
 
-  NonErrorHandlingBlocks neBlocks(function);
-
   for (SILBasicBlock &block : *function) {
     for (SILInstruction &inst : block) {
       if (visitInst(&inst, PerformanceConstraints::None, parentLoc)) {
@@ -283,26 +281,9 @@ bool PerformanceDiagnostics::visitFunction(SILFunction *function,
   if (!function->isDefinition())
     return false;
 
-  NonErrorHandlingBlocks neBlocks(function);
-
   for (SILBasicBlock &block : *function) {
     // Exclude fatal-error blocks.
     if (isa<UnreachableInst>(block.getTerminator()))
-      continue;
-
-    // TODO: it's not yet clear how to deal with error existentials.
-    // Ignore them for now. If we have typed throws we could ban error existentials
-    // because typed throws would provide and alternative.
-    if (isa<ThrowInst>(block.getTerminator()))
-      continue;
-
-    // If a function has multiple throws, all throw-path branch to the single throw-block.
-    if (SILBasicBlock *succ = block.getSingleSuccessorBlock()) {
-      if (isa<ThrowInst>(succ->getTerminator()))
-        continue;
-    }
-
-    if (!neBlocks.isNonErrorHandling(&block))
       continue;
 
     for (SILInstruction &inst : block) {
@@ -811,7 +792,7 @@ private:
     // Skip all performance/embedded diagnostics if asked. This is used from
     // SourceKit to avoid reporting false positives when WMO is turned off for
     // indexing purposes.
-    if (!module->getOptions().EnablePerformanceDiagnostics) return;
+    if (!module->getOptions().EnableWMORequiredDiagnostics) return;
 
     PerformanceDiagnostics diagnoser(*module, getAnalysis<BasicCalleeAnalysis>());
 

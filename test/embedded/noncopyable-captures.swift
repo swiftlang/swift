@@ -1,7 +1,6 @@
 // RUN: %target-swift-emit-ir %s -DIGNORE_FAILS -enable-experimental-feature Embedded -wmo -o /dev/null
 // RUN: %target-swift-emit-ir %s -enable-experimental-feature Embedded -wmo -verify
 
-// REQUIRES: OS=macosx || OS=linux-gnu
 // REQUIRES: swift_feature_Embedded
 
 struct MyStruct<Item> : ~Copyable {

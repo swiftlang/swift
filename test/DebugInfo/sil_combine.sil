@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt -sil-verify-all -sil-combine %s | %FileCheck %s
+// RUN: %target-sil-opt -sil-print-types -sil-verify-all -sil-combine %s | %FileCheck %s
 // RUN: %target-swift-frontend -g -O -emit-ir -primary-file %s | %FileCheck --check-prefix=CHECK-IR %s
 
 sil_stage canonical

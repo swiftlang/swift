@@ -16,7 +16,9 @@ public enum FileExtension: String {
   case def
   case gyb
   case h
+  case m
   case md
+  case mm
   case modulemap
   case o
   case rst

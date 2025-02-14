@@ -12,7 +12,7 @@
 
 import SIL
 
-extension BuiltinInst : OnoneSimplifyable {
+extension BuiltinInst : OnoneSimplifiable {
   func simplify(_ context: SimplifyContext) {
     switch id {
       case .IsConcrete:
@@ -33,9 +33,8 @@ extension BuiltinInst : OnoneSimplifyable {
            .Alignof:
         optimizeTargetTypeConst(context)
       case .DestroyArray:
-        if let elementType = substitutionMap.replacementTypes[0],
-           elementType.isTrivial(in: parentFunction)
-        {
+        let elementType = substitutionMap.replacementType.loweredType(in: parentFunction, maximallyAbstracted: true)
+        if elementType.isTrivial(in: parentFunction) {
           context.erase(instruction: self)
           return
         }
@@ -48,7 +47,6 @@ extension BuiltinInst : OnoneSimplifyable {
            .AssignCopyArrayFrontToBack,
            .AssignCopyArrayBackToFront,
            .AssignTakeArray,
-           .AllocVector,
            .IsPOD:
         optimizeArgumentToThinMetatype(argument: 0, context)
       case .ICMP_EQ:
@@ -63,7 +61,7 @@ extension BuiltinInst : OnoneSimplifyable {
   }
 }
 
-extension BuiltinInst : LateOnoneSimplifyable {
+extension BuiltinInst : LateOnoneSimplifiable {
   func simplifyLate(_ context: SimplifyContext) {
     if id == .IsConcrete {
       // At the end of the pipeline we can be sure that the isConcrete's type doesn't get "more" concrete.
@@ -129,24 +127,18 @@ private extension BuiltinInst {
   }
 
   func optimizeCanBeClass(_ context: SimplifyContext) {
-    guard let ty = substitutionMap.replacementTypes[0] else {
-      return
-    }
     let literal: IntegerLiteralInst
-    switch ty.canBeClass {
-    case .IsNot:
+    switch substitutionMap.replacementType.canonical.canBeClass {
+    case .isNot:
       let builder = Builder(before: self, context)
       literal = builder.createIntegerLiteral(0,  type: type)
-    case .Is:
+    case .is:
       let builder = Builder(before: self, context)
       literal = builder.createIntegerLiteral(1,  type: type)
-    case .CanBe:
+    case .canBe:
       return
-    default:
-      fatalError()
     }
-    uses.replaceAll(with: literal, context)
-    context.erase(instruction: self)
+    self.replace(with: literal, context)
   }
 
   func optimizeAssertConfig(_ context: SimplifyContext) {
@@ -167,10 +159,7 @@ private extension BuiltinInst {
   }
   
   func optimizeTargetTypeConst(_ context: SimplifyContext) {
-    guard let ty = substitutionMap.replacementTypes[0] else {
-      return
-    }
-    
+    let ty = substitutionMap.replacementType.loweredType(in: parentFunction, maximallyAbstracted: true)
     let value: Int?
     switch id {
     case .Sizeof:

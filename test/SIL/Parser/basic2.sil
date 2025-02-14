@@ -1,4 +1,4 @@
-// RUN: %target-sil-opt %s -enable-experimental-feature ValueGenerics | %target-sil-opt -enable-experimental-feature ValueGenerics | %FileCheck %s
+// RUN: %target-sil-opt -sil-print-types %s -enable-experimental-feature ValueGenerics | %target-sil-opt -sil-print-types -enable-experimental-feature ValueGenerics | %FileCheck %s
 
 // REQUIRES: swift_feature_ValueGenerics
 
@@ -467,6 +467,16 @@ bb0(%0 : @guaranteed $Klass):
   merge_isolation_region %0 : $Klass, %1 : $*MoveOnlyPair
   merge_isolation_region %1 : $*MoveOnlyPair, %0 : $Klass, %0 : $Klass
   dealloc_stack %1 : $*MoveOnlyPair
+  %9999 = tuple ()
+  return %9999 : $()
+}
+
+// CHECK-LABEL: sil [ossa] @ignored_use_test : $@convention(thin) (@guaranteed Klass) -> () {
+// CHECK:   ignored_use %0 : $Klass
+// CHECK: } // end sil function 'ignored_use_test'
+sil [ossa] @ignored_use_test : $@convention(thin) (@guaranteed Klass) -> () {
+bb0(%0 : @guaranteed $Klass):
+  ignored_use %0 : $Klass
   %9999 = tuple ()
   return %9999 : $()
 }

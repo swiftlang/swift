@@ -571,7 +571,7 @@ mapParsedParameters(Parser &parser,
     auto param = ParamDecl::createParsed(
         ctx, paramInfo.SpecifierLoc, argNameLoc, argName, paramNameLoc,
         paramName, paramInfo.DefaultArg, parser.CurDeclContext);
-    param->getAttrs() = paramInfo.Attrs;
+    param->attachParsedAttrs(paramInfo.Attrs);
 
     bool parsingEnumElt
       = (paramContext == Parser::ParameterContextKind::EnumElement);
@@ -631,6 +631,8 @@ mapParsedParameters(Parser &parser,
             // or typealias with underlying function type.
             if (ATR->has(TypeAttrKind::Autoclosure))
               param->setAutoClosure(true);
+            if (ATR->has(TypeAttrKind::Addressable))
+              param->setAddressable(true);
 
             unwrappedType = ATR->getTypeRepr();
             continue;

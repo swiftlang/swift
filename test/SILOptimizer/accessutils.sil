@@ -688,3 +688,22 @@ bb0(%0 : $C, %1 : $Builtin.Word, %2 : $Builtin.Word):
   %200 = tuple ()
   return %200 : $()
 }
+
+// CHECK-LABEL: Accesses for mark_dependence
+// CHECK:       Value:   %4 = pointer_to_address %3 : $Builtin.RawPointer to [strict] $*Int64 // user: %5
+// CHECK-NEXT:    Scope: base
+// CHECK-NEXT:    Base: class  -   %1 = ref_element_addr %0 : $List, #List.x
+// CHECK-NEXT:    Path: ""
+// CHECK-NEXT:      Storage: %0 = argument of bb0 : $List
+// CHECK-NEXT:      Path: "c0"
+// CHECK-LABEL: End accesses for mark_dependence
+sil [ossa] @mark_dependence : $@convention(thin) (@guaranteed List) -> Int64 {
+bb0(%0 : @guaranteed $List):
+  %1 = ref_element_addr %0, #List.x
+  %2 = address_to_pointer %1 to $Builtin.RawPointer
+  %3 = mark_dependence %2 on %0
+  %4 = pointer_to_address %3 to [strict] $*Int64
+  %6 = load [trivial] %4 : $*Int64
+  return %6 : $Int64
+}
+

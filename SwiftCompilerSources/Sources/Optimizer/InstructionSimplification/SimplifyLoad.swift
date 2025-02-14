@@ -12,7 +12,7 @@
 
 import SIL
 
-extension LoadInst : OnoneSimplifyable, SILCombineSimplifyable {
+extension LoadInst : OnoneSimplifiable, SILCombineSimplifiable {
   func simplify(_ context: SimplifyContext) {
     if optimizeLoadOfAddrUpcast(context) {
       return
@@ -234,8 +234,30 @@ private func getGlobalInitValue(address: Value, _ context: SimplifyContext) -> V
     }
   case let bai as BeginAccessInst:
     return getGlobalInitValue(address: bai.address, context)
+  case let rta as RefTailAddrInst:
+    return getGlobalTailElement(of: rta, index: 0)
+  case let ia as IndexAddrInst:
+    if let rta = ia.base as? RefTailAddrInst,
+       let literal = ia.index as? IntegerLiteralInst,
+       let index = literal.value
+    {
+      return getGlobalTailElement(of: rta, index: index)
+    }
+  case let rea as RefElementAddrInst:
+    if let object = rea.instance.immutableGlobalObjectRoot {
+      return object.baseOperands[rea.fieldIndex].value
+    }
   default:
     break
+  }
+  return nil
+}
+
+private func getGlobalTailElement(of refTailAddr: RefTailAddrInst, index: Int) -> Value? {
+  if let object = refTailAddr.instance.immutableGlobalObjectRoot,
+     index >= 0 && index < object.tailOperands.count
+  {
+    return object.tailOperands[index].value
   }
   return nil
 }
@@ -250,7 +272,10 @@ private func getInitializerFromInitFunction(of globalAddr: GlobalAddrInst, _ con
   }
   let initFn = initFnRef.referencedFunction
   context.notifyDependency(onBodyOf: initFn)
-  guard let (_, storeToGlobal) = getGlobalInitialization(of: initFn, forStaticInitializer: false, context) else {
+  guard let (_, storeToGlobal) = getGlobalInitialization(of: initFn, context, handleUnknownInstruction: {
+    // Accept `global_value` because the class header can be initialized at runtime by the `global_value` instruction.
+    return $0 is GlobalValueInst
+  }) else {
     return nil
   }
   return storeToGlobal.source
@@ -273,7 +298,9 @@ private func transitivelyErase(load: LoadInst, _ context: SimplifyContext) {
       context.erase(instruction: inst)
       return
     }
-    let operandInst = inst.operands[0].value as! SingleValueInstruction
+    guard let operandInst = inst.operands[0].value as? SingleValueInstruction else {
+      return
+    }
     context.erase(instruction: inst)
     inst = operandInst
   }
@@ -281,10 +308,6 @@ private func transitivelyErase(load: LoadInst, _ context: SimplifyContext) {
 
 private extension Value {
   func canBeCopied(into function: Function, _ context: SimplifyContext) -> Bool {
-    if !function.isAnySerialized {
-      return true
-    }
-
     // Can't use `ValueSet` because the this value is inside a global initializer and
     // not inside a function.
     var worklist = Stack<Value>(context)
@@ -296,8 +319,13 @@ private extension Value {
     handled.insert(ObjectIdentifier(self))
 
     while let value = worklist.pop() {
+      if value is VectorInst {
+        return false
+      }
       if let fri = value as? FunctionRefInst {
-        if !fri.referencedFunction.hasValidLinkageForFragileRef(function.serializedKind) {
+        if function.isAnySerialized, 
+           !fri.referencedFunction.hasValidLinkageForFragileRef(function.serializedKind)
+        {
           return false
         }
       }
@@ -320,6 +348,19 @@ private extension Value {
       return (baseAddress: indexAddr.base, offset: indexValue)
     }
     return (baseAddress: self, offset: 0)
+  }
+
+  // If the reference-root of self references a global object, returns the `object` instruction of the
+  // global's initializer. But only if the global is a let-global.
+  var immutableGlobalObjectRoot: ObjectInst? {
+    if let gv = self.referenceRoot as? GlobalValueInst,
+       gv.global.isLet,
+       let initval = gv.global.staticInitValue,
+       let object = initval as? ObjectInst
+    {
+      return object
+    }
+    return nil
   }
 }
 

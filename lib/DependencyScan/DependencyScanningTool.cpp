@@ -222,7 +222,6 @@ static swiftscan_dependency_graph_t generateHollowDiagnosticOutput(
                                           c_string_utils::create_empty_set(),
                                           c_string_utils::create_empty_set(),
                                           c_string_utils::create_empty_set(),
-                                          c_string_utils::create_empty_set(),
                                           c_string_utils::create_null(),
                                           false,
                                           false,
@@ -261,8 +260,6 @@ static swiftscan_import_set_t generateHollowDiagnosticOutputImportSet(
 
 DependencyScanningTool::DependencyScanningTool()
     : ScanningService(std::make_unique<SwiftDependencyScanningService>()),
-      VersionedPCMInstanceCacheCache(
-          std::make_unique<CompilerArgInstanceCacheMap>()),
       CDC(), Alloc(), Saver(Alloc) {}
 
 llvm::ErrorOr<swiftscan_dependency_graph_t>
@@ -325,65 +322,6 @@ DependencyScanningTool::getImports(ArrayRef<const char *> Command,
     return generateHollowDiagnosticOutputImportSet(*ScanDiagnosticConsumer);
 
   return std::move(*DependenciesOrErr);
-}
-
-std::vector<llvm::ErrorOr<swiftscan_dependency_graph_t>>
-DependencyScanningTool::getDependencies(
-    ArrayRef<const char *> Command,
-    const std::vector<BatchScanInput> &BatchInput,
-    const llvm::StringSet<> &PlaceholderModules, StringRef WorkingDirectory) {
-  // The primary instance used to scan Swift modules
-  auto ScanDiagnosticConsumer = std::make_shared<DependencyScanDiagnosticCollector>();
-  auto QueryContextOrErr = initCompilerInstanceForScan(Command,
-                                                       WorkingDirectory,
-                                                       ScanDiagnosticConsumer);
-  if (std::error_code EC = QueryContextOrErr.getError())
-    return std::vector<llvm::ErrorOr<swiftscan_dependency_graph_t>>(
-        BatchInput.size(), std::make_error_code(std::errc::invalid_argument));
-
-  auto QueryContext = std::move(*QueryContextOrErr);
-
-  // Local scan cache instance, wrapping the shared global cache.
-  ModuleDependenciesCache cache(
-      *ScanningService, QueryContext.ScanInstance->getMainModule()->getNameStr().str(),
-      QueryContext.ScanInstance->getInvocation().getFrontendOptions().ExplicitModulesOutputPath,
-      QueryContext.ScanInstance->getInvocation().getModuleScanningHash());
-  auto BatchScanResults = performBatchModuleScan(
-      *QueryContext.ScanInstance.get(), QueryContext.ScanDiagnostics.get(),
-      cache, VersionedPCMInstanceCacheCache.get(),
-      Saver, BatchInput);
-
-  return BatchScanResults;
-}
-
-void DependencyScanningTool::serializeCache(llvm::StringRef path) {
-  llvm::sys::SmartScopedLock<true> Lock(DependencyScanningToolStateLock);
-  SourceManager SM;
-  DiagnosticEngine Diags(SM);
-  Diags.addConsumer(CDC);
-  llvm::vfs::OnDiskOutputBackend Backend;
-  module_dependency_cache_serialization::writeInterModuleDependenciesCache(
-      Diags, Backend, path, *ScanningService);
-}
-
-bool DependencyScanningTool::loadCache(llvm::StringRef path) {
-  llvm::sys::SmartScopedLock<true> Lock(DependencyScanningToolStateLock);
-  SourceManager SM;
-  DiagnosticEngine Diags(SM);
-  Diags.addConsumer(CDC);
-  ScanningService = std::make_unique<SwiftDependencyScanningService>();
-  bool readFailed =
-      module_dependency_cache_serialization::readInterModuleDependenciesCache(
-          path, *ScanningService);
-  if (readFailed) {
-    Diags.diagnose(SourceLoc(), diag::warn_scanner_deserialize_failed, path);
-  }
-  return readFailed;
-}
-
-void DependencyScanningTool::resetCache() {
-  llvm::sys::SmartScopedLock<true> Lock(DependencyScanningToolStateLock);
-  ScanningService.reset(new SwiftDependencyScanningService());
 }
 
 std::vector<

@@ -118,6 +118,9 @@ void swift::simple_display(llvm::raw_ostream &out,
       {UnqualifiedLookupFlags::TypeLookup, "TypeLookup"},
       {UnqualifiedLookupFlags::MacroLookup, "MacroLookup"},
       {UnqualifiedLookupFlags::ModuleLookup, "ModuleLookup"},
+      {UnqualifiedLookupFlags::DisregardSelfBounds, "DisregardSelfBounds"},
+      {UnqualifiedLookupFlags::IgnoreMissingImports, "IgnoreMissingImports"},
+      {UnqualifiedLookupFlags::ABIProviding, "ABIProviding"},
   };
 
   auto flagsToPrint = llvm::make_filter_range(
@@ -296,6 +299,10 @@ void LookupResultEntry::print(llvm::raw_ostream& out) const {
     out << "\n";
   } else
     out << "\n(no-base)\n";
+
+  auto abiRole = ABIRoleInfo(getValueDecl());
+  out << "provides API=" << abiRole.providesAPI()
+      << ", provides ABI=" << abiRole.providesABI() << "\n";
 }
 
 
@@ -364,8 +371,8 @@ enum class ConstructorComparison {
 static ConstructorComparison compareConstructors(ConstructorDecl *ctor1,
                                                  ConstructorDecl *ctor2,
                                                  const swift::ASTContext &ctx) {
-  bool available1 = !ctor1->getAttrs().isUnavailable(ctx);
-  bool available2 = !ctor2->getAttrs().isUnavailable(ctx);
+  bool available1 = !ctor1->isUnavailable();
+  bool available2 = !ctor2->isUnavailable();
 
   // An unavailable initializer is always worse than an available initializer.
   if (available1 < available2)
@@ -384,6 +391,16 @@ static ConstructorComparison compareConstructors(ConstructorDecl *ctor1,
     return ConstructorComparison::Better;
 
   return ConstructorComparison::Same;
+}
+
+static bool isMemberImplementation(ValueDecl *VD) {
+  return VD->isObjCMemberImplementation();
+}
+static bool isMemberImplementation(OperatorDecl *VD) {
+  return false;
+}
+static bool isMemberImplementation(PrecedenceGroupDecl *VD) {
+  return false;
 }
 
 /// Given a set of declarations whose names and interface types have matched,
@@ -405,7 +422,8 @@ static void recordShadowedDeclsAfterTypeMatch(
   for (unsigned firstIdx : indices(decls)) {
     auto firstDecl = decls[firstIdx];
     auto firstModule = firstDecl->getModuleContext();
-    bool firstTopLevel = firstDecl->getDeclContext()->isModuleScopeContext();
+    auto firstDC = firstDecl->getDeclContext();
+    bool firstTopLevel = firstDC->isModuleScopeContext();
 
     auto name = firstDecl->getBaseName();
 
@@ -447,7 +465,8 @@ static void recordShadowedDeclsAfterTypeMatch(
       // Determine whether one module takes precedence over another.
       auto secondDecl = decls[secondIdx];
       auto secondModule = secondDecl->getModuleContext();
-      bool secondTopLevel = secondDecl->getDeclContext()->isModuleScopeContext();
+      auto secondDC = secondDecl->getDeclContext();
+      bool secondTopLevel = secondDC->isModuleScopeContext();
       bool secondPrivate = isPrivateImport(secondModule);
 
       // For member types, we skip most of the below rules. Instead, we allow
@@ -531,6 +550,22 @@ static void recordShadowedDeclsAfterTypeMatch(
         }
       }
 
+      // Member implementations are usually filtered out by access control.
+      // They're sometimes visible in contexts that can directly access storage,
+      // though, and there they should shadow the matching imported declaration.
+      if (firstDC != secondDC
+            && firstDC->getImplementedObjCContext() ==
+                 secondDC->getImplementedObjCContext()) {
+        if (isMemberImplementation(firstDecl) && secondDecl->hasClangNode()) {
+          shadowed.insert(secondDecl);
+          continue;
+        }
+        if (isMemberImplementation(secondDecl) && firstDecl->hasClangNode()) {
+          shadowed.insert(firstDecl);
+          continue;
+        }
+      }
+
       // Swift 4 compatibility hack: Don't shadow properties defined in
       // extensions of generic types with properties defined elsewhere.
       // This is due to the fact that in Swift 4, we only gave custom overload
@@ -560,15 +595,14 @@ static void recordShadowedDeclsAfterTypeMatch(
 
       // If one declaration is available and the other is not, prefer the
       // available one.
-      if (firstDecl->getAttrs().isUnavailable(ctx) !=
-            secondDecl->getAttrs().isUnavailable(ctx)) {
-       if (firstDecl->getAttrs().isUnavailable(ctx)) {
-         shadowed.insert(firstDecl);
-         break;
-       } else {
-         shadowed.insert(secondDecl);
-         continue;
-       }
+      if (firstDecl->isUnavailable() != secondDecl->isUnavailable()) {
+        if (firstDecl->isUnavailable()) {
+          shadowed.insert(firstDecl);
+          break;
+        } else {
+          shadowed.insert(secondDecl);
+          continue;
+        }
       }
 
       // Don't apply module-shadowing rules to members of protocol types.
@@ -631,22 +665,6 @@ static void recordShadowedDeclsAfterTypeMatch(
 
       // Next, prefer any other module over the _StringProcessing module.
       if (auto spModule = ctx.getLoadedModule(ctx.Id_StringProcessing)) {
-        if ((firstModule == spModule) != (secondModule == spModule)) {
-          // If second module is _StringProcessing, then it is shadowed by
-          // first.
-          if (secondModule == spModule) {
-            shadowed.insert(secondDecl);
-            continue;
-          }
-
-          // Otherwise, the first declaration is shadowed by the second.
-          shadowed.insert(firstDecl);
-          break;
-        }
-      }
-
-      // Next, prefer any other module over the _Backtracing module.
-      if (auto spModule = ctx.getLoadedModule(ctx.Id_Backtracing)) {
         if ((firstModule == spModule) != (secondModule == spModule)) {
           // If second module is _StringProcessing, then it is shadowed by
           // first.
@@ -1511,6 +1529,10 @@ void MemberLookupTable::addMember(Decl *member) {
   // And if given a synonym, under that name too.
   if (A)
     A->getMemberName().addToLookupTable(Lookup, vd);
+
+  auto abiRole = ABIRoleInfo(vd);
+  if (!abiRole.providesABI())
+    addMember(abiRole.getCounterpart());
 }
 
 void MemberLookupTable::addMembers(DeclRange members) {
@@ -1780,7 +1802,7 @@ namelookup::isInMacroArgument(SourceFile *sourceFile, SourceLoc loc) {
 
         if (macro.getFreestanding()) {
           inMacroArgument = true;
-        } else if (auto *attr = macro.getAttr()) {
+        } else if (macro.getAttr()) {
           auto *moduleScope = sourceFile->getModuleScopeContext();
           auto results =
               lookupMacros(moduleScope, macro.getModuleName(),
@@ -1920,7 +1942,7 @@ PotentialMacroExpansions PotentialMacroExpansionsInContextRequest::evaluate(
           dc->getModuleScopeContext(), med->getMacroName(),
           MacroRole::Declaration, nameTracker);
     } else if (auto *vd = dyn_cast<ValueDecl>(member)) {
-      nameTracker.attachedTo = dyn_cast<ValueDecl>(member);
+      nameTracker.attachedTo = vd;
       forEachPotentialAttachedMacro(member, MacroRole::Peer, nameTracker);
     }
   }
@@ -2006,7 +2028,7 @@ populateLookupTableEntryFromMacroExpansions(ASTContext &ctx,
             dc->getModuleScopeContext(), med->getMacroName(),
             MacroRole::Declaration, nameTracker);
       } else if (auto *vd = dyn_cast<ValueDecl>(member)) {
-        nameTracker.attachedTo = dyn_cast<ValueDecl>(member);
+        nameTracker.attachedTo = vd;
         forEachPotentialAttachedMacro(member, MacroRole::Peer, nameTracker);
       }
 
@@ -2063,29 +2085,34 @@ void NominalTypeDecl::prepareLookupTable() {
   LookupTable.setInt(true);
 }
 
-static TinyPtrVector<ValueDecl *>
-maybeFilterOutUnwantedDecls(TinyPtrVector<ValueDecl *> decls,
-                            DeclName name,
-                            bool includeAttrImplements,
-                            bool excludeMacroExpansions) {
-  if (includeAttrImplements && !excludeMacroExpansions)
-    return decls;
+static TinyPtrVector<ValueDecl *> maybeFilterOutUnwantedDecls(
+      TinyPtrVector<ValueDecl *> decls,
+      DeclName name,
+      OptionSet<NominalTypeDecl::LookupDirectFlags> flags) {
+  using Flags = NominalTypeDecl::LookupDirectFlags;
+
   TinyPtrVector<ValueDecl*> result;
   for (auto V : decls) {
     // If we're supposed to exclude anything that comes from a macro expansion,
     // check whether the source location of the declaration is in a macro
     // expansion, and skip this declaration if it does.
-    if (excludeMacroExpansions) {
+    if (flags.contains(Flags::ExcludeMacroExpansions)) {
       auto sourceFile =
           V->getModuleContext()->getSourceFileContainingLocation(V->getLoc());
       if (sourceFile && sourceFile->Kind == SourceFileKind::MacroExpansion)
         continue;
     }
 
+    // If this decl is on either side of an @abi attribute, make sure it's on
+    // the side we want.
+    if (!ABIRoleInfo(V).matchesOptions(flags))
+      continue;
+
     // Filter-out any decl that doesn't have the name we're looking for
     // (asserting as a consistency-check that such entries all have
     // @_implements attrs for the name!)
-    if (V->getName().matchesRef(name)) {
+    if (flags.contains(Flags::IncludeAttrImplements)
+            || V->getName().matchesRef(name)) {
       result.push_back(V);
     } else {
       auto A = V->getAttrs().getAttribute<ImplementsAttr>();
@@ -2111,8 +2138,6 @@ DirectLookupRequest::evaluate(Evaluator &evaluator,
   auto *decl = desc.DC;
 
   ASTContext &ctx = decl->getASTContext();
-  const bool includeAttrImplements =
-      flags.contains(NominalTypeDecl::LookupDirectFlags::IncludeAttrImplements);
   const bool excludeMacroExpansions =
       flags.contains(NominalTypeDecl::LookupDirectFlags::ExcludeMacroExpansions);
 
@@ -2148,9 +2173,8 @@ DirectLookupRequest::evaluate(Evaluator &evaluator,
       if (!allFound.empty()) {
         auto known = Table.find(name);
         if (known != Table.end()) {
-          auto swiftLookupResult = maybeFilterOutUnwantedDecls(
-              known->second, name, includeAttrImplements,
-              excludeMacroExpansions);
+          auto swiftLookupResult =
+              maybeFilterOutUnwantedDecls(known->second, name, flags);
           for (auto foundSwiftDecl : swiftLookupResult) {
             allFound.push_back(foundSwiftDecl);
           }
@@ -2196,9 +2220,7 @@ DirectLookupRequest::evaluate(Evaluator &evaluator,
   }
 
   // We found something; return it.
-  return maybeFilterOutUnwantedDecls(known->second, name,
-                                     includeAttrImplements,
-                                     excludeMacroExpansions);
+  return maybeFilterOutUnwantedDecls(known->second, name, flags);
 }
 
 bool NominalTypeDecl::createObjCMethodLookup() {
@@ -2330,22 +2352,27 @@ ObjCCategoryNameMap ClassDecl::getObjCCategoryNameMap() {
                            ObjCCategoryNameMap());
 }
 
-static bool missingImportForMemberDecl(const DeclContext *dc, ValueDecl *decl) {
-  // Only require explicit imports for members when MemberImportVisibility is
-  // enabled.
-  auto &ctx = dc->getASTContext();
+/// Determines whether MemberImportVisiblity should be enforced for lookups in
+/// the given context.
+static bool shouldRequireImportsInContext(const DeclContext *lookupContext) {
+  auto &ctx = lookupContext->getASTContext();
   if (!ctx.LangOpts.hasFeature(Feature::MemberImportVisibility))
     return false;
 
-  return !dc->isDeclImported(decl);
+  // Code outside of the main module (which is often synthesized) isn't subject
+  // to MemberImportVisibility rules.
+  if (lookupContext->getParentModule() != ctx.MainModule)
+    return false;
+
+  return true;
 }
 
 /// Determine whether the given declaration is an acceptable lookup
 /// result when searching from the given DeclContext.
-static bool isAcceptableLookupResult(const DeclContext *dc,
-                                     NLOptions options,
+static bool isAcceptableLookupResult(const DeclContext *dc, NLOptions options,
                                      ValueDecl *decl,
-                                     bool onlyCompleteObjectInits) {
+                                     bool onlyCompleteObjectInits,
+                                     bool requireImport) {
   // Filter out designated initializers, if requested.
   if (onlyCompleteObjectInits) {
     if (auto ctor = dyn_cast<ConstructorDecl>(decl)) {
@@ -2373,12 +2400,28 @@ static bool isAcceptableLookupResult(const DeclContext *dc,
 
   // Check that there is some import in the originating context that makes this
   // decl visible.
-  if (!(options & NL_IgnoreMissingImports)) {
-    if (missingImportForMemberDecl(dc, decl))
+  if (requireImport && !(options & NL_IgnoreMissingImports))
+    if (!dc->isDeclImported(decl))
+      return false;
+
+  // Check that it has the appropriate ABI role.
+  if (!ABIRoleInfo(decl).matchesOptions(options))
+    return false;
+
+  return true;
+}
+
+bool namelookup::isInABIAttr(SourceFile *sourceFile, SourceLoc loc) {
+  // Make sure that the source location is actually within the given source
+  // file.
+  if (sourceFile && loc.isValid()) {
+    sourceFile =
+        sourceFile->getParentModule()->getSourceFileContainingLocation(loc);
+    if (!sourceFile)
       return false;
   }
 
-  return true;
+  return ASTScope::lookupEnclosingABIAttributeScope(sourceFile, loc) != nullptr;
 }
 
 void namelookup::pruneLookupResultSet(const DeclContext *dc, NLOptions options,
@@ -2593,6 +2636,9 @@ QualifiedLookupRequest::evaluate(Evaluator &eval, const DeclContext *DC,
   // Whether we only want to return complete object initializers.
   bool onlyCompleteObjectInits = false;
 
+  // Whether to enforce MemberImportVisibility import restrictions.
+  bool requireImport = shouldRequireImportsInContext(DC);
+
   // Visit all of the nominal types we know about, discovering any others
   // we need along the way.
   bool wantProtocolMembers = (options & NL_ProtocolMembers);
@@ -2610,6 +2656,8 @@ QualifiedLookupRequest::evaluate(Evaluator &eval, const DeclContext *DC,
       flags |= NominalTypeDecl::LookupDirectFlags::IncludeAttrImplements;
     if (options & NL_ExcludeMacroExpansions)
       flags |= NominalTypeDecl::LookupDirectFlags::ExcludeMacroExpansions;
+    if (options & NL_ABIProviding)
+      flags |= NominalTypeDecl::LookupDirectFlags::ABIProviding;
 
     // Note that the source loc argument doesn't matter, because excluding
     // macro expansions is already propagated through the lookup flags above.
@@ -2625,7 +2673,8 @@ QualifiedLookupRequest::evaluate(Evaluator &eval, const DeclContext *DC,
       if ((options & NL_OnlyMacros) && !isa<MacroDecl>(decl))
         continue;
 
-      if (isAcceptableLookupResult(DC, options, decl, onlyCompleteObjectInits))
+      if (isAcceptableLookupResult(DC, options, decl, onlyCompleteObjectInits,
+                                   requireImport))
         decls.push_back(decl);
     }
 
@@ -2752,7 +2801,8 @@ AnyObjectLookupRequest::evaluate(Evaluator &evaluator, const DeclContext *dc,
   QualifiedLookupResult decls;
 
   // Type-only and macro lookup won't find anything on AnyObject.
-  if (options & (NL_OnlyTypes | NL_OnlyMacros))
+  // AnyObject doesn't provide ABI.
+  if (options & (NL_OnlyTypes | NL_OnlyMacros | NL_ABIProviding))
     return decls;
 
   // Collect all of the visible declarations.
@@ -2761,6 +2811,9 @@ AnyObjectLookupRequest::evaluate(Evaluator &evaluator, const DeclContext *dc,
     import.importedModule->lookupClassMember(import.accessPath,
                                              member.getFullName(), allDecls);
   }
+
+  /// Whether to enforce MemberImportVisibility import restrictions.
+  bool requireImport = shouldRequireImportsInContext(dc);
 
   // For each declaration whose context is not something we've
   // already visited above, add it to the list of declarations.
@@ -2794,7 +2847,8 @@ AnyObjectLookupRequest::evaluate(Evaluator &evaluator, const DeclContext *dc,
     // result, add it to the list.
     if (knownDecls.insert(decl).second &&
         isAcceptableLookupResult(dc, options, decl,
-                                 /*onlyCompleteObjectInits=*/false))
+                                 /*onlyCompleteObjectInits=*/false,
+                                 requireImport))
       decls.push_back(decl);
   }
 
@@ -2945,6 +2999,11 @@ static DirectlyReferencedTypeDecls directReferencesForUnqualifiedTypeLookup(
   // is overridden below.
   if (namelookup::isInMacroArgument(dc->getParentSourceFile(), loc))
     options |= UnqualifiedLookupFlags::ExcludeMacroExpansions;
+
+  // If the source location is located anywhere within an `@abi` attribute, look
+  // up using ABI names.
+  if (namelookup::isInABIAttr(dc->getParentSourceFile(), loc))
+    options |= UnqualifiedLookupFlags::ABIProviding;
 
   // In a protocol or protocol extension, the 'where' clause can refer to
   // associated types without 'Self' qualification:
@@ -3575,7 +3634,7 @@ CollectedOpaqueReprs swift::collectOpaqueTypeReprs(TypeRepr *r, ASTContext &ctx,
       if (!Ctx.LangOpts.hasFeature(Feature::ImplicitSome))
         return Action::Continue();
       
-      if (auto existential = dyn_cast<ExistentialTypeRepr>(repr)) {
+      if (isa<ExistentialTypeRepr>(repr)) {
         return Action::SkipNode();
       } else if (auto composition = dyn_cast<CompositionTypeRepr>(repr)) {
         if (!composition->isTypeReprAny())
@@ -3905,18 +3964,21 @@ void swift::getDirectlyInheritedNominalTypeDecls(
   SourceLoc loc;
   SourceLoc uncheckedLoc;
   SourceLoc preconcurrencyLoc;
+  SourceLoc unsafeLoc;
   auto inheritedTypes = InheritedTypes(decl);
   bool isSuppressed = inheritedTypes.getEntry(i).isSuppressed();
   if (TypeRepr *typeRepr = inheritedTypes.getTypeRepr(i)) {
     loc = typeRepr->getLoc();
     uncheckedLoc = typeRepr->findAttrLoc(TypeAttrKind::Unchecked);
     preconcurrencyLoc = typeRepr->findAttrLoc(TypeAttrKind::Preconcurrency);
+    unsafeLoc = typeRepr->findAttrLoc(TypeAttrKind::Unsafe);
   }
 
   // Form the result.
   for (auto nominal : nominalTypes) {
     result.push_back(
-        {nominal, loc, uncheckedLoc, preconcurrencyLoc, isSuppressed});
+        {nominal, loc, uncheckedLoc, preconcurrencyLoc, unsafeLoc,
+          isSuppressed});
   }
 }
 
@@ -3948,7 +4010,8 @@ swift::getDirectlyInheritedNominalTypeDecls(
     auto loc = attr->getLocation();
     result.push_back(
         {attr->getProtocol(), loc, attr->isUnchecked() ? loc : SourceLoc(),
-         /*preconcurrencyLoc=*/SourceLoc(), /*isSuppressed=*/false});
+         /*preconcurrencyLoc=*/SourceLoc(), SourceLoc(),
+          /*isSuppressed=*/false});
   }
 
   // Else we have access to this information on the where clause.
@@ -3959,8 +4022,8 @@ swift::getDirectlyInheritedNominalTypeDecls(
   // FIXME: Refactor SelfBoundsFromWhereClauseRequest to dig out
   // the source location.
   for (auto inheritedNominal : selfBounds.decls)
-    result.emplace_back(inheritedNominal, SourceLoc(), SourceLoc(), SourceLoc(),
-                        /*isSuppressed=*/false);
+    result.emplace_back(inheritedNominal, SourceLoc(), SourceLoc(),
+                        SourceLoc(), SourceLoc(),  /*isSuppressed=*/false);
 
   return result;
 }
@@ -4132,6 +4195,7 @@ void swift::simple_display(llvm::raw_ostream &out, NLOptions options) {
     FLAG(NL_ExcludeMacroExpansions)
     FLAG(NL_OnlyMacros)
     FLAG(NL_IgnoreMissingImports)
+    FLAG(NL_ABIProviding)
 #undef FLAG
   };
 

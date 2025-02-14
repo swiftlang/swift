@@ -145,7 +145,7 @@ extension Burrito: Alias {} // expected-error {{conformance to 'Copyable' must b
 extension Burrito: Copyable & Edible & P {} // expected-warning {{redundant conformance of 'Burrito<Filling>' to protocol 'Copyable'}}
 
 struct Blah<T: ~Copyable>: ~Copyable {}
-extension Blah: P, Q, Copyable, R {} // expected-error {{generic struct 'Blah' required to be 'Copyable' but is marked with '~Copyable'}}
+extension Blah: P, Q, Copyable, R {} // expected-error{{must explicitly state whether 'T' is required to conform to 'Copyable' or not}} expected-error {{generic struct 'Blah' required to be 'Copyable' but is marked with '~Copyable'}}
 // expected-error@-1 {{conformance to 'Copyable' must be declared in a separate extension}}
 
 enum Hello<Gesture: ~Copyable>: ~Copyable {}

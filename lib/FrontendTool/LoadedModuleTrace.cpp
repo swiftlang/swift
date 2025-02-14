@@ -22,6 +22,7 @@
 #include "swift/Basic/FileTypes.h"
 #include "swift/Basic/JSONSerialization.h"
 #include "swift/Basic/SourceManager.h"
+#include "swift/Frontend/Frontend.h"
 #include "swift/Frontend/FrontendOptions.h"
 #include "swift/Frontend/ModuleInterfaceSupport.h"
 #include "swift/IDE/SourceEntityWalker.h"
@@ -52,6 +53,7 @@ struct SwiftModuleTraceInfo {
   std::string Path;
   bool IsImportedDirectly;
   bool SupportsLibraryEvolution;
+  bool StrictMemorySafety;
 };
 
 struct SwiftMacroTraceInfo {
@@ -64,6 +66,7 @@ struct LoadedModuleTraceFormat {
   unsigned Version;
   Identifier Name;
   std::string Arch;
+  bool StrictMemorySafety;
   std::vector<SwiftModuleTraceInfo> SwiftModules;
   std::vector<SwiftMacroTraceInfo> SwiftMacros;
 };
@@ -79,6 +82,8 @@ template <> struct ObjectTraits<SwiftModuleTraceInfo> {
     out.mapRequired("isImportedDirectly", contents.IsImportedDirectly);
     out.mapRequired("supportsLibraryEvolution",
                     contents.SupportsLibraryEvolution);
+    out.mapRequired("strictMemorySafety",
+                    contents.StrictMemorySafety);
   }
 };
 
@@ -102,6 +107,8 @@ template <> struct ObjectTraits<LoadedModuleTraceFormat> {
     out.mapRequired("name", name);
 
     out.mapRequired("arch", contents.Arch);
+
+    out.mapRequired("strictMemorySafety", contents.StrictMemorySafety);
 
     // The 'swiftmodules' key is kept for backwards compatibility.
     std::vector<std::string> moduleNames;
@@ -642,7 +649,8 @@ static void computeSwiftModuleTraceInfo(
            /*IsImportedDirectly=*/
            isImportedDirectly,
            /*SupportsLibraryEvolution=*/
-           depMod->isResilient()});
+           depMod->isResilient(),
+           depMod->strictMemorySafety()});
       buffer.clear();
 
       continue;
@@ -781,8 +789,9 @@ bool swift::emitLoadedModuleTraceIfNeeded(ModuleDecl *mainModule,
   LoadedModuleTraceFormat trace = {
       /*version=*/LoadedModuleTraceFormat::CurrentVersion,
       /*name=*/mainModule->getName(),
-      /*arch=*/ctxt.LangOpts.Target.getArchName().str(), swiftModules,
-      swiftMacros};
+      /*arch=*/ctxt.LangOpts.Target.getArchName().str(),
+      mainModule ? mainModule->strictMemorySafety() : false,
+      swiftModules, swiftMacros};
 
   // raw_fd_ostream is unbuffered, and we may have multiple processes writing,
   // so first write to memory and then dump the buffer to the trace file.
@@ -853,77 +862,66 @@ public:
   }
 };
 
-static std::optional<int> createObjCMessageTraceFile(const InputFile &input,
-                                                     ModuleDecl *MD,
-                                        std::vector<SourceFile*> &filesToWalk) {
-  if (input.getLoadedModuleTracePath().empty()) {
+static void createFineModuleTraceFile(CompilerInstance &instance,
+                                      const InputFile &input) {
+  StringRef tracePath = input.getFineModuleTracePath();
+  if (tracePath.empty()) {
     // we basically rely on the passing down of module trace file path
     // as an indicator that this job needs to emit an ObjC message trace file.
     // FIXME: add a separate swift-frontend flag for ObjC message trace path
     // specifically.
-    return {};
+    return;
   }
-  for (auto *FU : MD->getFiles()) {
-    if (auto *SF = dyn_cast<SourceFile>(FU)) {
-      switch (SF->Kind) {
-      case swift::SourceFileKind::Library:
-      case swift::SourceFileKind::Main:
-      case swift::SourceFileKind::MacroExpansion:
-      case swift::SourceFileKind::DefaultArgument:
-        filesToWalk.push_back(SF);
-        LLVM_FALLTHROUGH;
-      case swift::SourceFileKind::SIL:
-      case swift::SourceFileKind::Interface:
-        continue;
-      }
-    }
+  ModuleDecl *MD = instance.getMainModule();
+  auto &ctx = MD->getASTContext();
+  // Write output via atomic append.
+  llvm::vfs::OutputConfig config;
+  config.setAppend().setAtomicWrite();
+  auto outputFile = ctx.getOutputBackend().createFile(tracePath, config);
+  if (!outputFile) {
+    ctx.Diags.diagnose(SourceLoc(), diag::error_opening_output, tracePath,
+                       toString(outputFile.takeError()));
+    return;
   }
-  // No source files to walk, abort.
-  if (filesToWalk.empty()) {
-    return {};
+  ObjcMethodReferenceCollector collector(MD);
+
+  auto blocklisted = ctx.blockListConfig.hasBlockListAction(MD->getNameStr(),
+    BlockListKeyKind::ModuleName, BlockListAction::SkipEmittingFineModuleTrace);
+
+  if (!blocklisted) {
+    instance.forEachFileToTypeCheck([&](SourceFile& SF) {
+      collector.setFileBeforeVisiting(&SF);
+      collector.walk(SF);
+      return false;
+    });
   }
-  llvm::SmallString<128> tracePath;
-  if (const char *P = ::getenv("SWIFT_COMPILER_OBJC_MESSAGE_TRACE_DIRECTORY")) {
-    StringRef DirPath = P;
-    llvm::sys::path::append(tracePath, DirPath);
-  } else {
-    llvm::sys::path::append(tracePath, input.getLoadedModuleTracePath());
-    llvm::sys::path::remove_filename(tracePath);
-    llvm::sys::path::append(tracePath, ".SWIFT_FINE_DEPENDENCY_TRACE");
+
+  // print this json line.
+  std::string stringBuffer;
+  {
+    llvm::raw_string_ostream memoryBuffer(stringBuffer);
+    collector.serializeAsJson(memoryBuffer);
   }
-  if (!llvm::sys::fs::exists(tracePath)) {
-    if (llvm::sys::fs::create_directory(tracePath))
-      return {};
+  stringBuffer += "\n";
+
+  // Write output via atomic append.
+  *outputFile << stringBuffer;
+  if (auto err = outputFile->keep()) {
+    ctx.Diags.diagnose(SourceLoc(), diag::error_opening_output,
+                       tracePath, toString(std::move(err)));
+    return;
   }
-  SmallString<32> fileName(MD->getNameStr());
-  fileName.append("-%%%%-%%%%-%%%%.json");
-  llvm::sys::path::append(tracePath, fileName);
-  int tmpFD;
-  if (llvm::sys::fs::createUniqueFile(tracePath.str(), tmpFD, tracePath)) {
-    return {};
-  }
-  return tmpFD;
 }
 
-bool swift::emitObjCMessageSendTraceIfNeeded(ModuleDecl *mainModule,
-                                             const FrontendOptions &opts) {
+bool swift::emitFineModuleTraceIfNeeded(CompilerInstance &Instance,
+                                        const FrontendOptions &opts) {
+  ModuleDecl *mainModule = Instance.getMainModule();
   ASTContext &ctxt = mainModule->getASTContext();
   assert(!ctxt.hadError() &&
          "We should've already exited earlier if there was an error.");
 
   opts.InputsAndOutputs.forEachInput([&](const InputFile &input) {
-    std::vector<SourceFile*> filesToWalk;
-    auto tmpFD = createObjCMessageTraceFile(input, mainModule, filesToWalk);
-    if (!tmpFD)
-      return false;
-    // Write the contents of the buffer.
-    llvm::raw_fd_ostream out(*tmpFD, /*shouldClose=*/true);
-    ObjcMethodReferenceCollector collector(mainModule);
-    for (auto *SF : filesToWalk) {
-      collector.setFileBeforeVisiting(SF);
-      collector.walk(*SF);
-    }
-    collector.serializeAsJson(out);
+    createFineModuleTraceFile(Instance, input);
     return true;
   });
   return false;

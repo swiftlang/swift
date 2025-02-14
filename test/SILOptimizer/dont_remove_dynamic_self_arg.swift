@@ -1,4 +1,4 @@
-// RUN: %target-swift-frontend -module-name test -emit-sil -O %s | %FileCheck %s
+// RUN: %target-swift-frontend -module-name test -Xllvm -sil-print-types -emit-sil -O %s | %FileCheck %s
 // Make sure IRGen does not crash
 // RUN: %target-swift-frontend -module-name test -emit-ir -O %s
 

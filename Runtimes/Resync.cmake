@@ -59,6 +59,18 @@ copy_library_sources(include "" "Core")
 # Copy magic linker symbols
 copy_library_sources("linker-support" "" "Core")
 
+# Copy Plist
+message(STATUS "plist[${StdlibSources}/Info.plist.in] -> Core/Info.plist.in")
+file(COPY_FILE
+  "${StdlibSources}/Info.plist.in"                             # From
+  "${CMAKE_CURRENT_LIST_DIR}/Core/Info.plist.in"               # To
+  RESULT _output
+  ONLY_IF_DIFFERENT)
+if(_output)
+  message(SEND_ERROR
+    "Copy ${StdlibSources}/Info.plist.in] -> Core/Info.plist.in Failed: ${_output}")
+endif()
+
 set(CoreLibs
   LLVMSupport
   SwiftShims

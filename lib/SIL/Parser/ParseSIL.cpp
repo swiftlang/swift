@@ -1504,14 +1504,23 @@ bool SILParser::parseTypedValueRef(SILValue &Result, SourceLoc &Loc,
   Loc = P.Tok.getLoc();
 
   UnresolvedValueName Name;
-  SILType Ty;
-  if (parseValueName(Name) ||
-      P.parseToken(tok::colon, diag::expected_sil_colon_value_ref) ||
-      parseSILType(Ty))
+  if (parseValueName(Name))
     return true;
-  
-  Result = getLocalValue(Name, Ty, RegularLocation(Loc), B);
-  return false;
+
+  if (P.consumeIf(tok::colon)) {
+    SILType Ty;
+    parseSILType(Ty);
+    Result = getLocalValue(Name, Ty, RegularLocation(Loc), B);
+    return false;
+  } else {
+    ValueBase *&Entry = LocalValues[Name.Name];
+    if (!Entry) {
+      P.diagnose(Name.NameLoc, diag::sil_forward_ref_value_needs_type, Name.Name);
+      return true;
+    }
+    Result = SILValue(Entry);
+    return false;
+  }
 }
 
 /// Look up whether the given string corresponds to a SIL opcode.
@@ -3460,16 +3469,16 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
     ResultVal = B.createEndCOWMutation(InstLoc, Val, keepUnique);
     break;
   }
-  case SILInstructionKind::IsEscapingClosureInst: {
+  case SILInstructionKind::DestroyNotEscapedClosureInst: {
     bool IsObjcVerificationType = false;
     if (parseSILOptional(IsObjcVerificationType, *this, "objc"))
       return true;
     if (parseTypedValueRef(Val, B) || parseSILDebugLocation(InstLoc, B))
       return true;
-    ResultVal = B.createIsEscapingClosure(
+    ResultVal = B.createDestroyNotEscapedClosure(
         InstLoc, Val,
-        IsObjcVerificationType ? IsEscapingClosureInst::ObjCEscaping
-                              : IsEscapingClosureInst::WithoutActuallyEscaping);
+        IsObjcVerificationType ? DestroyNotEscapedClosureInst::ObjCEscaping
+                              : DestroyNotEscapedClosureInst::WithoutActuallyEscaping);
     break;
   }
 
@@ -4979,21 +4988,6 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
                              isFromVarDecl, usesMoveableValueDebugInfo);
     break;
   }
-  case SILInstructionKind::AllocVectorInst: {
-    SILType Ty;
-    if (parseSILType(Ty))
-      return true;
-
-    if (P.parseToken(tok::comma, diag::expected_tok_in_sil_instr, ","))
-      return true;
-
-    SILValue capacity;
-    if (parseTypedValueRef(capacity, B))
-      return true;
-
-    ResultVal = B.createAllocVector(InstLoc, capacity, Ty);
-    break;
-  }
   case SILInstructionKind::MetatypeInst: {
     SILType Ty;
     if (parseSILType(Ty))
@@ -5068,6 +5062,11 @@ bool SILParser::parseSpecificSILInstruction(SILBuilder &B,
     }
     break;
   }
+  case SILInstructionKind::IgnoredUseInst:
+    if (parseTypedValueRef(Val, B) || parseSILDebugLocation(InstLoc, B))
+      return true;
+    ResultVal = B.createIgnoredUse(InstLoc, Val);
+    break;
 
   case SILInstructionKind::DeallocStackInst:
     if (parseTypedValueRef(Val, B) || parseSILDebugLocation(InstLoc, B))
@@ -7432,6 +7431,15 @@ bool SILParserState::parseDeclSIL(Parser &P) {
     }
 
     FunctionState.F->setLinkage(resolveSILLinkage(FnLinkage, isDefinition));
+    switch (FunctionState.F->getLinkage()) {
+    case SILLinkage::PublicExternal:
+    case SILLinkage::PackageExternal:
+      if (!FunctionState.F->isExternalDeclaration() && !FunctionState.F->isAnySerialized())
+        FunctionState.F->getModule().setParsedAsSerializedSIL();
+      break;
+    default:
+      break;
+    }
   }
 
   if (FunctionState.diagnoseProblems())

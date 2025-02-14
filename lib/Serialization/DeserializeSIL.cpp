@@ -394,6 +394,47 @@ SILDeserializer::readNextRecord(SmallVectorImpl<uint64_t> &scratch) {
   return maybeKind;
 }
 
+std::optional<SILLocation>
+SILDeserializer::readLoc(unsigned kind, SmallVectorImpl<uint64_t> &scratch) {
+  unsigned LocationKind, Implicit = 0;
+  SILLocation::FilenameAndLocation *FNameLoc = nullptr;
+  // Each SourceLoc opaque pointer is serialized once. Successive appearences
+  // are serialized as references to earlier serializations, with LocID as the
+  // indexing key
+  if (kind == SIL_SOURCE_LOC_REF) {
+    ValueID LocID;
+    SourceLocRefLayout::readRecord(scratch, LocID, LocationKind, Implicit);
+    if (LocID == 0)
+      return std::optional<SILLocation>();
+    FNameLoc = ParsedLocs[LocID - 1];
+  } else {
+    ValueID Row = 0, Col = 0, FNameID = 0;
+    SourceLocLayout::readRecord(scratch, Row, Col, FNameID, LocationKind,
+                                Implicit);
+
+    FNameLoc = SILLocation::FilenameAndLocation::alloc(
+        Row, Col, MF->getIdentifierText(FNameID), SILMod);
+
+    ParsedLocs.push_back(FNameLoc);
+  }
+
+  switch (LocationKind) {
+  case SILLocation::ReturnKind:
+    return ReturnLocation(FNameLoc, Implicit);
+  case SILLocation::ImplicitReturnKind:
+    return ImplicitReturnLocation(FNameLoc, Implicit);
+  case SILLocation::InlinedKind:
+  case SILLocation::MandatoryInlinedKind:
+  case SILLocation::CleanupKind:
+  case SILLocation::ArtificialUnreachableKind:
+  case SILLocation::RegularKind:
+    return RegularLocation(FNameLoc, Implicit);
+  }
+
+  // LocationKind was not a recognized SILLocation::LocationKind.
+  return std::nullopt;
+}
+
 llvm::Expected<const SILDebugScope *>
 SILDeserializer::readDebugScopes(SILFunction *F,
                                  SmallVectorImpl<uint64_t> &scratch,
@@ -1066,6 +1107,7 @@ llvm::Expected<SILFunction *> SILDeserializer::readSILFunctionChecked(
   BlocksByID.clear();
   UndefinedBlocks.clear();
   ParsedScopes.clear();
+  ParsedLocs.clear();
 
   // The first two IDs are reserved for SILUndef.
   LastValueID = 1;
@@ -1095,6 +1137,9 @@ llvm::Expected<SILFunction *> SILDeserializer::readSILFunctionChecked(
         isFirstScope = false;
       }
       Builder.setCurrentDebugScope(Scope);
+    } else if (kind == SIL_SOURCE_LOC || kind == SIL_SOURCE_LOC_REF) {
+      auto Loc = readLoc(kind, scratch);
+      Builder.applyDebugLocOverride(Loc);
     } else {
       // If CurrentBB is empty, just return fn. The code in readSILInstruction
       // assumes that such a situation means that fn is a declaration. Thus it
@@ -1662,16 +1707,6 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
         Attr == 0 ? OpenedExistentialAccess::Immutable
                   : OpenedExistentialAccess::Mutable);
     break;
-  case SILInstructionKind::AllocVectorInst:
-    assert(RecordKind == SIL_ONE_TYPE_ONE_OPERAND &&
-           "Layout should be OneTypeOneOperand.");
-    ResultInst = Builder.createAllocVector(
-        Loc,
-        getLocalValue(
-            Builder.maybeGetFunction(), ValID,
-            getSILType(MF->getType(TyID2), (SILValueCategory)TyCategory2, Fn)),
-        getSILType(MF->getType(TyID), (SILValueCategory)TyCategory, Fn));
-    break;
   case SILInstructionKind::DynamicPackIndexInst: {
     assert(RecordKind == SIL_ONE_TYPE_ONE_OPERAND &&
            "Layout should be OneTypeOneOperand.");
@@ -2196,6 +2231,14 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
                            getSILType(Ty, (SILValueCategory)TyCategory, Fn)));
     break;
   }
+  case SILInstructionKind::IgnoredUseInst: {
+    assert(RecordKind == SIL_ONE_OPERAND && "Should be one operand");
+    auto Ty = MF->getType(TyID);
+    ResultInst = Builder.createIgnoredUse(
+        Loc, getLocalValue(Builder.maybeGetFunction(), ValID,
+                           getSILType(Ty, (SILValueCategory)TyCategory, Fn)));
+    break;
+  }
   case SILInstructionKind::DeallocPackInst: {
     auto Ty = MF->getType(TyID);
     ResultInst = Builder.createDeallocPack(
@@ -2495,10 +2538,10 @@ bool SILDeserializer::readSILInstruction(SILFunction *Fn,
     break;
   }
 
-  case SILInstructionKind::IsEscapingClosureInst: {
+  case SILInstructionKind::DestroyNotEscapedClosureInst: {
     assert(RecordKind == SIL_ONE_OPERAND && "Layout should be OneOperand.");
     unsigned verificationType = Attr;
-    ResultInst = Builder.createIsEscapingClosure(
+    ResultInst = Builder.createDestroyNotEscapedClosure(
         Loc,
         getLocalValue(
             Builder.maybeGetFunction(), ValID,

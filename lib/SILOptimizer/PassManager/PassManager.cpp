@@ -488,16 +488,35 @@ bool SILPassManager::continueTransforming() {
   return NumPassesRun < maxNumPassesToRun;
 }
 
-bool SILPassManager::continueWithNextSubpassRun(SILInstruction *forInst,
-                                                SILFunction *function,
-                                                SILTransform *trans) {
+bool SILPassManager::continueWithNextSubpassRun(
+    std::optional<Transformee> origTransformee, SILFunction *function,
+    SILTransform *trans) {
+  // Rewrite .some(nullptr) as .none.
+  std::optional<llvm::PointerUnion<SILValue, SILInstruction *>> forTransformee;
+  if (origTransformee) {
+    auto forValue = dyn_cast<SILValue>(*origTransformee);
+    if (forValue) {
+      forTransformee = forValue;
+    } else if (auto *forInst = cast<SILInstruction *>(*origTransformee)) {
+      forTransformee = forInst;
+    }
+  }
+
   unsigned subPass = numSubpassesRun++;
 
-  if (forInst && isFunctionSelectedForPrinting(function) &&
-      SILPrintEverySubpass) {
+  if (isFunctionSelectedForPrinting(function) && SILPrintEverySubpass) {
     dumpPassInfo("*** SIL function before ", trans, function);
-    if (forInst) {
-      llvm::dbgs() << "  *** sub-pass " << subPass << " for " << *forInst;
+    llvm::dbgs() << "  *** sub-pass " << subPass << " for ";
+    if (forTransformee) {
+      auto forValue = dyn_cast<SILValue>(*forTransformee);
+      if (forValue) {
+        llvm::dbgs() << forValue;
+      } else {
+        auto *forInst = cast<SILInstruction *>(*forTransformee);
+        llvm::dbgs() << *forInst;
+      }
+    } else {
+      llvm::dbgs() << "???\n";
     }
     function->dump(getOptions().EmitVerboseSIL);
   }
@@ -509,8 +528,16 @@ bool SILPassManager::continueWithNextSubpassRun(SILInstruction *forInst,
 
   if (subPass == maxNumSubpassesToRun - 1 && SILPrintLast) {
     dumpPassInfo("*** SIL function before ", trans, function);
-    if (forInst) {
-      llvm::dbgs() << "  *** sub-pass " << subPass << " for " << *forInst;
+    if (forTransformee) {
+      auto forValue = dyn_cast<SILValue>(*forTransformee);
+      if (forValue) {
+        llvm::dbgs() << forValue;
+      } else {
+        auto *forInst = cast<SILInstruction *>(*forTransformee);
+        llvm::dbgs() << *forInst;
+      }
+    } else {
+      llvm::dbgs() << "???\n";
     }
     function->dump(getOptions().EmitVerboseSIL);
   }
@@ -760,6 +787,9 @@ void SILPassManager::runPassOnFunction(unsigned TransIdx, SILFunction *F) {
     F->verify(getAnalysis<BasicCalleeAnalysis>()->getCalleeCache());
     verifyAnalyses(F);
     runSwiftFunctionVerification(F);
+  } else if (getOptions().VerifyOwnershipAll &&
+             (CurrentPassHasInvalidated || SILVerifyWithoutInvalidation)) {
+    F->verifyOwnership();
   } else {
     if ((SILVerifyAfterPass.end() != std::find_if(SILVerifyAfterPass.begin(),
                                                   SILVerifyAfterPass.end(),
@@ -1605,6 +1635,15 @@ bool BridgedFunction::isTrapNoReturn() const {
   return swift::isTrapNoReturnFunction(getFunction());
 }
 
+bool BridgedFunction::isConvertPointerToPointerArgument() const {
+  if (auto declRef = getFunction()->getDeclRef()) {
+    auto *conversionDecl =
+      declRef.getASTContext().getConvertPointerToPointerArgument();
+    return declRef.getFuncDecl() == conversionDecl;
+  }
+  return false;
+}
+
 bool BridgedFunction::isAutodiffVJP() const {
   return swift::isDifferentiableFuncComponent(
       getFunction(), swift::AutoDiffFunctionComponent::VJP);
@@ -1793,6 +1832,7 @@ bool BridgedPassContext::specializeAppliesInFunction(BridgedFunction function, b
 namespace  {
 class GlobalVariableMangler : public Mangle::ASTMangler {
 public:
+  GlobalVariableMangler(ASTContext &Ctx) : ASTMangler(Ctx) {}
   std::string mangleOutlinedVariable(SILFunction *F, int &uniqueIdx) {
     std::string GlobName;
     do {
@@ -1812,7 +1852,7 @@ BridgedOwnedString BridgedPassContext::mangleOutlinedVariable(BridgedFunction fu
   SILFunction *f = function.getFunction();
   SILModule &mod = f->getModule();
   while (true) {
-    GlobalVariableMangler mangler;
+    GlobalVariableMangler mangler(f->getASTContext());
     std::string name = mangler.mangleOutlinedVariable(f, idx);
     if (!mod.lookUpGlobalVariable(name))
       return BridgedOwnedString(name);
@@ -1826,7 +1866,7 @@ BridgedOwnedString BridgedPassContext::mangleAsyncRemoved(BridgedFunction functi
   // FIXME: hard assumption on what pass is requesting this.
   auto P = Demangle::SpecializationPass::AsyncDemotion;
 
-  Mangle::FunctionSignatureSpecializationMangler Mangler(
+  Mangle::FunctionSignatureSpecializationMangler Mangler(F->getASTContext(),
       P, F->getSerializedKind(), F);
   Mangler.setRemovedEffect(EffectKind::Async);
   return BridgedOwnedString(Mangler.mangle());
@@ -1836,7 +1876,7 @@ BridgedOwnedString BridgedPassContext::mangleWithDeadArgs(const SwiftInt * _Null
                                                           SwiftInt numDeadArgs,
                                                           BridgedFunction function) const {
   SILFunction *f = function.getFunction();
-  Mangle::FunctionSignatureSpecializationMangler Mangler(
+  Mangle::FunctionSignatureSpecializationMangler Mangler(f->getASTContext(),
       Demangle::SpecializationPass::FunctionSignatureOpts,
       f->getSerializedKind(), f);
   for (SwiftInt idx = 0; idx < numDeadArgs; idx++) {
@@ -1852,7 +1892,7 @@ BridgedOwnedString BridgedPassContext::mangleWithClosureArgs(
 ) const {
   auto pass = Demangle::SpecializationPass::ClosureSpecializer;
   auto serializedKind = applySiteCallee.getFunction()->getSerializedKind();
-  Mangle::FunctionSignatureSpecializationMangler mangler(
+  Mangle::FunctionSignatureSpecializationMangler mangler(applySiteCallee.getFunction()->getASTContext(),
       pass, serializedKind, applySiteCallee.getFunction());
 
   llvm::SmallVector<swift::SILValue, 16> closureArgsStorage;
@@ -1879,11 +1919,14 @@ BridgedOwnedString BridgedPassContext::mangleWithClosureArgs(
   return BridgedOwnedString(mangler.mangle());
 }
 
-BridgedGlobalVar BridgedPassContext::createGlobalVariable(BridgedStringRef name, BridgedType type, bool isPrivate) const {
-  return {SILGlobalVariable::create(
+BridgedGlobalVar BridgedPassContext::createGlobalVariable(BridgedStringRef name, BridgedType type, BridgedLinkage linkage, bool isLet) const {
+  auto *global = SILGlobalVariable::create(
       *invocation->getPassManager()->getModule(),
-      isPrivate ? SILLinkage::Private : SILLinkage::Public, IsNotSerialized,
-      name.unbridged(), type.unbridged())};
+      (swift::SILLinkage)linkage, IsNotSerialized,
+      name.unbridged(), type.unbridged());
+  if (isLet)
+    global->setLet(true);
+  return {global};
 }
 
 void BridgedPassContext::fixStackNesting(BridgedFunction function) const {

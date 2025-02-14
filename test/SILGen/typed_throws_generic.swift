@@ -1,4 +1,4 @@
-// RUN: %target-swift-emit-silgen %s -enable-experimental-feature FullTypedThrows | %FileCheck %s
+// RUN: %target-swift-emit-silgen -Xllvm -sil-print-types %s -enable-experimental-feature FullTypedThrows | %FileCheck %s
 
 // REQUIRES: swift_feature_FullTypedThrows
 

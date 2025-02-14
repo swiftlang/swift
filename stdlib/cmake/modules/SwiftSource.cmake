@@ -248,13 +248,13 @@ function(_add_target_variant_swift_compile_flags
     if("${sdk}" STREQUAL "OSX" AND DEFINED VARIANT_DEPLOYMENT_VERSION_OSX)
       set(sdk_deployment_version ${VARIANT_DEPLOYMENT_VERSION_OSX})
     endif()
-    if("${sdk}" STREQUAL "IOS" AND DEFINED VARIANT_DEPLOYMENT_VERSION_IOS)
+    if(("${sdk}" STREQUAL "IOS" OR "${sdk}" STREQUAL "IOS_SIMULATOR") AND DEFINED VARIANT_DEPLOYMENT_VERSION_IOS)
       set(sdk_deployment_version ${VARIANT_DEPLOYMENT_VERSION_IOS})
     endif()
-    if("${sdk}" STREQUAL "TVOS" AND DEFINED VARIANT_DEPLOYMENT_VERSION_TVOS)
+    if(("${sdk}" STREQUAL "TVOS" OR "${sdk}" STREQUAL "TVOS_SIMULATOR") AND DEFINED VARIANT_DEPLOYMENT_VERSION_TVOS)
       set(sdk_deployment_version ${VARIANT_DEPLOYMENT_VERSION_TVOS})
     endif()
-    if("${sdk}" STREQUAL "WATCHOS" AND DEFINED VARIANT_DEPLOYMENT_VERSION_WATCHOS)
+    if(("${sdk}" STREQUAL "WATCHOS" OR "${sdk}" STREQUAL "WATCHOS_SIMULATOR") AND DEFINED VARIANT_DEPLOYMENT_VERSION_WATCHOS)
       set(sdk_deployment_version ${VARIANT_DEPLOYMENT_VERSION_WATCHOS})
     endif()
 
@@ -324,10 +324,6 @@ function(_add_target_variant_swift_compile_flags
 
   if(SWIFT_ENABLE_EXPERIMENTAL_OBSERVATION)
     list(APPEND result "-D" "SWIFT_ENABLE_EXPERIMENTAL_OBSERVATION")
-  endif()
-
-  if(SWIFT_ENABLE_EXPERIMENTAL_POINTER_BOUNDS)
-    list(APPEND result "-D" "SWIFT_ENABLE_EXPERIMENTAL_POINTER_BOUNDS")
   endif()
 
   if(SWIFT_ENABLE_SYNCHRONIZATION)
@@ -988,37 +984,6 @@ function(_compile_swift_files
 
     # FIXME: should we use '-resource-dir' here?  Seems like it has no advantage
     # over '-I' in this case.
-  endif()
-
-  if(XCODE)
-    # HACK: work around an issue with CMake Xcode generator and the Swift
-    # driver.
-    #
-    # The Swift driver does not update the mtime of the output files if the
-    # existing output files on disk are identical to the ones that are about
-    # to be written.  This behavior confuses the makefiles used in CMake Xcode
-    # projects: the makefiles will not consider everything up to date after
-    # invoking the compiler.  As a result, the standard library gets rebuilt
-    # multiple times during a single build.
-    #
-    # To work around this issue we touch the output files so that their mtime
-    # always gets updated.
-    set(command_touch_standard_outputs
-      COMMAND "${CMAKE_COMMAND}" -E touch ${standard_outputs})
-    set(command_touch_module_outputs
-      COMMAND "${CMAKE_COMMAND}" -E touch ${module_outputs})
-    set(command_touch_sib_outputs
-      COMMAND "${CMAKE_COMMAND}" -E touch ${sib_outputs})
-    set(command_touch_sibopt_outputs
-      COMMAND "${CMAKE_COMMAND}" -E touch ${sibopt_outputs})
-    set(command_touch_sibgen_outputs
-      COMMAND "${CMAKE_COMMAND}" -E touch ${sibgen_outputs})
-
-    # macCatalyst zippered outputs
-    if(maccatalyst_build_flavor STREQUAL "zippered")
-      set(command_touch_maccatalyst_module_outputs
-        COMMAND "${CMAKE_COMMAND}" -E touch ${maccatalyst_module_outputs})
-    endif()
   endif()
 
   list(REMOVE_DUPLICATES dirs_to_create)

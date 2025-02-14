@@ -24,14 +24,14 @@ public struct Builder {
     case staticInitializer(GlobalVariable)
   }
 
-  let insertAt: InsertionPoint
+  public let insertionPoint: InsertionPoint
   let location: Location
   private let notificationHandler: BridgedChangeNotificationHandler
   private let notifyNewInstruction: (Instruction) -> ()
 
   /// Return 'nil' when inserting at the start of a function or in a global initializer.
   public var insertionBlock: BasicBlock? {
-    switch insertAt {
+    switch insertionPoint {
     case let .before(inst):
       return inst.parentBlock
     case let .atEndOf(block):
@@ -42,7 +42,7 @@ public struct Builder {
   }
 
   public var bridged: BridgedBuilder {
-    switch insertAt {
+    switch insertionPoint {
     case .before(let inst):
       return BridgedBuilder(insertAt: .beforeInst, insertionObj: inst.bridged.obj,
                             loc: location.bridged)
@@ -73,10 +73,21 @@ public struct Builder {
   public init(insertAt: InsertionPoint, location: Location,
               _ notifyNewInstruction: @escaping (Instruction) -> (),
               _ notificationHandler: BridgedChangeNotificationHandler) {
-    self.insertAt = insertAt
+    self.insertionPoint = insertAt
     self.location = location;
     self.notifyNewInstruction = notifyNewInstruction
     self.notificationHandler = notificationHandler
+  }
+
+  public func createBuiltin(name: StringRef,
+                            type: Type,
+                            substitutions: SubstitutionMap = SubstitutionMap(),
+                            arguments: [Value]) -> BuiltinInst {
+    return arguments.withBridgedValues { valuesRef in
+      let bi = bridged.createBuiltin(
+        name._bridged, type.bridged, substitutions.bridged, valuesRef)
+      return notifyNew(bi.getAs(BuiltinInst.self))
+    }
   }
 
   public func createBuiltinBinaryFunction(name: String,
@@ -119,11 +130,6 @@ public struct Builder {
     return notifyNew(dr.getAs(AllocStackInst.self))
   }
 
-  public func createAllocVector(capacity: Value, elementType: Type) -> AllocVectorInst {
-    let dr = bridged.createAllocVector(capacity.bridged, elementType.bridged)
-    return notifyNew(dr.getAs(AllocVectorInst.self))
-  }
-
   @discardableResult
   public func createDeallocStack(_ operand: Value) -> DeallocStackInst {
     let dr = bridged.createDeallocStack(operand.bridged)
@@ -142,9 +148,27 @@ public struct Builder {
     return notifyNew(dr.getAs(AddressToPointerInst.self))
   }
 
+  public func createPointerToAddress(pointer: Value, addressType: Type,
+                                     isStrict: Bool, isInvariant: Bool,
+                                     alignment: Int? = nil) -> PointerToAddressInst {
+    let dr = bridged.createPointerToAddress(pointer.bridged, addressType.bridged, isStrict, isInvariant,
+                                            UInt64(alignment ?? 0))
+    return notifyNew(dr.getAs(PointerToAddressInst.self))
+  }
+
+  public func createIndexAddr(base: Value, index: Value, needStackProtection: Bool) -> IndexAddrInst {
+    let dr = bridged.createIndexAddr(base.bridged, index.bridged, needStackProtection)
+    return notifyNew(dr.getAs(IndexAddrInst.self))
+  }
+
   public func createUncheckedRefCast(from value: Value, to type: Type) -> UncheckedRefCastInst {
     let cast = bridged.createUncheckedRefCast(value.bridged, type.bridged)
     return notifyNew(cast.getAs(UncheckedRefCastInst.self))
+  }
+
+  public func createUncheckedAddrCast(from value: Value, to type: Type) -> UncheckedAddrCastInst {
+    let cast = bridged.createUncheckedAddrCast(value.bridged, type.bridged)
+    return notifyNew(cast.getAs(UncheckedAddrCastInst.self))
   }
 
   public func createUpcast(from value: Value, to type: Type) -> UpcastInst {

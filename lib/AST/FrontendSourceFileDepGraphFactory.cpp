@@ -61,7 +61,7 @@ using namespace fine_grained_dependencies;
 static std::string identifierForContext(const DeclContext *DC) {
   if (!DC) return "";
 
-  Mangle::ASTMangler Mangler;
+  Mangle::ASTMangler Mangler(DC->getASTContext());
   if (const auto *context = dyn_cast<NominalTypeDecl>(DC)) {
     return Mangler.mangleTypeAsContextUSR(context);
   }

@@ -546,7 +546,9 @@ fileprivate struct EscapeWalker<V: EscapeVisitor> : ValueDefUseWalker,
       // We need to follow the partial_apply value for two reasons:
       // 1. the closure (with the captured values) itself can escape
       // 2. something can escape in a destructor when the context is destroyed
-      return walkDownUses(ofValue: pai, path: path.with(knownType: nil))
+      if followLoads(at: path) || pai.capturesAddress(of: operand) {
+        return walkDownUses(ofValue: pai, path: path.with(knownType: nil))
+      }
     case is LoadInst, is LoadWeakInst, is LoadUnownedInst, is LoadBorrowInst:
       if !followLoads(at: path) {
         return .continueWalk
@@ -964,5 +966,25 @@ fileprivate struct EscapeWalker<V: EscapeVisitor> : ValueDefUseWalker,
 private extension SmallProjectionPath {
   var escapePath: EscapeUtilityTypes.EscapePath {
     EscapeUtilityTypes.EscapePath(projectionPath: self, followStores: false, addressIsStored: false, knownType: nil)
+  }
+}
+
+private extension PartialApplyInst {
+  func capturesAddress(of operand: Operand) -> Bool {
+    assert(operand.value.type.isAddress)
+    guard let conv = convention(of: operand) else {
+      fatalError("callee operand of partial_apply cannot have address type")
+    }
+    switch conv {
+    case .indirectIn, .indirectInGuaranteed:
+      // A partial_apply copies the values from indirect-in arguments, but does not capture the address.
+      return false
+    case .indirectInout, .indirectInoutAliasable, .packInout:
+      return true
+    case .directOwned, .directUnowned, .directGuaranteed, .packOwned, .packGuaranteed:
+      fatalError("invalid convention for address operand")
+    case .indirectOut, .packOut, .indirectInCXX:
+      fatalError("invalid convention for partial_apply")
+    }
   }
 }

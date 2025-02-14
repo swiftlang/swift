@@ -40,6 +40,8 @@ final public class Function : CustomStringConvertible, HasShortDescription, Hash
 
   public var isAutodiffVJP: Bool { bridged.isAutodiffVJP() }
 
+  public var isConvertPointerToPointerArgument: Bool { bridged.isConvertPointerToPointerArgument() }
+
   public var specializationLevel: Int { bridged.specializationLevel() }
   
   public var hasOwnership: Bool { bridged.hasOwnership() }
@@ -252,6 +254,29 @@ final public class Function : CustomStringConvertible, HasShortDescription, Hash
       case .AlwaysInline: return .always
       default:
         fatalError()
+    }
+  }
+
+  public enum SourceFileKind {
+    case library         /// A normal .swift file.
+    case main            /// A .swift file that can have top-level code.
+    case sil             /// Came from a .sil file.
+    case interface       /// Came from a .swiftinterface file, representing another module.
+    case macroExpansion  /// Came from a macro expansion.
+    case defaultArgument /// Came from default argument at caller side
+  };
+
+  public var sourceFileKind: SourceFileKind? {
+    switch bridged.getSourceFileKind() {
+    case .Library: return .library
+    case .Main: return .main
+    case .SIL: return .sil
+    case .Interface: return .interface
+    case .MacroExpansion: return .macroExpansion
+    case .DefaultArgument: return .defaultArgument
+    case .None: return nil
+    @unknown default:
+      fatalError("unknown enum case")
     }
   }
 }

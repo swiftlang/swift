@@ -1087,7 +1087,7 @@ private:
 static std::string getClonedName(SILFunction *func, SerializedKind_t serialized,
                                  const SmallBitVector &argsToConvertIndices) {
   auto kind = Demangle::SpecializationPass::MoveDiagnosticInOutToOut;
-  Mangle::FunctionSignatureSpecializationMangler Mangler(kind, serialized,
+  Mangle::FunctionSignatureSpecializationMangler Mangler(func->getASTContext(), kind, serialized,
                                                          func);
   for (int i = argsToConvertIndices.find_first(); i != -1;
        i = argsToConvertIndices.find_next(i)) {
@@ -2539,7 +2539,7 @@ struct UnsupportedUseCaseDiagnosticEmitter {
   bool tryEmitCannotConsumeNonLocalMemoryError() const {
     auto src = stripAccessMarkers(mai->getSrc());
 
-    if (auto *gai = dyn_cast<GlobalAddrInst>(src)) {
+    if (isa<GlobalAddrInst>(src)) {
       auto diag = diag::sil_movekillscopyable_move_applied_to_nonlocal_memory;
       diagnose(getASTContext(), mai->getLoc().getSourceLoc(), diag, 0);
       return true;

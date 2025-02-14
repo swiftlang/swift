@@ -276,6 +276,11 @@ llvm::cl::opt<std::string> StatsOnlyFunctionsNamePattern(
 struct FunctionStat {
   int BlockCount = 0;
   int InstCount = 0;
+  /// True when the FunctionStat is created for a SIL Function after a SIL
+  /// Optimization pass has been run on it. When it is a post optimization SIL
+  /// Function, we do not want to store anything in the InlinedAts Map in
+  /// InstCountVisitor.
+  bool NewFunc = false;
   /// Instruction counts per SILInstruction kind.
   InstructionCounts InstCounts;
 
@@ -283,8 +288,10 @@ struct FunctionStat {
                            unsigned, unsigned>;
   llvm::StringSet<> VarNames;
   llvm::DenseSet<FunctionStat::VarID> DebugVariables;
+  llvm::DenseSet<const SILDebugScope *> VisitedScope;
+  llvm::DenseMap<VarID, const SILDebugScope *> InlinedAts;
 
-  FunctionStat(SILFunction *F);
+  FunctionStat(SILFunction *F, bool NewFunc = false);
   FunctionStat() {}
 
   // The DebugVariables set contains pointers to VarNames. Disallow copy.
@@ -384,15 +391,24 @@ struct ModuleStat {
 struct InstCountVisitor : SILInstructionVisitor<InstCountVisitor> {
   int BlockCount = 0;
   int InstCount = 0;
+  /// True when the InstCountVisitor is created for a SIL Function after a SIL
+  /// Optimization pass has been run on it. When it is a post optimization SIL
+  /// Function, we do not want to store anything in the InlinedAts Map in
+  /// InstCountVisitor.
+  const bool &NewFunc;
   InstructionCounts &InstCounts;
 
   llvm::StringSet<> &VarNames;
   llvm::DenseSet<FunctionStat::VarID> &DebugVariables;
+  llvm::DenseMap<FunctionStat::VarID, const SILDebugScope *> &InlinedAts;
 
-  InstCountVisitor(InstructionCounts &InstCounts,
-                   llvm::StringSet<> &VarNames,
-                   llvm::DenseSet<FunctionStat::VarID> &DebugVariables)
-  : InstCounts(InstCounts), VarNames(VarNames), DebugVariables(DebugVariables) {}
+  InstCountVisitor(
+      InstructionCounts &InstCounts, llvm::StringSet<> &VarNames,
+      llvm::DenseSet<FunctionStat::VarID> &DebugVariables,
+      llvm::DenseMap<FunctionStat::VarID, const SILDebugScope *> &InlinedAts,
+      bool &NewFunc)
+      : NewFunc(NewFunc), InstCounts(InstCounts), VarNames(VarNames),
+        DebugVariables(DebugVariables), InlinedAts(InlinedAts) {}
 
   int getBlockCount() const {
     return BlockCount;
@@ -431,6 +447,8 @@ struct InstCountVisitor : SILInstructionVisitor<InstCountVisitor> {
               varInfo->Scope ? varInfo->Scope : inst->getDebugScope(),
               UniqueName, line, col);
     DebugVariables.insert(key);
+    if (!NewFunc)
+      InlinedAts.try_emplace(key, varInfo->Scope->InlinedCallSite);
   }
 };
 
@@ -710,16 +728,85 @@ bool isFirstTimeData(int Old, int New) {
   return Old == 0 && New != Old;
 }
 
-int computeLostVariables(llvm::DenseSet<FunctionStat::VarID> &Old,
-                         llvm::DenseSet<FunctionStat::VarID> &New) {
-  unsigned count = 0;
-  for (auto &var : Old) {
-    if (New.contains(var))
-      continue;
-    // llvm::dbgs() << "Lost variable: " << std::get<1>(var) << "\n";
-    count++;
+/// Return true if \p Scope is the same as \p DbgValScope or a child scope of
+/// \p DbgValScope, return false otherwise.
+bool isScopeChildOfOrEqualTo(const SILDebugScope *Scope,
+                             const SILDebugScope *DbgValScope) {
+  llvm::DenseSet<const SILDebugScope *> VisitedScope;
+  while (Scope != nullptr) {
+    if (VisitedScope.find(Scope) == VisitedScope.end()) {
+      VisitedScope.insert(Scope);
+      if (Scope == DbgValScope) {
+        return true;
+      }
+      if (auto *S = dyn_cast<const SILDebugScope *>(Scope->Parent))
+        Scope = S;
+    } else
+      return false;
   }
-  return count;
+  return false;
+}
+
+/// Return true if \p InlinedAt is the same as \p DbgValInlinedAt or part of
+/// the InlinedAt chain, return false otherwise.
+bool isInlinedAtChildOfOrEqualTo(const SILDebugScope *InlinedAt,
+                                 const SILDebugScope *DbgValInlinedAt) {
+  if (DbgValInlinedAt == InlinedAt)
+    return true;
+  if (!DbgValInlinedAt)
+    return false;
+  if (!InlinedAt)
+    return false;
+  auto *IA = InlinedAt;
+  while (IA) {
+    if (IA == DbgValInlinedAt)
+      return true;
+    IA = IA->InlinedCallSite;
+  }
+  return false;
+}
+
+int computeLostVariables(SILFunction *F, FunctionStat &Old, FunctionStat &New) {
+  unsigned LostCount = 0;
+  unsigned PrevLostCount = 0;
+  auto &OldSet = Old.DebugVariables;
+  auto &NewSet = New.DebugVariables;
+  // Find an Instruction that shares the same scope as the dropped debug_value
+  // or has a scope that is the child of the scope of the debug_value, and has
+  // an inlinedAt equal to the inlinedAt of the debug_value or it's inlinedAt
+  // chain contains the inlinedAt of the debug_value, if such an Instruction is
+  // found, debug information is dropped.
+  for (auto &Var : OldSet) {
+    if (NewSet.contains(Var))
+      continue;
+    auto &DbgValScope = std::get<0>(Var);
+    for (auto &BB : *F) {
+      for (auto &I : BB) {
+        if (I.isDebugInstruction()) {
+          auto DbgLoc = I.getDebugLocation();
+          auto Scope = DbgLoc.getScope();
+          // If the Scope is a child of, or equal to the DbgValScope and is
+          // inlined at the Var's InlinedAt location, return true to signify
+          // that the Var has been dropped.
+          if (isScopeChildOfOrEqualTo(Scope, DbgValScope)) {
+            if (isInlinedAtChildOfOrEqualTo(Scope->InlinedCallSite,
+                                            Old.InlinedAts[Var])) {
+              // Found another instruction in the variable's scope, so there
+              // exists a break point at which the variable could be observed.
+              // Count it as dropped.
+              LostCount++;
+              break;
+            }
+          }
+        }
+      }
+      if (PrevLostCount != LostCount) {
+        PrevLostCount = LostCount;
+        break;
+      }
+    }
+  }
+  return LostCount;
 }
 
 /// Dump statistics for a SILFunction. It is only used if a user asked to
@@ -782,8 +869,7 @@ void processFuncStatsChanges(SILFunction *F, FunctionStat &OldStat,
   // Compute deltas.
   double DeltaBlockCount = computeDelta(OldStat.BlockCount, NewStat.BlockCount);
   double DeltaInstCount = computeDelta(OldStat.InstCount, NewStat.InstCount);
-  int LostVariables = computeLostVariables(OldStat.DebugVariables,
-                                           NewStat.DebugVariables);
+  int LostVariables = computeLostVariables(F, OldStat, NewStat);
 
   NewLineInserter nl;
 
@@ -959,7 +1045,7 @@ void OptimizerStatsAnalysis::updateModuleStats(TransformationContext &Ctx) {
       InvalidatedFuncs.pop_back();
       auto &FuncStat = getFunctionStat(F);
       auto &OldFuncStat = FuncStat;
-      FunctionStat NewFuncStat(F);
+      FunctionStat NewFuncStat(F, true);
       processFuncStatsChanges(F, OldFuncStat, NewFuncStat, Ctx);
       NewModStat.subFunctionStat(OldFuncStat);
       NewModStat.addFunctionStat(NewFuncStat);
@@ -984,7 +1070,7 @@ void OptimizerStatsAnalysis::updateModuleStats(TransformationContext &Ctx) {
       AddedFuncs.pop_back();
       auto &FuncStat = getFunctionStat(F);
       FunctionStat OldFuncStat;
-      FunctionStat NewFuncStat(F);
+      FunctionStat NewFuncStat(F, true);
       processFuncStatsChanges(F, OldFuncStat, NewFuncStat, Ctx);
       NewModStat.addFunctionStat(NewFuncStat);
       FuncStat = std::move(NewFuncStat);
@@ -1003,8 +1089,8 @@ void OptimizerStatsAnalysis::updateModuleStats(TransformationContext &Ctx) {
   ModStat = NewModStat;
 }
 
-FunctionStat::FunctionStat(SILFunction *F) {
-  InstCountVisitor V(InstCounts, VarNames, DebugVariables);
+FunctionStat::FunctionStat(SILFunction *F, bool NewFunc) : NewFunc(NewFunc) {
+  InstCountVisitor V(InstCounts, VarNames, DebugVariables, InlinedAts, NewFunc);
   V.visitSILFunction(F);
   BlockCount = V.getBlockCount();
   InstCount = V.getInstCount();

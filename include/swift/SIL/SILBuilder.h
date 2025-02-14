@@ -437,16 +437,6 @@ public:
         isFromVarDecl, wasMoved));
   }
 
-  AllocVectorInst *
-  createAllocVector(SILLocation loc, SILValue capacity, SILType elementType) {
-    if (isInsertingIntoGlobal()) {
-      return insert(AllocVectorInst::createInInitializer(
-          getSILDebugLocation(loc, true), capacity, elementType, getModule()));
-    }
-    return insert(AllocVectorInst::create(
-        getSILDebugLocation(loc, true), capacity, elementType, getFunction()));
-  }
-
   AllocPackInst *createAllocPack(SILLocation loc, SILType packType) {
     return insert(AllocPackInst::create(getSILDebugLocation(loc), packType,
                                         getFunction()));
@@ -2371,11 +2361,11 @@ public:
     return insert(new (getModule()) EndCOWMutationInst(getSILDebugLocation(Loc),
                                                   operand, keepUnique));
   }
-  IsEscapingClosureInst *createIsEscapingClosure(SILLocation Loc,
+  DestroyNotEscapedClosureInst *createDestroyNotEscapedClosure(SILLocation Loc,
                                                  SILValue operand,
                                                  unsigned VerificationType) {
     auto Int1Ty = SILType::getBuiltinIntegerType(1, getASTContext());
-    return insert(new (getModule()) IsEscapingClosureInst(
+    return insert(new (getModule()) DestroyNotEscapedClosureInst(
         getSILDebugLocation(Loc), operand, Int1Ty, VerificationType));
   }
 
@@ -3090,6 +3080,15 @@ public:
   }
 
   //===--------------------------------------------------------------------===//
+  // Misc Uses
+  //===--------------------------------------------------------------------===//
+
+  IgnoredUseInst *createIgnoredUse(SILLocation loc, SILValue value) {
+    return insert(new (getModule())
+                      IgnoredUseInst(getSILDebugLocation(loc), value));
+  }
+
+  //===--------------------------------------------------------------------===//
   // Private Helper Methods
   //===--------------------------------------------------------------------===//
 
@@ -3116,12 +3115,16 @@ private:
     C.notifyInserted(TheInst);
 
 #ifndef NDEBUG
-    // If we are inserting into a specific function (rather than a block for a
-    // global_addr), verify that our instruction/the associated location are in
-    // sync. We don't care if an instruction is used in global_addr.
-    if (F)
-      TheInst->verifyDebugInfo();
-    TheInst->verifyOperandOwnership(&C.silConv);
+    // A vector instruction can only be in a global initializer. Therefore there
+    // is no point in verifying debug info or ownership.
+    if (!isa<VectorInst>(TheInst)) {
+      // If we are inserting into a specific function (rather than a block for a
+      // global_addr), verify that our instruction/the associated location are in
+      // sync. We don't care if an instruction is used in global_addr.
+      if (F)
+        TheInst->verifyDebugInfo();
+      TheInst->verifyOperandOwnership(&C.silConv);
+    }
 #endif
   }
 

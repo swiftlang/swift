@@ -90,6 +90,18 @@ SolverTrail::~SolverTrail() {
     result.TheConstraint.Constraint = constraint; \
     return result; \
   }
+#define BINDING_RELATION_CHANGE(Name) \
+  SolverTrail::Change \
+  SolverTrail::Change::Name(TypeVariableType *typeVar, \
+                            TypeVariableType *otherTypeVar, \
+                            Constraint *constraint) { \
+    Change result; \
+    result.Kind = ChangeKind::Name; \
+    result.BindingRelation.TypeVar = typeVar; \
+    result.BindingRelation.OtherTypeVar = otherTypeVar; \
+    result.BindingRelation.Constraint = constraint; \
+    return result; \
+  }
 #define SCORE_CHANGE(Name) \
   SolverTrail::Change \
   SolverTrail::Change::Name(ScoreKind kind, unsigned value) { \
@@ -306,6 +318,19 @@ SolverTrail::Change::RetiredConstraint(ConstraintList::iterator where,
   return result;
 }
 
+SolverTrail::Change
+SolverTrail::Change::RetractedBinding(TypeVariableType *typeVar,
+                                      inference::PotentialBinding binding) {
+  Change result;
+  result.Kind = ChangeKind::RetractedBinding;
+  result.Binding.TypeVar = typeVar;
+  result.Binding.BindingType = binding.BindingType;
+  result.Binding.BindingSource = binding.BindingSource;
+  result.Options = unsigned(binding.Kind);
+
+  return result;
+}
+
 SyntacticElementTargetKey
 SolverTrail::Change::getSyntacticElementTargetKey() const {
   ASSERT(Kind == ChangeKind::RecordedTarget);
@@ -359,11 +384,9 @@ void SolverTrail::Change::undo(ConstraintSystem &cs) const {
     cg.addConstraint(TheConstraint.TypeVar, TheConstraint.Constraint);
     break;
 
-  case ChangeKind::ExtendedEquivalenceClass: {
-    auto &node = cg[EquivClass.TypeVar];
-    node.truncateEquivalenceClass(EquivClass.PrevSize);
+  case ChangeKind::ExtendedEquivalenceClass:
+    cg[EquivClass.TypeVar].truncateEquivalenceClass(EquivClass.PrevSize);
     break;
-   }
 
   case ChangeKind::RelatedTypeVariables:
     cg.unrelateTypeVariables(Relation.TypeVar, Relation.OtherTypeVar);
@@ -373,9 +396,12 @@ void SolverTrail::Change::undo(ConstraintSystem &cs) const {
     cg.retractBindings(TheConstraint.TypeVar, TheConstraint.Constraint);
     break;
 
-  case ChangeKind::RetractedBindings:
-    cg.inferBindings(TheConstraint.TypeVar, TheConstraint.Constraint);
+  case ChangeKind::RetractedBindings: {
+    auto &bindings = cg[TheConstraint.TypeVar].getPotentialBindings();
+    bool inserted = bindings.Constraints.insert(TheConstraint.Constraint);
+    ASSERT(inserted);
     break;
+  }
 
   case ChangeKind::UpdatedTypeVariable:
     Update.TypeVar->getImpl().setRawOptions(Options);
@@ -494,6 +520,45 @@ void SolverTrail::Change::undo(ConstraintSystem &cs) const {
     cs.InactiveConstraints.insert(Retiree.Where,
                                   Retiree.Constraint);
     break;
+
+  case ChangeKind::RetractedDelayedBy:
+    cg[TheConstraint.TypeVar].getPotentialBindings()
+        .DelayedBy.push_back(TheConstraint.Constraint);
+    break;
+
+  case ChangeKind::RetractedAdjacentVar:
+    cg[BindingRelation.TypeVar].getPotentialBindings()
+        .AdjacentVars.emplace_back(BindingRelation.OtherTypeVar,
+                                   BindingRelation.Constraint);
+    break;
+
+  case ChangeKind::RetractedSubtypeOf:
+    cg[BindingRelation.TypeVar].getPotentialBindings()
+        .SubtypeOf.emplace_back(BindingRelation.OtherTypeVar,
+                                BindingRelation.Constraint);
+    break;
+
+  case ChangeKind::RetractedSupertypeOf:
+    cg[BindingRelation.TypeVar].getPotentialBindings()
+        .SupertypeOf.emplace_back(BindingRelation.OtherTypeVar,
+                                  BindingRelation.Constraint);
+    break;
+
+  case ChangeKind::RetractedEquivalentTo:
+    cg[BindingRelation.TypeVar].getPotentialBindings()
+        .EquivalentTo.emplace_back(BindingRelation.OtherTypeVar,
+                                   BindingRelation.Constraint);
+    break;
+
+  case ChangeKind::RetractedBinding: {
+    PotentialBinding binding(Binding.BindingType,
+                             AllowedBindingKind(Options),
+                             Binding.BindingSource);
+
+    auto &bindings = cg[BindingRelation.TypeVar].getPotentialBindings();
+    bindings.Bindings.push_back(binding);
+    break;
+  }
   }
 }
 
@@ -539,6 +604,17 @@ void SolverTrail::Change::dump(llvm::raw_ostream &out,
                                       indent + 2); \
       out << " on type variable "; \
       TheConstraint.TypeVar->print(out, PO); \
+      out << ")\n"; \
+      break;
+#define BINDING_RELATION_CHANGE(Name) \
+    case ChangeKind::Name: \
+      out << "(" << #Name << " "; \
+      BindingRelation.Constraint->print(out, &cs.getASTContext().SourceMgr, \
+                                        indent + 2); \
+      out << " on type variable "; \
+      BindingRelation.TypeVar->print(out, PO); \
+      out << " and "; \
+      BindingRelation.OtherTypeVar->print(out, PO); \
       out << ")\n"; \
       break;
 #define SCORE_CHANGE(Name) \
@@ -692,6 +768,14 @@ void SolverTrail::Change::dump(llvm::raw_ostream &out,
                               indent + 2);
     out << ")\n";
     break;
+
+  case ChangeKind::RetractedBinding:
+    out << "(RetractedBinding ";
+    Binding.TypeVar->print(out, PO);
+    out << " with type ";
+    Binding.BindingType->print(out, PO);
+    out << " and kind " << Options << ")\n";
+    break;
   }
 }
 
@@ -730,21 +814,10 @@ void SolverTrail::undo(unsigned toIndex) {
   ASSERT(!UndoActive);
   UndoActive = true;
 
-  // FIXME: Undo all changes in the correct order!
   for (unsigned i = Changes.size(); i > toIndex; i--) {
     auto change = Changes[i - 1];
-    if (change.Kind == ChangeKind::UpdatedTypeVariable) {
-      LLVM_DEBUG(llvm::dbgs() << "- "; change.dump(llvm::dbgs(), CS, 0));
-      change.undo(CS);
-    }
-  }
-
-  for (unsigned i = Changes.size(); i > toIndex; i--) {
-    auto change = Changes[i - 1];
-    if (change.Kind != ChangeKind::UpdatedTypeVariable) {
-      LLVM_DEBUG(llvm::dbgs() << "- "; change.dump(llvm::dbgs(), CS, 0));
-      change.undo(CS);
-    }
+    LLVM_DEBUG(llvm::dbgs() << "- "; change.dump(llvm::dbgs(), CS, 0));
+    change.undo(CS);
   }
 
   Changes.resize(toIndex);
@@ -754,12 +827,148 @@ void SolverTrail::undo(unsigned toIndex) {
 void SolverTrail::dumpActiveScopeChanges(llvm::raw_ostream &out,
                                          unsigned fromIndex,
                                          unsigned indent) const {
-  out.indent(indent);
-  out << "(changes:\n";
+  if (Changes.empty())
+    return;
 
-  for (unsigned i = fromIndex; i < Changes.size(); ++i)
-    Changes[i].dump(out, CS, indent + 2);
+  // Collect Changes for printing.
+  std::vector<TypeVariableType *> addedTypeVars;
+  std::set<TypeVariableType *> updatedTypeVars;
+  std::set<Constraint *> addedConstraints;
+  std::set<Constraint *> removedConstraints;
+  for (unsigned int i = fromIndex; i < Changes.size(); i++) {
+    auto change = Changes[i];
+    switch (change.Kind) {
+    case ChangeKind::AddedTypeVariable:
+      addedTypeVars.push_back(change.TypeVar);
+      break;
+    case ChangeKind::UpdatedTypeVariable:
+      updatedTypeVars.insert(change.Update.TypeVar);
+      break;
+    case ChangeKind::AddedConstraint:
+      addedConstraints.insert(change.TheConstraint.Constraint);
+      break;
+    case ChangeKind::RemovedConstraint:
+      removedConstraints.insert(change.TheConstraint.Constraint);
+      break;
+    default:
+      // Don't consider changes that don't affect the graph.
+      break;
+    }
+  }
+
+  // If there are any constraints that were both added and removed in this set
+  // of Changes, remove them from both.
+  std::set<Constraint *> intersects;
+  set_intersection(addedConstraints.begin(), addedConstraints.end(),
+                   removedConstraints.begin(), removedConstraints.end(),
+                   std::inserter(intersects, intersects.begin()));
+  llvm::set_subtract(addedConstraints, intersects);
+  llvm::set_subtract(removedConstraints, intersects);
+
+  // Print out Changes.
+  PrintOptions PO;
+  PO.PrintTypesForDebugging = true;
+  out.indent(indent);
+  out << "(Changes:\n";
+  if (!addedTypeVars.empty()) {
+    out.indent(indent + 2);
+    auto heading = (addedTypeVars.size() > 1) ? "(New Type Variables: \n"
+                                              : "(New Type Variable: \n";
+    out << heading;
+    for (const auto &typeVar : addedTypeVars) {
+      out.indent(indent + 4);
+      out << "> $T" << typeVar->getImpl().getID();
+      out << '\n';
+    }
+    out.indent(indent + 2);
+    out << ")\n";
+  }
+  if (!updatedTypeVars.empty()) {
+    std::vector<TypeVariableType *> assignments;
+    std::vector<std::pair<TypeVariableType *, TypeVariableType *>> equivalences;
+
+    for (auto *typeVar : updatedTypeVars) {
+      if (auto *parentVar =
+              typeVar->getImpl().getRepresentative(/*trail=*/nullptr)) {
+        if (parentVar != typeVar) {
+          equivalences.push_back(std::make_pair(parentVar, typeVar));
+          continue;
+        }
+      }
+
+      if (typeVar->getImpl().ParentOrFixed.is<TypeBase *>())
+        assignments.push_back(typeVar);
+    }
+
+    if (!assignments.empty()) {
+      out.indent(indent + 2);
+      auto heading = (assignments.size() > 1) ? "(Bound Type Variables: \n"
+                                              : "(Bound Type Variable: \n";
+      out << heading;
+
+      for (auto *typeVar : assignments) {
+        out.indent(indent + 4);
+        out << "> $T" << typeVar->getImpl().getID() << " := ";
+        typeVar->getImpl().ParentOrFixed.get<TypeBase *>()->print(out, PO);
+        out << '\n';
+      }
+      out.indent(indent + 2);
+      out << ")\n";
+    }
+
+    if (!equivalences.empty()) {
+      out.indent(indent + 2);
+      auto heading = (equivalences.size() > 1) ? "(New Equivalences: \n"
+                                               : "(New Equivalence: \n";
+      out << heading;
+      for (const auto &eq : equivalences) {
+        out.indent(indent + 4);
+        out << "> $T" << eq.first->getImpl().getID();
+        out << " == ";
+        out << "$T" << eq.second->getImpl().getID();
+        out << '\n';
+      }
+      out.indent(indent + 2);
+      out << ")\n";
+    }
+  }
+  if (!addedConstraints.empty()) {
+    out.indent(indent + 2);
+    auto heading = (addedConstraints.size() > 1) ? "(Added Constraints: \n"
+                                                 : "(Added Constraint: \n";
+    out << heading;
+    for (const auto &constraint : addedConstraints) {
+      out.indent(indent + 4);
+      out << "> ";
+      constraint->print(out, &CS.getASTContext().SourceMgr, indent + 6);
+      out << '\n';
+    }
+    out.indent(indent + 2);
+    out << ")\n";
+  }
+  if (!removedConstraints.empty()) {
+    out.indent(indent + 2);
+    auto heading = (removedConstraints.size() > 1) ? "(Removed Constraints: \n"
+                                                   : "(Removed Constraint: \n";
+    out << heading;
+    for (const auto &constraint : removedConstraints) {
+      out.indent(indent + 4);
+      out << "> ";
+      constraint->print(out, &CS.getASTContext().SourceMgr, indent + 6);
+      out << '\n';
+    }
+    out.indent(indent + 2);
+    out << ")\n";
+  }
 
   out.indent(indent);
   out << ")\n";
+}
+
+void SolverTrail::dump() const { dump(llvm::errs()); }
+
+void SolverTrail::dump(raw_ostream &OS, unsigned fromIndex,
+                       unsigned indent) const {
+  for (unsigned i = fromIndex; i < Changes.size(); ++i)
+    Changes[i].dump(OS, CS, indent);
 }

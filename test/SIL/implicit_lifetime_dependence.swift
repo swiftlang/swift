@@ -5,6 +5,30 @@
 
 // REQUIRES: swift_feature_LifetimeDependence
 
+@_unsafeNonescapableResult
+@lifetime(borrow source)
+internal func _overrideLifetime<
+  T: ~Copyable & ~Escapable, U: ~Copyable & ~Escapable
+>(
+  _ dependent: consuming T, borrowing source: borrowing U
+) -> T {
+  // TODO: Remove @_unsafeNonescapableResult. Instead, the unsafe dependence
+  // should be expressed by a builtin that is hidden within the function body.
+  dependent
+}
+
+@_unsafeNonescapableResult
+@lifetime(source)
+internal func _overrideLifetime<
+  T: ~Copyable & ~Escapable, U: ~Copyable & ~Escapable
+>(
+  _ dependent: consuming T, copying source: borrowing U
+) -> T {
+  // TODO: Remove @_unsafeNonescapableResult. Instead, the unsafe dependence
+  // should be expressed by a builtin that is hidden within the function body.
+  dependent
+}
+
 struct BufferView : ~Escapable {
   let ptr: UnsafeRawBufferPointer
   let c: Int
@@ -13,7 +37,7 @@ struct BufferView : ~Escapable {
     self.ptr = ptr
     self.c = c
   }
-  @_unsafeNonescapableResult
+  @lifetime(borrow ptr)
   init(independent ptr: UnsafeRawBufferPointer, _ c: Int) {
     self.ptr = ptr
     self.c = c
@@ -66,7 +90,8 @@ func derive(_ unused: Int, _ x: borrowing BufferView) -> BufferView {
 
 // CHECK-LABEL: sil hidden @$s28implicit_lifetime_dependence16consumeAndCreateyAA10BufferViewVADnF : $@convention(thin) (@owned BufferView) -> @lifetime(copy 0)  @owned BufferView {
 func consumeAndCreate(_ x: consuming BufferView) -> BufferView {
-  return BufferView(independent: x.ptr, x.c)
+  let bv = BufferView(independent: x.ptr, x.c)
+  return _overrideLifetime(bv, copying: x)
 }
 
 func use(_ x: borrowing BufferView) {}
@@ -134,6 +159,7 @@ struct GenericBufferView<Element> : ~Escapable {
   let count: Int
 
 // CHECK-LABEL: sil hidden @$s28implicit_lifetime_dependence17GenericBufferViewV11baseAddress5countACyxGSV_SitcfC : $@convention(method) <Element> (UnsafeRawPointer, Int, @thin GenericBufferView<Element>.Type) -> @lifetime(borrow 0) @owned GenericBufferView<Element> {
+  @lifetime(borrow baseAddress)
   init<Storage>(baseAddress: Pointer,
                 count: Int,
                 dependsOn: borrowing Storage) {
@@ -160,10 +186,13 @@ struct GenericBufferView<Element> : ~Escapable {
 // CHECK: sil hidden @$s28implicit_lifetime_dependence17GenericBufferViewVyACyxGAA9FakeRangeVySVGcig : $@convention(method) <Element> (FakeRange<UnsafeRawPointer>, @guaranteed GenericBufferView<Element>) -> @lifetime(copy 1) @owned GenericBufferView<Element> {
   subscript(bounds: FakeRange<Pointer>) -> Self {
     get {
-      GenericBufferView(
-        baseAddress: UnsafeRawPointer(bounds.lowerBound),
+      let pointer = UnsafeRawPointer(bounds.lowerBound)
+      let result = GenericBufferView(
+        baseAddress: pointer,
         count: bounds.upperBound.distance(to:bounds.lowerBound) / MemoryLayout<Element>.stride
       )
+      // assuming that bounds is within self
+      return _overrideLifetime(result, copying: self)
     }
   }
 }

@@ -46,6 +46,7 @@ public:
                         llvm::cas::ActionCache &Cache,
                         llvm::cas::ObjectRef BaseKey,
                         const FrontendInputsAndOutputs &InputsAndOutputs,
+                        const FrontendOptions &Opts,
                         FrontendOptions::ActionType Action);
   ~SwiftCASOutputBackend();
 
