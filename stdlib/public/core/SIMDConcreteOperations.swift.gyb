@@ -362,6 +362,110 @@ extension SIMD${n} where Scalar == ${Scalar} {
       Builtin.fcmp_oge_${Builtin}(a._storage._value, b._storage._value)
     ))
   }
+
+  /// The wrapping sum of two vectors.
+  @_alwaysEmitIntoClient
+  public static func +(a: Self, b: Self) -> Self {
+    Self(Builtin.fadd_${Builtin}(a._storage._value, b._storage._value))
+  }
+
+  /// The wrapping difference of two vectors.
+  @_alwaysEmitIntoClient
+  public static func -(a: Self, b: Self) -> Self {
+    Self(Builtin.fsub_${Builtin}(a._storage._value, b._storage._value))
+  }
+
+  /// The pointwise wrapping product of two vectors.
+  @_alwaysEmitIntoClient
+  public static func *(a: Self, b: Self) -> Self {
+    Self(Builtin.fmul_${Builtin}(a._storage._value, b._storage._value))
+  }
+
+  /// The pointwise wrapping quotient of two vectors.
+  @_alwaysEmitIntoClient
+  public static func /(a: Self, b: Self) -> Self {
+    Self(Builtin.fdiv_${Builtin}(a._storage._value, b._storage._value))
+  }
+
+  @_alwaysEmitIntoClient
+  public static func +(a: Scalar, b: Self) -> Self {
+    return Self(repeating: a) + b
+  }
+
+  @_alwaysEmitIntoClient
+  public static func -(a: Scalar, b: Self) -> Self {
+    return Self(repeating: a) - b
+  }
+
+  @_alwaysEmitIntoClient
+  public static func *(a: Scalar, b: Self) -> Self {
+    return Self(repeating: a) * b
+  }
+
+  @_alwaysEmitIntoClient
+  public static func /(a: Scalar, b: Self) -> Self {
+    return Self(repeating: a) / b
+  }
+
+  @_alwaysEmitIntoClient
+  public static func +(a: Self, b: Scalar) -> Self {
+    return a + Self(repeating: b)
+  }
+
+  @_alwaysEmitIntoClient
+  public static func -(a: Self, b: Scalar) -> Self {
+    return a - Self(repeating: b)
+  }
+
+  @_alwaysEmitIntoClient
+  public static func *(a: Self, b: Scalar) -> Self {
+    return a * Self(repeating: b)
+  }
+
+  @_alwaysEmitIntoClient
+  public static func /(a: Self, b: Scalar) -> Self {
+    return a / Self(repeating: b)
+  }
+
+  /// Updates the left hand side with the wrapping sum of the two
+  /// vectors.
+  @_alwaysEmitIntoClient
+  public static func +=(a: inout Self, b: Self) { a = a + b }
+
+  /// Updates the left hand side with the wrapping difference of the two
+  /// vectors.
+  @_alwaysEmitIntoClient
+  public static func -=(a: inout Self, b: Self) { a = a - b }
+
+  /// Updates the left hand side with the pointwise wrapping product of two
+  /// vectors.
+  @_alwaysEmitIntoClient
+  public static func *=(a: inout Self, b: Self) { a = a * b }
+
+  /// Updates the left hand side with the pointwise wrapping quotient of two
+  /// vectors.
+  @_alwaysEmitIntoClient
+  public static func /=(a: inout Self, b: Self) { a = a / b }
+
+  @_alwaysEmitIntoClient
+  public static func +=(a: inout Self, b: Scalar) {
+    a = a + b
+  }
+
+  @_alwaysEmitIntoClient
+  public static func -=(a: inout Self, b: Scalar) {
+    a = a - b
+  }
+
+  @_alwaysEmitIntoClient
+  public static func *=(a: inout Self, b: Scalar) {
+    a = a * b
+  }
+
+  @_alwaysEmitIntoClient
+  public static func /=(a: inout Self, b: Scalar) {
+    a = a / b
+  }
 }
 %  if bits == 16:
 #endif
