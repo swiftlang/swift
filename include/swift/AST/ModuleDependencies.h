@@ -266,7 +266,7 @@ class SwiftInterfaceModuleDependenciesStorage
     : public ModuleDependencyInfoStorageBase {
 public:
   /// Destination output path
-  const std::string moduleOutputPath;
+  std::string moduleOutputPath;
 
   /// The Swift interface file to be used to generate the module file.
   const std::string swiftInterfaceFile;
@@ -275,7 +275,7 @@ public:
   const std::vector<std::string> compiledModuleCandidates;
 
   /// The hash value that will be used for the generated module
-  const std::string contextHash;
+  std::string contextHash;
 
   /// A flag that indicates this dependency is a framework
   const bool isFramework;
@@ -290,22 +290,20 @@ public:
   const std::string userModuleVersion;
 
   SwiftInterfaceModuleDependenciesStorage(
-      StringRef moduleOutputPath, StringRef swiftInterfaceFile,
+      StringRef swiftInterfaceFile,
       ArrayRef<StringRef> compiledModuleCandidates,
       ArrayRef<ScannerImportStatementInfo> moduleImports,
       ArrayRef<ScannerImportStatementInfo> optionalModuleImports,
       ArrayRef<StringRef> buildCommandLine, ArrayRef<LinkLibrary> linkLibraries,
-      StringRef contextHash, bool isFramework,
-      bool isStatic, StringRef RootID, StringRef moduleCacheKey,
-      StringRef userModuleVersion)
+      bool isFramework, bool isStatic, StringRef RootID,
+      StringRef moduleCacheKey, StringRef userModuleVersion)
       : ModuleDependencyInfoStorageBase(ModuleDependencyKind::SwiftInterface,
                                         moduleImports, optionalModuleImports,
                                         linkLibraries, moduleCacheKey),
-        moduleOutputPath(moduleOutputPath),
         swiftInterfaceFile(swiftInterfaceFile),
         compiledModuleCandidates(compiledModuleCandidates.begin(),
                                  compiledModuleCandidates.end()),
-        contextHash(contextHash), isFramework(isFramework), isStatic(isStatic),
+        isFramework(isFramework), isStatic(isStatic),
         textualModuleDetails(buildCommandLine, RootID),
         userModuleVersion(userModuleVersion) {}
 
@@ -585,21 +583,18 @@ public:
   /// Describe the module dependencies for a Swift module that can be
   /// built from a Swift interface file (\c .swiftinterface).
   static ModuleDependencyInfo forSwiftInterfaceModule(
-      StringRef moduleOutputPath, StringRef swiftInterfaceFile,
-      ArrayRef<StringRef> compiledCandidates, ArrayRef<StringRef> buildCommands,
+      StringRef swiftInterfaceFile, ArrayRef<StringRef> compiledCandidates,
+      ArrayRef<StringRef> buildCommands,
       ArrayRef<ScannerImportStatementInfo> moduleImports,
       ArrayRef<ScannerImportStatementInfo> optionalModuleImports,
-      ArrayRef<LinkLibrary> linkLibraries,
-      StringRef contextHash, bool isFramework, bool isStatic,
+      ArrayRef<LinkLibrary> linkLibraries, bool isFramework, bool isStatic,
       StringRef CASFileSystemRootID, StringRef moduleCacheKey,
       StringRef userModuleVersion) {
     return ModuleDependencyInfo(
         std::make_unique<SwiftInterfaceModuleDependenciesStorage>(
-            moduleOutputPath, swiftInterfaceFile, compiledCandidates,
-            moduleImports, optionalModuleImports,
-            buildCommands, linkLibraries, contextHash,
-            isFramework, isStatic, CASFileSystemRootID, moduleCacheKey,
-            userModuleVersion));
+            swiftInterfaceFile, compiledCandidates, moduleImports,
+            optionalModuleImports, buildCommands, linkLibraries, isFramework,
+            isStatic, CASFileSystemRootID, moduleCacheKey, userModuleVersion));
   }
 
   /// Describe the module dependencies for a serialized or parsed Swift module.
@@ -982,6 +977,9 @@ public:
 
   /// Set the chained bridging header buffer.
   void setChainedBridgingHeaderBuffer(StringRef path, StringRef buffer);
+
+  /// Set the output path and the context hash.
+  void setOutputPathAndHash(StringRef outputPath, StringRef hash);
 
   /// Collect a map from a secondary module name to a list of cross-import
   /// overlays, when this current module serves as the primary module.

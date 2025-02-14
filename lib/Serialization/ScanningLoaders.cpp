@@ -248,9 +248,13 @@ SwiftModuleScanner::scanInterfaceFile(Twine moduleInterfacePath,
         bool isStatic = llvm::find(ArgsRefs, "-static") != ArgsRefs.end();
 
         Result = ModuleDependencyInfo::forSwiftInterfaceModule(
-            outputPathBase.str().str(), InPath, compiledCandidatesRefs,
-            ArgsRefs, {}, {}, linkLibraries, Hash, isFramework,
-            isStatic, {}, /*module-cache-key*/ "", UserModVer);
+            InPath, compiledCandidatesRefs, ArgsRefs, {}, {}, linkLibraries,
+            isFramework, isStatic, {}, /*module-cache-key*/ "", UserModVer);
+
+        // We do NOT need the code below to set output path in the dependency
+        // info because it will be calculated again later. We do not want to
+        // create output paths that do not exist in the end.
+        // Result->setOutputPathAndHash(outputPathBase.str().str(), Hash);
 
         if (Ctx.CASOpts.EnableCaching) {
           std::vector<std::string> clangDependencyFiles;
