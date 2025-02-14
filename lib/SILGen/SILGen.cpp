@@ -1439,6 +1439,9 @@ void SILGenModule::emitAbstractFuncDecl(AbstractFunctionDecl *AFD) {
   // Emit default arguments and property wrapper initializers.
   emitArgumentGenerators(AFD, AFD->getParameters());
 
+  ASSERT(ABIRoleInfo(AFD).providesAPI()
+            && "emitAbstractFuncDecl() on ABI-only decl?");
+
   // If the declaration is exported as a C function, emit its native-to-foreign
   // thunk too, if it wasn't already forced.
   if (AFD->getAttrs().hasAttribute<CDeclAttr>()) {

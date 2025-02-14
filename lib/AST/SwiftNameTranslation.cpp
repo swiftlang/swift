@@ -37,6 +37,10 @@ getNameForObjC(const ValueDecl *VD, CustomNamesOnly_t customNamesOnly) {
   assert(isa<ClassDecl>(VD) || isa<ProtocolDecl>(VD) || isa<StructDecl>(VD) ||
          isa<EnumDecl>(VD) || isa<EnumElementDecl>(VD) ||
          isa<TypeAliasDecl>(VD));
+  auto abiRole = ABIRoleInfo(VD);
+  if (!abiRole.providesAPI() && abiRole.getCounterpart())
+    return getNameForObjC(abiRole.getCounterpart(), customNamesOnly);
+
   if (auto objc = VD->getAttrs().getAttribute<ObjCAttr>()) {
     if (auto name = objc->getName()) {
       assert(name->getNumSelectorPieces() == 1);
@@ -63,6 +67,10 @@ getErrorDomainStringForObjC(const EnumDecl *ED) {
   // Should have already been diagnosed as diag::objc_enum_generic.
   assert(!ED->isGenericContext() && "Trying to bridge generic enum error to Obj-C");
 
+  auto abiRole = ABIRoleInfo(ED);
+  if (!abiRole.providesAPI() && abiRole.getCounterpart())
+    return getErrorDomainStringForObjC(abiRole.getCounterpart());
+
   SmallVector<const NominalTypeDecl *, 4> outerTypes;
   for (const NominalTypeDecl * D = ED;
        D != nullptr;
@@ -86,6 +94,11 @@ getErrorDomainStringForObjC(const EnumDecl *ED) {
 bool swift::objc_translation::
 printSwiftEnumElemNameInObjC(const EnumElementDecl *EL, llvm::raw_ostream &OS,
                              Identifier PreferredName) {
+  auto abiRole = ABIRoleInfo(EL);
+  if (!abiRole.providesAPI() && abiRole.getCounterpart())
+    return printSwiftEnumElemNameInObjC(abiRole.getCounterpart(), OS,
+                                        PreferredName);
+
   StringRef ElemName = getNameForObjC(EL, CustomNamesOnly);
   if (!ElemName.empty()) {
     OS << ElemName;
@@ -104,6 +117,10 @@ printSwiftEnumElemNameInObjC(const EnumElementDecl *EL, llvm::raw_ostream &OS,
 
 std::pair<Identifier, ObjCSelector> swift::objc_translation::
 getObjCNameForSwiftDecl(const ValueDecl *VD, DeclName PreferredName){
+  auto abiRole = ABIRoleInfo(VD);
+  if (!abiRole.providesAPI() && abiRole.getCounterpart())
+    return getObjCNameForSwiftDecl(abiRole.getCounterpart(), PreferredName);
+
   ASTContext &Ctx = VD->getASTContext();
   Identifier BaseName;
   if (PreferredName) {
