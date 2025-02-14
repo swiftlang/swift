@@ -4965,7 +4965,8 @@ public:
       printField(domain->getNameForAttributePrinting(),
                  Label::always("domain"));
     } else {
-      printField(*Attr->getDomainString(), Label::always("domainString"));
+      printField(*Attr->getDomainIdentifier(),
+                 Label::always("domainIdentifier"));
     }
 
     switch (Attr->getKind()) {
