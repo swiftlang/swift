@@ -3701,6 +3701,11 @@ public:
       maybeDiagKeyPath(KP);
     }
     if (auto A = dyn_cast<AssignExpr>(E)) {
+      // Attempting to assign to a @preconcurrency declaration should
+      // downgrade Sendable conformance mismatches to warnings.
+      PreconcurrencyCalleeStack.push_back(
+        hasReferenceToPreconcurrencyDecl(A->getDest()));
+
       walkAssignExpr(A);
       return Action::SkipChildren(E);
     }

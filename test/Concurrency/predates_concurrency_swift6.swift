@@ -307,4 +307,7 @@ do {
     // expected-warning@-1 {{type '() -> ()' does not conform to the 'Sendable' protocol}}
     // expected-note@-2 {{a function type must be marked '@Sendable' to conform to 'Sendable'}}
   }
+
+  // If destination is @preconcurrency the Sendable conformance error should be downgraded
+  d = data // expected-warning {{type 'Any' does not conform to the 'Sendable' protocol}}
 }
