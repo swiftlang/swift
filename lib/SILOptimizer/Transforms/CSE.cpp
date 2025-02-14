@@ -518,6 +518,13 @@ public:
         llvm::hash_combine_range(Operands.begin(), Operands.end()),
         X->getElementType());
   }
+
+  hash_code visitTypeValueInst(TypeValueInst *X) {
+    OperandValueArrayRef Operands(X->getAllOperands());
+    return llvm::hash_combine(
+        X->getKind(), X->getType(),
+        llvm::hash_combine_range(Operands.begin(), Operands.end()));
+  }
 };
 } // end anonymous namespace
 
@@ -1231,6 +1238,7 @@ bool CSE::canHandle(SILInstruction *Inst) {
   case SILInstructionKind::ScalarPackIndexInst:
   case SILInstructionKind::DynamicPackIndexInst:
   case SILInstructionKind::TuplePackElementAddrInst:
+  case SILInstructionKind::TypeValueInst:
     // Intentionally we don't handle (prev_)dynamic_function_ref.
     // They change at runtime.
 #define LOADABLE_REF_STORAGE(Name, ...) \
