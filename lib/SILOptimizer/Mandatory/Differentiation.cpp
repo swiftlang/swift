@@ -478,10 +478,8 @@ static SILValue reapplyFunctionConversion(
 
 SILFunction *DifferentiationTransformer::getUnwrappedCurryThunkFunction(
     SILFunction *originalFn) {
-  auto *abstractCE = originalFn->getDeclRef().getAbstractClosureExpr();
-  if (abstractCE == nullptr)
-    return nullptr;
-  auto *autoCE = dyn_cast<AutoClosureExpr>(abstractCE);
+  auto *autoCE = dyn_cast_or_null<AutoClosureExpr>(
+      originalFn->getDeclRef().getAbstractClosureExpr());
   if (autoCE == nullptr)
     return nullptr;
 
@@ -517,8 +515,11 @@ SILFunction *DifferentiationTransformer::getUnwrappedCurryThunkFunction(
         // parameters are not handled since we can't now construct a test case
         // for that due to the crash
         // https://github.com/swiftlang/swift/issues/77613
-        if (currentAFD->hasCurriedSelf())
-          afdToSILFn.insert({currentAFD, &currentFunc});
+        if (currentAFD->hasCurriedSelf()) {
+          auto [_, wasEmplace] =
+              afdToSILFn.try_emplace(currentAFD, &currentFunc);
+          assert(wasEmplace);
+        }
       }
     }
 
