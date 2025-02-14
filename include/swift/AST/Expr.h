@@ -4482,8 +4482,6 @@ public:
 class AutoClosureExpr : public AbstractClosureExpr {
   BraceStmt *Body;
 
-  ApplyExpr *getUnwrappedCurryThunkImpl() const;
-
 public:
   enum class Kind : uint8_t {
     // An autoclosure with type () -> Result. Formed from type checking an
@@ -4544,10 +4542,6 @@ public:
   /// - for single curry thunks, returns the ApplyExpr for the self call.
   /// - otherwise, returns nullptr for convenience.
   Expr *getUnwrappedCurryThunkExpr() const;
-
-  /// Same as getUnwrappedCurryThunkExpr, but get the called ValueDecl instead
-  /// of the expr.
-  ValueDecl *getUnwrappedCurryThunkCalledValue() const;
 
   // Implement isa/cast/dyncast/etc.
   static bool classof(const Expr *E) {

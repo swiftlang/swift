@@ -485,8 +485,18 @@ SILFunction *DifferentiationTransformer::getUnwrappedCurryThunkFunction(
   if (autoCE == nullptr)
     return nullptr;
 
-  auto *afd =
-      cast<AbstractFunctionDecl>(autoCE->getUnwrappedCurryThunkCalledValue());
+  AbstractFunctionDecl *afd = nullptr;
+  Expr *expr = autoCE->getUnwrappedCurryThunkExpr();
+  switch (autoCE->getThunkKind()) {
+  default:
+    llvm_unreachable("Only single and double curry thunks are expected");
+  case AutoClosureExpr::Kind::SingleCurryThunk:
+  case AutoClosureExpr::Kind::DoubleCurryThunk:
+    afd = cast<AbstractFunctionDecl>(cast<ApplyExpr>(expr)->getCalledValue(
+        /*skipFunctionConversions=*/true));
+    break;
+  }
+  assert(afd);
 
   auto silFnIt = afdToSILFn.find(afd);
   if (silFnIt == afdToSILFn.end()) {

@@ -2145,7 +2145,7 @@ Expr *AutoClosureExpr::getSingleExpressionBody() const {
   return cast<ReturnStmt>(Body->getLastElement().get<Stmt *>())->getResult();
 }
 
-ApplyExpr *AutoClosureExpr::getUnwrappedCurryThunkImpl() const {
+Expr *AutoClosureExpr::getUnwrappedCurryThunkExpr() const {
   auto maybeUnwrapOpenExistential = [](Expr *expr) {
     if (auto *openExistential = dyn_cast<OpenExistentialExpr>(expr)) {
       expr = openExistential->getSubExpr()->getSemanticsProvidingExpr();
@@ -2189,7 +2189,7 @@ ApplyExpr *AutoClosureExpr::getUnwrappedCurryThunkImpl() const {
     body = maybeUnwrapConversions(body);
 
     if (auto *outerCall = dyn_cast<ApplyExpr>(body)) {
-      return outerCall;
+      return outerCall->getFn();
     }
 
     assert(false && "Malformed curry thunk?");
@@ -2210,7 +2210,7 @@ ApplyExpr *AutoClosureExpr::getUnwrappedCurryThunkImpl() const {
       if (auto *outerCall = dyn_cast<ApplyExpr>(innerBody)) {
         auto outerFn = maybeUnwrapConversions(outerCall->getFn());
         if (auto *innerCall = dyn_cast<ApplyExpr>(outerFn)) {
-          return innerCall;
+          return innerCall->getFn();
         }
       }
     }
@@ -2221,20 +2221,6 @@ ApplyExpr *AutoClosureExpr::getUnwrappedCurryThunkImpl() const {
   }
 
   return nullptr;
-}
-
-Expr *AutoClosureExpr::getUnwrappedCurryThunkExpr() const {
-  ApplyExpr *ae = getUnwrappedCurryThunkImpl();
-  if (ae == nullptr)
-    return nullptr;
-  return ae->getFn();
-}
-
-ValueDecl *AutoClosureExpr::getUnwrappedCurryThunkCalledValue() const {
-  ApplyExpr *ae = getUnwrappedCurryThunkImpl();
-  if (ae == nullptr)
-    return nullptr;
-  return ae->getCalledValue(/*skipFunctionConversions=*/true);
 }
 
 FORWARD_SOURCE_LOCS_TO(UnresolvedPatternExpr, subPattern)
