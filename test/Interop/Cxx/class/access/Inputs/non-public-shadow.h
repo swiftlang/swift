@@ -52,13 +52,26 @@ private:
 
 struct Shadow : Priv, Prot, Publ {
 public:
-  Return publPublShadowed(void) const { return Return::Shadow_publPublShadowed; }
-  Return protPublShadowed(void) const { return Return::Shadow_protPublShadowed; }
-  Return privPublShadowed(void) const { return Return::Shadow_privPublShadowed; }
+  Return publPublShadowed(void) const {
+    return Return::Shadow_publPublShadowed;
+  }
+  Return protPublShadowed(void) const {
+    return Return::Shadow_protPublShadowed;
+  }
+  Return privPublShadowed(void) const {
+    return Return::Shadow_privPublShadowed;
+  }
+
 private:
-  Return publPrivShadowed(void) const { return Return::Shadow_publPrivShadowed; }
-  Return protPrivShadowed(void) const { return Return::Shadow_protPrivShadowed; }
-  Return privPrivShadowed(void) const { return Return::Shadow_privPrivShadowed; }
+  Return publPrivShadowed(void) const {
+    return Return::Shadow_publPrivShadowed;
+  }
+  Return protPrivShadowed(void) const {
+    return Return::Shadow_protPrivShadowed;
+  }
+  Return privPrivShadowed(void) const {
+    return Return::Shadow_privPrivShadowed;
+  }
 };
 
 #endif /* NON_PUBLIC_SHADOW_H */
