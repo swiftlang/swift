@@ -459,7 +459,7 @@ public final class FakeInvocationDecoder: DistributedTargetInvocationDecoder {
 
   var argumentIndex: Int = 0
 
-  fileprivate init(
+  public init(
     args: [Any],
     substitutions: [Any.Type] = [],
     returnType: Any.Type? = nil,
