@@ -112,9 +112,9 @@ struct DoesNotConform : Up {
 // Circular protocols
 
 protocol CircleMiddle : CircleStart { func circle_middle() }
-// expected-note@-1 3 {{protocol 'CircleMiddle' declared here}}
-protocol CircleStart : CircleEnd { func circle_start() } // expected-error 3 {{protocol 'CircleStart' refines itself}}
-protocol CircleEnd : CircleMiddle { func circle_end()} // expected-note 3 {{protocol 'CircleEnd' declared here}}
+// expected-note@-1 2 {{protocol 'CircleMiddle' declared here}}
+protocol CircleStart : CircleEnd { func circle_start() } // expected-error 2 {{protocol 'CircleStart' refines itself}}
+protocol CircleEnd : CircleMiddle { func circle_end()} // expected-note 2 {{protocol 'CircleEnd' declared here}}
 
 protocol CircleEntry : CircleTrivial { }
 protocol CircleTrivial : CircleTrivial { } // expected-error {{protocol 'CircleTrivial' refines itself}}
@@ -475,7 +475,7 @@ func i<T : C3>(_ x : T?) -> Bool {
   // expected-warning@-1 {{checking a value with optional type 'T?' against type 'any P1' succeeds whenever the value is non-nil; did you mean to use '!= nil'?}}
 }
 func j(_ x : C1) -> Bool {
-  return x is P1 // expected-error {{use of protocol 'P1' as a type must be written 'any P1'}}
+  return x is P1 // expected-warning {{use of protocol 'P1' as a type must be written 'any P1'}}
 }
 func k(_ x : C1?) -> Bool {
   return x is any P1
