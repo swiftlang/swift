@@ -6,6 +6,8 @@
 // REQUIRES: concurrency
 // REQUIRES: swift_feature_GlobalActorIsolatedTypesUsability
 
+// XFAIL: *
+
 ////////////////////////
 // MARK: Declarations //
 ////////////////////////

@@ -1270,6 +1270,9 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
     Opts.enableFeature(Feature::IsolatedDefaultValues);
     Opts.enableFeature(Feature::GlobalConcurrency);
     Opts.enableFeature(Feature::RegionBasedIsolation);
+    
+    // Enabled for experimental purposes, still under investigation.
+    Opts.enableFeature(Feature::StrictSendableMetatypes);
   }
 
   Opts.WarnImplicitOverrides =
