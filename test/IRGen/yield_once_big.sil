@@ -45,7 +45,7 @@ entry:
 
   //   Coroutine setup.
   // CHECK-32-NEXT: [[ID:%.*]] = call token @llvm.coro.id.retcon.once(i32 [[BUFFER_SIZE]], i32 [[BUFFER_ALIGN:4]], ptr %0, ptr @"$s14yield_once_big3BigVyxGAA9SomeClassCRbzlIetAYi_TC", ptr @malloc, ptr @free)
-  // CHECK-64-NEXT: [[ID:%.*]] = call token @llvm.coro.id.retcon.once(i32 [[BUFFER_SIZE]], i32 [[BUFFER_ALIGN:8]], ptr %0, ptr @"$s14yield_once_big3BigVyxGAA9SomeClassCRbzlIetAYi_TC", ptr @malloc, ptr @free)
+  // CHECK-64-NEXT: [[ID:%.*]] = call token (i32, i32, ptr, ptr, ptr, ptr, ...) @llvm.coro.id.retcon.once(i32 [[BUFFER_SIZE]], i32 [[BUFFER_ALIGN:8]], ptr %0, ptr @"$s14yield_once_big3BigVyxGAA9SomeClassCRbzlIetAYi_TC", ptr @swift_coroFrameAlloc, ptr @free, i64 38223)
   // CHECK-NEXT:    [[BEGIN:%.*]] = call ptr @llvm.coro.begin(token [[ID]], ptr null)
   // CHECK-NEXT:    store ptr
 
@@ -182,7 +182,7 @@ entry(%arg : $*BigWrapper<C>):
 
   //   Coroutine setup.
   // CHECK-32-NEXT: [[ID:%.*]] = call token @llvm.coro.id.retcon.once(i32 [[BUFFER_SIZE]], i32 [[BUFFER_ALIGN:4]], ptr %0, ptr @"$s14yield_once_big10BigWrapperVyxGAA0D0VyxGAA9SomeClassCRbzlIetAnYn_TC", ptr @malloc, ptr @free)
-  // CHECK-64-NEXT: [[ID:%.*]] = call token @llvm.coro.id.retcon.once(i32 [[BUFFER_SIZE]], i32 [[BUFFER_ALIGN:8]], ptr %0, ptr @"$s14yield_once_big10BigWrapperVyxGAA0D0VyxGAA9SomeClassCRbzlIetAnYn_TC", ptr @malloc, ptr @free)
+  // CHECK-64-NEXT: [[ID:%.*]] = call token (i32, i32, ptr, ptr, ptr, ptr, ...) @llvm.coro.id.retcon.once(i32 [[BUFFER_SIZE]], i32 [[BUFFER_ALIGN:8]], ptr %0, ptr @"$s14yield_once_big10BigWrapperVyxGAA0D0VyxGAA9SomeClassCRbzlIetAnYn_TC", ptr @swift_coroFrameAlloc, ptr @free, i64 35368)
   // CHECK-NEXT:    [[BEGIN:%.*]] = call ptr @llvm.coro.begin(token [[ID]], ptr null)
   // CHECK-NEXT:    store ptr
 
