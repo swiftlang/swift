@@ -82,7 +82,7 @@ include(DefaultSettings)
 include(EmitSwiftInterface)
 include(PlatformInfo)
 include(gyb)
-include(Plist)
+include(ResourceEmbedding)
 
 check_symbol_exists("asl_log" "asl.h" SwiftCore_HAS_ASL)
 check_symbol_exists("dladdr" "dlfcn.h" SwiftCore_HAS_DLADDR)
