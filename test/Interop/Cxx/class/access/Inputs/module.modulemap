@@ -2,3 +2,8 @@ module NonPublicInheritance {
     requires cplusplus
     header "non-public-inheritance.h"
 }
+
+module NonPublicShadow {
+    requires cplusplus
+    header "non-public-shadow.h"
+}
