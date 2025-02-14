@@ -84,6 +84,18 @@ BridgedTypeAttribute BridgedTypeAttribute_createSimple(
                                      cAtLoc.unbridged(), cNameLoc.unbridged());
 }
 
+BridgedConventionTypeAttr BridgedConventionTypeAttr_createParsed(
+    BridgedASTContext cContext, BridgedSourceLoc cAtLoc,
+    BridgedSourceLoc cKwLoc, BridgedSourceRange cParens, BridgedStringRef cName,
+    BridgedSourceLoc cNameLoc, BridgedDeclNameRef cWitnessMethodProtocol,
+    BridgedStringRef cClangType, BridgedSourceLoc cClangTypeLoc) {
+  return new (cContext.unbridged()) ConventionTypeAttr(
+      cAtLoc.unbridged(), cKwLoc.unbridged(), cParens.unbridged(),
+      {cName.unbridged(), cNameLoc.unbridged()},
+      cWitnessMethodProtocol.unbridged(),
+      {cClangType.unbridged(), cClangTypeLoc.unbridged()});
+}
+
 BridgedIsolatedTypeAttr BridgedIsolatedTypeAttr_createParsed(
     BridgedASTContext cContext, BridgedSourceLoc cAtLoc,
     BridgedSourceLoc cNameLoc, BridgedSourceLoc cLPLoc,
