@@ -8361,14 +8361,14 @@ ClangInheritanceInfo::forUsingDecl(const clang::UsingShadowDecl *usingDecl) {
   ClangInheritanceInfo info;
 
   auto *derivedRecord =
-      llvm::cast_if_present<clang::CXXRecordDecl>(usingDecl->getDeclContext());
+      dyn_cast_or_null<clang::CXXRecordDecl>(usingDecl->getDeclContext());
   auto *baseMember =
-      llvm::cast_if_present<clang::NamedDecl>(usingDecl->getTargetDecl());
+      dyn_cast_or_null<clang::NamedDecl>(usingDecl->getTargetDecl());
   if (!derivedRecord || !baseMember)
     return info;
 
   auto *baseRecord =
-      llvm::cast_if_present<clang::CXXRecordDecl>(baseMember->getDeclContext());
+      dyn_cast_or_null<clang::CXXRecordDecl>(baseMember->getDeclContext());
   if (!baseRecord)
     return info;
 
@@ -8378,17 +8378,17 @@ ClangInheritanceInfo::forUsingDecl(const clang::UsingShadowDecl *usingDecl) {
   // NOTE: inheritedAccess usually indicates the cumulative inheritance access
   // level, rather than the access level of individual members, but here we're
   // conflating those concepts in order to reuse the field.
-  info.inheritedAccess = usingDecl->getAccess();
+  info.access = usingDecl->getAccess();
   info.shadowedByUsing = true;
 
-  assert(info.inheritedAccess != clang::AS_none &&
+  assert(info.access != clang::AS_none &&
          "'using' decls should have an explicit access level");
   return info;
 }
 
 AccessLevel
 ClangInheritanceInfo::accessForBaseDecl(const ValueDecl *baseDecl) const {
-  auto inherited = importer::convertClangAccess(inheritedAccess);
+  auto inherited = importer::convertClangAccess(access);
   if (shadowedByUsing)
     return inherited;
 
@@ -8400,7 +8400,7 @@ ClangInheritanceInfo::accessForBaseDecl(const ValueDecl *baseDecl) const {
 void ClangInheritanceInfo::setUnavailableIfNecessary(
     const ValueDecl *baseDecl, ValueDecl *clonedDecl) const {
   auto *clangDecl =
-      llvm::cast_if_present<clang::NamedDecl>(baseDecl->getClangDecl());
+      dyn_cast_or_null<clang::NamedDecl>(baseDecl->getClangDecl());
   if (!clangDecl)
     return;
 

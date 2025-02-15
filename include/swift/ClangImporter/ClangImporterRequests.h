@@ -145,7 +145,7 @@ struct ClangRecordMemberLookupDescriptor final {
 
   ClangRecordMemberLookupDescriptor(NominalTypeDecl *recordDecl, DeclName name)
       : recordDecl(recordDecl), inheritingDecl(recordDecl), name(name),
-        inheritance(ClangInheritanceInfo()) {
+        inheritance() {
     assert(isa<clang::RecordDecl>(recordDecl->getClangDecl()));
   }
 
