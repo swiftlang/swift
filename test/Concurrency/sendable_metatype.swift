@@ -66,3 +66,13 @@ nonisolated func passSendableToMainActorSmuggledAny<T: Sendable>(_: T.Type) asyn
   let x: Sendable.Type = T.self
   await acceptMetaOnMainActor(x)
 }
+
+// -------------------------------------------------------------------------
+// Existential opening
+// -------------------------------------------------------------------------
+nonisolated func passMetaSmuggledAnyFromExistential(_ qT: Q.Type) {
+  let x: Any.Type = qT
+  Task.detached { // expected-error{{risks causing data races}}
+    acceptMeta(x) // expected-note{{closure captures 'x' which is accessible to code in the current task}}
+  }
+}
