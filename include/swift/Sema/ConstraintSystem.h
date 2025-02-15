@@ -486,6 +486,14 @@ public:
   /// literal (represented by `ArrayExpr` and `DictionaryExpr` in AST).
   bool isCollectionLiteralType() const;
 
+  /// Determine whether this type variable represents a literal such
+  /// as an integer value, a floating-point value with and without a sign.
+  bool isNumberLiteralType() const;
+
+  /// Determine whether this type variable represents a result type of a
+  /// function call.
+  bool isFunctionResult() const;
+
   /// Retrieve the representative of the equivalence class to which this
   /// type variable belongs.
   ///
@@ -2258,10 +2266,6 @@ private:
 
   llvm::SetVector<TypeVariableType *> TypeVariables;
 
-  /// Maps expressions to types for choosing a favored overload
-  /// type in a disjunction constraint.
-  llvm::DenseMap<Expr *, TypeBase *> FavoredTypes;
-
   /// Maps discovered closures to their types inferred
   /// from declared parameters/result and body.
   ///
@@ -2472,74 +2476,6 @@ public:
       SynthesizedConformances;
 
 private:
-  /// Describe the candidate expression for partial solving.
-  /// This class used by shrink & solve methods which apply
-  /// variation of directional path consistency algorithm in attempt
-  /// to reduce scopes of the overload sets (disjunctions) in the system.
-  class Candidate {
-    Expr *E;
-    DeclContext *DC;
-    llvm::BumpPtrAllocator &Allocator;
-
-    // Contextual Information.
-    Type CT;
-    ContextualTypePurpose CTP;
-
-  public:
-    Candidate(ConstraintSystem &cs, Expr *expr, Type ct = Type(),
-              ContextualTypePurpose ctp = ContextualTypePurpose::CTP_Unused)
-        : E(expr), DC(cs.DC), Allocator(cs.Allocator), CT(ct), CTP(ctp) {}
-
-    /// Return underlying expression.
-    Expr *getExpr() const { return E; }
-
-    /// Try to solve this candidate sub-expression
-    /// and re-write it's OSR domains afterwards.
-    ///
-    /// \param shrunkExprs The set of expressions which
-    /// domains have been successfully shrunk so far.
-    ///
-    /// \returns true on solver failure, false otherwise.
-    bool solve(llvm::SmallSetVector<OverloadSetRefExpr *, 4> &shrunkExprs);
-
-    /// Apply solutions found by solver as reduced OSR sets for
-    /// for current and all of it's sub-expressions.
-    ///
-    /// \param solutions The solutions found by running solver on the
-    /// this candidate expression.
-    ///
-    /// \param shrunkExprs The set of expressions which
-    /// domains have been successfully shrunk so far.
-    void applySolutions(
-        llvm::SmallVectorImpl<Solution> &solutions,
-        llvm::SmallSetVector<OverloadSetRefExpr *, 4> &shrunkExprs) const;
-
-    /// Check if attempt at solving of the candidate makes sense given
-    /// the current conditions - number of shrunk domains which is related
-    /// to the given candidate over the total number of disjunctions present.
-    static bool
-    isTooComplexGiven(ConstraintSystem *const cs,
-                      llvm::SmallSetVector<OverloadSetRefExpr *, 4> &shrunkExprs) {
-      SmallVector<Constraint *, 8> disjunctions;
-      cs->collectDisjunctions(disjunctions);
-
-      unsigned unsolvedDisjunctions = disjunctions.size();
-      for (auto *disjunction : disjunctions) {
-        auto *locator = disjunction->getLocator();
-        if (!locator)
-          continue;
-
-        if (auto *OSR = getAsExpr<OverloadSetRefExpr>(locator->getAnchor())) {
-          if (shrunkExprs.count(OSR) > 0)
-            --unsolvedDisjunctions;
-        }
-      }
-
-      // The threshold used to be `TypeCheckerOpts.SolverShrinkUnsolvedThreshold`
-      return unsolvedDisjunctions >= 10;
-    }
-  };
-
   /// Describes the current solver state.
   struct SolverState {
     SolverState(ConstraintSystem &cs,
@@ -3061,15 +2997,6 @@ public:
     if (result != KeyPaths.end())
       return std::get<0>(result->second);
     return nullptr;
-  }
-
-  TypeBase* getFavoredType(Expr *E) {
-    assert(E != nullptr);
-    return this->FavoredTypes[E];
-  }
-  void setFavoredType(Expr *E, TypeBase *T) {
-    assert(E != nullptr);
-    this->FavoredTypes[E] = T;
   }
 
   /// Set the type in our type map for the given node, and record the change
@@ -5374,19 +5301,11 @@ private:
   /// \returns true if an error occurred, false otherwise.
   bool solveSimplified(SmallVectorImpl<Solution> &solutions);
 
-  /// Find reduced domains of disjunction constraints for given
-  /// expression, this is achieved to solving individual sub-expressions
-  /// and combining resolving types. Such algorithm is called directional
-  /// path consistency because it goes from children to parents for all
-  /// related sub-expressions taking union of their domains.
-  ///
-  /// \param expr The expression to find reductions for.
-  void shrink(Expr *expr);
-
   /// Pick a disjunction from the InactiveConstraints list.
   ///
-  /// \returns The selected disjunction.
-  Constraint *selectDisjunction();
+  /// \returns The selected disjunction and a set of it's favored choices.
+  std::optional<std::pair<Constraint *, llvm::TinyPtrVector<Constraint *>>>
+  selectDisjunction();
 
   /// Pick a conjunction from the InactiveConstraints list.
   ///
@@ -5574,11 +5493,6 @@ public:
   /// \returns true if solution cannot be applied.
   bool applySolutionToBody(TapExpr *tapExpr,
                            SyntacticElementTargetRewriter &rewriter);
-
-  /// Reorder the disjunctive clauses for a given expression to
-  /// increase the likelihood that a favored constraint will be successfully
-  /// resolved before any others.
-  void optimizeConstraints(Expr *e);
 
   void startExpressionTimer(ExpressionTimer::AnchorType anchor);
 
@@ -6320,7 +6234,8 @@ class DisjunctionChoiceProducer : public BindingProducer<DisjunctionChoice> {
 public:
   using Element = DisjunctionChoice;
 
-  DisjunctionChoiceProducer(ConstraintSystem &cs, Constraint *disjunction)
+  DisjunctionChoiceProducer(ConstraintSystem &cs, Constraint *disjunction,
+                            llvm::TinyPtrVector<Constraint *> &favorites)
       : BindingProducer(cs, disjunction->shouldRememberChoice()
                                 ? disjunction->getLocator()
                                 : nullptr),
@@ -6329,6 +6244,11 @@ public:
         Disjunction(disjunction) {
     assert(disjunction->getKind() == ConstraintKind::Disjunction);
     assert(!disjunction->shouldRememberChoice() || disjunction->getLocator());
+
+    // Mark constraints as favored. This information
+    // is going to be used by partitioner.
+    for (auto *choice : favorites)
+      cs.favorConstraint(choice);
 
     // Order and partition the disjunction choices.
     partitionDisjunction(Ordering, PartitionBeginning);
@@ -6374,8 +6294,9 @@ private:
   // Partition the choices in the disjunction into groups that we will
   // iterate over in an order appropriate to attempt to stop before we
   // have to visit all of the options.
-  void partitionDisjunction(SmallVectorImpl<unsigned> &Ordering,
-                            SmallVectorImpl<unsigned> &PartitionBeginning);
+  void
+  partitionDisjunction(SmallVectorImpl<unsigned> &Ordering,
+                       SmallVectorImpl<unsigned> &PartitionBeginning);
 
   /// Partition the choices in the range \c first to \c last into groups and
   /// order the groups in the best order to attempt based on the argument
