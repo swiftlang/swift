@@ -483,22 +483,16 @@ SILFunction *DifferentiationTransformer::getUnwrappedCurryThunkFunction(
   if (autoCE == nullptr)
     return nullptr;
 
-  AbstractFunctionDecl *afd = nullptr;
-  Expr *expr = autoCE->getUnwrappedCurryThunkExpr();
-  switch (autoCE->getThunkKind()) {
-  default:
-    llvm_unreachable("Only single and double curry thunks are expected");
-  case AutoClosureExpr::Kind::SingleCurryThunk:
-  case AutoClosureExpr::Kind::DoubleCurryThunk:
-    afd = cast<AbstractFunctionDecl>(cast<ApplyExpr>(expr)->getCalledValue(
-        /*skipFunctionConversions=*/true));
-    break;
-  }
-  assert(afd);
+  auto *ae = dyn_cast_or_null<ApplyExpr>(autoCE->getUnwrappedCurryThunkExpr());
+  if (ae == nullptr)
+    return nullptr;
 
+  AbstractFunctionDecl *afd = cast<AbstractFunctionDecl>(ae->getCalledValue(
+      /*skipFunctionConversions=*/true));
   auto silFnIt = afdToSILFn.find(afd);
   if (silFnIt == afdToSILFn.end()) {
-    assert(afdToSILFn.empty());
+    assert(afdToSILFn.empty() && "Expect all 'afdToSILFn' cache entries to be "
+                                 "filled at once on the first access attempt");
 
     SILModule *module = getTransform().getModule();
     for (SILFunction &currentFunc : module->getFunctions()) {
@@ -518,13 +512,16 @@ SILFunction *DifferentiationTransformer::getUnwrappedCurryThunkFunction(
         if (currentAFD->hasCurriedSelf()) {
           auto [_, wasEmplace] =
               afdToSILFn.try_emplace(currentAFD, &currentFunc);
-          assert(wasEmplace);
+          assert(wasEmplace && "Expect all 'afdToSILFn' cache entries to be "
+                               "filled at once on the first access attempt");
         }
       }
     }
 
     silFnIt = afdToSILFn.find(afd);
-    assert(silFnIt != afdToSILFn.end());
+    assert(silFnIt != afdToSILFn.end() &&
+           "Expect present curry thunk to SIL function mapping after "
+           "'afdToSILFn' cache fill");
   }
 
   return silFnIt->second;
