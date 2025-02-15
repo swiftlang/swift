@@ -448,6 +448,9 @@ SUPPRESSIBLE_EXPERIMENTAL_FEATURE(CustomAvailability, true)
 /// Be strict about the Sendable conformance of metatypes.
 EXPERIMENTAL_FEATURE(StrictSendableMetatypes, true)
 
+// Used for test purposes only.
+EXPERIMENTAL_FEATURE(SupportedFeaturesTest, false)
+
 #undef EXPERIMENTAL_FEATURE_EXCLUDED_FROM_MODULE_INTERFACE
 #undef EXPERIMENTAL_FEATURE
 #undef UPCOMING_FEATURE
