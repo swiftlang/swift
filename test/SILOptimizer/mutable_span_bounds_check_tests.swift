@@ -129,7 +129,7 @@ public func span_bubble_sort(_ span: inout MutableSpan<Int>) {
 }
 
 // CHECK-SIL-LABEL: sil @$s31mutable_span_bounds_check_tests6sortedySb10SpanExtras07MutableG0VySiGF : 
-// CHECK-SIL: bb4:
+// CHECK-SIL: bb4({{.*}}):
 // CHECK-SIL: cond_fail {{.*}}, "precondition failure"
 // CHECK-SIL: cond_fail {{.*}}, "precondition failure"
 // CHECK-SIL: cond_br
