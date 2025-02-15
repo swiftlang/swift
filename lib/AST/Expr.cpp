@@ -1934,6 +1934,12 @@ unsigned AbstractClosureExpr::getDiscriminator() const {
   evaluateOrDefault(
       ctx.evaluator, LocalDiscriminatorsRequest{getParent()}, 0);
 
+#if NDEBUG
+  static constexpr bool useFallbackDiscriminator = true;
+#else
+  static constexpr bool useFallbackDiscriminator = false;
+#endif
+
   // If we don't have a discriminator, and either
   //   1. We have ill-formed code and we're able to assign a discriminator, or
   //   2. We are in a macro expansion buffer
@@ -1943,7 +1949,8 @@ unsigned AbstractClosureExpr::getDiscriminator() const {
   if (getRawDiscriminator() == InvalidDiscriminator &&
       (ctx.Diags.hadAnyError() ||
        getParentSourceFile()->getFulfilledMacroRole() != std::nullopt ||
-       getParent()->isModuleScopeContext())) {
+       getParent()->isModuleScopeContext() ||
+       useFallbackDiscriminator)) {
     auto discriminator = ctx.getNextDiscriminator(getParent());
     ctx.setMaxAssignedDiscriminator(getParent(), discriminator + 1);
     const_cast<AbstractClosureExpr *>(this)->
