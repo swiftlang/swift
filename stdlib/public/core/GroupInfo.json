@@ -202,6 +202,14 @@
     "RawSpan.swift",
     "Span.swift"
   ],
+  "UTF8Span": [ 
+    "UTF8EncodingError.swift",
+    "UTF8Span.swift",
+    "UTF8SpanBits.swift",
+    "UTF8SpanFundamentals.swift",
+    "UTF8SpanInternalHelpers.swift",
+    "UTF8SpanIterators.swift"
+  ],
   "Protocols": [
     "CompilerProtocols.swift",
     "ShadowProtocols.swift"

@@ -13,14 +13,18 @@
 import SwiftShims
 
 /// CR and LF are common special cases in grapheme breaking logic
-private var _CR: UInt8 { return 0x0d }
-private var _LF: UInt8 { return 0x0a }
+private var _CR: UInt8 { return 0x0D }
+private var _LF: UInt8 { return 0x0A }
 
-internal func _hasGraphemeBreakBetween(
+/// Perform a quick-check to determine if there's a grapheme-break between two
+/// scalars, without consulting the data tables. Returns true if there
+/// definitely is a break, false if there definitely is none, and nil if a
+/// break couldn't be determined
+internal func _quickHasGraphemeBreakBetween(
   _ lhs: Unicode.Scalar, _ rhs: Unicode.Scalar
-) -> Bool {
-
-  // CR-LF is a special case: no break between these
+) -> Bool? {
+  // GB3:
+  //   CR-LF is a special case: no break between these
   if lhs == Unicode.Scalar(_CR) && rhs == Unicode.Scalar(_LF) {
     return false
   }
@@ -80,7 +84,10 @@ internal func _hasGraphemeBreakBetween(
     default: return false
     }
   }
-  return hasBreakWhenPaired(lhs) && hasBreakWhenPaired(rhs)
+  if hasBreakWhenPaired(lhs) && hasBreakWhenPaired(rhs) {
+    return true
+  }
+  return nil
 }
 
 extension _StringGuts {
@@ -456,6 +463,19 @@ extension Unicode.Scalar {
   }
 }
 
+extension Unicode {
+  /// **QUESTION**: Hashable? Codable?
+  /// **QUESTION**: Can we be frozen? What's the cost of resiliency here?
+  public struct GraphemeBreakingState: Sendable, Equatable {
+    internal var _state: _GraphemeBreakingState
+
+    /// ...
+    public init() {
+      self._state = .init()
+    }
+  }
+}
+
 internal struct _GraphemeBreakingState: Sendable, Equatable {
   // When we're looking through an indic sequence, one of the requirements is
   // that there is at LEAST 1 InCB=Linker present between two InCB=Consonant.
@@ -513,6 +533,8 @@ extension Unicode {
     internal var _previous: Unicode.Scalar
     internal var _state: _GraphemeBreakingState
 
+    /// Refactoring TODO: should we use a quick check result?
+    ///
     /// Returns a non-nil value if it can be determined whether there is a
     /// grapheme break between `scalar1` and `scalar2` without knowing anything
     /// about the scalars that precede `scalar1`. This can optionally be used as
@@ -523,13 +545,7 @@ extension Unicode {
       between scalar1: Unicode.Scalar,
       and scalar2: Unicode.Scalar
     ) -> Bool? {
-      if scalar1.value == 0xD, scalar2.value == 0xA {
-        return false
-      }
-      if _hasGraphemeBreakBetween(scalar1, scalar2) {
-        return true
-      }
-      return nil
+      _quickHasGraphemeBreakBetween(scalar1, scalar2)
     }
 
     /// Initialize a new character recognizer at the _start of text_ (sot)
@@ -708,13 +724,8 @@ extension _GraphemeBreakingState {
     between scalar1: Unicode.Scalar,
     and scalar2: Unicode.Scalar
   ) -> Bool {
-    // GB3
-    if scalar1.value == 0xD, scalar2.value == 0xA {
-      return false
-    }
-
-    if _hasGraphemeBreakBetween(scalar1, scalar2) {
-      return true
+    if let result = _quickHasGraphemeBreakBetween(scalar1, scalar2) {
+      return result
     }
 
     let x = Unicode._GraphemeBreakProperty(from: scalar1)
@@ -883,13 +894,8 @@ extension _StringGuts {
     at index: Int,
     with previousScalar: (Int) -> (scalar: Unicode.Scalar, start: Int)?
   ) -> Bool {
-    // GB3
-    if scalar1.value == 0xD, scalar2.value == 0xA {
-      return false
-    }
-
-    if _hasGraphemeBreakBetween(scalar1, scalar2) {
-      return true
+    if let result = _quickHasGraphemeBreakBetween(scalar1, scalar2) {
+      return result
     }
 
     let x = Unicode._GraphemeBreakProperty(from: scalar1)
