@@ -637,6 +637,12 @@ def create_argument_parser():
                 '`bootstrapping-with-hostlibs`, `crosscompile`, and '
                 '`crosscompile-with-hostlibs`')
 
+    option('--use-linker', store('use_linker'),
+           choices=['gold', 'lld'],
+           default=None,
+           metavar='USE_LINKER',
+           help='Choose the default linker to use when compiling LLVM/Swift')
+
     # -------------------------------------------------------------------------
     in_group('Host and cross-compilation targets')
 

@@ -478,6 +478,15 @@ class TestDriverArgumentParser(
         with self.assertRaises(ParserError):
             self.parse_default_args([option_string, '0.0.0.1'])
 
+    def test_option_use_linker(self):
+        option_string = '--use-linker'
+
+        self.parse_default_args([option_string, 'lld'])
+        self.parse_default_args([option_string, 'gold'])
+
+        with self.assertRaises(ParserError):
+            self.parse_default_args([option_string, 'foo'])
+
     def test_option_swift_user_visible_version(self):
         option_string = '--swift-user-visible-version'
 
