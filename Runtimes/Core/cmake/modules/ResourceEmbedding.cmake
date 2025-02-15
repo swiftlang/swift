@@ -30,8 +30,11 @@ function(generate_plist project_name project_version target)
   endif()
 endfunction()
 
-if(NOT DEFINED CMAKE_MT)
-  find_program(CMAKE_MT NAMES mt llvm-mt)
+# FIXME: it appears that `CMAKE_MT` evaluates to an empty string which prevents
+# the use of the variable. This aliases `MT` to `CMAKE_MT` and tries to fallback
+# to known spellings for the tool.
+if(WIN32 AND BUILD_SHARED_LIBS)
+  find_program(MT HINTS ${CMAKE_MT} NAMES mt llvm-mt REQUIRED)
 endif()
 
 function(embed_manifest target)
@@ -62,6 +65,6 @@ function(embed_manifest target)
 
   if(WIN32)
     add_custom_command(TARGET ${target} POST_BUILD
-      COMMAND ${CMAKE_MT} -nologo -manifest "${_EM_BINARY_DIR}/${_EM_NAME}-${PROJECT_VERSION}.1.manifest" "-outputresource:$<TARGET_FILE:${target}>;#1")
+      COMMAND "${MT}" -nologo -manifest "${_EM_BINARY_DIR}/${_EM_NAME}-${PROJECT_VERSION}.1.manifest" "-outputresource:$<TARGET_FILE:${target}>;#1")
   endif()
 endfunction()
