@@ -783,6 +783,10 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
 
   DifferentiabilityWitnessTy = createStructType(
       *this, "swift.differentiability_witness", {Int8PtrTy, Int8PtrTy});
+
+  CoroFunctionPointerTy = createStructType(*this, "swift.coro_func_pointer",
+                                           {RelativeAddressTy, Int32Ty}, true);
+  CoroFunctionPointerPtrTy = CoroFunctionPointerTy->getPointerTo();
 }
 
 IRGenModule::~IRGenModule() {
