@@ -44,11 +44,11 @@ extension A2 {
 @objc @objcMembers class A3 {}
 
 // CHECK-NEXT: @interface A3 (SWIFT_EXTENSION(extensions))
-// CHECK-NEXT: @property (nonatomic, readonly) NSInteger some;
+// CHECK-NEXT: @property (nonatomic, readonly) NSInteger more;
 // CHECK-NEXT: @end
 // CHECK-EMPTY:
 // CHECK-NEXT: @interface A3 (SWIFT_EXTENSION(extensions))
-// CHECK-NEXT: @property (nonatomic, readonly) NSInteger more;
+// CHECK-NEXT: @property (nonatomic, readonly) NSInteger some;
 // CHECK-NEXT: @end
 // CHECK-EMPTY:
 extension A3 {
@@ -97,21 +97,21 @@ extension A5 {
 @objc class A6 {}
 
 extension A6 {
-  @objc(skippedBool:) func skipped(_: Bool) {}
-  @objc func def() {}
-}
-extension A6 {
   @objc(skippedInt:) func skipped(_: Int) {}
   @objc func abc() {}
 }
+extension A6 {
+  @objc(skippedBool:) func skipped(_: Bool) {}
+  @objc func def() {}
+}
 // CHECK: @interface A6 (SWIFT_EXTENSION(extensions))
-// CHECK-NEXT: - (void)skippedInt:
-// CHECK-NEXT: - (void)abc
+// CHECK-NEXT: - (void)skippedBool:
+// CHECK-NEXT: - (void)def
 // CHECK-NEXT: @end
 // CHECK-EMPTY:
 // CHECK-NEXT: @interface A6 (SWIFT_EXTENSION(extensions))
-// CHECK-NEXT: - (void)skippedBool:
-// CHECK-NEXT: - (void)def
+// CHECK-NEXT: - (void)skippedInt:
+// CHECK-NEXT: - (void)abc
 // CHECK-NEXT: @end
 // CHECK-EMPTY:
 

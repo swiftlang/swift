@@ -780,7 +780,7 @@ public:
           std::mismatch(lhsProtos.begin(), lhsProtos.end(), rhsProtos.begin(),
                         [] (const ProtocolDecl *nextLHSProto,
                             const ProtocolDecl *nextRHSProto) {
-          return nextLHSProto->getName() != nextRHSProto->getName();
+          return nextLHSProto->getName() == nextRHSProto->getName();
         });
         if (mismatch.first != lhsProtos.end()) {
           StringRef lhsProtoName = (*mismatch.first)->getName().str();
@@ -788,30 +788,35 @@ public:
         }
       }
 
-      // Still nothing? Fine, we'll pick the one with the alphabetically first
-      // member instead.
+      // Still nothing? Fine, we'll look for a difference between the members.
       {
-        auto mismatch = std::mismatch(
-            cast<ExtensionDecl>(*lhs)->getAllMembers().begin(),
-            cast<ExtensionDecl>(*lhs)->getAllMembers().end(),
-            cast<ExtensionDecl>(*rhs)->getAllMembers().begin(),
-            [](const Decl *nextLHSDecl, const Decl *nextRHSDecl) {
-              if (isa<ValueDecl>(nextLHSDecl) && isa<ValueDecl>(nextRHSDecl)) {
-                return cast<ValueDecl>(nextLHSDecl)->getName() !=
-                       cast<ValueDecl>(nextRHSDecl)->getName();
-              }
-              return isa<ValueDecl>(nextLHSDecl) != isa<ValueDecl>(nextRHSDecl);
-            });
-        if (mismatch.first !=
-            cast<ExtensionDecl>(*lhs)->getAllMembers().end()) {
-          auto *lhsMember = dyn_cast<ValueDecl>(*mismatch.first),
-               *rhsMember = dyn_cast<ValueDecl>(*mismatch.second);
+        for (auto pair : llvm::zip_equal(lhsMembers, rhsMembers)) {
+          auto *lhsMember = dyn_cast<ValueDecl>(std::get<0>(pair)),
+               *rhsMember = dyn_cast<ValueDecl>(std::get<1>(pair));
           if (!rhsMember && lhsMember)
             return Descending;
-          if (lhsMember && !rhsMember)
+          if (!lhsMember && rhsMember)
             return Ascending;
-          if (lhsMember && rhsMember)
-            return rhsMember->getName().compare(lhsMember->getName());
+          if (!lhsMember && !rhsMember)
+            continue;
+
+          result = rhsMember->getName().compare(lhsMember->getName());
+          if (result != 0)
+            return result;
+
+          result = rhsMember->getInterfaceType().getString().compare(
+                                   lhsMember->getInterfaceType().getString());
+          if (result != 0)
+            return result;
+
+          auto lhsGeneric = lhsMember->getAsGenericContext(),
+               rhsGeneric = rhsMember->getAsGenericContext();
+          if (lhsGeneric && rhsGeneric) {
+            result = rhsGeneric->getGenericSignature().getAsString().compare(
+                               lhsGeneric->getGenericSignature().getAsString());
+            if (result != 0)
+              return result;
+          }
         }
       }
 
