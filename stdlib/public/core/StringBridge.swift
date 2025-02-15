@@ -752,6 +752,7 @@ extension StringProtocol {
 
   public // SPI(Foundation)
   func _toUTF16Indices(_ range: Range<Int>) -> Range<Index> {
+#if hasFeature(Macros)
     if Self.self == String.self {
       let s = unsafe unsafeBitCast(self, to: String.self)
       return s.utf16._indexRange(for: range, from: s.startIndex)
@@ -760,6 +761,7 @@ extension StringProtocol {
       let s = unsafe unsafeBitCast(self, to: Substring.self)
       return s._slice._base.utf16._indexRange(for: range, from: s.startIndex)
     }
+#endif
     let lowerbound = _toUTF16Index(range.lowerBound)
     let upperbound = _toUTF16Index(range.upperBound)
     return unsafe Range(uncheckedBounds: (lower: lowerbound, upper: upperbound))
