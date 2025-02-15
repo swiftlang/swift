@@ -1895,10 +1895,20 @@ extension Array {
   ///   execution.
   /// - Returns: The return value, if any, of the `body` closure parameter.
   @inlinable
-  public mutating func withUnsafeMutableBytes<R>(
+  public mutating func withUnsafeMutableBytes<R, E>(
+    _ body: (UnsafeMutableRawBufferPointer) throws(E) -> R
+  ) throws(E) -> R {
+    return try self.withUnsafeMutableBufferPointer { (buffer: inout UnsafeMutableBufferPointer<Element>) throws(E) -> R in 
+      return try body(UnsafeMutableRawBufferPointer(buffer))
+    }
+  }
+
+  @inlinable
+  @_silgen_name("$sSa22withUnsafeMutableBytesyqd__qd__SwKXEKlF")
+  mutating func __abi_withUnsafeMutableBytes<R>(
     _ body: (UnsafeMutableRawBufferPointer) throws -> R
   ) rethrows -> R {
-    return try self.withUnsafeMutableBufferPointer {
+    return try self.withUnsafeMutableBufferPointer { 
       return try body(UnsafeMutableRawBufferPointer($0))
     }
   }
@@ -1931,7 +1941,17 @@ extension Array {
   ///   argument is valid only for the duration of the closure's execution.
   /// - Returns: The return value, if any, of the `body` closure parameter.
   @inlinable
-  public func withUnsafeBytes<R>(
+  public func withUnsafeBytes<R, E>(
+    _ body: (UnsafeRawBufferPointer) throws(E) -> R
+  ) throws(E) -> R {
+    return try self.withUnsafeBufferPointer { (buffer: UnsafeBufferPointer<Element>) throws(E) -> R in 
+      try body(UnsafeRawBufferPointer(buffer))
+    }
+  }
+
+  @inlinable
+  @_silgen_name("$sSa15withUnsafeBytesyqd__qd__SWKXEKl")
+  func __abi_withUnsafeBytes<R>(
     _ body: (UnsafeRawBufferPointer) throws -> R
   ) rethrows -> R {
     return try self.withUnsafeBufferPointer {
