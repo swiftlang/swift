@@ -12,6 +12,7 @@
 
 import ASTBridging
 import BasicBridging
+import SwiftIfConfig
 @_spi(RawSyntax) import SwiftSyntax
 
 public protocol BridgedNullable: ExpressibleByNilLiteral {
@@ -161,6 +162,25 @@ extension BridgedStringRef: /*@retroactive*/ Swift.ExpressibleByStringLiteral {
   }
 }
 
+extension VersionTuple {
+  var bridged: BridgedVersionTuple {
+    switch self.components.count {
+    case 4:
+      return BridgedVersionTuple(CUnsignedInt(components[0]), CUnsignedInt(components[1]), CUnsignedInt(components[2]), CUnsignedInt(components[3]))
+    case 3:
+      return BridgedVersionTuple(CUnsignedInt(components[0]), CUnsignedInt(components[1]), CUnsignedInt(components[2]))
+    case 2:
+      return BridgedVersionTuple(CUnsignedInt(components[0]), CUnsignedInt(components[1]))
+    case 1:
+      return BridgedVersionTuple(CUnsignedInt(components[0]))
+    case 0:
+      return BridgedVersionTuple()
+    default:
+      fatalError("unsuported version form")
+    }
+  }
+}
+
 extension SyntaxProtocol {
   /// Obtains the bridged start location of the node excluding leading trivia in the source buffer provided by `astgen`
   ///
@@ -289,4 +309,29 @@ extension ConcatCollection: LazyCollectionProtocol {
     case .c2(let i): return c2[i]
     }
   }
+}
+
+extension BridgedArrayRef {
+  public func withElements<T, R>(ofType ty: T.Type, _ c: (UnsafeBufferPointer<T>) -> R) -> R {
+    let start = data?.assumingMemoryBound(to: ty)
+    let buffer = UnsafeBufferPointer(start: start, count: count)
+    return c(buffer)
+  }
+}
+
+/// Utility to pass Swift closure to C/C++ bridging API.
+///
+/// C/C++ API can call the closure via `BridgedSwiftClosure::operator()` which
+/// calls `bridgedSwiftClosureCall_1(_:_:)` function below.
+func withBridgedSwiftClosure(closure: (UnsafeRawPointer?) -> Void, call: (BridgedSwiftClosure) -> Void) {
+  withoutActuallyEscaping(closure) { escapingClosure in
+    withUnsafePointer(to: escapingClosure) { ptr in
+      call(BridgedSwiftClosure(closure: ptr))
+    }
+  }
+}
+
+@_cdecl("swift_ASTGen_bridgedSwiftClosureCall_1")
+func bridgedSwiftClosureCall_1(_ bridged: BridgedSwiftClosure, _ arg: UnsafeRawPointer?) {
+  bridged.closure.assumingMemoryBound(to: ((UnsafeRawPointer?) -> Void).self).pointee(arg)
 }

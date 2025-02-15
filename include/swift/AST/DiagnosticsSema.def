@@ -4745,7 +4745,10 @@ NOTE(ambiguous_because_of_trailing_closure,none,
      (bool, const ValueDecl *))
 
 // In-package resilience bypassing
-WARNING(cannot_bypass_resilience_due_to_missing_member,none,
+WARNING(cannot_bypass_resilience_due_to_missing_member_warn,none,
+      "cannot bypass resilience due to member deserialization failure while attempting to access %select{member %0|missing member}1 of %2 in module %3 from module %4",
+      (Identifier, bool, Identifier, Identifier, Identifier))
+ERROR(cannot_bypass_resilience_due_to_missing_member,none,
       "cannot bypass resilience due to member deserialization failure while attempting to access %select{member %0|missing member}1 of %2 in module %3 from module %4",
       (Identifier, bool, Identifier, Identifier, Identifier))
 
@@ -5604,6 +5607,10 @@ ERROR(non_sendable_isolated_capture,none,
       "capture of %1 with non-sendable type %0 in an isolated "
       "%select{local function|closure}2",
       (Type, DeclName, bool))
+ERROR(non_sendable_metatype_capture,none,
+      "capture of non-sendable type %0 in an isolated "
+      "%select{local function|closure}1",
+      (Type, bool))
 ERROR(self_capture_deinit_task,none,
       "capture of 'self' in a closure that outlives deinit",
       ())
@@ -5656,9 +5663,6 @@ ERROR(distributed_actor_func_unsupported_specifier, none,
 ERROR(distributed_actor_func_variadic, none,
       "cannot declare variadic argument %0 in %kind1",
       (DeclName, const ValueDecl *))
-ERROR(distributed_actor_func_typed_throws, none,
-      "cannot declare distributed function with typed throws",
-      ())
 NOTE(actor_mutable_state,none,
      "mutation of this %0 is only permitted within the actor",
      (DescriptiveDeclKind))
@@ -5839,11 +5843,12 @@ ERROR(any_not_existential,none,
 ERROR(incorrect_optional_any,none,
       "optional 'any' type must be written %0",
       (Type))
-ERROR(existential_requires_any,none,
-      "use of %select{protocol |}2%0 as a type must be written %1",
-      (Type, Type, bool))
-ERROR(inverse_requires_any,none,
-      "constraint that suppresses conformance requires 'any'", ())
+
+GROUPED_ERROR(existential_requires_any,ExistentialAny,none,
+              "use of %select{protocol |}2%0 as a type must be written %1",
+              (Type, Type, bool))
+GROUPED_ERROR(inverse_requires_any,ExistentialAny,none,
+              "constraint that suppresses conformance requires 'any'", ())
 
 ERROR(nonisolated_mutable_storage,none,
       "'nonisolated' cannot be applied to mutable stored properties",
@@ -7976,10 +7981,6 @@ ERROR(noncopyable_cannot_have_read_set_accessor,none,
       "noncopyable %select{variable|subscript}0 cannot provide a read and set accessor",
       (unsigned))
 
-ERROR(span_requires_feature_flag,none,
-      "'%0' requires -enable-experimental-feature Span",
-      (StringRef))
-
 //------------------------------------------------------------------------------
 // MARK: Init accessors
 //------------------------------------------------------------------------------
@@ -8212,11 +8213,11 @@ ERROR(invalid_value_for_type_same_type,none,
       "cannot constrain type parameter %0 to be integer %1", (Type, Type))
 
 //===----------------------------------------------------------------------===//
-// MARK: Slab
+// MARK: InlineArray
 //===----------------------------------------------------------------------===//
 
-ERROR(slab_literal_incorrect_count,none,
-      "expected %0 elements in slab literal, but got %1", (Type, Type))
+ERROR(inlinearray_literal_incorrect_count,none,
+      "expected %0 elements in inline array literal, but got %1", (Type, Type))
 
 //===----------------------------------------------------------------------===//
 // MARK: @abi Attribute
@@ -8257,9 +8258,13 @@ ERROR(attr_abi_incompatible_with_silgen_name,none,
 // MARK: @execution Attribute
 //===----------------------------------------------------------------------===//
 
-ERROR(attr_execution_concurrent_only_on_async,none,
-      "cannot use '@execution(concurrent)' on non-async %kind0",
+ERROR(attr_execution_only_on_async,none,
+      "cannot use '@execution' on non-async %kind0",
       (ValueDecl *))
+
+ERROR(attr_execution_type_attr_only_on_async,none,
+      "cannot use '@execution' on non-async function type",
+      ())
 
 ERROR(attr_execution_concurrent_incompatible_isolated_parameter,none,
       "cannot use '@execution(concurrent)' on %kind0 because it has "
@@ -8275,6 +8280,19 @@ ERROR(attr_execution_concurrent_incompatible_with_nonisolated,none,
       "cannot use '@execution(concurrent)' and 'nonisolated' on the same %0 "
       "because they serve the same purpose",
       (ValueDecl *))
+
+ERROR(attr_execution_concurrent_type_attr_incompatible_with_global_isolation,none,
+      "cannot use '@execution(concurrent)' because function type is "
+      "isolated to global actor %0",
+      (Type))
+
+ERROR(attr_execution_concurrent_type_attr_incompatible_with_isolated_param,none,
+      "cannot use '@execution(concurrent)' together with isolated parameter",
+      ())
+
+ERROR(attr_execution_concurrent_type_attr_incompatible_with_isolated_any,none,
+      "cannot use '@execution(concurrent)' together with @isolated(any)",
+      ())
 
 
 #define UNDEFINE_DIAGNOSTIC_MACROS

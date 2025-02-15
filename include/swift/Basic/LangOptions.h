@@ -201,7 +201,7 @@ namespace swift {
     /// Maximum number of typo corrections we are allowed to perform.
     /// This is disabled by default until we can get typo-correction working within acceptable performance bounds.
     unsigned TypoCorrectionLimit = 0;
-    
+
     /// Should access control be respected?
     bool EnableAccessControl = true;
 
@@ -260,7 +260,7 @@ namespace swift {
 
     /// Emit a remark when indexing a system module.
     bool EnableIndexingSystemModuleRemarks = false;
-    
+
     /// Emit a remark on early exit in explicit interface build
     bool EnableSkipExplicitInterfaceModuleBuildRemarks = false;
 
@@ -603,12 +603,11 @@ namespace swift {
     /// from source.
     bool AllowNonResilientAccess = false;
 
-    /// When Package CMO is enabled, deserialization checks are done to
-    /// ensure that the members of a decl are correctly deserialized to maintain
-    /// proper layout. This ensures that bypassing resilience is safe. Accessing
-    /// an incorrectly laid-out decl directly can lead to runtime crashes. This flag
-    /// should only be used temporarily during migration to enable Package CMO.
-    bool SkipDeserializationChecksForPackageCMO = false;
+    /// When Package CMO is enabled, deserialization checks ensure that a decl's
+    /// members are correctly deserialized to maintain the proper layout—a prerequisite
+    /// for bypassing resilience when accessing the decl. By default, a warning is issued
+    /// if a deserialization failure is found; this flag causes the build to fail fast instead.
+    bool AbortOnDeserializationFailForPackageCMO = false;
 
     /// Enables dumping type witness systems from associated type inference.
     bool DumpTypeWitnessSystems = false;
@@ -684,7 +683,7 @@ namespace swift {
     void clearAllPlatformConditionValues() {
       PlatformConditionValues.clear();
     }
-    
+
     /// Returns the value for the given platform condition or an empty string.
     StringRef getPlatformConditionValue(PlatformConditionKind Kind) const;
 
@@ -864,7 +863,7 @@ namespace swift {
     /// 4.2 GHz Intel Core i7.
     /// (It's arbitrary, but will keep the compiler from taking too much time.)
     unsigned SwitchCheckingInvocationThreshold = 200000;
-    
+
     /// If true, the time it takes to type-check each function will be dumped
     /// to llvm::errs().
     bool DebugTimeFunctionBodies = false;
@@ -906,9 +905,12 @@ namespace swift {
     /// is for testing purposes.
     std::vector<std::string> DebugForbidTypecheckPrefixes;
 
+    /// Disable the shrink phase of the expression type checker.
+    bool SolverDisableShrink = false;
+
     /// Enable experimental operator designated types feature.
     bool EnableOperatorDesignatedTypes = false;
-    
+
     /// Disable constraint system performance hacks.
     bool DisableConstraintSolverPerformanceHacks = false;
 
@@ -955,6 +957,9 @@ namespace swift {
 
     /// The bridging header or PCH that will be imported.
     std::string BridgingHeader;
+
+    /// The bridging header PCH file.
+    std::string BridgingHeaderPCH;
 
     /// When automatically generating a precompiled header from the bridging
     /// header, place it in this directory.
@@ -1077,6 +1082,9 @@ namespace swift {
     /// compilation source targets.
     std::vector<std::string>
     getReducedExtraArgsForSwiftModuleDependency() const;
+
+    /// Get PCH input path. Return empty string if there is no PCH input.
+    std::string getPCHInputPath() const;
   };
 
 } // end namespace swift

@@ -4008,8 +4008,7 @@ void PrintAST::printOneParameter(const ParamDecl *param,
     Printer << " = ";
 
     switch (param->getDefaultArgumentKind()) {
-#define MAGIC_IDENTIFIER(NAME, STRING, SYNTAX_KIND) \
-    case DefaultArgumentKind::NAME:
+#define MAGIC_IDENTIFIER(NAME, STRING) case DefaultArgumentKind::NAME:
 #include "swift/AST/MagicIdentifierKinds.def"
       Printer.printKeyword(defaultArgStr, Options);
       break;
@@ -6421,6 +6420,10 @@ public:
     case FunctionTypeIsolation::Kind::Erased:
       if (!Options.SuppressIsolatedAny)
         Printer << "@isolated(any) ";
+      break;
+
+    case FunctionTypeIsolation::Kind::NonIsolatedCaller:
+      Printer << "@execution(caller) ";
       break;
     }
 

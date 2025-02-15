@@ -1006,9 +1006,9 @@ bb0:
 // CHECK-NEXT: [[BEGIN:%.*]] = begin_access [read] [dynamic] [no_nested_conflict] [[GLOBAL]] : $*X
 // CHECK-NEXT: load [trivial] [[BEGIN]] : $*X
 // CHECK-NEXT: load [trivial] [[BEGIN]] : $*X
-// CHECK-NEXT: end_access [[BEGIN]] : $*X
 // CHECK-NEXT: destroy_value
-// CHECK-NEXT: [[BEGIN:%.*]] = begin_access [read] [dynamic] [no_nested_conflict] [[GLOBAL]] : $*X
+// CHECK-NEXT: load [trivial] [[BEGIN]] : $*X
+// CHECK-NEXT: end_access [[BEGIN]] : $*X
 // CHECK-LABEL: } // end sil function 'testOldToNewMapReadMayRelease'
 sil [ossa] @testOldToNewMapReadMayRelease : $@convention(thin) () -> () {
 bb0:

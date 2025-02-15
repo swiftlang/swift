@@ -32,6 +32,18 @@ class LLVMLinuxCrossCompileTestCase(unittest.TestCase):
         self.toolchain.cc = '/path/to/cc'
         self.toolchain.cxx = '/path/to/cxx'
 
+        # Setup args
+        self.args = argparse.Namespace(
+            llvm_targets_to_build='X86;ARM;AArch64',
+            llvm_assertions='true',
+            compiler_vendor='none',
+            clang_compiler_version=None,
+            clang_user_visible_version=None,
+            cross_compile_hosts='linux-aarch64',
+            cross_compile_deps_path='sysroot',
+            use_linker=None
+        )
+
         # Setup shell
         shell.dry_run = True
         self._orig_stdout = sys.stdout

@@ -52,6 +52,7 @@
 #include "clang/Sema/TemplateDeduction.h"
 #include "llvm/ADT/APFloat.h"
 #include "llvm/ADT/APInt.h"
+#include "llvm/ADT/STLExtras.h"
 #include "llvm/ADT/SmallString.h"
 #include "llvm/Support/Compiler.h"
 #include "llvm/Support/SaveAndRestore.h"
@@ -3060,14 +3061,14 @@ namespace {
 #endif
 
       switch (expr->getKind()) {
-#define MAGIC_STRING_IDENTIFIER(NAME, STRING, SYNTAX_KIND) \
-      case MagicIdentifierLiteralExpr::NAME: \
+#define MAGIC_STRING_IDENTIFIER(NAME, STRING)                                  \
+      case MagicIdentifierLiteralExpr::NAME:                                   \
         return handleStringLiteralExpr(expr);
-#define MAGIC_INT_IDENTIFIER(NAME, STRING, SYNTAX_KIND) \
-      case MagicIdentifierLiteralExpr::NAME: \
+#define MAGIC_INT_IDENTIFIER(NAME, STRING)                                     \
+      case MagicIdentifierLiteralExpr::NAME:                                   \
         return handleIntegerLiteralExpr(expr);
-#define MAGIC_POINTER_IDENTIFIER(NAME, STRING, SYNTAX_KIND) \
-      case MagicIdentifierLiteralExpr::NAME: \
+#define MAGIC_POINTER_IDENTIFIER(NAME, STRING)                                 \
+      case MagicIdentifierLiteralExpr::NAME:                                   \
         return expr;
 #include "swift/AST/MagicIdentifierKinds.def"
       }
@@ -3803,7 +3804,7 @@ namespace {
       Type arrayTy = cs.getType(expr);
       Type elementType;
 
-      if (arrayTy->isSlab()) {
+      if (arrayTy->isInlineArray()) {
         // <let count: Int, Element>
         elementType = arrayTy->castTo<BoundGenericStructType>()->getGenericArgs()[1];
       } else {
@@ -7538,8 +7539,20 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
             fromEI.intoBuilder()
                 .withDifferentiabilityKind(toEI.getDifferentiabilityKind())
                 .build();
-        fromFunc = FunctionType::get(toFunc->getParams(), fromFunc->getResult(),
-                                     newEI);
+        SmallVector<AnyFunctionType::Param, 4> params(fromFunc->getParams());
+        assert(params.size() == toFunc->getParams().size() &&
+               "unexpected @differentiable conversion");
+        // Propagate @noDerivate from target function type
+        for (auto paramAndIndex : llvm::enumerate(toFunc->getParams())) {
+          if (!paramAndIndex.value().isNoDerivative())
+            continue;
+
+          auto &param = params[paramAndIndex.index()];
+          param =
+            param.withFlags(param.getParameterFlags().withNoDerivative(true));
+        }
+
+        fromFunc = FunctionType::get(params, fromFunc->getResult(), newEI);
         switch (toEI.getDifferentiabilityKind()) {
         // TODO: Ban `Normal` and `Forward` cases.
         case DifferentiabilityKind::Normal:
@@ -8396,9 +8409,7 @@ Expr *ExprRewriter::finishApply(ApplyExpr *apply, Type openedType,
     // If this is a call to a distributed method thunk,
     // let's mark the call as implicitly throwing.
     if (isDistributedThunk(callee, apply->getFn())) {
-      auto *FD = cast<AbstractFunctionDecl>(callee.getDecl());
-      if (!FD->hasThrows())
-        apply->setImplicitlyThrows(true);
+      apply->setImplicitlyThrows(true);
     }
 
     solution.setExprTypes(apply);

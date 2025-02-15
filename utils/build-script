@@ -184,28 +184,6 @@ def tar(source, destination):
     shell.call(args + [source], stderr=shell.DEVNULL)
 
 
-def process_system_exit(e: SystemExit) -> int:
-    # According to Python's documents, `SystemExit.code` is the exit status
-    # or error message that is passed to the constructor. (Defaults to None.)
-    #
-    # This means that `SystemExit.code` is either `None`, an `int` object or
-    # a `string` object of error message.
-    if e.code is None:
-        # Fallback to 1 if there is no error code but a `SystemExit`.
-        return 1
-    try:
-        numeric_code = int(e.code)
-        return numeric_code
-    except ValueError:
-        # Fallback to 1 if it is an error message and print that message.
-        print(e)
-        return 1
-    finally:
-        # Fallback to 1 and do nothing, since there is only ValueError as
-        # expected exception.
-        return 1
-
-
 # -----------------------------------------------------------------------------
 # Argument Validation
 
@@ -230,6 +208,15 @@ def validate_arguments(toolchain, args):
         if toolchain.sccache is None:
             fatal_error(
                 "can't find sccache (please install sccache)")
+
+    # Xcode project generation is no longer supported.
+    if args.cmake_generator == "Xcode":
+        fatal_error(
+            "build-script no longer supports Xcode project generation, you "
+            "should use utils/generate-xcode instead, see "
+            "https://github.com/swiftlang/swift/blob/main/docs/HowToGuides/"
+            "GettingStarted.md#using-ninja-with-xcode for more info"
+        )
 
     if args.host_target is None or args.stdlib_deployment_targets is None:
         fatal_error("unknown operating system")
@@ -324,8 +311,8 @@ def apply_default_arguments(toolchain, args):
     if ninja_required and toolchain.ninja is None:
         args.build_ninja = True
 
-    # Enable test colors if we're on a tty and aren't generating for Xcode.
-    if args.color_in_tests and sys.stdout.isatty() and args.cmake_generator != "Xcode":
+    # Enable test colors if we're on a tty.
+    if args.color_in_tests and sys.stdout.isatty():
         args.lit_args += " --param color_output"
 
     # Set the default stdlib-deployment-targets, if none were provided.
@@ -786,17 +773,6 @@ def main_normal():
             tar(source=prefix.lstrip('/'),
                 destination=args.symbols_package)
 
-    if args.cmake_generator == "Xcode":
-        print_warning(
-            "The Xcode projects generated with '--xcode' can be used for "
-            "navigation or editing purposes, but are not a recommended means "
-            "to building, running or debugging. For a full-fledged Xcode "
-            "workflow using these generated projects, see "
-            "https://github.com/swiftlang/swift/blob/main/docs/HowToGuides/"
-            "GettingStarted.md#using-ninja-with-xcode"
-        )
-        print()
-
     return 0
 
 
@@ -827,11 +803,12 @@ def main():
 if __name__ == "__main__":
     try:
         exit_code = main()
-    except SystemExit as e:
-        error_code = process_system_exit(e)
-        os._exit(error_code)
+        log_analyzer()
+    except SystemExit:
+        raise
     except KeyboardInterrupt:
         sys.exit(1)
-    finally:
+    except Exception:
         log_analyzer()
+        raise
     sys.exit(exit_code)

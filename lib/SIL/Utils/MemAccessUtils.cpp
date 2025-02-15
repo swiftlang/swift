@@ -2616,7 +2616,6 @@ static void visitBuiltinAddress(BuiltinInst *builtin,
     case BuiltinValueKind::DeallocRaw:
     case BuiltinValueKind::StackAlloc:
     case BuiltinValueKind::UnprotectedStackAlloc:
-    case BuiltinValueKind::AllocVector:
     case BuiltinValueKind::StackDealloc:
     case BuiltinValueKind::Fence:
     case BuiltinValueKind::StaticReport:
@@ -2829,6 +2828,7 @@ void swift::visitAccessedAddress(SILInstruction *I,
   case SILInstructionKind::EndLifetimeInst:
   case SILInstructionKind::ExistentialMetatypeInst:
   case SILInstructionKind::FixLifetimeInst:
+  case SILInstructionKind::MarkDependenceInst:
   case SILInstructionKind::GlobalAddrInst:
   case SILInstructionKind::HasSymbolInst:
   case SILInstructionKind::HopToExecutorInst:

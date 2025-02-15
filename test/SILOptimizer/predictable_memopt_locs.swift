@@ -14,8 +14,6 @@ public func main() {
   // CHECK-SAME: loc {{.*}}:11:10, scope [[S:[0-9]+]]
   // CHECK-NEXT:  %[[I:.*]] = struct_extract %[[A]]
   // CHECK-SAME:  loc {{.*}}:11:10, scope [[S]]
-  // CHECK-NEXT:  struct_extract %[[I]]
-  // CHECK-SAME:  loc {{.*}}:11:10, scope [[S]]
   // CHECK:  store %[[A]] to %0 : $*MyStruct,
   // CHECK-SAME:  loc {{.*}}:11:10, scope [[S]]
 	use(a.a)

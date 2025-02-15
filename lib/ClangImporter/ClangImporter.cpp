@@ -50,6 +50,7 @@
 #include "swift/Basic/Version.h"
 #include "swift/ClangImporter/ClangImporterRequests.h"
 #include "swift/ClangImporter/ClangModule.h"
+#include "swift/Frontend/CompileJobCacheKey.h"
 #include "swift/Parse/ParseVersion.h"
 #include "swift/Strings.h"
 #include "swift/Subsystems.h"
@@ -476,11 +477,10 @@ void importer::getNormalInvocationArguments(
   ClangImporterOptions &importerOpts = ctx.ClangImporterOpts;
   auto languageVersion = ctx.LangOpts.EffectiveLanguageVersion;
 
-  if (isPCHFilenameExtension(importerOpts.BridgingHeader)) {
-    invocationArgStrs.insert(invocationArgStrs.end(), {
-        "-include-pch", importerOpts.BridgingHeader
-    });
-  }
+  auto bridgingPCH = importerOpts.getPCHInputPath();
+  if (!bridgingPCH.empty())
+    invocationArgStrs.insert(invocationArgStrs.end(),
+                             {"-include-pch", bridgingPCH});
 
   // If there are no shims in the resource dir, add a search path in the SDK.
   SmallString<128> shimsPath(searchPathOpts.RuntimeResourcePath);
@@ -937,20 +937,24 @@ importer::addCommonInvocationArguments(
   }
 
   for (const auto &framepath : searchPathOpts.getFrameworkSearchPaths()) {
-    if (framepath.IsSystem) {
-      invocationArgStrs.push_back("-iframework");
-      invocationArgStrs.push_back(framepath.Path);
-    } else {
-      invocationArgStrs.push_back("-F" + framepath.Path);
+    if (!framepath.Path.empty()) {
+      if (framepath.IsSystem) {
+        invocationArgStrs.push_back("-iframework");
+        invocationArgStrs.push_back(framepath.Path);
+      } else {
+        invocationArgStrs.push_back("-F" + framepath.Path);
+      }
     }
   }
 
   for (const auto &path : searchPathOpts.getImportSearchPaths()) {
-    if (path.IsSystem) {
-      invocationArgStrs.push_back("-isystem");
-      invocationArgStrs.push_back(path.Path);
-    } else {
-      invocationArgStrs.push_back("-I" + path.Path);
+    if (!path.Path.empty()) {
+      if (path.IsSystem) {
+        invocationArgStrs.push_back("-isystem");
+        invocationArgStrs.push_back(path.Path);
+      } else {
+        invocationArgStrs.push_back("-I" + path.Path);
+      }
     }
   }
 }
@@ -1066,9 +1070,10 @@ void ClangImporter::addClangInvovcationDependencies(
 std::optional<std::string>
 ClangImporter::getPCHFilename(const ClangImporterOptions &ImporterOptions,
                               StringRef SwiftPCHHash, bool &isExplicit) {
-  if (isPCHFilenameExtension(ImporterOptions.BridgingHeader)) {
+  auto bridgingPCH = ImporterOptions.getPCHInputPath();
+  if (!bridgingPCH.empty()) {
     isExplicit = true;
-    return ImporterOptions.BridgingHeader;
+    return bridgingPCH;
   }
   isExplicit = false;
 
@@ -1261,6 +1266,9 @@ std::optional<std::vector<std::string>> ClangImporter::getClangCC1Arguments(
   }
   CI->getFrontendOpts().ModuleMapFiles = FilteredModuleMapFiles;
 
+  // Clear clang debug flags.
+  CI->getCodeGenOpts().DwarfDebugFlags.clear();
+
   return CI->getCC1CommandLine();
 }
 
@@ -1302,8 +1310,9 @@ ClangImporter::create(ASTContext &ctx,
       new ClangImporter(ctx, tracker, dwarfImporterDelegate)};
   auto &importerOpts = ctx.ClangImporterOpts;
 
-  if (isPCHFilenameExtension(importerOpts.BridgingHeader)) {
-    importer->Impl.setSinglePCHImport(importerOpts.BridgingHeader);
+  auto bridgingPCH = importerOpts.getPCHInputPath();
+  if (!bridgingPCH.empty()) {
+    importer->Impl.setSinglePCHImport(bridgingPCH);
     importer->Impl.IsReadingBridgingPCH = true;
     if (tracker) {
       // Currently ignoring dependency on bridging .pch files because they are
@@ -1311,7 +1320,7 @@ ClangImporter::create(ASTContext &ctx,
       // should be removed.
       auto &coll = static_cast<ClangImporterDependencyCollector &>(
         *tracker->getClangCollector());
-      coll.excludePath(importerOpts.BridgingHeader);
+      coll.excludePath(bridgingPCH);
     }
   }
 
@@ -1884,12 +1893,30 @@ setupIncludeTreeInput(clang::CompilerInvocation &invocation,
   if (!DB)
     return DB.takeError();
   auto CAS = DB->first;
+  auto Cache = DB->second;
   auto ID = CAS->parseID(pchIncludeTree);
   if (!ID)
     return ID.takeError();
-  auto includeTreeRef = CAS->getReference(*ID);
-  if (!includeTreeRef)
+  auto Ref = CAS->getReference(*ID);
+  if (!Ref)
     return llvm::cas::ObjectStore::createUnknownObjectError(*ID);
+  auto Key = ClangImporter::createEmbeddedBridgingHeaderCacheKey(*CAS, *Ref);
+  if (!Key)
+    return Key.takeError();
+  auto Lookup = Cache->get(CAS->getID(*Key));
+  if (!Lookup)
+    return Lookup.takeError();
+
+  std::optional<llvm::cas::ObjectRef> includeTreeRef;
+  if (*Lookup) {
+    includeTreeRef = CAS->getReference(**Lookup);
+    if (!includeTreeRef)
+      return llvm::cas::ObjectStore::createUnknownObjectError(**Lookup);
+  } else
+    // Failed to look up. This is from a caching build that doesn't use bridging
+    // header chaining due to an older swift-driver. Just use the include tree
+    // for PCH directly.
+    includeTreeRef = *Ref;
 
   invocation.getFrontendOpts().Inputs.push_back(clang::FrontendInputFile(
       *includeTreeRef, headerPath, clang::Language::ObjC));
@@ -4078,15 +4105,11 @@ void ClangModuleUnit::collectLinkLibraries(
   if (clangModule->UseExportAsModuleLinkName)
     return;
 
-  for (auto clangLinkLib : clangModule->LinkLibraries) {
-    LibraryKind kind;
-    if (clangLinkLib.IsFramework)
-      kind = LibraryKind::Framework;
-    else
-      kind = LibraryKind::Library;
-
-    callback(LinkLibrary(clangLinkLib.Library, kind));
-  }
+  for (auto clangLinkLib : clangModule->LinkLibraries)
+    callback(LinkLibrary{clangLinkLib.Library,
+                         clangLinkLib.IsFramework ? LibraryKind::Framework
+                                                  : LibraryKind::Library,
+                         /*static=*/false});
 }
 
 StringRef ClangModuleUnit::getFilename() const {
@@ -6336,7 +6359,7 @@ static bool isImplValid(ExtensionDecl *ext) {
   // This is diagnosed in AttributeChecker::visitObjCImplementationAttr().
   if (!attr->isEarlyAdopter() && !attr->CategoryName.empty())
     return false;
-  
+
   return !attr->isCategoryNameInvalid();
 }
 
@@ -7610,6 +7633,15 @@ SourceLoc ClangImporter::importSourceLocation(clang::SourceLocation loc) {
       getClangASTContext().getSourceManager(), loc);
 }
 
+llvm::Expected<llvm::cas::ObjectRef>
+ClangImporter::createEmbeddedBridgingHeaderCacheKey(
+    llvm::cas::ObjectStore &CAS, llvm::cas::ObjectRef ChainedPCHIncludeTree) {
+  // Create a cache key for looking up embedded bridging header include tree
+  // from chained bridging header cache key.
+  return CAS.store({ChainedPCHIncludeTree},
+                   "ChainedHeaderIncludeTree -> EmbeddedHeaderIncludeTree");
+}
+
 static bool hasImportAsRefAttr(const clang::RecordDecl *decl) {
   return decl->hasAttrs() && llvm::any_of(decl->getAttrs(), [](auto *attr) {
            if (auto swiftAttr = dyn_cast<clang::SwiftAttrAttr>(attr))
@@ -7936,7 +7968,7 @@ CxxRecordSemantics::evaluate(Evaluator &evaluator,
   if (hasIteratorAPIAttr(cxxDecl) || isIterator(cxxDecl)) {
     return CxxRecordSemanticsKind::Iterator;
   }
-  
+
   if (hasCopyTypeOperations(cxxDecl)) {
     return CxxRecordSemanticsKind::Owned;
   }
@@ -7993,7 +8025,7 @@ bool anySubobjectsSelfContained(const clang::CXXRecordDecl *decl) {
 
   if (hasCustomCopyOrMoveConstructor(decl) || hasOwnedValueAttr(decl))
     return true;
-  
+
   auto checkType = [](clang::QualType t) {
     if (auto recordType = dyn_cast<clang::RecordType>(t.getCanonicalType())) {
       if (auto cxxRecord =
@@ -8014,7 +8046,7 @@ bool anySubobjectsSelfContained(const clang::CXXRecordDecl *decl) {
     if (checkType(base.getType()))
       return true;
   }
-  
+
   return false;
 }
 

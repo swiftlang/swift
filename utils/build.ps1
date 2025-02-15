@@ -109,22 +109,29 @@ PS> .\Build.ps1
 PS> .\Build.ps1 -WindowsSDKs x64 -ProductVersion 1.2.3 -Test foundation,xctest
 #>
 [CmdletBinding(PositionalBinding = $false)]
-param(
-  [string] $SourceCache = "S:\SourceCache",
-  [string] $BinaryCache = "S:\b",
-  [string] $ImageRoot = "S:",
+param
+(
+  [System.IO.FileInfo] $SourceCache = "S:\SourceCache",
+  [System.IO.FileInfo] $BinaryCache = "S:\b",
+  [System.IO.FileInfo] $ImageRoot = "S:",
+  [ValidateSet("codeview", "dwarf")]
   [string] $CDebugFormat = "dwarf",
+  [ValidateSet("codeview", "dwarf")]
   [string] $SwiftDebugFormat = "dwarf",
-  [string] $AndroidAPILevel = 28,
+  [ValidateRange(1, 36)]
+  [int] $AndroidAPILevel = 28,
   [string[]] $AndroidSDKs = @(),
   [string[]] $WindowsSDKs = @("X64","X86","Arm64"),
   [string] $ProductVersion = "0.0.0",
   [string] $ToolchainIdentifier = $(if (${env:TOOLCHAIN_VERSION}) { "${env:TOOLCHAIN_VERSION}" } else { "${env:USERNAME}.development" }),
   [string] $PinnedBuild = "",
+  [ValidatePattern("^[A-Fa-f0-9]{64}$")]
   [string] $PinnedSHA256 = "",
   [string] $PinnedVersion = "",
   [string] $PythonVersion = "3.9.10",
+  [ValidatePattern("^r(?:[1-9]|[1-9][0-9])(?:[a-z])?$")]
   [string] $AndroidNDKVersion = "r26b",
+  [ValidatePattern("^\d+\.\d+\.\d+(?:-\w+)?")]
   [string] $WinSDKVersion = "",
   [switch] $Android = $false,
   [switch] $SkipBuild = $false,
@@ -132,7 +139,16 @@ param(
   [switch] $IncludeDS2 = $false,
   [string[]] $Test = @(),
   [string] $Stage = "",
+  [ValidateSet("ArgumentParser", "ASN1", "BuildTools", "Certificates", "CMark",
+    "Collections", "Compilers", "Crypto", "CURL", "Dispatch", "DocC", "Driver",
+    "DS2", "ExperimentalRuntime", "Format", "Foundation", "FoundationMacros",
+    "IndexStoreDB", "Inspect", "Installer", "LLBuild", "LLVM", "LMDB",
+    "Markdown", "mimalloc", "PackageManager", "PlatformInfoPlist", "RegsGen2",
+    "Runtime", "Sanitizers", "SDKSettingsPlist", "SourceKitLSP", "SQLite",
+    "System", "Testing", "TestingMacros", "ToolsSupportCore", "XCTest", "XML2",
+    "ZLib")]
   [string] $BuildTo = "",
+  [ValidateSet("AMD64", "ARM64")]
   [string] $HostArchName = $(if ($env:PROCESSOR_ARCHITEW6432 -ne $null) { "$env:PROCESSOR_ARCHITEW6432" } else { "$env:PROCESSOR_ARCHITECTURE" }),
   [switch] $Clean,
   [switch] $DebugInfo,
@@ -183,7 +199,7 @@ $VSInstallRoot = & $vswhere -nologo -latest -products "*" -all -prerelease -prop
 $msbuild = "$VSInstallRoot\MSBuild\Current\Bin\$BuildArchName\MSBuild.exe"
 
 # Hoist to global scope as this is used in two sites.
-$WiXVersion = "4.0.5"
+$WiXVersion = "4.0.6"
 
 # Avoid $env:ProgramFiles in case this script is running as x86
 $UnixToolsBinDir = "$env:SystemDrive\Program Files\Git\usr\bin"
@@ -219,6 +235,7 @@ $ArchX64 = @{
   BinaryCache = "$BinaryCache\x64";
   PlatformInstallRoot = "$BinaryCache\x64\Windows.platform";
   SDKInstallRoot = "$BinaryCache\x64\Windows.platform\Developer\SDKs\Windows.sdk";
+  ExperimentalSDKInstallRoot = "$BinaryCache\x64\Windows.platform\Developer\SDKs\WindowsExperimental.sdk";
   XCTestInstallRoot = "$BinaryCache\x64\Windows.platform\Developer\Library\XCTest-development";
   SwiftTestingInstallRoot = "$BinaryCache\x64\Windows.platform\Developer\Library\Testing-development";
   ToolchainInstallRoot = "$BinaryCache\x64\toolchains\$ProductVersion+Asserts";
@@ -236,6 +253,7 @@ $ArchX86 = @{
   BinaryCache = "$BinaryCache\x86";
   PlatformInstallRoot = "$BinaryCache\x86\Windows.platform";
   SDKInstallRoot = "$BinaryCache\x86\Windows.platform\Developer\SDKs\Windows.sdk";
+  ExperimentalSDKInstallRoot = "$BinaryCache\x86\Windows.platform\Developer\SDKs\WindowsExperimental.sdk";
   XCTestInstallRoot = "$BinaryCache\x86\Windows.platform\Developer\Library\XCTest-development";
   SwiftTestingInstallRoot = "$BinaryCache\x86\Windows.platform\Developer\Library\Testing-development";
   Cache = @{};
@@ -252,6 +270,7 @@ $ArchARM64 = @{
   BinaryCache = "$BinaryCache\arm64";
   PlatformInstallRoot = "$BinaryCache\arm64\Windows.platform";
   SDKInstallRoot = "$BinaryCache\arm64\Windows.platform\Developer\SDKs\Windows.sdk";
+  ExperimentalSDKInstallRoot = "$BinaryCache\arm64\Windows.platform\Developer\SDKs\WindowsExperimental.sdk";
   XCTestInstallRoot = "$BinaryCache\arm64\Windows.platform\Developer\Library\XCTest-development";
   ToolchainInstallRoot = "$BinaryCache\arm64\toolchains\$ProductVersion+Asserts";
   SwiftTestingInstallRoot = "$BinaryCache\arm64\Windows.platform\Developer\Library\Testing-development";
@@ -269,6 +288,7 @@ $AndroidARM64 = @{
   BinaryCache = "$BinaryCache\aarch64";
   PlatformInstallRoot = "$BinaryCache\arm64\Android.platform";
   SDKInstallRoot = "$BinaryCache\arm64\Android.platform\Developer\SDKs\Android.sdk";
+  ExperimentalSDKInstallRoot = "$BinaryCache\arm64\Android.platform\Developer\SDKs\AndroidExperimental.sdk";
   XCTestInstallRoot = "$BinaryCache\arm64\Android.platform\Developer\Library\XCTest-development";
   SwiftTestingInstallRoot = "$BinaryCache\arm64\Android.platform\Developer\Library\Testing-development";
   Cache = @{};
@@ -285,6 +305,7 @@ $AndroidARMv7 = @{
   BinaryCache = "$BinaryCache\armv7";
   PlatformInstallRoot = "$BinaryCache\armv7\Android.platform";
   SDKInstallRoot = "$BinaryCache\armv7\Android.platform\Developer\SDKs\Android.sdk";
+  ExperimentalSDKInstallRoot = "$BinaryCache\arm64\Android.platform\Developer\SDKs\AndroidExperimental.sdk";
   XCTestInstallRoot = "$BinaryCache\armv7\Android.platform\Developer\Library\XCTest-development";
   SwiftTestingInstallRoot = "$BinaryCache\armv7\Android.platform\Developer\Library\Testing-development";
   Cache = @{};
@@ -301,6 +322,7 @@ $AndroidX86 = @{
   BinaryCache = "$BinaryCache\i686";
   PlatformInstallRoot = "$BinaryCache\x86\Android.platform";
   SDKInstallRoot = "$BinaryCache\x86\Android.platform\Developer\SDKs\Android.sdk";
+  ExperimentalSDKInstallRoot = "$BinaryCache\arm64\Android.platform\Developer\SDKs\AndroidExperimental.sdk";
   XCTestInstallRoot = "$BinaryCache\x86\Android.platform\Developer\Library\XCTest-development";
   SwiftTestingInstallRoot = "$BinaryCache\x86\Android.platform\Developer\Library\Testing-development";
   Cache = @{};
@@ -317,6 +339,7 @@ $AndroidX64 = @{
   BinaryCache = "$BinaryCache\x86_64";
   PlatformInstallRoot = "$BinaryCache\x64\Android.platform";
   SDKInstallRoot = "$BinaryCache\x64\Android.platform\Developer\SDKs\Android.sdk";
+  ExperimentalSDKInstallRoot = "$BinaryCache\arm64\Android.platform\Developer\SDKs\AndroidExperimental.sdk";
   XCTestInstallRoot = "$BinaryCache\x64\Android.platform\Developer\Library\XCTest-development";
   SwiftTestingInstallRoot = "$BinaryCache\x64\Android.platform\Developer\Library\Testing-development";
   Cache = @{};
@@ -425,6 +448,9 @@ enum TargetComponent {
   Testing
   ClangBuiltins
   ClangRuntime
+  SwiftInspect
+  ExperimentalRuntime
+  StaticFoundation
 }
 
 function Get-TargetProjectBinaryCache($Arch, [TargetComponent]$Project) {
@@ -452,7 +478,6 @@ enum HostComponent {
   SourceKitLSP
   SymbolKit
   DocC
-  SwiftInspect
 }
 
 function Get-HostProjectBinaryCache([HostComponent]$Project) {
@@ -630,7 +655,7 @@ function Invoke-VsDevShell($Arch) {
   if ($ToBatch) {
     Write-Output "call `"$VSInstallRoot\Common7\Tools\VsDevCmd.bat`" $DevCmdArguments"
   } else {
-    # This dll path is valid for VS2019 and VS2022, but it was under a vsdevcmd subfolder in VS2017 
+    # This dll path is valid for VS2019 and VS2022, but it was under a vsdevcmd subfolder in VS2017
     Import-Module "$VSInstallRoot\Common7\Tools\Microsoft.VisualStudio.DevShell.dll"
     Enter-VsDevShell -VsInstallPath $VSInstallRoot -SkipAutomaticLocation -DevCmdArguments $DevCmdArguments
 
@@ -712,7 +737,6 @@ function Fetch-Dependencies {
     Expand-Archive -Path $source -DestinationPath $destination -Force
   }
 
-
   function Extract-Toolchain {
     param
     (
@@ -742,7 +766,7 @@ function Fetch-Dependencies {
     Get-ChildItem "$BinaryCache\toolchains\WixAttachedContainer" -Filter "*.msi" | ForEach-Object {
       $LogFile = [System.IO.Path]::ChangeExtension($_.Name, "log")
       $TARGETDIR = if ($_.Name -eq "rtl.msi") { "$BinaryCache\toolchains\$ToolchainName\LocalApp\Programs\Swift\Runtimes\$(Get-PinnedToolchainVersion)\usr\bin" } else { "$BinaryCache\toolchains\$ToolchainName" }
-    Invoke-Program -OutNull msiexec.exe /lvx! $BinaryCache\toolchains\$LogFile /qn /a $BinaryCache\toolchains\WixAttachedContainer\$($_.Name) ALLUSERS=0 TARGETDIR=$TARGETDIR
+      Invoke-Program -OutNull msiexec.exe /lvx! $BinaryCache\toolchains\$LogFile /qn /a $BinaryCache\toolchains\WixAttachedContainer\$($_.Name) ALLUSERS=0 TARGETDIR=$TARGETDIR
     }
   }
 
@@ -754,7 +778,7 @@ function Fetch-Dependencies {
   }
 
   $WiXURL = "https://www.nuget.org/api/v2/package/wix/$WiXVersion"
-  $WiXHash = "DF9BDB347183716F82EFE2CECB8C54BB3554AA907A69F47A41741D6FA4D0A754"
+  $WiXHash = "A94DD42AE1FB56B32DA180E2173CEDA4F0D10B4C8871C5EE59ECB502131A1EB6"
   DownloadAndVerify $WixURL "$BinaryCache\WiX-$WiXVersion.zip" $WiXHash
   Extract-ZipFile WiX-$WiXVersion.zip $BinaryCache WiX-$WiXVersion
 
@@ -909,7 +933,17 @@ function Fetch-Dependencies {
   }
 }
 
-function Get-PinnedToolchainTool() {
+function Get-PinnedToolchainToolsDir() {
+  # NOTE: add a workaround for the main snapshots that used the wrong version
+  # when building that was not noticed. This allows use of the nightly snapshot
+  # as a pinned toolchain.
+  if ((Get-PinnedToolchainVersion) -eq "0.0.0") {
+    if (-not (Test-Path "$BinaryCache\toolchains\${PinnedToolchain}\LocalApp\Programs\Swift\Toolchains\0.0.0+Asserts\usr\bin")) {
+      if (Test-Path "$BinaryCache\toolchains\${PinnedToolchain}\LocalApp\Programs\Swift\Toolchains\6.0.0+Asserts\usr\bin") {
+        return "$BinaryCache\toolchains\${PinnedToolchain}\LocalApp\Programs\Swift\Toolchains\6.0.0+Asserts\usr\bin"
+      }
+    }
+  }
   if (Test-Path "$BinaryCache\toolchains\${PinnedToolchain}\LocalApp\Programs\Swift\Toolchains\$(Get-PinnedToolchainVersion)+Asserts\usr\bin") {
     return "$BinaryCache\toolchains\${PinnedToolchain}\LocalApp\Programs\Swift\Toolchains\$(Get-PinnedToolchainVersion)+Asserts\usr\bin"
   }
@@ -1097,8 +1131,8 @@ function Build-CMakeProject {
         Append-FlagsDefine $Defines CMAKE_POLICY_CMP0141 NEW
         # Add additional linker flags for generating the debug info.
         if ($UseGNUDriver) {
-          Append-FlagsDefine $Defines CMAKE_SHARED_LINKER_FLAGS "-Xlinker -debug"
-          Append-FlagsDefine $Defines CMAKE_EXE_LINKER_FLAGS "-Xlinker -debug"
+          Append-FlagsDefine $Defines CMAKE_SHARED_LINKER_FLAGS @("-Xlinker", "-debug")
+          Append-FlagsDefine $Defines CMAKE_EXE_LINKER_FLAGS @("-Xlinker", "-debug")
         } else {
           Append-FlagsDefine $Defines CMAKE_SHARED_LINKER_FLAGS "/debug"
           Append-FlagsDefine $Defines CMAKE_EXE_LINKER_FLAGS "/debug"
@@ -1132,7 +1166,7 @@ function Build-CMakeProject {
       if ($UseBuiltCompilers.Contains("ASM")) {
         TryAdd-KeyValue $Defines CMAKE_ASM_COMPILER ([IO.Path]::Combine($CompilersBinaryCache, "bin", $Driver))
       } else {
-        TryAdd-KeyValue $Defines CMAKE_ASM_COMPILER (Join-Path -Path (Get-PinnedToolchainTool) -ChildPath $Driver)
+        TryAdd-KeyValue $Defines CMAKE_ASM_COMPILER (Join-Path -Path (Get-PinnedToolchainToolsDir) -ChildPath $Driver)
       }
       Append-FlagsDefine $Defines CMAKE_ASM_FLAGS "--target=$($Arch.LLVMTarget)"
       if ($Platform -eq "Windows") {
@@ -1144,7 +1178,7 @@ function Build-CMakeProject {
       if ($UseBuiltCompilers.Contains("C")) {
         TryAdd-KeyValue $Defines CMAKE_C_COMPILER ([IO.Path]::Combine($CompilersBinaryCache, "bin", $Driver))
       } else {
-        TryAdd-KeyValue $Defines CMAKE_C_COMPILER (Join-Path -Path (Get-PinnedToolchainTool) -ChildPath $Driver)
+        TryAdd-KeyValue $Defines CMAKE_C_COMPILER (Join-Path -Path (Get-PinnedToolchainToolsDir) -ChildPath $Driver)
       }
       TryAdd-KeyValue $Defines CMAKE_C_COMPILER_TARGET $Arch.LLVMTarget
 
@@ -1158,7 +1192,7 @@ function Build-CMakeProject {
       if ($UseBuiltCompilers.Contains("CXX")) {
         TryAdd-KeyValue $Defines CMAKE_CXX_COMPILER ([IO.Path]::Combine($CompilersBinaryCache, "bin", $Driver))
       } else {
-        TryAdd-KeyValue $Defines CMAKE_CXX_COMPILER (Join-Path -Path (Get-PinnedToolchainTool) -ChildPath $Driver)
+        TryAdd-KeyValue $Defines CMAKE_CXX_COMPILER (Join-Path -Path (Get-PinnedToolchainToolsDir) -ChildPath $Driver)
       }
       TryAdd-KeyValue $Defines CMAKE_CXX_COMPILER_TARGET $Arch.LLVMTarget
 
@@ -1175,7 +1209,7 @@ function Build-CMakeProject {
       } elseif ($UseBuiltCompilers.Contains("Swift")) {
         TryAdd-KeyValue $Defines CMAKE_Swift_COMPILER ([IO.Path]::Combine($CompilersBinaryCache, "bin", "swiftc.exe"))
       } else {
-        TryAdd-KeyValue $Defines CMAKE_Swift_COMPILER (Join-Path -Path (Get-PinnedToolchainTool) -ChildPath  "swiftc.exe")
+        TryAdd-KeyValue $Defines CMAKE_Swift_COMPILER (Join-Path -Path (Get-PinnedToolchainToolsDir) -ChildPath  "swiftc.exe")
       }
       if (-not ($Platform -eq "Windows")) {
         TryAdd-KeyValue $Defines CMAKE_Swift_COMPILER_WORKS = "YES"
@@ -1442,7 +1476,7 @@ function Build-WiXProject() {
   $ProductVersionArg = $ProductVersion
   if (-not $Bundle) {
     # WiX v4 will accept a semantic version string for Bundles,
-    # but Packages still require a purely numerical version number, 
+    # but Packages still require a purely numerical version number,
     # so trim any semantic versioning suffixes
     $ProductVersionArg = [regex]::Replace($ProductVersion, "[-+].*", "")
   }
@@ -1616,11 +1650,13 @@ function Build-Compilers() {
     $PythonRoot = "$BinaryCache\Python$($Arch.CMakeName)-$PythonVersion\tools"
     $PythonLibName = "python{0}{1}" -f ([System.Version]$PythonVersion).Major, ([System.Version]$PythonVersion).Minor
 
-    # The STL in VS 17.10 requires Clang 17 or higher, but Swift toolchains prior to version 6 include older versions
-    # of Clang. If bootstrapping with an older toolchain, we need to relax to relax this requirement with
-    # ALLOW_COMPILER_AND_STL_VERSION_MISMATCH.
+    # The STL in the latest versions of VS typically require a newer version of
+    # Clang than released Swift toolchains include. If bootstrapping with an
+    # older toolchain, we need to relax this requirement by defining
+    # _ALLOW_COMPILER_AND_STL_VERSION_MISMATCH. Developer builds are (currently)
+    # up-to-date.
     $SwiftFlags = @();
-    if ([System.Version](Get-PinnedToolchainVersion) -lt [System.Version]"6.0" -and [System.Version](Get-PinnedToolchainVersion) -ne [System.Version]"0.0.0") {
+    if ([System.Version](Get-PinnedToolchainVersion) -ne [System.Version]"0.0.0") {
       $SwiftFlags += @("-Xcc", "-D_ALLOW_COMPILER_AND_STL_VERSION_MISMATCH");
     }
 
@@ -1656,7 +1692,7 @@ function Build-Compilers() {
         Python3_LIBRARY = "$PythonRoot\libs\$PythonLibName.lib";
         Python3_ROOT_DIR = $PythonRoot;
         SWIFT_BUILD_SWIFT_SYNTAX = "YES";
-        SWIFT_CLANG_LOCATION = (Get-PinnedToolchainTool);
+        SWIFT_CLANG_LOCATION = (Get-PinnedToolchainToolsDir);
         SWIFT_ENABLE_EXPERIMENTAL_CONCURRENCY = "YES";
         SWIFT_ENABLE_EXPERIMENTAL_CXX_INTEROP = "YES";
         SWIFT_ENABLE_EXPERIMENTAL_DIFFERENTIABLE_PROGRAMMING = "YES";
@@ -1787,7 +1823,7 @@ function Build-Sanitizers([Platform]$Platform, $Arch) {
       LLVM_ENABLE_PER_TARGET_RUNTIME_DIR = "YES";
       COMPILER_RT_DEFAULT_TARGET_ONLY = "YES";
     })
-  
+
   Build-CMakeProject `
     -Src $SourceCache\llvm-project\compiler-rt `
     -Bin "$(Get-TargetProjectBinaryCache $Arch ClangRuntime)" `
@@ -2047,6 +2083,49 @@ function Build-Runtime([Platform]$Platform, $Arch) {
   }
 }
 
+function Build-ExperimentalRuntime {
+  [CmdletBinding(PositionalBinding = $false)]
+  param
+  (
+    [Parameter(Position = 0, Mandatory = $true)]
+    [Platform] $Platform,
+    [Parameter(Position = 1, Mandatory = $true)]
+    [hashtable] $Arch,
+    [switch] $Static = $false
+  )
+
+  # TODO: remove this once the migration is completed.
+  Isolate-EnvVars {
+    Invoke-VsDevShell $BuildArch
+
+    Push-Location "${SourceCache}\swift\Runtimes"
+    Start-Process -Wait -WindowStyle Hidden -FilePath cmake.exe -ArgumentList @("-P", "Resync.cmake")
+    Pop-Location
+  }
+
+  Isolate-EnvVars {
+    $env:Path = "$(Get-CMarkBinaryCache $Arch)\src;$(Get-PinnedToolchainRuntime);${env:Path}"
+
+    $CompilersBinaryCache = if ($IsCrossCompiling) {
+      Get-BuildProjectBinaryCache Compilers
+    } else {
+      Get-HostProjectBinaryCache Compilers
+    }
+
+   Build-CMakeProject `
+     -Src $SourceCache\swift\Runtimes\Core `
+     -Bin (Get-TargetProjectBinaryCache $Arch ExperimentalRuntime) `
+     -InstallTo "$($Arch.ExperimentalSDKInstallRoot)\usr" `
+     -Arch $Arch `
+     -Platform $Platform `
+     -UseBuiltCompilers C,CXX,Swift `
+     -UseGNUDriver `
+     -Defines @{
+       BUILD_SHARED_LIBS = if ($Static) { "NO" } else { "YES" };
+     }
+  }
+}
+
 function Write-SDKSettingsPlist([Platform]$Platform, $Arch) {
   if ($Platform -eq [Platform]::Windows) {
     Invoke-Program "$(Get-PythonExecutable)" -c "import plistlib; print(str(plistlib.dumps({ 'DefaultProperties': { 'DEFAULT_USE_RUNTIME': 'MD' } }), encoding='utf-8'))" `
@@ -2074,28 +2153,42 @@ function Write-SDKSettingsPlist([Platform]$Platform, $Arch) {
 }
 
 function Build-Dispatch([Platform]$Platform, $Arch, [switch]$Test = $false) {
-  if ($Test) {
-    $Targets = @("default", "ExperimentalTest")
-    $InstallPath = ""
-  } else {
-    $Targets = @("install")
-    $InstallPath = "$($Arch.SDKInstallRoot)\usr"
-  }
-
-  Build-CMakeProject `
-    -Src $SourceCache\swift-corelibs-libdispatch `
-    -Bin (Get-TargetProjectBinaryCache $Arch Dispatch) `
-    -InstallTo $InstallPath `
-    -Arch $Arch `
-    -Platform $Platform `
-    -BuildTargets $Targets `
-    -UseBuiltCompilers C,CXX,Swift `
-    -Defines @{
-      ENABLE_SWIFT = "YES";
+  Isolate-EnvVars {
+    if ($Test) {
+      $Targets = @("default", "ExperimentalTest")
+      $InstallPath = ""
+      $env:CTEST_OUTPUT_ON_FAILURE = "YES"
+    } else {
+      $Targets = @("install")
+      $InstallPath = "$($Arch.SDKInstallRoot)\usr"
     }
+
+    Build-CMakeProject `
+      -Src $SourceCache\swift-corelibs-libdispatch `
+      -Bin (Get-TargetProjectBinaryCache $Arch Dispatch) `
+      -InstallTo $InstallPath `
+      -Arch $Arch `
+      -Platform $Platform `
+      -BuildTargets $Targets `
+      -UseBuiltCompilers C,CXX,Swift `
+      -Defines @{
+        ENABLE_SWIFT = "YES";
+      }
+  }
 }
 
-function Build-Foundation([Platform]$Platform, $Arch, [switch]$Test = $false) {
+function Build-Foundation {
+  [CmdletBinding(PositionalBinding = $false)]
+  param
+  (
+    [Parameter(Position = 0, Mandatory = $true)]
+    [Platform] $Platform,
+    [Parameter(Position = 1, Mandatory = $true)]
+    [hashtable] $Arch,
+    [switch] $Static = $false,
+    [switch] $Test = $false
+  )
+
   if ($Test) {
     # Foundation tests build via swiftpm rather than CMake
     $OutDir = Join-Path -Path $HostArch.BinaryCache -ChildPath swift-foundation-tests
@@ -2128,7 +2221,11 @@ function Build-Foundation([Platform]$Platform, $Arch, [switch]$Test = $false) {
     }
   } else {
     $DispatchBinaryCache = Get-TargetProjectBinaryCache $Arch Dispatch
-    $FoundationBinaryCache = Get-TargetProjectBinaryCache $Arch DynamicFoundation
+    $FoundationBinaryCache = if ($Static) {
+      Get-TargetProjectBinaryCache $Arch StaticFoundation
+    } else {
+      Get-TargetProjectBinaryCache $Arch DynamicFoundation
+    }
     $ShortArch = $Arch.LLVMName
 
     Isolate-EnvVars {
@@ -2141,14 +2238,16 @@ function Build-Foundation([Platform]$Platform, $Arch, [switch]$Test = $false) {
       Build-CMakeProject `
         -Src $SourceCache\swift-corelibs-foundation `
         -Bin $FoundationBinaryCache `
-        -InstallTo "$($Arch.SDKInstallRoot)\usr" `
+        -InstallTo $(if ($Static) { "$($Arch.ExperimentalSDKInstallRoot)\usr" } else { "$($Arch.SDKInstallRoot)\usr" }) `
         -Arch $Arch `
         -Platform $Platform `
         -UseBuiltCompilers ASM,C,CXX,Swift `
         -SwiftSDK:$SDKRoot `
         -Defines @{
+          BUILD_SHARED_LIBS = if ($Static) { "NO" } else { "YES" };
           CMAKE_FIND_PACKAGE_PREFER_CONFIG = "YES";
           CMAKE_NINJA_FORCE_RESPONSE_FILE = "YES";
+          CMAKE_STATIC_LIBRARY_PREFIX_Swift = "lib";
           ENABLE_TESTING = "NO";
           FOUNDATION_BUILD_TOOLS = if ($Platform -eq "Windows") { "YES" } else { "NO" };
           CURL_DIR = "$LibraryRoot\curl-8.9.1\usr\lib\$Platform\$ShortArch\cmake\CURL";
@@ -2408,6 +2507,7 @@ function Build-System($Arch) {
     -BuildTargets default `
     -Defines @{
       BUILD_SHARED_LIBS = "NO";
+      CMAKE_STATIC_LIBRARY_PREFIX_Swift = "lib";
     }
 }
 
@@ -2422,6 +2522,7 @@ function Build-ToolsSupportCore($Arch) {
     -SwiftSDK (Get-HostSwiftSDK) `
     -Defines @{
       BUILD_SHARED_LIBS = "YES";
+      CMAKE_STATIC_LIBRARY_PREFIX_Swift = "lib";
     }
 }
 
@@ -2480,6 +2581,7 @@ function Build-ArgumentParser($Arch) {
     -Defines @{
       BUILD_SHARED_LIBS = "YES";
       BUILD_TESTING = "NO";
+      CMAKE_STATIC_LIBRARY_PREFIX_Swift = "lib";
     }
 }
 
@@ -2494,6 +2596,7 @@ function Build-Driver($Arch) {
     -SwiftSDK (Get-HostSwiftSDK) `
     -Defines @{
       BUILD_SHARED_LIBS = "YES";
+      CMAKE_STATIC_LIBRARY_PREFIX_Swift = "lib";
       TSC_DIR = (Get-HostProjectCMakeModules ToolsSupportCore);
       LLBuild_DIR = (Get-HostProjectCMakeModules LLBuild);
       ArgumentParser_DIR = (Get-HostProjectCMakeModules ArgumentParser);
@@ -2517,6 +2620,7 @@ function Build-Crypto($Arch) {
     -BuildTargets default `
     -Defines @{
       BUILD_SHARED_LIBS = "NO";
+      CMAKE_STATIC_LIBRARY_PREFIX_Swift = "lib";
     }
 }
 
@@ -2531,6 +2635,7 @@ function Build-Collections($Arch) {
     -SwiftSDK (Get-HostSwiftSDK) `
     -Defines @{
       BUILD_SHARED_LIBS = "YES";
+      CMAKE_STATIC_LIBRARY_PREFIX_Swift = "lib";
     }
 }
 
@@ -2544,6 +2649,7 @@ function Build-ASN1($Arch) {
     -BuildTargets default `
     -Defines @{
       BUILD_SHARED_LIBS = "NO";
+      CMAKE_STATIC_LIBRARY_PREFIX_Swift = "lib";
     }
 }
 
@@ -2558,6 +2664,7 @@ function Build-Certificates($Arch) {
     -BuildTargets default `
     -Defines @{
       BUILD_SHARED_LIBS = "NO";
+      CMAKE_STATIC_LIBRARY_PREFIX_Swift = "lib";
       SwiftCrypto_DIR = (Get-HostProjectCMakeModules Crypto);
       SwiftASN1_DIR = (Get-HostProjectCMakeModules ASN1);
     }
@@ -2581,6 +2688,7 @@ function Build-PackageManager($Arch) {
     -Defines @{
       BUILD_SHARED_LIBS = "YES";
       CMAKE_Swift_FLAGS = @("-DCRYPTO_v2");
+      CMAKE_STATIC_LIBRARY_PREFIX_Swift = "lib";
       SwiftSystem_DIR = (Get-HostProjectCMakeModules System);
       TSC_DIR = (Get-HostProjectCMakeModules ToolsSupportCore);
       LLBuild_DIR = (Get-HostProjectCMakeModules LLBuild);
@@ -2607,6 +2715,7 @@ function Build-Markdown($Arch) {
     -SwiftSDK (Get-HostSwiftSDK) `
     -Defines @{
       BUILD_SHARED_LIBS = "NO";
+      CMAKE_STATIC_LIBRARY_PREFIX_Swift = "lib";
       ArgumentParser_DIR = (Get-HostProjectCMakeModules ArgumentParser);
       "cmark-gfm_DIR" = "$($Arch.ToolchainInstallRoot)\usr\lib\cmake";
     }
@@ -2654,7 +2763,7 @@ function Test-Format {
     "-Xswiftc", "-I$(Get-HostProjectBinaryCache Format)\swift",
     "-Xlinker", "-L$(Get-HostProjectBinaryCache Format)\lib"
   )
-  
+
   Isolate-EnvVars {
     $env:SWIFTFORMAT_BUILD_ONLY_TESTS=1
     # Testing swift-format is faster in serial mode than in parallel mode, probably because parallel test execution
@@ -2691,6 +2800,7 @@ function Build-IndexStoreDB($Arch) {
     -BuildTargets default `
     -Defines @{
       BUILD_SHARED_LIBS = "NO";
+      CMAKE_STATIC_LIBRARY_PREFIX_Swift = "lib";
       CMAKE_C_FLAGS = @("-I$SDKInstallRoot\usr\include", "-I$SDKInstallRoot\usr\include\Block");
       CMAKE_CXX_FLAGS = @("-I$SDKInstallRoot\usr\include", "-I$SDKInstallRoot\usr\include\Block");
       LMDB_DIR = (Get-HostProjectCMakeModules LMDB);
@@ -2707,6 +2817,7 @@ function Build-SourceKitLSP($Arch) {
     -UseBuiltCompilers C,Swift `
     -SwiftSDK (Get-HostSwiftSDK) `
     -Defines @{
+      CMAKE_STATIC_LIBRARY_PREFIX_Swift = "lib";
       SwiftSyntax_DIR = (Get-HostProjectCMakeModules Compilers);
       TSC_DIR = (Get-HostProjectCMakeModules ToolsSupportCore);
       LLBuild_DIR = (Get-HostProjectCMakeModules LLBuild);
@@ -2765,12 +2876,12 @@ function Test-SourceKitLSP {
     # indexstore-db
     "-Xswiftc", "-I$(Get-HostProjectBinaryCache IndexStoreDB)\swift",
     "-Xlinker", "-L$(Get-HostProjectBinaryCache IndexStoreDB)\Sources\IndexStoreDB",
-    "-Xlinker", "$(Get-HostProjectBinaryCache IndexStoreDB)\lib\CIndexStoreDB\CIndexStoreDB.lib",
-    "-Xlinker", "$(Get-HostProjectBinaryCache IndexStoreDB)\lib\Core\Core.lib",
-    "-Xlinker", "$(Get-HostProjectBinaryCache IndexStoreDB)\lib\Database\Database.lib",
-    "-Xlinker", "$(Get-HostProjectBinaryCache IndexStoreDB)\lib\Index\Index.lib",
-    "-Xlinker", "$(Get-HostProjectBinaryCache IndexStoreDB)\lib\LLVMSupport\LLVMSupport.lib",
-    "-Xlinker", "$(Get-HostProjectBinaryCache IndexStoreDB)\lib\Support\Support.lib",
+    "-Xlinker", "$(Get-HostProjectBinaryCache IndexStoreDB)\Sources\IndexStoreDB_CIndexStoreDB\CIndexStoreDB.lib",
+    "-Xlinker", "$(Get-HostProjectBinaryCache IndexStoreDB)\Sources\IndexStoreDB_Core\Core.lib",
+    "-Xlinker", "$(Get-HostProjectBinaryCache IndexStoreDB)\Sources\IndexStoreDB_Database\Database.lib",
+    "-Xlinker", "$(Get-HostProjectBinaryCache IndexStoreDB)\Sources\IndexStoreDB_Index\Index.lib",
+    "-Xlinker", "$(Get-HostProjectBinaryCache IndexStoreDB)\Sources\IndexStoreDB_LLVMSupport\LLVMSupport.lib",
+    "-Xlinker", "$(Get-HostProjectBinaryCache IndexStoreDB)\Sources\IndexStoreDB_Support\Support.lib",
     # LMDB
     "-Xlinker", "$(Get-HostProjectBinaryCache LMDB)\lib\CLMDB.lib",
     # sourcekit-lsp
@@ -2879,19 +2990,34 @@ function Install-HostToolchain() {
   Copy-Item -Force $SwiftDriver "$($HostArch.ToolchainInstallRoot)\usr\bin\swiftc.exe"
 }
 
-function Build-Inspect() {
-  $SDKRoot = Get-HostSwiftSDK
+function Build-Inspect([Platform]$Platform, $Arch) {
+  if ($Arch -eq $HostArch) {
+    # When building for the host target, use the host version of the swift-argument-parser,
+    # and place the host swift-inspect executable with the other host toolchain binaries.
+    $ArgumentParserDir = Get-HostProjectCMakeModules ArgumentParser
+    $InstallPath = "$($HostArch.ToolchainInstallRoot)\usr"
+  } else {
+    # When building for non-host target, let CMake fetch the swift-argument-parser dependency
+    # since it is currently only built for the host and and cannot be built for Android until
+    # the pinned version is >= 1.5.0.
+    $ArgumentParserDir = ""
+    $InstallPath = "$($Arch.PlatformInstallRoot)\Developer\Library\$(Get-ModuleTriple $Arch)"
+  }
 
   Build-CMakeProject `
     -Src $SourceCache\swift\tools\swift-inspect `
-    -Bin (Get-HostProjectBinaryCache SwiftInspect) `
-    -InstallTo "$($HostArch.ToolchainInstallRoot)\usr" `
-    -Arch $HostArch `
+    -Bin (Get-TargetProjectBinaryCache $Arch SwiftInspect)`
+    -InstallTo $InstallPath `
+    -Arch $Arch `
+    -Platform $Platform `
     -UseBuiltCompilers C,CXX,Swift `
-    -SwiftSDK $SDKRoot `
+    -SwiftSDK $Arch.SDKInstallRoot `
     -Defines @{
-      CMAKE_Swift_FLAGS = @("-Xcc", "-I$SDKRoot\usr\include\swift\SwiftRemoteMirror");
-      ArgumentParser_DIR = (Get-HostProjectCMakeModules ArgumentParser);
+      CMAKE_Swift_FLAGS = @(
+        "-Xcc", "-I$($Arch.SDKInstallRoot)\usr\lib\swift",
+        "-Xcc", "-I$($Arch.SDKInstallRoot)\usr\include\swift\SwiftRemoteMirror",
+        "-L$($Arch.SDKInstallRoot)\usr\lib\swift\$Platform");
+      ArgumentParser_DIR = $ArgumentParserDir;
     }
 }
 
@@ -3035,6 +3161,9 @@ if (-not $SkipBuild) {
     Invoke-BuildStep Build-Testing Windows $Arch
     Invoke-BuildStep Write-SDKSettingsPlist Windows $Arch
     Invoke-BuildStep Write-PlatformInfoPlist $Arch
+
+    Invoke-BuildStep Build-ExperimentalRuntime -Static Windows $Arch
+    Invoke-BuildStep Build-Foundation -Static Windows $Arch
   }
 
   foreach ($Arch in $AndroidSDKArchs) {
@@ -3053,8 +3182,17 @@ if (-not $SkipBuild) {
     Invoke-BuildStep Build-Sanitizers Android $Arch
     Invoke-BuildStep Build-XCTest Android $Arch
     Invoke-BuildStep Build-Testing Android $Arch
+
+    # Android swift-inspect only supports 64-bit platforms.
+    if ($Arch.AndroidArchABI -eq "arm64-v8a" -or
+        $Arch.AndroidArchABI -eq "x86_64") {
+      Invoke-BuildStep Build-Inspect -Platform Android -Arch $Arch
+    }
     Invoke-BuildStep Write-SDKSettingsPlist Android $Arch
     Invoke-BuildStep Write-PlatformInfoPlist $Arch
+
+    Invoke-BuildStep Build-ExperimentalRuntime -Static Android $Arch
+    Invoke-BuildStep Build-Foundation -Static Android $Arch
   }
 
   # Build Macros for distribution
@@ -3097,7 +3235,7 @@ if (-not $SkipBuild) {
   Invoke-BuildStep Build-LMDB $HostArch
   Invoke-BuildStep Build-IndexStoreDB $HostArch
   Invoke-BuildStep Build-SourceKitLSP $HostArch
-  Invoke-BuildStep Build-Inspect $HostArch
+  Invoke-BuildStep Build-Inspect Windows $HostArch
 }
 
 Install-HostToolchain

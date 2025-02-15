@@ -1687,6 +1687,7 @@ struct CopiedLoadBorrowEliminationVisitor
       case OperandOwnership::InstantaneousUse:
       case OperandOwnership::UnownedInstantaneousUse:
       case OperandOwnership::InteriorPointer:
+      case OperandOwnership::AnyInteriorPointer:
       case OperandOwnership::BitwiseEscape: {
         // Look through copy_value of a move only value. We treat copy_value of
         // copyable values as normal uses.
@@ -2978,7 +2979,7 @@ bool GlobalLivenessChecker::testInstVectorLiveness(
             LLVM_DEBUG(llvm::dbgs() << "    Also a def block; skipping!\n");
             continue;
           }
-          [[clang::fallthrough]];
+          LLVM_FALLTHROUGH;
         }
         case IsLive::LiveWithin:
           if (isLive == IsLive::LiveWithin)

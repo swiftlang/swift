@@ -15,7 +15,9 @@
 #include "swift/Basic/Assertions.h"
 #include "swift/SILOptimizer/Analysis/AccessStorageAnalysis.h"
 #include "swift/SILOptimizer/Analysis/BasicCalleeAnalysis.h"
+#include "swift/SILOptimizer/Analysis/DestructorAnalysis.h"
 #include "swift/SILOptimizer/Analysis/FunctionOrder.h"
+#include "swift/SILOptimizer/Utils/InstOptUtils.h"
 #include "swift/SILOptimizer/PassManager/PassManager.h"
 
 using namespace swift;
@@ -313,13 +315,16 @@ void AccessStorageResult::visitBeginAccess(B *beginAccess) {
     result.first->mergeFrom(storageAccess);
 }
 
-void AccessStorageResult::analyzeInstruction(SILInstruction *I) {
+void AccessStorageResult::analyzeInstruction(SILInstruction *I,
+                                             DestructorAnalysis *DA) {
   assert(!FullApplySite::isa(I) && "caller should merge");
 
   if (auto *BAI = dyn_cast<BeginAccessInst>(I))
     visitBeginAccess(BAI);
   else if (auto *BUAI = dyn_cast<BeginUnpairedAccessInst>(I))
     visitBeginAccess(BUAI);
+  else if (I->mayRelease() && !isDestructorSideEffectFree(I, DA))
+    setWorstEffects();
 }
 
 void StorageAccessInfo::print(raw_ostream &os) const {
@@ -393,6 +398,7 @@ bool FunctionAccessStorage::summarizeCall(FullApplySite fullApply) {
 void AccessStorageAnalysis::initialize(
     SILPassManager *PM) {
   BCA = PM->getAnalysis<BasicCalleeAnalysis>();
+  DA = PM->getAnalysis<DestructorAnalysis>();
 }
 
 void AccessStorageAnalysis::invalidate() {
@@ -449,7 +455,7 @@ void AccessStorageAnalysis::analyzeFunction(
       if (auto fullApply = FullApplySite::isa(&I))
         analyzeCall(functionInfo, fullApply, bottomUpOrder, recursionDepth);
       else
-        functionInfo->functionEffects.analyzeInstruction(&I);
+        functionInfo->functionEffects.analyzeInstruction(&I, DA);
     }
   }
   LLVM_DEBUG(llvm::dbgs() << "  << finished " << F->getName() << '\n');

@@ -259,8 +259,7 @@ public:
       return;
 
     if (!F->hasAsync()) {
-      diagnoseAndRemoveAttr(attr, diag::attr_execution_concurrent_only_on_async,
-                            F);
+      diagnoseAndRemoveAttr(attr, diag::attr_execution_only_on_async, F);
       return;
     }
 
@@ -2338,7 +2337,8 @@ static Decl *getEnclosingDeclForDecl(Decl *D) {
 
 static std::optional<std::pair<SemanticAvailableAttr, const Decl *>>
 getSemanticAvailableRangeDeclAndAttr(const Decl *decl) {
-  if (auto attr = decl->getAvailableAttrForPlatformIntroduction())
+  if (auto attr = decl->getAvailableAttrForPlatformIntroduction(
+          /*checkExtension=*/false))
     return std::make_pair(*attr, decl);
 
   if (auto *parent =
@@ -2467,12 +2467,6 @@ void AttributeChecker::visitAvailableAttr(AvailableAttr *parsedAttr) {
           // not diagnosed previously, so only emit a warning in that case.
           if (isa<ExtensionDecl>(DC->getTopmostDeclarationDeclContext()))
             limit = DiagnosticBehavior::Warning;
-        } else if (enclosingAttr.getPlatform() != attr->getPlatform()) {
-          // Downgrade to a warning when the limiting attribute is for a more
-          // specific platform.
-          if (inheritsAvailabilityFromPlatform(enclosingAttr.getPlatform(),
-                                               attr->getPlatform()))
-            limit = DiagnosticBehavior::Warning;
         }
         diagnose(D->isImplicit() ? enclosingDecl->getLoc()
                                  : parsedAttr->getLocation(),
@@ -2520,14 +2514,14 @@ static bool canDeclareSymbolName(StringRef symbol, ModuleDecl *fromModule) {
   // to predict ways. Warn when code attempts to do so; hopefully we can
   // promote this to an error after a while.
   
-  return llvm::StringSwitch<bool>(symbol)
 #define FUNCTION(_, Module, Name, ...) \
-    .Case(#Name, false) \
-    .Case("_" #Name, false) \
-    .Case(#Name "_", false) \
-    .Case("_" #Name "_", false)
+  if (symbol == #Name) { return false; } \
+  if (symbol == "_" #Name) { return false; } \
+  if (symbol == #Name "_") { return false; } \
+  if (symbol == "_" #Name "_") { return false; }
 #include "swift/Runtime/RuntimeFunctions.def"
-    .Default(true);
+
+  return true;
 }
 
 void AttributeChecker::visitCDeclAttr(CDeclAttr *attr) {
@@ -5130,34 +5124,33 @@ void AttributeChecker::checkBackDeployedAttrs(
         D->getLoc(), D->getInnermostDeclContext());
 
     // Unavailable decls cannot be back deployed.
-    if (auto unavailableDomain = availability.getUnavailableDomain()) {
-      auto backDeployedDomain = AvailabilityDomain::forPlatform(Attr->Platform);
-      if (unavailableDomain->contains(backDeployedDomain)) {
-        auto platformString = prettyPlatformString(Attr->Platform);
-        llvm::VersionTuple ignoredVersion;
+    auto backDeployedDomain = AvailabilityDomain::forPlatform(Attr->Platform);
+    if (auto unavailableDomain =
+            availability.containsUnavailableDomain(backDeployedDomain)) {
+      auto platformString = prettyPlatformString(Attr->Platform);
+      llvm::VersionTuple ignoredVersion;
 
-        AvailabilityInference::updateBeforePlatformForFallback(
-            Attr, Ctx, platformString, ignoredVersion);
+      AvailabilityInference::updateBeforePlatformForFallback(
+          Attr, Ctx, platformString, ignoredVersion);
 
-        diagnose(AtLoc, diag::attr_has_no_effect_on_unavailable_decl, Attr, VD,
-                 platformString);
+      diagnose(AtLoc, diag::attr_has_no_effect_on_unavailable_decl, Attr, VD,
+               platformString);
 
-        // Find the attribute that makes the declaration unavailable.
-        const Decl *attrDecl = D;
-        do {
-          if (auto unavailableAttr = attrDecl->getUnavailableAttr()) {
-            diagnose(unavailableAttr->getParsedAttr()->AtLoc,
-                     diag::availability_marked_unavailable, VD)
-                .highlight(unavailableAttr->getParsedAttr()->getRange());
-            break;
-          }
+      // Find the attribute that makes the declaration unavailable.
+      const Decl *attrDecl = D;
+      do {
+        if (auto unavailableAttr = attrDecl->getUnavailableAttr()) {
+          diagnose(unavailableAttr->getParsedAttr()->AtLoc,
+                   diag::availability_marked_unavailable, VD)
+              .highlight(unavailableAttr->getParsedAttr()->getRange());
+          break;
+        }
 
-          attrDecl = AvailabilityInference::parentDeclForInferredAvailability(
-              attrDecl);
-        } while (attrDecl);
+        attrDecl =
+            AvailabilityInference::parentDeclForInferredAvailability(attrDecl);
+      } while (attrDecl);
 
-        continue;
-      }
+      continue;
     }
 
     // Verify that the decl is available before the back deployment boundary.
@@ -8333,13 +8326,13 @@ ValueDecl *RenamedDeclRequest::evaluate(Evaluator &evaluator,
 }
 
 static std::optional<AvailabilityDomain>
-getAvailabilityDomainForName(StringRef name, const DeclContext *declContext) {
-  if (auto builtinDomain =
-          AvailabilityDomain::builtinDomainForString(name, declContext))
+getAvailabilityDomainForName(Identifier identifier,
+                             const DeclContext *declContext) {
+  if (auto builtinDomain = AvailabilityDomain::builtinDomainForString(
+          identifier.str(), declContext))
     return builtinDomain;
 
   auto &ctx = declContext->getASTContext();
-  auto identifier = ctx.getIdentifier(name);
   if (auto customDomain =
           ctx.MainModule->getAvailabilityDomainForIdentifier(identifier))
     return customDomain;
@@ -8366,22 +8359,23 @@ SemanticAvailableAttrRequest::evaluate(swift::Evaluator &evaluator,
   auto domain = attr->getCachedDomain();
 
   if (!domain) {
-    auto domainName = attr->getDomainString();
-    ASSERT(domainName);
+    auto domainIdentifier = attr->getDomainIdentifier();
+    ASSERT(domainIdentifier);
 
     // Attempt to resolve the domain specified for the attribute and diagnose
     // if no domain is found.
     auto declContext = decl->getInnermostDeclContext();
-    domain = getAvailabilityDomainForName(*domainName, declContext);
+    domain = getAvailabilityDomainForName(*domainIdentifier, declContext);
     if (!domain) {
-      if (auto suggestion = closestCorrectedPlatformString(*domainName)) {
+      auto domainString = domainIdentifier->str();
+      if (auto suggestion = closestCorrectedPlatformString(domainString)) {
         diags
             .diagnose(domainLoc, diag::attr_availability_suggest_platform,
-                      *domainName, attrName, *suggestion)
+                      domainString, attrName, *suggestion)
             .fixItReplace(SourceRange(domainLoc), *suggestion);
       } else {
         diags.diagnose(attrLoc, diag::attr_availability_unknown_platform,
-                       *domainName, attrName);
+                       domainString, attrName);
       }
       return std::nullopt;
     }
@@ -8391,7 +8385,7 @@ SemanticAvailableAttrRequest::evaluate(swift::Evaluator &evaluator,
         !declContext->isInSwiftinterface()) {
       diags.diagnose(domainLoc,
                      diag::attr_availability_requires_custom_availability,
-                     *domainName, attr);
+                     domain->getNameForAttributePrinting(), attr);
       return std::nullopt;
     }
 
@@ -8404,9 +8398,7 @@ SemanticAvailableAttrRequest::evaluate(swift::Evaluator &evaluator,
   bool hasVersionSpec =
       (introducedVersion || deprecatedVersion || obsoletedVersion);
 
-  // FIXME: [availability] For the universal domain, this is currently
-  // diagnosed during parsing. That diagnostic should be subsumed by this one.
-  if (!domain->isVersioned() && hasVersionSpec && !domain->isUniversal()) {
+  if (!domain->isVersioned() && hasVersionSpec) {
     SourceRange versionSourceRange;
     if (introducedVersion)
       versionSourceRange = semanticAttr.getIntroducedSourceRange();

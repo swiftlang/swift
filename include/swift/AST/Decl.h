@@ -1432,13 +1432,18 @@ public:
   /// Returns the active platform-specific `@available` attribute for this decl.
   /// There may be multiple `@available` attributes that are relevant to the
   /// current platform, but the returned one has the highest priority.
-  std::optional<SemanticAvailableAttr> getActiveAvailableAttrForCurrentPlatform(
-      bool ignoreAppExtensions = false) const;
+  std::optional<SemanticAvailableAttr>
+  getActiveAvailableAttrForCurrentPlatform() const;
 
   /// Returns the active platform-specific `@available` attribute that should be
   /// used to determine the platform introduction version of the decl.
+  ///
+  /// If the declaration does not have a platform introduction attribute of its
+  /// own and is a member of an extension then the platform introduction
+  /// attribute attached to the extension will be returned instead unless \p
+  /// checkExtension is false.
   std::optional<SemanticAvailableAttr>
-  getAvailableAttrForPlatformIntroduction() const;
+  getAvailableAttrForPlatformIntroduction(bool checkExtension = true) const;
 
   /// Returns true if the declaration is deprecated at the current deployment
   /// target.
@@ -1474,8 +1479,7 @@ public:
   /// If the decl is always unavailable in the current compilation
   /// context, returns the attribute attached to the decl (or its parent
   /// extension) that makes it unavailable.
-  std::optional<SemanticAvailableAttr>
-  getUnavailableAttr(bool ignoreAppExtensions = false) const;
+  std::optional<SemanticAvailableAttr> getUnavailableAttr() const;
 
   /// Returns true if the decl is effectively always unavailable in the current
   /// compilation context. This query differs from \c isUnavailable() because it
@@ -1511,6 +1515,10 @@ public:
 
   /// Returns true if this declaration has any `@backDeployed` attributes.
   bool hasBackDeployedAttr() const;
+
+  /// Apply the specified function to decls that should be placed _next_ to
+  /// this decl when constructing AST.
+  void forEachDeclToHoist(llvm::function_ref<void(Decl *)> callback) const;
 
   /// Emit a diagnostic tied to this declaration.
   template<typename ...ArgTypes>
@@ -1859,6 +1867,10 @@ public:
     assert(!IsSuppressed && "setting suppressed again!?");
     IsSuppressed = true;
   }
+
+  void dump(raw_ostream &os) const;
+
+  SWIFT_DEBUG_DUMP;
 };
 
 /// A wrapper for the collection of inherited types for either a `TypeDecl` or
@@ -3986,7 +3998,7 @@ public:
   /// type parameter.
   ///
   /// \code
-  /// struct Slab<let count: Int, Element: ~Copyable>
+  /// struct InlineArray<let count: Int, Element: ~Copyable>
   /// \endcode
   bool isValue() const {
     return getParamKind() == GenericTypeParamKind::Value;
@@ -5579,12 +5591,6 @@ public:
   /// - `Self` appears in non-covariant position in the type signature of a
   ///   value requirement.
   bool hasSelfOrAssociatedTypeRequirements() const;
-
-  /// Determine whether an existential type constrained by this protocol must
-  /// be written using `any` syntax.
-  ///
-  /// \Note This method takes language feature state into account.
-  bool existentialRequiresAny() const;
 
   /// Returns a list of protocol requirements that must be assessed to
   /// determine a concrete's conformance effect polymorphism kind.
@@ -8073,7 +8079,11 @@ public:
   /// source buffers for e.g. code-completion.
   SourceRange getOriginalBodySourceRange() const;
 
-  /// Retrieve the source range of the function declaration name + patterns.
+  /// Retrieve the source range of the function declaration name and parameter list.
+  SourceRange getParameterListSourceRange() const;
+
+  /// Retrieve the source range of the function declaration name, parameter list,
+  /// and effects. For FuncDecl, this does not include the return type.
   SourceRange getSignatureSourceRange() const;
 
   CaptureInfo getCaptureInfo() const;
@@ -8660,7 +8670,7 @@ public:
   /// Get the list of elements declared in this case.
   ArrayRef<EnumElementDecl *> getElements() const {
     return {getTrailingObjects<EnumElementDecl *>(),
-            Bits.EnumCaseDecl.NumElements};
+            static_cast<size_t>(Bits.EnumCaseDecl.NumElements)};
   }
   SourceRange getSourceRange() const;
 

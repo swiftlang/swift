@@ -171,12 +171,12 @@ def verify_generic_signatures : Separate<["-"], "verify-generic-signatures">,
 
 def show_diagnostics_after_fatal : Flag<["-"], "show-diagnostics-after-fatal">,
   HelpText<"Keep emitting subsequent diagnostics after a fatal error">;
-  
+
 def enable_cross_import_overlays : Flag<["-"], "enable-cross-import-overlays">,
   HelpText<"Automatically import declared cross-import overlays.">;
 def disable_cross_import_overlays : Flag<["-"], "disable-cross-import-overlays">,
   HelpText<"Do not automatically import declared cross-import overlays.">;
-  
+
 def enable_testable_attr_requires_testable_module :
   Flag<["-"], "enable-testable-attr-requires-testable-module">,
   HelpText<"Enable checking of @testable">;
@@ -196,7 +196,7 @@ def enable_target_os_checking :
 def disable_target_os_checking :
   Flag<["-"], "disable-target-os-checking">,
   HelpText<"Disable checking the target OS of serialized modules">;
-  
+
 def crosscheck_unqualified_lookup : Flag<["-"], "crosscheck-unqualified-lookup">,
   HelpText<"Compare legacy DeclContext- to ASTScope-based unqualified name lookup (for debugging)">;
 
@@ -266,7 +266,10 @@ def serialize_dependency_scan_cache : Flag<["-"], "serialize-dependency-scan-cac
    HelpText<"After performing a dependency scan, serialize the scanner's internal state.">;
 
 def reuse_dependency_scan_cache : Flag<["-"], "load-dependency-scan-cache">,
-   HelpText<"After performing a dependency scan, serialize the scanner's internal state.">;
+   HelpText<"For performing a dependency scan, deserialize the scanner's internal state from a prior scan.">;
+   
+def validate_prior_dependency_scan_cache : Flag<["-"], "validate-prior-dependency-scan-cache">,
+   HelpText<"For performing a dependency scan with a prior scanner state, validate module dependencies.">;
 
 def dependency_scan_cache_path : Separate<["-"], "dependency-scan-cache-path">,
   HelpText<"The path to output the dependency scanner's internal state.">;
@@ -381,9 +384,9 @@ def public_autolink_library :
 // HIDDEN FLAGS
 let Flags = [FrontendOption, NoDriverOption, HelpHidden] in {
 
-def enable_experimental_swift_based_closure_specialization : 
+def enable_experimental_swift_based_closure_specialization :
   Flag<["-"], "experimental-swift-based-closure-specialization">,
-  HelpText<"Use the experimental Swift based closure-specialization optimization pass instead of the existing C++ one">; 
+  HelpText<"Use the experimental Swift based closure-specialization optimization pass instead of the existing C++ one">;
 
 def checked_async_objc_bridging : Joined<["-"], "checked-async-objc-bridging=">,
   HelpText<"Control whether checked continuations are used when bridging "
@@ -763,6 +766,10 @@ def conditional_runtime_records : Flag<["-"], "conditional-runtime-records">,
   Flags<[FrontendOption, NoInteractiveOption, HelpHidden]>,
   HelpText<"Allow removal of runtime metadata records (public types, protocol conformances) based on whether they're used or unused">;
 
+def mergeable_symbols : Flag<["-"], "mergeable-symbols">,
+  Flags<[FrontendOption, NoInteractiveOption, HelpHidden]>,
+  HelpText<"Emit symbol definitions as mergeable (linkonce_odr)">;
+
 def disable_preallocated_instantiation_caches : Flag<["-"], "disable-preallocated-instantiation-caches">,
   Flags<[FrontendOption, NoInteractiveOption, HelpHidden]>,
   HelpText<"Avoid preallocating metadata instantiation caches in globals">;
@@ -828,6 +835,10 @@ def solver_scope_threshold_EQ : Joined<["-"], "solver-scope-threshold=">,
 
 def solver_trail_threshold_EQ : Joined<["-"], "solver-trail-threshold=">,
   HelpText<"Expression type checking trail change limit">;
+
+def solver_disable_shrink :
+  Flag<["-"], "solver-disable-shrink">,
+  HelpText<"Disable the shrink phase of expression type checking">;
 
 def solver_disable_splitter : Flag<["-"], "solver-disable-splitter">,
   HelpText<"Disable the component splitter phase of expression type checking">;
@@ -895,7 +906,7 @@ def disable_concrete_type_metadata_mangled_name_accessors : Flag<["-"], "disable
 def disable_standard_substitutions_in_reflection_mangling : Flag<["-"], "disable-standard-substitutions-in-reflection-mangling">,
   HelpText<"Disable referencing stdlib symbols via mangled names in reflection mangling">,
   Flags<[FrontendOption, HelpHidden]>;
-  
+
 def playground : Flag<["-"], "playground">,
   HelpText<"Apply the playground semantics and transformation">;
 
@@ -935,13 +946,13 @@ def sil_unroll_threshold : Separate<["-"], "sil-unroll-threshold">,
 
 def sil_verify_all : Flag<["-"], "sil-verify-all">,
   HelpText<"Verify SIL after each transform">;
-  
+
 def sil_verify_none : Flag<["-"], "sil-verify-none">,
   HelpText<"Completely disable SIL verification">;
 
 def sil_ownership_verify_all : Flag<["-"], "sil-ownership-verify-all">,
   HelpText<"Verify ownership after each transform">;
-  
+
 def verify_all_substitution_maps : Flag<["-"], "verify-all-substitution-maps">,
   HelpText<"Verify all SubstitutionMaps on construction">;
 
@@ -1160,7 +1171,7 @@ def disable_interface_lockfile : Flag<["-"], "disable-interface-lock">,
 def bridging_header_directory_for_print: Separate<["-"], "bridging-header-directory-for-print">, MetaVarName<"<path>">,
     HelpText<"Directory for bridging header to be printed in compatibility header">;
 
-def entry_point_function_name: Separate<["-"], "entry-point-function-name">, MetaVarName<"<string>">, 
+def entry_point_function_name: Separate<["-"], "entry-point-function-name">, MetaVarName<"<string>">,
     HelpText<"Name of the entry point function">;
 
 def target_sdk_version : Separate<["-"], "target-sdk-version">,
@@ -1235,11 +1246,6 @@ def disable_sil_opaque_values : Flag<["-"], "disable-sil-opaque-values">,
 def new_driver_path
   : Separate<["-"], "new-driver-path">, MetaVarName<"<path>">,
   HelpText<"Path of the new driver to be used">;
-
-def skip_import_in_public_interface:
-  Separate<["-"], "skip-import-in-public-interface">,
-  HelpText<"Skip the import statement corresponding to a module name "
-           "when printing the public interface.">;
 
 def disable_fine_module_tracing:
   Flag<["-"], "disable-fine-module-tracing">,
@@ -1446,6 +1452,12 @@ def no_scanner_module_validation: Flag<["-"], "no-scanner-module-validation">,
 def module_load_mode: Separate<["-"], "module-load-mode">,
     MetaVarName<"only-interface|prefer-interface|prefer-serialized|only-serialized">,
     HelpText<"Module loading mode">;
+
+def scanner_output_dir: Separate<["-"], "scanner-output-dir">,
+  HelpText<"Directory for generated files from swift dependency scanner">;
+def scanner_debug_write_output: Flag<["-"], "scanner-debug-write-output">,
+  HelpText<"Write generated output from scanner for debugging purpose">,
+  Flags<[HelpHidden]>;
 
 def platform_availability_inheritance_map_path
   : Separate<["-"], "platform-availability-inheritance-map-path">, MetaVarName<"<path>">,

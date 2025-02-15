@@ -11,7 +11,10 @@
 #===------------------------------------------------------------------------===#
 #
 #  The Runtime module isn't the runtime itself; that lives in libswiftCore;
-#  rather, it's a high level Swift interface to things
+#  rather, it's a high level Swift interface to things in the runtime.
+#
+#===------------------------------------------------------------------------===#
+
 set(swift_runtime_link_libraries
   swiftCore
   swift_Concurrency
@@ -20,6 +23,11 @@ set(swift_runtime_link_libraries
 set(concurrency)
 if(SWIFT_BUILD_STDLIB AND SWIFT_ENABLE_EXPERIMENTAL_CONCURRENCY)
   set(concurrency _Concurrency)
+endif()
+
+set(cxxstdlib_overlay)
+if(SWIFT_ENABLE_EXPERIMENTAL_CXX_INTEROP)
+  set(cxxstdlib_overlay CxxStdlib)
 endif()
 
 set(RUNTIME_SOURCES
@@ -100,7 +108,7 @@ endif()
 add_swift_target_library(swiftRuntime ${SWIFT_STDLIB_LIBRARY_BUILD_TYPES} IS_STDLIB
   ${RUNTIME_SOURCES}
 
-  SWIFT_MODULE_DEPENDS ${concurrency}
+  SWIFT_MODULE_DEPENDS ${concurrency} ${cxxstdlib_overlay}
 
   SWIFT_MODULE_DEPENDS_ANDROID Android
   SWIFT_MODULE_DEPENDS_LINUX Glibc

@@ -40,15 +40,15 @@ var lens = Lens(Rectangle(topLeft: topLeft,
                           bottomRight: bottomRight))
 
 // CHECK: function_ref @$s29keypath_dynamic_member_lookup4LensV0B6MemberACyqd__Gs15WritableKeyPathCyxqd__G_tcluig
-// CHECK-NEXT: apply %45<Rectangle, Point>({{.*}})
+// CHECK-NEXT: apply %{{[0-9]+}}<Rectangle, Point>({{.*}})
 // CHECK: function_ref @$s29keypath_dynamic_member_lookup4LensV0B6MemberACyqd__Gs7KeyPathCyxqd__G_tcluig
-// CHECK-NEXT: apply %{{.*}}<Point, Int>({{.*}})
+// CHECK-NEXT: apply %{{[0-9]+}}<Point, Int>({{.*}})
 _ = lens.topLeft.x
 
 // CHECK: function_ref @$s29keypath_dynamic_member_lookup4LensV0B6MemberACyqd__Gs15WritableKeyPathCyxqd__G_tcluig
-// CHECK-NEXT: apply %68<Rectangle, Point>({{.*}})
+// CHECK-NEXT: apply %{{[0-9]+}}<Rectangle, Point>({{.*}})
 // CHECK: function_ref @$s29keypath_dynamic_member_lookup4LensV0B6MemberACyqd__Gs15WritableKeyPathCyxqd__G_tcluig
-// CHECK-NEXT: apply %75<Point, Int>({{.*}})
+// CHECK-NEXT: apply %{{[0-9]+}}<Point, Int>({{.*}})
 _ = lens.topLeft.y
 
 lens.topLeft = Lens(Point(x: 1, y: 2)) // Ok

@@ -15,6 +15,7 @@
 
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ArgumentList.h"
+#include "swift/AST/AvailabilityDomain.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/IfConfigClauseRangeInfo.h"
@@ -133,8 +134,31 @@ bool BridgedDeclContext_isModuleScopeContext(BridgedDeclContext dc) {
   return dc.unbridged()->isModuleScopeContext();
 }
 
+bool BridgedDeclContext_isClosureExpr(BridgedDeclContext dc) {
+  return llvm::isa_and_present<swift::ClosureExpr>(
+      llvm::dyn_cast<swift::AbstractClosureExpr>(dc.unbridged()));
+}
+
+BridgedClosureExpr BridgedDeclContext_castToClosureExpr(BridgedDeclContext dc) {
+  return llvm::cast<swift::ClosureExpr>(
+      llvm::cast<swift::AbstractClosureExpr>(dc.unbridged()));
+}
+
 BridgedASTContext BridgedDeclContext_getASTContext(BridgedDeclContext dc) {
   return dc.unbridged()->getASTContext();
+}
+
+BridgedSourceFile
+BridgedDeclContext_getParentSourceFile(BridgedDeclContext dc) {
+  return dc.unbridged()->getParentSourceFile();
+}
+
+//===----------------------------------------------------------------------===//
+// MARK: BridgedSoureFile
+//===----------------------------------------------------------------------===//
+
+BRIDGED_INLINE bool BridgedSourceFile_isScriptMode(BridgedSourceFile sf) {
+  return sf.unbridged()->isScriptMode();
 }
 
 //===----------------------------------------------------------------------===//
@@ -200,14 +224,32 @@ bool BridgedDeclObj::Destructor_isIsolated() const {
 // MARK: BridgedASTNode
 //===----------------------------------------------------------------------===//
 
+BridgedASTNode::BridgedASTNode(void *_Nonnull pointer, BridgedASTNodeKind kind)
+    : opaque(intptr_t(pointer) | kind) {
+  assert(getPointer() == pointer && getKind() == kind);
+}
+
+BridgedExpr BridgedASTNode::castToExpr() const {
+  assert(getKind() == BridgedASTNodeKindExpr);
+  return static_cast<swift::Expr *>(getPointer());
+}
+BridgedStmt BridgedASTNode::castToStmt() const {
+  assert(getKind() == BridgedASTNodeKindStmt);
+  return static_cast<swift::Stmt *>(getPointer());
+}
+BridgedDecl BridgedASTNode::castToDecl() const {
+  assert(getKind() == BridgedASTNodeKindDecl);
+  return static_cast<swift::Decl *>(getPointer());
+}
+
 swift::ASTNode BridgedASTNode::unbridged() const {
-  switch (Kind) {
-  case ASTNodeKindExpr:
-    return swift::ASTNode(static_cast<swift::Expr *>(Raw));
-  case ASTNodeKindStmt:
-    return swift::ASTNode(static_cast<swift::Stmt *>(Raw));
-  case ASTNodeKindDecl:
-    return swift::ASTNode(static_cast<swift::Decl *>(Raw));
+  switch (getKind()) {
+  case BridgedASTNodeKindExpr:
+    return castToExpr().unbridged();
+  case BridgedASTNodeKindStmt:
+    return castToStmt().unbridged();
+  case BridgedASTNodeKindDecl:
+    return castToDecl().unbridged();
   }
 }
 
@@ -236,6 +278,14 @@ swift::DeclAttributes BridgedDeclAttributes::unbridged() const {
   return attrs;
 }
 
+BridgedAvailabilityDomain::BridgedAvailabilityDomain(
+    swift::AvailabilityDomain domain)
+    : opaque(domain.getOpaqueValue()) {}
+
+swift::AvailabilityDomain BridgedAvailabilityDomain::unbridged() const {
+  return swift::AvailabilityDomain::fromOpaque(opaque);
+}
+
 //===----------------------------------------------------------------------===//
 // MARK: BridgedParamDecl
 //===----------------------------------------------------------------------===//
@@ -259,6 +309,10 @@ swift::ParamSpecifier unbridge(BridgedParamSpecifier specifier) {
 void BridgedParamDecl_setSpecifier(BridgedParamDecl cDecl,
                                    BridgedParamSpecifier cSpecifier) {
   cDecl.unbridged()->setSpecifier(unbridge(cSpecifier));
+}
+
+void BridgedParamDecl_setImplicit(BridgedParamDecl cDecl) {
+  cDecl.unbridged()->setImplicit();
 }
 
 //===----------------------------------------------------------------------===//

@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "swift/AST/ASTWalker.h"
+#include "swift/AST/AvailabilitySpec.h"
 #include "swift/AST/GenericParamList.h"
 #include "swift/AST/TypeRepr.h"
 #include "swift/Basic/Assertions.h"

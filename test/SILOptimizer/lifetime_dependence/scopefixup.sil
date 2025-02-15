@@ -91,11 +91,11 @@ sil @pointeeAddressor : $@convention(method) <τ_0_0 where τ_0_0 : ~Copyable> (
 // CHECK: bb0(%0 : $UnsafePointer<Int64>):
 // CHECK:   [[ACCESS:%.*]] = begin_access [read] [unknown]
 // CHECK:   [[LD:%.*]] = load [trivial] [[ACCESS]]
+// CHECK:   end_access [[ACCESS]]
 // CHECK:   [[ADR:%.*]] = pointer_to_address %{{.*}} to [strict] $*Int64
 // CHECK:   [[MD:%.*]] = mark_dependence [unresolved] [[ADR]] on [[LD]]
 // CHECK:   [[ACCESS2:%.*]] = begin_access [read] [unsafe] [[MD]]
 // CHECK:   end_access [[ACCESS2]]
-// CHECK:   end_access [[ACCESS]]
 // CHECK-LABEL: } // end sil function 'testTrivialAccess'
 sil hidden [ossa] @testTrivialAccess : $@convention(thin) (UnsafePointer<Int64>) -> () {
 bb0(%0 : $UnsafePointer<Int64>):

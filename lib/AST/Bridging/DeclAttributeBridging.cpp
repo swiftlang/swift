@@ -73,6 +73,59 @@ void BridgedDeclAttributes_add(BridgedDeclAttributes *cAttrs,
   *cAttrs = attrs;
 }
 
+static AvailableAttr::Kind unbridge(BridgedAvailableAttrKind value) {
+  switch (value) {
+  case BridgedAvailableAttrKindDefault:
+    return AvailableAttr::Kind::Default;
+  case BridgedAvailableAttrKindDeprecated:
+    return AvailableAttr::Kind::Deprecated;
+  case BridgedAvailableAttrKindUnavailable:
+    return AvailableAttr::Kind::Unavailable;
+  case BridgedAvailableAttrKindNoAsync:
+    return AvailableAttr::Kind::NoAsync;
+  }
+  llvm_unreachable("unhandled enum value");
+}
+
+BridgedAvailableAttr BridgedAvailableAttr_createParsed(
+    BridgedASTContext cContext, BridgedSourceLoc cAtLoc,
+    BridgedSourceRange cRange, BridgedAvailabilityDomain cDomain,
+    BridgedSourceLoc cDomainLoc, BridgedAvailableAttrKind cKind,
+    BridgedStringRef cMessage, BridgedStringRef cRenamed,
+    BridgedVersionTuple cIntroduced, BridgedSourceRange cIntroducedRange,
+    BridgedVersionTuple cDeprecated, BridgedSourceRange cDeprecatedRange,
+    BridgedVersionTuple cObsoleted, BridgedSourceRange cObsoletedRange) {
+  return new (cContext.unbridged())
+      AvailableAttr(cAtLoc.unbridged(), cRange.unbridged(), cDomain.unbridged(),
+                    cDomainLoc.unbridged(), unbridge(cKind),
+                    cMessage.unbridged(), cRenamed.unbridged(),
+                    cIntroduced.unbridged(), cIntroducedRange.unbridged(),
+                    cDeprecated.unbridged(), cDeprecatedRange.unbridged(),
+                    cObsoleted.unbridged(), cObsoletedRange.unbridged(),
+                    /*Implicit=*/false,
+                    /*IsSPI=*/false);
+}
+
+BridgedAvailableAttr BridgedAvailableAttr_createParsedIdentifier(
+    BridgedASTContext cContext, BridgedSourceLoc cAtLoc,
+    BridgedSourceRange cRange, BridgedIdentifier cDomainIdentifier,
+    BridgedSourceLoc cDomainLoc, BridgedAvailableAttrKind cKind,
+    BridgedStringRef cMessage, BridgedStringRef cRenamed,
+    BridgedVersionTuple cIntroduced, BridgedSourceRange cIntroducedRange,
+    BridgedVersionTuple cDeprecated, BridgedSourceRange cDeprecatedRange,
+    BridgedVersionTuple cObsoleted, BridgedSourceRange cObsoletedRange) {
+
+  return new (cContext.unbridged())
+      AvailableAttr(cAtLoc.unbridged(), cRange.unbridged(),
+                    cDomainIdentifier.unbridged(), cDomainLoc.unbridged(),
+                    unbridge(cKind), cMessage.unbridged(), cRenamed.unbridged(),
+                    cIntroduced.unbridged(), cIntroducedRange.unbridged(),
+                    cDeprecated.unbridged(), cDeprecatedRange.unbridged(),
+                    cObsoleted.unbridged(), cObsoletedRange.unbridged(),
+                    /*Implicit=*/false,
+                    /*IsSPI=*/false);
+}
+
 static std::optional<AccessLevel> unbridge(BridgedAccessLevel level) {
   switch (level) {
   case BridgedAccessLevelPrivate:
@@ -131,6 +184,15 @@ BridgedAllowFeatureSuppressionAttr_createParsed(BridgedASTContext cContext,
   return AllowFeatureSuppressionAttr::create(
       cContext.unbridged(), cAtLoc.unbridged(), cRange.unbridged(),
       /*implicit*/ false, inverted, features);
+}
+
+BridgedBackDeployedAttr BridgedBackDeployedAttr_createParsed(
+    BridgedASTContext cContext, BridgedSourceLoc cAtLoc,
+    BridgedSourceRange cRange, BridgedPlatformKind cPlatform,
+    BridgedVersionTuple cVersion) {
+  return new (cContext.unbridged()) BackDeployedAttr(
+      cAtLoc.unbridged(), cRange.unbridged(), unbridge(cPlatform),
+      cVersion.unbridged(), /*Implicit=*/false);
 }
 
 BridgedCDeclAttr BridgedCDeclAttr_createParsed(BridgedASTContext cContext,
@@ -334,6 +396,16 @@ BridgedMacroRoleAttr BridgedMacroRoleAttr_createParsed(
       cContext.unbridged(), cAtLoc.unbridged(), cRange.unbridged(),
       unbridge(cSyntax), cLParenLoc.unbridged(), unbridge(cRole), names,
       conformances, cRParenLoc.unbridged(), /*implicit=*/false);
+}
+
+BridgedOriginallyDefinedInAttr BridgedOriginallyDefinedInAttr_createParsed(
+    BridgedASTContext cContext, BridgedSourceLoc cAtLoc,
+    BridgedSourceRange cRange, BridgedStringRef cModuleName,
+    BridgedPlatformKind cPlatform, BridgedVersionTuple cVersion) {
+  return new (cContext.unbridged()) OriginallyDefinedInAttr(
+      cAtLoc.unbridged(), cRange.unbridged(), cModuleName.unbridged(),
+      unbridge(cPlatform), cVersion.unbridged(),
+      /*Implicit=*/false);
 }
 
 BridgedStorageRestrictionsAttr BridgedStorageRestrictionsAttr_createParsed(

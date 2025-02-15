@@ -23,6 +23,16 @@ using namespace swift;
 // MARK: TypeAttributes
 //===----------------------------------------------------------------------===//
 
+// Define `.asTypeAttr` on each BridgedXXXTypeAttr type.
+#define SIMPLE_TYPE_ATTR(...)
+#define TYPE_ATTR(SPELLING, CLASS)                                             \
+  SWIFT_NAME("getter:Bridged" #CLASS "TypeAttr.asTypeAttribute(self:)")        \
+  BridgedTypeAttribute Bridged##CLASS##TypeAttr_asTypeAttribute(               \
+      Bridged##CLASS##TypeAttr attr) {                                         \
+    return attr.unbridged();                                                   \
+  }
+#include "swift/AST/TypeAttr.def"
+
 BridgedTypeAttrKind BridgedTypeAttrKind_fromString(BridgedStringRef cStr) {
   auto optKind = TypeAttribute::getAttrKindFromString(cStr.unbridged());
   if (!optKind)
@@ -74,7 +84,19 @@ BridgedTypeAttribute BridgedTypeAttribute_createSimple(
                                      cAtLoc.unbridged(), cNameLoc.unbridged());
 }
 
-BridgedTypeAttribute BridgedTypeAttribute_createIsolated(
+BridgedConventionTypeAttr BridgedConventionTypeAttr_createParsed(
+    BridgedASTContext cContext, BridgedSourceLoc cAtLoc,
+    BridgedSourceLoc cKwLoc, BridgedSourceRange cParens, BridgedStringRef cName,
+    BridgedSourceLoc cNameLoc, BridgedDeclNameRef cWitnessMethodProtocol,
+    BridgedStringRef cClangType, BridgedSourceLoc cClangTypeLoc) {
+  return new (cContext.unbridged()) ConventionTypeAttr(
+      cAtLoc.unbridged(), cKwLoc.unbridged(), cParens.unbridged(),
+      {cName.unbridged(), cNameLoc.unbridged()},
+      cWitnessMethodProtocol.unbridged(),
+      {cClangType.unbridged(), cClangTypeLoc.unbridged()});
+}
+
+BridgedIsolatedTypeAttr BridgedIsolatedTypeAttr_createParsed(
     BridgedASTContext cContext, BridgedSourceLoc cAtLoc,
     BridgedSourceLoc cNameLoc, BridgedSourceLoc cLPLoc,
     BridgedSourceLoc cIsolationLoc,
@@ -90,4 +112,24 @@ BridgedTypeAttribute BridgedTypeAttribute_createIsolated(
       IsolatedTypeAttr(cAtLoc.unbridged(), cNameLoc.unbridged(),
                        {cLPLoc.unbridged(), cRPLoc.unbridged()},
                        {isolationKind, cIsolationLoc.unbridged()});
+}
+
+BridgedExecutionTypeAttr BridgedExecutionTypeAttr_createParsed(
+    BridgedASTContext cContext, BridgedSourceLoc cAtLoc,
+    BridgedSourceLoc cNameLoc, BridgedSourceLoc cLPLoc,
+    BridgedSourceLoc cBehaviorLoc,
+    BridgedExecutionTypeAttrExecutionKind behavior, BridgedSourceLoc cRPLoc) {
+  auto behaviorKind = [=] {
+    switch (behavior) {
+    case BridgedExecutionTypeAttrExecutionKind_Concurrent:
+      return ExecutionKind::Concurrent;
+    case BridgedExecutionTypeAttrExecutionKind_Caller:
+      return ExecutionKind::Caller;
+    }
+    llvm_unreachable("bad kind");
+  }();
+  return new (cContext.unbridged())
+      ExecutionTypeAttr(cAtLoc.unbridged(), cNameLoc.unbridged(),
+                        {cLPLoc.unbridged(), cRPLoc.unbridged()},
+                        {behaviorKind, cBehaviorLoc.unbridged()});
 }

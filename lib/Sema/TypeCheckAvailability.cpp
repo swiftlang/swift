@@ -25,6 +25,7 @@
 #include "swift/AST/AvailabilityDomain.h"
 #include "swift/AST/AvailabilityInference.h"
 #include "swift/AST/AvailabilityScope.h"
+#include "swift/AST/AvailabilitySpec.h"
 #include "swift/AST/ClangModuleLoader.h"
 #include "swift/AST/DiagnosticsParse.h"
 #include "swift/AST/GenericEnvironment.h"
@@ -349,8 +350,7 @@ static bool computeContainedByDeploymentTarget(AvailabilityScope *scope,
 static bool isInsideCompatibleUnavailableDeclaration(
     const Decl *D, AvailabilityContext availabilityContext,
     const SemanticAvailableAttr &attr) {
-  auto contextDomain = availabilityContext.getUnavailableDomain();
-  if (!contextDomain)
+  if (!availabilityContext.isUnavailable())
     return false;
 
   if (!attr.isUnconditionallyUnavailable())
@@ -364,7 +364,7 @@ static bool isInsideCompatibleUnavailableDeclaration(
       return false;
   }
 
-  return contextDomain->contains(declDomain);
+  return availabilityContext.containsUnavailableDomain(declDomain);
 }
 
 std::optional<SemanticAvailableAttr>
@@ -1273,7 +1273,7 @@ private:
         Query->setVariantAvailableRange(VariantRange);
       }
 
-      if (Spec->getKind() == AvailabilitySpecKind::OtherPlatform) {
+      if (Spec->isWildcard()) {
         // The wildcard spec '*' represents the minimum deployment target, so
         // there is no need to create an availability scope for this query.
         // Further, we won't diagnose for useless #available() conditions
@@ -1297,15 +1297,13 @@ private:
         DiagnosticEngine &Diags = Context.Diags;
         if (CurrentScope->getReason() != AvailabilityScope::Reason::Root) {
           PlatformKind BestPlatform = targetPlatform(Context.LangOpts);
-          auto *PlatformSpec =
-              dyn_cast<PlatformVersionConstraintAvailabilitySpec>(Spec);
 
           // If possible, try to report the diagnostic in terms for the
           // platform the user uttered in the '#available()'. For a platform
           // that inherits availability from another platform it may be
           // different from the platform specified in the target triple.
-          if (PlatformSpec)
-            BestPlatform = PlatformSpec->getPlatform();
+          if (Spec->getPlatform() != PlatformKind::none)
+            BestPlatform = Spec->getPlatform();
           Diags.diagnose(Query->getLoc(),
                          diag::availability_query_useless_enclosing_scope,
                          platformString(BestPlatform));
@@ -1379,30 +1377,28 @@ private:
   /// such spec exists.
   AvailabilitySpec *bestActiveSpecForQuery(PoundAvailableInfo *available,
                                            bool forTargetVariant = false) {
-    OtherPlatformAvailabilitySpec *FoundOtherSpec = nullptr;
-    PlatformVersionConstraintAvailabilitySpec *BestSpec = nullptr;
+    AvailabilitySpec *FoundWildcardSpec = nullptr;
+    AvailabilitySpec *BestSpec = nullptr;
 
     for (auto *Spec : available->getQueries()) {
-      if (auto *OtherSpec = dyn_cast<OtherPlatformAvailabilitySpec>(Spec)) {
-        FoundOtherSpec = OtherSpec;
+      if (Spec->isWildcard()) {
+        FoundWildcardSpec = Spec;
         continue;
       }
 
-      auto *VersionSpec =
-          dyn_cast<PlatformVersionConstraintAvailabilitySpec>(Spec);
-      if (!VersionSpec)
+      auto Domain = Spec->getDomain();
+      if (!Domain || !Domain->isPlatform())
         continue;
 
       // FIXME: This is not quite right: we want to handle AppExtensions
       // properly. For example, on the OSXApplicationExtension platform
       // we want to chose the OS X spec unless there is an explicit
       // OSXApplicationExtension spec.
-      if (isPlatformActive(VersionSpec->getPlatform(), Context.LangOpts,
+      if (isPlatformActive(Spec->getPlatform(), Context.LangOpts,
                            forTargetVariant, /* ForRuntimeQuery */ true)) {
-        if (!BestSpec ||
-            inheritsAvailabilityFromPlatform(VersionSpec->getPlatform(),
-                                             BestSpec->getPlatform())) {
-          BestSpec = VersionSpec;
+        if (!BestSpec || inheritsAvailabilityFromPlatform(
+                             Spec->getPlatform(), BestSpec->getPlatform())) {
+          BestSpec = Spec;
         }
       }
     }
@@ -1412,12 +1408,12 @@ private:
 
     // If we have reached this point, we found no spec for our target, so
     // we return the other spec ('*'), if we found it, or nullptr, if not.
-    if (FoundOtherSpec) {
-      return FoundOtherSpec;
+    if (FoundWildcardSpec) {
+      return FoundWildcardSpec;
     } else if (available->isUnavailability()) {
       // For #unavailable, imply the presence of a wildcard.
       SourceLoc Loc = available->getRParenLoc();
-      return new (Context) OtherPlatformAvailabilitySpec(Loc);
+      return AvailabilitySpec::createWildcard(Context, Loc);
     } else {
       return nullptr;
     }
@@ -1426,15 +1422,12 @@ private:
   /// Return the availability context for the given spec.
   AvailabilityRange contextForSpec(AvailabilitySpec *Spec,
                                    bool GetRuntimeContext) {
-    if (isa<OtherPlatformAvailabilitySpec>(Spec)) {
+    if (Spec->isWildcard()) {
       return AvailabilityRange::alwaysAvailable();
     }
 
-    auto *VersionSpec = cast<PlatformVersionConstraintAvailabilitySpec>(Spec);
-
-    llvm::VersionTuple Version = (GetRuntimeContext ?
-                                    VersionSpec->getRuntimeVersion() :
-                                    VersionSpec->getVersion());
+    llvm::VersionTuple Version =
+        (GetRuntimeContext ? Spec->getRuntimeVersion() : Spec->getVersion());
 
     return AvailabilityRange(VersionRange::allGTE(Version));
   }
@@ -3013,12 +3006,12 @@ bool shouldHideDomainNameForConstraintDiagnostic(
 
   case AvailabilityDomain::Kind::PackageDescription:
   case AvailabilityDomain::Kind::SwiftLanguage:
-    switch (constraint.getKind()) {
-    case AvailabilityConstraint::Kind::AlwaysUnavailable:
-    case AvailabilityConstraint::Kind::IntroducedInNewerVersion:
+    switch (constraint.getReason()) {
+    case AvailabilityConstraint::Reason::UnconditionallyUnavailable:
+    case AvailabilityConstraint::Reason::IntroducedInLaterVersion:
       return false;
-    case AvailabilityConstraint::Kind::RequiresVersion:
-    case AvailabilityConstraint::Kind::Obsoleted:
+    case AvailabilityConstraint::Reason::IntroducedInLaterDynamicVersion:
+    case AvailabilityConstraint::Reason::Obsoleted:
       return true;
     }
   }
@@ -3031,7 +3024,7 @@ bool diagnoseExplicitUnavailability(SourceLoc loc,
                                     const ExportContext &where,
                                     bool warnIfConformanceUnavailablePreSwift6,
                                     bool preconcurrency) {
-  if (constraint.isConditionallySatisfiable())
+  if (!constraint.isUnavailable())
     return false;
 
   // Invertible protocols are never unavailable.
@@ -3062,24 +3055,24 @@ bool diagnoseExplicitUnavailability(SourceLoc loc,
       .limitBehaviorWithPreconcurrency(behavior, preconcurrency)
       .warnUntilSwiftVersionIf(warnIfConformanceUnavailablePreSwift6, 6);
 
-  switch (constraint.getKind()) {
-  case AvailabilityConstraint::Kind::AlwaysUnavailable:
+  switch (constraint.getReason()) {
+  case AvailabilityConstraint::Reason::UnconditionallyUnavailable:
     diags
         .diagnose(ext, diag::conformance_availability_marked_unavailable, type,
                   proto)
         .highlight(attr.getParsedAttr()->getRange());
     break;
-  case AvailabilityConstraint::Kind::RequiresVersion:
+  case AvailabilityConstraint::Reason::IntroducedInLaterVersion:
     diags.diagnose(ext, diag::conformance_availability_introduced_in_version,
                    type, proto, versionedPlatform, *attr.getIntroduced());
     break;
-  case AvailabilityConstraint::Kind::Obsoleted:
+  case AvailabilityConstraint::Reason::Obsoleted:
     diags
         .diagnose(ext, diag::conformance_availability_obsoleted, type, proto,
                   versionedPlatform, *attr.getObsoleted())
         .highlight(attr.getParsedAttr()->getRange());
     break;
-  case AvailabilityConstraint::Kind::IntroducedInNewerVersion:
+  case AvailabilityConstraint::Reason::IntroducedInLaterDynamicVersion:
     llvm_unreachable("unexpected constraint");
   }
   return true;
@@ -3108,12 +3101,12 @@ swift::getUnsatisfiedAvailabilityConstraint(
       if ((attr->isSwiftLanguageModeSpecific() ||
            attr->isPackageDescriptionVersionSpecific()) &&
           attr->getIntroduced().has_value())
-        return AvailabilityConstraint::forRequiresVersion(*attr);
+        return AvailabilityConstraint::introducedInLaterVersion(*attr);
 
-      return AvailabilityConstraint::forAlwaysUnavailable(*attr);
+      return AvailabilityConstraint::unconditionallyUnavailable(*attr);
 
     case AvailableVersionComparison::Obsoleted:
-      return AvailabilityConstraint::forObsoleted(*attr);
+      return AvailabilityConstraint::obsoleted(*attr);
     }
   }
 
@@ -3121,7 +3114,8 @@ swift::getUnsatisfiedAvailabilityConstraint(
   if (auto rangeAttr = decl->getAvailableAttrForPlatformIntroduction()) {
     auto range = rangeAttr->getIntroducedRange(ctx);
     if (!availabilityContext.getPlatformRange().isContainedIn(range))
-      return AvailabilityConstraint::forIntroducedInNewerVersion(*rangeAttr);
+      return AvailabilityConstraint::introducedInLaterDynamicVersion(
+          *rangeAttr);
   }
 
   return std::nullopt;
@@ -3463,7 +3457,7 @@ bool diagnoseExplicitUnavailability(
     const ExportContext &Where, DeclAvailabilityFlags Flags,
     llvm::function_ref<void(InFlightDiagnostic &, StringRef)>
         attachRenameFixIts) {
-  if (constraint.isConditionallySatisfiable())
+  if (!constraint.isUnavailable())
     return false;
 
   auto Attr = constraint.getAttr();
@@ -3527,24 +3521,24 @@ bool diagnoseExplicitUnavailability(
   }
 
   auto sourceRange = Attr.getParsedAttr()->getRange();
-  switch (constraint.getKind()) {
-  case AvailabilityConstraint::Kind::AlwaysUnavailable:
+  switch (constraint.getReason()) {
+  case AvailabilityConstraint::Reason::UnconditionallyUnavailable:
     diags.diagnose(D, diag::availability_marked_unavailable, D)
         .highlight(sourceRange);
     break;
-  case AvailabilityConstraint::Kind::RequiresVersion:
+  case AvailabilityConstraint::Reason::IntroducedInLaterVersion:
     diags
         .diagnose(D, diag::availability_introduced_in_version, D,
                   versionedPlatform, *Attr.getIntroduced())
         .highlight(sourceRange);
     break;
-  case AvailabilityConstraint::Kind::Obsoleted:
+  case AvailabilityConstraint::Reason::Obsoleted:
     diags
         .diagnose(D, diag::availability_obsoleted, D, versionedPlatform,
                   *Attr.getObsoleted())
         .highlight(sourceRange);
     break;
-  case AvailabilityConstraint::Kind::IntroducedInNewerVersion:
+  case AvailabilityConstraint::Reason::IntroducedInLaterDynamicVersion:
     llvm_unreachable("unexpected constraint");
     break;
   }

@@ -19,8 +19,8 @@ import E
 import G
 import SubE
 
-// CHECK-REMARK-SAVE: remark: Serializing module scanning dependency cache to:
-// CHECK-REMARK-LOAD: remark: Re-using serialized module scanning dependency cache from:
+// CHECK-REMARK-SAVE: remark: Incremental module scan: Serializing module scanning dependency cache to:
+// CHECK-REMARK-LOAD: remark: Incremental module scan: Re-using serialized module scanning dependency cache from:
 
 // CHECK: "mainModuleName": "deps"
 

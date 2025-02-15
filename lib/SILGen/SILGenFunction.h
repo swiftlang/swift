@@ -2521,6 +2521,25 @@ public:
                                            CanSILFunctionType toType,
                                            bool reorderSelf);
 
+  /// Emit conversion from T.TangentVector to Optional<T>.TangentVector.
+  ManagedValue
+  emitTangentVectorToOptionalTangentVector(SILLocation loc,
+                                           ManagedValue input,
+                                           CanType wrappedType, // `T`
+                                           CanType inputType,   // `T.TangentVector`
+                                           CanType outputType,  // `Optional<T>.TangentVector`
+                                           SGFContext ctxt);
+
+  /// Emit conversion from Optional<T>.TangentVector to T.TangentVector.
+  ManagedValue
+  emitOptionalTangentVectorToTangentVector(SILLocation loc,
+                                           ManagedValue input,
+                                           CanType wrappedType, // `T`
+                                           CanType inputType,   // `Optional<T>.TangentVector`
+                                           CanType outputType,  // `T.TangentVector`
+                                           SGFContext ctxt);
+
+  
   //===--------------------------------------------------------------------===//
   // Back Deployment thunks
   //===--------------------------------------------------------------------===//

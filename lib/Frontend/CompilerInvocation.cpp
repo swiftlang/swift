@@ -525,9 +525,6 @@ static void ParseModuleInterfaceArgs(ModuleInterfaceOptions &Opts,
       Opts.setInterfaceMode(PrintOptions::InterfaceMode::Private);
     }
   }
-  for (auto val: Args.getAllArgValues(OPT_skip_import_in_public_interface)) {
-    Opts.ModulesToSkipInPublicInterface.push_back(val);
-  }
 }
 
 /// Checks if an arg is generally allowed to be included
@@ -1029,7 +1026,7 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
     Opts.EnableTargetOSChecking
       = A->getOption().matches(OPT_enable_target_os_checking);
   }
-  
+
   Opts.EnableNewOperatorLookup = Args.hasFlag(OPT_enable_new_operator_lookup,
                                               OPT_disable_new_operator_lookup,
                                               /*default*/ false);
@@ -1349,7 +1346,7 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
     }
   }
 
-  Opts.SkipDeserializationChecksForPackageCMO = Args.hasArg(OPT_ExperimentalSkipDeserializationChecksForPackageCMO);
+  Opts.AbortOnDeserializationFailForPackageCMO = Args.hasArg(OPT_ExperimentalPackageCMOAbortOnDeserializationFail);
   Opts.AllowNonResilientAccess =
       Args.hasArg(OPT_experimental_allow_non_resilient_access) ||
       Args.hasArg(OPT_allow_non_resilient_access) ||
@@ -1436,7 +1433,7 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   if (const Arg *A = Args.getLastArg(OPT_clang_target)) {
     Opts.ClangTarget = llvm::Triple(A->getValue());
   }
-  
+
   Opts.setCxxInteropFromArgs(Args, Diags);
 
   Opts.EnableObjCInterop =
@@ -1486,7 +1483,7 @@ static bool ParseLangArgs(LangOptions &Opts, ArgList &Args,
   auto getDefaultMinimumInliningTargetVersion =
       [&](const llvm::Triple &triple) -> llvm::VersionTuple {
     const auto targetVersion = getVersionTuple(triple);
-    
+
     // In API modules, default to the version when Swift first became available.
     if (Opts.LibraryLevel == LibraryLevel::API) {
       if (auto minVersion = minimumAvailableOSVersionForTriple(triple))
@@ -1859,6 +1856,9 @@ static bool ParseTypeCheckerArgs(TypeCheckerOptions &Opts, ArgList &Args,
     Opts.DebugForbidTypecheckPrefixes.push_back(A);
   }
 
+  if (Args.getLastArg(OPT_solver_disable_shrink))
+    Opts.SolverDisableShrink = true;
+
   if (Args.getLastArg(OPT_solver_disable_splitter))
     Opts.SolverDisableSplitter = true;
 
@@ -1973,6 +1973,8 @@ static bool ParseClangImporterArgs(ClangImporterOptions &Opts, ArgList &Args,
 
   if (auto *A = Args.getLastArg(OPT_import_objc_header))
     Opts.BridgingHeader = A->getValue();
+  if (auto *A = Args.getLastArg(OPT_import_pch))
+    Opts.BridgingHeaderPCH = A->getValue();
   Opts.DisableSwiftBridgeAttr |= Args.hasArg(OPT_disable_swift_bridge_attr);
 
   Opts.DisableOverlayModules |= Args.hasArg(OPT_emit_imported_modules);
@@ -2294,7 +2296,9 @@ static bool ParseSearchPathArgs(SearchPathOptions &Opts, ArgList &Args,
   Opts.ScannerModuleValidation |= Args.hasFlag(OPT_scanner_module_validation,
                                                OPT_no_scanner_module_validation,
                                                CASOpts.EnableCaching);
-
+  Opts.BridgingHeaderChaining |=
+      Args.hasFlag(OPT_auto_bridging_header_chaining,
+                   OPT_no_auto_bridging_header_chaining, false);
   bool buildingFromInterface =
       FrontendOpts.InputMode ==
       FrontendOptions::ParseInputMode::SwiftModuleInterface;
@@ -2993,7 +2997,7 @@ static bool ParseSILArgs(SILOptions &Opts, ArgList &Args,
 
   Opts.NoAllocations = Args.hasArg(OPT_no_allocations);
 
-  Opts.EnableExperimentalSwiftBasedClosureSpecialization = 
+  Opts.EnableExperimentalSwiftBasedClosureSpecialization =
       Args.hasArg(OPT_enable_experimental_swift_based_closure_specialization);
 
   // If these optimizations are enabled never preserve functions for the
@@ -3211,7 +3215,8 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
       llvm_unreachable("Unknown LinkLibrary option kind");
     }
 
-    Opts.LinkLibraries.push_back(LinkLibrary(A->getValue(), Kind));
+    Opts.LinkLibraries.emplace_back(
+        A->getValue(), Kind, /*static=*/false);
   }
 
   if (auto valueNames = Args.getLastArg(OPT_disable_llvm_value_names,
@@ -3441,11 +3446,11 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
   }
 
   for (const auto &Lib : Args.getAllArgValues(options::OPT_autolink_library))
-    Opts.LinkLibraries.push_back(LinkLibrary(Lib, LibraryKind::Library));
+    Opts.LinkLibraries.emplace_back(
+        Lib, LibraryKind::Library, /*static=*/false);
 
-  for (const auto &Lib : Args.getAllArgValues(options::OPT_public_autolink_library)) {
-    Opts.PublicLinkLibraries.push_back(Lib);
-  }
+  for (const auto &Lib : Args.getAllArgValues(options::OPT_public_autolink_library))
+    Opts.PublicLinkLibraries.push_back(std::make_tuple(Lib, /*static=*/false));
 
   if (const Arg *A = Args.getLastArg(OPT_type_info_dump_filter_EQ)) {
     StringRef mode(A->getValue());
@@ -3550,6 +3555,10 @@ static bool ParseIRGenArgs(IRGenOptions &Opts, ArgList &Args,
   }
 
   Opts.InternalizeSymbols = FrontendOpts.Static;
+
+  if (Args.hasArg(OPT_mergeable_symbols)) {
+    Opts.MergeableSymbols = true;
+  }
 
   if (Args.hasArg(OPT_disable_preallocated_instantiation_caches)) {
     Opts.NoPreallocatedInstantiationCaches = true;

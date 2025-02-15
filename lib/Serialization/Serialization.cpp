@@ -904,6 +904,7 @@ void Serializer::writeBlockInfoBlock() {
   BLOCK_RECORD(index_block, SUBSTITUTION_MAP_OFFSETS);
   BLOCK_RECORD(index_block, CLANG_TYPE_OFFSETS);
   BLOCK_RECORD(index_block, LOCAL_TYPE_DECLS);
+  BLOCK_RECORD(index_block, OPAQUE_RETURN_TYPE_DECLS);
   BLOCK_RECORD(index_block, PROTOCOL_CONFORMANCE_OFFSETS);
   BLOCK_RECORD(index_block, PACK_CONFORMANCE_OFFSETS);
   BLOCK_RECORD(index_block, SIL_LAYOUT_OFFSETS);
@@ -1425,30 +1426,33 @@ void Serializer::writeInputBlock() {
   // Make sure the bridging header module is always at the top of the import
   // list, mimicking how it is processed before any module imports when
   // compiling source files.
-  if (llvm::is_contained(allLocalImports, bridgingHeaderImport)) {
+  if (llvm::is_contained(allLocalImports, bridgingHeaderImport) &&
+      Options.SerializeBridgingHeader) {
     off_t importedHeaderSize = 0;
     time_t importedHeaderModTime = 0;
     std::string contents;
-    auto importedHeaderPath = Options.ImportedHeader;
-    std::string pchIncludeTree;
-    // We do not want to serialize the explicitly-specified .pch path if one was
-    // provided. Instead we write out the path to the original header source so
-    // that clients can consume it.
-    if (Options.ExplicitModuleBuild &&
-        llvm::sys::path::extension(importedHeaderPath)
-            .ends_with(file_types::getExtension(file_types::TY_PCH))) {
-      auto *pch = clangImporter->getClangInstance()
-                      .getASTReader()
-                      ->getModuleManager()
-                      .lookupByFileName(importedHeaderPath);
-      pchIncludeTree = pch->IncludeTreeID;
-      importedHeaderPath = pch->OriginalSourceFileName;
-    }
+    std::string importedHeaderPath;
+    if (!Options.SerializeEmptyBridgingHeader) {
+      importedHeaderPath = Options.ImportedHeader;
+      std::string pchIncludeTree;
+      // We do not want to serialize the explicitly-specified .pch path if one
+      // was provided. Instead we write out the path to the original header
+      // source so that clients can consume it.
+      if (!Options.ImportedPCHPath.empty()) {
+        auto *pch = clangImporter->getClangInstance()
+                        .getASTReader()
+                        ->getModuleManager()
+                        .lookupByFileName(Options.ImportedPCHPath);
+        if (importedHeaderPath.empty())
+          importedHeaderPath = pch->OriginalSourceFileName;
+        pchIncludeTree = pch->IncludeTreeID;
+      }
 
-    if (!importedHeaderPath.empty()) {
-      contents = clangImporter->getBridgingHeaderContents(
-          importedHeaderPath, importedHeaderSize, importedHeaderModTime,
-          pchIncludeTree);
+      if (!importedHeaderPath.empty()) {
+        contents = clangImporter->getBridgingHeaderContents(
+            importedHeaderPath, importedHeaderSize, importedHeaderModTime,
+            pchIncludeTree);
+      }
     }
     assert(publicImportSet.count(bridgingHeaderImport));
     ImportedHeader.emit(ScratchRecord,
@@ -1503,14 +1507,15 @@ void Serializer::writeInputBlock() {
     }
   }
 
-  if (!Options.ModuleLinkName.empty()) {
+  if (!Options.ModuleLinkName.empty())
     LinkLibrary.emit(ScratchRecord, serialization::LibraryKind::Library,
-                     Options.AutolinkForceLoad, Options.ModuleLinkName);
-  }
-  for (auto dependentLib : Options.PublicDependentLibraries) {
+                     Options.StaticLibrary, Options.AutolinkForceLoad,
+                     Options.ModuleLinkName);
+
+  for (auto dependency : Options.PublicDependentLibraries)
     LinkLibrary.emit(ScratchRecord, serialization::LibraryKind::Library,
-                     Options.AutolinkForceLoad, dependentLib);
-  }
+                     std::get<1>(dependency), Options.AutolinkForceLoad,
+                     std::get<0>(dependency));
 }
 
 /// Translate AST default argument kind to the Serialization enum values, which
@@ -1542,7 +1547,7 @@ static uint8_t getRawStableDefaultArgumentKind(swift::DefaultArgumentKind kind) 
   llvm_unreachable("Unhandled DefaultArgumentKind in switch.");
 }
 
-static uint8_t 
+static uint8_t
 getRawStableActorIsolationKind(swift::ActorIsolation::Kind kind) {
   switch (kind) {
 #define CASE(X) \
@@ -3451,14 +3456,14 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
     case DeclAttrKind::RawLayout: {
       auto *attr = cast<RawLayoutAttr>(DA);
       auto abbrCode = S.DeclTypeAbbrCodes[RawLayoutDeclAttrLayout::Code];
-      
+
       uint32_t rawSize;
       uint8_t rawAlign;
       TypeID typeID;
       TypeID countID;
-      
+
       auto SD = const_cast<StructDecl*>(cast<StructDecl>(D));
-      
+
       if (auto sizeAndAlign = attr->getSizeAndAlignment()) {
         typeID = 0;
         countID = 0;
@@ -3479,7 +3484,7 @@ class Serializer::DeclSerializer : public DeclVisitor<DeclSerializer> {
       } else {
         llvm_unreachable("unhandled raw layout attribute, or trying to serialize unresolved attr!");
       }
-      
+
       RawLayoutDeclAttrLayout::emitRecord(
         S.Out, S.ScratchRecord, abbrCode, attr->isImplicit(),
         typeID, countID, rawSize, rawAlign, attr->shouldMoveAsLikeType());
@@ -4078,7 +4083,16 @@ public:
   /// \returns the number of entries added.
   size_t addInherited(InheritedTypes inheritedEntries,
                       SmallVectorImpl<uint64_t> &result) {
-    for (const auto &inherited : inheritedEntries.getEntries()) {
+    for (size_t i : inheritedEntries.getIndices()) {
+      // Ensure that we run the `InheritedTypeRequest` before getting the
+      // inherited type. We serialize the inherited type from `getEntry` rather
+      // than `getResolvedType` since the former represents a suppressed
+      // conformance as a separate bit distinct from the type, which is how we
+      // want to serialize it. We thus need to get the type to serialize using a
+      // subsequent call to `getEntry(i).getType()` (see
+      // `InheritedTypeRequest::cacheResult`).
+      (void)inheritedEntries.getResolvedType(i);
+      const InheritedEntry &inherited = inheritedEntries.getEntry(i);
       assert(!inherited.getType() || !inherited.getType()->hasArchetype());
       uint64_t typeRef = S.addTypeRef(inherited.getType());
       uint64_t originalTypeRef = typeRef;
@@ -4092,7 +4106,7 @@ public:
 
       assert(typeRef >> (NumProtocolConformanceOptions+1) == originalTypeRef);
       (void)originalTypeRef;
-      
+
       result.push_back(typeRef);
     }
 
@@ -5513,7 +5527,7 @@ public:
   void visitBuiltinType(BuiltinType *ty) {
     visitBuiltinTypeImpl(ty);
   }
-  
+
   void visitBuiltinFixedArrayType(BuiltinFixedArrayType *ty) {
     using namespace decls_block;
     unsigned abbrCode = S.DeclTypeAbbrCodes[BuiltinFixedArrayTypeLayout::Code];
@@ -5767,6 +5781,8 @@ public:
     switch (isolation.getKind()) {
     case swift::FunctionTypeIsolation::Kind::NonIsolated:
       return unsigned(FunctionTypeIsolation::NonIsolated);
+    case swift::FunctionTypeIsolation::Kind::NonIsolatedCaller:
+      return unsigned(FunctionTypeIsolation::NonIsolatedCaller);
     case swift::FunctionTypeIsolation::Kind::Parameter:
       return unsigned(FunctionTypeIsolation::Parameter);
     case swift::FunctionTypeIsolation::Kind::Erased:

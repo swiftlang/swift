@@ -267,7 +267,8 @@ void ConstraintSystem::assignFixedType(TypeVariableType *typeVar, Type type,
 void ConstraintSystem::addTypeVariableConstraintsToWorkList(
        TypeVariableType *typeVar) {
   // Activate the constraints affected by a change to this type variable.
-  for (auto *constraint : CG.gatherAllConstraints(typeVar))
+  auto gatheringKind = ConstraintGraph::GatheringKind::AllMentions;
+  for (auto *constraint : CG.gatherConstraints(typeVar, gatheringKind))
     if (!constraint->isActive())
       activateConstraint(constraint);
 }
@@ -1668,7 +1669,7 @@ struct TypeSimplifier {
           // Special case: When building slab literals, we go through the same
           // array literal machinery, so there will be a conversion constraint
           // for the element to ExpressibleByArrayLiteral.ArrayLiteralType.
-          if (lookupBaseType->isSlab()) {
+          if (lookupBaseType->isInlineArray()) {
             auto &ctx = CS.getASTContext();
             auto arrayProto =
                 ctx.getProtocol(KnownProtocolKind::ExpressibleByArrayLiteral);
@@ -1865,6 +1866,39 @@ Type Solution::simplifyTypeForCodeCompletion(Type Ty) const {
 
     return typeVar;
   });
+
+  // Logic to determine the contextual type inside buildBlock result builders:
+  //
+  // When completing inside a result builder, the result builder
+  //   @ViewBuilder var body: some View {
+  //     Text("Foo")
+  //     #^COMPLETE^#
+  //   }
+  // gets rewritten to
+  //   @ViewBuilder var body: some View {
+  //     let $__builder2: Text
+  //     let $__builder0 = Text("Foo")
+  //     let $__builder1 = #^COMPLETE^#
+  //     $__builder2 = ViewBuilder.buildBlock($__builder0, $__builder1)
+  //     return $__builder2
+  //   }
+  // Inside the constraint system
+  //     let $__builder1 = #^COMPLETE^#
+  // gets type checked without context, so we can't know the contextual type for
+  // the code completion token. But we know that $__builder1 (and thus the type
+  // of #^COMPLETE^#) is used as the second argument to ViewBuilder.buildBlock,
+  // so we can extract the contextual type from that call. To do this, figure
+  // out the type variable that is used for $__builder1 in the buildBlock call.
+  // This type variable is connected to the type variable of $__builder1's
+  // definition by a one-way constraint.
+  if (auto TV = Ty->getAs<TypeVariableType>()) {
+    for (auto constraint : CS.getConstraintGraph()[TV].getConstraints()) {
+      if (constraint->getKind() == ConstraintKind::OneWayEqual &&
+          constraint->getSecondType()->isEqual(TV)) {
+        return simplifyTypeForCodeCompletion(constraint->getFirstType());
+      }
+    }
+  }
 
   // Remove any remaining type variables and placeholders
   Ty = simplifyType(Ty);
@@ -4884,11 +4918,11 @@ bool ConstraintSystem::isReadOnlyKeyPathComponent(
   // If the setter is unavailable, then the keypath ought to be read-only
   // in this context.
   if (auto setter = storage->getOpaqueAccessor(AccessorKind::Set)) {
-    // FIXME: Fully unavailable setters should cause the key path to be
-    // readonly too.
+    // FIXME: [availability] Fully unavailable setters should cause the key path
+    // to be readonly too.
     auto constraint =
         getUnsatisfiedAvailabilityConstraint(setter, DC, referenceLoc);
-    if (constraint && constraint->isConditionallySatisfiable())
+    if (constraint && constraint->isPotentiallyAvailable())
       return true;
   }
 

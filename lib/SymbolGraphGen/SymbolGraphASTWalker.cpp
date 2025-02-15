@@ -181,6 +181,9 @@ static bool isUnavailableOrObsoletedOnPlatform(const Decl *D) {
 }
 
 bool SymbolGraphASTWalker::walkToDeclPre(Decl *D, CharSourceRange Range) {
+  if (SynthesizedChildrenBaseDecl && D == SynthesizedChildrenBaseDecl)
+    return true;
+
   if (isUnavailableOrObsoletedOnPlatform(D)) {
     return false;
   }
@@ -301,7 +304,7 @@ bool SymbolGraphASTWalker::walkToDeclPre(Decl *D, CharSourceRange Range) {
 
   auto *VD = cast<ValueDecl>(D);
 
-  if (!SG->canIncludeDeclAsNode(VD)) {
+  if (!BaseDecl && !SG->canIncludeDeclAsNode(VD)) {
     return false;
   }
 
@@ -332,8 +335,21 @@ bool SymbolGraphASTWalker::walkToDeclPre(Decl *D, CharSourceRange Range) {
     }
   }
 
+  if (const auto *TD = dyn_cast_or_null<TypeAliasDecl>(VD)) {
+    const auto InnerType = TD->getUnderlyingType();
+    if (NominalTypeDecl *NTD = InnerType->getAnyNominal()) {
+      // Only fold typedefs together if the inner type is from our module and it
+      // otherwise isn't being shown
+      if (isOurModule(NTD->getModuleContext()) &&
+          !SG->canIncludeDeclAsNode(NTD)) {
+        PublicPrivateTypeAliases.insert_or_assign(NTD, TD);
+        synthesizeChildSymbols(NTD, TD);
+      }
+    }
+  }
+
   // Otherwise, record this in the main module `M`'s symbol graph.
-  SG->recordNode(Symbol(SG, VD, nullptr));
+  SG->recordNode(Symbol(SG, VD, BaseDecl));
 
   return true;
 }
@@ -401,4 +417,16 @@ bool SymbolGraphASTWalker::shouldBeRecordedAsExtension(
                           ED->getExtendedNominal()->getModuleContext()) &&
          !isExportedImportedModule(
              ED->getExtendedNominal()->getModuleContext());
+}
+
+bool SymbolGraphASTWalker::synthesizeChildSymbols(Decl *D,
+                                                  const ValueDecl *BD) {
+  BaseDecl = BD;
+  SynthesizedChildrenBaseDecl = D;
+  SWIFT_DEFER {
+    BaseDecl = nullptr;
+    SynthesizedChildrenBaseDecl = nullptr;
+  };
+
+  return walk(D);
 }

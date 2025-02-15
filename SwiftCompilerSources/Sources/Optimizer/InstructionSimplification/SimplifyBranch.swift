@@ -12,7 +12,7 @@
 
 import SIL
 
-extension BranchInst : OnoneSimplifyable {
+extension BranchInst : OnoneSimplifiable {
   func simplify(_ context: SimplifyContext) {
     tryMergeWithTargetBlock(context)
   }

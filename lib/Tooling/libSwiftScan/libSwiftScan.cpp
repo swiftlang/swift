@@ -249,10 +249,17 @@ swiftscan_string_ref_t
 swiftscan_link_library_info_get_link_name(swiftscan_link_library_info_t info) {
   return info->name;
 }
+
+bool swiftscan_link_library_info_get_is_static(
+    swiftscan_link_library_info_t info) {
+  return info->isStatic;
+}
+
 bool
 swiftscan_link_library_info_get_is_framework(swiftscan_link_library_info_t info) {
   return info->isFramework;
 }
+
 bool
 swiftscan_link_library_info_get_should_force_load(swiftscan_link_library_info_t info) {
   return info->forceLoad;
@@ -332,6 +339,18 @@ swiftscan_string_ref_t swiftscan_swift_textual_detail_get_module_cache_key(
 swiftscan_string_ref_t swiftscan_swift_textual_detail_get_user_module_version(
     swiftscan_module_details_t details) {
   return details->swift_textual_details.user_module_version;
+}
+
+swiftscan_string_ref_t
+swiftscan_swift_textual_detail_get_chained_bridging_header_path(
+    swiftscan_module_details_t details) {
+  return details->swift_textual_details.chained_bridging_header_path;
+}
+
+swiftscan_string_ref_t
+swiftscan_swift_textual_detail_get_chained_bridging_header_content(
+    swiftscan_module_details_t details) {
+  return details->swift_textual_details.chained_bridging_header_content;
 }
 
 //=== Swift Binary Module Details query APIs ------------------------------===//
@@ -570,7 +589,7 @@ swiftscan_scanner_diagnostics_query(swiftscan_scanner_t scanner) {
   swiftscan_diagnostic_set_t *Result = new swiftscan_diagnostic_set_t;
   Result->count = NumDiagnostics;
   Result->diagnostics = new swiftscan_diagnostic_info_t[NumDiagnostics];
-  
+
   for (size_t i = 0; i < NumDiagnostics; ++i) {
     const auto &Diagnostic = Diagnostics[i];
     swiftscan_diagnostic_info_s *DiagnosticInfo = new swiftscan_diagnostic_info_s;

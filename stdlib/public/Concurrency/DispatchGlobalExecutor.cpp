@@ -57,30 +57,6 @@
 
 using namespace swift;
 
-// Ensure that Job's layout is compatible with what Dispatch expects.
-// Note: MinimalDispatchObjectHeader just has the fields we care about, it is
-// not complete and should not be used for anything other than these asserts.
-struct MinimalDispatchObjectHeader {
-  const void *VTable;
-  int Opaque0;
-  int Opaque1;
-  void *Linkage;
-};
-
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wgnu-offsetof-extensions"
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Winvalid-offsetof"
-static_assert(
-    offsetof(Job, metadata) == offsetof(MinimalDispatchObjectHeader, VTable),
-    "Job Metadata field must match location of Dispatch VTable field.");
-static_assert(offsetof(Job, SchedulerPrivate[Job::DispatchLinkageIndex]) ==
-                  offsetof(MinimalDispatchObjectHeader, Linkage),
-              "Dispatch Linkage field must match Job "
-              "SchedulerPrivate[DispatchLinkageIndex].");
-#pragma clang diagnostic pop
-#pragma clang diagnostic pop
-
 /// The function passed to dispatch_async_f to execute a job.
 static void __swift_run_job(void *_job) {
   SwiftJob *job = (SwiftJob*) _job;
@@ -151,9 +127,9 @@ static constexpr size_t globalQueueCacheCount =
     static_cast<size_t>(JobPriority::UserInteractive) + 1;
 static std::atomic<dispatch_queue_t> globalQueueCache[globalQueueCacheCount];
 
+#if defined(__APPLE__) && !defined(SWIFT_CONCURRENCY_BACK_DEPLOYMENT)
 static constexpr size_t dispatchQueueCooperativeFlag = 4;
-
-#if defined(SWIFT_CONCURRENCY_BACK_DEPLOYMENT) || !defined(__APPLE__)
+#else
 extern "C" void dispatch_queue_set_width(dispatch_queue_t dq, long width);
 #endif
 

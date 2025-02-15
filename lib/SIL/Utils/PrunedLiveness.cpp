@@ -299,7 +299,8 @@ PrunedLiveRange<LivenessWithDefs>::updateForBorrowingOperand(Operand *operand) {
 template <typename LivenessWithDefs>
 AddressUseKind PrunedLiveRange<LivenessWithDefs>::checkAndUpdateInteriorPointer(
     Operand *operand) {
-  assert(operand->getOperandOwnership() == OperandOwnership::InteriorPointer);
+  assert(operand->getOperandOwnership() == OperandOwnership::InteriorPointer
+         || operand->getOperandOwnership() == OperandOwnership::AnyInteriorPointer);
 
   if (auto scopedAddress = ScopedAddressValue::forUse(operand)) {
     scopedAddress.visitScopeEndingUses([this](Operand *end) {
@@ -364,6 +365,7 @@ LiveRangeSummary PrunedLiveRange<LivenessWithDefs>::recursivelyUpdateForDef(
       summary.meet(AddressUseKind::PointerEscape);
       break;
     case OperandOwnership::InteriorPointer:
+    case OperandOwnership::AnyInteriorPointer:
       summary.meet(checkAndUpdateInteriorPointer(use));
       break;
     case OperandOwnership::GuaranteedForwarding: {

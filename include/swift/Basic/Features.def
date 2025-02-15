@@ -158,7 +158,6 @@ BASELINE_LANGUAGE_FEATURE(BuiltinCreateAsyncTaskWithExecutor, 0, "Task create bu
 BASELINE_LANGUAGE_FEATURE(BuiltinCreateAsyncDiscardingTaskInGroupWithExecutor, 0, "Task create in discarding task group with extra executor preference")
 BASELINE_LANGUAGE_FEATURE(BuiltinStackAlloc, 0, "Builtin.stackAlloc")
 BASELINE_LANGUAGE_FEATURE(BuiltinUnprotectedStackAlloc, 0, "Builtin.unprotectedStackAlloc")
-BASELINE_LANGUAGE_FEATURE(BuiltinAllocVector, 0, "Builtin.allocVector")
 BASELINE_LANGUAGE_FEATURE(BuiltinTaskRunInline, 0, "Builtin.taskRunInline")
 BASELINE_LANGUAGE_FEATURE(BuiltinUnprotectedAddressOf, 0, "Builtin.unprotectedAddressOf")
 BASELINE_LANGUAGE_FEATURE(NewCxxMethodSafetyHeuristics, 0, "Only import C++ methods that return pointers (projections) on owned types as unsafe")
@@ -235,7 +234,6 @@ EXPERIMENTAL_FEATURE(MacrosOnImports, true)
 EXPERIMENTAL_FEATURE(TupleConformances, false)
 EXPERIMENTAL_FEATURE(FullTypedThrows, false)
 EXPERIMENTAL_FEATURE(SameElementRequirements, false)
-EXPERIMENTAL_FEATURE(Span, true)
 
 // Whether to enable @_used and @_section attributes
 EXPERIMENTAL_FEATURE(SymbolLinkageMarkers, true)
@@ -367,9 +365,6 @@ EXPERIMENTAL_FEATURE(StaticExclusiveOnly, true)
 /// Enable the @extractConstantsFromMembers attribute.
 EXPERIMENTAL_FEATURE(ExtractConstantsFromMembers, false)
 
-/// Enables the FixedArray data type.
-EXPERIMENTAL_FEATURE(FixedArrays, true)
-
 // Group Main Actor Isolation Errors by Scope
 EXPERIMENTAL_FEATURE(GroupActorErrors, true)
 
@@ -449,6 +444,9 @@ EXPERIMENTAL_FEATURE(NonIsolatedAsyncInheritsIsolationFromContext, false)
 
 /// Allow custom availability domains to be defined and referenced.
 SUPPRESSIBLE_EXPERIMENTAL_FEATURE(CustomAvailability, true)
+
+/// Be strict about the Sendable conformance of metatypes.
+EXPERIMENTAL_FEATURE(StrictSendableMetatypes, true)
 
 #undef EXPERIMENTAL_FEATURE_EXCLUDED_FROM_MODULE_INTERFACE
 #undef EXPERIMENTAL_FEATURE

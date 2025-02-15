@@ -478,6 +478,15 @@ class TestDriverArgumentParser(
         with self.assertRaises(ParserError):
             self.parse_default_args([option_string, '0.0.0.1'])
 
+    def test_option_use_linker(self):
+        option_string = '--use-linker'
+
+        self.parse_default_args([option_string, 'lld'])
+        self.parse_default_args([option_string, 'gold'])
+
+        with self.assertRaises(ParserError):
+            self.parse_default_args([option_string, 'foo'])
+
     def test_option_swift_user_visible_version(self):
         option_string = '--swift-user-visible-version'
 
@@ -639,11 +648,3 @@ class TestDriverArgumentParser(
     def test_implied_defaults_swift_disable_dead_stripping(self):
         namespace = self.parse_default_args(['--swift-disable-dead-stripping'])
         self.assertTrue(namespace.swift_disable_dead_stripping)
-
-    def test_implied_defaults_xcode(self):
-        namespace = self.parse_default_args(['--xcode'])
-        self.assertEqual(namespace.cmake_generator, 'Xcode')
-        self.assertEqual(namespace.build_variant, 'MinSizeRel')
-        self.assertTrue(namespace.skip_build)
-        self.assertFalse(namespace.build_early_swift_driver)
-        self.assertFalse(namespace.build_early_swiftsyntax)

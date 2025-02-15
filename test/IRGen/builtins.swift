@@ -861,4 +861,13 @@ func injectEnumTag<T>(_ x: inout T, tag: UInt32) {
   Builtin.injectEnumTag(&x, tag._value)
 }
 
+// Check that we still support the obsolete allocVector builtin in old Swift.interface files.
+
+// CHECK-LABEL: define {{.*}} swiftcc ptr @"$s8builtins14allocateVector11elementType8capacityBpxm_BwtlF"
+// CHECK:       trap()
+// CHECK:       unreachable
+func allocateVector<Element>(elementType: Element.Type, capacity: Builtin.Word) -> Builtin.RawPointer {
+  return Builtin.allocVector(elementType, capacity)
+}
+
 // CHECK: ![[R]] = !{i64 0, i64 9223372036854775807}

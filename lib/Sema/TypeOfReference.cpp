@@ -1834,15 +1834,11 @@ Type ConstraintSystem::getEffectiveOverloadType(ConstraintLocator *locator,
           type, var, useDC, GetClosureType{*this},
           ClosureIsolatedByPreconcurrency{*this});
     } else if (isa<AbstractFunctionDecl>(decl) || isa<EnumElementDecl>(decl)) {
-      if (decl->isInstanceMember()) {
-        auto baseTy = overload.getBaseType();
-        if (!baseTy)
-          return Type();
-
-        baseTy = baseTy->getRValueType();
-        if (!baseTy->getAnyNominal() && !baseTy->is<ExistentialType>())
-          return Type();
-      }
+      if (decl->isInstanceMember() &&
+          (!overload.getBaseType() ||
+           (!overload.getBaseType()->getAnyNominal() &&
+            !overload.getBaseType()->is<ExistentialType>())))
+        return Type();
 
       // Cope with 'Self' returns.
       if (!decl->getDeclContext()->getSelfProtocolDecl()) {
@@ -1933,8 +1929,9 @@ void ConstraintSystem::bindOverloadType(
         {FunctionType::Param(argTy, ctx.Id_dynamicMember)}, resultTy);
 
     ConstraintLocatorBuilder builder(callLoc);
-    addConstraint(ConstraintKind::ApplicableFunction, callerTy, fnTy,
-                  builder.withPathElement(ConstraintLocator::ApplyFunction));
+    addApplicationConstraint(
+        callerTy, fnTy, /*trailingClosureMatching=*/std::nullopt, useDC,
+        builder.withPathElement(ConstraintLocator::ApplyFunction));
 
     if (isExpr<KeyPathExpr>(locator->getAnchor())) {
       auto paramTy = fnTy->getParams()[0].getParameterType();
@@ -2044,8 +2041,8 @@ void ConstraintSystem::bindOverloadType(
       increaseScore(SK_KeyPathSubscript, locator);
 
       auto boundTypeVar = boundType->castTo<TypeVariableType>();
-      auto constraints = getConstraintGraph().gatherNearbyConstraints(
-          boundTypeVar,
+      auto constraints = getConstraintGraph().gatherConstraints(
+          boundTypeVar, ConstraintGraph::GatheringKind::EquivalenceClass,
           [](Constraint *constraint) {
             return constraint->getKind() == ConstraintKind::ApplicableFunction;
           });
@@ -2088,8 +2085,9 @@ void ConstraintSystem::bindOverloadType(
       // Add a constraint for the inner application that uses the args of the
       // original call-site, and a fresh type var result equal to the leaf type.
       ConstraintLocatorBuilder kpLocBuilder(keyPathLoc);
-      addConstraint(
-          ConstraintKind::ApplicableFunction, adjustedFnTy, memberTy,
+      addApplicationConstraint(
+          adjustedFnTy, memberTy, /*trailingClosureMatching=*/std::nullopt,
+          useDC,
           kpLocBuilder.withPathElement(ConstraintLocator::ApplyFunction));
 
       addConstraint(ConstraintKind::Equal, subscriptResultTy, leafTy,
