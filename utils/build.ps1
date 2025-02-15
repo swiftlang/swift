@@ -2122,6 +2122,8 @@ function Build-ExperimentalRuntime {
      -UseGNUDriver `
      -Defines @{
        BUILD_SHARED_LIBS = if ($Static) { "NO" } else { "YES" };
+       CMAKE_FIND_PACKAGE_PREFER_CONFIG = "YES";
+       dispatch_DIR = "$(Get-TargetProjectBinaryCache $Arch Dispatch)\cmake\modules";
      }
   }
 }
