@@ -22,6 +22,13 @@ func testAnnotated() {
   _ = v
 }
 
+func testNonCopyable() {
+  let x = HasCopyConstructorWithDefaultArgs(5)
+  let v = copy x // expected-error {{'copy' cannot be applied to noncopyable types}}
+  _ = v
+}
+
 test()
 testField()
 testAnnotated()
+testNonCopyable()
