@@ -199,6 +199,5 @@ protocol OpProto {}
 struct OpStruct: OpProto {}
 struct OpTest {
   func opResult() -> some OpProto { OpStruct() }
-  // FIXME: Implement SF->addUnvalidatedDeclWithOpaqueResultType() in ASTGen
-  // typealias Result = @_opaqueReturnTypeOf("$s6ASTGen6OpTestV8opResultQryF", 0) __
+  typealias Result = @_opaqueReturnTypeOf("$s6ASTGen6OpTestV8opResultQryF", 0) __
 }
