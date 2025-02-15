@@ -787,6 +787,20 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
   CoroFunctionPointerTy = createStructType(*this, "swift.coro_func_pointer",
                                            {RelativeAddressTy, Int32Ty}, true);
   CoroFunctionPointerPtrTy = CoroFunctionPointerTy->getPointerTo();
+  CoroAllocationTy = PtrTy;
+  CoroAllocateFnTy =
+      llvm::FunctionType::get(CoroAllocationTy, SizeTy, /*isVarArg*/ false);
+  CoroDeallocateFnTy =
+      llvm::FunctionType::get(VoidTy, CoroAllocationTy, /*isVarArg*/ false);
+  CoroAllocatorFlagsTy = Int32Ty;
+  // swift/ABI/Coro.h : CoroAllocator
+  CoroAllocatorTy = createStructType(*this, "swift.coro_allocator",
+                                     {
+                                         Int32Ty, // CoroAllocator.Flags
+                                         CoroAllocateFnTy,
+                                         CoroDeallocateFnTy,
+                                     });
+  CoroAllocatorPtrTy = CoroAllocatorTy->getPointerTo();
 }
 
 IRGenModule::~IRGenModule() {
@@ -1010,6 +1024,14 @@ namespace RuntimeConstants {
 
   RuntimeAvailability ValueGenericTypeAvailability(ASTContext &Context) {
     auto featureAvailability = Context.getValueGenericTypeAvailability();
+    if (!isDeploymentAvailabilityContainedIn(Context, featureAvailability)) {
+      return RuntimeAvailability::ConditionallyAvailable;
+    }
+    return RuntimeAvailability::AlwaysAvailable;
+  }
+
+  RuntimeAvailability CoroutineAccessorsAvailability(ASTContext &Context) {
+    auto featureAvailability = Context.getCoroutineAccessorsAvailability();
     if (!isDeploymentAvailabilityContainedIn(Context, featureAvailability)) {
       return RuntimeAvailability::ConditionallyAvailable;
     }

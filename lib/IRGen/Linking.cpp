@@ -590,6 +590,8 @@ SILDeclRef::Kind LinkEntity::getSILDeclRefKind() const {
     return SILDeclRef::Kind::Allocator;
   case Kind::DistributedThunkAsyncFunctionPointer:
   case Kind::AsyncFunctionPointerAST:
+  case Kind::CoroFunctionPointerAST:
+  case Kind::DistributedThunkCoroFunctionPointer:
     return static_cast<SILDeclRef::Kind>(
         reinterpret_cast<uintptr_t>(SecondaryPointer));
   default:
@@ -874,6 +876,8 @@ SILLinkage LinkEntity::getLinkage(ForDefinition_t forDefinition) const {
 
   case Kind::AsyncFunctionPointerAST:
   case Kind::DistributedThunkAsyncFunctionPointer:
+  case Kind::CoroFunctionPointerAST:
+  case Kind::DistributedThunkCoroFunctionPointer:
     return getSILLinkage(getDeclLinkage(getDecl()), forDefinition);
 
   case Kind::DynamicallyReplaceableFunctionImpl:
@@ -937,8 +941,6 @@ SILLinkage LinkEntity::getLinkage(ForDefinition_t forDefinition) const {
   case Kind::DistributedAccessorCoroFunctionPointer:
     return getUnderlyingEntityForCoroFunctionPointer().getLinkage(
         forDefinition);
-  case Kind::CoroFunctionPointerAST:
-  case Kind::DistributedThunkCoroFunctionPointer:
     return getSILLinkage(getDeclLinkage(getDecl()), forDefinition);
   }
   llvm_unreachable("bad link entity kind");

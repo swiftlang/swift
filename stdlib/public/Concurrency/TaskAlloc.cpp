@@ -17,9 +17,10 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "swift/Runtime/Concurrency.h"
-#include "swift/ABI/Task.h"
 #include "TaskPrivate.h"
+#include "swift/ABI/Task.h"
+#include "swift/Runtime/Concurrency.h"
+#include "swift/Runtime/Coro.h"
 
 #include <stdlib.h>
 
@@ -66,4 +67,51 @@ void swift::swift_task_dealloc(void *ptr) {
 
 void swift::_swift_task_dealloc_specific(AsyncTask *task, void *ptr) {
   allocator(task).dealloc(ptr);
+}
+
+static void *swift_task_alloc_thunk(size_t size) {
+  return swift_task_alloc(size);
+}
+
+static void swift_task_dealloc_thunk(void *ptr) { swift_task_dealloc(ptr); }
+
+void swift::swift_task_dealloc_through(void *ptr) {
+  allocator(swift_task_getCurrent()).deallocThrough(ptr);
+}
+
+static CoroAllocator CoroTaskAllocatorImpl{
+    CoroAllocatorFlags(/*CoroAllocatorKind::Async*/ 1), swift_task_alloc_thunk,
+    swift_task_dealloc_thunk};
+
+CoroAllocator *const swift::_swift_coro_task_allocator = &CoroTaskAllocatorImpl;
+
+CoroAllocator *swift::swift_coro_getGlobalAllocator(CoroAllocatorFlags flags) {
+  switch (flags.getKind()) {
+  case CoroAllocatorKind::Sync:
+    return nullptr;
+  case CoroAllocatorKind::Async:
+    return _swift_coro_task_allocator;
+  case CoroAllocatorKind::Malloc:
+    return _swift_coro_malloc_allocator;
+  }
+}
+
+static CoroAllocator CoroMallocAllocatorImpl{
+    CoroAllocatorFlags(/*CoroAllocatorKind::Malloc*/ 2), malloc, free};
+
+CoroAllocator *const swift::_swift_coro_malloc_allocator =
+    &CoroMallocAllocatorImpl;
+
+void *swift::swift_coro_alloc(CoroAllocator *allocator, size_t size) {
+  return allocator->allocate(size);
+}
+
+void swift::swift_coro_dealloc(CoroAllocator *allocator, void *ptr) {
+  // Calls to swift_coro_dealloc are emitted in resume funclets for every
+  // live-across dynamic allocation.  Whether such calls immediately deallocate
+  // memory depends on the allocator.
+  if (!allocator->shouldDeallocateImmediately()) {
+    return;
+  }
+  allocator->deallocate(ptr);
 }

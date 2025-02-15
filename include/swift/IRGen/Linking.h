@@ -389,6 +389,11 @@ class LinkEntity {
     /// The pointer is an AbstractFunctionDecl*.
     AsyncFunctionPointerAST,
 
+    /// The same as CoroFunctionPointer but with a different stored value, for
+    /// use by TBDGen.
+    /// The pointer is an AbstractFunctionDecl*.
+    CoroFunctionPointerAST,
+
     /// The pointer is a SILFunction*.
     DynamicallyReplaceableFunctionKey,
 
@@ -558,11 +563,6 @@ class LinkEntity {
     /// The pointer is a SILFunction*.
     CoroFunctionPointer,
 
-    /// The same as CoroFunctionPointer but with a different stored value, for
-    /// use by TBDGen.
-    /// The pointer is an AbstractFunctionDecl*.
-    CoroFunctionPointerAST,
-
     /// An coro function pointer for a method dispatch thunk.  The pointer is
     /// a FuncDecl* inside a protocol or a class.
     DispatchThunkCoroFunctionPointer,
@@ -610,9 +610,7 @@ class LinkEntity {
     return !(LHS == RHS);
   }
 
-  static bool isDeclKind(Kind k) {
-    return k <= Kind::AsyncFunctionPointerAST;
-  }
+  static bool isDeclKind(Kind k) { return k <= Kind::CoroFunctionPointerAST; }
   static bool isTypeKind(Kind k) {
     return k >= Kind::ProtocolWitnessTableLazyAccessFunction;
   }
@@ -1541,6 +1539,17 @@ public:
       llvm_unreachable("Link entity kind cannot have an coro function pointer");
     }
 
+    return entity;
+  }
+
+  static LinkEntity forCoroFunctionPointer(SILDeclRef declRef) {
+    LinkEntity entity;
+    entity.setForDecl(declRef.isDistributedThunk()
+                          ? Kind::DistributedThunkCoroFunctionPointer
+                          : Kind::CoroFunctionPointerAST,
+                      declRef.getAbstractFunctionDecl());
+    entity.SecondaryPointer =
+        reinterpret_cast<void *>(static_cast<uintptr_t>(declRef.kind));
     return entity;
   }
 
