@@ -189,3 +189,15 @@ extension User {
     // expected-error@-1 {{referencing initializer 'init(age:)' on '[String : any Sendable].Type' requires the types 'any Sendable' and 'Any' be equivalent}}
   }
 }
+
+// https://github.com/swiftlang/swift/issues/79361
+do {
+  @preconcurrency var d = Dictionary<String, any Sendable>()
+  
+  func test(_ dict: inout Dictionary<String, Any>) {}
+  test(&d) // Ok
+
+  @preconcurrency var a = Array<any Sendable>()
+  let values: [Any] = []
+  a += values // Ok
+}

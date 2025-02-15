@@ -4351,6 +4351,9 @@ void VarDeclUsageChecker::markStoredOrInOutExpr(Expr *E, unsigned Flags) {
     if (auto *expr = OpaqueValueMap[OVE])
       return markStoredOrInOutExpr(expr, Flags);
 
+  if (auto *ABIConv = dyn_cast<ABISafeConversionExpr>(E))
+    return markStoredOrInOutExpr(ABIConv->getSubExpr(), Flags);
+
   // If we don't know what kind of expression this is, assume it's a reference
   // and mark it as a read.
   E->walk(*this);
