@@ -123,7 +123,7 @@ extension SIMD64 {
 }
 
 @available(SwiftStdlib 6.2, *)
-extension Slab where Element: ~Copyable {
+extension InlineArray where Element: ~Copyable {
 
   @available(SwiftStdlib 6.2, *)
   public var storage: Span<Element> {
