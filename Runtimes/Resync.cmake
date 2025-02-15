@@ -79,7 +79,9 @@ set(CoreLibs
   stubs
   CommandLineSupport
   core
-  SwiftOnoneSupport)
+  SwiftOnoneSupport
+  Concurrency
+  Concurrency/InternalShims)
 
   # Add these as we get them building
   # Demangling
