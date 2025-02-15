@@ -212,10 +212,9 @@ func test_async_calls_in_async_context(v: Int) async {
   }
 
   // Only implicit `.init` should be accepted with a warning due type-checker previously picking an incorrect overload.
-  // FIXME: This should produce a warning once type-checker performance hacks are removed.
-  _ = Test(v) // Temporary okay
+  _ = Test(v) // expected-warning {{expression is 'async' but is not marked with 'await'; this is an error in the Swift 6 language mode}} expected-note {{call is 'async'}}
   _ = Test.init(v) // expected-error {{expression is 'async' but is not marked with 'await'}} expected-note {{call is 'async'}}
 
   Test.test(v) // expected-error {{expression is 'async' but is not marked with 'await'}} expected-note {{call is 'async'}}
-  Test(v).test(v) // expected-error {{expression is 'async' but is not marked with 'await'}} expected-note {{call is 'async'}}
+  Test(v).test(v) // expected-error {{expression is 'async' but is not marked with 'await'}} expected-note 2 {{call is 'async'}}
 }
