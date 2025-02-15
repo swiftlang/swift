@@ -265,16 +265,6 @@ public:
 
     switch (attr->getBehavior()) {
     case ExecutionKind::Concurrent: {
-      // 'concurrent' doesn't work with explicit `nonisolated`
-      if (F->hasExplicitIsolationAttribute()) {
-        if (F->getAttrs().hasAttribute<NonisolatedAttr>()) {
-          diagnoseAndRemoveAttr(
-              attr,
-              diag::attr_execution_concurrent_incompatible_with_nonisolated, F);
-          return;
-        }
-      }
-
       auto parameters = F->getParameters();
       if (!parameters)
         return;
