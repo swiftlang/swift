@@ -293,6 +293,37 @@ extension SIMD${n} where Scalar == ${Scalar} {
   /// vectors.
   @_alwaysEmitIntoClient
   public static func &*=(a: inout Self, b: Self) { a = a &* b }
+
+%   for operator in ['.==', '.!=', '.<', '.<=', '.>', '.>=']:
+  @_alwaysEmitIntoClient
+  public static func ${operator}(a: Scalar, b: Self) -> SIMDMask<MaskStorage> {
+    Self(repeating: a) ${operator} b
+  }
+
+  @_alwaysEmitIntoClient
+  public static func ${operator}(a: Self, b: Scalar) -> SIMDMask<MaskStorage> {
+    a ${operator} Self(repeating: b)
+  }
+%   end
+
+%   for operator in ['&+', '&-', '&*']:
+  @_alwaysEmitIntoClient
+  public static func ${operator}(a: Scalar, b: Self) -> Self {
+    Self(repeating: a) ${operator} b
+  }
+
+  @_alwaysEmitIntoClient
+  public static func ${operator}(a: Self, b: Scalar) -> Self {
+    a ${operator} Self(repeating: b)
+  }
+%   end
+
+%   for operator in ['&+=', '&-=', '&*=']:
+  @_alwaysEmitIntoClient
+  public static func ${operator}(a: inout Self, b: Scalar) {
+    a ${operator} Self(repeating: b)
+  }
+%   end
 }
 
 % end
@@ -362,6 +393,18 @@ extension SIMD${n} where Scalar == ${Scalar} {
       Builtin.fcmp_oge_${Builtin}(a._storage._value, b._storage._value)
     ))
   }
+
+%   for operator in ['.==', '.!=', '.<', '.<=', '.>', '.>=']:
+  @_alwaysEmitIntoClient
+  public static func ${operator}(a: Scalar, b: Self) -> SIMDMask<MaskStorage> {
+    Self(repeating: a) ${operator} b
+  }
+
+  @_alwaysEmitIntoClient
+  public static func ${operator}(a: Self, b: Scalar) -> SIMDMask<MaskStorage> {
+    a ${operator} Self(repeating: b)
+  }
+%   end
 }
 %  if bits == 16:
 #endif
