@@ -2480,6 +2480,23 @@ parseLifetimeDescriptor(Parser &P,
   case tok::identifier: {
     Identifier name;
     auto loc = P.consumeIdentifier(name, /*diagnoseDollarPrefix=*/false);
+    
+    // In SIL, lifetimes explicitly state whether they are dependent on a
+    // memory location in addition to the value stored at that location.
+    if (P.isInSILMode()
+        && name.str() == "address"
+        && P.Tok.is(tok::integer_literal)) {
+      SourceLoc orderedLoc;
+      unsigned index;
+      
+      if (P.parseUnsignedInteger(
+              index, loc, diag::expected_param_index_lifetime_dependence)) {
+        return std::nullopt;
+      }
+      return LifetimeDescriptor::forOrdered(index, lifetimeDependenceKind, loc,
+                                            /*addressable*/ true);
+    }
+    
     return LifetimeDescriptor::forNamed(name.str(), lifetimeDependenceKind,
                                         loc);
   }

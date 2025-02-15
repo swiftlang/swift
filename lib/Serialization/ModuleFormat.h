@@ -2284,6 +2284,7 @@ namespace decls_block {
                      BCFixed<1>,         // isImmortal
                      BCFixed<1>,         // hasInheritLifetimeParamIndices
                      BCFixed<1>,         // hasScopeLifetimeParamIndices
+                     BCFixed<1>,         // hasAddressableParamIndices
                      BCArray<BCFixed<1>> // concatenated param indices
                      >;
 
