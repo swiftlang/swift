@@ -3793,8 +3793,8 @@ SourceFile::FileIDStr::parse(StringRef fileID) {
       fileName.contains('/'))
     return {};
 
-  return {
-      SourceFile::FileIDStr{.moduleName = moduleName, .fileName = fileName}};
+  return {SourceFile::FileIDStr{/*.moduleName=*/moduleName,
+                                /*.fileName=*/fileName}};
 }
 
 bool SourceFile::FileIDStr::matches(const SourceFile *file) const {
