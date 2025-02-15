@@ -30,7 +30,7 @@ StaticMemberVarTestSuite.test("write-static-member-from-swift") {
 }
 
 StaticMemberVarTestSuite.test("incomplete-array-static-member") {
-  //TODO recognize array member variable `arrayMember`.
+  // TODO: recognize array member variable `arrayMember`.
   // expectEqual(18, WithIncompleteStaticMember.arrayMember[0])
   // expectEqual(3, WithIncompleteStaticMember.arrayMember.count)
 }
@@ -56,28 +56,28 @@ StaticMemberVarTestSuite.test("write-incomplete-self-static-member-from-swift") 
 }
 
 StaticMemberVarTestSuite.test("const-static-member") {
-  //TODO fix undefined reference to `WithConstStaticMember::notDefined`.
+  // TODO: fix undefined reference to `WithConstStaticMember::notDefined`.
   // expectEqual(24, WithConstStaticMember.notDefined)
   expectEqual(48, WithConstStaticMember.defined)
   expectEqual(96, WithConstStaticMember.definedOutOfLine)
 }
 
 StaticMemberVarTestSuite.test("const-static-member") {
-  //TODO fix undefined reference to `WithConstStaticMember::notDefined`.
+  // TODO: fix undefined reference to `WithConstStaticMember::notDefined`.
   // expectEqual(24, WithConstStaticMember.notDefined)
   expectEqual(48, WithConstStaticMember.defined)
   expectEqual(96, WithConstStaticMember.definedOutOfLine)
 }
 
 StaticMemberVarTestSuite.test("const-static-member") {
-  //TODO fix undefined reference to `WithConstStaticMember::notDefined`.
+  // TODO: fix undefined reference to `WithConstStaticMember::notDefined`.
   // expectEqual(24, WithConstStaticMember.notDefined)
   expectEqual(48, WithConstStaticMember.defined)
   expectEqual(96, WithConstStaticMember.definedOutOfLine)
 }
 
 StaticMemberVarTestSuite.test("const-static-member") {
-  //TODO fix undefined reference to `WithConstStaticMember::notDefined`.
+  // TODO: fix undefined reference to `WithConstStaticMember::notDefined`.
   // expectEqual(WithConstStaticMember.notDefined)
   expectEqual(48, WithConstStaticMember.defined)
   expectEqual(96, WithConstStaticMember.definedOutOfLine)
