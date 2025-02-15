@@ -35,25 +35,25 @@ struct X {
 
 // CHECK:      @_alwaysEmitIntoClient @lifetime(span)
 // CHECK-NEXT: func myFunc(_ span: Span<CInt>) -> Span<CInt> {
-// CHECK-NEXT:     return Span(_unsafeCxxSpan: myFunc(SpanOfInt(span)))
+// CHECK-NEXT:     return _unsafeRemoveLifetime(Span(_unsafeCxxSpan: myFunc(SpanOfInt(span))))
 // CHECK-NEXT: }
 
 // CHECK:      @_alwaysEmitIntoClient @lifetime(borrow vec) @_disfavoredOverload
 // CHECK-NEXT: func myFunc2(_ vec: borrowing VecOfInt) -> Span<CInt> {
-// CHECK-NEXT:     return Span(_unsafeCxxSpan: myFunc2(vec))
+// CHECK-NEXT:     return _unsafeRemoveLifetime(Span(_unsafeCxxSpan: myFunc2(vec)))
 // CHECK-NEXT: }
 
 // CHECK:      @_alwaysEmitIntoClient @lifetime(span1, span2)
 // CHECK-NEXT: func myFunc3(_ span1: Span<CInt>, _ span2: Span<CInt>) -> Span<CInt> {
-// CHECK-NEXT:     return Span(_unsafeCxxSpan: myFunc3(SpanOfInt(span1), SpanOfInt(span2)))
+// CHECK-NEXT:     return _unsafeRemoveLifetime(Span(_unsafeCxxSpan: myFunc3(SpanOfInt(span1), SpanOfInt(span2))))
 // CHECK-NEXT: }
 
 // CHECK:      @_alwaysEmitIntoClient @lifetime(borrow vec, span)
 // CHECK-NEXT: func myFunc4(_ vec: borrowing VecOfInt, _ span: Span<CInt>) -> Span<CInt> {
-// CHECK-NEXT:     return Span(_unsafeCxxSpan: myFunc4(vec, SpanOfInt(span)))
+// CHECK-NEXT:     return _unsafeRemoveLifetime(Span(_unsafeCxxSpan: myFunc4(vec, SpanOfInt(span))))
 // CHECK-NEXT: }
 
 // CHECK:      @_alwaysEmitIntoClient @lifetime(borrow self) @_disfavoredOverload
 // CHECK-NEXT: func myFunc5() -> Span<CInt> {
-// CHECK-NEXT:     return Span(_unsafeCxxSpan: myFunc5())
+// CHECK-NEXT:     return _unsafeRemoveLifetime(Span(_unsafeCxxSpan: myFunc5()))
 // CHECK-NEXT: }
