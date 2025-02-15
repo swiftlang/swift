@@ -251,6 +251,10 @@ BRIDGED_INLINE SwiftInt BridgedStringRef_count(BridgedStringRef str);
 SWIFT_NAME("getter:BridgedStringRef.isEmpty(self:)")
 BRIDGED_INLINE bool BridgedStringRef_empty(BridgedStringRef str);
 
+SWIFT_NAME("BridgedStringRef.equals(self:_:)")
+BRIDGED_INLINE bool BridgedStringRef_equals(BridgedStringRef lhs,
+                                            BridgedStringRef rhs);
+
 class BridgedOwnedString {
   char *_Nonnull Data;
   size_t Length;

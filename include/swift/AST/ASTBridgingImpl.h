@@ -40,7 +40,10 @@ swift::Identifier BridgedIdentifier::unbridged() const {
   return swift::Identifier::getFromOpaquePointer(Raw);
 }
 
-SWIFT_NAME("getter:BridgedIdentifier.isOperator(self:)")
+BridgedStringRef BridgedIdentifier_getStr(const BridgedIdentifier ident) {
+  return ident.unbridged().str();
+}
+
 bool BridgedIdentifier_isOperator(const BridgedIdentifier ident) {
   return ident.unbridged().isOperator();
 }
@@ -629,6 +632,20 @@ swift::StmtConditionElement BridgedStmtConditionElement::unbridged() const {
   return swift::StmtConditionElement::fromOpaqueValue(Raw);
 }
 
+//===----------------------------------------------------------------------===//
+// MARK: BridgedCaptureListEntry
+//===----------------------------------------------------------------------===//
+
+BridgedCaptureListEntry::BridgedCaptureListEntry(swift::CaptureListEntry CLE)
+    : PBD(CLE.PBD) {}
+
+swift::CaptureListEntry BridgedCaptureListEntry::unbridged() const {
+  return swift::CaptureListEntry(PBD);
+}
+
+BridgedVarDecl BridegedCaptureListEntry_getVar(BridgedCaptureListEntry entry) {
+  return entry.unbridged().getVar();
+}
 
 SWIFT_END_NULLABILITY_ANNOTATIONS
 

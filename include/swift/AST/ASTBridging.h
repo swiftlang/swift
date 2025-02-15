@@ -37,6 +37,7 @@ class AvailabilityDomain;
 class Argument;
 class ASTContext;
 struct ASTNode;
+struct CaptureListEntry;
 class DeclAttributes;
 class DeclBaseName;
 class DeclNameLoc;
@@ -55,6 +56,7 @@ enum class PlatformKind : uint8_t;
 class ProtocolConformanceRef;
 class RegexLiteralPatternFeature;
 class RegexLiteralPatternFeatureKind;
+enum class ReferenceOwnership : uint8_t;
 class Type;
 class CanType;
 class TypeBase;
@@ -113,6 +115,10 @@ SWIFT_NAME("getter:BridgedIdentifier.raw(self:)")
 inline const void *_Nullable BridgedIdentifier_raw(BridgedIdentifier ident) {
   return ident.Raw;
 }
+
+SWIFT_NAME("getter:BridgedIdentifier.str(self:)")
+BRIDGED_INLINE BridgedStringRef
+BridgedIdentifier_getStr(BridgedIdentifier ident);
 
 SWIFT_NAME("getter:BridgedIdentifier.isOperator(self:)")
 BRIDGED_INLINE bool BridgedIdentifier_isOperator(const BridgedIdentifier);
@@ -1104,10 +1110,13 @@ BridgedRawDocCommentAttr_createParsed(BridgedASTContext cContext,
                                       BridgedCharSourceRange cRange);
 
 enum ENUM_EXTENSIBILITY_ATTR(closed) BridgedReferenceOwnership {
+  BridgedReferenceOwnershipStrong,
   BridgedReferenceOwnershipWeak,
   BridgedReferenceOwnershipUnowned,
   BridgedReferenceOwnershipUnmanaged,
 };
+
+swift::ReferenceOwnership unbridged(BridgedReferenceOwnership kind);
 
 SWIFT_NAME("BridgedReferenceOwnershipAttr.createParsed(_:atLoc:range:kind:)")
 BridgedReferenceOwnershipAttr BridgedReferenceOwnershipAttr_createParsed(
@@ -1624,6 +1633,33 @@ SWIFT_NAME("BridgedCallExpr.createParsed(_:fn:args:)")
 BridgedCallExpr BridgedCallExpr_createParsed(BridgedASTContext cContext,
                                              BridgedExpr fn,
                                              BridgedArgumentList args);
+
+class BridgedCaptureListEntry {
+  swift::PatternBindingDecl *_Nonnull PBD;
+
+public:
+  BRIDGED_INLINE BridgedCaptureListEntry(swift::CaptureListEntry CLE);
+
+  BRIDGED_INLINE swift::CaptureListEntry unbridged() const;
+};
+
+SWIFT_NAME("BridgedCaptureListEntry.createParsed(_:declContext:ownership:"
+           "ownershipRange:name:nameLoc:equalLoc:initializer:)")
+BridgedCaptureListEntry BridegedCaptureListEntry_createParsed(
+    BridgedASTContext cContext, BridgedDeclContext cDeclContext,
+    BridgedReferenceOwnership cOwnershipKind,
+    BridgedSourceRange cOwnershipRange, BridgedIdentifier cName,
+    BridgedSourceLoc cNameLoc, BridgedSourceLoc cEqualLoc,
+    BridgedExpr cInitializer);
+
+SWIFT_NAME("getter:BridgedCaptureListEntry.varDecl(self:)")
+BRIDGED_INLINE BridgedVarDecl
+BridegedCaptureListEntry_getVar(BridgedCaptureListEntry entry);
+
+SWIFT_NAME("BridgedCaptureListExpr.createParsed(_:captureList:closure:)")
+BridgedCaptureListExpr BridgedCaptureListExpr_createParsed(BridgedASTContext cContext,
+                                                           BridgedArrayRef cCaptureList,
+                                                           BridgedClosureExpr cClosure);
 
 SWIFT_NAME("BridgedClosureExpr.createParsed(_:declContext:attributes:"
            "bracketRange:capturedSelfDecl:parameterList:asyncLoc:throwsLoc:"

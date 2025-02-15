@@ -2737,34 +2737,16 @@ ParserStatus Parser::parseClosureSignatureIfPresent(
         initializer = ExprResult.get();
       }
 
-      // Create the VarDecl and the PatternBindingDecl for the captured
-      // expression.  This uses the parent declcontext (not the closure) since
-      // the initializer expression is evaluated before the closure is formed.
-      auto introducer = (ownershipKind != ReferenceOwnership::Weak
-                         ? VarDecl::Introducer::Let
-                         : VarDecl::Introducer::Var);
-      auto *VD = new (Context) VarDecl(/*isStatic*/false, introducer,
-                                       nameLoc, name, CurDeclContext);
-        
+      // Create the capture list entry using the parent DeclContext (not the
+      // closure) since the initializer expression is evaluated before the
+      // closure is formed.
+      auto CLE = CaptureListEntry::createParsed(
+          Context, ownershipKind, {ownershipLocStart, ownershipLocEnd}, name,
+          nameLoc, equalLoc, initializer, CurDeclContext);
+
       // If we captured something under the name "self", remember that.
       if (name == Context.Id_self)
-        capturedSelfDecl = VD;
-
-      // Attributes.
-      if (ownershipKind != ReferenceOwnership::Strong)
-        VD->getAttrs().add(new (Context) ReferenceOwnershipAttr(
-          SourceRange(ownershipLocStart, ownershipLocEnd), ownershipKind));
-
-      auto pattern = NamedPattern::createImplicit(Context, VD);
-
-      auto *PBD = PatternBindingDecl::create(
-          Context, /*StaticLoc*/ SourceLoc(), StaticSpellingKind::None,
-          /*VarLoc*/ nameLoc, pattern, /*EqualLoc*/ equalLoc, initializer,
-          CurDeclContext);
-
-      auto CLE = CaptureListEntry(PBD);
-      if (CLE.isSimpleSelfCapture())
-        VD->setIsSelfParamCapture();
+        capturedSelfDecl = CLE.getVar();
 
       captureList.push_back(CLE);
     } while (HasNext && !Tok.is(tok::r_square));
