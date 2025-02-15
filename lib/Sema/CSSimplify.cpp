@@ -2964,6 +2964,10 @@ ConstraintSystem::matchFunctionIsolations(FunctionType *func1,
     case FunctionTypeIsolation::Kind::NonIsolated:
       return true;
 
+    // A thunk is going to pass `nil` to the isolated parameter.
+    case FunctionTypeIsolation::Kind::NonIsolatedCaller:
+      return matchIfConversion();
+
     // Erasing global-actor isolation to non-isolation can admit data
     // races; such violations are diagnosed by the actor isolation checker.
     // We deliberately do not allow actor isolation violations to influence
@@ -2981,6 +2985,35 @@ ConstraintSystem::matchFunctionIsolations(FunctionType *func1,
     // Parameter isolation is value-dependent and cannot be erased.
     case FunctionTypeIsolation::Kind::Parameter:
       return false;
+    }
+    llvm_unreachable("bad kind");
+
+  // Converting to a caller isolated async function type.
+  case FunctionTypeIsolation::Kind::NonIsolatedCaller:
+    switch (isolation1.getKind()) {
+    // Exact match.
+    case FunctionTypeIsolation::Kind::NonIsolatedCaller:
+      return true;
+
+    // Global actor: Thunk will hop to the global actor
+    // and would ignore passed in isolation.
+    // Erased: Just like global actor but would hop to
+    // the isolation stored in the @isolated(any) function.
+    case FunctionTypeIsolation::Kind::GlobalActor:
+    case FunctionTypeIsolation::Kind::Erased:
+      return matchIfConversion();
+
+    // In this case the isolation is dependent on a
+    // specific actor passed in as the isolation parameter
+    // and the thunk won't have it.
+    case FunctionTypeIsolation::Kind::Parameter:
+      return false;
+
+    // For asynchronous: Thunk would hop the appropriate actor.
+    // For synchronous: Thunk would call the function without
+    // a hop.
+    case FunctionTypeIsolation::Kind::NonIsolated:
+      return matchIfConversion();
     }
     llvm_unreachable("bad kind");
 
@@ -3002,6 +3035,11 @@ ConstraintSystem::matchFunctionIsolations(FunctionType *func1,
     // Adding global actor isolation to a non-isolated function is fine,
     // whether synchronous or asynchronous.
     case FunctionTypeIsolation::Kind::NonIsolated:
+      return matchIfConversion();
+
+    // A thunk is going to pass in an instance of a global actor
+    // to the isolated parameter.
+    case FunctionTypeIsolation::Kind::NonIsolatedCaller:
       return matchIfConversion();
 
     // Parameter isolation cannot be altered in the same way.
@@ -3030,6 +3068,10 @@ ConstraintSystem::matchFunctionIsolations(FunctionType *func1,
     case FunctionTypeIsolation::Kind::GlobalActor:
       return matchIfConversion();
 
+    // A thunk is going to forward the isolation.
+    case FunctionTypeIsolation::Kind::NonIsolatedCaller:
+      return matchIfConversion();
+
     // Don't allow dynamically-isolated function types to convert to
     // any specific isolation for the same policy reasons that we don't
     // want to allow global-actors to change.
@@ -3049,6 +3091,11 @@ ConstraintSystem::matchFunctionIsolations(FunctionType *func1,
     case FunctionTypeIsolation::Kind::NonIsolated:
     case FunctionTypeIsolation::Kind::GlobalActor:
       return matchIfConversion(/*erasure*/ true);
+
+    // It's not possible to form a thunk for this case because
+    // we don't know what to pass to the isolated parameter.
+    case FunctionTypeIsolation::Kind::NonIsolatedCaller:
+      return false;
 
     // Parameter isolation is value-dependent and can't be erased in the
     // abstract, though.  We need to be able to recover the isolation from

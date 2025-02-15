@@ -6421,6 +6421,10 @@ public:
       if (!Options.SuppressIsolatedAny)
         Printer << "@isolated(any) ";
       break;
+
+    case FunctionTypeIsolation::Kind::NonIsolatedCaller:
+      Printer << "@execution(caller) ";
+      break;
     }
 
     if (!Options.excludeAttrKind(TypeAttrKind::Sendable) && info.isSendable()) {
