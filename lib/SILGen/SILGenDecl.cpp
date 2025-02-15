@@ -1761,7 +1761,7 @@ SILValue SILGenFunction::emitZipperedOSVersionRangeCheck(
   VersionRange VariantOSVersion = variantRange;
 
   // We're building zippered, so we need to pass both macOS and iOS
-  // versions to the the runtime version range check. At run time
+  // versions to the runtime version range check. At run time
   // that check will determine what kind of process this code is loaded
   // into. In a macOS process it will use the macOS version; in an
   // macCatalyst process it will use the iOS version.
