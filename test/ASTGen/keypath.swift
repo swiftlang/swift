@@ -8,12 +8,10 @@
 // should end up with the same type-checked AST.
 
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend %s -dump-ast -enable-experimental-feature ParserASTGen -verify > %t/astgen.ast.raw
-// RUN: not %target-swift-frontend %s -dump-ast > %t/cpp-parser.ast.raw
-
-// Filter out any addresses in the dump, since they can differ.
-// RUN: sed -E 's#0x[0-9a-fA-F]+##g' %t/cpp-parser.ast.raw > %t/cpp-parser.ast
-// RUN: sed -E 's#0x[0-9a-fA-F]+##g' %t/astgen.ast.raw > %t/astgen.ast
+// RUN: %target-swift-frontend-dump-ast -enable-experimental-feature ParserASTGen -verify \
+// RUN:   | %sanitize-address > %t/astgen.ast
+// RUN: not %target-swift-frontend-dump-ast \
+// RUN:   | %sanitize-address > %t/cpp-parser.ast
 
 // RUN: %diff -u %t/astgen.ast %t/cpp-parser.ast
 

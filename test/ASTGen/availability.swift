@@ -9,16 +9,12 @@
 // RUN:   -define-availability '_myProject 2.5:macOS 52.5' \
 // RUN: )
 
-// RUN: %target-swift-frontend %s "${COMPILER_ARGS[@]}" -dump-parse \
+// RUN: %target-swift-frontend-dump-parse "${COMPILER_ARGS[@]}" \
 // RUN:   -enable-experimental-feature ParserASTGen \
-// RUN:   > %t/astgen.ast.raw
+// RUN:   | %sanitize-address > %t/astgen.ast
 
-// RUN: %target-swift-frontend %s "${COMPILER_ARGS[@]}" -dump-parse \
-// RUN:   > %t/cpp-parser.ast.raw
-
-// Filter out any addresses in the dump, since they can differ.
-// RUN: sed -E 's#0x[0-9a-fA-F]+#<ADDR>#g' %t/astgen.ast.raw > %t/astgen.ast
-// RUN: sed -E 's#0x[0-9a-fA-F]+#<ADDR>#g' %t/cpp-parser.ast.raw > %t/cpp-parser.ast
+// RUN: %target-swift-frontend-dump-parse "${COMPILER_ARGS[@]}" \
+// RUN:   | %sanitize-address > %t/cpp-parser.ast
 
 // RUN: %diff -u %t/astgen.ast %t/cpp-parser.ast
 

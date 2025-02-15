@@ -16,6 +16,7 @@
 #include "swift/AST/AccessScope.h"
 #include "swift/AST/AvailabilityInference.h"
 #include "swift/AST/ClangModuleLoader.h"
+#include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/FileUnit.h"
 #include "swift/AST/GenericEnvironment.h"
@@ -25,8 +26,8 @@
 #include "swift/AST/ParseRequests.h"
 #include "swift/AST/SourceFile.h"
 #include "swift/AST/TypeCheckRequests.h"
+#include "swift/AST/TypeRepr.h"
 #include "swift/AST/Types.h"
-#include "swift/AST/DiagnosticsSema.h"
 #include "swift/Basic/Assertions.h"
 #include "swift/Basic/SourceManager.h"
 #include "swift/Basic/Statistic.h"
@@ -802,10 +803,17 @@ unsigned DeclContext::printContext(raw_ostream &OS, const unsigned indent,
     OS << " name=" << cast<GenericTypeDecl>(this)->getName();
     break;
 
-  case DeclContextKind::ExtensionDecl:
-    OS << " line=" << getLineNumber(cast<ExtensionDecl>(this));
-    OS << " base=" << cast<ExtensionDecl>(this)->getExtendedType();
+  case DeclContextKind::ExtensionDecl: {
+    auto *ED = cast<ExtensionDecl>(this);
+    OS << " line=" << getLineNumber(ED);
+    OS << " base=";
+    if (ED->hasBeenBound()) {
+      OS << ED->getExtendedType();
+    } else {
+      ED->getExtendedTypeRepr()->print(OS);
+    }
     break;
+  }
 
   case DeclContextKind::TopLevelCodeDecl:
     OS << " line=" << getLineNumber(cast<TopLevelCodeDecl>(this));
@@ -817,7 +825,12 @@ unsigned DeclContext::printContext(raw_ostream &OS, const unsigned indent,
 
   case DeclContextKind::AbstractFunctionDecl: {
     auto *AFD = cast<AbstractFunctionDecl>(this);
-    OS << " name=" << AFD->getName();
+    OS << " name=";
+    if (auto *AD = dyn_cast<AccessorDecl>(AFD)) {
+      OS << accessorKindName(AD->getAccessorKind());
+    } else {
+      OS << AFD->getName();
+    }
     if (AFD->hasInterfaceType())
       OS << " : " << AFD->getInterfaceType();
     else

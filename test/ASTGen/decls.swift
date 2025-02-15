@@ -1,11 +1,9 @@
 
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend %s -dump-parse -disable-availability-checking -enable-experimental-move-only -enable-experimental-feature ParserASTGen -enable-experimental-feature ValueGenerics > %t/astgen.ast.raw
-// RUN: %target-swift-frontend %s -dump-parse -disable-availability-checking -enable-experimental-move-only -enable-experimental-feature ValueGenerics > %t/cpp-parser.ast.raw
-
-// Filter out any addresses in the dump, since they can differ.
-// RUN: sed -E 's#0x[0-9a-fA-F]+##g' %t/cpp-parser.ast.raw > %t/cpp-parser.ast
-// RUN: sed -E 's#0x[0-9a-fA-F]+##g' %t/astgen.ast.raw > %t/astgen.ast
+// RUN: %target-swift-frontend-dump-parse -disable-availability-checking -enable-experimental-move-only -enable-experimental-feature ValueGenerics -enable-experimental-feature ParserASTGen \
+// RUN:    | %sanitize-address > %t/astgen.ast
+// RUN: %target-swift-frontend-dump-parse -disable-availability-checking -enable-experimental-move-only -enable-experimental-feature ValueGenerics \
+// RUN:    | %sanitize-address > %t/cpp-parser.ast
 
 // RUN: %diff -u %t/astgen.ast %t/cpp-parser.ast
 
