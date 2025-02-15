@@ -456,6 +456,8 @@ public:
 
   unsigned ConditionalRuntimeRecords : 1;
 
+  unsigned AnnotateCondFailMessage : 1;
+
   unsigned InternalizeAtLink : 1;
 
   /// Internalize symbols (static library) - do not export any public symbols.
@@ -591,6 +593,7 @@ public:
         DisableStandardSubstitutionsInReflectionMangling(false),
         EnableGlobalISel(false), VirtualFunctionElimination(false),
         WitnessMethodElimination(false), ConditionalRuntimeRecords(false),
+        AnnotateCondFailMessage(false),
         InternalizeAtLink(false), InternalizeSymbols(false),
         MergeableSymbols(false),
         EmitGenericRODatas(true), NoPreallocatedInstantiationCaches(false),
