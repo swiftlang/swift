@@ -1,4 +1,4 @@
-// RUN: %target-run-simple-swift(-plugin-path %swift-plugin-dir -I %S/Inputs -Xfrontend -enable-experimental-cxx-interop -swift-version 6 -Xfrontend -disable-availability-checking -Xcc -std=c++20 -enable-experimental-feature LifetimeDependence -enable-experimental-feature Span -enable-experimental-feature SafeInteropWrappers)
+// RUN: %target-run-simple-swift(-plugin-path %swift-plugin-dir -I %S/Inputs -Xfrontend -enable-experimental-cxx-interop -swift-version 6 -Xfrontend -disable-availability-checking -Xcc -std=c++20 -enable-experimental-feature LifetimeDependence -enable-experimental-feature SafeInteropWrappers)
 
 // FIXME swift-ci linux tests do not support std::span
 // UNSUPPORTED: OS=linux-gnu
@@ -7,7 +7,6 @@
 // UNSUPPORTED: OS=windows-msvc
 
 // REQUIRES: swift_feature_SafeInteropWrappers
-// REQUIRES: swift_feature_Span
 // REQUIRES: swift_feature_LifetimeDependence
 
 // REQUIRES: executable_test
