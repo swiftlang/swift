@@ -4822,8 +4822,11 @@ emitRetconCoroutineEntry(IRGenFunction &IGF, CanSILFunctionType fnType,
   auto prototype =
     IGF.IGM.getOpaquePtr(IGF.IGM.getAddrOfContinuationPrototype(fnType));
 
-  // Use malloc and free as our allocator.
-  auto allocFn = IGF.IGM.getOpaquePtr(IGF.IGM.getMallocFn());
+  // Use swift_coroFrameAlloc as our allocator.
+  auto coroAllocFn = IGF.IGM.getOpaquePtr(IGF.IGM.getCoroFrameAllocFn());
+  auto mallocTypeId = IGF.getMallocTypeId();
+
+  // Use free as our deallocator.
   auto deallocFn = IGF.IGM.getOpaquePtr(IGF.IGM.getFreeFn());
 
   // Call the right 'llvm.coro.id.retcon' variant.
@@ -4833,8 +4836,9 @@ emitRetconCoroutineEntry(IRGenFunction &IGF, CanSILFunctionType fnType,
     llvm::ConstantInt::get(IGF.IGM.Int32Ty, bufferAlignment.getValue()),
     buffer,
     prototype,
-    allocFn,
-    deallocFn
+    coroAllocFn,
+    deallocFn,
+    mallocTypeId
   });
 
   // Call 'llvm.coro.begin', just for consistency with the normal pattern.
