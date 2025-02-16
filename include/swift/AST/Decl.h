@@ -8369,8 +8369,6 @@ public:
 
   TypeRepr *getResultTypeRepr() const { return FnRetType.getTypeRepr(); }
 
-  void setDeserializedResultTypeLoc(TypeLoc ResultTyR);
-
   SourceRange getResultTypeSourceRange() const {
     return FnRetType.getSourceRange();
   }
@@ -8897,9 +8895,6 @@ class ConstructorDecl : public AbstractFunctionDecl {
   /// inserted at the end of the initializer by SILGen.
   Expr *CallToSuperInit = nullptr;
 
-  /// Valid when lifetime dependence specifiers are present.
-  TypeLoc InitRetType;
-
 public:
   ConstructorDecl(DeclName Name, SourceLoc ConstructorLoc,
                   bool Failable, SourceLoc FailabilityLoc,
@@ -8908,7 +8903,7 @@ public:
                   TypeLoc thrownTy,
                   ParameterList *BodyParams,
                   GenericParamList *GenericParams,
-                  DeclContext *Parent, TypeRepr *InitRetTy);
+                  DeclContext *Parent);
 
   static ConstructorDecl *
   createImported(ASTContext &ctx, ClangNode clangNode, DeclName name,
@@ -8929,10 +8924,6 @@ public:
 
   /// Get the interface type of the initializing constructor.
   Type getInitializerInterfaceType();
-
-  TypeRepr *getResultTypeRepr() const { return InitRetType.getTypeRepr(); }
-
-  void setDeserializedResultTypeLoc(TypeLoc ResultTyR);
 
   /// Get the typechecked call to super.init expression, which needs to be
   /// inserted at the end of the initializer by SILGen.
