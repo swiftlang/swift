@@ -1547,7 +1547,7 @@ void CheckRedeclarationRequest::writeDependencySink(
     return;
 
   if (currentDC->isTypeContext()) {
-    if (auto nominal = std::get<1>(getStorage())) {
+    if (auto nominal = currentDC->getSelfNominalTypeDecl()) {
       tracker.addUsedMember(nominal, current->getBaseName());
     }
   } else {
