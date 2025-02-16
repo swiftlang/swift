@@ -559,8 +559,10 @@ BridgedRawDocCommentAttr_createParsed(BridgedASTContext cContext,
   return new (cContext.unbridged()) RawDocCommentAttr(cRange.unbridged());
 }
 
-static ReferenceOwnership unbridged(BridgedReferenceOwnership kind) {
+ReferenceOwnership unbridged(BridgedReferenceOwnership kind) {
   switch (kind) {
+  case BridgedReferenceOwnershipStrong:
+    return ReferenceOwnership::Strong;
   case BridgedReferenceOwnershipWeak:
     return ReferenceOwnership::Weak;
   case BridgedReferenceOwnershipUnowned:

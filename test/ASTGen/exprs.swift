@@ -114,6 +114,23 @@ func testTrailingClsure() {
     acceptClosures { $2 = $1 }
   }
 }
+class TestClosure {
+  func testCaptureList() {
+    var val = self
+    var str = "t"
+    acceptClosures { [self] in _ = self }
+    acceptClosures { [self] in _ = $1 }
+    acceptClosures { [foo = self] in }
+    acceptClosures { [self = self] in }
+    acceptClosures { [weak self] in }
+    acceptClosures { [unowned self] in }
+    acceptClosures { [unowned(safe) self] in }
+    acceptClosures { [unowned(unsafe) self] in }
+    acceptClosures { [unowned(unsafe) self = val] in }
+    acceptClosures { [val = self] in }
+    acceptClosures { [val = self, str, self = val] in }
+  }
+}
 
 func testInOut() {
   func acceptInOut(arg: inout Int) { arg += 1 }

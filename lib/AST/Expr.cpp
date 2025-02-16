@@ -1360,6 +1360,34 @@ CaptureListEntry::CaptureListEntry(PatternBindingDecl *PBD) : PBD(PBD) {
          "Capture lists only support single-var patterns");
 }
 
+CaptureListEntry CaptureListEntry::createParsed(
+    ASTContext &Ctx, ReferenceOwnership ownershipKind,
+    SourceRange ownershipRange, Identifier name, SourceLoc nameLoc,
+    SourceLoc equalLoc, Expr *initializer, DeclContext *DC) {
+
+  auto introducer =
+      (ownershipKind != ReferenceOwnership::Weak ? VarDecl::Introducer::Let
+                                                 : VarDecl::Introducer::Var);
+  auto *VD =
+      new (Ctx) VarDecl(/*isStatic==*/false, introducer, nameLoc, name, DC);
+
+  if (ownershipKind != ReferenceOwnership::Strong)
+    VD->getAttrs().add(
+        new (Ctx) ReferenceOwnershipAttr(ownershipRange, ownershipKind));
+
+  auto *pattern = NamedPattern::createImplicit(Ctx, VD);
+
+  auto *PBD = PatternBindingDecl::create(Ctx, /*StaticLoc=*/SourceLoc(),
+                                         StaticSpellingKind::None, nameLoc,
+                                         pattern, equalLoc, initializer, DC);
+  CaptureListEntry CLE(PBD);
+
+  if (CLE.isSimpleSelfCapture())
+    VD->setIsSelfParamCapture();
+
+  return CLE;
+}
+
 VarDecl *CaptureListEntry::getVar() const {
   return PBD->getSingleVar();
 }
