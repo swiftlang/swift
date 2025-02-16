@@ -121,6 +121,31 @@ BridgedCallExpr BridgedCallExpr_createParsed(BridgedASTContext cContext,
                           /*implicit*/ false);
 }
 
+BridgedCaptureListEntry BridegedCaptureListEntry_createParsed(
+    BridgedASTContext cContext, BridgedDeclContext cDeclContext,
+    BridgedReferenceOwnership cOwnershipKind,
+    BridgedSourceRange cOwnershipRange, BridgedIdentifier cName,
+    BridgedSourceLoc cNameLoc, BridgedSourceLoc cEqualLoc,
+    BridgedExpr cInitializer) {
+  return CaptureListEntry::createParsed(
+      cContext.unbridged(), unbridged(cOwnershipKind),
+      cOwnershipRange.unbridged(), cName.unbridged(), cNameLoc.unbridged(),
+      cEqualLoc.unbridged(), cInitializer.unbridged(),
+      cDeclContext.unbridged());
+}
+
+BridgedCaptureListExpr
+BridgedCaptureListExpr_createParsed(BridgedASTContext cContext,
+                                    BridgedArrayRef cCaptureList,
+                                    BridgedClosureExpr cClosure) {
+  SmallVector<CaptureListEntry, 4> captureList;
+  for (auto e : cCaptureList.unbridged<BridgedCaptureListEntry>())
+    captureList.push_back(e.unbridged());
+
+  return CaptureListExpr::create(cContext.unbridged(), captureList,
+                                 cClosure.unbridged());
+}
+
 BridgedClosureExpr BridgedClosureExpr_createParsed(
     BridgedASTContext cContext, BridgedDeclContext cDeclContext,
     BridgedDeclAttributes cAttributes, BridgedSourceRange cBracketRange,

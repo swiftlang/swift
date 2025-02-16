@@ -35,7 +35,7 @@ extension ASTGenVisitor {
     case .borrowExpr(let node):
       return self.generate(borrowExpr: node).asExpr
     case .closureExpr(let node):
-      return self.generate(closureExpr: node).asExpr
+      return self.generate(closureExpr: node)
     case .consumeExpr(let node):
       return self.generate(consumeExpr: node).asExpr
     case .copyExpr(let node):
@@ -219,7 +219,7 @@ extension ASTGenVisitor {
   }
 
   func generate(binaryOperatorExpr node: BinaryOperatorExprSyntax) -> BridgedUnresolvedDeclRefExpr {
-    return createOperatorRefExpr(token: node.operator, kind: .binaryOperator)
+    return createUnresolvedDeclRefExpr(token: node.operator, kind: .binaryOperator)
   }
 
   func generate(closureSignature node: ClosureSignatureSyntax) -> GeneratedClosureSignature {
@@ -233,7 +233,7 @@ extension ASTGenVisitor {
     if let node = node.capture {
       result.bracketRange = self.generateSourceRange(node)
       let captures = node.items.lazy.map { node in
-        self.generate(closureCapture: node)
+        self.generate(closureCapture: node, capturedSelfDecl: &result.capturedSelfDecl)
       }
       result.captureList = captures.bridgedArray(in: self)
     }
@@ -244,12 +244,7 @@ extension ASTGenVisitor {
     case .simpleInput(let node):
       result.params = self.generate(closureShorthandParameterList: node)
     case nil:
-      result.params = .createParsed(
-        self.ctx,
-        leftParenLoc: nil,
-        parameters: BridgedArrayRef(),
-        rightParenLoc: nil
-      )
+      result.params = nil
     }
 
     if let effects = node.effectSpecifiers {
@@ -268,8 +263,56 @@ extension ASTGenVisitor {
     return result
   }
 
-  func generate(closureCapture node: ClosureCaptureSyntax) {
-    fatalError("unimplemented")
+  func generate(closureCapture node: ClosureCaptureSyntax, capturedSelfDecl: inout BridgedVarDecl?) -> BridgedCaptureListEntry {
+    let ownership: BridgedReferenceOwnership
+    switch node.specifier?.specifier.rawText {
+    case nil:
+      ownership = .strong
+    case "weak":
+      ownership = .weak
+    case "unowned":
+      switch node.specifier?.detail?.rawText {
+      case nil, "safe":
+        ownership = .unowned
+      case "unsafe":
+        ownership = .unmanaged
+      default:
+        // TODO: Diagnose.
+        fatalError("invalid ownership")
+      }
+    default:
+      // TODO: Diagnose.
+      fatalError("invalid ownership")
+    }
+    let nameAndLoc = self.generateIdentifierAndSourceLoc(node.name)
+    let equalLoc: BridgedSourceLoc
+    let initExpr: BridgedExpr
+    if let initializer = node.initializer {
+      equalLoc = self.generateSourceLoc(initializer.equal)
+      initExpr = self.generate(expr: initializer.value)
+    } else {
+      // Otherwise, create an 'UnresolvedDeclRefExpr' with the name
+      equalLoc = nil
+      initExpr = self.createUnresolvedDeclRefExpr(token: node.name, kind: .ordinary).asExpr
+    }
+
+    let entry = BridgedCaptureListEntry.createParsed(
+      self.ctx,
+      declContext: self.declContext,
+      ownership: ownership,
+      ownershipRange: self.generateSourceRange(node.specifier),
+      name: nameAndLoc.identifier,
+      nameLoc: nameAndLoc.sourceLoc,
+      equalLoc: equalLoc,
+      initializer: initExpr
+    )
+
+    // If we captured something under the name "self", remember that.
+    if nameAndLoc.identifier == ctx.id_self {
+      capturedSelfDecl = entry.varDecl
+    }
+
+    return entry
   }
 
   struct GeneratedClosureSignature {
@@ -286,7 +329,7 @@ extension ASTGenVisitor {
     var inLoc: BridgedSourceLoc = nil
   }
 
-  func generate(closureExpr node: ClosureExprSyntax) -> BridgedClosureExpr {
+  func generate(closureExpr node: ClosureExprSyntax) -> BridgedExpr {
     let signature: GeneratedClosureSignature
     if let node = node.signature {
       signature = self.generate(closureSignature: node)
@@ -299,7 +342,7 @@ extension ASTGenVisitor {
       declContext: self.declContext,
       attributes: signature.attributes,
       bracketRange: signature.bracketRange,
-      capturedSelfDecl: BridgedNullableVarDecl(raw: signature.capturedSelfDecl?.raw),
+      capturedSelfDecl: signature.capturedSelfDecl.asNullable,
       parameterList: signature.params.asNullable,
       asyncLoc: signature.asyncLoc,
       throwsLoc: signature.throwsLoc,
@@ -353,10 +396,14 @@ extension ASTGenVisitor {
     expr.setBody(body)
 
     if signature.captureList.count > 0 {
-      // TODO: CaptureListExpr.
+      return BridgedCaptureListExpr.createParsed(
+        self.ctx,
+        captureList: signature.captureList,
+        closure: expr
+      ).asExpr
     }
 
-    return expr
+    return expr.asExpr
   }
 
   func generate(consumeExpr node: ConsumeExprSyntax) -> BridgedConsumeExpr {
@@ -414,7 +461,7 @@ extension ASTGenVisitor {
       let bridgedTrailingClosureArg = BridgedCallArgument(
         labelLoc: nil,
         label: nil,
-        argExpr: self.generate(closureExpr: trailingClosure).asExpr
+        argExpr: self.generate(closureExpr: trailingClosure)
       )
       let normalArgsAndClosure = ConcatCollection(normalArgs, CollectionOfOne(bridgedTrailingClosureArg))
       guard let additionalTrailingClosures else {
@@ -426,7 +473,7 @@ extension ASTGenVisitor {
         return BridgedCallArgument(
           labelLoc: self.generateSourceLoc(argNode.label),
           label: self.generateIdentifier(argNode.label),
-          argExpr: self.generate(closureExpr: argNode.closure).asExpr
+          argExpr: self.generate(closureExpr: argNode.closure)
         )
       }
       let allArgs = ConcatCollection(normalArgsAndClosure, additions)
@@ -1044,7 +1091,7 @@ extension ASTGenVisitor {
     let operand = self.generate(expr: node.expression, postfixIfConfigBaseExpr: postfixIfConfigBaseExpr)
     return .createParsed(
       self.ctx,
-      operator: self.createOperatorRefExpr(
+      operator: self.createUnresolvedDeclRefExpr(
         token: node.operator,
         kind: .postfixOperator
       ).asExpr,
@@ -1055,7 +1102,7 @@ extension ASTGenVisitor {
   func generate(prefixOperatorExpr node: PrefixOperatorExprSyntax) -> BridgedPrefixUnaryExpr {
     return .createParsed(
       self.ctx,
-      operator: self.createOperatorRefExpr(
+      operator: self.createUnresolvedDeclRefExpr(
         token: node.operator,
         kind: .prefixOperator
       ).asExpr,
@@ -1294,7 +1341,7 @@ extension ASTGenVisitor {
 }
 
 extension ASTGenVisitor {
-  fileprivate func createOperatorRefExpr(
+  fileprivate func createUnresolvedDeclRefExpr(
     token node: TokenSyntax,
     kind: BridgedDeclRefKind
   ) -> BridgedUnresolvedDeclRefExpr {
