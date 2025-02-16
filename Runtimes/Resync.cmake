@@ -68,7 +68,52 @@ file(COPY_FILE
   ONLY_IF_DIFFERENT)
 if(_output)
   message(SEND_ERROR
-    "Copy ${StdlibSources}/Info.plist.in] -> Core/Info.plist.in Failed: ${_output}")
+    "Copy ${StdlibSources}/Info.plist.in -> Core/Info.plist.in Failed: ${_output}")
+endif()
+
+# Copy Windows clang overlays
+message(STATUS "modulemap[${StdlibSources}/Windows/ucrt.modulemap] -> Overlay/Windows/clang")
+file(COPY_FILE
+  "${StdlibSources}/public/Platform/ucrt.modulemap"                 # From
+  "${CMAKE_CURRENT_LIST_DIR}/Overlay/Windows/clang/ucrt.modulemap"  # To
+  RESULT _output
+  ONLY_IF_DIFFERENT)
+if(_output)
+  message(SEND_ERROR
+    "Copy ${StdlibSources}/public/Platform/ucrt.modulemap -> Overlay/Windows/clang/ucrt.modulemap Failed: ${_output}")
+endif()
+
+message(STATUS "modulemap[${StdlibSources}/Windows/winsdk.modulemap] -> Overlay/Windows/clang")
+file(COPY_FILE
+  "${StdlibSources}/public/Platform/winsdk.modulemap"                 # From
+  "${CMAKE_CURRENT_LIST_DIR}/Overlay/Windows/clang/winsdk.modulemap"  # To
+  RESULT _output
+  ONLY_IF_DIFFERENT)
+if(_output)
+  message(SEND_ERROR
+    "Copy ${StdlibSources}/public/Platform/winsdk.modulemap -> Overlay/Windows/clang/winsdk.modulemap Failed: ${_output}")
+endif()
+
+message(STATUS "modulemap[${StdlibSources}/Windows/vcruntime.modulemap] -> Overlay/Windows/clang")
+file(COPY_FILE
+  "${StdlibSources}/public/Platform/vcruntime.modulemap"                # From
+  "${CMAKE_CURRENT_LIST_DIR}/Overlay/Windows/clang/vcruntime.modulemap" # To
+  RESULT _output
+  ONLY_IF_DIFFERENT)
+if(_output)
+  message(SEND_ERROR
+    "Copy ${StdlibSources}/public/Platform/vcruntime.modulemap -> Overlay/Windows/clang/vcruntime.modulemap Failed: ${_output}")
+endif()
+
+message(STATUS "APINotes[${StdlibSources}/Windows/vcruntime.apinotes] -> Overlay/Windows/clang")
+file(COPY_FILE
+  "${StdlibSources}/public/Platform/vcruntime.apinotes"                 # From
+  "${CMAKE_CURRENT_LIST_DIR}/Overlay/Windows/clang/vcruntime.apinotes"  # To
+  RESULT _output
+  ONLY_IF_DIFFERENT)
+if(_output)
+  message(SEND_ERROR
+    "Copy ${StdlibSources}/public/Platform/vcruntime.apinotes -> Overlay/Windows/clang/vcruntime.modulemap Failed: ${_output}")
 endif()
 
 set(CoreLibs
