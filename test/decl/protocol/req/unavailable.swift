@@ -104,6 +104,15 @@ protocol UnavailableAssoc {
   @available(*, unavailable) // expected-error {{associated type cannot be marked unavailable with '@available'}}
   associatedtype A1
 
-  @available(swift, introduced: 99) // expected-error {{associated type cannot be marked unavailable with '@available'}}
+  @available(swift, introduced: 4)
   associatedtype A2
+
+  @available(swift, introduced: 99) // expected-error {{associated type cannot be marked unavailable with '@available'}}
+  associatedtype A3
+
+  @available(swift, obsoleted: 4) // expected-error {{associated type cannot be marked unavailable with '@available'}}
+  associatedtype A4
+
+  @available(swift, obsoleted: 99)
+  associatedtype A5
 }
