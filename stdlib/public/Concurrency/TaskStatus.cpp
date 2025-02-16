@@ -741,7 +741,7 @@ void AsyncTask::dropInitialTaskExecutorPreferenceRecord() {
   SWIFT_TASK_DEBUG_LOG("[InitialTaskExecutorPreference] Drop initial task "
                        "preference record from task:%p",
                        this);
-  assert(this->hasInitialTaskExecutorPreferenceRecord());
+  assert(hasInitialTaskExecutorPreferenceRecord());
 
   HeapObject *executorIdentityToRelease = nullptr;
   withStatusRecordLock(this, [&](ActiveTaskStatus status) {
@@ -779,6 +779,67 @@ void AsyncTask::dropInitialTaskExecutorPreferenceRecord() {
   // swift_release), because a dispatch_queue_t conforms to TaskExecutor,
   // and may be passed in here; in which case swift_releasing it would be incorrect.
   swift_unknownObjectRelease(executorIdentityToRelease);
+}
+
+/**************************************************************************/
+/************************** CHILD NAMING ******** *************************/
+/**************************************************************************/
+
+void AsyncTask::pushInitialTaskName(const char* taskName) {
+  void *allocation = _swift_task_alloc_specific(
+      this, sizeof(class TaskNameStatusRecord));
+  auto record =
+      ::new (allocation) TaskNameStatusRecord(taskName);
+  SWIFT_TASK_DEBUG_LOG("[TaskName] Create initial task name record %p "
+                       "for task:%p", record, this);
+
+  addStatusRecord(this, record,
+                  [&](ActiveTaskStatus oldStatus, ActiveTaskStatus &newStatus) {
+                    // We use a flag to mark a task executor preference is
+                    // present in order to avoid looking for task name
+                    // records when running the task, and we know there is no
+                    // name present -- therefore avoid locking the records.
+                    newStatus = newStatus.withTaskExecutorPreference();
+
+                    return true;
+                  });
+}
+
+void AsyncTask::dropInitialTaskNameRecord() {
+  if (!hasInitialTaskName()) {
+    return;
+  }
+
+  assert(false && "not implemented");
+}
+
+const char*
+AsyncTask::getTaskName() {
+  // We first check the executor preference status flag, in order to avoid
+  // having to scan through the records of the task checking if there was
+  // such record.
+  //
+  // This is an optimization in order to make the enqueue/run
+  // path of a task avoid excessive work if a task had many records.
+  if (!hasTaskExecutorPreferenceRecord()) {
+    return nullptr;
+  }
+
+  const char *data = nullptr;
+//  uintptr_t length = 0;
+  withStatusRecordLock(this, [&](ActiveTaskStatus status) {
+    for (auto record : status.records()) {
+      if (record->getKind() == TaskStatusRecordKind::TaskName) {
+        auto nameRecord =
+            cast<TaskNameStatusRecord>(record);
+        data = nameRecord->getName();
+//        length = nameRecord->getLength();
+        return;
+      }
+    }
+  });
+
+  return data;
 }
 
 /**************************************************************************/
@@ -906,6 +967,10 @@ static void performCancellationAction(TaskStatusRecord *record) {
   // Cancellation has no impact on executor preference.
   case TaskStatusRecordKind::TaskExecutorPreference:
     break;
+
+  // Cancellation has no impact on task names.
+  case TaskStatusRecordKind::TaskName:
+    break;
   }
 
   // Other cases can fall through here and be ignored.
@@ -974,14 +1039,6 @@ static void performEscalationAction(TaskStatusRecord *record,
     return;
   }
 
-  // Cancellation notifications can be ignore.
-  case TaskStatusRecordKind::CancellationNotification:
-    return;
-
-  /// Executor preference we can ignore.
-  case TaskStatusRecordKind::TaskExecutorPreference:
-    return;
-
   // Escalation notifications need to be called.
   case TaskStatusRecordKind::EscalationNotification:  {
     auto notification =
@@ -1001,6 +1058,15 @@ static void performEscalationAction(TaskStatusRecord *record,
   // Record locks shouldn't be found this way, but they don't have
   // anything to do anyway.
   case TaskStatusRecordKind::Private_RecordLock:
+    return;
+  // Cancellation notifications can be ignore.
+  case TaskStatusRecordKind::CancellationNotification:
+    return;
+  /// Executor preference we can ignore.
+  case TaskStatusRecordKind::TaskExecutorPreference:
+    return;
+  /// Task names don't matter to priority escalation.
+  case TaskStatusRecordKind::TaskName:
     return;
   }
 
