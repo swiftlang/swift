@@ -202,7 +202,10 @@ void AvailabilityContext::constrainWithDeclAndPlatformRange(
   bool isConstrained = false;
 
   Info info{storage->info};
-  auto constraints = swift::getAvailabilityConstraintsForDecl(decl, *this);
+  AvailabilityConstraintFlags flags =
+      AvailabilityConstraintFlag::SkipEnclosingExtension;
+  auto constraints =
+      swift::getAvailabilityConstraintsForDecl(decl, *this, flags);
   isConstrained |= info.constrainWith(constraints, decl->getASTContext());
   isConstrained |= CONSTRAIN_BOOL(info.IsDeprecated, decl->isDeprecated());
   isConstrained |= constrainRange(info.Range, platformRange);

@@ -89,6 +89,6 @@ protocol P3 {
   @available(macOS, obsoleted: 12) // expected-error{{associated type cannot be marked unavailable with '@available'}}
   associatedtype A1
 
-  @available(macOS, obsoleted: 99) // FIXME: this should probably be diagnosed
+  @available(macOS, obsoleted: 99)
   associatedtype A2
 }

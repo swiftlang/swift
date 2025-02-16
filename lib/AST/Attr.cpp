@@ -2294,50 +2294,6 @@ SemanticAvailableAttr::getActiveVersion(const ASTContext &ctx) const {
   }
 }
 
-AvailableVersionComparison
-SemanticAvailableAttr::getVersionAvailability(const ASTContext &ctx) const {
-
-  // Unconditional unavailability.
-  if (attr->isUnconditionallyUnavailable())
-    return AvailableVersionComparison::Unavailable;
-
-  llvm::VersionTuple queryVersion = getActiveVersion(ctx);
-  std::optional<llvm::VersionTuple> ObsoletedVersion = getObsoleted();
-
-  StringRef ObsoletedPlatform;
-  llvm::VersionTuple RemappedObsoletedVersion;
-  if (AvailabilityInference::updateObsoletedPlatformForFallback(
-          *this, ctx, ObsoletedPlatform, RemappedObsoletedVersion))
-    ObsoletedVersion = RemappedObsoletedVersion;
-
-  // If this entity was obsoleted before or at the query platform version,
-  // consider it obsolete.
-  if (ObsoletedVersion && *ObsoletedVersion <= queryVersion)
-    return AvailableVersionComparison::Obsoleted;
-
-  std::optional<llvm::VersionTuple> IntroducedVersion = getIntroduced();
-  StringRef IntroducedPlatform;
-  llvm::VersionTuple RemappedIntroducedVersion;
-  if (AvailabilityInference::updateIntroducedPlatformForFallback(
-          *this, ctx, IntroducedPlatform, RemappedIntroducedVersion))
-    IntroducedVersion = RemappedIntroducedVersion;
-
-  // If this entity was introduced after the query version and we're doing a
-  // platform comparison, true availability can only be determined dynamically;
-  // if we're doing a _language_ version check, the query version is a
-  // static requirement, so we treat "introduced later" as just plain
-  // unavailable.
-  if (IntroducedVersion && *IntroducedVersion > queryVersion) {
-    if (isSwiftLanguageModeSpecific() || isPackageDescriptionVersionSpecific())
-      return AvailableVersionComparison::Unavailable;
-    else
-      return AvailableVersionComparison::PotentiallyUnavailable;
-  }
-
-  // The entity is available.
-  return AvailableVersionComparison::Available;
-}
-
 SpecializeAttr::SpecializeAttr(SourceLoc atLoc, SourceRange range,
                                TrailingWhereClause *clause, bool exported,
                                SpecializationKind kind,
