@@ -1080,15 +1080,30 @@ extension Array: RangeReplaceableCollection {
   internal mutating func _reserveCapacityImpl(
     minimumCapacity: Int, growForAppend: Bool
   ) {
+    _ = _reserveCapacityImpl(
+      minimumCapacity: minimumCapacity,
+      growForAppend: growForAppend,
+      rangeToNotCopy: 0..<0
+    )
+  }
+
+  @_alwaysEmitIntoClient
+  internal mutating func _reserveCapacityImpl(
+    minimumCapacity: Int,
+    growForAppend: Bool,
+    rangeToNotCopy: Range<Int>
+  ) -> Bool {
     let isUnique = _buffer.beginCOWMutation()
     if _slowPath(!isUnique || _buffer.mutableCapacity < minimumCapacity) {
-      _createNewBuffer(bufferIsUnique: isUnique,
-                       minimumCapacity: Swift.max(minimumCapacity, _buffer.count),
-                       growForAppend: growForAppend)
+      _createNewBuffer(
+        bufferIsUnique: isUnique,
+        minimumCapacity: Swift.max(minimumCapacity, _buffer.count),
+        growForAppend: growForAppend,
+        rangeToNotCopy: rangeToNotCopy)
     }
     _internalInvariant(_buffer.mutableCapacity >= minimumCapacity)
-    _internalInvariant(_buffer.mutableCapacity == 0 ||
-                       _buffer.isUniquelyReferenced())
+    _internalInvariant(_buffer.mutableCapacity == 0 || _buffer.isUniquelyReferenced())
+    return !isUnique
   }
 
   /// Creates a new buffer, replacing the current buffer.
@@ -1103,12 +1118,28 @@ extension Array: RangeReplaceableCollection {
   internal mutating func _createNewBuffer(
     bufferIsUnique: Bool, minimumCapacity: Int, growForAppend: Bool
   ) {
+    _createNewBuffer(
+      bufferIsUnique: bufferIsUnique,
+      minimumCapacity: minimumCapacity,
+      growForAppend: growForAppend,
+      rangeToNotCopy: 0..<0
+    )
+  }
+
+  @_alwaysEmitIntoClient
+  internal mutating func _createNewBuffer(
+    bufferIsUnique: Bool,
+    minimumCapacity: Int,
+    growForAppend: Bool,
+    rangeToNotCopy: Range<Int>
+  ) {
     _internalInvariant(!bufferIsUnique || _buffer.isUniquelyReferenced())
     _buffer = _buffer._consumeAndCreateNew(bufferIsUnique: bufferIsUnique,
                                            minimumCapacity: minimumCapacity,
-                                           growForAppend: growForAppend)
+                                           growForAppend: growForAppend,
+                                           rangeToNotCopy: rangeToNotCopy)
   }
-
+  
   /// Copy the contents of the current buffer to a new unique mutable buffer.
   /// The count of the new buffer is set to `oldCount`, the capacity of the
   /// new buffer is big enough to hold 'oldCount' + 1 elements.
@@ -1151,7 +1182,8 @@ extension Array: RangeReplaceableCollection {
     if _slowPath(oldCount &+ 1 > capacity) {
       _createNewBuffer(bufferIsUnique: capacity > 0,
                        minimumCapacity: oldCount &+ 1,
-                       growForAppend: true)
+                       growForAppend: true,
+                       rangeToNotCopy: 0..<0)
     }
   }
 
@@ -1794,9 +1826,15 @@ extension Array {
     let insertCount = newElements.count
     let growth = insertCount - eraseCount
 
-    _reserveCapacityImpl(minimumCapacity: self.count + growth,
-                         growForAppend: true)
-    _buffer.replaceSubrange(subrange, with: insertCount, elementsOf: newElements)
+    let punchedHole = _reserveCapacityImpl(
+      minimumCapacity: self.count + growth,
+      growForAppend: true,
+      rangeToNotCopy: subrange)
+    _buffer.replaceSubrange(
+      subrange,
+      with: insertCount,
+      elementsOf: newElements,
+      holeAlreadyPunched: punchedHole)
     _endMutation()
   }
 }
