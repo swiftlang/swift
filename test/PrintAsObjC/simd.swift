@@ -8,7 +8,7 @@
 // FIXME: END -enable-source-import hackaround
 
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk-nosource -I %t) -emit-module -emit-module-doc -o %t -module-name simd_test %s
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk-nosource -I %t) -parse-as-library %t/simd_test.swiftmodule -typecheck -emit-objc-header-path %t/simd.h -import-objc-header %S/../Inputs/empty.h -disable-objc-attr-requires-foundation-module
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk-nosource -I %t) -parse-as-library %t/simd_test.swiftmodule -typecheck -verify -emit-objc-header-path %t/simd.h -import-objc-header %S/../Inputs/empty.h -disable-objc-attr-requires-foundation-module
 // RUN: %FileCheck %s < %t/simd.h
 // RUN: %check-in-clang %t/simd.h
 // RUN: %check-in-clang -fno-modules -Qunused-arguments %t/simd.h

@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
 
-// RUN: %target-swift-frontend -typecheck %s -typecheck -module-name UseCoreFoundation -enable-experimental-cxx-interop -clang-header-expose-decls=all-public -emit-clang-header-path %t/UseCoreFoundation.h
+// RUN: %target-swift-frontend %s -module-name UseCoreFoundation -enable-experimental-cxx-interop -clang-header-expose-decls=all-public -typecheck -verify -emit-clang-header-path %t/UseCoreFoundation.h
 // RUN: %FileCheck %s < %t/UseCoreFoundation.h
 
 // REQUIRES: objc_interop

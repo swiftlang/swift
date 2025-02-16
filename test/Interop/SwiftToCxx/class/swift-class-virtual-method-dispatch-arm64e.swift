@@ -1,5 +1,5 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend %S/swift-class-virtual-method-dispatch.swift -typecheck -module-name Class -clang-header-expose-decls=all-public -emit-clang-header-path %t/class.h
+// RUN: %target-swift-frontend %S/swift-class-virtual-method-dispatch.swift -module-name Class -clang-header-expose-decls=all-public -typecheck -verify -emit-clang-header-path %t/class.h
 // RUN: %FileCheck %s < %t/class.h
 
 // RUN: %check-interop-cxx-header-in-clang(%t/class.h -DSWIFT_CXX_INTEROP_HIDE_STL_OVERLAY)

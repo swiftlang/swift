@@ -751,21 +751,45 @@ public:
       if (result != 0)
         return result;
 
+      auto lastDitchSort = [&](bool suppressDiagnostic) -> int {
+        // With no other criteria, we'll sort by memory address.
+        if (*lhs < *rhs)
+          result = Ascending;
+        else if (*lhs > *rhs)
+          result = Descending;
+        else {
+          // Sorting with yourself shouldn't happen (but implement consistent
+          // behavior if this assert is disabled).
+          ASSERT(*lhs != *rhs && "sorting should not compare decl to itself");
+          result = Equivalent;
+        }
+
+        // Warn that this isn't stable across different compilations.
+        if (!suppressDiagnostic) {
+          auto earlier = (result == Ascending) ? *lhs : *rhs;
+          auto later = (result == Ascending) ? *rhs : *lhs;
+
+          earlier->diagnose(diag::objc_header_sorting_arbitrary,
+                            earlier, later);
+          later->diagnose(diag::objc_header_sorting_arbitrary_other,
+                          earlier, later);
+          earlier->diagnose(diag::objc_header_sorting_arbitrary_please_report);
+        }
+
+        return result;
+      };
+
       // Mangled names ought to distinguish all value decls, leaving only
       // extensions of the same nominal type beyond this point.
-      assert(isa<ExtensionDecl>(*lhs) && isa<ExtensionDecl>(*rhs));
+      if (!isa<ExtensionDecl>(*lhs) || !isa<ExtensionDecl>(*rhs))
+        return lastDitchSort(/*suppressDiagnostic=*/false);
 
       // Break ties in extensions by putting smaller extensions last (in reverse
       // order).
-      // FIXME: This will end up taking linear time.
       auto lhsMembers = cast<ExtensionDecl>(*lhs)->getAllMembers();
       auto rhsMembers = cast<ExtensionDecl>(*rhs)->getAllMembers();
-      unsigned numLHSMembers = std::distance(lhsMembers.begin(),
-                                             lhsMembers.end());
-      unsigned numRHSMembers = std::distance(rhsMembers.begin(),
-                                             rhsMembers.end());
-      if (numLHSMembers != numRHSMembers)
-        return numLHSMembers < numRHSMembers ? Descending : Ascending;
+      if (lhsMembers.size() != rhsMembers.size())
+        return lhsMembers.size() < rhsMembers.size() ? Descending : Ascending;
 
       // Or the extension with fewer protocols.
       auto lhsProtos = cast<ExtensionDecl>(*lhs)->getLocalProtocols();
@@ -780,44 +804,65 @@ public:
           std::mismatch(lhsProtos.begin(), lhsProtos.end(), rhsProtos.begin(),
                         [] (const ProtocolDecl *nextLHSProto,
                             const ProtocolDecl *nextRHSProto) {
-          return nextLHSProto->getName() != nextRHSProto->getName();
+          return nextLHSProto->getName() == nextRHSProto->getName();
         });
         if (mismatch.first != lhsProtos.end()) {
           StringRef lhsProtoName = (*mismatch.first)->getName().str();
-          return lhsProtoName.compare((*mismatch.second)->getName().str());
+          result = lhsProtoName.compare((*mismatch.second)->getName().str());
+          if (result != 0)
+            return result;
         }
       }
 
-      // Still nothing? Fine, we'll pick the one with the alphabetically first
-      // member instead.
+      // Still nothing? Fine, we'll look for a difference between the members.
       {
-        auto mismatch = std::mismatch(
-            cast<ExtensionDecl>(*lhs)->getAllMembers().begin(),
-            cast<ExtensionDecl>(*lhs)->getAllMembers().end(),
-            cast<ExtensionDecl>(*rhs)->getAllMembers().begin(),
-            [](const Decl *nextLHSDecl, const Decl *nextRHSDecl) {
-              if (isa<ValueDecl>(nextLHSDecl) && isa<ValueDecl>(nextRHSDecl)) {
-                return cast<ValueDecl>(nextLHSDecl)->getName() !=
-                       cast<ValueDecl>(nextRHSDecl)->getName();
-              }
-              return isa<ValueDecl>(nextLHSDecl) != isa<ValueDecl>(nextRHSDecl);
-            });
-        if (mismatch.first !=
-            cast<ExtensionDecl>(*lhs)->getAllMembers().end()) {
-          auto *lhsMember = dyn_cast<ValueDecl>(*mismatch.first),
-               *rhsMember = dyn_cast<ValueDecl>(*mismatch.second);
+        for (auto pair : llvm::zip_equal(lhsMembers, rhsMembers)) {
+          auto *lhsMember = dyn_cast<ValueDecl>(std::get<0>(pair)),
+               *rhsMember = dyn_cast<ValueDecl>(std::get<1>(pair));
           if (!rhsMember && lhsMember)
             return Descending;
-          if (lhsMember && !rhsMember)
+          if (!lhsMember && rhsMember)
             return Ascending;
-          if (lhsMember && rhsMember)
-            return rhsMember->getName().compare(lhsMember->getName());
+          if (!lhsMember && !rhsMember)
+            continue;
+
+          result = rhsMember->getName().compare(lhsMember->getName());
+          if (result != 0)
+            return result;
+
+          result = rhsMember->getInterfaceType().getString().compare(
+                                   lhsMember->getInterfaceType().getString());
+          if (result != 0)
+            return result;
+
+          auto lhsGeneric = lhsMember->getAsGenericContext(),
+               rhsGeneric = rhsMember->getAsGenericContext();
+          if (lhsGeneric && rhsGeneric) {
+            result = rhsGeneric->getGenericSignature().getAsString().compare(
+                               lhsGeneric->getGenericSignature().getAsString());
+            if (result != 0)
+              return result;
+          }
         }
       }
 
-      // Hopefully two extensions with identical conformances and member names
-      // will be interchangeable enough not to matter.
-      return Equivalent;
+      // Tough customer. Maybe they have different generic signatures?
+      {
+        auto lhsSig = cast<ExtensionDecl>(*lhs)->getGenericSignature()
+                                                    .getAsString();
+        auto rhsSig = cast<ExtensionDecl>(*rhs)->getGenericSignature()
+                                                    .getAsString();
+        result = rhsSig.compare(lhsSig);
+        if (result != 0)
+          return result;
+      }
+
+      // Nothing, sadly.
+      bool areEmptyExtensions = lhsMembers.size() == 0
+                                  && rhsMembers.size() == 0
+                                  && lhsProtos.size() == 0
+                                  && rhsProtos.size() == 0;
+      return lastDitchSort(/*suppressDiagnostic=*/areEmptyExtensions);
     });
 
     assert(declsToWrite.empty());

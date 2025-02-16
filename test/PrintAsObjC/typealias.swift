@@ -1,11 +1,11 @@
 // RUN: %empty-directory(%t)
 
 // RUN: %target-swift-frontend -emit-module -o %t/typealias.swiftmodule %s -disable-objc-attr-requires-foundation-module
-// RUN: %target-swift-frontend -parse-as-library %t/typealias.swiftmodule -typecheck -emit-objc-header-path %t/typealias.h -disable-objc-attr-requires-foundation-module
+// RUN: %target-swift-frontend -parse-as-library %t/typealias.swiftmodule -typecheck -verify -emit-objc-header-path %t/typealias.h -disable-objc-attr-requires-foundation-module
 // RUN: %FileCheck %s < %t/typealias.h
 // RUN: %check-in-clang %t/typealias.h
 
-// RUN: %target-swift-frontend -typecheck %s -emit-objc-header-path %t/typealias_wmo.h -disable-objc-attr-requires-foundation-module
+// RUN: %target-swift-frontend %s -typecheck -verify -emit-objc-header-path %t/typealias_wmo.h -disable-objc-attr-requires-foundation-module
 // RUN: %FileCheck %s < %t/typealias_wmo.h
 // RUN: %check-in-clang %t/typealias_wmo.h
 

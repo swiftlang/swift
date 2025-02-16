@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
 
-// RUN: %target-swift-frontend -typecheck %s -typecheck -module-name UseFoundation -enable-experimental-cxx-interop -emit-clang-header-path %t/UseFoundation.h
+// RUN: %target-swift-frontend %s -module-name UseFoundation -enable-experimental-cxx-interop -typecheck -verify -emit-clang-header-path %t/UseFoundation.h
 // RUN: %FileCheck %s < %t/UseFoundation.h
 
 // REQUIRES: objc_interop

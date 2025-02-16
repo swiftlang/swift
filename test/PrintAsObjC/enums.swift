@@ -1,7 +1,7 @@
 // RUN: %empty-directory(%t)
 
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -enable-source-import -emit-module -emit-module-doc -o %t %s -import-objc-header %S/Inputs/enums.h -disable-objc-attr-requires-foundation-module
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -parse-as-library %t/enums.swiftmodule -typecheck -emit-objc-header-path %t/enums.h -import-objc-header %S/Inputs/enums.h -disable-objc-attr-requires-foundation-module
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -parse-as-library %t/enums.swiftmodule -typecheck -verify -emit-objc-header-path %t/enums.h -import-objc-header %S/Inputs/enums.h -disable-objc-attr-requires-foundation-module
 // RUN: %FileCheck %s < %t/enums.h
 // RUN: %FileCheck -check-prefix=NEGATIVE %s < %t/enums.h
 // RUN: %check-in-clang %t/enums.h
@@ -17,7 +17,7 @@
 // file map also works.
 
 // RUN: echo "{\"%s\": {\"objc-header\": \"%t/enums-supplemental.h\"}}" > %t-output-file-map.json
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -parse-as-library %s -enable-source-import -typecheck -supplementary-output-file-map %t-output-file-map.json -import-objc-header %S/Inputs/enums.h -disable-objc-attr-requires-foundation-module
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -parse-as-library %s -enable-source-import -typecheck -verify -supplementary-output-file-map %t-output-file-map.json -import-objc-header %S/Inputs/enums.h -disable-objc-attr-requires-foundation-module
 // RUN: %FileCheck -check-prefix CHECK-SUPPLEMENTAL %s < %t/enums-supplemental.h
 
 // REQUIRES: objc_interop
