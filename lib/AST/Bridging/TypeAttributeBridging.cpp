@@ -96,29 +96,11 @@ BridgedConventionTypeAttr BridgedConventionTypeAttr_createParsed(
       {cClangType.unbridged(), cClangTypeLoc.unbridged()});
 }
 
-BridgedIsolatedTypeAttr BridgedIsolatedTypeAttr_createParsed(
-    BridgedASTContext cContext, BridgedSourceLoc cAtLoc,
-    BridgedSourceLoc cNameLoc, BridgedSourceLoc cLPLoc,
-    BridgedSourceLoc cIsolationLoc,
-    BridgedIsolatedTypeAttrIsolationKind cIsolation, BridgedSourceLoc cRPLoc) {
-  auto isolationKind = [=] {
-    switch (cIsolation) {
-    case BridgedIsolatedTypeAttrIsolationKind_DynamicIsolation:
-      return IsolatedTypeAttr::IsolationKind::Dynamic;
-    }
-    llvm_unreachable("bad kind");
-  }();
-  return new (cContext.unbridged())
-      IsolatedTypeAttr(cAtLoc.unbridged(), cNameLoc.unbridged(),
-                       {cLPLoc.unbridged(), cRPLoc.unbridged()},
-                       {isolationKind, cIsolationLoc.unbridged()});
-}
-
 BridgedExecutionTypeAttr BridgedExecutionTypeAttr_createParsed(
     BridgedASTContext cContext, BridgedSourceLoc cAtLoc,
-    BridgedSourceLoc cNameLoc, BridgedSourceLoc cLPLoc,
-    BridgedSourceLoc cBehaviorLoc,
-    BridgedExecutionTypeAttrExecutionKind behavior, BridgedSourceLoc cRPLoc) {
+    BridgedSourceLoc cNameLoc, BridgedSourceRange cParensRange,
+    BridgedExecutionTypeAttrExecutionKind behavior,
+    BridgedSourceLoc cBehaviorLoc) {
   auto behaviorKind = [=] {
     switch (behavior) {
     case BridgedExecutionTypeAttrExecutionKind_Concurrent:
@@ -128,8 +110,37 @@ BridgedExecutionTypeAttr BridgedExecutionTypeAttr_createParsed(
     }
     llvm_unreachable("bad kind");
   }();
-  return new (cContext.unbridged())
-      ExecutionTypeAttr(cAtLoc.unbridged(), cNameLoc.unbridged(),
-                        {cLPLoc.unbridged(), cRPLoc.unbridged()},
-                        {behaviorKind, cBehaviorLoc.unbridged()});
+  return new (cContext.unbridged()) ExecutionTypeAttr(
+      cAtLoc.unbridged(), cNameLoc.unbridged(), cParensRange.unbridged(),
+      {behaviorKind, cBehaviorLoc.unbridged()});
+}
+
+BridgedIsolatedTypeAttr BridgedIsolatedTypeAttr_createParsed(
+    BridgedASTContext cContext, BridgedSourceLoc cAtLoc,
+    BridgedSourceLoc cNameLoc, BridgedSourceRange cParensRange,
+
+    BridgedIsolatedTypeAttrIsolationKind cIsolation,
+    BridgedSourceLoc cIsolationLoc) {
+  auto isolationKind = [=] {
+    switch (cIsolation) {
+    case BridgedIsolatedTypeAttrIsolationKind_DynamicIsolation:
+      return IsolatedTypeAttr::IsolationKind::Dynamic;
+    }
+    llvm_unreachable("bad kind");
+  }();
+  return new (cContext.unbridged()) IsolatedTypeAttr(
+      cAtLoc.unbridged(), cNameLoc.unbridged(), cParensRange.unbridged(),
+      {isolationKind, cIsolationLoc.unbridged()});
+}
+
+BridgedOpaqueReturnTypeOfTypeAttr
+BridgedOpaqueReturnTypeOfTypeAttr_createParsed(
+    BridgedASTContext cContext, BridgedSourceLoc cAtLoc,
+    BridgedSourceLoc cKwLoc, BridgedSourceRange cParens,
+    BridgedStringRef cMangled, BridgedSourceLoc cMangledLoc, size_t index,
+    BridgedSourceLoc cIndexLoc) {
+  return new (cContext.unbridged()) OpaqueReturnTypeOfTypeAttr(
+      cAtLoc.unbridged(), cKwLoc.unbridged(), cParens.unbridged(),
+      {cMangled.unbridged(), cMangledLoc.unbridged()},
+      {static_cast<unsigned int>(index), cIndexLoc.unbridged()});
 }

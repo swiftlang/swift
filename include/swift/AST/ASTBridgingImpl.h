@@ -106,7 +106,6 @@ BridgedASTContext BridgedASTContext_fromRaw(void * _Nonnull ptr) {
   return *static_cast<swift::ASTContext *>(ptr);
 }
 
-BRIDGED_INLINE
 void *_Nullable BridgedASTContext_allocate(BridgedASTContext bridged,
                                            size_t size, size_t alignment) {
   return bridged.unbridged().Allocate(size, alignment);
@@ -162,7 +161,7 @@ BridgedDeclContext_getParentSourceFile(BridgedDeclContext dc) {
 // MARK: BridgedSoureFile
 //===----------------------------------------------------------------------===//
 
-BRIDGED_INLINE bool BridgedSourceFile_isScriptMode(BridgedSourceFile sf) {
+bool BridgedSourceFile_isScriptMode(BridgedSourceFile sf) {
   return sf.unbridged()->isScriptMode();
 }
 

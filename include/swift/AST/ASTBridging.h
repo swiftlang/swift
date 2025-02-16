@@ -2299,26 +2299,37 @@ BridgedConventionTypeAttr BridgedConventionTypeAttr_createParsed(
     BridgedSourceLoc cNameLoc, BridgedDeclNameRef cWitnessMethodProtocol,
     BridgedStringRef cClangType, BridgedSourceLoc cClangTypeLoc);
 
-SWIFT_NAME("BridgedIsolatedTypeAttr.createParsed(_:atLoc:nameLoc:lpLoc:"
-           "isolationKindLoc:isolationKind:rpLoc:)")
-BridgedIsolatedTypeAttr BridgedIsolatedTypeAttr_createParsed(
-    BridgedASTContext cContext, BridgedSourceLoc cAtLoc,
-    BridgedSourceLoc cNameLoc, BridgedSourceLoc cLPLoc,
-    BridgedSourceLoc cIsolationLoc,
-    BridgedIsolatedTypeAttrIsolationKind cIsolation, BridgedSourceLoc cRPLoc);
-
 enum ENUM_EXTENSIBILITY_ATTR(closed) BridgedExecutionTypeAttrExecutionKind {
   BridgedExecutionTypeAttrExecutionKind_Concurrent,
   BridgedExecutionTypeAttrExecutionKind_Caller
 };
 
-SWIFT_NAME("BridgedExecutionTypeAttr.createParsed(_:atLoc:nameLoc:lpLoc:"
-           "behaviorLoc:behavior:rpLoc:)")
+SWIFT_NAME("BridgedExecutionTypeAttr.createParsed(_:atLoc:nameLoc:parensRange:"
+           "behavior:behaviorLoc:)")
 BridgedExecutionTypeAttr BridgedExecutionTypeAttr_createParsed(
     BridgedASTContext cContext, BridgedSourceLoc cAtLoc,
-    BridgedSourceLoc cNameLoc, BridgedSourceLoc cLPLoc,
-    BridgedSourceLoc cBehaviorLoc,
-    BridgedExecutionTypeAttrExecutionKind behavior, BridgedSourceLoc cRPLoc);
+    BridgedSourceLoc cNameLoc, BridgedSourceRange cParensRange,
+    BridgedExecutionTypeAttrExecutionKind behavior,
+    BridgedSourceLoc cBehaviorLoc);
+
+SWIFT_NAME("BridgedIsolatedTypeAttr.createParsed(_:atLoc:nameLoc:parensRange:"
+           "isolationKind:isolationKindLoc:)")
+BridgedIsolatedTypeAttr BridgedIsolatedTypeAttr_createParsed(
+    BridgedASTContext cContext, BridgedSourceLoc cAtLoc,
+    BridgedSourceLoc cNameLoc, BridgedSourceRange cParensRange,
+
+    BridgedIsolatedTypeAttrIsolationKind cIsolation,
+    BridgedSourceLoc cIsolationLoc);
+
+SWIFT_NAME("BridgedOpaqueReturnTypeOfTypeAttr.createParsed(_:atLoc:nameLoc:"
+           "parensRange:"
+           "mangled:mangledLoc:index:indexLoc:)")
+BridgedOpaqueReturnTypeOfTypeAttr
+BridgedOpaqueReturnTypeOfTypeAttr_createParsed(
+    BridgedASTContext cContext, BridgedSourceLoc cAtLoc,
+    BridgedSourceLoc cKwLoc, BridgedSourceRange cParens,
+    BridgedStringRef cMangled, BridgedSourceLoc cMangledDoc, size_t index,
+    BridgedSourceLoc cIndexLoc);
 
 //===----------------------------------------------------------------------===//
 // MARK: TypeReprs
