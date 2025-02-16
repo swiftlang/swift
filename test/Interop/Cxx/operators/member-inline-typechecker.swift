@@ -71,7 +71,7 @@ let voidReturnTypeResult: HasPreIncrementOperatorWithVoidReturnType = voidReturn
 let immortalIncrement = myCounter.successor() // expected-error {{value of type 'ImmortalCounter' has no member 'successor'}}
 
 let derivedConstIter = DerivedFromConstIteratorPrivately()
-derivedConstIter.pointee // expected-error {{value of type 'DerivedFromConstIteratorPrivately' has no member 'pointee'}}
+derivedConstIter.pointee // expected-error {{'pointee' is inaccessible due to 'private' protection level}}
 
 let derivedConstIterWithUD = DerivedFromConstIteratorPrivatelyWithUsingDecl()
 let _ = derivedConstIterWithUD.pointee
