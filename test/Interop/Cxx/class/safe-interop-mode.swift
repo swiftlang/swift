@@ -71,23 +71,20 @@ import Test
 import CoreFoundation
 import CxxStdlib
 
-// expected-warning@+3{{global function 'useUnsafeParam' has an interface that involves unsafe types}}
-// expected-note@+2{{add '@unsafe' to indicate that this declaration is unsafe to use}}{{1-1=@unsafe }}
-// expected-note@+1{{add '@safe' to indicate that this declaration is memory-safe to use}}{{1-1=@safe }}
-func useUnsafeParam(x: Unannotated) { // expected-note{{reference to unsafe struct 'Unannotated'}}
+func useUnsafeParam(x: Unannotated) {
+  // expected-warning@+1{{expression uses unsafe constructs but is not marked with 'unsafe'}}
+ _ = x // expected-note{{reference to parameter 'x' involves unsafe type}}
 }
 
-// expected-warning@+4{{global function 'useUnsafeParam2' has an interface that involves unsafe types}}
-// expected-note@+2{{add '@unsafe' to indicate that this declaration is unsafe to use}}{{1-1=@unsafe }}
-// expected-note@+1{{add '@safe' to indicate that this declaration is memory-safe to use}}{{1-1=@safe }}
 @available(SwiftStdlib 5.8, *)
-func useUnsafeParam2(x: UnsafeReference) { // expected-note{{reference to unsafe class 'UnsafeReference'}}
+func useUnsafeParam2(x: UnsafeReference) {
+  // expected-warning@+1{{expression uses unsafe constructs but is not marked with 'unsafe'}}
+  _ = x // expected-note{{reference to parameter 'x' involves unsafe type}}
 }
 
-// expected-warning@+3{{global function 'useUnsafeParam3' has an interface that involves unsafe types}}
-// expected-note@+2{{add '@unsafe' to indicate that this declaration is unsafe to use}}{{1-1=@unsafe }}
-// expected-note@+1{{add '@safe' to indicate that this declaration is memory-safe to use}}{{1-1=@safe }}
-func useUnsafeParam3(x: UnknownEscapabilityAggregate) { // expected-note{{reference to unsafe struct 'UnknownEscapabilityAggregate'}}
+func useUnsafeParam3(x: UnknownEscapabilityAggregate) {
+  // expected-warning@+1{{expression uses unsafe constructs but is not marked with 'unsafe'}}
+  _ = x // expected-note{{reference to parameter 'x' involves unsafe type}}
 }
 
 func useSafeParams(x: Owner, y: View, z: SafeEscapableAggregate, c: MyContainer) {
@@ -101,10 +98,9 @@ func useCfType(x: CFArray) {
 func useString(x: std.string) {
 }
 
-// expected-warning@+3{{global function 'useVecOfPtr' has an interface}}
-// expected-note@+2{{add '@unsafe' to indicate that this declaration is unsafe to use}}{{1-1=@unsafe }}
-// expected-note@+1{{add '@safe' to indicate that this declaration is memory-safe to use}}{1-1=@safe }}
-func useVecOfPtr(x: VecOfPtr) { // expected-note{{reference to unsafe type alias 'VecOfPtr'}}
+func useVecOfPtr(x: VecOfPtr) {
+  // expected-warning@+1{{expression uses unsafe constructs but is not marked with 'unsafe'}}
+  _ = x // expected-note{{reference to parameter 'x' involves unsafe type}}
 }
 
 func useVecOfInt(x: VecOfInt) {
@@ -113,22 +109,19 @@ func useVecOfInt(x: VecOfInt) {
 func useSafeTuple(x: SafeTuple) {
 }
 
-// expected-warning@+3{{global function 'useUnsafeTuple' has an interface that involves unsafe types}}
-// expected-note@+2{{add '@unsafe' to indicate that this declaration is unsafe to use}}{{1-1=@unsafe }}
-// expected-note@+1{{add '@safe' to indicate that this declaration is memory-safe to use}}{1-1=@safe }}
-func useUnsafeTuple(x: UnsafeTuple) { // expected-note{{reference to unsafe type alias 'UnsafeTuple'}}
+func useUnsafeTuple(x: UnsafeTuple) {
+  // expected-warning@+1{{expression uses unsafe constructs but is not marked with 'unsafe'}}
+  _ = x // expected-note{{reference to parameter 'x' involves unsafe type}}
 }
 
-// expected-warning@+3{{global function 'useCppSpan' has an interface that involves unsafe types}}
-// expected-note@+2{{add '@unsafe' to indicate that this declaration is unsafe to use}}{{1-1=@unsafe }}
-// expected-note@+1{{add '@safe' to indicate that this declaration is memory-safe to use}}{1-1=@safe }}
-func useCppSpan(x: SpanOfInt) { // expected-note{{reference to unsafe type alias 'SpanOfInt'}}
+func useCppSpan(x: SpanOfInt) {
+  // expected-warning@+1{{expression uses unsafe constructs but is not marked with 'unsafe'}}
+  _ = x // expected-note{{reference to parameter 'x' involves unsafe type}}
 }
 
-// expected-warning@+3{{global function 'useCppSpan2' has an interface that involves unsafe types}}
-// expected-note@+2{{add '@unsafe' to indicate that this declaration is unsafe to use}}{{1-1=@unsafe }}
-// expected-note@+1{{add '@safe' to indicate that this declaration is memory-safe to use}}{1-1=@safe }}
-func useCppSpan2(x: SpanOfIntAlias) { // expected-note{{reference to unsafe type alias 'SpanOfIntAlias'}}
+func useCppSpan2(x: SpanOfIntAlias) {
+  // expected-warning@+1{{expression uses unsafe constructs but is not marked with 'unsafe'}}
+  _ = x // expected-note{{reference to parameter 'x' involves unsafe type}}
 }
 
 func useSafeLifetimeAnnotated(v: View) {

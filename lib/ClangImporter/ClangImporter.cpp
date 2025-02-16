@@ -8215,6 +8215,106 @@ CustomRefCountingOperationResult CustomRefCountingOperation::evaluate(
   return {CustomRefCountingOperationResult::tooManyFound, nullptr, name};
 }
 
+/// Check whether the given Clang type involves an unsafe type.
+static bool hasUnsafeType(
+    Evaluator &evaluator, ASTContext &swiftContext, clang::QualType clangType
+) {
+  // Handle pointers.
+  auto pointeeType = clangType->getPointeeType();
+  if (!pointeeType.isNull()) {
+    // Function pointers are okay.
+    if (pointeeType->isFunctionType())
+      return false;
+    
+    // Pointers to record types are okay if they come in as foreign reference
+    // types.
+    if (auto recordDecl = pointeeType->getAsRecordDecl()) {
+      if (hasImportAsRefAttr(recordDecl))
+        return false;
+    }
+    
+    // All other pointers are considered unsafe.
+    return true;
+  }
+  
+  // Handle records recursively.
+  if (auto recordDecl = clangType->getAsTagDecl()) {
+    auto safety = evaluateOrDefault(
+        evaluator, 
+        ClangDeclExplicitSafety({recordDecl, swiftContext}),
+        ExplicitSafety::Unspecified);
+    switch (safety) {
+      case ExplicitSafety::Unsafe:
+        return true;
+        
+      case ExplicitSafety::Safe:
+      case ExplicitSafety::Unspecified:
+        return false;        
+    }
+  }
+    
+  // Everything else is safe.
+  return false;
+}
+
+ExplicitSafety ClangDeclExplicitSafety::evaluate(
+    Evaluator &evaluator,
+    SafeUseOfCxxDeclDescriptor desc
+) const {
+  // FIXME: Somewhat duplicative with importAsUnsafe.
+  // FIXME: Also similar to hasPointerInSubobjects
+  // FIXME: should probably also subsume IsSafeUseOfCxxDecl
+  
+  // Explicitly unsafe.
+  auto decl = desc.decl;
+  if (hasUnsafeAPIAttr(decl) || hasSwiftAttribute(decl, "unsafe"))
+    return ExplicitSafety::Unsafe;
+  
+  // Explicitly safe.
+  if (hasSwiftAttribute(decl, "safe"))
+    return ExplicitSafety::Safe;
+  
+  // Enums are always safe.
+  if (isa<clang::EnumDecl>(decl))
+    return ExplicitSafety::Safe;
+  
+  // If it's not a record, leave it unspecified.
+  auto recordDecl = dyn_cast<clang::RecordDecl>(decl);
+  if (!recordDecl)
+    return ExplicitSafety::Unspecified;
+
+  // Escapable and non-escapable annotations imply that the declaration is
+  // safe.
+  if (hasNonEscapableAttr(recordDecl) || hasEscapableAttr(recordDecl))
+    return ExplicitSafety::Safe;
+  
+  // If we don't have a definition, leave it unspecified.
+  recordDecl = recordDecl->getDefinition();
+  if (!recordDecl)
+    return ExplicitSafety::Unspecified;
+  
+  // If this is a C++ class, check its bases.
+  if (auto cxxRecordDecl = dyn_cast<clang::CXXRecordDecl>(recordDecl)) {
+    for (auto base : cxxRecordDecl->bases()) {
+      if (hasUnsafeType(evaluator, desc.ctx, base.getType()))
+        return ExplicitSafety::Unsafe;
+    }
+  }
+  
+  // Check the fields.
+  for (auto field : recordDecl->fields()) {
+    if (hasUnsafeType(evaluator, desc.ctx, field->getType()))
+      return ExplicitSafety::Unsafe;
+  }
+  
+  // Okay, call it safe.
+  return ExplicitSafety::Safe;
+}
+
+bool ClangDeclExplicitSafety::isCached() const {
+  return isa<clang::RecordDecl>(std::get<0>(getStorage()).decl);
+}
+
 void ClangImporter::withSymbolicFeatureEnabled(
     llvm::function_ref<void(void)> callback) {
   llvm::SaveAndRestore<bool> oldImportSymbolicCXXDecls(
