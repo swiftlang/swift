@@ -77,23 +77,16 @@ extension ASTGenVisitor {
         .unimplementable:
         return self.generateSimpleTypeAttr(attribute: node, kind: attrKind)
 
-      case .opened:
-        fatalError("unimplemented")
-      case .packElement:
-        fatalError("unimplemented")
-      case .differentiable:
-        fatalError("unimplemented")
       case .convention:
         return self.generateConventionTypeAttr(attribute: node)?.asTypeAttribute
+      case .differentiable:
         fatalError("unimplemented")
-      case .opaqueReturnTypeOf:
-        fatalError("unimplemented")
-
-      case .isolated:
-        return self.generateIsolatedTypeAttr(attribute: node)?.asTypeAttribute
-
       case .execution:
         return self.generateExecutionTypeAttr(attribute: node)?.asTypeAttribute
+      case .opaqueReturnTypeOf:
+        return self.generateOpaqueReturnTypeOfTypeAttr(attribute: node)?.asTypeAttribute
+      case .isolated:
+        return self.generateIsolatedTypeAttr(attribute: node)?.asTypeAttribute
 
       // SIL type attributes are not supported.
       case .autoreleased,
@@ -116,8 +109,10 @@ extension ASTGenVisitor {
         .inoutAliasable,
         .moveOnly,
         .objCMetatype,
+        .opened,
         .out,
         .owned,
+        .packElement,
         .silIsolated,
         .silUnmanaged,
         .silUnowned,
@@ -148,7 +143,7 @@ extension ASTGenVisitor {
   }
   
   func generateConventionTypeAttr(attribute node: AttributeSyntax) -> BridgedConventionTypeAttr? {
-    // FIXME: This don't need custom attribute arguments syntax.
+    // FIXME: This doesn't need custom attribute arguments syntax.
     // FIXME: Support 'witness_method' argument.
     guard let args = node.arguments?.as(ConventionAttributeArgumentsSyntax.self) else {
       // TODO: Diangose.
@@ -171,7 +166,7 @@ extension ASTGenVisitor {
       self.ctx,
       atLoc: self.generateSourceLoc(node.atSign),
       nameLoc: self.generateSourceLoc(node.attributeName),
-      parensRange: self.generateSourceRange(start: node.leftParen!, end: node.rightParen!),
+      parensRange: self.generateAttrParensRange(attribute: node),
       name: ctx.allocateCopy(string: args.conventionLabel.rawText.bridged),
       nameLoc: self.generateSourceLoc(args.conventionLabel),
       witnessMethodProtocol: witnessMethodProtocol,
@@ -180,67 +175,96 @@ extension ASTGenVisitor {
     )
   }
   
-  func generateIsolatedTypeAttr(attribute node: AttributeSyntax) -> BridgedIsolatedTypeAttr? {
-    guard case .argumentList(let isolatedArgs) = node.arguments,
-          isolatedArgs.count == 1,
-          let labelArg = isolatedArgs.first,
-          labelArg.label == nil,
-          let isolationKindExpr = labelArg.expression.as(DeclReferenceExprSyntax.self),
-          isolationKindExpr.argumentNames == nil
-    else {
-      // TODO: Diagnose.
+  func generateExecutionTypeAttr(attribute node: AttributeSyntax) -> BridgedExecutionTypeAttr? {
+    let behaviorLoc = self.generateSourceLoc(node.arguments)
+    let behavior: BridgedExecutionTypeAttrExecutionKind? = self.generateSingleAttrOption(
+      attribute: node,
+      {
+        switch $0.rawText {
+        case "concurrent": return .concurrent
+        case "caller": return .caller
+        default:
+          // TODO: Diagnose.
+          return nil
+        }
+      }
+    )
+    guard let behavior else {
       return nil
     }
-  
-
-    var isolationKind: BridgedIsolatedTypeAttrIsolationKind
-    switch isolationKindExpr.baseName {
-    case "any": isolationKind = .dynamicIsolation
-    default:
-      // TODO: Diagnose.
-      return nil
-    }
-
-    return BridgedIsolatedTypeAttr.createParsed(
+      
+    return .createParsed(
       self.ctx,
       atLoc: self.generateSourceLoc(node.atSign),
       nameLoc: self.generateSourceLoc(node.attributeName),
-      lpLoc: self.generateSourceLoc(node.leftParen!),
-      isolationKindLoc: self.generateSourceLoc(isolationKindExpr.baseName),
+      parensRange: self.generateAttrParensRange(attribute: node),
+      behavior: behavior,
+      behaviorLoc: behaviorLoc
+    )
+  }
+  
+  func generateIsolatedTypeAttr(attribute node: AttributeSyntax) -> BridgedIsolatedTypeAttr? {
+    let isolationKindLoc = self.generateSourceLoc(node.arguments)
+    let isolationKind: BridgedIsolatedTypeAttrIsolationKind? = self.generateSingleAttrOption(
+      attribute: node,
+      {
+        switch $0.rawText {
+        case "any": return .dynamicIsolation
+        default:
+          // TODO: Diagnose.
+          return nil
+        }
+      }
+    )
+    guard let isolationKind else {
+      return nil
+    }
+
+    return .createParsed(
+      self.ctx,
+      atLoc: self.generateSourceLoc(node.atSign),
+      nameLoc: self.generateSourceLoc(node.attributeName),
+      parensRange: self.generateAttrParensRange(attribute: node),
       isolationKind: isolationKind,
-      rpLoc: self.generateSourceLoc(node.rightParen!)
+      isolationKindLoc: isolationKindLoc
     )
   }
 
-  func generateExecutionTypeAttr(attribute node: AttributeSyntax) -> BridgedExecutionTypeAttr? {
-    guard case .argumentList(let executionArgs) = node.arguments,
-          executionArgs.count == 1,
-          let labelArg = executionArgs.first,
-          labelArg.label == nil,
-          let behaviorExpr = labelArg.expression.as(DeclReferenceExprSyntax.self),
-          behaviorExpr.argumentNames == nil
-    else {
-      // TODO: Diagnose.
-      return nil
+  func generateOpaqueReturnTypeOfTypeAttr(attribute node: AttributeSyntax) -> BridgedOpaqueReturnTypeOfTypeAttr? {
+    // FIXME: This doesn't need custom attribute arguments syntax.
+    guard let args = node.arguments?.as(OpaqueReturnTypeOfAttributeArgumentsSyntax.self) else {
+      // TODO: Diagnose
+      fatalError("expected arguments for @_opaqueReturnTypeOfType type attribute")
     }
 
-    var behavior: BridgedExecutionTypeAttrExecutionKind
-    switch behaviorExpr.baseName {
-    case "concurrent": behavior = .concurrent
-    case "caller": behavior = .caller
-    default:
-      // TODO: Diagnose.
-      return nil
+    let mangledLoc = self.generateSourceLoc(args.mangledName)
+    guard let mangled = self.generateStringLiteralTextIfNotInterpolated(expr: args.mangledName) else {
+      // TODO: Diagnose
+      fatalError("expected string literal for @_opaqueReturnTypeOfType type attribute")
+    }
+    
+    let indexLoc = self.generateSourceLoc(args.ordinal)
+    let index =  Int(args.ordinal.text, radix: 10)
+    guard let index else {
+      // TODO: Diagnose
+      fatalError("expected integer literal for @_opaqueReturnTypeOfType type attribute")
     }
 
-    return BridgedExecutionTypeAttr.createParsed(
+    return .createParsed(
       self.ctx,
       atLoc: self.generateSourceLoc(node.atSign),
       nameLoc: self.generateSourceLoc(node.attributeName),
-      lpLoc: self.generateSourceLoc(node.leftParen!),
-      behaviorLoc: self.generateSourceLoc(behaviorExpr.baseName),
-      behavior: behavior,
-      rpLoc: self.generateSourceLoc(node.rightParen!)
+      parensRange: self.generateAttrParensRange(attribute: node),
+      mangled: mangled,
+      mangledLoc: mangledLoc,
+      index: index, indexLoc: indexLoc
     )
+  }
+  
+  func generateAttrParensRange(attribute node: AttributeSyntax) -> BridgedSourceRange {
+    guard let lParen = node.leftParen else {
+      return BridgedSourceRange()
+    }
+    return self.generateSourceRange(start: lParen, end: node.lastToken(viewMode: .sourceAccurate)!)
   }
 }
