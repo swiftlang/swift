@@ -308,7 +308,7 @@ extension ASTGenVisitor {
     )
 
     // If we captured something under the name "self", remember that.
-    if nameAndLoc.identifier.str == "self" {
+    if nameAndLoc.identifier == ctx.id_self {
       capturedSelfDecl = entry.varDecl
     }
 

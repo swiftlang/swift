@@ -40,10 +40,6 @@ swift::Identifier BridgedIdentifier::unbridged() const {
   return swift::Identifier::getFromOpaquePointer(Raw);
 }
 
-BridgedStringRef BridgedIdentifier_getStr(const BridgedIdentifier ident) {
-  return ident.unbridged().str();
-}
-
 bool BridgedIdentifier_isOperator(const BridgedIdentifier ident) {
   return ident.unbridged().isOperator();
 }
@@ -120,6 +116,12 @@ BridgedStringRef BridgedASTContext_allocateCopyString(BridgedASTContext bridged,
                                                       BridgedStringRef cStr) {
   return bridged.unbridged().AllocateCopy(cStr.unbridged());
 }
+
+#define IDENTIFIER_WITH_NAME(Name, _) \
+BridgedIdentifier BridgedASTContext_id_##Name(BridgedASTContext bridged) { \
+return bridged.unbridged().Id_##Name; \
+}
+#include "swift/AST/KnownIdentifiers.def"
 
 //===----------------------------------------------------------------------===//
 // MARK: BridgedDeclContext

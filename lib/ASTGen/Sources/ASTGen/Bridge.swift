@@ -166,12 +166,6 @@ extension BridgedStringRef: /*@retroactive*/ Swift.ExpressibleByStringLiteral {
   }
 }
 
-extension BridgedStringRef: /*@retroactive*/ Swift.Equatable {
-  public static func ==(lhs: BridgedStringRef, rhs: BridgedStringRef) -> Bool {
-    lhs.equals(rhs)
-  }
-}
-
 extension VersionTuple {
   var bridged: BridgedVersionTuple {
     switch self.components.count {

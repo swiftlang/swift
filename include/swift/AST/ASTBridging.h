@@ -116,10 +116,6 @@ inline const void *_Nullable BridgedIdentifier_raw(BridgedIdentifier ident) {
   return ident.Raw;
 }
 
-SWIFT_NAME("getter:BridgedIdentifier.str(self:)")
-BRIDGED_INLINE BridgedStringRef
-BridgedIdentifier_getStr(BridgedIdentifier ident);
-
 SWIFT_NAME("getter:BridgedIdentifier.isOperator(self:)")
 BRIDGED_INLINE bool BridgedIdentifier_isOperator(const BridgedIdentifier);
 
@@ -226,6 +222,11 @@ public:
   SWIFT_UNAVAILABLE("Use '.raw' instead")
   BRIDGED_INLINE swift::ASTContext &unbridged() const;
 };
+
+#define IDENTIFIER_WITH_NAME(Name, _) \
+SWIFT_NAME("getter:BridgedASTContext.id_" #Name "(self:)") \
+BRIDGED_INLINE BridgedIdentifier BridgedASTContext_id_##Name(BridgedASTContext bridged);
+#include "swift/AST/KnownIdentifiers.def"
 
 SWIFT_NAME("getter:BridgedASTContext.raw(self:)")
 BRIDGED_INLINE

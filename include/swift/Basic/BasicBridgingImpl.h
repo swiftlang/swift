@@ -70,10 +70,6 @@ bool BridgedStringRef_empty(BridgedStringRef str) {
   return str.unbridged().empty();
 }
 
-bool BridgedStringRef_equals(BridgedStringRef lhs, BridgedStringRef rhs) {
-  return lhs.unbridged() == rhs.unbridged();
-}
-
 //===----------------------------------------------------------------------===//
 // MARK: BridgedOwnedString
 //===----------------------------------------------------------------------===//
