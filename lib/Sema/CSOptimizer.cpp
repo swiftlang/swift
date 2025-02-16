@@ -1342,64 +1342,6 @@ static void determineBestChoicesInContext(
   }
 }
 
-// Attempt to find a disjunction of bind constraints where all options
-// in the disjunction are binding the same type variable.
-//
-// Prefer disjunctions where the bound type variable is also the
-// right-hand side of a conversion constraint, since having a concrete
-// type that we're converting to can make it possible to split the
-// constraint system into multiple ones.
-static Constraint *
-selectBestBindingDisjunction(ConstraintSystem &cs,
-                             SmallVectorImpl<Constraint *> &disjunctions) {
-
-  if (disjunctions.empty())
-    return nullptr;
-
-  auto getAsTypeVar = [&cs](Type type) {
-    return cs.simplifyType(type)->getRValueType()->getAs<TypeVariableType>();
-  };
-
-  Constraint *firstBindDisjunction = nullptr;
-  for (auto *disjunction : disjunctions) {
-    auto choices = disjunction->getNestedConstraints();
-    assert(!choices.empty());
-
-    auto *choice = choices.front();
-    if (choice->getKind() != ConstraintKind::Bind)
-      continue;
-
-    // We can judge disjunction based on the single choice
-    // because all of choices (of bind overload set) should
-    // have the same left-hand side.
-    // Only do this for simple type variable bindings, not for
-    // bindings like: ($T1) -> $T2 bind String -> Int
-    auto *typeVar = getAsTypeVar(choice->getFirstType());
-    if (!typeVar)
-      continue;
-
-    if (!firstBindDisjunction)
-      firstBindDisjunction = disjunction;
-
-    auto constraints = cs.getConstraintGraph().gatherConstraints(
-        typeVar, ConstraintGraph::GatheringKind::EquivalenceClass,
-        [](Constraint *constraint) {
-          return constraint->getKind() == ConstraintKind::Conversion;
-        });
-
-    for (auto *constraint : constraints) {
-      if (typeVar == getAsTypeVar(constraint->getSecondType()))
-        return disjunction;
-    }
-  }
-
-  // If we had any binding disjunctions, return the first of
-  // those. These ensure that we attempt to bind types earlier than
-  // trying the elements of other disjunctions, which can often mean
-  // we fail faster.
-  return firstBindDisjunction;
-}
-
 /// Prioritize `build{Block, Expression, ...}` and any chained
 /// members that are connected to individual builder elements
 /// i.e. `ForEach(...) { ... }.padding(...)`, once `ForEach`
@@ -1480,9 +1422,6 @@ ConstraintSystem::selectDisjunction() {
   collectDisjunctions(disjunctions);
   if (disjunctions.empty())
     return std::nullopt;
-
-  if (auto *disjunction = selectBestBindingDisjunction(*this, disjunctions))
-    return std::make_pair(disjunction, llvm::TinyPtrVector<Constraint *>());
 
   llvm::DenseMap<Constraint *, DisjunctionInfo> favorings;
   determineBestChoicesInContext(*this, disjunctions, favorings);
