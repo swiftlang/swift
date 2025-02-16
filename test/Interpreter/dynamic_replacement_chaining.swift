@@ -35,6 +35,8 @@ import StdlibUnittest
 #elseif os(Windows)
   import CRT
   import WinSDK
+#elseif canImport(FreeBSD)
+  import FreeBSD
 #else
 #error("Unsupported platform")
 #endif
