@@ -8149,6 +8149,18 @@ NOTE(note_reference_exclusivity_unchecked,none,
 NOTE(note_use_of_unsafe_conformance_is_unsafe,none,
      "@unsafe conformance of %0 to %kind1 involves unsafe code",
      (Type, const ValueDecl *))
+NOTE(note_unsafe_storage,none,
+     "%kindbase1 involves unsafe type %2", (bool, const ValueDecl *, Type))
+
+GROUPED_WARNING(decl_unsafe_storage,Unsafe,none,
+      "%kindbase0 has storage involving unsafe types",
+      (const Decl *))
+NOTE(decl_storage_mark_unsafe,none,
+      "add '@unsafe' if this type is also unsafe to use",
+      ())
+NOTE(decl_storage_mark_safe,none,
+      "add '@safe' if this type encapsulates the unsafe storage in "
+      "a safe interface", ())
 
 GROUPED_WARNING(conformance_involves_unsafe,Unsafe,none,
      "conformance of %0 to %kind1 involves unsafe code; use '@unsafe' to "

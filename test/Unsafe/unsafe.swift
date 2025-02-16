@@ -174,9 +174,20 @@ typealias SuperUnsafe = UnsafeSuper
 
 @unsafe typealias SuperUnsafe2 = UnsafeSuper
 
+// expected-warning@+3{{enum 'HasUnsafeThings' has storage involving unsafe types [Unsafe]}}
+// expected-note@+2{{add '@unsafe' if this type is also unsafe to use}}{{1-1=@unsafe }}
+// expected-note@+1{{add '@safe' if this type encapsulates the unsafe storage in a safe interface}}{{1-1=@safe }}
 enum HasUnsafeThings {
 
-case one(UnsafeSuper)
+case one(UnsafeSuper) // expected-note{{enum case 'one' involves unsafe type 'UnsafeSuper'}}
 
-@unsafe case two(UnsafeSuper)
+case two(UnsafeSuper) // expected-note{{enum case 'two' involves unsafe type 'UnsafeSuper'}}
+}
+
+// expected-warning@+3{{class 'ClassWithUnsafeStorage' has storage involving unsafe types [Unsafe]}}
+// expected-note@+2{{add '@unsafe' if this type is also unsafe to use}}{{1-1=@unsafe }}
+// expected-note@+1{{add '@safe' if this type encapsulates the unsafe storage in a safe interface}}{{1-1=@safe }}
+class ClassWithUnsafeStorage {
+  var int: Int = 0
+  var array: [UnsafeSuper]? = nil // expected-note{{property 'array' involves unsafe type 'UnsafeSuper'}}
 }
