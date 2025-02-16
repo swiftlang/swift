@@ -157,6 +157,10 @@ split_embedded_sources(
   EMBEDDED Sort.swift
   EMBEDDED Span/RawSpan.swift
   EMBEDDED Span/Span.swift
+  EMBEDDED Span/Properties/ArrayTypeExtensions.swift
+  EMBEDDED Span/Properties/InlineTypeExtensions.swift
+  EMBEDDED Span/Properties/StringFamilyExtensions.swift
+  EMBEDDED Span/Properties/UnsafeBufferPointerExtensions.swift
   EMBEDDED StaticString.swift
   EMBEDDED StaticPrint.swift
   EMBEDDED Stride.swift
@@ -448,7 +452,7 @@ if(SWIFT_SHOULD_BUILD_EMBEDDED_STDLIB)
     list(GET list 0 arch)
     list(GET list 1 mod)
     list(GET list 2 triple)
-    
+
     set(SWIFT_SDK_embedded_ARCH_${arch}_MODULE "${mod}")
     set(SWIFT_SDK_embedded_LIB_SUBDIR "embedded")
     set(SWIFT_SDK_embedded_ARCH_${arch}_TRIPLE "${triple}")
