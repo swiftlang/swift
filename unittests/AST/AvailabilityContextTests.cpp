@@ -59,7 +59,7 @@ TEST_F(AvailabilityContextTest, PlatformIntroduction) {
   stillMacOS10_9.constrainWithPlatformRange(getAvailabilityRange(10, 9), ctx);
   EXPECT_EQ(stillMacOS10_9, macOS10_9);
 
-  // Constrain the the macOS version to >= 10.10 instead. The resulting context
+  // Constrain the macOS version to >= 10.10 instead. The resulting context
   // should be a new context that is less available than the deployment target
   // context (a.k.a. "contained by").
   auto macOS10_10 = macOS10_9;

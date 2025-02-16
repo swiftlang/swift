@@ -541,7 +541,7 @@ SILFunction *SILGenModule::getOrCreateForeignAsyncCompletionHandlerImplFunction(
         }
         auto blockParamIndex = [paramIndices](unsigned long i) {
           // The non-error, non-flag block parameter (formal types of the
-          // completion handler's arguments) indices are the same as the the
+          // completion handler's arguments) indices are the same as the
           // parameter (lowered types of the completion handler's arguments)
           // indices but shifted by 1 corresponding to the fact that the lowered
           // completion handler has a block_storage argument but the formal type
