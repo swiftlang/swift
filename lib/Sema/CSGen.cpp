@@ -353,6 +353,18 @@ namespace {
             if (isLValueBase)
               outputTy = LValueType::get(outputTy);
           }
+        } else if (auto dictTy = CS.isDictionaryType(baseObjTy)) {
+          auto keyTy = dictTy->first;
+          auto valueTy = dictTy->second;
+
+          if (argList->isUnlabeledUnary()) {
+            auto argTy = CS.getType(argList->getExpr(0));
+            if (keyTy->isEqual(argTy)) {
+              outputTy = OptionalType::get(valueTy);
+              if (isLValueBase)
+                outputTy = LValueType::get(outputTy);
+            }
+          }
         }
       }
       
