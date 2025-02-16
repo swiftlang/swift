@@ -8491,13 +8491,7 @@ Parser::parseDeclVar(ParseDeclOptions Flags,
 
       pattern = patternRes.get();
     }
-    
-    bool hasOpaqueReturnTy = false;
-    if (auto typedPattern = dyn_cast<TypedPattern>(pattern)) {
-      hasOpaqueReturnTy = typedPattern->getTypeRepr()->hasOpaque();
-    }
-    auto sf = CurDeclContext->getOutermostParentSourceFile();
-    
+
     // Configure all vars with attributes, 'static' and parent pattern.
     pattern->forEachVariable([&](VarDecl *VD) {
       VD->setStatic(StaticLoc.isValid());
@@ -8505,10 +8499,6 @@ Parser::parseDeclVar(ParseDeclOptions Flags,
       VD->setTopLevelGlobal(topLevelDecl);
 
       Decls.push_back(VD);
-      if (hasOpaqueReturnTy && sf && !InInactiveClauseEnvironment
-          && !InFreestandingMacroArgument) {
-        sf->addUnvalidatedDeclWithOpaqueResultType(VD);
-      }
     });
 
     // Remember this pattern/init pair for our ultimate PatternBindingDecl. The
@@ -8788,14 +8778,6 @@ ParserResult<FuncDecl> Parser::parseDeclFunc(SourceLoc StaticLoc,
                               BodyParams, FuncRetTy,
                               CurDeclContext);
 
-  // Let the source file track the opaque return type mapping, if any.
-  if (FuncRetTy && FuncRetTy->hasOpaque() &&
-      !InInactiveClauseEnvironment && !InFreestandingMacroArgument) {
-    if (auto sf = CurDeclContext->getOutermostParentSourceFile()) {
-      sf->addUnvalidatedDeclWithOpaqueResultType(FD);
-    }
-  }
-  
   // Parse a 'where' clause if present.
   if (Tok.is(tok::kw_where)) {
     ContextChange CC(*this, FD);
@@ -9682,14 +9664,6 @@ Parser::parseDeclSubscript(SourceLoc StaticLoc,
       Context, StaticLoc, StaticSpelling, SubscriptLoc, Indices.get(), ArrowLoc,
       ElementTy.get(), CurDeclContext, GenericParams);
   Subscript->attachParsedAttrs(Attributes);
-  
-  // Let the source file track the opaque return type mapping, if any.
-  if (ElementTy.get() && ElementTy.get()->hasOpaque() &&
-      !InInactiveClauseEnvironment && !InFreestandingMacroArgument) {
-    if (auto sf = CurDeclContext->getOutermostParentSourceFile()) {
-      sf->addUnvalidatedDeclWithOpaqueResultType(Subscript);
-    }
-  }
 
   DefaultArgs.setFunctionContext(Subscript, Subscript->getIndices());
 
