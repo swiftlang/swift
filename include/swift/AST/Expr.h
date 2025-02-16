@@ -4562,6 +4562,11 @@ struct CaptureListEntry {
 
   explicit CaptureListEntry(PatternBindingDecl *PBD);
 
+  static CaptureListEntry
+  createParsed(ASTContext &Ctx, ReferenceOwnership ownershipKind,
+               SourceRange ownershipRange, Identifier name, SourceLoc nameLoc,
+               SourceLoc equalLoc, Expr *initializer, DeclContext *DC);
+
   VarDecl *getVar() const;
   bool isSimpleSelfCapture(bool excludeWeakCaptures = true) const;
 };

@@ -40,7 +40,6 @@ swift::Identifier BridgedIdentifier::unbridged() const {
   return swift::Identifier::getFromOpaquePointer(Raw);
 }
 
-SWIFT_NAME("getter:BridgedIdentifier.isOperator(self:)")
 bool BridgedIdentifier_isOperator(const BridgedIdentifier ident) {
   return ident.unbridged().isOperator();
 }
@@ -117,6 +116,12 @@ BridgedStringRef BridgedASTContext_allocateCopyString(BridgedASTContext bridged,
                                                       BridgedStringRef cStr) {
   return bridged.unbridged().AllocateCopy(cStr.unbridged());
 }
+
+#define IDENTIFIER_WITH_NAME(Name, _) \
+BridgedIdentifier BridgedASTContext_id_##Name(BridgedASTContext bridged) { \
+return bridged.unbridged().Id_##Name; \
+}
+#include "swift/AST/KnownIdentifiers.def"
 
 //===----------------------------------------------------------------------===//
 // MARK: BridgedDeclContext
@@ -629,6 +634,20 @@ swift::StmtConditionElement BridgedStmtConditionElement::unbridged() const {
   return swift::StmtConditionElement::fromOpaqueValue(Raw);
 }
 
+//===----------------------------------------------------------------------===//
+// MARK: BridgedCaptureListEntry
+//===----------------------------------------------------------------------===//
+
+BridgedCaptureListEntry::BridgedCaptureListEntry(swift::CaptureListEntry CLE)
+    : PBD(CLE.PBD) {}
+
+swift::CaptureListEntry BridgedCaptureListEntry::unbridged() const {
+  return swift::CaptureListEntry(PBD);
+}
+
+BridgedVarDecl BridegedCaptureListEntry_getVar(BridgedCaptureListEntry entry) {
+  return entry.unbridged().getVar();
+}
 
 SWIFT_END_NULLABILITY_ANNOTATIONS
 
