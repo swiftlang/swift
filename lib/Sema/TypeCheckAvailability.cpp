@@ -246,8 +246,7 @@ static void computeExportContextBits(ASTContext &Ctx, Decl *D, bool *spi,
   }
 }
 
-ExportContext ExportContext::forDeclSignature(
-    Decl *D, llvm::SmallVectorImpl<UnsafeUse> *unsafeUses) {
+ExportContext ExportContext::forDeclSignature(Decl *D) {
   auto &Ctx = D->getASTContext();
 
   auto *DC = D->getInnermostDeclContext();
@@ -263,7 +262,7 @@ ExportContext ExportContext::forDeclSignature(
 
   bool exported = ::isExported(D);
 
-  return ExportContext(DC, availabilityContext, fragileKind, unsafeUses,
+  return ExportContext(DC, availabilityContext, fragileKind, nullptr,
                        spi, exported, implicit);
 }
 
@@ -286,8 +285,7 @@ ExportContext ExportContext::forFunctionBody(DeclContext *DC, SourceLoc loc) {
 ExportContext ExportContext::forConformance(DeclContext *DC,
                                             ProtocolDecl *proto) {
   assert(isa<ExtensionDecl>(DC) || isa<NominalTypeDecl>(DC));
-  auto where = forDeclSignature(DC->getInnermostDeclarationDeclContext(),
-                                nullptr);
+  auto where = forDeclSignature(DC->getInnermostDeclarationDeclContext());
 
   where.Exported &= proto->getFormalAccessScope(
       DC, /*usableFromInlineAsPublic*/true).isPublic();
@@ -2947,7 +2945,7 @@ void swift::diagnoseOverrideOfUnavailableDecl(ValueDecl *override,
 
   // FIXME: [availability] Take an unsatisfied constraint as input instead of
   // recomputing it.
-  ExportContext where = ExportContext::forDeclSignature(override, nullptr);
+  ExportContext where = ExportContext::forDeclSignature(override);
   auto constraint =
       getUnsatisfiedAvailabilityConstraint(base, where.getAvailability());
   if (!constraint)
