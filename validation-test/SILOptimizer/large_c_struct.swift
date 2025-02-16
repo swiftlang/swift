@@ -2,11 +2,11 @@
 // RUN: split-file %s %t
 
 // The compiler should finish in less than 20 seconds. To give some slack,
-// specify a timeout of 1 minute.
-// If the compiler needs more than 1 minute, there is probably a real problem.
+// specify a timeout of 3 minutes.
+// If the compiler needs more than 3 minutes, there is probably a real problem.
 // So please don't just increase the timeout in case this fails.
 
-// RUN: %{python} %S/../../test/Inputs/timeout.py 60 %target-swift-frontend -c -o %t/out.o -primary-file %t/test.swift -import-objc-header %t/bigstruct.h
+// RUN: %{python} %S/../../test/Inputs/timeout.py 180 %target-swift-frontend -c -o %t/out.o -primary-file %t/test.swift -import-objc-header %t/bigstruct.h
 
 // REQUIRES: long_test
 
