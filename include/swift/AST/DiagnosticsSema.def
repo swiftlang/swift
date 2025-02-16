@@ -8162,6 +8162,10 @@ NOTE(decl_storage_mark_safe,none,
       "add '@safe' if this type encapsulates the unsafe storage in "
       "a safe interface", ())
 
+GROUPED_WARNING(unsafe_superclass,Unsafe,none,
+     "%kindbase0 has superclass involving unsafe type %1", 
+     (const ValueDecl *, Type))
+
 GROUPED_WARNING(conformance_involves_unsafe,Unsafe,none,
      "conformance of %0 to %kind1 involves unsafe code; use '@unsafe' to "
      "indicate that the conformance is not memory-safe",

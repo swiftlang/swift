@@ -392,6 +392,27 @@ void swift::checkUnsafeStorage(NominalTypeDecl *nominal) {
     break;
   }
 
+  // Check whether the superclass is unsafe. If so, the only thing one can
+  // do is mark the class unsafe.
+  ASTContext &ctx = nominal->getASTContext();
+  if (auto classDecl = dyn_cast<ClassDecl>(nominal)) {
+    if (Type superclassType = classDecl->getSuperclass()) {
+      superclassType = classDecl->mapTypeIntoContext(superclassType);
+      bool diagnosed = false;
+      diagnoseUnsafeType(ctx, classDecl->getLoc(), superclassType, [&](Type type) {
+        if (diagnosed)
+          return;
+
+        classDecl->diagnose(diag::unsafe_superclass, classDecl, type)
+          .fixItInsert(classDecl->getAttributeInsertionLoc(false), "@unsafe ");
+        diagnosed = true;
+      });
+
+      if (diagnosed)
+        return;
+    }
+  }
+
   // Visitor that finds unsafe storage.
   class UnsafeStorageVisitor: public StorageVisitor {
     ASTContext &ctx;
@@ -421,7 +442,6 @@ void swift::checkUnsafeStorage(NominalTypeDecl *nominal) {
   };
 
   // Look for any unsafe storage in this nominal type.
-  ASTContext &ctx = nominal->getASTContext();
   SmallVector<UnsafeUse, 4> unsafeUses;
   UnsafeStorageVisitor(ctx, unsafeUses).visit(nominal, nominal->getDeclContext());
 

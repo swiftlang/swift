@@ -120,7 +120,7 @@ class ExclusivityChecking {
   func f() { }
 };
 
-// TODO: diagnose the need for @unsafe when there's an unsafe superclass.
+// expected-warning@+1{{class 'UnsafeSub' has superclass involving unsafe type 'UnsafeSuper' [Unsafe]}}{{1-1=@unsafe }}
 class UnsafeSub: UnsafeSuper { }
 
 // -----------------------------------------------------------------------
