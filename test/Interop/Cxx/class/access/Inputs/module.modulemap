@@ -1,0 +1,4 @@
+module NonPublic {
+    requires cplusplus
+    header "non-public.h"
+}

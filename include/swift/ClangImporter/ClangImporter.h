@@ -738,11 +738,23 @@ llvm::StringRef getCFTypeName(const clang::TypedefNameDecl *decl);
 ValueDecl *getImportedMemberOperator(const DeclBaseName &name,
                                      NominalTypeDecl *selfType,
                                      std::optional<Type> parameterType);
+
 /// Map the access specifier of a Clang record member to a Swift access level.
 ///
 /// This mapping is conservative: the resulting Swift access should be at _most_
 /// as permissive as the input C++ access.
 AccessLevel convertClangAccess(clang::AccessSpecifier access);
+
+/// Read file IDs from 'private_fileid' Swift attributes on a Clang decl.
+///
+/// May return >1 fileID when a decl is annotated more than once, which should
+/// be treated as an error and appropriately diagnosed (using the included
+/// SourceLocation).
+///
+/// The returned fileIDs may not be of a valid format (e.g., missing a '/'),
+/// and should be parsed using swift::SourceFile::FileIDStr::parse().
+SmallVector<std::pair<StringRef, clang::SourceLocation>, 1>
+getPrivateFileIDAttrs(const clang::Decl *decl);
 } // namespace importer
 
 struct ClangInvocationFileMapping {
