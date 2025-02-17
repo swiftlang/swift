@@ -6,14 +6,11 @@ func entity(_: Int) -> Int {
 
 struct Test {
   func test(_ v: Int) -> Int { v }
-  // expected-note@-1 {{found this candidate}}
   func test(_ v: Int?) -> Int? { v }
-  // expected-note@-1 {{found this candidate}}
 }
 
 func test_ternary_literal(v: Test) -> Int? {
-  // Literals don't have a favored type
-  true ? v.test(0) : nil // expected-error {{ambiguous use of 'test'}}
+  true ? v.test(0) : nil // Ok
 }
 
 func test_ternary(v: Test) -> Int? {

@@ -262,6 +262,79 @@ inferTypeFromInitializerResultType(ConstraintSystem &cs,
   return {instanceTy, hasFailable};
 }
 
+/// If the given expression represents a chain of operators that only have
+/// only literals as arguments, attempt to deduce a potential type of the
+/// chain. For example if chain has only integral literals it's going to
+/// be `Int`, if there are some floating-point literals mixed in - it's going
+/// to be `Double`.
+static Type inferTypeOfArithmeticOperatorChain(DeclContext *dc, ASTNode node) {
+  auto binaryOp = getAsExpr<BinaryExpr>(node);
+  if (!binaryOp)
+    return Type();
+
+  class OperatorChainAnalyzer : public ASTWalker {
+    ASTContext &C;
+    DeclContext *DC;
+
+    llvm::SmallPtrSet<Type, 2> literals;
+
+    bool unsupported = false;
+
+    PreWalkResult<Expr *> walkToExprPre(Expr *expr) override {
+      if (isa<BinaryExpr>(expr))
+        return Action::Continue(expr);
+
+      if (isa<ParenExpr>(expr))
+        return Action::Continue(expr);
+
+      // This inference works only with arithmetic operators
+      // because we know the structure of their overloads.
+      if (auto *ODRE = dyn_cast<OverloadedDeclRefExpr>(expr)) {
+        if (auto *choice = ODRE->getDecls().front()) {
+          if (choice->getBaseIdentifier().isArithmeticOperator())
+            return Action::Continue(expr);
+        }
+      }
+
+      if (auto *LE = dyn_cast<LiteralExpr>(expr)) {
+        if (auto *P = TypeChecker::getLiteralProtocol(C, LE)) {
+          if (auto defaultTy = TypeChecker::getDefaultType(P, DC)) {
+            if (defaultTy->isInt()) {
+              // Don't add `Int` if `Double` is already in the list.
+              if (literals.contains(C.getDoubleType()))
+                return Action::Continue(expr);
+            } else if (defaultTy->isDouble()) {
+              // A single use of a floating-point literal flips the
+              // type of the entire chain to `Double`.
+              (void)literals.erase(C.getIntType());
+            }
+
+            literals.insert(defaultTy);
+            return Action::Continue(expr);
+          }
+        }
+      }
+
+      unsupported = true;
+      return Action::Stop();
+    }
+
+  public:
+    OperatorChainAnalyzer(DeclContext *DC) : C(DC->getASTContext()), DC(DC) {}
+
+    Type chainType() const {
+      if (unsupported)
+        return Type();
+      return literals.size() != 1 ? Type() : *literals.begin();
+    }
+  };
+
+  OperatorChainAnalyzer analyzer(dc);
+  binaryOp->walk(analyzer);
+
+  return analyzer.chainType();
+}
+
 NullablePtr<Constraint> getApplicableFnConstraint(ConstraintGraph &CG,
                                                   Constraint *disjunction) {
   auto *boundVar = disjunction->getNestedConstraints()[0]
@@ -419,25 +492,62 @@ static std::optional<DisjunctionInfo> preserveFavoringOfUnlabeledUnaryArgument(
   // The hack operated on "favored" types and only declaration references,
   // applications, and (dynamic) subscripts had them if they managed to
   // get an overload choice selected during constraint generation.
+  // It's sometimes possible to infer a type of a literal and an operator
+  // chain, so it should be allowed as well.
   if (!(isExpr<DeclRefExpr>(argument) || isExpr<ApplyExpr>(argument) ||
         isExpr<SubscriptExpr>(argument) ||
-        isExpr<DynamicSubscriptExpr>(argument)))
+        isExpr<DynamicSubscriptExpr>(argument) ||
+        isExpr<LiteralExpr>(argument) || isExpr<BinaryExpr>(argument)))
     return {/*score=*/0};
 
-  auto argumentType = cs.getType(argument);
+  auto argumentType = cs.getType(argument)->getRValueType();
+
+  // For chains like `1 + 2 * 3` it's easy to deduce the type because
+  // we know what literal types are preferred.
+  if (isa<BinaryExpr>(argument)) {
+    auto chainTy = inferTypeOfArithmeticOperatorChain(cs.DC, argument);
+    if (!chainTy)
+      return {/*score=*/0};
+
+    argumentType = chainTy;
+  }
+
+  // Use default type of a literal (when available) to make a guess.
+  // This is what old hack used to do as well.
+  if (auto *LE = dyn_cast<LiteralExpr>(argument)) {
+    auto *P = TypeChecker::getLiteralProtocol(cs.getASTContext(), LE);
+    if (!P)
+      return {/*score=*/0};
+
+    auto defaultTy = TypeChecker::getDefaultType(P, cs.DC);
+    if (!defaultTy)
+      return {/*score=*/0};
+
+    argumentType = defaultTy;
+  }
+
+  ASSERT(argumentType);
+
   if (argumentType->hasTypeVariable() || argumentType->hasDependentMember())
     return {/*score=*/0};
 
   SmallVector<Constraint *, 2> favoredChoices;
   forEachDisjunctionChoice(
       cs, disjunction,
-      [&argumentType, &favoredChoices](Constraint *choice, ValueDecl *decl,
-                                       FunctionType *overloadType) {
+      [&argumentType, &favoredChoices, &argument](
+          Constraint *choice, ValueDecl *decl, FunctionType *overloadType) {
         if (overloadType->getNumParams() != 1)
           return;
 
-        auto paramType = overloadType->getParams()[0].getPlainType();
-        if (paramType->isEqual(argumentType))
+        auto &param = overloadType->getParams()[0];
+
+        // Literals are speculative, let's not attempt to apply them too
+        // eagerly.
+        if (!param.getParameterFlags().isNone() &&
+            (isa<LiteralExpr>(argument) || isa<BinaryExpr>(argument)))
+          return;
+
+        if (argumentType->isEqual(param.getPlainType()))
           favoredChoices.push_back(choice);
       });
 
