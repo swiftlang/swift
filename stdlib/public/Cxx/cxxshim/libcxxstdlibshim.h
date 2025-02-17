@@ -2,6 +2,10 @@
 #include <functional>
 #include <string>
 
+inline std::string __swift_interopMakeString(const char* begin, size_t count) {
+  return std::string(begin, count);
+}
+
 /// Used for std::string conformance to Swift.Hashable
 typedef std::hash<std::string> __swift_interopHashOfString;
 inline std::size_t __swift_interopComputeHashOfString(const std::string &str) {
