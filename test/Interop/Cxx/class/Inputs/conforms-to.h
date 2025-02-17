@@ -16,11 +16,21 @@ struct
   void play() const;
 };
 
+struct 
+    __attribute__((swift_attr("conforms_to:SwiftTest.Testable")))
+    __attribute__((swift_attr("conforms_to:SwiftTest.Playable")))
+ ConformsToBothHasTestAndHasPlay {
+  void test() const;
+  void play() const;
+};
+
 struct
     __attribute__((swift_attr("conforms_to:ImportedModule.ProtocolFromImportedModule")))
     HasImportedConf {
   void testImported() const;
 };
+
+struct DerivedFromHasTestAndHasPlay: ConformsToBothHasTestAndHasPlay {};
 
 struct DerivedFromHasTest : HasTest {};
 struct DerivedFromDerivedFromHasTest : HasTest {};
