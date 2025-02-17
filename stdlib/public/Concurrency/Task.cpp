@@ -753,11 +753,8 @@ swift_task_create_commonImpl(size_t rawTaskCreateFlags,
       break;
 
     case TaskOptionRecordKind::InitialTaskName:
-      fprintf(stderr, "[%s:%d](%s) GET OPTION InitialTaskName\n", __FILE_NAME__, __LINE__, __FUNCTION__);
       taskName = cast<InitialTaskNameTaskOptionRecord>(option)
                          ->getTaskName();
-      fprintf(stderr, "[%s:%d](%s) GET OPTION InitialTaskName = %s\n", __FILE_NAME__, __LINE__, __FUNCTION__,
-              taskName);
       jobFlags.task_setHasInitialTaskName(true);
       break;
 
@@ -1181,8 +1178,6 @@ swift_task_create_commonImpl(size_t rawTaskCreateFlags,
 
     // Task name
     if (jobFlags.task_hasInitialTaskName()) {
-      fprintf(stderr, "[%s:%d](%s) PUSH TASK NAME InitialTaskName = %s\n", __FILE_NAME__, __LINE__, __FUNCTION__,
-        taskName);
       task->pushInitialTaskName(taskName);
     }
   }

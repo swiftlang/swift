@@ -1338,15 +1338,15 @@ func _getCurrentThreadPriority() -> Int
 
 @available(SwiftStdlib 6.2, *)
 @_silgen_name("swift_task_getCurrentTaskName")
-internal func _getCurrentTaskName() -> (UnsafePointer<UInt8>, Int)
+internal func _getCurrentTaskName() -> UnsafePointer<UInt8>?
 
 @available(SwiftStdlib 6.2, *)
 internal func _getCurrentTaskNameString() -> String? {
-  let (stringPtr, count) = _getCurrentTaskName()
-  if (stringPtr == nil || count == 0) {
-    return nil
+  if let stringPtr = _getCurrentTaskName() {
+    String(cString: stringPtr)
+  } else {
+    nil
   }
-  return String(cString: stringPtr)
 }
 
 

@@ -758,13 +758,6 @@ struct InitialTaskNameRecordTraits {
     return TaskOptionRecordFlags(TaskOptionRecordKind::InitialTaskName);
   }
   static CanType getValueType(ASTContext &ctx) {
-    // FIXME: maybe raw pointer type?
-//    return OptionalType::get(ctx.getUnsafeRawBufferPointerType())
-//        ->getCanonicalType();
-
-//      return OptionalType::get(ctx.TheRawPointerType)
-//        ->getCanonicalType();
-
       return ctx.TheRawPointerType;
   }
 
@@ -774,33 +767,6 @@ struct InitialTaskNameRecordTraits {
     auto record =
       IGF.Builder.CreateStructGEP(recordAddr, 1, 2 * IGF.IGM.getPointerSize());
     IGF.Builder.CreateStore(taskName.claimNext(), record);
-//
-//    fprintf(stderr, "[%s:%d](%s) initialize InitialTaskNameTaskOptionRecord\n", __FILE_NAME__, __LINE__, __FUNCTION__);
-//    taskName.dump();
-//
-//    fprintf(stderr, "[%s:%d](%s) taskName.size() = %d\n", __FILE_NAME__, __LINE__, __FUNCTION__,
-//            taskName.size());
-//
-//    // FIXME: why is this wrong?
-//    // [GenConcurrency.cpp:725](initialize) initialize InitialTaskNameTaskOptionRecord
-//    //  %16 = extractvalue { i64, i64 } %15, 0
-//    //  %17 = extractvalue { i64, i64 } %15, 1
-//    // [GenConcurrency.cpp:728](initialize) taskName.size() = 2
-//    //  Assertion failed: (isa<llvm::StructType>(address.getElementType()) || isa<llvm::ArrayType>(address.getElementType())), function CreateStructGEP, file IRBuilder.h, line 193. Process 27213 stopped
-//
-////    auto record =
-////        IGF.Builder.CreateStructGEP(recordAddr, 1, 2 * IGF.IGM.getPointerSize());
-////    IGF.Builder.CreateStore(taskName.claimNext(),
-////                            IGF.Builder.CreateStructGEP(record, 0, Size()));
-////    IGF.Builder.CreateStore(taskName.claimNext(),
-////                            IGF.Builder.CreateStructGEP(record, 1, Size()));
-//
-//    auto record = IGF.Builder.CreateStructGEP(recordAddr, 1, 2 * IGF.IGM.getPointerSize());
-//    fprintf(stderr, "[%s:%d](%s) record = \n", __FILE_NAME__, __LINE__, __FUNCTION__);
-//    record->dump();
-//    IGF.Builder.CreateStore(
-//        taskName.claimNext(),
-//        record);
   }
 };
 

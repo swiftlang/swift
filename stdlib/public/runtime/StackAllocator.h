@@ -327,8 +327,6 @@ public:
   /// Deallocate memory \p ptr.
   void dealloc(void *ptr) {
     if (!lastAllocation || lastAllocation->getAllocatedMemory() != ptr) {
-      fprintf(stderr, "[%s:%d](%s) pointer = %p\n", __FILE_NAME__, __LINE__, __FUNCTION__, ptr);
-      fprintf(stderr, "[%s:%d](%s) last allocation = %p\n", __FILE_NAME__, __LINE__, __FUNCTION__, lastAllocation);
       SWIFT_FATAL_ERROR(0, "freed pointer was not the last allocation");
     }
 

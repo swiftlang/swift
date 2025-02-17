@@ -791,19 +791,16 @@ void AsyncTask::pushInitialTaskName(const char* _taskName) {
 
   void *allocation = _swift_task_alloc_specific(
       this, sizeof(class TaskNameStatusRecord));
-  fprintf(stderr, "[%s:%d](%s) allocate record = %p\n", __FILE_NAME__, __LINE__, __FUNCTION__, allocation);
-  // TODO: Copy the string maybe into the same allocation at an offset?
+
+  // TODO: Copy the string maybe into the same allocation at an offset or retain the swift string?
   char* taskNameCopy = reinterpret_cast<char*>(
       _swift_task_alloc_specific(this, strlen(_taskName) + 1/*null terminator*/));
-  (void) strcpy(/*dst=*/taskNameCopy, /*src=*/_taskName); // TODO: could we pass down a swift string and retain it?
+  (void) strcpy(/*dst=*/taskNameCopy, /*src=*/_taskName);
 
-  fprintf(stderr, "[%s:%d](%s) allocate name = %p\n", __FILE_NAME__, __LINE__, __FUNCTION__, taskNameCopy);
   auto record =
       ::new (allocation) TaskNameStatusRecord(taskNameCopy);
   SWIFT_TASK_DEBUG_LOG("[TaskName] Create initial task name record %p "
                        "for task:%p, name:%s", record, this, taskNameCopy);
-  fprintf(stderr, "[%s:%d](%s) task = %p, made record = %p name = %s\n", __FILE_NAME__, __LINE__, __FUNCTION__,
-          this, record, taskNameCopy);
 
   addStatusRecord(this, record,
                   [&](ActiveTaskStatus oldStatus, ActiveTaskStatus &newStatus) {
@@ -828,9 +825,7 @@ void AsyncTask::dropInitialTaskNameRecord() {
         removeStatusRecordLocked(status, record);
         // Since we first allocated the record, and then the string copy
         char *name = const_cast<char*>(record->getName());
-        fprintf(stderr, "[%s:%d](%s) dealloc name = %s @ %p\n", __FILE_NAME__, __LINE__, __FUNCTION__, name, name);
         _swift_task_dealloc_specific(this, name);
-        fprintf(stderr, "[%s:%d](%s) dealloc record = %p\n", __FILE_NAME__, __LINE__, __FUNCTION__, record);
         _swift_task_dealloc_specific(this, record);
         return;
       }
