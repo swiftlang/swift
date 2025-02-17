@@ -798,79 +798,72 @@ function Fetch-Dependencies {
   New-Item -ItemType Directory -ErrorAction Ignore $BinaryCache\toolchains | Out-Null
   Extract-Toolchain "$PinnedToolchain.exe" $BinaryCache $PinnedToolchain
 
-  function Download-Python($ArchName) {
-    $PythonAMD64URL = "https://www.nuget.org/api/v2/package/python/$PythonVersion"
-    $PythonAMD64Hash = "ac43b491e9488ac926ed31c5594f0c9409a21ecbaf99dc7a93f8c7b24cf85867"
+  function Install-Python([string] $ArchName) {
+    $Python = @{
+      AMD64 = @{
+        URL = "https://www.nuget.org/api/v2/package/python/$PythonVersion";
+        SHA256 = "ac43b491e9488ac926ed31c5594f0c9409a21ecbaf99dc7a93f8c7b24cf85867";
+      };
+      ARM64 = @{
+        URL = "https://www.nuget.org/api/v2/package/pythonarm64/$PythonVersion";
+        SHA256 = "429ada77e7f30e4bd8ff22953a1f35f98b2728e84c9b1d006712561785641f69";
+      }
+    }
 
-    $PythonARM64URL = "https://www.nuget.org/api/v2/package/pythonarm64/$PythonVersion"
-    $PythonARM64Hash = "429ada77e7f30e4bd8ff22953a1f35f98b2728e84c9b1d006712561785641f69"
-
-    DownloadAndVerify (Get-Variable -Name "Python${ArchName}URL").Value $BinaryCache\Python$ArchName-$PythonVersion.zip (Get-Variable -Name "Python${ArchName}Hash").Value
-
+    DownloadAndVerify $Python[$ArchName].URL "$BinaryCache\Python$ArchName-$PythonVersion.zip" $Python[$ArchName].SHA256
     if (-not $ToBatch) {
-      Extract-ZipFile Python$ArchName-$PythonVersion.zip $BinaryCache Python$ArchName-$PythonVersion
+      Extract-ZipFile Python$ArchName-$PythonVersion.zip "$BinaryCache" Python$ArchName-$PythonVersion
     }
   }
 
-  function Ensure-PythonModules($Python) {
+  function Install-PythonWheel([string] $ModuleName, [string] $WheelFile, [string] $WheelURL, [string] $WheelHash) {
+    try {
+      Invoke-Program "$(Get-PythonExecutable)" -c "import $ModuleName" *> $null
+    } catch {
+      DownloadAndVerify $WheelURL "$BinaryCache\python\$WheelFile" $WheelHash
+      Write-Output "Installing '$WheelFile' ..."
+      Invoke-Program -OutNull "$(Get-PythonExecutable)" '-I' -m pip install "$BinaryCache\python\$WheelFile" --disable-pip-version-check
+    }
+  }
+
+  function Install-PythonModules() {
     # First ensure pip is installed, else bootstrap it
     try {
-      Invoke-Program -OutNull $Python -m pip *> $null
+      Invoke-Program "$(Get-PythonExecutable)" -m pip *> $null
     } catch {
       Write-Output "Installing pip ..."
-      Invoke-Program -OutNull $Python '-I' -m ensurepip -U --default-pip
+      Invoke-Program -OutNull "$(Get-PythonExecutable)" '-I' -m ensurepip -U --default-pip
     }
+
     # 'packaging' is required for building LLVM 18+
-    try {
-      Invoke-Program -OutNull $Python -c 'import packaging' *> $null
-    } catch {
-      $WheelURL = "https://files.pythonhosted.org/packages/08/aa/cc0199a5f0ad350994d660967a8efb233fe0416e4639146c089643407ce6/packaging-24.1-py3-none-any.whl"
-      $WheelHash = "5b8f2217dbdbd2f7f384c41c628544e6d52f2d0f53c6d0c3ea61aa5d1d7ff124"
-      DownloadAndVerify $WheelURL "$BinaryCache\python\packaging-24.1-py3-none-any.whl" $WheelHash
-      Write-Output "Installing 'packaging-24.1-py3-none-any.whl' ..."
-      Invoke-Program -OutNull $Python '-I' -m pip install "$BinaryCache\python\packaging-24.1-py3-none-any.whl" --disable-pip-version-check
-    }
+    Install-PythonWheel 'packaging' 'packaging-24.1-py3-none-any.whl' `
+      'https://files.pythonhosted.org/packages/08/aa/cc0199a5f0ad350994d660967a8efb233fe0416e4639146c089643407ce6/packaging-24.1-py3-none-any.whl' `
+      '5b8f2217dbdbd2f7f384c41c628544e6d52f2d0f53c6d0c3ea61aa5d1d7ff124'
+
     # 'setuptools' provides 'distutils' module for Python 3.12+, required for SWIG support
-    # https://github.com/swiftlang/llvm-project/issues/9289
-    try {
-      Invoke-Program -OutNull $Python -c 'import distutils' *> $null
-    } catch {
-      $WheelURL = "https://files.pythonhosted.org/packages/ff/ae/f19306b5a221f6a436d8f2238d5b80925004093fa3edea59835b514d9057/setuptools-75.1.0-py3-none-any.whl"
-      $WheelHash = "35ab7fd3bcd95e6b7fd704e4a1539513edad446c097797f2985e0e4b960772f2"
-      DownloadAndVerify $WheelURL "$BinaryCache\python\setuptools-75.1.0-py3-none-any.whl" $WheelHash
-      Write-Output "Installing 'setuptools-75.1.0-py3-none-any.whl' ..."
-      Invoke-Program -OutNull $Python '-I' -m pip install "$BinaryCache\python\setuptools-75.1.0-py3-none-any.whl" --disable-pip-version-check
-    }
+    Install-PythonWheel 'distutils' 'setuptools-75.1.0-py3-none-any.whl' `
+      'https://files.pythonhosted.org/packages/ff/ae/f19306b5a221f6a436d8f2238d5b80925004093fa3edea59835b514d9057/setuptools-75.1.0-py3-none-any.whl' `
+      '35ab7fd3bcd95e6b7fd704e4a1539513edad446c097797f2985e0e4b960772f2'
+
     if ($Test -contains "lldb") {
       # 'psutil' is required for testing LLDB
-      try {
-        Invoke-Program -OutNull $Python -c 'import psutil' *> $null
-      } catch {
-        $WheelURL = "https://files.pythonhosted.org/packages/11/91/87fa6f060e649b1e1a7b19a4f5869709fbf750b7c8c262ee776ec32f3028/psutil-6.1.0-cp37-abi3-win_amd64.whl"
-        $WheelHash = "a8fb3752b491d246034fa4d279ff076501588ce8cbcdbb62c32fd7a377d996be"
-        DownloadAndVerify $WheelURL "$BinaryCache\python\psutil-6.1.0-cp37-abi3-win_amd64.whl" $WheelHash
-        Write-Output "Installing 'psutil-6.1.0-cp37-abi3-win_amd64.whl' ..."
-        Invoke-Program -OutNull $Python '-I' -m pip install "$BinaryCache\python\psutil-6.1.0-cp37-abi3-win_amd64.whl" --disable-pip-version-check
-      }
+      Install-PythonWheel 'psutil' 'psutil-6.1.0-cp37-abi3-win_amd64.whl' `
+        'https://files.pythonhosted.org/packages/11/91/87fa6f060e649b1e1a7b19a4f5869709fbf750b7c8c262ee776ec32f3028/psutil-6.1.0-cp37-abi3-win_amd64.whl' `
+        'a8fb3752b491d246034fa4d279ff076501588ce8cbcdbb62c32fd7a377d996be'
+
       # 'unittest2' is required for testing LLDB
-      try {
-        Invoke-Program -OutNull $Python -c 'import unittest2' *> $null
-      } catch {
-        $WheelURL = "https://files.pythonhosted.org/packages/72/20/7f0f433060a962200b7272b8c12ba90ef5b903e218174301d0abfd523813/unittest2-1.1.0-py2.py3-none-any.whl"
-        $WheelHash = "13f77d0875db6d9b435e1d4f41e74ad4cc2eb6e1d5c824996092b3430f088bb8"
-        DownloadAndVerify $WheelURL "$BinaryCache\python\unittest2-1.1.0-py2.py3-none-any.whl" $WheelHash
-        Write-Output "Installing 'unittest2-1.1.0-py2.py3-none-any.whl' ..."
-        Invoke-Program -OutNull $Python '-I' -m pip install "$BinaryCache\python\unittest2-1.1.0-py2.py3-none-any.whl" --disable-pip-version-check
-      }
+      Install-PythonWheel 'unittest2' 'unittest2-1.1.0-py2.py3-none-any.whl' `
+        'https://files.pythonhosted.org/packages/72/20/7f0f433060a962200b7272b8c12ba90ef5b903e218174301d0abfd523813/unittest2-1.1.0-py2.py3-none-any.whl' `
+        '13f77d0875db6d9b435e1d4f41e74ad4cc2eb6e1d5c824996092b3430f088bb8'
     }
   }
 
-  Download-Python $HostArchName
+  Install-Python $HostArchName
   if ($IsCrossCompiling) {
-    Download-Python $BuildArchName
+    Install-Python $BuildArchName
   }
   # Ensure Python modules that are required as host build tools
-  Ensure-PythonModules "$(Get-PythonExecutable)"
+  Install-PythonModules
 
   if ($Android) {
     # Only a specific NDK version is supported right now.
