@@ -6063,10 +6063,6 @@ void cloneImportedAttributes(ValueDecl *fromDecl, ValueDecl* toDecl) {
 
 static ValueDecl *cloneBaseMemberDecl(ValueDecl *decl, DeclContext *newContext,
                                       ClangInheritanceInfo inheritance) {
-  assert(inheritance && "only inherited members should be cloned");
-
-  // Adjust access according to whichever is more restrictive, between what decl
-  // was declared with (in its base class) or what it is being inherited with.
   AccessLevel access = inheritance.accessForBaseDecl(decl);
   ASTContext &context = decl->getASTContext();
 
@@ -8356,49 +8352,22 @@ AccessLevel importer::convertClangAccess(clang::AccessSpecifier access) {
   }
 }
 
-ClangInheritanceInfo
-ClangInheritanceInfo::forUsingDecl(const clang::UsingShadowDecl *usingDecl) {
-  ClangInheritanceInfo info;
-
-  auto *derivedRecord =
-      dyn_cast_or_null<clang::CXXRecordDecl>(usingDecl->getDeclContext());
-  auto *baseMember =
-      dyn_cast_or_null<clang::NamedDecl>(usingDecl->getTargetDecl());
-  if (!derivedRecord || !baseMember)
-    return info;
-
-  auto *baseRecord =
-      dyn_cast_or_null<clang::CXXRecordDecl>(baseMember->getDeclContext());
-  if (!baseRecord)
-    return info;
-
-  if (!derivedRecord->isDerivedFrom(baseRecord))
-    return info;
-
-  // NOTE: inheritedAccess usually indicates the cumulative inheritance access
-  // level, rather than the access level of individual members, but here we're
-  // conflating those concepts in order to reuse the field.
-  info.access = usingDecl->getAccess();
-  info.shadowedByUsing = true;
-
-  assert(info.access != clang::AS_none &&
-         "'using' decls should have an explicit access level");
-  return info;
-}
-
 AccessLevel
 ClangInheritanceInfo::accessForBaseDecl(const ValueDecl *baseDecl) const {
-  auto inherited = importer::convertClangAccess(access);
-  if (shadowedByUsing)
-    return inherited;
+  if (!isInheriting())
+    return AccessLevel::Public;
 
   static_assert(AccessLevel::Private < AccessLevel::Public &&
                 "std::min() relies on this ordering");
+  auto inherited = importer::convertClangAccess(access);
   return std::min(baseDecl->getFormalAccess(), inherited);
 }
 
 void ClangInheritanceInfo::setUnavailableIfNecessary(
     const ValueDecl *baseDecl, ValueDecl *clonedDecl) const {
+  if (!isInheriting())
+    return;
+
   auto *clangDecl =
       dyn_cast_or_null<clang::NamedDecl>(baseDecl->getClangDecl());
   if (!clangDecl)

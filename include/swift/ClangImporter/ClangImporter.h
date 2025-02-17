@@ -789,47 +789,16 @@ class ClangInheritanceInfo {
   /// See ClangInheritanceInfo::cumulativeNestedPrivate() for an example.
   bool nestedPrivate;
 
-  /// Indicates that this instance was constructed for a \c using declaration,
-  /// by ClangInheritanceInfo::forUsingDecl().
-  bool shadowedByUsing;
-
 public:
   /// Default constructor for this class that is used as the base case when
   /// recursively walking up a class inheritance hierarchy.
-  ClangInheritanceInfo()
-      : access(clang::AS_none), nestedPrivate(false), shadowedByUsing(false) {}
+  ClangInheritanceInfo() : access(clang::AS_none), nestedPrivate(false) {}
 
   /// Inductive case for this class that is used to accumulate inheritance
   /// metadata for cases of (nested) inheritance.
   ClangInheritanceInfo(ClangInheritanceInfo prev, clang::CXXBaseSpecifier base)
       : access(cumulativeInheritedAccess(prev, base)),
-        nestedPrivate(cumulativeNestedPrivate(prev, base)),
-        shadowedByUsing(false) {
-    assert(!prev.shadowedByUsing &&
-           "inheritance info for 'using' decls shouldn't be mixed with nested "
-           "inheritance");
-  }
-
-  /// Construct a special instance of this class \c using declarations, which
-  /// may override an inherited member's access level to be more permissive than
-  /// what it was declared with.
-  ///
-  /// For example, in the following, Derived::foo and Derived::bar are both
-  /// inherited from Base, but the latter is public because of \c using:
-  ///
-  /// \code{.cpp}
-  /// struct Base {
-  /// protected:
-  ///   void foo(void);
-  ///   void bar(void);
-  /// };
-  /// struct Derived : Base {
-  /// public:
-  ///   using Base::bar;
-  /// };
-  /// \endcode
-  static ClangInheritanceInfo
-  forUsingDecl(const clang::UsingShadowDecl *usingDecl);
+        nestedPrivate(cumulativeNestedPrivate(prev, base)) {}
 
   /// Whether this is info represents a case of C++ inheritance.
   ///
@@ -846,14 +815,16 @@ public:
   /// \param decl was declared with (in its base class), or what it is being
   /// inherited with (ClangInheritanceInfo::access).
   ///
-  /// Returns swift::AccessLevel::Public (i.e., corresponding to clang::AS_none)
-  /// if this is not inheriting.
+  /// Always returns swift::AccessLevel::Public (i.e., corresponding to
+  /// clang::AS_none) if this ClangInheritanceInfo::isInheriting() is \c false.
   AccessLevel accessForBaseDecl(const ValueDecl *baseDecl) const;
 
   /// Marks \param clonedDecl as unavailable (using \c @available) if it
   /// cannot be accessed from the derived class, either because \param baseDecl
   /// was declared as private in the base class, or because \param clonedDecl
   /// was inherited with private inheritance.
+  ///
+  /// Does nothing if this ClangInheritanceInfo::isInheriting() is \c false.
   void setUnavailableIfNecessary(const ValueDecl *baseDecl,
                                  ValueDecl *clonedDecl) const;
 

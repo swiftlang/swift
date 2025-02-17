@@ -4546,11 +4546,12 @@ namespace {
       }
       if (auto targetMethod =
               dyn_cast<clang::CXXMethodDecl>(decl->getTargetDecl())) {
-
-        auto inheritance = ClangInheritanceInfo::forUsingDecl(decl);
-
-        // Only import this using decl if we can ascertain its inheritance info
-        if (!inheritance)
+        auto *derivedRecord =
+            dyn_cast_or_null<clang::CXXRecordDecl>(decl->getDeclContext());
+        auto *baseRecord = dyn_cast_or_null<clang::CXXRecordDecl>(
+            targetMethod->getDeclContext());
+        if (!derivedRecord || !baseRecord ||
+            !derivedRecord->isDerivedFrom(baseRecord))
           return nullptr;
 
         // TODO: If the derived class already has a member with the same name,
@@ -4565,9 +4566,11 @@ namespace {
 
         auto clonedMethod =
             dyn_cast_or_null<FuncDecl>(Impl.importBaseMemberDecl(
-                importedBaseMethod, importedDC, inheritance));
+                importedBaseMethod, importedDC, ClangInheritanceInfo()));
         if (!clonedMethod)
           return nullptr;
+        clonedMethod->overwriteAccess(
+            importer::convertClangAccess(decl->getAccess()));
 
         bool success = processSpecialImportedFunc(
             clonedMethod, importedName, targetMethod->getOverloadedOperator());
