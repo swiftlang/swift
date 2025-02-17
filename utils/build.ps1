@@ -1809,6 +1809,7 @@ function Build-Sanitizers([Platform]$Platform, $Arch) {
   $InstallTo = "$($HostArch.ToolchainInstallRoot)\usr\lib\clang\$LLVMVersionMajor"
   Write-Host "Sanitizers SDK directory: $InstallTo"
 
+  # TODO: Move on to per-target lib path convention once Xcode is ready
   Build-CMakeProject `
     -Src $SourceCache\llvm-project\compiler-rt\lib\builtins `
     -Bin "$(Get-TargetProjectBinaryCache $Arch ClangBuiltins)" `
@@ -1820,7 +1821,7 @@ function Build-Sanitizers([Platform]$Platform, $Arch) {
     -Defines (@{
       CMAKE_SYSTEM_NAME = $Platform.ToString();
       LLVM_DIR = "$LLVMTargetCache\lib\cmake\llvm";
-      LLVM_ENABLE_PER_TARGET_RUNTIME_DIR = "YES";
+      LLVM_ENABLE_PER_TARGET_RUNTIME_DIR = "NO";
       COMPILER_RT_DEFAULT_TARGET_ONLY = "YES";
     })
 
@@ -1835,7 +1836,7 @@ function Build-Sanitizers([Platform]$Platform, $Arch) {
     -Defines (@{
       CMAKE_SYSTEM_NAME = $Platform.ToString();
       LLVM_DIR = "$LLVMTargetCache\lib\cmake\llvm";
-      LLVM_ENABLE_PER_TARGET_RUNTIME_DIR = "YES";
+      LLVM_ENABLE_PER_TARGET_RUNTIME_DIR = "NO";
       COMPILER_RT_DEFAULT_TARGET_ONLY = "YES";
       COMPILER_RT_BUILD_BUILTINS = "NO";
       COMPILER_RT_BUILD_CRT = "NO";
