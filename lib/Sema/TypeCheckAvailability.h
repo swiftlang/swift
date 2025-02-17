@@ -127,8 +127,7 @@ public:
   ///
   /// If the declaration is exported, the resulting context is restricted to
   /// referencing exported types only. Otherwise it can reference anything.
-  static ExportContext forDeclSignature(
-      Decl *D, llvm::SmallVectorImpl<UnsafeUse> *unsafeUses);
+  static ExportContext forDeclSignature(Decl *D);
 
   /// Create an instance describing the declarations that can be referenced
   /// from the given function's body.

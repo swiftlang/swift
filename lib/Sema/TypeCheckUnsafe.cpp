@@ -16,6 +16,7 @@
 
 #include "TypeCheckAvailability.h"
 #include "TypeCheckConcurrency.h"
+#include "TypeCheckInvertible.h"
 #include "TypeCheckType.h"
 #include "TypeCheckUnsafe.h"
 
@@ -121,6 +122,7 @@ void swift::diagnoseUnsafeUse(const UnsafeUse &use) {
   }
 
   case UnsafeUse::ReferenceToUnsafe:
+  case UnsafeUse::ReferenceToUnsafeStorage:
   case UnsafeUse::CallToUnsafe: {
     bool isCall = use.getKind() == UnsafeUse::CallToUnsafe;
     auto decl = cast_or_null<ValueDecl>(use.getDecl());
@@ -133,7 +135,8 @@ void swift::diagnoseUnsafeUse(const UnsafeUse &use) {
           [&](Type specificType) {
             ctx.Diags.diagnose(
                 loc,
-                diag::note_reference_to_unsafe_typed_decl,
+                use.getKind() == UnsafeUse::ReferenceToUnsafeStorage                       ? diag::note_unsafe_storage
+                    : diag::note_reference_to_unsafe_typed_decl,
                 isCall, decl, specificType);
           });
     } else if (type) {
@@ -375,4 +378,82 @@ void swift::diagnoseUnsafeType(ASTContext &ctx, SourceLoc loc, Type type,
   });
 
   diagnose(specificType ? specificType : type);
+}
+
+void swift::checkUnsafeStorage(NominalTypeDecl *nominal) {
+  // If the type is marked explicitly with @safe or @unsafe, there's nothing
+  // to check.
+  switch (nominal->getExplicitSafety()) {
+  case ExplicitSafety::Safe:
+  case ExplicitSafety::Unsafe:
+    return;
+
+  case ExplicitSafety::Unspecified:
+    break;
+  }
+
+  // Check whether the superclass is unsafe. If so, the only thing one can
+  // do is mark the class unsafe.
+  ASTContext &ctx = nominal->getASTContext();
+  if (auto classDecl = dyn_cast<ClassDecl>(nominal)) {
+    if (Type superclassType = classDecl->getSuperclass()) {
+      superclassType = classDecl->mapTypeIntoContext(superclassType);
+      bool diagnosed = false;
+      diagnoseUnsafeType(ctx, classDecl->getLoc(), superclassType, [&](Type type) {
+        if (diagnosed)
+          return;
+
+        classDecl->diagnose(diag::unsafe_superclass, classDecl, type)
+          .fixItInsert(classDecl->getAttributeInsertionLoc(false), "@unsafe ");
+        diagnosed = true;
+      });
+
+      if (diagnosed)
+        return;
+    }
+  }
+
+  // Visitor that finds unsafe storage.
+  class UnsafeStorageVisitor: public StorageVisitor {
+    ASTContext &ctx;
+    SmallVectorImpl<UnsafeUse> &unsafeUses;
+
+  public:
+    UnsafeStorageVisitor(ASTContext &ctx, SmallVectorImpl<UnsafeUse> &unsafeUses)
+      : ctx(ctx), unsafeUses(unsafeUses) { }
+
+    bool operator()(VarDecl *property, Type propertyType) override {
+      diagnoseUnsafeType(ctx, property->getLoc(), propertyType, [&](Type type) {
+        unsafeUses.push_back(
+            UnsafeUse::forReferenceToUnsafeStorage(
+              property, propertyType, property->getLoc()));
+      });
+      return false;
+    }
+
+    bool operator()(EnumElementDecl *element, Type elementType) override {
+      diagnoseUnsafeType(ctx, element->getLoc(), elementType, [&](Type type) {
+        unsafeUses.push_back(
+            UnsafeUse::forReferenceToUnsafeStorage(
+            element, elementType, element->getLoc()));
+      });
+      return false;
+    }
+  };
+
+  // Look for any unsafe storage in this nominal type.
+  SmallVector<UnsafeUse, 4> unsafeUses;
+  UnsafeStorageVisitor(ctx, unsafeUses).visit(nominal, nominal->getDeclContext());
+
+  // If we didn't find any unsafe storage, there's nothing to do.
+  if (unsafeUses.empty())
+    return;
+
+  // Complain about this type needing @safe or @unsafe.
+  nominal->diagnose(diag::decl_unsafe_storage, nominal);
+  nominal->diagnose(diag::decl_storage_mark_unsafe)
+    .fixItInsert(nominal->getAttributeInsertionLoc(false), "@unsafe ");
+  nominal->diagnose(diag::decl_storage_mark_safe)
+    .fixItInsert(nominal->getAttributeInsertionLoc(false), "@safe ");
+  std::for_each(unsafeUses.begin(), unsafeUses.end(), diagnoseUnsafeUse);
 }

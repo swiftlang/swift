@@ -31,6 +31,7 @@ namespace swift {
 class Decl;
 class DeclName;
 class EnumDecl;
+enum class ExplicitSafety;
 
 /// The input type for a clang direct lookup request.
 struct ClangDirectLookupDescriptor final {
@@ -563,6 +564,25 @@ private:
 
 void simple_display(llvm::raw_ostream &out, EscapabilityLookupDescriptor desc);
 SourceLoc extractNearestSourceLoc(EscapabilityLookupDescriptor desc);
+
+/// Determine the safety of the given Clang declaration.
+class ClangDeclExplicitSafety
+    : public SimpleRequest<ClangDeclExplicitSafety,
+                           ExplicitSafety(SafeUseOfCxxDeclDescriptor),
+                           RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+  // Source location
+  SourceLoc getNearestLoc() const { return SourceLoc(); };
+  bool isCached() const;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  ExplicitSafety evaluate(Evaluator &evaluator, SafeUseOfCxxDeclDescriptor desc) const;
+};
 
 #define SWIFT_TYPEID_ZONE ClangImporter
 #define SWIFT_TYPEID_HEADER "swift/ClangImporter/ClangImporterTypeIDZone.def"
