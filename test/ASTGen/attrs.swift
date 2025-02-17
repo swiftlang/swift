@@ -1,19 +1,21 @@
 // RUN: %empty-directory(%t)
 
-// RUN: %target-swift-frontend-dump-parse -disable-availability-checking \
-// RUN:   -enable-experimental-feature SymbolLinkageMarkers \
+// RUN: %target-swift-frontend-dump-parse \
 // RUN:   -enable-experimental-feature ABIAttribute \
 // RUN:   -enable-experimental-feature Extern \
+// RUN:   -enable-experimental-feature LifetimeDependence \
 // RUN:   -enable-experimental-feature NonIsolatedAsyncInheritsIsolationFromContext \
+// RUN:   -enable-experimental-feature SymbolLinkageMarkers \
 // RUN:   -enable-experimental-move-only \
 // RUN:   -enable-experimental-feature ParserASTGen \
 // RUN:   | %sanitize-address > %t/astgen.ast
 
-// RUN: %target-swift-frontend-dump-parse -disable-availability-checking \
-// RUN:   -enable-experimental-feature SymbolLinkageMarkers \
+// RUN: %target-swift-frontend-dump-parse \
 // RUN:   -enable-experimental-feature ABIAttribute \
 // RUN:   -enable-experimental-feature Extern \
+// RUN:   -enable-experimental-feature LifetimeDependence \
 // RUN:   -enable-experimental-feature NonIsolatedAsyncInheritsIsolationFromContext \
+// RUN:   -enable-experimental-feature SymbolLinkageMarkers \
 // RUN:   -enable-experimental-move-only \
 // RUN:   | %sanitize-address > %t/cpp-parser.ast
 
@@ -22,19 +24,21 @@
 // RUN: %target-typecheck-verify-swift \
 // RUN:   -module-abi-name ASTGen \
 // RUN:   -enable-experimental-feature ParserASTGen \
-// RUN:   -enable-experimental-feature SymbolLinkageMarkers \
 // RUN:   -enable-experimental-feature ABIAttribute \
 // RUN:   -enable-experimental-feature Extern \
-// RUN:   -enable-experimental-move-only \
-// RUN:   -enable-experimental-feature NonIsolatedAsyncInheritsIsolationFromContext
+// RUN:   -enable-experimental-feature LifetimeDependence \
+// RUN:   -enable-experimental-feature NonIsolatedAsyncInheritsIsolationFromContext \
+// RUN:   -enable-experimental-feature SymbolLinkageMarkers \
+// RUN:   -enable-experimental-move-only
 
 // REQUIRES: executable_test
 // REQUIRES: swift_swift_parser
-// REQUIRES: swift_feature_SymbolLinkageMarkers
-// REQUIRES: swift_feature_Extern
 // REQUIRES: swift_feature_ParserASTGen
 // REQUIRES: swift_feature_ABIAttribute
+// REQUIRES: swift_feature_Extern
+// REQUIRES: swift_feature_LifetimeDependence
 // REQUIRES: swift_feature_NonIsolatedAsyncInheritsIsolationFromContext
+// REQUIRES: swift_feature_SymbolLinkageMarkers
 
 // rdar://116686158
 // UNSUPPORTED: asan
@@ -201,3 +205,13 @@ struct OpTest {
   func opResult() -> some OpProto { OpStruct() }
   typealias Result = @_opaqueReturnTypeOf("$s6ASTGen6OpTestV8opResultQryF", 0) __
 }
+
+struct E {}
+struct NE : ~Escapable {}
+@lifetime(ne) func derive(_ ne: NE) -> NE { ne }
+@lifetime(borrow ne1, ne2) func derive(_ ne1: NE, _ ne2: NE) -> NE {
+  if (Int.random(in: 1..<100) < 50) { return ne1 }
+  return ne2
+}
+@lifetime(borrow borrow) func testNameConflict(_ borrow: E) -> NE { NE() }
+@lifetime(result: source) func testTarget(_ result: inout NE, _ source: consuming NE) { result = source }

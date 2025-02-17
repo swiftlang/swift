@@ -48,6 +48,7 @@ class Fingerprint;
 class Identifier;
 class IfConfigClauseRangeInfo;
 struct LabeledStmtInfo;
+struct LifetimeDescriptor;
 enum class MacroRole : uint32_t;
 class MacroIntroducedDeclName;
 enum class MacroIntroducedDeclNameKind;
@@ -963,6 +964,79 @@ BridgedInlineAttr BridgedInlineAttr_createParsed(BridgedASTContext cContext,
                                                  BridgedSourceLoc cAtLoc,
                                                  BridgedSourceRange cRange,
                                                  BridgedInlineKind cKind);
+
+enum ENUM_EXTENSIBILITY_ATTR(closed) BridgedParsedLifetimeDependenceKind {
+  BridgedParsedLifetimeDependenceKindDefault,
+  BridgedParsedLifetimeDependenceKindScope,
+  BridgedParsedLifetimeDependenceKindInherit,
+};
+
+class BridgedLifetimeDescriptor {
+  union Value {
+    BridgedIdentifier name;
+    unsigned index;
+
+    Value(BridgedIdentifier name) : name(name) {}
+    Value(unsigned index) : index(index) {}
+    Value() : name() {}
+  } value;
+
+  enum DescriptorKind {
+    Named,
+    Ordered,
+    Self,
+  } kind;
+
+  BridgedParsedLifetimeDependenceKind dependenceKind;
+  BridgedSourceLoc loc;
+
+  BridgedLifetimeDescriptor(Value value, DescriptorKind kind,
+                            BridgedParsedLifetimeDependenceKind dependenceKind,
+                            BridgedSourceLoc loc)
+      : value(value), kind(kind), dependenceKind(dependenceKind), loc(loc) {}
+
+public:
+  SWIFT_NAME("forNamed(_:dependenceKind:loc:)")
+  static BridgedLifetimeDescriptor
+  forNamed(BridgedIdentifier name,
+           BridgedParsedLifetimeDependenceKind dependenceKind,
+           BridgedSourceLoc loc) {
+    return BridgedLifetimeDescriptor(name, DescriptorKind::Named,
+                                     dependenceKind, loc);
+  }
+  SWIFT_NAME("forOrdered(_:dependenceKind:loc:)")
+  static BridgedLifetimeDescriptor
+  forOrdered(size_t index, BridgedParsedLifetimeDependenceKind dependenceKind,
+             BridgedSourceLoc loc) {
+    return BridgedLifetimeDescriptor(index, DescriptorKind::Ordered,
+                                     dependenceKind, loc);
+  }
+  SWIFT_NAME("forSelf(dependenceKind:loc:)")
+  static BridgedLifetimeDescriptor
+  forSelf(BridgedParsedLifetimeDependenceKind dependenceKind,
+          BridgedSourceLoc loc) {
+    return BridgedLifetimeDescriptor({}, DescriptorKind::Self, dependenceKind,
+                                     loc);
+  }
+
+  swift::LifetimeDescriptor unbridged();
+};
+
+SWIFT_NAME("BridgedLifetimeEntry.createParsed(_:range:sources:)")
+BridgedLifetimeEntry
+BridgedLifetimeEntry_createParsed(BridgedASTContext cContext,
+                                  BridgedSourceRange cRange,
+                                  BridgedArrayRef cSources);
+
+SWIFT_NAME("BridgedLifetimeEntry.createParsed(_:range:sources:target:)")
+BridgedLifetimeEntry BridgedLifetimeEntry_createParsed(
+    BridgedASTContext cContext, BridgedSourceRange cRange,
+    BridgedArrayRef cSources, BridgedLifetimeDescriptor cTarget);
+
+SWIFT_NAME("BridgedLifetimeAttr.createParsed(_:atLoc:range:entry:)")
+BridgedLifetimeAttr BridgedLifetimeAttr_createParsed(
+    BridgedASTContext cContext, BridgedSourceLoc cAtLoc,
+    BridgedSourceRange cRange, BridgedLifetimeEntry cEntry);
 
 enum ENUM_EXTENSIBILITY_ATTR(closed) BridgedMacroSyntax {
   BridgedMacroSyntaxFreestanding,

@@ -360,6 +360,72 @@ BridgedInlineAttr BridgedInlineAttr_createParsed(BridgedASTContext cContext,
       InlineAttr(cAtLoc.unbridged(), cRange.unbridged(), unbridged(cKind));
 }
 
+static swift::ParsedLifetimeDependenceKind
+unbridged(BridgedParsedLifetimeDependenceKind kind) {
+  switch (kind) {
+  case BridgedParsedLifetimeDependenceKindDefault:
+    return swift::ParsedLifetimeDependenceKind::Default;
+  case BridgedParsedLifetimeDependenceKindScope:
+    return swift::ParsedLifetimeDependenceKind::Scope;
+  case BridgedParsedLifetimeDependenceKindInherit:
+    return swift::ParsedLifetimeDependenceKind::Inherit;
+  }
+  llvm_unreachable("unhandled enum value");
+}
+
+swift::LifetimeDescriptor BridgedLifetimeDescriptor::unbridged() {
+  switch (kind) {
+  case DescriptorKind::Named:
+    return LifetimeDescriptor::forNamed(
+        value.name.unbridged(), ::unbridged(dependenceKind), loc.unbridged());
+  case DescriptorKind::Ordered:
+    return LifetimeDescriptor::forOrdered(
+        value.index, ::unbridged(dependenceKind), loc.unbridged());
+  case DescriptorKind::Self:
+    return LifetimeDescriptor::forSelf(::unbridged(dependenceKind),
+                                       loc.unbridged());
+  }
+  llvm_unreachable("unhandled enum value");
+}
+
+static BridgedLifetimeEntry BridgedLifetimeEntry_createParsedImpl(
+    BridgedASTContext cContext, BridgedSourceRange cRange,
+    BridgedArrayRef cSources,
+    std::optional<BridgedLifetimeDescriptor> cTarget) {
+  SmallVector<LifetimeDescriptor> sources;
+  for (auto cSource : cSources.unbridged<BridgedLifetimeDescriptor>())
+    sources.push_back(cSource.unbridged());
+  std::optional<LifetimeDescriptor> target;
+  if (cTarget)
+    target = cTarget->unbridged();
+
+  return LifetimeEntry::create(cContext.unbridged(), cRange.Start.unbridged(),
+                               cRange.End.unbridged(), sources, target);
+}
+
+BridgedLifetimeEntry
+BridgedLifetimeEntry_createParsed(BridgedASTContext cContext,
+                                  BridgedSourceRange cRange,
+                                  BridgedArrayRef cSources) {
+  return BridgedLifetimeEntry_createParsedImpl(cContext, cRange, cSources,
+                                               std::nullopt);
+}
+
+BridgedLifetimeEntry BridgedLifetimeEntry_createParsed(
+    BridgedASTContext cContext, BridgedSourceRange cRange,
+    BridgedArrayRef cSources, BridgedLifetimeDescriptor cTarget) {
+  return BridgedLifetimeEntry_createParsedImpl(cContext, cRange, cSources,
+                                               cTarget);
+}
+
+BridgedLifetimeAttr BridgedLifetimeAttr_createParsed(
+    BridgedASTContext cContext, BridgedSourceLoc cAtLoc,
+    BridgedSourceRange cRange, BridgedLifetimeEntry cEntry) {
+  return LifetimeAttr::create(cContext.unbridged(), cAtLoc.unbridged(),
+                              cRange.unbridged(), /*implicit=*/false,
+                              cEntry.unbridged());
+}
+
 BridgedMacroRole BridgedMacroRole_fromString(BridgedStringRef str) {
   // Match the role string to the known set of roles.
   auto role =
