@@ -836,6 +836,12 @@ bool irgen::isSpecializedNominalTypeMetadataStaticallyAddressable(
     if (IGM.getSwiftModule() == nominal->getModuleContext()) {
       return false;
     }
+    // We cannot reference the type context across the module boundary on
+    // PE/COFF without a load. This prevents us from statically initializing the
+    // pattern.
+    if (IGM.Triple.isOSWindows() &&
+        !nominal->getModuleContext()->isStaticLibrary())
+      return false;
     if (nominal->isResilient(IGM.getSwiftModule(),
                              ResilienceExpansion::Maximal)) {
       return false;
