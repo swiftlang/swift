@@ -287,7 +287,7 @@ getParamDeclFromDescriptor(AbstractFunctionDecl *afd,
     unsigned paramIndex = 0;
     ParamDecl *candidateParam = nullptr;
     for (auto *param : *afd->getParameters()) {
-      if (param->getParameterName().str() == descriptor.getName()) {
+      if (param->getParameterName() == descriptor.getName()) {
         candidateParam = param;
         break;
       }
