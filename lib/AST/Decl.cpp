@@ -1150,6 +1150,14 @@ ExplicitSafety Decl::getExplicitSafety() const {
   if (auto safety = getExplicitSafetyFromAttrs(this))
     return *safety;
 
+  // If this declaration is from C, ask the Clang importer.
+  if (auto clangDecl = getClangDecl()) {
+    ASTContext &ctx = getASTContext();
+    return evaluateOrDefault(
+        ctx.evaluator, ClangDeclExplicitSafety({clangDecl, ctx}),
+        ExplicitSafety::Unspecified);
+  }
+  
   // Inference: Check the enclosing context.
   if (auto enclosingDC = getDeclContext()) {
     // Is this an extension with @safe or @unsafe on it?
