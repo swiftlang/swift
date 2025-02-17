@@ -301,3 +301,8 @@ func testMagicIdentifier(file: String = #file, line: Int = #line) {
     let _: String = file
     let _: Int = line
 }
+
+class StaticTest {
+  class var classVar: Int { 42 }
+  static let staticVar = 42
+}
