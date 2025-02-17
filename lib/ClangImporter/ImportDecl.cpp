@@ -2040,8 +2040,7 @@ namespace {
       if (Impl.SwiftContext.LangOpts.hasFeature(Feature::LifetimeDependence)) {
         fd->getAttrs().add(new (Impl.SwiftContext)
                                UnsafeNonEscapableResultAttr(/*Implicit=*/true));
-        if (Impl.SwiftContext.LangOpts.hasFeature(Feature::SafeInterop) &&
-            Impl.SwiftContext.LangOpts.hasFeature(
+        if (Impl.SwiftContext.LangOpts.hasFeature(
                 Feature::AllowUnsafeAttribute))
           fd->getAttrs().add(new (Impl.SwiftContext)
                                  UnsafeAttr(/*Implicit=*/true));
@@ -2203,8 +2202,7 @@ namespace {
 
       // We have to do this after populating ImportedDecls to avoid importing
       // the same multiple times.
-      if (Impl.SwiftContext.LangOpts.hasFeature(Feature::SafeInterop) &&
-          Impl.SwiftContext.LangOpts.hasFeature(
+      if (Impl.SwiftContext.LangOpts.hasFeature(
               Feature::AllowUnsafeAttribute)) {
         if (const auto *ctsd =
                 dyn_cast<clang::ClassTemplateSpecializationDecl>(decl)) {
@@ -4135,8 +4133,7 @@ namespace {
             LifetimeDependenceInfoRequest{result},
             Impl.SwiftContext.AllocateCopy(lifetimeDependencies));
       }
-      if (ASTContext.LangOpts.hasFeature(Feature::AllowUnsafeAttribute) &&
-          ASTContext.LangOpts.hasFeature(Feature::SafeInterop)) {
+      if (ASTContext.LangOpts.hasFeature(Feature::AllowUnsafeAttribute)) {
         for (auto [idx, param] : llvm::enumerate(decl->parameters())) {
           if (swiftParams->get(idx)->getInterfaceType()->isEscapable())
             continue;
@@ -8500,8 +8497,7 @@ static bool importAsUnsafe(ClangImporter::Implementation &impl,
                            const clang::NamedDecl *decl,
                            const Decl *MappedDecl) {
   auto &context = impl.SwiftContext;
-  if (!context.LangOpts.hasFeature(Feature::SafeInterop) ||
-      !context.LangOpts.hasFeature(Feature::AllowUnsafeAttribute))
+  if (!context.LangOpts.hasFeature(Feature::AllowUnsafeAttribute))
     return false;
 
   if (isa<clang::CXXMethodDecl>(decl) &&
