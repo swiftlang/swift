@@ -29,7 +29,7 @@
 
 namespace swift {
 
-#if 0
+#if 1
 using ThreadID = decltype(pthread_self());
 
 inline ThreadID _swift_get_thread_id() {

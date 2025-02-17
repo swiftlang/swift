@@ -1557,6 +1557,9 @@ enum class CreateTaskOptions {
 
   /// The builtin has a non-optional TaskExecutor argument.
   TaskExecutor = 0x8,
+
+//  /// The builtin has a non-optional task name argument.
+//  TaskName = 0x10,
 };
 
 /// Emit SIL for the various createAsyncTask builtins.
@@ -1636,6 +1639,21 @@ static ManagedValue emitCreateAsyncTask(SILGenFunction &SGF, SILLocation loc,
     }
   }();
 
+  ManagedValue taskName = [&] {
+    if (options & CreateTaskOptions::OptionalEverything) {
+      fprintf(stderr, "[%s:%d](%s) optional task name\n", __FILE_NAME__, __LINE__, __FUNCTION__);
+      return nextArg().getAsSingleValue(SGF);
+//    } else if (options & CreateTaskOptions::TaskName) {
+//      fprintf(stderr, "[%s:%d](%s) emit optional some task name\n", __FILE_NAME__, __LINE__, __FUNCTION__);
+//      return emitOptionalSome(nextArg());
+    } else {
+      fprintf(stderr, "[%s:%d](%s) emit raw pointer task name NONE\n", __FILE_NAME__, __LINE__, __FUNCTION__);
+//      return emitOptionalNone(ctx.getUnsafeRawBufferPointerType()
+//                                  ->getCanonicalType());
+       return emitOptionalNone(ctx.TheRawPointerType);
+    }
+  }();
+
   auto functionValue = [&] {
     // No reabstraction required.
     if (options & CreateTaskOptions::Discarding) {
@@ -1693,6 +1711,7 @@ static ManagedValue emitCreateAsyncTask(SILGenFunction &SGF, SILLocation loc,
     taskGroup.getUnmanagedValue(),
     taskExecutorDeprecated.getUnmanagedValue(),
     taskExecutorConsuming.forward(SGF),
+    taskName.forward(SGF),
     functionValue.forward(SGF)
   };
 
@@ -1756,9 +1775,19 @@ static ManagedValue emitBuiltinCreateAsyncTask(
 static ManagedValue emitBuiltinCreateTask(
     SILGenFunction &SGF, SILLocation loc, SubstitutionMap subs,
     PreparedArguments &&args, SGFContext C) {
+  fprintf(stderr, "[%s:%d](%s) emitBuiltinCreateTask === ALL OPTIONAL\n", __FILE_NAME__, __LINE__, __FUNCTION__);
   return emitCreateAsyncTask(SGF, loc, subs, std::move(args),
       { CreateTaskOptions::OptionalEverything });
 }
+
+//static ManagedValue emitBuiltinCreateTask222(
+//    SILGenFunction &SGF, SILLocation loc, SubstitutionMap subs,
+//    PreparedArguments &&args, SGFContext C) {
+//  fprintf(stderr, "[%s:%d](%s) emitBuiltinCreateTask222 === ALL OPTIONAL AND NAME\n", __FILE_NAME__, __LINE__, __FUNCTION__);
+//  return emitCreateAsyncTask(SGF, loc, subs, std::move(args),
+//      { CreateTaskOptions::OptionalEverything,
+//        CreateTaskOptions::TaskName });
+//}
 
 // Emit SIL for the named builtin: createDiscardingTask.
 static ManagedValue emitBuiltinCreateDiscardingTask(
