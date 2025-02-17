@@ -802,6 +802,27 @@ private:
   }
 };
 
+/// Retrieves the DeclContext that a conjunction should be solved within.
+static DeclContext *getDeclContextForConjunction(ConstraintLocator *loc) {  
+  // Closures introduce a new DeclContext that needs switching into.
+  auto anchor = loc->getAnchor();
+  if (loc->directlyAt<ClosureExpr>())
+    return castToExpr<ClosureExpr>(anchor);
+
+  // SingleValueStmtExprs need to switch to their enclosing context. This
+  // is unfortunately necessary since they can be present in single-expression
+  // closures, which don't have their DeclContext established since they're
+  // solved together with the rest of the system.
+  if (loc->isForSingleValueStmtConjunction())
+    return castToExpr<SingleValueStmtExpr>(anchor)->getDeclContext();
+  
+  // Do the same for TapExprs.
+  if (loc->directlyAt<TapExpr>())
+    return castToExpr<TapExpr>(anchor)->getVar()->getDeclContext();
+
+  return nullptr;
+}
+
 class ConjunctionStep : public BindingStep<ConjunctionElementProducer> {
   /// Snapshot of the constraint system before conjunction.
   class SolverSnapshot {
@@ -826,11 +847,9 @@ class ConjunctionStep : public BindingStep<ConjunctionElementProducer> {
         : CS(cs), Conjunction(conjunction),
           TypeVars(std::move(cs.TypeVariables)) {
       auto *locator = Conjunction->getLocator();
-      // If this conjunction represents a closure, we need to
-      // switch declaration context over to it.
-      if (locator->directlyAt<ClosureExpr>()) {
-        DC.emplace(CS.DC, castToExpr<ClosureExpr>(locator->getAnchor()));
-      }
+      // If we need to switch into a new DeclContext for the conjunction, do so.
+      if (auto *newDC = getDeclContextForConjunction(locator))
+        DC.emplace(CS.DC, newDC);
 
       auto &CG = CS.getConstraintGraph();
       // Remove all of the current inactive constraints.
