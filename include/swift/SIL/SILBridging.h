@@ -384,6 +384,7 @@ struct BridgedOperand {
   BRIDGED_INLINE bool isTypeDependent() const;
   BRIDGED_INLINE bool isLifetimeEnding() const;
   BRIDGED_INLINE bool canAcceptOwnership(BridgedValue::Ownership ownership) const;
+  BRIDGED_INLINE bool isDeleted() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE OptionalBridgedOperand getNextUse() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedValue getValue() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedInstruction getUser() const;

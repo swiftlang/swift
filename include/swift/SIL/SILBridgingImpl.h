@@ -616,6 +616,10 @@ bool BridgedOperand::canAcceptOwnership(BridgedValue::Ownership ownership) const
   return op->canAcceptKind(BridgedValue::unbridge(ownership));
 }
 
+bool BridgedOperand::isDeleted() const {
+  return op->getUser() == nullptr;
+}
+
 OptionalBridgedOperand BridgedOperand::getNextUse() const {
   return {op->getNextUse()};
 }
