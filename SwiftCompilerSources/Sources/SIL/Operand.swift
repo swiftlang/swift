@@ -105,8 +105,16 @@ public struct UseList : CollectionLikeSequence {
     var currentOpPtr: OptionalBridgedOperand
     
     public mutating func next() -> Operand? {
-      if let op = currentOpPtr.operand {
-        currentOpPtr = op.getNextUse()
+      if let bridgedOp = currentOpPtr.operand {
+        var op = bridgedOp
+        // Skip operands of deleted instructions.
+        while op.isDeleted() {
+          guard let nextOp = op.getNextUse().operand else {
+            return nil
+          }
+          op = nextOp
+        }
+        currentOpPtr = op.getNextUse();
         return Operand(bridged: op)
       }
       return nil
