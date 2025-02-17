@@ -5120,7 +5120,12 @@ public:
   }
   void visitLifetimeAttr(LifetimeAttr *Attr, Label label) {
     printCommon(Attr, "lifetime_attr", label);
-    // TODO: Implement.
+    // FIXME: Improve, more detailed info.
+    printFieldRaw(
+        [&](raw_ostream &out) {
+          out << " " << Attr->getLifetimeEntry()->getString() << " ";
+        },
+        Label::optional("lifetime_entry"));
     printFoot();
   }
   void visitMacroRoleAttr(MacroRoleAttr *Attr, Label label) {

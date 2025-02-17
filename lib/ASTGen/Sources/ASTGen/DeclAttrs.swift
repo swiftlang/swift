@@ -146,7 +146,7 @@ extension ASTGenVisitor {
       case .inline:
         return handle(self.generateInlineAttr(attribute: node)?.asDeclAttribute)
       case .lifetime:
-        fatalError("unimplemented")
+        return handle(self.generateLifetimeAttr(attribute: node)?.asDeclAttribute)
       case .macroRole:
         return handle(self.generateMacroRoleAttr(attribute: node, attrName: attrName)?.asDeclAttribute)
       case .nonSendable:
@@ -877,6 +877,129 @@ extension ASTGenVisitor {
       atLoc: self.generateSourceLoc(node.atSign),
       range: self.generateAttrSourceRange(node),
       kind: kind
+    )
+  }
+
+  func generateLifetimeDescriptor(nameToken node: TokenSyntax, lifetimeDependenceKind: BridgedParsedLifetimeDependenceKind = .default) -> BridgedLifetimeDescriptor {
+    let ident = self.generateIdentifier(node)
+    let loc = self.generateSourceLoc(node)
+    if ident == ctx.id_self {
+      return .forSelf(
+        dependenceKind: lifetimeDependenceKind,
+        loc: loc
+      )
+    } else {
+      return .forNamed(
+        ident,
+        dependenceKind: lifetimeDependenceKind,
+        loc: loc
+      );
+    }
+  }
+
+  func generateLifetimeDescriptor(expr node: ExprSyntax) -> BridgedLifetimeDescriptor? {
+    let lifetimeDependenceKind: BridgedParsedLifetimeDependenceKind
+    let descriptorExpr: ExprSyntax
+    if let copyExpr = node.as(CopyExprSyntax.self) {
+      lifetimeDependenceKind = .inherit
+      descriptorExpr = copyExpr.expression
+    } else if let borrowExpr = node.as(BorrowExprSyntax.self) {
+      lifetimeDependenceKind = .scope
+      descriptorExpr = borrowExpr.expression
+    } else {
+      lifetimeDependenceKind = .default
+      descriptorExpr = node
+    }
+
+    let loc = self.generateSourceLoc(descriptorExpr)
+    if
+      let declRefExpr = descriptorExpr.as(DeclReferenceExprSyntax.self),
+      declRefExpr.argumentNames == nil
+    {
+      return generateLifetimeDescriptor(
+        nameToken: declRefExpr.baseName,
+        lifetimeDependenceKind: lifetimeDependenceKind
+      )
+    }
+
+    if let index = descriptorExpr.as(IntegerLiteralExprSyntax.self)?.representedLiteralValue {
+      return .forOrdered(
+        index,
+        dependenceKind: lifetimeDependenceKind,
+        loc: loc
+      )
+    }
+
+    // TODO: Diangose
+    fatalError("expected identifier, 'self', or integer in @lifetime")
+  }
+
+  func generateLifetimeEntry(attribute node: AttributeSyntax) -> BridgedLifetimeEntry? {
+    self.generateWithLabeledExprListArguments(attribute: node) { args in
+      guard !args.isEmpty else {
+        // TODO: Diagnose
+        fatalError("expected arguments in @lifetime attribute")
+      }
+
+      var target: BridgedLifetimeDescriptor? = nil
+      var sources: [BridgedLifetimeDescriptor] = []
+      var first = true
+      while let arg = args.popFirst() {
+        if first {
+          if let targetToken = arg.label {
+            target = self.generateLifetimeDescriptor(nameToken: targetToken)
+          }
+          first = false
+        } else {
+          if arg.label != nil {
+            // TODO: Diagnose.
+            fatalError("invalid argument label in @lifetime attribute")
+          }
+        }
+
+        if let src = self.generateLifetimeDescriptor(expr: arg.expression) {
+          sources.append(src)
+        }
+      }
+
+      if let target {
+        return .createParsed(
+          self.ctx,
+          range: self.generateAttrSourceRange(node),
+          sources: sources.lazy.bridgedArray(in: self),
+          target: target
+        )
+      } else {
+        return .createParsed(
+          self.ctx,
+          range: self.generateAttrSourceRange(node),
+          sources: sources.lazy.bridgedArray(in: self)
+        )
+      }
+    }
+  }
+
+  /// E.g.
+  ///   ```
+  ///   @lifetime(src1, src2)
+  ///   @lifetime(target: borrow src1, copy src2)
+  ///   @lifetime(2)
+  ///   @lifetime(self)
+  ///   ```
+  func generateLifetimeAttr(attribute node: AttributeSyntax) -> BridgedLifetimeAttr? {
+    guard self.ctx.langOptsHasFeature(.LifetimeDependence) else {
+      // TODO: Diagnose
+      fatalError("@lifetime attribute requires 'LifetimeDependence' feature")
+    }
+    guard let entry = self.generateLifetimeEntry(attribute: node) else {
+      // TODO: Diagnose?
+      return nil
+    }
+    return .createParsed(
+      self.ctx,
+      atLoc: self.generateSourceLoc(node.atSign),
+      range: self.generateAttrSourceRange(node),
+      entry: entry
     )
   }
 
