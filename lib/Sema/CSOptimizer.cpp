@@ -926,7 +926,10 @@ static void determineBestChoicesInContext(
         paramType = paramType->lookThroughAllOptionalTypes(paramOptionals);
 
         if (!candidateOptionals.empty() || !paramOptionals.empty()) {
-          if (paramOptionals.size() >= candidateOptionals.size()) {
+          // Can match i.e. Int? to Int or T to Int?
+          if ((paramOptionals.empty() &&
+               paramType->is<GenericTypeParamType>()) ||
+              paramOptionals.size() >= candidateOptionals.size()) {
             auto score = scoreCandidateMatch(genericSig, choice, candidateType,
                                              paramType, options);
             // Injection lowers the score slightly to comply with
@@ -1030,6 +1033,11 @@ static void determineBestChoicesInContext(
             hasUnsatisfiableRequirements |= toExamine.size() > 1;
           }
         }
+
+        // If there are no requirements associated with the generic
+        // parameter or dependent member type it could match any type.
+        if (requirements.empty())
+          return 0.7;
 
         // If some of the requirements cannot be satisfied, because
         // they reference other generic parameters, for example:
