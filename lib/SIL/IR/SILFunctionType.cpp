@@ -1573,18 +1573,29 @@ class DestructureInputs {
   std::optional<ForeignSelfInfo> ForeignSelf;
   AbstractionPattern TopLevelOrigType = AbstractionPattern::getInvalid();
   SmallVectorImpl<SILParameterInfo> &Inputs;
-  ArrayRef<LifetimeDependenceInfo> Dependencies;
+  SmallVectorImpl<int> &ParameterMap;
+  SmallBitVector &AddressableLoweredParameters;
   unsigned NextOrigParamIndex = 0;
+
+  void addLoweredParameter(SILParameterInfo parameter,
+                           unsigned formalParameterIndex) {
+    assert(Inputs.size() == ParameterMap.size());
+    Inputs.push_back(parameter);
+    ParameterMap.push_back(formalParameterIndex);
+  }
 
 public:
   DestructureInputs(TypeExpansionContext expansion, TypeConverter &TC,
                     const Conventions &conventions, const ForeignInfo &foreign,
                     std::optional<ActorIsolation> isolationInfo,
                     SmallVectorImpl<SILParameterInfo> &inputs,
-                    ArrayRef<LifetimeDependenceInfo> dependencies)
+                    SmallVectorImpl<int> &parameterMap,
+                    SmallBitVector &addressableParams)
       : expansion(expansion), TC(TC), Convs(conventions), Foreign(foreign),
         IsolationInfo(isolationInfo), Inputs(inputs),
-        Dependencies(dependencies) {}
+        ParameterMap(parameterMap),
+        AddressableLoweredParameters(addressableParams)
+  {}
 
   void destructure(AbstractionPattern origType,
                    CanAnyFunctionType::CanParamArrayRef params,
@@ -1657,7 +1668,8 @@ private:
       auto actorProtocol = TC.Context.getProtocol(KnownProtocolKind::Actor);
       auto actorType =
           ExistentialType::get(actorProtocol->getDeclaredInterfaceType());
-      addParameter(CanType(actorType).wrapInOptionalType(),
+      addParameter(-1,
+                   CanType(actorType).wrapInOptionalType(),
                    ParameterConvention::Direct_Guaranteed,
                    ParameterTypeFlags().withIsolated(true),
                    true /*implicit leading parameter*/);
@@ -1668,10 +1680,9 @@ private:
     // positioned after any parameters it adds.
     maybeAddForeignParameters();
     
-    // Parameters may lower differently when the function returns values that
-    // depends on them.
+    // Parameters may lower differently when they have scoped dependencies.
     SmallBitVector paramsWithScopedDependencies(params.size(), false);
-    for (auto &depInfo : Dependencies) {
+    for (auto &depInfo : extInfoBuilder.getLifetimeDependencies()) {
       if (auto scopeIndices = depInfo.getScopeIndices()) {
         paramsWithScopedDependencies |= scopeIndices->getBitVector();
       }
@@ -1701,7 +1712,8 @@ private:
         auto packTy = SILPackType::get(TC.Context, extInfo, {loweredParamTy});
 
         auto origFlags = param.getOrigFlags();
-        addPackParameter(packTy, origFlags.getValueOwnership(), origFlags);
+        addPackParameter(param.getSubstIndex(),
+                         packTy, origFlags.getValueOwnership(), origFlags);
         return;
       }
       
@@ -1710,6 +1722,7 @@ private:
       // pattern for the type.
       if (!param.isOrigPackExpansion()) {
         visit(param.getOrigType(), param.getSubstParams()[0],
+              param.getSubstIndex(),
               /*forSelf*/false,
               paramsWithScopedDependencies[param.getSubstIndex()]);
         return;
@@ -1732,7 +1745,8 @@ private:
       auto packTy = SILPackType::get(TC.Context, extInfo, packElts);
 
       auto origFlags = param.getOrigFlags();
-      addPackParameter(packTy, origFlags.getValueOwnership(), origFlags);
+      addPackParameter(param.getSubstIndex(),
+                       packTy, origFlags.getValueOwnership(), origFlags);
     });
 
     // Process the self parameter.  But if we have a formal foreign self
@@ -1741,15 +1755,24 @@ private:
     if (hasSelf && !hasForeignSelf) {
       auto origParamType = origType.getFunctionParamType(numOrigParams - 1);
       auto substParam = params.back();
-      visit(origParamType, substParam, /*forSelf*/true,
+      visit(origParamType, substParam,
+            params.size() - 1,
+            /*forSelf*/true,
             paramsWithScopedDependencies[params.size() - 1]);
     }
 
     TopLevelOrigType = AbstractionPattern::getInvalid();
     ForeignSelf = std::nullopt;
+
+    assert(ParameterMap.size() == Inputs.size());
+    
+    // Any parameters not yet marked addressable shouldn't be.
+    assert(AddressableLoweredParameters.size() <= ParameterMap.size());
+    AddressableLoweredParameters.resize(ParameterMap.size(), false);
   }
 
   void visit(AbstractionPattern origType, AnyFunctionType::Param substParam,
+             unsigned formalParamIndex,
              bool forSelf, bool hasScopedDependency) {
     // FIXME: we should really be using the flags from the original
     // parameter here, right?
@@ -1766,14 +1789,17 @@ private:
       bool indirect = true;
       SILPackType::ExtInfo extInfo(/*address*/ indirect);
       auto packTy = SILPackType::get(TC.Context, extInfo, {substType});
-      return addPackParameter(packTy, flags.getValueOwnership(), flags);
+      return addPackParameter(formalParamIndex,
+                              packTy, flags.getValueOwnership(), flags);
     }
 
-    visit(flags.getValueOwnership(), forSelf, hasScopedDependency,
+    visit(flags.getValueOwnership(), formalParamIndex,
+          forSelf, hasScopedDependency,
           origType, substType, flags);
   }
 
-  void visit(ValueOwnership ownership, bool forSelf, bool hasScopedDependency,
+  void visit(ValueOwnership ownership, int formalParamIndex,
+             bool forSelf, bool hasScopedDependency,
              AbstractionPattern origType, CanType substType,
              ParameterTypeFlags origFlags) {
     assert(!isa<InOutType>(substType));
@@ -1782,6 +1808,11 @@ private:
     // abstraction.
     if (origFlags.isAddressable()) {
       origType = AbstractionPattern::getOpaque();
+      
+      // Remember that this lowered parameter is addressable in the
+      // addressable parameters vector.
+      AddressableLoweredParameters.resize(ParameterMap.size() + 1, false);
+      AddressableLoweredParameters[ParameterMap.size()] = true;
     } else if (hasScopedDependency) {
       // If there is a scoped dependency on this parameter, and the parameter
       // is addressable-for-dependencies, then lower it with maximal abstraction
@@ -1789,12 +1820,18 @@ private:
       auto &initialSubstTL = TC.getTypeLowering(origType, substType, expansion);
       if (initialSubstTL.getRecursiveProperties().isAddressableForDependencies()) {
         origType = AbstractionPattern::getOpaque();
+
+        // Remember that this lowered parameter is addressable in the
+        // addressable parameters vector.
+        AddressableLoweredParameters.resize(ParameterMap.size() + 1, false);
+        AddressableLoweredParameters[ParameterMap.size()] = true;
       }
     }
 
     // Tuples get expanded unless they're inout.
     if (origType.isTuple() && ownership != ValueOwnership::InOut) {
-      expandTuple(ownership, forSelf, origType, substType, origFlags);
+      expandTuple(ownership, formalParamIndex,
+                  forSelf, origType, substType, origFlags);
       return;
     }
 
@@ -1825,11 +1862,12 @@ private:
       assert(!isIndirectFormalParameter(convention));
     }
 
-    addParameter(loweredType, convention, origFlags);
+    addParameter(formalParamIndex, loweredType, convention, origFlags);
   }
 
   /// Recursively expand a tuple type into separate parameters.
-  void expandTuple(ValueOwnership ownership, bool forSelf,
+  void expandTuple(ValueOwnership ownership, int formalParamIndex,
+                   bool forSelf,
                    AbstractionPattern origType, CanType substType,
                    ParameterTypeFlags oldFlags) {
     assert(ownership != ValueOwnership::InOut);
@@ -1837,7 +1875,7 @@ private:
 
     origType.forEachTupleElement(substType, [&](TupleElementGenerator &elt) {
       if (!elt.isOrigPackExpansion()) {
-        visit(ownership, forSelf, /*scoped dependency*/ false,
+        visit(ownership, formalParamIndex, forSelf, /*scoped dependency*/ false,
               elt.getOrigType(), elt.getSubstTypes()[0],
               oldFlags);
         return;
@@ -1858,13 +1896,14 @@ private:
       SILPackType::ExtInfo extInfo(/*address*/ indirect);
       auto packTy = SILPackType::get(TC.Context, extInfo, packElts);
 
-      addPackParameter(packTy, ownership, oldFlags);
+      addPackParameter(formalParamIndex, packTy, ownership, oldFlags);
     });
   }
 
   /// Add a parameter that we derived from deconstructing the
   /// formal type.
-  void addParameter(CanType loweredType, ParameterConvention convention,
+  void addParameter(int formalParameterIndex,
+                    CanType loweredType, ParameterConvention convention,
                     ParameterTypeFlags origFlags, bool isImplicit = false) {
     SILParameterInfo param(loweredType, convention);
 
@@ -1878,14 +1917,16 @@ private:
       param = param.addingOption(SILParameterInfo::ImplicitLeading);
 
     Inputs.push_back(param);
+    ParameterMap.push_back(formalParameterIndex);
     maybeAddForeignParameters();
   }
 
-  void addPackParameter(CanSILPackType packTy, ValueOwnership ownership,
+  void addPackParameter(int formalParameterIndex,
+                        CanSILPackType packTy, ValueOwnership ownership,
                         ParameterTypeFlags origFlags) {
     unsigned origParamIndex = NextOrigParamIndex++;
     auto convention = Convs.getPack(ownership, origParamIndex);
-    addParameter(packTy, convention, origFlags);
+    addParameter(formalParameterIndex, packTy, convention, origFlags);
   }
 
   /// Given that we've just reached an argument index for the
@@ -1912,6 +1953,8 @@ private:
       .getASTType();
     Inputs.push_back(SILParameterInfo(completionHandlerTy,
                                       ParameterConvention::Direct_Unowned));
+    // No corresponding formal parameter.
+    ParameterMap.push_back(-1);
     ++NextOrigParamIndex;
     return true;
   }
@@ -1927,6 +1970,8 @@ private:
     // Assume the error parameter doesn't have interesting lowering.
     Inputs.push_back(SILParameterInfo(foreignErrorTy,
                                       ParameterConvention::Direct_Unowned));
+    // No corresponding formal parameter.
+    ParameterMap.push_back(-1);
     ++NextOrigParamIndex;
     return true;
   }
@@ -1939,6 +1984,7 @@ private:
     if (ForeignSelf) {
       // This is a "self", but it's not a Swift self, we handle it differently.
       visit(ForeignSelf->SubstSelfParam.getValueOwnership(),
+            Foreign.self.getSelfIndex(),
             /*forSelf=*/false, /*scoped dependency=*/false,
             ForeignSelf->OrigSelfParam,
             ForeignSelf->SubstSelfParam.getParameterType(), {});
@@ -2515,19 +2561,10 @@ static CanSILFunctionType getSILFunctionType(
   updateResultTypeForForeignInfo(foreignInfo, genericSig, origResultType,
                                  substFormalResultType);
 
-  // Lifetime dependencies can influence parameter lowering if there are
-  // address dependencies.
-  ArrayRef<LifetimeDependenceInfo> dependencies = {};
-  if (constant) {
-    if (auto afd = dyn_cast_or_null<AbstractFunctionDecl>(constant->getDecl())){
-      if (auto declDependencies = afd->getLifetimeDependencies()) {
-        dependencies = *declDependencies;
-      }
-    }
-  }
-
   // Destructure the input tuple type.
   SmallVector<SILParameterInfo, 8> inputs;
+  SmallVector<int, 8> parameterMap;
+  SmallBitVector addressableParams;
   {
     std::optional<ActorIsolation> actorIsolation;
     if (constant) {
@@ -2550,7 +2587,7 @@ static CanSILFunctionType getSILFunctionType(
     }
     DestructureInputs destructurer(expansionContext, TC, conventions,
                                    foreignInfo, actorIsolation, inputs,
-                                   dependencies);
+                                   parameterMap, addressableParams);
     destructurer.destructure(origType, substFnInterfaceType.getParams(),
                              extInfoBuilder, unimplementable);
   }
@@ -2577,6 +2614,87 @@ static CanSILFunctionType getSILFunctionType(
     lowerCaptureContextParameters(TC, *constant, genericSig,
                                   TC.getCaptureTypeExpansionContext(*constant),
                                   inputs, extInfoBuilder);
+  }
+  
+  // Form the lowered lifetime dependency records using the parameter mapping
+  // we formed above.
+  SmallVector<LifetimeDependenceInfo, 8> loweredLifetimes;
+  auto lowerLifetimeDependence
+    = [&](const LifetimeDependenceInfo &formalDeps,
+          unsigned target) -> LifetimeDependenceInfo {
+      if (formalDeps.isImmortal()) {
+        return LifetimeDependenceInfo(nullptr, nullptr,
+                                      target, /*immortal*/ true);
+      }
+      
+      auto lowerIndexSet = [&](IndexSubset *formal) -> IndexSubset * {
+        if (!formal) {
+          return nullptr;
+        }
+        
+        SmallBitVector loweredIndices;
+        loweredIndices.resize(parameterMap.size());      
+        for (unsigned j = 0; j < parameterMap.size(); ++j) {
+          int formalIndex = parameterMap[j];
+          if (formalIndex < 0) {
+            continue;
+          }
+          loweredIndices[j] = formal->contains(formalIndex);
+        }
+        
+        if (!loweredIndices.any()) {
+          return nullptr;
+        }
+        
+        return IndexSubset::get(TC.Context, loweredIndices);
+      };
+      
+      IndexSubset *inheritIndicesSet
+        = lowerIndexSet(formalDeps.getInheritIndices());
+      IndexSubset *scopeIndicesSet
+        = lowerIndexSet(formalDeps.getScopeIndices());
+      
+      // If the original formal parameter dependencies were lowered away
+      // entirely (such as if they were of `()` type), then there is effectively
+      // no dependency, leaving behind an immortal value.
+      if (!inheritIndicesSet && !scopeIndicesSet) {
+        return LifetimeDependenceInfo(nullptr, nullptr, target,
+                                      /*immortal*/ true);
+      }
+      
+      SmallBitVector addressableDeps = scopeIndicesSet
+        ? scopeIndicesSet->getBitVector() & addressableParams
+        : SmallBitVector(1, false);
+      IndexSubset *addressableSet = addressableDeps.any()
+        ? IndexSubset::get(TC.Context, addressableDeps)
+        : nullptr;
+      
+      return LifetimeDependenceInfo(inheritIndicesSet,
+                                    scopeIndicesSet,
+                                    target, /*immortal*/ false,
+                                    addressableSet);
+    };
+  // Lower parameter dependencies.
+  for (unsigned i = 0; i < parameterMap.size(); ++i) {
+    if (parameterMap[i] < 0) {
+      continue;
+    }
+    
+    auto formalParamDeps = getLifetimeDependenceFor(
+                                       extInfoBuilder.getLifetimeDependencies(),
+                                       parameterMap[i]);
+    if (!formalParamDeps) {
+      continue;
+    }
+    
+    loweredLifetimes.emplace_back(lowerLifetimeDependence(*formalParamDeps, i));
+  }
+  // Lower the return value dependencies.
+  if (auto formalReturnDeps = getLifetimeDependenceFor(
+                                      extInfoBuilder.getLifetimeDependencies(),
+                                      substFnInterfaceType.getParams().size())){
+    loweredLifetimes.emplace_back(lowerLifetimeDependence(*formalReturnDeps,
+                                                          parameterMap.size()));
   }
   
   auto calleeConvention = ParameterConvention::Direct_Unowned;
@@ -2609,7 +2727,7 @@ static CanSILFunctionType getSILFunctionType(
           .withSendable(isSendable)
           .withAsync(isAsync)
           .withUnimplementable(unimplementable)
-          .withLifetimeDependencies(extInfoBuilder.getLifetimeDependencies())
+          .withLifetimeDependencies(loweredLifetimes)
           .build();
 
   return SILFunctionType::get(genericSig, silExtInfo, coroutineKind,
@@ -2639,8 +2757,12 @@ static CanSILFunctionType getSILFunctionTypeForInitAccessor(
     bool unimplementable = false;
     ForeignInfo foreignInfo;
     std::optional<ActorIsolation> actorIsolation; // For now always null.
+    SmallVector<int, 8> unusedParameterMap;
+    SmallBitVector unusedAddressableParams;
     DestructureInputs destructurer(context, TC, conventions, foreignInfo,
-                                   actorIsolation, inputs, {});
+                                   actorIsolation, inputs,
+                                   unusedParameterMap,
+                                   unusedAddressableParams);
     destructurer.destructure(
         origType, substAccessorType.getParams(),
         extInfoBuilder.withRepresentation(SILFunctionTypeRepresentation::Thin),
