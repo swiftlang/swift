@@ -5,6 +5,6 @@ let x: Int?
 
 let _ = [
 %for i in range(0, N):
-  "%{i}" : x ?? 0,
+  "${i}" : x ?? 0,
 %end
 ]
