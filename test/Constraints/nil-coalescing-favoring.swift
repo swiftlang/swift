@@ -28,3 +28,17 @@ do {
     let _: Super = x
   }
 }
+
+// Reduced from vapor project. Favoring _only_ an overload of `??` and takes `T?` as a second parameter would result in an invalid solution.
+extension Array where Element == UInt8 {
+  init?(decodingBase32 str: String) {
+    guard let decoded = str.utf8.withContiguousStorageIfAvailable({ Array(decodingBase32: $0) }) ?? Array(decodingBase32: Array(str.utf8)) else { // Ok
+      return nil
+    }
+    self = decoded
+  }
+
+  init?<C>(decodingBase32 bytes: C) where C: RandomAccessCollection, C.Element == UInt8, C.Index == Int {
+    fatalError()
+  }
+}
