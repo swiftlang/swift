@@ -202,6 +202,7 @@ CONDITIONALLY_SUPPRESSIBLE_LANGUAGE_FEATURE(IsolatedAny, 431, "@isolated(any) fu
 LANGUAGE_FEATURE(IsolatedAny2, 431, "@isolated(any) function types")
 LANGUAGE_FEATURE(ObjCImplementation, 436, "@objc @implementation extensions")
 LANGUAGE_FEATURE(NonescapableTypes, 446, "Nonescapable types")
+LANGUAGE_FEATURE(BuiltinEmplaceTypedThrows, 0, "Builtin.emplace typed throws")
 
 // Swift 6
 UPCOMING_FEATURE(ConciseMagicFile, 274, 6)
