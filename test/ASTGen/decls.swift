@@ -1,13 +1,13 @@
 
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend-dump-parse -disable-availability-checking -enable-experimental-move-only -enable-experimental-feature ValueGenerics -enable-experimental-feature ParserASTGen \
+// RUN: %target-swift-frontend-dump-parse -disable-availability-checking -enable-experimental-move-only -enable-experimental-concurrency -enable-experimental-feature ValueGenerics -enable-experimental-feature ParserASTGen \
 // RUN:    | %sanitize-address > %t/astgen.ast
-// RUN: %target-swift-frontend-dump-parse -disable-availability-checking -enable-experimental-move-only -enable-experimental-feature ValueGenerics \
+// RUN: %target-swift-frontend-dump-parse -disable-availability-checking -enable-experimental-move-only -enable-experimental-concurrency -enable-experimental-feature ValueGenerics \
 // RUN:    | %sanitize-address > %t/cpp-parser.ast
 
 // RUN: %diff -u %t/astgen.ast %t/cpp-parser.ast
 
-// RUN: %target-run-simple-swift(-Xfrontend -disable-availability-checking -enable-experimental-feature ParserASTGen -enable-experimental-feature ValueGenerics)
+// RUN: %target-run-simple-swift(-Xfrontend -disable-availability-checking -Xfrontend -enable-experimental-concurrency -enable-experimental-feature ValueGenerics -enable-experimental-feature ParserASTGen)
 
 // REQUIRES: executable_test
 // REQUIRES: swift_swift_parser
@@ -103,6 +103,15 @@ func testVars() {
   var s: Int {
     get async throws { return 0 }
   }
+}
+
+func rethrowingFn(fn: () throws -> Void) rethrows {}
+func reasyncFn(fn: () async -> Void) reasync {}
+func testRethrows() {
+    rethrowingFn { _ = 1 }
+
+    // FIXME: Assertion failed: (isAsync()), function getAsyncContext, file GenCall.cpp, line 215.
+    // reasyncFn { _ = 1 }
 }
 
 struct TestVars {
