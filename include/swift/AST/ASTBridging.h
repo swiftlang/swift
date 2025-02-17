@@ -1212,13 +1212,20 @@ BridgedAccessorDecl BridgedAccessorDecl_createParsed(
     BridgedNullableParameterList cParamList, BridgedSourceLoc cAsyncLoc,
     BridgedSourceLoc cThrowsLoc, BridgedNullableTypeRepr cThrownType);
 
-SWIFT_NAME(
-    "BridgedPatternBindingDecl.createParsed(_:declContext:bindingKeywordLoc:"
-    "entries:attributes:isStatic:isLet:)")
+enum ENUM_EXTENSIBILITY_ATTR(closed) BridgedVarDeclIntroducer {
+  BridgedVarDeclIntroducerLet = 0,
+  BridgedVarDeclIntroducerVar = 1,
+  BridgedVarDeclIntroducerInOut = 2,
+  BridgedVarDeclIntroducerBorrowing = 3,
+};
+
+SWIFT_NAME("BridgedPatternBindingDecl.createParsed(_:declContext:attributes:"
+           "staticLoc:staticSpelling:introducerLoc:introducer:entries:)")
 BridgedPatternBindingDecl BridgedPatternBindingDecl_createParsed(
     BridgedASTContext cContext, BridgedDeclContext cDeclContext,
-    BridgedSourceLoc cBindingKeywordLoc, BridgedArrayRef cBindingEntries, BridgedDeclAttributes cAttrs,
-                                                                 bool isStatic, bool isLet);
+    BridgedDeclAttributes cAttrs, BridgedSourceLoc cStaticLoc,
+    BridgedStaticSpelling cStaticSpelling, BridgedSourceLoc cIntroducerLoc,
+    BridgedVarDeclIntroducer cIntorducer, BridgedArrayRef cBindingEntries);
 
 SWIFT_NAME("BridgedParamDecl.createParsed(_:declContext:specifierLoc:argName:"
            "argNameLoc:paramName:paramNameLoc:type:defaultValue:)")

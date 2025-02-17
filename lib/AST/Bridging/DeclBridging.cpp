@@ -141,13 +141,33 @@ BridgedAccessorDecl BridgedAccessorDecl_createParsed(
       cThrownType.unbridged(), cDeclContext.unbridged());
 }
 
+static VarDecl::Introducer unbridged(BridgedVarDeclIntroducer introducer) {
+  switch (introducer) {
+  case BridgedVarDeclIntroducerLet:
+    return swift::VarDecl::Introducer::Let;
+  case BridgedVarDeclIntroducerVar:
+    return swift::VarDecl::Introducer::Var;
+  case BridgedVarDeclIntroducerInOut:
+    return swift::VarDecl::Introducer::InOut;
+  case BridgedVarDeclIntroducerBorrowing:
+    return swift::VarDecl::Introducer::Borrowing;
+  }
+  llvm_unreachable("unhandled enum value");
+}
+
 BridgedPatternBindingDecl BridgedPatternBindingDecl_createParsed(
     BridgedASTContext cContext, BridgedDeclContext cDeclContext,
-    BridgedSourceLoc cBindingKeywordLoc, BridgedArrayRef cBindingEntries, BridgedDeclAttributes cAttrs, bool isStatic, bool isLet) {
+    BridgedDeclAttributes cAttrs, BridgedSourceLoc cStaticLoc,
+    BridgedStaticSpelling cStaticSpelling, BridgedSourceLoc cIntroducerLoc,
+    BridgedVarDeclIntroducer cIntroducer, BridgedArrayRef cBindingEntries) {
+
   ASTContext &context = cContext.unbridged();
   DeclContext *declContext = cDeclContext.unbridged();
 
-  auto introducer = isLet ? VarDecl::Introducer::Let : VarDecl::Introducer::Var;
+  auto introducer = unbridged(cIntroducer);
+  auto introducerLoc = cIntroducerLoc.unbridged();
+  auto staticSpelling = unbridged(cStaticSpelling);
+  auto staticLoc = cStaticLoc.unbridged();
 
   SmallVector<PatternBindingEntry, 4> entries;
   for (auto &entry : cBindingEntries.unbridged<BridgedPatternBindingEntry>()) {
@@ -156,7 +176,7 @@ BridgedPatternBindingDecl BridgedPatternBindingDecl_createParsed(
     // Configure all vars.
     pattern->forEachVariable([&](VarDecl *VD) {
       VD->attachParsedAttrs(cAttrs.unbridged());
-      VD->setStatic(isStatic);
+      VD->setStatic(staticLoc.isValid());
       VD->setIntroducer(introducer);
       VD->setTopLevelGlobal(isa<TopLevelCodeDecl>(declContext));
     });
@@ -165,12 +185,8 @@ BridgedPatternBindingDecl BridgedPatternBindingDecl_createParsed(
                          entry.init.unbridged(), entry.initContext.unbridged());
   }
 
-  return PatternBindingDecl::create(
-      context,
-      /*StaticLoc=*/SourceLoc(),
-      // FIXME: 'class' spelling kind.
-      isStatic ? StaticSpellingKind::KeywordStatic : StaticSpellingKind::None,
-      cBindingKeywordLoc.unbridged(), entries, declContext);
+  return PatternBindingDecl::create(context, staticLoc, staticSpelling,
+                                    introducerLoc, entries, declContext);
 }
 
 BridgedParamDecl BridgedParamDecl_createParsed(
