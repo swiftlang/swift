@@ -3402,6 +3402,9 @@ void IRGenDebugInfoImpl::emitVariableDeclaration(
   if (!DInstLine || (ArgNo > 0 && VarInfo.Name == IGM.Context.Id_self.str()))
     Artificial = ArtificialValue;
 
+  if (VarInfo.Name == "index")
+    llvm::errs();
+
   llvm::DINode::DIFlags Flags = llvm::DINode::FlagZero;
   if (Artificial || DITy->isArtificial() || DITy == InternalType)
     Flags |= llvm::DINode::FlagArtificial;
@@ -3458,10 +3461,10 @@ void IRGenDebugInfoImpl::emitVariableDeclaration(
 
   auto appendDIExpression =
       [&VarInfo, this](llvm::DIExpression *DIExpr,
-                       llvm::DIExpression::FragmentInfo PieceFragment)
-      -> llvm::DIExpression * {
+                       llvm::DIExpression::FragmentInfo PieceFragment,
+                       bool IsFirstAndOnlyPiece) -> llvm::DIExpression * {
     if (!VarInfo.DIExpr) {
-      if (!PieceFragment.SizeInBits)
+      if (!PieceFragment.SizeInBits || IsFirstAndOnlyPiece)
         return DIExpr;
 
       return llvm::DIExpression::createFragmentExpression(
@@ -3478,7 +3481,7 @@ void IRGenDebugInfoImpl::emitVariableDeclaration(
       DIExpr = llvm::DIExpression::append(DIExpr, Operands);
 
     // Add the fragment of the SIL variable.
-    if (VarFragment.SizeInBits)
+    if (VarFragment.SizeInBits && !IsFirstAndOnlyPiece)
       DIExpr = llvm::DIExpression::createFragmentExpression(
                    DIExpr, VarFragment.OffsetInBits, VarFragment.SizeInBits)
                    .value_or(nullptr);
@@ -3528,8 +3531,14 @@ void IRGenDebugInfoImpl::emitVariableDeclaration(
       Fragment.OffsetInBits = OffsetInBits;
       Fragment.SizeInBits = SizeInBits;
     }
+    // LLVM complains if a single fragment covers the entire variable. This can
+    // happen if, e.g., the optimizer takes the _value out of an Int
+    // struct. Detect this case and don't emit a fragment.
+    bool IsFirstAndOnlyPiece =
+        !IsPiece && Fragment.OffsetInBits == 0 &&
+        Fragment.SizeInBits == getSizeInBits(Var->getType());
     llvm::DIExpression *DIExpr = DBuilder.createExpression(Operands);
-    DIExpr = appendDIExpression(DIExpr, Fragment);
+    DIExpr = appendDIExpression(DIExpr, Fragment, IsFirstAndOnlyPiece);
     if (DIExpr)
       emitDbgIntrinsic(
           Builder, Piece, Var, DIExpr, DInstLine, DInstLoc.Column, Scope, DS,
@@ -3541,7 +3550,7 @@ void IRGenDebugInfoImpl::emitVariableDeclaration(
   if (Storage.empty()) {
     llvm::DIExpression::FragmentInfo NoFragment = {0, 0};
     if (auto *DIExpr =
-            appendDIExpression(DBuilder.createExpression(), NoFragment))
+            appendDIExpression(DBuilder.createExpression(), NoFragment, false))
       emitDbgIntrinsic(Builder, llvm::ConstantInt::get(IGM.Int64Ty, 0), Var,
                        DIExpr, DInstLine, DInstLoc.Column, Scope, DS,
                        Indirection == CoroDirectValue ||
