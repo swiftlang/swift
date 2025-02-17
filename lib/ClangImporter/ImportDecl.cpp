@@ -2244,7 +2244,7 @@ namespace {
       bool isNonEscapable = false;
       if (evaluateOrDefault(
               Impl.SwiftContext.evaluator,
-              ClangTypeEscapability({decl->getTypeForDecl(), Impl}),
+              ClangTypeEscapability({decl->getTypeForDecl(), &Impl}),
               CxxEscapability::Unknown) == CxxEscapability::NonEscapable) {
         result->getAttrs().add(new (Impl.SwiftContext)
                                    NonEscapableAttr(/*Implicit=*/true));
@@ -4116,7 +4116,7 @@ namespace {
             evaluateOrDefault(
                 Impl.SwiftContext.evaluator,
                 ClangTypeEscapability(
-                    {ctordecl->getParent()->getTypeForDecl(), Impl}),
+                    {ctordecl->getParent()->getTypeForDecl(), &Impl}),
                 CxxEscapability::Unknown) == CxxEscapability::NonEscapable)
           lifetimeDependencies.push_back(immortalLifetime);
       }
@@ -8501,8 +8501,7 @@ static bool importAsUnsafe(ClangImporter::Implementation &impl,
     return false;
 
   if (isa<clang::CXXMethodDecl>(decl) &&
-      !evaluateOrDefault(context.evaluator, IsSafeUseOfCxxDecl({decl, context}),
-                         {}))
+      !evaluateOrDefault(context.evaluator, IsSafeUseOfCxxDecl({decl}), {}))
     return true;
 
   if (isa<ClassDecl>(MappedDecl))
@@ -8518,7 +8517,7 @@ static bool importAsUnsafe(ClangImporter::Implementation &impl,
   if (const auto *record = dyn_cast<clang::RecordDecl>(decl))
     return evaluateOrDefault(
                context.evaluator,
-               ClangTypeEscapability({record->getTypeForDecl(), impl, false}),
+               ClangTypeEscapability({record->getTypeForDecl(), &impl, false}),
                CxxEscapability::Unknown) == CxxEscapability::Unknown;
 
   return false;

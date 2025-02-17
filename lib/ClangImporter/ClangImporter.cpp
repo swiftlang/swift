@@ -5213,9 +5213,10 @@ ClangTypeEscapability::evaluate(Evaluator &evaluator,
           } else
             nonPackArgs.push_back(arg);
           for (auto nonPackArg : nonPackArgs) {
-            if (nonPackArg.getKind() != clang::TemplateArgument::Type) {
-              desc.impl.diagnose(loc, diag::type_template_parameter_expected,
-                                 argToCheck.second);
+            if (nonPackArg.getKind() != clang::TemplateArgument::Type &&
+                desc.impl) {
+              desc.impl->diagnose(loc, diag::type_template_parameter_expected,
+                                  argToCheck.second);
               return CxxEscapability::Unknown;
             }
 
@@ -5236,8 +5237,9 @@ ClangTypeEscapability::evaluate(Evaluator &evaluator,
         }
       }
 
-      for (auto name : conditionalParams)
-        desc.impl.diagnose(loc, diag::unknown_template_parameter, name);
+      if (desc.impl)
+        for (auto name : conditionalParams)
+          desc.impl->diagnose(loc, diag::unknown_template_parameter, name);
 
       return hadUnknown ? CxxEscapability::Unknown : CxxEscapability::Escapable;
     }
@@ -8216,9 +8218,7 @@ CustomRefCountingOperationResult CustomRefCountingOperation::evaluate(
 }
 
 /// Check whether the given Clang type involves an unsafe type.
-static bool hasUnsafeType(
-    Evaluator &evaluator, ASTContext &swiftContext, clang::QualType clangType
-) {
+static bool hasUnsafeType(Evaluator &evaluator, clang::QualType clangType) {
   // Handle pointers.
   auto pointeeType = clangType->getPointeeType();
   if (!pointeeType.isNull()) {
@@ -8239,10 +8239,9 @@ static bool hasUnsafeType(
   
   // Handle records recursively.
   if (auto recordDecl = clangType->getAsTagDecl()) {
-    auto safety = evaluateOrDefault(
-        evaluator, 
-        ClangDeclExplicitSafety({recordDecl, swiftContext}),
-        ExplicitSafety::Unspecified);
+    auto safety =
+        evaluateOrDefault(evaluator, ClangDeclExplicitSafety({recordDecl}),
+                          ExplicitSafety::Unspecified);
     switch (safety) {
       case ExplicitSafety::Unsafe:
         return true;
@@ -8285,7 +8284,10 @@ ExplicitSafety ClangDeclExplicitSafety::evaluate(
 
   // Escapable and non-escapable annotations imply that the declaration is
   // safe.
-  if (hasNonEscapableAttr(recordDecl) || hasEscapableAttr(recordDecl))
+  if (evaluateOrDefault(
+          evaluator,
+          ClangTypeEscapability({recordDecl->getTypeForDecl(), nullptr}),
+          CxxEscapability::Unknown) != CxxEscapability::Unknown)
     return ExplicitSafety::Safe;
   
   // If we don't have a definition, leave it unspecified.
@@ -8296,14 +8298,14 @@ ExplicitSafety ClangDeclExplicitSafety::evaluate(
   // If this is a C++ class, check its bases.
   if (auto cxxRecordDecl = dyn_cast<clang::CXXRecordDecl>(recordDecl)) {
     for (auto base : cxxRecordDecl->bases()) {
-      if (hasUnsafeType(evaluator, desc.ctx, base.getType()))
+      if (hasUnsafeType(evaluator, base.getType()))
         return ExplicitSafety::Unsafe;
     }
   }
   
   // Check the fields.
   for (auto field : recordDecl->fields()) {
-    if (hasUnsafeType(evaluator, desc.ctx, field->getType()))
+    if (hasUnsafeType(evaluator, field->getType()))
       return ExplicitSafety::Unsafe;
   }
   

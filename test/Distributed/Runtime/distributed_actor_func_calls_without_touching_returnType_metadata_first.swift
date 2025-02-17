@@ -1057,10 +1057,8 @@ distributed actor D {
   }
 }
 
-// This is the dumbest imaginable way to spin on a value.
 func attempt(n: Int) {
   var fname = "$s4dist1DC13getBigGenericAA0cD0VyAA8Type\(n)VGyF"
-//  var fname = "$s4dist1DC13getBigGenericAA0cD0VyAA8Type\(n)VGyYaKFTE"
 
   func tryLookup() {
     let t = fname.withUTF8 {

@@ -417,10 +417,8 @@ private:
 
 struct SafeUseOfCxxDeclDescriptor final {
   const clang::Decl *decl;
-  ASTContext &ctx;
 
-  SafeUseOfCxxDeclDescriptor(const clang::Decl *decl, ASTContext &ctx)
-      : decl(decl), ctx(ctx) {}
+  SafeUseOfCxxDeclDescriptor(const clang::Decl *decl) : decl(decl) {}
 
   friend llvm::hash_code hash_value(const SafeUseOfCxxDeclDescriptor &desc) {
     return llvm::hash_combine(desc.decl);
@@ -528,7 +526,7 @@ enum class CxxEscapability { Escapable, NonEscapable, Unknown };
 
 struct EscapabilityLookupDescriptor final {
   const clang::Type *type;
-  ClangImporter::Implementation &impl;
+  ClangImporter::Implementation *impl;
   bool annotationOnly = true;
 
   friend llvm::hash_code hash_value(const EscapabilityLookupDescriptor &desc) {
