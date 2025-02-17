@@ -47,7 +47,7 @@ enum class LifetimeDependenceKind : uint8_t { Inherit = 0, Scope };
 struct LifetimeDescriptor {
   union Value {
     struct {
-      StringRef name;
+      Identifier name;
     } Named;
     struct {
       unsigned index;
@@ -55,7 +55,7 @@ struct LifetimeDescriptor {
     } Ordered;
     struct {
     } Self;
-    Value(StringRef name) : Named({name}) {}
+    Value(Identifier name) : Named({name}) {}
     Value(unsigned index, bool isAddress) : Ordered({index, isAddress}) {}
     Value() : Self() {}
   } value;
@@ -67,7 +67,7 @@ struct LifetimeDescriptor {
   SourceLoc loc;
 
 private:
-  LifetimeDescriptor(StringRef name,
+  LifetimeDescriptor(Identifier name,
                      ParsedLifetimeDependenceKind parsedLifetimeDependenceKind,
                      SourceLoc loc)
       : value{name}, kind(DescriptorKind::Named),
@@ -84,7 +84,7 @@ private:
 
 public:
   static LifetimeDescriptor
-  forNamed(StringRef name,
+  forNamed(Identifier name,
            ParsedLifetimeDependenceKind parsedLifetimeDependenceKind,
            SourceLoc loc) {
     return {name, parsedLifetimeDependenceKind, loc};
@@ -106,7 +106,7 @@ public:
     return parsedLifetimeDependenceKind;
   }
 
-  StringRef getName() const {
+  Identifier getName() const {
     assert(kind == DescriptorKind::Named);
     return value.Named.name;
   }
@@ -130,13 +130,13 @@ public:
     if (getDescriptorKind() != LifetimeDescriptor::DescriptorKind::Named) {
       return false;
     }
-    return getName() == "immortal";
+    return getName().str() == "immortal";
   }
 
   std::string getString() const {
     switch (kind) {
     case DescriptorKind::Named:
-      return getName().str();
+      return getName().str().str();
     case DescriptorKind::Ordered:
       return std::to_string(getIndex());
     case DescriptorKind::Self:

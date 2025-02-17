@@ -376,9 +376,8 @@ unbridged(BridgedParsedLifetimeDependenceKind kind) {
 swift::LifetimeDescriptor BridgedLifetimeDescriptor::unbridged() {
   switch (kind) {
   case DescriptorKind::Named:
-    return LifetimeDescriptor::forNamed(value.name.unbridged().str(),
-                                        ::unbridged(dependenceKind),
-                                        loc.unbridged());
+    return LifetimeDescriptor::forNamed(
+        value.name.unbridged(), ::unbridged(dependenceKind), loc.unbridged());
   case DescriptorKind::Ordered:
     return LifetimeDescriptor::forOrdered(
         value.index, ::unbridged(dependenceKind), loc.unbridged());

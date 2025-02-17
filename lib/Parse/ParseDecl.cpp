@@ -2497,8 +2497,7 @@ parseLifetimeDescriptor(Parser &P,
                                             /*addressable*/ true);
     }
     
-    return LifetimeDescriptor::forNamed(name.str(), lifetimeDependenceKind,
-                                        loc);
+    return LifetimeDescriptor::forNamed(name, lifetimeDependenceKind, loc);
   }
   case tok::integer_literal: {
     SourceLoc loc;
