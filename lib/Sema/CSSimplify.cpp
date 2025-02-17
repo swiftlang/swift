@@ -3668,7 +3668,8 @@ static bool matchSendableExistentialToAnyInGenericArgumentPosition(
 
     for (unsigned i = 0, n = path.size(); i < n; ++i) {
       const auto &elt = path[i];
-      if (elt.is<LocatorPathElt::GenericType>()) {
+      if (elt.is<LocatorPathElt::GenericType>() ||
+          elt.is<LocatorPathElt::LValueConversion>()) {
         if (!dropFromIdx)
           dropFromIdx = i;
         continue;
@@ -3708,6 +3709,12 @@ static bool matchSendableExistentialToAnyInGenericArgumentPosition(
         if (locator->isLastElement<LocatorPathElt::ApplyArgToParam>())
           return isPreconcurrencyContext(
               cs.getConstraintLocator(simplifyLocatorToAnchor(locator)));
+
+        if (locator->directlyAt<InOutExpr>()) {
+          auto *IOE = castToExpr<InOutExpr>(locator->getAnchor());
+          return isPreconcurrencyContext(
+              cs.getConstraintLocator(IOE->getSubExpr()));
+        }
 
         auto *calleeLoc = cs.getCalleeLocator(locator);
         if (!calleeLoc)
