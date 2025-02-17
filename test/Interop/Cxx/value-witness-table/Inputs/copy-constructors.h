@@ -47,6 +47,30 @@ struct HasCopyConstructorWithOneParameterWithDefaultArg {
       : numCopies(other.numCopies + 1) {}
 };
 
+struct HasMoveConstructorWithDefaultArgsStruct {
+  int value;
+  HasMoveConstructorWithDefaultArgsStruct(int value) : value(value) {}
+
+  HasMoveConstructorWithDefaultArgsStruct(
+      const HasMoveConstructorWithDefaultArgsStruct &) = default;
+
+  HasMoveConstructorWithDefaultArgsStruct(
+      HasMoveConstructorWithDefaultArgsStruct &&other, int value = 1)
+      : value(other.value + value) {}
+};
+
+class HasMoveConstructorWithDefaultArgsClass {
+  int value;
+  HasMoveConstructorWithDefaultArgsClass(int value) : value(value) {}
+
+  HasMoveConstructorWithDefaultArgsClass(
+      const HasMoveConstructorWithDefaultArgsClass &) = default;
+
+  HasMoveConstructorWithDefaultArgsClass(
+      HasMoveConstructorWithDefaultArgsClass &&other, int value = 1)
+      : value(other.value + value) {}
+};
+
 // Make sure that we don't crash on struct templates with copy-constructors.
 template <typename T> struct S {
   S(S const &) {}

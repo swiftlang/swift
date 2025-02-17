@@ -19,3 +19,5 @@ let _ = TemplatedCopyConstructor(123)
 let _ = TemplatedCopyConstructorWithExtraArg(123)
 takesCopyable(TemplatedCopyConstructor.self)
 takesCopyable(TemplatedCopyConstructorWithExtraArg.self)
+
+// DEBUG add test here

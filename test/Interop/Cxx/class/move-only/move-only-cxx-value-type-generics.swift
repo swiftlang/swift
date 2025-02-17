@@ -37,4 +37,6 @@ MoveOnlyCxxValueType.test("Test move only type ref return pointee borrow") {
 #endif
 }
 
+// DEBUG add test here
+
 runAllTests()

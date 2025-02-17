@@ -7891,7 +7891,7 @@ static bool hasMoveTypeOperations(const clang::CXXRecordDecl *decl) {
     return false;
 
   return llvm::any_of(decl->ctors(), [](clang::CXXConstructorDecl *ctor) {
-    return ctor->isMoveConstructor();
+    return ctor->isMoveConstructor() && !hasNonFirstDefaultArg(ctor);
   });
 }
 

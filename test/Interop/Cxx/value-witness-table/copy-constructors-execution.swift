@@ -69,4 +69,24 @@ CXXCopyConstructorTestSuite.test("Copy constructor with one parameter that has a
   expectEqual(copy.numCopies, 1)
 }
 
+CXXCopyConstructorTestSuite.test("Move constructor with default arguments") {
+  // When in the presence of a C++ copy constructor with default args, we make the type non-copyable
+  let originalStruct = HasMoveConstructorWithDefaultArgsStruct(5)
+  expectEqual(originalStruct.value, 5)
+
+  // copy originalStruct
+  let newStruct = originalStruct
+  expectEqual(newStruct.value, 5)
+
+
+  // Class
+
+  let originalClass = HasMoveConstructorWithDefaultArgsClass(5)
+  expectEqual(originalClass.value, 5)
+
+  // copy originalClass
+  let newClass = originalClass
+  expectEqual(newClass.value, 5)
+}
+
 runAllTests()

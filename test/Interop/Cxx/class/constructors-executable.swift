@@ -63,4 +63,6 @@ CxxConstructorTestSuite.test("implicit default ctor") {
   expectNil(instance3.ptr)
 }
 
+// DEBUG add test here
+
 runAllTests()
