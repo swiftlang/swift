@@ -401,9 +401,6 @@ SUPPRESSIBLE_EXPERIMENTAL_FEATURE(AllowUnsafeAttribute, true)
 /// Warn on use of unsafe constructs.
 EXPERIMENTAL_FEATURE(WarnUnsafe, true)
 
-/// Import unsafe C and C++ constructs as @unsafe.
-EXPERIMENTAL_FEATURE(SafeInterop, true)
-
 // Import bounds safety and lifetime attributes from interop headers to
 // generate Swift wrappers with safe pointer types.
 EXPERIMENTAL_FEATURE(SafeInteropWrappers, false)
