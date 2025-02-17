@@ -21,20 +21,11 @@ internal func _allASCII(_ input: UnsafeBufferPointer<UInt8>) -> Bool {
   //
   let count = input.count
   var ptr = UnsafeRawPointer(input.baseAddress._unsafelyUnwrappedUnchecked)
-
+  let end = Int(bitPattern: ptr) + count
+  
   let asciiMask64 = 0x8080_8080_8080_8080 as UInt64
-  let asciiMask32 = UInt32(truncatingIfNeeded: asciiMask64)
-  let asciiMask16 = UInt16(truncatingIfNeeded: asciiMask64)
-  let asciiMask8 = UInt8(truncatingIfNeeded: asciiMask64)
-  
-  let end128 = ptr + count & ~(MemoryLayout<(UInt64, UInt64)>.stride &- 1)
-  let end64 = ptr + count & ~(MemoryLayout<UInt64>.stride &- 1)
-  let end32 = ptr + count & ~(MemoryLayout<UInt32>.stride &- 1)
-  let end16 = ptr + count & ~(MemoryLayout<UInt16>.stride &- 1)
-  let end = ptr + count
-
-  
-  while ptr < end128 {
+  let end128 = end & ~(MemoryLayout<(UInt64, UInt64)>.stride &- 1)
+  while Int(bitPattern: ptr) < end128 {
     let pair = ptr.loadUnaligned(as: (UInt64, UInt64).self)
     let result = (pair.0 | pair.1) & asciiMask64
     guard result == 0 else { return false }
@@ -43,29 +34,35 @@ internal func _allASCII(_ input: UnsafeBufferPointer<UInt8>) -> Bool {
   
   // If we had enough bytes for two iterations of this, we would have hit
   // the loop above, so we only need to do this once
-  if ptr < end64 {
+  let end64 = end & ~(MemoryLayout<UInt64>.stride &- 1)
+  if Int(bitPattern: ptr) < end64 {
     let value = ptr.loadUnaligned(as: UInt64.self)
     guard value & asciiMask64 == 0 else { return false }
     ptr = ptr + MemoryLayout<UInt64>.stride
   }
   
-  if ptr < end32 {
+  let asciiMask32 = UInt32(truncatingIfNeeded: asciiMask64)
+  let end32 = end & ~(MemoryLayout<UInt32>.stride &- 1)
+  if Int(bitPattern: ptr) < end32 {
     let value = ptr.loadUnaligned(as: UInt32.self)
     guard value & asciiMask32 == 0 else { return false }
     ptr = ptr + MemoryLayout<UInt32>.stride
   }
   
-  if ptr < end16 {
+  let asciiMask16 = UInt16(truncatingIfNeeded: asciiMask64)
+  let end16 = end & ~(MemoryLayout<UInt16>.stride &- 1)
+  if Int(bitPattern: ptr) < end16 {
     let value = ptr.loadUnaligned(as: UInt16.self)
     guard value & asciiMask16 == 0 else { return false }
     ptr = ptr + MemoryLayout<UInt16>.stride
   }
 
-  if ptr < end {
-    let value = ptr.loadUnaligned(fromByteOffset: 0, as: UInt8.self)
+  let asciiMask8 = UInt8(truncatingIfNeeded: asciiMask64)
+  if Int(bitPattern: ptr) < end {
+    let value = ptr.loadUnaligned(as: UInt8.self)
     guard value & asciiMask8 == 0 else { return false }
   }
-  _internalInvariant(ptr == end || ptr + 1 == end)
+  _internalInvariant(Int(bitPattern: ptr) == end || Int(bitPattern: ptr) + 1 == end)
   return true
 }
 
