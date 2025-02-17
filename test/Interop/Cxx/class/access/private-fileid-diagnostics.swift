@@ -1,6 +1,9 @@
 // RUN: split-file %s %t
 // RUN: %target-swift-frontend -typecheck -verify %t/some/subdir/file1.swift -verify-additional-file %t/Cxx/include/cxx-header.h -I %t/Cxx/include -cxx-interoperability-mode=default -module-name main -suppress-remarks
 
+// This test uses -verify-additional-file, which do not work well on Windows:
+// UNSUPPORTED: OS=windows-msvc
+
 //--- Cxx/include/module.modulemap
 module CxxModule {
     requires cplusplus
