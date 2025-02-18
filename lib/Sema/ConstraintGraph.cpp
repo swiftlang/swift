@@ -322,10 +322,16 @@ void ConstraintGraphNode::updateFixedType(
   }
 }
 
-void ConstraintGraphNode::retractFromInference(Type fixedType) {
+void ConstraintGraphNode::retractFromInference() {
   auto &cs = CG.getConstraintSystem();
-  return updateFixedType(
-      fixedType,
+
+  // Notify all of the type variables that reference this one.
+  //
+  // Since this type variable is going to be replaced with a fixed type
+  // all of the concrete types that reference it are going to change,
+  // which means that all of the not-yet-attempted bindings should
+  // change as well.
+  return notifyReferencingVars(
       [&cs](ConstraintGraphNode &node, Constraint *constraint) {
         node.getPotentialBindings().retract(cs, node.getTypeVariable(), constraint);
       });
@@ -523,8 +529,8 @@ void ConstraintGraph::bindTypeVariable(TypeVariableType *typeVar, Type fixed) {
   }
 }
 
-void ConstraintGraph::retractFromInference(TypeVariableType *typeVar, Type fixed) {
-  (*this)[typeVar].retractFromInference(fixed);
+void ConstraintGraph::retractFromInference(TypeVariableType *typeVar) {
+  (*this)[typeVar].retractFromInference();
 }
 
 void ConstraintGraph::introduceToInference(TypeVariableType *typeVar, Type fixed) {

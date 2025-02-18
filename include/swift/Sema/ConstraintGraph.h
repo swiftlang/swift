@@ -148,7 +148,7 @@ private:
 
   /// Perform graph updates that must be undone after we bind a fixed type
   /// to a type variable.
-  void retractFromInference(Type fixedType);
+  void retractFromInference();
 
   /// Perform graph updates that must be undone before we bind a fixed type
   /// to a type variable.
@@ -294,7 +294,7 @@ public:
 
   /// Perform graph updates that must be undone after we bind a fixed type
   /// to a type variable.
-  void retractFromInference(TypeVariableType *typeVar, Type fixedType);
+  void retractFromInference(TypeVariableType *typeVar);
 
   /// Perform graph updates that must be undone before we bind a fixed type
   /// to a type variable.
