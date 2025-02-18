@@ -539,10 +539,13 @@ public struct Builder {
   public func createInitExistentialMetatype(
     metatype: Value,
     existentialType: Type,
-    conformances: ConformanceArray) -> InitExistentialMetatypeInst {
-    let initExistential = bridged.createInitExistentialMetatype(metatype.bridged,
-                                                                existentialType.bridged,
-                                                                conformances.bridged)
+    conformances: [Conformance]
+  ) -> InitExistentialMetatypeInst {
+    let initExistential = conformances.map{ $0.bridged }.withBridgedArrayRef {
+      return bridged.createInitExistentialMetatype(metatype.bridged,
+                                                   existentialType.bridged,
+                                                   BridgedConformanceArray(pcArray: $0))
+    }
     return notifyNew(initExistential.getAs(InitExistentialMetatypeInst.self))
   }
 
