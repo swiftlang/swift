@@ -701,6 +701,8 @@ static void determineBestChoicesInContext(
     llvm::TinyPtrVector<Type> resultTypes;
 
     bool hasArgumentCandidates = false;
+    bool isOperator = isOperatorDisjunction(disjunction);
+
     for (unsigned i = 0, n = argFuncType->getNumParams(); i != n; ++i) {
       const auto &param = argFuncType->getParams()[i];
       auto argType = cs.simplifyType(param.getPlainType());
@@ -759,6 +761,17 @@ static void determineBestChoicesInContext(
         // a type for the second operand of `+` based on a type being
         // constructed.
         if (typeVar->getImpl().isFunctionResult()) {
+          auto *resultLoc = typeVar->getImpl().getLocator();
+
+          // We don't want to try and infer parts of operator
+          // chains.
+          if (!isOperator) {
+            if (auto type = inferTypeOfArithmeticOperatorChain(
+                    cs.DC, resultLoc->getAnchor())) {
+              types.push_back({type, /*fromLiteral=*/true});
+            }
+          }
+
           auto binding =
               inferTypeFromInitializerResultType(cs, typeVar, disjunctions);
 
