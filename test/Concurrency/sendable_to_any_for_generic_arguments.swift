@@ -175,3 +175,29 @@ func test_subscript_computed_property_and_mutating_access(u: User) {
 
   u.dict.testMutating() // Ok
 }
+
+extension Dictionary where Key == String, Value == Any {
+  init(age: Int) { // expected-note {{'init(age:)' declared here}}
+    self.init()
+  }
+}
+
+extension User {
+  convenience init(age: Int) {
+    self.init()
+    self.dict = .init(age: age)
+    // expected-error@-1 {{referencing initializer 'init(age:)' on '[String : any Sendable].Type' requires the types 'any Sendable' and 'Any' be equivalent}}
+  }
+}
+
+// https://github.com/swiftlang/swift/issues/79361
+do {
+  @preconcurrency var d = Dictionary<String, any Sendable>()
+  
+  func test(_ dict: inout Dictionary<String, Any>) {}
+  test(&d) // Ok
+
+  @preconcurrency var a = Array<any Sendable>()
+  let values: [Any] = []
+  a += values // Ok
+}

@@ -41,6 +41,13 @@ struct Test {
   @preconcurrency var funcRef: S<([any Sendable]) -> (any Sendable)?> = S(v: { $0.first })
 }
 
+func testInOut(_ dict: inout Dictionary<String, Any>) {
+  dict["inout"] = "yes"
+}
+
+func testInOut(_ arr: inout [Any]) {
+  arr.append("inout")
+}
 
 func test() {
   var c = C()
@@ -98,6 +105,19 @@ func test() {
 
   expectsFuncAny(v1.funcRef)
   // CHECK: 42
+
+  testInOut(&c.dict)
+  print(c.dict["inout"] ?? "no")
+  // CHECK: yes
+
+  testInOut(&c.arr)
+  print(c.arr.contains(where: { $0 as? String == "inout" }))
+  // CHECK: true
+
+  var newValues: [Any] = ["other inout"]
+  c.arr += newValues // checks implicit inout injection via operator
+  print(c.arr.contains(where: { $0 as? String == "other inout" }))
+  // CHECK: true
 }
 
 test()
