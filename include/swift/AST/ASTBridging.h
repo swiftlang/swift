@@ -1837,6 +1837,11 @@ BridgedFloatLiteralExpr_createParsed(BridgedASTContext cContext,
                                      BridgedStringRef cStr,
                                      BridgedSourceLoc cTokenLoc);
 
+SWIFT_NAME("BridgedFloatLiteralExpr.setNegative(self:loc:)")
+BRIDGED_INLINE void
+BridgedFloatLiteralExpr_setNegative(BridgedFloatLiteralExpr cExpr,
+                                    BridgedSourceLoc cLoc);
+
 SWIFT_NAME("BridgedForceTryExpr.createParsed(_:tryLoc:subExpr:exclaimLoc:)")
 BridgedForceTryExpr
 BridgedForceTryExpr_createParsed(BridgedASTContext cContext,
@@ -1877,6 +1882,11 @@ BridgedIntegerLiteralExpr
 BridgedIntegerLiteralExpr_createParsed(BridgedASTContext cContext,
                                        BridgedStringRef cStr,
                                        BridgedSourceLoc cTokenLoc);
+
+SWIFT_NAME("BridgedIntegerLiteralExpr.setNegative(self:loc:)")
+BRIDGED_INLINE void
+BridgedIntegerLiteralExpr_setNegative(BridgedIntegerLiteralExpr cExpr,
+                                      BridgedSourceLoc cLoc);
 
 SWIFT_NAME("BridgedInterpolatedStringLiteralExpr.createParsed(_:loc:"
            "literalCapacity:interpolationCount:appendingExpr:)")

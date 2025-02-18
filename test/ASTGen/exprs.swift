@@ -25,8 +25,8 @@ func test1(x: Int, fn: (Int) -> Int) async throws -> Int {
     true
 
   let arlit = [0]
-  let tuple = (0, 1)
-  let diclit = [0: 1, 2: 3]
+  let tuple = (0, -21.4)
+  let diclit = [0: 1, 2: -3]
 
   return fn(x)
 }

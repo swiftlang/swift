@@ -1983,7 +1983,10 @@ extension ASTGenVisitor {
     -> BridgedDeclAttribute?
   {
     if let detail = node.detail {
-      precondition(detail.detail.keywordKind == .set, "only accepted modifier argument is '(set)'")
+      guard detail.detail.rawText == "set" else {
+        // TODO: Diagnose
+        fatalError("only accepted modifier argument is '(set)'")
+      }
       return BridgedSetterAccessAttr.createParsed(
         self.ctx,
         range: self.generateSourceRange(node),
