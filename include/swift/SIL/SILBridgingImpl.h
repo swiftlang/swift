@@ -2128,6 +2128,28 @@ BridgedInstruction BridgedBuilder::createUpcast(BridgedValue op, BridgedType typ
                                    type.unbridged())};
 }
 
+BridgedInstruction BridgedBuilder::createCheckedCastAddrBranch(
+                                        BridgedValue source, BridgedCanType sourceFormalType,
+                                        BridgedValue destination, BridgedCanType targetFormalType,
+                                        BridgedInstruction::CastConsumptionKind consumptionKind,
+                                        BridgedBasicBlock successBlock, BridgedBasicBlock failureBlock) const
+{
+  return {unbridged().createCheckedCastAddrBranch(
+            regularLoc(), (swift::CastConsumptionKind)consumptionKind,
+                          source.getSILValue(), sourceFormalType.unbridged(),
+                          destination.getSILValue(), targetFormalType.unbridged(),
+                          successBlock.unbridged(), failureBlock.unbridged())};
+}
+
+BridgedInstruction BridgedBuilder::createUnconditionalCheckedCastAddr(
+                                        BridgedValue source, BridgedCanType sourceFormalType,
+                                        BridgedValue destination, BridgedCanType targetFormalType) const
+{
+  return {unbridged().createUnconditionalCheckedCastAddr(
+            regularLoc(), source.getSILValue(), sourceFormalType.unbridged(),
+                          destination.getSILValue(), targetFormalType.unbridged())};
+}
+
 BridgedInstruction BridgedBuilder::createLoad(BridgedValue op, SwiftInt ownership) const {
   return {unbridged().createLoad(regularLoc(), op.getSILValue(),
                                  (swift::LoadOwnershipQualifier)ownership)};
@@ -2226,6 +2248,11 @@ BridgedInstruction BridgedBuilder::createEndLifetime(BridgedValue op) const {
   return {unbridged().createEndLifetime(regularLoc(), op.getSILValue())};
 }
 
+BridgedInstruction BridgedBuilder::createDebugValue(BridgedValue op,
+                                                    BridgedSILDebugVariable var) const {
+  return {unbridged().createDebugValue(regularLoc(), op.getSILValue(), var.unbridge())};
+}
+
 BridgedInstruction BridgedBuilder::createDebugStep() const {
   return {unbridged().createDebugStep(regularLoc())};
 }
@@ -2257,6 +2284,14 @@ BridgedInstruction BridgedBuilder::createTryApply(BridgedValue function, Bridged
       arguments.getValues(argValues), normalBB.unbridged(), errorBB.unbridged(), applyOpts, specInfo.data)};
 }
 
+BridgedInstruction BridgedBuilder::createWitnessMethod(BridgedCanType lookupType,
+                                        BridgedConformance conformance,
+                                        BridgedDeclRef member, BridgedType methodType) const {
+  return {unbridged().createWitnessMethod(regularLoc(), lookupType.unbridged(), conformance.unbridged(),
+                                          member.unbridged(), methodType.unbridged())};
+}
+
+
 BridgedInstruction BridgedBuilder::createReturn(BridgedValue op) const {
   return {unbridged().createReturn(regularLoc(), op.getSILValue())};
 }
@@ -2276,6 +2311,14 @@ BridgedInstruction BridgedBuilder::createUncheckedEnumData(BridgedValue enumVal,
 BridgedInstruction BridgedBuilder::createUncheckedTakeEnumDataAddr(BridgedValue enumAddr, SwiftInt caseIdx) const {
   swift::SILValue en = enumAddr.getSILValue();
   return {unbridged().createUncheckedTakeEnumDataAddr(regularLoc(), en, en->getType().getEnumElement(caseIdx))};
+}
+
+BridgedInstruction BridgedBuilder::createInitEnumDataAddr(BridgedValue enumAddr,
+                                                          SwiftInt caseIdx,
+                                                          BridgedType type) const {
+  swift::SILValue en = enumAddr.getSILValue();
+  return {unbridged().createInitEnumDataAddr(regularLoc(), en, en->getType().getEnumElement(caseIdx),
+                                             type.unbridged())};
 }
 
 BridgedInstruction BridgedBuilder::createEnum(SwiftInt caseIdx, OptionalBridgedValue payload,

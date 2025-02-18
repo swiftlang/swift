@@ -175,6 +175,38 @@ public struct Builder {
     let cast = bridged.createUpcast(value.bridged, type.bridged)
     return notifyNew(cast.getAs(UpcastInst.self))
   }
+  
+  @discardableResult
+  public func createCheckedCastAddrBranch(
+    source: Value, sourceFormalType: CanonicalType,
+    destination: Value, targetFormalType: CanonicalType,
+    consumptionKind: CheckedCastAddrBranchInst.CastConsumptionKind, 
+    successBlock: BasicBlock,
+    failureBlock: BasicBlock
+  ) -> CheckedCastAddrBranchInst {
+    
+    let bridgedConsumption: BridgedInstruction.CastConsumptionKind
+    switch consumptionKind {
+      case .TakeAlways:    bridgedConsumption = .TakeAlways
+      case .TakeOnSuccess: bridgedConsumption = .TakeOnSuccess
+      case .CopyOnSuccess: bridgedConsumption = .CopyOnSuccess    
+    }
+    let cast = bridged.createCheckedCastAddrBranch(source.bridged, sourceFormalType.bridged,
+                                                   destination.bridged, targetFormalType.bridged,
+                                                   bridgedConsumption,
+                                                   successBlock.bridged, failureBlock.bridged)
+    return notifyNew(cast.getAs(CheckedCastAddrBranchInst.self))
+  }
+
+  @discardableResult
+  public func createUnconditionalCheckedCastAddr(
+    source: Value, sourceFormalType: CanonicalType,
+    destination: Value, targetFormalType: CanonicalType
+  ) -> UnconditionalCheckedCastAddrInst {
+    let cast = bridged.createUnconditionalCheckedCastAddr(source.bridged, sourceFormalType.bridged,
+                                                          destination.bridged, targetFormalType.bridged)
+    return notifyNew(cast.getAs(UnconditionalCheckedCastAddrInst.self))
+  }
 
   public func createLoad(fromAddress: Value, ownership: LoadInst.LoadOwnership) -> LoadInst {
     let load = bridged.createLoad(fromAddress.bridged, ownership.rawValue)
@@ -286,6 +318,11 @@ public struct Builder {
   }
 
   @discardableResult
+  public func createDebugValue(value: Value, debugVariable: DebugVariableInstruction.DebugVariable) -> DebugValueInst {
+    return notifyNew(bridged.createDebugValue(value.bridged, debugVariable).getAs(DebugValueInst.self))
+  }
+
+  @discardableResult
   public func createDebugStep() -> DebugStepInst {
     return notifyNew(bridged.createDebugStep().getAs(DebugStepInst.self))
   }
@@ -324,6 +361,14 @@ public struct Builder {
     return notifyNew(apply.getAs(TryApplyInst.self))
   }
   
+  public func createWitnessMethod(lookupType: CanonicalType,
+                                  conformance: Conformance,
+                                  member: DeclRef,
+                                  methodType: Type) -> WitnessMethodInst {
+    return notifyNew(bridged.createWitnessMethod(lookupType.bridged, conformance.bridged,
+                                                 member.bridged, methodType.bridged).getAs(WitnessMethodInst.self))    
+  }
+  
   @discardableResult
   public func createReturn(of value: Value) -> ReturnInst {
     return notifyNew(bridged.createReturn(value.bridged).getAs(ReturnInst.self))
@@ -345,6 +390,11 @@ public struct Builder {
                                               caseIndex: Int) -> UncheckedTakeEnumDataAddrInst {
     let uteda = bridged.createUncheckedTakeEnumDataAddr(enumAddress.bridged, caseIndex)
     return notifyNew(uteda.getAs(UncheckedTakeEnumDataAddrInst.self))
+  }
+
+  public func createInitEnumDataAddr(enumAddress: Value, caseIndex: Int, type: Type) -> InitEnumDataAddrInst {
+    let uteda = bridged.createInitEnumDataAddr(enumAddress.bridged, caseIndex, type.bridged)
+    return notifyNew(uteda.getAs(InitEnumDataAddrInst.self))
   }
 
   public func createEnum(caseIndex: Int, payload: Value?, enumType: Type) -> EnumInst {

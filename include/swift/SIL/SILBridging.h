@@ -1135,6 +1135,14 @@ struct BridgedBuilder{
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedInstruction createUncheckedAddrCast(BridgedValue op,
                                                                                 BridgedType type) const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedInstruction createUpcast(BridgedValue op, BridgedType type) const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedInstruction createCheckedCastAddrBranch(
+                                          BridgedValue source, BridgedCanType sourceFormalType,
+                                          BridgedValue destination, BridgedCanType targetFormalType,
+                                          BridgedInstruction::CastConsumptionKind consumptionKind,
+                                          BridgedBasicBlock successBlock, BridgedBasicBlock failureBlock) const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedInstruction createUnconditionalCheckedCastAddr(
+                                          BridgedValue source, BridgedCanType sourceFormalType,
+                                          BridgedValue destination, BridgedCanType targetFormalType) const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedInstruction createLoad(BridgedValue op, SwiftInt ownership) const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedInstruction createLoadBorrow(BridgedValue op) const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedInstruction createBeginDeallocRef(BridgedValue reference,
@@ -1162,6 +1170,8 @@ struct BridgedBuilder{
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedInstruction createDestroyValue(BridgedValue op) const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedInstruction createDestroyAddr(BridgedValue op) const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedInstruction createEndLifetime(BridgedValue op) const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedInstruction createDebugValue(BridgedValue src,
+                                                                         BridgedSILDebugVariable var) const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedInstruction createDebugStep() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedInstruction createApply(BridgedValue function,
                                           BridgedSubstitutionMap subMap,
@@ -1173,6 +1183,9 @@ struct BridgedBuilder{
                                           BridgedBasicBlock normalBB, BridgedBasicBlock errorBB,
                                           bool isNonAsync,
                                           BridgedGenericSpecializationInformation specInfo) const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedInstruction createWitnessMethod(BridgedCanType lookupType,
+                                          BridgedConformance conformance,
+                                          BridgedDeclRef member, BridgedType methodType) const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedInstruction createReturn(BridgedValue op) const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedInstruction createThrow(BridgedValue op) const;
   SWIFT_IMPORT_UNSAFE BridgedInstruction createSwitchEnumInst(BridgedValue enumVal,
@@ -1185,6 +1198,9 @@ struct BridgedBuilder{
                                           SwiftInt caseIdx, BridgedType resultType) const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedInstruction createUncheckedTakeEnumDataAddr(BridgedValue enumAddr,
                                                                                         SwiftInt caseIdx) const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedInstruction createInitEnumDataAddr(BridgedValue enumAddr,
+                                                                               SwiftInt caseIdx,
+                                                                               BridgedType type) const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedInstruction createEnum(SwiftInt caseIdx, OptionalBridgedValue payload,
                                           BridgedType resultType) const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedInstruction createThinToThickFunction(BridgedValue fn,
