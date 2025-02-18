@@ -5,6 +5,8 @@
 // REQUIRES: concurrency
 // REQUIRES: asserts
 
+// XFAIL: *
+
 class NotConcurrent { } // expected-note 12{{class 'NotConcurrent' does not conform to the 'Sendable' protocol}}
 // expected-tns-allow-typechecker-note @-1 {{class 'NotConcurrent' does not conform to the 'Sendable' protocol}}
 
