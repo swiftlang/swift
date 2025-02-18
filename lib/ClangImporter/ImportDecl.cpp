@@ -8501,36 +8501,6 @@ bool swift::importer::isMutabilityAttr(const clang::SwiftAttrAttr *swiftAttr) {
          swiftAttr->getAttribute() == "nonmutating";
 }
 
-static bool importAsUnsafe(ClangImporter::Implementation &impl,
-                           const clang::NamedDecl *decl,
-                           const Decl *MappedDecl) {
-  auto &context = impl.SwiftContext;
-  if (!context.LangOpts.hasFeature(Feature::AllowUnsafeAttribute))
-    return false;
-
-  if (isa<clang::CXXMethodDecl>(decl) &&
-      !evaluateOrDefault(context.evaluator, IsSafeUseOfCxxDecl({decl}), {}))
-    return true;
-
-  if (isa<ClassDecl>(MappedDecl))
-    return false;
-
-  // Most STL containers have std::allocator as their default allocator. We need
-  // to consider std::allocator safe for the STL containers to be ever
-  // considered safe.
-  if (decl->isInStdNamespace() && decl->getIdentifier() &&
-      decl->getName() == "allocator")
-    return false;
-
-  if (const auto *record = dyn_cast<clang::RecordDecl>(decl))
-    return evaluateOrDefault(
-               context.evaluator,
-               ClangTypeEscapability({record->getTypeForDecl(), &impl, false}),
-               CxxEscapability::Unknown) == CxxEscapability::Unknown;
-
-  return false;
-}
-
 void ClangImporter::Implementation::importNontrivialAttribute(
     Decl *MappedDecl, llvm::StringRef AttrString) {
   bool cached = true;
@@ -8717,7 +8687,11 @@ ClangImporter::Implementation::importSwiftAttrAttributes(Decl *MappedDecl) {
       importNontrivialAttribute(MappedDecl, swiftAttr->getAttribute());
     }
 
-    if (seenUnsafe || importAsUnsafe(*this, ClangDecl, MappedDecl)) {
+    bool importUnsafeHeuristic =
+        isa<clang::CXXMethodDecl>(ClangDecl) &&
+        !evaluateOrDefault(SwiftContext.evaluator,
+                           IsSafeUseOfCxxDecl({ClangDecl}), {});
+    if (seenUnsafe || importUnsafeHeuristic) {
       auto attr = new (SwiftContext) UnsafeAttr(/*implicit=*/!seenUnsafe);
       MappedDecl->getAttrs().add(attr);
     }
