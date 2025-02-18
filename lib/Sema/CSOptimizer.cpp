@@ -18,6 +18,7 @@
 #include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/ExistentialLayout.h"
 #include "swift/AST/GenericSignature.h"
+#include "swift/Basic/Defer.h"
 #include "swift/Basic/OptionSet.h"
 #include "swift/Sema/ConstraintGraph.h"
 #include "swift/Sema/ConstraintSystem.h"
@@ -48,6 +49,103 @@ struct DisjunctionInfo {
   DisjunctionInfo(double score, ArrayRef<Constraint *> favoredChoices = {})
       : Score(score), FavoredChoices(favoredChoices) {}
 };
+
+static DeclContext *getDisjunctionDC(Constraint *disjunction) {
+  auto *choice = disjunction->getNestedConstraints()[0];
+  switch (choice->getKind()) {
+  case ConstraintKind::BindOverload:
+    return choice->getOverloadUseDC();
+  case ConstraintKind::ValueMember:
+  case ConstraintKind::UnresolvedValueMember:
+  case ConstraintKind::ValueWitness:
+    return choice->getMemberUseDC();
+  default:
+    return nullptr;
+  }
+}
+
+/// Determine whether the given disjunction appears in a context
+/// transformed by a result builder.
+static bool isInResultBuilderContext(ConstraintSystem &cs,
+                                     Constraint *disjunction) {
+  auto *DC = getDisjunctionDC(disjunction);
+  if (!DC)
+    return false;
+
+  do {
+    auto fnContext = AnyFunctionRef::fromDeclContext(DC);
+    if (!fnContext)
+      return false;
+
+    if (cs.getAppliedResultBuilderTransform(*fnContext))
+      return true;
+
+  } while ((DC = DC->getParent()));
+
+  return false;
+}
+
+/// If the given operator disjunction appears in some position
+// inside of a not yet resolved call i.e. `a.b(1 + c(4) - 1)`
+// both `+` and `-` are "in" argument context of `b`.
+static bool isOperatorPassedToUnresolvedCall(ConstraintSystem &cs,
+                                             Constraint *disjunction) {
+  ASSERT(isOperatorDisjunction(disjunction));
+
+  auto *curr = castToExpr(disjunction->getLocator()->getAnchor());
+  while (auto *parent = cs.getParentExpr(curr)) {
+    SWIFT_DEFER { curr = parent; };
+
+    switch (parent->getKind()) {
+    case ExprKind::OptionalEvaluation:
+    case ExprKind::Paren:
+    case ExprKind::Binary:
+    case ExprKind::PrefixUnary:
+    case ExprKind::PostfixUnary:
+      continue;
+
+    // a.b(<<cond>> ? <<operator chain>> : <<...>>)
+    case ExprKind::Ternary: {
+      auto *T = cast<TernaryExpr>(parent);
+      // If the operator is located in the condition it's
+      // not tied to the context.
+      if (T->getCondExpr() == curr)
+        return false;
+
+      // But the branches are connected to the context.
+      continue;
+    }
+
+    // Handles `a(<<operator chain>>), `a[<<operator chain>>]`,
+    // `.a(<<operator chain>>)` etc.
+    case ExprKind::Call: {
+      auto *call = cast<CallExpr>(parent);
+
+      // Type(...)
+      if (isa<TypeExpr>(call->getFn())) {
+        auto *ctorLoc = cs.getConstraintLocator(
+            call, {LocatorPathElt::ApplyFunction(),
+                   LocatorPathElt::ConstructorMember()});
+        return !cs.findSelectedOverloadFor(ctorLoc);
+      }
+
+      // Ignore injected result builder methods like `buildExpression`
+      // and `buildBlock`.
+      if (auto *UDE = dyn_cast<UnresolvedDotExpr>(call->getFn())) {
+        if (isResultBuilderMethodReference(cs.getASTContext(), UDE))
+          return false;
+      }
+
+      return !cs.findSelectedOverloadFor(call->getFn());
+    }
+
+    default:
+      return false;
+    }
+  }
+
+  return false;
+}
 
 // TODO: both `isIntegerType` and `isFloatType` should be available on Type
 // as `isStdlib{Integer, Float}Type`.
@@ -1552,77 +1650,30 @@ static void determineBestChoicesInContext(
   }
 }
 
-/// Prioritize `build{Block, Expression, ...}` and any chained
-/// members that are connected to individual builder elements
-/// i.e. `ForEach(...) { ... }.padding(...)`, once `ForEach`
-/// is resolved, `padding` should be prioritized because its
-/// requirements can help prune the solution space before the
-/// body is checked.
-static Constraint *
-selectDisjunctionInResultBuilderContext(ConstraintSystem &cs,
-                                        ArrayRef<Constraint *> disjunctions) {
-  auto context = AnyFunctionRef::fromDeclContext(cs.DC);
-  if (!context)
-    return nullptr;
+static std::optional<bool> isPreferable(ConstraintSystem &cs,
+                                        Constraint *disjunctionA,
+                                        Constraint *disjunctionB) {
+  // Consider only operator vs. non-operator situations.
+  if (isOperatorDisjunction(disjunctionA) ==
+      isOperatorDisjunction(disjunctionB))
+    return std::nullopt;
 
-  if (!cs.getAppliedResultBuilderTransform(context.value()))
-    return nullptr;
-
-  std::pair<Constraint *, unsigned> best{nullptr, 0};
-  for (auto *disjunction : disjunctions) {
-    auto *member =
-        getAsExpr<UnresolvedDotExpr>(disjunction->getLocator()->getAnchor());
-    if (!member)
-      continue;
-
-    // Attempt `build{Block, Expression, ...} first because they
-    // provide contextual information for the inner calls.
-    if (isResultBuilderMethodReference(cs.getASTContext(), member))
-      return disjunction;
-
-    Expr *curr = member;
-    bool disqualified = false;
-    // Walk up the parent expression chain and check whether this
-    // disjunction represents one of the members in a chain that
-    // leads up to `buildExpression` (if defined by the builder)
-    // or to a pattern binding for `$__builderN` (the walk won't
-    // find any argument position locations in that case).
-    while (auto parent = cs.getParentExpr(curr)) {
-      if (!(isExpr<CallExpr>(parent) || isExpr<UnresolvedDotExpr>(parent))) {
-        disqualified = true;
-        break;
-      }
-
-      if (auto *call = getAsExpr<CallExpr>(parent)) {
-        // The current parent appears in an argument position.
-        if (call->getFn() != curr) {
-          // Allow expressions that appear in a argument position to
-          // `build{Expression, Block, ...} methods.
-          if (auto *UDE = getAsExpr<UnresolvedDotExpr>(call->getFn())) {
-            disqualified =
-                !isResultBuilderMethodReference(cs.getASTContext(), UDE);
-          } else {
-            disqualified = true;
-          }
-        }
-      }
-
-      if (disqualified)
-        break;
-
-      curr = parent;
-    }
-
-    if (disqualified)
-      continue;
-
-    if (auto depth = cs.getExprDepth(member)) {
-      if (!best.first || best.second > depth)
-        best = std::make_pair(disjunction, depth.value());
+  // Prevent operator selection if its passed as an argument
+  // to not-yet resolved call. This helps to make sure that
+  // in result builder context chained members and other
+  // non-operator disjunctions are always selected first,
+  // because they provide the context and help to prune the system.
+  if (isInResultBuilderContext(cs, disjunctionA)) {
+    if (isOperatorDisjunction(disjunctionA)) {
+      if (isOperatorPassedToUnresolvedCall(cs, disjunctionA))
+        return false;
+    } else {
+      if (isOperatorPassedToUnresolvedCall(cs, disjunctionB))
+        return true;
     }
   }
 
-  return best.first;
+  return std::nullopt;
 }
 
 std::optional<std::pair<Constraint *, llvm::TinyPtrVector<Constraint *>>>
@@ -1636,11 +1687,6 @@ ConstraintSystem::selectDisjunction() {
   llvm::DenseMap<Constraint *, DisjunctionInfo> favorings;
   determineBestChoicesInContext(*this, disjunctions, favorings);
 
-  if (auto *disjunction =
-          selectDisjunctionInResultBuilderContext(*this, disjunctions)) {
-    return std::make_pair(disjunction, favorings[disjunction].FavoredChoices);
-  }
-
   // Pick the disjunction with the smallest number of favored, then active
   // choices.
   auto bestDisjunction = std::min_element(
@@ -1651,6 +1697,9 @@ ConstraintSystem::selectDisjunction() {
 
         if (firstActive == 1 || secondActive == 1)
           return secondActive != 1;
+
+        if (auto preference = isPreferable(*this, first, second))
+          return preference.value();
 
         auto &[firstScore, firstFavoredChoices] = favorings[first];
         auto &[secondScore, secondFavoredChoices] = favorings[second];
