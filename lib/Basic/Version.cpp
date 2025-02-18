@@ -343,11 +343,10 @@ std::string getCompilerVersion() {
   std::string buf;
   llvm::raw_string_ostream OS(buf);
 
-#if defined(SWIFT_COMPILER_VERSION)
-  OS << SWIFT_COMPILER_VERSION;
-#else
-  OS << SWIFT_VERSION_STRING;
-#endif
+ // TODO: This should print SWIFT_COMPILER_VERSION when
+ // available, but to do that we need to switch from
+ // llvm::VersionTuple to swift::Version.
+ OS << SWIFT_VERSION_STRING;
 
   return OS.str();
 }
