@@ -43,7 +43,7 @@ public struct RangeSet<Bound: Comparable> {
   public init() {
     _ranges = Ranges()
   }
-  
+
   /// Creates a range set containing the given range.
   ///
   /// - Parameter range: The range to use for the new range set.
@@ -54,7 +54,7 @@ public struct RangeSet<Bound: Comparable> {
       self._ranges = Ranges()
     }
   }
-  
+
   /// Creates a range set containing the values in the given ranges.
   ///
   /// Any empty ranges in `ranges` are ignored, and non-empty ranges are merged
@@ -75,7 +75,7 @@ public struct RangeSet<Bound: Comparable> {
   internal init(_ranges: Ranges) {
     self._ranges = _ranges
   }
-  
+
   /// Checks the invariants of `_ranges`.
   ///
   /// The ranges stored by a range set are never empty, never overlap,
@@ -94,7 +94,7 @@ public struct RangeSet<Bound: Comparable> {
     }
 #endif
   }
-  
+
   /// Creates a new range set from `ranges`, which satisfies the range set
   /// invariants.
   @usableFromInline
@@ -106,12 +106,12 @@ public struct RangeSet<Bound: Comparable> {
     }
     _checkInvariants()
   }
-  
+
   /// A Boolean value indicating whether the range set is empty.
   public var isEmpty: Bool {
     _ranges.isEmpty
   }
-  
+
   /// Returns a Boolean value indicating whether the given value is
   /// contained by the ranges in the range set.
   ///
@@ -124,7 +124,7 @@ public struct RangeSet<Bound: Comparable> {
   public func contains(_ value: Bound) -> Bool {
     _ranges._contains(value)
   }
-  
+
   /// Inserts the given range into the range set.
   ///
   /// - Parameter range: The range to insert into the set.
@@ -136,7 +136,7 @@ public struct RangeSet<Bound: Comparable> {
     if range.isEmpty { return }
     _ranges._insert(contentsOf: range)
   }
-  
+
   /// Removes the given range from the range set.
   ///
   /// - Parameter range: The range to remove from the set.
@@ -206,7 +206,7 @@ extension RangeSet {
   ) -> Bool where C.Index == Bound {
     _ranges._insert(contentsOf: index ..< collection.index(after: index))
   }
-  
+
   /// Removes the range that contains only the specified index from the range
   /// set.
   ///
@@ -257,7 +257,7 @@ extension RangeSet {
   public mutating func formUnion(_ other: __owned RangeSet<Bound>) {
     self = self.union(other)
   }
-  
+
   /// Removes the contents of this range set that aren't also in the given
   /// range set.
   ///
@@ -265,7 +265,7 @@ extension RangeSet {
   public mutating func formIntersection(_ other: RangeSet<Bound>) {
     self = self.intersection(other)
   }
-  
+
   /// Removes the contents of this range set that are also in the given set
   /// and adds the contents of the given set that are not already in this
   /// range set.
@@ -276,7 +276,7 @@ extension RangeSet {
   ) {
     self = self.symmetricDifference(other)
   }
-  
+
   /// Removes the contents of the given range set from this range set.
   ///
   /// - Parameter other: A range set to subtract from this one.
@@ -285,7 +285,7 @@ extension RangeSet {
       remove(contentsOf: range)
     }
   }
-  
+
   /// Returns a new range set containing the contents of both this set and the
   /// given set.
   ///
@@ -296,7 +296,7 @@ extension RangeSet {
   ) -> RangeSet<Bound> {
     return RangeSet(_ranges: _ranges._union(other._ranges))
   }
-  
+
   /// Returns a new range set containing the contents of both this set and the
   /// given set.
   ///
@@ -307,7 +307,7 @@ extension RangeSet {
   ) -> RangeSet<Bound> {
     return RangeSet(_ranges: _ranges._intersection(other._ranges))
   }
-  
+
   /// Returns a new range set representing the values in this range set or the
   /// given range set, but not both.
   ///
@@ -318,7 +318,7 @@ extension RangeSet {
   ) -> RangeSet<Bound> {
     return union(other).subtracting(intersection(other))
   }
-  
+
   /// Returns a new set containing the contents of this range set that are not
   /// also in the given range set.
   ///
@@ -331,7 +331,7 @@ extension RangeSet {
     result.subtract(other)
     return result
   }
-  
+
   /// Returns a Boolean value that indicates whether this range set is a
   /// subset of the given set.
   ///
@@ -355,7 +355,7 @@ extension RangeSet {
     }
     return true
   }
-  
+
   /// Returns a Boolean value that indicates whether this range set is a
   /// superset of the given set.
   ///
@@ -365,7 +365,7 @@ extension RangeSet {
   public func isSuperset(of other: RangeSet<Bound>) -> Bool {
     other.isSubset(of: self)
   }
-  
+
   /// Returns a Boolean value that indicates whether this range set is a
   /// strict subset of the given set.
   ///
@@ -375,7 +375,7 @@ extension RangeSet {
   public func isStrictSubset(of other: RangeSet<Bound>) -> Bool {
     self != other && isSubset(of: other)
   }
-  
+
   /// Returns a Boolean value that indicates whether this range set is a
   /// strict superset of the given set.
   ///

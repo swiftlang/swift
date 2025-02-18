@@ -57,7 +57,7 @@ class Identifier {
   friend class DeclBaseName;
 
   const char *Pointer;
-  
+
 public:
   enum : size_t {
     NumLowBitsAvailable = 3,
@@ -80,9 +80,9 @@ private:
 
 public:
   explicit Identifier() : Pointer(nullptr) {}
-  
+
   const char *get() const { return Pointer; }
-  
+
   StringRef str() const { return Pointer; }
 
   explicit operator std::string() const { return std::string(Pointer); }
@@ -91,14 +91,14 @@ public:
     assert(Pointer != nullptr && "Tried getting length of empty identifier");
     return ::strlen(Pointer);
   }
-  
+
   bool empty() const { return Pointer == nullptr; }
   bool nonempty() const { return !empty(); }
 
   LLVM_ATTRIBUTE_USED bool is(StringRef string) const {
     return str() == string;
   }
-  
+
   /// isOperator - Return true if this identifier is an operator, false if it is
   /// a normal identifier.
   /// FIXME: We should maybe cache this.
@@ -144,7 +144,7 @@ public:
     static const char OpChars[] = "/=-+*%<>!&|^~.?";
     if (C < 0x80)
       return memchr(OpChars, C, sizeof(OpChars) - 1) != 0;
-    
+
     // Unicode math, symbol, arrow, dingbat, and line/box drawing chars.
     return (C >= 0x00A1 && C <= 0x00A7)
         || C == 0x00A9 || C == 0x00AB || C == 0x00AC || C == 0x00AE
@@ -157,7 +157,7 @@ public:
         || (C >= 0x2E00 && C <= 0x2E7F) || (C >= 0x3001 && C <= 0x3003)
         || (C >= 0x3008 && C <= 0x3030);
   }
-  
+
   /// isOperatorContinuationCodePoint - Return true if the specified code point
   /// is a valid operator code point.
   static bool isOperatorContinuationCodePoint(uint32_t C) {
@@ -184,15 +184,15 @@ public:
   bool hasDollarPrefix() const {
     return str().starts_with("$") && !(getLength() == 1);
   }
-  
+
   bool hasUnderscoredNaming() const {
     return str().starts_with("_");
   }
-  
+
   const void *getAsOpaquePointer() const {
       return static_cast<const void *>(Pointer);
   }
-  
+
   static Identifier getFromOpaquePointer(const void *P) {
     return Identifier((const char*)P);
   }
@@ -211,7 +211,7 @@ public:
   bool operator!=(Identifier RHS) const { return !(*this==RHS); }
 
   bool operator<(Identifier RHS) const { return Pointer < RHS.Pointer; }
-  
+
   static Identifier getEmptyKey() {
     uintptr_t Val = static_cast<uintptr_t>(-1);
     Val <<= NumLowBitsAvailable;
@@ -227,7 +227,7 @@ public:
 private:
   bool isOperatorSlow() const;
 };
-  
+
 class DeclName;
 class DeclNameRef;
 class ObjCSelector;
@@ -255,7 +255,7 @@ namespace llvm {
       return LHS == RHS;
     }
   };
-  
+
   // An Identifier is "pointer like".
   template<typename T> struct PointerLikeTypeTraits;
   template<>
@@ -269,7 +269,7 @@ namespace llvm {
     }
     enum { NumLowBitsAvailable = swift::Identifier::NumLowBitsAvailable };
   };
-  
+
 } // end namespace llvm
 
 class BridgedDeclBaseName;
@@ -288,7 +288,7 @@ public:
     Constructor,
     Destructor
   };
-  
+
 private:
   /// In a special DeclName representing a subscript, this opaque pointer
   /// is used as the data of the base name identifier.
@@ -454,7 +454,7 @@ class DeclName {
 
     explicit CompoundDeclName(DeclBaseName BaseName, size_t NumArgs)
         : BaseName(BaseName), NumArgs(NumArgs) { }
-    
+
     ArrayRef<Identifier> getArgumentNames() const {
       return {getTrailingObjects<Identifier>(), NumArgs};
     }
@@ -536,7 +536,7 @@ public:
       return true;
     return !BaseNameOrCompound.get<DeclBaseName>().empty();
   }
-  
+
   /// True if this is a simple one-component name.
   bool isSimpleName() const {
     return BaseNameOrCompound.is<DeclBaseName>();
@@ -546,13 +546,13 @@ public:
   bool isCompoundName() const {
     return !isSimpleName();
   }
-  
+
   /// True if this name is a simple one-component name identical to the
   /// given identifier.
   bool isSimpleName(DeclBaseName name) const {
     return isSimpleName() && getBaseName() == name;
   }
-  
+
   /// True if this name is a simple one-component name equal to the
   /// given string.
   bool isSimpleName(StringRef name) const {
@@ -566,12 +566,12 @@ public:
   /// True if this name is a compound name equal to the given normal
   /// base name and argument names.
   bool isCompoundName(StringRef base, ArrayRef<StringRef> args) const;
-  
+
   /// True if this name is an operator.
   bool isOperator() const {
     return getBaseName().isOperator();
   }
-  
+
   /// True if this name should be found by a decl ref or member ref under the
   /// name specified by 'refName'.
   ///

@@ -517,7 +517,7 @@ extension OwnershipUseVisitor {
 /// When computing interior liveness for %f, %b is an inner
 /// scope. Because inner scopes are complete, the only relevant use is
 /// end_borrow %b. Despite the address_to_pointer instruction, %f does
-/// not escape any dependent address. 
+/// not escape any dependent address.
 ///
 /// TODO: Implement the hasPointerEscape flags on BeginBorrowInst,
 /// MoveValueInst, and Allocation. Then this visitor should assert
@@ -631,7 +631,7 @@ extension InteriorUseWalker: OwnershipUseVisitor {
       return .abortWalk
     }
     return walkDownAddressUses(of: address)
-  }  
+  }
 
   // Handle partial_apply [on_stack] and mark_dependence [nonescaping].
   //
@@ -656,7 +656,7 @@ extension InteriorUseWalker: OwnershipUseVisitor {
       return .abortWalk
     }
     return walkDownUses(of: value)
-  }  
+  }
 
   mutating func pointerEscapingUse(of operand: Operand) -> WalkResult {
     if useVisitor(operand) == .abortWalk {
@@ -749,13 +749,13 @@ extension InteriorUseWalker: AddressUseVisitor {
   mutating func loadedAddressUse(of operand: Operand, into value: Value)
     -> WalkResult {
     return .continueWalk
-  }    
+  }
 
   mutating func loadedAddressUse(of operand: Operand, into address: Operand)
     -> WalkResult {
     return .continueWalk
   }
-  
+
   mutating func yieldedAddressUse(of operand: Operand) -> WalkResult {
     return .continueWalk
   }
@@ -763,7 +763,7 @@ extension InteriorUseWalker: AddressUseVisitor {
   mutating func dependentAddressUse(of operand: Operand, into value: Value)
     -> WalkResult {
     walkDownUses(of: value)
-  }    
+  }
 
   mutating func escapingAddressUse(of operand: Operand) -> WalkResult {
     pointerStatus.setEscaping(operand: operand)
@@ -985,7 +985,7 @@ let interiorLivenessTest = FunctionTest("interior_liveness_swift") {
   }
   print(range)
   print("Unenclosed phis {")
-  visitor.unenclosedPhis.forEach { print("  \($0)") } 
+  visitor.unenclosedPhis.forEach { print("  \($0)") }
   print("}")
 
   var boundary = LivenessBoundary(value: value, range: range, context)

@@ -97,7 +97,7 @@ extension KeyValuePairs: RandomAccessCollection {
   public typealias Index = Int
   public typealias Indices = Range<Int>
   public typealias SubSequence = Slice<KeyValuePairs>
-  
+
   /// The position of the first element in a nonempty collection.
   ///
   /// If the `KeyValuePairs` instance is empty, `startIndex` is equal to

@@ -15,7 +15,7 @@
 //  variant known as a ternary search tree.  In performance, it is similar
 //  to a binary tree; however, it has two properties specific to the use of
 //  homogeneous sequences as keys:
-// 
+//
 //    - Individual entries do not necessarily store the entire key; instead,
 //      the key data may be spread over a sequence of nodes.  This causes the
 //      tree to be much more space-compact when keys share common prefixes.

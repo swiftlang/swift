@@ -214,7 +214,7 @@ private struct CollectedEffects {
       globalEffects.isDeinitBarrier = true
     }
   }
-  
+
   mutating func addEffectsForEscapingArgument(argument: FunctionArgument) {
     var escapeWalker = ArgumentEscapingWalker(context)
 
@@ -495,7 +495,7 @@ private struct ArgumentEscapingWalker : ValueDefUseWalker, AddressDefUseWalker {
         foundTakingLoad = true
       }
       return .continueWalk
- 
+
     case let load as LoadInst:
       if !address.value.hasTrivialType &&
           // In non-ossa SIL we don't know if a load is taking.

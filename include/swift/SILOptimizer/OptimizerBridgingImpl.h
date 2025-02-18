@@ -503,7 +503,7 @@ bool BridgedPassContext::continueWithNextSubpassRun(OptionalBridgedInstruction i
 }
 
 BridgedPassContext BridgedPassContext::initializeNestedPassContext(BridgedFunction newFunction) const {
-  return { invocation->initializeNestedSwiftPassInvocation(newFunction.getFunction()) }; 
+  return { invocation->initializeNestedSwiftPassInvocation(newFunction.getFunction()) };
 }
 
 void BridgedPassContext::deinitializedNestedPassContext() const {

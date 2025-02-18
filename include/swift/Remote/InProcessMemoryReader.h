@@ -105,7 +105,7 @@ class InProcessMemoryReader final : public MemoryReader {
     return ReadBytesResult(address.getLocalPointer<void>(), [](const void *) {});
   }
 };
- 
+
 }
 }
 

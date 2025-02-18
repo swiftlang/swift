@@ -130,10 +130,10 @@ bool DerivedConformance::derivesProtocolConformance(DeclContext *DC,
         // conformance.
       case KnownDerivableProtocolKind::Equatable:
         return canDeriveEquatable(DC, Nominal);
-      
+
       case KnownDerivableProtocolKind::Comparable:
         return !enumDecl->hasPotentiallyUnavailableCaseValue()
-            && canDeriveComparable(DC, enumDecl); 
+            && canDeriveComparable(DC, enumDecl);
 
         // "Simple" enums without availability attributes can explicitly derive
         // a CaseIterable conformance.
@@ -202,7 +202,7 @@ void DerivedConformance::tryDiagnoseFailedDerivation(DeclContext *DC,
   auto knownProtocol = protocol->getKnownProtocolKind();
   if (!knownProtocol)
     return;
-  
+
   if (*knownProtocol == KnownProtocolKind::Equatable) {
     tryDiagnoseFailedEquatableDerivation(DC, nominal);
   }
@@ -361,7 +361,7 @@ ValueDecl *DerivedConformance::getDerivableRequirement(NominalTypeDecl *nominal,
   if (auto func = dyn_cast<FuncDecl>(requirement)) {
     if (func->isOperator() && name.getBaseName() == "<")
       return getRequirement(KnownProtocolKind::Comparable);
-    
+
     if (func->isOperator() && name.getBaseName() == "==")
       return getRequirement(KnownProtocolKind::Equatable);
 
@@ -647,10 +647,10 @@ bool DerivedConformance::checkAndDiagnoseDisallowedContext(
 /// \p C The AST context.
 /// \p lhsExpr The first expression to compare for equality.
 /// \p rhsExpr The second expression to compare for equality.
-/// \p guardReturnValue The expression to return if the two sides are not equal 
+/// \p guardReturnValue The expression to return if the two sides are not equal
 GuardStmt *DerivedConformance::returnIfNotEqualGuard(ASTContext &C,
                                         Expr *lhsExpr,
-                                        Expr *rhsExpr, 
+                                        Expr *rhsExpr,
                                         Expr *guardReturnValue) {
   SmallVector<StmtConditionElement, 1> conditions;
   SmallVector<ASTNode, 1> statements;
@@ -677,7 +677,7 @@ GuardStmt *DerivedConformance::returnIfNotEqualGuard(ASTContext &C,
 /// returns `false`.
 /// \p C The AST context.
 /// \p lhsExpr The first expression to compare for equality.
-/// \p rhsExpr The second expression to compare for equality. 
+/// \p rhsExpr The second expression to compare for equality.
 GuardStmt *DerivedConformance::returnFalseIfNotEqualGuard(ASTContext &C,
                                         Expr *lhsExpr,
                                         Expr *rhsExpr) {
@@ -715,7 +715,7 @@ GuardStmt *DerivedConformance::returnNilIfFalseGuardTypeChecked(ASTContext &C,
 /// returns lhs < rhs.
 /// \p C The AST context.
 /// \p lhsExpr The first expression to compare for equality.
-/// \p rhsExpr The second expression to compare for equality. 
+/// \p rhsExpr The second expression to compare for equality.
 GuardStmt *DerivedConformance::returnComparisonIfNotEqualGuard(ASTContext &C,
                                         Expr *lhsExpr,
                                         Expr *rhsExpr) {

@@ -915,7 +915,7 @@ extension ASTGenVisitor {
     switch macroNameText {
     case "selector":
       return self.generateObjCSelectorExpr(macroExpansionExpr: node).asExpr
-    case "keyPath":  
+    case "keyPath":
       return self.generateObjCKeyPathExpr(macroExpansionExpr: node).asExpr
     case "assert" where ctx.langOptsHasFeature(.StaticAssert), "error", "warning":
       // TODO: Diagnose.

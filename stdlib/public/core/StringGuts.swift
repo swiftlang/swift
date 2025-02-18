@@ -63,7 +63,7 @@ extension _StringGuts {
   internal init(_ storage: __SharedStringStorage) {
     self.init(_StringObject(storage))
   }
-  
+
 #if !$Embedded
 internal init(
   constantCocoa cocoa: AnyObject,
@@ -284,7 +284,7 @@ extension _StringGuts {
       ptr += 1
       numWritten += 1
     }
-    
+
     return numWritten
     #else
     fatalError("No foreign strings on Linux in this version of Swift")

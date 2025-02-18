@@ -267,7 +267,7 @@ namespace {
       if (!this->isCopyable(expansion)) {
         return false;
       }
-                                   
+
       auto fields = asImpl().getFields();
       if (fields.size() != 1)
         return false;
@@ -918,7 +918,7 @@ namespace {
                                    const StructFieldInfo &field) const {
       llvm_unreachable("non-fixed field in loadable type?");
     }
-    
+
     void consume(IRGenFunction &IGF, Explosion &explosion,
                  Atomicity atomicity, SILType T) const override {
       // If the struct has a deinit declared, then call it to consume the
@@ -1423,7 +1423,7 @@ private:
         } else {
           swiftField = nullptr;
         }
-      } 
+      }
 
       // Try to position this field.  If this fails, it's because we
       // didn't lay out padding correctly.

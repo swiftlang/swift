@@ -157,7 +157,7 @@ private extension BuiltinInst {
       return
     }
   }
-  
+
   func optimizeTargetTypeConst(_ context: SimplifyContext) {
     let ty = substitutionMap.replacementType.loweredType(in: parentFunction, maximallyAbstracted: true)
     let value: Int?
@@ -171,17 +171,17 @@ private extension BuiltinInst {
     default:
       fatalError()
     }
-    
+
     guard let value else {
       return
     }
-    
+
     let builder = Builder(before: self, context)
     let literal = builder.createIntegerLiteral(value, type: type)
     uses.replaceAll(with: literal, context)
     context.erase(instruction: self)
   }
-  
+
   func optimizeArgumentToThinMetatype(argument: Int, _ context: SimplifyContext) {
     let type: Type
 
@@ -196,7 +196,7 @@ private extension BuiltinInst {
     guard type.representationOfMetatype(in: parentFunction) == .Thick else {
       return
     }
-    
+
     let instanceType = type.loweredInstanceTypeOfMetatype(in: parentFunction)
     let builder = Builder(before: self, context)
     let newMetatype = builder.createMetatype(of: instanceType, representation: .Thin)

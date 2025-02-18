@@ -55,7 +55,7 @@ public protocol WalkingPath : Equatable {
 
   /// Returns the merged path of this path and `with`.
   func merge(with: Self) -> Self
-  
+
   /// Pops the first path component if it is exactly of kind `kind` - not considering wildcards.
   ///
   /// Returns the index of the component and the new path or - if not matching - returns nil.
@@ -66,7 +66,7 @@ public protocol WalkingPath : Equatable {
   ///
   /// Called for projection instructions during down-walking and for aggregate instructions during up-walking.
   func popIfMatches(_ kind: FieldKind, index: Int?) -> Self?
-  
+
   /// Pushes a new first component to the path and returns the new path.
   ///
   /// Called for aggregate instructions during down-walking and for projection instructions during up-walking.
@@ -146,7 +146,7 @@ public struct WalkerCache<Path : WalkingPath> {
       }
       return nil
     }
-    
+
     // Handle the second inline entry.
     guard let e = inlineEntry1 else {
       inlineEntry1 = (value, path)
@@ -160,7 +160,7 @@ public struct WalkerCache<Path : WalkingPath> {
       }
       return nil
     }
-    
+
     // If there are more than two elements, it goes into the `cache` Dictionary.
     return cache[value.hashable, default: CacheEntry()].needWalk(path: path)
   }
@@ -173,7 +173,7 @@ public struct WalkerCache<Path : WalkingPath> {
 
   private struct CacheEntry {
     var cachedPath: Path?
-    
+
     mutating func needWalk(path: Path) -> Path? {
       guard let previousPath = cachedPath else {
         self.cachedPath = path
@@ -248,12 +248,12 @@ public struct WalkerCache<Path : WalkingPath> {
 /// ```
 public protocol ValueDefUseWalker {
   associatedtype Path: WalkingPath
-  
+
   /// Called on each use. The implementor can decide to continue the walk by calling
   /// `walkDownDefault(value: value, path: path)` or
   /// do nothing.
   mutating func walkDown(value: Operand, path: Path) -> WalkResult
-  
+
   /// Walks down all results of the multi-value instruction `inst`.
   ///
   /// This is called if the path doesn't filter a specific result, but contains a wildcard which matches all results.
@@ -264,7 +264,7 @@ public protocol ValueDefUseWalker {
   /// this is an instruction unknown to the default walker which _might_ be a "transitive use"
   /// of the target value (such as `destroy_value %initial` or a `builtin ... %initial` instruction)
   mutating func leafUse(value: Operand, path: Path) -> WalkResult
-  
+
   /// `unmatchedPath` is called from `walkDownDefault` when this is a use
   /// of the initial value in an instruction recognized by the walker
   /// but for which the requested `path` does not allow the walk to continue.
@@ -297,11 +297,11 @@ extension ValueDefUseWalker {
   public mutating func walkDown(value operand: Operand, path: Path) -> WalkResult {
     return walkDownDefault(value: operand, path: path)
   }
-  
+
   public mutating func unmatchedPath(value: Operand, path: Path) -> WalkResult {
     return .continueWalk
   }
-  
+
   /// Given an operand to an instruction, tries to continue the walk with the uses of
   /// instruction's result if the target value is reachable from it (i.e. matches the `path`) .
   /// If the walk can't continue, it calls `leafUse` or `unmatchedPath`
@@ -421,7 +421,7 @@ extension ValueDefUseWalker {
       return leafUse(value: operand, path: path)
     }
   }
-  
+
   /// Starts the walk
   public mutating func walkDownUses(ofValue: Value, path: Path) -> WalkResult {
     for operand in ofValue.uses where !operand.isTypeDependent {
@@ -431,7 +431,7 @@ extension ValueDefUseWalker {
     }
     return .continueWalk
   }
-  
+
   public mutating func walkDownAllResults(of inst: MultipleValueInstruction, path: Path) -> WalkResult {
     for result in inst.results {
       if let path = walkDownCache.needWalk(for: result, path: path) {
@@ -453,17 +453,17 @@ extension ValueDefUseWalker {
 /// and the whole walk.
 public protocol AddressDefUseWalker {
   associatedtype Path: WalkingPath
-  
+
   /// Called on each use. The implementor can decide to continue the walk by calling
   /// `walkDownDefault(address: address, path: path)` or
   /// do nothing.
   mutating func walkDown(address: Operand, path: Path) -> WalkResult
-  
+
   /// `leafUse` is called from `walkDownDefault` when the walk can't continue for this use since
   /// this is an instruction unknown to the default walker which might be a "transitive use"
   /// of the target value (such as `destroy_addr %initial_addr` or a `builtin ... %initial_addr` instruction).
   mutating func leafUse(address: Operand, path: Path) -> WalkResult
-  
+
   /// `unmatchedPath` is called from `walkDownDefault` when this is a use
   /// of the initial address in an instruction recognized by the walker
   /// but for which the requested `path` does not allow the walk to continue.
@@ -474,11 +474,11 @@ extension AddressDefUseWalker {
   public mutating func walkDown(address operand: Operand, path: Path) -> WalkResult {
     return walkDownDefault(address: operand, path: path)
   }
-  
+
   public mutating func unmatchedPath(address: Operand, path: Path) -> WalkResult {
     return .continueWalk
   }
-  
+
   public mutating func walkDownDefault(address operand: Operand, path: Path) -> WalkResult {
     let instruction = operand.instruction
     switch instruction {
@@ -531,7 +531,7 @@ extension AddressDefUseWalker {
       return leafUse(address: operand, path: path)
     }
   }
-  
+
   public mutating func walkDownUses(ofAddress: Value, path: Path) -> WalkResult {
     for operand in ofAddress.uses where !operand.isTypeDependent {
       if walkDown(address: operand, path: path) == .abortWalk {
@@ -580,7 +580,7 @@ extension AddressDefUseWalker {
 ///     denote that the walk can't continue and that the definition of the target has been reached.
 public protocol ValueUseDefWalker {
   associatedtype Path: WalkingPath
-  
+
   /// Starting point of the walk. The implementor can decide to continue the walk by calling
   /// `walkUpDefault(value: value, path: path)` or
   /// do nothing.
@@ -596,11 +596,11 @@ public protocol ValueUseDefWalker {
   /// * the defining instruction is unknown to the default walker
   /// * the `path` is empty (`""`) and therefore this is the definition of the target value.
   mutating func rootDef(value: Value, path: Path) -> WalkResult
-  
+
   /// `unmatchedPath` is called from `walkUpDefault` when the defining instruction
   /// is unrelated to the `path` the walk should follow.
   mutating func unmatchedPath(value: Value, path: Path) -> WalkResult
-  
+
   /// A client must implement this function to cache walking results.
   /// The function returns nil if the walk doesn't need to continue because
   /// the `def` was already handled before.
@@ -613,11 +613,11 @@ extension ValueUseDefWalker {
   public mutating func walkUp(value: Value, path: Path) -> WalkResult {
     return walkUpDefault(value: value, path: path)
   }
-  
+
   public mutating func unmatchedPath(value: Value, path: Path) -> WalkResult {
     return .continueWalk
   }
-  
+
   public mutating func walkUpDefault(value def: Value, path: Path) -> WalkResult {
     switch def {
     case let str as StructInst:
@@ -724,7 +724,7 @@ extension ValueUseDefWalker {
       return rootDef(value: def, path: path)
     }
   }
-  
+
   public mutating func walkUpAllOperands(of def: Instruction, path: Path) -> WalkResult {
     for operand in def.operands {
       // `shouldRecompute` is called to avoid exponential complexity in
@@ -746,33 +746,33 @@ extension ValueUseDefWalker {
 
 public protocol AddressUseDefWalker {
   associatedtype Path: WalkingPath
-  
+
   /// Starting point of the walk. The implementor can decide to continue the walk by calling
   /// `walkUpDefault(address: address, path: path)` or
   /// do nothing.
   mutating func walkUp(address: Value, path: Path) -> WalkResult
-  
+
   /// `rootDef` is called from `walkUpDefault` when the walk can't continue for this use since
   /// either
   /// * the defining instruction is unknown to the default walker
   /// * the `path` is empty (`""`) and therefore this is the definition of the target value.
   mutating func rootDef(address: Value, path: Path) -> WalkResult
-  
+
   /// `unmatchedPath` is called from `walkUpDefault` when the defining instruction
   /// is unrelated to the `path` the walk should follow.
   mutating func unmatchedPath(address: Value, path: Path) -> WalkResult
 }
 
 extension AddressUseDefWalker {
-  
+
   public mutating func walkUp(address: Value, path: Path) -> WalkResult {
     return walkUpDefault(address: address, path: path)
   }
-  
+
   public mutating func unmatchedPath(address: Value, path: Path) -> WalkResult {
     return .continueWalk
   }
-  
+
   public mutating func walkUpDefault(address def: Value, path: Path) -> WalkResult {
     switch def {
     case let sea as StructElementAddrInst:

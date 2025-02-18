@@ -39,7 +39,7 @@
 //   %forward = struct (%begin)          // forwards a guaranteed value
 //   ...
 //   end_borrow %begin                   // scope-ending use
-//  
+//
 // Every guaranteed OSSA value has a set of borrow introducers, each
 // of which dominates the value and introduces a borrow scope that
 // encloses all forwarded uses of the guaranteed value.
@@ -78,41 +78,41 @@
 //
 //                                Borrow Introducer    Enclosing Value
 //                                ~~~~~~~~~~~~~~~~~    ~~~~~~~~~~~~~~~
-//                                
-//     cond_br ..., bb1, bb2      
-//   bb1:                         
+//
+//     cond_br ..., bb1, bb2
+//   bb1:
 //     %2 = begin_borrow %0       %2                   %0
 //     %3 = struct (%2)           %2                   %2
-//     br bb3(%2, %3)             
-//   bb2:                         
+//     br bb3(%2, %3)
+//   bb2:
 //     %6 = begin_borrow %0       %6                   %0
 //     %7 = struct (%6)           %6                   %6
-//     br bb3(%6, %7)             
+//     br bb3(%6, %7)
 //   bb3(%reborrow: @reborrow,    %reborrow            %0
 //       %phi: @guaranteed):      %phi                 %reborrow
-//  
+//
 // `%reborrow` is an outer-adjacent phi to `%phi` because it encloses
 // `%phi`. `%phi` is an inner-adjacent phi to `%reborrow` because its
 // uses keep `%reborrow` alive. An outer-adjacent phi is either an
 // owned value or a reborrow. An inner-adjacent phi is either a
 // reborrow or a guaranteed forwarding phi. Here is an example of an
 // owned outer-adjacent phi with an inner-adjacent reborrow:
-// 
+//
 //                                Borrow Introducer    Enclosing Value
 //                                ~~~~~~~~~~~~~~~~~    ~~~~~~~~~~~~~~~
-//                                
-//     cond_br ..., bb1, bb2      
-//   bb1:                         
-//     %1 = owned value           
+//
+//     cond_br ..., bb1, bb2
+//   bb1:
+//     %1 = owned value
 //     %2 = begin_borrow %1       %2                   %1
-//     br bb3(%1, %2)             
-//   bb2:                         
-//     %5 = owned value           
+//     br bb3(%1, %2)
+//   bb2:
+//     %5 = owned value
 //     %6 = begin_borrow %5       %6                   %5
-//     br bb3(%5, %6)             
+//     br bb3(%5, %6)
 //   bb3(%phi: @owned,            invalid              none
 //       %reborrow: @reborrow):   %reborrow            %phi
-//  
+//
 // In OSSA, each owned value defines a separate lifetime. It is
 // consumed on all paths by a direct use. Owned lifetimes can,
 // however, be nested within a borrow scope. In this case, finding the
@@ -180,7 +180,7 @@ enum BorrowingInstruction : CustomStringConvertible, Hashable {
       return nil
     }
   }
-  
+
   var instruction: Instruction {
     switch self {
     case .beginBorrow(let bbi):
@@ -308,7 +308,7 @@ enum BeginBorrowValue {
       return nil
     }
   }
-  
+
   var value: Value {
     switch self {
     case .beginBorrow(let bbi): return bbi

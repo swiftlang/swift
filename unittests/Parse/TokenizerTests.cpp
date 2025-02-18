@@ -63,35 +63,35 @@ public:
         break;
     }
   }
-  
+
   void assertTokens(std::vector<Token> Ts, StringRef Expected) {
     std::string Actual;
     for (auto C = Ts.begin(), E = Ts.end(); C != E; ++C) {
       Actual += tokToString(C->getKind());
       Actual += ": ";
-      
+
       std::string Txt(C->getRawText());
       replaceNewLines(Txt);
       Actual += Txt;
-      
+
       Actual += "\n";
     }
     EXPECT_EQ(Expected, Actual)
-      << "---- Expected: \n" << Expected << "\n" 
+      << "---- Expected: \n" << Expected << "\n"
       << "---- Actual: \n" << Actual << "\n";
   }
-  
+
   std::vector<Token> parseAndGetSplitTokens(unsigned BufID) {
     swift::ParserUnit PU(SM, SourceFileKind::Main, BufID, LangOpts, "unknown");
     SmallVector<ASTNode, 8> items;
     PU.getParser().parseTopLevelItems(items);
     return PU.getParser().getSplitTokens();
   }
-  
+
   std::vector<Token> tokenize(unsigned BufID, const std::vector<Token> &SplitTokens = {}) {
-    return swift::tokenize(LangOpts, 
-                           SM, 
-                           BufID, 
+    return swift::tokenize(LangOpts,
+                           SM,
+                           BufID,
                            /* Offset = */ 0,
                            /* EndOffset = */ 0,
                            /* Diags = */nullptr,
@@ -106,7 +106,7 @@ TEST_F(TokenizerTest, ProperlySplitTokens) {
     "infix operator ⊕ { associativity left precedence 100 }\n"
     "func ⊕<T>(t1: T, t2: T) {}\n"
   );
-  
+
   // Tokenize w/o fixing split tokens
   auto Tokens = tokenize(BufID);
   assertTokens(Tokens,

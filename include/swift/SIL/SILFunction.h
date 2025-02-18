@@ -189,7 +189,7 @@ private:
 class SILFunction
   : public llvm::ilist_node<SILFunction>, public SILAllocated<SILFunction>,
     public SwiftObjectHeader {
-    
+
 private:
   void *libswiftSpecificData[4];
 
@@ -226,7 +226,7 @@ private:
   ///
   /// Snapshots are copies of the current function at a given point in time.
   SILFunction *snapshots = nullptr;
-  
+
   /// The snapshot ID of this function.
   ///
   /// 0 means, it's not a snapshot, but the original function.
@@ -555,13 +555,13 @@ public:
 
   /// Creates a snapshot with a given `ID` from the current function.
   void createSnapshot(int ID);
-  
+
   /// Returns the snapshot with the given `ID` or null if no such snapshot exists.
   SILFunction *getSnapshot(int ID);
-  
+
   /// Restores the current function from a given snapshot.
   void restoreFromSnapshot(int ID);
-  
+
   /// Deletes a snapshot with the `ID`.
   void deleteSnapshot(int ID);
 
@@ -900,7 +900,7 @@ public:
     return effectiveLinkageForClassMember(getLinkage(),
                                           getClassSubclassScope());
   }
-    
+
   /// Helper method which returns true if this function has "external" linkage.
   bool isAvailableExternally() const {
     return swift::isAvailableExternally(getLinkage());
@@ -1195,7 +1195,7 @@ public:
   void setEffectsKind(EffectsKind E) {
     EffectsKindAttr = unsigned(E);
   }
-  
+
   std::pair<const char *, int>  parseArgumentEffectsFromSource(StringRef effectStr,
                                                               ArrayRef<StringRef> paramNames);
   std::pair<const char *, int>  parseArgumentEffectsFromSIL(StringRef effectStr,
@@ -1229,7 +1229,7 @@ public:
   /// function itself does not need this attribute. It is private and only
   /// called within the addressor.
   bool isGlobalInit() const { return specialPurpose == Purpose::GlobalInit; }
-    
+
   bool isGlobalInitOnceFunction() const {
     return specialPurpose == Purpose::GlobalInitOnceFunction;
   }
@@ -1286,7 +1286,7 @@ public:
     validateSubclassScope(getClassSubclassScope(), isThunk(), Info);
     SpecializationInfo = Info;
   }
-  
+
   /// If this function is a specialization, return the original function from
   /// which this function was specialized.
   const SILFunction *getOriginOfSpecialization() const;
@@ -1497,7 +1497,7 @@ public:
   /// Transfer all blocks of \p F into this function, at the begin of the block
   /// list.
   void moveAllBlocksFromOtherFunction(SILFunction *F);
-  
+
   /// Transfer \p blockInOtherFunction of another function into this function,
   /// before \p insertPointInThisFunction.
   void moveBlockFromOtherFunction(SILBasicBlock *blockInOtherFunction,
@@ -1544,7 +1544,7 @@ public:
                           return isa<ThrowInst>(TI) || isa<ThrowAddrInst>(TI);
                         });
   }
-  
+
   /// Return the unique basic block containing a throw inst if it
   /// exists. Otherwise, returns end.
   const_iterator findThrowBB() const {
@@ -1700,7 +1700,7 @@ public:
   /// Pretty-print the SILFunction.
   void dump(bool Verbose) const;
   void dump() const;
-  
+
   /// Pretty-print the SILFunction.
   /// Useful for dumping the function when running in a debugger.
   /// Warning: no error handling is done. Fails with an assert if the file

@@ -278,7 +278,7 @@ TEST(FixedBitSet, equality) {
   FixedBitSet<141, int> rhs = {1};
   EXPECT_NE(lhs, rhs);
 
-  lhs.insert(1);  
+  lhs.insert(1);
   EXPECT_EQ(lhs, rhs);
 
   rhs.insert(107);

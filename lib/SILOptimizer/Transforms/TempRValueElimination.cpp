@@ -533,7 +533,7 @@ void TempRValueOptPass::tryOptimizeCopyIntoTemp(CopyAddrInst *copyInst) {
   }
 
   bool isOSSA = copyInst->getFunction()->hasOwnership();
-  
+
   SILValue copySrc = copyInst->getSrc();
   assert(tempObj != copySrc && "can't initialize temporary with itself");
 

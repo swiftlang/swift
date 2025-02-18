@@ -50,7 +50,7 @@ final public class BasicBlock : CustomStringConvertible, HasShortDescription, Ha
     }
     return nil
   }
-  
+
   public var hasSinglePredecessor: Bool { singlePredecessor != nil }
 
   public var singleSuccessor: BasicBlock? {
@@ -85,7 +85,7 @@ final public class BasicBlock : CustomStringConvertible, HasShortDescription, Ha
     }
     fatalError()
   }
- 
+
   public var name: String { "bb\(index)" }
 
   public static func == (lhs: BasicBlock, rhs: BasicBlock) -> Bool { lhs === rhs }

@@ -595,7 +595,7 @@ availabilityDomainsForABICompatibility(const ASTContext &ctx) {
 
   if (auto targetDomain = AvailabilityDomain::forTargetPlatform(ctx))
     domains.push_back(targetDomain->getABICompatibilityDomain());
-  
+
   if (auto variantDomain = AvailabilityDomain::forTargetVariantPlatform(ctx))
     domains.push_back(variantDomain->getABICompatibilityDomain());
 
@@ -659,7 +659,7 @@ static bool isUnavailableForAllABICompatiblePlatforms(const Decl *decl) {
     if (!unavailableDescendantDomains.contains(compatibilityDomain))
       return false;
   }
-  
+
   // Verify that there aren't any explicitly available descendant domains.
   if (availableDescendantDomains.size() > 0)
     return false;

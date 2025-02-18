@@ -26,21 +26,21 @@ internal func _allASCII(_ input: UnsafeBufferPointer<UInt8>) -> Bool {
   let asciiMask32 = UInt32(truncatingIfNeeded: asciiMask64)
   let asciiMask16 = UInt16(truncatingIfNeeded: asciiMask64)
   let asciiMask8 = UInt8(truncatingIfNeeded: asciiMask64)
-  
+
   let end128 = ptr + count & ~(MemoryLayout<(UInt64, UInt64)>.stride &- 1)
   let end64 = ptr + count & ~(MemoryLayout<UInt64>.stride &- 1)
   let end32 = ptr + count & ~(MemoryLayout<UInt32>.stride &- 1)
   let end16 = ptr + count & ~(MemoryLayout<UInt16>.stride &- 1)
   let end = ptr + count
 
-  
+
   while ptr < end128 {
     let pair = ptr.loadUnaligned(as: (UInt64, UInt64).self)
     let result = (pair.0 | pair.1) & asciiMask64
     guard result == 0 else { return false }
     ptr = ptr + MemoryLayout<(UInt64, UInt64)>.stride
   }
-  
+
   // If we had enough bytes for two iterations of this, we would have hit
   // the loop above, so we only need to do this once
   if ptr < end64 {
@@ -48,13 +48,13 @@ internal func _allASCII(_ input: UnsafeBufferPointer<UInt8>) -> Bool {
     guard value & asciiMask64 == 0 else { return false }
     ptr = ptr + MemoryLayout<UInt64>.stride
   }
-  
+
   if ptr < end32 {
     let value = ptr.loadUnaligned(as: UInt32.self)
     guard value & asciiMask32 == 0 else { return false }
     ptr = ptr + MemoryLayout<UInt32>.stride
   }
-  
+
   if ptr < end16 {
     let value = ptr.loadUnaligned(as: UInt16.self)
     guard value & asciiMask16 == 0 else { return false }

@@ -39,7 +39,7 @@ import SIL
 /// types yet. Therefore it's needed to call `deinitialize()` explicitly to
 /// destruct this data structure, e.g. in a `defer {}` block.
 struct InstructionRange : CustomStringConvertible, NoReflectionChildren {
-  
+
   /// The underlying block range.
   private(set) var blockRange: BasicBlockRange
 

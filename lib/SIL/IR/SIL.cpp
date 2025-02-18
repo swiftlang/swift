@@ -131,7 +131,7 @@ bool SILModule::isTypeMetadataAccessible(CanType type) {
     // Public declarations are accessible from everywhere.
     case FormalLinkage::PublicUnique:
     case FormalLinkage::PublicNonUnique:
-    case FormalLinkage::PackageUnique: 
+    case FormalLinkage::PackageUnique:
       return false;
 
     // Hidden declarations are inaccessible from different modules.
@@ -207,7 +207,7 @@ FormalLinkage swift::getGenericSignatureLinkage(CanGenericSignature sig) {
 /// type declaration.
 FormalLinkage swift::getTypeLinkage(CanType t) {
   assert(t->isLegalFormalType());
-  
+
   class Walker : public TypeWalker {
   public:
     FormalLinkage Linkage;
@@ -218,7 +218,7 @@ FormalLinkage swift::getTypeLinkage(CanType t) {
       auto decl = ty->getNominalOrBoundGenericNominal();
       if (!decl)
         return Action::Continue;
-      
+
       Linkage = std::max(Linkage, getDeclLinkage(decl));
       return Action::Continue;
     }
@@ -353,7 +353,7 @@ static bool isUnsupportedKeyPathValueType(Type ty) {
 bool AbstractStorageDecl::exportsPropertyDescriptor() const {
   // The storage needs a descriptor if it sits at a module's ABI boundary,
   // meaning it has public linkage.
-  
+
   if (!isStatic()) {
     if (auto contextTy = getDeclContext()->getDeclaredTypeInContext()) {
       if (contextTy->isNoncopyable()) {
@@ -366,7 +366,7 @@ bool AbstractStorageDecl::exportsPropertyDescriptor() const {
   // as key paths from ().
   if (!getDeclContext()->isTypeContext())
     return false;
-  
+
   // Protocol requirements do not need property descriptors.
   if (isa<ProtocolDecl>(getDeclContext()))
     return false;
@@ -396,7 +396,7 @@ bool AbstractStorageDecl::exportsPropertyDescriptor() const {
 
   // Check the linkage of the declaration.
   auto getterLinkage = SILDeclRef(getter).getLinkage(ForDefinition);
-  
+
   switch (getterLinkage) {
   case SILLinkage::Public:
   case SILLinkage::PublicNonABI:
@@ -404,13 +404,13 @@ bool AbstractStorageDecl::exportsPropertyDescriptor() const {
   case SILLinkage::PackageNonABI:
     // We may need a descriptor.
     break;
-    
+
   case SILLinkage::Shared:
   case SILLinkage::Private:
   case SILLinkage::Hidden:
     // Don't need a public descriptor.
     return false;
-    
+
   case SILLinkage::HiddenExternal:
   case SILLinkage::PublicExternal:
   case SILLinkage::PackageExternal:
@@ -430,21 +430,21 @@ bool AbstractStorageDecl::exportsPropertyDescriptor() const {
       // Keypaths can't capture inout indices.
       if (index->isInOut())
         return false;
-      
+
       auto indexTy = index->getInterfaceType()
                         ->getReducedType(sub->getGenericSignatureOfContext());
-      
+
       // TODO: Handle reabstraction and tuple explosion in thunk generation.
       // This wasn't previously a concern because anything that was Hashable
       // had only one abstraction level and no explosion.
-      
+
       if (isa<TupleType>(indexTy))
         return false;
-      
+
       auto indexObjTy = indexTy;
       if (auto objTy = indexObjTy.getOptionalObjectType())
         indexObjTy = objTy;
-      
+
       if (isa<AnyFunctionType>(indexObjTy)
           || isa<AnyMetatypeType>(indexObjTy))
         return false;

@@ -39,11 +39,11 @@ public func emitCollection<C: Collection>(
 ) {
   result += """
   static const \(type) \(name)[\(collection.count)] = {
-  
+
   """
-  
+
   formatCollection(collection, into: &result, using: formatter)
-  
+
   result += "\n};\n\n"
 }
 
@@ -71,10 +71,10 @@ public func emitMph(
 ) {
   result += """
   #define \(defineLabel)_LEVEL_COUNT \(mph.bitArrays.count)
-  
-  
+
+
   """
-  
+
   emitMphSizes(mph, name, into: &result)
   emitMphBitarrays(mph, name, into: &result)
   emitMphRanks(mph, name, into: &result)
@@ -94,13 +94,13 @@ func emitMphSizes(_ mph: Mph, _ name: String, into result: inout String) {
 
 func emitMphBitarrays(_ mph: Mph, _ name: String, into result: inout String) {
   // Individual bitarrays
-  
+
   for (i, ba) in mph.bitArrays.enumerated() {
     emitCollection(ba.words, name: "\(name)_keys\(i)", into: &result)
   }
-  
+
   // Overall bitarrays
-  
+
   emitCollection(
     mph.bitArrays.indices,
     name: "\(name)_keys",
@@ -113,13 +113,13 @@ func emitMphBitarrays(_ mph: Mph, _ name: String, into result: inout String) {
 
 func emitMphRanks(_ mph: Mph, _ name: String, into result: inout String) {
   // Individual ranks
-  
+
   for (i, rank) in mph.ranks.enumerated() {
     emitCollection(rank, name: "\(name)_ranks\(i)", into: &result)
   }
-  
+
   // Overall ranks
-  
+
   emitCollection(
     mph.ranks.indices,
     name: "\(name)_ranks",

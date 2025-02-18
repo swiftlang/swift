@@ -133,7 +133,7 @@ where Element: AdditiveArithmetic & Differentiable {
   public static var zero: Array.DifferentiableView {
     return Array.DifferentiableView([])
   }
-  
+
   @inlinable
   public static func + (
     lhs: Array.DifferentiableView,

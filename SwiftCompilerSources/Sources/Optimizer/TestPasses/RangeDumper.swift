@@ -44,9 +44,9 @@ let rangeDumper = FunctionPass(name: "dump-ranges") {
       }
     }
   }
-  
+
   guard let begin = begin else { return }
-  
+
   var instRange = InstructionRange(begin: begin, context)
   defer { instRange.deinitialize() }
 
@@ -60,7 +60,7 @@ let rangeDumper = FunctionPass(name: "dump-ranges") {
   print("End function \(function.name)\n")
 
   verify(instRange.blockRange, context)
-  
+
   for i in ins {
     assert(instRange.contains(i))
     assert(instRange.inclusiveRangeContains(i))

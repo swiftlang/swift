@@ -118,7 +118,7 @@ public:
   std::string manglePrespecialized(SubstitutionMap subs) {
     return manglePrespecialized(getGenericSignature(), subs);
   }
-                                    
+
   static std::string manglePrespecialization(ASTContext &Ctx, std::string unspecializedName,
                                              GenericSignature genericSig,
                                              GenericSignature specializedSig);

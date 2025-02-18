@@ -22,7 +22,7 @@ public protocol CxxSet<Element>: ExpressibleByArrayLiteral {
 
   // std::pair<iterator, bool> for std::set and std::unordered_set
   // iterator for std::multiset
-  associatedtype InsertionResult 
+  associatedtype InsertionResult
 
   init()
 

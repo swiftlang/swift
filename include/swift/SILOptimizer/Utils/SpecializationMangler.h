@@ -30,7 +30,7 @@ class PartialSpecializationMangler : public SpecializationMangler {
 
   CanSILFunctionType SpecializedFnTy;
   bool isReAbstracted;
-  
+
 public:
   PartialSpecializationMangler(ASTContext &Ctx, SILFunction *F,
                                CanSILFunctionType SpecializedFnTy,
@@ -116,7 +116,7 @@ public:
   void setRemovedEffect(EffectKind effect);
 
   std::string mangle();
-  
+
 private:
   void mangleConstantProp(SILInstruction *constInst);
   void mangleClosureProp(SILInstruction *Inst);

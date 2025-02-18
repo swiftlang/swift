@@ -991,7 +991,7 @@ void ElementUseCollector::collectUses(SILValue Pointer, unsigned BaseEltNo) {
         addElementUses(BaseEltNo, PointeeType, User, DIUseKind::IndirectIn);
         continue;
 
-      
+
       // If this is an @inout parameter, it is like both a load and store.
       case ParameterConvention::Indirect_InoutAliasable: {
         // FIXME: The @inout_aliasable convention is used for indirect captures
@@ -1013,7 +1013,7 @@ void ElementUseCollector::collectUses(SILValue Pointer, unsigned BaseEltNo) {
           addElementUses(BaseEltNo, PointeeType, User, DIUseKind::IndirectIn);
           continue;
         }
-        
+
         LLVM_FALLTHROUGH;
       }
       case ParameterConvention::Indirect_Inout: {
@@ -1202,7 +1202,7 @@ bool ElementUseCollector::addClosureElementUses(PartialApplyInst *pai,
 
   unsigned argIndex = ApplySite(pai).getCalleeArgIndex(*argUse);
   SILArgument *arg = callee->getArgument(argIndex);
-  
+
   // Bail if arg is not the original 'self' object, but e.g. a projected member.
   assert(TheMemory.getType().isObject());
   if (arg->getType().getObjectType() != TheMemory.getType())
@@ -1214,7 +1214,7 @@ bool ElementUseCollector::addClosureElementUses(PartialApplyInst *pai,
 
   if (!ArgUseInfo.Releases.empty() || !ArgUseInfo.StoresToSelf.empty())
     return false;
-    
+
   for (const DIMemoryUse &use : ArgUseInfo.Uses) {
     // Only handle loads and escapes. Implicit closures will not have stores or
     // store-like uses, anyway.
@@ -1320,7 +1320,7 @@ void ElementUseCollector::collectClassSelfUses(SILValue ClassPointer) {
   // If we are looking at the init method for a root class, just walk the
   // MUI use-def chain directly to find our uses.
   if (TheMemory.isRootSelf() ||
-  
+
       // Also, just visit all users if ClassPointer is a closure argument,
       // i.e. collectClassSelfUses is called from addClosureElementUses.
       isa<SILFunctionArgument>(ClassPointer)) {
@@ -1689,7 +1689,7 @@ void ElementUseCollector::collectClassSelfUses(
         Kind = DIUseKind::SelfInit;
       }
     }
-    
+
     if (isUninitializedMetatypeInst(User))
       continue;
 
@@ -1795,7 +1795,7 @@ collectDelegatingInitUses(const DIMemoryObjectInfo &TheMemory,
     // Ignore end_access
     if (isa<EndAccessInst>(User))
       continue;
-    
+
     // A load of the value that's only used to handle a type(of:) query before
     // self has been initialized can just use the initializer's metatype
     // argument. For value types, there's no metatype subtyping to worry about,

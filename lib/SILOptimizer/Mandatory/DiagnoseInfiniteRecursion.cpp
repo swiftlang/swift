@@ -317,7 +317,7 @@ struct BlockInfo {
 
   /// Is there any path from the this block to a recursive call?
   bool reachesRecursiveCall;
-  
+
   /// Get block information with expected \p invariants.
   BlockInfo(SILBasicBlock *block, Invariants invariants) :
       recursiveCall(nullptr),
@@ -424,7 +424,7 @@ class InfiniteRecursionAnalysis {
       }
     }
   }
-  
+
   /// Propagates the `reachesFunctionExit` flags up the control flow.
   void propagateFunctionExits() {
     StackList<SILBasicBlock *> workList(blockInfos.getFunction());
@@ -471,7 +471,7 @@ class InfiniteRecursionAnalysis {
       }
     }
   }
-  
+
   /// Finds all infinite recursive calls reachable from the entry and issues
   /// warnings.
   /// Returns true if the function contains infinite recursive calls.

@@ -27,16 +27,16 @@ class SILGenFunction;
 /// active executor after making a hop to an actor for actor-isolated calls.
 class ExecutorBreadcrumb {
   bool mustReturnToExecutor;
-  
+
 public:
   // An empty breadcrumb, indicating no hop back is necessary.
   ExecutorBreadcrumb() : mustReturnToExecutor(false) {}
-  
+
   // A breadcrumb representing the need to hop back to the expected
   // executor of the current function.
   explicit ExecutorBreadcrumb(bool mustReturnToExecutor)
     : mustReturnToExecutor(mustReturnToExecutor) {}
-  
+
   // Emits the hop back sequence, if any, necessary to get back to
   // the executor represented by this breadcrumb.
   void emit(SILGenFunction &SGF, SILLocation loc);

@@ -382,7 +382,7 @@ fileprivate final class ProjectGenerator {
     var libBuildArgs = try buildDir.clangArgs.getArgs(for: targetPath)
     applyBaseSubstitutions(to: &libBuildArgs)
 
-    target.buildSettings.common.HEADER_SEARCH_PATHS = 
+    target.buildSettings.common.HEADER_SEARCH_PATHS =
       libBuildArgs.takePrintedValues(for: .I)
 
     target.buildSettings.common.CLANG_CXX_LANGUAGE_STANDARD =
@@ -762,7 +762,7 @@ fileprivate final class ProjectGenerator {
 
     if !unbuildableSources.isEmpty {
       let target = ClangTarget(
-        name: "Unbuildables", 
+        name: "Unbuildables",
         parentPath: ".",
         sources: unbuildableSources,
         headers: []

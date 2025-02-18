@@ -327,7 +327,7 @@ public:
   /// Derive a Decodable requirement for a struct type.
   ///
   /// \returns the derived member, which will also be added to the type.
-  ValueDecl *deriveDecodable(ValueDecl *requirement);  
+  ValueDecl *deriveDecodable(ValueDecl *requirement);
 
   /// Identifiable may need to have the `ID` type witness synthesized explicitly
   static bool canDeriveIdentifiable(NominalTypeDecl *nominal,

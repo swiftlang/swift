@@ -966,7 +966,7 @@ ReplaceOpaqueTypesWithUnderlyingTypes::shouldPerformSubstitution(
     OpaqueTypeDecl *opaque, ModuleDecl *contextModule,
     ResilienceExpansion contextExpansion) {
   auto namingDecl = opaque->getNamingDecl();
-  
+
   // Don't allow replacement if the naming decl is dynamically replaceable.
   if (namingDecl && namingDecl->isDynamic())
     return OpaqueSubstitutionKind::DontSubstitute;
@@ -1198,19 +1198,19 @@ ProtocolConformanceRef ReplaceOpaqueTypesWithUnderlyingTypes::
 operator()(CanType maybeOpaqueType, Type replacementType,
            ProtocolDecl *protocol) const {
   auto abstractRef = ProtocolConformanceRef::forAbstract(maybeOpaqueType, protocol);
-  
+
   auto archetype = dyn_cast<OpaqueTypeArchetypeType>(maybeOpaqueType);
   if (!archetype) {
     if (maybeOpaqueType->isTypeParameter() ||
         maybeOpaqueType->is<ArchetypeType>())
       return abstractRef;
-    
+
     // SIL type lowering may have already substituted away the opaque type, in
     // which case we'll end up "substituting" the same type.
     if (maybeOpaqueType->isEqual(replacementType)) {
       return lookupConformance(replacementType, protocol);
     }
-    
+
     llvm_unreachable("origType should have been an opaque type or type parameter");
   }
 
@@ -1264,7 +1264,7 @@ operator()(CanType maybeOpaqueType, Type replacementType,
   // If the type still contains opaque types, recur.
   if (substTy->hasOpaqueArchetype()) {
     SeenDecl seenKey(decl, outerSubs);
-    
+
     if (auto *alreadySeen = this->seenDecls) {
       // Detect substitution loops. If we find one, just bounce the original
       // type back to the caller. This substitution will fail at runtime

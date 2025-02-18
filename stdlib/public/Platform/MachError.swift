@@ -24,7 +24,7 @@ public enum MachErrorCode : Int32 {
   case protectionFailure        = 2
 
   /// The address range specified is already in use, or no address
-  /// range of the size specified could be found.  
+  /// range of the size specified could be found.
   case noSpace                  = 3
 
   /// The function requested was not applicable to this type of

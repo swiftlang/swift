@@ -50,7 +50,7 @@ public struct UInt128: Sendable {
     self = unsafeBitCast((_high, _low), to: Self.self)
 #endif
   }
-  
+
 #else
   //  On 32-bit platforms, we don't want to use Builtin.Int128 for layout
   //  because it would be 16B aligned, which is excessive for such targets

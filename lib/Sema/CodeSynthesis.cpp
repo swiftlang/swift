@@ -324,7 +324,7 @@ static ConstructorDecl *createImplicitConstructor(NominalTypeDecl *decl,
   }
 
   auto paramList = ParameterList::create(ctx, params);
-  
+
   // Create the constructor.
   DeclName name(ctx, DeclBaseName::createConstructor(), paramList);
   auto *ctor = new (ctx) ConstructorDecl(

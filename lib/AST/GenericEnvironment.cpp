@@ -758,7 +758,7 @@ GenericEnvironment::mapConformanceRefIntoContext(GenericEnvironment *genericEnv,
                                            ProtocolConformanceRef conformance) {
   if (!genericEnv)
     return {conformingType, conformance};
-  
+
   return genericEnv->mapConformanceRefIntoContext(conformingType, conformance);
 }
 
@@ -769,7 +769,7 @@ GenericEnvironment::mapConformanceRefIntoContext(
   auto contextConformance = conformance.subst(conformingInterfaceType,
     QueryInterfaceTypeSubstitutions(this),
     LookUpConformanceInModule());
-  
+
   auto contextType = mapTypeIntoContext(conformingInterfaceType);
   return {contextType, contextConformance};
 }

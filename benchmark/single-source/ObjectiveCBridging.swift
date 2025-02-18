@@ -770,14 +770,14 @@ var unicodeStringFromCodableDict = [String:Void]()
 public func setup_UnicodeStringFromCodable() {
   do {
     let jsonString = "[\(String(reflecting: "Nice string which works rather slöw."))]"
-    
+
     let decoded = try JSONDecoder().decode([String].self, from: Data(jsonString.utf8))
     let reEncoded = try JSONEncoder().encode(decoded)
     let desc = try JSONDecoder().decode([String].self, from: reEncoded)
-    
+
     unicodeStringFromCodable = desc[0]
   } catch (_) {
-    
+
   }
 }
 

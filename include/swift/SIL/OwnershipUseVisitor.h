@@ -174,7 +174,7 @@ protected:
   bool visitInnerBorrow(Operand *borrowingOperand);
 
   bool visitInnerAdjacentReborrow(SILArgument *reborrow);
-  
+
   bool visitInnerBorrowScopeEnd(Operand *borrowEnd);
 
   bool visitOwnedUse(Operand *use);
@@ -229,7 +229,7 @@ bool OwnershipUseVisitor<Impl>::visitConsumes(SILValue ssaDef) {
     if (use->isConsuming()) {
       if (PhiOperand(use) && !asImpl().handleOwnedPhi(use))
         return false;
-        
+
       if (!handleUsePoint(use, UseLifetimeConstraint::LifetimeEnding))
         return false;
     }

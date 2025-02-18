@@ -942,7 +942,7 @@ public:
   NullablePtr<const void> addressForPrinting() const override { return decl; }
 
   bool ignoreInDebugInfo() const override { return true; }
-  
+
 private:
   void expandAScopeThatDoesNotCreateANewInsertionPoint(ScopeCreator &);
 
@@ -1507,7 +1507,7 @@ class GuardStmtScope final : public LabeledConditionalStmtScope {
 public:
   GuardStmt *const stmt;
   SourceLoc endLoc;
-  GuardStmtScope(GuardStmt *e, SourceLoc endLoc) 
+  GuardStmtScope(GuardStmt *e, SourceLoc endLoc)
       : LabeledConditionalStmtScope(ScopeKind::GuardStmt),
         stmt(e), endLoc(endLoc) {}
   virtual ~GuardStmtScope() {}

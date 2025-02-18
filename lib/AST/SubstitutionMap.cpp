@@ -385,7 +385,7 @@ SubstitutionMap SubstitutionMap::subst(InFlightSubstitution &IFS) const {
 
       newConformances.push_back(conformance.subst(substType, IFS));
     }
-    
+
     oldConformances = oldConformances.slice(1);
   }
 

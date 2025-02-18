@@ -236,7 +236,7 @@ public func valueWithGradient<T, U, V, R>(
 
 // Derivative (curried)
 
-@inlinable 
+@inlinable
 public func derivative<T: FloatingPoint, R>(
   of f: @escaping @differentiable(reverse) (T) -> R
 ) -> (T) -> R.TangentVector
@@ -244,7 +244,7 @@ public func derivative<T: FloatingPoint, R>(
   return { x in derivative(at: x, of: f) }
 }
 
-@inlinable 
+@inlinable
 public func derivative<T: FloatingPoint, U: FloatingPoint, R>(
   of f: @escaping @differentiable(reverse) (T, U) -> R
 ) -> (T, U) -> R.TangentVector

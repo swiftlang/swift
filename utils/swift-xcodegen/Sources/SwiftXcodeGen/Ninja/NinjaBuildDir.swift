@@ -53,7 +53,7 @@ public final class NinjaBuildDir: Sendable {
     }
     return inferredProjectRootPath
   }
-  
+
   public init(at path: AbsolutePath, projectRootDir: AbsolutePath?) throws {
     guard path.exists else {
       throw XcodeGenError.pathNotFound(path)
@@ -62,7 +62,7 @@ public final class NinjaBuildDir: Sendable {
     self._tripleSuffix = Self.detectTripleSuffix(buildDir: path)
     self.projectRootDir = try projectRootDir ?? Self.detectProjectRoot()
   }
-  
+
   public func buildDir(for repo: Repo) throws -> RepoBuildDir {
     try repoBuildDirs.withLock { repoBuildDirs in
       if let buildDir = repoBuildDirs[repo] {

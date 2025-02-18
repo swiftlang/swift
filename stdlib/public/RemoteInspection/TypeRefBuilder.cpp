@@ -458,7 +458,7 @@ public:
     return Builder.getTypeRefString(
         Builder.readTypeRef(Field, Field->FieldName));
   }
-    
+
   NodePointer getDemangledTypeName() override {
     return Builder.demangleTypeRef(
         Builder.readTypeRef(Field, Field->MangledTypeName));
@@ -682,7 +682,7 @@ public:
   }
 };
 } // namespace
-  
+
 RemoteRef<MultiPayloadEnumDescriptor>
 TypeRefBuilder::ReflectionTypeDescriptorFinder::getMultiPayloadEnumInfo(
     const TypeRef *TR) {

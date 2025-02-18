@@ -112,7 +112,7 @@ public:
     auto Buf = readBytes(address, length);
     if (!Buf)
       return false;
-    
+
     dest = std::string(reinterpret_cast<const char *>(Buf.get()), length);
     return true;
   }

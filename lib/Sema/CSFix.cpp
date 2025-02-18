@@ -2056,7 +2056,7 @@ SpecifyKeyPathRootType::create(ConstraintSystem &cs,
 bool SpecifyKeyPathRootType::diagnose(const Solution &solution,
                                       bool asNote) const {
   UnableToInferKeyPathRootFailure failure(solution, getLocator());
-  
+
   return failure.diagnose(asNote);
 }
 
@@ -2076,7 +2076,7 @@ UnwrapOptionalBaseKeyPathApplication::attempt(ConstraintSystem &cs, Type baseTy,
 
   if (!isExpr<SubscriptExpr>(locator->getAnchor()))
     return nullptr;
-  
+
   // Only diagnose this if base is an optional type and we only have a
   // single level of optionality so we can safely suggest unwrapping.
   auto nonOptionalTy = baseTy->getOptionalObjectType();

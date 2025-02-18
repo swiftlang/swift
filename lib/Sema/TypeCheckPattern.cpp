@@ -295,13 +295,13 @@ public:
     // Keep track of the fact that we're inside of a var/let pattern.  This
     // affects how unqualified identifiers are processed.
     P->setSubPattern(visit(P->getSubPattern()));
-    
+
     // If the var pattern has no variables bound underneath it, then emit a
     // warning that the var/let is pointless.
     if (!P->isImplicit()) {
       bool HasVariable = false;
       P->forEachVariable([&](VarDecl *VD) { HasVariable = true; });
-      
+
       if (!HasVariable) {
         Context.Diags
             .diagnose(P->getLoc(), diag::var_pattern_didnt_bind_variables,
@@ -310,7 +310,7 @@ public:
             .fixItRemove(P->getLoc());
       }
     }
-    
+
     return P;
   }
 
@@ -323,7 +323,7 @@ public:
     P->setSubPattern(visit(P->getSubPattern()));
     return P;
   }
-  
+
   Pattern *visitExprPattern(ExprPattern *P) {
     if (P->isResolved())
       return P;
@@ -337,17 +337,17 @@ public:
     }
     return exprAsPattern;
   }
-  
+
   // Most exprs remain exprs and should be wrapped in ExprPatterns.
   Pattern *visitExpr(Expr *E) {
     return nullptr;
   }
-  
+
   // Unwrap UnresolvedPatternExprs.
   Pattern *visitUnresolvedPatternExpr(UnresolvedPatternExpr *E) {
     return visit(E->getSubPattern());
   }
-  
+
   // Convert a '_' expression to an AnyPattern.
   Pattern *visitDiscardAssignmentExpr(DiscardAssignmentExpr *E) {
     if (E->isImplicit()) {
@@ -355,7 +355,7 @@ public:
     }
     return new (Context) AnyPattern(E->getLoc());
   }
-  
+
   // Cast expressions 'x as T' get resolved to checked cast patterns.
   // Pattern resolution occurs before sequence resolution, so the cast will
   // appear as a SequenceExpr.
@@ -377,14 +377,14 @@ public:
     return new (Context)
         IsPattern(cast->getLoc(), TE, subPattern, CheckedCastKind::Unresolved);
   }
-  
+
   // Convert a paren expr to a pattern if it contains a pattern.
   Pattern *visitParenExpr(ParenExpr *E) {
     Pattern *subPattern = getSubExprPattern(E->getSubExpr());
     return new (Context)
         ParenPattern(E->getLParenLoc(), subPattern, E->getRParenLoc());
   }
-  
+
   // Convert all tuples to patterns.
   Pattern *visitTupleExpr(TupleExpr *E) {
     // Construct a TuplePattern.
@@ -417,7 +417,7 @@ public:
                                       ume->getName(), ume,
                                       /*subPattern*/ nullptr, DC);
   }
-  
+
   // Member syntax 'T.Element' forms a pattern if 'T' is an enum and the
   // member name is a member of the enum.
   Pattern *visitUnresolvedDotExpr(UnresolvedDotExpr *ude) {
@@ -459,13 +459,13 @@ public:
                                       ude->getName(), referencedElement,
                                       /*subPattern*/ nullptr, DC);
   }
-  
+
   // A DeclRef 'E' that refers to an enum element forms an EnumElementPattern.
   Pattern *visitDeclRefExpr(DeclRefExpr *de) {
     auto *elt = dyn_cast<EnumElementDecl>(de->getDecl());
     if (!elt)
       return nullptr;
-    
+
     // Use the type of the enum from context.
     auto enumTy = elt->getParentEnum()->getDeclaredTypeInContext();
     auto *base = TypeExpr::createImplicit(enumTy, Context);
@@ -491,8 +491,8 @@ public:
                                         ude->getName(), referencedElement,
                                         /*subPattern*/ nullptr, DC);
     }
-      
-    
+
+
     // Perform unqualified name lookup to find out what the UDRE is.
     return getSubExprPattern(TypeChecker::resolveDeclRefExpr(ude, DC));
   }
@@ -610,7 +610,7 @@ Pattern *ResolvePatternRequest::evaluate(Evaluator &evaluator, Pattern *P,
           IsPattern(TE->getStartLoc(), TE,
                     /*subpattern*/ nullptr, CheckedCastKind::Unresolved);
     }
-  
+
   // Look through a TypedPattern if present.
   auto *InnerP = P;
   if (auto *TP = dyn_cast<TypedPattern>(P))
@@ -865,7 +865,7 @@ Type PatternTypeRequest::evaluate(Evaluator &evaluator,
 
     return TupleType::get(typeElts, Context);
   }
-      
+
   //--- Refutable patterns.
   //
   // Refutable patterns occur when checking the PatternBindingDecls in if/let,
@@ -1178,7 +1178,7 @@ Pattern *TypeChecker::coercePatternToType(
     Type diagTy = type->lookThroughAllOptionalTypes();
     bool isOptional = !type->getOptionalObjectType().isNull();
     if (!diagTy) diagTy = type;
-    
+
     auto diag = diag::type_inferred_to_undesirable_type;
     bool shouldRequireType = false;
     if (NP->isImplicit()) {
@@ -1207,7 +1207,7 @@ Pattern *TypeChecker::coercePatternToType(
       if (BST->isArray())
         shouldRequireType = BST->getGenericArgs()[0]->isVoid();
     }
-    
+
     if (shouldRequireType &&
         !options.is(TypeResolverContext::ForEachStmt) &&
         !options.is(TypeResolverContext::EditorPlaceholderExpr) &&
@@ -1230,7 +1230,7 @@ Pattern *TypeChecker::coercePatternToType(
   case PatternKind::Tuple: {
     TuplePattern *TP = cast<TuplePattern>(P);
     bool hadError = type->hasError();
-    
+
     // Sometimes a paren is just a paren. If the tuple pattern has a single
     // element, we can reduce it to a paren pattern.
     bool canDecayToParen = TP->getNumElements() == 1;
@@ -1267,7 +1267,7 @@ Pattern *TypeChecker::coercePatternToType(
     if (!hadError && tupleTy->getNumElements() != TP->getNumElements()) {
       if (canDecayToParen)
         return decayToParen();
-      
+
       diags.diagnose(TP->getStartLoc(), diag::tuple_pattern_length_mismatch,
                      type);
       hadError = true;
@@ -1284,7 +1284,7 @@ Pattern *TypeChecker::coercePatternToType(
         CoercionType = ErrorType::get(Context);
       else
         CoercionType = tupleTy->getElement(i).getType();
-      
+
       // If the tuple pattern had a label for the tuple element, it must match
       // the label for the tuple type being matched.
       if (!hadError && !elt.getLabel().empty() &&
@@ -1325,7 +1325,7 @@ Pattern *TypeChecker::coercePatternToType(
 
     return P;
   }
-      
+
   // Coerce an 'is' pattern by determining the cast kind.
   case PatternKind::Is: {
     auto IP = cast<IsPattern>(P);
@@ -1413,7 +1413,7 @@ Pattern *TypeChecker::coercePatternToType(
       break;
     }
     IP->setType(type);
-    
+
     // Coerce the subpattern to the destination type.
     if (Pattern *sub = IP->getSubPattern()) {
       sub = coercePatternToType(
@@ -1426,19 +1426,19 @@ Pattern *TypeChecker::coercePatternToType(
 
       IP->setSubPattern(sub);
     }
-    
+
     return P;
   }
-      
+
   case PatternKind::EnumElement: {
     auto *EEP = cast<EnumElementPattern>(P);
-    
+
     // If the element decl was not resolved (because it was spelled without a
     // type as `.Foo`), resolve it now that we have a type.
     std::optional<CheckedCastKind> castKind;
 
     EnumElementDecl *elt = EEP->getElementDecl();
-    
+
     Type enumTy;
     if (!elt) {
       elt = lookupEnumMemberElement(dc, type, EEP->getName(),
@@ -1582,7 +1582,7 @@ Pattern *TypeChecker::coercePatternToType(
           .fixItRemove(sub->getSourceRange());
         return nullptr;
       }
-      
+
       Type elementType;
       if (payloadType)
         elementType = enumTy->getTypeOfMember(elt, payloadType);
@@ -1637,7 +1637,7 @@ Pattern *TypeChecker::coercePatternToType(
       isPattern->setType(type);
       P = isPattern;
     }
-    
+
     return P;
   }
 
@@ -1715,7 +1715,7 @@ void TypeChecker::coerceParameterListToType(ParameterList *P,
     auto &param = P->get(i);
     assert(param->getArgumentName().empty() &&
            "Closures cannot have API names");
-    
+
     handleParameter(param,
                     params[i].getParameterType(),
                     params[i].isInOut());

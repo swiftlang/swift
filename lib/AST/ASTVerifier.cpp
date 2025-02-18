@@ -531,7 +531,7 @@ public:
     void cleanup(Stmt *S) { }
     void cleanup(Pattern *P) { }
     void cleanup(Decl *D) { }
-    
+
     // Base cases for the various stages of verification.
     void verifyParsed(Expr *E) {}
     void verifyParsed(Stmt *S) {}
@@ -638,16 +638,16 @@ public:
 
       bool foundError = type->getCanonicalType().findIf([&](Type type) -> bool {
         if (auto archetype = type->getAs<ArchetypeType>()) {
-          
+
           // Opaque archetypes are globally available. We don't need to check
           // them here.
           if (isa<OpaqueTypeArchetypeType>(archetype))
             return false;
-          
+
           // Only visit each archetype once.
           if (!visitedArchetypes.insert(archetype).second)
             return false;
-          
+
           // We should know about archetypes corresponding to opened
           // existential archetypes.
           if (isa<LocalArchetypeType>(archetype)) {
@@ -702,7 +702,7 @@ public:
 
         return false;
       });
-      
+
       if (foundError)
         abort();
     }
@@ -923,12 +923,12 @@ public:
     bool shouldVerify(MakeTemporarilyEscapableExpr *expr) {
       if (!shouldVerify(cast<Expr>(expr)))
         return false;
-      
+
       assert(!OpaqueValues.count(expr->getOpaqueValue()));
       OpaqueValues[expr->getOpaqueValue()] = 0;
       return true;
     }
-    
+
     void cleanup(MakeTemporarilyEscapableExpr *expr) {
       assert(OpaqueValues.count(expr->getOpaqueValue()));
       OpaqueValues.erase(expr->getOpaqueValue());
@@ -1169,12 +1169,12 @@ public:
         break;
       }
     }
-    
+
     void checkCondition(StmtCondition C) {
       for (auto elt : C)
         checkConditionElement(elt);
     }
-    
+
     void verifyChecked(IfStmt *S) {
       checkCondition(S->getCond());
       verifyCheckedBase(S);
@@ -1252,7 +1252,7 @@ public:
       checkSameType(lhsTy, S->getSrc()->getType(), "assignment operands");
       verifyCheckedBase(S);
     }
-    
+
     void verifyChecked(EnumIsCaseExpr *E) {
       auto nom = E->getSubExpr()->getType()->getAnyNominal();
       if (!nom || !isa<EnumDecl>(nom)) {
@@ -1261,7 +1261,7 @@ public:
         Out << '\n';
         abort();
       }
-      
+
       if (nom != E->getEnumElement()->getParentEnum()) {
         Out << "enum_is_decl case is not member of enum:\n";
         Out << "  case: ";
@@ -1295,7 +1295,7 @@ public:
       Type srcObj = checkLValue(E->getSubExpr()->getType(),
                                 "result of InOutExpr");
       auto DestTy = E->getType()->castTo<InOutType>()->getObjectType();
-      
+
       checkSameType(DestTy, srcObj, "object types for InOutExpr");
       verifyCheckedBase(E);
     }
@@ -1419,20 +1419,20 @@ public:
       checkTrivialSubtype(srcTy, destTy, "MetatypeConversionExpr");
       verifyCheckedBase(E);
     }
-    
+
     void verifyChecked(ClassMetatypeToObjectExpr *E) {
       PrettyStackTraceExpr debugStack(Ctx, "verifying ClassMetatypeToObject", E);
-      
+
       auto srcTy = checkMetatypeType(E->getSubExpr()->getType(),
                                      "source of ClassMetatypeToObject");
-      
+
       if (!srcTy->mayHaveSuperclass()) {
         Out << "ClassMetatypeToObject with non-class metatype:\n";
         E->dump(Out);
         Out << "\n";
         abort();
       }
-      
+
       if (!E->getType()->isEqual(Ctx.getAnyObjectType())) {
         Out << "ClassMetatypeToObject does not produce AnyObject:\n";
         E->dump(Out);
@@ -1440,14 +1440,14 @@ public:
         abort();
       }
     }
-    
+
     void verifyChecked(ExistentialMetatypeToObjectExpr *E) {
       PrettyStackTraceExpr debugStack(Ctx,
                                     "verifying ExistentialMetatypeToObject", E);
-      
+
       auto srcTy = checkMetatypeType(E->getSubExpr()->getType(),
                                      "source of ExistentialMetatypeToObject");
-      
+
       if (!E->getSubExpr()->getType()->is<ExistentialMetatypeType>()) {
         Out << "ExistentialMetatypeToObject with non-existential "
                "metatype:\n";
@@ -1462,7 +1462,7 @@ public:
         Out << "\n";
         abort();
       }
-      
+
       if (!E->getType()->isEqual(Ctx.getAnyObjectType())) {
         Out << "ExistentialMetatypeToObject does not produce AnyObject:\n";
         E->dump(Out);
@@ -1470,11 +1470,11 @@ public:
         abort();
       }
     }
-    
+
     void verifyChecked(ProtocolMetatypeToObjectExpr *E) {
       PrettyStackTraceExpr debugStack(Ctx,
                                     "verifying ProtocolMetatypeToObject", E);
-      
+
       auto srcTy = checkMetatypeType(E->getSubExpr()->getType(),
                                      "source of ProtocolMetatypeToObject");
       if (E->getSubExpr()->getType()->is<ExistentialMetatypeType>()) {
@@ -1509,14 +1509,14 @@ public:
         abort();
       }
     }
-    
+
     void verifyChecked(PointerToPointerExpr *E) {
       PrettyStackTraceExpr debugStack(Ctx,
                                       "verifying PointerToPointer", E);
 
       auto fromElement = E->getSubExpr()->getType()->getAnyPointerElementType();
       auto toElement = E->getType()->getAnyPointerElementType();
-      
+
       if (!fromElement || !toElement) {
         Out << "PointerToPointer does not convert between pointer types:\n";
         E->dump(Out);
@@ -1524,7 +1524,7 @@ public:
         abort();
       }
     }
-    
+
     void verifyChecked(InOutToPointerExpr *E) {
       PrettyStackTraceExpr debugStack(Ctx,
                                       "verifying InOutToPointer", E);
@@ -1538,16 +1538,16 @@ public:
 
       auto fromElement = E->getSubExpr()->getType()->getInOutObjectType();
       auto toElement = E->getType()->getAnyPointerElementType();
-      
+
       if (!E->getSubExpr()->getType()->is<InOutType>() && !toElement) {
         Out << "InOutToPointer does not convert from inout to pointer:\n";
         E->dump(Out);
         Out << "\n";
         abort();
       }
-      
+
       // Ensure we don't convert an array to a void pointer this way.
-      
+
       if (fromElement->isArray() && toElement->isVoid()) {
         Out << "InOutToPointer is converting an array to a void pointer; "
                "ArrayToPointer should be used instead:\n";
@@ -1556,7 +1556,7 @@ public:
         abort();
       }
     }
-    
+
     void verifyChecked(ArrayToPointerExpr *E) {
       PrettyStackTraceExpr debugStack(Ctx,
                                       "verifying ArrayToPointer", E);
@@ -1570,14 +1570,14 @@ public:
 
       // The source may be optionally inout.
       auto fromArray = E->getSubExpr()->getType()->getInOutObjectType();
-      
+
       if (!fromArray->isArray()) {
         Out << "ArrayToPointer does not convert from array:\n";
         E->dump(Out);
         Out << "\n";
         abort();
       }
-      
+
       auto toElement = E->getType()->getAnyPointerElementType();
 
       if (!toElement) {
@@ -1587,18 +1587,18 @@ public:
         abort();
       }
     }
-    
+
     void verifyChecked(StringToPointerExpr *E) {
       PrettyStackTraceExpr debugStack(Ctx,
                                       "verifying StringToPointer", E);
-      
+
       if (!E->getSubExpr()->getType()->isString()) {
         Out << "StringToPointer does not convert from string:\n";
         E->dump(Out);
         Out << "\n";
         abort();
       }
-      
+
       PointerTypeKind PTK;
       auto toElement = E->getType()->getAnyPointerElementType(PTK);
       if (!toElement) {
@@ -1614,12 +1614,12 @@ public:
         abort();
       }
     }
-    
+
     void verifyChecked(CollectionUpcastConversionExpr *E) {
       verifyChecked(E->getSubExpr());
       verifyCheckedBase(E);
     }
-        
+
     void verifyChecked(DerivedToBaseExpr *E) {
       PrettyStackTraceExpr debugStack(Ctx, "verifying DerivedToBaseExpr", E);
 
@@ -1676,7 +1676,7 @@ public:
 
       auto erasedTy = E->getType();
       auto concreteTy = E->getSubExpr()->getType();
-      
+
       // Erasure can be from concrete to existential or from existential to more
       // general existential. If we look through metatypes then we're forced
       // into one or the other by context; otherwise, it doesn't matter.
@@ -1685,7 +1685,7 @@ public:
         ConcreteErasureOnly,
         ExistentialErasureOnly,
       } knownConcreteErasure = AnyErasure;
-      
+
       // Existential metatypes should be erased from (existential or concrete)
       // metatypes.
       while (auto meta = erasedTy->getAs<ExistentialMetatypeType>()) {
@@ -1753,7 +1753,7 @@ public:
           } else {
             canBeClass = false;
           }
-          
+
           if (!canBeClass) {
             Out << "ErasureExpr from non-class to existential that requires a "
                    "class\n"
@@ -1765,7 +1765,7 @@ public:
             abort();
           }
         }
-        
+
         auto superclass = erasedLayout.getSuperclass();
         if (superclass
             && !superclass->isExactSuperclassOf(concreteTy)) {
@@ -1778,7 +1778,7 @@ public:
           Out << "\n";
           abort();
         }
-        
+
         // A concrete-to-existential erasure should have conformances on hand
         // for all of the existential's requirements.
         auto conformances = E->getConformances();
@@ -1797,7 +1797,7 @@ public:
           }
           // TODO: Verify that the conformance applies to the type?
         }
-        
+
         // TODO: Check layout constraints?
       }
     }
@@ -2087,7 +2087,7 @@ public:
 
       verifyCheckedBase(E);
     }
-    
+
     void checkOptionalObjectType(Type optionalType,
                                  Type objectType,
                                  Expr *E) {
@@ -2113,7 +2113,7 @@ public:
       checkSameType(E->getType(), E->getSubExpr()->getType(),
                     "OptionalEvaluation cannot change type");
     }
-    
+
     void verifyChecked(BindOptionalExpr *E) {
       PrettyStackTraceExpr debugStack(Ctx, "verifying BindOptionalExpr", E);
 
@@ -2122,10 +2122,10 @@ public:
         E->dump(Out);
         abort();
       }
-      
+
       checkOptionalObjectType(E->getSubExpr()->getType(),
                               E->getType(), E);
-      
+
       verifyCheckedBase(E);
     }
 
@@ -2183,11 +2183,11 @@ public:
           Out << "OptionalTryExpr result type is not optional\n";
           abort();
         }
-        
+
         checkSameType(unwrappedType, E->getSubExpr()->getType(),
                       "OptionalTryExpr and sub-expression");
       }
-      
+
       verifyCheckedBase(E);
     }
 
@@ -2271,7 +2271,7 @@ public:
                     "then and else branches of a TernaryExpr");
       verifyCheckedBase(E);
     }
-    
+
     void verifyChecked(SuperRefExpr *expr) {
       verifyCheckedBase(expr);
     }
@@ -2288,7 +2288,7 @@ public:
     void verifyChecked(ForceValueExpr *E) {
       checkOptionalObjectType(E->getSubExpr()->getType(),
                               E->getType(), E);
-      
+
       verifyCheckedBase(E);
     }
 
@@ -2313,7 +2313,7 @@ public:
     void verifyChecked(MakeTemporarilyEscapableExpr *E) {
       PrettyStackTraceExpr debugStack(
         Ctx, "verifying MakeTemporarilyEscapableExpr", E);
-      
+
       // Expression type should match subexpression.
       if (!E->getType()->isEqual(E->getSubExpr()->getType())) {
         Out << "MakeTemporarilyEscapableExpr type does not match subexpression";
@@ -2372,15 +2372,15 @@ public:
         abort();
       }
     }
-  
+
     void verifyChecked(KeyPathApplicationExpr *E) {
       PrettyStackTraceExpr debugStack(
         Ctx, "verifying KeyPathApplicationExpr", E);
-      
+
       auto baseTy = E->getBase()->getType();
       auto keyPathTy = E->getKeyPath()->getType();
       auto resultTy = E->getType();
-      
+
       if (keyPathTy->isAnyKeyPath()) {
         // AnyKeyPath application is <T> rvalue T -> rvalue Any?
         if (baseTy->is<LValueType>()) {
@@ -2428,7 +2428,7 @@ public:
             baseTy = baseTy->getRValueType();
             resultTy = resultTy->getRValueType();
           }
-          
+
           if (!baseTy->isEqual(bgt->getGenericArgs()[0])) {
             Out << "WritableKeyPath application base doesn't match type\n";
             abort();
@@ -2468,7 +2468,7 @@ public:
           return;
         }
       }
-      
+
       Out << "invalid key path type\n";
       abort();
     }
@@ -2847,7 +2847,7 @@ public:
       case ProtocolConformanceState::Complete:
         // More checking below.
         break;
-        
+
       case ProtocolConformanceState::Incomplete:
         // Ignore incomplete conformances; we didn't need them.
         return;
@@ -2931,7 +2931,7 @@ public:
           if (!normal->hasTypeWitness(assocType)) {
             dumpRef(decl);
             Out << " is missing type witness for "
-                << conformance->getProtocol()->getName().str() 
+                << conformance->getProtocol()->getName().str()
                 << "." << assocType->getName().str()
                 << "\n";
             abort();
@@ -2945,11 +2945,11 @@ public:
             .verifyChecked(replacementType);
           continue;
         }
-          
+
         // No witness necessary for type aliases
         if (isa<TypeAliasDecl>(member))
           continue;
-        
+
         // If this is an accessor for something, ignore it.
         if (isa<AccessorDecl>(member))
           continue;
@@ -2968,7 +2968,7 @@ public:
 
             dumpRef(decl);
             Out << " is missing witness for "
-                << conformance->getProtocol()->getName().str() 
+                << conformance->getProtocol()->getName().str()
                 << "." << req->getBaseName()
                 << "\n";
             abort();
@@ -3182,7 +3182,7 @@ public:
         }
 
         // Also check the interface type.
-        if (auto genericFn 
+        if (auto genericFn
               = CD->getInterfaceType()->getAs<GenericFunctionType>()) {
           resultIsOptional = (bool) genericFn->getResult()
               ->castTo<AnyFunctionType>()
@@ -3465,7 +3465,7 @@ public:
 
     void verifyChecked(ClassDecl *CD) {
       PrettyStackTraceDecl debugStack("verifying ClassDecl", CD);
-      
+
       if (!CD->hasLazyMembers()) {
         unsigned NumDestructors = 0;
         for (auto Member : CD->getMembers()) {
@@ -3541,7 +3541,7 @@ public:
       bool Q0, Q1;
       bool isLValue0 = lookThroughLValue(T0, Q0);
       bool isLValue1 = lookThroughLValue(T1, Q1);
-      
+
       if (isLValue0 != isLValue1) {
         Out << "lvalue-ness of " << what << " do not match: "
             << isLValue0 << ", " << isLValue1 << "\n";
@@ -3644,12 +3644,12 @@ public:
       (void) Ctx.SourceMgr.findBufferContainingLoc(SR.End);
       return true;
     }
-    
+
     template<typename T>
     void checkSourceRangesBase(T ASTNode) {
       checkSourceRanges(cast<typename ASTNodeBase<T>::BaseTy>(ASTNode));
     }
-    
+
     void checkSourceRanges(Expr *E) {
       PrettyStackTraceExpr debugStack(Ctx, "verifying ranges", E);
 

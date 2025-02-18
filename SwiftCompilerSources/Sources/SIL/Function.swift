@@ -43,7 +43,7 @@ final public class Function : CustomStringConvertible, HasShortDescription, Hash
   public var isConvertPointerToPointerArgument: Bool { bridged.isConvertPointerToPointerArgument() }
 
   public var specializationLevel: Int { bridged.specializationLevel() }
-  
+
   public var hasOwnership: Bool { bridged.hasOwnership() }
 
   public var hasLoweredAddresses: Bool { bridged.hasLoweredAddresses() }
@@ -86,7 +86,7 @@ final public class Function : CustomStringConvertible, HasShortDescription, Hash
   public var reversedInstructions: LazySequence<FlattenSequence<LazyMapSequence<ReverseBasicBlockList, ReverseInstructionList>>>  {
     blocks.reversed().lazy.flatMap { $0.instructions.reversed() }
   }
-  
+
   public var returnInstruction: ReturnInst? {
     for block in blocks.reversed() {
       if let retInst = block.terminator as? ReturnInst { return retInst }
@@ -323,7 +323,7 @@ extension Function {
   public var selfArgumentIndex: Int { argumentConventions.selfIndex! }
 
   public var selfArgument: FunctionArgument { arguments[selfArgumentIndex] }
-  
+
   public var dynamicSelfMetadata: FunctionArgument? {
     if bridged.hasDynamicSelfMetadata() {
       return arguments.last!
@@ -361,7 +361,7 @@ extension Function {
   public enum EffectAttribute {
     /// No effect attribute is specified.
     case none
-    
+
     /// `[readnone]`
     ///
     /// A readnone function does not have any observable memory read or write operations.
@@ -378,7 +378,7 @@ extension Function {
     ///   referenced from a parameter.
     /// * Any kind of observable side-effects are not allowed, like `print`, file IO, etc.
     case readNone
-    
+
     /// `[readonly]`
     ///
     /// A readonly function does not have any observable memory write operations.
@@ -388,7 +388,7 @@ extension Function {
     /// a function if its return value is not used.
     /// The same conclusions as for readnone also apply to readonly.
     case readOnly
-    
+
     /// `[releasenone]`
     ///
     /// A releasenone function must not perform any observable release-operation on an object.
@@ -501,7 +501,7 @@ extension Function {
         let destFunc = toFunc.function
         let srcResultArgs = srcFunc.numIndirectResultArguments
         let destResultArgs = destFunc.numIndirectResultArguments
-        
+
         // We only support reabstraction (indirect -> direct) of a single
         // return value.
         if srcResultArgs != destResultArgs &&

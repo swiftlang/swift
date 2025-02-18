@@ -504,14 +504,14 @@ bool SILCombiner::optimizeStackAllocatedEnum(AllocStackInst *AS) {
   EnumDecl *enumDecl = AS->getType().getEnumOrBoundGenericEnum();
   if (!enumDecl)
     return false;
-  
+
   EnumElementDecl *element = nullptr;
   unsigned numInits =0;
   unsigned numTakes = 0;
   SILBasicBlock *initBlock = nullptr;
   SILBasicBlock *takeBlock = nullptr;
   SILType payloadType;
-  
+
   // First step: check if the stack location is only used to hold one specific
   // enum case with payload.
   for (auto *use : AS->getUses()) {

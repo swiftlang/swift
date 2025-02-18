@@ -114,15 +114,15 @@ public struct AsyncStream<Element> {
     ///
     /// The `onTermination` closure receives an instance of this type.
     public enum Termination: Sendable {
-      
+
       /// The stream finished as a result of calling the continuation's
       ///  `finish` method.
       case finished
-      
+
       /// The stream finished as a result of cancellation.
       case cancelled
     }
-    
+
     /// A type that indicates the result of yielding a value to a client, by
     /// way of the continuation.
     ///
@@ -130,7 +130,7 @@ public struct AsyncStream<Element> {
     /// type to indicate the success or failure of yielding an element to the
     /// continuation.
     public enum YieldResult {
-      
+
       /// The stream successfully enqueued the element.
       ///
       /// This value represents the successful enqueueing of an element, whether
@@ -144,12 +144,12 @@ public struct AsyncStream<Element> {
       /// that uses the `remaining` value could race on the consumption of
       /// values from the stream.
       case enqueued(remaining: Int)
-      
+
       /// The stream didn't enqueue the element because the buffer was full.
       ///
       /// The associated element for this case is the element dropped by the stream.
       case dropped(Element)
-      
+
       /// The stream didn't enqueue the element because the stream was in a
       /// terminal state.
       ///
@@ -157,19 +157,19 @@ public struct AsyncStream<Element> {
       /// because the stream finished normally or through cancellation.
       case terminated
     }
-    
+
     /// A strategy that handles exhaustion of a buffer’s capacity.
     public enum BufferingPolicy: Sendable {
       /// Continue to add to the buffer, without imposing a limit on the number
       /// of buffered elements.
       case unbounded
-      
+
       /// When the buffer is full, discard the newly received element.
       ///
       /// This strategy enforces keeping at most the specified number of oldest
       /// values.
       case bufferingOldest(Int)
-      
+
       /// When the buffer is full, discard the oldest element in the buffer.
       ///
       /// This strategy enforces keeping at most the specified number of newest
@@ -243,7 +243,7 @@ public struct AsyncStream<Element> {
   }
 
   let context: _Context
-  
+
 
   /// Constructs an asynchronous stream for an element type, using the
   /// specified buffering policy and element-producing closure.
@@ -297,7 +297,7 @@ public struct AsyncStream<Element> {
     build(Continuation(storage: storage))
   }
 
-  
+
   /// Constructs an asynchronous stream from a given element-producing
   /// closure, with an optional closure to handle cancellation.
   ///
@@ -536,7 +536,7 @@ public struct AsyncStream<Element> {
   @available(SwiftStdlib 5.1, *)
   @available(*, unavailable, message: "Unavailable in task-to-thread concurrency model")
   public init(
-    unfolding produce: @escaping () async -> Element?, 
+    unfolding produce: @escaping () async -> Element?,
     onCancel: (@Sendable () -> Void)? = nil
   ) {
     fatalError("Unavailable in task-to-thread concurrency model")
@@ -554,7 +554,7 @@ extension AsyncStream {
     public mutating func next() async -> Element? {
       fatalError("Unavailable in task-to-thread concurrency model")
     }
-    
+
     @available(SwiftStdlib 6.0, *)
     @available(*, unavailable, message: "Unavailable in task-to-thread concurrency model")
     public mutating func next(isolation actor: isolated (any Actor)?) async -> Element? {

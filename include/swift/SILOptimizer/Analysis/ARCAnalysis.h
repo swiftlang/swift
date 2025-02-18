@@ -113,7 +113,7 @@ valueHasARCDecrementOrCheckInInstructionRange(SILValue Op,
 /// epilogue retains for a specific function.
 ///
 /// If we can not find the retain in the return block, we will try to find
-/// in the predecessors. 
+/// in the predecessors.
 ///
 /// The search stop when we encounter an instruction that may decrement
 /// the returned value, as we do not want to create a lifetime gap once the
@@ -121,7 +121,7 @@ valueHasARCDecrementOrCheckInInstructionRange(SILValue Op,
 class ConsumedResultToEpilogueRetainMatcher {
 public:
   /// The state on how retains are found in a basic block.
-  enum class FindRetainKind { 
+  enum class FindRetainKind {
     None,      ///< Did not find a retain.
     Found,     ///< Found a retain.
     Recursion, ///< Found a retain and its due to self-recursion.

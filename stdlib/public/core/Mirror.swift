@@ -584,9 +584,9 @@ extension String {
     _print_unlocked(instance, &self)
   }
 
-  // These overloads serve as fast paths for init(describing:), but they 
-  // also preserve source compatibility for clients which accidentally  
-  // used init(stringInterpolationSegment:) through constructs like 
+  // These overloads serve as fast paths for init(describing:), but they
+  // also preserve source compatibility for clients which accidentally
+  // used init(stringInterpolationSegment:) through constructs like
   // myArray.map(String.init).
 
   /// Creates a string representing the given value.

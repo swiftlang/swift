@@ -132,7 +132,7 @@ public func rawBufferCopyContentsSetup() {
   assert(r8.baseAddress == nil)
   let count = a.count * MemoryLayout<Int>.stride
   let rb = UnsafeMutableRawBufferPointer.allocate(
-    byteCount: count, 
+    byteCount: count,
     alignment: MemoryLayout<Int>.alignment)
   a.withUnsafeBytes {
     rb.copyMemory(from: $0)

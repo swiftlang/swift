@@ -46,7 +46,7 @@
 ///             default: fatalError("Index out of bounds.")
 ///             }
 ///         }
-///         
+///
 ///         func index(after i: Int) -> Int {
 ///             precondition(i < endIndex, "Can't advance beyond endIndex")
 ///             return i + 1
@@ -339,7 +339,7 @@ public protocol Collection<Element>: Sequence {
   // FIXME: ideally this would be in MigrationSupport.swift, but it needs
   // to be on the protocol instead of as an extension
   @available(*, deprecated/*, obsoleted: 5.0*/, message: "all index distances are now of type Int")
-  typealias IndexDistance = Int  
+  typealias IndexDistance = Int
 
   // FIXME: Associated type inference requires this.
   override associatedtype Element
@@ -361,7 +361,7 @@ public protocol Collection<Element>: Sequence {
   ///
   /// If the collection is empty, `startIndex` is equal to `endIndex`.
   var startIndex: Index { get }
- 
+
   /// The collection's "past the end" position---that is, the position one
   /// greater than the last valid subscript argument.
   ///
@@ -466,10 +466,10 @@ public protocol Collection<Element>: Sequence {
   /// A type that represents the indices that are valid for subscripting the
   /// collection, in ascending order.
   associatedtype Indices: Collection = DefaultIndices<Self>
-    where Indices.Element == Index, 
+    where Indices.Element == Index,
           Indices.Index == Index,
           Indices.SubSequence == Indices
-        
+
   /// The indices that are valid for subscripting the collection, in ascending
   /// order.
   ///
@@ -519,7 +519,7 @@ public protocol Collection<Element>: Sequence {
   ///   `RandomAccessCollection`; otherwise, O(*n*), where *n* is the length
   ///   of the collection.
   var count: Int { get }
-  
+
   // The following requirements enable dispatching for firstIndex(of:) and
   // lastIndex(of:) when the element type is Equatable.
 
@@ -1281,7 +1281,7 @@ extension Collection {
       offsetBy: amount, limitedBy: endIndex) ?? endIndex
     return self[startIndex..<end]
   }
-    
+
   /// Returns a subsequence by skipping elements while `predicate` returns
   /// `true` and returning the remaining elements.
   ///
@@ -1298,7 +1298,7 @@ extension Collection {
     var start = startIndex
     while try start != endIndex && predicate(self[start]) {
       formIndex(after: &start)
-    } 
+    }
     return self[start..<endIndex]
   }
 
@@ -1331,7 +1331,7 @@ extension Collection {
       offsetBy: maxLength, limitedBy: endIndex) ?? endIndex
     return self[startIndex..<end]
   }
-  
+
   /// Returns a subsequence containing the initial elements until `predicate`
   /// returns `false` and skipping the remaining elements.
   ///

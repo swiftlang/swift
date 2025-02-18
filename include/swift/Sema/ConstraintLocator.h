@@ -468,7 +468,7 @@ public:
   void Profile(llvm::FoldingSetNodeID &id) {
     Profile(id, anchor, getPath());
   }
-  
+
   /// Produce a debugging dump of this locator.
   SWIFT_DEBUG_DUMPER(dump(SourceManager *SM));
   SWIFT_DEBUG_DUMPER(dump(ConstraintSystem *CS));
@@ -510,7 +510,7 @@ private:
 
   /// A set of flags summarizing interesting properties of the path.
   unsigned summaryFlags : 7;
-  
+
   friend class ConstraintSystem;
 };
 

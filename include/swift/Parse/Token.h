@@ -51,7 +51,7 @@ class Token {
 
   /// Whether this token is an escaped `identifier` token.
   unsigned EscapedIdentifier : 1;
-  
+
   /// Modifiers for string literals
   unsigned MultilineString : 1;
 
@@ -83,7 +83,7 @@ public:
   tok getKind() const { return Kind; }
   void setKind(tok K) { Kind = K; }
   void clearCommentLength() { CommentLength = 0; }
-  
+
   /// is/isNot - Predicates to check if this token is a specific kind, as in
   /// "if (Tok.is(tok::l_brace)) {...}".
   bool is(tok K) const { return Kind == K; }
@@ -168,7 +168,7 @@ public:
 
   /// Set whether this token occurred at the start of a line.
   void setAtStartOfLine(bool value) { AtStartOfLine = value; }
-  
+
   /// True if this token is an escaped identifier token.
   bool isEscapedIdentifier() const { return EscapedIdentifier; }
   /// Set whether this token is an escaped identifier token.
@@ -177,12 +177,12 @@ public:
            "only identifiers can be escaped identifiers");
     EscapedIdentifier = value;
   }
-  
+
   bool isContextualKeyword(StringRef ContextKW) const {
     return isAny(tok::identifier, tok::contextual_keyword) &&
            !isEscapedIdentifier() && Text == ContextKW;
   }
-  
+
   /// Return true if this is a contextual keyword that could be the start of a
   /// decl.
   bool isContextualDeclKeyword() const {
@@ -231,7 +231,7 @@ public:
   bool isFollowingLParen() const {
     return !isAtStartOfLine() && Kind == tok::l_paren;
   }
-  
+
   /// True if the token is an l_square token that does not start a new line.
   bool isFollowingLSquare() const {
     return !isAtStartOfLine() && Kind == tok::l_square;
@@ -281,7 +281,7 @@ public:
     this->MultilineString = IsMultilineString;
     this->CustomDelimiterLen = CustomDelimiterLen;
   }
-  
+
   /// getLoc - Return a source location identifier for the specified
   /// offset in the current file.
   SourceLoc getLoc() const {
@@ -307,7 +307,7 @@ public:
       SourceLoc(llvm::SMLoc::getFromPointer(TrimedComment.begin())),
       TrimedComment.size());
   }
-  
+
   SourceLoc getCommentStart() const {
     if (CommentLength == 0) return SourceLoc();
     return SourceLoc(llvm::SMLoc::getFromPointer(trimComment().begin()));
@@ -340,7 +340,7 @@ public:
            "custom string delimiter length > 255");
   }
 };
-  
+
 } // end namespace swift
 
 

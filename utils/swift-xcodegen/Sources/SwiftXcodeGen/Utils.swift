@@ -109,7 +109,7 @@ extension String {
   /// since the former involves bridging, and the latter currently has no fast
   /// paths for strings.
   func replacing(_ other: String, with replacement: String) -> String {
-    guard !other.isEmpty else { 
+    guard !other.isEmpty else {
       return self
     }
     guard isASCII else {

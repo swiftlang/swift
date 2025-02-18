@@ -49,7 +49,7 @@ extension LazyMapSequence {
 
     @inlinable
     internal init(
-      _base: Base.Iterator, 
+      _base: Base.Iterator,
       _transform: @escaping (Base.Element) -> Element
     ) {
       self._base = _base

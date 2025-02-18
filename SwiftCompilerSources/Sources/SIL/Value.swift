@@ -18,12 +18,12 @@ public protocol Value : AnyObject, CustomStringConvertible {
   var uses: UseList { get }
   var type: Type { get }
   var ownership: Ownership { get }
-  
+
   /// The instruction which defines the value.
   ///
   /// This is nil if the value is not defined by an instruction, e.g. an `Argument`.
   var definingInstruction: Instruction? { get }
-  
+
   /// The block where the value is defined.
   var parentBlock: BasicBlock { get }
 
@@ -50,13 +50,13 @@ public enum Ownership {
   /// Unowned ownership kind occurs mainly along method/function boundaries in
   /// between Swift and Objective-C code.
   case unowned
-  
+
   /// A Value with `owned` ownership kind is an independent value that has
   /// an ownership independent of any other ownership imbued within it. The
   /// Value must be paired with a consuming operation that ends the SSA
   /// value's lifetime exactly once along all paths through the program.
   case owned
-  
+
   /// A Value with `guaranteed` ownership kind is an independent value that
   /// is guaranteed to be live over a specific region of the program. This
   /// region can come in several forms:
@@ -71,7 +71,7 @@ public enum Ownership {
   /// Any value with guaranteed ownership must be paired with an end_borrow
   /// instruction exactly once along any path through the program.
   case guaranteed
-  
+
   /// A Value with `none` ownership kind is an independent value outside of
   /// the ownership system. It is used to model values that are statically
   /// determined to be trivial. This includes trivially typed values as well
@@ -117,7 +117,7 @@ extension Value {
   }
 
   public var uses: UseList { UseList(bridged.getFirstUse()) }
-  
+
   // Default implementation for all values which have a parent block, like instructions and arguments.
   public var parentFunction: Function { parentBlock.parentFunction }
 

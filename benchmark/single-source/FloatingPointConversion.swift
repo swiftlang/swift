@@ -53,7 +53,7 @@ extension MockBinaryFloatingPoint {
   static var pi: Self { Self(_Value.pi) }
   static var signalingNaN: Self { Self(_Value.signalingNaN) }
   static var significandBitCount: Int { _Value.significandBitCount }
-  
+
   static func + (lhs: Self, rhs: Self) -> Self { Self(lhs._value + rhs._value) }
   static func += (lhs: inout Self, rhs: Self) { lhs._value += rhs._value }
   static func - (lhs: Self, rhs: Self) -> Self { Self(lhs._value - rhs._value) }
@@ -62,7 +62,7 @@ extension MockBinaryFloatingPoint {
   static func *= (lhs: inout Self, rhs: Self) { lhs._value *= rhs._value }
   static func / (lhs: Self, rhs: Self) -> Self { Self(lhs._value / rhs._value) }
   static func /= (lhs: inout Self, rhs: Self) { lhs._value /= rhs._value }
-  
+
   init(_ value: Int) { self.init(_Value(value)) }
   init(_ value: Float) { self.init(_Value(value)) }
   init(_ value: Double) { self.init(_Value(value)) }
@@ -90,7 +90,7 @@ extension MockBinaryFloatingPoint {
         exponentBitPattern: exponentBitPattern,
         significandBitPattern: significandBitPattern))
   }
-  
+
   var binade: Self { Self(_value.binade) }
   var exponent: _Value.Exponent { _value.exponent }
   var exponentBitPattern: _Value.RawExponent { _value.exponentBitPattern }
@@ -112,7 +112,7 @@ extension MockBinaryFloatingPoint {
   }
   var significandWidth: Int { _value.significandWidth }
   var ulp: Self { Self(_value.ulp) }
-  
+
   mutating func addProduct(_ lhs: Self, _ rhs: Self) {
     _value.addProduct(lhs._value, rhs._value)
   }

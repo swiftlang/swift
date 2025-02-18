@@ -259,7 +259,7 @@ namespace swift {
   /// Turn the given Swift file into LLVM IR and return the generated module.
   /// To compile and output the generated code, call \c performLLVM.
   GeneratedModule
-  performIRGeneration(FileUnit *file, const IRGenOptions &Opts, 
+  performIRGeneration(FileUnit *file, const IRGenOptions &Opts,
                       const TBDGenOptions &TBDOpts,
                       std::unique_ptr<SILModule> SILMod,
                       StringRef ModuleName, const PrimarySpecificPaths &PSPs,

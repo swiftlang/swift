@@ -174,12 +174,12 @@ func visitLifetimeIntroducers(for value: Value, _ context: Context,
 private struct VisitLifetimeIntroducers : ForwardingUseDefWalker {
   var visitor: (Value) -> WalkResult
   var visitedValues: ValueSet
-  
+
   init(_ context: Context, visitor: @escaping (Value) -> WalkResult) {
     self.visitor = visitor
     self.visitedValues = ValueSet(context)
   }
-  
+
   mutating func deinitialize() { visitedValues.deinitialize() }
 
   mutating func needWalk(for value: Value, _: Void) -> Bool {
@@ -243,7 +243,7 @@ protocol ForwardingDefUseWalker {
   /// owned value, then this identifies all OSSA lifetimes in the
   /// forward-extendd lifetime.
   mutating func walkDownUses(of: Value, using: Operand?) -> WalkResult
-    
+
   mutating func walkDown(operand: Operand) -> WalkResult
 }
 
@@ -315,7 +315,7 @@ func visitForwardedUses(introducer: Value, _ context: Context,
 private struct VisitForwardedUses : ForwardingDefUseWalker {
   var visitedValues: ValueSet
   var visitor: (ForwardingUseResult) -> WalkResult
-  
+
   init(visitor: @escaping (ForwardingUseResult) -> WalkResult,
     _ context: Context) {
     self.visitedValues = ValueSet(context)
@@ -325,7 +325,7 @@ private struct VisitForwardedUses : ForwardingDefUseWalker {
   mutating func needWalk(for value: Value) -> Bool {
     visitedValues.insert(value)
   }
-  
+
   mutating func nonForwardingUse(of operand: Operand) -> WalkResult {
     return visitor(.operand(operand))
   }

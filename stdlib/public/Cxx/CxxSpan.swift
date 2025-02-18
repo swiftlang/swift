@@ -63,14 +63,14 @@ extension CxxSpan {
   /// Creates a C++ span from a Swift UnsafeBufferPointer
   @inlinable
   public init(_ unsafeBufferPointer: UnsafeBufferPointer<Element>) {
-    precondition(unsafeBufferPointer.baseAddress != nil, 
+    precondition(unsafeBufferPointer.baseAddress != nil,
                   "UnsafeBufferPointer should not point to nil")
     self.init(unsafeBufferPointer.baseAddress!, Size(unsafeBufferPointer.count))
   }
 
   @inlinable
   public init(_ unsafeMutableBufferPointer: UnsafeMutableBufferPointer<Element>) {
-    precondition(unsafeMutableBufferPointer.baseAddress != nil, 
+    precondition(unsafeMutableBufferPointer.baseAddress != nil,
                   "UnsafeMutableBufferPointer should not point to nil")
     self.init(unsafeMutableBufferPointer.baseAddress!, Size(unsafeMutableBufferPointer.count))
   }
@@ -113,7 +113,7 @@ extension CxxMutableSpan {
   /// Creates a C++ span from a Swift UnsafeMutableBufferPointer
   @inlinable
   public init(_ unsafeMutableBufferPointer: UnsafeMutableBufferPointer<Element>) {
-    precondition(unsafeMutableBufferPointer.baseAddress != nil, 
+    precondition(unsafeMutableBufferPointer.baseAddress != nil,
                   "UnsafeMutableBufferPointer should not point to nil")
     self.init(unsafeMutableBufferPointer.baseAddress!, Size(unsafeMutableBufferPointer.count))
   }

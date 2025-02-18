@@ -188,7 +188,7 @@ where SubSequence: BidirectionalCollection, Indices: BidirectionalCollection {
   ///     }
   ///     // c == MyFancyCollection([2, 4, 6, 8, 10])
   override var indices: Indices { get }
-  
+
   /// Accesses a contiguous subrange of the collection's elements.
   ///
   /// The accessed slice uses the same indices for the same elements as the

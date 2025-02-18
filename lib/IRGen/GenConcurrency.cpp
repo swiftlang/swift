@@ -233,7 +233,7 @@ llvm::Value *irgen::emitBuiltinStartAsyncLet(IRGenFunction &IGF,
                                              SubstitutionMap subs) {
   localContextInfo = IGF.Builder.CreateBitCast(localContextInfo,
                                                IGF.IGM.OpaquePtrTy);
-  
+
   // stack allocate AsyncLet, and begin lifetime for it (until EndAsyncLet)
   auto ty = llvm::ArrayType::get(IGF.IGM.Int8PtrTy, NumWords_AsyncLet);
   auto address = IGF.createAlloca(ty, Alignment(Alignment_AsyncLet));
@@ -275,12 +275,12 @@ llvm::Value *irgen::emitBuiltinStartAsyncLet(IRGenFunction &IGF,
       // and ID intrinsic so that it will never fit in the preallocated space.
       uint64_t origSize = cast<llvm::ConstantInt>(taskAsyncID->getArgOperand(0))
         ->getValue().getLimitedValue();
-      
+
       uint64_t paddedSize = std::max(origSize,
                      (NumWords_AsyncLet * IGF.IGM.getPointerSize()).getValue());
       auto paddedSizeVal = llvm::ConstantInt::get(IGF.IGM.Int32Ty, paddedSize);
       taskAsyncID->setArgOperand(0, paddedSizeVal);
-      
+
       auto origInit = taskAsyncFunctionPointer->getInitializer();
       auto newInit = llvm::ConstantStruct::get(
                                    cast<llvm::StructType>(origInit->getType()),
@@ -297,7 +297,7 @@ llvm::Value *irgen::emitBuiltinStartAsyncLet(IRGenFunction &IGF,
   // In embedded Swift, create and pass result type info.
   taskOptions =
     maybeAddEmbeddedSwiftResultTypeInfo(IGF, taskOptions, futureResultType);
-  
+
   llvm::CallInst *call;
   if (localResultBuffer) {
     // This is @_silgen_name("swift_asyncLet_begin")

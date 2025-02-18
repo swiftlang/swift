@@ -73,7 +73,7 @@ public:
     ProjectionIndex PI(V);
     if (!PI.isValid())
       return V;
-    
+
     SILValue UnderlyingObject = getAccessPath(PI.Aggregate, Path);
     Path.push_back(PI.Index);
     return UnderlyingObject;

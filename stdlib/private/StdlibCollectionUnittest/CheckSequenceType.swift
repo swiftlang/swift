@@ -86,7 +86,7 @@ public struct ElementsEqualWithPredicateTest {
     public let expectedLeftoverSequence: [Int]
     public let expectedLeftoverOther: [String]
     public let loc: SourceLoc
-    
+
     public init(
         _ expected: Bool, _ sequence: [Int], _ other: [String],
         _ predicate: @escaping (Int, String) -> Bool,
@@ -174,7 +174,7 @@ public struct FindTest {
     self.expected = expected
     self.element = MinimalEquatableValue(element)
     self.sequence = sequence.enumerated().map {
-      return MinimalEquatableValue($1, identity: $0) 
+      return MinimalEquatableValue($1, identity: $0)
     }
     self.expectedLeftoverSequence = expectedLeftoverSequence.map(
       MinimalEquatableValue.init)
@@ -193,13 +193,13 @@ public struct CollectionBinaryOperationTest {
     file: String = #file, line: UInt = #line
   ) {
     self.expected = expected.enumerated().map {
-      return MinimalEquatableValue($1, identity: $0) 
+      return MinimalEquatableValue($1, identity: $0)
     }
     self.lhs = lhs.map {
-      return MinimalEquatableValue($0, identity: $0) 
+      return MinimalEquatableValue($0, identity: $0)
     }
     self.rhs = rhs.map {
-      return MinimalEquatableValue($0, identity: $0) 
+      return MinimalEquatableValue($0, identity: $0)
     }
     self.loc = SourceLoc(file, line, comment: "test data")
   }
@@ -217,10 +217,10 @@ public struct CollectionPredicateTest {
   ) {
     self.expected = expected
     self.lhs = lhs.enumerated().map {
-      return MinimalEquatableValue($1, identity: $0) 
+      return MinimalEquatableValue($1, identity: $0)
     }
     self.rhs = rhs.enumerated().map {
-      return MinimalEquatableValue($1, identity: $0) 
+      return MinimalEquatableValue($1, identity: $0)
     }
     self.loc = SourceLoc(file, line, comment: "test data")
   }
@@ -506,16 +506,16 @@ func elementsEqualPredicate(_ x: Int, y: String) -> Bool {
 
 public let elementsEqualWithPredicateTests: [ElementsEqualWithPredicateTest] = [
     ElementsEqualWithPredicateTest(true, [], [], elementsEqualPredicate, [], []),
-    
+
     ElementsEqualWithPredicateTest(false, [ 1 ], [], elementsEqualPredicate, [ 1 ], []),
     ElementsEqualWithPredicateTest(false, [], [ "1" ], elementsEqualPredicate, [], [ "1" ]),
-    
+
     ElementsEqualWithPredicateTest(false, [ 1, 2 ], [], elementsEqualPredicate, [ 1, 2 ], []),
     ElementsEqualWithPredicateTest(false, [], [ "1", "2" ], elementsEqualPredicate, [], [ "1", "2" ]),
-    
+
     ElementsEqualWithPredicateTest(false, [ 1, 2, 3, 4 ], [ "1", "2" ], elementsEqualPredicate, [ 3, 4 ], []),
     ElementsEqualWithPredicateTest(false, [ 1, 2 ], [ "1", "2", "3", "4" ], elementsEqualPredicate, [], [ "3", "4" ]),
-    
+
     ElementsEqualWithPredicateTest(true, [ 1, 2, 3, 4 ], [ "1", "2", "3", "4" ], elementsEqualPredicate, [], []),
     ElementsEqualWithPredicateTest(true, [ 1, 2 ], [ "1", "2" ], elementsEqualPredicate, [], []),
 ]

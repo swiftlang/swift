@@ -32,7 +32,7 @@ namespace swift {
 namespace irgen {
 
 /// \group HeapTypeInfo
-  
+
 /// The kind of 'isa' encoding a heap object uses to reference its heap
 /// metadata.
 enum class IsaEncoding : uint8_t {
@@ -78,14 +78,14 @@ public:
       *refcounting = asDerived().getReferenceCounting();
     return true;
   }
-  
+
   bool canValueWitnessExtraInhabitantsUpTo(IRGenModule &IGM,
                                            unsigned index) const override {
     // Refcounting functions are no-ops when passed a null pointer, which is the
     // first extra inhabitant.
     return index == 0;
   }
-  
+
   IsaEncoding getIsaEncoding(ResilienceExpansion expansion) const {
     switch (asDerived().getReferenceCounting()) {
     // We can access the isa of pure Swift heap objects directly.

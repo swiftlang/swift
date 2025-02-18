@@ -41,7 +41,7 @@ public:
                 std::is_convertible<OtherT *, T *>::value,
                 PlaceHolder
               >::type = PlaceHolder()) : Ptr(Other.getPtrOrNull()) {}
-  
+
   bool isNull() const { return Ptr == 0; }
   bool isNonNull() const { return Ptr != 0; }
 
@@ -79,7 +79,7 @@ public:
 
   bool operator!=(const T *other) const { return !(*this == other); }
 };
-  
+
 } // end namespace swift
 
 namespace llvm {

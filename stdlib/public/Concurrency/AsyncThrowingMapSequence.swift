@@ -77,7 +77,7 @@ public struct AsyncThrowingMapSequence<Base: AsyncSequence, Transformed> {
 
   @usableFromInline
   init(
-    _ base: Base, 
+    _ base: Base,
     transform: @escaping (Base.Element) async throws -> Transformed
   ) {
     self.base = base
@@ -113,7 +113,7 @@ extension AsyncThrowingMapSequence: AsyncSequence {
 
     @usableFromInline
     init(
-      _ baseIterator: Base.AsyncIterator, 
+      _ baseIterator: Base.AsyncIterator,
       transform: @escaping (Base.Element) async throws -> Transformed
     ) {
       self.baseIterator = baseIterator
@@ -136,7 +136,7 @@ extension AsyncThrowingMapSequence: AsyncSequence {
         return try await transform(element)
       } catch {
         finished = true
-        throw error   
+        throw error
       }
     }
 
@@ -157,7 +157,7 @@ extension AsyncThrowingMapSequence: AsyncSequence {
         return try await transform(element)
       } catch {
         finished = true
-        throw error   
+        throw error
       }
     }
   }
@@ -169,13 +169,13 @@ extension AsyncThrowingMapSequence: AsyncSequence {
 }
 
 @available(SwiftStdlib 5.1, *)
-extension AsyncThrowingMapSequence: @unchecked Sendable 
-  where Base: Sendable, 
-        Base.Element: Sendable, 
+extension AsyncThrowingMapSequence: @unchecked Sendable
+  where Base: Sendable,
+        Base.Element: Sendable,
         Transformed: Sendable { }
 
 @available(SwiftStdlib 5.1, *)
-extension AsyncThrowingMapSequence.Iterator: @unchecked Sendable 
-  where Base.AsyncIterator: Sendable, 
-        Base.Element: Sendable, 
+extension AsyncThrowingMapSequence.Iterator: @unchecked Sendable
+  where Base.AsyncIterator: Sendable,
+        Base.Element: Sendable,
         Transformed: Sendable { }

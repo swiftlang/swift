@@ -65,7 +65,7 @@ public:
 /// For details see NodeBitfield.
 class NodeSet {
   NodeBitfield bit;
-  
+
 public:
   NodeSet(SILFunction *function) : bit(function, 1) {}
 
@@ -93,7 +93,7 @@ public:
 /// For details see NodeBitfield.
 class InstructionSet {
   NodeSet nodeSet;
-  
+
 public:
   using Element = SILInstruction *;
 
@@ -116,7 +116,7 @@ using InstructionSetWithSize = KnownSizeSet<InstructionSet>;
 /// For details see NodeBitfield.
 class ValueSet {
   NodeSet nodeSet;
-  
+
 public:
   using Element = SILValue;
 

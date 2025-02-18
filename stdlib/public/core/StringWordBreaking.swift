@@ -223,12 +223,12 @@ extension _StringGuts {
     }
 
     let x = Unicode._WordBreakProperty(from: scalar1)
-    
+
     // WB3a, handled here since we don't need to look up `y` for this
     if x == .newlineCRLF {
       return true
     }
-    
+
     let y = Unicode._WordBreakProperty(from: scalar2)
 
     switch (x, y) {

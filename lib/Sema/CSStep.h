@@ -459,14 +459,14 @@ private:
     // to preliminary modify constraint system or log anything.
     if (IsSingle)
       return;
-    
+
     if (CS.isDebugMode()) {
       auto &log = getDebugLogger();
       log << "(solving component #" << Index << '\n';
     }
-    
+
     ComponentScope.emplace(*this);
-    
+
     if (CS.isDebugMode()) {
       auto &log = getDebugLogger();
       log << "Type variables in scope = "
@@ -545,7 +545,7 @@ public:
               llvm::errs(), ActiveChoice->first.startTrailSteps,
               CS.solverState->getCurrentIndent());
           }
-          
+
           return suspend(std::make_unique<SplitterStep>(CS, Solutions));
         }
       }
@@ -803,7 +803,7 @@ private:
 };
 
 /// Retrieves the DeclContext that a conjunction should be solved within.
-static DeclContext *getDeclContextForConjunction(ConstraintLocator *loc) {  
+static DeclContext *getDeclContextForConjunction(ConstraintLocator *loc) {
   // Closures introduce a new DeclContext that needs switching into.
   auto anchor = loc->getAnchor();
   if (loc->directlyAt<ClosureExpr>())
@@ -815,7 +815,7 @@ static DeclContext *getDeclContextForConjunction(ConstraintLocator *loc) {
   // solved together with the rest of the system.
   if (loc->isForSingleValueStmtConjunction())
     return castToExpr<SingleValueStmtExpr>(anchor)->getDeclContext();
-  
+
   // Do the same for TapExprs.
   if (loc->directlyAt<TapExpr>())
     return castToExpr<TapExpr>(anchor)->getVar()->getDeclContext();

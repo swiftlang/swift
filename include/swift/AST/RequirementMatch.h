@@ -97,7 +97,7 @@ enum class MatchKind : uint8_t {
 
   /// The witness is missing a `@differentiable` attribute from the requirement.
   MissingDifferentiableAttr,
-  
+
   /// The witness did not match because it is an enum case with
   /// associated values.
   EnumCaseWithAssociatedValues,

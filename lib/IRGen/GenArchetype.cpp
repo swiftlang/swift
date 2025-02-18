@@ -70,7 +70,7 @@ irgen::emitArchetypeTypeMetadataRef(IRGenFunction &IGF,
   // Check for an existing cache entry.
   if (auto response = IGF.tryGetLocalTypeMetadata(archetype, request))
     return response;
-  
+
   // If this is an opaque archetype, we'll need to instantiate using its
   // descriptor.
   if (auto opaque = dyn_cast<OpaqueTypeArchetypeType>(archetype)) {
@@ -479,7 +479,7 @@ withOpaqueTypeGenericArgs(IRGenFunction &IGF,
     genericArgs = IGF.Builder.CreateBitCast(alloca.getAddress(),
                                             IGF.IGM.Int8PtrTy);
   }
-  
+
   // Pass them down to the body.
   body(genericArgs);
 
@@ -561,7 +561,7 @@ MetadataResponse irgen::emitOpaqueTypeMetadataRef(IRGenFunction &IGF,
       result->setOnlyReadsMemory();
     });
   assert(result);
-  
+
   auto response = MetadataResponse::handle(IGF, request, result);
   IGF.setScopedLocalTypeMetadata(archetype, response);
   return response;
@@ -614,7 +614,7 @@ llvm::Value *irgen::emitOpaqueTypeWitnessTableRef(IRGenFunction &IGF,
   (void)found;
   assert(found && "Opaque type does not conform to protocol");
   auto indexValue = llvm::ConstantInt::get(IGF.IGM.SizeTy, index);
-  
+
   llvm::CallInst *result = nullptr;
   withOpaqueTypeGenericArgs(IGF, archetype,
     [&](llvm::Value *genericArgs) {
@@ -625,7 +625,7 @@ llvm::Value *irgen::emitOpaqueTypeWitnessTableRef(IRGenFunction &IGF,
       result->setOnlyReadsMemory();
     });
   assert(result);
-  
+
   IGF.setScopedLocalTypeData(archetype,
                  LocalTypeDataKind::forAbstractProtocolWitnessTable(protocol),
                  result);

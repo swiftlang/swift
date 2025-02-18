@@ -21,7 +21,7 @@ extension BasicBlock {
   func postDominates(_ other: BasicBlock, _ pdomTree: PostDominatorTree) -> Bool {
     pdomTree.bridged.postDominates(self.bridged, other.bridged)
   }
-  
+
   func strictlyPostDominates(_ other: BasicBlock, _ pdomTree: PostDominatorTree) -> Bool {
     postDominates(other, pdomTree) && self != other
   }

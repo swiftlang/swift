@@ -141,7 +141,7 @@ TEST(SourceLoc, AssignExpr) {
 
 TEST(SourceLoc, StmtConditionElement) {
   TestContext C;
-  
+
   // In a pattern binding statement condition element the SourceRange is only
   // valid iff the Initializer has a valid end loc and either:
   // a. the IntroducerLoc has a valid start loc
@@ -151,7 +151,7 @@ TEST(SourceLoc, StmtConditionElement) {
   auto bufferID = C.Ctx.SourceMgr //       0123456789012345678901234567890
                         .addMemBufferCopy("if let x = Optional.some(1) { }");
   SourceLoc start = C.Ctx.SourceMgr.getLocForBufferStart(bufferID);
-  
+
   auto vardecl = new (C.Ctx) VarDecl(/*IsStatic*/false,
                                      VarDecl::Introducer::Let,
                                      start.getAdvancedLoc(7)
@@ -160,7 +160,7 @@ TEST(SourceLoc, StmtConditionElement) {
   auto pattern = new (C.Ctx) NamedPattern(vardecl);
   auto init = new (C.Ctx) IntegerLiteralExpr( "1", start.getAdvancedLoc(25)
                                             , false);
-  
+
   // Case a, when the IntroducerLoc is valid.
   auto introducer = StmtConditionElement(ConditionalPatternBindingInfo::create(
       C.Ctx, start.getAdvancedLoc(3), pattern, init));
@@ -169,7 +169,7 @@ TEST(SourceLoc, StmtConditionElement) {
   EXPECT_EQ(start.getAdvancedLoc(25), introducer.getEndLoc());
   EXPECT_EQ( SourceRange(start.getAdvancedLoc(3), start.getAdvancedLoc(25))
            , introducer.getSourceRange());
-  
+
   // Case b, when the IntroducerLoc is invalid, but the pattern has a valid loc.
   auto patternStmtCond = StmtConditionElement(
       ConditionalPatternBindingInfo::create(C.Ctx, SourceLoc(), pattern, init));
@@ -178,7 +178,7 @@ TEST(SourceLoc, StmtConditionElement) {
   EXPECT_EQ(start.getAdvancedLoc(25), patternStmtCond.getEndLoc());
   EXPECT_EQ( SourceRange(start.getAdvancedLoc(7), start.getAdvancedLoc(25))
            , patternStmtCond.getSourceRange());
-  
+
   // If the IntroducerLoc is valid but the stmt cond init is invalid.
   auto invalidInit = new (C.Ctx) IntegerLiteralExpr("1", SourceLoc(), false);
   auto introducerStmtInvalid =
@@ -188,8 +188,8 @@ TEST(SourceLoc, StmtConditionElement) {
   EXPECT_EQ(SourceLoc(), introducerStmtInvalid.getStartLoc());
   EXPECT_EQ(SourceLoc(), introducerStmtInvalid.getEndLoc());
   EXPECT_EQ(SourceRange(), introducerStmtInvalid.getSourceRange());
-  
-  // If the IntroducerLoc is invalid, the pattern is valid, but the stmt cond 
+
+  // If the IntroducerLoc is invalid, the pattern is valid, but the stmt cond
   // init is invalid.
   auto patternStmtInvalid =
       StmtConditionElement(ConditionalPatternBindingInfo::create(
@@ -202,7 +202,7 @@ TEST(SourceLoc, StmtConditionElement) {
 
 TEST(SourceLoc, TupleExpr) {
   TestContext C;
-  
+
   // In a TupleExpr, if the parens are both invalid, then you can only have a
   // valid range if there exists at least one expr with a valid source range.
   // The tuple's source range will be the upper bound of the inner source
@@ -219,48 +219,48 @@ TEST(SourceLoc, TupleExpr) {
   //       valid ^    invalid ^
   // COL:  xxxxxx012xxxxxxxxxxxxxxxxx
   // and the SourceRange of 'one' is 1:0 - 1:2.
-  
+
   //                                                01234567
   auto bufferID = C.Ctx.SourceMgr.addMemBufferCopy("one four");
   SourceLoc start = C.Ctx.SourceMgr.getLocForBufferStart(bufferID);
-  
+
   auto one = new (C.Ctx) UnresolvedDeclRefExpr(
       DeclNameRef(C.Ctx.getIdentifier("one")),
       DeclRefKind::Ordinary,
       DeclNameLoc(start));
-  
+
   auto two = new (C.Ctx) UnresolvedDeclRefExpr(
       DeclNameRef(C.Ctx.getIdentifier("two")),
       DeclRefKind::Ordinary,
       DeclNameLoc());
-  
+
   auto three = new (C.Ctx) UnresolvedDeclRefExpr(
       DeclNameRef(C.Ctx.getIdentifier("three")),
       DeclRefKind::Ordinary,
       DeclNameLoc());
-  
+
   auto four = new (C.Ctx) UnresolvedDeclRefExpr(
       DeclNameRef(C.Ctx.getIdentifier("four")),
       DeclRefKind::Ordinary,
       DeclNameLoc(start.getAdvancedLoc(4)));
-  
+
   EXPECT_EQ(start, one->getStartLoc());
   EXPECT_EQ(SourceLoc(), two->getStartLoc());
-  
+
   // a tuple with only invalid elements
   SmallVector<Expr *, 2> subExprsInvalid({ two, three });
   SmallVector<Identifier, 2> subExprNamesInvalid(2, Identifier());
   auto allInvalid = TupleExpr::createImplicit(C.Ctx, subExprsInvalid, subExprNamesInvalid);
-  
+
   EXPECT_EQ(SourceLoc(), allInvalid->getStartLoc());
   EXPECT_EQ(SourceLoc(), allInvalid->getEndLoc());
   EXPECT_EQ(SourceRange(), allInvalid->getSourceRange());
-  
+
   // the tuple from the example
   SmallVector<Expr *, 2> subExprsRight({ one, two });
   SmallVector<Identifier, 2> subExprNamesRight(2, Identifier());
   auto rightInvalidTuple = TupleExpr::createImplicit(C.Ctx, subExprsRight, subExprNamesRight);
-  
+
   EXPECT_EQ(start, rightInvalidTuple->getStartLoc());
   EXPECT_EQ(start, rightInvalidTuple->getEndLoc());
   EXPECT_EQ(SourceRange(start, start), rightInvalidTuple->getSourceRange());
@@ -268,11 +268,11 @@ TEST(SourceLoc, TupleExpr) {
   SmallVector<Expr *, 2> subExprsLeft({ two, one });
   SmallVector<Identifier, 2> subExprNamesLeft(2, Identifier());
   auto leftInvalidTuple = TupleExpr::createImplicit(C.Ctx, subExprsLeft, subExprNamesLeft);
-  
+
   EXPECT_EQ(start, leftInvalidTuple->getStartLoc());
   EXPECT_EQ(start, leftInvalidTuple->getEndLoc());
   EXPECT_EQ(SourceRange(start, start), leftInvalidTuple->getSourceRange());
-  
+
   // Some TupleExprs are triples. If only the middle expr has a valid SourceLoc
   // then the TupleExpr's SourceLoc should point at that.
   SmallVector<Expr *, 3> subExprsTriple({ two, one, two });
@@ -281,7 +281,7 @@ TEST(SourceLoc, TupleExpr) {
   EXPECT_EQ(start, tripleValidMid->getStartLoc());
   EXPECT_EQ(start, tripleValidMid->getEndLoc());
   EXPECT_EQ(SourceRange(start, start), tripleValidMid->getSourceRange());
-  
+
   // Some TupleExprs are quadruples. Quadruples should point at the range from
   // the first to the last valid exprs.
   SmallVector<Expr *, 4> subExprsQuad({ one, two, four, three });
@@ -290,7 +290,7 @@ TEST(SourceLoc, TupleExpr) {
   EXPECT_EQ(start, quadValidMids->getStartLoc());
   EXPECT_EQ(start.getAdvancedLoc(4), quadValidMids->getEndLoc());
   EXPECT_EQ(SourceRange(start, start.getAdvancedLoc(4)), quadValidMids->getSourceRange());
-  
+
 }
 
 TEST(SourceLoc, CharSourceRangeOverlaps) {

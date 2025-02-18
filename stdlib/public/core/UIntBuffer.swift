@@ -26,7 +26,7 @@ public struct _UIntBuffer<Element: UnsignedInteger & FixedWidthInteger> {
     self._storage = _storage
     self._bitCount = _bitCount
   }
-  
+
   @inlinable
   @inline(__always)
   public init(containing e: Element) {
@@ -47,7 +47,7 @@ extension _UIntBuffer: Sequence {
     @inlinable
     @inline(__always)
     public init(_ x: _UIntBuffer) { _impl = x }
-    
+
     @inlinable
     @inline(__always)
     public mutating func next() -> Element? {
@@ -59,7 +59,7 @@ extension _UIntBuffer: Sequence {
       return Element(truncatingIfNeeded: _impl._storage)
     }
   }
-  
+
   @inlinable
   @inline(__always)
   public func makeIterator() -> Iterator {
@@ -74,10 +74,10 @@ extension _UIntBuffer: Collection {
   public struct Index: Comparable {
     @usableFromInline
     internal var bitOffset: UInt8
-    
+
     @inlinable
     internal init(bitOffset: UInt8) { self.bitOffset = bitOffset }
-    
+
     @inlinable
     public static func == (lhs: Index, rhs: Index) -> Bool {
       return lhs.bitOffset == rhs.bitOffset
@@ -93,13 +93,13 @@ extension _UIntBuffer: Collection {
     @inline(__always)
     get { return Index(bitOffset: 0) }
   }
-  
+
   @inlinable
   public var endIndex: Index {
     @inline(__always)
     get { return Index(bitOffset: _bitCount) }
   }
-  
+
   @inlinable
   @inline(__always)
   public func index(after i: Index) -> Index {
@@ -110,7 +110,7 @@ extension _UIntBuffer: Collection {
   internal var _elementWidth: UInt8 {
     return UInt8(truncatingIfNeeded: Element.bitWidth)
   }
-  
+
   @inlinable
   public subscript(i: Index) -> Element {
     @inline(__always)
@@ -130,7 +130,7 @@ extension _UIntBuffer: BidirectionalCollection {
 
 extension _UIntBuffer: RandomAccessCollection {
   public typealias Indices = DefaultIndices<_UIntBuffer>
-  
+
   @inlinable
   @inline(__always)
   public func index(_ i: Index, offsetBy n: Int) -> Index {
@@ -203,7 +203,7 @@ extension _UIntBuffer: RangeReplaceableCollection {
     _storage = _storage._fullShiftRight(_elementWidth)
     return result
   }
-  
+
   @inlinable
   @inline(__always)
   public mutating func replaceSubrange<C: Collection>(
@@ -212,7 +212,7 @@ extension _UIntBuffer: RangeReplaceableCollection {
     _debugPrecondition(
       (0..<_bitCount)._contains_(
         target.lowerBound.bitOffset..<target.upperBound.bitOffset))
-    
+
     let replacement1 = _UIntBuffer(replacement)
 
     let targetCount = distance(

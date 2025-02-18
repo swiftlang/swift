@@ -236,7 +236,7 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
   auto &opts = irgen.Opts;
 
   EnableValueNames = opts.shouldProvideValueNames();
-  
+
   VoidTy = llvm::Type::getVoidTy(getLLVMContext());
   PtrTy = llvm::PointerType::getUnqual(getLLVMContext());
   Int1Ty = llvm::Type::getInt1Ty(getLLVMContext());
@@ -335,7 +335,7 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
     RelativeAddressTy,      // superclass
     RelativeAddressTy       // associated type names
   });
-  
+
   ProtocolDescriptorPtrTy = ProtocolDescriptorStructTy->getPointerTo();
 
   ProtocolRequirementStructTy =
@@ -343,7 +343,7 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
     Int32Ty,                // flags
     RelativeAddressTy,      // default implementation
   });
-  
+
   // A tuple type metadata record has a couple extra fields.
   auto tupleElementTy = createStructType(*this, "swift.tuple_element_type", {
     TypeMetadataPtrTy,      // Metadata *Type;
@@ -523,7 +523,7 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
     ObjCClassPtrTy
   };
   ObjCSuperStructTy->setBody(objcSuperElts);
-  
+
   ObjCBlockStructTy = llvm::StructType::create(getLLVMContext(), "objc_block");
   ObjCBlockPtrTy = ObjCBlockStructTy->getPointerTo(DefaultAS);
   llvm::Type *objcBlockElts[] = {
@@ -557,7 +557,7 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
   auto ErrorStructTy = llvm::StructType::create(getLLVMContext(), "swift.error");
   // ErrorStruct is currently opaque to the compiler.
   ErrorPtrTy = ErrorStructTy->getPointerTo(DefaultAS);
-  
+
   llvm::Type *openedErrorTriple[] = {
     OpaquePtrTy,
     TypeMetadataPtrTy,
@@ -569,7 +569,7 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
   OpenedErrorTriplePtrTy = OpenedErrorTripleTy->getPointerTo(DefaultAS);
 
   WitnessTablePtrPtrTy = WitnessTablePtrTy->getPointerTo(DefaultAS);
-  
+
   // todo
   OpaqueTypeDescriptorTy = TypeContextDescriptorTy;
   OpaqueTypeDescriptorPtrTy = OpaqueTypeDescriptorTy->getPointerTo();
@@ -577,7 +577,7 @@ IRGenModule::IRGenModule(IRGenerator &irgen,
   InvariantMetadataID = getLLVMContext().getMDKindID("invariant.load");
   InvariantNode = llvm::MDNode::get(getLLVMContext(), {});
   DereferenceableID = getLLVMContext().getMDKindID("dereferenceable");
-  
+
   C_CC = getOptions().PlatformCCallingConvention;
   // TODO: use "tinycc" on platforms that support it
   DefaultCC = SWIFT_DEFAULT_LLVM_CC;

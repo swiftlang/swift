@@ -600,7 +600,7 @@ swift::tryDynamicCastNSErrorObjectToValue(HeapObject *object,
     reinterpret_cast<BridgeErrorToNSErrorFunction>(
       dlsym(RTLD_DEFAULT,
             MANGLE_AS_STRING(MANGLE_SYM(10Foundation21_bridgeNSErrorToError_3outSbSo0C0C_SpyxGtAA021_ObjectiveCBridgeableE0RzlF)))));
-  
+
   // protocol _ObjectiveCBridgeableError
   auto TheObjectiveCBridgeableError = SWIFT_LAZY_CONSTANT(
     reinterpret_cast<ProtocolDescriptor *>(

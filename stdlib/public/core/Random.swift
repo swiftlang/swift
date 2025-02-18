@@ -64,7 +64,7 @@ public protocol RandomNumberGenerator {
 }
 
 extension RandomNumberGenerator {
-  
+
   // An unavailable default implementation of next() prevents types that do
   // not implement the RandomNumberGenerator interface from conforming to the
   // protocol; without this, the default next() method returning a generic
@@ -73,7 +73,7 @@ extension RandomNumberGenerator {
   @available(*, unavailable)
   @_alwaysEmitIntoClient
   public mutating func next() -> UInt64 { fatalError() }
-  
+
   /// Returns a value from a uniform, independent distribution of binary data.
   ///
   /// Use this method when you need random binary data to generate another

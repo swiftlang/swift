@@ -76,7 +76,7 @@ public struct AsyncThrowingDropWhileSequence<Base: AsyncSequence> {
 
   @usableFromInline
   init(
-    _ base: Base, 
+    _ base: Base,
     predicate: @escaping (Base.Element) async throws -> Bool
   ) {
     self.base = base
@@ -115,7 +115,7 @@ extension AsyncThrowingDropWhileSequence: AsyncSequence {
 
     @usableFromInline
     init(
-      _ baseIterator: Base.AsyncIterator, 
+      _ baseIterator: Base.AsyncIterator,
       predicate: @escaping (Base.Element) async throws -> Bool
     ) {
       self.baseIterator = baseIterator
@@ -148,7 +148,7 @@ extension AsyncThrowingDropWhileSequence: AsyncSequence {
           throw error
         }
       }
-      guard !finished else { 
+      guard !finished else {
         return nil
       }
       return try await baseIterator.next()
@@ -181,7 +181,7 @@ extension AsyncThrowingDropWhileSequence: AsyncSequence {
           throw error
         }
       }
-      guard !finished else { 
+      guard !finished else {
         return nil
       }
       return try await baseIterator.next(isolation: actor)
@@ -195,11 +195,11 @@ extension AsyncThrowingDropWhileSequence: AsyncSequence {
 }
 
 @available(SwiftStdlib 5.1, *)
-extension AsyncThrowingDropWhileSequence: @unchecked Sendable 
-  where Base: Sendable, 
+extension AsyncThrowingDropWhileSequence: @unchecked Sendable
+  where Base: Sendable,
         Base.Element: Sendable { }
 
 @available(SwiftStdlib 5.1, *)
-extension AsyncThrowingDropWhileSequence.Iterator: @unchecked Sendable 
-  where Base.AsyncIterator: Sendable, 
+extension AsyncThrowingDropWhileSequence.Iterator: @unchecked Sendable
+  where Base.AsyncIterator: Sendable,
         Base.Element: Sendable { }

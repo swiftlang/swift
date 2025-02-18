@@ -773,7 +773,7 @@ private:
                      std::optional<Node::Kind> kind = std::nullopt) {
     if (!Mangled)
       return nullptr;
-    
+
     bool isPunycoded = Mangled.nextIf('X');
     std::string decodeBuffer;
 
@@ -784,7 +784,7 @@ private:
         return {};
       return decodeBuffer;
     };
-    
+
     bool isOperator = false;
     if (Mangled.nextIf('o')) {
       isOperator = true;
@@ -815,10 +815,10 @@ private:
       return nullptr;
     if (!Mangled.hasAtLeast(length))
       return nullptr;
-    
+
     StringRef identifier = Mangled.slice(length);
     Mangled.advanceOffset(length);
-    
+
     // Decode Unicode identifiers.
     identifier = decode(identifier);
     if (identifier.empty())
@@ -846,7 +846,7 @@ private:
       }
       identifier = opDecodeBuffer;
     }
-    
+
     return Factory.createNode(*kind, identifier);
   }
 
@@ -1186,7 +1186,7 @@ private:
 
     // static?
     bool isStatic = Mangled.nextIf('Z');
-  
+
     // entity-kind
     Node::Kind entityBasicKind;
     if (Mangled.nextIf('F')) {
@@ -1391,7 +1391,7 @@ private:
         entity->addChild(type, Factory);
       }
     }
-    
+
     if (isStatic) {
       auto staticNode = Factory.createNode(Node::Kind::Static);
       staticNode->addChild(entity, Factory);
@@ -1515,7 +1515,7 @@ private:
       if (!baseType) return nullptr;
       return demangleDependentMemberTypeName(baseType, depth + 1);
     }
-    
+
     // Otherwise, we have a generic parameter.
     return demangleGenericParamIndex(depth + 1);
   }
@@ -1550,13 +1550,13 @@ private:
                             : Node::Kind::DependentGenericSignature);
     // First read in the parameter counts at each depth.
     Node::IndexType count = ~(Node::IndexType)0;
-    
+
     auto addCount = [&]{
       auto countNode =
         Factory.createNode(Node::Kind::DependentGenericParamCount, count);
       sig->addChild(countNode, Factory);
     };
-    
+
     while (Mangled.peek() != 'R' && Mangled.peek() != 'r') {
       if (Mangled.nextIf('z')) {
         count = 0;
@@ -1567,26 +1567,26 @@ private:
       }
       addCount();
     }
-    
+
     // No mangled parameters means we have exactly one.
     if (count == ~(Node::IndexType)0) {
       count = 1;
       addCount();
     }
-    
+
     // Next read in the generic requirements, if any.
     if (Mangled.nextIf('r'))
       return sig;
-    
+
     if (!Mangled.nextIf('R'))
       return nullptr;
-    
+
     while (!Mangled.nextIf('r')) {
       NodePointer reqt = demangleGenericRequirement(depth + 1);
       if (!reqt) return nullptr;
       sig->addChild(reqt, Factory);
     }
-    
+
     return sig;
   }
 
@@ -1841,7 +1841,7 @@ private:
     if (!out_args)
       return nullptr;
     NodePointer block = Factory.createNode(kind);
-    
+
     if (throws) {
       block->addChild(Factory.createNode(Node::Kind::ThrowsAnnotation), Factory);
     }

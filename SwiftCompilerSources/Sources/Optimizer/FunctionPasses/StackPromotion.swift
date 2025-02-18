@@ -41,7 +41,7 @@ import SIL
 /// Later optimizations can clean that up.
 let stackPromotion = FunctionPass(name: "stack-promotion") {
   (function: Function, context: FunctionPassContext) in
-  
+
   let deadEndBlocks = context.deadEndBlocks
 
   var needFixStackNesting = false
@@ -244,7 +244,7 @@ private func getDominatingBlockOfAllUsePoints(context: FunctionPassContext,
       return .continueWalk
     }
   }
-  
+
   return value.visit(using: FindDominatingBlock(result: value.parentBlock, domTree: domTree), context)!
 }
 

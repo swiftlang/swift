@@ -58,7 +58,7 @@ namespace irgen {
   llvm::Value *emitDynamicTypeOfOpaqueArchetype(IRGenFunction &IGF,
                                                 Address archetypeAddr,
                                                 SILType archetypeType);
-  
+
   /// Emit a lookup for an opaque result type's metadata.
   MetadataResponse emitOpaqueTypeMetadataRef(IRGenFunction &IGF,
                                              CanOpaqueTypeArchetypeType archetype,

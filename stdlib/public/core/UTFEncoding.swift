@@ -21,7 +21,7 @@ public protocol _UTFParser {
 
   func _parseMultipleCodeUnits() -> (isValid: Bool, bitCount: UInt8)
   func _bufferedScalar(bitCount: UInt8) -> Encoding.EncodedScalar
-  
+
   var _buffer: _UIntBuffer<Encoding.CodeUnit> { get set }
 }
 
@@ -69,14 +69,14 @@ where Encoding.EncodedScalar: RangeReplaceableCollection {
     _internalInvariant(scalarBitCount % numericCast(Encoding.CodeUnit.bitWidth) == 0)
     _internalInvariant(1...4 ~= scalarBitCount / 8)
     _internalInvariant(scalarBitCount <= _buffer._bitCount)
-    
+
     // Consume the decoded bytes (or maximal subpart of ill-formed sequence).
     let encodedScalar = _bufferedScalar(bitCount: scalarBitCount)
-    
+
     _buffer._storage = UInt32(
       // widen to 64 bits so that we can empty the buffer in the 4-byte case
       truncatingIfNeeded: UInt64(_buffer._storage) &>> scalarBitCount)
-      
+
     _buffer._bitCount = _buffer._bitCount &- scalarBitCount
 
     if _fastPath(isValid) {

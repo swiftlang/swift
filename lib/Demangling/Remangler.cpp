@@ -3964,7 +3964,7 @@ ManglingError Remangler::mangleExtendedExistentialTypeShape(Node *node,
   }
 
   if (genSig) {
-    RETURN_IF_ERROR(mangle(genSig, depth + 1));  
+    RETURN_IF_ERROR(mangle(genSig, depth + 1));
   }
   RETURN_IF_ERROR(mangle(type, depth + 1));
 

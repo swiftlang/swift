@@ -20,7 +20,7 @@ let functionUsesDumper = ModulePass(name: "dump-function-uses") {
 
   for function in context.functions {
     let uses = functionUses.getUses(of: function)
-    
+
     print("Uses of \(function.name)")
     print(uses)
     print("End function \(function.name)\n")

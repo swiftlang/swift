@@ -63,7 +63,7 @@ public protocol RangeExpression<Bound> {
   func relative<C: Collection>(
     to collection: C
   ) -> Range<Bound> where C.Index == Bound
-  
+
   /// Returns a Boolean value indicating whether the given element is contained
   /// within the range expression.
   ///
@@ -96,7 +96,7 @@ extension RangeExpression {
   @inlinable
   public static func ~= (pattern: Self, value: Bound) -> Bool {
     return pattern.contains(value)
-  }  
+  }
 }
 
 /// A half-open interval from a lower bound up to, but not including, an upper
@@ -364,7 +364,7 @@ extension Range {
   @inlinable // trivial-implementation
   @inline(__always)
   public func clamped(to limits: Range) -> Range {
-    let lower =         
+    let lower =
       limits.lowerBound > self.lowerBound ? limits.lowerBound
           : limits.upperBound < self.lowerBound ? limits.upperBound
           : self.lowerBound
@@ -490,7 +490,7 @@ extension Range: Encodable where Bound: Encodable {
 @frozen
 public struct PartialRangeUpTo<Bound: Comparable> {
   public let upperBound: Bound
-  
+
   @inlinable // trivial-implementation
   public init(_ upperBound: Bound) { self.upperBound = upperBound }
 }
@@ -501,7 +501,7 @@ extension PartialRangeUpTo: RangeExpression {
   where C.Index == Bound {
     return collection.startIndex..<self.upperBound
   }
-  
+
   @_transparent
   public func contains(_ element: Bound) -> Bool {
     return element < upperBound
@@ -546,9 +546,9 @@ extension PartialRangeUpTo: Encodable where Bound: Encodable {
 ///     print(numbers[...3])
 ///     // Prints "[10, 20, 30, 40]"
 @frozen
-public struct PartialRangeThrough<Bound: Comparable> {  
+public struct PartialRangeThrough<Bound: Comparable> {
   public let upperBound: Bound
-  
+
   @inlinable // trivial-implementation
   public init(_ upperBound: Bound) { self.upperBound = upperBound }
 }
@@ -712,8 +712,8 @@ extension PartialRangeFrom: Sequence
 
   /// Returns an iterator for this sequence.
   @inlinable
-  public __consuming func makeIterator() -> Iterator { 
-    return Iterator(_current: lowerBound) 
+  public __consuming func makeIterator() -> Iterator {
+    return Iterator(_current: lowerBound)
   }
 }
 
@@ -947,7 +947,7 @@ extension Collection {
   -> SubSequence where R.Bound == Index {
     return self[r.relative(to: self)]
   }
-  
+
   @inlinable
   public subscript(x: UnboundedRange) -> SubSequence {
     return self[startIndex...]
@@ -1073,7 +1073,7 @@ extension Range {
     other.isEmpty ||
       (lowerBound <= other.lowerBound && upperBound >= other.upperBound)
   }
-  
+
   /// Returns a Boolean value indicating whether the given closed range is
   /// contained within this range.
   ///

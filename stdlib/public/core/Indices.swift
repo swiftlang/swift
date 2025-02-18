@@ -81,7 +81,7 @@ extension DefaultIndices: Collection {
   public var indices: Indices {
     return self
   }
-  
+
   @_alwaysEmitIntoClient
   public func index(_ i: Index, offsetBy distance: Int) -> Index {
     return _elements.index(i, offsetBy: distance)

@@ -1211,7 +1211,7 @@ extension BrowserViewController {
 extension BrowserViewController: URLBarDelegate {
     func showTabTray() {
         Sentry.shared.clearBreadcrumbs()
-        
+
         updateFindInPageVisibility(visible: false)
 
         let tabTrayController = TabTrayController(tabManager: tabManager, profile: profile, tabTrayDelegate: self)
@@ -1564,7 +1564,7 @@ extension BrowserViewController: TabToolbarDelegate, PhotonActionSheetProtocol {
         }
         return [newTab, closeTab]
     }
-  
+
     func tabToolbarDidLongPressTabs(_ tabToolbar: TabToolbarProtocol, button: UIButton) {
         guard self.presentedViewController == nil else {
             return

@@ -903,7 +903,7 @@ public func run_SetIsDisjointInt(
     }
 }
 
-// Run isDisjoint Int switching the order of the two sets.  
+// Run isDisjoint Int switching the order of the two sets.
 @inline(never)
 public func run_SetIsDisjointIntCommutative(
     _ a: Set<Int>,
@@ -913,7 +913,7 @@ public func run_SetIsDisjointIntCommutative(
     for _ in 0 ..< n {
       let isDisjointA = a.isDisjoint(with: identity(b))
       check(isDisjointA == r)
-  
+
       let isDisjointB = b.isDisjoint(with: identity(a))
       check(isDisjointB == r)
     }
@@ -1119,7 +1119,7 @@ func run_SetIsDisjointBox(
     }
 }
 
-// Run isDisjoint Box switching the order of the two sets.  
+// Run isDisjoint Box switching the order of the two sets.
 @inline(never)
 func run_SetIsDisjointBoxCommutative(
     _ a: Set<Box<Int>>,
@@ -1129,7 +1129,7 @@ func run_SetIsDisjointBoxCommutative(
     for _ in 0 ..< n {
         let isDisjointA = a.isDisjoint(with: identity(b))
         check(isDisjointA == r)
-  
+
         let isDisjointB = b.isDisjoint(with: identity(a))
         check(isDisjointB == r)
     }

@@ -200,7 +200,7 @@ public:
   const Data &operator[] (SILBasicBlock *block) const {
     return data[getIndex(block)];
   }
-  
+
   /// If \p block is a new block, i.e. created after this BasicBlockData was
   /// constructed, creates a new Data with \p init and returns it.
   Data &get(SILBasicBlock *block, llvm::function_ref<Data()> init) {

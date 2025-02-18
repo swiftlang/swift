@@ -127,7 +127,7 @@ extension AddressUseVisitor {
       return escapingAddressUse(of: operand)
 
     case is StructElementAddrInst, is TupleElementAddrInst,
-         is IndexAddrInst, is TailAddrInst, is TuplePackElementAddrInst, 
+         is IndexAddrInst, is TailAddrInst, is TuplePackElementAddrInst,
          is InitEnumDataAddrInst, is UncheckedTakeEnumDataAddrInst,
          is InitExistentialAddrInst, is OpenExistentialAddrInst,
          is ProjectBlockStorageInst, is UncheckedAddrCastInst,
@@ -147,7 +147,7 @@ extension AddressUseVisitor {
          is AssignInst, is AssignByWrapperInst, is AssignOrInitInst,
          is TupleAddrConstructorInst, is InitBlockStorageHeaderInst,
          is RetainValueAddrInst, is ReleaseValueAddrInst,
-         is DestroyAddrInst, is DeallocStackInst, 
+         is DestroyAddrInst, is DeallocStackInst,
          is DeinitExistentialAddrInst,
          is IsUniqueInst, is MarkFunctionEscapeInst,
          is PackElementSetInst:

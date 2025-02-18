@@ -192,7 +192,7 @@ lowerAssignByWrapperInstruction(SILBuilderWithScope &b,
   SILValue dest = inst->getDest();
   SILLocation loc = inst->getLoc();
   SILBuilderWithScope forCleanup(std::next(inst->getIterator()));
-  
+
   switch (inst->getMode()) {
     case AssignByWrapperInst::Unknown:
       assert(b.getModule().getASTContext().hadError() &&
@@ -230,7 +230,7 @@ lowerAssignByWrapperInstruction(SILBuilderWithScope &b,
       // is an inout. Therefore we cannot keep it as a dead closure to be
       // cleaned up later. We have to delete it in this pass.
       toDelete.insert(inst->getSetter());
-      
+
       // Also the argument of the closure (which usually is a "load") has to be
       // deleted to avoid memory lifetime violations.
       auto *setterPA = dyn_cast<PartialApplyInst>(inst->getSetter());
@@ -253,7 +253,7 @@ lowerAssignByWrapperInstruction(SILBuilderWithScope &b,
       // nested access violation.
       if (isa<BeginAccessInst>(dest))
         toDelete.insert(dest);
-        
+
       // Again, we have to delete the unused dead closure.
       toDelete.insert(inst->getInitializer());
       break;
@@ -406,7 +406,7 @@ static void deleteDeadClosureArg(LoadInst *load) {
   if (load->getOwnershipQualifier() != LoadOwnershipQualifier::Trivial &&
       load->getOwnershipQualifier() != LoadOwnershipQualifier::Copy)
     return;
-    
+
   for (Operand *use : load->getUses()) {
     if (!isa<DestroyValueInst>(use->getUser()))
       return;

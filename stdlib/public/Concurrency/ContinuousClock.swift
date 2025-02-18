@@ -12,8 +12,8 @@
 import Swift
 
 #if !$Embedded
-/// A clock that measures time that always increments and does not stop 
-/// incrementing while the system is asleep. 
+/// A clock that measures time that always increments and does not stop
+/// incrementing while the system is asleep.
 ///
 /// `ContinuousClock` can be considered as a stopwatch style time. The frame of
 /// reference of the `Instant` may be bound to process launch, machine boot or
@@ -55,8 +55,8 @@ extension Duration {
 
 @available(SwiftStdlib 5.7, *)
 extension Clock where Self == ContinuousClock {
-  /// A clock that measures time that always increments but does not stop 
-  /// incrementing while the system is asleep. 
+  /// A clock that measures time that always increments but does not stop
+  /// incrementing while the system is asleep.
   ///
   ///       try await Task.sleep(until: .now + .seconds(3), clock: .continuous)
   ///
@@ -101,7 +101,7 @@ extension ContinuousClock: Clock {
   /// to coalesce CPU wake-ups to more efficiently process the wake-ups in
   /// a more power efficient manner.
   ///
-  /// If the task is canceled before the time ends, this function throws 
+  /// If the task is canceled before the time ends, this function throws
   /// `CancellationError`.
   ///
   /// This function doesn't block the underlying thread.

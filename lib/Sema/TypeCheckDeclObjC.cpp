@@ -1099,7 +1099,7 @@ bool swift::isRepresentableInObjC(
 
 bool swift::isRepresentableInObjC(const VarDecl *VD, ObjCReason Reason) {
   // If you change this function, you must add or modify a test in PrintAsClang.
-  
+
   if (VD->isInvalid())
     return false;
 
@@ -1706,7 +1706,7 @@ static bool isEnumObjC(EnumDecl *enumDecl) {
   if (enumDecl->getAllElements().empty()) {
     enumDecl->diagnose(diag::empty_enum_raw_type);
   }
-  
+
   return true;
 }
 
@@ -2017,7 +2017,7 @@ void markAsObjC(ValueDecl *D, ObjCReason reason,
         }
       }
     }
-    
+
     for (auto req : findWitnessedObjCRequirements(method)) {
       auto reqMethod = dyn_cast<AbstractFunctionDecl>(req);
       if (!reqMethod) continue;
@@ -2213,7 +2213,7 @@ bool swift::fixDeclarationName(InFlightDiagnostic &diag, const ValueDecl *decl,
   if (name.getArgumentNames().size()
           != targetName.getArgumentNames().size())
     return false;
-  
+
   auto params = func->getParameters();
   for (unsigned i = 0, n = name.getArgumentNames().size(); i != n; ++i) {
     auto origArg = name.getArgumentNames()[i];
@@ -2717,7 +2717,7 @@ bool swift::diagnoseObjCMethodConflicts(SourceFile &sf) {
   for (const auto &conflictSet : conflictSets) {
     // Diagnose the conflict.
     anyConflicts = true;
-    
+
     const auto &conflict = conflictSet.first;
     const auto &methods = conflictSet.second;
 
@@ -2741,7 +2741,7 @@ bool swift::diagnoseObjCMethodConflicts(SourceFile &sf) {
 
       // * Selectors for imported methods with async variants.
       bool breakingInSwift5 = originalIsImportedAsync;
-      
+
       // * Protocol requirements
       if (!isa<ClassDecl>(conflict.typeDecl))
         breakingInSwift5 = true;
@@ -3844,7 +3844,7 @@ private:
       auto diag =
         diagnose(cand, diag::objc_implementation_required_attr_mismatch,
                  cand, req->getDescriptiveKind(),  shouldBeRequired);
-      
+
       if (shouldBeRequired)
         diag.fixItInsert(cand->getAttributeInsertionLoc(/*forModifier=*/true),
                          "required ");
