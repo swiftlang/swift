@@ -1965,6 +1965,8 @@ extension ASTGenVisitor {
       return self.generateAccessControlAttr(declModifier: node, level: .public)
     case .open:
       return self.generateAccessControlAttr(declModifier: node, level: .open)
+    case .nonisolated:
+      return self.generateNonisolatedAttr(declModifier: node)?.asDeclAttribute
     case .weak, .unowned:
       return self.generateReferenceOwnershipAttr(declModifier: node)?.asDeclAttribute
     default:
@@ -1999,6 +2001,27 @@ extension ASTGenVisitor {
         accessLevel: level
       ).asDeclAttribute
     }
+  }
+
+  func generateNonisolatedAttr(declModifier node: DeclModifierSyntax) -> BridgedNonisolatedAttr? {
+    let isUnsafe: Bool
+    switch node.detail?.detail.rawText {
+    case "unsafe":
+      isUnsafe = true
+    case nil:
+      isUnsafe = false
+    case let text?:
+      // TODO: Diagnose
+      _ = text
+      fatalError("invalid argument for nonisolated modifier")
+    }
+
+    return BridgedNonisolatedAttr.createParsed(
+      self.ctx,
+      atLoc: nil,
+      range: self.generateSourceRange(node),
+      isUnsafe: isUnsafe
+    )
   }
 
   func generateReferenceOwnershipAttr(declModifier node: DeclModifierSyntax) -> BridgedReferenceOwnershipAttr? {

@@ -215,3 +215,12 @@ struct NE : ~Escapable {}
 }
 @lifetime(borrow borrow) func testNameConflict(_ borrow: E) -> NE { NE() }
 @lifetime(result: source) func testTarget(_ result: inout NE, _ source: consuming NE) { result = source }
+
+actor MyActor {
+  nonisolated let constFlag: Bool = false
+  nonisolated(unsafe) var mutableFlag: Bool = false
+}
+func testNonIsolated(actor: MyActor) {
+  _ = actor.constFlag
+  _ = actor.mutableFlag
+}
