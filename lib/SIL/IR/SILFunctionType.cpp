@@ -1660,9 +1660,7 @@ private:
     // If we are an async function that is unspecified or nonisolated, insert an
     // isolated parameter if NonIsolatedAsyncInheritsIsolationFromContext is
     // enabled.
-    if (TC.Context.LangOpts.hasFeature(
-            Feature::NonIsolatedAsyncInheritsIsolationFromContext) &&
-        IsolationInfo &&
+    if (IsolationInfo &&
         IsolationInfo->getKind() == ActorIsolation::CallerIsolationInheriting &&
         extInfoBuilder.isAsync()) {
       auto actorProtocol = TC.Context.getProtocol(KnownProtocolKind::Actor);
