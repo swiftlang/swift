@@ -75,6 +75,7 @@ struct BridgedASTType;
 class BridgedCanType;
 class BridgedASTContext;
 struct BridgedSubstitutionMap;
+struct BridgedConformance;
 class BridgedParameterList;
 enum BridgedPlatformKind : size_t;
 
@@ -2989,11 +2990,17 @@ struct BridgedASTType {
   BRIDGED_INLINE BridgedOwnedString getDebugDescription() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedCanType getCanonicalType() const;
   BRIDGED_INLINE bool hasTypeParameter() const;
+  BRIDGED_INLINE bool hasOpenedExistential() const;
   BRIDGED_INLINE bool isOpenedExistentialWithError() const;
   BRIDGED_INLINE bool isEscapable() const;
   BRIDGED_INLINE bool isNoEscape() const;
   BRIDGED_INLINE bool isInteger() const;
+  BRIDGED_INLINE bool isMetatypeType() const;
+  BRIDGED_INLINE bool isExistentialMetatypeType() const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE OptionalBridgedDeclObj getAnyNominal() const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedASTType getInstanceTypeOfMetatype() const;
   SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedASTType subst(BridgedSubstitutionMap substMap) const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedConformance checkConformance(BridgedDeclObj proto) const;  
 };
 
 class BridgedCanType {
