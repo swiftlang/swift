@@ -28,6 +28,11 @@ func test() async {
       print("Task.name = \(Task.name ?? "NONE")")
       return 12
     }
+    g.addTaskUnlessCancelled(name: "Caplin the TaskGroup Task (unless cancelled)") {
+      // CHECK: Task.name = Caplin the TaskGroup Task (unless cancelled)
+      print("Task.name = \(Task.name ?? "NONE")")
+      return 12
+    }
   }
 
 //  _ = await withThrowingTaskGroup(of: Int.self) { g in
