@@ -366,7 +366,8 @@ extension ASTGenVisitor {
             paramName: ctx.getDollarIdentifier(idx),
             paramNameLoc: loc,
             type: nil,
-            defaultValue: nil
+            defaultValue: nil,
+            defaultValueInitContext: nil
           )
           param.setSpecifier(.default)
           param.setImplicit()

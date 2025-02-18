@@ -8854,8 +8854,6 @@ ParserResult<FuncDecl> Parser::parseDeclFunc(SourceLoc StaticLoc,
     CodeCompletionCallbacks->setParsedDecl(FD);
   }
 
-  DefaultArgs.setFunctionContext(FD, FD->getParameters());
-
   if (Flags.contains(PD_InProtocol)) {
     if (Tok.is(tok::l_brace)) {
       diagnose(Tok, diag::protocol_method_with_body);
@@ -9235,8 +9233,6 @@ Parser::parseDeclEnumCase(ParseDeclOptions Flags,
                                                  EqualsLoc,
                                                  LiteralRawValueExpr,
                                                  CurDeclContext);
-
-    DefaultArgs.setFunctionContext(result, result->getParameterList());
 
     if (NameLoc == CaseLoc) {
       result->setImplicit(); // Parse error
@@ -9706,8 +9702,6 @@ Parser::parseDeclSubscript(SourceLoc StaticLoc,
       ElementTy.get(), CurDeclContext, GenericParams);
   Subscript->attachParsedAttrs(Attributes);
 
-  DefaultArgs.setFunctionContext(Subscript, Subscript->getIndices());
-
   // Parse a 'where' clause if present.
   if (Tok.is(tok::kw_where)) {
     ContextChange CC(*this, Subscript);
@@ -9880,8 +9874,6 @@ Parser::parseDeclInit(ParseDeclOptions Flags, DeclAttributes &Attributes) {
   }
 
   // No need to setLocalDiscriminator.
-
-  DefaultArgs.setFunctionContext(CD, CD->getParameters());
 
   // Pass the function signature to code completion.
   if (Status.hasCodeCompletion()) {
@@ -10485,8 +10477,6 @@ ParserResult<MacroDecl> Parser::parseDeclMacro(DeclAttributes &attributes) {
     }
     status |= whereStatus;
   }
-
-  defaultArgs.setFunctionContext(macro, macro->getParameterList());
 
   return dcc.fixupParserResult(status, macro);
 }

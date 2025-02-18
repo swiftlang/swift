@@ -631,6 +631,15 @@ SWIFT_NAME("getter:BridgedPatternBindingInitializer.asDeclContext(self:)")
 BridgedDeclContext BridgedPatternBindingInitializer_asDeclContext(
     BridgedPatternBindingInitializer cInit);
 
+SWIFT_NAME("BridgedDefaultArgumentInitializer.create(declContext:index:)")
+BridgedDefaultArgumentInitializer
+BridgedDefaultArgumentInitializer_create(BridgedDeclContext cDeclContext,
+                                         size_t index);
+
+SWIFT_NAME("getter:BridgedDefaultArgumentInitializer.asDeclContext(self:)")
+BridgedDeclContext DefaultArgumentInitializer_asDeclContext(
+    BridgedDefaultArgumentInitializer cInit);
+
 SWIFT_NAME("BridgedCustomAttributeInitializer.create(declContext:)")
 BridgedCustomAttributeInitializer
 BridgedCustomAttributeInitializer_create(BridgedDeclContext cDeclContext);
@@ -1302,13 +1311,15 @@ BridgedPatternBindingDecl BridgedPatternBindingDecl_createParsed(
     BridgedVarDeclIntroducer cIntorducer, BridgedArrayRef cBindingEntries);
 
 SWIFT_NAME("BridgedParamDecl.createParsed(_:declContext:specifierLoc:argName:"
-           "argNameLoc:paramName:paramNameLoc:type:defaultValue:)")
+           "argNameLoc:paramName:paramNameLoc:type:defaultValue:"
+           "defaultValueInitContext:)")
 BridgedParamDecl BridgedParamDecl_createParsed(
     BridgedASTContext cContext, BridgedDeclContext cDeclContext,
     BridgedSourceLoc cSpecifierLoc, BridgedIdentifier cArgName,
     BridgedSourceLoc cArgNameLoc, BridgedIdentifier cParamName,
     BridgedSourceLoc cParamNameLoc, BridgedNullableTypeRepr type,
-    BridgedNullableExpr defaultValue);
+    BridgedNullableExpr defaultValue,
+    BridgedNullableDefaultArgumentInitializer cDefaultArgumentInitContext);
 
 /// The various spellings of ownership modifier that can be used in source.
 enum ENUM_EXTENSIBILITY_ATTR(closed) BridgedParamSpecifier {
