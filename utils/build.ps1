@@ -3134,7 +3134,29 @@ if (-not $SkipBuild) {
   Invoke-BuildStep Build-XML2 Windows $HostArch
   Invoke-BuildStep Build-Compilers $HostArch
 
-  foreach ($Arch in $WindowsSDKArchs) {
+  # Build BuildArch SDK
+  Invoke-BuildStep Build-ZLib Windows $BuildArch
+  Invoke-BuildStep Build-XML2 Windows $BuildArch
+  Invoke-BuildStep Build-CURL Windows $BuildArch
+  Invoke-BuildStep Build-LLVM Windows $BuildArch
+
+  # Build platform: SDK, Redist and XCTest
+  Invoke-BuildStep Build-Runtime Windows $BuildArch
+  Invoke-BuildStep Build-Dispatch Windows $BuildArch
+  Invoke-BuildStep Build-FoundationMacros -Build Windows $BuildArch
+  Invoke-BuildStep Build-TestingMacros -Build Windows $BuildArch
+  Invoke-BuildStep Build-Foundation Windows $BuildArch
+  Invoke-BuildStep Build-Sanitizers Windows $BuildArch
+  Invoke-BuildStep Build-XCTest Windows $BuildArch
+  Invoke-BuildStep Build-Testing Windows $BuildArch
+  Invoke-BuildStep Write-SDKSettingsPlist Windows $BuildArch
+  Invoke-BuildStep Write-PlatformInfoPlist $BuildArch
+
+  Invoke-BuildStep Build-ExperimentalRuntime -Static Windows $BuildArch
+  Invoke-BuildStep Build-ExperimentalRuntime Windows $BuildArch
+  Invoke-BuildStep Build-Foundation -Static Windows $BuildArch
+
+  foreach ($Arch in $WindowsSDKArchs | Where-Object { $_ -ne $BuildArch }) {
     Invoke-BuildStep Build-ZLib Windows $Arch
     Invoke-BuildStep Build-XML2 Windows $Arch
     Invoke-BuildStep Build-CURL Windows $Arch
@@ -3143,9 +3165,6 @@ if (-not $SkipBuild) {
     # Build platform: SDK, Redist and XCTest
     Invoke-BuildStep Build-Runtime Windows $Arch
     Invoke-BuildStep Build-Dispatch Windows $Arch
-    # FIXME(compnerd) ensure that the _build_ is the first arch and don't rebuild on each arch
-    Invoke-BuildStep Build-FoundationMacros -Build Windows $BuildArch
-    Invoke-BuildStep Build-TestingMacros -Build Windows $BuildArch
     Invoke-BuildStep Build-Foundation Windows $Arch
     Invoke-BuildStep Build-Sanitizers Windows $Arch
     Invoke-BuildStep Build-XCTest Windows $Arch
