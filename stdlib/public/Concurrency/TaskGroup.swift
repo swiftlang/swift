@@ -362,10 +362,70 @@ public struct TaskGroup<ChildTaskResult: Sendable> {
     // Create the task in this group.
     let builtinSerialExecutor =
       Builtin.extractFunctionIsolation(operation)?.unownedExecutor.executor
+
     _ = Builtin.createTask(flags: flags,
                            initialSerialExecutor: builtinSerialExecutor,
                            taskGroup: _group,
                            operation: operation)
+  }
+
+  /// Adds a child task to the group.
+  ///
+  /// - Parameters:
+  ///   - name: Human readable name of this task.
+  ///   - priority: The priority of the operation task.
+  ///     Omit this parameter or pass `.unspecified`
+  ///     to set the child task's priority to the priority of the group.
+  ///   - operation: The operation to execute as part of the task group.
+  @_alwaysEmitIntoClient
+  public mutating func addTask(
+    name: String? = nil,
+    priority: TaskPriority? = nil,
+    operation: sending @escaping @isolated(any) () async -> ChildTaskResult
+  ) {
+    #if SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
+    let enqueueJob = false
+    #else
+    let enqueueJob = true
+    #endif
+
+    let flags = taskCreateFlags(
+      priority: priority, isChildTask: true, copyTaskLocals: false,
+      inheritContext: false, enqueueJob: enqueueJob,
+      addPendingGroupTaskUnconditionally: true,
+      isDiscardingTask: false
+    )
+
+    // Create the task in this group.
+    let builtinSerialExecutor =
+      Builtin.extractFunctionIsolation(operation)?.unownedExecutor.executor
+
+    var task: Builtin.NativeObject?
+    #if $BuiltinCreateAsyncTaskName
+    if var name {
+      task =
+        name.withUTF8 { nameBytes in
+          Builtin.createTask(
+            flags: flags,
+            initialSerialExecutor: builtinSerialExecutor,
+            taskGroup: _group,
+            taskName: nameBytes.baseAddress?._rawValue,
+            operation: operation).0
+        }
+    }
+    #endif
+
+    if task == nil {
+      // either no task name was set, or names are unsupported
+      task = Builtin.createTask(
+        flags: flags,
+        // unsupported names, so we drop it.
+        initialSerialExecutor: builtinSerialExecutor,
+        operation: operation).0
+    }
+
+    // task was enqueued to the group, no need to store the 'task' ref itself
+    assert(task != nil, "Expected task to be created!")
   }
 
   /// Adds a child task to the group, unless the group has been canceled.

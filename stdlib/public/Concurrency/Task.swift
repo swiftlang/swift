@@ -704,6 +704,7 @@ extension Task where Failure == Never {
   @available(SwiftStdlib 6.2, *)
   public init(
     name: String? = nil,
+    // TaskExecutor is unavailable in embedded
     priority: TaskPriority? = nil,
     @_inheritActorContext @_implicitSelfCapture operation: sending @escaping () async -> Success
   ) {
@@ -762,7 +763,8 @@ extension Task where Failure == Never {
     // Create the asynchronous task.
     let builtinSerialExecutor =
       Builtin.extractFunctionIsolation(operation)?.unownedExecutor.executor
-    let task: Builtin.NativeObject
+
+    var task: Builtin.NativeObject?
     #if $BuiltinCreateAsyncTaskName
     if var name {
       task =
@@ -773,21 +775,17 @@ extension Task where Failure == Never {
             taskName: nameBytes.baseAddress?._rawValue,
             operation: operation).0
       }
-    } else {
-      task = Builtin.createTask(
-        flags: flags,
-        initialSerialExecutor: builtinSerialExecutor,
-        operation: operation).0
     }
-    #else
-    task = Builtin.createTask(
+    #endif
+    if task == nil {
+      // either no task name was set, or names are unsupported
+      task = Builtin.createTask(
       flags: flags,
-      // unsupported names, so we drop it.
       initialSerialExecutor: builtinSerialExecutor,
       operation: operation).0
-    #endif
+    }
 
-    self._task = task
+    self._task = task!
   }
 #endif
 }

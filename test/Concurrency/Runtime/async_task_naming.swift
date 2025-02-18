@@ -22,9 +22,17 @@ func test() async {
 //    return 12
 //  }.value
 
-//  _ = await withTaskGroup(of: Int.self) { g in
-//    g.addTask(name: "Caplin the TaskGroup Task") {
-//      // CHECK: Task.name = Caplin the TaskGroup Task
+  _ = await withTaskGroup(of: Int.self) { g in
+    g.addTask(name: "Caplin the TaskGroup Task") {
+      // CHECK: Task.name = Caplin the TaskGroup Task
+      print("Task.name = \(Task.name ?? "NONE")")
+      return 12
+    }
+  }
+
+//  _ = await withThrowingTaskGroup(of: Int.self) { g in
+//    g.addTask(name: "Caplin the ThrowingTaskGroup Task") {
+//      // CHECK: Task.name = Caplin the ThrowingTaskGroup Task
 //      print("Task.name = \(Task.name ?? "NONE")")
 //      return 12
 //    }
