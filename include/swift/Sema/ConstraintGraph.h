@@ -175,11 +175,6 @@ private:
   /// Notify all of the type variables referenced by this one about a change.
   void notifyReferencedVars(
       llvm::function_ref<void(ConstraintGraphNode &)> notification) const;
-
-  void updateFixedType(
-      Type fixedType,
-      llvm::function_ref<void (ConstraintGraphNode &,
-                               Constraint *)> notification) const;
   /// }
 
   /// The constraint graph this node belongs to.
