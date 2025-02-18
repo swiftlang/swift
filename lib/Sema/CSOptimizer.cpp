@@ -108,9 +108,12 @@ static bool isSupportedSpecialConstructor(ConstructorDecl *ctor) {
   return false;
 }
 
-static bool isStandardComparisonOperator(ValueDecl *decl) {
-  return decl->isOperator() &&
-         decl->getBaseIdentifier().isStandardComparisonOperator();
+static bool isStandardComparisonOperator(Constraint *disjunction) {
+  auto *choice = disjunction->getNestedConstraints()[0];
+  if (auto *decl = getOverloadChoiceDecl(choice))
+    return decl->isOperator() &&
+           decl->getBaseIdentifier().isStandardComparisonOperator();
+  return false;
 }
 
 static bool isOperatorNamed(Constraint *disjunction, StringRef name) {
@@ -695,6 +698,38 @@ static void determineBestChoicesInContext(
             fromInitializerCall(fromInitializerCall) {}
     };
 
+    // Determine whether there are any non-speculative choices
+    // in the given set of candidates. Speculative choices are
+    // literals or types inferred from initializer calls.
+    auto anyNonSpeculativeCandidates =
+        [&](ArrayRef<ArgumentCandidate> candidates) {
+          // If there is only one (non-CGFloat) candidate inferred from
+          // an initializer call we don't consider this a speculation.
+          //
+          // CGFloat inference is always speculative because of the
+          // implicit conversion between Double and CGFloat.
+          if (llvm::count_if(candidates, [&](const auto &candidate) {
+                return candidate.fromInitializerCall &&
+                       !candidate.type->isCGFloat();
+              }) == 1)
+            return true;
+
+          // If there are no non-literal and non-initializer-inferred types
+          // in the list, consider this is a speculation.
+          return llvm::any_of(candidates, [&](const auto &candidate) {
+            return !candidate.fromLiteral && !candidate.fromInitializerCall;
+          });
+        };
+
+    auto anyNonSpeculativeResultTypes = [](ArrayRef<Type> results) {
+      return llvm::any_of(results, [](Type resultTy) {
+        // Double and CGFloat are considered speculative because
+        // there exists an implicit conversion between them and
+        // preference is based on score impact in the overall solution.
+        return !(resultTy->isDouble() || resultTy->isCGFloat());
+      });
+    };
+
     SmallVector<SmallVector<ArgumentCandidate, 2>, 2>
         argumentCandidates;
     argumentCandidates.resize(argFuncType->getNumParams());
@@ -819,18 +854,18 @@ static void determineBestChoicesInContext(
       resultTypes.push_back(resultType);
     }
 
-    // Determine whether all of the argument candidates are inferred from literals.
-    // This information is going to be used later on when we need to decide how to
-    // score a matching choice.
-    bool onlyLiteralCandidates =
+    // Determine whether all of the argument candidates are speculative (i.e.
+    // literals). This information is going to be used later on when we need to
+    // decide how to score a matching choice.
+    bool onlySpeculativeArgumentCandidates =
         hasArgumentCandidates &&
         llvm::none_of(
             indices(argFuncType->getParams()), [&](const unsigned argIdx) {
-              auto &candidates = argumentCandidates[argIdx];
-              return llvm::any_of(candidates, [&](const auto &candidate) {
-                return !candidate.fromLiteral;
-              });
+              return anyNonSpeculativeCandidates(argumentCandidates[argIdx]);
             });
+
+    bool canUseContextualResultTypes =
+        isOperator && !isStandardComparisonOperator(disjunction);
 
     // Match arguments to the given overload choice.
     auto matchArguments = [&](OverloadChoice choice, FunctionType *overloadType)
@@ -1229,16 +1264,12 @@ static void determineBestChoicesInContext(
           if (!matchings)
             return;
 
-          auto canUseContextualResultTypes = [&decl]() {
-            return decl->isOperator() && !isStandardComparisonOperator(decl);
-          };
-
           // Require exact matches only if all of the arguments
           // are literals and there are no usable contextual result
           // types that could help narrow favored choices.
           bool favorExactMatchesOnly =
-              onlyLiteralCandidates &&
-              (!canUseContextualResultTypes() || resultTypes.empty());
+              onlySpeculativeArgumentCandidates &&
+              (!canUseContextualResultTypes || resultTypes.empty());
 
           // This is important for SIMD operators in particular because
           // a lot of their overloads have same-type requires to a concrete
@@ -1384,7 +1415,7 @@ static void determineBestChoicesInContext(
           // because regular functions/methods/subscripts and
           // especially initializers could end up with a lot of
           // favored overloads because on the result type alone.
-          if (canUseContextualResultTypes() &&
+          if (canUseContextualResultTypes &&
               (score > 0 || !hasArgumentCandidates)) {
             if (llvm::any_of(resultTypes, [&](const Type candidateResultTy) {
                   return scoreCandidateMatch(genericSig, decl,
@@ -1437,6 +1468,34 @@ static void determineBestChoicesInContext(
     for (const auto &choice : favoredChoices) {
       if (choice.second == bestScore)
         info.FavoredChoices.push_back(choice.first);
+    }
+
+    // Reset operator disjunction score but keep favoring
+    // choices only available candidates where speculative
+    // with no contextual information available, standard
+    // comparison operators are a special cases because
+    // their return type is fixed to `Bool` unlike that of
+    // bitwise, arithmetic, and other operators.
+    //
+    // This helps to prevent over-eager selection of the
+    // operators over unsupported non-operator declarations.
+    if (isOperator && onlySpeculativeArgumentCandidates &&
+        (!canUseContextualResultTypes ||
+         !anyNonSpeculativeResultTypes(resultTypes))) {
+      if (cs.isDebugMode()) {
+        PrintOptions PO;
+        PO.PrintTypesForDebugging = true;
+
+        llvm::errs().indent(cs.solverState->getCurrentIndent())
+            << "<<< Disjunction "
+            << disjunction->getNestedConstraints()[0]
+                   ->getFirstType()
+                   ->getString(PO)
+            << " score " << bestScore
+            << " was reset due to having only speculative candidates\n";
+      }
+
+      info.Score = 0;
     }
 
     recordResult(disjunction, std::move(info));
@@ -1604,8 +1663,13 @@ ConstraintSystem::selectDisjunction() {
             return *firstScore > *secondScore;
         }
 
-        unsigned numFirstFavored = firstFavoredChoices.size();
-        unsigned numSecondFavored = secondFavoredChoices.size();
+        // Use favored choices only if disjunction score is higher
+        // than zero. This means that we can maintain favoring
+        // choices without impacting selection decisions.
+        unsigned numFirstFavored =
+            firstScore.value_or(0) ? firstFavoredChoices.size() : 0;
+        unsigned numSecondFavored =
+            secondScore.value_or(0) ? secondFavoredChoices.size() : 0;
 
         if (numFirstFavored == numSecondFavored) {
           if (firstActive != secondActive)
