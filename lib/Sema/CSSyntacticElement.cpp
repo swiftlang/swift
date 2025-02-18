@@ -436,7 +436,8 @@ ElementInfo makeJoinElement(ConstraintSystem &cs, TypeJoinExpr *join,
 
 struct SyntacticElementContext
     : public llvm::PointerUnion<AbstractFunctionDecl *, AbstractClosureExpr *,
-                                SingleValueStmtExpr *, ExprPattern *, TapExpr *> {
+                                SingleValueStmtExpr *, ExprPattern *, TapExpr *,
+                                CaptureListExpr *> {
   // Inherit the constructors from PointerUnion.
   using PointerUnion::PointerUnion;
 
@@ -459,6 +460,10 @@ struct SyntacticElementContext
 
   static SyntacticElementContext forFunction(AbstractFunctionDecl *func) {
     return {func};
+  }
+
+  static SyntacticElementContext forCaptureList(CaptureListExpr *CLE) {
+    return {CLE};
   }
 
   static SyntacticElementContext
@@ -484,6 +489,9 @@ struct SyntacticElementContext
       return EP->getDeclContext();
     } else if (auto *tap = this->dyn_cast<TapExpr *>()) {
       return tap->getVar()->getDeclContext();
+    } else if (auto *CLE = this->dyn_cast<CaptureListExpr *>()) {
+      // The capture list is part of the closure's parent context.
+      return CLE->getClosureBody()->getParent();
     } else {
       llvm_unreachable("unsupported kind");
     }
@@ -552,6 +560,8 @@ class SyntacticElementConstraintGenerator
   SyntacticElementContext context;
   ConstraintLocator *locator;
 
+  std::optional<llvm::SaveAndRestore<DeclContext *>> DCScope;
+
   /// Whether a conjunction was generated.
   bool generatedConjunction = false;
 
@@ -562,7 +572,17 @@ public:
   SyntacticElementConstraintGenerator(ConstraintSystem &cs,
                                       SyntacticElementContext context,
                                       ConstraintLocator *locator)
-      : cs(cs), context(context), locator(locator) {}
+      : cs(cs), context(context), locator(locator) {
+    // Capture list bindings in multi-statement closures get solved as part of
+    // the closure's conjunction, which has the DeclContext set to the closure.
+    // This is wrong for captures though, which are semantically bound outside
+    // of the closure body. So we need to re-adjust their DeclContext here for
+    // constraint generation. The constraint system's DeclContext will be wrong
+    // for solving, but CSGen should ensure that constraints carry the correct
+    // DeclContext.
+    if (context.is<CaptureListExpr *>())
+      DCScope.emplace(cs.DC, context.getAsDeclContext());
+  }
 
   void createConjunction(ArrayRef<ElementInfo> elements,
                          ConstraintLocator *locator, bool isIsolated = false,
@@ -1616,26 +1636,40 @@ bool isConditionOfStmt(ConstraintLocatorBuilder locator) {
   return false;
 }
 
+static std::optional<SyntacticElementContext>
+getSyntacticElementContext(ASTNode element, ConstraintLocatorBuilder locator) {
+  /// Capture list bindings are part of the capture list, which is semantically
+  /// outside the closure it's part of. As such, it needs its own context.
+  if (auto *PBD = getAsDecl<PatternBindingDecl>(element)) {
+    if (auto *VD = PBD->getSingleVar()) {
+      if (auto *CLE = VD->getParentCaptureList())
+        return SyntacticElementContext::forCaptureList(CLE);
+    }
+  }
+
+  auto anchor = locator.getAnchor();
+  if (auto *closure = getAsExpr<ClosureExpr>(anchor))
+    return SyntacticElementContext::forClosure(closure);
+  if (auto *fn = getAsDecl<AbstractFunctionDecl>(anchor))
+    return SyntacticElementContext::forFunction(fn);
+  if (auto *SVE = getAsExpr<SingleValueStmtExpr>(anchor))
+    return SyntacticElementContext::forSingleValueStmtExpr(SVE);
+  if (auto *EP = getAsPattern<ExprPattern>(anchor))
+    return SyntacticElementContext::forExprPattern(EP);
+  if (auto *tap = getAsExpr<TapExpr>(anchor))
+    return SyntacticElementContext::forTapExpr(tap);
+
+  return std::nullopt;
+}
+
 ConstraintSystem::SolutionKind
 ConstraintSystem::simplifySyntacticElementConstraint(
     ASTNode element, ContextualTypeInfo contextInfo, bool isDiscarded,
     TypeMatchOptions flags, ConstraintLocatorBuilder locator) {
-  auto anchor = locator.getAnchor();
 
-  std::optional<SyntacticElementContext> context;
-  if (auto *closure = getAsExpr<ClosureExpr>(anchor)) {
-    context = SyntacticElementContext::forClosure(closure);
-  } else if (auto *fn = getAsDecl<AbstractFunctionDecl>(anchor)) {
-    context = SyntacticElementContext::forFunction(fn);
-  } else if (auto *SVE = getAsExpr<SingleValueStmtExpr>(anchor)) {
-    context = SyntacticElementContext::forSingleValueStmtExpr(SVE);
-  } else if (auto *EP = getAsPattern<ExprPattern>(anchor)) {
-    context = SyntacticElementContext::forExprPattern(EP);
-  } else if (auto *tap = getAsExpr<TapExpr>(anchor)) {
-    context = SyntacticElementContext::forTapExpr(tap);
-  } else {
+  auto context = getSyntacticElementContext(element, locator);
+  if (!context)
     return SolutionKind::Error;
-  }
 
   SyntacticElementConstraintGenerator generator(*this, *context,
                                                 getConstraintLocator(locator));
