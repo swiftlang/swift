@@ -16,6 +16,7 @@
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ArgumentList.h"
 #include "swift/AST/AvailabilityDomain.h"
+#include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/IfConfigClauseRangeInfo.h"
@@ -400,6 +401,10 @@ bool BridgedASTType::hasTypeParameter() const {
   return unbridged()->hasTypeParameter();
 }
 
+bool BridgedASTType::hasOpenedExistential() const {
+  return unbridged()->hasOpenedExistential();
+}
+
 bool BridgedASTType::isOpenedExistentialWithError() const {
   return unbridged()->isOpenedExistentialWithError();
 }
@@ -416,9 +421,29 @@ bool BridgedASTType::isInteger() const {
   return unbridged()->is<swift::IntegerType>();
 }
 
+bool BridgedASTType::isMetatypeType() const {
+  return unbridged()->is<swift::AnyMetatypeType>();
+}
+
+bool BridgedASTType::isExistentialMetatypeType() const {
+  return unbridged()->is<swift::ExistentialMetatypeType>();
+}
+
+OptionalBridgedDeclObj BridgedASTType::getAnyNominal() const {
+  return {unbridged()->getAnyNominal()};
+}
+
+BridgedASTType BridgedASTType::getInstanceTypeOfMetatype() const {
+  return {unbridged()->getAs<swift::AnyMetatypeType>()->getInstanceType().getPointer()};
+}
+
 BridgedASTType BridgedASTType::subst(BridgedSubstitutionMap substMap) const {
   return {unbridged().subst(substMap.unbridged()).getPointer()};
 }
+
+BridgedConformance BridgedASTType::checkConformance(BridgedDeclObj proto) const {
+  return swift::checkConformance(unbridged(), proto.getAs<swift::ProtocolDecl>(), /*allowMissing=*/ false);
+}  
 
 //===----------------------------------------------------------------------===//
 // MARK: BridgedCanType

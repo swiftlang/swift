@@ -33,13 +33,33 @@ public struct Type: CustomStringConvertible, NoReflectionChildren {
   public var description: String { String(taking: bridged.getDebugDescription()) }
 
   public var hasTypeParameter: Bool { bridged.hasTypeParameter() }
+  public var hasOpenedExistential: Bool { bridged.hasOpenedExistential() }
   public var isOpenedExistentialWithError: Bool { bridged.isOpenedExistentialWithError() }
   public var isEscapable: Bool { bridged.isEscapable() }
   public var isNoEscape: Bool { bridged.isNoEscape() }
   public var isInteger: Bool { bridged.isInteger() }
+  public var isMetatypeType: Bool { bridged.isMetatypeType() }
+  public var isExistentialMetatypeType: Bool { bridged.isExistentialMetatypeType() }
 
+  public var anyNominal: NominalTypeDecl? { bridged.getAnyNominal().getAs(NominalTypeDecl.self) }
+  public var instanceTypeOfMetatype: Type { Type(bridged: bridged.getInstanceTypeOfMetatype()) }
+  
   public func subst(with substitutionMap: SubstitutionMap) -> Type {
     return Type(bridged: bridged.subst(substitutionMap.bridged))
+  }
+  
+  /// Performas a global conformance lookup for this type for `protocol`.
+  /// It checks conditional requirements.
+  /// 
+  /// This type must be a contextualized type. It must not contain type parameters.
+  ///
+  /// The resulting conformance reference does not include "missing" conformances, which are synthesized for
+  /// some protocols as an error recovery mechanism.
+  ///
+  /// Returns an invalid conformance if the search failed, otherwise an
+  /// abstract, concrete or pack conformance, depending on the lookup type.
+  public func checkConformance(to protocol: ProtocolDecl) -> Conformance {
+    return Conformance(bridged: bridged.checkConformance(`protocol`.bridged))
   }
 }
 
@@ -61,15 +81,26 @@ public struct CanonicalType: CustomStringConvertible, NoReflectionChildren {
   public var description: String { type.description }
 
   public var hasTypeParameter: Bool { type.hasTypeParameter }
+  public var hasOpenedExistential: Bool { type.hasOpenedExistential }
   public var isOpenedExistentialWithError: Bool { type.isOpenedExistentialWithError }
   public var isEscapable: Bool { type.isEscapable }
   public var isNoEscape: Bool { type.isNoEscape }
   public var isInteger: Bool { type.isInteger }
+  public var isMetatypeType: Bool { type.isMetatypeType }
+  public var isExistentialMetatypeType: Bool { type.isExistentialMetatypeType }
 
+  public var anyNominal: NominalTypeDecl? { type.anyNominal }
+  public var instanceTypeOfMetatype: CanonicalType { type.instanceTypeOfMetatype.canonical }
+  
   public func subst(with substitutionMap: SubstitutionMap) -> CanonicalType {
     return type.subst(with: substitutionMap).canonical
   }
 
+  // See `type.checkConformance` 
+  public func checkConformance(to proto: ProtocolDecl) -> Conformance {
+    return type.checkConformance(to: proto)
+  }
+  
   public var canBeClass: TraitResult { bridged.canBeClass().result }
 }
 
@@ -102,5 +133,17 @@ extension BridgedCanType.TraitResult {
     default:
       fatalError("wrong type TraitResult enum case")
     }
+  }
+}
+
+extension Type: Equatable {
+  public static func ==(lhs: Type, rhs: Type) -> Bool { 
+    lhs.bridged.type == rhs.bridged.type
+  }
+}
+
+extension CanonicalType: Equatable {
+  public static func ==(lhs: CanonicalType, rhs: CanonicalType) -> Bool { 
+    lhs.type == rhs.type
   }
 }
