@@ -793,7 +793,7 @@ static bool ParseEnabledFeatureArgs(LangOptions &Opts, ArgList &Args,
     if (!seenFeatures.insert(*feature).second)
       continue;
 
-    // If the the current language mode enables the feature by default then
+    // If the current language mode enables the feature by default then
     // diagnose and skip it.
     if (auto firstVersion = getFeatureLanguageVersion(*feature)) {
       if (Opts.isSwiftVersionAtLeast(*firstVersion)) {
