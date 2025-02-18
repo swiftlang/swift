@@ -3071,6 +3071,8 @@ struct BridgedConformanceArray {
 struct BridgedSubstitutionMap {
   uint64_t storage[1];
 
+  static SWIFT_IMPORT_UNSAFE BridgedSubstitutionMap get(BridgedGenericSignature genSig,
+                                                        BridgedArrayRef replacementTypes);
   BRIDGED_INLINE BridgedSubstitutionMap(swift::SubstitutionMap map);
   BRIDGED_INLINE swift::SubstitutionMap unbridged() const;
   BRIDGED_INLINE BridgedSubstitutionMap();

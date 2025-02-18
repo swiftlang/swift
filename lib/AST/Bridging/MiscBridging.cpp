@@ -115,6 +115,12 @@ BridgedOwnedString BridgedConformance::getDebugDescription() const {
 static_assert(sizeof(BridgedSubstitutionMap) >= sizeof(swift::SubstitutionMap),
               "BridgedSubstitutionMap has wrong size");
 
+BridgedSubstitutionMap BridgedSubstitutionMap::get(BridgedGenericSignature genSig, BridgedArrayRef replacementTypes) {
+  return SubstitutionMap::get(genSig.unbridged(),
+                              replacementTypes.unbridged<Type>(),
+                              swift::LookUpConformanceInModule());
+}
+
 BridgedOwnedString BridgedSubstitutionMap::getDebugDescription() const {
   std::string str;
   llvm::raw_string_ostream os(str);
