@@ -45,11 +45,13 @@ struct LineColumnRange {
 };
 
 class CapturedFixItInfo final {
+  SourceManager *diagSM;
   DiagnosticInfo::FixIt FixIt;
   mutable LineColumnRange LineColRange;
 
 public:
-  CapturedFixItInfo(DiagnosticInfo::FixIt FixIt) : FixIt(FixIt) {}
+  CapturedFixItInfo(SourceManager &diagSM, DiagnosticInfo::FixIt FixIt)
+    : diagSM(&diagSM), FixIt(FixIt) {}
 
   CharSourceRange &getSourceRange() { return FixIt.getRange(); }
   const CharSourceRange &getSourceRange() const { return FixIt.getRange(); }
@@ -58,13 +60,12 @@ public:
 
   /// Obtain the line-column range corresponding to the fix-it's
   /// replacement range.
-  const LineColumnRange &getLineColumnRange(const SourceManager &SM,
-                                            unsigned BufferID) const;
+  const LineColumnRange &getLineColumnRange(SourceManager &SM) const;
 };
 
 struct CapturedDiagnosticInfo {
   llvm::SmallString<128> Message;
-  llvm::SmallString<32> FileName;
+  std::optional<unsigned> SourceBufferID;
   DiagnosticKind Classification;
   SourceLoc Loc;
   unsigned Line;
@@ -73,14 +74,14 @@ struct CapturedDiagnosticInfo {
   SmallVector<std::string, 1> EducationalNotes;
 
   CapturedDiagnosticInfo(llvm::SmallString<128> Message,
-                         llvm::SmallString<32> FileName,
+                         std::optional<unsigned> SourceBufferID,
                          DiagnosticKind Classification, SourceLoc Loc,
                          unsigned Line, unsigned Column,
                          SmallVector<CapturedFixItInfo, 2> FixIts,
                          SmallVector<std::string, 1> EducationalNotes)
-      : Message(Message), FileName(FileName), Classification(Classification),
-        Loc(Loc), Line(Line), Column(Column), FixIts(FixIts),
-        EducationalNotes(EducationalNotes) {
+      : Message(Message), SourceBufferID(SourceBufferID),
+        Classification(Classification), Loc(Loc), Line(Line), Column(Column),
+        FixIts(FixIts), EducationalNotes(EducationalNotes) {
     std::sort(EducationalNotes.begin(), EducationalNotes.end());
   }
 };
@@ -91,7 +92,7 @@ class DiagnosticVerifier : public DiagnosticConsumer {
   SourceManager &SM;
   std::vector<CapturedDiagnosticInfo> CapturedDiagnostics;
   ArrayRef<unsigned> BufferIDs;
-  SmallVector<unsigned, 4> AdditionalBufferIDs;
+  ArrayRef<std::string> AdditionalFilePaths;
   bool AutoApplyFixes;
   bool IgnoreUnknown;
   bool UseColor;
@@ -99,16 +100,14 @@ class DiagnosticVerifier : public DiagnosticConsumer {
 
 public:
   explicit DiagnosticVerifier(SourceManager &SM, ArrayRef<unsigned> BufferIDs,
+                              ArrayRef<std::string> AdditionalFilePaths,
                               bool AutoApplyFixes, bool IgnoreUnknown,
                               bool UseColor,
                               ArrayRef<std::string> AdditionalExpectedPrefixes)
-      : SM(SM), BufferIDs(BufferIDs), AutoApplyFixes(AutoApplyFixes),
-        IgnoreUnknown(IgnoreUnknown), UseColor(UseColor),
+      : SM(SM), BufferIDs(BufferIDs), AdditionalFilePaths(AdditionalFilePaths),
+        AutoApplyFixes(AutoApplyFixes), IgnoreUnknown(IgnoreUnknown),
+        UseColor(UseColor),
         AdditionalExpectedPrefixes(AdditionalExpectedPrefixes) {}
-
-  void appendAdditionalBufferID(unsigned bufferID) {
-    AdditionalBufferIDs.push_back(bufferID);
-  }
 
   virtual void handleDiagnostic(SourceManager &SM,
                                 const DiagnosticInfo &Info) override;
