@@ -81,7 +81,7 @@ public struct Type : CustomStringConvertible, NoReflectionChildren {
     !isNoEscapeFunction && isEscapable(in: function)
   }
 
-  /// Can only be used if the type is in fact a nominal type (`isNominal` is true).
+  /// Can only be used if the type is in fact a nominal type.
   public var nominal: NominalTypeDecl? {
     bridged.getNominalOrBoundGenericNominal().getAs(NominalTypeDecl.self)
   }
@@ -128,7 +128,7 @@ public struct Type : CustomStringConvertible, NoReflectionChildren {
     function.bridged.getLoweredType(self.bridged).type
   }
 
-  /// Can only be used if the type is in fact a nominal type (`isNominal` is true).
+  /// Can only be used if the type is in fact a nominal type.
   /// Returns nil if the nominal is a resilient type because in this case the complete list
   /// of fields is not known.
   public func getNominalFields(in function: Function) -> NominalFieldsArray? {
