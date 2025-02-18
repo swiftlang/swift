@@ -19,12 +19,13 @@
 
 #include "ImportEnumInfo.h"
 #include "SwiftLookupTable.h"
-#include "swift/Basic/StringExtras.h"
-#include "swift/Basic/Version.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/ForeignAsyncConvention.h"
 #include "swift/AST/ForeignErrorConvention.h"
+#include "swift/Basic/StringExtras.h"
+#include "swift/Basic/Version.h"
+#include "swift/ClangImporter/ClangImporter.h"
 #include "clang/Sema/Sema.h"
 
 namespace swift {
@@ -424,13 +425,16 @@ class NameImporter {
 
   bool importSymbolicCXXDecls;
 
+  ClangImporter::Implementation *importerImpl;
+
 public:
   NameImporter(ASTContext &ctx, const PlatformAvailability &avail,
-               clang::Sema &cSema)
+               clang::Sema &cSema, ClangImporter::Implementation *importerImpl)
       : swiftCtx(ctx), availability(avail), clangSema(cSema),
         enumInfos(clangSema.getPreprocessor()),
         importSymbolicCXXDecls(
-            ctx.LangOpts.hasFeature(Feature::ImportSymbolicCXXDecls)) {}
+            ctx.LangOpts.hasFeature(Feature::ImportSymbolicCXXDecls)),
+        importerImpl(importerImpl) {}
 
   /// Determine the Swift name for a Clang decl
   ImportedName importName(const clang::NamedDecl *decl,
@@ -466,6 +470,7 @@ public:
 
   ASTContext &getContext() { return swiftCtx; }
   const LangOptions &getLangOpts() const { return swiftCtx.LangOpts; }
+  ClangImporter::Implementation *getImporterImpl() { return importerImpl; }
 
   Identifier getIdentifier(StringRef name) {
     return swiftCtx.getIdentifier(name);
