@@ -751,9 +751,7 @@ public func hasImplicitlyDifferentiatedTopLevelDefaultArgument(
   _ f: @differentiable(reverse) (Float) -> Float = implicitlyDifferentiableFromFragile
 ) {}
 
-// TODO(TF-1030): This will eventually not be an error.
-// expected-error @+2 {{function is not differentiable}}
-// expected-note @+1 {{differentiated functions in default arguments must be marked '@differentiable' or have a public '@derivative'; this is not possible with a closure, make a top-level function instead}}
+// No error expected
 public func hasImplicitlyDifferentiatedClosureDefaultArgument(_ f: @differentiable(reverse) (Float) -> Float = { $0 }) {}
 
 @inlinable
