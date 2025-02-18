@@ -243,7 +243,7 @@ public func span_element_sum(_ v: Span<Int>, _ i: Int) -> Int {
 // CHECK-SIL-LABEL: sil @$s23span_bounds_check_tests0A7_searchySiSgs4SpanVyxG_xtSQRzlF : 
 // CHECK-SIL: bb3:
 // CHECK-SIL: cond_fail {{.*}}, "Index out of bounds"
-// CHECK-SIL: cond_fail {{.*}}, "Index out of bounds"
+// CHECK-SIL-NOT: cond_fail {{.*}}, "Index out of bounds"
 // CHECK-SIL: cond_br
 // CHECK-SIL-LABEL: } // end sil function '$s23span_bounds_check_tests0A7_searchySiSgs4SpanVyxG_xtSQRzlF'
 public func span_search<T : Equatable>(_ v: Span<T>, _ elem: T) -> Int? {
@@ -260,7 +260,7 @@ public func span_search<T : Equatable>(_ v: Span<T>, _ elem: T) -> Int? {
 // CHECK-SIL-LABEL: sil @$s23span_bounds_check_tests0A11_search_splySiSgs4SpanVySiG_SitF : 
 // CHECK-SIL: bb3:
 // CHECK-SIL: cond_fail {{.*}}, "Index out of bounds"
-// CHECK-SIL: cond_fail {{.*}}, "Index out of bounds"
+// CHECK-SIL-NOT: cond_fail {{.*}}, "Index out of bounds"
 // CHECK-SIL: cond_br
 // CHECK-SIL-LABEL: } // end sil function '$s23span_bounds_check_tests0A11_search_splySiSgs4SpanVySiG_SitF'
 public func span_search_spl(_ v: Span<Int>, _ elem: Int) -> Int? {
