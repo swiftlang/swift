@@ -574,7 +574,18 @@ extension ASTGenVisitor {
 
   func generate(variableDecl node: VariableDeclSyntax) -> BridgedDecl {
     let attrs = self.generateDeclAttributes(node, allowStatic: true)
-    let isLet = node.bindingSpecifier.keywordKind == .let
+    let introducer: BridgedVarDeclIntroducer
+    switch node.bindingSpecifier.rawText {
+    case "let":
+      introducer = .let
+    case "var":
+      introducer = .var
+    case "inout":
+      introducer = .inOut
+    default:
+      // TODO: Diagnostics
+      fatalError("invalid pattern binding introducer")
+    }
     let topLevelDecl: BridgedTopLevelCodeDecl?
     if self.declContext.isModuleScopeContext, self.declContext.parentSourceFile.isScriptMode {
       topLevelDecl = BridgedTopLevelCodeDecl.create(self.ctx, declContext: self.declContext)
@@ -585,11 +596,12 @@ extension ASTGenVisitor {
     let decl = BridgedPatternBindingDecl.createParsed(
       self.ctx,
       declContext: topLevelDecl?.asDeclContext ?? self.declContext,
-      bindingKeywordLoc: self.generateSourceLoc(node.bindingSpecifier),
-      entries: self.generateBindingEntries(for: node, attrs: attrs, topLevelDecl: topLevelDecl),
       attributes: attrs.attributes,
-      isStatic: attrs.staticLoc.isValid,
-      isLet: isLet
+      staticLoc: attrs.staticLoc,
+      staticSpelling: attrs.staticSpelling,
+      introducerLoc: self.generateSourceLoc(node.bindingSpecifier),
+      introducer: introducer,
+      entries: self.generateBindingEntries(for: node, attrs: attrs, topLevelDecl: topLevelDecl)
     )
     if let topLevelDecl {
       let range = self.generateImplicitBraceRange(node)
