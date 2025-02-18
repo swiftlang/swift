@@ -167,10 +167,6 @@ class CMake(object):
         define("CMAKE_AR:PATH", toolchain.ar)
         define("CMAKE_RANLIB:PATH", toolchain.ranlib)
 
-        if args.cmake_generator == 'Xcode':
-            define("CMAKE_CONFIGURATION_TYPES",
-                   "Debug;Release;MinSizeRel;RelWithDebInfo")
-
         if args.clang_user_visible_version:
             major, minor, patch = \
                 args.clang_user_visible_version.components[0:3]
@@ -209,10 +205,6 @@ class CMake(object):
             build_args += ['-j%s' % jobs]
             if args.verbose_build:
                 build_args += ['VERBOSE=1']
-
-        elif args.cmake_generator == 'Xcode':
-            build_args += ['-parallelizeTargets',
-                           '-jobs', str(jobs)]
 
         return build_args
 

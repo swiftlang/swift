@@ -3061,14 +3061,14 @@ namespace {
 #endif
 
       switch (expr->getKind()) {
-#define MAGIC_STRING_IDENTIFIER(NAME, STRING, SYNTAX_KIND) \
-      case MagicIdentifierLiteralExpr::NAME: \
+#define MAGIC_STRING_IDENTIFIER(NAME, STRING)                                  \
+      case MagicIdentifierLiteralExpr::NAME:                                   \
         return handleStringLiteralExpr(expr);
-#define MAGIC_INT_IDENTIFIER(NAME, STRING, SYNTAX_KIND) \
-      case MagicIdentifierLiteralExpr::NAME: \
+#define MAGIC_INT_IDENTIFIER(NAME, STRING)                                     \
+      case MagicIdentifierLiteralExpr::NAME:                                   \
         return handleIntegerLiteralExpr(expr);
-#define MAGIC_POINTER_IDENTIFIER(NAME, STRING, SYNTAX_KIND) \
-      case MagicIdentifierLiteralExpr::NAME: \
+#define MAGIC_POINTER_IDENTIFIER(NAME, STRING)                                 \
+      case MagicIdentifierLiteralExpr::NAME:                                   \
         return expr;
 #include "swift/AST/MagicIdentifierKinds.def"
       }
@@ -3804,7 +3804,7 @@ namespace {
       Type arrayTy = cs.getType(expr);
       Type elementType;
 
-      if (arrayTy->isSlab()) {
+      if (arrayTy->isInlineArray()) {
         // <let count: Int, Element>
         elementType = arrayTy->castTo<BoundGenericStructType>()->getGenericArgs()[1];
       } else {
@@ -7414,6 +7414,19 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
                                             /*isImplicit*/ true));
   }
 
+  case TypeKind::InOut: {
+    auto *inOutExpr = getAsExpr<InOutExpr>(expr);
+    if (!inOutExpr)
+      break;
+
+    // If there is an `any Sendable` -> `Any` mismatch here,
+    // the conversion should be performed on l-value and the
+    // address taken from that. This is something that is already
+    // done as part of implicit `inout` injection for operators
+    // and could be reused here.
+    return coerceToType(inOutExpr->getSubExpr(), toType, locator);
+  }
+
   case TypeKind::Pack:
   case TypeKind::PackElement: {
     llvm_unreachable("Unimplemented!");
@@ -7777,7 +7790,6 @@ Expr *ExprRewriter::coerceToType(Expr *expr, Type toType,
 #define TYPE(Name, Parent)
 #include "swift/AST/TypeNodes.def"
   case TypeKind::Error:
-  case TypeKind::InOut:
   case TypeKind::Module:
   case TypeKind::Enum:
   case TypeKind::Struct:

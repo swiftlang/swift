@@ -151,13 +151,12 @@ protected:
       Value : 32
     );
 
-    SWIFT_INLINE_BITFIELD(AvailableAttr, DeclAttribute, 4+1+1+1+1+1,
+    SWIFT_INLINE_BITFIELD(AvailableAttr, DeclAttribute, 4+1+1+1+1,
       /// An `AvailableAttr::Kind` value.
       Kind : 4,
 
       /// State storage for `SemanticAvailableAttrRequest`.
       HasComputedSemanticAttr : 1,
-      HasDomain : 1,
 
       /// State storage for `RenamedDeclRequest`.
       HasComputedRenamedDecl : 1,
@@ -704,23 +703,6 @@ public:
   }
 };
 
-/// Determine the result of comparing an availability attribute to a specific
-/// platform or language version.
-enum class AvailableVersionComparison {
-  /// The entity is guaranteed to be available.
-  Available,
-
-  /// The entity is never available.
-  Unavailable,
-
-  /// The entity might be unavailable at runtime, because it was introduced
-  /// after the requested minimum platform version.
-  PotentiallyUnavailable,
-
-  /// The entity has been obsoleted.
-  Obsoleted,
-};
-
 /// Defines the @available attribute.
 class AvailableAttr : public DeclAttribute {
 public:
@@ -737,16 +719,8 @@ public:
     NoAsync,
   };
 
-  AvailableAttr(SourceLoc AtLoc, SourceRange Range, AvailabilityDomain Domain,
-                SourceLoc DomainLoc, Kind Kind, StringRef Message,
-                StringRef Rename, const llvm::VersionTuple &Introduced,
-                SourceRange IntroducedRange,
-                const llvm::VersionTuple &Deprecated,
-                SourceRange DeprecatedRange,
-                const llvm::VersionTuple &Obsoleted, SourceRange ObsoletedRange,
-                bool Implicit, bool IsSPI);
-
-  AvailableAttr(SourceLoc AtLoc, SourceRange Range, StringRef DomainString,
+  AvailableAttr(SourceLoc AtLoc, SourceRange Range,
+                AvailabilityDomainOrIdentifier DomainOrIdentifier,
                 SourceLoc DomainLoc, Kind Kind, StringRef Message,
                 StringRef Rename, const llvm::VersionTuple &Introduced,
                 SourceRange IntroducedRange,
@@ -758,10 +732,7 @@ public:
 private:
   friend class SemanticAvailableAttr;
 
-  union {
-    AvailabilityDomain Domain;
-    StringRef DomainString;
-  };
+  AvailabilityDomainOrIdentifier DomainOrIdentifier;
   const SourceLoc DomainLoc;
 
   const StringRef Message;
@@ -777,24 +748,20 @@ private:
 public:
   /// Returns true if the `AvailabilityDomain` associated with the attribute
   /// has been resolved successfully.
-  bool hasCachedDomain() const { return Bits.AvailableAttr.HasDomain; }
+  bool hasCachedDomain() const { return DomainOrIdentifier.isDomain(); }
 
   /// Returns the `AvailabilityDomain` associated with the attribute, or
   /// `std::nullopt` if it has either not yet been resolved or could not be
   /// resolved successfully.
   std::optional<AvailabilityDomain> getCachedDomain() const {
-    if (hasCachedDomain())
-      return Domain;
-    return std::nullopt;
+    return DomainOrIdentifier.getAsDomain();
   }
 
   /// If the attribute does not already have a cached `AvailabilityDomain`, this
-  /// returns the domain string that was written in source, from which an
+  /// returns the domain identifier that was written in source, from which an
   /// `AvailabilityDomain` can be resolved.
-  std::optional<StringRef> getDomainString() const {
-    if (hasCachedDomain())
-      return std::nullopt;
-    return DomainString;
+  std::optional<Identifier> getDomainIdentifier() const {
+    return DomainOrIdentifier.getAsIdentifier();
   }
 
   SourceLoc getDomainLoc() const { return DomainLoc; }
@@ -919,9 +886,8 @@ private:
   void setRawObsoleted(llvm::VersionTuple version) { Obsoleted = version; }
 
   void setCachedDomain(AvailabilityDomain domain) {
-    assert(!Bits.AvailableAttr.HasDomain);
-    Domain = domain;
-    Bits.AvailableAttr.HasDomain = true;
+    assert(!DomainOrIdentifier.isDomain());
+    DomainOrIdentifier.setDomain(domain);
   }
 
   bool hasComputedSemanticAttr() const {
@@ -2962,7 +2928,7 @@ public:
 
   ArrayRef<Identifier> getSuppressedFeatures() const {
     return {getTrailingObjects<Identifier>(),
-            Bits.AllowFeatureSuppressionAttr.NumFeatures};
+            static_cast<size_t>(Bits.AllowFeatureSuppressionAttr.NumFeatures)};
   }
 
   static bool classof(const DeclAttribute *DA) {
@@ -3394,12 +3360,6 @@ public:
   /// version for swift version-specific availability kind, PackageDescription
   /// version for PackageDescription version-specific availability.
   llvm::VersionTuple getActiveVersion(const ASTContext &ctx) const;
-
-  /// Compare this attribute's version information against the platform or
-  /// language version (assuming the this attribute pertains to the active
-  /// platform).
-  AvailableVersionComparison
-  getVersionAvailability(const ASTContext &ctx) const;
 
   /// Returns true if this attribute is considered active in the current
   /// compilation context.

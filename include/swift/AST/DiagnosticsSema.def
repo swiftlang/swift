@@ -5607,6 +5607,10 @@ ERROR(non_sendable_isolated_capture,none,
       "capture of %1 with non-sendable type %0 in an isolated "
       "%select{local function|closure}2",
       (Type, DeclName, bool))
+ERROR(non_sendable_metatype_capture,none,
+      "capture of non-sendable type %0 in an isolated "
+      "%select{local function|closure}1",
+      (Type, bool))
 ERROR(self_capture_deinit_task,none,
       "capture of 'self' in a closure that outlives deinit",
       ())
@@ -5839,11 +5843,12 @@ ERROR(any_not_existential,none,
 ERROR(incorrect_optional_any,none,
       "optional 'any' type must be written %0",
       (Type))
-ERROR(existential_requires_any,none,
-      "use of %select{protocol |}2%0 as a type must be written %1",
-      (Type, Type, bool))
-ERROR(inverse_requires_any,none,
-      "constraint that suppresses conformance requires 'any'", ())
+
+GROUPED_ERROR(existential_requires_any,ExistentialAny,none,
+              "use of %select{protocol |}2%0 as a type must be written %1",
+              (Type, Type, bool))
+GROUPED_ERROR(inverse_requires_any,ExistentialAny,none,
+              "constraint that suppresses conformance requires 'any'", ())
 
 ERROR(nonisolated_mutable_storage,none,
       "'nonisolated' cannot be applied to mutable stored properties",
@@ -7976,10 +7981,6 @@ ERROR(noncopyable_cannot_have_read_set_accessor,none,
       "noncopyable %select{variable|subscript}0 cannot provide a read and set accessor",
       (unsigned))
 
-ERROR(span_requires_feature_flag,none,
-      "'%0' requires -enable-experimental-feature Span",
-      (StringRef))
-
 //------------------------------------------------------------------------------
 // MARK: Init accessors
 //------------------------------------------------------------------------------
@@ -8034,7 +8035,7 @@ ERROR(pack_iteration_where_clause_not_supported, none,
 //------------------------------------------------------------------------------
 
 ERROR(lifetime_dependence_invalid_param_name, none,
-      "invalid parameter name specified '%0'", (StringRef))
+      "invalid parameter name specified %0", (Identifier))
 ERROR(lifetime_dependence_invalid_param_index, none,
       "invalid parameter index specified '%0'", (unsigned))
 ERROR(lifetime_dependence_invalid_self_in_static, none,
@@ -8148,15 +8149,22 @@ NOTE(note_reference_exclusivity_unchecked,none,
 NOTE(note_use_of_unsafe_conformance_is_unsafe,none,
      "@unsafe conformance of %0 to %kind1 involves unsafe code",
      (Type, const ValueDecl *))
+NOTE(note_unsafe_storage,none,
+     "%kindbase1 involves unsafe type %2", (bool, const ValueDecl *, Type))
 
-GROUPED_WARNING(decl_signature_involves_unsafe,Unsafe,none,
-      "%kindbase0 has an interface that involves unsafe types",
+GROUPED_WARNING(decl_unsafe_storage,Unsafe,none,
+      "%kindbase0 has storage involving unsafe types",
       (const Decl *))
-NOTE(decl_signature_mark_unsafe,none,
-      "add '@unsafe' to indicate that this declaration is unsafe to use",
+NOTE(decl_storage_mark_unsafe,none,
+      "add '@unsafe' if this type is also unsafe to use",
       ())
-NOTE(decl_signature_mark_safe,none,
-      "add '@safe' to indicate that this declaration is memory-safe to use", ())
+NOTE(decl_storage_mark_safe,none,
+      "add '@safe' if this type encapsulates the unsafe storage in "
+      "a safe interface", ())
+
+GROUPED_WARNING(unsafe_superclass,Unsafe,none,
+     "%kindbase0 has superclass involving unsafe type %1", 
+     (const ValueDecl *, Type))
 
 GROUPED_WARNING(conformance_involves_unsafe,Unsafe,none,
      "conformance of %0 to %kind1 involves unsafe code; use '@unsafe' to "
@@ -8212,11 +8220,11 @@ ERROR(invalid_value_for_type_same_type,none,
       "cannot constrain type parameter %0 to be integer %1", (Type, Type))
 
 //===----------------------------------------------------------------------===//
-// MARK: Slab
+// MARK: InlineArray
 //===----------------------------------------------------------------------===//
 
-ERROR(slab_literal_incorrect_count,none,
-      "expected %0 elements in slab literal, but got %1", (Type, Type))
+ERROR(inlinearray_literal_incorrect_count,none,
+      "expected %0 elements in inline array literal, but got %1", (Type, Type))
 
 //===----------------------------------------------------------------------===//
 // MARK: @abi Attribute

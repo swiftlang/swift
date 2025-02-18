@@ -66,7 +66,7 @@ extension ASTGenVisitor {
     }
   }
 
-  func generate(codeBlockItem node: CodeBlockItemSyntax) -> ASTNode? {
+  func generate(codeBlockItem node: CodeBlockItemSyntax) -> BridgedASTNode? {
     // TODO: Set semicolon loc.
     switch node.item {
     case .decl(let node):
@@ -89,7 +89,17 @@ extension ASTGenVisitor {
       guard let item = self.generate(codeBlockItem: codeBlockItem) else {
         return
       }
-      allItems.append(item.bridged)
+      allItems.append(item)
+
+      // Hoist 'VarDecl' to the block.
+      if item.kind == .decl {
+        withBridgedSwiftClosure { ptr in
+          let d = ptr!.load(as: BridgedDecl.self)
+          allItems.append(.decl(d))
+        } call: { handle in
+          item.castToDecl().forEachDeclToHoist(handle)
+        }
+      }
     }
 
     return allItems.lazy.bridgedArray(in: self)
@@ -494,7 +504,7 @@ extension ASTGenVisitor {
       }
     } body: { caseNode in
       allBridgedCases.append(
-        ASTNode.stmt(self.generate(switchCase: caseNode).asStmt).bridged
+        .stmt(self.generate(switchCase: caseNode).asStmt)
       )
     }
 

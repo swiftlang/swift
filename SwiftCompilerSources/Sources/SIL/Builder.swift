@@ -130,11 +130,6 @@ public struct Builder {
     return notifyNew(dr.getAs(AllocStackInst.self))
   }
 
-  public func createAllocVector(capacity: Value, elementType: Type) -> AllocVectorInst {
-    let dr = bridged.createAllocVector(capacity.bridged, elementType.bridged)
-    return notifyNew(dr.getAs(AllocVectorInst.self))
-  }
-
   @discardableResult
   public func createDeallocStack(_ operand: Value) -> DeallocStackInst {
     let dr = bridged.createDeallocStack(operand.bridged)

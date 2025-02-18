@@ -310,3 +310,42 @@ func callAsyncIndirectResult<A>(p: any AsyncGenProto<A>, x: Int) async throws(Sm
   return try await p.fn(arg: x)
 }
 
+@inline(never)
+func smallResultLargerError() throws(SmallError) -> Int8? {
+  return 10
+}
+
+// CHECK:  [[COERCED:%.*]] = alloca { i16 }, align 2
+// CHECK:  [[RES:%.*]] = call swiftcc i64 @"$s12typed_throws22smallResultLargerErrors4Int8VSgyAA05SmallF0VYKF"(ptr swiftself undef, ptr noalias nocapture swifterror dereferenceable(8) %swifterror)
+// CHECK:  [[TRUNC:%.*]] = trunc i64 [[RES]] to i16
+// CHECK:  [[COERCED_PTR:%.*]] = getelementptr inbounds { i16 }, ptr [[COERCED]], i32 0, i32 0
+// CHECK:  store i16 [[TRUNC]], ptr [[COERCED_PTR]], align 2
+func callSmallResultLargerError() {
+  let res = try! smallResultLargerError()
+  precondition(res! == 10)
+}
+
+enum UInt8OptSingletonError: Error {
+  case a(Int8?)
+}
+
+@inline(never)
+func smallErrorLargerResult() throws(UInt8OptSingletonError) -> Int {
+  throw .a(10)
+}
+
+// CHECK:  [[COERCED:%.*]] = alloca { i16 }, align 2
+// CHECK:  [[RES:%.*]] = call swiftcc i64 @"$s12typed_throws22smallErrorLargerResultSiyAA017UInt8OptSingletonD0OYKF"(ptr swiftself undef, ptr noalias nocapture swifterror dereferenceable(8) %swifterror)
+// CHECK:  [[TRUNC:%.*]] = trunc i64 [[RES]] to i16
+// CHECK:  [[COERCED_PTR:%.*]] = getelementptr inbounds { i16 }, ptr [[COERCED]], i32 0, i32 0
+// CHECK:  store i16 [[TRUNC]], ptr [[COERCED_PTR]], align 2
+func callSmallErrorLargerResult() {
+  do {
+    _ = try smallErrorLargerResult()
+  } catch {
+    switch error {
+      case .a(let x):
+        precondition(x! == 10)
+    }
+  }
+}

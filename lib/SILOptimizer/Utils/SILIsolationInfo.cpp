@@ -805,6 +805,12 @@ SILIsolationInfo SILIsolationInfo::get(SILInstruction *inst) {
     }
   }
 
+  /// Consider non-Sendable metatypes to be task-isolated, so they cannot cross
+  /// into another isolation domain.
+  if (auto *mi = dyn_cast<MetatypeInst>(inst)) {
+    return SILIsolationInfo::getTaskIsolated(mi);
+  }
+
   // Check if we have an ApplyInst with nonisolated.
   //
   // NOTE: We purposely avoid using other isolation info from an ApplyExpr since

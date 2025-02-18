@@ -83,8 +83,6 @@ public:
 
   StackAddress allocateStack(IRGenFunction &IGF, SILType T,
                              const llvm::Twine &name) const override;
-  StackAddress allocateVector(IRGenFunction &IGF, SILType T,
-                              llvm::Value *capacity, const Twine &name) const override;
   void deallocateStack(IRGenFunction &IGF, StackAddress addr, SILType T) const override;
   void destroyStack(IRGenFunction &IGF, StackAddress addr, SILType T,
                     bool isOutlined) const override;

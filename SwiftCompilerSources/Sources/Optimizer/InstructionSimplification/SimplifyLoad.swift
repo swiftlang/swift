@@ -12,7 +12,7 @@
 
 import SIL
 
-extension LoadInst : OnoneSimplifyable, SILCombineSimplifyable {
+extension LoadInst : OnoneSimplifiable, SILCombineSimplifiable {
   func simplify(_ context: SimplifyContext) {
     if optimizeLoadOfAddrUpcast(context) {
       return
@@ -272,7 +272,10 @@ private func getInitializerFromInitFunction(of globalAddr: GlobalAddrInst, _ con
   }
   let initFn = initFnRef.referencedFunction
   context.notifyDependency(onBodyOf: initFn)
-  guard let (_, storeToGlobal) = getGlobalInitialization(of: initFn, forStaticInitializer: false, context) else {
+  guard let (_, storeToGlobal) = getGlobalInitialization(of: initFn, context, handleUnknownInstruction: {
+    // Accept `global_value` because the class header can be initialized at runtime by the `global_value` instruction.
+    return $0 is GlobalValueInst
+  }) else {
     return nil
   }
   return storeToGlobal.source
@@ -305,10 +308,6 @@ private func transitivelyErase(load: LoadInst, _ context: SimplifyContext) {
 
 private extension Value {
   func canBeCopied(into function: Function, _ context: SimplifyContext) -> Bool {
-    if !function.isAnySerialized {
-      return true
-    }
-
     // Can't use `ValueSet` because the this value is inside a global initializer and
     // not inside a function.
     var worklist = Stack<Value>(context)
@@ -320,8 +319,13 @@ private extension Value {
     handled.insert(ObjectIdentifier(self))
 
     while let value = worklist.pop() {
+      if value is VectorInst {
+        return false
+      }
       if let fri = value as? FunctionRefInst {
-        if !fri.referencedFunction.hasValidLinkageForFragileRef(function.serializedKind) {
+        if function.isAnySerialized, 
+           !fri.referencedFunction.hasValidLinkageForFragileRef(function.serializedKind)
+        {
           return false
         }
       }

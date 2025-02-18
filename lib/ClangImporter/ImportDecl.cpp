@@ -2040,8 +2040,7 @@ namespace {
       if (Impl.SwiftContext.LangOpts.hasFeature(Feature::LifetimeDependence)) {
         fd->getAttrs().add(new (Impl.SwiftContext)
                                UnsafeNonEscapableResultAttr(/*Implicit=*/true));
-        if (Impl.SwiftContext.LangOpts.hasFeature(Feature::SafeInterop) &&
-            Impl.SwiftContext.LangOpts.hasFeature(
+        if (Impl.SwiftContext.LangOpts.hasFeature(
                 Feature::AllowUnsafeAttribute))
           fd->getAttrs().add(new (Impl.SwiftContext)
                                  UnsafeAttr(/*Implicit=*/true));
@@ -2203,8 +2202,7 @@ namespace {
 
       // We have to do this after populating ImportedDecls to avoid importing
       // the same multiple times.
-      if (Impl.SwiftContext.LangOpts.hasFeature(Feature::SafeInterop) &&
-          Impl.SwiftContext.LangOpts.hasFeature(
+      if (Impl.SwiftContext.LangOpts.hasFeature(
               Feature::AllowUnsafeAttribute)) {
         if (const auto *ctsd =
                 dyn_cast<clang::ClassTemplateSpecializationDecl>(decl)) {
@@ -2246,7 +2244,7 @@ namespace {
       bool isNonEscapable = false;
       if (evaluateOrDefault(
               Impl.SwiftContext.evaluator,
-              ClangTypeEscapability({decl->getTypeForDecl(), Impl}),
+              ClangTypeEscapability({decl->getTypeForDecl(), &Impl}),
               CxxEscapability::Unknown) == CxxEscapability::NonEscapable) {
         result->getAttrs().add(new (Impl.SwiftContext)
                                    NonEscapableAttr(/*Implicit=*/true));
@@ -2604,6 +2602,44 @@ namespace {
       return result;
     }
 
+    void validatePrivateFileIDAttributes(const clang::CXXRecordDecl *decl) {
+      auto anns = importer::getPrivateFileIDAttrs(decl);
+
+      if (anns.size() > 1) {
+        Impl.diagnose(HeaderLoc(decl->getLocation()),
+                      diag::private_fileid_attr_repeated, decl->getName());
+        for (auto ann : anns)
+          Impl.diagnose(HeaderLoc(ann.second), diag::private_fileid_attr_here);
+      } else if (anns.size() == 1) {
+        auto ann = anns[0];
+        if (!SourceFile::FileIDStr::parse(ann.first)) {
+          Impl.diagnose(HeaderLoc(ann.second),
+                        diag::private_fileid_attr_format_invalid,
+                        decl->getName());
+          Impl.diagnose({}, diag::private_fileid_attr_format_specification);
+
+          if (ann.first.count('/') > 1) {
+            // Try to construct a suggestion from predictable mistakes.
+            SmallString<32> suggestion;
+
+            // Mistake #1: confusing fileID for filePath => writing too many
+            // '/'s
+            suggestion.append(ann.first.split('/').first);
+            suggestion.push_back('/');
+            suggestion.append(ann.first.rsplit('/').second);
+
+            // Mistake #2: forgetting to use filename with .swift extension
+            if (!suggestion.ends_with(".swift"))
+              suggestion.append(".swift");
+
+            if (SourceFile::FileIDStr::parse(suggestion))
+              Impl.diagnose({}, diag::private_fileid_attr_format_suggestion,
+                            suggestion);
+          }
+        }
+      }
+    }
+
     void validateForeignReferenceType(const clang::CXXRecordDecl *decl,
                                       ClassDecl *classDecl) {
 
@@ -2806,6 +2842,16 @@ namespace {
             Diagnostic(diag::incomplete_record, Impl.SwiftContext.AllocateCopy(
                                                     decl->getNameAsString())),
             decl->getLocation());
+
+        auto attrs = importer::getPrivateFileIDAttrs(decl);
+        if (!attrs.empty()) {
+          Impl.diagnose(HeaderLoc(decl->getLocation()),
+                        diag::private_fileid_attr_on_incomplete_type,
+                        decl->getName());
+          for (auto attr : attrs)
+            Impl.diagnose(HeaderLoc(attr.second),
+                          diag::private_fileid_attr_here);
+        }
       }
 
       decl = decl->getDefinition();
@@ -2959,6 +3005,8 @@ namespace {
                              "C++ classes with `trivial_abi` Clang attribute "
                              "are not yet available in Swift");
       }
+
+      validatePrivateFileIDAttributes(decl);
 
       if (auto classDecl = dyn_cast<ClassDecl>(result)) {
         validateForeignReferenceType(decl, classDecl);
@@ -3922,8 +3970,7 @@ namespace {
             /*failable=*/false, /*FailabilityLoc=*/SourceLoc(),
             /*Async=*/false, /*AsyncLoc=*/SourceLoc(),
             /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(),
-            /*ThrownType=*/TypeLoc(), bodyParams, genericParams, dc,
-            /*LifetimeDependentTypeRepr*/ nullptr);
+            /*ThrownType=*/TypeLoc(), bodyParams, genericParams, dc);
       } else {
         auto resultTy = importedType.getType();
 
@@ -3946,6 +3993,9 @@ namespace {
           }
           if (selfIdx) {
             func->setSelfIndex(selfIdx.value());
+            if (Impl.SwiftContext.LangOpts.hasFeature(
+                    Feature::AddressableParameters))
+              func->getImplicitSelfDecl()->setAddressable();
           } else {
             func->setStatic();
             func->setImportAsStaticMember();
@@ -4009,10 +4059,10 @@ namespace {
                                               /*isImmortal*/ true);
       if (const auto *funDecl = dyn_cast<FuncDecl>(result))
         if (hasUnsafeAPIAttr(decl) && !funDecl->getResultInterfaceType()->isEscapable()) {
+          lifetimeDependencies.push_back(immortalLifetime);
           Impl.SwiftContext.evaluator.cacheOutput(
               LifetimeDependenceInfoRequest{result},
               Impl.SwiftContext.AllocateCopy(lifetimeDependencies));
-          lifetimeDependencies.push_back(immortalLifetime);
           return;
         }
 
@@ -4116,7 +4166,7 @@ namespace {
             evaluateOrDefault(
                 Impl.SwiftContext.evaluator,
                 ClangTypeEscapability(
-                    {ctordecl->getParent()->getTypeForDecl(), Impl}),
+                    {ctordecl->getParent()->getTypeForDecl(), &Impl}),
                 CxxEscapability::Unknown) == CxxEscapability::NonEscapable)
           lifetimeDependencies.push_back(immortalLifetime);
       }
@@ -4133,8 +4183,7 @@ namespace {
             LifetimeDependenceInfoRequest{result},
             Impl.SwiftContext.AllocateCopy(lifetimeDependencies));
       }
-      if (ASTContext.LangOpts.hasFeature(Feature::AllowUnsafeAttribute) &&
-          ASTContext.LangOpts.hasFeature(Feature::SafeInterop)) {
+      if (ASTContext.LangOpts.hasFeature(Feature::AllowUnsafeAttribute)) {
         for (auto [idx, param] : llvm::enumerate(decl->parameters())) {
           if (swiftParams->get(idx)->getInterfaceType()->isEscapable())
             continue;
@@ -6672,6 +6721,7 @@ Decl *SwiftDeclConverter::importGlobalAsInitializer(
   ArrayRef<Identifier> argNames = name.getArgumentNames();
 
   ParameterList *parameterList = nullptr;
+  DeclName nameBeforeAdjustment;
   if (argNames.size() == 1 && decl->getNumParams() == 0) {
     // Special case: We need to create an empty first parameter for our
     // argument label
@@ -6688,6 +6738,25 @@ Decl *SwiftDeclConverter::importGlobalAsInitializer(
         dc, decl, {decl->param_begin(), decl->param_end()}, decl->isVariadic(),
         allowNSUIntegerAsInt, argNames, /*genericParams=*/{},
         /*resultType=*/nullptr, /*hasBoundsAnnotatedParam=*/nullptr);
+
+    if (name && parameterList && argNames.size() != parameterList->size()) {
+      // Remember that the name has changed.
+      nameBeforeAdjustment = name;
+
+      // Add or remove argument labels as needed to match `parameterList`.
+      SmallVector<Identifier, 16> newArgNames;
+      llvm::append_range(newArgNames, argNames);
+      while (newArgNames.size() > parameterList->size())
+        newArgNames.pop_back();
+      while (newArgNames.size() < parameterList->size()) {
+        auto param = parameterList->get(newArgNames.size());
+        newArgNames.push_back(param->getArgumentName());
+      }
+
+      // Construct the new name.
+      name = DeclName(Impl.SwiftContext, name.getBaseName(), newArgNames);
+      argNames = name.getArgumentNames();
+    }
   }
   if (!parameterList)
     return nullptr;
@@ -6712,8 +6781,7 @@ Decl *SwiftDeclConverter::importGlobalAsInitializer(
       /*FailabilityLoc=*/SourceLoc(),
       /*Async=*/false, /*AsyncLoc=*/SourceLoc(),
       /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(), /*ThrownType=*/TypeLoc(),
-      parameterList, /*GenericParams=*/nullptr, dc,
-      /*LifetimeDependentTypeRepr*/ nullptr);
+      parameterList, /*GenericParams=*/nullptr, dc);
   result->setImplicitlyUnwrappedOptional(isIUO);
   result->getASTContext().evaluator.cacheOutput(InitKindRequest{result},
                                                 std::move(initKind));
@@ -6724,6 +6792,21 @@ Decl *SwiftDeclConverter::importGlobalAsInitializer(
   result->setOverriddenDecls({ });
   result->setIsObjC(false);
   result->setIsDynamic(false);
+
+  if (nameBeforeAdjustment) {
+    SmallString<16> message;
+    llvm::raw_svector_ostream os(message);
+    os << "declared Swift name '" << nameBeforeAdjustment
+       << "' was adjusted to '" << name
+       << "' because it does not have the correct number of parameters ("
+       << nameBeforeAdjustment.getArgumentNames().size() << " vs. "
+       << name.getArgumentNames().size()
+       << "); please report this to its maintainer";
+
+    auto attr = AvailableAttr::createUniversallyDeprecated(Impl.SwiftContext,
+                    Impl.SwiftContext.AllocateCopy(message.str()), "");
+    result->getAttrs().add(attr);
+  }
 
   finishFuncDecl(decl, result);
   if (correctSwiftName)
@@ -7225,8 +7308,7 @@ ConstructorDecl *SwiftDeclConverter::importConstructor(
       /*Async=*/false, /*AsyncLoc=*/SourceLoc(),
       /*Throws=*/importedName.getErrorInfo().has_value(),
       /*ThrowsLoc=*/SourceLoc(), /*ThrownType=*/TypeLoc(), bodyParams,
-      /*GenericParams=*/nullptr, const_cast<DeclContext *>(dc),
-      /*LifetimeDependentTypeRepr*/ nullptr);
+      /*GenericParams=*/nullptr, const_cast<DeclContext *>(dc));
 
   addObjCAttribute(result, selector);
   recordMemberInContext(dc, result);
@@ -7291,6 +7373,14 @@ ConstructorDecl *SwiftDeclConverter::importConstructor(
 
   // If this constructor overrides another constructor, mark it as such.
   recordObjCOverride(result);
+
+  // If we ignored a custom Swift name because it wasn't suitable for an init,
+  // diagnose that now.
+  if (importedName.hasInvalidCustomName() && isActiveSwiftVersion()) {
+    if (auto customName = NameImporter::findCustomName(objcMethod, version)) {
+      result->diagnose(diag::invalid_swift_name_for_decl, *customName, result);
+    }
+  }
 
   return result;
 }
@@ -8466,13 +8556,11 @@ static bool importAsUnsafe(ClangImporter::Implementation &impl,
                            const clang::NamedDecl *decl,
                            const Decl *MappedDecl) {
   auto &context = impl.SwiftContext;
-  if (!context.LangOpts.hasFeature(Feature::SafeInterop) ||
-      !context.LangOpts.hasFeature(Feature::AllowUnsafeAttribute))
+  if (!context.LangOpts.hasFeature(Feature::AllowUnsafeAttribute))
     return false;
 
   if (isa<clang::CXXMethodDecl>(decl) &&
-      !evaluateOrDefault(context.evaluator, IsSafeUseOfCxxDecl({decl, context}),
-                         {}))
+      !evaluateOrDefault(context.evaluator, IsSafeUseOfCxxDecl({decl}), {}))
     return true;
 
   if (isa<ClassDecl>(MappedDecl))
@@ -8488,7 +8576,7 @@ static bool importAsUnsafe(ClangImporter::Implementation &impl,
   if (const auto *record = dyn_cast<clang::RecordDecl>(decl))
     return evaluateOrDefault(
                context.evaluator,
-               ClangTypeEscapability({record->getTypeForDecl(), impl, false}),
+               ClangTypeEscapability({record->getTypeForDecl(), &impl, false}),
                CxxEscapability::Unknown) == CxxEscapability::Unknown;
 
   return false;

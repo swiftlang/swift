@@ -245,15 +245,21 @@ bool swift::isOverrideBasedOnType(const ValueDecl *decl, Type declTy,
 
 static bool isUnavailableInAllVersions(ValueDecl *decl) {
   ASTContext &ctx = decl->getASTContext();
-  auto attr = decl->getUnavailableAttr();
-  if (!attr)
-    return false;
 
-  if (attr->isUnconditionallyUnavailable())
-    return true;
+  auto deploymentContext = AvailabilityContext::forDeploymentTarget(ctx);
+  auto constraints = getAvailabilityConstraintsForDecl(decl, deploymentContext);
+  for (auto constraint : constraints) {
+    switch (constraint.getReason()) {
+    case AvailabilityConstraint::Reason::UnconditionallyUnavailable:
+    case AvailabilityConstraint::Reason::IntroducedInLaterVersion:
+      return true;
+    case AvailabilityConstraint::Reason::Obsoleted:
+    case AvailabilityConstraint::Reason::IntroducedInLaterDynamicVersion:
+      break;
+    }
+  }
 
-  return attr->getVersionAvailability(ctx) ==
-         AvailableVersionComparison::Unavailable;
+  return false;
 }
 
 /// Perform basic checking to determine whether a declaration can override a

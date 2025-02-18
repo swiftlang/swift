@@ -38,6 +38,7 @@ extension BridgedNullableParameterList: /*@retroactive*/ swiftASTGen.BridgedNull
 extension BridgedNullablePatternBindingInitializer: /*@retroactive*/ swiftASTGen.BridgedNullable {}
 extension BridgedNullableCustomAttributeInitializer: /*@retroactive*/ swiftASTGen.BridgedNullable {}
 extension BridgedNullableArgumentList: /*@retroactive*/ swiftASTGen.BridgedNullable {}
+extension BridgedNullableVarDecl: /*@retroactive*/ swiftASTGen.BridgedNullable {}
 
 extension BridgedIdentifier: /*@retroactive*/ Swift.Equatable {
   public static func == (lhs: Self, rhs: Self) -> Bool {
@@ -91,6 +92,9 @@ extension BridgedCustomAttributeInitializer: BridgedHasNullable {
 }
 extension BridgedArgumentList: BridgedHasNullable {
   typealias Nullable = BridgedNullableArgumentList
+}
+extension BridgedVarDecl: BridgedHasNullable {
+  typealias Nullable = BridgedNullableVarDecl
 }
 
 public extension BridgedSourceLoc {
@@ -317,4 +321,21 @@ extension BridgedArrayRef {
     let buffer = UnsafeBufferPointer(start: start, count: count)
     return c(buffer)
   }
+}
+
+/// Utility to pass Swift closure to C/C++ bridging API.
+///
+/// C/C++ API can call the closure via `BridgedSwiftClosure::operator()` which
+/// calls `bridgedSwiftClosureCall_1(_:_:)` function below.
+func withBridgedSwiftClosure(closure: (UnsafeRawPointer?) -> Void, call: (BridgedSwiftClosure) -> Void) {
+  withoutActuallyEscaping(closure) { escapingClosure in
+    withUnsafePointer(to: escapingClosure) { ptr in
+      call(BridgedSwiftClosure(closure: ptr))
+    }
+  }
+}
+
+@_cdecl("swift_ASTGen_bridgedSwiftClosureCall_1")
+func bridgedSwiftClosureCall_1(_ bridged: BridgedSwiftClosure, _ arg: UnsafeRawPointer?) {
+  bridged.closure.assumingMemoryBound(to: ((UnsafeRawPointer?) -> Void).self).pointee(arg)
 }

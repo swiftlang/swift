@@ -2964,6 +2964,10 @@ ConstraintSystem::matchFunctionIsolations(FunctionType *func1,
     case FunctionTypeIsolation::Kind::NonIsolated:
       return true;
 
+    // A thunk is going to pass `nil` to the isolated parameter.
+    case FunctionTypeIsolation::Kind::NonIsolatedCaller:
+      return matchIfConversion();
+
     // Erasing global-actor isolation to non-isolation can admit data
     // races; such violations are diagnosed by the actor isolation checker.
     // We deliberately do not allow actor isolation violations to influence
@@ -2981,6 +2985,35 @@ ConstraintSystem::matchFunctionIsolations(FunctionType *func1,
     // Parameter isolation is value-dependent and cannot be erased.
     case FunctionTypeIsolation::Kind::Parameter:
       return false;
+    }
+    llvm_unreachable("bad kind");
+
+  // Converting to a caller isolated async function type.
+  case FunctionTypeIsolation::Kind::NonIsolatedCaller:
+    switch (isolation1.getKind()) {
+    // Exact match.
+    case FunctionTypeIsolation::Kind::NonIsolatedCaller:
+      return true;
+
+    // Global actor: Thunk will hop to the global actor
+    // and would ignore passed in isolation.
+    // Erased: Just like global actor but would hop to
+    // the isolation stored in the @isolated(any) function.
+    case FunctionTypeIsolation::Kind::GlobalActor:
+    case FunctionTypeIsolation::Kind::Erased:
+      return matchIfConversion();
+
+    // In this case the isolation is dependent on a
+    // specific actor passed in as the isolation parameter
+    // and the thunk won't have it.
+    case FunctionTypeIsolation::Kind::Parameter:
+      return false;
+
+    // For asynchronous: Thunk would hop the appropriate actor.
+    // For synchronous: Thunk would call the function without
+    // a hop.
+    case FunctionTypeIsolation::Kind::NonIsolated:
+      return matchIfConversion();
     }
     llvm_unreachable("bad kind");
 
@@ -3002,6 +3035,11 @@ ConstraintSystem::matchFunctionIsolations(FunctionType *func1,
     // Adding global actor isolation to a non-isolated function is fine,
     // whether synchronous or asynchronous.
     case FunctionTypeIsolation::Kind::NonIsolated:
+      return matchIfConversion();
+
+    // A thunk is going to pass in an instance of a global actor
+    // to the isolated parameter.
+    case FunctionTypeIsolation::Kind::NonIsolatedCaller:
       return matchIfConversion();
 
     // Parameter isolation cannot be altered in the same way.
@@ -3030,6 +3068,10 @@ ConstraintSystem::matchFunctionIsolations(FunctionType *func1,
     case FunctionTypeIsolation::Kind::GlobalActor:
       return matchIfConversion();
 
+    // A thunk is going to forward the isolation.
+    case FunctionTypeIsolation::Kind::NonIsolatedCaller:
+      return matchIfConversion();
+
     // Don't allow dynamically-isolated function types to convert to
     // any specific isolation for the same policy reasons that we don't
     // want to allow global-actors to change.
@@ -3049,6 +3091,11 @@ ConstraintSystem::matchFunctionIsolations(FunctionType *func1,
     case FunctionTypeIsolation::Kind::NonIsolated:
     case FunctionTypeIsolation::Kind::GlobalActor:
       return matchIfConversion(/*erasure*/ true);
+
+    // It's not possible to form a thunk for this case because
+    // we don't know what to pass to the isolated parameter.
+    case FunctionTypeIsolation::Kind::NonIsolatedCaller:
+      return false;
 
     // Parameter isolation is value-dependent and can't be erased in the
     // abstract, though.  We need to be able to recover the isolation from
@@ -3686,7 +3733,8 @@ static bool matchSendableExistentialToAnyInGenericArgumentPosition(
 
     for (unsigned i = 0, n = path.size(); i < n; ++i) {
       const auto &elt = path[i];
-      if (elt.is<LocatorPathElt::GenericType>()) {
+      if (elt.is<LocatorPathElt::GenericType>() ||
+          elt.is<LocatorPathElt::LValueConversion>()) {
         if (!dropFromIdx)
           dropFromIdx = i;
         continue;
@@ -3726,6 +3774,12 @@ static bool matchSendableExistentialToAnyInGenericArgumentPosition(
         if (locator->isLastElement<LocatorPathElt::ApplyArgToParam>())
           return isPreconcurrencyContext(
               cs.getConstraintLocator(simplifyLocatorToAnchor(locator)));
+
+        if (locator->directlyAt<InOutExpr>()) {
+          auto *IOE = castToExpr<InOutExpr>(locator->getAnchor());
+          return isPreconcurrencyContext(
+              cs.getConstraintLocator(IOE->getSubExpr()));
+        }
 
         auto *calleeLoc = cs.getCalleeLocator(locator);
         if (!calleeLoc)
@@ -7392,28 +7446,18 @@ ConstraintSystem::matchTypes(Type type1, Type type2, ConstraintKind kind,
         // Look through all value-to-optional promotions to allow
         // conversions like Double -> CGFloat?? and vice versa.
         // T -> Optional<T>
-        if (location.endsWith<LocatorPathElt::OptionalPayload>()) {
+        if (location.endsWith<LocatorPathElt::OptionalPayload>() ||
+            location.endsWith<LocatorPathElt::GenericArgument>()) {
           SmallVector<LocatorPathElt, 4> path;
           auto anchor = location.getLocatorParts(path);
 
-          // An attempt at Double/CGFloat conversion through
-          // optional chaining. This is not supported at the
-          // moment because solution application doesn't know
-          // how to map Double to/from CGFloat through optionals.
-          if (isExpr<OptionalEvaluationExpr>(anchor)) {
-            if (!shouldAttemptFixes())
-              return getTypeMatchFailure(locator);
-
-            conversionsOrFixes.push_back(ContextualMismatch::create(
-                *this, nominal1, nominal2, getConstraintLocator(locator)));
-            break;
-          }
-
-          // Drop all of the applied `value-to-optional` promotions.
+          // Drop all of the applied `value-to-optional` and
+          // `optional-to-optional` conversions.
           path.erase(llvm::remove_if(
                          path,
                          [](const LocatorPathElt &elt) {
-                           return elt.is<LocatorPathElt::OptionalPayload>();
+                           return elt.is<LocatorPathElt::OptionalPayload>() ||
+                                  elt.is<LocatorPathElt::GenericArgument>();
                          }),
                      path.end());
 
@@ -8709,30 +8753,30 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyConformsToConstraint(
     auto anchor = loc->getAnchor();
     auto arrayLiteral = getAsExpr<ArrayExpr>(anchor);
 
-    // If we're attempting to bind an array literal to a 'Slab' parameter,
-    // then check if the counts are equal and solve.
+    // If we're attempting to bind an array literal to an 'InlineArray'
+    // parameter, then check if the counts are equal and solve.
     if (kind == ConstraintKind::LiteralConformsTo &&
         protocol == arrayLiteralProto &&
-        type->isSlab() &&
+        type->isInlineArray() &&
         arrayLiteral) {
-      auto slabTy = type->castTo<BoundGenericStructType>();
+      auto iaTy = type->castTo<BoundGenericStructType>();
 
       // <let count: Int, Element>
       // Attempt to bind the number of elements in the literal with the
       // contextual count. This will diagnose if the literal does not enough
       // or too many elements.
-      auto contextualCount = slabTy->getGenericArgs()[0];
+      auto contextualCount = iaTy->getGenericArgs()[0];
       auto literalCount = IntegerType::get(
           std::to_string(arrayLiteral->getNumElements()),
           /* isNegative */ false,
-          slabTy->getASTContext());
+          iaTy->getASTContext());
 
       // If the counts are already equal, '2' == '2', then we're done.
       if (contextualCount->isEqual(literalCount)) {
         return SolutionKind::Solved;
       }
 
-      // If our contextual count is not known, e.g., Slab<_, Int> = [1, 2],
+      // If our contextual count is not known, e.g., InlineArray<_, Int> = [1, 2],
       // then just eagerly bind the count to what the literal count is.
       if (contextualCount->isTypeVariableOrMember()) {
         addConstraint(ConstraintKind::Bind, contextualCount, literalCount,
@@ -8744,8 +8788,9 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyConformsToConstraint(
       if (!shouldAttemptFixes())
         return SolutionKind::Error;
 
-      auto fix = AllowSlabLiteralCountMismatch::create(*this, contextualCount,
-                                                       literalCount, loc);
+      auto fix = AllowInlineArrayLiteralCountMismatch::create(*this,
+                                                              contextualCount,
+                                                              literalCount, loc);
       return recordFix(fix) ? SolutionKind::Error : SolutionKind::Solved;
     }
   } break;
@@ -9938,6 +9983,7 @@ performMemberLookup(ConstraintKind constraintKind, DeclNameRef memberName,
   // If this is true, we're using type construction syntax (Foo()) rather
   // than an explicit call to `init` (Foo.init()).
   bool isImplicitInit = false;
+  TypeBase *favoredType = nullptr;
   if (memberName.isSimpleName(DeclBaseName::createConstructor())) {
     SmallVector<LocatorPathElt, 2> parts;
     if (auto anchor = memberLocator->getAnchor()) {
@@ -9945,6 +9991,17 @@ performMemberLookup(ConstraintKind constraintKind, DeclNameRef memberName,
       if (!path.empty())
         if (path.back().getKind() == ConstraintLocator::ConstructorMember)
           isImplicitInit = true;
+
+      if (auto *applyExpr = getAsExpr<ApplyExpr>(anchor)) {
+        if (auto *argExpr = applyExpr->getArgs()->getUnlabeledUnaryExpr()) {
+          favoredType = getFavoredType(argExpr);
+
+          if (!favoredType) {
+            optimizeConstraints(argExpr);
+            favoredType = getFavoredType(argExpr);
+          }
+        }
+      }
     }
   }
 
@@ -10051,6 +10108,30 @@ performMemberLookup(ConstraintKind constraintKind, DeclNameRef memberName,
       // Otherwise, we can access all instance members.
       hasInstanceMembers = true;
       hasInstanceMethods = true;
+    }
+
+    // If the invocation's argument expression has a favored type,
+    // use that information to determine whether a specific overload for
+    // the candidate should be favored.
+    if (isa<ConstructorDecl>(decl) && favoredType &&
+        result.FavoredChoice == ~0U) {
+      auto *ctor = cast<ConstructorDecl>(decl);
+
+      // Only try and favor monomorphic unary initializers.
+      if (!ctor->isGenericContext()) {
+        if (!ctor->getMethodInterfaceType()->hasError()) {
+          // The constructor might have an error type because we don't skip
+          // invalid decls for code completion
+          auto args = ctor->getMethodInterfaceType()
+                          ->castTo<FunctionType>()
+                          ->getParams();
+          if (args.size() == 1 && !args[0].hasLabel() &&
+              args[0].getPlainType()->isEqual(favoredType)) {
+            if (!isDeclUnavailable(decl, memberLocator))
+              result.FavoredChoice = result.ViableCandidates.size();
+          }
+        }
+      }
     }
 
     const auto isUnsupportedExistentialMemberAccess = [&] {
@@ -14840,19 +14921,9 @@ ConstraintSystem::simplifyRestrictedConstraintImpl(
         restriction == ConversionRestrictionKind::CGFloatToDouble ? 2 : 10;
 
     if (restriction == ConversionRestrictionKind::DoubleToCGFloat) {
-      SmallVector<LocatorPathElt> originalPath;
-      auto anchor = locator.getLocatorParts(originalPath);
-
-      SourceRange range;
-      ArrayRef<LocatorPathElt> path(originalPath);
-      simplifyLocator(anchor, path, range);
-
-      if (path.empty() || llvm::all_of(path, [](const LocatorPathElt &elt) {
-            return elt.is<LocatorPathElt::OptionalPayload>();
-          })) {
-        if (auto *expr = getAsExpr(anchor))
-          if (auto depth = getExprDepth(expr))
-            impact = (*depth + 1) * impact;
+      if (auto *anchor = locator.trySimplifyToExpr()) {
+        if (auto depth = getExprDepth(anchor))
+          impact = (*depth + 1) * impact;
       }
     } else if (locator.directlyAt<AssignExpr>() ||
                locator.endsWith<LocatorPathElt::ContextualType>()) {
@@ -15640,7 +15711,7 @@ ConstraintSystem::SolutionKind ConstraintSystem::simplifyFixConstraint(
   case FixKind::IgnoreInvalidPlaceholder:
   case FixKind::IgnoreOutOfPlaceThenStmt:
   case FixKind::IgnoreMissingEachKeyword:
-  case FixKind::AllowSlabLiteralCountMismatch:
+  case FixKind::AllowInlineArrayLiteralCountMismatch:
     llvm_unreachable("handled elsewhere");
   }
 

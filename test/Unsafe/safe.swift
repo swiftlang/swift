@@ -17,10 +17,7 @@ func g() {
   unsafe unsafeFunction()
 }
 
-// expected-warning@+3{{global function 'h' has an interface that involves unsafe types}}
-// expected-note@+2{{add '@unsafe' to indicate that this declaration is unsafe to use}}{{1-1=@unsafe }}
-// expected-note@+1{{add '@safe' to indicate that this declaration is memory-safe to use}}{{1-1=@safe }}
-func h(_: UnsafeType) { // expected-note{{reference to unsafe struct 'UnsafeType'}}
+func h(_: UnsafeType) {
 // expected-warning@+1{{expression uses unsafe constructs but is not marked with 'unsafe'}}
   unsafeFunction() // expected-note{{reference to unsafe global function 'unsafeFunction()'}}
 
@@ -31,16 +28,10 @@ func h(_: UnsafeType) { // expected-note{{reference to unsafe struct 'UnsafeType
   unsafe g()
 }
 
-// expected-warning@+3 {{global function 'rethrowing' has an interface that involves unsafe types}}
-// expected-note@+2{{add '@unsafe' to indicate that this declaration is unsafe to use}}{{1-1=@unsafe }}
-// expected-note@+1{{add '@safe' to indicate that this declaration is memory-safe to use}}{1-1=@safe }}
-func rethrowing(body: (UnsafeType) throws -> Void) rethrows { } // expected-note{{reference to unsafe struct 'UnsafeType'}}
+func rethrowing(body: (UnsafeType) throws -> Void) rethrows { }
 
 class HasStatics {
-  // expected-warning@+3{{static method 'f' has an interface that involves unsafe types}}
-// expected-note@+2{{add '@unsafe' to indicate that this declaration is unsafe to use}}{{3-3=@unsafe }}
-// expected-note@+1{{add '@safe' to indicate that this declaration is memory-safe to use}}{3-3=@safe }}
-  static internal func f(_: UnsafeType) { } // expected-note{{reference to unsafe struct 'UnsafeType'}}
+  static internal func f(_: UnsafeType) { }
 
   
 }
@@ -87,8 +78,9 @@ func returnsExistentialP() -> any P {
   // expected-note@-1{{@unsafe conformance of 'Int' to protocol 'P' involves unsafe code}}
 }
 
-struct UnsafeAsSequence: @unsafe Sequence, IteratorProtocol {
-  mutating func next() -> Int? { nil }
+// FIXME: Should work even if the IteratorProtocol conformance is safe
+struct UnsafeAsSequence: @unsafe Sequence, @unsafe IteratorProtocol {
+  @unsafe mutating func next() -> Int? { nil }
 }
 
 func testUnsafeAsSequenceForEach() {
@@ -96,6 +88,7 @@ func testUnsafeAsSequenceForEach() {
 
   // expected-warning@+1{{expression uses unsafe constructs but is not marked with 'unsafe'}}{{12-12=unsafe }}
   for _ in uas { } // expected-note{{conformance}}
+  // expected-note@-1{{reference}}
 
   for _ in unsafe uas { } // okay
 }

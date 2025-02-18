@@ -234,7 +234,7 @@ extension ASTGenVisitor {
       self.ctx,
       atLoc: atLoc,
       range: range,
-      domainString: platformStr.bridged,
+      domainIdentifier: self.ctx.getIdentifier(platformStr.bridged),
       domainLoc: platformLoc,
       kind: attrKind,
       message: message ?? BridgedStringRef(),
@@ -291,14 +291,14 @@ extension ASTGenVisitor {
           ? .languageVersionConstraint
           : .packageDescriptionVersionConstraint
 
-        let spec = BridgedPlatformAgnosticVersionConstraintAvailabilitySpec.createParsed(
+        let spec = BridgedAvailabilitySpec.createPlatformAgnostic(
           self.ctx,
           kind: kind,
           nameLoc: nameLoc,
           version: version?.bridged ?? BridgedVersionTuple(),
           versionRange: versionRange
         )
-        result.append(spec.asAvailabilitySpec)
+        result.append(spec)
 
       case let name:
         var macroMatched = false;
@@ -329,15 +329,14 @@ extension ASTGenVisitor {
             // TODO: Diagnostics.
             fatalError("expected version")
           }
-          let spec = BridgedPlatformVersionConstraintAvailabilitySpec.createParsed(
+          let spec = BridgedAvailabilitySpec.createPlatformVersioned(
             self.ctx,
             platform: platform,
             platformLoc: nameLoc,
             version: version.bridged,
-            runtimeVersion: version.bridged,
             versionRange: versionRange
           )
-          result.append(spec.asAvailabilitySpec)
+          result.append(spec)
         }
       }
     }
@@ -345,11 +344,11 @@ extension ASTGenVisitor {
     for parsed in node {
       switch parsed.argument {
       case .token(let tok) where tok.rawText == "*":
-        let spec = BridgedOtherPlatformAvailabilitySpec.createParsed(
+        let spec = BridgedAvailabilitySpec.createWildcard(
           self.ctx,
           loc: self.generateSourceLoc(tok)
         )
-        result.append(spec.asAvailabilitySpec)
+        result.append(spec)
       case .token(let tok):
         handle(domainNode: tok, versionNode: nil)
       case .availabilityVersionRestriction(let platformVersion):

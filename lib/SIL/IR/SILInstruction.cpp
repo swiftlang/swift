@@ -897,6 +897,9 @@ namespace {
       return X->getElementType() == RHS->getElementType();
     }
 
+    bool visitTypeValueInst(const TypeValueInst *RHS) {
+      return true;
+    }
   private:
     const SILInstruction *LHS;
   };
@@ -1277,7 +1280,6 @@ namespace {
 
 bool SILInstruction::isAllocatingStack() const {
   if (isa<AllocStackInst>(this) ||
-      isa<AllocVectorInst>(this) ||
       isa<AllocPackInst>(this) ||
       isa<AllocPackMetadataInst>(this))
     return true;

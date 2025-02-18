@@ -1669,7 +1669,7 @@ struct TypeSimplifier {
           // Special case: When building slab literals, we go through the same
           // array literal machinery, so there will be a conversion constraint
           // for the element to ExpressibleByArrayLiteral.ArrayLiteralType.
-          if (lookupBaseType->isSlab()) {
+          if (lookupBaseType->isInlineArray()) {
             auto &ctx = CS.getASTContext();
             auto arrayProto =
                 ctx.getProtocol(KnownProtocolKind::ExpressibleByArrayLiteral);
@@ -4553,6 +4553,8 @@ Expr *ConstraintSystem::buildAutoClosureExpr(Expr *expr,
 Expr *ConstraintSystem::buildTypeErasedExpr(Expr *expr, DeclContext *dc,
                                             Type contextualType,
                                             ContextualTypePurpose purpose) {
+  auto &ctx = dc->getASTContext();
+
   if (purpose != CTP_ReturnStmt)
     return expr;
 
@@ -4571,13 +4573,33 @@ Expr *ConstraintSystem::buildTypeErasedExpr(Expr *expr, DeclContext *dc,
     return expr;
 
   auto *PD = protocols.front();
-  auto *attr = PD->getAttrs().getAttribute<TypeEraserAttr>();
-  if (!attr)
+
+  auto contextAvailability =
+      TypeChecker::availabilityAtLocation(expr->getLoc(), dc);
+  auto refinedAvailability =
+      AvailabilityContext::forPlatformRange(
+        AvailabilityRange::alwaysAvailable(), ctx);
+
+  // The least available type eraser for the enclosing context.
+  Type typeEraser;
+  for (auto *attr : PD->getAttrs().getAttributes<TypeEraserAttr>()) {
+    auto eraser = attr->getResolvedType(PD);
+    assert(eraser && "Failed to resolve eraser type!");
+
+    auto *nominal = eraser->getAnyNominal();
+    auto nominalAvailability =
+        TypeChecker::availabilityForDeclSignature(nominal);
+
+    if (contextAvailability.isContainedIn(nominalAvailability) &&
+        nominalAvailability.isContainedIn(refinedAvailability)) {
+      refinedAvailability = nominalAvailability;
+      typeEraser = eraser;
+    }
+  }
+
+  if (!typeEraser)
     return expr;
 
-  auto typeEraser = attr->getResolvedType(PD);
-  assert(typeEraser && "Failed to resolve eraser type!");
-  auto &ctx = dc->getASTContext();
   auto *argList = ArgumentList::forImplicitSingle(ctx, ctx.Id_erasing, expr);
   return CallExpr::createImplicit(
       ctx, TypeExpr::createImplicit(typeEraser, ctx), argList);
@@ -4918,11 +4940,11 @@ bool ConstraintSystem::isReadOnlyKeyPathComponent(
   // If the setter is unavailable, then the keypath ought to be read-only
   // in this context.
   if (auto setter = storage->getOpaqueAccessor(AccessorKind::Set)) {
-    // FIXME: Fully unavailable setters should cause the key path to be
-    // readonly too.
+    // FIXME: [availability] Fully unavailable setters should cause the key path
+    // to be readonly too.
     auto constraint =
         getUnsatisfiedAvailabilityConstraint(setter, DC, referenceLoc);
-    if (constraint && constraint->isConditionallySatisfiable())
+    if (constraint && constraint->isPotentiallyAvailable())
       return true;
   }
 

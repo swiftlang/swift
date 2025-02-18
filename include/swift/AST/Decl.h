@@ -1516,6 +1516,10 @@ public:
   /// Returns true if this declaration has any `@backDeployed` attributes.
   bool hasBackDeployedAttr() const;
 
+  /// Apply the specified function to decls that should be placed _next_ to
+  /// this decl when constructing AST.
+  void forEachDeclToHoist(llvm::function_ref<void(Decl *)> callback) const;
+
   /// Emit a diagnostic tied to this declaration.
   template<typename ...ArgTypes>
   InFlightDiagnostic diagnose(
@@ -3994,7 +3998,7 @@ public:
   /// type parameter.
   ///
   /// \code
-  /// struct Slab<let count: Int, Element: ~Copyable>
+  /// struct InlineArray<let count: Int, Element: ~Copyable>
   /// \endcode
   bool isValue() const {
     return getParamKind() == GenericTypeParamKind::Value;
@@ -5587,12 +5591,6 @@ public:
   /// - `Self` appears in non-covariant position in the type signature of a
   ///   value requirement.
   bool hasSelfOrAssociatedTypeRequirements() const;
-
-  /// Determine whether an existential type constrained by this protocol must
-  /// be written using `any` syntax.
-  ///
-  /// \Note This method takes language feature state into account.
-  bool existentialRequiresAny() const;
 
   /// Returns a list of protocol requirements that must be assessed to
   /// determine a concrete's conformance effect polymorphism kind.
@@ -8371,8 +8369,6 @@ public:
 
   TypeRepr *getResultTypeRepr() const { return FnRetType.getTypeRepr(); }
 
-  void setDeserializedResultTypeLoc(TypeLoc ResultTyR);
-
   SourceRange getResultTypeSourceRange() const {
     return FnRetType.getSourceRange();
   }
@@ -8672,7 +8668,7 @@ public:
   /// Get the list of elements declared in this case.
   ArrayRef<EnumElementDecl *> getElements() const {
     return {getTrailingObjects<EnumElementDecl *>(),
-            Bits.EnumCaseDecl.NumElements};
+            static_cast<size_t>(Bits.EnumCaseDecl.NumElements)};
   }
   SourceRange getSourceRange() const;
 
@@ -8899,9 +8895,6 @@ class ConstructorDecl : public AbstractFunctionDecl {
   /// inserted at the end of the initializer by SILGen.
   Expr *CallToSuperInit = nullptr;
 
-  /// Valid when lifetime dependence specifiers are present.
-  TypeLoc InitRetType;
-
 public:
   ConstructorDecl(DeclName Name, SourceLoc ConstructorLoc,
                   bool Failable, SourceLoc FailabilityLoc,
@@ -8910,7 +8903,7 @@ public:
                   TypeLoc thrownTy,
                   ParameterList *BodyParams,
                   GenericParamList *GenericParams,
-                  DeclContext *Parent, TypeRepr *InitRetTy);
+                  DeclContext *Parent);
 
   static ConstructorDecl *
   createImported(ASTContext &ctx, ClangNode clangNode, DeclName name,
@@ -8931,10 +8924,6 @@ public:
 
   /// Get the interface type of the initializing constructor.
   Type getInitializerInterfaceType();
-
-  TypeRepr *getResultTypeRepr() const { return InitRetType.getTypeRepr(); }
-
-  void setDeserializedResultTypeLoc(TypeLoc ResultTyR);
 
   /// Get the typechecked call to super.init expression, which needs to be
   /// inserted at the end of the initializer by SILGen.

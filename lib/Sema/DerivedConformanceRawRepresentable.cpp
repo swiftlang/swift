@@ -20,6 +20,8 @@
 #include "TypeCheckAvailability.h"
 #include "TypeCheckDecl.h"
 #include "TypeChecker.h"
+#include "swift/AST/AvailabilityConstraint.h"
+#include "swift/AST/AvailabilitySpec.h"
 #include "swift/AST/Decl.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/ParameterList.h"
@@ -199,17 +201,15 @@ struct RuntimeVersionCheck {
   /// fails, e.g. "guard #available(iOS 10, *) else { return nil }".
   Stmt *createEarlyReturnStmt(ASTContext &C) const {
     // platformSpec = "\(attr.platform) \(attr.introduced)"
-    auto platformSpec = new (C) PlatformVersionConstraintAvailabilitySpec(
-                            Platform, SourceLoc(),
-                            Version, Version, SourceLoc()
-                        );
+    auto platformSpec = AvailabilitySpec::createPlatformVersioned(
+        C, Platform, SourceLoc(), Version, SourceLoc());
 
-    // otherSpec = "*"
-    auto otherSpec = new (C) OtherPlatformAvailabilitySpec(SourceLoc());
+    // wildcardSpec = "*"
+    auto wildcardSpec = AvailabilitySpec::createWildcard(C, SourceLoc());
 
-    // availableInfo = "#available(\(platformSpec), \(otherSpec))"
+    // availableInfo = "#available(\(platformSpec), \(wildcardSpec))"
     auto availableInfo = PoundAvailableInfo::create(
-        C, SourceLoc(), SourceLoc(), { platformSpec, otherSpec }, SourceLoc(),
+        C, SourceLoc(), SourceLoc(), {platformSpec, wildcardSpec}, SourceLoc(),
         false);
 
     // This won't be filled in by TypeCheckAvailability because we have
@@ -241,21 +241,21 @@ checkAvailability(const EnumElementDecl *elt,
                   AvailabilityContext availabilityContext,
                   std::optional<RuntimeVersionCheck> &versionCheck) {
   auto &C = elt->getASTContext();
-  auto constraint =
-      getUnsatisfiedAvailabilityConstraint(elt, availabilityContext);
+  auto constraint = getAvailabilityConstraintsForDecl(elt, availabilityContext)
+                        .getPrimaryConstraint();
 
   // Is it always available?
   if (!constraint)
     return true;
 
+  // Is it never available?
+  if (constraint->isUnavailable())
+    return false;
+
   // Some constraints are active for type checking but can't translate to
   // runtime restrictions.
   if (!constraint->isActiveForRuntimeQueries(C))
     return true;
-
-  // Is it never available?
-  if (!constraint->isConditionallySatisfiable())
-    return false;
 
   // It's conditionally available; create a version constraint and return true.
   auto platform = constraint->getPlatform();
@@ -431,8 +431,7 @@ deriveRawRepresentable_init(DerivedConformance &derived) {
                               /*Async=*/false, /*AsyncLoc=*/SourceLoc(),
                               /*Throws=*/false, /*ThrowsLoc=*/SourceLoc(),
                               /*ThrownType=*/TypeLoc(), paramList,
-                              /*GenericParams=*/nullptr, parentDC,
-                              /*LifetimeDependentTypeRepr*/ nullptr);
+                              /*GenericParams=*/nullptr, parentDC);
 
   initDecl->setImplicit();
   initDecl->setBodySynthesizer(&deriveBodyRawRepresentable_init);

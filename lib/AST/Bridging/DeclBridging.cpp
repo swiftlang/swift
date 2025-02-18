@@ -120,6 +120,14 @@ void BridgedDecl_attachParsedAttrs(BridgedDecl decl,
   decl.unbridged()->attachParsedAttrs(attrs.unbridged());
 }
 
+void BridgedDecl_forEachDeclToHoist(BridgedDecl cDecl,
+                                    BridgedSwiftClosure closure) {
+  cDecl.unbridged()->forEachDeclToHoist([&](Decl *D) {
+    BridgedDecl bridged(D);
+    closure(&bridged);
+  });
+}
+
 BridgedAccessorDecl BridgedAccessorDecl_createParsed(
     BridgedASTContext cContext, BridgedDeclContext cDeclContext,
     BridgedAccessorKind cKind, BridgedAbstractStorageDecl cStorage,
@@ -133,13 +141,33 @@ BridgedAccessorDecl BridgedAccessorDecl_createParsed(
       cThrownType.unbridged(), cDeclContext.unbridged());
 }
 
+static VarDecl::Introducer unbridged(BridgedVarDeclIntroducer introducer) {
+  switch (introducer) {
+  case BridgedVarDeclIntroducerLet:
+    return swift::VarDecl::Introducer::Let;
+  case BridgedVarDeclIntroducerVar:
+    return swift::VarDecl::Introducer::Var;
+  case BridgedVarDeclIntroducerInOut:
+    return swift::VarDecl::Introducer::InOut;
+  case BridgedVarDeclIntroducerBorrowing:
+    return swift::VarDecl::Introducer::Borrowing;
+  }
+  llvm_unreachable("unhandled enum value");
+}
+
 BridgedPatternBindingDecl BridgedPatternBindingDecl_createParsed(
     BridgedASTContext cContext, BridgedDeclContext cDeclContext,
-    BridgedSourceLoc cBindingKeywordLoc, BridgedArrayRef cBindingEntries, BridgedDeclAttributes cAttrs, bool isStatic, bool isLet) {
+    BridgedDeclAttributes cAttrs, BridgedSourceLoc cStaticLoc,
+    BridgedStaticSpelling cStaticSpelling, BridgedSourceLoc cIntroducerLoc,
+    BridgedVarDeclIntroducer cIntroducer, BridgedArrayRef cBindingEntries) {
+
   ASTContext &context = cContext.unbridged();
   DeclContext *declContext = cDeclContext.unbridged();
 
-  auto introducer = isLet ? VarDecl::Introducer::Let : VarDecl::Introducer::Var;
+  auto introducer = unbridged(cIntroducer);
+  auto introducerLoc = cIntroducerLoc.unbridged();
+  auto staticSpelling = unbridged(cStaticSpelling);
+  auto staticLoc = cStaticLoc.unbridged();
 
   SmallVector<PatternBindingEntry, 4> entries;
   for (auto &entry : cBindingEntries.unbridged<BridgedPatternBindingEntry>()) {
@@ -148,20 +176,17 @@ BridgedPatternBindingDecl BridgedPatternBindingDecl_createParsed(
     // Configure all vars.
     pattern->forEachVariable([&](VarDecl *VD) {
       VD->attachParsedAttrs(cAttrs.unbridged());
-      VD->setStatic(isStatic);
+      VD->setStatic(staticLoc.isValid());
       VD->setIntroducer(introducer);
+      VD->setTopLevelGlobal(isa<TopLevelCodeDecl>(declContext));
     });
 
     entries.emplace_back(pattern, entry.equalLoc.unbridged(),
                          entry.init.unbridged(), entry.initContext.unbridged());
   }
 
-  return PatternBindingDecl::create(
-      context,
-      /*StaticLoc=*/SourceLoc(),
-      // FIXME: 'class' spelling kind.
-      isStatic ? StaticSpellingKind::KeywordStatic : StaticSpellingKind::None,
-      cBindingKeywordLoc.unbridged(), entries, declContext);
+  return PatternBindingDecl::create(context, staticLoc, staticSpelling,
+                                    introducerLoc, entries, declContext);
 }
 
 BridgedParamDecl BridgedParamDecl_createParsed(
@@ -281,13 +306,11 @@ BridgedConstructorDecl BridgedConstructorDecl_createParsed(
   auto throwsLoc = cThrowsLoc.unbridged();
   auto failabilityMarkLoc = cFailabilityMarkLoc.unbridged();
   // FIXME: rethrows
-  // TODO: Handle LifetimeDependentReturnTypeRepr here.
   auto *decl = new (context) ConstructorDecl(
       declName, cInitKeywordLoc.unbridged(), failabilityMarkLoc.isValid(),
       failabilityMarkLoc, asyncLoc.isValid(), asyncLoc, throwsLoc.isValid(),
       throwsLoc, thrownType.unbridged(), parameterList,
-      genericParams.unbridged(), cDeclContext.unbridged(),
-      /*InitRetTy*/ nullptr);
+      genericParams.unbridged(), cDeclContext.unbridged());
   decl->setTrailingWhereClause(genericWhereClause.unbridged());
   decl->setImplicitlyUnwrappedOptional(isIUO);
 
@@ -345,32 +368,15 @@ static void setParsedMembers(IterableDeclContext *IDC, BridgedArrayRef cMembers,
 
   Fingerprint fp = cFingerprint.unbridged();
 
-  SmallVector<Decl *> members;
-  for (auto *decl : cMembers.unbridged<Decl *>()) {
-    members.push_back(decl);
-
-    // Add any variables bound to the list of decls.
-    if (auto *PBD = dyn_cast<PatternBindingDecl>(decl)) {
-      for (auto idx : range(PBD->getNumPatternEntries())) {
-        PBD->getPattern(idx)->forEachVariable(
-            [&](VarDecl *VD) { members.push_back(VD); });
-      }
-    }
-    // Each enum case element is also part of the members list according to the
-    // legacy parser.
-    if (auto *ECD = dyn_cast<EnumCaseDecl>(decl)) {
-      for (auto *EED : ECD->getElements()) {
-        members.push_back(EED);
-      }
-    }
-  }
+  ArrayRef<Decl *> members =
+      ctx.AllocateTransform<Decl *>(cMembers.unbridged<BridgedDecl>(),
+                                    [](auto decl) { return decl.unbridged(); });
 
   IDC->setMaybeHasOperatorDeclarations();
   IDC->setMaybeHasNestedClassDeclarations();
   // FIXME: Split requests. e.g. DeclMembersFingerprintRequest.
-  ctx.evaluator.cacheOutput(
-      ParseMembersRequest{IDC},
-      FingerprintAndMembers{fp, ctx.AllocateCopy(members)});
+  ctx.evaluator.cacheOutput(ParseMembersRequest{IDC},
+                            FingerprintAndMembers{fp, members});
 }
 
 void BridgedNominalTypeDecl_setParsedMembers(BridgedNominalTypeDecl cDecl,
@@ -660,32 +666,15 @@ BridgedSubscriptDecl BridgedSubscriptDecl_createParsed(
       cGenericParamList.unbridged());
 }
 
-BridgedTopLevelCodeDecl BridgedTopLevelCodeDecl_createStmt(
-    BridgedASTContext cContext, BridgedDeclContext cDeclContext,
-    BridgedSourceLoc cStartLoc, BridgedStmt statement,
-    BridgedSourceLoc cEndLoc) {
-  ASTContext &context = cContext.unbridged();
-  DeclContext *declContext = cDeclContext.unbridged();
-
-  auto *S = statement.unbridged();
-  auto Brace = BraceStmt::create(context, cStartLoc.unbridged(), {S},
-                                 cEndLoc.unbridged(),
-                                 /*Implicit=*/true);
-  return new (context) TopLevelCodeDecl(declContext, Brace);
+BridgedTopLevelCodeDecl
+BridgedTopLevelCodeDecl_create(BridgedASTContext cContext,
+                               BridgedDeclContext cDeclContext) {
+  return new (cContext.unbridged()) TopLevelCodeDecl(cDeclContext.unbridged());
 }
 
-BridgedTopLevelCodeDecl BridgedTopLevelCodeDecl_createExpr(
-    BridgedASTContext cContext, BridgedDeclContext cDeclContext,
-    BridgedSourceLoc cStartLoc, BridgedExpr expression,
-    BridgedSourceLoc cEndLoc) {
-  ASTContext &context = cContext.unbridged();
-  DeclContext *declContext = cDeclContext.unbridged();
-
-  auto *E = expression.unbridged();
-  auto Brace = BraceStmt::create(context, cStartLoc.unbridged(), {E},
-                                 cEndLoc.unbridged(),
-                                 /*Implicit=*/true);
-  return new (context) TopLevelCodeDecl(declContext, Brace);
+void BridgedTopLevelCodeDecl_setBody(BridgedTopLevelCodeDecl cDecl,
+                                     BridgedBraceStmt cBody) {
+  cDecl.unbridged()->setBody(cBody.unbridged());
 }
 
 BridgedVarDecl BridgedVarDec_createImplicitStringInterpolationVar(

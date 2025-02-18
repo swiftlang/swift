@@ -42,6 +42,7 @@ namespace llvm {
 }
 
 namespace swift {
+  class AvailabilitySpec;
   class CodeCompletionCallbacks;
   class DoneParsingCallback;
   class DefaultArgumentInitializer;
@@ -53,7 +54,7 @@ namespace swift {
   class SILParserStateBase;
   class SourceManager;
   class UUID;
-  
+
   struct EnumElementInfo;
 
   /// Different contexts in which BraceItemList are parsed.
@@ -1788,7 +1789,10 @@ public:
   /// \param name The parsed name of the label (empty if it doesn't exist, or is
   /// _)
   /// \param loc The location of the label (empty if it doesn't exist)
-  void parseOptionalArgumentLabel(Identifier &name, SourceLoc &loc);
+  /// \param isAttr True if this is an argument label for an attribute (allows, but deprecates, use of
+  ///               \c '=' instead of \c ':').
+  void parseOptionalArgumentLabel(Identifier &name, SourceLoc &loc,
+                                  bool isAttr = false);
 
   enum class DeclNameFlag : uint8_t {
     /// If passed, operator basenames are allowed.
@@ -2056,10 +2060,8 @@ public:
                                    SmallVectorImpl<AvailabilitySpec *> &Specs);
 
   ParserResult<AvailabilitySpec> parseAvailabilitySpec();
-  ParserResult<PlatformVersionConstraintAvailabilitySpec>
-  parsePlatformVersionConstraintSpec();
-  ParserResult<PlatformAgnosticVersionConstraintAvailabilitySpec>
-  parsePlatformAgnosticVersionConstraintSpec();
+  ParserResult<AvailabilitySpec> parsePlatformVersionConstraintSpec();
+  ParserResult<AvailabilitySpec> parsePlatformAgnosticVersionConstraintSpec();
   bool
   parseAvailability(bool parseAsPartOfSpecializeAttr, StringRef AttrName,
                     bool &DiscardAttribute, SourceRange &attrRange,

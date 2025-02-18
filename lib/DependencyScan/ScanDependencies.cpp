@@ -81,7 +81,7 @@ namespace {
 class ExplicitModuleDependencyResolver {
 public:
   ExplicitModuleDependencyResolver(
-      ModuleDependencyID moduleID, ModuleDependenciesCache &cache,
+      const ModuleDependencyID &moduleID, ModuleDependenciesCache &cache,
       CompilerInstance &instance, std::optional<SwiftDependencyTracker> tracker)
       : moduleID(moduleID), cache(cache), instance(instance),
         resolvingDepInfo(cache.findKnownDependency(moduleID)),
@@ -169,7 +169,11 @@ public:
       }
     }
 
-    pruneUnusedVFSOverlay();
+    SwiftInterfaceModuleOutputPathResolution::ResultTy swiftInterfaceOutputPath;
+    if (resolvingDepInfo.isSwiftInterfaceModule()) {
+      pruneUnusedVFSOverlay(swiftInterfaceOutputPath);
+      updateSwiftInterfaceModuleOutputPath(swiftInterfaceOutputPath);
+    }
 
     // Update the dependency in the cache with the modified command-line.
     if (resolvingDepInfo.isSwiftInterfaceModule() ||
@@ -182,7 +186,7 @@ public:
     }
 
     auto dependencyInfoCopy = resolvingDepInfo;
-    if (auto err = finalize(dependencyInfoCopy))
+    if (auto err = finalize(dependencyInfoCopy, swiftInterfaceOutputPath))
       return err;
 
     dependencyInfoCopy.setIsFinalized(true);
@@ -192,14 +196,21 @@ public:
 
 private:
   // Finalize the resolving dependency info.
-  llvm::Error finalize(ModuleDependencyInfo &depInfo) {
+  llvm::Error finalize(ModuleDependencyInfo &depInfo,
+                       const SwiftInterfaceModuleOutputPathResolution::ResultTy
+                           &swiftInterfaceModuleOutputPath) {
     if (resolvingDepInfo.isSwiftPlaceholderModule())
       return llvm::Error::success();
 
+    if (resolvingDepInfo.isSwiftInterfaceModule())
+      depInfo.setOutputPathAndHash(
+          swiftInterfaceModuleOutputPath.outputPath.str().str(),
+          swiftInterfaceModuleOutputPath.hash.str());
+
     // Add macros.
     for (auto &macro : macros)
-      depInfo.addMacroDependency(
-          macro.first(), macro.second.LibraryPath, macro.second.ExecutablePath);
+      depInfo.addMacroDependency(macro.first(), macro.second.LibraryPath,
+                                 macro.second.ExecutablePath);
 
     for (auto &macro : depInfo.getMacroDependencies()) {
       std::string arg = macro.second.LibraryPath + "#" +
@@ -213,8 +224,7 @@ private:
       return err;
 
     if (!bridgingHeaderBuildCmd.empty())
-      depInfo.updateBridgingHeaderCommandLine(
-          bridgingHeaderBuildCmd);
+      depInfo.updateBridgingHeaderCommandLine(bridgingHeaderBuildCmd);
     if (!resolvingDepInfo.isSwiftBinaryModule()) {
       depInfo.updateCommandLine(commandline);
       if (auto err = updateModuleCacheKey(depInfo))
@@ -376,16 +386,18 @@ private:
     }
   }
 
-  void pruneUnusedVFSOverlay() {
+  void pruneUnusedVFSOverlay(
+      SwiftInterfaceModuleOutputPathResolution::ResultTy &outputPath) {
     // Pruning of unused VFS overlay options for Clang dependencies is performed
     // by the Clang dependency scanner.
     if (moduleID.Kind == ModuleDependencyKind::Clang)
       return;
 
+    // Prune the command line.
     std::vector<std::string> resolvedCommandLine;
     size_t skip = 0;
-    for (auto it = commandline.begin(), end = commandline.end();
-         it != end; it++) {
+    for (auto it = commandline.begin(), end = commandline.end(); it != end;
+         it++) {
       if (skip) {
         skip--;
         continue;
@@ -402,7 +414,62 @@ private:
       }
       resolvedCommandLine.push_back(*it);
     }
+
     commandline = std::move(resolvedCommandLine);
+
+    // Prune the clang impoter options. We do not need to deal with -Xcc because
+    // these are clang options.
+    const auto &CI = instance.getInvocation();
+
+    SwiftInterfaceModuleOutputPathResolution::ArgListTy extraArgsList;
+    const auto &clangImporterOptions =
+        CI.getClangImporterOptions()
+            .getReducedExtraArgsForSwiftModuleDependency();
+
+    skip = 0;
+    for (auto it = clangImporterOptions.begin(),
+              end = clangImporterOptions.end();
+         it != end; it++) {
+      if (skip) {
+        skip = 0;
+        continue;
+      }
+
+      if ((it + 1) != end && isVFSOverlayFlag(*it)) {
+        if (!usedVFSOverlayPaths.contains(*(it + 1))) {
+          skip = 1;
+          continue;
+        }
+      }
+
+      extraArgsList.push_back(*it);
+    }
+
+    auto swiftTextualDeps = resolvingDepInfo.getAsSwiftInterfaceModule();
+    auto &interfacePath = swiftTextualDeps->swiftInterfaceFile;
+    auto sdkPath = instance.getASTContext().SearchPathOpts.getSDKPath();
+    SwiftInterfaceModuleOutputPathResolution::setOutputPath(
+        outputPath, moduleID.ModuleName, interfacePath, sdkPath, CI,
+        extraArgsList);
+
+    return;
+  }
+
+  void updateSwiftInterfaceModuleOutputPath(
+      const SwiftInterfaceModuleOutputPathResolution::ResultTy &outputPath) {
+    StringRef outputName = outputPath.outputPath.str();
+
+    bool isOutputPath = false;
+    for (auto &A : commandline) {
+      if (isOutputPath) {
+        A = outputName.str();
+        break;
+      } else if (A == "-o") {
+        isOutputPath = true;
+      }
+    }
+
+    return;
   }
 
   llvm::Error collectCASDependencies(ModuleDependencyInfo &dependencyInfoCopy) {
@@ -524,7 +591,7 @@ private:
   }
 
 private:
-  ModuleDependencyID moduleID;
+  const ModuleDependencyID &moduleID;
   ModuleDependenciesCache &cache;
   CompilerInstance &instance;
   const ModuleDependencyInfo &resolvingDepInfo;
@@ -540,7 +607,7 @@ private:
 };
 
 static llvm::Error resolveExplicitModuleInputs(
-    ModuleDependencyID moduleID,
+    const ModuleDependencyID &moduleID,
     const std::set<ModuleDependencyID> &dependencies,
     ModuleDependenciesCache &cache, CompilerInstance &instance,
     std::optional<std::set<ModuleDependencyID>> bridgingHeaderDeps,

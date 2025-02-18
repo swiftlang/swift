@@ -12,7 +12,7 @@
 
 import SIL
 
-extension ValueToBridgeObjectInst : OnoneSimplifyable {
+extension ValueToBridgeObjectInst : OnoneSimplifiable {
   func simplify(_ context: SimplifyContext) {
 
     // Optimize the sequence

@@ -636,6 +636,39 @@ bool Decl::hasBackDeployedAttr() const {
   return false;
 }
 
+void Decl::forEachDeclToHoist(llvm::function_ref<void(Decl *)> callback) const {
+  switch (getKind()) {
+  case DeclKind::TopLevelCode: {
+    auto *TLCD = cast<TopLevelCodeDecl>(this);
+    if (TLCD->getBody()) {
+      for (auto node : TLCD->getBody()->getElements())
+        if (auto *d = node.dyn_cast<Decl *>())
+          d->forEachDeclToHoist(callback);
+    }
+    break;
+  }
+  case DeclKind::PatternBinding: {
+    auto *PBD = cast<PatternBindingDecl>(this);
+    // Variable declarations are part of the list on par with pattern binding
+    // declarations.
+    for (auto i : range(PBD->getNumPatternEntries())) {
+      PBD->getPattern(i)->forEachVariable([&](VarDecl *VD) { callback(VD); });
+    }
+    break;
+  }
+  case DeclKind::EnumCase: {
+    auto *ECD = cast<EnumCaseDecl>(this);
+    // Each enum case element is part of the members list.
+    for (auto *EED : ECD->getElements()) {
+      callback(EED);
+    }
+    break;
+  }
+  default:
+    break;
+  }
+}
+
 llvm::raw_ostream &swift::operator<<(llvm::raw_ostream &OS,
                                      StaticSpellingKind SSK) {
   switch (SSK) {
@@ -1117,6 +1150,14 @@ ExplicitSafety Decl::getExplicitSafety() const {
   if (auto safety = getExplicitSafetyFromAttrs(this))
     return *safety;
 
+  // If this declaration is from C, ask the Clang importer.
+  if (auto clangDecl = getClangDecl()) {
+    ASTContext &ctx = getASTContext();
+    return evaluateOrDefault(ctx.evaluator,
+                             ClangDeclExplicitSafety({clangDecl}),
+                             ExplicitSafety::Unspecified);
+  }
+  
   // Inference: Check the enclosing context.
   if (auto enclosingDC = getDeclContext()) {
     // Is this an extension with @safe or @unsafe on it?
@@ -3961,8 +4002,6 @@ TypeRepr *ValueDecl::getResultTypeRepr() const {
     returnRepr = SD->getElementTypeRepr();
   } else if (auto *MD = dyn_cast<MacroDecl>(this)) {
     returnRepr = MD->resultType.getTypeRepr();
-  } else if (auto *CD = dyn_cast<ConstructorDecl>(this)) {
-    returnRepr = CD->getResultTypeRepr();
   }
 
   return returnRepr;
@@ -6632,11 +6671,9 @@ bool EnumDecl::hasOnlyCasesWithoutAssociatedValues() const {
   bool hasAssociatedValues = false;
 
   for (auto elt : getAllElements()) {
-    for (auto Attr : elt->getAttrs()) {
-      if (auto AvAttr = dyn_cast<AvailableAttr>(Attr)) {
-        if (!AvAttr->isInvalid())
-          hasAnyUnavailableValues = true;
-      }
+    for (auto Attr : elt->getSemanticAvailableAttrs()) {
+      // FIXME: [availability] Deprecation doesn't make an element unavailable
+      hasAnyUnavailableValues = true;
     }
 
     if (!elt->isAvailableDuringLowering())
@@ -6945,13 +6982,6 @@ bool ProtocolDecl::hasSelfOrAssociatedTypeRequirements() const {
                            HasSelfOrAssociatedTypeRequirementsRequest{
                                const_cast<ProtocolDecl *>(this)},
                            resultForCycle);
-}
-
-bool ProtocolDecl::existentialRequiresAny() const {
-  if (getASTContext().LangOpts.hasFeature(Feature::ExistentialAny))
-    return true;
-
-  return hasSelfOrAssociatedTypeRequirements();
 }
 
 ArrayRef<AssociatedTypeDecl *>
@@ -8647,7 +8677,7 @@ static DefaultArgumentKind computeDefaultArgumentKind(DeclContext *dc,
     return DefaultArgumentKind::Normal;
 
   switch (magic->getKind()) {
-#define MAGIC_IDENTIFIER(NAME, STRING, SYNTAX_KIND)                            \
+#define MAGIC_IDENTIFIER(NAME, STRING)                                         \
   case MagicIdentifierLiteralExpr::NAME:                                       \
     return DefaultArgumentKind::NAME;
 #include "swift/AST/MagicIdentifierKinds.def"
@@ -8867,7 +8897,7 @@ bool ParamDecl::hasDefaultExpr() const {
   case DefaultArgumentKind::StoredProperty:
     return false;
   case DefaultArgumentKind::Normal:
-#define MAGIC_IDENTIFIER(NAME, STRING, SYNTAX_KIND) \
+#define MAGIC_IDENTIFIER(NAME, STRING)                                         \
   case DefaultArgumentKind::NAME:
 #include "swift/AST/MagicIdentifierKinds.def"
   case DefaultArgumentKind::ExpressionMacro:
@@ -8888,7 +8918,7 @@ bool ParamDecl::hasCallerSideDefaultExpr() const {
   case DefaultArgumentKind::StoredProperty:
   case DefaultArgumentKind::Normal:
     return false;
-#define MAGIC_IDENTIFIER(NAME, STRING, SYNTAX_KIND) \
+#define MAGIC_IDENTIFIER(NAME, STRING)                                         \
   case DefaultArgumentKind::NAME:
 #include "swift/AST/MagicIdentifierKinds.def"
   case DefaultArgumentKind::NilLiteral:
@@ -9190,7 +9220,7 @@ ParamDecl::getDefaultValueStringRepresentation(
     return extractInlinableText(getASTContext(), init, scratch);
   }
   case DefaultArgumentKind::Inherited: return "super";
-#define MAGIC_IDENTIFIER(NAME, STRING, SYNTAX_KIND) \
+#define MAGIC_IDENTIFIER(NAME, STRING)                                         \
   case DefaultArgumentKind::NAME: return STRING;
 #include "swift/AST/MagicIdentifierKinds.def"
   case DefaultArgumentKind::NilLiteral: return "nil";
@@ -10474,10 +10504,6 @@ void FuncDecl::setResultInterfaceType(Type type) {
                                         std::move(type));
 }
 
-void FuncDecl::setDeserializedResultTypeLoc(TypeLoc ResultTyR) {
-  FnRetType = ResultTyR;
-}
-
 FuncDecl *FuncDecl::createImpl(ASTContext &Context,
                                SourceLoc StaticLoc,
                                StaticSpellingKind StaticSpelling,
@@ -10915,7 +10941,7 @@ ConstructorDecl::ConstructorDecl(DeclName Name, SourceLoc ConstructorLoc,
                                  TypeLoc ThrownType,
                                  ParameterList *BodyParams,
                                  GenericParamList *GenericParams,
-                                 DeclContext *Parent, TypeRepr *ResultTyR)
+                                 DeclContext *Parent)
   : AbstractFunctionDecl(DeclKind::Constructor, Parent, Name, ConstructorLoc,
                          Async, AsyncLoc, Throws, ThrowsLoc, ThrownType,
                          /*HasImplicitSelfDecl=*/true,
@@ -10926,7 +10952,6 @@ ConstructorDecl::ConstructorDecl(DeclName Name, SourceLoc ConstructorLoc,
   if (BodyParams)
     setParameters(BodyParams);
 
-  InitRetType = TypeLoc(ResultTyR);
   Bits.ConstructorDecl.HasStubImplementation = 0;
   Bits.ConstructorDecl.Failable = Failable;
 
@@ -10947,14 +10972,9 @@ ConstructorDecl *ConstructorDecl::createImported(
                       failable, failabilityLoc, 
                       async, asyncLoc,
                       throws, throwsLoc, TypeLoc::withoutLoc(thrownType),
-                      bodyParams, genericParams, parent,
-                      /*LifetimeDependenceTypeRepr*/ nullptr);
+                      bodyParams, genericParams, parent);
   ctor->setClangNode(clangNode);
   return ctor;
-}
-
-void ConstructorDecl::setDeserializedResultTypeLoc(TypeLoc ResultTyR) {
-  InitRetType = ResultTyR;
 }
 
 bool ConstructorDecl::isObjCZeroParameterWithLongSelector() const {

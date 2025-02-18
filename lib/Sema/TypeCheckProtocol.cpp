@@ -2339,7 +2339,8 @@ static void diagnoseConformanceImpliedByConditionalConformance(
 /// to the given protocol. This should return true when @unchecked can be
 /// used to disable those semantic checks.
 static bool hasAdditionalSemanticChecks(ProtocolDecl *proto) {
-  return proto->isSpecificProtocol(KnownProtocolKind::Sendable);
+  return proto->isSpecificProtocol(KnownProtocolKind::Sendable) ||
+      proto->isSpecificProtocol(KnownProtocolKind::SendableMetatype);
 }
 
 /// Determine whether a conformance to this protocol can be determined at
@@ -4963,12 +4964,16 @@ static bool diagnoseTypeWitnessAvailability(
   bool shouldError =
       ctx.LangOpts.EffectiveLanguageVersion.isVersionAtLeast(warnBeforeVersion);
 
-  if (auto attr = where.shouldDiagnoseDeclAsUnavailable(witness)) {
+  auto constraint =
+      getAvailabilityConstraintsForDecl(witness, where.getAvailability())
+          .getPrimaryConstraint();
+  if (constraint && constraint->isUnavailable()) {
+    auto attr = constraint->getAttr();
     ctx.addDelayedConformanceDiag(
         conformance, shouldError,
         [witness, assocType, attr](NormalProtocolConformance *conformance) {
           SourceLoc loc = getLocForDiagnosingWitness(conformance, witness);
-          EncodedDiagnosticMessage encodedMessage(attr->getMessage());
+          EncodedDiagnosticMessage encodedMessage(attr.getMessage());
           auto &ctx = conformance->getDeclContext()->getASTContext();
           ctx.Diags
               .diagnose(loc, diag::witness_unavailable, witness,
