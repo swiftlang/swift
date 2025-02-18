@@ -111,7 +111,7 @@ struct DiagLoc {
 
   DiagLoc(SourceManager &diagSM, SourceManager &verifierSM,
           SourceLoc initialSourceLoc, bool wantEnd = false)
-      : sourceLoc(initialSourceLoc), bufferID(std::nullopt), line(0), column(0)
+      : bufferID(std::nullopt), line(0), column(0), sourceLoc(initialSourceLoc)
   {
     if (sourceLoc.isInvalid())
       return;
