@@ -105,6 +105,7 @@ extension InlineArray where Element: ~Copyable {
   @available(SwiftStdlib 6.2, *)
   @_alwaysEmitIntoClient
   public init<E: Error>(_ body: (Int) throws(E) -> Element) throws(E) {
+#if $BuiltinEmplaceTypedThrows
     self = try Builtin.emplace { (rawPtr) throws(E) -> () in
       let buffer = InlineArray<count, Element>._initializationBuffer(
         start: rawPtr
@@ -125,6 +126,9 @@ extension InlineArray where Element: ~Copyable {
         }
       }
     }
+#else
+    fatalError()
+#endif
   }
 
   /// Initializes every element in this vector by running the closure with the
@@ -149,6 +153,7 @@ extension InlineArray where Element: ~Copyable {
     first: consuming Element,
     next: (borrowing Element) throws(E) -> Element
   ) throws(E) {
+#if $BuiltinEmplaceTypedThrows
     // FIXME: We should be able to mark 'Builtin.emplace' as '@once' or something
     //        to give the compiler enough information to know we will only run
     //        it once so it can consume the capture. For now, we use an optional
@@ -176,6 +181,9 @@ extension InlineArray where Element: ~Copyable {
         }
       }
     }
+#else
+    fatalError()
+#endif
   }
 }
 
