@@ -408,22 +408,10 @@ bool CompilerInstance::setupDiagnosticVerifierIfNeeded() {
 
   if (diagOpts.VerifyMode != DiagnosticOptions::NoVerify) {
     DiagVerifier = std::make_unique<DiagnosticVerifier>(
-        SourceMgr, InputSourceCodeBufferIDs,
+        SourceMgr, InputSourceCodeBufferIDs, diagOpts.AdditionalVerifierFiles,
         diagOpts.VerifyMode == DiagnosticOptions::VerifyAndApplyFixes,
         diagOpts.VerifyIgnoreUnknown, diagOpts.UseColor,
         diagOpts.AdditionalDiagnosticVerifierPrefixes);
-    for (const auto &filename : diagOpts.AdditionalVerifierFiles) {
-      auto result = getFileSystem().getBufferForFile(filename);
-      if (!result) {
-        Diagnostics.diagnose(SourceLoc(), diag::error_open_input_file,
-                             filename, result.getError().message());
-        hadError |= true;
-        continue;
-      }
-
-      auto bufferID = SourceMgr.addNewSourceBuffer(std::move(result.get()));
-      DiagVerifier->appendAdditionalBufferID(bufferID);
-    }
 
     addDiagnosticConsumer(DiagVerifier.get());
   }
