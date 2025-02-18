@@ -306,3 +306,11 @@ class StaticTest {
   class var classVar: Int { 42 }
   static let staticVar = 42
 }
+
+func defaultArgInitTestFunc(fn: () -> () = {}) {}
+struct DefaultArgInitTestStruct {
+  func foo(fn: () -> () = {}) {}
+}
+enum DefaultArgInitTestEnum {
+    case foo(x: () -> () = {})
+}
