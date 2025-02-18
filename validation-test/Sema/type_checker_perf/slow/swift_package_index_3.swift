@@ -1,4 +1,4 @@
-// RUN: %target-typecheck-verify-swift -solver-scope-threshold=50000
+// RUN: %target-typecheck-verify-swift %s -solver-scope-threshold=50000
 // REQUIRES: tools-release,no_asan
 
 extension String {
@@ -9,7 +9,7 @@ extension String {
 func getProperties(
     from ics: String
 ) -> [(name: String, value: String)] {
-    return ics
+    return ics // expected-error {{the compiler is unable to type-check this expression in reasonable time}}
         .replacingOccurrences(of: "\r\n ", with: "")
         .components(separatedBy: "\r\n")
         .map { $0.split(separator: ":", maxSplits: 1, omittingEmptySubsequences: true) }
