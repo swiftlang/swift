@@ -155,7 +155,7 @@ extension Maybe: Copyable where Wrapped: Copyable {}
 // expected-note@+2{{requirement specified as 'Wrapped' : 'Copyable'}}
 // expected-note@+1{{requirement from conditional conformance of 'Maybe<Wrapped>' to 'Copyable'}}
 struct RequireCopyable<T> {
-  // expected-note@-1 {{consider adding '~Copyable' to generic struct 'RequireCopyable'}}{{27-27=: ~Copyable}}
+  // expected-note@-1 {{consider adding '~Copyable' to generic struct 'RequireCopyable'}}{{27-27=: ~Copyable }}
   deinit {} // expected-error {{deinitializer cannot be declared in generic struct 'RequireCopyable' that conforms to 'Copyable'}}
 }
 

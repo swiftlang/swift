@@ -38,6 +38,7 @@ static void addConformanceFixIt(const NominalTypeDecl *nominal,
     text.append(": ");
     if (inverse) text.append("~");
     text.append(getProtocolName(proto));
+    text.append(" ");
     diag.fixItInsert(fixItLoc, text);
   } else {
     auto fixItLoc = nominal->getInherited().getEndLoc();
