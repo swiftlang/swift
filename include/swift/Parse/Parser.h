@@ -1789,7 +1789,10 @@ public:
   /// \param name The parsed name of the label (empty if it doesn't exist, or is
   /// _)
   /// \param loc The location of the label (empty if it doesn't exist)
-  void parseOptionalArgumentLabel(Identifier &name, SourceLoc &loc);
+  /// \param isAttr True if this is an argument label for an attribute (allows, but deprecates, use of
+  ///               \c '=' instead of \c ':').
+  void parseOptionalArgumentLabel(Identifier &name, SourceLoc &loc,
+                                  bool isAttr = false);
 
   enum class DeclNameFlag : uint8_t {
     /// If passed, operator basenames are allowed.

@@ -2148,9 +2148,14 @@ ParserResult<Expr> Parser::parseExprStringLiteral() {
                                       AppendingExpr));
 }
 
-void Parser::parseOptionalArgumentLabel(Identifier &name, SourceLoc &loc) {
+void Parser::parseOptionalArgumentLabel(Identifier &name, SourceLoc &loc,
+                                        bool isAttr) {
+  /// A token that has the same meaning as colon, but is deprecated, if one exists for this call.
+  auto altColon = isAttr ? tok::equal : tok::NUM_TOKENS;
+
   // Check to see if there is an argument label.
-  if (Tok.canBeArgumentLabel() && peekToken().is(tok::colon)) {
+  if (Tok.canBeArgumentLabel() && peekToken().isAny(tok::colon, altColon)) {
+    // Label found, including colon.
     auto text = Tok.getText();
 
     // If this was an escaped identifier that need not have been escaped, say
@@ -2168,11 +2173,23 @@ void Parser::parseOptionalArgumentLabel(Identifier &name, SourceLoc &loc) {
     }
 
     loc = consumeArgumentLabel(name, /*diagnoseDollarPrefix=*/false);
-    consumeToken(tok::colon);
-  } else if (Tok.is(tok::colon)) {
-    diagnose(Tok, diag::expected_label_before_colon);
-    consumeToken(tok::colon);
+  } else if (Tok.isAny(tok::colon, altColon)) {
+    // Found only the colon.
+    diagnose(Tok, diag::expected_label_before_colon)
+      .fixItInsert(Tok.getLoc(), "<#label#>");
+  } else {
+    // No label here.
+    return;
   }
+
+  // If we get here, we ought to be on the colon.
+  assert(Tok.isAny(tok::colon, altColon));
+
+  if (Tok.is(altColon))
+    diagnose(Tok, diag::replace_equal_with_colon_for_value)
+      .fixItReplace(Tok.getLoc(), ": ");
+
+  consumeToken();
 }
 
 static bool tryParseArgLabelList(Parser &P, Parser::DeclNameOptions flags,
