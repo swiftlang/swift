@@ -1459,8 +1459,10 @@ public:
         cast<SILFunctionType>(
           unsubstType->mapTypeOutOfContext()->getCanonicalType())));
 
-    // Use malloc and free as our allocator.
-    auto allocFn = subIGF.IGM.getOpaquePtr(subIGF.IGM.getMallocFn());
+    // Use swift_coroFrameAlloc as our allocator.
+    auto coroAllocFn = subIGF.IGM.getOpaquePtr(subIGF.IGM.getCoroFrameAllocFn());
+    auto mallocTypeId = subIGF.getMallocTypeId();
+    // Use free as our allocator.
     auto deallocFn = subIGF.IGM.getOpaquePtr(subIGF.IGM.getFreeFn());
 
     // Call the right 'llvm.coro.id.retcon' variant.
@@ -1473,7 +1475,7 @@ public:
          llvm::ConstantInt::get(
              subIGF.IGM.Int32Ty,
              getYieldOnceCoroutineBufferAlignment(subIGF.IGM).getValue()),
-         buffer, prototype, allocFn, deallocFn});
+         buffer, prototype, coroAllocFn, deallocFn, mallocTypeId});
 
     // Call 'llvm.coro.begin', just for consistency with the normal pattern.
     // This serves as a handle that we can pass around to other intrinsics.
