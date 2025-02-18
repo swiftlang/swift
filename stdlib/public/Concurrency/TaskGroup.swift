@@ -14,6 +14,16 @@ import Swift
 
 // ==== TaskGroup --------------------------------------------------------------
 
+// In the task-to-thread model we don't enqueue tasks created using addTask
+// to the global pool, but will run them inline instead.
+#if SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
+@usableFromInline
+let enqueueJobOnCreate = false
+#else
+@usableFromInline
+let enqueueJobOnCreate = true
+#endif
+
 /// Starts a new scope that can contain a dynamic number of child tasks.
 ///
 /// A group waits for all of its child tasks
@@ -159,9 +169,9 @@ public func _unsafeInheritExecutor_withTaskGroup<ChildTaskResult, GroupResult>(
 /// by calling the `cancelAll()` method on the task group,
 /// or by canceling the task in which the group is running.
 ///
-/// If you call `addTask(priority:operation:)` to create a new task in a canceled group,
+/// If you call `addTask(name:priority:operation:)` to create a new task in a canceled group,
 /// that task is immediately canceled after creation.
-/// Alternatively, you can call `addTaskUnlessCancelled(priority:operation:)`,
+/// Alternatively, you can call `addTaskUnlessCancelled(name:priority:operation:)`,
 /// which doesn't create the task if the group has already been canceled.
 /// Choosing between these two functions
 /// lets you control how to react to cancellation within a group:
@@ -307,8 +317,8 @@ public func _unsafeInheritExecutor_withThrowingTaskGroup<ChildTaskResult, GroupR
 ///
 /// A cancelled task group can still keep adding tasks, however they will start
 /// being immediately cancelled, and may act accordingly to this. To avoid adding
-/// new tasks to an already cancelled task group, use ``addTaskUnlessCancelled(priority:body:)``
-/// rather than the plain ``addTask(priority:body:)`` which adds tasks unconditionally.
+/// new tasks to an already cancelled task group, use ``addTaskUnlessCancelled(name:priority:body:)``
+/// rather than the plain ``addTask(name:priority:body:)`` which adds tasks unconditionally.
 ///
 /// For information about the language-level concurrency model that `TaskGroup` is part of,
 /// see [Concurrency][concurrency] in [The Swift Programming Language][tspl].
@@ -344,20 +354,12 @@ public struct TaskGroup<ChildTaskResult: Sendable> {
     priority: TaskPriority? = nil,
     operation: sending @escaping @isolated(any) () async -> ChildTaskResult
   ) {
-#if SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
     let flags = taskCreateFlags(
       priority: priority, isChildTask: true, copyTaskLocals: false,
-      inheritContext: false, enqueueJob: false,
+      inheritContext: false, enqueueJob: enqueueJobOnCreate,
       addPendingGroupTaskUnconditionally: true,
       isDiscardingTask: false
     )
-#else
-    let flags = taskCreateFlags(
-      priority: priority, isChildTask: true, copyTaskLocals: false,
-      inheritContext: false, enqueueJob: true,
-      addPendingGroupTaskUnconditionally: true,
-      isDiscardingTask: false)
-#endif
 
     // Create the task in this group.
     let builtinSerialExecutor =
@@ -383,15 +385,9 @@ public struct TaskGroup<ChildTaskResult: Sendable> {
     priority: TaskPriority? = nil,
     operation: sending @escaping @isolated(any) () async -> ChildTaskResult
   ) {
-    #if SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
-    let enqueueJob = false
-    #else
-    let enqueueJob = true
-    #endif
-
     let flags = taskCreateFlags(
       priority: priority, isChildTask: true, copyTaskLocals: false,
-      inheritContext: false, enqueueJob: enqueueJob,
+      inheritContext: false, enqueueJob: enqueueJobOnCreate,
       addPendingGroupTaskUnconditionally: true,
       isDiscardingTask: false
     )
@@ -448,19 +444,11 @@ public struct TaskGroup<ChildTaskResult: Sendable> {
       // the group is cancelled and is not accepting any new work
       return false
     }
-#if SWIFT_STDLIB_TASK_TO_THREAD_MODEL_CONCURRENCY
     let flags = taskCreateFlags(
       priority: priority, isChildTask: true, copyTaskLocals: false,
-      inheritContext: false, enqueueJob: false,
+      inheritContext: false, enqueueJob: enqueueJobOnCreate,
       addPendingGroupTaskUnconditionally: false,
       isDiscardingTask: false)
-#else
-    let flags = taskCreateFlags(
-      priority: priority, isChildTask: true, copyTaskLocals: false,
-      inheritContext: false, enqueueJob: true,
-      addPendingGroupTaskUnconditionally: false,
-      isDiscardingTask: false)
-#endif
 
     // Create the task in this group.
     let builtinSerialExecutor =
@@ -469,6 +457,67 @@ public struct TaskGroup<ChildTaskResult: Sendable> {
                            initialSerialExecutor: builtinSerialExecutor,
                            taskGroup: _group,
                            operation: operation)
+
+    return true
+  }
+
+  /// Adds a child task to the group, unless the group has been canceled.
+  ///
+  /// - Parameters:
+  ///   - name: Human readable name of the task.
+  ///   - priority: The priority of the operation task.
+  ///     Omit this parameter or pass `.unspecified`
+  ///     to set the child task's priority to the priority of the group.
+  ///   - operation: The operation to execute as part of the task group.
+  /// - Returns: `true` if the child task was added to the group;
+  ///   otherwise `false`.
+  @_alwaysEmitIntoClient
+  public mutating func addTaskUnlessCancelled(
+    name: String? = nil,
+    priority: TaskPriority? = nil,
+    operation: sending @escaping @isolated(any) () async -> ChildTaskResult
+  ) -> Bool {
+    let canAdd = _taskGroupAddPendingTask(group: _group, unconditionally: false)
+
+    guard canAdd else {
+      // the group is cancelled and is not accepting any new work
+      return false
+    }
+    let flags = taskCreateFlags(
+      priority: priority, isChildTask: true, copyTaskLocals: false,
+      inheritContext: false, enqueueJob: enqueueJobOnCreate,
+      addPendingGroupTaskUnconditionally: false,
+      isDiscardingTask: false)
+
+    let builtinSerialExecutor =
+      Builtin.extractFunctionIsolation(operation)?.unownedExecutor.executor
+
+    var task: Builtin.NativeObject?
+    #if $BuiltinCreateAsyncTaskName
+    if var name {
+      task =
+        name.withUTF8 { nameBytes in
+          Builtin.createTask(
+            flags: flags,
+            initialSerialExecutor: builtinSerialExecutor,
+            taskGroup: _group,
+            taskName: nameBytes.baseAddress?._rawValue,
+            operation: operation).0
+        }
+    }
+    #endif
+
+    if task == nil {
+      // either no task name was set, or names are unsupported
+      task = Builtin.createTask(
+      flags: flags,
+      // unsupported names, so we drop it.
+      initialSerialExecutor: builtinSerialExecutor,
+      operation: operation).0
+    }
+
+    // task was enqueued to the group, no need to store the 'task' ref itself
+    assert(task != nil, "Expected task to be created!")
 
     return true
   }
