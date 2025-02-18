@@ -3066,6 +3066,12 @@ function Build-Installer($Arch) {
     $Properties["SDK_ROOT_$($SDK.VSName.ToUpperInvariant())"] = "$($SDK.SDKInstallRoot)\"
   }
 
+  foreach ($SDK in $AndroidSDKArchs) {
+    $Properties["INCLUDE_ANDROID_$($SDK.ShortName.ToUpperInvariant())_SDK"] = "true"
+    $Properties["PLATFORM_ROOT_$($SDK.ShortName.ToUpperInvariant())"] = "$($SDK.PlatformInstallRoot)\"
+    $Properties["SDK_ROOT_$($SDK.ShortName.ToUpperInvariant())"] = "$($SDK.SDKInstallRoot)\"
+  }
+
   Build-WiXProject bundle\installer.wixproj -Arch $Arch -Bundle -Properties $Properties
 }
 
