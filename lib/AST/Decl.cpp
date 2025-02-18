@@ -8686,26 +8686,29 @@ static DefaultArgumentKind computeDefaultArgumentKind(DeclContext *dc,
   llvm_unreachable("Unhandled MagicIdentifierLiteralExpr in switch.");
 }
 
-ParamDecl *ParamDecl::createParsed(ASTContext &Context, SourceLoc specifierLoc,
-                                   SourceLoc argumentNameLoc,
-                                   Identifier argumentName,
-                                   SourceLoc parameterNameLoc,
-                                   Identifier parameterName, Expr *defaultValue,
-                                   DeclContext *dc) {
+ParamDecl *ParamDecl::createParsed(
+    ASTContext &Context, SourceLoc specifierLoc, SourceLoc argumentNameLoc,
+    Identifier argumentName, SourceLoc parameterNameLoc,
+    Identifier parameterName, Expr *defaultValue,
+    DefaultArgumentInitializer *defaultValueInitContext, DeclContext *dc) {
   auto *decl =
       new (Context) ParamDecl(specifierLoc, argumentNameLoc, argumentName,
                               parameterNameLoc, parameterName, dc);
 
-  const auto kind = computeDefaultArgumentKind(dc, defaultValue);
-  if (kind == DefaultArgumentKind::Inherited) {
-    // The 'super' in inherited default arguments is a specifier rather than an
-    // expression.
-    // TODO: However, we may want to retain its location for diagnostics.
-    defaultValue = nullptr;
+  if (defaultValue) {
+    const auto kind = computeDefaultArgumentKind(dc, defaultValue);
+    if (kind == DefaultArgumentKind::Inherited) {
+      // The 'super' in inherited default arguments is a specifier rather than
+      // an expression.
+      // TODO: However, we may want to retain its location for diagnostics.
+      defaultValue = nullptr;
+    }
+    ASSERT(defaultValueInitContext);
+    decl->setDefaultExpr(defaultValue);
+    decl->setDefaultArgumentKind(kind);
+    if (defaultValue)
+      decl->setDefaultArgumentInitContext(defaultValueInitContext);
   }
-
-  decl->setDefaultExpr(defaultValue);
-  decl->setDefaultArgumentKind(kind);
 
   return decl;
 }
@@ -8870,7 +8873,7 @@ AnyFunctionType::Param ParamDecl::toFunctionParam(Type type) const {
   return AnyFunctionType::Param(type, label, flags, internalLabel);
 }
 
-std::optional<Initializer *>
+std::optional<DefaultArgumentInitializer *>
 ParamDecl::getCachedDefaultArgumentInitContext() const {
   if (auto *defaultInfo = DefaultValueAndFlags.getPointer())
     if (auto *init = defaultInfo->InitContextAndIsTypeChecked.getPointer())
@@ -9043,7 +9046,8 @@ CustomAttr *ValueDecl::getAttachedResultBuilder() const {
                            nullptr);
 }
 
-void ParamDecl::setDefaultArgumentInitContext(Initializer *initContext) {
+void ParamDecl::setDefaultArgumentInitContext(
+    DefaultArgumentInitializer *initContext) {
   auto oldContext = getCachedDefaultArgumentInitContext();
   assert((!oldContext || oldContext == initContext) &&
          "Cannot change init context after setting");
@@ -9246,15 +9250,9 @@ ParamDecl::setDefaultValueStringRepresentation(StringRef stringRepresentation) {
       stringRepresentation;
 }
 
-void DefaultArgumentInitializer::changeFunction(
-    DeclContext *parent, ParameterList *paramList) {
-  if (parent->isLocalContext()) {
-    setParent(parent);
-  }
-
-  auto param = paramList->get(getIndex());
-  if (param->hasDefaultExpr() || param->getStoredProperty())
-    param->setDefaultArgumentInitContext(this);
+void DefaultArgumentInitializer::changeFunction(DeclContext *parent) {
+  ASSERT(parent->isLocalContext());
+  setParent(parent);
 }
 
 /// Determine whether the given Swift type is an integral type, i.e.,

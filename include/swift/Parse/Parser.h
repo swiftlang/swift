@@ -1504,7 +1504,6 @@ public:
   /// A structure for collecting information about the default
   /// arguments of a context.
   struct DefaultArgumentInfo {
-    llvm::SmallVector<DefaultArgumentInitializer *, 4> ParsedContexts;
     unsigned NextIndex : 31;
     
     /// Track whether or not one of the parameters in a signature's argument
@@ -1515,10 +1514,6 @@ public:
     /// all the arguments, not just those that have default arguments.
     unsigned claimNextIndex() { return NextIndex++; }
 
-    /// Set the parsed context of all default argument initializers to
-    /// the given function, enum case or subscript.
-    void setFunctionContext(DeclContext *DC, ParameterList *paramList);
-    
     DefaultArgumentInfo() {
       NextIndex = 0;
       HasDefaultArgument = false;
@@ -1566,6 +1561,9 @@ public:
 
     /// The default argument for this parameter.
     Expr *DefaultArg = nullptr;
+
+    /// The default argument for this parameter.
+    DefaultArgumentInitializer *DefaultArgInitContext = nullptr;
 
     /// True if we emitted a parse error about this parameter.
     bool isInvalid = false;
