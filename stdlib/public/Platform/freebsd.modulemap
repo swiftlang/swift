@@ -1,0 +1,505 @@
+module _assert [system] {
+  textual header "assert.h"
+}
+
+module _complex [system] {
+  header "complex.h"
+  export *
+}
+
+module _ctype [system] {
+  header "ctype.h"
+  export *
+}
+
+module _malloc [system] {
+  header "malloc.h"
+  header "malloc_np.h"
+  export *
+}
+
+module _errno [system] {
+  header "errno.h"
+  export *
+}
+
+module _fenv [system] {
+  header "fenv.h"
+  export *
+}
+
+module _float [system] {
+  header "float.h"
+  export *
+}
+
+module _inttypes [system] {
+  header "inttypes.h"
+  export *
+}
+
+module _iso646 [system] {
+  header "iso646.h"
+  export *
+}
+
+module _limits [system] {
+  header "limits.h"
+  export *
+}
+
+module _locale [system] {
+  header "locale.h"
+  export *
+}
+
+module _math [system] {
+  header "math.h"
+  export *
+  link "m"
+}
+
+module _pty [system] {
+  header "pty.h"
+  export *
+}
+
+module _setjmp [system] {
+  header "setjmp.h"
+  export *
+}
+
+module _signal [system] {
+  header "signal.h"
+  header "sys/ucontext.h"
+  export *
+}
+
+module _stdalign [system] {
+  header "stdalign.h"
+  export *
+}
+
+module _stdarg [system] {
+  header "stdarg.h"
+  export *
+}
+
+module _stdatomic [system] {
+  header "stdatomic.h"
+  export *
+}
+
+module _stdbool [system] {
+  header "stdbool.h"
+  export *
+}
+
+module _stddef [system] {
+  header "stddef.h"
+  export *
+}
+
+module _stdint [system] {
+  header "stdint.h"
+  export *
+}
+
+module _stdio [system] {
+  header "stdio.h"
+  export *
+}
+
+module _stdlib [system] {
+  header "stdlib.h"
+  export *
+}
+
+module _string [system] {
+  header "string.h"
+  export *
+}
+
+module _strings [system] {
+  header "strings.h"
+  export *
+}
+
+module _tgmath [system] {
+  header "tgmath.h"
+  export *
+}
+
+module _uchar [system] {
+  header "uchar.h"
+  export *
+}
+
+module _wchar [system] {
+  header "wchar.h"
+  export *
+}
+
+module _time [system] {
+  header "time.h"
+  export *
+}
+
+module _stdnoreturn [system] {
+  header "stdnoreturn.h"
+  export *
+}
+
+module _threads [system] {
+  header "threads.h"
+  export *
+  link "stdthreads"
+}
+
+// POSIX
+module posix_aio [system] {
+  header "aio.h"
+  export *
+}
+
+module posix_cpio [system] {
+  header "cpio.h"
+  export *
+}
+
+module posix_dirent [system] {
+  header "dirent.h"
+  export *
+}
+
+module posix_dlfcn [system] {
+  header "dlfcn.h"
+  export *
+  link "dl"
+}
+
+module posix_fcntl [system] {
+  header "fcntl.h"
+  export *
+}
+
+module posix_fmtmsg [system] {
+  header "fmtmsg.h"
+  export *
+}
+
+module posix_fnmatch [system] {
+  header "fnmatch.h"
+  export *
+}
+
+module posix_ftw [system] {
+  header "ftw.h"
+  export *
+}
+
+module posix_glob [system] {
+  header "glob.h"
+  export *
+}
+
+module posix_grp [system] {
+  header "grp.h"
+  export *
+}
+
+module posix_iconv [system] {
+  header "iconv.h"
+  export *
+}
+
+module posix_langinfo [system] {
+  header "langinfo.h"
+  export *
+}
+
+module posix_libgen [system] {
+  header "libgen.h"
+  export *
+}
+
+module posix_monetary [system] {
+  header "monetary.h"
+  export *
+}
+
+module posix_mqueue [system] {
+  header "mqueue.h"
+  export *
+}
+
+module _netdb [system] {
+  header "netdb.h"
+  export *
+}
+
+module _nl_types [system] {
+  header "nl_types.h"
+  export *
+}
+
+module _poll [system] {
+  header "poll.h"
+  export *
+}
+
+module _pwd [system] {
+  header "pwd.h"
+  export *
+}
+
+module _regex [system] {
+  header "regex.h"
+  export *
+}
+
+module _resolv [system] {
+  header "resolv.h"
+  export *
+}
+
+module _sched [system] {
+  header "sched.h"
+  export *
+}
+
+module _semaphore [system] {
+  header "semaphore.h"
+  export *
+}
+
+module _search [system] {
+  header "search.h"
+  export *
+}
+
+module _spawn [system] {
+  header "spawn.h"
+  export *
+}
+
+module _sys_event [system] {
+  header "sys/event.h"
+  export *
+}
+
+//module _sys_extattr [system] {
+//  header "sys/extattr.h"
+//  export *
+//}
+
+module _sys_file [system] {
+  header "sys/file.h"
+  export *
+}
+
+module _sys_ioctl [system] {
+  header "sys/ioctl.h"
+  export *
+}
+
+//module _sys_ipc [system] {
+//  header "sys/ipc.h"
+//  export *
+//}
+
+module _sys_mman [system] {
+  header "sys/mman.h"
+  export *
+}
+
+module _sys_mount [system] {
+  header "sys/mount.h"
+  export *
+}
+
+module _sys_msg [system] {
+  header "sys/msg.h"
+  export *
+}
+
+module _sys_resource [system] {
+  header "sys/resource.h"
+  export *
+}
+
+module _sys_select [system] {
+  header "sys/select.h"
+  export *
+}
+
+module _sys_sem [system] {
+  header "sys/sem.h"
+  export *
+}
+
+module _sys_shm [system] {
+  header "sys/shm.h"
+  export *
+}
+
+module _sys_socket [system] {
+  header "sys/socket.h"
+  export *
+}
+
+module _sys_stat [system] {
+  header "sys/stat.h"
+  export *
+}
+
+module _sys_statvfs [system] {
+  header "sys/statvfs.h"
+  export *
+}
+
+module _sys_time [system] {
+  header "sys/time.h"
+  export *
+}
+
+module _sys_times [system] {
+  header "sys/times.h"
+  export *
+}
+
+module _sys_types [system] {
+  textual header "sys/types.h"
+}
+
+module _sys_uio [system] {
+  header "sys/uio.h"
+  export *
+}
+
+module _sys_un [system] {
+  header "sys/un.h"
+  export *
+}
+
+module _sys_wait [system] {
+  header "sys/wait.h"
+  export *
+}
+
+module _sysexits [system] {
+  header "sysexits.h"
+  export *
+}
+
+module _syslog [system] {
+  header "syslog.h"
+  export *
+}
+
+module _tar [system] {
+  header "tar.h"
+  export *
+}
+
+module _termios [system] {
+  header "termios.h"
+  export *
+}
+
+module _ulimit [system] {
+  header "ulimit.h"
+  export *
+}
+
+module _unistd [system] {
+  header "unistd.h"
+  export *
+}
+
+module _utime [system] {
+  header "utime.h"
+  export *
+}
+
+module _utmpx [system] {
+  header "utmpx.h"
+  export *
+}
+
+module _wait [system] {
+  header "wait.h"
+  export *
+}
+
+module _wordexp [system] {
+  header "wordexp.h"
+  export *
+}
+
+module _netinet [system] {
+  header "netinet/in.h"
+  header "netinet/tcp.h"
+  export *
+}
+
+module _link [system] {
+  header "link.h"
+  header "sys/link_elf.h"
+  export *
+}
+
+module _ifaddrs [system] {
+  header "ifaddrs.h"
+  export *
+}
+
+module net_if [system] {
+  header "net/if.h"
+  export *
+}
+
+module fts [system] {
+  header "fts.h"
+  export *
+}
+
+module pthread [system] {
+  header "pthread.h"
+  header "pthread_np.h"
+  link "pthread"
+  export *
+}
+
+//module lzma [system] {
+//  header "lzma.h"
+//  export *
+//  link "lzma"
+//}
+
+module util [system] {
+  header "libutil.h"
+  export *
+  link "util"
+}
+
+//module zlib [system] {
+//  header "zlib.h"
+//  explicit module zconf {
+//    header "zconf.h"
+//    export *
+//  }
+//  export *
+//  link "z"
+//}
+
+module SwiftFreeBSD [system] {
+  header "SwiftFreeBSD.h"
+  export *
+}
+
+module CUUID [system] {
+  header "uuid/uuid.h"
+  link "uuid"
+  export *
+}
