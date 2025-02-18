@@ -117,8 +117,6 @@ public:
   }
 };
 
-namespace {
-
 namespace compare_detail {
 
 enum : int {
@@ -244,7 +242,7 @@ static int lastDitchSort(Decl *lhs, Decl *rhs, bool suppressDiagnostic) {
   return result;
 }
 
-}
+} // end namespace compare_detail
 
 /// Comparator for use with \c llvm::array_pod_sort() . This sorts decls into
 /// reverse order since they will be pushed onto a stack.
@@ -334,6 +332,7 @@ static int reverseCompareDecls(Decl * const *lhs, Decl * const *rhs) {
 
   // Still nothing? Fine, we'll look for a difference between the members.
   {
+    // First pass: compare names
     for (auto pair : llvm::zip_equal(lhsMembers, rhsMembers)) {
       auto *lhsMember = dyn_cast<ValueDecl>(std::get<0>(pair)),
            *rhsMember = dyn_cast<ValueDecl>(std::get<1>(pair));
@@ -345,9 +344,19 @@ static int reverseCompareDecls(Decl * const *lhs, Decl * const *rhs) {
       ASSERT(lhsMember && rhsMember);
 
       COMPARE(getNameString(lhsMember), getNameString(rhsMember));
+    }
+
+    // Second pass: compare other traits.
+    for (auto pair : llvm::zip_equal(lhsMembers, rhsMembers)) {
+      auto *lhsMember = dyn_cast<ValueDecl>(std::get<0>(pair)),
+           *rhsMember = dyn_cast<ValueDecl>(std::get<1>(pair));
+      if (!lhsMember || !rhsMember)
+        continue;
+
       COMPARE(getTypeString(lhsMember), getTypeString(rhsMember));
       COMPARE(getGenericSignatureString(lhsMember),
               getGenericSignatureString(rhsMember));
+      COMPARE(getMangledNameString(lhsMember), getMangledNameString(rhsMember));
     }
   }
 
@@ -360,7 +369,6 @@ static int reverseCompareDecls(Decl * const *lhs, Decl * const *rhs) {
   return lastDitchSort(*lhs, *rhs, /*suppressDiagnostic=*/bothEmpty);
 
 #undef COMPARE
-}
 }
 
 class ModuleWriter {

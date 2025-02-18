@@ -97,21 +97,21 @@ extension A5 {
 @objc class A6 {}
 
 extension A6 {
-  @objc(skippedInt:) func skipped(_: Int) {}
-  @objc func abc() {}
-}
-extension A6 {
   @objc(skippedBool:) func skipped(_: Bool) {}
   @objc func def() {}
 }
+extension A6 {
+  @objc(skippedInt:) func skipped(_: Int) {}
+  @objc func abc() {}
+}
 // CHECK: @interface A6 (SWIFT_EXTENSION(extensions))
-// CHECK-NEXT: - (void)skippedBool:
-// CHECK-NEXT: - (void)def
+// CHECK-NEXT: - (void)skippedInt:
+// CHECK-NEXT: - (void)abc
 // CHECK-NEXT: @end
 // CHECK-EMPTY:
 // CHECK-NEXT: @interface A6 (SWIFT_EXTENSION(extensions))
-// CHECK-NEXT: - (void)skippedInt:
-// CHECK-NEXT: - (void)abc
+// CHECK-NEXT: - (void)skippedBool:
+// CHECK-NEXT: - (void)def
 // CHECK-NEXT: @end
 // CHECK-EMPTY:
 
