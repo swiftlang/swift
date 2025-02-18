@@ -217,12 +217,24 @@ public:
   ///
   class ConditionalMember : public BuilderMember {
   public:
+    class AvailabilitySpec {
+    private:
+      AvailabilityDomain Domain;
+      llvm::VersionTuple Version;
+
+    public:
+      AvailabilitySpec(AvailabilityDomain Domain, llvm::VersionTuple Version)
+          : Domain(Domain), Version(Version) {}
+
+      AvailabilityDomain getDomain() const { return Domain; }
+      llvm::VersionTuple getVersion() const { return Version; }
+    };
+
     ConditionalMember(MemberKind MemberKind,
-                      std::vector<AvailabilitySpec> AvailabilityAttributes,
+                      std::vector<AvailabilitySpec> AvailabilitySpecs,
                       std::vector<std::shared_ptr<BuilderMember>> IfElements,
                       std::vector<std::shared_ptr<BuilderMember>> ElseElements)
-        : BuilderMember(MemberKind),
-          AvailabilityAttributes(AvailabilityAttributes),
+        : BuilderMember(MemberKind), AvailabilitySpecs(AvailabilitySpecs),
           IfElements(IfElements), ElseElements(ElseElements) {}
 
     ConditionalMember(MemberKind MemberKind,
@@ -238,9 +250,8 @@ public:
              (Kind == MemberKind::Optional);
     }
 
-    std::optional<std::vector<AvailabilitySpec>>
-    getAvailabilityAttributes() const {
-      return AvailabilityAttributes;
+    std::optional<std::vector<AvailabilitySpec>> getAvailabilitySpecs() const {
+      return AvailabilitySpecs;
     }
     std::vector<std::shared_ptr<BuilderMember>> getIfElements() const {
       return IfElements;
@@ -250,7 +261,7 @@ public:
     }
 
   private:
-    std::optional<std::vector<AvailabilitySpec>> AvailabilityAttributes;
+    std::optional<std::vector<AvailabilitySpec>> AvailabilitySpecs;
     std::vector<std::shared_ptr<BuilderMember>> IfElements;
     std::vector<std::shared_ptr<BuilderMember>> ElseElements;
   };
