@@ -645,11 +645,47 @@ extension ASTGenVisitor {
 // MARK: - AbstractFunctionDecl
 
 extension ASTGenVisitor {
+  struct GeneratedFunctionSignature {
+    var parameterList: BridgedParameterList
+    var asyncLoc: BridgedSourceLoc
+    var isReasync: Bool
+    var throwsLoc: BridgedSourceLoc
+    var isRethrows: Bool
+    var thrownType: BridgedTypeRepr?
+    var returnType: BridgedTypeRepr?
+  }
+  
+  func generate(
+    functionSignature node: FunctionSignatureSyntax,
+    for context: ParameterContext
+  ) -> GeneratedFunctionSignature {
+    let parameterList = self.generate(functionParameterClause: node.parameterClause, for: context)
+    let asyncLoc = self.generateSourceLoc(node.effectSpecifiers?.asyncSpecifier)
+    let isReasync = node.effectSpecifiers?.asyncSpecifier?.rawText == "reasync"
+    let throwsLoc = self.generateSourceLoc(node.effectSpecifiers?.throwsClause?.throwsSpecifier)
+    let isRethrows = node.effectSpecifiers?.throwsClause?.throwsSpecifier.rawText == "rethrows"
+    let thrownType = (node.effectSpecifiers?.thrownError).map(self.generate(type:))
+    let returnType = (node.returnClause?.type).map(self.generate(type:))
+    return GeneratedFunctionSignature(
+      parameterList: parameterList,
+      asyncLoc: asyncLoc,
+      isReasync: isReasync,
+      throwsLoc: throwsLoc,
+      isRethrows: isRethrows,
+      thrownType: thrownType,
+      returnType: returnType
+    )
+  } 
+  
   func generate(functionDecl node: FunctionDeclSyntax) -> BridgedFuncDecl? {
-    let attrs = self.generateDeclAttributes(node, allowStatic: true)
+    var attrs = self.generateDeclAttributes(node, allowStatic: true)
     guard let (name, nameLoc) = self.generateIdentifierDeclNameAndLoc(node.name) else {
       return nil
     }
+    let signature = self.generate(
+      functionSignature: node.signature,
+      for: name.isOperator ? .operator : .function
+    )
 
     let decl = BridgedFuncDecl.createParsed(
       self.ctx,
@@ -660,13 +696,19 @@ extension ASTGenVisitor {
       name: name,
       nameLoc: nameLoc,
       genericParamList: self.generate(genericParameterClause: node.genericParameterClause),
-      parameterList: self.generate(functionParameterClause: node.signature.parameterClause, for: name.isOperator ? .operator : .function),
-      asyncSpecifierLoc: self.generateSourceLoc(node.signature.effectSpecifiers?.asyncSpecifier),
-      throwsSpecifierLoc: self.generateSourceLoc(node.signature.effectSpecifiers?.throwsClause?.throwsSpecifier),
-      thrownType: self.generate(type: node.signature.effectSpecifiers?.thrownError),
-      returnType: self.generate(type: node.signature.returnClause?.type),
+      parameterList: signature.parameterList,
+      asyncSpecifierLoc: signature.asyncLoc,
+      throwsSpecifierLoc: signature.throwsLoc,
+      thrownType: signature.thrownType.asNullable,
+      returnType: signature.returnType.asNullable,
       genericWhereClause: self.generate(genericWhereClause: node.genericWhereClause)
     )
+    if signature.isReasync {
+      attrs.attributes.add(BridgedDeclAttribute.createSimple(self.ctx, kind: .reasync, atLoc: nil, nameLoc: signature.asyncLoc))
+    }
+    if signature.isRethrows {
+      attrs.attributes.add(BridgedDeclAttribute.createSimple(self.ctx, kind: .rethrows, atLoc: nil, nameLoc: signature.throwsLoc))
+    }
     decl.asDecl.attachParsedAttrs(attrs.attributes)
 
     if let body = node.body {
@@ -679,7 +721,11 @@ extension ASTGenVisitor {
   }
 
   func generate(initializerDecl node: InitializerDeclSyntax) -> BridgedConstructorDecl {
-    let attrs = self.generateDeclAttributes(node, allowStatic: false)
+    var attrs = self.generateDeclAttributes(node, allowStatic: false)
+    let signature = self.generate(
+      functionSignature: node.signature,
+      for: .initializer
+    )
 
     let decl = BridgedConstructorDecl.createParsed(
       self.ctx,
@@ -688,13 +734,24 @@ extension ASTGenVisitor {
       failabilityMarkLoc: self.generateSourceLoc(node.optionalMark),
       isIUO: node.optionalMark?.rawTokenKind == .exclamationMark,
       genericParamList: self.generate(genericParameterClause: node.genericParameterClause),
-      parameterList: self.generate(functionParameterClause: node.signature.parameterClause, for: .initializer),
-      asyncSpecifierLoc: self.generateSourceLoc(node.signature.effectSpecifiers?.asyncSpecifier),
-      throwsSpecifierLoc: self.generateSourceLoc(node.signature.effectSpecifiers?.throwsClause?.throwsSpecifier),
-      thrownType: self.generate(type: node.signature.effectSpecifiers?.thrownError),
+      parameterList: signature.parameterList,
+      asyncSpecifierLoc: signature.asyncLoc,
+      throwsSpecifierLoc: signature.throwsLoc,
+      thrownType: signature.thrownType.asNullable,
       genericWhereClause: self.generate(genericWhereClause: node.genericWhereClause)
     )
+    if signature.isReasync {
+      attrs.attributes.add(BridgedDeclAttribute.createSimple(self.ctx, kind: .reasync, atLoc: nil, nameLoc: signature.asyncLoc))
+    }
+    if signature.isRethrows {
+      attrs.attributes.add(BridgedDeclAttribute.createSimple(self.ctx, kind: .rethrows, atLoc: nil, nameLoc: signature.throwsLoc))
+    }
     decl.asDecl.attachParsedAttrs(attrs.attributes)
+    
+    guard signature.returnType == nil else {
+      // TODO: Diagnose.
+      fatalError("unexpected return type in initializer decl")
+    }
 
     if let body = node.body {
       self.withDeclContext(decl.asDeclContext) {
