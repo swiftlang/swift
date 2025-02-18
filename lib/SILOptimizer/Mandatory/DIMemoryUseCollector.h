@@ -292,7 +292,7 @@ enum DIUseKind {
   /// This instruction is a call to 'self.init' in a delegating initializer,
   /// or a call to 'super.init' in a designated initializer of a derived class..
   SelfInit,
-  
+
   /// This instruction is a load that's only used to answer a `type(of: self)`
   /// question.
   LoadForTypeOfSelf,

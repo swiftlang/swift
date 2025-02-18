@@ -1474,7 +1474,7 @@ public:
   void visitAbstractStorageDecl(AbstractStorageDecl *asd) {
     if (asd->isObjC())
       SGM.emitObjCPropertyMethodThunks(asd);
-    
+
     SGM.tryEmitPropertyDescriptor(asd);
     visitAccessors(asd);
   }

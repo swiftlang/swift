@@ -225,7 +225,7 @@ processFunctionWithoutLoopSupport(SILFunction &F, bool FreezePostDomReleases,
 //===----------------------------------------------------------------------===//
 
 static bool processFunctionWithLoopSupport(
-    SILFunction &F, AliasAnalysis *AA, PostOrderAnalysis *POTA, 
+    SILFunction &F, AliasAnalysis *AA, PostOrderAnalysis *POTA,
     LoopRegionFunctionInfo *LRFI, SILLoopInfo *LI, RCIdentityFunctionInfo *RCFI,
     EpilogueARCFunctionInfo *EAFI, ProgramTerminationFunctionInfo *PTFI) {
   // GlobalARCOpts seems to be taking up a lot of compile time when running on

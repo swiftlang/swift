@@ -2245,7 +2245,7 @@ SwiftDeclSynthesizer::makeOperator(FuncDecl *operatorMethod,
 
   auto topLevelStaticFuncDecl = FuncDecl::createImplicit(
       ctx, StaticSpellingKind::None, opDeclName, SourceLoc(),
-      /*Async*/ false, /*Throws*/ false, /*ThrownType=*/Type(), 
+      /*Async*/ false, /*Throws*/ false, /*ThrownType=*/Type(),
       genericParamList, ParameterList::create(ctx, newParams),
       operatorMethod->getResultInterfaceType(), parentCtx);
 

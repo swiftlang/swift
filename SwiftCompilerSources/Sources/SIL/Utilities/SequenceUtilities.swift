@@ -22,7 +22,7 @@ public protocol HasShortDescription {
 
 private struct CustomMirrorChild : CustomStringConvertible, NoReflectionChildren {
   public var description: String
-  
+
   public init(description: String) { self.description = description }
 }
 
@@ -40,7 +40,7 @@ extension FormattedLikeArray {
       return String(describing: $0)
     }.joined(separator: ", ") + "]"
   }
-  
+
   /// The mirror which adds the children of a Sequence, similar to `Array`.
   public var customMirror: Mirror {
     // If the one-line description is not too large, print that instead of the

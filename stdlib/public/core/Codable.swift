@@ -267,7 +267,7 @@ public protocol KeyedEncodingContainerProtocol {
   /// - throws: `EncodingError.invalidValue` if the given value is invalid in
   ///   the current context for this format.
   mutating func encode(_ value: Int64, forKey key: Key) throws
-  
+
   /// Encodes the given value for the given key.
   ///
   /// - parameter value: The value to encode.
@@ -316,7 +316,7 @@ public protocol KeyedEncodingContainerProtocol {
   /// - throws: `EncodingError.invalidValue` if the given value is invalid in
   ///   the current context for this format.
   mutating func encode(_ value: UInt64, forKey key: Key) throws
-  
+
   /// Encodes the given value for the given key.
   ///
   /// - parameter value: The value to encode.
@@ -420,7 +420,7 @@ public protocol KeyedEncodingContainerProtocol {
   /// - throws: `EncodingError.invalidValue` if the given value is invalid in
   ///   the current context for this format.
   mutating func encodeIfPresent(_ value: Int64?, forKey key: Key) throws
-  
+
   /// Encodes the given value for the given key if it is not `nil`.
   ///
   /// - parameter value: The value to encode.
@@ -469,7 +469,7 @@ public protocol KeyedEncodingContainerProtocol {
   /// - throws: `EncodingError.invalidValue` if the given value is invalid in
   ///   the current context for this format.
   mutating func encodeIfPresent(_ value: UInt64?, forKey key: Key) throws
-  
+
   /// Encodes the given value for the given key if it is not `nil`.
   ///
   /// - parameter value: The value to encode.
@@ -650,7 +650,7 @@ public struct KeyedEncodingContainer<K: CodingKey> :
   public mutating func encode(_ value: Int64, forKey key: Key) throws {
     try _box.encode(value, forKey: key)
   }
-  
+
   /// Encodes the given value for the given key.
   ///
   /// - parameter value: The value to encode.
@@ -711,7 +711,7 @@ public struct KeyedEncodingContainer<K: CodingKey> :
   public mutating func encode(_ value: UInt64, forKey key: Key) throws {
     try _box.encode(value, forKey: key)
   }
-  
+
   /// Encodes the given value for the given key.
   ///
   /// - parameter value: The value to encode.
@@ -869,7 +869,7 @@ public struct KeyedEncodingContainer<K: CodingKey> :
   ) throws {
     try _box.encodeIfPresent(value, forKey: key)
   }
-  
+
   /// Encodes the given value for the given key if it is not `nil`.
   ///
   /// - parameter value: The value to encode.
@@ -948,7 +948,7 @@ public struct KeyedEncodingContainer<K: CodingKey> :
   ) throws {
     try _box.encodeIfPresent(value, forKey: key)
   }
-  
+
   /// Encodes the given value for the given key if it is not `nil`.
   ///
   /// - parameter value: The value to encode.
@@ -1184,7 +1184,7 @@ public protocol KeyedDecodingContainerProtocol {
   /// - throws: `DecodingError.valueNotFound` if `self` has a null entry for
   ///   the given key.
   func decode(_ type: Int64.Type, forKey key: Key) throws -> Int64
-  
+
   /// Decodes a value of the given type for the given key.
   ///
   /// - parameter type: The type of value to decode.
@@ -1269,7 +1269,7 @@ public protocol KeyedDecodingContainerProtocol {
   /// - throws: `DecodingError.valueNotFound` if `self` has a null entry for
   ///   the given key.
   func decode(_ type: UInt64.Type, forKey key: Key) throws -> UInt64
-  
+
   /// Decodes a value of the given type for the given key.
   ///
   /// - parameter type: The type of value to decode.
@@ -1433,7 +1433,7 @@ public protocol KeyedDecodingContainerProtocol {
   /// - throws: `DecodingError.typeMismatch` if the encountered encoded value
   ///   is not convertible to the requested type.
   func decodeIfPresent(_ type: Int64.Type, forKey key: Key) throws -> Int64?
-  
+
   /// Decodes a value of the given type for the given key, if present.
   ///
   /// This method returns `nil` if the container does not have a value
@@ -1524,7 +1524,7 @@ public protocol KeyedDecodingContainerProtocol {
   /// - throws: `DecodingError.typeMismatch` if the encountered encoded value
   ///   is not convertible to the requested type.
   func decodeIfPresent(_ type: UInt64.Type, forKey key: Key) throws -> UInt64?
-  
+
   /// Decodes a value of the given type for the given key, if present.
   ///
   /// This method returns `nil` if the container does not have a value
@@ -1810,7 +1810,7 @@ public struct KeyedDecodingContainer<K: CodingKey> :
   public func decode(_ type: Int64.Type, forKey key: Key) throws -> Int64 {
     return try _box.decode(Int64.self, forKey: key)
   }
-  
+
   /// Decodes a value of the given type for the given key.
   ///
   /// - parameter type: The type of value to decode.
@@ -1907,7 +1907,7 @@ public struct KeyedDecodingContainer<K: CodingKey> :
   public func decode(_ type: UInt64.Type, forKey key: Key) throws -> UInt64 {
     return try _box.decode(UInt64.self, forKey: key)
   }
-  
+
   /// Decodes a value of the given type for the given key.
   ///
   /// - parameter type: The type of value to decode.
@@ -2123,7 +2123,7 @@ public struct KeyedDecodingContainer<K: CodingKey> :
   ) throws -> Int64? {
     return try _box.decodeIfPresent(Int64.self, forKey: key)
   }
-  
+
   /// Decodes a value of the given type for the given key, if present.
   ///
   /// This method returns `nil` if the container does not have a value
@@ -2244,7 +2244,7 @@ public struct KeyedDecodingContainer<K: CodingKey> :
   ) throws -> UInt64? {
     return try _box.decodeIfPresent(UInt64.self, forKey: key)
   }
-  
+
   /// Decodes a value of the given type for the given key, if present.
   ///
   /// This method returns `nil` if the container does not have a value
@@ -2429,7 +2429,7 @@ public protocol UnkeyedEncodingContainer {
   /// - throws: `EncodingError.invalidValue` if the given value is invalid in
   ///   the current context for this format.
   mutating func encode(_ value: Int64) throws
-  
+
   /// Encodes the given value.
   ///
   /// - parameter value: The value to encode.
@@ -2472,7 +2472,7 @@ public protocol UnkeyedEncodingContainer {
   /// - throws: `EncodingError.invalidValue` if the given value is invalid in
   ///   the current context for this format.
   mutating func encode(_ value: UInt64) throws
-  
+
   /// Encodes the given value.
   ///
   /// - parameter value: The value to encode.
@@ -2573,7 +2573,7 @@ public protocol UnkeyedEncodingContainer {
   mutating func encode<T: Sequence>(
     contentsOf sequence: T
   ) throws where T.Element == Int64
-  
+
   /// Encodes the elements of the given sequence.
   ///
   /// - parameter sequence: The sequences whose contents to encode.
@@ -2622,7 +2622,7 @@ public protocol UnkeyedEncodingContainer {
   mutating func encode<T: Sequence>(
     contentsOf sequence: T
   ) throws where T.Element == UInt64
-  
+
   /// Encodes the elements of the given sequence.
   ///
   /// - parameter sequence: The sequences whose contents to encode.
@@ -2789,7 +2789,7 @@ public protocol UnkeyedDecodingContainer {
   /// - throws: `DecodingError.valueNotFound` if the encountered encoded value
   ///   is null, or of there are no more values to decode.
   mutating func decode(_ type: Int64.Type) throws -> Int64
-  
+
   /// Decodes a value of the given type.
   ///
   /// - parameter type: The type of value to decode.
@@ -2856,7 +2856,7 @@ public protocol UnkeyedDecodingContainer {
   /// - throws: `DecodingError.valueNotFound` if the encountered encoded value
   ///   is null, or of there are no more values to decode.
   mutating func decode(_ type: UInt64.Type) throws -> UInt64
-  
+
   /// Decodes a value of the given type.
   ///
   /// - parameter type: The type of value to decode.
@@ -2996,7 +2996,7 @@ public protocol UnkeyedDecodingContainer {
   /// - throws: `DecodingError.typeMismatch` if the encountered encoded value
   ///   is not convertible to the requested type.
   mutating func decodeIfPresent(_ type: Int64.Type) throws -> Int64?
-  
+
   /// Decodes a value of the given type, if present.
   ///
   /// This method returns `nil` if the container has no elements left to
@@ -3075,7 +3075,7 @@ public protocol UnkeyedDecodingContainer {
   /// - throws: `DecodingError.typeMismatch` if the encountered encoded value
   ///   is not convertible to the requested type.
   mutating func decodeIfPresent(_ type: UInt64.Type) throws -> UInt64?
-  
+
   /// Decodes a value of the given type, if present.
   ///
   /// This method returns `nil` if the container has no elements left to
@@ -3227,7 +3227,7 @@ public protocol SingleValueEncodingContainer {
   /// - precondition: May not be called after a previous `self.encode(_:)`
   ///   call.
   mutating func encode(_ value: Int64) throws
-  
+
   /// Encodes a single value of the given type.
   ///
   /// - parameter value: The value to encode.
@@ -3282,7 +3282,7 @@ public protocol SingleValueEncodingContainer {
   /// - precondition: May not be called after a previous `self.encode(_:)`
   ///   call.
   mutating func encode(_ value: UInt64) throws
-  
+
   /// Encodes a single value of the given type.
   ///
   /// - parameter value: The value to encode.
@@ -3403,7 +3403,7 @@ public protocol SingleValueDecodingContainer {
   /// - throws: `DecodingError.valueNotFound` if the encountered encoded value
   ///   is null.
   func decode(_ type: Int64.Type) throws -> Int64
-  
+
   /// Decodes a single value of the given type.
   ///
   /// - parameter type: The type to decode as.
@@ -3464,7 +3464,7 @@ public protocol SingleValueDecodingContainer {
   /// - throws: `DecodingError.valueNotFound` if the encountered encoded value
   ///   is null.
   func decode(_ type: UInt64.Type) throws -> UInt64
-  
+
   /// Decodes a single value of the given type.
   ///
   /// - parameter type: The type to decode as.
@@ -3860,7 +3860,7 @@ internal class _KeyedEncodingContainerBase {
   internal func encode<K: CodingKey>(_ value: Int64, forKey key: K) throws {
     fatalError("_KeyedEncodingContainerBase cannot be used directly.")
   }
-  
+
   @available(SwiftStdlib 6.0, *)
   internal func encode<K: CodingKey>(_ value: Int128, forKey key: K) throws {
     fatalError("_KeyedEncodingContainerBase cannot be used directly.")
@@ -3885,7 +3885,7 @@ internal class _KeyedEncodingContainerBase {
   internal func encode<K: CodingKey>(_ value: UInt64, forKey key: K) throws {
     fatalError("_KeyedEncodingContainerBase cannot be used directly.")
   }
-  
+
   @available(SwiftStdlib 6.0, *)
   internal func encode<K: CodingKey>(_ value: UInt128, forKey key: K) throws {
     fatalError("_KeyedEncodingContainerBase cannot be used directly.")
@@ -3937,7 +3937,7 @@ internal class _KeyedEncodingContainerBase {
   internal func encodeIfPresent<K: CodingKey>(_ value: Int64?, forKey key: K) throws {
     fatalError("_KeyedEncodingContainerBase cannot be used directly.")
   }
-  
+
   @available(SwiftStdlib 6.0, *)
   internal func encodeIfPresent<K: CodingKey>(_ value: Int128?, forKey key: K) throws {
     fatalError("_KeyedEncodingContainerBase cannot be used directly.")
@@ -3962,7 +3962,7 @@ internal class _KeyedEncodingContainerBase {
   internal func encodeIfPresent<K: CodingKey>(_ value: UInt64?, forKey key: K) throws {
     fatalError("_KeyedEncodingContainerBase cannot be used directly.")
   }
-  
+
   @available(SwiftStdlib 6.0, *)
   internal func encodeIfPresent<K: CodingKey>(_ value: UInt128?, forKey key: K) throws {
     fatalError("_KeyedEncodingContainerBase cannot be used directly.")
@@ -4071,7 +4071,7 @@ internal final class _KeyedEncodingContainerBox<
     let key = unsafeBitCast(key, to: Key.self)
     try concrete.encode(value, forKey: key)
   }
-  
+
   @available(SwiftStdlib 6.0, *)
   override internal func encode<K: CodingKey>(_ value: Int128, forKey key: K) throws {
     _internalInvariant(K.self == Key.self)
@@ -4108,7 +4108,7 @@ internal final class _KeyedEncodingContainerBox<
     let key = unsafeBitCast(key, to: Key.self)
     try concrete.encode(value, forKey: key)
   }
-  
+
   @available(SwiftStdlib 6.0, *)
   override internal func encode<K: CodingKey>(_ value: UInt128, forKey key: K) throws {
     _internalInvariant(K.self == Key.self)
@@ -4214,7 +4214,7 @@ internal final class _KeyedEncodingContainerBox<
     let key = unsafeBitCast(key, to: Key.self)
     try concrete.encodeIfPresent(value, forKey: key)
   }
-  
+
   @available(SwiftStdlib 6.0, *)
   override internal func encodeIfPresent<K: CodingKey>(
     _ value: Int128?,
@@ -4269,7 +4269,7 @@ internal final class _KeyedEncodingContainerBox<
     let key = unsafeBitCast(key, to: Key.self)
     try concrete.encodeIfPresent(value, forKey: key)
   }
-  
+
   @available(SwiftStdlib 6.0, *)
   override internal func encodeIfPresent<K: CodingKey>(
     _ value: UInt128?,
@@ -4400,7 +4400,7 @@ internal class _KeyedDecodingContainerBase {
   ) throws -> Int64 {
     fatalError("_KeyedDecodingContainerBase cannot be used directly.")
   }
-  
+
   @available(SwiftStdlib 6.0, *)
   internal func decode<K: CodingKey>(
     _ type: Int128.Type,
@@ -4443,7 +4443,7 @@ internal class _KeyedDecodingContainerBase {
   ) throws -> UInt64 {
     fatalError("_KeyedDecodingContainerBase cannot be used directly.")
   }
-  
+
   @available(SwiftStdlib 6.0, *)
   internal func decode<K: CodingKey>(
     _ type: UInt128.Type,
@@ -4521,7 +4521,7 @@ internal class _KeyedDecodingContainerBase {
   ) throws -> Int64? {
     fatalError("_KeyedDecodingContainerBase cannot be used directly.")
   }
-  
+
   @available(SwiftStdlib 6.0, *)
   internal func decodeIfPresent<K: CodingKey>(
     _ type: Int128.Type,
@@ -4564,7 +4564,7 @@ internal class _KeyedDecodingContainerBase {
   ) throws -> UInt64? {
     fatalError("_KeyedDecodingContainerBase cannot be used directly.")
   }
-  
+
   @available(SwiftStdlib 6.0, *)
   internal func decodeIfPresent<K: CodingKey>(
     _ type: UInt128.Type,
@@ -4713,7 +4713,7 @@ internal final class _KeyedDecodingContainerBox<
     let key = unsafeBitCast(key, to: Key.self)
     return try concrete.decode(Int64.self, forKey: key)
   }
-  
+
   @available(SwiftStdlib 6.0, *)
   override internal func decode<K: CodingKey>(
     _ type: Int128.Type,
@@ -4768,7 +4768,7 @@ internal final class _KeyedDecodingContainerBox<
     let key = unsafeBitCast(key, to: Key.self)
     return try concrete.decode(UInt64.self, forKey: key)
   }
-  
+
   @available(SwiftStdlib 6.0, *)
   override internal func decode<K: CodingKey>(
     _ type: UInt128.Type,
@@ -4868,7 +4868,7 @@ internal final class _KeyedDecodingContainerBox<
     let key = unsafeBitCast(key, to: Key.self)
     return try concrete.decodeIfPresent(Int64.self, forKey: key)
   }
-  
+
   @available(SwiftStdlib 6.0, *)
   override internal func decodeIfPresent<K: CodingKey>(
     _ type: Int128.Type,
@@ -4923,7 +4923,7 @@ internal final class _KeyedDecodingContainerBox<
     let key = unsafeBitCast(key, to: Key.self)
     return try concrete.decodeIfPresent(UInt64.self, forKey: key)
   }
-  
+
   @available(SwiftStdlib 6.0, *)
   override internal func decodeIfPresent<K: CodingKey>(
     _ type: UInt128.Type,
@@ -5560,7 +5560,7 @@ extension Int128: Codable {
   public init(from decoder: any Decoder) throws {
     self = try decoder.singleValueContainer().decode(Int128.self)
   }
-  
+
   /// Encodes this value into the given encoder.
   ///
   /// This function throws an error if any values are invalid for the given
@@ -5609,7 +5609,7 @@ extension RawRepresentable<Int128> where Self: Decodable {
         )
       )
     }
-    
+
     self = value
   }
 }
@@ -5925,7 +5925,7 @@ extension UInt128: Codable {
   public init(from decoder: any Decoder) throws {
     self = try decoder.singleValueContainer().decode(UInt128.self)
   }
-  
+
   /// Encodes this value into the given encoder.
   ///
   /// This function throws an error if any values are invalid for the given
@@ -5974,7 +5974,7 @@ extension RawRepresentable<UInt128> where Self: Decodable {
         )
       )
     }
-    
+
     self = value
   }
 }
@@ -6447,7 +6447,7 @@ extension KeyedEncodingContainerProtocol {
     guard let value = value else { return }
     try encode(value, forKey: key)
   }
-  
+
   @available(SwiftStdlib 6.0, *)
   public mutating func encodeIfPresent(
     _ value: Int128?,
@@ -6496,7 +6496,7 @@ extension KeyedEncodingContainerProtocol {
     guard let value = value else { return }
     try encode(value, forKey: key)
   }
-  
+
   @available(SwiftStdlib 6.0, *)
   public mutating func encodeIfPresent(
     _ value: UInt128?,
@@ -6527,7 +6527,7 @@ extension KeyedEncodingContainerProtocol {
       )
     )
   }
-  
+
   @available(SwiftStdlib 6.0, *)
   public mutating func encode(_ value: UInt128, forKey key: Key) throws {
     throw EncodingError.invalidValue(
@@ -6623,7 +6623,7 @@ extension KeyedDecodingContainerProtocol {
       else { return nil }
     return try self.decode(Int64.self, forKey: key)
   }
-  
+
   @available(SwiftStdlib 6.0, *)
   public func decodeIfPresent(
     _ type: Int128.Type,
@@ -6678,7 +6678,7 @@ extension KeyedDecodingContainerProtocol {
       else { return nil }
     return try self.decode(UInt64.self, forKey: key)
   }
-  
+
   @available(SwiftStdlib 6.0, *)
   public func decodeIfPresent(
     _ type: UInt128.Type,
@@ -6714,7 +6714,7 @@ extension KeyedDecodingContainerProtocol {
       )
     )
   }
-  
+
   @available(SwiftStdlib 6.0, *)
   public func decode(
     _ type: UInt128.Type,
@@ -6810,7 +6810,7 @@ extension UnkeyedEncodingContainer {
       try self.encode(element)
     }
   }
-  
+
   @available(SwiftStdlib 6.0, *)
   public mutating func encode<T: Sequence>(
     contentsOf sequence: T
@@ -6859,7 +6859,7 @@ extension UnkeyedEncodingContainer {
       try self.encode(element)
     }
   }
-  
+
   @available(SwiftStdlib 6.0, *)
   public mutating func encode<T: Sequence>(
     contentsOf sequence: T
@@ -6890,7 +6890,7 @@ extension UnkeyedEncodingContainer {
       )
     )
   }
-  
+
   @available(SwiftStdlib 6.0, *)
   public mutating func encode(_ value: UInt128) throws {
     throw EncodingError.invalidValue(
@@ -6968,7 +6968,7 @@ extension UnkeyedDecodingContainer {
     guard try !self.isAtEnd && !self.decodeNil() else { return nil }
     return try self.decode(Int64.self)
   }
-  
+
   @available(SwiftStdlib 6.0, *)
   public mutating func decodeIfPresent(
     _ type: Int128.Type
@@ -7011,7 +7011,7 @@ extension UnkeyedDecodingContainer {
     guard try !self.isAtEnd && !self.decodeNil() else { return nil }
     return try self.decode(UInt64.self)
   }
-  
+
   @available(SwiftStdlib 6.0, *)
   public mutating func decodeIfPresent(
     _ type: UInt128.Type
@@ -7040,7 +7040,7 @@ extension UnkeyedDecodingContainer {
       )
     )
   }
-  
+
   @available(SwiftStdlib 6.0, *)
   public mutating func decode(_ type: UInt128.Type) throws -> UInt128 {
     throw DecodingError.typeMismatch(
@@ -7065,7 +7065,7 @@ extension SingleValueEncodingContainer {
       )
     )
   }
-  
+
   @available(SwiftStdlib 6.0, *)
   public mutating func encode(_ value: UInt128) throws {
     throw EncodingError.invalidValue(
@@ -7090,7 +7090,7 @@ extension SingleValueDecodingContainer {
       )
     )
   }
-  
+
   @available(SwiftStdlib 6.0, *)
   public func decode(_ type: UInt128.Type) throws -> UInt128 {
     throw DecodingError.typeMismatch(
@@ -7116,7 +7116,7 @@ extension SingleValueEncodingContainer where Self: UnkeyedEncodingContainer {
       )
     )
   }
-  
+
   @available(SwiftStdlib 6.0, *)
   public mutating func encode(_ value: UInt128) throws {
     throw EncodingError.invalidValue(
@@ -7142,7 +7142,7 @@ extension SingleValueDecodingContainer where Self: UnkeyedDecodingContainer {
       )
     )
   }
-  
+
   @available(SwiftStdlib 6.0, *)
   public func decode(_ type: UInt128.Type) throws -> UInt128 {
     throw DecodingError.typeMismatch(

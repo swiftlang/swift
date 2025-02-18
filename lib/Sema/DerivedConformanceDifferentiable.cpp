@@ -91,7 +91,7 @@ getStoredPropertiesForDifferentiation(
     // Skip `let` stored properties with a mutating `move(by:)` if requested.
     // `mutating func move(by:)` cannot be synthesized to update `let`
     // properties.
-    if (!includeLetPropertiesWithNonmutatingMoveBy && 
+    if (!includeLetPropertiesWithNonmutatingMoveBy &&
         !canInvokeMoveByOnProperty(vd, conformance))
       continue;
     result.push_back(vd);
@@ -469,7 +469,7 @@ getOrSynthesizeTangentVectorStruct(DerivedConformance &derived, Identifier id) {
   // If nominal type is `@frozen`, also mark `TangentVector` struct.
   if (nominal->getAttrs().hasAttribute<FrozenAttr>())
     structDecl->getAttrs().add(new (C) FrozenAttr(/*implicit*/ true));
-  
+
   // Add `typealias TangentVector = Self` so that the `TangentVector` itself
   // won't need its own conformance derivation.
   auto *tangentEqualsSelfAlias = new (C) TypeAliasDecl(
@@ -554,7 +554,7 @@ static void checkAndDiagnoseImplicitNoDerivative(ASTContext &Context,
     auto varType = DC->mapTypeIntoContext(vd->getValueInterfaceType());
     auto diffableConformance = checkConformance(varType, diffableProto);
     // If stored property should not be diagnosed, continue.
-    if (diffableConformance && 
+    if (diffableConformance &&
         canInvokeMoveByOnProperty(vd, diffableConformance))
       continue;
     // Otherwise, add an implicit `@noDerivative` attribute.

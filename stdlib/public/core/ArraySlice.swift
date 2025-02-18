@@ -168,7 +168,7 @@ extension ArraySlice {
       _buffer = _Buffer(copying: _buffer)
     }
   }
-  
+
   /// Marks the end of a mutation.
   ///
   /// After a call to `_endMutation` the buffer must not be mutated until a call
@@ -954,11 +954,11 @@ extension ArraySlice: RangeReplaceableCollection {
     let oldCount = self.count
     let startNewElements = _buffer.firstElementAddress + oldCount
     let buf = UnsafeMutableBufferPointer(
-                start: startNewElements, 
+                start: startNewElements,
                 count: self.capacity - oldCount)
 
     let (remainder,writtenUpTo) = buf.initialize(from: newElements)
-    
+
     // trap on underflow from the sequence's underestimate:
     let writtenCount = buf.distance(from: buf.startIndex, to: writtenUpTo)
     _precondition(newElementsCount <= writtenCount,
@@ -1008,7 +1008,7 @@ extension ArraySlice: RangeReplaceableCollection {
     self.replaceSubrange((i &- 1)..<i, with: EmptyCollection())
     return result
   }
-  
+
   /// Removes and returns the element at the specified position.
   ///
   /// All the elements following the specified position are moved up to
@@ -1300,7 +1300,7 @@ extension ArraySlice {
     // a precondition and Array never lies about its count.
     guard var p = buffer.baseAddress
       else { _preconditionFailure("Attempt to copy contents into nil buffer pointer") }
-    _precondition(self.count <= buffer.count, 
+    _precondition(self.count <= buffer.count,
       "Insufficient space allocated to copy array contents")
 
     if let s = _baseAddressIfContiguous {

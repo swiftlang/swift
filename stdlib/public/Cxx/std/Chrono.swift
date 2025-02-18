@@ -27,7 +27,7 @@ extension std.chrono.milliseconds {
   public init(_ duration: Duration) {
     let (seconds, attoseconds) = duration.components
     self = __swift_interopMakeChronoMilliseconds(
-      seconds * 1_000 + 
+      seconds * 1_000 +
       attoseconds / 1_000_000_000_000_000)
   }
 }

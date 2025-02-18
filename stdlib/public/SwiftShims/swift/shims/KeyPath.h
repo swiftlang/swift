@@ -36,7 +36,7 @@ static const __swift_uint32_t _SwiftKeyPathBufferHeader_IsSingleComponentFlag
   = 0x20000000U;
 static const __swift_uint32_t _SwiftKeyPathBufferHeader_ReservedMask
   = 0x1F000000U;
-  
+
 // Bitfields for a key path component header.
 
 static const __swift_uint32_t _SwiftKeyPathComponentHeader_PayloadMask
@@ -66,16 +66,16 @@ static const __swift_uint32_t _SwiftKeyPathComponentHeader_StoredOffsetPayloadMa
 
 static const __swift_uint32_t _SwiftKeyPathComponentHeader_MaximumOffsetPayload
   = 0x007FFFFCU;
-  
+
 static const __swift_uint32_t _SwiftKeyPathComponentHeader_UnresolvedIndirectOffsetPayload
   = 0x007FFFFDU;
-  
+
 static const __swift_uint32_t _SwiftKeyPathComponentHeader_UnresolvedFieldOffsetPayload
   = 0x007FFFFEU;
 
 static const __swift_uint32_t _SwiftKeyPathComponentHeader_OutOfLineOffsetPayload
   = 0x007FFFFFU;
-  
+
 static const __swift_uint32_t _SwiftKeyPathComponentHeader_StoredMutableFlag
   = 0x00800000U;
 
@@ -88,7 +88,7 @@ static const __swift_uint32_t _SwiftKeyPathComponentHeader_OptionalForcePayload
 
 static const __swift_uint32_t _SwiftKeyPathComponentHeader_EndOfReferencePrefixFlag
   = 0x80000000U;
-  
+
 static const __swift_uint32_t _SwiftKeyPathComponentHeader_ComputedMutatingFlag
   = 0x00800000U;
 static const __swift_uint32_t _SwiftKeyPathComponentHeader_ComputedSettableFlag

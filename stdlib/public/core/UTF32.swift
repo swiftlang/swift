@@ -55,13 +55,13 @@ extension Unicode.UTF32: Unicode.Encoding {
   ) -> EncodedScalar? {
     return EncodedScalar(source.value)
   }
-  
+
   @frozen
   public struct Parser: Sendable {
     @inlinable
     public init() { }
   }
-  
+
   public typealias ForwardParser = Parser
   public typealias ReverseParser = Parser
 }
@@ -80,7 +80,7 @@ extension UTF32.Parser: Unicode.Parser {
       // Check code unit is valid: not surrogate-reserved and within range.
       guard _fastPath((x &>> 11) != 0b1101_1 && x <= 0x10ffff)
       else { return .error(length: 1) }
-      
+
       // x is a valid scalar.
       return .valid(UTF32.EncodedScalar(x))
     }

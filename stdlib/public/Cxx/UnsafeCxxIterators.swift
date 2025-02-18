@@ -10,7 +10,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-/// Bridged C++ iterator that allows to traverse the elements of a sequence 
+/// Bridged C++ iterator that allows to traverse the elements of a sequence
 /// using a for-in loop.
 ///
 /// Mostly useful for conforming a type to the `CxxSequence` protocol and should

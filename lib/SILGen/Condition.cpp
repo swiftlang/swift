@@ -37,7 +37,7 @@ void Condition::exit(SILGenFunction &SGF, SILBasicBlock *destBB,
   // If the current point it reachable, branch to the continuation block.
   if (!SGF.B.hasValidInsertionPoint())
     return;
-  
+
   SGF.B.createBranch(getContinuationLoc(*SGF.B.getInsertionBB(), Loc),
                      ContBB, Args);
 }
@@ -75,7 +75,7 @@ SGFContext ConditionalValue::enterBranch(SILBasicBlock *bb) {
     assert(!SGF.B.hasValidInsertionPoint() && "already in a branch");
     SGF.B.emitBlock(bb);
   }
-  
+
   assert(!scope.has_value() && "already have a scope");
   // Start a scope for the current branch.
   scope.emplace(SGF.Cleanups, CleanupLocation(loc));

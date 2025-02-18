@@ -1654,18 +1654,18 @@ extension String {
   @available(macOS 15.0, iOS 18.0, watchOS 11.0, tvOS 18.0, visionOS 2.0, *)
   var _words: [Substring] {
     var result: [Substring] = []
-    
+
     var i = startIndex
-    
+
     while i < endIndex {
       let start = i
       let end = _wordIndex(after: i)
-      
+
       let substr = self[start ..< end]
       result.append(substr)
       i = end
     }
-    
+
     return result
   }
 }

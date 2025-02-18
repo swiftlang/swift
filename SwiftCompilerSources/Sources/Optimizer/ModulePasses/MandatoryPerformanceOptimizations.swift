@@ -91,7 +91,7 @@ private func optimize(function: Function, _ context: FunctionPassContext, _ modu
       worklist.pushIfNotVisited(f)
     }
   }
-  
+
   var changed = true
   while changed {
     changed = runSimplification(on: function, context, preserveDebugInfo: true) { instruction, simplifyCtxt in
@@ -159,7 +159,7 @@ private func optimize(function: Function, _ context: FunctionPassContext, _ modu
         {
           fri.referencedFunction.set(linkage: .public, moduleContext)
         }
-        
+
       case let copy as CopyAddrInst:
         if function.isGlobalInitOnceFunction, copy.source.type.isLoadable(in: function) {
           // In global init functions we have to make sure that redundant load elimination can remove all
@@ -417,7 +417,7 @@ private extension Value {
       guard let use = relevantUses.singleUse else {
         return nil
       }
-      
+
       switch use.instruction {
       case is StructInst:
         path = path.push(.structField, index: use.index)

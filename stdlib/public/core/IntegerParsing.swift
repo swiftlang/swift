@@ -16,10 +16,10 @@ internal func _parseIntegerDigits<Result: FixedWidthInteger>(
 ) -> Result? {
   _internalInvariant(radix >= 2 && radix <= 36)
   guard _fastPath(!codeUnits.isEmpty) else { return nil }
-  
+
   // ASCII constants, named for clarity:
   let _0 = 48 as UInt8, _A = 65 as UInt8, _a = 97 as UInt8
-  
+
   let numericalUpperBound: UInt8
   let uppercaseUpperBound: UInt8
   let lowercaseUpperBound: UInt8
@@ -62,10 +62,10 @@ internal func _parseInteger<Result: FixedWidthInteger>(
   ascii codeUnits: UnsafeBufferPointer<UInt8>, radix: Int
 ) -> Result? {
   _internalInvariant(!codeUnits.isEmpty)
-  
+
   // ASCII constants, named for clarity:
   let _plus = 43 as UInt8, _minus = 45 as UInt8
-  
+
   let first = codeUnits[0]
   if first == _minus {
     return _parseIntegerDigits(

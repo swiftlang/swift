@@ -267,7 +267,7 @@ extension Unicode.UTF16: Unicode.Encoding {
   internal static var _replacementCodeUnit: CodeUnit {
     @inline(__always) get { return 0xfffd }
   }
-  
+
   @inlinable
   public static var encodedReplacementCharacter: EncodedScalar {
     return EncodedScalar(_storage: 0xFFFD, _bitCount: 16)
@@ -344,7 +344,7 @@ extension Unicode.UTF16: Unicode.Encoding {
       s &>>= 8
       r |= s & 0b0__11_1111
       b = b &- 1
-      
+
       if _fastPath(b == 0) {
         return EncodedScalar(_storage: r & 0b0__111_1111_1111, _bitCount: 16)
       }
@@ -352,11 +352,11 @@ extension Unicode.UTF16: Unicode.Encoding {
       s &>>= 8
       r |= s & 0b0__11_1111
       b = b &- 1
-      
+
       if _fastPath(b == 0) {
         return EncodedScalar(_storage: r & 0xFFFF, _bitCount: 16)
       }
-      
+
       r &<<= 6
       s &>>= 8
       r |= s & 0b0__11_1111
@@ -402,7 +402,7 @@ extension UTF16.ReverseParser: Unicode.Parser, _UTFParser {
     }
     return (false, 1*16)
   }
-  
+
   @inlinable
   public func _bufferedScalar(bitCount: UInt8) -> Encoding.EncodedScalar {
     return Encoding.EncodedScalar(
@@ -415,7 +415,7 @@ extension UTF16.ReverseParser: Unicode.Parser, _UTFParser {
 
 extension Unicode.UTF16.ForwardParser: Unicode.Parser, _UTFParser {
   public typealias Encoding = Unicode.UTF16
-  
+
   @inlinable
   public func _parseMultipleCodeUnits() -> (isValid: Bool, bitCount: UInt8) {
     _internalInvariant(  // this case handled elsewhere
@@ -425,7 +425,7 @@ extension Unicode.UTF16.ForwardParser: Unicode.Parser, _UTFParser {
     }
     return (false, 1*16)
   }
-  
+
   @inlinable
   public func _bufferedScalar(bitCount: UInt8) -> Encoding.EncodedScalar {
     var r = _buffer

@@ -580,7 +580,7 @@ extension Substring {
     return _wholeGuts._opaqueCharacterStride(startingAt: i._encodedOffset)
   }
 
-  
+
   /// Return the length of the extended grapheme cluster that ends with, or
   /// includes, `i`.
   ///

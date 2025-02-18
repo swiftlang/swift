@@ -72,24 +72,24 @@ public:
   RemoteAbsolutePointer()
     : Symbol(), Offset(0)
   {}
-  
+
   RemoteAbsolutePointer(std::nullptr_t)
     : RemoteAbsolutePointer()
   {}
-  
+
   RemoteAbsolutePointer(llvm::StringRef Symbol, int64_t Offset)
     : Symbol(Symbol), Offset(Offset)
   {}
-  
+
   bool isResolved() const { return Symbol.empty(); }
   llvm::StringRef getSymbol() const { return Symbol; }
   int64_t getOffset() const { return Offset; }
-  
+
   RemoteAddress getResolvedAddress() const {
     assert(isResolved());
     return RemoteAddress(Offset);
   }
-  
+
   explicit operator bool() const {
     return Offset != 0 || !Symbol.empty();
   }

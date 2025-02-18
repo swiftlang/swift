@@ -13,11 +13,11 @@ import Swift
 
 #if !$Embedded
 
-/// A clock that measures time that always increments but stops incrementing 
-/// while the system is asleep. 
+/// A clock that measures time that always increments but stops incrementing
+/// while the system is asleep.
 ///
-/// `SuspendingClock` can be considered as a system awake time clock. The frame 
-/// of reference of the `Instant` may be bound machine boot or some other 
+/// `SuspendingClock` can be considered as a system awake time clock. The frame
+/// of reference of the `Instant` may be bound machine boot or some other
 /// locally defined reference point. This means that the instants are
 /// only comparable on the same machine in the same booted session.
 ///
@@ -37,8 +37,8 @@ public struct SuspendingClock: Sendable {
 
 @available(SwiftStdlib 5.7, *)
 extension Clock where Self == SuspendingClock {
-  /// A clock that measures time that always increments but stops incrementing 
-  /// while the system is asleep. 
+  /// A clock that measures time that always increments but stops incrementing
+  /// while the system is asleep.
   ///
   ///       try await Task.sleep(until: .now + .seconds(3), clock: .suspending)
   ///
@@ -86,7 +86,7 @@ extension SuspendingClock: Clock {
   /// to coalesce CPU wake-ups to more efficiently process the wake-ups in
   /// a more power efficient manner.
   ///
-  /// If the task is canceled before the time ends, this function throws 
+  /// If the task is canceled before the time ends, this function throws
   /// `CancellationError`.
   ///
   /// This function doesn't block the underlying thread.

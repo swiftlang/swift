@@ -530,7 +530,7 @@ public:
   using value_type = VectorIt;
   using difference_type = std::ptrdiff_t;
   using pointer = value_type*;
-  using reference = value_type&;    
+  using reference = value_type&;
 
   ViewerIterator(SDKNodeVectorViewer &Viewer, VectorIt P) : Viewer(Viewer), P(P) {}
   ViewerIterator(const ViewerIterator& mit) : Viewer(mit.Viewer), P(mit.P) {}

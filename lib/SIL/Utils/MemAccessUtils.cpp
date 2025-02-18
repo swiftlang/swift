@@ -463,8 +463,8 @@ bool swift::mayLoadWeakOrUnowned(SILInstruction *instruction) {
   if (isa<BuiltinInst>(instruction)) {
     return instruction->mayReadOrWriteMemory();
   }
-  return isa<LoadWeakInst>(instruction) 
-      || isa<LoadUnownedInst>(instruction) 
+  return isa<LoadWeakInst>(instruction)
+      || isa<LoadUnownedInst>(instruction)
       || isa<StrongCopyUnownedValueInst>(instruction)
       || isa<StrongCopyUnmanagedValueInst>(instruction);
 }
@@ -2653,7 +2653,7 @@ static void visitBuiltinAddress(BuiltinInst *builtin,
       // SIL address.
       // visitor(&builtin->getAllOperands()[0]);
       return;
-      
+
     // zeroInitializer with an address operand zeroes the address.
     case BuiltinValueKind::ZeroInitializer:
       if (builtin->getAllOperands().size() > 0) {

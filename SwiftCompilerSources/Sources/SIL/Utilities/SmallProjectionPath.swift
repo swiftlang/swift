@@ -97,7 +97,7 @@ public struct SmallProjectionPath : Hashable, CustomStringConvertible, NoReflect
           return false
       }
     }
-    
+
     public var isClassField: Bool {
       switch self {
         case .anyClassField, .classField, .tailElements:
@@ -157,7 +157,7 @@ public struct SmallProjectionPath : Hashable, CustomStringConvertible, NoReflect
     var idx = 0
     var b = bytes
     var numBits = 0
-    
+
     // Parse any index overflow bytes.
     while (b & 1) == 1 {
       idx = (idx << 7) | Int((b >> 1) &  0x7f)
@@ -416,7 +416,7 @@ public struct SmallProjectionPath : Hashable, CustomStringConvertible, NoReflect
   ///    `s0.c1.c2` merged with `s0.c3`    -> `s0.**`
   public func merge(with rhs: SmallProjectionPath) -> SmallProjectionPath {
     if self == rhs { return self }
-    
+
     let (lhsKind, lhsIdx, lhsBits) = top
     let (rhsKind, rhsIdx, rhsBits) = rhs.top
     if lhsKind == rhsKind && lhsIdx == rhsIdx {
@@ -463,10 +463,10 @@ public struct SmallProjectionPath : Hashable, CustomStringConvertible, NoReflect
     if isEmpty || rhs.isEmpty {
       return true
     }
-  
+
     let (lhsKind, lhsIdx, lhsBits) = top
     let (rhsKind, rhsIdx, rhsBits) = rhs.top
-    
+
     if lhsKind == .anything || rhsKind == .anything {
       return true
     }
@@ -578,11 +578,11 @@ extension StringParser {
         try throwError("expected selection path component")
       }
     } while consume(".")
- 
+
     if let ty = currentTy, !ty.isClass {
       try throwError("the select field is not a class - add 'anyValueFields'")
     }
-    
+
     return try createPath(from: entries)
   }
 
@@ -637,7 +637,7 @@ extension StringParser {
         try throwError("'**' only allowed in last path component")
       }
       path = path.push(kind, index: idx)
-      
+
       // Check for overflow
       if !first && path == SmallProjectionPath(.anything) {
         try throwError("path is too long")
@@ -654,7 +654,7 @@ extension StringParser {
 
 extension SmallProjectionPath {
   public static func runUnitTests() {
-  
+
     basicPushPop()
     parsing()
     merging()
@@ -663,7 +663,7 @@ extension SmallProjectionPath {
     overlapping()
     predicates()
     path2path()
-  
+
     func basicPushPop() {
       let p1 = SmallProjectionPath(.structField, index: 3)
                         .push(.classField, index: 12345678)
@@ -688,7 +688,7 @@ extension SmallProjectionPath {
       let (k11, i11, p12) = p11.pop()
       assert(k11 == .anyIndexedElement && i11 == 0 && p12.isEmpty)
     }
-    
+
     func parsing() {
       testParse("v**.c*", expect: SmallProjectionPath(.anyClassField)
                                          .push(.anyValueFields))
@@ -726,7 +726,7 @@ extension SmallProjectionPath {
       let str = path.description
       assert(str == pathStr)
     }
-   
+
     func merging() {
       testMerge("c1.c0",    "c0",     expect: "c*.**")
       testMerge("c2.c1",    "c2",     expect: "c2.**")
@@ -758,7 +758,7 @@ extension SmallProjectionPath {
       let result2 = rhs.merge(with: lhs)
       assert(result2 == expect)
     }
-   
+
     func subtracting() {
       testSubtract("s0",           "s0.s1",        expect: "s1")
       testSubtract("s0",           "s1",           expect: nil)
@@ -887,7 +887,7 @@ extension SmallProjectionPath {
       let result = property(path)
       assert(result == expect)
     }
-    
+
     func path2path() {
       testPath2Path("s0.e2.3.c4.s1", { $0.popAllValueFields() }, expect: "c4.s1")
       testPath2Path("v**.c4.s1",     { $0.popAllValueFields() }, expect: "c4.s1")
@@ -903,7 +903,7 @@ extension SmallProjectionPath {
       testPath2Path("v**.c3", { $0.popIfMatches(.anyValueFields) }, expect: "v**.c3")
       testPath2Path("**",     { $0.popIfMatches(.anyValueFields) }, expect: "**")
       testPath2Path("s0.c3",  { $0.popIfMatches(.anyValueFields) }, expect: nil)
-      
+
       testPath2Path("c0.s3",  { $0.popIfMatches(.anyClassField) }, expect: nil)
       testPath2Path("**",     { $0.popIfMatches(.anyClassField) }, expect: "**")
       testPath2Path("c*.e3",  { $0.popIfMatches(.anyClassField) }, expect: "e3")

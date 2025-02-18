@@ -366,7 +366,7 @@ extension _SmallString {
     }
     self._invariantCheck()
   }
-  
+
   @_effects(readonly) // @opaque
   internal init?(taggedASCIICocoa cocoa: AnyObject) {
     self.init()

@@ -84,7 +84,7 @@ extension BinaryInteger {
       buffer[0] = UInt8(("0" as Unicode.Scalar).value)
       return 1
     }
-    
+
     func _ascii(_ digit: UInt8) -> UTF8.CodeUnit {
       if digit < 10 {
         UInt8(("0" as Unicode.Scalar).value) + digit
@@ -94,7 +94,7 @@ extension BinaryInteger {
     }
     let isNegative = Self.isSigned && self < (0 as Self)
     var value = magnitude
-    
+
     var index = Int(bufferLength - 1)
     while value != 0 {
       let (quotient, remainder) = value.quotientAndRemainder(dividingBy: Magnitude(radix))
@@ -109,11 +109,11 @@ extension BinaryInteger {
     let start = index + 1
     let end = Int(bufferLength - 1)
     let count = end - start + 1
-    
+
     let intermediate = UnsafeBufferPointer(start: buffer.advanced(by: start), count: count)
     let destination = UnsafeMutableRawBufferPointer(start: buffer, count: Int(bufferLength))
     destination.copyMemory(from: UnsafeRawBufferPointer(intermediate))
-    
+
     return count
   }
 

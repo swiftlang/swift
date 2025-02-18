@@ -107,10 +107,10 @@ getLLVMIntrinsicIDForBuiltinWithOverflow(BuiltinValueKind ID);
 ///
 /// Returns null if the name does not identifier a known builtin value.
 ValueDecl *getBuiltinValueDecl(ASTContext &Context, Identifier Name);
-  
+
 /// Returns the name of a builtin declaration given a builtin ID.
 StringRef getBuiltinName(BuiltinValueKind ID);
-  
+
 /// The information identifying the builtin - its kind and types.
 class BuiltinInfo {
 public:

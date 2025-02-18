@@ -242,7 +242,7 @@ public:
 };
 
 SWIFT_NAME("getter:BridgedStringRef.data(self:)")
-BRIDGED_INLINE 
+BRIDGED_INLINE
 const uint8_t *_Nullable BridgedStringRef_data(BridgedStringRef str);
 
 SWIFT_NAME("getter:BridgedStringRef.count(self:)")
@@ -264,7 +264,7 @@ public:
 } SWIFT_SELF_CONTAINED;
 
 SWIFT_NAME("getter:BridgedOwnedString.data(self:)")
-BRIDGED_INLINE 
+BRIDGED_INLINE
 const uint8_t *_Nullable BridgedOwnedString_data(BridgedOwnedString str);
 
 SWIFT_NAME("getter:BridgedOwnedString.count(self:)")

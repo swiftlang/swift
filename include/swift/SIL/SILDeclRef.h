@@ -425,7 +425,7 @@ struct SILDeclRef {
   bool operator!=(SILDeclRef rhs) const {
     return !(*this == rhs);
   }
-  
+
   void print(llvm::raw_ostream &os) const;
   void dump() const;
 
@@ -538,7 +538,7 @@ struct SILDeclRef {
   /// Return a SILDeclRef to the declaration overridden by this one, or
   /// a null SILDeclRef if there is no override.
   SILDeclRef getOverridden() const;
-  
+
   /// Return a SILDeclRef to the declaration whose vtable entry this declaration
   /// overrides. This may be different from "getOverridden" because some
   /// declarations do not always have vtable entries.
@@ -610,7 +610,7 @@ struct SILDeclRef {
     assert(isAutoDiffDerivativeFunction());
     return pointer.get<AutoDiffDerivativeFunctionIdentifier *>();
   }
-  
+
   bool hasAsync() const;
 
 private:

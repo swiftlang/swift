@@ -52,7 +52,7 @@ public:
     /// or if the method was not serialized (for de-serialized witness tables).
     SILFunction *Witness;
   };
-  
+
   /// A witness table entry describing the witness for an associated type.
   struct AssociatedTypeWitness {
     /// The associated type required.
@@ -60,7 +60,7 @@ public:
     /// The concrete semantic type of the witness.
     CanType Witness;
   };
-  
+
   /// A witness table entry describing the witness for an associated type's
   /// protocol requirement.
   struct AssociatedConformanceWitness {
@@ -73,7 +73,7 @@ public:
     /// conformance is dependent.
     ProtocolConformanceRef Witness;
   };
-  
+
   /// A witness table entry referencing the protocol conformance for a refined
   /// base protocol.
   struct BaseProtocolWitness {
@@ -82,7 +82,7 @@ public:
     /// The ProtocolConformance for the base protocol.
     ProtocolConformance *Witness;
   };
-                          
+
   /// A witness table entry kind.
   enum WitnessKind {
     Invalid,
@@ -91,7 +91,7 @@ public:
     AssociatedConformance,
     BaseProtocol
   } ENUM_EXTENSIBILITY_ATTR(open);
-  
+
   /// A witness table entry.
   class Entry {
     WitnessKind Kind;
@@ -101,28 +101,28 @@ public:
       AssociatedConformanceWitness AssociatedConformance;
       BaseProtocolWitness BaseProtocol;
     };
-    
+
   public:
     Entry() : Kind(WitnessKind::Invalid) {}
-    
+
     Entry(const MethodWitness &Method)
       : Kind(WitnessKind::Method), Method(Method)
     {}
-    
+
     Entry(const AssociatedTypeWitness &AssociatedType)
       : Kind(WitnessKind::AssociatedType), AssociatedType(AssociatedType)
     {}
-    
+
     Entry(const AssociatedConformanceWitness &AssociatedConformance)
       : Kind(WitnessKind::AssociatedConformance),
         AssociatedConformance(AssociatedConformance)
     {}
-    
+
     Entry(const BaseProtocolWitness &BaseProtocol)
       : Kind(WitnessKind::BaseProtocol),
         BaseProtocol(BaseProtocol)
     {}
-    
+
     WitnessKind getKind() const { return Kind; }
 
     bool isValid() const { return Kind != WitnessKind::Invalid; }
@@ -143,7 +143,7 @@ public:
       assert(Kind == WitnessKind::BaseProtocol);
       return BaseProtocol;
     }
-    
+
     void removeWitnessMethod() {
       assert(Kind == WitnessKind::Method);
       if (Method.Witness) {
@@ -193,7 +193,7 @@ private:
   /// whether or not entries is empty since you can have an empty witness table
   /// that is not a declaration.
   bool IsDeclaration;
- 
+
   /// Whether or not this witness table is serialized, which allows
   /// devirtualization from another module.
   unsigned SerializedKind : 2;
@@ -222,7 +222,7 @@ public:
                                  ProtocolConformance *conformance);
 
   ~SILWitnessTable();
-  
+
   SILModule &getModule() const { return Mod; }
 
   /// Return the AST ProtocolConformance this witness table represents.
@@ -288,10 +288,10 @@ public:
       }
     }
   }
-  
+
   /// Verify that the witness table is well-formed.
   void verify(const SILModule &M) const;
-  
+
   /// Get the linkage of the witness table.
   SILLinkage getLinkage() const { return Linkage; }
 
@@ -336,7 +336,7 @@ public:
 //===----------------------------------------------------------------------===//
 
 namespace llvm {
-  
+
 template <>
 struct ilist_traits<::swift::SILWitnessTable> :
 public ilist_node_traits<::swift::SILWitnessTable> {
@@ -344,7 +344,7 @@ public ilist_node_traits<::swift::SILWitnessTable> {
 
 public:
   static void deleteNode(SILWitnessTable *WT) { WT->~SILWitnessTable(); }
-  
+
 private:
   void createNode(const SILWitnessTable &);
 };

@@ -12,7 +12,7 @@
 //
 // TO ADD A NEW TEST, just add a new FunctionTest instance.
 // - In the source file containing the functionality you want to test:
-//       let myNewTest = 
+//       let myNewTest =
 //       FunctionTest("my_new_test") { function, arguments, context in
 //       }
 // - In SwiftCompilerSources/Sources/SIL/Test.swift's registerOptimizerTests
@@ -59,7 +59,7 @@
 //
 //    and
 //
-//    let myNeatoUtilityTest = 
+//    let myNeatoUtilityTest =
 //    FunctionTest("my_neato_utility") { function, arguments, test in
 //         // The code here is described in detail below.
 //         // See 4).
@@ -195,8 +195,8 @@ private func registerFunctionTest(_ test: FunctionTest) {
 /// function.
 private func functionTestThunk(
   _ erasedInvocation: UnsafeMutableRawPointer,
-  _ function: BridgedFunction, 
-  _ arguments: BridgedTestArguments, 
+  _ function: BridgedFunction,
+  _ arguments: BridgedTestArguments,
   _ passInvocation: BridgedSwiftPassInvocation) {
   let invocation = castToInvocation(fromOpaquePointer: erasedInvocation)
   let context = FunctionPassContext(_bridged: BridgedPassContext(invocation: passInvocation.invocation))
@@ -237,8 +237,8 @@ private func castToInvocation(fromOpaquePointer erasedInvocation: UnsafeMutableR
 // - for each argument (after the initial string)
 //   - its type
 //   - something to identify the instance (mostly this means calling dump)
-let parseTestSpecificationTest = 
-FunctionTest("test_specification_parsing") { function, arguments, context in 
+let parseTestSpecificationTest =
+FunctionTest("test_specification_parsing") { function, arguments, context in
   let expectedFields = arguments.takeString()
   for expectedField in expectedFields.string {
     switch expectedField {

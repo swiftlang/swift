@@ -244,7 +244,7 @@ private:
     return (node->getKind() == Node::Kind::Module &&
             node->getText() == STDLIB_NAME);
   }
-  
+
   bool printContext(NodePointer Context) {
     if (!Options.QualifyEntities)
       return false;
@@ -266,7 +266,7 @@ private:
     return (node->getKind() == Node::Kind::Identifier &&
             node->getText() == desired);
   }
-  
+
   enum class SugarType {
     None,
     Optional,
@@ -674,17 +674,17 @@ private:
     if (Node->getNumChildren() == 1 &&
         Node->getKind() == Node::Kind::Type)
       return findSugar(Node->getChild(0));
-    
+
     if (Node->getNumChildren() != 2)
       return SugarType::None;
-    
+
     if (Node->getKind() != Node::Kind::BoundGenericEnum &&
         Node->getKind() != Node::Kind::BoundGenericStructure)
       return SugarType::None;
 
     auto unboundType = Node->getChild(0)->getChild(0); // drill through Type
     auto typeArgs = Node->getChild(1);
-    
+
     if (Node->getKind() == Node::Kind::BoundGenericEnum) {
       // Swift.Optional
       if (isIdentifier(unboundType->getChild(1), "Optional") &&
@@ -694,7 +694,7 @@ private:
       }
 
       // Swift.ImplicitlyUnwrappedOptional
-      if (isIdentifier(unboundType->getChild(1), 
+      if (isIdentifier(unboundType->getChild(1),
                        "ImplicitlyUnwrappedOptional") &&
           typeArgs->getNumChildren() == 1 &&
           isSwiftModule(unboundType->getChild(0))) {
@@ -749,7 +749,7 @@ private:
     }
 
     SugarType sugarType = findSugar(Node);
-    
+
     switch (sugarType) {
       case SugarType::None:
         printBoundGenericNoSugar(Node, depth);
@@ -2842,7 +2842,7 @@ NodePointer NodePrinter::print(NodePointer Node, unsigned depth,
     return nullptr;
   case Node::Kind::ImplErasedIsolation:
     Printer << "@isolated(any)";
-    return nullptr;    
+    return nullptr;
   case Node::Kind::ImplCoroutineKind:
     // Skip if text is empty.
     if (Node->getText().empty())
@@ -2935,7 +2935,7 @@ NodePointer NodePrinter::print(NodePointer Node, unsigned depth,
   case Node::Kind::ErrorType:
     Printer << "<ERROR TYPE>";
     return nullptr;
-      
+
   case Node::Kind::DependentPseudogenericSignature:
   case Node::Kind::DependentGenericSignature: {
     printGenericSignature(Node, depth);

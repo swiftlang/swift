@@ -786,7 +786,7 @@ void ConstraintLocator::dump(ConstraintSystem *CS) const {
 void ConstraintLocator::dump(SourceManager *sm, raw_ostream &out) const {
   PrintOptions PO;
   PO.PrintTypesForDebugging = true;
-  
+
   out << "locator@" << (void*) this << " [";
 
   constraints::dumpAnchor(anchor, sm, out);

@@ -26,23 +26,23 @@ import GenUtils
 func getCCCData(from data: String, with dict: inout [UInt32: UInt16]) {
   for line in data.split(separator: "\n") {
     let components = line.split(separator: ";", omittingEmptySubsequences: false)
-    
+
     let ccc = UInt16(components[3])!
-    
+
     // For the most part, CCC 0 is the default case, so we can save much more
     // space by not keeping this information and making it the fallback case.
     if ccc == 0 {
       continue
     }
-    
+
     let scalarStr = components[0]
     let scalar = UInt32(scalarStr, radix: 16)!
 
     var newValue = dict[scalar, default: 0]
-    
+
     // Store our ccc past the 3rd bit.
     newValue |= ccc << 3
-    
+
     dict[scalar] = newValue
   }
 }

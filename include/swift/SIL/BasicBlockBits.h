@@ -68,7 +68,7 @@ public:
   BasicBlockFlag(SILFunction *function) : bit(function, 1) {}
 
   SILFunction *getFunction() const { return bit.getFunction(); }
-  
+
   bool get(SILBasicBlock *block) const { return (bool)bit.get(block); }
 
   void set(SILBasicBlock *block, bool value = true) {

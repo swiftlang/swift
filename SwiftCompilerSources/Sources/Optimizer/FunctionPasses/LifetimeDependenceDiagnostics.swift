@@ -272,7 +272,7 @@ private struct DiagnoseDependence {
 private struct LifetimeVariable {
   var varDecl: VarDecl?
   var sourceLoc: SourceLoc?
-  
+
   var name: StringRef? {
     return varDecl?.userFacingName
   }
@@ -413,13 +413,13 @@ private struct DiagnoseDependenceWalker {
   var visitedValues: ValueSet
 
   var function: Function { diagnostics.function }
-  
+
   init(_ diagnostics: DiagnoseDependence, _ context: Context) {
     self.context = context
     self.diagnostics = diagnostics
     self.visitedValues = ValueSet(context)
   }
-  
+
   mutating func deinitialize() {
     visitedValues.deinitialize()
   }

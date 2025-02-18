@@ -303,7 +303,7 @@ public:
 
     /// True if this shouldn't be serialized.
     NotSerialized = 1ull << (unsigned(DeclKindIndex::Last_Decl) + 4),
-    
+
     /// True if this attribute is only valid when parsing a .sil file.
     SILOnly = 1ull << (unsigned(DeclKindIndex::Last_Decl) + 5),
 
@@ -662,7 +662,7 @@ public:
   }
 
   unsigned getValue() const { return Bits.AlignmentAttr.Value; }
-  
+
   static bool classof(const DeclAttribute *DA) {
     return DA->getKind() == DeclAttrKind::Alignment;
   }
@@ -692,7 +692,7 @@ public:
 
   // The base class's name.
   const Identifier BaseClassName;
-  
+
   static bool classof(const DeclAttribute *DA) {
     return DA->getKind() == DeclAttrKind::SwiftNativeObjCRuntimeBase;
   }
@@ -955,7 +955,7 @@ public:
                           bool implicitName);
 
   /// Create an unnamed Objective-C attribute, i.e., @objc.
-  static ObjCAttr *createUnnamed(ASTContext &Ctx, SourceLoc AtLoc, 
+  static ObjCAttr *createUnnamed(ASTContext &Ctx, SourceLoc AtLoc,
                                  SourceLoc ObjCLoc);
 
   static ObjCAttr *createUnnamedImplicit(ASTContext &Ctx);
@@ -966,8 +966,8 @@ public:
   /// Note that a nullary Objective-C attribute may represent either a
   /// selector for a zero-parameter function or some other Objective-C
   /// entity, such as a class or protocol.
-  static ObjCAttr *createNullary(ASTContext &Ctx, SourceLoc AtLoc, 
-                                 SourceLoc ObjCLoc, SourceLoc LParenLoc, 
+  static ObjCAttr *createNullary(ASTContext &Ctx, SourceLoc AtLoc,
+                                 SourceLoc ObjCLoc, SourceLoc LParenLoc,
                                  SourceLoc NameLoc, Identifier Name,
                                  SourceLoc RParenLoc);
 
@@ -977,13 +977,13 @@ public:
   /// Note that a nullary Objective-C attribute may represent either a
   /// selector for a zero-parameter function or some other Objective-C
   /// entity, such as a class or protocol.
-  static ObjCAttr *createNullary(ASTContext &Ctx, Identifier Name, 
+  static ObjCAttr *createNullary(ASTContext &Ctx, Identifier Name,
                                  bool isNameImplicit);
 
   /// Create a "selector" Objective-C attribute, which has some number
   /// of identifiers followed by colons.
-  static ObjCAttr *createSelector(ASTContext &Ctx, SourceLoc AtLoc, 
-                                  SourceLoc ObjCLoc, SourceLoc LParenLoc, 
+  static ObjCAttr *createSelector(ASTContext &Ctx, SourceLoc AtLoc,
+                                  SourceLoc ObjCLoc, SourceLoc LParenLoc,
                                   ArrayRef<SourceLoc> NameLocs,
                                   ArrayRef<Identifier> Names,
                                   SourceLoc RParenLoc);
@@ -1405,7 +1405,7 @@ public:
     assert(getKind() == EffectsKind::Custom);
     return customString;
   }
-  
+
   SourceLoc getCustomStringLocation() const {
     return customStringLoc;
   }
@@ -2812,7 +2812,7 @@ public:
       return nullptr;
     return LikeType;
   }
-  
+
   /// Return the type whose array layout the attribute type should get its
   /// layout from, along with the size of that array. Returns None if the
   /// attribute specifies scalar or manual layout.
@@ -3036,7 +3036,7 @@ public:
     using value_type = T*;
     using difference_type = std::ptrdiff_t;
     using pointer = value_type*;
-    using reference = value_type&;    
+    using reference = value_type&;
 
     explicit iterator_base(T *Impl) : Impl(Impl) {}
     DERIVED &operator++() { Impl = Impl->Next; return (DERIVED&)*this; }

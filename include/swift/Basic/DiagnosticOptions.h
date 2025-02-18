@@ -57,7 +57,7 @@ public:
 
   /// Suppress all warnings
   bool SuppressWarnings = false;
-  
+
   /// Suppress all remarks
   bool SuppressRemarks = false;
 

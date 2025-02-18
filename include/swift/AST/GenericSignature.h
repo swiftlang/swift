@@ -347,7 +347,7 @@ public:
 
   /// Determines whether this GenericSignature is canonical.
   bool isCanonical() const;
-  
+
   ASTContext &getASTContext() const;
 
   /// Retrieve the requirement machine for the given generic signature.
@@ -361,7 +361,7 @@ public:
   void Profile(llvm::FoldingSetNodeID &ID) const {
     Profile(ID, getGenericParams(), getRequirements());
   }
-  
+
   /// Determine whether the given dependent type is required to be a class.
   bool requiresClass(Type type) const;
 
@@ -488,7 +488,7 @@ public:
   static void Profile(llvm::FoldingSetNodeID &ID,
                       ArrayRef<GenericTypeParamType *> genericParams,
                       ArrayRef<Requirement> requirements);
-  
+
   void print(raw_ostream &OS, PrintOptions Options = PrintOptions()) const;
   void print(ASTPrinter &Printer, PrintOptions Opts = PrintOptions()) const;
   SWIFT_DEBUG_DUMP;

@@ -70,7 +70,7 @@ StackAddress FixedTypeInfo::allocateStack(IRGenFunction &IGF, SILType T,
   Address alloca =
     IGF.createAlloca(getStorageType(), getFixedAlignment(), name);
   IGF.Builder.CreateLifetimeStart(alloca, getFixedSize());
-  
+
   return { alloca };
 }
 

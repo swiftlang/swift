@@ -1199,7 +1199,7 @@ extension RangeReplaceableCollection {
     guard !subranges.isEmpty else {
       return
     }
-    
+
     let inversion = subranges._inverted(within: self)
     var result = Self()
     for range in inversion.ranges {
@@ -1230,10 +1230,10 @@ extension MutableCollection where Self: RangeReplaceableCollection {
     guard let firstRange = subranges.ranges.first else {
       return
     }
-    
+
     var endOfElementsToKeep = firstRange.lowerBound
     var firstUnprocessed = firstRange.upperBound
-    
+
     // This performs a half-stable partition based on the ranges in
     // `indices`. At all times, the collection is divided into three
     // regions:
@@ -1254,10 +1254,10 @@ extension MutableCollection where Self: RangeReplaceableCollection {
         formIndex(after: &endOfElementsToKeep)
         formIndex(after: &firstUnprocessed)
       }
-      
+
       firstUnprocessed = range.upperBound
     }
-    
+
     // After dealing with all the ranges in `subranges`, move the elements
     // that are still in the third region down to the first.
     while firstUnprocessed != endIndex {
@@ -1265,7 +1265,7 @@ extension MutableCollection where Self: RangeReplaceableCollection {
       formIndex(after: &endOfElementsToKeep)
       formIndex(after: &firstUnprocessed)
     }
-    
+
     removeSubrange(endOfElementsToKeep..<endIndex)
   }
 }

@@ -29,7 +29,7 @@ import Android
 import WASILibc
 #endif
 let (platform_read, platform_write, platform_close) = (read, write, close)
-#endif 
+#endif
 
 #if os(Windows)
 public struct _FDInputStream {

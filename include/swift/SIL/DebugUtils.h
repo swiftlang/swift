@@ -73,45 +73,45 @@ public:
   using value_type = Operand*;
   using difference_type = std::ptrdiff_t;
   using pointer = value_type*;
-  using reference = value_type&;    
+  using reference = value_type&;
 
 private:
   ValueBaseUseIterator BaseIterator;
-  
+
   // Skip any debug or non-debug instructions (depending on the nonDebugInsts
   // template argument).
   void skipInsts() {
     while (true) {
       if (*BaseIterator == nullptr)
         return;
-      
+
       SILInstruction *User = BaseIterator->getUser();
       if (User->isDebugInstruction() != nonDebugInsts)
         return;
-      
+
       BaseIterator++;
     }
   }
-  
+
 public:
-  
+
   DebugUseIterator(ValueBaseUseIterator BaseIterator) :
       BaseIterator(BaseIterator) {
     skipInsts();
   }
-  
+
   DebugUseIterator() = default;
-  
+
   Operand *operator*() const { return *BaseIterator; }
   Operand *operator->() const { return *BaseIterator; }
   SILInstruction *getUser() const { return BaseIterator.getUser(); }
-  
+
   DebugUseIterator &operator++() {
     BaseIterator++;
     skipInsts();
     return *this;
   }
-  
+
   DebugUseIterator operator++(int unused) {
     DebugUseIterator Copy = *this;
     ++*this;

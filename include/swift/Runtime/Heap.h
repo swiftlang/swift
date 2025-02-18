@@ -27,7 +27,7 @@
 
 namespace swift {
 // Allocate plain old memory. This is the generalized entry point
-// Never returns nil. The returned memory is uninitialized. 
+// Never returns nil. The returned memory is uninitialized.
 //
 // An "alignment mask" is just the alignment (a power of 2) minus 1.
 SWIFT_EXTERN_C SWIFT_RETURNS_NONNULL SWIFT_NODISCARD SWIFT_RUNTIME_EXPORT_ATTRIBUTE

@@ -199,7 +199,7 @@ bool StackNesting::solve() {
       }
     }
   } while (changed);
-  
+
   return isNested;
 }
 

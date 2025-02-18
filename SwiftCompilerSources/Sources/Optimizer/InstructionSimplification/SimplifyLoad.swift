@@ -323,7 +323,7 @@ private extension Value {
         return false
       }
       if let fri = value as? FunctionRefInst {
-        if function.isAnySerialized, 
+        if function.isAnySerialized,
            !fri.referencedFunction.hasValidLinkageForFragileRef(function.serializedKind)
         {
           return false

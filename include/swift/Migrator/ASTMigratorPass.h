@@ -55,8 +55,8 @@ void runAPIDiffMigratorPass(EditorAdapter &Editor,
 void runOptionalTryMigratorPass(EditorAdapter &Editor,
                                 SourceFile *SF,
                                 const MigratorOptions &Opts);
-  
-  
+
+
 } // end namespace migrator
 } // end namespace swift
 

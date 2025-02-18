@@ -90,7 +90,7 @@ extension ReversedCollection.Iterator: Sendable
 
 extension ReversedCollection.Iterator: IteratorProtocol, Sequence {
   public typealias Element = Base.Element
-  
+
   @inlinable
   @inline(__always)
   public mutating func next() -> Element? {
@@ -209,7 +209,7 @@ extension ReversedCollection.Index: Hashable where Base.Index: Hashable {
   }
 }
 
-extension ReversedCollection: BidirectionalCollection {  
+extension ReversedCollection: BidirectionalCollection {
   @inlinable
   public var startIndex: Index {
     return Index(_base.endIndex)

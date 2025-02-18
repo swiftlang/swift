@@ -36,7 +36,7 @@ public let benchmarks = [
     runFunction: { with(arrayArray08x08, $0) },
     tags: [.validation, .api],
     setUpFunction: { blackHole(arrayArray08x08) }),
-  
+
   BenchmarkInfo(
     name: "FlattenDistanceFromTo.Array.String.04.04",
     runFunction: { with(arrayString04x04, $0) },
@@ -76,7 +76,7 @@ let arrayArray08x08 = makeArrayArray(08, 08)
 @inline(never)
 public func with(_ collection: FlattenSequence<[[UInt8]]>, _ iterations: Int) {
   var value = 0 as Int
-  
+
   for _ in 0 ..< iterations {
     for a in collection.indices {
       for b in collection.indices {
@@ -103,7 +103,7 @@ let arrayString08x08 = makeArrayString(08, 08)
 @inline(never)
 public func with(_ collection: FlattenSequence<[String]>, _ iterations: Int) {
   var value = 0 as Int
-  
+
   for _ in 0 ..< iterations {
     for a in collection.indices {
       for b in collection.indices {

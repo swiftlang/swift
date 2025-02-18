@@ -591,7 +591,7 @@ static void rewriteApplyInst(const CallSiteDescriptor &CSDesc,
   case FullApplySiteKind::BeginApplyInst:
     llvm_unreachable("Unhandled case");
   }
-    
+
   // Erase the old apply.
   AI.getInstruction()->eraseFromParent();
 

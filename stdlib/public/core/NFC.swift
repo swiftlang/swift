@@ -298,7 +298,7 @@ extension Unicode._NFCNormalizer {
             continue
           }
 
-          // Primary Composite found. 
+          // Primary Composite found.
           // It becomes our new 'composee' and 'current' is discarded.
 
           composee = composed
@@ -352,7 +352,7 @@ extension Unicode._NFCNormalizer {
 
           // 'current' is blocked from composing with 'composee'.
           //
-          // If 'current' is a starter, yield 'composee', 
+          // If 'current' is a starter, yield 'composee',
           // emit the segment that we have in the buffer,
           // and begin a new segment with 'current' as the new 'composee'.
           // Otherwise, 'current' is a non-composing mark

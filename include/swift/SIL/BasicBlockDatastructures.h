@@ -35,7 +35,7 @@ namespace swift {
 class BasicBlockSetVector {
   StackList<SILBasicBlock *> vector;
   BasicBlockSet set;
-  
+
 public:
   using iterator = typename StackList<SILBasicBlock *>::iterator;
 
@@ -71,7 +71,7 @@ public:
 class BasicBlockWorklist {
   StackList<SILBasicBlock *> worklist;
   BasicBlockSet visited;
-  
+
 public:
   /// Construct an empty worklist.
   BasicBlockWorklist(SILFunction *function)

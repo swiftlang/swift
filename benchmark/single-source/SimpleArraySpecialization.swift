@@ -57,7 +57,7 @@ public func run_SimpleArraySpecializationBenchmarks(_ n: Int) {
 
   // prevent refcount overflow
   _stdlib_immortalize(myObject)
-  
+
   for _ in 0..<n {
     for i in 0..<100_000 {
       xs.append(myObject)
@@ -71,7 +71,7 @@ public func run_SimpleArraySpecializationBenchmarks(_ n: Int) {
 @inline(never)
 public func run_SimpleArraySpecializationBenchmarks2(_ n: Int) {
   let myObject = MyClass()
-  
+
   // prevent refcount overflow
   _stdlib_immortalize(myObject)
 
@@ -88,7 +88,7 @@ public func run_SimpleArraySpecializationBenchmarks2(_ n: Int) {
 @inline(never)
 public func run_SimpleArraySpecializationBenchmarks3(_ n: Int) {
   let myObject = MyClass()
-  
+
   // prevent refcount overflow
   _stdlib_immortalize(myObject)
 
@@ -105,7 +105,7 @@ public func run_SimpleArraySpecializationBenchmarks3(_ n: Int) {
 @inline(never)
 public func run_SimpleArraySpecializationBenchmarks4(_ n: Int) {
   let myObject = MyClass()
-  
+
   // prevent refcount overflow
   _stdlib_immortalize(myObject)
 

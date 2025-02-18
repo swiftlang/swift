@@ -24,7 +24,7 @@ public protocol CxxSequence<Element>: CxxConvertibleToCollection, Sequence {
     where RawIterator.Pointee == Element
   override associatedtype Iterator = CxxIterator<Self>
 
-  // `begin()` and `end()` have to be mutating, otherwise calling 
+  // `begin()` and `end()` have to be mutating, otherwise calling
   // `self.sequence.begin()` will copy `self.sequence` into a temporary value,
   // and the result will be dangling. This does not mean that the implementing
   // methods _have_ to be mutating.

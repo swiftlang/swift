@@ -55,15 +55,15 @@ struct Stack<Element> : CollectionLikeSequence {
     var index: Int
     let lastSlab: BridgedPassContext.Slab
     let endIndex: Int
-    
+
     mutating func next() -> Element? {
       let end = (slab.data == lastSlab.data ? endIndex : slabCapacity)
-      
+
       guard index < end else { return nil }
-    
+
       let elem = Stack.element(in: slab, at: index)
       index += 1
-      
+
       if index >= end && slab.data != lastSlab.data {
         slab = slab.getNext()
         index = 0
@@ -71,7 +71,7 @@ struct Stack<Element> : CollectionLikeSequence {
       return elem
     }
   }
-  
+
   init(_ context: some Context) { self.bridgedContext = context._bridged }
 
   func makeIterator() -> Iterator {
@@ -109,7 +109,7 @@ struct Stack<Element> : CollectionLikeSequence {
   }
 
   var isEmpty: Bool { return endIndex == 0 }
-  
+
   mutating func pop() -> Element? {
     if isEmpty {
       return nil
@@ -117,7 +117,7 @@ struct Stack<Element> : CollectionLikeSequence {
     assert(endIndex > 0)
     endIndex -= 1
     let elem = Stack.pointer(in: lastSlab, at: endIndex).move()
-    
+
     if endIndex == 0 {
       if lastSlab.data == firstSlab.data {
         _ = bridgedContext.freeSlab(lastSlab)
@@ -132,7 +132,7 @@ struct Stack<Element> : CollectionLikeSequence {
 
     return elem
   }
-  
+
   mutating func removeAll() {
     while pop() != nil { }
   }

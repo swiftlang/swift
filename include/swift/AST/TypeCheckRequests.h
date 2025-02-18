@@ -465,7 +465,7 @@ private:
   friend SimpleRequest;
 
   // Evaluation.
-  bool 
+  bool
   evaluate(Evaluator &evaluator, EffectKind kind,
            ProtocolConformance *conformance) const;
 
@@ -707,7 +707,7 @@ public:
 
   // Cycle handling.
   void noteCycleStep(DiagnosticEngine &diags) const;
-                           
+
   // Caching.
   bool isCached() const;
 };
@@ -2173,14 +2173,14 @@ class FunctionOperatorRequest :
                          RequestFlags::Cached> {
 public:
   using SimpleRequest::SimpleRequest;
-  
+
 private:
   friend SimpleRequest;
-  
+
   // Evaluation.
   OperatorDecl *
   evaluate(Evaluator &evaluator, FuncDecl *value) const;
-  
+
 public:
   // Caching.
   bool isCached() const { return true; }
@@ -2192,14 +2192,14 @@ class GenericSignatureRequest :
                          RequestFlags::SeparatelyCached> {
 public:
   using SimpleRequest::SimpleRequest;
-  
+
 private:
   friend SimpleRequest;
-  
+
   // Evaluation.
   GenericSignature
   evaluate(Evaluator &evaluator, GenericContext *value) const;
-  
+
 public:
   // Separate caching.
   bool isCached() const { return true; }
@@ -2258,19 +2258,19 @@ class EnumRawValuesRequest :
                          RequestFlags::SeparatelyCached> {
 public:
   using SimpleRequest::SimpleRequest;
-  
+
 private:
   friend SimpleRequest;
-  
+
   // Evaluation.
   evaluator::SideEffect
   evaluate(Evaluator &evaluator, EnumDecl *ED, TypeResolutionStage stage) const;
-  
+
 public:
   // Cycle handling.
   void diagnoseCycle(DiagnosticEngine &diags) const;
   void noteCycleStep(DiagnosticEngine &diags) const;
-                           
+
   // Separate caching.
   bool isCached() const;
   std::optional<evaluator::SideEffect> getCachedResult() const;
@@ -3208,7 +3208,7 @@ public:
 private:
   friend SimpleRequest;
 
-  ActorIsolation evaluate(Evaluator &evaluator, 
+  ActorIsolation evaluate(Evaluator &evaluator,
                           VarDecl *) const;
 
 public:

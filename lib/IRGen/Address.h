@@ -58,7 +58,7 @@ public:
   Alignment getAlignment() const {
     return Align;
   }
-  
+
   llvm::PointerType *getType() const {
     return cast<llvm::PointerType>(Addr->getType());
   }

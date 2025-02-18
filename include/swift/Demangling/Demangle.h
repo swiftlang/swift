@@ -193,7 +193,7 @@ public:
   using IndexType = uint64_t;
 
   friend class NodeFactory;
-  
+
 private:
 
   struct NodeVector {
@@ -466,7 +466,7 @@ public:
   /// The lifetime of the returned node tree ends with the lifetime of the
   /// context or with a call of clear().
   NodePointer demangleTypeAsNode(llvm::StringRef MangledName);
-  
+
   /// Demangle the given symbol and return the readable name.
   ///
   /// \param MangledName The mangled symbol string, which start a mangling
@@ -546,7 +546,7 @@ demangleSymbolAsString(const std::string &mangledName,
   return demangleSymbolAsString(mangledName.data(), mangledName.size(),
                                 options);
 }
-  
+
 /// Standalone utility function to demangle the given symbol as string.
 ///
 /// If performance is an issue when demangling multiple symbols,
@@ -595,7 +595,7 @@ demangleTypeAsString(llvm::StringRef MangledName,
   return demangleTypeAsString(MangledName.data(),
                               MangledName.size(), Options);
 }
-  
+
 
 enum class OperatorKind {
   NotOperator,
@@ -747,7 +747,7 @@ public:
     Stream.append(Value.data(), Value.size());
     return *this;
   }
-  
+
   DemanglerPrinter &operator<<(char c) & {
     Stream.push_back(c);
     return *this;
@@ -766,14 +766,14 @@ public:
   DemanglerPrinter &operator<<(int n) & {
     return *this << (long long)n;
   }
-  
+
   template<typename T>
   DemanglerPrinter &&operator<<(T &&x) && {
     return std::move(*this << std::forward<T>(x));
   }
-  
+
   DemanglerPrinter &writeHex(unsigned long long n) &;
- 
+
   std::string &&str() && { return std::move(Stream); }
 
   llvm::StringRef getStringRef() const { return Stream; }

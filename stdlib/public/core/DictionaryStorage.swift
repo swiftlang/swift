@@ -220,7 +220,7 @@ extension __RawDictionaryStorage {
     return Builtin.bridgeFromRawPointer(
       Builtin.addressof(&_swiftEmptyDictionarySingleton))
   }
-  
+
   @_alwaysEmitIntoClient
   @inline(__always)
   internal final func uncheckedKey<Key: Hashable>(at bucket: _HashTable.Bucket) -> Key {

@@ -2072,7 +2072,7 @@ class DeclAvailabilityChecker : public DeclVisitor<DeclAvailabilityChecker> {
     // Don't bother checking errors.
     if (type && type->hasError())
       return;
-    
+
     // If the decl which references this type is unavailable on the current
     // platform, don't diagnose the availability of the type.
     if (Where.getAvailability().isUnavailable())
@@ -2159,7 +2159,7 @@ public:
     DeclVisitor<DeclAvailabilityChecker>::visit(D);
     checkGlobalActor(D);
   }
-  
+
   // Force all kinds to be handled at a lower level.
   void visitDecl(Decl *D) = delete;
   void visitValueDecl(ValueDecl *D) = delete;

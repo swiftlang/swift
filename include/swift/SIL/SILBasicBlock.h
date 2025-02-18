@@ -86,9 +86,9 @@ public SwiftObjectHeader {
   template <class, class> friend class SILBitfield;
 
   static SwiftMetatype registeredMetatype;
-  
+
   using CustomBitsType = uint32_t;
-  
+
 public:
   using InstListType = llvm::iplist<SILInstruction>;
 private:
@@ -115,7 +115,7 @@ private:
 
   /// Custom bits managed by BasicBlockBitfield.
   CustomBitsType customBits = 0;
-  
+
   /// The BasicBlockBitfield ID of the last initialized bitfield in customBits.
   /// Example:
   ///
@@ -434,7 +434,7 @@ public:
 
   using SuccessorListTy = TermInst::SuccessorListTy;
   using ConstSuccessorListTy = TermInst::ConstSuccessorListTy;
-  
+
   /// The successors of a SILBasicBlock are defined either explicitly as
   /// a single successor as the branch targets of the terminator instruction.
   ConstSuccessorListTy getSuccessors() const {
@@ -470,7 +470,7 @@ public:
   const_succblock_iterator succblock_end() const {
     return getTerminator()->succblock_end();
   }
-  
+
   unsigned getNumSuccessors() const {
     return getTerminator()->getNumSuccessors();
   }

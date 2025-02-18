@@ -307,12 +307,12 @@ public:
                   "only implemented for trivial types");
   }
   ~MiniVector() { free(first); }
-  
+
   MiniVector(const MiniVector &) = delete;
-  
+
   Element *begin() { return first; }
   Element *end() { return first + size; }
-  
+
   void push_back(const Element &e) {
     if (size >= capacity) {
       capacity = capacity ? capacity*2 : 8;
@@ -322,7 +322,7 @@ public:
     }
     first[size++] = e;
   }
-  
+
   void clear_and_shrink_to_fit() {
     free(first);
     first = nullptr;
@@ -363,71 +363,71 @@ private:
       return reinterpret_cast<ElemTy *>(&Elem);
     }
   };
-  
+
   size_t Capacity;
   std::atomic<size_t> ReaderCount;
   std::atomic<Storage *> Elements;
   pthread_mutex_t WriterMutex;
   MiniVector<Storage *> FreeList;
-  
+
   void incrementReaders() {
     ReaderCount.fetch_add(1, std::memory_order_acquire);
   }
-  
+
   void decrementReaders() {
     ReaderCount.fetch_sub(1, std::memory_order_release);
   }
-  
+
   void deallocateFreeList() {
     for (Storage *storage : FreeList)
       storage->deallocate();
     FreeList.clear_and_shrink_to_fit();
   }
-  
+
 public:
   struct Snapshot {
     ConcurrentReadableArray *Array;
     const ElemTy *Start;
     size_t Count;
-    
+
     Snapshot(ConcurrentReadableArray *array, const ElemTy *start, size_t count)
       : Array(array), Start(start), Count(count) {}
-    
+
     Snapshot(const Snapshot &other)
       : Array(other.Array), Start(other.Start), Count(other.Count) {
       Array->incrementReaders();
     }
-    
+
     ~Snapshot() {
       Array->decrementReaders();
     }
-    
+
     const ElemTy *begin() { return Start; }
     const ElemTy *end() { return Start + Count; }
     size_t count() { return Count; }
   };
-  
+
   // This type cannot be safely copied, moved, or deleted.
   ConcurrentReadableArray(const ConcurrentReadableArray &) = delete;
   ConcurrentReadableArray(ConcurrentReadableArray &&) = delete;
   ConcurrentReadableArray &operator=(const ConcurrentReadableArray &) = delete;
-  
+
   ConcurrentReadableArray()
     : Capacity(0), ReaderCount(0), Elements(nullptr) {
     pthread_mutex_init(&WriterMutex, nullptr);
   }
-  
+
   ~ConcurrentReadableArray() {
     assert(ReaderCount.load(std::memory_order_acquire) == 0 &&
            "deallocating ConcurrentReadableArray with outstanding snapshots");
     deallocateFreeList();
     pthread_mutex_destroy(&WriterMutex);
   }
-  
+
   void push_back(const ElemTy &elem) {
     pthread_mutex_lock(&WriterMutex);
     SWIFT_DEFER { pthread_mutex_unlock(&WriterMutex); };
-    
+
     auto *storage = Elements.load(std::memory_order_relaxed);
     auto count = storage ? storage->Count.load(std::memory_order_relaxed) : 0;
     if (count >= Capacity) {
@@ -438,26 +438,26 @@ public:
         newStorage->Count.store(count, std::memory_order_relaxed);
         FreeList.push_back(storage);
       }
-      
+
       storage = newStorage;
       Capacity = newCapacity;
       Elements.store(storage, std::memory_order_release);
     }
-    
+
     new(&storage->data()[count]) ElemTy(elem);
     storage->Count.store(count + 1, std::memory_order_release);
-    
+
     if (ReaderCount.load(std::memory_order_acquire) == 0)
       deallocateFreeList();
   }
-  
+
   Snapshot snapshot() {
     incrementReaders();
     auto *storage = Elements.load(SWIFT_MEMORY_ORDER_CONSUME);
     if (storage == nullptr) {
       return Snapshot(this, nullptr, 0);
     }
-    
+
     auto count = storage->Count.load(std::memory_order_acquire);
     const auto *ptr = storage->data();
     return Snapshot(this, ptr, count);

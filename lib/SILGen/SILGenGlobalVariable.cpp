@@ -226,7 +226,7 @@ void SILGenModule::emitGlobalInitialization(PatternBindingDecl *pd,
   Mangle::ASTMangler TokenMangler(pd->getASTContext());
   std::string onceTokenBuffer = TokenMangler.mangleGlobalInit(pd, pbdEntry,
                                                               false);
-  
+
   auto onceTy = BuiltinIntegerType::getWordType(M.getASTContext());
   auto onceSILTy
     = SILType::getPrimitiveObjectType(onceTy->getCanonicalType());
@@ -242,7 +242,7 @@ void SILGenModule::emitGlobalInitialization(PatternBindingDecl *pd,
   Mangle::ASTMangler FuncMangler(pd->getASTContext());
   std::string onceFuncBuffer = FuncMangler.mangleGlobalInit(pd, pbdEntry,
                                                             true);
-  
+
   SILFunction *onceFunc = emitLazyGlobalInitializer(onceFuncBuffer, pd,
                                                     pbdEntry);
 

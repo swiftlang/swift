@@ -24,7 +24,7 @@
 
 namespace swift {
 namespace irgen {
-  
+
 /// A description of how to represent an enum payload as a value.
 /// A payload can either use a generic word-chunked representation,
 /// or attempt to follow the explosion schema of one of its payload
@@ -83,10 +83,10 @@ class EnumPayload {
 public:
   /// A value, or the type of a zero value in the payload.
   using LazyValue = llvm::PointerUnion<llvm::Value *, llvm::Type *>;
-  
+
   mutable SmallVector<LazyValue, 2> PayloadValues;
   mutable llvm::Type *StorageType = nullptr;
-  
+
   EnumPayload() = default;
 
   /// Generate a "zero" enum payload.
@@ -107,35 +107,35 @@ public:
   void insertValue(IRGenModule &IGM,
                    IRBuilder &builder,
                    llvm::Value *value, unsigned bitOffset);
-  
+
   /// Extract a value from the enum payload.
   llvm::Value *extractValue(IRGenFunction &IGF,
                             llvm::Type *type, unsigned bitOffset) const;
-  
+
   /// Take an enum payload out of an explosion.
   static EnumPayload fromExplosion(IRGenModule &IGM,
                                    Explosion &in,
                                    EnumPayloadSchema schema);
-  
+
   /// Add the payload to an explosion.
   void explode(IRGenModule &IGM, Explosion &out) const;
-  
+
   /// Pack into another enum payload.
   void packIntoEnumPayload(IRGenModule &IGM,
                            IRBuilder &builder,
                            EnumPayload &dest,
                            unsigned bitOffset) const;
-  
+
   /// Unpack from another enum payload.
   static EnumPayload unpackFromEnumPayload(IRGenFunction &IGF,
                                            const EnumPayload &src,
                                            unsigned bitOffset,
                                            EnumPayloadSchema schema);
-  
+
   /// Load an enum payload from memory.
   static EnumPayload load(IRGenFunction &IGF, Address address,
                           EnumPayloadSchema schema);
-  
+
   /// Store an enum payload to memory.
   void store(IRGenFunction &IGF, Address address) const;
 
@@ -145,19 +145,19 @@ public:
                   const APInt &mask,
                   ArrayRef<std::pair<APInt, llvm::BasicBlock*>> cases,
                   SwitchDefaultDest dflt) const;
-  
+
   /// Emit an equality comparison operation that payload & mask == value.
   llvm::Value *emitCompare(IRGenFunction &IGF,
                            const APInt &mask,
                            const APInt &value) const;
-  
+
   /// Apply an AND mask to the payload.
   void emitApplyAndMask(IRGenFunction &IGF, const APInt &mask);
-  
+
   /// Apply an OR mask to the payload.
   void emitApplyOrMask(IRGenModule &IGM,
                        IRBuilder &builder, const APInt &mask);
-  
+
   /// Apply an OR mask to the payload.
   void emitApplyOrMask(IRGenFunction &IGF, EnumPayload mask);
 
@@ -183,7 +183,7 @@ private:
   /// This will always be a multiple of 8.
   unsigned getAllocSizeInBits(const llvm::DataLayout &DL) const;
 };
-  
+
 }
 }
 

@@ -61,7 +61,7 @@ extension FlattenSequence.Iterator: Sendable
 
 extension FlattenSequence.Iterator: IteratorProtocol {
   public typealias Element = Base.Element.Element
-  
+
   /// Advances to the next element and returns it, or `nil` if no next element
   /// exists.
   ///

@@ -115,7 +115,7 @@ static bool isDirectlyRefutablePattern(const Pattern *p) {
   case PatternKind::Named:
   case PatternKind::Expr:
     llvm_unreachable("non-specializable patterns");
-  
+
   // Tuple and nominal-type patterns are not themselves directly refutable.
   case PatternKind::Tuple:
     return false;
@@ -132,7 +132,7 @@ static bool isDirectlyRefutablePattern(const Pattern *p) {
   case PatternKind::Typed:
   case PatternKind::Binding:
     return isDirectlyRefutablePattern(p->getSemanticsProvidingPattern());
-  }  
+  }
   llvm_unreachable("bad pattern");
 }
 
@@ -157,7 +157,7 @@ static unsigned getNumSpecializationsRecursive(const Pattern *p, unsigned n) {
   // Expressions are always-refutable wildcards.
   case PatternKind::Expr:
     return AlwaysRefutable;
-  
+
   // Tuple and nominal-type patterns are not themselves directly refutable.
   case PatternKind::Tuple: {
     auto tuple = cast<TuplePattern>(p);
@@ -165,7 +165,7 @@ static unsigned getNumSpecializationsRecursive(const Pattern *p, unsigned n) {
       n = getNumSpecializationsRecursive(elt.getPattern(), n);
     return n;
   }
-  
+
   // isa and enum-element patterns are refutable, at least in theory.
   case PatternKind::Is: {
     auto isa = cast<IsPattern>(p);
@@ -193,7 +193,7 @@ static unsigned getNumSpecializationsRecursive(const Pattern *p, unsigned n) {
   case PatternKind::Typed:
   case PatternKind::Binding:
     return getNumSpecializationsRecursive(p->getSemanticsProvidingPattern(), n);
-  }  
+  }
   llvm_unreachable("bad pattern");
 }
 
@@ -220,7 +220,7 @@ static bool isWildcardPattern(const Pattern *p) {
   case PatternKind::Expr:
   case PatternKind::Named:
     return true;
-  
+
   // Non-wildcards.
   case PatternKind::Tuple:
   case PatternKind::Is:
@@ -292,7 +292,7 @@ static Pattern *getSimilarSpecializingPattern(Pattern *p, Pattern *first) {
     }
     return nullptr;
   }
-    
+
   case PatternKind::Paren:
   case PatternKind::Binding:
   case PatternKind::Typed:
@@ -404,7 +404,7 @@ class PatternMatchEmission {
   PatternMatchEmission &operator=(const PatternMatchEmission &) = delete;
 
   SILGenFunction &SGF;
-  
+
   /// PatternMatchStmt - The 'switch', or do-catch statement that we're emitting
   /// this pattern match for.
   Stmt *PatternMatchStmt;
@@ -421,12 +421,12 @@ class PatternMatchEmission {
 public:
   using CompletionHandlerTy =
     llvm::function_ref<void(PatternMatchEmission &, ArgArray, ClauseRow &)>;
-    
+
 private:
   CompletionHandlerTy CompletionHandler;
-  
+
 public:
-  
+
   PatternMatchEmission(SILGenFunction &SGF, Stmt *S,
                        CompletionHandlerTy completionHandler)
     : SGF(SGF), PatternMatchStmt(S),
@@ -468,7 +468,7 @@ public:
     assert(found != Temporaries.end());
     return found->second;
   }
-  
+
   // Set up match emission to borrow a noncopyable subject value.
   void setNoncopyableBorrowingOwnership() {
     NoncopyableMatchOwnership = ValueOwnership::Shared;
@@ -530,11 +530,11 @@ private:
   // Bind copyable variable bindings as independent variables.
   void bindIrrefutablePatterns(const ClauseRow &row, ArgArray args,
                                bool forIrrefutableRow, bool hasMultipleItems);
-                               
+
   // Bind noncopyable variable bindings as borrows.
   void bindIrrefutableBorrows(const ClauseRow &row, ArgArray args,
                                bool forIrrefutableRow, bool hasMultipleItems);
-  
+
   // End the borrow of the subject and derived values during a move-only match.
   void unbindAndEndBorrows(const ClauseRow &row, ArgArray args);
 
@@ -584,12 +584,12 @@ private:
 /// inject "mock" objects in a unittest file.
 class ClauseRow {
   friend class ClauseMatrix;
-  
+
   Stmt *ClientData;
   Pattern *CasePattern;
   Expr *CaseGuardExpr;
-  
-  
+
+
   /// HasFallthroughTo - True if there is a fallthrough into this case.
   bool HasFallthroughTo;
 
@@ -610,7 +610,7 @@ public:
     Columns.push_back(CasePattern);
     if (CaseGuardExpr)
       NumRemainingSpecializations = AlwaysRefutable;
-    else 
+    else
       NumRemainingSpecializations = getNumSpecializations(Columns[0]);
   }
 
@@ -622,7 +622,7 @@ public:
   Pattern *getCasePattern() const { return CasePattern; }
   Expr *getCaseGuardExpr() const { return CaseGuardExpr; }
   bool hasFallthroughTo() const { return HasFallthroughTo; }
-  
+
   ArrayRef<Pattern *> getColumns() const {
     return Columns;
   }
@@ -670,21 +670,21 @@ public:
       return isDirectlyRefutablePattern(Columns[column]);
     return NumRemainingSpecializations == 0;
   }
-  
+
   Pattern * const *begin() const {
     return getColumns().begin();
   }
   Pattern * const *end() const {
     return getColumns().end();
   }
-  
+
   Pattern **begin() {
     return getColumns().begin();
   }
   Pattern **end() {
     return getColumns().end();
   }
-  
+
   Pattern *operator[](unsigned column) const {
     return getColumns()[column];
   }
@@ -721,7 +721,7 @@ public:
 
   ClauseMatrix(ClauseMatrix &&) = default;
   ClauseMatrix &operator=(ClauseMatrix &&) = default;
-  
+
   unsigned rows() const { return Rows.size(); }
 
   ClauseRow &operator[](unsigned row) {
@@ -773,9 +773,9 @@ void ClauseMatrix::print(llvm::raw_ostream &out) const {
   SmallVector<size_t, 4> columnSizes;
 
   patternStrings.resize(Rows.size());
-    
+
   llvm::formatted_raw_ostream fos(out);
-    
+
   for (unsigned r = 0, rend = rows(); r < rend; ++r) {
     const ClauseRow &row = (*this)[r];
     auto &rowStrings = patternStrings[r];
@@ -1085,7 +1085,7 @@ void PatternMatchEmission::emitDispatch(ClauseMatrix &clauses, ArgArray args,
       outerFailure(clauses[clauses.rows() - 1].getCasePattern());
       return;
     }
-    
+
     // Try to find a "necessary column".
     std::optional<unsigned> column = chooseNecessaryColumn(clauses, firstRow);
 
@@ -1192,13 +1192,13 @@ void PatternMatchEmission::emitWildcardDispatch(ClauseMatrix &clauses,
       bindIrrefutableBorrows(clauses[row], args,
                              !hasGuard, hasMultipleItems);
     }
-    
+
     if (hasGuard) {
       // The guard will bind borrows locally if necessary.
       this->emitGuardBranch(guardExpr, guardExpr, failure,
                             clauses[row], args);
     }
-    
+
     if (*ownership > ValueOwnership::Shared) {
       unbindAndEndBorrows(clauses[row], args);
     }
@@ -1328,7 +1328,7 @@ void
 PatternMatchEmission::unbindAndEndBorrows(const ClauseRow &row,
                                           ArgArray args) {
   assert(*getNoncopyableOwnership() > ValueOwnership::Shared);
-  
+
   // Unbind the pattern variables since their borrow will be invalidated.
   for (auto column : row) {
     if (!column) // We use null patterns to mean artificial AnyPatterns
@@ -1350,7 +1350,7 @@ PatternMatchEmission::unbindAndEndBorrows(const ClauseRow &row,
       llvm_unreachable("bad pattern kind");
     }
   }
-  
+
   // Stop borrowing the value by popping up to the scope outside the borrow.
   SGF.Cleanups.endNoncopyablePatternMatchBorrow(EndNoncopyableBorrowDest,
                                                 PatternMatchStmt);
@@ -1403,7 +1403,7 @@ void PatternMatchEmission::bindVariable(Pattern *pattern, VarDecl *var,
 void PatternMatchEmission::bindBorrow(Pattern *pattern, VarDecl *var,
                                       ConsumableManagedValue value) {
   assert(value.getFinalConsumption() == CastConsumptionKind::BorrowAlways);
-  
+
   auto bindValue = value.asBorrowedOperand2(SGF, pattern).getFinalManagedValue();
 
   // Borrow bindings of copyable type should still be no-implicit-copy.
@@ -1445,7 +1445,7 @@ void PatternMatchEmission::emitGuardBranch(SILLocation loc, Expr *guard,
   SILValue testBool;
   {
     FullExpr scope(SGF.Cleanups, CleanupLocation(guard));
-    
+
     // If the final pattern match is destructive, then set up borrow bindings
     // to evaluate the guard expression without allowing it to destruct the
     // subject yet.
@@ -1515,7 +1515,7 @@ void PatternMatchEmission::emitSpecializedDispatch(ClauseMatrix &clauses,
   //
   // since the cleanup state changes performed by ArgUnforwarder will
   // occur too late.
-  
+
   unsigned firstRow = lastRow;
 
   // Collect the rows to specialize.
@@ -1584,7 +1584,7 @@ void PatternMatchEmission::emitSpecializedDispatch(ClauseMatrix &clauses,
   case PatternKind::Typed:
   case PatternKind::Binding:
     llvm_unreachable("non-semantic pattern kind!");
-  
+
   case PatternKind::Tuple:
     return emitTupleDispatch(rowsToSpecialize, arg, handler, failure);
   case PatternKind::Is:
@@ -1956,7 +1956,7 @@ void PatternMatchEmission::emitIsDispatch(ArrayRef<RowToSpecialize> rows,
   };
   if (ArgUnforwarder::requiresUnforwarding(SGF, src))
     innerFailure = &specializedFailure;
-  
+
   // Perform a conditional cast branch.
   SGF.emitCheckedCastBranch(
       loc, castOperand, sourceType, targetType, SGFContext(),
@@ -2437,11 +2437,11 @@ void PatternMatchEmission::emitEnumElementDispatch(
         case CastConsumptionKind::TakeAlways:
           eltValue = SGF.B.createLoadTake(loc, eltValue);
           break;
-          
+
         case CastConsumptionKind::BorrowAlways:
           eltValue = SGF.B.createLoadBorrow(loc, eltValue);
           break;
-          
+
         case CastConsumptionKind::TakeOnSuccess:
           llvm_unreachable("not possible");
         }
@@ -2540,7 +2540,7 @@ emitBoolDispatch(ArrayRef<RowToSpecialize> rows, ConsumableManagedValue src,
       index = caseToIndex[isTrue];
     } else {
       caseToIndex[isTrue] = index;
-    
+
       curBB = SGF.createBasicBlockAfter(curBB);
       auto *IL = SGF.B.createIntegerLiteral(PatternMatchStmt,
                                     SILType::getBuiltinIntegerType(1, Context),
@@ -2609,7 +2609,7 @@ void PatternMatchEmission::emitDestructiveCaseBlocks() {
   SGF.Cleanups.endNoncopyablePatternMatchBorrow(EndNoncopyableBorrowDest,
                                                 PatternMatchStmt,
                                                 /* pop cleanups*/ true);
-  
+
   // Visitor to consume a value while binding pattern variables out of it.
   // The conditions tested by the pattern are assumed to be true because
   // the match has already happened at this point.
@@ -2622,7 +2622,7 @@ void PatternMatchEmission::emitDestructiveCaseBlocks() {
     ConsumingPatternBindingVisitor(PatternMatchEmission &emission, CaseStmt *stmt)
       : emission(emission), stmt(stmt)
     {}
-    
+
     VarDecl *getMatchingCaseVarDecl(VarDecl *patternVar) {
       for (auto *caseVar : stmt->getCaseBodyVariables()) {
         if (patternVar->hasName()
@@ -2632,14 +2632,14 @@ void PatternMatchEmission::emitDestructiveCaseBlocks() {
       }
       return nullptr;
     }
-  
+
     void visitNamedPattern(NamedPattern *p, ManagedValue mv) {
       // Find the matching case block variable for the pattern variable.
       auto caseVar = getMatchingCaseVarDecl(p->getDecl());
       if (!caseVar) {
         return;
       }
-      
+
       // Set up a variable binding for it.
       // TODO: Handle multiple case pattern blocks.
       emission.bindVariable(p, caseVar,
@@ -2653,13 +2653,13 @@ void PatternMatchEmission::emitDestructiveCaseBlocks() {
         .emitDebugDescription(caseVar, emission.SGF.VarLocs[caseVar].value,
                               dbgVar);
     }
-    
+
     void visitTuplePattern(TuplePattern *p, ManagedValue mv) {
       auto &SGF = emission.SGF;
       // Destructure the tuple and bind its components.
       if (mv.getType().isObject()) {
         auto destructure = SGF.B.createDestructureTuple(p, mv.forward(SGF));
-        
+
         for (unsigned i = 0, e = p->getNumElements(); i < e; ++i) {
           auto elementVal = destructure->getAllResults()[i];
           visit(p->getElement(i).getPattern(),
@@ -2677,12 +2677,12 @@ void PatternMatchEmission::emitDestructiveCaseBlocks() {
         }
       }
     }
-    
+
     void visitIsPattern(IsPattern *p, ManagedValue mv) {
       // TODO
       llvm_unreachable("cast pattern in noncopyable pattern match not implemented");
     }
-    
+
     void visitEnumProjection(ManagedValue mv,
                              EnumElementDecl *enumCase,
                              SILLocation loc,
@@ -2691,7 +2691,7 @@ void PatternMatchEmission::emitDestructiveCaseBlocks() {
         // Nothing to do if there's no payload to match.
         return;
       }
-                             
+
       auto &SGF = emission.SGF;
 
       // Force-project the enum payload. We can assume that the case tag
@@ -2715,15 +2715,15 @@ void PatternMatchEmission::emitDestructiveCaseBlocks() {
               SGF.emitManagedRValueWithCleanup(payload));
       }
     }
-    
+
     void visitEnumElementPattern(EnumElementPattern *p, ManagedValue mv) {
       visitEnumProjection(mv, p->getElementDecl(), p, p->getSubPattern());
     }
-    
+
     void visitOptionalSomePattern(OptionalSomePattern *p, ManagedValue mv) {
       visitEnumProjection(mv, p->getElementDecl(), p, p->getSubPattern());
     }
-    
+
     // Drop subpatterns that can't bind anything.
 
     void visitExprPattern(ExprPattern *P, ManagedValue mv) {
@@ -2738,7 +2738,7 @@ void PatternMatchEmission::emitDestructiveCaseBlocks() {
     }
 
     // Pass through decorative patterns.
-    
+
     void visitParenPattern(ParenPattern *P, ManagedValue mv) {
       return visit(P->getSubPattern(), mv);
     }
@@ -2749,7 +2749,7 @@ void PatternMatchEmission::emitDestructiveCaseBlocks() {
       return visit(P->getSubPattern(), mv);
     }
   };
-  
+
   // Now we can start destructively binding the value.
   for (auto &casePattern : DestructiveCases) {
     CaseStmt *stmt;
@@ -2759,7 +2759,7 @@ void PatternMatchEmission::emitDestructiveCaseBlocks() {
 
     SGF.B.setInsertionPoint(bb);
     SGF.emitProfilerIncrement(stmt);
-    
+
     // Restore the original subject's cleanup when we're done with this block so
     // it can be destructured again in other blocks.
     CleanupStateRestorationScope restoreSubject(SGF.Cleanups);
@@ -2767,10 +2767,10 @@ void PatternMatchEmission::emitDestructiveCaseBlocks() {
       restoreSubject.pushCleanupState(NoncopyableConsumableValue.getCleanup(),
                                       CleanupState::PersistentlyActive);
     }
-    
+
     // Create a scope to break down the subject value.
     Scope caseScope(SGF, pattern);
-    
+
     ManagedValue subject;
     if (NoncopyableConsumableValue.getType().isAddress()) {
       // If the subject value is in memory, enter a deinit access for the memory.
@@ -2786,7 +2786,7 @@ void PatternMatchEmission::emitDestructiveCaseBlocks() {
       subject = SGF.emitManagedRValueWithCleanup(
                                       NoncopyableConsumableValue.forward(SGF));
     }
-    
+
 
     // TODO: handle fallthroughs and multiple cases bindings
     // In those cases we'd need to forward bindings through the shared case
@@ -2911,13 +2911,13 @@ void PatternMatchEmission::emitSharedCaseBlocks(
       && !SharedCases.empty()) {
     SGF.SGM.diagnose(SharedCases.front().first,
                      diag::noncopyable_shared_case_block_unimplemented);
-    
+
     for (auto &entry : SharedCases) {
       SILBasicBlock *caseBB = entry.second.first;
       SGF.B.setInsertionPoint(caseBB);
       SGF.B.createUnreachable(entry.first);
     }
-    
+
     return;
   }
   for (auto &entry : SharedCases) {
@@ -2939,7 +2939,7 @@ void PatternMatchEmission::emitSharedCaseBlocks(
 
       // Emit the case body into the predecessor's block.
       SGF.B.setInsertionPoint(predBB);
-      
+
     } else {
       // If we did not need a shared case block, we shouldn't have emitted one.
       assert(!caseBB->pred_empty() &&
@@ -3252,13 +3252,13 @@ static bool isBorrowableSubject(SILGenFunction &SGF,
   // Look through forwarding expressions.
   for (;;) {
     subjectExpr = subjectExpr->getValueProvidingExpr();
-    
+
     // Look through loads.
     if (auto load = dyn_cast<LoadExpr>(subjectExpr)) {
       subjectExpr = load->getSubExpr();
       continue;
     }
-    
+
     // Look through optional force-projections.
     // We can't look through optional evaluations here because wrapping the
     // value up in an Optional at the end needs a copy/move to create the
@@ -3290,15 +3290,15 @@ static bool isBorrowableSubject(SILGenFunction &SGF,
 
     break;
   }
-  
+
   // An explicit `borrow` expression requires us to do a borrowing access.
   if (isa<BorrowExpr>(subjectExpr)) {
     return true;
   }
-  
+
   AbstractStorageDecl *storage;
   AccessSemantics access;
-  
+
   // A subject is potentially borrowable if it's some kind of storage reference.
   if (auto declRef = dyn_cast<DeclRefExpr>(subjectExpr)) {
     storage = dyn_cast<AbstractStorageDecl>(declRef->getDecl());
@@ -3312,13 +3312,13 @@ static bool isBorrowableSubject(SILGenFunction &SGF,
   } else {
     return false;
   }
-  
+
   // If the member being referenced isn't storage, there's no benefit to
   // borrowing it.
   if (!storage) {
     return false;
   }
-  
+
   // Check the access strategy used to read the storage.
   auto strategy =
       storage->getAccessStrategy(access, AccessKind::Read, SGF.SGM.SwiftModule,
@@ -3353,7 +3353,7 @@ static bool isBorrowableSubject(SILGenFunction &SGF,
       llvm_unreachable("should not be involved in a read");
     }
     llvm_unreachable("switch not covered?");
-    
+
   case AccessStrategy::Kind::MaterializeToTemporary:
   case AccessStrategy::Kind::DispatchToDistributedThunk:
     return false;
@@ -3388,7 +3388,7 @@ void SILGenFunction::emitSwitchStmt(SwitchStmt *S) {
   if (subjectTy->isNoncopyable()) {
     // Determine the overall ownership behavior of the switch, based on the
     // subject expression and the patterns' ownership behavior.
-    
+
     // If the subject expression is borrowable, then perform the switch as
     // a borrow. (A `consume` expression would render the expression
     // non-borrowable.) Otherwise, perform it as a consume.
@@ -3561,7 +3561,7 @@ void SILGenFunction::emitSwitchStmt(SwitchStmt *S) {
     break;
   }
   }
-  
+
   // Inline constructor for subject.
   auto subject = ([&]() -> ConsumableManagedValue {
     // TODO: Move-only-wrapped subjects should also undergo a noncopying switch.
@@ -3577,7 +3577,7 @@ void SILGenFunction::emitSwitchStmt(SwitchStmt *S) {
       switch (ownership) {
       case ValueOwnership::Default:
         llvm_unreachable("invalid");
-      
+
       case ValueOwnership::Shared:
         emission.setNoncopyableBorrowingOwnership();
         if (subjectMV.getType().isAddress()) {
@@ -3602,11 +3602,11 @@ void SILGenFunction::emitSwitchStmt(SwitchStmt *S) {
                                         BeginBorrowInst::IsFixed);
         }
         return {subjectMV, CastConsumptionKind::BorrowAlways};
-        
+
       case ValueOwnership::InOut:
         // TODO: mutating switches
         llvm_unreachable("not implemented");
-        
+
       case ValueOwnership::Owned:
         // Make sure we own the subject value.
         subjectMV = subjectMV.ensurePlusOne(*this, S);
@@ -3615,7 +3615,7 @@ void SILGenFunction::emitSwitchStmt(SwitchStmt *S) {
           // Move the value into memory if it's loadable.
           subjectMV = B.createLoadTake(S, subjectMV);
         }
-        
+
         // Unwind cleanups to this point when we're ready to reproject
         // the value for consumption or mutation.
         emission.setNoncopyableConsumingOwnership(
@@ -3634,7 +3634,7 @@ void SILGenFunction::emitSwitchStmt(SwitchStmt *S) {
       }
       llvm_unreachable("unhandled value ownership");
     }
-    
+
     // TODO: Move-only-wrapped subjects should also undergo a noncopying switch.
     // For now, unwrap them and perform a normal switch over them.
     if (subjectMV.getType().isMoveOnlyWrapped()) {
@@ -3789,7 +3789,7 @@ void SILGenFunction::emitSwitchStmt(SwitchStmt *S) {
   } else {
     B.emitBlock(contBB);
   }
-  
+
   // End the formal access to the subject now (if there was one).
   if (subjectUndergoesFormalAccess) {
     switchFormalAccess.reset();

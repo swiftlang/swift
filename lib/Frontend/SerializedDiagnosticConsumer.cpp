@@ -161,7 +161,7 @@ public:
   /// the diagnostics, the frontend emits a truncated diagnostics file
   /// for the latter case.
   /// The unfortunate aspect is that the truncation discards warnings, etc.
-  
+
   void informDriverOfIncompleteBatchModeCompilation() override {
     CompilationWasComplete = false;
   }
@@ -265,7 +265,7 @@ unsigned SerializedDiagnosticConsumer::getEmitFile(
   Record.push_back(entry);
   Record.push_back(0); // For legacy.
   Record.push_back(0); // For legacy.
-  
+
   // Sanitize the filename enough that the serialized diagnostics reader won't
   // reject it.
   SmallString<32> filenameScratch;

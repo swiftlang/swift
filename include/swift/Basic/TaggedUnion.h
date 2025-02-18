@@ -75,7 +75,7 @@ public:
     using TargetType = TaggedUnionImpl::simplify_member_type<T>;
     TheKind = StorageType::template kindForMember<TargetType>();
     Storage.template emplace<TargetType>(TheKind, std::forward<T>(value));
-    return *this;    
+    return *this;
   }
 
   /// Replace the current value in the union with a value of the given

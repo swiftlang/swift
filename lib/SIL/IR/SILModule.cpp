@@ -49,7 +49,7 @@ class SILModule::SerializationCallback final
 
   void didDeserialize(ModuleDecl *M, SILGlobalVariable *var) override {
     updateLinkage(var);
-    
+
     // For globals we currently do not support available_externally.
     // In the interpreter it would result in two instances for a single global:
     // one in the imported module and one in the main module.
@@ -841,14 +841,14 @@ shouldSerializeEntitiesAssociatedWithDeclContext(const DeclContext *DC) const {
   if (DC->isChildContextOf(getAssociatedContext())) {
     return true;
   }
-  
+
   // Serialize entities associated with clang modules, since other entities
   // may depend on them, and someone who deserializes those entities may not
   // have their own copy.
   if (isa<ClangModuleUnit>(DC->getModuleScopeContext())) {
     return true;
   }
-  
+
   return false;
 }
 

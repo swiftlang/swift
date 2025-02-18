@@ -84,7 +84,7 @@ public struct WitnessTable : CustomStringConvertible, NoReflectionChildren {
   public struct EntryArray : BridgedRandomAccessCollection {
     fileprivate let bridgedTable: BridgedWitnessTable
     public let count: Int
-    
+
     init(witnessTable: WitnessTable) {
       self.bridgedTable = witnessTable.bridged
       self.count = witnessTable.bridged.getNumEntries()

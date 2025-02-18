@@ -249,7 +249,7 @@ extension String: BidirectionalCollection {
     }
     return i
   }
-  
+
   /// Returns the distance between two indices.
   ///
   /// - Parameters:

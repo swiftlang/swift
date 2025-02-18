@@ -280,7 +280,7 @@ public:
 /// block on) the current state of a type metadata.
 ///
 /// --
-/// 
+///
 /// While this class is principally used to report the response to a type
 /// metadata request, it does have some secondary uses.
 ///
@@ -558,7 +558,7 @@ bool isCanonicalInitializableTypeMetadataStaticallyAddressable(IRGenModule &IGM,
 /// Determine how the given type metadata should be accessed.
 MetadataAccessStrategy getTypeMetadataAccessStrategy(CanType type);
 
-/// Return the address of a function that will return type metadata 
+/// Return the address of a function that will return type metadata
 /// for the given non-dependent type.
 llvm::Function *getOrCreateTypeMetadataAccessFunction(IRGenModule &IGM,
                                                       CanType type);

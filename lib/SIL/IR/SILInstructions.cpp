@@ -566,7 +566,7 @@ InitBlockStorageHeaderInst::create(SILFunction &F,
   void *Buffer = F.getModule().allocateInst(
     sizeof(InitBlockStorageHeaderInst),
     alignof(InitBlockStorageHeaderInst));
-  
+
   return ::new (Buffer) InitBlockStorageHeaderInst(DebugLoc, BlockStorage,
                                                    InvokeFunction, BlockType,
                                                    Subs);
@@ -2804,7 +2804,7 @@ bool ConvertFunctionInst::onlyConvertsSubstitutions() const {
   auto fromType = getOperand()->getType().castTo<SILFunctionType>();
   auto toType = getType().castTo<SILFunctionType>();
   auto &M = getModule();
-  
+
   return fromType->getUnsubstitutedType(M) == toType->getUnsubstitutedType(M);
 }
 
@@ -3001,7 +3001,7 @@ forEachRefcountableReference(const KeyPathPatternComponent &component,
     LLVM_FALLTHROUGH;
   case KeyPathPatternComponent::Kind::GettableProperty:
     forFunction(component.getComputedPropertyGetter());
-    
+
     switch (component.getComputedPropertyId().getKind()) {
     case KeyPathPatternComponent::ComputedPropertyId::DeclRef:
       // Mark the vtable entry as used somehow?
@@ -3012,7 +3012,7 @@ forEachRefcountableReference(const KeyPathPatternComponent &component,
     case KeyPathPatternComponent::ComputedPropertyId::Property:
       break;
     }
-    
+
     if (auto equals = component.getSubscriptIndexEquals())
       forFunction(equals);
     if (auto hash = component.getSubscriptIndexHash())
@@ -3037,12 +3037,12 @@ KeyPathPattern::get(SILModule &M, CanGenericSignature signature,
                     StringRef objcString) {
   llvm::FoldingSetNodeID id;
   Profile(id, signature, rootType, valueType, components, objcString);
-  
+
   void *insertPos;
   auto existing = M.KeyPathPatterns.FindNodeOrInsertPos(id, insertPos);
   if (existing)
     return existing;
-  
+
   // Determine the number of operands.
   int maxOperandNo = -1;
   for (auto component : components) {
@@ -3053,7 +3053,7 @@ KeyPathPattern::get(SILModule &M, CanGenericSignature signature,
     case KeyPathPatternComponent::Kind::OptionalForce:
     case KeyPathPatternComponent::Kind::TupleElement:
       break;
-    
+
     case KeyPathPatternComponent::Kind::GettableProperty:
     case KeyPathPatternComponent::Kind::SettableProperty:
       for (auto &index : component.getSubscriptIndices()) {
@@ -3061,7 +3061,7 @@ KeyPathPattern::get(SILModule &M, CanGenericSignature signature,
       }
     }
   }
-  
+
   auto newPattern = KeyPathPattern::create(M, signature, rootType, valueType,
                                            components, objcString,
                                            maxOperandNo + 1);
@@ -3110,7 +3110,7 @@ void KeyPathPattern::Profile(llvm::FoldingSetNodeID &ID,
   ID.AddPointer(rootType.getPointer());
   ID.AddPointer(valueType.getPointer());
   ID.AddString(objcString);
-  
+
   auto profileIndices = [&](ArrayRef<KeyPathPatternComponent::Index> indices) {
     for (auto &index : indices) {
       ID.AddInteger(index.Operand);
@@ -3119,7 +3119,7 @@ void KeyPathPattern::Profile(llvm::FoldingSetNodeID &ID,
       ID.AddPointer(index.Hashable.getOpaqueValue());
     }
   };
-  
+
   for (auto &component : components) {
     ID.AddInteger((unsigned)component.getKind());
     switch (component.getKind()) {
@@ -3127,15 +3127,15 @@ void KeyPathPattern::Profile(llvm::FoldingSetNodeID &ID,
     case KeyPathPatternComponent::Kind::OptionalWrap:
     case KeyPathPatternComponent::Kind::OptionalChain:
       break;
-      
+
     case KeyPathPatternComponent::Kind::StoredProperty:
       ID.AddPointer(component.getStoredPropertyDecl());
       break;
-    
+
     case KeyPathPatternComponent::Kind::TupleElement:
       ID.AddInteger(component.getTupleIndex());
       break;
-    
+
     case KeyPathPatternComponent::Kind::SettableProperty:
       ID.AddPointer(component.getComputedPropertySetter());
       LLVM_FALLTHROUGH;
@@ -3204,7 +3204,7 @@ KeyPathInst::KeyPathInst(SILDebugLocation Loc,
   for (unsigned i = 0; i < allOperands.size(); ++i) {
     ::new ((void*)&operandsBuf[i]) Operand(this, allOperands[i]);
   }
-  
+
   // Increment the use of any functions referenced from the keypath pattern.
   for (auto component : Pattern->getComponents()) {
     component.incrementRefCounts();

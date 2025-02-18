@@ -198,7 +198,7 @@ public:
   /// 'T : C' can be satisfied; however, if 'T' already has an unrelated
   /// superclass requirement, 'T : C' cannot be satisfied.
   bool canBeSatisfied() const;
-  
+
   /// True if the requirement states a conformance to an invertible protocol
   /// that is implied by default (such as `Copyable` or `Escapable`.
   bool isInvertibleProtocolRequirement() const;

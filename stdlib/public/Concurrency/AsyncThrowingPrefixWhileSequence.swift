@@ -72,7 +72,7 @@ public struct AsyncThrowingPrefixWhileSequence<Base: AsyncSequence> {
 
   @usableFromInline
   init(
-    _ base: Base, 
+    _ base: Base,
     predicate: @escaping (Base.Element) async throws -> Bool
   ) {
     self.base = base
@@ -108,7 +108,7 @@ extension AsyncThrowingPrefixWhileSequence: AsyncSequence {
 
     @usableFromInline
     init(
-      _ baseIterator: Base.AsyncIterator, 
+      _ baseIterator: Base.AsyncIterator,
       predicate: @escaping (Base.Element) async throws -> Bool
     ) {
       self.baseIterator = baseIterator
@@ -125,7 +125,7 @@ extension AsyncThrowingPrefixWhileSequence: AsyncSequence {
     @inlinable
     public mutating func next() async throws -> Base.Element? {
       if !predicateHasFailed, let nextElement = try await baseIterator.next() {
-        do { 
+        do {
           if try await predicate(nextElement) {
             return nextElement
           } else {
@@ -150,7 +150,7 @@ extension AsyncThrowingPrefixWhileSequence: AsyncSequence {
     @inlinable
     public mutating func next(isolation actor: isolated (any Actor)?) async throws(Failure) -> Base.Element? {
       if !predicateHasFailed, let nextElement = try await baseIterator.next(isolation: actor) {
-        do { 
+        do {
           if try await predicate(nextElement) {
             return nextElement
           } else {
@@ -172,11 +172,11 @@ extension AsyncThrowingPrefixWhileSequence: AsyncSequence {
 }
 
 @available(SwiftStdlib 5.1, *)
-extension AsyncThrowingPrefixWhileSequence: @unchecked Sendable 
-  where Base: Sendable, 
+extension AsyncThrowingPrefixWhileSequence: @unchecked Sendable
+  where Base: Sendable,
         Base.Element: Sendable { }
 
 @available(SwiftStdlib 5.1, *)
-extension AsyncThrowingPrefixWhileSequence.Iterator: @unchecked Sendable 
-  where Base.AsyncIterator: Sendable, 
+extension AsyncThrowingPrefixWhileSequence.Iterator: @unchecked Sendable
+  where Base.AsyncIterator: Sendable,
         Base.Element: Sendable { }

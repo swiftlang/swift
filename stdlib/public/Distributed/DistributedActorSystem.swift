@@ -798,7 +798,7 @@ public struct RemoteCallArgument<Value> {
 /// decode the incoming values, which may themselves be distributed actors.
 ///
 /// An actor system must be provided to the ``Decoder`` in order for a distributed actor's ``Decodable/init(from:)``
-/// to be able to return the instance of the actor. Specifically, the decoded``ActorID`` is passed to the actor system's `resolve(id:as:)` method in order to 
+/// to be able to return the instance of the actor. Specifically, the decoded``ActorID`` is passed to the actor system's `resolve(id:as:)` method in order to
 /// return either a local instance identified by this ID, or creating a remote actor reference.
 /// Thus, you must set the actor system the decoding is performed for, on the decoder's `userInfo`, as follows:
 ///

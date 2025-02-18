@@ -76,7 +76,7 @@ PolymorphicEffectRequirementsRequest::evaluate(Evaluator &evaluator,
 
   SmallVector<AbstractFunctionDecl *, 2> requirements;
   SmallVector<std::pair<Type, ProtocolDecl *>, 2> conformances;
-  
+
   // check if immediate members of protocol are 'throws'
   for (auto member : proto->getMembers()) {
     auto fnDecl = dyn_cast<AbstractFunctionDecl>(member);
@@ -97,7 +97,7 @@ PolymorphicEffectRequirementsRequest::evaluate(Evaluator &evaluator,
 
     conformances.emplace_back(requirement.getFirstType(), protoDecl);
   }
-  
+
   return PolymorphicEffectRequirementList(ctx.AllocateCopy(requirements),
                                           ctx.AllocateCopy(conformances));
 }
@@ -177,8 +177,8 @@ PolymorphicEffectKindRequest::evaluate(Evaluator &evaluator,
   return PolymorphicEffectKind::Invalid;
 }
 
-static bool classifyWitness(ModuleDecl *module, 
-                            ProtocolConformance *conformance, 
+static bool classifyWitness(ModuleDecl *module,
+                            ProtocolConformance *conformance,
                             AbstractFunctionDecl *req,
                             EffectKind kind) {
   auto declRef = conformance->getWitnessDeclRef(req);
@@ -280,7 +280,7 @@ bool ConformanceHasEffectRequest::evaluate(
     }
 
     for (auto pair : list.getConformances()) {
-      auto assocConf = 
+      auto assocConf =
           current->getAssociatedConformance(
               pair.first, pair.second);
       if (!assocConf.isConcrete())
@@ -489,7 +489,7 @@ public:
         break;
       }
     }
-    
+
     // Constructor delegation.
     if (auto otherCtorDeclRef = dyn_cast<OtherConstructorDeclRefExpr>(fn)) {
       return AbstractFunction(otherCtorDeclRef->getDecl(),
@@ -926,9 +926,9 @@ class Classification {
   void print(raw_ostream &out) const {
     out << "{ IsInvalid = " << IsInvalid
         << ", ThrowKind = ";
-    
+
     simple_display(out, ThrowKind);
-         
+
     out << ", ThrowReason = ";
     if (!ThrowReason)
       out << "nil";
@@ -989,7 +989,7 @@ public:
     result.UnsafeUses.clear();
     return result;
   }
-  
+
   /// Return a classification that only retains the throwing parts of the
   /// given classification.
   Classification onlyThrowing(std::optional<PotentialEffectReason>
@@ -3368,7 +3368,7 @@ class CheckEffectsCoverage : public EffectsHandlingWalker<CheckEffectsCoverage> 
 
       preserveDiagnoseErrorOnTryFlag();
     }
-    
+
     void preserveCoverageFromTryOperand() {
       OldFlags.mergeFrom(ContextFlags::HasAnyThrowSite, Self.Flags);
       OldFlags.mergeFrom(ContextFlags::asyncAwaitFlags(), Self.Flags);
@@ -4194,7 +4194,7 @@ private:
     }
     Ctx.Diags.diagnose(E->getUnsafeLoc(), diag::no_unsafe_in_unsafe);
   }
-  
+
   std::pair<SourceLoc, std::string>
   getFixItForUncoveredSite(const Expr *anchor, StringRef keyword) const {
     SourceLoc insertLoc = anchor->getStartLoc();

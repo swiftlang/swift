@@ -207,7 +207,7 @@ namespace sil_block {
     DeclIDField,          // SILFunction name
     BCFixed<2>            // SerializedKind.
   >;
-  
+
   using PropertyLayout = BCRecordLayout<
     SIL_PROPERTY,
     DeclIDField,          // Property decl
@@ -309,7 +309,7 @@ namespace sil_block {
     ValueIDField, /// Column.
     ValueIDField, /// FName.
     TypeIDField,
-    SILTypeCategoryField 
+    SILTypeCategoryField
   >;
 
   using SourceLocLayout = BCRecordLayout<

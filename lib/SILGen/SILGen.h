@@ -47,10 +47,10 @@ class LLVM_LIBRARY_VISIBILITY SILGenModule : public ASTVisitor<SILGenModule> {
 public:
   /// The Module being constructed.
   SILModule &M;
-  
+
   /// The type converter for the module.
   TypeConverter &Types;
-  
+
   /// The Swift module we are visiting.
   ModuleDecl *SwiftModule;
 
@@ -119,7 +119,7 @@ public:
   SILGenModule(SILModule &M, ModuleDecl *SM);
 
   ~SILGenModule();
-  
+
   SILGenModule(SILGenModule const &) = delete;
   void operator=(SILGenModule const &) = delete;
 
@@ -135,7 +135,7 @@ public:
 
   static DeclName getMagicFunctionName(SILDeclRef ref);
   static DeclName getMagicFunctionName(DeclContext *dc);
-  
+
   /// Get the function for a SILDeclRef, or return nullptr if it hasn't been
   /// emitted yet.
   SILFunction *getEmittedFunction(SILDeclRef constant,
@@ -166,7 +166,7 @@ public:
                                            CanSILFunctionType toType,
                                            CanType dynamicSelfType,
                                            CanType fromGlobalActor);
-  
+
   /// Get or create the declaration of a completion handler block
   /// implementation function for an ObjC API that was imported
   /// as `async` in Swift.
@@ -338,7 +338,7 @@ public:
   /// Emits argument generators, including default argument generators and
   /// property wrapper argument generators, for the given parameter list.
   void emitArgumentGenerators(SILDeclRef::Loc decl, ParameterList *paramList);
-  
+
   /// Emits a thunk from a foreign function to the native Swift convention.
   void emitForeignToNativeThunk(SILDeclRef thunk);
 
@@ -361,13 +361,13 @@ public:
 
   void preEmitFunction(SILDeclRef constant, SILFunction *F, SILLocation L);
   void postEmitFunction(SILDeclRef constant, SILFunction *F);
-  
+
   /// Add a global variable to the SILModule.
   void addGlobalVariable(VarDecl *global);
 
   /// Emit the ObjC-compatible entry point for a method.
   void emitObjCMethodThunk(FuncDecl *method);
-  
+
   /// Emit the ObjC-compatible getter and setter for a property.
   void emitObjCPropertyMethodThunks(AbstractStorageDecl *prop);
 
@@ -398,7 +398,7 @@ public:
   SILFunction *emitLazyGlobalInitializer(StringRef funcName,
                                          PatternBindingDecl *binding,
                                          unsigned pbdEntry);
-  
+
   /// Emit the accessor for a global variable or stored static property.
   ///
   /// This ensures the lazy initializer has been run before returning the
@@ -483,7 +483,7 @@ public:
 #define KNOWN_SDK_FUNC_DECL(MODULE, NAME, ID) \
   FuncDecl *get##NAME(SILLocation loc);
 #include "swift/AST/KnownSDKDecls.def"
-  
+
   /// Retrieve the _ObjectiveCBridgeable protocol definition.
   ProtocolDecl *getObjectiveCBridgeable(SILLocation loc);
 
@@ -638,7 +638,7 @@ private:
   /// isolated, function should be the deallocator itself.
   void emitDeallocatorImpl(SILDeclRef constant, SILFunction *f);
 };
- 
+
 } // end namespace Lowering
 } // end namespace swift
 

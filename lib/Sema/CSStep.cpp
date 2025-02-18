@@ -931,7 +931,7 @@ StepResult ConjunctionStep::resume(bool prevFailed) {
     Snapshot.reset();
     if (CS.isDebugMode())
       getDebugLogger() << ")\n";
-    
+
     return done(/*isSuccess=*/!prevFailed);
   }
 

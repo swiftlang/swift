@@ -70,7 +70,7 @@ extension LazyFilterSequence.Iterator: Sendable {}
 
 extension LazyFilterSequence.Iterator: IteratorProtocol, Sequence {
   public typealias Element = Base.Element
-  
+
   /// Advances to the next element and returns it, or `nil` if no next element
   /// exists.
   ///
@@ -293,7 +293,7 @@ extension LazyFilterCollection: Collection {
   public subscript(bounds: Range<Index>) -> SubSequence {
     return SubSequence(_base: _base[bounds], _predicate)
   }
-  
+
   @inlinable
   public func _customLastIndexOfEquatableElement(_ element: Element) -> Index?? {
     guard _predicate(element) else { return .some(nil) }

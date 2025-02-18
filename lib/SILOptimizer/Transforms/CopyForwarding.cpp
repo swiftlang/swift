@@ -659,7 +659,7 @@ public:
 ///
 /// The caller has already proven that lifetime of the value being copied ends
 /// at the copy. (Either it is a [take] or is immediately destroyed).
-/// 
+///
 ///
 /// If the forwarded copy is not an [init], then insert a destroy of the copy's
 /// dest.
@@ -784,17 +784,17 @@ CopyAddrInst *CopyForwarding::findCopyIntoDeadTemp(
 ///
 /// Returns true if the copy was successfully forwarded.
 ///
-/// Old SIL: 
+/// Old SIL:
 /// copy_addr %src, %temp
 /// copy_addr %temp, %dest
 ///
-/// New SIL: 
+/// New SIL:
 /// copy_addr %src, %dest
 ///
 /// Precondition: `srcCopy->getDest()` == `destCopy->getSrc()`
 /// Precondition: %src is unused between srcCopy and destCopy.
 /// Precondition: The lifetime of %temp ends immediate after `destCopy`.
-/// 
+///
 /// Postcondition:
 /// - `srcCopy` is erased.
 /// - Any initial value in %temp is destroyed at `srcCopy` position.
@@ -1085,7 +1085,7 @@ bool CopyForwarding::forwardPropagateCopy() {
 /// i.e. If Def is returned directly, RootUserInsts will be empty.
 ///
 /// Return nullptr when the root != Def, and root has unrecognized uses.
-/// 
+///
 /// If the returned root is not 'Def' itself, then 'Def' must be an address
 /// projection that can be trivially rematerialized with the root as its
 /// operand.
@@ -1181,7 +1181,7 @@ bool CopyForwarding::backwardPropagateCopy() {
 
   for (auto *DVAI : DebugValueInstsToDelete)
     DVAI->eraseFromParent();
-  
+
   // Convert a reinitialization of this address into a destroy, followed by an
   // initialization. Replacing a copy with a destroy+init is not by itself
   // profitable. However, it does allow us to eliminate the later copy, and the

@@ -843,7 +843,7 @@ public struct SwiftifyImportMacro: PeerMacro {
     if dependsOn == .`return` {
         throw DiagnosticError("lifetime cannot depend on the return value", node: dependsOnArg)
     }
-    let type = try getArgumentByName(argumentList, "type") 
+    let type = try getArgumentByName(argumentList, "type")
     let depType: DependenceType
     switch try parseEnumName(type) {
       case "borrow":
@@ -1048,10 +1048,10 @@ public struct SwiftifyImportMacro: PeerMacro {
     var args : [LabeledExprSyntax] = []
     for dependence in returnDependencies {
       if (dependence.type == .borrow) {
-        args.append(LabeledExprSyntax(expression: 
+        args.append(LabeledExprSyntax(expression:
           DeclReferenceExprSyntax(baseName: TokenSyntax("borrow"))))
       }
-      args.append(LabeledExprSyntax(expression: 
+      args.append(LabeledExprSyntax(expression:
         DeclReferenceExprSyntax(baseName: TokenSyntax(tryGetParamName(funcDecl, dependence.dependsOn))!),
         trailingComma: .commaToken()))
     }

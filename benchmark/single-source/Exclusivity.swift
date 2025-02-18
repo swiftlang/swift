@@ -87,7 +87,7 @@ public class C {
   }
 }
 
-// Thunk 
+// Thunk
 @inline(never)
 func updateClass(_ c: C) {
   c.inc()

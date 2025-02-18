@@ -233,7 +233,7 @@ void collectMinimalIndicesForFunctionCall(
       ++indResIdx;
     }
   }
-  
+
   // Record all semantic result parameters as results.
   auto semanticResultParamResultIndex = calleeFnTy->getNumResults();
   for (const auto &paramAndIdx : enumerate(calleeConvs.getParameters())) {

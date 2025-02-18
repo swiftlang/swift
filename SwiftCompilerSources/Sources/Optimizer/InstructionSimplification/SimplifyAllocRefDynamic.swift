@@ -41,7 +41,7 @@ extension AllocRefDynamicInst : OnoneSimplifiable {
     let builder = Builder(before: self, context)
     let newAlloc = builder.createAllocRef(type, isObjC: self.isObjC, canAllocOnStack: self.canAllocOnStack, isBare: false,
       tailAllocatedTypes: self.tailAllocatedTypes, tailAllocatedCounts: Array(self.tailAllocatedCounts.values))
-    
+
     let result: Value
     if emitUpcast {
       result = builder.createUpcast(from: newAlloc, to: self.type)

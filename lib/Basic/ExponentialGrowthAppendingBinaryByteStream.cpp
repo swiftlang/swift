@@ -20,7 +20,7 @@ Error ExponentialGrowthAppendingBinaryByteStream::readBytes(
   if (auto Error = checkOffsetForRead(Offset, Size)) {
     return Error;
   }
-  
+
   Buffer = ArrayRef<uint8_t>(Data.data() + Offset, Size);
   return Error::success();
 }
@@ -47,7 +47,7 @@ Error ExponentialGrowthAppendingBinaryByteStream::writeBytes(
   if (auto Error = checkOffsetForWrite(Offset, Buffer.size())) {
     return Error;
   }
-  
+
   // Resize the internal buffer if needed.
   uint64_t RequiredSize = Offset + Buffer.size();
   if (RequiredSize > Data.size()) {

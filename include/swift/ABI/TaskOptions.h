@@ -179,7 +179,7 @@ public:
   AsyncLet *getAsyncLet() const {
     return asyncLet;
   }
-  
+
   void *getResultBuffer() const {
     return resultBuffer;
   }
