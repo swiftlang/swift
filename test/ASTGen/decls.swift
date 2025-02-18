@@ -325,3 +325,14 @@ struct DefaultArgInitTestStruct {
 enum DefaultArgInitTestEnum {
     case foo(x: () -> () = {})
 }
+
+@resultBuilder
+struct MyBuilder {
+static func buildBlock(_ items: Any...) -> [Any] { items }
+}
+func acceptBuilder(@MyBuilder fn: () -> [Any]) -> [Any] { fn() }
+func testBuilder() {
+  let _: [Any] = acceptBuilder {
+    1
+  }
+}

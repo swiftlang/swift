@@ -17,6 +17,7 @@ import SwiftSyntax
 // MARK: - ParamDecl
 
 fileprivate protocol ValueParameterSyntax: SyntaxProtocol {
+  var optionalAttributes: AttributeListSyntax? { get }
   /// The `firstName` with optional type.
   ///
   /// This is the lowest denominator between `FunctionParameterSyntax` and `EnumCaseParameterSyntax`.
@@ -37,6 +38,9 @@ fileprivate protocol ValueParameterSyntax: SyntaxProtocol {
 }
 
 extension FunctionParameterSyntax: ValueParameterSyntax {
+  fileprivate var optionalAttributes: AttributeListSyntax? {
+    attributes
+  }
   fileprivate var optionalFirstName: TokenSyntax? {
     firstName
   }
@@ -47,6 +51,10 @@ extension FunctionParameterSyntax: ValueParameterSyntax {
 }
 
 extension EnumCaseParameterSyntax: ValueParameterSyntax {
+  fileprivate var optionalAttributes: AttributeListSyntax? {
+    nil
+  }
+
   fileprivate var optionalFirstName: TokenSyntax? {
     firstName
   }
@@ -61,6 +69,10 @@ extension EnumCaseParameterSyntax: ValueParameterSyntax {
 }
 
 extension ClosureParameterSyntax: ValueParameterSyntax {
+  fileprivate var optionalAttributes: AttributeListSyntax? {
+    attributes
+  }
+
   fileprivate var optionalFirstName: TokenSyntax? {
     self.firstName
   }
@@ -98,6 +110,15 @@ extension ASTGenVisitor {
   /// Generate a ParamDecl. If `argNameByDefault` is true, then the parameter's
   /// argument label is inferred from the first name if no second name is present.
   private func makeParamDecl(_ node: some ValueParameterSyntax, argNameByDefault: Bool, at index: Int) -> BridgedParamDecl {
+    var attrs = BridgedDeclAttributes()
+
+    // Attributes.
+    if let attributes = node.optionalAttributes {
+      self.generateDeclAttributes(attributeList: attributes) { attr in
+        attrs.add(attr)
+      }
+    }
+
     // FIXME: This location should be derived from the type repr.
     let specifierLoc: BridgedSourceLoc = nil
 
@@ -147,7 +168,7 @@ extension ASTGenVisitor {
     }
 
     // The decl context will be reset to the function later.
-    return .createParsed(
+    let param = BridgedParamDecl.createParsed(
       self.ctx,
       declContext: self.declContext,
       specifierLoc: specifierLoc,
@@ -159,6 +180,8 @@ extension ASTGenVisitor {
       defaultValue: initExpr.asNullable,
       defaultValueInitContext: initContext.asNullable
     )
+    param.asDecl.attachParsedAttrs(attrs)
+    return param
   }
 
   func generate(closureShorthandParameter node : ClosureShorthandParameterSyntax) -> BridgedParamDecl {
