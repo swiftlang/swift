@@ -34,6 +34,7 @@ struct SWIFT_ESCAPABLE Owner {};
 
 struct Unannotated {
     Unannotated();
+    int *pointer;
 };
 
 struct SWIFT_UNSAFE_REFERENCE UnsafeReference {};
