@@ -1,5 +1,5 @@
 
-find_package(dispatch QUIET)
+find_package(dispatch QUIET REQUIRED)
 
 target_sources(swift_Concurrency PRIVATE
   DispatchGlobalExecutor.cpp)
