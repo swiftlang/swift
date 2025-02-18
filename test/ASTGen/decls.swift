@@ -150,6 +150,8 @@ struct TestVars {
   var s: Int {
     get async throws { return 0 }
   }
+
+  private(set) var testPrivateSet = 1
 }
 
 extension TestVars {
