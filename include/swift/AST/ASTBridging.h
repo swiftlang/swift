@@ -2340,15 +2340,39 @@ void BridgedStmt_dump(BridgedStmt statement);
 // MARK: TypeAttributes
 //===----------------------------------------------------------------------===//
 
-#ifdef USED_IN_CPP_SOURCE
-namespace swift {
-class TypeAttributes {
+class BridgedTypeOrCustomAttr {
 public:
-  SmallVector<TypeOrCustomAttr> attrs;
-  TypeAttributes() {}
+  enum Kind : uint8_t {
+    TypeAttr,
+    CustomAttr,
+  } kind;
+
+private:
+  intptr_t opaque;
+
+  void *_Nonnull getPointer() const {
+    return reinterpret_cast<void *>(opaque & ~0x7);
+  }
+
+  BRIDGED_INLINE BridgedTypeOrCustomAttr(void *_Nonnull pointer, Kind kind);
+
+public:
+  SWIFT_NAME("typeAttr(_:)")
+  static BridgedTypeOrCustomAttr createTypeAttr(BridgedTypeAttribute typeAttr) {
+    return BridgedTypeOrCustomAttr(typeAttr.unbridged(), Kind::TypeAttr);
+  }
+  SWIFT_NAME("customAttr(_:)")
+  static BridgedTypeOrCustomAttr
+  createCust0kAttr(BridgedCustomAttr customAttr) {
+    return BridgedTypeOrCustomAttr(customAttr.unbridged(), Kind::CustomAttr);
+  }
+
+  Kind getKind() const { return static_cast<Kind>(opaque & 0x7); }
+
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedTypeAttribute
+  castToTypeAttr() const;
+  SWIFT_IMPORT_UNSAFE BRIDGED_INLINE BridgedCustomAttr castToCustomAttr() const;
 };
-} // namespace swift
-#endif
 
 // Bridged type attribute kinds, which mirror TypeAttrKind exactly.
 enum ENUM_EXTENSIBILITY_ATTR(closed) BridgedTypeAttrKind {
@@ -2359,19 +2383,6 @@ enum ENUM_EXTENSIBILITY_ATTR(closed) BridgedTypeAttrKind {
 
 SWIFT_NAME("BridgedTypeAttrKind.init(from:)")
 BridgedTypeAttrKind BridgedTypeAttrKind_fromString(BridgedStringRef cStr);
-
-SWIFT_NAME("BridgedTypeAttributes.new()")
-BridgedTypeAttributes BridgedTypeAttributes_create();
-
-SWIFT_NAME("BridgedTypeAttributes.delete(self:)")
-void BridgedTypeAttributes_delete(BridgedTypeAttributes cAttributes);
-
-SWIFT_NAME("BridgedTypeAttributes.add(self:_:)")
-void BridgedTypeAttributes_add(BridgedTypeAttributes cAttributes,
-                               BridgedTypeAttribute cAttribute);
-
-SWIFT_NAME("getter:BridgedTypeAttributes.isEmpty(self:)")
-bool BridgedTypeAttributes_isEmpty(BridgedTypeAttributes cAttributes);
 
 SWIFT_NAME("BridgedTypeAttribute.createSimple(_:kind:atLoc:nameLoc:)")
 BridgedTypeAttribute BridgedTypeAttribute_createSimple(
@@ -2454,12 +2465,11 @@ BridgedArrayTypeRepr BridgedArrayTypeRepr_createParsed(
     BridgedASTContext cContext, BridgedTypeRepr base,
     BridgedSourceLoc cLSquareLoc, BridgedSourceLoc cRSquareLoc);
 
-SWIFT_NAME(
-    "BridgedAttributedTypeRepr.createParsed(_:base:consumingAttributes:)")
+SWIFT_NAME("BridgedAttributedTypeRepr.createParsed(_:base:attributes:)")
 BridgedAttributedTypeRepr
 BridgedAttributedTypeRepr_createParsed(BridgedASTContext cContext,
                                        BridgedTypeRepr base,
-                                       BridgedTypeAttributes cAttributes);
+                                       BridgedArrayRef cAttributes);
 
 SWIFT_NAME("BridgedCompositionTypeRepr.createEmpty(_:anyKeywordLoc:)")
 BridgedCompositionTypeRepr

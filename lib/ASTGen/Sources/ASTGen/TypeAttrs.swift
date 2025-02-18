@@ -16,12 +16,8 @@ import SwiftDiagnostics
 @_spi(ExperimentalLanguageFeatures) @_spi(RawSyntax) import SwiftSyntax
 
 extension ASTGenVisitor {
-  func generateTypeAttributes(_ node: some WithAttributesSyntax) -> BridgedTypeAttributes? {
-    guard !node.attributes.isEmpty else {
-      return nil
-    }
-
-    let attrs = BridgedTypeAttributes.new()
+  func generateTypeAttributes(_ node: some WithAttributesSyntax) -> [BridgedTypeOrCustomAttr] {
+    var attrs: [BridgedTypeOrCustomAttr] = []
     visitIfConfigElements(node.attributes, of: AttributeSyntax.self) { element in
       switch element {
       case .ifConfigDecl(let ifConfigDecl):
@@ -31,19 +27,13 @@ extension ASTGenVisitor {
       }
     } body: { attribute in
       if let attr = self.generateTypeAttribute(attribute: attribute) {
-        attrs.add(attr)
+        attrs.append(attr)
       }
     }
-
-    guard !attrs.isEmpty else {
-      attrs.delete()
-      return nil
-    }
-
     return attrs
   }
 
-  func generateTypeAttribute(attribute node: AttributeSyntax) -> BridgedTypeAttribute? {
+  func generateTypeAttribute(attribute node: AttributeSyntax) -> BridgedTypeOrCustomAttr? {
     if let identTy = node.attributeName.as(IdentifierTypeSyntax.self) {
       let attrName = identTy.name.rawText
       let attrKind = BridgedTypeAttrKind(from: attrName.bridged)
@@ -76,17 +66,22 @@ extension ASTGenVisitor {
         .thick,
         .unimplementable:
         return self.generateSimpleTypeAttr(attribute: node, kind: attrKind)
+          .map(BridgedTypeOrCustomAttr.typeAttr(_:))
 
       case .convention:
-        return self.generateConventionTypeAttr(attribute: node)?.asTypeAttribute
+        return (self.generateConventionTypeAttr(attribute: node)?.asTypeAttribute)
+          .map(BridgedTypeOrCustomAttr.typeAttr(_:))
       case .differentiable:
         fatalError("unimplemented")
       case .execution:
-        return self.generateExecutionTypeAttr(attribute: node)?.asTypeAttribute
+        return (self.generateExecutionTypeAttr(attribute: node)?.asTypeAttribute)
+          .map(BridgedTypeOrCustomAttr.typeAttr(_:))
       case .opaqueReturnTypeOf:
-        return self.generateOpaqueReturnTypeOfTypeAttr(attribute: node)?.asTypeAttribute
+        return (self.generateOpaqueReturnTypeOfTypeAttr(attribute: node)?.asTypeAttribute)
+          .map(BridgedTypeOrCustomAttr.typeAttr(_:))
       case .isolated:
-        return self.generateIsolatedTypeAttr(attribute: node)?.asTypeAttribute
+        return (self.generateIsolatedTypeAttr(attribute: node)?.asTypeAttribute)
+          .map(BridgedTypeOrCustomAttr.typeAttr(_:))
 
       // SIL type attributes are not supported.
       case .autoreleased,
@@ -120,15 +115,19 @@ extension ASTGenVisitor {
         .silSending,
         .silImplicitLeadingParam,
         .unownedInnerPointer:
+        // TODO: Diagnose or fallback to CustomAttr?
+        fatalError("SIL type attributes are not supported")
         break;
 
-      // Not a type attribute.
       case .none:
+        // Not a builtin type attribute. Fall back to CustomAttr
         break;
       }
     }
 
-    // TODO: Diagnose.
+    if let customAttr = self.generateCustomAttr(attribute: node) {
+      return .customAttr(customAttr)
+    }
     return nil
   }
 
