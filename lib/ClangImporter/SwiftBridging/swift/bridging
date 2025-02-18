@@ -191,6 +191,42 @@
 #define SWIFT_RETURNS_UNRETAINED                                               \
   __attribute__((swift_attr("returns_unretained")))
 
+/// Specifies that the non-public members of a C++ class, struct, or union can
+/// be accessed from extensions of that type, in the given file ID.
+///
+/// In other words, Swift's access controls will behave as if the non-public
+/// members of the annotated C++ class were privated declared in the specified
+/// Swift source file, rather than in a C++ header file/Clang module.
+///
+/// For example, we can annotate a C++ class definition like this:
+///
+/// ```c++
+/// class SWIFT_PRIVATE_FILEID("MySwiftModule/MySwiftFile.swift")
+/// MyCxxClass {
+/// private:
+///   void privateMethod();
+///   int  privateStorage;
+/// };
+/// ```
+///
+/// Then, Swift extensions of `MyCxxClass` in `MySwiftModule/MySwiftFile.swift`
+/// are allowed to access `privateMethod()` and `privateStorage`:
+///
+/// ```swift
+/// //-- MySwiftModule/SwiftFile.swift
+/// extension MyCxxClass {
+///     func ext() {
+///         privateMethod()
+///         print("\(privateStorage)")
+///     }
+/// }
+/// ```
+///
+/// Non-public access is still forbidden outside of extensions and outside of
+/// the designated file ID.
+#define SWIFT_PRIVATE_FILEID(_fileID) \
+  __attribute__((swift_attr("private_fileid:" _fileID)))
+
 #else  // #if _CXX_INTEROP_HAS_ATTRIBUTE(swift_attr)
 
 // Empty defines for compilers that don't support `attribute(swift_attr)`.
@@ -210,6 +246,7 @@
 #define SWIFT_ESCAPABLE_IF(...)
 #define SWIFT_RETURNS_RETAINED
 #define SWIFT_RETURNS_UNRETAINED
+#define SWIFT_PRIVATE_FILEID(_fileID)
 
 #endif // #if _CXX_INTEROP_HAS_ATTRIBUTE(swift_attr)
 
