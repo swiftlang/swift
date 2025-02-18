@@ -1,10 +1,10 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend %s -typecheck -module-name Generics -enable-experimental-cxx-interop -emit-clang-header-path %t/generics.h
+// RUN: %target-swift-frontend %s -module-name Generics -enable-experimental-cxx-interop -typecheck -verify -emit-clang-header-path %t/generics.h
 // RUN: %FileCheck %s < %t/generics.h
 // RUN: %check-interop-cxx-header-in-clang(%t/generics.h -Wno-reserved-identifier -DSWIFT_CXX_INTEROP_HIDE_STL_OVERLAY)
 
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend %s -enable-library-evolution -typecheck -module-name Generics -clang-header-expose-decls=all-public -emit-clang-header-path %t/generics.h
+// RUN: %target-swift-frontend %s -enable-library-evolution -module-name Generics -clang-header-expose-decls=all-public -typecheck -verify -emit-clang-header-path %t/generics.h
 // RUN: %FileCheck %s < %t/generics.h
 // RUN: %check-interop-cxx-header-in-clang(%t/generics.h -Wno-reserved-identifier -DSWIFT_CXX_INTEROP_HIDE_STL_OVERLAY)
 
@@ -33,6 +33,7 @@ public struct StructForEnum {
 }
 
 @frozen public enum GenericOpt<T> {
+    // expected-note@-1 {{'T' previously declared here}}
     case none
     case some(T)
 
@@ -46,6 +47,7 @@ public struct StructForEnum {
     }
 
     public func genericMethod<T>(_ x: T) -> T {
+        // expected-warning@-1 {{generic parameter 'T' shadows generic parameter from outer scope with the same name}}
         print("GenericOpt<T>::genericMethod<T>::\(self),\(x);")
         return x
     }

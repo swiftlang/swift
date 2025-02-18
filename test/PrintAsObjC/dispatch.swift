@@ -1,5 +1,5 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend -typecheck %s -parse-as-library -emit-objc-header-path %t/swift.h
+// RUN: %target-swift-frontend %s -parse-as-library -typecheck -verify -emit-objc-header-path %t/swift.h
 // RUN: %FileCheck %s < %t/swift.h
 
 // REQUIRES: objc_interop

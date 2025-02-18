@@ -1,13 +1,13 @@
 // RUN: %empty-directory(%t)
 // RUN: split-file %s %t
 
-// RUN: %target-swift-frontend -typecheck %t/swiftMod.swift -typecheck -module-name SwiftMod -emit-clang-header-path %t/swiftMod.h -I %t -enable-experimental-cxx-interop -Xcc -DFIRSTPASS
+// RUN: %target-swift-frontend %t/swiftMod.swift -module-name SwiftMod -typecheck -verify -emit-clang-header-path %t/swiftMod.h -I %t -enable-experimental-cxx-interop -Xcc -DFIRSTPASS
 
 // RUN: %target-swift-frontend %t/swiftMod.swift -module-name SwiftMod -emit-module -o %t/SwiftMod.swiftmodule -I %t -enable-experimental-cxx-interop -Xcc -DFIRSTPASS
 
 // RUN: %target-swift-ide-test -print-module -module-to-print=SwiftMod -module-to-print=SwiftToCxxTest -I %t -source-filename=x -enable-experimental-cxx-interop -Xcc -DSWIFT_CXX_INTEROP_HIDE_SWIFT_ERROR | %FileCheck --check-prefix=INTERFACE %s
 
-// RUN: %target-swift-frontend -typecheck %t/swiftMod.swift -typecheck -module-name SwiftMod -I %t -enable-experimental-cxx-interop -Xcc -DSWIFT_CXX_INTEROP_HIDE_SWIFT_ERROR -DSECOND_PASS -emit-sil -o - | %FileCheck --check-prefix=SIL %s
+// RUN: %target-swift-frontend -typecheck %t/swiftMod.swift -module-name SwiftMod -I %t -enable-experimental-cxx-interop -Xcc -DSWIFT_CXX_INTEROP_HIDE_SWIFT_ERROR -DSECOND_PASS -emit-sil -o - | %FileCheck --check-prefix=SIL %s
 
 // UNSUPPORTED: OS=windows-msvc
 

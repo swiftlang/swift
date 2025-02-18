@@ -1,5 +1,5 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend %s -typecheck -module-name Functions -clang-header-expose-decls=all-public -emit-clang-header-path %t/functions.h  -cxx-interoperability-mode=upcoming-swift
+// RUN: %target-swift-frontend %s -module-name Functions -clang-header-expose-decls=all-public -typecheck -verify -emit-clang-header-path %t/functions.h  -cxx-interoperability-mode=upcoming-swift
 // RUN: %FileCheck %s < %t/functions.h
 
 import CxxStdlib

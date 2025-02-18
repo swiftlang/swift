@@ -10,7 +10,7 @@
 // FIXME: END -enable-source-import hackaround
 
 // RUN: %target-swift-frontend(mock-sdk: -sdk %S/../Inputs/clang-importer-sdk -I %t) -emit-module -I %S/Inputs/custom-modules -o %t %s -disable-objc-attr-requires-foundation-module -swift-version 4
-// RUN: %target-swift-frontend(mock-sdk: -sdk %S/../Inputs/clang-importer-sdk -I %t) -parse-as-library %t/versioned.swiftmodule -typecheck -I %S/Inputs/custom-modules -emit-objc-header-path %t/versioned.h -import-objc-header %S/../Inputs/empty.h -disable-objc-attr-requires-foundation-module -swift-version 4
+// RUN: %target-swift-frontend(mock-sdk: -sdk %S/../Inputs/clang-importer-sdk -I %t) -parse-as-library %t/versioned.swiftmodule -typecheck -verify -emit-objc-header-path %t/versioned.h -I %S/Inputs/custom-modules -import-objc-header %S/../Inputs/empty.h -disable-objc-attr-requires-foundation-module -swift-version 4
 // RUN: %FileCheck %s < %t/versioned.h
 // RUN: %check-in-clang -I %S/Inputs/custom-modules/ %t/versioned.h
 // RUN: %check-in-clang -I %S/Inputs/custom-modules/ -fno-modules -Qunused-arguments %t/versioned.h -include VersionedFMWK.h

@@ -1,7 +1,7 @@
 // RUN: %empty-directory(%t)
 // RUN: split-file %s %t
 
-// RUN: %target-swift-frontend -typecheck %t/use-cxx-types.swift -typecheck -module-name UseCxxTy -emit-clang-header-path %t/UseCxxTy.h -I %t -enable-experimental-cxx-interop -clang-header-expose-decls=all-public -disable-availability-checking
+// RUN: %target-swift-frontend %t/use-cxx-types.swift -module-name UseCxxTy -typecheck -verify -emit-clang-header-path %t/UseCxxTy.h -I %t -enable-experimental-cxx-interop -clang-header-expose-decls=all-public -disable-availability-checking
 
 // RUN: %FileCheck %s < %t/UseCxxTy.h
 

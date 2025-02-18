@@ -1,7 +1,7 @@
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend %s -D RESILIENT_MODULE -module-name Class -emit-module -emit-module-path %t/Class.swiftmodule -enable-library-evolution -clang-header-expose-decls=all-public -emit-clang-header-path %t/class.h
 
-// RUN: %target-swift-frontend %s -I %t -typecheck -module-name UseClass -clang-header-expose-decls=all-public -emit-clang-header-path %t/useclass.h
+// RUN: %target-swift-frontend %s -I %t -module-name UseClass -clang-header-expose-decls=all-public -typecheck -verify -emit-clang-header-path %t/useclass.h
 
 // RUN: %FileCheck %s < %t/useclass.h
 
