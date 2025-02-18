@@ -1693,7 +1693,7 @@ function Build-Compilers() {
       })
   }
 
-  Invoke-Program "$(Get-PythonExecutable)" -c "import plistlib; print(str(plistlib.dumps({ 'Identifier': '${ToolchainIdentifier}' }), encoding='utf-8'))" `
+  Invoke-Program "$(Get-PythonExecutable)" -c "import plistlib; print(str(plistlib.dumps({ 'Identifier': '${ToolchainIdentifier}', 'FallbackLibrarySearchPaths': ['usr/bin'], 'Version': '${ProductVersion}' }), encoding='utf-8'))" `
       -OutFile "$($Arch.ToolchainInstallRoot)\ToolchainInfo.plist"
 }
 
