@@ -92,6 +92,7 @@ func testFor(arg1: [Int?]) {
     elem += 1
     print(elem)
   }
+  for (a, b) in [(1,2)] {}
 }
 
 func testRepeat() {
