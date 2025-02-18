@@ -1131,12 +1131,14 @@ swift_task_create_commonImpl(size_t rawTaskCreateFlags,
   }
 
   // FIXME: add discarding flag
-  // FIXME: add task executor
   concurrency::trace::task_create(
       task, parent, group, asyncLet,
       static_cast<uint8_t>(task->Flags.getPriority()),
       task->Flags.task_isChildTask(), task->Flags.task_isFuture(),
-      task->Flags.task_isGroupChildTask(), task->Flags.task_isAsyncLetTask());
+      task->Flags.task_isGroupChildTask(), task->Flags.task_isAsyncLetTask(),
+      taskCreateFlags.isDiscardingTask(),
+      task->Flags.task_hasInitialTaskExecutorPreference(),
+      taskName);
 
   // Attach to the group, if needed.
   if (group) {
