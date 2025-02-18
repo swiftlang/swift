@@ -334,6 +334,7 @@ static int reverseCompareDecls(Decl * const *lhs, Decl * const *rhs) {
 
   // Still nothing? Fine, we'll look for a difference between the members.
   {
+    // First pass: compare names
     for (auto pair : llvm::zip_equal(lhsMembers, rhsMembers)) {
       auto *lhsMember = dyn_cast<ValueDecl>(std::get<0>(pair)),
            *rhsMember = dyn_cast<ValueDecl>(std::get<1>(pair));
@@ -345,9 +346,19 @@ static int reverseCompareDecls(Decl * const *lhs, Decl * const *rhs) {
       ASSERT(lhsMember && rhsMember);
 
       COMPARE(getNameString(lhsMember), getNameString(rhsMember));
+    }
+
+    // Second pass: compare other traits.
+    for (auto pair : llvm::zip_equal(lhsMembers, rhsMembers)) {
+      auto *lhsMember = dyn_cast<ValueDecl>(std::get<0>(pair)),
+           *rhsMember = dyn_cast<ValueDecl>(std::get<1>(pair));
+      if (!lhsMember || !rhsMember)
+        continue;
+
       COMPARE(getTypeString(lhsMember), getTypeString(rhsMember));
       COMPARE(getGenericSignatureString(lhsMember),
               getGenericSignatureString(rhsMember));
+      COMPARE(getMangledNameString(lhsMember), getMangledNameString(rhsMember));
     }
   }
 
