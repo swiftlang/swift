@@ -513,6 +513,13 @@ final public class DebugStepInst : Instruction {}
 final public class SpecifyTestInst : Instruction {}
 
 final public class UnconditionalCheckedCastAddrInst : Instruction, SourceDestAddrInstruction {
+  public var sourceFormalType: CanonicalType {
+    CanonicalType(bridged: bridged.UnconditionalCheckedCastAddr_getSourceFormalType())
+  }
+  public var targetFormalType: CanonicalType {
+    CanonicalType(bridged: bridged.UnconditionalCheckedCastAddr_getTargetFormalType())
+  }
+
   public var isTakeOfSrc: Bool { true }
   public var isInitializationOfDest: Bool { true }
   public override var mayTrap: Bool { true }
@@ -1013,6 +1020,13 @@ final public class KeyPathInst : SingleValueInstruction {
 final public
 class UnconditionalCheckedCastInst : SingleValueInstruction, UnaryInstruction {
   public override var mayTrap: Bool { true }
+  
+  public var sourceFormalType: CanonicalType {
+    CanonicalType(bridged: bridged.UnconditionalCheckedCast_getSourceFormalType())
+  }
+  public var targetFormalType: CanonicalType {
+    CanonicalType(bridged: bridged.UnconditionalCheckedCast_getTargetFormalType())
+  }
 }
 
 final public
@@ -1205,7 +1219,12 @@ final public class ObjCMethodInst : SingleValueInstruction, UnaryInstruction {}
 
 final public class ObjCSuperMethodInst : SingleValueInstruction, UnaryInstruction {}
 
-final public class WitnessMethodInst : SingleValueInstruction {}
+final public class WitnessMethodInst : SingleValueInstruction {
+  public var member: DeclRef { DeclRef(bridged: bridged.WitnessMethodInst_getMember()) }
+  public var lookupType: CanonicalType { CanonicalType(bridged: bridged.WitnessMethodInst_getLookupType()) }
+  public var lookupProtocol: ProtocolDecl { bridged.WitnessMethodInst_getLookupProtocol().getAs(ProtocolDecl.self) }
+  public var conformance: Conformance { Conformance(bridged: bridged.WitnessMethodInst_getConformance()) }
+}
 
 final public class IsUniqueInst : SingleValueInstruction, UnaryInstruction {}
 
@@ -1265,6 +1284,8 @@ public protocol Allocation : SingleValueInstruction { }
 
 final public class AllocStackInst : SingleValueInstruction, Allocation, DebugVariableInstruction, MetaInstruction {
   public var hasDynamicLifetime: Bool { bridged.AllocStackInst_hasDynamicLifetime() }
+  public var isFromVarDecl: Bool { bridged.AllocStackInst_isFromVarDecl() }
+  public var usesMoveableValueDebugInfo: Bool { bridged.AllocStackInst_usesMoveableValueDebugInfo() }
 
   public var varDecl: VarDecl? {
     bridged.AllocStack_getDecl().getAs(VarDecl.self)
@@ -1612,6 +1633,7 @@ final public class TryApplyInst : TermInst, FullApplySite {
 
   public var singleDirectResult: Value? { normalBlock.arguments[0] }
 
+  public var isNonAsync: Bool { bridged.TryApplyInst_getNonAsync() }
   public var specializationInfo: ApplyInst.SpecializationInfo { bridged.TryApplyInst_getSpecializationInfo() }
 }
 
@@ -1716,6 +1738,13 @@ final public class CheckedCastBranchInst : TermInst, UnaryInstruction {
 final public class CheckedCastAddrBranchInst : TermInst {
   public var source: Value { operands[0].value }
   public var destination: Value { operands[1].value }
+
+  public var sourceFormalType: CanonicalType {
+    CanonicalType(bridged: bridged.CheckedCastAddrBranch_getSourceFormalType())
+  }
+  public var targetFormalType: CanonicalType {
+    CanonicalType(bridged: bridged.CheckedCastAddrBranch_getTargetFormalType())
+  }
 
   public var successBlock: BasicBlock { bridged.CheckedCastAddrBranch_getSuccessBlock().block }
   public var failureBlock: BasicBlock { bridged.CheckedCastAddrBranch_getFailureBlock().block }

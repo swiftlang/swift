@@ -1336,8 +1336,28 @@ BridgedGenericSpecializationInformation BridgedInstruction::ApplyInst_getSpecial
   return {getAs<swift::ApplyInst>()->getSpecializationInfo()};
 }
 
+bool BridgedInstruction::TryApplyInst_getNonAsync() const {
+  return getAs<swift::TryApplyInst>()->isNonAsync();  
+}
+
 BridgedGenericSpecializationInformation BridgedInstruction::TryApplyInst_getSpecializationInfo() const {
   return {getAs<swift::TryApplyInst>()->getSpecializationInfo()};
+}
+
+BridgedDeclRef BridgedInstruction::WitnessMethodInst_getMember() const {
+  return getAs<swift::WitnessMethodInst>()->getMember();
+}
+
+BridgedCanType BridgedInstruction::WitnessMethodInst_getLookupType() const {
+  return getAs<swift::WitnessMethodInst>()->getLookupType();  
+}
+
+BridgedDeclObj BridgedInstruction::WitnessMethodInst_getLookupProtocol() const {
+  return getAs<swift::WitnessMethodInst>()->getLookupProtocol();
+}
+
+BridgedConformance BridgedInstruction::WitnessMethodInst_getConformance() const {
+  return getAs<swift::WitnessMethodInst>()->getConformance();
 }
 
 SwiftInt BridgedInstruction::ObjectInst_getNumBaseElements() const {
@@ -1358,6 +1378,14 @@ bool BridgedInstruction::PartialApplyInst_hasUnknownResultIsolation() const {
 
 bool BridgedInstruction::AllocStackInst_hasDynamicLifetime() const {
   return getAs<swift::AllocStackInst>()->hasDynamicLifetime();
+}
+
+bool BridgedInstruction::AllocStackInst_isFromVarDecl() const {
+  return getAs<swift::AllocStackInst>()->isFromVarDecl();
+}
+
+bool BridgedInstruction::AllocStackInst_usesMoveableValueDebugInfo() const {
+  return getAs<swift::AllocStackInst>()->usesMoveableValueDebugInfo();
 }
 
 bool BridgedInstruction::AllocRefInstBase_isObjc() const {
@@ -1523,12 +1551,36 @@ void BridgedInstruction::CheckedCastBranch_updateSourceFormalTypeFromOperandLowe
   getAs<swift::CheckedCastBranchInst>()->updateSourceFormalTypeFromOperandLoweredType();
 }
 
+BridgedCanType BridgedInstruction::UnconditionalCheckedCast_getSourceFormalType() const {
+  return {getAs<swift::UnconditionalCheckedCastInst>()->getSourceFormalType()};  
+}
+
+BridgedCanType BridgedInstruction::UnconditionalCheckedCast_getTargetFormalType() const {
+  return {getAs<swift::UnconditionalCheckedCastInst>()->getTargetFormalType()};    
+}
+
+BridgedCanType BridgedInstruction::UnconditionalCheckedCastAddr_getSourceFormalType() const {
+  return {getAs<swift::UnconditionalCheckedCastAddrInst>()->getSourceFormalType()};  
+}
+
+BridgedCanType BridgedInstruction::UnconditionalCheckedCastAddr_getTargetFormalType() const {
+  return {getAs<swift::UnconditionalCheckedCastAddrInst>()->getTargetFormalType()};    
+}
+
 BridgedBasicBlock BridgedInstruction::CheckedCastBranch_getSuccessBlock() const {
   return {getAs<swift::CheckedCastBranchInst>()->getSuccessBB()};
 }
 
 BridgedBasicBlock BridgedInstruction::CheckedCastBranch_getFailureBlock() const {
   return {getAs<swift::CheckedCastBranchInst>()->getFailureBB()};
+}
+
+BridgedCanType BridgedInstruction::CheckedCastAddrBranch_getSourceFormalType() const {
+  return {getAs<swift::CheckedCastAddrBranchInst>()->getSourceFormalType()};
+}
+
+BridgedCanType BridgedInstruction::CheckedCastAddrBranch_getTargetFormalType() const {
+  return {getAs<swift::CheckedCastAddrBranchInst>()->getTargetFormalType()};  
 }
 
 BridgedBasicBlock BridgedInstruction::CheckedCastAddrBranch_getSuccessBlock() const {
