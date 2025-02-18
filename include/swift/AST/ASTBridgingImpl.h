@@ -648,6 +648,20 @@ BridgedVarDecl BridegedCaptureListEntry_getVar(BridgedCaptureListEntry entry) {
   return entry.unbridged().getVar();
 }
 
+//===----------------------------------------------------------------------===//
+// MARK: NumberLiteralExpr
+//===----------------------------------------------------------------------===//
+
+void BridgedFloatLiteralExpr_setNegative(BridgedFloatLiteralExpr cExpr,
+                                         BridgedSourceLoc cLoc) {
+  cExpr.unbridged()->setNegative(cLoc.unbridged());
+}
+
+void BridgedIntegerLiteralExpr_setNegative(BridgedIntegerLiteralExpr cExpr,
+                                           BridgedSourceLoc cLoc) {
+  cExpr.unbridged()->setNegative(cLoc.unbridged());
+}
+
 SWIFT_END_NULLABILITY_ANNOTATIONS
 
 #endif // SWIFT_AST_ASTBRIDGINGIMPL_H

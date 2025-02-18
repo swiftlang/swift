@@ -91,7 +91,7 @@ extension ASTGenVisitor {
     case .postfixOperatorExpr(let node):
       return self.generate(postfixOperatorExpr: node).asExpr
     case .prefixOperatorExpr(let node):
-      return self.generate(prefixOperatorExpr: node).asExpr
+      return self.generate(prefixOperatorExpr: node)
     case .regexLiteralExpr(let node):
       return self.generate(regexLiteralExpr: node).asExpr
     case .sequenceExpr(let node):
@@ -1099,15 +1099,27 @@ extension ASTGenVisitor {
     )
   }
 
-  func generate(prefixOperatorExpr node: PrefixOperatorExprSyntax) -> BridgedPrefixUnaryExpr {
-    return .createParsed(
+  func generate(prefixOperatorExpr node: PrefixOperatorExprSyntax) -> BridgedExpr {
+    if node.operator.rawText == "-" {
+      if let subNode = node.expression.as(IntegerLiteralExprSyntax.self) {
+        let literal = self.generate(integerLiteralExpr: subNode)
+        literal.setNegative(loc: self.generateSourceLoc(node.operator))
+        return literal.asExpr
+      }
+      if let subNode = node.expression.as(FloatLiteralExprSyntax.self) {
+        let literal = self.generate(floatLiteralExpr: subNode)
+        literal.setNegative(loc: self.generateSourceLoc(node.operator))
+        return literal.asExpr
+      }
+    }
+    return BridgedPrefixUnaryExpr.createParsed(
       self.ctx,
       operator: self.createUnresolvedDeclRefExpr(
         token: node.operator,
         kind: .prefixOperator
       ).asExpr,
       operand: self.generate(expr: node.expression)
-    )
+    ).asExpr
   }
 
   func generate(regexLiteralExpr node: RegexLiteralExprSyntax) -> BridgedRegexLiteralExpr {
