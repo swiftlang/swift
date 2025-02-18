@@ -825,6 +825,22 @@ public:
 
   ArrayRef<TypeDecl *> getLocalTypeDecls() const;
 
+  /// Uniquely identifies a source file without exposing its full file path.
+  ///
+  /// A valid file ID should always be of the format "modulename/filename.swift"
+  struct FileIDStr {
+    StringRef moduleName;
+    StringRef fileName;
+
+    /// Parse a string as a SourceFile::FileIDStr.
+    ///
+    /// Returns \c nullopt if \param fileID could not be parsed.
+    static std::optional<FileIDStr> parse(StringRef fileID);
+
+    /// Whether this SourceFile::FileID matches that of the given \param file.
+    bool matches(const SourceFile *file) const;
+  };
+
 private:
 
   /// If not \c None, the underlying vector contains the parsed tokens of this
