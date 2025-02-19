@@ -1542,9 +1542,7 @@ Parser::parseAvailabilitySpecList(SmallVectorImpl<AvailabilitySpec *> &Specs,
           // If this was preceded by a single platform version constraint, we
           // can guess that the intention was to treat it as 'introduced' and
           // suggest a fix-it to combine them.
-          if (Specs.size() == 1 &&
-              Previous->getPlatform() != PlatformKind::none &&
-              Text != "introduced") {
+          if (Specs.size() == 1 && Text != "introduced") {
             auto PlatformNameEndLoc = Lexer::getLocForEndOfToken(
                 SourceManager, Previous->getStartLoc());
 
