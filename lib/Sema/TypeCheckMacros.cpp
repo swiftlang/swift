@@ -1869,6 +1869,7 @@ std::optional<unsigned> swift::expandPeers(CustomAttr *attr, MacroDecl *macro,
 ArrayRef<unsigned>
 ExpandExtensionMacros::evaluate(Evaluator &evaluator,
                                 NominalTypeDecl *nominal) const {
+  nominal->dump();
   SmallVector<unsigned, 2> bufferIDs;
   for (auto customAttrConst :
        nominal->getExpandedAttrs().getAttributes<CustomAttr>()) {
