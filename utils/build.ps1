@@ -1584,7 +1584,7 @@ function Build-Compilers() {
     $BuildTools = Join-Path -Path (Get-BuildProjectBinaryCache BuildTools) -ChildPath bin
 
     if ($TestClang -or $TestLLD -or $TestLLDB -or $TestLLVM -or $TestSwift) {
-      $env:Path = "$(Get-CMarkBinaryCache $Arch)\src;$CompilersBinaryCache\tools\swift\libdispatch-windows-$($Arch.LLVMName)-prefix\bin;$CompilersBinaryCache\bin;$env:Path;$VSInstallRoot\DIA SDK\bin\$($HostArch.VSName);$UnixToolsBinDir"
+      $env:Path = "$(Get-CMarkBinaryCache $Arch)\src;$CompilersBinaryCache\tools\swift\libdispatch-windows-$($Arch.LLVMName)-prefix\bin;$CompilersBinaryCache\bin;$env:Path;$VSInstallRoot\DIA SDK\bin\$($HostArch.VSName)"
       $Targets = @()
       $TestingDefines = @{
         SWIFT_BUILD_DYNAMIC_SDK_OVERLAY = "YES";
