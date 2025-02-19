@@ -79,3 +79,10 @@ unconditionallyRenamed() // expected-error {{'unconditionallyRenamed()' has been
 func unconditionallyRenamedAndIntroducedLater() {} // expected-note {{'unconditionallyRenamedAndIntroducedLater()' has been explicitly marked unavailable here}}
 
 unconditionallyRenamedAndIntroducedLater() // expected-error {{'unconditionallyRenamedAndIntroducedLater()' has been renamed to 'shortFour'}}
+
+func testQuery() {
+  if #available(_PackageDescription 4.0) { // expected-error {{PackageDescription version checks not allowed in #available(...)}}
+    // expected-error@-1 {{condition required for target platform}}
+    shortFourPointOh()
+  }
+}

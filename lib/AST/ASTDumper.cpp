@@ -1102,40 +1102,19 @@ namespace {
     void printRec(AvailabilitySpec *Spec, Label label) {
       printRecArbitrary(
           [&](Label label) {
-            switch (Spec->getKind()) {
-            case AvailabilitySpecKind::PlatformVersionConstraint: {
-              printHead("platform_version_constraint_availability_spec",
-                        PatternColor, label);
-              printField(platformString(Spec->getPlatform()),
-                         Label::always("platform"));
+            printHead("availability_spec", PatternColor, label);
+            StringRef domainName =
+                Spec->isWildcard()
+                    ? "*"
+                    : Spec->getDomain()->getNameForAttributePrinting();
+            printField(domainName, Label::always("domain"));
+            if (!Spec->getVersion().empty())
               printFieldRaw(
                   [&](llvm::raw_ostream &OS) { OS << Spec->getVersion(); },
                   Label::always("version"));
-              printFoot();
-              break;
-            }
-            case AvailabilitySpecKind::LanguageVersionConstraint:
-            case AvailabilitySpecKind::PackageDescriptionVersionConstraint: {
-              printHead("platform_agnostic_version_constraint_"
-                        "availability_spec",
-                        PatternColor, label);
-              printField(Spec->getDomain()->isSwiftLanguage()
-                             ? "swift"
-                             : "package_description",
-                         Label::always("kind"));
-              printFieldRaw(
-                  [&](llvm::raw_ostream &OS) { OS << Spec->getVersion(); },
-                  Label::always("version"));
-              printFoot();
-              break;
-            }
-            case AvailabilitySpecKind::Wildcard:
-              printHead("wildcard_constraint_availability_spec", PatternColor,
-                        label);
-              printFoot();
-              break;
-            }
-          }, label);
+            printFoot();
+          },
+          label);
     }
 
     /// Print a range of nodes as a single "array" child node.
