@@ -2234,6 +2234,12 @@ ParamSpecifierRequest::evaluate(Evaluator &evaluator,
   }
 
   auto typeRepr = param->getTypeRepr();
+
+  if (!typeRepr && !param->isImplicit()) {
+    // Untyped closure parameter.
+    return ParamSpecifier::Default;
+  }
+
   assert(typeRepr != nullptr && "Should call setSpecifier() on "
          "synthesized parameter declarations");
 
