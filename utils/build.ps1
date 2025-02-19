@@ -2150,7 +2150,7 @@ function Write-SDKSettingsPlist([Platform]$Platform, $Arch) {
   if ($Platform -eq [Platform]::Windows) {
     $SDKSettings.DefaultProperties.DEFAULT_USE_RUNTIME = "MD"
   }
-  $SDKSettings | ConvertTo-JSON | Out-FIle -FilePath "$($Arch.SDKInstallRoot)\SDKSettings.json"
+  $SDKSettings | ConvertTo-JSON | Out-File -FilePath "$($Arch.SDKInstallRoot)\SDKSettings.json"
 }
 
 function Build-Dispatch([Platform]$Platform, $Arch, [switch]$Test = $false) {
