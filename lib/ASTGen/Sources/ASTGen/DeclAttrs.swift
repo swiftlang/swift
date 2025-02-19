@@ -15,7 +15,7 @@ import BasicBridging
 import SwiftDiagnostics
 import SwiftIfConfig
 
-@_spi(ExperimentalLanguageFeatures) @_spi(RawSyntax) import SwiftSyntax
+@_spi(ExperimentalLanguageFeatures) @_spi(RawSyntax) @_spi(Compiler) import SwiftSyntax
 
 extension ASTGenVisitor {
   struct DeclAttributesResult {
@@ -2074,6 +2074,21 @@ extension ASTGenVisitor {
       atLoc: nil,
       nameLoc: self.generateSourceLoc(node.name)
     )
+  }
+}
+
+extension ASTGenVisitor {
+  func generate(generatedAttributeClauseFile node: AttributeClauseFileSyntax) -> BridgedDecl {
+    let attrs = self.generateDeclAttributes(node, allowStatic: false)
+
+    // Attach the attribute list to a implicit 'MissingDecl' as the placeholder.
+    let decl = BridgedMissingDecl.create(
+      self.ctx,
+      declContext: self.declContext,
+      loc: self.generateSourceLoc(node.endOfFileToken)
+    ).asDecl
+    decl.attachParsedAttrs(attrs.attributes)
+    return decl
   }
 }
 

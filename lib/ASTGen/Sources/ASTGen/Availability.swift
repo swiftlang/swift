@@ -254,7 +254,7 @@ extension ASTGenVisitor {
     return map.has(name: name.bridged)
   }
 
-  func generate(availabilityMacroDefinition node: AvailabilityMacroDefinitionSyntax) -> BridgedAvailabilityMacroDefinition {
+  func generate(availabilityMacroDefinition node: AvailabilityMacroDefinitionFileSyntax) -> BridgedAvailabilityMacroDefinition {
 
     let name = allocateBridgedString(node.platformVersion.platform.text)
     let version = self.generate(versionTuple: node.platformVersion.version)
@@ -446,7 +446,7 @@ func parseAvailabilityMacroDefinition(
 
   // Parse.
   var parser = Parser(buffer)
-  let parsed = AvailabilityMacroDefinitionSyntax.parse(from: &parser)
+  let parsed = AvailabilityMacroDefinitionFileSyntax.parse(from: &parser)
 
   // Emit diagnostics.
   let diagnostics = ParseDiagnosticsGenerator.diagnostics(for: parsed)
