@@ -662,6 +662,26 @@ void BridgedIntegerLiteralExpr_setNegative(BridgedIntegerLiteralExpr cExpr,
   cExpr.unbridged()->setNegative(cLoc.unbridged());
 }
 
+//===----------------------------------------------------------------------===//
+// MARK: BridgedTypeOrCustomAttr
+//===----------------------------------------------------------------------===//
+
+BridgedTypeOrCustomAttr::BridgedTypeOrCustomAttr(void *_Nonnull pointer,
+                                                 Kind kind)
+    : opaque(intptr_t(pointer) | kind) {
+  assert(getPointer() == pointer && getKind() == kind);
+}
+
+BridgedTypeAttribute BridgedTypeOrCustomAttr::castToTypeAttr() const {
+  assert(getKind() == Kind::TypeAttr);
+  return static_cast<swift::TypeAttribute *>(getPointer());
+}
+
+BridgedCustomAttr BridgedTypeOrCustomAttr::castToCustomAttr() const {
+  assert(getKind() == Kind::CustomAttr);
+  return static_cast<swift::CustomAttr *>(getPointer());
+}
+
 SWIFT_END_NULLABILITY_ANNOTATIONS
 
 #endif // SWIFT_AST_ASTBRIDGINGIMPL_H
