@@ -1562,6 +1562,20 @@ function Build-BuildTools($Arch) {
     }
 }
 
+function Write-PList {
+  [CmdletBinding(PositionalBinding = $false)]
+  param
+  (
+    [Parameter(Mandatory = $true)]
+    [PSCustomObject] $Settings,
+    [Parameter(Mandatory = $true)]
+    [string] $Path
+  )
+
+  Invoke-Program "$(Get-PythonExecutable)" -c "import plistlib; print(str(plistlib.dumps($(($Settings | ConvertTo-JSON -Compress) -replace '"', "'")), encoding='utf-8'))" `
+      -OutFile $Path
+}
+
 function Build-Compilers() {
   [CmdletBinding(PositionalBinding = $false)]
   param
@@ -1714,8 +1728,13 @@ function Build-Compilers() {
       })
   }
 
-  Invoke-Program "$(Get-PythonExecutable)" -c "import plistlib; print(str(plistlib.dumps({ 'Identifier': '${ToolchainIdentifier}', 'FallbackLibrarySearchPaths': ['usr/bin'], 'Version': '${ProductVersion}' }), encoding='utf-8'))" `
-      -OutFile "$($Arch.ToolchainInstallRoot)\ToolchainInfo.plist"
+  $Settings = @{
+    FallbackLibrarySearchPaths = @("usr/bin")
+    Identifier = "${ToolchainIdentifier}"
+    Version = "${ProductVersion}"
+  }
+
+  Write-PList -Settings $Settings -Path "$($Arch.ToolchainInstallRoot)\ToolchainInfo.plist"
 }
 
 # Reference: https://github.com/microsoft/mimalloc/tree/dev/bin#minject
@@ -2129,13 +2148,14 @@ function Build-ExperimentalRuntime {
 }
 
 function Write-SDKSettingsPlist([Platform]$Platform, $Arch) {
-  if ($Platform -eq [Platform]::Windows) {
-    Invoke-Program "$(Get-PythonExecutable)" -c "import plistlib; print(str(plistlib.dumps({ 'DefaultProperties': { 'DEFAULT_USE_RUNTIME': 'MD' } }), encoding='utf-8'))" `
-      -OutFile "$($Arch.SDKInstallRoot)\SDKSettings.plist"
-  } else {
-    Invoke-Program "$(Get-PythonExecutable)" -c "import plistlib; print(str(plistlib.dumps({ 'DefaultProperties': { } }), encoding='utf-8'))" `
-      -OutFile "$($Arch.SDKInstallRoot)\SDKSettings.plist"
+  $SDKSettings = @{
+    DefaultProperties = @{
+    }
   }
+  if ($Platform -eq [Platform]::Windows) {
+    $SDKSettings.DefaultProperties.DEFAULT_USE_RUNTIME = "MD"
+  }
+  Write-PList -Settings $SDKSettings -Path "$($Arch.SDKInstallRoot)\SDKSettings.plist"
 
   $SDKSettings = @{
     CanonicalName = "$($Arch.LLVMTarget)"
@@ -2387,8 +2407,17 @@ function Build-Testing([Platform]$Platform, $Arch, [switch]$Test = $false) {
 }
 
 function Write-PlatformInfoPlist([Platform] $Platform) {
-    Invoke-Program "$(Get-PythonExecutable)" -c "import plistlib; print(str(plistlib.dumps({ 'DefaultProperties': { 'XCTEST_VERSION': 'development', 'SWIFT_TESTING_VERSION': 'development', 'SWIFTC_FLAGS': ['-use-ld=lld'] } }), encoding='utf-8'))" `
-      -OutFile ([IO.Path]::Combine((Get-PlatformRoot $Platform), "Info.plist"))
+  $Settings = @{
+    DefaultProperties = @{
+      SWIFT_TESTING_VERSION = "development"
+      XCTEST_VERSION = "development"
+    }
+  }
+  if ($Platform -eq [Platform]::Windows) {
+    $Settings.DefaultProperties.SWIFTC_FLAGS = @( "-use-ld=lld" )
+  }
+
+  Write-PList -Settings $Settings -Path "$(Get-PlatformRoot $Platform)\Info.plist"
 }
 
 # Copies files installed by CMake from the arch-specific platform root,
