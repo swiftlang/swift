@@ -36,6 +36,7 @@ extension BridgedNullableGenericParamList: /*@retroactive*/ swiftASTGen.BridgedN
 extension BridgedNullableTrailingWhereClause: /*@retroactive*/ swiftASTGen.BridgedNullable {}
 extension BridgedNullableParameterList: /*@retroactive*/ swiftASTGen.BridgedNullable {}
 extension BridgedNullablePatternBindingInitializer: /*@retroactive*/ swiftASTGen.BridgedNullable {}
+extension BridgedNullableDefaultArgumentInitializer: /*@retroactive*/ swiftASTGen.BridgedNullable {}
 extension BridgedNullableCustomAttributeInitializer: /*@retroactive*/ swiftASTGen.BridgedNullable {}
 extension BridgedNullableArgumentList: /*@retroactive*/ swiftASTGen.BridgedNullable {}
 extension BridgedNullableVarDecl: /*@retroactive*/ swiftASTGen.BridgedNullable {}
@@ -86,6 +87,9 @@ extension BridgedParameterList: BridgedHasNullable {
 }
 extension BridgedPatternBindingInitializer: BridgedHasNullable {
   typealias Nullable = BridgedNullablePatternBindingInitializer
+}
+extension BridgedDefaultArgumentInitializer: BridgedHasNullable {
+  typealias Nullable = BridgedNullableDefaultArgumentInitializer
 }
 extension BridgedCustomAttributeInitializer: BridgedHasNullable {
   typealias Nullable = BridgedNullableCustomAttributeInitializer

@@ -6859,6 +6859,7 @@ public:
 
 /// A function parameter declaration.
 class ParamDecl : public VarDecl {
+  friend class ParameterList;
   friend class DefaultArgumentInitContextRequest;
   friend class DefaultArgumentExprRequest;
   friend class DefaultArgumentTypeRequest;
@@ -6885,7 +6886,8 @@ class ParamDecl : public VarDecl {
 
     /// Stores the context for the default argument as well as a bit to
     /// indicate whether the default expression has been type-checked.
-    llvm::PointerIntPair<Initializer *, 1, bool> InitContextAndIsTypeChecked;
+    llvm::PointerIntPair<DefaultArgumentInitializer *, 1, bool>
+        InitContextAndIsTypeChecked;
 
     StringRef StringRepresentation;
     CaptureInfo Captures;
@@ -6893,7 +6895,8 @@ class ParamDecl : public VarDecl {
 
   /// Retrieve the cached initializer context for the parameter's default
   /// argument without triggering a request.
-  std::optional<Initializer *> getCachedDefaultArgumentInitContext() const;
+  std::optional<DefaultArgumentInitializer *>
+  getCachedDefaultArgumentInitContext() const;
 
   /// NOTE: This is stored using bits from TyReprAndFlags and
   /// DefaultValueAndFlags.
@@ -7002,12 +7005,11 @@ public:
                  DeclContext *Parent,
                  ParamSpecifier specifier = ParamSpecifier::Default);
 
-  static ParamDecl *createParsed(ASTContext &Context, SourceLoc specifierLoc,
-                                 SourceLoc argumentNameLoc,
-                                 Identifier argumentName,
-                                 SourceLoc parameterNameLoc,
-                                 Identifier parameterName, Expr *defaultValue,
-                                 DeclContext *dc);
+  static ParamDecl *createParsed(
+      ASTContext &Context, SourceLoc specifierLoc, SourceLoc argumentNameLoc,
+      Identifier argumentName, SourceLoc parameterNameLoc,
+      Identifier parameterName, Expr *defaultValue,
+      DefaultArgumentInitializer *defaultValueInitContext, DeclContext *dc);
 
   /// Retrieve the argument (API) name for this function parameter.
   Identifier getArgumentName() const {
@@ -7118,7 +7120,7 @@ public:
   /// Retrieve the initializer context for the parameter's default argument.
   Initializer *getDefaultArgumentInitContext() const;
 
-  void setDefaultArgumentInitContext(Initializer *initContext);
+  void setDefaultArgumentInitContext(DefaultArgumentInitializer *initContext);
 
   CaptureInfo getDefaultArgumentCaptureInfo() const;
 
