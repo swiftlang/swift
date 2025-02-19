@@ -317,3 +317,22 @@ class StaticTest {
   class var classVar: Int { 42 }
   static let staticVar = 42
 }
+
+func defaultArgInitTestFunc(fn: () -> () = {}) {}
+struct DefaultArgInitTestStruct {
+  func foo(fn: () -> () = {}) {}
+}
+enum DefaultArgInitTestEnum {
+    case foo(x: () -> () = {})
+}
+
+@resultBuilder
+struct MyBuilder {
+static func buildBlock(_ items: Any...) -> [Any] { items }
+}
+func acceptBuilder(@MyBuilder fn: () -> [Any]) -> [Any] { fn() }
+func testBuilder() {
+  let _: [Any] = acceptBuilder {
+    1
+  }
+}

@@ -194,11 +194,13 @@ BridgedParamDecl BridgedParamDecl_createParsed(
     BridgedSourceLoc cSpecifierLoc, BridgedIdentifier cArgName,
     BridgedSourceLoc cArgNameLoc, BridgedIdentifier cParamName,
     BridgedSourceLoc cParamNameLoc, BridgedNullableTypeRepr opaqueType,
-    BridgedNullableExpr opaqueDefaultValue) {
+    BridgedNullableExpr cDefaultArgument,
+    BridgedNullableDefaultArgumentInitializer cDefaultArgumentInitContext) {
   auto *paramDecl = ParamDecl::createParsed(
       cContext.unbridged(), cSpecifierLoc.unbridged(), cArgNameLoc.unbridged(),
       cArgName.unbridged(), cParamNameLoc.unbridged(), cParamName.unbridged(),
-      opaqueDefaultValue.unbridged(), cDeclContext.unbridged());
+      cDefaultArgument.unbridged(), cDefaultArgumentInitContext.unbridged(),
+      cDeclContext.unbridged());
 
   if (auto type = opaqueType.unbridged()) {
     paramDecl->setTypeRepr(type);
