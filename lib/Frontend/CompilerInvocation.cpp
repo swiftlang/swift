@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2014 - 2020 Apple Inc. and the Swift project authors
+// Copyright (c) 2014 - 2025 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -750,17 +750,18 @@ static bool ParseEnabledFeatureArgs(LangOptions &Opts, ArgList &Args,
            OPT_enable_upcoming_feature, OPT_disable_upcoming_feature)) {
     auto &option = A->getOption();
     StringRef value = A->getValue();
-    bool enableUpcoming = option.matches(OPT_enable_upcoming_feature);
-    bool isUpcomingFlag =
-        enableUpcoming || option.matches(OPT_disable_upcoming_feature);
-    bool enableFeature =
-        enableUpcoming || option.matches(OPT_enable_experimental_feature);
+    bool isEnableUpcomingFeatureFlag =
+        option.matches(OPT_enable_upcoming_feature);
+    bool isUpcomingFeatureFlag = isEnableUpcomingFeatureFlag ||
+                                 option.matches(OPT_disable_upcoming_feature);
+    bool isEnableFeatureFlag = isEnableUpcomingFeatureFlag ||
+                               option.matches(OPT_enable_experimental_feature);
 
     // Collect some special case pseudo-features which should be processed
     // separately.
     if (value.starts_with("StrictConcurrency") ||
         value.starts_with("AvailabilityMacro=")) {
-      if (enableFeature)
+      if (isEnableFeatureFlag)
         psuedoFeatures.push_back(value);
       continue;
     }
@@ -768,13 +769,13 @@ static bool ParseEnabledFeatureArgs(LangOptions &Opts, ArgList &Args,
     auto feature = getUpcomingFeature(value);
     if (feature) {
       // Diagnose upcoming features enabled with -enable-experimental-feature.
-      if (!isUpcomingFlag)
+      if (!isUpcomingFeatureFlag)
         Diags.diagnose(SourceLoc(), diag::feature_not_experimental, value,
-                       enableFeature);
+                       isEnableFeatureFlag);
     } else {
       // If -enable-upcoming-feature was used and an upcoming feature was not
       // found, diagnose and continue.
-      if (isUpcomingFlag) {
+      if (isUpcomingFeatureFlag) {
         Diags.diagnose(SourceLoc(), diag::unrecognized_feature, value,
                        /*upcoming=*/true);
         continue;
@@ -815,7 +816,7 @@ static bool ParseEnabledFeatureArgs(LangOptions &Opts, ArgList &Args,
     }
 
     // Enable the feature if requested.
-    if (enableFeature)
+    if (isEnableFeatureFlag)
       Opts.enableFeature(*feature);
   }
 
