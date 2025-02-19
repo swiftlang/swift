@@ -191,3 +191,11 @@ class ClassWithUnsafeStorage {
   var int: Int = 0
   var array: [UnsafeSuper]? = nil // expected-note{{property 'array' involves unsafe type 'UnsafeSuper'}}
 }
+
+// expected-warning@+3{{generic struct 'GenericStructWithUnsafeThings' has storage involving unsafe types}}
+// expected-note@+2{{add '@unsafe' if this type is also unsafe to use}}
+// expected-note@+1{{add '@safe' if this type encapsulates the unsafe storage in a safe interface}}
+struct GenericStructWithUnsafeThings<T> {
+  var property: T
+  var pointer: PointerType // expected-note{{property 'pointer' involves unsafe type 'PointerType'}}
+}

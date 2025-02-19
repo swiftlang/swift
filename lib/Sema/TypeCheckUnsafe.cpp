@@ -443,7 +443,7 @@ void swift::checkUnsafeStorage(NominalTypeDecl *nominal) {
 
   // Look for any unsafe storage in this nominal type.
   SmallVector<UnsafeUse, 4> unsafeUses;
-  UnsafeStorageVisitor(ctx, unsafeUses).visit(nominal, nominal->getDeclContext());
+  UnsafeStorageVisitor(ctx, unsafeUses).visit(nominal, nominal);
 
   // If we didn't find any unsafe storage, there's nothing to do.
   if (unsafeUses.empty())
