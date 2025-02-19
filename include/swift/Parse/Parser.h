@@ -19,7 +19,6 @@
 
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTNode.h"
-#include "swift/AST/DiagnosticsParse.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/LayoutConstraint.h"
 #include "swift/AST/LifetimeDependence.h"
@@ -543,29 +542,7 @@ public:
   /// diagnose it if not permitted in this mode.
   /// \param diagnoseDollarPrefix Whether to diagnose dollar-prefixed
   /// identifiers in addition to a standalone '$'.
-  void diagnoseDollarIdentifier(const Token &tok,
-                                bool diagnoseDollarPrefix) {
-    assert(tok.getText()[0] == '$');
-
-    // If '$' is not guarded by backticks, offer
-    // to replace it with '`$`'.
-    if (Tok.getRawText() == "$") {
-      diagnose(Tok.getLoc(), diag::standalone_dollar_identifier)
-          .fixItReplace(Tok.getLoc(), "`$`");
-      return;
-    }
-
-    if (!diagnoseDollarPrefix)
-      return;
-
-    if (tok.getText().size() == 1 || Context.LangOpts.EnableDollarIdentifiers ||
-        isInSILMode() || L->isSwiftInterface() ||
-        isInMacroExpansion(tok.getLoc()))
-      return;
-
-    diagnose(tok.getLoc(), diag::dollar_identifier_decl,
-             Context.getIdentifier(tok.getText()));
-  }
+  void diagnoseDollarIdentifier(const Token &tok, bool diagnoseDollarPrefix);
 
   /// Retrieve the location just past the end of the previous
   /// source location.
