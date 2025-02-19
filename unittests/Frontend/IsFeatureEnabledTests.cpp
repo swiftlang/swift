@@ -96,26 +96,74 @@ static const IsFeatureEnabledTestCase singleEnableTestCases[] = {
       {"-enable-upcoming-feature", baselineF.name},
       {{baselineF, true}}),
   IsFeatureEnabledTestCase(
+      {"-enable-upcoming-feature", baselineF.name + ":undef"},
+      {{baselineF, true}}),
+  IsFeatureEnabledTestCase(
+      {"-enable-upcoming-feature", baselineF.name + ":adoption"},
+      {{baselineF, true}}),
+  IsFeatureEnabledTestCase(
       {"-enable-experimental-feature", baselineF.name},
+      {{baselineF, true}}),
+  IsFeatureEnabledTestCase(
+      {"-enable-experimental-feature", baselineF.name + ":undef"},
+      {{baselineF, true}}),
+  IsFeatureEnabledTestCase(
+      {"-enable-experimental-feature", baselineF.name + ":adoption"},
       {{baselineF, true}}),
   IsFeatureEnabledTestCase(
       {"-enable-upcoming-feature", upcomingF.name},
       {{upcomingF, true}}),
   IsFeatureEnabledTestCase(
+      {"-enable-upcoming-feature", upcomingF.name + ":undef"},
+      {{upcomingF, false}}),
+  IsFeatureEnabledTestCase(
+      {"-enable-upcoming-feature", upcomingF.name + ":adoption"},
+      {{upcomingF, false}}),
+  IsFeatureEnabledTestCase(
       {"-enable-experimental-feature", upcomingF.name},
       {{upcomingF, true}}),
+  IsFeatureEnabledTestCase(
+      {"-enable-experimental-feature", upcomingF.name + ":undef"},
+      {{upcomingF, false}}),
+  IsFeatureEnabledTestCase(
+      {"-enable-experimental-feature", upcomingF.name + ":adoption"},
+      {{upcomingF, false}}),
   IsFeatureEnabledTestCase(
       {"-enable-upcoming-feature", strictConcurrencyF.name},
       {{strictConcurrencyF, true}}),
   IsFeatureEnabledTestCase(
+      {"-enable-upcoming-feature", strictConcurrencyF.name + ":undef"},
+      {{strictConcurrencyF, false}}),
+  IsFeatureEnabledTestCase(
+      {"-enable-upcoming-feature", strictConcurrencyF.name + ":adoption"},
+      {{strictConcurrencyF, false}}),
+  IsFeatureEnabledTestCase(
       {"-enable-experimental-feature", strictConcurrencyF.name},
       {{strictConcurrencyF, true}}),
+  IsFeatureEnabledTestCase(
+      {"-enable-experimental-feature", strictConcurrencyF.name + ":undef"},
+      {{strictConcurrencyF, false}}),
+  IsFeatureEnabledTestCase(
+      {"-enable-experimental-feature", strictConcurrencyF.name + ":adoption"},
+      {{strictConcurrencyF, false}}),
   IsFeatureEnabledTestCase(
       {"-enable-upcoming-feature", experimentalF.name},
       {{experimentalF, false}}),
   IsFeatureEnabledTestCase(
+      {"-enable-upcoming-feature", experimentalF.name + ":undef"},
+      {{experimentalF, false}}),
+  IsFeatureEnabledTestCase(
+      {"-enable-upcoming-feature", experimentalF.name + ":adoption"},
+      {{experimentalF, false}}),
+  IsFeatureEnabledTestCase(
       {"-enable-experimental-feature", experimentalF.name},
       {{experimentalF, true}}),
+  IsFeatureEnabledTestCase(
+      {"-enable-experimental-feature", experimentalF.name + ":undef"},
+      {{experimentalF, false}}),
+  IsFeatureEnabledTestCase(
+      {"-enable-experimental-feature", experimentalF.name + ":adoption"},
+      {{experimentalF, false}}),
 };
 // clang-format on
 INSTANTIATE_TEST_SUITE_P(SingleEnable, IsFeatureEnabledTest,
@@ -180,6 +228,115 @@ static const IsFeatureEnabledTestCase singleDisableTestCases[] = {
 INSTANTIATE_TEST_SUITE_P(SingleDisable, IsFeatureEnabledTest,
                          ::testing::ValuesIn(singleDisableTestCases));
 
+// MARK: - Double enable
+
+// clang-format off
+static const IsFeatureEnabledTestCase doubleEnableTestCases[] = {
+  IsFeatureEnabledTestCase({
+        "-enable-upcoming-feature", upcomingF.name + ":undef",
+        "-enable-upcoming-feature", upcomingF.name,
+      },
+      {{upcomingF, true}}),
+  IsFeatureEnabledTestCase({
+        "-enable-upcoming-feature", upcomingF.name + ":adoption",
+        "-enable-upcoming-feature", upcomingF.name,
+      },
+      {{upcomingF, true}}),
+  IsFeatureEnabledTestCase({
+        "-enable-upcoming-feature", upcomingF.name,
+        "-enable-upcoming-feature", upcomingF.name + ":undef",
+      },
+      {{upcomingF, true}}),
+  IsFeatureEnabledTestCase({
+        "-enable-upcoming-feature", upcomingF.name,
+        "-enable-upcoming-feature", upcomingF.name + ":adoption",
+      },
+      {{upcomingF, true}}),
+  IsFeatureEnabledTestCase({
+        "-enable-upcoming-feature", upcomingF.name + ":undef",
+        "-enable-experimental-feature", upcomingF.name,
+      },
+      {{upcomingF, true}}),
+  IsFeatureEnabledTestCase({
+        "-enable-upcoming-feature", upcomingF.name + ":adoption",
+        "-enable-experimental-feature", upcomingF.name,
+      },
+      {{upcomingF, true}}),
+  IsFeatureEnabledTestCase({
+        "-enable-upcoming-feature", upcomingF.name,
+        "-enable-experimental-feature", upcomingF.name + ":undef",
+      },
+      {{upcomingF, true}}),
+  IsFeatureEnabledTestCase({
+        "-enable-upcoming-feature", upcomingF.name,
+        "-enable-experimental-feature", upcomingF.name + ":adoption",
+      },
+      {{upcomingF, true}}),
+  IsFeatureEnabledTestCase({
+        "-enable-experimental-feature", upcomingF.name + ":undef",
+        "-enable-upcoming-feature", upcomingF.name,
+      },
+      {{upcomingF, true}}),
+  IsFeatureEnabledTestCase({
+        "-enable-experimental-feature", upcomingF.name + ":adoption",
+        "-enable-upcoming-feature", upcomingF.name,
+      },
+      {{upcomingF, true}}),
+  IsFeatureEnabledTestCase({
+        "-enable-experimental-feature", upcomingF.name,
+        "-enable-upcoming-feature", upcomingF.name + ":undef",
+      },
+      {{upcomingF, true}}),
+  IsFeatureEnabledTestCase({
+        "-enable-experimental-feature", upcomingF.name,
+        "-enable-upcoming-feature", upcomingF.name + ":adoption",
+      },
+      {{upcomingF, true}}),
+  IsFeatureEnabledTestCase({
+        "-enable-experimental-feature", upcomingF.name + ":undef",
+        "-enable-experimental-feature", upcomingF.name,
+      },
+      {{upcomingF, true}}),
+  IsFeatureEnabledTestCase({
+        "-enable-experimental-feature", upcomingF.name + ":adoption",
+        "-enable-experimental-feature", upcomingF.name,
+      },
+      {{upcomingF, true}}),
+  IsFeatureEnabledTestCase({
+        "-enable-experimental-feature", upcomingF.name,
+        "-enable-experimental-feature", upcomingF.name + ":undef",
+      },
+      {{upcomingF, true}}),
+  IsFeatureEnabledTestCase({
+        "-enable-experimental-feature", upcomingF.name,
+        "-enable-experimental-feature", upcomingF.name + ":adoption",
+      },
+      {{upcomingF, true}}),
+  IsFeatureEnabledTestCase({
+        "-enable-experimental-feature", experimentalF.name + ":undef",
+        "-enable-experimental-feature", experimentalF.name,
+      },
+      {{experimentalF, true}}),
+  IsFeatureEnabledTestCase({
+        "-enable-experimental-feature", experimentalF.name + ":adoption",
+        "-enable-experimental-feature", experimentalF.name,
+      },
+      {{experimentalF, true}}),
+  IsFeatureEnabledTestCase({
+        "-enable-experimental-feature", experimentalF.name,
+        "-enable-experimental-feature", experimentalF.name + ":undef",
+      },
+      {{experimentalF, true}}),
+  IsFeatureEnabledTestCase({
+        "-enable-experimental-feature", experimentalF.name,
+        "-enable-experimental-feature", experimentalF.name + ":adoption",
+      },
+      {{experimentalF, true}}),
+};
+// clang-format on
+INSTANTIATE_TEST_SUITE_P(DoubleEnable, IsFeatureEnabledTest,
+                         ::testing::ValuesIn(doubleEnableTestCases));
+
 // MARK: - Enable / disable
 
 // clang-format off
@@ -190,6 +347,16 @@ static const IsFeatureEnabledTestCase enableDisableTestCases[] = {
       },
       {{upcomingF, false}}),
   IsFeatureEnabledTestCase({
+        "-enable-upcoming-feature", upcomingF.name,
+        "-disable-upcoming-feature", upcomingF.name + ":undef",
+      },
+      {{upcomingF, true}}),
+  IsFeatureEnabledTestCase({
+        "-enable-upcoming-feature", upcomingF.name,
+        "-disable-upcoming-feature", upcomingF.name + ":adoption",
+      },
+      {{upcomingF, true}}),
+  IsFeatureEnabledTestCase({
         "-disable-upcoming-feature", upcomingF.name,
         "-enable-upcoming-feature", upcomingF.name,
       },
@@ -199,6 +366,16 @@ static const IsFeatureEnabledTestCase enableDisableTestCases[] = {
         "-disable-upcoming-feature", upcomingF.name,
       },
       {{upcomingF, false}}),
+  IsFeatureEnabledTestCase({
+        "-enable-experimental-feature", upcomingF.name,
+        "-disable-upcoming-feature", upcomingF.name + ":undef",
+      },
+      {{upcomingF, true}}),
+  IsFeatureEnabledTestCase({
+        "-enable-experimental-feature", upcomingF.name,
+        "-disable-upcoming-feature", upcomingF.name + ":adoption",
+      },
+      {{upcomingF, true}}),
   IsFeatureEnabledTestCase({
         "-disable-experimental-feature", upcomingF.name,
         "-enable-upcoming-feature", upcomingF.name,
@@ -210,6 +387,16 @@ static const IsFeatureEnabledTestCase enableDisableTestCases[] = {
       },
       {{upcomingF, false}}),
   IsFeatureEnabledTestCase({
+        "-enable-upcoming-feature", upcomingF.name,
+        "-disable-experimental-feature", upcomingF.name + ":undef",
+      },
+      {{upcomingF, true}}),
+  IsFeatureEnabledTestCase({
+        "-enable-upcoming-feature", upcomingF.name,
+        "-disable-experimental-feature", upcomingF.name + ":adoption",
+      },
+      {{upcomingF, true}}),
+  IsFeatureEnabledTestCase({
         "-disable-upcoming-feature", upcomingF.name,
         "-enable-experimental-feature", upcomingF.name,
       },
@@ -219,6 +406,16 @@ static const IsFeatureEnabledTestCase enableDisableTestCases[] = {
         "-disable-experimental-feature", upcomingF.name,
       },
       {{upcomingF, false}}),
+  IsFeatureEnabledTestCase({
+        "-enable-experimental-feature", upcomingF.name,
+        "-disable-experimental-feature", upcomingF.name + ":undef",
+      },
+      {{upcomingF, true}}),
+  IsFeatureEnabledTestCase({
+        "-enable-experimental-feature", upcomingF.name,
+        "-disable-experimental-feature", upcomingF.name + ":adoption",
+      },
+      {{upcomingF, true}}),
   IsFeatureEnabledTestCase({
         "-disable-experimental-feature", upcomingF.name,
         "-enable-experimental-feature", upcomingF.name,
@@ -229,6 +426,16 @@ static const IsFeatureEnabledTestCase enableDisableTestCases[] = {
         "-disable-experimental-feature", experimentalF.name,
       },
       {{experimentalF, false}}),
+  IsFeatureEnabledTestCase({
+        "-enable-experimental-feature", experimentalF.name,
+        "-disable-experimental-feature", experimentalF.name + ":undef",
+      },
+      {{experimentalF, true}}),
+  IsFeatureEnabledTestCase({
+        "-enable-experimental-feature", experimentalF.name,
+        "-disable-experimental-feature", experimentalF.name + ":adoption",
+      },
+      {{experimentalF, true}}),
   IsFeatureEnabledTestCase({
         "-disable-experimental-feature", experimentalF.name,
         "-enable-experimental-feature", experimentalF.name,
