@@ -6671,10 +6671,9 @@ bool EnumDecl::hasOnlyCasesWithoutAssociatedValues() const {
   bool hasAssociatedValues = false;
 
   for (auto elt : getAllElements()) {
-    for (auto Attr : elt->getSemanticAvailableAttrs()) {
-      // FIXME: [availability] Deprecation doesn't make an element unavailable
+    // FIXME: [availability] Deprecation doesn't make an element unavailable
+    if (!elt->getSemanticAvailableAttrs().empty())
       hasAnyUnavailableValues = true;
-    }
 
     if (!elt->isAvailableDuringLowering())
       hasAnyUnavailableDuringLoweringValues = true;
