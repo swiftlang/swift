@@ -656,9 +656,10 @@ ManagedValue SILGenFunction::emitExistentialErasure(
   // If we're erasing to the 'Error' type, we might be able to get an NSError
   // representation more efficiently.
   auto &ctx = getASTContext();
+  auto *nsErrorDecl = ctx.getNSErrorDecl();
   if (ctx.LangOpts.EnableObjCInterop && conformances.size() == 1 &&
       conformances[0].getRequirement() == ctx.getErrorDecl() &&
-      ctx.getNSErrorDecl()) {
+      nsErrorDecl && referenceAllowed(nsErrorDecl)) {
     // If the concrete type is NSError or a subclass thereof, just erase it
     // directly.
     auto nsErrorType = ctx.getNSErrorType()->getCanonicalType();
