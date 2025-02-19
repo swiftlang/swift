@@ -23,6 +23,7 @@
 // DEP: _putchar
 // DEP: _puts
 // DEP: _strlen
+// DEP: _strcpy
 // DEP: _swift_task_asyncMainDrainQueueImpl
 // DEP: _swift_task_enqueueGlobalImpl
 // DEP: _swift_task_getMainExecutorImpl

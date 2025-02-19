@@ -796,13 +796,11 @@ struct AsyncTask::PrivateStorage {
     // here, before the task-local storage elements are destroyed; in order to
     // respect stack-discipline of the task-local allocator.
     {
-
-      if (task->hasInitialTaskExecutorPreferenceRecord()) {
-        task->dropInitialTaskExecutorPreferenceRecord();
-      }
-
       if (task->hasInitialTaskNameRecord()) {
         task->dropInitialTaskNameRecord();
+      }
+      if (task->hasInitialTaskExecutorPreferenceRecord()) {
+        task->dropInitialTaskExecutorPreferenceRecord();
       }
     }
 

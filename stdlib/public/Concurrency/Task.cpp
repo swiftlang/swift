@@ -208,6 +208,8 @@ TaskExecutorRef _task_taskExecutor_getTaskExecutorRef(
 
 TaskExecutorRef
 InitialTaskExecutorOwnedPreferenceTaskOptionRecord::getExecutorRefFromUnownedTaskExecutor() const {
+  if (!Identity) return TaskExecutorRef::undefined();
+
   TaskExecutorRef executorRef = _task_taskExecutor_getTaskExecutorRef(
       Identity,
       /*selfType=*/swift_getObjectType(Identity),
@@ -737,8 +739,8 @@ swift_task_create_commonImpl(size_t rawTaskCreateFlags,
     case TaskOptionRecordKind::InitialTaskExecutorUnowned:
       taskExecutor = cast<InitialTaskExecutorRefPreferenceTaskOptionRecord>(option)
                          ->getExecutorRef();
-      jobFlags.task_setHasInitialTaskExecutorPreference(true);
       taskExecutorIsOwned = false;
+      jobFlags.task_setHasInitialTaskExecutorPreference(true);
       break;
 
     case TaskOptionRecordKind::InitialTaskExecutorOwned:
@@ -1130,7 +1132,6 @@ swift_task_create_commonImpl(size_t rawTaskCreateFlags,
     task->_private().Local.initializeLinkParent(task, parent);
   }
 
-  // FIXME: add discarding flag
   concurrency::trace::task_create(
       task, parent, group, asyncLet,
       static_cast<uint8_t>(task->Flags.getPriority()),

@@ -857,13 +857,6 @@ irgen::emitTaskCreate(IRGenFunction &IGF, llvm::Value *flags,
   }
 
   // Add an option record for the initial task name, if present.
-  //
-  //    (lldb) e taskName.value.Values[0]
-  //        (llvm::Value *) $11 = 0x000060000220d1a0
-  //    (lldb) e taskName.value.Values[0]->dump()
-  //        %16 = extractvalue { i64, i64 } %15, 0
-  //    (lldb) e taskName.value.Values[1]->dump()
-  //       %17 = extractvalue { i64, i64 } %15, 1
   taskOptions = maybeAddTaskNameOptionRecord(IGF, taskOptions, taskName);
 
   // In embedded Swift, create and pass result type info.

@@ -219,19 +219,6 @@ _generics(ParamS... params) {
   return {{params...}};
 }
 
-///// A conditional synthesizer which generates a generic parameter list.
-///// If the 'condition' is false, no generic parameters are created.
-//template <class... ParamS>
-//struct ConditionalGenericParamListSynthesizer {
-//  bool condition;
-//  VariadicSynthesizerStorage<ParamS...> Params;
-//};
-//template <class... ParamS>
-//constexpr ConditionalGenericParamListSynthesizer<ParamS...>
-//_ifGenerics(bool condition, ParamS... params) {
-//  return {condition, {params...}};
-//}
-
 struct CountGenericParameters {
   unsigned &Count;
 
@@ -305,21 +292,6 @@ static GenericParamList *synthesizeGenericParamList(SynthesisContext &SC,
   return paramList;
 }
 
-//template <class... ParamsS>
-//static GenericParamList *synthesizeGenericParamList(
-//    SynthesisContext &SC,
-//    const ConditionalGenericParamListSynthesizer<ParamsS...> &params) {
-//  if (params.condition) {
-//    unsigned count = 0;
-//    params.Params.visit(CountGenericParameters{count});
-//    auto paramList = getGenericParams(SC.Context, count);
-//    SC.GenericParams = paramList;
-//    return paramList;
-//  } else {
-//    return GenericParamList::create(SC.Context, SourceLoc(), {}, SourceLoc());
-//  }
-//}
-
 namespace {
 struct CollectGenericParams {
   SynthesisContext &SC;
@@ -368,24 +340,6 @@ synthesizeGenericSignature(SynthesisContext &SC,
                                std::move(collector.AddedRequirements),
                                /*allowInverses=*/false);
 }
-
-//template <class... ParamsS>
-//static GenericSignature
-//synthesizeGenericSignature(SynthesisContext &SC,
-//                     const ConditionalGenericParamListSynthesizer<ParamsS...> &list) {
-//  CollectGenericParams collector(SC);
-//  if (list.condition) {
-//    list.Params.visit(collector);
-//
-//    return buildGenericSignature(SC.Context,
-//                                 GenericSignature(),
-//                                 std::move(collector.GenericParamTypes),
-//                                 std::move(collector.AddedRequirements),
-//                                 /*allowInverses=*/false);
-//  } else {
-//    return GenericSignature();
-//  }
-//}
 
 /// Build a builtin function declaration.
 ///
