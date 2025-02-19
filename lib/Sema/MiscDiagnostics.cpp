@@ -5123,6 +5123,34 @@ checkImplicitPromotionsInCondition(const StmtConditionElement &cond,
 /// was emitted.
 static bool diagnoseAvailabilityCondition(PoundAvailableInfo *info,
                                           DeclContext *DC) {
+  auto &diags = DC->getASTContext().Diags;
+
+  llvm::SmallSet<AvailabilityDomain, 8> seenDomains;
+  for (auto spec : info->getQueries()) {
+    auto domain = spec->getDomain();
+    if (!domain) {
+      continue;
+    }
+
+    if (!domain->isPlatform()) {
+      diags.diagnose(
+          spec->getStartLoc(),
+          domain->isSwiftLanguage()
+              ? diag::availability_query_swift_not_allowed
+              : diag::availability_query_package_description_not_allowed,
+          info->isUnavailability() ? "#unavailable" : "#available");
+      return true;
+    }
+
+    // Diagnose duplicate platforms.
+    if (!seenDomains.insert(*domain).second) {
+      diags.diagnose(spec->getStartLoc(),
+                     diag::availability_query_repeated_platform,
+                     domain->getNameForAttributePrinting());
+      return true;
+    }
+  }
+
   // Reject inlinable code using availability macros. In order to lift this
   // restriction, macros would need to either be expanded when printed in
   // swiftinterfaces or be parsable as macros by module clients.
@@ -5130,10 +5158,9 @@ static bool diagnoseAvailabilityCondition(PoundAvailableInfo *info,
   if (fragileKind.kind != FragileFunctionKind::None) {
     for (auto availSpec : info->getQueries()) {
       if (availSpec->getMacroLoc().isValid()) {
-        DC->getASTContext().Diags.diagnose(
-            availSpec->getMacroLoc(),
-            swift::diag::availability_macro_in_inlinable,
-            fragileKind.getSelector());
+        diags.diagnose(availSpec->getMacroLoc(),
+                       swift::diag::availability_macro_in_inlinable,
+                       fragileKind.getSelector());
         return true;
       }
     }

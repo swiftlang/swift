@@ -1998,18 +1998,6 @@ ERROR(availability_query_wildcard_required, none,
 ERROR(unavailability_query_wildcard_not_required, none,
       "platform wildcard '*' is always implicit in #unavailable", ())
 
-ERROR(availability_must_occur_alone, none,
-      "'%0' version-availability must be specified alone", (StringRef))
-
-ERROR(pound_available_swift_not_allowed, none,
-      "Swift language version checks not allowed in %0(...)", (StringRef))
-
-ERROR(pound_available_package_description_not_allowed, none,
-      "PackageDescription version checks not allowed in %0(...)", (StringRef))
-
-ERROR(availability_query_repeated_platform, none,
-      "version for '%0' already specified", (StringRef))
-
 ERROR(availability_cannot_be_mixed,none,
       "#available and #unavailable cannot be in the same statement", ())
 

@@ -1289,9 +1289,8 @@ static void parseGuardedPattern(Parser &P, GuardedPattern &result,
 /// removing specs for unrecognized platforms.
 static void
 validateAvailabilitySpecList(Parser &P,
-                             SmallVectorImpl<AvailabilitySpec *> &Specs,
+                             const SmallVectorImpl<AvailabilitySpec *> &Specs,
                              Parser::AvailabilitySpecSource Source) {
-  llvm::SmallSet<PlatformKind, 4> Platforms;
   std::optional<SourceLoc> WildcardSpecLoc = std::nullopt;
 
   if (Specs.size() == 1) {
@@ -1303,37 +1302,9 @@ validateAvailabilitySpecList(Parser &P,
       return;
   }
 
-  SmallVector<AvailabilitySpec *, 5> RecognizedSpecs;
   for (auto *Spec : Specs) {
-    RecognizedSpecs.push_back(Spec);
     if (Spec->isWildcard()) {
       WildcardSpecLoc = Spec->getStartLoc();
-      continue;
-    }
-
-    // We keep specs for unrecognized domains around for error recovery
-    // during parsing but remove them once parsing is completed.
-    auto Domain = Spec->getDomain();
-    if (!Domain) {
-      RecognizedSpecs.pop_back();
-      continue;
-    }
-
-    if (!Domain->isPlatform()) {
-      P.diagnose(Spec->getStartLoc(), diag::availability_must_occur_alone,
-                 Domain->getNameForAttributePrinting());
-      continue;
-    }
-
-    bool Inserted = Platforms.insert(Spec->getPlatform()).second;
-    if (!Inserted) {
-      // Rule out multiple version specs referring to the same platform.
-      // For example, we emit an error for
-      /// #available(OSX 10.10, OSX 10.11, *)
-      PlatformKind Platform = Spec->getPlatform();
-      P.diagnose(Spec->getStartLoc(),
-                 diag::availability_query_repeated_platform,
-                 platformString(Platform));
     }
   }
 
@@ -1362,8 +1333,6 @@ validateAvailabilitySpecList(Parser &P,
     break;
   }
   }
-
-  Specs = RecognizedSpecs;
 }
 
 // #available(...)
@@ -1397,18 +1366,6 @@ ParserResult<PoundAvailableInfo> Parser::parseStmtConditionPoundAvailable() {
 
   SmallVector<AvailabilitySpec *, 5> Specs;
   ParserStatus Status = parseAvailabilitySpecList(Specs, Source);
-
-  for (auto *Spec : Specs) {
-    if (Spec->getPlatform() != PlatformKind::none || Spec->isWildcard())
-      continue;
-
-    diagnose(Spec->getStartLoc(),
-             Spec->getDomain()->isSwiftLanguage()
-                 ? diag::pound_available_swift_not_allowed
-                 : diag::pound_available_package_description_not_allowed,
-             getTokenText(MainToken));
-    Status.setIsParseError();
-  }
 
   SourceLoc RParenLoc;
   if (parseMatchingToken(tok::r_paren, RParenLoc,

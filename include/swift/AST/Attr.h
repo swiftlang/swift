@@ -151,7 +151,7 @@ protected:
       Value : 32
     );
 
-    SWIFT_INLINE_BITFIELD(AvailableAttr, DeclAttribute, 4+1+1+1+1,
+    SWIFT_INLINE_BITFIELD(AvailableAttr, DeclAttribute, 4+1+1+1+1+1+1,
       /// An `AvailableAttr::Kind` value.
       Kind : 4,
 
@@ -163,7 +163,15 @@ protected:
       HasRenamedDecl : 1,
 
       /// Whether this attribute was spelled `@_spi_available`.
-      IsSPI : 1
+      IsSPI : 1,
+
+      /// Whether this attribute is an interior attribute of a group of
+      /// `@available` attributes that were written in source using short form
+      /// syntax (`@available(macOS 15, ...)`).
+      IsFollowedByGroupedAvailableAttr : 1,
+
+      /// Whether this attribute was followed by `, *` when parsed from source.
+      IsFollowedByWildcard : 1
     );
 
     SWIFT_INLINE_BITFIELD(ClangImporterSynthesizedTypeAttr, DeclAttribute, 1,
@@ -805,6 +813,10 @@ public:
   /// a rename decl even when this string is empty.
   StringRef getRename() const { return Rename; }
 
+  bool hasCachedRenamedDecl() const {
+    return Bits.AvailableAttr.HasRenamedDecl;
+  }
+
   /// Whether this is an unconditionally unavailable entity.
   bool isUnconditionallyUnavailable() const;
 
@@ -816,6 +828,28 @@ public:
 
   /// Whether this attribute was spelled `@_spi_available`.
   bool isSPI() const { return Bits.AvailableAttr.IsSPI; }
+
+  /// Returns the following `@available` if this was generated from an
+  /// attribute that was written in source using short form syntax, e.g.
+  /// `@available(macOS 15, iOS 18, *)`.
+  const AvailableAttr *getNextGroupedAvailableAttr() const {
+    if (Bits.AvailableAttr.IsFollowedByGroupedAvailableAttr)
+      return dyn_cast_or_null<AvailableAttr>(Next);
+    return nullptr;
+  }
+
+  void setIsFollowedByGroupedAvailableAttr() {
+    Bits.AvailableAttr.IsFollowedByGroupedAvailableAttr = true;
+  }
+
+  /// Whether this attribute was followed by `, *` when parsed from source.
+  bool isFollowedByWildcard() const {
+    return Bits.AvailableAttr.IsFollowedByWildcard;
+  }
+
+  void setIsFollowedByWildcard() {
+    Bits.AvailableAttr.IsFollowedByWildcard = true;
+  }
 
   /// Returns the kind of availability the attribute specifies.
   Kind getKind() const { return static_cast<Kind>(Bits.AvailableAttr.Kind); }
@@ -858,10 +892,6 @@ public:
 
   static bool classof(const DeclAttribute *DA) {
     return DA->getKind() == DeclAttrKind::Available;
-  }
-
-  bool hasCachedRenamedDecl() const {
-    return Bits.AvailableAttr.HasRenamedDecl;
   }
 
 private:
