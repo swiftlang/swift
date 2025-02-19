@@ -263,45 +263,31 @@ public:
       return;
     }
 
-    switch (attr->getBehavior()) {
-    case ExecutionKind::Concurrent: {
-      auto parameters = F->getParameters();
-      if (!parameters)
+    auto parameters = F->getParameters();
+    if (!parameters)
+      return;
+
+    for (auto *P : *parameters) {
+      auto *repr = P->getTypeRepr();
+      if (!repr)
+        continue;
+
+      // isolated parameters affect isolation of the function itself
+      if (isa<IsolatedTypeRepr>(repr)) {
+        diagnoseAndRemoveAttr(
+            attr, diag::attr_execution_incompatible_isolated_parameter, F, P);
         return;
+      }
 
-      for (auto *P : *parameters) {
-        auto *repr = P->getTypeRepr();
-        if (!repr)
-          continue;
-
-        // isolated parameters affect isolation of the function itself
-        if (isa<IsolatedTypeRepr>(repr)) {
+      if (auto *attrType = dyn_cast<AttributedTypeRepr>(repr)) {
+        if (attrType->has(TypeAttrKind::Isolated)) {
           diagnoseAndRemoveAttr(
               attr,
-              diag::attr_execution_concurrent_incompatible_isolated_parameter,
+              diag::attr_execution_incompatible_dynamically_isolated_parameter,
               F, P);
           return;
         }
-
-        if (auto *attrType = dyn_cast<AttributedTypeRepr>(repr)) {
-          if (attrType->has(TypeAttrKind::Isolated)) {
-            diagnoseAndRemoveAttr(
-                attr,
-                diag::
-                    attr_execution_concurrent_incompatible_dynamically_isolated_parameter,
-                F, P);
-            return;
-          }
-        }
       }
-
-      break;
-    }
-
-    case ExecutionKind::Caller: {
-      // no restrictions for now.
-      break;
-    }
     }
   }
 
