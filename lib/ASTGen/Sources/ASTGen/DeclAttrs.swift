@@ -187,6 +187,8 @@ extension ASTGenVisitor {
         fatalError("unimplemented")
       case .unavailableFromAsync:
         return handle(self.generateUnavailableFromAsyncAttr(attribute: node)?.asDeclAttribute)
+      case .none where attrName == "_unavailableInEmbedded":
+        return handle(self.generateUnavailableInEmbeddedAttr(attribute: node)?.asDeclAttribute)
 
       // Simple attributes.
       case .addressableSelf,
@@ -1776,6 +1778,30 @@ extension ASTGenVisitor {
       range: self.generateAttrSourceRange(node),
       message: self.ctx.allocateCopy(string: message ?? "")
     )
+  }
+
+  func generateUnavailableInEmbeddedAttr(attribute node: AttributeSyntax) -> BridgedAvailableAttr? {
+    if ctx.langOptsHasFeature(.Embedded) {
+      return BridgedAvailableAttr.createParsed(
+        self.ctx,
+        atLoc: self.generateSourceLoc(node.atSign),
+        range: self.generateAttrSourceRange(node),
+        domain: .forEmbedded(),
+        domainLoc: nil,
+        kind: .unavailable,
+        message: "unavailable in embedded Swift",
+        renamed: "",
+        introduced: BridgedVersionTuple(),
+        introducedRange: BridgedSourceRange(),
+        deprecated: BridgedVersionTuple(),
+        deprecatedRange:  BridgedSourceRange(),
+        obsoleted: BridgedVersionTuple(),
+        obsoletedRange: BridgedSourceRange()
+      )
+    } else {
+      // For non-Embedded mode, ignore it.
+      return nil
+    }
   }
 
   func generateSimpleDeclAttr(attribute node: AttributeSyntax, kind: BridgedDeclAttrKind) -> BridgedDeclAttribute? {
