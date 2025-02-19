@@ -3177,7 +3177,6 @@ if (-not $SkipBuild) {
   Invoke-BuildStep Build-XCTest Windows $BuildArch
   Invoke-BuildStep Build-Testing Windows $BuildArch
   Invoke-BuildStep Write-SDKSettingsPlist Windows $BuildArch
-  Invoke-BuildStep Write-PlatformInfoPlist $BuildArch
 
   Invoke-BuildStep Build-ExperimentalRuntime -Static Windows $BuildArch
   Invoke-BuildStep Build-ExperimentalRuntime Windows $BuildArch
@@ -3197,7 +3196,6 @@ if (-not $SkipBuild) {
     Invoke-BuildStep Build-XCTest Windows $Arch
     Invoke-BuildStep Build-Testing Windows $Arch
     Invoke-BuildStep Write-SDKSettingsPlist Windows $Arch
-    Invoke-BuildStep Write-PlatformInfoPlist $Arch
 
     Invoke-BuildStep Build-ExperimentalRuntime -Static Windows $Arch
     Invoke-BuildStep Build-Foundation -Static Windows $Arch
@@ -3226,7 +3224,6 @@ if (-not $SkipBuild) {
       Invoke-BuildStep Build-Inspect -Platform Android -Arch $Arch
     }
     Invoke-BuildStep Write-SDKSettingsPlist Android $Arch
-    Invoke-BuildStep Write-PlatformInfoPlist $Arch
 
     Invoke-BuildStep Build-ExperimentalRuntime -Static Android $Arch
     Invoke-BuildStep Build-Foundation -Static Android $Arch
@@ -3249,9 +3246,13 @@ if (-not $ToBatch) {
   foreach ($Arch in $WindowsSDKArchs) {
     Install-Platform Windows $Arch
   }
+  Invoke-BuildStep Write-PlatformInfoPlist Windows
 
   foreach ($Arch in $AndroidSDKArchs) {
     Install-Platform Android $Arch
+  }
+  if ($Android) {
+    Invoke-BuildStep Write-PlatformInfoPlist Android
   }
 }
 
