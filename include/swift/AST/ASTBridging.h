@@ -768,6 +768,9 @@ struct BridgedDeclAttributes {
   BRIDGED_INLINE swift::DeclAttributes unbridged() const;
 };
 
+SWIFT_NAME("BridgedDeclAttribute.isDeclModifier(_:)")
+bool BridgedDeclAttribute_isDeclModifier(BridgedDeclAttrKind cKind);
+
 SWIFT_NAME("BridgedDeclAttributes.add(self:_:)")
 void BridgedDeclAttributes_add(BridgedDeclAttributes *_Nonnull attrs,
                                BridgedDeclAttribute add);

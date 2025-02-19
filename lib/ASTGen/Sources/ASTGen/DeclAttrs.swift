@@ -1971,9 +1971,12 @@ extension ASTGenVisitor {
       // Other modifiers are all "simple" attributes.
       let kind = BridgedDeclAttrKind(from: node.name.rawText.bridged)
       guard kind != .none else {
-        // TODO: Diagnose?
-        assertionFailure("unknown decl modifier")
-        return nil
+        // TODO: Diagnose.
+        fatalError("(compiler bug) unknown decl modifier")
+      }
+      if !BridgedDeclAttribute.isDeclModifier(kind) {
+        // TODO: Diagnose.
+        fatalError("(compiler bug) decl attribute was parsed as a modifier")
       }
       return self.generateSimpleDeclAttr(declModifier: node, kind: kind)
     }
