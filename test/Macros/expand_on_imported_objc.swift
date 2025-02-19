@@ -12,19 +12,22 @@
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -typecheck -verify -swift-version 5 -enable-experimental-feature MacrosOnImports -load-plugin-library %t/%target-library-name(MacroDefinition) -module-name ModuleUser %s -I %t -DTEST_DIAGNOSTICS
 
 // Emit IR just to make sure nothing else fails.
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -emit-ir -swift-version 5 -g -enable-experimental-feature MacrosOnImports -load-plugin-library %t/%target-library-name(MacroDefinition) -module-name ModuleUser %s -I %t | %FileCheck %s
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -emit-ir -swift-version 5 -g -enable-experimental-feature MacrosOnImports -load-plugin-library %t/%target-library-name(MacroDefinition) -module-name ModuleUser %s -I %t -dump-macro-expansions | %FileCheck %s
 
 import CompletionHandlerGlobals
 import macro_library
 
 @available(SwiftStdlib 5.1, *)
-func testAll(x: Double, y: Double, computer: Computer, untypedComputer: AnyObject) async {
+func testAll(x: Double, y: Double, computer: Computer, untypedComputer: AnyObject, foo: FooProtocol) async {
   let _: Double = await computer.multiply(x, by: y)
 
   #if TEST_DIAGNOSTICS
   // expected-error@+1{{missing argument for parameter 'afterDone' in call}}
   untypedComputer.multiply(x, by: y)
   #endif
+
+  let _: CInt = foo.barMethod(42)
+  let _: Double = foo.extMethod(42.0)
 }
 
 // CHECK: define linkonce_odr hidden swifttailcc void @"$sSo8ComputerC8multiply_2byS2d_SdtYaF"

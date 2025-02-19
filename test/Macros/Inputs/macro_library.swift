@@ -60,6 +60,9 @@ public macro AddAsync() = #externalMacro(module: "MacroDefinition", type: "AddAs
 @attached(peer, names: overloaded)
 public macro AddAsyncFinal() = #externalMacro(module: "MacroDefinition", type: "AddAsyncMacro")
 
+@attached(extension, names: arbitrary)
+public macro AddExt() = #externalMacro(module: "MacroDefinition", type: "AddExtMacro")
+
 public enum Something {
 case something
 }

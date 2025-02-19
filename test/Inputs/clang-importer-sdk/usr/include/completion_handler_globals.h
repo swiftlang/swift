@@ -29,4 +29,9 @@ void f3(double x) DO_SOMETHING_DOTTED;
   ADD_ASYNC_FINAL
   __attribute__((swift_async(none)));
 @end
+
+__attribute__((swift_attr("@macro_library.AddExt")))
+@protocol FooProtocol
+-(int)barMethod:(int)x;
+@end
 #endif

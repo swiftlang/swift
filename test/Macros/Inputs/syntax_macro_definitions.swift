@@ -1115,6 +1115,21 @@ public struct AddAsyncMacro: PeerMacro {
   }
 }
 
+public struct AddExtMacro: ExtensionMacro {
+    public static func expansion(
+    of node: AttributeSyntax,
+    attachedTo declaration: some DeclGroupSyntax,
+    providingExtensionsOf type: some TypeSyntaxProtocol,
+    conformingTo protocols: [TypeSyntax],
+    in context: some MacroExpansionContext
+  ) throws -> [ExtensionDeclSyntax] {
+    return [ExtensionDeclSyntax(DeclSyntax("extension \(type) { public func extMethod(_ x: Double) -> Double { return x } }"))!]
+    // these do not trigger errors either:
+    //fatalError("pang!")
+    //throw CustomError.message("@addExt not implemented")
+  }
+}
+
 public struct AddCompletionHandler: PeerMacro {
   public static func expansion(
     of node: AttributeSyntax,

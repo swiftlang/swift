@@ -14,3 +14,11 @@ import CompletionHandlerGlobals
 
 // CHECK: class Computer
 // CHECK: @_alwaysEmitIntoClient public final func multiply(_ x: Double, by y: Double) async -> Double
+
+// CHECK: @objc protocol FooProtocol {
+// CHECK:   @discardableResult
+// CHECK:   @objc func barMethod(_ x: Int32) -> Int32
+// CHECK: }
+// CHECK: extension FooProtocol {
+// CHECK:   public final func extMethod(_ x: Double) -> Double
+// CHECK: }
