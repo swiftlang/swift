@@ -1,4 +1,5 @@
-// RUN: %target-typecheck-verify-swift
+// RUN: %target-typecheck-verify-swift -enable-experimental-feature KeyPathWithMethodMembers
+// REQUIRES: swift_feature_KeyPathWithMethodMembers
 
 var global = 42
 
@@ -475,6 +476,44 @@ var namedTupleLens = Lens<(question: String, answer: Int)>((question: "ultimate 
 _ = namedTupleLens.question.count
 _ = namedTupleLens.answer
 
+struct MethodAndInitializerTest {
+  let value: Int
+  init(value: Int) { self.value = value }
+  func instanceMethod() -> String { return "InstanceMethod" }
+  static func staticMethod() -> Int { return 42 }
+}
+
+@dynamicMemberLookup
+struct MethodAndInitializerLens<T> {
+  var value: T
+  var type: T.Type
+
+  subscript<U>(dynamicMember member: KeyPath<T, U>) -> U {
+      return value[keyPath: member]
+  }
+
+  subscript<U>(dynamicMember member: (T) -> () -> U) -> () -> U {
+      return { member(self.value)() }
+  }
+
+  subscript<U>(dynamicMember member: (T.Type) -> () -> U) -> () -> U {
+      return { member(self.type)() }
+  }
+}
+
+func test_method_and_init_lens() {
+  let instance = MethodAndInitializerTest(value: 10)
+  let methodLens = MethodAndInitializerLens(value: instance, type: MethodAndInitializerTest.self)
+
+  let _ = methodLens[dynamicMember: MethodAndInitializerTest.instanceMethod]()
+
+  let staticMethodClosure = methodLens[dynamicMember: { $0.staticMethod }]
+  let _ = staticMethodClosure()
+
+  let initializer = MethodAndInitializerTest.init
+  let _ = MethodAndInitializerLens(value: initializer(20), type: MethodAndInitializerTest.self)
+}
+
 @dynamicMemberLookup
 class A<T> {
   var value: T
@@ -484,6 +523,19 @@ class A<T> {
   }
 
   subscript<U>(dynamicMember member: KeyPath<T, U>) -> U {
+    get { return value[keyPath: member] }
+  }
+}
+
+@dynamicMemberLookup
+class AMetatype<T> {
+  var value: T.Type
+
+  init(_ v: T.Type) {
+    self.value = v
+  }
+
+  subscript<U>(dynamicMember member: KeyPath<T.Type, U>) -> U {
     get { return value[keyPath: member] }
   }
 }
@@ -668,8 +720,8 @@ func test_chain_of_recursive_lookups(_ lens: Lens<Lens<Lens<Point>>>) {
   _ = \Lens<Lens<Point>>.obj.x
 }
 
-// KeyPath Dynamic Member Lookup can't refer to methods, mutating setters and static members
-// because of the KeyPath limitations
+// KeyPath Dynamic Member Lookup can't refer mutating setters because of the
+// KeyPath limitations
 func invalid_refs_through_dynamic_lookup() {
   struct S {
     static var foo: Int = 42
@@ -683,9 +735,14 @@ func invalid_refs_through_dynamic_lookup() {
 
   func test(_ lens: A<S>) {
     _ = lens.foo           // expected-error {{static member 'foo' cannot be used on instance of type 'S'}}
-    _ = lens.bar()         // expected-error {{dynamic key path member lookup cannot refer to instance method 'bar()'}}
-    _ = lens.bar().faz + 1 // expected-error {{dynamic key path member lookup cannot refer to instance method 'bar()'}}
-    _ = lens.baz("hello")  // expected-error {{dynamic key path member lookup cannot refer to static method 'baz'}}
+    _ = lens.bar()
+    _ = lens.bar().faz + 1 
+    _ = lens.baz("hello")  // expected-error {{static member 'baz' cannot be used on instance of type 'S'}}
+  }
+  
+  func testStatic(_ lens: AMetatype<S>) {
+    _ = lens.foo
+    _ = lens.baz("hello")
   }
 }
 
