@@ -69,6 +69,11 @@ void doSomethingConcurrently(__attribute__((noescape)) void SWIFT_SENDABLE (^blo
 -(void)computeWithCompletionHandler: (void (^)(void)) handler;
 @end
 
+@interface Shadowing : NSObject
+-(void)computeWithCompletion: (void (^)(void)) completion;
+-(void)updateWithCompletionHandler: (void (^_Nullable)(void)) handler;
+@end
+
 #pragma clang assume_nonnull end
 
 //--- main.swift
@@ -164,4 +169,17 @@ class TestConformanceWithoutStripping : InnerSendableTypes {
 
   @objc func compute(completionHandler: @escaping () -> Void) {}
   // expected-warning@-1 {{sendability of function types in instance method 'compute(completionHandler:)' of type '(@escaping () -> Void) -> ()' does not match type '(@escaping @Sendable () -> Void) -> Void' declared by the header}}
+}
+
+// Methods deliberately has no `@Sendable` to make sure that
+// shadowing rules are preserved when SendableCompletionHandlers feature is enabled.
+@objc extension Shadowing {
+  @objc func compute(completion: @escaping () -> Void) {}
+
+  @objc func update(completionHandler: (() -> Void)? = nil) {}
+
+  func testCompute() {
+    self.compute { } // Ok - no ambiguity
+    self.update { }  // Ok - no ambiguity
+  }
 }
