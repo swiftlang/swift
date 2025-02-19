@@ -56,7 +56,7 @@ func testF4(a: Int, b: Int, c: Double, d: Double) {
 
   let _: (Int, Int) -> Int = f4
   let _: (Double, Double) -> Double = f4
-  
+
   let _: (_ x: Int, _ y: Int) -> Int = f4
   let _: (_ x: Double, _ y: Double) -> Double = f4
 }

@@ -11,7 +11,7 @@
 
 public class BaseClass {
   var field: Int64
-    
+
   init() {
     field = 0
     print("init BaseClass")

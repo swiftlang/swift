@@ -126,7 +126,7 @@ private:
 
   /// External context struct used by \see ownershipRAUWHelper.
   OwnershipFixupContext ownershipFixupContext;
-  
+
   /// For invoking Swift instruction passes.
   SwiftPassInvocation swiftPassInvocation;
 
@@ -291,14 +291,14 @@ public:
   visitCheckedCastBranchInst(CheckedCastBranchInst *CBI);
   SILInstruction *visitUnreachableInst(UnreachableInst *UI);
   SILInstruction *visitAllocRefDynamicInst(AllocRefDynamicInst *ARDI);
-      
+
   SILInstruction *visitMarkDependenceInst(MarkDependenceInst *MDI);
   SILInstruction *visitConvertFunctionInst(ConvertFunctionInst *CFI);
   SILInstruction *
   visitConvertEscapeToNoEscapeInst(ConvertEscapeToNoEscapeInst *Cvt);
   SILInstruction *
   visitDifferentiableFunctionExtractInst(DifferentiableFunctionExtractInst *DFEI);
-  
+
   SILInstruction *visitPackLengthInst(PackLengthInst *PLI);
   SILInstruction *visitPackElementGetInst(PackElementGetInst *PEGI);
   SILInstruction *visitTuplePackElementAddrInst(TuplePackElementAddrInst *TPEAI);
@@ -444,7 +444,7 @@ private:
   bool hasOwnership() const {
     return Builder.hasOwnership();
   }
-  
+
   void runSwiftInstructionPass(SILInstruction *inst,
                                void (*runFunction)(BridgedInstructionPassCtxt));
 

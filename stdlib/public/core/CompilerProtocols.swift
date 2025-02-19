@@ -255,7 +255,7 @@ public protocol CaseIterable {
   /// A type that can represent a collection of all values of this type.
   associatedtype AllCases: Collection = [Self]
     where AllCases.Element == Self
-  
+
   /// A collection of all values of this type.
   static var allCases: AllCases { get }
 }
@@ -346,7 +346,7 @@ public protocol ExpressibleByFloatLiteral {
   /// Valid types for `FloatLiteralType` are `Float`, `Double`, and `Float80`
   /// where available.
   associatedtype FloatLiteralType: _ExpressibleByBuiltinFloatLiteral
-  
+
   /// Creates an instance initialized to the specified floating-point value.
   ///
   /// Do not call this initializer directly. Instead, initialize a variable or
@@ -469,7 +469,7 @@ public protocol ExpressibleByExtendedGraphemeClusterLiteral
   /// `String`, and `StaticString`.
   associatedtype ExtendedGraphemeClusterLiteralType
     : _ExpressibleByBuiltinExtendedGraphemeClusterLiteral
-  
+
   /// Creates an instance initialized to the given value.
   ///
   /// - Parameter value: The value of the new instance.
@@ -509,12 +509,12 @@ public protocol _ExpressibleByBuiltinStringLiteral
 /// implement the required initializer.
 public protocol ExpressibleByStringLiteral
   : ExpressibleByExtendedGraphemeClusterLiteral {
-  
+
   /// A type that represents a string literal.
   ///
   /// Valid types for `StringLiteralType` are `String` and `StaticString`.
   associatedtype StringLiteralType: _ExpressibleByBuiltinStringLiteral
-  
+
   /// Creates an instance initialized to the given string value.
   ///
   /// - Parameter value: The value of the new instance.
@@ -764,7 +764,7 @@ public protocol ExpressibleByDictionaryLiteral {
 /// For more information, see the `StringInterpolationProtocol` documentation.
 public protocol ExpressibleByStringInterpolation
   : ExpressibleByStringLiteral {
-  
+
 #if !$Embedded
   /// The type each segment of a string literal containing interpolations
   /// should be appended to.
@@ -794,7 +794,7 @@ public protocol ExpressibleByStringInterpolation
 
 extension ExpressibleByStringInterpolation
   where StringInterpolation == DefaultStringInterpolation {
-  
+
   /// Creates a new instance from an interpolated string literal.
   /// 
   /// Don't call this initializer directly. It's used by the compiler when

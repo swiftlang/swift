@@ -29,7 +29,7 @@ internal struct _ArrayBody {
   ) {
     _internalInvariant(count >= 0)
     _internalInvariant(capacity >= 0)
-    
+
     _storage = _SwiftArrayBodyStorage(
       count: count,
       _capacityAndFlags:
@@ -45,7 +45,7 @@ internal struct _ArrayBody {
   internal init() {
     _storage = _SwiftArrayBodyStorage(count: 0, _capacityAndFlags: 0)
   }
-  
+
   /// The number of elements stored in this Array.
   @inlinable
   internal var count: Int {

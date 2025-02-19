@@ -123,7 +123,7 @@ func testSwitchEnumBoolTuple(_ b1: Bool, b2: Bool, xi: Int) -> Int {
   case (false, false):
     x -= 1
   }
-  
+
   return x
 }
 

@@ -303,7 +303,7 @@ public:
 
     /// True if this shouldn't be serialized.
     NotSerialized = 1ull << (unsigned(DeclKindIndex::Last_Decl) + 4),
-    
+
     /// True if this attribute is only valid when parsing a .sil file.
     SILOnly = 1ull << (unsigned(DeclKindIndex::Last_Decl) + 5),
 
@@ -662,7 +662,7 @@ public:
   }
 
   unsigned getValue() const { return Bits.AlignmentAttr.Value; }
-  
+
   static bool classof(const DeclAttribute *DA) {
     return DA->getKind() == DeclAttrKind::Alignment;
   }
@@ -692,7 +692,7 @@ public:
 
   // The base class's name.
   const Identifier BaseClassName;
-  
+
   static bool classof(const DeclAttribute *DA) {
     return DA->getKind() == DeclAttrKind::SwiftNativeObjCRuntimeBase;
   }
@@ -1405,7 +1405,7 @@ public:
     assert(getKind() == EffectsKind::Custom);
     return customString;
   }
-  
+
   SourceLoc getCustomStringLocation() const {
     return customStringLoc;
   }
@@ -2812,7 +2812,7 @@ public:
       return nullptr;
     return LikeType;
   }
-  
+
   /// Return the type whose array layout the attribute type should get its
   /// layout from, along with the size of that array. Returns None if the
   /// attribute specifies scalar or manual layout.

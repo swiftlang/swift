@@ -439,7 +439,7 @@ public:
     swift::writeEscaped(Str, OS);
     OS << '\"';
   }
-  
+
   void visitUID(StringRef UID) {
     OSColor(OS, UIDColor) << UID;
   }

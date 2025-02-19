@@ -205,13 +205,13 @@ usesDefaultDefinition(AssociatedTypeDecl *requirement) const {
 bool ProtocolConformance::isRetroactive() const {
   auto extensionModule = getDeclContext()->getParentModule();
   auto protocolModule = getProtocol()->getParentModule();
-  
+
   auto isSameRetroactiveContext = 
     [](ModuleDecl *moduleA, ModuleDecl *moduleB) -> bool {
       return moduleA->isSameModuleLookingThroughOverlays(moduleB) ||
         moduleA->inSamePackage(moduleB);
     };
-  
+
   if (isSameRetroactiveContext(extensionModule, protocolModule)) {
     return false;
   }

@@ -90,7 +90,7 @@ extension ReversedCollection.Iterator: Sendable
 
 extension ReversedCollection.Iterator: IteratorProtocol, Sequence {
   public typealias Element = Base.Element
-  
+
   @inlinable
   @inline(__always)
   public mutating func next() -> Element? {

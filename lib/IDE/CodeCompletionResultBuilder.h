@@ -36,7 +36,7 @@ class CodeCompletionStringPrinter;
 
 class CodeCompletionResultBuilder {
   friend CodeCompletionStringPrinter;
-  
+
   CodeCompletionResultSink &Sink;
   CodeCompletionResultKind Kind;
   SemanticContextKind SemanticContext;

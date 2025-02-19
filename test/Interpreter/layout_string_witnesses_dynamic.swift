@@ -30,7 +30,7 @@ class TestClass {
 
 func testGeneric() {
     let ptr = allocateInternalGenericPtr(of: TestClass.self)
-    
+
     do {
         let x = TestClass()
         testGenericInit(ptr, to: x)

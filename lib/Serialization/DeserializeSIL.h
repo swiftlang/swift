@@ -27,7 +27,7 @@ namespace llvm {
 namespace swift {
   class SILDeserializer {
     using TypeID = serialization::TypeID;
-    
+
     ModuleFile *MF;
     SILModule &SILMod;
     DeserializationNotificationHandlerSet *Callback;

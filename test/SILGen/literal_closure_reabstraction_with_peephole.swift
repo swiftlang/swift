@@ -7,7 +7,7 @@ func crash1() {
     let closure2: Closure? = nil
     let closure3: Closure? = nil
     print("Closures: \(String(describing: closure1)), \(String(describing: closure2)), \(String(describing: closure3))")
-   
+
     let closure = closure1 ?? closure2 ?? closure3
 
     print("\(#line): \(String(describing: closure))")

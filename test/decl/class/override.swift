@@ -228,7 +228,7 @@ class IUOTestSubclass2 : IUOTestBaseClass {
   override func oneC(_: AnyObject!) {} // expected-warning {{overriding instance method parameter of type 'AnyObject' with implicitly unwrapped optional type 'AnyObject?'}}
   // expected-note@-1 {{remove '!' to make the parameter required}} {{34-35=}}
   // expected-note@-2 {{add parentheses to silence this warning}} {{25-25=(}} {{35-35=)}}
-  
+
 }
 
 class IUOTestSubclassOkay : IUOTestBaseClass {

@@ -1382,7 +1382,7 @@ struct AmbiguousCallInResultBuilder {
 
   func ttroke(_ content: Int, style: String) -> Int { 41 }
   func ttroke(_ content: Int, lineWidth: Int = 1) -> Int { 42 }
-  
+
   @MyResultBuilder var body: Int {
     self.ttroke(1, #^AMBIGUOUS_IN_RESULT_BUILDER^#)
 // AMBIGUOUS_IN_RESULT_BUILDER: Begin completions, 2 items
@@ -1398,7 +1398,7 @@ struct AtStartOfFunctionCallWithExistingParams {
     // AT_START_OF_CALL_NO_EXISTING_ARGUMENTS: Begin completions, 2 items
     // AT_START_OF_CALL_NO_EXISTING_ARGUMENTS-DAG: Decl[InstanceMethod]/CurrNominal/Flair[ArgLabels]: ['(']{#b: Int#}[')'][#Void#]; name=b:
     // AT_START_OF_CALL_NO_EXISTING_ARGUMENTS-DAG: Decl[InstanceMethod]/CurrNominal/Flair[ArgLabels]: ['(']{#a: Int#}, {#b: Int#}, {#c: Int#}[')'][#Void#]; name=a:b:c:
-    
+
     self.foo(#^AT_START_OF_CALL_ONE_EXISTING_ARGUMENT^# b: 1)
     self.foo(#^AT_START_OF_CALL_ONE_EXISTING_ARGUMENT_NO_SPACE?check=AT_START_OF_CALL_ONE_EXISTING_ARGUMENT^#b: 1)
     self.foo(#^AT_START_OF_CALL_TWO_EXISTING_ARGUMENTS?check=AT_START_OF_CALL_ONE_EXISTING_ARGUMENT^# b: 1, c: 2)

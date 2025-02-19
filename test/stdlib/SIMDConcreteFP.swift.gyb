@@ -62,7 +62,7 @@ ${Scalar}x${n}_TestSuite.test("comparisons") {
   expectTrue(all(a .<= ap1))
   expectFalse(any(a .> ap1))
   expectFalse(any(a .>= ap1))
-  
+
   let b = a.replacing(
     with: ${Vector}.random(in: -1 ..< 1),
     where: .random()

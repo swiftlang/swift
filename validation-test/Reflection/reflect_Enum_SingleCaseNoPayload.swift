@@ -25,7 +25,7 @@ class ClassWithSingleCaseNoPayloadEnum {
   var e3: SingleCaseNoPayloadEnum? = .`default`
   var e4: SingleCaseNoPayloadEnum??
   let marker = Marker()
-	
+
 }
 
 reflect(object: ClassWithSingleCaseNoPayloadEnum())

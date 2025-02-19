@@ -1,7 +1,7 @@
 public protocol OriginalGetter {
   associatedtype Index
   associatedtype Element
-  
+
   subscript (index: Index) -> Element { get }
 }
 

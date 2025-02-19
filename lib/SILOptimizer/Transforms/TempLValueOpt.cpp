@@ -115,7 +115,7 @@ static SingleValueInstruction *isMovableProjection(SILValue addr) {
     return enumData;
   if (auto *existentialAddr = dyn_cast<InitExistentialAddrInst>(addr))
     return existentialAddr;
-    
+
   if (SingleValueInstruction *svi = Projection::isAddressProjection(addr)) {
     if (svi->getNumOperands() == 1)
       return svi;
@@ -216,7 +216,7 @@ void TempLValueOptPass::tempLValueOpt(CopyAddrInst *copyInst) {
       // destination (it would break the def-use dominance rule).
       if (inst == destRootInst)
         return;
-        
+
       if (!AA)
         AA = PM->getAnalysis<AliasAnalysis>(getFunction());
 

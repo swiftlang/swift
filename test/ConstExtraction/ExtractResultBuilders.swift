@@ -57,7 +57,7 @@ public enum FooBuilder {
     public static func buildBlock(_ components: Component...) -> Component {
         return components.flatMap { $0 }
     }
-    
+
     public static func buildLimitedAvailability(_ component: Component) -> Component {
         return component
     }

@@ -238,15 +238,15 @@ func testit() {
   print(functionArray()[0](100) + functionArray()[1](100) + functionArray()[2](100))
   // CHECK-OUTPUT-NEXT: 27
   print(FStr.globalFunc(27))
-  
+
   let tuples = arrayOfTuples()
   // CHECK-OUTPUT-NEXT: tuples [(1, false), (2, true), (3, false)]
   print("tuples \(tuples)")
-  
+
   let dict = returnDictionary()
   // CHECK-OUTPUT-NEXT: dict 3: 2, 4, 6
   print("dict \(dict.count): \(dict[1]!), \(dict[3]!), \(dict[5]!)")
-  
+
   let sdict = returnStringDictionary()
   // CHECK-OUTPUT-NEXT: sdict 3: 2, 4, 6
   print("sdict \(sdict.count): \(sdict["1"]!), \(sdict["3"]!), \(sdict["5"]!)")

@@ -120,7 +120,7 @@ struct DenseMapInfo<swift::GenericParamKey> {
            a.Index == b.Index;
   }
 };
-  
+
 } // end namespace llvm
 
 #endif // SWIFT_AST_GENERICPARAMKEY_H

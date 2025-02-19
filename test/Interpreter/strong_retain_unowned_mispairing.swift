@@ -22,7 +22,7 @@ public class Binding: P {
 
   public init() {
     helper = Helper(o: self)
-    
+
     // Listen to model changes
     takeEscaping { [unowned self] (value: String) in
       self.update()

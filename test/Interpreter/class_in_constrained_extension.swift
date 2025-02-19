@@ -5,7 +5,7 @@ class Foo {}
 
 extension Array where Element == Foo {
   class Bar { var foo = Foo() }
-  
+
   init(withAThing: String) {
     self = [Bar(), Bar(), Bar()].map { $0.foo }
   }

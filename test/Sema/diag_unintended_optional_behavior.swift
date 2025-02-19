@@ -214,11 +214,11 @@ func warnOptionalInStringInterpolationSegment(_ o : Int?) {
 
   print("Always some, Always some, Always some: \(o as Int?)") // No warning
   print("Always some, Always some, Always some: \(o.debugDescription)") // No warning.
-  
+
   let oST = Optional(SpecialType())
   let ooST = Optional(oST)
   print("Always some, Always some, Always some: \(oST)") // No warning.
-  
+
   print("Always some, Always some, Always some: \(ooST)")
   // expected-warning@-1 {{string interpolation produces a debug description for an optional value; did you mean to make this explicit?}}
   // expected-note@-2 {{use 'String(describing:)' to silence this warning}} {{51-51=String(describing: }} {{55-55=)}} 

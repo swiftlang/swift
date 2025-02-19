@@ -91,7 +91,7 @@ class NonObjC {}
   @IBOutlet var outlet27: P1.Type! // expected-error{{@IBOutlet property cannot have non-object type}} {{3-13=}}
   @IBOutlet var outlet28: CP1.Type! // expected-error{{@IBOutlet property cannot have non-object type}} {{3-13=}}
   @IBOutlet var outlet29: OP1.Type! // expected-error{{@IBOutlet property cannot have non-object type}} {{3-13=}}
-  
+
   // String
   @IBOutlet var outlet33: String?
   @IBOutlet var outlet34: String!
@@ -153,7 +153,7 @@ class NonObjC {}
    _ = outlet1
    _ = outlet2
   }
-  
+
   // This outlet is strong and optional.
   @IBOutlet var outlet4: AnyObject?
 

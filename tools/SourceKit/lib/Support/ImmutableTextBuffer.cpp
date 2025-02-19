@@ -104,7 +104,7 @@ bool ImmutableTextSnapshot::precedesOrSame(ImmutableTextSnapshotRef Other) {
 bool ImmutableTextSnapshot::foreachReplaceUntil(
     ImmutableTextSnapshotRef EndSnapshot,
     std::function<bool(ReplaceImmutableTextUpdateRef Upd)> Fn) {
-  
+
   assert(EndSnapshot);
   ImmutableTextUpdateRef Upd = DiffEnd;
 

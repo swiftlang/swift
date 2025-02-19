@@ -414,7 +414,7 @@ public func useInitializers() -> StructWithPublicAndInternalAndPrivateLetPropert
 
 struct RACStruct {
     private let end = 27
-    
+
     var startIndex: Int { return 0 }
 
 
@@ -429,7 +429,7 @@ struct RACStruct {
     // CHECK: struct_extract %0 : $RACStruct, #RACStruct.end
     // CHECK-LABEL: } // end sil function '${{.*}}9RACStructV8endIndexSivg'
     var endIndex: Int { return end }
-    
+
     subscript(_ bitIndex: Int) -> Bool {
         get { return false }
         set { }

@@ -8,7 +8,7 @@
 public protocol Proto {
   func method<T>(_: T?)
 }
-  
+
 extension Proto {
   public func method<T>(_: T?) {}
 }

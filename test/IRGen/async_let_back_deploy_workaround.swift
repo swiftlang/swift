@@ -3,7 +3,7 @@
 
 // REQUIRES: OS=macosx
 // UNSUPPORTED: CPU=arm64e
- 
+
 // rdar://90506708: Prior to Swift 5.7, the Swift concurrency runtime had a bug
 // that led to memory corruption in cases when an `async let` child task
 // would try to use the last 16 bytes of the preallocated slab from the parent

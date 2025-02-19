@@ -9,7 +9,7 @@ protocol B {
   associatedtype Value
 
   var value: Value { get }
-  
+
   subscript<Subject>(dynamicMember dynamicMember: WritableKeyPath<Value, Subject>) -> Value { get }
 }
 

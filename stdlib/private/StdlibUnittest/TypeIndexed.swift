@@ -36,7 +36,7 @@ public class TypeIndexed<Value> : Resettable {
     self.defaultValue = value
     _allResettables.append(self)
   }
-  
+
   public subscript(t: Any.Type) -> Value {
     get {
       return byType[TypeIdentifier(t)] ?? defaultValue

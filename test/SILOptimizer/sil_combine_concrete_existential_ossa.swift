@@ -125,7 +125,7 @@ public protocol Q {}
 extension P where Self : Q {
   public func witnessComposition() {}
 }
-  
+
 public class C_PQ: P & Q {}
 
 // testExtensionProtocolComposition(c:)

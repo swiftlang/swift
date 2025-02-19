@@ -17,7 +17,7 @@ struct Example {
   protocol Proto {
     var count: Int { borrowing get }
   }
-  
+
   func takeProto(_ p: borrowing some Proto) -> Int {
     p.count
   }

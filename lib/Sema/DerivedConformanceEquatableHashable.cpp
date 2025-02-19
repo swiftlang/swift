@@ -496,7 +496,7 @@ static CallExpr *createHasherCombineCall(ASTContext &C,
   // hasher.combine(_:)
   auto *combineCall = UnresolvedDotExpr::createImplicit(
       C, hasherExpr, C.Id_combine, {Identifier()});
-  
+
   // hasher.combine(hashable)
   auto *argList = ArgumentList::forImplicitUnlabeled(C, {hashable});
   return CallExpr::createImplicit(C, combineCall, argList);
@@ -981,7 +981,7 @@ ValueDecl *DerivedConformance::deriveHashable(ValueDecl *requirement) {
     if (hashValueDecl->isImplicit()) {
       // Neither hashValue nor hash(into:) is explicitly defined; we need to do
       // a full Hashable derivation.
-      
+
       // Refuse to synthesize Hashable if type isn't a struct or enum, or if it
       // has non-Hashable stored properties/associated values.
       auto hashableProto = Context.getProtocol(KnownProtocolKind::Hashable);

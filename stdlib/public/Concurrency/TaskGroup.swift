@@ -1311,7 +1311,7 @@ extension ThrowingTaskGroup: AsyncSequence {
         throw error as! Failure
       }
     }
-    
+
     public mutating func cancel() {
       finished = true
       group.cancelAll()

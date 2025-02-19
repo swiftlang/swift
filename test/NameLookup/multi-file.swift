@@ -12,7 +12,7 @@ func test() {
   var _: Int = funcOrVar // expected-error{{cannot convert value of type '() -> ()' to specified type 'Int'}}
 
   _ = SomeStruct(value: 42) // use the local SomeStruct
-  
+
   var _: Bool = 1 + 2 ~~ 3 + 4 // (1 + 2) ~~ (3 + 4)
 }
 

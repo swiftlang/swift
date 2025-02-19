@@ -27,7 +27,7 @@ func test(s: String, answer: Int) {
 
   let r1 = f1("hello")
   let _: B = r1
-  
+
   let r2a = f2("hello")
   let _: B = r2a
   let r2b = f2("the answer is \(answer)")

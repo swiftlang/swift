@@ -393,7 +393,7 @@ ErrorHandlingTests.test("ErrorHandling/sorted") {
     }
   }
 }
- 
+
 ErrorHandlingTests.test("ErrorHandling/sort") {
   let collection = Array(1...5)
   forAllPermutations(collection) { sequence in
@@ -413,7 +413,7 @@ ErrorHandlingTests.test("ErrorHandling/sort") {
     }
   }
 }
- 
+
 ErrorHandlingTests.test("ErrorHandling/sorted") {
   let collection = Array(1...5)
   forAllPermutations(collection) { sequence in
@@ -443,5 +443,5 @@ ErrorHandlingTests.test("ErrorHandling/sorted") {
     }
   }
 }
- 
+
 runAllTests()

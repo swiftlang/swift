@@ -469,7 +469,7 @@ getOrSynthesizeTangentVectorStruct(DerivedConformance &derived, Identifier id) {
   // If nominal type is `@frozen`, also mark `TangentVector` struct.
   if (nominal->getAttrs().hasAttribute<FrozenAttr>())
     structDecl->getAttrs().add(new (C) FrozenAttr(/*implicit*/ true));
-  
+
   // Add `typealias TangentVector = Self` so that the `TangentVector` itself
   // won't need its own conformance derivation.
   auto *tangentEqualsSelfAlias = new (C) TypeAliasDecl(

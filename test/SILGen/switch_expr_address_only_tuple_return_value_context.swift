@@ -27,7 +27,7 @@ func nothrowStr() -> String { fatalError() }
 
 func maybeThrowDuringSingleExprSwitchResult(condition: Bool) throws
     -> (BigNontrivialThing?, String) {
-    
+
     switch (condition, condition) {
     case (false, false):
         (nothrowBNT(), nothrowStr())

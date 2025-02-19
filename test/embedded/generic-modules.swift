@@ -24,7 +24,7 @@ extension MyContainer: Collection {
     typealias Index = Int
     var startIndex: Index { fatalError() }
     var endIndex: Index { fatalError() }
-    
+
     subscript(_ index: Index) -> UInt8 {
         get {
             fatalError()
@@ -33,7 +33,7 @@ extension MyContainer: Collection {
             fatalError()
         }
     }
-    
+
     func index(after i: Int) -> Int {
         fatalError()
     }

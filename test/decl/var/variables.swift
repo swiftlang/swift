@@ -105,7 +105,7 @@ let uselessValue : String?
 func tuplePatternDestructuring(_ x : Int, y : Int) {
   let (b: _, a: h) = (b: x, a: y)
   _ = h
-  
+
   // <rdar://problem/20392122> Destructuring tuple with labels doesn't work
   let (i, j) = (b: x, a: y)
   _ = i+j

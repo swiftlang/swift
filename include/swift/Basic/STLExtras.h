@@ -564,7 +564,7 @@ public:
   DowncastFilterRange(Range range) 
     : Inherited(range, DowncastAsOptional<Subclass>()) { }
 };
-              
+
 template<typename Subclass, typename Range>
 DowncastFilterRange<Subclass, Range>
 makeDowncastFilterRange(Range range) {
@@ -695,7 +695,7 @@ public:
     return !(left == right);
   }
 };
-  
+
 /// Cast a pointer to \c U  to a pointer to a supertype \c T.
 /// Example:  Wobulator *w = up_cast<Wobulator>(coloredWobulator)
 /// Useful with ?: where each arm is a different subtype.

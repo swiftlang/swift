@@ -77,7 +77,7 @@ protected:
 
   bool shouldStoreInvocationInDebugInfo() const override;
   std::string getGlobalDebugPathRemapping() const override;
-  
+
   /// Retrieve the target SDK version for the given target triple.
   std::optional<llvm::VersionTuple>
   getTargetSDKVersion(const llvm::Triple &triple) const;

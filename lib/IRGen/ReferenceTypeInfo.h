@@ -24,7 +24,7 @@ namespace swift {
 namespace irgen {
 
 class TypeConverter;
-  
+
 /// An abstract class designed for use when implementing a type
 /// that has reference semantics.
 class ReferenceTypeInfo : public LoadableTypeInfo {

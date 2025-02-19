@@ -359,14 +359,14 @@ extension Y {
   func with2(_ body: () -> ()) {
     body()
   }
-  
+
   func with1(_ body: (Int) -> (Int)) -> Int {
     with2 {
       _ = body(48)
     }
     return 777
   }
-  
+
   func Xsort() -> Int {
     with1 { i in
       i

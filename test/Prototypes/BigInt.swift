@@ -1101,7 +1101,7 @@ public struct _BigInt<Word: FixedWidthInteger & UnsignedInteger> :
     }
 
     let wordWidth = RHS(Word.bitWidth)
-    
+
     // We can add `rhs / bits` extra words full of zero at the low end.
     let extraWords = Int(rhs / wordWidth)
     lhs._data.reserveCapacity(lhs._data.count + extraWords + 1)
@@ -1299,7 +1299,7 @@ struct Bit : FixedWidthInteger, UnsignedInteger {
     let mask: UInt8 = ~0 << 1
     return v & mask != 0
   }
-  
+
   func addingReportingOverflow(_ rhs: Bit) ->
     (partialValue: Bit, overflow: Bool) {
       let result = value &+ rhs.value
@@ -1485,7 +1485,7 @@ BitTests.test("Basics") {
 
   expectEqual(x, x + y)
   expectGT(x, x &+ x)
-  
+
   expectEqual(1, x.nonzeroBitCount)
   expectEqual(0, y.nonzeroBitCount)
 

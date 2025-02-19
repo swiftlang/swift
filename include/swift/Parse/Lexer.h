@@ -110,7 +110,7 @@ class Lexer {
   const char *CurPtr;
 
   Token NextToken;
-  
+
   /// The kind of source we're lexing. This either enables special behavior for
   /// module interfaces, or enables things like the 'sil' keyword if lexing
   /// a .sil file.
@@ -407,7 +407,7 @@ public:
   SourceLoc getLocForStartOfBuffer() const {
     return SourceLoc(llvm::SMLoc::getFromPointer(BufferStart));
   }
-  
+
   /// StringSegment - A segment of a (potentially interpolated) string.
   struct StringSegment {
     enum : char { Literal, Expr } Kind;
@@ -430,7 +430,7 @@ public:
       Result.CustomDelimiterLen = CustomDelimiterLen;
       return Result;
     }
-    
+
     static StringSegment getExpr(SourceLoc Loc, unsigned Length) {
       StringSegment Result;
       Result.Kind = Expr;
@@ -567,7 +567,7 @@ private:
 
   void lexImpl();
   InFlightDiagnostic diagnose(const char *Loc, Diagnostic Diag);
-  
+
   template<typename ...DiagArgTypes, typename ...ArgTypes>
   InFlightDiagnostic diagnose(const char *Loc, Diag<DiagArgTypes...> DiagID,
                               ArgTypes &&...Args) {

@@ -9,7 +9,7 @@ var OptionSetTests = TestSuite("OptionSetTests")
 
 struct Days: OptionSet {
   let rawValue: Int
-  
+
   static let sunday = Days(rawValue: 1 << 0)
   static let monday = Days(rawValue: 1 << 1)
   static let tuesday = Days(rawValue: 1 << 2)
@@ -23,23 +23,23 @@ struct Days: OptionSet {
 
 OptionSetTests.test("RawValue.SingleOption") {
   let s = Days.friday
-  
+
   expectEqual(32, s.rawValue)
 }
 
 OptionSetTests.test("RawValue.MultipleOptions") {
   let s: Days = [.monday, .tuesday, .wednesday, .thursday, .friday]
-  
+
   expectEqual(62, s.rawValue)
 }
 
 OptionSetTests.test("RawValue.EmptySet") {
   var s: Days = []
-  
+
   expectEqual(0, s.rawValue)
-  
+
   s.insert(.monday)
-  
+
   expectEqual(2, s.rawValue)
 }
 
@@ -47,23 +47,23 @@ OptionSetTests.test("RawValue.EmptySet") {
 
 OptionSetTests.test("IsEmpty.SingleOption") {
   let s = Days.friday
-  
+
   expectFalse(s.isEmpty)
 }
 
 OptionSetTests.test("IsEmpty.MultipleOptions") {
   let s: Days = [.monday, .tuesday, .wednesday, .thursday, .friday]
-  
+
   expectFalse(s.isEmpty)
 }
 
 OptionSetTests.test("IsEmpty.EmptySet") {
   var s: Days = []
-  
+
   expectTrue(s.isEmpty)
-  
+
   s.insert(.monday)
-  
+
   expectFalse(s.isEmpty)
 }
 
@@ -100,7 +100,7 @@ OptionSetTests.test("==.EmptySet") {
 
 OptionSetTests.test("Contains.SingleOption") {
   let s = Days.friday
-  
+
   expectFalse(s.contains(.sunday))
   expectFalse(s.contains(.monday))
   expectFalse(s.contains(.tuesday))
@@ -112,7 +112,7 @@ OptionSetTests.test("Contains.SingleOption") {
 
 OptionSetTests.test("Contains.MultipleOptions") {
   let s: Days = [.monday, .tuesday, .wednesday, .thursday, .friday]
-  
+
   expectFalse(s.contains(.sunday))
   expectTrue(s.contains(.monday))
   expectTrue(s.contains(.tuesday))
@@ -124,7 +124,7 @@ OptionSetTests.test("Contains.MultipleOptions") {
 
 OptionSetTests.test("Contains.EmptySet") {
   let s: Days = []
-  
+
   expectFalse(s.contains(.sunday))
   expectFalse(s.contains(.monday))
   expectFalse(s.contains(.tuesday))
@@ -140,9 +140,9 @@ OptionSetTests.test("FormIntersection.SingleOption") {
   do {
     var s1 = Days.monday
     let s2: Days = [.monday, .tuesday, .wednesday]
-  
+
     s1.formIntersection(s2)
-    
+
     expectTrue(s1.contains(.monday))
     expectFalse(s1.contains(.tuesday))
     expectFalse(s1.contains(.sunday))
@@ -150,9 +150,9 @@ OptionSetTests.test("FormIntersection.SingleOption") {
   do {
     var s1 = Days.monday
     let s2: Days = [.tuesday, .wednesday, .friday]
-  
+
     s1.formIntersection(s2)
-    
+
     expectFalse(s1.contains(.monday))
     expectFalse(s1.contains(.tuesday))
     expectFalse(s1.contains(.sunday))
@@ -163,9 +163,9 @@ OptionSetTests.test("FormIntersection.MultipleOptions") {
   do {
     var s1: Days = [.monday, .tuesday, .wednesday]
     let s2: Days = [.wednesday, .thursday, .friday]
-  
+
     s1.formIntersection(s2)
-    
+
     expectTrue(s1.contains(.wednesday))
     expectFalse(s1.contains(.tuesday))
     expectFalse(s1.contains(.sunday))
@@ -173,9 +173,9 @@ OptionSetTests.test("FormIntersection.MultipleOptions") {
   do {
     var s1: Days = [.monday, .tuesday, .wednesday]
     let s2: Days = [.thursday, .friday, .saturday]
-  
+
     s1.formIntersection(s2)
-    
+
     expectFalse(s1.contains(.wednesday))
     expectFalse(s1.contains(.thursday))
     expectFalse(s1.contains(.sunday))
@@ -187,7 +187,7 @@ OptionSetTests.test("FormIntersection.EmptySet") {
   let s2: Days = [.monday, .tuesday, .wednesday]
 
   s1.formIntersection(s2)
-  
+
   expectFalse(s1.contains(.wednesday))
   expectFalse(s1.contains(.thursday))
 }
@@ -198,7 +198,7 @@ OptionSetTests.test("FormSymmetricDifference.SingleOption") {
   do {
     var s1 = Days.monday
     let s2: Days = [.monday, .tuesday, .wednesday]
-  
+
     s1.formSymmetricDifference(s2)
 
     expectTrue(s1.contains(.tuesday))
@@ -208,9 +208,9 @@ OptionSetTests.test("FormSymmetricDifference.SingleOption") {
   do {
     var s1 = Days.monday
     let s2: Days = [.tuesday, .wednesday, .friday]
-  
+
     s1.formSymmetricDifference(s2)
-    
+
     expectTrue(s1.contains(.monday))
     expectTrue(s1.contains(.tuesday))
     expectFalse(s1.contains(.sunday))
@@ -221,7 +221,7 @@ OptionSetTests.test("FormSymmetricDifference.MultipleOptions") {
   do {
     var s1: Days = [.monday, .tuesday, .wednesday]
     let s2: Days = [.wednesday, .thursday, .friday]
-  
+
     s1.formSymmetricDifference(s2)
 
     expectTrue(s1.contains(.tuesday))
@@ -231,7 +231,7 @@ OptionSetTests.test("FormSymmetricDifference.MultipleOptions") {
   do {
     var s1: Days = [.monday, .tuesday, .wednesday]
     let s2: Days = [.thursday, .friday, .saturday]
-  
+
     s1.formSymmetricDifference(s2)
     expectTrue(s1.contains(.wednesday))
     expectTrue(s1.contains(.thursday))
@@ -254,7 +254,7 @@ OptionSetTests.test("FormUnion.SingleOption") {
   do {
     var s1 = Days.monday
     let s2: Days = [.monday, .tuesday, .wednesday]
-  
+
     s1.formUnion(s2)
     expectTrue(s1.contains(.monday))
     expectTrue(s1.contains(.tuesday))
@@ -263,7 +263,7 @@ OptionSetTests.test("FormUnion.SingleOption") {
   do {
     var s1 = Days.monday
     let s2: Days = [.tuesday, .wednesday, .friday]
-  
+
     s1.formUnion(s2)
     expectTrue(s1.contains(.monday))
     expectTrue(s1.contains(.tuesday))
@@ -275,7 +275,7 @@ OptionSetTests.test("FormUnion.MultipleOptions") {
   do {
     var s1: Days = [.monday, .tuesday, .wednesday]
     let s2: Days = [.wednesday, .thursday, .friday]
-  
+
     s1.formUnion(s2)
     expectTrue(s1.contains(.wednesday))
     expectTrue(s1.contains(.tuesday))
@@ -284,7 +284,7 @@ OptionSetTests.test("FormUnion.MultipleOptions") {
   do {
     var s1: Days = [.monday, .tuesday, .wednesday]
     let s2: Days = [.thursday, .friday, .saturday]
-  
+
     s1.formUnion(s2)
     expectTrue(s1.contains(.wednesday))
     expectTrue(s1.contains(.thursday))
@@ -305,9 +305,9 @@ OptionSetTests.test("FormUnion.EmptySet") {
 
 OptionSetTests.test("Insert.SingleOption") {
   var s = Days.monday
-  
+
   expectFalse(s.contains(.tuesday))
-  
+
   let (inserted1, member1) = s.insert(.tuesday)
 
   expectTrue(s.contains(.monday))
@@ -315,7 +315,7 @@ OptionSetTests.test("Insert.SingleOption") {
   expectFalse(s.contains(.sunday))
   expectTrue(inserted1)
   expectEqual(.tuesday, member1)
-  
+
   let (inserted2, member2) = s.insert(.tuesday)
   expectFalse(inserted2)
   expectEqual(.tuesday, member2)
@@ -323,17 +323,17 @@ OptionSetTests.test("Insert.SingleOption") {
 
 OptionSetTests.test("Insert.MultipleOptions") {
   var s: Days = [.monday, .tuesday, .wednesday]
-  
+
   expectFalse(s.contains(.friday))
-  
+
   let (inserted1, member1) = s.insert(.friday)
-  
+
   expectTrue(s.contains(.monday))
   expectTrue(s.contains(.friday))
   expectFalse(s.contains(.sunday))
   expectTrue(inserted1)
   expectEqual(.friday, member1)
-  
+
   let (inserted2, member2) = s.insert(.friday)
   expectFalse(inserted2)
   expectEqual(.friday, member2)
@@ -343,13 +343,13 @@ OptionSetTests.test("Insert.EmptySet") {
   var s: Days = []
 
   expectFalse(s.contains(.monday))
-  
+
   let (inserted1, member1) = s.insert(.monday)
-  
+
   expectTrue(s.contains(.monday))
   expectTrue(inserted1)
   expectEqual(.monday, member1)
-  
+
   let (inserted2, member2) = s.insert(.monday)
   expectFalse(inserted2)
   expectEqual(.monday, member2)
@@ -361,7 +361,7 @@ OptionSetTests.test("Intersection.SingleOption") {
   do {
     let s1 = Days.monday
     let s2: Days = [.monday, .tuesday, .wednesday]
-  
+
     let intersection = s1.intersection(s2)
     expectTrue(intersection.contains(.monday))
     expectFalse(intersection.contains(.tuesday))
@@ -370,7 +370,7 @@ OptionSetTests.test("Intersection.SingleOption") {
   do {
     let s1 = Days.monday
     let s2: Days = [.tuesday, .wednesday, .friday]
-  
+
     let intersection = s1.intersection(s2)
     expectFalse(intersection.contains(.monday))
     expectFalse(intersection.contains(.tuesday))
@@ -382,7 +382,7 @@ OptionSetTests.test("Intersection.MultipleOptions") {
   do {
     let s1: Days = [.monday, .tuesday, .wednesday]
     let s2: Days = [.wednesday, .thursday, .friday]
-  
+
     let intersection = s1.intersection(s2)
     expectTrue(intersection.contains(.wednesday))
     expectFalse(intersection.contains(.tuesday))
@@ -391,7 +391,7 @@ OptionSetTests.test("Intersection.MultipleOptions") {
   do {
     let s1: Days = [.monday, .tuesday, .wednesday]
     let s2: Days = [.thursday, .friday, .saturday]
-  
+
     let intersection = s1.intersection(s2)
     expectFalse(intersection.contains(.wednesday))
     expectFalse(intersection.contains(.thursday))
@@ -499,9 +499,9 @@ OptionSetTests.test("IsSupersetOf.EmptySet") {
 
 OptionSetTests.test("Remove.SingleOption") {
   var s = Days.monday
-  
+
   expectTrue(s.contains(.monday))
-  
+
   let removed = s.remove(.monday)
 
   expectFalse(s.contains(.monday))
@@ -511,11 +511,11 @@ OptionSetTests.test("Remove.SingleOption") {
 
 OptionSetTests.test("Remove.MultipleOptions") {
   var s: Days = [.monday, .tuesday, .wednesday]
-  
+
   expectTrue(s.contains(.tuesday))
-  
+
   let removed = s.remove(.tuesday)
-  
+
   expectTrue(s.contains(.monday))
   expectFalse(s.contains(.tuesday))
   expectFalse(s.contains(.sunday))
@@ -526,9 +526,9 @@ OptionSetTests.test("Remove.EmptySet") {
   var s: Days = []
 
   expectFalse(s.contains(.monday))
-  
+
   let removed = s.remove(.monday)
-  
+
   expectFalse(s.contains(.monday))
   expectNil(removed)
 }
@@ -538,16 +538,16 @@ OptionSetTests.test("Remove.EmptySet") {
 OptionSetTests.test("Subtract.SingleOption") {
   do {
     var s = Days.monday
-    
+
     s.subtract([.monday])
-    
+
     expectFalse(s.contains(.monday))
   }
   do {
     var s = Days.monday
-    
+
     s.subtract([.tuesday])
-    
+
     expectTrue(s.contains(.monday))
   }
 }
@@ -555,17 +555,17 @@ OptionSetTests.test("Subtract.SingleOption") {
 OptionSetTests.test("Subtract.MultipleOptions") {
   do {
     var s: Days = [.monday, .tuesday, .wednesday]
-    
+
     s.subtract([.monday])
-    
+
     expectFalse(s.contains(.monday))
     expectTrue(s.contains(.tuesday))
   }
   do {
     var s: Days = [.monday, .tuesday, .wednesday]
-    
+
     s.subtract([.friday])
-    
+
     expectTrue(s.contains(.monday))
     expectFalse(s.contains(.friday))
   }
@@ -573,9 +573,9 @@ OptionSetTests.test("Subtract.MultipleOptions") {
 
 OptionSetTests.test("Subtract.EmptySet") {
   var s: Days = []
-  
+
   s.subtract([.monday])
-  
+
   expectFalse(s.contains(.monday))
   expectFalse(s.contains(.tuesday))
 }
@@ -585,16 +585,16 @@ OptionSetTests.test("Subtract.EmptySet") {
 OptionSetTests.test("Subtracting.SingleOption") {
   do {
     let s = Days.monday
-    
+
     let difference = s.subtracting([.monday])
-    
+
     expectFalse(difference.contains(.monday))
   }
   do {
     let s = Days.monday
-    
+
     let difference = s.subtracting([.tuesday])
-    
+
     expectTrue(difference.contains(.monday))
   }
 }
@@ -602,17 +602,17 @@ OptionSetTests.test("Subtracting.SingleOption") {
 OptionSetTests.test("Subtracting.MultipleOptions") {
   do {
     let s: Days = [.monday, .tuesday, .wednesday]
-    
+
     let difference = s.subtracting([.monday])
-    
+
     expectFalse(difference.contains(.monday))
     expectTrue(difference.contains(.tuesday))
   }
   do {
     let s: Days = [.monday, .tuesday, .wednesday]
-    
+
     let difference = s.subtracting([.friday])
-    
+
     expectTrue(difference.contains(.monday))
     expectFalse(difference.contains(.friday))
   }
@@ -620,9 +620,9 @@ OptionSetTests.test("Subtracting.MultipleOptions") {
 
 OptionSetTests.test("Subtracting.EmptySet") {
   let s: Days = []
-  
+
   let difference = s.subtracting([.monday])
-  
+
   expectFalse(difference.contains(.monday))
   expectFalse(difference.contains(.tuesday))
 }
@@ -633,7 +633,7 @@ OptionSetTests.test("SymmetricDifference.SingleOption") {
   do {
     let s1 = Days.monday
     let s2: Days = [.monday, .tuesday, .wednesday]
-  
+
     let difference = s1.symmetricDifference(s2)
     expectFalse(difference.contains(.monday))
     expectTrue(difference.contains(.tuesday))
@@ -642,7 +642,7 @@ OptionSetTests.test("SymmetricDifference.SingleOption") {
   do {
     let s1 = Days.monday
     let s2: Days = [.tuesday, .wednesday, .friday]
-  
+
     let difference = s1.symmetricDifference(s2)
     expectTrue(difference.contains(.monday))
     expectTrue(difference.contains(.tuesday))
@@ -654,7 +654,7 @@ OptionSetTests.test("SymmetricDifference.MultipleOptions") {
   do {
     let s1: Days = [.monday, .tuesday, .wednesday]
     let s2: Days = [.wednesday, .thursday, .friday]
-  
+
     let difference = s1.symmetricDifference(s2)
     expectFalse(difference.contains(.wednesday))
     expectTrue(difference.contains(.tuesday))
@@ -663,7 +663,7 @@ OptionSetTests.test("SymmetricDifference.MultipleOptions") {
   do {
     let s1: Days = [.monday, .tuesday, .wednesday]
     let s2: Days = [.thursday, .friday, .saturday]
-  
+
     let difference = s1.symmetricDifference(s2)
     expectTrue(difference.contains(.wednesday))
     expectTrue(difference.contains(.thursday))
@@ -686,7 +686,7 @@ OptionSetTests.test("Union.SingleOption") {
   do {
     let s1 = Days.monday
     let s2: Days = [.monday, .tuesday, .wednesday]
-  
+
     let union = s1.union(s2)
     expectTrue(union.contains(.monday))
     expectTrue(union.contains(.tuesday))
@@ -695,7 +695,7 @@ OptionSetTests.test("Union.SingleOption") {
   do {
     let s1 = Days.monday
     let s2: Days = [.tuesday, .wednesday, .friday]
-  
+
     let union = s1.union(s2)
     expectTrue(union.contains(.monday))
     expectTrue(union.contains(.tuesday))
@@ -707,7 +707,7 @@ OptionSetTests.test("Union.MultipleOptions") {
   do {
     let s1: Days = [.monday, .tuesday, .wednesday]
     let s2: Days = [.wednesday, .thursday, .friday]
-  
+
     let union = s1.union(s2)
     expectTrue(union.contains(.wednesday))
     expectTrue(union.contains(.tuesday))
@@ -716,7 +716,7 @@ OptionSetTests.test("Union.MultipleOptions") {
   do {
     let s1: Days = [.monday, .tuesday, .wednesday]
     let s2: Days = [.thursday, .friday, .saturday]
-  
+
     let union = s1.union(s2)
     expectTrue(union.contains(.wednesday))
     expectTrue(union.contains(.thursday))
@@ -737,32 +737,32 @@ OptionSetTests.test("Union.EmptySet") {
 
 OptionSetTests.test("UpdateWith.SingleOption") {
   var s = Days.monday
-  
+
   expectFalse(s.contains(.tuesday))
-  
+
   let member1 = s.update(with: .tuesday)
 
   expectTrue(s.contains(.monday))
   expectTrue(s.contains(.tuesday))
   expectFalse(s.contains(.sunday))
   expectNil(member1)
-  
+
   let member2 = s.update(with: .tuesday)
   expectEqual(.tuesday, member2)
 }
 
 OptionSetTests.test("UpdateWith.MultipleOptions") {
   var s: Days = [.monday, .tuesday, .wednesday]
-  
+
   expectFalse(s.contains(.friday))
-  
+
   let member1 = s.update(with: .friday)
-  
+
   expectTrue(s.contains(.monday))
   expectTrue(s.contains(.friday))
   expectFalse(s.contains(.sunday))
   expectNil(member1)
-  
+
   let member2 = s.update(with: .friday)
   expectEqual(.friday, member2)
 }
@@ -771,12 +771,12 @@ OptionSetTests.test("UpdateWith.EmptySet") {
   var s: Days = []
 
   expectFalse(s.contains(.monday))
-  
+
   let member1 = s.update(with: .monday)
-  
+
   expectTrue(s.contains(.monday))
   expectNil(member1)
-  
+
   let member2 = s.update(with: .monday)
   expectEqual(.monday, member2)
 }

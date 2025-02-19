@@ -130,7 +130,7 @@ func physical_subclass_lvalue(_ r: RefSubclass, a: Int) {
   // CHECK-NOT: destroy_value [[ARG1]]
   // CHECK: } // end sil function '$s10properties24physical_subclass_lvalue{{[_0-9a-zA-Z]*}}F'
 }
-  
+
 
 
 func struct_rvalue() -> Val {}
@@ -494,7 +494,7 @@ class rdar16151899Derived : rdar16151899Base {
         // This should not be a direct access, it should call the setter in the
         // base.
         x = zero
-        
+
         // CHECK:  [[BASEPTR:%[0-9]+]] = upcast {{.*}} : $rdar16151899Derived to $rdar16151899Base
         // CHECK: load{{.*}}Int
         // CHECK-NEXT: end_access {{.*}} : $*Int
@@ -660,11 +660,11 @@ class ClassWithLetProperty {
 class r19254812Base {}
 class r19254812Derived: r19254812Base{
   let pi = 3.14159265359
-  
+
   init(x : ()) {
     use(pi)
   }
-  
+
 // Accessing the "pi" property should not copy_value/release self.
 // CHECK-LABEL: sil hidden [ossa] @$s10properties16r19254812DerivedC{{[_0-9a-zA-Z]*}}fc
 // CHECK: [[MARKED_SELF_BOX:%.*]] = mark_uninitialized [derivedself]
@@ -691,11 +691,11 @@ class r19254812Derived: r19254812Base{
 
 class RedundantSelfRetains {
   final var f : RedundantSelfRetains
-  
+
   init() {
     f = RedundantSelfRetains()
   }
-  
+
   // <rdar://problem/19275047> Extraneous copy_values/releases of self are bad
   func testMethod1() {
     f = RedundantSelfRetains()
@@ -704,7 +704,7 @@ class RedundantSelfRetains {
   // CHECK: bb0(%0 : @guaranteed $RedundantSelfRetains):
 
   // CHECK-NOT: copy_value
-  
+
   // CHECK: [[FPTR:%[0-9]+]] = ref_element_addr %0 : $RedundantSelfRetains, #RedundantSelfRetains.f
   // CHECK-NEXT: [[WRITE:%.*]] = begin_access [modify] [dynamic] [[FPTR]] : $*RedundantSelfRetains
   // CHECK-NEXT: assign {{.*}} to [[WRITE]] : $*RedundantSelfRetains

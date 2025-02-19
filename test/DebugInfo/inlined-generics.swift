@@ -3,7 +3,7 @@ public protocol P {
   associatedtype DT1
   func getDT() -> DT1
 }
- 
+
 @inline(__always)
 func foo1<T:P>(_ t: T, _ dt: T.DT1) -> T.DT1 {
   var dttmp: T.DT1 = dt

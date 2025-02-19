@@ -54,7 +54,7 @@ unsigned PointerInfo::getExtraInhabitantCount(const IRGenModule &IGM) const {
     IGM.TargetInfo.LeastValidPointerValue >> NumReservedLowBits;
 
   if (Nullable) rawCount--;
-  
+
   // The runtime limits the count.
   return std::min(uint64_t(ValueWitnessFlags::MaxNumExtraInhabitants),
                   rawCount);

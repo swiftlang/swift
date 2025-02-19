@@ -522,7 +522,7 @@ void TBDGenVisitor::visit(const TBDGenDescriptor &desc) {
 
   // Add any autolinking force_load symbols.
   addFirstFileSymbols();
-  
+
   if (auto *singleFile = desc.getSingleFile()) {
     assert(SwiftModule == singleFile->getParentModule() &&
            "mismatched file and module");

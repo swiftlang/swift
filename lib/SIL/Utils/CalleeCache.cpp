@@ -345,7 +345,7 @@ CalleeList CalleeCache::getDestructors(SILType type, bool isExactType) const {
   if (isExactType || classDecl->isFinal()) {
     // In case of a final class, just pick the deinit of the class.
     SILDeclRef destructor = SILDeclRef(classDecl->getDestructor());
-    
+
     // In embedded Swift, we need the specialized destructor, not the generic
     // one.
     if (auto *vtable = M.lookUpSpecializedVTable(type)) {

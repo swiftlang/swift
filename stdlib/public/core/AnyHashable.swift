@@ -157,7 +157,7 @@ public struct AnyHashable {
       self.init(_box: _ConcreteHashableBox(base))
       return
     }
-    
+
     if let custom =
       (base as? _HasCustomAnyHashableRepresentation)?._toCustomAnyHashable() {
       self = custom

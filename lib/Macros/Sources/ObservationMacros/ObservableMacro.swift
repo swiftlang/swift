@@ -30,19 +30,19 @@ public struct ObservableMacro {
   static var qualifiedRegistrarTypeName: String {
     return "\(moduleName).\(registrarTypeName)"
   }
-  
+
   static let trackedMacroName = "ObservationTracked"
   static let ignoredMacroName = "ObservationIgnored"
 
   static let registrarVariableName = "_$observationRegistrar"
-  
+
   static func registrarVariable(_ observableType: TokenSyntax, context: some MacroExpansionContext) -> DeclSyntax {
     return
       """
       @\(raw: ignoredMacroName) private let \(raw: registrarVariableName) = \(raw: qualifiedRegistrarTypeName)()
       """
   }
-  
+
   static func accessFunction(_ observableType: TokenSyntax, context: some MacroExpansionContext) -> DeclSyntax {
     let memberGeneric = context.makeUniqueName("Member")
     return
@@ -54,7 +54,7 @@ public struct ObservableMacro {
       }
       """
   }
-  
+
   static func withMutationFunction(_ observableType: TokenSyntax, context: some MacroExpansionContext) -> DeclSyntax {
     let memberGeneric = context.makeUniqueName("Member")
     let mutationGeneric = context.makeUniqueName("MutationResult")
@@ -68,7 +68,7 @@ public struct ObservableMacro {
       }
       """
   }
-  
+
   static func shouldNotifyObserversNonEquatableFunction(_ observableType: TokenSyntax, context: some MacroExpansionContext) -> DeclSyntax {
     let memberGeneric = context.makeUniqueName("Member")
     return
@@ -76,7 +76,7 @@ public struct ObservableMacro {
        private nonisolated func shouldNotifyObservers<\(memberGeneric)>(_ lhs: \(memberGeneric), _ rhs: \(memberGeneric)) -> Bool { true }
       """
   }
-  
+
   static func shouldNotifyObserversEquatableFunction(_ observableType: TokenSyntax, context: some MacroExpansionContext) -> DeclSyntax {
     let memberGeneric = context.makeUniqueName("Member")
     return
@@ -84,7 +84,7 @@ public struct ObservableMacro {
       private nonisolated func shouldNotifyObservers<\(memberGeneric): Equatable>(_ lhs: \(memberGeneric), _ rhs: \(memberGeneric)) -> Bool { lhs != rhs }
       """
   }
-  
+
   static func shouldNotifyObserversNonEquatableObjectFunction(_ observableType: TokenSyntax, context: some MacroExpansionContext) -> DeclSyntax {
     let memberGeneric = context.makeUniqueName("Member")
     return
@@ -116,17 +116,17 @@ struct ObservationDiagnostic: DiagnosticMessage {
     case invalidApplication = "invalid type"
     case missingInitializer = "missing initializer"
   }
-  
+
   var message: String
   var diagnosticID: MessageID
   var severity: DiagnosticSeverity
-  
+
   init(message: String, diagnosticID: SwiftDiagnostics.MessageID, severity: SwiftDiagnostics.DiagnosticSeverity = .error) {
     self.message = message
     self.diagnosticID = diagnosticID
     self.severity = severity
   }
-  
+
   init(message: String, domain: String, id: ID, severity: SwiftDiagnostics.DiagnosticSeverity = .error) {
     self.message = message
     self.diagnosticID = MessageID(domain: domain, id: id.rawValue)
@@ -163,7 +163,7 @@ extension DeclModifierListSyntax {
       }
     }
   }
-  
+
   init(keyword: Keyword) {
     self.init([DeclModifierSyntax(name: .keyword(keyword))])
   }
@@ -198,10 +198,10 @@ extension PatternBindingListSyntax {
           accessorBlock: binding.accessorBlock,
           trailingComma: binding.trailingComma,
           trailingTrivia: binding.trailingTrivia)
-        
+
       }
     }
-    
+
     return PatternBindingListSyntax(bindings)
   }
 }
@@ -218,7 +218,7 @@ extension VariableDeclSyntax {
       trailingTrivia: trailingTrivia
     )
   }
-  
+
   var isValidForObservation: Bool {
     !isComputed && isInstance && !isImmutable && identifier != nil
   }
@@ -237,9 +237,9 @@ extension ObservableMacro: MemberMacro {
     guard let identified = declaration.asProtocol(NamedDeclSyntax.self) else {
       return []
     }
-    
+
     let observableType = identified.name.trimmed
-    
+
     if declaration.isEnum {
       // enumerations cannot store properties
       throw DiagnosticsError(syntax: node, message: "'@Observable' cannot be applied to enumeration type '\(observableType.text)'", id: .invalidApplication)
@@ -252,7 +252,7 @@ extension ObservableMacro: MemberMacro {
       // actors cannot yet be supported for their isolation
       throw DiagnosticsError(syntax: node, message: "'@Observable' cannot be applied to actor type '\(observableType.text)'", id: .invalidApplication)
     }
-    
+
     var declarations = [DeclSyntax]()
 
     declaration.addIfNeeded(ObservableMacro.registrarVariable(observableType, context: context), to: &declarations)
@@ -288,8 +288,8 @@ extension ObservableMacro: MemberAttributeMacro {
        property.hasMacroApplication(ObservableMacro.trackedMacroName) {
       return []
     }
-    
-    
+
+
     return [
       AttributeSyntax(attributeName: IdentifierTypeSyntax(name: .identifier(ObservableMacro.trackedMacroName)))
     ]
@@ -337,7 +337,7 @@ public struct ObservationTrackedMacro: AccessorMacro {
           let identifier = property.identifier?.trimmed else {
       return []
     }
-    
+
     guard context.lexicalContext[0].as(ClassDeclSyntax.self) != nil else {
       return []
     }
@@ -372,7 +372,7 @@ public struct ObservationTrackedMacro: AccessorMacro {
         }
       }
       """
-      
+
     // Note: this accessor cannot test the equality since it would incur
     // additional CoW's on structural types. Most mutations in-place do
     // not leave the value equal so this is "fine"-ish.
@@ -409,16 +409,16 @@ extension ObservationTrackedMacro: PeerMacro {
           property.identifier?.trimmed != nil else {
       return []
     }
-    
+
     guard context.lexicalContext[0].as(ClassDeclSyntax.self) != nil else {
       return []
     }
-    
+
     if property.hasMacroApplication(ObservableMacro.ignoredMacroName) ||
        property.hasMacroApplication(ObservableMacro.trackedMacroName) {
       return []
     }
-    
+
     let storage = DeclSyntax(property.privatePrefixed("_", addingAttribute: ObservableMacro.ignoredAttribute))
     return [storage]
   }

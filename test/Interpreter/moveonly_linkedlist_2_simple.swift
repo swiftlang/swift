@@ -35,13 +35,13 @@
 
 struct Box<Wrapped: ~Copyable & Dumpable>: ~Copyable {
   let ptr: MyLittlePointer<Wrapped>
-  
+
   init(_ wrapped: consuming Wrapped) {
     wrapped.dump(prefix: "hi")
     ptr = .allocate(capacity: 1)
     ptr.initialize(to: wrapped)
   }
-      
+
   deinit {
     ptr.move().dump(prefix: "bye")
     ptr.deallocate()

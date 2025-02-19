@@ -31,13 +31,13 @@ extension SIMDMask where Storage == ${Vector} {
   internal init(_ _builtin: Builtin.${Builtin}) {
     _storage = ${Vector}(_builtin)
   }
-  
+
   @_alwaysEmitIntoClient
   internal static var allTrue: Self {
     let zero = ${Vector}()
     return zero .== zero
   }
-  
+
   /// A vector mask that is the pointwise logical negation of the input.
   ///
   /// Equivalent to:
@@ -51,7 +51,7 @@ extension SIMDMask where Storage == ${Vector} {
   public static prefix func .!(a: Self) -> Self {
     a .^ .allTrue
   }
-    
+
   /// A vector mask that is the pointwise logical conjunction of the inputs.
   ///
   /// Equivalent to:
@@ -71,7 +71,7 @@ extension SIMDMask where Storage == ${Vector} {
       b._storage._storage._value
     )))
   }
-    
+
   /// Replaces `a` with the pointwise logical conjunction of `a` and `b`.
   ///
   /// Equivalent to:
@@ -84,7 +84,7 @@ extension SIMDMask where Storage == ${Vector} {
   public static func .&=(a: inout Self, b: Self) {
     a = a .& b
   }
-      
+
   /// A vector mask that is the pointwise exclusive or of the inputs.
   ///
   /// Equivalent to:
@@ -101,7 +101,7 @@ extension SIMDMask where Storage == ${Vector} {
       b._storage._storage._value
     )))
   }
-    
+
   /// Replaces `a` with the pointwise exclusive or of `a` and `b`.
   ///
   /// Equivalent to:
@@ -114,7 +114,7 @@ extension SIMDMask where Storage == ${Vector} {
   public static func .^=(a: inout Self, b: Self) {
     a = a .^ b
   }
-      
+
   /// A vector mask that is the pointwise logical disjunction of the inputs.
   ///
   /// Equivalent to:
@@ -134,7 +134,7 @@ extension SIMDMask where Storage == ${Vector} {
       b._storage._storage._value
     )))
   }
-    
+
   /// Replaces `a` with the pointwise logical disjunction of `a` and `b`.
   ///
   /// Equivalent to:
@@ -147,7 +147,7 @@ extension SIMDMask where Storage == ${Vector} {
   public static func .|=(a: inout Self, b: Self) {
     a = a .| b
   }
-    
+
   /// A vector mask with the result of a pointwise equality comparison.
   ///
   /// Equivalent to:
@@ -161,7 +161,7 @@ extension SIMDMask where Storage == ${Vector} {
   public static func .==(a: Self, b: Self) -> Self {
     .!(a .^ b)
   }
-  
+
   /// A vector mask with the result of a pointwise inequality comparison.
   ///
   /// Equivalent to:
@@ -175,7 +175,7 @@ extension SIMDMask where Storage == ${Vector} {
   public static func .!=(a: Self, b: Self) -> Self {
     a .^ b
   }
-    
+
   /// Replaces elements of this vector with elements of `other` in the lanes
   /// where `mask` is `true`.
   ///
@@ -189,7 +189,7 @@ extension SIMDMask where Storage == ${Vector} {
   public mutating func replace(with other: Self, where mask: Self) {
     self = replacing(with: other, where: mask)
   }
-    
+
   /// Returns a copy of this vector, with elements replaced by elements of
   /// `other` in the lanes where `mask` is `true`.
   ///
@@ -212,7 +212,7 @@ extension SIMD${n} where Scalar == ${Scalar} {
   internal init(_ _builtin: Builtin.${Builtin}) {
     _storage = ${Scalar}.SIMD${storageN}Storage(_builtin)
   }
-    
+
   /// A vector mask with the result of a pointwise equality comparison.
   @_alwaysEmitIntoClient
   public static func .==(a: Self, b: Self) -> SIMDMask<MaskStorage> {
@@ -220,7 +220,7 @@ extension SIMD${n} where Scalar == ${Scalar} {
       Builtin.cmp_eq_${Builtin}(a._storage._value, b._storage._value)
     ))
   }
-  
+
   /// A vector mask with the result of a pointwise inequality comparison.
   @_alwaysEmitIntoClient
   public static func .!=(a: Self, b: Self) -> SIMDMask<MaskStorage> {
@@ -228,7 +228,7 @@ extension SIMD${n} where Scalar == ${Scalar} {
       Builtin.cmp_ne_${Builtin}(a._storage._value, b._storage._value)
     ))
   }
-  
+
   /// A vector mask with the result of a pointwise less-than comparison.
   @_alwaysEmitIntoClient
   public static func .<(a: Self, b: Self) -> SIMDMask<MaskStorage> {
@@ -236,7 +236,7 @@ extension SIMD${n} where Scalar == ${Scalar} {
       Builtin.cmp_${s}lt_${Builtin}(a._storage._value, b._storage._value)
     ))
   }
-  
+
   /// A vector mask with the result of a pointwise less-than-or-equal-to comparison.
   @_alwaysEmitIntoClient
   public static func .<=(a: Self, b: Self) -> SIMDMask<MaskStorage> {
@@ -244,7 +244,7 @@ extension SIMD${n} where Scalar == ${Scalar} {
       Builtin.cmp_${s}le_${Builtin}(a._storage._value, b._storage._value)
     ))
   }
-  
+
   /// A vector mask with the result of a pointwise greater-than comparison.
   @_alwaysEmitIntoClient
   public static func .>(a: Self, b: Self) -> SIMDMask<MaskStorage> {
@@ -252,7 +252,7 @@ extension SIMD${n} where Scalar == ${Scalar} {
       Builtin.cmp_${s}gt_${Builtin}(a._storage._value, b._storage._value)
     ))
   }
-  
+
   /// A vector mask with the result of a pointwise greater-than-or-equal-to comparison.
   @_alwaysEmitIntoClient
   public static func .>=(a: Self, b: Self) -> SIMDMask<MaskStorage> {
@@ -260,35 +260,35 @@ extension SIMD${n} where Scalar == ${Scalar} {
       Builtin.cmp_${s}ge_${Builtin}(a._storage._value, b._storage._value)
     ))
   }
-    
+
   /// The wrapping sum of two vectors.
   @_alwaysEmitIntoClient
   public static func &+(a: Self, b: Self) -> Self {
     Self(Builtin.add_${Builtin}(a._storage._value, b._storage._value))
   }
-    
+
   /// The wrapping difference of two vectors.
   @_alwaysEmitIntoClient
   public static func &-(a: Self, b: Self) -> Self {
     Self(Builtin.sub_${Builtin}(a._storage._value, b._storage._value))
   }
-    
+
   /// The pointwise wrapping product of two vectors.
   @_alwaysEmitIntoClient
   public static func &*(a: Self, b: Self) -> Self {
     Self(Builtin.mul_${Builtin}(a._storage._value, b._storage._value))
   }
-        
+
   /// Updates the left hand side with the wrapping sum of the two
   /// vectors.
   @_alwaysEmitIntoClient
   public static func &+=(a: inout Self, b: Self) { a = a &+ b }
-    
+
   /// Updates the left hand side with the wrapping difference of the two
   /// vectors.
   @_alwaysEmitIntoClient
   public static func &-=(a: inout Self, b: Self) { a = a &- b }
-    
+
   /// Updates the left hand side with the pointwise wrapping product of two
   /// vectors.
   @_alwaysEmitIntoClient
@@ -314,7 +314,7 @@ extension SIMD${n} where Scalar == ${Scalar} {
   internal init(_ _builtin: Builtin.${Builtin}) {
     _storage = ${Scalar}.SIMD${storageN}Storage(_builtin)
   }
-  
+
   /// A vector mask with the result of a pointwise equality comparison.
   @_alwaysEmitIntoClient
   public static func .==(a: Self, b: Self) -> SIMDMask<MaskStorage> {
@@ -322,7 +322,7 @@ extension SIMD${n} where Scalar == ${Scalar} {
       Builtin.fcmp_oeq_${Builtin}(a._storage._value, b._storage._value)
     ))
   }
-  
+
   /// A vector mask with the result of a pointwise inequality comparison.
   @_alwaysEmitIntoClient
   public static func .!=(a: Self, b: Self) -> SIMDMask<MaskStorage> {
@@ -330,7 +330,7 @@ extension SIMD${n} where Scalar == ${Scalar} {
       Builtin.fcmp_une_${Builtin}(a._storage._value, b._storage._value)
     ))
   }
-  
+
   /// A vector mask with the result of a pointwise less-than comparison.
   @_alwaysEmitIntoClient
   public static func .<(a: Self, b: Self) -> SIMDMask<MaskStorage> {
@@ -338,7 +338,7 @@ extension SIMD${n} where Scalar == ${Scalar} {
       Builtin.fcmp_olt_${Builtin}(a._storage._value, b._storage._value)
     ))
   }
-  
+
   /// A vector mask with the result of a pointwise less-than-or-equal-to comparison.
   @_alwaysEmitIntoClient
   public static func .<=(a: Self, b: Self) -> SIMDMask<MaskStorage> {
@@ -346,7 +346,7 @@ extension SIMD${n} where Scalar == ${Scalar} {
       Builtin.fcmp_ole_${Builtin}(a._storage._value, b._storage._value)
     ))
   }
-  
+
   /// A vector mask with the result of a pointwise greater-than comparison.
   @_alwaysEmitIntoClient
   public static func .>(a: Self, b: Self) -> SIMDMask<MaskStorage> {
@@ -354,7 +354,7 @@ extension SIMD${n} where Scalar == ${Scalar} {
       Builtin.fcmp_ogt_${Builtin}(a._storage._value, b._storage._value)
     ))
   }
-  
+
   /// A vector mask with the result of a pointwise greater-than-or-equal-to comparison.
   @_alwaysEmitIntoClient
   public static func .>=(a: Self, b: Self) -> SIMDMask<MaskStorage> {

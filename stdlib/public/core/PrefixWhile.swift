@@ -129,7 +129,7 @@ extension LazyPrefixWhileCollection {
     case index(Base.Index)
     case pastEnd
   }
-  
+
   /// A position in a `LazyPrefixWhileCollection` or
   /// `LazyPrefixWhileBidirectionalCollection` instance.
   @frozen // lazy-performance

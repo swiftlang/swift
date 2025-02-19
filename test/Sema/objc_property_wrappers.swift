@@ -16,7 +16,7 @@ public class WrapperObjcClass: NSObject {
     public init(wrappedValue: Int) {
         self.wrappedValue = wrappedValue
     }
-    
+
     public init(projectedValue: WrapperObjcClass) {
         fatalError()
     }
@@ -39,7 +39,7 @@ public class WrapperGenericClass<Element> {
     public init(wrappedValue: Element) {
         self.wrappedValue = wrappedValue
     }
-    
+
     public init(projectedValue: WrapperGenericClass<Element>) {
         fatalError()
     }
@@ -62,7 +62,7 @@ public struct WrapperStruct {
     public init(wrappedValue: Int) {
         self.wrappedValue = wrappedValue
     }
-    
+
     public init(projectedValue: WrapperStruct) {
         fatalError()
     }
@@ -86,7 +86,7 @@ public enum WrapperEnum {
 
     public init(wrappedValue: Int) {
     }
-    
+
     public init(projectedValue: WrapperStruct) {
         fatalError()
     }

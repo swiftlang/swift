@@ -270,18 +270,18 @@ func foo<T: C>(_ x: T, y: T.Type) where T: P {
   var ci2 = x.init(x: 0) // expected-error{{'init' is a member of the type; use 'type(of: ...)' to initialize a new object of the same dynamic type}} {{13-13=type(of: }} {{14-14=)}}
   var ci3 = x.init() // expected-error{{'init' is a member of the type; use 'type(of: ...)' to initialize a new object of the same dynamic type}} {{13-13=type(of: }} {{14-14=)}}
   var ci4 = x.init(proto: "") // expected-error{{'init' is a member of the type; use 'type(of: ...)' to initialize a new object of the same dynamic type}} {{13-13=type(of: }} {{14-14=)}}
-  
+
   var z = x
   z.init(required: 0) // expected-error {{'init' is a member of the type; use assignment to initialize the value instead}} {{4-4= = }}
   z.init(x: 0) // expected-error {{'init' is a member of the type; use assignment to initialize the value instead}} {{4-4= = }}
   z.init() // expected-error {{'init' is a member of the type; use assignment to initialize the value instead}} {{4-4= = }}
   z.init(proto: "") // expected-error {{'init' is a member of the type; use assignment to initialize the value instead}} {{4-4= = }}
-  
+
   var ci1a = z.init(required: 0) // expected-error {{'init' is a member of the type; use 'type(of: ...)' to initialize a new object of the same dynamic type}} {{14-14=type(of: }} {{15-15=)}}
   var ci2a = z.init(x: 0) // expected-error {{'init' is a member of the type; use 'type(of: ...)' to initialize a new object of the same dynamic type}} {{14-14=type(of: }} {{15-15=)}}
   var ci3a = z.init() // expected-error {{'init' is a member of the type; use 'type(of: ...)' to initialize a new object of the same dynamic type}} {{14-14=type(of: }} {{15-15=)}}
   var ci4a = z.init(proto: "") // expected-error {{'init' is a member of the type; use 'type(of: ...)' to initialize a new object of the same dynamic type}} {{14-14=type(of: }} {{15-15=)}}
-  
+
   var ci1b = x(required: 0) // expected-error{{cannot call value of non-function type 'T'}}
   var ci2b = x(x: 0) // expected-error{{cannot call value of non-function type 'T'}}
   var ci3b = x() // expected-error{{cannot call value of non-function type 'T'}}{{15-17=}}
@@ -322,11 +322,11 @@ class TestOverloadSets {
   convenience init() {
     self.init(5, 5) // expected-error{{extra argument in call}}
   }
-  
+
   convenience init(a : Z0) { // expected-note{{candidate expects value of type 'Z0' for parameter #1}}
     self.init(42 as Int8) // expected-error{{no exact matches in call to initializer}}
   }
-  
+
   init(value: Int) { /* ... */ } // expected-note{{candidate expects value of type 'Int' for parameter #1}}
   init(value: Double) { /* ... */ } // expected-note{{candidate expects value of type 'Double' for parameter #1}}
 }
@@ -518,12 +518,12 @@ func testInsideOperator(x: X) {
 struct Y {
   var x: X
   let x2: X
-  
+
   init() {
     x.init() // expected-error {{'init' is a member of the type; use assignment to initialize the value instead}} {{6-6= = }}
     foo(x.init()) // expected-error {{'init' is a member of the type; use 'type(of: ...)' to initialize a new object of the same dynamic type}} {{9-9=type(of: }} {{10-10=)}}
   }
-  
+
   func foo(_: X) {}
   func asFunctionReturn() -> X {
     var a = X()

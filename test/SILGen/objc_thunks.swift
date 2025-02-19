@@ -137,7 +137,7 @@ class Hoozit : Gizmo {
   // CHECK-NEXT:   destroy_value [[SELF_COPY]]
   // CHECK-NEXT:   return [[RES]] : $Gizmo
   // CHECK-NEXT: }
-  
+
   // CHECK-LABEL: sil hidden [ossa] @$s11objc_thunks6HoozitC15typicalPropertySo5GizmoCvg : $@convention(method) (@guaranteed Hoozit) -> @owned Gizmo
   // CHECK: bb0(%0 : @guaranteed $Hoozit):
   // CHECK-NEXT:   debug_value %0

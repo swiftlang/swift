@@ -357,7 +357,7 @@ bool FulfillmentMap::searchNominalTypeMetadata(IRGenModule &IGM,
   if (type.getAnyNominal()->hasClangNode()) {
     return false;
   }
-  
+
   auto *nominal = type.getAnyNominal();
   if (!nominal->isGenericContext() || isa<ProtocolDecl>(nominal)) {
     return false;
@@ -469,7 +469,7 @@ bool FulfillmentMap::searchShapeRequirement(IRGenModule &IGM, CanType argType,
   path.addPackExpansionCountComponent(0);
 
   auto parameter = expansion.getCountType();
-  
+
   // Add the fulfillment.
   return addFulfillment(GenericRequirement::forShape(parameter),
                         source, std::move(path), MetadataState::Complete);

@@ -216,7 +216,7 @@ extension LoggingSequence: Sequence {
     SequenceLog.underestimatedCount[selfType] += 1
     return base.underestimatedCount
   }
-  
+
   public func withContiguousStorageIfAvailable<R>(
     _ body: (UnsafeBufferPointer<Element>) throws -> R
   ) rethrows -> R? {
@@ -351,7 +351,7 @@ extension LoggingBidirectionalCollection: BidirectionalCollection {
 
 public typealias LoggingRandomAccessCollection<Base: RandomAccessCollection> 
   = LoggingBidirectionalCollection<Base>
-  
+
 extension LoggingRandomAccessCollection: RandomAccessCollection { }
 
 public typealias LoggingMutableCollection<Base: MutableCollection>
@@ -386,7 +386,7 @@ extension LoggingMutableCollection: MutableCollection {
      Log.partitionBy[selfType] += 1
      return try base.partition(by: belongsInSecondPartition)
    }
-   
+
   @available(*, deprecated, renamed: "withContiguousMutableStorageIfAvailable")
   public mutating func _withUnsafeMutableBufferPointerIfSupported<R>(
     _ body: (inout UnsafeMutableBufferPointer<Element>) throws -> R
@@ -540,7 +540,7 @@ public struct BufferAccessLoggingMutableCollection<
 
 extension BufferAccessLoggingMutableCollection: LoggingType {
   public typealias Log = MutableCollectionLog
-  
+
   public init(wrapping base: Base) {
     self.base = base
   }
@@ -613,7 +613,7 @@ extension BufferAccessLoggingMutableCollection: MutableCollection {
     }
     return result
   }
-  
+
   public mutating func withContiguousMutableStorageIfAvailable<R>(
     _ body: (inout UnsafeMutableBufferPointer<Element>) throws -> R
   ) rethrows -> R? {

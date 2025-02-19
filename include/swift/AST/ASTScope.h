@@ -942,7 +942,7 @@ public:
   NullablePtr<const void> addressForPrinting() const override { return decl; }
 
   bool ignoreInDebugInfo() const override { return true; }
-  
+
 private:
   void expandAScopeThatDoesNotCreateANewInsertionPoint(ScopeCreator &);
 

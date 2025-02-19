@@ -23,7 +23,7 @@ import Foundation
 class CodingA : NSObject, NSCoding {
   required init(coder: NSCoder) { }
   func encode(coder: NSCoder) { }
-  
+
 }   // okay
 
 // Nested classes

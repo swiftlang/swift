@@ -574,7 +574,7 @@ extension Unsafe${Mutable}RawBufferPointer {
     guard let position = _position else {
       return
     }
-    
+
     if source.withContiguousStorageIfAvailable({
       (buffer: UnsafeBufferPointer<UInt8>) -> Void in
       _debugPrecondition(source.count <= self.count,
@@ -723,7 +723,7 @@ extension Unsafe${Mutable}RawBufferPointer {
   }
 
   %  if mutable:
-  
+
   /// Initializes the memory referenced by this buffer with the given value,
   /// binds the memory to the value's type, and returns a typed buffer of the
   /// initialized memory.
@@ -753,7 +753,7 @@ extension Unsafe${Mutable}RawBufferPointer {
     guard let base = _position else {
       return .init(start: nil, count: 0)
     }
-    
+
     let count = (_end._unsafelyUnwrappedUnchecked-base) / MemoryLayout<T>.stride
     let initialized = base.initializeMemory(
       as: type, repeating: repeatedValue, count: count
@@ -792,7 +792,7 @@ extension Unsafe${Mutable}RawBufferPointer {
     var it = source.makeIterator()
     var idx = startIndex
     let elementStride = MemoryLayout<S.Element>.stride
-    
+
     // This has to be a debug precondition due to the cost of walking over some collections.
     _debugPrecondition(source.underestimatedCount <= (count / elementStride),
       "insufficient space to accommodate source.underestimatedCount elements")

@@ -47,10 +47,10 @@ func testDefaultArguments() {
 func testAlwaysEmitIntoClient() {
   // CHECK-DAG: @weak_variable = extern_weak global
   aeicFuncUsingWeakVar()
-  
+
   // CHECK-DAG: @strong_variable = extern_weak global
   aeicFuncUsingStrongVar()
-  
+
   // CHECK-DAG: declare extern_weak void @always_available_function()
   aeicFuncCallingAlwaysAvailableFunc()
 }

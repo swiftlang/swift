@@ -19,11 +19,11 @@ func foo() {
   func bar() {
     2
   }
-  
+
   let baz: () -> Void = {
     3
   }
-  
+
   1
   bar()
   baz()

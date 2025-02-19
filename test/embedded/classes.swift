@@ -84,7 +84,7 @@ struct Main {
     // CHECK: MySubClass.foo
     // CHECK: MySubSubClass.foo
     print("")
-    
+
     print("5") // CHECK: 5
     o.0 = nil
     // CHECK: MyClass.deinit

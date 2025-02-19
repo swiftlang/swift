@@ -267,7 +267,7 @@ SILGenFunction::emitTransformExistential(SILLocation loc,
   // Build conformance table
   CanType fromInstanceType = inputType;
   CanType toInstanceType = outputType;
-  
+
   // Look through metatypes
   while (isa<MetatypeType>(fromInstanceType) &&
          isa<ExistentialMetatypeType>(toInstanceType)) {
@@ -555,7 +555,7 @@ ManagedValue Transform::transform(ManagedValue v,
     return SGF.emitOptionalToOptional(Loc, v, loweredResultTy,
                                       transformOptionalPayload);
   }
-  
+
   // Abstraction changes:
 
   //  - functions
@@ -669,7 +669,7 @@ ManagedValue Transform::transform(ManagedValue v,
     return SGF.emitClassMetatypeToObject(Loc, v,
                                    SGF.getLoweredLoadableType(outputSubstType));
   }
-  
+
   // - existential metatype to AnyObject conversion
   if (outputSubstType->isAnyObject() &&
       isa<ExistentialMetatypeType>(inputSubstType)) {
@@ -800,7 +800,7 @@ ManagedValue Transform::transformMetatype(ManagedValue meta,
 
   auto wasRepr = meta.getType().castTo<MetatypeType>()->getRepresentation();
   auto willBeRepr = expectedType.castTo<MetatypeType>()->getRepresentation();
-  
+
   SILValue result;
 
   if ((wasRepr == MetatypeRepresentation::Thick &&
@@ -2875,7 +2875,7 @@ static ManagedValue applyTrivialConversions(SILGenFunction &SGF,
         SGF.SGM.Types.checkFunctionForABIDifferences(SGF.SGM.M,
                                                      outerFnTy,
                                                      innerFnTy);
-      
+
       if (abiDiffA == TypeConverter::ABIDifference::CompatibleRepresentation
         || abiDiffA == TypeConverter::ABIDifference::CompatibleCallingConvention
         || abiDiffB == TypeConverter::ABIDifference::CompatibleRepresentation
@@ -5607,7 +5607,7 @@ static ManagedValue createThunk(SILGenFunction &SGF,
                                 const TypeLowering &expectedTL) {
   auto substSourceType = fn.getType().castTo<SILFunctionType>();
   auto substExpectedType = expectedTL.getLoweredType().castTo<SILFunctionType>();
-  
+
   LLVM_DEBUG(llvm::dbgs() << "=== Generating reabstraction thunk from:\n";
              substSourceType.dump(llvm::dbgs());
              llvm::dbgs() << "\n    to:\n";
@@ -5625,7 +5625,7 @@ static ManagedValue createThunk(SILGenFunction &SGF,
                loc.dump();
              }
              llvm::dbgs() << "\n");
-  
+
   // Apply substitutions in the source and destination types, since the thunk
   // doesn't change because of different function representations.
   CanSILFunctionType sourceType;
@@ -5636,7 +5636,7 @@ static ManagedValue createThunk(SILGenFunction &SGF,
   } else {
     sourceType = substSourceType;
   }
-  
+
   auto expectedType = substExpectedType
     ->getUnsubstitutedType(SGF.SGM.M);
 
@@ -5721,7 +5721,7 @@ static ManagedValue createThunk(SILGenFunction &SGF,
     thunkedFn = SGF.B.createConvertFunction(loc, thunkedFn,
                     SILType::getPrimitiveObjectType(substEscapingExpectedType));
   }
-  
+
   if (!substExpectedType->isNoEscape()) {
     return thunkedFn;
   }
@@ -5958,7 +5958,7 @@ SILGenFunction::createWithoutActuallyEscapingClosure(
     thunkedFn = B.createConvertFunction(loc, thunkedFn,
                             SILType::getPrimitiveObjectType(escapingFnSubstTy));
   }
-  
+
   // We need to ensure the 'lifetime' of the trivial values context captures. As
   // long as we represent these captures by the same value the following works.
   thunkedFn = emitManagedRValueWithCleanup(
@@ -6884,7 +6884,7 @@ SILGenFunction::emitVTableThunk(SILDeclRef base,
              outputSubstType.getParams(),
              inputOrigType,
              inputSubstType.getParams());
-  
+
   auto coroutineKind = F.getLoweredFunctionType()->getCoroutineKind();
 
   // Collect the arguments to the implementation.
@@ -6974,7 +6974,7 @@ SILGenFunction::emitVTableThunk(SILDeclRef base,
     result = B.createTuple(loc, {});
     break;
   }
-  
+
   scope.pop();
   B.createReturn(loc, result);
 

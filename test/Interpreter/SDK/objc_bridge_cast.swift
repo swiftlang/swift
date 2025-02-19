@@ -246,7 +246,7 @@ func testValueToObjectBridgingInSwitch() {
     let nsString = string as NSString
     objc_setAssociatedObject(nsString, &CanaryAssocObjectHandle, Canary(),
       .OBJC_ASSOCIATION_RETAIN_NONATOMIC)
-    
+
     switch nsString as AnyObject {
     case let s as String:
       print("Got string \(s)")

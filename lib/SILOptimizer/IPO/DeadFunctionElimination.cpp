@@ -179,7 +179,7 @@ class DeadFunctionAndGlobalElimination {
         !keepExternalWitnessTablesAlive) {
       return;
     }
-  
+
     LLVM_DEBUG(llvm::dbgs() << "    scan witness table " << WT->getName()
                             << '\n');
 
@@ -466,7 +466,7 @@ class DeadFunctionAndGlobalElimination {
         ensureAlive(&F);
       }
     }
-    
+
     for (SILGlobalVariable &global : Module->getSILGlobals()) {
       if (global.isPossiblyUsedExternally())
         ensureAlive(&global);
@@ -574,7 +574,7 @@ class DeadFunctionAndGlobalElimination {
         // so let's avoid marking it alive in the subclass vtable either.
         bool embedded = Module->getOptions().EmbeddedSwift;
         if (embedded && !F->isDefinition()) { continue; }
-        
+
         if (// We also have to check the method declaration's access level.
             // Needed if it's a public base method declared in another
             // compilation unit (for this we have no SILFunction).
@@ -747,7 +747,7 @@ public:
         DeadFunctions.push_back(&F);
       }
     }
-    
+
     for (SILGlobalVariable &global : Module->getSILGlobals()) {
       if (!isAlive(&global)) {
         global.dropAllReferences();
@@ -779,7 +779,7 @@ public:
       ++NumDeadGlobals;
       Module->eraseGlobalVariable(deadGlobal);
     }
-    
+
     if (changedTables)
       DFEPass->invalidateFunctionTables();
   }

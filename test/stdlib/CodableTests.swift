@@ -427,7 +427,7 @@ class TestCodable : TestCodableSuper {
         expectEqual(value.upperBound, decoded.upperBound, "\(#file):\(#line): Decoded ClosedRange upperBound <\(debugDescription(decoded))> not equal to original <\(debugDescription(value))>")
         expectEqual(value.lowerBound, decoded.lowerBound, "\(#file):\(#line): Decoded ClosedRange lowerBound <\(debugDescription(decoded))> not equal to original <\(debugDescription(value))>")
     }
-    
+
     func test_ClosedRange_JSON_Errors() {
         expectDecodingErrorViaJSON(
             type: ClosedRange<Int>.self,
@@ -450,13 +450,13 @@ class TestCodable : TestCodableSuper {
         #line : [1, 2, 3].difference(from: [2, 3, 4]),
         #line : [1, 2, 3].difference(from: [6, 7, 8]),
     ]
-    
+
     func test_CollectionDifference_JSON() {
         for (testLine, difference) in collectionDifferenceValues {
             expectRoundTripEqualityThroughJSON(for: difference, lineNumber: testLine)
         }
     }
-    
+
     func test_CollectionDifference_Plist() {
         for (testLine, difference) in collectionDifferenceValues {
             expectRoundTripEqualityThroughPlist(for: difference, lineNumber: testLine)
@@ -469,7 +469,7 @@ class TestCodable : TestCodableSuper {
         //   "insertions" : [ { "associatedOffset" : null, "element" : 1, "isRemove" : false, "offset" : 0 } ],
         //   "removals"   : [ { "associatedOffset" : null, "element" : 4, "isRemove" : true,  "offset" : 2 } ]
         // }
-        
+
         // Removal in insertion
         expectDecodingErrorViaJSON(
             type: CollectionDifference<Int>.self,
@@ -794,7 +794,7 @@ class TestCodable : TestCodableSuper {
         struct Nope: Codable {
             var no: Never
         }
-      
+
         do {
             let neverJSON = Data(#"{"no":"never"}"#.utf8)
             _ = try JSONDecoder().decode(Nope.self, from: neverJSON)
@@ -908,7 +908,7 @@ class TestCodable : TestCodableSuper {
         expectEqual(value.upperBound, decoded.upperBound, "\(#file):\(#line): Decoded Range upperBound<\(debugDescription(decoded))> not equal to original <\(debugDescription(value))>")
         expectEqual(value.lowerBound, decoded.lowerBound, "\(#file):\(#line): Decoded Range lowerBound<\(debugDescription(decoded))> not equal to original <\(debugDescription(value))>")
     }
-    
+
     func test_Range_JSON_Errors() {
         expectDecodingErrorViaJSON(
             type: Range<Int>.self,
@@ -942,7 +942,7 @@ class TestCodable : TestCodableSuper {
             expectRoundTripEqualityThroughPlist(for: timeZone, lineNumber: testLine)
         }
     }
-    
+
     // MARK: - URL
     lazy var urlValues: [Int : URL] = {
         var values: [Int : URL] = [
@@ -979,7 +979,7 @@ class TestCodable : TestCodableSuper {
             expectRoundTripEqualityThroughPlist(for: url, lineNumber: testLine)
         }
     }
-    
+
     // MARK: - URLComponents
     lazy var urlComponentsValues: [Int : URLComponents] = [
         #line : URLComponents(),

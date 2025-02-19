@@ -37,7 +37,7 @@ public struct Holder<Value> {
         public func transform(_ holder: Holder<Value>) -> Result {
             return fn(holder.value)
         }
-    
+
     // CHECK-NEXT: }
     }
 

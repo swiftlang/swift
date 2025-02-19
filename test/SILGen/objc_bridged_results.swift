@@ -36,11 +36,11 @@ func testNullable(_ obj: Test) -> [Any]? {
   // CHECK: [[RESULT_VAL:%[0-9]+]] = apply [[CONVERT]]<Any>([[COCOA_SOME_VAL]], [[ARRAY_META]])
   // CHECK: [[RESULT_SOME:%[0-9]+]] = enum $Optional<Array<Any>>, #Optional.some!enumelt, [[RESULT_VAL]] : $Array<Any>
   // CHECK: br [[FINISH:bb[0-9]+]]([[RESULT_SOME]] : $Optional<Array<Any>>)
-  
+
   // CHECK: [[CASE_NIL]]:
   // CHECK:   [[RESULT_NONE:%[0-9]+]] = enum $Optional<Array<Any>>, #Optional.none!enumelt
   // CHECK: br [[FINISH]]([[RESULT_NONE]] : $Optional<Array<Any>>)
-  
+
   // CHECK: [[FINISH]]([[RESULT:%[0-9]+]] : @owned $Optional<Array<Any>>):
   // CHECK-NOT: destroy_value [[ARG]] : $Test
   // CHECK: return [[RESULT]] : $Optional<Array<Any>>
@@ -62,7 +62,7 @@ func testNullUnspecified(_ obj: Test) -> [Any]! {
   // CHECK: [[RESULT_VAL:%[0-9]+]] = apply [[CONVERT]]<Any>([[COCOA_SOME_VAL]], [[ARRAY_META]])
   // CHECK: [[RESULT_SOME:%[0-9]+]] = enum $Optional<Array<Any>>, #Optional.some!enumelt, [[RESULT_VAL]] : $Array<Any>
   // CHECK: br [[FINISH:bb[0-9]+]]([[RESULT_SOME]] : $Optional<Array<Any>>)
-  
+
   // CHECK: [[CASE_NIL]]:
   // CHECK:   [[RESULT_NONE:%[0-9]+]] = enum $Optional<Array<Any>>, #Optional.none!enumelt
   // CHECK: br [[FINISH]]([[RESULT_NONE]] : $Optional<Array<Any>>)

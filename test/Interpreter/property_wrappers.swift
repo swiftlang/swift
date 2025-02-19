@@ -17,7 +17,7 @@ struct Other<Value: Equatable> {
 struct Observable<Value: Equatable> {
   private var stored: Value
 
-  
+
   init(wrappedValue: Value) {
     self.stored = wrappedValue
   }
@@ -31,7 +31,7 @@ struct Observable<Value: Equatable> {
     get { fatalError("called projectedValue getter") }
     set { fatalError("called projectedValue setter") }
   }
-  
+
   static subscript<EnclosingSelf: Observed, FinalValue>(
       _enclosingInstance observed: EnclosingSelf,
       wrapped wrappedKeyPath: ReferenceWritableKeyPath<EnclosingSelf, FinalValue>,
@@ -44,7 +44,7 @@ struct Observable<Value: Equatable> {
       if observed[keyPath: storageKeyPath].stored != newValue {
         observed.broadcastValueWillChange(newValue: newValue)
       }
-      
+
       observed[keyPath: storageKeyPath].stored = newValue
     }
   }
@@ -68,7 +68,7 @@ class MyType<T: Equatable>: Observed {
   init(x: T) {
     self.x = x
   }
-  
+
   func broadcastValueWillChange<T>(newValue: T) {
     print("Value of 'x' is changing from \(x) to \(newValue)")
     print($x.hello())

@@ -67,7 +67,7 @@ getImageNameFromSwiftClass(Class _Nullable objcClass,
                            const char * _Nullable * _Nonnull outImageName) {
   if (objcClass == Nil)
     return NO;
-  
+
   auto *classAsMetadata = reinterpret_cast<const ClassMetadata *>(objcClass);
 
   // Is this a Swift class?
@@ -88,7 +88,7 @@ getImageNameFromSwiftClass(Class _Nullable objcClass,
 #endif
     return *outImageName != nullptr;
   }
-  
+
   return NO;
 }
 
@@ -220,7 +220,7 @@ static void patchLazyPointers(const mach_header *mh, const char *symbolName,
         const uint8_t type = sect.flags & SECTION_TYPE;
         if (type != S_LAZY_SYMBOL_POINTERS)
           continue;
-        
+
         const size_t pointerCount = sect.size / sizeof(uintptr_t);
         uintptr_t * const symbolPointers = (uintptr_t *)(sect.addr + slide);
         const uint32_t indirectTableOffset = sect.reserved1;
@@ -300,7 +300,7 @@ static id patchedBundleForClass(id self, SEL _cmd, Class objcClass) {
     return ((id (*)(id, SEL, const char *))objc_msgSend)(
       self, BUNDLE_WITH_EXECUTABLE_PATH_SEL, imageName);
   }
-  
+
   // Call through to the original, which is now found under the patched
   // selector.
   return ((id (*)(id, SEL, Class))objc_msgSend)(
@@ -310,24 +310,24 @@ static id patchedBundleForClass(id self, SEL _cmd, Class objcClass) {
 /// Install the patched +[NSBundle bundleForClass:].
 static void patchNSBundle(void) {
   if (didPatchNSBundle) return;
-  
+
   Class NSBundle = objc_getClass("NSBundle");
   if (!NSBundle) return;
-  
+
   Method origMethod = class_getClassMethod(NSBundle, BUNDLE_FOR_CLASS_SEL);
   if (!origMethod) return;
-  
+
   // Stuff can fail below, but if it does then we can't reasonably try again.
   didPatchNSBundle = true;
-  
+
   BOOL success = class_addMethod(
     object_getClass(NSBundle), PATCHED_BUNDLE_FOR_CLASS_SEL,
     reinterpret_cast<IMP>(patchedBundleForClass), method_getTypeEncoding(origMethod));
   if (!success) return;
-  
+
   Method patchMethod = class_getClassMethod(NSBundle, PATCHED_BUNDLE_FOR_CLASS_SEL);
   if (!patchMethod) return;
-  
+
   method_exchangeImplementations(origMethod, patchMethod);
 }
 #endif

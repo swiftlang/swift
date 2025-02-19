@@ -186,7 +186,7 @@ namespace swift {
       DiagnosticInfo *DiagnosticVal;
       const clang::NamedDecl *ClangDecl;
     };
-    
+
   public:
     DiagnosticArgument(StringRef S)
       : Kind(DiagnosticArgumentKind::String), StringVal(S) {
@@ -546,7 +546,7 @@ namespace swift {
       result.gatherArgsFromTuple<DiagArgTuple<ArgTypes...>, 0, ArgTypes...>(tuple);
       return result;
     }
-    
+
     // Accessors.
     DiagID getID() const { return ID; }
     DiagGroupID getGroupID() const { return GroupID; }
@@ -620,7 +620,7 @@ namespace swift {
 
   /// A diagnostic that has no input arguments, so it is trivially-destructable.
   using ZeroArgDiagnostic = Diag<>;
-  
+
   /// Describes an in-flight diagnostic, which is currently active
   /// within the diagnostic engine and can be augmented within additional
   /// information (source ranges, Fix-Its, etc.).
@@ -630,16 +630,16 @@ namespace swift {
   /// diagnostic.
   class InFlightDiagnostic {
     friend class DiagnosticEngine;
-    
+
     DiagnosticEngine *Engine;
     bool IsActive;
-    
+
     /// Create a new in-flight diagnostic. 
     ///
     /// This constructor is only available to the DiagnosticEngine.
     InFlightDiagnostic(DiagnosticEngine &Engine)
       : Engine(&Engine), IsActive(true) { }
-    
+
     InFlightDiagnostic(const InFlightDiagnostic &) = delete;
     InFlightDiagnostic &operator=(const InFlightDiagnostic &) = delete;
     InFlightDiagnostic &operator=(InFlightDiagnostic &&) = delete;
@@ -651,19 +651,19 @@ namespace swift {
     /// syntax to add additional information to a diagnostic without
     /// actually emitting a diagnostic.
     InFlightDiagnostic() : Engine(0), IsActive(true) { }
-    
+
     /// Transfer an in-flight diagnostic to a new object, which is
     /// typically used when returning in-flight diagnostics.
     InFlightDiagnostic(InFlightDiagnostic &&Other)
       : Engine(Other.Engine), IsActive(Other.IsActive) {
       Other.IsActive = false;
     }
-    
+
     ~InFlightDiagnostic() {
       if (IsActive)
         flush();
     }
-    
+
     /// Flush the active diagnostic to the diagnostic output engine.
     void flush();
 
@@ -866,11 +866,11 @@ namespace swift {
     InFlightDiagnostic &fixItInsertAfter(SourceLoc L, StringRef Str) {
       return fixItInsertAfter(L, "%0", {Str});
     }
-    
+
     /// Add a token-based removal fix-it to the currently-active
     /// diagnostic.
     InFlightDiagnostic &fixItRemove(SourceRange R);
-    
+
     /// Add a character-based removal fix-it to the currently-active
     /// diagnostic.
     InFlightDiagnostic &fixItRemoveChars(SourceLoc Start, SourceLoc End) {
@@ -880,7 +880,7 @@ namespace swift {
     /// Add two replacement fix-it exchanging source ranges to the
     /// currently-active diagnostic.
     InFlightDiagnostic &fixItExchange(SourceRange R1, SourceRange R2);
-    
+
   private:
     InFlightDiagnostic &fixItReplace(SourceRange R, StringRef FormatString,
                                      ArrayRef<DiagnosticArgument> Args);
@@ -907,7 +907,7 @@ namespace swift {
 
     /// Don't emit any warnings
     bool suppressWarnings = false;
-    
+
     /// Don't emit any remarks
     bool suppressRemarks = false;
 
@@ -950,7 +950,7 @@ namespace swift {
     /// Whether to skip emitting warnings
     void setSuppressWarnings(bool val) { suppressWarnings = val; }
     bool getSuppressWarnings() const { return suppressWarnings; }
-    
+
     /// Whether to skip emitting remarks
     void setSuppressRemarks(bool val) { suppressRemarks = val; }
     bool getSuppressRemarks() const { return suppressRemarks; }
@@ -1314,7 +1314,7 @@ namespace swift {
       ActiveDiagnostic->setLoc(Loc);
       return InFlightDiagnostic(*this);
     }
-    
+
     /// Emit a diagnostic with the given set of diagnostic arguments.
     ///
     /// \param Loc The location to which the diagnostic refers in the source
@@ -1452,7 +1452,7 @@ namespace swift {
 
     /// Flush the active diagnostic.
     void flushActiveDiagnostic();
-    
+
     /// Retrieve the active diagnostic.
     Diagnostic &getActiveDiagnostic() { return *ActiveDiagnostic; }
 

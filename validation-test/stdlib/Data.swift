@@ -55,11 +55,11 @@ DataTestSuite.test("Data SubSequence") {
       if dataSlice.count > 0 {
         expectEqual(dataSlice.startIndex, i)
         expectEqual(dataSlice.endIndex, j)
-        
+
         expectEqual(dataSlice[i], arraySlice[i])
 
         dataSlice[i] = 0xFF
-        
+
         expectEqual(dataSlice.startIndex, i)
         expectEqual(dataSlice.endIndex, j)
       }

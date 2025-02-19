@@ -43,7 +43,7 @@ class SourceLoc {
 public:
   SourceLoc() {}
   explicit SourceLoc(llvm::SMLoc Value) : Value(Value) {}
-  
+
   bool isValid() const { return Value.isValid(); }
   bool isInvalid() const { return !isValid(); }
 
@@ -55,7 +55,7 @@ public:
 
   bool operator==(const SourceLoc &RHS) const { return RHS.Value == Value; }
   bool operator!=(const SourceLoc &RHS) const { return !operator==(RHS); }
-  
+
   /// Return a source location advanced a specified number of bytes.
   SourceLoc getAdvancedLoc(int ByteOffset) const {
     assert(isValid() && "Can't advance an invalid location");
@@ -111,7 +111,7 @@ public:
     assert(Start.isValid() == End.isValid() &&
            "Start and end should either both be valid or both be invalid!");
   }
-  
+
   bool isValid() const { return Start.isValid(); }
   bool isInvalid() const { return !isValid(); }
 
@@ -248,7 +248,7 @@ public:
     assert(isValid() && "length does not make sense for an invalid range");
     return ByteLength;
   }
-  
+
   /// Print out the CharSourceRange.  If the locations are in the same buffer
   /// as specified by LastBufferID, then we don't print the filename.  If not,
   /// we do print the filename, and then update LastBufferID with the BufferID
@@ -261,7 +261,7 @@ public:
     unsigned Tmp = ~0U;
     print(OS, SM, Tmp, PrintText);
   }
-  
+
   SWIFT_DEBUG_DUMPER(dump(const SourceManager &SM));
 };
 

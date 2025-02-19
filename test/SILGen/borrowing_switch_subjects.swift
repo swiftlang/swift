@@ -31,7 +31,7 @@ func borrowParam(x: borrowing Outer) {
     }
     // CHECK: end_borrow [[BORROW]]
 
-    
+
     // CHECK: [[BORROW_OUTER:%.*]] = begin_borrow {{.*}} : $Outer
     // CHECK: [[BORROW_INNER:%.*]] = struct_extract [[BORROW_OUTER]]
     // CHECK: [[BORROW_FIX:%.*]] = begin_borrow [fixed] [[BORROW_INNER]]

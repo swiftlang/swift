@@ -1115,7 +1115,7 @@ class diff_match_patch {
           blankLine2 = true;
       }
     }
-  
+
     if (blankLine1 || blankLine2) {
       // Five points for blank lines.
       return 5;
@@ -1301,7 +1301,7 @@ class diff_match_patch {
             prevEqual->text += (*cur_diff).text;
             diffs.erase(cur_diff--);
           }
-          
+
           count_insert = 0;
           count_delete = 0;
           text_delete.clear();

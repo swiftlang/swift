@@ -29,7 +29,7 @@ class Integrate {
   init (f: @escaping (Double) -> Double) {
     fun = f
   }
-    
+
   private func recEval(_ l: Double, fl: Double, r: Double, fr: Double, a: Double) -> Double {
     let h = (r - l) / 2
     let hh = h / 2

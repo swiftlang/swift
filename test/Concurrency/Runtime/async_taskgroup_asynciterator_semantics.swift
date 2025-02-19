@@ -133,8 +133,8 @@ func test_taskGroup_contains() async {
 
     let six = await group.contains(6)
     print("six = \(six)") // CHECK: six = true
-                                                                    
-                                                                    
+
+
     let sixAgain = await group.contains(6)
     print("six again = \(sixAgain)") // CHECK: six again = false
 

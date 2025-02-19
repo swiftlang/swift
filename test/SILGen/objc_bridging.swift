@@ -438,7 +438,7 @@ class Bas : NSObject {
   // CHECK:   destroy_value [[SELF_COPY]] : $Bas
   // CHECK:   return [[RESULT]] : $()
   @objc func arrayArg(_ array: [AnyObject]) { }
-  
+
   // CHECK-LABEL: sil private [thunk] [ossa] @$s13objc_bridging3BasC11arrayResultSayyXlGyFTo : $@convention(objc_method) (Bas) -> @autoreleased NSArray
   // CHECK: bb0([[SELF:%[0-9]+]] : @unowned $Bas):
   // CHECK:   [[SELF_COPY:%.*]] = copy_value [[SELF]] : $Bas

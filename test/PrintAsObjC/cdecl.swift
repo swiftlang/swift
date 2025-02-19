@@ -38,7 +38,7 @@ public func function_pointer_recurring_nightmare(x: @escaping @convention(c) (@c
   -> @convention(c) (@convention(c) (CUnsignedChar) -> CChar) -> Double {
   fatalError()
 }
-  
+
 // CHECK-LABEL: SWIFT_EXTERN void has_keyword_arg_names(NSInteger auto_, NSInteger union_) SWIFT_NOEXCEPT;
 @_cdecl("has_keyword_arg_names")
 func keywordArgNames(auto: Int, union: Int) {}

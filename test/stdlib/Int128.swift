@@ -17,7 +17,7 @@ Int128Tests.test("Memory layout") {
       MemoryLayout<Int128>.alignment >= MemoryLayout<Int64>.alignment
     )
     expectTrue(MemoryLayout<Int128>.alignment <= 16)
-    
+
     // Size and stride must both be 16B.
     expectEqual(MemoryLayout<UInt128>.size, 16)
     expectEqual(MemoryLayout<UInt128>.stride, 16)
@@ -33,7 +33,7 @@ Int128Tests.test("Memory layout") {
 extension UInt128 {
   var high: UInt64 { UInt64(truncatingIfNeeded: self >> 64) }
   var low: UInt64 { UInt64(truncatingIfNeeded: self) }
-  
+
   init(tenToThe n: Int) {
     let tens: [UInt64] = [
       1,
@@ -70,7 +70,7 @@ extension UInt128 {
 extension Int128 {
   var high: Int64 { Int64(truncatingIfNeeded: self >> 64) }
   var low: UInt64 { UInt64(truncatingIfNeeded: self) }
-  
+
   init(tenToThe n: Int) {
     self.init(bitPattern: UInt128(tenToThe: n))
   }
@@ -117,7 +117,7 @@ Int128Tests.test("Literals") {
     expectEqual(1000000000000000000000000000000000000, UInt128(tenToThe: 36))
     expectEqual(10000000000000000000000000000000000000, UInt128(tenToThe: 37))
     expectEqual(100000000000000000000000000000000000000, UInt128(tenToThe: 38))
-    
+
     expectEqual(1, Int128(tenToThe: 0))
     expectEqual(10, Int128(tenToThe: 1))
     expectEqual(100, Int128(tenToThe: 2))
@@ -157,11 +157,11 @@ Int128Tests.test("Literals") {
     expectEqual(1000000000000000000000000000000000000, Int128(tenToThe: 36))
     expectEqual(10000000000000000000000000000000000000, Int128(tenToThe: 37))
     expectEqual(100000000000000000000000000000000000000, Int128(tenToThe: 38))
-    
+
     expectEqual(0, UInt128.zero)
     expectEqual(0xffffffffffffffff_ffffffffffffffff, UInt128.max)
     expectEqual(340282366920938463463374607431768211455, UInt128.max)
-    
+
     expectEqual(0, Int128.zero)
     expectEqual(0x7fffffffffffffff_ffffffffffffffff, Int128.max)
     expectEqual(170141183460469231731687303715884105727, Int128.max)
@@ -180,7 +180,7 @@ func testConversion(
   var r1: UInt128? = nil
   var r2: Int128? = nil
   var r3: Int128? = nil
-  
+
   if let r0 {
     if r0 == 0 { r1 = 0 }
     if r0 <= Int128.max { r2 = Int128(bitPattern: r0) }
@@ -192,7 +192,7 @@ func testConversion(
     if let r2 { expectEqual( Int128( input), r2, line: line) }
     if let r3 { expectEqual( Int128(-input), r3, line: line) }
   }
-  
+
   if exact {
     expectEqual(UInt128(exactly:  input), r0, line: line)
     expectEqual(UInt128(exactly: -input), r1, line: line)
@@ -208,14 +208,14 @@ func testConversion(
 
 Int128Tests.test("Conversion from Double") {
   if #available(SwiftStdlib 6.0, *) {
-    
+
     func testCase(
       _ input: Double,
       _ r0: UInt128?,
       exact: Bool = false,
       line: UInt = #line
     ) { testConversion(input, r0, exact: exact, line: line) }
-    
+
     testCase(.zero, 0, exact: true)
     testCase(.leastNonzeroMagnitude, 0)
     testCase(.leastNormalMagnitude, 0)
@@ -245,14 +245,14 @@ Int128Tests.test("Conversion from Double") {
 
 Int128Tests.test("Conversion from Float") {
   if #available(SwiftStdlib 6.0, *) {
-    
+
     func testCase(
       _ input: Float,
       _ r0: UInt128?,
       exact: Bool = false,
       line: UInt = #line
     ) { testConversion(input, r0, exact: exact, line: line) }
-    
+
     testCase(.zero, 0, exact: true)
     testCase(.leastNonzeroMagnitude, 0)
     testCase(.leastNormalMagnitude, 0)
@@ -280,14 +280,14 @@ Int128Tests.test("Conversion from Float") {
 #if !((os(macOS) || targetEnvironment(macCatalyst)) && arch(x86_64))
 Int128Tests.test("Conversion from Float16") {
   if #available(SwiftStdlib 6.0, *) {
-    
+
     func testCase(
       _ input: Float16,
       _ r0: UInt128?,
       exact: Bool = false,
       line: UInt = #line
     ) { testConversion(input, r0, exact: exact, line: line) }
-    
+
     testCase(.zero, 0, exact: true)
     testCase(.leastNonzeroMagnitude, 0)
     testCase(.leastNormalMagnitude, 0)
@@ -313,7 +313,7 @@ Int128Tests.test("Conversion from integers") {
     expectEqual(Int128(truncatingIfNeeded: Int64.min), -0x8000000000000000)
     expectEqual(Int128(truncatingIfNeeded: Int64.max), 0x0000000000000000_7fffffffffffffff)
     expectEqual(Int128(truncatingIfNeeded: UInt64.max), 0x0000000000000000_ffffffffffffffff)
-    
+
     expectEqual(Int128(exactly: -1), -1)
     expectEqual(Int128(exactly: Int8.min), -0x80)
     expectEqual(Int128(exactly: Int8.max),  0x7f)
@@ -321,7 +321,7 @@ Int128Tests.test("Conversion from integers") {
     expectEqual(Int128(exactly: Int64.min), -0x8000000000000000)
     expectEqual(Int128(exactly: Int64.max),  0x7fffffffffffffff)
     expectEqual(Int128(exactly: UInt64.max), 0xffffffffffffffff)
-    
+
     expectEqual(Int128(clamping: -1), -1)
     expectEqual(Int128(clamping: Int8.min), -0x80)
     expectEqual(Int128(clamping: Int8.max),  0x7f)
@@ -329,7 +329,7 @@ Int128Tests.test("Conversion from integers") {
     expectEqual(Int128(clamping: Int64.min), -0x8000000000000000)
     expectEqual(Int128(clamping: Int64.max),  0x7fffffffffffffff)
     expectEqual(Int128(clamping: UInt64.max), 0xffffffffffffffff)
-    
+
     expectEqual(UInt128(truncatingIfNeeded: -1),       0xffffffffffffffff_ffffffffffffffff)
     expectEqual(UInt128(truncatingIfNeeded: Int8.min), 0xffffffffffffffff_ffffffffffffff80)
     expectEqual(UInt128(truncatingIfNeeded: Int8.max), 0x0000000000000000_000000000000007f)
@@ -337,7 +337,7 @@ Int128Tests.test("Conversion from integers") {
     expectEqual(UInt128(truncatingIfNeeded: Int64.min),  0xffffffffffffffff_8000000000000000)
     expectEqual(UInt128(truncatingIfNeeded: Int64.max),  0x0000000000000000_7fffffffffffffff)
     expectEqual(UInt128(truncatingIfNeeded: UInt64.max), 0x0000000000000000_ffffffffffffffff)
-    
+
     expectEqual(UInt128(exactly: -1),        nil)
     expectEqual(UInt128(exactly: Int8.min),  nil)
     expectEqual(UInt128(exactly: Int8.max),  0x7f)
@@ -345,7 +345,7 @@ Int128Tests.test("Conversion from integers") {
     expectEqual(UInt128(exactly: Int64.min),   nil)
     expectEqual(UInt128(exactly: Int64.max),   0x7fffffffffffffff)
     expectEqual(UInt128(exactly: UInt64.max),  0xffffffffffffffff)
-    
+
     expectEqual(UInt128(clamping: -1),       0)
     expectEqual(UInt128(clamping: Int8.min), 0)
     expectEqual(UInt128(clamping: Int8.max), 0x7f)
@@ -387,7 +387,7 @@ Int128Tests.test("Bitwise operations") {
     expectEqual(a & b, 0xf0e00000b0a00000_7060000030200000)
     expectEqual(a | b, 0xffffd0c0ffff9080_ffff5040ffff1000)
     expectEqual(a ^ b, 0x0f1fd0c04f5f9080_8f9f5040cfdf1000)
-    
+
     expectEqual(a &>> 0,   a)
     expectEqual(a &>> 1,   0x7fff80007fff8000_7fff80007fff8000)
     expectEqual(a &>> 2,   0x3fffc0003fffc000_3fffc0003fffc000)
@@ -399,7 +399,7 @@ Int128Tests.test("Bitwise operations") {
     expectEqual(b &>>  64, 0x0000000000000000_f0e0d0c0b0a09080)
     expectEqual(b &>> 127, 0x0000000000000000_0000000000000001)
     expectEqual(b &>> 128, b)
-    
+
     expectEqual(a &<< 0,   a)
     expectEqual(a &<< 1,   0xfffe0001fffe0001_fffe0001fffe0000)
     expectEqual(a &<< 2,   0xfffc0003fffc0003_fffc0003fffc0000)
@@ -411,7 +411,7 @@ Int128Tests.test("Bitwise operations") {
     expectEqual(b &<<  64, 0x7060504030201000_0000000000000000)
     expectEqual(b &<< 127, 0x0000000000000000_0000000000000000)
     expectEqual(b &<< 128, b)
-    
+
     expectEqual(a.nonzeroBitCount, 64)
     expectEqual(b.nonzeroBitCount, 32)
     for i in 0 ..< 128 {
@@ -430,7 +430,7 @@ Int128Tests.test("Addition and subtraction") {
       _ c: Bool,
       line: UInt = #line
     ) {
-      
+
       expectEqual(a.addingReportingOverflow(b), (r, c), line: line)
       expectEqual(r.subtractingReportingOverflow(b), (a, c), line: line)
       expectEqual(a &+ b, r, line: line)
@@ -439,12 +439,12 @@ Int128Tests.test("Addition and subtraction") {
         expectEqual(a + b, r, line: line)
         expectEqual(r - b, a, line: line)
       }
-      
+
       let sa = Int128(bitPattern: a)
       let sb = Int128(bitPattern: b)
       let sr = Int128(bitPattern: r)
       let o = (sr < sa) != (sb < 0)
-      
+
       expectEqual(sa.addingReportingOverflow(sb), (sr, o), line: line)
       expectEqual(sr.subtractingReportingOverflow(sb), (sa, o), line: line)
       expectEqual(sa &+ sb, sr, line: line)
@@ -454,7 +454,7 @@ Int128Tests.test("Addition and subtraction") {
         expectEqual(sr - sb, sa, line: line)
       }
     }
-    
+
     testCase(0x22cece8fc3a992208da8556f20cd17b4, 0x5bf62486bf4d907e675fa524340e9d5a, 0x7ec4f31682f7229ef507fa9354dbb50e, false)
     testCase(0xe9584e473c12b6939c5082bc1a6fefb8, 0xff05d7ed3e790d90d5ef9ebcb73d9069, 0xe85e26347a8bc42472402178d1ad8021, true)
     testCase(0x7a798c5a2be3c25d535afa5034515452, 0x0d0ace9628ab60f1daf587b6b67c955c, 0x87845af0548f234f2e508206eacde9ae, false)
@@ -506,7 +506,7 @@ Int128Tests.test("Wide multiplication and division") {
         expectEqual(sa.dividingFullWidth((high: h1, low: l1)), (sb, Int128(rem)), line: line)
       }
     }
-    
+
     testCase(0x14f6c7bb051951bc8f36082753d0ad15, 0xdba081b2a9cde4e20c6778833e3795dd, 0x11fc41b8ce63bc91660b4e6b14214280, 0xc0c6e5ba6909c6bdaf80e33b1565a421)
     testCase(0x4e0d20760a881de82733cea44f83b686, 0xff6f66e9e75392e824ff2eca4b114ad4, 0x4de10a6733150dc755f9f237e920c12d, 0x2d3e5a1b8508cace5d0b97024cbbe2f8)
     testCase(0x2e79ffe8593c337e6711ce338d24e68e, 0x0865ae2d496547bef886cbd8cd01a507, 0x018645c05e2a2bfc986d97269c67548c, 0x2d7cc7781078868df9e718f64129d3e2)

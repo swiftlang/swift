@@ -12,7 +12,7 @@ func main(_ i: Int, _ d: Double, _ s: String, arr: [String], dict: [Int: String]
 	takeStringConst("")
 	takeArrayConst([""])
 	takeDictConst([1: "", 2: "text"])
-	
+
 	takeIntConst(i) // expected-error {{expect a compile-time constant literal}}
 	takeDoubleConst(d) // expected-error {{expect a compile-time constant literal}}
 	takeStringConst("\(d)") // expected-error {{expect a compile-time constant literal}}

@@ -217,8 +217,8 @@ class subject_class1 { // no-error
 
   @objc // access-note-move{{subject_class1.subject_instanceFunc()}}
   func subject_instanceFunc() {} // no-error
-  
-  
+
+
 }
 
 @objc // access-note-move{{subject_class2}}
@@ -257,7 +257,7 @@ extension subject_genericClass where T : Hashable {
 extension subject_genericClass {
   @objc // bad-access-note-move{{subject_genericClass.extProp}}
   var extProp: Int { return 0 } // access-note-adjust{{@objc}} expected-error{{extensions of generic classes cannot contain '@objc' members}}
-  
+
   @objc // bad-access-note-move{{subject_genericClass.extFoo()}}
   func extFoo() {} // access-note-adjust{{@objc}} expected-error{{extensions of generic classes cannot contain '@objc' members}}
 }
@@ -1396,7 +1396,7 @@ class infer_instanceVar1 {
   var var_CFunctionPointer_invalid_1: @convention(c) Int // expected-error {{@convention attribute only applies to function types}}
   // CHECK-LABEL: {{^}} var var_CFunctionPointer_invalid_2: <<error type>>
   var var_CFunctionPointer_invalid_2: @convention(c) (PlainStruct) -> Int // expected-error {{'(PlainStruct) -> Int' is not representable in Objective-C, so it cannot be used with '@convention(c)'}}
-  
+
   // <rdar://problem/20918869> Confusing diagnostic for @convention(c) throws
   var var_CFunctionPointer_invalid_3 : @convention(c) (Int) throws -> Int // expected-error {{'(Int) throws -> Int' is not representable in Objective-C, so it cannot be used with '@convention(c)'}}
 
@@ -2058,7 +2058,7 @@ class BadClass2 {
 
   @objc(foo) // bad-access-note-move{{BadClass2.noArgNamesOneParam(x:)}} expected-error{{'@objc' method name provides names for 0 arguments, but method has one parameter}}
   func noArgNamesOneParam(x: Int) { }
-  
+
   @objc(foo) // bad-access-note-move{{BadClass2.noArgNamesOneParam2(_:)}} expected-error{{'@objc' method name provides names for 0 arguments, but method has one parameter}}
   func noArgNamesOneParam2(_: Int) { }
 

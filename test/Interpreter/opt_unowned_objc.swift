@@ -34,7 +34,7 @@ func printState(_ x : ObjCClassBase?) {
 
 func testObjCClass() {
   print("testObjCClass")                // CHECK: testObjCClass
-  
+
   unowned var w : ObjCClassBase?
   printState(w)                           // CHECK-NEXT: is nil
   var c : ObjCClassBase = ObjCClass()     // CHECK: ObjCClass Created

@@ -198,7 +198,7 @@ extension LazySequence: Sequence {
   public __consuming func makeIterator() -> Iterator {
     return _base.makeIterator()
   }
-  
+
   @inlinable // lazy-performance
   public var underestimatedCount: Int {
     return _base.underestimatedCount
@@ -216,7 +216,7 @@ extension LazySequence: Sequence {
   public func _customContainsEquatableElement(_ element: Element) -> Bool? { 
     return _base._customContainsEquatableElement(element)
   }
-  
+
   @inlinable // generic-performance
   public __consuming func _copyToContiguousArray() -> ContiguousArray<Element> {
     return _base._copyToContiguousArray()

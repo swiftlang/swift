@@ -67,7 +67,7 @@ import gizmo
   // CHECK:   destroy_value [[SET]]
   // CHECK:   return [[NSSET]] : $NSSet
   // CHECK: } // end sil function '$s17objc_set_bridging3FooC8property{{[_0-9a-zA-Z]*}}vgTo'
-  
+
   // Property setter
   // CHECK-LABEL: sil private [thunk] [ossa] @$s17objc_set_bridging3FooC8property{{[_0-9a-zA-Z]*}}vsTo : $@convention(objc_method) (NSSet, Foo) -> () {
   // CHECK: bb0([[NSSET:%[0-9]+]] : @unowned $NSSet, [[SELF:%[0-9]+]] : @unowned $Foo):
@@ -83,7 +83,7 @@ import gizmo
   // CHECK:   end_borrow [[BORROWED_SELF_COPY]]
   // CHECK:   destroy_value [[SELF_COPY]] : $Foo
   // CHECK:   return [[RESULT]] : $()
-  
+
   // CHECK-LABEL: sil private [thunk] [ossa] @$s17objc_set_bridging3FooC19nonVerbatimProperty{{[_0-9a-zA-Z]*}}vgTo : $@convention(objc_method) (Foo) -> @autoreleased NSSet
   // CHECK-LABEL: sil private [thunk] [ossa] @$s17objc_set_bridging3FooC19nonVerbatimProperty{{[_0-9a-zA-Z]*}}vsTo : $@convention(objc_method) (NSSet, Foo) -> () {
   @objc var nonVerbatimProperty: Set<String> = Set()

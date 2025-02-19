@@ -96,7 +96,7 @@ func generateOperandAccessors() {
 
 struct FPConstantFoldedComparisonOpsValidator: FPOptimizedOpsValidator {
     /////////////////////// TYPES ///////////////////////
-    
+
     /// Type of floating points this validator deals with.
     enum _FpType : CaseIterable, Representable, Equatable {
         case Float
@@ -307,13 +307,13 @@ struct FPConstantFoldedComparisonOpsValidator: FPOptimizedOpsValidator {
                         let comparisonFuncName = ["comparison", fpType.printable_name(), op.printable_name(), op1.printable_name(), op2.printable_name()].joined(separator: "_")
                         let optFuncName = [optPrefix, fpType.printable_name(), op.printable_name(), op1.printable_name(), op2.printable_name()].joined(separator: "_")
                         let unoptFuncName = [unoptPrefix, fpType.printable_name(), op.printable_name(), op1.printable_name(), op2.printable_name()].joined(separator: "_")
-                        
+
                         print("""
                         @inline(never) @_silgen_name("\(comparisonFuncName)") @_optimize(none)
                         func \(comparisonFuncName)() -> Bool {
                             return \(optFuncName)() == \(unoptFuncName)()
                         }
-                                
+
                         """)
                     }
                 }
@@ -382,7 +382,7 @@ struct FPConstantFoldedComparisonOpsValidator: FPOptimizedOpsValidator {
             return \(operand1) \(op.math_name()) \(operand2)
         }
         \(checkDirectives)
-                
+
         """)
     }
 
@@ -579,13 +579,13 @@ struct FPConstantFoldedArithmeticOpsValidator: FPOptimizedOpsValidator {
                         let comparisonFuncName = ["comparison", fpType.printable_name(), op.printable_name(), op1.printable_name(), op2.printable_name()].joined(separator: "_")
                         let optFuncName = [optPrefix, fpType.printable_name(), op.printable_name(), op1.printable_name(), op2.printable_name()].joined(separator: "_")
                         let unoptFuncName = [unoptPrefix, fpType.printable_name(), op.printable_name(), op1.printable_name(), op2.printable_name()].joined(separator: "_")
-                        
+
                         print("""
                         @inline(never) @_silgen_name("\(comparisonFuncName)") @_optimize(none)
                         func \(comparisonFuncName)() -> Bool {
                             return \(optFuncName)() == \(unoptFuncName)()
                         }
-                                
+
                         """)
                     }
                 }
@@ -643,7 +643,7 @@ struct FPConstantFoldedArithmeticOpsValidator: FPOptimizedOpsValidator {
             return \(operand1) \(op.math_name()) \(operand2)
         }
         \(checkDirectives)
-                
+
         """)
     }
 }

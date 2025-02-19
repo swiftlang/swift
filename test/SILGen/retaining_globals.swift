@@ -36,15 +36,15 @@ func main() {
   // CHECK: [[load_1:%.*]] = load [copy] {{%.*}} : $*Optional<NSObject>
   // CHECK: [[move_1:%.*]] = move_value [lexical] [var_decl] [[load_1]]
   let object = globalObject
-  
+
   // CHECK: [[load_2:%.*]] = load [copy] {{%.*}} : $*Optional<AnyObject>
   // CHECK: [[move_2:%.*]] = move_value [lexical] [var_decl] [[load_2]]
   let id = globalId
-  
+
   // CHECK: [[load_3:%.*]] = load [copy] {{%.*}} : $*Optional<NSArray>
   // CHECK: [[move_3:%.*]] = move_value [lexical] [var_decl] [[load_3]]
   let arr = globalArray
-  
+
   // CHECK: [[load_4:%.*]] = load [copy] {{%.*}} : $*Optional<NSArray>
   // CHECK: [[move_4:%.*]] = move_value [lexical] [var_decl] [[load_4]]
   let constArr = globalConstArray

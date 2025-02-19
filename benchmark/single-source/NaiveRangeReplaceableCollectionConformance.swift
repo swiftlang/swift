@@ -30,31 +30,31 @@ public let benchmarks = [
 ]
 
 struct NaiveRRC : RangeReplaceableCollection {
-  
+
   var storage:[UInt8] = []
-  
+
   init() {}
-  
+
   func index(after i: Int) -> Int {
     i + 1
   }
-  
+
   func index(before i: Int) -> Int {
     i - 1
   }
-  
+
   var startIndex: Int {
     0
   }
-  
+
   var endIndex: Int {
     count
   }
-  
+
   var count: Int {
     storage.count
   }
-  
+
   subscript(position: Int) -> UInt8 {
     get {
       storage[position]
@@ -63,11 +63,11 @@ struct NaiveRRC : RangeReplaceableCollection {
       storage[position] = newValue
     }
   }
-  
+
   mutating func replaceSubrange(_ subrange: Range<Int>, with newElements: some Collection<UInt8>) {
     storage.replaceSubrange(subrange, with: newElements)
   }
-  
+
   mutating func reserveCapacity(_ n: Int) {
     storage.reserveCapacity(n)
   }

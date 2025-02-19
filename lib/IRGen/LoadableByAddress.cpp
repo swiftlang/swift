@@ -298,13 +298,13 @@ LargeSILTypeMapper::getNewSILFunctionType(GenericEnvironment *env,
   if (!modifiableFunction(fnType) && !mustTransform) {
     return fnType;
   }
-  
+
   // Map substituted function types according to their substituted generic
   // signature.
   if (fnType->getPatternSubstitutions()) {
     env = getSubstGenericEnvironment(fnType);
   }
-  
+
   auto newParams = getNewParameters(env, fnType, IGM);
   auto newYields = getNewYields(env, fnType, IGM);
   auto newResults = getNewResults(env, fnType, IGM, mustTransform);
@@ -2433,7 +2433,7 @@ void LoadableByAddress::runOnFunction(SILFunction *F) {
     }
     return;
   }
-  
+
   StructLoweringState pass(F, *currIRMod, MapperCache);
 
   // Rewrite function args and insert allocs.

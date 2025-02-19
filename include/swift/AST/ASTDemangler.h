@@ -32,7 +32,7 @@
 #include <optional>
 
 namespace swift {
- 
+
 class TypeDecl;
 
 namespace Demangle {
@@ -128,7 +128,7 @@ public:
   TypeDecl *createTypeDecl(NodePointer node);
 
   GenericTypeDecl *createTypeDecl(StringRef mangledName, bool &typeAlias);
-  
+
   GenericTypeDecl *createTypeDecl(NodePointer node,
                                   bool &typeAlias);
 
@@ -141,7 +141,7 @@ public:
   Type createTypeAliasType(GenericTypeDecl *decl, Type parent);
 
   Type createBoundGenericType(GenericTypeDecl *decl, ArrayRef<Type> args);
-  
+
   Type resolveOpaqueType(NodePointer opaqueDescriptor,
                          ArrayRef<ArrayRef<Type>> args,
                          unsigned ordinal);

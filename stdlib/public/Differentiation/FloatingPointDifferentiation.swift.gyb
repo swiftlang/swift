@@ -60,7 +60,7 @@ extension ${Self} {
   Other = other_type.stdlib_name
   other_bits = other_type.bits
   }%
-  
+
   % if other_bits == 80:
   #if !(os(Windows) || os(Android) || $Embedded) && (arch(i386) || arch(x86_64))
   % end
@@ -76,7 +76,7 @@ extension ${Self} {
   -> (value: ${Self}, pullback: (${Self}) -> ${Other}) {
     return (value: ${Self}(x), pullback: { v in ${Other}(v) })
   }
-  
+
   ${Availability(other_bits)}
   @inlinable
   @_transparent
@@ -85,7 +85,7 @@ extension ${Self} {
   -> (value: ${Self}, differential: (${Other}) -> ${Self}) {
     return (value: ${Self}(x), differential: { dx in ${Self}(dx) })
   }
-  
+
   % if other_bits == 80 or other_bits == 16:
   #endif
   % end

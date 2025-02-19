@@ -16,7 +16,7 @@ BundleTests.test("Bundle.bundleForNilClass") {
 
   typealias BundleForClassFunc =
     @convention(c) (AnyObject, Selector, AnyObject?) -> Bundle
-  
+
   let sel = #selector(Bundle.init(for:))
   let imp = unsafeBitCast(Bundle.method(for: sel), to: BundleForClassFunc.self)
   let bundleForNil = imp(Bundle.self, sel, nil);

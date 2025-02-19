@@ -399,12 +399,12 @@ private:
       }
       return true;
     }
-    
+
     /// Computes the discriminator for pointer signing.
     void computeDiscriminator(LLVMContext &Context) {
       assert(needsPointerSigning);
       assert(!discriminator);
-      
+
       /// Get a hash from the concatenated function names.
       /// The hash is deterministic, because the order of values depends on the
       /// order of functions in the module, which is itself deterministic.
@@ -448,14 +448,14 @@ private:
 
   /// True if the architecture has pointer authentication enabled.
   bool ptrAuthEnabled = false;
-  
+
   /// The key for pointer authentication.
   unsigned ptrAuthKey = 0;
 
   FunctionEntry *getEntry(Function *F) const {
     return FuncEntries.lookup(F);
   }
-  
+
   bool isInEquivalenceClass(FunctionEntry *FE) const {
     if (FE->TreeIter != FnTree.end()) {
       return true;
@@ -676,7 +676,7 @@ static unsigned getBenefit(Function *F) {
 static bool isEligibleFunction(Function *F) {
   if (F->isDeclaration())
     return false;
-  
+
   if (F->hasAvailableExternallyLinkage())
     return false;
 
@@ -685,16 +685,16 @@ static bool isEligibleFunction(Function *F) {
 
   if (F->getCallingConv() == CallingConv::SwiftTail)
     return false;
-  
+
   unsigned Benefit = getBenefit(F);
   if (Benefit < FunctionMergeThreshold)
     return false;
-  
+
   return true;
 }
 
 bool SwiftMergeFunctions::runOnModule(Module &M) {
-  
+
   if (FunctionMergeThreshold == 0)
     return false;
 
@@ -866,7 +866,7 @@ bool SwiftMergeFunctions::tryMergeEquivalenceClass(FunctionEntry *FirstInClass) 
   int Try = 0;
 
   unsigned Benefit = getBenefit(FirstInClass->F);
-  
+
   // The bigger the function, the more parameters are allowed.
   unsigned maxParams = std::max(4u, Benefit / 100);
 
@@ -1089,7 +1089,7 @@ void SwiftMergeFunctions::mergeWithParams(const FunctionInfos &FInfos,
   // Insert the new function after the last function in the equivalence class.
   FirstF->getParent()->getFunctionList().insert(
                         std::next(FInfos[1].F->getIterator()), NewFunction);
-  
+
   LLVM_DEBUG(dbgs() << "  Merge into " << NewFunction->getName() << '\n');
 
   // Move the body of FirstF into the NewFunction.
@@ -1221,14 +1221,14 @@ void SwiftMergeFunctions::writeThunk(Function *ToFunc, Function *Thunk,
                                      unsigned FuncIdx) {
   // Delete the existing content of Thunk.
   Thunk->dropAllReferences();
-  
+
   BasicBlock *BB = BasicBlock::Create(Thunk->getContext(), "", Thunk);
   IRBuilder<> Builder(BB);
 
   SmallVector<Value *, 16> Args;
   unsigned ParamIdx = 0;
   FunctionType *ToFuncTy = ToFunc->getFunctionType();
-  
+
   // Add arguments which are passed through Thunk.
   for (Argument & AI : Thunk->args()) {
     Args.push_back(createCast(Builder, &AI, ToFuncTy->getParamType(ParamIdx)));
@@ -1268,7 +1268,7 @@ bool SwiftMergeFunctions::replaceDirectCallers(Function *Old, Function *New,
   bool AllReplaced = true;
 
   SmallVector<CallInst *, 8> Callers;
-  
+
   for (Use &U : Old->uses()) {
     auto *I = dyn_cast<Instruction>(U.getUser());
     if (!I) {
@@ -1278,7 +1278,7 @@ bool SwiftMergeFunctions::replaceDirectCallers(Function *Old, Function *New,
     FunctionEntry *FE = getEntry(I->getFunction());
     if (FE)
       removeEquivalenceClassFromTree(FE);
-    
+
     auto *CI = dyn_cast<CallInst>(I);
     if (!CI || CI->getCalledOperand() != Old) {
       AllReplaced = false;
@@ -1301,7 +1301,7 @@ bool SwiftMergeFunctions::replaceDirectCallers(Function *Old, Function *New,
     FunctionType *NewFuncTy = New->getFunctionType();
     (void) NewFuncTy;
     unsigned ParamIdx = 0;
-    
+
     // Add the existing parameters.
     for (Value *OldArg : CI->args()) {
       NewArgAttrs.push_back(NewPAL.getParamAttrs(ParamIdx));

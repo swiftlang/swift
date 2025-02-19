@@ -818,7 +818,7 @@ namespace {
                     return getComponent(lhs).getNumDisjunctions() >
                         getComponent(rhs).getNumDisjunctions();
                   });
-        
+
         representativeTypeVars =
             computeOneWayComponentOrdering(representativeTypeVars);
 

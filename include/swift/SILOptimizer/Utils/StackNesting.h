@@ -115,7 +115,7 @@ private:
   ///
   /// Returns the status of what changes were made.
   Changes run();
-  
+
   /// For debug dumping.
   void dump() const;
 

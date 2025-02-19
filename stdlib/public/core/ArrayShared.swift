@@ -356,7 +356,7 @@ extension _ArrayBufferProtocol {
   internal mutating func _arrayAppendSequence<S: Sequence>(
     _ newItems: __owned S
   ) where S.Element == Element {
-    
+
     // this function is only ever called from append(contentsOf:)
     // which should always have exhausted its capacity before calling
     _internalInvariant(count == capacity)

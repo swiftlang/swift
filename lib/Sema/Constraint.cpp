@@ -339,7 +339,7 @@ void Constraint::print(llvm::raw_ostream &Out, SourceManager *sm,
       Locator->dump(sm, Out);
     }
     Out << ":\n";
-    
+
     // Sort constraints by favored, unmarked, disabled
     // for printing only.
     std::vector<Constraint *> sortedConstraints(getNestedConstraints().begin(),

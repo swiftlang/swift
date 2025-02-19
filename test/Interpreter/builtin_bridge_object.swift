@@ -76,7 +76,7 @@ if true {
 
   print(nonPointerBits(bo) == 0)
   // CHECK-NEXT: true
-  
+
   var bo3 = Builtin.castToBridgeObject(C(), 0._builtinWordValue)
   print(Bool(_builtinBooleanLiteral: Builtin.isUnique(&bo3)))
   // CHECK-NEXT: true
@@ -102,10 +102,10 @@ if true {
   print(x === x1)
   // CHECK-NEXT: true
   print(x === x2)
-  
+
   print(nonPointerBits(bo) == NATIVE_SPARE_BITS)
   // CHECK-NEXT: true
-  
+
   var bo3 = Builtin.castToBridgeObject(C(), NATIVE_SPARE_BITS._builtinWordValue)
   print(Bool(_builtinBooleanLiteral: Builtin.isUnique(&bo3)))
   // CHECK-NEXT: true
@@ -172,7 +172,7 @@ if true {
   print(x === x1)
   // CHECK-NEXT: true
   print(x === x2)
-  
+
   var bo3 = nonNativeBridgeObject(unTaggedString)
   print(Bool(_builtinBooleanLiteral: Builtin.isUnique(&bo3)))
   // CHECK-NEXT: true

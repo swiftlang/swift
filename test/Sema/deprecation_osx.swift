@@ -189,7 +189,7 @@ class I59843_B {
   static func configure(a: String, b: String) {}
 
   static func configure(with: Int, and: Int) {}
-  
+
   @available(macOS, deprecated: 51, renamed: "method(with:and:)")
   func method(a: String, b: String) {}
 
@@ -205,7 +205,7 @@ class I59843_B {
   static func contextDiff(a: String, b: String) {}
 
   static func contextDiff(with: Int, and: Int) {}
-  
+
   func f() {
     self.method(a: "a", b: "b") // expected-warning{{'method(a:b:)' was deprecated in macOS 51: renamed to 'method(with:and:)' [DeprecatedDeclaration]}}
     // expected-note@-1{{use 'method(with:and:)' instead}} {{17-18=with}} {{25-26=and}}

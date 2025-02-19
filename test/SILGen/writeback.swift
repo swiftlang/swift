@@ -125,7 +125,7 @@ protocol Runcible {
 
 protocol Frobable {
   associatedtype Anse
-  
+
   var anse: Anse { get set }
 }
 

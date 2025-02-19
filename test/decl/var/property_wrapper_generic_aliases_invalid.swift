@@ -3,7 +3,7 @@
 @propertyWrapper
 struct SomeStruct<T> {
   var wrappedValue: T 
-    
+
   init(wrappedValue: T) { 
     self.wrappedValue = wrappedValue
   } 

@@ -52,7 +52,7 @@ func test0() throws {
   //   Normal path: fall out and return.
   // CHECK: [[NORMAL_BB]]:
   // CHECK: return
-  
+
   //   Error path: fall out and rethrow.
   // CHECK: [[ERROR_BB]]:
   // CHECK: [[T0:%.*]] = load [take] [[ERR_TEMP0]]

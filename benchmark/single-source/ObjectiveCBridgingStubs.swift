@@ -442,7 +442,7 @@ public func setup_SpecificRangeOfStringBridging() {
   setup_StringBridgeBenchmark()
   longNativeASCII = Array(repeating: "The quick brown fox jump over the lazy dog", count: 1000).joined() + "s"
   longNativeNonASCII = "ü" + longNativeASCII + "ö"
-  
+
 }
 
 @inline(never)

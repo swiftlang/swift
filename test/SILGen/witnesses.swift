@@ -108,7 +108,7 @@ struct ConformingStruct : X {
   // CHECK-NEXT:    %7 = tuple ()
   // CHECK-NEXT:    return %7 : $()
   // CHECK-NEXT:  }
-  
+
   mutating
   func loadable(x: Loadable) -> Loadable { return x }
   // CHECK-LABEL: sil private [transparent] [thunk] [ossa] @$s9witnesses16ConformingStructVAA1XA2aDP8loadable{{[_0-9a-zA-Z]*}}FTW :
@@ -118,7 +118,7 @@ struct ConformingStruct : X {
   // CHECK-NEXT:    %3 = apply %2(%0, %1) : $@convention(method) (Loadable, @inout ConformingStruct) -> Loadable
   // CHECK-NEXT:    return %3 : $Loadable
   // CHECK-NEXT:  }
-  
+
   mutating
   func addrOnly(x: AddrOnly) -> AddrOnly { return x }
   // CHECK-LABEL: sil private [transparent] [thunk] [ossa] @$s9witnesses16ConformingStructVAA1XA2aDP8addrOnly{{[_0-9a-zA-Z]*}}FTW :
@@ -129,7 +129,7 @@ struct ConformingStruct : X {
   // CHECK-NEXT:    %5 = tuple ()
   // CHECK-NEXT:    return %5 : $()
   // CHECK-NEXT:  }
-  
+
   mutating
   func generic<C>(x: C) -> C { return x }
   // CHECK-LABEL: sil private [transparent] [thunk] [ossa] @$s9witnesses16ConformingStructVAA1XA2aDP7generic{{[_0-9a-zA-Z]*}}FTW :

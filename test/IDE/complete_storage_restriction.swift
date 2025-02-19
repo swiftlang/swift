@@ -29,7 +29,7 @@ struct Test {
   // SECOND_ACCESSES_ARGUMENT: Begin completions, 2 items
   // SECOND_ACCESSES_ARGUMENT-DAG: Keyword/None: initializes: [#Specify stored properties initialized by the accessor#];
   // SECOND_ACCESSES_ARGUMENT-DAG: Decl[InstanceVar]/CurrNominal: storedProperty[#Int#];
-  
+
 
   var secondInitializesArgument: Int {
     @storageRestrictions(initializes: x, #^SECOND_INITIALIZES_ARGUMENT^#) 

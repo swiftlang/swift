@@ -6,15 +6,15 @@ struct Foo {
   subscript() -> String {
     return "instance subscript"
   }
-  
+
   func `subscript`() -> String {
     return "instance func"
   }
-  
+
   static subscript() -> String {
     return "static subscript"
   }
-  
+
   static func `subscript`() -> String {
     return "static func"
   }

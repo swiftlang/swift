@@ -16,7 +16,7 @@ import StdlibUnittest
 import Foundation
 #endif
 var SmallStringTests = TestSuite("SmallStringTests")
-  
+
 SmallStringTests.test("FitsInSmall") {
   func runTest(_ input: String) throws {
     let tiny = Array(input.utf8)

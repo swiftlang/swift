@@ -57,7 +57,7 @@ enum Ty {
 
 struct TestStruct {
   func method(arg: Int, _ c: Int) {}
-  
+
   func test() {
     _ = method(arg:_:)
     _ = self.method(arg:_:).self

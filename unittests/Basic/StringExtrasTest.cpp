@@ -29,7 +29,7 @@ TEST(CamelCaseWordsTest, Iteration) {
   // Iteration contents.
   auto iter = words.begin();
   EXPECT_EQ(*iter, "URL");
-  
+
   // Stepping forward.
   ++iter;
   EXPECT_EQ(*iter, "By");  

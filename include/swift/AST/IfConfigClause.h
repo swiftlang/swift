@@ -30,11 +30,11 @@ namespace swift {
 struct IfConfigClause {
   /// The location of the #if, #elseif, or #else keyword.
   SourceLoc Loc;
-  
+
   /// The condition guarding this #if or #elseif block.  If this is null, this
   /// is a #else clause.
   Expr *Cond;
-  
+
   /// Elements inside the clause
   ArrayRef<ASTNode> Elements;
 

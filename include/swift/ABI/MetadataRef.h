@@ -78,7 +78,7 @@ using TargetClassMetadataObjCInterop =
 template <typename Runtime, template <typename> class Pointee>
 using TargetMetadataPointer
   = typename Runtime::template Pointer<Pointee<Runtime>>;
-  
+
 /// A convenience typedef for a target-parameterized const pointer
 /// to a target-parameterized type.
 template <typename Runtime, template <typename> class Pointee>

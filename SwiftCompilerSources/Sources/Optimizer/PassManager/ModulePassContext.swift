@@ -28,7 +28,7 @@ struct ModulePassContext : Context, CustomStringConvertible {
 
   struct FunctionList : CollectionLikeSequence, IteratorProtocol {
     private var currentFunction: Function?
-    
+
     fileprivate init(first: Function?) { currentFunction = first }
 
     mutating func next() -> Function? {
@@ -68,7 +68,7 @@ struct ModulePassContext : Context, CustomStringConvertible {
 
   struct WitnessTableList : CollectionLikeSequence, IteratorProtocol {
     private var currentTable: WitnessTable?
-    
+
     fileprivate init(first: WitnessTable?) { currentTable = first }
 
     mutating func next() -> WitnessTable? {
@@ -82,7 +82,7 @@ struct ModulePassContext : Context, CustomStringConvertible {
 
   struct DefaultWitnessTableList : CollectionLikeSequence, IteratorProtocol {
     private var currentTable: DefaultWitnessTable?
-    
+
     fileprivate init(first: DefaultWitnessTable?) { currentTable = first }
 
     mutating func next() -> DefaultWitnessTable? {
@@ -97,13 +97,13 @@ struct ModulePassContext : Context, CustomStringConvertible {
   var functions: FunctionList {
     FunctionList(first: _bridged.getFirstFunctionInModule().function)
   }
-  
+
   var globalVariables: GlobalVariableList {
     GlobalVariableList(first: _bridged.getFirstGlobalInModule().globalVar)
   }
 
   var vTables: VTableArray { VTableArray(bridgedCtxt: _bridged) }
-  
+
   var witnessTables: WitnessTableList {
     WitnessTableList(first: _bridged.getFirstWitnessTableInModule().witnessTable)
   }

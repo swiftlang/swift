@@ -17,7 +17,7 @@ private func test<T: NSObject & NSCoding>(type: T.Type, name: String) {
     archiver.encode(T(), forKey: "key")
     archiver.finishEncoding()
     let d = archiver.encodedData
-  
+
     let unarchiver = try! NSKeyedUnarchiver(forReadingFrom: d)
     _ = unarchiver.decodeObject(of: T.self, forKey: "key")
   }

@@ -36,7 +36,7 @@ func someTypeIsTheSame() {
   d = barString.foo(0) // expected-error{{no 'foo' candidates produce the expected contextual result type 'some Foo'}}
   d = getAssocType(barInt)
   d = getAssocType(barString) // expected-error{{cannot assign}}
-  
+
   var d2 = barInt.prop
   d2 = barInt.prop
   d2 = barString.prop // expected-error{{cannot assign}}

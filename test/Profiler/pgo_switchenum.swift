@@ -79,7 +79,7 @@ func main() {
   for _ in 1...5000 {
     guesses += guess1(x: MaybePair.Left(10))
   }
-  
+
   guesses += guess2(x: MaybePair.Neither)
   guesses += guess2(x: MaybePair.Neither)
   guesses += guess2(x: MaybePair.Left(42))

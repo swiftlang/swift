@@ -9,10 +9,10 @@ void tryWeakReferencing(id (^makeThing)(void)) {
   @autoreleasepool {
     thingy = [makeThing() retain];
   }
-  
+
   id weakThingy = nil;
   objc_initWeak(&weakThingy, thingy);
-  
+
   @autoreleasepool {
     fputs("before giving up strong reference:\n", stderr);
     id x = objc_loadWeak(&weakThingy);
@@ -23,7 +23,7 @@ void tryWeakReferencing(id (^makeThing)(void)) {
       fputs("Gone\n", stderr);
     }
   }
-  
+
   [thingy release];
   thingy = nil;
 
@@ -36,7 +36,7 @@ void tryWeakReferencing(id (^makeThing)(void)) {
       objc_storeWeak(&weakTmp, nil);
     }
   }
-   
+
   @autoreleasepool {
     fputs("after giving up strong reference:\n", stderr);
     id x = objc_loadWeak(&weakThingy);

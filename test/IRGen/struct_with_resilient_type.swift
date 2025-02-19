@@ -14,17 +14,17 @@ struct StructWithFunc {
 
 struct ProtAndResilStruct {
   let foundationType: ResilientBool
-  
+
   let fooImp: StructWithFunc
-  
+
   init(fType: ResilientBool, fooImp: StructWithFunc) {
     self.foundationType = fType
     self.fooImp = fooImp
   }
-  
+
   func bar() {
   }
-  
+
   func crash() {
     fooImp.foo(ptr: bar)
   }

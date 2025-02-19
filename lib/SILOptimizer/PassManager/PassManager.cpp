@@ -709,7 +709,7 @@ void SILPassManager::runPassOnFunction(unsigned TransIdx, SILFunction *F) {
                        SILForceVerifyAroundPass.end(), MatchFun)) {
     forcePrecomputeAnalyses(F);
   }
-  
+
   llvm::sys::TimePoint<> startTime = std::chrono::system_clock::now();
   std::chrono::nanoseconds duration(0);
 
@@ -740,7 +740,7 @@ void SILPassManager::runPassOnFunction(unsigned TransIdx, SILFunction *F) {
         invalidateAnalysis(F, SILAnalysis::InvalidationKind::Everything);
         F->restoreFromSnapshot(SnapshotID);
       }
-      
+
       // Continue time measurement (including flushing deleted instructions).
       startTime = std::chrono::system_clock::now();
     } else {
@@ -920,12 +920,12 @@ void SILPassManager::runModulePass(unsigned TransIdx) {
   assert(analysesUnlocked() && "Expected all analyses to be unlocked!");
   SMT->run();
   assert(analysesUnlocked() && "Expected all analyses to be unlocked!");
-  
+
   if (!CurrentPassHasInvalidated && Mod->hasInstructionsScheduledForDeletion()) {
     // Last chance for invalidating analysis if the pass forgot to call invalidateAnalysis.
     invalidateAllAnalysis();
   }
-  
+
   Mod->flushDeletedInsts();
   swiftPassInvocation.finishedModulePassRun();
 
@@ -979,7 +979,7 @@ void SILPassManager::verifyAnalyses() const {
 void SILPassManager::verifyAnalyses(SILFunction *F) const {
   if (Mod->getOptions().VerifyNone)
     return;
-    
+
   for (auto *A : Analyses) {
     A->verify(F);
   }
@@ -2095,14 +2095,14 @@ ClosureSpecializer_createEmptyFunctionWithSpecializedSignature(BridgedStringRef 
       /*classSubclassScope=*/SubclassScope::NotApplicable,
       applySiteCallee->getInlineStrategy(), applySiteCallee->getEffectsKind(),
       applySiteCallee, applySiteCallee->getDebugScope());
-  
+
   if (!applySiteCallee->hasOwnership()) {
     specializedApplySiteCallee->setOwnershipEliminated();
   }
-  
+
   for (auto &Attr : applySiteCallee->getSemanticsAttrs())
     specializedApplySiteCallee->addSemanticsAttr(Attr);
-  
+
   return {specializedApplySiteCallee};
 }
 

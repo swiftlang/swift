@@ -164,7 +164,7 @@ class Foo {
     autoclosure(testMagicLiterals())
     return x
   }
- 
+
   // CHECK-LABEL: sil private [global_init_once_fn] [ossa] @{{.*}}WZ
   // CHECK:         string_literal utf8 "Foo" 
   static let x = Foo(int:0)

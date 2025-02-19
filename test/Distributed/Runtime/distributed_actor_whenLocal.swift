@@ -42,7 +42,7 @@ func test() async throws {
   let valueWhenRemote: String? = await remote.whenLocal { __secretlyKnownToBeLocal in
     __secretlyKnownToBeLocal.eat()
   }
-  
+
   // CHECK: valueWhenRemote: nil
   print("valueWhenRemote: \(valueWhenRemote ?? "nil")")
 }

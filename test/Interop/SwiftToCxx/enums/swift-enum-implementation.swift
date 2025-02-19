@@ -40,7 +40,7 @@ public enum Expr {
 
 public struct S {
     public var x: Int64
-    
+
     public init(x: Int64) {
         print("S.init()")
         self.x = x

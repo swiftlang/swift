@@ -384,14 +384,14 @@ bool FunctionAccessStorage::summarizeFunction(SILFunction *F) {
 
 bool FunctionAccessStorage::summarizeCall(FullApplySite fullApply) {
   assert(accessResult.isEmpty() && "expected uninitialized results.");
-  
+
   if (SILFunction *callee = fullApply.getReferencedFunctionOrNull()) {
     if (callee->getName() == "_swift_stdlib_malloc_size" ||
         callee->getName() == "_swift_stdlib_has_malloc_size") {
       return true;
     }
   }
-  
+
   return false;
 }
 

@@ -142,7 +142,7 @@ StdMapTestSuite.test("Map.subscript") {
   expectEqual(m[3], 3)
   expectNil(m[-1])
   expectNil(m[5])
-  
+
   m[1] = 111
   expectEqual(m[1], 111)
 
@@ -276,7 +276,7 @@ StdMapTestSuite.test("Map.filter") {
 
   m = m.filter { k, v in k != 1 }
   n = n.filter { k, v in false }
- 
+
   expectNil(m[1])
   expectEqual(m[2], 2)
   expectEqual(m[3], 3)

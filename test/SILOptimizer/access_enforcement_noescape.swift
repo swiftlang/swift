@@ -330,7 +330,7 @@ func writeWrite() {
 // CHECK: end_access [[ACCESS]] 
 // CHECK-LABEL: } // end sil function '$s27access_enforcement_noescape10writeWriteyyFyyXEfU0_'
 
-  
+
 // Allow aliased noescape write + write of an `inout` arg.
 func inoutWriteWrite(x: inout Int) {
   // Inside closure 1: [modify] [static]

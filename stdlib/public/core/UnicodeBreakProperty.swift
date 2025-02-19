@@ -105,7 +105,7 @@ extension Unicode {
     case singleQuote
     case wSegSpace
     case zwj
-    
+
     init(from scalar: Unicode.Scalar) {
       switch scalar.value {
       case 0xA ... 0xD,
@@ -122,7 +122,7 @@ extension Unicode {
         self = .regionalIndicator
       default:
         let rawValue = _swift_stdlib_getWordBreakProperty(scalar.value)
-        
+
         switch rawValue {
         case 0:
           self = .extend

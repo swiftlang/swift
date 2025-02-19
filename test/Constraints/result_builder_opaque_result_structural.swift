@@ -9,7 +9,7 @@ struct TupleBuilder {
 
 protocol Tupled {
   associatedtype TupleType
-  
+
   @TupleBuilder var tuple: TupleType { get }
 }
 

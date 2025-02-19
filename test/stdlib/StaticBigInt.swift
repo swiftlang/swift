@@ -139,7 +139,7 @@ extension StaticBigIntTests {
 
 @available(SwiftStdlib 5.8, *)
 extension StaticBigIntTests {
-  
+
   func testPrefixPlusTypeInference() {
     let a: Int = 7
     // An earlier version of StaticBigInt contained a prefix + operation,
@@ -150,7 +150,7 @@ extension StaticBigIntTests {
     // Int + StaticBigInt operation.
     let c = a + b
   }
-  
+
   func testPrefixMinusTypeInference() {
     // This example shouldn't suffer from the same problem as above, because
     // -1 is a literal, not a prefix operator followed by a literal.

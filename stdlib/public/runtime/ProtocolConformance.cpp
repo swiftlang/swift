@@ -149,9 +149,9 @@ template<> void ProtocolConformanceDescriptor::dump() const {
     printf("unique nominal type descriptor %s", symbolName(getTypeDescriptor()));
     break;
   }
-  
+
   printf(" => ");
-  
+
   printf("witness table pattern (%p) %s\n", getWitnessTablePattern(), symbolName(getWitnessTablePattern()));
 }
 #endif
@@ -1811,7 +1811,7 @@ checkInvertibleRequirementsStructural(const Metadata *type,
     // The existential representation has no room for specifying any
     // suppressed requirements, so it always succeeds.
     return std::nullopt;
-    
+
   case MetadataKind::FixedArray:
     // Builtin.FixedArray has no conformances of its own.
     return std::nullopt;

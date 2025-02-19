@@ -121,7 +121,7 @@ public class C: Equatable, Comparable, Simple {
   public func compare(_ c1:C, _ c2:C) -> Bool {
     return c1 == c2
   }
-  
+
   public func foo(_ c:C) -> Bool {
     return true
   }

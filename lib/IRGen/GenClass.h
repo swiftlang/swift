@@ -48,7 +48,7 @@ namespace irgen {
   class Size;
   class StructLayout;
   class TypeInfo;
-  
+
   enum class ClassDeallocationKind : unsigned char;
   enum class FieldAccess : uint8_t;
 
@@ -125,7 +125,7 @@ namespace irgen {
   emitClassPrivateDataFields(IRGenModule &IGM,
                              ConstantStructBuilder &builder,
                              ClassDecl *cls);
-  
+
   llvm::Constant *emitClassPrivateData(IRGenModule &IGM, ClassDecl *theClass);
 
   llvm::Constant *emitSpecializedGenericClassPrivateData(IRGenModule &IGM,

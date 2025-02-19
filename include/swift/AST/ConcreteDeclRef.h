@@ -82,7 +82,7 @@ public:
   friend bool operator==(ConcreteDeclRef lhs, ConcreteDeclRef rhs) {
     return lhs.decl == rhs.decl && lhs.substitutions == rhs.substitutions;
   }
-  
+
   /// Dump a debug representation of this reference.
   void dump(raw_ostream &os) const;
   SWIFT_DEBUG_DUMP;

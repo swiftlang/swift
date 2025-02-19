@@ -33,7 +33,7 @@ func testModuleNameInBody() {
 // EXPR-DAG: Decl[Protocol]/OtherModule[XLogging]/Flair[RareType]: Logging[#Logging#]; name=Logging
 // EXPR-DAG: Decl[Struct]/OtherModule[XLogging]: Logger[#Logger#]; name=Logger
 // EXPR-DAG: Decl[FreeFunction]/OtherModule[XLogging]: setupLogger()[#Logger?#]; name=setupLogger()
- 
+
 // RUN: %empty-directory(%t/Out)
 // RUN: %target-swift-ide-test -batch-code-completion -source-filename %t/FileLib2.swift -module-alias XLogging=AppleLogging  -filecheck %raw-FileCheck -completion-output-dir %t/Out -I %t/Modules
 

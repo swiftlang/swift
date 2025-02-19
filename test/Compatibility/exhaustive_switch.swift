@@ -6,13 +6,13 @@ func foo(a: Int?, b: Int?) -> Int {
   case (_, .none): return 2
   case (.some(_), .some(_)): return 3
   }
-    
+
   switch (a, b) {
   case (.none, _): return 1
   case (_, .none): return 2
   case (_?, _?): return 3
   }
-  
+
   switch Optional<(Int?, Int?)>.some((a, b)) {
   case .none: return 1
   case let (_, x?)?: return x
@@ -60,7 +60,7 @@ func foo() {
   case (_, .B(_)):
     ()
   }
-  
+
   switch (Foo.A(1), Optional<(Int, Int)>.some((0, 0))) {
   case (.A(_), _):
     break
@@ -343,11 +343,11 @@ func checkUninhabited() {
   func test1(x : Never) {
     switch x {} // No diagnostic.
   }
-  
+
   func test2(x : Never) {
     switch (x, x) {} // No diagnostic.
   }
-  
+
   func test3(x : MyNever) {
     switch x { // No diagnostic.
     case myFatalError(): break
@@ -538,7 +538,7 @@ func quiteBigEnough() -> Bool {
   case (.case3, .case3): return true
   case _: return true
   }
-  
+
   // No diagnostic 
   switch ContainsOverlyLargeEnum.one(.case0) {
   case .one: return true
@@ -572,7 +572,7 @@ func infinitelySized() -> Bool {
   case (.one, .one): return true
   case (.two, .two): return true
   }
-  
+
   switch (MutuallyRecursive.one, MutuallyRecursive.one) { // expected-error {{switch must be exhaustive}}
   // expected-note@-1 8 {{add missing case:}}
   // expected-note@-2 {{add missing cases}}
@@ -601,7 +601,7 @@ func diagnoseDuplicateLiterals() {
   case "ghi": break
   default: break
   }
-  
+
   switch str {
   case "abc", "def": break // expected-note 2 {{first occurrence of identical literal pattern is here}}
   case "ghi", "jkl": break
@@ -653,7 +653,7 @@ func diagnoseDuplicateLiterals() {
   case 3: break
   default: break
   }
-    
+
   switch int {
   case -2, -2: break // expected-note {{first occurrence of identical literal pattern is here}} expected-warning {{literal value is already handled by previous pattern; consider removing it}}
   case 1, 2: break // expected-note 3 {{first occurrence of identical literal pattern is here}}
@@ -718,7 +718,7 @@ func diagnoseDuplicateLiterals() {
   case 3.5: break
   default: break
   }
-  
+
   switch dbl {
   case -3.5: break
   case -2.5: break // expected-note {{first occurrence of identical literal pattern is here}}
@@ -730,14 +730,14 @@ func diagnoseDuplicateLiterals() {
   case 3.5: break
   default: break
   }
-  
+
   switch dbl {
   case 1.5, 4.5, 7.5, 6.9: break // expected-note 2 {{first occurrence of identical literal pattern is here}}
   case 3.4, 1.5: break // expected-warning {{literal value is already handled by previous pattern; consider removing it}}
   case 7.5, 2.3: break // expected-warning {{literal value is already handled by previous pattern; consider removing it}}
   default: break
   }
-  
+
   switch dbl {
   case 1: break
   case 1.5: break // expected-note 2 {{first occurrence of identical literal pattern is here}}
@@ -751,7 +751,7 @@ func diagnoseDuplicateLiterals() {
   case 23452.43: break
   default: break
   }
-  
+
   func someDouble() -> Double { return 324.4523 }
   let otherDouble = 458.2345
   switch dbl {
@@ -780,7 +780,7 @@ func checkLiteralTuples() {
   let int2 = 7
   let dbl1 = 4.23
   let dbl2 = 23.45
-  
+
   // No Diagnostics
   switch (str1, str2) {
   case ("abc", "def"): break
@@ -789,7 +789,7 @@ func checkLiteralTuples() {
   case ("abc", "def"): break // We currently don't catch this
   default: break
   }
-  
+
   // No Diagnostics
   switch (int1, int2) {
   case (94, 23): break
@@ -798,7 +798,7 @@ func checkLiteralTuples() {
   case (23, 7): break
   default: break
   }
-  
+
   // No Diagnostics
   switch (dbl1, dbl2) {
   case (543.21, 123.45): break
@@ -854,13 +854,13 @@ public func testNonExhaustive(_ value: NonExhaustive, _ payload: NonExhaustivePa
   case .a: break
   case .b: break
   }
-  
+
   switch value {
   case .a: break
   case .b: break
   default: break // no-warning
   }
- 
+
   switch value {
   case .a: break
   case .b: break
@@ -950,7 +950,7 @@ public func testNonExhaustive(_ value: NonExhaustive, _ payload: NonExhaustivePa
   case .a: break
   case .b: break
   }
-  
+
   switch payload {
   case .a: break
   case .b: break
@@ -1014,7 +1014,7 @@ public func testNonExhaustiveWithinModule(_ value: NonExhaustive, _ payload: Non
   case .a: break
   case .b: break
   }
-  
+
   switch value {
   case .a: break
   case .b: break
@@ -1092,7 +1092,7 @@ public func testNonExhaustiveWithinModule(_ value: NonExhaustive, _ payload: Non
   case .a: break
   case .b: break
   }
-  
+
   switch payload {
   case .a: break
   case .b: break

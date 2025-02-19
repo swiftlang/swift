@@ -206,7 +206,7 @@ public:
       asDerived().emitScalarRelease(IGF, value, IGF.getDefaultAtomicity());
     }
   }
-  
+
   void packIntoEnumPayload(IRGenModule &IGM,
                            IRBuilder &builder,
                            EnumPayload &payload,
@@ -214,7 +214,7 @@ public:
                            unsigned offset) const override {
     payload.insertValue(IGM, builder, src.claimNext(), offset);
   }
-  
+
   void unpackFromEnumPayload(IRGenFunction &IGF,
                              const EnumPayload &payload,
                              Explosion &dest,

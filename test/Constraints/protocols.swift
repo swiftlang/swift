@@ -103,7 +103,7 @@ protocol P : Initable {
   func bar(_ x: Int)
   mutating func mut(_ x: Int)
   static func tum()
-  
+
   typealias E = Int
   typealias F = Self.E
   typealias G = Array

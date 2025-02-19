@@ -106,7 +106,7 @@ package class Foo {
 }
 
 final package class Bar {
-  
+
   // CHECK-OPT-DAG: define {{(dllexport |protected )?}}swiftcc{{.*}} {{i32|i64}} @"$s4Core3BarC02myB0AA3PubCSgvpfi"()
   // CHECK-COMMON-DAG: define {{(dllexport |protected )?}}swiftcc {{i32|i64}} @"$s4Core3BarC02myB0AA3PubCSgvg"(ptr swiftself %0)
   // CHECK-COMMON-DAG: define {{(dllexport |protected )?}}swiftcc void @"$s4Core3BarC02myB0AA3PubCSgvs"({{i32|i64}} %0, ptr swiftself %1)
@@ -137,7 +137,7 @@ class UFIKlass {
 
   // key path setter for Core.UFIKlass.varUfi
   // CHECK-COMMON-DAG: define linkonce_odr hidden swiftcc void @"$s4Core8UFIKlassC6varUfiSSSgvpACTk"
-  
+
   // dispatch thunk of Core.UFIKlass.varUfi.getter
   // CHECK-COMMON-DAG: define {{(dllexport |protected )?}}swiftcc {{.*}} @"$s4Core8UFIKlassC6varUfiSSSgvgTj"
 

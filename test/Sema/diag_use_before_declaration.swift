@@ -3,7 +3,7 @@
 // https://github.com/apple/swift/issues/47739
 do {
   func foo(_ x: Int) -> Int? { return 1 }
-  
+
   func fn() {
     let a = foo(c) // expected-error {{use of local variable 'c' before its declaration}}
     guard let b = a else { return }

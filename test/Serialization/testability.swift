@@ -44,7 +44,7 @@
   @testable import testability
 
   class Sub : Base {}
-  
+
   public func unrelated() {}
 
 #elseif MAIN

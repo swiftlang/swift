@@ -184,7 +184,7 @@ func test_multiple_patterns3(x: Int) {
 func test_multiple_patterns4(x: Int) {
     switch (x, x) {
     case (0, let a) where #^MULTI_PATTERN_4^#
-        
+
     }
 }
 

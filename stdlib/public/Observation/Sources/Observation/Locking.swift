@@ -31,7 +31,7 @@ internal struct _ManagedCriticalState<State> {
   internal init(_ buffer: ManagedBuffer<State, UnsafeRawPointer>) {
     self.buffer = buffer
   }
-  
+
   internal init(_ initial: State) {
     let roundedSize = (_lockSize() + MemoryLayout<UnsafeRawPointer>.size - 1) / MemoryLayout<UnsafeRawPointer>.size 
     self.init(LockedBuffer.create(minimumCapacity: Swift.max(roundedSize, 1)) { buffer in

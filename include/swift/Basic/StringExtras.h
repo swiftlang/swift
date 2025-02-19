@@ -137,7 +137,7 @@ namespace swift {
 
         // Move to the next position.
         Position = NextPosition;
-        
+
         // We don't know what lies ahead.
         NextPositionValid = false;
         return *this;

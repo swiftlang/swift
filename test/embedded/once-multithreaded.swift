@@ -58,7 +58,7 @@ struct Main {
     pthread_join(t2, nil)
 
     print("All done")
-    
+
     // CHECK: Start
     // CHECK-NEXT: MyStructWithAnExpensiveInitializer.init
     // CHECK-NEXT: MyStructWithAnExpensiveInitializer.init done

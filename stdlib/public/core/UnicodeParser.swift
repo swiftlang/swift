@@ -15,10 +15,10 @@ extension Unicode {
   public enum ParseResult<T> {
   /// A `T` was parsed successfully
   case valid(T)
-  
+
   /// The input was entirely consumed.
   case emptyInput
-  
+
   /// An encoding error was detected.
   ///
   /// `length` is the number of underlying code units consumed by this

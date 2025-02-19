@@ -33,7 +33,7 @@ class SomeClass {
       func innerClassMethod() { }
     }
   }
-  
+
   func someUnrefinedMethod() { }
 
   @available(OSX 52, *)

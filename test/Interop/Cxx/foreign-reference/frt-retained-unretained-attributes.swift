@@ -95,7 +95,7 @@ func testtFreeFunctionsWithoutNonnull() {
 
     let frtLocalVar2 = global_function_returning_FRT_with_attr_returns_retained_wihout_Nonnull()
     // CHECK: function_ref @{{.*}}global_function_returning_FRT_with_attr_returns_retained_wihout_Nonnull{{.*}} : $@convention(c) () ->  @owned Optional<FRTStruct>
-   
+
     let frtLocalVar3 = global_function_returning_FRT_with_attr_returns_unretained_wihout_Nonnull()
     // CHECK: function_ref @{{.*}}global_function_returning_FRT_with_attr_returns_unretained_wihout_Nonnull{{.*}} : $@convention(c) () -> Optional<FRTStruct>
 
@@ -187,10 +187,10 @@ func testStaticMethodsReturningNonFRT() {
 
 func testtFreeFunctionsTemplated(frt : FRTStruct) {
     let frtLocalVar1 : Int = 1;
-    
+
     let frtLocalVar2 = global_templated_function_returning_FRT(frtLocalVar1)
     // CHECK: function_ref @{{.*}}global_templated_function_returning_FRT{{.*}} : $@convention(c) (Int) -> FRTStruct
-    
+
     let frtLocalVar3 = global_templated_function_returning_FRT_copy(frtLocalVar1)
     // CHECK: function_ref @{{.*}}global_templated_function_returning_FRT_copy{{.*}} : $@convention(c) (Int) -> @owned FRTStruct
 
@@ -199,25 +199,25 @@ func testtFreeFunctionsTemplated(frt : FRTStruct) {
 
     let frtLocalVar5 = global_templated_function_returning_FRT_init(frtLocalVar1)
     // CHECK: function_ref @{{.*}}global_templated_function_returning_FRT_init{{.*}} : $@convention(c) (Int) -> FRTStruct
-    
+
     let frtLocalVar6 = global_templated_function_returning_FRT_clone(frtLocalVar1)
     // CHECK: function_ref @{{.*}}global_templated_function_returning_FRT_clone{{.*}} : $@convention(c) (Int) -> FRTStruct
 
     let frtLocalVar7 = global_templated_function_returning_FRT_with_attr_returns_retained(frtLocalVar1)
     // CHECK: function_ref @{{.*}}global_templated_function_returning_FRT_with_attr_returns_retained{{.*}} : $@convention(c) (Int) -> @owned FRTStruct
-    
+
     let frtLocalVar8 = global_templated_function_returning_FRT_copy_with_attr_returns_retained(frtLocalVar1)
     // CHECK: function_ref @{{.*}}global_templated_function_returning_FRT_copy_with_attr_returns_retained{{.*}} : $@convention(c) (Int) -> @owned FRTStruct
-    
+
     let frtLocalVar9 = global_templated_function_returning_FRT_create_with_attr_returns_retained(frtLocalVar1)
     // CHECK: function_ref @{{.*}}global_templated_function_returning_FRT_create_with_attr_returns_retained{{.*}} : $@convention(c) (Int) -> @owned FRTStruct
-    
+
     let frtLocalVar10 = global_templated_function_returning_FRT_with_attr_returns_unretained(frtLocalVar1)
     // CHECK: function_ref @{{.*}}global_templated_function_returning_FRT_with_attr_returns_unretained{{.*}} : $@convention(c) (Int) -> FRTStruct
-    
+
     let frtLocalVar11 = global_templated_function_returning_FRT_copy_with_attr_returns_unretained(frtLocalVar1)
     // CHECK: function_ref @{{.*}}global_templated_function_returning_FRT_copy_with_attr_returns_unretained{{.*}} : $@convention(c) (Int) -> FRTStruct
-    
+
     let frtLocalVar12 = global_templated_function_returning_FRT_create_with_attr_returns_unretained(frtLocalVar1)
     // CHECK: function_ref @{{.*}}global_templated_function_returning_FRT_create_with_attr_returns_unretained{{.*}} : $@convention(c) (Int) -> FRTStruct
 
@@ -235,13 +235,13 @@ func testVirtualMethods(base: Base, derived: Derived) {
 
     var frt1 = mutableBase.VirtualMethodReturningFRTUnowned()
     // CHECK: function_ref @{{.*}}VirtualMethodReturningFRTUnowned{{.*}} : $@convention(cxx_method) (@inout Base) -> FRTStruct
-    
+
     var frt2 = mutableDerived.VirtualMethodReturningFRTUnowned()
     // CHECK: function_ref @{{.*}}VirtualMethodReturningFRTUnowned{{.*}} : $@convention(cxx_method) (@inout Derived) -> FRTStruct
-    
+
     var frt3 = mutableBase.VirtualMethodReturningFRTOwned()
     // CHECK: function_ref @{{.*}}VirtualMethodReturningFRTOwned{{.*}} : $@convention(cxx_method) (@inout Base) ->  @owned FRTStruct
-    
+
     var frt4 = mutableDerived.VirtualMethodReturningFRTOwned()
     // CHECK: function_ref @{{.*}}VirtualMethodReturningFRTOwned{{.*}} : $@convention(cxx_method) (@inout Derived) -> @owned FRTStruct
 }

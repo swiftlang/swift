@@ -62,7 +62,7 @@ FilterTests.test("single-count") {
     count += 1
     return $0 % 7 == 0
   }
-    
+
   let f0 = (0..<30).makeIterator().lazy.filter(mod7AndCount)
   _ = Array(f0)
   expectEqual(30, count)
@@ -75,7 +75,7 @@ FilterTests.test("single-count") {
 
 FilterTests.test("chained filter order") {
   let array = [1]
-  
+
   let lazyFilter = array.lazy
     .filter { _ in false }
     .filter { _ in
@@ -83,14 +83,14 @@ FilterTests.test("chained filter order") {
       return true
     }
   let lazyResult = Array(lazyFilter)
-  
+
   let result = array
     .filter { _ in false }
     .filter { _ in
       expectUnreachable("Executed second filter before first")
       return true
     }
-  
+
   expectEqual(lazyResult.count, 0)
   expectEqual(result.count, 0)
 }

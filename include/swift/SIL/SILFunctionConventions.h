@@ -89,16 +89,16 @@ public:
 private:
   SILModule *M;
   bool loweredAddresses;
-  
+
   SILModuleConventions(SILModule &M, bool loweredAddresses)
     : M(&M), loweredAddresses(loweredAddresses)
   {}
-  
+
 public:
   SILModuleConventions(SILModule &M);
 
   SILFunctionConventions getFunctionConventions(CanSILFunctionType funcTy);
-  
+
   SILModule &getModule() const { return *M; }
 
   bool useLoweredAddresses() const { return loweredAddresses; }
@@ -372,14 +372,14 @@ public:
   }
 
   struct SILParameterTypeFunc;
-  
+
   // Gratuitous template parameter is to delay instantiating `mapped_iterator`
   // on the incomplete type SILParameterTypeFunc.
   template<bool _ = false>
   using SILParameterTypeIter = typename
     delay_template_expansion<_, llvm::mapped_iterator,
                           const SILParameterInfo *, SILParameterTypeFunc>::type;
-  
+
   template<bool _ = false>
   using SILParameterTypeRange = iterator_range<SILParameterTypeIter<_>>;
 

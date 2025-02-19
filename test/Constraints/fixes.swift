@@ -66,7 +66,7 @@ func forgotOptionalBang(_ a: A, obj: AnyObject) {
   a = a < a // expected-error{{value of optional type 'A?' must be unwrapped to a value of type 'A'}}
   // expected-note@-1{{coalesce using '??' to provide a default when the optional value contains 'nil'}}{{7-7=(}}{{12-12=) ?? <#default value#>}}
   // expected-note@-2{{force-unwrap using '!' to abort execution if the optional value contains 'nil'}}{{7-7=(}}{{12-12=)!}}
-  
+
   // rdar://problem/20377684 -- take care that the '!' doesn't fall into an
   // optional evaluation context
   let bo: B? = b

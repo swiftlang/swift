@@ -60,7 +60,7 @@ public func accessFinalFields(ofSub holder: SubButtHolder) -> (Any, Any, Any) {
   // CHECK-V4: [[OFFSET:%.*]] = load [[WORD]], ptr @"$s4main13SubButtHolderC1wSfvpWvd"
 
   // CHECK-V4: getelementptr inbounds i8, ptr {{.*}}, [[WORD]] [[OFFSET]]
-  
+
   // ButtHolder.y is correctly imported in Swift 5 mode, so we can use fixed offsets.
 
   // CHECK-V5: [[OFFSET:%.*]] = getelementptr inbounds %T14UsingObjCStuff10ButtHolderC, ptr %3, i32 0, i32 1

@@ -58,21 +58,21 @@ class A {
     set {
     }
   }
-  
+
   class subscript (i: String) -> String { // expected-note{{overridden declaration is here}} expected-note{{potential overridden class subscript 'subscript(_:)' here}}
     get {
       return "hello"
     }
-    
+
     set {
     }
   }
-  
+
   class subscript (typeInSuperclass a: [Int]) -> String {
     get {
       return "hello"
     }
-    
+
     set {
     }
   }
@@ -142,39 +142,39 @@ class B : A {
     set {
     }
   }
-  
+
   override class subscript (i: Int) -> String { // expected-error{{subscript does not override any subscript from its superclass}}
     get {
       return "hello"
     }
-    
+
     set {
     }
   }
-  
+
   static subscript (i: String) -> String { // expected-error{{overriding declaration requires an 'override' keyword}} {{3-3=override }}
     get {
       return "hello"
     }
-    
+
     set {
     }
   }
-  
+
   static subscript (i: Double) -> String {
     get {
       return "hello"
     }
-    
+
     set {
     }
   }
-  
+
   override class subscript (typeInSuperclass a: [Int]) -> String {
     get {
       return "hello"
     }
-    
+
     set {
     }
   }

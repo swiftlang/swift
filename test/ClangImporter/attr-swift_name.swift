@@ -9,7 +9,7 @@ import ObjCIRExtras
 
 func test(_ i: Int) {
   let t = SwiftNameTest()
-  
+
   t.theMethod(number: i)
 
   _ = t.renamedSomeProp
@@ -19,7 +19,7 @@ func test(_ i: Int) {
 
   // We only see these five warnings because Clang can catch the other invalid
   // cases, and marks the attribute as invalid ahead of time.
-  
+
   // CHECK: warning: too few parameters in swift_name attribute (expected 2; got 1)
   // CHECK: + (instancetype)g:(id)x outParam:(int *)foo SWIFT_NAME(init(g:));
   // CHECK-NOT: warning:

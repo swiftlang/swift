@@ -602,7 +602,7 @@ func testOperators() {
 
   ***nil // expected-error {{'***' has been renamed to 'add'}} {{none}}
   ***0 // expected-error {{'***' has been replaced by instance method 'Int.foo()'}} {{none}}
-  
+
   nil*** // expected-error {{'***' has been renamed to 'add'}} {{none}}
   0*** // expected-error {{'***' has been replaced by instance method 'Int.foo()'}} {{none}}
 }

@@ -11,7 +11,7 @@ import NotificationCenter
 
 func testInstanceTypeFactoryMethod(_ queen: Bee) {
   _ = Hive(queen: queen)
-  
+
   _ = NSObjectFactory() // okay, prefers init method
   _ = NSObjectFactory(integer: 1)
   _ = NSObjectFactory(double: 314159)
@@ -43,16 +43,16 @@ func testFactoryWithLaterIntroducedInit() {
   // available designated initializer
   _ = NSHavingConvenienceFactoryAndLaterDesignatedInit(flim:5) // expected-error {{'init(flim:)' is only available in macOS 52 or newer}}
     // expected-note @-1 {{add 'if #available' version check}}
-  
+
   _ = NSHavingConvenienceFactoryAndLaterDesignatedInit(flam:5) // expected-error {{'init(flam:)' is only available in macOS 52 or newer}}
   // expected-note @-1 {{add 'if #available' version check}}  {{3-63=if #available(macOS 52, *) {\n      _ = NSHavingConvenienceFactoryAndLaterDesignatedInit(flam:5)\n  \} else {\n      // Fallback on earlier versions\n  \}}}
 
-  
+
   // Don't prefer more available factory initializer over less
   // available designated initializer
   _ = NSHavingFactoryAndLaterConvenienceInit(flim:5) // expected-error {{'init(flim:)' is only available in macOS 52 or newer}}
   // expected-note @-1 {{add 'if #available' version check}}
-  
+
 
   _ = NSHavingFactoryAndLaterConvenienceInit(flam:5) // expected-error {{'init(flam:)' is only available in macOS 52 or newer}}
   // expected-note @-1 {{add 'if #available' version check}}

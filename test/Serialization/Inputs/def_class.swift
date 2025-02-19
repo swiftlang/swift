@@ -2,7 +2,7 @@ open class Empty {}
 
 open class TwoInts {
   open var x, y : Int
-  
+
   required public init(a : Int, b : Int) {
     x = a
     y = b
@@ -41,7 +41,7 @@ open class Pair<A, B> {
 
 open class GenericCtor<U> {
   public init<T>(_ t : T) {}
-  
+
   open func doSomething<T>(_ t : T) {}
 }
 

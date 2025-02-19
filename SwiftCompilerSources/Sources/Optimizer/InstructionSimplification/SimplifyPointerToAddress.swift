@@ -198,7 +198,7 @@ private extension PointerToAddressInst {
   ///   %5 = load %4
   /// ```
   func hasIllegalUsesAfterLifetime(of baseAddress: AddressToPointerInst, _ context: SimplifyContext) -> Bool {
-    
+
     var lifetimeFrontier = InstructionSet(context)
     defer { lifetimeFrontier.deinitialize() }
 

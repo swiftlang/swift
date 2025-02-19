@@ -26,7 +26,7 @@ class OptionalInoutFuncType {
   func execute(_ error: Error?) {
     var p : BigStruct?
     var handler: ((BigStruct?, Error?) -> ())?
-    
+
     takeClosure {
       p = self.lp
       handler = self._handler
@@ -89,7 +89,7 @@ public class BigClass {
   }
 
   public var optVar: ((BigStruct)-> Void)? = nil
-    
+
   func useBigStruct(bigStruct: BigStruct) {
     optVar!(bigStruct)
   }
@@ -210,7 +210,7 @@ class TestBig {
         let arr = [Handler?]()
         let d = arr.firstIndex(where: { _ in true })
     }
-    
+
     func test2() {
         let arr: [(ID: String, handler: Handler?)] = []
         for (_, handler) in arr {

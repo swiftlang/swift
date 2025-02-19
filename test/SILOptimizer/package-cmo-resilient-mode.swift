@@ -82,12 +82,12 @@ import Lib
 // CHECK-MAIN-COMMON-NEXT: [[PUB_REF_ELEM_ADDR:%.*]] = ref_element_addr [[PUB_INIT]] : $PubKlass, #PubKlass.data
 // CHECK-MAIN-COMMON-NEXT: store {{.*}} to [[PUB_REF_ELEM_ADDR]] : $*Int
 // CHECK-MAIN-COMMON-NEXT: store [[PUB_INIT]] to {{.*}} : $*PubKlass
-  
+
 // CHECK-MAIN-COMMON: [[PUBK_GET:%.*]] = load {{.*}} : $*PubKlass
 // CHECK-MAIN-COMMON: class_method [[PUBK_GET]] : $PubKlass, #PubKlass.data!getter : (PubKlass) -> () -> Int, $@convention(method) (@guaranteed PubKlass) -> Int
 // CHECK-MAIN-COMMON: [[PUBK_SET:%.*]] = load {{.*}} : $*PubKlass
 // CHECK-MAIN-COMMON: class_method [[PUBK_SET]] : $PubKlass, #PubKlass.data!setter : (PubKlass) -> (Int) -> (), $@convention(method) (Int, @guaranteed PubKlass) -> ()
-  
+
 // CHECK-MAIN-RES: [[PKG_ALLOC:%.*]] = alloc_ref $PkgKlass
 // CHECK-MAIN-RES-NEXT: [[PKG_INIT:%.*]] = end_init_let_ref [[PKG_ALLOC]] : $PkgKlass
 // CHECK-MAIN-RES-NEXT: [[PKG_REF_ELEM_ADDR:%.*]] = ref_element_addr [[PKG_INIT]] : $PkgKlass, #PkgKlass.data
@@ -106,13 +106,13 @@ import Lib
 // CHECK-MAIN-COMMON-NEXT: [[FNL_PUB_REF_ELEM_ADDR:%.*]] = ref_element_addr [[FNL_PUB_INIT]] : $FinalPubKlass, #FinalPubKlass.data
 // CHECK-MAIN-COMMON-NEXT: store {{.*}} to [[FNL_PUB_REF_ELEM_ADDR]] : $*Int
 // CHECK-MAIN-COMMON: store [[FNL_PUB_INIT]] to {{.*}} : $*FinalPubKlass
-  
+
 // CHECK-MAIN-COMMON: [[FNL_PUB_GET:%.*]] = load {{.*}} : $*FinalPubKlass
 // CHECK-MAIN-COMMON: [[FNL_PUB_REF:%.*]] = ref_element_addr [[FNL_PUB_GET]] : $FinalPubKlass, #FinalPubKlass.data
 // CHECK-MAIN-COMMON-NEXT: [[FNL_PUB_ACCESS:%.*]] = begin_access {{.*}} [[FNL_PUB_REF]] : $*Int
 // CHECK-MAIN-COMMON-NEXT: [[FNL_PUB_LOAD:%.*]] = load [[FNL_PUB_ACCESS]] : $*Int
 // CHECK-MAIN-COMMON: store [[FNL_PUB_LOAD]] to {{.*}} : $*Int
-  
+
 // CHECK-MAIN-RES: [[FNL_PKG_ALLOC:%.*]] = alloc_ref $FinalPkgKlass
 // CHECK-MAIN-RES-NEXT: [[FNL_PKG_INIT:%.*]] = end_init_let_ref [[FNL_PKG_ALLOC]] : $FinalPkgKlass
 // CHECK-MAIN-RES-NEXT: [[FNL_PKG_REF_ELEM_ADDR:%.*]] = ref_element_addr [[FNL_PKG_INIT]] : $FinalPkgKlass, #FinalPkgKlass.data
@@ -125,7 +125,7 @@ import Lib
 // CHECK-MAIN-COMMON-NEXT: [[FNL_PKG_ACCESS:%.*]] = begin_access {{.*}} [[FNL_PKG_REF]] : $*Int
 // CHECK-MAIN-COMMON-NEXT: [[FNL_PKG_LOAD:%.*]] = load [[FNL_PKG_ACCESS]] : $*Int
 // CHECK-MAIN-COMMON: store [[FNL_PKG_LOAD]] to {{.*}} : $*Int
-  
+
 // CHECK-MAIN-RES-DAG: sil public_external @$s3Lib8PubKlassCyACSicfC : $@convention(method) (Int, @thick PubKlass.Type) -> @owned PubKlass {
 // CHECK-MAIN-NONRES-DAG: sil public_external @$s3Lib8PubKlassCyACSicfC : $@convention(method) (Int, @thick PubKlass.Type) -> @owned PubKlass {
 
@@ -255,12 +255,12 @@ public struct PubStruct {
   // CHECK-NONRES-DAG: sil [transparent] [serialized] [canonical] [ossa] @$s3Lib9PubStructV16pubStaticFuncPtrySiACcvgZ : $@convention(method) (@thin PubStruct.Type) -> @owned @callee_guaranteed (PubStruct) -> Int {
     // function_ref PubStruct.pubStaticFuncPtr.unsafeMutableAddressor
   // CHECK-NONRES-DAG: function_ref @$s3Lib9PubStructV16pubStaticFuncPtrySiACcvau : $@convention(thin) () -> Builtin.RawPointer
-    
+
   // PubStruct.pubStaticFuncPtr.unsafeMutableAddressor
   // CHECK-NONRES-DAG: sil [serialized] [global_init] [canonical] [ossa] @$s3Lib9PubStructV16pubStaticFuncPtrySiACcvau : $@convention(thin) () -> Builtin.RawPointer {
   // CHECK-NONRES-DAG: [[PUB_FADDR:%.*]] = global_addr @$s3Lib9PubStructV16pubStaticFuncPtrySiACcvpZ : $*@callee_guaranteed (PubStruct) -> Int
   // CHECK-NONRES-DAG: address_to_pointer [[PUB_FADDR]] : $*@callee_guaranteed (PubStruct) -> Int to $Builtin.RawPointer
-  
+
   public static var pubStaticFuncPtr: (PubStruct) -> (Int) = runPub
 
   // static PubStruct.pubStaticSimpleClosurePtr.setter
@@ -276,7 +276,7 @@ public struct PubStruct {
   // CHECK-NONRES-DAG: sil [transparent] [serialized] [canonical] [ossa] @$s3Lib9PubStructV19pubStaticClosurePtrySiACcvgZ : $@convention(method) (@thin PubStruct.Type) -> @owned @callee_guaranteed (PubStruct) -> Int {
     // function_ref PubStruct.pubStaticClosurePtr.unsafeMutableAddressor
   // CHECK-NONRES-DAG:  function_ref @$s3Lib9PubStructV19pubStaticClosurePtrySiACcvau : $@convention(thin)
-    
+
   // PubStruct.pubStaticClosurePtr.unsafeMutableAddressor
   // CHECK-NONRES-DAG: sil [serialized] [global_init] [canonical] [ossa] @$s3Lib9PubStructV19pubStaticClosurePtrySiACcvau : $@convention(thin) () -> Builtin.RawPointer {
   // CHECK-NONRES-DAG:  [[PUB_CADDR:%.*]] = global_addr @$s3Lib9PubStructV19pubStaticClosurePtrySiACcvpZ : $*@callee_guaranteed (PubStruct) -> Int

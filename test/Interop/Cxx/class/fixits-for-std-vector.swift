@@ -26,7 +26,7 @@ public func test(v: V) {
   // CHECK: ^~~~~
   // CHECK: makeIterator
   _ = v.begin()
-  
+
   // CHECK: note: C++ method 'end' that returns an iterator is unavailable
   // CHECK: note: do you want to compare against 'nil' instead?
   // CHECK: ^~~~
@@ -39,7 +39,7 @@ public func test(v: V) {
   // CHECK: ^~~~~~~
   // CHECK: first
   _ = v.front()
-  
+
   // CHECK: note: C++ method 'back' that returns a reference of type 'UnsafePointer' is unavailable
   // CHECK: note: C++ method 'back' may return an interior pointer
   // CHECK: note: do you want to get the last element instead?

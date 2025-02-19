@@ -145,45 +145,45 @@ public struct MyString : ExpressibleByStringLiteral,
   public init(stringLiteral value: String) {
     self.init(str: value)
   }
-  
+
   public init(stringInterpolation: StringInterpolation) {
     self.init(str: stringInterpolation.result)
   }
-  
+
   public struct StringInterpolation: StringInterpolationProtocol {
     var result: String
-    
+
     public init(literalCapacity: Int, interpolationCount: Int) {
       result = String(literalCapacity) + "/" + String(interpolationCount)
     }
-    
+
     public mutating func appendLiteral(_ literal: String) {
       result += "<literal " + literal + ">"
     }
-    
+
     public mutating func appendInterpolation<T>(_ expr: T) {
       result += "<interpolation:T " + String(describing: expr) + ">"
     }
-    
+
     public mutating func appendInterpolation(_ expr: Int) {
       result += "<interpolation:Int " + String(expr) + ">"
     }
-    
+
     public mutating func appendInterpolation(_ expr: Int, radix: Int) {
       result += "<interpolation:Int,radix " + String(expr, radix: radix) + ">"
     }
-    
+
     public mutating func appendInterpolation<T>(debug: T) {
       result += "<interpolation:T debug: " + String(reflecting: debug) + ">"
     }
-    
+
     public mutating func appendInterpolation(fails: Bool) throws {
       if fails {
         throw MyStringError.failure
       }
       result += "<interpolation:fails >"
     }
-    
+
     public mutating
     func appendInterpolation(required: Bool, optional: Bool = false) {
       result += "<interpolation:required:optional " +
@@ -194,7 +194,7 @@ public struct MyString : ExpressibleByStringLiteral,
 
 public struct MySimpleString : ExpressibleByStringInterpolation {
   public var value: String
-  
+
   public init(stringLiteral: String) {
     value = stringLiteral
   }

@@ -79,7 +79,7 @@ func testFinite(_ bitPattern: UInt16) {
   }
   let exponent = Int(match.exp ?? "0")! - bias
   let float = Float(value)
-  
+
   let error = (float - Float(string)!).magnitude
   // If the string representation isn't exact (up to Float accuracy), try
   // the adjacent values to see if they would have been closer.
@@ -97,7 +97,7 @@ func testFinite(_ bitPattern: UInt16) {
       "Float16(\(value)).description was \(string), but \(dn) would be closer."
     )
   }
-  
+
   // If the string representation isn't an exact integer, check if we could
   // have used a shorter string.
   if error != 0 || match.exp != nil {
@@ -122,19 +122,19 @@ PrintTests.test("Printable_Float16") {
     testFinite(bitPattern)
     testFinite(0x8000 | bitPattern)
   }
-  
+
   expectEqual(Float16.infinity.description, "inf")
   expectEqual((-Float16.infinity).description, "-inf")
   expectEqual(Float16.infinity.debugDescription, "inf")
   expectEqual((-Float16.infinity).debugDescription, "-inf")
-  
+
   // Platforms without float 16 argument passing can cause NaNs to be changed
   // while being passed.
   #if !arch(wasm32)
   for bitPattern in (0x7c01 as UInt16) ... 0x7fff {
     expectEqual(Float16(bitPattern: bitPattern).description, "nan")
     expectEqual(Float16(bitPattern: 0x8000 | bitPattern).description, "nan")
-    
+
     let payload: String = if bitPattern & 0xff == 0 {
       ""
     } else {

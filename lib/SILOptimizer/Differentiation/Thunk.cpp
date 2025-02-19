@@ -344,7 +344,7 @@ SILValue reabstractCoroutine(
   LLVM_DEBUG(auto &s = getADDebugStream() << "Converting coroutine\n";
              s << "  From type: " << fromType << '\n';
              s << "  To type: " << toType << '\n'; s << '\n');
-  
+
   if (fromType != unsubstFromType)
     fn = builder.createConvertFunction(
         loc, fn, SILType::getPrimitiveObjectType(unsubstFromType),
@@ -353,7 +353,7 @@ SILValue reabstractCoroutine(
   fn = builder.createConvertFunction(loc, fn,
                                      SILType::getPrimitiveObjectType(unsubstToType),
                                      /*withoutActuallyEscaping*/ false);
-  
+
   if (toType != unsubstToType)
     fn = builder.createConvertFunction(loc, fn,
                                        SILType::getPrimitiveObjectType(toType),

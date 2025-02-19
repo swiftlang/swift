@@ -559,7 +559,7 @@ extension String {
         length: count)
     }
   }
-  
+
   @_spi(Foundation)
   public init(_cocoaString: AnyObject) {
     self._guts = _bridgeCocoaString(_cocoaString)

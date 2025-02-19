@@ -42,7 +42,7 @@ public class DerivedFromClassBoundToGlobalActor: ClassBoundToGlobalActor {}
 public class NoActorClass {
   // CHECK: @Test.GlobalActor public var varBoundToGlobalActor: Swift.Int
   @GlobalActor public var varBoundToGlobalActor: Int
-  
+
   // CHECK: @Test.GlobalActor public init()
   @GlobalActor public init() {
     self.varBoundToGlobalActor = 0

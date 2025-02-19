@@ -141,29 +141,29 @@ let swiftOrgHTML = """
   <link rel="apple-touch-icon" sizes="152x152" href="/apple-touch-icon-152x152.png" />
   <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon-180x180.png" />
   <link rel="mask-icon" href="/assets/images/icon-swift.svg" color="#F05339" />
-  
-  <link rel="alternate" type="application/atom+xml" title="Swift.org (Atom Feed)" href="/atom.xml" />
-  
 
-  
+  <link rel="alternate" type="application/atom+xml" title="Swift.org (Atom Feed)" href="/atom.xml" />
+
+
+
   <link rel="canonical" href="https://swift.org/blog/" />
-  
+
 
   <meta name="twitter:card" content="summary" />
   <meta name="twitter:site" content="@SwiftLang" />
-  
+
   <meta name="twitter:title" content="Swift.org" />
   <meta name="twitter:description" content="Swift is a general-purpose programming language built using a modern approach to safety, performance, and software design patterns." />
-  
+
 
   <meta property="og:site_name" content="Swift.org" />
   <meta property="og:image" content="https://swift.org/apple-touch-icon-180x180.png" />
-  
-  
+
+
   <meta property="og:title" content="Swift.org" />
   <meta property="og:url" content="https://swift.org" />
   <meta property="og:description" content="Swift is a general-purpose programming language built using a modern approach to safety, performance, and software design patterns." />
-  
+
 </head>
 
 <body>
@@ -181,192 +181,192 @@ let swiftOrgHTML = """
   </div>
 
   <div class="list-items">
-    
-    
+
+
     <ul>
-      
-      
+
+
       <li>
-      
+
         <a href="/about/">About Swift</a>
-        
+
       </li>
-      
-      
+
+
       <li class="active">
-      
+
         <a href="/blog/">Blog</a>
-        
+
       </li>
-      
-      
+
+
       <li>
-      
+
         <a href="/getting-started/">Getting Started</a>
-        
+
       </li>
-      
-      
+
+
       <li>
-      
+
         <a href="/download/">Download</a>
-        
+
       </li>
-      
-      
+
+
       <li>
-      
+
         <a href="/platform-support/">Platform Support</a>
-        
+
       </li>
-      
-      
+
+
       <li>
-      
+
         <a href="/documentation/">Documentation</a>
-        
+
       </li>
-      
+
     </ul>
-    
-    
+
+
     <h2>Community</h2>
-    
+
     <ul>
-      
-      
+
+
       <li>
-      
+
         <a href="/community/">Community Overview</a>
-        
+
       </li>
-      
-      
+
+
       <li>
-      
+
         <a href="/diversity/">Diversity</a>
-        
+
       </li>
-      
-      
+
+
       <li>
-      
+
         <a href="/mentorship/">Mentorship</a>
-        
+
       </li>
-      
-      
+
+
       <li>
-      
+
         <a href="/contributing/">Contributing</a>
-        
+
       </li>
-      
-      
+
+
       <li>
-      
+
         <a href="/code-of-conduct/">Code of Conduct</a>
-        
+
       </li>
-      
+
     </ul>
-    
-    
+
+
     <h2>Open Source Development</h2>
-    
+
     <ul>
-      
-      
+
+
       <li>
-      
+
         <a href="/source-code/">Source Code</a>
-        
+
       </li>
-      
-      
+
+
       <li>
-      
+
         <a href="/continuous-integration/">Continuous Integration</a>
-        
+
       </li>
-      
-      
+
+
       <li>
-      
+
         <a href="/source-compatibility/">Source Compatibility</a>
-        
+
       </li>
-      
-      
+
+
       <li>
-      
+
         <a href="/support/security.html">Security</a>
-        
+
       </li>
-      
+
     </ul>
-    
-    
+
+
     <h2>Open Source Efforts</h2>
-    
+
     <ul>
-      
-      
+
+
       <li>
-      
+
         <a href="/swift-compiler/">Swift Compiler</a>
-        
+
       </li>
-      
-      
+
+
       <li>
-      
+
         <a href="/standard-library/">Standard Library</a>
-        
+
       </li>
-      
-      
+
+
       <li>
-      
+
         <a href="/package-manager/">Package Manager</a>
-        
+
       </li>
-      
-      
+
+
       <li>
-      
+
         <a href="/core-libraries/">Core Libraries</a>
-        
+
       </li>
-      
-      
+
+
       <li>
-      
+
         <a href="/lldb/">REPL, Debugger & Playgrounds</a>
-        
+
       </li>
-      
-      
+
+
       <li>
-      
+
         <a href="/server/">Swift on Server</a>
-        
+
       </li>
-      
-      
+
+
       <li>
-      
+
         <a href="/website/">Swift.org website</a>
-        
+
       </li>
-      
+
     </ul>
-    
+
   </div>
 </nav>
 
 <main role="main">
-  
+
   <article id="/blog/language-workgroup" class="summary">
     <header>
       <h1 class="title"><a href="/blog/language-workgroup/">Announcing the Language Workgroup</a></h1>
@@ -1594,7 +1594,7 @@ architecture on Linux.</p>
 
 <footer role="contentinfo">
   <div class="footer-content">
-    
+
     <p class="copyright">Copyright © 2022 Apple Inc. All rights reserved.</p>
     <p class="trademark">Swift and the Swift logo are trademarks of Apple Inc.</p>
     <p class="privacy">
@@ -1654,18 +1654,18 @@ extension String {
   @available(macOS 15.0, iOS 18.0, watchOS 11.0, tvOS 18.0, visionOS 2.0, *)
   var _words: [Substring] {
     var result: [Substring] = []
-    
+
     var i = startIndex
-    
+
     while i < endIndex {
       let start = i
       let end = _wordIndex(after: i)
-      
+
       let substr = self[start ..< end]
       result.append(substr)
       i = end
     }
-    
+
     return result
   }
 }

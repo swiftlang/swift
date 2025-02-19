@@ -53,7 +53,7 @@ struct BasicBlockRange : CustomStringConvertible, NoReflectionChildren {
 
   /// The inclusive range, i.e. the exclusive range plus the end blocks.
   private(set) var inclusiveRange: Stack<BasicBlock>
-  
+
   /// The exclusive range, i.e. not containing the end blocks.
   var range: LazyFilterSequence<Stack<BasicBlock>> {
     inclusiveRange.lazy.filter { contains($0) }
@@ -65,7 +65,7 @@ struct BasicBlockRange : CustomStringConvertible, NoReflectionChildren {
   private var wasInserted: BasicBlockSet
   private var inExclusiveRange: BasicBlockSet
   private var worklist: BasicBlockWorklist
-  
+
   init(begin: BasicBlock, _ context: some Context) {
     self.begin = begin
     self.inclusiveRange = Stack(context)
@@ -102,7 +102,7 @@ struct BasicBlockRange : CustomStringConvertible, NoReflectionChildren {
 
   /// Returns true if the exclusive range contains `block`.
   func contains(_ block: BasicBlock) -> Bool { inExclusiveRange.contains(block) }
-  
+
   /// Returns true if the inclusive range contains `block`.
   func inclusiveRangeContains (_ block: BasicBlock) -> Bool {
     worklist.hasBeenPushed(block)
@@ -136,7 +136,7 @@ struct BasicBlockRange : CustomStringConvertible, NoReflectionChildren {
   var interiors: LazyFilterSequence<Stack<BasicBlock>> {
     inserted.lazy.filter { contains($0) && $0 != begin }
   }
-  
+
   var description: String {
     return (isValid ? "" : "<invalid>\n") +
       """

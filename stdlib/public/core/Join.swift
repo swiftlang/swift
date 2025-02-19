@@ -16,7 +16,7 @@
 public struct JoinedSequence<Base: Sequence> where Base.Element: Sequence {
 
   public typealias Element = Base.Element.Element
-  
+
   @usableFromInline // lazy-performance
   internal var _base: Base
   @usableFromInline // lazy-performance
@@ -161,7 +161,7 @@ extension JoinedSequence: Sequence {
     return result
   }
 }
-  
+
 extension Sequence where Element: Sequence {
   /// Returns the concatenated elements of this sequence of sequences,
   /// inserting the given separator between each element.

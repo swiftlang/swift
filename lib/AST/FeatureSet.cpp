@@ -301,7 +301,7 @@ static bool usesFeatureAddressableParameters(Decl *d) {
   if (!fd) {
     return false;
   }
-  
+
   for (auto pd : *fd->getParameters()) {
     if (pd->isAddressable()) {
       return true;
@@ -314,7 +314,7 @@ static bool usesFeatureAddressableTypes(Decl *d) {
   if (d->getAttrs().hasAttribute<AddressableForDependenciesAttr>()) {
     return true;
   }
-  
+
   return false;
 }
 

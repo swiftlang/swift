@@ -30,11 +30,11 @@ case Error(Error)
   init(success x: Value) {
     self = .Success(x)
   }
-  
+
   init(error: Error) {
     self = .Error(error)
   }
-  
+
   func map<U>(_ transform: (Value) -> U) -> Result<U> {
     switch self {
     case .Success(let x): return .Success(transform(x))

@@ -50,26 +50,26 @@ public enum AccessBase : CustomStringConvertible, Hashable {
 
   /// The address of a boxed variable, i.e. a field of an `alloc_box`.
   case box(ProjectBoxInst)
-  
+
   /// The address of a stack-allocated value, i.e. an `alloc_stack`
   case stack(AllocStackInst)
-  
+
   /// The address of a global variable.
   ///
   /// TODO: make this payload the global address. Make AccessBase.address non-optional. Make AccessBase comparison see
   /// though things like project_box and global_addr. Then cleanup APIs like LifetimeDependence.Scope that carry extra
   /// address values around.
   case global(GlobalVariable)
-  
+
   /// The address of a stored property of a class instance.
   case `class`(RefElementAddrInst)
-  
+
   /// The base address of the tail allocated elements of a class instance.
   case tail(RefTailAddrInst)
 
   /// An indirect function argument, like `@inout`.
   case argument(FunctionArgument)
-  
+
   /// An indirect result of a `begin_apply`.
   case yield(MultipleValueInstructionResult)
 
@@ -291,7 +291,7 @@ public enum AccessBase : CustomStringConvertible, Hashable {
     }
 
     switch (self, other) {
-    
+
     // First handle all pairs of the same kind (except `yield`, `pointer` and `index`).
     case (.box(let pb), .box(let otherPb)):
       return pb.fieldIndex != otherPb.fieldIndex ||
@@ -310,7 +310,7 @@ public enum AccessBase : CustomStringConvertible, Hashable {
              hasDifferentType(rta.instance, otherRta.instance)
     case (.argument(let arg), .argument(let otherArg)):
       return (arg.convention.isExclusiveIndirect || otherArg.convention.isExclusiveIndirect) && arg != otherArg
-      
+
     // Handle arguments vs non-arguments
     case (.argument(let arg), _):
       return argIsDistinct(arg, from: other)

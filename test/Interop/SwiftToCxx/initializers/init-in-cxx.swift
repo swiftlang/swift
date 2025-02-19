@@ -23,7 +23,7 @@
 
 public struct FirstSmallStruct {
     public let x: UInt32
-    
+
     public init() {
         x = 42
     }

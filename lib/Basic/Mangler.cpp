@@ -48,7 +48,7 @@ static int numLargeSubsts = 0;
 
 struct OpStatEntry {
   OpStatEntry() : num(0), size(0) { }
-  
+
   int num;
   int size;
 };
@@ -89,7 +89,7 @@ void Mangle::printManglingStats() {
     llvm::outs() << "  delta " << E.sizeDiff << ": " << E.Old << " - " << E.New
                  << '\n';
   }
-  
+
   llvm::outs() << "Mangling operator stats:\n";
 
   using MapEntry = llvm::StringMapEntry<OpStatEntry>;

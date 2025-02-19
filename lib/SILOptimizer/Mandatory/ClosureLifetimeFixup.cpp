@@ -358,7 +358,7 @@ static SILInstruction *lookThroughRebastractionUsers(
     memoized[from] = toResult;
     return toResult;
   };
-  
+
   auto getSingleNonDebugNonRefCountUser =
     [](SILValue v) -> SILInstruction* {
       SILInstruction *singleNonDebugNonRefCountUser = nullptr;
@@ -522,7 +522,7 @@ collectStackClosureLifetimeEnds(SmallVectorImpl<SILInstruction *> &lifetimeEnds,
       // Any partial_apply already converted to a stack closure should have
       // also been converted to borrowing its captures.
       assert(!pa->isOnStack());
-      
+
       SILValue singlePAUser = pa;
       do {
         SILInstruction *nextUser = nullptr;
@@ -538,12 +538,12 @@ collectStackClosureLifetimeEnds(SmallVectorImpl<SILInstruction *> &lifetimeEnds,
                   "itself nonescaping?!");
         singlePAUser = nextUser->getResult(0);
       } while (!isa<ConvertEscapeToNoEscapeInst>(singlePAUser));
-      
+
       auto convert = cast<ConvertEscapeToNoEscapeInst>(singlePAUser);
       collectStackClosureLifetimeEnds(lifetimeEnds, convert);
       continue;
     }
-    
+
     // There shouldn't be any other consuming uses of the value that aren't
     // forwarding.
     assert(consumer->hasResults());
@@ -617,7 +617,7 @@ static SILValue tryRewriteToPartialApplyStack(
       return SILValue();
     singleNonDebugNonRefCountUser = user;
   }
-  
+
   SILBuilderWithScope b(cvt);
 
   // Remove the original destroy of the partial_apply, if any, since the
@@ -671,24 +671,24 @@ static SILValue tryRewriteToPartialApplyStack(
     llvm::errs() << "=== replacing conversion\n";
     convert->dumpInContext();
     */
-    
+
     auto origTy = convert->getType().castTo<SILFunctionType>();
     auto origWithNoEscape = SILType::getPrimitiveObjectType(
         origTy->getWithExtInfo(origTy->getExtInfo().withNoEscape()));
     closureOp = b.createConvertFunction(convert->getLoc(), closure,
                                         origWithNoEscape, false);
-    
+
     /* DEBUG
     llvm::errs() << "--- with\n";
     closureOp->dumpInContext();
     */
   }
-  
+
   // Replace the convert_escape_to_noescape uses with the new
   // partial_apply [stack].
   cvt->replaceAllUsesWith(closureOp);
   saveDeleteInst(cvt);
-  
+
   // Delete the ref count operations on the original partial_apply.
   for (auto *refInst : refCountInsts)
     saveDeleteInst(refInst);
@@ -731,7 +731,7 @@ static SILValue tryRewriteToPartialApplyStack(
   // lifetime ends.
   SmallVector<SILInstruction *, 4> lifetimeEnds;
   collectStackClosureLifetimeEnds(lifetimeEnds, closureOp);
-  
+
   // For address-only captures, see if we can eliminate the copy
   // that SILGen emitted to allow the original partial_apply to take ownership.
   // We do this here because otherwise the move checker will see the copy as an
@@ -779,7 +779,7 @@ static SILValue tryRewriteToPartialApplyStack(
                  llvm::dbgs() << "\n");
       continue;
     }
-    
+
     // It needs to have been initialized by copying from somewhere else.
     CopyAddrInst *initialization = nullptr;
     MarkDependenceInst *markDep = nullptr;
@@ -851,7 +851,7 @@ static SILValue tryRewriteToPartialApplyStack(
       LLVM_DEBUG(llvm::dbgs() << "-- failed to find single initializing use\n");
       continue;
     }
-    
+
     // The source should have no writes in the duration of the partial_apply's
     // liveness.
     auto orig = initialization->getSrc();
@@ -917,7 +917,7 @@ static SILValue tryRewriteToPartialApplyStack(
     stack->eraseFromParent();
     borrowedOriginals.insert(orig);
   }
-  
+
   /* DEBUG
   llvm::errs() << "=== found lifetime ends for\n";
   closureOp->dump();

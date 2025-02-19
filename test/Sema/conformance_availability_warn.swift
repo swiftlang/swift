@@ -30,13 +30,13 @@ func passAvailableConformance1(x: HasAvailableConformance1) { // expected-note 6
 
   takesHorseExistential(x) // expected-warning {{conformance of 'HasAvailableConformance1' to 'Horse' is only available in macOS 100 or newer; this is an error in the Swift 6 language mode}}
   // expected-note@-1 {{add 'if #available' version check}}
-  
+
   x.giddyUp() // expected-warning {{conformance of 'HasAvailableConformance1' to 'Horse' is only available in macOS 100 or newer; this is an error in the Swift 6 language mode}}
   // expected-note@-1 {{add 'if #available' version check}}
-  
+
   _ = x.isGalloping // expected-warning {{conformance of 'HasAvailableConformance1' to 'Horse' is only available in macOS 100 or newer; this is an error in the Swift 6 language mode}}
   // expected-note@-1 {{add 'if #available' version check}}
-  
+
   _ = x[keyPath: \.isGalloping] // expected-warning {{conformance of 'HasAvailableConformance1' to 'Horse' is only available in macOS 100 or newer; this is an error in the Swift 6 language mode}}
   // expected-note@-1 {{add 'if #available' version check}}
 

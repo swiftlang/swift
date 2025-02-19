@@ -361,7 +361,7 @@ public protocol Collection<Element>: Sequence {
   ///
   /// If the collection is empty, `startIndex` is equal to `endIndex`.
   var startIndex: Index { get }
- 
+
   /// The collection's "past the end" position---that is, the position one
   /// greater than the last valid subscript argument.
   ///
@@ -469,7 +469,7 @@ public protocol Collection<Element>: Sequence {
     where Indices.Element == Index, 
           Indices.Index == Index,
           Indices.SubSequence == Indices
-        
+
   /// The indices that are valid for subscripting the collection, in ascending
   /// order.
   ///
@@ -519,7 +519,7 @@ public protocol Collection<Element>: Sequence {
   ///   `RandomAccessCollection`; otherwise, O(*n*), where *n* is the length
   ///   of the collection.
   var count: Int { get }
-  
+
   // The following requirements enable dispatching for firstIndex(of:) and
   // lastIndex(of:) when the element type is Equatable.
 
@@ -1281,7 +1281,7 @@ extension Collection {
       offsetBy: amount, limitedBy: endIndex) ?? endIndex
     return self[startIndex..<end]
   }
-    
+
   /// Returns a subsequence by skipping elements while `predicate` returns
   /// `true` and returning the remaining elements.
   ///
@@ -1331,7 +1331,7 @@ extension Collection {
       offsetBy: maxLength, limitedBy: endIndex) ?? endIndex
     return self[startIndex..<end]
   }
-  
+
   /// Returns a subsequence containing the initial elements until `predicate`
   /// returns `false` and skipping the remaining elements.
   ///

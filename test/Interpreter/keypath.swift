@@ -11,35 +11,35 @@ class MyLabel {
 }
 
 class Controller {
-  
+
   fileprivate let label = MyLabel()
   fileprivate var secondLabel: MyLabel? = MyLabel()
   public var thirdLabel: MyLabel? = MyLabel()
   fileprivate var fourthLabel: MyLabel.Type? { return MyLabel.self }
   public var fifthLabel: MyLabel.Type? { return MyLabel.self }
-  
+
   subscript(string: String) -> String {
     get {
       ""
     }
     set {
-      
+
     }
   }
-  
+
   subscript(int int: Int, str str: String, otherInt: Int) -> Int {
     get {
       0
     }
     set {
-      
+
     }
   }
-  
+
   subscript() -> Int {
     0
   }
-  
+
   subscript<T>(array: [T]) -> T? {
     array.first
   }
@@ -198,7 +198,7 @@ do {
   struct Weekday {
       static let day = "Monday"
   }
-  
+
   @dynamicMemberLookup
   struct StaticExample<T> {
       subscript<U>(dynamicMember keyPath: KeyPath<T.Type, U>) -> U {

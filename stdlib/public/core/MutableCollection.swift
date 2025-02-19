@@ -426,11 +426,11 @@ extension MutableCollection {
   ) -> Index {
     var m = middle, s = subrange.lowerBound
     let e = subrange.upperBound
-    
+
     // Handle the trivial cases
     if s == m { return e }
     if m == e { return s }
-    
+
     // We have two regions of possibly-unequal length that need to be
     // exchanged.  The return value of this method is going to be the
     // position following that of the element that is currently last
@@ -452,7 +452,7 @@ extension MutableCollection {
       //   s    s1       m    m1/e       s   s1/m   m1      e
       //
       let (s1, m1) = _swapNonemptySubrangePrefixes(s..<m, m..<e)
-      
+
       if m1 == e {
         // Left-hand case: we have moved element j into position.  if
         // we haven't already, we can capture the return value which
@@ -462,11 +462,11 @@ extension MutableCollection {
         // comparison once the return value is known.  I'm not sure
         // it's a worthwhile optimization, though.
         if ret == e { ret = s1 }
-        
+
         // If both regions were the same size, we're done.
         if s1 == m { break }
       }
-      
+
       // Now we have a smaller problem that is also a rotation, so we
       // can adjust our bounds and repeat.
       //
@@ -476,10 +476,10 @@ extension MutableCollection {
       s = s1
       if s == m { m = m1 }
     }
-    
+
     return ret
   }
-  
+
   /// Swaps the elements of the two given subranges, up to the upper bound of
   /// the smaller subrange. The returned indices are the ends of the two
   /// ranges that were actually swapped.
@@ -505,7 +505,7 @@ extension MutableCollection {
   ) -> (Index, Index) {
     _internalInvariant(!lhs.isEmpty)
     _internalInvariant(!rhs.isEmpty)
-    
+
     var p = lhs.lowerBound
     var q = rhs.lowerBound
     repeat {

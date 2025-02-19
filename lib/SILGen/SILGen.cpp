@@ -1655,7 +1655,7 @@ void SILGenModule::emitDeallocatorImpl(SILDeclRef constant, SILFunction *f) {
 
 void SILGenModule::emitDestructor(ClassDecl *cd, DestructorDecl *dd) {
   emitAbstractFuncDecl(dd);
-  
+
   // Emit the ivar destroyer, if needed.
   if (requiresIVarDestroyer(cd)) {
     SILDeclRef ivarDestroyer(cd, SILDeclRef::Kind::IVarDestroyer);
@@ -2030,7 +2030,7 @@ void SILGenModule::tryEmitPropertyDescriptor(AbstractStorageDecl *decl) {
   // TODO: Key path code emission doesn't handle opaque values properly yet.
   if (!SILModuleConventions(M).useLoweredAddresses())
     return;
-  
+
   if (!decl->exportsPropertyDescriptor())
     return;
 
@@ -2042,7 +2042,7 @@ void SILGenModule::tryEmitPropertyDescriptor(AbstractStorageDecl *decl) {
     baseTy = decl->getDeclContext()->getSelfInterfaceType()
                  ->getReducedType(decl->getInnermostDeclContext()
                                       ->getGenericSignatureOfContext());
-    
+
     if (decl->isStatic()) {
       baseTy = MetatypeType::get(baseTy);
     }
@@ -2056,16 +2056,16 @@ void SILGenModule::tryEmitPropertyDescriptor(AbstractStorageDecl *decl) {
                         ->getGenericEnvironmentOfContext();
   unsigned baseOperand = 0;
   bool needsGenericContext = true;
-  
+
   if (canStorageUseTrivialDescriptor(*this, decl)) {
     (void)SILProperty::create(M, /*serializedKind*/ 0, decl, std::nullopt);
     return;
   }
-  
+
   SubstitutionMap subs;
   if (genericEnv)
     subs = genericEnv->getForwardingSubstitutionMap();
-  
+
   auto component = emitKeyPathComponentForDecl(SILLocation(decl),
                                                genericEnv,
                                                ResilienceExpansion::Maximal,
@@ -2074,7 +2074,7 @@ void SILGenModule::tryEmitPropertyDescriptor(AbstractStorageDecl *decl) {
                                                baseTy->getCanonicalType(),
                                                M.getSwiftModule(),
                                                /*property descriptor*/ true);
-  
+
   (void)SILProperty::create(M, /*serializedKind*/ 0, decl, component);
 }
 

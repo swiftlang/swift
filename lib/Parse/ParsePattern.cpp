@@ -64,17 +64,17 @@ parseDefaultArgument(Parser &P, Parser::DefaultArgumentInfo *defaultArgs,
     diagID = diag::no_default_arg_curried;
     break;
   }
-  
+
   assert((diagID.ID != DiagID()) == !defaultArgs &&
          "Default arguments specified for an unexpected parameter list kind");
-  
+
   if (diagID.ID != DiagID()) {
     auto inFlight = P.diagnose(equalLoc, diagID);
     if (initR.isNonNull())
       inFlight.fixItRemove(SourceRange(equalLoc, initR.get()->getEndLoc()));
     return ParserStatus();
   }
-  
+
   defaultArgs->HasDefaultArgument = true;
 
   if (initR.hasCodeCompletion()) {
@@ -244,7 +244,7 @@ Parser::parseParameterClause(SourceLoc &leftParenLoc,
           if (partOfArgumentLabel)
             break;
         }
-        
+
         if (Tok.isContextualKeyword("isolated")) {
           diagnose(Tok, diag::parameter_specifier_as_attr_disallowed, Tok.getText())
                     .warnUntilSwiftVersion(6);
@@ -319,7 +319,7 @@ Parser::parseParameterClause(SourceLoc &leftParenLoc,
         }
       }
     }
-    
+
     // If let or var is being used as an argument label, allow it but
     // generate a warning.
     if (!isClosure &&
@@ -523,7 +523,7 @@ validateParameterWithOwnership(Parser &parser,
   if (parsingEnumElt) {
     return new (parser.Context) OwnershipTypeRepr(type, specifier, loc);
   }
-  
+
   if (isa<SpecifierTypeRepr>(type)) {
     parser.diagnose(loc, diag::parameter_specifier_repeated).fixItRemove(loc);
   } else {
@@ -567,7 +567,7 @@ mapParsedParameters(Parser &parser,
     // names indicates the parameter is synthetic.
     if (!parsingEnumElt && argNameLoc.isInvalid() && paramNameLoc.isInvalid())
       param->setImplicit();
-    
+
     // If we diagnosed this parameter as a parse error, propagate to the decl.
     if (paramInfo.isInvalid)
       param->setInvalid();
@@ -644,7 +644,7 @@ mapParsedParameters(Parser &parser,
       llvm::SmallString<16> specifier;
       {
         llvm::raw_svector_ostream ss(specifier);
-        
+
         ss << '\'' << ParamDecl::getSpecifierSpelling(paramInfo.SpecifierKind)
            << '\'';
       }
@@ -774,7 +774,7 @@ Parser::parseSingleParameterClause(ParameterContextKind paramContext,
   ParserStatus status;
   SmallVector<ParsedParameter, 4> params;
   SourceLoc leftParenLoc, rightParenLoc;
-  
+
   // Parse the parameter clause.
   status |= parseParameterClause(leftParenLoc, params, rightParenLoc,
                                  defaultArgs, paramContext);
@@ -1047,11 +1047,11 @@ ParserStatus Parser::parseEffectsSpecifiers(SourceLoc existingArrowLoc,
 ///
 ParserResult<Pattern> Parser::parseTypedPattern() {
   auto result = parsePattern();
-  
+
   // Now parse an optional type annotation.
   if (Tok.is(tok::colon)) {
     SourceLoc colonLoc = consumeToken(tok::colon);
-    
+
     if (result.isNull()) {
       // Recover by creating AnyPattern.
       auto *AP = new (Context) AnyPattern(colonLoc);
@@ -1077,7 +1077,7 @@ ParserResult<Pattern> Parser::parseTypedPattern() {
                                                /*isExprBasic*/ false);
         if (!argListResult.isParseErrorOrHasCompletion()) {
           backtrack.cancelBacktrack();
-          
+
           // Suggest replacing ':' with '='
           auto *args = argListResult.get();
           diagnose(args->getLParenLoc(), diag::initializer_as_typed_pattern)
@@ -1089,11 +1089,11 @@ ParserResult<Pattern> Parser::parseTypedPattern() {
     } else {
       Ty = makeParserResult(ErrorTypeRepr::create(Context, PreviousLoc));
     }
-    
+
     result = makeParserResult(result,
                             new (Context) TypedPattern(result.get(), Ty.get()));
   }
-  
+
   return result;
 }
 
@@ -1140,7 +1140,7 @@ ParserResult<Pattern> Parser::parsePattern() {
 
     return makeParserResult(createBindingFromPattern(loc, name, introducer));
   }
-    
+
   case tok::code_complete:
     if (!CurDeclContext->isTypeContext()) {
       // This cannot be an overridden property, so just eat the token. We cannot
@@ -1194,7 +1194,7 @@ ParserResult<Pattern> Parser::parsePattern() {
         newBindingState.getIntroducer().value_or(VarDecl::Introducer::Var),
         subPattern.get()));
   }
-      
+
   default:
     break;
   }
@@ -1339,7 +1339,7 @@ ParserResult<Pattern> Parser::parseMatchingPattern(bool isExprBasic) {
     return parseMatchingPatternAsBinding(newPatternBindingState, varLoc,
                                          isExprBasic);
   }
-  
+
   // The `borrowing` modifier is a contextual keyword, so it's only accepted
   // directly applied to a binding name, as in `case .foo(borrowing x)`.
   if ((Tok.isContextualKeyword("_borrowing")
@@ -1353,7 +1353,7 @@ ParserResult<Pattern> Parser::parseMatchingPattern(bool isExprBasic) {
 
     Tok.setKind(tok::contextual_keyword);
     SourceLoc borrowingLoc = consumeToken();
-    
+
     // If we have `case borrowing x.`, `x(`, `x[`, or `x<` then this looks
     // like an attempt to include a subexpression under a `borrowing`
     // binding, which isn't yet supported.
@@ -1364,7 +1364,7 @@ ParserResult<Pattern> Parser::parseMatchingPattern(bool isExprBasic) {
       // Diagnose the unsupported production.
       diagnose(Tok.getLoc(),
                diag::borrowing_subpattern_unsupported);
-      
+
       // Recover by parsing as if it was supported.
       return parseMatchingPattern(isExprBasic);
     }
@@ -1375,7 +1375,7 @@ ParserResult<Pattern> Parser::parseMatchingPattern(bool isExprBasic) {
                                            VarDecl::Introducer::Borrowing);
     auto bindPattern = new (Context) BindingPattern(
       borrowingLoc, VarDecl::Introducer::Borrowing, namedPattern);
-    
+
     return makeParserResult(bindPattern);
   }
 
@@ -1517,7 +1517,7 @@ static bool canParsePatternTuple(Parser &P) {
 ///
 bool Parser::canParseTypedPattern() {
   if (!canParsePattern(*this)) return false;
-  
+
   if (consumeIf(tok::colon))
     return canParseType();
   return true;

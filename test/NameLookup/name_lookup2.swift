@@ -219,9 +219,9 @@ print(forwardReferenceVar, terminator: ""); var forwardReferenceVar: Int = 0
 // https://gist.github.com/erynofwales/61768899502b7ac83c6e
 struct Matrix4<T: FloatingPoint> {
   static func size() -> Int {}
-  
+
   private var data: Int = Matrix4.size()   // Ok: Matrix4<T>
-  
+
   init() {
     data = Matrix4.size()  // Ok: Matrix4<T>
   }

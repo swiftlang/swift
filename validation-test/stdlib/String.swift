@@ -2385,12 +2385,12 @@ StringTests.test("String.CoW.reserveCapacity") {
   str.reserveCapacity(30)
   expectGE(str.capacity, 30)
   let preGrowCapacity = str.capacity
-  
+
   // Growth shouldn't be linear
   let newElementCount = (preGrowCapacity - str.count) + 10
   str.append(contentsOf: String(repeating: "z", count: newElementCount))
   expectGE(str.capacity, preGrowCapacity * 2)
-  
+
   // Capacity can shrink when copying, but not below the count
   var copy = str
   copy.reserveCapacity(30)
@@ -2403,14 +2403,14 @@ StringTests.test("NSString.CoW.reserveCapacity") {
   func newNSString() -> NSString {
     NSString(string: String(repeating: "a", count: 20))
   }
-  
+
   // Test that reserveCapacity(_:) doesn't actually shrink capacity
   var str = newNSString() as String
   var copy = str
   copy.reserveCapacity(10)
   copy.reserveCapacity(30)
   expectGE(copy.capacity, 30)
-  
+
   var str2 = newNSString() as String
   var copy2 = str2
   copy2.append(contentsOf: String(repeating: "z", count: 10))

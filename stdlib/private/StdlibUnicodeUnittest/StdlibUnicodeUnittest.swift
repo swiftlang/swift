@@ -27,7 +27,7 @@ extension String {
     }
     return utf8
   }
-  
+
   func parseUTF16CodeUnits() -> [UInt16] {
     var utf16 = [UInt16]()
     let units = self.split(separator: " ")
@@ -35,7 +35,7 @@ extension String {
       let i = Int(string, radix: 16)!
       return Unicode.Scalar(i)
     }
-    
+
     for scalar in scalars {
       utf16 += scalar.utf16
     }
@@ -91,7 +91,7 @@ func readInputNormalizationTest(index: Int) -> [NormalizationTest] {
     }
 
     let content = line.split(separator: "#").first!
-  
+
     guard !content.isEmpty else {
       continue
     }
@@ -110,7 +110,7 @@ func readInputNormalizationTest(index: Int) -> [NormalizationTest] {
 
     tests.append(test)
   }
-  
+
   return tests
 }
 

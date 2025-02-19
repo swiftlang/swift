@@ -21,7 +21,7 @@ extension BasicBlock {
   func dominates(_ other: BasicBlock, _ domTree: DominatorTree) -> Bool {
     domTree.bridged.dominates(self.bridged, other.bridged)
   }
-  
+
   func strictlyDominates(_ other: BasicBlock, _ domTree: DominatorTree) -> Bool {
     dominates(other, domTree) && self != other
   }

@@ -173,7 +173,7 @@ public:
       Offset,
       DirectImpl,
     };
-    
+
   private:
     Kind TheKind;
     union {
@@ -187,7 +187,7 @@ public:
       : TheKind(Kind::DirectImpl), TheImpl(impl) {}
 
     Kind getKind() const { return TheKind; }
-    
+
     Offset getOffset() const {
       assert(getKind() == Kind::Offset);
       return TheOffset;

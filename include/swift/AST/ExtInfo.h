@@ -1306,7 +1306,7 @@ public:
   SILExtInfo withNoEscape(bool noEscape = true) const {
     return builder.withNoEscape(noEscape).build();
   }
-  
+
   SILExtInfo withSendable(bool isSendable = true) const {
     return builder.withSendable(isSendable).build();
   }

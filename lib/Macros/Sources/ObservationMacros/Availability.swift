@@ -48,7 +48,7 @@ extension IfConfigClauseSyntax {
       return nil
     }
   }
-  
+
   var clonedAsIf: IfConfigClauseSyntax {
     detached.with(\.poundKeyword, .poundIfToken())
   }
@@ -71,7 +71,7 @@ extension IfConfigDeclSyntax {
     } else {
       return with(\.clauses, IfConfigClauseListSyntax(elements))
     }
-    
+
   }
 }
 

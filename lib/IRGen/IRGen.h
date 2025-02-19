@@ -347,7 +347,7 @@ public:
 
   constexpr Size() : Value(0) {}
   explicit constexpr Size(int_type Value) : Value(Value) {}
-  
+
   static constexpr Size forBits(int_type bitSize) {
     return Size((bitSize + 7U) / 8U);
   }
@@ -359,7 +359,7 @@ public:
   bool isInvalid() const { return *this == Size::invalid(); }
 
   constexpr int_type getValue() const { return Value; }
-  
+
   int_type getValueInBits() const { return Value * 8; }
 
   bool isZero() const { return Value == 0; }

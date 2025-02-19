@@ -643,7 +643,7 @@ void swift::simple_display(
 void swift::simple_display(llvm::raw_ostream &os, PropertyWrapperMutability m) {
   static const char *names[] =
     {"is nonmutating", "is mutating", "doesn't exist"};
-  
+
   os << "getter " << names[m.Getter] << ", setter " << names[m.Setter];
 }
 
@@ -1050,7 +1050,7 @@ void EnumRawValuesRequest::diagnoseCycle(DiagnosticEngine &diags) const {
 }
 
 void EnumRawValuesRequest::noteCycleStep(DiagnosticEngine &diags) const {
-  
+
 }
 
 //----------------------------------------------------------------------------//
@@ -2676,7 +2676,7 @@ LifetimeDependenceInfoRequest::getCachedResult() const {
 void LifetimeDependenceInfoRequest::cacheResult(
     std::optional<llvm::ArrayRef<LifetimeDependenceInfo>> result) const {
   auto *func = std::get<0>(getStorage());
-  
+
   if (!result) {
     func->LazySemanticInfo.NoLifetimeDependenceInfo = 1;
     return;

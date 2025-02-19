@@ -108,7 +108,7 @@ static void addReturnValueImpl(SILBasicBlock *RetBB, SILBasicBlock *NewRetBB,
   SILBuilder Builder(*F);
   Builder.setCurrentDebugScope(F->getDebugScope());
   SILLocation Loc = F->getLocation();
-  
+
   auto *RetInst = RetBB->getTerminator();
   assert(RetInst->isFunctionExiting() &&
          "expected a properly terminated return or throw block");

@@ -72,7 +72,7 @@ let initializeStaticGlobalsPass = FunctionPass(name: "initialize-static-globals"
   for array in inlineArrays {
     lowerInlineArray(array: array, context)
   }
-    
+
   var cloner = StaticInitCloner(cloneTo: allocInst.global, context)
   defer { cloner.deinitialize() }
 
@@ -97,9 +97,9 @@ private func getGlobalInitializerInfo(
 
   var arrayInitInstructions = InstructionSet(context)
   defer { arrayInitInstructions.deinitialize() }
-  
+
   var inlineArrays = [InlineArray]()
-  
+
   guard let (allocInst, storeToGlobal) = getGlobalInitialization(of: function, context,
     handleUnknownInstruction: { inst in
       if let asi = inst as? AllocStackInst {
@@ -123,14 +123,14 @@ private func getGlobalInitializerInfo(
 /// Represents an inline array which is initialized by a literal.
 private struct InlineArray {
   let elementType: Type
-  
+
   /// In case the `elementType` is a tuple, the element values are flattened,
   /// i.e. `elements` contains elementcount * tupleelements values.
   let elements: [Value]
-  
+
   /// The final load instruction which loads the initialized array from a temporary stack location.
   let finalArrayLoad: LoadInst
-  
+
   /// The stack location which contains the initialized array.
   var stackLoocation: AllocStackInst { finalArrayLoad.address as! AllocStackInst }
 }
@@ -200,7 +200,7 @@ private func getInlineArrayInfo(of allocStack: AllocStackInst) -> InlineArray? {
   guard let arrayLoad, let elementStorage else {
     return nil
   } 
-  
+
   var stores = Array<StoreInst?>()
   if !findArrayElementStores(toElementAddress: elementStorage, elementIndex: 0, stores: &stores) {
     return nil

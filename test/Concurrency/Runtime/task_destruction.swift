@@ -21,7 +21,7 @@ enum Main {
       try await Task.sleep(nanoseconds: 10_000_000_000)
       fatalError("Fail!")
     }
-    
+
     while weakRef != nil {
       await Task.yield()
     }

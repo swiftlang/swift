@@ -1554,7 +1554,7 @@ public:
         Table.addNullPointer(IGM.Int8PtrTy);
         return;
       }
-      
+
       auto descriptor =
         IGM.getAddrOfProtocolConformanceDescriptor(&Conformance);
       if (isRelative)
@@ -2374,11 +2374,11 @@ namespace {
           llvm::ArrayType::get(IGM.Int8PtrTy,
                                swift::NumGenericMetadataPrivateDataWords);
         auto privateDataInit = llvm::Constant::getNullValue(privateDataTy);
-        
+
         IRGenMangler mangler(IGM.Context);
         auto symbolName =
           mangler.mangleProtocolConformanceInstantiationCache(Conformance);
-        
+
         auto privateData =
           new llvm::GlobalVariable(IGM.Module, privateDataTy,
                                    /*constant*/ false,
@@ -3685,7 +3685,7 @@ llvm::Value *irgen::emitWitnessTableRef(IRGenFunction &IGF,
     std::tie(srcType, conformance) =
       IGF.IGM.substOpaqueTypesWithUnderlyingTypes(srcType, conformance);
   }
-  
+
   // If we don't have concrete conformance information, the type must be
   // an archetype and the conformance must be via one of the protocol
   // requirements of the archetype. Look at what's locally bound.
@@ -3740,7 +3740,7 @@ static CanType getOrigSelfType(IRGenModule &IGM,
     if (!selfParam.isFormalIndirect())
       inputType = meta.getInstanceType();
   }
-  
+
   return inputType;
 }
 
@@ -3748,7 +3748,7 @@ static CanType getSubstSelfType(IRGenModule &IGM,
                                 CanSILFunctionType origFnType,
                                 SubstitutionMap subs) {
   CanType inputType = getOrigSelfType(IGM, origFnType);
-  
+
   // Substitute the `self` type.
   // FIXME: This has to be done as a formal AST type substitution rather than
   // a SIL function type substitution, because some nominal types (viz
@@ -3761,7 +3761,7 @@ static CanType getSubstSelfType(IRGenModule &IGM,
   if (!subs.empty()) {
     inputType = inputType.subst(subs)->getCanonicalType();
   }
-  
+
   return inputType;
 }
 

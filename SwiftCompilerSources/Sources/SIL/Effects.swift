@@ -60,14 +60,14 @@ public struct FunctionEffects : CustomStringConvertible, NoReflectionChildren {
 }
 
 extension Function {
-  
+
   /// Returns the global side effects of the function.
   public func getSideEffects() -> SideEffects.GlobalEffects {
     if let sideEffects = effects.sideEffects {
       /// There are computed side effects.
       return sideEffects.accumulatedEffects
     } else {
-      
+
       var effects = definedGlobalEffects
 
       // Even a `[readnone]` function can read from indirect arguments.
@@ -233,7 +233,7 @@ public struct EscapeEffects : CustomStringConvertible, NoReflectionChildren {
       ///    [%0: noescape **]   // argument 0 and all transitively contained values do not escape
       ///
       case notEscaping
-      
+
       /// The argument value escapes to the function return value.
       ///
       /// Syntax examples:
@@ -292,13 +292,13 @@ public struct EscapeEffects : CustomStringConvertible, NoReflectionChildren {
 
     /// To which argument does this effect apply to?
     public let argumentIndex: Int
-    
+
     /// To which projection(s) of the argument does this effect apply to?
     public let pathPattern: SmallProjectionPath
-    
+
     /// The kind of effect.
     public let kind: Kind
-    
+
     /// True, if this effect is derived in an optimization pass.
     /// False, if this effect is defined in the Swift source code.
     public let isDerived: Bool
@@ -383,10 +383,10 @@ public struct SideEffects : CustomStringConvertible, NoReflectionChildren {
   /// This array is indexed by the argument index. Arguments which indices, which
   /// are not included in this array, are defined to have no effects.
   public let arguments: [ArgumentEffects]
-  
+
   /// Effects, which cannot be attributed to a specific argument.
   public let global: GlobalEffects
-  
+
   public init(arguments: [ArgumentEffects], global: GlobalEffects) {
     self.arguments = arguments
     self.global = global
@@ -427,7 +427,7 @@ public struct SideEffects : CustomStringConvertible, NoReflectionChildren {
     result += "[global: \(global)]\n"
     return result
   }
-  
+
   /// Side-effects of a specific function argument.
   ///
   /// The paths describe what (projected) values of an argument are affected.
@@ -462,10 +462,10 @@ public struct SideEffects : CustomStringConvertible, NoReflectionChildren {
 
     /// If not nil, the function may write to the argument at the path.
     public var write: SmallProjectionPath?
-    
+
     /// If not nil, the function may copy/retain the argument at the path (only non-trivial values).
     public var copy: SmallProjectionPath?
-    
+
     /// If not nil, the function may destroy/release the argument at the path (only non-trivial values).
     public var destroy: SmallProjectionPath?
 
@@ -494,7 +494,7 @@ public struct SideEffects : CustomStringConvertible, NoReflectionChildren {
 
     /// Memory reads and writes.
     public var memory: Memory
-    
+
     /// Copies and destroys.
     public var ownership: Ownership
 
@@ -660,7 +660,7 @@ extension StringParser {
       let fromArgIdx = try parseArgumentIndexFromSource(for: function, params: params)
       let fromPath = try parsePathPatternFromSource(for: function, type: function.argumentTypes[fromArgIdx])
       let exclusive = try parseEscapingArrow()
-      
+
       if consume("return") {
         if function.numIndirectResultArguments > 0 {
           if function.numIndirectResultArguments != 1 {
@@ -703,7 +703,7 @@ extension StringParser {
     }
     try throwError("parameter name expected")
   }
-  
+
   private mutating func parsePathPatternFromSource(for function: Function, type: Type) throws -> SmallProjectionPath {
     if consume(".") {
       return try parseProjectionPathFromSource(for: function, type: type)
@@ -728,7 +728,7 @@ extension StringParser {
     }
     try parseEffectsFromSIL(argumentIndex: argumentIndex, to: &effects)
   }
-  
+
   mutating func parseEffectsFromSIL(argumentIndex: Int, to effects: inout FunctionEffects) throws {
     repeat {
       if consume("noescape") {

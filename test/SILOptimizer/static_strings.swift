@@ -123,7 +123,7 @@ func print_strings_from_addressors() {
 @inline(never)
 func testit() {
   // Also check if the generated code is correct.
-  
+
   // CHECK-OUTPUT: abc123a
   // CHECK-OUTPUT: abc123asd3sdj3basfasdf
   // CHECK-OUTPUT: ❄️gastroperiodyni
@@ -132,7 +132,7 @@ func testit() {
   print(get_largestr())
   print(get_unicodestr())
   print("<\(get_emptystr())>")
-  
+
   // CHECK-OUTPUT: abc123a
   // CHECK-OUTPUT: abc123asd3sdj3basfasdf
   // CHECK-OUTPUT: ❄️gastroperiodyni

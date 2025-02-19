@@ -31,12 +31,12 @@
 #include "swift/shims/Visibility.h"
 
 namespace swift {
-  
+
 struct InProcess;
 
 template <typename Runtime> struct TargetMetadata;
 using Metadata = TargetMetadata<InProcess>;
-  
+
 template <typename Runtime> struct TargetHeapMetadata;
 using HeapMetadata = TargetHeapMetadata<InProcess>;
 
@@ -1016,7 +1016,7 @@ swift_unknownObjectUnownedTakeStrong(UnownedReference *ref) {
 #endif // SWIFT_OBJC_INTEROP
 
 #if SWIFT_OBJC_INTEROP
-  
+
 /// Destroy an unowned reference to an object with unknown reference counting.
 SWIFT_RUNTIME_EXPORT
 void swift_unknownObjectUnownedDestroy(UnownedReference *ref);

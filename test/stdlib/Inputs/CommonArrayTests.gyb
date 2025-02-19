@@ -524,7 +524,7 @@ extension Collection {
           high.initialize(to: element)
         }
       }
-    
+
       let highIndex = high - buffer.baseAddress!
       buffer[highIndex...].reverse()
       initializedCount = buffer.count

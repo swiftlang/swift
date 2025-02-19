@@ -330,7 +330,7 @@ public func alwaysUnavailable(
   _ = AtDeploymentTarget()
   _ = AfterDeploymentTarget() // expected-error {{'AfterDeploymentTarget' is only available in macOS 11 or newer}} expected-note {{add 'if #available'}}
   _ = Unavailable()
-  
+
   if #available(macOS 11, *) {
     _ = AfterDeploymentTarget()
   }
@@ -979,7 +979,7 @@ public struct PublicStruct { // expected-note 21 {{add @available attribute}}
              dPublicInferredAvailBetween = BetweenTargets(),
              ePublicInferredAvailBetween = AtDeploymentTarget(), // FIXME: Inferred type should be diagnosed
              fPublicInferredAvailBetween = AfterDeploymentTarget() // expected-error {{'AfterDeploymentTarget' is only available in macOS 11 or newer}}
-  
+
   // Property initializers are not exposed.
   public var aPublicInit: Any = NoAvailable(),
              bPublicInit: Any = BeforeInliningTarget(),
@@ -1072,7 +1072,7 @@ public struct PublicStruct { // expected-note 21 {{add @available attribute}}
       }
     }
   }
-  
+
   public var block: () -> () = {
     // The body of a block assigned to a public property acts like non-@inlinable
     _ = NoAvailable()
@@ -1081,7 +1081,7 @@ public struct PublicStruct { // expected-note 21 {{add @available attribute}}
     _ = BetweenTargets()
     _ = AtDeploymentTarget()
     _ = AfterDeploymentTarget() // expected-error {{'AfterDeploymentTarget' is only available in macOS 11 or newer}} expected-note {{add 'if #available'}}
-    
+
     if #available(macOS 11, *) {
       _ = AfterDeploymentTarget()
     }
@@ -1097,7 +1097,7 @@ public struct PublicStructWithWrappers { // expected-note 4 {{add @available att
   @PropertyWrapper public var dExplicitInit = BetweenTargets() // FIXME: Inferred type should be diagnosed
   @PropertyWrapper public var eExplicitInit = AtDeploymentTarget() // FIXME: Inferred type should be diagnosed
   @PropertyWrapper public var fExplicitInit = AfterDeploymentTarget() // expected-error {{'AfterDeploymentTarget' is only available in macOS 11 or newer}}
-  
+
   // The property type is inferred from the initializer expression. The
   // expressions themselves will not be exposed.
   @PropertyWrapper(NoAvailable()) public var aExplicitInitAlt
@@ -1664,7 +1664,7 @@ public enum NoAvailableEnumWithClasses {
   public class InheritsBetweenTargets: BetweenTargetsClass {} // expected-error {{'BetweenTargetsClass' is only available in macOS 10.14.5 or newer; clients of 'Test' may have a lower deployment target}} expected-note 2 {{add @available attribute to enclosing class}}
   public class InheritsAtDeploymentTarget: AtDeploymentTargetClass {} // expected-error {{'AtDeploymentTargetClass' is only available in macOS 10.15 or newer; clients of 'Test' may have a lower deployment target}} expected-note 2 {{add @available attribute to enclosing class}}
   public class InheritsAfterDeploymentTarget: AfterDeploymentTargetClass {} // expected-error {{'AfterDeploymentTargetClass' is only available in macOS 11 or newer}} expected-note 2 {{add @available attribute to enclosing class}}
-  
+
   @usableFromInline
   class UFIInheritsBetweenTargets: BetweenTargetsClass {} // expected-error {{'BetweenTargetsClass' is only available in macOS 10.14.5 or newer; clients of 'Test' may have a lower deployment target}} expected-note 2 {{add @available attribute to enclosing class}}
 }

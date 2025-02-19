@@ -49,7 +49,7 @@ getLifetimeDependenceFor(ArrayRef<LifetimeDependenceInfo> lifetimeDependencies,
 std::string LifetimeDependenceInfo::getString() const {
   std::string lifetimeDependenceString = "@lifetime(";
   auto addressable = getAddressableIndices();
-  
+
   auto getSourceString = [&](IndexSubset *bitvector, StringRef kind) {
     std::string result;
     bool isFirstSetBit = true;
@@ -415,7 +415,7 @@ LifetimeDependenceInfo::fromLifetimeAttribute(AbstractFunctionDecl *afd) {
   auto *dc = afd->getDeclContext();
   auto &ctx = dc->getASTContext();
   auto &diags = ctx.Diags;
-  
+
   SmallVector<LifetimeDependenceInfo, 1> lifetimeDependencies;
   llvm::SmallSet<unsigned, 1> lifetimeDependentTargets;
   auto lifetimeAttrs = afd->getAttrs().getAttributes<LifetimeAttr>();

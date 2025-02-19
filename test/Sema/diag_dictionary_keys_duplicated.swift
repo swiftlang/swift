@@ -3,7 +3,7 @@
 class CustomDict: ExpressibleByDictionaryLiteral {
   typealias Key = String
   typealias Value = String
-  
+
   required init(dictionaryLiteral elements: (String, String)...) {}
 }
 func fDict(_ d: [String: String]) {}

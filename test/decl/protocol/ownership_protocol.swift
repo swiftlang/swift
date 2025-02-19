@@ -19,7 +19,7 @@ protocol P {
 extension P {
   weak var foo5: SomeClass? // expected-error {{extensions must not contain stored properties}}
   unowned var foo6: SomeClass // expected-error {{extensions must not contain stored properties}}
-  
+
   weak var foo7: SomeClass? { // Okay
     return SomeClass()
   }

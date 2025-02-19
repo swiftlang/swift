@@ -359,7 +359,7 @@ static int run_driver(StringRef ExecName,
     } else
       Diags.diagnose(SourceLoc(), diag::new_driver_not_found, NewDriverPath);
   }
-  
+
   // We are in the fallback to legacy driver mode.
   // Now that we have determined above that we are not going to
   // forward the invocation to the new driver, ensure the rest of the
@@ -368,7 +368,7 @@ static int run_driver(StringRef ExecName,
     ExecName = "swift";
   else if (ExecName == "swiftc-legacy-driver")
     ExecName = "swiftc";
-  
+
   Driver TheDriver(Path, ExecName, argv, Diags);
   switch (TheDriver.getDriverKind()) {
   case Driver::DriverKind::SILOpt:

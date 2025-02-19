@@ -100,16 +100,16 @@ let printWithFileLine = buildPrinter { }
         parenthesizedExpansionAtDeclOkay()
         print(result)
         printWithFileLine(context: "macro")
-      
+
         // CHECK: hello world
         preferVariableFromLocalScope()
-      
+
         do {
             let shadowed = 42
             // CHECK: hello 42
             preferVariableFromLocalScope()
         }
-        
+
         // CHECK: [[# @LINE + 1]]
         asDefaultArgument()
         // CHECK: [[# @LINE + 1]]

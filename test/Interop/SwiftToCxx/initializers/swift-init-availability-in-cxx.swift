@@ -11,7 +11,7 @@ public struct Struct {
     field = 0
   }
 
-  
+
   @available(macOS 11, *)
   public init(_ field: Int16) {
     self.field = field

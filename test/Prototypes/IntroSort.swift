@@ -54,34 +54,34 @@ extension MutableCollection {
     //   ordered as any permutation of 1, 1, and 2 or 1, 2, and 2: 112, 121, 211,
     //   122, 212, or 221.
     // - If all three elements are equivalent, they are already in order: 111.
-    
+
     switch try (areInIncreasingOrder(self[b], self[a]),
                 areInIncreasingOrder(self[c], self[b])) {
     case (false, false):
       // 0 swaps: 123, 112, 122, 111
       break
-      
+
     case (true, true):
       // 1 swap: 321
       // swap(a, c): 312->123
       swapAt(a, c)
-      
+
     case (true, false):
       // 1 swap: 213, 212 --- 2 swaps: 312, 211
       // swap(a, b): 213->123, 212->122, 312->132, 211->121
       swapAt(a, b)
-      
+
       if try areInIncreasingOrder(self[c], self[b]) {
         // 132 (started as 312), 121 (started as 211)
         // swap(b, c): 132->123, 121->112
         swapAt(b, c)
       }
-      
+
     case (false, true):
       // 1 swap: 132, 121 --- 2 swaps: 231, 221
       // swap(b, c): 132->123, 121->112, 231->213, 221->212
       swapAt(b, c)
-      
+
       if try areInIncreasingOrder(self[b], self[a]) {
         // 213 (started as 231), 212 (started as 221)
         // swap(a, b): 213->123, 212->122
@@ -105,17 +105,17 @@ extension MutableCollection where Self: RandomAccessCollection {
   ) rethrows -> Index {
     var lo = range.lowerBound
     var hi = index(before: range.upperBound)
-    
+
     // Sort the first, middle, and last elements, then use the middle value
     // as the pivot for the partition.
     let half = distance(from: lo, to: hi) / 2
     let mid = index(lo, offsetBy: half)
     try _sort3(lo, mid, hi, by: areInIncreasingOrder)
-    
+
     // FIXME: Stashing the pivot element instead of using the index won't work
     // for move-only types.
     let pivot = self[mid]
-    
+
     // Loop invariants:
     // * lo < hi
     // * self[i] < pivot, for i in range.lowerBound..<lo
@@ -129,7 +129,7 @@ extension MutableCollection where Self: RandomAccessCollection {
         }
         break Loop
       }
-      
+
       FindHi: do {
         formIndex(before: &hi)
         while hi != lo {
@@ -138,23 +138,23 @@ extension MutableCollection where Self: RandomAccessCollection {
         }
         break Loop
       }
-      
+
       swapAt(lo, hi)
     }
-    
+
     return lo
   }
-  
+
   @inlinable
   public // @testable
   mutating func _introSort(
     within range: Range<Index>,
     by areInIncreasingOrder: (Element, Element) throws -> Bool
   ) rethrows {
-    
+
     let n = distance(from: range.lowerBound, to: range.upperBound)
     guard n > 1 else { return }
-    
+
     // Set max recursion depth to 2*floor(log(N)), as suggested in the introsort
     // paper: http://www.cs.rpi.edu/~musser/gp/introsort.ps
     let depthLimit = 2 * n._binaryLogarithm()
@@ -163,14 +163,14 @@ extension MutableCollection where Self: RandomAccessCollection {
       by: areInIncreasingOrder,
       depthLimit: depthLimit)
   }
-  
+
   @inlinable
   internal mutating func _introSortImpl(
     within range: Range<Index>,
     by areInIncreasingOrder: (Element, Element) throws -> Bool,
     depthLimit: Int
   ) rethrows {
-    
+
     // Insertion sort is better at handling smaller regions.
     if distance(from: range.lowerBound, to: range.upperBound) < 20 {
       try _insertionSort(within: range, by: areInIncreasingOrder)
@@ -191,7 +191,7 @@ extension MutableCollection where Self: RandomAccessCollection {
         depthLimit: depthLimit &- 1)
     }
   }
-  
+
   @inlinable
   internal mutating func _siftDown(
     _ idx: Index,
@@ -228,7 +228,7 @@ extension MutableCollection where Self: RandomAccessCollection {
       }
     }
   }
-  
+
   @inlinable
   internal mutating func _heapify(
     within range: Range<Index>,
@@ -244,13 +244,13 @@ extension MutableCollection where Self: RandomAccessCollection {
     let root = range.lowerBound
     let half = distance(from: range.lowerBound, to: range.upperBound) / 2
     var node = index(root, offsetBy: half)
-    
+
     while node != root {
       formIndex(before: &node)
       try _siftDown(node, within: range, by: areInIncreasingOrder)
     }
   }
-  
+
   @inlinable
   public // @testable
   mutating func _heapSort(
@@ -296,7 +296,7 @@ func makeQSortKiller(_ len: Int) -> [Int] {
     }
     return keys[x]! > keys[y]!
   }
-  
+
   var ary = [Int](repeating: 0, count: len)
   var ret = [Int](repeating: 0, count: len)
   for i in 0..<len { ary[i] = i }
@@ -309,7 +309,7 @@ func makeQSortKiller(_ len: Int) -> [Int] {
 
 suite.test("sorted/complexity") {
   var ary: [Int] = []
-  
+
   // Check performance of sorting an array of repeating values.
   var comparisons_100 = 0
   ary = Array(repeating: 0, count: 100)
@@ -318,7 +318,7 @@ suite.test("sorted/complexity") {
   ary = Array(repeating: 0, count: 1000)
   ary._introSort(within: 0..<ary.count) { comparisons_1000 += 1; return $0 < $1 }
   expectTrue(comparisons_1000/comparisons_100 < 20)
-  
+
   // Try to construct 'bad' case for quicksort, on which the algorithm
   // goes quadratic.
   comparisons_100 = 0
@@ -378,11 +378,11 @@ suite.test("heapSort") {
     }
     return num
   }
-  
+
   // Test binary number size.
   let numberLength = 11
   var binaryNumber = Array(repeating: 0, count: numberLength)
-  
+
   // We are testing sort on all permutations off 0-1s of size `numberLength`
   // except the all 1's case (its equals to all 0's case).
   while !binaryNumber.allSatisfy({ $0 == 1 }) {

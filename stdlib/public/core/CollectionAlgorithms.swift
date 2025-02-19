@@ -341,7 +341,7 @@ extension MutableCollection {
   ) rethrows -> Index {
     guard var i = try firstIndex(where: isSuffixElement)
     else { return endIndex }
-    
+
     var j = index(after: i)
     while j != endIndex {
       if try !isSuffixElement(self[j]) { swapAt(i, j); formIndex(after: &i) }
@@ -504,7 +504,7 @@ extension Collection {
   ) rethrows -> Index {
     var n = count
     var l = startIndex
-    
+
     while n > 0 {
       let half = n / 2
       let mid = index(l, offsetBy: half)
@@ -554,7 +554,7 @@ extension Sequence {
     result.shuffle(using: &generator)
     return Array(result)
   }
-  
+
   /// Returns the elements of the sequence, shuffled.
   ///
   /// For example, you can shuffle the numbers between `0` and `9` by calling
@@ -615,7 +615,7 @@ extension MutableCollection where Self: RandomAccessCollection {
       formIndex(after: &currentIndex)
     }
   }
-  
+
   /// Shuffles the collection in place.
   ///
   /// Use the `shuffle()` method to randomly reorder the elements of an array.

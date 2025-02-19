@@ -6,7 +6,7 @@ struct Box<Wrapped: ~Copyable>: ~Copyable {
 
 struct Tree<Element>: ~Copyable {
     struct Node: ~Copyable { }
-    
+
     enum Branch: ~Copyable {
         case empty
         case more(Box<Node>)

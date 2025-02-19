@@ -34,7 +34,7 @@ RangeTraps.test("HalfOpen")
   .code {
   var range = 1..<1
   expectType(CountableRange<Int>.self, &range)
-  
+
   expectCrashLater()
   _ = 1..<0
 }
@@ -67,7 +67,7 @@ RangeTraps.test("CountablePartialRangeFrom")
     { _isFastAssertConfiguration() },
     reason: "this trap is not guaranteed to happen in -Ounchecked"))
   .code {
-    
+
     let range = (Int.max - 1)...
     var it = range.makeIterator()
     _ = it.next()

@@ -97,7 +97,7 @@ struct Notification: _ObjectiveCBridgeable {
  class ClassWithCustomName {
   @objc func forwardCustomName(_: ClassWithCustomName2) {}
 }
-  
+
 // CHECK-LABEL: SWIFT_CLASS_NAMED("ClassWithCustomName2")
 // CHECK-NEXT: @interface CustomName2{{$}}
 // CHECK-NEXT: init
@@ -105,7 +105,7 @@ struct Notification: _ObjectiveCBridgeable {
 @objc(CustomName2)
 @objcMembers
 class ClassWithCustomName2 {}
-  
+
 // CHECK-LABEL: SWIFT_CLASS_NAMED("ClassWithCustomNameSub")
 // CHECK-NEXT: @interface CustomNameSub : CustomName{{$}}
 // CHECK-NEXT: init

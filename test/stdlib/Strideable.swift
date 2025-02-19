@@ -68,33 +68,33 @@ StrideTestSuite.test("Double") {
       sum,
       stride(from: start, to: end, by: stepSize).reduce(0.0, +))
   }
-  
+
   func checkClosed(from start: Double, through end: Double, by stepSize: Double, sum: Double) {
     // Work on Doubles
     expectEqual(
       sum,
       stride(from: start, through: end, by: stepSize).reduce(0.0, +))
   }
-  
+
   checkOpen(from: 1.0, to: 15.0, by: 3.0, sum: 35.0)
   checkOpen(from: 1.0, to: 16.0, by: 3.0, sum: 35.0)
   checkOpen(from: 1.0, to: 17.0, by: 3.0, sum: 51.0)
-  
+
   checkOpen(from: 1.0, to: -13.0, by: -3.0, sum: -25.0)
   checkOpen(from: 1.0, to: -14.0, by: -3.0, sum: -25.0)
   checkOpen(from: 1.0, to: -15.0, by: -3.0, sum: -39.0)
-  
+
   checkOpen(from: 4.0, to: 16.0, by: -3.0, sum: 0.0)
   checkOpen(from: 1.0, to: -16.0, by: 3.0, sum: 0.0)
-  
+
   checkClosed(from: 1.0, through: 15.0, by: 3.0, sum: 35.0)
   checkClosed(from: 1.0, through: 16.0, by: 3.0, sum: 51.0)
   checkClosed(from: 1.0, through: 17.0, by: 3.0, sum: 51.0)
-  
+
   checkClosed(from: 1.0, through: -13.0, by: -3.0, sum: -25.0)
   checkClosed(from: 1.0, through: -14.0, by: -3.0, sum: -39.0)
   checkClosed(from: 1.0, through: -15.0, by: -3.0, sum: -39.0)
-  
+
   checkClosed(from: 4.0, through: 16.0, by: -3.0, sum: 0.0)
   checkClosed(from: 1.0, through: -16.0, by: 3.0, sum: 0.0)
 }
@@ -112,15 +112,15 @@ StrideTestSuite.test("HalfOpen") {
       sum,
       stride(from: R(start), to: R(end), by: stepSize).reduce(0) { $0 + $1.x })
   }
-  
+
   check(from: 1, to: 15, by: 3, sum: 35)  // 1 + 4 + 7 + 10 + 13
   check(from: 1, to: 16, by: 3, sum: 35)  // 1 + 4 + 7 + 10 + 13
   check(from: 1, to: 17, by: 3, sum: 51)  // 1 + 4 + 7 + 10 + 13 + 16
-  
+
   check(from: 1, to: -13, by: -3, sum: -25)  // 1 + -2 + -5 + -8 + -11
   check(from: 1, to: -14, by: -3, sum: -25)  // 1 + -2 + -5 + -8 + -11
   check(from: 1, to: -15, by: -3, sum: -39)  // 1 + -2 + -5 + -8 + -11 + -14
-  
+
   check(from: 4, to: 16, by: -3, sum: 0)
   check(from: 1, to: -16, by: 3, sum: 0)
 }
@@ -140,15 +140,15 @@ StrideTestSuite.test("Closed") {
         0, { $0 + $1.x })
     )
   }
-  
+
   check(from: 1, through: 15, by: 3, sum: 35)  // 1 + 4 + 7 + 10 + 13
   check(from: 1, through: 16, by: 3, sum: 51)  // 1 + 4 + 7 + 10 + 13 + 16
   check(from: 1, through: 17, by: 3, sum: 51)  // 1 + 4 + 7 + 10 + 13 + 16
-  
+
   check(from: 1, through: -13, by: -3, sum: -25) // 1 + -2 + -5 + -8 + -11
   check(from: 1, through: -14, by: -3, sum: -39) // 1 + -2 + -5 + -8 + -11 + -14
   check(from: 1, through: -15, by: -3, sum: -39) // 1 + -2 + -5 + -8 + -11 + -14
-  
+
   check(from: 4, through: 16, by: -3, sum: 0)
   check(from: 1, through: -16, by: 3, sum: 0)
 }
@@ -202,7 +202,7 @@ StrideTestSuite.test("FloatingPointStride/rounding error") {
     expectEqual(7, c.count)
     expectEqual(1 as Double, c.last)
   }
-  
+
   if (1 as Float).addingProduct(0.9, 6) == 6.3999996 {
     let d = Array(stride(from: 1 as Float, through: 6.3999996, by: 0.9))
     expectEqual(7, d.count)

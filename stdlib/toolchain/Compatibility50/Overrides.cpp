@@ -72,7 +72,7 @@ getObjCClassByMangledName_untrusted(const char * _Nonnull typeName,
       return NO;
     }
   }
-  
+
   if (OldGetClassHook) {
     return OldGetClassHook(typeName, outClass);
   }
@@ -90,7 +90,7 @@ using mach_header_platform = mach_header;
 __attribute__((constructor))
 static void installGetClassHook_untrusted() {
   extern char __dso_handle[];
-  
+
   // swiftCompatibility* might be linked into multiple dynamic libraries because
   // of build system reasons, but the copy in the main executable is the only
   // one that should count. Bail early unless we're running out of the main
@@ -98,7 +98,7 @@ static void installGetClassHook_untrusted() {
   auto machHeader = (const mach_header_platform *)__dso_handle;
   if (machHeader->filetype != MH_EXECUTE)
     return;
-  
+
   // FIXME: delete this #if and dlsym once we don't
   // need to build with older libobjc headers
 #if !OBJC_GETCLASSHOOK_DEFINED

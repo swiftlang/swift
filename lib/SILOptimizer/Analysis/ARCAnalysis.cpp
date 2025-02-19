@@ -563,7 +563,7 @@ findMatchingRetainsInBasicBlock(SILBasicBlock *BB, SILValue V) {
     if (auto *AI = dyn_cast<ApplyInst>(&*II))
       if (AI->getCalleeFunction() == BB->getParent()) 
         return std::make_pair(FindRetainKind::Recursion, AI);
-    
+
     // If we do not have a retain_value or strong_retain...
     if (!isa<RetainValueInst>(*II) && !isa<StrongRetainInst>(*II)) {
       // we can ignore it if it can not decrement the reference count of the
@@ -663,7 +663,7 @@ findMatchingRetains(SILBasicBlock *BB) {
       EpilogueRetainInsts.push_back(Kind.second);
       continue;
     }
-  
+
     // Did not find a retain in this block, try to go to its predecessors.
     if (Kind.first == FindRetainKind::None) {
       // We can not find a retain in a block with no predecessors.
@@ -690,7 +690,7 @@ findMatchingRetains(SILBasicBlock *BB) {
           WorkList.push_back(std::make_pair(X, SA->getIncomingPhiValue(X)));
         } else
           WorkList.push_back(std::make_pair(X, R.second));
-   
+
         HandledBBs.insert(X);
       }
     }

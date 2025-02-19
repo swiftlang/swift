@@ -83,7 +83,7 @@ struct Test : ~Copyable {
         let f = { // expected-note {{capturing 'self' here}}
             let _ = self.e
         }
-        
+
         f()
     }
 

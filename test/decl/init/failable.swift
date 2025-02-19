@@ -39,10 +39,10 @@ func testConstruction(_ i: Int, s: String) {
   var _: S0 = s0Opt // expected-error{{value of optional type 'S0?' must be unwrapped}}
   // expected-note@-1{{coalesce}}
   // expected-note@-2{{force-unwrap}}
-  
+
   let s0IUO = S0(int: i)
   assert(s0IUO != nil)
-  
+
   _ = s0IUO
 }
 

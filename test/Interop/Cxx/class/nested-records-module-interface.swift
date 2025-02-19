@@ -15,39 +15,39 @@
 // CHECK:   struct U2 {
 // CHECK:   }
 // CHECK: }
- 
+
 // CHECK: struct U3 {
 // CHECK:   struct E1 : Hashable, Equatable, RawRepresentable {
 // CHECK:     typealias RawValue = {{UInt32|Int32}}
 // CHECK:   }
 // CHECK: }
- 
+
 // CHECK: struct U4 {
 // CHECK:   struct S5 {
 // CHECK:   }
 // CHECK: }
- 
+
 // CHECK: struct S6 {
 // CHECK:   init()
 // CHECK:   struct E3 : Hashable, Equatable, RawRepresentable {
 // CHECK:     typealias RawValue = {{UInt32|Int32}}
 // CHECK:   }
 // CHECK: }
- 
+
 // CHECK: struct S7 {
 // CHECK:   struct U5 {
 // CHECK:     struct U6 {
 // CHECK:     }
 // CHECK:   }
 // CHECK: }
- 
+
 // CHECK: struct S8 {
 // CHECK:   struct S9 {
 // CHECK:     struct U7 {
 // CHECK:     }
 // CHECK:   }
 // CHECK: }
- 
+
 // CHECK: struct S10 {
 // CHECK:   struct U8 {
 // CHECK:     struct E4 : Hashable, Equatable, RawRepresentable {

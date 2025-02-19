@@ -156,7 +156,7 @@ class C1_52548: C2 {
 
 class C2_52548 {
   @objc let abc: Int = 1
-  
+
   func doNotCrash() {
     let _: KeyPath<AnyObject, Int> = \.abc // expected-error {{the root type of a Swift key path cannot be 'AnyObject'}}
   }

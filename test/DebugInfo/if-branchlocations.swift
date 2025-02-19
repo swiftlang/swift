@@ -11,7 +11,7 @@ class NSPathControl {
 }
 
 class AppDelegate {
-    
+
   func LogStr(_ message: String) {
   }
 
