@@ -749,7 +749,8 @@ static bool ParseEnabledFeatureArgs(LangOptions &Opts, ArgList &Args,
            OPT_enable_experimental_feature, OPT_disable_experimental_feature,
            OPT_enable_upcoming_feature, OPT_disable_upcoming_feature)) {
     auto &option = A->getOption();
-    StringRef value = A->getValue();
+    const StringRef argValue = A->getValue();
+
     bool isEnableUpcomingFeatureFlag =
         option.matches(OPT_enable_upcoming_feature);
     bool isUpcomingFeatureFlag = isEnableUpcomingFeatureFlag ||
@@ -759,40 +760,44 @@ static bool ParseEnabledFeatureArgs(LangOptions &Opts, ArgList &Args,
 
     // Collect some special case pseudo-features which should be processed
     // separately.
-    if (value.starts_with("StrictConcurrency") ||
-        value.starts_with("AvailabilityMacro=")) {
+    if (argValue.starts_with("StrictConcurrency") ||
+        argValue.starts_with("AvailabilityMacro=")) {
       if (isEnableFeatureFlag)
-        psuedoFeatures.push_back(value);
+        psuedoFeatures.push_back(argValue);
       continue;
     }
 
-    auto feature = getUpcomingFeature(value);
+    // For all other features, the argument format is `<name>[:adoption]`.
+    StringRef featureName;
+    std::optional<StringRef> featureMode;
+    std::tie(featureName, featureMode) = argValue.rsplit(':');
+    if (featureMode.value().empty()) {
+      featureMode = std::nullopt;
+    }
+
+    auto feature = getUpcomingFeature(featureName);
     if (feature) {
       // Diagnose upcoming features enabled with -enable-experimental-feature.
       if (!isUpcomingFeatureFlag)
-        Diags.diagnose(SourceLoc(), diag::feature_not_experimental, value,
+        Diags.diagnose(SourceLoc(), diag::feature_not_experimental, featureName,
                        isEnableFeatureFlag);
     } else {
       // If -enable-upcoming-feature was used and an upcoming feature was not
       // found, diagnose and continue.
       if (isUpcomingFeatureFlag) {
-        Diags.diagnose(SourceLoc(), diag::unrecognized_feature, value,
+        Diags.diagnose(SourceLoc(), diag::unrecognized_feature, featureName,
                        /*upcoming=*/true);
         continue;
       }
 
       // If the feature is also not a recognized experimental feature, skip it.
-      feature = getExperimentalFeature(value);
+      feature = getExperimentalFeature(featureName);
       if (!feature) {
-        Diags.diagnose(SourceLoc(), diag::unrecognized_feature, value,
+        Diags.diagnose(SourceLoc(), diag::unrecognized_feature, featureName,
                        /*upcoming=*/false);
         continue;
       }
     }
-
-    // Skip features that are already enabled or disabled.
-    if (!seenFeatures.insert(*feature).second)
-      continue;
 
     // If the current language mode enables the feature by default then
     // diagnose and skip it.
@@ -810,10 +815,36 @@ static bool ParseEnabledFeatureArgs(LangOptions &Opts, ArgList &Args,
     if (Opts.RestrictNonProductionExperimentalFeatures &&
         !isFeatureAvailableInProduction(*feature)) {
       Diags.diagnose(SourceLoc(),
-                     diag::experimental_not_supported_in_production, value);
+                     diag::experimental_not_supported_in_production,
+                     featureName);
       HadError = true;
       continue;
     }
+
+    if (featureMode) {
+      if (isEnableFeatureFlag) {
+        // Diagnose an invalid mode.
+        StringRef validModeName = "adoption";
+        if (*featureMode != validModeName) {
+          Diags.diagnose(SourceLoc(), diag::invalid_feature_mode, *featureMode,
+                         featureName,
+                         /*didYouMean=*/validModeName);
+          continue;
+        }
+      } else {
+        // `-disable-*-feature` flags do not support a mode specifier.
+        Diags.diagnose(SourceLoc(), diag::cannot_disable_feature_with_mode,
+                       option.getPrefixedName(), argValue);
+        continue;
+      }
+
+      // Adoption mode is not plumbed through; ignore it.
+      continue;
+    }
+
+    // Skip features that are already enabled or disabled.
+    if (!seenFeatures.insert(*feature).second)
+      continue;
 
     // Enable the feature if requested.
     if (isEnableFeatureFlag)
