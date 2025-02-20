@@ -295,7 +295,9 @@ ERROR(returns_retained_or_returns_unretained_for_non_cxx_frt_values, none,
       "a SWIFT_SHARED_REFERENCE type",
       (const clang::NamedDecl *))
 
-// TODO: make this case an error in next cxx-interop versions rdar://138806722
+// TODO: In the next C++ interop version, convert this warning into an error and
+// stop importing unannotated C++ APIs that return SWIFT_SHARED_REFERENCE.
+// rdar://138806722
 WARNING(no_returns_retained_returns_unretained, none,
         "%0 should be annotated with either SWIFT_RETURNS_RETAINED or "
         "SWIFT_RETURNS_UNRETAINED as it is returning a SWIFT_SHARED_REFERENCE",
@@ -306,6 +308,15 @@ WARNING(returns_retained_returns_unretained_on_overloaded_operator, none,
         "yet for overloaded C++ %0. Overloaded C++ operators always "
         "return "
         "SWIFT_SHARED_REFERENCE types as owned ",
+        (const clang::NamedDecl *))
+
+// TODO: In the next C++ interop version, convert this warning into an error and
+// stop importing C++ types that inherit from SWIFT_SHARED_REFERENCE if the
+// Swift compiler cannot find unique retain/release functions.
+// rdar://145194375
+WARNING(cant_infer_frt_in_cxx_inheritance, none,
+        "unable to infer SWIFT_SHARED_REFERENCE for %0, although one of its "
+        "transitive base types is marked as SWIFT_SHARED_REFERENCE",
         (const clang::NamedDecl *))
 
 NOTE(unsupported_builtin_type, none, "built-in type '%0' not supported", (StringRef))
