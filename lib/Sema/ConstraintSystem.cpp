@@ -217,7 +217,7 @@ void ConstraintSystem::assignFixedType(TypeVariableType *typeVar, Type type,
   assert(!type->hasError() &&
          "Should not be assigning a type involving ErrorType!");
 
-  CG.retractFromInference(typeVar, type);
+  CG.retractFromInference(typeVar);
   typeVar->getImpl().assignFixedType(type, getTrail());
 
   if (!updateState)
