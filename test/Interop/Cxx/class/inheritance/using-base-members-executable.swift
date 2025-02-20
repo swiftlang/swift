@@ -35,4 +35,9 @@ UsingBaseTestSuite.test("UsingBaseConstructorEmpty") {
   expectEqual(456, p.value)
 }
 
+UsingBaseTestSuite.test("ProtectedMemberPrivateInheritance") {
+  let p = ProtectedMemberPrivateInheritance()
+  expectEqual(456, p.protectedGetter())
+}
+
 runAllTests()

@@ -16,3 +16,6 @@ let _ = UsingBaseConstructorWithParam(566 as Int32)
 let _ = UsingBaseConstructorWithParam(566 as UInt32)
 
 let _ = UsingBaseConstructorEmpty()
+
+let p = ProtectedMemberPrivateInheritance()
+let _ = p.protectedGetter()

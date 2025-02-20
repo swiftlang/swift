@@ -1,3 +1,6 @@
+#ifndef _USING_BASE_MEMBERS_H
+#define _USING_BASE_MEMBERS_H
+
 struct PublicBase {
 private:
   int value = 123;
@@ -36,12 +39,13 @@ struct UsingBaseConstructorEmpty : private Empty {
   int value = 456;
 };
 
-// TODO: make this work for protected base methods as well
-//struct ProtectedBase {
-//protected:
-//  int protectedGetter() const { return 456; }
-//};
-//
-//struct ProtectedMemberPrivateInheritance : private ProtectedBase {
-//  using ProtectedBase::protectedGetter;
-//};
+struct ProtectedBase {
+protected:
+  int protectedGetter() const { return 456; }
+};
+
+struct ProtectedMemberPrivateInheritance : private ProtectedBase {
+  using ProtectedBase::protectedGetter;
+};
+
+#endif // !_USING_BASE_MEMBERS_H

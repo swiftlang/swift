@@ -41,3 +41,13 @@
 // CHECK-NEXT:   public init(_: Empty)
 // CHECK-NEXT:   public var value: Int32
 // CHECK-NEXT: }
+
+// CHECK:      public struct ProtectedBase {
+// CHECK-NEXT:   public init()
+// CHECK-NEXT:   private func protectedGetter() -> Int32
+// CHECK-NEXT: }
+
+// CHECK:      public struct ProtectedMemberPrivateInheritance {
+// CHECK-NEXT:   public init()
+// CHECK-NEXT:   public func protectedGetter() -> Int32
+// CHECK-NEXT: }
