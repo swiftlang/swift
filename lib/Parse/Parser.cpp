@@ -576,6 +576,29 @@ SourceLoc Parser::getEndOfPreviousLoc() const {
   return Lexer::getLocForEndOfToken(SourceMgr, PreviousLoc);
 }
 
+void Parser::diagnoseDollarIdentifier(const Token &tok,
+                                      bool diagnoseDollarPrefix) {
+  assert(tok.getText()[0] == '$');
+
+  // If '$' is not guarded by backticks, offer to replace it with '`$`'.
+  if (Tok.getRawText() == "$") {
+    diagnose(Tok.getLoc(), diag::standalone_dollar_identifier)
+        .fixItReplace(Tok.getLoc(), "`$`");
+    return;
+  }
+
+  if (!diagnoseDollarPrefix)
+    return;
+
+  if (tok.getText().size() == 1 || Context.LangOpts.EnableDollarIdentifiers ||
+      isInSILMode() || L->isSwiftInterface() ||
+      isInMacroExpansion(tok.getLoc()))
+    return;
+
+  diagnose(tok.getLoc(), diag::dollar_identifier_decl,
+           Context.getIdentifier(tok.getText()));
+}
+
 SourceLoc Parser::consumeAttributeLParen() {
   SourceLoc LastTokenEndLoc = getEndOfPreviousLoc();
   if (LastTokenEndLoc != Tok.getLoc() && !isInSILMode()) {
