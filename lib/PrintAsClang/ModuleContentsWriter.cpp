@@ -35,6 +35,7 @@
 #include "swift/Strings.h"
 
 #include "clang/AST/Decl.h"
+#include "clang/AST/DeclObjC.h"
 #include "clang/Basic/Module.h"
 
 #include "llvm/Support/raw_ostream.h"
@@ -285,10 +286,20 @@ public:
   }
 
   void emitReferencedClangTypeMetadata(const TypeDecl *typeDecl) {
-    if (!isa<clang::TypeDecl>(typeDecl->getClangDecl()))
+    const auto *clangDecl = typeDecl->getClangDecl();
+    if (const auto *objCInt = dyn_cast<clang::ObjCInterfaceDecl>(clangDecl)) {
+      auto clangType = clangDecl->getASTContext()
+                           .getObjCInterfaceType(objCInt)
+                           .getCanonicalType();
+      auto it = seenClangTypes.insert(clangType.getTypePtr());
+      if (it.second)
+        ClangValueTypePrinter::printClangTypeSwiftGenericTraits(os, typeDecl, &M,
+                                                                printer);
+      return;
+    }
+    if (!isa<clang::TypeDecl>(clangDecl))
       return;
     // Get the underlying clang type from a type alias decl or record decl.
-    auto clangDecl = typeDecl->getClangDecl();
     auto clangType = clangDecl->getASTContext()
                          .getTypeDeclType(cast<clang::TypeDecl>(clangDecl))
                          .getCanonicalType();
@@ -313,6 +324,8 @@ public:
         if (!addImport(NTD))
           forwardDeclareCxxValueTypeIfNeeded(NTD);
         else if (isa<StructDecl>(TD) && NTD->hasClangNode())
+          emitReferencedClangTypeMetadata(NTD);
+        else if (isa<ClassDecl>(TD) && TD->isObjC()) 
           emitReferencedClangTypeMetadata(NTD);
       } else if (auto TAD = dyn_cast<TypeAliasDecl>(TD)) {
         if (TAD->hasClangNode())
