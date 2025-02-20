@@ -212,6 +212,10 @@ bool TypeVariableType::Implementation::isFunctionResult() const {
   return locator && locator->isLastElement<LocatorPathElt::FunctionResult>();
 }
 
+bool TypeVariableType::Implementation::isTernary() const {
+  return locator && locator->directlyAt<TernaryExpr>();
+}
+
 void *operator new(size_t bytes, ConstraintSystem& cs,
                    size_t alignment) {
   return cs.getAllocator().Allocate(bytes, alignment);

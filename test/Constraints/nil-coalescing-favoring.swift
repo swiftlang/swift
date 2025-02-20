@@ -42,3 +42,23 @@ extension Array where Element == UInt8 {
     fatalError()
   }
 }
+
+func test_no_incorrect_favoring(v: Int?, o: Int) {
+  func ternary<T>(_: T, _: T) -> T { fatalError() }
+
+  func nilCoelesing<T>(_: T?, _: T) -> T { fatalError() }
+  func nilCoelesing<T>(_: T?, _: T?) -> T? { fatalError() }
+
+  let t1 = v ?? (true ? nil : v)
+  let t2 = v ?? ternary(nil, o)
+
+  let s1 = nilCoelesing(v, (true ? nil : v))
+  let s2 = nilCoelesing(v, ternary(nil, o))
+
+  func sameType<T>(_: T, as: T.Type) {}
+
+  sameType(t1, as: Int?.self)
+  sameType(t2, as: Int?.self)
+  sameType(s1, as: Int?.self)
+  sameType(s2, as: Int?.self)
+}
