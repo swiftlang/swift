@@ -570,6 +570,8 @@ void SolverTrail::Change::dump(llvm::raw_ostream &out,
 
   out.indent(indent);
 
+  auto &ctx = cs.getASTContext();
+  auto &SM = ctx.SourceMgr;
   switch (Kind) {
 
 #define LOCATOR_CHANGE(Name, _) \
@@ -695,10 +697,9 @@ void SolverTrail::Change::dump(llvm::raw_ostream &out,
     break;
 
   case ChangeKind::RecordedPackElementExpansion:
-    // FIXME: Print short form of PackExpansionExpr
     out << "(RecordedPackElementExpansion ";
-    simple_display(out, TheElement);
-    out << "\n";
+    dumpAnchor(TheElement, &SM, out);
+    out << ")\n";
     break;
 
   case ChangeKind::RecordedNodeType:
@@ -730,8 +731,9 @@ void SolverTrail::Change::dump(llvm::raw_ostream &out,
     break;
 
   case ChangeKind::RecordedContextualInfo:
-    // FIXME: Print short form of ASTNode
-    out << "(RecordedContextualInfo)\n";
+    out << "(RecordedContextualInfo ";
+    dumpAnchor(Node.Node, &SM, out);
+    out << ")\n";
     break;
 
   case ChangeKind::RecordedTarget:
@@ -741,8 +743,9 @@ void SolverTrail::Change::dump(llvm::raw_ostream &out,
     break;
 
   case ChangeKind::RecordedCaseLabelItemInfo:
-    // FIXME: Print something here
-    out << "(RecordedCaseLabelItemInfo)\n";
+    out << "(RecordedCaseLabelItemInfo ";
+    dumpAnchor(TheItem, &SM, out);
+    out << ")\n";
     break;
 
   case ChangeKind::RecordedPotentialThrowSite:
