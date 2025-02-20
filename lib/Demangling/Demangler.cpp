@@ -988,6 +988,8 @@ NodePointer Demangler::demangleTypeAnnotation() {
   case 'c':
     return createWithChild(
         Node::Kind::GlobalActorFunctionType, popTypeAndGetChild());
+  case 'C':
+    return createNode(Node::Kind::NonIsolatedCallerFunctionType);
   case 'i':
     return createType(
         createWithChild(Node::Kind::Isolated, popTypeAndGetChild()));
@@ -1654,7 +1656,8 @@ NodePointer Demangler::popFunctionType(Node::Kind kind, bool hasClangType) {
   // function-isolation?
   auto isFunctionIsolation = [](Node::Kind kind) {
     return kind == Node::Kind::GlobalActorFunctionType ||
-           kind == Node::Kind::IsolatedAnyFunctionType;
+           kind == Node::Kind::IsolatedAnyFunctionType ||
+           kind == Node::Kind::NonIsolatedCallerFunctionType;
   };
   addChild(FuncType, popNode(isFunctionIsolation));
 
@@ -1716,6 +1719,9 @@ NodePointer Demangler::popFunctionParamLabels(NodePointer Type) {
     ++FirstChildIdx;
   if (FuncType->getChild(FirstChildIdx)->getKind()
         == Node::Kind::IsolatedAnyFunctionType)
+    ++FirstChildIdx;
+  if (FuncType->getChild(FirstChildIdx)->getKind()
+        == Node::Kind::NonIsolatedCallerFunctionType)
     ++FirstChildIdx;
   if (FuncType->getChild(FirstChildIdx)->getKind()
         == Node::Kind::DifferentiableFunctionType)

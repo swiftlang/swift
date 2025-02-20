@@ -6608,9 +6608,11 @@ bool ClassDecl::isForeignReferenceType() const {
   if (!clangRecordDecl)
     return false;
 
+  // `importerImpl` is set to nullptr here to avoid diagnostics during this
+  // CxxRecordSemantics evaluation.
   CxxRecordSemanticsKind kind = evaluateOrDefault(
       getASTContext().evaluator,
-      CxxRecordSemantics({clangRecordDecl, getASTContext()}), {});
+      CxxRecordSemantics({clangRecordDecl, getASTContext(), nullptr}), {});
   return kind == CxxRecordSemanticsKind::Reference;
 }
 

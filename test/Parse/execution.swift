@@ -8,14 +8,23 @@ typealias E = @execution(concurrent) () -> Void
 func test1(_: @execution(caller) (Int...) async -> Void) {}
 func test2(_: @execution(concurrent) (Int...) async -> Void) {}
 
-func test_err1(_: @execution(concurrent) @MainActor () async -> Void) {}
-// expected-error@-1 {{cannot use '@execution(concurrent)' because function type is isolated to global actor 'MainActor'}}
+func test_err1_concurrent(_: @execution(concurrent) @MainActor () async -> Void) {}
+// expected-error@-1 {{cannot use '@execution' because function type is isolated to a global actor 'MainActor'}}
 
-func test_err2(_: @execution(concurrent) @isolated(any) () async -> Void) {}
-// expected-error@-1 {{cannot use '@execution(concurrent)' together with @isolated(any)}}
+func test_err1_caller(_: @execution(caller) @MainActor () async -> Void) {}
+// expected-error@-1 {{cannot use '@execution' because function type is isolated to a global actor 'MainActor'}}
 
-func test_err3(_: @execution(concurrent) (isolated (any Actor)?) async -> Void) {}
-// expected-error@-1 {{cannot use '@execution(concurrent)' together with isolated parameter}}
+func test_err2_concurrent(_: @execution(concurrent) @isolated(any) () async -> Void) {}
+// expected-error@-1 {{cannot use '@execution' together with @isolated(any)}}
+
+func test_err2_caller(_: @execution(caller) @isolated(any) () async -> Void) {}
+// expected-error@-1 {{cannot use '@execution' together with @isolated(any)}}
+
+func test_err3_concurrent(_: @execution(concurrent) (isolated (any Actor)?) async -> Void) {}
+// expected-error@-1 {{cannot use '@execution' together with an isolated parameter}}
+
+func test_err3_caller(_: @execution(caller) (isolated (any Actor)?) async -> Void) {}
+// expected-error@-1 {{cannot use '@execution' together with an isolated parameter}}
 
 func test_err4(_: @execution (Int) -> Void) {}
 // expected-error@-1 {{expected 'concurrent' or 'caller' as the execution behavior}}

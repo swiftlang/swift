@@ -47,6 +47,10 @@ Constraint::Constraint(ConstraintKind kind, ArrayRef<Constraint *> constraints,
                           getTypeVariablesBuffer().begin());
 }
 
+static bool isAdmissibleType(Type type) {
+  return !type->hasUnboundGenericType() && !type->hasTypeParameter();
+}
+
 Constraint::Constraint(ConstraintKind Kind, Type First, Type Second,
                        ConstraintLocator *locator,
                        SmallPtrSetImpl<TypeVariableType *> &typeVars)
@@ -55,6 +59,9 @@ Constraint::Constraint(ConstraintKind Kind, Type First, Type Second,
       IsFavored(false), IsIsolated(false),
       NumTypeVariables(typeVars.size()), Types{First, Second, Type()},
       Locator(locator) {
+  ASSERT(isAdmissibleType(First));
+  ASSERT(isAdmissibleType(Second));
+
   switch (Kind) {
   case ConstraintKind::Bind:
   case ConstraintKind::Equal:
@@ -84,11 +91,9 @@ Constraint::Constraint(ConstraintKind Kind, Type First, Type Second,
   case ConstraintKind::SameShape:
   case ConstraintKind::MaterializePackExpansion:
   case ConstraintKind::LValueObject:
-    assert(!First.isNull());
-    assert(!Second.isNull());
     break;
   case ConstraintKind::DynamicCallableApplicableFunction:
-    assert(First->is<FunctionType>()
+    ASSERT(First->is<FunctionType>()
            && "The left-hand side type should be a function type");
     break;
 
@@ -99,8 +104,6 @@ Constraint::Constraint(ConstraintKind Kind, Type First, Type Second,
 
   case ConstraintKind::Defaultable:
   case ConstraintKind::FallbackType:
-    assert(!First.isNull());
-    assert(!Second.isNull());
     break;
 
   case ConstraintKind::BindOverload:
@@ -136,6 +139,10 @@ Constraint::Constraint(ConstraintKind Kind, Type First, Type Second, Type Third,
       IsFavored(false), IsIsolated(false),
       NumTypeVariables(typeVars.size()), Types{First, Second, Third},
       Locator(locator) {
+  ASSERT(isAdmissibleType(First));
+  ASSERT(isAdmissibleType(Second));
+  ASSERT(isAdmissibleType(Third));
+
   switch (Kind) {
   case ConstraintKind::Bind:
   case ConstraintKind::Equal:
@@ -180,9 +187,6 @@ Constraint::Constraint(ConstraintKind Kind, Type First, Type Second, Type Third,
 
   case ConstraintKind::KeyPath:
   case ConstraintKind::KeyPathApplication:
-    assert(!First.isNull());
-    assert(!Second.isNull());
-    assert(!Third.isNull());
     break;
   }
 
@@ -256,8 +260,8 @@ Constraint::Constraint(ConstraintKind kind,
       RememberChoice(false), IsFavored(false), IsIsolated(false),
       NumTypeVariables(typeVars.size()), Types{first, second, Type()},
       Locator(locator) {
-  assert(!first.isNull());
-  assert(!second.isNull());
+  ASSERT(isAdmissibleType(first));
+  ASSERT(isAdmissibleType(second));
   std::copy(typeVars.begin(), typeVars.end(), getTypeVariablesBuffer().begin());
 }
 
@@ -269,8 +273,8 @@ Constraint::Constraint(ConstraintKind kind, ConstraintFix *fix, Type first,
       IsFavored(false), IsIsolated(false),
       NumTypeVariables(typeVars.size()), Types{first, second, Type()},
       Locator(locator) {
-  assert(!first.isNull());
-  assert(!second.isNull());
+  ASSERT(isAdmissibleType(first));
+  ASSERT(isAdmissibleType(second));
   std::copy(typeVars.begin(), typeVars.end(), getTypeVariablesBuffer().begin());
   if (fix)
     *getTrailingObjects<ConstraintFix *>() = fix;
@@ -297,8 +301,8 @@ Constraint::Constraint(FunctionType *appliedFn, Type calleeType,
       HasRestriction(false), IsActive(false), IsDisabled(false),
       IsDisabledForPerformance(false), RememberChoice(false), IsFavored(false),
       IsIsolated(false), NumTypeVariables(typeVars.size()), Locator(locator) {
-  assert(appliedFn);
-  assert(calleeType);
+  ASSERT(isAdmissibleType(appliedFn));
+  ASSERT(isAdmissibleType(calleeType));
   assert(trailingClosureMatching >= 0 && trailingClosureMatching <= 2);
   assert(useDC);
 

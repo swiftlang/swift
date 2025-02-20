@@ -44,10 +44,10 @@ struct TestAttributeCollisions {
   @execution(concurrent) nonisolated func testNonIsolated() async {}
 
   @execution(concurrent) func test(arg: isolated MainActor) async {}
-  // expected-error@-1 {{cannot use '@execution(concurrent)' on instance method 'test(arg:)' because it has an isolated parameter: 'arg'}}
+  // expected-error@-1 {{cannot use '@execution' on instance method 'test(arg:)' because it has an isolated parameter: 'arg'}}
 
   @execution(concurrent) func testIsolationAny(arg: @isolated(any) () -> Void) async {}
-  // expected-error@-1 {{cannot use '@execution(concurrent)' on instance method 'testIsolationAny(arg:)' because it has a dynamically isolated parameter: 'arg'}}
+  // expected-error@-1 {{cannot use '@execution' on instance method 'testIsolationAny(arg:)' because it has a dynamically isolated parameter: 'arg'}}
 
   @MainActor @execution(concurrent) func testGlobalActor() async {}
   // expected-warning @-1 {{instance method 'testGlobalActor()' has multiple actor-isolation attributes ('MainActor' and 'execution(concurrent)')}}
@@ -55,8 +55,9 @@ struct TestAttributeCollisions {
   @execution(caller) nonisolated func testNonIsolatedCaller() async {} // Ok
   @MainActor @execution(caller) func testGlobalActorCaller() async {}
   // expected-warning@-1 {{instance method 'testGlobalActorCaller()' has multiple actor-isolation attributes ('MainActor' and 'execution(caller)')}}
-  @execution(caller) func testCaller(arg: isolated MainActor) async {} // Ok
-
+  @execution(caller) func testCaller(arg: isolated MainActor) async {}
+  // expected-error@-1 {{cannot use '@execution' on instance method 'testCaller(arg:)' because it has an isolated parameter: 'arg'}}
+  
   @execution(concurrent) @Sendable func test(_: @Sendable () -> Void, _: sending Int) async {} // Ok
   @execution(caller) @Sendable func testWithSendableCaller(_: @Sendable () -> Void, _: sending Int) async {} // Ok
 }

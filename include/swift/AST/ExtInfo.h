@@ -123,6 +123,9 @@ public:
   bool isErased() const {
     return getKind() == Kind::Erased;
   }
+  bool isNonIsolatedCaller() const {
+    return getKind() == Kind::NonIsolatedCaller;
+  }
 
   // The opaque accessors below are just for the benefit of ExtInfoBuilder,
   // which finds it convenient to break down the type separately.  Normal
