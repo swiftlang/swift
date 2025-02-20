@@ -2192,6 +2192,7 @@ namespace {
                                 Label::optional("generic_signature"));
         } else {
           printParsedGenericParams(GC->getParsedGenericParams());
+          printWhereRequirements(GC);
         }
       }
 

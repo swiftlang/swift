@@ -1568,14 +1568,15 @@ BridgedImportDecl BridgedImportDecl_createParsed(
 
 SWIFT_NAME("BridgedSubscriptDecl.createParsed(_:declContext:staticLoc:"
            "staticSpelling:subscriptKeywordLoc:genericParamList:parameterList:"
-           "arrowLoc:returnType:)")
+           "arrowLoc:returnType:genericWhereClause:)")
 BridgedSubscriptDecl BridgedSubscriptDecl_createParsed(
     BridgedASTContext cContext, BridgedDeclContext cDeclContext,
     BridgedSourceLoc cStaticLoc, BridgedStaticSpelling cStaticSpelling,
     BridgedSourceLoc cSubscriptKeywordLoc,
     BridgedNullableGenericParamList cGenericParamList,
     BridgedParameterList cParamList, BridgedSourceLoc cArrowLoc,
-    BridgedTypeRepr returnType);
+    BridgedTypeRepr returnType,
+    BridgedNullableTrailingWhereClause genericWhereClause);
 
 SWIFT_NAME("BridgedTopLevelCodeDecl.create(_:declContext:)")
 BridgedTopLevelCodeDecl
