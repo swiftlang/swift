@@ -148,7 +148,7 @@ private:
 
   /// Perform graph updates that must be undone after we bind a fixed type
   /// to a type variable.
-  void retractFromInference(Type fixedType);
+  void retractFromInference();
 
   /// Perform graph updates that must be undone before we bind a fixed type
   /// to a type variable.
@@ -175,11 +175,6 @@ private:
   /// Notify all of the type variables referenced by this one about a change.
   void notifyReferencedVars(
       llvm::function_ref<void(ConstraintGraphNode &)> notification) const;
-
-  void updateFixedType(
-      Type fixedType,
-      llvm::function_ref<void (ConstraintGraphNode &,
-                               Constraint *)> notification) const;
   /// }
 
   /// The constraint graph this node belongs to.
@@ -294,7 +289,7 @@ public:
 
   /// Perform graph updates that must be undone after we bind a fixed type
   /// to a type variable.
-  void retractFromInference(TypeVariableType *typeVar, Type fixedType);
+  void retractFromInference(TypeVariableType *typeVar);
 
   /// Perform graph updates that must be undone before we bind a fixed type
   /// to a type variable.
