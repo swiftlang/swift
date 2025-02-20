@@ -831,6 +831,13 @@ static bool ParseEnabledFeatureArgs(LangOptions &Opts, ArgList &Args,
                          /*didYouMean=*/validModeName);
           continue;
         }
+
+        if (!isFeatureAdoptable(*feature)) {
+          Diags.diagnose(SourceLoc(),
+                         diag::feature_does_not_support_adoption_mode,
+                         featureName);
+          continue;
+        }
       } else {
         // `-disable-*-feature` flags do not support a mode specifier.
         Diags.diagnose(SourceLoc(), diag::cannot_disable_feature_with_mode,
