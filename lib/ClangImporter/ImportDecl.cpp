@@ -1612,6 +1612,7 @@ namespace {
 
         auto access = importer::convertClangAccess(decl->getAccess());
         auto Loc = Impl.importSourceLoc(decl->getLocation());
+        // DEBUG structDecl name is "Projection"
         auto structDecl = Impl.createDeclWithClangNode<StructDecl>(
             decl, access, Loc, name, Loc, std::nullopt, nullptr, dc);
 
@@ -1842,6 +1843,7 @@ namespace {
       }
       }
 
+      // DEBUG doesn't have any mention of "HdCamera" -> is this expected?
       const clang::EnumDecl *canonicalClangDecl = decl->getCanonicalDecl();
       Impl.ImportedDecls[{canonicalClangDecl, getVersion()}] = result;
 

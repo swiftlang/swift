@@ -145,6 +145,7 @@ void EnumInfo::classifyEnum(const clang::EnumDecl *decl,
     return;
   }
 
+  // DEBUG Projection enum kind is unknown
   // Fall back to the 'Unknown' path.
   kind = EnumKind::Unknown;
 }

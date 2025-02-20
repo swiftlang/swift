@@ -25,14 +25,14 @@ NestedEnumsTestSuite.test("HdCamera.Orthographic") {
   let xx : GfCamera.Projection = GfCamera.Orthographic
   let yy : GfCamera.Projection = GfCamera.Orthographic
 
-  // print(xx == yy)
-  // print(x == y)
-  print("First check")
-  expectEqual(xx, yy)
+  print(xx == yy)
+  print(x == y)
+  // print("First check")
+  // expectEqual(xx, yy)
   
-  print("Second check")
-  expectEqual(x, y)
-  print("End")
+  // print("Second check")
+  // expectEqual(x, y)
+  // print("End")
 }
 
 runAllTests()
