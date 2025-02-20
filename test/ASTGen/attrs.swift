@@ -2,6 +2,7 @@
 
 // RUN: %target-swift-frontend-dump-parse \
 // RUN:   -enable-experimental-feature ABIAttribute \
+// RUN:   -enable-experimental-feature ExecutionAttribute \
 // RUN:   -enable-experimental-feature Extern \
 // RUN:   -enable-experimental-feature LifetimeDependence \
 // RUN:   -enable-experimental-feature SymbolLinkageMarkers \
@@ -11,6 +12,7 @@
 
 // RUN: %target-swift-frontend-dump-parse \
 // RUN:   -enable-experimental-feature ABIAttribute \
+// RUN:   -enable-experimental-feature ExecutionAttribute \
 // RUN:   -enable-experimental-feature Extern \
 // RUN:   -enable-experimental-feature LifetimeDependence \
 // RUN:   -enable-experimental-feature SymbolLinkageMarkers \
@@ -23,6 +25,7 @@
 // RUN:   -module-abi-name ASTGen \
 // RUN:   -enable-experimental-feature ParserASTGen \
 // RUN:   -enable-experimental-feature ABIAttribute \
+// RUN:   -enable-experimental-feature ExecutionAttribute \
 // RUN:   -enable-experimental-feature Extern \
 // RUN:   -enable-experimental-feature LifetimeDependence \
 // RUN:   -enable-experimental-feature SymbolLinkageMarkers \
@@ -32,6 +35,7 @@
 // REQUIRES: swift_swift_parser
 // REQUIRES: swift_feature_ParserASTGen
 // REQUIRES: swift_feature_ABIAttribute
+// REQUIRES: swift_feature_ExecutionAttribute
 // REQUIRES: swift_feature_Extern
 // REQUIRES: swift_feature_LifetimeDependence
 // REQUIRES: swift_feature_SymbolLinkageMarkers

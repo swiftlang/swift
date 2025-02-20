@@ -436,6 +436,10 @@ SUPPRESSIBLE_EXPERIMENTAL_FEATURE(AddressableTypes, true)
 /// Allow the @abi attribute.
 SUPPRESSIBLE_EXPERIMENTAL_FEATURE(ABIAttribute, true)
 
+/// Allow the @execution attribute. This is also connected to
+/// AsyncCallerExecution feature.
+SUPPRESSIBLE_EXPERIMENTAL_FEATURE(ExecutionAttribute, false)
+
 /// Functions with nonisolated isolation inherit their isolation from the
 /// calling context.
 EXPERIMENTAL_FEATURE(AsyncCallerExecution, false)
