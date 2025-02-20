@@ -30,8 +30,8 @@ RawSpanTests.test(
   data.withUnsafeBytes { rawBuffer in
     let rawSpan = RawSpan(_unsafeBytes: rawBuffer)
     var cursor = rawSpan._startCursor()
-    let value1 = rawSpan._consumingLoad(from: &cursor, as: UInt16.self)
-    let value2: UInt16 = rawSpan._consumingLoad(from: &cursor)
+    let value1 = rawSpan._unsafeLoad(advancing: &cursor, as: UInt16.self)
+    let value2: UInt16 = rawSpan._unsafeLoad(advancing: &cursor)
     expectEqual(0x0100, value1)
     expectEqual(0x0302, value2)
     let remaining1 = cursor.distance(to: rawSpan._endCursor())
@@ -49,8 +49,8 @@ RawSpanTests.test(
   data.withUnsafeBytes { rawBuffer in
     let rawSpan = RawSpan(_unsafeBytes: rawBuffer)
     var cursor = rawSpan._startCursor()
-    let value1 = rawSpan._uncheckedConsumingLoad(from: &cursor, as: UInt16.self)
-    let value2: UInt16 = rawSpan._uncheckedConsumingLoad(from: &cursor)
+    let value1 = rawSpan._unsafeUncheckedLoad(advancing: &cursor, as: UInt16.self)
+    let value2: UInt16 = rawSpan._unsafeUncheckedLoad(advancing: &cursor)
     expectEqual(0x0100, value1)
     expectEqual(0x0302, value2)
     let remaining1 = cursor.distance(to: rawSpan._endCursor())
@@ -61,17 +61,17 @@ RawSpanTests.test(
   
   data.withUnsafeBytes { rawBuffer in
     let rawSpan = RawSpan(_unsafeBytes: rawBuffer)
-    var cursor = rawSpan.startCursor()
+    var cursor = rawSpan._startCursor()
     var total: UInt64 = 0
-    while !rawSpan.isAtEnd(cursor) {
-      total += UInt64(rawSpan.uncheckedConsumingLoad(from: &cursor, as: UInt16.self))
+    while !rawSpan._isAtEnd(cursor) {
+      total += UInt64(rawSpan._unsafeUncheckedLoad(advancing: &cursor, as: UInt16.self))
     }
     expectEqual(0x403f80, total)
-    let remaining1 = cursor.distance(to: rawSpan.endCursor())
-    let remaining2 = rawSpan.count(remainingAfter: cursor)
+    let remaining1 = cursor.distance(to: rawSpan._endCursor())
+    let remaining2 = rawSpan._count(remainingAfter: cursor)
     expectEqual(0, remaining1)
     expectEqual(0, remaining2)
-    expectTrue(rawSpan.isAtEnd(cursor))
+    expectTrue(rawSpan._isAtEnd(cursor))
   }
 }
 

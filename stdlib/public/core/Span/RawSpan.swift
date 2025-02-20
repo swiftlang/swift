@@ -774,6 +774,7 @@ extension RawSpan {
     _pointer != nil
   }
   
+  // This traps if the span has a nil starting pointer.
   @_alwaysEmitIntoClient
   @lifetime(self)
   public func _startCursor() -> _Cursor {
@@ -799,25 +800,28 @@ extension RawSpan {
     _count - (cursor._pointer - _start())
   }
   
+  @unsafe
   @_alwaysEmitIntoClient
-  public func _consumingLoad<T: BitwiseCopyable>(
-    from cursor: inout _Cursor,
+  public func _unsafeLoad<T: BitwiseCopyable>(
+    advancing cursor: inout _Cursor,
     as: T.Type = T.self
   ) -> T {
     let newPointer = cursor._pointer + MemoryLayout<T>.stride
-    let end = _start() + _count
+    let start = _start()
+    let end = start + _count
+    _precondition(cursor._pointer >= start, "Read before start of RawSpan")
     _precondition(newPointer <= end, "Read past end of RawSpan")
     defer { cursor._pointer = newPointer }
     return cursor._pointer.loadUnaligned(as: T.self)
   } 
   
+  @unsafe
   @_alwaysEmitIntoClient
-  public func _uncheckedConsumingLoad<T: BitwiseCopyable>(
-    from cursor: inout _Cursor,
+  public func _unsafeUncheckedLoad<T: BitwiseCopyable>(
+    advancing cursor: inout _Cursor,
     as: T.Type = T.self
   ) -> T {
     defer { cursor._pointer += MemoryLayout<T>.stride }
     return cursor._pointer.loadUnaligned(as: T.self)
   } 
 }
-
