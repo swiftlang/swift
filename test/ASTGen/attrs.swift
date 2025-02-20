@@ -4,7 +4,6 @@
 // RUN:   -enable-experimental-feature ABIAttribute \
 // RUN:   -enable-experimental-feature Extern \
 // RUN:   -enable-experimental-feature LifetimeDependence \
-// RUN:   -enable-experimental-feature NonIsolatedAsyncInheritsIsolationFromContext \
 // RUN:   -enable-experimental-feature SymbolLinkageMarkers \
 // RUN:   -enable-experimental-move-only \
 // RUN:   -enable-experimental-feature ParserASTGen \
@@ -14,7 +13,6 @@
 // RUN:   -enable-experimental-feature ABIAttribute \
 // RUN:   -enable-experimental-feature Extern \
 // RUN:   -enable-experimental-feature LifetimeDependence \
-// RUN:   -enable-experimental-feature NonIsolatedAsyncInheritsIsolationFromContext \
 // RUN:   -enable-experimental-feature SymbolLinkageMarkers \
 // RUN:   -enable-experimental-move-only \
 // RUN:   | %sanitize-address > %t/cpp-parser.ast
@@ -27,7 +25,6 @@
 // RUN:   -enable-experimental-feature ABIAttribute \
 // RUN:   -enable-experimental-feature Extern \
 // RUN:   -enable-experimental-feature LifetimeDependence \
-// RUN:   -enable-experimental-feature NonIsolatedAsyncInheritsIsolationFromContext \
 // RUN:   -enable-experimental-feature SymbolLinkageMarkers \
 // RUN:   -enable-experimental-move-only
 
@@ -37,7 +34,6 @@
 // REQUIRES: swift_feature_ABIAttribute
 // REQUIRES: swift_feature_Extern
 // REQUIRES: swift_feature_LifetimeDependence
-// REQUIRES: swift_feature_NonIsolatedAsyncInheritsIsolationFromContext
 // REQUIRES: swift_feature_SymbolLinkageMarkers
 
 // rdar://116686158
