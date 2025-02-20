@@ -2,7 +2,7 @@
 //
 // This source file is part of the Swift.org open source project
 //
-// Copyright (c) 2021 - 2023 Apple Inc. and the Swift project authors
+// Copyright (c) 2021 - 2025 Apple Inc. and the Swift project authors
 // Licensed under Apache License v2.0 with Runtime Library Exception
 //
 // See https://swift.org/LICENSE.txt for license information
@@ -78,7 +78,7 @@
 // A feature that's both suppressible and upcoming.
 // Delegates to whichever the includer defines.
 #ifndef SUPPRESSIBLE_UPCOMING_FEATURE
-#  if defined(SUPPRESSIBLE_UPCOMING_FEATURE) && \
+#  if defined(SUPPRESSIBLE_LANGUAGE_FEATURE) && \
       defined(UPCOMING_FEATURE)
 #    error ambiguous defines when including Features.def
 #  elif defined(SUPPRESSIBLE_LANGUAGE_FEATURE)
