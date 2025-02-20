@@ -4532,23 +4532,30 @@ void CallEmission::emitToUnmappedExplosionWithDirectTypedError(
   extractScalarResults(IGF, result->getType(), result, nativeExplosion);
   auto values = nativeExplosion.claimAll();
 
-  Explosion errorExplosion;
-  if (!errorSchema.empty()) {
-    auto *expandedType = errorSchema.getExpandedType(IGF.IGM);
+  auto convertIntoExplosion = [](IRGenFunction &IGF,
+                                 const NativeConventionSchema &schema,
+                                 llvm::ArrayRef<llvm::Value *> values,
+                                 Explosion &explosion,
+                                 std::function<unsigned(unsigned)> mapIndex) {
+    auto *expandedType = schema.getExpandedType(IGF.IGM);
     if (auto *structTy = dyn_cast<llvm::StructType>(expandedType)) {
       for (unsigned i = 0, e = structTy->getNumElements(); i < e; ++i) {
-        llvm::Value *elt = values[combined.errorValueMapping[i]];
+        llvm::Value *elt = values[mapIndex(i)];
         auto *nativeTy = structTy->getElementType(i);
         elt = convertForDirectError(IGF, elt, nativeTy, /*forExtraction*/ true);
-        errorExplosion.add(elt);
+        explosion.add(elt);
       }
     } else {
-      auto *converted =
-          convertForDirectError(IGF, values[combined.errorValueMapping[0]],
-                                expandedType, /*forExtraction*/ true);
-      errorExplosion.add(converted);
+      auto *converted = convertForDirectError(
+          IGF, values[mapIndex(0)], expandedType, /*forExtraction*/ true);
+      explosion.add(converted);
     }
+  };
 
+  Explosion errorExplosion;
+  if (!errorSchema.empty()) {
+    convertIntoExplosion(IGF, errorSchema, values, errorExplosion,
+                         [&](auto i) { return combined.errorValueMapping[i]; });
     typedErrorExplosion =
         errorSchema.mapFromNative(IGF.IGM, IGF, errorExplosion, errorType);
   } else {
@@ -4558,19 +4565,8 @@ void CallEmission::emitToUnmappedExplosionWithDirectTypedError(
   // If the regular result type is void, there is nothing to explode
   if (!nativeSchema.empty()) {
     Explosion resultExplosion;
-    auto *expandedType = nativeSchema.getExpandedType(IGF.IGM);
-    if (auto *structTy = dyn_cast<llvm::StructType>(expandedType)) {
-      for (unsigned i = 0, e = structTy->getNumElements(); i < e; ++i) {
-        auto *nativeTy = structTy->getElementType(i);
-        auto *converted = convertForDirectError(IGF, values[i], nativeTy,
-                                                /*forExtraction*/ true);
-        resultExplosion.add(converted);
-      }
-    } else {
-      auto *converted = convertForDirectError(IGF, values[0], expandedType,
-                                              /*forExtraction*/ true);
-      resultExplosion.add(converted);
-    }
+    convertIntoExplosion(IGF, nativeSchema, values, resultExplosion,
+                         [](auto i) { return i; });
     out = nativeSchema.mapFromNative(IGF.IGM, IGF, resultExplosion, resultType);
   }
 }
