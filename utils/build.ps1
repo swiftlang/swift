@@ -919,6 +919,11 @@ function Fetch-Dependencies {
 
         # Dump virtual devices to confirm that swift-test-device exists
         Invoke-Program "$SDKDir\cmdline-tools\latest\bin\avdmanager.bat" list avd
+
+        # Grant network access permission to CLI tool
+        $adb = "$BinaryCache\android-sdk\platform-tools\adb.exe"
+        New-NetFirewallRule -DisplayName "abd inbound" -Direction Inbound -Program $adb -RemoteAddress LocalSubnet -Action Allow
+        New-NetFirewallRule -DisplayName "abd outbound" -Direction Outbound -Program $adb -RemoteAddress LocalSubnet -Action Allow
       }
     }
   }
