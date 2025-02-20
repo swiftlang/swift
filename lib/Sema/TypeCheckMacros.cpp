@@ -201,7 +201,7 @@ MacroDefinition MacroDefinitionRequest::evaluate(
   if (!typeCheckedType)
     return MacroDefinition::forInvalid();
 
-  // If the expanded macro was one of the the magic literal expressions
+  // If the expanded macro was one of the magic literal expressions
   // (like #file), there's nothing to expand.
   if (isa<MagicIdentifierLiteralExpr>(definition)) {
     StringRef expansionText = externalMacroName.unbridged();

@@ -414,7 +414,7 @@ void MoveOnlyObjectCheckerPImpl::check(
     }
 
     // NOTE: In the following we only rewrite lifetimes once we have emitted
-    // diagnostics. This ensures that we can emit diagnostics using the the
+    // diagnostics. This ensures that we can emit diagnostics using the
     // liveness information before rewrite lifetimes has enriched the liveness
     // info with maximized liveness information.
 
