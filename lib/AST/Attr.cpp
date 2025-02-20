@@ -2141,6 +2141,8 @@ AvailableAttr::AvailableAttr(
       ObsoletedRange(ObsoletedRange) {
   Bits.AvailableAttr.Kind = static_cast<uint8_t>(Kind);
   Bits.AvailableAttr.IsSPI = IsSPI;
+  Bits.AvailableAttr.IsFollowedByGroupedAvailableAttr = false;
+  Bits.AvailableAttr.IsFollowedByWildcard = false;
 }
 
 AvailableAttr *AvailableAttr::createUniversallyUnavailable(ASTContext &C,
