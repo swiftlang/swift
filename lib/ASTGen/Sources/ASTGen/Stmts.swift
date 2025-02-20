@@ -161,6 +161,14 @@ extension ASTGenVisitor {
       // I'm not sure this should really be implicit.
       pat.setImplicit()
 
+      if let typeAnnotation = node.typeAnnotation {
+        pat = BridgedTypedPattern.createParsed(
+          self.ctx,
+          pattern: pat,
+          type: self.generate(type: typeAnnotation.type)
+        ).asPattern
+      }
+
       let initializer: BridgedExpr
       if let initNode = node.initializer {
         initializer = self.generate(expr: initNode.value)
