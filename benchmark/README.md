@@ -119,6 +119,9 @@ installed libraries instead, enable
 This will reflect the performance of the Swift standard library
 installed on the device, not the one included in the Swift root.
 
+If build fails due with the error like `cannot find X in scope` it is because default toolchains don't give access to stdlib SPI.
+Use dev toolchain built locally or dev snapshot from [swift.org](https://www.swift.org/install/).
+
 ### build-script using SwiftPM+LLBuild
 
 To build the benchmarks using build-script/swiftpm, one must build both
@@ -147,6 +150,11 @@ swift-source/swift/benchmark$ .build/release/SwiftBench
 2,AngryPhonebook,1,2044,2044,2044,0,2044
 ...
 ```
+
+### Troubleshooting
+
+- To check what libraries benchmark is linked against set `DYLD_PRINT_SEARCHING` environment variable. E.g. `export DYLD_PRINT_SEARCHING=1`.
+- To force linking with built stdlib use `DYLD_LIBRARY_PATH` environment variable. E.g. `export DYLD_LIBRARY_PATH=<path_to_build_folder>/Ninja-ReleaseAssert/swift-macosx-x86_64/lib/swift/macosx/x86_64`.
 
 ## Editing in Xcode
 
