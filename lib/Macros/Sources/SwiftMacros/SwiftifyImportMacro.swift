@@ -1107,6 +1107,10 @@ func constructOverloadFunction(forDecl funcDecl: FunctionDeclSyntax,
         atSign: .atSignToken(),
         attributeName: IdentifierTypeSyntax(name: "_disfavoredOverload")))
   ] : [])
+  let hasVisibilityModifier = funcDecl.modifiers.contains { modifier in
+    let modName = modifier.name.trimmed.text
+    return modName == "public" || modName == "internal" || modName == "open" || modName == "private" || modName == "filePrivate"
+  }
   let newFunc =
     funcDecl
     .with(\.signature, newSignature)
@@ -1129,6 +1133,7 @@ func constructOverloadFunction(forDecl funcDecl: FunctionDeclSyntax,
       ]
       + lifetimeAttrs
       + disfavoredOverload)
+    .with(\.modifiers, funcDecl.modifiers + (hasVisibilityModifier ? [] : [DeclModifierSyntax(name: .identifier("public"))]))
   return DeclSyntax(newFunc)
 }
 
