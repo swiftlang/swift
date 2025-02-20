@@ -823,16 +823,19 @@ static bool ParseEnabledFeatureArgs(LangOptions &Opts, ArgList &Args,
 
     if (featureMode) {
       if (isEnableFeatureFlag) {
+        const auto isAdoptable = isFeatureAdoptable(*feature);
+
         // Diagnose an invalid mode.
         StringRef validModeName = "adoption";
         if (*featureMode != validModeName) {
           Diags.diagnose(SourceLoc(), diag::invalid_feature_mode, *featureMode,
                          featureName,
-                         /*didYouMean=*/validModeName);
+                         /*didYouMean=*/validModeName,
+                         /*showDidYouMean=*/isAdoptable);
           continue;
         }
 
-        if (!isFeatureAdoptable(*feature)) {
+        if (!isAdoptable) {
           Diags.diagnose(SourceLoc(),
                          diag::feature_does_not_support_adoption_mode,
                          featureName);

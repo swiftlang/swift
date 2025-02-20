@@ -42,12 +42,12 @@
 // CHECK-SWIFT-5-NEXT: warning: '-disable-upcoming-feature' argument 'DynamicActorIsolation:invalid5' cannot specify a mode{{$}}
 // CHECK-SWIFT-5-NEXT: warning: feature 'DynamicActorIsolation' does not support adoption mode{{$}}
 // CHECK-SWIFT-5-NEXT: warning: feature 'DynamicActorIsolation' does not support adoption mode{{$}}
-// CHECK-SWIFT-5-NEXT: warning: 'invalid4' is not a recognized mode for feature 'DynamicActorIsolation'; did you mean 'adoption'?{{$}}
-// CHECK-SWIFT-5-NEXT: warning: 'invalid3' is not a recognized mode for feature 'DynamicActorIsolation'; did you mean 'adoption'?{{$}}
+// CHECK-SWIFT-5-NEXT: warning: 'invalid4' is not a recognized mode for feature 'DynamicActorIsolation'{{$}}
+// CHECK-SWIFT-5-NEXT: warning: 'invalid3' is not a recognized mode for feature 'DynamicActorIsolation'{{$}}
 // CHECK-SWIFT-5-NEXT: warning: feature 'DynamicActorIsolation' does not support adoption mode{{$}}
 // CHECK-SWIFT-5-NEXT: warning: feature 'DynamicActorIsolation' does not support adoption mode{{$}}
-// CHECK-SWIFT-5-NEXT: warning: 'invalid2' is not a recognized mode for feature 'DynamicActorIsolation'; did you mean 'adoption'?{{$}}
-// CHECK-SWIFT-5-NEXT: warning: 'invalid1' is not a recognized mode for feature 'DynamicActorIsolation'; did you mean 'adoption'?{{$}}
+// CHECK-SWIFT-5-NEXT: warning: 'invalid2' is not a recognized mode for feature 'DynamicActorIsolation'{{$}}
+// CHECK-SWIFT-5-NEXT: warning: 'invalid1' is not a recognized mode for feature 'DynamicActorIsolation'{{$}}
 // CHECK-SWIFT-5-NOT: warning:
 
 // CHECK-SWIFT-6-NOT: warning:
