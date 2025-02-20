@@ -552,3 +552,16 @@ do {
     }
   }
 }
+
+// rdar://91922018
+do {
+  func f<E>(_ c: some Collection<E>) -> some Collection<E> {
+    return c
+  }
+  let c: any Collection<Int>
+  let result = f(c)
+  do {
+    var types = SwiftTypePair(typeOf: result, type2: SwiftType<any Collection<Int>>.self)
+    types.assertTypesAreEqual()
+  }
+}

@@ -1,0 +1,57 @@
+// RUN: %target-sil-opt %s \
+// RUN:   --lifetime-dependence-diagnostics \
+// RUN:   -verify \
+// RUN:   -sil-verify-all \
+// RUN:   -module-name Swift \
+// RUN:   -enable-experimental-feature LifetimeDependence \
+// RUN:   -o /dev/null
+
+// REQUIRES: swift_in_compiler
+// REQUIRES: swift_feature_LifetimeDependence
+
+// Verify diagnostics from the LifetimeDependenceDiagnostics pass.
+
+sil_stage raw
+
+import Builtin
+
+@_marker protocol Copyable: ~Escapable {}
+@_marker protocol Escapable: ~Copyable {}
+
+class C {}
+
+struct NE : ~Escapable {}
+
+struct NEObject : ~Escapable {
+  var c: C
+
+  @lifetime(immortal)
+  init()
+}
+
+sil @makeNE : $@convention(thin) () -> @lifetime(immortal) @owned NE
+sil @makeNEObject : $@convention(thin) () -> @lifetime(immortal) @owned NEObject
+
+// Test returning a owned dependence on a trivial value
+sil [ossa] @return_trivial_dependence : $@convention(thin) (@guaranteed C) -> @lifetime(borrow 0) @owned NE {
+entry(%0 : @guaranteed $C):
+  %zero = integer_literal $Builtin.Int1, 0
+  %makeNE = function_ref @makeNE : $@convention(thin) () -> @lifetime(immortal) @owned NE
+  %call = apply %makeNE() : $@convention(thin) () -> @lifetime(immortal) @owned NE
+  // expected-error @-1{{lifetime-dependent value escapes its scope}}
+  // expected-note  @-4{{it depends on the lifetime of this parent value}}
+  %mark = mark_dependence [unresolved] %call : $NE on %zero : $Builtin.Int1
+  return %mark // expected-note {{this use causes the lifetime-dependent value to escape}}
+}
+
+// Test returning a unowned dependence on a trivial value
+sil [ossa] @return_object_trivial_dependence : $@convention(thin) (@guaranteed C) -> @lifetime(borrow 0) @owned NEObject {
+entry(%0 : @guaranteed $C):
+  %zero = integer_literal $Builtin.Int1, 0
+  %makeNE = function_ref @makeNEObject : $@convention(thin) () -> @lifetime(immortal) @owned NEObject
+  %call = apply %makeNE() : $@convention(thin) () -> @lifetime(immortal) @owned NEObject
+  // expected-error @-1{{lifetime-dependent value escapes its scope}}
+  // expected-note  @-4{{it depends on the lifetime of this parent value}}
+  %mark = mark_dependence [unresolved] %call : $NEObject on %zero : $Builtin.Int1
+  return %mark // expected-note {{this use causes the lifetime-dependent value to escape}}
+}

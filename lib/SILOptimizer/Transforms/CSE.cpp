@@ -518,6 +518,13 @@ public:
         llvm::hash_combine_range(Operands.begin(), Operands.end()),
         X->getElementType());
   }
+
+  hash_code visitTypeValueInst(TypeValueInst *X) {
+    OperandValueArrayRef Operands(X->getAllOperands());
+    return llvm::hash_combine(
+        X->getKind(), X->getType(),
+        llvm::hash_combine_range(Operands.begin(), Operands.end()));
+  }
 };
 } // end anonymous namespace
 
@@ -1094,13 +1101,14 @@ bool CSE::processNode(DominanceInfoNode *Node) {
         if (!isa<SingleValueInstruction>(Inst))
           continue;
 
-        OwnershipRAUWHelper helper(RAUWFixupContext,
-                                   cast<SingleValueInstruction>(Inst),
-                                   cast<SingleValueInstruction>(AvailInst));
+        auto oldValue = cast<SingleValueInstruction>(Inst);
+        auto newValue = cast<SingleValueInstruction>(AvailInst);
+        OwnershipRAUWHelper helper(RAUWFixupContext, oldValue, newValue);
         // If RAUW requires cloning the original, then there's no point. If it
         // also requires introducing a copy and new borrow scope, then it's a
         // very bad idea.
-        if (!helper.isValid() || helper.requiresCopyBorrowAndClone())
+        if (!helper.isValid() || helper.requiresCopyBorrowAndClone() ||
+            helper.mayIntroduceUnoptimizableCopies())
           continue;
         // Replace SingleValueInstruction using OSSA RAUW here
         nextI = helper.perform();
@@ -1231,6 +1239,7 @@ bool CSE::canHandle(SILInstruction *Inst) {
   case SILInstructionKind::ScalarPackIndexInst:
   case SILInstructionKind::DynamicPackIndexInst:
   case SILInstructionKind::TuplePackElementAddrInst:
+  case SILInstructionKind::TypeValueInst:
     // Intentionally we don't handle (prev_)dynamic_function_ref.
     // They change at runtime.
 #define LOADABLE_REF_STORAGE(Name, ...) \

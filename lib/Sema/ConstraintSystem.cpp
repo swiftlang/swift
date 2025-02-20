@@ -217,7 +217,7 @@ void ConstraintSystem::assignFixedType(TypeVariableType *typeVar, Type type,
   assert(!type->hasError() &&
          "Should not be assigning a type involving ErrorType!");
 
-  CG.retractFromInference(typeVar, type);
+  CG.retractFromInference(typeVar);
   typeVar->getImpl().assignFixedType(type, getTrail());
 
   if (!updateState)
@@ -267,7 +267,8 @@ void ConstraintSystem::assignFixedType(TypeVariableType *typeVar, Type type,
 void ConstraintSystem::addTypeVariableConstraintsToWorkList(
        TypeVariableType *typeVar) {
   // Activate the constraints affected by a change to this type variable.
-  for (auto *constraint : CG.gatherAllConstraints(typeVar))
+  auto gatheringKind = ConstraintGraph::GatheringKind::AllMentions;
+  for (auto *constraint : CG.gatherConstraints(typeVar, gatheringKind))
     if (!constraint->isActive())
       activateConstraint(constraint);
 }
@@ -487,7 +488,7 @@ void ConstraintSystem::recordPotentialThrowSite(
 
   // do..catch statements without an explicit `throws` clause do infer
   // thrown types.
-  if (auto doCatch = catchNode.dyn_cast<DoCatchStmt *>()) {
+  if (catchNode.is<DoCatchStmt *>()) {
     PotentialThrowSite site{kind, type, getConstraintLocator(locator)};
     recordPotentialThrowSite(catchNode, site);
     return;
@@ -1073,7 +1074,7 @@ Type ConstraintSystem::getFixedTypeRecursive(Type type, TypeMatchOptions &flags,
 
   // Tuple types can lose their tuple structure under substitution
   // when a parameter pack is substituted with one element.
-  if (auto tuple = type->getAs<TupleType>()) {
+  if (type->is<TupleType>()) {
     auto simplified = simplifyType(type);
     if (simplified.getPointer() == type.getPointer())
       return type;
@@ -1081,7 +1082,7 @@ Type ConstraintSystem::getFixedTypeRecursive(Type type, TypeMatchOptions &flags,
     return getFixedTypeRecursive(simplified, flags, wantRValue);
   }
 
-  if (auto metatype = type->getAs<AnyMetatypeType>()) {
+  if (type->is<AnyMetatypeType>()) {
     auto simplified = simplifyType(type);
     if (simplified.getPointer() == type.getPointer())
       return type;
@@ -1668,7 +1669,7 @@ struct TypeSimplifier {
           // Special case: When building slab literals, we go through the same
           // array literal machinery, so there will be a conversion constraint
           // for the element to ExpressibleByArrayLiteral.ArrayLiteralType.
-          if (lookupBaseType->isSlab()) {
+          if (lookupBaseType->isInlineArray()) {
             auto &ctx = CS.getASTContext();
             auto arrayProto =
                 ctx.getProtocol(KnownProtocolKind::ExpressibleByArrayLiteral);
@@ -1865,6 +1866,39 @@ Type Solution::simplifyTypeForCodeCompletion(Type Ty) const {
 
     return typeVar;
   });
+
+  // Logic to determine the contextual type inside buildBlock result builders:
+  //
+  // When completing inside a result builder, the result builder
+  //   @ViewBuilder var body: some View {
+  //     Text("Foo")
+  //     #^COMPLETE^#
+  //   }
+  // gets rewritten to
+  //   @ViewBuilder var body: some View {
+  //     let $__builder2: Text
+  //     let $__builder0 = Text("Foo")
+  //     let $__builder1 = #^COMPLETE^#
+  //     $__builder2 = ViewBuilder.buildBlock($__builder0, $__builder1)
+  //     return $__builder2
+  //   }
+  // Inside the constraint system
+  //     let $__builder1 = #^COMPLETE^#
+  // gets type checked without context, so we can't know the contextual type for
+  // the code completion token. But we know that $__builder1 (and thus the type
+  // of #^COMPLETE^#) is used as the second argument to ViewBuilder.buildBlock,
+  // so we can extract the contextual type from that call. To do this, figure
+  // out the type variable that is used for $__builder1 in the buildBlock call.
+  // This type variable is connected to the type variable of $__builder1's
+  // definition by a one-way constraint.
+  if (auto TV = Ty->getAs<TypeVariableType>()) {
+    for (auto constraint : CS.getConstraintGraph()[TV].getConstraints()) {
+      if (constraint->getKind() == ConstraintKind::OneWayEqual &&
+          constraint->getSecondType()->isEqual(TV)) {
+        return simplifyTypeForCodeCompletion(constraint->getFirstType());
+      }
+    }
+  }
 
   // Remove any remaining type variables and placeholders
   Ty = simplifyType(Ty);
@@ -3475,7 +3509,7 @@ void constraints::simplifyLocator(ASTNode &anchor,
       LLVM_FALLTHROUGH;
 
     case ConstraintLocator::Member:
-      if (auto UDE = getAsExpr<UnresolvedDotExpr>(anchor)) {
+      if (isExpr<UnresolvedDotExpr>(anchor)) {
         path = path.slice(1);
         continue;
       }
@@ -4519,6 +4553,8 @@ Expr *ConstraintSystem::buildAutoClosureExpr(Expr *expr,
 Expr *ConstraintSystem::buildTypeErasedExpr(Expr *expr, DeclContext *dc,
                                             Type contextualType,
                                             ContextualTypePurpose purpose) {
+  auto &ctx = dc->getASTContext();
+
   if (purpose != CTP_ReturnStmt)
     return expr;
 
@@ -4537,13 +4573,33 @@ Expr *ConstraintSystem::buildTypeErasedExpr(Expr *expr, DeclContext *dc,
     return expr;
 
   auto *PD = protocols.front();
-  auto *attr = PD->getAttrs().getAttribute<TypeEraserAttr>();
-  if (!attr)
+
+  auto contextAvailability =
+      TypeChecker::availabilityAtLocation(expr->getLoc(), dc);
+  auto refinedAvailability =
+      AvailabilityContext::forPlatformRange(
+        AvailabilityRange::alwaysAvailable(), ctx);
+
+  // The least available type eraser for the enclosing context.
+  Type typeEraser;
+  for (auto *attr : PD->getAttrs().getAttributes<TypeEraserAttr>()) {
+    auto eraser = attr->getResolvedType(PD);
+    assert(eraser && "Failed to resolve eraser type!");
+
+    auto *nominal = eraser->getAnyNominal();
+    auto nominalAvailability =
+        TypeChecker::availabilityForDeclSignature(nominal);
+
+    if (contextAvailability.isContainedIn(nominalAvailability) &&
+        nominalAvailability.isContainedIn(refinedAvailability)) {
+      refinedAvailability = nominalAvailability;
+      typeEraser = eraser;
+    }
+  }
+
+  if (!typeEraser)
     return expr;
 
-  auto typeEraser = attr->getResolvedType(PD);
-  assert(typeEraser && "Failed to resolve eraser type!");
-  auto &ctx = dc->getASTContext();
   auto *argList = ArgumentList::forImplicitSingle(ctx, ctx.Id_erasing, expr);
   return CallExpr::createImplicit(
       ctx, TypeExpr::createImplicit(typeEraser, ctx), argList);
@@ -4667,7 +4723,7 @@ void ConstraintSystem::diagnoseFailureFor(SyntacticElementTarget target) {
       nominal->diagnose(diag::property_wrapper_declared_here,
                         nominal->getName());
     }
-  } else if (auto *var = target.getAsUninitializedVar()) {
+  } else if (target.getAsUninitializedVar()) {
     DE.diagnose(target.getLoc(), diag::failed_to_produce_diagnostic);
   } else if (target.isForEachPreamble()) {
     DE.diagnose(target.getLoc(), diag::failed_to_produce_diagnostic);
@@ -4884,11 +4940,11 @@ bool ConstraintSystem::isReadOnlyKeyPathComponent(
   // If the setter is unavailable, then the keypath ought to be read-only
   // in this context.
   if (auto setter = storage->getOpaqueAccessor(AccessorKind::Set)) {
-    // FIXME: Fully unavailable setters should cause the key path to be
-    // readonly too.
+    // FIXME: [availability] Fully unavailable setters should cause the key path
+    // to be readonly too.
     auto constraint =
         getUnsatisfiedAvailabilityConstraint(setter, DC, referenceLoc);
-    if (constraint && constraint->isConditionallySatisfiable())
+    if (constraint && constraint->isPotentiallyAvailable())
       return true;
   }
 

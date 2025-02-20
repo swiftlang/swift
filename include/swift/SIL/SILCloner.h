@@ -1053,17 +1053,6 @@ SILCloner<ImplClass>::visitAllocStackInst(AllocStackInst *Inst) {
 }
 
 template <typename ImplClass>
-void SILCloner<ImplClass>::visitAllocVectorInst(
-    AllocVectorInst *Inst) {
-  getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));
-  recordClonedInstruction(Inst, getBuilder().createAllocVector(
-                                    getOpLocation(Inst->getLoc()),
-                                    getOpValue(Inst->getCapacity()),
-                                    getOpType(Inst->getElementType())));
-}
-
-
-template <typename ImplClass>
 void SILCloner<ImplClass>::visitAllocPackMetadataInst(
     AllocPackMetadataInst *Inst) {
   getBuilder().setCurrentDebugScope(getOpScope(Inst->getDebugScope()));

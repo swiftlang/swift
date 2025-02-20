@@ -1188,7 +1188,6 @@ public:
   void emitDebugInfoForAllocStack(AllocStackInst *i, const TypeInfo &type,
                                   llvm::Value *addr);
   void visitAllocStackInst(AllocStackInst *i);
-  void visitAllocVectorInst(AllocVectorInst *i);
   void visitAllocPackInst(AllocPackInst *i);
   void visitAllocPackMetadataInst(AllocPackMetadataInst *i);
   void visitAllocRefInst(AllocRefInst *i);
@@ -2521,7 +2520,7 @@ static void noteUseOfMetadataByCXXInterop(IRGenerator &IRGen,
       Walker(IRGenerator &IRGen) : IRGen(IRGen) {}
 
       Action walkToTypePre(Type ty) override {
-        if (auto *BGT = ty->getAs<BoundGenericType>())
+        if (ty->is<BoundGenericType>())
           genericDepth++;
         else if (auto *nominal = ty->getAs<NominalType>())
           noteUseOfTypeMetadata(nominal->getDecl());
@@ -2529,7 +2528,7 @@ static void noteUseOfMetadataByCXXInterop(IRGenerator &IRGen,
       }
 
       Action walkToTypePost(Type ty) override {
-        if (auto *BGT = ty->getAs<BoundGenericType>())
+        if (ty->is<BoundGenericType>())
           genericDepth--;
 
         return Action::Continue;
@@ -4787,6 +4786,12 @@ void IRGenSILFunction::visitEndApply(BeginApplyInst *i, EndApplyInst *ei) {
       llvm::ConstantInt::get(IGM.Int1Ty, isAbort)
     });
 
+  // Destroy the temporaries before setting the lowered value for `ei`, since
+  // `setLoweredExplosion` will insert into the LoweredValues DenseMap and
+  // invalidate the `coroutine` reference.
+  coroutine.Temporaries.destroyAll(*this);
+  emitDeallocYieldOnceCoroutineBuffer(*this, coroutine.Buffer);
+
   if (!isAbort) {
     auto resultType = call->getType();
     if (!resultType->isVoidTy()) {
@@ -4794,13 +4799,12 @@ void IRGenSILFunction::visitEndApply(BeginApplyInst *i, EndApplyInst *ei) {
       // FIXME: Do we need to handle ABI-related conversions here?
       // It seems we cannot have C function convention for coroutines, etc.
       extractScalarResults(*this, resultType, call, e);
+      
+      // NOTE: This inserts a new entry into the LoweredValues DenseMap,
+      // invalidating the reference held by `coroutine`.
       setLoweredExplosion(ei, e);
     }
   }
-
-  coroutine.Temporaries.destroyAll(*this);
-
-  emitDeallocYieldOnceCoroutineBuffer(*this, coroutine.Buffer);
 }
 
 static llvm::BasicBlock *emitBBMapForSwitchValue(
@@ -5399,18 +5403,14 @@ void IRGenSILFunction::visitRetainValueInst(swift::RetainValueInst *i) {
 void IRGenSILFunction::visitRetainValueAddrInst(swift::RetainValueAddrInst *i) {
   SILValue operandValue = i->getOperand();
   assert(!operandValue->getType().isMoveOnly());
-  Address addr = getLoweredAddress(operandValue);
-  SILType addrTy = operandValue->getType();
-  SILType objectT = addrTy.getObjectType();
-  llvm::Type *llvmType = addr.getAddress()->getType();
-  const TypeInfo &addrTI = getTypeInfo(addrTy);
-  auto atomicity = i->isAtomic() ? Atomicity::Atomic : Atomicity::NonAtomic;
-  auto *outlinedF = cast<llvm::Function>(
-      IGM.getOrCreateRetainFunction(addrTI, objectT, llvmType, atomicity));
-  llvm::Value *args[] = {addr.getAddress()};
-  llvm::CallInst *call =
-      Builder.CreateCall(outlinedF->getFunctionType(), outlinedF, args);
-  call->setCallingConv(IGM.DefaultCC);
+
+  auto objTy = operandValue->getType().getObjectType();
+  const TypeInfo &type = getTypeInfo(objTy);
+  auto stackAddr = type.allocateStack(*this, objTy, "retain.value.addr.tmp");
+  Address src = getLoweredAddress(operandValue);
+  type.initializeWithCopy(*this, stackAddr.getAddress(), src,
+                          operandValue->getType(), false);
+  type.deallocateStack(*this, stackAddr, operandValue->getType());
 }
 
 void IRGenSILFunction::visitCopyValueInst(swift::CopyValueInst *i) {
@@ -5489,15 +5489,10 @@ void IRGenSILFunction::visitReleaseValueInst(swift::ReleaseValueInst *i) {
 void IRGenSILFunction::visitReleaseValueAddrInst(
     swift::ReleaseValueAddrInst *i) {
   SILValue operandValue = i->getOperand();
-  Address addr = getLoweredAddress(operandValue);
   SILType addrTy = operandValue->getType();
-  SILType objectT = addrTy.getObjectType();
-  if (tryEmitDestroyUsingDeinit(*this, addr, addrTy)) {
-    return;
-  }
   const TypeInfo &addrTI = getTypeInfo(addrTy);
-  auto atomicity = i->isAtomic() ? Atomicity::Atomic : Atomicity::NonAtomic;
-  addrTI.callOutlinedRelease(*this, addr, objectT, atomicity);
+  Address base = getLoweredAddress(operandValue);
+  addrTI.destroy(*this, base, addrTy, false /*isOutlined*/);
 }
 
 void IRGenSILFunction::visitDestroyValueInst(swift::DestroyValueInst *i) {
@@ -6483,15 +6478,6 @@ void IRGenSILFunction::visitAllocStackInst(swift::AllocStackInst *i) {
   }
   emitDebugInfoForAllocStack(i, type, addr.getAddress());
 }
-
-void IRGenSILFunction::visitAllocVectorInst(AllocVectorInst *i) {
-  const TypeInfo &type = getTypeInfo(i->getElementType());
-  Explosion capacity = getLoweredExplosion(i->getCapacity());
-  auto stackAddr = type.allocateVector(*this, i->getElementType(),
-                                       capacity.claimNext(), StringRef());
-  setLoweredStackAddress(i, stackAddr);
-}
-
 
 void IRGenSILFunction::visitAllocPackInst(swift::AllocPackInst *i) {
   auto addr = allocatePack(*this, i->getPackType());

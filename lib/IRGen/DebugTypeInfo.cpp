@@ -179,25 +179,20 @@ TypeDecl *DebugTypeInfo::getDecl() const {
   return nullptr;
 }
 
-bool DebugTypeInfo::isForwardDecl() const {
-  return isNull() || (!isa<TypeAliasType>(getType()));
-}
-
 #if !defined(NDEBUG) || defined(LLVM_ENABLE_DUMP)
 LLVM_DUMP_METHOD void DebugTypeInfo::dump() const {
   llvm::errs() << "[";
   llvm::errs() << "Alignment " << Align.getValue() << "] ";
   if (auto *Type = getType())
     Type->dump(llvm::errs());
-
-  if (isForwardDecl())
-    llvm::errs() << "forward-declared\n";
 }
 #endif
 
 std::optional<CompletedDebugTypeInfo>
 CompletedDebugTypeInfo::getFromTypeInfo(swift::Type Ty, const TypeInfo &Info,
                                         IRGenModule &IGM) {
+  if (!Ty || Ty->hasTypeParameter())
+    return {};
   auto *StorageType = IGM.getStorageTypeForUnlowered(Ty);
   std::optional<uint64_t> SizeInBits;
   if (StorageType->isSized())

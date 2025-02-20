@@ -510,6 +510,18 @@ bb0(%0 :  $*T):
   return %res : $()
 }
 
+sil [ossa] @test_non_escaping_closure_with_mark_dependence : $@convention(thin) () -> () {
+bb0:
+  %0 = alloc_stack $T
+  %func = function_ref @closure : $@convention(thin) (@in_guaranteed T) -> ()
+  %pa = partial_apply [callee_guaranteed] [on_stack] %func(%0) : $@convention(thin) (@in_guaranteed T) -> ()
+  %pa1 = mark_dependence %pa on %0
+  destroy_value %pa1 : $@noescape @callee_guaranteed () -> () 
+  dealloc_stack %0
+  %res = tuple ()
+  return %res : $()
+}
+
 sil [ossa] @test_store_borrow : $@convention(thin) (@guaranteed T) -> () {
 bb0(%0 :  @guaranteed $T):
   %s = alloc_stack $T
@@ -804,5 +816,37 @@ bb2:
 bb3:
   %r = tuple ()
   return %r : $()
+}
+
+sil [ossa] @mark_dependence : $@convention(method) (@owned T, @owned Inner) -> @owned Inner {
+bb0(%0 : @owned $T, %1 : @owned $Inner):
+  %2 = alloc_stack $T
+  store %0 to [init] %2
+  %4 = alloc_stack $Inner
+  store %1 to [init] %4
+  %6 = mark_dependence %4 on %2
+  %7 = begin_access [read] [dynamic] %6
+  %8 = load [take] %7
+  end_access %7
+  dealloc_stack %4
+  destroy_addr %2
+  dealloc_stack %2
+  return %8
+}
+
+sil [ossa] @mark_dependence_uninit_value : $@convention(thin) (@owned T, @owned Inner) -> @owned Inner {
+bb0(%0 : @owned $T, %1 : @owned $Inner):
+  %2 = alloc_stack $T
+  store %0 to [init] %2
+  %4 = alloc_stack $Inner
+  store %1 to [init] %4
+  %6 = mark_dependence %4 on %2
+  %7 = begin_access [read] [dynamic] %6
+  %8 = load [take] %7
+  end_access %7
+  dealloc_stack %4
+  destroy_addr %2
+  dealloc_stack %2
+  return %8
 }
 

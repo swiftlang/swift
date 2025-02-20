@@ -15,6 +15,7 @@
 
 #include "SILParserState.h"
 
+#include "swift/AST/DiagnosticsParse.h"
 #include "swift/Parse/Parser.h"
 #include "swift/SIL/SILCoverageMap.h"
 #include "swift/Sema/SILTypeResolutionContext.h"

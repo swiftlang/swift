@@ -33,15 +33,15 @@ func twoShorthandsFollowedByDeprecated() {}
 // Missing/wrong warning message for '*' or 'swift' platform.
 
 @available(*, deprecated: 4.2)
-// expected-warning@-1 {{unexpected version number in 'available' attribute for non-specific platform '*'}} {{25-30=}}
+// expected-warning@-1 {{unexpected version number in '@available' attribute for '*'}}
 func allPlatformsDeprecatedVersion() {}
 
 @available(*, deprecated, obsoleted: 4.2)
-// expected-warning@-1 {{unexpected version number in 'available' attribute for non-specific platform '*'}} {{36-41=}}
+// expected-warning@-1 {{unexpected version number in '@available' attribute for '*'}}
 func allPlatformsDeprecatedAndObsoleted() {}
 
 @available(*, introduced: 4.0, deprecated: 4.1, obsoleted: 4.2)
-// expected-warning@-1 {{unexpected version number in 'available' attribute for non-specific platform '*'}} {{25-30=}} {{42-47=}} {{58-63=}}
+// expected-warning@-1 {{unexpected version number in '@available' attribute for '*'}}
 func allPlatformsDeprecatedAndObsoleted2() {}
 
 @available(swift, unavailable)
@@ -63,6 +63,12 @@ func swiftDeprecatedObsoleted() {}
 @available(swift, message: "missing valid option")
 // expected-warning@-1 {{expected 'introduced', 'deprecated', or 'obsoleted' in 'available' attribute for platform 'swift'}}
 func swiftMessage() {}
+
+@available(swift 5, deprecated: 6)
+// expected-error@-1 {{'deprecated' can't be combined with shorthand specification 'swift 5'}}
+// expected-note@-2 {{did you mean to specify an introduction version?}} {{17-17=, introduced:}}
+// expected-error@-3 {{expected declaration}}
+func swiftShorthandFollowedByDeprecated() {}
 
 @available(*, unavailable, message: "\("message")")
 // expected-error@-1{{'message' cannot be an interpolated string literal}}

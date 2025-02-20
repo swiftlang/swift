@@ -393,6 +393,16 @@ static ConstructorComparison compareConstructors(ConstructorDecl *ctor1,
   return ConstructorComparison::Same;
 }
 
+static bool isMemberImplementation(ValueDecl *VD) {
+  return VD->isObjCMemberImplementation();
+}
+static bool isMemberImplementation(OperatorDecl *VD) {
+  return false;
+}
+static bool isMemberImplementation(PrecedenceGroupDecl *VD) {
+  return false;
+}
+
 /// Given a set of declarations whose names and interface types have matched,
 /// figure out which of these declarations have been shadowed by others.
 template <typename T>
@@ -412,7 +422,8 @@ static void recordShadowedDeclsAfterTypeMatch(
   for (unsigned firstIdx : indices(decls)) {
     auto firstDecl = decls[firstIdx];
     auto firstModule = firstDecl->getModuleContext();
-    bool firstTopLevel = firstDecl->getDeclContext()->isModuleScopeContext();
+    auto firstDC = firstDecl->getDeclContext();
+    bool firstTopLevel = firstDC->isModuleScopeContext();
 
     auto name = firstDecl->getBaseName();
 
@@ -454,7 +465,8 @@ static void recordShadowedDeclsAfterTypeMatch(
       // Determine whether one module takes precedence over another.
       auto secondDecl = decls[secondIdx];
       auto secondModule = secondDecl->getModuleContext();
-      bool secondTopLevel = secondDecl->getDeclContext()->isModuleScopeContext();
+      auto secondDC = secondDecl->getDeclContext();
+      bool secondTopLevel = secondDC->isModuleScopeContext();
       bool secondPrivate = isPrivateImport(secondModule);
 
       // For member types, we skip most of the below rules. Instead, we allow
@@ -534,6 +546,22 @@ static void recordShadowedDeclsAfterTypeMatch(
           break;
         } else if (firstScoped && !secondScoped) {
           shadowed.insert(secondDecl);
+          continue;
+        }
+      }
+
+      // Member implementations are usually filtered out by access control.
+      // They're sometimes visible in contexts that can directly access storage,
+      // though, and there they should shadow the matching imported declaration.
+      if (firstDC != secondDC
+            && firstDC->getImplementedObjCContext() ==
+                 secondDC->getImplementedObjCContext()) {
+        if (isMemberImplementation(firstDecl) && secondDecl->hasClangNode()) {
+          shadowed.insert(secondDecl);
+          continue;
+        }
+        if (isMemberImplementation(secondDecl) && firstDecl->hasClangNode()) {
+          shadowed.insert(firstDecl);
           continue;
         }
       }
@@ -1774,7 +1802,7 @@ namelookup::isInMacroArgument(SourceFile *sourceFile, SourceLoc loc) {
 
         if (macro.getFreestanding()) {
           inMacroArgument = true;
-        } else if (auto *attr = macro.getAttr()) {
+        } else if (macro.getAttr()) {
           auto *moduleScope = sourceFile->getModuleScopeContext();
           auto results =
               lookupMacros(moduleScope, macro.getModuleName(),
@@ -1914,7 +1942,7 @@ PotentialMacroExpansions PotentialMacroExpansionsInContextRequest::evaluate(
           dc->getModuleScopeContext(), med->getMacroName(),
           MacroRole::Declaration, nameTracker);
     } else if (auto *vd = dyn_cast<ValueDecl>(member)) {
-      nameTracker.attachedTo = dyn_cast<ValueDecl>(member);
+      nameTracker.attachedTo = vd;
       forEachPotentialAttachedMacro(member, MacroRole::Peer, nameTracker);
     }
   }
@@ -2000,7 +2028,7 @@ populateLookupTableEntryFromMacroExpansions(ASTContext &ctx,
             dc->getModuleScopeContext(), med->getMacroName(),
             MacroRole::Declaration, nameTracker);
       } else if (auto *vd = dyn_cast<ValueDecl>(member)) {
-        nameTracker.attachedTo = dyn_cast<ValueDecl>(member);
+        nameTracker.attachedTo = vd;
         forEachPotentialAttachedMacro(member, MacroRole::Peer, nameTracker);
       }
 
@@ -3606,7 +3634,7 @@ CollectedOpaqueReprs swift::collectOpaqueTypeReprs(TypeRepr *r, ASTContext &ctx,
       if (!Ctx.LangOpts.hasFeature(Feature::ImplicitSome))
         return Action::Continue();
       
-      if (auto existential = dyn_cast<ExistentialTypeRepr>(repr)) {
+      if (isa<ExistentialTypeRepr>(repr)) {
         return Action::SkipNode();
       } else if (auto composition = dyn_cast<CompositionTypeRepr>(repr)) {
         if (!composition->isTypeReprAny())

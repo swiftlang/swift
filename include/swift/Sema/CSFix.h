@@ -484,9 +484,9 @@ enum class FixKind : uint8_t {
   /// result.
   AllowSendingMismatch,
 
-  /// Ignore when a 'Slab' literal has mismatched number of elements to the
-  /// type it's attempting to bind to.
-  AllowSlabLiteralCountMismatch,
+  /// Ignore when an 'InlineArray' literal has mismatched number of elements to
+  /// the type it's attempting to bind to.
+  AllowInlineArrayLiteralCountMismatch,
 };
 
 class ConstraintFix {
@@ -3841,12 +3841,12 @@ public:
   }
 };
 
-class AllowSlabLiteralCountMismatch final : public ConstraintFix {
+class AllowInlineArrayLiteralCountMismatch final : public ConstraintFix {
   Type lhsCount, rhsCount;
 
-  AllowSlabLiteralCountMismatch(ConstraintSystem &cs, Type lhsCount,
+  AllowInlineArrayLiteralCountMismatch(ConstraintSystem &cs, Type lhsCount,
                                 Type rhsCount, ConstraintLocator *locator)
-      : ConstraintFix(cs, FixKind::AllowSlabLiteralCountMismatch, locator),
+      : ConstraintFix(cs, FixKind::AllowInlineArrayLiteralCountMismatch, locator),
         lhsCount(lhsCount), rhsCount(rhsCount) {}
 
 public:
@@ -3856,12 +3856,12 @@ public:
 
   bool diagnose(const Solution &solution, bool asNote = false) const override;
 
-  static AllowSlabLiteralCountMismatch *
+  static AllowInlineArrayLiteralCountMismatch *
   create(ConstraintSystem &cs, Type lhsCount, Type rhsCount,
          ConstraintLocator *locator);
 
   static bool classof(const ConstraintFix *fix) {
-    return fix->getKind() == FixKind::AllowSlabLiteralCountMismatch;
+    return fix->getKind() == FixKind::AllowInlineArrayLiteralCountMismatch;
   }
 };
 

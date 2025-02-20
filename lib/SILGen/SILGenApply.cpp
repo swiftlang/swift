@@ -7012,13 +7012,20 @@ bool AccessorBaseArgPreparer::shouldLoadBaseAddress() const {
   // base isn't a temporary.  We aren't allowed to pass aliased
   // memory to 'in', and we have pass at +1.
   case ParameterConvention::Indirect_In:
-  case ParameterConvention::Indirect_In_Guaranteed:
   case ParameterConvention::Indirect_In_CXX:
     // TODO: We shouldn't be able to get an lvalue here, but the AST
     // sometimes produces an inout base for non-mutating accessors.
     // rdar://problem/19782170
     // assert(!base.isLValue());
-    return base.isLValue() || base.isPlusZeroRValueOrTrivial();
+    return base.isLValue() || base.isPlusZeroRValueOrTrivial()
+      || !SGF.silConv.useLoweredAddresses();
+
+  case ParameterConvention::Indirect_In_Guaranteed:
+    // We can pass the memory we already have at +0. The memory referred to
+    // by the base should be already immutable unless it was lowered as an
+    // lvalue.
+    return base.isLValue()
+      || !SGF.silConv.useLoweredAddresses();
 
   // If the accessor wants the value directly, we definitely have to
   // load.
@@ -7077,7 +7084,7 @@ ArgumentSource AccessorBaseArgPreparer::prepareAccessorAddressBaseArg() {
 
   // Otherwise, we have a value that we can forward without any additional
   // handling.
-  return ArgumentSource(loc, RValue(SGF, loc, baseFormalType, base));
+  return ArgumentSource(loc, RValue(SGF, {base}, baseFormalType));
 }
 
 ArgumentSource AccessorBaseArgPreparer::prepareAccessorObjectBaseArg() {

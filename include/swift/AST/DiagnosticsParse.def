@@ -1579,10 +1579,6 @@ ERROR(attr_availability_expected_equal,none,
 ERROR(attr_availability_expected_version,none,
       "expected version number in '%0' attribute", (StringRef))
 
-WARNING(attr_availability_nonspecific_platform_unexpected_version,none,
-      "unexpected version number in '%0' attribute for non-specific platform "
-      "'*'", (StringRef))
-
 WARNING(attr_availability_wildcard_ignored,none,
         "* as platform name has no effect in '%0' attribute", (StringRef))
 
@@ -1682,6 +1678,14 @@ ERROR(attr_isolated_expected_rparen,none,
       "expected ')' after isolation kind", ())
 ERROR(attr_isolated_expected_kind,none,
       "expected 'any' as the isolation kind", ())
+
+ERROR(attr_execution_expected_lparen,none,
+      "expected '(' after '@execution'",
+      ())
+ERROR(attr_execution_expected_rparen,none,
+      "expected ')' after execution behavior", ())
+ERROR(attr_execution_expected_kind,none,
+      "expected 'concurrent' or 'caller' as the execution behavior", ())
 
 ERROR(attr_private_import_expected_rparen,none,
       "expected ')' after function name for @_private", ())
@@ -1993,18 +1997,6 @@ ERROR(availability_query_wildcard_required, none,
 
 ERROR(unavailability_query_wildcard_not_required, none,
       "platform wildcard '*' is always implicit in #unavailable", ())
-
-ERROR(availability_must_occur_alone, none,
-      "'%0' version-availability must be specified alone", (StringRef))
-
-ERROR(pound_available_swift_not_allowed, none,
-      "Swift language version checks not allowed in %0(...)", (StringRef))
-
-ERROR(pound_available_package_description_not_allowed, none,
-      "PackageDescription version checks not allowed in %0(...)", (StringRef))
-
-ERROR(availability_query_repeated_platform, none,
-      "version for '%0' already specified", (StringRef))
 
 ERROR(availability_cannot_be_mixed,none,
       "#available and #unavailable cannot be in the same statement", ())

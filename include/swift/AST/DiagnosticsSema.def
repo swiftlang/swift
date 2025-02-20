@@ -4745,7 +4745,10 @@ NOTE(ambiguous_because_of_trailing_closure,none,
      (bool, const ValueDecl *))
 
 // In-package resilience bypassing
-WARNING(cannot_bypass_resilience_due_to_missing_member,none,
+WARNING(cannot_bypass_resilience_due_to_missing_member_warn,none,
+      "cannot bypass resilience due to member deserialization failure while attempting to access %select{member %0|missing member}1 of %2 in module %3 from module %4",
+      (Identifier, bool, Identifier, Identifier, Identifier))
+ERROR(cannot_bypass_resilience_due_to_missing_member,none,
       "cannot bypass resilience due to member deserialization failure while attempting to access %select{member %0|missing member}1 of %2 in module %3 from module %4",
       (Identifier, bool, Identifier, Identifier, Identifier))
 
@@ -5604,6 +5607,10 @@ ERROR(non_sendable_isolated_capture,none,
       "capture of %1 with non-sendable type %0 in an isolated "
       "%select{local function|closure}2",
       (Type, DeclName, bool))
+ERROR(non_sendable_metatype_capture,none,
+      "capture of non-sendable type %0 in an isolated "
+      "%select{local function|closure}1",
+      (Type, bool))
 ERROR(self_capture_deinit_task,none,
       "capture of 'self' in a closure that outlives deinit",
       ())
@@ -5656,9 +5663,6 @@ ERROR(distributed_actor_func_unsupported_specifier, none,
 ERROR(distributed_actor_func_variadic, none,
       "cannot declare variadic argument %0 in %kind1",
       (DeclName, const ValueDecl *))
-ERROR(distributed_actor_func_typed_throws, none,
-      "cannot declare distributed function with typed throws",
-      ())
 NOTE(actor_mutable_state,none,
      "mutation of this %0 is only permitted within the actor",
      (DescriptiveDeclKind))
@@ -5839,11 +5843,12 @@ ERROR(any_not_existential,none,
 ERROR(incorrect_optional_any,none,
       "optional 'any' type must be written %0",
       (Type))
-ERROR(existential_requires_any,none,
-      "use of %select{protocol |}2%0 as a type must be written %1",
-      (Type, Type, bool))
-ERROR(inverse_requires_any,none,
-      "constraint that suppresses conformance requires 'any'", ())
+
+GROUPED_ERROR(existential_requires_any,ExistentialAny,none,
+              "use of %select{protocol |}2%0 as a type must be written %1",
+              (Type, Type, bool))
+GROUPED_ERROR(inverse_requires_any,ExistentialAny,none,
+              "constraint that suppresses conformance requires 'any'", ())
 
 ERROR(nonisolated_mutable_storage,none,
       "'nonisolated' cannot be applied to mutable stored properties",
@@ -6340,6 +6345,17 @@ ERROR(invalid_objc_swift_rooted_class,none,
 NOTE(invalid_objc_swift_root_class_insert_nsobject,none,
      "inherit from 'NSObject' to silence this error", ())
 
+WARNING(objc_header_sorting_arbitrary,none,
+        "arbitrarily printing %0 before %1 in generated header; subsequent "
+        "compilations may print them in a different order",
+        (Decl *, Decl *))
+NOTE(objc_header_sorting_arbitrary_other,none,
+     "%1 will be printed after %0 during this compilation",
+     (Decl *, Decl *))
+NOTE(objc_header_sorting_arbitrary_please_report,none,
+     "please report this as a bug in the Swift compiler and describe both "
+     "declarations", ())
+
 ERROR(invalid_nonobjc_decl,none,
       "only class members and extensions of classes can be declared @nonobjc", ())
 ERROR(invalid_nonobjc_extension,none,
@@ -6731,6 +6747,13 @@ WARNING(attr_availability_cannot_be_used_for_domain, none,
 WARNING(attr_availability_expected_version_spec, none,
        "expected 'introduced', 'deprecated', or 'obsoleted' in '%0' attribute "
        "for platform '%1'", (StringRef, StringRef))
+ERROR(attr_availability_requires_custom_availability, none,
+      "specifying '%0' in '%1' attribute requires "
+      "-enable-experimental-feature CustomAvailability",
+      (StringRef, const DeclAttribute))
+WARNING(attr_availability_unexpected_version,none,
+       "unexpected version number in '%0' attribute for '%1'",
+       (const DeclAttribute, StringRef))
 
 ERROR(availability_decl_unavailable, none,
       "%0 is unavailable%select{ in %2|}1%select{|: %3}3",
@@ -6950,6 +6973,22 @@ GROUPED_WARNING(conformance_availability_deprecated,
 ERROR(conformance_availability_only_version_newer, none,
       "conformance of %0 to %1 is only available in %2 %3 or newer",
       (Type, Type, StringRef, llvm::VersionTuple))
+
+ERROR(availability_must_occur_alone, none,
+      "'%0' version-availability must be specified alone", (StringRef))
+
+//------------------------------------------------------------------------------
+// MARK: if #available(...)
+//------------------------------------------------------------------------------
+
+ERROR(availability_query_swift_not_allowed, none,
+      "Swift language version checks not allowed in %0(...)", (StringRef))
+
+ERROR(availability_query_package_description_not_allowed, none,
+      "PackageDescription version checks not allowed in %0(...)", (StringRef))
+
+ERROR(availability_query_repeated_platform, none,
+      "version for '%0' already specified", (StringRef))
 
 //------------------------------------------------------------------------------
 // MARK: @discardableResult
@@ -7969,10 +8008,6 @@ ERROR(noncopyable_cannot_have_read_set_accessor,none,
       "noncopyable %select{variable|subscript}0 cannot provide a read and set accessor",
       (unsigned))
 
-ERROR(span_requires_feature_flag,none,
-      "'%0' requires -enable-experimental-feature Span",
-      (StringRef))
-
 //------------------------------------------------------------------------------
 // MARK: Init accessors
 //------------------------------------------------------------------------------
@@ -8027,7 +8062,7 @@ ERROR(pack_iteration_where_clause_not_supported, none,
 //------------------------------------------------------------------------------
 
 ERROR(lifetime_dependence_invalid_param_name, none,
-      "invalid parameter name specified '%0'", (StringRef))
+      "invalid parameter name specified %0", (Identifier))
 ERROR(lifetime_dependence_invalid_param_index, none,
       "invalid parameter index specified '%0'", (unsigned))
 ERROR(lifetime_dependence_invalid_self_in_static, none,
@@ -8141,15 +8176,22 @@ NOTE(note_reference_exclusivity_unchecked,none,
 NOTE(note_use_of_unsafe_conformance_is_unsafe,none,
      "@unsafe conformance of %0 to %kind1 involves unsafe code",
      (Type, const ValueDecl *))
+NOTE(note_unsafe_storage,none,
+     "%kindbase1 involves unsafe type %2", (bool, const ValueDecl *, Type))
 
-GROUPED_WARNING(decl_signature_involves_unsafe,Unsafe,none,
-      "%kindbase0 has an interface that involves unsafe types",
+GROUPED_WARNING(decl_unsafe_storage,Unsafe,none,
+      "%kindbase0 has storage involving unsafe types",
       (const Decl *))
-NOTE(decl_signature_mark_unsafe,none,
-      "add '@unsafe' to indicate that this declaration is unsafe to use",
+NOTE(decl_storage_mark_unsafe,none,
+      "add '@unsafe' if this type is also unsafe to use",
       ())
-NOTE(decl_signature_mark_safe,none,
-      "add '@safe' to indicate that this declaration is memory-safe to use", ())
+NOTE(decl_storage_mark_safe,none,
+      "add '@safe' if this type encapsulates the unsafe storage in "
+      "a safe interface", ())
+
+GROUPED_WARNING(unsafe_superclass,Unsafe,none,
+     "%kindbase0 has superclass involving unsafe type %1", 
+     (const ValueDecl *, Type))
 
 GROUPED_WARNING(conformance_involves_unsafe,Unsafe,none,
      "conformance of %0 to %kind1 involves unsafe code; use '@unsafe' to "
@@ -8205,11 +8247,11 @@ ERROR(invalid_value_for_type_same_type,none,
       "cannot constrain type parameter %0 to be integer %1", (Type, Type))
 
 //===----------------------------------------------------------------------===//
-// MARK: Slab
+// MARK: InlineArray
 //===----------------------------------------------------------------------===//
 
-ERROR(slab_literal_incorrect_count,none,
-      "expected %0 elements in slab literal, but got %1", (Type, Type))
+ERROR(inlinearray_literal_incorrect_count,none,
+      "expected %0 elements in inline array literal, but got %1", (Type, Type))
 
 //===----------------------------------------------------------------------===//
 // MARK: @abi Attribute
@@ -8250,9 +8292,13 @@ ERROR(attr_abi_incompatible_with_silgen_name,none,
 // MARK: @execution Attribute
 //===----------------------------------------------------------------------===//
 
-ERROR(attr_execution_concurrent_only_on_async,none,
-      "cannot use '@execution(concurrent)' on non-async %kind0",
+ERROR(attr_execution_only_on_async,none,
+      "cannot use '@execution' on non-async %kind0",
       (ValueDecl *))
+
+ERROR(attr_execution_type_attr_only_on_async,none,
+      "cannot use '@execution' on non-async function type",
+      ())
 
 ERROR(attr_execution_concurrent_incompatible_isolated_parameter,none,
       "cannot use '@execution(concurrent)' on %kind0 because it has "
@@ -8268,6 +8314,19 @@ ERROR(attr_execution_concurrent_incompatible_with_nonisolated,none,
       "cannot use '@execution(concurrent)' and 'nonisolated' on the same %0 "
       "because they serve the same purpose",
       (ValueDecl *))
+
+ERROR(attr_execution_concurrent_type_attr_incompatible_with_global_isolation,none,
+      "cannot use '@execution(concurrent)' because function type is "
+      "isolated to global actor %0",
+      (Type))
+
+ERROR(attr_execution_concurrent_type_attr_incompatible_with_isolated_param,none,
+      "cannot use '@execution(concurrent)' together with isolated parameter",
+      ())
+
+ERROR(attr_execution_concurrent_type_attr_incompatible_with_isolated_any,none,
+      "cannot use '@execution(concurrent)' together with @isolated(any)",
+      ())
 
 
 #define UNDEFINE_DIAGNOSTIC_MACROS

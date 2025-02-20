@@ -1,7 +1,7 @@
 // RUN: %empty-directory(%t)
 // RUN: split-file %s %t
 
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -typecheck %t/use-cxx-types.swift -typecheck -module-name UseCxxTy -emit-clang-header-path %t/UseCxxTy.h -I %t -enable-experimental-cxx-interop -disable-availability-checking -Xcc -DSIMD_NO_CODE
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) %t/use-cxx-types.swift -module-name UseCxxTy -typecheck -verify -emit-clang-header-path %t/UseCxxTy.h -I %t -enable-experimental-cxx-interop -disable-availability-checking -Xcc -DSIMD_NO_CODE
 
 // RUN: %FileCheck %s < %t/UseCxxTy.h
 

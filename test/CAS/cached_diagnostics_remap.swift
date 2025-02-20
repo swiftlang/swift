@@ -2,19 +2,19 @@
 // RUN: split-file %s %t
 
 /// Check path remapping.
-// RUN: %target-swift-frontend -scan-dependencies -module-name Test -O -import-objc-header %t/objc.h \
+// RUN: %target-swift-frontend -scan-dependencies -module-name Test -O -import-objc-header %t/objc.h -auto-bridging-header-chaining \
 // RUN:   -disable-implicit-string-processing-module-import -disable-implicit-concurrency-module-import -parse-stdlib \
-// RUN:   %t/test.swift -o %t/deps.json -cache-compile-job -cas-path %t/cas -scanner-prefix-map %t=/^test
+// RUN:   %t/test.swift -o %t/deps.json -cache-compile-job -cas-path %t/cas -scanner-prefix-map %t=/^test -scanner-output-dir %t.noremap
 
-// RUN: %{python} %S/Inputs/BuildCommandExtractor.py %t/deps.json bridgingHeader | tail -n +2  > %t/header.cmd
-// RUN: %target-swift-frontend @%t/header.cmd -disable-implicit-swift-modules /^test/objc.h -O -o %t/objc.pch 2>&1 | %FileCheck %s -check-prefix BRIDGE
+// RUN: %{python} %S/Inputs/BuildCommandExtractor.py %t/deps.json bridgingHeader > %t/header.cmd
+// RUN: %target-swift-frontend @%t/header.cmd -disable-implicit-swift-modules -O -o %t/objc.pch 2>&1 | %FileCheck %s -check-prefix BRIDGE
 // RUN: %cache-tool -cas-path %t/cas -cache-tool-action print-output-keys -- \
-// RUN:   %target-swift-frontend @%t/header.cmd -disable-implicit-swift-modules /^test/objc.h -O -o %t/objc.pch > %t/keys.json
+// RUN:   %target-swift-frontend @%t/header.cmd -disable-implicit-swift-modules -O -o %t/objc.pch > %t/keys.json
 // RUN: %cache-tool -cas-path %t/cas -cache-tool-action render-diags %t/keys.json -- \
-// RUN:    %target-swift-frontend @%t/header.cmd -disable-implicit-swift-modules /^test/objc.h -O -o %t/objc.pch -cache-replay-prefix-map /^test=%t 2>&1 \
+// RUN:    %target-swift-frontend @%t/header.cmd -disable-implicit-swift-modules -O -o %t/objc.pch -cache-replay-prefix-map /^test=%t 2>&1 \
 // RUN:    | %FileCheck %s -check-prefix BRIDGE -check-prefix BRIDGE-REMAP
 
-// RUN: %{python} %S/Inputs/ExtractOutputKey.py %t/keys.json /^test/objc.h > %t/key
+// RUN: %{python} %S/Inputs/ExtractOutputKey.py %t/keys.json > %t/key
 
 // RUN: %{python} %S/Inputs/BuildCommandExtractor.py %t/deps.json Test > %t/MyApp.cmd
 // RUN: echo "\"-disable-implicit-string-processing-module-import\"" >> %t/MyApp.cmd
@@ -33,7 +33,7 @@
 // RUN:   -emit-module -o %t/test.swiftmodule /^test/test.swift > %t/cache_key.json
 // RUN: %cache-tool -cas-path %t/cas -cache-tool-action render-diags %t/cache_key.json -- %target-swift-frontend -cache-compile-job -module-name Test \
 // RUN:   -O -cas-path %t/cas @%t/MyApp.cmd \
-// RUN:   -emit-module -o %t/test.swiftmodule /^test/test.swift -cache-replay-prefix-map /^test=%t 2>&1 | %FileCheck %s --check-prefix REMAP 
+// RUN:   -emit-module -o %t/test.swiftmodule /^test/test.swift -cache-replay-prefix-map /^test=%t 2>&1 | %FileCheck %s --check-prefix REMAP
 
 // BRIDGE: /^test/objc.h:3:2: warning: warning in bridging header
 // BRIDGE-REMAP: BUILD_DIR{{.*}}{{/|\\}}objc.h:3:2: warning: warning in bridging header

@@ -293,7 +293,6 @@ EXPECTED_DEFAULTS = {
     'test_cygwin': False,
     'test_freebsd': False,
     'test_ios': False,
-    'test_watchos_32bit_simulator': False,
     'test_ios_host': False,
     'test_ios_simulator': False,
     'test_linux': False,
@@ -336,6 +335,7 @@ EXPECTED_DEFAULTS = {
     'xros_all': False,
     'llvm_install_components': defaults.llvm_install_components(),
     'clean_install_destdir': False,
+    'use_linker': None,
 }
 
 
@@ -739,8 +739,6 @@ EXPECTED_OPTIONS = [
     DisableOption('--skip-test-cygwin', dest='test_cygwin'),
     DisableOption('--skip-test-freebsd', dest='test_freebsd'),
     DisableOption('--skip-test-ios', dest='test_ios'),
-    DisableOption('--skip-test-watchos-32bit-simulator',
-                  dest='test_watchos_32bit_simulator'),
     DisableOption('--skip-test-ios-host', dest='test_ios_host'),
     DisableOption('--skip-test-ios-simulator', dest='test_ios_simulator'),
     DisableOption('--skip-test-linux', dest='test_linux'),
@@ -894,4 +892,5 @@ EXPECTED_OPTIONS = [
     IgnoreOption('--xros-all'),
 
     StrOption('--llvm-install-components'),
+    ChoicesOption('--use-linker', dest='use_linker', choices=['gold', 'lld']),
 ]

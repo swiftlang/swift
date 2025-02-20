@@ -34,6 +34,8 @@ sil @unknown : $@convention(thin) () -> ()
 sil @load_string : $@convention(thin) (@in_guaranteed String) -> String
 sil @guaranteed_user : $@convention(thin) (@guaranteed Klass) -> ()
 sil @consume : $@convention(thin) (@owned C) -> ()
+sil @createKlass : $@convention(thin) () -> @owned Klass
+sil @initC : $@convention(thin) () -> @out C
 
 sil @inguaranteed_user_without_result : $@convention(thin) (@in_guaranteed Klass) -> () {
 bb0(%0 : $*Klass):
@@ -802,3 +804,26 @@ bb0(%0 : $C):
   dealloc_stack %2
   return %5
 }
+
+// CHECK-LABEL: sil [ossa] @dont_shrink_lifetime_of_mark_dependence_base
+// CHECK:         copy_addr
+// CHECK:         apply
+// CHECK:       } // end sil function 'dont_shrink_lifetime_of_mark_dependence_base'
+sil [ossa] @dont_shrink_lifetime_of_mark_dependence_base : $@convention(thin) () -> () {
+bb0:
+  %0 = alloc_stack $C
+  %1 = function_ref @initC : $@convention(thin) () -> @out C
+  %2 = apply %1(%0) : $@convention(thin) () -> @out C
+  %3 = alloc_stack [var_decl] $C, let, name "a"
+  copy_addr [take] %0 to [init] %3
+  %5 = function_ref @createKlass : $@convention(thin) () -> @owned Klass
+  %6 = apply %5() : $@convention(thin) () -> @owned Klass
+  %7 = mark_dependence [nonescaping] %6 on %3
+  destroy_value %7
+  destroy_addr %3
+  dealloc_stack %3
+  dealloc_stack %0
+  %12 = tuple ()
+  return %12
+}
+

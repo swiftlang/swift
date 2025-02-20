@@ -532,3 +532,51 @@ func available_func_call_extension_methods(_ e: ExtendMe) { // expected-note {{a
   e.osx_app_extension_extension_osx_future_method() // expected-error {{'osx_app_extension_extension_osx_future_method()' is only available in macOS 99 or newer}}
   // expected-note@-1 {{add 'if #available' version check}}
 }
+
+@available(OSX, obsoleted: 10.9)
+struct OSXObsoleted {} // expected-note 2 {{'OSXObsoleted' was obsoleted in macOS 10.9}}
+
+@available(OSX, unavailable)
+@available(OSX, introduced: 99)
+struct OSXUnavailableAndIntroducedInFuture {}
+
+@available(OSX, unavailable, introduced: 99)
+struct OSXUnavailableAndIntroducedInFutureSameAttribute {}
+
+@available(OSX, introduced: 99)
+@available(OSX, unavailable)
+struct OSXIntroducedInFutureAndUnavailable {}
+
+@available(OSX, unavailable)
+func osx_unavailable_func(
+  _ s1: OSXFutureAvailable,
+  _ s2: OSXObsoleted,
+  _ s3: OSXUnavailableAndIntroducedInFuture,
+  _ s4: OSXUnavailableAndIntroducedInFutureSameAttribute,
+  _ s5: OSXIntroducedInFutureAndUnavailable,
+) -> (
+  OSXFutureAvailable,
+  OSXObsoleted,
+  OSXUnavailableAndIntroducedInFuture,
+  OSXUnavailableAndIntroducedInFutureSameAttribute,
+  OSXIntroducedInFutureAndUnavailable
+) {
+  // FIXME: [availability] Stop diagnosing potential unavailability or obsoletion in an unavailable context.
+  _ = OSXFutureAvailable() // expected-error {{'OSXFutureAvailable' is only available in macOS 99 or newer}}
+  // expected-note@-1 {{add 'if #available' version check}}
+  _ = OSXObsoleted() // expected-error {{'OSXObsoleted' is unavailable in macOS}}
+  _ = OSXUnavailableAndIntroducedInFuture()
+  _ = OSXUnavailableAndIntroducedInFutureSameAttribute()
+  _ = OSXIntroducedInFutureAndUnavailable()
+
+  func takesType<T>(_ t: T.Type) {}
+  takesType(OSXFutureAvailable.self) // expected-error {{'OSXFutureAvailable' is only available in macOS 99 or newer}}
+  // expected-note@-1 {{add 'if #available' version check}}
+  takesType(OSXObsoleted.self) // expected-error {{'OSXObsoleted' is unavailable in macOS}}
+  takesType(OSXUnavailableAndIntroducedInFuture.self)
+  takesType(OSXUnavailableAndIntroducedInFutureSameAttribute.self)
+  takesType(OSXIntroducedInFutureAndUnavailable.self)
+
+  return (s1, s2, s3, s4, s5)
+}
+

@@ -193,12 +193,10 @@ static bool usesFeatureNonescapableTypes(Decl *decl) {
 
 UNINTERESTING_FEATURE(StaticExclusiveOnly)
 UNINTERESTING_FEATURE(ExtractConstantsFromMembers)
-UNINTERESTING_FEATURE(FixedArrays)
 UNINTERESTING_FEATURE(GroupActorErrors)
 UNINTERESTING_FEATURE(SameElementRequirements)
 UNINTERESTING_FEATURE(UnspecifiedMeansMainActorIsolated)
 UNINTERESTING_FEATURE(GenerateForceToMainActorThunks)
-UNINTERESTING_FEATURE(Span)
 
 static bool usesFeatureSendingArgsAndResults(Decl *decl) {
   auto isFunctionTypeWithSending = [](Type type) {
@@ -270,6 +268,7 @@ UNINTERESTING_FEATURE(NonfrozenEnumExhaustivity)
 UNINTERESTING_FEATURE(ClosureIsolation)
 UNINTERESTING_FEATURE(Extern)
 UNINTERESTING_FEATURE(ConsumeSelfInDeinit)
+UNINTERESTING_FEATURE(StrictSendableMetatypes)
 
 static bool usesFeatureBitwiseCopyable2(Decl *decl) {
   if (!decl->getModuleContext()->isStdlibModule()) {
@@ -349,7 +348,6 @@ static bool usesFeatureABIAttribute(Decl *decl) {
 }
 
 UNINTERESTING_FEATURE(WarnUnsafe)
-UNINTERESTING_FEATURE(SafeInterop)
 UNINTERESTING_FEATURE(SafeInteropWrappers)
 UNINTERESTING_FEATURE(AssumeResilientCxxTypes)
 UNINTERESTING_FEATURE(CoroutineAccessorsUnwindOnCallerError)
@@ -410,6 +408,11 @@ static bool usesFeatureCoroutineAccessors(Decl *decl) {
 static bool usesFeatureCustomAvailability(Decl *decl) {
   // FIXME: [availability] Check whether @available attributes for custom
   // domains are attached to the decl.
+  return false;
+}
+
+static bool usesFeatureBuiltinEmplaceTypedThrows(Decl *decl) {
+  // Callers of 'Builtin.emplace' should explicitly guard the usage with #if.
   return false;
 }
 

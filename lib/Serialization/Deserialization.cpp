@@ -18,6 +18,7 @@
 #include "swift/AST/Attr.h"
 #include "swift/AST/AttrKind.h"
 #include "swift/AST/AutoDiff.h"
+#include "swift/AST/ConformanceLookup.h"
 #include "swift/AST/DiagnosticsSema.h"
 #include "swift/AST/DistributedDecl.h"
 #include "swift/AST/Expr.h"
@@ -957,16 +958,29 @@ ProtocolConformanceDeserializer::readNormalProtocolConformanceXRef(
   if (!module)
     module = MF.getAssociatedModule();
 
-  SmallVector<ProtocolConformance *, 2> conformances;
-  nominal->lookupConformance(proto, conformances);
   PrettyStackTraceModuleFile traceMsg(
       "If you're seeing a crash here, check that your SDK and dependencies "
       "are at least as new as the versions used to build", MF);
-  // This would normally be an assertion but it's more useful to print the
-  // PrettyStackTrace here even in no-asserts builds.
-  if (conformances.empty())
-    abort();
-  return conformances.front();
+
+  // Because Sendable conformances are currently inferred with
+  // 'ImplicitKnownProtocolConformanceRequest' in swift::lookupConformance,
+  // we may end up in a situation where we are deserializing such inferred
+  // conformance but a lookup on the 'NominalDecl' will not succeed nor
+  // will it run inference logic. For now, special-case 'Sendable' lookups
+  // here.
+  // TODO: Sink Sendable derivation into the conformance lookup table
+  if (proto->isSpecificProtocol(KnownProtocolKind::Sendable)) {
+    auto conformanceRef = lookupConformance(nominal->getDeclaredInterfaceType(), proto);
+    if (!conformanceRef.isConcrete())
+      abort();
+    return conformanceRef.getConcrete();
+  } else {
+    SmallVector<ProtocolConformance *, 2> conformances;
+    nominal->lookupConformance(proto, conformances);
+    if (conformances.empty())
+      abort();
+    return conformances.front();
+  }
 }
 
 Expected<ProtocolConformance *>
@@ -2857,7 +2871,7 @@ Expected<DeclContext *>ModuleFile::getLocalDeclContext(LocalDeclContextID DCID) 
     DeclContext *parent;
     UNWRAP(getDeclContextChecked(parentID), parent);
 
-    declContextOrOffset = new (ctx) DefaultArgumentInitializer(parent, index);
+    declContextOrOffset = DefaultArgumentInitializer::create(parent, index);
     break;
   }
 
@@ -3703,8 +3717,7 @@ public:
                                                /*ThrowsLoc=*/SourceLoc(),
                                                TypeLoc::withoutLoc(thrownType),
                                                /*BodyParams=*/nullptr,
-                                               genericParams, parent,
-                                               nullptr);
+                                               genericParams, parent);
     declOrOffset = ctor;
 
     ctor->setGenericSignature(MF.getGenericSignature(genericSigID));
@@ -7119,6 +7132,8 @@ detail::function_deserializer::deserialize(ModuleFile &MF,
   auto isolation = swift::FunctionTypeIsolation::forNonIsolated();
   if (rawIsolation == unsigned(FunctionTypeIsolation::NonIsolated)) {
     // do nothing
+  } else if (rawIsolation == unsigned(FunctionTypeIsolation::NonIsolatedCaller)) {
+    isolation = swift::FunctionTypeIsolation::forNonIsolatedCaller();
   } else if (rawIsolation == unsigned(FunctionTypeIsolation::Parameter)) {
     isolation = swift::FunctionTypeIsolation::forParameter();
   } else if (rawIsolation == unsigned(FunctionTypeIsolation::Erased)) {
@@ -9085,13 +9100,16 @@ ModuleFile::maybeReadLifetimeDependence(unsigned numParams) {
   bool isImmortal;
   bool hasInheritLifetimeParamIndices;
   bool hasScopeLifetimeParamIndices;
+  bool hasAddressableParamIndices;
   ArrayRef<uint64_t> lifetimeDependenceData;
   LifetimeDependenceLayout::readRecord(
       scratch, targetIndex, isImmortal, hasInheritLifetimeParamIndices,
-      hasScopeLifetimeParamIndices, lifetimeDependenceData);
+      hasScopeLifetimeParamIndices, hasAddressableParamIndices,
+      lifetimeDependenceData);
 
   SmallBitVector inheritLifetimeParamIndices(numParams, false);
   SmallBitVector scopeLifetimeParamIndices(numParams, false);
+  SmallBitVector addressableParamIndices(numParams, false);
 
   unsigned startIndex = 0;
   auto pushData = [&](SmallBitVector &bits) {
@@ -9109,6 +9127,9 @@ ModuleFile::maybeReadLifetimeDependence(unsigned numParams) {
   if (hasScopeLifetimeParamIndices) {
     pushData(scopeLifetimeParamIndices);
   }
+  if (hasAddressableParamIndices) {
+    pushData(addressableParamIndices);
+  }
 
   ASTContext &ctx = getContext();
   return LifetimeDependenceInfo(
@@ -9118,5 +9139,8 @@ ModuleFile::maybeReadLifetimeDependence(unsigned numParams) {
       hasScopeLifetimeParamIndices
           ? IndexSubset::get(ctx, scopeLifetimeParamIndices)
           : nullptr,
-      targetIndex, isImmortal);
+      targetIndex, isImmortal,
+      hasAddressableParamIndices
+          ? IndexSubset::get(ctx, addressableParamIndices)
+          : nullptr);
 }

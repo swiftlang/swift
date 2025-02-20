@@ -238,7 +238,7 @@ findClosureUse(Operand *initialOperand) {
       return {};
 
     auto *f = as.getCalleeFunction();
-    if (!f)
+    if (!f || f->empty())
       return {};
 
     unsigned argumentIndex = as.getCalleeArgIndex(*initialOperand);
@@ -280,7 +280,7 @@ findClosureUse(Operand *initialOperand) {
     // See if we have a callee function. In such a case, find our operand in the
     // callee and visit its uses.
     if (auto as = dyn_cast<PartialApplyInst>(op->getUser())) {
-      if (auto *f = as->getCalleeFunction()) {
+      if (auto *f = as->getCalleeFunction(); f && !f->empty()) {
         auto *fArg = f->getArgument(ApplySite(as).getCalleeArgIndex(*op));
         for (auto *use : fArg->getUses()) {
           if (visitedOperand.insert(use).second)
@@ -294,14 +294,16 @@ findClosureUse(Operand *initialOperand) {
     // immediately invoked. In such a case, we can emit a better diagnostic in
     // the called closure.
     if (auto fas = FullApplySite::isa(op->getUser())) {
-      if (auto *f = fas.getCalleeFunction();
-          f && f->getDeclRef().getClosureExpr()) {
-        auto *fArg = f->getArgument(fas.getCalleeArgIndex(*op));
-        for (auto *use : fArg->getUses()) {
-          if (visitedOperand.insert(use).second)
-            worklist.emplace_back(use, fArg);
+      if (auto *f = fas.getCalleeFunction(); f && !f->empty()) {
+        auto *fArg = cast<SILFunctionArgument>(
+            f->getArgument(fas.getCalleeArgIndex(*op)));
+        if (fArg->isClosureCapture()) {
+          for (auto *use : fArg->getUses()) {
+            if (visitedOperand.insert(use).second)
+              worklist.emplace_back(use, fArg);
+          }
+          continue;
         }
-        continue;
       }
     }
 
@@ -2622,7 +2624,7 @@ void NonSendableIsolationCrossingResultDiagnosticEmitter::emit() {
     return emitUnknownPatternError();
 
   auto type = getType();
-  if (auto *decl = getCalledDecl()) {
+  if (getCalledDecl()) {
     diagnoseError(error.op->getSourceInst(), diag::rbi_isolation_crossing_result,
                   type, isolationCrossing->getCalleeIsolation(), getCalledDecl(),
                   isolationCrossing->getCallerIsolation())

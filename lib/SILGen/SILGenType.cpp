@@ -94,7 +94,7 @@ SILGenModule::emitVTableMethod(ClassDecl *theClass, SILDeclRef derived,
     implFn = getDynamicThunk(
         derived, Types.getConstantInfo(TypeExpansionContext::minimal(), derived)
                      .SILFnType);
-  } else if (auto *derivativeId = derived.getDerivativeFunctionIdentifier()) {
+  } else if (derived.getDerivativeFunctionIdentifier()) {
     // For JVP/VJP methods, create a vtable entry thunk. The thunk contains an
     // `differentiable_function` instruction, which is later filled during the
     // differentiation transform.
@@ -1233,7 +1233,7 @@ public:
   }
 
   void visitDestructorDecl(DestructorDecl *dd) {
-    if (auto *cd = dyn_cast<ClassDecl>(theType))
+    if (isa<ClassDecl>(theType))
       return SGM.emitDestructor(cast<ClassDecl>(theType), dd);
     if (auto *nom = dyn_cast<NominalTypeDecl>(theType)) {
       if (!nom->canBeCopyable()) {

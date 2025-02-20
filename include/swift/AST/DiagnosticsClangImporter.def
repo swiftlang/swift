@@ -54,6 +54,10 @@ ERROR(dump_pcm_error,Fatal,
 WARNING(invalid_swift_name_method,none,
   "too %select{few|many}0 parameters in swift_name attribute (expected %1; "
   "got %2)", (bool, unsigned, unsigned))
+WARNING(invalid_swift_name_for_decl,none,
+  "custom Swift name '%0' ignored because it is not valid for %kindonly1; "
+  "imported as %1 instead",
+  (StringRef, ValueDecl *))
 
 NOTE(note_while_importing, none, "while importing '%0'", (StringRef))
 ERROR(swift_name_protocol_static, none, "swift_name cannot be used to define "
@@ -207,6 +211,24 @@ NOTE(iterator_method_unavailable, none, "C++ method '%0' that returns an "
      (StringRef))
 NOTE(iterator_potentially_unsafe, none, "C++ methods that return iterators "
                                         "are potentially unsafe; try using Swift collection APIs instead", ())
+
+ERROR(private_fileid_attr_repeated, none,
+     "multiple SWIFT_PRIVATE_FILEID annotations were found on '%0'",
+     (StringRef))
+
+ ERROR(private_fileid_attr_on_incomplete_type, none,
+     "SWIFT_PRIVATE_FILEID cannot be applied to incomplete type, '%0'",
+     (StringRef))
+ NOTE(private_fileid_attr_here, none,
+     "SWIFT_PRIVATE_FILEID annotation found here", ())
+
+ WARNING(private_fileid_attr_format_invalid, none,
+     "SWIFT_PRIVATE_FILEID annotation on '%0' does not have a valid file ID",
+     (StringRef))
+ REMARK(private_fileid_attr_format_specification, none,
+     "file IDs have the following format: 'ModuleName/FileName.swift'", ())
+ NOTE(private_fileid_attr_format_suggestion, none,
+     "did you mean '%0'?", (StringRef))
 
 ERROR(reference_type_must_have_retain_release_attr, none,
       "reference type '%1' must have %select{'retain:'|'release:'}0 Swift "

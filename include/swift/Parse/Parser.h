@@ -19,7 +19,6 @@
 
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/ASTNode.h"
-#include "swift/AST/DiagnosticsParse.h"
 #include "swift/AST/Expr.h"
 #include "swift/AST/LayoutConstraint.h"
 #include "swift/AST/LifetimeDependence.h"
@@ -42,6 +41,7 @@ namespace llvm {
 }
 
 namespace swift {
+  class AvailabilitySpec;
   class CodeCompletionCallbacks;
   class DoneParsingCallback;
   class DefaultArgumentInitializer;
@@ -53,7 +53,7 @@ namespace swift {
   class SILParserStateBase;
   class SourceManager;
   class UUID;
-  
+
   struct EnumElementInfo;
 
   /// Different contexts in which BraceItemList are parsed.
@@ -542,29 +542,7 @@ public:
   /// diagnose it if not permitted in this mode.
   /// \param diagnoseDollarPrefix Whether to diagnose dollar-prefixed
   /// identifiers in addition to a standalone '$'.
-  void diagnoseDollarIdentifier(const Token &tok,
-                                bool diagnoseDollarPrefix) {
-    assert(tok.getText()[0] == '$');
-
-    // If '$' is not guarded by backticks, offer
-    // to replace it with '`$`'.
-    if (Tok.getRawText() == "$") {
-      diagnose(Tok.getLoc(), diag::standalone_dollar_identifier)
-          .fixItReplace(Tok.getLoc(), "`$`");
-      return;
-    }
-
-    if (!diagnoseDollarPrefix)
-      return;
-
-    if (tok.getText().size() == 1 || Context.LangOpts.EnableDollarIdentifiers ||
-        isInSILMode() || L->isSwiftInterface() ||
-        isInMacroExpansion(tok.getLoc()))
-      return;
-
-    diagnose(tok.getLoc(), diag::dollar_identifier_decl,
-             Context.getIdentifier(tok.getText()));
-  }
+  void diagnoseDollarIdentifier(const Token &tok, bool diagnoseDollarPrefix);
 
   /// Retrieve the location just past the end of the previous
   /// source location.
@@ -1503,7 +1481,6 @@ public:
   /// A structure for collecting information about the default
   /// arguments of a context.
   struct DefaultArgumentInfo {
-    llvm::SmallVector<DefaultArgumentInitializer *, 4> ParsedContexts;
     unsigned NextIndex : 31;
     
     /// Track whether or not one of the parameters in a signature's argument
@@ -1514,10 +1491,6 @@ public:
     /// all the arguments, not just those that have default arguments.
     unsigned claimNextIndex() { return NextIndex++; }
 
-    /// Set the parsed context of all default argument initializers to
-    /// the given function, enum case or subscript.
-    void setFunctionContext(DeclContext *DC, ParameterList *paramList);
-    
     DefaultArgumentInfo() {
       NextIndex = 0;
       HasDefaultArgument = false;
@@ -1565,6 +1538,9 @@ public:
 
     /// The default argument for this parameter.
     Expr *DefaultArg = nullptr;
+
+    /// The default argument for this parameter.
+    DefaultArgumentInitializer *DefaultArgInitContext = nullptr;
 
     /// True if we emitted a parse error about this parameter.
     bool isInvalid = false;
@@ -1788,7 +1764,10 @@ public:
   /// \param name The parsed name of the label (empty if it doesn't exist, or is
   /// _)
   /// \param loc The location of the label (empty if it doesn't exist)
-  void parseOptionalArgumentLabel(Identifier &name, SourceLoc &loc);
+  /// \param isAttr True if this is an argument label for an attribute (allows, but deprecates, use of
+  ///               \c '=' instead of \c ':').
+  void parseOptionalArgumentLabel(Identifier &name, SourceLoc &loc,
+                                  bool isAttr = false);
 
   enum class DeclNameFlag : uint8_t {
     /// If passed, operator basenames are allowed.
@@ -2047,27 +2026,17 @@ public:
   ParserStatus
   parseAvailabilityMacro(SmallVectorImpl<AvailabilitySpec *> &Specs);
 
-  /// Parse the availability macros definitions passed as arguments.
-  AvailabilityMacroMap &parseAllAvailabilityMacroArguments();
-
-  /// Result of parsing an availability macro definition.
-  struct AvailabilityMacroDefinition {
-    StringRef Name;
-    llvm::VersionTuple Version;
-    SmallVector<AvailabilitySpec *, 4> Specs;
-  };
-
   /// Parse an availability macro definition from a command line argument.
-  /// This function should be called on a Parser set up on the command line
+  /// This function should only be called on a Parser set up on the command line
   /// argument code.
   ParserStatus
-  parseAvailabilityMacroDefinition(AvailabilityMacroDefinition &Result);
+  parseAvailabilityMacroDefinition(std::string &Name,
+                                   llvm::VersionTuple &Version,
+                                   SmallVectorImpl<AvailabilitySpec *> &Specs);
 
   ParserResult<AvailabilitySpec> parseAvailabilitySpec();
-  ParserResult<PlatformVersionConstraintAvailabilitySpec>
-  parsePlatformVersionConstraintSpec();
-  ParserResult<PlatformAgnosticVersionConstraintAvailabilitySpec>
-  parsePlatformAgnosticVersionConstraintSpec();
+  ParserResult<AvailabilitySpec> parsePlatformVersionConstraintSpec();
+  ParserResult<AvailabilitySpec> parsePlatformAgnosticVersionConstraintSpec();
   bool
   parseAvailability(bool parseAsPartOfSpecializeAttr, StringRef AttrName,
                     bool &DiscardAttribute, SourceRange &attrRange,

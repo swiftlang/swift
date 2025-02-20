@@ -883,7 +883,7 @@ private:
     IndexSymbol Info;
 
     // Dig back to the original captured variable
-    if (auto *VD = dyn_cast<VarDecl>(D)) {
+    if (isa<VarDecl>(D)) {
       Info.originalDecl = firstDecl(D);
     }
 
@@ -2155,7 +2155,7 @@ void index::indexSourceFile(SourceFile *SF, IndexDataConsumer &consumer) {
 
 void index::indexModule(ModuleDecl *module, IndexDataConsumer &consumer) {
   assert(module);
-  auto mName = module->getRealName().str().str();
+  auto mName = module->getRealName().str();
   if (module->getASTContext().blockListConfig.hasBlockListAction(mName,
       BlockListKeyKind::ModuleName,
       BlockListAction::SkipIndexingModule)) {

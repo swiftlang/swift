@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "clang/AST/DeclObjC.h"
+#include "clang/Basic/Module.h"
 #include "swift/AST/ASTContext.h"
 #include "swift/AST/Comment.h"
 #include "swift/AST/Decl.h"
@@ -239,7 +240,7 @@ void SymbolGraph::recordMemberRelationship(Symbol S) {
     // doesn't exist), don't record a memberOf relationship.
     return;
   }
-  if (const auto *PublicDecl = Walker.PublicPrivateTypeAliases[ParentDecl]) {
+  if (const auto *PublicDecl = Walker.PublicPrivateTypeAliases.lookup(ParentDecl)) {
     // If our member target is a private type that has a public type alias,
     // point the membership to that type alias instead.
     ParentDecl = PublicDecl;
@@ -332,7 +333,7 @@ void SymbolGraph::recordConformanceSynthesizedMemberRelationships(Symbol S) {
   // synthesized members for the underlying type.
   if (const auto *TD = dyn_cast<TypeAliasDecl>(D)) {
     const auto *NTD = TD->getUnderlyingType()->getAnyNominal();
-    if (NTD && Walker.PublicPrivateTypeAliases[NTD] == D)
+    if (NTD && Walker.PublicPrivateTypeAliases.lookup(NTD) == D)
         D = NTD;
   }
 
@@ -422,8 +423,8 @@ void SymbolGraph::recordConformanceSynthesizedMemberRelationships(Symbol S) {
               }
 
               const ValueDecl *BaseDecl = OwningNominal;
-              if (Walker.PublicPrivateTypeAliases.contains(BaseDecl))
-                BaseDecl = Walker.PublicPrivateTypeAliases[BaseDecl];
+              if (const auto *PublicDecl = Walker.PublicPrivateTypeAliases.lookup(BaseDecl))
+                BaseDecl = PublicDecl;
 
               Symbol Source(this, SynthMember, BaseDecl);
 
@@ -462,7 +463,7 @@ SymbolGraph::recordInheritanceRelationships(Symbol S) {
   // for the underlying type instead.
   if (const auto *TD = dyn_cast<TypeAliasDecl>(D)) {
     const auto *NTD = TD->getUnderlyingType()->getAnyNominal();
-    if (NTD && Walker.PublicPrivateTypeAliases[NTD] == D)
+    if (NTD && Walker.PublicPrivateTypeAliases.lookup(NTD) == D)
       D = NTD;
   }
 
@@ -558,7 +559,7 @@ void SymbolGraph::recordConformanceRelationships(Symbol S) {
   // for the underlying type instead.
   if (const auto *TD = dyn_cast<TypeAliasDecl>(D)) {
     const auto *NTD = TD->getUnderlyingType()->getAnyNominal();
-    if (NTD && Walker.PublicPrivateTypeAliases[NTD] == D)
+    if (NTD && Walker.PublicPrivateTypeAliases.lookup(NTD) == D)
       D = NTD;
   }
 
@@ -624,14 +625,14 @@ void SymbolGraph::serialize(llvm::json::OStream &OS) {
     OS.attributeObject("module", [&](){
       if (DeclaringModule) {
         // A cross-import overlay can be considered part of its declaring module
-        OS.attribute("name", (*DeclaringModule)->getNameStr());
+        OS.attribute("name", getFullModuleName(*DeclaringModule));
         std::vector<StringRef> B;
         for (auto BModule : BystanderModules) {
           B.push_back(BModule.str());
         }
         OS.attribute("bystanders", B);
       } else {
-        OS.attribute("name", M.getNameStr());
+        OS.attribute("name", getFullModuleName(&M));
       }
       AttributeRAII Platform("platform", OS);
 
@@ -896,7 +897,15 @@ bool SymbolGraph::canIncludeDeclAsNode(const Decl *D,
 
   // If this decl isn't in this module or module that this module imported with `@_exported`, don't record it,
   // as it will appear elsewhere in its module's symbol graph.
-  if (D->getModuleContext()->getName() != M.getName() && !Walker.isConsideredExportedImported(D)) {
+
+  // If a Clang decl was declared in a submodule, the Swift decl's context will still point to the
+  // top-level module. Instead, we need to probe the owning module on the Clang side, which will
+  // correctly point to the submodule.
+  auto RealModuleName = (std::string)D->getModuleContext()->getName();
+  if (auto *ClangDecl = D->getClangDecl())
+    if (auto *ClangModule = ClangDecl->getOwningModule())
+      RealModuleName = ClangModule->Name;
+  if (RealModuleName != (std::string)M.getName() && !Walker.isConsideredExportedImported(D)) {
     return false;
   }
 

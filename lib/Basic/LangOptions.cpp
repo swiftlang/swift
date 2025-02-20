@@ -18,6 +18,7 @@
 #include "swift/Basic/LangOptions.h"
 #include "swift/AST/DiagnosticEngine.h"
 #include "swift/Basic/Feature.h"
+#include "swift/Basic/FileTypes.h"
 #include "swift/Basic/Platform.h"
 #include "swift/Basic/PlaygroundOption.h"
 #include "swift/Basic/Range.h"
@@ -100,6 +101,7 @@ static const SupportedConditionalValue SupportedConditionalCompilationArches[] =
   "powerpc64le",
   "s390x",
   "wasm32",
+  "riscv32",
   "riscv64",
   "avr"
 };
@@ -540,6 +542,9 @@ std::pair<bool, bool> LangOptions::setTarget(llvm::Triple triple) {
   case llvm::Triple::ArchType::wasm32:
     addPlatformConditionValue(PlatformConditionKind::Arch, "wasm32");
     break;
+  case llvm::Triple::ArchType::riscv32:
+    addPlatformConditionValue(PlatformConditionKind::Arch, "riscv32");
+    break;
   case llvm::Triple::ArchType::riscv64:
     addPlatformConditionValue(PlatformConditionKind::Arch, "riscv64");
     break;
@@ -729,10 +734,11 @@ namespace {
         "-working-directory=",
         "-working-directory"};
 
-  constexpr std::array<std::string_view, 15>
+  constexpr std::array<std::string_view, 16>
       knownClangDependencyIgnorablePrefiexes = {"-I",
                                                 "-F",
                                                 "-fmodule-map-file=",
+                                                "-ffile-compilation-dir",
                                                 "-iquote",
                                                 "-idirafter",
                                                 "-iframeworkwithsysroot",
@@ -813,4 +819,15 @@ ClangImporterOptions::getReducedExtraArgsForSwiftModuleDependency() const {
   }
 
   return filtered_args;
+}
+
+std::string ClangImporterOptions::getPCHInputPath() const {
+  if (!BridgingHeaderPCH.empty())
+    return BridgingHeaderPCH;
+
+  if (llvm::sys::path::extension(BridgingHeader)
+          .ends_with(file_types::getExtension(file_types::TY_PCH)))
+    return BridgingHeader;
+
+  return {};
 }

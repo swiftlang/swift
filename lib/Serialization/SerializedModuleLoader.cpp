@@ -41,6 +41,7 @@
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/Path.h"
 #include "llvm/Support/CommandLine.h"
+#include <memory>
 #include <optional>
 #include <system_error>
 
@@ -620,8 +621,9 @@ SerializedModuleLoaderBase::scanModuleFile(Twine modulePath, bool isFramework,
     llvm::copy(loadedModuleFile->getLinkLibraries(),
                std::back_inserter(linkLibraries));
     if (loadedModuleFile->isFramework())
-      linkLibraries.push_back(LinkLibrary(loadedModuleFile->getName(),
-                                          LibraryKind::Framework));
+      linkLibraries.emplace_back(
+          loadedModuleFile->getName(), LibraryKind::Framework,
+                      loadedModuleFile->isStaticLibrary());
   }
 
   // Attempt to resolve the module's defining .swiftinterface path
@@ -1244,7 +1246,8 @@ void swift::serialization::diagnoseSerializedASTLoadFailure(
                        moduleBufferID);
     break;
   case serialization::Status::NotInOSSA:
-    if (Ctx.SerializationOpts.ExplicitModuleBuild) {
+    if (Ctx.SerializationOpts.ExplicitModuleBuild ||
+        Ctx.SILOpts.EnableOSSAModules) {
       Ctx.Diags.diagnose(diagLoc,
                          diag::serialization_non_ossa_module_incompatible,
                          ModuleName);
@@ -1554,6 +1557,21 @@ swift::extractUserModuleVersionFromInterface(StringRef moduleInterfacePath) {
     }
   }
   return result;
+}
+
+std::string swift::extractEmbeddedBridgingHeaderContent(
+    std::unique_ptr<llvm::MemoryBuffer> file, ASTContext &Context) {
+  std::shared_ptr<const ModuleFileSharedCore> loadedModuleFile;
+  serialization::ValidationInfo loadInfo = ModuleFileSharedCore::load(
+      "", "", std::move(file), nullptr, nullptr, false,
+      Context.SILOpts.EnableOSSAModules, Context.LangOpts.SDKName,
+      Context.SearchPathOpts.DeserializedPathRecoverer,
+      loadedModuleFile);
+
+  if (loadInfo.status != serialization::Status::Valid)
+    return {};
+
+  return loadedModuleFile->getEmbeddedHeader();
 }
 
 bool SerializedModuleLoaderBase::canImportModule(

@@ -151,7 +151,7 @@ static bool isPrespecilizationDeclWithTarget(const ValueDecl *vd) {
   for (auto *attr : vd->getAttrs().getAttributes<SpecializeAttr>()) {
     if (!attr->isExported())
       continue;
-    if (auto *targetFun = attr->getTargetFunctionDecl(vd))
+    if (attr->getTargetFunctionDecl(vd))
       return true;
   }
   return false;
@@ -2702,7 +2702,11 @@ static void addNamespaceMembers(Decl *decl,
   const auto *declOwner = namespaceDecl->getOwningModule();
   if (declOwner)
     declOwner = declOwner->getTopLevelModule();
-  for (auto redecl : namespaceDecl->redecls()) {
+  auto Redecls = llvm::SmallVector<clang::NamespaceDecl *, 2>(namespaceDecl->redecls());
+  std::stable_sort(Redecls.begin(), Redecls.end(), [&](clang::NamespaceDecl *LHS, clang::NamespaceDecl *RHS) {
+    return LHS->getOwningModule()->Name < RHS->getOwningModule()->Name;
+  });
+  for (auto redecl : Redecls) {
     // Skip namespace declarations that come from other top-level modules.
     if (const auto *redeclOwner = redecl->getOwningModule()) {
       if (declOwner && declOwner != redeclOwner->getTopLevelModule())
@@ -4004,8 +4008,7 @@ void PrintAST::printOneParameter(const ParamDecl *param,
     Printer << " = ";
 
     switch (param->getDefaultArgumentKind()) {
-#define MAGIC_IDENTIFIER(NAME, STRING, SYNTAX_KIND) \
-    case DefaultArgumentKind::NAME:
+#define MAGIC_IDENTIFIER(NAME, STRING) case DefaultArgumentKind::NAME:
 #include "swift/AST/MagicIdentifierKinds.def"
       Printer.printKeyword(defaultArgStr, Options);
       break;
@@ -4132,7 +4135,7 @@ void PrintAST::visitAccessorDecl(AccessorDecl *decl) {
   // Explicitly print 'mutating' and 'nonmutating' if needed.
   printSelfAccessKindModifiersIfNeeded(decl);
 
-  switch (auto kind = decl->getAccessorKind()) {
+  switch (decl->getAccessorKind()) {
   case AccessorKind::Get:
   case AccessorKind::DistributedGet:
   case AccessorKind::Address:
@@ -4769,13 +4772,13 @@ void PrintAST::visitErrorExpr(ErrorExpr *expr) {
 
 void PrintAST::visitTernaryExpr(TernaryExpr *expr) {
   if (auto condExpr = expr->getCondExpr()) {
-    visit(expr->getCondExpr());
+    visit(condExpr);
   }
   Printer << " ? ";
   visit(expr->getThenExpr());
   Printer << " : ";
   if (auto elseExpr = expr->getElseExpr()) {
-    visit(expr->getElseExpr());
+    visit(elseExpr);
   }
 }
 
@@ -6056,7 +6059,7 @@ public:
       } else if (auto *VD = originator.dyn_cast<VarDecl *>()) {
         Printer << "decl = ";
         Printer << VD->getName();
-      } else if (auto *EE = originator.dyn_cast<ErrorExpr *>()) {
+      } else if (originator.is<ErrorExpr *>()) {
         Printer << "error_expr";
       } else if (auto *DMT = originator.dyn_cast<DependentMemberType *>()) {
         visit(DMT);
@@ -6417,6 +6420,10 @@ public:
     case FunctionTypeIsolation::Kind::Erased:
       if (!Options.SuppressIsolatedAny)
         Printer << "@isolated(any) ";
+      break;
+
+    case FunctionTypeIsolation::Kind::NonIsolatedCaller:
+      Printer << "@execution(caller) ";
       break;
     }
 

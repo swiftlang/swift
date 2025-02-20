@@ -144,14 +144,16 @@ toolchains::Windows::constructInvocation(const DynamicLinkJobAction &job,
                                                    getTriple().getArchName()));
   }
 
-  SmallString<128> SharedResourceDirPath;
-  getResourceDirPath(SharedResourceDirPath, context.Args, /*Shared=*/true);
+  if (!context.Args.hasArg(options::OPT_nostartfiles)) {
+    SmallString<128> SharedResourceDirPath;
+    getResourceDirPath(SharedResourceDirPath, context.Args, /*Shared=*/true);
 
-  SmallString<128> swiftrtPath = SharedResourceDirPath;
-  llvm::sys::path::append(swiftrtPath,
-                          swift::getMajorArchitectureName(getTriple()));
-  llvm::sys::path::append(swiftrtPath, "swiftrt.obj");
-  Arguments.push_back(context.Args.MakeArgString(swiftrtPath));
+    SmallString<128> swiftrtPath = SharedResourceDirPath;
+    llvm::sys::path::append(swiftrtPath,
+                            swift::getMajorArchitectureName(getTriple()));
+    llvm::sys::path::append(swiftrtPath, "swiftrt.obj");
+    Arguments.push_back(context.Args.MakeArgString(swiftrtPath));
+  }
 
   addPrimaryInputsOfType(Arguments, context.Inputs, context.Args,
                          file_types::TY_Object);

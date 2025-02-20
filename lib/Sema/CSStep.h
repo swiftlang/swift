@@ -39,7 +39,7 @@ class SolverStep;
 class ComponentStep;
 
 /// Represents available states which every
-/// given step could be in during it's lifetime.
+/// given step could be in during its lifetime.
 enum class StepState { Setup, Ready, Running, Suspended, Done };
 
 /// Represents result of the step execution,
@@ -240,6 +240,10 @@ class SplitterStep final : public SolverStep {
 
   SmallVector<Constraint *, 4> OrphanedConstraints;
 
+  /// Whether to include the partial results of this component in the final
+  /// merged results.
+  SmallVector<bool, 4> IncludeInMergedResults;
+
 public:
   SplitterStep(ConstraintSystem &cs, SmallVectorImpl<Solution> &solutions)
       : SolverStep(cs, solutions) {}
@@ -263,6 +267,56 @@ private:
   ///
   /// \returns true if there are any solutions, false otherwise.
   bool mergePartialSolutions() const;
+};
+
+/// `DependentComponentSplitterStep` is responsible for composing the partial
+/// solutions from other components (on which this component depends) into
+/// the inputs based on which we can solve a particular component.
+class DependentComponentSplitterStep final : public SolverStep {
+  /// Constraints "in scope" of this step.
+  ConstraintList *Constraints;
+
+  /// Index into the parent splitter step.
+  unsigned Index;
+
+  /// The component that has dependencies.
+  ConstraintGraph::Component Component;
+
+  /// Array containing all of the partial solutions for the parent split.
+  MutableArrayRef<SmallVector<Solution, 4>> AllPartialSolutions;
+
+  /// The solutions computed the \c ComponentSteps created for each partial
+  /// solution combinations. Will be merged into the final \c Solutions vector
+  /// in \c resume.
+  std::vector<std::unique_ptr<SmallVector<Solution, 2>>> ContextualSolutions;
+
+  /// Take all of the constraints in this component and put them into
+  /// \c Constraints.
+  void injectConstraints() {
+    for (auto constraint : Component.getConstraints()) {
+      Constraints->erase(constraint);
+      Constraints->push_back(constraint);
+    }
+  }
+
+public:
+  DependentComponentSplitterStep(
+      ConstraintSystem &cs,
+      ConstraintList *constraints,
+      unsigned index,
+      ConstraintGraph::Component &&component,
+      MutableArrayRef<SmallVector<Solution, 4>> allPartialSolutions)
+    : SolverStep(cs, allPartialSolutions[index]), Constraints(constraints),
+      Index(index), Component(std::move(component)),
+      AllPartialSolutions(allPartialSolutions) {
+    assert(!Component.getDependencies().empty() && "Should use ComponentStep");
+    injectConstraints();
+  }
+
+  StepResult take(bool prevFailed) override;
+  StepResult resume(bool prevFailed) override;
+
+  void print(llvm::raw_ostream &Out) override;
 };
 
 
@@ -327,6 +381,10 @@ class ComponentStep final : public SolverStep {
   /// Constraints "in scope" of this step.
   ConstraintList *Constraints;
 
+  /// The set of partial solutions that should be composed before evaluating
+  /// this component.
+  SmallVector<const Solution *, 2> DependsOnPartialSolutions;
+
   /// Constraint which doesn't have any free type variables associated
   /// with it, which makes it disconnected in the graph.
   Constraint *OrphanedConstraint = nullptr;
@@ -361,6 +419,8 @@ public:
       constraints->erase(constraint);
       Constraints->push_back(constraint);
     }
+
+    assert(component.getDependencies().empty());
   }
 
   /// Create a component step that composes existing partial solutions before
@@ -369,11 +429,15 @@ public:
       ConstraintSystem &cs, unsigned index,
       ConstraintList *constraints,
       const ConstraintGraph::Component &component,
+      llvm::SmallVectorImpl<const Solution *> &&dependsOnPartialSolutions,
       SmallVectorImpl<Solution> &solutions)
         : SolverStep(cs, solutions), Index(index), IsSingle(false),
           OriginalScore(getCurrentScore()), OriginalBestScore(getBestScore()),
-          Constraints(constraints) {
+          Constraints(constraints),
+          DependsOnPartialSolutions(std::move(dependsOnPartialSolutions)) {
     TypeVars = component.typeVars;
+    assert(DependsOnPartialSolutions.size() ==
+           component.getDependencies().size());
 
     for (auto constraint : component.getConstraints()) {
       constraints->erase(constraint);
@@ -607,28 +671,26 @@ protected:
 
 class DisjunctionStep final : public BindingStep<DisjunctionChoiceProducer> {
   Constraint *Disjunction;
+  SmallVector<Constraint *, 4> DisabledChoices;
+
   std::optional<Score> BestNonGenericScore;
   std::optional<std::pair<Constraint *, Score>> LastSolvedChoice;
 
 public:
-  DisjunctionStep(
-      ConstraintSystem &cs,
-      std::pair<Constraint *, llvm::TinyPtrVector<Constraint *>> &disjunction,
-      SmallVectorImpl<Solution> &solutions)
-      : DisjunctionStep(cs, disjunction.first, disjunction.second, solutions) {}
-
   DisjunctionStep(ConstraintSystem &cs, Constraint *disjunction,
-                  llvm::TinyPtrVector<Constraint *> &favoredChoices,
                   SmallVectorImpl<Solution> &solutions)
-      : BindingStep(cs, {cs, disjunction, favoredChoices}, solutions),
-        Disjunction(disjunction) {
+      : BindingStep(cs, {cs, disjunction}, solutions), Disjunction(disjunction) {
     assert(Disjunction->getKind() == ConstraintKind::Disjunction);
+    pruneOverloadSet(Disjunction);
     ++cs.solverState->NumDisjunctions;
   }
 
   ~DisjunctionStep() override {
     // Rewind back any changes left after attempting last choice.
     ActiveChoice.reset();
+    // Re-enable previously disabled overload choices.
+    for (auto *choice : DisabledChoices)
+      choice->setEnabled();
   }
 
   StepResult resume(bool prevFailed) override;
@@ -681,6 +743,46 @@ private:
   /// simplified further, false otherwise.
   bool attempt(const DisjunctionChoice &choice) override;
 
+  // Check if selected disjunction has a representative
+  // this might happen when there are multiple binary operators
+  // chained together. If so, disable choices which differ
+  // from currently selected representative.
+  void pruneOverloadSet(Constraint *disjunction) {
+    auto *choice = disjunction->getNestedConstraints().front();
+    if (choice->getKind() != ConstraintKind::BindOverload)
+      return;
+
+    auto *typeVar = choice->getFirstType()->getAs<TypeVariableType>();
+    if (!typeVar)
+      return;
+
+    auto *repr = typeVar->getImpl().getRepresentative(nullptr);
+    if (!repr || repr == typeVar)
+      return;
+
+    for (auto overload : CS.getResolvedOverloads()) {
+      auto resolved = overload.second;
+      if (!resolved.boundType->isEqual(repr))
+        continue;
+
+      auto &representative = resolved.choice;
+      if (!representative.isDecl())
+        return;
+
+      // Disable all of the overload choices which are different from
+      // the one which is currently picked for representative.
+      for (auto *constraint : disjunction->getNestedConstraints()) {
+        auto choice = constraint->getOverloadChoice();
+        if (!choice.isDecl() || choice.getDecl() == representative.getDecl())
+          continue;
+
+        constraint->setDisabled();
+        DisabledChoices.push_back(constraint);
+      }
+      break;
+    }
+  };
+
   // Figure out which of the solutions has the smallest score.
   static std::optional<Score>
   getBestScore(SmallVectorImpl<Solution> &solutions) {
@@ -699,6 +801,27 @@ private:
     return bestScore;
   }
 };
+
+/// Retrieves the DeclContext that a conjunction should be solved within.
+static DeclContext *getDeclContextForConjunction(ConstraintLocator *loc) {  
+  // Closures introduce a new DeclContext that needs switching into.
+  auto anchor = loc->getAnchor();
+  if (loc->directlyAt<ClosureExpr>())
+    return castToExpr<ClosureExpr>(anchor);
+
+  // SingleValueStmtExprs need to switch to their enclosing context. This
+  // is unfortunately necessary since they can be present in single-expression
+  // closures, which don't have their DeclContext established since they're
+  // solved together with the rest of the system.
+  if (loc->isForSingleValueStmtConjunction())
+    return castToExpr<SingleValueStmtExpr>(anchor)->getDeclContext();
+  
+  // Do the same for TapExprs.
+  if (loc->directlyAt<TapExpr>())
+    return castToExpr<TapExpr>(anchor)->getVar()->getDeclContext();
+
+  return nullptr;
+}
 
 class ConjunctionStep : public BindingStep<ConjunctionElementProducer> {
   /// Snapshot of the constraint system before conjunction.
@@ -724,11 +847,9 @@ class ConjunctionStep : public BindingStep<ConjunctionElementProducer> {
         : CS(cs), Conjunction(conjunction),
           TypeVars(std::move(cs.TypeVariables)) {
       auto *locator = Conjunction->getLocator();
-      // If this conjunction represents a closure, we need to
-      // switch declaration context over to it.
-      if (locator->directlyAt<ClosureExpr>()) {
-        DC.emplace(CS.DC, castToExpr<ClosureExpr>(locator->getAnchor()));
-      }
+      // If we need to switch into a new DeclContext for the conjunction, do so.
+      if (auto *newDC = getDeclContextForConjunction(locator))
+        DC.emplace(CS.DC, newDC);
 
       auto &CG = CS.getConstraintGraph();
       // Remove all of the current inactive constraints.

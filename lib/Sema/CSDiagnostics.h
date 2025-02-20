@@ -3234,17 +3234,17 @@ public:
   bool diagnoseAsError() override;
 };
 
-/// Diagnose when a slab literal has an incorrect number of elements for the
-/// contextual slab type it's initializing.
+/// Diagnose when an inline array literal has an incorrect number of elements
+/// for the contextual inline array type it's initializing.
 ///
 /// \code
-/// let x: Slab<4, Int> = [1, 2] // expected '4' elements but got '2'
+/// let x: InlineArray<4, Int> = [1, 2] // expected '4' elements but got '2'
 /// \endcode
-class IncorrectSlabLiteralCount final : public FailureDiagnostic {
+class IncorrectInlineArrayLiteralCount final : public FailureDiagnostic {
   Type lhsCount, rhsCount;
 
 public:
-  IncorrectSlabLiteralCount(const Solution &solution, Type lhsCount,
+  IncorrectInlineArrayLiteralCount(const Solution &solution, Type lhsCount,
                             Type rhsCount, ConstraintLocator *locator)
       : FailureDiagnostic(solution, locator), lhsCount(resolveType(lhsCount)),
         rhsCount(resolveType(rhsCount)) {}

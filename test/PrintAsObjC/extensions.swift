@@ -2,7 +2,7 @@
 
 // RUN: %empty-directory(%t)
 // RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -emit-module -o %t %s -disable-objc-attr-requires-foundation-module -Xllvm -sil-disable-pass=MandatoryARCOpts
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -parse-as-library %t/extensions.swiftmodule -typecheck -emit-objc-header-path %t/extensions.h -import-objc-header %S/../Inputs/empty.h -disable-objc-attr-requires-foundation-module -Xllvm -sil-disable-pass=MandatoryARCOpts
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -parse-as-library %t/extensions.swiftmodule -typecheck -verify -emit-objc-header-path %t/extensions.h -import-objc-header %S/../Inputs/empty.h -disable-objc-attr-requires-foundation-module -Xllvm -sil-disable-pass=MandatoryARCOpts
 // RUN: %FileCheck %s --input-file %t/extensions.h
 // RUN: %FileCheck --check-prefix=NEGATIVE %s --input-file %t/extensions.h
 // RUN: %check-in-clang %t/extensions.h
@@ -44,11 +44,11 @@ extension A2 {
 @objc @objcMembers class A3 {}
 
 // CHECK-NEXT: @interface A3 (SWIFT_EXTENSION(extensions))
-// CHECK-NEXT: @property (nonatomic, readonly) NSInteger some;
+// CHECK-NEXT: @property (nonatomic, readonly) NSInteger more;
 // CHECK-NEXT: @end
 // CHECK-EMPTY:
 // CHECK-NEXT: @interface A3 (SWIFT_EXTENSION(extensions))
-// CHECK-NEXT: @property (nonatomic, readonly) NSInteger more;
+// CHECK-NEXT: @property (nonatomic, readonly) NSInteger some;
 // CHECK-NEXT: @end
 // CHECK-EMPTY:
 extension A3 {

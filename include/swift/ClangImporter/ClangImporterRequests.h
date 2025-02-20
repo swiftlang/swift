@@ -31,6 +31,7 @@ namespace swift {
 class Decl;
 class DeclName;
 class EnumDecl;
+enum class ExplicitSafety;
 
 /// The input type for a clang direct lookup request.
 struct ClangDirectLookupDescriptor final {
@@ -416,10 +417,8 @@ private:
 
 struct SafeUseOfCxxDeclDescriptor final {
   const clang::Decl *decl;
-  ASTContext &ctx;
 
-  SafeUseOfCxxDeclDescriptor(const clang::Decl *decl, ASTContext &ctx)
-      : decl(decl), ctx(ctx) {}
+  SafeUseOfCxxDeclDescriptor(const clang::Decl *decl) : decl(decl) {}
 
   friend llvm::hash_code hash_value(const SafeUseOfCxxDeclDescriptor &desc) {
     return llvm::hash_combine(desc.decl);
@@ -527,7 +526,7 @@ enum class CxxEscapability { Escapable, NonEscapable, Unknown };
 
 struct EscapabilityLookupDescriptor final {
   const clang::Type *type;
-  ClangImporter::Implementation &impl;
+  ClangImporter::Implementation *impl;
   bool annotationOnly = true;
 
   friend llvm::hash_code hash_value(const EscapabilityLookupDescriptor &desc) {
@@ -563,6 +562,25 @@ private:
 
 void simple_display(llvm::raw_ostream &out, EscapabilityLookupDescriptor desc);
 SourceLoc extractNearestSourceLoc(EscapabilityLookupDescriptor desc);
+
+/// Determine the safety of the given Clang declaration.
+class ClangDeclExplicitSafety
+    : public SimpleRequest<ClangDeclExplicitSafety,
+                           ExplicitSafety(SafeUseOfCxxDeclDescriptor),
+                           RequestFlags::Cached> {
+public:
+  using SimpleRequest::SimpleRequest;
+
+  // Source location
+  SourceLoc getNearestLoc() const { return SourceLoc(); };
+  bool isCached() const;
+
+private:
+  friend SimpleRequest;
+
+  // Evaluation.
+  ExplicitSafety evaluate(Evaluator &evaluator, SafeUseOfCxxDeclDescriptor desc) const;
+};
 
 #define SWIFT_TYPEID_ZONE ClangImporter
 #define SWIFT_TYPEID_HEADER "swift/ClangImporter/ClangImporterTypeIDZone.def"

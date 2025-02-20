@@ -9,11 +9,7 @@ func iAmUnsafe() { }
 @unsafe
 struct UnsafeType { }
 
-// expected-note@+3{{reference to unsafe struct 'UnsafeType'}}
-// expected-note@+2{{add '@unsafe' to indicate that this declaration is unsafe to use}}{{1-1=@unsafe }}
-// expected-note@+1{{add '@safe' to indicate that this declaration is memory-safe to use}}{1-1=@safe }}
 func iAmImpliedUnsafe() -> UnsafeType? { nil }
-// expected-warning@-1{{global function 'iAmImpliedUnsafe' has an interface that involves unsafe types}}
 
 @unsafe
 func labeledUnsafe(_: UnsafeType) {
@@ -115,4 +111,43 @@ extension UnsafeOuter {
 @unsafe
 extension UnsafeOuter {
   func i(_: UnsafeType) { }
+}
+
+// -----------------------------------------------------------------------
+// Miscellaneous issues
+// -----------------------------------------------------------------------
+var yieldUnsafe: Int {
+  _read {
+    @unsafe let x = 5
+    yield x // expected-warning{{expression uses unsafe constructs but is not marked with 'unsafe' [Unsafe]}}
+    // expected-note@-1{{reference to unsafe let 'x'}}
+  }
+  _modify {
+    @unsafe var x = 5
+    yield &x // expected-warning{{expression uses unsafe constructs but is not marked with 'unsafe' [Unsafe]}}
+    // expected-note@-1{{reference to unsafe var 'x'}}
+  }
+}
+
+var yieldUnsafeOkay: Int {
+  _read {
+    @unsafe let x = 5
+    yield unsafe x
+  }
+  _modify {
+    @unsafe var x = 5
+    yield unsafe &x
+  }
+}
+
+struct UnsafeSequence: @unsafe IteratorProtocol, @unsafe Sequence {
+  @unsafe func next() -> Int? { nil }
+}
+
+func forEachLoop(us: UnsafeSequence) {
+  for _ in us { } // expected-warning{{expression uses unsafe constructs but is not marked with 'unsafe' [Unsafe]}}{{12-12=unsafe }}
+  // expected-note@-1{{@unsafe conformance of 'UnsafeSequence' to protocol 'Sequence' involves unsafe code}}
+  // expected-note@-2{{reference to unsafe instance method 'next()'}}
+
+  for _ in unsafe us { }
 }

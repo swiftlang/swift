@@ -335,7 +335,8 @@ TEST_F(CursorInfoTest, CursorInfoMustWaitDueToken) {
   EXPECT_EQ(strlen("fog"), Info.Length);
 }
 
-TEST_F(CursorInfoTest, CursorInfoMustWaitDueTokenRace) {
+TEST_F(CursorInfoTest, DISABLED_CursorInfoMustWaitDueTokenRace) {
+  // Disabled due to a race condition (rdar://88652757)
   const char *DocName = "test.swift";
   const char *Contents = "let value = foo\n"
                          "let foo = 0\n";

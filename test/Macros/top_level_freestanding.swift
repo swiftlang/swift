@@ -107,12 +107,12 @@ func testGlobalVariable() {
 
 // expected-note @+1 6 {{in expansion of macro 'anonymousTypes' here}}
 #anonymousTypes(causeErrors: true) { "foo" }
-// DIAG_BUFFERS-DAG: @__swiftmacro_9MacroUser0033top_level_freestandingswift_DbGHjfMX108_0_33_082AE7CFEFA6960C804A9FE7366EB5A0Ll14anonymousTypesfMf0_{{.*}}: error: use of protocol 'Equatable' as a type must be written 'any Equatable'
-// DIAG_BUFFERS-DAG: @__swiftmacro_9MacroUser00142___swiftmacro_9MacroUser0033top_level_freestandingswift_DbGHjfMX108_0_33_082AE7CFEFA6960C804A9FE7366EB5A0Ll14anonymousTypesfMf0_swift_DAIABdjIbfMX23_2_33_082AE7CFEFA6960C804A9FE7366EB5A0Ll27introduceTypeCheckingErrorsfMf_{{.*}}: error: use of protocol 'Hashable' as a type must be written 'any Hashable'
+// DIAG_BUFFERS-DAG: @__swiftmacro_9MacroUser0033top_level_freestandingswift_DbGHjfMX108_0_33_082AE7CFEFA6960C804A9FE7366EB5A0Ll14anonymousTypesfMf0_{{.*}}: warning: use of protocol 'Equatable' as a type must be written 'any Equatable'
+// DIAG_BUFFERS-DAG: @__swiftmacro_9MacroUser00142___swiftmacro_9MacroUser0033top_level_freestandingswift_DbGHjfMX108_0_33_082AE7CFEFA6960C804A9FE7366EB5A0Ll14anonymousTypesfMf0_swift_DAIABdjIbfMX23_2_33_082AE7CFEFA6960C804A9FE7366EB5A0Ll27introduceTypeCheckingErrorsfMf_{{.*}}: warning: use of protocol 'Hashable' as a type must be written 'any Hashable'
 
 // expected-note @+1 2 {{in expansion of macro 'anonymousTypes' here}}
 #anonymousTypes { () -> String in
-  // expected-error @+1 {{use of protocol 'Equatable' as a type must be written 'any Equatable'}}
+  // expected-warning @+1 {{use of protocol 'Equatable' as a type must be written 'any Equatable'}}
   _ = 0 as Equatable
   return "foo"
 }

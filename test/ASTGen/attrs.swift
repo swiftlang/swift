@@ -1,40 +1,44 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend %s -dump-parse -disable-availability-checking \
-// RUN:   -enable-experimental-feature SymbolLinkageMarkers \
+
+// RUN: %target-swift-frontend-dump-parse \
 // RUN:   -enable-experimental-feature ABIAttribute \
 // RUN:   -enable-experimental-feature Extern \
+// RUN:   -enable-experimental-feature LifetimeDependence \
 // RUN:   -enable-experimental-feature NonIsolatedAsyncInheritsIsolationFromContext \
+// RUN:   -enable-experimental-feature SymbolLinkageMarkers \
 // RUN:   -enable-experimental-move-only \
-// RUN:   -enable-experimental-feature ParserASTGen > %t/astgen.ast.raw
+// RUN:   -enable-experimental-feature ParserASTGen \
+// RUN:   | %sanitize-address > %t/astgen.ast
 
-// RUN: %target-swift-frontend %s -dump-parse -disable-availability-checking \
-// RUN:   -enable-experimental-feature SymbolLinkageMarkers \
+// RUN: %target-swift-frontend-dump-parse \
 // RUN:   -enable-experimental-feature ABIAttribute \
 // RUN:   -enable-experimental-feature Extern \
+// RUN:   -enable-experimental-feature LifetimeDependence \
 // RUN:   -enable-experimental-feature NonIsolatedAsyncInheritsIsolationFromContext \
-// RUN:   -enable-experimental-move-only > %t/cpp-parser.ast.raw
-
-// Filter out any addresses in the dump, since they can differ.
-// RUN: sed -E 's#0x[0-9a-fA-F]+##g' %t/cpp-parser.ast.raw > %t/cpp-parser.ast
-// RUN: sed -E 's#0x[0-9a-fA-F]+##g' %t/astgen.ast.raw > %t/astgen.ast
+// RUN:   -enable-experimental-feature SymbolLinkageMarkers \
+// RUN:   -enable-experimental-move-only \
+// RUN:   | %sanitize-address > %t/cpp-parser.ast
 
 // RUN: %diff -u %t/astgen.ast %t/cpp-parser.ast
 
 // RUN: %target-typecheck-verify-swift \
-// RUN:   -enable-experimental-feature SymbolLinkageMarkers \
+// RUN:   -module-abi-name ASTGen \
+// RUN:   -enable-experimental-feature ParserASTGen \
 // RUN:   -enable-experimental-feature ABIAttribute \
 // RUN:   -enable-experimental-feature Extern \
-// RUN:   -enable-experimental-move-only \
-// RUN:   -enable-experimental-feature ParserASTGen \
-// RUN:   -enable-experimental-feature NonIsolatedAsyncInheritsIsolationFromContext
+// RUN:   -enable-experimental-feature LifetimeDependence \
+// RUN:   -enable-experimental-feature NonIsolatedAsyncInheritsIsolationFromContext \
+// RUN:   -enable-experimental-feature SymbolLinkageMarkers \
+// RUN:   -enable-experimental-move-only
 
 // REQUIRES: executable_test
 // REQUIRES: swift_swift_parser
-// REQUIRES: swift_feature_SymbolLinkageMarkers
-// REQUIRES: swift_feature_Extern
 // REQUIRES: swift_feature_ParserASTGen
 // REQUIRES: swift_feature_ABIAttribute
+// REQUIRES: swift_feature_Extern
+// REQUIRES: swift_feature_LifetimeDependence
 // REQUIRES: swift_feature_NonIsolatedAsyncInheritsIsolationFromContext
+// REQUIRES: swift_feature_SymbolLinkageMarkers
 
 // rdar://116686158
 // UNSUPPORTED: asan
@@ -163,6 +167,9 @@ struct ProjectedValueStruct {
 
 @_silgen_name("silgen_func") func silGenFn() -> Int
 
+@_specialize(where X: _TrivialStride(16), Y: _Trivial(32, 4), Z: _Class)
+func testSpecialize<X, Y, Z>(x: X, y: Y, z: Z) {}
+
 @_spi(SPIName) public func spiFn() {}
 
 struct StorageRestrctionTest {
@@ -189,4 +196,34 @@ do {
   struct Test {
     @execution(concurrent) func testMember() async {} // Ok
   }
+}
+
+typealias testConvention = @convention(c) (Int) -> Int
+typealias testExecution = @execution(concurrent) () async -> Void
+typealias testIsolated = @isolated(any) () -> Void
+
+protocol OpProto {}
+struct OpStruct: OpProto {}
+struct OpTest {
+  func opResult() -> some OpProto { OpStruct() }
+  typealias Result = @_opaqueReturnTypeOf("$s6ASTGen6OpTestV8opResultQryF", 0) __
+}
+
+struct E {}
+struct NE : ~Escapable {}
+@lifetime(ne) func derive(_ ne: NE) -> NE { ne }
+@lifetime(borrow ne1, ne2) func derive(_ ne1: NE, _ ne2: NE) -> NE {
+  if (Int.random(in: 1..<100) < 50) { return ne1 }
+  return ne2
+}
+@lifetime(borrow borrow) func testNameConflict(_ borrow: E) -> NE { NE() }
+@lifetime(result: source) func testTarget(_ result: inout NE, _ source: consuming NE) { result = source }
+
+actor MyActor {
+  nonisolated let constFlag: Bool = false
+  nonisolated(unsafe) var mutableFlag: Bool = false
+}
+func testNonIsolated(actor: MyActor) {
+  _ = actor.constFlag
+  _ = actor.mutableFlag
 }

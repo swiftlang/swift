@@ -188,7 +188,7 @@ static bool extractLinkerFlags(const llvm::object::Binary *Bin,
       }
     }
     return bool(Error);
-  } else if (auto *IRObjectFile = llvm::dyn_cast<llvm::object::IRObjectFile>(Bin)) {
+  } else if (llvm::isa<llvm::object::IRObjectFile>(Bin)) {
     // Ignore the LLVM IR files (LTO)
     return false;
   }  else {

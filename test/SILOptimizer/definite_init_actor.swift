@@ -188,9 +188,9 @@ actor BoringActor {
    // CHECK:         store [[INIT2]] to [[SELF_ALLOC]] : $*SingleVarActor
    // CHECK-NEXT:    hop_to_executor [[INIT2]] : $SingleVarActor
 
+   // CHECK:         bb3([[T0:%.*]] : $SingleVarActor):
    // CHECK:         [[ARBITRARY_FN:%.*]] = function_ref @$s4test14arbitraryAsyncyyYaF
    // CHECK-NEXT:    apply [[ARBITRARY_FN]]()
-   // CHECK-NEXT:    [[T0:%.*]] = load [[SELF_ALLOC]] :
    // CHECK-NEXT:    strong_retain [[T0]]
    // CHECK-NEXT:    [[T1:%.*]] = init_existential_ref [[T0]] :
    // CHECK-NEXT:    [[T2:%.*]] = enum $Optional<any Actor>, #Optional.some!enumelt, [[T1]] :

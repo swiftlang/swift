@@ -1236,7 +1236,7 @@ static Expr *buildStorageReference(AccessorDecl *accessor,
           diagnoseDeclAvailability(
               wrappedValue,
               var->getAttachedPropertyWrappers()[i]->getRangeWithAt(), nullptr,
-              ExportContext::forDeclSignature(accessor, nullptr));
+              ExportContext::forDeclSignature(accessor));
         }
 
         underlyingVars.push_back({ wrappedValue, isWrapperRefLValue });
@@ -2873,7 +2873,7 @@ IsAccessorTransparentRequest::evaluate(Evaluator &evaluator,
         }
       }
 
-      if (auto subscript = dyn_cast<SubscriptDecl>(storage)) {
+      if (isa<SubscriptDecl>(storage)) {
         break;
       }
 

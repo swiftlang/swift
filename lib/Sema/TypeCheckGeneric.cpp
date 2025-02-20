@@ -726,7 +726,7 @@ GenericSignatureRequest::evaluate(Evaluator &evaluator,
         if (auto *specifier = dyn_cast<SpecifierTypeRepr>(typeRepr))
           typeRepr = specifier->getBase();
 
-        if (auto *packExpansion = dyn_cast<VarargTypeRepr>(typeRepr)) {
+        if (isa<VarargTypeRepr>(typeRepr)) {
           paramOptions.setContext(TypeResolverContext::VariadicFunctionInput);
         } else {
           paramOptions.setContext(TypeResolverContext::FunctionInput);
@@ -1126,11 +1126,6 @@ Type StructuralTypeRequest::evaluate(Evaluator &evaluator,
                                               /*placeholderHandler*/ nullptr,
                                               /*packElementOpener*/ nullptr)
           .resolveType(underlyingTypeRepr);
-
-  // Don't build a generic siganture for a protocol extension, because this
-  // request might be evaluated while building a protocol requirement signature.
-  if (parentDC->getSelfProtocolDecl())
-    return result;
 
   Type parent;
   if (parentDC->isTypeContext())

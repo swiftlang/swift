@@ -5,6 +5,11 @@
 
 ## Swift 6.1
 
+* Previous versions of Swift would incorrectly allow Objective-C `-init...`
+  methods with custom Swift names to be imported as initializers, but with base 
+  names other than `init`. The compiler now diagnoses these attributes and
+  infers a name for the initializer as though they are not present.
+
 * Projected value initializers are now correctly injected into calls when
   an argument exactly matches a parameter with an external property wrapper.
 

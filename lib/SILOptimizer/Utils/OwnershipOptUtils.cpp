@@ -439,6 +439,18 @@ static bool canFixUpOwnershipForRAUW(SILValue oldValue, SILValue newValue,
   }
 }
 
+bool OwnershipRAUWHelper::mayIntroduceUnoptimizableCopies() {
+  if (oldValue->getOwnershipKind() != OwnershipKind::Guaranteed) {
+    return false;
+  }
+
+  if (areUsesWithinValueLifetime(newValue, ctx->guaranteedUsePoints,
+                                 &ctx->deBlocks)) {
+    return false;
+  }
+  return true;
+}
+
 bool swift::areUsesWithinLexicalValueLifetime(SILValue value,
                                               ArrayRef<Operand *> uses) {
   assert(value->isLexical());
@@ -471,8 +483,15 @@ bool swift::areUsesWithinValueLifetime(SILValue value, ArrayRef<Operand *> uses,
     return false;
   }
   if (value->getOwnershipKind() == OwnershipKind::Guaranteed) {
+    // For guaranteed values, we have to find the borrow introducing guaranteed
+    // reference roots and then ensure uses are within all of their lifetimes.
+    // For simplicity, we only look through single forwarding operations to find
+    // a borrow introducer here.
     value = findOwnershipReferenceAggregate(value);
     BorrowedValue borrowedValue(value);
+    if (!borrowedValue) {
+      return false;
+    }
     if (!borrowedValue.isLocalScope()) {
       return true;
     }
