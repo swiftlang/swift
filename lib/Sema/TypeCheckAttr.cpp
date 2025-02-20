@@ -4957,17 +4957,70 @@ void AttributeChecker::checkOriginalDefinedInAttrs(
   }
 }
 
-void AttributeChecker::checkAvailableAttrs(ArrayRef<AvailableAttr *> Attrs) {
-  if (Attrs.empty())
+/// Find each of the `AvailableAttr`s that represents the first attribute in a
+/// group of attributes what were parsed from a short-form available attribute,
+/// e.g. `@available(macOS , iOS, *)`.
+static llvm::SmallSet<const AvailableAttr *, 8>
+getAvailableAttrGroups(ArrayRef<AvailableAttr *> attrs) {
+  llvm::SmallSet<const AvailableAttr *, 8> heads;
+
+  // Find each attribute that belongs to a group.
+  for (auto attr : attrs) {
+    if (attr->getNextGroupedAvailableAttr())
+      heads.insert(attr);
+  }
+
+  // Remove the interior attributes of each group, leaving only the head.
+  for (auto attr : attrs) {
+    if (auto next = attr->getNextGroupedAvailableAttr()) {
+      heads.erase(next);
+    }
+  }
+
+  return heads;
+}
+
+void AttributeChecker::checkAvailableAttrs(ArrayRef<AvailableAttr *> attrs) {
+  if (attrs.empty())
     return;
 
   // Only diagnose top level decls since nested ones may have inherited availability.
   if (!D->getDeclContext()->getInnermostDeclarationDeclContext()) {
     // If all available are spi available, we should use @_spi instead.
-    if (std::all_of(Attrs.begin(), Attrs.end(), [](AvailableAttr *AV) {
-      return AV->isSPI();
-    })) {
+    if (std::all_of(attrs.begin(), attrs.end(),
+                    [](AvailableAttr *AV) { return AV->isSPI(); })) {
       diagnose(D->getLoc(), diag::spi_preferred_over_spi_available);
+    }
+  }
+
+  auto attrGroups = getAvailableAttrGroups(attrs);
+  for (const AvailableAttr *groupHead : attrGroups) {
+    llvm::SmallSet<AvailabilityDomain, 8> seenDomains;
+
+    for (auto *groupedAttr = groupHead; groupedAttr != nullptr;
+         groupedAttr = groupedAttr->getNextGroupedAvailableAttr()) {
+      auto loc = groupedAttr->getLocation();
+      auto attr = D->getSemanticAvailableAttr(groupedAttr);
+
+      // If the attribute cannot be resolved, it may have had an unrecognized
+      // domain. Assume this unrecognized domain could be an unrecognized
+      // platform and skip it.
+      if (!attr)
+        continue;
+
+      // Only platform availability is allowed to be written in short form.
+      auto domain = attr->getDomain();
+      if (!domain.isPlatform()) {
+        diagnose(loc, diag::availability_must_occur_alone,
+                 domain.getNameForAttributePrinting());
+        continue;
+      }
+
+      // Diagnose duplicate platforms.
+      if (!seenDomains.insert(domain).second) {
+        diagnose(loc, diag::availability_query_repeated_platform,
+                 domain.getNameForAttributePrinting());
+      }
     }
   }
 

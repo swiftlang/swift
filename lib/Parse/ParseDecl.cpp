@@ -790,24 +790,36 @@ bool Parser::parseAvailability(
     // we will synthesize
     //   @available(_PackageDescription, introduced: 4.2)
 
+    AvailabilitySpec *PrevSpec = nullptr;
     for (auto *Spec : Specs) {
-      // FIXME: [availability] Allow arbitrary availability domains.
+      if (Spec->isWildcard())
+        continue;
+
       std::optional<AvailabilityDomain> Domain = Spec->getDomain();
       if (!Domain)
         continue;
 
-      addAttribute(new (Context) AvailableAttr(
-          AtLoc, attrRange, *Domain, Spec->getSourceRange().Start,
-          AvailableAttr::Kind::Default,
-          /*Message=*/StringRef(),
-          /*Rename=*/StringRef(),
-          /*Introduced=*/Spec->getVersion(),
-          /*IntroducedRange=*/Spec->getVersionSrcRange(),
-          /*Deprecated=*/llvm::VersionTuple(),
-          /*DeprecatedRange=*/SourceRange(),
-          /*Obsoleted=*/llvm::VersionTuple(),
-          /*ObsoletedRange=*/SourceRange(),
-          /*Implicit=*/false, AttrName == SPI_AVAILABLE_ATTRNAME));
+      auto Attr = new (Context)
+          AvailableAttr(AtLoc, attrRange, *Domain, Spec->getSourceRange().Start,
+                        AvailableAttr::Kind::Default,
+                        /*Message=*/StringRef(),
+                        /*Rename=*/StringRef(),
+                        /*Introduced=*/Spec->getVersion(),
+                        /*IntroducedRange=*/Spec->getVersionSrcRange(),
+                        /*Deprecated=*/llvm::VersionTuple(),
+                        /*DeprecatedRange=*/SourceRange(),
+                        /*Obsoleted=*/llvm::VersionTuple(),
+                        /*ObsoletedRange=*/SourceRange(),
+                        /*Implicit=*/false, AttrName == SPI_AVAILABLE_ATTRNAME);
+      addAttribute(Attr);
+
+      if (PrevSpec) {
+        if (PrevSpec->isWildcard())
+          Attr->setIsFollowedByWildcard();
+        else
+          Attr->setIsFollowedByGroupedAvailableAttr();
+      }
+      PrevSpec = Spec;
     }
 
     return true;
