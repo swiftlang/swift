@@ -97,6 +97,10 @@ EDUCATIONAL_NOTES(concurrent_access_of_local_capture,
                   "sendable-closure-captures.md")
 EDUCATIONAL_NOTES(concurrent_access_of_inout_param,
                   "sendable-closure-captures.md")
+EDUCATIONAL_NOTES(actor_isolated_call,
+                  "actor-isolated-call.md")
+EDUCATIONAL_NOTES(actor_isolated_call_decl,
+                  "actor-isolated-call.md")
 
 EDUCATIONAL_NOTES(error_in_swift_lang_mode,
                   "error-in-future-swift-version.md")
