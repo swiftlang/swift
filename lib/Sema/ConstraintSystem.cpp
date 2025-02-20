@@ -918,18 +918,21 @@ void ConstraintSystem::recordPackExpansionEnvironment(
 }
 
 PackExpansionExpr *
-ConstraintSystem::getPackEnvironment(PackElementExpr *packElement) const {
-  const auto match = PackEnvironments.find(packElement);
-  return (match == PackEnvironments.end()) ? nullptr : match->second;
+ConstraintSystem::getPackElementExpansion(PackElementExpr *packElement) const {
+  const auto match = PackElementExpansions.find(packElement);
+  return (match == PackElementExpansions.end()) ? nullptr : match->second;
 }
 
-void ConstraintSystem::addPackEnvironment(PackElementExpr *packElement,
-                                          PackExpansionExpr *packExpansion) {
-  bool inserted = PackEnvironments.insert({packElement, packExpansion}).second;
+void ConstraintSystem::recordPackElementExpansion(
+    PackElementExpr *packElement, PackExpansionExpr *packExpansion) {
+  bool inserted =
+      PackElementExpansions.insert({packElement, packExpansion}).second;
   ASSERT(inserted);
 
-  if (solverState)
-    recordChange(SolverTrail::Change::RecordedPackEnvironment(packElement));
+  if (solverState) {
+    recordChange(
+        SolverTrail::Change::RecordedPackElementExpansion(packElement));
+  }
 }
 
 /// Extend the given depth map by adding depths for all of the subexpressions
@@ -1916,6 +1919,7 @@ size_t Solution::getTotalMemory() const {
   if (TotalMemory)
     return *TotalMemory;
 
+  // clang-format off
   const_cast<Solution *>(this)->TotalMemory
        = sizeof(*this) + size_in_bytes(typeBindings) +
          overloadChoices.getMemorySize() +
@@ -1925,7 +1929,7 @@ size_t Solution::getTotalMemory() const {
          OpenedTypes.getMemorySize() + OpenedExistentialTypes.getMemorySize() +
          OpenedPackExpansionTypes.getMemorySize() +
          PackExpansionEnvironments.getMemorySize() +
-         size_in_bytes(PackEnvironments) +
+         size_in_bytes(PackElementExpansions) +
          (DefaultedConstraints.size() * sizeof(void *)) +
          nodeTypes.getMemorySize() +
          keyPathComponentTypes.getMemorySize() +
@@ -1941,6 +1945,7 @@ size_t Solution::getTotalMemory() const {
          size_in_bytes(argumentLists) +
          size_in_bytes(ImplicitCallAsFunctionRoots) +
          size_in_bytes(SynthesizedConformances);
+  // clang-format on
 
   return *TotalMemory;
 }

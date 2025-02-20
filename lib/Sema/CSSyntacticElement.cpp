@@ -188,8 +188,8 @@ public:
     // that reference pack elements have to bring expansion's shape
     // type in scope to make sure that the shapes match.
     if (auto *packElement = getAsExpr<PackElementExpr>(expr)) {
-      if (auto *outerEnvironment = CS.getPackEnvironment(packElement)) {
-        auto *expansionTy = CS.simplifyType(CS.getType(outerEnvironment))
+      if (auto *outerExpansion = CS.getPackElementExpansion(packElement)) {
+        auto *expansionTy = CS.simplifyType(CS.getType(outerExpansion))
                                 ->castTo<PackExpansionType>();
         expansionTy->getCountType()->getTypeVariables(ReferencedVars);
       }

@@ -1565,9 +1565,8 @@ public:
   llvm::DenseMap<ConstraintLocator *, std::pair<UUID, Type>>
       PackExpansionEnvironments;
 
-  /// The pack expansion environment that can open a given pack element.
-  llvm::DenseMap<PackElementExpr *, PackExpansionExpr *>
-      PackEnvironments;
+  /// The pack expansion expression for a given pack element.
+  llvm::DenseMap<PackElementExpr *, PackExpansionExpr *> PackElementExpansions;
 
   /// The locators of \c Defaultable constraints whose defaults were used.
   llvm::DenseSet<ConstraintLocator *> DefaultedConstraints;
@@ -2412,7 +2411,7 @@ private:
       PackExpansionEnvironments;
 
   llvm::SmallDenseMap<PackElementExpr *, PackExpansionExpr *, 2>
-      PackEnvironments;
+      PackElementExpansions;
 
   llvm::SmallVector<GenericEnvironment *, 4> PackElementGenericEnvironments;
 
@@ -3379,17 +3378,18 @@ public:
   void recordPackExpansionEnvironment(ConstraintLocator *locator,
                                       std::pair<UUID, Type> uuidAndShape);
 
-  /// Get the opened element generic environment for the given pack element.
-  PackExpansionExpr *getPackEnvironment(PackElementExpr *packElement) const;
+  /// Get the pack expansion expr for the given pack element.
+  PackExpansionExpr *
+  getPackElementExpansion(PackElementExpr *packElement) const;
 
-  /// Associate an opened element generic environment to a pack element,
-  /// and record a change in the trail.
-  void addPackEnvironment(PackElementExpr *packElement,
-                          PackExpansionExpr *packExpansion);
+  /// Associate a pack element with a given pack expansion, and record the
+  /// change in the trail.
+  void recordPackElementExpansion(PackElementExpr *packElement,
+                                  PackExpansionExpr *packExpansion);
 
   /// Undo the above change.
-  void removePackEnvironment(PackElementExpr *packElement) {
-    bool erased = PackEnvironments.erase(packElement);
+  void removePackElementExpansion(PackElementExpr *packElement) {
+    bool erased = PackElementExpansions.erase(packElement);
     ASSERT(erased);
   }
 

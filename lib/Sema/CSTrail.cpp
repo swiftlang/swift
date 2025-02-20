@@ -191,10 +191,10 @@ SolverTrail::Change::RecordedOpenedPackExpansionType(PackExpansionType *expansio
   return result;
 }
 
-SolverTrail::Change
-SolverTrail::Change::RecordedPackEnvironment(PackElementExpr *packElement) {
+SolverTrail::Change SolverTrail::Change::RecordedPackElementExpansion(
+    PackElementExpr *packElement) {
   Change result;
-  result.Kind = ChangeKind::RecordedPackEnvironment;
+  result.Kind = ChangeKind::RecordedPackElementExpansion;
   result.TheElement = packElement;
   return result;
 }
@@ -426,8 +426,8 @@ void SolverTrail::Change::undo(ConstraintSystem &cs) const {
     cs.removeOpenedPackExpansionType(TheExpansion);
     break;
 
-  case ChangeKind::RecordedPackEnvironment:
-    cs.removePackEnvironment(TheElement);
+  case ChangeKind::RecordedPackElementExpansion:
+    cs.removePackElementExpansion(TheElement);
     break;
 
   case ChangeKind::RecordedNodeType:
@@ -694,9 +694,9 @@ void SolverTrail::Change::dump(llvm::raw_ostream &out,
     out << ")\n";
     break;
 
-  case ChangeKind::RecordedPackEnvironment:
+  case ChangeKind::RecordedPackElementExpansion:
     // FIXME: Print short form of PackExpansionExpr
-    out << "(RecordedPackEnvironment ";
+    out << "(RecordedPackElementExpansion ";
     simple_display(out, TheElement);
     out << "\n";
     break;
