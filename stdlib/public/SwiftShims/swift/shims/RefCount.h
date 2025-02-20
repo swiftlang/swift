@@ -281,6 +281,8 @@ struct RefCountBitOffsets<8> {
   static const size_t SideTableMarkShift = SideTableBitCount;
   static const size_t SideTableMarkBitCount = 1;
   static const uint64_t SideTableMarkMask = maskForField(SideTableMark);
+  
+  static const uint64_t UniquelyReferencedMask = maskForField(IsDeiniting) | maskForField(UseSlowRC) | maskForField(StrongExtraRefCount);
 };
 
 // 32-bit inline
@@ -318,6 +320,8 @@ struct RefCountBitOffsets<4> {
   static const size_t SideTableMarkShift = SideTableBitCount;
   static const size_t SideTableMarkBitCount = 1;
   static const uint32_t SideTableMarkMask = maskForField(SideTableMark);
+  
+  static const uint32_t UniquelyReferencedMask = maskForField(IsDeiniting) | maskForField(UseSlowRC) | maskForField(StrongExtraRefCount);
 };
 
 
@@ -478,6 +482,11 @@ class RefCountBitsT {
       }
     }
   }
+  
+  SWIFT_ALWAYS_INLINE
+  bool hasSideTableOrIsImmortal() const {
+    return getUseSlowRC();
+  }
 
   SWIFT_ALWAYS_INLINE
   bool hasSideTable() const {
@@ -607,7 +616,7 @@ class RefCountBitsT {
   }
 
   SWIFT_ALWAYS_INLINE
-  bool isUniquelyReferenced() {
+  bool isUniquelyReferenced() const {
     static_assert(Offsets::UnownedRefCountBitCount +
                   Offsets::IsDeinitingBitCount +
                   Offsets::StrongExtraRefCountBitCount +
@@ -619,12 +628,7 @@ class RefCountBitsT {
     // IsDeiniting: false
     // StrongExtra: 0
     // UseSlowRC: false
-
-    if (SWIFT_UNLIKELY(getUseSlowRC() | getIsDeiniting() | (getStrongExtraRefCount() != 0))) {
-      return false;
-    }
-    
-    return true;
+    return (bits & Offsets::UniquelyReferencedMask) == 0;
   }
 
   SWIFT_ALWAYS_INLINE
@@ -954,11 +958,21 @@ class RefCounts {
   // Once deinit begins the reference count is undefined.
   bool isUniquelyReferenced() const {
     auto bits = refCounts.load(SWIFT_MEMORY_ORDER_CONSUME);
-    if (bits.hasSideTable())
+    //bits.isUniquelyReferenced already checks for `hasSideTable` via the `useSlowRC` check
+    if (SWIFT_LIKELY(bits.isUniquelyReferenced())) {
+      return true;
+    }
+
+    //We want to generate a single branch on the useSlowRC bit before bothering
+    // to check for immortality, so we avoid hasSideTable here which checks both
+    if (SWIFT_UNLIKELY(bits.hasSideTableOrIsImmortal())) {
+      if (bits.isImmortal(false)) {
+        return false;
+      }
       return bits.getSideTable()->isUniquelyReferenced();
+    }
     
-    assert(!bits.getIsDeiniting());
-    return bits.isUniquelyReferenced();
+    return false;
   }
 
   // Return true if the object has started deiniting.
@@ -1416,6 +1430,7 @@ class HeapObjectSideTableEntry {
     return refCounts.getCount();
   }
 
+  __attribute__((noinline))
   bool isUniquelyReferenced() const {
     return refCounts.isUniquelyReferenced();
   }
