@@ -83,6 +83,11 @@ EDUCATIONAL_NOTES(result_builder_missing_build_array,
 EDUCATIONAL_NOTES(multiple_inheritance,
                   "multiple-inheritance.md")
 
+EDUCATIONAL_NOTES(regionbasedisolation_named_send_yields_race,
+                  "sending-risks-data-race.md")
+EDUCATIONAL_NOTES(regionbasedisolation_type_send_yields_race,
+                  "sending-risks-data-race.md")
+
 EDUCATIONAL_NOTES(error_in_swift_lang_mode,
                   "error-in-future-swift-version.md")
 
