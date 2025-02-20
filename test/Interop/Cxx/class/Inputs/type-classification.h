@@ -274,4 +274,13 @@ struct HasCopyConstructorWithDefaultArgs {
       default;
 };
 
+struct HasMoveConstructorWithDefaultArgs {
+  int value;
+  HasMoveConstructorWithDefaultArgs(int value) : value(value) {}
+
+  HasMoveConstructorWithDefaultArgs(HasMoveConstructorWithDefaultArgs &&other,
+                                    int value = 1)
+      : value(other.value + value) {}
+};
+
 #endif // TEST_INTEROP_CXX_CLASS_INPUTS_TYPE_CLASSIFICATION_H

@@ -22,13 +22,18 @@ func testAnnotated() {
   _ = v
 }
 
-func testNonCopyable() {
+func testHasCopyTypeOperations() {
   let x = HasCopyConstructorWithDefaultArgs(5)
   let v = copy x // expected-error {{'copy' cannot be applied to noncopyable types}}
   _ = v
 }
 
+func testHasMoveTypeOperations() {
+  let x = HasMoveConstructorWithDefaultArgs(5) // expected-error {{cannot find 'HasMoveConstructorWithDefaultArgs' in scope}}
+}
+
 test()
 testField()
 testAnnotated()
-testNonCopyable()
+testHasCopyTypeOperations()
+testHasMoveTypeOperations()
