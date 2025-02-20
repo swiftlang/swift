@@ -48,7 +48,7 @@ Constraint::Constraint(ConstraintKind kind, ArrayRef<Constraint *> constraints,
 }
 
 static bool isAdmissibleType(Type type) {
-  return !type->hasUnboundGenericType();
+  return !type->hasUnboundGenericType() && !type->hasTypeParameter();
 }
 
 Constraint::Constraint(ConstraintKind Kind, Type First, Type Second,
