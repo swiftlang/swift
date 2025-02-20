@@ -857,6 +857,18 @@ static void determineBestChoicesInContext(
       if (auto *typeVar = argType->getAs<TypeVariableType>()) {
         auto bindingSet = cs.getBindingsFor(typeVar);
 
+        // We need to have a notion of "complete" binding set before
+        // we can allow inference from generic parameters and ternary,
+        // otherwise we'd make a favoring decision that might not be
+        // correct i.e. `v ?? (<<cond>> ? nil : o)` where `o` is `Int`.
+        // `getBindingsFor` doesn't currently infer transitive bindings
+        // which means that for a ternary we'd only have a single
+        // binding - `Int` which could lead to favoring overload of
+        // `??` and has non-optional parameter on the right-hand side.
+        if (typeVar->getImpl().getGenericParameter() ||
+            typeVar->getImpl().isTernary())
+          continue;
+
         auto restoreOptionality = [](Type type, unsigned numOptionals) {
           for (unsigned i = 0; i != numOptionals; ++i)
             type = type->wrapInOptionalType();
