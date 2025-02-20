@@ -499,6 +499,10 @@ public:
   /// function call.
   bool isFunctionResult() const;
 
+  /// Determine whether this type variable represents a type of the ternary
+  /// operator.
+  bool isTernary() const;
+
   /// Retrieve the representative of the equivalence class to which this
   /// type variable belongs.
   ///
