@@ -620,9 +620,11 @@ class RefCountBitsT {
     // StrongExtra: 0
     // UseSlowRC: false
 
-    // Compiler is clever enough to optimize this.
-    return
-      !getUseSlowRC() && !getIsDeiniting() && getStrongExtraRefCount() == 0;
+    if (SWIFT_UNLIKELY(getUseSlowRC() | getIsDeiniting() | (getStrongExtraRefCount() != 0))) {
+      return false;
+    }
+    
+    return true;
   }
 
   SWIFT_ALWAYS_INLINE
