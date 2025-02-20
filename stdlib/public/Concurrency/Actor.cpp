@@ -18,7 +18,9 @@
 #include "swift/Runtime/Concurrency.h"
 #include <atomic>
 #include <new>
+#if __has_feature(ptrauth_calls)
 #include <ptrauth.h>
+#endif
 
 #include "../CompatibilityOverride/CompatibilityOverride.h"
 #include "swift/ABI/Actor.h"
