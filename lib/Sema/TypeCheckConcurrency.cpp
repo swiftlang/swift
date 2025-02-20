@@ -3288,6 +3288,7 @@ namespace {
 
           case AutoClosureExpr::Kind::DoubleCurryThunk:
           case AutoClosureExpr::Kind::SingleCurryThunk:
+            return ReferencedActor(var, isPotentiallyIsolated, specificNonIsoClosureKind(dc));
           case AutoClosureExpr::Kind::None:
             break;
           }
