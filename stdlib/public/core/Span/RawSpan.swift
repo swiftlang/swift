@@ -21,7 +21,6 @@
 @available(SwiftStdlib 6.1, *)
 @frozen
 public struct RawSpan: ~Escapable, Copyable, BitwiseCopyable {
-
   /// The starting address of this `RawSpan`.
   ///
   /// `_pointer` can be `nil` if and only if `_count` equals 0.
@@ -740,3 +739,85 @@ extension RawSpan {
     return _overrideLifetime(newSpan, copying: self)
   }
 }
+
+// MARK: RawSpan._Cursor
+
+@available(SwiftStdlib 6.1, *)
+extension RawSpan {
+  @available(SwiftStdlib 6.1, *)
+  @frozen
+  public struct _Cursor: ~Escapable, Copyable, BitwiseCopyable {
+    /// The address of this cursor.
+    @usableFromInline
+    internal var _pointer: UnsafeRawPointer
+
+    @_alwaysEmitIntoClient
+    @inline(__always)
+    @lifetime(borrow pointer)
+    internal init(_unsafePointer pointer: UnsafeRawPointer) {
+      self._pointer = pointer
+    }
+    
+    @_alwaysEmitIntoClient
+    public func distance(to other: borrowing _Cursor) -> Int {
+      other._pointer - _pointer
+    }
+    
+    @_alwaysEmitIntoClient
+    public func isEqual(to other: borrowing _Cursor) -> Bool {
+      other._pointer == _pointer
+    }
+  }
+
+  @_alwaysEmitIntoClient
+  public var _hasCursors: Bool {
+    _pointer != nil
+  }
+  
+  @_alwaysEmitIntoClient
+  @lifetime(self)
+  public func _startCursor() -> _Cursor {
+    let cursor = _Cursor(_unsafePointer: _start())
+    return _overrideLifetime(cursor, copying: self)
+  }
+  
+  @_alwaysEmitIntoClient
+  @lifetime(self)
+  public func _endCursor() -> _Cursor {
+    var end = _startCursor()
+    end._pointer += _count
+    return end
+  }
+  
+  @_alwaysEmitIntoClient
+  public func _isAtEnd(_ cursor: borrowing _Cursor) -> Bool {
+    _count == (cursor._pointer - _start())
+  }
+
+  @_alwaysEmitIntoClient
+  public func _count(remainingAfter cursor: borrowing _Cursor) -> Int {
+    _count - (cursor._pointer - _start())
+  }
+  
+  @_alwaysEmitIntoClient
+  public func _consumingLoad<T: BitwiseCopyable>(
+    from cursor: inout _Cursor,
+    as: T.Type = T.self
+  ) -> T {
+    let newPointer = cursor._pointer + MemoryLayout<T>.stride
+    let end = _start() + _count
+    _precondition(newPointer <= end, "Read past end of RawSpan")
+    defer { cursor._pointer = newPointer }
+    return cursor._pointer.loadUnaligned(as: T.self)
+  } 
+  
+  @_alwaysEmitIntoClient
+  public func _uncheckedConsumingLoad<T: BitwiseCopyable>(
+    from cursor: inout _Cursor,
+    as: T.Type = T.self
+  ) -> T {
+    defer { cursor._pointer += MemoryLayout<T>.stride }
+    return cursor._pointer.loadUnaligned(as: T.self)
+  } 
+}
+
