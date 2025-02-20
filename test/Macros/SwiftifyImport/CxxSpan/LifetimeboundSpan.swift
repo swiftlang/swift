@@ -57,32 +57,32 @@ func myFunc8(_ ptr: UnsafeRawPointer, _ span: SpanOfInt, _ count: CInt, _ size: 
 func myFunc9(_ span: MutableSpanOfInt) -> MutableSpanOfInt {
 }
 
-// CHECK:      @_alwaysEmitIntoClient @lifetime(copy span)
+// CHECK:      @_alwaysEmitIntoClient @lifetime(copy span) public
 // CHECK-NEXT: func myFunc(_ span: Span<CInt>) -> Span<CInt> {
 // CHECK-NEXT:     return unsafe _cxxOverrideLifetime(Span(_unsafeCxxSpan: unsafe myFunc(SpanOfInt(span))), copying: ())
 // CHECK-NEXT: }
 
-// CHECK:      @_alwaysEmitIntoClient @lifetime(borrow vec) @_disfavoredOverload
+// CHECK:      @_alwaysEmitIntoClient @lifetime(borrow vec) @_disfavoredOverload public
 // CHECK-NEXT: func myFunc2(_ vec: borrowing VecOfInt) -> Span<CInt> {
 // CHECK-NEXT:     return unsafe _cxxOverrideLifetime(Span(_unsafeCxxSpan: unsafe myFunc2(vec)), copying: ())
 // CHECK-NEXT: }
 
-// CHECK:      @_alwaysEmitIntoClient @lifetime(copy span1, copy span2)
+// CHECK:      @_alwaysEmitIntoClient @lifetime(copy span1, copy span2) public
 // CHECK-NEXT: func myFunc3(_ span1: Span<CInt>, _ span2: Span<CInt>) -> Span<CInt> {
 // CHECK-NEXT:     return unsafe _cxxOverrideLifetime(Span(_unsafeCxxSpan: unsafe myFunc3(SpanOfInt(span1), SpanOfInt(span2))), copying: ())
 // CHECK-NEXT: }
 
-// CHECK:      @_alwaysEmitIntoClient @lifetime(borrow vec, copy span)
+// CHECK:      @_alwaysEmitIntoClient @lifetime(borrow vec, copy span) public
 // CHECK-NEXT: func myFunc4(_ vec: borrowing VecOfInt, _ span: Span<CInt>) -> Span<CInt> {
 // CHECK-NEXT:     return unsafe _cxxOverrideLifetime(Span(_unsafeCxxSpan: unsafe myFunc4(vec, SpanOfInt(span))), copying: ())
 // CHECK-NEXT: }
 
-// CHECK:      @_alwaysEmitIntoClient @lifetime(borrow self) @_disfavoredOverload
+// CHECK:      @_alwaysEmitIntoClient @lifetime(borrow self) @_disfavoredOverload public
 // CHECK-NEXT: func myFunc5() -> Span<CInt> {
 // CHECK-NEXT:     return unsafe _cxxOverrideLifetime(Span(_unsafeCxxSpan: unsafe myFunc5()), copying: ())
 // CHECK-NEXT: }
 
-// CHECK:      @_alwaysEmitIntoClient @lifetime(copy span)
+// CHECK:      @_alwaysEmitIntoClient @lifetime(copy span) public
 // CHECK-NEXT: func myFunc6(_ span: Span<CInt>, _ ptr: RawSpan, _ count: CInt, _ size: CInt) -> Span<CInt> {
 // CHECK-NEXT:     let _ptrCount: some BinaryInteger = count * size
 // CHECK-NEXT:     if ptr.byteCount < _ptrCount || _ptrCount < 0 {
@@ -93,7 +93,7 @@ func myFunc9(_ span: MutableSpanOfInt) -> MutableSpanOfInt {
 // CHECK-NEXT:     }), copying: ())
 // CHECK-NEXT: }
 
-// CHECK:      @_alwaysEmitIntoClient @lifetime(copy span)
+// CHECK:      @_alwaysEmitIntoClient @lifetime(copy span) public
 // CHECK-NEXT: func myFunc7(_ span: Span<CInt>, _ ptr: RawSpan, _ count: CInt, _ size: CInt) -> Span<CInt> {
 // CHECK-NEXT:     let _ptrCount: some BinaryInteger = count * size
 // CHECK-NEXT:     if ptr.byteCount < _ptrCount || _ptrCount < 0 {
@@ -104,7 +104,7 @@ func myFunc9(_ span: MutableSpanOfInt) -> MutableSpanOfInt {
 // CHECK-NEXT:     }), copying: ())
 // CHECK-NEXT: }
 
-// CHECK:      @_alwaysEmitIntoClient @lifetime(copy span)
+// CHECK:      @_alwaysEmitIntoClient @lifetime(copy span) public
 // CHECK-NEXT: func myFunc8(_ ptr: RawSpan, _ span: Span<CInt>, _ count: CInt, _ size: CInt) -> Span<CInt> {
 // CHECK-NEXT:     let _ptrCount: some BinaryInteger = count * size
 // CHECK-NEXT:     if ptr.byteCount < _ptrCount || _ptrCount < 0 {
@@ -115,7 +115,7 @@ func myFunc9(_ span: MutableSpanOfInt) -> MutableSpanOfInt {
 // CHECK-NEXT:     }), copying: ())
 // CHECK-NEXT: }
 
-// CHECK:      @_alwaysEmitIntoClient @lifetime(copy span) @lifetime(span: copy span)
+// CHECK:      @_alwaysEmitIntoClient @lifetime(copy span) @lifetime(span: copy span) public
 // CHECK-NEXT: func myFunc9(_ span: inout MutableSpan<CInt>) -> MutableSpan<CInt> {
 // CHECK-NEXT:     return unsafe _cxxOverrideLifetime(MutableSpan(_unsafeCxxSpan: unsafe span.withUnsafeMutableBufferPointer { _spanPtr in
 // CHECK-NEXT:         return unsafe myFunc9(MutableSpanOfInt(_spanPtr))

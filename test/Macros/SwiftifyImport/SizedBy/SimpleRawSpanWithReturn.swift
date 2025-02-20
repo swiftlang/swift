@@ -7,7 +7,7 @@
 func myFunc(_ ptr: UnsafeRawPointer, _ size: CInt) -> CInt {
 }
 
-// CHECK:      @_alwaysEmitIntoClient
+// CHECK:      @_alwaysEmitIntoClient public
 // CHECK-NEXT: func myFunc(_ ptr: RawSpan) -> CInt {
 // CHECK-NEXT:     return unsafe ptr.withUnsafeBytes { _ptrPtr in
 // CHECK-NEXT:         return unsafe myFunc(_ptrPtr.baseAddress!, CInt(exactly: ptr.byteCount)!)

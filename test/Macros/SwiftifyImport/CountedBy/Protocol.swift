@@ -8,7 +8,7 @@ protocol SimpleProtocol {
 }
 
 // CHECK:      extension SimpleProtocol {
-// CHECK-NEXT:   @_alwaysEmitIntoClient
+// CHECK-NEXT:   @_alwaysEmitIntoClient public
 // CHECK-NEXT:   func myFunc(_ ptr: UnsafeBufferPointer<CInt>) {
 // CHECK-NEXT:       return unsafe myFunc(ptr.baseAddress!, CInt(exactly: ptr.count)!)
 // CHECK-NEXT:   }
@@ -22,14 +22,14 @@ protocol SpanProtocol {
 }
 
 // CHECK:       extension SpanProtocol {
-// CHECK-NEXT:     @_alwaysEmitIntoClient
+// CHECK-NEXT:     @_alwaysEmitIntoClient public
 // CHECK-NEXT:       func foo(_ ptr: Span<CInt>) {
 // CHECK-NEXT:         return unsafe ptr.withUnsafeBufferPointer { _ptrPtr in
 // CHECK-NEXT:             return unsafe foo(_ptrPtr.baseAddress!, CInt(exactly: ptr.count)!)
 // CHECK-NEXT:           }
 // CHECK-NEXT:     }
 
-// CHECK-NEXT:     @_alwaysEmitIntoClient @lifetime(borrow self) @_disfavoredOverload
+// CHECK-NEXT:     @_alwaysEmitIntoClient @lifetime(borrow self) @_disfavoredOverload public
 // CHECK-NEXT:       func bar(_ len: CInt) -> Span<CInt> {
 // CHECK-NEXT:         return unsafe Span<CInt>(_unsafeStart: unsafe bar(len), count: Int(len))
 // CHECK-NEXT:     }
@@ -43,15 +43,14 @@ protocol MixedProtocol {
 }
 
 // CHECK:       extension MixedProtocol {
-// CHECK-NEXT:     @_alwaysEmitIntoClient
+// CHECK-NEXT:     @_alwaysEmitIntoClient public
 // CHECK-NEXT:       func foo(_ ptr: Span<CInt>) {
 // CHECK-NEXT:         return unsafe ptr.withUnsafeBufferPointer { _ptrPtr in
 // CHECK-NEXT:             return unsafe foo(_ptrPtr.baseAddress!, CInt(exactly: ptr.count)!)
 // CHECK-NEXT:           }
 // CHECK-NEXT:     }
-// CHECK-NEXT:     @_alwaysEmitIntoClient
+// CHECK-NEXT:     @_alwaysEmitIntoClient public
 // CHECK-NEXT:       func bar(_ ptr: UnsafeBufferPointer<CInt>) {
 // CHECK-NEXT:         return unsafe bar(ptr.baseAddress!, CInt(exactly: ptr.count)!)
 // CHECK-NEXT:     }
 // CHECK-NEXT: }
-
