@@ -86,6 +86,10 @@ public func retObjCProtocolNullable() -> ObjCProtocol? {
     return ObjCKlassConforming(2)
 }
 
+public func retObjClassArray() -> [ObjCKlass] {
+    return [ObjCKlass(1)]
+}
+
 //--- use-swift-objc-types.mm
 
 #include "header.h"
@@ -188,5 +192,14 @@ int main() {
 // CHECK-NEXT: ObjCKlassConforming: 2
 // CHECK-NEXT: destroy ObjCKlassConforming
 // DESTROY: destroy ObjCKlassConforming
+  puts("Part4");
+  @autoreleasepool {
+    swift::Array<ObjCKlass*> val = retObjClassArray();
+    assert(val[0].getValue == 1);
+    assert(globalCounter == 1);
+  }
+  assert(globalCounter == 0);
+// CHECK: create ObjCKlass
+// DESTROY: destroy ObjCKlass
   return 0;
 }
