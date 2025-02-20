@@ -83,6 +83,8 @@ public:
 private:
   void tempLValueOpt(CopyAddrInst *copyInst);
   void combineCopyAndDestroy(CopyAddrInst *copyInst);
+  bool hasInvalidApplyArgumentAliasing(SILInstruction *inst, SILValue tempAddr,
+                                       SILValue destAddr, AliasAnalysis *aa);
 };
 
 void TempLValueOptPass::run() {
@@ -230,6 +232,11 @@ void TempLValueOptPass::tempLValueOpt(CopyAddrInst *copyInst) {
           projections.contains(inst) == 0)
         return;
 
+      // Check if replacing the temporary with destination would invalidate an applied
+      // function's alias rules of indirect arguments.
+      if (hasInvalidApplyArgumentAliasing(inst, temporary, destination, AA))
+        return;
+      
       if (needDestroyEarly && isDeinitBarrier(inst, bca))
         return;
     }
@@ -267,6 +274,45 @@ void TempLValueOptPass::tempLValueOpt(CopyAddrInst *copyInst) {
   temporary->eraseFromParent();
   copyInst->eraseFromParent();
   invalidateAnalysis(SILAnalysis::InvalidationKind::Instructions);
+}
+
+/// Returns true if after replacing tempAddr with destAddr an apply instruction
+/// would have invalid aliasing of indirect arguments.
+/// 
+/// An indirect argument (except `@inout_aliasable`) must not alias with another
+/// indirect argument. Now, if we would replace tempAddr with destAddr in
+/// 
+///   apply %f(%tempAddr, %destAddr) : (@in T) -> @out T
+///   
+/// we would invalidate this rule.
+/// This is even true if the called function does not read from destAddr.
+///
+bool TempLValueOptPass::hasInvalidApplyArgumentAliasing(SILInstruction *inst,
+                                                        SILValue tempAddr,
+                                                        SILValue destAddr,
+                                                        AliasAnalysis *aa) {
+  auto as = FullApplySite::isa(inst);
+  if (!as)
+    return false;
+  
+  bool tempAccessed = false;
+  bool destAccessed = false;
+  bool mutatingAccess = false;
+  for (Operand &argOp : as.getArgumentOperands()) {
+    auto conv = as.getArgumentConvention(argOp);
+    if (conv.isExclusiveIndirectParameter()) {
+      if (aa->mayAlias(tempAddr, argOp.get())) {
+        tempAccessed = true;
+        if (!conv.isGuaranteedConventionInCaller())
+          mutatingAccess = true;
+      } else if (aa->mayAlias(destAddr, argOp.get())) {
+        destAccessed = true;
+        if (!conv.isGuaranteedConventionInCaller())
+          mutatingAccess = true;
+      }
+    }
+  }
+  return mutatingAccess && tempAccessed && destAccessed;
 }
 
 void TempLValueOptPass::combineCopyAndDestroy(CopyAddrInst *copyInst) {
