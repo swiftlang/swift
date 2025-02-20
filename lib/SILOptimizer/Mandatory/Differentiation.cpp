@@ -681,15 +681,28 @@ DifferentiationTransformer::emitDerivativeFunctionReference(
     }
     assert(minimalWitness);
     if (original->getFunction()->isSerialized()) {
-      // When dealing with curry thunk, look at the function being wrapped
-      // inside implicit closure. If it has public visibility, the corresponding
-      // differentiability witness also has public visibility. It should be OK
-      // for implicit wrapper closure and its witness to have private linkage.
-      SILFunction *unwrappedFn = getUnwrappedCurryThunkFunction(originalFn);
-      bool isWitnessPublic =
-          unwrappedFn == nullptr
-              ? hasPublicVisibility(minimalWitness->getLinkage())
-              : hasPublicVisibility(unwrappedFn->getLinkage());
+      bool isWitnessPublic;
+      if (SILFunction *unwrappedFn =
+              getUnwrappedCurryThunkFunction(originalFn)) {
+        // When dealing with curry thunk, look at the function being wrapped
+        // inside implicit closure. If it has public visibility, the
+        // corresponding differentiability witness also has public visibility.
+        // It should be OK for implicit wrapper closure and its witness to have
+        // private linkage.
+        isWitnessPublic = hasPublicVisibility(unwrappedFn->getLinkage());
+      } else if (originalFn->getDeclRef().getAbstractClosureExpr() &&
+                 originalFRI->getFunction()
+                     ->getDeclRef()
+                     .isDefaultArgGenerator()) {
+        // If we reference a closure from inside default argument generator,
+        // check against generator's visibility. If the function having this
+        // default argument has public visibility, it's OK to have a closure
+        // (which always has private visibility) as its default value.
+        isWitnessPublic =
+            hasPublicVisibility(originalFRI->getFunction()->getLinkage());
+      } else {
+        isWitnessPublic = hasPublicVisibility(minimalWitness->getLinkage());
+      }
       if (!isWitnessPublic) {
         enum { Inlinable = 0, DefaultArgument = 1 };
         unsigned fragileKind = Inlinable;
