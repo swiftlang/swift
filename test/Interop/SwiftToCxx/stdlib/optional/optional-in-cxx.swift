@@ -1,6 +1,6 @@
 // RUN: %empty-directory(%t)
 
-// RUN: %target-swift-frontend -typecheck %s -typecheck -module-name UseOptional -enable-experimental-cxx-interop -clang-header-expose-decls=all-public -emit-clang-header-path %t/useopt.h
+// RUN: %target-swift-frontend %s -module-name UseOptional -enable-experimental-cxx-interop -clang-header-expose-decls=all-public -typecheck -verify -emit-clang-header-path %t/useopt.h
 
 // RUN: %check-interop-cxx-header-in-clang(%t/useopt.h -DSWIFT_CXX_INTEROP_HIDE_STL_OVERLAY)
 

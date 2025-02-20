@@ -1,7 +1,7 @@
 // REQUIRES: objc_interop
 
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -F %S/Inputs/ -typecheck -emit-objc-header-path %t/textual-imports.h -emit-clang-header-nonmodular-includes %s 
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -F %S/Inputs/ -typecheck -verify -emit-objc-header-path %t/textual-imports.h -emit-clang-header-nonmodular-includes %s 
 // RUN: %FileCheck %s < %t/textual-imports.h
 // RUN: %check-in-clang -fno-modules -Qunused-arguments %t/textual-imports.h -F %S/Inputs
 

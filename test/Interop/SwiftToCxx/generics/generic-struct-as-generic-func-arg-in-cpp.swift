@@ -1,7 +1,7 @@
 // RUN: %empty-directory(%t)
 // RUN: split-file %s %t
 
-// RUN: %target-swift-frontend -typecheck %t/generics.swift -typecheck -module-name Generics -enable-experimental-cxx-interop -emit-clang-header-path %t/Generics-Swift.h
+// RUN: %target-swift-frontend %t/generics.swift -module-name Generics -enable-experimental-cxx-interop -typecheck -verify -emit-clang-header-path %t/Generics-Swift.h
 
 // RUN: %target-interop-build-clangxx -fno-exceptions -std=gnu++20 -c %t/generics.cpp -I %t -o %t/generics.o
 // RUN: %target-build-swift %t/generics.swift -o %t/generics -Xlinker %t/generics.o -module-name Generics -Xfrontend -entry-point-function-name -Xfrontend swiftMain

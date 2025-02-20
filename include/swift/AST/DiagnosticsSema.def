@@ -6345,6 +6345,17 @@ ERROR(invalid_objc_swift_rooted_class,none,
 NOTE(invalid_objc_swift_root_class_insert_nsobject,none,
      "inherit from 'NSObject' to silence this error", ())
 
+WARNING(objc_header_sorting_arbitrary,none,
+        "arbitrarily printing %0 before %1 in generated header; subsequent "
+        "compilations may print them in a different order",
+        (Decl *, Decl *))
+NOTE(objc_header_sorting_arbitrary_other,none,
+     "%1 will be printed after %0 during this compilation",
+     (Decl *, Decl *))
+NOTE(objc_header_sorting_arbitrary_please_report,none,
+     "please report this as a bug in the Swift compiler and describe both "
+     "declarations", ())
+
 ERROR(invalid_nonobjc_decl,none,
       "only class members and extensions of classes can be declared @nonobjc", ())
 ERROR(invalid_nonobjc_extension,none,
