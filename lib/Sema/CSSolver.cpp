@@ -858,9 +858,10 @@ bool ConstraintSystem::Candidate::solve(
     auto constraintKind = ConstraintKind::Conversion;
     if (CTP == CTP_CallArgument)
       constraintKind = ConstraintKind::ArgumentConversion;
-
-    cs.addConstraint(constraintKind, cs.getType(E), CT,
-                     cs.getConstraintLocator(E), /*isFavored=*/true);
+    if (!CT->hasUnboundGenericType()) {
+      cs.addConstraint(constraintKind, cs.getType(E), CT,
+                       cs.getConstraintLocator(E), /*isFavored=*/true);
+    }
   }
 
   // Try to solve the system and record all available solutions.
