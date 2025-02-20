@@ -91,6 +91,12 @@ EDUCATIONAL_NOTES(shared_mutable_state_decl,
                   "mutable-global-variable.md")
 EDUCATIONAL_NOTES(shared_immutable_state_decl,
                   "mutable-global-variable.md")
+EDUCATIONAL_NOTES(non_sendable_capture,
+                  "sendable-closure-captures.md")
+EDUCATIONAL_NOTES(concurrent_access_of_local_capture,
+                  "sendable-closure-captures.md")
+EDUCATIONAL_NOTES(concurrent_access_of_inout_param,
+                  "sendable-closure-captures.md")
 
 EDUCATIONAL_NOTES(error_in_swift_lang_mode,
                   "error-in-future-swift-version.md")
