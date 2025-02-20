@@ -296,7 +296,7 @@ ERROR(returns_retained_or_returns_unretained_for_non_cxx_frt_values, none,
       (const clang::NamedDecl *))
 
 // TODO: make this case an error in next cxx-interop versions rdar://138806722
-WARNING(no_returns_retained_returns_unretained, none,
+ERROR(no_returns_retained_returns_unretained, none,
         "%0 should be annotated with either SWIFT_RETURNS_RETAINED or "
         "SWIFT_RETURNS_UNRETAINED as it is returning a SWIFT_SHARED_REFERENCE",
         (const clang::NamedDecl *))
