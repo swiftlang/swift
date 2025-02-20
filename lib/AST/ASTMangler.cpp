@@ -3287,8 +3287,7 @@ void ASTMangler::appendFunctionSignature(AnyFunctionType *fn,
     break;
 
   case FunctionTypeIsolation::Kind::NonIsolatedCaller:
-    // TODO: We need a special mangling for this to
-    // make it distinct from the `@execution(concurrent)`.
+    appendOperator("YC");
     break;
   }
 

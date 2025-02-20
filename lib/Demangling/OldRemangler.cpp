@@ -858,6 +858,12 @@ ManglingError Remangler::mangleIsolatedAnyFunctionType(Node *node,
   return ManglingError::Success;
 }
 
+ManglingError Remangler::mangleNonIsolatedCallerFunctionType(Node *node,
+                                                             unsigned depth) {
+  Buffer << "YC";
+  return ManglingError::Success;
+}
+
 ManglingError Remangler::mangleSendingResultFunctionType(Node *node,
                                                          unsigned depth) {
   Buffer << "YT";
