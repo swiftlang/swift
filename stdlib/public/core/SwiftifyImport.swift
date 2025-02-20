@@ -60,7 +60,7 @@ public enum _SwiftifyInfo {
 /// safety of the generated wrapper function depends on this info being extensive and accurate.
 #if hasFeature(Macros)
 @attached(peer, names: overloaded)
-public macro _SwiftifyImport(_ paramInfo: _SwiftifyInfo..., typeMappings: [String: String] = [:]) =
+public macro _SwiftifyImport(_ paramInfo: _SwiftifyInfo..., availability: [String: String] = [:], typeMappings: [String: String] = [:]) =
     #externalMacro(module: "SwiftMacros", type: "SwiftifyImportMacro")
 #endif
 
@@ -71,7 +71,7 @@ public macro _SwiftifyImport(_ paramInfo: _SwiftifyInfo..., typeMappings: [Strin
 /// _SwiftifyImportProtocolMethod, so they should not affect linkage since there are never any instances
 /// at runtime.
 public enum _SwiftifyProtocolMethodInfo {
-    case method(name: String, paramInfo: [_SwiftifyInfo])
+    case method(signature: String, paramInfo: [_SwiftifyInfo])
 }
 
 /// Like _SwiftifyImport, but since protocols cannot contain function implementations they need to
@@ -81,6 +81,47 @@ public enum _SwiftifyProtocolMethodInfo {
 #if hasFeature(Macros)
 @attached(extension, names: arbitrary)
 public macro _SwiftifyImportProtocol(_ methodInfo: _SwiftifyProtocolMethodInfo...,
+                                     availability: [String: String] = [:],
                                      typeMappings: [String: String] = [:]) =
     #externalMacro(module: "SwiftMacros", type: "SwiftifyImportProtocolMacro")
 #endif
+
+/// Unsafely discard any lifetime dependency on the `dependent` argument. Return
+/// a value identical to `dependent` with a lifetime dependency on the caller's
+/// borrow scope of the `source` argument.
+///
+/// This mimics the stdlib definition. It is public for use with import macros.
+@unsafe
+@_unsafeNonescapableResult
+@_alwaysEmitIntoClient
+@_transparent
+@lifetime(borrow source)
+public func _swiftifyOverrideLifetime<
+  T: ~Copyable & ~Escapable, U: ~Copyable & ~Escapable
+>(
+  _ dependent: consuming T, borrowing source: borrowing U
+) -> T {
+  // TODO: Remove @_unsafeNonescapableResult. Instead, the unsafe dependence
+  // should be expressed by a builtin that is hidden within the function body.
+  dependent
+}
+
+/// Unsafely discard any lifetime dependency on the `dependent` argument. Return
+/// a value identical to `dependent` that inherits all lifetime dependencies from
+/// the `source` argument.
+///
+/// This mimics the stdlib definition. It is public for use with import macros.
+@unsafe
+@_unsafeNonescapableResult
+@_alwaysEmitIntoClient
+@_transparent
+@lifetime(copy source)
+public func _swiftifyOverrideLifetime<
+  T: ~Copyable & ~Escapable, U: ~Copyable & ~Escapable
+>(
+  _ dependent: consuming T, copying source: borrowing U
+) -> T {
+  // TODO: Remove @_unsafeNonescapableResult. Instead, the unsafe dependence
+  // should be expressed by a builtin that is hidden within the function body.
+  dependent
+}

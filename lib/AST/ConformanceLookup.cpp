@@ -533,6 +533,22 @@ static ProtocolConformanceRef getPackTypeConformance(
       PackConformance::get(type, protocol, patternConformances));
 }
 
+static bool shouldExpandExtensionMacro(Evaluator &evaluator, NominalTypeDecl *nominal) {
+  if (evaluator.hasActiveRequest(ExpandExtensionMacros{nominal})) {
+    return false;
+  }
+
+  // Expanding an extension macro for this type will require pretty printing the node,
+  // leading to evaluation of it's members. Once the macro expansion requrest has started
+  // it's too late to check for cycles.
+  for (auto member : nominal->getMembers())
+    if (auto VD = dyn_cast<ValueDecl>(member))
+      if (evaluator.hasActiveRequest(InterfaceTypeRequest{VD}))
+        return false;
+
+  return true;
+}
+
 ProtocolConformanceRef
 LookupConformanceInModuleRequest::evaluate(
     Evaluator &evaluator, LookupConformanceDescriptor desc) const {
@@ -670,10 +686,11 @@ LookupConformanceInModuleRequest::evaluate(
   // extension macro can generate a conformance to the
   // given protocol, but conformance macros do not specify
   // that information upfront.
-  (void)evaluateOrDefault(
-      ctx.evaluator,
-      ExpandExtensionMacros{nominal},
-      { });
+  if (shouldExpandExtensionMacro(ctx.evaluator, nominal))
+    (void)evaluateOrDefault(
+        evaluator,
+        ExpandExtensionMacros{nominal},
+        { });
 
   // Find the root conformance in the nominal type declaration's
   // conformance lookup table.

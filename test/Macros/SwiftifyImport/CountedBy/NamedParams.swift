@@ -26,33 +26,33 @@ func allNamed(ptr: UnsafePointer<CInt>, len: CInt) {
 func allNamedOther(buf ptr: UnsafePointer<CInt>, count len: CInt) {
 }
 
-// CHECK: @_alwaysEmitIntoClient public
-// CHECK-NEXT: func ptrNamed(ptr: UnsafeBufferPointer<CInt>) {
+// CHECK: @_alwaysEmitIntoClient
+// CHECK-NEXT: public func ptrNamed(ptr: UnsafeBufferPointer<CInt>) {
 // CHECK-NEXT:     return unsafe ptrNamed(ptr: ptr.baseAddress!, CInt(exactly: ptr.count)!)
 // CHECK-NEXT: }
 
-// CHECK: @_alwaysEmitIntoClient public
-// CHECK-NEXT: func ptrNamedOther(buf ptr: UnsafeBufferPointer<CInt>) {
+// CHECK: @_alwaysEmitIntoClient
+// CHECK-NEXT: public func ptrNamedOther(buf ptr: UnsafeBufferPointer<CInt>) {
 // CHECK-NEXT:     return unsafe ptrNamedOther(buf: ptr.baseAddress!, CInt(exactly: ptr.count)!)
 // CHECK-NEXT: }
 
-// CHECK: @_alwaysEmitIntoClient public
-// CHECK-NEXT: func lenNamed(_ ptr: UnsafeBufferPointer<CInt>) {
+// CHECK: @_alwaysEmitIntoClient
+// CHECK-NEXT: public func lenNamed(_ ptr: UnsafeBufferPointer<CInt>) {
 // CHECK-NEXT:     return unsafe lenNamed(ptr.baseAddress!, len: CInt(exactly: ptr.count)!)
 // CHECK-NEXT: }
 
-// CHECK: @_alwaysEmitIntoClient public
-// CHECK-NEXT: func lenNamedOther(_ ptr: UnsafeBufferPointer<CInt>) {
+// CHECK: @_alwaysEmitIntoClient
+// CHECK-NEXT: public func lenNamedOther(_ ptr: UnsafeBufferPointer<CInt>) {
 // CHECK-NEXT:     return unsafe lenNamedOther(ptr.baseAddress!, count: CInt(exactly: ptr.count)!)
 // CHECK-NEXT: }
 
-// CHECK: @_alwaysEmitIntoClient public
-// CHECK-NEXT: func allNamed(ptr: UnsafeBufferPointer<CInt>) {
+// CHECK: @_alwaysEmitIntoClient
+// CHECK-NEXT: public func allNamed(ptr: UnsafeBufferPointer<CInt>) {
 // CHECK-NEXT:     return unsafe allNamed(ptr: ptr.baseAddress!, len: CInt(exactly: ptr.count)!)
 // CHECK-NEXT: }
 
-// CHECK: @_alwaysEmitIntoClient public
-// CHECK-NEXT: func allNamedOther(buf ptr: UnsafeBufferPointer<CInt>) {
+// CHECK: @_alwaysEmitIntoClient
+// CHECK-NEXT: public func allNamedOther(buf ptr: UnsafeBufferPointer<CInt>) {
 // CHECK-NEXT:     return unsafe allNamedOther(buf: ptr.baseAddress!, count: CInt(exactly: ptr.count)!)
 // CHECK-NEXT: }
 

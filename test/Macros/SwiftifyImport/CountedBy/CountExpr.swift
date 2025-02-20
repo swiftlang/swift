@@ -6,8 +6,8 @@
 func myFunc(_ ptr: UnsafePointer<CInt>, _ size: CInt, _ count: CInt) {
 }
 
-// CHECK:      @_alwaysEmitIntoClient public
-// CHECK-NEXT: func myFunc(_ ptr: UnsafeBufferPointer<CInt>, _ size: CInt, _ count: CInt) {
+// CHECK:      @_alwaysEmitIntoClient
+// CHECK-NEXT: public func myFunc(_ ptr: UnsafeBufferPointer<CInt>, _ size: CInt, _ count: CInt) {
 // CHECK-NEXT:     let _ptrCount: some BinaryInteger = size * count
 // CHECK-NEXT:     if ptr.count < _ptrCount || _ptrCount < 0 {
 // CHECK-NEXT:         fatalError("bounds check failure when calling unsafe function")

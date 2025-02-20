@@ -10,13 +10,13 @@ func foo(_ ptr: Swift.UnsafePointer<Swift.Int>, _ len: Swift.Int) -> Swift.Void 
 func bar(_ ptr: Swift.UnsafePointer<Swift.CInt>, _ len: Swift.Int) -> () {
 }
 
-// CHECK:      @_alwaysEmitIntoClient public
-// CHECK-NEXT: func foo(_ ptr: Swift.UnsafeBufferPointer<Swift.Int>) -> Swift.Void {
+// CHECK:      @_alwaysEmitIntoClient
+// CHECK-NEXT: public func foo(_ ptr: Swift.UnsafeBufferPointer<Swift.Int>) -> Swift.Void {
 // CHECK-NEXT:     return unsafe foo(ptr.baseAddress!, ptr.count)
 // CHECK-NEXT: }
 
-// CHECK:      @_alwaysEmitIntoClient public
-// CHECK-NEXT: func bar(_ ptr: Swift.UnsafeBufferPointer<Swift.CInt>) -> () {
+// CHECK:      @_alwaysEmitIntoClient
+// CHECK-NEXT: public func bar(_ ptr: Swift.UnsafeBufferPointer<Swift.CInt>) -> () {
 // CHECK-NEXT:     return unsafe bar(ptr.baseAddress!, ptr.count)
 // CHECK-NEXT: }
 

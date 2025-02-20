@@ -58,7 +58,7 @@ extension CxxVector {
     borrowing get {
       let buffer = unsafe UnsafeBufferPointer(start: self.__dataUnsafe(), count: Int(self.size()))
       let span = unsafe Span(_unsafeElements: buffer)
-      return unsafe _cxxOverrideLifetime(span, borrowing: self)
+      return unsafe _swiftifyOverrideLifetime(span, borrowing: self)
     }
   }
 }

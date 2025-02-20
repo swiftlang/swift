@@ -1375,6 +1375,13 @@ static SourceFile *evaluateAttachedMacro(MacroDecl *macro, Decl *attachedTo,
   } else if (role == MacroRole::Conformance || role == MacroRole::Extension) {
     // Conformance macros always expand to extensions at file-scope.
     dc = attachedTo->getDeclContext()->getParentSourceFile();
+    if (!dc) {
+      assert(isa<ClangModuleUnit>(
+          attachedTo->getDeclContext()->getModuleScopeContext()));
+      dc = attachedTo->getDeclContext();
+      // decls imported from clang do not have a SourceFile
+      assert(isa<FileUnit>(dc));
+    }
   } else {
     dc = attachedTo->getInnermostDeclContext();
   }

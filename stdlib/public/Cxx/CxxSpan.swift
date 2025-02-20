@@ -18,46 +18,6 @@ internal func unsafeBitCast<T: ~Escapable, U>(
   Builtin.reinterpretCast(x)
 }
 
-/// Unsafely discard any lifetime dependency on the `dependent` argument. Return
-/// a value identical to `dependent` with a lifetime dependency on the caller's
-/// borrow scope of the `source` argument.
-///
-/// This mimics the stdlib definition. It is public for use with import macros.
-@unsafe
-@_unsafeNonescapableResult
-@_alwaysEmitIntoClient
-@_transparent
-@lifetime(borrow source)
-public func _cxxOverrideLifetime<
-  T: ~Copyable & ~Escapable, U: ~Copyable & ~Escapable
->(
-  _ dependent: consuming T, borrowing source: borrowing U
-) -> T {
-  // TODO: Remove @_unsafeNonescapableResult. Instead, the unsafe dependence
-  // should be expressed by a builtin that is hidden within the function body.
-  dependent
-}
-
-/// Unsafely discard any lifetime dependency on the `dependent` argument. Return
-/// a value identical to `dependent` that inherits all lifetime dependencies from
-/// the `source` argument.
-///
-/// This mimics the stdlib definition. It is public for use with import macros.
-@unsafe
-@_unsafeNonescapableResult
-@_alwaysEmitIntoClient
-@_transparent
-@lifetime(copy source)
-public func _cxxOverrideLifetime<
-  T: ~Copyable & ~Escapable, U: ~Copyable & ~Escapable
->(
-  _ dependent: consuming T, copying source: borrowing U
-) -> T {
-  // TODO: Remove @_unsafeNonescapableResult. Instead, the unsafe dependence
-  // should be expressed by a builtin that is hidden within the function body.
-  dependent
-}
-
 /// A C++ type that is an object that can refer to a contiguous sequence of objects.
 ///
 /// C++ standard library type `std::span` conforms to this protocol.
@@ -111,7 +71,7 @@ extension Span {
     let buffer = unsafe UnsafeBufferPointer(start: span.__dataUnsafe(), count: Int(span.size()))
     let newSpan = unsafe Span(_unsafeElements: buffer)
     // 'self' is limited to the caller's scope of the variable passed to the 'span' argument.
-    self = unsafe _cxxOverrideLifetime(newSpan, borrowing: span)
+    self = unsafe _swiftifyOverrideLifetime(newSpan, borrowing: span)
   }
 }
 
@@ -127,7 +87,7 @@ extension MutableSpan {
     let buffer = unsafe UnsafeMutableBufferPointer(start: span.__dataUnsafe(), count: Int(span.size()))
     let newSpan = unsafe MutableSpan(_unsafeElements: buffer)
     // 'self' is limited to the caller's scope of the variable passed to the 'span' argument.
-    self = unsafe _cxxOverrideLifetime(newSpan, borrowing: span)
+    self = unsafe _swiftifyOverrideLifetime(newSpan, borrowing: span)
   }
 }
 

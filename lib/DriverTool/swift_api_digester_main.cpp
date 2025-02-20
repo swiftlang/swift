@@ -652,6 +652,7 @@ public:
         ProtocolReqAllowlist(std::move(prAllowlist)),
         DebugMapping(DebugMapping) {}
 
+
   void diagnoseMissingAvailable(SDKNodeDecl *D) {
     // For extensions of external types, we diagnose individual member's missing
     // available attribute instead of the extension itself.

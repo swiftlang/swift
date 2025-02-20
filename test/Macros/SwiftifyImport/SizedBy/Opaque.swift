@@ -26,45 +26,45 @@ func nullableSpan(_ ptr: OpaquePointer?, _ size: CInt) {
 func impNullableSpan(_ ptr: OpaquePointer!, _ size: CInt) {
 }
 
-// CHECK:      @_alwaysEmitIntoClient public
-// CHECK-NEXT: func nonnullUnsafeRawBufferPointer(_ ptr: UnsafeRawBufferPointer) {
+// CHECK:      @_alwaysEmitIntoClient
+// CHECK-NEXT: public func nonnullUnsafeRawBufferPointer(_ ptr: UnsafeRawBufferPointer) {
 // CHECK-NEXT:     return unsafe nonnullUnsafeRawBufferPointer(OpaquePointer(ptr.baseAddress!), CInt(exactly: ptr.count)!)
 // CHECK-NEXT: }
 
-// CHECK:      @_alwaysEmitIntoClient public
-// CHECK-NEXT: func nullableUnsafeRawBufferPointer(_ ptr: UnsafeRawBufferPointer?) {
+// CHECK:      @_alwaysEmitIntoClient
+// CHECK-NEXT: public func nullableUnsafeRawBufferPointer(_ ptr: UnsafeRawBufferPointer?) {
 // CHECK-NEXT:     return unsafe nullableUnsafeRawBufferPointer(OpaquePointer(ptr?.baseAddress), CInt(exactly: ptr?.count ?? 0)!)
 // CHECK-NEXT: }
 
-// CHECK:      @_alwaysEmitIntoClient public
-// CHECK-NEXT: func impNullableUnsafeRawBufferPointer(_ ptr: UnsafeRawBufferPointer) {
+// CHECK:      @_alwaysEmitIntoClient
+// CHECK-NEXT: public func impNullableUnsafeRawBufferPointer(_ ptr: UnsafeRawBufferPointer) {
 // CHECK-NEXT:     return unsafe impNullableUnsafeRawBufferPointer(OpaquePointer(ptr.baseAddress!), CInt(exactly: ptr.count)!)
 // CHECK-NEXT: }
 
-// CHECK:      @_alwaysEmitIntoClient public
-// CHECK-NEXT: func nonnullSpan(_ ptr: RawSpan) {
+// CHECK:      @_alwaysEmitIntoClient
+// CHECK-NEXT: public func nonnullSpan(_ ptr: RawSpan) {
 // CHECK-NEXT:     return unsafe ptr.withUnsafeBytes { _ptrPtr in
-// CHECK-NEXT:         return unsafe nonnullSpan(OpaquePointer(_ptrPtr.baseAddress!), CInt(exactly: ptr.byteCount)!)
+// CHECK-NEXT:         return unsafe nonnullSpan(OpaquePointer(_ptrPtr.baseAddress!), CInt(exactly: _ptrPtr.count)!)
 // CHECK-NEXT:     }
 // CHECK-NEXT: }
 
-// CHECK:      @_alwaysEmitIntoClient public
-// CHECK-NEXT: func nullableSpan(_ ptr: RawSpan?) {
+// CHECK:      @_alwaysEmitIntoClient
+// CHECK-NEXT: public func nullableSpan(_ ptr: RawSpan?) {
 // CHECK-NEXT:     return { () in
 // CHECK-NEXT:         return if ptr == nil {
 // CHECK-NEXT:             unsafe nullableSpan(nil, CInt(exactly: ptr?.byteCount ?? 0)!)
 // CHECK-NEXT:         } else {
 // CHECK-NEXT:             unsafe ptr!.withUnsafeBytes { _ptrPtr in
-// CHECK-NEXT:                 return unsafe nullableSpan(OpaquePointer(_ptrPtr.baseAddress), CInt(exactly: ptr?.byteCount ?? 0)!)
+// CHECK-NEXT:                 return unsafe nullableSpan(OpaquePointer(_ptrPtr.baseAddress), CInt(exactly: _ptrPtr.count)!)
 // CHECK-NEXT:             }
 // CHECK-NEXT:         }
 // CHECK-NEXT:     }()
 // CHECK-NEXT: }
 
-// CHECK:      @_alwaysEmitIntoClient public
-// CHECK-NEXT: func impNullableSpan(_ ptr: RawSpan) {
+// CHECK:      @_alwaysEmitIntoClient
+// CHECK-NEXT: public func impNullableSpan(_ ptr: RawSpan) {
 // CHECK-NEXT:     return unsafe ptr.withUnsafeBytes { _ptrPtr in
-// CHECK-NEXT:         return unsafe impNullableSpan(OpaquePointer(_ptrPtr.baseAddress!), CInt(exactly: ptr.byteCount)!)
+// CHECK-NEXT:         return unsafe impNullableSpan(OpaquePointer(_ptrPtr.baseAddress!), CInt(exactly: _ptrPtr.count)!)
 // CHECK-NEXT:     }
 // CHECK-NEXT: }
 

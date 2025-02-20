@@ -5,7 +5,7 @@
 // RUN: %target-swift-ide-test -plugin-path %swift-plugin-dir -I %t/Inputs -cxx-interoperability-mode=upcoming-swift -enable-experimental-feature SafeInteropWrappers -print-module -module-to-print=Method -source-filename=x | %FileCheck %s
 // RUN: %target-swift-frontend -plugin-path %swift-plugin-dir -I %t/Inputs -cxx-interoperability-mode=default -enable-experimental-feature SafeInteropWrappers %t/method.swift -dump-macro-expansions -typecheck -verify
 
-// CHECK: @_alwaysEmitIntoClient 
+// CHECK: @_alwaysEmitIntoClient
 // CHECK-SAME: public mutating func bar(_ p: UnsafeMutableBufferPointer<Float>)
 
 //--- Inputs/module.modulemap
@@ -23,8 +23,8 @@ public:
 
 //--- method.swift
 import Method
-  
+
 func test(s: UnsafeMutableBufferPointer<Float>) {
   var foo = Foo()
   foo.bar(s)
-}    
+}

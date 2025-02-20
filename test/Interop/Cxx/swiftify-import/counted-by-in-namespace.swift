@@ -22,7 +22,7 @@ namespace foo {
 
 //--- namespace.swift
 import Namespace
-  
+
 func test(s: UnsafeMutableBufferPointer<Float>) {
   foo.bar(s)
-}    
+}

@@ -19,24 +19,24 @@ func lifetimeDependentCopy(_ p: UnsafePointer<CInt>, _ len1: CInt, _ len2: CInt)
 func lifetimeDependentBorrow(_ p: borrowing UnsafePointer<CInt>, _ len1: CInt, _ len2: CInt) -> UnsafePointer<CInt> {
 }
 
-// CHECK:      @_alwaysEmitIntoClient @_disfavoredOverload public
-// CHECK-NEXT: func myFunc(_ len: CInt) -> UnsafeMutableBufferPointer<CInt> {
+// CHECK:      @_alwaysEmitIntoClient @_disfavoredOverload
+// CHECK-NEXT: public func myFunc(_ len: CInt) -> UnsafeMutableBufferPointer<CInt> {
 // CHECK-NEXT:     return unsafe UnsafeMutableBufferPointer<CInt> (start: unsafe myFunc(len), count: Int(len))
 // CHECK-NEXT: }
 
-// CHECK:      @_alwaysEmitIntoClient @_disfavoredOverload public
-// CHECK-NEXT: func nonEscaping(_ len: CInt) -> UnsafeBufferPointer<CInt> {
+// CHECK:      @_alwaysEmitIntoClient @_disfavoredOverload
+// CHECK-NEXT: public func nonEscaping(_ len: CInt) -> UnsafeBufferPointer<CInt> {
 // CHECK-NEXT:     return unsafe UnsafeBufferPointer<CInt> (start: unsafe nonEscaping(len), count: Int(len))
 
-// CHECK:      @_alwaysEmitIntoClient @lifetime(copy p) public
-// CHECK-NEXT: func lifetimeDependentCopy(_ p: Span<CInt>, _ len2: CInt) -> Span<CInt> {
-// CHECK-NEXT:     return unsafe Span<CInt> (_unsafeStart:   unsafe p.withUnsafeBufferPointer { _pPtr in
-// CHECK-NEXT:         return unsafe lifetimeDependentCopy(_pPtr.baseAddress!, CInt(exactly: p.count)!, len2)
-// CHECK-NEXT:       }, count: Int(len2))
+// CHECK:      @_alwaysEmitIntoClient @lifetime(copy p)
+// CHECK-NEXT: public func lifetimeDependentCopy(_ p: Span<CInt>, _ len2: CInt) -> Span<CInt> {
+// CHECK-NEXT:     return unsafe _swiftifyOverrideLifetime(Span<CInt> (_unsafeStart:   unsafe p.withUnsafeBufferPointer { _pPtr in
+// CHECK-NEXT:         return unsafe lifetimeDependentCopy(_pPtr.baseAddress!, CInt(exactly: _pPtr.count)!, len2)
+// CHECK-NEXT:       }, count: Int(len2)), copying: ())
 // CHECK-NEXT: }
 
-// CHECK:      @_alwaysEmitIntoClient @lifetime(borrow p) public
-// CHECK-NEXT: func lifetimeDependentBorrow(_ p: borrowing UnsafeBufferPointer<CInt>, _ len2: CInt) -> Span<CInt> {
-// CHECK-NEXT:     return unsafe Span<CInt> (_unsafeStart: unsafe lifetimeDependentBorrow(p.baseAddress!, CInt(exactly: p.count)!, len2), count: Int(len2))
+// CHECK:      @_alwaysEmitIntoClient @lifetime(borrow p)
+// CHECK-NEXT: public func lifetimeDependentBorrow(_ p: borrowing UnsafeBufferPointer<CInt>, _ len2: CInt) -> Span<CInt> {
+// CHECK-NEXT:     return unsafe _swiftifyOverrideLifetime(Span<CInt> (_unsafeStart: unsafe lifetimeDependentBorrow(p.baseAddress!, CInt(exactly: p.count)!, len2), count: Int(len2)), copying: ())
 // CHECK-NEXT: }
 

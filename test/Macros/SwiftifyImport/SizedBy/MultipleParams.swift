@@ -6,7 +6,7 @@
 func myFunc(_ ptr: UnsafeRawPointer, _ size: CInt, _ ptr2: UnsafeRawPointer, _ size2: CInt) {
 }
 
-// CHECK:      @_alwaysEmitIntoClient public
-// CHECK-NEXT: func myFunc(_ ptr: UnsafeRawBufferPointer, _ ptr2: UnsafeRawBufferPointer) {
+// CHECK:      @_alwaysEmitIntoClient
+// CHECK-NEXT: public func myFunc(_ ptr: UnsafeRawBufferPointer, _ ptr2: UnsafeRawBufferPointer) {
 // CHECK-NEXT:     return unsafe myFunc(ptr.baseAddress!, CInt(exactly: ptr.count)!, ptr2.baseAddress!, CInt(exactly: ptr2.count)!)
 // CHECK-NEXT: }

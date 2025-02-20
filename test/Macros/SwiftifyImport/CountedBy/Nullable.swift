@@ -18,26 +18,26 @@ func myFunc3(_ ptr: UnsafeMutablePointer<CInt>?, _ len: CInt, _ ptr2: UnsafeMuta
 func myFunc4(_ ptr: UnsafeMutablePointer<CInt>?, _ len: CInt) -> UnsafeMutablePointer<CInt>? {
 }
 
-// CHECK:      @_alwaysEmitIntoClient public
-// CHECK-NEXT: func myFunc(_ ptr: UnsafeBufferPointer<CInt>?) {
+// CHECK:      @_alwaysEmitIntoClient
+// CHECK-NEXT: public func myFunc(_ ptr: UnsafeBufferPointer<CInt>?) {
 // CHECK-NEXT:     return unsafe myFunc(ptr?.baseAddress, CInt(exactly: ptr?.count ?? 0)!)
 // CHECK-NEXT: }
 
-// CHECK:      @_alwaysEmitIntoClient @lifetime(ptr: copy ptr) public
-// CHECK-NEXT: func myFunc2(_ ptr: inout MutableSpan<CInt>?) {
+// CHECK:      @_alwaysEmitIntoClient @lifetime(ptr: copy ptr)
+// CHECK-NEXT: public func myFunc2(_ ptr: inout MutableSpan<CInt>?) {
 // CHECK-NEXT:     return { () in
 // CHECK-NEXT:         return if ptr == nil {
 // CHECK-NEXT:             unsafe myFunc2(nil, CInt(exactly: ptr?.count ?? 0)!)
 // CHECK-NEXT:         } else {
 // CHECK-NEXT:             unsafe ptr!.withUnsafeMutableBufferPointer { _ptrPtr in
-// CHECK-NEXT:                 return unsafe myFunc2(_ptrPtr.baseAddress, CInt(exactly: ptr?.count ?? 0)!)
+// CHECK-NEXT:                 return unsafe myFunc2(_ptrPtr.baseAddress, CInt(exactly: _ptrPtr.count)!)
 // CHECK-NEXT:             }
 // CHECK-NEXT:         }
 // CHECK-NEXT:     }()
 // CHECK-NEXT: }
 
-// CHECK:      @_alwaysEmitIntoClient @lifetime(ptr: copy ptr) @lifetime(ptr2: copy ptr2) public
-// CHECK-NEXT: func myFunc3(_ ptr: inout MutableSpan<CInt>?, _ ptr2: inout MutableSpan<CInt>?) {
+// CHECK:      @_alwaysEmitIntoClient @lifetime(ptr: copy ptr) @lifetime(ptr2: copy ptr2)
+// CHECK-NEXT: public func myFunc3(_ ptr: inout MutableSpan<CInt>?, _ ptr2: inout MutableSpan<CInt>?) {
 // CHECK-NEXT:     return { () in
 // CHECK-NEXT:         return if ptr2 == nil {
 // CHECK-NEXT:             { () in
@@ -45,7 +45,7 @@ func myFunc4(_ ptr: UnsafeMutablePointer<CInt>?, _ len: CInt) -> UnsafeMutablePo
 // CHECK-NEXT:                     unsafe myFunc3(nil, CInt(exactly: ptr?.count ?? 0)!, nil, CInt(exactly: ptr2?.count ?? 0)!)
 // CHECK-NEXT:                 } else {
 // CHECK-NEXT:                     unsafe ptr!.withUnsafeMutableBufferPointer { _ptrPtr in
-// CHECK-NEXT:                         return unsafe myFunc3(_ptrPtr.baseAddress, CInt(exactly: ptr?.count ?? 0)!, nil, CInt(exactly: ptr2?.count ?? 0)!)
+// CHECK-NEXT:                         return unsafe myFunc3(_ptrPtr.baseAddress, CInt(exactly: _ptrPtr.count)!, nil, CInt(exactly: ptr2?.count ?? 0)!)
 // CHECK-NEXT:                     }
 // CHECK-NEXT:                 }
 // CHECK-NEXT:             }()
@@ -53,10 +53,10 @@ func myFunc4(_ ptr: UnsafeMutablePointer<CInt>?, _ len: CInt) -> UnsafeMutablePo
 // CHECK-NEXT:             unsafe ptr2!.withUnsafeMutableBufferPointer { _ptr2Ptr in
 // CHECK-NEXT:                 return { () in
 // CHECK-NEXT:                     return if ptr == nil {
-// CHECK-NEXT:                         unsafe myFunc3(nil, CInt(exactly: ptr?.count ?? 0)!, _ptr2Ptr.baseAddress, CInt(exactly: ptr2?.count ?? 0)!)
+// CHECK-NEXT:                         unsafe myFunc3(nil, CInt(exactly: ptr?.count ?? 0)!, _ptr2Ptr.baseAddress, CInt(exactly: _ptr2Ptr.count)!)
 // CHECK-NEXT:                     } else {
 // CHECK-NEXT:                         unsafe ptr!.withUnsafeMutableBufferPointer { _ptrPtr in
-// CHECK-NEXT:                             return unsafe myFunc3(_ptrPtr.baseAddress, CInt(exactly: ptr?.count ?? 0)!, _ptr2Ptr.baseAddress, CInt(exactly: ptr2?.count ?? 0)!)
+// CHECK-NEXT:                             return unsafe myFunc3(_ptrPtr.baseAddress, CInt(exactly: _ptrPtr.count)!, _ptr2Ptr.baseAddress, CInt(exactly: _ptr2Ptr.count)!)
 // CHECK-NEXT:                         }
 // CHECK-NEXT:                     }
 // CHECK-NEXT:                 }()
@@ -65,8 +65,8 @@ func myFunc4(_ ptr: UnsafeMutablePointer<CInt>?, _ len: CInt) -> UnsafeMutablePo
 // CHECK-NEXT:     }()
 // CHECK-NEXT: }
 
-// CHECK:      @_alwaysEmitIntoClient @lifetime(copy ptr) @lifetime(ptr: copy ptr) public
-// CHECK-NEXT: func myFunc4(_ ptr: inout MutableSpan<CInt>?, _ len: CInt) -> MutableSpan<CInt>? {
+// CHECK:      @_alwaysEmitIntoClient @lifetime(copy ptr) @lifetime(ptr: copy ptr)
+// CHECK-NEXT: public func myFunc4(_ ptr: inout MutableSpan<CInt>?, _ len: CInt) -> MutableSpan<CInt>? {
 // CHECK-NEXT:     let _ptrCount: some BinaryInteger = len
 // CHECK-NEXT:     if ptr?.count ?? 0 < _ptrCount || _ptrCount < 0 {
 // CHECK-NEXT:         fatalError("bounds check failure when calling unsafe function")
