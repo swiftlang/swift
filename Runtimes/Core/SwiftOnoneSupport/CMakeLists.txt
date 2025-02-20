@@ -35,9 +35,6 @@ install(TARGETS swiftSwiftOnoneSupport
     ARCHIVE DESTINATION "${SwiftCore_INSTALL_LIBDIR}"
     LIBRARY DESTINATION "${SwiftCore_INSTALL_LIBDIR}"
     RUNTIME DESTINATION "${CMAKE_INSTALL_BINDIR}")
-install(FILES "${CMAKE_CURRENT_BINARY_DIR}/SwiftOnoneSupport.swiftmodule"
-  DESTINATION "${SwiftCore_INSTALL_SWIFTMODULEDIR}/SwiftOnoneSupport.swiftmodule"
-  RENAME "${SwiftCore_MODULE_TRIPLE}.swiftmodule")
 emit_swift_interface(swiftSwiftOnoneSupport)
 install_swift_interface(swiftSwiftOnoneSupport)
 
