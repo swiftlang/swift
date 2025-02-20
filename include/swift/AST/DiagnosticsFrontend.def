@@ -51,9 +51,9 @@ GROUPED_WARNING(feature_not_experimental, StrictLanguageFeatures, DefaultIgnore,
                 (StringRef, bool))
 
 GROUPED_WARNING(invalid_feature_mode, StrictLanguageFeatures, none,
-                "'%0' is not a recognized mode for feature '%1'; "
-                "did you mean '%2'?",
-                (StringRef, StringRef, StringRef))
+                "'%0' is not a recognized mode for feature '%1'"
+                "%select{|; did you mean '%2'?}3",
+                (StringRef, StringRef, StringRef, bool))
 
 GROUPED_WARNING(cannot_disable_feature_with_mode, StrictLanguageFeatures, none,
                 "'%0' argument '%1' cannot specify a mode",
