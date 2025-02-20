@@ -4753,6 +4753,24 @@ getIsolationFromAttributes(const Decl *decl, bool shouldDiagnose = true,
     return std::nullopt;
   }
 
+  // If the declaration is explicitly marked with 'execution', return the
+  // appropriate isolation.
+  //
+  // NOTE: This needs to occur before we handle an explicit nonisolated attr,
+  // since if @execution and nonisolated are used together, we want to ensure
+  // that @execution takes priority. This ensures that if we import code from a
+  // module that was compiled with a different value for
+  // NonIsolatedAsyncInheritsIsolationFromContext, we get the semantics of the
+  // source module.
+  if (concurrentExecutionAttr) {
+    switch (concurrentExecutionAttr->getBehavior()) {
+    case ExecutionKind::Concurrent:
+      return ActorIsolation::forNonisolated(false /*is unsafe*/);
+    case ExecutionKind::Caller:
+      return ActorIsolation::forCallerIsolationInheriting();
+    }
+  }
+
   // If the declaration is explicitly marked 'nonisolated', report it as
   // independent.
   if (nonisolatedAttr) {
@@ -4855,17 +4873,6 @@ getIsolationFromAttributes(const Decl *decl, bool shouldDiagnose = true,
     return ActorIsolation::forGlobalActor(
         globalActorType->mapTypeOutOfContext())
         .withPreconcurrency(decl->preconcurrency() || isUnsafe);
-  }
-
-  // If the declaration is explicitly marked with 'execution', return the
-  // appropriate isolation.
-  if (concurrentExecutionAttr) {
-    switch (concurrentExecutionAttr->getBehavior()) {
-    case ExecutionKind::Concurrent:
-      return ActorIsolation::forNonisolated(false /*is unsafe*/);
-    case ExecutionKind::Caller:
-      return ActorIsolation::forCallerIsolationInheriting();
-    }
   }
 
   llvm_unreachable("Forgot about an attribute?");
@@ -5534,6 +5541,9 @@ static void addAttributesForActorIsolation(ValueDecl *value,
   ASTContext &ctx = value->getASTContext();
   switch (isolation) {
   case ActorIsolation::CallerIsolationInheriting:
+    value->getAttrs().add(new (ctx) ExecutionAttr(ExecutionKind::Caller,
+                                                  /*implicit=*/true));
+    break;
   case ActorIsolation::Nonisolated:
   case ActorIsolation::NonisolatedUnsafe: {
     value->getAttrs().add(new (ctx) NonisolatedAttr(
@@ -5566,6 +5576,83 @@ static void addAttributesForActorIsolation(ValueDecl *value,
       break;
     }
     }
+}
+
+/// Determine the default isolation and isolation source for this declaration,
+/// which may still be overridden by other inference rules.
+static std::tuple<InferredActorIsolation, ValueDecl *,
+                  std::optional<ActorIsolation>>
+computeDefaultInferredActorIsolation(ValueDecl *value) {
+  auto &ctx = value->getASTContext();
+
+  // If we are supposed to infer main actor isolation by default for entities
+  // within our module, make our default isolation main actor.
+  if (ctx.LangOpts.hasFeature(Feature::UnspecifiedMeansMainActorIsolated) &&
+      value->getModuleContext() == ctx.MainModule) {
+
+    // Default global actor isolation does not apply to any declarations
+    // within actors and distributed actors.
+    bool inActorContext = false;
+    auto *dc = value->getInnermostDeclContext();
+    while (dc && !inActorContext) {
+      if (auto *nominal = dc->getSelfNominalTypeDecl()) {
+        inActorContext = nominal->isAnyActor();
+      }
+      dc = dc->getParent();
+    }
+
+    if (!inActorContext) {
+      // FIXME: deinit should be implicitly MainActor too.
+      if (isa<TypeDecl>(value) || isa<ExtensionDecl>(value) ||
+          isa<AbstractStorageDecl>(value) || isa<FuncDecl>(value) ||
+          isa<ConstructorDecl>(value)) {
+        return {{ActorIsolation::forMainActor(ctx), {}}, nullptr, {}};
+      }
+    }
+  }
+
+  // If we have an async function... by default we inherit isolation.
+  if (ctx.LangOpts.hasFeature(
+          Feature::NonIsolatedAsyncInheritsIsolationFromContext)) {
+    if (auto *func = dyn_cast<AbstractFunctionDecl>(value);
+        func && func->hasAsync() &&
+        func->getModuleContext() == ctx.MainModule) {
+      return {
+          {ActorIsolation::forCallerIsolationInheriting(), {}}, nullptr, {}};
+    }
+  }
+
+  if (auto func = dyn_cast<AbstractFunctionDecl>(value)) {
+    // A @Sendable function is assumed to be actor-independent.
+    if (func->isSendable()) {
+      return {
+          {ActorIsolation::forNonisolated(/*unsafe=*/false), {}}, nullptr, {}};
+    }
+  }
+
+  // When no other isolation applies, an actor's non-async init is independent
+  if (auto nominal = value->getDeclContext()->getSelfNominalTypeDecl())
+    if (nominal->isAnyActor())
+      if (auto ctor = dyn_cast<ConstructorDecl>(value))
+        if (!ctor->hasAsync())
+          return {{ActorIsolation::forNonisolated(/*unsafe=*/false), {}},
+                  nullptr,
+                  {}};
+
+  // Look for and remember the overridden declaration's isolation.
+  if (auto *overriddenValue = value->getOverriddenDeclOrSuperDeinit()) {
+    // Use the overridden decl's isolation as the default isolation for this
+    // decl.
+    auto isolation = getOverriddenIsolationFor(value);
+    return {{isolation,
+             IsolationSource(overriddenValue, IsolationSource::Override)},
+            overriddenValue,
+            isolation}; // use the overridden decl's iso as the default
+                        // isolation for this decl.
+  }
+
+  // We did not find anything special, return unspecified.
+  return {{ActorIsolation::forUnspecified(), {}}, nullptr, {}};
 }
 
 InferredActorIsolation ActorIsolationRequest::evaluate(
@@ -5611,7 +5698,20 @@ InferredActorIsolation ActorIsolationRequest::evaluate(
     value->getAttrs().add(preconcurrency);
   }
 
-  if (FuncDecl *fd = dyn_cast<FuncDecl>(value)) {
+  // Check if we inferred CallerIsolationInheriting from our isolation attr, but
+  // did not have an ExecutionKind::Caller attached to it.
+  //
+  // DISCUSSION: This occurs when we have a value decl that is explicitly marked
+  // as nonisolated but since NonIsolatedAsyncInheritsIsolationFromContext is
+  // enabled, we return CallerIsolationInheriting.
+  if (isolationFromAttr && isolationFromAttr->getKind() ==
+          ActorIsolation::CallerIsolationInheriting &&
+      !value->getAttrs().hasAttribute<ExecutionAttr>()) {
+    value->getAttrs().add(new (ctx) ExecutionAttr(ExecutionKind::Caller,
+                                                  /*implicit=*/true));
+  }
+
+  if (auto *fd = dyn_cast<FuncDecl>(value)) {
     // Main.main() and Main.$main are implicitly MainActor-protected.
     // Any other isolation is an error.
     std::optional<ActorIsolation> mainIsolation =
@@ -5644,74 +5744,11 @@ InferredActorIsolation ActorIsolationRequest::evaluate(
             IsolationSource(/*source*/ nullptr, IsolationSource::Explicit)};
   }
 
-  // Determine the default isolation for this declaration, which may still be
-  // overridden by other inference rules.
-  ActorIsolation defaultIsolation = ActorIsolation::forUnspecified();
-  IsolationSource defaultIsolationSource;
-
-  // If we are supposed to infer main actor isolation by default for entities
-  // within our module, make our default isolation main actor.
-  if (ctx.LangOpts.hasFeature(Feature::UnspecifiedMeansMainActorIsolated) &&
-      value->getModuleContext() == ctx.MainModule) {
-
-    // Default global actor isolation does not apply to any declarations
-    // within actors and distributed actors.
-    bool inActorContext = false;
-    auto *dc = value->getInnermostDeclContext();
-    while (dc && !inActorContext) {
-      if (auto *nominal = dc->getSelfNominalTypeDecl()) {
-        inActorContext = nominal->isAnyActor();
-      }
-      dc = dc->getParent();
-    }
-
-    if (!inActorContext) {
-      // FIXME: deinit should be implicitly MainActor too.
-      if (isa<TypeDecl>(value) || isa<ExtensionDecl>(value) ||
-          isa<AbstractStorageDecl>(value) || isa<FuncDecl>(value) ||
-          isa<ConstructorDecl>(value)) {
-        defaultIsolation = ActorIsolation::forMainActor(ctx);
-      }
-    }
-  }
-
-  // If we have an async function... by default we inherit isolation.
-  if (ctx.LangOpts.hasFeature(
-          Feature::NonIsolatedAsyncInheritsIsolationFromContext)) {
-    if (auto *func = dyn_cast<AbstractFunctionDecl>(value);
-        func && func->hasAsync() &&
-        func->getModuleContext() == ctx.MainModule) {
-      defaultIsolation = ActorIsolation::forCallerIsolationInheriting();
-    }
-  }
-
-  if (auto func = dyn_cast<AbstractFunctionDecl>(value)) {
-    // A @Sendable function is assumed to be actor-independent.
-    if (func->isSendable()) {
-      defaultIsolation = ActorIsolation::forNonisolated(/*unsafe=*/false);
-    }
-  }
-
-  // When no other isolation applies, an actor's non-async init is independent
-  if (auto nominal = value->getDeclContext()->getSelfNominalTypeDecl())
-    if (nominal->isAnyActor())
-      if (auto ctor = dyn_cast<ConstructorDecl>(value))
-        if (!ctor->hasAsync())
-          defaultIsolation = ActorIsolation::forNonisolated(/*unsafe=*/false);
-
-  // Look for and remember the overridden declaration's isolation.
-  std::optional<ActorIsolation> overriddenIso;
-  ValueDecl *overriddenValue = value->getOverriddenDeclOrSuperDeinit();
-  if (overriddenValue) {
-    // use the overridden decl's iso as the default isolation for this decl.
-    defaultIsolation = getOverriddenIsolationFor(value);
-    defaultIsolationSource =
-        IsolationSource(overriddenValue, IsolationSource::Override);
-    overriddenIso = defaultIsolation;
-  }
-
-  // NOTE: After this point, the default has been set. Only touch the default
-  // isolation above this point since code below assumes it is now constant.
+  InferredActorIsolation defaultIsolation;
+  ValueDecl *overriddenValue;
+  std::optional<ActorIsolation> overridenIsolation;
+  std::tie(defaultIsolation, overriddenValue, overridenIsolation) =
+      computeDefaultInferredActorIsolation(value);
 
   // Function used when returning an inferred isolation.
   auto inferredIsolation = [&](ActorIsolation inferred,
@@ -5722,16 +5759,17 @@ InferredActorIsolation ActorIsolationRequest::evaluate(
       // if the inferred isolation is not valid, then carry-over the overridden
       // declaration's isolation as this decl's inferred isolation.
       switch (validOverrideIsolation(value, inferred, overriddenValue,
-                                     *overriddenIso)) {
+                                     *overridenIsolation)) {
       case OverrideIsolationResult::Allowed:
       case OverrideIsolationResult::Sendable:
         break;
 
       case OverrideIsolationResult::Disallowed:
-        if (overriddenValue->hasClangNode() && overriddenIso->isUnspecified()) {
-          inferred = overriddenIso->withPreconcurrency(true);
+        if (overriddenValue->hasClangNode() &&
+            overridenIsolation->isUnspecified()) {
+          inferred = overridenIsolation->withPreconcurrency(true);
         } else {
-          inferred = *overriddenIso;
+          inferred = *overridenIsolation;
         }
         break;
       }
@@ -5758,6 +5796,7 @@ InferredActorIsolation ActorIsolationRequest::evaluate(
       addAttributesForActorIsolation(value, inferred);
       break;
     case ActorIsolation::CallerIsolationInheriting:
+      addAttributesForActorIsolation(value, inferred);
       break;
     case ActorIsolation::Erased:
       llvm_unreachable("cannot infer erased isolation");
@@ -5988,8 +6027,18 @@ InferredActorIsolation ActorIsolationRequest::evaluate(
     }
   }
 
-  // Default isolation for this member.
-  return {defaultIsolation, defaultIsolationSource};
+  // We did not invoke any earlier rules... so just return the default
+  // isolation.
+  if (defaultIsolation.isolation.getKind() ==
+      ActorIsolation::CallerIsolationInheriting) {
+    // If we have caller isolation inheriting, attach the attribute for it so
+    // that we preserve that we chose CallerIsolationInheriting through
+    // serialization. We do this since we need to support compiling where
+    // nonisolated is the default and where caller isolation inheriting is the
+    // default.
+    addAttributesForActorIsolation(value, defaultIsolation.isolation);
+  }
+  return defaultIsolation;
 }
 
 bool HasIsolatedSelfRequest::evaluate(
