@@ -1,7 +1,7 @@
 // RUN: %empty-directory(%t)
 // RUN: split-file %s %t
 
-// RUN: %target-swift-frontend -typecheck %t/use-objc-types.swift -typecheck -module-name UseObjCTy -emit-clang-header-path %t/UseObjCTy.h -I %t -enable-experimental-cxx-interop -clang-header-expose-decls=all-public
+// RUN: %target-swift-frontend %t/use-objc-types.swift -module-name UseObjCTy -typecheck -verify -emit-clang-header-path %t/UseObjCTy.h -I %t -enable-experimental-cxx-interop -clang-header-expose-decls=all-public
 
 // RUN: %FileCheck %s < %t/UseObjCTy.h
 

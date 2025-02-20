@@ -1,5 +1,5 @@
 // RUN: %empty-directory(%t)
-// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) -typecheck %s -parse-as-library -emit-objc-header-path %t/swift.h
+// RUN: %target-swift-frontend(mock-sdk: %clang-importer-sdk) %s -parse-as-library -typecheck -verify -emit-objc-header-path %t/swift.h
 // RUN: %FileCheck %s < %t/swift.h
 // RUN: %check-in-clang %t/swift.h
 // RUN: %check-in-clang-cxx %t/swift.h
