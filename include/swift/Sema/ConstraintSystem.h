@@ -5024,6 +5024,11 @@ private:
                                               TypeMatchOptions flags,
                                               ConstraintLocatorBuilder locator);
 
+  /// Attempt to match a pack element type with the fully resolved pattern type
+  /// for the pack expansion.
+  SolutionKind matchPackElementType(Type elementType, Type patternType,
+                                    ConstraintLocatorBuilder locator);
+
   /// Attempt to simplify a PackElementOf constraint.
   ///
   /// Solving this constraint is delayed until the element type is fully
