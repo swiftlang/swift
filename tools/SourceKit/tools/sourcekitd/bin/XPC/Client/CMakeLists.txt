@@ -16,8 +16,6 @@ add_sourcekit_framework(sourcekitd
 )
 target_link_libraries(sourcekitd PRIVATE sourcekitdAPI)
 
-add_definitions(-DSOURCEKIT_XPCSERVICE_IDENTIFIER="com.apple.SourceKitService.${SOURCEKIT_VERSION_STRING}_${SOURCEKIT_TOOLCHAIN_NAME}")
-
 if (SOURCEKIT_BUILT_STANDALONE)
   # Create the symlink necessary to find the swift stdlib.
   swift_create_post_build_symlink(sourcekitd
