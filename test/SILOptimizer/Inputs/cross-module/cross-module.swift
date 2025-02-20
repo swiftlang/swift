@@ -311,3 +311,11 @@ public struct S<each T : Visitable> {
     _ = (repeat (each storage).visit())
   }
 }
+
+public struct StructWithInternal {
+  var internalVar: Int
+}
+
+public func getKP() -> KeyPath<StructWithInternal, Int> {
+  return \StructWithInternal.internalVar
+}
