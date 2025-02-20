@@ -48,6 +48,8 @@ class Fingerprint;
 class Identifier;
 class IfConfigClauseRangeInfo;
 struct LabeledStmtInfo;
+class LayoutConstraint;
+class LayoutConstraintInfo;
 struct LifetimeDescriptor;
 enum class MacroRole : uint32_t;
 class MacroIntroducedDeclName;
@@ -58,6 +60,7 @@ class ProtocolConformanceRef;
 class RegexLiteralPatternFeature;
 class RegexLiteralPatternFeatureKind;
 enum class ReferenceOwnership : uint8_t;
+class RequirementRepr;
 class Type;
 class CanType;
 class TypeBase;
@@ -2677,57 +2680,104 @@ SWIFT_NAME("getter:BridgedPattern.boundName(self:)")
 BridgedIdentifier BridgedPattern_getBoundName(BridgedPattern cPattern);
 
 //===----------------------------------------------------------------------===//
-// MARK: Misc
+// MARK: Generics
 //===----------------------------------------------------------------------===//
 
-struct BridgedTupleTypeElement {
-  BridgedIdentifier Name;
-  BridgedSourceLoc NameLoc;
-  BridgedIdentifier SecondName;
-  BridgedSourceLoc SecondNameLoc;
-  BridgedSourceLoc UnderscoreLoc;
-  BridgedSourceLoc ColonLoc;
-  BridgedTypeRepr Type;
-  BridgedSourceLoc TrailingCommaLoc;
+enum ENUM_EXTENSIBILITY_ATTR(closed) BridgedLayoutConstraintKind {
+  BridgedLayoutConstraintKindUnknownLayout,
+  BridgedLayoutConstraintKindTrivialOfExactSize,
+  BridgedLayoutConstraintKindTrivialOfAtMostSize,
+  BridgedLayoutConstraintKindTrivial,
+  BridgedLayoutConstraintKindClass,
+  BridgedLayoutConstraintKindNativeClass,
+  BridgedLayoutConstraintKindRefCountedObject,
+  BridgedLayoutConstraintKindNativeRefCountedObject,
+  BridgedLayoutConstraintKindBridgeObject,
+  BridgedLayoutConstraintKindTrivialStride,
 };
 
+class BridgedLayoutConstraint {
+  swift::LayoutConstraintInfo *_Nullable raw;
+
+public:
+  SWIFT_UNAVAILABLE("Use the factory methods")
+  BRIDGED_INLINE BridgedLayoutConstraint();
+
+  SWIFT_UNAVAILABLE("Use the factory methods")
+  BRIDGED_INLINE BridgedLayoutConstraint(swift::LayoutConstraint constraint);
+
+  BRIDGED_INLINE swift::LayoutConstraint unbridged() const;
+};
+
+SWIFT_NAME("BridgedLayoutConstraint.getLayoutConstraint(_:id:)")
+BridgedLayoutConstraint
+BridgedLayoutConstraint_getLayoutConstraint(BridgedASTContext cContext,
+                                            BridgedIdentifier cID);
+
+SWIFT_NAME("BridgedLayoutConstraint.getLayoutConstraint(_:kind:)")
+BridgedLayoutConstraint
+BridgedLayoutConstraint_getLayoutConstraint(BridgedASTContext cContext,
+                                            BridgedLayoutConstraintKind cKind);
+
+SWIFT_NAME(
+    "BridgedLayoutConstraint.getLayoutConstraint(_:kind:size:alignment:)")
+BridgedLayoutConstraint
+BridgedLayoutConstraint_getLayoutConstraint(BridgedASTContext cContext,
+                                            BridgedLayoutConstraintKind cKind,
+                                            size_t size, size_t alignment);
+
+SWIFT_NAME("getter:BridgedLayoutConstraint.isNull(self:)")
+BRIDGED_INLINE bool
+BridgedLayoutConstraint_isNull(BridgedLayoutConstraint cConstraint);
+
+SWIFT_NAME("getter:BridgedLayoutConstraint.kind(self:)")
+BridgedLayoutConstraintKind
+BridgedLayoutConstraint_getKind(BridgedLayoutConstraint cConstraint);
+
+SWIFT_NAME("getter:BridgedLayoutConstraint.isKnownLayout(self:)")
+BRIDGED_INLINE bool
+BridgedLayoutConstraint_isKnownLayout(BridgedLayoutConstraint cConstraint);
+
+SWIFT_NAME("getter:BridgedLayoutConstraint.isTrivial(self:)")
+BRIDGED_INLINE bool
+BridgedLayoutConstraint_isTrivial(BridgedLayoutConstraint cConstraint);
+
 enum ENUM_EXTENSIBILITY_ATTR(open) BridgedRequirementReprKind : size_t {
-  /// A type bound T : P, where T is a type that depends on a generic
-  /// parameter and P is some type that should bound T, either as a concrete
-  /// supertype or a protocol to which T must conform.
   BridgedRequirementReprKindTypeConstraint,
-
-  /// A same-type requirement T == U, where T and U are types that shall be
-  /// equivalent.
   BridgedRequirementReprKindSameType,
-
-  /// A layout bound T : L, where T is a type that depends on a generic
-  /// parameter and L is some layout specification that should bound T.
   BridgedRequirementReprKindLayoutConstraint,
-
-  // Note: there is code that packs this enum in a 2-bit bitfield.  Audit users
-  // when adding enumerators.
 };
 
 struct BridgedRequirementRepr {
   BridgedSourceLoc SeparatorLoc;
   BridgedRequirementReprKind Kind;
   BridgedTypeRepr FirstType;
-  BridgedTypeRepr SecondType;
-  // FIXME: Handle Layout Requirements
+  BridgedNullableTypeRepr SecondType;
+  BridgedLayoutConstraint LayoutConstraint;
+  BridgedSourceLoc LayoutConstraintLoc;
+
+  // TODO: bool IsExpansionPattern;
+
+  swift::RequirementRepr unbridged() const;
 };
 
-enum ENUM_EXTENSIBILITY_ATTR(open) BridgedMacroDefinitionKind : size_t {
-  /// An expanded macro.
-  BridgedExpandedMacro = 0,
-  /// An external macro, spelled with either the old spelling (Module.Type)
-  /// or the new spelling `#externalMacro(module: "Module", type: "Type")`.
-  BridgedExternalMacro,
-  /// The builtin definition for "externalMacro".
-  BridgedBuiltinExternalMacro,
-  /// The builtin definition for the "isolation" macro.
-  BridgedBuiltinIsolationMacro,
-};
+SWIFT_NAME(
+    "BridgedRequirementRepr.createTypeConstraint(subject:colonLoc:constraint:)")
+BridgedRequirementRepr
+BridgedRequirementRepr_createTypeConstraint(BridgedTypeRepr cSubject,
+                                            BridgedSourceLoc cColonLoc,
+                                            BridgedTypeRepr cConstraint);
+SWIFT_NAME(
+    "BridgedRequirementRepr.createSameType(firstType:equalLoc:secondType:)")
+BridgedRequirementRepr
+BridgedRequirementRepr_createSameType(BridgedTypeRepr cFirstType,
+                                      BridgedSourceLoc cEqualLoc,
+                                      BridgedTypeRepr cSecondType);
+SWIFT_NAME("BridgedRequirementRepr.createLayoutConstraint(subject:colonLoc:"
+           "layout:layoutLoc:)")
+BridgedRequirementRepr BridgedRequirementRepr_createLayoutConstraint(
+    BridgedTypeRepr cSubject, BridgedSourceLoc cColonLoc,
+    BridgedLayoutConstraint cLayout, BridgedSourceLoc cLayoutLoc);
 
 enum ENUM_EXTENSIBILITY_ATTR(closed) BridgedGenericTypeParamKind : size_t {
   /// A regular generic type parameter: 'T'
@@ -2774,6 +2824,33 @@ size_t BridgedParameterList_size(BridgedParameterList cParameterList);
 SWIFT_NAME("BridgedParameterList.get(self:_:)")
 BridgedParamDecl BridgedParameterList_get(BridgedParameterList cParameterList,
                                           size_t i);
+
+//===----------------------------------------------------------------------===//
+// MARK: Misc
+//===----------------------------------------------------------------------===//
+
+struct BridgedTupleTypeElement {
+  BridgedIdentifier Name;
+  BridgedSourceLoc NameLoc;
+  BridgedIdentifier SecondName;
+  BridgedSourceLoc SecondNameLoc;
+  BridgedSourceLoc UnderscoreLoc;
+  BridgedSourceLoc ColonLoc;
+  BridgedTypeRepr Type;
+  BridgedSourceLoc TrailingCommaLoc;
+};
+
+enum ENUM_EXTENSIBILITY_ATTR(open) BridgedMacroDefinitionKind : size_t {
+  /// An expanded macro.
+  BridgedExpandedMacro = 0,
+  /// An external macro, spelled with either the old spelling (Module.Type)
+  /// or the new spelling `#externalMacro(module: "Module", type: "Type")`.
+  BridgedExternalMacro,
+  /// The builtin definition for "externalMacro".
+  BridgedBuiltinExternalMacro,
+  /// The builtin definition for the "isolation" macro.
+  BridgedBuiltinIsolationMacro,
+};
 
 struct BridgedASTType {
   swift::TypeBase * _Nullable type;

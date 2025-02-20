@@ -167,6 +167,9 @@ struct ProjectedValueStruct {
 
 @_silgen_name("silgen_func") func silGenFn() -> Int
 
+@_specialize(where X: _TrivialStride(16), Y: _Trivial(32, 4), Z: _Class)
+func testSpecialize<X, Y, Z>(x: X, y: Y, z: Z) {}
+
 @_spi(SPIName) public func spiFn() {}
 
 struct StorageRestrctionTest {
