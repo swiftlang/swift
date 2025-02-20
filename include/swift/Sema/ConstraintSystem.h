@@ -1560,9 +1560,9 @@ public:
   llvm::DenseMap<PackExpansionType *, TypeVariableType *>
       OpenedPackExpansionTypes;
 
-  /// The pack expansion environment that can open pack elements for
-  /// a given locator.
-  llvm::DenseMap<ConstraintLocator *, std::pair<UUID, Type>>
+  /// The generic environment that can open pack elements for a given
+  /// pack expansion.
+  llvm::DenseMap<PackExpansionExpr *, GenericEnvironment *>
       PackExpansionEnvironments;
 
   /// The pack expansion expression for a given pack element.
@@ -1809,6 +1809,11 @@ public:
     }
     return Type();
   }
+
+  /// Retrieve the generic environment for the opened element of a given pack
+  /// expansion, or \c nullptr if no environment was recorded.
+  GenericEnvironment *
+  getPackExpansionEnvironment(PackExpansionExpr *expr) const;
 
   /// For a given locator describing a function argument conversion, or a
   /// constraint within an argument conversion, returns information about the
@@ -2407,7 +2412,7 @@ private:
   llvm::SmallDenseMap<PackExpansionType *, TypeVariableType *, 4>
       OpenedPackExpansionTypes;
 
-  llvm::SmallDenseMap<ConstraintLocator *, std::pair<UUID, Type>, 4>
+  llvm::SmallDenseMap<PackExpansionExpr *, GenericEnvironment *, 4>
       PackExpansionEnvironments;
 
   llvm::SmallDenseMap<PackElementExpr *, PackExpansionExpr *, 2>
@@ -3370,13 +3375,26 @@ public:
   void recordOpenedExistentialType(ConstraintLocator *locator,
                                    OpenedArchetypeType *opened);
 
-  /// Get the opened element generic environment for the given locator.
-  GenericEnvironment *getPackElementEnvironment(ConstraintLocator *locator,
-                                                CanType shapeClass);
+  /// Retrieve the generic environment for the opened element of a given pack
+  /// expansion, or \c nullptr if no environment was recorded yet.
+  GenericEnvironment *
+  getPackExpansionEnvironment(PackExpansionExpr *expr) const;
+
+  /// Create a new opened element generic environment for the given pack
+  /// expansion.
+  GenericEnvironment *
+  createPackExpansionEnvironment(PackExpansionExpr *expr,
+                                 CanGenericTypeParamType shapeParam);
 
   /// Update PackExpansionEnvironments and record a change in the trail.
-  void recordPackExpansionEnvironment(ConstraintLocator *locator,
-                                      std::pair<UUID, Type> uuidAndShape);
+  void recordPackExpansionEnvironment(PackExpansionExpr *expr,
+                                      GenericEnvironment *env);
+
+  /// Undo the above change.
+  void removePackExpansionEnvironment(PackExpansionExpr *expr) {
+    bool erased = PackExpansionEnvironments.erase(expr);
+    ASSERT(erased);
+  }
 
   /// Get the pack expansion expr for the given pack element.
   PackExpansionExpr *

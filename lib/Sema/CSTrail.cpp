@@ -200,6 +200,14 @@ SolverTrail::Change SolverTrail::Change::RecordedPackElementExpansion(
 }
 
 SolverTrail::Change
+SolverTrail::Change::RecordedPackExpansionEnvironment(PackExpansionExpr *expr) {
+  Change result;
+  result.Kind = ChangeKind::RecordedPackExpansionEnvironment;
+  result.TheExpansionExpr = expr;
+  return result;
+}
+
+SolverTrail::Change
 SolverTrail::Change::RecordedNodeType(ASTNode node, Type oldType) {
   Change result;
   result.Kind = ChangeKind::RecordedNodeType;
@@ -428,6 +436,10 @@ void SolverTrail::Change::undo(ConstraintSystem &cs) const {
 
   case ChangeKind::RecordedPackElementExpansion:
     cs.removePackElementExpansion(TheElement);
+    break;
+
+  case ChangeKind::RecordedPackExpansionEnvironment:
+    cs.removePackExpansionEnvironment(TheExpansionExpr);
     break;
 
   case ChangeKind::RecordedNodeType:
@@ -699,6 +711,12 @@ void SolverTrail::Change::dump(llvm::raw_ostream &out,
   case ChangeKind::RecordedPackElementExpansion:
     out << "(RecordedPackElementExpansion ";
     dumpAnchor(TheElement, &SM, out);
+    out << ")\n";
+    break;
+
+  case ChangeKind::RecordedPackExpansionEnvironment:
+    out << "(RecordedPackExpansionEnvironment ";
+    dumpAnchor(TheExpansionExpr, &SM, out);
     out << ")\n";
     break;
 
