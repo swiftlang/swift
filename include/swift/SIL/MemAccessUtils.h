@@ -644,7 +644,7 @@ public:
   SILValue getOwnershipReferenceAggregate() const {
     return findOwnershipReferenceAggregate(getReference());
   }
-  
+
   /// Return the storage root of the reference being accessed.
   ///
   /// Precondition: isReference() is true.
@@ -1106,9 +1106,9 @@ public:
     }
 
     int getEncoding() const { return indexEncoding; }
-    
+
     void print(raw_ostream &os) const;
-    
+
     void dump() const;
   };
 

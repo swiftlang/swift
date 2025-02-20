@@ -60,7 +60,7 @@ public:
   using AllocatorBase<MetadataAllocator>::Deallocate;
 
   void PrintStats() const {}
-  
+
   MetadataAllocator withTag(uint16_t Tag) {
     MetadataAllocator Allocator = *this;
     Allocator.Tag = Tag;

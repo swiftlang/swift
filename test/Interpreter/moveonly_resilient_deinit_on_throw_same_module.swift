@@ -22,7 +22,7 @@ public struct Resilient: ~Copyable {
         Self.nextValue += 1
     }
     deinit { print("resilient deinit \(value)") }
-    
+
     public init(throwing: Bool) throws {
         if throwing {
             throw MyError()

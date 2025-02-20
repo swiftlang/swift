@@ -91,7 +91,7 @@ func testTypenameInterpolation() {
     "\(GE<Model>.self)")
   expectEqual("GC2<Model, Model2>",
     "\(GC2<Model, Model2>.self)")
-  
+
   expectEqual("P", "\(P.self)")
   typealias PP2 = P & P2
   expectEqual("P & P2",

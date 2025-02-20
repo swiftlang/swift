@@ -45,7 +45,7 @@ public class ClassF {
   func foo() -> Int {
     return 10
   }
-  
+
   func bar() -> Int {
     return 10
   }
@@ -57,7 +57,7 @@ public class ClassG <T> {
   func foo() -> Int {
     return 10
   }
-  
+
   func bar() -> Int {
     return 10
   }

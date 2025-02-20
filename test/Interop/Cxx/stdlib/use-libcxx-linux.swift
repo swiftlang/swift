@@ -42,7 +42,7 @@ LibcxxLinuxTestSuite.test("std::vector<std::string>") {
   v.push_back(std.string())
   v.push_back(std.string())
   expectEqual(2, v.size())
-  
+
   var count = 0
   for s in v { // relies on the conformance to CxxRandomAccessCollection
     count += 1

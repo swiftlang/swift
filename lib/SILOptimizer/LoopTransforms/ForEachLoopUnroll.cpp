@@ -337,12 +337,12 @@ void ArrayInfo::classifyUsesOfArray(SILValue arrayValue) {
     ArraySemanticsCall arrayOp(user);
     if (arrayOp.doesNotChangeArray())
       continue;
-    
+
     if (arrayOp.getKind() == swift::ArrayCallKind::kArrayFinalizeIntrinsic) {
       classifyUsesOfArray((ApplyInst *)arrayOp);
       continue;
     }
-    
+
     mayBeWritten = true;
   }
 }

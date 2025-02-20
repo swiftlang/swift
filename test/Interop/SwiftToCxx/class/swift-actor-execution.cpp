@@ -43,7 +43,7 @@ int main() {
   }
 // CHECK:      init ActorWithField
 // CHECK-NEXT: destroy ActorWithField
-    
+
   {
     auto x = ActorWithField::init();
     {
@@ -55,7 +55,7 @@ int main() {
 // CHECK-NEXT: init ActorWithField
 // CHECK-NEXT: takeActorWithIntField
 // CHECK-NEXT: destroy ActorWithField
-    
+
   {
     auto x = ActorWithField::init();
     x.method();

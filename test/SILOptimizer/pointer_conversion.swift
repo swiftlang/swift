@@ -86,7 +86,7 @@ public func testMutableArrayToOptional() {
 // CHECK-LABEL: sil @$s18pointer_conversion21arrayLiteralPromotionyyF
 public func arrayLiteralPromotion() {
   takesConstRawPointer([-41,-42,-43,-44])
-  
+
   // Outline the array literal.
   // CHECK: [[ARR:%.+]] = global_value
   // CHECK: [[CAST:%.+]] = upcast [[ARR]]

@@ -22,10 +22,10 @@ extension StaticProperties {
 extension TheReplaceables {
   @_dynamicReplacement(for: property1) // expected-error{{replaced accessor for 'property1' occurs in multiple places}}
   var replace_property1: Int { return 0 }
-  
+
   @_dynamicReplacement(for: property2)
   var replace_property2_int: Int { return 1 }
-  
+
   @_dynamicReplacement(for: property2)
   var replace_property2_string: String { return "replaced" }
 

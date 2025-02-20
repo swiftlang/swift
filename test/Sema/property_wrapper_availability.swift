@@ -88,7 +88,7 @@ struct Available51Struct {
 struct UnavailableStruct {
   @AlwaysAvailableWrapper var alwaysAvailableExplicit: S
   @AlwaysAvailableWrapper var alwaysAvailableInferred = S()
-  
+
   @Available51Wrapper var available51Explicit: S
   @Available51Wrapper var available51Inferred = S()
 

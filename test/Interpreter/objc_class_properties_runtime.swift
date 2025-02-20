@@ -45,7 +45,7 @@ class SwiftClass : ProtoWithClassProperty {
 class Subclass : ClassWithClassProperty {
   static var getCount = 0
   static var setCount = 0
-  
+
   override class func reset() {
     getCount = 0
     setCount = 0

@@ -503,7 +503,7 @@ extension BinaryInteger {
 protocol P_53382 {}
 struct S_53382<T> {}
 extension S_53382: P_53382 where T: P_53382 {} // expected-note {{requirement from conditional conformance of 'S_53382<String>' to 'P_53382'}}
-	
+
 func f1_53382(_ fn: (S_53382<String>) -> Void) {}
 func f2_53382(_ fn: (P_53382) -> Void) {
   f1_53382(fn) // expected-error {{global function 'f1_53382' requires that 'String' conform to 'P_53382'}}

@@ -13,7 +13,7 @@ struct S1 : P1 {
 
 enum E1 : P1 {
   case A, B
-  
+
   init() { self = .A } // okay
 }
 

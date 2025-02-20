@@ -60,7 +60,7 @@ internal var storageVar: _SwiftEmptyArrayStorage {
 
 public struct Bar {
   let storage: _SwiftEmptyArrayStorage
-  
+
   init () {
     storage = storageVar
   }

@@ -791,7 +791,7 @@ tryCastToAnyHashable(
          == &STRUCT_TYPE_DESCR_SYM(s11AnyHashable));
 
   const HashableWitnessTable *hashableConformance = nullptr;
-  
+
   switch (srcType->getKind()) {
   case MetadataKind::ForeignClass: // CF -> String
   case MetadataKind::ObjCClassWrapper: { // Obj-C -> String

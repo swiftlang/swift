@@ -275,7 +275,7 @@ public func setupKeyPathNestedStructs() {
     let classStructInstance = D1(b: D2(b: 0, c: D3(c: 0, d: D4(d: 0,
       e: D5(e: expectedIntForNestedItems)))))
     holder.mainArrayForClassStructs.append(classStructInstance)
-      
+
     var mutatingGetsetInstance = MutatingGetsetNested1()
     mutatingGetsetInstance.nestedItem.nestedItem.nestedItem.nestedItem
       .storage = expectedIntForNestedItems

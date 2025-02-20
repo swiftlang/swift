@@ -96,7 +96,7 @@ class ObserverKVO : NSObject {
        options: [.new, .old],
        context: &kvoContext)
   }
-  
+
   func removeTarget() {
     self.target!.removeObserver(self, forKeyPath:"objcValue",
                                       context: &kvoContext)

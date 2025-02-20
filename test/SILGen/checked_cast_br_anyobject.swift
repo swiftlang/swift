@@ -12,7 +12,7 @@ extension UnsafeMutablePointer where Pointee == BridgedSwiftObject {
     let ptr = Unmanaged.passUnretained(object).toOpaque()
     self = ptr.bindMemory(to: BridgedSwiftObject.self, capacity: 1)
   }
-  
+
   func getAs<T: AnyObject>(_ objectType: T.Type) -> T {
     return Unmanaged<T>.fromOpaque(self).takeUnretainedValue()
   }

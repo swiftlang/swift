@@ -12,7 +12,7 @@ class Interval {
   func show() {
     print("[\(lo), \(hi)]")
   }
-  
+
   class func like(_ lo: Int, _ hi: Int) -> Interval {
     return Interval(lo, hi)
   }

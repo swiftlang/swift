@@ -523,7 +523,7 @@ void MoveOnlyObjectCheckerPImpl::check(
             cvi->eraseFromParent();
             continue;
           }
-          
+
           // Handle:
           //   (%yield, ..., %handle) = begin_apply
           //   %copy = copy_value %yield

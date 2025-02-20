@@ -73,7 +73,7 @@ public struct AsyncDropWhileSequence<Base: AsyncSequence> {
 
 @available(SwiftStdlib 5.1, *)
 extension AsyncDropWhileSequence: AsyncSequence {
-  
+
   /// The type of element produced by this asynchronous sequence.
   ///
   /// The drop-while sequence produces whatever type of element its base

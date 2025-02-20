@@ -13,7 +13,7 @@ var DefaultedTemplateTestSuite = TestSuite("Defaulted Template Type Parameters")
 DefaultedTemplateTestSuite.test("Correct ctor picked") {
   let x1 = X(0)
   expectEqual(x1.picked, .arg)
-  
+
   let x2 = X()
   expectEqual(x2.picked, .empty)
 }

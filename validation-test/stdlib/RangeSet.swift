@@ -42,7 +42,7 @@ if #available(SwiftStdlib 6.0, *) {
     }
     return set
   }
-  
+
   RangeSetTests.test("initialization") {
     // Test coalescing and elimination of empty ranges
     do {
@@ -51,7 +51,7 @@ if #available(SwiftStdlib 6.0, *) {
 
       let repeated = RangeSet(Array(repeating: 0..<3, count: 100))
       expectEqual(repeated, [0..<3])
-      
+
       let singleAfterEmpty = RangeSet(Array(repeating: 0..<0, count: 100) + [0..<3])
       expectEqual(singleAfterEmpty, [0..<3])
 
@@ -59,7 +59,7 @@ if #available(SwiftStdlib 6.0, *) {
       expectEqual(RangeSet(contiguousRanges), [0..<100])
       expectEqual(RangeSet(contiguousRanges.shuffled()), [0..<100])
     }
-    
+
     // The `buildRandomRangeSet()` function builds a range set via additions
     // and removals. This function creates an array of potentially empty or
     // overlapping ranges that can be used to initialize a range set.
@@ -70,11 +70,11 @@ if #available(SwiftStdlib 6.0, *) {
         return low ..< (low + count)
       }
     }
-    
+
     for _ in 0..<1000 {
       let ranges = randomRanges()
       let set = RangeSet(ranges)
-      
+
       // Manually construct a range set for comparison
       var comparison = RangeSet<Int>()
       for r in ranges {
@@ -91,13 +91,13 @@ if #available(SwiftStdlib 6.0, *) {
     expectFalse(source.contains(5))
     expectTrue(source.contains(28))
     expectFalse(source.contains(29))
-    
+
     for _ in 0..<1000 {
       let set = buildRandomRangeSet()
       for i in parent.indices[set] {
         expectTrue(set.contains(i))
       }
-      
+
       for i in parent.indices.removingSubranges(set) {
         expectFalse(set.contains(i))
       }
@@ -111,28 +111,28 @@ if #available(SwiftStdlib 6.0, *) {
       s.insert(contentsOf: 3..<21)
       expectEqualSequence(s.ranges, [1..<22, 27..<29])
     }
-    
+
     do {
       // insert in middle
       var s = source
       s.insert(contentsOf: 13..<15)
       expectEqualSequence(s.ranges, [1..<5, 8..<10, 13..<15, 20..<22, 27..<29])
     }
-    
+
     do {
       // extend a range
       var s = source
       s.insert(contentsOf: 22..<25)
       expectEqualSequence(s.ranges, [1..<5, 8..<10, 20..<25, 27..<29])
     }
-    
+
     do {
       // extend at beginning of range
       var s = source
       s.insert(contentsOf: 17..<20)
       expectEqualSequence(s.ranges, [1..<5, 8..<10, 17..<22, 27..<29])
     }
-    
+
     do {
       // insert at the beginning
       var s = source
@@ -142,28 +142,28 @@ if #available(SwiftStdlib 6.0, *) {
         [-10 ..< -5, 1..<5, 8..<10, 20..<22, 27..<29]
       )
     }
-    
+
     do {
       // insert at the end
       var s = source
       s.insert(contentsOf: 35 ..< 40)
       expectEqualSequence(s.ranges, [1..<5, 8..<10, 20..<22, 27..<29, 35..<40])
     }
-    
+
     do {
       // Overlap multiple ranges
       var s = source
       s.insert(contentsOf: 0..<21)
       expectEqualSequence(s.ranges, [0..<22, 27..<29])
     }
-    
+
     do {
       // Insert at end of range
       var s = source
       s.insert(22, within: parent)
       expectEqualSequence(s.ranges, [1..<5, 8..<10, 20..<23, 27..<29])
     }
-    
+
     do {
       // Insert between ranges
       var s = source
@@ -205,10 +205,10 @@ if #available(SwiftStdlib 6.0, *) {
   RangeSetTests.test("invariants") {
     for _ in 0..<1000 {
       let set = buildRandomRangeSet()
-      
+
       // No empty ranges allowed
       expectTrue(set.ranges.allSatisfy { !$0.isEmpty })
-      
+
       // No overlapping / out-of-order ranges allowed
       let adjacentRanges = zip(set.ranges, set.ranges.dropFirst())
       expectTrue(adjacentRanges.allSatisfy { $0.upperBound < $1.lowerBound })
@@ -241,12 +241,12 @@ if #available(SwiftStdlib 6.0, *) {
       set3.formUnion(set1)
       expectEqual(set3, union)
     }
-    
+
     // Simple tests
     testUnion([0..<5, 9..<14],
               [1..<3, 4..<6, 8..<12],
               expect: [0..<6, 8..<14])
-    
+
     testUnion([10..<20, 50..<60],
               [15..<55, 58..<65],
               expect: [10..<65])
@@ -255,7 +255,7 @@ if #available(SwiftStdlib 6.0, *) {
     testUnion([10..<20, 30..<40],
               [15..<30, 40..<50],
               expect: [10..<50])
-    
+
     for _ in 0..<100 {
       let set1 = buildRandomRangeSet()
       let set2 = buildRandomRangeSet()
@@ -263,7 +263,7 @@ if #available(SwiftStdlib 6.0, *) {
                 expect: unionViaSet(set1, set2))
     }
   }
-  
+
   RangeSetTests.test("intersection") {
     func intersectionViaSet(
       _ s1: RangeSet<Int>,
@@ -273,7 +273,7 @@ if #available(SwiftStdlib 6.0, *) {
       let set2 = Set(parent.indices[s2])
       return RangeSet(set1.intersection(set2), within: parent)
     }
-    
+
     do {
       // Simple test
       let set1: RangeSet = [0..<5, 9..<14]
@@ -282,7 +282,7 @@ if #available(SwiftStdlib 6.0, *) {
       expectEqual(set1.intersection(set2), intersection)
       expectEqual(set2.intersection(set1), intersection)
     }
-    
+
     do {
       // Test with upper bound / lower bound equality
       let set1: RangeSet = [10..<20, 30..<40]
@@ -291,11 +291,11 @@ if #available(SwiftStdlib 6.0, *) {
       expectEqual(set1.intersection(set2), intersection)
       expectEqual(set2.intersection(set1), intersection)
     }
-    
+
     for _ in 0..<100 {
       let set1 = buildRandomRangeSet()
       let set2 = buildRandomRangeSet()
-      
+
       let rangeSetIntersection = set1.intersection(set2)
       let stdlibSetIntersection = intersectionViaSet(set1, set2)
       expectEqual(rangeSetIntersection, stdlibSetIntersection)
@@ -311,7 +311,7 @@ if #available(SwiftStdlib 6.0, *) {
       let set2 = Set(parent.indices[s2])
       return RangeSet(set1.symmetricDifference(set2), within: parent)
     }
-    
+
     do {
       // Simple test
       let set1: RangeSet = [0..<5, 9..<14]
@@ -320,7 +320,7 @@ if #available(SwiftStdlib 6.0, *) {
       expectEqual(set1.symmetricDifference(set2), difference)
       expectEqual(set2.symmetricDifference(set1), difference)
     }
-    
+
     do {
       // Test with upper bound / lower bound equality
       let set1: RangeSet = [10..<20, 30..<40]
@@ -329,11 +329,11 @@ if #available(SwiftStdlib 6.0, *) {
       expectEqual(set1.symmetricDifference(set2), difference)
       expectEqual(set2.symmetricDifference(set1), difference)
     }
-    
+
     for _ in 0..<100 {
       let set1 = buildRandomRangeSet()
       let set2 = buildRandomRangeSet()
-      
+
       let rangeSetDifference = set1.symmetricDifference(set2)
       let stdlibSetDifference = symmetricDifferenceViaSet(set1, set2)
       expectEqual(rangeSetDifference, stdlibSetDifference)
@@ -357,11 +357,11 @@ if #available(SwiftStdlib 6.0, *) {
       expectTrue(set1.isDisjoint(set3))
       expectTrue(set3.isDisjoint(set1))
     }
-    
+
     for _ in 0..<100 {
       let set1 = buildRandomRangeSet()
       let set2 = buildRandomRangeSet()
-      
+
       let rangeSetDisjoint = set1.isDisjoint(set2)
       let stdlibSetDisjoint = isDisjointViaSet(set1, set2)
       expectEqual(rangeSetDisjoint, stdlibSetDisjoint)
@@ -390,11 +390,11 @@ if #available(SwiftStdlib 6.0, *) {
       expectTrue(set4.isSubset(of: set1))
       expectTrue(set4.isSubset(of: set2))
     }
-    
+
     for _ in 0..<100 {
       let set1 = buildRandomRangeSet()
       let set2 = buildRandomRangeSet()
-      
+
       let rangeSetSubset = set1.isSubset(of: set2)
       let stdlibSetSubset = isSubsetViaSet(set1, set2)
       expectEqual(rangeSetSubset, stdlibSetSubset)
@@ -405,17 +405,17 @@ if #available(SwiftStdlib 6.0, *) {
     let a = [1, 2, 3, 4, 3, 3, 4, 5, 3, 4, 3, 3, 3]
     let indices = a.indices(of: 3)
     expectEqual(indices, [2..<3, 4..<6, 8..<9, 10..<13])
-    
+
     let allTheThrees = a[indices]
     expectEqual(allTheThrees.count, 7)
     expectTrue(allTheThrees.allSatisfy { $0 == 3 })
     expectEqual(Array(allTheThrees), Array(repeating: 3, count: 7))
-    
+
     let lowerIndices = letterString.indices(where: { $0.isLowercase })
     let lowerOnly = letterString[lowerIndices]
     expectEqualSequence(lowerOnly, lowercaseLetters)
     expectEqualSequence(lowerOnly.reversed(), lowercaseLetters.reversed())
-    
+
     let upperOnly = letterString.removingSubranges(lowerIndices)
     expectEqualSequence(upperOnly, uppercaseLetters)
     expectEqualSequence(upperOnly.reversed(), uppercaseLetters.reversed())
@@ -426,27 +426,27 @@ if #available(SwiftStdlib 6.0, *) {
     let indices = a.indices(of: 3)
     a.removeSubranges(indices)
     expectEqual(a, [1, 2, 4, 4, 5, 4])
-    
+
     var numbers = Array(1...20)
     numbers.removeSubranges(RangeSet([2..<5, 10..<15, 18..<20]))
     expectEqual(numbers, [1, 2, 6, 7, 8, 9, 10, 16, 17, 18])
-    
+
     numbers = Array(1...20)
     numbers.removeSubranges([])
     expectEqual(numbers, Array(1...20))
 
     let sameNumbers = numbers.removingSubranges([])
     expectEqualSequence(numbers, sameNumbers)
-    
+
     let noNumbers = numbers.removingSubranges(RangeSet(numbers.indices))
     expectEqualSequence(EmptyCollection(), noNumbers)
-    
+
     var str = letterString
     let lowerIndices = str.indices(where: { $0.isLowercase })
-    
+
     let upperOnly = str.removingSubranges(lowerIndices)
     expectEqualSequence(upperOnly, uppercaseLetters)
-    
+
     str.removeSubranges(lowerIndices)
     expectEqualSequence(str, uppercaseLetters)
   }
@@ -461,7 +461,7 @@ if #available(SwiftStdlib 6.0, *) {
       11, 12, 13, 14, 15,
       19, 20,
       5, 6, 7, 8, 9, 10, 16, 17, 18])
-    
+
     // Move to start
     numbers = Array(1...20)
     let range2 = numbers.moveSubranges(RangeSet([10..<15, 18..<20]), to: 0)
@@ -470,7 +470,7 @@ if #available(SwiftStdlib 6.0, *) {
       11, 12, 13, 14, 15,
       19, 20,
       1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 16, 17, 18])
-    
+
     // Move to end
     numbers = Array(1...20)
     let range3 = numbers.moveSubranges(RangeSet([10..<15, 18..<20]), to: 20)
@@ -480,7 +480,7 @@ if #available(SwiftStdlib 6.0, *) {
       11, 12, 13, 14, 15,
       19, 20,
     ])
-    
+
     // Move to middle of selected elements
     numbers = Array(1...20)
     let range4 = numbers.moveSubranges(RangeSet([10..<15, 18..<20]), to: 14)
@@ -490,7 +490,7 @@ if #available(SwiftStdlib 6.0, *) {
       11, 12, 13, 14, 15,
       19, 20,
       16, 17, 18])
-    
+
     // Move none
     numbers = Array(1...20)
     let range5 = numbers.moveSubranges(RangeSet(), to: 10)
@@ -510,7 +510,7 @@ if #available(SwiftStdlib 6.0, *) {
 
   RangeSetTests.test("DiscontiguousSliceSequence") {
     let initial = 1...100
-    
+
     // Build an array of ranges that include alternating groups of 5 elements
     // e.g. 1...5, 11...15, etc
     let rangeStarts = initial.indices.every(10)
@@ -534,7 +534,7 @@ if #available(SwiftStdlib 6.0, *) {
 
   RangeSetTests.test("DiscontiguousSliceSlicing") {
     let initial = 1...100
-    
+
     // Build an array of ranges that include alternating groups of 5 elements
     // e.g. 1...5, 11...15, etc
     let rangeStarts = initial.indices.every(10)
@@ -542,15 +542,15 @@ if #available(SwiftStdlib 6.0, *) {
       initial.index($0, offsetBy: 5, limitedBy: initial.endIndex)
     }
     let ranges = zip(rangeStarts, rangeEnds).map(Range.init)
-    
+
     // Create a collection of the elements represented by `ranges` without
     // using `RangeSet`
     let chosenElements = ranges.map { initial[$0] }.joined()
-    
+
     let set = RangeSet(ranges)
     let discontiguousSlice = initial[set]
     expectEqualSequence(discontiguousSlice, chosenElements)
-    
+
     for (chosenIdx, disIdx) in
       zip(chosenElements.indices, discontiguousSlice.indices)
     {

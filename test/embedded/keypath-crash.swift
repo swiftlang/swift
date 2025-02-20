@@ -20,7 +20,7 @@ public struct Binding<Value> {
 
 public struct State<Wrapped> {
   public var wrappedValue: Wrapped
-  
+
   public init(wrappedValue: Wrapped) {
     self.wrappedValue = wrappedValue
   }

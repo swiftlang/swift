@@ -62,7 +62,7 @@ actor ActorOnNaiveQueueExecutor {
         await actor.checkPreconditionIsolated()
       }
     }
-    
+
     await runAllTestsAsync()
   }
 }

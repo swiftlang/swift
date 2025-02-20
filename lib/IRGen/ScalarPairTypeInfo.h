@@ -168,7 +168,7 @@ public:
     payload.insertValue(IGM, builder, src.claimNext(),
       offset + asDerived().getSecondElementOffset(IGM).getValueInBits());
   }
-  
+
   void unpackFromEnumPayload(IRGenFunction &IGF,
                              const EnumPayload &payload,
                              Explosion &dest,

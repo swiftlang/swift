@@ -238,10 +238,10 @@ class ReturnType {
   // CHECK:  <ifunc>func <name>foo()</name> -> <type>Int</type> {
   // CHECK:  return 0
   // CHECK: }</ifunc>
-  
+
   func foo2<T>() -> T {}
   // CHECK:  <ifunc>func <name>foo2<<generic-param><name>T</name></generic-param>>()</name> -> <type>T</type> {}</ifunc>
-  
+
   func foo3() -> () -> Int {}
   // CHECK:  <ifunc>func <name>foo3()</name> -> <type>() -> Int</type> {}</ifunc>
 }
@@ -278,13 +278,13 @@ struct Tuples {
     return (1, "test")
     // CHECK: <tuple>(<elem-expr>1</elem-expr>, <elem-expr>"test"</elem-expr>)</tuple>
   }
-  
+
   func foo2() {
     foo3(x: (1, 20))
     // CHECK: <call><name>foo3</name>(<arg><name>x</name>: <tuple>(<elem-expr>1</elem-expr>, <elem-expr>20</elem-expr>)</tuple></arg>)</call>
     let y = (x, foo4(a: 0))
     // CHECK: <lvar>let <name>y</name> = <tuple>(<elem-expr>x</elem-expr>, <elem-expr><call><name>foo4</name>(<arg><name>a</name>: 0</arg>)</call></elem-expr>)</tuple></lvar>
-    
+
     let z = (name1: 1, name2: 2)
     // CHECK: <lvar>let <name>z</name> = <tuple>(name1: <elem-expr>1</elem-expr>, name2: <elem-expr>2</elem-expr>)</tuple></lvar>
   }

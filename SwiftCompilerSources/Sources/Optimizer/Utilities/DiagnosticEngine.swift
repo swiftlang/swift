@@ -103,7 +103,7 @@ struct DiagnosticEngine {
     // calls, so we don't escape anything from the closure. 'bridgedArgs' and
     // 'bridgedFixIts' are temporary storage to store bridged values. So they
     // should not be used after the closure is executed.
- 
+
     var closure: () -> Void = {
       bridgedArgs.withBridgedArrayRef { bridgedArgsRef in
         bridgedFixIts.withBridgedArrayRef { bridgedFixItsRef in

@@ -79,7 +79,7 @@ class ConformanceLookupTable : public ASTAllocated<ConformanceLookupTable> {
   std::unordered_map<NominalTypeDecl *,
                      std::array<LastProcessedEntry, NumConformanceStages>>
   LastProcessed;
-  
+
   struct ConformanceEntry;
 
   /// Describes the "source" of a conformance, indicating where the

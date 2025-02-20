@@ -188,7 +188,7 @@ extension NSRange : _ObjectiveCBridgeable {
   ) {
     result = x.rangeValue
   }
-  
+
   public static func _conditionallyBridgeFromObjectiveC(
     _ x: NSValue,
     result: inout NSRange?

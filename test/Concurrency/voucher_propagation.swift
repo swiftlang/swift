@@ -79,12 +79,12 @@ actor Counter {
 actor ActorWithSelfIsolatedDeinit {
   let expectedVoucher: voucher_t?
   let group: DispatchGroup
-  
+
   init(expectedVoucher: voucher_t?, group: DispatchGroup) {
     self.expectedVoucher = expectedVoucher
     self.group = group
   }
-  
+
   isolated deinit {
     expectTrue(isCurrentExecutor(self.unownedExecutor))
     let currentVoucher = voucher_copy()
@@ -96,7 +96,7 @@ actor ActorWithSelfIsolatedDeinit {
 
 @globalActor actor AnotherActor: GlobalActor {
   static let shared = AnotherActor()
-  
+
   func performTesting(_ work: @Sendable () -> Void) {
     work()
   }
@@ -106,12 +106,12 @@ actor ActorWithSelfIsolatedDeinit {
 actor ActorWithDeinitIsolatedOnAnother {
   let expectedVoucher: voucher_t?
   let group: DispatchGroup
-  
+
   init(expectedVoucher: voucher_t?, group: DispatchGroup) {
     self.expectedVoucher = expectedVoucher
     self.group = group
   }
-  
+
   @AnotherActor
   deinit {
     expectTrue(isCurrentExecutor(AnotherActor.shared.unownedExecutor))
@@ -126,12 +126,12 @@ actor ActorWithDeinitIsolatedOnAnother {
 class ClassWithIsolatedDeinit {
   let expectedVoucher: voucher_t?
   let group: DispatchGroup
-  
+
   init(expectedVoucher: voucher_t?, group: DispatchGroup) {
     self.expectedVoucher = expectedVoucher
     self.group = group
   }
-  
+
   @AnotherActor
   deinit {
     expectTrue(isCurrentExecutor(AnotherActor.shared.unownedExecutor))

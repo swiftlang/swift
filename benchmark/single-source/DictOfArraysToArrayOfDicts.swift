@@ -98,7 +98,7 @@ extension ZipSequence3 {
 
 extension ZipSequence3.Iterator: IteratorProtocol {
   public typealias Element = (A.Element,B.Element,C.Element)
-  
+
   public mutating func next() -> Element? {
     switch (a.next(), b.next(), c.next()) {
     case let (aValue?, bValue?, cValue?):

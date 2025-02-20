@@ -347,7 +347,7 @@ where Index: Strideable,
       result, bounds: ClosedRange(uncheckedBounds: (startIndex, endIndex)))
     return result
   }
-  
+
   /// Returns the distance between two indices.
   ///
   /// - Parameters:

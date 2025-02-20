@@ -115,14 +115,14 @@ enum Rdar56131416 {
 
   struct Fail<T> {}
   static func f<T, U>(_ value: T, _ transform: (T) -> U) -> Fail<U> { fatalError() }
-  
+
   static func takesCorrectType(_: Pass<UInt>) {}
 }
 
 func rdar56131416() {
   // This call should not be ambiguous.
   let result = Rdar56131416.f(1, \.magnitude) // no-error
-  
+
   // This type should be selected correctly.
   Rdar56131416.takesCorrectType(result)
 }
@@ -184,12 +184,12 @@ func key_path_value_mismatch() {
   struct S {
     var member: Int
   }
-	
+
   func test(_: KeyPath<S, String>) {}
   // expected-note@-1 {{found candidate with type 'KeyPath<S, Int>'}}
   func test(_: KeyPath<S, Float>) {}
   // expected-note@-1 {{found candidate with type 'KeyPath<S, Int>'}}
-	
+
   test(\.member)
   // expected-error@-1 {{no exact matches in call to local function 'test'}}
 }
@@ -227,7 +227,7 @@ func issue_65965() {
 	  var s: String
 	  let v: String
   }
-	
+
   let refKP: ReferenceWritableKeyPath<S, String>
   refKP = \.s
   // expected-error@-1 {{cannot convert key path type 'WritableKeyPath<S, String>' to contextual type 'ReferenceWritableKeyPath<S, String>'}}
@@ -241,7 +241,7 @@ func test_any_key_path() {
   struct S {
     var v: String
   }
-  
+
   var anyKP: AnyKeyPath
   anyKP = \S.v
   anyKP = \.v
@@ -253,7 +253,7 @@ func rdar32101765() {
   struct R32101765 {
     let prop32101765 = 0
   }
-  
+
   let _: KeyPath<R32101765, Float> = \.prop32101765
   // expected-error@-1 {{cannot assign value of type 'KeyPath<R32101765, Int>' to type 'KeyPath<R32101765, Float>'}}
   // expected-note@-2 {{arguments to generic parameter 'Value' ('Int' and 'Float') are expected to be equal}}

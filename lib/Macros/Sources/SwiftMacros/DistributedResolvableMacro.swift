@@ -209,7 +209,7 @@ extension DistributedResolvableMacro {
       if isGenericOverActorSystem, let specificActorSystemRequirement {
         typeParamConstraints = ["ActorSystem: \(specificActorSystemRequirement)"] + typeParamConstraints
       }
-      
+
       if !typeParamConstraints.isEmpty {
         whereClause += "\n  where " + typeParamConstraints.joined(separator: ",\n  ")
       }

@@ -90,11 +90,11 @@ func iterateTrivial<each Element>(over element: repeat each Element) {
 //
 // CHECK: } // end sil function '$s14pack_iteration11equalTuples3lhs3rhsSbxxQp_t_xxQp_ttRvzSQRzlF'
 func equalTuples<each Element: Equatable>(lhs: (repeat each Element), rhs: (repeat each Element)) -> Bool {
-  
+
   for (left, right) in repeat (each lhs, each rhs) {
     guard left == right else { return false }
   }
-  
+
   return true
 }
 

@@ -13,7 +13,7 @@ typedef NS_OPTIONS(NSUInteger, UIViewAnimationOptions) {
     UIViewAnimationOptionLayoutSubviews            = 1 <<  0,
     UIViewAnimationOptionTransitionFlipFromBottom  = 7 << 20,
   };
-  
+
 @interface UIView(UIViewAnimationWithBlocks)
 
 + (void)animateWithDuration:(NSTimeInterval)duration 

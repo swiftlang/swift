@@ -119,7 +119,7 @@ namespace {
     ArrayRef<Term> LHSSubstitutions;
     ArrayRef<Term> RHSSubstitutions;
     RewriteContext &Context;
-    
+
   public:
     /// Mismatches where both sides are type parameters and the left hand
     /// side orders before the right hand side. The integer is an index

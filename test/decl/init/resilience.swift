@@ -31,7 +31,7 @@ public struct Animal {
 
 public class Widget {
   public let name: String
-  
+
   public init(nonInlinableName name: String) {
     self.name = name
   }

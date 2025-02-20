@@ -24,7 +24,7 @@ public struct CollectionDifference<ChangeElement> {
     /// A non-`nil` `associatedWith` value is the offset of the complementary 
     /// change.
     case insert(offset: Int, element: ChangeElement, associatedWith: Int?)
-    
+
     /// A removal.
     ///
     /// The `offset` value is the offset of the element to be removed in the
@@ -74,7 +74,7 @@ public struct CollectionDifference<ChangeElement> {
   /// The insertions contained by this difference, from lowest offset to 
   /// highest.
   public let insertions: [Change]
-  
+
   /// The removals contained by this difference, from lowest offset to highest.
   public let removals: [Change]
 
@@ -350,7 +350,7 @@ extension CollectionDifference where ChangeElement: Hashable {
       }
       return result.filter { (_, v) -> Bool in v != .none }
     }()
-    
+
     let uniqueInsertions: [ChangeElement:Int?] = {
       var result = [ChangeElement:Int?](minimumCapacity: Swift.min(removals.count, insertions.count))
       for insertion in insertions {
@@ -424,7 +424,7 @@ extension CollectionDifference: Codable where ChangeElement: Codable {
     case insertions
     case removals
   }
-  
+
   public init(from decoder: Decoder) throws {
     let container = try decoder.container(keyedBy: _CodingKeys.self)
     var changes = try container.decode([Change].self, forKey: .removals)
@@ -443,7 +443,7 @@ extension CollectionDifference: Codable where ChangeElement: Codable {
 
     self.init(_validatedChanges: changes)
   }
-  
+
   public func encode(to encoder: Encoder) throws {
     var container = encoder.container(keyedBy: _CodingKeys.self)
     try container.encode(insertions, forKey: .insertions)

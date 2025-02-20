@@ -8,7 +8,7 @@ protocol Fooable: class {
 }
 
 class Foo: Fooable {
-  
+
   func foo() { }
   // CHECK-LABEL: sil private [transparent] [thunk] [ossa] @$s15witnesses_class3FooCAA7FooableA2aDP3foo{{[_0-9a-zA-Z]*}}FTW
   // CHECK-NOT:     function_ref

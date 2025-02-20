@@ -8,7 +8,7 @@ public class Base<T> {
    func foo() -> Int32 {
      return 1
    }
-   
+
    func boo() -> Int32 {
      return 11
    }
@@ -64,7 +64,7 @@ private class IndirectMethodCall<T> {
     func bug() {
         overrideMe()
     }
-    
+
     @inline(never)
     func overrideMe() { }
 }

@@ -56,7 +56,7 @@ func checkIsolationValueType(_ formance: InferredFromConformance,
   _ = await ext.point // expected-warning {{no 'async' operations occur within 'await' expression}}
   _ = await formance.counter  // expected-warning {{no 'async' operations occur within 'await' expression}}
   _ = await anno.counter  // expected-warning {{no 'async' operations occur within 'await' expression}}
-  
+
   // this does not need an await, since the property is 'Sendable' and of a
   // value type
   _ = anno.point

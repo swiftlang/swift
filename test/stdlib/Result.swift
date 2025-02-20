@@ -22,7 +22,7 @@ fileprivate extension Result {
       return nil
     }
   }
-  
+
   var failure: Failure? {
     switch self {
     case .success:
@@ -79,7 +79,7 @@ ResultTests.test("Throwing Initialization and Unwrapping") {
 
   expectEqual(result1.failure as? Err, Err.err)
   expectEqual(result2.success, string)
-    
+
   do {
     _ = try result1.get()
   } catch let error as Err {
@@ -87,14 +87,14 @@ ResultTests.test("Throwing Initialization and Unwrapping") {
   } catch {
     expectUnreachable()
   }
-    
+
   do {
     let unwrapped = try result2.get()
     expectEqual(unwrapped, string)
   } catch {
     expectUnreachable()
   }
-    
+
   // Test unwrapping strongly typed error.
   let result3 = Result<String, Err>.failure(Err.err)
   do {
@@ -126,11 +126,11 @@ ResultTests.test("Functional Transforms") {
   func transformDouble(_ int: Int) -> Int {
     return 2 * int
   }
-  
+
   func transformTriple(_ int: Int) -> Int {
     return 3 * int
   }
-  
+
   func transformError(_ err: Err) -> Err {
     if err == .err {
       return .derr
@@ -142,29 +142,29 @@ ResultTests.test("Functional Transforms") {
   func resultValueTransform(_ int: Int) -> Result<Int, Err> {
     return .success(transformDouble(int))
   }
-  
+
   func resultErrorTransform(_ err: Err) -> Result<Int, Err> {
     return .failure(transformError(err))
   }
-    
+
   let result1: Result<Int, Err> = .success(1)
   let newResult1 = result1.map(transformDouble)
-    
+
   expectEqual(newResult1, .success(2))
-    
+
   let result2: Result<Int, Err> = .failure(.err)
   let newResult2 = result2.mapError(transformError)
-    
+
   expectEqual(newResult2, .failure(.derr))
-    
+
   let result3: Result<Int, Err> = .success(1)
   let newResult3 = result3.flatMap(resultValueTransform)
-    
+
   expectEqual(newResult3, .success(2))
-    
+
   let result4: Result<Int, Err> = .failure(.derr)
   let newResult4 = result4.flatMapError(resultErrorTransform)
-    
+
   expectEqual(newResult4, .failure(.err))
 }
 
@@ -181,14 +181,14 @@ ResultTests.test("Equatable") {
   expectNotEqual(result2, .success(2))
   expectEqual(result2, .failure(.err))
   expectNotEqual(result2, .failure(.derr))
-  
+
   let confusables: [Result<Err, Err>] = [
     .success(.err),
     .success(.derr),
     .failure(.err),
     .failure(.derr)
   ]
-  
+
   checkEquatable(confusables, oracle: { $0 == $1 })
 }
 

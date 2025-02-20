@@ -13,7 +13,7 @@ func strings() {
   // String literal containing spaces and punctuation.
   blackHole("Hello, world! Padding past 16.")
   // CHECK-DAG: @".str.30.Hello, world! Padding past 16." = private unnamed_addr constant [31 x i8] c"Hello, world! Padding past 16.\00"
-  
+
   // String literal containing non-ASCII characters.
   blackHole("🏳️‍⚧️👩‍❤️‍💋‍👩🥹")
   // CHECK-DAG:  @".str.47.\F0\9F\8F\B3\EF\B8\8F\E2\80\8D\E2\9A\A7\EF\B8\8F\F0\9F\91\A9\E2\80\8D\E2\9D\A4\EF\B8\8F\E2\80\8D\F0\9F\92\8B\E2\80\8D\F0\9F\91\A9\F0\9F\A5\B9" = private unnamed_addr constant [48 x i8] c"\F0\9F\8F\B3\EF\B8\8F\E2\80\8D\E2\9A\A7\EF\B8\8F\F0\9F\91\A9\E2\80\8D\E2\9D\A4\EF\B8\8F\E2\80\8D\F0\9F\92\8B\E2\80\8D\F0\9F\91\A9\F0\9F\A5\B9\00"

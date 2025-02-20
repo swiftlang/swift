@@ -113,7 +113,7 @@ ErrorBridgingTests.test("NSError-to-enum bridging") {
 
     objc_setAssociatedObject(ns, &CanaryHandle, NoisyError(),
                              .OBJC_ASSOCIATION_RETAIN_NONATOMIC)
-  
+
     let e: Error = ns
 
     let cocoaCode: Int?
@@ -222,7 +222,7 @@ ErrorBridgingTests.test("NSError-to-enum bridging") {
 
     expectTrue(isMemoryFailure)
   }
-  
+
   expectEqual(NoisyErrorDeathCount, NoisyErrorLifeCount)
 }
 
@@ -617,7 +617,7 @@ enum DefaultCustomizedError3 : UInt, CustomNSError {
 #else
 #error ("Unknown pointer size")
 #endif
-  
+
   static var errorDomain: String {
     return "customized3"
   }

@@ -45,7 +45,7 @@ swift::_SwiftEmptyArrayStorage swift::_swiftEmptyArrayStorage = {
     &swift::CLASS_METADATA_SYM(s19__EmptyArrayStorage), // isa pointer
     InlineRefCounts::Immortal
   },
-  
+
   // _SwiftArrayBodyStorage body;
   {
     0, // int count;                                    
@@ -92,7 +92,7 @@ swift::_SwiftEmptyDictionarySingleton swift::_swiftEmptyDictionarySingleton = {
     &swift::CLASS_METADATA_SYM(s26__EmptyDictionarySingleton), // isa pointer
     InlineRefCounts::Immortal
   },
-  
+
   // _SwiftDictionaryBodyStorage body;
   {
     // Setting the scale to 0 makes for a bucketCount of 1 -- so that the
@@ -120,7 +120,7 @@ swift::_SwiftEmptySetSingleton swift::_swiftEmptySetSingleton = {
     &swift::CLASS_METADATA_SYM(s19__EmptySetSingleton), // isa pointer
     InlineRefCounts::Immortal
   },
-  
+
   // _SwiftSetBodyStorage body;
   {
     // Setting the scale to 0 makes for a bucketCount of 1 -- so that the

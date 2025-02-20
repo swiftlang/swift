@@ -755,7 +755,7 @@ extension InteriorUseWalker: AddressUseVisitor {
     -> WalkResult {
     return .continueWalk
   }
-  
+
   mutating func yieldedAddressUse(of operand: Operand) -> WalkResult {
     return .continueWalk
   }

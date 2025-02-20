@@ -374,7 +374,7 @@ class NotSendable {}
             continuation.onTermination = { @Sendable _ in expectation.fulfilled = true }
           }
         }
-        
+
         scopedLifetime(expectation)
 
         expectTrue(expectation.fulfilled)
@@ -389,7 +389,7 @@ class NotSendable {}
             continuation.finish()
           }
         }
-        
+
         scopedLifetime(expectation)
 
         expectTrue(expectation.fulfilled)
@@ -409,7 +409,7 @@ class NotSendable {}
             }
           }
         }
-        
+
         scopedLifetime(expectation)
 
         expectTrue(expectation.fulfilled)
@@ -429,7 +429,7 @@ class NotSendable {}
             }
           }
         }
-        
+
         scopedLifetime(expectation)
 
         expectTrue(expectation.fulfilled)

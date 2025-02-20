@@ -214,7 +214,7 @@ protected:
     other.Begin = other.End = other.Allocated = (char*) (&other + 1);
     assert(other.isAllocatedInline());
   }
-  
+
 public:
   ~DiverseStackImpl() {
     checkValid();

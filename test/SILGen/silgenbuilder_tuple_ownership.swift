@@ -32,12 +32,12 @@ class Controller {
     let content = content2!
     let httpClient2: HttpClient? = nil
     let httpClient: HttpClient = httpClient2!
-    
+
     // Create a Future to encapsulate the response handler.
     // This allows us to guarantee we only call it once.
     // We set the handler in the success block and we fail the future if we should no longer be allowed to call the completion
     let futureResponseHandler = Future<([String: Any]?, Error?)>()
-  
+
     do {
       try httpClient.fetch(requestContent: content) { (outcome) in
       }

@@ -35,7 +35,7 @@ struct BasicBlockSet : IntrusiveSet {
 
   private let context: BridgedPassContext
   private let bridged: BridgedBasicBlockSet
-    
+
   init(_ context: some Context) {
     self.context = context._bridged
     self.bridged = self.context.allocBasicBlockSet()
@@ -80,7 +80,7 @@ struct ValueSet : IntrusiveSet {
 
   private let context: BridgedPassContext
   private let bridged: BridgedNodeSet
-    
+
   init(_ context: some Context) {
     self.context = context._bridged
     self.bridged = self.context.allocNodeSet()
@@ -139,7 +139,7 @@ struct SpecificInstructionSet<InstType: Instruction> : IntrusiveSet {
 
   private let context: BridgedPassContext
   private let bridged: BridgedNodeSet
-    
+
   init(_ context: some Context) {
     self.context = context._bridged
     self.bridged = self.context.allocNodeSet()

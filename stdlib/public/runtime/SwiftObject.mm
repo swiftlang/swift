@@ -1683,7 +1683,7 @@ void swift_objc_swift3ImplicitObjCEntrypoint(id self, SEL selector,
   // atomic flag for each entry point.
   if (didLog->exchange(true))
     return;
-  
+
   // Figure out how much reporting we want by querying the environment
   // variable SWIFT_DEBUG_IMPLICIT_OBJC_ENTRYPOINT. We have four meaningful
   // levels:
@@ -1706,7 +1706,7 @@ void swift_objc_swift3ImplicitObjCEntrypoint(id self, SEL selector,
   bool isInstanceMethod = !class_isMetaClass(object_getClass(self));
   void (*reporter)(uint32_t, const char *, ...) =
     reportLevel > 2 ? swift::fatalError : swift::warning;
-  
+
   if (filenameLength > INT_MAX)
     filenameLength = INT_MAX;
 

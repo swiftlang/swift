@@ -40,7 +40,7 @@ public func foo(_ x: Int32) {
   // SIL-OPT: integer_literal $Builtin.Int32, 4242
   // SIL-OPT: integer_literal $Builtin.Int32, 42
   // SIL-OPT: function_ref @$s13pgo_si_reduce3barys5Int32VADF : $@convention(thin) (Int32) -> Int32
-  
+
   var sum : Int32 = 0
   for index in 1...x {
     if (index % 2 == 0) {

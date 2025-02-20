@@ -19,7 +19,7 @@
 // OUTNOMINAL_STRING_TESTVALUE_STATIC-NOT: name=testValue
 // OUTNOMINAL_STRING_TESTVALUE_STATIC:     Decl[StaticVar]/OutNominal: testValue[#String#]; name=testValue
 // OUTNOMINAL_STRING_TESTVALUE_STATIC-NOT: name=testValue
-  
+
 // GENERICPARAM_TESTVALUE-NOT: name=testValue
 // GENERICPARAM_TESTVALUE:  Decl[GenericTypeParam]/Local: testValue[#testValue#]; name=testValue
 // GENERICPARAM_TESTVALUE-NOT: name=testValue

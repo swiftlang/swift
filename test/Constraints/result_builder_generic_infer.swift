@@ -5,7 +5,7 @@ protocol P {
 
   @Builder<A>
   var x1: [S] { get }
-    
+
   @Builder<Self>
   var x2: [S] { get }
 }

@@ -134,18 +134,18 @@ public struct AsyncThrowingStream<Element, Failure: Error> {
     ///
     /// The `onTermination` closure receives an instance of this type.
     public enum Termination: Sendable {
-      
+
       /// The stream finished as a result of calling the continuation's
       ///  `finish` method.
       ///
       ///  The associated `Failure` value provides the error that terminated
       ///  the stream. If no error occurred, this value is `nil`.
       case finished(Failure?)
-      
+
       /// The stream finished as a result of cancellation.
       case cancelled
     }
-    
+
     /// A type that indicates the result of yielding a value to a client, by
     /// way of the continuation.
     ///
@@ -153,7 +153,7 @@ public struct AsyncThrowingStream<Element, Failure: Error> {
     /// this type to indicate the success or failure of yielding an element to
     /// the continuation.
     public enum YieldResult {
-      
+
       /// The stream successfully enqueued the element.
       ///
       /// This value represents the successful enqueueing of an element, whether
@@ -167,13 +167,13 @@ public struct AsyncThrowingStream<Element, Failure: Error> {
       /// that uses the `remaining` value could race on the consumption of
       /// values from the stream.
       case enqueued(remaining: Int)
-      
+
       /// The stream didn't enqueue the element because the buffer was full.
       ///
       /// The associated element for this case is the element that the stream
       /// dropped.
       case dropped(Element)
-      
+
       /// The stream didn't enqueue the element because the stream was in a
       /// terminal state.
       ///
@@ -182,17 +182,17 @@ public struct AsyncThrowingStream<Element, Failure: Error> {
       /// it threw an error.
       case terminated
     }
-    
+
     /// A strategy that handles exhaustion of a buffer’s capacity.
     public enum BufferingPolicy: Sendable {
       /// Continue to add to the buffer, treating its capacity as infinite.
       case unbounded
-      
+
       /// When the buffer is full, discard the newly received element.
       ///
       /// This strategy enforces keeping the specified amount of oldest values.
       case bufferingOldest(Int)
-      
+
       /// When the buffer is full, discard the oldest element in the buffer.
       ///
       /// This strategy enforces keeping the specified amount of newest values.
@@ -331,7 +331,7 @@ public struct AsyncThrowingStream<Element, Failure: Error> {
     context = _Context(storage: storage, produce: storage.next)
     build(Continuation(storage: storage))
   }
-  
+
   /// Constructs an asynchronous throwing stream from a given element-producing
   /// closure.
   ///

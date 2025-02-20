@@ -131,7 +131,7 @@ struct LifetimeDependence : CustomStringConvertible {
   }
   let scope: Scope
   let dependentValue: Value
-  
+
   var parentValue: Value { scope.parentValue }
 
   var function: Function {
@@ -953,13 +953,13 @@ private struct LifetimeDependenceUsePrinter : LifetimeDependenceDefUseWalker {
   let function: Function
   let localReachabilityCache = LocalVariableReachabilityCache()
   var visitedValues: ValueSet
-  
+
   init(function: Function, _ context: Context) {
     self.context = context
     self.function = function
     self.visitedValues = ValueSet(context)
   }
-  
+
   mutating func deinitialize() {
     visitedValues.deinitialize()
   }

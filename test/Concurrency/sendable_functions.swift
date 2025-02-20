@@ -10,7 +10,7 @@
 @available(SwiftStdlib 5.1, *)
 actor A {
   var state: Bool = false
-  
+
   @Sendable func f() { // expected-warning{{actor-isolated synchronous instance method 'f()' cannot be marked as '@Sendable'}}
     state = true
   }

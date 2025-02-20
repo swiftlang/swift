@@ -49,13 +49,13 @@ private class Derived2 : Base2 {
 public func callOuter(_ x: Int) -> Int {
 
   var o:Base2
-  
+
   if x == 1 {
     o = Base2()
   } else {
     o = Derived2()
   }
-  
+
   o.outer()
   return x
 }
@@ -130,7 +130,7 @@ class Base4 {
 // CHECK: } // end sil function '$s19devirt_default_case5Base4C4testyyF'
     foo() 
   }
-  
+
   @inline(never) func foo() { }
 }
 
@@ -151,7 +151,7 @@ open class Base5 {
   open func test() { 
     foo() 
   }
-  
+
   @inline(never) public final func foo() { }
 }
 

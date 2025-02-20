@@ -230,10 +230,10 @@ class CapturingClass {
   // CHECK: Reflecting an object.
   // CHECK: Type reference:
   // CHECK-NEXT: (class functions.CapturingClass)
- 
+
   // CHECK-64: Type info:
   // CHECK-64-NEXT: (class_instance size=16 alignment=1 stride=16
-  
+
   // CHECK-32: Type info:
   // CHECK-32-NEXT: (class_instance size=8 alignment=1 stride=8
   @_optimize(none)
@@ -249,7 +249,7 @@ class CapturingClass {
   // CHECK: Reflecting an object.
   // CHECK: Type reference:
   // CHECK-NEXT: (builtin Builtin.NativeObject)
-  
+
   // CHECK-64:        Type info:
   // CHECK-64-NEXT: (closure_context size=32 alignment=8 stride=32 num_extra_inhabitants=0 bitwise_takable=1
   // CHECK-64-NEXT:   (field offset=16
@@ -324,7 +324,7 @@ class CapturingClass {
   // CHECK: Reflecting an object.
   // CHECK: Type reference:
   // CHECK-NEXT: (builtin Builtin.NativeObject)
-  
+
   // CHECK-64:        Type info:
   // CHECK-64-NEXT: (closure_context size=24 alignment=8 stride=24 num_extra_inhabitants=0 bitwise_takable=1
   // CHECK-64-NEXT:   (field offset=16
@@ -350,7 +350,7 @@ class CapturingClass {
     let closure = { (i: Int, s: String, a: AnyObject?) in
       print(c)
     }
-  
+
     reflect(function: closure)
     return closure
   }
@@ -403,7 +403,7 @@ class CapturingClass {
   // CHECK: Reflecting an object.
   // CHECK: Type reference:
   // CHECK-NEXT: (builtin Builtin.NativeObject)
-  
+
   // CHECK-64:        Type info:
   // CHECK-64-NEXT: (closure_context size=32 alignment=8 stride=32 num_extra_inhabitants=0 bitwise_takable=1
   // CHECK-64-NEXT:   (field offset=16
@@ -437,7 +437,7 @@ class CapturingClass {
   // CHECK: Reflecting an object.
   // CHECK: Type reference:
   // CHECK-NEXT: (builtin Builtin.NativeObject)
-  
+
   // CHECK-64: Type info:
   // CHECK-64-NEXT: (closure_context size=40 alignment=8 stride=40 num_extra_inhabitants=0 bitwise_takable=1
   // CHECK-64-NEXT:   (field offset=16
@@ -482,7 +482,7 @@ class CapturingClass {
   // CHECK: Reflecting an object.
   // CHECK: Type reference:
   // CHECK-NEXT: (builtin Builtin.NativeObject)
- 
+
   // CHECK-64: Type info:
   // CHECK-64-NEXT: (closure_context size=40 alignment=8 stride=40 num_extra_inhabitants=0 bitwise_takable=1
   // CHECK-64-NEXT:   (field offset=16

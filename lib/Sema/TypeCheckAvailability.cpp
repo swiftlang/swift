@@ -3641,7 +3641,7 @@ public:
       diagnoseTypeAvailability(CE->getCastTypeRepr(), CE->getCastType(),
                                E->getLoc(), Where);
     }
-    
+
     if (auto EE = dyn_cast<ErasureExpr>(E)) {
       checkTypeMetadataAvailability(EE->getSubExpr()->getType(),
                                     EE->getLoc(), Where.getDeclContext());
@@ -4218,7 +4218,7 @@ ExprAvailabilityWalker::diagnoseIncDecRemoval(const ValueDecl *D, SourceRange R)
     replacement = " = " + SM.extractText(CSR).str();
     replacement += isInc ? ".successor()" : ".predecessor()";
   }
-  
+
   if (!replacement.empty()) {
     // If we emit a deprecation diagnostic, produce a fixit hint as well.
     auto diag = Context.Diags.diagnose(

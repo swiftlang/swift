@@ -8,7 +8,7 @@
 
 public struct MyStruct {
   public init(_ noext: Int, ext int: Int) {}
-    
+
 // INIT-LABEL: "precise": "s:17FunctionSignature8MyStructV_3extACSi_Sitcfc",
 // INIT: "name": "noext"
 // INIT-NOT: "internalName": "noext"
@@ -33,12 +33,12 @@ public struct MyStruct {
 // INIT: "kind": "typeIdentifier"
 // INIT-NEXT: "spelling": "Int"
 // INIT-NEXT: "preciseIdentifier": "s:Si"
-    
+
   public subscript(_ noext: Int, ext int: Int) -> String {
     get { return "OK" }
     set { }
   }
-    
+
 // SUBSCRIPT-LABEL: "precise": "s:17FunctionSignature8MyStructV_3extSSSi_Sitcip",
 // SUBSCRIPT: "name": "noext"
 // SUBSCRIPT-NOT: "internalName": "noext"
@@ -68,11 +68,11 @@ public struct MyStruct {
 // SUBSCRIPT: "kind": "typeIdentifier"
 // SUBSCRIPT-NEXT: "spelling": "String"
 // SUBSCRIPT-NEXT: "preciseIdentifier": "s:SS"
-    
+
   public func foo(_ noext: Int, ext int: Int) -> String {
     return "OK"
   }
-    
+
 // FUNC-LABEL: "precise": "s:17FunctionSignature8MyStructV3foo_3extSSSi_SitF",
 // FUNC: "name": "noext"
 // FUNC-NOT: "internalName": "noext"
@@ -102,9 +102,9 @@ public struct MyStruct {
 // FUNC: "kind": "typeIdentifier"
 // FUNC-NEXT: "spelling": "String"
 // FUNC-NEXT: "preciseIdentifier": "s:SS"
-    
+
   public func bar(_: Int, ext _: Int) -> Void {}
-      
+
 // FUNC2-LABEL: "precise": "s:17FunctionSignature8MyStructV3bar_3extySi_SitF",
 // FUNC2: "name": "_"
 // FUNC2-NOT: "internalName": "_"
@@ -134,5 +134,5 @@ public struct MyStruct {
 // FUNC2: "kind": "typeIdentifier"
 // FUNC2-NEXT: "spelling": "Void"
 // FUNC2-NEXT: "preciseIdentifier": "s:s4Voida"
-    
+
 }

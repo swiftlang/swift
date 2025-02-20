@@ -49,7 +49,7 @@ func otherExistential<T : EqualComparable>(_ t1: T) {
   var otherEqComp : OtherEqualComparable = t1 // expected-error{{value of type 'T' does not conform to specified type 'OtherEqualComparable'}}
   otherEqComp = t1 // expected-error{{cannot assign value of type 'T' to type 'any OtherEqualComparable'}}
   _ = otherEqComp
-  
+
   var otherEqComp2 : any OtherEqualComparable // Ok
   otherEqComp2 = t1 // expected-error{{cannot assign value of type 'T' to type 'any OtherEqualComparable'}}
   _ = otherEqComp2

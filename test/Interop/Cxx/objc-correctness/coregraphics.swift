@@ -6,4 +6,3 @@
  import CoreGraphics
 
  var _: CGBitmapInfo! = nil
- 

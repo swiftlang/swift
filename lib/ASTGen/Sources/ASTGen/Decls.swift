@@ -654,7 +654,7 @@ extension ASTGenVisitor {
     var thrownType: BridgedTypeRepr?
     var returnType: BridgedTypeRepr?
   }
-  
+
   func generate(
     functionSignature node: FunctionSignatureSyntax,
     for context: ParameterContext
@@ -676,7 +676,7 @@ extension ASTGenVisitor {
       returnType: returnType
     )
   } 
-  
+
   func generate(functionDecl node: FunctionDeclSyntax) -> BridgedFuncDecl? {
     var attrs = self.generateDeclAttributes(node, allowStatic: true)
     guard let (name, nameLoc) = self.generateIdentifierDeclNameAndLoc(node.name) else {
@@ -747,7 +747,7 @@ extension ASTGenVisitor {
       attrs.attributes.add(BridgedDeclAttribute.createSimple(self.ctx, kind: .rethrows, atLoc: nil, nameLoc: signature.throwsLoc))
     }
     decl.asDecl.attachParsedAttrs(attrs.attributes)
-    
+
     guard signature.returnType == nil else {
       // TODO: Diagnose.
       fatalError("unexpected return type in initializer decl")

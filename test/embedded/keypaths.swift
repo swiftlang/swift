@@ -35,7 +35,7 @@ struct StructWithDynamicMemberLookup<T>: ~Copyable {
     private var value: UnsafeMutablePointer<T>
     init(from t: T) { value = UnsafeMutablePointer<T>.allocate(capacity: 1); value.pointee = t }
     deinit { value.deallocate() }
-    
+
     subscript<U>(dynamicMember keyPath: KeyPath<T, U>) -> UnsafeMutablePointer<U> {
         @_transparent
         get {

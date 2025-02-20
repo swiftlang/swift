@@ -213,7 +213,7 @@ extension MutatingContext {
     }
     return nil
   }
-  
+
   func tryOptimizeKeypath(apply: FullApplySite) -> Bool {
     return _bridged.tryOptimizeKeypath(apply.bridged)
   }
@@ -449,12 +449,12 @@ extension Type {
     let v = context._bridged.getStaticSize(self.bridged)
     return v == -1 ? nil : v
   }
-  
+
   func getStaticAlignment(context: SimplifyContext) -> Int? {
     let v = context._bridged.getStaticAlignment(self.bridged)
     return v == -1 ? nil : v
   }
-  
+
   func getStaticStride(context: SimplifyContext) -> Int? {
     let v = context._bridged.getStaticStride(self.bridged)
     return v == -1 ? nil : v
@@ -599,7 +599,7 @@ extension BasicBlock {
     context.notifyInstructionsChanged()
     return bridged.addBlockArgument(type.bridged, ownership._bridged).argument
   }
-  
+
   func addFunctionArgument(type: Type, _ context: some MutatingContext) -> FunctionArgument {
     context.notifyInstructionsChanged()
     return bridged.addFunctionArgument(type.bridged).argument as! FunctionArgument

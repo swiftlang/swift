@@ -28,7 +28,7 @@
 namespace swift {
 
 class SILPrintContext;
-  
+
 /// A descriptor for a public property or subscript that can be resiliently
 /// referenced from key paths in external modules.
 class SILProperty : public llvm::ilist_node<SILProperty>,
@@ -37,10 +37,10 @@ class SILProperty : public llvm::ilist_node<SILProperty>,
 private:
   /// True if serialized.
   unsigned Serialized : 2;
-  
+
   /// The declaration the descriptor represents.
   AbstractStorageDecl *Decl;
-  
+
   /// The key path component that represents its implementation.
   std::optional<KeyPathPatternComponent> Component;
 
@@ -62,7 +62,7 @@ public:
   }
 
   AbstractStorageDecl *getDecl() const { return Decl; }
-  
+
   bool isTrivial() const {
     return !Component.has_value();
   }
@@ -75,10 +75,10 @@ public:
 
   void print(SILPrintContext &Ctx) const;
   void dump() const;
-  
+
   void verify(const SILModule &M) const;
 };
-  
+
 } // end namespace swift
 
 namespace llvm {

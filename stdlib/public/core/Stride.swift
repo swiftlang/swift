@@ -561,7 +561,7 @@ public struct StrideThrough<Element: Strideable> {
   internal let _end: Element
   @usableFromInline
   internal let _stride: Element.Stride
-  
+
   @inlinable
   internal init(_start: Element, end: Element, stride: Element.Stride) {
     _precondition(stride != 0, "Stride size must not be zero")

@@ -28,7 +28,7 @@ extension _NativeSet { // Bridging
   @usableFromInline
   internal __consuming func bridged() -> AnyObject {
     _connectOrphanedFoundationSubclassesIfNeeded()
-    
+
     // We can zero-cost bridge if our keys are verbatim
     // or if we're the empty singleton.
 

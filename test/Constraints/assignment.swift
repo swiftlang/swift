@@ -83,7 +83,7 @@ _ = returnsVoid() // expected-warning {{using '_' to ignore the result of a Void
 // https://github.com/apple/swift/issues/56396
 class С_56396 {
   var callback: ((С_56396) -> Void)!
-  
+
   func setCallback(_ callback: @escaping (Self) -> Void) {
     self.callback = callback // expected-error {{cannot assign value of type '(Self) -> Void' to type '(С_56396) -> Void'}}
   }

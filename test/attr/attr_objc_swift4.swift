@@ -10,7 +10,7 @@ class ObjCSubclass : NSObject {
 
 class DynamicMembers {
   @objc dynamic func foo() { }
-  
+
   @objc dynamic var bar: NSObject? = nil
 }
 
@@ -65,7 +65,7 @@ class DesignatedInitsInheritObjCAttrSub: InitsInheritObjCAttrBase {
   // FIXME: The '@objc' is relied upon, but the 'dynamic' probably shouldn't be!
   // CHECK: {{^}} @objc dynamic init(bar: Int)
   init(bar: Int) { super.init() }
-  
+
   // CHECK: {{^}} init(unrelated: Int)
   init(unrelated: Int) { super.init() }
 } // CHECK: {{^[}]$}}

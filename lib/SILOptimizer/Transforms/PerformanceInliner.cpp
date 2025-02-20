@@ -1080,7 +1080,7 @@ void SILPerformanceInliner::collectAppliesToInline(
   // Compute the shortest-path analysis for the caller.
   ShortestPathAnalysis *SPA = getSPA(Caller, LI);
   SPA->analyze(CBI, [&](FullApplySite FAS) -> int {
-  
+
     // This closure returns the length of a called function.
 
     // At this occasion we record additional weight increases.
@@ -1293,7 +1293,7 @@ bool SILPerformanceInliner::inlineCallsIntoFunction(SILFunction *Caller) {
     }
   }
   deleter.cleanupDeadInstructions();
-  
+
   // The inliner splits blocks at call sites. Re-merge trivial branches to
   // reestablish a canonical CFG.
   mergeBasicBlocks(Caller);

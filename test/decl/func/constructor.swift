@@ -31,7 +31,7 @@ Z(a: 1, b: 2) // expected-warning{{unused}}
 // User-written init suppresses implicit constructors.
 struct A {
   var i, j : Int
-  
+
   init(x : Int) { // expected-note {{'init(x:)' declared here}}
     i = x
     j = x

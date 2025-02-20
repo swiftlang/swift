@@ -144,13 +144,13 @@ class ClassWithPotentiallyUnavailableMethod {
 
   @available(OSX, introduced: 10.9)
   func methAvailableOn10_9() {}
-  
+
   @available(OSX, introduced: 51)
   func methAvailableOn51() {}
-  
+
   @available(OSX, introduced: 51)
   class func classMethAvailableOn51() {}
-  
+
   func someOtherMethod() {
     // expected-note@-1 {{add @available attribute to enclosing instance method}}
 
@@ -165,12 +165,12 @@ func callPotentiallyUnavailableMethods(_ o: ClassWithPotentiallyUnavailableMetho
 
   let m10_9 = o.methAvailableOn10_9
   m10_9()
-  
+
   let m51 = o.methAvailableOn51 // expected-error {{'methAvailableOn51()' is only available in macOS 51 or newer}}
       // expected-note@-1 {{add 'if #available' version check}}
 
   m51()
-  
+
   o.methAvailableOn10_9()
   o.methAvailableOn51() // expected-error {{'methAvailableOn51()' is only available in macOS 51 or newer}}
       // expected-note@-1 {{add 'if #available' version check}}
@@ -181,13 +181,13 @@ func callPotentiallyUnavailableMethodsViaIUO(_ o: ClassWithPotentiallyUnavailabl
 
   let m10_9 = o.methAvailableOn10_9
   m10_9()
-  
+
   let m51 = o.methAvailableOn51 // expected-error {{'methAvailableOn51()' is only available in macOS 51 or newer}}
-      
+
       // expected-note@-2 {{add 'if #available' version check}}
 
   m51()
-  
+
   o.methAvailableOn10_9()
   o.methAvailableOn51() // expected-error {{'methAvailableOn51()' is only available in macOS 51 or newer}}
       // expected-note@-1 {{add 'if #available' version check}}
@@ -198,7 +198,7 @@ func callPotentiallyUnavailableClassMethod() {
 
   ClassWithPotentiallyUnavailableMethod.classMethAvailableOn51() // expected-error {{'classMethAvailableOn51()' is only available in macOS 51 or newer}}
       // expected-note@-1 {{add 'if #available' version check}}
-  
+
   let m51 = ClassWithPotentiallyUnavailableMethod.classMethAvailableOn51 // expected-error {{'classMethAvailableOn51()' is only available in macOS 51 or newer}}
       // expected-note@-1 {{add 'if #available' version check}}
 
@@ -224,15 +224,15 @@ class SubClassOverridingPotentiallyUnavailableMethod : ClassWithPotentiallyUnava
     methAvailableOn10_9()
     super.methAvailableOn51() // expected-error {{'methAvailableOn51()' is only available in macOS 51 or newer}}
         // expected-note@-1 {{add 'if #available' version check}}
-    
+
     let m10_9 = super.methAvailableOn10_9
     m10_9()
-    
+
     let m51 = super.methAvailableOn51 // expected-error {{'methAvailableOn51()' is only available in macOS 51 or newer}}
         // expected-note@-1 {{add 'if #available' version check}}
     m51()
   }
-  
+
   func someMethod() {
     methAvailableOn10_9()
     // Calling our override should be fine
@@ -301,17 +301,17 @@ class ClassWithPotentiallyUnavailableInitializer {
 
   @available(OSX, introduced: 10.9)
   required init() {  }
-  
+
   @available(OSX, introduced: 51)
   required init(_ val: Int) {  }
-  
+
   convenience init(s: String) {
         // expected-note@-1 {{add @available attribute to enclosing initializer}}
-    
+
     self.init(5) // expected-error {{'init(_:)' is only available in macOS 51 or newer}}
         // expected-note@-1 {{add 'if #available' version check}}
   }
-  
+
   @available(OSX, introduced: 51)
   convenience init(onlyOn1010: String) {
     self.init(5)
@@ -324,7 +324,7 @@ func callPotentiallyUnavailableInitializer() {
   _ = ClassWithPotentiallyUnavailableInitializer()
   _ = ClassWithPotentiallyUnavailableInitializer(5) // expected-error {{'init(_:)' is only available in macOS 51 or newer}}
       // expected-note@-1 {{add 'if #available' version check}}
-  
+
   let i = ClassWithPotentiallyUnavailableInitializer.self
   _ = i.init()
   _ = i.init(5) // expected-error {{'init(_:)' is only available in macOS 51 or newer}}
@@ -334,7 +334,7 @@ func callPotentiallyUnavailableInitializer() {
 class SuperWithWithPotentiallyUnavailableInitializer {
   @available(OSX, introduced: 10.9)
   init() {  }
-  
+
   @available(OSX, introduced: 51)
   init(_ val: Int) {  }
 }
@@ -348,11 +348,11 @@ class SubOfClassWithPotentiallyUnavailableInitializer : SuperWithWithPotentially
     super.init(5) // expected-error {{'init(_:)' is only available in macOS 51 or newer}}
         // expected-note@-1 {{add 'if #available' version check}}
   }
-  
+
   override init() {
     super.init()
   }
-  
+
   @available(OSX, introduced: 51)
   init(on1010: Int) {
     super.init(22)
@@ -378,7 +378,7 @@ class ClassWithPotentiallyUnavailableProperties {
 
   @available(OSX, introduced: 10.9)
   lazy var availableOn10_9Stored: Int = 9
-  
+
   @available(OSX, introduced: 51) // expected-error {{stored properties cannot be marked potentially unavailable with '@available'}}
   lazy var availableOn51Stored : Int = 10
 
@@ -387,18 +387,18 @@ class ClassWithPotentiallyUnavailableProperties {
     get {
       let _: Int = availableOn51Stored // expected-error {{'availableOn51Stored' is only available in macOS 51 or newer}}
           // expected-note@-1 {{add 'if #available' version check}}
-      
+
       if #available(OSX 51, *) {
         let _: Int = availableOn51Stored
       }
-      
+
       return availableOn10_9Stored
     }
     set(newVal) {
       availableOn10_9Stored = newVal
     }
   }
-  
+
   @available(OSX, introduced: 51)
   var availableOn51Computed: Int {
     get {
@@ -408,7 +408,7 @@ class ClassWithPotentiallyUnavailableProperties {
       availableOn51Stored = newVal
     }
   }
-  
+
   var propWithSetterOnlyAvailableOn51 : Int {
       // expected-note@-1 {{add @available attribute to enclosing property}}
     get {
@@ -421,7 +421,7 @@ class ClassWithPotentiallyUnavailableProperties {
     _ = globalFuncAvailableOn51()
     }
   }
-  
+
   var propWithGetterOnlyAvailableOn51 : Int {
       // expected-note@-1 {{add @available attribute to enclosing property}}
     @available(OSX, introduced: 51)
@@ -434,7 +434,7 @@ class ClassWithPotentiallyUnavailableProperties {
           // expected-note@-1 {{add 'if #available' version check}}
     }
   }
-  
+
   var propWithGetterAndSetterOnlyAvailableOn51 : Int {
     @available(OSX, introduced: 51)
     get {
@@ -444,7 +444,7 @@ class ClassWithPotentiallyUnavailableProperties {
     set(newVal) {
     }
   }
-  
+
   var propWithSetterOnlyAvailableOn51ForNestedMemberRef : ClassWithPotentiallyUnavailableProperties {
     get {
       return ClassWithPotentiallyUnavailableProperties()
@@ -453,7 +453,7 @@ class ClassWithPotentiallyUnavailableProperties {
     set(newVal) {
     }
   }
-  
+
   var propWithGetterOnlyAvailableOn51ForNestedMemberRef : ClassWithPotentiallyUnavailableProperties {
     @available(OSX, introduced: 51)
     get {
@@ -481,7 +481,7 @@ func accessPotentiallyUnavailableProperties(_ o: ClassWithPotentiallyUnavailable
   let _: Int = o.availableOn10_9Stored
   let _: Int = o.availableOn51Stored // expected-error {{'availableOn51Stored' is only available in macOS 51 or newer}}
       // expected-note@-1 {{add 'if #available' version check}}
-  
+
   o.availableOn10_9Stored = 9
   o.availableOn51Stored = 10 // expected-error {{'availableOn51Stored' is only available in macOS 51 or newer}}
       // expected-note@-1 {{add 'if #available' version check}}
@@ -490,21 +490,21 @@ func accessPotentiallyUnavailableProperties(_ o: ClassWithPotentiallyUnavailable
   let _: Int = o.availableOn10_9Computed
   let _: Int = o.availableOn51Computed // expected-error {{'availableOn51Computed' is only available in macOS 51 or newer}}
       // expected-note@-1 {{add 'if #available' version check}}
-  
+
   o.availableOn10_9Computed = 9
   o.availableOn51Computed = 10 // expected-error {{'availableOn51Computed' is only available in macOS 51 or newer}}
       // expected-note@-1 {{add 'if #available' version check}}
-  
+
   // Getter allowed on 10.9 but setter is not
   let _: Int = o.propWithSetterOnlyAvailableOn51
   o.propWithSetterOnlyAvailableOn51 = 5 // expected-error {{setter for 'propWithSetterOnlyAvailableOn51' is only available in macOS 51 or newer}}
       // expected-note@-1 {{add 'if #available' version check}}
-  
+
   if #available(OSX 51, *) {
     // Setter is allowed on 51 and greater
     o.propWithSetterOnlyAvailableOn51 = 5
   }
-  
+
   // Setter allowed on 10.9 but getter is not
   o.propWithGetterOnlyAvailableOn51 = 5
   let _: Int = o.propWithGetterOnlyAvailableOn51 // expected-error {{getter for 'propWithGetterOnlyAvailableOn51' is only available in macOS 51 or newer}}
@@ -514,9 +514,9 @@ func accessPotentiallyUnavailableProperties(_ o: ClassWithPotentiallyUnavailable
     // Getter is allowed on 51 and greater
     let _: Int = o.propWithGetterOnlyAvailableOn51
   }
-  
+
   // Tests for nested member refs
-  
+
   // Both getters are potentially unavailable.
   let _: Int = o.propWithGetterOnlyAvailableOn51ForNestedMemberRef.propWithGetterOnlyAvailableOn51 // expected-error {{getter for 'propWithGetterOnlyAvailableOn51ForNestedMemberRef' is only available in macOS 51 or newer}} expected-error {{getter for 'propWithGetterOnlyAvailableOn51' is only available in macOS 51 or newer}}
       // expected-note@-1 2{{add 'if #available' version check}}
@@ -531,8 +531,8 @@ func accessPotentiallyUnavailableProperties(_ o: ClassWithPotentiallyUnavailable
 
   // Both getters are always available.
   let _: Int = o.propWithSetterOnlyAvailableOn51ForNestedMemberRef.propWithSetterOnlyAvailableOn51
-  
-  
+
+
   // Nesting in source of assignment
   var v: Int
 
@@ -545,15 +545,15 @@ func accessPotentiallyUnavailableProperties(_ o: ClassWithPotentiallyUnavailable
   _ = v // muffle warning
 
   // Inout requires access to both getter and setter
-  
+
   func takesInout(_ i : inout Int) { }
-  
+
   takesInout(&o.propWithGetterOnlyAvailableOn51) // expected-error {{cannot pass as inout because getter for 'propWithGetterOnlyAvailableOn51' is only available in macOS 51 or newer}}
       // expected-note@-1 {{add 'if #available' version check}}
 
   takesInout(&o.propWithSetterOnlyAvailableOn51) // expected-error {{cannot pass as inout because setter for 'propWithSetterOnlyAvailableOn51' is only available in macOS 51 or newer}}
       // expected-note@-1 {{add 'if #available' version check}}
-  
+
   takesInout(&o.propWithGetterAndSetterOnlyAvailableOn51) // expected-error {{cannot pass as inout because getter for 'propWithGetterAndSetterOnlyAvailableOn51' is only available in macOS 51 or newer}} expected-error {{cannot pass as inout because setter for 'propWithGetterAndSetterOnlyAvailableOn51' is only available in macOS 51 or newer}}
       // expected-note@-1 2{{add 'if #available' version check}}
 
@@ -602,7 +602,7 @@ enum CompassPoint {
   case WithPotentiallyUnavailablePayload(p : EnumIntroducedOn52) // expected-error {{'EnumIntroducedOn52' is only available in macOS 52 or newer}}
 
   case WithPotentiallyUnavailablePayload1(p : EnumIntroducedOn52), WithPotentiallyUnavailablePayload2(p : EnumIntroducedOn52) // expected-error 2{{'EnumIntroducedOn52' is only available in macOS 52 or newer}}
-  
+
   @available(OSX, unavailable)
   case WithPotentiallyUnavailablePayload3(p : EnumIntroducedOn52)
 }
@@ -654,7 +654,7 @@ func useEnums() {
         // For the moment, we do not incorporate enum element availability into 
         // scope construction. Perhaps we should?
         functionTakingEnumIntroducedOn52(p)  // expected-error {{'functionTakingEnumIntroducedOn52' is only available in macOS 52 or newer}}
-          
+
           // expected-note@-2 {{add 'if #available' version check}}
     }
   }
@@ -702,14 +702,14 @@ func classAvailability() {
   _ = ClassAvailableOn10_9.self
   _ = ClassAvailableOn51.self // expected-error {{'ClassAvailableOn51' is only available in macOS 51 or newer}}
       // expected-note@-1 {{add 'if #available' version check}}
-  
+
   let o10_9 = ClassAvailableOn10_9()
   let o51 = ClassAvailableOn51() // expected-error {{'ClassAvailableOn51' is only available in macOS 51 or newer}}
       // expected-note@-1 {{add 'if #available' version check}}
-  
+
   o10_9.someMethod()
   o51.someMethod()
-  
+
   let _ = o10_9.someProp
   let _ = o51.someProp 
 }
@@ -748,7 +748,7 @@ func classViaTypeParameter() {
   let _ : ClassAvailableOn51_Creatable = // expected-error {{'ClassAvailableOn51_Creatable' is only available in macOS 51 or newer}}
       // expected-note@-1 {{add 'if #available' version check}}
       create()
-      
+
   let _ = create() as
       ClassAvailableOn51_Creatable // expected-error {{'ClassAvailableOn51_Creatable' is only available in macOS 51 or newer}}
           // expected-note@-1 {{add 'if #available' version check}}
@@ -782,7 +782,7 @@ class ClassWithDeclarationsOfPotentiallyUnavailableClasses {
   init() {}
 
   var propertyOfPotentiallyUnavailableType: ClassAvailableOn51 // expected-error {{'ClassAvailableOn51' is only available in macOS 51 or newer}}
-  
+
   @available(OSX, introduced: 51)
   static var potentiallyUnavailableStaticPropertyOfPotentiallyUnavailableType: ClassAvailableOn51 = ClassAvailableOn51()
 
@@ -792,10 +792,10 @@ class ClassWithDeclarationsOfPotentiallyUnavailableClasses {
   func methodWithPotentiallyUnavailableParameterType(_ o : ClassAvailableOn51) { // expected-error {{'ClassAvailableOn51' is only available in macOS 51 or newer}}
       // expected-note@-1 {{add @available attribute to enclosing instance method}}
   }
-  
+
   @available(OSX, introduced: 51)
   func potentiallyUnavailableMethodWithPotentiallyUnavailableParameterType(_ o : ClassAvailableOn51) {}
-  
+
   func methodWithPotentiallyUnavailableReturnType() -> ClassAvailableOn51 { // expected-error {{'ClassAvailableOn51' is only available in macOS 51 or newer}}
       // expected-note@-1 2{{add @available attribute to enclosing instance method}}
 
@@ -805,12 +805,12 @@ class ClassWithDeclarationsOfPotentiallyUnavailableClasses {
 
   @available(OSX, unavailable)
   func unavailableMethodWithPotentiallyUnavailableParameterType(_ o : ClassAvailableOn51) {}
-  
+
   @available(OSX, introduced: 51)
   func potentiallyUnavailableMethodWithPotentiallyUnavailableReturnType() -> ClassAvailableOn51 {
     return ClassAvailableOn51()
   }
-  
+
   @available(OSX, unavailable)
   func unavailableMethodWithPotentiallyUnavailableReturnType() -> ClassAvailableOn51 {
     guard #available(OSX 51, *) else { fatalError() }
@@ -822,12 +822,12 @@ class ClassWithDeclarationsOfPotentiallyUnavailableClasses {
     let _ : ClassAvailableOn51 = methodWithPotentiallyUnavailableReturnType() // expected-error {{'ClassAvailableOn51' is only available in macOS 51 or newer}}
       // expected-note@-1 {{add 'if #available' version check}}
   }
-  
+
   @available(OSX, introduced: 51)
   func potentiallyUnavailableMethodWithPotentiallyUnavailableLocalDeclaration() {
     let _ : ClassAvailableOn51 = methodWithPotentiallyUnavailableReturnType()
   }
-  
+
   @available(OSX, unavailable)
   func unavailableMethodWithPotentiallyUnavailableLocalDeclaration() {
     let _ : ClassAvailableOn51 = methodWithPotentiallyUnavailableReturnType()
@@ -857,7 +857,7 @@ class UnavailableClassExtendingPotentiallyUnavailableClass : ClassAvailableOn51 
 class SuperWithAlwaysAvailableMembers {
   func shouldAlwaysBeAvailableMethod() { // expected-note {{overridden declaration is here}}
   }
-  
+
   var shouldAlwaysBeAvailableProperty: Int { // expected-note {{overridden declaration is here}}
     get { return 9 }
     set(newVal) {}
@@ -878,7 +878,7 @@ class SubWithLimitedMemberAvailability : SuperWithAlwaysAvailableMembers {
   @available(OSX, introduced: 51)
   override func shouldAlwaysBeAvailableMethod() { // expected-error {{overriding 'shouldAlwaysBeAvailableMethod' must be as available as declaration it overrides}}
   }
-  
+
   @available(OSX, introduced: 51)
   override var shouldAlwaysBeAvailableProperty: Int { // expected-error {{overriding 'shouldAlwaysBeAvailableProperty' must be as available as declaration it overrides}}
     get { return 10 }
@@ -953,12 +953,12 @@ extension ClassAvailableOn51 {
 @available(OSX, introduced: 51)
 class SubWithLimitedAvailablility : SuperWithAlwaysAvailableMembers {
   override func shouldAlwaysBeAvailableMethod() {}
-  
+
   override var shouldAlwaysBeAvailableProperty: Int {
     get { return 10 }
     set(newVal) {}
   }
-  
+
   override var setterShouldAlwaysBeAvailableProperty: Int {
     get { return 9 }
     set(newVal) {}
@@ -974,7 +974,7 @@ class SuperWithLimitedMemberAvailability {
   @available(OSX, introduced: 51)
   func someMethod() {
   }
-  
+
   @available(OSX, introduced: 51)
   var someProperty: Int {
     get { return 10 }
@@ -988,22 +988,22 @@ class SubWithLargerMemberAvailability : SuperWithLimitedMemberAvailability {
   override func someMethod() {
     super.someMethod() // expected-error {{'someMethod()' is only available in macOS 51 or newer}}
         // expected-note@-1 {{add 'if #available' version check}}
-    
+
     if #available(OSX 51, *) {
       super.someMethod()
     }
   }
-  
+
   @available(OSX, introduced: 10.9)
   override var someProperty: Int {
     get { 
       let _ = super.someProperty // expected-error {{'someProperty' is only available in macOS 51 or newer}}
           // expected-note@-1 {{add 'if #available' version check}}
-      
+
       if #available(OSX 51, *) {
         let _ = super.someProperty
       }
-      
+
       return 9
       }
     set(newVal) {}
@@ -1015,7 +1015,7 @@ class SubWithLimitedAvailability : SuperWithLimitedMemberAvailability {
   override func someMethod() {
     super.someMethod()
   }
-  
+
   override var someProperty: Int {
     get { super.someProperty }
     set(newVal) { super.someProperty = newVal }
@@ -1027,7 +1027,7 @@ class SubWithMoreLimitedAvailability : SuperWithLimitedMemberAvailability {
   override func someMethod() {
     super.someMethod()
   }
-  
+
   override var someProperty: Int {
     get { super.someProperty }
     set(newVal) { super.someProperty = newVal }
@@ -1040,7 +1040,7 @@ class SubWithMoreLimitedAvailabilityAndRedundantMemberAvailability : SuperWithLi
   override func someMethod() {
     super.someMethod()
   }
-  
+
   @available(OSX, introduced: 52)
   override var someProperty: Int {
     get { super.someProperty }
@@ -1052,7 +1052,7 @@ class SubWithMoreLimitedAvailabilityAndRedundantMemberAvailability : SuperWithLi
 class UnavailableSubWithLargerMemberAvailability : SuperWithLimitedMemberAvailability {
   override func someMethod() {
   }
-  
+
   override var someProperty: Int {
     get { return 5 }
     set(newVal) {}
@@ -1138,13 +1138,13 @@ func UnavailableGenericSignature<T : ProtocolAvailableOn51>(_ t: T) {
 struct GenericType<T> { // expected-note {{add @available attribute to enclosing generic struct}}
   func nonGenericWhereClause() where T : ProtocolAvailableOn51 {} // expected-error {{'ProtocolAvailableOn51' is only available in macOS 51 or newer}}
   // expected-note@-1 {{add @available attribute to enclosing instance method}}
-  
+
   @available(OSX, unavailable)
   func unavailableNonGenericWhereClause() where T : ProtocolAvailableOn51 {}
 
   struct NestedType where T : ProtocolAvailableOn51 {} // expected-error {{'ProtocolAvailableOn51' is only available in macOS 51 or newer}}
   // expected-note@-1 2{{add @available attribute to enclosing struct}}
-  
+
   @available(OSX, unavailable)
   struct UnavailableNestedType where T : ProtocolAvailableOn51 {}
 }
@@ -1241,10 +1241,10 @@ func functionWithDefaultAvailabilityAndUselessCheck(_ p: Bool) {
   if #available(OSX 10.9, *) { // no-warning
     let _ = globalFuncAvailableOn10_9()
   }
-  
+
   if #available(OSX 51, *) { // expected-note {{enclosing scope here}}
     let _ = globalFuncAvailableOn51()
-    
+
     if #available(OSX 51, *) { // expected-warning {{unnecessary check for 'macOS'; enclosing scope ensures guard will always be true}}
       let _ = globalFuncAvailableOn51()
     }
@@ -1310,7 +1310,7 @@ func functionWithSpecifiedAvailabilityAndUselessCheck() { // expected-note 2{{en
   if #available(OSX 10.9, *) { // expected-warning {{unnecessary check for 'macOS'; enclosing scope ensures guard will always be true}}
     let _ = globalFuncAvailableOn10_9()
   }
-  
+
   if #available(OSX 51, *) { // expected-warning {{unnecessary check for 'macOS'; enclosing scope ensures guard will always be true}}
     let _ = globalFuncAvailableOn51()
   }
@@ -1447,7 +1447,7 @@ func fixitForReferenceInGlobalFunction() {
   functionAvailableOn51()
       // expected-error@-1 {{'functionAvailableOn51()' is only available in macOS 51 or newer}}
       // expected-note@-2 {{add 'if #available' version check}} {{3-26=if #available(macOS 51, *) {\n      functionAvailableOn51()\n  } else {\n      // Fallback on earlier versions\n  }}}
-      
+
 }
 
 public func fixitForReferenceInGlobalFunctionWithDeclModifier() {
@@ -1455,7 +1455,7 @@ public func fixitForReferenceInGlobalFunctionWithDeclModifier() {
   functionAvailableOn51()
       // expected-error@-1 {{'functionAvailableOn51()' is only available in macOS 51 or newer}}
       // expected-note@-2 {{add 'if #available' version check}} {{3-26=if #available(macOS 51, *) {\n      functionAvailableOn51()\n  } else {\n      // Fallback on earlier versions\n  }}}
-      
+
 }
 
 func fixitForReferenceInGlobalFunctionWithAttribute() -> Never {
@@ -1464,7 +1464,7 @@ func fixitForReferenceInGlobalFunctionWithAttribute() -> Never {
   functionAvailableOn51()
     // expected-error@-1 {{'functionAvailableOn51()' is only available in macOS 51 or newer}}
     // expected-note@-2 {{add 'if #available' version check}} {{3-26=if #available(macOS 51, *) {\n      functionAvailableOn51()\n  } else {\n      // Fallback on earlier versions\n  }}}
-    
+
 }
 
 func takesAutoclosure(_ c : @autoclosure () -> ()) {
@@ -1496,7 +1496,7 @@ class ClassForFixit {
     takesAutoclosure(functionAvailableOn51())
           // expected-error@-1 {{'functionAvailableOn51()' is only available in macOS 51 or newer}}
           // expected-note@-2 {{add 'if #available' version check}} {{5-46=if #available(macOS 51, *) {\n        takesAutoclosure(functionAvailableOn51())\n    } else {\n        // Fallback on earlier versions\n    }}}
-          
+
   }
 
   var fixitForReferenceInPropertyAccessor: Int {
@@ -1505,7 +1505,7 @@ class ClassForFixit {
       functionAvailableOn51()
         // expected-error@-1 {{'functionAvailableOn51()' is only available in macOS 51 or newer}}
         // expected-note@-2 {{add 'if #available' version check}} {{7-30=if #available(macOS 51, *) {\n          functionAvailableOn51()\n      } else {\n          // Fallback on earlier versions\n      }}}
-        
+
       return 5
     }
   }
@@ -1557,7 +1557,7 @@ enum EnumForFixit {
 
   case CaseWithPotentiallyUnavailablePayload2(p: ClassAvailableOn51), WithoutPayload
       // expected-error@-1 {{'ClassAvailableOn51' is only available in macOS 51 or newer}}
-      
+
 }
 
 @objc
@@ -1583,7 +1583,7 @@ func testForFixitWithNestedMemberRefExpr() {
   anyX.y?.z = globalFuncAvailableOn52()
       // expected-error@-1 {{'globalFuncAvailableOn52()' is only available in macOS 52 or newer}}
       // expected-note@-2 {{add 'if #available' version check}} {{3-40=if #available(macOS 52, *) {\n      anyX.y?.z = globalFuncAvailableOn52()\n  } else {\n      // Fallback on earlier versions\n  }}}
-      
+
 }
 
 // Protocol Conformances
@@ -1592,7 +1592,7 @@ protocol ProtocolWithRequirementMentioningPotentiallyUnavailable {
       // expected-note@-1 2{{add @available attribute to enclosing protocol}}
   func hasPotentiallyUnavailableParameter(_ p: ClassAvailableOn51) // expected-error * {{'ClassAvailableOn51' is only available in macOS 51 or newer}}
       // expected-note@-1 * {{add @available attribute to enclosing instance method}}
-      
+
 
   func hasPotentiallyUnavailableReturn() -> ClassAvailableOn51 // expected-error * {{'ClassAvailableOn51' is only available in macOS 51 or newer}}
       // expected-note@-1 * {{add @available attribute to enclosing instance method}}

@@ -92,11 +92,11 @@ void SILGenFunction::emitInjectOptionalValueInto(SILLocation loc,
   auto destPayload =
     B.createInitEnumDataAddr(loc, dest, someDecl,
                              loweredPayloadTy.getAddressType());
-  
+
   // Emit the value into the payload area.
   TemporaryInitialization emitInto(destPayload, CleanupHandle::invalid());
   std::move(value).forwardInto(*this, &emitInto);
-  
+
   // Inject the tag.
   B.createInjectEnumAddr(loc, dest, someDecl);
 }
@@ -108,7 +108,7 @@ void SILGenFunction::emitInjectOptionalNothingInto(SILLocation loc,
 
   B.createInjectEnumAddr(loc, dest, getASTContext().getOptionalNoneDecl());
 }
-      
+
 /// Return a value for an optional ".None" of the specified type. This only
 /// works for loadable enum types.
 SILValue SILGenFunction::getOptionalNoneValue(SILLocation loc,
@@ -142,7 +142,7 @@ auto SILGenFunction::emitSourceLocationArgs(SourceLoc sourceLoc,
                                             SILLocation emitLoc)
 -> SourceLocArgs {
   auto &ctx = getASTContext();
-  
+
   std::string filename = "";
   unsigned line = 0;
   unsigned column = 0;
@@ -151,7 +151,7 @@ auto SILGenFunction::emitSourceLocationArgs(SourceLoc sourceLoc,
     std::tie(line, column) =
         ctx.SourceMgr.getPresumedLineAndColumnForLoc(sourceLoc);
   }
-  
+
   bool isASCII = true;
   for (unsigned char c : filename) {
     if (c > 127) {
@@ -159,10 +159,10 @@ auto SILGenFunction::emitSourceLocationArgs(SourceLoc sourceLoc,
       break;
     }
   }
-  
+
   auto wordTy = SILType::getBuiltinWordType(ctx);
   auto i1Ty = SILType::getBuiltinIntegerType(1, ctx);
-  
+
   SourceLocArgs result;
   SILValue literal = B.createStringLiteral(emitLoc, StringRef(filename),
                                            StringLiteralInst::Encoding::UTF8);
@@ -230,7 +230,7 @@ SILGenFunction::emitPreconditionOptionalHasValue(SILLocation loc,
   if (auto diagnoseFailure =
         getASTContext().getDiagnoseUnexpectedNilOptional()) {
     auto args = emitSourceLocationArgs(loc.getSourceLoc(), loc);
-    
+
     auto i1Ty = SILType::getBuiltinIntegerType(1, getASTContext());
     auto isImplicitUnwrapLiteral =
       B.createIntegerLiteral(loc, i1Ty, isImplicitUnwrap);
@@ -278,7 +278,7 @@ SILValue SILGenFunction::emitDoesOptionalHaveValue(SILLocation loc,
   SILValue yes = B.createIntegerLiteral(loc, boolTy, 1);
   SILValue no = B.createIntegerLiteral(loc, boolTy, 0);
   auto someDecl = getASTContext().getOptionalSomeDecl();
-  
+
   if (addrOrValue->getType().isAddress())
     return B.createSelectEnumAddr(loc, addrOrValue, boolTy, no,
                                   std::make_pair(someDecl, yes));
@@ -539,7 +539,7 @@ SILGenFunction::emitPointerToPointer(SILLocation loc,
   auto subMap =
     SubstitutionMap::get(genericSig, replacementTypes,
                          LookUpConformanceInModule());
-  
+
   return emitApplyOfLibraryIntrinsic(loc, converter, subMap, origValue, C);
 }
 
@@ -552,7 +552,7 @@ class ExistentialInitialization final : public SingleBufferInitialization {
   CanType concreteFormalType;
   ArrayRef<ProtocolConformanceRef> conformances;
   ExistentialRepresentation repr;
-  
+
   // Initialized lazily when the address for initialization is demanded.
   SILValue concreteBuffer;
   CleanupHandle deinitExistentialCleanup;
@@ -572,7 +572,7 @@ public:
       repr(repr)
   {
     assert(existential->getType().isAddress());
-    
+
     // Create a cleanup to deallocate an allocated but uninitialized concrete
     // type buffer.
     // It won't be activated until that buffer is formed later, though.
@@ -581,17 +581,17 @@ public:
                                         existential, concreteFormalType, repr);
 
   }
-  
+
   SILValue getAddressForInPlaceInitialization(SILGenFunction &SGF,
                                               SILLocation loc) override {
     // Create the buffer when needed, because in some cases the type may
     // be the opened type from another existential that hasn't been opened
     // at the point the existential destination was formed.
     assert(!concreteBuffer && "concrete buffer already formed?!");
-    
+
     auto concreteLoweredType =
         SGF.getLoweredType(AbstractionPattern::getOpaque(), concreteFormalType);
-    
+
     switch (repr) {
     case ExistentialRepresentation::Opaque: {
       concreteBuffer = SGF.B.createInitExistentialAddr(loc, existential,
@@ -617,7 +617,7 @@ public:
     case ExistentialRepresentation::None:
       llvm_unreachable("not supported");
     }
-    
+
     // Activate the cleanup to deallocate the buffer we just allocated, should
     SGF.Cleanups.setCleanupState(deinitExistentialCleanup,
                                  CleanupState::Active);
@@ -848,7 +848,7 @@ ManagedValue SILGenFunction::emitExistentialErasure(
     return emitManagedRValueWithCleanup(value);
   }
   case ExistentialRepresentation::Opaque: {
-  
+
     // If the concrete value is a pseudogeneric archetype, first erase it to
     // its upper bound.
     auto anyObjectTy = getASTContext().getAnyObjectType();
@@ -916,7 +916,7 @@ ManagedValue SILGenFunction::emitClassMetatypeToObject(SILLocation loc,
                                              MetatypeRepresentation::ObjC);
   value = B.createThickToObjCMetatype(loc, value,
                            SILType::getPrimitiveObjectType(objcMetatypeTy));
-  
+
   // Convert to an object reference.
   value = B.createObjCMetatypeToObject(loc, value, resultTy);
   return emitManagedRValueWithCleanup(value);
@@ -926,7 +926,7 @@ ManagedValue SILGenFunction::emitExistentialMetatypeToObject(SILLocation loc,
                                                              ManagedValue v,
                                                              SILType resultTy) {
   SILValue value = v.getUnmanagedValue();
-  
+
   // Convert the metatype to objc representation.
   auto metatypeTy = value->getType().castTo<ExistentialMetatypeType>();
   auto objcMetatypeTy = CanExistentialMetatypeType::get(
@@ -934,10 +934,10 @@ ManagedValue SILGenFunction::emitExistentialMetatypeToObject(SILLocation loc,
                                               MetatypeRepresentation::ObjC);
   value = B.createThickToObjCMetatype(loc, value,
                                SILType::getPrimitiveObjectType(objcMetatypeTy));
-  
+
   // Convert to an object reference.
   value = B.createObjCExistentialMetatypeToObject(loc, value, resultTy);
-  
+
   return emitManagedRValueWithCleanup(value);
 }
 
@@ -951,7 +951,7 @@ ManagedValue SILGenFunction::emitProtocolMetatypeToObject(SILLocation loc,
   ProtocolDecl *protocol = protocolType->castTo<ProtocolType>()->getDecl();
 
   SILValue value = B.createObjCProtocol(loc, protocol, resultTy);
-  
+
   // Protocol objects, despite being global objects, inherit default reference
   // counting semantics from NSObject, so we need to retain the protocol
   // reference when we use it to prevent it being released and attempting to

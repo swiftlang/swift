@@ -30,7 +30,7 @@
 
 #ifdef LINKS
 extern "C" void _fatalError_Cxx_move_of_Swift_value_type_not_supported_yet() {
-    
+
 }
 #endif
 

@@ -325,7 +325,7 @@ where Bound: Strideable, Bound.Stride: SignedInteger
     // The first and last elements are the same because each element is unique.
     return _customIndexOfEquatableElement(element)
   }
-  
+
   /// Returns a Boolean value indicating whether the given range is contained
   /// within this closed range.
   ///

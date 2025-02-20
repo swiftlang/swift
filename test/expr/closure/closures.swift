@@ -35,8 +35,8 @@ func funcdecl4(_ a: ((Int) -> Int), _ b: Int) {}
 func funcdecl5(_ a: Int, _ y: Int) {
   // Pass in a closure containing the call to funcdecl3.
   funcdecl4({ funcdecl3() }, 12)  // expected-error {{contextual type for closure argument list expects 1 argument, which cannot be implicitly ignored}} {{14-14= _ in}}
-  
-  
+
+
   func6({$0 + $1})       // Closure with two named anonymous arguments
   func6({($0) + $1})    // Closure with sequence expr inferred type
   func6({($0) + $0})    // // expected-error {{contextual closure type '(Int, Int) -> Int' expects 2 arguments, but 1 was used in closure body}}
@@ -55,34 +55,34 @@ func funcdecl5(_ a: Int, _ y: Int) {
   // Tuple expressions with named elements.
   var i : (y : Int, x : Int) = (x : 42, y : 11) // expected-warning {{expression shuffles the elements of this tuple; this behavior is deprecated}}
   funcdecl1(123, 444)
-  
+
   // Calls.
   4()  // expected-error {{cannot call value of non-function type 'Int'}}{{4-6=}}
-  
-  
+
+
   // rdar://12017658 - Infer some argument types from func6.
   func6({ a, b -> Int in a+b})
   // Return type inference.
   func6({ a,b in a+b })
-  
+
   // Infer incompatible type.
   func6({a,b -> Float in 4.0 })    // expected-error {{declared closure result 'Float' is incompatible with contextual type 'Int'}} {{17-22=Int}}  // Pattern doesn't need to name arguments.
   func6({ _,_ in 4 })
-  
+
   func6({a,b in 4.0 })  // expected-error {{cannot convert value of type 'Double' to closure result type 'Int'}}
-  
+
   // TODO: This diagnostic can be improved: rdar://22128205
   func6({(a : Float, b) in 4 }) // expected-error {{cannot convert value of type '(Float, Int) -> Int' to expected argument type '(Int, Int) -> Int'}}
 
-  
-  
+
+
   var fn = {}
   var fn2 = { 4 }
-  
-  
+
+
   var c : Int = { a,b -> Int in a+b} // expected-error{{cannot convert value of type '(Int, Int) -> Int' to specified type 'Int'}}
-  
-  
+
+
 }
 
 func unlabeledClosureArgument() {
@@ -202,7 +202,7 @@ class ExplicitSelfRequiredTest {
     doStuff({ [unowned self] in method() })
     doStuff({ [unowned(unsafe) self] in method() })
     doStuff({ [unowned self = self] in method() })
-    
+
     // When there's no space between the opening brace and the first expression, insert it
     doStuff {method() }  // expected-error {{call to method 'method' in closure requires explicit use of 'self' to make capture semantics explicit}} expected-note{{capture 'self' explicitly to enable implicit 'self' in this closure}} {{14-14= [self] in }} expected-note{{reference 'self.' explicitly}} {{14-14=self.}}
     doVoidStuff {_ = method() }  // expected-error {{call to method 'method' in closure requires explicit use of 'self' to make capture semantics explicit}} expected-note{{capture 'self' explicitly to enable implicit 'self' in this closure}} {{18-18= [self] in }} expected-note{{reference 'self.' explicitly}} {{22-22=self.}}
@@ -239,7 +239,7 @@ class ExplicitSelfRequiredTest {
     // String interpolation should offer the diagnosis and fix-its at the expected locations
     doVoidStuff { _ = "\(method())" } // expected-error {{call to method 'method' in closure requires explicit use of 'self' to make capture semantics explicit}} expected-note{{reference 'self.' explicitly}} {{26-26=self.}} expected-note {{capture 'self' explicitly to enable implicit 'self' in this closure}} {{18-18= [self] in}}
     doVoidStuff { _ = "\(x+1)" } // expected-error {{reference to property 'x' in closure requires explicit use of 'self' to make capture semantics explicit}} expected-note{{reference 'self.' explicitly}} {{26-26=self.}} expected-note {{capture 'self' explicitly to enable implicit 'self' in this closure}} {{18-18= [self] in}}
-    
+
     // If we already have a capture list, self should be added to the list
     let y = 1
     doStuff { [y] in method() } // expected-warning {{capture 'y' was never used}} expected-error {{call to method 'method' in closure requires explicit use of 'self' to make capture semantics explicit}} expected-note{{capture 'self' explicitly to enable implicit 'self' in this closure}} {{16-16=self, }} expected-note{{reference 'self.' explicitly}} {{22-22=self.}}
@@ -257,7 +257,7 @@ class ExplicitSelfRequiredTest {
 
     return 42
   }
-  
+
   // The error emitted by these cases cause `VarDeclUsageChecker` to not run analysis on this method,
   // because its `sawError` flag is set to true. To preserve the "capture 'y' was never used" warnings
   // above, we put these cases in their own method.
@@ -280,7 +280,7 @@ struct ImplicitSelfAllowedInStruct {
         doStuff({ method() })
         doVoidStuff({ _ = method() })
     }
-    
+
     func method2() -> Int {
         doStuff({ x+1 })
         doVoidStuff({ _ = x+1 })
@@ -298,7 +298,7 @@ enum ImplicitSelfAllowedInEnum {
         doStuff({ method() })
         doVoidStuff({ _ = method() })
     }
-    
+
     func method2() -> Int {
         doStuff({ x+1 })
         doVoidStuff({ _ = x+1 })
@@ -326,7 +326,7 @@ func testCaptureBehavior(_ ptr : SomeClass) {
   doStuff { uv1.foo() }
   doStuff { uv2.foo() }
 
-  
+
   // Capture list tests
   let v1 : SomeClass? = ptr
   let v2 : SomeClass = ptr
@@ -427,7 +427,7 @@ var x = {return $0}(1)
 func returnsInt() -> Int { return 0 }
 takesVoidFunc(returnsInt) // expected-error {{cannot convert value of type '() -> Int' to expected argument type '() -> ()'}}
 takesVoidFunc({() -> Int in 0}) // expected-error {{declared closure result 'Int' is incompatible with contextual type '()'}} {{22-25=()}}
-  
+
 // These used to crash the compiler, but were fixed to support the implementation of rdar://problem/17228969
 Void(0) // expected-error{{argument passed to call that takes no arguments}}
 _ = {0}
@@ -617,7 +617,7 @@ class C_56501 {
       }
     }
   }
-  
+
   func test7() {
     doVoidStuff { [self] in
       func innerFunction() {
@@ -625,7 +625,7 @@ class C_56501 {
       }
     }
   }
-  
+
   func test8() {
     doVoidStuffNonEscaping { [self] in
       func innerFunction() {
@@ -761,19 +761,19 @@ func takesEscapingWithAllowedImplicitSelf(@_implicitSelfCapture _ fn: @escaping 
 public class TestImplicitSelfForWeakSelfCapture {
   static let staticOptional: TestImplicitSelfForWeakSelfCapture? = nil
   func method() { }
-  
+
   private init(x: TestImplicitSelfForWeakSelfCapture) {
     doVoidStuff { [weak self] in
       method() // expected-error {{call to method 'method' in closure requires explicit use of 'self' to make capture semantics explicit}}
       guard let self = self else { return }
       method()
     }
-    
+
     doVoidStuff { [weak self] in
       guard let self else { return }
       method()
     }
-    
+
     doVoidStuff { [weak self] in
       if let self = self {
         method()
@@ -783,7 +783,7 @@ public class TestImplicitSelfForWeakSelfCapture {
         method()
       }
     }
-    
+
     doVoidStuff { [weak self] in
       guard let self = self else { return }
       doVoidStuff { // expected-note {{capture 'self' explicitly to enable implicit 'self' in this closure}}
@@ -802,18 +802,18 @@ public class TestImplicitSelfForWeakSelfCapture {
         }
       }
     }
-    
+
     doVoidStuff { [weak self] in
       guard let self = self ?? TestImplicitSelfForWeakSelfCapture.staticOptional else { return } // expected-warning {{value 'self' was defined but never used; consider replacing with boolean test}}
       method() // expected-error {{call to method 'method' in closure requires explicit use of 'self' to make capture semantics explicit}}
     }
-    
+
     doVoidStuffNonEscaping { [weak self] in
       method() // expected-warning {{call to method 'method' in closure requires explicit use of 'self' to make capture semantics explicit}}
       guard let self = self else { return }
       method()
     }
-    
+
     doVoidStuffNonEscaping { [weak self] in
       if let self = self {
         method()
@@ -831,85 +831,85 @@ public class TestImplicitSelfForWeakSelfCapture {
       guard let self = self else { return }
       method() // expected-error {{call to method 'method' in closure requires explicit use of 'self' to make capture semantics explicit}}
     }
-    
+
     doVoidStuffNonEscaping { [weak self] in
       let `self`: TestImplicitSelfForWeakSelfCapture? = self ?? TestImplicitSelfForWeakSelfCapture.staticOptional
       guard let self = self else { return }
       method() // expected-warning {{call to method 'method' in closure requires explicit use of 'self' to make capture semantics explicit}}
     }
-    
+
     doVoidStuffNonEscaping { [weak self] in
       guard let self = self else { return } // expected-warning {{value 'self' was defined but never used; consider replacing with boolean test}}
       doVoidStuff { // expected-note {{capture 'self' explicitly to enable implicit 'self' in this closure}}
         method() // expected-error {{call to method 'method' in closure requires explicit use of 'self' to make capture semantics explicit}} expected-note {{reference 'self.' explicitly}}
       }
     }
-    
+
     doVoidStuffNonEscaping { [weak self] in
       guard let self = self ?? TestImplicitSelfForWeakSelfCapture.staticOptional else { return } // expected-warning {{value 'self' was defined but never used; consider replacing with boolean test}}
       method() // expected-warning {{call to method 'method' in closure requires explicit use of 'self' to make capture semantics explicit}}
     }
-    
+
     doVoidStuff { [weak self] in
       func innerFunction1() {
           method() // expected-error {{call to method 'method' in closure requires explicit use of 'self' to make capture semantics explicit}}
           self?.method()
       }
-      
+
       guard let self else { return }
-      
+
       func innerFunction2() {
           method()
           self.method()
       }
-      
+
       subscript(index: Int) -> Int { // expected-error {{subscript' functions may only be declared within a type}}
         method()
         return index
       }
     }
-    
+
     doVoidStuffNonEscaping { [weak self] in
       func innerFunction1() {
           method() // expected-warning{{call to method 'method' in closure requires explicit use of 'self' to make capture semantics explicit; this is an error in the Swift 6 language mode}}
           self?.method()
       }
-      
+
       guard let self else { return }
-      
+
       func innerFunction2() {
           method()
           self.method()
       }
-      
+
       subscript(index: Int) -> Int { // expected-error {{subscript' functions may only be declared within a type}}
         method()
         return index
       }
     }
-    
+
     doVoidStuff { [weak self] in
       guard let self else { return }
-      
+
       func innerFunction1() {
         doVoidStuff { // expected-note {{capture 'self' explicitly to enable implicit 'self' in this closure}}
           method() // expected-error {{call to method 'method' in closure requires explicit use of 'self' to make capture semantics explicit}} expected-note {{reference 'self.' explicitly}}
         }
-        
+
         doVoidStuff { [self] in // expected-note {{variable other than 'self' captured here under the name 'self' does not enable implicit 'self'}}
           method() // expected-error {{call to method 'method' in closure requires explicit use of 'self' to make capture semantics explicit}}
           self.method()
         }
-        
+
         doVoidStuff { [weak self] in
           method() // expected-error {{call to method 'method' in closure requires explicit use of 'self' to make capture semantics explicit}}
           self?.method()
         }
-        
+
         doVoidStuff { [weak self] in
           guard let self else { return }
           method()
-          
+
           func innerMethod3() {
             method()
             self.method()
@@ -922,7 +922,7 @@ public class TestImplicitSelfForWeakSelfCapture {
 
 class NoImplicitSelfInInnerClass {
   func method() { }
-  
+
   private init() { // expected-note {{'self' declared here}} expected-note {{'self' declared here}} expected-note {{'self' declared here}} expected-note {{'self' declared here}} expected-note {{'self' declared here}} expected-note {{'self' declared here}} expected-note {{'self' declared here}}
     doVoidStuff {
       class InnerType { // expected-note {{type declared here}} expected-note {{type declared here}} expected-note {{type declared here}}
@@ -930,12 +930,12 @@ class NoImplicitSelfInInnerClass {
           method() // expected-error {{class declaration cannot close over value 'self' defined in outer scope}}
           self.method() // expected-error {{value of type 'InnerType' has no member 'method'}}
         }
-        
+
         func functionInsideInnerType() {
           method() // expected-error {{class declaration cannot close over value 'self' defined in outer scope}}
           self.method() // expected-error {{value of type 'InnerType' has no member 'method'}}
         }
-        
+
         subscript(index: Int) -> Int {
           method() // expected-error {{class declaration cannot close over value 'self' defined in outer scope}}
           self.method() // expected-error {{value of type 'InnerType' has no member 'method'}}
@@ -943,26 +943,26 @@ class NoImplicitSelfInInnerClass {
         }
       }
     }
-    
+
     doVoidStuff { [weak self] in
       guard let self else { return }
       method()
-      
+
       class InnerType { // expected-note {{type declared here}} expected-note {{type declared here}} expected-note {{type declared here}}
         func methodOnInnerType() { }
-        
+
         init() {
           methodOnInnerType()
           method() // expected-error {{class declaration cannot close over value 'self' defined in outer scope}}
           self.method() // expected-error {{value of type 'InnerType' has no member 'method'}}
         }
-        
+
         func functionInsideInnerType() {
           methodOnInnerType()
           method() // expected-error {{class declaration cannot close over value 'self' defined in outer scope}}
           self.method() // expected-error {{value of type 'InnerType' has no member 'method'}}
         }
-        
+
         subscript(index: Int) -> Int {
           methodOnInnerType()
           method() // expected-error {{class declaration cannot close over value 'self' defined in outer scope}}
@@ -971,27 +971,27 @@ class NoImplicitSelfInInnerClass {
         }
       }
     }
-    
+
     doVoidStuff { [weak self] in
       guard let self else { return }
-      
+
       func innerMethod() {
         method()
-        
+
         class InnerType { // expected-note {{type declared here}}
           func methodOnInnerType() { }
-          
+
           init() {
             methodOnInnerType()
             method() // expected-error {{class declaration cannot close over value 'self' defined in outer scope}}
             self.method() // expected-error {{value of type 'InnerType' has no member 'method'}}
-            
+
             doVoidStuff { [weak self] in
               guard let self else { return }
               self.method() // expected-error {{value of type 'InnerType' has no member 'method'}}
               methodOnInnerType()
             }
-            
+
             doVoidStuff { [weak self] in
               guard let self else { return }
               method() // expected-error {{value of type 'InnerType' has no member 'method'}}
@@ -1001,25 +1001,25 @@ class NoImplicitSelfInInnerClass {
         }
       }
     }
-    
+
   }
-  
+
   func foo(condition: Bool) {
     doVoidStuff { [weak self] in
       guard condition, let self else { return }
       method()
     }
-    
+
     doVoidStuff { [weak self] in
       guard let self, condition else { return }
       method()
     }
-    
+
     doVoidStuffNonEscaping { [weak self] in
       guard condition, let self else { return }
       method()
     }
-    
+
     doVoidStuffNonEscaping { [weak self] in
       guard let self, condition else { return }
       method()
@@ -1031,49 +1031,49 @@ class NoImplicitSelfInInnerClass {
       guard let optionalCondition, optionalCondition, let self else { return }
       method()
     }
-    
+
     doVoidStuff { [weak self] in
       guard let self, let optionalCondition, optionalCondition else { return }
       method()
     }
-    
+
     doVoidStuff { [weak self] in
       guard let optionalCondition, let self, optionalCondition else { return }
       method()
     }
-    
+
     doVoidStuffNonEscaping { [weak self] in
       guard let optionalCondition, optionalCondition, let self else { return }
       method()
     }
-    
+
     doVoidStuffNonEscaping { [weak self] in
       guard let self, let optionalCondition, optionalCondition else { return }
       method()
     }
-    
+
     doVoidStuffNonEscaping { [weak self] in
       guard let optionalCondition, let self, optionalCondition else { return }
       method()
     }
   }
-  
+
   func foo() {
     doVoidStuff { [weak self] in
       guard #available(SwiftStdlib 5.8, *), let self else { return }
       method()
     }
-    
+
     doVoidStuff { [weak self] in
       guard let self, #available(SwiftStdlib 5.8, *) else { return }
       method()
     }
-    
+
     doVoidStuffNonEscaping { [weak self] in
       guard #available(SwiftStdlib 5.8, *), let self else { return }
       method()
     }
-    
+
     doVoidStuffNonEscaping { [weak self] in
       guard let self, #available(SwiftStdlib 5.8, *) else { return }
       method()
@@ -1083,23 +1083,23 @@ class NoImplicitSelfInInnerClass {
 
 public class TestRebindingSelfIsDisallowed {
   let count: Void = ()
-  
+
   private init() {
     doVoidStuff {
       let `self` = "self shouldn't become a string"
       let _: Int = count // expected-error{{cannot convert value of type 'Void' to specified type 'Int'}}
     }
-    
+
     doVoidStuffNonEscaping {
       let `self` = "self shouldn't become a string"
       let _: Int = count // expected-error{{cannot convert value of type 'Void' to specified type 'Int'}}
     }
-    
+
     doVoidStuff { [weak self] in
       let `self` = "self shouldn't become a string"
       let _: Int = count // expected-error{{cannot convert value of type 'Void' to specified type 'Int'}}
     }
-    
+
     doVoidStuffNonEscaping { [weak self] in
       let `self` = "self shouldn't become a string"
       let _: Int = count // expected-error{{cannot convert value of type 'Void' to specified type 'Int'}}
@@ -1204,16 +1204,16 @@ final class EscapingWrapper {
 
 final class TestGithubIssue64757 {
   var instanceProperty: String = "instance property"
-  
+
   @VoidBuilder
   var void: Void {
     EscapingWrapper.wrapper { [weak self] in
       print(instanceProperty) // expected-error {{reference to property 'instanceProperty' in closure requires explicit use of 'self' to make capture semantics explicit}}
-      
+
       if let self {
         print(instanceProperty)
       }
-      
+
       guard let self else { return }
       print(instanceProperty)
     }
@@ -1251,7 +1251,7 @@ class TestGithubIssue70089 {
             self.x += 1
           }
         }
-        
+
         doVoidStuff { [weak self] in
           x += 1 // expected-error {{reference to property 'x' in closure requires explicit use of 'self' to make capture semantics explicit}}
           self?.x += 1
@@ -1301,7 +1301,7 @@ class TestGithubIssue70089 {
       doVoidStuff { [weak self] in
         // Since this unwrapping is invalid, implicit self is disallowed in all nested closures:
         guard let self = self ?? TestGithubIssue70089.staticOptional else { return }
-        
+
         doVoidStuff { [self] in // expected-note {{variable other than 'self' captured here under the name 'self' does not enable implicit 'self'}}
           x += 1 // expected-error {{reference to property 'x' in closure requires explicit use of 'self' to make capture semantics explicit}}
           self.x += 1
@@ -1312,7 +1312,7 @@ class TestGithubIssue70089 {
           self.x += 1
         }
       }
-      
+
       doVoidStuff { [self = TestGithubIssue70089()] in
         doVoidStuff { [self] in // expected-note {{variable other than 'self' captured here under the name 'self' does not enable implicit 'self'}}
           x += 1 // expected-error {{reference to property 'x' in closure requires explicit use of 'self' to make capture semantics explicit}}
@@ -1377,7 +1377,7 @@ class TestGithubIssue69911 {
             self.x += 1
           }
         }
-        
+
         doVoidStuffNonEscaping { [weak self] in
           doVoidStuffNonEscaping {
             guard let self else { return }
@@ -1400,7 +1400,7 @@ class TestGithubIssue69911 {
              self.x += 1
            }
         }
-        
+
         doVoidStuffNonEscaping { [weak self] in
           x += 1 // expected-warning {{reference to property 'x' in closure requires explicit use of 'self' to make capture semantics explicit}}
           self?.x += 1
@@ -1448,7 +1448,7 @@ class TestGithubIssue69911 {
            x += 1 // expected-error {{reference to property 'x' in closure requires explicit use of 'self' to make capture semantics explicit}}
            self.x += 1
         }
-        
+
         doVoidStuffNonEscaping { [weak self] in
           x += 1 // expected-warning {{reference to property 'x' in closure requires explicit use of 'self' to make capture semantics explicit}}
           self?.x += 1
@@ -1487,11 +1487,11 @@ final class AutoclosureTests {
   func foo(_ x: AutoclosureTests) {
     withNonEscapingAutoclosure(bar())
     withEscapingAutoclosure(bar()) // expected-error {{call to method 'bar' in closure requires explicit use of 'self' to make capture semantics explicit}} expected-note {{reference 'self.' explicitly}}
-    
+
     doVoidStuff { [self] in // expected-note {{variable other than 'self' captured here under the name 'self' does not enable implicit 'self'}} << This is a false positive
       withNonEscapingAutoclosure(bar())
       withEscapingAutoclosure(bar()) // expected-warning {{call to method 'bar' in closure requires explicit use of 'self' to make capture semantics explicit}} expected-note {{reference 'self.' explicitly}}
-      
+
       doVoidStuff { // expected-note {{capture 'self' explicitly to enable implicit 'self' in this closure}}
         withNonEscapingAutoclosure(bar()) // expected-warning {{call to method 'bar' in closure requires explicit use of 'self' to make capture semantics explicit}} expected-note {{reference 'self.' explicitly}}
       }
@@ -1499,43 +1499,43 @@ final class AutoclosureTests {
       doVoidStuff { [self] in
         withNonEscapingAutoclosure(bar())
       }
-      
+
       doVoidStuffNonEscaping {
         withNonEscapingAutoclosure(bar())
       }
-      
+
       // NOTE: This is a false positive
       doVoidStuffNonEscaping { [self] in
         withNonEscapingAutoclosure(bar()) // expected-warning {{call to method 'bar' in closure requires explicit use of 'self' to make capture semantics explicit}}
       }
-      
+
       doVoidStuff {
         withEscapingAutoclosure(bar()) // expected-warning {{call to method 'bar' in closure requires explicit use of 'self' to make capture semantics explicit}} expected-note {{reference 'self.' explicitly}}
       }
-      
+
       doVoidStuffNonEscaping {
         withEscapingAutoclosure(bar()) // expected-warning {{call to method 'bar' in closure requires explicit use of 'self' to make capture semantics explicit}} expected-note {{reference 'self.' explicitly}}
       }
-      
+
       doVoidStuffNonEscaping { [self] in
         withEscapingAutoclosure(bar()) // expected-warning {{call to method 'bar' in closure requires explicit use of 'self' to make capture semantics explicit}} expected-note {{reference 'self.' explicitly}}
       }
     }
-    
+
     doVoidStuff { [weak self] in // expected-warning {{variable 'self' was written to, but never read}}
       withNonEscapingAutoclosure(bar()) // expected-error {{call to method 'bar' in closure requires explicit use of 'self' to make capture semantics explicit}}
     }
-    
+
     doVoidStuff { [weak self] in // expected-warning {{variable 'self' was written to, but never read}}
       withEscapingAutoclosure(bar()) // expected-error {{call to method 'bar' in closure requires explicit use of 'self' to make capture semantics explicit}} expected-note {{reference 'self.' explicitly}}
     }
-    
+
     doVoidStuff { [weak self] in // expected-warning {{variable 'self' was written to, but never read}}
       doVoidStuff { // expected-note {{capture 'self' explicitly to enable implicit 'self' in this closure}}
         withNonEscapingAutoclosure(bar()) // expected-error {{all to method 'bar' in closure requires explicit use of 'self' to make capture semantics explicit}} expected-note {{reference 'self.' explicitly}}
       }
     }
-      
+
     doVoidStuff { [weak self] in // expected-warning {{variable 'self' was written to, but never read}}
       doVoidStuff {
         withEscapingAutoclosure(bar()) // expected-error {{call to method 'bar' in closure requires explicit use of 'self' to make capture semantics explicit}} expected-note {{reference 'self.' explicitly}}
@@ -1547,7 +1547,7 @@ final class AutoclosureTests {
         withNonEscapingAutoclosure(bar()) // expected-error {{call to method 'bar' in closure requires explicit use of 'self' to make capture semantics explicit}}
       }
     }
-      
+
     doVoidStuff { [weak self] in
       doVoidStuff { [self] in // expected-warning {{capture 'self' was never used}}
         withEscapingAutoclosure(bar()) // expected-error {{call to method 'bar' in closure requires explicit use of 'self' to make capture semantics explicit}} expected-note {{reference 'self.' explicitly}}
@@ -1556,42 +1556,42 @@ final class AutoclosureTests {
 
     doVoidStuff { [weak self] in      
       guard let self else { return }
-      
+
       withNonEscapingAutoclosure(bar())
       withEscapingAutoclosure(bar())
-      
+
       doVoidStuff { // expected-note {{capture 'self' explicitly to enable implicit 'self' in this closure}}
         withNonEscapingAutoclosure(bar()) // expected-error {{call to method 'bar' in closure requires explicit use of 'self' to make capture semantics explicit}} expected-note {{reference 'self.' explicitly}}
       }
-      
+
       doVoidStuffNonEscaping {
         withNonEscapingAutoclosure(bar()) // expected-error {{call to method 'bar' in closure requires explicit use of 'self' to make capture semantics explicit}}
       }
-      
+
       doVoidStuffNonEscaping { [self] in // expected-warning {{capture 'self' was never used}}
         withNonEscapingAutoclosure(bar()) // expected-error {{call to method 'bar' in closure requires explicit use of 'self' to make capture semantics explicit}}
       }
-      
+
       doVoidStuff {
         withEscapingAutoclosure(bar()) // expected-error {{call to method 'bar' in closure requires explicit use of 'self' to make capture semantics explicit}} expected-note {{reference 'self.' explicitly}}
       }
-      
+
       doVoidStuffNonEscaping {
         withEscapingAutoclosure(bar()) // expected-error {{call to method 'bar' in closure requires explicit use of 'self' to make capture semantics explicit}} expected-note {{reference 'self.' explicitly}}
       }
-      
+
       doVoidStuffNonEscaping { [self] in // expected-warning {{capture 'self' was never used}}
         withEscapingAutoclosure(bar()) // expected-error {{call to method 'bar' in closure requires explicit use of 'self' to make capture semantics explicit}} expected-note {{reference 'self.' explicitly}}
       }
     }
-    
+
     doVoidStuff { [weak self] in
       doVoidStuff { [self] in // expected-note {{variable other than 'self' captured here under the name 'self' does not enable implicit 'self'}}
         guard let self else { return } // expected-warning {{value 'self' was defined but never used; consider replacing with boolean test}}
         method() // expected-error {{call to method 'method' in closure requires explicit use of 'self' to make capture semantics explicit}}
       }
     }
-  
+
     doVoidStuff { [weak self] in
       let someOptional: Self? = Self()
       let `self` = self ?? someOptional
@@ -1607,7 +1607,7 @@ final class AutoclosureTests {
       // so we have to continue allowing it to maintain source compatibility.
       method()
     }
-  
+
     doVoidStuff { // expected-note {{capture 'self' explicitly to enable implicit 'self' in this closure}}
       let someOptional: Self? = Self()
       guard case let self = someOptional else { return } // expected-warning {{immutable value 'self' was never used; consider replacing with '_' or removing it}}
@@ -1687,7 +1687,7 @@ class TestInvalidRebindingOutsideOfClosure {
     doVoidStuffNonEscaping { [self] in // expected-warning {{capture 'self' was never used}}
       method()
     }
-    
+
     doVoidStuff() { [weak self] in
       guard let self else { return }
       method()
@@ -1710,7 +1710,7 @@ class TestInvalidRebindingOutsideOfClosure {
     doVoidStuffNonEscaping { [self] in // expected-warning {{capture 'self' was never used}}
       method()
     }
-    
+
     doVoidStuff() { [weak self] in
       guard let self else { return }
       method()

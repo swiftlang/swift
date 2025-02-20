@@ -913,7 +913,7 @@ public func run_SetIsDisjointIntCommutative(
     for _ in 0 ..< n {
       let isDisjointA = a.isDisjoint(with: identity(b))
       check(isDisjointA == r)
-  
+
       let isDisjointB = b.isDisjoint(with: identity(a))
       check(isDisjointB == r)
     }
@@ -1129,7 +1129,7 @@ func run_SetIsDisjointBoxCommutative(
     for _ in 0 ..< n {
         let isDisjointA = a.isDisjoint(with: identity(b))
         check(isDisjointA == r)
-  
+
         let isDisjointB = b.isDisjoint(with: identity(a))
         check(isDisjointB == r)
     }

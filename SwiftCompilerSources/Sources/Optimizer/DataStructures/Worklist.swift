@@ -29,7 +29,7 @@ struct Worklist<Set: IntrusiveSet> : CustomStringConvertible, NoReflectionChildr
     self.worklist = Stack(context)
     self.pushedElements = Set(context)
   }
-  
+
   mutating func pop() -> Element? { return worklist.pop() }
 
   /// Pop and allow the popped element to be pushed again to the worklist.

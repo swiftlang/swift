@@ -38,7 +38,7 @@ public:
   virtual void print(llvm::raw_ostream &OS) const override {
     OS << "While " << action << " -- visiting node ";
     node->print(OS);
-    
+
     if (auto inst = dyn_cast<SILInstruction>(node)) {
       OS << "While visiting instruction in function ";
       inst->getFunction()->print(OS);
@@ -72,10 +72,10 @@ class PerformanceDiagnostics {
   /// Used to print the whole back trace of a location.
   struct LocWithParent {
     SourceLoc loc;
-    
+
     /// Null if this is the top-leve location.
     LocWithParent *parent;
-    
+
     LocWithParent(SourceLoc loc, LocWithParent *parent) :
       loc(loc), parent(parent) {}
   };
@@ -137,13 +137,13 @@ private:
 
   bool visitCallee(SILInstruction *callInst, CalleeList callees,
                    PerformanceConstraints perfConstr, LocWithParent *parentLoc);
-                      
+
   template<typename ...ArgTypes>
   void diagnose(LocWithParent loc, Diag<ArgTypes...> ID,
                 typename detail::PassArgument<ArgTypes>::type... Args) {
     diagnose(loc, Diagnostic(ID, std::move(Args)...));
   }
-  
+
   void diagnose(LocWithParent loc, Diagnostic &&D);
 };
 
@@ -431,7 +431,7 @@ bool PerformanceDiagnostics::visitCallee(SILInstruction *callInst,
   for (SILFunction *callee : callees) {
     if (callee->hasSemanticsAttr(semantics::NO_PERFORMANCE_ANALYSIS))
       continue;
-  
+
     // If the callee has a defined performance constraint which is at least as
     // strong as the required constraint, we are done.
     PerformanceConstraints calleeConstr = callee->getPerfConstraints();
@@ -451,7 +451,7 @@ bool PerformanceDiagnostics::visitCallee(SILInstruction *callInst,
     if (computedConstr >= perfConstr)
       return false;
     computedConstr = perfConstr;
-    
+
     if (visitFunction(callee, perfConstr, loc))
       return true;
   }
@@ -604,7 +604,7 @@ bool PerformanceDiagnostics::visitInst(SILInstruction *inst,
   if (impact & RuntimeEffect::MetaData) {
     // TODO: be more specific on metadata.
     // E.g. distinguish locking and allocating metadata operations, etc.
-  
+
     // Try to give a good error message by looking which type of code it is.
     switch (inst->getKind()) {
     case SILInstructionKind::KeyPathInst: {
@@ -655,10 +655,10 @@ bool PerformanceDiagnostics::visitInst(SILInstruction *inst,
     }
     return true;
   }
-  
+
   if (perfConstr == PerformanceConstraints::NoRuntime)
     return false;
-  
+
   if (impact & RuntimeEffect::Allocating) {
     PrettyStackTracePerformanceDiagnostics stackTrace(
         "found allocation effect", inst);
@@ -710,7 +710,7 @@ bool PerformanceDiagnostics::visitInst(SILInstruction *inst,
     return false;
 
   // Handle locking-only effects.
-  
+
   PrettyStackTracePerformanceDiagnostics stackTrace(
       "found locking or ref counting effect", inst);
 
@@ -736,7 +736,7 @@ void PerformanceDiagnostics::checkNonAnnotatedFunction(SILFunction *function) {
       auto as = FullApplySite::isa(&inst);
       if (!as)
         continue;
-        
+
       // We only consider direct calls.
       // TODO: this is a hole in the verification because we are not catching
       // cases where a "bad" closure is passed to a performance-annotated
@@ -764,7 +764,7 @@ void PerformanceDiagnostics::diagnose(LocWithParent loc, Diagnostic &&D) {
     validLoc = validLoc->parent;
   }
   module.getASTContext().Diags.diagnose(validLoc->loc, D);
-  
+
   // Print the whole back trace. Otherwise it would be difficult for the user
   // to know which annotated function caused the error.
   LocWithParent *parentLoc = validLoc->parent;
@@ -824,7 +824,7 @@ private:
     for (SILFunction &function : *module) {
       if (function.getPerfConstraints() != PerformanceConstraints::None) {
         annotatedFunctionsFound = true;
-      
+
         // Don't rerun diagnostics on deserialized functions.
         if (function.wasDeserializedCanonical())
           continue;

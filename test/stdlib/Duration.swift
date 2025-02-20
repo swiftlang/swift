@@ -34,7 +34,7 @@ if #available(SwiftStdlib 5.7, *) {
     let _ = duration.components
     #endif
   }
-  
+
   suite.test("milliseconds from Double") {
     for _ in 0 ..< 100 {
       let integerValue = Double(Int64.random(in: 0 ... 0x7fff_ffff_ffff_fc00))
@@ -43,7 +43,7 @@ if #available(SwiftStdlib 5.7, *) {
       expectEqual(attosec, Int64(integerValue) % 1000 * 1_000_000_000_000_000)
     }
   }
-  
+
   suite.test("microseconds from Double") {
     for _ in 0 ..< 100 {
       let integerValue = Double(Int64.random(in: 0 ... 0x7fff_ffff_ffff_fc00))
@@ -52,7 +52,7 @@ if #available(SwiftStdlib 5.7, *) {
       expectEqual(attosec, Int64(integerValue) % 1_000_000 * 1_000_000_000_000)
     }
   }
-  
+
   suite.test("seconds from Int64") {
     let one = Duration.seconds(1 as Int64)
     expectEqual(one._high, 0)
@@ -67,7 +67,7 @@ if #available(SwiftStdlib 5.7, *) {
     expectEqual(min64._high,-500_000_000_000_000_000)
     expectEqual(min64._low, 0)
   }
-  
+
   suite.test("seconds from UInt64") {
     let one = Duration.seconds(1 as UInt64)
     expectEqual(one._high, 0)
@@ -76,7 +76,7 @@ if #available(SwiftStdlib 5.7, *) {
     expectEqual(max64._high, 999_999_999_999_999_999)
     expectEqual(max64._low, .max - 999_999_999_999_999_999)
   }
-  
+
   suite.test("milliseconds from Int64") {
     let one = Duration.milliseconds(1 as Int64)
     expectEqual(one._high, 0)
@@ -91,7 +91,7 @@ if #available(SwiftStdlib 5.7, *) {
     expectEqual(min64._high,-500_000_000_000_000)
     expectEqual(min64._low, 0)
   }
-  
+
   suite.test("milliseconds from UInt64") {
     let one = Duration.milliseconds(1 as UInt64)
     expectEqual(one._high, 0)
@@ -100,7 +100,7 @@ if #available(SwiftStdlib 5.7, *) {
     expectEqual(max64._high, 999_999_999_999_999)
     expectEqual(max64._low, .max - 999_999_999_999_999)
   }
-  
+
   suite.test("microseconds from Int64") {
     let one = Duration.microseconds(1 as Int64)
     expectEqual(one._high, 0)
@@ -115,7 +115,7 @@ if #available(SwiftStdlib 5.7, *) {
     expectEqual(min64._high,-500_000_000_000)
     expectEqual(min64._low, 0)
   }
-  
+
   suite.test("microseconds from UInt64") {
     let one = Duration.microseconds(1 as UInt64)
     expectEqual(one._high, 0)
@@ -124,7 +124,7 @@ if #available(SwiftStdlib 5.7, *) {
     expectEqual(max64._high, 999_999_999_999)
     expectEqual(max64._low, .max - 999_999_999_999)
   }
-  
+
   suite.test("nanoseconds from Int64") {
     let one = Duration.nanoseconds(1 as Int64)
     expectEqual(one._high, 0)
@@ -139,7 +139,7 @@ if #available(SwiftStdlib 5.7, *) {
     expectEqual(min64._high,-500_000_000)
     expectEqual(min64._low, 0)
   }
-  
+
   suite.test("nanoseconds from UInt64") {
     let one = Duration.nanoseconds(1 as UInt64)
     expectEqual(one._high, 0)
@@ -149,7 +149,7 @@ if #available(SwiftStdlib 5.7, *) {
     expectEqual(max64._low, .max - 999_999_999)
   }
 }
- 
+
 if #available(SwiftStdlib 6.0, *) {
   suite.test("seconds from Int128") {
     let one = Duration.seconds(1 as Int128)
@@ -174,7 +174,7 @@ if #available(SwiftStdlib 6.0, *) {
     let _ = Duration.seconds( 170141183460469231732 as Int128)
     #endif
   }
-  
+
   suite.test("milliseconds from Int128") {
     let one = Duration.milliseconds(1 as Int128)
     expectEqual(one._high, 0)
@@ -194,7 +194,7 @@ if #available(SwiftStdlib 6.0, *) {
     let _ = Duration.milliseconds( 170141183460469231731689 as Int128)
     #endif
   }
-  
+
   suite.test("microseconds from Int128") {
     let one = Duration.microseconds(1 as Int128)
     expectEqual(one._high, 0)
@@ -214,7 +214,7 @@ if #available(SwiftStdlib 6.0, *) {
     let _ = Duration.microseconds( 170141183460469231731687304 as Int128)
     #endif
   }
-  
+
   suite.test("nanoseconds from Int128") {
     let one = Duration.nanoseconds(1 as Int128)
     expectEqual(one._high, 0)
@@ -234,7 +234,7 @@ if #available(SwiftStdlib 6.0, *) {
     let _ = Duration.nanoseconds( 170141183460469231731687303716 as Int128)
     #endif
   }
-  
+
   suite.test("attoseconds init") {
     let zero = Duration(attoseconds: 0)
     expectEqual(zero._high, 0)
@@ -252,7 +252,7 @@ if #available(SwiftStdlib 6.0, *) {
     expectEqual(min._high, -9_223_372_036_854_775_808)
     expectEqual(min._low, 0)
   }
-  
+
   suite.test("attoseconds var") {
     let zero = Duration(_high: 0, low: 0)
     expectEqual(zero.attoseconds, 0)

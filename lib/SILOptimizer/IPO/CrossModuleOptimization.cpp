@@ -58,7 +58,7 @@ class CrossModuleOptimization {
   llvm::SmallPtrSet<TypeBase *, 16> typesHandled;
 
   SILModule &M;
-  
+
   /// True, if CMO runs by default.
   /// In this case, serialization decisions are made very conservatively to
   /// avoid code size increase.
@@ -747,7 +747,7 @@ static bool couldBeLinkedStatically(DeclContext *funcCtxt, SILModule &module) {
   // could be linked statically.
   if (module.getSwiftModule() == funcModule)
     return false;
-    
+
   // The stdlib module is always linked dynamically.
   if (funcModule == module.getASTContext().getStdlibModule())
     return false;
@@ -778,7 +778,7 @@ bool CrossModuleOptimization::canUseFromInline(DeclContext *declCtxt) {
   /// conservative here.
   if (conservative && M.getOptions().emitTBD && couldBeLinkedStatically(declCtxt, M))
     return false;
-    
+
   return true;
 }
 

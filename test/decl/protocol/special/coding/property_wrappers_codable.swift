@@ -33,5 +33,5 @@ struct Y: Codable {
   @Wrapper var foo: Int
   // expected-note@-1{{cannot automatically synthesize 'Encodable' because 'Wrapper<Int>' does not conform to 'Encodable'}}
   // expected-note@-2{{cannot automatically synthesize 'Decodable' because 'Wrapper<Int>' does not conform to 'Decodable'}}
-  
+
 }

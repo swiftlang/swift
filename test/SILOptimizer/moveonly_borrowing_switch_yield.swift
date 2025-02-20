@@ -15,19 +15,19 @@ extension List {
 
 struct Box<Wrapped: ~Copyable>: ~Copyable {
     private let _pointer: UnsafeMutablePointer<Wrapped>
-    
+
     init(_ element: consuming Wrapped) {
         _pointer = .allocate(capacity: 1)
         print("allocatin", _pointer)
         _pointer.initialize(to: element)
     }
-        
+
     deinit {
         print("not deallocatin", _pointer)
         _pointer.deinitialize(count: 1)
         _pointer.deallocate()
     }
-    
+
     consuming func move() -> Wrapped {
         let wrapped = _pointer.move()
         print("deallocatin", _pointer)
@@ -35,7 +35,7 @@ struct Box<Wrapped: ~Copyable>: ~Copyable {
         discard self
         return wrapped
     }
-    
+
     var wrapped: Wrapped {
         _read { yield _pointer.pointee }
     }
@@ -78,7 +78,7 @@ extension List {
         default: false
         }
     }
-    
+
     mutating func pop() -> Element {
         let h = self.head
         switch consume h {

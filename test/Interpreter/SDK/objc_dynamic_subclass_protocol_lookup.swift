@@ -59,7 +59,7 @@ allTests.test("Lookup via dynamic subclasses") {
   expectNil(model1obj as? Q)
   expectNil(model2obj as? P)
   expectNotNil(model2obj as? Q)
-  
+
   // Check via "Any"
   let model1: Any = observer.model1
   let model2: Any = observer.model2
@@ -73,7 +73,7 @@ allTests.test("Lookup via dynamic subclasses") {
   expectNil(model1 as? Q)
   expectNil(model2 as? P)
   expectNotNil(model2 as? Q)
-  
+
   print(model1)
   print(model2)
 }

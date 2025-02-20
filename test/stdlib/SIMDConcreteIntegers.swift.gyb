@@ -69,7 +69,7 @@ ${Scalar}x${n}_TestSuite.test("comparisons") {
   expectFalse(any(a .!= a))
   expectFalse(any(a .== a &+ ${Vector}(repeating: 1)))
   expectTrue(all(a .!= a &+ ${Vector}(repeating: 1)))
-  
+
   let b = a.replacing(
     with: ${Vector}.random(in: ${Scalar}.min ... .max),
     where: .random()

@@ -63,9 +63,9 @@ internal func _getDisplayStyle<T>(_: T) -> CChar
 internal func getChild<T>(of value: T, type: Any.Type, index: Int) -> (label: String?, value: Any) {
   var nameC: UnsafePointer<CChar>? = nil
   var freeFunc: NameFreeFunc? = nil
-  
+
   let value = _getChild(of: value, type: type, index: index, outName: &nameC, outFreeFunc: &freeFunc)
-  
+
   let name = nameC.flatMap({ String(validatingCString: $0) })
   freeFunc?(nameC)
   return (name, value)
@@ -100,11 +100,11 @@ internal func _getClassPlaygroundQuickLook(
       return .int(number.longLongValue)
     }
   }
-  
+
   if _is(object, kindOf: "NSAttributedString") {
     return .attributedString(object)
   }
-  
+
   if _is(object, kindOf: "NSImage") ||
      _is(object, kindOf: "UIImage") ||
      _is(object, kindOf: "NSImageView") ||
@@ -113,17 +113,17 @@ internal func _getClassPlaygroundQuickLook(
      _is(object, kindOf: "NSBitmapImageRep") {
     return .image(object)
   }
-  
+
   if _is(object, kindOf: "NSColor") ||
      _is(object, kindOf: "UIColor") {
     return .color(object)
   }
-  
+
   if _is(object, kindOf: "NSBezierPath") ||
      _is(object, kindOf: "UIBezierPath") {
     return .bezierPath(object)
   }
-  
+
   if _is(object, kindOf: "NSString") {
     return .text(_forceBridgeFromObjectiveC(object, String.self))
   }
@@ -138,19 +138,19 @@ extension Mirror {
               customAncestor: Mirror? = nil)
   {
     let subjectType = subjectType ?? _getNormalizedType(subject, type: type(of: subject))
-    
+
     let childCount = _getChildCount(subject, type: subjectType)
     let children = (0 ..< childCount).lazy.map({
       getChild(of: subject, type: subjectType, index: $0)
     })
     self.children = Children(children)
-    
+
     self._makeSuperclassMirror = {
       guard let subjectClass = subjectType as? AnyClass,
             let superclass = _getSuperclass(subjectClass) else {
         return nil
       }
-      
+
       // Handle custom ancestors. If we've hit the custom ancestor's subject type,
       // or descendants are suppressed, return it. Otherwise continue reflecting.
       if let customAncestor = customAncestor {
@@ -165,7 +165,7 @@ extension Mirror {
                     subjectType: superclass,
                     customAncestor: customAncestor)
     }
-    
+
     let rawDisplayStyle = _getDisplayStyle(subject)
     switch UnicodeScalar(Int(rawDisplayStyle)) {
     case "c": self.displayStyle = .class
@@ -175,11 +175,11 @@ extension Mirror {
     case "\0": self.displayStyle = nil
     default: preconditionFailure("Unknown raw display style '\(rawDisplayStyle)'")
     }
-    
+
     self.subjectType = subjectType
     self._defaultDescendantRepresentation = .generated
   }
-  
+
   internal static func quickLookObject(_ subject: Any) -> _PlaygroundQuickLook? {
 #if _runtime(_ObjC)
     let object = _getQuickLookObject(subject)
@@ -224,7 +224,7 @@ public enum _MetadataKind: UInt {
   // runtimePrivate = 0x100
   // nonHeap = 0x200
   // nonType = 0x400
-  
+
   case `class` = 0
   case `struct` = 0x200     // 0 | nonHeap
   case `enum` = 0x201       // 1 | nonHeap
@@ -241,7 +241,7 @@ public enum _MetadataKind: UInt {
   case heapGenericLocalVariable = 0x500 // 0 | nonType | runtimePrivate
   case errorObject = 0x501  // 1 | nonType | runtimePrivate
   case unknown = 0xffff
-  
+
   init(_ type: Any.Type) {
     let v = _metadataKind(type)
     if let result = _MetadataKind(rawValue: v) {

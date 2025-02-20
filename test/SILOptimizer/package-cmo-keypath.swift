@@ -32,7 +32,7 @@ package protocol PkgProto {
   //    return %5 : $()                                 // id: %6
   //  } // end sil function '$s3Lib8PkgProtoP6pkgVarSSvpAaBRzlxTK'
   var pkgVar: String { get }
-  
+
   // key path getter for PkgProto.pkgVar : <A>A
   // CHECK-NOT: sil [serialized_for_package] [thunk] [canonical] @$s3Lib8PkgProtoP6pkgVarSSvpAaBRzlxTK : $@convention(keypath_accessor_getter) <T where T : PkgProto> (@in_guaranteed T) -> @out String {
   // CHECK-NOT: witness_method $T, #PkgProto.pkgVar!getter : <Self where Self : PkgProto> (Self) -> () -> String : $@convention(witness_method: PkgProto) <τ_0_0 where τ_0_0 : PkgProto> (@in_guaranteed τ_0_0) -> @owned String // user: %3

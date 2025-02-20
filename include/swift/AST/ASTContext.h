@@ -648,7 +648,7 @@ public:
 
   /// Retrieve the declaration of Swift.Optional<T>.Some.
   EnumElementDecl *getOptionalSomeDecl() const;
-  
+
   /// Retrieve the declaration of Swift.Optional<T>.None.
   EnumElementDecl *getOptionalNoneDecl() const;
 
@@ -797,7 +797,7 @@ public:
   /// Does *not* perform any name lookup to check whether, the module already
   /// contains a decl with the same name, only does synthesis.
   ProtocolDecl *synthesizeInvertibleProtocolDecl(InvertibleProtocolKind ip) const;
-  
+
   /// Determine whether the given nominal type is one of the standard
   /// library or Cocoa framework types that is known to be bridged by another
   /// module's overlay, for layering or implementation detail reasons.
@@ -1014,7 +1014,7 @@ public:
   //===--------------------------------------------------------------------===//
 
   bool hadError() const;
-  
+
   //===--------------------------------------------------------------------===//
   // Type manipulation routines.
   //===--------------------------------------------------------------------===//
@@ -1031,7 +1031,7 @@ public:
 
   const CanType TheIEEE32Type;            /// 32-bit IEEE floating point
   const CanType TheIEEE64Type;            /// 64-bit IEEE floating point
-  
+
   // Target specific types.
   const CanType TheIEEE16Type;            /// 16-bit IEEE floating point
   const CanType TheIEEE80Type;            /// 80-bit IEEE floating point
@@ -1428,10 +1428,10 @@ public:
   Type getSideCachedPropertyWrapperBackingPropertyType(VarDecl *var) const;
   void setSideCachedPropertyWrapperBackingPropertyType(VarDecl *var,
                                                         Type type);
-  
+
   /// Returns memory usage of this ASTContext.
   size_t getTotalMemory() const;
-  
+
   /// Returns memory used exclusively by constraint solver.
   size_t getSolverMemory() const;
 
@@ -1543,7 +1543,7 @@ public:
 
   /// Retrieve the IRGen specific SIL passes.
   SILTransformCtors getIRGenSILTransforms() const;
-  
+
   /// Check whether a given string would be considered "pure ASCII" by the
   /// standard library's String implementation.
   bool isASCIIString(StringRef s) const;

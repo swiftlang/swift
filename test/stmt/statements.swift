@@ -16,11 +16,11 @@ func invalid_semi() {
 func nested1(_ x: Int) {
   var y : Int
   // expected-warning@-1 {{variable 'y' was never mutated; consider changing to 'let' constant}}
-  
+
   func nested2(_ z: Int) -> Int {
     return x+y+z
   }
-  
+
   _ = nested2(1)
 }
 
@@ -83,7 +83,7 @@ func funcdecl5(_ a: Int, y: Int) {
   } else {
     f2()
   }
-  
+
   // while statement.
   while (B) {
   }
@@ -311,7 +311,7 @@ Outer:
     case 139: break   // <rdar://problem/16563853> 'break' should be able to break out of switch statements
     }
   }
-  
+
   // <rdar://problem/16692437> shadowing loop labels should be an error
 Loop:  // expected-note {{previously declared here}}
   for _ in 0...2 {
@@ -330,17 +330,17 @@ Loop:  // expected-note {{previously declared here}}
   default:
     markUsed("")
   }
-  
+
   let x : Int? = 42
-  
+
   // <rdar://problem/16879701> Should be able to pattern match 'nil' against optionals
   switch x { // expected-error {{switch must be exhaustive}}
   // expected-note@-1 {{missing case: '.some(_)'}}
   case .some(42): break
   case nil: break
-  
+
   }
-  
+
 }
 
 
@@ -360,7 +360,7 @@ func testMyEnumWithCaseLabels(_ a : MyEnumWithCaseLabels) {
 
 
 func test_guard(_ x : Int, y : Int??, z: Int?, cond : Bool) {
-  
+
   // These are all ok.
   guard let a = y else {}
   markUsed(a)
@@ -369,8 +369,8 @@ func test_guard(_ x : Int, y : Int??, z: Int?, cond : Bool) {
   guard case let Optional.some(d) = y else {}
   guard x != 4, case _ = x else { }
   guard let z, cond else {}
-  
-  
+
+
   guard case let f? : Int?, cond else {}    // expected-error {{variable binding in a condition requires an initializer}}
 
   // FIXME: Bring back the tailored diagnostic
@@ -445,8 +445,8 @@ func r23684220(_ b: Any) {
 func f21080671() {
   try {  // expected-error {{the 'do' keyword is used to specify a 'catch' region}} {{3-6=do}}
   } catch { }
-  
-  
+
+
   try {  // expected-error {{the 'do' keyword is used to specify a 'catch' region}} {{3-6=do}}
     f21080671()
   } catch let x as Int {

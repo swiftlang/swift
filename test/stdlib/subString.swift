@@ -37,16 +37,16 @@ SubstringTests.test("Equality") {
     s.index(s.startIndex, offsetBy: 4)]
   let s2 = s1[s1.startIndex..<s1.endIndex]
   let s3 = s2[s1.startIndex..<s1.endIndex]
-  
+
   expectEqual(s1, "cd")
   expectEqual(s2, "cd")
   expectEqual(s3, "cd")
 	expectTrue("" == s.dropFirst(s.count))
 	expectTrue(s.dropFirst().dropFirst(s.count) == s.dropFirst(s.count))
-  
+
   expectEqual("ab" as String, s.prefix(2))
   expectEqual("fg" as String, s.suffix(2))
-  
+
 #if _runtime(_ObjC)
   expectTrue(s == s[...])
   expectTrue(s[...] == s)
@@ -133,21 +133,21 @@ SubstringTests.test("CharacterView") {
   let s = "abcdefg"
   var t = s.dropFirst(2)
   var u = t.dropFirst(2)
-  
+
   checkMatch(s, t, t.startIndex)
   checkMatch(s, t, t.index(after: t.startIndex))
   checkMatch(s, t, t.index(before: t.endIndex))
-  
+
   checkMatch(s, t, u.startIndex)
   checkMatch(t, u, u.startIndex)
   checkMatch(t, u, u.index(after: u.startIndex))
   checkMatch(t, u, u.index(before: u.endIndex))
-  
+
   expectEqual("", String(t.dropFirst(10)))
   expectEqual("", String(t.dropLast(10)))
   expectEqual("", String(u.dropFirst(10)))
   expectEqual("", String(u.dropLast(10)))
-  
+
   t.replaceSubrange(t.startIndex...t.startIndex, with: ["C"])
   u.replaceSubrange(u.startIndex...u.startIndex, with: ["E"])
   expectEqual(String(u), "Efg")
@@ -159,21 +159,21 @@ SubstringTests.test("UnicodeScalars") {
   let s = "abcdefg"
   var t = s.unicodeScalars.dropFirst(2)
   var u = t.dropFirst(2)
-  
+
   checkMatch(s.unicodeScalars, t, t.startIndex)
   checkMatch(s.unicodeScalars, t, t.index(after: t.startIndex))
   checkMatch(s.unicodeScalars, t, t.index(before: t.endIndex))
-  
+
   checkMatch(s.unicodeScalars, t, u.startIndex)
   checkMatch(t, u, u.startIndex)
   checkMatch(t, u, u.index(after: u.startIndex))
   checkMatch(t, u, u.index(before: u.endIndex))
-  
+
   expectEqual("", String(t.dropFirst(10)))
   expectEqual("", String(t.dropLast(10)))
   expectEqual("", String(u.dropFirst(10)))
   expectEqual("", String(u.dropLast(10)))
-  
+
   t.replaceSubrange(t.startIndex...t.startIndex, with: ["C"])
   u.replaceSubrange(u.startIndex...u.startIndex, with: ["E"])
   expectEqual(String(u), "Efg")
@@ -185,16 +185,16 @@ SubstringTests.test("UTF16View") {
   let s = "abcdefg"
   let t = s.utf16.dropFirst(2)
   let u = t.dropFirst(2)
-  
+
   checkMatch(s.utf16, t, t.startIndex)
   checkMatch(s.utf16, t, t.index(after: t.startIndex))
   checkMatch(s.utf16, t, t.index(before: t.endIndex))
-  
+
   checkMatch(s.utf16, t, u.startIndex)
   checkMatch(t, u, u.startIndex)
   checkMatch(t, u, u.index(after: u.startIndex))
   checkMatch(t, u, u.index(before: u.endIndex))
-  
+
   expectEqual("", String(t.dropFirst(10))!)
   expectEqual("", String(t.dropLast(10))!)
   expectEqual("", String(u.dropFirst(10))!)

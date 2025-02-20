@@ -189,7 +189,7 @@ func testSwitchEnum(_ xi: Int) -> Int {
   default: 
     x -= 1
   }
-  
+
   return x
 }
 
@@ -207,7 +207,7 @@ func intConstantTest() -> Int{
   if y == 1 { // expected-note {{condition always evaluates to true}}
     return y
   }
-  
+
   return 1 // expected-warning {{will never be executed}}
 }
 

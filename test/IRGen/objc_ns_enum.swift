@@ -112,7 +112,7 @@ func test_enum_without_name_Equatable(_ obj: TestThatEnumType) -> Bool {
 
 // CHECK-LABEL: define hidden swiftcc void @"$s12objc_ns_enum0a1_C13_method_callsyyAA15ObjCEnumMethodsCF"(ptr %0)
 func objc_enum_method_calls(_ x: ObjCEnumMethods) {
-  
+
   // CHECK: call i64 @objc_msgSend
   // CHECK: call void @objc_msgSend
   x.enumIn(x.enumOut())

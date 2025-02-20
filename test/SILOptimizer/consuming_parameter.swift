@@ -1,5 +1,5 @@
 // RUN: %target-swift-frontend -c -target %target-swift-5.1-abi-triple -Xllvm --sil-print-final-ossa-module -O -module-name=main -o /dev/null %s 2>&1 | %FileCheck %s
- 
+
 // REQUIRES: concurrency
 
 // CHECK-LABEL: sil [ossa] @async_dead_arg_call : {{.*}} {
@@ -15,7 +15,7 @@ public func async_dead_arg_call(o: consuming AnyObject) async {
   // o should be destroyed here
   await bar()
 }
- 
+
 // CHECK-LABEL: sil [ossa] @async_dead_arg_call_lexical : {{.*}} {
 // CHECK:       {{bb[0-9]+}}([[INSTANCE:%[^,]+]] : @noImplicitCopy @_lexical @owned
 // CHECK:         [[EXECUTOR:%[^,]+]] = enum $Optional<Builtin.Executor>, #Optional.none!enumelt 

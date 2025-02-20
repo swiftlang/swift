@@ -594,7 +594,7 @@ SwiftLookupTable::findOrCreate(TableType &Table,
 
   // If we found something, we're done.
   if (known != Table.end()) return known;
-  
+
   // If there's no reader, we've found all there is to find.
   if (!Reader) return known;
 

@@ -117,7 +117,7 @@ FloatingPoint.test("BinaryFloatingPoint/genericFloatingPointConversion") {
   func convert<
     T: BinaryFloatingPoint, U: BinaryFloatingPoint
   >(exactly value: T, to: U.Type) -> U? { U(exactly: value) }
-  
+
   expectEqual(convert(exactly: 0 as Float, to: Double.self), 0.0)
   expectEqual(convert(exactly: -0.0 as Float, to: Double.self), -0.0)
   expectEqual(
@@ -154,7 +154,7 @@ FloatingPoint.test("BinaryFloatingPoint/genericFloatingPointConversion") {
   expectEqual(
     convert(exactly: Float.greatestFiniteMagnitude, to: Double.self),
     Double(Float.greatestFiniteMagnitude))
-  
+
   expectTrue(Double._convert(from: 0 as Float) == (value: 0, exact: true))
   expectTrue(Double._convert(from: -0.0 as Float) == (value: -0.0, exact: true))
   expectTrue(Double._convert(from: 1 as Float) == (value: 1, exact: true))

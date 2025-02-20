@@ -81,11 +81,11 @@ ExtendedTypes.test("Constrained generic") {
   var trivial = makeIt(Trivial.self)
   var result = callTestMethods(on: trivial)
   expectEqual(42, result)
-  
+
   let nonTrivial = makeIt(NonTrivial.self)
   result = callTestMethods(on: nonTrivial)
   expectEqual(42, result)
-  
+
   trivial = makeItWithDummy(Trivial.self)
   result = callTestMethods(on: trivial)
   expectEqual(42, result)
@@ -95,7 +95,7 @@ ExtendedTypes.test("Generic struct") {
   var hold = Holder<Trivial>()
   var result = callTestMethods(on: hold)
   expectEqual(42, result)
-  
+
   hold.value = makeItWithDummy(NonTrivial.self)
   result = callTestMethods(on: hold)
   expectEqual(42, result)

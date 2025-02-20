@@ -83,7 +83,7 @@ ProtocolDecl *TypeChecker::getLiteralProtocol(ASTContext &Context, Expr *expr) {
 
   if (!isa<LiteralExpr>(expr))
     return nullptr;
-  
+
   if (isa<NilLiteralExpr>(expr))
     return TypeChecker::getProtocol(Context, expr->getLoc(),
                                     KnownProtocolKind::ExpressibleByNilLiteral);

@@ -11,7 +11,7 @@ func test1(_ a : Int) -> Int {
   let (b,c) = (a, 32)
 
   return b+c
-  
+
   // CHECK: return
 }
 
@@ -76,7 +76,7 @@ func test3() {
   // CHECK: [[USEFN:%[0-9]+]] = function_ref{{.*}}useAString
   // CHECK-NEXT: [[USE:%[0-9]+]] = apply [[USEFN]]([[STR_BORROW]])
   useAString(o)
-  
+
   // CHECK: destroy_value [[STR_MOV]]
 }
 // CHECK: } // end sil function '{{.*}}test3{{.*}}'
@@ -94,7 +94,7 @@ func produceAddressOnlyStruct<T>(_ x : T) -> AddressOnlyStruct<T> {}
 // CHECK: bb0([[FUNC_ARG:%.*]] : $*T):
 func testAddressOnlyStructString<T>(_ a : T) -> String {
   return produceAddressOnlyStruct(a).str
-  
+
   // CHECK: [[TMPSTRUCT:%[0-9]+]] = alloc_stack $AddressOnlyStruct<T>
   // CHECK: [[PRODFN:%[0-9]+]] = function_ref @{{.*}}produceAddressOnlyStruct
   // CHECK: apply [[PRODFN]]<T>([[TMPSTRUCT]], [[FUNC_ARG]])
@@ -144,7 +144,7 @@ struct GetOnlySubscriptStruct {
 // CHECK-LABEL: sil hidden [ossa] @{{.*}}testGetOnlySubscript
 func testGetOnlySubscript(_ x : GetOnlySubscriptStruct, idx : Int) -> Int {
   return x[idx]
-  
+
   // CHECK: [[SUBFN:%[0-9]+]] = function_ref @{{.*}}i
   // CHECK-NEXT: [[CALL:%[0-9]+]] = apply [[SUBFN]](
   // CHECK: return [[CALL]]
@@ -159,7 +159,7 @@ struct CloseOverAddressOnlyConstant<T> {
     let AOV: T?
     takeClosure({ AOV.getLV() })
   }
-  
+
 }
 
 // CHECK-LABEL: sil hidden [ossa] @{{.*}}callThroughLet
@@ -244,7 +244,7 @@ func test_weird_property(_ v : WeirdPropertyTest, i : Int) -> Int {
   // CHECK: [[SETFN:%[0-9]+]] = function_ref @$s9let_decls17WeirdPropertyTestV1pSivs
   // CHECK: apply [[SETFN]](%1, [[VVAL]])
   v.p = i
-  
+
   // The getter is mutating, so it takes the box address.
   // CHECK: [[WRITE:%.*]] = begin_access [modify] [unknown] [[PB]]
   // CHECK: [[GETFN:%[0-9]+]] = function_ref @$s9let_decls17WeirdPropertyTestV1pSivg
@@ -298,7 +298,7 @@ func testLetProtocolBases(_ p : SimpleProtocol) {
   // CHECK-NEXT: witness_method
   // CHECK-NEXT: apply
   p.doSomethingGreat()
-  
+
   // CHECK-NOT: destroy_addr %0
   // CHECK-NEXT: tuple
   // CHECK-NEXT: return
@@ -332,7 +332,7 @@ func testDebugValue(_ a : Int, b : SimpleProtocol) -> Int {
 
   // CHECK: apply
   b.doSomethingGreat()
-  
+
   // CHECK-NOT: destroy_addr
 
   // CHECK: return [[MV]]
@@ -418,7 +418,7 @@ struct StructMemberTest {
   // CHECK:  destroy_value [[EXT_1_COPY]]
   // CHECK:  return [[EXT_2]] : $Int
   // CHECK: } // end sil function '$s9let_decls16StructMemberTestV016testRecursiveIntD4LoadSiyF'
-  
+
   func testTupleMemberLoad() -> Int {
     return t.1.i
   }
@@ -452,7 +452,7 @@ struct GenericStruct<T> {
   func getB() -> Int {
     return b
   }
-  
+
   // CHECK-LABEL: sil hidden [ossa] @{{.*}}GenericStructV4getB{{.*}} : $@convention(method) <T> (@in_guaranteed GenericStruct<T>) -> Int
   // CHECK: bb0([[SELF_ADDR:%.*]] : $*GenericStruct<T>):
   // CHECK-NEXT: debug_value [[SELF_ADDR]] : $*GenericStruct<T>, let, name "self", {{.*}} expr op_deref

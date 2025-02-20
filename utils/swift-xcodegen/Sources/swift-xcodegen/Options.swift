@@ -166,7 +166,7 @@ struct ProjectOptions: ParsableArguments {
       Generate targets for Swift files in the standard library. This requires
       using Xcode with a main development Swift snapshot, and as such is
       disabled by default. 
-      
+
       A development snapshot is necessary to avoid spurious build/live issues
       due to the fact that the stdlib is built using the just-built Swift
       compiler, which may support features not yet supported by the Swift
@@ -214,7 +214,7 @@ struct ProjectOptions: ParsableArguments {
       folder references to be used for compatible targets. This allows new
       source files to be added to a target without needing to regenerate the
       project.
-      
+
       Only supported for targets that have no per-file build settings. This
       unfortunately means some Clang targes such as 'lib/Basic' and 'stdlib' 
       cannot currently use buildable folders.
@@ -228,7 +228,7 @@ struct ProjectOptions: ParsableArguments {
       Experimental: The path to a build directory for the new 'Runtimes/'
       stdlib CMake build. This creates a separate 'SwiftRuntimes' project, along
       with a 'Swift+Runtimes' workspace.
-      
+
       Note: This requires passing '-DCMAKE_EXPORT_COMPILE_COMMANDS=YES' to
       CMake.
       """

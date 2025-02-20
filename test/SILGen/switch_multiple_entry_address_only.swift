@@ -133,7 +133,7 @@ func fallthroughWithValue(e: E) {
   // CHECK-NEXT: [[E_COPY:%.*]] = alloc_stack $E
   // CHECK-NEXT: copy_addr %0 to [init] [[E_COPY]]
   // CHECK-NEXT: switch_enum_addr [[E_COPY]] : $*E, case #E.a!enumelt: bb1, case #E.b!enumelt: bb2, default bb4
-  
+
   // CHECK:      bb1:
   // CHECK-NEXT: [[E_PAYLOAD:%.*]] = unchecked_take_enum_data_addr [[E_COPY]] : $*E, #E.a!enumelt
   // CHECK-NEXT: [[ORIGINAL_ANY_BOX:%.*]] = alloc_stack [lexical] [var_decl] $Any
@@ -145,7 +145,7 @@ func fallthroughWithValue(e: E) {
   // CHECK-NEXT: dealloc_stack [[ORIGINAL_ANY_BOX]]
   // CHECK-NEXT: dealloc_stack [[E_COPY]]
   // CHECK-NEXT: br bb3
-  
+
   // CHECK:      bb2:
   // CHECK-NEXT: [[E_PAYLOAD:%.*]] = unchecked_take_enum_data_addr [[E_COPY]] : $*E, #E.b!enumelt
   // CHECK-NEXT: [[ANY_BOX:%.*]] = alloc_stack [lexical] [var_decl] $Any
@@ -155,23 +155,23 @@ func fallthroughWithValue(e: E) {
   // CHECK-NEXT: dealloc_stack [[ANY_BOX]]
   // CHECK-NEXT: dealloc_stack [[E_COPY]]
   // CHECK-NEXT: br bb3
-  
+
   // CHECK:      bb3:
   // CHECK:      [[FN2:%.*]] = function_ref @$s34switch_multiple_entry_address_only8takesAnyyyypF
   // CHECK-NEXT: apply [[FN2]]([[X_PHI]]
   // CHECK-NEXT: destroy_addr [[X_PHI]]
   // CHECK-NEXT: br bb5
-  
+
   // CHECK:      bb4:
   // CHECK-NEXT: destroy_addr [[E_COPY]]
   // CHECK-NEXT: dealloc_stack [[E_COPY]]
   // CHECK-NEXT: br bb5
-  
+
   // CHECK:      bb5:
   // CHECK-NEXT: dealloc_stack [[X_PHI]]
   // CHECK-NEXT: tuple ()
   // CHECK-NEXT: return
-  
+
   switch e {
   case .a(let x):
     takesAny(x)

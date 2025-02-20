@@ -906,7 +906,7 @@ inline int swift_getHeapObjectExtraInhabitantIndex(HeapObject * const* src) {
   return int(value);
 #endif
 }
-  
+
 /// Store an extra inhabitant of a heap object pointer to memory,
 /// in the style of a value witness.
 inline void swift_storeHeapObjectExtraInhabitant(HeapObject **dest, int index) {
@@ -949,7 +949,7 @@ inline int swift_getFunctionPointerExtraInhabitantIndex(void * const* src) {
   return (value < heap_object_abi::LeastValidPointerValue
             ? (int) value : -1);
 }
-  
+
 /// Store an extra inhabitant of a function pointer to memory, in the
 /// style of a value witness.
 inline void swift_storeFunctionPointerExtraInhabitant(void **dest, int index) {

@@ -9,7 +9,7 @@ extern OSStatus
 LSCopyDisplayNameForURL(
   CFURLRef       inURL,
   CFStringRef *  outDisplayName);
-  
+
 extern OSStatus 
 LSGetExtensionInfo(
   UniCharCount    inNameLen,

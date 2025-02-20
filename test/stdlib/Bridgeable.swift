@@ -67,7 +67,7 @@ struct UnbridgedValueType {}
 // CHECK-NEXT: UnbridgedValueType is unbridged
 // CHECK-NEXT: UnbridgedValueType instance bridged as itself
 testBridging(UnbridgedValueType(), "UnbridgedValueType")
-  
+
 //===----------------------------------------------------------------------===//
 class PlainClass {}
 

@@ -6,9 +6,9 @@ internal class Base : CustomStringConvertible {
   init(_ id: Int) {
     self.id = id
   }
-  
+
   var description: String { return "instance \(id)" }
-  
+
   fileprivate func privateFn() -> String {
     return "private \(id)"
   }

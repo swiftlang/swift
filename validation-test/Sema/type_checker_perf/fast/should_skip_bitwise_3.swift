@@ -6,7 +6,7 @@
 
 struct Field25519 {
     static let mask51 = UInt64(0x7ffffffffffff)
-    
+
     var l0: UInt64
     var l1: UInt64
     var l2: UInt64

@@ -19,9 +19,9 @@
 #include <cstdlib>
 
 namespace swift {
-  
+
 struct MirrorWitnessTable;
-  
+
 /// The layout of protocol<Mirror>.
 struct Mirror {
   OpaqueExistentialContainer Header;

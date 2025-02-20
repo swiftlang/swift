@@ -121,7 +121,7 @@ actor MyActor {
     await unspecifiedAsync()
   }
 }
-  
+
 @globalActor
 struct GlobalActor {
   static var shared: MyActor = MyActor()

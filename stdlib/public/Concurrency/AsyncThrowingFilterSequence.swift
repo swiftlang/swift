@@ -60,7 +60,7 @@ extension AsyncSequence {
 public struct AsyncThrowingFilterSequence<Base: AsyncSequence> {
   @usableFromInline
   let base: Base
-  
+
   @usableFromInline
   let isIncluded: (Element) async throws -> Bool
 

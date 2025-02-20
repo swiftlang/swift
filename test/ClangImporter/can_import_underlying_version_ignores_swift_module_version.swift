@@ -24,7 +24,7 @@ func canImportUnderlyingVersion() {
 #if canImport(Simple, _underlyingVersion: 2)
   let a = 1  // expected-warning {{initialization of immutable value 'a' was never used; consider replacing with assignment to '_' or removing it}}
 #endif
-  
+
 #if canImport(Simple, _underlyingVersion: 3)
   let b = 1  // expected-warning {{initialization of immutable value 'b' was never used; consider replacing with assignment to '_' or removing it}}
 #endif
@@ -38,7 +38,7 @@ func canImportVersion() {
 #if canImport(Simple, _version: 4)
   let a = 1  // expected-warning {{initialization of immutable value 'a' was never used; consider replacing with assignment to '_' or removing it}}
 #endif
-  
+
 #if canImport(Simple, _version: 5)
   let b = 1  // expected-warning {{initialization of immutable value 'b' was never used; consider replacing with assignment to '_' or removing it}}
 #endif

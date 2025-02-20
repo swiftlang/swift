@@ -165,7 +165,7 @@ public:
   GlobalAccessRemoval(SILModule &module) : module(module) {}
 
   void perform();
-  
+
   void invalidateAnalysis(SILModuleTransform *pass);
 
 protected:

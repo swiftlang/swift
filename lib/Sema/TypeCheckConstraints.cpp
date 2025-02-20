@@ -60,7 +60,7 @@ void TypeVariableType::Implementation::print(llvm::raw_ostream &OS) {
   PrintOptions PO;
   PO.PrintTypesForDebugging = true;
   getTypeVariable()->print(OS, PO);
-  
+
   SmallVector<TypeVariableOptions, 4> bindingOptions;
   if (canBindToLValue())
     bindingOptions.push_back(TypeVariableOptions::TVO_CanBindToLValue);
@@ -213,7 +213,7 @@ bool constraints::computeTupleShuffle(TupleType *fromTuple,
                                       TupleType *toTuple,
                                       SmallVectorImpl<unsigned> &sources) {
   const unsigned unassigned = -1;
-  
+
   auto fromElts = fromTuple->getElements();
   auto toElts = toTuple->getElements();
 
@@ -867,7 +867,7 @@ bool TypeChecker::typeCheckPatternBinding(PatternBindingDecl *PBD,
   if (hadError)
     PBD->setInvalid();
   PBD->setInitializerChecked(patternNumber);
-  
+
   return hadError;
 }
 
@@ -1739,7 +1739,7 @@ TypeChecker::typeCheckCheckedCast(Type fromType, Type toType,
   if (fromType->getMetatypeInstanceType()->isNoncopyable()
       || toType->getMetatypeInstanceType()->isNoncopyable())
     return CheckedCastKind::Unresolved;
-  
+
   // Check for a bridging conversion.
   // Anything bridges to AnyObject.
   if (toType->isAnyObject())
@@ -1778,7 +1778,7 @@ TypeChecker::typeCheckCheckedCast(Type fromType, Type toType,
     fromType = fromValueType;
     optionalToOptionalCast = true;
   }
-  
+
   // On the other hand, casts can decrease optionality monadically.
   unsigned extraFromOptionals = 0;
   while (auto fromValueType = fromType->getOptionalObjectType()) {
@@ -2036,12 +2036,12 @@ TypeChecker::typeCheckCheckedCast(Type fromType, Type toType,
     auto fromMetatype = fromType->getAs<MetatypeType>();
     if (!fromMetatype)
       break;
-    
+
     metatypeCast = true;
     toType = toMetatype->getInstanceType();
     fromType = fromMetatype->getInstanceType();
   }
-  
+
   // Strip an inner layer of potentially existential metatype.
   bool toExistentialMetatype = false;
   bool fromExistentialMetatype = false;
@@ -2070,7 +2070,7 @@ TypeChecker::typeCheckCheckedCast(Type fromType, Type toType,
     fromRequiresClass = fromType->getExistentialLayout().requiresClass();
   else
     fromRequiresClass = fromType->mayHaveSuperclass();
-  
+
   // Casts between metatypes only succeed if none of the types are existentials
   // or if one is an existential and the other is a generic type because there
   // may be protocol conformances unknown at compile time.
@@ -2202,7 +2202,7 @@ TypeChecker::typeCheckCheckedCast(Type fromType, Type toType,
   // of the source type, we perform a downcast instead.
   if (toType->isBindableTo(fromType) || fromType->isBindableTo(toType))
     return CheckedCastKind::ValueCast;
-  
+
   // Objective-C metaclasses are subclasses of NSObject in the ObjC runtime,
   // so casts from NSObject to potentially-class metatypes may succeed.
   if (auto nsObject = Context.getNSObjectType()) {
@@ -2258,7 +2258,7 @@ TypeChecker::typeCheckCheckedCast(Type fromType, Type toType,
   auto clazz = toType->getClassOrBoundGenericClass();
   if (clazz && clazz->getForeignClassKind() == ClassDecl::ForeignKind::CFType)
     return CheckedCastKind::ValueCast;
-  
+
   // Don't warn on casts that change the generic parameters of ObjC generic
   // classes. This may be necessary to force-fit ObjC APIs that depend on
   // covariance, or for APIs where the generic parameter annotations in the
@@ -2297,7 +2297,7 @@ ForcedCheckedCastExpr *swift::findForcedDowncast(ASTContext &ctx, Expr *expr) {
   // Look through a consume, just in case.
   if (auto consume = dyn_cast<ConsumeExpr>(expr))
     expr = consume->getSubExpr();
-  
+
   // Simple case: forced checked cast.
   if (auto forced = dyn_cast<ForcedCheckedCastExpr>(expr)) {
     return forced;
@@ -2325,7 +2325,7 @@ ForcedCheckedCastExpr *swift::findForcedDowncast(ASTContext &ctx, Expr *expr) {
         expr = bindOptional->getSubExpr();
         continue;
       }
-      
+
       break;
     } while (true);
 
@@ -2333,7 +2333,7 @@ ForcedCheckedCastExpr *swift::findForcedDowncast(ASTContext &ctx, Expr *expr) {
   };
 
   auto sub = skipOptionalEvalAndBinds(expr);
-  
+
   // If we have an explicit cast, we're done.
   if (auto *FCE = dyn_cast<ForcedCheckedCastExpr>(sub))
     return FCE;

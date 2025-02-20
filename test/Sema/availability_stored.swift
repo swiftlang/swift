@@ -42,11 +42,11 @@ struct BadReferenceStruct1 {
   // expected-error@+1 {{stored properties cannot be marked potentially unavailable with '@available'}}
   @available(macOS 50, *)
   var x: NewStruct
-  
+
   // expected-error@+1 {{stored properties cannot be marked potentially unavailable with '@available'}}
   @available(macOS 50, *)
   @NewPropertyWrapper var y: Int
-  
+
   // expected-error@+1 {{stored properties cannot be marked potentially unavailable with '@available'}}
   @available(macOS 50, *)
   lazy var z: Int = 42
@@ -57,11 +57,11 @@ struct BadReferenceStruct2 {
   // expected-error@+1 {{stored properties cannot be marked potentially unavailable with '@available'}}
   @available(macOS 50, *)
   var x: NewStruct
-  
+
   // expected-error@+1 {{stored properties cannot be marked potentially unavailable with '@available'}}
   @available(macOS 50, *)
   @NewPropertyWrapper var y: Int
-  
+
   // expected-error@+1 {{stored properties cannot be marked potentially unavailable with '@available'}}
   @available(macOS 50, *)
   lazy var z: Int = 42

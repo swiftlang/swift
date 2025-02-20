@@ -56,10 +56,10 @@ protected:
       // only one element to operate on
       return body(addrs);
     }
-    
+
     auto arraySize = getArraySize(IGF, T);
     auto predBB = IGF.Builder.GetInsertBlock();
-    
+
     auto loopBB = IGF.createBasicBlock("each_array_element");
     auto endBB = IGF.createBasicBlock("end_array_element");
 
@@ -75,7 +75,7 @@ protected:
       // Otherwise, we statically handled the zero case above.
       IGF.Builder.CreateBr(loopBB);
     }
-    
+
     IGF.Builder.emitBlock(loopBB);
 
     auto countPhi = IGF.Builder.CreatePHI(IGF.IGM.IntPtrTy, 2);
@@ -92,7 +92,7 @@ protected:
       eltAddrs.push_back(Address(addrPhi, Element.getStorageType(),
                                  a.getAlignment()));
     }
-    
+
     body(eltAddrs);
 
     // The just ran body may have generated new blocks. Get the current
@@ -109,10 +109,10 @@ protected:
 
     auto nextCount = IGF.Builder.CreateSub(countPhi, one);
     countPhi->addIncoming(nextCount, predBB);
-    
+
     auto done = IGF.Builder.CreateICmpEQ(nextCount, zero);
     IGF.Builder.CreateCondBr(done, endBB, loopBB);
-    
+
     IGF.Builder.emitBlock(endBB);
   }
 
@@ -149,7 +149,7 @@ public:
                                                      eltTy, isOutlined);
                         }, {dest, src});
   }
-  
+
 
   void initializeWithTake(IRGenFunction &IGF, Address dest, Address src,
                           SILType T,
@@ -164,7 +164,7 @@ public:
                                                      zeroizeIfSensitive);
                         }, {dest, src});
   }
-  
+
   virtual void destroy(IRGenFunction &IGF, Address address, SILType T,
                        bool isOutlined) const override {
     auto eltTy = getElementSILType(IGF.IGM, T);
@@ -205,7 +205,7 @@ protected:
     if (arraySize == 0) {
       return llvm::StructType::get(LLVMContext, {});
     }
-    
+
     // If we need to, pad it to stride.
     if (elementTI.getFixedSize() < elementTI.getFixedStride()) {
       uint64_t paddingBytes = elementTI.getFixedStride().getValue()
@@ -221,7 +221,7 @@ protected:
           /*packed*/ true);
       }
     }
-    
+
     return llvm::ArrayType::get(elementTy, arraySize);
   }
 
@@ -230,7 +230,7 @@ protected:
     if (arraySize == 0) {
       return SpareBitVector();
     }
-    
+
     // Take spare bits from the first element only.
     SpareBitVector result = elementTI.getSpareBits();
     // We can use the padding to the next element as spare bits too.
@@ -238,7 +238,7 @@ protected:
                            - result.size());
     return result;
   }
-  
+
   void eachElement(llvm::function_ref<void()> body) const {
     for (uint64_t i = 0; i < ArraySize; ++i) {
       body();
@@ -251,15 +251,15 @@ protected:
       auto elementAddr = Element.indexArray(IGF, addr,
         llvm::ConstantInt::get(IGF.IGM.IntPtrTy, i),
         SILType());
-      
+
       body(elementAddr);
     }
   }
-  
+
   std::optional<uint64_t> getFixedArraySize(SILType T) const override {
     return ArraySize;
   }
-  
+
   llvm::Value *getArraySize(IRGenFunction &IGF, SILType T) const override {
     return llvm::ConstantInt::get(IGF.IGM.IntPtrTy, ArraySize);
   }
@@ -316,13 +316,13 @@ public:
                                      unsigned index) const override {
     return Element.getFixedExtraInhabitantValue(IGM, bits, index);
   }
-    
+
   llvm::Value *getExtraInhabitantIndex(IRGenFunction &IGF,
                                        Address src, SILType T,
                                        bool isOutlined) const override {
     if (ArraySize == 0)
       return llvm::ConstantInt::get(IGF.IGM.Int32Ty, -1);
-      
+
     auto firstElementAddr
       = IGF.Builder.CreateElementBitCast(src, Element.getStorageType());
 
@@ -330,7 +330,7 @@ public:
                                            getElementSILType(IGF.IGM, T),
                                            isOutlined);
   }
-    
+
   void storeExtraInhabitant(IRGenFunction &IGF,
                             llvm::Value *index,
                             Address dest, SILType T,
@@ -361,7 +361,7 @@ public:
                        elementTI.isABIAccessible())
   {
   }
-  
+
   unsigned getExplosionSize() const override {
     return Element.getExplosionSize() * ArraySize;
   }
@@ -381,7 +381,7 @@ public:
                       Element.loadAsTake(IGF, elementAddr, explosion);
                     });
   }
-  
+
   void assign(IRGenFunction &IGF, Explosion &explosion, Address addr,
               bool isOutlined, SILType T) const override {
     auto eltTy = getElementSILType(IGF.IGM, T);
@@ -399,14 +399,14 @@ public:
                       Element.initialize(IGF, explosion, elementAddr, isOutlined);
                     });
   }
-  
+
   void reexplode(Explosion &sourceExplosion,
                  Explosion &targetExplosion) const override {
     eachElement([&]{
       Element.reexplode(sourceExplosion, targetExplosion);
     });
   }
-  
+
   void copy(IRGenFunction &IGF,
             Explosion &sourceExplosion,
             Explosion &targetExplosion,
@@ -415,7 +415,7 @@ public:
       Element.copy(IGF, sourceExplosion, targetExplosion, atomicity);
     });
   }
-  
+
   void consume(IRGenFunction &IGF, Explosion &explosion,
                Atomicity atomicity,
                SILType T) const override {
@@ -438,7 +438,7 @@ public:
       body(i * Element.getFixedStride().getValue());
     }
   }
-  
+
   void packIntoEnumPayload(IRGenModule &IGM,
                            IRBuilder &builder,
                            EnumPayload &payload,
@@ -450,7 +450,7 @@ public:
                                   offset + eltByteOffset * 8);
     });
   }
-  
+
   void unpackFromEnumPayload(IRGenFunction &IGF,
                              const EnumPayload &payload,
                              Explosion &targetExplosion,
@@ -461,7 +461,7 @@ public:
                                     offset + eltByteOffset * 8);
     });
   }
-  
+
   void addToAggLowering(IRGenModule &IGM, SwiftAggLowering &lowering,
                         Size offset) const override {
     eachElementOffset([&](unsigned eltByteOffset){
@@ -500,23 +500,23 @@ class NonFixedArrayTypeInfo final
                              TypeInfo> {
   using super = ArrayTypeInfoBase<IndirectTypeInfo<NonFixedArrayTypeInfo, TypeInfo>,
                                   TypeInfo>;
-  
+
   llvm::Value *getArraySize(IRGenFunction &IGF, SILType T) const override {
     if (auto fixedSize = getFixedArraySize(T)) {
       return llvm::ConstantInt::get(IGF.IGM.IntPtrTy, *fixedSize);
     }
-    
+
     CanType sizeParam = T.castTo<BuiltinFixedArrayType>()->getSize();
-    
+
     auto arg = IGF.emitValueGenericRef(sizeParam);
     auto zero = llvm::ConstantInt::get(IGF.IGM.IntPtrTy, 0);
     auto isNegative = IGF.Builder.CreateICmpSLT(arg, zero);
     return IGF.Builder.CreateSelect(isNegative, zero, arg);
   }
-  
+
   std::optional<uint64_t> getFixedArraySize(SILType T) const override {
     CanType sizeParam = T.castTo<BuiltinFixedArrayType>()->getSize();
-    
+
     if (auto integer = sizeParam->getAs<IntegerType>()) {
       if (integer->getValue().isNonNegative()) {
         return integer->getValue().getLimitedValue();
@@ -524,7 +524,7 @@ class NonFixedArrayTypeInfo final
     }
     return std::nullopt;
   }
-  
+
 public:
   NonFixedArrayTypeInfo(llvm::Type *opaqueTy,
                         const TypeInfo &Element)
@@ -569,19 +569,19 @@ public:
     auto isBT = getIsBitwiseTakable(IGF, T);
     auto size = getSize(IGF, T);
     auto align = getAlignmentMask(IGF, T);
-    
+
     auto endBB = IGF.createBasicBlock("array_is_packed_inline");
     IGF.Builder.SetInsertPoint(endBB);
     auto result = IGF.Builder.CreatePHI(IGF.IGM.Int1Ty, 3);
     IGF.Builder.SetInsertPoint(startBB);
-    
+
     // packed inline if the payload is bitwise-takable...
     auto isBT_BB = IGF.createBasicBlock("array_is_bt");
     IGF.Builder.CreateCondBr(isBT, isBT_BB, endBB);
     result->addIncoming(no, startBB);
-    
+
     IGF.Builder.emitBlock(isBT_BB);
-    
+
     // ...size fits the fixed-size buffer...
     auto bufferSize = llvm::ConstantInt::get(IGF.IGM.IntPtrTy,
                                         getFixedBufferSize(IGF.IGM).getValue());
@@ -589,7 +589,7 @@ public:
     auto sizeFitsBB = IGF.createBasicBlock("array_size_fits");
     IGF.Builder.CreateCondBr(sizeFits, sizeFitsBB, endBB);
     result->addIncoming(no, isBT_BB);
-    
+
     IGF.Builder.emitBlock(sizeFitsBB);
 
     // ...and so does alignment
@@ -685,22 +685,22 @@ TypeConverter::convertBuiltinFixedArrayType(BuiltinFixedArrayType *T) {
   // ...unless the array size is not fixed, then the array layout is never
   // fixed.
   auto fixedSize = T->getFixedInhabitedSize();
-  
+
   // Statically zero or negative-sized array types are empty.
   if (fixedSize == 0 || T->isFixedNegativeSize()) {
     return &getEmptyTypeInfo();
   }
-                                  
+
   if (!fixedSize.has_value() || !elementTI.isFixedSize()) {
     return new NonFixedArrayTypeInfo(IGM.OpaqueTy, elementTI);
   }
-  
+
   if (*fixedSize <= BuiltinFixedArrayType::MaximumLoadableSize) {
     if (auto *loadableTI = dyn_cast<LoadableTypeInfo>(&elementTI)) {
       return new LoadableArrayTypeInfo(fixedSize.value(), *loadableTI);
     }
   }
-  
+
   return new FixedArrayTypeInfo(fixedSize.value(),
                                 *cast<FixedTypeInfo>(&elementTI));
 }

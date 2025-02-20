@@ -97,7 +97,7 @@ void swift::diagnoseUnsafeUse(const UnsafeUse &use) {
         var);
     return;
   }
-      
+
   case UnsafeUse::NonisolatedUnsafe: {
     auto decl = use.getDecl();
     ASTContext &ctx = decl->getASTContext();

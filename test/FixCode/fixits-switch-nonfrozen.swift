@@ -154,7 +154,7 @@ func infinitelySized() -> Bool {
   case (.one, .one): return true
   case (.two, .two): return true
   }
-  
+
   switch (MutuallyRecursive.one, MutuallyRecursive.one) {
   // expected-error@-1 {{switch must be exhaustive}}
   // expected-note@-2 {{add missing case: '(.recur(_), _)'}} {{+13:3-3=case (.recur(_), _):\n<#code#>\n}}
@@ -205,7 +205,7 @@ public func testNonExhaustive(_ value: NonExhaustive, _ payload: NonExhaustivePa
   case .a: break
   case .b: break
   }
-  
+
   switch value {
   case .a: break
   case .b: break
@@ -336,7 +336,7 @@ public func testNonExhaustive(_ value: NonExhaustive, _ payload: NonExhaustivePa
   case .a: break
   case .b: break
   }
-  
+
   switch payload {
   case .a: break
   case .b: break

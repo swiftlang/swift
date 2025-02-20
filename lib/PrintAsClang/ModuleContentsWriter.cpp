@@ -530,7 +530,7 @@ public:
 
   void forwardDeclare(const EnumDecl *ED) {
     assert(ED->isObjC() || ED->hasClangNode());
-    
+
     forwardDeclare(ED, [&]{
       os << "enum " << getNameForObjC(ED) << " : ";
       printer.print(ED->getRawType());
@@ -830,7 +830,7 @@ public:
     printer.print(ED);
     return true;
   }
-  
+
   bool writeEnum(const EnumDecl *ED) {
     if (addImport(ED))
       return true;
@@ -842,7 +842,7 @@ public:
 
     if (seenTypes[ED].first == EmissionState::Defined)
       return true;
-    
+
     seenTypes[ED] = {EmissionState::Defined, true};
     printer.print(ED);
 

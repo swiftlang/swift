@@ -86,7 +86,7 @@ public struct ElementsEqualWithPredicateTest {
     public let expectedLeftoverSequence: [Int]
     public let expectedLeftoverOther: [String]
     public let loc: SourceLoc
-    
+
     public init(
         _ expected: Bool, _ sequence: [Int], _ other: [String],
         _ predicate: @escaping (Int, String) -> Bool,
@@ -506,16 +506,16 @@ func elementsEqualPredicate(_ x: Int, y: String) -> Bool {
 
 public let elementsEqualWithPredicateTests: [ElementsEqualWithPredicateTest] = [
     ElementsEqualWithPredicateTest(true, [], [], elementsEqualPredicate, [], []),
-    
+
     ElementsEqualWithPredicateTest(false, [ 1 ], [], elementsEqualPredicate, [ 1 ], []),
     ElementsEqualWithPredicateTest(false, [], [ "1" ], elementsEqualPredicate, [], [ "1" ]),
-    
+
     ElementsEqualWithPredicateTest(false, [ 1, 2 ], [], elementsEqualPredicate, [ 1, 2 ], []),
     ElementsEqualWithPredicateTest(false, [], [ "1", "2" ], elementsEqualPredicate, [], [ "1", "2" ]),
-    
+
     ElementsEqualWithPredicateTest(false, [ 1, 2, 3, 4 ], [ "1", "2" ], elementsEqualPredicate, [ 3, 4 ], []),
     ElementsEqualWithPredicateTest(false, [ 1, 2 ], [ "1", "2", "3", "4" ], elementsEqualPredicate, [], [ "3", "4" ]),
-    
+
     ElementsEqualWithPredicateTest(true, [ 1, 2, 3, 4 ], [ "1", "2", "3", "4" ], elementsEqualPredicate, [], []),
     ElementsEqualWithPredicateTest(true, [ 1, 2 ], [ "1", "2" ], elementsEqualPredicate, [], []),
 ]

@@ -53,7 +53,7 @@ func archetypeStaticSubscript<
 >(_ t: T.Type, u: U.Type) -> String {
   // Subscript an archetype.
   if false { return t[17] }
-  
+
   // Subscript an archetype for which the subscript operator is in a base class.
   return u[17]
 }

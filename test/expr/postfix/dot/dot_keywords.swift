@@ -20,7 +20,7 @@ func f2(a : SE0071Struct) -> Int {
   return a.`default`
 }
 
-  
+
 enum SE0071Enum {
   case `case`
 }
@@ -93,7 +93,7 @@ struct S {
 
 extension S.A.B {
   private static let x: Int = 5
-    
+
   func f() -> Int {
     return x  // expected-error {{static member 'x' cannot be used on instance of type 'S.A.B'}} {{12-12=S.A.B.}}
   }

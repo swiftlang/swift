@@ -24,7 +24,7 @@ struct Delayed<Value> {
       value = newValue
     }
   }
-  
+
   var value: Value?
 }
 

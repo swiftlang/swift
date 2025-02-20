@@ -6,7 +6,7 @@ public struct MyType {
     public init(_ value: String) {
         self.value = value
     }
-    
+
     private static let defaultValue = MyType("not me")
 }
 

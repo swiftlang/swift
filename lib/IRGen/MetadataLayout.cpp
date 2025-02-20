@@ -392,7 +392,7 @@ ClassMetadataLayout::ClassMetadataLayout(IRGenModule &IGM, ClassDecl *decl)
       }
       super::addReifiedVTableEntry(fn);
     }
-    
+
     void noteNonoverriddenMethod(SILDeclRef fn) {
       if (fn.getDecl()->getDeclContext() == Target) {
         auto impl = VTable->getEntry(IGM.getSILModule(), fn);

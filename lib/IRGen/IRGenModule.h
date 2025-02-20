@@ -223,7 +223,7 @@ public:
 
 private:
   llvm::DenseMap<SourceFile *, IRGenModule *> GenModules;
-  
+
   // Stores the IGM from which a function is referenced the first time.
   // It is used if a function has no source-file association.
   llvm::DenseMap<SILFunction *, IRGenModule *> DefaultIGMForFunction;
@@ -351,9 +351,9 @@ private:
 
   /// The queue of IRGenModules for multi-threaded compilation.
   SmallVector<IRGenModule *, 8> Queue;
-  
+
   std::atomic<int> QueueIndex;
-  
+
   friend class CurrentIGMPtr;
 public:
   explicit IRGenerator(const IRGenOptions &opts, SILModule &module);
@@ -364,7 +364,7 @@ public:
   /// Add an IRGenModule for a source file.
   /// Should only be called from IRGenModule's constructor.
   void addGenModule(SourceFile *SF, IRGenModule *IGM);
-  
+
   /// Get an IRGenModule for a source file.
   IRGenModule *getGenModule(SourceFile *SF);
 
@@ -396,17 +396,17 @@ public:
     assert(PrimaryIGM);
     return PrimaryIGM;
   }
-  
+
   bool hasMultipleIGMs() const { return GenModules.size() >= 2; }
-  
+
   llvm::DenseMap<SourceFile *, IRGenModule *>::iterator begin() {
     return GenModules.begin();
   }
-  
+
   llvm::DenseMap<SourceFile *, IRGenModule *>::iterator end() {
     return GenModules.end();
   }
-  
+
   /// Emit functions, variables and tables which are needed anyway, e.g. because
   /// they are externally visible.
   void emitGlobalTopLevel(const std::vector<std::string> &LinkerDirectives);
@@ -508,7 +508,7 @@ public:
                                       RequireMetadata_t requireMetadata) {
     noteUseOfTypeGlobals(type, false, requireMetadata);
   }
-  
+
   void noteUseOfOpaqueTypeDescriptor(OpaqueTypeDecl *opaque);
   void noteUseOfExtensionDescriptor(ExtensionDecl *ext);
   void noteUseOfFieldDescriptor(NominalTypeDecl *type);
@@ -542,7 +542,7 @@ public:
            "no order number for SIL function definition?");
     return it->second;
   }
-  
+
   /// In multi-threaded compilation fetch the next IRGenModule from the queue.
   IRGenModule *fetchFromQueue() {
     int idx = QueueIndex++;
@@ -928,7 +928,7 @@ public:
 
     llvm_unreachable("Not a valid ReferenceCounting.");
   }
-  
+
   /// Return the spare bit mask to use for types that comprise heap object
   /// pointers.
   const SpareBitVector &getHeapObjectSpareBits() const;
@@ -969,7 +969,7 @@ public:
   void error(SourceLoc loc, const Twine &message);
 
   bool shouldPrespecializeGenericMetadata();
-  
+
   bool canMakeStaticObjectReadOnly(SILType objectType);
 
   ClassDecl *getStaticArrayStorageDecl();
@@ -998,16 +998,16 @@ public:
 
   void addAsyncCoroIDMapping(llvm::GlobalVariable *asyncFunctionPointer,
                              llvm::CallInst *coro_id_builtin);
-  
+
   llvm::CallInst *getAsyncCoroIDMapping(
                                     llvm::GlobalVariable *asyncFunctionPointer);
-  
+
   void markAsyncFunctionPointerForPadding(
                                     llvm::GlobalVariable *asyncFunctionPointer);
-  
+
   bool isAsyncFunctionPointerMarkedForPadding(
                                     llvm::GlobalVariable *asyncFunctionPointer);
-  
+
 private:
   Size PtrSize;
   Size AtomicBoolSize;
@@ -1100,7 +1100,7 @@ public:
   }
 
   clang::CodeGen::CodeGenModule &getClangCGM() const;
-  
+
   CanType getRuntimeReifiedType(CanType type);
   CanType substOpaqueTypesWithUnderlyingTypes(CanType type);
   SILType substOpaqueTypesWithUnderlyingTypes(SILType type, CanGenericSignature genericSig);
@@ -1153,7 +1153,7 @@ private:
 
   friend class GenericContextScope;
   friend class LoweringModeScope;
-  
+
 //--- Globals ---------------------------------------------------------------
 public:
   std::pair<llvm::GlobalVariable *, llvm::Constant *> createStringConstant(
@@ -1274,7 +1274,7 @@ private:
 
   llvm::Constant *getOrCreateGOTEquivalent(llvm::Constant *global,
                                            LinkEntity entity);
-                                           
+
   llvm::DenseMap<LinkEntity, llvm::Constant*> GlobalVars;
   llvm::DenseMap<LinkEntity, llvm::Constant*> IndirectAsyncFunctionPointers;
   llvm::DenseMap<LinkEntity, llvm::Constant*> GlobalGOTEquivalents;
@@ -1414,7 +1414,7 @@ public:
 
   std::pair<llvm::Constant *, unsigned>
   getTypeRef(Type type, GenericSignature genericSig, MangledTypeRefRole role);
-  
+
   std::pair<llvm::Constant *, unsigned>
   getTypeRef(CanType type, CanGenericSignature sig, MangledTypeRefRole role);
 
@@ -1885,7 +1885,7 @@ public:
   /// Retrieve the generic signature for the current generic context, or null if no
   /// generic environment is active.
   CanGenericSignature getCurGenericContext();
-  
+
   /// Retrieve the generic environment for the current generic context.
   ///
   /// Fails if there is no generic context.
@@ -2017,7 +2017,7 @@ public:
   ~CurrentIGMPtr() {
     IGM->IRGen.CurrentIGM = nullptr;
   }
-  
+
   IRGenModule *get() const { return IGM; }
   IRGenModule *operator->() const { return IGM; }
 };

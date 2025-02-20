@@ -393,7 +393,7 @@ actor SomeActor {
 
 actor Ahmad {
   var x: Int = 0
-  
+
   // CHECK-LABEL: sil hidden @$s4test5AhmadCACyYacfc : $@convention(method) @async (@owned Ahmad) -> @owned Ahmad {
   // CHECK:         bb0{{.*}}:
   // CHECK-NEXT:      [[GENERIC:%[0-9]+]] = enum $Optional<Builtin.Executor>, #Optional.none!enumelt

@@ -171,17 +171,17 @@ struct Image : View {}
 
 struct MyView {
   let image = Image()
-  
+
   @ViewBuilder var globalView: some View {
     if #_hasSymbol(global) { image }
     else { image }
   }
-  
+
   @ViewBuilder var ambiguousFuncView: some View {
     if #_hasSymbol(ambiguousFunc) { image } // expected-error {{ambiguous use of 'ambiguousFunc()'}}
     else { image }
   }
-    
+
   @ViewBuilder var localFuncView: some View {
     if #_hasSymbol(localFunc) { image } // expected-warning {{global function 'localFunc()' is not a weakly linked declaration}}
     else { image }

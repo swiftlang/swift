@@ -253,7 +253,7 @@ extension Dictionary {
     set(newValue) {
     }
   }
-  
+
   public mutating func inoutAccessOfSubscript(key: Value) {
     func increment(x: inout Value) { }
 

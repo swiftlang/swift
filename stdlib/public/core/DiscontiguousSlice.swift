@@ -15,7 +15,7 @@
 @available(SwiftStdlib 6.0, *)
 public struct DiscontiguousSlice<Base: Collection> {
   internal var _base: Base
-  
+
   /// The set of subranges that are available through this discontiguous slice.
   public let subranges: RangeSet<Base.Index>
 
@@ -66,7 +66,7 @@ extension DiscontiguousSlice {
   public struct Index {
     /// The index of the range that contains `base`.
     internal let _rangeOffset: Int
-    
+
     /// The position of this index in the base collection.
     public let base: Base.Index
 
@@ -131,17 +131,17 @@ extension DiscontiguousSlice: Sequence {
 extension DiscontiguousSlice: Collection {
   public typealias SubSequence = Self
   public typealias Indices = DefaultIndices<Self>
-  
+
   public var startIndex: Index {
     subranges.isEmpty
       ? endIndex
       : Index(_rangeOffset: 0, base: subranges.ranges[0].lowerBound)
   }
-  
+
   public var endIndex: Index {
     Index(_rangeOffset: subranges.ranges.endIndex, base: _base.endIndex)
   }
-  
+
   public var count: Int {
     var c = 0
     for range in subranges.ranges {
@@ -170,7 +170,7 @@ extension DiscontiguousSlice: Collection {
     }
     return head + middle + tail
   }
-  
+
   public func index(after i: Index) -> Index {
     // Note: index validation performed by the underlying collections only
     let currentRange = subranges.ranges[i._rangeOffset]
@@ -178,7 +178,7 @@ extension DiscontiguousSlice: Collection {
     if nextIndex < currentRange.upperBound {
       return Index(_rangeOffset: i._rangeOffset, base: nextIndex)
     }
-    
+
     let nextOffset = i._rangeOffset + 1
     guard nextOffset < subranges.ranges.endIndex else {
       return endIndex
@@ -192,7 +192,7 @@ extension DiscontiguousSlice: Collection {
     // Note: index validation performed by the base collection only
     _base[subranges.ranges[i._rangeOffset]][i.base]
   }
-  
+
   public subscript(bounds: Range<Index>) -> DiscontiguousSlice<Base> {
     let baseBounds = bounds.lowerBound.base ..< bounds.upperBound.base
     let baseSlice = base[baseBounds]

@@ -6,7 +6,7 @@
 
 public class MyClass {
   public init() { }
-    
+
   @PropertyWrapper()
   public static var staticProperty: Bool
 

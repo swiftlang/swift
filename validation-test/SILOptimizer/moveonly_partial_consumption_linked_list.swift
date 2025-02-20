@@ -33,17 +33,17 @@ func dumpList<Element>(_ l: borrowing List<Element>) {}
 
 struct Box<Wrapped: ~Copyable>: ~Copyable {
   private let _pointer: MyLittlePointer<Wrapped>
-  
+
   init(_ element: consuming Wrapped) {
     _pointer = .allocate(capacity: 1)
     _pointer.initialize(to: element)
   }
-      
+
   deinit {
     _pointer.deinitialize(count: 1)
     _pointer.deallocate()
   }
-  
+
   consuming func move() -> Wrapped {
     let wrapped = _pointer.move()
     _pointer.deallocate()

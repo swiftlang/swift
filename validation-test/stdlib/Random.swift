@@ -24,12 +24,12 @@ RandomTests.test("_fill(bytes:)") {
     expectEqual(bytes1, bytes2)
     expectEqual(bytes1, zeros)
     expectEqual(bytes2, zeros)
-    
+
     var g = SystemRandomNumberGenerator()
     bytes1.withUnsafeMutableBytes { g._fill(bytes: $0) }
     expectNotEqual(bytes1, bytes2)
     expectNotEqual(bytes1, zeros)
-    
+
     bytes2.withUnsafeMutableBytes { g._fill(bytes: $0) }
     expectNotEqual(bytes1, bytes2)
     expectNotEqual(bytes2, zeros)
@@ -53,7 +53,7 @@ RandomTests.test("basic random numbers") {
 // Random integers in ranges
 
 func integerRangeTest<T: FixedWidthInteger>(_ type: T.Type) {
-    
+
   func testRange(_ range: Range<T>, iterations: Int = 1_000) {
     var integerSet: Set<T> = []
     for _ in 0 ..< iterations {
@@ -63,7 +63,7 @@ func integerRangeTest<T: FixedWidthInteger>(_ type: T.Type) {
     }
     expectEqual(integerSet, Set(range))
   }
-    
+
   func testClosedRange(_ range: ClosedRange<T>, iterations: Int = 1_000) {
     var integerSet: Set<T> = []
     for _ in 0 ..< iterations {
@@ -73,26 +73,26 @@ func integerRangeTest<T: FixedWidthInteger>(_ type: T.Type) {
     }
     expectEqual(integerSet, Set(range))
   }
-  
+
   // min open range
   testRange(T.min ..< (T.min + 10))
-  
+
   // min closed range
   testClosedRange(T.min ... (T.min + 10))
-  
+
   // max open range
   testRange((T.max - 10) ..< T.max)
-  
+
   // max closed range
   testClosedRange((T.max - 10) ... T.max)
-  
+
   // Test full ranges for Int8 and UInt8
   if T.bitWidth == 8 {
     let fullIterations = 10_000
-    
+
     // full open range
     testRange(T.min ..< T.max, iterations: fullIterations)
-    
+
     // full closed range
     testClosedRange(T.min ... T.max, iterations: fullIterations)
   }
@@ -113,16 +113,16 @@ RandomTests.test("random integers in ranges") {
 
 func floatingPointRangeTest<T: BinaryFloatingPoint>(_ type: T.Type) 
   where T.RawSignificand: FixedWidthInteger {
-  
+
   let testRange = 0 ..< 1_000
-  
+
   // open range
   let openRange: Range<T> = 0.0 ..< 10.0
   for _ in testRange {
     let random = T.random(in: openRange)
     expectTrue(openRange.contains(random))
   }
-  
+
   // closed range
   let closedRange: ClosedRange<T> = 0.0 ... 10.0
   for _ in testRange {
@@ -152,7 +152,7 @@ RandomTests.test("random elements from collection") {
     elementSet.insert(randomGreeting!)
   }
   expectEqual(elementSet, Set(greetings))
-  
+
   // Empty collection
   let emptyArray: [String] = []
   for _ in 0 ..< 1_000 {
@@ -187,12 +187,12 @@ public struct LCRNG: RandomNumberGenerator {
   public init(seed: UInt64) {
     self.state = seed
   }
-  
+
   private mutating func next() -> UInt32 {
     state = (LCRNG.a &* state &+ LCRNG.c) % LCRNG.m
     return UInt32(truncatingIfNeeded: state >> 15)
   }
-  
+
   public mutating func next() -> UInt64 {
     return UInt64(next() as UInt32) << 32 | UInt64(next() as UInt32)
   }
@@ -205,30 +205,30 @@ RandomTests.test("different random number generators") {
   var boolPasses: [[Bool]] = [[], []]
   var collectionPasses: [[Int]] = [[], []]
   var shufflePasses: [[[Int]]] = [[], []]
-  
+
   for i in 0 ..< 2 {
     let seed: UInt64 = 1234567890
     var rng = LCRNG(seed: seed)
-    
+
     for _ in 0 ..< 1_000 {
       let randomInt = Int.random(in: 0 ... 100, using: &rng)
       intPasses[i].append(randomInt)
-      
+
       let randomDouble = Double.random(in: 0 ..< 1, using: &rng)
       doublePasses[i].append(randomDouble)
-      
+
       let randomBool = Bool.random(using: &rng)
       boolPasses[i].append(randomBool)
-      
+
       let randomIntFromCollection = Array(0 ... 100).randomElement(using: &rng)
       expectNotNil(randomIntFromCollection)
       collectionPasses[i].append(randomIntFromCollection!)
-      
+
       let randomShuffledCollection = Array(0 ... 100).shuffled(using: &rng)
       shufflePasses[i].append(randomShuffledCollection)
     }
   }
-  
+
   expectEqual(intPasses[0], intPasses[1])
   expectEqual(doublePasses[0], doublePasses[1])
   expectEqual(boolPasses[0], boolPasses[1])
@@ -248,25 +248,25 @@ public struct RotatingRNG: RandomNumberGenerator {
     { return lcrng.next() }
   ]
   public var rotationIndex = 0
-  
+
   public mutating func next() -> UInt64 {
     if rotationIndex == rotation.count {
       rotationIndex = 0
     }
-    
+
     defer {
       rotationIndex += 1
     }
-    
+
     return rotation[rotationIndex]()
   }
 }
 
 func floatingPointRangeMaxTest<T: BinaryFloatingPoint>(_ type: T.Type)
   where T.RawSignificand: FixedWidthInteger {
-  
+
   let testRange = 0 ..< 1_000
-  
+
   var rng = RotatingRNG()
   let ranges: [Range<T>] = [0 ..< 1, 1 ..< 2, 10 ..< 11, 0 ..< 10]
   for range in ranges {
@@ -318,7 +318,7 @@ RandomTests.test("uniform distribution") {
     let randomIndex = Int.random(in: 0 ..< upperBound)
     array[randomIndex] += 1.0
   }
-  
+
   expectTrue(chi2Test(array))
 }
 

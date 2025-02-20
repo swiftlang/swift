@@ -2,14 +2,14 @@
 
 struct Int64Distance<Element>: Collection {
   let _storage: [Element]
-  
+
   typealias Index = Int64
   typealias IndexDistance = Int64
-  
+
   var startIndex: Index { return Int64(_storage.startIndex) }
   var endIndex: Index { return Int64(_storage.startIndex) }
   func index(after i: Index) -> Index { return i + 1 }
-  
+
   subscript(i: Index) -> Element { return _storage[Int(i)] }
 }
 

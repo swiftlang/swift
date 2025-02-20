@@ -76,7 +76,7 @@ public struct Bool: Sendable {
 
   @_transparent
   public init(_ _v: Builtin.Int1) { self._value = _v }
-  
+
   /// Creates an instance equal to the given Boolean value.
   ///
   /// - Parameter value: The Boolean value to copy.
@@ -115,7 +115,7 @@ public struct Bool: Sendable {
   ) -> Bool {
     return (generator.next() >> 17) & 1 == 0
   }
-  
+
   /// Returns a random Boolean value.
   ///
   /// This method returns `true` and `false` with equal probability.

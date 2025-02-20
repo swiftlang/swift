@@ -68,7 +68,7 @@ func test_cast_to_nserror() {
   do {
     throw e
   } catch _ as NSError {
-    
+
   }
 }
 

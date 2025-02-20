@@ -25,7 +25,7 @@ public func testNonExhaustive(_ value: NonExhaustive, _ payload: NonExhaustivePa
   case .a: break
   case .b: break
   }
-  
+
   switch value {
   case .a: break
   case .b: break
@@ -93,7 +93,7 @@ public func testNonExhaustive(_ value: NonExhaustive, _ payload: NonExhaustivePa
   case .a: break
   case .b: break
   }
-  
+
   switch payload {
   case .a: break
   case .b: break
@@ -136,7 +136,7 @@ public func testNonExhaustiveWithinModule(_ value: NonExhaustive, _ payload: Non
   case .a: break
   case .b: break
   }
-  
+
   switch value {
   case .a: break
   case .b: break
@@ -200,7 +200,7 @@ public func testNonExhaustiveWithinModule(_ value: NonExhaustive, _ payload: Non
   case .a: break
   case .b: break
   }
-  
+
   switch payload {
   case .a: break
   case .b: break

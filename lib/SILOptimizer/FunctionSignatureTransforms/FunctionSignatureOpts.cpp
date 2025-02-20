@@ -792,7 +792,7 @@ bool FunctionSignatureTransform::removeDeadArgs(int minPartialAppliedArgs) {
 namespace {
 
 class FunctionSignatureOpts : public SILFunctionTransform {
-  
+
   /// If true, perform a special kind of dead argument elimination to enable
   /// removal of partial_apply instructions where all partially applied
   /// arguments are dead.

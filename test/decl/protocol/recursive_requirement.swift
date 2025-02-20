@@ -115,17 +115,17 @@ protocol AsExistentialAssocTypeAgainB {
 protocol A {
     associatedtype B1: B
     associatedtype C1: C
-    
+
     mutating func addObserver(_ observer: B1, forProperty: C1)
 }
 
 protocol C {
-    
+
 }
 
 protocol B {
     associatedtype BA: A
     associatedtype BC: C
-    
+
     func observeChangeOfProperty(_ property: BC, observable: BA)
 }

@@ -15,7 +15,7 @@ public class M {
     var value : Int
   // Verify that definite initialization doesn't create a bogus description of
   // self pointing to the liveness bitvector.
-  
+
   // CHECK-LABEL: sil @$s4main1MC4fromAcA12WithDelegate_p_tKcfc
   // CHECK:       bb0
   // CHECK-NOT:     alloc_stack $Builtin.Int2{{.*}}let

@@ -45,7 +45,7 @@ macro AddPeerStruct() = #externalMacro(module: "MacroDefinition", type: "AddPeer
 @AddPeerStruct
 struct MyStruct {
   #AddMacroAddedVar
-  
+
   @AddPeerVar
   @AddExtension
   @AddMemberVar
@@ -56,7 +56,7 @@ struct MyStruct {
 @AddMacro
 extension MyStruct {
   func fromFunc() { }
-  
+
   @AddGetter
   var fromVar = 123
 }

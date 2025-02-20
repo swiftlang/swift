@@ -291,7 +291,7 @@ extension Value {
       let builder = Builder(before: exitBlock.instructions.first!, context)
       builder.createDestroyValue(operand: self)
     }
-  
+
     if useToDefRange.contains(destBlock) {
       // The `destBlock` is within a loop, so we need to copy the value at each iteration.
       let builder = Builder(before: destBlock.instructions.first!, context)
@@ -888,7 +888,7 @@ extension CopyAddrInst {
       loadOwnership = .unqualified
       storeOwnership = .unqualified
     }
-    
+
     let builder = Builder(before: self, context)
     let value = builder.createLoad(fromAddress: source, ownership: loadOwnership)
     let store = builder.createStore(source: value, destination: destination, ownership: storeOwnership)

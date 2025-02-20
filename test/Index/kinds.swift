@@ -13,7 +13,7 @@ enum AnEnumeration {
 // Struct
 struct AStruct {
   // CHECK: [[@LINE-1]]:8 | struct/Swift | AStruct | s:14swift_ide_test7AStructV | Def | rel: 0
-  
+
   var base: UnsafeMutablePointer<Int>
 
   // Subscript

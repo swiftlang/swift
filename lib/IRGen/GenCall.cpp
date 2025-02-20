@@ -265,7 +265,7 @@ static void addDereferenceableAttributeToBuilder(IRGenModule &IGM,
   // dereferenceable.
   if (ti.isKnownEmpty(ResilienceExpansion::Maximal))
     return;
-  
+
   // If we know the type to have a fixed nonempty size, then the pointer is
   // dereferenceable to at least that size.
   // TODO: Would be nice to have a "getMinimumKnownSize" on TypeInfo for
@@ -486,7 +486,7 @@ void IRGenModule::addSwiftErrorAttributes(llvm::AttributeList &attrs,
   // swifterror attribute.
   if (ShouldUseSwiftError)
     b.addAttribute(llvm::Attribute::SwiftError);
-  
+
   // The error result should not be aliased, captured, or pointed at invalid
   // addresses regardless.
   b.addAttribute(llvm::Attribute::NoAlias);
@@ -1221,7 +1221,7 @@ namespace {
       }
       llvm_unreachable("bad type kind");
     }
-    
+
     Size getSizeOfType(clang::QualType type) {
       auto clangSize = Ctx.getTypeSizeInChars(type);
       return Size(clangSize.getQuantity());
@@ -1369,7 +1369,7 @@ namespace {
       assert(addr.getType() == IGM.Int8PtrTy);
       super::visit(type, addr);
     }
-    
+
     Size beginArrayElements(clang::CanQualType element) {
       return getSizeOfType(element);
     }
@@ -4886,19 +4886,19 @@ void irgen::emitAsyncFunctionEntry(IRGenFunction &IGF,
     .isAsyncFunctionPointerMarkedForPadding(asyncFuncPointerVar);
   auto asyncFuncPointer = IGF.Builder.CreateBitOrPointerCast(
                                            asyncFuncPointerVar, IGM.Int8PtrTy);
-  
+
   if (isPadded) {
     size = std::max(layout.getSize(),
                     NumWords_AsyncLet * IGM.getPointerSize());
   }
-  
+
   auto *id = IGF.Builder.CreateIntrinsicCall(
       llvm::Intrinsic::coro_id_async,
       {llvm::ConstantInt::get(IGM.Int32Ty, size.getValue()),
        llvm::ConstantInt::get(IGM.Int32Ty, 16),
        llvm::ConstantInt::get(IGM.Int32Ty, asyncContextIndex),
        asyncFuncPointer});
-  
+
   IGM.addAsyncCoroIDMapping(asyncFuncPointerVar, id);
 
   // Call 'llvm.coro.begin', just for consistency with the normal pattern.
@@ -5299,18 +5299,18 @@ bool IRGenFunction::emitBranchToReturnBB() {
   // If there are no edges to the return block, we never want to emit it.
   if (ReturnBB->use_empty()) {
     ReturnBB->eraseFromParent();
-    
+
     // Normally this means that we'll just insert the epilogue in the
     // current block, but if the current IP is unreachable then so is
     // the entire epilogue.
     if (!Builder.hasValidIP())
       return false;
-    
+
     // Otherwise, branch to it if the current IP is reachable.
   } else if (Builder.hasValidIP()) {
     Builder.CreateBr(ReturnBB);
     Builder.SetInsertPoint(ReturnBB);
-    
+
     // Otherwise, if there is exactly one use of the return block, merge
     // it into its predecessor.
   } else if (ReturnBB->hasOneUse()) {
@@ -5320,7 +5320,7 @@ bool IRGenFunction::emitBranchToReturnBB() {
     Builder.SetInsertPoint(Br->getParent());
     Br->eraseFromParent();
     ReturnBB->eraseFromParent();
-    
+
     // Otherwise, just move the IP to the return block.
   } else {
     Builder.SetInsertPoint(ReturnBB);
@@ -5400,7 +5400,7 @@ irgen::allocateForCoercion(IRGenFunction &IGF,
                            llvm::Type *toTy,
                            const llvm::Twine &basename) {
   auto &DL = IGF.IGM.DataLayout;
-  
+
   auto fromSize = DL.getTypeSizeInBits(fromTy);
   auto toSize = DL.getTypeSizeInBits(toTy);
   auto bufferTy = fromSize >= toSize
@@ -5412,7 +5412,7 @@ irgen::allocateForCoercion(IRGenFunction &IGF,
 
   auto buffer = IGF.createAlloca(bufferTy, Alignment(alignment.value()),
                                  basename + ".coerced");
-  
+
   Size size(std::max(fromSize, toSize));
   return {buffer, size};
 }

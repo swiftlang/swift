@@ -26,7 +26,7 @@ struct Y1: P1 {
 
 public struct X1<ID> {
   let p: any P1<ID>
-  
+
   // CHECK-LABEL: sil {{.*}} @$s4test2X1V6testit1i1xAA2S1VyxGx_xtF :
   // CHECK:         unchecked_trivial_bit_cast
   // CHECK:       } // end sil function '$s4test2X1V6testit1i1xAA2S1VyxGx_xtF'
@@ -55,7 +55,7 @@ struct Y2: P2 {
 
 public struct X2<ID> {
   let p: any P2<ID>
-  
+
   // CHECK-LABEL: sil {{.*}} @$s4test2X2V6testit1i1xAA2S2VyxGx_xtF :
   // CHECK:         unchecked_bitwise_cast
   // CHECK:       } // end sil function '$s4test2X2V6testit1i1xAA2S2VyxGx_xtF'
@@ -87,7 +87,7 @@ struct Y3: P3 {
 
 public struct X3<ID> {
   let p: any P3<ID>
-  
+
   // CHECK-LABEL: sil {{.*}} @$s4test2X3V6testit1i1xAA2S3VyxGx_xtF :
   // CHECK:         unchecked_bitwise_cast
   // CHECK:       } // end sil function '$s4test2X3V6testit1i1xAA2S3VyxGx_xtF'
@@ -115,7 +115,7 @@ struct Y4: P4 {
 
 public struct X4<ID> {
   let p: any P4<ID>
-  
+
   // CHECK-LABEL: sil {{.*}} @$s4test2X4V6testit1i1xAA2C4CyxGx_xtF :
   // CHECK:         unchecked_ref_cast
   // CHECK:       } // end sil function '$s4test2X4V6testit1i1xAA2C4CyxGx_xtF'
@@ -145,7 +145,7 @@ struct Y5: P5 {
 
 public struct X5<ID> {
   let p: any P5<ID>
-  
+
   // CHECK-LABEL: sil {{.*}} @$s4test2X5V6testit1i1xAA2S5VyxGx_xtF :
   // CHECK:         unchecked_bitwise_cast
   // CHECK:       } // end sil function '$s4test2X5V6testit1i1xAA2S5VyxGx_xtF'

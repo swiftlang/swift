@@ -80,13 +80,13 @@ public enum POSIXErrorCode: Int32, Sendable {
   case EMLINK          = 31
   /// Broken pipe.
   case EPIPE           = 32
-    
+
   /// math software.
   /// Numerical argument out of domain.
   case EDOM            = 33
   /// Result too large.
   case ERANGE          = 34
-    
+
   /// non-blocking and interrupt i/o.
   /// Resource temporarily unavailable.
   case EAGAIN          = 35
@@ -96,7 +96,7 @@ public enum POSIXErrorCode: Int32, Sendable {
   case EINPROGRESS     = 36
   /// Operation already in progress.
   case EALREADY        = 37
-    
+
   /// ipc/network software -- argument errors.
   /// Socket operation on non-socket.
   case ENOTSOCK        = 38
@@ -122,7 +122,7 @@ public enum POSIXErrorCode: Int32, Sendable {
   case EADDRINUSE      = 48
   /// Can't assign requested address.
   case EADDRNOTAVAIL   = 49
-    
+
   /// ipc/network software -- operational errors
   /// Network is down.
   case ENETDOWN        = 50
@@ -148,19 +148,19 @@ public enum POSIXErrorCode: Int32, Sendable {
   case ETIMEDOUT       = 60
   /// Connection refused.
   case ECONNREFUSED    = 61
-    
+
   /// Too many levels of symbolic links.
   case ELOOP           = 62
   /// File name too long.
   case ENAMETOOLONG    = 63
-    
+
   /// Host is down.
   case EHOSTDOWN       = 64
   /// No route to host.
   case EHOSTUNREACH    = 65
   /// Directory not empty.
   case ENOTEMPTY       = 66
-    
+
   /// quotas & mush.
   /// Too many processes.
   case EPROCLIM        = 67
@@ -168,7 +168,7 @@ public enum POSIXErrorCode: Int32, Sendable {
   case EUSERS          = 68
   /// Disc quota exceeded.
   case EDQUOT          = 69
-    
+
   /// Network File System.
   /// Stale NFS file handle.
   case ESTALE          = 70
@@ -184,25 +184,25 @@ public enum POSIXErrorCode: Int32, Sendable {
   case EPROGMISMATCH   = 75
   /// Bad procedure for program.
   case EPROCUNAVAIL    = 76
-    
+
   /// No locks available.
   case ENOLCK          = 77
   /// Function not implemented.
   case ENOSYS          = 78
-    
+
   /// Inappropriate file type or format.
   case EFTYPE          = 79
   /// Authentication error.
   case EAUTH           = 80
   /// Need authenticator.
   case ENEEDAUTH       = 81
-    
+
   /// Intelligent device errors.
   /// Device power is off.
   case EPWROFF         = 82
   /// Device error, e.g. paper out.
   case EDEVERR         = 83
-    
+
   /// Value too large to be stored in data type.
   case EOVERFLOW       = 84
 
@@ -216,10 +216,10 @@ public enum POSIXErrorCode: Int32, Sendable {
   case ESHLIBVERS      = 87
   /// Malformed Macho file.
   case EBADMACHO       = 88
-    
+
   /// Operation canceled.
   case ECANCELED       = 89
-    
+
   /// Identifier removed.
   case EIDRM           = 90
   /// No message of desired type.
@@ -228,7 +228,7 @@ public enum POSIXErrorCode: Int32, Sendable {
   case EILSEQ          = 92
   /// Attribute not found.
   case ENOATTR         = 93
-    
+
   /// Bad message.
   case EBADMSG         = 94
   /// Reserved.
@@ -245,20 +245,20 @@ public enum POSIXErrorCode: Int32, Sendable {
   case EPROTO          = 100
   /// STREAM ioctl timeout.
   case ETIME           = 101
-    
+
   /// No such policy registered.
   case ENOPOLICY       = 103
-    
+
   /// State not recoverable.
   case ENOTRECOVERABLE = 104
   /// Previous owner died.
   case EOWNERDEAD      = 105
-  
+
   /// Interface output queue is full.
   case EQFULL          = 106
   /// Must be equal largest errno.
   public static var ELAST: POSIXErrorCode { return EQFULL }
-    
+
   // FIXME: EOPNOTSUPP has different values depending on __DARWIN_UNIX03 and
   // KERNEL.
 }
@@ -336,55 +336,55 @@ public enum POSIXErrorCode: Int32, Sendable {
   case EDOM            = 33
   /// Result too large.
   case ERANGE          = 34
-    
+
   /// Resource deadlock would occur.
   case EDEADLK          = 35
-    
+
   /// File name too long.
   case ENAMETOOLONG     = 36
-    
+
   /// No record locks available
   case ENOLCK           = 37
-    
+
   /// Function not implemented.
   case ENOSYS           = 38
-    
+
   /// Directory not empty.
   case ENOTEMPTY        = 39
-    
+
   /// Too many symbolic links encountered
   case ELOOP            = 40
-    
+
   /// Operation would block.
   public static var EWOULDBLOCK: POSIXErrorCode { return .EAGAIN }
 
   /// No message of desired type.
   case ENOMSG          = 42
-    
+
   /// Identifier removed.
   case EIDRM           = 43
-    
+
   /// Channel number out of range.
   case ECHRNG          = 44
-    
+
   /// Level 2 not synchronized.
   case EL2NSYNC        = 45
-    
+
   /// Level 3 halted
   case EL3HLT          = 46
-    
+
   /// Level 3 reset.
   case EL3RST          = 47
-    
+
   /// Link number out of range.
   case ELNRNG          = 48
-    
+
   /// Protocol driver not attached.
   case EUNATCH         = 49
-    
+
   /// No CSI structure available.
   case ENOCSI          = 50
-    
+
   /// Level 2 halted.
   case EL2HLT          = 51
   /// Invalid exchange
@@ -545,7 +545,7 @@ public enum POSIXErrorCode: Int32, Sendable {
   case EKEYREVOKED     = 128
   /// Key was rejected by service
   case EKEYREJECTED    = 129
-  
+
   /// Owner died
   case EOWNERDEAD      = 130
   /// State not recoverable
@@ -685,7 +685,7 @@ public enum POSIXErrorCode: Int32, Sendable {
 
   /// Operation not supported on transport endpoint
   public static var EOPNOTSUPP: POSIXErrorCode { return .ENOTSUP }
-  
+
   /// Inappropriate I/O control operation.
   case ENOTTY          = 59
   /// No such device or address.
@@ -728,124 +728,124 @@ public enum POSIXErrorCode: Int32, Sendable {
 
 /// Enumeration describing POSIX error codes.
 public enum POSIXErrorCode: Int32, Sendable {
-    
+
     /// Operation not permitted
     case EPERM          = 1
-    
+
     /// No such file or directory
     case ENOENT         = 2
-    
+
     /// No such process
     case ESRCH          = 3
-    
+
     /// Interrupted function
     case EINTR          = 4
-    
+
     /// I/O error
     case EIO            = 5
-    
+
     /// No such device or address
     case ENXIO          = 6
-    
+
     /// Argument list too long
     case E2BIG          = 7
-    
+
     /// Exec format error
     case ENOEXEC        = 8
-    
+
     /// Bad file number
     case EBADF          = 9
-    
+
     /// No spawned processes
     case ECHILD         = 10
-    
+
     /// No more processes or not enough memory or maximum nesting level reached
     case EAGAIN         = 11
-    
+
     /// Not enough memory
     case ENOMEM         = 12
-    
+
     /// Permission denied
     case EACCES         = 13
-    
+
     /// Bad address
     case EFAULT         = 14
-    
+
     /// Device or resource busy
     case EBUSY          = 16
-    
+
     /// File exists
     case EEXIST         = 17
-    
+
     /// Cross-device link
     case EXDEV          = 18
-    
+
     /// No such device
     case ENODEV         = 19
-    
+
     /// Not a directory
     case ENOTDIR        = 20
-    
+
     /// Is a directory
     case EISDIR         = 21
-    
+
     /// Invalid argument
     case EINVAL         = 22
-    
+
     /// Too many files open in system
     case ENFILE         = 23
-    
+
     /// Too many open files
     case EMFILE         = 24
-    
+
     /// Inappropriate I/O control operation
     case ENOTTY         = 25
-    
+
     /// File too large
     case EFBIG          = 27
-    
+
     /// No space left on device
     case ENOSPC         = 28
-    
+
     /// Invalid seek
     case ESPIPE         = 29
-    
+
     /// Read-only file system
     case EROFS          = 30
-    
+
     /// Too many links
     case EMLINK         = 31
-    
+
     /// Broken pipe
     case EPIPE          = 32
-    
+
     /// Math argument
     case EDOM           = 33
-    
+
     /// Result too large
     case ERANGE         = 34
-    
+
     /// Resource deadlock would occur
     case EDEADLK        = 36
-    
+
     /// Same as EDEADLK for compatibility with older Microsoft C versions
     public static var EDEADLOCK: POSIXErrorCode { return .EDEADLK }
-    
+
     /// Filename too long
     case ENAMETOOLONG   = 38
-    
+
     /// No locks available
     case ENOLCK         = 39
-    
+
     /// Function not supported
     case ENOSYS         = 40
-    
+
     /// Directory not empty
     case ENOTEMPTY      = 41
-    
+
     /// Illegal byte sequence
     case EILSEQ         = 42
-    
+
     /// String was truncated
     case STRUNCATE      = 80
 }

@@ -85,7 +85,7 @@ static bool EncodeToUTF8(unsigned CharValue,
   } else {
     return true;  // UTF8 can encode these, but they aren't valid code points.
   }
-  
+
   // Emit all of the trailing bytes.
   while (NumTrailingBytes--)
     Result.push_back(char(0x80 | (0x3F & (CharValue >> (NumTrailingBytes*6)))));
@@ -107,11 +107,11 @@ uint32_t swift::validateUTF8CharacterAndAdvance(const char *&Ptr,
                                                 const char *End) {
   if (Ptr >= End)
     return ~0U;
-  
+
   unsigned char CurByte = *Ptr++;
   if (CurByte < 0x80)
     return CurByte;
-  
+
   // If this is not the start of a UTF8 character,
   // then it is either a continuation byte or an invalid UTF8 code point.
   if (!isStartOfUTF8Character(CurByte)) {
@@ -121,15 +121,15 @@ uint32_t swift::validateUTF8CharacterAndAdvance(const char *&Ptr,
       ++Ptr;
     return ~0U;
   }
-  
+
   // Read the number of high bits set, which indicates the number of bytes in
   // the character.
   unsigned char EncodedBytes = llvm::countl_one(CurByte);
   assert((EncodedBytes >= 2 && EncodedBytes <= 4));
-  
+
   // Drop the high bits indicating the # bytes of the result.
   unsigned CharValue = (unsigned char)(CurByte << EncodedBytes) >> EncodedBytes;
-  
+
   // Read and validate the continuation bytes.
   for (unsigned char i = 1; i != EncodedBytes; ++i) {
     if (Ptr >= End)
@@ -138,22 +138,22 @@ uint32_t swift::validateUTF8CharacterAndAdvance(const char *&Ptr,
     // If the high bit isn't set or the second bit isn't clear, then this is not
     // a continuation byte!
     if (CurByte < 0x80 || CurByte >= 0xC0) return ~0U;
-    
+
     // Accumulate our result.
     CharValue <<= 6;
     CharValue |= CurByte & 0x3F;
     ++Ptr;
   }
-  
+
   // UTF-16 surrogate pair values are not valid code points.
   if (CharValue >= 0xD800 && CharValue <= 0xDFFF)
     return ~0U;
-  
+
   // If we got here, we read the appropriate number of accumulated bytes.
   // Verify that the encoding was actually minimal.
   // Number of bits in the value, ignoring leading zeros.
   unsigned NumBits = 32-llvm::countl_zero(CharValue);
-  
+
   if (NumBits <= 5+6)
     return EncodedBytes == 2 ? CharValue : ~0U;
   if (NumBits <= 4+6+6)
@@ -260,7 +260,7 @@ Lexer::Lexer(const Lexer &Parent, State BeginState, State EndState,
 InFlightDiagnostic Lexer::diagnose(const char *Loc, Diagnostic Diag) {
   if (auto *Diags = getTokenDiags())
     return Diags->diagnose(getSourceLoc(Loc), Diag);
-  
+
   return InFlightDiagnostic();
 }
 
@@ -514,41 +514,41 @@ void Lexer::skipSlashStarComment() {
 static bool isValidIdentifierContinuationCodePoint(uint32_t c) {
   if (c < 0x80)
     return clang::isAsciiIdentifierContinue(c, /*dollar*/true);
-  
+
   // N1518: Recommendations for extended identifier characters for C and C++
   // Proposed Annex X.1: Ranges of characters allowed
   return c == 0x00A8 || c == 0x00AA || c == 0x00AD || c == 0x00AF
     || (c >= 0x00B2 && c <= 0x00B5) || (c >= 0x00B7 && c <= 0x00BA)
     || (c >= 0x00BC && c <= 0x00BE) || (c >= 0x00C0 && c <= 0x00D6)
     || (c >= 0x00D8 && c <= 0x00F6) || (c >= 0x00F8 && c <= 0x00FF)
-  
+
     || (c >= 0x0100 && c <= 0x167F)
     || (c >= 0x1681 && c <= 0x180D)
     || (c >= 0x180F && c <= 0x1FFF)
-  
+
     || (c >= 0x200B && c <= 0x200D)
     || (c >= 0x202A && c <= 0x202E)
     || (c >= 0x203F && c <= 0x2040)
     || c == 0x2054
     || (c >= 0x2060 && c <= 0x206F)
-  
+
     || (c >= 0x2070 && c <= 0x218F)
     || (c >= 0x2460 && c <= 0x24FF)
     || (c >= 0x2776 && c <= 0x2793)
     || (c >= 0x2C00 && c <= 0x2DFF)
     || (c >= 0x2E80 && c <= 0x2FFF)
-  
+
     || (c >= 0x3004 && c <= 0x3007)
     || (c >= 0x3021 && c <= 0x302F)
     || (c >= 0x3031 && c <= 0x303F)
-  
+
     || (c >= 0x3040 && c <= 0xD7FF)
-  
+
     || (c >= 0xF900 && c <= 0xFD3D)
     || (c >= 0xFD40 && c <= 0xFDCF)
     || (c >= 0xFDF0 && c <= 0xFE44)
     || (c >= 0xFE47 && c <= 0xFFF8)
-  
+
     || (c >= 0x10000 && c <= 0x1FFFD)
     || (c >= 0x20000 && c <= 0x2FFFD)
     || (c >= 0x30000 && c <= 0x3FFFD)
@@ -577,7 +577,7 @@ static bool isValidIdentifierStartCodePoint(uint32_t c) {
       (c >= 0x20D0 && c <= 0x20FF) ||
       (c >= 0xFE20 && c <= 0xFE2F))
     return false;
-  
+
   return true;
 }
 
@@ -790,7 +790,7 @@ void Lexer::lexOperatorIdentifier() {
   bool didStart = advanceIfValidStartOfOperator(CurPtr, BufferEnd);
   assert(didStart && "unexpected operator start");
   (void) didStart;
-  
+
   do {
     if (CurPtr != BufferEnd && InSILBody &&
         (*CurPtr == '!' || *CurPtr == '?'))
@@ -855,9 +855,9 @@ void Lexer::lexOperatorIdentifier() {
         return formToken(tok::period, TokStart);
       if (rightBound)
         return formToken(tok::period_prefix, TokStart);
-      
+
       // If left bound but not right bound, handle some likely situations.
-      
+
       // If there is just some horizontal whitespace before the next token, its
       // addition is probably incorrect.
       const char *AfterHorzWhitespace = CurPtr;
@@ -992,14 +992,14 @@ void Lexer::lexHexNumber() {
   if (*CurPtr == '.') {
     PtrOnDot = CurPtr;
     ++CurPtr;
-    
+
     // If the character after the '.' is not a digit, assume we have an int
     // literal followed by a dot expression.
     if (!isHexDigit(*CurPtr)) {
       --CurPtr;
       return formToken(tok::integer_literal, TokStart);
     }
-    
+
     while (isHexDigit(*CurPtr) || *CurPtr == '_')
       ++CurPtr;
 
@@ -1013,11 +1013,11 @@ void Lexer::lexHexNumber() {
       return formToken(tok::unknown, TokStart);
     }
   }
-  
+
   // [pP][+-]?[0-9][0-9_]*
   assert(*CurPtr == 'p' || *CurPtr == 'P' && "not at a hex float exponent?!");
   ++CurPtr;
-  
+
   bool signedExponent = false;
   if (*CurPtr == '+' || *CurPtr == '-') {
     ++CurPtr;  // Eat the sign.
@@ -1044,7 +1044,7 @@ void Lexer::lexHexNumber() {
 
     return expected_digit();
   }
-  
+
   while (isDigit(*CurPtr) || *CurPtr == '_')
     ++CurPtr;
 
@@ -1085,7 +1085,7 @@ void Lexer::lexNumber() {
 
   if (*TokStart == '0' && *CurPtr == 'x')
     return lexHexNumber();
-  
+
   if (*TokStart == '0' && *CurPtr == 'o') {
     // 0o[0-7][0-7_]*
     ++CurPtr;
@@ -1101,7 +1101,7 @@ void Lexer::lexNumber() {
 
     return formToken(tok::integer_literal, TokStart);
   }
-  
+
   if (*TokStart == '0' && *CurPtr == 'b') {
     // 0b[01][01_]*
     ++CurPtr;
@@ -1144,12 +1144,12 @@ void Lexer::lexNumber() {
   // Lex decimal point.
   if (*CurPtr == '.') {
     ++CurPtr;
-   
+
     // Lex any digits after the decimal point.
     while (isDigit(*CurPtr) || *CurPtr == '_')
       ++CurPtr;
   }
-  
+
   // Lex exponent.
   if (*CurPtr == 'e' || *CurPtr == 'E') {
     ++CurPtr;  // Eat the 'e'
@@ -1180,7 +1180,7 @@ void Lexer::lexNumber() {
       return expected_digit();
     }
   }
-  
+
   return formToken(tok::floating_literal, TokStart);
 }
 
@@ -1392,7 +1392,7 @@ unsigned Lexer::lexCharacter(const char *&CurPtr, char StopQuote,
       return '\\';
     break;
   }
-  
+
   unsigned CharValue = 0;
   // Escape processing.  We already ate the "\".
   switch (*CurPtr) {
@@ -1407,7 +1407,7 @@ unsigned Lexer::lexCharacter(const char *&CurPtr, char StopQuote,
     // is an invalid escape.
     if (isAlphanumeric(*CurPtr)) ++CurPtr;
     return ~1U;
-      
+
   // Simple single-character escapes.
   case '0': ++CurPtr; return '\0';
   case 'n': ++CurPtr; return '\n';
@@ -1438,7 +1438,7 @@ unsigned Lexer::lexCharacter(const char *&CurPtr, char StopQuote,
       diagnose(CharStart, diag::lex_invalid_unicode_scalar);
     return ~1U;
   }
-  
+
   return CharValue;
 }
 
@@ -1621,7 +1621,7 @@ static size_t commonPrefixLength(StringRef shorter, StringRef longer) {
   while (offset < shorter.size() && offset < longer.size() && shorter[offset] == longer[offset]) {
     ++offset;
   }
-  
+
   return offset;
 }
 
@@ -1666,7 +1666,7 @@ getMultilineTrailingIndent(StringRef Bytes, DiagnosticEngine *Diags = nullptr,
       sawNonWhitespace = true;
     }
   }
-  
+
   if (sawNonWhitespace && Diags) {
     auto loc = Lexer::getSourceLoc(start + 1);
     Diags->diagnose(loc, diag::lex_illegal_multiline_string_end)
@@ -1709,24 +1709,24 @@ static void diagnoseInvalidMultilineIndents(
       return 2;
     }
   };
-  
+
   Diags->diagnose(getLoc(LineStarts[0] + MistakeOffset),
                   diag::lex_multiline_string_indent_inconsistent,
                   LineStarts.size() != 1, LineStarts.size(),
                   classify(Bytes[LineStarts[0] + MistakeOffset]));
-  
+
   Diags->diagnose(IndentLoc.getAdvancedLoc(MistakeOffset), 
                   diag::lex_multiline_string_indent_should_match_here, 
                   classify(ExpectedIndent[MistakeOffset]));
-  
+
   auto fix = Diags->diagnose(getLoc(LineStarts[0] + MistakeOffset),
                              diag::lex_multiline_string_indent_change_line,
                              LineStarts.size() != 1);
-  
+
   assert(MistakeOffset <= ActualIndent.size());
   assert(ExpectedIndent.substr(0, MistakeOffset) == 
          ActualIndent.substr(0, MistakeOffset));
-  
+
   for (auto line : LineStarts) {
     fix.fixItReplaceChars(getLoc(line + MistakeOffset), 
                           getLoc(line + ActualIndent.size()),
@@ -1753,30 +1753,30 @@ static void validateMultilineIndents(const Token &Str,
   SmallVector<size_t, 4> linesWithLastMistakeOffset = {};
   // Prefix of indentation that's present on all lines in linesWithLastMatchLength.
   StringRef commonIndentation = "";
-  
+
   for (size_t pos = Bytes.find('\n'); pos != StringRef::npos; pos = Bytes.find('\n', pos + 1)) {
     size_t nextpos = pos + 1;
     auto restOfBytes = Bytes.substr(nextpos);
-    
+
     // Ignore blank lines.
     if (restOfBytes[0] == '\n' || restOfBytes[0] == '\r') {
       continue;
     }
-    
+
     // Where is the first difference?
     auto errorOffset = commonPrefixLength(Indent, restOfBytes);
-    
+
     // Are we starting a new run?
     if (errorOffset != lastMistakeOffset) {
       // Diagnose problems in the just-finished run of lines.
       diagnoseInvalidMultilineIndents(Diags, Indent, IndentStartLoc, Bytes, 
                                       linesWithLastMistakeOffset, lastMistakeOffset, 
                                       commonIndentation);
-      
+
       // Set up for a new run.
       lastMistakeOffset = errorOffset;
       linesWithLastMistakeOffset = {};
-      
+
       // To begin with, all whitespace is part of the common indentation.
       auto prefixLength = restOfBytes.find_first_not_of(" \t");
       commonIndentation = restOfBytes.substr(0, prefixLength);
@@ -1786,11 +1786,11 @@ static void validateMultilineIndents(const Token &Str,
       auto prefixLength = commonPrefixLength(commonIndentation, restOfBytes);
       commonIndentation = commonIndentation.substr(0, prefixLength);
     }
-    
+
     // Either way, add this line to the run.
     linesWithLastMistakeOffset.push_back(nextpos);
   }
-  
+
   // Handle the last run.
   diagnoseInvalidMultilineIndents(Diags, Indent, IndentStartLoc, Bytes, 
                                   linesWithLastMistakeOffset, lastMistakeOffset, 
@@ -1954,12 +1954,12 @@ const char *Lexer::findEndOfCurlyQuoteStringLiteral(const char *Body,
     unsigned CharValue = lexCharacter(Body, '\0', /*EmitDiagnostics=*/false);
     // If the character was incorrectly encoded, give up.
     if (CharValue == ~1U) return nullptr;
-    
+
     // If we found a straight-quote, then we're done.  Just return the spot
     // to continue.
     if (CharValue == '"')
       return Body;
-    
+
     // If we found an ending curly quote (common since this thing started with
     // an opening curly quote) diagnose it with a fixit and then return.
     if (CharValue == 0x0000201D) {
@@ -1970,7 +1970,7 @@ const char *Lexer::findEndOfCurlyQuoteStringLiteral(const char *Body,
       }
       return Body;
     }
-    
+
     // Otherwise, keep scanning.
   }
 }
@@ -2221,7 +2221,7 @@ bool Lexer::tryLexRegexLiteral(const char *TokStart) {
 /// If it doesn't match this production, the leading ` is a punctuator.
 void Lexer::lexEscapedIdentifier() {
   assert(CurPtr[-1] == '`' && "Unexpected start of escaped identifier");
-  
+
   const char *Quote = CurPtr-1;
 
   // Check whether we have an identifier followed by another backtick, in which
@@ -2257,7 +2257,7 @@ static const char *findConflictEnd(const char *CurPtr, const char *BufferEnd,
   StringRef terminator = CMK == ConflictMarkerKind::Perforce ? "<<<<\n"
                                                              : ">>>>>>> ";
   size_t termLen = terminator.size();
-  
+
   // Get a reference to the rest of the buffer minus the length of the start
   // of the conflict marker.
   auto restOfBuffer = StringRef(CurPtr, BufferEnd - CurPtr).substr(termLen);
@@ -2281,26 +2281,26 @@ bool Lexer::tryLexConflictMarker(bool EatNewline) {
   // Only a conflict marker if it starts at the beginning of a line.
   if (Ptr != ContentStart && Ptr[-1] != '\n' && Ptr[-1] != '\r')
     return false;
-  
+
   // Check to see if we have <<<<<<< or >>>>.
   StringRef restOfBuffer(Ptr, BufferEnd - Ptr);
   if (!restOfBuffer.starts_with("<<<<<<< ") && !restOfBuffer.starts_with(">>>> "))
     return false;
-  
+
   ConflictMarkerKind Kind = *Ptr == '<' ? ConflictMarkerKind::Normal
                                         : ConflictMarkerKind::Perforce;
   if (const char *End = findConflictEnd(Ptr, BufferEnd, Kind)) {
     // Diagnose at the conflict marker, then jump ahead to the end.
     diagnose(CurPtr, diag::lex_conflict_marker_in_file);
     CurPtr = End;
-    
+
     // Skip ahead to the end of the marker.
     if (CurPtr != BufferEnd)
       skipToEndOfLine(EatNewline);
-    
+
     return true;
   }
-  
+
   // No end of conflict marker found.
   return false;
 }
@@ -2472,14 +2472,14 @@ StringRef Lexer::getEncodedStringSegmentImpl(StringRef Bytes,
       TempString.push_back(CurChar);
       continue;
     }
-    
+
     // Invalid escapes are accepted by the lexer but diagnosed as an error.  We
     // just ignore them here.
     unsigned CharValue = 0; // Unicode character value for \x, \u, \U.
     switch (*BytesPtr++) {
     default:
       continue;   // Invalid escape, ignore it.
-          
+
       // Simple single-character escapes.
     case '0': TempString.push_back('\0'); continue;
     case 'n': TempString.push_back('\n'); continue;
@@ -2499,7 +2499,7 @@ StringRef Lexer::getEncodedStringSegmentImpl(StringRef Bytes,
     // String interpolation.
     case '(':
       llvm_unreachable("string contained interpolated segments");
-        
+
       // Unicode escapes of various lengths.
     case 'u':  //  \u HEX HEX HEX HEX
       if (BytesPtr[0] != '{')
@@ -2510,13 +2510,13 @@ StringRef Lexer::getEncodedStringSegmentImpl(StringRef Bytes,
       if (CharValue == ~1U) continue;
       break;
     }
-    
+
     if (CharValue < 0x80) 
       TempString.push_back(CharValue);
     else
       EncodeToUTF8(CharValue, TempString);
   }
-  
+
   // If we didn't escape or reprocess anything, then we don't need to use the
   // temporary string, just point to the original one. We know that this
   // is safe because unescaped strings are always shorter than their escaped
@@ -2628,7 +2628,7 @@ void Lexer::lexImpl() {
     char const *Tmp = CurPtr-1;
     if (advanceIfValidStartOfIdentifier(Tmp, BufferEnd))
       return lexIdentifier();
-    
+
     if (advanceIfValidStartOfOperator(Tmp, BufferEnd))
       return lexOperatorIdentifier();
 
@@ -2727,7 +2727,7 @@ void Lexer::lexImpl() {
       do {
         ++CurPtr;
       } while (clang::isAsciiIdentifierContinue(CurPtr[0]));
-      
+
       return formToken(tok::sil_local_name, TokStart);
     }
     return lexOperatorIdentifier();
@@ -2738,7 +2738,7 @@ void Lexer::lexImpl() {
     if (isLeftBound(TokStart, ContentStart))
       return formToken(tok::exclaim_postfix, TokStart);
     return lexOperatorIdentifier();
-  
+
   case '?':
     if (isLeftBound(TokStart, ContentStart))
       return formToken(tok::question_postfix, TokStart);
@@ -2751,7 +2751,7 @@ void Lexer::lexImpl() {
     return lexOperatorIdentifier();
   case '>':
     return lexOperatorIdentifier();
- 
+
   case '=': case '-': case '+': case '*':
   case '&': case '|':  case '^': case '~': case '.':
     return lexOperatorIdentifier();
@@ -2777,7 +2777,7 @@ void Lexer::lexImpl() {
   case '\'':
   case '"':
     return lexStringLiteral();
-      
+
   case '`':
     return lexEscapedIdentifier();
   }
@@ -2793,7 +2793,7 @@ Token Lexer::getTokenAtLocation(const SourceManager &SM, SourceLoc Loc,
   int BufferID = SM.findBufferContainingLoc(Loc);
   if (BufferID < 0)
     return Token();
-  
+
   // Use fake language options; language options only affect validity
   // and the exact token produced.
   LangOptions FakeLangOpts;

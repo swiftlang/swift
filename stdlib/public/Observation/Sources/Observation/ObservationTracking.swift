@@ -20,14 +20,14 @@ public struct ObservationTracking: Sendable {
 
   struct Entry: @unchecked Sendable {
     let context: ObservationRegistrar.Context
-    
+
     var properties: Set<AnyKeyPath>
-    
+
     init(_ context: ObservationRegistrar.Context, properties: Set<AnyKeyPath> = []) {
       self.context = context
       self.properties = properties
     }
-    
+
     func addWillSetObserver(_ changed: @Sendable @escaping (AnyKeyPath) -> Void) -> Int {
       return context.registerTracking(for: properties, willSet: changed)
     }
@@ -35,33 +35,33 @@ public struct ObservationTracking: Sendable {
     func addDidSetObserver(_ changed: @Sendable @escaping (AnyKeyPath) -> Void) -> Int {
       return context.registerTracking(for: properties, didSet: changed)
     }
-    
+
     func removeObserver(_ token: Int) {
       context.cancel(token)
     }
-    
+
     mutating func insert(_ keyPath: AnyKeyPath) {
       properties.insert(keyPath)
     }
-    
+
     func union(_ entry: Entry) -> Entry {
       Entry(context, properties: properties.union(entry.properties))
     }
   }
-  
+
   @_spi(SwiftUI)
   public struct _AccessList: Sendable {
     internal var entries = [ObjectIdentifier : Entry]()
 
     internal init() { }
-    
+
     internal mutating func addAccess<Subject: Observable>(
       keyPath: PartialKeyPath<Subject>,
       context: ObservationRegistrar.Context
     ) {
       entries[context.id, default: Entry(context)].insert(keyPath)
     }
-    
+
     internal mutating func merge(_ other: _AccessList) {
       entries.merge(other.entries) { existing, entry in
         existing.union(entry)
@@ -99,7 +99,7 @@ public struct ObservationTracking: Sendable {
         fatalError()
       }  
     }
-    
+
     tracking.install(values)
   }
 
@@ -120,10 +120,10 @@ public struct ObservationTracking: Sendable {
     var cancelled = false
     var changed: AnyKeyPath?
   }
-  
+
   private let state = _ManagedCriticalState(State())
   private let list: _AccessList
-  
+
   @_spi(SwiftUI)
   public init(_ list: _AccessList?) {
     self.list = list ?? _AccessList()

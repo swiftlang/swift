@@ -64,7 +64,7 @@ public struct UMA_Small<T>: ~Copyable {
 
 public struct Box<T : ~Copyable> : ~Copyable {
   public init(_ l: consuming T) {}
-      
+
   deinit {}
 }
 

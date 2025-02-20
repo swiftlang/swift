@@ -3,7 +3,7 @@
 // RUN: %target-swift-frontend %t/test.swift -I %t/Inputs -typecheck -enable-library-evolution -enable-experimental-cxx-interop -disable-availability-checking -disable-implicit-cxx-module-import -enable-experimental-feature AssumeResilientCxxTypes -verify
 
 // REQUIRES: swift_feature_AssumeResilientCxxTypes
- 
+
 //--- Inputs/module.modulemap
 module CxxModule {
     header "header.h"
@@ -37,7 +37,7 @@ __attribute__((swift_attr("release:immortal")))
 SingletonReference {
 public:
     SingletonReference(const SingletonReference &) = delete;
-    
+
     static SingletonReference * _Nonnull create();
 
     void method();
@@ -68,7 +68,7 @@ public typealias EnumT = CxxEnum
 
 extension CxxTemplateInt {
     func testInternal() {
-        
+
     }
 }
 

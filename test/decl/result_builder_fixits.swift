@@ -11,15 +11,15 @@ struct TupleBuilderWithoutIf { // expected-note 3{{struct 'TupleBuilderWithoutIf
   // expected-note@-2{{add 'buildEither(first:)' and 'buildEither(second:)' to the result builder 'TupleBuilderWithoutIf' to add support for 'if'-'else' and 'switch'}}{{31-31=\n    static func buildEither(first component: <#Component#>) -> <#Component#> {\n      <#code#>\n    \}\n\n    static func buildEither(second component: <#Component#>) -> <#Component#> {\n      <#code#>\n    \}}}
   // expected-note@-3{{add 'buildArray(_:)' to the result builder 'TupleBuilderWithoutIf' to add support for 'for'..'in' loops}}{{31-31=\n    static func buildArray(_ components: [<#Component#>]) -> <#Component#> {\n      <#code#>\n    \}}}
   static func buildBlock() -> () { }
-  
+
   static func buildBlock<T1>(_ t1: T1) -> T1 {
     return t1
   }
-  
+
   static func buildBlock<T1, T2>(_ t1: T1, _ t2: T2) -> (T1, T2) {
     return (t1, t2)
   }
-  
+
   static func buildBlock<T1, T2, T3>(_ t1: T1, _ t2: T2, _ t3: T3)
       -> (T1, T2, T3) {
     return (t1, t2, t3)

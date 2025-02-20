@@ -230,7 +230,7 @@ public:
       return Alignment(Align);
     }
   };
-  
+
 private:
   SmallVector<Element, 8> Elements;
   bool ContainsAggregate;

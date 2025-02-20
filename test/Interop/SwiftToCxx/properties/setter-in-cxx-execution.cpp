@@ -23,7 +23,7 @@ int main() {
   smallStructWithProps.setComputedInt(45);
   assert(smallStructWithProps.getStoredInt() == 43);
   assert(smallStructWithProps.getComputedInt() == 45);
-    
+
   auto largeStructWithProps = smallStructWithProps.getLargeStructWithProps();
   assert(largeStructWithProps.getStoredSmallStruct().getX() == 0xFAE);
   largeStructWithProps.setStoredSmallStruct(createFirstSmallStruct(999));
@@ -38,7 +38,7 @@ int main() {
 
   smallStructWithProps.setLargeStructWithProps(largeStructWithProps);
 // CHECK: SET: LargeStruct(x1: 90, x2: 1, x3: 2, x4: 3, x5: 4, x6: 5), FirstSmallStruct(x: 999)
-    
+
   auto largeStruct = largeStructWithProps.getStoredLargeStruct();
   largeStruct.setX1(0);
   largeStruct.setX2(largeStruct.getX2() * 2);

@@ -24,7 +24,7 @@ class MyClass {
   @MyGlobalActor func funcOnGlobalActor() -> Int { return 0 }
   @MyOtherGlobalActor func funcOnOtherGlobalActor() -> Int { return 0 }
   func funcSync() -> Int { return 0 }
-  
+
   @MyGlobalActor func nonSenableFuncOnGlobalActor(arg: MyNonSendable) -> Int { return 0 }
   @MyOtherGlobalActor func nonSenableFuncOnOtherGlobalActor(arg: MyNonSendable) -> Int { return 0 }
 

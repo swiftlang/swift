@@ -38,7 +38,7 @@ func inoutToSharedConversions() {
   fooOW({ (x : __owned Int) in return Int(5) }) // '__owned'-to-'__owned' allowed
   fooOW({ (x : __shared Int) in return Int(5) }) // '__shared'-to-'__owned' allowed
   fooOW({ (x : inout Int) in return Int(5) }) // expected-error {{cannot convert value of type '(inout Int) -> Int' to expected argument type '(__owned Int) -> Int'}}
-  
+
   func fooIO<T, U>(_ f : (inout T) -> U) {}
   fooIO({ (x : inout Int) in return Int(5) }) // 'inout'-to-'inout' allowed
   fooIO({ (x : Int) in return Int(5) }) // expected-error {{cannot convert value of type '(Int) -> Int' to expected argument type '(inout Int) -> Int'}}
@@ -415,16 +415,16 @@ func r20789423() {
   class C {
     func f(_ value: Int) { }
   }
-  
+
   let p: C
   print(p.f(p)())  // expected-error {{cannot convert value of type 'C' to expected argument type 'Int'}}
   // expected-error@-1:11 {{cannot call value of non-function type '()'}}
-  
+
   let _f = { (v: Int) in
     print("a")
     return "hi"
   }
-  
+
 }
 
 /// In the example below, https://github.com/apple/swift/issues/45110 started

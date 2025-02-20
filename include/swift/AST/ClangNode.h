@@ -26,7 +26,7 @@ namespace clang {
 }
 
 namespace swift {
-  
+
 namespace detail {
   /// A wrapper to avoid having to import Clang headers. We can't just
   /// forward-declare their PointerLikeTypeTraits because we don't own
@@ -129,7 +129,7 @@ struct PointerLikeTypeTraits<swift::detail::ClangNodeBox<T>> {
   /// Note: We are relying on Clang nodes to be at least 4-byte aligned.
   enum { NumLowBitsAvailable = 2 };
 };
-  
+
 } // end namespace llvm
 
 #endif

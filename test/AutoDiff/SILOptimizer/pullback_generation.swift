@@ -10,7 +10,7 @@ import _Differentiation
 //===----------------------------------------------------------------------===//
 struct PiecewiseMaterializable: Differentiable, Equatable, AdditiveArithmetic {
     public typealias TangentVector = Self
-    
+
     var a: Float
     var b: Double
 }
@@ -141,11 +141,11 @@ struct A: Differentiable {
 
 struct B: Differentiable {
     var y: A
-    
+
     public init(a: A) {
         self.y = a
     }
-    
+
     @differentiable(reverse)
     public var x: Float {
         get { return self.y.x }

@@ -76,7 +76,7 @@ internal func _splitRandomAccessIndexRange<
 /// instance and adding elements one by one.
 public protocol CollectionBuilder {
   associatedtype Destination : Collection
-    
+
   associatedtype Element = Destination.Iterator.Element
 
   init()

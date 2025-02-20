@@ -37,7 +37,7 @@ __attribute__((swift_attr("release:immortal")))
 SingletonReference {
 public:
     SingletonReference(const SingletonReference &) = delete;
-    
+
     static SingletonReference * _Nonnull create();
 
     void method();
@@ -73,7 +73,7 @@ public typealias EnumT = CxxEnum
 extension CxxTemplateInt {
     // ok
     func testInternal() {
-        
+
     }
 }
 

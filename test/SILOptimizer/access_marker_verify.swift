@@ -76,7 +76,7 @@ class SuperHasInt {
 
 class SubHasInt : SuperHasInt {
   var j: Int
-  
+
   override init() {
     j = 4
     super.init()
@@ -657,7 +657,7 @@ struct GenericStructWithGetter<T> {
 
   struct Value {
     internal var val: Int
-    
+
     internal init(_ val: Int) { self.val = val }
   }
   var value : Value {

@@ -61,7 +61,7 @@ class Type;
 class TypeWalker;
 struct ExistentialLayout;
 enum class ResilienceExpansion : unsigned;
-  
+
 /// Type substitution mapping from substitutable types to their
 /// replacements.
 typedef llvm::DenseMap<SubstitutableType *, Type> TypeSubstitutionMap;
@@ -93,7 +93,7 @@ using GenericFunction = auto(CanType dependentType,
                              ProtocolDecl *conformedProtocol)
                             -> ProtocolConformanceRef;
 using LookupConformanceFn = llvm::function_ref<GenericFunction>;
-  
+
 /// Functor class suitable for use as a \c LookupConformanceFn to look up a
 /// conformance through a module.
 class LookUpConformanceInModule {
@@ -114,7 +114,7 @@ public:
                                     Type conformingReplacementType,
                                     ProtocolDecl *conformedProtocol) const;
 };
-  
+
 /// Flags that can be passed when substituting into a type.
 enum class SubstFlags {
   /// Map member types to their desugared witness type.
@@ -232,16 +232,16 @@ class Type {
   TypeBase *Ptr;
 public:
   /*implicit*/ Type(TypeBase *P = 0) : Ptr(P) {}
-  
+
   TypeBase *getPointer() const { return Ptr; }
-  
+
   bool isNull() const { return Ptr == 0; }
-  
+
   TypeBase *operator->() const {
     assert(Ptr && "Cannot dereference a null Type!");
     return Ptr;
   }
-  
+
   explicit operator bool() const { return Ptr != 0; }
 
   /// Walk this type.
@@ -538,7 +538,7 @@ public:
   CanType getReferenceStorageReferent() const {
     return getReferenceStorageReferentImpl(*this);
   }
-  
+
   CanType getWithoutSpecifierType() const {
     return getWithoutSpecifierTypeImpl(*this);
   }
@@ -670,7 +670,7 @@ namespace llvm {
   };
   template<> struct simplify_type< ::swift::Type>
     : public simplify_type<const ::swift::Type> {};
-  
+
   // Type hashes just like pointers.
   template<> struct DenseMapInfo<swift::Type> {
     static swift::Type getEmptyKey() {
@@ -710,7 +710,7 @@ namespace llvm {
     }
     enum { NumLowBitsAvailable = swift::TypeAlignInBits };
   };
-  
+
   template<>
   struct PointerLikeTypeTraits<swift::CanType> :
     public PointerLikeTypeTraits<swift::Type> {

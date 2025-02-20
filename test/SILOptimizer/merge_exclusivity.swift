@@ -300,7 +300,7 @@ public protocol WriteProt {
 
 public final class StreamClass {
     private var buffer: [UInt8]
-    
+
     public init() {
         self.buffer = []
     }
@@ -319,7 +319,7 @@ public final class StreamClass {
     public func writeEscaped(_ string: String) {
         writeEscaped(string: string.utf8)
     }
-    
+
     @inline(__always)
     public func writeEscaped<T: Collection>(
         string sequence: T
@@ -350,7 +350,7 @@ public func asWriteProt(_ string: String) -> WriteProt {
 
 private struct EscapedString: WriteProt {
     let value: String
-        
+
     @inline(__always)
     func writeTo(_ stream: StreamClass) {
         _ = toStream(stream, UInt8(ascii: "a"))

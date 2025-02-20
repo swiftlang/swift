@@ -17,7 +17,7 @@ struct Main {
 
     print("integers: \(42) \(-42) \(0xffffffff)")
     // CHECK: integers: 42 -42 4294967295
-    
+
     print("booleans: \(true) \(false)")
     // CHECK: booleans: true false
   }

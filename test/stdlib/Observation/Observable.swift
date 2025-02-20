@@ -267,15 +267,15 @@ extension Parent.Nested {}
 
 struct CowContainer {
   final class Contents { }
-  
+
   var contents = Contents()
-  
+
   mutating func mutate() {
     if !isKnownUniquelyReferenced(&contents) {
       contents = Contents()
     }
   }
-  
+
   var id: ObjectIdentifier {
     ObjectIdentifier(contents)
   }
@@ -292,30 +292,30 @@ struct Validator {
   @MainActor
   static func main() {
 
-    
+
     let suite = TestSuite("Observable")
 
     suite.test("only instantiate") {
       let test = MiddleNamePerson()
     }
-    
+
     suite.test("unobserved value changes") {
       let test = MiddleNamePerson()
       for i in 0..<100 {
         test.firstName = "\(i)"
       }
     }
-    
+
     suite.test("tracking changes") {
       let changed = CapturedState(state: false)
-      
+
       let test = MiddleNamePerson()
       withObservationTracking {
         _blackHole(test.firstName)
       } onChange: {
         changed.state = true
       }
-      
+
       test.firstName = "c"
       expectEqual(changed.state, true)
       changed.state = false
@@ -327,49 +327,49 @@ struct Validator {
       func testConformance<O: Observable>(_ o: O) -> Bool {
         return true
       }
-      
+
       func testConformance<O>(_ o: O) -> Bool {
         return false
       }
-      
+
       let test = Person()
       expectEqual(testConformance(test), true)
     }
-    
+
     suite.test("tracking nonchanged") {
       let changed = CapturedState(state: false)
-      
+
       let test = MiddleNamePerson()
       withObservationTracking {
         _blackHole(test.lastName)
       } onChange: {
         changed.state = true
       }
-      
+
       test.firstName = "c"
       expectEqual(changed.state, false)
     }
-    
+
     suite.test("tracking computed") {
       let changed = CapturedState(state: false)
-      
+
       let test = MiddleNamePerson()
       withObservationTracking {
         _blackHole(test.fullName)
       } onChange: {
         changed.state = true
       }
-      
+
       test.middleName = "c"
       expectEqual(changed.state, true)
       changed.state = false
       test.middleName = "c"
       expectEqual(changed.state, false)
     }
-    
+
     suite.test("graph changes") {
       let changed = CapturedState(state: false)
-      
+
       let test = MiddleNamePerson()
       let friend = MiddleNamePerson()
       test.friends.append(friend)
@@ -384,11 +384,11 @@ struct Validator {
       friend.middleName = "c"
       expectEqual(changed.state, true)
     }
-    
+
     suite.test("nesting") {
       let changedOuter = CapturedState(state: false)
       let changedInner = CapturedState(state: false)
-      
+
       let test = MiddleNamePerson()
       withObservationTracking {
         withObservationTracking {
@@ -399,7 +399,7 @@ struct Validator {
       } onChange: {
         changedOuter.state = true
       }
-      
+
       test.firstName = "c"
       expectEqual(changedInner.state, true)
       expectEqual(changedOuter.state, true)
@@ -407,7 +407,7 @@ struct Validator {
       test.firstName = "c"
       expectEqual(changedOuter.state, false)
     }
-    
+
     suite.test("access and mutation") {
       let accessKeyPath = CapturedState<PartialKeyPath<ImplementsAccessAndMutation>?>(state: nil)
       let mutationKeyPath = CapturedState<PartialKeyPath<ImplementsAccessAndMutation>?>(state: nil)
@@ -416,7 +416,7 @@ struct Validator {
       } withMutationCalled: { keyPath in
         mutationKeyPath.state = keyPath
       }
-      
+
       expectEqual(accessKeyPath.state, nil)
       _blackHole(test.field)
       expectEqual(accessKeyPath.state, \.field)
@@ -426,27 +426,27 @@ struct Validator {
       expectEqual(accessKeyPath.state, nil)
       expectEqual(mutationKeyPath.state, \.field)
     }
-    
+
     suite.test("ignores no change") {
       let changed = CapturedState(state: false)
-      
+
       let test = HasIgnoredProperty()
       withObservationTracking {
         _blackHole(test.ignored)
       } onChange: {
         changed.state = true
       }
-      
+
       test.ignored = 122112
       expectEqual(changed.state, false)
       changed.state = false
       test.field = 3429
       expectEqual(changed.state, false)
     }
-    
+
     suite.test("ignores change") {
       let changed = CapturedState(state: false)
-      
+
       let test = HasIgnoredProperty()
       withObservationTracking {
         _blackHole(test.ignored)
@@ -454,7 +454,7 @@ struct Validator {
       } onChange: {
         changed.state = true
       }
-      
+
       test.ignored = 122112
       expectEqual(changed.state, false)
       changed.state = false
@@ -464,14 +464,14 @@ struct Validator {
 
     suite.test("isolated class") { @MainActor in
       let changed = CapturedState(state: false)
-      
+
       let test = IsolatedClass()
       withObservationTracking {
         _blackHole(test.test)
       } onChange: {
         changed.state = true
       }
-      
+
       test.test = "c"
       expectEqual(changed.state, true)
       changed.state = false
@@ -502,7 +502,7 @@ struct Validator {
       expectEqual(obj.innerEventCount, 2)
       expectEqual(obj.outerEventCount, 2)
     }
-    
+
     suite.test("validate copy on write semantics") {
       let subject = CowTest()
       let startId = subject.container.id

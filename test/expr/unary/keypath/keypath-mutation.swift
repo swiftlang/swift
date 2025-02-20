@@ -18,7 +18,7 @@ func referenceSetting<Root, Value>(_ kp: ReferenceWritableKeyPath<Root, Value>, 
   // expected-warning@+1 {{was never mutated}}
   var copy = root
   copy[keyPath: kp] = value
-  
+
   // Should not warn about lack of use of `immCopy`
   let immCopy = root
   immCopy[keyPath: kp] = value

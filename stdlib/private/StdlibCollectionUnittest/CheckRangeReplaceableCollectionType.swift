@@ -14,38 +14,38 @@ import StdlibUnittest
 
 // A minimal RRC conformance, to test default implementations with
 public struct NaiveRRC : RangeReplaceableCollection, ExpressibleByArrayLiteral {
-  
+
   // we're trying to move away from calling reserveCapacity inside most mutating
   // methods, this will let us verify that we don't
   internal var allowReserveCapacity = true
   var storage:[Int] = []
-  
+
   public init() {}
-  
+
   public init(arrayLiteral elements: Element...) {
     storage.append(contentsOf: elements)
   }
-  
+
   public func index(after i: Int) -> Int {
     i + 1
   }
-  
+
   public func index(before i: Int) -> Int {
     i - 1
   }
-  
+
   public var startIndex: Int {
     0
   }
-  
+
   public var endIndex: Int {
     count
   }
-  
+
   public var count: Int {
     storage.count
   }
-  
+
   public subscript(position: Int) -> Int {
     get {
       storage[position]
@@ -54,11 +54,11 @@ public struct NaiveRRC : RangeReplaceableCollection, ExpressibleByArrayLiteral {
       storage[position] = newValue
     }
   }
-  
+
   public mutating func replaceSubrange(_ subrange: Range<Int>, with newElements: some Collection<Int>) {
     storage.replaceSubrange(subrange, with: newElements)
   }
-  
+
   public mutating func reserveCapacity(_ n: Int) {
     precondition(allowReserveCapacity)
     storage.reserveCapacity(n)
@@ -404,7 +404,7 @@ let appendContentsOfTests: [AppendContentsOfTest] = [
     collection: [1010, 2020, 3030, 4040],
     newElements: [5050, 6060, 7070, 8080],
     expected: [1010, 2020, 3030, 4040, 5050, 6060, 7070, 8080]),
-  
+
   // NaiveRRC doesn't implement withContiguousStorageIfAvailable, so this tests discontiguous appendees
   AppendContentsOfTest(
     collection: [] as NaiveRRC,
@@ -440,7 +440,7 @@ let appendContentsOfTests: [AppendContentsOfTest] = [
     collection: [1010, 2020, 3030, 4040] as NaiveRRC,
     newElements: [5050, 6060, 7070, 8080] as NaiveRRC,
     expected: [1010, 2020, 3030, 4040, 5050, 6060, 7070, 8080] as NaiveRRC),
-  
+
   // Here we use Array to catch the contiguous cases
   AppendContentsOfTest(
     collection: [] as NaiveRRC,
@@ -567,7 +567,7 @@ public let replaceRangeTests: [ReplaceSubrangeTest] = [
     rangeSelection: .offsets(1, 2),
     expected: [1010, 8080, 9090, 3030],
     closedExpected: [1010, 8080, 9090]),
-  
+
   //replaceSubrange is the protocol requirement, so we don't test NaiveRRC here
 ]
 
@@ -611,7 +611,7 @@ public let removeRangeTests: [RemoveSubrangeTest] = [
     collection: [1010, 2020, 3030, 4040, 5050, 6060],
     rangeSelection: .middle,
     expected: [1010, 6060]),
-  
+
   RemoveSubrangeTest(
     collection: [] as NaiveRRC,
     rangeSelection: .emptyRange,

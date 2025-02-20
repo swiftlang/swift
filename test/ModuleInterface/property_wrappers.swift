@@ -20,7 +20,7 @@ public struct Wrapper<T> {
 @propertyWrapper
 public struct WrapperWithInitialValue<T> {
   private var value: T
-  
+
   public var wrappedValue: T {
     get { value }
     set { value = newValue }

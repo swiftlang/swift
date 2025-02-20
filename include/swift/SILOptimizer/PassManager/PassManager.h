@@ -114,7 +114,7 @@ public:
   ~SwiftPassInvocation();
 
   SILPassManager *getPassManager() const { return passManager; }
-  
+
   SILTransform *getTransform() const { return transform; }
 
   SILFunction *getFunction() const { return function; }
@@ -162,7 +162,7 @@ public:
 
   /// Called by the SILCombiner when the instruction pass has finished.
   void finishedInstructionPassRun();
-  
+
   void beginTransformFunction(SILFunction *function);
 
   void endTransformFunction();
@@ -253,7 +253,7 @@ class SILPassManager {
   /// the pass doesn't need to run, because nothing has changed since the
   /// previous run of that pass.
   typedef std::bitset<(size_t)PassKind::AllPasses_Last + 1> CompletedPasses;
-  
+
   /// A completed-passes mask for each function.
   llvm::DenseMap<SILFunction *, CompletedPasses> CompletedPassesMap;
 
@@ -371,7 +371,7 @@ public:
     for (auto AP : Analyses)
       if (!AP->isLocked())
         AP->invalidate(F, K);
-    
+
     CurrentPassHasInvalidated = true;
     // Any change let all passes run again.
     CompletedPassesMap[F].reset();

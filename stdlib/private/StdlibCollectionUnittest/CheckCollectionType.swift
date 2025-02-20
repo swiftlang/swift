@@ -116,7 +116,7 @@ public struct FindLastTest {
   public let element: MinimalEquatableValue
   public let sequence: [MinimalEquatableValue]
   public let loc: SourceLoc
-  
+
   public init(
     expected: Int?, comparisons: Int, element: Int, sequence: [Int],
     file: String = #file, line: UInt = #line
@@ -332,7 +332,7 @@ let findLastTests = [
     comparisons: 0,
     element: 42,
     sequence: []),
-  
+
   FindLastTest(
     expected: nil,
     comparisons: 1,
@@ -343,7 +343,7 @@ let findLastTests = [
     comparisons: 1,
     element: 1010,
     sequence: [ 1010 ]),
-  
+
   FindLastTest(
     expected: nil,
     comparisons: 2,
@@ -354,7 +354,7 @@ let findLastTests = [
     comparisons: 1,
     element: 1010,
     sequence: [ 1010, 1010 ]),
-  
+
   FindLastTest(
     expected: nil,
     comparisons: 4,
@@ -380,7 +380,7 @@ let findLastTests = [
     comparisons: 1,
     element: 4040,
     sequence: [ 1010, 2020, 3030, 4040 ]),
-  
+
   FindLastTest(
     expected: 3,
     comparisons: 2,

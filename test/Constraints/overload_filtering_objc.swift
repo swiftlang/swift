@@ -14,7 +14,7 @@ import Foundation
 
   @objc optional func opt(_ i: Int) -> Int
   @objc optional func opt(double: Double) -> Int
-  
+
   subscript(i: Int) -> String { get }
 }
 

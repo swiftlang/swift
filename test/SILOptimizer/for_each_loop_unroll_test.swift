@@ -29,7 +29,7 @@ func unrollLetArrayLiteralWithVariableElements(x: Int64, y: Int64) {
   // CHECK: [[STACK:%[0-9]+]] = alloc_stack $Int64
   // CHECK: store %0 to [[STACK]]
   // CHECK: try_apply %{{.*}}([[STACK]]) : {{.*}}, normal [[NORMAL:bb[0-9]+]], error [[ERROR:bb[0-9]+]]
-  
+
   // CHECK: [[NORMAL]](%{{.*}} : $()):
   // CHECK: store %1 to [[STACK]] : $*Int64
   // CHECK: try_apply {{.*}}([[STACK]])
@@ -42,7 +42,7 @@ func unrollLetArrayLiteralWithNonTrivialElements() {
   // CHECK: [[LIT1:%[0-9]+]] = string_literal utf8 "a"
   // CHECK: [[STRING_INIT:%[0-9]+]] = function_ref @$sSS21_builtinStringLiteral17utf8CodeUnitCount7isASCIISSBp_BwBi1_tcfC
   // CHECK: [[STRING1:%[0-9]+]] = apply [[STRING_INIT]]([[LIT1]],
-  
+
   // CHECK: [[LIT2:%[0-9]+]] = string_literal utf8 "aa"
   // CHECK: [[STRING_INIT2:%[0-9]+]] = function_ref @$sSS21_builtinStringLiteral17utf8CodeUnitCount7isASCIISSBp_BwBi1_tcfC
   // CHECK: [[STRING2:%[0-9]+]] = apply [[STRING_INIT2]]([[LIT2]],
@@ -51,7 +51,7 @@ func unrollLetArrayLiteralWithNonTrivialElements() {
   // CHECK: [[STACK:%[0-9]+]] = alloc_stack $String
   // CHECK: store [[STRING1]] to [[STACK]] : $*String
   // CHECK: try_apply %{{.*}}([[STACK]]) : {{.*}}, normal [[NORMAL:bb[0-9]+]], error [[ERROR:bb[0-9]+]]
-  
+
   // CHECK: [[NORMAL]](%{{.*}} : $()):
   // CHECK: store [[STRING2]] to [[STACK]] : $*String
   // CHECK: try_apply {{.*}}([[STACK]])
@@ -71,12 +71,12 @@ func unrollLetArrayLiteralWithClosures(i: Int32, j: Int32) {
   // CHECK: store [[CLOSURE1:%[0-9]+]] to [[STORAGEADDR]]
   // CHECK: [[INDEX1:%[0-9]+]] = index_addr [[STORAGEADDR]]
   // CHECK: store [[CLOSURE2:%[0-9]+]] to [[INDEX1]]
-  
+
   // CHECK-NOT: forEach
   // CHECK: [[STACK:%[0-9]+]] = alloc_stack
   // CHECK: store [[CLOSURE1]] to [[STACK]]
   // CHECK: try_apply %{{.*}}([[STACK]]) : ${{.*}}, normal [[NORMAL:bb[0-9]+]], error [[ERROR:bb[0-9]+]]
-  
+
   // CHECK: [[NORMAL]](%{{.*}} : $()):
   // CHECK: store [[CLOSURE2]] to [[STACK]]
   // CHECK: try_apply {{.*}}([[STACK]])

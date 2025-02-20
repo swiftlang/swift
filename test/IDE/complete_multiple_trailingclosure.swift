@@ -43,7 +43,7 @@ func testNonFuncArg() {
     // GLOBALFUNC3:     Begin completions, 2 items
     // GLOBALFUNC3-DAG: Decl[InstanceMethod]/CurrNominal:   .member()[#Void#]; name=member()
     // GLOBALFUNC3-DAG: Keyword[self]/CurrNominal: .self[#S#]; name=self
-    
+
     globalFunc3 {}
       .#^GLOBALFUNC3_DOT^#
     // GLOBALFUNC3_DOT:     Begin completions, 2 items

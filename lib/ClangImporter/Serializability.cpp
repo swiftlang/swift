@@ -268,7 +268,7 @@ ClangImporter::resolveStableSerializationPath(
       // Ignore unacceptable declarations.
       if (!isAcceptable(lookupDecl, step.first))
         continue;
-  
+
       // Bail out if we find multiple matching declarations.
       // TODO: make an effort to filter by the target module?
       if (resultDecl && !isSameDecl(resultDecl, lookupDecl))

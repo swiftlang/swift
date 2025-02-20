@@ -155,7 +155,7 @@ protected:
     other.Begin = other.End = other.EndOfAllocation = (char*) (&other + 1);
     assert(other.isAllocatedInline());
   }
-  
+
 public:
   /// Query whether the stack is empty.
   bool empty() const {

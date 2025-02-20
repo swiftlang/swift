@@ -341,7 +341,7 @@ ArrayAutoDiffTests.test("Array.+") {
   }
   let v = FloatArrayTan([4, -5, 6])
   expectEqual(v, pullback(at: [1, 2, 3], of: identity)(v))
-  
+
   let v1: [Float] = [1, 1]
   let v2: [Float] = [1, 1, 1]
   expectEqual((.zero, .zero), pullback(at: v1, v2, of: +)(.zero))

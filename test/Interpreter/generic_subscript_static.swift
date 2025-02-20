@@ -146,14 +146,14 @@ class EchoBase<T: SignedNumeric> {
       return "EchoBase.Type.subscript(a: \(a))"
     }
   }
-  
+
   // In EchoDerived, subscript(b:) will be overridden with a super call.
   class subscript(b b: T) -> String {
     get {
       return "EchoBase.Type.subscript(b: \(b))"
     }
   }
-  
+
   // In EchoDerived, subscript(c:) will not be overridden.
   class subscript(c c: T) -> String {
     get {
@@ -168,13 +168,13 @@ class EchoDerived<T: SignedNumeric>: EchoBase<T> {
       return  "EchoDerived.Type.subscript(a: \(a))"
     }
   }
-  
+
   override class subscript(b b: T) -> String {
     get {
       return "\(super[b: -b]) EchoDerived.Type.subscript(b: \(b))"
     }
   }
-  
+
   class subscript(d d: T) -> String {
     return  "EchoDerived.Type.subscript(d: \(d))"
   }
@@ -183,11 +183,11 @@ class EchoDerived<T: SignedNumeric>: EchoBase<T> {
 GenericSubscriptTestSuite.test("Overrides") {
   let base = EchoBase<Int>.self
   let derived = EchoDerived<Int>.self
-  
+
   expectEqual(base[a: 42], "EchoBase.Type.subscript(a: 42)")
   expectEqual(base[b: 42], "EchoBase.Type.subscript(b: 42)")
   expectEqual(base[c: 42], "EchoBase.Type.subscript(c: 42)")
-  
+
   expectEqual(derived[a: 42], "EchoDerived.Type.subscript(a: 42)")
   expectEqual(derived[b: 42], "EchoBase.Type.subscript(b: -42) EchoDerived.Type.subscript(b: 42)")
   expectEqual(derived[c: 42], "EchoBase.Type.subscript(c: 42)")

@@ -214,7 +214,7 @@ extension _StringGuts {
         return 1
       }
     }
-    
+
     return _opaqueComplexCharacterStride(startingAt: i)
   }
 
@@ -718,12 +718,12 @@ extension _GraphemeBreakingState {
     }
 
     let x = Unicode._GraphemeBreakProperty(from: scalar1)
-    
+
     // GB4 handled here because we don't need to know `y` for this case
     if x == .control {
       return true
     }
-    
+
     // This variable and the defer statement help toggle the isInEmojiSequence
     // state variable to false after every decision of 'shouldBreak'. If we
     // happen to see a rhs .extend or .zwj, then it's a signal that we should
@@ -737,7 +737,7 @@ extension _GraphemeBreakingState {
       isInEmojiSequence = enterEmojiSequence
       isInIndicSequence = enterIndicSequence
     }
-    
+
     let y = Unicode._GraphemeBreakProperty(from: scalar2)
 
     switch (x, y) {

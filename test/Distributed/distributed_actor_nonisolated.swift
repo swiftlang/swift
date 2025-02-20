@@ -32,7 +32,7 @@ distributed actor DA {
   nonisolated func access() async throws {
     _ = self.id // ok
     _ = self.actorSystem // ok
-    
+
     // self is a distributed actor self is NOT isolated
     _ = self.local // expected-error{{distributed actor-isolated property 'local' can not be accessed from a nonisolated context}}
     _ = try await self.dist() // ok, was made implicitly throwing and async

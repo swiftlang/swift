@@ -55,7 +55,7 @@ public struct AsyncDropFirstSequence<Base: AsyncSequence> {
 
   @usableFromInline
   let count: Int
-  
+
   @usableFromInline 
   init(_ base: Base, dropping count: Int) {
     self.base = base
@@ -83,7 +83,7 @@ extension AsyncDropFirstSequence: AsyncSequence {
   public struct Iterator: AsyncIteratorProtocol {
     @usableFromInline
     var baseIterator: Base.AsyncIterator
-    
+
     @usableFromInline
     var count: Int
 

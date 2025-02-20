@@ -330,7 +330,7 @@ do {
       // expected-error@-1 {{'where' clause in pack iteration is not supported}}
     }
   }
-  
+
   func nested<each T, each U>(value: repeat each T, value1: repeat each U) {
     for e1 in repeat each value {
       for _ in [] {}

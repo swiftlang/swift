@@ -61,12 +61,12 @@ private class F2 : F1 {
 
   override func addToGraph() {
   }
-  
+
   @inline(never) 
   func test() {
     addConstraint()
   }
-  
+
 }
 
 private class F3 : F2 {

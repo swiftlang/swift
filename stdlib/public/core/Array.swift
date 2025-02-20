@@ -803,7 +803,7 @@ extension Array: RandomAccessCollection, MutableCollection {
       }
     }
   }
-  
+
   /// The number of elements in the array.
   @inlinable
   @_semantics("array.get_count")
@@ -1240,7 +1240,7 @@ extension Array: RangeReplaceableCollection {
                 count: _buffer.mutableCapacity - oldCount)
 
     var (remainder,writtenUpTo) = buf.initialize(from: newElements)
-    
+
     // trap on underflow from the sequence's underestimate:
     let writtenCount = buf.distance(from: buf.startIndex, to: writtenUpTo)
     _precondition(newElementsCount <= writtenCount, 

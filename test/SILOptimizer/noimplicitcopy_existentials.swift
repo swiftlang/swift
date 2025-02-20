@@ -16,7 +16,7 @@ protocol B {
 
 struct A: B {
     let a: Int
-    
+
     init(k: borrowing K) {
         self.a = k.a
     }

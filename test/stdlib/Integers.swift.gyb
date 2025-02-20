@@ -707,7 +707,7 @@ tests.test("words") {
   expectEqualSequence([UInt.max << 7], Int8.min.words)
   expectEqualSequence([UInt.max << 15], Int16.min.words)
   expectEqualSequence([UInt.max << 31], Int32.min.words)
-  
+
   expectEqualSequence([UInt.max], (-1 as Int).words)
   expectEqualSequence([UInt.max], (-1 as Int8).words)
   expectEqualSequence([UInt.max], (-1 as Int16).words)

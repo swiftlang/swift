@@ -116,7 +116,7 @@ public:
 
     // We want to look through type aliases here.
     type = type->getCanonicalType();
-    
+
     class TypeCaptureWalker : public TypeWalker {
       bool ObjC;
       std::function<void(Type)> Callback;
@@ -124,7 +124,7 @@ public:
       explicit TypeCaptureWalker(bool ObjC,
                                  std::function<void(Type)> callback)
         : ObjC(ObjC), Callback(std::move(callback)) {}
-    
+
       Action walkToTypePre(Type ty) override {
         Callback(ty);
         // Pseudogeneric classes don't use their generic parameters so we
@@ -589,7 +589,7 @@ public:
       if (E->getType()->isObjCExistentialType()
           || E->getType()->is<AnyMetatypeType>())
         return false;
-      
+
       // We also special case Any erasure in pseudogeneric contexts
       // not to rely on concrete type metadata by erasing from AnyObject
       // as a waypoint.
@@ -604,13 +604,13 @@ public:
       return true;
     }
 
-    
+
     // Converting an @objc metatype to AnyObject doesn't require type
     // metadata.
     if (isa<ClassMetatypeToObjectExpr>(E)
         || isa<ExistentialMetatypeToObjectExpr>(E))
       return false;
-    
+
     // Casting to an ObjC class doesn't require the metadata of its type
     // parameters, if any.
     if (auto cast = dyn_cast<CheckedCastExpr>(E)) {
@@ -626,7 +626,7 @@ public:
         }
       }
     }
-    
+
     // Assigning an object doesn't require type metadata.
     if (auto assignment = dyn_cast<AssignExpr>(E))
       return assignment->getSrc()->getType() &&

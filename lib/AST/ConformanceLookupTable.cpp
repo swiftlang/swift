@@ -178,7 +178,7 @@ void ConformanceLookupTable::forEachInStage(ConformanceStage stage,
 
   LastProcessedEntry &lastProcessed
     = LastProcessed[nominal][static_cast<unsigned>(stage)];
-  
+
   // Handle the nominal type.
   if (!lastProcessed.getInt()) {
     lastProcessed.setInt(true);
@@ -279,7 +279,7 @@ void ConformanceLookupTable::inheritConformances(ClassDecl *classDecl,
     // anyway.
     if (!protocols.insert(protocol).second)
       return;
-    
+
     // Add the inherited entry.
     (void)addProtocol(protocol, getSuperclassLoc(), 
                       ConformanceSource::forInherited(classDecl));
@@ -364,12 +364,12 @@ void ConformanceLookupTable::updateLookupTable(NominalTypeDecl *nominal,
         superclassDecl->ConformanceTable->updateLookupTable(
           superclassDecl,
           ConformanceStage::Resolved);
-        
+
         // Expand inherited conformances from all superclasses.
         // We may have circular inheritance in ill-formed classes, so keep an
         // eye out for that.
         auto circularSuperclass = superclassDecl->getSuperclassDecl();
-        
+
         do {
           forEachInStage(
               stage, superclassDecl,
@@ -413,7 +413,7 @@ void ConformanceLookupTable::updateLookupTable(NominalTypeDecl *nominal,
     // Expand inherited conformances so we have the complete set of
     // conformances.
     updateLookupTable(nominal, ConformanceStage::ExpandedImplied);
-    
+
     /// Determine whether any extensions were added that might require
     /// us to compute conformances again.
     bool anyChanged = false;
@@ -812,7 +812,7 @@ bool ConformanceLookupTable::resolveConformances(ProtocolDecl *protocol) {
         doneWithEntry = true;
         break;
       }
-    
+
       if (doneWithEntry)
         break;
     }
@@ -848,7 +848,7 @@ DeclContext *ConformanceLookupTable::getConformingContext(
     // If we had a circular dependency, the superclass may not exist.
     auto superclassDecl
       = classDecl->getSuperclassDecl();
-    
+
     if (!superclassDecl)
       return nullptr;
 
@@ -1304,7 +1304,7 @@ ConformanceLookupTable::getSatisfiedProtocolRequirementsForMember(
 void ConformanceLookupTable::dump() const {
   dump(llvm::errs());
 }
-  
+
 void ConformanceLookupTable::dump(raw_ostream &os) const {
   for (const auto &dcEntries : AllConformances) {
     os << "Conformances in context:\n";

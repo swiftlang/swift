@@ -63,7 +63,7 @@ public protocol RangeExpression<Bound> {
   func relative<C: Collection>(
     to collection: C
   ) -> Range<Bound> where C.Index == Bound
-  
+
   /// Returns a Boolean value indicating whether the given element is contained
   /// within the range expression.
   ///
@@ -490,7 +490,7 @@ extension Range: Encodable where Bound: Encodable {
 @frozen
 public struct PartialRangeUpTo<Bound: Comparable> {
   public let upperBound: Bound
-  
+
   @inlinable // trivial-implementation
   public init(_ upperBound: Bound) { self.upperBound = upperBound }
 }
@@ -501,7 +501,7 @@ extension PartialRangeUpTo: RangeExpression {
   where C.Index == Bound {
     return collection.startIndex..<self.upperBound
   }
-  
+
   @_transparent
   public func contains(_ element: Bound) -> Bool {
     return element < upperBound
@@ -548,7 +548,7 @@ extension PartialRangeUpTo: Encodable where Bound: Encodable {
 @frozen
 public struct PartialRangeThrough<Bound: Comparable> {  
   public let upperBound: Bound
-  
+
   @inlinable // trivial-implementation
   public init(_ upperBound: Bound) { self.upperBound = upperBound }
 }
@@ -947,7 +947,7 @@ extension Collection {
   -> SubSequence where R.Bound == Index {
     return self[r.relative(to: self)]
   }
-  
+
   @inlinable
   public subscript(x: UnboundedRange) -> SubSequence {
     return self[startIndex...]
@@ -1073,7 +1073,7 @@ extension Range {
     other.isEmpty ||
       (lowerBound <= other.lowerBound && upperBound >= other.upperBound)
   }
-  
+
   /// Returns a Boolean value indicating whether the given closed range is
   /// contained within this range.
   ///

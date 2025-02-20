@@ -42,7 +42,7 @@ namespace irgen {
   void emitExtractFunctionIsolation(IRGenFunction &IGF,
                                     llvm::Value *fnContext,
                                     Explosion &result);
-  
+
   /// Emit the block header into a block storage slot.
   void emitBlockHeader(IRGenFunction &IGF,
                        Address storage,

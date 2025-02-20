@@ -14,7 +14,7 @@ class A {
 
   init(double d: Double) { 
   }
-  
+
   convenience init(crazy : A) {
     self.init(int: 42)
   }

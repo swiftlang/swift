@@ -50,7 +50,7 @@ struct HasOperatorExclaim {
 
 struct HasOperatorEqualEqual {
   int value;
-  
+
   bool operator==(const HasOperatorEqualEqual &other) const {
     return value == other.value;
   }

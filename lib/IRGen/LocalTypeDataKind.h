@@ -36,9 +36,9 @@ public:
   using RawType = uintptr_t;
 private:
   RawType Value;
-  
+
   explicit LocalTypeDataKind(RawType Value) : Value(Value) {}
-  
+
   /// Magic values for special kinds of type metadata.  These should be
   /// small so that they should never conflict with a valid pointer.
   ///
@@ -68,9 +68,9 @@ private:
 
 public:
   LocalTypeDataKind() = default;
-  
+
   // The magic values are all odd and so do not collide with pointer values.
-  
+
   /// A reference to the formal type metadata.
   static LocalTypeDataKind forFormalTypeMetadata() {
     return LocalTypeDataKind(FormalTypeMetadata);
@@ -97,7 +97,7 @@ public:
   static LocalTypeDataKind forValueWitnessDiscriminator(ValueWitness witness) {
     return LocalTypeDataKind(ValueWitnessDiscriminatorBase + (unsigned)witness);
   }
-  
+
   /// A reference to the shape expression of a pack type.
   static LocalTypeDataKind forPackShapeExpression() {
     return LocalTypeDataKind(Shape);
@@ -197,7 +197,7 @@ public:
       return ProtocolConformanceRef(getConcreteProtocolConformance());
     }
   }
-  
+
   RawType getRawValue() const {
     return Value;
   }

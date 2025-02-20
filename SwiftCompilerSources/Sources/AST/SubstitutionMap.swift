@@ -24,7 +24,7 @@ public struct SubstitutionMap: CustomStringConvertible {
   public init(bridged: BridgedSubstitutionMap) {
     self.bridged = bridged
   }
-  
+
   public init() {
     self.bridged = BridgedSubstitutionMap()
   }

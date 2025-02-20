@@ -120,10 +120,10 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
 
         // Verify warn_unqualified_access uses.
         checkUnqualifiedAccessUse(DRE);
-        
+
         // Verify that special decls are eliminated.
         checkForDeclWithSpecialTypeCheckingSemantics(DRE);
-        
+
         // Verify that `unsafeBitCast` isn't misused.
         checkForSuspiciousBitCasts(DRE, nullptr);
       }
@@ -144,7 +144,7 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
       if (auto *Call = dyn_cast<ApplyExpr>(E)) {
         // Warn about surprising implicit optional promotions.
         checkOptionalPromotions(Call);
-        
+
         // Check the callee, looking through implicit conversions.
         auto base = Call->getFn();
         unsigned uncurryLevel = 0;
@@ -216,7 +216,7 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
           }
         }
       }
-      
+
       // If we have an assignment expression, scout ahead for acceptable _'s.
       if (auto *AE = dyn_cast<AssignExpr>(E)) {
         auto destExpr = AE->getDest();
@@ -292,7 +292,7 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
         // Diagnose tuple expressions with duplicate element label.
         diagnoseDuplicateLabels(tupleExpr->getLoc(),
                                 tupleExpr->getElementNames());
-                                
+
         // Diagnose attempts to form a tuple with any noncopyable elements.
         if (E->getType()->isNoncopyable()
             && !Ctx.LangOpts.hasFeature(Feature::MoveOnlyTuples)) {
@@ -855,7 +855,7 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
           .fixItInsert(DRE->getStartLoc(), namePlusDot);
       }
     }
-    
+
     void checkForDeclWithSpecialTypeCheckingSemantics(const DeclRefExpr *DRE) {
       // Referencing type(of:) and other decls with special type-checking
       // behavior as functions is not implemented. Maybe we could wrap up the
@@ -866,7 +866,7 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
                            DRE->getDecl()->getBaseIdentifier());
       }
     }
-    
+
     enum BitcastableNumberKind {
       BNK_None = 0,
       BNK_Int8,
@@ -900,23 +900,23 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
       MATCH_DECL(Float)
       MATCH_DECL(Double)
 #undef MATCH_DECL
-      
+
       return BNK_None;
     }
-    
+
     static constexpr unsigned BNKPair(BitcastableNumberKind a,
                                       BitcastableNumberKind b) {
       return (a << 8) | b;
     }
-    
+
     void checkForSuspiciousBitCasts(DeclRefExpr *DRE,
                                     Expr *Parent = nullptr) {
       if (DRE->getDecl() != Ctx.getUnsafeBitCast())
         return;
-      
+
       if (DRE->getDeclRef().getSubstitutions().empty())
         return;
-      
+
       // Don't check the same use of unsafeBitCast twice.
       if (!AlreadyDiagnosedBitCasts.insert(DRE).second)
         return;
@@ -927,7 +927,7 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
 
       // Warn about `unsafeBitCast` formulations that are undefined behavior
       // or have better-defined alternative APIs that can be used instead.
-      
+
       // If we have a parent ApplyExpr that calls bitcast, extract the argument
       // for fixits.
       Expr *subExpr = nullptr;
@@ -946,7 +946,7 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
                        Lexer::getLocForEndOfToken(Ctx.SourceMgr,
                                                   apply->getEndLoc()));
       }
-  
+
       // Casting to the same type or a superclass is a no-op.
       if (toTy->isEqual(fromTy) ||
           toTy->isExactSuperclassOf(fromTy)) {
@@ -960,7 +960,7 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
         }
         return;
       }
-      
+
      if (auto fromFnTy = fromTy->getAs<FunctionType>()) {
         if (auto toFnTy = toTy->getAs<FunctionType>()) {
           // Casting a nonescaping function to escaping is UB.
@@ -979,7 +979,7 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
           return;
         }
       }
-      
+
       // Unchecked casting to a subclass is better done by unsafeDowncast.
       if (fromTy->isBindableToSuperclassOf(toTy)) {
         Ctx.Diags.diagnose(DRE->getLoc(), diag::bitcasting_to_downcast,
@@ -1016,13 +1016,13 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
               before = "UnsafeMutablePointer(mutating: ";
               after = ")";
               break;
-              
+
             case PTK_UnsafeRawPointer:
               // UnsafeRawPointer(pointer)
               before = "UnsafeRawPointer(";
               after = ")";
               break;
-              
+
             case PTK_UnsafeMutableRawPointer:
               // UnsafeMutableRawPointer(mutating: rawPointer)
               before = fromPTK == PTK_UnsafeMutablePointer
@@ -1040,7 +1040,7 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
           }
           return;
         }
-        
+
         // Casting to a different typed pointer type should use
         // withMemoryRebound.
         if (!isRawPointerKind(fromPTK) && !isRawPointerKind(toPTK)) {
@@ -1049,7 +1049,7 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
                              fromTy, toTy);
           return;
         }
-        
+
         // Casting a raw pointer to a typed pointer should bind the memory
         // (or assume it's already bound).
         assert(isRawPointerKind(fromPTK) && !isRawPointerKind(toPTK)
@@ -1091,7 +1091,7 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
         }
         return;
       }
-      
+
       StringRef replaceBefore, replaceAfter;
       std::optional<Diag<Type, Type>> diagID;
       SmallString<64> replaceBeforeBuf;
@@ -1123,7 +1123,7 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
           replaceBefore = replaceBeforeBuf;
           replaceAfter = ")";
           break;
-        
+
         // Combos that can be bitPattern-ed with a constructor and sign flip
         case BNKPair(BNK_Int32, BNK_Float):
         case BNKPair(BNK_Int64, BNK_Double):
@@ -1140,14 +1140,14 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
           replaceBefore = replaceBeforeBuf;
           replaceAfter = "))";
           break;
-        
+
         // Combos that can be bitPattern-ed with a property
         case BNKPair(BNK_Float, BNK_UInt32):
         case BNKPair(BNK_Double, BNK_UInt64):
           diagID = diag::bitcasting_for_number_bit_pattern_property;
           replaceAfter = ".bitPattern";
           break;
-        
+
         // Combos that can be bitPattern-ed with a property and sign flip
         case BNKPair(BNK_Float, BNK_Int32):
         case BNKPair(BNK_Double, BNK_Int64):
@@ -1174,12 +1174,12 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
             llvm::raw_svector_ostream os(replaceBeforeBuf);
             toTy->print(os);
             os << "(bitPattern: ";
-            
+
             if (fromBNK == BNK_Int)
               os << "Int";
             else
               os << "UInt";
-            
+
             if (toBNK == BNK_Float
                 || toBNK == BNK_Int32
                 || toBNK == BNK_UInt32)
@@ -1198,7 +1198,7 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
             llvm::raw_svector_ostream os(replaceBeforeBuf);
             toTy->print(os);
             os << "(bitPattern: UInt";
-            
+
             if (toBNK == BNK_Float
                 || toBNK == BNK_Int32
                 || toBNK == BNK_UInt32)
@@ -1209,7 +1209,7 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
           replaceBefore = replaceBeforeBuf;
           replaceAfter = ")))";
           break;
-    
+
         // Combos that can be bitPattern-ed then converted from a sized type
         // to (U)Int.
         case BNKPair(BNK_Int32, BNK_UInt):
@@ -1233,7 +1233,7 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
           replaceBefore = replaceBeforeBuf;
           replaceAfter = "))";
           break;
-        
+
         case BNKPair(BNK_Float, BNK_UInt):
         case BNKPair(BNK_Double, BNK_UInt):
           diagID = diag::bitcasting_for_number_bit_pattern_property;
@@ -1245,7 +1245,7 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
           replaceBefore = replaceBeforeBuf;
           replaceAfter = ".bitPattern)";
           break;
-          
+
         case BNKPair(BNK_Float, BNK_Int):
         case BNKPair(BNK_Double, BNK_Int):
           diagID = diag::bitcasting_for_number_bit_pattern_property;
@@ -1257,7 +1257,7 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
           replaceBefore = replaceBeforeBuf;
           replaceAfter = ".bitPattern))";
           break;
-        
+
         // Combos that should be done with a value-preserving initializer.
         case BNKPair(BNK_Int, BNK_Int32):
         case BNKPair(BNK_Int, BNK_Int64):
@@ -1276,13 +1276,13 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
           replaceBefore = replaceBeforeBuf;
           replaceAfter = ")";
           break;
-        
+
         default:
           // Leave other combos alone.
           break;
         }
       }
-      
+
       // Casting a pointer to an int or back should also use bitPattern
       // initializers.
       if (fromPointee && toBNK) {
@@ -1298,7 +1298,7 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
           replaceBefore = replaceBeforeBuf;
           replaceAfter = ")";
           break;
-          
+
         case BNK_UInt64:
         case BNK_UInt32:
         case BNK_Int64:
@@ -1316,7 +1316,7 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
           replaceBefore = replaceBeforeBuf;
           replaceAfter = "))";
           break;
-        
+
         default:
           break;
         }
@@ -1334,7 +1334,7 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
           replaceBefore = replaceBeforeBuf;
           replaceAfter = ")";
           break;
-          
+
         case BNK_UInt64:
         case BNK_UInt32:
         case BNK_Int64:
@@ -1357,7 +1357,7 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
           break;
         }
       }
-      
+
       if (diagID) {
         auto d = Ctx.Diags.diagnose(DRE->getLoc(), *diagID, fromTy, toTy);
         if (subExpr) {
@@ -1371,7 +1371,7 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
       }
 
     }
-    
+
     /// Return true if this is a 'nil' literal.  This looks
     /// like this if the type is Optional<T>:
     ///
@@ -1421,7 +1421,7 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
       auto DRE = dyn_cast<DeclRefExpr>(fnExpr);
       if (!DRE || !DRE->getDecl()->isOperator())
         return;
-      
+
       auto lhs = BE->getLHS();
       auto rhs = BE->getRHS();
       auto calleeName = DRE->getDecl()->getBaseName();
@@ -1439,7 +1439,7 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
                 Lexer::getLocForEndOfToken(Ctx.SourceMgr, rhs->getEndLoc()));
         return;
       }
-      
+
       if (calleeName == "==" || calleeName == "!=" ||
           calleeName == "===" || calleeName == "!==") {
         if (((subExpr = isImplicitPromotionToOptional(lhs)) &&
@@ -1448,7 +1448,7 @@ static void diagSyntacticUseRestrictions(const Expr *E, const DeclContext *DC,
              (subExpr = isImplicitPromotionToOptional(rhs)))) {
           bool isTrue = calleeName == "!=" || calleeName == "!==";
           bool isNilLiteral = isa<NilLiteralExpr>(lhs) || isa<NilLiteralExpr>(rhs);
-              
+
           Ctx.Diags.diagnose(DRE->getLoc(), diag::nonoptional_compare_to_nil,
                              subExpr->getType(), isNilLiteral, isTrue)
             .highlight(lhs->getSourceRange())
@@ -1584,7 +1584,7 @@ static void diagRecursivePropertyAccess(const Expr *E, const DeclContext *DC) {
 
       if (auto *AE = dyn_cast<AssignExpr>(E)) {
         subExpr = AE->getDest();
-        
+
         // If we couldn't flatten this expression, don't explode.
         if (!subExpr)
           return Action::Continue(E);
@@ -1623,7 +1623,7 @@ static void diagRecursivePropertyAccess(const Expr *E, const DeclContext *DC) {
                                  Var->getName(), Accessor->isSetter());
             }
           }
-          
+
           // If this is a direct store in a "willSet", we reject this because
           // it is about to get overwritten.
           if (isStore &&
@@ -1641,7 +1641,7 @@ static void diagRecursivePropertyAccess(const Expr *E, const DeclContext *DC) {
         if (MRE->getMember().getDecl() == Var &&
             isa<DeclRefExpr>(MRE->getBase()) &&
             isImplicitSelfUse(MRE->getBase())) {
-          
+
           if (MRE->getAccessSemantics() == AccessSemantics::Ordinary) {
             bool shouldDiagnose = false;
             // Warn about any property access in the getter.
@@ -2583,7 +2583,7 @@ static void diagnoseImplicitSelfUseInClosure(const Expr *E,
       DC = DC->getParent();
     }
   }
-  
+
   const_cast<Expr *>(E)->walk(DiagnoseWalker(ctx, ACE));
 }
 
@@ -2626,7 +2626,7 @@ bool TypeChecker::getDefaultGenericArgumentsString(
   llvm::interleave(typeDecl->getInnermostGenericParamTypes(),
                    printGenericParamSummary,
                    [&] { genericParamText << ", "; });
-  
+
   genericParamText << ">";
   return true;
 }
@@ -3181,10 +3181,10 @@ class VarDeclUsageChecker : public ASTWalker {
     RK_Defined     = 1,      ///< Whether it was ever defined in this scope.
     RK_Read        = 2,      ///< Whether it was ever read.
     RK_Written     = 4,      ///< Whether it was ever written or passed inout.
-    
+
     RK_CaptureList = 8       ///< Var is an entry in a capture list.
   };
-  
+
   /// These are all of the variables that we are tracking.  VarDecls get added
   /// to this when the declaration is seen.  We use a MapVector to keep the
   /// diagnostics emission in deterministic order.
@@ -3204,9 +3204,9 @@ class VarDeclUsageChecker : public ASTWalker {
 #ifndef NDEBUG
   llvm::SmallPtrSet<Expr*, 32> AllExprsSeen;
 #endif
-  
+
   bool sawError = false;
-  
+
   VarDeclUsageChecker(const VarDeclUsageChecker &) = delete;
   void operator=(const VarDeclUsageChecker &) = delete;
 
@@ -3242,18 +3242,18 @@ public:
     // If the variable is implicit, ignore it.
     if (VD->isImplicit() || VD->getLoc().isInvalid())
       return false;
-    
+
     // If the variable is computed, ignore it.
     if (!VD->hasStorage())
       return false;
-    
+
     // If the variable was invalid, ignore it and notice that the code is
     // malformed.
     if (VD->isInvalid()) {
       sawError = true;
       return false;
     }
-    
+
     // If the variable is already unnamed, ignore it.
     if (!VD->hasName() || VD->getName().str() == "_")
       return false;
@@ -3270,7 +3270,7 @@ public:
 
   void markBaseOfStorageUse(Expr *E, ConcreteDeclRef decl, unsigned flags);
   void markBaseOfStorageUse(Expr *E, bool isMutating);
-  
+
   void markStoredOrInOutExpr(Expr *E, unsigned Flags);
 
   MacroWalking getMacroWalkingBehavior() const override {
@@ -3379,7 +3379,7 @@ public:
         }
       }
     }
-    
+
     // A fallthrough dest case's bound variable means the source case's
     // var of the same name is read.
     if (auto *fallthroughStmt = dyn_cast<FallthroughStmt>(S)) {
@@ -3387,7 +3387,7 @@ public:
         SmallVector<VarDecl *, 4> sourceVars;
         auto sourcePattern = sourceCase->getCaseLabelItems()[0].getPattern();
         sourcePattern->collectVariables(sourceVars);
-        
+
         auto destCase = fallthroughStmt->getFallthroughDest();
         auto destPattern = destCase->getCaseLabelItems()[0].getPattern();
         destPattern->forEachVariable([&](VarDecl *V) {
@@ -3413,7 +3413,7 @@ public:
     return Action::Continue(S);
   }
 };
-  
+
 /// An AST walker that determines the underlying type of an opaque return decl
 /// from its associated function body.
 class OpaqueUnderlyingTypeChecker : public ASTWalker {
@@ -3995,12 +3995,12 @@ VarDeclUsageChecker::~VarDeclUsageChecker() {
       isWrittenLet = (access & RK_Written) != 0;
       access &= ~RK_Written;
     }
-    
+
     // If this variable has WeakStorageType, then it can be mutated in ways we
     // don't know.
     if (var->getInterfaceType()->is<WeakStorageType>())
       access |= RK_Written;
-    
+
     // Diagnose variables that were never used (other than their
     // initialization).
     //
@@ -4016,7 +4016,7 @@ VarDeclUsageChecker::~VarDeclUsageChecker() {
                        var->getName());
         continue;
       }
-      
+
       // If the source of the VarDecl is a trivial PatternBinding with only a
       // single binding, rewrite the whole thing into an assignment.
       //    let x = foo()
@@ -4139,7 +4139,7 @@ VarDeclUsageChecker::~VarDeclUsageChecker() {
           continue;
         }
       }
-      
+
       // Otherwise, this is something more complex, perhaps
       //    let (a,b) = foo()
       if (isUsedInInactive(var))
@@ -4158,7 +4158,7 @@ VarDeclUsageChecker::~VarDeclUsageChecker() {
       }
       continue;
     }
-    
+
     // If this is a mutable 'var', and it was never written to, suggest
     // upgrading to 'let'.
     if (var->getIntroducer() == VarDecl::Introducer::Var
@@ -4208,7 +4208,7 @@ VarDeclUsageChecker::~VarDeclUsageChecker() {
         continue;
       }
     }
-    
+
     // If this is a variable that was only written to, emit a warning.
     if ((access & RK_Read) == 0) {
       if (isUsedInInactive(var))
@@ -4283,22 +4283,22 @@ void VarDeclUsageChecker::markStoredOrInOutExpr(Expr *E, unsigned Flags) {
     sawError = true;
     return;
   }
-  
+
   // Ignore parens and other easy cases.
   E = E->getSemanticsProvidingExpr();
-  
+
   // If we found a decl that is being assigned to, then mark it.
   if (auto *DRE = dyn_cast<DeclRefExpr>(E)) {
     addMark(DRE->getDecl(), Flags);
     return;
   }
-  
+
   if (auto *TE = dyn_cast<TupleExpr>(E)) {
     for (auto &elt : TE->getElements())
       markStoredOrInOutExpr(elt, Flags);
     return;
   }
-  
+
   // If this is an assignment into a mutating subscript lvalue expr, then we
   // are mutating the base expression.  We also need to visit the index
   // expressions as loads though.
@@ -4308,7 +4308,7 @@ void VarDeclUsageChecker::markStoredOrInOutExpr(Expr *E, unsigned Flags) {
     markBaseOfStorageUse(SE->getBase(), SE->getDecl(), Flags);
     return;
   }
-  
+
   // Likewise for key path applications. An application of a WritableKeyPath
   // reads and writes its base; an application of a ReferenceWritableKeyPath
   // only reads its base; the other KeyPath types cannot be written at all.
@@ -4321,10 +4321,10 @@ void VarDeclUsageChecker::markStoredOrInOutExpr(Expr *E, unsigned Flags) {
     markBaseOfStorageUse(KPA->getBase(), isMutating);
     return;
   }
-  
+
   if (auto *ioe = dyn_cast<InOutExpr>(E))
     return markStoredOrInOutExpr(ioe->getSubExpr(), RK_Written|RK_Read);
-  
+
   if (auto *MRE = dyn_cast<MemberRefExpr>(E)) {
     markBaseOfStorageUse(MRE->getBase(), MRE->getMember(), Flags);
     return;
@@ -4332,7 +4332,7 @@ void VarDeclUsageChecker::markStoredOrInOutExpr(Expr *E, unsigned Flags) {
 
   if (auto *TEE = dyn_cast<TupleElementExpr>(E))
     return markStoredOrInOutExpr(TEE->getBase(), Flags);
-  
+
   if (auto *FVE = dyn_cast<ForceValueExpr>(E))
     return markStoredOrInOutExpr(FVE->getSubExpr(), Flags);
 
@@ -4403,19 +4403,19 @@ ASTWalker::PreWalkResult<Expr *> VarDeclUsageChecker::walkToExprPre(Expr *E) {
   // about.
   if (auto *assign = dyn_cast<AssignExpr>(E)) {
     markStoredOrInOutExpr(assign->getDest(), RK_Written);
-    
+
     // Don't walk into the LHS of the assignment, only the RHS.
     assign->getSrc()->walk(*this);
     return Action::SkipNode(E);
   }
-  
+
   // '&x' is a read and write of 'x'.
   if (auto *io = dyn_cast<InOutExpr>(E)) {
     markStoredOrInOutExpr(io->getSubExpr(), RK_Read|RK_Written);
     // Don't bother walking into this.
     return Action::SkipNode(E);
   }
-  
+
   // If we see an OpenExistentialExpr, remember the mapping for its OpaqueValue
   // and only walk the subexpr.
   if (auto *oee = dyn_cast<OpenExistentialExpr>(E)) {
@@ -4430,7 +4430,7 @@ ASTWalker::PreWalkResult<Expr *> VarDeclUsageChecker::walkToExprPre(Expr *E) {
       mapping->walk(*this);
     return Action::SkipNode(E);
   }
-  
+
   // If we saw an ErrorExpr, take note of this.
   if (isa<ErrorExpr>(E))
     sawError = true;
@@ -5075,7 +5075,7 @@ checkImplicitPromotionsInCondition(const StmtConditionElement &cond,
                                    ASTContext &ctx) {
   auto *p = cond.getPatternOrNull();
   if (!p) return;
-  
+
   if (auto *subExpr = isImplicitPromotionToOptional(cond.getInitializer())) {
     // If the subexpression was actually optional, then the pattern must be
     // checking for a type, which forced it to be promoted to a double optional
@@ -5429,7 +5429,7 @@ static void diagnoseUnintendedOptionalBehavior(const Expr *E,
       size_t optionalityDifference = 0;
       if (!isOptionalToAnyCoercion(srcType, destType, optionalityDifference))
         return;
-      
+
       // If we're implicitly unwrapping from IUO to Any then emit a custom
       // diagnostic
       if (hasImplicitlyUnwrappedResult(subExpr)) {
@@ -5450,7 +5450,7 @@ static void diagnoseUnintendedOptionalBehavior(const Expr *E,
                            /* from */ srcType, /* to */ destType)
             .highlight(subExpr->getSourceRange());
       }
-      
+
       if (optionalityDifference == 1) {
         Ctx.Diags.diagnose(subExpr->getLoc(), diag::default_optional_to_any)
             .highlight(subExpr->getSourceRange())
@@ -6096,7 +6096,7 @@ diagnoseDictionaryLiteralDuplicateKeyEntries(const Expr *E,
       }
       return "'" + out + "'";
     }
-    
+
     bool shouldDiagnoseLiteral(const LiteralExpr *LE) {
       switch (LE->getKind()) {
       case ExprKind::IntegerLiteral:
@@ -6157,7 +6157,7 @@ diagnoseDictionaryLiteralDuplicateKeyEntries(const Expr *E,
         auto *LE = dyn_cast<LiteralExpr>(keyExpr);
         if (!LE)
           continue;
-        
+
         if (!shouldDiagnoseLiteral(LE))
           continue;
 
@@ -6502,7 +6502,7 @@ TypeChecker::omitNeedlessWords(AbstractFunctionDecl *afd) {
     paramTypes.push_back(getTypeNameForOmission(param->getInterfaceType())
                          .withDefaultArgument(param->isDefaultArgument()));
   }
-  
+
   // Handle contextual type, result type, and returnsSelf.
   Type contextType = afd->getDeclContext()->getDeclaredInterfaceType();
   Type resultType;
